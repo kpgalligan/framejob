@@ -272,6 +272,14 @@ schema, §6 the op table, §7 the architecture.
   (0–100%) sets and animates how much of it applies. **Clip ▸ Look ▸** does
   the same from the menu, with a checkmark on the selection's look. A look
   is applied after Light and Color, on a video, image or adjustment clip.
+- **Imported LUTs** (the `grading` branch). A `.cube` 3D LUT is media: add
+  it with File ▸ Add Media…, a drop on the Media tab, or the Look section's
+  **Import LUT…** button, which also applies it to the selected clips in one
+  undo step. Each LUT gets a tile in the gallery's **Imported** group,
+  named after its file, with a thumbnail of the frame under it, and an item
+  in **Clip ▸ Look ▸** after the eight looks; it applies after Light and
+  Color like a look, with the same Amount row. A missing LUT file draws the
+  clip ungraded until it is relinked.
 - **Output.** **File ▸ Save Frame…** (⌥⌘E) writes the frame under the
   playhead as a PNG, JPEG or HEIC still — the same writer `render_frame`
   uses, so a still saved from the menu and one an agent asked for are the

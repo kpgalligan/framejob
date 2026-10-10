@@ -101,10 +101,12 @@ equivalent, and it duplicates the Audio section's button deliberately —
 a command reachable from a pane alone can be lost), Add Action, Speed…,
 Close Gap, Remove
 Silences…, Transition ▸, Motion ▸ (In ▸ / Out ▸ / During ▸, each the kinds
-and None; no key equivalent), Look ▸ (the eight looks, a separator, None — a
-checkmark on the kind every grading target carries, a dash on one only some
-carry; for the selected clips that take a grade, off when none do; no key
-equivalent; undo "Look"; §11 GR-7, the grading branch), Add Background ▸ (Solid Color · Image… — road map
+and None; no key equivalent), Look ▸ (the eight looks, a separator, then the
+project's `.cube` LUTs in media-list order and a second separator when there
+are any, then None — §11 GR-8 [b]; a LUT item is named by its file less
+`.cube`; a checkmark on the kind or LUT every grading target carries, a dash
+on one only some carry; for the selected clips that take a grade, off when
+none do; no key equivalent; undo "Look"; §11 GR-7, the grading branch), Add Background ▸ (Solid Color · Image… — road map
 2's phase 6c, a submenu rather than one dialog because the two are
 different commands: the colour takes no dialog at all and is re-coloured
 afterwards in the Shape section's Fill row, which is also how a

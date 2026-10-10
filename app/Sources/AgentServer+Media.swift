@@ -10,6 +10,8 @@ extension AgentServer {
 
     /// `import_media` — File ▸ Add Media… and every Finder drop
     /// (`ProjectDocument.importMedia`): probe the file, then `add_media`.
+    /// With `set_video {look: {kind: "lut", media}}` after it, it mirrors the
+    /// Look section's Import LUT… (`EditorViewController.importLUT`, GR-8).
     ///
     /// **Runs on the server thread** (`AgentServer.offMainTools`).
     /// `MediaImporter.probe`'s completion is delivered on the MAIN thread, so

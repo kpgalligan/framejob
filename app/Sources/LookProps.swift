@@ -61,29 +61,33 @@ struct LookProps: Codable, Equatable {
     }
 }
 
-/// What a look write SENDS: a kind, an amount, or both. A kind alone keeps
-/// each clip's amount (1 on a clip with none, the core's default); an amount
-/// alone is refused by the core on a clip with no look. Removing the look is
-/// `VideoPatch.look = .some(nil)`.
+/// What a look write SENDS: a kind, an amount, or both, and a LUT's `media`
+/// with kind `lut` (GR-8). A kind alone keeps each clip's amount (1 on a clip
+/// with none, the core's default); an amount alone is refused by the core on
+/// a clip with no look. Removing the look is `VideoPatch.look = .some(nil)`.
 struct LookPatch: Codable, Equatable {
     var kind: LookKind?
     var amount: Double?
+    var media: UInt32?
 
-    init(kind: LookKind? = nil, amount: Double? = nil) {
+    init(kind: LookKind? = nil, amount: Double? = nil, media: UInt32? = nil) {
         self.kind = kind
         self.amount = amount
+        self.media = media
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         kind = c.lenient(.kind)
         amount = c.lenient(.amount)
+        media = c.lenient(.media)
     }
 
     var dictionary: [String: Any] {
         var d: [String: Any] = [:]
         if let kind = kind { d["kind"] = kind.rawValue }
         if let amount = amount { d["amount"] = amount }
+        if let media = media { d["media"] = media }
         return d
     }
 }

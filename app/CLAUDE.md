@@ -814,7 +814,12 @@ the key map behind it.
   sub-tab (Light · Color · Look): the 3×3 gallery and an Amount row shown only
   when every clip has a look (GR-7; `LookGallery.swift` renders its
   thumbnails through `Exporter.renderFrame` at 256 px, 0.3 s after changes
-  settle and only while open; `LookGalleryView.swift` draws it); +`Transition`,
+  settle and only while open; `LookGalleryView.swift` draws it; under the grid
+  the Imported group, a tile per `.cube` LUT in media-list order, and Import
+  LUT…, which runs `add_media` and the look as ONE "Import LUT" edit, reusing a
+  listed file, GR-8; Clip ▸ Look ▸'s LUT rows are filled when it opens by
+  `LookMenuFiller` in `AppDelegate+ClipMenus.swift`; `-RCDevLookGalleryDump`
+  also writes `lut-<id>.png` and the manifest's `tiles`); +`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
@@ -2160,7 +2165,8 @@ free.
   (`devOffMainTools`), and every AppKit touch is an `onMain` hop.
 - `UIMenu.swift` — the menu tool's main-thread half. It walks the menu's
   leaves and looks up a path, validating each level first because a
-  validator may retitle an item. It holds the refusal, an ALLOW table where
+  validator may retitle an item, and filling each level by its delegate for
+  the named window first (`fillDynamic`: Clip ▸ Look ▸'s LUT rows). It holds the refusal, an ALLOW table where
   a selector with no row is `unclassified`, and the responder walk and
   validation, which never write `isEnabled`. An item's explicit target counts
   only when it answers the action; otherwise the item has no target and is

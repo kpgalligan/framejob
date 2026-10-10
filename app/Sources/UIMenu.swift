@@ -117,8 +117,20 @@ enum UIMenu {
         return .missing(at: [], titles: [])
     }
 
-    /// Runs every validator of one level, as AppKit does before it shows it.
+    /// Fills each level a delegate fills when it opens — Clip ▸ Look ▸'s LUT
+    /// rows (`LookMenuFiller`) — for the named window, as AppKit would for
+    /// the main one before it shows it.
+    static func fillDynamic(_ menu: NSMenu, window: NSWindow?) {
+        (menu.delegate as? LookMenuFiller)?.fill(menu, for: window)
+        for item in menu.items {
+            if let submenu = item.submenu { fillDynamic(submenu, window: window) }
+        }
+    }
+
+    /// Fills, then runs every validator of one level, as AppKit does before
+    /// it shows it.
     private static func validate(_ menu: NSMenu, window: NSWindow?) {
+        fillDynamic(menu, window: window)
         for item in menu.items where item.action != nil {
             _ = isEnabled(item, target: target(for: item, window: window))
         }
@@ -196,6 +208,7 @@ enum UIMenu {
     /// and refusal.
     static func listing(window: NSWindow?) -> [[String: Any]] {
         guard let main = NSApp.mainMenu else { return [] }
+        fillDynamic(main, window: window)
         var enabled: [ObjectIdentifier: Bool] = [:]
         for leaf in leaves(of: main) where leaf.item.action != nil {
             let item = leaf.item

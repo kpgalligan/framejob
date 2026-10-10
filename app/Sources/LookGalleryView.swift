@@ -2,7 +2,9 @@ import AppKit
 
 /// The Look section's gallery (spec §11 GR-7 [b]): a 3×3 grid of tiles —
 /// None, then the eight looks in `LookGallery.tiles` order — each a thumbnail
-/// with its name beneath, the kind every target shares outlined in the accent.
+/// with its name beneath, the kind every target shares outlined in the accent;
+/// under it the Imported group, a tile per `.cube` LUT in rows of three (spec
+/// §11 GR-8 [b]), then the Import LUT… button.
 ///
 /// An `OptionControl`, so the section's `refresh()` reaches it like any row:
 /// each refresh hands the model the selection and whether the gallery is OPEN —
@@ -13,15 +15,29 @@ import AppKit
 /// overwrites on every build.
 final class LookGalleryView: NSView, OptionControl {
     let tiles: [LookTileButton]
+    let lutTiles: [LookTileButton]
+    let importButton: NSButton
     private let gallery: LookGallery
     private let binding: InspectorBinding
     private let onPick: (LookKind?) -> Void
+    private let onPickLUT: (UInt32) -> Void
+    private let onImport: () -> Void
 
-    init(gallery: LookGallery, binding: InspectorBinding, onPick: @escaping (LookKind?) -> Void) {
+    init(
+        gallery: LookGallery, binding: InspectorBinding, onPick: @escaping (LookKind?) -> Void,
+        onPickLUT: @escaping (UInt32) -> Void, onImport: @escaping () -> Void
+    ) {
         self.gallery = gallery
         self.binding = binding
         self.onPick = onPick
+        self.onPickLUT = onPickLUT
+        self.onImport = onImport
         tiles = LookGallery.tiles.map { LookTileButton(kind: $0) }
+        lutTiles = LookGallery.luts(in: binding.snapshot).map {
+            LookTileButton(kind: .lut, lut: $0)
+        }
+        importButton = StickerButton(
+            title: "Import LUT…", style: .secondary, target: nil, action: nil)
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         let grid = NSStackView()
@@ -45,7 +61,34 @@ final class LookGalleryView: NSView, OptionControl {
             grid.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: grid.widthAnchor).isActive = true
         }
-        for tile in tiles {
+        if let first = tiles.first, !lutTiles.isEmpty {
+            let label = NSTextField(labelWithString: "Imported")
+            label.font = DS.sans(10)
+            label.textColor = DS.textMuted
+            grid.addArrangedSubview(label)
+            // Each LUT tile is a built-in tile's width, so a short last row
+            // keeps third-width tiles.
+            for start in stride(from: 0, to: lutTiles.count, by: 3) {
+                let row = NSStackView(
+                    views: Array(lutTiles[start..<min(start + 3, lutTiles.count)]))
+                row.orientation = .horizontal
+                row.distribution = .fill
+                row.alignment = .top
+                row.spacing = 6
+                grid.addArrangedSubview(row)
+            }
+            for tile in lutTiles {
+                tile.widthAnchor.constraint(equalTo: first.widthAnchor).isActive = true
+            }
+        }
+        // The house square block (sharp pass), at the inspector's control height.
+        importButton.font = DS.sans(11)
+        importButton.heightAnchor.constraint(equalToConstant: DS.controlHeight).isActive = true
+        importButton.toolTip = "Import a .cube file and apply it to the selected clips"
+        importButton.target = self
+        importButton.action = #selector(importPicked(_:))
+        grid.addArrangedSubview(importButton)
+        for tile in tiles + lutTiles {
             tile.target = self
             tile.action = #selector(tilePicked(_:))
         }
@@ -73,12 +116,19 @@ final class LookGalleryView: NSView, OptionControl {
         for tile in tiles {
             tile.isOutlined = shared.map { $0 == tile.kind } ?? false
         }
+        for tile in lutTiles {
+            tile.isOutlined = !targets.isEmpty && targets.allSatisfy {
+                $0.videoProps.look?.kind == .lut && $0.videoProps.look?.media == tile.media
+            }
+        }
+        importButton.isEnabled = !targets.isEmpty
     }
 
     /// The model's thumbnails, onto the tiles.
     func showThumbnails() {
         guard gallery.view === self else { return }
         for (tile, image) in zip(tiles, gallery.thumbnails) { tile.thumbnail = image }
+        for tile in lutTiles { tile.thumbnail = tile.media.flatMap { gallery.lutThumbnails[$0] } }
     }
 
     override func viewDidMoveToWindow() {
@@ -97,14 +147,20 @@ final class LookGalleryView: NSView, OptionControl {
     }
 
     @objc private func tilePicked(_ sender: LookTileButton) {
-        onPick(sender.kind)
+        if let media = sender.media { onPickLUT(media) } else { onPick(sender.kind) }
+    }
+
+    @objc private func importPicked(_ sender: Any?) {
+        onImport()
     }
 }
 
 /// One tile: a well holding the thumbnail, aspect-fit, and the look's name
-/// beneath; outlined in the accent when every target carries its kind.
+/// beneath; outlined in the accent when every target carries its kind. A LUT's
+/// tile (`lut`) is kind `lut`, its `media` the LUT's id, its name the file's.
 final class LookTileButton: NSButton {
     let kind: LookKind?
+    let media: UInt32?
     var isOutlined = false {
         didSet { if isOutlined != oldValue { needsDisplay = true } }
     }
@@ -114,9 +170,10 @@ final class LookTileButton: NSButton {
     private let well = NSView()
     private let name: NSTextField
 
-    init(kind: LookKind?) {
+    init(kind: LookKind?, lut: MediaSnapshot? = nil) {
         self.kind = kind
-        let title = kind?.displayName ?? "None"
+        media = lut?.id
+        let title = lut.map(LookGallery.lutName) ?? kind?.displayName ?? "None"
         name = NSTextField(labelWithString: title)
         super.init(frame: .zero)
         self.title = ""

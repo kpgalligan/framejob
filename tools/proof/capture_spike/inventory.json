@@ -1019,6 +1019,13 @@
    ],
    "other_caller": ""
   },
+  "app/Sources/EditorViewController+Look.swift:61": {
+   "token": "beginSheetModal",
+   "func": "importLUT",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/VideoPane+Look.swift `self?.inspector?.onCommand?(#selector(EditorViewController.importLUT(_:)))` — the Look section's Import LUT… button (spec §11 GR-8 [b]); no menu item"
+  },
   "app/Sources/EditorViewController+Inspector.swift:283": {
    "token": "beginSheetModal",
    "func": "presentNoFootageForTransition",

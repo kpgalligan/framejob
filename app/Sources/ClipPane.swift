@@ -89,6 +89,9 @@ final class ClipPane: InspectorPaneView {
             matteNote == nil ? "-" : "matte",
             // Whether every clip has a look adds or removes Look's Amount row.
             videoPane.allLooked ? "look" : "-",
+            // The LUTs are the Look gallery's Imported tiles (GR-8 [b]).
+            LookGallery.luts(in: binding.snapshot).map { "\($0.id)=\(LookGallery.lutName($0))" }
+                .joined(separator: ","),
         ].joined(separator: "|")
     }
 

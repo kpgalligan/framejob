@@ -132,6 +132,12 @@ Built by `screens.py` on the first screen that names one, into
   holding `video` — `media/speech.mov` at 0 with the look `{teal_orange, 0.8}`
   — so the Look section outlines Teal & Orange and shows its Amount row at 80%.
   Ready once `video`'s peaks are cached.
+- `lut` — `Lut.reelcut` (grading GR6b, spec §11 GR-8 [b]): `look`'s one track,
+  "Video", holding `video` — `media/speech.mov` at 0 — then two size-2 `.cube`
+  files the script writes into the fixtures folder, "Warm Print.cube" and
+  "Bleach.cube", imported in that order after it, and the clip's look `{lut,
+  Warm Print, 0.8}` — so the Look section shows an Imported group of two tiles
+  with Warm Print outlined. Ready once `video`'s peaks are cached.
 
 ## Adding a screen
 

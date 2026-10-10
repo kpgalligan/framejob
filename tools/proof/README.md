@@ -18273,7 +18273,7 @@ as it calls `lut.rs`'s `evaluates_as_look`. K1 expects the eight and `lut`
 
 **Its record**: `designs/grading.md`'s GR5a and GR5b sections.
 
-## Road map grading — GR6a, `.cube` LUTs end to end over MCP (`lut_proof.py` T0, I1, R1, R2, N1, S1, A1, F1, K1, O1, X1, U1, J1, M1, C1, D1, P1, P2, T1, T2, P3, Z1 and eight mutants; `lut_probe.swift`; `core/tests/cube.rs`, `core/tests/lut.rs`; spec §11 GR-8; the `grading` branch)
+## Road map grading — GR6a and GR6b, `.cube` LUTs end to end over MCP (`lut_proof.py` T0, I1, R1, R2, N1, S1, A1, F1, K1, O1, X1, U1, J1, M1, C1, D1, P1, LG1, LG2, LM4, P2, T1, T2, P3, P4, P5, P6, P7, Z1 and seventeen mutants; `lut_probe.swift`; `core/tests/cube.rs`, `core/tests/lut.rs`; spec §11 GR-8; the `grading` branch)
 
 **What it answers.** That a `.cube` file imported over MCP becomes media of
 kind `lut` read by the core's parser, and that `set_video {patch: {look:
@@ -18303,21 +18303,35 @@ by `swift_build.build` over `app/Sources` (a failed build is a scored
 FAILURE): the clipboard's media ids, a size-2 asymmetric file through
 `LutTextures` read back red fastest, nil for a missing or refused file, and
 `RecipeSource.lookURLs(for:)` answering the URLs published under an
-instruction's key after it was built. The module docstring lists every row and
+instruction's key after it was built.
+
+GR6b adds project LG (the CHART with `{warm, 0.5}`, saved first as LG0 for the
+probe) on an instance launched with `look_proof.pins(closed=False,
+dump=WORK/dump)`: LG1 each Imported tile's dumped thumbnail is BYTE-identical to
+`set_video {look: {kind: lut, media}}` then `render_frame {t, max_width: 256}`;
+LG2 the Look section's layout before the import (Import LUT…, no Imported) and
+after it (Imported under the nine, swap-33 and invert on one row, Import LUT…
+under them, no layout problem); LM4 Clip ▸ Look ▸'s titles before and after,
+the listing's checkmarks, performing a LUT item and its undo. P4–P7 are the
+probe's: `LookGallery`'s LUT answers, `LookMenuFiller` and the LUT items'
+validation and `setLook:`, a headless pane's Imported tiles, outline, summary
+and Import LUT… enabling, and `importLUT(from:into:clips:)` as one undo
+step that reuses a listed file. The section's summary is drawn by its header,
+not a view, so P6 reads it, not LG2. The module docstring lists every row and
 its fixture.
 
 ```
 python3 tools/proof/lut_proof.py                        # Debug unless RC_PROOF_APP=release
 python3 tools/proof/lut_proof.py --only S1,X1           # run and score only these rows
 python3 tools/proof/lut_proof.py --lut ~/LUTs/Film.cube # F1 with an owner's file too (T4)
-python3 tools/proof/lut_proof.py --mutant NAME          # one of the eight below
+python3 tools/proof/lut_proof.py --mutant NAME          # one of the seventeen below
 cd core && cargo test --release --test cube --test lut
 ```
 
 It launches its own instance on a scratch socket in a scratch home
 (`tools/proof/work/lut/home`), writes every `.cube` file and its fixtures into
-its work folder (the Concat rule: nothing is copied from anywhere), performs no
-menu item, closes every project it opens, and removes its work folder at the
+its work folder (the Concat rule: nothing is copied from anywhere), performs
+only Clip ▸ Look ▸ items (they persist nothing), closes every project it opens, and removes its work folder at the
 start and at exit. `--mutant` builds a tree copy as `look_proof` does and
 reports MUTANT PASS only when every named row failed and no other scored row
 did; a core mutant also runs `cargo test --release --no-fail-fast --test cube
@@ -18333,5 +18347,14 @@ did; a core mutant also runs `cargo test --release --no-fail-fast --test cube
 | `remove-deletes-clips` | `with_clips` deletes a LUT's clips | D1 CT |
 | `paste-not-remapped` | `paste` leaves a look's id as the payload's | P1 CT |
 | `urls-from-instruction` | `lookURLs(for:)` answers only the instruction's map | P3 |
+| `luts-reversed` | `LookGallery.luts` answers reverse media order | LG1 LG2 LM4 P4 P5 P6 |
+| `name-keeps-extension` | `lutName` keeps `.cube` | LG2 LM4 P4 P5 P6 |
+| `menu-no-luts` | `LookMenuFiller.fill` adds no LUT item | LM4 P5 |
+| `signature-ignores-luts` | `ClipPane`'s signature omits the LUTs | LG2 |
+| `lut-tile-amount-one` | a LUT trial sends amount 1 | LG1 |
+| `lut-outline-any-lut` | a LUT tile is outlined for any LUT look | P6 |
+| `import-two-steps` | Import LUT is two grouped edits | P7 |
+| `import-new-id-always` | Import LUT predicts `next_id` even for a listed file | P7 |
+| `summary-says-lut` | a LUT look's summary is "LUT" | P4 P6 |
 
-**Its record**: `designs/grading.md`'s GR6a section.
+**Its record**: `designs/grading.md`'s GR6a and GR6b sections.

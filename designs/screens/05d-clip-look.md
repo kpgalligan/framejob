@@ -36,8 +36,10 @@ frame at the playhead with its name beneath: None, Warm, Cool; Teal & Orange,
 Vivid, Faded; Vintage, Dramatic, Black & White. Every picture is the navy card
 on black, each tinted by its own look — the Faded and Vintage cards greyer, the
 Dramatic and Black & White ones darker — and Teal & Orange's tile wears a blue
-outline, the clip's own look. Under the grid the Amount row: a slider four
-fifths along and an "80%" field with a chevron for the quick values.
+outline, the clip's own look. Under the grid the "Import LUT…" button, a square bordered block (the
+project holds no LUT, so there is no Imported group; 05e has one), then the
+Amount row: a slider four fifths along and an "80%" field with a chevron for the
+quick values.
 
 In the light capture the inspector is white with black labels, the section
 headers light-grey bars with grey capitals, and each unpicked tile a thin grey

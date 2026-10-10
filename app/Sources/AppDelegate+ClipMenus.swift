@@ -64,8 +64,10 @@ extension AppDelegate {
     /// Clip ▸ Look (spec §11 GR-7 [b]): the eight looks from `LookKind.allCases`
     /// with the index as the tag, a separator, None as −1 — the
     /// `transitionMenu()` idiom; `validateLookAction` checks and dashes them.
+    /// `LookMenuFiller` puts the project's LUTs before None when it opens.
     func lookMenu() -> NSMenu {
         let menu = NSMenu(title: "Look")
+        menu.delegate = LookMenuFiller.shared
         for (index, kind) in LookKind.builtIns.enumerated() {
             menu.addItem(tagged(kind.displayName, #selector(EditorViewController.setLook(_:)), index))
         }
@@ -113,5 +115,39 @@ extension AppDelegate {
             return true
         }
         return image
+    }
+}
+
+/// Clip ▸ Look ▸'s LUT rows (spec §11 GR-8 [b]): between the eight's separator
+/// and None, the project's `.cube` LUTs in media-list order, tag −2 with the
+/// media id as `representedObject`, then a second separator — none of either
+/// with no LUT. Rewritten each time the menu opens (`menuNeedsUpdate`), for
+/// the main window's project; `UIMenu.fillDynamic` asks it for a named window.
+final class LookMenuFiller: NSObject, NSMenuDelegate {
+    static let shared = LookMenuFiller()
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        fill(menu, for: NSApp.mainWindow)
+    }
+
+    func fill(_ menu: NSMenu, for window: NSWindow?) {
+        let document = window?.windowController?.document as? ProjectDocument
+        Self.fill(menu, luts: document.map { LookGallery.luts(in: $0.project.snapshot) } ?? [])
+    }
+
+    static func fill(_ menu: NSMenu, luts: [MediaSnapshot]) {
+        guard let first = menu.items.firstIndex(where: \.isSeparatorItem) else { return }
+        while menu.items.count > first + 2 { menu.removeItem(at: first + 1) }
+        var at = first + 1
+        for lut in luts {
+            let item = NSMenuItem(
+                title: LookGallery.lutName(lut),
+                action: #selector(EditorViewController.setLook(_:)), keyEquivalent: "")
+            item.tag = EditorViewController.lookLUTTag
+            item.representedObject = NSNumber(value: lut.id)
+            menu.insertItem(item, at: at)
+            at += 1
+        }
+        if at > first + 1 { menu.insertItem(.separator(), at: at) }
     }
 }

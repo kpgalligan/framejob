@@ -3,7 +3,8 @@ import AppKit
 /// The Look section's gallery model (spec §11 GR-7 [b], the grading branch's
 /// GR5b): which clips a look applies to, the op a tile or a menu item sends,
 /// and the nine thumbnails — None and the eight — each the composited frame
-/// with that tile's click applied.
+/// with that tile's click applied, then one per imported `.cube` LUT (spec
+/// §11 GR-8 [b]), in the media list's order.
 ///
 /// **It lives on `ClipPane`, not on the view**, because the pane rebuilds its
 /// sections on every structure change and a thumbnail set that died with each
@@ -17,9 +18,10 @@ import AppKit
 /// playhead moving every frame (playback, a scrub) never renders. The timer
 /// renders only if the gallery is open then (its section expanded, its window
 /// there); hiding it or leaving the window cancels the timer and supersedes a
-/// running generation. A generation applies the nine trial ops on main and
-/// renders them off main, one tile after another, through `Exporter.renderFrame`
-/// — `render_frame`'s renderer, so a thumbnail is the bytes that tool writes —
+/// running generation. A generation applies the trial ops (the nine, then one
+/// per LUT) on main and renders them off main, one tile after another, through
+/// `Exporter.renderFrame` — `render_frame`'s renderer, so a thumbnail is the
+/// bytes that tool writes —
 /// with `RecipeOptions.none` (thumbnails ignore Show Ungraded, as an export
 /// does). A superseded generation skips its remaining tiles, and its results
 /// never land.
@@ -35,6 +37,8 @@ final class LookGallery {
     #endif
 
     private(set) var thumbnails: [CGImage?] = Array(repeating: nil, count: tiles.count)
+    /// The Imported group's thumbnails, by the LUT's media id.
+    private(set) var lutThumbnails: [UInt32: CGImage] = [:]
     /// The attached view; an update from any other is ignored.
     weak var view: LookGalleryView?
 
@@ -159,12 +163,18 @@ final class LookGallery {
         let number = generation
         let token = Token()
         running = token
-        let trials: [ReelProject?] = Self.tiles.map { tile in
-            switch try? inputs.project.applying(Self.op(tile, clips: inputs.ids)) {
+        func trial(_ edit: ReelEdit?) -> ReelProject? {
+            switch edit {
             case .applied(let project)?: return project
             case .identity?: return inputs.project
             default: return nil
             }
+        }
+        let luts = Self.luts(in: inputs.project.snapshot).map(\.id)
+        let trials: [ReelProject?] = Self.tiles.map { tile in
+            trial(try? inputs.project.applying(Self.op(tile, clips: inputs.ids)))
+        } + luts.map { lut in
+            trial(try? inputs.project.applying(Self.op(lut: lut, clips: inputs.ids)))
         }
         let urls = document.mediaURLs()
         let graphics = GraphicRegistry.shared.snapshot(for: document.recipeKey)
@@ -185,25 +195,30 @@ final class LookGallery {
                 })
             }
             if token.isCancelled { return }
-            if let dump { Self.write(images, generation: number, inputs: inputs, to: dump) }
+            let names = Self.tiles.map { $0?.rawValue ?? "none" } + luts.map { "lut-\($0)" }
+            if let dump { Self.write(images, names, generation: number, inputs: inputs, to: dump) }
             DispatchQueue.main.async {
                 guard let self, self.running === token, !token.isCancelled else { return }
                 self.running = nil
-                self.thumbnails = images
+                self.thumbnails = Array(images.prefix(Self.tiles.count))
+                self.lutThumbnails = [:]
+                for (lut, image) in zip(luts, images.dropFirst(Self.tiles.count)) {
+                    self.lutThumbnails[lut] = image
+                }
                 self.rendered = inputs
                 self.view?.showThumbnails()
             }
         }
     }
 
-    /// The dev dump: the nine PNGs, then the manifest, last.
+    /// The dev dump: the PNGs (the nine, then `lut-<id>`), then the
+    /// manifest, last, with `tiles` the names in order.
     private static func write(
-        _ images: [CGImage?], generation: Int, inputs: Inputs, to folder: URL
+        _ images: [CGImage?], _ names: [String], generation: Int, inputs: Inputs, to folder: URL
     ) {
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         var missing: [String] = []
-        for (tile, image) in zip(tiles, images) {
-            let name = tile?.rawValue ?? "none"
+        for (name, image) in zip(names, images) {
             guard let image else {
                 missing.append(name)
                 continue
@@ -213,6 +228,7 @@ final class LookGallery {
         }
         let manifest: [String: Any] = [
             "generation": generation, "t": inputs.time, "clips": inputs.ids, "missing": missing,
+            "tiles": names,
         ]
         if let data = try? JSONSerialization.data(withJSONObject: manifest) {
             try? data.write(to: folder.appendingPathComponent("manifest.json"))
@@ -236,6 +252,22 @@ final class LookGallery {
         .setVideo(clips: clips, patch: VideoPatch(look: .some(kind.map { LookPatch(kind: $0) })))
     }
 
+    /// What a LUT's tile or menu item sends: `{kind: lut, media}`, no amount.
+    static func op(lut media: UInt32, clips: [UInt32]) -> ReelOp {
+        .setVideo(clips: clips, patch: VideoPatch(look: .some(LookPatch(kind: .lut, media: media))))
+    }
+
+    /// The project's `.cube` LUTs, in the media list's order (GR-8 [b]).
+    static func luts(in snapshot: ProjectSnapshot) -> [MediaSnapshot] {
+        snapshot.media.filter { $0.kind == .lut }
+    }
+
+    /// A LUT's tile and item title: its name less a trailing `.cube`.
+    static func lutName(_ media: MediaSnapshot) -> String {
+        let name = media.name
+        return name.lowercased().hasSuffix(".cube") ? String(name.dropLast(5)) : name
+    }
+
     /// The thumbnail time: the playhead inside the first clip, else its first
     /// frame.
     static func time(first: ClipSnapshot, playhead: Ticks) -> Ticks {
@@ -250,12 +282,15 @@ final class LookGallery {
         return looks.allSatisfy({ $0?.kind == kind }) ? .some(kind) : nil
     }
 
-    /// "Warm 80%" when kind and amount are shared, "none" when no clip has a
-    /// look, "mixed" otherwise.
-    static func summary(_ looks: [LookProps?]) -> String {
+    /// "Warm 80%" when kind, LUT and amount are shared (a LUT by `names`,
+    /// "LUT" when it has none), "none" when no clip has a look, "mixed"
+    /// otherwise.
+    static func summary(_ looks: [LookProps?], names: [UInt32: String] = [:]) -> String {
         guard let first = looks.first else { return "none" }
         guard looks.allSatisfy({ $0 == first }) else { return "mixed" }
         guard let look = first else { return "none" }
-        return look.kind.displayName + String(format: " %.0f%%", look.amount * 100)
+        let name = look.kind == .lut ? look.media.flatMap { names[$0] } ?? "LUT"
+            : look.kind.displayName
+        return name + String(format: " %.0f%%", look.amount * 100)
     }
 }

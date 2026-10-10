@@ -239,6 +239,8 @@ FIXTURES = {
                "clips": ["video", "adjustment"], "media": ["speech.mov"], "sound": ["video"]},
     "look": {"path": os.path.join(FIXTURE_DIR, "Look.reelcut"),
              "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
+    "lut": {"path": os.path.join(FIXTURE_DIR, "Lut.reelcut"),
+            "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -387,6 +389,8 @@ def build_fixture(mcp, name):
             ids = _adjust_ops(mcp, path)
         elif name == "look":
             ids = _look_ops(mcp, path)
+        elif name == "lut":
+            ids = _lut_ops(mcp, path)
         mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
@@ -567,6 +571,39 @@ def _look_ops(mcp, path):
     ids = {"video": clips[0]["id"]}
     _call(mcp, "set_video", path, clips=[ids["video"]],
           patch={"look": {"kind": "teal_orange", "amount": 0.8}})
+    return ids
+
+
+def _cube(path, function):
+    """A size-2 `.cube` file written here (the Concat rule): `function(r, g,
+    b)` at each lattice point, red fastest, six decimals."""
+    rows = [" ".join(f"{v:.6f}" for v in function(r, g, b))
+            for b in (0, 1) for g in (0, 1) for r in (0, 1)]
+    with open(path, "w") as handle:
+        handle.write("LUT_3D_SIZE 2\n" + "\n".join(rows) + "\n")
+
+
+def _lut_ops(mcp, path):
+    """Grading GR6b (spec §11 GR-8 [b]): `look`'s one track, "Video", holding
+    `speech.mov` at 0, then two script-written size-2 LUTs imported after it,
+    "Warm Print.cube" and "Bleach.cube", and the clip's look `{lut, Warm
+    Print, 0.8}` — the Look section's Imported group, its outline and Import
+    LUT… (05e)."""
+    _call(mcp, "set_track", path, track=1, name="Video")
+    video = _call(mcp, "import_media", path, path=os.path.join(MEDIA, "speech.mov"))
+    _call(mcp, "add_clip", path, media=_media_id(video), track=1, at=0)
+    clips = _project(mcp, path)["clips"]
+    if len(clips) != 1:
+        raise FixtureError(f"building lut: the project holds {len(clips)} clips, not 1")
+    ids = {"video": clips[0]["id"]}
+    warm = os.path.join(FIXTURE_DIR, "Warm Print.cube")
+    bleach = os.path.join(FIXTURE_DIR, "Bleach.cube")
+    _cube(warm, lambda r, g, b: (0.1 + 0.9 * r, 0.04 + 0.9 * g, 0.8 * b))
+    _cube(bleach, lambda r, g, b: tuple(0.5 * c + (r + g + b) / 6 for c in (r, g, b)))
+    lut = _media_id(_call(mcp, "import_media", path, path=warm))
+    _media_id(_call(mcp, "import_media", path, path=bleach))
+    _call(mcp, "set_video", path, clips=[ids["video"]],
+          patch={"look": {"kind": "lut", "media": lut, "amount": 0.8}})
     return ids
 
 

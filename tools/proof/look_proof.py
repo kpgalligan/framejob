@@ -20,7 +20,7 @@ the start and at exit (the control folder DIR is not). It performs only
 Clip ▸ Look ▸ items, which persist nothing. A scratch home does not move
 `UserDefaults` (#238), so the sections GR5b reads are pinned by argument-domain
 plist fragments (stored value: COLLAPSED) — `video.look` open, `video.light`
-and `video.color` closed — and `-RCDevLookGalleryDump WORK/dump` has the
+and `video.color` closed — and the inspector's width at 304 pt, and `-RCDevLookGalleryDump WORK/dump` has the
 gallery write each completed generation; G3's second instance pins
 `video.look` closed and dumps to `WORK/dump-closed`. Every call is bounded
 (`CALL_BOUND`), every ffmpeg too (120 s). Every project is closed
@@ -204,8 +204,11 @@ GALLERY = "app/Sources/LookGallery.swift"
 
 
 def pins(closed, dump):
-    """The argument-domain pins (stored value: COLLAPSED) and the dump folder."""
-    return ["-ReelcutInspectorSection.video.look", "<true/>" if closed else "<false/>",
+    """The argument-domain pins (stored value: COLLAPSED), the inspector's
+    width (screens.py's 304, so the gallery's rows do not follow a width the
+    domain holds), and the dump folder."""
+    return ["-ReelcutInspectorWidth", "<real>304</real>",
+            "-ReelcutInspectorSection.video.look", "<true/>" if closed else "<false/>",
             "-ReelcutInspectorSection.video.light", "<true/>",
             "-ReelcutInspectorSection.video.color", "<true/>",
             "-RCDevLookGalleryDump", str(dump)]

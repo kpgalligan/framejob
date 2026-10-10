@@ -314,6 +314,22 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
     a tile per LUT in Media-tab order named by its file name without `.cube`, thumbnails by
     GR-7's rule; Clip ▸ Look ▸ lists them after the eight, under a separator, before None. No
     separate picker.
+  - **[b] How GR6b reads choices 1 and 3** (recorded before its code; decided, not asked):
+    "Media-tab order" is the media list's own order, the Media tab's default Import Order — the
+    gallery and the menu do not follow the tab's sort or search, which are per-window view state
+    (`MediaListFilter.swift`). Clip ▸ Look ▸ reads the eight · a separator · the LUTs · a
+    separator · None, and with no LUT is unchanged (the eight · a separator · None). A LUT whose
+    file is missing keeps its tile and its item; its thumbnail is the ungraded frame, as its
+    picture is, and the Media tab badges it (choice 5). "Import LUT…" sits under the gallery
+    (under the Imported group when there is one) and above the Amount row; it is off when no
+    selected clip takes a grade; with an action selected it writes the clip's own look, as a tile
+    does (GR-7 [b] (1)); a file already in the media list is reused, not added again; a refused
+    file shows choice 7's sentence in the document's error sheet and changes nothing. A tile and
+    a menu item are named by the media's name (a consolidated copy is named after its original)
+    less a trailing `.cube` in any case; two LUTs with one name show two tiles and items with that
+    title. The summary of a LUT look is "<name> 80%". A tile or item for a LUT writes `{kind:
+    "lut", media}` with no amount, so each clip keeps its own (100 % for a clip with none); undo
+    "Look".
   - **The look** (choice 4): `video.look` gains the kind `lut` and the key `media` (the LUT's
     media id, stored between `kind` and `amount` and written only with `lut`). `media` is
     required with `lut` and refused with a built-in kind, and must name a `lut` media of the

@@ -1420,3 +1420,136 @@ kept every `CLAUDE.md` untouched): app/CLAUDE.md's map gains
 core/CLAUDE.md's map gains `cube.rs`, `ffi_cube.rs`, `lut.rs` and
 `MediaKind::Lut`, `model_look.rs`'s `lut` and `media`, and `actions.rs`'s
 object discriminants. GR5b's, GR5a's, GR4a's and GR4b's still-owed lines above.
+
+## GR6b — imported LUTs in the chrome: the Imported group, Import LUT…, Clip ▸ Look ▸'s LUT items, screen 05e (2026-10-10, on the `grading` branch)
+
+The rest of GR6: GR-8's [b] items (choices 1 and 3), app-side and documents
+only — no core, FFI, op, tool or format change (`set_video {look: {kind: "lut",
+media}}` already carried it from GR6a).
+
+**What landed.**
+- Spec first: GR-8 [b] gains "How GR6b reads choices 1 and 3" (Media-tab order
+  is the media list's own order; the menu's eight · separator · LUTs ·
+  separator · None, unchanged with no LUT; a missing LUT keeps its tile and
+  item; Import LUT…'s place, enabling, reuse of a listed file and refusal
+  sheet; the titles; the summary "<name> 80%"). Then §4.3a (the Look bullet),
+  §9 (Look ▸'s LUT items), §7.4 (the Look row, `LookMenuFiller`,
+  `UIMenu.fillDynamic`), §7.9a (the dump's `lut-<id>` and manifest `tiles`;
+  perform_menu_item fills Look ▸ for the named window) and the index's Lines.
+- App: `LookPatch.media`; `LookGallery.luts(in:)`, `lutName(_:)`,
+  `op(lut:clips:)`, `summary(_:names:)` and `lutThumbnails` — a generation
+  renders the nine and then one trial per LUT, and the dump writes
+  `lut-<id>.png` and `tiles`; `LookGalleryView`'s "Imported" label, `lutTiles`
+  in rows of three (each tile the built-in tiles' width, so a short row keeps
+  third-width tiles) and `importButton` ("Import LUT…", on exactly when there
+  is a target), a LUT tile outlined when every target's own look is that LUT;
+  `VideoPane+Look` passes `onPickLUT` (undo "Look") and `onImport` (the
+  inspector's `onCommand` with `importLUT:`) and the summary's names;
+  `ClipPane`'s signature gains `id=name` per LUT; `EditorViewController+Look`'s
+  `lookLUTTag` (−2, `representedObject` the id), `setLook:` and the validator
+  for a LUT item, `importLUT(_:)` (a sheet `NSOpenPanel` over
+  `MediaImporter.lutType`) and `importLUT(from:into:clips:)` (the probe,
+  `backgroundMedia(for:in:)` against `document.project`, then ONE
+  `performGroupedEdit("Import LUT", [add_media, set_video])`; a refusal is
+  `document.present`); `AppDelegate+ClipMenus`'s `LookMenuFiller`, the Look
+  menu's delegate, rewriting the rows between the eight's separator and None
+  when it opens; `UIMenu.fillDynamic`, called by `lookup`'s per-level
+  `validate` and by `listing`; `AgentServer+Media`'s `import_media` comment
+  naming the UI path it mirrors with `set_video`.
+- Instruments: `lut_proof.py` gains LG1, LG2, LM4 and probe rows P4–P7 (project
+  LG, saved first as LG0 for the probe), its instance launched with
+  `look_proof.pins(closed=False, dump=WORK/dump)`, and nine mutants;
+  `lut_probe.swift` gains P4–P7; `capture_spike/inventory.json` one site row
+  (`importLUT`'s `beginSheetModal`, `reached_from: []`, the Look section's
+  button as `other_caller`); `screens.py`'s `lut` fixture (two size-2 `.cube`
+  files the script writes, "Warm Print" and "Bleach") and screen 05e; 05d's
+  prose; the screens README's fixture row; the proof README's section;
+  `look_proof.pins` also pins `ReelcutInspectorWidth` 304 (below).
+- Documents: README's **Imported LUTs** bullet; GRD-6 (new) and GRD-5's step 4
+  through the gallery rather than MCP.
+
+**Sizes.** Product code (`git diff --numstat 9d237f0 -- app/Sources core/src
+core/include app/Resources/Shaders`) +267 −47, **220 net**:
+`EditorViewController+Look.swift` +68 −10 (64 → 122), `LookGalleryView.swift`
++64 −7 (190 → 247), `LookGallery.swift` +51 −16 (261 → 296),
+`AppDelegate+ClipMenus.swift` +36 (117 → 153), `VideoPane+Look.swift` +20 −8,
+`UIMenu.swift` +14 −1 (264 → 277), `LookProps.swift` +9 −5, `ClipPane.swift` +3
+(240 → 243), `AgentServer+Media.swift` +2 (the comment; 421 → 423, already over
+the 400-line new-file cap before it). No frozen file touched, no new Swift file.
+**The running total is about 4,560 of "Worth keeping"'s ≤ 4,500 — the cap is
+missed by about 60 lines** (GR2–GR6a about 4,340 by their records, plus GR6b's
+220). The owner said "Build GR6b, record the overage" (2026-10-10); GR7's
+verdict reads this figure.
+
+**Measured.** 2026-10-10, Apple M2 Max, AC power.
+- Loop, Debug: `make typecheck` 0 errors and the 4 baseline warnings;
+  `spec_index_proof.py` 150/150; `inventory.py --check` 5/5 (49 grep sites);
+  `v2_menu.py --only H` 5/5 (103 rows, as before); `lut_proof.py --only
+  LG1,LG2,LM4,P4,P5,P6,P7,Z1` 7/8 on the first build — LG2 found an ambiguous
+  `NSStackView` (the LUT row, gravity areas) — then `--only LG2,Z1` 2/2 after the
+  row took `distribution = .fill`; `look_proof.py --only
+  G1,G2,G3,S1,S2,LM1,LM2,LM3,B1,B2,B3,B4,Z1` 13/13 (S1's rows at y 329, 403,
+  477, as GR5b's); `screens.py --only 05d-clip-look,05e-clip-look-lut` 7/7,
+  both screens pass in both looks, 0 new problems, every PNG looked at.
+- `make gate`: PASS in 257 s, and again in 296 s after the filler's last edit
+  (typecheck 8 s, test 156 s, app 130 s; fmt and lint skipped — no Rust).
+- Recorded, on the gate's Release build, on the final instrument:
+  `RC_PROOF_APP=release lut_proof.py` 28/28 and T0's record (GR6a's rows and
+  GR6b's; LG1 generation 2 with tiles none, the eight, `lut-4`, `lut-5`; LG2's
+  LUT names on one row at y 527 under "Imported" at 456 and over the button at
+  547), no `Reelcut: ` line, no `DEFAULTS MOVED`; `RC_PROOF_APP=release
+  look_proof.py --only G1,G2,G3,S1,S2,LM1,LM2,LM3,B1,B2,B3,B4,Z1` 13/13.
+- Mutants, each `lut_proof.py --mutant NAME` on Debug on the final instrument,
+  all nine MUTANT PASS (every named row failed, no other scored row did), no
+  `DEFAULTS MOVED`: `luts-reversed` LG1 LG2 LM4 P4 P5 P6;
+  `name-keeps-extension` LG2 LM4 P4 P5 P6; `menu-no-luts` LM4 P5;
+  `signature-ignores-luts` LG2; `lut-tile-amount-one` LG1;
+  `lut-outline-any-lut` P6; `import-two-steps` P7 (step ii: one undo left the
+  row); `import-new-id-always` P7 (step iv: the unminted id was refused, so the
+  look stayed warm); `summary-says-lut` P4 P6. `menu-no-luts`' first run crashed
+  the filler (an insert past the menu's end) and so failed other rows; the
+  filler now inserts at a running index, the mutant removes that insert, and it
+  then passed.
+- Review fix pass (Import LUT… made the square `StickerButton`; the unused
+  `window` parameter dropped from `importLUT(from:into:clips:)`): `make
+  typecheck` the 4 baseline warnings; Debug `lut_proof.py --only
+  LG1,LG2,LM4,P4,P5,P6,P7,Z1` 8/8 (the button at 94 × 22); `screens.py --only
+  05d-clip-look,05e-clip-look-lut` 7/7, 0 new problems, every PNG looked at
+  (the button square and bordered in both looks); `make gate` PASS in 203 s;
+  then on its Release build `RC_PROOF_APP=release lut_proof.py` 28/28 (LG2's
+  names at y 525 under "Imported" at 454, over the button at 545) and
+  `look_proof.py --only G1,G2,G3,S1,S2,LM1,LM2,LM3,B1,B2,B3,B4,Z1` 13/13 (S1's
+  rows 329, 403, 477), no `Reelcut: ` line, no `DEFAULTS MOVED`. No mutant's
+  anchor line changed, so the nine were not re-run.
+
+**Deviations.**
+- **The summary is not read over MCP.** The section's header DRAWS its summary
+  (`InspectorSectionHeader.drawSummary`), so no view and no layout-dump text
+  holds "swap-33 80%". LG2 does not check it; P6 reads the Look section header's
+  summary in a headless pane ("pA 80%", by `Mirror` over its private
+  `lastSummary`). So `summary-says-lut` fails P4 P6, not the spec's LG2 P4.
+- LG2 reads "Imported" as a label of its own, under every built-in tile name and
+  over the LUT tiles, rather than on one row with them.
+- `LookMenuFiller.fill(_:luts:)` is static, so it builds a LUT item with
+  `NSMenuItem` (title, `setLook:`, no key, tag −2) rather than
+  `AppDelegate.tagged`, which needs an instance.
+- `look_proof.pins` (outside the spec's files) also pins
+  `ReelcutInspectorWidth` to 304, screens.py's value: the Release run's S1 failed
+  "inside False" with tile rows 96 pt apart, against 74 on Debug — the Release
+  domain holds a wider inspector, so the third row fell below the captured
+  inspector. Host state, not GR6b; with the pin, Release 13/13 (rows 329, 403,
+  477). lut_proof shares the pins.
+- Import LUT… is the house square block (`StickerButton`, secondary, at the
+  inspector's 22 pt control height, `DS.sans(11)`), as the sharp pass's README
+  rules for chrome; the first build's small rounded system bezel was a review
+  finding, fixed before the recorded runs. Still an `NSButton`, so the layout
+  dump reads its title and P6 its `isEnabled`. `importLUT(from:into:clips:)`
+  takes no window: errors go through `document.present`.
+
+**Owed.** GRD-6 and GRD-5 are the owner's; GR7. The `CLAUDE.md` lines (the spec
+kept every `CLAUDE.md` untouched): app/CLAUDE.md's Look row gains
+`LookMenuFiller` (Clip ▸ Look ▸'s LUT rows, filled when it opens), the
+Imported group and Import LUT… (`importLUT`, one undo step "Import LUT"), and
+the dump's `lut-<id>` and `tiles`; its dev-tools entry gains
+`UIMenu.fillDynamic`. GR6a's, GR5b's, GR5a's, GR4a's and GR4b's still-owed
+lines above.

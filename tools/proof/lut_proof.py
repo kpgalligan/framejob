@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Road map "grading", phase GR6a (spec §11 GR-8) — `.cube` LUTs end to end
-over MCP: a LUT imported as media of kind `lut` (`import_media`, the core's
-parser through `rc_cube_parse`), applied as `video.look {kind: "lut", media,
-amount}` and drawn at step 4d from an `rgba16Float` `size³` texture, read back
-as `render_frame` bytes; then the probe's rows over `app/Sources`.
+"""Road map "grading", phases GR6a and GR6b (spec §11 GR-8) — `.cube` LUTs end
+to end over MCP: a LUT imported as media of kind `lut` (`import_media`, the
+core's parser through `rc_cube_parse`), applied as `video.look {kind: "lut",
+media, amount}` and drawn at step 4d from an `rgba16Float` `size³` texture, read
+back as `render_frame` bytes (GR6a); the Look gallery's Imported tiles, Import
+LUT… and Clip ▸ Look ▸'s LUT items (GR6b); then the probe's rows over
+`app/Sources`.
 
     python3 tools/proof/lut_proof.py [--app PATH] [--only I1,S1,...] [--lut PATH]
     python3 tools/proof/lut_proof.py --mutant NAME
@@ -12,9 +14,13 @@ Launches the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
 on a scratch socket of its own, and stops only that process. **The instance
 runs in a scratch home**, `CFFIXED_USER_HOME=tools/proof/work/lut/home`, and
 every package, fixture, `.cube` file and PNG is under `tools/proof/work/lut/`,
-removed at the start and at exit. It performs no menu item. Every call is
-bounded (`CALL_BOUND`), every ffmpeg too (120 s). Every project is closed
-(`close_project`, discard).
+removed at the start and at exit. It performs only Clip ▸ Look ▸ items, which
+persist nothing. The instance is launched with `look_proof.pins(closed=False,
+dump=WORK/dump)`: the sections GR6b reads pinned by argument-domain plist
+fragments (`video.look` open, `video.light` and `video.color` closed) and
+`-RCDevLookGalleryDump` writing each completed gallery generation. Every call
+is bounded (`CALL_BOUND`), every wait too, every ffmpeg too (120 s). Every
+project is closed (`close_project`, discard).
 
 Fixtures, written by this script — **every LUT is written here** (the Concat
 rule): CHART, `look_proof.py`'s 640×360 grey ramp over six saturated
@@ -86,6 +92,35 @@ Project H (CHART on its first track, 30 fps 640×360, background black):
   published under an instruction's key after it was built with none, and the
   instruction's own for a key that never published.
 
+GR6b — project LG (CHART on its first track with `{warm, 0.5}`, selected, the
+playhead at 0.5 s, the Clip tab's Color sub-tab, `section: video.look`), saved
+first as LG0 (no LUT) for the probe and worked on as LG-work:
+- **LG2's control**: settled, the inspector's layout shows "Import LUT…" and
+  no "Imported". **LM4's control**: `perform_menu_item ["Clip", "Look"]` is
+  refused as a submenu naming the eight and None. Then `swap-33` (A) and
+  `invert` (B) are imported.
+- **LG1**: the first manifest naming the clip at 0.5 s whose `tiles` are none,
+  the eight, `lut-A`, `lut-B`: each LUT PNG is BYTE-identical to `set_video
+  {look: {kind: lut, media}}` (the amount 0.5 kept) then `render_frame {t,
+  max_width: 256}`, undone after; the two differ from each other and from
+  None's.
+- Then `{lut, A, 0.8}` is set (a fixture step).
+- **LG2**: "Imported" is below every built-in tile name; "swap-33" and
+  "invert" are tile names on one row in that order, below "Imported"; "Import
+  LUT…" is below them; no layout problem under the gallery. (The section's
+  summary is drawn by its header, not a view, so P6 reads it.)
+- **LM4**: the submenu refusal names the eight, swap-33, invert and None;
+  the listing has swap-33 on, invert and None off; performing invert stores
+  `{lut, B, 0.8}`, and `undo` answers "Look" and restores `{lut, A, 0.8}`.
+- **P4–P7**: `lut_probe.swift` (the same build): P4 `luts`, `lutName`,
+  `summary` and `op(lut:)`; P5 `LookMenuFiller.fill` (the eight, "", pA, pB,
+  "", None; a refill with none), the LUT items' tags, ids, validation (on,
+  mixed, off) and `setLook:`; P6 a headless pane's `lutTiles` (pA, pB), their
+  outline, the B tile's op, the Look section's summary "pA 80%" and Import
+  LUT…'s enabling; P7 `importLUT(from:into:clips:)` on LG0: one step
+  "Import LUT", one undo removes both, then a second import after redo and
+  `{warm}` reuses the row.
+
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`; a `core/`
 mutant makes the copy's `core/` its own through `hevc_alpha_proof.own_core`
 and links the tree's `core/tests`), applies its edits (each anchor asserted
@@ -103,6 +138,15 @@ did:
   remove-deletes-clips    `with_clips` deletes a LUT's clips: D1 CT
   paste-not-remapped      `paste` leaves a look's id as the payload's: P1 CT
   urls-from-instruction   a look reads only its instruction's URLs: P3
+  luts-reversed           the LUTs in reverse media order: LG1 LG2 LM4 P4 P5 P6
+  name-keeps-extension    a LUT's title keeps `.cube`: LG2 LM4 P4 P5 P6
+  menu-no-luts            the filler adds no LUT item: LM4 P5
+  signature-ignores-luts  the pane's signature omits the LUTs: LG2
+  lut-tile-amount-one     a LUT trial sends amount 1: LG1
+  lut-outline-any-lut     a LUT tile is outlined for any LUT look: P6
+  import-two-steps        Import LUT is two undo steps: P7
+  import-new-id-always    Import LUT predicts a new id for a listed file: P7
+  summary-says-lut        a LUT summary is "LUT", never its name: P4 P6
 Exit 0 when every scored row passed (a mutant: caught); 1 when one failed
 (a mutant: survived); 2 when the control could not be performed.
 """
@@ -123,7 +167,8 @@ import proof_app  # noqa: E402
 import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 from hevc_alpha_proof import own_core  # noqa: E402
-from look_proof import SAMPLES, write_chart  # noqa: E402
+from look_proof import (KINDS, SAMPLES, TILE_NAMES, manifests, pins, settled,  # noqa: E402
+                        under, visible_texts, wait_manifest, write_chart)
 from tone_proof import Frame, decode, same_pixels  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/lut"
@@ -136,11 +181,21 @@ SEC = 600_000
 T = SEC // 2
 W, H = 640, 360
 ROWS = ["T0", "I1", "R1", "R2", "N1", "S1", "A1", "F1", "K1", "O1", "X1", "U1", "J1",
-        "M1", "C1", "D1", "P1", "P2", "T1", "T2", "P3", "Z1"]
+        "M1", "C1", "D1", "P1", "LG1", "LG2", "LM4", "P2", "T1", "T2", "P3", "P4", "P5", "P6",
+        "P7", "Z1"]
 RECORDS = {"T0"}
 H_ROWS = {"I1", "R1", "R2", "N1", "S1", "A1", "F1", "K1", "O1", "X1", "U1", "J1", "M1",
           "C1", "D1", "P1"}
-PROBE_ROWS = {"P2", "T1", "T2", "P3"}
+PROBE_ROWS = {"P2", "T1", "T2", "P3", "P4", "P5", "P6", "P7"}
+LG_ROWS = {"LG1", "LG2", "LM4"}
+# The rows that need project LG built (and LG0 saved for the probe).
+LG_NEEDED = LG_ROWS | {"P5", "P6", "P7"}
+DUMP = WORK / "dump"
+LG0 = WORK / "LG0.reelcut"
+LG_WORK = WORK / "LG-work.reelcut"
+IMPORT_BUTTON = "Import LUT…"
+LOOK_MENU = ["Clip", "Look"]
+GALLERY = "app/Sources/LookGallery.swift"
 # T0's tags: (name, primaries, transfer, matrix) for prores_metadata.
 TAGS = [("bt709", "bt709", "bt709", "bt709"),
         ("bt2020-709", "bt2020", "bt709", "bt2020nc"),
@@ -196,6 +251,46 @@ MUTANTS = {
         "app/Sources/RecipeSource.swift",
         "return mediaURLs[instruction.recipeKey] ?? instruction.mediaURLs",
         "return instruction.mediaURLs")], ["P3"]),
+    "luts-reversed": ([(
+        GALLERY,
+        "snapshot.media.filter { $0.kind == .lut }",
+        "Array(snapshot.media.filter { $0.kind == .lut }.reversed())")],
+        ["LG1", "LG2", "LM4", "P4", "P5", "P6"]),
+    "name-keeps-extension": ([(
+        GALLERY,
+        'return name.lowercased().hasSuffix(".cube") ? String(name.dropLast(5)) : name',
+        "return name")], ["LG2", "LM4", "P4", "P5", "P6"]),
+    "menu-no-luts": ([(
+        "app/Sources/AppDelegate+ClipMenus.swift",
+        "            menu.insertItem(item, at: at)\n            at += 1\n",
+        "")], ["LM4", "P5"]),
+    "signature-ignores-luts": ([(
+        "app/Sources/ClipPane.swift",
+        '            LookGallery.luts(in: binding.snapshot).map { "\\($0.id)=\\(LookGallery.lutName($0))" }\n'
+        '                .joined(separator: ","),\n',
+        "")], ["LG2"]),
+    "lut-tile-amount-one": ([(
+        GALLERY,
+        "trial(try? inputs.project.applying(Self.op(lut: lut, clips: inputs.ids)))",
+        "trial(try? inputs.project.applying(.setVideo(clips: inputs.ids, patch: VideoPatch("
+        "look: .some(LookPatch(kind: .lut, amount: 1, media: lut))))))")], ["LG1"]),
+    "lut-outline-any-lut": ([(
+        "app/Sources/LookGalleryView.swift",
+        " && $0.videoProps.look?.media == tile.media",
+        "")], ["P6"]),
+    "import-two-steps": ([(
+        "app/Sources/EditorViewController+Look.swift",
+        'document.performGroupedEdit("Import LUT", [add, look])',
+        'document.performGroupedEdit("Import LUT", [add])\n'
+        '                document.performGroupedEdit("Import LUT", [look])')], ["P7"]),
+    "import-new-id-always": ([(
+        "app/Sources/EditorViewController+Look.swift",
+        "try Self.backgroundMedia(for: descriptor, in: document.project)",
+        "Optional(document.project.snapshot.nextId)")], ["P7"]),
+    "summary-says-lut": ([(
+        GALLERY,
+        'look.media.flatMap { names[$0] } ?? "LUT"',
+        '"LUT"')], ["P4", "P6"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -813,6 +908,151 @@ def run_p1(client, chart, state):
     return close(client, target.path) and closed
 
 
+# ---- GR6b: project LG, the Imported tiles, Import LUT… and Clip ▸ Look ▸ -------
+
+def lg_layout(doc, tag):
+    """The inspector's `snapshot_ui` layout dump: (the dump, the error)."""
+    got = doc.call("snapshot_ui", window="editor", view="inspector",
+                   path=str(WORK / f"{tag}.png"))
+    path = reply(got).get("layout_path")
+    if not path:
+        return {}, got.get("error", "no layout dump")
+    with open(path) as handle:
+        return json.load(handle), ""
+
+
+def run_lg(client, chart, state):
+    """Project LG: CHART with {warm, 0.5}, saved as LG0 for the probe and
+    worked on as LG-work."""
+    doc, sized = opened(client, "LG")
+    track = (doc.tracks() or [{}])[0].get("id")
+    chart_media = doc.media(chart)
+    clip = doc.added("add_clip", track=track, media=chart_media, at=0) \
+        if chart_media is not None else None
+    warm = doc.look([clip], {"kind": "warm", "amount": 0.5}) if clip else {"ok": False}
+    saved = doc.call("save_project", path=str(LG0))
+    doc.path = LG0
+    moved = doc.call("save_project", path=str(LG_WORK))
+    doc.path = LG_WORK
+    state["lg_fixture"] = sized and clip is not None and warm["ok"] and saved["ok"] \
+        and moved["ok"]
+    print(f"  LG: clip {clip}; LG0 {saved.get('error', 'ok')}", flush=True)
+    if not state["lg_fixture"] or not selected & LG_ROWS:
+        return close(client, doc.path) and state["lg_fixture"]
+    ids = [clip]
+    builtins = TILE_NAMES[1:]
+    doc.call("set_selection", clips=ids)
+    doc.call("set_playhead", t=T)
+    tabs = reply(doc.call("select_inspector_tab", tab="clip", sub_tab="color",
+                          section="video.look"))
+    quiet = settled(doc)
+    dump, error = lg_layout(doc, "lg2-before")
+    before = visible_texts(dump.get("views") or []) if not error else {error}
+    lg2_control = tabs.get("sub_tab") == "color" and quiet and IMPORT_BUTTON in before \
+        and "Imported" not in before
+    submenu = doc.call("perform_menu_item", path=LOOK_MENU)
+    want = "is a submenu, not an item; its items are: "
+    lm4_control = not submenu["ok"] and \
+        submenu.get("error", "").endswith(want + ", ".join(builtins + ["None"]) + ".")
+    a_id = doc.media(LUTS / "swap-33.cube")
+    b_id = doc.media(LUTS / "invert.cube")
+    print(f"  LG: controls LG2 {lg2_control} LM4 {lm4_control}; A {a_id}, B {b_id}", flush=True)
+
+    # LG1
+    tiles = ["none"] + KINDS + [f"lut-{a_id}", f"lut-{b_id}"]
+    found = wait_manifest(DUMP, lambda m: m.get("clips") == ids and m.get("t") == T
+                          and m.get("tiles") == tiles, 30)
+    misses, dumped = [], {}
+    if found is not None:
+        folder = found["dir"]
+        for name in ("none", f"lut-{a_id}", f"lut-{b_id}"):
+            png = folder / f"{name}.png"
+            dumped[name] = png.read_bytes() if png.exists() else None
+        for media in (a_id, b_id):
+            name = f"lut-{media}"
+            got = doc.look(ids, {"kind": "lut", "media": media})
+            out = WORK / f"lg1-{name}.png"
+            rendered = doc.call("render_frame", t=T, max_width=256, path=str(out))
+            mine = out.read_bytes() if rendered["ok"] and out.exists() else None
+            if got["ok"]:
+                doc.call("undo")
+            if not got["ok"] or mine is None or mine != dumped.get(name):
+                misses.append(f"{name}: set {got.get('error', 'ok')[:60]}, render "
+                              f"{rendered.get('error', 'ok')[:60]}, bytes "
+                              f"{'equal' if mine == dumped.get(name) else 'differ'}")
+    blobs = list(dumped.values())
+    distinct = len(blobs) == 3 and None not in blobs and len(set(blobs)) == 3
+    back = doc.look_of(clip)
+    check("LG1 the first manifest naming the clip at 0.5 s with tiles none, the eight, lut-A, "
+          "lut-B: each LUT PNG is BYTE-identical to set_video {look: {kind: lut, media}} then "
+          "render_frame {t, max_width: 256}; the two differ from each other and from None's",
+          found is not None and not misses and distinct
+          and back == {"kind": "warm", "amount": 0.5},
+          f"generation {found.get('generation') if found else None}; tiles of the last "
+          f"{(manifests(DUMP) or [{}])[-1].get('tiles')}; misses {misses}; distinct {distinct}; "
+          f"look after {back}")
+
+    # The fixture step LG2 and LM4 read: A at 0.8.
+    at_a = doc.look(ids, {"kind": "lut", "media": a_id, "amount": 0.8})
+
+    # LG2
+    shown = doc.call("select_inspector_tab", section="video.look")
+    quiet = settled(doc)
+    dump, error = lg_layout(doc, "lg2")
+    views = [v for v in dump.get("views") or [] if not v.get("hidden")]
+    names = [v for v in views if v.get("class") == "NSTextField"
+             and under(views, v["i"], {"LookTileButton"})]
+    built = [v for v in names if v.get("text") in TILE_NAMES]
+    luts = sorted((v for v in names if v.get("text") not in TILE_NAMES),
+                  key=lambda v: v["frame"][0])
+    imported = [v for v in views if v.get("text") == "Imported"
+                and under(views, v["i"], {"LookGalleryView"})]
+    button = [v for v in views if v.get("text") == IMPORT_BUTTON
+              and under(views, v["i"], {"LookGalleryView"})]
+    lowest = max((v["frame"][1] for v in built), default=None)
+    lut_y = {round(v["frame"][1]) for v in luts}
+    placed = (len(built) == 9 and len(imported) == 1 and len(button) == 1
+              and [v["text"] for v in luts] == ["swap-33", "invert"] and len(lut_y) == 1
+              and lowest is not None and imported[0]["frame"][1] > lowest
+              and luts[0]["frame"][1] > imported[0]["frame"][1]
+              and button[0]["frame"][1] > luts[0]["frame"][1])
+    problems = [p for p in dump.get("problems") or []
+                if under(views, p.get("view"), {"LookGalleryView", "LookTileButton"})]
+    check("LG2 CONTROL before the import: Import LUT… and no Imported; after it, Imported "
+          "below every built-in tile name, swap-33 and invert on one row in that order below "
+          "it, Import LUT… below them, no layout problem under the gallery",
+          lg2_control and at_a["ok"] and shown["ok"] and quiet and not error and placed
+          and not problems,
+          f"control {lg2_control} ({sorted(t for t in before if t)[:3]}…); set A "
+          f"{at_a.get('error', 'ok')}; settled {quiet}; dump {error or 'ok'}; built "
+          f"{len(built)}; LUT names {[v['text'] for v in luts]} at y {sorted(lut_y)}; "
+          f"Imported {[v['frame'] for v in imported]}; button {[v['frame'] for v in button]}; "
+          f"lowest built-in {lowest}; problems {problems[:2]}")
+
+    # LM4
+    submenu = doc.call("perform_menu_item", path=LOOK_MENU)
+    titled = not submenu["ok"] and submenu.get("error", "").endswith(
+        want + ", ".join(builtins + ["swap-33", "invert", "None"]) + ".")
+    listing = reply(doc.call("perform_menu_item")).get("items") or []
+    states = {tuple(item.get("path") or [])[-1]: item.get("state") for item in listing
+              if list(item.get("path") or [])[:2] == LOOK_MENU}
+    marked = (states.get("swap-33"), states.get("invert"), states.get("None"))
+    performed = doc.call("perform_menu_item", path=LOOK_MENU + ["invert"])
+    to_b = doc.look_of(clip)
+    undone = reply(doc.call("undo")).get("undone")
+    restored = doc.look_of(clip)
+    check("LM4 CONTROL before the import: the submenu names the eight and None; after it: the "
+          "eight, swap-33, invert, None; swap-33 on, invert and None off; Clip ▸ Look ▸ invert "
+          "stores {lut, B, 0.8}; undo answers \"Look\" and restores {lut, A, 0.8}",
+          lm4_control and titled and marked == ("on", "off", "off") and performed["ok"]
+          and to_b == {"kind": "lut", "media": b_id, "amount": 0.8} and undone == "Look"
+          and restored == {"kind": "lut", "media": a_id, "amount": 0.8},
+          f"control {lm4_control}; after {submenu.get('error', 'ACCEPTED')[-160:]!r}; states "
+          f"{marked}; perform {performed.get('error', 'ok')}; → {to_b}; undo {undone!r} → "
+          f"{restored}")
+    return close(client, doc.path)
+
+
 # ---- the probe ----------------------------------------------------------------
 
 def run_probe(sources):
@@ -832,7 +1072,8 @@ def run_probe(sources):
     request, answer = folder / "request.json", folder / "answer.json"
     if answer.exists():
         answer.unlink()
-    request.write_text(json.dumps({"folder": str(folder / "files")}))
+    request.write_text(json.dumps({"folder": str(folder / "files"), "package": str(LG0),
+                                   "lut": str(LUTS / "p7-film.cube")}))
     ran = bounded.run([str(built.binary), str(request), str(answer)], 600,
                       env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
     try:
@@ -859,6 +1100,7 @@ def fixtures():
     for n in (17, 33, 65):
         write_lut(f"smooth-{n}", n, smooth)
     write_lut("invert", 33, invert)
+    write_lut("p7-film", 2, swap)
     return chart
 
 
@@ -952,7 +1194,7 @@ def main():
     sources = ROOT / "app/Sources"
     config = proof_app.config()
     if args.mutant:
-        print(f"grading GR6a — the {args.mutant} MUTANT ({' '.join(named)} must FAIL)",
+        print(f"grading GR6 — the {args.mutant} MUTANT ({' '.join(named)} must FAIL)",
               flush=True)
         app, copy = build_mutant(args.mutant)
         if app is None:
@@ -967,15 +1209,15 @@ def main():
                   "--test lut in the copy's core\n       " + " | ".join(last), flush=True)
             scored.append("CT")
     else:
-        print(f"grading GR6a — LUTs over MCP ({config} build {binary})", flush=True)
+        print(f"grading GR6 — LUTs over MCP ({config} build {binary})", flush=True)
     if not binary.is_file():
         print(f"instrument failure: no app binary at {binary}")
         return 2
     chart = fixtures()
     log = WORK / "instance.log"
     state, closed = {}, True
-    if selected & (H_ROWS | {"T0"}):
-        launched = mcp.launch(str(binary), [],
+    if selected & (H_ROWS | {"T0"} | LG_NEEDED):
+        launched = mcp.launch(str(binary), pins(closed=False, dump=DUMP),
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
                               log_path=str(log), timeout=CALL_BOUND)
         try:
@@ -988,6 +1230,8 @@ def main():
                     closed = run_t0(launched.client, state) and closed
                 if selected & H_ROWS:
                     closed = run_h(launched.client, chart, owner_lut, state) and closed
+                if selected & LG_NEEDED:
+                    closed = run_lg(launched.client, chart, state) and closed
             except Exception as error:  # a row that could not run is a failure
                 print(f"  instrument error: {type(error).__name__}: {error}", flush=True)
                 closed = False
