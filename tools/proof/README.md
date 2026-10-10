@@ -17951,3 +17951,40 @@ removed: C1);
 `half-no-unpremultiply` (RH) and `half-no-fill` (KH), its
 `hevc-no-profile` (B1) and `label-premultiplied` on its new anchor, and the
 four B93 probe mutants, since the fill they anchor in went generic.
+
+## Road map grading — GR0, the grading spike (`grading_spike/`; #258)
+
+**What it answers.** What tone and a 3D LUT cost an ungraded and a graded
+layer in the tree's own `Compositor.metal` under three routes — a uniform flag
+(VF), function constants (VC), always on at neutral values (VA) — at 1920×1080
+and 3840×2160, the route chosen by a rule written beforehand in
+`designs/grading.md`; and for #258, whether a 10-bit biplanar source (`x420`,
+`x422`) wins back what a `64RGBAHalf` source costs the layer stage. Nothing is
+merged into `app/`. `grading_spike/README.md` has the variants, scenes, rows,
+statistic and mutants.
+
+```
+python3 tools/proof/grading_spike/grading_spike.py --check                       # B0–B2, K1–K5 (10 frames, 1 run)
+python3 tools/proof/grading_spike/grading_spike.py --check --mutant NAME         # anchor-missing | exposure-encoded | lut-axes-swapped | adjust-ignores-destination | biplanar-full-range | neutral-drift
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure   # adds H0, C0, C1, F, T0–T2, P1, X0, X1, D1; recorded
+```
+
+**Its record** (2026-10-09, Apple M2 Max, macOS 26.5.1, `powermode 0`, AC
+power, load `{ 7.68 8.94 9.76 }` before and `{ 6.88 8.61 9.61 }` after, seed
+20261009): `--check` exit 0 (B0–B2 and 44 K rows); `--measure` exit 0. C0 noise
+0.001 ms at 1080p and 0.000 ms at 4K; one ungraded full-bleed layer, V0 0.125
+/ 0.481 ms (1080p / 4K); S1 overhead over V0 for the TL variants: VF-TL 0.000 /
+0.001, VC-TL −0.003 / −0.000, VA-TL 0.022 / 0.083 ms. **T1: route VF** (VA-TL
+misses bound + noise at both sizes). A graded layer over its own S1, tone and
+a 33³ look at 0.8: VF 0.057 / 0.226, VC 0.037 / 0.149, VA 0.001 / 0.003 ms; one
+adjustment pass 0.045–0.047 / 0.169–0.174 ms; the linear-light step 0.011 /
+0.040 ms. P1: two stacked adjustment passes keep 256 of 256 levels through
+`rgba16Float` (CONTROL through `bgra8Unorm`: 189). #258 (SH, four video
+layers, 4K): B8 0.765, H16 0.900, X420 0.769, X422 0.792 ms, C1 noise 0.002;
+G 0.135, W 0.131 ms, so **X1: #258 stays open for the owner's choice**. D1
+(fps into 32BGRA / 64RGBAHalf / x420 / x422): ProRes 422 10-bit 198.6 / 313.3
+/ 196.4 / 450.8, HEVC Main 10 198.5 / 277.3 / 341.0 / 315.9. Mutants: all six
+killed (`anchor-missing` by B0, `exposure-encoded` by K2 and K4,
+`lut-axes-swapped` by K3, `adjust-ignores-destination` by K4,
+`biplanar-full-range` by K5, `neutral-drift` by K1). The full tables are
+`designs/grading.md`'s GR0 record.
