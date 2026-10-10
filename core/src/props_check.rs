@@ -67,6 +67,12 @@ pub(crate) const COMPRESSOR_MAKEUP_MAX_DB: f64 = 24.0;
 pub(crate) const WORD_SCALE_MIN: f64 = 1.0;
 pub(crate) const WORD_SCALE_MAX: f64 = 1.5;
 
+/// Tone's bounds (spec §11 GR-2): exposure is ±3 EV, and the other eight
+/// are ±1 — fade 0…1 — at the strengths `Compositor.metal`'s `gradeTone`
+/// gives them.
+pub(crate) const EXPOSURE_MAX: f64 = 3.0;
+pub(crate) const TONE_MAX: f64 = 1.0;
+
 // ---- range checks --------------------------------------------------------
 
 fn finite(key: &str, value: f64) -> Result<(), String> {
@@ -207,6 +213,28 @@ pub(crate) fn check_video(props: &VideoProps, size: Option<(f64, f64)>) -> Resul
     finite("video.color.contrast", props.color.contrast)?;
     finite("video.color.saturation", props.color.saturation)?;
     finite("video.color.hue", props.color.hue)?;
+    // Tone is bounded, unlike the four above: each bound is where its
+    // strength is defined (spec §11 GR-2), and the inspector shows exactly it.
+    let c = &props.color;
+    in_range(
+        "video.color.exposure",
+        c.exposure,
+        -EXPOSURE_MAX,
+        EXPOSURE_MAX,
+    )?;
+    in_range(
+        "video.color.temperature",
+        c.temperature,
+        -TONE_MAX,
+        TONE_MAX,
+    )?;
+    in_range("video.color.tint", c.tint, -TONE_MAX, TONE_MAX)?;
+    in_range("video.color.highlights", c.highlights, -TONE_MAX, TONE_MAX)?;
+    in_range("video.color.shadows", c.shadows, -TONE_MAX, TONE_MAX)?;
+    in_range("video.color.whites", c.whites, -TONE_MAX, TONE_MAX)?;
+    in_range("video.color.blacks", c.blacks, -TONE_MAX, TONE_MAX)?;
+    in_range("video.color.vibrance", c.vibrance, -TONE_MAX, TONE_MAX)?;
+    in_range("video.color.fade", c.fade, 0.0, TONE_MAX)?;
     if let Some(chroma) = &props.chroma {
         for channel in &chroma.key {
             in_range("video.chroma.key", *channel, 0.0, 1.0)?;

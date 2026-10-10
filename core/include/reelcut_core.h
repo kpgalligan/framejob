@@ -108,8 +108,13 @@ extern "C" {
  * `alpha`, `alpha_inverted`, `luma` or `luma_inverted` — written only when
  * it is not `none`, so an ordinary track writes the text it did. The
  * default is `none`, so there is no migration step; an older build would
- * drop the key and draw a matte track's clips over the picture they cut. */
-#define RC_FORMAT_VERSION 14
+ * drop the key and draw a matte track's clips over the picture they cut.
+ *
+ * Version 1015 is the grading branch's own number (spec §11 GR-9), main's 14
+ * plus a thousand: tone, nine keys on `video.color` after `hue`, each written
+ * only when not 0. The branch reads 1 to 14 and 1015 and refuses the numbers
+ * between by name; the merge renumbers it to main's next. */
+#define RC_FORMAT_VERSION 1015
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

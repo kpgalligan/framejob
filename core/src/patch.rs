@@ -92,7 +92,9 @@ impl Group {
     /// naming them.
     fn template(self) -> Value {
         match self {
-            Group::Video => actions::to_json(&VideoProps {
+            // `video_json`: tone's neutral keys are left out of `to_json`
+            // and would read as unknown here (spec §11 GR-2).
+            Group::Video => actions::video_json(&VideoProps {
                 shadow: Some(Shadow::default()),
                 chroma: Some(Chroma::default()),
                 filters: vec![Filter::default()],

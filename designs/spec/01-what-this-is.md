@@ -10,7 +10,10 @@ shapes, transitions and simple animation, without Final Cut's magnetic
 timeline, roles, multicam, scopes, or a plugin ecosystem.
 
 Deliberate non-goals: camera recording, multicam, color grading beyond
-per-clip controls, audio beyond what shipped (volume, fades, duck, pan,
+per-clip controls (on the `grading` branch, §11 GR-1 makes tier 1 of grading —
+tone, adjustment clips, looks, LUT import, an ungraded switch and one luma
+waveform — an experiment, and lets "scopes" above wait for its verdict),
+audio beyond what shipped (volume, fades, duck, pan,
 compressor, noise reduction, peak normalize, the transition crossfade and
 the export's loudness target — M3 and §11 R5-2; so no EQ, mix buses or
 Audio Units, while offline voice effects are deferred rather than out), a

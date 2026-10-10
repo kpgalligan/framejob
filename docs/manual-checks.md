@@ -475,6 +475,13 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Expect:** both ProRes files play; the gradient is smooth in each, with no band or step you cannot also see in the preview; the colours and the title are the ones the preview shows. The HEVC 10-bit file plays, smooth across the ramp, the same colours as the preview; beside it the `hevc` file may show faint bands, and the 10-bit one shows fewer or none.
 - **Source:** the precision road map's PR1 (spec §11 PR-3: the ProRes rows take the compositor's 16-bit frames) and PR3 (spec §11 PR-3: the `hevc_10bit` row writes Main 10; `precision_proof.py` T2 measures the ramp, not what the player shows).
 
+## Grading
+
+**GRD-1 — Light looks right on real footage** (the `grading` branch's Release build)
+- **Do:** 1. Open real camera footage (1080p or 4K, a face and a sky or a wall with a soft gradient if possible) and select the clip. 2. On the Clip tab's Color sub-tab, open Light and drag Exposure to +1.00 EV, then −1.00 EV, then back to 0. 3. Set Temperature to +0.5, then −0.5; then Tint to +0.5 and −0.5. 4. Try Highlights −0.5, Shadows +0.5, Whites +0.5, Blacks −0.5, Vibrance +0.5 and Fade 0.5, one at a time, each back to 0 after. 5. Play the clip with a few of them set, at View ▸ Preview Quality ▸ Full and Quarter. Repeat in the other appearance.
+- **Expect:** +1 EV looks like one stop brighter (twice the light, highlights rolling into white rather than turning flat grey) and −1 EV one stop darker; positive temperature reads warmer and negative cooler, with no green or magenta cast creeping in, and tint moves only along green–magenta; highlights and whites move the bright end, shadows and blacks the dark end; vibrance lifts dull colours more than strong ones (skin does not go orange); fade lifts the blacks to a matte look; no new banding in the sky or wall at any setting; playback is smooth; every slider, field and the section's "neutral"/"adjusted" summary read clearly in both appearances, and Reset puts the clip back exactly as it was.
+- **Source:** the grading road map's GR2 (spec §11 GR-2); `tools/proof/tone_proof.py` measures each strength on synthetic cards, not how it looks on footage.
+
 ## Screen recording
 
 Launch Reelcut from the Finder or Dock unless the check says otherwise.

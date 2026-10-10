@@ -591,7 +591,22 @@ fn an_end_patch_that_replaces_the_whole_video_group_falls_through_to_the_base() 
     // caught panic would come back as "internal error" from `clip_state`
     // and as a NULL recipe, and defaults would move the clip.
     let control = Handle::from_value(&moving(8, Some(full_motion())));
-    let base = at(&control.value(), "/clips/0/video").clone();
+    let mut base = at(&control.value(), "/clips/0/video").clone();
+    // `clip_state` reports `color` with every key, tone's nine at 0 included
+    // (spec §11 GR-2), where the stored clip leaves a neutral tone key out.
+    for key in [
+        "exposure",
+        "temperature",
+        "tint",
+        "highlights",
+        "shadows",
+        "whites",
+        "blacks",
+        "vibrance",
+        "fade",
+    ] {
+        base["color"][key] = json!(0.0);
+    }
     for replacement in [
         json!(5),
         json!(null),

@@ -208,7 +208,24 @@ use crate::model::{Canvas, Project};
 /// migration step; an older build would drop the key and write back a
 /// matte track as an ordinary one, its clips suddenly drawn over the
 /// picture they were cutting.
-pub const RC_FORMAT_VERSION: u32 = 14;
+///
+/// **Version 1015 is the grading branch's own number** (spec §11 GR-9): main's
+/// 14 plus a thousand, so every main build refuses a branch-made project as
+/// newer instead of opening it and dropping its grades on the next save. It
+/// is tone (GR-2): nine keys on [`crate::model::ColorAdjust`] after `hue` —
+/// `exposure`, `temperature`, `tint`, `highlights`, `shadows`, `whites`,
+/// `blacks`, `vibrance`, `fade` — each written only when not 0, so an
+/// untoned project writes exactly the text it did, and the reader's default
+/// is 0, so there is no migration step. The branch reads 1 to
+/// [`BRANCH_BASE_VERSION`] and 1015, and refuses the numbers between in its
+/// own sentence: a later main file would open here and lose its new keys on
+/// save. At the merge 1015 is renumbered to main's next with one migration
+/// arm, and the gap and `BRANCH_BASE_VERSION` go with it.
+pub const RC_FORMAT_VERSION: u32 = 1015;
+
+/// The last main version the grading branch was cut from (spec §11 GR-9):
+/// the reader takes 1 to this and [`RC_FORMAT_VERSION`], and refuses the gap.
+pub const BRANCH_BASE_VERSION: u32 = 14;
 
 /// Reader caps, mirrored by the `RC_MAX_*` defines in the C header. They
 /// exist so a corrupt or generated file cannot make the app allocate
@@ -377,6 +394,13 @@ pub fn read(json: &str) -> Result<Project, String> {
         return Err(format!(
             "project format version {version} is newer than this build understands \
              (version {RC_FORMAT_VERSION}); update Reelcut to open it"
+        ));
+    }
+    if version > u64::from(BRANCH_BASE_VERSION) && version < u64::from(RC_FORMAT_VERSION) {
+        return Err(format!(
+            "project format version {version} is not one this grading build reads (it reads 1 \
+             to {BRANCH_BASE_VERSION} and {RC_FORMAT_VERSION}); open it in the Reelcut that \
+             made it"
         ));
     }
 

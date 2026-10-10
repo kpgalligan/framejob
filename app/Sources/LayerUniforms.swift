@@ -73,8 +73,8 @@ struct LayerUniforms {
     // `CompositorEffects.swift` fills every one of these and is where each
     // field's meaning, units and range are argued; the declarations live here
     // because the layout contract above governs the whole struct and a reader
-    // checking it against `Compositor.metal` has to see all 104 fields in one
-    // list.
+    // checking it against `Compositor.metal` has to see all 116 fields in one
+    // list (104 to here and the tone group's twelve at the end).
     //
     // The M3 block's 28 begin with the four floats that used to be
     // `reserved0…3`; the obscure block's 36 restored a padding tail of three,
@@ -167,8 +167,8 @@ struct LayerUniforms {
     var blendMode: Float = 0
     /// The DESTINATION's size relative to the canvas, as CANVAS PIXELS PER
     /// DESTINATION PIXEL on each axis (phase 8d). The two spent what was left
-    /// of the padding tail, so the block is still 104 floats and the tail is
-    /// now EMPTY — the next field to land needs three companions.
+    /// of the padding tail, so the block stayed 104 floats with an EMPTY tail,
+    /// and the tone group below came as twelve.
     ///
     /// **Why the fragment stage needs telling.** `[[position]]` is in
     /// DESTINATION pixels. Until phase 8a the destination was always the
@@ -191,6 +191,22 @@ struct LayerUniforms {
     /// existed.
     var canvasPerDestX: Float = 1
     var canvasPerDestY: Float = 1
+    // Tone (spec §11 GR-2, grading GR2): `ColorAdjust`'s nine tone keys in
+    // the model's order, then `toneEnabled` — 1 exactly when one of them is
+    // not 0, the effects gate's term (`apply(tone:)`, `GradeProps.swift`) —
+    // and two reserved. 104 + 12 = 116 floats = 464 bytes, 29 × 16.
+    var exposure: Float = 0
+    var temperature: Float = 0
+    var tint: Float = 0
+    var highlights: Float = 0
+    var shadows: Float = 0
+    var whites: Float = 0
+    var blacks: Float = 0
+    var vibrance: Float = 0
+    var fade: Float = 0
+    var toneEnabled: Float = 0
+    var toneReserved0: Float = 0
+    var toneReserved1: Float = 0
 }
 
 /// The shadow pass's uniform block, mirroring `ShadowUniforms` in

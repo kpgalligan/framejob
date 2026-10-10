@@ -2,7 +2,9 @@
 // road map "grading" GR0's spike (`grading_spike.py`). Compiled as `main.swift`
 // over every other file in `app/Sources` through `swift_build.build(…,
 // optimize=True)`, for the app's own types: it fills the app's `LayerUniforms`
-// (416 bytes, asserted below) followed by 16 grade floats (480 bytes, asserted),
+// and hands the shader its first 104 floats (416 bytes, asserted below — the
+// block the shader pinned at 4d742cc reads; the tree's own grew a tone group in
+// grading GR2) followed by 16 grade floats (480 bytes, asserted),
 // builds its pipelines the way `MetalRenderer.pipelineDescriptor` does with
 // `MetalRenderer.workingFormat` (`rgba16Float`, spec §11 PR-1), and wraps #258's
 // sources through a `CVMetalTextureCache` the way `Compositor.texture(from:live:)`
@@ -177,19 +179,36 @@ struct GradeFields {
     var reserved2: Float = 0
 }
 
-/// What every draw hands the shader: the app's block, then the grade.
+/// What every draw fills: the app's block, then the grade. What the shader is
+/// HANDED is `packed(_:)`: the block's first 104 floats, then the grade.
 struct GradeBlock {
     var layer = LayerUniforms()
     var grade = GradeFields()
 }
 
-guard MemoryLayout<LayerUniforms>.stride == 416 else {
-    fail("LayerUniforms is \(MemoryLayout<LayerUniforms>.stride) bytes, not 416")
+/// The 104 floats every variant's shader reads before the grade: the block as
+/// it stood at 4d742cc, which ends at `canvasPerDestY`.
+let layerBytes = 416
+guard MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.canvasPerDestY) == layerBytes - 4,
+    MemoryLayout<LayerUniforms>.stride >= layerBytes
+else {
+    fail("LayerUniforms' first 104 floats do not end at \(layerBytes) bytes")
 }
-guard MemoryLayout<GradeBlock>.stride == 480,
-    MemoryLayout<GradeBlock>.offset(of: \GradeBlock.grade) == 416
-else { fail("the grade block is \(MemoryLayout<GradeBlock>.stride) bytes, not 480") }
-let blockBytes = MemoryLayout<GradeBlock>.stride
+guard MemoryLayout<GradeFields>.stride == 64 else {
+    fail("the grade is \(MemoryLayout<GradeFields>.stride) bytes, not 64")
+}
+let blockBytes = layerBytes + MemoryLayout<GradeFields>.stride
+guard blockBytes == 480 else { fail("the handed block is \(blockBytes) bytes, not 480") }
+
+/// `block` as the shader reads it: `LayerUniforms`' first 416 bytes, then the
+/// 64-byte grade.
+func packed(_ block: GradeBlock) -> [UInt8] {
+    var layer = block.layer
+    var grade = block.grade
+    let head = withUnsafeBytes(of: &layer) { Array($0.prefix(layerBytes)) }
+    let tail = withUnsafeBytes(of: &grade) { Array($0) }
+    return head + tail
+}
 
 guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue()
 else { fail("no Metal device") }
@@ -569,10 +588,10 @@ func pass(_ buffer: MTLCommandBuffer, _ target: MTLTexture, load: Bool = false,
 func drawLayer(_ e: MTLRenderCommandEncoder, _ state: MTLRenderPipelineState,
                _ source: MTLTexture, _ block: GradeBlock, look: MTLTexture = identity2,
                chroma: MTLTexture? = nil) {
-    var b = block
+    let b = packed(block)
     e.setRenderPipelineState(state)
-    e.setVertexBytes(&b, length: blockBytes, index: 0)
-    e.setFragmentBytes(&b, length: blockBytes, index: 0)
+    e.setVertexBytes(b, length: blockBytes, index: 0)
+    e.setFragmentBytes(b, length: blockBytes, index: 0)
     e.setFragmentTexture(source, index: 0)
     e.setFragmentTexture(mattePlaceholder, index: 1)
     e.setFragmentTexture(look, index: 2)
@@ -583,9 +602,9 @@ func drawLayer(_ e: MTLRenderCommandEncoder, _ state: MTLRenderPipelineState,
 
 func drawAdjust(_ e: MTLRenderCommandEncoder, _ state: MTLRenderPipelineState,
                 _ block: GradeBlock, look: MTLTexture = identity2) {
-    var b = block
+    let b = packed(block)
     e.setRenderPipelineState(state)
-    e.setFragmentBytes(&b, length: blockBytes, index: 0)
+    e.setFragmentBytes(b, length: blockBytes, index: 0)
     e.setFragmentTexture(look, index: 2)
     e.setFragmentSamplerState(sampler, index: 0)
     e.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)

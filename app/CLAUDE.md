@@ -25,7 +25,10 @@ detail there.
   `AudioPatch`, `ClipPatch`, the `ActionPatch` extension; a pure move, B73),
   `TextPatch` (with `case`, `words` and `word_style`) is `TextPatch.swift`'s,
   moved out so it could grow, and `ShapePatch` `ShapePatch.swift`'s (a pure
-  move, the toll for `ReelColor`). `word_style` has ONE
+  move, the toll for `ReelColor`). `VideoPatch.color` is a sparse `ColorPatch`
+  (`GradeProps.swift`, with `ColorAdjust`'s neutrality helpers and
+  `LayerUniforms.apply(tone:)`), so a row writes only its own key to every
+  selected clip. `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10). `ReelAgentSocket` (road map
   14's MC2) wraps `rc_agent_socket_start` / `_release`: `start` throws the
   core's sentence, `release` is the quit's unlink-if-still-ours with no join.
@@ -785,8 +788,9 @@ the key map behind it.
   shows) ·
   `ClipSelectionHeader.swift`
   (`ClipSelectionHeaderView`, a pure move out of `ClipPane.swift`) ·
-  `ClipPinnedBlock.swift` (`ClipSubTab` — six cases in display order, text,
-  shape, graphic, picture, sound, clip; `graphic` counts `graphic.props`, a stale key included (G-34 (l), CI-6 amended) — with
+  `ClipPinnedBlock.swift` (`ClipSubTab` — seven cases in display order, text,
+  shape, graphic, picture, color, sound, clip; `color` (spec §11 GR-2) shows only
+  when `videoClips` is non-empty and every clip has source pixels, and counts `color`; `graphic` counts `graphic.props`, a stale key included (G-34 (l), CI-6 amended) — with
   its `◆N` key count,
   `ClipSubTabsView`, and `ClipHeaderBlock` — header, lane, sub-tabs and, when given one, the matte
   note — which
@@ -800,7 +804,8 @@ the key map behind it.
   holding a point wins, the one painted on top) · `ActionLaneDecor.swift`
   (CI-12: the lane's hatch, fades and wedges as geometry by the timeline's
   own gates, drawn under the bands; `Curve.laneName`; `CurveGlyphView`,
-  beside the Curve popup because `OptionPopupControl` is not forked) · `VideoPane.swift` (+`Color` — the Color section, a pure move, grading GR1; +`Transition`,
+  beside the Curve popup because `OptionPopupControl` is not forked) · `VideoPane.swift` (+`Color` — the Color section, a pure move, grading GR1, writing a sparse `ColorPatch`;
+  +`Light` — the Light section, the nine tone rows (GR-2); +`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
@@ -1087,9 +1092,9 @@ the key map behind it.
   wraps a buffer by its own format. Every video source decodes to
   `64RGBAHalf` (`Compositor.sourcePixelFormat`, spec §11 PR-2), clamped to
   0…1 where the shader samples it. The uniform block's field ORDER is a contract with the
-  shader checked only by reading both, so change them in one edit; it is 104
-  floats and **the padding tail is EMPTY** (the next field needs three
-  companions). **Seven pipelines from five fragment functions**: the two
+  shader checked only by reading both, so change them in one edit; it is 116
+  floats (464 bytes), ending in the tone group (spec §11 GR-2: the nine tone
+  values, `toneEnabled`, and two reserved floats a next field can take). **Seven pipelines from five fragment functions**: the two
   programmable-blend pipelines MUST be built with fixed-function blending
   OFF, or the finished pixel is blended twice — invisible over an opaque
   destination, so a proof of it reads the ALPHA channel over a translucent

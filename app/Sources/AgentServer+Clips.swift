@@ -462,7 +462,7 @@ extension AgentServer {
 
     // MARK: - Properties
 
-    /// `set_video` — the Video tab (`VideoPane` through `InspectorBinding`)
+    /// `set_video` — the Picture and Color sub-tabs (`VideoPane`, `InspectorBinding`)
     /// and every canvas gesture (`CanvasMoveSession` and its siblings).
     ///
     /// **The inspector's redirect is deliberately NOT mirrored here**: with

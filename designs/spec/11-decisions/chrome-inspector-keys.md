@@ -86,6 +86,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   two titles are renamed, `video.motion` to *Motion presets* and
   `text.animation` to *Reveal*. The handoff's "8/10 padding" is read as 8 pt
   top and bottom and 10 pt sides (`InspectorMetrics.inset`).
+  **Amended by GR-2** (grading GR2, on the `grading` branch): a **Color**
+  tab sits after Picture, shown when the selection has clips that draw and
+  every selected clip has source pixels (media, image, still), holding Light
+  and the Color section moved from Picture; Picture stays the default.
 - **CI-6 — `◆N` counts KEYS, and the slider knob is the block.** In this
   phase a sub-tab's `◆N` badge counts the KEYS of the selected action's end
   patch that the tab's sections write (Picture: `video` minus `motion`;
@@ -99,6 +103,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   **Amended 2026-10-07, by issue batch B87 (#239, G-34 (l))**: Graphic
   counts the keys of the end's `graphic.props`, a key its module no longer
   declares included, so the tab's and the Properties section's `◆N` agree.
+  **Amended by GR-2** (grading GR2, on the `grading` branch): Color counts
+  `color` (1 when the end holds `video.color`), and Picture counts `video`
+  minus `motion` and `color`.
 - **CI-7 — Every inspector row carries the 14 pt mark gutter, and the label
   stays 76** (road map 9 §5, the clip inspector redesign's phase 3a). The
   gutter is the FIRST view of every `inspectorRow`, blank when its mark is

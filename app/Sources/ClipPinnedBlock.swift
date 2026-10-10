@@ -3,7 +3,7 @@ import AppKit
 /// One sub-tab of the Clip tab (spec §11 CI-5). The case order is the display
 /// order: Text and Shape come first for those kinds, Clip is always last.
 enum ClipSubTab: String, CaseIterable {
-    case text, shape, graphic, picture, sound, clip
+    case text, shape, graphic, picture, color, sound, clip
 
     var title: String {
         switch self {
@@ -11,6 +11,7 @@ enum ClipSubTab: String, CaseIterable {
         case .shape: return "Shape"
         case .graphic: return "Graphic"
         case .picture: return "Picture"
+        case .color: return "Color"
         case .sound: return "Sound"
         case .clip: return "Clip"
         }
@@ -20,13 +21,17 @@ enum ClipSubTab: String, CaseIterable {
     /// this tab's sections write. Motion lives on Clip, so Picture counts the
     /// video keys without it; a shape's props are not animatable; Graphic
     /// counts the end's `graphic.props`, a key its module no longer declares
-    /// included (CI-6 amended, G-34 (l)).
+    /// included (CI-6 amended, G-34 (l)). Color counts `color`, one key
+    /// however many of its thirteen the end names, and Picture no longer does
+    /// (CI-6 amended by GR-2).
     func keyedCount(in end: ActionPatch) -> Int {
         switch self {
         case .text: return end.text?.dictionary.count ?? 0
         case .shape: return 0
         case .graphic: return end.graphic?.props.count ?? 0
-        case .picture: return end.video?.dictionary.keys.filter { $0 != "motion" }.count ?? 0
+        case .picture:
+            return end.video?.dictionary.keys.filter { $0 != "motion" && $0 != "color" }.count ?? 0
+        case .color: return end.video?.color?.isEmpty == false ? 1 : 0
         case .sound: return end.audio?.dictionary.count ?? 0
         case .clip: return end.video?.dictionary["motion"] == nil ? 0 : 1
         }

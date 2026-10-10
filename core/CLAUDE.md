@@ -78,8 +78,8 @@ governs a module now.
 - `model_matte.rs` — the matte vocabulary (format version 14, spec §11 MT-1):
   `TrackMatte` (`none`, `alpha`, `alpha_inverted`, `luma`, `luma_inverted`)
   and `is_none`, re-exported through `model_props.rs`; the FIELD
-  `Track.matte` stays in `model.rs`, the model's one `skip_serializing_if`
-  (an ordinary track writes no key).
+  `Track.matte` stays in `model.rs`, skipped when `none` (an ordinary track
+  writes no key), as `ColorAdjust`'s nine tone keys are when 0.
 - `model_color.rs` — `normalise_color`, G-12's colour grammar (hex,
   `rgb()`/`rgba()`, `hsl()`/`hsla()` and the CSS named colours, from
   svgtypes' table) to lowercase `#rrggbb[aa]`; out of range is refused,
@@ -420,6 +420,9 @@ governs a module now.
   (each a wrong picture or a wrong sound if carried) and refuses a nest.
   Default plate colour is white: the canvas is already black.
 - `actions.rs` — action evaluation and interpolation, and `clip_state`;
+  `video_json` / `color_json` write all thirteen colour keys, the tone keys at
+  0 included, for the five callers that must see them (the base state,
+  `clip_state`, `patch.rs`'s template, `recipe_layer.rs`, `edit_split.rs`);
   its last line of defence is `actions_clamp.rs`'s, and a graphic's props
   are `actions_graphic.rs`'s (spec §11 G-34), carried in `Evaluated.graphic`
   and `clip_state`'s `graphic`. **The LIST rule is stated here once as the
@@ -568,7 +571,9 @@ governs a module now.
 - `snap.rs` — candidates and `resolve`.
 - `format.rs` — `RC_FORMAT_VERSION`, the `MAX_*` caps (four of them
   `RC_MAX_*` in the header), read-any-version / write-current, the migration
-  hook.
+  hook. On the `grading` branch the version is 1015 and `BRANCH_BASE_VERSION`
+  14: a file numbered 15–1014 (a later main build's) is refused by name, so its
+  newer keys are never dropped on save (spec §11 GR-9).
 - `export.rs` · `export_overrides.rs` · `export_size.rs` · `export_table.rs`
   — settings resolution (`Project::export_settings`, the one thing that reads
   a canvas, a duration, a rate and an override against a preset row); how an

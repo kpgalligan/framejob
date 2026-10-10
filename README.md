@@ -240,6 +240,16 @@ schema, §6 the op table, §7 the architecture.
   every export. The header tags the track ("Matte · Alpha"), its clips
   draw at half opacity with a dashed outline, and the Clip tab says which
   of a matte clip's settings have no effect.
+- **Light** (the `grading` branch, an experiment). A movie, image or still
+  clip has a **Color** sub-tab beside Picture: its **Light** section sets
+  exposure (±3 stops, on linear light), temperature and tint (white balance,
+  also on linear light), highlights, shadows, whites, blacks, vibrance and a
+  fade, and the Color section beside it keeps brightness, contrast,
+  saturation and hue. Each slider writes only its own setting, so several
+  clips keep their own other values; every one animates in an action, draws
+  the same in the preview, stills and every export, and an untouched clip
+  renders exactly as before. A project saved by this build opens only in a
+  grading build (format 1015).
 - **Output.** **File ▸ Save Frame…** (⌥⌘E) writes the frame under the
   playhead as a PNG, JPEG or HEIC still — the same writer `render_frame`
   uses, so a still saved from the menu and one an agent asked for are the

@@ -3237,13 +3237,14 @@ def main():
     if compositor is None:
         check("the compositor probe answered", False, compositor_error or "")
         compositor = {}
-    check("`LayerUniforms` is 416 bytes and `ShadowUniforms` 48 — the layout contract's own "
-          "arithmetic (104 floats, 26 x 16; and 12 floats, 3 x 16), read from "
+    check("`LayerUniforms` is 464 bytes and `ShadowUniforms` 48 — the layout contract's own "
+          "arithmetic (116 floats since grading GR2's tone group, 29 x 16; and 12 floats, "
+          "3 x 16), read from "
           "`MemoryLayout` rather than counted by eye. Nothing checks the METAL half of that "
           "contract but reading it, and the twelve renders below, which come back as "
           "garbage the moment the two lists disagree",
-          compositor.get("layerUniformsSize") == 416
-          and compositor.get("layerUniformsStride") == 416
+          compositor.get("layerUniformsSize") == 464
+          and compositor.get("layerUniformsStride") == 464
           and compositor.get("shadowUniformsSize") == 48
           and compositor.get("shadowUniformsStride") == 48,
           f"layer {compositor.get('layerUniformsSize')}/"

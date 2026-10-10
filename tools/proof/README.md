@@ -17988,3 +17988,58 @@ killed (`anchor-missing` by B0, `exposure-encoded` by K2 and K4,
 `lut-axes-swapped` by K3, `adjust-ignores-destination` by K4,
 `biplanar-full-range` by K5, `neutral-drift` by K1). The full tables are
 `designs/grading.md`'s GR0 record.
+
+## Road map grading — GR2, tone end to end over MCP (`tone_proof.py` N0–N2, E1, E2, W1, K1, F1, O1, A1, R1, X1, U1, M1, B1, P1–P4, Z1 and seven mutants; `tone_probe.swift`; `core/tests/tone.rs`, `core/tests/schema_v1015.rs`; spec §11 GR-2, GR-9; the `grading` branch)
+
+**What it answers.** That `set_video {patch: {color: {…}}}`'s nine tone keys
+reach the compositor's step 4c and do what spec §11 GR-2 says, in
+`render_frame`'s bytes: exposure ±1 as a doubling and a halving of LINEAR
+light on a grey-128 card, temperature and tint as linear-light gains, whites
+and blacks held at their ends and fade lifting black to 26 and white to 242 on
+a 0–255 ramp, tone after the obscure regions' own re-sample, an action
+interpolating from neutral, the range refusals, undo and redo, a luma matte
+clip toned into a wider window, and `render_frame` against a `prores_422`
+export's frame. N0 holds six neutral frames byte-identical (16 bits a channel)
+to a control captured on the UNTOUCHED tree's Release build before any product
+edit; N2 reads the saved `project.json`; P1–P4 are `tone_probe.swift`, built
+by `swift_build.build` over `app/Sources` (a failed build is a scored FAILURE):
+a Light row's write over two clips carries only its own key, the flag is set by
+a negative value, the block is 464 bytes with `exposure` at 416, and the Color
+sub-tab's `◆N`. The module docstring lists every row and its fixture.
+
+```
+python3 tools/proof/tone_proof.py                                   # Debug unless RC_PROOF_APP=release; N0 not run
+python3 tools/proof/tone_proof.py --only E1,A1                      # run and score only these rows
+RC_PROOF_APP=release python3 tools/proof/tone_proof.py capture DIR  # the neutral control, on the untouched tree
+RC_PROOF_APP=release python3 tools/proof/tone_proof.py compare DIR  # every row, and N0 (scored on Release only)
+python3 tools/proof/tone_proof.py --mutant NAME                     # one of the seven below
+cd core && cargo test --release --test tone --test schema_v1015
+```
+
+It launches its own instance on a scratch socket in a scratch home
+(`tools/proof/work/tone/home`), writes its fixtures (a 640×360 grey-128 PNG,
+a 1920×360 ramp PNG, a 2 s `testsrc2` H.264 movie) into its work folder,
+performs no menu item, closes every project it opens, and removes its work
+folder at the start and at exit (the control folder is not under it).
+`--mutant` builds a tree copy (`tree_copy.make_copy`, `own_core` for a
+`core/` edit with the tree's `core/tests` linked in), applies its edits (each
+anchor asserted to occur once), builds the probe over the copy's
+`app/Sources`, and reports MUTANT PASS only when every named row failed and no
+other scored row did; a core mutant also runs `cargo test --release
+--no-fail-fast --test tone --test schema_v1015` in the copy's core (row CT).
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `exposure-encoded` | exposure multiplies the ENCODED value (white balance stays linear) | E1 E2 |
+| `tone-before-obscure` | step 4c moved before 4b | O1 |
+| `flag-ignores-negative` | `apply(tone:)` raises `toneEnabled` only for a positive key | E2 P2 |
+| `range-check-dropped` | `check_video`'s exposure range check removed | R1 CT |
+| `tone-always-written` | `is_zero` answers false, so every tone key is serialised | N2 CT |
+| `lerp-base-unfilled` | `evaluate_clip`'s base state through `to_json`, not `video_json` | A1 CT |
+| `light-writes-group` | a Light row writes the whole colour group | P1 |
+
+GR2 also pinned the GR0 spike's shader to `4d742cc` (`grading_spike.py`'s
+`SHADER_COMMIT`) and made both spikes' benches hand their shader the first 104
+floats of `LayerUniforms`, since the tree's block grew a tone group.
+
+**Its record**: `designs/grading.md`'s GR2 section.

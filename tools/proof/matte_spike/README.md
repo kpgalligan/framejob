@@ -22,7 +22,8 @@ app for `proof_app.py` to choose.
 - `matte_spike.py` — patches, compiles, builds, runs the bench per size,
   scores. Its docstring is the row list.
 - `bench.swift` — compiled as `main.swift` over every other `app/Sources` file
-  for the app's own `LayerUniforms` (416 bytes, asserted), with pipelines built
+  for the app's own `LayerUniforms` (its first 104 floats, 416 bytes, asserted;
+  the tree's grading tone group after them is left at 0), with pipelines built
   as `MetalRenderer.init` builds them.
 - Output under `tools/proof/work/matte_spike/<check|measure|mutant-NAME>/`:
   the three `.metal` sources and metallibs, `bench-<height>.json` (each

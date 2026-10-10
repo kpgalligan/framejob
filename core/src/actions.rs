@@ -33,8 +33,8 @@ use serde_json::{Map, Number, Value};
 use crate::actions_clamp::{clamp_audio, clamp_video};
 use crate::actions_graphic::evaluate_graphic;
 use crate::model::{
-    Action, AudioProps, Clip, Curve, GraphicProps, Project, ShapeProps, Source, TextProps,
-    VideoProps,
+    Action, AudioProps, Clip, ColorAdjust, Curve, GraphicProps, Project, ShapeProps, Source,
+    TextProps, VideoProps,
 };
 use crate::time::Ticks;
 
@@ -309,6 +309,47 @@ pub(crate) fn to_json<T: Serialize>(value: &T) -> Value {
     serde_json::to_value(value).unwrap_or(Value::Null)
 }
 
+/// A clip's `color` with ALL thirteen keys, tone's nine included at 0 —
+/// where `to_json` leaves a neutral tone key out, as the file does (spec §11
+/// GR-2). Every reader that walks keys needs them present: an action's
+/// [`lerp_at`] walks only its FROM side's keys, so a neutral key absent
+/// there would drop out mid-action and jump at the end; `patch.rs`'s
+/// template would refuse `color.exposure` as unknown; and the recipe's
+/// `color` is the compositor's, which `clip_state` must equal.
+pub(crate) fn color_json(color: &ColorAdjust) -> Value {
+    let keys = [
+        ("brightness", color.brightness),
+        ("contrast", color.contrast),
+        ("saturation", color.saturation),
+        ("hue", color.hue),
+        ("exposure", color.exposure),
+        ("temperature", color.temperature),
+        ("tint", color.tint),
+        ("highlights", color.highlights),
+        ("shadows", color.shadows),
+        ("whites", color.whites),
+        ("blacks", color.blacks),
+        ("vibrance", color.vibrance),
+        ("fade", color.fade),
+    ];
+    let mut out = Map::new();
+    for (key, value) in keys {
+        out.insert(key.to_string(), to_json(&value));
+    }
+    Value::Object(out)
+}
+
+/// A video group as JSON with its `color` through [`color_json`], so every
+/// tone key is present: what an action interpolates from, what a patch is
+/// checked against and what a split writes back.
+pub(crate) fn video_json(video: &VideoProps) -> Value {
+    let mut value = to_json(video);
+    if let Value::Object(fields) = &mut value {
+        fields.insert("color".to_string(), color_json(&video.color));
+    }
+    value
+}
+
 impl Project {
     /// The clip's properties at `clip_t` — CLIP time, so 0 is the clip's
     /// first frame — with every action applied and, if `clip_t` lands
@@ -322,7 +363,7 @@ impl Project {
         let base_audio = clip.audio.unwrap_or_default();
 
         let mut fields = Map::new();
-        fields.insert("video".to_string(), to_json(&base_video));
+        fields.insert("video".to_string(), video_json(&base_video));
         fields.insert("audio".to_string(), to_json(&base_audio));
         // A patch may only reach `text` on a clip that HAS text: evaluation
         // resolves properties, it never decides what kind of layer a clip
@@ -427,7 +468,7 @@ impl Project {
             "in_action".to_string(),
             in_action.map(Value::from).unwrap_or(Value::Null),
         );
-        out.insert("video".to_string(), to_json(&evaluated.video));
+        out.insert("video".to_string(), video_json(&evaluated.video));
         out.insert("audio".to_string(), to_json(&evaluated.audio));
         out.insert("text".to_string(), to_json(&evaluated.text));
         out.insert("shape".to_string(), to_json(&evaluated.shape));

@@ -11,8 +11,8 @@
 //  moment someone adds a `float2` or a `float4x4` here, the two layouts stop
 //  being obviously equal and the frame silently renders with garbage
 //  uniforms. Add fields at the END, in groups of four (the struct is
-//  deliberately a multiple of 16 bytes — 104 floats, 416 bytes, as of the
-//  obscure block), and mirror them in Swift in the same order.
+//  deliberately a multiple of 16 bytes — 116 floats, 464 bytes, as of the
+//  tone group, grading GR2), and mirror them in Swift in the same order.
 //
 
 #include <metal_stdlib>
@@ -304,8 +304,8 @@ struct LayerUniforms {
     float blendMode;
     // ── The DESTINATION's size, as CANVAS PIXELS PER DESTINATION PIXEL on
     // each axis (phase 8d). These spent the last two floats of the padding
-    // tail, so the struct is still 104 floats and the tail is now EMPTY: the
-    // next field to land needs three companions.
+    // tail, so the struct was still 104 floats with an EMPTY tail, and the
+    // tone group below came as twelve (nine, its flag and two reserved).
     //
     // **What they are for.** `[[position]]` is in DESTINATION pixels, and
     // until phase 8a the destination was always the canvas — `renderSize` was
@@ -327,6 +327,24 @@ struct LayerUniforms {
     // pass draws into a canvas-sized target of its own.
     float canvasPerDestX;
     float canvasPerDestY;
+    // ── Tone (spec §11 GR-2, grading GR2): `video.color`'s nine tone keys in
+    // the model's order, applied at step 4c by `gradeTone`. `toneEnabled` is
+    // 1 exactly when one of the nine is not 0, and joins the effects gate's
+    // sum, so an untoned layer never enters 4c and renders byte-identical
+    // (GR0's route VF). Twelve floats: 104 + 12 = 116 floats = 464 bytes,
+    // and 464 is 29 × 16; the two reserved floats are the group's tail.
+    float exposure;             // −3…+3 EV, on linear light
+    float temperature;          // −1…+1
+    float tint;                 // −1…+1
+    float highlights;           // −1…+1
+    float shadows;              // −1…+1
+    float whites;               // −1…+1
+    float blacks;               // −1…+1
+    float vibrance;             // −1…+1
+    float fade;                 // 0…1
+    float toneEnabled;          // 1 when any of the nine is not 0
+    float toneReserved0;
+    float toneReserved1;
 };
 
 /// A fragment's `[[position]]` in CANVAS pixels — the frame the nest clip
@@ -867,6 +885,46 @@ static inline ObscurePlan obscurePlan(constant LayerUniforms &u, float2 localPx,
     return plan;
 }
 
+// MARK: - Tone (spec §11 GR-2)
+
+// The sRGB transfer functions (IEC 61966-2-1), on [0, 1]. Textbook formulas
+// only (the Concat rule, `designs/grading.md`), carried over from GR0's spike
+// with its names and numbers.
+static inline float3 gradeDecode(float3 c) {
+    c = clamp(c, 0.0, 1.0);
+    return select(pow((c + 0.055) / 1.055, float3(2.4)), c / 12.92, c <= 0.04045);
+}
+
+static inline float3 gradeEncode(float3 c) {
+    c = clamp(c, 0.0, 1.0);
+    return select(1.055 * pow(c, float3(1.0 / 2.4)) - 0.055, c * 12.92, c <= 0.0031308);
+}
+
+// Tone, on straight colour: exposure and white balance in LOCAL linear light
+// — decoded, multiplied and re-encoded here, a colour transform like
+// `hueRotate`, not the whole-pipeline linear light §7.5 and PR-5 defer — and
+// the curve and saturation shapes on encoded values. At ±1 (Reelcut's own
+// strengths, GR-2): exposure ×2^±1 on linear light; temperature red ×2^±0.3
+// and blue ×2^∓0.3; tint +1 green ×2^−0.3; highlights and shadows ±0.25
+// weighted to the top and bottom halves of luma; whites and blacks a ±15 %
+// stretch held at black and at white; vibrance saturation ×(1 ± 1) where a
+// colour has little; fade 1 black to 10 % and white to 95 %. Neutral (all
+// zero) is the identity, but an untoned layer never comes here at all.
+static inline float3 gradeTone(float3 rgb, constant LayerUniforms &u) {
+    float3 gains = exp2(float3(0.3 * u.temperature, -0.3 * u.tint, -0.3 * u.temperature));
+    float3 lin = gradeDecode(rgb) * exp2(u.exposure) * gains;
+    rgb = gradeEncode(lin);
+    float luma = dot(rgb, float3(0.2126, 0.7152, 0.0722));
+    rgb += 0.25 * u.highlights * smoothstep(0.5, 1.0, luma)
+         + 0.25 * u.shadows * (1.0 - smoothstep(0.0, 0.5, luma));
+    rgb += 0.15 * u.whites * rgb + 0.15 * u.blacks * (1.0 - rgb);
+    float spread = max(rgb.r, max(rgb.g, rgb.b)) - min(rgb.r, min(rgb.g, rgb.b));
+    luma = dot(rgb, float3(0.2126, 0.7152, 0.0722));
+    rgb = mix(float3(luma), rgb, 1.0 + u.vibrance * (1.0 - saturate(spread)));
+    rgb = mix(rgb, rgb * 0.85 + 0.1, u.fade);
+    return rgb;
+}
+
 // MARK: - The layer fragment stage
 
 // ORDER OF OPERATIONS. Fixed by the M3 contract, and each stage is where it
@@ -879,6 +937,11 @@ static inline ObscurePlan obscurePlan(constant LayerUniforms &u, float2 localPx,
 //                              and spill, brightness/contrast/saturation/hue
 //   4. blur, then sharpen      gather neighbours, each one through (3)
 //  4b. obscure the regions     colour only, and AFTER the sharpen: see below
+//  4c. tone                    `gradeTone`, once per pixel (spec §11 GR-2):
+//                              after the regions' own re-sample, so hidden
+//                              content is toned like the picture around it,
+//                              and before the point filters, which act on
+//                              the toned colour
 //   5. the point filters       sepia, noir, vignette, invert, IN SLOT ORDER
 //   6. spotlight dim           after every colour stage: the dim is a light
 //                              on the layer, not something the filters act on
@@ -964,6 +1027,11 @@ static inline ObscurePlan obscurePlan(constant LayerUniforms &u, float2 localPx,
 // everything else is behind that comparison, or compiled out of its pipeline
 // entirely (`kGatherFilters`).
 //
+// TONE (spec §11 GR-2) joins that comparison as a ninth uniform read. GR0's
+// spike measured what the flag costs a full-bleed UNGRADED layer at 0.000 ms
+// at 1080p and 0.001 ms at 4K; a toned layer pays about 0.05 ms at 1080p and
+// 0.20 ms at 4K (`designs/grading.md`, GR0's T0 and T2).
+//
 // What each effect DOES cost on that same layer, over the no-effect baseline:
 // a clip rectangle 0.02 ms, a reflection 0.02, a spotlight with its lens 0.04,
 // a pixelate 0.03, four point filters together 0.08, a sharpen 0.18, a blur
@@ -1018,7 +1086,7 @@ static inline float4 layerColorPremultiplied(Varyings in,
     // measuring the same as the pre-M3 shader.
     bool effects = (u.filterKind0 + u.filterKind1 + u.filterKind2 + u.filterKind3
                     + u.spotEnabled + u.clipEnabled + u.reflectionPass
-                    + u.obscureEnabled) > 0.5;
+                    + u.obscureEnabled + u.toneEnabled) > 0.5;
 
     float2 uv = in.uv;
     float spot = 1.0;
@@ -1191,6 +1259,13 @@ static inline float4 layerColorPremultiplied(Varyings in,
                 float2 snapped = ((floor(px / hide.block) + 0.5) * hide.block) / srcSize;
                 rgb = mix(rgb, layerSample(source, samp, snapped, u).rgb, hide.pixelCover);
             }
+        }
+
+        // (4c) Tone (spec §11 GR-2): once per pixel, after the regions' own
+        // re-sample and before the point filters. Behind `toneEnabled`, so an
+        // untoned layer never enters it.
+        if (u.toneEnabled > 0.5) {
+            rgb = gradeTone(rgb, u);
         }
 
         // (5) The four point filters, in the order the model lists them. A slot

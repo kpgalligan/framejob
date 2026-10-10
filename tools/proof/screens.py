@@ -123,7 +123,7 @@ SECTIONS = {
     "text.animation": True, "text.backdrop": True, "text.box": True, "text.content": False,
     "text.font": True, "text.outline": True, "text.presets": True, "text.style": True,
     "video.chroma": True, "video.color": True, "video.corner": True, "video.crop": True,
-    "video.filters": True, "video.motion": True, "video.obscure": True,
+    "video.filters": True, "video.light": False, "video.motion": True, "video.obscure": True,
     "video.reflection": True, "video.shadow": True, "video.speed": True,
     "video.spotlight": True, "video.transform": False, "video.transition": True,
 }

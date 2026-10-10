@@ -7,8 +7,8 @@
 use crate::audio::MAX_GAIN;
 use crate::model::{AudioProps, BlendMode, VideoProps, MAX_FILTERS, MAX_OBSCURE};
 use crate::props_check::{
-    COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, SCALE_MAX,
-    SCALE_MIN, SPOT_ZOOM_MAX,
+    COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, EXPOSURE_MAX,
+    SCALE_MAX, SCALE_MIN, SPOT_ZOOM_MAX, TONE_MAX,
 };
 
 /// Brings an evaluated value back into the range the ops enforce.
@@ -70,6 +70,16 @@ pub(crate) fn clamp_video(mut props: VideoProps, is_nest: bool) -> VideoProps {
     props.color.contrast = finite_or(props.color.contrast, 0.0);
     props.color.saturation = finite_or(props.color.saturation, 0.0);
     props.color.hue = finite_or(props.color.hue, 0.0);
+    let tone = &mut props.color;
+    tone.exposure = bounded(tone.exposure, -EXPOSURE_MAX, EXPOSURE_MAX, 0.0);
+    tone.temperature = bounded(tone.temperature, -TONE_MAX, TONE_MAX, 0.0);
+    tone.tint = bounded(tone.tint, -TONE_MAX, TONE_MAX, 0.0);
+    tone.highlights = bounded(tone.highlights, -TONE_MAX, TONE_MAX, 0.0);
+    tone.shadows = bounded(tone.shadows, -TONE_MAX, TONE_MAX, 0.0);
+    tone.whites = bounded(tone.whites, -TONE_MAX, TONE_MAX, 0.0);
+    tone.blacks = bounded(tone.blacks, -TONE_MAX, TONE_MAX, 0.0);
+    tone.vibrance = bounded(tone.vibrance, -TONE_MAX, TONE_MAX, 0.0);
+    tone.fade = bounded(tone.fade, 0.0, TONE_MAX, 0.0);
     if let Some(chroma) = props.chroma.as_mut() {
         for channel in chroma.key.iter_mut() {
             *channel = bounded(*channel, 0.0, 1.0, 0.0);

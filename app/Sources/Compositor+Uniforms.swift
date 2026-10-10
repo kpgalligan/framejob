@@ -46,6 +46,7 @@ extension MetalRenderer {
         u.contrast = Float(layer.color.contrast)
         u.saturation = Float(layer.color.saturation)
         u.hue = Float(layer.color.hue * .pi / 180)
+        u.apply(tone: layer.color)
         if let chroma = layer.chroma {
             u.chromaEnabled = 1
             u.chromaKeyR = Float(chroma.key.count > 0 ? chroma.key[0] : 0)

@@ -17,18 +17,18 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 
 | File | Lines | Read it for |
 |---|---|---|
-| [`01-what-this-is.md`](01-what-this-is.md) | 32 | The product in one page, its opening flow, and its non-goals. |
+| [`01-what-this-is.md`](01-what-this-is.md) | 35 | The product in one page, its opening flow, and its non-goals. |
 | [`02-six-ideas.md`](02-six-ideas.md) | 26 | The six a screencast editor ideas the model copies, and why it stays simple. |
 | [`03-window-layout.md`](03-window-layout.md) | 62 | The window's regions, as the design handoff specifies them. |
 | **§4 — The regions in detail** | | |
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 25 | The toolbar. |
 | [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 74 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping. |
-| [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 366 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear; every video, audio, text and shape section. |
+| [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 383 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear; every video, audio, text and shape section. |
 | [`04.3b-inspector-media-document-assistant.md`](04.3b-inspector-media-document-assistant.md) | 179 | The inspector's Media tab (find band, rows, drags, Consolidate, import, generate and export captions), Document tab and Assistant tab. |
 | [`04.4-timeline.md`](04.4-timeline.md) | 209 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
-| [`05.2-project-schema.md`](05.2-project-schema.md) | 391 | The project JSON schema: every persisted field (format version 14). |
+| [`05.2-project-schema.md`](05.2-project-schema.md) | 400 | The project JSON schema: every persisted field (format version 14; 1015 on the grading branch). |
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
 | [`05.4-actions.md`](05.4-actions.md) | 92 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
 | [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
@@ -41,9 +41,9 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 122 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 133 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
-| [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 358 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in. |
+| [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 362 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 52 | The spec's Swift file map (app/CLAUDE.md is the live one). |
-| [`07.5-compositor.md`](07.5-compositor.md) | 158 | The Metal compositor's passes, mattes, and transitions. |
+| [`07.5-compositor.md`](07.5-compositor.md) | 173 | The Metal compositor's passes, mattes, and transitions. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 46 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 183 | `MediaImporter.probe`, the formats import accepts, the WebM/Matroska rewrap, its copy's progress window, the copy's original, and the opt-in ffmpeg step's original and checked VP9 copy. |
 | [`07.8-export.md`](07.8-export.md) | 351 | Export: writers, formats, loudness, the queue. |
@@ -53,7 +53,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 155 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 5843 in 17 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 5946 in 18 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

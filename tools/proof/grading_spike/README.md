@@ -26,8 +26,9 @@ needs `core/target/release/libreelcut_core.a`. `--measure` also needs `ffmpeg`
 - `grading_spike.py` — patches, compiles, builds, runs the bench per size,
   scores, applies the rules, runs D1. Its docstring is the row list.
 - `bench.swift` — compiled as `main.swift` over every other `app/Sources` file
-  for the app's own `LayerUniforms` (416 bytes, asserted) followed by 16 grade
-  floats (480 bytes, asserted), `MetalRenderer.workingFormat` and
+  for the app's own `LayerUniforms`, handing the shader its first 104 floats
+  (416 bytes, asserted; the tree's block grew a tone group in grading GR2)
+  followed by 16 grade floats (480 bytes, asserted), `MetalRenderer.workingFormat` and
   `MetalRenderer.metalFormat(for:)`. Its second mode, `--decode`, is D1's timer.
 - Output under `tools/proof/work/grading_spike/<check|measure|mutant-NAME>/`:
   the nine `.metal` sources and metallibs, `bench-<height>.json` (each
@@ -35,10 +36,12 @@ needs `core/target/release/libreelcut_core.a`. `--measure` also needs `ffmpeg`
   P1), `decode.json` (D1) and `result.json` (the rows, the host, the figures,
   the route, #258's outcome).
 
-**The variants**, each made from the WORKING TREE's
-`app/Resources/Shaders/Compositor.metal`. Every patch anchor must occur exactly
-once and every token rewrite must hit its count pinned at `3cc61e7`; otherwise
-B0 fails naming it.
+**The variants**, each made from `app/Resources/Shaders/Compositor.metal` as it
+stood at `4d742cc` (`SHADER_COMMIT`, `git show`; a failed show is a B0 failure),
+the tree GR0 measured: grading GR2 built tone into the tree's own shader, so
+the spike was pinned there, matte_spike's pattern. Every patch anchor must occur
+exactly once and every token rewrite must hit its count pinned at `3cc61e7`;
+otherwise B0 fails naming it.
 
 - **V0** — the tree, unpatched (and V0b, the same library drawn as a second
   series, for the C0 control).

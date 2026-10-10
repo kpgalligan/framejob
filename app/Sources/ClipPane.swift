@@ -101,14 +101,17 @@ final class ClipPane: InspectorPaneView {
     // MARK: - Sub-tabs
 
     /// The selection's tabs, in display order: Text or Shape first for those
-    /// kinds, Picture for clips that draw, Sound for clips with audio, and
-    /// Clip always, last.
+    /// kinds, Picture for clips that draw, Color when every one of those has
+    /// source pixels (spec §11 GR-2: never text, shape, graphic, nest or an
+    /// audio-only file's clip, which draws nothing), Sound for clips with
+    /// audio, and Clip always, last.
     var subTabs: [ClipSubTab] {
         var tabs: [ClipSubTab] = []
         if textPane.allText { tabs.append(.text) }
         if shapePane.allShape { tabs.append(.shape) }
         if graphicPane.allGraphic { tabs.append(.graphic) }
         if !binding.videoClips.isEmpty { tabs.append(.picture) }
+        if !binding.videoClips.isEmpty && videoPane.allSourcePixels { tabs.append(.color) }
         if !binding.audioClips.isEmpty { tabs.append(.sound) }
         tabs.append(.clip)
         return tabs
@@ -169,8 +172,7 @@ final class ClipPane: InspectorPaneView {
             // crop off a clip that draws nothing.
             if videoPane.allSourcePixels {
                 sections += [
-                    videoPane.cropSection(), videoPane.cornerSection(), videoPane.colorSection(),
-                    videoPane.chromaSection(),
+                    videoPane.cropSection(), videoPane.cornerSection(), videoPane.chromaSection(),
                 ]
             }
             // Shadow is shared by all three drawing kinds, so it is here once.
@@ -179,6 +181,9 @@ final class ClipPane: InspectorPaneView {
                 videoPane.reflectionSection(), videoPane.spotlightSection(),
                 videoPane.obscureSection(),
             ]
+        case .color:
+            // Light, then the Color section Picture used to hold (GR-2).
+            sections = [videoPane.lightSection(), videoPane.colorSection()]
         case .sound:
             sections = [
                 audioPane.volumeSection(), audioPane.fadeSection(), audioPane.duckSection(),

@@ -53,7 +53,7 @@ struct VideoPatch: Codable, Equatable {
     var crop: CropInsets?
     var cornerRadius: Double?
     var shadow: ShadowProps??
-    var color: ColorAdjust?
+    var color: ColorPatch?
     var chroma: ChromaProps??
     var filters: [FilterProps]?
     var reflection: ReflectionProps??
@@ -75,7 +75,7 @@ struct VideoPatch: Codable, Equatable {
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
         opacity: Double? = nil, crop: CropInsets? = nil, cornerRadius: Double? = nil,
-        shadow: ShadowProps?? = nil, color: ColorAdjust? = nil, chroma: ChromaProps?? = nil,
+        shadow: ShadowProps?? = nil, color: ColorPatch? = nil, chroma: ChromaProps?? = nil,
         filters: [FilterProps]? = nil, reflection: ReflectionProps?? = nil,
         spotlight: SpotlightProps?? = nil, obscure: [ObscureProps]? = nil,
         blend: BlendMode? = nil, motion: MotionProps?? = nil

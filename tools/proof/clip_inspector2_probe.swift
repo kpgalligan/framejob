@@ -118,8 +118,10 @@ func sectionIDs(_ pane: ClipPane, _ tab: ClipSubTab) -> [String] {
 
 // MARK: - T1 tabs per kind, and the default
 
+// Grading GR2 (spec §11 GR-2): Color after Picture for a clip with source
+// pixels; an audio-only file's clip draws nothing, so it gets neither.
 let kinds: [(String, [ClipSubTab])] = [
-    ("av", [.picture, .sound, .clip]), ("video", [.picture, .clip]),
+    ("av", [.picture, .color, .sound, .clip]), ("video", [.picture, .color, .clip]),
     ("audio", [.sound, .clip]), ("text", [.text, .picture, .clip]),
     ("shape", [.shape, .picture, .clip]),
 ]
@@ -142,8 +144,9 @@ let expected: [(String, ClipSubTab, [String])] = [
                      "text.backdrop", "text.box", "text.animation", "text.presets"]),
     ("text", .picture, ["video.transform"] + picture),
     ("text", .clip, ["clip.timing", "video.motion"]),
-    ("av", .picture, ["video.transform", "video.crop", "video.corner", "video.color",
-                      "video.chroma"] + picture),
+    ("av", .picture, ["video.transform", "video.crop", "video.corner", "video.chroma"]
+        + picture),
+    ("av", .color, ["video.light", "video.color"]),
     ("av", .sound, ["audio.volume", "audio.fades", "audio.duck", "audio.noise",
                     "audio.compressor", "audio.mix"]),
     ("av", .clip, ["clip.timing", "video.speed", "video.motion"]),

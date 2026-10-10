@@ -5,6 +5,7 @@
 
 use serde_json::{Map, Value};
 
+use crate::actions::color_json;
 use crate::evaluate::{json, number};
 use crate::model::{BlendMode, VideoProps};
 use crate::nest::Frame;
@@ -78,7 +79,8 @@ impl RecipeLayer<'_> {
         out.insert("blend".to_string(), json(&self.blend));
         out.insert("corner_radius".to_string(), number(video.corner_radius));
         out.insert("shadow".to_string(), json(&video.shadow));
-        out.insert("color".to_string(), json(&video.color));
+        // All thirteen keys, tone's included at 0 (spec §11 GR-2).
+        out.insert("color".to_string(), color_json(&video.color));
         out.insert("chroma".to_string(), json(&video.chroma));
         out.insert("filters".to_string(), json(&video.filters));
         out.insert("reflection".to_string(), json(&video.reflection));

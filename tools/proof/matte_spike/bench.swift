@@ -1,7 +1,8 @@
 // tools/proof/matte_spike/bench.swift — the GPU half of road map "mattes" MT0's
 // spike (`matte_spike.py`). Compiled as `main.swift` over every other file in
 // `app/Sources` through `swift_build.build(…, optimize=True)`, for ONE reason:
-// it fills the app's own `LayerUniforms` (416 bytes, asserted below), so the
+// it fills the app's own `LayerUniforms` (its first 104 floats, 416 bytes,
+// asserted below; grading GR2's tone group follows them, 0 here), so the
 // block it hands the shader is the block the compositor hands it. It draws
 // with pipelines of its own, built the way `MetalRenderer.init` builds them,
 // from the metallibs `matte_spike.py` compiles:
@@ -70,8 +71,14 @@ let matteVariants = ["V1", "V2", "VT"].filter { libs[$0] != nil }
 guard width > 0, height > 0, frames > 0, runs > 0, !outPath.isEmpty,
     libs["V0"] != nil, !matteVariants.isEmpty
 else { fail("usage: --lib V0=… (--lib V1=… --lib V2=… | --lib VT=…) --width --height --frames --runs --out") }
-guard MemoryLayout<LayerUniforms>.stride == 416 else {
-    fail("LayerUniforms is \(MemoryLayout<LayerUniforms>.stride) bytes, not 416")
+// The first 104 floats are the block every variant's shader reads (V0 ends at
+// `canvasPerDestY`); the tree's grows past them (grading GR2's tone group, left
+// at 0 — untoned), so the stride is not asserted.
+guard MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.canvasPerDestY) == 412,
+    MemoryLayout<LayerUniforms>.stride >= 416
+else {
+    fail("LayerUniforms' first 104 floats do not end at 416 bytes (canvasPerDestY at "
+        + "\(MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.canvasPerDestY) ?? -1))")
 }
 
 guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue()

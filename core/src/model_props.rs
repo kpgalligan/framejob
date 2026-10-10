@@ -223,8 +223,14 @@ impl Default for Shadow {
     }
 }
 
-/// All four are offsets from neutral: 0 changes nothing, which is why the
+/// All thirteen are offsets from neutral: 0 changes nothing, which is why the
 /// derived `Default` is correct here.
+///
+/// The nine after `hue` are tone (spec §11 GR-2, format 1015 on the grading
+/// branch), in the one order the uniforms and the inspector share. Each is
+/// written only when not 0 (`is_zero`), so an untoned file's text is what it
+/// was; readers that need every key — an action's interpolation, the patch
+/// template, the recipe — go through `actions::color_json`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ColorAdjust {
@@ -232,6 +238,38 @@ pub struct ColorAdjust {
     pub contrast: f64,
     pub saturation: f64,
     pub hue: f64,
+    /// −3…+3 EV, on linear light.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub exposure: f64,
+    /// −1…+1: red up and blue down in linear light (warmer), or the reverse.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub temperature: f64,
+    /// −1…+1: green down in linear light (magenta), or up.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub tint: f64,
+    /// −1…+1, the upper half of luma.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub highlights: f64,
+    /// −1…+1, the lower half of luma.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub shadows: f64,
+    /// −1…+1, a stretch held at black.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub whites: f64,
+    /// −1…+1, a stretch held at white.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub blacks: f64,
+    /// −1…+1, saturation on the colours that have little.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub vibrance: f64,
+    /// 0…1: black lifted towards 10 %, white lowered towards 95 %.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub fade: f64,
+}
+
+/// Whether a tone key is neutral, and so left out of the file.
+fn is_zero(value: &f64) -> bool {
+    *value == 0.0
 }
 
 /// Chroma key (M3). `key` is the RGB being removed.

@@ -9,8 +9,10 @@ rules, written before measuring") with the constants below.
     python3 tools/proof/grading_spike/grading_spike.py --measure [--seed N]      # adds H0, C0, C1, F, T0–T2, P1, X0, X1, D1
 
 Nothing is merged into `app/`. Every shader is made in
-`work/grading_spike/<tag>/` from the WORKING TREE's
-`app/Resources/Shaders/Compositor.metal`: V0 the tree unpatched; VF-T and VF-TL
+`work/grading_spike/<tag>/` from `app/Resources/Shaders/Compositor.metal` as it
+stood at `SHADER_COMMIT` 4d742cc, the tree GR0 measured (pinned in grading GR2,
+when the tree's own shader took tone: `git show`, matte_spike's pattern; a
+failed show is the scored FAILURE row B0): V0 that shader unpatched; VF-T and VF-TL
 (tone, and tone plus a look, behind a uniform flag that joins the effects sum,
 at step 4c/4d before `// (5) The four point filters`); VC-T and VC-TL (the same
 stages behind function constants `kTone` 2 and `kLook` 3); VA-T and VA-TL (always
@@ -78,7 +80,8 @@ BOUND = {1080: 0.02, 2160: 0.06}
 ROUTE_ORDER = ("VA", "VF", "VC")
 WIN_SHARE = 0.5
 
-SHADER = ROOT / "app/Resources/Shaders/Compositor.metal"
+SHADER = "app/Resources/Shaders/Compositor.metal"
+SHADER_COMMIT = "4d742cc"
 WORK = PROOF / "work/grading_spike"
 SIZES = [(1920, 1080), (3840, 2160)]
 MUTANTS = ("anchor-missing", "exposure-encoded", "lut-axes-swapped",
@@ -352,10 +355,13 @@ def ms(value):
 # ---- building -----------------------------------------------------------------
 
 def build_shaders(folder, mutant):
-    if not SHADER.exists():
-        emit("B0", "FAIL", f"{SHADER.relative_to(ROOT)} is missing")
+    shown = subprocess.run(["git", "-C", str(ROOT), "show", f"{SHADER_COMMIT}:{SHADER}"],
+                           capture_output=True, text=True)
+    if shown.returncode != 0:
+        emit("B0", "FAIL", f"git show {SHADER_COMMIT}:{SHADER} failed: "
+             f"{shown.stderr.strip()[-300:]}")
         return None
-    source = SHADER.read_text()
+    source = shown.stdout
     texts = {"V0": source}
     for variant in GRADING + ("VB",):
         try:
@@ -364,8 +370,8 @@ def build_shaders(folder, mutant):
         except PatchError as error:
             emit("B0", "FAIL", f"{variant}: {error}")
             return None
-    emit("B0", "PASS", f"{', '.join(n for n in texts if n != 'V0')} patched from the working "
-         f"tree's {SHADER.relative_to(ROOT)} ({source.count(chr(10))} lines): every anchor exactly "
+    emit("B0", "PASS", f"{', '.join(n for n in texts if n != 'V0')} patched from "
+         f"{SHADER} at {SHADER_COMMIT} ({source.count(chr(10))} lines): every anchor exactly "
          "once; VB's token rewrites hit " + "/".join(str(r[3]) for r in TOKEN_REWRITES))
     libs = {}
     for name, text in texts.items():

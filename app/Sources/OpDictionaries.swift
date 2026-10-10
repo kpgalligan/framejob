@@ -16,9 +16,18 @@ extension ShadowProps {
     }
 }
 
-extension ColorAdjust {
+extension ColorPatch {
+    /// The keys the write names, and no others (spec §11 GR-2's sparse rows).
     var dictionary: [String: Any] {
-        ["brightness": brightness, "contrast": contrast, "saturation": saturation, "hue": hue]
+        let keys: [(String, Double?)] = [
+            ("brightness", brightness), ("contrast", contrast), ("saturation", saturation),
+            ("hue", hue), ("exposure", exposure), ("temperature", temperature), ("tint", tint),
+            ("highlights", highlights), ("shadows", shadows), ("whites", whites),
+            ("blacks", blacks), ("vibrance", vibrance), ("fade", fade),
+        ]
+        var d: [String: Any] = [:]
+        for case let (key, value?) in keys { d[key] = value }
+        return d
     }
 }
 

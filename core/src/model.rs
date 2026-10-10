@@ -186,7 +186,8 @@ pub struct Track {
     /// Matte (format version 14, spec §11 MT-1): `none` is an ordinary
     /// track; any other mode makes the track's clips draw nothing on the
     /// canvas and cut the track directly behind (MT-2, MT-3). Written only
-    /// when not `none` — the model's one `skip_serializing_if` — so an
+    /// when not `none` — this file's one `skip_serializing_if`, the model's
+    /// first (tone's nine keys in `model_props.rs` are the rest) — so an
     /// ordinary track and every older file round-trip byte for byte.
     #[serde(default, skip_serializing_if = "TrackMatte::is_none")]
     pub matte: TrackMatte,

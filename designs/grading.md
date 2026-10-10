@@ -668,3 +668,109 @@ is the one the file's own banner drew. `place`, `segment_of`, `assign` and
 seams are in `designs/adr/app-file-history.md` and `core-file-history.md`:
 `ShapeProps.swift`, `VideoPane+Chroma.swift`, and the View menu's submenus.
 `AgentCatalog+Clips.swift` and `evaluate.rs` have none named.
+
+## GR2 — the decisions and tone (2026-10-09, on the `grading` branch)
+
+**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, cut from
+main at `4d742cc` (main had not moved, so no merge was due). The owner's
+answers to GR2's nine choices were "All as recommended" (2026-10-09).
+
+**What landed.**
+- Spec §11 first: `designs/spec/11-decisions/grading.md` with GR-1 (the
+  experiment; amends §1), GR-2 (tone, step 4c, local linear light, the route,
+  the Color sub-tab and the nine choices), GR-3 (the float pipeline, encoded
+  blending) and GR-9 (format 1015, the 15–1014 refusal, the merge's
+  renumbering); its README rows; "Amended by GR-2" under CI-5 and CI-6. Then
+  §1, §4.3a, §5.2, §7.3 and §7.5, and the spec index's Lines cells.
+- Core: `ColorAdjust` gains `exposure`, `temperature`, `tint`, `highlights`,
+  `shadows`, `whites`, `blacks`, `vibrance`, `fade`, each
+  `skip_serializing_if = "is_zero"`; `props_check.rs`'s `EXPOSURE_MAX` 3 and
+  `TONE_MAX` 1 and nine `in_range` checks; nine `bounded` lines in
+  `clamp_video`; `actions::color_json` (all thirteen keys) and `video_json`
+  at `evaluate_clip`'s base state, `clip_state`'s `video`, `patch.rs`'s video
+  template, `edit_split.rs`'s `state_patch` and (`color_json`) the recipe
+  layer; `RC_FORMAT_VERSION` 1015 and `BRANCH_BASE_VERSION` 14 with the gap's
+  sentence in `format::read`, and the header's `#define`. No new op, op-table
+  row or FFI export. New `core/tests/tone.rs` (6) and `schema_v1015.rs` (5).
+- App: `LayerUniforms` 104 → 116 floats (464 bytes): the nine, `toneEnabled`
+  and two reserved, in Swift and Metal; `Compositor.metal`'s `gradeDecode`,
+  `gradeEncode` and `gradeTone` (GR0's spike formulas and numbers), the gate
+  sum's `+ u.toneEnabled` and step 4c between 4b and 5, with the
+  order-of-operations and cost comments; `Compositor+Uniforms.swift`'s one
+  `u.apply(tone:)`. New `GradeProps.swift` (`ColorPatch`, the two neutrality
+  helpers, `LayerUniforms.apply(tone:)`) and `VideoPane+Light.swift`;
+  `ClipSubTab.color`, its `keyedCount` and Picture's without `color`;
+  `ClipPane`'s Color tab (videoClips non-empty and `allSourcePixels`) holding
+  Light then Color; Color's rows write `ColorPatch` sparsely; the eyedropper's
+  suppression writes all thirteen at 0; `set_video`'s catalog prose names the
+  nine keys and ranges.
+- Instruments: `tone_proof.py` and `tone_probe.swift`; `phase8_chrome.py`'s
+  size row (464); both spikes' benches hand their shader the first 104 floats,
+  and `grading_spike.py` reads the shader at `4d742cc`; `clip_inspector2`'s
+  T1/T2; the screen catalog's `05b-clip-color` and `05-clip-picture`'s prose;
+  `phase9_proof.py`'s version loop over 1–`BRANCH_BASE_VERSION` and the
+  current version. GRD-1 in `docs/manual-checks.md`; the README's Light bullet.
+
+**Sizes.** Product code (`app/Sources`, `core/src`, the shader): +347 −64 in
+changed files and 165 lines in the two new Swift files, so about +448 net,
+against "Worth keeping"'s ≤ 4,500 for GR2–GR6. `ProjectSnapshot.swift` grew
+only by `ColorAdjust`'s 34 lines (1,750 → 1,784); `AgentServer+Clips.swift`
+stayed 636 and `CanvasSessions.swift` (over the cap) 1,092, both net 0; no
+frozen file was touched. The inspector gained one sub-tab with
+two sections; Picture lost Color and gained nothing.
+
+**Measured.** Every run on 2026-10-09, Apple M2 Max, macOS 26.5.1, AC power.
+- The control: `make app` on the untouched worktree (main's `4d742cc` plus
+  only the §11 text), then `RC_PROOF_APP=release tone_proof.py capture
+  tools/proof/work/gr2/control`: six neutral frames.
+- `tone_proof.py` on Debug in the loop: 18/18 scored rows.
+- Recorded, on the final gate's Release build and the final instrument:
+  `RC_PROOF_APP=release tone_proof.py
+  compare tools/proof/work/gr2/control` 19/19 — N0 the six neutral frames
+  byte-identical at 16 bits a channel; E1 exposure +1 takes grey 128 to 176
+  (round(255·enc(2·dec(128/255)))), E2 −1 to 92; W1 temperature +0.5 gives
+  (134, 128, 122) and tint +0.5 (128, 122, 128); K1 whites +1 keeps 0 and
+  takes 128 to 147, blacks +1 keeps 255 and lifts 0 to 38; F1 fade 1 gives
+  black 25 (26 ±1) and white 242; A1's mid-span 150 between 128 and E1's
+  measured 175; M1 the matte frame's
+  mean ×1.367; X1 the `prores_422` frame within ±8 at all 920 samples. **B1
+  (recorded, unscored): the 1920-column ramp at exposure +1 keeps 189 distinct
+  levels in its middle row against 256 neutral** — the top half of the ramp
+  clips to white at +1 EV, which is the operation, not banding.
+- `word_looks_proof.py --only B1` on Release: 3/3, `moved: []`.
+- `phase8_chrome.py` 150/150 (its size row reads 464); `phase9_proof.py`
+  223/223 on Release, the version loop opening 1–14 and 1015 and refusing 1016.
+- `clip_inspector2_proof.py` 33/33; `screens.py --only
+  05-clip-picture,05b-clip-color` 7/7, 0 new problems;
+  `grading_spike.py --check` exit 0 (B0–B2, 44 K rows, as at GR0);
+  `matte_spike.py --check` and `--check --tree` exit 0.
+- `cargo test --release` (every suite) and `make gate`: the first gate failed
+  at test (`schema_v8.rs`, below); after that fix PASS in 278 s, and after the
+  last edit (`CanvasSessions.swift` brought back to net 0 lines) PASS in 286 s
+  (typecheck 8 s with the 4 baseline warnings, fmt and lint skipped by stamp,
+  test 178 s, app 100 s).
+- Mutants, each `tone_proof.py --mutant NAME` on Debug, all seven MUTANT PASS
+  (every named row failed, no other scored row did): `exposure-encoded` E1
+  E2; `tone-before-obscure` O1; `flag-ignores-negative` E2 P2;
+  `range-check-dropped` R1 CT; `tone-always-written` N2 CT;
+  `lerp-base-unfilled` A1 CT; `light-writes-group` P1. The first pass found
+  two instrument faults, both fixed before the final runs: A1 bounded its
+  mid-span by E1's FORMULA, so `exposure-encoded` also failed A1 (A1 now reads
+  E1's measured value), and R1 left an accepted 3.5 in place for U1's undo
+  to land on (R1 now takes back what was accepted). `exposure-encoded` and
+  `tone-before-obscure`, which had run before those fixes, were run again on
+  the final instrument; the other five ran on it.
+
+**Deviations.** `core/tests/schema_v8.rs`'s
+`an_end_patch_that_replaces_the_whole_video_group_falls_through_to_the_base`
+compared `clip_state`'s `video` with the stored clip's; `clip_state` now
+reports `color` with all thirteen keys (GR-2, the spec's `video_json`), so its
+oracle fills tone's nine at 0. The `exposure-encoded` mutant also fails E2 (an
+encoded halving is 64, not 92), so it names E1 and E2. Exposure's field shows
+" EV" with a space, as every other unit row does (" px", " dB").
+
+**Owed.** GRD-1 (the owner, on real footage). The root and per-side
+`CLAUDE.md` lines (app map: `LayerUniforms` 116 floats, `ClipSubTab`'s seven
+cases, `GradeProps.swift`, `VideoPane+Light.swift`; core map: `ColorAdjust`'s
+tone, format 1015 and its gap, `video_json`) are owed by the phase that edits
+them (GR2's spec kept `CLAUDE.md` untouched). GR3, seeing, is next.

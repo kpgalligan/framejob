@@ -38,7 +38,9 @@ use crate::time::Ticks;
 /// `kinds` through untouched.
 fn state_patch(evaluated: &Evaluated) -> Value {
     let mut out = serde_json::Map::new();
-    out.insert("video".to_string(), actions::to_json(&evaluated.video));
+    // `video_json`: a tone key at exactly 0 at the cut must still be here,
+    // or `narrow_to` puts back the action's END value (spec §11 GR-2).
+    out.insert("video".to_string(), actions::video_json(&evaluated.video));
     out.insert("audio".to_string(), actions::to_json(&evaluated.audio));
     if let Some(text) = &evaluated.text {
         out.insert("text".to_string(), actions::to_json(text));
