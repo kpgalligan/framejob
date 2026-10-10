@@ -240,6 +240,12 @@ else is what bloats files:
   `wc -l app/Sources/*.swift core/src/*.rs graphic/src/*.rs | sort -rn`; the
   seam a record already named for a file is under "Named next cuts" in
   `designs/adr/app-file-history.md` / `core-file-history.md`.
+- **Size rules are per FILE, never per feature.** A brief, design, road map,
+  spec or proof never sets a budget on how many lines a feature may add,
+  never measures a feature's total against one, and never names code size as
+  a reason to cut, trim or drop a feature: a feature takes as much code as it
+  needs. Keeping files small is the cap above and its pure moves, nothing
+  else (owner, 2026-10-10).
 - **A decision in spec §11 is not re-litigated** (`designs/spec/11-decisions/`). A phase that needs a new
   one records it there before the code, not after.
 - **`.secrets/` (gitignored) holds the owner's own keys for proofs**, e.g.

@@ -376,9 +376,8 @@ owner's; the numbers are what he decides with.
 
 | Measure | Cap | Measured (GR7a) |
 |---|---|---|
-| Product code (`app/Sources`, `core/src`, the shader), net lines added by GR2–GR6 | ≤ 4,500 (REASONED estimate ~3,000–3,500; mattes were ~1,290 net, section 9) | **4,528 net** (+4,878 −350: `app/Sources` 2,917, `core/src` 1,384, the shaders 227): **missed by 28 lines**. Outside it, never capped: `core/include` +50. (`grading_verdict.py sizes` L1) |
 | Frozen files | Wiring only; no frozen file grows by more than ~50 lines in total | `EditorViewController.swift` 1,139 → 1,142 (+3); the other four net 0: held. (L2) |
-| Files over the cap | None left unpaid | **2 unpaid, missed by 2 files**: `ProjectSnapshot.swift` 1,750 → 1,769 (+19), `edit_clip.rs` 755 → 757 (+2). Four more over 600 at net ≤ 0, two exempt tables, three frozen (L2's). (L3) |
+| Files over the cap | None left unpaid | Held after the L3 payment (6f68daa): `ProjectSnapshot.swift` 1,750 → 1,570, `edit_clip.rs` 755 → 661, both paid by pure moves. GR7a had measured them at 1,769 and 757. (`grading_verdict.py sizes` L3) |
 | Inspector | One new sub-tab (Color) of at most four sections; Picture loses one section (Color) and gains none | Color added, 4 sections (Light, Color, Adjustment, Look); Picture lost Color and gained none: held. (L4) |
 | Menus | Clip ▸ Look ▸, Insert ▸ Adjustment Clip, View ▸ Show Ungraded, View ▸ Waveform; nothing else | 175 → 187 leaves: Clip ▸ Look ▸ (9: the eight and None), Insert ▸ Adjustment Clip, View ▸ Show Ungraded, View ▸ Waveform; none removed: held. (`measure` M1) |
 | An UNGRADED layer | At most +0.02 ms at 1080p and +0.06 ms at 4K over main, by the matte spike's method (the placeholder's 0.054 ms at 4K is the precedent) | +0.009 ms at 1080p, +0.002 ms at 4K (C0 noise 0.000 at both): held. (`grading_spike.py --measure --tree` TC) |
@@ -441,9 +440,10 @@ which look, and whether you would use one of the eight again; T4: imported and
 applied or not, how it compared by eye, and the script's figure on your file;
 T5: done through the tools, one undo step per op or not; T6: done without being
 shown or not); GRD-1…GRD-6, each pass or what you saw; whether you would reach
-for grading again; and the verdict — kept (the merge) or dropped — with the
-cap still missed (product code, 4,546 net lines against 4,500, by 46 after the
-L3 payment; the two over-cap files are paid) weighed as "a conversation, not an automatic no".
+for grading again; and the verdict — kept (the merge) or dropped — with any
+cap the measured column misses weighed as "a conversation, not an automatic
+no". Code size is not one of them: the owner removed the product-lines budget
+on 2026-10-10 (root CLAUDE.md, "Size rules are per FILE").
 
 ## Phases
 
@@ -1770,3 +1770,10 @@ unpaid against none: cap held" (`ProjectSnapshot.swift` 1750 → 1570,
 tables exempt); L1 "net 4546 against ≤ 4500: cap missed by 46 lines". No
 mutants: a pure move adds no decision. The `CLAUDE.md` maps were updated in
 the same commit (`edit_detach.rs`, `ShapeProps.swift`).
+
+**The product-lines budget removed (owner, 2026-10-10).** "We need as much
+code as we need." The brief's ≤ 4,500 net-line budget is gone from "What it
+may cost" and from `grading_verdict.py` (L1 now prints the totals as a record:
+4,546 net at e969058); the root `CLAUDE.md` now says size rules are per file,
+never per feature. The phase records above that measure a running total
+against that budget are history, kept as written.

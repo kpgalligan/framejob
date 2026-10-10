@@ -18369,11 +18369,11 @@ the exit status; a scored row is about the instrument (it read, it built, it
 timed, the fixture is what it says).
 
 - **`sizes`** (git only, no app; `work/gr7/sizes.json`): **L1** `git diff
-  --numstat BASE HEAD` over `CAPPED` (`app/Sources`, `core/src`,
-  `app/Resources/Shaders` — the cap's own roots), scored that every root
-  contributes and `Compositor.metal` is listed; per root, in total against
-  4,500, and per first-parent commit in `BASE..HEAD` against its first parent;
-  `core/include`'s net printed beside the total, outside it, never capped.
+  --numstat BASE HEAD` over `PRODUCT` (`app/Sources`, `core/src`,
+  `app/Resources/Shaders`), scored that every root contributes and
+  `Compositor.metal` is listed; per root, in total, and per first-parent commit
+  in `BASE..HEAD` against its first parent, as a record only (no feature has a
+  size budget, root CLAUDE.md); `core/include`'s net printed beside the total.
   **L2** each frozen file's lines at BASE and HEAD and its net against ~50.
   **L3** every changed `.swift`/`.rs` under `app/Sources` or `core/src` that is
   new and over 400 lines, or over 600, with BASE → HEAD; "unpaid" when it grew
@@ -18442,7 +18442,7 @@ RC_PROOF_APP=release python3 tools/proof/grading_verdict.py measure --only T4 --
 ```
 
 **Mutants** (each edits the driver's own behaviour): `sizes --mutant
-shader-not-counted` (the shader root dropped from `CAPPED`) must fail L1;
+shader-not-counted` (the shader root dropped from `PRODUCT`) must fail L1;
 `measure --mutant lut-not-applied` (the look skipped) T4; `measure --mutant
 graded-fixture-ungraded` (every clip's grade and the adjustment clip's colour
 dropped, the clip kept) G0; `measure --mutant menus-same-app` (the branch

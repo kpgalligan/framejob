@@ -13,9 +13,10 @@ never changes the exit status.
         [--mutant lut-not-applied|graded-fixture-ungraded|menus-same-app]
 
 **sizes** (git only, no app; every command runs in this worktree; writes
-`work/gr7/sizes.json`): L1 numstat over `CAPPED` (the cap's own roots), per root
-and in total, and per first-parent commit in BASE..HEAD; the header's net
-printed beside the total, never capped. L2 the frozen files at BASE and HEAD.
+`work/gr7/sizes.json`): L1 numstat over `PRODUCT` (app code, core code, the shaders), per
+root and in total, and per first-parent commit in BASE..HEAD, as a record only
+(no feature has a size budget: root CLAUDE.md); the header's net printed beside
+the total. L2 the frozen files at BASE and HEAD.
 L3 every changed `.swift`/`.rs` under `app/Sources` or `core/src` that is new
 and over 400 lines or over 600, "unpaid" when it grew outside `EXEMPT` and
 `FROZEN` (a frozen file is L2's). L4 `ClipSubTab`'s cases and each case's
@@ -38,7 +39,7 @@ CONTROL T4c; Z1 every project closes and no log holds `Reelcut: `. Exit 0 when
 every scored row passes, 1 when one fails, 2 when H0 is shut.
 
 Mutants (each edits this driver's own behaviour): `shader-not-counted` drops
-the shader root from `CAPPED` (must fail L1); `lut-not-applied` skips the look
+the shader root from `PRODUCT` (must fail L1); `lut-not-applied` skips the look
 (T4); `graded-fixture-ungraded` drops every clip's grade and the adjustment
 clip's colour, keeping the clip (G0); `menus-same-app` reads the branch
 listing from main's instance (M1). README: `tools/proof/README.md`, "Road map
@@ -66,14 +67,13 @@ import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 
 BASE = "f407f87"
-CAPPED = ("app/Sources", "core/src", "app/Resources/Shaders")
+PRODUCT = ("app/Sources", "core/src", "app/Resources/Shaders")
 HEADER = ("core/include",)
 FROZEN = ("app/Sources/EditorViewController.swift", "app/Sources/TimelineView.swift",
           "app/Sources/PreviewCanvasView.swift", "app/Sources/AgentServer.swift",
           "app/Sources/InspectorViewController.swift")
 EXEMPT = ("core/src/edit.rs", "app/Sources/ReelOps.swift")
 SHADER_FILE = "app/Resources/Shaders/Compositor.metal"
-LINES_CAP = 4500
 FROZEN_CAP = 50
 FILE_CAP = 600
 NEW_FILE_CAP = 400
@@ -228,11 +228,11 @@ def phase_of(subject):
 # ---- sizes ---------------------------------------------------------------------------
 
 def sizes(mutant):
-    capped = tuple(r for r in CAPPED if not (mutant == "shader-not-counted"
+    capped = tuple(r for r in PRODUCT if not (mutant == "shader-not-counted"
                                             and r == "app/Resources/Shaders"))
     head = git("rev-parse", "--short", "HEAD").strip()
     print(f"grading_verdict sizes at {datetime.datetime.now().astimezone():%Y-%m-%d %H:%M %Z}: "
-          f"BASE {BASE}, HEAD {head}; CAPPED {capped}", flush=True)
+          f"BASE {BASE}, HEAD {head}; PRODUCT {capped}", flush=True)
     result = {"base": BASE, "head": head, "capped": capped, "header": HEADER}
 
     # L1
@@ -256,19 +256,19 @@ def sizes(mutant):
                         "deleted": deleted, "net": added - deleted})
     commits.reverse()
     listed = {r[2] for r in rows}
-    contributes = all(roots[r]["files"] > 0 for r in CAPPED if r in roots) and \
-        all(r in roots for r in CAPPED)
+    contributes = all(roots[r]["files"] > 0 for r in PRODUCT if r in roots) and \
+        all(r in roots for r in PRODUCT)
     shader_listed = SHADER_FILE in listed
     ok = contributes and shader_listed
     counts = ", ".join(f"{r} {v['files']} files" for r, v in roots.items())
     emit("L1", "PASS" if ok else "FAIL",
-         f"numstat {BASE}..{head} over {', '.join(capped)}: every CAPPED root contributes "
+         f"numstat {BASE}..{head} over {', '.join(capped)}: every PRODUCT root contributes "
          f"{contributes} ({counts}); {SHADER_FILE} listed {shader_listed}")
     for root, v in roots.items():
         emit("L1", "RECORD", f"{root}: +{v['added']} −{v['deleted']}, net {v['net']} "
              f"({v['files']} files)")
-    emit("L1", "RECORD", f"CAPPED total +{total['added']} −{total['deleted']}, net "
-         f"{total['net']} against ≤ {LINES_CAP}: {cap_text(total['net'], LINES_CAP, ' lines')}")
+    emit("L1", "RECORD", f"PRODUCT total +{total['added']} −{total['deleted']}, net "
+         f"{total['net']} (a record: no feature has a size budget)")
     emit("L1", "RECORD", f"beside it, outside it and never capped: {HEADER[0]} "
          f"+{header['added']} −{header['deleted']}, net {header['net']}")
     for c in commits:
