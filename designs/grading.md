@@ -442,8 +442,8 @@ applied or not, how it compared by eye, and the script's figure on your file;
 T5: done through the tools, one undo step per op or not; T6: done without being
 shown or not); GRD-1…GRD-6, each pass or what you saw; whether you would reach
 for grading again; and the verdict — kept (the merge) or dropped — with the
-caps the measured column misses (product code by 28 lines, two unpaid files)
-weighed as "a conversation, not an automatic no".
+cap still missed (product code, 4,546 net lines against 4,500, by 46 after the
+L3 payment; the two over-cap files are paid) weighed as "a conversation, not an automatic no".
 
 ## Phases
 
