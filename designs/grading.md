@@ -1764,7 +1764,9 @@ detach_audio` (2 passed), `--test refusal_non_edits` (9 passed) and `--test
 op_default_booleans` (5 passed), `make lint` and `spec_index_proof.py`
 (150/150) exit 0; `make gate` PASS in 221 s (typecheck, fmt, lint, test 126 s,
 app 86 s). `grading_verdict.py sizes` reads committed `HEAD`, so its L3 lines
-cannot exist before this commit; they are recorded after it. No mutants: a
-pure move adds no decision. Owed `CLAUDE.md` lines: `core/CLAUDE.md`'s
-`edit_clip.rs` entry loses "detach" and gains an `edit_detach.rs` entry;
-`app/CLAUDE.md`'s file list and map gain `ShapeProps.swift`.
+cannot exist before this commit. Run after it at 6f68daa: L3 PASS, "0
+unpaid against none: cap held" (`ProjectSnapshot.swift` 1750 → 1570,
+`edit_clip.rs` 755 → 661, both paid; the frozen files referred to L2; the two
+tables exempt); L1 "net 4546 against ≤ 4500: cap missed by 46 lines". No
+mutants: a pure move adds no decision. The `CLAUDE.md` maps were updated in
+the same commit (`edit_detach.rs`, `ShapeProps.swift`).
