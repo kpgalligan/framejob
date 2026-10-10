@@ -1077,3 +1077,116 @@ product tools" → ninety; the app map's `Compositor+Adjustment.swift`,
 `AgentServer+Grading.swift`, `ClipSource.adjustment` and "eight pipelines from
 six"; the core map's `edit_adjustment.rs` and `Source::Adjustment`, and
 `op_table.rs`'s "fifty-nine op tools"). The person check GRD-3.
+
+## GR5a — looks: `video.look`, the eight as core data, the GPU bake, step 4d (2026-10-10, on the `grading` branch)
+
+**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `09b056c`
+(GR4b). GR5 did not fit one spec and is split like GR4: GR5a (this) is the
+model, the picture and the MCP mirror; GR5b is the Look section, its gallery and
+Clip ▸ Look ▸. The owner's answer to GR5's thirteen choices was "All as
+recommended" (2026-10-10), the eighth look Black & White (not Night).
+
+**What landed.**
+- Spec §11 first: GR-7 in `designs/spec/11-decisions/grading.md` (the thirteen
+  choices with the eight looks' table, GR5b's marked [b]; the bake, the 33³
+  `rgba16Float` lattice, step 4d, `texture(2)`, the 2³ placeholder, the uniform
+  pair; the Concat rule restated) and its README row. Then §5.2 (`video.look`),
+  §7.3 (the `look` key, twenty-three keys, `ungraded` removing it), §7.4 (the
+  compositor row), §7.5 (step 4d, the bake, the pair), §7.9a (`ungraded`) and
+  §7.10 (`model_look.rs`, `recipe_layer.rs`, `actions.rs`'s guard), and the
+  index's Lines cells.
+- Core: new `model_look.rs` (`LookKind`, `Look` — `kind` with no default,
+  `amount` 1 by default — `SplitTone`, `LookDefinition`, `LOOK_DEFAULT_AMOUNT`,
+  and `LookKind::definition`, GR-7's table as data), re-exported through
+  `model_props.rs`; `VideoProps.look`, the group's last field, skipped when
+  `None`. `props_check.rs` refuses an amount outside 0…1;
+  `actions_clamp.rs` bounds an evaluated one (NaN to 0); `patch.rs`'s video
+  template carries a look; `recipe_layer.rs` writes the `look` key after
+  `color` (`look_json`: null for none, an amount of 0 or an ungraded frame,
+  else kind, amount and the definition with all thirteen colour keys);
+  `recipe.rs`'s `ungraded` removes it; `actions.rs`'s `evaluate_clip` turns a
+  merged look that does not read as a `Look` into `null` beside the motion
+  guard, so an end of `{look: {amount}}` on a look-less clip is inert and
+  keeps its other animated keys. The format and header comments name
+  `video.look`; the number stays 1015. New `core/tests/look.rs` (10);
+  `recipe.rs`'s `LAYER_KEYS` at twenty-three; `ungraded.rs`'s fixture gains a
+  clip look, an action end's look and an adjustment clip's look, and its twin
+  drops `look` with `color`.
+- App: new `LookProps.swift` (`LookKind`, `LookProps`, `LookPatch`,
+  `SplitTone`, `LookDefinition`, `RecipeLook`, `LayerUniforms.apply(look:)`)
+  and `LookTextures.swift` (`LookBakeUniforms`; the bake on its own queue,
+  waited for; an LRU of eight under one `NSLock`; the 2³ identity
+  placeholder written from the CPU; a failed bake answers the placeholder).
+  `LayerUniforms`' `toneReserved0/1` became `lookAmount` and `lookEnabled`
+  (still 116 floats, 464 bytes). `Compositor.metal`: the pair, `gradeLook`,
+  `lookHueChroma`, `lookSplitTone`, `LookBakeUniforms`, step 4d after 4c in
+  `layerColorPremultiplied` and in `reelcut_adjust_fragment`, `lookEnabled` in
+  the gate sum, `texture(2)` on the three fragments, the kernel
+  `reelcut_look_bake` at the end, and the order-of-operations line.
+  `MetalRenderer.looks`; `drawLayer` binds the look before the shadow and the
+  reflection, `encodeShadow` takes it to the mask pass, `drawAdjustment` binds
+  it and `isNeutralAdjustment` needs no look. `VideoProps.look`,
+  `RecipeLayer.look`, `VideoPatch.look` (`LookPatch??`). The eyedropper's
+  suppression also sends `look: null`; `keyedCount` counts an end's `look` on
+  Color and never on Picture; `set_video`'s catalog prose gains `lookClause`,
+  its kinds from `LookKind.allCases`.
+- Instruments: `look_proof.py` (18 scored rows and a record, seven mutants) and
+  `look_probe.swift`, and the proof README's section.
+
+**Sizes.** Product code about +710 net: changed Swift and Rust files +163 −49,
+the shader +97 −11, the header +3 −2, new files `model_look.rs` 199,
+`LookProps.swift` 150, `LookTextures.swift` 161. With GR2–GR4b, about 2,600 of
+"Worth keeping"'s ≤ 4,500. `model_props.rs` 509 → 523, `recipe_layer.rs` 104 →
+125, `actions.rs` 488 → 502, `ProjectSnapshot.swift` 1,784 → 1,783,
+`Compositor.swift` 723 → 723, `CanvasSessions.swift` 1,090 → 1,090,
+`TypedPatches.swift` 300 → 309, `AgentCatalog+Properties.swift` 252 → 266.
+
+**Measured.** 2026-10-10, Apple M2 Max, macOS 26.5.1, AC power.
+- Control: before any product edit, the untouched tree's `make app`, then
+  `RC_PROOF_APP=release look_proof.py capture tools/proof/work/gr5/control`
+  (four neutral frames: chart, adjustment, card, movie).
+- Loop, Debug: `cargo test --release` for `look` 10/10, `recipe`, `ungraded`,
+  `tone`, `adjustment`, `patch_door` all green; `make lint` clean; `make
+  typecheck` 0 errors and the 4 baseline warnings; `look_proof.py` 17/17;
+  `tone_proof.py --only P1,P2,P3,P4,E1,W1` 6/6; `adjustment_proof.py --only
+  A1,G1,M1,O1` 5/5 (with Z1); `seeing_proof.py --only U1,U2` 2/2;
+  `matte_spike.py --check --tree` every scored row; `spec_index_proof.py`
+  150/150.
+- `make gate`: PASS in 247 s (typecheck 5 s, fmt 2 s, lint 1 s, test 146 s,
+  app 93 s).
+- Recorded, on the gate's Release build: `RC_PROOF_APP=release look_proof.py
+  compare tools/proof/work/gr5/control` 18/18 — N0's four neutral frames
+  byte-identical at 16 bits, so a look-less layer is unchanged — no
+  `Reelcut: ` line, no `DEFAULTS MOVED`. D1's smallest pair is teal_orange
+  against vivid, 19 levels; black_white moves a sample by 255.
+- L4, the bake (each of the eight, a 33³ dispatch waited for): 0.29–0.65 ms on
+  the Release run (0.22–0.42 ms on the Debug one); the first frame that needs a
+  new definition pays it once.
+- Mutants, each `look_proof.py --mutant NAME` on Debug, all seven MUTANT PASS
+  (every named row failed, no other scored row did), no `DEFAULTS MOVED`:
+  `look-before-tone` O1; `amount-ignored` M1 A1 U2 L3; `ungraded-keeps-look` U1
+  CT; `adjustment-ignores-look` J1; `amount-range-dropped` R1 CT;
+  `split-ignored` L5; `kindless-look-kept` CT. `amount-ignored`'s first run
+  failed U2 and L3 beside its named M1 A1 — both correctly, since U2's amount
+  0.5 and L3's read of `lookAmount` are what the mutant breaks — so its list was
+  widened to the four and it was re-run on the final instrument.
+- `make gate` again after the instrument and §7.5 edits: PASS in 73 s (test 72
+  s, the rest skipped as passed).
+
+**Deviations.** `amount-ignored` must fail M1 A1 U2 L3, not the spec's M1 A1
+(above). U2's row reads a new kind keeping the clip's amount (`{kind:
+vivid}` after M1 renders vivid at 0.5, neither M1's bytes nor D1's vivid), which
+the spec's "undo/redo" leaves open; undo and redo are as written. The spec's
+`designs/spec/07.10-rust-module-map.md` edit also names `actions.rs`'s look guard
+in that file's `actions.rs` row. `Compositor.swift` holds net 0 by two comments
+folded to one line each.
+
+**Owed.** GR5b (the Look section and its gallery of `render_frame` thumbnails,
+Clip ▸ Look ▸, the menu inventory rows, the screens' pins and prose, §4.3a and
+§9, GRD-4, the README bullet, G1 gallery = `render_frame`); until it lands a look
+is reachable only through MCP and Paste Attributes. The `CLAUDE.md` lines (the
+spec kept every `CLAUDE.md` untouched): the app map's `LookProps.swift`,
+`LookTextures.swift`, `LayerUniforms`' look pair and `texture(2)` on the three
+layer-stage fragments; the core map's `model_look.rs` and `VideoProps.look`,
+and "twenty-three" for the recipe layer's keys at `core/CLAUDE.md:475`; and
+GR4a's and GR4b's still-owed lines above.

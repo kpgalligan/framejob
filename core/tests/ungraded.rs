@@ -2,9 +2,10 @@
 //! driven through the C FFI exactly as `ReelCore.swift` drives it.
 //!
 //! The oracle is written independently of the code under test: the SAME
-//! project with every `video.color` group removed from its JSON — on top-level
-//! clips, inside a nest, on a luma-matte clip and in an action's end — read
-//! back through `rc_project_from_json`. The option's recipe must be that
+//! project with every `video.color` group and every `video.look` (GR-7)
+//! removed from its JSON — on top-level clips, inside a nest, on a luma-matte
+//! clip, on an adjustment clip and in an action's end — read back through
+//! `rc_project_from_json`. The option's recipe must be that
 //! project's recipe byte for byte, and with the option off (or misspelt) the
 //! recipe must be the plain one byte for byte. What the option does to a
 //! pixel is `tools/proof/seeing_proof.py`'s.
@@ -49,10 +50,11 @@ fn graded_shape(handle: Handle, track: u32, color: Value) -> (Handle, u32) {
     (next, id)
 }
 
-/// A graded media clip on track 1; a graded shape with a filter, a chroma
-/// key and an opacity (all kept) on track 2, with an action whose end grades
-/// it further; a graded shape inside a nest on track 3; a graded shape on a
-/// luma-matte track 4.
+/// A graded media clip with a look on track 1; a graded shape with a filter,
+/// a chroma key and an opacity (all kept) on track 2, with an action whose
+/// end grades it further and gives it a look; a graded shape inside a nest
+/// on track 3; a graded shape on a luma-matte track 4; an adjustment clip
+/// whose only grade is a look on track 5.
 fn graded() -> Handle {
     let handle = Handle::new(640, 360, 30, 1).apply_all(&[
         json!({"op": "add_media", "descriptor": {
@@ -63,7 +65,8 @@ fn graded() -> Handle {
     ]);
     let media_clip = last_id(&handle, "/clips");
     let handle = handle.apply(&json!({"op": "set_video", "clips": [media_clip], "patch": {
-        "color": {"exposure": 1.0, "brightness": 0.1, "contrast": 0.2}}}));
+        "color": {"exposure": 1.0, "brightness": 0.1, "contrast": 0.2},
+        "look": {"kind": "warm", "amount": 0.8}}}));
 
     let (handle, two) = add_track(handle);
     let (handle, toned) = graded_shape(
@@ -91,7 +94,8 @@ fn graded() -> Handle {
     };
     let handle = handle.apply(
         &json!({"op": "set_action_end", "clip": toned, "action": action,
-        "patch": {"video": {"color": {"saturation": 0.5, "vibrance": -0.5}}}}),
+        "patch": {"video": {"color": {"saturation": 0.5, "vibrance": -0.5},
+                            "look": {"kind": "cool"}}}}),
     );
 
     let (handle, three) = add_track(handle);
@@ -100,45 +104,74 @@ fn graded() -> Handle {
 
     let (handle, four) = add_track(handle);
     let (handle, _) = graded_shape(handle, four, json!({"exposure": -1.0, "whites": 0.3}));
-    handle.apply(&json!({"op": "set_track", "track": four, "matte": "luma"}))
+    let handle = handle.apply(&json!({"op": "set_track", "track": four, "matte": "luma"}));
+
+    let (handle, five) = add_track(handle);
+    let handle = handle.apply(&json!({
+        "op": "add_adjustment_clip", "track": five, "at": 0, "duration": 2 * SEC
+    }));
+    let adjustment = last_id(&handle, "/clips");
+    handle.apply(&json!({"op": "set_video", "clips": [adjustment],
+                         "patch": {"look": {"kind": "vivid"}}}))
 }
 
-/// `value` with every `video` object's `color` removed, at every depth.
-fn without_color(value: &Value) -> Value {
+/// `value` with every `video` object's `color` and `look` removed, at every
+/// depth.
+fn without_grade(value: &Value) -> Value {
     match value {
         Value::Object(map) => Value::Object(
             map.iter()
                 .map(|(key, item)| {
-                    let mut item = without_color(item);
+                    let mut item = without_grade(item);
                     if key == "video" {
                         if let Value::Object(video) = &mut item {
                             video.remove("color");
+                            video.remove("look");
                         }
                     }
                     (key.clone(), item)
                 })
                 .collect(),
         ),
-        Value::Array(items) => Value::Array(items.iter().map(without_color).collect()),
+        Value::Array(items) => Value::Array(items.iter().map(without_grade).collect()),
         other => other.clone(),
     }
 }
 
 /// The graded project's own neutral twin.
 fn neutral(handle: &Handle) -> Handle {
-    Handle::from_value(&without_color(&handle.value()))
+    Handle::from_value(&without_grade(&handle.value()))
 }
 
 #[test]
 fn the_fixture_grades_every_role_it_claims_to() {
     let value = graded().value();
     let text = value.to_string();
-    let twin = without_color(&value).to_string();
+    let twin = without_grade(&value).to_string();
     assert!(text.contains("\"exposure\""), "{text}");
     assert!(!twin.contains("\"exposure\""), "{twin}");
     assert!(!twin.contains("\"vibrance\""), "{twin}");
+    assert!(text.contains("\"look\""), "{text}");
+    assert!(!twin.contains("\"look\""), "{twin}");
     let handle = graded();
     let recipe = handle.recipe(SEC / 2);
+    let looked = array(&recipe, "/layers")
+        .iter()
+        .filter(|l| !l["look"].is_null())
+        .count();
+    assert_eq!(
+        looked, 2,
+        "the media clip's and the adjustment clip's looks"
+    );
+    let past = handle.recipe(3 * SEC / 2);
+    assert_eq!(
+        array(&past, "/layers")
+            .iter()
+            .filter(|l| !l["look"].is_null())
+            .count(),
+        3,
+        "and the action's end gives the shape a look"
+    );
     assert!(array(&recipe, "/mattes")
         .iter()
         .any(|m| m["mode"] == json!("luma")));
@@ -173,8 +206,10 @@ fn ungraded_keeps_every_other_key() {
         for color in b["color"].as_object().expect("color").values() {
             assert_eq!(color, &json!(0.0), "{b}");
         }
+        assert_eq!(b["look"], Value::Null, "{b}");
         a["color"] = Value::Null;
         b["color"] = Value::Null;
+        a["look"] = Value::Null;
         assert_eq!(a, b);
     }
     assert_eq!(plain["mattes"], ungraded["mattes"]);

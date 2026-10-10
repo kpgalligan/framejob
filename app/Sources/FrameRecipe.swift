@@ -278,6 +278,10 @@ struct RecipeLayer: Codable, Equatable {
     let cornerRadius: Double
     let shadow: ShadowProps?
     let color: ColorAdjust
+    /// Step 4d's look (spec §11 GR-7): its amount and the definition
+    /// `LookTextures` bakes; nil for no look, which the core also publishes
+    /// for an amount of 0 and an ungraded frame.
+    let look: RecipeLook?
     let chroma: ChromaProps?
     /// Applied in order, at most `FilterProps.max` of them.
     let filters: [FilterProps]
@@ -316,6 +320,7 @@ struct RecipeLayer: Codable, Equatable {
         cornerRadius = c.lenient(.cornerRadius, 0)
         shadow = c.lenient(.shadow)
         color = c.lenient(.color, ColorAdjust.identity)
+        look = c.lenient(.look)
         chroma = c.lenient(.chroma)
         filters = c.lenient(.filters, [])
         reflection = c.lenient(.reflection)

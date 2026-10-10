@@ -116,6 +116,13 @@ pub use crate::model_motion::*;
 /// its declaration order is a shader discriminant.
 pub use crate::model_matte::*;
 
+/// The look vocabulary — [`Look`], [`LookKind`], [`LookDefinition`],
+/// [`SplitTone`] and [`LOOK_DEFAULT_AMOUNT`] (spec §11 GR-7) — lives in
+/// `model_look.rs` and is re-exported whole, so every `crate::model::Look`
+/// path resolves. See that module's doc for why a look is data the
+/// compositor bakes.
+pub use crate::model_look::*;
+
 // ---- video properties ----------------------------------------------------
 
 /// Placement on the canvas plus the per-clip image controls. `x`/`y` are an
@@ -163,6 +170,12 @@ pub struct VideoProps {
     /// plan — therefore reads the clip UN-MOVED, which is what keeps an
     /// edit working on the numbers a person typed (spec §5.4, §7.3).
     pub motion: Option<Motion>,
+    /// One of the eight built-in looks and its amount (spec §11 GR-7, format
+    /// 1015 on the grading branch), applied at step 4d after tone. `None`
+    /// is no look, and writes no key, so a look-less file's text is what it
+    /// was.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub look: Option<Look>,
 }
 
 impl Default for VideoProps {
@@ -184,6 +197,7 @@ impl Default for VideoProps {
             obscure: Vec::new(),
             blend: BlendMode::Normal,
             motion: None,
+            look: None,
         }
     }
 }

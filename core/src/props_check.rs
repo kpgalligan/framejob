@@ -235,6 +235,11 @@ pub(crate) fn check_video(props: &VideoProps, size: Option<(f64, f64)>) -> Resul
     in_range("video.color.blacks", c.blacks, -TONE_MAX, TONE_MAX)?;
     in_range("video.color.vibrance", c.vibrance, -TONE_MAX, TONE_MAX)?;
     in_range("video.color.fade", c.fade, 0.0, TONE_MAX)?;
+    // A look's amount is a fraction of the look (spec §11 GR-7). Its KIND
+    // needs no check: serde refuses an unknown variant, naming the eight.
+    if let Some(look) = &props.look {
+        in_range("video.look.amount", look.amount, 0.0, 1.0)?;
+    }
     if let Some(chroma) = &props.chroma {
         for channel in &chroma.key {
             in_range("video.chroma.key", *channel, 0.0, 1.0)?;

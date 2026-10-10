@@ -71,6 +71,10 @@ struct VideoPatch: Codable, Equatable {
     /// `.some(an empty MotionProps)` both write `NSNull`, since the core
     /// normalises an all-`None` motion to `None` anyway.
     var motion: MotionProps??
+    /// `look` (spec §11 GR-7) is a `T??` for `motion`'s reason: it HAS a null
+    /// form, which removes the look. Like `motion`, it is the app's writer
+    /// only; an agent's `look` reaches the core unread.
+    var look: LookPatch??
 
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
@@ -78,7 +82,7 @@ struct VideoPatch: Codable, Equatable {
         shadow: ShadowProps?? = nil, color: ColorPatch? = nil, chroma: ChromaProps?? = nil,
         filters: [FilterProps]? = nil, reflection: ReflectionProps?? = nil,
         spotlight: SpotlightProps?? = nil, obscure: [ObscureProps]? = nil,
-        blend: BlendMode? = nil, motion: MotionProps?? = nil
+        blend: BlendMode? = nil, motion: MotionProps?? = nil, look: LookPatch?? = nil
     ) {
         self.x = x
         self.y = y
@@ -96,6 +100,7 @@ struct VideoPatch: Codable, Equatable {
         self.obscure = obscure
         self.blend = blend
         self.motion = motion
+        self.look = look
     }
 
     init(from decoder: Decoder) throws {
@@ -121,6 +126,7 @@ struct VideoPatch: Codable, Equatable {
         // caller's object goes to the core unread — so the gap the other
         // `T??` fields carry does not arise here either.
         motion = c.nullable(.motion)
+        look = c.nullable(.look)
     }
 
     var dictionary: [String: Any] {
@@ -170,6 +176,9 @@ struct VideoPatch: Codable, Equatable {
             } else {
                 d["motion"] = NSNull()
             }
+        }
+        if let look = look {
+            if let look = look { d["look"] = look.dictionary } else { d["look"] = NSNull() }
         }
         return d
     }

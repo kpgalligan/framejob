@@ -80,6 +80,10 @@ pub(crate) fn clamp_video(mut props: VideoProps, is_nest: bool) -> VideoProps {
     tone.blacks = bounded(tone.blacks, -TONE_MAX, TONE_MAX, 0.0);
     tone.vibrance = bounded(tone.vibrance, -TONE_MAX, TONE_MAX, 0.0);
     tone.fade = bounded(tone.fade, 0.0, TONE_MAX, 0.0);
+    // A NaN amount is none of the look, the neutral a filter's amount has.
+    if let Some(look) = props.look.as_mut() {
+        look.amount = bounded(look.amount, 0.0, 1.0, 0.0);
+    }
     if let Some(chroma) = props.chroma.as_mut() {
         for channel in chroma.key.iter_mut() {
             *channel = bounded(*channel, 0.0, 1.0, 0.0);

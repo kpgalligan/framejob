@@ -179,15 +179,20 @@ extension MetalRenderer {
     ) throws {
         var uniforms = prepared.uniforms
         let state = pipelineState(gather: layer.needsGather, blend: layer.needsBlend)
+        // The look's lattice, or the placeholder (spec §11 GR-7): every draw
+        // through the layer fragments binds `texture(2)`, the shadow's mask
+        // pass and the reflection's included.
+        let look = looks.texture(for: layer.look)
         if let shadow = layer.shadow {
             encodeShadow(
-                shadow, uniforms: uniforms, texture: prepared.texture, matte: matte,
+                shadow, uniforms: uniforms, texture: prepared.texture, matte: matte, look: look,
                 canvas: canvas, maskState: pipelineState(gather: layer.needsGather, blend: false),
                 pass: &pass)
         }
         guard let encoder = pass.open() else { throw MatteError.noTarget }
         if state !== pipeline { encoder.setRenderPipelineState(state) }
         encoder.setFragmentTexture(matte, index: 1)
+        encoder.setFragmentTexture(look, index: 2)
         if layer.reflection != nil {
             encodeReflection(uniforms: uniforms, texture: prepared.texture, encoder: encoder)
         }

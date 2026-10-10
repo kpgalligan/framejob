@@ -82,6 +82,19 @@ extension AgentServer {
         + "meet rather than refusing. It is NOT an animation target — set_action_end "
         + "refuses it — and get_project reports the clip UN-MOVED, since the preset "
         + "becomes placement only when a frame is rendered)"
+    // `video.look`'s clause (spec §11 GR-7), its own explicitly-typed local
+    // for `blendClause`'s reason: the kind names are a non-literal operand.
+    // They are `LookKind.allCases`, the core's order, which is the order the
+    // UI paths it mirrors show them in: the Color sub-tab's Look section (its
+    // gallery and Amount row) and Clip ▸ Look ▸ (both GR5b).
+    private static let lookNames: [String] = LookKind.allCases.map { $0.rawValue }
+    private static let lookClause: String =
+        ", look (null, or {kind: \(lookNames.joined(separator: "|")), amount: 0–1} — one of "
+        + "the eight built-in looks, applied after color and before the filters; amount is "
+        + "how much of it, 1 when left out, refused outside 0–1. It MERGES: a new kind keeps "
+        + "the clip's amount, an amount alone needs a clip that already has a look, and "
+        + "{look: null} removes it. In an action's end the amount animates and a change of "
+        + "kind switches at the end)"
     // The three patch vocabularies, written once: every property group of
     // spec §5.2, with the ranges the ops enforce. A patch MERGES, so a key
     // left out keeps its current value and a key set to null clears an
@@ -114,6 +127,7 @@ extension AgentServer {
         + obscureClause
         + blendClause
         + motionClause
+        + lookClause
         + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
         + "length and a component outside the range is refused by name, neither "
         + "filled in nor clamped. chroma's key is the one exception, three numbers "

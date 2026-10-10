@@ -112,8 +112,9 @@ extern "C" {
  *
  * Version 1015 is the grading branch's own number (spec §11 GR-9), main's 14
  * plus a thousand: tone, nine keys on `video.color` after `hue`, each written
- * only when not 0, and the `adjustment` source kind (GR-6), which a build
- * that does not know it refuses as an unknown variant. The branch reads 1 to
+ * only when not 0, the `adjustment` source kind (GR-6), which a build
+ * that does not know it refuses as an unknown variant, and `video.look`
+ * (GR-7), written only when a clip has a look. The branch reads 1 to
  * 14 and 1015 and refuses the numbers between by name; the merge renumbers
  * it to main's next. */
 #define RC_FORMAT_VERSION 1015

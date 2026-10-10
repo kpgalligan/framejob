@@ -7,7 +7,7 @@ import Metal
 /// `reelcut_adjust_fragment`, reads the target it is drawing into through
 /// `[[color(0)]]` — everything already drawn behind the clip in its
 /// container, the canvas background included — and writes it back graded by
-/// the layer's colour, tone and point filters, by `mix(dst, graded, w)`,
+/// the layer's colour, tone, look and point filters, by `mix(dst, graded, w)`,
 /// `w` the layer's opacity (its strength) times the matte coverage sampled
 /// as step 7c samples it. One full-frame quad, the shadow pass's vertex
 /// stage; the clip's stored transform, crop, shadow and the rest do nothing.
@@ -26,12 +26,14 @@ extension RecipeLayer {
     }
 
     /// An adjustment layer that would change nothing: its colour neutral (all
-    /// thirteen keys, which Show Ungraded writes so) and no point filter with
-    /// an amount above 0. It draws nothing, so the frame is byte-identical to
-    /// one without the clip (GR-6, GR-4).
+    /// thirteen keys, which Show Ungraded writes so), no look (which Show
+    /// Ungraded removes, GR-7) and no point filter with an amount above 0. It
+    /// draws nothing, so the frame is byte-identical to one without the clip
+    /// (GR-6, GR-4).
     var isNeutralAdjustment: Bool {
         let point: Set<FilterKind> = [.sepia, .noir, .vignette, .invert]
-        return color.isIdentity && !filters.contains { point.contains($0.kind) && $0.amount > 0 }
+        return color.isIdentity && look == nil
+            && !filters.contains { point.contains($0.kind) && $0.amount > 0 }
     }
 }
 
@@ -69,6 +71,7 @@ extension MetalRenderer {
         encoder.setRenderPipelineState(adjustPipeline)
         encoder.setFragmentBytes(&u, length: MemoryLayout<LayerUniforms>.stride, index: 0)
         encoder.setFragmentTexture(matte, index: 1)
+        encoder.setFragmentTexture(looks.texture(for: layer.look), index: 2)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         encoder.setRenderPipelineState(pass.pipeline)
     }

@@ -75,6 +75,12 @@ governs a module now.
   STORED). **A props map is changed only by `insert` and
   `shift_remove`**: under `preserve_order`, `Map::remove` is `swap_remove`,
   and `Project ==` cannot see the reorder.
+- `model_look.rs` — the look vocabulary (spec §11 GR-7): `Look {kind, amount}`
+  (the FIELD `VideoProps.look`, optional, written only when set) and the eight
+  built-in looks' definitions as data — Color's four, Light's nine and a split
+  tone each — which the recipe's `look` key carries whole, so retuning a look
+  is a core change only. `actions.rs` turns a merged look with no valid `kind`
+  into `null`, so an action's end can never drop the clip's video group.
 - `model_matte.rs` — the matte vocabulary (format version 14, spec §11 MT-1):
   `TrackMatte` (`none`, `alpha`, `alpha_inverted`, `luma`, `luma_inverted`)
   and `is_none`, re-exported through `model_props.rs`; the FIELD
@@ -472,7 +478,7 @@ governs a module now.
   out of `evaluate.rs` (grading GR1).
 - `recipe.rs` · `recipe_layer.rs` · `recipe_text.rs` — `frame_recipe(t)`: the
   layer list at one instant. `RecipeLayer` (`recipe_layer.rs`, re-exported by
-  `recipe.rs`) is the twenty-two keys of a layer written in ONE place
+  `recipe.rs`) is the twenty-three keys of a layer written in ONE place
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
   is what a caller wanted besides `t` — the burn-in timecode, and `ungraded`

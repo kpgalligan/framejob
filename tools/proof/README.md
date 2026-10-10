@@ -18172,3 +18172,65 @@ failed and no other scored row did.
 | `adjustment-note-gone` | the adjustment matte note gone | S4 |
 
 **Its record**: `designs/grading.md`'s GR4a and GR4b sections.
+
+## Road map grading — GR5a, looks end to end over MCP (`look_proof.py` N0, R1, K1, D1, P1, A0, M1, U2, U1, J1, A1, O1, X1, L1–L5, Z1 and seven mutants; `look_probe.swift`; `core/tests/look.rs`, `core/tests/ungraded.rs`; spec §11 GR-7; the `grading` branch)
+
+**What it answers.** That `set_video {patch: {look: {kind, amount}}}` reaches
+the compositor's step 4d through the recipe's `look` — the core's definition,
+baked on the GPU into a 33³ lattice at `texture(2)` — and does what spec §11
+GR-7 says, in `render_frame`'s bytes. On a CHART (a grey ramp over six
+saturated patches): R1 the amount's range sentence and an unknown kind's,
+naming the eight; K1 those eight are the `set_video` catalog clause's, in
+order; D1 every look differs from none and from each other by more than 3
+levels; P1 a save writes `video.look` only when there is one, as the group's
+last key; A0 amount 0 is the neutral bytes; M1 amount 0.5 is the midpoint ±1;
+U2 a new kind keeps the amount, and undo and redo; U1 `render_frame
+{ungraded}` removes a clip's look and an adjustment clip's; J1 `look: null`
+removes it, and an adjustment clip with `vivid` over the chart is the clip's
+own `vivid` ±1; A1 an action from amount 0 to 1 is strictly between at
+mid-span and the full look at its end. On a grey card O1 holds the order
+(tone, then the look): temperature +0.5 under `black_white` stays grey. X1 is
+`render_frame` against a `prores_422` export's frame. N0 holds four neutral
+frames byte-identical (16 bits a channel) to a control captured on the
+UNTOUCHED tree's Release build before any product edit. L1–L5 are
+`look_probe.swift`, built by `swift_build.build` over `app/Sources` (a failed
+build is a scored FAILURE) with the tree's `Compositor.metal` compiled by
+`makeLibrary(source:)` beside three probe kernels: the 2³ placeholder and a
+neutral 33³ bake return all 16,777,216 8-bit colours through `gradeLook`, the
+neutral bake's texels are their coordinates, `apply(look:)` and the pair's
+offsets 456 / 460 of 464, the eight bakes' milliseconds (a record), and
+`teal_orange`'s lattice (its definition read off the core's recipe) is bluer
+than red at grey 0.2 and redder than blue at 0.8. The module docstring lists
+every row and its fixture.
+
+```
+python3 tools/proof/look_proof.py                                   # Debug unless RC_PROOF_APP=release; N0 not run
+python3 tools/proof/look_proof.py --only D1,M1                      # run and score only these rows
+RC_PROOF_APP=release python3 tools/proof/look_proof.py capture DIR  # the neutral control, on the untouched tree
+RC_PROOF_APP=release python3 tools/proof/look_proof.py compare DIR  # every row, and N0 (scored on Release only)
+python3 tools/proof/look_proof.py --mutant NAME                     # one of the seven below
+cd core && cargo test --release --test look --test ungraded
+```
+
+It launches its own instance on a scratch socket in a scratch home
+(`tools/proof/work/look/home`), writes its fixtures (the 640×360 chart PNG, a
+640×360 grey-128 PNG, a 2 s `testsrc2` H.264 movie) into its work folder,
+performs no menu item, closes every project it opens, and removes its work
+folder at the start and at exit (the control folder is not under it).
+`--mutant` builds a tree copy as `tone_proof` does, the probe over the copy's
+`app/Sources` and its shader, and reports MUTANT PASS only when every named
+row failed and no other scored row did; a core mutant also runs `cargo test
+--release --no-fail-fast --test look --test ungraded` in the copy's core (row
+CT).
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `look-before-tone` | step 4d moved before 4c | O1 |
+| `amount-ignored` | `apply(look:)` writes `lookAmount` 1 | M1 A1 U2 L3 |
+| `ungraded-keeps-look` | the `ungraded` option keeps the look | U1 CT |
+| `adjustment-ignores-look` | `reelcut_adjust_fragment` has no step 4d | J1 |
+| `amount-range-dropped` | `check_video`'s look amount range check removed | R1 CT |
+| `split-ignored` | `reelcut_look_bake` skips the split tone | L5 |
+| `kindless-look-kept` | `evaluate_clip`'s look guard removed | CT |
+
+**Its record**: `designs/grading.md`'s GR5a section.

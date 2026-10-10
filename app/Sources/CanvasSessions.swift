@@ -826,7 +826,7 @@ struct CanvasEyedropperSession {
     ///  - the clip's own chroma, because a keyed pixel is a HOLE — the most
     ///    natural pick of all, "the green I can still see", would otherwise
     ///    sample whatever shows through it;
-    ///  - its colour adjustment and tone (all thirteen keys, GR-2), because the shader
+    ///  - its colour adjustment, tone and look (GR-2, GR-7), because the shader
     ///    keys BEFORE them (§7.5's order of operations), so the adjusted pixel
     ///    is not the one being compared;
     ///  - its opacity, because a faded layer's pixel on screen is already
@@ -836,9 +836,9 @@ struct CanvasEyedropperSession {
     /// COVERED by another one is still covered — the pick is what is visible
     /// at that point, which is what a user aiming at it means.
     var suppression: ReelOp {
-        .setVideo(
-            clips: clips,
-            patch: VideoPatch(opacity: 1, color: ColorPatch(.identity), chroma: .some(nil)))
+        .setVideo(clips: clips, patch: VideoPatch(
+            opacity: 1, color: ColorPatch(.identity), chroma: .some(nil),
+            look: .some(nil)))
     }
 
     /// The sampled colour as the props to write. A first pick keeps

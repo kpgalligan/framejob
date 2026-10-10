@@ -364,10 +364,10 @@ final class MetalRenderer {
     /// The routed dissolve's mix (spec §11 MT-8, `Compositor+Dissolve.swift`).
     let dissolvePipeline: MTLRenderPipelineState
     let adjustPipeline: MTLRenderPipelineState
+    let looks: LookTextures
     let sampler: MTLSamplerState
     private let textureCache: CVMetalTextureCache
-    /// Bound wherever the shader ignores the texture (the missing-media
-    /// slate), because a draw with no texture bound is undefined.
+    /// Bound where the shader ignores the texture (the slate): an unbound draw is undefined.
     let placeholder: MTLTexture
     private let renderers: LayerRenderers
     /// Whether this device can run `MPSImageGaussianBlur`. Every Mac the app
@@ -466,21 +466,20 @@ final class MetalRenderer {
             let dissolvePipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.pipelineDescriptor(
                     label: "Reelcut dissolve", vertex: shadowVertex, fragment: dissolveFragment)),
-            let adjustPipeline = MetalRenderer.adjustPipeline(device: device, library: library)
+            let adjustPipeline = MetalRenderer.adjustPipeline(device: device, library: library),
+            let looks = LookTextures(device: device, library: library)
         else { return nil }
 
         let samplerDescriptor = MTLSamplerDescriptor()
         samplerDescriptor.minFilter = .linear
         samplerDescriptor.magFilter = .linear
-        // Clamp, so a crop window that lands exactly on the edge never wraps
-        // a row of pixels around from the other side.
+        // Clamp: a crop window on the edge never wraps a row from the other side.
         samplerDescriptor.sAddressMode = .clampToEdge
         samplerDescriptor.tAddressMode = .clampToEdge
         guard let sampler = device.makeSamplerState(descriptor: samplerDescriptor)
         else { return nil }
 
-        // The cache is asked for both source and destination textures, so it
-        // is created with both usages.
+        // Asked for both source and destination textures, so both usages.
         var cache: CVMetalTextureCache?
         let usage = MTLTextureUsage([.shaderRead, .renderTarget]).rawValue
         CVMetalTextureCacheCreate(
@@ -510,6 +509,7 @@ final class MetalRenderer {
         self.mattePool = MattePool(device: device)
         self.dissolvePipeline = dissolvePipeline
         self.adjustPipeline = adjustPipeline
+        self.looks = looks
         self.sampler = sampler
         self.textureCache = cache
         self.placeholder = placeholder

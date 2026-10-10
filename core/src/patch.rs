@@ -27,8 +27,8 @@ use serde_json::Value;
 use crate::actions::{self, MAX_PATCH_DEPTH};
 use crate::export::describe;
 use crate::model::{
-    AudioProps, Chroma, Compressor, Filter, Motion, ObscureRegion, Reflection, Shadow, ShapeProps,
-    Spotlight, TextProps, VideoProps,
+    AudioProps, Chroma, Compressor, Filter, Look, LookKind, Motion, ObscureRegion, Reflection,
+    Shadow, ShapeProps, Spotlight, TextProps, VideoProps, LOOK_DEFAULT_AMOUNT,
 };
 
 // ---- property groups -----------------------------------------------------
@@ -76,7 +76,7 @@ impl Group {
 
     /// A fully-populated instance of the group, serialized: every optional
     /// sub-object present, so the key check can see inside `shadow`,
-    /// `chroma`, `reflection`, `spotlight`, `duck`, `compressor`, `outline`,
+    /// `chroma`, `reflection`, `spotlight`, `look`, `duck`, `compressor`, `outline`,
     /// `backdrop`, `animation`, `word_style`, `stroke` and `gradient` even
     /// when the clip currently has `null` there — and one `filters` entry,
     /// one `obscure` region and one `text.words` entry, so it can see inside
@@ -102,6 +102,10 @@ impl Group {
                 spotlight: Some(Spotlight::default()),
                 obscure: vec![ObscureRegion::default()],
                 motion: Some(Motion::template()),
+                look: Some(Look {
+                    kind: LookKind::Warm,
+                    amount: LOOK_DEFAULT_AMOUNT,
+                }),
                 ..VideoProps::default()
             }),
             Group::Audio => actions::to_json(&AudioProps {

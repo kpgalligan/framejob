@@ -9,8 +9,10 @@ GR-2, GR-3 and GR-9 were recorded in GR2, before its code, from the owner's answ
 2026-10-09 ("Start grading", then "All as recommended" to the brief's choices, and "All as
 recommended" again to GR2's nine choices). GR-4 and GR-5 were recorded in GR3, before its code,
 from the owner's "All as recommended" to GR3's eleven choices (2026-10-09). GR-6 was recorded in GR4a, before its code,
-from the owner's "All as recommended" to GR4's twelve choices, both halves (2026-10-10). GR-7 and
-GR-8 are later phases' and are recorded at their start. The brief's D2 and D3 (from the effects survey) are not recorded as written: GR-1
+from the owner's "All as recommended" to GR4's twelve choices, both halves (2026-10-10). GR-7 was
+recorded in GR5a, before its code, from the owner's "All as recommended" to GR5's thirteen choices,
+with Black & White as the eighth look (2026-10-10). GR-8 is a later phase's and is recorded at its
+start. The brief's D2 and D3 (from the effects survey) are not recorded as written: GR-1
 stands in their place.
 
 **Stands, and nothing here re-litigates it:** R5-1 (closed vocabularies, never a runtime); G-1;
@@ -196,6 +198,86 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
     refusing the transform keys. Risk accepted: an adjustment clip's stored placement keys are
     inert and shown nowhere in the inspector; they stay reachable through MCP and Paste
     Attributes.
+- **GR-7 — Looks: `video.look {kind, amount}`, eight built-ins defined in the core as data,
+  baked on the GPU into a 33³ `rgba16Float` lattice and mixed at step 4d.** The owner's thirteen
+  choices of 2026-10-10, each as recommended, the eighth look Black & White (not Night); GR5a
+  builds the model, the picture and the MCP mirror, GR5b the gallery, the Look section and the
+  menu ([b] below).
+  - **The eight** (choice 1), a closed `LookKind` in this order, which is the gallery's and the
+    menu's (appended, never reordered): `warm` (Warm), `cool` (Cool), `teal_orange` (Teal &
+    Orange), `vivid` (Vivid), `faded` (Faded), `vintage` (Vintage), `dramatic` (Dramatic),
+    `black_white` (Black & White). Each is built from Color's four keys, Light's nine (GR-2's
+    strengths) and a **split tone** — a shadow hue and a highlight hue in degrees, each with an
+    amount 0…1 — with every unlisted value 0. Generic names and Reelcut's own first numbers, tuned
+    by the owner by eye at GR7:
+    | kind | in plain words | blocks |
+    |---|---|---|
+    | `warm` | golden, sunny | temperature 0.35, tint 0.05, vibrance 0.10; highlights split 40° 0.25 |
+    | `cool` | crisp, cold | temperature −0.35, contrast 0.05; shadows split 215° 0.30 |
+    | `teal_orange` | blockbuster: teal shadows, warm skin | contrast 0.15, vibrance 0.20; shadows 190° 0.60, highlights 35° 0.45 |
+    | `vivid` | punchy, richer colour, deeper blacks | contrast 0.15, saturation 0.10, vibrance 0.40, whites 0.20, blacks −0.20 |
+    | `faded` | soft matte, muted | contrast −0.15, saturation −0.25, highlights −0.15, fade 0.60 |
+    | `vintage` | old print: warm, faded, green shadows, cream highlights | contrast −0.05, saturation −0.30, temperature 0.25, fade 0.40; shadows 160° 0.30, highlights 50° 0.35 |
+    | `dramatic` | moody: darker, harder, drained, cold shadows | exposure −0.25, contrast 0.25, saturation −0.35, highlights −0.20, shadows −0.20; shadows 220° 0.20 |
+    | `black_white` | monochrome with a little punch | saturation −1, contrast 0.20, whites 0.10, blacks −0.10 |
+  - **Amount** (choice 2): 0…1 (0–100 %), 1 by default; outside it is refused in the rule's own
+    sentence (`video.look.amount must be between 0 and 1, not 1.5`), never clamped by a patch; an
+    action's end is clamped (NaN to 0). An unknown kind is refused by the patch read, naming the
+    eight.
+  - **Order** (choice 3): in a layer, Color's four, then Light, then **the look**, then the point
+    filters, then opacity — correct first, then the look; on an adjustment clip the same, over what
+    is behind it. **Split tone lives only inside looks** (choice 4): no Light row.
+  - **The bake.** The core publishes each look's DEFINITION in the recipe (`look: {kind, amount,
+    definition: {color, split}}`, or `null` when there is no look, its amount is 0 or the frame is
+    ungraded), and the compositor bakes it once per definition on the GPU, by a compute kernel that
+    runs the identity lattice through the layer stage's own functions — step 3's colour adjust
+    (`gradeSample`, chroma off), step 4c's tone (`gradeTone`) and the split tone, `rgb += 0.2 ·
+    (shadow amount · (1 − Y)² · chroma(shadow hue) + highlight amount · Y² · chroma(highlight
+    hue))`, Y the saturated Rec. 709 luma and chroma(h) the fully saturated hue h less its own
+    luma — into a **33³ `rgba16Float` 3D texture**, kept in a least-recently-used cache of eight
+    keyed by the definition. A failed bake answers the identity.
+  - **Step 4d** applies it once per pixel, right after 4c: the lattice sampled trilinearly at
+    `saturate(rgb)·(n−1)/n + 0.5/n` and mixed in by `amount`. The texture is bound at
+    **`texture(2)`** on every draw through the three fragments that run the stage
+    (`reelcut_layer_fragment`, `reelcut_layer_blend_fragment`, `reelcut_adjust_fragment`); a
+    layer with no look binds a **2³ identity placeholder** and never samples it, because
+    `LayerUniforms`' two reserved tone floats become `lookAmount` and `lookEnabled` (still 116
+    floats, 464 bytes) and `lookEnabled` joins the effects gate's sum — GR0's route VF, so a
+    look-less layer renders byte-identical.
+  - **Seeing it** (choice 10): Show Ungraded and `render_frame {ungraded}` remove every look, an
+    adjustment clip's included (GR-4 extended); an export never does; the chroma-key eyedropper
+    removes the look while it picks, as it does Light and Color.
+  - **Animation** (choice 11): `amount` animates like every number; a change of `kind` switches at
+    the action's end (§5.4's discriminant rule); a look is faded in by animating `amount` from 0.
+    An action's end that names a look with no `kind` on a clip that has none (and so does not read
+    as a look) evaluates as no look, and never costs the end its other keys.
+  - **No new op, tool or format number** (choices 12, 13): `set_video {patch: {look: {kind,
+    amount?}}}` sets it — a new kind keeps the clip's amount, a clip with none gets 1 — and `look:
+    null` removes it; a `look` with no `kind` on a clip that has none is refused. The key is
+    optional and absent when there is no look, so the format stays 1015 (GR-9's rule): a branch
+    build from before GR5 drops a look on save. Through MCP `set_video` reaches any clip, as
+    Color's keys do (GR-2's parity).
+  - **[b] The Look section** (choice 5), in the Color sub-tab after Color (Adjustment · Light ·
+    Color · Look), closed by default. **The gallery** (choice 6): a 3×3 grid — None, then the
+    eight in the table's order — each tile a thumbnail with its name beneath, the shared kind
+    outlined in the accent (none when mixed); under it an Amount row (0–100 %, quick
+    0/25/50/75/100) shown only when every selected clip has a look; the summary "Warm 80%",
+    "none" or "mixed"; Reset removes the look. **Thumbnails** (choice 7): the composited frame at
+    the playhead (inside the first selected clip, else its first frame) with that tile's look on
+    every selected clip at the first clip's amount (100 % if it has none) — exactly what a click
+    gives — through `render_frame`'s renderer at 256 px wide, refreshed 0.3 s after the selection,
+    the project or the playhead stop changing (never mid-playback) and only while the section is
+    open. **A tile click** (choice 8) sets the kind and keeps each clip's amount (100 % for a clip
+    with none); None removes; undo "Look". **Clip ▸ Look ▸** (choice 9), after Motion ▸: the eight,
+    a separator, None; a checkmark on the shared kind, a dash when mixed; for the selected clips
+    that take a grade (video, image, still, adjustment), off when none do; no shortcut; undo
+    "Look".
+  - **The Concat rule stands**: the looks are the table's numbers and the textbook formulas above
+    (Rec. 709 luma, the HSV hue ramp, IEC 61966-2-1 inside 4c); no Core Image, and nothing of
+    Concat is opened at design or build time.
+  - Risk accepted: a looked layer costs one 3D sample more than a toned one, and the first frame
+    of a new definition pays its bake (GR5a's record measures it); `.cube` import (GR-8) is how a
+    person gets a look that is not one of the eight.
 - **GR-9 — The branch writes project format 1015, refuses 15–1014 by name, and the merge
   renumbers.** The branch's `RC_FORMAT_VERSION` is **1015** (main's 14 plus a thousand), in
   `core/src/format.rs` and the header, so every main build refuses a branch-made project as "made

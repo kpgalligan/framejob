@@ -332,7 +332,10 @@ struct LayerUniforms {
     // 1 exactly when one of the nine is not 0, and joins the effects gate's
     // sum, so an untoned layer never enters 4c and renders byte-identical
     // (GR0's route VF). Twelve floats: 104 + 12 = 116 floats = 464 bytes,
-    // and 464 is 29 × 16; the two reserved floats are the group's tail.
+    // and 464 is 29 × 16. The group's last two are the LOOK's (spec §11
+    // GR-7): `lookAmount` mixes step 4d's lattice in, and `lookEnabled`, 1
+    // exactly when the layer has a look with an amount above 0, joins the
+    // same sum, so a look-less layer never samples `texture(2)`.
     float exposure;             // −3…+3 EV, on linear light
     float temperature;          // −1…+1
     float tint;                 // −1…+1
@@ -343,8 +346,8 @@ struct LayerUniforms {
     float vibrance;             // −1…+1
     float fade;                 // 0…1
     float toneEnabled;          // 1 when any of the nine is not 0
-    float toneReserved0;
-    float toneReserved1;
+    float lookAmount;           // 0…1
+    float lookEnabled;          // 1 when the layer has a look above 0
 };
 
 /// A fragment's `[[position]]` in CANVAS pixels — the frame the nest clip
@@ -925,6 +928,43 @@ static inline float3 gradeTone(float3 rgb, constant LayerUniforms &u) {
     return rgb;
 }
 
+// MARK: - Looks (spec §11 GR-7)
+
+// The split tone's uniforms, mirroring `LookBakeUniforms` in
+// `LookTextures.swift` FIELD FOR FIELD: hues in degrees, amounts 0…1.
+struct LookBakeUniforms {
+    float shadowHue;
+    float shadowAmount;
+    float highlightHue;
+    float highlightAmount;
+};
+
+// The fully saturated hue `degrees` (the textbook HSV ramp) less its own
+// Rec. 709 luma: a push towards that hue that moves no brightness.
+static inline float3 lookHueChroma(float degrees) {
+    float3 full = saturate(abs(fmod(degrees / 60.0 + float3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0);
+    return full - dot(full, float3(0.2126, 0.7152, 0.0722));
+}
+
+// The split tone, a look's one block Light does not have: the shadow hue
+// weighted by (1 − Y)² and the highlight hue by Y², Y the saturated luma, at
+// a fifth of the amount. Reelcut's own strength, tuned at GR7.
+static inline float3 lookSplitTone(float3 rgb, constant LookBakeUniforms &b) {
+    float y = saturate(dot(rgb, float3(0.2126, 0.7152, 0.0722)));
+    return rgb + 0.2 * (b.shadowAmount * (1.0 - y) * (1.0 - y) * lookHueChroma(b.shadowHue)
+                        + b.highlightAmount * y * y * lookHueChroma(b.highlightHue));
+}
+
+// Step 4d: the look's lattice (`LookTextures`, baked by `reelcut_look_bake`
+// below) sampled trilinearly at the texel CENTRES' span — so an identity
+// lattice of any size returns its input — and mixed in by `lookAmount`.
+static inline float3 gradeLook(float3 rgb, texture3d<float> look, sampler samp,
+                               constant LayerUniforms &u) {
+    float n = float(look.get_width());
+    float3 coord = saturate(rgb) * ((n - 1.0) / n) + 0.5 / n;
+    return mix(rgb, look.sample(samp, coord).rgb, u.lookAmount);
+}
+
 // MARK: - The layer fragment stage
 
 // ORDER OF OPERATIONS. Fixed by the M3 contract, and each stage is where it
@@ -942,6 +982,9 @@ static inline float3 gradeTone(float3 rgb, constant LayerUniforms &u) {
 //                              content is toned like the picture around it,
 //                              and before the point filters, which act on
 //                              the toned colour
+//  4d. the look                `gradeLook`, once per pixel (spec §11 GR-7):
+//                              right after tone, so a look grades the
+//                              corrected colour, and before the point filters
 //   5. the point filters       sepia, noir, vignette, invert, IN SLOT ORDER
 //   6. spotlight dim           after every colour stage: the dim is a light
 //                              on the layer, not something the filters act on
@@ -1063,7 +1106,8 @@ static inline float4 layerColorPremultiplied(Varyings in,
                                              constant LayerUniforms &u,
                                              texture2d<float> source,
                                              sampler samp,
-                                             texture2d<float> matte) {
+                                             texture2d<float> matte,
+                                             texture3d<float> look) {
     float2 srcSize = max(float2(u.sourceWidth, u.sourceHeight), float2(1.0));
     float2 cropped = max(srcSize - float2(u.cropL + u.cropR, u.cropT + u.cropB), float2(1.0));
 
@@ -1086,7 +1130,7 @@ static inline float4 layerColorPremultiplied(Varyings in,
     // measuring the same as the pre-M3 shader.
     bool effects = (u.filterKind0 + u.filterKind1 + u.filterKind2 + u.filterKind3
                     + u.spotEnabled + u.clipEnabled + u.reflectionPass
-                    + u.obscureEnabled + u.toneEnabled) > 0.5;
+                    + u.obscureEnabled + u.toneEnabled + u.lookEnabled) > 0.5;
 
     float2 uv = in.uv;
     float spot = 1.0;
@@ -1266,6 +1310,13 @@ static inline float4 layerColorPremultiplied(Varyings in,
         // untoned layer never enters it.
         if (u.toneEnabled > 0.5) {
             rgb = gradeTone(rgb, u);
+        }
+
+        // (4d) The look (spec §11 GR-7): once per pixel, right after tone and
+        // before the point filters. Behind `lookEnabled`, so a look-less layer
+        // never samples `texture(2)`.
+        if (u.lookEnabled > 0.5) {
+            rgb = gradeLook(rgb, look, samp, u);
         }
 
         // (5) The four point filters, in the order the model lists them. A slot
@@ -1453,8 +1504,9 @@ fragment float4 reelcut_layer_fragment(Varyings in [[stage_in]],
                                        constant LayerUniforms &u [[buffer(0)]],
                                        texture2d<float> source [[texture(0)]],
                                        sampler samp [[sampler(0)]],
-                                       texture2d<float> matte [[texture(1)]]) {
-    return layerColorPremultiplied(in, u, source, samp, matte);
+                                       texture2d<float> matte [[texture(1)]],
+                                       texture3d<float> look [[texture(2)]]) {
+    return layerColorPremultiplied(in, u, source, samp, matte, look);
 }
 
 /// Step 11: one layer's colour combined with the destination under a
@@ -1575,8 +1627,9 @@ fragment float4 reelcut_layer_blend_fragment(Varyings in [[stage_in]],
                                              texture2d<float> source [[texture(0)]],
                                              sampler samp [[sampler(0)]],
                                              float4 dst [[color(0)]],
-                                             texture2d<float> matte [[texture(1)]]) {
-    float4 src = layerColorPremultiplied(in, u, source, samp, matte);
+                                             texture2d<float> matte [[texture(1)]],
+                                             texture3d<float> look [[texture(2)]]) {
+    float4 src = layerColorPremultiplied(in, u, source, samp, matte, look);
     // Clamped, because the 16-bit-float canvas keeps whatever is returned
     // and a blend can step past 1 or below 0 (spec §11 PR-1).
     return saturate(blendPremultiplied(int(u.blendMode + 0.5), src, dst));
@@ -1770,8 +1823,8 @@ fragment float4 reelcut_dissolve_fragment(ShadowVaryings in [[stage_in]],
 // An adjustment clip's layer: no texture, one full-frame quad, blending OFF.
 // It reads what is already drawn behind it — the target `encodeLayers` is
 // drawing into — un-premultiplies it, grades it as step 3's colour adjust
-// (`gradeSample`, the chroma key off), step 4c's tone and step 5's point
-// filters would (the canvas's uv as the filters' local position), and
+// (`gradeSample`, the chroma key off), step 4c's tone, step 4d's look and
+// step 5's point filters would (the canvas's uv as the filters' local position), and
 // premultiplies it back by the destination's own alpha, so alpha is
 // preserved. The weight is the layer's opacity, its strength, times the
 // matte coverage sampled as step 7c samples it.
@@ -1779,12 +1832,16 @@ fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
                                         constant LayerUniforms &u [[buffer(0)]],
                                         float4 dst [[color(0)]],
                                         texture2d<float> matte [[texture(1)]],
+                                        texture3d<float> look [[texture(2)]],
                                         sampler samp [[sampler(0)]]) {
     float a = saturate(dst.a);
     float3 c = saturate(dst.rgb / max(a, 1e-4));
     c = gradeSample(c, 1.0, u).rgb;
     if (u.toneEnabled > 0.5) {
         c = gradeTone(c, u);
+    }
+    if (u.lookEnabled > 0.5) {
+        c = gradeLook(c, look, samp, u);
     }
     float2 local = canvasPixels(in.position.xy, float2(u.canvasPerDestX, u.canvasPerDestY))
         / max(float2(u.canvasWidth, u.canvasHeight), float2(1.0));
@@ -1796,4 +1853,33 @@ fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
     float4 g = float4(c * a, a);
     float w = saturate(u.opacity * matte.sample(samp, local).r);
     return mix(dst, g, w);
+}
+
+// MARK: - The look bake (spec §11 GR-7)
+
+// One look's lattice: the identity lattice — texel (r, g, b) holds its own
+// coordinate — run through the layer stage's own colour functions with the
+// look's definition as their uniforms: step 3's colour adjust, step 4c's
+// tone, then the split tone. Each runs only when its block is not neutral,
+// so a neutral definition writes the identity exactly. `LookTextures`
+// dispatches it once per definition and caches the texture.
+kernel void reelcut_look_bake(texture3d<float, access::write> lattice [[texture(0)]],
+                              constant LayerUniforms &u [[buffer(0)]],
+                              constant LookBakeUniforms &b [[buffer(1)]],
+                              uint3 gid [[thread_position_in_grid]]) {
+    uint n = lattice.get_width();
+    if (gid.x >= n || gid.y >= n || gid.z >= n) {
+        return;
+    }
+    float3 c = float3(gid) / float(max(n, 2u) - 1u);
+    if (u.brightness != 0.0 || u.contrast != 0.0 || u.saturation != 0.0 || u.hue != 0.0) {
+        c = gradeSample(c, 1.0, u).rgb;
+    }
+    if (u.toneEnabled > 0.5) {
+        c = gradeTone(c, u);
+    }
+    if (b.shadowAmount != 0.0 || b.highlightAmount != 0.0) {
+        c = lookSplitTone(c, b);
+    }
+    lattice.write(float4(saturate(c), 1.0), gid);
 }

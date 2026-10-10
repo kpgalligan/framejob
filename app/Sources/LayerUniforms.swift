@@ -194,7 +194,9 @@ struct LayerUniforms {
     // Tone (spec §11 GR-2, grading GR2): `ColorAdjust`'s nine tone keys in
     // the model's order, then `toneEnabled` — 1 exactly when one of them is
     // not 0, the effects gate's term (`apply(tone:)`, `GradeProps.swift`) —
-    // and two reserved. 104 + 12 = 116 floats = 464 bytes, 29 × 16.
+    // and the look's two (spec §11 GR-7, `apply(look:)`, `LookProps.swift`),
+    // which took the group's reserved tail: step 4d's mix and its gate term.
+    // 104 + 12 = 116 floats = 464 bytes, 29 × 16.
     var exposure: Float = 0
     var temperature: Float = 0
     var tint: Float = 0
@@ -205,8 +207,8 @@ struct LayerUniforms {
     var vibrance: Float = 0
     var fade: Float = 0
     var toneEnabled: Float = 0
-    var toneReserved0: Float = 0
-    var toneReserved1: Float = 0
+    var lookAmount: Float = 0
+    var lookEnabled: Float = 0
 }
 
 /// The shadow pass's uniform block, mirroring `ShadowUniforms` in

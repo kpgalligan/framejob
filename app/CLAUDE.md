@@ -1115,7 +1115,13 @@ the key map behind it.
   0…1 where the shader samples it. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 116
   floats (464 bytes), ending in the tone group (spec §11 GR-2: the nine tone
-  values, `toneEnabled`, and two reserved floats a next field can take). **Eight pipelines from six fragment functions** (the eighth,
+  values, `toneEnabled`, then `lookAmount` and `lookEnabled`, spec §11 GR-7; a
+  next field adds a group of four). A layer's look is a baked 33³ `rgba16Float`
+  lattice at `texture(2)` on every layer, shadow-mask and adjustment draw
+  (`LookTextures.swift`: the bake on the GPU, an LRU keyed by the look's whole
+  definition from the recipe, a 2³ identity placeholder for no look or a failed
+  bake; `LookProps.swift`: `LookProps`, `LookPatch`, `SplitTone`, the recipe's
+  `RecipeLook`). **Eight pipelines from six fragment functions** (the eighth,
   `Compositor+Adjustment.swift`'s, is an adjustment clip's full-frame pass reading
   the destination, blending off; spec §11 GR-6): the two
   programmable-blend pipelines MUST be built with fixed-function blending

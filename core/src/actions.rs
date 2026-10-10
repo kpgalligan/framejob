@@ -34,7 +34,7 @@ use crate::actions_clamp::{clamp_audio, clamp_video};
 use crate::actions_graphic::evaluate_graphic;
 use crate::edit_adjustment::{clamp_adjustment, is_adjustment};
 use crate::model::{
-    Action, AudioProps, Clip, ColorAdjust, Curve, GraphicProps, Project, ShapeProps, Source,
+    Action, AudioProps, Clip, ColorAdjust, Curve, GraphicProps, Look, Project, ShapeProps, Source,
     TextProps, VideoProps,
 };
 use crate::time::Ticks;
@@ -405,8 +405,22 @@ impl Project {
         // MINT `{"motion": …}` and decode as DEFAULT props rather than base.
         // With the `if let` each keeps falling through to
         // `.ok().unwrap_or(base_video)`, as it always did.
+        //
+        // A look that does not read as one becomes no look (spec §11 GR-7),
+        // in the same place and for the same reason. `set_action_end` checks
+        // an end against the patch TEMPLATE, whose look has a kind, so an end
+        // of `{"look": {"amount": 1}}` is accepted — and on a clip with no
+        // look (or one whose look was removed after the end was written) the
+        // merge leaves a kind-less look, which would fail the whole group's
+        // decode below and snap every animated key back to base. Inert
+        // instead: no kind, no look; every other key keeps its value.
         if let Some(Value::Object(video)) = state.get_mut("video") {
             video.insert("motion".to_string(), to_json(&base_video.motion));
+            if video.get("look").is_some_and(|look| {
+                !look.is_null() && serde_json::from_value::<Look>(look.clone()).is_err()
+            }) {
+                video.insert("look".to_string(), Value::Null);
+            }
         }
         // A patch that writes a bad type into a field (12.5 into a tick
         // count, say) loses that whole group rather than failing: the

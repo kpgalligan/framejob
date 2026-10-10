@@ -219,7 +219,10 @@ use crate::model::{Canvas, Project};
 /// is 0, so there is no migration step. It is also the `adjustment` source
 /// kind (GR-6, amending GR-9), a new variant rather than an optional key: a
 /// build that does not know it refuses the file with serde's "unknown
-/// variant `adjustment`", so nothing is dropped silently. The branch reads 1 to
+/// variant `adjustment`", so nothing is dropped silently. It is also
+/// `video.look` (GR-7), an optional key written only when a clip has a look,
+/// so a look-less project writes the text it did; a branch build from before
+/// it would drop a look on save. The branch reads 1 to
 /// [`BRANCH_BASE_VERSION`] and 1015, and refuses the numbers between in its
 /// own sentence: a later main file would open here and lose its new keys on
 /// save. At the merge 1015 is renumbered to main's next with one migration

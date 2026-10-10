@@ -278,7 +278,8 @@ impl Project {
     }
 
     /// One layer of the recipe, its roles in the frame given (`LayerRoles`);
-    /// `ungraded` writes its `video.color` neutral (spec §11 GR-4).
+    /// `ungraded` writes its `video.color` neutral and removes its look (spec
+    /// §11 GR-4, GR-7).
     fn layer(
         &self,
         instance: &Instance,
@@ -319,6 +320,7 @@ impl Project {
         // the one writer of layer keys, so no key is added or dropped.
         if ungraded {
             moved.color = ColorAdjust::default();
+            moved.look = None;
         }
         let video = &moved;
         let (source, source_size) = self.layer_source(instance, &evaluated, clip_t, assignment);

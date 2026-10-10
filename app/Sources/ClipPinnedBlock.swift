@@ -24,16 +24,19 @@ enum ClipSubTab: String, CaseIterable {
     /// included (CI-6 amended, G-34 (l)). Color counts `color`, one key
     /// however many of its thirteen the end names, and Picture no longer does
     /// (CI-6 amended by GR-2); for an all-adjustment selection (`adjustment`)
-    /// it also counts `opacity`, the Adjustment section's Strength (GR-6).
+    /// it also counts `opacity`, the Adjustment section's Strength (GR-6). An
+    /// end's `look` is Color's too, one key (GR-7), and Picture's never.
     func keyedCount(in end: ActionPatch, adjustment: Bool = false) -> Int {
         switch self {
         case .text: return end.text?.dictionary.count ?? 0
         case .shape: return 0
         case .graphic: return end.graphic?.props.count ?? 0
         case .picture:
-            return end.video?.dictionary.keys.filter { $0 != "motion" && $0 != "color" }.count ?? 0
+            let other: Set<String> = ["motion", "color", "look"]
+            return end.video?.dictionary.keys.filter { !other.contains($0) }.count ?? 0
         case .color:
             return (end.video?.color?.isEmpty == false ? 1 : 0)
+                + (end.video?.dictionary["look"] != nil ? 1 : 0)
                 + (adjustment && end.video?.dictionary["opacity"] != nil ? 1 : 0)
         case .sound: return end.audio?.dictionary.count ?? 0
         case .clip: return end.video?.dictionary["motion"] == nil ? 0 : 1

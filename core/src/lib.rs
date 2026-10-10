@@ -65,6 +65,7 @@ pub mod mcp_versions;
 pub mod model;
 mod model_color;
 pub mod model_graphic;
+pub mod model_look;
 pub mod model_matte;
 pub mod model_motion;
 pub mod model_props;

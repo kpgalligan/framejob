@@ -572,7 +572,7 @@ struct ShadowProps: Codable, Equatable {
 }
 
 /// Per-clip colour controls, all centred on 0 = no change.
-struct ColorAdjust: Codable, Equatable {
+struct ColorAdjust: Codable, Hashable {
     let brightness: Double
     let contrast: Double
     let saturation: Double
@@ -852,20 +852,17 @@ struct VideoProps: Codable, Equatable {
     /// array and not an optional.
     let obscure: [ObscureProps]
     /// How this layer combines with what is already on the canvas (format
-    /// version 6). Now the LAST key of the struct, as it is in
-    /// `model_props.rs` — `obscure` held that place until phase 6, and a new
-    /// key landing at the END is the whole of the append-only rule the two
-    /// shader discriminants rest on. `.normal` is source-over, so it is both
-    /// the default and how a blend is cleared; there is no null form.
+    /// version 6). `.normal` is source-over, so it is both the default and
+    /// how a blend is cleared; there is no null form.
     let blend: BlendMode
     /// What the clip DOES — an entrance, an exit, a continuous motion
-    /// (format version 8). The LAST key of the struct now, as in
-    /// `model_props.rs`; `blend` held that place until road map 5's E2.
-    /// Nothing on this side reads it to DRAW: the core turns a preset into
-    /// placement inside the recipe, so the inspector and the canvas see the
-    /// clip UN-MOVED while the picture moves (spec §5.4), which is why a
-    /// drag begun mid-motion starts from the base box.
+    /// (format version 8). Nothing on this side reads it to DRAW: the core
+    /// turns a preset into placement inside the recipe, so the inspector and
+    /// the canvas see the clip UN-MOVED while the picture moves (spec §5.4),
+    /// which is why a drag begun mid-motion starts from the base box.
     let motion: MotionProps?
+    /// The clip's look (spec §11 GR-7, `LookProps.swift`); nil is none.
+    let look: LookProps?
 
     init(
         x: Double = 0, y: Double = 0, scale: Double = 1, rotation: Double = 0,
@@ -874,7 +871,7 @@ struct VideoProps: Codable, Equatable {
         chroma: ChromaProps? = nil, filters: [FilterProps] = [],
         reflection: ReflectionProps? = nil, spotlight: SpotlightProps? = nil,
         obscure: [ObscureProps] = [], blend: BlendMode = .normal,
-        motion: MotionProps? = nil
+        motion: MotionProps? = nil, look: LookProps? = nil
     ) {
         self.x = x
         self.y = y
@@ -892,6 +889,7 @@ struct VideoProps: Codable, Equatable {
         self.obscure = obscure
         self.blend = blend
         self.motion = motion
+        self.look = look
     }
 
     init(from decoder: Decoder) throws {
@@ -921,6 +919,7 @@ struct VideoProps: Codable, Equatable {
         // what every clip did before it existed. Same argument again, same
         // reason version 8 needs no migrate step.
         motion = c.lenient(.motion)
+        look = c.lenient(.look)
     }
 
     static let identity = VideoProps()

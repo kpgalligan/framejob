@@ -7,16 +7,16 @@ use serde_json::{Map, Value};
 
 use crate::actions::color_json;
 use crate::evaluate::{json, number};
-use crate::model::{BlendMode, VideoProps};
+use crate::model::{BlendMode, Look, VideoProps};
 use crate::nest::Frame;
 
-/// The TWENTY-TWO keys of a recipe layer (spec §7.3), and the one place they
+/// The TWENTY-THREE keys of a recipe layer (spec §7.3), and the one place they
 /// are written.
 ///
 /// It is a struct rather than twenty lines inside [`crate::model::Project::layer`] because
 /// phase 7 gave the recipe a SECOND producer of layers — the burn-in
 /// [`crate::recipe_text::burn_in_layer`] synthesizes, which belongs to no
-/// clip — and a second literal copy of a twenty-two-key object is a copy that
+/// clip — and a second literal copy of a twenty-three-key object is a copy that
 /// drifts. It would drift SILENTLY, which is the part worth stating:
 /// `FrameRecipe.swift`'s `RecipeLayer.init(from:)` reads every key
 /// leniently and DEFAULTS a missing one with no diagnostic anywhere, so a
@@ -56,6 +56,26 @@ pub(crate) struct RecipeLayer<'a> {
     pub dissolve: Value,
 }
 
+/// The layer's look as the compositor bakes and mixes it (spec §11 GR-7):
+/// its kind, its amount and the core's definition — the colour with all
+/// thirteen keys and the split tone — or `null` when there is none, when
+/// its amount is 0 (a look-less layer, so the frame is byte-identical), or
+/// when the frame is ungraded (`recipe.rs` removes it before this).
+fn look_json(look: Option<Look>) -> Value {
+    let Some(look) = look.filter(|look| look.amount > 0.0) else {
+        return Value::Null;
+    };
+    let definition = look.kind.definition();
+    let mut body = Map::new();
+    body.insert("color".to_string(), color_json(&definition.color));
+    body.insert("split".to_string(), json(&definition.split));
+    let mut out = Map::new();
+    out.insert("kind".to_string(), json(&look.kind));
+    out.insert("amount".to_string(), number(look.amount));
+    out.insert("definition".to_string(), Value::Object(body));
+    Value::Object(out)
+}
+
 impl RecipeLayer<'_> {
     /// The layer as the recipe publishes it.
     ///
@@ -81,6 +101,7 @@ impl RecipeLayer<'_> {
         out.insert("shadow".to_string(), json(&video.shadow));
         // All thirteen keys, tone's included at 0 (spec §11 GR-2).
         out.insert("color".to_string(), color_json(&video.color));
+        out.insert("look".to_string(), look_json(video.look));
         out.insert("chroma".to_string(), json(&video.chroma));
         out.insert("filters".to_string(), json(&video.filters));
         out.insert("reflection".to_string(), json(&video.reflection));
