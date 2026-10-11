@@ -56,6 +56,14 @@ kernels compiled from the tree's `Waveform.metal`):
   Scored: the worst 4K figure of each of parade, vectorscope and histogram
   ≤ 1.1 ms (GR-10). The waveform and the waveform + vectorscope pair are
   recorded, with `pmset -g`'s power lines.
+- **T2**: the tree's parade against the same shader with its one
+  `bool banded = ` line forced to `false` (every group adding globally),
+  timed back to back on the five 4K fixtures as T1 times them. Scored: on the
+  fixture where the forced-global parade is slowest (flat on the M2 Max), the
+  banded time ≤ 0.75 × the global one, which says the banded path is the one
+  running (T1 alone cannot: the global parade sits about T1's 1.1 ms). The
+  other fixtures are recorded; banding gains nothing on them. A shader with no
+  such line, or more than one, is a FAILURE, never a skip.
 
 **MCP rows** (project S):
 - **M1**: `render_frame` with all four booleans: four sentences in
@@ -85,12 +93,13 @@ sources), over project S saved:
 - **Z1** (CONTROL): the fixture holds, the project closes and the log holds
   no `Reelcut: ` line.
 
-`--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`), applies
-its edits (each anchor asserted to occur exactly once), builds it by the
-copy's own `make app-debug` (`make app` under `RC_PROOF_APP=release`) and runs
-every row but H1–H3 on it, the probe built over the copy's `app/Sources` and
-its shader. MUTANT PASS when every named row FAILED and no other scored row
-did:
+`--mutant NAME`, one of the eleven below, builds a COPY of the tree
+(`tree_copy.make_copy`), applies its edits (each anchor asserted to occur
+exactly once), builds it by the copy's own `make app-debug` (`make app` under
+`RC_PROOF_APP=release`) and runs every row but H1–H3 on it, the probe built
+over the copy's `app/Sources` and its shader. MUTANT PASS when every named
+row FAILED and no other scored row did, but a row the mutant tolerates
+(`TOLERATED`), which the MUTANT line names when it failed:
   cb-cr-swapped        the kernel puts Cr on the Cb axis: S1 M1
   bt601                the vectorscope's matrix is BT.601's: S1 M1
   bins-edged           the chroma bins floor instead of round: S1 S2
@@ -102,6 +111,9 @@ did:
   slots-not-shrunk     the bodies stay at their preferred heights: S10
   parade-band-misplaced  the parade's merge puts both bands in the group's
                        first column: S3
+  parade-global        every parade group adds globally: T2 (T1 tolerated: the
+                       forced-global parade measured 1.15 ms at 4K on flat in
+                       G2-5 (1.019–1.042 in G2-1), at or over T1's 1.1 ms)
 Exit 0 when every scored row passed (a mutant: caught); 1 when one failed
 (a mutant: survived); 2 when the control could not be performed.
 """
@@ -139,10 +151,11 @@ SEC = 600_000
 T = SEC // 2
 W, H = 640, 360
 BOUND_MS = 1.1
+RATIO_MAX = 0.75
 KINDS = ["waveform", "parade", "vectorscope", "histogram"]
-ROWS = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "T1", "M1", "M2", "M3",
-        "M4", "H1", "H2", "H3", "Z1"]
-S_ROWS = {"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "T1"}
+ROWS = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "T1", "T2", "M1", "M2",
+        "M3", "M4", "H1", "H2", "H3", "Z1"]
+S_ROWS = {"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "T1", "T2"}
 M_ROWS = {"M1", "M2", "M3", "M4"}
 H_ROWS = {"H1", "H2", "H3"}
 SCOPES = ["View", "Scopes"]
@@ -185,7 +198,12 @@ MUTANTS = {
     "parade-band-misplaced": ([(
         SHADER, "(channel * 256u + first + band) * 256u", "(channel * 256u + first) * 256u")],
         ["S3"]),
+    "parade-global": ([(
+        SHADER, "bool banded = last - first < kParadeBands;", "bool banded = false;")],
+        ["T2"]),
 }
+# A row a mutant may fail BECAUSE of it, besides the rows it must fail.
+TOLERATED = {"parade-global": ["T1"]}
 rows = {}
 selected = set(ROWS)
 
@@ -489,6 +507,29 @@ def score_t1(body):
           all(w is not None and w[0] <= BOUND_MS for w in scored))
 
 
+def score_t2(body):
+    figures = (body.get("records") or {}).get("T2") or {}
+    pairs = figures.get("4K") or {}
+    for name, pair in sorted(pairs.items()):
+        note(f"T2 4K {name}: banded {pair.get('banded')}, global {pair.get('global')} ms")
+    banded = [pair.get("banded") for pair in pairs.values()]
+    global_ = [pair.get("global") for pair in pairs.values()]
+    whole = (len(pairs) == 5 and not figures.get("anchor") and not figures.get("error")
+             and all(isinstance(v, (int, float)) for v in banded + global_))
+    # The fixture where the forced-global parade is slowest, the one banding is for.
+    at = max(pairs, key=lambda name: pairs[name].get("global")) if whole else None
+    worst_b = pairs[at].get("banded") if whole else None
+    worst_g = pairs[at].get("global") if whole else None
+    ratio = worst_b / worst_g if whole and worst_g else None
+    check(f"T2 on the fixture where the forced-global parade is slowest, the banded parade's 4K "
+          f"time is ≤ {RATIO_MAX} × the global one's (the banded path is the one running): "
+          f"{at}, banded {worst_b}, global {worst_g}, "
+          f"ratio {None if ratio is None else round(ratio, 3)}",
+          ratio is not None and worst_b <= RATIO_MAX * worst_g,
+          "" if whole else f"anchor {figures.get('anchor')}; error {figures.get('error')}; "
+          f"fixtures {sorted(pairs)}; host {figures.get('gpu')}")
+
+
 def run_probe(sources, package):
     folder = WORK / "probe"
     folder.mkdir(parents=True, exist_ok=True)
@@ -520,8 +561,10 @@ def run_probe(sources, package):
         score_s1(body)
     if "T1" in selected:
         score_t1(body)
+    if "T2" in selected:
+        score_t2(body)
     for name in scored:
-        if name in ("S1", "T1"):
+        if name in ("S1", "T1", "T2"):
             continue
         mine = [r for r in answered if r["name"].split()[0] == name]
         if not mine:
@@ -762,12 +805,16 @@ def main():
                   f"reached {missing}, fixtures {state}")
             return 2
         survived = [name for name in named if rows.get(name)]
-        others = [name for name in scored if not rows.get(name) and name not in named]
+        tolerated = TOLERATED.get(args.mutant, [])
+        others = [name for name in scored
+                  if not rows.get(name) and name not in named and name not in tolerated]
+        excused = [name for name in tolerated if name in rows and not rows.get(name)]
         caught = not survived and not others
         print(f"{'MUTANT PASS' if caught else 'MUTANT FAILURE'}: {args.mutant} — "
               f"{' '.join(named)} {'all FAILED' if not survived else 'did not all fail'} in the "
               f"copy (survived: {', '.join(survived) or 'none'}; other rows failed: "
-              f"{', '.join(others) or 'none'})")
+              f"{', '.join(others) or 'none'}; tolerated rows failed: "
+              f"{', '.join(excused) or 'none'})")
         return 0 if caught else 1
     return 0 if passed == len(scored) else 1
 

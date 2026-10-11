@@ -1195,3 +1195,103 @@ and `app/CLAUDE.md` entries (G2-4's spec, "CLAUDE.md edits owed").
 and the eighth pipeline's GR-13 clause; `selectionArg` moved above `renderFrame`'s doc;
 `core/CLAUDE.md`'s recipe-options list. Review 2 passed. `make gate` PASS (313 s); no proof row or
 mutant re-run, since no instrument changed.
+
+## G2-5 — the close (2026-10-11)
+
+**What landed** (2026-10-11, in the worktree on `grading-2`, from `c948fad`). G2-1's accepted
+limit, "a mutant forcing `banded` off would survive T1", is closed here rather than filed, with an
+instrument row and no product code:
+- `scopes_probe.swift`: T1's inner loop factored into `gpuMedian(_:_:_:_:)`, unchanged in
+  behaviour (the burst of sixteen, then twelve passes one at a time, the median of the last ten);
+  **T2** builds a second library from the tree's `Waveform.metal` with the one line whose trimmed
+  text starts `bool banded = ` replaced by `bool banded = false;`, and times the tree's parade and
+  that forced-global parade back to back on each of the five 4K fixtures. Zero or several such
+  lines is recorded as `anchor`, a compile failure or a nil analyser as `error`; either is a
+  FAILURE, never a skip.
+- `scopes_proof.py`: `score_t2` (T2 passes when, on the fixture where the forced-global parade
+  is slowest, the banded time ≤ `RATIO_MAX` 0.75 × the global one, an instrument threshold, not
+  a §11 bound; it first compared the banded worst with the global worst across fixtures,
+  and the review moved it, "Review" below); the eleventh mutant,
+  `parade-global` (`bool banded = last - first < kParadeBands;` → `bool banded = false;`, must
+  fail T2); `TOLERATED = {"parade-global": ["T1"]}`, since the forced-global parade measured
+  1.15 ms at 4K on flat in G2-5 (1.019–1.042 in G2-1), at or over T1's 1.1 ms, and fails it
+  because of the mutant, and the MUTANT line names any tolerated row that failed; the
+  docstring.
+- The close's documents: this road map condensed into `designs/adr/grading-2.md`; this file
+  moved to `archive/grading-2.md` with its `archive/INDEX.md` row;
+  `designs/spec/11-decisions/grading-2.md`'s opening paragraph (the road map closed) and its two
+  paths; spec §1's non-goals sentence (wheels, curves and qualifiers are in, GR-10…GR-13; colour
+  management deferred, #256); the proofs README's G2-1 section (T2, the eleventh mutant, its
+  record) and its four record paths. No Lines cell moved: both spec files kept their line counts.
+
+**Verification**, 2026-10-11, AC power (`pmset -g`: powermode 0, AC Power), Apple M2 Max, macOS
+26.5.1:
+- `python3 tools/proof/swift_build.py typecheck tools/proof/scopes_probe.swift`: exit 0, the 4
+  baseline warnings.
+- `make app-debug`: BUILD SUCCEEDED.
+- `python3 tools/proof/scopes_proof.py --only T1,T2` on Debug: 2/2. T1 at 4K, worst of five:
+  parade 0.624 ms (noise), vectorscope 0.449 (noise), histogram 0.668 (flat). T2 at 4K, banded /
+  forced-global ms: flat 0.442 / 1.154, gradient 0.627 / 1.134, near-grey 0.748 / 0.448, noise
+  0.624 / 0.672, ramp 0.748 / 0.363; worst 0.748 against 1.154, ratio 0.649. (The global parade is
+  slower only where few bins take many pixels, flat and gradient, and faster than the banded one
+  on near-grey and the ramp; the row then compared worsts across fixtures, which "Review" below
+  changed.)
+- `python3 tools/proof/scopes_proof.py --mutant parade-global` (a Debug copy): **MUTANT PASS** —
+  T2 failed, banded worst 1.152 ms against global 1.154 (ratio 0.999; both libraries global);
+  no other row failed but the tolerated T1 (parade 1.151 ms on flat); 15/17. The other ten
+  mutants were not re-run: no anchor line of theirs changed.
+- `python3 tools/proof/spec_index_proof.py`: 153/153 (no Lines cell moved).
+  `python3 tools/proof/capture_spike/inventory.py --check`: 5/5, exit 0. `git grep -n
+  "designs/grading-2\.md" -- . ':!archive'`: nothing.
+- `make gate`: PASS in 69 s (test 68 s; typecheck, fmt, lint and app skipped as unchanged, since
+  no product input moved: the Release app is the one G2-4's gate built at identical inputs).
+- `RC_PROOF_APP=release python3 tools/proof/scopes_proof.py`, whole, on that Release build: 20/20,
+  no `Reelcut: ` line, no `DEFAULTS MOVED`. T1 at 4K, worst of five: parade 0.623 ms
+  (near-grey), vectorscope 0.392 (gradient), histogram 0.668 (flat); recorded waveform 0.449,
+  waveform + vectorscope 0.794; every 1080p figure ≤ 0.541 (the histogram on flat). T2 at 4K,
+  banded / forced-global ms: flat 0.440 / 1.155, gradient 0.436 / 1.118, near-grey 0.433 / 0.368,
+  noise 0.433 / 0.670, ramp 0.433 / 0.227; worst 0.440 against 1.155, ratio 0.381.
+
+**Review.** T2 as first written scored the banded worst against the global worst, across
+fixtures, so it scored the banded parade's near-grey and ramp figures, which moved 0.433 → 0.748
+ms between the two runs above. Both runs used one probe build (`277f1e2ff0a67d82`, reused), so
+the move is run-to-run GPU clock variance, not Debug against Release. On near-grey and the ramp
+banding gains nothing, and 0.649 sat 13 % under 0.75 with the code correct. T2 now scores the
+fixture where the forced-global parade is slowest (flat on this host), the one banding is for:
+banded ≤ 0.75 × global there. The proof's, the proofs README's, the ADR's and this record's
+`TOLERATED` reason also moved off G2-1's "5–7 % under 1.1 ms" to the figure measured here.
+Re-verified 2026-10-11, AC power (powermode 0), Apple M2 Max:
+- `python3 tools/proof/scopes_proof.py --only T1,T2` on Debug (probe `277f1e2ff0a67d82`
+  reused): 2/2. T1 at 4K, worst of five: parade 0.746 ms (noise), vectorscope 0.398 (noise),
+  histogram 0.667 (flat). T2 at 4K, banded / forced-global ms: flat 0.442 / 1.149, gradient
+  0.436 / 1.121, near-grey 0.433 / 0.362, noise 0.433 / 0.670, ramp 0.433 / 0.219; at flat,
+  ratio 0.384.
+- `python3 tools/proof/scopes_proof.py --mutant parade-global`: **MUTANT PASS**, 15/17. T2 failed
+  at flat, banded 1.152 ms against global 1.157, ratio 0.995. No other row failed but the
+  tolerated T1 (parade 1.153 ms on flat).
+- `make gate`: PASS in 70 s (test 70 s; typecheck, fmt, lint and app skipped as unchanged).
+- `RC_PROOF_APP=release python3 tools/proof/scopes_proof.py`, whole: 20/20, no `Reelcut: ` line,
+  no `DEFAULTS MOVED`. T1 at 4K, worst of five: parade 0.624 ms (noise), vectorscope 0.447
+  (noise), histogram 0.667 (flat). T2 at 4K, banded / forced-global ms: flat 0.440 / 1.153,
+  gradient 0.436 / 1.130, near-grey 0.433 / 0.367, noise 0.434 / 0.670, ramp 0.433 / 0.221;
+  at flat, ratio 0.382.
+
+**Issues.** Filed at the close, each `ai-drafted` and `low-priority` (all but #272 also
+`enhancement`), after a search of every issue, open and closed, found none of them: #265
+(vectorscope zoom), #266 (an Offset wheel), #267 (hue-vs-hue and hue-vs-saturation
+curves), #268 (a cleanup blur of the qualifier's selection), #269 (a qualifier on picture
+clips), #270 (the curves editor's extras), #271 (animating between curves of different point
+counts), #272 (the master strip's off-knob double-click, two undo steps), #273 (1,024-level
+scopes for 10-bit work). Commented: #256 (tier 3: what tier 2 defined on encoded values), #264
+(the texture slots; an input LUT's place before 4c; the qualifier reads encoded values), #124
+(its cutout would take `texture(4)`). #260, #261, #262 and #263 were already CLOSED
+(`gh issue view`). #257 stays for after tier 2 (owner, 2026-10-10), untouched.
+
+**Owed.** GRD-11…GRD-15, the owner's standing rows in `docs/manual-checks.md`. The root
+`CLAUDE.md`'s "Where to look" `designs/adr/` cell gains a `grading-2` entry, the orchestrator's.
+
+**Reviews (G2-5).** Three reviews: the first's two should-fixes (T2 scored at the fixture where
+the forced-global parade is slowest; the tolerated-T1 reason) and three nits applied; the second's
+probe comment and two record figures applied, `make gate` PASS (67 s); the third passed. Filed:
+#265–#273. Commented: #256, #264 (corrected: a qualifier reads the picture an input LUT has
+already converted), #124.

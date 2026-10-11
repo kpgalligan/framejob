@@ -18457,7 +18457,7 @@ listing read from main's instance) M1; `grading_spike.py --check --tree
 **Its record** is `archive/grading.md`'s "GR7a" section, with every figure's
 command, host, power and load.
 
-## Road map grading-2 — G2-1, the scopes (`scopes_proof.py` S1–S10, T1, M1–M4, H1–H3, Z1 and ten mutants; `scopes_probe.swift`; spec §11 GR-10)
+## Road map grading-2 — G2-1, the scopes (`scopes_proof.py` S1–S10, T1, T2, M1–M4, H1–H3, Z1 and eleven mutants; `scopes_probe.swift`; spec §11 GR-10)
 
 **What it answers.** That the parade, the vectorscope and the histogram count
 what the person sees, by GR-10's arithmetic and its counting rule, in time;
@@ -18481,7 +18481,14 @@ S10 `layout(picks:paneHeight:)` for every pick pair. T1 times each scope at
 (the tap's), each pass alone after a burst of sixteen that brings the GPU's
 clock up, median of 10 after 2 warm-ups, and scores the worst 4K figure of
 the parade, the vectorscope and the histogram against 1.1 ms, recording the
-waveform, the waveform + vectorscope pair and `pmset -g`. M1–M4 are over MCP
+waveform, the waveform + vectorscope pair and `pmset -g`. T2 (G2-5) builds a
+second library from the same shader with its one `bool banded = ` line forced
+to `false` and times the tree's parade and that forced-global one back to back
+on the five 4K fixtures, as T1 times them; on the fixture where the
+forced-global parade is slowest (flat on the M2 Max) it scores the banded time
+against 0.75 × the global one, which says the banded path is the one running
+(the global parade sits about 1.1 ms, so T1 alone cannot), and a shader with
+no such line, or more than one, is a FAILURE. M1–M4 are over MCP
 on a 75 % bars PNG: the four sentences and JSON files of `render_frame` with
 all four booleans and the vectorscope's bins against this script's from the
 PNG's pixels; the top slot's readouts against the waveform JSON; the refusal
@@ -18495,7 +18502,7 @@ rects the harness prints (`seeing panel …`, `seeing slot …`) at panes of abo
 ```
 python3 tools/proof/scopes_proof.py                  # Debug unless RC_PROOF_APP=release
 python3 tools/proof/scopes_proof.py --only S1,M1     # run and score only these rows
-python3 tools/proof/scopes_proof.py --mutant NAME    # one of the ten below
+python3 tools/proof/scopes_proof.py --mutant NAME    # one of the eleven below
 ```
 
 It launches its own instance on a scratch socket in a scratch home
@@ -18506,7 +18513,8 @@ project it opens, and removes its work folder at the start and at exit.
 `--mutant` builds a tree copy as `seeing_proof` does, builds the probe over the
 copy's `app/Sources` and shader, skips H1–H3 (the harness builds the tree's
 own sources), and reports MUTANT PASS only when every named row failed and no
-other scored row did.
+other scored row did, but a row the mutant tolerates (`TOLERATED`), which the
+MUTANT line names when it failed.
 
 | Mutant | Edit | Must fail |
 |---|---|---|
@@ -18520,8 +18528,9 @@ other scored row did.
 | `tap-first-kind-only` | the tap measures only the first shown kind | S7 S8 |
 | `slots-not-shrunk` | the slot bodies stay at their preferred heights | S10 |
 | `parade-band-misplaced` | the parade's merge puts both bands in the group's first column | S3 |
+| `parade-global` | every parade group adds globally (`bool banded = false;`) | T2; T1 tolerated (the forced-global parade measured 1.15 ms at 4K on flat in G2-5, 1.019–1.042 in G2-1, at or over T1's 1.1 ms) |
 
-**Its record**: `designs/grading-2.md`'s G2-1 section.
+**Its record**: `archive/grading-2.md`'s G2-1 and G2-5 sections.
 
 ## Road map grading-2 — G2-2, the wheels (`wheels_proof.py` N0–N2, L1, G1, Y1, C1, O1, A1, J1, X1, U1, V1, P0, R1, P1–P7, Z1 and nine mutants; `wheels_probe.swift`; `core/tests/wheels.rs`, `core/tests/schema_v16.rs`; spec §11 GR-11)
 
@@ -18584,7 +18593,7 @@ Also moved by G2-2 (the block's 464 → 512): `tone_probe.swift` P3,
 T2's Color list, `phase8_chrome.py`'s uniform-size row and
 `grading_spike/tree_bench.swift` (`--tree-base REV` on `grading_spike.py`).
 
-**Its record**: `designs/grading-2.md`'s G2-2 section.
+**Its record**: `archive/grading-2.md`'s G2-2 section.
 
 ## Road map grading-2 — G2-3, the curves (`curves_proof.py` N0–N2, K1, K3, C1, M1, O1, A1–A3, J1, X1, U1, V1, P0, R1, P1–P11, Z1 and ten mutants; `curves_probe.swift`; `core/tests/curves.rs`, `core/tests/schema_v17.rs`; spec §11 GR-12)
 
@@ -18661,7 +18670,7 @@ Also moved by G2-3: `wheels_proof.py` N2 (the header's format version, not
 `clip_inspector2_probe.swift`'s Color section lists, and `grading_spike/tree_bench.swift`, which binds an identity
 strip at `texture(3)` (`--tree-base b2fd1f9`).
 
-**Its record**: `designs/grading-2.md`'s G2-3 section.
+**Its record**: `archive/grading-2.md`'s G2-3 section.
 
 ## Road map grading-2 — G2-4, the qualifier (`qualifier_proof.py` N0–N2, H1, W1, G1, S1, S1b, S2, L1, I1, M1, D1, E1, V1, B1, F1, A1, A2, R1, P0, U1, V2, K1–K8, Z1 and thirteen mutants; `qualifier_probe.swift`; `core/tests/qualifier.rs`, `core/tests/selection.rs`, `core/tests/schema_v18.rs`; spec §11 GR-13)
 
@@ -18747,4 +18756,4 @@ scene (an unqualified adjustment pass over S1 with a neutral
 `QualifierUniforms` at `buffer(1)`) and the rows KA and TA (`--tree-base
 75ebf34`).
 
-**Its record**: `designs/grading-2.md`'s G2-4 section.
+**Its record**: `archive/grading-2.md`'s G2-4 section.

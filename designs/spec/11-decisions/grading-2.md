@@ -3,14 +3,14 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map that makes these is `designs/grading-2.md`, open: each phase's record is there (G2-0
-the road map, GR-10 and the pure moves; G2-1 scopes; G2-2 wheels; G2-3 curves; G2-4 qualifiers;
-G2-5 the close). The IDs continue the GR- series of [`grading.md`](grading.md), so a citation never
-has to say which file. GR-10 was recorded in G2-0, before G2-1's code, from the owner's "All as
-recommended" (2026-10-10) to the tier-2 brief's choices 1a, 2b, 3a, 4a, 5 yes, 6a, 7 yes, 8b and
-9 yes (`designs/grading-2.md`, "The owner's choices"). GR-11, GR-12 and GR-13 are recorded each
-before its own phase's code (G2-2, G2-3, G2-4), and GR-14 (the working arrangement) with GR-11
-in G2-2.
+The road map that made these is closed: its condensed record is `designs/adr/grading-2.md`, and
+the original, `archive/grading-2.md`, holds each phase's record (G2-0 the road map, GR-10 and the
+pure moves; G2-1 scopes; G2-2 wheels; G2-3 curves; G2-4 qualifiers; G2-5 the close). The IDs
+continue the GR- series of [`grading.md`](grading.md), so a citation never has to say which file.
+GR-10 was recorded in G2-0, before G2-1's code, from the owner's "All as recommended"
+(2026-10-10) to the tier-2 brief's choices 1a, 2b, 3a, 4a, 5 yes, 6a, 7 yes, 8b and 9 yes
+(`archive/grading-2.md`, "The owner's choices"). GR-11, GR-12 and GR-13 are recorded each before
+its own phase's code (G2-2, G2-3, G2-4), and GR-14 (the working arrangement) with GR-11 in G2-2.
 
 **Stands, and nothing here re-litigates it:** R5-1 (closed vocabularies, never a runtime); R5-5;
 G-1; §7.5's blending in encoded sRGB; MT-1..MT-9; PR-1..PR-5; GR-1 (tiers 2 and 3 deferred as
@@ -55,7 +55,7 @@ Concat is opened, at design time or build time.
     red-across/green-down gradient, and random RGB noise. It is measured in the app's own pass,
     with the host and power state recorded. #263's 0.168 / 0.331 ms is the waveform's figure on
     one ramp and is not the bound, because a ramp is a naive vectorscope's worst case (6.99 ms
-    at 4K in the tier-2 brief's scratch spike, `designs/grading-2.md` "Costs").
+    at 4K in the tier-2 brief's scratch spike, `archive/grading-2.md` "Costs").
   - **Panel:** GR-5's 248 pt column holds two stacked slots, each with a picker in its header
     (Waveform, Parade, Vectorscope, Histogram). It opens as Waveform over Vectorscope, and the
     vectorscope is a square that fits its slot. Per window, not persisted (no `UserDefaults`

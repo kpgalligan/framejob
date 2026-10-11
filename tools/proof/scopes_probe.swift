@@ -15,7 +15,8 @@
 // project the proof saved over MCP. One JSON object out: `rows` (S2–S10, each
 // a name, ok and detail, the name starting with its row id), `data` (S1's
 // bins, which the proof scores against its own BT.709 arithmetic) and
-// `records` (T1's GPU times, which the proof scores against GR-10's bound).
+// `records` (T1's GPU times, which the proof scores against GR-10's bound, and
+// T2's banded and forced-global parade times, which it scores as a ratio).
 import AppKit
 import CoreVideo
 import Metal
@@ -514,6 +515,38 @@ do {
 
 // MARK: - T1 the passes' GPU time (scored by the proof)
 
+/// The median GPU time of `kinds` over `frame`, in ms. A burst of sixteen
+/// passes committed back to back first, unread, so the GPU's clock is up as it
+/// is under playback: measured cold, one at a time, the figures swung two- to
+/// threefold between runs. Then the twelve passes one at a time, each waited
+/// on, since buffers committed together run two at once and each one's own
+/// time doubles.
+func gpuMedian(
+    _ analyzer: WaveformAnalyzer, _ kinds: Set<ScopeKind>, _ frame: MTLTexture,
+    _ queue: MTLCommandQueue
+) -> Double? {
+    var burst: [MTLCommandBuffer] = []
+    for _ in 0..<16 {
+        guard let buffer = queue.makeCommandBuffer(),
+            analyzer.encode(kinds, frame: frame, into: buffer) != nil
+        else { continue }
+        buffer.commit()
+        burst.append(buffer)
+    }
+    for buffer in burst { buffer.waitUntilCompleted() }
+    var times: [Double] = []
+    for _ in 0..<12 {
+        guard let buffer = queue.makeCommandBuffer(),
+            analyzer.encode(kinds, frame: frame, into: buffer) != nil
+        else { continue }
+        buffer.commit()
+        buffer.waitUntilCompleted()
+        times.append((buffer.gpuEndTime - buffer.gpuStartTime) * 1000)
+    }
+    let sorted = times.dropFirst(2).sorted()
+    return sorted.isEmpty ? nil : sorted[sorted.count / 2]
+}
+
 do {
     var cache: CVMetalTextureCache?
     CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cache)
@@ -533,33 +566,9 @@ do {
                     &wrapper)
                 guard let wrapper, let made = CVMetalTextureGetTexture(wrapper) else { continue }
                 for (variant, kinds) in variants {
-                    // A burst of sixteen passes committed back to back
-                    // first, unread, so the GPU's clock is up as it is under
-                    // playback: measured cold, one at a time, the figures
-                    // swung two- to threefold between runs. Then the twelve
-                    // passes one at a time, each waited on, since buffers
-                    // committed together run two at once and each one's
-                    // own time doubles.
-                    var burst: [MTLCommandBuffer] = []
-                    for _ in 0..<16 {
-                        guard let buffer = queue.makeCommandBuffer(),
-                            analyzer.encode(kinds, frame: made, into: buffer) != nil
-                        else { continue }
-                        buffer.commit()
-                        burst.append(buffer)
+                    if let median = gpuMedian(analyzer, kinds, made, queue) {
+                        bySize[variant, default: [:]][name] = median
                     }
-                    for buffer in burst { buffer.waitUntilCompleted() }
-                    var times: [Double] = []
-                    for _ in 0..<12 {
-                        guard let buffer = queue.makeCommandBuffer(),
-                            analyzer.encode(kinds, frame: made, into: buffer) != nil
-                        else { continue }
-                        buffer.commit()
-                        buffer.waitUntilCompleted()
-                        times.append((buffer.gpuEndTime - buffer.gpuStartTime) * 1000)
-                    }
-                    let sorted = times.dropFirst(2).sorted()
-                    if !sorted.isEmpty { bySize[variant, default: [:]][name] = sorted[sorted.count / 2] }
                 }
                 withExtendedLifetime(wrapper) {}
             }
@@ -567,6 +576,64 @@ do {
         }
     }
     records["T1"] = figures
+}
+
+// MARK: - T2 the banded parade against the forced-global one (scored by the proof)
+
+// The tree's shader again, with its one `bool banded = ` line forced to
+// `false`, so every parade group adds globally. The tree's parade and the
+// forced-global one are timed back to back on each 4K fixture; the proof
+// holds the banded time, on the fixture where the forced-global parade is
+// slowest, to a fraction of the global one, which is what says the banded
+// path is the one running (T1 alone cannot: the global parade sits about
+// GR-10's 1.1 ms).
+do {
+    let text = (try? String(contentsOfFile: shaderPath, encoding: .utf8)) ?? ""
+    var lines = text.components(separatedBy: "\n")
+    let prefix = "bool banded = "
+    let matches = lines.indices.filter {
+        lines[$0].trimmingCharacters(in: .whitespaces).hasPrefix(prefix)
+    }
+    if matches.count != 1 {
+        records["T2"] = ["anchor": "\(matches.count) lines start `\(prefix)`"]
+    } else {
+        lines[matches[0]] = "    bool banded = false;"
+        var error = ""
+        var global: WaveformAnalyzer?
+        do {
+            let forced = try device.makeLibrary(source: lines.joined(separator: "\n"), options: nil)
+            global = WaveformAnalyzer(device: device, library: forced)
+            if global == nil { error = "the forced-global WaveformAnalyzer is nil" }
+        } catch let failure {
+            error = "the forced-global shader does not compile: \(failure)"
+        }
+        var cache: CVMetalTextureCache?
+        CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cache)
+        let queue = device.makeCommandQueue()
+        if let global, let cache, let queue {
+            var byFixture: [String: [String: Double]] = [:]
+            let (width, height) = (3840, 2160)
+            for (name, fill) in fixtures(width, height) {
+                guard let frame = pixelBuffer(width, height, fill) else { continue }
+                var wrapper: CVMetalTexture?
+                CVMetalTextureCacheCreateTextureFromImage(
+                    kCFAllocatorDefault, cache, frame, nil, .rgba16Float, width, height, 0,
+                    &wrapper)
+                guard let wrapper, let made = CVMetalTextureGetTexture(wrapper) else { continue }
+                var pair: [String: Double] = [:]
+                pair["banded"] = gpuMedian(analyzer, [.parade], made, queue)
+                pair["global"] = gpuMedian(global, [.parade], made, queue)
+                byFixture[name] = pair
+                withExtendedLifetime(wrapper) {}
+            }
+            records["T2"] = ["gpu": device.name, "4K": byFixture]
+        } else {
+            if error.isEmpty {
+                error = "cache \(cache != nil), queue \(queue != nil)"
+            }
+            records["T2"] = ["error": error]
+        }
+    }
 }
 
 // MARK: - S9 the panel: picks, no defaults, the 360 pt floor
