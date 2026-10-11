@@ -352,9 +352,11 @@ struct LayerUniforms {
     // x, y and master, in the model's order, applied at step 4c.1 by
     // `gradeWheels`. `wheelsEnabled` is 1 exactly when one of the nine is
     // not 0 and joins the effects gate's sum, so an unwheeled layer never
-    // enters 4c.1 and renders byte-identical. `curvesEnabled` is G2-3's,
-    // unread until then. Twelve floats: 116 + 12 = 128 floats = 512 bytes,
-    // and 512 is 32 × 16.
+    // enters 4c.1 and renders byte-identical. `curvesEnabled` (spec §11
+    // GR-12, grading-2 G2-3) is 1 exactly when one of the four curves is not
+    // the identity and joins the same sum, so an uncurved layer never enters
+    // 4c.2 and never samples `texture(3)`. Twelve floats: 116 + 12 = 128
+    // floats = 512 bytes, and 512 is 32 × 16.
     float liftX;                // −1…1, inside the unit circle with liftY
     float liftY;
     float liftMaster;           // −1…1
@@ -365,7 +367,7 @@ struct LayerUniforms {
     float gainY;
     float gainMaster;
     float wheelsEnabled;        // 1 when any of the nine is not 0
-    float curvesEnabled;        // G2-3's; unread
+    float curvesEnabled;        // 1 when any curve is not the identity
     float gradeReserved0;
 };
 
@@ -1000,6 +1002,19 @@ static inline float3 gradeWheels(float3 rgb, constant LayerUniforms &u) {
     return v;
 }
 
+// Step 4c.2, on encoded straight colour (spec §11 GR-12): each channel
+// through its own composite curve, `channel(master(v))`, which `CurveTable`
+// wrote into the n × 1 strip at `texture(3)` — red's in the texels' r, green's
+// in g, blue's in b — sampled linearly at the texel CENTRES' span (4d's
+// rule), so the strip's first and last texels are exactly v = 0 and 1.
+static inline float3 gradeCurves(float3 rgb, texture2d<float> strip, sampler samp) {
+    float n = float(strip.get_width());
+    float3 at = saturate(rgb) * ((n - 1.0) / n) + 0.5 / n;
+    return float3(strip.sample(samp, float2(at.r, 0.5)).r,
+                  strip.sample(samp, float2(at.g, 0.5)).g,
+                  strip.sample(samp, float2(at.b, 0.5)).b);
+}
+
 // The split tone, a look's one block Light does not have: the shadow hue
 // weighted by (1 − Y)² and the highlight hue by Y², Y the saturated luma, at
 // a fifth of the amount. Reelcut's own strength, tuned at GR7.
@@ -1040,6 +1055,9 @@ static inline float3 gradeLook(float3 rgb, texture3d<float> look, sampler samp,
 //                              GR-11): after tone, so a wheel refines the
 //                              exposure and white balance, and before the
 //                              look, which grades the corrected colour
+// 4c.2 the curves              `gradeCurves`, once per pixel (spec §11
+//                              GR-12): after the wheels and before the look,
+//                              through the strip at `texture(3)`
 //  4d. the look                `gradeLook`, once per pixel (spec §11 GR-7):
 //                              right after tone, so a look grades the
 //                              corrected colour, and before the point filters
@@ -1165,7 +1183,8 @@ static inline float4 layerColorPremultiplied(Varyings in,
                                              texture2d<float> source,
                                              sampler samp,
                                              texture2d<float> matte,
-                                             texture3d<float> look) {
+                                             texture3d<float> look,
+                                             texture2d<float> curves) {
     float2 srcSize = max(float2(u.sourceWidth, u.sourceHeight), float2(1.0));
     float2 cropped = max(srcSize - float2(u.cropL + u.cropR, u.cropT + u.cropB), float2(1.0));
 
@@ -1189,7 +1208,7 @@ static inline float4 layerColorPremultiplied(Varyings in,
     bool effects = (u.filterKind0 + u.filterKind1 + u.filterKind2 + u.filterKind3
                     + u.spotEnabled + u.clipEnabled + u.reflectionPass
                     + u.obscureEnabled + u.toneEnabled + u.lookEnabled
-                    + u.wheelsEnabled) > 0.5;
+                    + u.wheelsEnabled + u.curvesEnabled) > 0.5;
 
     float2 uv = in.uv;
     float spot = 1.0;
@@ -1376,6 +1395,13 @@ static inline float4 layerColorPremultiplied(Varyings in,
         // enters it.
         if (u.wheelsEnabled > 0.5) {
             rgb = gradeWheels(rgb, u);
+        }
+
+        // (4c.2) The curves (spec §11 GR-12): once per pixel, after the wheels
+        // and before the look, through the strip at `texture(3)`. Behind
+        // `curvesEnabled`, so an uncurved layer never enters it.
+        if (u.curvesEnabled > 0.5) {
+            rgb = gradeCurves(rgb, curves, samp);
         }
 
         // (4d) The look (spec §11 GR-7): once per pixel, right after tone and
@@ -1571,8 +1597,9 @@ fragment float4 reelcut_layer_fragment(Varyings in [[stage_in]],
                                        texture2d<float> source [[texture(0)]],
                                        sampler samp [[sampler(0)]],
                                        texture2d<float> matte [[texture(1)]],
-                                       texture3d<float> look [[texture(2)]]) {
-    return layerColorPremultiplied(in, u, source, samp, matte, look);
+                                       texture3d<float> look [[texture(2)]],
+                                       texture2d<float> curves [[texture(3)]]) {
+    return layerColorPremultiplied(in, u, source, samp, matte, look, curves);
 }
 
 /// Step 11: one layer's colour combined with the destination under a
@@ -1694,8 +1721,9 @@ fragment float4 reelcut_layer_blend_fragment(Varyings in [[stage_in]],
                                              sampler samp [[sampler(0)]],
                                              float4 dst [[color(0)]],
                                              texture2d<float> matte [[texture(1)]],
-                                             texture3d<float> look [[texture(2)]]) {
-    float4 src = layerColorPremultiplied(in, u, source, samp, matte, look);
+                                             texture3d<float> look [[texture(2)]],
+                                             texture2d<float> curves [[texture(3)]]) {
+    float4 src = layerColorPremultiplied(in, u, source, samp, matte, look, curves);
     // Clamped, because the 16-bit-float canvas keeps whatever is returned
     // and a blend can step past 1 or below 0 (spec §11 PR-1).
     return saturate(blendPremultiplied(int(u.blendMode + 0.5), src, dst));
@@ -1890,7 +1918,7 @@ fragment float4 reelcut_dissolve_fragment(ShadowVaryings in [[stage_in]],
 // It reads what is already drawn behind it — the target `encodeLayers` is
 // drawing into — un-premultiplies it, grades it as step 3's colour adjust
 // (`gradeSample`, the chroma key off), step 4c's tone, step 4c.1's wheels,
-// step 4d's look and
+// step 4c.2's curves, step 4d's look and
 // step 5's point filters would (the canvas's uv as the filters' local position), and
 // premultiplies it back by the destination's own alpha, so alpha is
 // preserved. The weight is the layer's opacity, its strength, times the
@@ -1900,6 +1928,7 @@ fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
                                         float4 dst [[color(0)]],
                                         texture2d<float> matte [[texture(1)]],
                                         texture3d<float> look [[texture(2)]],
+                                        texture2d<float> curves [[texture(3)]],
                                         sampler samp [[sampler(0)]]) {
     float a = saturate(dst.a);
     float3 c = saturate(dst.rgb / max(a, 1e-4));
@@ -1909,6 +1938,9 @@ fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
     }
     if (u.wheelsEnabled > 0.5) {
         c = gradeWheels(c, u);
+    }
+    if (u.curvesEnabled > 0.5) {
+        c = gradeCurves(c, curves, samp);
     }
     if (u.lookEnabled > 0.5) {
         c = gradeLook(c, look, samp, u);

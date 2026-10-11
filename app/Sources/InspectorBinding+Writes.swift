@@ -80,6 +80,29 @@ extension InspectorBinding {
             base.obscure = obscure
             animatable.obscure = nil
         }
+        // A curve is a list too (spec §11 GR-12), with one more case that
+        // still animates: an identity curve on either side, which the core
+        // aligns to the other's x's (`align_identity_curves`). So a channel
+        // goes to the END when its new count is the edited one's, or either
+        // the edited or the new list is the identity, and to the BASE only
+        // for a count change between two curves.
+        if let curves = patch.curves {
+            var moved = ColorCurvesPatch()
+            var kept = curves
+            for channel in CurveChannel.allCases {
+                guard case .some(.some(let list)) = curves.entry(channel) else { continue }
+                let edited = editedCurve(clip, channel)
+                if list.count == edited.count || ColorCurves.isIdentity(edited)
+                    || ColorCurves.isIdentity(list)
+                {
+                    continue
+                }
+                moved = moved.setting(channel, .some(list))
+                kept = kept.setting(channel, nil)
+            }
+            if !moved.isEmpty { base.curves = moved }
+            animatable.curves = kept.isEmpty ? nil : kept
+        }
         // Motion is not an animation target (the core refuses it in
         // `set_action_end`), so it ALWAYS lands on the base props.
         if patch.motion != nil {
@@ -87,6 +110,19 @@ extension InspectorBinding {
             animatable.motion = nil
         }
         return (base.isEmpty ? nil : base, animatable.isEmpty ? nil : animatable)
+    }
+
+    /// The curve a write of `channel` replaces on `clip` (`editedList`'s
+    /// rule): the selected action's end curve when the end names one, the
+    /// clip's base curve otherwise (the identity when it has none).
+    func editedCurve(_ clip: ClipSnapshot, _ channel: CurveChannel) -> [CurvePoint] {
+        editedList(
+            clip,
+            action: { end -> [CurvePoint]? in
+                guard case .some(.some(let list)) = end.curves?.entry(channel) else { return nil }
+                return list
+            },
+            base: { $0.curves.points(channel) })
     }
 
     /// One clip's ops for a video patch: the action's end state when the

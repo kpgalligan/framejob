@@ -231,9 +231,17 @@ use crate::model::{Canvas, Project};
 /// every key written only when not 0 and a neutral wheel not at all, so an
 /// unwheeled project writes exactly the text it did, and the reader's
 /// default is 0, so there is no migration step. The bump is so an older
-/// build refuses the file instead of dropping the wheels on save. Every
-/// number from 17 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 16;
+/// build refuses the file instead of dropping the wheels on save.
+///
+/// Version 17 is the curves (spec §11 GR-12): [`crate::model::Curves`] on
+/// `video.curves` — `master`, `red`, `green` and `blue`, each a list of 2–16
+/// `[x, y]` points — a channel written only when not the identity and
+/// `curves` not at all when all four are, so an uncurved project writes
+/// exactly the text it did, and the reader's default is the identity, so
+/// there is no migration step. The bump is so an older build refuses the
+/// file instead of dropping the curves on save. Every number from 18 up,
+/// 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 17;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;
@@ -430,7 +438,7 @@ pub fn read(json: &str) -> Result<Project, String> {
 
     // MIGRATION HOOK. Each bump adds one step here, applied in order from
     // `version` up to RC_FORMAT_VERSION, rewriting `value` in place before
-    // it is deserialized. Versions 3 through 16 needed no rewrite — every
+    // it is deserialized. Versions 3 through 17 needed no rewrite — every
     // field any of them added carries a serde default — so none has a line
     // (15's one step, `migrate_1015_to_15` above, renumbers the version
     // alone, before the gate); the next version that changes a field's

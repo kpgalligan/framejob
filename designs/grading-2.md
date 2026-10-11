@@ -953,7 +953,128 @@ there is one undo step; off the knob it stays a jump and a reset, two steps, acc
 Release build 8/8. The owed `make gate` PASSED in 234 s (typecheck 5 s, fmt and lint
 skipped as unchanged, test 114 s, app 115 s).
 
-**Owed.** GRD-12, the owner's standing row. The `app/CLAUDE.md` and `core/CLAUDE.md` entries
+**Owed.** GRD-12, the owner's standing row, only. Done, not owed: the `app/CLAUDE.md` and `core/CLAUDE.md` entries
 (the compositor's 128 floats, the Wheels section, the three new Swift files, `GradeProps.swift`'s
 wheel types, `model_grade.rs`, `grade_check.rs`), applied by the orchestrator.
 
+
+## G2-3 — the curves (#261, GR-12)
+
+**What landed** (2026-10-11, in the worktree on `grading-2`, from `b2fd1f9`). GR-12 first
+(`designs/spec/11-decisions/grading-2.md`, its README rows, "Amended by GR-12" lines on GR-2,
+GR-4, GR-6 and GR-7 and their README cells, the Lines cells), from the owner's answers to G2-3's
+choices 1–10 ("All as recommended", choice 9 (a)) and 11–13 (internal); then `video.curves
+{master, red, green, blue}`, each 2–16 `[x, y]` points, at format 17. GR-12's three refusal
+sentences replace the draft sentence in "Curves (#261), G2-3" above.
+- Core: `model_grade.rs` (`CurvePoint`, `Curves`, `CURVE_POINTS_MIN`/`MAX`, `IDENTITY_CURVE`,
+  `curve_is_identity`, `points_are_identity`, `Curves::drop_identities`), `VideoProps.curves`
+  after `wheels`, `grade_check.rs`'s `check_curves` (called after `check_wheels`), the new
+  `actions_curves.rs` (`curves_json`, inserted by `video_json`, so the template, the evaluator,
+  `split` and the recipe see all four with no `patch.rs` edit; `align_identity_curves`, called by
+  `evaluate_clip` before the lerp), `clamp_curves` in `clamp_video`, `patch_clips`' `Video` arm
+  dropping identity channels after `check_video`, the recipe's `curves` key after `wheels`
+  (twenty-five keys), `ungraded` writing the identity, `RC_FORMAT_VERSION` 17 and the header. No
+  op, tool, FFI export or op-table row.
+- Metal: `gradeCurves` (each channel through the strip at `texture(3)`, sampled at
+  `saturate(v)·(n−1)/n + 0.5/n`), step 4c.2 between the wheels' block and the look's in
+  `layerColorPremultiplied` and `reelcut_adjust_fragment`, `texture2d<float> curves
+  [[texture(3)]]` on both layer fragments and the adjust fragment, `+ u.curvesEnabled` in the
+  gate sum, the stage table and the struct comment. `LayerUniforms` stays 128 floats:
+  `curvesEnabled` is GR-11's reserved float, now read.
+- Swift: `GradeProps.swift` (`CurvePoint` coded as `[x, y]`, `CurveChannel`, `ColorCurves`,
+  `ColorCurvesPatch` with `reset`, `neutral`, `channel`, `setting`, and `apply(curves:)`);
+  `CurveTable.swift` (new, 98: the Fritsch–Carlson spline and the strip's texels);
+  `CurveTextures.swift` (new, 98: the strip's upload, an LRU of eight, the 2 × 1 placeholder),
+  held by `LookTextures` as `curves`, so `Compositor.swift` took nothing; `prepare`'s strip and
+  `PreparedLayer.curves`; `texture(3)` bound in `drawLayer`, the shadow's mask pass and the
+  adjustment pass; `isNeutralAdjustment` requiring the identity; `RecipeLayer.curves`,
+  `VideoProps.curves`, `VideoPatch.curves` and its dictionary; `structural(video:for:)`'s curves
+  arm and `editedCurve`; `CurveEditorView.swift` (new, 397: the plot) and
+  `VideoPane+Curves.swift` (new, 351: `curvesSection(_:)`, `InspectorBinding.curvesReset`,
+  `CurveEditorState`, `CurvesView`, `CurvePointField`, `CurveChannelPicker`); `ClipPane`'s
+  `curveState` (cleared by `forgetSubTab()`) and the `.color` list; `keyedCount`; the row's
+  spacer; the eyedropper's `curves: .reset`; the Delete item's validator; `set_video`'s
+  `curvesClause` and the adjustment sentence (which now names curves and the look).
+- Measured layout (screen `05g`, both looks): the plot is 254 pt at the default pane (246 pt of
+  well inside its 4 pt inset), the picker and the point row aligned with the well's frame.
+- Proofs: `curves_proof.py` and `curves_probe.swift` (new); `wheels_proof.py` N2 reads the
+  header's version; the Color section lists of `wheels_probe.swift` P1, `look_probe.swift` B4 and
+  `clip_inspector2_probe.swift`; `grading_spike/tree_bench.swift` binds an identity strip at
+  `texture(3)` and its README names `--tree-base b2fd1f9`; `screens.py` (`video.curves` pinned
+  open, the `curves` fixture) and screens `05g` (new), `05b`, `05c`, `05f`; tests the new key
+  moved: `core/tests/recipe.rs` (`LAYER_KEYS` 24 → 25), `schema_v8.rs` (`clip_state`'s
+  `curves`), `ungraded.rs` (curves stripped and neutralised), `wheels.rs` (the recipe's key
+  order: `curves` now sits between `wheels` and `look`), `schema_v16.rs` (its current-number
+  literals now `RC_FORMAT_VERSION`; its "is 16" test a `const` assertion that 16 is at most the
+  current, clippy's `assertions_on_constants`).
+- Documents: spec §4.3a, §5.2 (format 17), §5.4, §7.3, §7.4, §7.5, §7.9a, §7.10 and the index;
+  the README's Curves bullet; GRD-13 in `docs/manual-checks.md`; the proofs README's section; the
+  two file-history ADRs.
+
+**Deviations from the phase's spec, each measured.** (1) K1 and C1 read a column's INPUT as the
+code the ramp wrote there (`round(255·x/1919)`) and its 8-bit OUTPUT as the 16-bit sample / 257,
+rounded: ffmpeg's `rgba` decode of a 16-bit PNG truncates, so the first Debug run found "v 192"
+at a column the ramp wrote 191 and failed K1 by 4.4 levels. (2) A1's "clip_state holds y 0.6" is
+`core/tests/curves.rs`' (`an_action_between_curves_of_one_count_lerps_per_point`): no MCP tool
+reads `clip_state`, so the proof row holds the frame only. (3) `CurveEditorState` lives in
+`VideoPane+Curves.swift`, not beside the plot: `CurveEditorView.swift` was 442 lines, and the
+move (with a few compactions) brought it to 397, under the 400 cap. (4) `CurvePointField` (the
+blank, disabled box with no point selected) is a small view of the section's own:
+`OptionFieldControl` has no blank, disabled state, and `OptionControls.swift` (1,082 lines) is
+past the ~600 cap, so it takes nothing on before a pure move.
+(5) Screen 05g expects the "Out" label: the picker draws its titles, so "Master" is no view's
+text. (6) `wheels_probe.swift` and `core/tests/wheels.rs` were outside the spec's list; the new
+section and key moved them, as G2-2's `LAYER_KEYS` did.
+
+**Verification**, 2026-10-11, AC power (`pmset -g`: powermode 0, AC Power), Apple M2 Max:
+- Control first: `make app` on the untouched tree (only the decision documents edited), its
+  bundle copied out of `build/` before the first code edit, then `RC_PROOF_APP=release
+  curves_proof.py capture tools/proof/work/curves-control --app <the copy>`: seven frames, Z1
+  ok; the ramp's frame a 16-bit PNG.
+- In the loop: `cargo test --release --test curves --test schema_v17 --test schema_v16 --test
+  recipe --test schema_v8 --test ungraded --test wheels --test patch_door` (9, 6, 4, 15, 18, 5,
+  11, 9 passed, after `wheels.rs`' key order); `make lint` (clean after clippy's constant
+  assertion); `make typecheck` (0 errors, the 4 baseline warnings); `swift_build.py typecheck
+  tools/proof/curves_probe.swift`; `curves_proof.py` on Debug 28/28 (N0 printed only: equal);
+  `spec_index_proof.py` 153/153.
+- `make gate`: PASSED in 278 s on the first run (typecheck 4 s, fmt 2 s, lint 1 s, test 170 s,
+  app 100 s); after the picker's alignment and the blank field's appearance it PASSED again in
+  260 s (typecheck 10 s, fmt and lint skipped as unchanged, test 143 s, app 106 s).
+- `RC_PROOF_APP=release python3 tools/proof/curves_proof.py compare
+  tools/proof/work/curves-control`, whole, on the second gate's Release build and the final
+  instrument: 29/29 — N0 the seven curve-less frames byte-identical at 16 bits; K1's points 0,
+  0, 0.375 and 0 of a 10-bit level off; no `Reelcut: ` line, no `DEFAULTS MOVED`
+  (`tools/proof/work/g2-3/curves-release.txt`).
+- `RC_PROOF_APP=release wheels_proof.py` 22/22 (P1 after its section list); `look_proof.py
+  --only B4` 1/1; `clip_inspector2_proof.py` 33/33.
+- `grading_spike.py --measure --tree --tree-base b2fd1f9`, twice. The first (load before 27, a
+  rustc of another session at 96 %): KT 0/1023 at both sizes; 2160p T0 +0.001 ms against 0.061
+  (held); 1080p T0 +0.077 ms against 0.020, MISSED — but the GPU changed clock state inside the
+  run: V0b's first series and VT's third ran at 0.35 ms where every other series ran at 0.120, so
+  the medians of three put VT at 0.198, while VT's full-clock series (0.1204) equals V0's (0.1203).
+  The second, on the final tree (load before 22, another session's tests): every 1080p series at
+  the slower state, T0 +0.001 ms (0.352 against 0.351), held; 2160p +0.000 ms, held. The flag adds
+  one term to a sum, as GR-11's did (+0.003 / −0.001 ms in G2-2).
+- `screens.py --only 05b-clip-color,05c-clip-adjustment,05f-clip-wheels,05g-clip-curves` on the
+  final Debug build: 9/9, both looks, 0 new problems.
+- Mutants, ten, once each on the final instrument (Debug copies; `catmull-rom`'s copy predates
+  the blank field's appearance fix, which no row reads): `catmull-rom` (K3 P6; K3's worst fall
+  3592 16-bit levels, P6 0.20 off), `master-channel-swapped` (M1: 220 for 192),
+  `strip-without-half-texel` (C1: 948 G/B samples off), `strip-rgba16` (P7),
+  `rising-check-dropped` (R1, CT `--test curves`), `curves-before-wheels` (O1: 88 for 82),
+  `ungraded-misses-curves` (V1, CT `--test ungraded`), `adjust-without-curves` (J1),
+  `identity-kept` (N1, CT `--test curves`), `identity-not-aligned` (A2 A3, CT `--test curves`):
+  every one MUTANT PASS, no other row failing.
+
+**Owed.** GRD-13, the owner's standing row, only. Done, not owed: the `app/CLAUDE.md` and `core/CLAUDE.md` entries
+(`model_grade.rs`'s curves, `grade_check.rs`'s `check_curves`, the new `actions_curves.rs`, the
+recipe's twenty-five keys, `GradeProps.swift`'s curve types, `CurveEditorView.swift`, the
+`VideoPane` entry's `+Curves` and the Color sub-tab's order, the compositor's `curvesEnabled`
+and the strip at `texture(3)`), applied by the orchestrator.
+
+**After review (G2-3).** The review passed with four nits, all applied: the record's reason for
+`CurvePointField`, the Owed wording, a stub line in `app/CLAUDE.md`, and `CurveTable`'s tangents,
+now computed once per curve (`CurveTable.Spline`; `strip` builds the four channels' splines once,
+the editor's stroke once per curve) instead of on every sample. Re-run on the change: `make gate`
+PASS (232 s); `RC_PROOF_APP=release curves_proof.py compare` 29/29; `catmull-rom` (K3, P6) and
+`master-channel-swapped` (M1) MUTANT PASS, no other row failing.

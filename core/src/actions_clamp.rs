@@ -6,7 +6,8 @@
 
 use crate::audio::MAX_GAIN;
 use crate::model::{
-    AudioProps, BlendMode, VideoProps, Wheels, MAX_FILTERS, MAX_OBSCURE, WHEEL_MAX,
+    AudioProps, BlendMode, CurvePoint, Curves, VideoProps, Wheels, CURVE_POINTS_MAX,
+    CURVE_POINTS_MIN, MAX_FILTERS, MAX_OBSCURE, WHEEL_MAX,
 };
 use crate::props_check::{
     COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, EXPOSURE_MAX,
@@ -83,6 +84,7 @@ pub(crate) fn clamp_video(mut props: VideoProps, is_nest: bool) -> VideoProps {
     tone.vibrance = bounded(tone.vibrance, -TONE_MAX, TONE_MAX, 0.0);
     tone.fade = bounded(tone.fade, 0.0, TONE_MAX, 0.0);
     clamp_wheels(&mut props.wheels);
+    clamp_curves(&mut props.curves);
     // A NaN amount is none of the look, the neutral a filter's amount has.
     if let Some(look) = props.look.as_mut() {
         look.amount = bounded(look.amount, 0.0, 1.0, 0.0);
@@ -174,6 +176,41 @@ fn clamp_wheels(wheels: &mut Wheels) {
             wheel.y /= radius;
         }
     }
+}
+
+/// The curves (spec §11 GR-12): each x and y to 0…1, a channel holding a
+/// NaN removed; a channel with fewer than 2 or more than 16 points, or whose
+/// x's do not strictly rise after the clamp, removed; then every identity
+/// channel removed, so an action that ends on the identity ends uncurved.
+fn clamp_curves(curves: &mut Curves) {
+    for curve in [
+        &mut curves.master,
+        &mut curves.red,
+        &mut curves.green,
+        &mut curves.blue,
+    ] {
+        if let Some(points) = curve.as_mut() {
+            if !clamp_points(points) {
+                *curve = None;
+            }
+        }
+    }
+    curves.drop_identities();
+}
+
+/// One channel's points clamped in place; false when the channel must go.
+fn clamp_points(points: &mut [CurvePoint]) -> bool {
+    if !(CURVE_POINTS_MIN..=CURVE_POINTS_MAX).contains(&points.len()) {
+        return false;
+    }
+    for point in points.iter_mut() {
+        if point.iter().any(|value| value.is_nan()) {
+            return false;
+        }
+        point[0] = point[0].clamp(0.0, 1.0);
+        point[1] = point[1].clamp(0.0, 1.0);
+    }
+    points.windows(2).all(|pair| pair[1][0] > pair[0][0])
 }
 
 pub(crate) fn clamp_audio(mut props: AudioProps) -> AudioProps {

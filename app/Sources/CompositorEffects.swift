@@ -401,7 +401,12 @@ extension MetalRenderer {
         let urls = layer.look?.media == nil ? [:] : RecipeSource.shared.lookURLs(for: instruction)
         let look = looks.lattice(for: layer.look, urls: urls)
         if look == nil { uniforms.lookEnabled = 0 }
-        return PreparedLayer(uniforms: uniforms, texture: texture, look: look ?? looks.placeholder)
+        // The curves' strip (GR-12): the placeholder for none — or for a
+        // strip that could not be uploaded, which draws the layer uncurved.
+        let curves = looks.curves.texture(for: layer.curves)
+        if curves === looks.curves.placeholder { uniforms.curvesEnabled = 0 }
+        return PreparedLayer(
+            uniforms: uniforms, texture: texture, look: look ?? looks.placeholder, curves: curves)
     }
 
     /// True only when the buffer's `kCVImageBufferAlphaChannelModeKey`
@@ -418,11 +423,13 @@ extension MetalRenderer {
 }
 
 /// What `MetalRenderer.prepare` hands `render`: a layer's uniform block,
-/// the texture it samples, and its look's lattice (the placeholder for none).
+/// the texture it samples, its look's lattice and its curves' strip (each
+/// the placeholder for none).
 struct PreparedLayer {
     var uniforms: LayerUniforms
     let texture: MTLTexture
     let look: MTLTexture
+    let curves: MTLTexture
 }
 
 /// `value` into 0…1 as a `Float`. Spelled out once because the effect block

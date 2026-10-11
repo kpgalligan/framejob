@@ -38,7 +38,8 @@ slider three quarters along, and a "75%" field with a chevron for the quick valu
 0, 25, 50, 75 and 100. Below it the LIGHT section is open, summary "neutral", with
 05b's nine rows: Exposure ("0.00 EV", clipped at the field's edge as on 05b) through
 Fade. The COLOR section follows, closed, then the WHEELS section (grading-2 G2-2),
-open, and the LOOK section (GR5b), open, all below the captured height.
+open, the CURVES section (G2-3), open, and the LOOK section (GR5b), open, all
+below the captured height.
 
 In the light capture the inspector is white with black labels, the section headers
 light-grey bars with grey capitals, the Color sub-tab pale blue with a blue outline,

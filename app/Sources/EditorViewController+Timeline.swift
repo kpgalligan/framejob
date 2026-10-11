@@ -410,6 +410,11 @@ extension EditorViewController {
             // the timecode field, an inline rename and a text clip alike.
             // The same test `handleEditorKey` opens with.
             if view.window?.firstResponder is NSText { return false }
+            // And dead while the curve plot holds a selected point, whose ⌫
+            // deletes the point (spec §11 GR-12).
+            if (view.window?.firstResponder as? CurveEditorView)?.holdsDeleteKey == true {
+                return false
+            }
             return hasSelection || (document.inOutRange.map { $0.end > $0.start } ?? false)
         case #selector(showSpeedSheet(_:)):
             // `set_speed` is an ERROR on a non-media source (spec §6), so the

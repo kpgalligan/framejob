@@ -272,14 +272,15 @@ do {
             && look(cool, "image") == nil
         let imageOutline = outlined(pane(plain, ["image"]))
         check(
-            "B4 Color sections [light, color, wheels, look] (AJ: adjustment first); Warm on "
+            "B4 Color sections [light, color, wheels, curves, look] (AJ: adjustment first); Warm on "
                 + "IM+{cool, 0.5} "
                 + "sends one set_video {look: {kind: warm}} named \"Look\" and IM reads {warm, "
                 + "0.5}; None sends {look: null}; outlines [MOVIE] Warm, [MOVIE, IM+cool] none, "
                 + "[IM] None",
-            movieSections == ["video.light", "video.color", "video.wheels", "video.look"]
+            movieSections == ["video.light", "video.color", "video.wheels", "video.curves",
+                              "video.look"]
                 && adjustmentSections == ["video.adjustment", "video.light", "video.color",
-                                          "video.wheels", "video.look"]
+                                          "video.wheels", "video.curves", "video.look"]
                 && tiles.count == 9 && warmOk && noneOk && movieOutline == ["Warm"]
                 && mixedOutline.isEmpty && imageOutline == ["None"],
             "sections \(movieSections) / \(adjustmentSections); tiles \(tiles.count); warm "

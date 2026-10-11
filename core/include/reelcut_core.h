@@ -122,9 +122,15 @@ extern "C" {
  * Version 16 is the wheels (spec §11 GR-11): `video.wheels {lift, gamma,
  * gain}`, each `{x, y, master}`, every key written only when not 0 and a
  * neutral wheel not at all, so an unwheeled project writes the text it did;
- * the reader's default is 0, so there is no migration step. 17 and above,
- * 1014 included, are newer. */
-#define RC_FORMAT_VERSION 16
+ * the reader's default is 0, so there is no migration step.
+ *
+ * Version 17 is the curves (spec §11 GR-12): `video.curves {master, red,
+ * green, blue}`, each a list of 2–16 `[x, y]` points, a channel written only
+ * when not the identity and the key not at all when all four are, so an
+ * uncurved project writes the text it did; the reader's default is the
+ * identity, so there is no migration step. 18 and above, 1014 included, are
+ * newer. */
+#define RC_FORMAT_VERSION 17
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

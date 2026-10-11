@@ -109,6 +109,18 @@ extension AgentServer {
         + "{lift: {x: 0.2, y: -0.1}}} keeps lift's master and the other two wheels. Applied "
         + "after color's tone and before look: lift moves black and holds white, gain moves "
         + "white and holds black, gamma moves the middle and holds both ends)"
+    // `video.curves`' clause (spec §11 GR-12), typed for `lookClause`'s
+    // reason. It mirrors the Color sub-tab's Curves section (the channel
+    // picker, the plot's points, the In and Out fields, Reset).
+    private static let curvesClause: String =
+        ", curves ({master, red, green, blue}, each a list of 2 to 16 [x, y] points, x "
+        + "strictly rising, x and y 0–1 inclusive; refused outside, never clamped. A list "
+        + "REPLACES that channel whole, null removes it, and a curve with every y = x from x "
+        + "0 to x 1 is the identity, stored as no curve. Each channel is a monotone spline "
+        + "(Fritsch–Carlson) through its points, flat outside its first and last x; a colour "
+        + "is red(master(v)). Applied after wheels and before look. In an action's end an "
+        + "identity curve animates to neutral (an identity on either side takes the other "
+        + "curve's x's); any other change of point count switches at the end)"
     // The three patch vocabularies, written once: every property group of
     // spec §5.2, with the ranges the ops enforce. A patch MERGES, so a key
     // left out keeps its current value and a key set to null clears an
@@ -142,6 +154,7 @@ extension AgentServer {
         + blendClause
         + motionClause
         + wheelsClause
+        + curvesClause
         + lookClause
         + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
         + "length and a component outside the range is refused by name, neither "
@@ -241,9 +254,9 @@ extension AgentServer {
                     + "canvas centre plus (x, y), scaled, then rotated about that centre, and "
                     + "crop removes edges in place without shifting the content. To animate a "
                     + "property instead, add_action and then set_action_end. On an adjustment "
-                    + "clip only color, wheels, the point filters and opacity (the grade's "
-                    + "strength) do anything, and blur, sharpen, pixelate or a blend mode is an "
-                    + "error.",
+                    + "clip only color, wheels, curves, look, the point filters and opacity (the "
+                    + "grade's strength) do anything, and blur, sharpen, pixelate or a blend mode "
+                    + "is an error.",
                 ["clips": clipsDescription, "patch": videoPatchDescription]),
             opTool(
                 "set_audio",

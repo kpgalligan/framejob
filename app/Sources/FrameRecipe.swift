@@ -281,6 +281,10 @@ struct RecipeLayer: Codable, Equatable {
     /// Step 4c.1's wheels (spec §11 GR-11): all nine values, each at 0 when
     /// neutral (the core always writes the key; `ungraded` writes it at 0).
     let wheels: ColorWheels
+    /// Step 4c.2's curves (spec §11 GR-12): all four, an identity one as
+    /// `[[0, 0], [1, 1]]` (the core always writes the key; `ungraded` writes
+    /// all four so). Absent or malformed reads as the identity.
+    let curves: ColorCurves
     /// Step 4d's look (spec §11 GR-7): its amount and the definition
     /// `LookTextures` bakes; nil for no look, which the core also publishes
     /// for an amount of 0 and an ungraded frame.
@@ -324,6 +328,7 @@ struct RecipeLayer: Codable, Equatable {
         shadow = c.lenient(.shadow)
         color = c.lenient(.color, ColorAdjust.identity)
         wheels = c.lenient(.wheels, ColorWheels.neutral)
+        curves = c.lenient(.curves, ColorCurves.identity)
         look = c.lenient(.look)
         chroma = c.lenient(.chroma)
         filters = c.lenient(.filters, [])
@@ -354,7 +359,7 @@ struct RecipeLayer: Codable, Equatable {
             x: x, y: y, scale: scale, rotation: rotation, opacity: opacity, crop: crop,
             cornerRadius: cornerRadius, shadow: shadow, color: color, chroma: chroma,
             filters: filters, reflection: reflection, spotlight: spotlight,
-            obscure: obscure, blend: blend, wheels: wheels)
+            obscure: obscure, blend: blend, wheels: wheels, curves: curves)
     }
 }
 

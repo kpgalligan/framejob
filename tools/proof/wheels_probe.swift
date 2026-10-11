@@ -255,7 +255,9 @@ func p1p6() {
         check("P6 the Color tab has a Wheels section with three discs", false, why)
         return
     }
-    let order = Array(ids.drop { $0 != "video.color" }.prefix(3))
+    // The Color sections from Color on: Curves (grading-2 G2-3) joined
+    // between Wheels and Look.
+    let order = Array(ids.drop { $0 != "video.color" }.prefix(4))
     let disc = view.discs[0]
     disc.frame = NSRect(x: 0, y: 0, width: 80, height: 80)
     spin(0.1)
@@ -293,7 +295,7 @@ func p1p6() {
             && moved.allSatisfy { $0.x > 0 && $0.x * $0.x + $0.y * $0.y <= 1 + 1e-9 }
             && moved.map(\.master) == masters
             && undone.allSatisfy { $0.x == 0 && $0.y == 0 } && undone.map(\.master) == masters
-            && !more && order == ["video.color", "video.wheels", "video.look"],
+            && !more && order == ["video.color", "video.wheels", "video.curves", "video.look"],
         "begins \(begins), ended \(ended), updates \(shapes), undo name \(name), moved "
             + "\(moved), undone \(undone), more steps \(more), sections \(ids)")
 

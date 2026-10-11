@@ -38,8 +38,9 @@ pub struct RecipeOptions {
     /// Draw the project timecode at `t` over everything else.
     pub burn_in_timecode: bool,
     /// Every layer's `video.color` neutral (all thirteen keys), its wheels
-    /// neutral (all nine, spec §11 GR-11) and its look removed, nested and
-    /// matte layers included: the picture as if no clip were graded.
+    /// neutral (all nine, spec §11 GR-11), its curves the identity (all
+    /// four, GR-12) and its look removed, nested and matte layers included:
+    /// the picture as if no clip were graded.
     pub ungraded: bool,
 }
 

@@ -139,14 +139,17 @@ K1. The script prints `mutant NAME: killed by …` or `SURVIVED`.
 **`--tree` (grading GR7a).** In place of the routes, what the branch BUILT:
 V0 is `Compositor.metal` as it stood at `--tree-base REV` (by default `f407f87`,
 `TREE_BASE`, main at the branch point; grading-2 G2-2 passes `4f52ead`, the
-commit before its wheels; `git show`, a failed show is a B0 failure) and VT is the tree's
+commit before its wheels, and G2-3 `b2fd1f9`, the commit before its curves; `git show`,
+a failed show is a B0 failure) and VT is the tree's
 own file, unpatched — matte_spike's `--tree` pattern. B1 compiles the two;
 B2 builds `tree_bench.swift` (`-O`, over `app/Sources`), which hands BOTH
 libraries the app's whole `LayerUniforms` (128 floats, 512 bytes since
 grading-2 G2-2, asserted at `gradeReserved0`; an older base's shader reads a
 prefix of it), binds the picture at `texture(0)`, a 1×1
-white placeholder at `texture(1)` and an identity 2³ `rgba16Float` lattice at
-`texture(2)`, and builds its pipelines as `bench.swift`'s `layerState`
+white placeholder at `texture(1)`, an identity 2³ `rgba16Float` lattice at
+`texture(2)` and an identity 2×1 `rgba32Float` curve strip at `texture(3)` (since
+grading-2 G2-3; a base's shader that names no `texture(3)` ignores it), and builds
+its pipelines as `bench.swift`'s `layerState`
 (`kGatherFilters` false, the same blending, `MetalRenderer.workingFormat`).
 One scene, S1 over a copy of `bench.swift`'s `halfPicture`; series V0:S1,
 VT:S1 and V0b:S1 in the same seeded SplitMix64 order, 5 warm-up and N timed
@@ -164,6 +167,7 @@ python3 tools/proof/grading_spike/grading_spike.py --check --tree               
 python3 tools/proof/grading_spike/grading_spike.py --check --tree --mutant tree-graded
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree   # GR7a's record
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base 4f52ead   # G2-2's
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base b2fd1f9   # G2-3's
 ```
 
 **Its record** is `archive/grading.md`, "GR0 — the road map and the spike"

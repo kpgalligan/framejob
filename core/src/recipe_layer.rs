@@ -6,17 +6,18 @@
 use serde_json::{Map, Value};
 
 use crate::actions::{color_json, wheels_json};
+use crate::actions_curves::curves_json;
 use crate::evaluate::{json, number};
 use crate::model::{BlendMode, Look, VideoProps};
 use crate::nest::Frame;
 
-/// The TWENTY-FOUR keys of a recipe layer (spec §7.3), and the one place they
+/// The TWENTY-FIVE keys of a recipe layer (spec §7.3), and the one place they
 /// are written.
 ///
 /// It is a struct rather than twenty lines inside [`crate::model::Project::layer`] because
 /// phase 7 gave the recipe a SECOND producer of layers — the burn-in
 /// [`crate::recipe_text::burn_in_layer`] synthesizes, which belongs to no
-/// clip — and a second literal copy of a twenty-four-key object is a copy that
+/// clip — and a second literal copy of a twenty-five-key object is a copy that
 /// drifts. It would drift SILENTLY, which is the part worth stating:
 /// `FrameRecipe.swift`'s `RecipeLayer.init(from:)` reads every key
 /// leniently and DEFAULTS a missing one with no diagnostic anywhere, so a
@@ -118,6 +119,8 @@ impl RecipeLayer<'_> {
         out.insert("color".to_string(), color_json(&video.color));
         // All nine wheel values, each at 0 when neutral (spec §11 GR-11).
         out.insert("wheels".to_string(), wheels_json(&video.wheels));
+        // All four curves, an identity one as `[[0, 0], [1, 1]]` (GR-12).
+        out.insert("curves".to_string(), curves_json(&video.curves));
         out.insert("look".to_string(), look_json(video.look));
         out.insert("chroma".to_string(), json(&video.chroma));
         out.insert("filters".to_string(), json(&video.filters));

@@ -78,6 +78,9 @@ struct VideoPatch: Codable, Equatable {
     /// `wheels` (spec §11 GR-11): sparse, as `color` is — a write names only
     /// the wheels and keys its control owns.
     var wheels: ColorWheelsPatch?
+    /// `curves` (spec §11 GR-12): the channels a write names, each a whole
+    /// list or null; a write names only the channel its control edits.
+    var curves: ColorCurvesPatch?
 
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
@@ -86,7 +89,7 @@ struct VideoPatch: Codable, Equatable {
         filters: [FilterProps]? = nil, reflection: ReflectionProps?? = nil,
         spotlight: SpotlightProps?? = nil, obscure: [ObscureProps]? = nil,
         blend: BlendMode? = nil, motion: MotionProps?? = nil, look: LookPatch?? = nil,
-        wheels: ColorWheelsPatch? = nil
+        wheels: ColorWheelsPatch? = nil, curves: ColorCurvesPatch? = nil
     ) {
         self.x = x
         self.y = y
@@ -106,6 +109,7 @@ struct VideoPatch: Codable, Equatable {
         self.motion = motion
         self.look = look
         self.wheels = wheels
+        self.curves = curves
     }
 
     init(from decoder: Decoder) throws {
@@ -133,6 +137,7 @@ struct VideoPatch: Codable, Equatable {
         motion = c.nullable(.motion)
         look = c.nullable(.look)
         wheels = c.lenient(.wheels)
+        curves = c.lenient(.curves)
     }
 
     var dictionary: [String: Any] {
@@ -187,6 +192,7 @@ struct VideoPatch: Codable, Equatable {
             if let look = look { d["look"] = look.dictionary } else { d["look"] = NSNull() }
         }
         if let wheels = wheels, !wheels.isEmpty { d["wheels"] = wheels.dictionary }
+        if let curves = curves, !curves.isEmpty { d["curves"] = curves.dictionary }
         return d
     }
 

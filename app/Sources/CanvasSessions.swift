@@ -826,8 +826,8 @@ struct CanvasEyedropperSession {
     ///  - the clip's own chroma, because a keyed pixel is a HOLE — the most
     ///    natural pick of all, "the green I can still see", would otherwise
     ///    sample whatever shows through it;
-    ///  - its colour adjustment, tone, wheels and look (GR-2, GR-11, GR-7), since the shader
-    ///    keys BEFORE them (§7.5's order of operations), so the adjusted pixel
+    ///  - its colour adjustment, tone, wheels, curves and look (GR-2, GR-11, GR-12, GR-7), as
+    ///    the shader keys BEFORE them (§7.5's order of operations), so the adjusted pixel
     ///    is not the one being compared;
     ///  - its opacity, because a faded layer's pixel on screen is already
     ///    mixed with whatever lies behind it.
@@ -838,7 +838,7 @@ struct CanvasEyedropperSession {
     var suppression: ReelOp {
         .setVideo(clips: clips, patch: VideoPatch(
             opacity: 1, color: ColorPatch(.identity), chroma: .some(nil),
-            look: .some(nil), wheels: .neutral))
+            look: .some(nil), wheels: .neutral, curves: .reset))
     }
 
     /// The sampled colour as the props to write. A first pick keeps

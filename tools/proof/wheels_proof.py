@@ -37,7 +37,8 @@ tracks, lift masters 0.2 and −0.2, saved for the probe).
   change" and the frame is unchanged.
 - **N2** (S): saved neutral, `project.json` holds no `wheels`; saved with lift x
   0.2, the clip's `video.wheels` is exactly `{"lift": {"x": 0.2}}`; both
-  files' `version` is 16.
+  files' `version` is the header's `RC_FORMAT_VERSION` (16 when this phase
+  wrote it; read off the header since G2-3's 17).
 - **L1** (R): lift master 0.5: every 16th column = v + 0.125(255 − v) ±1, and
   255 stays 255.
 - **G1** (R): gain master +0.5 = v·1.25, then −0.5 = v·0.75, ±1; 0 stays 0.
@@ -111,6 +112,7 @@ import argparse
 import atexit
 import json
 import math
+import re
 import struct
 import subprocess
 import sys
@@ -118,6 +120,7 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+HEADER = ROOT / "core/include/reelcut_core.h"
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
@@ -719,6 +722,15 @@ def run_m(client, movie, neutral, state):
 
 # ---- project S: what a save writes (N2) --------------------------------------
 
+def format_version():
+    """`RC_FORMAT_VERSION` off the tree's own header, not a copy: a copy goes
+    stale at every bump (`e2_proof.py`'s helper)."""
+    match = re.search(r"#define RC_FORMAT_VERSION (\d+)", HEADER.read_text())
+    if match is None:
+        raise RuntimeError(f"{HEADER} has no `#define RC_FORMAT_VERSION <n>` line")
+    return int(match.group(1))
+
+
 def saved_wheels(path, clip):
     """The package's `version`, `clip`'s `video.wheels` (None when absent) and
     the file's text."""
@@ -750,10 +762,11 @@ def run_s(client, card, state):
     except (OSError, ValueError):
         wheeled_version, wheeled = None, None
     stray = '"wheels"' in plain_text
+    version = format_version()
     check("N2 a neutral save holds no `wheels`; with lift x 0.2 the clip's wheels are exactly "
-          "{\"lift\": {\"x\": 0.2}}; both at version 16",
-          saved["ok"] and resaved["ok"] and not stray
-          and wheeled == {"lift": {"x": 0.2}} and plain_version == 16 and wheeled_version == 16,
+          f"{{\"lift\": {{\"x\": 0.2}}}}; both at version {version} (the header's)",
+          saved["ok"] and resaved["ok"] and not stray and wheeled == {"lift": {"x": 0.2}}
+          and plain_version == version and wheeled_version == version,
           f"neutral has wheels {stray}, version {plain_version}; wheeled "
           f"{wheeled}, version {wheeled_version}")
     return close(client, doc.path)

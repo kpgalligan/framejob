@@ -788,6 +788,8 @@ struct VideoProps: Codable, Equatable {
     let motion: MotionProps?
     /// Lift, gamma and gain (spec §11 GR-11, `GradeProps.swift`).
     let wheels: ColorWheels
+    /// The tone curves (spec §11 GR-12, `GradeProps.swift`).
+    let curves: ColorCurves
     /// The clip's look (spec §11 GR-7, `LookProps.swift`); nil is none.
     let look: LookProps?
 
@@ -798,7 +800,8 @@ struct VideoProps: Codable, Equatable {
         chroma: ChromaProps? = nil, filters: [FilterProps] = [],
         reflection: ReflectionProps? = nil, spotlight: SpotlightProps? = nil,
         obscure: [ObscureProps] = [], blend: BlendMode = .normal,
-        motion: MotionProps? = nil, wheels: ColorWheels = .neutral, look: LookProps? = nil
+        motion: MotionProps? = nil, wheels: ColorWheels = .neutral,
+        curves: ColorCurves = .identity, look: LookProps? = nil
     ) {
         self.x = x
         self.y = y
@@ -817,6 +820,7 @@ struct VideoProps: Codable, Equatable {
         self.blend = blend
         self.motion = motion
         self.wheels = wheels
+        self.curves = curves
         self.look = look
     }
 
@@ -848,6 +852,7 @@ struct VideoProps: Codable, Equatable {
         // reason version 8 needs no migrate step.
         motion = c.lenient(.motion)
         wheels = c.lenient(.wheels, ColorWheels.neutral)
+        curves = c.lenient(.curves, ColorCurves.identity)
         look = c.lenient(.look)
     }
 

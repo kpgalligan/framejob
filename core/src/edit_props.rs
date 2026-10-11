@@ -376,6 +376,9 @@ impl Project {
                     }
                     normalise_look(&mut props, patch)?;
                     check_video(&props, self.source_size(&clip))?;
+                    // An identity curve is stored as none (spec §11 GR-12),
+                    // so an identity patch on an uncurved clip is an identity.
+                    props.curves.drop_identities();
                     check_blend(&clip, &props)?;
                     check_adjustment_video(&clip, &props)?;
                     self.check_look_media(&props)?;

@@ -9,7 +9,9 @@
 // prefix of it). Pipelines as `bench.swift`'s
 // `layerState`: `kGatherFilters` false, blending as `pipelineState`,
 // `MetalRenderer.workingFormat`. `texture(0)` the picture, `texture(1)` a 1×1
-// white placeholder, `texture(2)` an identity 2³ `rgba16Float` lattice.
+// white placeholder, `texture(2)` an identity 2³ `rgba16Float` lattice,
+// `texture(3)` an identity 2×1 `rgba32Float` curve strip (grading-2 G2-3's;
+// an older base's shader names no `texture(3)` and ignores it).
 //
 //   tree_bench --lib V0=PATH --lib VT=PATH --width W --height H --frames N
 //              --runs R --warmup K --seed S --vt-exposure EV --out JSON
@@ -201,6 +203,18 @@ let identity2: MTLTexture = {
     }
     return t
 }()
+/// The identity 2×1 `rgba32Float` curve strip, `CurveTextures`' placeholder.
+let identityStrip: MTLTexture = {
+    let d = MTLTextureDescriptor.texture2DDescriptor(
+        pixelFormat: .rgba32Float, width: 2, height: 1, mipmapped: false)
+    d.usage = [.shaderRead]
+    d.storageMode = .shared
+    guard let t = device.makeTexture(descriptor: d) else { fail("strip texture") }
+    var data: [Float] = [0, 0, 0, 1, 1, 1, 1, 1]
+    t.replace(region: MTLRegionMake2D(0, 0, 2, 1), mipmapLevel: 0, withBytes: &data,
+              bytesPerRow: 32)
+    return t
+}()
 let destination = texture2D(workingFormat, W, H, target: true)
 let background = MTLClearColor(red: 0.2, green: 0.4, blue: 0.6, alpha: 1)
 
@@ -243,6 +257,7 @@ func encode(_ series: String, _ buffer: MTLCommandBuffer) {
     e.setFragmentTexture(picture, index: 0)
     e.setFragmentTexture(placeholder, index: 1)
     e.setFragmentTexture(identity2, index: 2)
+    e.setFragmentTexture(identityStrip, index: 3)
     e.setFragmentSamplerState(sampler, index: 0)
     e.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
     e.endEncoding()

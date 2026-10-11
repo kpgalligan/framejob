@@ -30,7 +30,9 @@ detail there.
   `ProjectSnapshot.swift`, grading-2 G2-0) with its neutrality helpers, and
   `LayerUniforms.apply(tone:)`, and the wheels' `ColorWheel`, `ColorWheels`,
   `ColorWheelPatch`, `ColorWheelsPatch`, `ColorWheelKind` and
-  `LayerUniforms.apply(wheels:)` (GR-11)), so a row writes only its own key to
+  `LayerUniforms.apply(wheels:)` (GR-11), and the curves' `CurvePoint`,
+  `CurveChannel`, `ColorCurves`, `ColorCurvesPatch` and
+  `LayerUniforms.apply(curves:)` (GR-12)), so a row writes only its own key to
   every selected clip. `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10). `ReelAgentSocket` (road map
   14's MC2) wraps `rc_agent_socket_start` / `_release`: `start` throws the
@@ -746,6 +748,12 @@ the key map behind it.
   `WheelStripControl.swift` (`WheelStripControl`: the master strip with the
   slider's knob, a press on the knob grabs it, elsewhere jumps, ⌥ drags relative
   at a tenth, double-click resets) ·
+  `CurveEditorView.swift` (`CurveEditorView`: the curve plot — grid, diagonal,
+  the other channels faint, 7 × 7 square points; a press adds a point on the
+  curve and drags it, ⌫ or a double-click deletes, the arrows nudge, through
+  `press` / `drag` / `release` / `key`; first responder only while a point is
+  selected; its `CurveEditorState` is `VideoPane+Curves.swift`'s, kept on
+  `ClipPane`; spec §11 GR-12) ·
   `InspectorBinding+Writes.swift` (a pure move: a write with an action
   selected goes to `set_action_end`, with `structural(video:for:)` the
   exception that sends a list of a different LENGTH, or `motion`, to the
@@ -825,18 +833,23 @@ the key map behind it.
   rows (GR-2); +`Wheels` — the Wheels section (GR-11): Lift, Gamma and Gain
   across one row (`ColorWheelsView`), each a `ColorWheelControl` disc, a
   `WheelStripControl` master and a field, one row mark for `video.wheels`;
+  +`Curves` — the Curves section (GR-12): the channel picker
+  (`CurveChannelPicker`), the plot and the selected point's In/Out fields
+  (`CurvePointField`) in one row (`CurvesView`), one row mark for
+  `video.curves`, `CurveEditorState`, and `InspectorBinding.curvesReset`;
   +`Adjustment` — the Adjustment section's one Strength row (`video.opacity`)
   and the selection's adjustment tests (GR-6); +`Look` — the Look section, last
-  in the Color sub-tab (Light · Color · Wheels · Look): the 3×3 gallery and an
-  Amount row shown only when every clip has a look (GR-7; `LookGallery.swift`
-  renders its thumbnails through `Exporter.renderFrame` at 256 px, 0.3 s after
-  changes settle and only while open; `LookGalleryView.swift` draws it; under
-  the grid the Imported group, a tile per `.cube` LUT in media-list order, and
-  Import LUT…, which runs `add_media` and the look as ONE "Import LUT" edit,
-  reusing a listed file, GR-8; Clip ▸ Look ▸'s LUT rows are filled when it opens
-  by `LookMenuFiller` in `AppDelegate+ClipMenus.swift`; `-RCDevLookGalleryDump`
-  also writes `lut-<id>.png` and the manifest's `tiles`); +`Transition`,
-  +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
+  in the Color sub-tab (Light · Color · Wheels · Curves · Look): the 3×3 gallery
+  and an Amount row shown only when every clip has a look (GR-7;
+  `LookGallery.swift` renders its thumbnails through `Exporter.renderFrame` at
+  256 px, 0.3 s after changes settle and only while open;
+  `LookGalleryView.swift` draws it; under the grid the Imported group, a tile
+  per `.cube` LUT in media-list order, and Import LUT…, which runs `add_media`
+  and the look as ONE "Import LUT" edit, reusing a listed file, GR-8; Clip ▸
+  Look ▸'s LUT rows are filled when it opens by `LookMenuFiller` in
+  `AppDelegate+ClipMenus.swift`; `-RCDevLookGalleryDump` also writes
+  `lut-<id>.png` and the manifest's `tiles`); +`Transition`, +`Motion`,
+  +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
   a factory `ClipPane` calls when EVERY selected clip is a graphic; the
@@ -1154,13 +1167,18 @@ the key map behind it.
   is 128 floats (512 bytes): the tone group (spec §11 GR-2: the nine tone
   values, `toneEnabled`, then `lookAmount` and `lookEnabled`, spec §11 GR-7),
   then the wheels group (spec §11 GR-11: lift, gamma and gain as x, y, master
-  each, `wheelsEnabled`, `curvesEnabled` for G2-3, one reserved); a next field
-  adds a group of four. A layer's look is a baked 33³ `rgba16Float`
+  each, `wheelsEnabled`, `curvesEnabled`, spec §11 GR-12, one reserved); a next
+  field adds a group of four. A layer's look is a baked 33³ `rgba16Float`
   lattice at `texture(2)` on every layer, shadow-mask and adjustment draw
   (`LookTextures.swift`: the bake on the GPU, an LRU keyed by the look's whole
   definition from the recipe, a 2³ identity placeholder for no look or a failed
   bake; `LookProps.swift`: `LookProps`, `LookPatch`, `SplitTone`, the recipe's
-  `RecipeLook`; `LookKind.builtIns` is the eight the gallery and menu offer).
+  `RecipeLook`; `LookKind.builtIns` is the eight the gallery and menu offer). A
+  layer's curves are a 1,024 × 1 `rgba32Float` strip at `texture(3)` on every
+  layer, shadow-mask and adjustment draw (`CurveTextures.swift`, held by
+  `LookTextures` as `curves`: an LRU of eight keyed by `ColorCurves`, a 2 × 1
+  identity placeholder; `CurveTable.swift`: the Fritsch–Carlson spline the strip
+  and the editor both draw from).
   An imported LUT's look (GR-8) binds the `.cube` file's own lattice instead
   (`LutTextures.swift`: read through `MediaImporter+LUT.swift` and the core's
   `rc_cube_*`, cached by path and modification date, nothing bound — the clip

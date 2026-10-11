@@ -170,3 +170,103 @@ Concat is opened, at design time or build time.
   its code is written (16 wheels, 17 curves, 18 qualifiers) and renumbers before its merge if
   main moved first. There is no experiment verdict or trial phase: grading is kept (GR-1), and
   the owner's feedback waits for real use.
+- **GR-12 — Curves: `video.curves {master, red, green, blue}`, each 2–16 `[x, y]` points on a
+  Fritsch–Carlson monotone spline, applied at step 4c.2 after the wheels and before the look
+  through a 1,024-texel strip at `texture(3)`, in the layer stage and the adjustment pass;
+  format 17.** Recorded in G2-3 before its code, from the owner's answers of 2026-10-11 to G2-3's
+  choices 1–10 ("All as recommended", choice 9 (a)) and 11–13 (internal, as recommended).
+  - **The keys.** `video.curves` holds `master`, `red`, `green` and `blue`, each a list of 2–16
+    points `[x, y]`, x strictly rising, x and y each 0…1 (both bounds inclusive, so a point at
+    exactly 0 or 1 passes). Set by `set_video {patch: {curves: {red: [[0, 0], [0.5, 0.7], [1,
+    1]]}}}`: a list replaces the channel whole, `null` removes it, an absent key keeps it. No new
+    op, no op-table row, no new tool and no FFI export. Out of range is refused in the rule's own
+    sentence, in model order then point order, indices 0-based, never clamped by a patch:
+    `video.curves.red needs 2 to 16 points, not 17`; `video.curves.red[2].x must be between 0
+    and 1, not 1.2` (and `.y`); `video.curves.master[2].x (0.4) must be greater than
+    video.curves.master[1].x (0.5)`.
+  - **The identity.** A curve is the identity when its first x is 0, its last x is 1 and every
+    point has y = x (so `[[0, 0], [0.5, 0.5], [1, 1]]` is one). An identity curve is written
+    absent and `video.curves` with all four identity is absent, so an uncurved file's text is
+    unchanged (GR-2's rule). `set_video` normalises an identity channel to absent, so an identity
+    patch on an uncurved clip is an identity (no undo step). In an action's END patch an identity
+    curve is kept as written: there it means "animate to neutral" (`null` in an end patch removes
+    the key from the end, `prune_removed`, and so cannot). Inside an action the section's Reset
+    therefore writes the identity curve `[[0, 0], [1, 1]]` to the end, never `null`; outside one
+    it writes `null` to the clip.
+  - **The spline**: a monotone cubic Hermite (F. N. Fritsch and R. E. Carlson, "Monotone
+    Piecewise Cubic Interpolation", SIAM J. Numer. Anal. 17(2), 1980), exactly: secants δk;
+    tangents m0 = δ0, m(n−1) = δ(n−2), interior (δ(k−1) + δk) / 2, or 0 where δ(k−1)·δk ≤ 0; then
+    left to right per segment, δk = 0 sets mk = m(k+1) = 0, else with α = mk/δk, β = m(k+1)/δk and
+    α² + β² > 9 both are scaled by 3/√(α² + β²); cubic Hermite inside a segment; flat (the first
+    or last y) outside the first and last x; clamped to 0…1. It passes through every point and
+    never overshoots between two, so a curve that only rises never dips. **The spline lives in
+    Swift only** (`CurveTable.swift`, one implementation for the strip and the editor's drawing);
+    the core stores, checks and interpolates the points and never samples it.
+  - **Step 4c.2**, once per pixel, after the wheels (4c.1) and before the look (4d), in the layer
+    stage and the adjustment pass, on encoded values: per channel c, `v = c(master(v))` (the
+    master sets contrast for all three, a channel curve trims one colour of the contrasted
+    picture). `curvesEnabled` (reserved by GR-11, the block stays 128 floats) is 1 exactly when
+    any channel is not the identity and joins the effects block's gate sum, so an uncurved layer
+    never enters 4c.2 and renders byte-identical.
+  - **The strip**: one 1,024 × 1 texture, r, g and b holding the three composites at texel i =
+    `c(master(i / 1023))`, a = 1; `rgba32Float`, or `rgba16Float` on a device without 32-bit
+    float filtering (`!supports32BitFloatFiltering`; REASONED never on an Apple-silicon Mac).
+    Sampled linearly at `saturate(v)·(n−1)/n + 0.5/n` (4d's texel-centre rule) at `texture(3)` on
+    every layer, shadow-mask and adjustment draw; a 2 × 1 identity placeholder is bound when the
+    curves are the identity (or an upload fails) and never sampled behind `curvesEnabled`. Cached
+    by the curves in an LRU of eight held by `LookTextures`, beside the looks' cache.
+  - **Actions** (owner choice 9 (a)): §5.4's list rule interpolates two curves of the same point
+    count per point. An identity channel (absent included) meeting a curve of a different count
+    is first aligned to it: it takes that curve's x's with y = x, its first point `[0, 0]` and its
+    last `[1, 1]`, so a grade animates from neutral and back to neutral. Any other count change
+    switches at the end (the list rule). An action's end is clamped: x and y to 0…1 (NaN removes
+    the channel); a channel with fewer than 2 or more than 16 points, or whose x's do not strictly
+    rise after the clamp, is removed; then each identity channel is removed. In the inspector, a
+    write to a keyed action goes to the action's END when the new list has the edited list's
+    count, or either the edited or the new list is the identity; any other count change (a point
+    added or deleted between two non-identity curves) goes to the clip's BASE (the filters' rule).
+  - **Extends GR-4**: `ungraded` writes all four curves as the identity on every layer.
+    **Extends GR-6**: an adjustment clip's Color sub-tab gains Curves, and the adjustment pass
+    runs 4c.2 where the layer stage does. **Extends GR-7**: the order becomes Color's four,
+    Light, the wheels, the curves, the look, the point filters; the look's bake is unchanged and
+    the curves are the clip's own. The recipe writes all four always (`"curves"` after
+    `"wheels"`, an absent channel as `[[0, 0], [1, 1]]`), so Swift's lenient decoder never
+    defaults a missing key silently.
+  - **The Curves section** (owner choices 1–10), on the Color sub-tab after Wheels and before Look
+    (Adjustment · Light · Color · Wheels · Curves · Look), closed until opened, summary "neutral"
+    or "adjusted", Reset clears all four (undo "Curves"). (1) The plot is square, the row less its
+    14 pt mark gutter: about 254 pt at the default pane, 230 at the 280 pt minimum, capped at 300
+    pt; a 4 × 4 grid, the identity diagonal, the other channels faint behind the edited one, the
+    edited curve in its channel's tint, 7 × 7 square points. (2) A press anywhere off a point adds
+    a point ON the curve at the press's x, selects it, and the same press drags it: one undo step
+    "Curves". On an identity channel the added point's y is exactly its x and nothing is written
+    until it first moves (a drag, a nudge or a field entry); a press and release writes nothing.
+    (3) ⌫ or ⌦ deletes the selected point, as do a double-click on a point and the row's Delete
+    button, one step each; never below 2 points (the button disabled, the key beeps); no
+    drag-off-to-delete. (4) A drag grabs the point where it stands (no jump), held 0.001 inside
+    each neighbour's x and inside 0…1; the end points move too (black and white points); ⌥ held
+    moves at a tenth (GR-11's convention extended to the curves); no ⇧ axis lock. The arrow keys
+    nudge the selected point by 0.01 (⇧ 0.1), one step each. (5) The channel picker: four square
+    text cells Master · Red · Green · Blue above the plot, the chosen cell in its channel's tint,
+    a 3 pt dot under each channel that is not the identity; the choice is per window, kept across
+    selection changes, Master when a window opens, never saved. (6) At most 16 points: a 17th add
+    beeps and does nothing. (7) The section's Reset clears all four; each cell's context menu
+    "Reset Red" (and the rest) clears one; no double-click reset in the plot. (8) With an action
+    selected that keys `video.curves`: the edited curve and its points in action ink and the
+    action's start curve as a 1 pt dashed line; one row mark and one mixed badge for the whole of
+    `video.curves` (CI-7, CI-9 per group key). (10) The selected point's In and Out fields, 3
+    decimals, 0–1 (not 0–255), clamped like a drag, blank and disabled with no point selected.
+    Undo names "Curves" for every curve edit; a mixed selection draws the first clip's curve with
+    the mixed badge, and a write sends the edited channel's whole list to every selected clip. The
+    selected point survives a refresh and clears on a channel change, Esc or a selection change;
+    with none selected the plot passes keys on (Space still plays), and it holds first responder
+    only while a point is selected.
+  - **Format 17**: the key is optional, with no migration step; the bump stops an older build
+    dropping it on save. A file numbered 1–16 (and 1015) opens and is stamped 17; 18 and above are
+    newer.
+  - **Not:** no hue-against-hue or hue-against-saturation curves; no histogram behind the plot; no
+    hover readout; no resampling between two non-identity curves of different counts (it would
+    need the spline in the core).
+  - Risk accepted: an action between two non-identity curves of different counts switches at its
+    end rather than animating, and a point added or deleted on such a keyed curve lands on the
+    clip's base.

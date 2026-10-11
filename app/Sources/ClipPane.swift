@@ -43,6 +43,9 @@ final class ClipPane: InspectorPaneView {
     /// The Look section's gallery model (spec §11 GR-7 [b]), kept here rather
     /// than in the section so its thumbnails outlive a rebuild.
     let lookGallery = LookGallery()
+    /// The Curves section's channel, selected point and unwritten list (spec
+    /// §11 GR-12), kept here so they outlive a rebuild; per window, never saved.
+    let curveState = CurveEditorState()
 
     override init(inspector: InspectorViewController) {
         videoPane = VideoPane(inspector: inspector)
@@ -142,7 +145,10 @@ final class ClipPane: InspectorPaneView {
 
     /// Back to the default tab; triggers nothing. The controller calls it
     /// when the selection's ids change.
-    func forgetSubTab() { chosen = nil }
+    func forgetSubTab() {
+        chosen = nil
+        curveState.clear()
+    }
 
     // MARK: - Kind → sections
 
@@ -196,10 +202,11 @@ final class ClipPane: InspectorPaneView {
             ]
         case .color:
             // Light, then the Color section Picture used to hold (GR-2), then
-            // Wheels (GR-11), then Look (GR-7); Adjustment's Strength first
-            // when every clip is an adjustment clip (GR-6).
+            // Wheels (GR-11), Curves (GR-12), then Look (GR-7); Adjustment's
+            // Strength first when every clip is an adjustment clip (GR-6).
             sections = [
                 videoPane.lightSection(), videoPane.colorSection(), videoPane.wheelsSection(),
+                videoPane.curvesSection(curveState),
             ]
             if videoPane.allAdjustment { sections.insert(videoPane.adjustmentSection(), at: 0) }
             sections.append(videoPane.lookSection(lookGallery))

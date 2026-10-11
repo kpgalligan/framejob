@@ -324,7 +324,9 @@ fn the_recipe_carries_all_nine_between_color_and_look() {
         .collect();
     let color = keys.iter().position(|k| *k == "color").expect("color");
     assert_eq!(keys[color + 1], "wheels");
-    assert_eq!(keys[color + 2], "look");
+    // The curves (GR-12) sit between the wheels and the look.
+    assert_eq!(keys[color + 2], "curves");
+    assert_eq!(keys[color + 3], "look");
     assert_eq!(
         layer["wheels"],
         json!({"lift": {"x": 0.0, "y": 0.0, "master": 0.0},

@@ -33,8 +33,9 @@ Vibrance (each "0.00", knob in the middle), and Fade ("0.00", its knob at the
 left end, since fade runs 0 to 1). Below it the COLOR section is closed, summary
 "neutral" — the four Brightness, Contrast, Saturation and Hue rows that used to
 sit on Picture. Under it the WHEELS section's header (grading-2 G2-2), open with
-the summary "neutral"; its three discs, and the LOOK section (GR5b) after them,
-start below the captured height (05f and 05d show them).
+the summary "neutral"; its three discs, the CURVES section (G2-3) and the LOOK
+section (GR5b) after them start below the captured height (05f, 05g and 05d show
+them).
 
 In the light capture the inspector is white with black labels, the section
 headers light-grey bars with grey capitals, the Color sub-tab pale blue with a

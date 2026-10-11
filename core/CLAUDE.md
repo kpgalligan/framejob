@@ -87,8 +87,11 @@ governs a module now.
 - `model_grade.rs` — tier 2's grading vocabulary (format 16, spec §11 GR-11): `Wheels {lift,
   gamma, gain}`, each a `Wheel {x, y, master}`, the FIELD `VideoProps.wheels` written only when
   not neutral and each key only when not 0; `actions::wheels_json` writes all nine for the
-  evaluator, the patch template and the recipe, as `color_json` does tone's. Re-exported whole
-  by `model_props.rs`.
+  evaluator, the patch template and the recipe, as `color_json` does tone's. Format 17 (GR-12)
+  adds `Curves {master, red, green, blue}`, each an optional list of 2–16 `[x, y]` points
+  (`CurvePoint`), the FIELD `VideoProps.curves` written only when not the identity
+  (`curve_is_identity`: every y = x, from x 0 to x 1); `actions_curves.rs`'s `curves_json`
+  writes all four, an absent one as `IDENTITY_CURVE`. Re-exported whole by `model_props.rs`.
 - `cube.rs` — the `.cube` reader (spec §11 GR-8): 3D only, size 2–65, the
   default domain; anything else refused by line and name. `ffi_cube.rs` — the
   four `rc_cube_*` exports. `lut.rs` — a LUT media's rules: placing one is
@@ -321,7 +324,8 @@ governs a module now.
 - `grade_check.rs` — tier 2's range checks (spec §11 GR-11), called from `check_video`: each
   wheel's x, y and master −1…1, and x² + y² ≤ 1 (to `WHEEL_RIM_TOLERANCE`, 1e-9, so a rim point
   is never refused) refused in its own sentence; `actions_clamp.rs`'s `clamp_wheels` closes an
-  action's end.
+  action's end. `check_curves` (GR-12): 2–16 points, x and y 0…1, x strictly rising, each in
+  its own sentence; `clamp_curves` closes an action's end.
 - `edit_track.rs` — tracks, markers and the media list: the three lists a
   clip sits in. The canvas left here at road map 7's D2·3 toll. `clip_list`
   is the ONE spelling of the clips a `with_clips` refusal names — three ids
@@ -466,6 +470,12 @@ governs a module now.
   never looks at the clip for them; this bounds every value such a patch
   can carry and forces `normal` on a nest clip), with `bounded` /
   `finite_or`; a pure move out of `actions.rs` (issue batch B87, toll A).
+- `actions_curves.rs` — `curves_json` (all four curves, an absent one
+  as the identity, for `video_json`'s callers) and
+  `align_identity_curves` (spec §11 GR-12: an identity curve meeting a
+  curve of another count in an action takes that curve's x's, its ends
+  at 0 and 1, so a grade animates from neutral; any other count change
+  switches at the end, the list rule).
 - `actions_graphic.rs` — a graphic clip's props at a clip time (format
   version 13, spec §11 G-34): finished actions' `end.graphic.props` laid
   over the clip's map by `insert`, the spanning one interpolated — a number
@@ -497,7 +507,7 @@ governs a module now.
   out of `evaluate.rs` (grading GR1).
 - `recipe.rs` · `recipe_layer.rs` · `recipe_options.rs` · `recipe_text.rs` — `frame_recipe(t)`: the
   layer list at one instant. `RecipeLayer` (`recipe_layer.rs`, re-exported by
-  `recipe.rs`) is the twenty-three keys of a layer written in ONE place
+  `recipe.rs`) is the twenty-five keys of a layer written in ONE place
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
   (`recipe_options.rs`, a pure move out of `recipe.rs` in grading-2 G2-0, re-exported by it) is what a caller wanted besides `t` — the burn-in timecode, and `ungraded`

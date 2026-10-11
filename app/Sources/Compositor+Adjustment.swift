@@ -7,9 +7,9 @@ import Metal
 /// `reelcut_adjust_fragment`, reads the target it is drawing into through
 /// `[[color(0)]]` — everything already drawn behind the clip in its
 /// container, the canvas background included — and writes it back graded by
-/// the layer's colour, tone, look and point filters, by `mix(dst, graded, w)`,
-/// `w` the layer's opacity (its strength) times the matte coverage sampled
-/// as step 7c samples it. One full-frame quad, the shadow pass's vertex
+/// the layer's colour, tone, wheels, curves, look and point filters, by
+/// `mix(dst, graded, w)`, `w` the layer's opacity (its strength) times the
+/// matte coverage sampled as step 7c samples it. One full-frame quad, the shadow pass's vertex
 /// stage; the clip's stored transform, crop, shadow and the rest do nothing.
 ///
 /// **Blending is OFF** (`pipelineDescriptor`'s doc, the B6 lesson): the
@@ -27,14 +27,15 @@ extension RecipeLayer {
 
     /// An adjustment layer that would change nothing: its colour neutral (all
     /// thirteen keys, which Show Ungraded writes so), its wheels neutral (all
-    /// nine, GR-11, which Show Ungraded writes so too), no look that draws
+    /// nine, GR-11, which Show Ungraded writes so too), its curves the
+    /// identity (GR-12, the same), no look that draws
     /// (Show Ungraded removes a look, GR-7; a LUT look whose file is missing
     /// or refused draws nothing, GR-8) and no point filter with an amount
     /// above 0. It draws nothing, so the frame is byte-identical to one
     /// without the clip (GR-6, GR-4).
     func isNeutralAdjustment(drawsLook: Bool) -> Bool {
         let point: Set<FilterKind> = [.sepia, .noir, .vignette, .invert]
-        return color.isIdentity && wheels.isNeutral && !drawsLook
+        return color.isIdentity && wheels.isNeutral && curves.isIdentity && !drawsLook
             && !filters.contains { point.contains($0.kind) && $0.amount > 0 }
     }
 }
@@ -72,11 +73,14 @@ extension MetalRenderer {
         else { return }
         u.chromaEnabled = 0
         if look == nil { u.lookEnabled = 0 }
+        let curves = looks.curves.texture(for: layer.curves)
+        if curves === looks.curves.placeholder { u.curvesEnabled = 0 }
         guard let encoder = pass.open() else { throw MatteError.noTarget }
         encoder.setRenderPipelineState(adjustPipeline)
         encoder.setFragmentBytes(&u, length: MemoryLayout<LayerUniforms>.stride, index: 0)
         encoder.setFragmentTexture(matte, index: 1)
         encoder.setFragmentTexture(look ?? looks.placeholder, index: 2)
+        encoder.setFragmentTexture(curves, index: 3)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         encoder.setRenderPipelineState(pass.pipeline)
     }

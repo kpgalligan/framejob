@@ -2,10 +2,12 @@
 //! optional `video.wheels` key, driven through the C FFI exactly as
 //! `ReelCore.swift` drives it.
 //!
-//! Pinned here: every earlier version (1 to 15), and a file numbered 1015
-//! (GR-9's branch number, read as 15), opens stamped 16; 17 to 1014 and
-//! 1016 are refused as newer; an unwheeled file at 15 writes the same text
-//! as the same file at 16; and a wheeled file ROUND TRIPS byte for byte.
+//! Pinned here: version 16 is at most the current version; every earlier
+//! version (1 to 15), and a file numbered 1015 (GR-9's branch number, read
+//! as 15), opens stamped current; every number past the current one, 1014
+//! included, and 1016 are refused as newer; an unwheeled file at 15 writes
+//! the same text as the same file at 16; and a wheeled file ROUND TRIPS byte
+//! for byte.
 
 mod common;
 
@@ -30,16 +32,20 @@ fn file(version: u32, video: Value) -> Value {
     })
 }
 
-#[test]
-fn the_current_version_is_16() {
-    assert_eq!(RC_FORMAT_VERSION, 16);
-}
+const _: () = assert!(
+    RC_FORMAT_VERSION >= 16,
+    "version 16 is at most the current version"
+);
 
 #[test]
-fn every_earlier_version_and_1015_open_stamped_16() {
+fn every_earlier_version_and_1015_open_stamped_current() {
     for version in (1..=15u32).chain([GRADING_BRANCH_VERSION]) {
         let opened = Handle::from_value(&json!({ "version": version }));
-        assert_eq!(opened.value()["version"], json!(16), "version {version}");
+        assert_eq!(
+            opened.value()["version"],
+            json!(RC_FORMAT_VERSION),
+            "version {version}"
+        );
     }
     let wheeled = Handle::from_value(&file(
         GRADING_BRANCH_VERSION,
@@ -52,14 +58,20 @@ fn every_earlier_version_and_1015_open_stamped_16() {
 }
 
 #[test]
-fn seventeen_to_1014_and_1016_are_newer() {
-    for version in [17, 18, 500, 1014, 1016] {
+fn past_current_to_1014_and_1016_are_newer() {
+    for version in [
+        RC_FORMAT_VERSION + 1,
+        RC_FORMAT_VERSION + 2,
+        500,
+        1014,
+        1016,
+    ] {
         let message = Handle::try_from_value(&json!({ "version": version })).expect_err("newer");
         assert_eq!(
             message,
             format!(
                 "project format version {version} is newer than this build understands \
-                 (version 16); update Reelcut to open it"
+                 (version {RC_FORMAT_VERSION}); update Reelcut to open it"
             )
         );
     }

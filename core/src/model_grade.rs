@@ -15,6 +15,14 @@
 //! patch template, the recipe — go through `actions::wheels_json`, which
 //! writes all nine, as `color_json` does tone's.
 //!
+//! Format 17 (spec §11 GR-12) adds [`Curves`], the `video.curves` a clip
+//! carries — master, red, green and blue — each an optional list of 2–16
+//! [`CurvePoint`]s on a monotone spline the compositor's strip samples
+//! (Swift's `CurveTable`; the core never samples it). A channel equal to
+//! the identity ([`curve_is_identity`]) is not written, and `curves` only
+//! when one channel is not the identity; `actions_curves.rs`'s
+//! `curves_json` writes all four, an absent one as [`IDENTITY_CURVE`].
+//!
 //! Re-exported whole by `model_props.rs`, which `model.rs` re-exports whole
 //! in turn, so `crate::model::Wheels` resolves like every other property
 //! type.
@@ -83,4 +91,89 @@ impl Wheels {
 /// Whether a wheel key is neutral, and so left out of the file.
 fn is_zero(value: &f64) -> bool {
     *value == 0.0
+}
+
+/// One curve point, `[x, y]` in JSON: the input and the output, each 0…1
+/// (spec §11 GR-12).
+pub type CurvePoint = [f64; 2];
+
+/// The fewest points a curve may hold (GR-12).
+pub const CURVE_POINTS_MIN: usize = 2;
+
+/// The most points a curve may hold (GR-12).
+pub const CURVE_POINTS_MAX: usize = 16;
+
+/// The identity curve's shortest spelling: what `curves_json` writes for an
+/// absent channel, and what an action's Reset writes to its end.
+pub const IDENTITY_CURVE: [CurvePoint; 2] = [[0.0, 0.0], [1.0, 1.0]];
+
+/// Whether a channel is the identity (GR-12): absent, or a list whose first
+/// x is 0, last x is 1 and every point has y = x. Such a channel is not
+/// written.
+pub fn curve_is_identity(curve: &Option<Vec<CurvePoint>>) -> bool {
+    match curve {
+        None => true,
+        Some(points) => points_are_identity(points),
+    }
+}
+
+/// [`curve_is_identity`] of a list that is present.
+pub fn points_are_identity(points: &[CurvePoint]) -> bool {
+    match (points.first(), points.last()) {
+        (Some(first), Some(last)) => {
+            first[0] == 0.0 && last[0] == 1.0 && points.iter().all(|p| p[1] == p[0])
+        }
+        _ => false,
+    }
+}
+
+/// The four tone curves (spec §11 GR-12): `master` first, applied to all
+/// three channels, then each colour's own, `channel(master(v))`. `None` is
+/// the identity.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Curves {
+    #[serde(skip_serializing_if = "curve_is_identity")]
+    pub master: Option<Vec<CurvePoint>>,
+    #[serde(skip_serializing_if = "curve_is_identity")]
+    pub red: Option<Vec<CurvePoint>>,
+    #[serde(skip_serializing_if = "curve_is_identity")]
+    pub green: Option<Vec<CurvePoint>>,
+    #[serde(skip_serializing_if = "curve_is_identity")]
+    pub blue: Option<Vec<CurvePoint>>,
+}
+
+impl Curves {
+    /// Every channel the identity: `video.curves` is not written.
+    pub fn is_identity(&self) -> bool {
+        self.named()
+            .iter()
+            .all(|(_, curve)| curve_is_identity(curve))
+    }
+
+    /// The four channels with their names, in model order.
+    pub fn named(&self) -> [(&'static str, &Option<Vec<CurvePoint>>); 4] {
+        [
+            ("master", &self.master),
+            ("red", &self.red),
+            ("green", &self.green),
+            ("blue", &self.blue),
+        ]
+    }
+
+    /// Each identity channel becomes `None`: what `set_video` stores (so an
+    /// identity patch on an uncurved clip is an identity) and what an
+    /// action's end evaluates to.
+    pub fn drop_identities(&mut self) {
+        for curve in [
+            &mut self.master,
+            &mut self.red,
+            &mut self.green,
+            &mut self.blue,
+        ] {
+            if curve_is_identity(curve) {
+                *curve = None;
+            }
+        }
+    }
 }

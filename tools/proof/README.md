@@ -18541,7 +18541,7 @@ FAILURE of all seven), on a project of two cards at lift masters 0.2 / −0.2:
 P1 a puck drag through `ColorWheelControl.press` / `drag` / `release` in a
 headless `ClipPane` wired to a `ProjectDocument`'s live trio is one undo step
 "Lift" whose every update sends exactly `{wheels: {lift: {x, y}}}` to both
-clips (the masters kept), and the Color sections run Color, Wheels, Look; P2
+clips (the masters kept), and the Color sections run Color, Wheels, (Curves since G2-3,) Look; P2
 `apply(wheels:)`'s flag; P3 the 512-byte block with `liftX` at 464 and
 `wheelsEnabled` at 500; P4 the `◆N` badge; P5 ⌥ at a tenth for the puck and
 the strip (no jump on the strip's ⌥ press, and none on a press on its
@@ -18585,3 +18585,80 @@ T2's Color list, `phase8_chrome.py`'s uniform-size row and
 `grading_spike/tree_bench.swift` (`--tree-base REV` on `grading_spike.py`).
 
 **Its record**: `designs/grading-2.md`'s G2-2 section.
+
+## Road map grading-2 — G2-3, the curves (`curves_proof.py` N0–N2, K1, K3, C1, M1, O1, A1–A3, J1, X1, U1, V1, P0, R1, P1–P11, Z1 and ten mutants; `curves_probe.swift`; `core/tests/curves.rs`, `core/tests/schema_v17.rs`; spec §11 GR-12)
+
+**What it answers.** That `video.curves` changes nothing until set (N0: seven
+curve-less frames — the card, the card at exposure +1, at lift master 0.5, an
+adjustment clip at exposure +1 over it, the ramp, the ramp under Warm, the
+movie — byte-identical at 16 bits to `capture DIR`'s from the untouched tree's
+Release build), that an identity curve is no curve (N1) and a save writes
+only what is not the identity, at the header's format (N2); that a curve hits
+its points on a grey ramp (K1: ±1 at 8 bits and within one 10-bit level at 16
+bits — the ramp sits over a black 10-bit ProRes clip it covers, so its
+`render_frame` is a 16-bit PNG, spec §11 PR-4) and never falls along it (K3,
+the overshoot a Catmull–Rom tangent makes); that a red curve moves only red
+(C1: R follows the script's own Fritsch–Carlson ±1, G and B within one
+half-float step of the uncurved frame at 16 bits), that master runs before a
+channel (M1) and after the wheels (O1); that an action lerps per point (A1),
+animates from no curve through the identity aligned to the end's x's (A2)
+and back to neutral from an end of `[[0,0],[1,1]]` that keeps its key (A3);
+that the adjustment pass curves as a clip does (J1), an export matches
+`render_frame` (X1), undo works (U1), `ungraded` removes it (V1), it pastes
+(P0) and the three refusals speak in their sentences while 0 and 1 pass (R1).
+P1–P11 are `curves_probe.swift`, built by `swift_build.build` over
+`app/Sources` (a failed build is a scored FAILURE of all eleven), on a project
+of two cards with master middles 0.6 and 0.4, the plot driven through
+`CurveEditorView.press` / `drag` / `release` / `key` in a headless
+`ClipPane` wired to a `ProjectDocument`'s live trio: P1 a press adds one
+point on the curve, one live gesture "Curves" sending the whole master list
+to both clips, the Color sections running Color, Wheels, Curves, Look; P2 a
+drag is one step, held 0.001 inside its neighbour and in 0…1; P3 ⌫ and a
+double-click delete, one step each, nothing at two points; P4 the arrows
+±0.01 and ⇧ ±0.1, one step each; P5 `apply(curves:)`'s flag (0 for a 3-point
+diagonal); P6 `CurveTable.value` against the proof's own Fritsch–Carlson on
+200 seeded curves (1e-9) and inside each segment's y span; P7 the strip
+`rgba32Float` 1024×1 reading back `CurveTable.strip`, the 2×1 placeholder; P8
+the `◆N` badge; P9 the Delete item dead while the plot holds a point (an
+editor window of its own); P10 where a write lands inside an action and what
+Reset writes there (the identity curve, never `null`); P11 on an identity
+channel a click writes nothing, the point waits on y = x bit for bit, and ↑
+writes it. The module docstring lists every row and its fixture.
+
+```
+make app                                                                   # the untouched tree, before any product edit
+RC_PROOF_APP=release python3 tools/proof/curves_proof.py capture tools/proof/work/curves-control
+python3 tools/proof/curves_proof.py                                        # Debug unless RC_PROOF_APP=release
+RC_PROOF_APP=release python3 tools/proof/curves_proof.py compare tools/proof/work/curves-control
+python3 tools/proof/curves_proof.py --mutant NAME                          # one of the ten below
+cd core && cargo test --release --test curves --test schema_v17
+```
+
+It launches its own instance on a scratch socket in a scratch home
+(`tools/proof/work/curves/home`), writes its fixtures (`wheels_proof.py`'s
+card, ramp and `testsrc2` movie, and the 10-bit black clip) into its work
+folder, performs no menu item, closes every project it opens, and removes its
+work folder at the start and at exit. `--mutant` builds a tree copy as
+`wheels_proof` does; a core mutant also runs `cargo test --release
+--no-fail-fast --test curves --test ungraded` in the copy's core (row CT).
+MUTANT PASS only when every named row failed and no other scored row did.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `catmull-rom` | interior tangents the Catmull–Rom chord, no Fritsch–Carlson limit | K3 P6 |
+| `master-channel-swapped` | the strip holds master(channel(v)) | M1 |
+| `strip-without-half-texel` | the strip sampled at v, not v·(n−1)/n + 0.5/n | C1 |
+| `strip-rgba16` | the strip uploaded as `rgba16Float` | P7 |
+| `rising-check-dropped` | `check_curves`' rising-x refusal gone | R1 CT |
+| `curves-before-wheels` | step 4c.2's block moved before 4c.1 in the layer stage | O1 |
+| `ungraded-misses-curves` | `ungraded` keeps the curves | V1 CT |
+| `adjust-without-curves` | the adjustment pass has no step 4c.2 | J1 |
+| `identity-kept` | `set_video` stores an identity curve | N1 CT |
+| `identity-not-aligned` | no identity alignment before an action's lerp | A2 A3 CT |
+
+Also moved by G2-3: `wheels_proof.py` N2 (the header's format version, not
+16), `wheels_probe.swift` P1's, `look_probe.swift` B4's and
+`clip_inspector2_probe.swift`'s Color section lists, and `grading_spike/tree_bench.swift`, which binds an identity
+strip at `texture(3)` (`--tree-base b2fd1f9`).
+
+**Its record**: `designs/grading-2.md`'s G2-3 section.

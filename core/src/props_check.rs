@@ -31,7 +31,7 @@
 //! re-exports it, so a grep for its name finds every place a bound is read.
 
 use crate::audio::MAX_GAIN;
-use crate::grade_check::check_wheels;
+use crate::grade_check::{check_curves, check_wheels};
 use crate::model::{
     AudioProps, Color, ShapeProps, TextProps, VideoProps, MAX_FILTERS, MAX_GRADIENT_STOPS,
     MAX_OBSCURE,
@@ -243,6 +243,8 @@ pub(crate) fn check_video(props: &VideoProps, size: Option<(f64, f64)>) -> Resul
     }
     // The wheels (spec §11 GR-11): tier 2's checks, `grade_check.rs`'s.
     check_wheels(&props.wheels)?;
+    // The curves (spec §11 GR-12), after the wheels, in the stage order.
+    check_curves(&props.curves)?;
     if let Some(chroma) = &props.chroma {
         for channel in &chroma.key {
             in_range("video.chroma.key", *channel, 0.0, 1.0)?;

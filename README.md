@@ -265,6 +265,15 @@ schema, §6 the op table, §7 the architecture.
   to drag at a tenth of the speed, double-click to reset. A drag is one undo
   step, every value animates in an action, and the wheels apply after Light
   and before a look, on a clip or an adjustment clip.
+- **Curves**. The Color tab's **Curves** section shapes the picture's tones
+  with up to sixteen points on a smooth curve that never overshoots — on
+  **Master** for contrast, or on **Red**, **Green** or **Blue** to trim one
+  colour. Click the curve to add a point, drag it (⌥ for a tenth of the
+  speed), move the end points to set the black and white points, delete a
+  point with ⌫ or a double-click, nudge it with the arrow keys, or type its
+  In and Out. Each edit is one undo step; the curves animate in an action
+  (from or to straight, too) and apply after the wheels and before a look,
+  on a clip or an adjustment clip.
 - **Adjustment clips**. **Insert ▸ Adjustment Clip**
   places a clip that draws nothing of its own and grades everything behind
   it — its Light, Color and point filters apply to the whole picture under

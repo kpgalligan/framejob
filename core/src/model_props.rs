@@ -124,8 +124,10 @@ pub use crate::model_matte::*;
 pub use crate::model_look::*;
 
 /// Tier 2's grading vocabulary — [`Wheels`], [`Wheel`], [`WHEEL_MAX`] and
-/// [`WHEEL_RIM_TOLERANCE`] (spec §11 GR-11) — lives in `model_grade.rs` and
-/// is re-exported whole, so every `crate::model::Wheels` path resolves.
+/// [`WHEEL_RIM_TOLERANCE`] (spec §11 GR-11), and [`Curves`], [`CurvePoint`],
+/// [`CURVE_POINTS_MIN`], [`CURVE_POINTS_MAX`] and [`IDENTITY_CURVE`] (GR-12)
+/// — lives in `model_grade.rs` and is re-exported whole, so every
+/// `crate::model::Wheels` path resolves.
 pub use crate::model_grade::*;
 
 // ---- video properties ----------------------------------------------------
@@ -180,6 +182,11 @@ pub struct VideoProps {
     /// unwheeled file's text is what it was.
     #[serde(default, skip_serializing_if = "Wheels::is_neutral")]
     pub wheels: Wheels,
+    /// The tone curves (spec §11 GR-12, format 17), applied at step 4c.2
+    /// after the wheels and before the look. The identity writes no key, so
+    /// an uncurved file's text is what it was.
+    #[serde(default, skip_serializing_if = "Curves::is_identity")]
+    pub curves: Curves,
     /// One of the eight built-in looks and its amount (spec §11 GR-7, format
     /// 15), applied at step 4d after tone. `None` is no look, and writes no
     /// key, so a look-less file's text is what it was.
@@ -207,6 +214,7 @@ impl Default for VideoProps {
             blend: BlendMode::Normal,
             motion: None,
             wheels: Wheels::default(),
+            curves: Curves::default(),
             look: None,
         }
     }

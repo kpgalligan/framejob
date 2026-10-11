@@ -87,6 +87,10 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   116 → 128 floats (512 bytes), as this entry grew it; the Color sub-tab gains a Wheels section
   after Color. The tone keys' rules (written only when not 0, refused not clamped, an action's
   end clamped) are copied for `video.wheels`.
+  **Amended by GR-12** (grading-2 G2-3): `curvesEnabled`, reserved by GR-11, is read (the block
+  stays 128 floats); the Color sub-tab gains a Curves section after Wheels. The tone keys' rules
+  (an identity written absent, refused not clamped, an action's end clamped) are copied for
+  `video.curves`.
 - **GR-3 — Precision: grading runs on PR-1's float pipeline; blending stays encoded (§7.5).**
   Every stage between layers is `rgba16Float` and every video source decodes deep (PR-1, PR-2),
   so a stacked grade keeps its levels by construction (GR0's P1: −1 EV then +1 EV through
@@ -113,6 +117,8 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
     tool of its own (§7.9's Preview Quality exemption).
   **Amended by GR-11** (grading-2 G2-2): `ungraded` also writes `video.wheels` neutral (all nine
   values 0) on every layer.
+  **Amended by GR-12** (grading-2 G2-3): `ungraded` also writes `video.curves` as the identity
+  (all four channels `[[0, 0], [1, 1]]`) on every layer.
 - **GR-5 — The luma waveform: the composited preview frame, in a panel beside the preview, and
   no export path.**
   - **What it reads:** the composited, encoded (sRGB) preview frame at Preview Quality's size —
@@ -218,6 +224,9 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   **Amended by GR-11** (grading-2 G2-2): the adjustment clip's Color sub-tab gains Wheels, and
   the adjustment pass runs the wheels (step 4c.1) after tone and before the look, as the layer
   stage does.
+  **Amended by GR-12** (grading-2 G2-3): the adjustment clip's Color sub-tab gains Curves, and
+  the adjustment pass runs the curves (step 4c.2) after the wheels and before the look, as the
+  layer stage does.
 - **GR-7 — Looks: `video.look {kind, amount}`, eight built-ins defined in the core as data,
   baked on the GPU into a 33³ `rgba16Float` lattice and mixed at step 4d.** The owner's thirteen
   choices of 2026-10-10, each as recommended, the eighth look Black & White (not Night); GR5a
@@ -317,6 +326,9 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   **Amended by GR-11** (grading-2 G2-2): the order becomes Color's four, Light, the wheels (step
   4c.1), the look, the point filters. A look stays Color, Light and split tone; the bake is
   unchanged and the wheels are the clip's own.
+  **Amended by GR-12** (grading-2 G2-3): the order becomes Color's four, Light, the wheels, the
+  curves (step 4c.2), the look, the point filters. The bake is unchanged and the curves are the
+  clip's own.
 - **GR-8 — `.cube` LUTs: a LUT is MEDIA of kind `lut`, parsed by the core, applied as
   `video.look {kind: "lut", media, amount}` at step 4d to the layer's encoded values.** The
   owner's eleven choices (GR6, 2026-10-10, "all as recommended"); [b] marks what GR6b builds.

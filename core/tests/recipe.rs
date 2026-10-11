@@ -30,7 +30,7 @@ use reelcut_core::ffi::rc_timecode_format;
 /// itself lost a key would pass a comparison and fail a renderer:
 /// `RecipeLayer.init(from:)` DEFAULTS a missing key with no diagnostic
 /// anywhere, so nothing downstream would ever complain.
-const LAYER_KEYS: [&str; 24] = [
+const LAYER_KEYS: [&str; 25] = [
     "blend",
     "chroma",
     "clip",
@@ -38,6 +38,7 @@ const LAYER_KEYS: [&str; 24] = [
     "color",
     "corner_radius",
     "crop",
+    "curves",
     "dissolve",
     "filters",
     "look",

@@ -31,6 +31,7 @@ use serde::Serialize;
 use serde_json::{Map, Number, Value};
 
 use crate::actions_clamp::{clamp_audio, clamp_video};
+use crate::actions_curves::{align_identity_curves, curves_json};
 use crate::actions_graphic::evaluate_graphic;
 use crate::edit_adjustment::{clamp_adjustment, is_adjustment};
 use crate::model::{
@@ -365,15 +366,17 @@ pub(crate) fn wheels_json(wheels: &Wheels) -> Value {
     Value::Object(out)
 }
 
-/// A video group as JSON with its `color` through [`color_json`] and its
-/// `wheels` through [`wheels_json`], so every tone and wheel key is present:
-/// what an action interpolates from, what a patch is checked against and
-/// what a split writes back.
+/// A video group as JSON with its `color` through [`color_json`], its
+/// `wheels` through [`wheels_json`] and its `curves` through `curves_json`
+/// (all four, an absent one as the identity, GR-12), so every tone, wheel
+/// and curve key is present: what an action interpolates from, what a patch
+/// is checked against and what a split writes back.
 pub(crate) fn video_json(video: &VideoProps) -> Value {
     let mut value = to_json(video);
     if let Value::Object(fields) = &mut value {
         fields.insert("color".to_string(), color_json(&video.color));
         fields.insert("wheels".to_string(), wheels_json(&video.wheels));
+        fields.insert("curves".to_string(), curves_json(&video.curves));
     }
     value
 }
@@ -412,7 +415,10 @@ impl Project {
             // Interpolating the WHOLE state toward the patched state, not
             // just the patched keys, is what keeps this to one routine:
             // an untouched field lerps from itself to itself, exactly.
-            let target = merge(&state, &action.end);
+            let mut target = merge(&state, &action.end);
+            // An identity curve meeting a curve of another count takes its
+            // x's, so a grade animates from (or to) neutral (spec §11 GR-12).
+            align_identity_curves(&mut state, &mut target);
             let elapsed = clip_t.saturating_sub(action.start) as f64;
             let progress = elapsed / action.duration as f64;
             state = lerp(&state, &target, ease(action.curve, progress));

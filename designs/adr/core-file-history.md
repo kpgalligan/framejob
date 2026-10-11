@@ -229,6 +229,14 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   -l core/src/recipe.rs`: 548 before, 484 after; `recipe_options.rs` is 76. The next seam: the
   content hash (`FNV_OFFSET`, `FNV_PRIME`, `fnv1a`, `content_hash`, `sorted`) out to
   `recipe_hash.rs`.
+- `actions.rs`: 532 at grading-2's G2-2, near the cap, so G2-3's curve helpers went to a new
+  module rather than into it: `actions_curves.rs` (85) holds `curves_json` (all four channels,
+  an absent one as the identity, inserted by `video_json`) and `align_identity_curves` (called
+  by `evaluate_clip` before the lerp), and `actions.rs` took two lines of wiring and the import
+  (532 → 538). G2-3's other core file is `core/tests/curves.rs`; `model_grade.rs` (179) and
+  `grade_check.rs` (71) took the curve types and `check_curves` beside the wheels'. The next
+  seam, should `actions.rs` need one: the per-group JSON writers (`color_json`, `wheels_json`,
+  `video_json`) out to `actions_json.rs`, beside `curves_json`.
 - `ffi_graphic.rs`: at the new-module cap with nothing crate-free left to move (`diag_json` and
   `diag_error` name `Diagnostic`; road map 10 §10.7).
 - `core/tests/add_transition_edges.rs`: at the new-file cap; gives something up before it takes

@@ -483,6 +483,16 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   its lenient decode; the wheel types went to `GradeProps.swift`, 181 → 343): 1509 → 1513. The
   named seam is unchanged. `CanvasSessions.swift` took the eyedropper's `wheels: .neutral` with
   its line count unchanged (1090), GR5a's precedent on that over-cap file.
+  Grading-2's G2-3 gave it wiring only again (`VideoProps.curves`: the field, its init parameter
+  and its lenient decode; the curve types went to `GradeProps.swift`, 343 → 526): 1513 → 1518.
+  The named seam is unchanged. `CanvasSessions.swift` took the eyedropper's `curves: .reset`
+  with its line count unchanged (1090) again. G2-3's new files: `CurveTable.swift` (the spline
+  and the strip's texels), `CurveTextures.swift` (the strip's upload and cache, held by
+  `LookTextures` as `curves`, so `Compositor.swift`, 723, took nothing), `CurveEditorView.swift`
+  (the plot; 397, under the 400 cap only after `CurveEditorState` moved to
+  `VideoPane+Curves.swift`) and `VideoPane+Curves.swift` (the section, the row, the picker and
+  the point fields, 342). `GradeProps.swift` (526) is the next to need a seam: the curve types
+  (`// MARK: - The curves`) out whole to `CurveProps.swift`.
 - `Compositor.swift`: the mattes road map's MT1 (issue batch B89) moved `// MARK: - Shadows`
   through `blurKernel`, with `ShadowSurfaces`, to `Compositor+Shadow.swift`, and `render`'s
   per-layer uniforms-and-source block to `prepare` in `CompositorEffects.swift`, a pure move gated

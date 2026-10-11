@@ -39,8 +39,11 @@ Lift's small black square puck sits up and to the left of the centre, toward
 orange; Gamma's and Gain's sit on the crosshair. Under each disc a master strip,
 a thin rail with a blue fill up to a black block knob — Lift's a little right of
 the middle, Gamma's in the middle, Gain's a little further right — and a field
-under it: "0.10", "0.00", "0.20". Below the row, the LOOK section is open, summary
-"none", its gallery of looks.
+under it: "0.10", "0.00", "0.20". Below the row, the CURVES section (grading-2
+G2-3) is open, summary "neutral": its four channel cells with Master chosen, and
+the top of its square plot with the straight diagonal ending at a small square
+point in the top-right corner. The LOOK section after it is below the captured
+height.
 
 In the light capture the inspector is white with black labels, the section
 headers light-grey bars with grey capitals, and each disc's centre near white; in

@@ -13,6 +13,7 @@
 
 pub mod actions;
 mod actions_clamp;
+mod actions_curves;
 mod actions_graphic;
 pub mod agent;
 pub mod audio;

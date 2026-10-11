@@ -92,8 +92,8 @@ extension MetalRenderer {
     /// and inherits the blend — `encodeReflection` says why.)
     func encodeShadow(
         _ shadow: ShadowProps, uniforms: LayerUniforms, texture: MTLTexture, matte: MTLTexture,
-        look: MTLTexture, canvas: RecipeCanvas, maskState: MTLRenderPipelineState,
-        pass: inout DestinationPass
+        look: MTLTexture, curves: MTLTexture, canvas: RecipeCanvas,
+        maskState: MTLRenderPipelineState, pass: inout DestinationPass
     ) {
         func component(_ index: Int) -> Float {
             index < shadow.color.count ? Float(min(max(shadow.color[index], 0), 1))
@@ -117,8 +117,8 @@ extension MetalRenderer {
             Float(max(shadow.blur, 0)) * uniforms.scale * 0.5, MetalRenderer.maxShadowSigma)
         guard
             let silhouette = shadowSilhouette(
-                uniforms: uniforms, texture: texture, matte: matte, look: look, sigma: sigma,
-                canvas: canvas, maskState: maskState, pass: &pass),
+                uniforms: uniforms, texture: texture, matte: matte, look: look, curves: curves,
+                sigma: sigma, canvas: canvas, maskState: maskState, pass: &pass),
             let encoder = pass.open()
         else { return }
 
@@ -170,7 +170,7 @@ extension MetalRenderer {
     /// the reason `DestinationPass` exists.
     private func shadowSilhouette(
         uniforms: LayerUniforms, texture: MTLTexture, matte: MTLTexture, look: MTLTexture,
-        sigma: Float, canvas: RecipeCanvas, maskState: MTLRenderPipelineState,
+        curves: MTLTexture, sigma: Float, canvas: RecipeCanvas, maskState: MTLRenderPipelineState,
         pass: inout DestinationPass
     ) -> MTLTexture? {
         let width = max(1, canvas.width)
@@ -211,9 +211,11 @@ extension MetalRenderer {
         // the cut-out shape (spec §11 MT-3). It is sampled at the canvas-
         // normalised position, so this canvas-sized pass reads it right.
         encoder.setFragmentTexture(matte, index: 1)
-        // The layer's look (GR-7): the mask pass returns coverage, so it is
-        // never sampled, but the fragment names `texture(2)`.
+        // The layer's look (GR-7) and curves (GR-12): the mask pass returns
+        // coverage, so neither is sampled, but the fragment names `texture(2)`
+        // and `texture(3)`.
         encoder.setFragmentTexture(look, index: 2)
+        encoder.setFragmentTexture(curves, index: 3)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         encoder.endEncoding()
 

@@ -52,6 +52,19 @@ extension ColorWheelsPatch {
     }
 }
 
+extension ColorCurvesPatch {
+    /// The channels the write names (spec §11 GR-12): each a list of `[x, y]`
+    /// pairs, or `NSNull` to remove it.
+    var dictionary: [String: Any] {
+        var d: [String: Any] = [:]
+        for channel in CurveChannel.allCases {
+            guard let entry = entry(channel) else { continue }
+            d[channel.rawValue] = entry.map { points in points.map { [$0.x, $0.y] } } ?? NSNull()
+        }
+        return d
+    }
+}
+
 extension ChromaProps {
     var dictionary: [String: Any] {
         ["key": key, "tolerance": tolerance, "softness": softness, "spill": spill]

@@ -213,9 +213,10 @@ struct LayerUniforms {
     // The wheels (spec §11 GR-11, grading-2 G2-2): lift, gamma and gain, each
     // x, y and master, in the model's order; then `wheelsEnabled` — 1 exactly
     // when one of the nine is not 0, the effects gate's term (`apply(wheels:)`,
-    // `GradeProps.swift`) — `curvesEnabled`, reserved for G2-3's curves and
-    // unread until then, and one reserved. 116 + 12 = 128 floats = 512 bytes,
-    // 32 × 16.
+    // `GradeProps.swift`) — `curvesEnabled`, 1 exactly when one of the four
+    // curves is not the identity, the gate's next term (`apply(curves:)`, spec
+    // §11 GR-12; the curves themselves are the strip at `texture(3)`), and one
+    // reserved. 116 + 12 = 128 floats = 512 bytes, 32 × 16.
     var liftX: Float = 0
     var liftY: Float = 0
     var liftMaster: Float = 0

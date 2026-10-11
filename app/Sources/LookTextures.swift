@@ -35,6 +35,9 @@ final class LookTextures {
     let placeholder: MTLTexture
     /// Imported LUTs' lattices (spec §11 GR-8), cached by file.
     let luts: LutTextures
+    /// The curves' strips (spec §11 GR-12), cached by the curves: grade
+    /// textures keyed by a definition, beside the looks'.
+    let curves: CurveTextures
     private let device: MTLDevice
     private let queue: MTLCommandQueue
     private let pipeline: MTLComputePipelineState
@@ -47,13 +50,15 @@ final class LookTextures {
         guard let function = library.makeFunction(name: "reelcut_look_bake"),
             let pipeline = try? device.makeComputePipelineState(function: function),
             let queue = device.makeCommandQueue(),
-            let placeholder = LookTextures.identity(device: device)
+            let placeholder = LookTextures.identity(device: device),
+            let curves = CurveTextures(device: device)
         else { return nil }
         self.device = device
         self.queue = queue
         self.pipeline = pipeline
         self.placeholder = placeholder
         self.luts = LutTextures(device: device)
+        self.curves = curves
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) {
