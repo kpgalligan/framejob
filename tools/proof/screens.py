@@ -93,8 +93,9 @@ DEFAULT_SCREENS = os.path.join(ROOT, "designs", "screens")
 SECOND = 600_000
 
 # The two `none` menu items a screen may perform: grading GR3's view toggles
-# (spec §11 GR-4, GR-5), which persist nothing, so no instance's defaults move.
-VIEW_SELECTORS = ("toggleShowUngraded:", "toggleWaveform:")
+# (spec §11 GR-4, GR-5) and grading-2 G2-1's rename (GR-10), which persist
+# nothing, so no instance's defaults move.
+VIEW_SELECTORS = ("toggleShowUngraded:", "toggleScopes:")
 STEP_TOOLS = ("set_selection", "set_playhead", "detect_silence", "perform_menu_item",
               "cancel_sheet", "select_inspector_tab")
 LOOKS = ("light", "dark")

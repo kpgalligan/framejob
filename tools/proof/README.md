@@ -18069,7 +18069,8 @@ scored FAILURE): the ramp, grey, the Rec. 709 weights, the rounding at both
 ends and the saturation, the marks at 0.5 %, the two commands moving no
 `UserDefaults` key and setting `ungraded` on the document's key only, and the
 tap's latest-wins slot. G1 records the pass's GPU time. H1 and H2 are the
-harness's fifteenth argument, `seeing=waveform,ungraded,ramp`, light and dark.
+harness's fifteenth argument, `seeing=scopes,ungraded,ramp` (`waveform` before
+grading-2's G2-1 renamed View ▸ Waveform to View ▸ Scopes), light and dark.
 The module docstring lists every row and its fixture.
 
 ```
@@ -18082,7 +18083,7 @@ cd core && cargo test --release --test ungraded
 It launches its own instance on a scratch socket in a scratch home
 (`tools/proof/work/seeing/home`), writes its fixtures (a 640×360 grey-128 PNG,
 a 1920×360 ramp PNG, a 2 s `testsrc2` H.264 movie) into its work folder,
-performs only View ▸ Show Ungraded and View ▸ Waveform (which persist nothing,
+performs only View ▸ Show Ungraded and View ▸ Scopes (which persist nothing,
 and are turned off again), closes every project it opens, and removes its work
 folder at the start and at exit. `--mutant` builds a tree copy as `tone_proof`
 does, builds the probe over the copy's `app/Sources` and shader, skips H1–H2
@@ -18410,7 +18411,7 @@ timed, the fixture is what it says).
   0.2; **T** the movie at 0. **H0** the host gate (`grading_spike.host_gate`;
   shut → every row a named SKIP, exit 2). **M1** `perform_menu_item {}` with no
   project on main's instance and the branch's: the branch must hold View ▸
-  Show Ungraded, View ▸ Waveform, Insert ▸ Adjustment Clip and Clip ▸ Look ▸
+  Show Ungraded, View ▸ Scopes, Insert ▸ Adjustment Clip and Clip ▸ Look ▸
   Warm; the leaves added and removed, grouped by their first two path parts,
   against the cap's four. **G0** `render_frame` at 0.5 s of G differs from U by
   more than 8 levels and G holds one adjustment clip. **E1/E2** an h264
@@ -18455,3 +18456,69 @@ listing read from main's instance) M1; `grading_spike.py --check --tree
 
 **Its record** is `archive/grading.md`'s "GR7a" section, with every figure's
 command, host, power and load.
+
+## Road map grading-2 — G2-1, the scopes (`scopes_proof.py` S1–S10, T1, M1–M4, H1–H3, Z1 and ten mutants; `scopes_probe.swift`; spec §11 GR-10)
+
+**What it answers.** That the parade, the vectorscope and the histogram count
+what the person sees, by GR-10's arithmetic and its counting rule, in time;
+that the tap and `render_frame` read the same counts; and that the panel's
+two slots lay out by the shrink-to-fit rule and persist nothing. S1–S10 are
+`scopes_probe.swift`, built by `swift_build.build` over `app/Sources` with the
+tree's own `Waveform.metal` compiled from source (a failed build is a scored
+FAILURE of every probe row): S1 the six 75 % cards each in the ONE vectorscope
+bin this script computes from the BT.709 matrix, the JSON's targets and the
+123.3° skin line; S2 the centring (a grey card, a grey ramp and a
+(128, 129, 128)/255 card in bin (128, 128)); S3 a red ramp's parade, at 256
+wide (counted globally) and at 1920, 1999 (a last group 7 px across) and 3840
+wide (counted per band); S4 a grey
+ramp's flat histogram; S5 the histogram's Y′ against the waveform's column
+sums and the parade's marks; S6 every kind's counts totalling the pixels at
+sizes the threadgroup does not divide; S7 latest-wins with two kinds shown;
+S8 the tap's reading of a 64RGBAHalf buffer against `analyze(image:kinds:)`;
+S9 the panel's picks, defaults and 360 pt floor in an `EditorViewController`;
+S10 `layout(picks:paneHeight:)` for every pick pair. T1 times each scope at
+1080p and 4K on GR-10's five fixtures through an IOSurface 64RGBAHalf wrap
+(the tap's), each pass alone after a burst of sixteen that brings the GPU's
+clock up, median of 10 after 2 warm-ups, and scores the worst 4K figure of
+the parade, the vectorscope and the histogram against 1.1 ms, recording the
+waveform, the waveform + vectorscope pair and `pmset -g`. M1–M4 are over MCP
+on a 75 % bars PNG: the four sentences and JSON files of `render_frame` with
+all four booleans and the vectorscope's bins against this script's from the
+PNG's pixels; the top slot's readouts against the waveform JSON; the refusal
+of a non-boolean; the panel's layout through `snapshot_ui` (the pickers are
+parts, `scopes.<top|bottom>.picker`). H1–H3 are the harness's fifteenth
+argument, `seeing=scopes,ramp,top=<kind>,bottom=<kind>`: four pick pairs light
+and dark, each byte-identical twice; trace pixels in every body; and the slot
+rects the harness prints (`seeing panel …`, `seeing slot …`) at panes of about
+460, 755 and 305 pt. The module docstring lists every row and its fixture.
+
+```
+python3 tools/proof/scopes_proof.py                  # Debug unless RC_PROOF_APP=release
+python3 tools/proof/scopes_proof.py --only S1,M1     # run and score only these rows
+python3 tools/proof/scopes_proof.py --mutant NAME    # one of the ten below
+```
+
+It launches its own instance on a scratch socket in a scratch home
+(`tools/proof/work/scopes/home`), writes its fixture (a 640×360 75 % bars
+PNG with a white and a black quarter) into its work folder, performs only View
+▸ Scopes (which persists nothing, and is turned off again), closes the
+project it opens, and removes its work folder at the start and at exit.
+`--mutant` builds a tree copy as `seeing_proof` does, builds the probe over the
+copy's `app/Sources` and shader, skips H1–H3 (the harness builds the tree's
+own sources), and reports MUTANT PASS only when every named row failed and no
+other scored row did.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `cb-cr-swapped` | the kernel puts Cr on the Cb axis | S1 M1 |
+| `bt601` | the vectorscope's matrix is BT.601's | S1 M1 |
+| `bins-edged` | the chroma bins floor instead of round | S1 S2 |
+| `vectorscope-global` | every vectorscope pixel adds globally | T1 |
+| `histogram-global` | every histogram pixel adds globally | T1 |
+| `histogram-luma-601` | the histogram's Y′ takes BT.601's weights | S5 |
+| `pick-persisted` | a slot's pick is written to `UserDefaults` | S9 |
+| `tap-first-kind-only` | the tap measures only the first shown kind | S7 S8 |
+| `slots-not-shrunk` | the slot bodies stay at their preferred heights | S10 |
+| `parade-band-misplaced` | the parade's merge puts both bands in the group's first column | S3 |
+
+**Its record**: `designs/grading-2.md`'s G2-1 section.

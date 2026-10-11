@@ -3,7 +3,8 @@
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, against `libreelcut_core.a`, so every row drives the app's own
-// types: `WaveformAnalyzer`, `WaveformTrace`, `WaveformTaps`,
+// types: `WaveformAnalyzer`, `WaveformTrace`, `WaveformTaps` (attached with
+// the waveform alone),
 // `EditorViewController`'s two commands, `RecipeSource`. The kernel is the
 // tree's own `Waveform.metal`, compiled from source here (a probe has no
 // default library), so a mutant of the shader reaches the rows.
@@ -211,7 +212,11 @@ do {
     let taps = WaveformTaps(analyzer: analyzer)
     var seen: [Int] = []
     let key = 990_001
-    taps.attach(key: key) { trace in
+    taps.attach(key: key, kinds: [.waveform]) { traces in
+        guard case .waveform(let trace)? = traces[.waveform] else {
+            seen.append(-2)
+            return
+        }
         let levels = Set(cells(trace).map { $0.1 })
         seen.append(levels.count == 1 ? (levels.first ?? -1) : -1)
     }
@@ -293,15 +298,15 @@ func p6() {
     let other = RecipeSource.shared.register()
     defer { RecipeSource.shared.unregister(other) }
     controller.toggleShowUngraded(nil)
-    controller.toggleWaveform(nil)
+    controller.toggleScopes(nil)
     settle()
     let onKey = RecipeSource.shared.options(for: key)
     let onOther = RecipeSource.shared.options(for: other)
-    let shown = controller.waveformPanel?.isShown == true
+    let shown = controller.scopesPanel?.isShown == true
     let tagShown = controller.ungradedTag?.isHidden == false
     let tagClicks = controller.ungradedTag?.hitTest(NSPoint(x: 2, y: 2)) != nil
     controller.toggleShowUngraded(nil)
-    controller.toggleWaveform(nil)
+    controller.toggleScopes(nil)
     settle()
     let offKey = RecipeSource.shared.options(for: key)
     let after = UserDefaults.standard.dictionaryRepresentation() as NSDictionary
@@ -309,12 +314,12 @@ func p6() {
         (before[$0] as? NSObject) != (after[$0] as? NSObject)
     }
     check(
-        "P6 Show Ungraded and Waveform on and off write no UserDefaults key; on, the document's "
+        "P6 Show Ungraded and Scopes on and off write no UserDefaults key; on, the document's "
             + "key holds ungraded (only), another key none, the panel and the tag show and the "
             + "tag takes no click; off, the key holds none",
         moved.isEmpty && onKey == RecipeOptions(ungraded: true) && onOther == .none && shown
             && tagShown && !tagClicks && offKey == .none
-            && controller.waveformPanel?.isShown == false && controller.ungradedTag?.isHidden == true,
+            && controller.scopesPanel?.isShown == false && controller.ungradedTag?.isHidden == true,
         "moved \(moved.sorted()); on \(onKey), other \(onOther), shown \(shown), tag \(tagShown), "
             + "tag clicks \(tagClicks); off \(offKey)")
     window.close()

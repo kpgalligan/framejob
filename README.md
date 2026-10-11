@@ -250,10 +250,13 @@ schema, §6 the op table, §7 the architecture.
   the same in the preview, stills and every export, and an untouched clip
   renders exactly as before. **View ▸ Show Ungraded** (⌃⌘U) shows the
   preview as if no clip were graded — a before/after switch for the window,
-  never for an export — and **View ▸ Waveform** (⌃⌘W) puts a luma waveform
-  beside the preview, with red marks where highlights and shadows clip and
-  the share of the frame clipping at each end. Neither is remembered: a
-  window opens with both off.
+  never for an export — and **View ▸ Scopes** (⌃⌘W) puts two scopes beside
+  the preview, each slot picking a luma waveform (red marks where highlights
+  and shadows clip, and the share of the frame clipping at each end), an RGB
+  parade, a Rec. 709 vectorscope with its colour-bar targets and skin line,
+  or an RGB-and-luma histogram; it opens as Waveform over Vectorscope and
+  shrinks both to fit a short window. Neither is remembered: a window opens
+  with both off.
 - **Adjustment clips**. **Insert ▸ Adjustment Clip**
   places a clip that draws nothing of its own and grades everything behind
   it — its Light, Color and point filters apply to the whole picture under

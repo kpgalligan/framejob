@@ -12,8 +12,8 @@ timeline, roles, multicam, scopes, or a plugin ecosystem.
 Deliberate non-goals: camera recording, multicam, color grading beyond
 per-clip controls (§11 GR-1: tier 1 of grading — tone, adjustment clips,
 looks, LUT import, an ungraded switch and one luma waveform — is in, kept by
-the owner's verdict of 2026-10-10; colour wheels, curves, qualifiers, further
-scopes and colour management are deferred),
+the owner's verdict of 2026-10-10, and tier 2's scopes beside it, GR-10;
+colour wheels, curves, qualifiers and colour management are deferred),
 audio beyond what shipped (volume, fades, duck, pan,
 compressor, noise reduction, peak normalize, the transition crossfade and
 the export's loudness target — M3 and §11 R5-2; so no EQ, mix buses or

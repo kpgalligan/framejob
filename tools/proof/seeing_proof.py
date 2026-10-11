@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Road map "grading", phase GR3 (spec §11 GR-4, GR-5) — seeing the grade end
 to end: the `ungraded` recipe option (`render_frame {ungraded}`, View ▸ Show
-Ungraded on the window's preview only), the luma waveform (View ▸ Waveform's
-panel, `render_frame {waveform}`), the probe's rows over `app/Sources` and the
-harness's captures.
+Ungraded on the window's preview only), the luma waveform (View ▸ Scopes'
+panel, renamed from View ▸ Waveform in grading-2 G2-1, whose top slot opens on
+the waveform; `render_frame {waveform}`), the probe's rows over `app/Sources`
+and the harness's captures.
 
     python3 tools/proof/seeing_proof.py [--app PATH] [--only U1,V1,...]
     python3 tools/proof/seeing_proof.py --mutant NAME
@@ -13,7 +14,7 @@ on a scratch socket of its own, and stops only that process. **The instance
 runs in a scratch home**, `CFFIXED_USER_HOME=tools/proof/work/seeing/home`, and
 every package, fixture and PNG is under `tools/proof/work/seeing/`, removed at
 the start and at exit. The only menu items performed are View ▸ Show Ungraded
-and View ▸ Waveform, which persist nothing (GR-4, GR-5); `DEFAULTS MOVED` from
+and View ▸ Scopes, which persist nothing (GR-4, GR-5); `DEFAULTS MOVED` from
 `mcp.py` stops the run. Every call is bounded (`CALL_BOUND`), every ffmpeg too
 (120 s), every wait on the panel too (`PANEL_WAIT`). Every project is closed
 (`close_project`, discard).
@@ -41,9 +42,9 @@ Project V (1920×360, RAMP):
   "Waveform: highlights clipped in …" sits before "Written to", its JSON holds
   1920 × 360, and in every column bin the levels lie within the bin's rendered
   values and the counts total 360 × the bin's pixel columns.
-- **V1**: at exposure +2, `SETTLE` s after the edit, View ▸ Waveform shown,
-  paused: the panel's readouts
-  (`snapshot_ui`, ids `waveform.highlights` / `waveform.shadows`) are within
+- **V1**: at exposure +2, `SETTLE` s after the edit, View ▸ Scopes shown,
+  paused: the top slot's readouts
+  (`snapshot_ui`, ids `scopes.top.highlights` / `scopes.top.shadows`) are within
   0.2 points of `render_frame {waveform}`'s percentages, which clip high in
   more than 10 % of pixels.
 - **V2**: after View ▸ Show Ungraded the readouts are within 0.2 points of
@@ -64,7 +65,7 @@ Project V (1920×360, RAMP):
 - **G1** (RECORD, unscored): the pass's GPU time at 1080p and 4K (the median
   of ten).
 - **H1–H2** (not under `--mutant`: the harness builds the tree's own sources):
-  the harness with `seeing=waveform,ungraded,ramp`, light and dark, each twice:
+  the harness with `seeing=scopes,ungraded,ramp`, light and dark, each twice:
   H1 byte-identical twice; H2 the trace's well (its rect less the 24 pt label
   gutter) holds trace pixels (≥ 200 near white) and the red clip marks (≥ 4 px).
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
@@ -132,7 +133,7 @@ V_ROWS = {"W1", "V1", "V2", "V3", "V4"}
 P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "G1"}
 H_ROWS = {"H1", "H2"}
 UNGRADED = ["View", "Show Ungraded"]
-WAVEFORM = ["View", "Waveform"]
+WAVEFORM = ["View", "Scopes"]
 # name: ([(file, anchor, replacement), …], the rows that must fail)
 MUTANTS = {
     "ungraded-ignored": ([(
@@ -337,7 +338,7 @@ PERCENT = re.compile(r"clipped (\d+\.\d) %")
 def readouts(views):
     """The panel's two readouts as percentages, or None for "—"/absent."""
     found = []
-    for identifier in ("waveform.highlights", "waveform.shadows"):
+    for identifier in ("scopes.top.highlights", "scopes.top.shadows"):
         v = view(views, identifier)
         m = PERCENT.search((v or {}).get("text") or "") if v and not v.get("hidden") else None
         found.append(float(m.group(1)) if m else None)
@@ -534,13 +535,13 @@ def run_v(client, ramp, state):
     time.sleep(SETTLE)
     shown_menu = doc.menu(WAVEFORM)
     panel, views = wait_readouts(doc, "v1", None if None in want else want)
-    check(f"V1 View ▸ Waveform shown, paused, the ramp at exposure +2: the readouts {panel} "
+    check(f"V1 View ▸ Scopes shown, paused, the ramp at exposure +2: the readouts {panel} "
           f"are within 0.2 points of render_frame {{waveform}}'s {want}, highlights > 10 %",
           up["ok"] and shown_menu["ok"] and None not in panel and None not in want
           and want[0] > 10 and all(abs(a - b) <= 0.2 for a, b in zip(panel, want)),
           f"exposure {up.get('error', 'ok')}; menu {shown_menu.get('error', 'ok')}")
     canvas = view(views, cls="PreviewCanvasView") or {}
-    box = view(views, "waveform.panel") or {}
+    box = view(views, "scopes.panel") or {}
     root = (views[0].get("frame") if views else None) or [0, 0, 0, 0]
     cf, pf = canvas.get("frame") or [0, 0, 0, 0], box.get("frame") or [0, 0, 0, 0]
     on_ok = (not box.get("hidden", True) and abs(pf[2] - 248) <= 0.5
@@ -569,7 +570,7 @@ def run_v(client, ramp, state):
     doc.menu(WAVEFORM)
     views4 = doc.preview("v3-off")
     canvas4 = (view(views4, cls="PreviewCanvasView") or {}).get("frame") or [0, 0, 0, 0]
-    box4 = view(views4, "waveform.panel") or {}
+    box4 = view(views4, "scopes.panel") or {}
     root4 = (views4[0].get("frame") if views4 else None) or [0, 0, 0, 0]
     off_ok = (box4.get("hidden") is True and abs((box4.get("frame") or [0, 0, 1, 0])[2]) <= 0.5
               and abs(canvas4[2] - root4[2]) <= 0.5)
@@ -639,7 +640,7 @@ def harness_checks(package):
             out = WORK / f"harness-{look}-{n}.png"
             ran = subprocess.run(
                 [binary, str(package), str(out), look, "1440", "862", "-1", "0", "1", "clip",
-                 "-", "-", "-", "-", "-", "waveform,ungraded,ramp"],
+                 "-", "-", "-", "-", "-", "scopes,ungraded,ramp"],
                 capture_output=True, text=True, timeout=300)
             line = next((ln for ln in ran.stdout.splitlines() if ln.startswith("seeing trace ")),
                         "")
@@ -650,10 +651,10 @@ def harness_checks(package):
             traces[look] = [float(v) for v in line.split()[2:]]
     if error:
         for name in sorted(H_ROWS):
-            check(f"{name} the harness renders seeing=waveform,ungraded,ramp", False, error)
+            check(f"{name} the harness renders seeing=scopes,ungraded,ramp", False, error)
         return
     same = {look: captures[(look, 1)] == captures[(look, 2)] for look in ("light", "dark")}
-    check("H1 the harness with seeing=waveform,ungraded,ramp is byte-identical twice, light "
+    check("H1 the harness with seeing=scopes,ungraded,ramp is byte-identical twice, light "
           "and dark", all(same.values()), f"{same}")
     found = {}
     for look in ("light", "dark"):

@@ -568,6 +568,19 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   app/Sources/AgentCatalog+Files.swift`: 579 before, 377 after; `AgentCatalog+Render.swift` is
   239. The next seam: `// MARK: Recording` (`record_screen` and its four hoisted clauses) to
   `AgentCatalog+Recording.swift`.
+- `ScopesPanelView.swift` (was `WaveformPanelView.swift`): grading-2's G2-1 (spec §11 GR-10)
+  renamed the file with `git mv` and rewrote `WaveformPanelView` as `ScopesPanelView`, the
+  two-slot panel and its shrink-to-fit rule (`ScopeSlotLayout`, `layout(picks:paneHeight:)`).
+  `WaveformTraceView` went whole to the new `WaveformTraceView.swift`, beside `ScopeWell` (the
+  well, graticule, clip marks and density the parade shares); the three new bodies are
+  `ParadeView.swift`, `VectorscopeView.swift` and `HistogramView.swift`. A slot (`ScopeSlotView`
+  and its `UISnapshotParts` extension) went to `ScopeSlotView.swift` in the same phase: the
+  renamed file had reached 431 lines with about 112 of its 243 surviving (git puts the
+  similarity at 20 %), so it was held to the 400-line cap of a new file. `UngradedTagView` is
+  unchanged. `wc -l`: `WaveformPanelView.swift` 243 before; after, `ScopesPanelView.swift` 216,
+  `ScopeSlotView.swift` 216, `WaveformTraceView.swift` 133, `ParadeView.swift` 50,
+  `VectorscopeView.swift` 97, `HistogramView.swift` 61. The next seam: `UngradedTagView` (GR-4's
+  tag, not a scope) out whole to `UngradedTagView.swift`.
 - `AgentCatalog+Clips.swift`: the action rows went to `AgentCatalog+Actions.swift` in issue batch
   B87 phase 2. The grading road map's GR1 paid the next cut: the five property rows (`set_video`,
   `set_audio`, `set_text`, `set_shape`, `set_clip`) and the nineteen hoisted locals they read went

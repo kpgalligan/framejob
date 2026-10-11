@@ -1,11 +1,23 @@
 //
-//  Waveform.metal — the luma waveform's one pass (spec §11 GR-5). Owned by
-//  `app/Sources/WaveformAnalyzer.swift`, which dispatches one thread per
-//  pixel of a composited frame and reads the 256 × 256 counts back.
+//  Waveform.metal — the four scopes' passes (spec §11 GR-5, GR-10): the luma
+//  waveform, the RGB parade, the Rec. 709 vectorscope and the R′G′B′Y′
+//  histogram. Owned by `app/Sources/WaveformAnalyzer.swift`, which dispatches
+//  one thread per pixel of a composited frame for each shown scope and reads
+//  each scope's counts back.
 //
-//  Nothing here touches `Compositor.metal` or `LayerUniforms`: the pass reads
-//  a FINISHED frame (the compositor's destination, or a rendered image) and
-//  writes only its own counts buffer.
+//  Nothing here touches `Compositor.metal` or `LayerUniforms`: every pass
+//  reads a FINISHED frame (the compositor's destination, or a rendered image)
+//  and writes only its own counts buffer.
+//
+//  **The counting rule** (GR-10): never one global atomic per pixel into a
+//  counter a picture region shares. The waveform spreads by column, so it
+//  adds globally; the parade counts each 8-px-wide threadgroup's two column
+//  bins in threadgroup memory (GR-10's fallback, taken in G2-1); the
+//  vectorscope counts its central 64 × 64 bins (where grey and near-grey
+//  pixels land) in threadgroup memory and the rest globally; the histogram
+//  counts in threadgroup memory. Each threadgroup merges its counts once,
+//  and a threadgroup kernel guards its pixel read rather than returning
+//  before its barriers.
 //
 
 #include <metal_stdlib>
@@ -30,4 +42,151 @@ kernel void reelcut_waveform_bin(texture2d<half, access::read> frame [[texture(0
     uint level = min(255u, uint(dot(rgb, kLumaWeights) * 255.0 + 0.5));
     uint column = gid.x * 256u / width;
     atomic_fetch_add_explicit(&counts[column * 256u + level], 1u, memory_order_relaxed);
+}
+
+// A saturated encoded value's level, GR-5's rule: round(255·v), 0…255.
+static inline uint scopeLevel(float v) {
+    return min(255u, uint(v * 255.0 + 0.5));
+}
+
+// The parade's threadgroup: 8 pixels across (`WaveformAnalyzer.paradeAcross`),
+// which in a frame 1792 px wide or more (7 × 256) spans at most two of the
+// 256 column bins.
+constant uint kParadeBands = 2u;
+// Two copies of each threadgroup cell, alternate threads adding to
+// alternate copies, so neighbours on one flat run contend half as often.
+constant uint kParadeCopies = 2u;
+
+// R′, G′ and B′ each binned as the waveform bins Y′: `counts` is
+// `(channel * 256 + column) * 256 + level`, channel 0 R′, 1 G′, 2 B′. GR-10's
+// per-band threadgroup counts: a group spanning at most `kParadeBands`
+// column bins counts its pixels in threadgroup memory and merges once per
+// group, non-zero only; a group spanning more (some groups of a frame under
+// 1792 px wide) adds globally, as the waveform does. Taken in G2-1 because the global
+// parade's 4K time sat within 7 % of GR-10's bound.
+kernel void reelcut_parade_bin(texture2d<half, access::read> frame [[texture(0)]],
+                               device atomic_uint *counts [[buffer(0)]],
+                               uint2 gid [[thread_position_in_grid]],
+                               uint index [[thread_index_in_threadgroup]],
+                               uint2 group [[threads_per_threadgroup]]) {
+    const uint cells = kParadeBands * 3u * 256u;
+    threadgroup atomic_uint local[kParadeBands * 3u * 256u * kParadeCopies];
+    uint width = frame.get_width();
+    uint threads = group.x * group.y;
+    uint originX = gid.x - index % group.x;
+    uint first = originX * 256u / width;
+    uint last = min(originX + group.x - 1u, width - 1u) * 256u / width;
+    bool banded = last - first < kParadeBands;
+    if (banded) {
+        for (uint i = index; i < cells * kParadeCopies; i += threads) {
+            atomic_store_explicit(&local[i], 0u, memory_order_relaxed);
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (gid.x < width && gid.y < frame.get_height()) {
+        float3 rgb = saturate(float3(frame.read(gid).rgb));
+        uint column = gid.x * 256u / width;
+        uint copy = index % kParadeCopies;
+        for (uint channel = 0u; channel < 3u; channel++) {
+            uint level = scopeLevel(rgb[channel]);
+            if (banded) {
+                uint cell = (channel * kParadeBands + column - first) * 256u + level;
+                atomic_fetch_add_explicit(&local[cell * kParadeCopies + copy], 1u,
+                                          memory_order_relaxed);
+            } else {
+                atomic_fetch_add_explicit(&counts[(channel * 256u + column) * 256u + level], 1u,
+                                          memory_order_relaxed);
+            }
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (banded) {
+        for (uint i = index; i < cells; i += threads) {
+            uint n = 0u;
+            for (uint c = 0u; c < kParadeCopies; c++) {
+                n += atomic_load_explicit(&local[i * kParadeCopies + c], memory_order_relaxed);
+            }
+            if (n != 0u) {
+                uint channel = i / (kParadeBands * 256u);
+                uint band = (i / 256u) % kParadeBands;
+                atomic_fetch_add_explicit(&counts[(channel * 256u + first + band) * 256u + i % 256u],
+                                          n, memory_order_relaxed);
+            }
+        }
+    }
+}
+
+// Rec. 709 Cb and Cr of a saturated encoded colour, each as its bin: 256 bins
+// centred on neutral, `bin = clamp(128 + round(255·c), 0, 255)`, so a grey is
+// mid-bin 128 and never on an edge between two bins.
+static inline uint2 chromaBins(float3 rgb) {
+    float luma = dot(rgb, kLumaWeights);
+    float2 c = float2((rgb.b - luma) / 1.8556, (rgb.r - luma) / 1.5748);
+    return uint2(clamp(int2(128) + int2(round(255.0 * c)), int2(0), int2(255)));
+}
+
+// The vectorscope: `counts` is `crBin * 256 + cbBin`. The central 64 × 64
+// bins (96..<160 on both axes) are counted per threadgroup and merged once
+// per group, non-zero only; every other bin globally.
+kernel void reelcut_vectorscope_bin(texture2d<half, access::read> frame [[texture(0)]],
+                                    device atomic_uint *counts [[buffer(0)]],
+                                    uint2 gid [[thread_position_in_grid]],
+                                    uint index [[thread_index_in_threadgroup]],
+                                    uint2 group [[threads_per_threadgroup]]) {
+    threadgroup atomic_uint centre[4096];
+    uint threads = group.x * group.y;
+    for (uint i = index; i < 4096u; i += threads) {
+        atomic_store_explicit(&centre[i], 0u, memory_order_relaxed);
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (gid.x < frame.get_width() && gid.y < frame.get_height()) {
+        uint2 bins = chromaBins(saturate(float3(frame.read(gid).rgb)));
+        bool central = all(bins >= 96u) && all(bins < 160u);
+        if (central) {
+            atomic_fetch_add_explicit(&centre[(bins.y - 96u) * 64u + (bins.x - 96u)], 1u,
+                                      memory_order_relaxed);
+        } else {
+            atomic_fetch_add_explicit(&counts[bins.y * 256u + bins.x], 1u,
+                                      memory_order_relaxed);
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint i = index; i < 4096u; i += threads) {
+        uint n = atomic_load_explicit(&centre[i], memory_order_relaxed);
+        if (n != 0u) {
+            atomic_fetch_add_explicit(&counts[(i / 64u + 96u) * 256u + (i % 64u + 96u)], n,
+                                      memory_order_relaxed);
+        }
+    }
+}
+
+// The histogram: `counts` is `plane * 256 + level`, plane 0 R′, 1 G′, 2 B′,
+// 3 Y′, counted per threadgroup and merged once per group, non-zero only.
+kernel void reelcut_histogram_bin(texture2d<half, access::read> frame [[texture(0)]],
+                                  device atomic_uint *counts [[buffer(0)]],
+                                  uint2 gid [[thread_position_in_grid]],
+                                  uint index [[thread_index_in_threadgroup]],
+                                  uint2 group [[threads_per_threadgroup]]) {
+    threadgroup atomic_uint local[1024];
+    uint threads = group.x * group.y;
+    for (uint i = index; i < 1024u; i += threads) {
+        atomic_store_explicit(&local[i], 0u, memory_order_relaxed);
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (gid.x < frame.get_width() && gid.y < frame.get_height()) {
+        float3 rgb = saturate(float3(frame.read(gid).rgb));
+        uint4 levels = uint4(scopeLevel(rgb.r), scopeLevel(rgb.g), scopeLevel(rgb.b),
+                             scopeLevel(dot(rgb, kLumaWeights)));
+        for (uint plane = 0u; plane < 4u; plane++) {
+            atomic_fetch_add_explicit(&local[plane * 256u + levels[plane]], 1u,
+                                      memory_order_relaxed);
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint i = index; i < 1024u; i += threads) {
+        uint n = atomic_load_explicit(&local[i], memory_order_relaxed);
+        if (n != 0u) {
+            atomic_fetch_add_explicit(&counts[i], n, memory_order_relaxed);
+        }
+    }
 }

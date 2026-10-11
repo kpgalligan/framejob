@@ -1096,17 +1096,24 @@ the key map behind it.
   `RecipeClipRect`, `RecipeLayerMatte`, `RecipeLayerDissolve`,
   `RecipeMatteGroup`, `RecipeLayer` (with `matte` and `dissolve`) and `FrameRecipe` (with `mattes`), out of
   `ProjectSnapshot.swift`; the canvas hit-tests through `CanvasLayerBox`.
-- `WaveformAnalyzer.swift` (`WaveformTrace`, the GPU pass over
-  `Resources/Shaders/Waveform.metal`) · `WaveformTap.swift` (`WaveformTaps`:
-  `Compositor.serve` offers each composed frame by recipe key; one pass in
-  flight per key and one pending slot the newest frame replaces) ·
-  `WaveformPanelView.swift` (the panel, its trace view, `UngradedTagView`) ·
+- `WaveformAnalyzer.swift` (the four scopes' GPU passes over
+  `Resources/Shaders/Waveform.metal`: waveform, parade, vectorscope, histogram;
+  `WaveformTrace`) · `ScopeTraces.swift` (`ScopeKind`, `ParadeTrace`,
+  `VectorscopeTrace`, `HistogramTrace`, `ScopeTrace`, their JSON; spec §11
+  GR-10) · `WaveformTap.swift` (`WaveformTaps`: `Compositor.serve` offers each
+  composed frame by recipe key; one command buffer per frame for the shown
+  kinds; one pass in flight per key and one pending slot the newest frame
+  replaces) · `ScopesPanelView.swift` (View ▸ Scopes' panel: two slots with
+  pickers, the shrink-to-fit layout and its 360 pt floor, `UngradedTagView`) ·
+  `ScopeSlotView.swift` (a slot: the picker, the caption, the body and its readouts) ·
+  `WaveformTraceView.swift` · `ParadeView.swift` · `VectorscopeView.swift` ·
+  `HistogramView.swift` (the slot bodies) ·
   `EditorViewController+Adjustment.swift` (Insert ▸ Adjustment Clip, spec §11
   GR-6: its span — In/Out, else the selection, else the timeline — the
   front-most free non-matte track or a new front "Adjustment" track, one undo
   step, and its validator arm) ·
   `EditorViewController+Seeing.swift` (View ▸ Show Ungraded and View ▸
-  Waveform, `installSeeing`, their validator arm; spec §11 GR-4, GR-5) — the
+  Scopes, `installSeeing`, their validator arm; spec §11 GR-4, GR-5, GR-10) — the
   grade's seeing tools. Show Ungraded sets `RecipeOptions.ungraded` on the
   document's own key only, so an export or `render_frame`, which mint their
   own keys, never see it. `armCanvasMode` pins the modal overlays to the
@@ -1844,7 +1851,7 @@ free.
   (+`RecordingArguments`, +`RecordingResult`, +`RecordingChrome` —
   `RecordingToolChrome`, the tool's status item, flipped by the recorder's
   `pauseDidChangeNotification` and frozen at its
-  `finishingDidBeginNotification`) — the handlers, one file per group. `+Scopes` is `render_frame`'s scope writers (`writeWaveform`; a pure move out of `+Render`, grading-2 G2-0). `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
+  `finishingDidBeginNotification`) — the handlers, one file per group. `+Scopes` is `render_frame`'s scope writers (`writeScopes`: waveform, parade, vectorscope, histogram; grading-2 G2-0, G2-1). `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
   reader, the three cloud-only arguments refused by name under `apple`, the
   vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
   the network, and the result keys; `+Captions` dispatches on `engine` and is otherwise the code it was.
@@ -2395,8 +2402,8 @@ follow the canonical shape: `target(a)` → validate ids → `performGroupedEdit
 → `jsonResult`; failures throw `ToolError` and return in-band
 (`isError: true`). View state and preferences are the one exemption, and it
 is a decision: Preview Quality, the preview window, Show Ungraded and the
-Waveform panel (spec §11 GR-4, GR-5; `render_frame {ungraded, waveform}` is
-the capability), the export queue, the
+Scopes panel and its slot picks (spec §11 GR-4, GR-5, GR-10; `render_frame
+{ungraded, waveform, parade, vectorscope, histogram}` is the capability), the export queue, the
 Media tab's search and sort, the Assistant tab (view state; the dev tool
 `select_inspector_tab` shows it in a Release build, and the assistant's own
 calls already are tool calls) and Settings' Assistant pane (the key, the model

@@ -58,9 +58,10 @@ Concat is opened, at design time or build time.
     at 4K in the tier-2 brief's scratch spike, `designs/grading-2.md` "Costs").
   - **Panel:** GR-5's 248 pt column holds two stacked slots, each with a picker in its header
     (Waveform, Parade, Vectorscope, Histogram). It opens as Waveform over Vectorscope, and the
-    vectorscope is a square at the slot's width. Per window, not persisted (no `UserDefaults`
-    key), off when a project opens. Below a pane height that G2-1 sets from screen `04b`, only
-    the top slot shows. View ▸ Waveform becomes **View ▸ Scopes** (⌃⌘W), the same checkmark
+    vectorscope is a square that fits its slot. Per window, not persisted (no `UserDefaults`
+    key), off when a project opens. When the pane cannot hold both slots at their full sizes, both
+    shrink to fit; below 360 pt of pane height only the top slot shows (amended in G2-1,
+    owner 2026-10-10). View ▸ Waveform becomes **View ▸ Scopes** (⌃⌘W), the same checkmark
     toggle in the same place.
   - **Mirror:** `render_frame {parade, vectorscope, histogram}` are booleans beside `waveform`.
     Each writes `<path>.<scope>.json` through the panel's own analyser on the rendered image, so

@@ -50,13 +50,15 @@ extension AgentServer {
     /// that can photograph one, so it is the instrument every claim about
     /// phase 7c's layer is made through.
     ///
-    /// **`ungraded` and `waveform` are View ▸ Show Ungraded's and View ▸
-    /// Waveform's mirror** (spec §11 GR-4, GR-5): the switch and the panel are
-    /// view state and never reach this tool, so it is asked here. `ungraded`
-    /// is a recipe option like `burn_in_timecode`; `waveform` measures the
-    /// frame just written through the panel's own `WaveformTrace` and writes
-    /// it beside the image as `<path>.waveform.json` (`writeWaveform`, in
-    /// `AgentServer+Scopes.swift`).
+    /// **`ungraded` and the four scope booleans are View ▸ Show Ungraded's
+    /// and View ▸ Scopes' mirror** (spec §11 GR-4, GR-5, GR-10): the switch,
+    /// the panel and its slot picks are view state and never reach this tool,
+    /// so it is asked here. `ungraded` is a recipe option like
+    /// `burn_in_timecode`; `waveform`, `parade`, `vectorscope` and `histogram`
+    /// measure the frame just written through the panel's own analyser, once
+    /// for all of them, and write each beside the image as
+    /// `<path>.<scope>.json` with a sentence each, in that order
+    /// (`writeScopes`, in `AgentServer+Scopes.swift`).
     ///
     /// **A graphic that warned or failed is named** (G-8, G3c): one sentence
     /// per report the frame's pin held, before the last. The set is the
@@ -94,7 +96,10 @@ extension AgentServer {
         let options = RecipeOptions(
             burnInTimecode: try boolArg(a, "burn_in_timecode") ?? false,
             ungraded: try boolArg(a, "ungraded") ?? false)
-        let wantsWaveform = try boolArg(a, "waveform") ?? false
+        var scopes: [ScopeKind] = []
+        for kind in ScopeKind.allCases where try boolArg(a, kind.rawValue) ?? false {
+            scopes.append(kind)
+        }
         // Resolved BEFORE the render, so a mistyped folder is answered in a
         // millisecond rather than after a decode: `exportProject` orders its
         // own two the same way.
@@ -138,9 +143,8 @@ extension AgentServer {
         for report in rendered.graphics {
             text += " " + Self.graphicSentence(report)
         }
-        if wantsWaveform {
-            let waveform = try Self.writeWaveform(of: image, beside: url)
-            text += " " + waveform
+        if !scopes.isEmpty {
+            text += " " + (try Self.writeScopes(scopes, of: image, beside: url))
         }
         text += " Written to \(url.path)."
         return try callResult(

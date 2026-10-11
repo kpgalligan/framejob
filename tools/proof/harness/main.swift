@@ -73,17 +73,26 @@
 //                      own path, then four runloop turns. APPENDED, for
 //                      `tools/proof/clip_inspector2_proof.py`; compiled out
 //                      of a `-D HARNESS_REFERENCE_BUILD` harness.
-//   `seeing`           grading GR3 (spec §11 GR-4, GR-5): comma-separated
-//                      `waveform` (View ▸ Waveform on), `ungraded` (View ▸
-//                      Show Ungraded on) and `ramp` (the panel shows a fixed
-//                      256 × 360 ramp's trace), or "-"/absent for none. Both
-//                      toggles go through the editor's own commands; the
-//                      panel's tap is then detached, so no live frame can
-//                      replace the ramp and the capture is deterministic. With
-//                      `waveform`, one stdout line `seeing trace X Y W H`
-//                      gives the trace's rect in points, top-left origin.
-//                      APPENDED, for `tools/proof/seeing_proof.py`; compiled
-//                      out of a `-D HARNESS_REFERENCE_BUILD` harness.
+//   `seeing`           grading GR3 and grading-2 G2-1 (spec §11 GR-4, GR-5,
+//                      GR-10): comma-separated `scopes` (View ▸ Scopes on),
+//                      `ungraded` (View ▸ Show Ungraded on), `ramp` (every
+//                      slot shows a fixed trace of its kind: a 256 × 360 grey
+//                      ramp's waveform, parade and histogram, and a
+//                      vectorscope of lines from neutral to the six targets),
+//                      and `top=<kind>` / `bottom=<kind>` (a slot's pick,
+//                      through the panel's own `pick`), or "-"/absent for
+//                      none. The toggles go through the editor's own
+//                      commands; the panel's tap is then detached, so no live
+//                      frame can replace the fixed traces and the capture is
+//                      deterministic. With `scopes`, stdout gets `seeing
+//                      panel X Y W H`, one `seeing slot <top|bottom> <kind> X
+//                      Y W H` per visible slot (its body's rect: for a
+//                      vectorscope, the square) and, when a waveform slot
+//                      shows, `seeing trace X Y W H` (the first one's body),
+//                      each in points, top-left origin. APPENDED, for
+//                      `tools/proof/seeing_proof.py` and `scopes_proof.py`;
+//                      compiled out of a `-D HARNESS_REFERENCE_BUILD`
+//                      harness.
 //
 //                      **It drives the app's own controls and sets nothing
 //                      itself**: `MediaPane.filter` is private and stays that
@@ -1020,31 +1029,67 @@ extension Harness {
     /// The `seeing` argument (see the header); a nonzero exit code for an
     /// unknown item.
     static func applySeeing(_ items: [String], to controller: EditorViewController) -> Int32? {
-        if let unknown = items.first(where: { !["waveform", "ungraded", "ramp"].contains($0) }) {
-            FileHandle.standardError.write("seeing: unknown item \(unknown)\n".data(using: .utf8)!)
-            return 64
+        var picks: [(Int, ScopeKind)] = []
+        for item in items where !["scopes", "ungraded", "ramp"].contains(item) {
+            let parts = item.split(separator: "=", maxSplits: 1).map(String.init)
+            guard parts.count == 2, let slot = ["top", "bottom"].firstIndex(of: parts[0]),
+                let kind = ScopeKind(rawValue: parts[1])
+            else {
+                FileHandle.standardError.write("seeing: unknown item \(item)\n".data(using: .utf8)!)
+                return 64
+            }
+            picks.append((slot, kind))
         }
-        if items.contains("waveform") { controller.toggleWaveform(nil) }
+        if items.contains("scopes") { controller.toggleScopes(nil) }
         if items.contains("ungraded") { controller.toggleShowUngraded(nil) }
-        if let key = controller.document?.recipeKey { WaveformTaps.shared.detach(key: key) }
-        guard let panel = controller.waveformPanel else { return nil }
-        if items.contains("ramp") {
-            let side = WaveformTrace.columns
-            var counts = [UInt32](repeating: 0, count: side * WaveformTrace.levels)
-            for column in 0..<side { counts[column * side + column] = 360 }
-            panel.show(WaveformTrace(counts: counts, width: side, height: 360))
-        }
+        guard let panel = controller.scopesPanel else { return nil }
+        for (slot, kind) in picks { panel.pick(kind, slot: slot) }
         controller.view.layoutSubtreeIfNeeded()
-        func walk(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(walk) }
-        if items.contains("waveform"),
-            let trace = walk(panel).first(where: { $0 is WaveformTraceView })
-        {
-            let root = controller.view
-            let r = trace.convert(trace.bounds, to: root)
+        if let key = controller.document?.recipeKey { WaveformTaps.shared.detach(key: key) }
+        if items.contains("ramp") { panel.show(rampTraces()) }
+        controller.view.layoutSubtreeIfNeeded()
+        guard items.contains("scopes") else { return nil }
+        let root = controller.view
+        func rect(_ view: NSView) -> String {
+            let r = view.convert(view.bounds, to: root)
             let top = root.isFlipped ? r.minY : root.bounds.height - r.maxY
-            print("seeing trace \(r.minX) \(top) \(r.width) \(r.height)")
+            return "\(r.minX) \(top) \(r.width) \(r.height)"
+        }
+        print("seeing panel \(rect(panel))")
+        for slot in panel.slotViews where !slot.isHidden {
+            print("seeing slot \(slot.name) \(slot.kind.rawValue) \(rect(slot.body))")
+        }
+        if let waveform = panel.slotViews.first(where: { !$0.isHidden && $0.kind == .waveform }) {
+            print("seeing trace \(rect(waveform.body))")
         }
         return nil
+    }
+
+    /// The `ramp` item's fixed traces: a 256 × 360 grey ramp's waveform,
+    /// parade and histogram, and lines from neutral to the six targets.
+    static func rampTraces() -> [ScopeKind: ScopeTrace] {
+        let side = WaveformTrace.columns
+        var diagonal = [UInt32](repeating: 0, count: side * side)
+        for column in 0..<side { diagonal[column * side + column] = 360 }
+        var vectors = [UInt32](repeating: 0, count: side * side)
+        for target in VectorscopeTrace.targets {
+            let cb = VectorscopeTrace.bin(target.cb) - VectorscopeTrace.centre
+            let cr = VectorscopeTrace.bin(target.cr) - VectorscopeTrace.centre
+            let steps = max(abs(cb), abs(cr), 1)
+            for step in 0...steps {
+                let x = VectorscopeTrace.centre + cb * step / steps
+                let y = VectorscopeTrace.centre + cr * step / steps
+                vectors[y * side + x] = 360
+            }
+        }
+        return [
+            .waveform: .waveform(WaveformTrace(counts: diagonal, width: side, height: 360)),
+            .parade: .parade(ParadeTrace(counts: diagonal + diagonal + diagonal, width: side,
+                                         height: 360)),
+            .vectorscope: .vectorscope(VectorscopeTrace(counts: vectors, width: side, height: 360)),
+            .histogram: .histogram(HistogramTrace(
+                counts: [UInt32](repeating: 360, count: 4 * side), width: side, height: 360)),
+        ]
     }
 }
 #endif
@@ -1118,7 +1163,8 @@ let mediaFilterSpec = arguments.count > 12 && arguments[12] != "-" ? arguments[1
 let selectActionSpec = arguments.count > 13 ? arguments[13] : ""
 /// The Clip tab's sub-tab — the fourteenth argument (see the header).
 let subTabSpec = arguments.count > 14 && arguments[14] != "-" ? arguments[14] : ""
-/// Grading GR3's seeing — the fifteenth argument (see the header).
+/// Grading GR3's and grading-2 G2-1's seeing — the fifteenth argument (see
+/// the header).
 let seeingSpec = Harness.list(arguments.count > 15 ? arguments[15] : "-")
 
 Harness.pinDefaults(sizeIndex: sizeIndex, expand: expandSections)

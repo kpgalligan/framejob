@@ -4,7 +4,7 @@ import Metal
 
 /// One frame's luma waveform (spec §11 GR-5): for each of 256 column bins of
 /// the picture, how many pixels sit at each of 256 levels of Rec. 709 luma Y′
-/// on the encoded (sRGB) values. What View ▸ Waveform draws and what
+/// on the encoded (sRGB) values. What View ▸ Scopes' Waveform draws and what
 /// `render_frame {waveform}` writes beside its PNG — one type, so the panel and
 /// the tool cannot count differently.
 ///
@@ -81,13 +81,17 @@ struct WaveformTrace: Equatable {
     }
 }
 
-/// The waveform's GPU pass (`Waveform.metal`'s `reelcut_waveform_bin`): one
-/// thread per pixel, an atomic add into a 256 × 256 counts buffer.
+/// The scopes' GPU passes (`Waveform.metal`: `reelcut_waveform_bin`,
+/// `reelcut_parade_bin`, `reelcut_vectorscope_bin`, `reelcut_histogram_bin`;
+/// spec §11 GR-5, GR-10): one thread per pixel, each kind into a counts
+/// buffer of its own, under GR-10's counting rule.
 ///
-/// Two callers. `WaveformTaps` encodes the pass into a command buffer of its
-/// own over the compositor's finished destination (`encode`), never waiting;
-/// `render_frame {waveform}` analyses the frame it just rendered and waits
-/// (`analyze(image:)`), off the main thread like the rest of that tool.
+/// Two callers. `WaveformTaps` encodes the shown kinds' passes into ONE
+/// command buffer of its own over the compositor's finished destination
+/// (`encode`), never waiting; `render_frame {waveform, parade, vectorscope,
+/// histogram}` analyses the frame it just rendered and waits
+/// (`analyze(image:kinds:)`), off the main thread like the rest of that tool.
+/// Every iteration over a set of kinds runs in `ScopeKind.allCases` order.
 final class WaveformAnalyzer {
     /// Over the app's default library, where Xcode compiles every shader in
     /// `app/Resources/Shaders`; nil on a machine with no Metal device (and in
@@ -100,68 +104,144 @@ final class WaveformAnalyzer {
         return WaveformAnalyzer(device: device, library: library)
     }()
 
+    /// Each kind's kernel.
+    static let functions: [ScopeKind: String] = [
+        .waveform: "reelcut_waveform_bin", .parade: "reelcut_parade_bin",
+        .vectorscope: "reelcut_vectorscope_bin", .histogram: "reelcut_histogram_bin",
+    ]
+
     let device: MTLDevice
-    private let pipeline: MTLComputePipelineState
+    private let pipelines: [ScopeKind: MTLComputePipelineState]
     /// Only `analyze`'s; the tap encodes into a queue of its own.
     private let queue: MTLCommandQueue
 
-    static let countsLength =
-        WaveformTrace.columns * WaveformTrace.levels * MemoryLayout<UInt32>.stride
+    /// The parade's threadgroup width, `kParadeBands`' premise in
+    /// `Waveform.metal`.
+    static let paradeAcross = 8
 
+    /// The number of counters a kind's pass fills.
+    static func countsCount(_ kind: ScopeKind) -> Int {
+        let plane = WaveformTrace.columns * WaveformTrace.levels
+        switch kind {
+        case .waveform: return plane
+        case .parade: return 3 * plane
+        case .vectorscope: return VectorscopeTrace.bins * VectorscopeTrace.bins
+        case .histogram: return 4 * WaveformTrace.levels
+        }
+    }
+
+    /// A kind's counts buffer, in bytes.
+    static func countsLength(_ kind: ScopeKind) -> Int {
+        countsCount(kind) * MemoryLayout<UInt32>.stride
+    }
+
+    /// Fails unless all four kernels are in `library`.
     init?(device: MTLDevice, library: MTLLibrary) {
-        guard let function = library.makeFunction(name: "reelcut_waveform_bin"),
-            let pipeline = try? device.makeComputePipelineState(function: function),
-            let queue = device.makeCommandQueue()
-        else { return nil }
+        var pipelines: [ScopeKind: MTLComputePipelineState] = [:]
+        for kind in ScopeKind.allCases {
+            guard let name = Self.functions[kind], let function = library.makeFunction(name: name),
+                let pipeline = try? device.makeComputePipelineState(function: function)
+            else { return nil }
+            pipelines[kind] = pipeline
+        }
+        guard let queue = device.makeCommandQueue() else { return nil }
         self.device = device
-        self.pipeline = pipeline
+        self.pipelines = pipelines
         self.queue = queue
     }
 
-    /// Encodes the pass over `frame` into `buffer` and answers the counts
-    /// buffer it will fill, readable once `buffer` has completed.
-    func encode(_ frame: MTLTexture, into buffer: MTLCommandBuffer) -> MTLBuffer? {
-        guard let counts = device.makeBuffer(length: Self.countsLength, options: .storageModeShared),
-            let encoder = buffer.makeComputeCommandEncoder()
-        else { return nil }
-        memset(counts.contents(), 0, Self.countsLength)
-        encoder.setComputePipelineState(pipeline)
-        encoder.setTexture(frame, index: 0)
-        encoder.setBuffer(counts, offset: 0, index: 0)
-        let across = pipeline.threadExecutionWidth
-        let down = max(1, pipeline.maxTotalThreadsPerThreadgroup / across)
-        encoder.dispatchThreads(
-            MTLSize(width: frame.width, height: frame.height, depth: 1),
-            threadsPerThreadgroup: MTLSize(width: across, height: down, depth: 1))
+    /// Encodes each of `kinds`' passes over `frame` into `buffer`, in
+    /// `ScopeKind.allCases` order, and answers each kind's counts buffer,
+    /// readable once `buffer` has completed.
+    func encode(_ kinds: Set<ScopeKind>, frame: MTLTexture, into buffer: MTLCommandBuffer)
+        -> [ScopeKind: MTLBuffer]?
+    {
+        guard let encoder = buffer.makeComputeCommandEncoder() else { return nil }
+        var made: [ScopeKind: MTLBuffer] = [:]
+        for kind in ScopeKind.allCases where kinds.contains(kind) {
+            let length = Self.countsLength(kind)
+            guard let pipeline = pipelines[kind],
+                let counts = device.makeBuffer(length: length, options: .storageModeShared)
+            else {
+                encoder.endEncoding()
+                return nil
+            }
+            memset(counts.contents(), 0, length)
+            encoder.setComputePipelineState(pipeline)
+            encoder.setTexture(frame, index: 0)
+            encoder.setBuffer(counts, offset: 0, index: 0)
+            // The parade's threadgroups are 8 px wide, so each spans at
+            // most the two column bins its kernel counts per band.
+            let across = kind == .parade ? Self.paradeAcross : pipeline.threadExecutionWidth
+            let down = max(1, pipeline.maxTotalThreadsPerThreadgroup / across)
+            encoder.dispatchThreads(
+                MTLSize(width: frame.width, height: frame.height, depth: 1),
+                threadsPerThreadgroup: MTLSize(width: across, height: down, depth: 1))
+            made[kind] = counts
+        }
         encoder.endEncoding()
-        return counts
+        return made
     }
 
-    /// The trace a completed pass left in `counts`, for a `width` × `height`
-    /// frame.
+    /// The waveform's pass alone (`encode(_:frame:into:)` with `.waveform`).
+    func encode(_ frame: MTLTexture, into buffer: MTLCommandBuffer) -> MTLBuffer? {
+        encode([.waveform], frame: frame, into: buffer)?[.waveform]
+    }
+
+    /// The trace a completed `kind` pass left in `counts`, for a `width` ×
+    /// `height` frame.
+    func trace(_ kind: ScopeKind, of counts: MTLBuffer, width: Int, height: Int) -> ScopeTrace {
+        let count = Self.countsCount(kind)
+        let bound = counts.contents().bindMemory(to: UInt32.self, capacity: count)
+        let values = Array(UnsafeBufferPointer(start: bound, count: count))
+        switch kind {
+        case .waveform:
+            return .waveform(WaveformTrace(counts: values, width: width, height: height))
+        case .parade:
+            return .parade(ParadeTrace(counts: values, width: width, height: height))
+        case .vectorscope:
+            return .vectorscope(VectorscopeTrace(counts: values, width: width, height: height))
+        case .histogram:
+            return .histogram(HistogramTrace(counts: values, width: width, height: height))
+        }
+    }
+
+    /// The waveform trace a completed pass left in `counts`.
     func trace(of counts: MTLBuffer, width: Int, height: Int) -> WaveformTrace {
-        let count = WaveformTrace.columns * WaveformTrace.levels
+        let count = Self.countsCount(.waveform)
         let bound = counts.contents().bindMemory(to: UInt32.self, capacity: count)
         return WaveformTrace(
             counts: Array(UnsafeBufferPointer(start: bound, count: count)), width: width,
             height: height)
     }
 
-    /// The trace of `texture`, waiting for the GPU.
-    func analyze(texture: MTLTexture) -> WaveformTrace? {
+    /// `kinds`' traces of `texture`, waiting for the GPU.
+    func analyze(texture: MTLTexture, kinds: Set<ScopeKind>) -> [ScopeKind: ScopeTrace]? {
         guard let buffer = queue.makeCommandBuffer(),
-            let counts = encode(texture, into: buffer)
+            let counts = encode(kinds, frame: texture, into: buffer)
         else { return nil }
         buffer.commit()
         buffer.waitUntilCompleted()
         guard buffer.status == .completed else { return nil }
-        return trace(of: counts, width: texture.width, height: texture.height)
+        var traces: [ScopeKind: ScopeTrace] = [:]
+        for kind in ScopeKind.allCases {
+            guard let buffer = counts[kind] else { continue }
+            traces[kind] = trace(kind, of: buffer, width: texture.width, height: texture.height)
+        }
+        return traces
     }
 
-    /// The trace of a rendered image: drawn into an RGBA half-float bitmap in
-    /// the image's OWN colour space (no conversion, so the encoded values are
-    /// the image's), uploaded, then the kernel.
-    func analyze(image: CGImage) -> WaveformTrace? {
+    /// The waveform trace of `texture`, waiting for the GPU.
+    func analyze(texture: MTLTexture) -> WaveformTrace? {
+        guard case .waveform(let trace)? = analyze(texture: texture, kinds: [.waveform])?[.waveform]
+        else { return nil }
+        return trace
+    }
+
+    /// `kinds`' traces of a rendered image: drawn into an RGBA half-float
+    /// bitmap in the image's OWN colour space (no conversion, so the encoded
+    /// values are the image's), uploaded, then the kernels.
+    func analyze(image: CGImage, kinds: Set<ScopeKind>) -> [ScopeKind: ScopeTrace]? {
         let width = image.width
         let height = image.height
         let own = image.colorSpace.flatMap { $0.model == .rgb ? $0 : nil }
@@ -184,6 +264,13 @@ final class WaveformAnalyzer {
         texture.replace(
             region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: data,
             bytesPerRow: context.bytesPerRow)
-        return analyze(texture: texture)
+        return analyze(texture: texture, kinds: kinds)
+    }
+
+    /// The waveform trace of a rendered image.
+    func analyze(image: CGImage) -> WaveformTrace? {
+        guard case .waveform(let trace)? = analyze(image: image, kinds: [.waveform])?[.waveform]
+        else { return nil }
+        return trace
     }
 }

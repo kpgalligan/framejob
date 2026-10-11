@@ -33,7 +33,7 @@ extension EditorViewController {
         endCanvasModes()
         mode.translatesAutoresizingMaskIntoConstraints = false
         canvasContainer.addSubview(mode)
-        // Over the PICTURE, not the pane: the waveform panel (GR-5) shares the
+        // Over the PICTURE, not the pane: the scopes panel (GR-5) shares the
         // pane and must not be covered by a mode that swallows its clicks.
         let picture: NSView = previewCanvas ?? canvasContainer
         NSLayoutConstraint.activate([

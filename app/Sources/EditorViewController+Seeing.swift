@@ -1,13 +1,15 @@
 import AppKit
 
-/// Seeing the grade (grading GR3, spec §11 GR-4 and GR-5): View ▸ Show
-/// Ungraded and View ▸ Waveform, both checkmark toggles in the preview group.
+/// Seeing the grade (grading GR3, grading-2 G2-1, spec §11 GR-4, GR-5 and
+/// GR-10): View ▸ Show Ungraded and View ▸ Scopes, both checkmark toggles in
+/// the preview group.
 ///
 /// **Both are view state, per window, and neither persists**: no
-/// `UserDefaults` key, so a new window starts with both off and a proof can
-/// drive them through `perform_menu_item` without moving the defaults. No MCP
-/// tool mirrors them (§7.9's Preview Quality exemption); `render_frame
-/// {ungraded, waveform}` is the capability.
+/// `UserDefaults` key, so a new window starts with both off (and the scopes'
+/// slots at Waveform over Vectorscope) and a proof can drive them through
+/// `perform_menu_item` without moving the defaults. No MCP tool mirrors them
+/// or the slot picks (§7.9's Preview Quality exemption); `render_frame
+/// {ungraded, waveform, parade, vectorscope, histogram}` is the capability.
 ///
 /// **Show Ungraded is an option on the document's KEY** (`RecipeSource`,
 /// spec §7.3), so it reaches exactly what composes through that key: the
@@ -19,8 +21,8 @@ import AppKit
 /// subviews, as `previewCanvas` is: the frozen base file holds no property
 /// for them.
 extension EditorViewController {
-    var waveformPanel: WaveformPanelView? {
-        canvasContainer.subviews.compactMap { $0 as? WaveformPanelView }.first
+    var scopesPanel: ScopesPanelView? {
+        canvasContainer.subviews.compactMap { $0 as? ScopesPanelView }.first
     }
 
     var ungradedTag: UngradedTagView? {
@@ -29,9 +31,11 @@ extension EditorViewController {
 
     /// The panel at the pane's right edge, the canvas's trailing edge pinned
     /// to its leading one, and the tag in the void's top-left corner. Called
-    /// once, from `installCanvas`.
+    /// once, from `installCanvas`. A slot the panel reveals or re-picks asks
+    /// for a frame through `refreshSeeing`.
     func installSeeing(beside canvas: PreviewCanvasView) {
-        let panel = WaveformPanelView()
+        let panel = ScopesPanelView()
+        panel.onNeedsFrame = { [weak self] in self?.refreshSeeing() }
         let tag = UngradedTagView()
         for view in [panel, tag] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
@@ -59,9 +63,9 @@ extension EditorViewController {
         refreshSeeing()
     }
 
-    /// View ▸ Waveform (⌃⌘W): the panel beside the preview, on or off.
-    @objc func toggleWaveform(_ sender: Any?) {
-        guard let document = document, let panel = waveformPanel else { return }
+    /// View ▸ Scopes (⌃⌘W): the panel beside the preview, on or off.
+    @objc func toggleScopes(_ sender: Any?) {
+        guard let document = document, let panel = scopesPanel else { return }
         panel.setShown(!panel.isShown, key: document.recipeKey)
         refreshSeeing()
     }
@@ -86,8 +90,8 @@ extension EditorViewController {
             let on = document.map { RecipeSource.shared.options(for: $0.recipeKey).ungraded }
             (item as? NSMenuItem)?.state = on == true ? .on : .off
             return true
-        case #selector(toggleWaveform(_:)):
-            (item as? NSMenuItem)?.state = waveformPanel?.isShown == true ? .on : .off
+        case #selector(toggleScopes(_:)):
+            (item as? NSMenuItem)?.state = scopesPanel?.isShown == true ? .on : .off
             return true
         default:
             return nil

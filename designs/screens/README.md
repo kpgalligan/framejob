@@ -78,7 +78,7 @@ before any of its steps runs.
 **Menu items.** `perform_menu_item` takes a path of titles as the menu shows
 them (`["File", "Export…"]`). Only items the dev tool classifies `sheet` or
 `window` are allowed, and the two view toggles of grading GR3 (View ▸ Show
-Ungraded and View ▸ Waveform, `VIEW_SELECTORS` in `screens.py`), which persist
+Ungraded and View ▸ Scopes, `VIEW_SELECTORS` in `screens.py`), which persist
 nothing — a screen that turns one on turns it off in `after`. File ▸ New
 Recording… runs only in the LAST screen run:
 shown from the background its panel no longer takes key (spec §11, #137), but

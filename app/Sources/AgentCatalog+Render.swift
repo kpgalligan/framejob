@@ -152,10 +152,36 @@ extension AgentServer {
                     "waveform": [
                         "type": "boolean",
                         "description": "Also measure the frame's luma waveform, View ▸ "
-                            + "Waveform's: the text says what share of pixels clips high and "
-                            + "low, and <image path>.waveform.json holds the 256 × 256 counts "
-                            + "(one array per column bin, indexed by level), the clip marks "
-                            + "and both percentages. Default false.",
+                            + "Scopes' Waveform: the text says what share of pixels clips high "
+                            + "and low, and <image path>.waveform.json holds the 256 × 256 "
+                            + "counts (one array per column bin, indexed by level), the clip "
+                            + "marks and both percentages. Default false.",
+                    ],
+                    "parade": [
+                        "type": "boolean",
+                        "description": "Also measure the frame's RGB parade, View ▸ Scopes' "
+                            + "Parade: R′, G′ and B′ each binned as the waveform bins Y′. The "
+                            + "text says what share of pixels each channel clips high and low, "
+                            + "and <image path>.parade.json holds the counts keyed red, green "
+                            + "and blue (each 256 arrays by column bin, indexed by level) with "
+                            + "each channel's clip marks and clip counts. Default false.",
+                    ],
+                    "vectorscope": [
+                        "type": "boolean",
+                        "description": "Also measure the frame's vectorscope, View ▸ Scopes' "
+                            + "Vectorscope: Rec. 709 Cb and Cr of the encoded values in "
+                            + "256 × 256 bins centred on neutral (bin 128). The text says what "
+                            + "share of pixels is neutral, and <image path>.vectorscope.json "
+                            + "holds the counts (256 arrays by Cr bin, indexed by Cb bin), the "
+                            + "six 75 % targets' bins and the skin line's angle. Default false.",
+                    ],
+                    "histogram": [
+                        "type": "boolean",
+                        "description": "Also measure the frame's histogram, View ▸ Scopes' "
+                            + "Histogram: R′, G′, B′ and Y′ counts per 256 levels. The text says "
+                            + "what share of pixels clips high and low by Y′, and <image "
+                            + "path>.histogram.json holds the four planes' counts and both "
+                            + "percentages. Default false.",
                     ],
                 ]),
             tool(

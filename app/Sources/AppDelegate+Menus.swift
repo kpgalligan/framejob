@@ -441,15 +441,15 @@ extension AppDelegate {
             item(
                 "Preview Window", #selector(EditorViewController.togglePreviewWindow(_:)), "p",
                 [.command, .shift]))
-        // Grading GR3 (spec §11 GR-4, GR-5): two checkmark toggles about the
-        // preview, view state that nothing persists.
+        // Grading GR3 and grading-2 G2-1 (spec §11 GR-4, GR-5, GR-10): two
+        // checkmark toggles about the preview, view state that nothing persists.
         menu.addItem(
             item(
                 "Show Ungraded", #selector(EditorViewController.toggleShowUngraded(_:)), "u",
                 [.command, .control]))
         menu.addItem(
             item(
-                "Waveform", #selector(EditorViewController.toggleWaveform(_:)), "w",
+                "Scopes", #selector(EditorViewController.toggleScopes(_:)), "w",
                 [.command, .control]))
         return menu
     }

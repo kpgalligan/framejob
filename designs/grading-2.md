@@ -742,3 +742,106 @@ computing them from the Rec. 709 matrix in Python before they were written (the 
 
 **Owed.** Nothing; the `app/CLAUDE.md` and `core/CLAUDE.md` map entries for the four moves are
 applied. G2-1 (scopes, GR-10) is next, from main after this phase's merge.
+
+## G2-1 — the scopes (#263, GR-10)
+
+**What landed** (2026-10-10, in the worktree on `grading-2`, from `9dec954`). The RGB parade,
+the Rec. 709 vectorscope and the R′G′B′Y′ histogram beside the luma waveform, in the two stacked
+slots of View ▸ Scopes (⌃⌘W, renamed from View ▸ Waveform), and `render_frame {parade,
+vectorscope, histogram}`; the owner's choices 1–10 as settled before the code (choice 5 option B:
+shrink both slots to fit, the bottom slot hidden below 360 pt of pane).
+- `Waveform.metal`: `reelcut_parade_bin` (GR-10's per-band threadgroup counts: an 8 px wide
+  group's two column bins in threadgroup memory, two copies per cell, a group spanning more
+  bins adding globally; dispatched 8 wide by `WaveformAnalyzer.paradeAcross`),
+  `reelcut_vectorscope_bin` (the central 64 × 64 bins in threadgroup memory, the rest global) and
+  `reelcut_histogram_bin` (threadgroup counts), each merging once per group with its pixel read
+  guarded; `scopeLevel`; the waveform kernel and `kLumaWeights` untouched (`seeing_proof.py`'s
+  anchors hold once each).
+- `ScopeTraces.swift` (new): `ScopeKind`, `ParadeTrace`, `VectorscopeTrace` (targets and the skin
+  line computed through `chroma`: 123.278°), `HistogramTrace`, `ScopeTrace`, their JSON.
+- `WaveformAnalyzer.swift`: four pipelines (`init` fails unless all four exist), multi-kind
+  `encode` / `trace` / `analyze`, every kind set iterated in `ScopeKind.allCases` order; the
+  waveform-only methods stay.
+- `WaveformTap.swift`: `attach(key:kinds:onTraces:)`, one command buffer per offered frame for the
+  shown kinds, and `attachedKinds(key:)` (a reader for the probe's S9; not in the spec's interface).
+- `ScopesPanelView.swift` (`git mv` of `WaveformPanelView.swift`): the panel, `ScopeSlotLayout`
+  and `layout(picks:paneHeight:)`, `UngradedTagView` unchanged; 216 lines. `ScopeSlotView.swift`
+  (new, 216): a slot and its `UISnapshotParts` extension, split out at review because the renamed
+  file had reached 431 lines with about 112 of the old 243 surviving (git's similarity 20 %),
+  so the 400-line cap of a new file held. `WaveformTraceView.swift` (the
+  waveform body moved whole, and `ScopeWell`, the well, graticule, marks and density the parade
+  shares), `ParadeView.swift`, `VectorscopeView.swift`, `HistogramView.swift` (new).
+- `+Seeing` (`scopesPanel`, `toggleScopes`, `onNeedsFrame` → `refreshSeeing`), the menu, the
+  allow-table, the inventory, `screens.py`'s `VIEW_SELECTORS`; `AgentServer+Scopes.swift`
+  (`writeScopes`, one analyse for every kind asked, the waveform's sentence byte-identical),
+  `+Render` and the catalog's three rows; the harness's `seeing` items `scopes`, `top=`,
+  `bottom=`, `ramp` for every kind, and its `seeing panel` / `seeing slot` lines.
+- Documents: GR-10's Panel bullet amended (owner, 2026-10-10); spec §1, §4.2, §7.5, §7.9a, §9 and
+  the two indexes; README; GRD-2 step 3 and the new GRD-11; screen `04b-preview-waveform` →
+  `04b-preview-scopes`; the proofs README's section; `grading_verdict.py`'s menu paths (text only,
+  not re-run).
+
+**The parade's fallback was taken** (at review). The first T1 run, timing each pass alone
+straight after the last with no warm-up, missed: 4K parade 2.046 ms (noise), histogram 1.666
+(flat), with figures moving two- to threefold between runs. Scratch instruments (scratchpad, not
+committed) found why: a cold GPU's clock, and — when the passes were committed back to back
+instead — two command buffers running at once, so each one's own time doubled. T1 now commits a
+burst of sixteen passes first, unread, then times twelve one at a time (median of the last ten),
+which reproduced the brief's spike within a few hundredths and was stable between runs. On that
+instrument the global parade (the spec's primary design, global atomics as the waveform) scored
+1.019–1.042 ms at 4K on the flat fixture over eleven recorded runs: inside GR-10's 1.1 ms, but by
+5–7 %, on an M2 Max alone, on a row every whole run and every mutant run scores. The review
+(finding 1) called that a flaky row waiting to happen, so the spec's fallback replaced it: GR-10's
+per-band threadgroup counts, same kernel name and counts layout, 8 px wide groups (two column
+bins each at 1792 px wide or more), two copies of each threadgroup cell for alternate threads;
+a group spanning more bins (some groups of a narrower frame) adds globally. Measured on the same
+host: 4K parade 0.433–0.442 ms on Debug; on the recorded Release run 0.433–0.440, near-grey
+0.622 (1.8× headroom). S3 now also runs its red ramp at 1920, 1999 (a last group 7 px across) and
+3840 wide, where every group counts per band, so a band merged into the wrong column fails it
+(the tenth mutant, `parade-band-misplaced`, below). A mutant forcing `banded` off would survive
+T1, since the global parade's 1.02–1.04 ms is also under 1.1 ms: an accepted limit of T1, so no
+such mutant is written.
+
+**Verification**, 2026-10-10, AC power (`pmset -g`: powermode 0, AC Power), Apple M2 Max:
+- In the loop: `make typecheck` (0 errors, the 4 baseline warnings); `swift_build.py typecheck`
+  of `scopes_probe.swift` and `waveform_probe.swift`; `inventory.py --check` 5/5;
+  `spec_index_proof.py` 153/153 (cells: `04.2` 94 → 120, `07.5` 237 → 247, `07.9a` 507 → 524,
+  `11-decisions/` 6352 → 6353, `grading-2.md` 77 → 78); `scopes_proof.py` 19/19 and
+  `seeing_proof.py` 19/19 on Debug; `screens.py --only 04b-preview-scopes` 6/6, both looks, 0 new
+  problems (its first run found the header's picker and caption ambiguous — 12 + 120 + 8 + 102 +
+  12 > 248 — fixed by a 2 pt gap and the caption giving way first).
+- `make gate`: PASS in 192 s (typecheck 5 s, test 105 s, app 82 s; fmt and lint skipped as
+  unchanged).
+- `RC_PROOF_APP=release python3 tools/proof/scopes_proof.py`, whole, on the gate's Release build:
+  19/19, no `Reelcut: ` line. T1 at 4K, worst of five fixtures: parade 1.026 ms (flat), vectorscope
+  0.424 (ramp), histogram 0.751 (flat); recorded: waveform 0.451 (flat), waveform + vectorscope
+  0.802 (gradient). At 1080p every scope ≤ 0.638 ms.
+- `RC_PROOF_APP=release python3 tools/proof/seeing_proof.py`, whole: 19/19 (View ▸ Scopes, the
+  `scopes.*` ids, the new `attach`).
+- Mutants, nine, once each on the final instrument (Debug copies): `cb-cr-swapped` (S1 M1),
+  `bt601` (S1 M1), `bins-edged` (S1 S2), `vectorscope-global` (T1: vectorscope 7.165 ms on flat),
+  `histogram-global` (T1: histogram 7.165 ms on flat), `histogram-luma-601` (S5), `pick-persisted`
+  (S9), `tap-first-kind-only` (S7 S8), `slots-not-shrunk` (S10): every one MUTANT PASS, no other
+  row failing.
+- Review fixes (findings 1–5 of the G2-1 review, the same day): the banded parade above,
+  `ScopeSlotView.swift` split out, this record and the file history, `ParadeView` caching each
+  channel's clip marks per trace instead of per draw, and `screens.py`'s comment. `make
+  typecheck` (the 4 baseline warnings); `swift_build.py typecheck` of both probes;
+  `spec_index_proof.py` 153/153 (`07.5` 247 → 249); `scopes_proof.py --only S3,S5,S6,S8,T1` 5/5
+  on Debug; `screens.py --only 04b-preview-scopes` 6/6, 0 new problems; `make gate` PASS in
+  187 s (typecheck 4 s, test 101 s, app 81 s); `RC_PROOF_APP=release` `scopes_proof.py`, whole,
+  19/19, T1 at 4K worst of five: parade 0.622 ms (near-grey; 0.433–0.440 on the other four),
+  vectorscope 0.390 (gradient), histogram 0.668 (flat), recorded waveform 0.450, waveform +
+  vectorscope 0.798, every 1080p figure ≤ 0.394; `RC_PROOF_APP=release` `seeing_proof.py`
+  19/19. The nine mutants were not re-run: no mutant's anchor line changed.
+- Second review (findings 1–3, the same day): a tenth mutant, `parade-band-misplaced` (the
+  merge's `first + band` → `first`), run once on a Debug copy: MUTANT PASS, S3 failed (`1920
+  R[1][2]=64`, …) and no other row (15/16; T1's 4K parade 0.619 ms); S3 also runs 1999 × 64;
+  this record's 4K parade figures corrected to the Release run's. `swift_build.py typecheck` of
+  `scopes_probe.swift`; `scopes_proof.py --only S3` 1/1 on Debug; `make gate` PASS in 67 s (test
+  66 s, every other step skipped as unchanged); `RC_PROOF_APP=release` `scopes_proof.py --only
+  S3,Z1` 2/2.
+
+**Owed.** GRD-11, the owner's standing row in `docs/manual-checks.md`. Nothing else: the
+`app/CLAUDE.md` map and parity entries (`ScopeSlotView.swift` among them) are applied, and
+`designs/adr/app-file-history.md` has the panel's entry and its next seam.

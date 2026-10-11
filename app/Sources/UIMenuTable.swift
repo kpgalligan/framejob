@@ -110,7 +110,7 @@ extension UIMenu {
         "setPreviewQuality:": .plain,
         "togglePreviewWindow:": .window,
         "toggleShowUngraded:": .plain,
-        "toggleWaveform:": .plain,
+        "toggleScopes:": .plain,
         "performMiniaturize:": .framework,
         "performZoom:": .framework,
         "showExportQueue:": .window,

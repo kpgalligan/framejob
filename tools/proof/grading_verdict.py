@@ -108,10 +108,10 @@ F_LOOKS = ("warm", "cool", "teal_orange", "vivid")
 TAG = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
 TIMING = re.compile(r"\[reelcut\] compositor: ([\d.]+) ms average, ([\d.]+) ms worst")
 RELEASE_ONLY = "GR7a times exports and reads the compositor's frame times"
-MENU_PATHS = ("View ▸ Show Ungraded", "View ▸ Waveform", "Insert ▸ Adjustment Clip",
+MENU_PATHS = ("View ▸ Show Ungraded", "View ▸ Scopes", "Insert ▸ Adjustment Clip",
               "Clip ▸ Look ▸ Warm")
 MENU_CAP_GROUPS = ("Clip ▸ Look", "Insert ▸ Adjustment Clip", "View ▸ Show Ungraded",
-                   "View ▸ Waveform")
+                   "View ▸ Scopes")
 MEASURE_ROWS = ("H0", "M1", "G0", "E1", "E2", "F4", "T4", "Z1")
 SIZES_MUTANTS = ("shader-not-counted",)
 MEASURE_MUTANTS = ("lut-not-applied", "graded-fixture-ungraded", "menus-same-app")

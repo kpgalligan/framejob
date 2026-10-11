@@ -2,13 +2,17 @@ import CoreVideo
 import Foundation
 import Metal
 
-/// Where the waveform panel's frames come from (spec §11 GR-5): the
+/// Where the scopes panel's frames come from (spec §11 GR-5, GR-10): the
 /// compositor offers every finished preview frame (`Compositor.serve`, one
 /// line after `finish(withComposedVideoFrame:)`), and a window whose panel is
-/// shown has a tap on its document's `RecipeSource` key. A key with no tap —
-/// every export's, every offline frame's, and a document's with the panel
-/// hidden — costs one locked dictionary read, so the pass runs only while
-/// the panel is shown.
+/// shown has a tap on its document's `RecipeSource` key, attached with the
+/// set of scopes its slots show. A key with no tap — every export's, every
+/// offline frame's, and a document's with the panel hidden — costs one locked
+/// dictionary read, so the passes run only while the panel is shown.
+///
+/// **One command buffer per offered frame** holds every shown kind's pass
+/// (`WaveformAnalyzer.encode(_:frame:into:)`), and one delivery hands the
+/// panel every kind's trace from that one frame.
 ///
 /// **Latest wins.** At most one pass is in flight per key, and ONE pending
 /// frame waits beside it: a frame offered while a pass is in flight replaces
@@ -23,7 +27,7 @@ import Metal
 /// keeps its pool from recycling it until the pass is done.
 ///
 /// **The main hop is a documented seam** (app/CLAUDE.md's hygiene list): the
-/// pass completes on Metal's completion thread and the trace reaches the
+/// passes complete on Metal's completion thread and the traces reach the
 /// panel through one `DispatchQueue.main.async`, dropped there unless the
 /// SAME tap is still attached.
 final class WaveformTaps {
@@ -33,7 +37,9 @@ final class WaveformTaps {
         /// Which attach this is, so a pass begun for an earlier one is not
         /// delivered to a later one.
         let token: Int
-        let onTrace: (WaveformTrace) -> Void
+        /// The scopes to measure, never empty.
+        let kinds: Set<ScopeKind>
+        let onTraces: ([ScopeKind: ScopeTrace]) -> Void
         var inFlight = false
         var pending: CVPixelBuffer?
     }
@@ -57,12 +63,29 @@ final class WaveformTaps {
         textureCache = cache
     }
 
-    /// Starts analysing `key`'s frames; `onTrace` runs on the main thread.
-    func attach(key: Int, onTrace: @escaping (WaveformTrace) -> Void) {
+    /// Starts measuring `kinds` of `key`'s frames; `onTraces` runs on the
+    /// main thread with every kind's trace of one frame. Attaching an attached
+    /// key replaces its kinds and its callback (a pass begun for the old
+    /// attach is dropped when it completes); an empty set detaches it.
+    func attach(
+        key: Int, kinds: Set<ScopeKind>,
+        onTraces: @escaping ([ScopeKind: ScopeTrace]) -> Void
+    ) {
         lock.lock()
         defer { lock.unlock() }
-        taps[key] = Tap(token: nextToken, onTrace: onTrace)
+        guard !kinds.isEmpty else {
+            taps.removeValue(forKey: key)
+            return
+        }
+        taps[key] = Tap(token: nextToken, kinds: kinds, onTraces: onTraces)
         nextToken += 1
+    }
+
+    /// The kinds `key` is attached with, or nil when it has no tap.
+    func attachedKinds(key: Int) -> Set<ScopeKind>? {
+        lock.lock()
+        defer { lock.unlock() }
+        return taps[key]?.kinds
     }
 
     /// Stops it, emptying the pending slot; a pass in flight is dropped when
@@ -89,33 +112,40 @@ final class WaveformTaps {
         tap.inFlight = true
         taps[key] = tap
         lock.unlock()
-        start(frame, key: key, token: tap.token)
+        start(frame, key: key, token: tap.token, kinds: tap.kinds)
     }
 
-    private func start(_ frame: CVPixelBuffer, key: Int, token: Int) {
+    private func start(_ frame: CVPixelBuffer, key: Int, token: Int, kinds: Set<ScopeKind>) {
         let width = CVPixelBufferGetWidth(frame)
         let height = CVPixelBufferGetHeight(frame)
         guard let analyzer, let wrapper = wrap(frame),
             let texture = CVMetalTextureGetTexture(wrapper),
             let buffer = queue?.makeCommandBuffer(),
-            let counts = analyzer.encode(texture, into: buffer)
+            let counts = analyzer.encode(kinds, frame: texture, into: buffer)
         else {
-            finished(key: key, token: token, trace: nil)
+            finished(key: key, token: token, traces: nil)
             return
         }
         buffer.addCompletedHandler { [weak self] done in
             // The frame and its wrapper live until the GPU is done reading them.
             withExtendedLifetime((wrapper, frame)) {}
-            let trace = done.status == .completed
-                ? analyzer.trace(of: counts, width: width, height: height) : nil
-            self?.finished(key: key, token: token, trace: trace)
+            var traces: [ScopeKind: ScopeTrace]?
+            if done.status == .completed {
+                var read: [ScopeKind: ScopeTrace] = [:]
+                for kind in ScopeKind.allCases {
+                    guard let buffer = counts[kind] else { continue }
+                    read[kind] = analyzer.trace(kind, of: buffer, width: width, height: height)
+                }
+                traces = read
+            }
+            self?.finished(key: key, token: token, traces: traces)
         }
         buffer.commit()
     }
 
-    /// One pass over: the pending frame starts next, and the trace hops to
+    /// One pass over: the pending frame starts next, and the traces hop to
     /// main.
-    private func finished(key: Int, token: Int, trace: WaveformTrace?) {
+    private func finished(key: Int, token: Int, traces: [ScopeKind: ScopeTrace]?) {
         lock.lock()
         guard var tap = taps[key], tap.token == token else {
             lock.unlock()
@@ -126,16 +156,16 @@ final class WaveformTaps {
         tap.inFlight = next != nil
         taps[key] = tap
         lock.unlock()
-        if let next { start(next, key: key, token: token) }
-        guard let trace else { return }
-        DispatchQueue.main.async { [weak self] in self?.deliver(trace, key: key, token: token) }
+        if let next { start(next, key: key, token: token, kinds: tap.kinds) }
+        guard let traces else { return }
+        DispatchQueue.main.async { [weak self] in self?.deliver(traces, key: key, token: token) }
     }
 
-    private func deliver(_ trace: WaveformTrace, key: Int, token: Int) {
+    private func deliver(_ traces: [ScopeKind: ScopeTrace], key: Int, token: Int) {
         lock.lock()
-        let onTrace = taps[key].flatMap { $0.token == token ? $0.onTrace : nil }
+        let onTraces = taps[key].flatMap { $0.token == token ? $0.onTraces : nil }
         lock.unlock()
-        onTrace?(trace)
+        onTraces?(traces)
     }
 
     /// The frame as a Metal texture over the same IOSurface.
