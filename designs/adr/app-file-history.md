@@ -493,6 +493,16 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `VideoPane+Curves.swift`) and `VideoPane+Curves.swift` (the section, the row, the picker and
   the point fields, 342). `GradeProps.swift` (526) is the next to need a seam: the curve types
   (`// MARK: - The curves`) out whole to `CurveProps.swift`.
+  Grading-2's G2-4 gave it wiring only once more (`VideoProps.qualifier`: the field, its init
+  parameter and its lenient decode): 1518 → 1523. The qualifier's types went to a new file of
+  their own, `QualifierProps.swift` (305: the ranges, `ColorQualifier`, `QualifierWrite`,
+  `ColorQualifierPatch`, the shader block `QualifierUniforms`, the pick's `QualifierSample` and
+  `ColorQualifier.picked`), so `GradeProps.swift` (526) took nothing. G2-4's other new files:
+  `RangeStripControl.swift` (317, a range's strip), `VideoPane+Qualifier.swift` (160, the
+  section) and `EditorViewController+Qualifier.swift` (155, Pick from Canvas: the mode, its
+  overlay and `QualifierPick.sample`). `EditorViewController+Eyedropper.swift` (322 → 339) gave
+  its overlay's body to `CanvasPickOverlay`, which `CanvasEyedropperView` and the new
+  `QualifierPickView` subclass. `ProjectSnapshot.swift`'s named seam is unchanged.
 - `Compositor.swift`: the mattes road map's MT1 (issue batch B89) moved `// MARK: - Shadows`
   through `blurKernel`, with `ShadowSurfaces`, to `Compositor+Shadow.swift`, and `render`'s
   per-layer uniforms-and-source block to `prepare` in `CompositorEffects.swift`, a pure move gated
@@ -572,6 +582,9 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `wc -l app/Sources/AgentServer+Render.swift`: 584 before, 563 after; `AgentServer+Scopes.swift`
   is 37. The next seam: `// MARK: - Export` (`exportProject` through `spelled`) out whole to
   `AgentServer+Export.swift`.
+  Grading-2's G2-4 gave `renderFrame` `selection` (its reader `selectionArg`, the
+  adjustment-clip check and its sentence): 567 → 595, five lines under the cap, so the named seam
+  is the next thing it gives up before it takes anything more.
 - `AgentCatalog+Files.swift`: grading-2's G2-0 moved the rows under `// MARK: Rendering and export` (the
   `render_frame` and `export` rows) and the five hoisted locals only they read
   (`frameFormatNames`, `frameFormatProperty`, `burnInProperty`, `exportPresetProperty`,
@@ -593,8 +606,9 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   similarity at 20 %), so it was held to the 400-line cap of a new file. `UngradedTagView` is
   unchanged. `wc -l`: `WaveformPanelView.swift` 243 before; after, `ScopesPanelView.swift` 216,
   `ScopeSlotView.swift` 216, `WaveformTraceView.swift` 133, `ParadeView.swift` 50,
-  `VectorscopeView.swift` 97, `HistogramView.swift` 61. The next seam: `UngradedTagView` (GR-4's
-  tag, not a scope) out whole to `UngradedTagView.swift`.
+  `VectorscopeView.swift` 97, `HistogramView.swift` 61. Grading-2's G2-4 put `SelectionTagView`
+  (GR-13's "Selection" tag) beside `UngradedTagView`: 216 → 242. The next seam: the two tags
+  (GR-4's and GR-13's, not scopes) out whole to `PreviewTagViews.swift`.
 - `AgentCatalog+Clips.swift`: the action rows went to `AgentCatalog+Actions.swift` in issue batch
   B87 phase 2. The grading road map's GR1 paid the next cut: the five property rows (`set_video`,
   `set_audio`, `set_text`, `set_shape`, `set_clip`) and the nineteen hoisted locals they read went

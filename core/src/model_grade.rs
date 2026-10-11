@@ -23,6 +23,13 @@
 //! when one channel is not the identity; `actions_curves.rs`'s
 //! `curves_json` writes all four, an absent one as [`IDENTITY_CURVE`].
 //!
+//! Format 18 (spec §11 GR-13) adds [`Qualifier`], the `video.qualifier` an
+//! ADJUSTMENT clip carries — a [`HueRange`] in degrees, two [`LevelRange`]s
+//! (saturation and luma) in 0…1, each `None` when off, and `invert` —
+//! written only when not neutral ([`Qualifier::is_neutral`]). It narrows
+//! where the adjustment pass grades; on any other clip `set_video` refuses
+//! it (`edit_adjustment.rs`) and the recipe never publishes it.
+//!
 //! Re-exported whole by `model_props.rs`, which `model.rs` re-exports whole
 //! in turn, so `crate::model::Wheels` resolves like every other property
 //! type.
@@ -176,4 +183,89 @@ impl Curves {
             }
         }
     }
+}
+
+/// One turn of the hue circle, in degrees: a [`HueRange`]'s `center` and
+/// `width` are 0…360 (GR-13), the centre wrapping (360 is 0).
+pub const HUE_TURN: f64 = 360.0;
+
+/// The most a hue range's softness may be, in degrees (GR-13): half a turn,
+/// past which the fall-off would wrap onto the band's other side.
+pub const HUE_SOFTNESS_MAX: f64 = 180.0;
+
+/// A hue band (spec §11 GR-13): fully selected within `width / 2` degrees
+/// of `center` (wrapping), falling to nothing across `softness` degrees
+/// outside each edge. The default is the skin band a person ticks on first.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct HueRange {
+    pub center: f64,
+    pub width: f64,
+    pub softness: f64,
+}
+
+impl Default for HueRange {
+    fn default() -> Self {
+        HueRange {
+            center: 30.0,
+            width: 50.0,
+            softness: 25.0,
+        }
+    }
+}
+
+/// A saturation or luma band (spec §11 GR-13), in 0…1: fully selected from
+/// `low` to `high`, falling to nothing across `softness` outside each edge.
+/// The default passes everything until it is narrowed.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LevelRange {
+    pub low: f64,
+    pub high: f64,
+    pub softness: f64,
+}
+
+impl Default for LevelRange {
+    fn default() -> Self {
+        LevelRange {
+            low: 0.0,
+            high: 1.0,
+            softness: 0.1,
+        }
+    }
+}
+
+/// The qualifier (spec §11 GR-13, format 18): which of the destination's
+/// pixels an adjustment clip grades. A range that is `None` is off and
+/// passes everything; the weight is the product of the present ranges, then
+/// its complement when `invert` is set.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Qualifier {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hue: Option<HueRange>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub saturation: Option<LevelRange>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub luma: Option<LevelRange>,
+    #[serde(skip_serializing_if = "is_false")]
+    pub invert: bool,
+}
+
+impl Qualifier {
+    /// No range and not inverted: `video.qualifier` is not written, and the
+    /// adjustment pass weighs every pixel as it did before the key existed.
+    pub fn is_neutral(&self) -> bool {
+        self.hue.is_none() && self.saturation.is_none() && self.luma.is_none() && !self.invert
+    }
+
+    /// The two level ranges with their names, in model order.
+    pub fn levels(&self) -> [(&'static str, &Option<LevelRange>); 2] {
+        [("saturation", &self.saturation), ("luma", &self.luma)]
+    }
+}
+
+/// Whether `invert` is off, and so left out of the file.
+fn is_false(value: &bool) -> bool {
+    !*value
 }

@@ -1064,7 +1064,10 @@ static inline float3 gradeLook(float3 rgb, texture3d<float> look, sampler samp,
 //   5. the point filters       sepia, noir, vignette, invert, IN SLOT ORDER
 //   6. spotlight dim           after every colour stage: the dim is a light
 //                              on the layer, not something the filters act on
-//   7. coverage                corner radius × nest clip rectangle × matte
+//   7. coverage                corner radius × nest clip rectangle × matte;
+//                              an adjustment layer's weight also × the
+//                              qualifier's `q` (spec §11 GR-13), read from
+//                              the destination before step 3
 //   8. transition weight
 //   9. opacity, then the reflection's fade
 //  10. premultiply out
@@ -1912,6 +1915,90 @@ fragment float4 reelcut_dissolve_fragment(ShadowVaryings in [[stage_in]],
     return saturate(mix(o, i, p));
 }
 
+// MARK: - The qualifier (spec §11 GR-13)
+
+// The adjustment pass's second uniform block, at `buffer(1)` of that pass
+// only, so `LayerUniforms` does not grow for it. Mirrors `QualifierUniforms`
+// in `QualifierProps.swift` field for field: sixteen scalar floats, 64
+// bytes, the same layout contract as `LayerUniforms`. Each range is a group
+// of four — enabled, then its three numbers (hue in degrees, the two levels
+// in 0…1) — then `invert`, `selection` (draw `q` × coverage as grey instead
+// of grading: Show Selection), `enabled` (0 skips the reading, so an
+// unqualified pass weighs exactly as it did) and one reserved.
+struct QualifierUniforms {
+    float hueEnabled;
+    float hueCenter;
+    float hueWidth;
+    float hueSoftness;
+    float satEnabled;
+    float satLow;
+    float satHigh;
+    float satSoftness;
+    float lumaEnabled;
+    float lumaLow;
+    float lumaHigh;
+    float lumaSoftness;
+    float invert;
+    float selection;
+    float enabled;
+    float reserved;
+};
+
+// 1 at or inside `edge`, falling to 0 across `softness` OUTSIDE it by
+// Metal's Hermite `smoothstep`; a hard step at softness 0 (never
+// `smoothstep(e, e, x)`, which is undefined).
+static inline float qualifierFall(float x, float edge, float softness) {
+    if (softness <= 0.0) {
+        return x <= edge ? 1.0 : 0.0;
+    }
+    return 1.0 - smoothstep(edge, edge + softness, x);
+}
+
+// A level range: 1 from `low` to `high`, falling outside each edge.
+static inline float qualifierLevel(float v, float low, float high, float softness) {
+    return qualifierFall(low - v, 0.0, softness) * qualifierFall(v - high, 0.0, softness);
+}
+
+// The qualifier's weight `q` of an encoded, saturated, un-premultiplied
+// colour (GR-13): HSV hue against the band (wrapping), times the chroma
+// guard (no hue below C 0.02, full from 0.06); HSV saturation C / max
+// times the near-black guard (dark noise reads unsaturated: 0 at V ≤ 0.03,
+// full from 0.10); Rec. 709 Y′. The product of the ranges present, then its
+// complement when inverted. S and Y′ are saturated: a fast-math division can
+// put C / max an ulp past 1, which a hard edge at 1 would refuse.
+static inline float qualifierWeight(float3 c, constant QualifierUniforms &q) {
+    float mx = max(c.r, max(c.g, c.b));
+    float mn = min(c.r, min(c.g, c.b));
+    float chroma = mx - mn;
+    float w = 1.0;
+    if (q.hueEnabled > 0.5) {
+        float hue = 0.0;
+        if (chroma > 0.0) {
+            if (mx == c.r) {
+                hue = 60.0 * fmod((c.g - c.b) / chroma + 6.0, 6.0);
+            } else if (mx == c.g) {
+                hue = 60.0 * ((c.b - c.r) / chroma + 2.0);
+            } else {
+                hue = 60.0 * ((c.r - c.g) / chroma + 4.0);
+            }
+        }
+        float d = abs(hue - q.hueCenter);
+        d = min(d, 360.0 - d);
+        w *= qualifierFall(d, 0.5 * q.hueWidth, q.hueSoftness);
+        w *= smoothstep(0.02, 0.06, chroma);
+    }
+    if (q.satEnabled > 0.5) {
+        float s = mx > 0.0 ? saturate(chroma / mx) : 0.0;
+        s *= smoothstep(0.03, 0.10, mx);
+        w *= qualifierLevel(s, q.satLow, q.satHigh, q.satSoftness);
+    }
+    if (q.lumaEnabled > 0.5) {
+        float y = saturate(dot(c, float3(0.2126, 0.7152, 0.0722)));
+        w *= qualifierLevel(y, q.lumaLow, q.lumaHigh, q.lumaSoftness);
+    }
+    return q.invert > 0.5 ? 1.0 - w : w;
+}
+
 // MARK: - The adjustment pass (spec §11 GR-6)
 
 // An adjustment clip's layer: no texture, one full-frame quad, blending OFF.
@@ -1922,9 +2009,13 @@ fragment float4 reelcut_dissolve_fragment(ShadowVaryings in [[stage_in]],
 // step 5's point filters would (the canvas's uv as the filters' local position), and
 // premultiplies it back by the destination's own alpha, so alpha is
 // preserved. The weight is the layer's opacity, its strength, times the
-// matte coverage sampled as step 7c samples it.
+// matte coverage sampled as step 7c samples it, times the qualifier's `q`
+// (spec §11 GR-13), read from the destination BEFORE the grade so the grade
+// never moves what it selects. With `q.selection` set the pass writes
+// `q` × coverage as opaque grey instead (Show Selection).
 fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
                                         constant LayerUniforms &u [[buffer(0)]],
+                                        constant QualifierUniforms &q [[buffer(1)]],
                                         float4 dst [[color(0)]],
                                         texture2d<float> matte [[texture(1)]],
                                         texture3d<float> look [[texture(2)]],
@@ -1932,6 +2023,16 @@ fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
                                         sampler samp [[sampler(0)]]) {
     float a = saturate(dst.a);
     float3 c = saturate(dst.rgb / max(a, 1e-4));
+    float2 local = canvasPixels(in.position.xy, float2(u.canvasPerDestX, u.canvasPerDestY))
+        / max(float2(u.canvasWidth, u.canvasHeight), float2(1.0));
+    float coverage = matte.sample(samp, local).r;
+    float selected = 1.0;
+    if (q.enabled > 0.5) {
+        selected = qualifierWeight(c, q);
+    }
+    if (q.selection > 0.5) {
+        return float4(float3(saturate(selected * coverage)), 1.0);
+    }
     c = gradeSample(c, 1.0, u).rgb;
     if (u.toneEnabled > 0.5) {
         c = gradeTone(c, u);
@@ -1945,15 +2046,13 @@ fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
     if (u.lookEnabled > 0.5) {
         c = gradeLook(c, look, samp, u);
     }
-    float2 local = canvasPixels(in.position.xy, float2(u.canvasPerDestX, u.canvasPerDestY))
-        / max(float2(u.canvasWidth, u.canvasHeight), float2(1.0));
     for (int i = 0; i < 4; ++i) {
         float2 slot = filterSlot(u, i);
         c = pointFilter(int(slot.x + 0.5), clamp(slot.y, 0.0, 1.0), c, local);
     }
     c = saturate(c);
     float4 g = float4(c * a, a);
-    float w = saturate(u.opacity * matte.sample(samp, local).r);
+    float w = saturate(u.opacity * coverage * selected);
     return mix(dst, g, w);
 }
 

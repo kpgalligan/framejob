@@ -214,3 +214,29 @@ final class UngradedTagView: NSTextField {
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
+
+/// The "Selection" tag (spec §11 GR-13): Show Selection's, beside
+/// "Ungraded" in the preview's top-left void, shown only while the switch
+/// is on. It takes no clicks.
+final class SelectionTagView: NSTextField {
+    init() {
+        super.init(frame: .zero)
+        stringValue = "Selection"
+        isEditable = false
+        isSelectable = false
+        isBezeled = false
+        isBordered = false
+        drawsBackground = true
+        backgroundColor = DS.chromeBackground
+        textColor = DS.textMuted
+        font = DS.mono(10)
+        isHidden = true
+        setAccessibilityIdentifier("preview.selection")
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) {
+        fatalError("SelectionTagView does not support NSCoder")
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}

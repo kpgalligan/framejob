@@ -119,6 +119,8 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   values 0) on every layer.
   **Amended by GR-12** (grading-2 G2-3): `ungraded` also writes `video.curves` as the identity
   (all four channels `[[0, 0], [1, 1]]`) on every layer.
+  **Amended by GR-13** (grading-2 G2-4): `ungraded` keeps `video.qualifier`, so a neutral
+  adjustment clip with a qualifier still draws nothing.
 - **GR-5 — The luma waveform: the composited preview frame, in a panel beside the preview, and
   no export path.**
   - **What it reads:** the composited, encoded (sRGB) preview frame at Preview Quality's size —
@@ -227,6 +229,10 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   **Amended by GR-12** (grading-2 G2-3): the adjustment clip's Color sub-tab gains Curves, and
   the adjustment pass runs the curves (step 4c.2) after the wheels and before the look, as the
   layer stage does.
+  **Amended by GR-13** (grading-2 G2-4): the adjustment clip's Color sub-tab gains the
+  Qualifier section after Adjustment; the pass's weight becomes `opacity × matte × q`, `q` the
+  qualifier's reading of the destination before the grade; Paste Attributes drops a qualifier
+  onto a picture clip and an adjustment target keeps its own from a picture clip.
 - **GR-7 — Looks: `video.look {kind, amount}`, eight built-ins defined in the core as data,
   baked on the GPU into a 33³ `rgba16Float` lattice and mixed at step 4d.** The owner's thirteen
   choices of 2026-10-10, each as recommended, the eighth look Black & White (not Night); GR5a

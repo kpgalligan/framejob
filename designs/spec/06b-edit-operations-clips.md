@@ -38,6 +38,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   (`add_transition` either half, `set_transition` with a kind, `set_transition_style` with a key),
   and the overlap rule refuses any overlap holding one, each in GR-6's sentence; blur, sharpen,
   pixelate and a blend mode on it are **errors** from `set_video`, `paste` and `paste_attributes`.
+  Its `video.qualifier` (§11 GR-13) narrows the grade to the pixels it selects; on any other
+  clip a qualifier is an **error** from the same three.
 - **`add_background {media?, color?=white, duration?=the timeline's length}`** — A backdrop on a NEW
   back-most track, starting at 0 and named "Background". With `media`, that file placed as
   `add_clip` would place it but for its SCALE — the right source kind, audio props when it has
@@ -229,7 +231,10 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   and so is a copied value the inspector would refuse — each copied layer group passes the patches'
   range checks. Copied video motion and text animation pass the same original-value range checks as
   a patch, then snap to the target grid; audio envelopes retain sample precision. Speed, enabled,
-  actions, the transition, the source and the clip's own name and label stay. **`graphic` is the
+  actions, the transition, the source and the clip's own name and label stay. A video group's
+  `qualifier` follows the clip kind (§11 GR-13): dropped onto a picture clip (said in the tool's
+  description, not its answer — D2-1), an adjustment target's own kept when the payload clip is
+  not an adjustment clip, copied between two adjustment clips. **`graphic` is the
   fifth group, and only when NAMED** (§11 G-32, amending G-10): a side has it when its source is a
   graphic and it has a `graphic` description, and a target TAKES it when it has it and its
   `graphic.name` is the payload clip's. It copies `props` WHOLE — a target key the payload lacks is

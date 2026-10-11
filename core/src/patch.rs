@@ -27,8 +27,9 @@ use serde_json::Value;
 use crate::actions::{self, MAX_PATCH_DEPTH};
 use crate::export::describe;
 use crate::model::{
-    AudioProps, Chroma, Compressor, Filter, Look, LookKind, Motion, ObscureRegion, Reflection,
-    Shadow, ShapeProps, Spotlight, TextProps, VideoProps, LOOK_DEFAULT_AMOUNT,
+    AudioProps, Chroma, Compressor, Filter, HueRange, LevelRange, Look, LookKind, Motion,
+    ObscureRegion, Qualifier, Reflection, Shadow, ShapeProps, Spotlight, TextProps, VideoProps,
+    LOOK_DEFAULT_AMOUNT,
 };
 
 // ---- property groups -----------------------------------------------------
@@ -76,7 +77,7 @@ impl Group {
 
     /// A fully-populated instance of the group, serialized: every optional
     /// sub-object present, so the key check can see inside `shadow`,
-    /// `chroma`, `reflection`, `spotlight`, `look`, `duck`, `compressor`, `outline`,
+    /// `chroma`, `reflection`, `spotlight`, `look`, `qualifier`, `duck`, `compressor`, `outline`,
     /// `backdrop`, `animation`, `word_style`, `stroke` and `gradient` even
     /// when the clip currently has `null` there — and one `filters` entry,
     /// one `obscure` region and one `text.words` entry, so it can see inside
@@ -109,6 +110,14 @@ impl Group {
                     media: Some(0),
                     amount: LOOK_DEFAULT_AMOUNT,
                 }),
+                // Every range present and `invert` true, so the walk sees
+                // inside each and `invert` is a known key (spec §11 GR-13).
+                qualifier: Qualifier {
+                    hue: Some(HueRange::default()),
+                    saturation: Some(LevelRange::default()),
+                    luma: Some(LevelRange::default()),
+                    invert: true,
+                },
                 ..VideoProps::default()
             }),
             Group::Audio => actions::to_json(&AudioProps {

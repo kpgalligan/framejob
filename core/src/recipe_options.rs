@@ -15,8 +15,9 @@ use serde_json::Value;
 /// What a recipe was asked for BESIDES the instant (spec §7.3, §7.9's
 /// `rc_project_frame_recipe_opts`).
 ///
-/// Two members — the timecode burn-in of road map 2's phase 7 and the
-/// ungraded picture of grading GR3 (spec §11 GR-4) — and a struct rather
+/// Four members — the timecode burn-in of road map 2's phase 7, the
+/// ungraded picture of grading GR3 (spec §11 GR-4), and grading-2 G2-4's
+/// `selection` and `behind` (GR-13) — and a struct rather
 /// than `bool` arguments because each would otherwise be a second FFI
 /// signature and a third. One struct behind one
 /// `opts_json` string is the shape the header already uses for
@@ -40,8 +41,18 @@ pub struct RecipeOptions {
     /// Every layer's `video.color` neutral (all thirteen keys), its wheels
     /// neutral (all nine, spec §11 GR-11), its curves the identity (all
     /// four, GR-12) and its look removed, nested and matte layers included:
-    /// the picture as if no clip were graded.
+    /// the picture as if no clip were graded. A qualifier is kept (spec §11
+    /// GR-13): with its clip's grade neutral it draws nothing anyway.
     pub ungraded: bool,
+    /// Show Selection (spec §11 GR-13): the adjustment clip with this id
+    /// draws its qualifier's selection as grey instead of grading, and every
+    /// canvas layer in front of it is left out; no such layer on the frame
+    /// answers a black frame (`recipe_selection.rs`).
+    pub selection: Option<u32>,
+    /// Pick from Canvas (GR-13): the adjustment clip with this id and every
+    /// canvas layer in front of it are left out, so the frame is the picture
+    /// that clip reads (`recipe_selection.rs`).
+    pub behind: Option<u32>,
 }
 
 impl RecipeOptions {
@@ -73,6 +84,17 @@ impl RecipeOptions {
                 .get("ungraded")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            selection: clip_id(value, "selection"),
+            behind: clip_id(value, "behind"),
         }
     }
+}
+
+/// A clip id option: a whole number that fits a `u32`, else none (OFF, the
+/// reading `of` gives every mistyped option).
+fn clip_id(value: &Value, key: &str) -> Option<u32> {
+    value
+        .get(key)
+        .and_then(Value::as_u64)
+        .and_then(|id| u32::try_from(id).ok())
 }

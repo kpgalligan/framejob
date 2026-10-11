@@ -39,7 +39,7 @@
 
 use serde_json::Value;
 
-use crate::edit_adjustment::check_adjustment_video;
+use crate::edit_adjustment::{check_adjustment_video, check_qualifier_clip};
 use crate::edit_clip_timing::{SPEED_MAX, SPEED_MIN};
 use crate::export::describe;
 use crate::lut::normalise_look;
@@ -319,6 +319,7 @@ impl Project {
                     check_video(video, self.source_size(clip))?;
                     check_blend(clip, video)?;
                     check_adjustment_video(clip, video)?;
+                    check_qualifier_clip(clip, video)?;
                     self.check_look_media(video)
                 }
                 None => Ok(()),
@@ -381,6 +382,7 @@ impl Project {
                     props.curves.drop_identities();
                     check_blend(&clip, &props)?;
                     check_adjustment_video(&clip, &props)?;
+                    check_qualifier_clip(&clip, &props)?;
                     self.check_look_media(&props)?;
                     self.snap_motion(&mut props);
                     if let Some(slot) = next.clip_mut(id) {

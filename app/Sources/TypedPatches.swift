@@ -81,6 +81,9 @@ struct VideoPatch: Codable, Equatable {
     /// `curves` (spec §11 GR-12): the channels a write names, each a whole
     /// list or null; a write names only the channel its control edits.
     var curves: ColorCurvesPatch?
+    /// `qualifier` (spec §11 GR-13): the ranges a write names, each off,
+    /// on at the default, or whole, and `invert` (`QualifierProps.swift`).
+    var qualifier: ColorQualifierPatch?
 
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
@@ -89,7 +92,8 @@ struct VideoPatch: Codable, Equatable {
         filters: [FilterProps]? = nil, reflection: ReflectionProps?? = nil,
         spotlight: SpotlightProps?? = nil, obscure: [ObscureProps]? = nil,
         blend: BlendMode? = nil, motion: MotionProps?? = nil, look: LookPatch?? = nil,
-        wheels: ColorWheelsPatch? = nil, curves: ColorCurvesPatch? = nil
+        wheels: ColorWheelsPatch? = nil, curves: ColorCurvesPatch? = nil,
+        qualifier: ColorQualifierPatch? = nil
     ) {
         self.x = x
         self.y = y
@@ -110,6 +114,7 @@ struct VideoPatch: Codable, Equatable {
         self.look = look
         self.wheels = wheels
         self.curves = curves
+        self.qualifier = qualifier
     }
 
     init(from decoder: Decoder) throws {
@@ -138,6 +143,7 @@ struct VideoPatch: Codable, Equatable {
         look = c.nullable(.look)
         wheels = c.lenient(.wheels)
         curves = c.lenient(.curves)
+        qualifier = c.lenient(.qualifier)
     }
 
     var dictionary: [String: Any] {
@@ -193,6 +199,7 @@ struct VideoPatch: Codable, Equatable {
         }
         if let wheels = wheels, !wheels.isEmpty { d["wheels"] = wheels.dictionary }
         if let curves = curves, !curves.isEmpty { d["curves"] = curves.dictionary }
+        if let qualifier = qualifier, !qualifier.isEmpty { d["qualifier"] = qualifier.dictionary }
         return d
     }
 

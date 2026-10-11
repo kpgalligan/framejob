@@ -6,8 +6,9 @@
 
 use crate::audio::MAX_GAIN;
 use crate::model::{
-    AudioProps, BlendMode, CurvePoint, Curves, VideoProps, Wheels, CURVE_POINTS_MAX,
-    CURVE_POINTS_MIN, MAX_FILTERS, MAX_OBSCURE, WHEEL_MAX,
+    AudioProps, BlendMode, CurvePoint, Curves, HueRange, LevelRange, Qualifier, VideoProps, Wheels,
+    CURVE_POINTS_MAX, CURVE_POINTS_MIN, HUE_SOFTNESS_MAX, HUE_TURN, MAX_FILTERS, MAX_OBSCURE,
+    WHEEL_MAX,
 };
 use crate::props_check::{
     COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, EXPOSURE_MAX,
@@ -85,6 +86,7 @@ pub(crate) fn clamp_video(mut props: VideoProps, is_nest: bool) -> VideoProps {
     tone.fade = bounded(tone.fade, 0.0, TONE_MAX, 0.0);
     clamp_wheels(&mut props.wheels);
     clamp_curves(&mut props.curves);
+    clamp_qualifier(&mut props.qualifier);
     // A NaN amount is none of the look, the neutral a filter's amount has.
     if let Some(look) = props.look.as_mut() {
         look.amount = bounded(look.amount, 0.0, 1.0, 0.0);
@@ -211,6 +213,48 @@ fn clamp_points(points: &mut [CurvePoint]) -> bool {
         point[1] = point[1].clamp(0.0, 1.0);
     }
     points.windows(2).all(|pair| pair[1][0] > pair[0][0])
+}
+
+/// The qualifier (spec §11 GR-13): a range holding a NaN removed; every
+/// other number to its bounds — the hue's width 0…360 and softness 0…180,
+/// each level 0…1 — the hue centre taken `rem_euclid 360` (so a centre an
+/// action moved past 360 or below 0 on the short way round,
+/// `actions_qualifier.rs`, comes back onto the circle), and a level range
+/// whose `low` passed its `high` closed at `high = low`.
+fn clamp_qualifier(qualifier: &mut Qualifier) {
+    if let Some(hue) = qualifier.hue {
+        qualifier.hue = clamp_hue(hue);
+    }
+    for range in [&mut qualifier.saturation, &mut qualifier.luma] {
+        if let Some(level) = *range {
+            *range = clamp_level(level);
+        }
+    }
+}
+
+/// One hue range clamped, or `None` when it must go.
+fn clamp_hue(hue: HueRange) -> Option<HueRange> {
+    if !hue.center.is_finite() || hue.width.is_nan() || hue.softness.is_nan() {
+        return None;
+    }
+    Some(HueRange {
+        center: hue.center.rem_euclid(HUE_TURN),
+        width: hue.width.clamp(0.0, HUE_TURN),
+        softness: hue.softness.clamp(0.0, HUE_SOFTNESS_MAX),
+    })
+}
+
+/// One level range clamped, or `None` when it must go.
+fn clamp_level(level: LevelRange) -> Option<LevelRange> {
+    if level.low.is_nan() || level.high.is_nan() || level.softness.is_nan() {
+        return None;
+    }
+    let low = level.low.clamp(0.0, 1.0);
+    Some(LevelRange {
+        low,
+        high: level.high.clamp(0.0, 1.0).max(low),
+        softness: level.softness.clamp(0.0, 1.0),
+    })
 }
 
 pub(crate) fn clamp_audio(mut props: AudioProps) -> AudioProps {

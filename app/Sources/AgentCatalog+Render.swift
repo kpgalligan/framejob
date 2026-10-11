@@ -149,6 +149,16 @@ extension AgentServer {
                             + "View ▸ Show Ungraded's picture. The view switch itself never "
                             + "reaches this tool or an export. Default false.",
                     ],
+                    "selection": [
+                        "type": "integer",
+                        "description": "An adjustment clip's id: draw what its video.qualifier "
+                            + "selects instead of grading — grey, white fully graded, black "
+                            + "untouched, times any matte cutting it, its strength not applied "
+                            + "— with every layer in front of it left out; black where the clip "
+                            + "is not on the frame. View ▸ Show Selection's picture; the view "
+                            + "switch itself never reaches this tool or an export. Refused "
+                            + "unless it names an adjustment clip. Default: none.",
+                    ],
                     "waveform": [
                         "type": "boolean",
                         "description": "Also measure the frame's luma waveform, View ▸ "

@@ -448,7 +448,10 @@ extension AgentServer {
                     + "clip animates, which stays so the ramp keeps its start; a clip of another "
                     + "graphic is an error naming both. The props are checked for shape only, when "
                     + "a target takes them. Speed, enabled, actions, the transition and the clip's "
-                    + "own name and label stay. Refused (no change) when nothing changes.",
+                    + "own name and label stay. A video qualifier follows the clip kind: dropped "
+                    + "onto a picture clip, an adjustment clip's own kept when the payload clip is "
+                    + "not an adjustment clip, copied between two. Refused (no change) when "
+                    + "nothing changes.",
                 [
                     "clips": clipsDescription,
                     "payload": "What Copy wrote, {\"clips\": [...], \"media\": [...]}; see paste.",

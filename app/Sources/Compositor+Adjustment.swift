@@ -9,8 +9,13 @@ import Metal
 /// container, the canvas background included — and writes it back graded by
 /// the layer's colour, tone, wheels, curves, look and point filters, by
 /// `mix(dst, graded, w)`, `w` the layer's opacity (its strength) times the
-/// matte coverage sampled as step 7c samples it. One full-frame quad, the shadow pass's vertex
+/// matte coverage sampled as step 7c samples it, times its qualifier's `q`
+/// (spec §11 GR-13: `QualifierUniforms` at fragment `buffer(1)`, read from
+/// the destination before the grade). One full-frame quad, the shadow pass's vertex
 /// stage; the clip's stored transform, crop, shadow and the rest do nothing.
+/// A layer the recipe marks `selection` (Show Selection) writes `q` × the
+/// coverage as opaque grey instead, even when its grade is neutral or its
+/// strength 0.
 ///
 /// **Blending is OFF** (`pipelineDescriptor`'s doc, the B6 lesson): the
 /// fragment returns the finished pixel, and a fixed-function pass over it
@@ -25,6 +30,18 @@ extension RecipeLayer {
         return false
     }
 
+    /// The adjustment source's qualifier; `.none` for any other layer.
+    var qualifier: ColorQualifier {
+        if case .adjustment(let qualifier, _) = source { return qualifier }
+        return .none
+    }
+
+    /// Whether the recipe marked this adjustment layer for Show Selection.
+    var isSelection: Bool {
+        if case .adjustment(_, true) = source { return true }
+        return false
+    }
+
     /// An adjustment layer that would change nothing: its colour neutral (all
     /// thirteen keys, which Show Ungraded writes so), its wheels neutral (all
     /// nine, GR-11, which Show Ungraded writes so too), its curves the
@@ -32,7 +49,8 @@ extension RecipeLayer {
     /// (Show Ungraded removes a look, GR-7; a LUT look whose file is missing
     /// or refused draws nothing, GR-8) and no point filter with an amount
     /// above 0. It draws nothing, so the frame is byte-identical to one
-    /// without the clip (GR-6, GR-4).
+    /// without the clip (GR-6, GR-4). A qualifier alone changes nothing
+    /// (GR-13): it narrows a grade, and there is none.
     func isNeutralAdjustment(drawsLook: Bool) -> Bool {
         let point: Set<FilterKind> = [.sepia, .noir, .vignette, .invert]
         return color.isIdentity && wheels.isNeutral && curves.isIdentity && !drawsLook
@@ -58,7 +76,8 @@ extension MetalRenderer {
     /// One adjustment layer graded into `pass`, `matte` the coverage cutting
     /// it (the 1×1 placeholder when nothing does), `urls` where a LUT look's
     /// file is found (`RecipeSource.lookURLs(for:)`). Draws nothing when the
-    /// layer has no drawn opacity or would change nothing. The chroma key is
+    /// layer has no drawn opacity or would change nothing — unless it is
+    /// marked `selection`, which always draws (GR-13). The chroma key is
     /// off: it opens a hole in a layer's own picture, and there is none. The
     /// pass's own pipeline is bound again after the draw, so the next layer
     /// inherits the state `DestinationPass.open()` promises.
@@ -68,9 +87,12 @@ extension MetalRenderer {
     ) throws {
         let destination = CGSize(width: pass.target.width, height: pass.target.height)
         let look = looks.lattice(for: layer.look, urls: urls)
-        guard !layer.isNeutralAdjustment(drawsLook: look != nil),
-            var u = uniforms(for: layer, canvas: canvas, destination: destination)
+        let selection = layer.isSelection
+        guard selection || !layer.isNeutralAdjustment(drawsLook: look != nil),
+            var u = uniforms(
+                for: layer, canvas: canvas, destination: destination, ignoringOpacity: selection)
         else { return }
+        var q = QualifierUniforms(layer.qualifier, selection: selection)
         u.chromaEnabled = 0
         if look == nil { u.lookEnabled = 0 }
         let curves = looks.curves.texture(for: layer.curves)
@@ -78,6 +100,7 @@ extension MetalRenderer {
         guard let encoder = pass.open() else { throw MatteError.noTarget }
         encoder.setRenderPipelineState(adjustPipeline)
         encoder.setFragmentBytes(&u, length: MemoryLayout<LayerUniforms>.stride, index: 0)
+        encoder.setFragmentBytes(&q, length: MemoryLayout<QualifierUniforms>.stride, index: 1)
         encoder.setFragmentTexture(matte, index: 1)
         encoder.setFragmentTexture(look ?? looks.placeholder, index: 2)
         encoder.setFragmentTexture(curves, index: 3)

@@ -270,3 +270,118 @@ Concat is opened, at design time or build time.
   - Risk accepted: an action between two non-identity curves of different counts switches at its
     end rather than animating, and a point added or deleted on such a keyed curve lands on the
     clip's base.
+- **GR-13 — Qualifiers: `video.qualifier {hue, saturation, luma, invert}` on adjustment clips
+  only, a weight `q` read from the destination BEFORE the grade and multiplied into the
+  adjustment pass's `w`; Show Selection, Pick from Canvas and `render_frame {selection}`;
+  format 18.** Recorded in G2-4 before its code, from the owner's answers of 2026-10-11 to G2-4's
+  choices 1–13 (1–10 and 12–13 as recommended; 11 changed to the short way round) and the
+  orchestrator's calls on the spec's objections 1 and 3 (the pick's shift inside 0–1; Saturation
+  read as HSV S with a near-black guard).
+  - **Adjustment clips only.** `set_video {patch: {qualifier: …}}` on any other clip is an
+    error in the rule's own sentence, `clip 7 is not an adjustment clip and cannot take a
+    qualifier` (the error tier, as GR-6's filter sentence; `paste` and `paste_attributes` meet it
+    through `check_group`). A `null` or neutral qualifier on any clip is an identity. A qualifier
+    reached through a file or an action's end on another clip is inert: the recipe publishes it
+    only in an adjustment source.
+  - **The keys.** `video.qualifier` holds `hue {center, width, softness}` in degrees, `saturation`
+    and `luma {low, high, softness}` in 0…1, and `invert`; a range is absent when off and `invert`
+    written only when true, so the key is absent when no range is on and Invert is off (neutral,
+    GR-2's rule). Ticked on, a range takes the core's default: hue {center 30, width 50, softness
+    25} (skin), saturation and luma {low 0, high 1, softness 0.1} (passes everything until
+    narrowed). `set_video` merges a partial range (`{hue: {}}` turns hue on at the default;
+    `{hue: null}` turns it off). Bounds, all inclusive, refused never clamped: `center` 0–360
+    (360 = 0), `width` 0–360, hue `softness` 0–180, `low`, `high` and level `softness` 0–1, `low ≤
+    high`. Checked in the order hue centre, width, softness; saturation low, high, softness, then
+    the order; luma the same: `video.qualifier.hue.center must be between 0 and 360, not 400`
+    (each bound in `in_range`'s sentence) and `video.qualifier.saturation.low (0.8) must not be
+    greater than video.qualifier.saturation.high (0.2)`. An action's end is clamped: a NaN
+    removes its range, numbers go to their bounds, the centre `rem_euclid 360`, and `low > high`
+    sets `high = low`.
+  - **The reading** (owner choice 1, 3; on the ENCODED, saturated, un-premultiplied destination
+    colour `c` the adjustment pass reads, BEFORE step 3, so the grade never moves what it selects):
+    C = max − min; Y′ = 0.2126 r + 0.7152 g + 0.0722 b (Rec. 709, the waveform's); HSV hue in
+    degrees in [0, 360), 0 when C = 0; V = max; S = C / V (HSV saturation, 0 when V = 0). A range
+    is 1 inside and falls to 0 across `softness` OUTSIDE each edge by Metal's Hermite `smoothstep`,
+    a hard step at softness 0 (never `smoothstep(e, e, x)`). Hue: d = the angular distance from
+    `center` (wrapping at 360); `q_hue = band(d, width / 2, softness) · smoothstep(0.02, 0.06, C)`
+    — **the chroma guard**: a pixel with almost no colour has no hue, so a hue range is 0 at
+    C ≤ 0.02 and full at C ≥ 0.06, and no grey is ever picked by hue. Saturation reads
+    `S′ = S · smoothstep(0.03, 0.10, V)` — **the near-black guard**: dark noise reads as
+    unsaturated, so a pixel at V ≤ 0.03 reads S′ 0 and one at V ≥ 0.10 its full S. A dark, fully
+    saturated red reads as saturated (S, not chroma). Luma reads Y′. Both guards' numbers are
+    first numbers, tuned by GRD-14 by amending this entry. `q` is the product of the present
+    ranges (no range = 1), then `1 − q` when inverted (so greys come IN under an inverted hue
+    range).
+  - **Where it applies.** The adjustment pass's weight becomes `w = saturate(opacity × matte ×
+    q)`: a matte track above the clip still cuts it, so shape × colour range is the classic
+    secondary. `QualifierUniforms` — sixteen floats, 64 bytes: the hue, saturation and luma
+    groups of four (enabled, then the three numbers), `invert`, `selection`, `enabled` and one
+    reserved — is bound at `buffer(1)` of the adjustment pass only; `LayerUniforms` does not grow.
+    With `enabled` 0 the pass skips the reading and `w` is GR-6's, so an unqualified recipe
+    renders byte-identical. A qualifier alone draws nothing: an adjustment clip whose grade is
+    neutral stays a no-op (`isNeutralAdjustment` unchanged) except under `selection`.
+  - **`selection` and `behind`** (recipe options, GR-4's rule: view state on the document's KEY,
+    never an export override, never persisted). `selection: N` marks clip N's top-level adjustment
+    layer (`"selection": true` in its source) and drops every later layer that is not drawn into
+    a matte (matte-source layers stay: the coverage needs them; matte and dissolve ids are not
+    renumbered); the pass then returns `float4(float3(q × matte), 1)` — opaque grey, white fully
+    selected, the strength not applied — and draws even when the grade is neutral or the opacity
+    0. No such layer on the frame (outside its span, or deleted) answers no layers and a black
+    background. `behind: N` drops that layer and every later layer not drawn into a matte (none
+    found: unchanged) — the picture the clip reads, which Pick from Canvas samples. The source on
+    the wire is `{"kind": "adjustment"}` plus `"qualifier"` only when not neutral and `"selection":
+    true` only when marked, so every unqualified recipe is byte-identical.
+  - **Show Selection** (owner choice 9): View ▸ Show Selection, after Show Ungraded, no shortcut,
+    and a switch in the Qualifier section; a checkmark toggle bound to one clip — turning it on
+    binds the first selected adjustment clip; a selection change rebinds it to the first selected
+    adjustment clip, or turns it off when none is selected; disabled while off with no adjustment
+    clip selected. The editor's preview and the Preview Window (one key) and the scopes see it; a
+    "Selection" tag sits beside "Ungraded" in the preview's top-left void. Per window, off when a
+    project opens, no `UserDefaults` key. **Never reached by it:** an export, Save Frame…, the look
+    gallery, the chroma eyedropper and `render_frame`, which each mint their own options;
+    `render_frame {selection: <clip id>}` asks for it explicitly and refuses an id naming no
+    adjustment clip of the project, naming `selection`; its answer says ", drawn as clip N's
+    qualifier selection (white fully graded, black untouched)" before "Written to".
+  - **Pick from Canvas** (owner choice 8): a third canvas mode beside the chroma eyedropper and
+    the region band; one click on the preview samples the frame rendered with `behind: <clip>`
+    (the clip and every canvas layer in front of it left out); hue and saturation turn on centred
+    on the pixel — a range already on keeps its width and softness; one off takes hue width 30°
+    softness 15° and saturation ±0.15 softness 0.1; luma is re-centred (keeping width and
+    softness) only if already on. A saturation or luma range that would cross 0 or 1 is SHIFTED
+    back inside with its width kept, so the pixel stays inside (pure red → saturation 0.7–1). A
+    pixel with C < 0.06 turns hue off; Invert is unchanged. One undo step, "Qualifier"; Esc or a
+    selection change cancels; the hint "Click to pick the colour to qualify · Esc to cancel".
+  - **The Qualifier section** (owner choices 5–7), on the Color sub-tab of adjustment clips only,
+    after Adjustment (Adjustment · Qualifier · Light · Color · Wheels · Curves · Look), closed
+    until opened, summary "off" or the ranges on ("hue · sat · luma", plus " · inverted"), Reset
+    clears every range and Invert (undo "Qualifier"). Per range two rows: a checkbox (Hue,
+    Saturation, Luma) in the 76 pt label column then the strip; then three captioned 40 pt fields
+    (Centre, Width, Soft in whole degrees; Low, High, Soft to 2 decimals). Then Invert, then
+    `[Pick from Canvas]  ☐ Show Selection`. The strip is 14 pt tall and square-framed: the hue
+    spectrum (full saturation), a neutral → red ramp, or black → white; outside the range and its
+    softness dimmed 60 %, the soft bands 30 %; the edges are the slider's 7 × 11 block knobs, the
+    softness edges 5 × 5 squares; a knob drags the width (hue, symmetric) or low/high, a square the
+    softness (symmetric), the band's body moves the range (hue wraps); ⌥ moves at a tenth (GR-11's
+    convention); a double-click resets that range to its default; each a live gesture and one undo
+    step named after the range. Keyed: the band in action ink and the row's mark (one key for the
+    whole of `video.qualifier`). A mixed selection draws the first clip's values with the mixed
+    badge, and a write sends that range whole to every selected clip.
+  - **Paste Attributes** (owner choice 10): onto a picture clip the qualifier is dropped (said in
+    `paste_attributes`' description, not its answer — D2-1); onto an adjustment clip from a picture
+    clip the target keeps its own; between adjustment clips it is copied.
+  - **Actions** (owner choice 11, changed to the short way round): two present ranges interpolate
+    per number, and the hue centre takes the SHORTER arc — before the lerp, when both states hold
+    a centre and they are more than 180° apart, the target's centre moves by ±360 (two centres
+    exactly 180° apart go linearly), and the end's clamp brings the lerped centre back into
+    [0, 360): 350 → 10 passes 0, never 180 (`actions_qualifier.rs`'s `align_hue_center`; only the
+    interpolation target is touched). A range turned on or off, and Invert, switch at the end.
+  - **Extends GR-4**: `ungraded` keeps the qualifier, so a neutral adjustment clip with a qualifier
+    still draws nothing. **Extends GR-6**: the Qualifier section on the adjustment clip's Color
+    sub-tab, `w` gains `q`, and the paste rule above.
+  - **Format 18**: the key is optional, with no migration step; the bump stops an older build
+    dropping it on save. A file numbered 1–17 (and 1015) opens and is stamped 18; 19 and above
+    are newer.
+  - **Not:** no cleanup blur of the selection, no hue-against-hue or hue-against-saturation curves,
+    no qualifier on picture clips (later issues).
+  - Risk accepted: both guards are first numbers, judged by GRD-14 on real footage; the reading
+    is of encoded values (tier 3 #256 would be a second reading, not a reinterpretation).

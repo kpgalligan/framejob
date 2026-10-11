@@ -32,8 +32,10 @@ detail there.
   `ColorWheelPatch`, `ColorWheelsPatch`, `ColorWheelKind` and
   `LayerUniforms.apply(wheels:)` (GR-11), and the curves' `CurvePoint`,
   `CurveChannel`, `ColorCurves`, `ColorCurvesPatch` and
-  `LayerUniforms.apply(curves:)` (GR-12)), so a row writes only its own key to
-  every selected clip. `word_style` has ONE
+  `LayerUniforms.apply(curves:)` (GR-12); `VideoPatch.qualifier` is
+  `QualifierProps.swift`'s `ColorQualifierPatch`, beside `ColorQualifier`,
+  `QualifierUniforms` and the pick's `QualifierSample` (GR-13)), so a row writes
+  only its own key to every selected clip. `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10). `ReelAgentSocket` (road map
   14's MC2) wraps `rc_agent_socket_start` / `_release`: `start` throws the
   core's sentence, `release` is the quit's unlink-if-still-ours with no join.
@@ -535,10 +537,12 @@ the key map behind it.
   the frozen file stores `assistantTranscript` and a weak `assistantView`),
   `+Export` (the
   dialogs), `+SaveFrame` (⌥⌘E; renders off-main on `frameGrabQueue`; passes
-  no burn-in), `+PreviewQuality`, `+Eyedropper` and `+ZoomRegion`.
-- The two modal canvas modes (`+Eyedropper`, `+ZoomRegion`) install a bare
-  view over the canvas whose PRESENCE is the mode, through `armCanvasMode`,
-  which ends every OTHER armed mode first; a third mode inherits that by being
+  no burn-in), `+PreviewQuality`, `+Eyedropper`, `+Qualifier` (Pick from Canvas,
+  spec §11 GR-13) and `+ZoomRegion`.
+- The three modal canvas modes (`+Eyedropper` and `+Qualifier` on
+  `CanvasPickOverlay`, `+ZoomRegion` on `CanvasRegionView`) install a bare view
+  over the canvas whose PRESENCE is the mode, through `armCanvasMode`, which
+  ends every OTHER armed mode first; a fourth mode inherits that by being
   installed at all. The region frame reads the EVALUATED props (the opposite
   of every session in `CanvasSessions.swift`) because a region is drawn on
   what is on screen; ⇧ during the drag chooses `fill`. Their overlays sit
@@ -754,8 +758,10 @@ the key map behind it.
   `press` / `drag` / `release` / `key`; first responder only while a point is
   selected; its `CurveEditorState` is `VideoPane+Curves.swift`'s, kept on
   `ClipPane`; spec §11 GR-12) ·
-  `InspectorBinding+Writes.swift` (a pure move: a write with an action
-  selected goes to `set_action_end`, with `structural(video:for:)` the
+  `RangeStripControl.swift` (a qualifier range's strip: knobs for the edges,
+  squares for the softness, the body moves it, ⌥ a tenth, each a live gesture;
+  spec §11 GR-13) · `InspectorBinding+Writes.swift` (a pure move: a write with
+  an action selected goes to `set_action_end`, with `structural(video:for:)` the
   exception that sends a list of a different LENGTH, or `motion`, to the
   BASE props, and `structural(audio:for:)` the one that sends pan, mono,
   compressor, noise reduction, duck and keep-pitch there (CI-3);
@@ -837,19 +843,21 @@ the key map behind it.
   (`CurveChannelPicker`), the plot and the selected point's In/Out fields
   (`CurvePointField`) in one row (`CurvesView`), one row mark for
   `video.curves`, `CurveEditorState`, and `InspectorBinding.curvesReset`;
-  +`Adjustment` — the Adjustment section's one Strength row (`video.opacity`)
-  and the selection's adjustment tests (GR-6); +`Look` — the Look section, last
-  in the Color sub-tab (Light · Color · Wheels · Curves · Look): the 3×3 gallery
-  and an Amount row shown only when every clip has a look (GR-7;
-  `LookGallery.swift` renders its thumbnails through `Exporter.renderFrame` at
-  256 px, 0.3 s after changes settle and only while open;
-  `LookGalleryView.swift` draws it; under the grid the Imported group, a tile
-  per `.cube` LUT in media-list order, and Import LUT…, which runs `add_media`
-  and the look as ONE "Import LUT" edit, reusing a listed file, GR-8; Clip ▸
-  Look ▸'s LUT rows are filled when it opens by `LookMenuFiller` in
-  `AppDelegate+ClipMenus.swift`; `-RCDevLookGalleryDump` also writes
-  `lut-<id>.png` and the manifest's `tiles`); +`Transition`, +`Motion`,
-  +`Obscure` — the Obscure section, a pure move; +`Speed` — the
+  +`Qualifier` — the Qualifier section (GR-13), adjustment clips only, after
+  Adjustment: a strip and three fields per range, Invert, Pick from Canvas and
+  Show Selection; +`Adjustment` — the Adjustment section's one Strength row
+  (`video.opacity`) and the selection's adjustment tests (GR-6); +`Look` — the
+  Look section, last in the Color sub-tab (Adjustment · Qualifier on adjustment
+  clips, then Light · Color · Wheels · Curves · Look): the 3×3 gallery and an
+  Amount row shown only when every clip has a look (GR-7; `LookGallery.swift`
+  renders its thumbnails through `Exporter.renderFrame` at 256 px, 0.3 s after
+  changes settle and only while open; `LookGalleryView.swift` draws it; under
+  the grid the Imported group, a tile per `.cube` LUT in media-list order, and
+  Import LUT…, which runs `add_media` and the look as ONE "Import LUT" edit,
+  reusing a listed file, GR-8; Clip ▸ Look ▸'s LUT rows are filled when it opens
+  by `LookMenuFiller` in `AppDelegate+ClipMenus.swift`; `-RCDevLookGalleryDump`
+  also writes `lut-<id>.png` and the manifest's `tiles`); +`Transition`,
+  +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
   a factory `ClipPane` calls when EVERY selected clip is a graphic; the
@@ -1131,17 +1139,19 @@ the key map behind it.
   composed frame by recipe key; one command buffer per frame for the shown
   kinds; one pass in flight per key and one pending slot the newest frame
   replaces) · `ScopesPanelView.swift` (View ▸ Scopes' panel: two slots with
-  pickers, the shrink-to-fit layout and its 360 pt floor, `UngradedTagView`) ·
-  `ScopeSlotView.swift` (a slot: the picker, the caption, the body and its readouts) ·
+  pickers, the shrink-to-fit layout and its 360 pt floor, `UngradedTagView`,
+  `SelectionTagView`) · `ScopeSlotView.swift` (a slot: the picker, the caption,
+  the body and its readouts) ·
   `WaveformTraceView.swift` · `ParadeView.swift` · `VectorscopeView.swift` ·
   `HistogramView.swift` (the slot bodies) ·
   `EditorViewController+Adjustment.swift` (Insert ▸ Adjustment Clip, spec §11
   GR-6: its span — In/Out, else the selection, else the timeline — the
   front-most free non-matte track or a new front "Adjustment" track, one undo
   step, and its validator arm) ·
-  `EditorViewController+Seeing.swift` (View ▸ Show Ungraded and View ▸
-  Scopes, `installSeeing`, their validator arm; spec §11 GR-4, GR-5, GR-10) — the
-  grade's seeing tools. Show Ungraded sets `RecipeOptions.ungraded` on the
+  `EditorViewController+Seeing.swift` (View ▸ Show Ungraded, View ▸ Show
+  Selection and View ▸ Scopes, the tag stack, `installSeeing`, their validator
+  arm; spec §11 GR-4, GR-5, GR-10, GR-13) — the grade's seeing tools. Show
+  Ungraded sets `RecipeOptions.ungraded` on the
   document's own key only, so an export or `render_frame`, which mint their
   own keys, never see it. `armCanvasMode` pins the modal overlays to the
   canvas, not the pane, because the panel shares the pane.
@@ -1182,43 +1192,43 @@ the key map behind it.
   An imported LUT's look (GR-8) binds the `.cube` file's own lattice instead
   (`LutTextures.swift`: read through `MediaImporter+LUT.swift` and the core's
   `rc_cube_*`, cached by path and modification date, nothing bound — the clip
-  drawn ungraded — when the file is missing). **Eight pipelines from six fragment functions** (the eighth,
-  `Compositor+Adjustment.swift`'s, is an adjustment clip's full-frame pass reading
-  the destination, blending off; spec §11 GR-6): the two
-  programmable-blend pipelines MUST be built with fixed-function blending
-  OFF, or the finished pixel is blended twice — invisible over an opaque
-  destination, so a proof of it reads the ALPHA channel over a translucent
-  one. A shadow's silhouette pass takes `maskState`, the gather
-  specialization without the blend (defensive, not load-bearing). A shadow's
-  three passes and its canvas-sized pair are `Compositor+Shadow.swift`'s
-  (`encodeShadow`); a layer's uniforms and source texture are made by
-  `prepare` in `CompositorEffects.swift`, which `encodeLayers` calls once per layer.
-  A video frame is premultiplied only when its buffer's
-  `kCVImageBufferAlphaChannelModeKey` attachment says `PremultipliedAlpha`
-  (`declaresPremultipliedAlpha`, asked by `source(for:…)`), and straight
-  otherwise, an unlabelled one included (spec §11 G-35 (b)).
-  A layer's uniform block is filled by `uniforms(for:…)` in
-  `Compositor+Uniforms.swift`, with `partnerBox` and `clearColor`.
-  The matte pass is `Compositor+Matte.swift`'s `encodeMattes`, run BEFORE the
-  destination pass opens: each group the recipe's `mattes` lists is drawn by
-  the layer pipelines into a pooled destination-sized target (`MattePool`),
-  scheduled by `MattePlan.swift` (spec §11 MT-9: each cut set resolved once
-  its last matte is drawn, a composite given back after its last resolve; the
-  pool keeps what the renderer's last 30 frames held, a frame being one
-  `render` call),
-  each cut set resolved by the sixth pipeline, the matte resolve (r8, source
-  factor zero, destination factor `sourceColor`), into a pooled coverage the
-  layer stage samples at `texture(1)` — every layer draw binds one, the 1×1
-  placeholder when nothing cuts it, and so do the shadow's silhouette pass
-  and the reflection. A layer whose `matte.into` is non-null is never drawn
-  on the canvas, and a cut naming a matte not drawn before it fails the frame
-  (`MatteError.unordered`). Blending is in the ENCODED sRGB space,
-  deliberately. `[[position]]` arrives in
-  DESTINATION pixels, and `canvasPerDestX/Y` is what turns it into canvas
-  pixels — an invariant that held only because the two had always been
-  equal, until Preview Quality. A layer mid-transition blends `normal`
-  because the CORE emits it; grow no second opinion here. Where two obscure
-  regions cover one fragment the GREATER hiding wins. A layer's opacity is read as
+  drawn ungraded — when the file is missing). **Eight pipelines from six
+  fragment functions** (the eighth, `Compositor+Adjustment.swift`'s, is an
+  adjustment clip's full-frame pass reading the destination, blending off, its
+  weight times the qualifier's `q` (`QualifierUniforms` at `buffer(1)`) and a
+  layer marked `selection` writing `q` × coverage as opaque grey instead; spec
+  §11 GR-6, GR-13): the two programmable-blend pipelines MUST be built with
+  fixed-function blending OFF, or the finished pixel is blended twice —
+  invisible over an opaque destination, so a proof of it reads the ALPHA channel
+  over a translucent one. A shadow's silhouette pass takes `maskState`, the
+  gather specialization without the blend (defensive, not load-bearing). A
+  shadow's three passes and its canvas-sized pair are
+  `Compositor+Shadow.swift`'s (`encodeShadow`); a layer's uniforms and source
+  texture are made by `prepare` in `CompositorEffects.swift`, which
+  `encodeLayers` calls once per layer. A video frame is premultiplied only when
+  its buffer's `kCVImageBufferAlphaChannelModeKey` attachment says
+  `PremultipliedAlpha` (`declaresPremultipliedAlpha`, asked by `source(for:…)`),
+  and straight otherwise, an unlabelled one included (spec §11 G-35 (b)). A
+  layer's uniform block is filled by `uniforms(for:…)` in
+  `Compositor+Uniforms.swift`, with `partnerBox` and `clearColor`. The matte
+  pass is `Compositor+Matte.swift`'s `encodeMattes`, run BEFORE the destination
+  pass opens: each group the recipe's `mattes` lists is drawn by the layer
+  pipelines into a pooled destination-sized target (`MattePool`), scheduled by
+  `MattePlan.swift` (spec §11 MT-9: each cut set resolved once its last matte is
+  drawn, a composite given back after its last resolve; the pool keeps what the
+  renderer's last 30 frames held, a frame being one `render` call), each cut set
+  resolved by the sixth pipeline, the matte resolve (r8, source factor zero,
+  destination factor `sourceColor`), into a pooled coverage the layer stage
+  samples at `texture(1)` — every layer draw binds one, the 1×1 placeholder when
+  nothing cuts it, and so do the shadow's silhouette pass and the reflection. A
+  layer whose `matte.into` is non-null is never drawn on the canvas, and a cut
+  naming a matte not drawn before it fails the frame (`MatteError.unordered`).
+  Blending is in the ENCODED sRGB space, deliberately. `[[position]]` arrives in
+  DESTINATION pixels, and `canvasPerDestX/Y` is what turns it into canvas pixels
+  — an invariant that held only because the two had always been equal, until
+  Preview Quality. A layer mid-transition blends `normal` because the CORE emits
+  it; grow no second opinion here. Where two obscure regions cover one fragment
+  the GREATER hiding wins. A layer's opacity is read as
   `RecipeLayer.drawnOpacity` (`CompositorEffects.swift`): the recipe's
   `opacity`, times `1 − word_dim × pause_dim` for a timed text page with no
   backdrop (spec §11 W-16). A routed `cross_dissolve` or `zoom` (a layer's

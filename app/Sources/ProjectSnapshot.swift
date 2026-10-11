@@ -790,6 +790,8 @@ struct VideoProps: Codable, Equatable {
     let wheels: ColorWheels
     /// The tone curves (spec §11 GR-12, `GradeProps.swift`).
     let curves: ColorCurves
+    /// An adjustment clip's qualifier (spec §11 GR-13, `QualifierProps.swift`).
+    let qualifier: ColorQualifier
     /// The clip's look (spec §11 GR-7, `LookProps.swift`); nil is none.
     let look: LookProps?
 
@@ -801,7 +803,8 @@ struct VideoProps: Codable, Equatable {
         reflection: ReflectionProps? = nil, spotlight: SpotlightProps? = nil,
         obscure: [ObscureProps] = [], blend: BlendMode = .normal,
         motion: MotionProps? = nil, wheels: ColorWheels = .neutral,
-        curves: ColorCurves = .identity, look: LookProps? = nil
+        curves: ColorCurves = .identity, qualifier: ColorQualifier = .none,
+        look: LookProps? = nil
     ) {
         self.x = x
         self.y = y
@@ -821,6 +824,7 @@ struct VideoProps: Codable, Equatable {
         self.motion = motion
         self.wheels = wheels
         self.curves = curves
+        self.qualifier = qualifier
         self.look = look
     }
 
@@ -853,6 +857,7 @@ struct VideoProps: Codable, Equatable {
         motion = c.lenient(.motion)
         wheels = c.lenient(.wheels, ColorWheels.neutral)
         curves = c.lenient(.curves, ColorCurves.identity)
+        qualifier = c.lenient(.qualifier, ColorQualifier.none)
         look = c.lenient(.look)
     }
 

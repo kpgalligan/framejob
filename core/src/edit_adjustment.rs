@@ -2,7 +2,8 @@
 //! own. While it lasts, its `video.color` (all thirteen keys), its wheels
 //! (spec §11 GR-11), its curves (GR-12), its look, its point filters (sepia, noir, vignette,
 //! invert) and its opacity — the STRENGTH —
-//! apply to everything already drawn behind it in its container, the canvas
+//! apply to everything already drawn behind it in its container (to the
+//! pixels its qualifier selects, GR-13), the canvas
 //! background included, and never to a track in front. The compositor's
 //! eighth pipeline does the grading by reading the target it draws into
 //! (`Compositor+Adjustment.swift`); the core's part is the kind, the op,
@@ -47,6 +48,17 @@
 //! Its stored transform, crop, corner, shadow, reflection, chroma,
 //! spotlight, obscure and motion placement are kept and do nothing;
 //! refusing them would make Paste Attributes fail from any moved clip.
+//!
+//! **The qualifier is its alone** (spec §11 GR-13): `video.qualifier`
+//! narrows which of the destination's pixels the pass grades, read before
+//! the grade. On any other clip a non-neutral one is an error in its own
+//! sentence ([`check_qualifier_clip`], beside `check_adjustment_video` in
+//! `set_video`, `paste` and `paste_attributes`); one reached through a file
+//! or an action's end on another clip is inert, because the recipe
+//! publishes it only in an adjustment source (`recipe.rs`'s
+//! `layer_source`). Paste Attributes drops it onto a picture clip, and an
+//! adjustment target keeps its own when the payload clip is not an
+//! adjustment clip (`edit_paste_attributes.rs`'s `copy_group`).
 
 use crate::edit_clip::Described;
 use crate::model::{BlendMode, Clip, FilterKind, Project, Source, VideoProps};
@@ -124,6 +136,21 @@ pub(crate) fn check_adjustment_video(clip: &Clip, props: &VideoProps) -> Result<
         ));
     }
     Ok(())
+}
+
+/// The one rule about a qualifier and its clip (spec §11 GR-13): only an
+/// adjustment clip takes one. A neutral qualifier passes on any clip, so a
+/// `null` patch is an identity everywhere. An `Err` (the error tier, as
+/// [`check_adjustment_video`]'s), so `paste` and `paste_attributes` meet it
+/// through `check_group`.
+pub(crate) fn check_qualifier_clip(clip: &Clip, props: &VideoProps) -> Result<(), String> {
+    if is_adjustment(clip) || props.qualifier.is_neutral() {
+        return Ok(());
+    }
+    Err(format!(
+        "clip {} is not an adjustment clip and cannot take a qualifier",
+        clip.id
+    ))
 }
 
 /// The overlap rule's sentence for an overlapping pair that holds an

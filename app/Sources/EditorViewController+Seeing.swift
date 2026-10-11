@@ -1,42 +1,61 @@
 import AppKit
 
-/// Seeing the grade (grading GR3, grading-2 G2-1, spec §11 GR-4, GR-5 and
-/// GR-10): View ▸ Show Ungraded and View ▸ Scopes, both checkmark toggles in
-/// the preview group.
+/// Seeing the grade (grading GR3, grading-2 G2-1 and G2-4, spec §11 GR-4,
+/// GR-5, GR-10 and GR-13): View ▸ Show Ungraded, View ▸ Show Selection and
+/// View ▸ Scopes, checkmark toggles in the preview group.
 ///
-/// **Both are view state, per window, and neither persists**: no
+/// **All three are view state, per window, and none persists**: no
 /// `UserDefaults` key, so a new window starts with both off (and the scopes'
 /// slots at Waveform over Vectorscope) and a proof can drive them through
 /// `perform_menu_item` without moving the defaults. No MCP tool mirrors them
 /// or the slot picks (§7.9's Preview Quality exemption); `render_frame
-/// {ungraded, waveform, parade, vectorscope, histogram}` is the capability.
+/// {ungraded, selection, waveform, parade, vectorscope, histogram}` is the
+/// capability.
 ///
-/// **Show Ungraded is an option on the document's KEY** (`RecipeSource`,
+/// **Show Ungraded and Show Selection are options on the document's KEY** (`RecipeSource`,
 /// spec §7.3), so it reaches exactly what composes through that key: the
 /// editor's preview and the Preview Window, one player. An export, Save
 /// Frame…, the eyedropper and `render_frame` mint keys of their own
 /// (`Exporter`), which is why the switch cannot reach them.
 ///
-/// The panel and the tag are found by kind among `canvasContainer`'s
+/// **Show Selection is bound to ONE adjustment clip** (`selection` holds its
+/// id): turned on for the first selected adjustment clip, rebound when the
+/// selection changes to another (`syncShowSelection`, from `refreshCanvas`),
+/// and turned off when no adjustment clip is selected; disabled while off
+/// with none selected.
+///
+/// The panel and the tag stack are found by kind among `canvasContainer`'s
 /// subviews, as `previewCanvas` is: the frozen base file holds no property
-/// for them.
+/// for them. The tags sit in one horizontal stack (spacing 4, hidden tags
+/// detached), so "Selection" moves into the corner when "Ungraded" is off.
 extension EditorViewController {
     var scopesPanel: ScopesPanelView? {
         canvasContainer.subviews.compactMap { $0 as? ScopesPanelView }.first
     }
 
+    var seeingTags: SeeingTagStack? {
+        canvasContainer.subviews.compactMap { $0 as? SeeingTagStack }.first
+    }
+
     var ungradedTag: UngradedTagView? {
-        canvasContainer.subviews.compactMap { $0 as? UngradedTagView }.first
+        seeingTags?.arrangedSubviews.compactMap { $0 as? UngradedTagView }.first
+    }
+
+    var selectionTag: SelectionTagView? {
+        seeingTags?.arrangedSubviews.compactMap { $0 as? SelectionTagView }.first
     }
 
     /// The panel at the pane's right edge, the canvas's trailing edge pinned
-    /// to its leading one, and the tag in the void's top-left corner. Called
+    /// to its leading one, and the tags in the void's top-left corner. Called
     /// once, from `installCanvas`. A slot the panel reveals or re-picks asks
     /// for a frame through `refreshSeeing`.
     func installSeeing(beside canvas: PreviewCanvasView) {
         let panel = ScopesPanelView()
         panel.onNeedsFrame = { [weak self] in self?.refreshSeeing() }
-        let tag = UngradedTagView()
+        let tag = SeeingTagStack(views: [UngradedTagView(), SelectionTagView()])
+        tag.orientation = .horizontal
+        tag.spacing = 4
+        tag.detachesHiddenViews = true
         for view in [panel, tag] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             canvasContainer.addSubview(view)
@@ -63,6 +82,50 @@ extension EditorViewController {
         refreshSeeing()
     }
 
+    /// View ▸ Show Selection (no shortcut, spec §11 GR-13): on, bound to the
+    /// first selected adjustment clip; off. The Qualifier section's switch
+    /// sends the same command, and the inspector is refreshed so it follows.
+    @objc func toggleShowSelection(_ sender: Any?) {
+        guard let document = document else { return }
+        var options = RecipeSource.shared.options(for: document.recipeKey)
+        if options.selection != nil {
+            options.selection = nil
+        } else if let clip = firstSelectedAdjustment {
+            options.selection = clip
+        } else {
+            NSSound.beep()
+            return
+        }
+        showSelection(options, for: document)
+    }
+
+    /// Called from `refreshCanvas`: while Show Selection is on, a selection
+    /// change rebinds it to the first selected adjustment clip, or turns it
+    /// off when none is selected. Nothing while it is off.
+    func syncShowSelection() {
+        guard let document = document else { return }
+        var options = RecipeSource.shared.options(for: document.recipeKey)
+        guard let bound = options.selection else { return }
+        let next = firstSelectedAdjustment
+        guard next != bound else { return }
+        options.selection = next
+        showSelection(options, for: document)
+    }
+
+    /// The first selected adjustment clip's id, or nil.
+    private var firstSelectedAdjustment: UInt32? {
+        (inspector?.selectedClips ?? []).first { InspectorTab.isAdjustment($0) }?.id
+    }
+
+    /// Publishes `options` on the document's key, the tag and the switch
+    /// following.
+    private func showSelection(_ options: RecipeOptions, for document: ProjectDocument) {
+        RecipeSource.shared.setOptions(options, for: document.recipeKey)
+        selectionTag?.isHidden = options.selection == nil
+        refreshSeeing()
+        inspector?.refresh(isLive: false)
+    }
+
     /// View ▸ Scopes (⌃⌘W): the panel beside the preview, on or off.
     @objc func toggleScopes(_ sender: Any?) {
         guard let document = document, let panel = scopesPanel else { return }
@@ -80,8 +143,10 @@ extension EditorViewController {
     // MARK: - Validation
 
     /// The half of `validateUserInterfaceItem` this file owns; nil means "not
-    /// one of mine". Always enabled, like Preview Window: both are about the
-    /// preview, not the timeline. The checkmark is the state.
+    /// one of mine". Show Ungraded and Scopes are always enabled, like Preview
+    /// Window: both are about the preview, not the timeline; Show Selection
+    /// is disabled while off with no adjustment clip selected. The checkmark
+    /// is the state.
     func validateSeeingAction(
         _ action: Selector, item: any NSValidatedUserInterfaceItem
     ) -> Bool? {
@@ -90,6 +155,12 @@ extension EditorViewController {
             let on = document.map { RecipeSource.shared.options(for: $0.recipeKey).ungraded }
             (item as? NSMenuItem)?.state = on == true ? .on : .off
             return true
+        case #selector(toggleShowSelection(_:)):
+            let on = document.flatMap {
+                RecipeSource.shared.options(for: $0.recipeKey).selection
+            } != nil
+            (item as? NSMenuItem)?.state = on ? .on : .off
+            return on || firstSelectedAdjustment != nil
         case #selector(toggleScopes(_:)):
             (item as? NSMenuItem)?.state = scopesPanel?.isShown == true ? .on : .off
             return true
@@ -97,4 +168,11 @@ extension EditorViewController {
             return nil
         }
     }
+}
+
+/// The preview's tag stack (spec §11 GR-4, GR-13): "Ungraded" then
+/// "Selection", hidden tags detached. Like the tags, it takes no clicks, so
+/// a gesture in the void beneath it is the canvas's.
+final class SeeingTagStack: NSStackView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

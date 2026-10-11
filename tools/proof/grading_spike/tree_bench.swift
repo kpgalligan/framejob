@@ -12,16 +12,22 @@
 // white placeholder, `texture(2)` an identity 2³ `rgba16Float` lattice,
 // `texture(3)` an identity 2×1 `rgba32Float` curve strip (grading-2 G2-3's;
 // an older base's shader names no `texture(3)` and ignores it).
+// The adjustment pass's pipelines are `adjustPipeline`'s (the shadow vertex
+// stage, `reelcut_adjust_fragment`, blending OFF) with a NEUTRAL
+// `QualifierUniforms` bound at fragment `buffer(1)` (grading-2 G2-4's; an
+// older base's fragment names no `buffer(1)` and ignores it).
 //
 //   tree_bench --lib V0=PATH --lib VT=PATH --width W --height H --frames N
 //              --runs R --warmup K --seed S --vt-exposure EV --out JSON
 //
-// One scene, S1: one full-bleed picture layer, ungraded. Series V0:S1, VT:S1
-// and V0b:S1 (V0 again, the noise control), each run in an order drawn from
-// SplitMix64 seeded with seed + run; a series is K warm-up frames then N timed
-// ones, one command buffer per frame, committed and waited on, timed as
-// `gpuEndTime − gpuStartTime`. KT, VT:S1 against V0:S1 within 1/1023 over the
-// whole frame, is read back before any timing. `--vt-exposure` is 0 except
+// Two scenes: S1, one full-bleed picture layer, ungraded; and SA (grading-2
+// G2-4), S1 then one full-frame adjustment pass at +1 EV, unqualified. Series
+// V0:S1, VT:S1, V0b:S1, V0:SA, VT:SA and V0b:SA (V0b is V0 again, the noise
+// control), each run in an order drawn from SplitMix64 seeded with seed +
+// run; a series is K warm-up frames then N timed ones, one command buffer per
+// frame, committed and waited on, timed as `gpuEndTime − gpuStartTime`. KT,
+// VT:S1 against V0:S1, and KA, VT:SA against V0:SA, each within 1/1023 over
+// the whole frame, are read back before any timing. `--vt-exposure` is 0 except
 // under `grading_spike.py`'s mutant `tree-graded`, where VT's draws carry that
 // exposure with `toneEnabled` 1. The JSON has `bench-<h>.json`'s shape.
 import Foundation
@@ -115,6 +121,21 @@ func layerState(_ lib: String) -> MTLRenderPipelineState {
 }
 
 let states = ["V0": layerState("V0"), "VT": layerState("VT")]
+
+/// `MetalRenderer.adjustPipeline`'s: the shadow vertex stage and the adjust
+/// fragment, blending OFF.
+func adjustState(_ lib: String) -> MTLRenderPipelineState {
+    let d = MTLRenderPipelineDescriptor()
+    d.vertexFunction = function(lib, "reelcut_shadow_vertex")
+    d.fragmentFunction = function(lib, "reelcut_adjust_fragment")
+    d.colorAttachments[0].pixelFormat = workingFormat
+    d.colorAttachments[0].isBlendingEnabled = false
+    do { return try device.makeRenderPipelineState(descriptor: d) } catch {
+        fail("\(lib): adjustment pipeline: \(error)")
+    }
+}
+
+let adjustStates = ["V0": adjustState("V0"), "VT": adjustState("VT")]
 
 let samplerDescriptor = MTLSamplerDescriptor()
 samplerDescriptor.minFilter = .linear
@@ -240,8 +261,24 @@ func fullBleed(graded: Bool) -> LayerUniforms {
     return u
 }
 
+/// SA's adjustment block: the canvas, full strength, +1 EV (`toneEnabled` 1).
+func adjustBlock() -> LayerUniforms {
+    var u = LayerUniforms()
+    u.canvasWidth = Float(W)
+    u.canvasHeight = Float(H)
+    u.canvasPerDestX = 1
+    u.canvasPerDestY = 1
+    u.opacity = 1
+    u.exposure = 1
+    u.toneEnabled = 1
+    return u
+}
+
+/// One frame of `series` ("V0:S1", "VT:SA", …).
 func encode(_ series: String, _ buffer: MTLCommandBuffer) {
-    let lib = series == "VT" ? "VT" : "V0"
+    let parts = series.split(separator: ":").map(String.init)
+    let lib = parts[0] == "VT" ? "VT" : "V0"
+    let adjusted = parts.count > 1 && parts[1] == "SA"
     var block = fullBleed(graded: lib == "VT")
     let d = MTLRenderPassDescriptor()
     d.colorAttachments[0].texture = destination
@@ -260,6 +297,19 @@ func encode(_ series: String, _ buffer: MTLCommandBuffer) {
     e.setFragmentTexture(identityStrip, index: 3)
     e.setFragmentSamplerState(sampler, index: 0)
     e.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+    if adjusted {
+        var adjust = adjustBlock()
+        var qualifier = QualifierUniforms(.none, selection: false)
+        e.setRenderPipelineState(adjustStates[lib]!)
+        withUnsafeBytes(of: &adjust) { bytes in
+            e.setFragmentBytes(bytes.baseAddress!, length: blockBytes, index: 0)
+        }
+        e.setFragmentBytes(&qualifier, length: MemoryLayout<QualifierUniforms>.stride, index: 1)
+        e.setFragmentTexture(placeholder, index: 1)
+        e.setFragmentTexture(identity2, index: 2)
+        e.setFragmentTexture(identityStrip, index: 3)
+        e.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+    }
     e.endEncoding()
 }
 
@@ -287,9 +337,9 @@ func readHalves(_ series: String) -> [UInt16] {
 func r4(_ v: Double) -> Double { (v * 10000).rounded() / 10000 }
 
 var kRows: [[String: Any]] = []
-do {
-    let reference = readHalves("V0")
-    let got = readHalves("VT")
+for (row, scene) in [("KT", "S1"), ("KA", "SA")] {
+    let reference = readHalves("V0:\(scene)")
+    let got = readHalves("VT:\(scene)")
     var worst: Float = 0
     var at = 0
     for i in 0..<got.count {
@@ -298,8 +348,8 @@ do {
     }
     let ok = worst <= 1.0 / 1023
     kRows.append([
-        "row": "KT", "variant": "VT", "ok": ok,
-        "detail": "VT:S1 against V0:S1 max |Δ| \(r4(Double(worst))) "
+        "row": row, "variant": "VT", "ok": ok,
+        "detail": "VT:\(scene) against V0:\(scene) max |Δ| \(r4(Double(worst))) "
             + "(\(r4(Double(worst) * 1023)) / 1023) at pixel \(at / 4) channel \(at % 4); "
             + "bound 1/1023; VT exposure \(vtExposure)",
     ])
@@ -307,11 +357,11 @@ do {
 
 // ---- timing ----------------------------------------------------------------
 
-let plan = ["V0:S1", "VT:S1", "V0b:S1"]
+let plan = ["V0:S1", "VT:S1", "V0b:S1", "V0:SA", "VT:SA", "V0b:SA"]
 
 func frameMilliseconds(_ name: String) -> Double {
     guard let buffer = queue.makeCommandBuffer() else { fail("command buffer") }
-    encode(String(name.split(separator: ":")[0]), buffer)
+    encode(name, buffer)
     buffer.commit()
     buffer.waitUntilCompleted()
     if let error = buffer.error { fail("\(name): \(error)") }

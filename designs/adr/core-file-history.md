@@ -237,6 +237,16 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   `grade_check.rs` (71) took the curve types and `check_curves` beside the wheels'. The next
   seam, should `actions.rs` need one: the per-group JSON writers (`color_json`, `wheels_json`,
   `video_json`) out to `actions_json.rs`, beside `curves_json`.
+  G2-4 followed the same rule: the qualifier's action rule went to a new module,
+  `actions_qualifier.rs` (51: `align_hue_center`, the hue centre the short way round), and
+  `actions.rs` took one call, its comment and the import (538 → 541). `clamp_qualifier` went
+  beside `clamp_curves` in `actions_clamp.rs` (243 → 287), `check_qualifier` beside
+  `check_curves` in `grade_check.rs` (71 → 108), the types in `model_grade.rs` (179 → 271), and
+  `check_qualifier_clip` in `edit_adjustment.rs` (185 → 212).
+- `recipe.rs`: grading-2's G2-4 put the qualifier's two options (`selection`, `behind`) in a new
+  module, `recipe_selection.rs` (83: `LayerFacts`, `select_layers`), and `recipe.rs` took the
+  facts' collection, the one call, the black background and the adjustment source's `qualifier`
+  (486 → 513). The named seam (the content hash out to `recipe_hash.rs`) is unchanged.
 - `ffi_graphic.rs`: at the new-module cap with nothing crate-free left to move (`diag_json` and
   `diag_error` name `Diagnostic`; road map 10 §10.7).
 - `core/tests/add_transition_edges.rs`: at the new-file cap; gives something up before it takes

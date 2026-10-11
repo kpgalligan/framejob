@@ -77,9 +77,9 @@ before any of its steps runs.
 
 **Menu items.** `perform_menu_item` takes a path of titles as the menu shows
 them (`["File", "Export…"]`). Only items the dev tool classifies `sheet` or
-`window` are allowed, and the two view toggles of grading GR3 (View ▸ Show
-Ungraded and View ▸ Scopes, `VIEW_SELECTORS` in `screens.py`), which persist
-nothing — a screen that turns one on turns it off in `after`. File ▸ New
+`window` are allowed, and the three view toggles of grading GR3 and grading-2
+G2-4 (View ▸ Show Ungraded, View ▸ Scopes and View ▸ Show Selection,
+`VIEW_SELECTORS` in `screens.py`), which persist nothing — a screen that turns one on turns it off in `after`. File ▸ New
 Recording… runs only in the LAST screen run:
 shown from the background its panel no longer takes key (spec §11, #137), but
 an instance that is active when it runs still gets a key panel whose default
@@ -138,6 +138,11 @@ Built by `screens.py` on the first screen that names one, into
   "Bleach.cube", imported in that order after it, and the clip's look `{lut,
   Warm Print, 0.8}` — so the Look section shows an Imported group of two tiles
   with Warm Print outlined. Ready once `video`'s peaks are cached.
+- `qualifier` — `Qualifier.reelcut` (grading-2 G2-4, spec §11 GR-13): `adjust`'s
+  two tracks and clips, the adjustment clip at full strength with the
+  qualifier hue {25, 30, 15} and saturation {0.15, 1, 0.05}, so only the
+  video's warm, saturated pixels go grey. Ready once `video`'s peaks are
+  cached.
 
 ## Adding a screen
 

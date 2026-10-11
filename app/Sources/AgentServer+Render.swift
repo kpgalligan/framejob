@@ -14,6 +14,16 @@ extension AgentServer {
 
     // MARK: - Rendering
 
+    /// `render_frame`'s `selection`: absent, or an id (a whole number in the
+    /// id range), refused by name otherwise.
+    private func selectionArg(_ a: [String: Any]) throws -> UInt32? {
+        guard let value = try intArg(a, "selection") else { return nil }
+        guard value >= 0, value <= Int(UInt32.max) else {
+            throw ToolError(message: "selection is not a clip id: \(value)")
+        }
+        return UInt32(value)
+    }
+
     /// `render_frame` — the offline twin of the preview: an
     /// `AVAssetImageGenerator` over the SAME `AVComposition` +
     /// `AVVideoComposition` an export writes, so what comes back is what the
@@ -60,15 +70,29 @@ extension AgentServer {
     /// `<path>.<scope>.json` with a sentence each, in that order
     /// (`writeScopes`, in `AgentServer+Scopes.swift`).
     ///
+    /// **`selection` is View ▸ Show Selection's mirror** (spec §11 GR-13): an
+    /// adjustment clip's id, a recipe option like `ungraded` — the clip's
+    /// qualifier drawn as grey, every layer in front of it left out, black
+    /// where the clip is not on the frame. An id naming no adjustment clip of
+    /// the edited project is refused, naming `selection`.
+    ///
     /// **A graphic that warned or failed is named** (G-8, G3c): one sentence
     /// per report the frame's pin held, before the last. The set is the
     /// DOCUMENT's (`recipeKey`), not the scoped handle's: a nest draws the
     /// package's modules too.
     func renderFrame(_ a: [String: Any]) throws -> String {
+        let selection = try selectionArg(a)
         let context = try onMain {
             () throws -> (ReelProject, [UInt32: URL], Ticks, CGSize, GraphicSet?) in
             let document = try self.target(a)
             let t = try self.optionalTimeArg(a, "t", document) ?? document.playhead
+            if let selection, !(document.editedProject.snapshot.clip(selection)
+                .map(InspectorTab.isAdjustment) ?? false)
+            {
+                throw ToolError(
+                    message: "selection must name an adjustment clip of this project; clip "
+                        + "\(selection) is not one.")
+            }
             // `editedProject`, not `project` — road map 2's phase 9. With a
             // nest open (`set_scope`) this renders THAT nest at its own
             // frozen canvas, from its own zero, with the outer transform not
@@ -95,7 +119,7 @@ extension AgentServer {
         }
         let options = RecipeOptions(
             burnInTimecode: try boolArg(a, "burn_in_timecode") ?? false,
-            ungraded: try boolArg(a, "ungraded") ?? false)
+            ungraded: try boolArg(a, "ungraded") ?? false, selection: selection)
         var scopes: [ScopeKind] = []
         for kind in ScopeKind.allCases where try boolArg(a, kind.rawValue) ?? false {
             scopes.append(kind)
@@ -132,6 +156,10 @@ extension AgentServer {
         }
         if options.ungraded {
             text += ", with every grade removed"
+        }
+        if let selection {
+            text += ", drawn as clip \(selection)'s qualifier selection (white fully graded, "
+                + "black untouched)"
         }
         text += "."
         // Said where the caller can see it rather than only in the schema: a

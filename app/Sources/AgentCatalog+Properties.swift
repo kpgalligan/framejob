@@ -121,6 +121,21 @@ extension AgentServer {
         + "is red(master(v)). Applied after wheels and before look. In an action's end an "
         + "identity curve animates to neutral (an identity on either side takes the other "
         + "curve's x's); any other change of point count switches at the end)"
+    private static let qualifierClause: String =
+        ", qualifier (adjustment clips only — anything else is an error naming the clip; "
+        + "which pixels the clip's grade reaches, read from the picture behind it BEFORE the "
+        + "grade: {hue: {center, width, softness}, saturation: {low, high, softness}, luma: "
+        + "{low, high, softness}, invert}. hue is in degrees: center 0–360 (wraps), width "
+        + "0–360 fully selected about the centre, softness 0–180 of fall-off outside each "
+        + "edge; a colour with chroma under about 0.06 has no hue and is never selected by "
+        + "it. saturation is HSV saturation (chroma / max, and near-black reads as 0) and "
+        + "luma Rec. 709 Y′, each low ≤ high and softness 0–1. A range MERGES: {hue: {}} "
+        + "turns hue on at {30, 50, 25} (saturation and luma at {0, 1, 0.1}), a partial "
+        + "range keeps the rest, null turns it off; the weight is the product of the ranges "
+        + "on, inverted by invert: true. Refused outside the bounds, never clamped. In an "
+        + "action the numbers animate, the hue centre the short way round (350 to 10 passes "
+        + "0); a range turned on or off and invert switch at the end. render_frame "
+        + "{selection: clip} shows what it selects)"
     // The three patch vocabularies, written once: every property group of
     // spec §5.2, with the ranges the ops enforce. A patch MERGES, so a key
     // left out keeps its current value and a key set to null clears an
@@ -155,6 +170,7 @@ extension AgentServer {
         + motionClause
         + wheelsClause
         + curvesClause
+        + qualifierClause
         + lookClause
         + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
         + "length and a component outside the range is refused by name, neither "
@@ -255,8 +271,8 @@ extension AgentServer {
                     + "crop removes edges in place without shifting the content. To animate a "
                     + "property instead, add_action and then set_action_end. On an adjustment "
                     + "clip only color, wheels, curves, look, the point filters and opacity (the "
-                    + "grade's strength) do anything, and blur, sharpen, pixelate or a blend mode "
-                    + "is an error.",
+                    + "grade's strength) do anything, the qualifier narrows which pixels they "
+                    + "reach, and blur, sharpen, pixelate or a blend mode is an error.",
                 ["clips": clipsDescription, "patch": videoPatchDescription]),
             opTool(
                 "set_audio",

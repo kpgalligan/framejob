@@ -41,11 +41,14 @@ enum RecipeSourceRef: Codable, Equatable {
     /// The media could not be resolved — draw a slate.
     case missing
     /// An adjustment clip (spec §11 GR-6): no picture; the layer grades the
-    /// destination behind it (`Compositor+Adjustment.swift`).
-    case adjustment
+    /// destination behind it (`Compositor+Adjustment.swift`), weighted by its
+    /// `qualifier` (GR-13; `.none` when the source carries none). `selection`
+    /// is Show Selection's mark: the pass writes the qualifier's selection
+    /// as grey instead of grading.
+    case adjustment(qualifier: ColorQualifier, selection: Bool)
 
     private enum CodingKeys: String, CodingKey {
-        case kind, media, hash, text, shape
+        case kind, media, hash, text, shape, qualifier, selection
         // `track_id` converts to `trackId`, not `trackID`; spell it the way
         // the converter does or this key silently never matches.
         case trackID = "trackId"
@@ -69,7 +72,10 @@ enum RecipeSourceRef: Codable, Equatable {
         case "shape":
             self = .shape(hash: c.lenient(.hash, ""), props: c.lenient(.shape, ShapeProps()))
         case "graphic": self = RecipeSourceRef.graphic(from: decoder)
-        case "adjustment": self = .adjustment
+        case "adjustment":
+            self = .adjustment(
+                qualifier: c.lenient(.qualifier, ColorQualifier.none),
+                selection: c.lenient(.selection, false))
         default:
             self = .missing
         }
@@ -96,8 +102,10 @@ enum RecipeSourceRef: Codable, Equatable {
         case .graphic: try encodeGraphic(to: encoder)
         case .missing:
             try c.encode("missing", forKey: .kind)
-        case .adjustment:
+        case .adjustment(let qualifier, let selection):
             try c.encode("adjustment", forKey: .kind)
+            if !qualifier.isNeutral { try c.encode(qualifier, forKey: .qualifier) }
+            if selection { try c.encode(true, forKey: .selection) }
         }
     }
 

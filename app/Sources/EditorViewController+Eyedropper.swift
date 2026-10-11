@@ -50,6 +50,7 @@ extension EditorViewController {
     /// mode is not armed, so this is the whole cost of a new mode: one line.
     private func endCanvasModes() {
         endChromaEyedropper()
+        endQualifierPick()
         endRegionMode()
     }
 }
@@ -232,32 +233,32 @@ extension EditorViewController {
 
 // MARK: - The overlay
 
-/// The mode's view: a transparent sheet over the whole canvas pane that takes
-/// the one click, wears the crosshair, and says how to get back out.
+/// A pick mode's view (the chroma eyedropper's, Pick from Canvas's): a
+/// transparent sheet over the whole canvas pane that takes the one click,
+/// wears the crosshair, and says how to get back out in a pill. Subclassed
+/// for the state each mode carries.
 ///
-/// It holds the session and nothing else. Where the click landed on the
-/// canvas, what is under it, and what to do about it are all the view
-/// controller's — this is the same division `CanvasOverlayView` keeps with
-/// `PreviewCanvasView`.
-final class CanvasEyedropperView: NSView, CanvasModalMode {
-    let session: CanvasEyedropperSession
+/// It holds nothing else. Where the click landed on the canvas, what is
+/// under it, and what to do about it are all the view controller's — this
+/// is the same division `CanvasOverlayView` keeps with `PreviewCanvasView`.
+class CanvasPickOverlay: NSView, CanvasModalMode {
     /// The picked point in WINDOW coordinates.
     var onPick: ((CGPoint) -> Void)?
     var onCancel: (() -> Void)?
 
-    private static let hint = "Click to pick the key color · Esc to cancel"
+    private let hint: String
     private static let hintPadding: CGFloat = 9
     private static let hintTop: CGFloat = 10
 
-    init(session: CanvasEyedropperSession) {
-        self.session = session
+    init(hint: String) {
+        self.hint = hint
         super.init(frame: .zero)
         wantsLayer = true
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
-        fatalError("CanvasEyedropperView does not support NSCoder")
+        fatalError("CanvasPickOverlay does not support NSCoder")
     }
 
     /// The canvas's own y-down space, so the hint is placed from the top edge
@@ -303,7 +304,7 @@ final class CanvasEyedropperView: NSView, CanvasModalMode {
     /// how to leave it.
     override func draw(_ dirtyRect: NSRect) {
         let label = NSAttributedString(
-            string: Self.hint,
+            string: hint,
             attributes: [.font: DS.sans(11), .foregroundColor: DS.textStrong])
         let size = label.size()
         let pill = CGRect(
@@ -318,5 +319,21 @@ final class CanvasEyedropperView: NSView, CanvasModalMode {
         DS.accent.setStroke()
         path.stroke()
         label.draw(at: NSPoint(x: pill.minX + Self.hintPadding, y: pill.minY + 3))
+    }
+}
+
+/// The chroma eyedropper's overlay: the pick view and the session it was
+/// armed with.
+final class CanvasEyedropperView: CanvasPickOverlay {
+    let session: CanvasEyedropperSession
+
+    init(session: CanvasEyedropperSession) {
+        self.session = session
+        super.init(hint: "Click to pick the key color · Esc to cancel")
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("CanvasEyedropperView does not support NSCoder")
     }
 }

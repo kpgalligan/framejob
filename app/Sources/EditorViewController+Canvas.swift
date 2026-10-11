@@ -76,6 +76,10 @@ extension EditorViewController {
         // (EditorViewController+Eyedropper.swift), so this is where it learns
         // that what it was aimed at is no longer selected.
         syncChromaEyedropper()
+        // So is an armed Pick from Canvas (spec §11 GR-13), and Show
+        // Selection, bound to one adjustment clip, rebinds or turns off.
+        syncQualifierPick()
+        syncShowSelection()
         // And so is an armed region mode, for the same reason: it is armed for
         // ONE clip's layer box (EditorViewController+ZoomRegion.swift), and a
         // selection change is what tells it that clip is no longer the one.

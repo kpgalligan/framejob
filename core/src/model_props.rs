@@ -125,9 +125,10 @@ pub use crate::model_look::*;
 
 /// Tier 2's grading vocabulary — [`Wheels`], [`Wheel`], [`WHEEL_MAX`] and
 /// [`WHEEL_RIM_TOLERANCE`] (spec §11 GR-11), and [`Curves`], [`CurvePoint`],
-/// [`CURVE_POINTS_MIN`], [`CURVE_POINTS_MAX`] and [`IDENTITY_CURVE`] (GR-12)
-/// — lives in `model_grade.rs` and is re-exported whole, so every
-/// `crate::model::Wheels` path resolves.
+/// [`CURVE_POINTS_MIN`], [`CURVE_POINTS_MAX`] and [`IDENTITY_CURVE`] (GR-12),
+/// and [`Qualifier`], [`HueRange`], [`LevelRange`], [`HUE_TURN`] and
+/// [`HUE_SOFTNESS_MAX`] (GR-13) — lives in `model_grade.rs` and is
+/// re-exported whole, so every `crate::model::Wheels` path resolves.
 pub use crate::model_grade::*;
 
 // ---- video properties ----------------------------------------------------
@@ -187,6 +188,13 @@ pub struct VideoProps {
     /// an uncurved file's text is what it was.
     #[serde(default, skip_serializing_if = "Curves::is_identity")]
     pub curves: Curves,
+    /// Which pixels an ADJUSTMENT clip grades (spec §11 GR-13, format 18):
+    /// a hue, saturation and luma range and `invert`, read from the
+    /// destination before the grade. Neutral writes no key, so an
+    /// unqualified file's text is what it was; on any other clip it is
+    /// refused by `set_video` and never published by the recipe.
+    #[serde(default, skip_serializing_if = "Qualifier::is_neutral")]
+    pub qualifier: Qualifier,
     /// One of the eight built-in looks and its amount (spec §11 GR-7, format
     /// 15), applied at step 4d after tone. `None` is no look, and writes no
     /// key, so a look-less file's text is what it was.
@@ -215,6 +223,7 @@ impl Default for VideoProps {
             motion: None,
             wheels: Wheels::default(),
             curves: Curves::default(),
+            qualifier: Qualifier::default(),
             look: None,
         }
     }

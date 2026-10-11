@@ -274,6 +274,17 @@ schema, §6 the op table, §7 the architecture.
   In and Out. Each edit is one undo step; the curves animate in an action
   (from or to straight, too) and apply after the wheels and before a look,
   on a clip or an adjustment clip.
+- **Qualifiers**. An adjustment clip's Color tab has a **Qualifier** section
+  that narrows its grade to the pixels of one colour: a **Hue** band, a
+  **Saturation** band and a **Luma** band, each with a soft edge, and
+  **Invert**. Drag a range's strip (its knobs for the edges, its squares for
+  the softness, its middle to move it; ⌥ for a tenth) or type its numbers,
+  or press **Pick from Canvas** and click the colour in the picture behind
+  it. **Show Selection** (also View ▸ Show Selection) shows what is picked —
+  white where the grade applies, black where it does not — in the preview
+  only, never in an export. Greys are never picked by hue, a matte track
+  above the clip limits it to a shape, and a range animates in an action,
+  the hue the short way round the colour wheel.
 - **Adjustment clips**. **Insert ▸ Adjustment Clip**
   places a clip that draws nothing of its own and grades everything behind
   it — its Light, Color and point filters apply to the whole picture under

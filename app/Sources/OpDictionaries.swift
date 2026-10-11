@@ -65,6 +65,37 @@ extension ColorCurvesPatch {
     }
 }
 
+extension QualifierWrite {
+    /// `null` (off), `{}` (on at the core's default) or the whole range.
+    func dictionary(_ whole: (T) -> [String: Any]) -> Any {
+        switch self {
+        case .off: return NSNull()
+        case .on: return [String: Any]()
+        case .set(let range): return whole(range)
+        }
+    }
+}
+
+extension ColorQualifierPatch {
+    /// The ranges the write names, and `invert` when it names it (spec §11
+    /// GR-13).
+    var dictionary: [String: Any] {
+        func levels(_ l: QualifierLevels) -> [String: Any] {
+            ["low": l.low, "high": l.high, "softness": l.softness]
+        }
+        var d: [String: Any] = [:]
+        if let hue {
+            d["hue"] = hue.dictionary {
+                ["center": $0.center, "width": $0.width, "softness": $0.softness]
+            }
+        }
+        if let saturation { d["saturation"] = saturation.dictionary(levels) }
+        if let luma { d["luma"] = luma.dictionary(levels) }
+        if let invert { d["invert"] = invert }
+        return d
+    }
+}
+
 extension ChromaProps {
     var dictionary: [String: Any] {
         ["key": key, "tolerance": tolerance, "softness": softness, "spill": spill]

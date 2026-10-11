@@ -693,6 +693,13 @@
    ],
    "note": "view state, not persisted"
   },
+  "toggleShowSelection:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Seeing.swift `func toggleShowSelection(`"
+   ],
+   "note": "view state, not persisted"
+  },
   "toggleScopes:": {
    "verdict": "none",
    "code": [

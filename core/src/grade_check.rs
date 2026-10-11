@@ -1,7 +1,8 @@
 //! Tier 2's range checks (spec §11 GR-11), called from `props_check.rs`'s
 //! `check_video`: each wheel's `x`, `y` and `master` −1…1, and its push
 //! inside the unit circle; and each curve's 2–16 points, x and y 0…1, x
-//! strictly rising (GR-12).
+//! strictly rising (GR-12); and the qualifier's ranges, each bound in its
+//! own sentence and low ≤ high (GR-13).
 //!
 //! The rule is `props_check.rs`'s: a value out of range is NAMED in the
 //! rule's own sentence, never clamped (an action's end is clamped instead,
@@ -11,7 +12,8 @@
 //! make one — is never refused; the sentence still says `≤ 1`.
 
 use crate::model::{
-    Curves, Wheels, CURVE_POINTS_MAX, CURVE_POINTS_MIN, WHEEL_MAX, WHEEL_RIM_TOLERANCE,
+    Curves, Qualifier, Wheels, CURVE_POINTS_MAX, CURVE_POINTS_MIN, HUE_SOFTNESS_MAX, HUE_TURN,
+    WHEEL_MAX, WHEEL_RIM_TOLERANCE,
 };
 use crate::props_check::in_range;
 
@@ -65,6 +67,41 @@ pub(crate) fn check_curves(curves: &Curves) -> Result<(), String> {
                     points[index - 1][0]
                 ));
             }
+        }
+    }
+    Ok(())
+}
+
+/// `Ok` when every present range is inside its bounds (all inclusive, spec
+/// §11 GR-13): the hue's `center` and `width` 0…360 and its `softness`
+/// 0…180; each level range's `low`, `high` and `softness` 0…1 and `low ≤
+/// high`. The first refusal otherwise, in the order hue (centre, width,
+/// softness), saturation (low, high, softness, then the order), luma the
+/// same. A bound is compared exactly, so 360, 180, 0 and 1 all pass.
+pub(crate) fn check_qualifier(qualifier: &Qualifier) -> Result<(), String> {
+    if let Some(hue) = &qualifier.hue {
+        in_range("video.qualifier.hue.center", hue.center, 0.0, HUE_TURN)?;
+        in_range("video.qualifier.hue.width", hue.width, 0.0, HUE_TURN)?;
+        in_range(
+            "video.qualifier.hue.softness",
+            hue.softness,
+            0.0,
+            HUE_SOFTNESS_MAX,
+        )?;
+    }
+    for (name, range) in qualifier.levels() {
+        let Some(range) = range else {
+            continue;
+        };
+        let key = format!("video.qualifier.{name}");
+        in_range(&format!("{key}.low"), range.low, 0.0, 1.0)?;
+        in_range(&format!("{key}.high"), range.high, 0.0, 1.0)?;
+        in_range(&format!("{key}.softness"), range.softness, 0.0, 1.0)?;
+        if range.low > range.high {
+            return Err(format!(
+                "{key}.low ({}) must not be greater than {key}.high ({})",
+                range.low, range.high
+            ));
         }
     }
     Ok(())

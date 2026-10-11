@@ -91,7 +91,11 @@ governs a module now.
   adds `Curves {master, red, green, blue}`, each an optional list of 2–16 `[x, y]` points
   (`CurvePoint`), the FIELD `VideoProps.curves` written only when not the identity
   (`curve_is_identity`: every y = x, from x 0 to x 1); `actions_curves.rs`'s `curves_json`
-  writes all four, an absent one as `IDENTITY_CURVE`. Re-exported whole by `model_props.rs`.
+  writes all four, an absent one as `IDENTITY_CURVE`. Format 18 (GR-13) adds `Qualifier {hue,
+  saturation, luma, invert}` (`HueRange {center, width, softness}` in degrees, `LevelRange
+  {low, high, softness}` 0–1, a range `None` when off), the FIELD `VideoProps.qualifier`,
+  written only when not neutral; it acts only on an adjustment clip. Re-exported whole by
+  `model_props.rs`.
 - `cube.rs` — the `.cube` reader (spec §11 GR-8): 3D only, size 2–65, the
   default domain; anything else refused by line and name. `ffi_cube.rs` — the
   four `rc_cube_*` exports. `lut.rs` — a LUT media's rules: placing one is
@@ -325,7 +329,9 @@ governs a module now.
   wheel's x, y and master −1…1, and x² + y² ≤ 1 (to `WHEEL_RIM_TOLERANCE`, 1e-9, so a rim point
   is never refused) refused in its own sentence; `actions_clamp.rs`'s `clamp_wheels` closes an
   action's end. `check_curves` (GR-12): 2–16 points, x and y 0…1, x strictly rising, each in
-  its own sentence; `clamp_curves` closes an action's end.
+  its own sentence; `clamp_curves` closes an action's end. `check_qualifier` (GR-13): each
+  bound in its own sentence, low ≤ high; `clamp_qualifier` closes an action's end;
+  `edit_adjustment.rs`'s `check_qualifier_clip` refuses one on any other clip.
 - `edit_track.rs` — tracks, markers and the media list: the three lists a
   clip sits in. The canvas left here at road map 7's D2·3 toll. `clip_list`
   is the ONE spelling of the clips a `with_clips` refusal names — three ids
@@ -446,8 +452,9 @@ governs a module now.
   `add_adjustment_clip`, and the refusals every other door asks it for — a
   transition (from `add_transition`, `set_transition`, `set_transition_style`
   and the overlap rule), a nest, and the blur, sharpen and pixelate filters
-  and any blend mode. The recipe draws it as `{"kind":"adjustment"}`, and on
-  a matte track it is dropped before the frame's mattes (inert).
+  and any blend mode. The recipe draws it as `{"kind":"adjustment"}` (plus its `qualifier` when
+  it has one and `selection: true` when `RecipeOptions.selection` names it, GR-13); and on a
+  matte track it is dropped before the frame's mattes (inert).
 - `edit_background.rs` — `add_background` and `add_blurred_background`: one
   clip on a NEW back-most track, OPS rather than app-side composites because
   the composite carries constraints no half states. A blurred copy drops
@@ -476,6 +483,11 @@ governs a module now.
   curve of another count in an action takes that curve's x's, its ends
   at 0 and 1, so a grade animates from neutral; any other count change
   switches at the end, the list rule).
+- `actions_qualifier.rs` — `align_hue_center` (spec §11 GR-13): before
+  the lerp, an action's target hue centre moves by ±360 when the two
+  centres are more than 180° apart, so the centre animates the short
+  way round (350 → 10 through 0); `clamp_qualifier` brings it back
+  into [0, 360).
 - `actions_graphic.rs` — a graphic clip's props at a clip time (format
   version 13, spec §11 G-34): finished actions' `end.graphic.props` laid
   over the clip's map by `insert`, the spanning one interpolated — a number
@@ -505,15 +517,18 @@ governs a module now.
   `assign()`, the instruction tiling, and the decoder-budget warning
   (`MAX_CONCURRENT_VIDEO_TRACKS`). Deterministic to the byte. A pure move
   out of `evaluate.rs` (grading GR1).
-- `recipe.rs` · `recipe_layer.rs` · `recipe_options.rs` · `recipe_text.rs` — `frame_recipe(t)`: the
-  layer list at one instant. `RecipeLayer` (`recipe_layer.rs`, re-exported by
+- `recipe.rs` · `recipe_layer.rs` · `recipe_options.rs` · `recipe_selection.rs` ·
+  `recipe_text.rs` — `frame_recipe(t)`: the layer list at one instant. `RecipeLayer`
+  (`recipe_layer.rs`, re-exported by
   `recipe.rs`) is the twenty-five keys of a layer written in ONE place
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
-  (`recipe_options.rs`, a pure move out of `recipe.rs` in grading-2 G2-0, re-exported by it) is what a caller wanted besides `t` — the burn-in timecode, and `ungraded`
-  (spec §11 GR-4: every layer's `color` written neutral) — and is a
-  recipe option, never an export override, because the override table drops
-  an unknown key in silence. A layer whose `transition` or `dissolve` is non-null is
+  (`recipe_options.rs`, a pure move out of `recipe.rs` in grading-2 G2-0, re-exported by it) is
+  what a caller wanted besides `t` — the burn-in timecode, `ungraded` (spec §11 GR-4: every
+  layer's `color` written neutral), and `selection` and `behind` (GR-13: `recipe_selection.rs`
+  marks, or drops, the named adjustment clip's layer and drops every canvas layer in front of
+  it) — and is a recipe option, never an export override, because the override table drops an
+  unknown key in silence. A layer whose `transition` or `dissolve` is non-null is
   emitted `blend: "normal"` whatever the clip says: one of the core's TWO
   deliberate overrides of model values (the other: a matte layer's `blend`,
   `shadow` and `reflection`, MT-4), because the dissolve's weight correction

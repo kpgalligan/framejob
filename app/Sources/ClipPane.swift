@@ -203,12 +203,14 @@ final class ClipPane: InspectorPaneView {
         case .color:
             // Light, then the Color section Picture used to hold (GR-2), then
             // Wheels (GR-11), Curves (GR-12), then Look (GR-7); Adjustment's
-            // Strength first when every clip is an adjustment clip (GR-6).
+            // Strength first and the Qualifier second when every clip is an
+            // adjustment clip (GR-6, GR-13).
             sections = [
                 videoPane.lightSection(), videoPane.colorSection(), videoPane.wheelsSection(),
                 videoPane.curvesSection(curveState),
             ]
             if videoPane.allAdjustment { sections.insert(videoPane.adjustmentSection(), at: 0) }
+            if videoPane.allAdjustment { sections.insert(videoPane.qualifierSection(), at: 1) }
             sections.append(videoPane.lookSection(lookGallery))
         case .sound:
             sections = [

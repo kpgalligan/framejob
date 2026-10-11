@@ -2,7 +2,8 @@
 //! optional `video.curves` key, driven through the C FFI exactly as
 //! `ReelCore.swift` drives it.
 //!
-//! Pinned here: every earlier version (1 to 16), and a file numbered 1015
+//! Pinned here: version 17 is at most the current version; every earlier
+//! version (1 to 16), and a file numbered 1015
 //! (GR-9's branch number, read as 15), opens stamped current; every number
 //! past the current one, 1014 included, and 1016 are refused as newer; an
 //! uncurved file at 16 writes the same text as the same file at 17; an
@@ -32,10 +33,10 @@ fn file(version: u32, video: Value) -> Value {
     })
 }
 
-#[test]
-fn the_current_version_is_17() {
-    assert_eq!(RC_FORMAT_VERSION, 17);
-}
+const _: () = assert!(
+    RC_FORMAT_VERSION >= 17,
+    "version 17 is at most the current version"
+);
 
 #[test]
 fn every_earlier_version_and_1015_open_stamped_current() {

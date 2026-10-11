@@ -35,11 +35,17 @@ The inspector: the name field reads "Adjustment" beside a plum swatch, over
 ⌥⌘K adds one"), and two sub-tabs, Color (selected) and Clip. The ADJUSTMENT section is
 first and open, its summary "75%", with a Reset button. It has one row, Strength: a
 slider three quarters along, and a "75%" field with a chevron for the quick values
-0, 25, 50, 75 and 100. Below it the LIGHT section is open, summary "neutral", with
-05b's nine rows: Exposure ("0.00 EV", clipped at the field's edge as on 05b) through
-Fade. The COLOR section follows, closed, then the WHEELS section (grading-2 G2-2),
-open, the CURVES section (G2-3), open, and the LOOK section (GR5b), open, all
-below the captured height.
+0, 25, 50, 75 and 100. Below it the QUALIFIER section (grading-2 G2-4) is open,
+summary "off": three ranges, each a row of its checkbox (Hue, Saturation, Luma), all
+unticked, beside a dimmed strip — the hue spectrum, a white-to-red ramp, a
+black-to-white ramp — over a row of three dimmed captioned fields holding the
+defaults a tick would write (Centre 30°, Width 50°, Soft 25°; Low 0.00, High
+1.00, Soft 0.10 twice), then an unticked Invert, then a "Pick from Canvas" button
+beside an unticked "Show Selection" checkbox. Below it the LIGHT section is open,
+summary "neutral", with 05b's nine rows: Exposure ("0.00 EV", clipped at the field's
+edge as on 05b) through Fade, below the captured height. The COLOR section follows,
+closed, then the WHEELS section (grading-2 G2-2), open, the CURVES section (G2-3),
+open, and the LOOK section (GR5b), open, all below the captured height.
 
 In the light capture the inspector is white with black labels, the section headers
 light-grey bars with grey capitals, the Color sub-tab pale blue with a blue outline,

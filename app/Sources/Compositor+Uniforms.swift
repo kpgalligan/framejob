@@ -22,11 +22,15 @@ extension MetalRenderer {
     /// `LayerUniforms`. It is asked of the destination TEXTURE rather than of
     /// the recipe, because the texture is the thing `[[position]]` is actually
     /// in and no second opinion can drift from it.
+    ///
+    /// `ignoringOpacity` builds the block for a layer whose drawn opacity is
+    /// 0 rather than answering nil: Show Selection's adjustment layer draws
+    /// its selection whatever its strength (spec §11 GR-13).
     func uniforms(
         for layer: RecipeLayer, canvas: RecipeCanvas, destination: CGSize,
-        partner: RecipeLayer? = nil
+        partner: RecipeLayer? = nil, ignoringOpacity: Bool = false
     ) -> LayerUniforms? {
-        guard layer.drawnOpacity > 0 else { return nil }
+        guard ignoringOpacity || layer.drawnOpacity > 0 else { return nil }
         var u = LayerUniforms()
         u.canvasWidth = Float(max(1, canvas.width))
         u.canvasHeight = Float(max(1, canvas.height))

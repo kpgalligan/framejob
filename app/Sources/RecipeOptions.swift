@@ -27,6 +27,14 @@ struct RecipeOptions: Equatable {
     /// Every layer's `video.color` neutral (spec §11 GR-4): View ▸ Show
     /// Ungraded on a document's key, or `render_frame {ungraded}`.
     var ungraded: Bool = false
+    /// Show Selection (spec §11 GR-13): this adjustment clip draws its
+    /// qualifier's selection and every layer in front of it is left out —
+    /// View ▸ Show Selection on a document's key, or `render_frame
+    /// {selection}`.
+    var selection: UInt32? = nil
+    /// Pick from Canvas (GR-13): this adjustment clip and every layer in
+    /// front of it left out — the picture the clip reads.
+    var behind: UInt32? = nil
 
     /// Every option off: the recipe as it has always been.
     static let none = RecipeOptions()
@@ -37,6 +45,9 @@ struct RecipeOptions: Equatable {
     /// that has to match the header's key names.
     var json: String? {
         guard self != .none else { return nil }
-        return "{\"burn_in_timecode\":\(burnInTimecode),\"ungraded\":\(ungraded)}"
+        var json = "{\"burn_in_timecode\":\(burnInTimecode),\"ungraded\":\(ungraded)"
+        if let selection { json += ",\"selection\":\(selection)" }
+        if let behind { json += ",\"behind\":\(behind)" }
+        return json + "}"
     }
 }

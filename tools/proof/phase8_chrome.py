@@ -2437,16 +2437,17 @@ def main():
     bits = menu.get("modifierBits", {})
     check("the View menu exists and is not empty", len(view) > 3, f"{len(view)} rows")
     # The preview group is the rows after the LAST separator: grading GR3 and
-    # grading-2 G2-1 appended Show Ungraded and Scopes to it, so its tail is
-    # no longer Preview Window.
+    # grading-2 G2-1 appended Show Ungraded and Scopes to it, and G2-4 Show
+    # Selection after Show Ungraded, so its tail is no longer Preview Window.
     last_separator = max((i for i, r in enumerate(view) if r["separator"]), default=-1)
     group = view[last_separator + 1:] if last_separator >= 0 else []
     check("its LAST group, after a separator, is the Preview Quality submenu and Preview "
-          "Window, then Show Ungraded and Scopes — a group of their own, because all four "
-          "are about the PREVIEW rather than about the editor's own panes",
-          len(group) == 4
+          "Window, then Show Ungraded, Show Selection and Scopes — a group of their own, "
+          "because all five are about the PREVIEW rather than about the editor's own panes",
+          len(group) == 5
           and group[0].get("submenu", {}).get("title") == "Preview Quality"
-          and [r["title"] for r in group[1:]] == ["Preview Window", "Show Ungraded", "Scopes"],
+          and [r["title"] for r in group[1:]]
+          == ["Preview Window", "Show Ungraded", "Show Selection", "Scopes"],
           " | ".join(r["title"] or "(separator)" for r in view[last_separator:]))
 
     quality_rows = group[0].get("submenu", {}).get("items", []) if group else []

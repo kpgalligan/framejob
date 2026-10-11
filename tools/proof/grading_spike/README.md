@@ -139,7 +139,8 @@ K1. The script prints `mutant NAME: killed by …` or `SURVIVED`.
 **`--tree` (grading GR7a).** In place of the routes, what the branch BUILT:
 V0 is `Compositor.metal` as it stood at `--tree-base REV` (by default `f407f87`,
 `TREE_BASE`, main at the branch point; grading-2 G2-2 passes `4f52ead`, the
-commit before its wheels, and G2-3 `b2fd1f9`, the commit before its curves; `git show`,
+commit before its wheels, G2-3 `b2fd1f9`, the commit before its curves, and
+G2-4 `75ebf34`, the commit before its qualifier; `git show`,
 a failed show is a B0 failure) and VT is the tree's
 own file, unpatched — matte_spike's `--tree` pattern. B1 compiles the two;
 B2 builds `tree_bench.swift` (`-O`, over `app/Sources`), which hands BOTH
@@ -150,14 +151,20 @@ white placeholder at `texture(1)`, an identity 2³ `rgba16Float` lattice at
 `texture(2)` and an identity 2×1 `rgba32Float` curve strip at `texture(3)` (since
 grading-2 G2-3; a base's shader that names no `texture(3)` ignores it), and builds
 its pipelines as `bench.swift`'s `layerState`
-(`kGatherFilters` false, the same blending, `MetalRenderer.workingFormat`).
-One scene, S1 over a copy of `bench.swift`'s `halfPicture`; series V0:S1,
-VT:S1 and V0b:S1 in the same seeded SplitMix64 order, 5 warm-up and N timed
-frames each. **KT**, scored at both sizes before any timing: VT:S1 = V0:S1
-within 1/1023 over the whole frame. `--measure --tree` adds H0, C0 (|V0:S1 −
-V0b:S1|), F, T0 (VT:S1 − V0:S1) and **TC** (a RECORD: T0 ≤ `BOUND[h]` + C0 at
-1080 and 2160 — "What it may cost"'s UNGRADED-layer cap, +0.02 ms and
-+0.06 ms). Mutant `tree-graded` (`--vt-exposure 0.5`: VT's draws carry +0.5
+(`kGatherFilters` false, the same blending, `MetalRenderer.workingFormat`)
+and, since grading-2 G2-4, the adjustment pass's as `adjustPipeline`'s (the
+shadow vertex stage, `reelcut_adjust_fragment`, blending OFF) with a neutral
+`QualifierUniforms` at fragment `buffer(1)` (a base's fragment that names no
+`buffer(1)` ignores it). Two scenes over a copy of `bench.swift`'s
+`halfPicture`: S1, and SA (S1 then one full-frame adjustment pass at +1 EV,
+unqualified); series V0:S1, VT:S1, V0b:S1, V0:SA, VT:SA and V0b:SA in the same
+seeded SplitMix64 order, 5 warm-up and N timed frames each. **KT** and **KA**,
+scored at both sizes before any timing: VT:S1 = V0:S1 and VT:SA = V0:SA within
+1/1023 over the whole frame. `--measure --tree` adds H0, C0 (|V0:S1 −
+V0b:S1|, and |V0:SA − V0b:SA|), F, T0 (VT:S1 − V0:S1), **TC** (a RECORD: T0 ≤
+`BOUND[h]` + C0 at 1080 and 2160 — "What it may cost"'s UNGRADED-layer cap,
++0.02 ms and +0.06 ms) and **TA** (a RECORD: VT:SA − V0:SA ≤ `BOUND[h]` + the
+SA series' C0 — what the qualifier costs an unqualified adjustment pass). Mutant `tree-graded` (`--vt-exposure 0.5`: VT's draws carry +0.5
 EV with `toneEnabled` 1) must fail KT. Output under
 `work/grading_spike/tree-<check|measure|mutant-tree-graded>/` (`bench-<h>.json`
 of the same shape, `result.json`).
@@ -168,6 +175,7 @@ python3 tools/proof/grading_spike/grading_spike.py --check --tree --mutant tree-
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree   # GR7a's record
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base 4f52ead   # G2-2's
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base b2fd1f9   # G2-3's
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base 75ebf34   # G2-4's
 ```
 
 **Its record** is `archive/grading.md`, "GR0 — the road map and the spike"

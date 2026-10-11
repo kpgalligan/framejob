@@ -128,9 +128,16 @@ extern "C" {
  * green, blue}`, each a list of 2–16 `[x, y]` points, a channel written only
  * when not the identity and the key not at all when all four are, so an
  * uncurved project writes the text it did; the reader's default is the
- * identity, so there is no migration step. 18 and above, 1014 included, are
- * newer. */
-#define RC_FORMAT_VERSION 17
+ * identity, so there is no migration step.
+ *
+ * Version 18 is the qualifier (spec §11 GR-13): `video.qualifier {hue,
+ * saturation, luma, invert}` on an adjustment clip — `hue {center, width,
+ * softness}` in degrees, `saturation` and `luma {low, high, softness}` in
+ * 0…1, each absent when off, `invert` written only when true — the key not
+ * written at all when neutral, so an unqualified project writes the text it
+ * did; the reader's default is neutral, so there is no migration step. 19
+ * and above, 1014 included, are newer. */
+#define RC_FORMAT_VERSION 18
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips
@@ -273,13 +280,23 @@ char *rc_project_composition_plan(const RcProject *p);
 char *rc_project_frame_recipe(const RcProject *p, int64_t t);
 
 /* The same recipe, with the caller's OPTIONS. `opts_json` is
- * {"burn_in_timecode": bool, "ungraded": bool} (either key may be absent) —
+ * {"burn_in_timecode": bool, "ungraded": bool, "selection": clip id,
+ * "behind": clip id} (any key may be absent) —
  * or NULL, which is the defaults and is exactly what rc_project_frame_recipe
  * asks for, the two being one implementation.
  *
  * `ungraded` (spec 11 GR-4) writes every layer's `color` neutral — all
  * thirteen keys — and its `wheels` neutral — all nine (spec 11 GR-11) —
- * nested and matte layers included, and adds no layer.
+ * nested and matte layers included, and adds no layer. It keeps a qualifier
+ * (spec 11 GR-13).
+ *
+ * `selection` (spec 11 GR-13) marks that top-level adjustment clip's layer
+ * (`"selection": true` in its source: the compositor writes its qualifier's
+ * selection as grey) and leaves out every layer in front of it that is not
+ * drawn into a matte; when no such layer is on the frame there are no layers
+ * and the background is black. `behind` leaves out that layer and the same
+ * layers in front of it (none found: the recipe unchanged) — the picture the
+ * clip reads. A clip id is a whole number; anything else is OFF.
  *
  * `burn_in_timecode` APPENDS a text layer (so, last: topmost) showing the
  * project timecode at `t`, spelled by the document's own timecode_frames, in

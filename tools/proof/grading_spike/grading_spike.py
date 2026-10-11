@@ -61,9 +61,12 @@ passes the commit before its own change; `git show`, a failed show is B0), VT
 the tree's own file unpatched; both compiled (B1) and timed by
 `tree_bench.swift` (B2), which hands both the app's whole 512-byte
 `LayerUniforms` (464 until grading-2 G2-2). KT, scored at
-both sizes: VT:S1 = V0:S1 within 1/1023 over the frame. `--measure --tree` adds
-H0, C0, F, T0 (VT:S1 − V0:S1) and TC (a RECORD: T0 ≤ `BOUND[h]` + C0, "What it
-may cost"'s UNGRADED-layer cap). Mutant `tree-graded` (VT drawn at +0.5 EV with
+both sizes: VT:S1 = V0:S1 within 1/1023 over the frame; KA (grading-2 G2-4):
+VT:SA = V0:SA, the scene S1 then one unqualified adjustment pass at +1 EV with a
+neutral `QualifierUniforms` at `buffer(1)`. `--measure --tree` adds
+H0, C0, F, T0 (VT:S1 − V0:S1), TC (a RECORD: T0 ≤ `BOUND[h]` + C0, "What it
+may cost"'s UNGRADED-layer cap) and TA (a RECORD: VT:SA − V0:SA ≤ `BOUND[h]` +
+the SA series' own C0). Mutant `tree-graded` (VT drawn at +0.5 EV with
 `toneEnabled` 1) must fail KT. Output under `work/grading_spike/tree-<check|
 measure|mutant-NAME>/`.
 
@@ -737,6 +740,19 @@ def tree_timing_rows(answers, result):
         emit("TC", "RECORD", f"{h}p T0 {ms(over)} against ≤ BOUND {BOUND[h]:.2f} ms + C0 "
              f"{ms(noise)} = {ms(bound)}: "
              + ("cap held" if over <= bound else f"cap missed by {ms(over - bound)}"))
+        # grading-2 G2-4: an unqualified adjustment pass's cost, against the
+        # SA series' own noise control (V0b:SA).
+        if "VT:SA" in f:
+            noise_a = abs(f["V0:SA"][0] - f["V0b:SA"][0])
+            over_a = f["VT:SA"][0] - f["V0:SA"][0]
+            bound_a = BOUND[h] + noise_a
+            figures[str(h)].update({"noise_C0_SA": noise_a, "overhead_TA": over_a,
+                                    "bound_TA": bound_a})
+            emit("C0", "CONTROL", f"{h}p V0 SA twice: {ms(f['V0:SA'][0])} and "
+                 f"{ms(f['V0b:SA'][0])}: noise floor {ms(noise_a)}")
+            emit("TA", "RECORD", f"{h}p VT:SA − V0:SA {ms(over_a)} against ≤ BOUND "
+                 f"{BOUND[h]:.2f} ms + C0 (SA) {ms(noise_a)} = {ms(bound_a)}: "
+                 + ("cap held" if over_a <= bound_a else f"cap missed by {ms(over_a - bound_a)}"))
 
 
 def tree_main(args):
@@ -774,19 +790,20 @@ def tree_main(args):
         for w, h in SIZES:
             if h not in answers:
                 continue
-            entries = [k for k in answers[h]["k"] if k["row"] == "KT"]
-            if not entries:
-                emit("KT", "FAIL", f"{h}p: tree_bench reported no KT entry")
-                scored_ok = False
-            for entry in entries:
-                scored_ok &= entry["ok"]
-                emit("KT", "PASS" if entry["ok"] else "FAIL", f"{h}p {entry['variant']}: "
-                     f"{entry['detail']}")
+            for row in ("KT", "KA"):
+                entries = [k for k in answers[h]["k"] if k["row"] == row]
+                if not entries:
+                    emit(row, "FAIL", f"{h}p: tree_bench reported no {row} entry")
+                    scored_ok = False
+                for entry in entries:
+                    scored_ok &= entry["ok"]
+                    emit(row, "PASS" if entry["ok"] else "FAIL", f"{h}p {entry['variant']}: "
+                         f"{entry['detail']}")
     result = {"tag": tag, "started": started.isoformat(), "seed": args.seed, "host": facts,
               "tree_base": args.tree_base, "rules": {"BOUND": BOUND}, "rows": ROWS,
               "answers": {str(h): a for h, a in answers.items()}}
     if args.measure and not timing:
-        for row in ("C0", "F", "T0", "TC"):
+        for row in ("C0", "F", "T0", "TC", "TA"):
             emit(row, "SKIP", "the host gate is shut (H0)")
     elif timing and scored_ok and len(answers) == len(SIZES):
         tree_timing_rows(answers, result)

@@ -44,10 +44,13 @@
 //! argument existed. Grading GR3 gave it a second, `ungraded` (spec §11
 //! GR-4), which writes every layer's `video.color` neutral rather than
 //! adding a layer, so with it off the bytes are again what they were.
+//! Grading-2 G2-4 gave it `selection` and `behind` (GR-13), answered by
+//! `recipe_selection.rs` over the finished list before the burn-in.
 
 use serde_json::{Map, Value};
 
 use crate::actions::Evaluated;
+use crate::edit_adjustment::is_adjustment;
 use crate::evaluate::{json, number, Assignment};
 use crate::model::{BlendMode, ColorAdjust, Curves, Nest, Project, Source, VideoProps, Wheels};
 use crate::motion;
@@ -55,6 +58,7 @@ use crate::nest::{Enclosing, Frame, Instance};
 use crate::recipe_graphic::graphic_source;
 pub(crate) use crate::recipe_layer::RecipeLayer;
 pub use crate::recipe_options::RecipeOptions;
+use crate::recipe_selection::{select_layers, LayerFacts};
 use crate::recipe_text::burn_in_layer;
 use crate::time::Ticks;
 
@@ -167,7 +171,7 @@ impl Project {
         // So are the routed dissolves (`recipe_dissolve.rs`, spec §11 MT-8):
         // their ids are dense over the frame.
         let transitions = self.frame_transitions(&instances, t);
-        let mut layers: Vec<Value> = instances
+        let layers: Vec<Value> = instances
             .iter()
             .zip(mattes.drawn_into.iter().zip(mattes.layer))
             .zip(transitions.transition.into_iter().zip(transitions.dissolve))
@@ -183,6 +187,18 @@ impl Project {
                 },
             )
             .collect();
+        // The qualifier's two options (spec §11 GR-13): a selection whose
+        // clip is not on the frame draws no layers on black.
+        let facts: Vec<LayerFacts> = instances
+            .iter()
+            .zip(mattes.drawn_into.iter())
+            .map(|(instance, drawn_into)| LayerFacts {
+                clip: instance.clip.id,
+                top_adjustment: is_adjustment(instance.clip) && instance.inside.is_empty(),
+                drawn_into: *drawn_into,
+            })
+            .collect();
+        let (mut layers, black) = select_layers(layers, &facts, &opts);
         if opts.burn_in_timecode {
             layers.push(burn_in_layer(&self.canvas, t));
         }
@@ -190,9 +206,14 @@ impl Project {
         let mut canvas = Map::new();
         canvas.insert("width".to_string(), Value::from(self.canvas.width));
         canvas.insert("height".to_string(), Value::from(self.canvas.height));
+        let background = if black {
+            [0.0, 0.0, 0.0, 1.0]
+        } else {
+            self.canvas.background
+        };
         canvas.insert(
             "background".to_string(),
-            Value::Array(self.canvas.background.iter().map(|c| number(*c)).collect()),
+            Value::Array(background.iter().map(|c| number(*c)).collect()),
         );
 
         let mut out = Map::new();
@@ -458,10 +479,16 @@ impl Project {
             Source::Nest { .. } => (missing_source(), Value::Null),
             Source::Graphic => graphic_source(clip, evaluated, clip_t, &self.canvas),
             // No picture and no size: the compositor grades the destination
-            // with the layer's colour and filters (spec §11 GR-6).
+            // with the layer's colour and filters (spec §11 GR-6), weighted
+            // by its qualifier, published only when not neutral so an
+            // unqualified recipe is what it was (GR-13).
             Source::Adjustment => {
                 let mut source = Map::new();
                 source.insert("kind".to_string(), Value::from("adjustment"));
+                let qualifier = &evaluated.video.qualifier;
+                if !qualifier.is_neutral() {
+                    source.insert("qualifier".to_string(), json(qualifier));
+                }
                 (Value::Object(source), Value::Null)
             }
         }

@@ -92,10 +92,10 @@ DEFAULT_APP = str(proof_app.bundle())
 DEFAULT_SCREENS = os.path.join(ROOT, "designs", "screens")
 SECOND = 600_000
 
-# The two `none` menu items a screen may perform: grading GR3's view toggles
-# (spec §11 GR-4, GR-5) and grading-2 G2-1's rename (GR-10), which persist
-# nothing, so no instance's defaults move.
-VIEW_SELECTORS = ("toggleShowUngraded:", "toggleScopes:")
+# The three `none` menu items a screen may perform: grading GR3's view toggles
+# (spec §11 GR-4, GR-5), grading-2 G2-1's rename (GR-10) and G2-4's Show
+# Selection (GR-13), which persist nothing, so no instance's defaults move.
+VIEW_SELECTORS = ("toggleShowUngraded:", "toggleScopes:", "toggleShowSelection:")
 STEP_TOOLS = ("set_selection", "set_playhead", "detect_silence", "perform_menu_item",
               "cancel_sheet", "select_inspector_tab")
 LOOKS = ("light", "dark")
@@ -120,7 +120,9 @@ STEP_KEYS = {"call", "args", "until_absent", "within"}
 # `video.wheels` is pinned OPEN so 05f shows the three wheels (grading-2 G2-2);
 # it opens Wheels between Color and Look on 05b and 05c too. `video.curves` is
 # pinned OPEN so 05g shows the curve plot (grading-2 G2-3); it opens Curves
-# between Wheels and Look on 05b, 05c and 05f too.
+# between Wheels and Look on 05b, 05c and 05f too. `video.qualifier` is pinned
+# OPEN so 05h shows the ranges (grading-2 G2-4); it opens the Qualifier between
+# Adjustment and Light on 05c too.
 SECTIONS = {
     "audio.compressor": True, "audio.duck": True, "audio.fades": True, "audio.mix": True,
     "audio.noise": True, "audio.volume": False,
@@ -140,7 +142,7 @@ SECTIONS = {
     "video.obscure": True,
     "video.reflection": True, "video.shadow": True, "video.speed": True,
     "video.spotlight": True, "video.transform": False, "video.transition": True,
-    "video.wheels": False, "video.curves": False,
+    "video.wheels": False, "video.curves": False, "video.qualifier": False,
 }
 
 
@@ -251,6 +253,9 @@ FIXTURES = {
                "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
     "curves": {"path": os.path.join(FIXTURE_DIR, "Curves.reelcut"),
                "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
+    "qualifier": {"path": os.path.join(FIXTURE_DIR, "Qualifier.reelcut"),
+                  "clips": ["video", "adjustment"], "media": ["speech.mov"],
+                  "sound": ["video"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -405,6 +410,8 @@ def build_fixture(mcp, name):
             ids = _wheels_ops(mcp, path)
         elif name == "curves":
             ids = _curves_ops(mcp, path)
+        elif name == "qualifier":
+            ids = _qualifier_ops(mcp, path)
         mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
@@ -620,6 +627,19 @@ def _curves_ops(mcp, path):
     _call(mcp, "set_video", path, clips=[ids["video"]],
           patch={"curves": {"master": [[0, 0], [0.25, 0.18], [0.75, 0.84], [1, 1]],
                             "red": [[0, 0.08], [0.5, 0.52], [1, 1]]}})
+    return ids
+
+
+def _qualifier_ops(mcp, path):
+    """Grading-2 G2-4 (spec §11 GR-13): `adjust`'s two tracks, the adjustment
+    clip at saturation −1 and full strength with a qualifier — hue {25, 30, 15}
+    and saturation {0.15, 1, 0.05}, luma off — so only the card's warm,
+    saturated pixels go grey: the Qualifier section with two ranges on (05h)."""
+    ids = _adjust_ops(mcp, path)
+    _call(mcp, "set_video", path, clips=[ids["adjustment"]],
+          patch={"opacity": 1.0,
+                 "qualifier": {"hue": {"center": 25, "width": 30, "softness": 15},
+                               "saturation": {"low": 0.15, "high": 1, "softness": 0.05}}})
     return ids
 
 

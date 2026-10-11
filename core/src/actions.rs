@@ -33,6 +33,7 @@ use serde_json::{Map, Number, Value};
 use crate::actions_clamp::{clamp_audio, clamp_video};
 use crate::actions_curves::{align_identity_curves, curves_json};
 use crate::actions_graphic::evaluate_graphic;
+use crate::actions_qualifier::align_hue_center;
 use crate::edit_adjustment::{clamp_adjustment, is_adjustment};
 use crate::model::{
     Action, AudioProps, Clip, ColorAdjust, Curve, GraphicProps, Project, ShapeProps, Source,
@@ -419,6 +420,8 @@ impl Project {
             // An identity curve meeting a curve of another count takes its
             // x's, so a grade animates from (or to) neutral (spec §11 GR-12).
             align_identity_curves(&mut state, &mut target);
+            // The hue centre the short way round (spec §11 GR-13).
+            align_hue_center(&mut state, &mut target);
             let elapsed = clip_t.saturating_sub(action.start) as f64;
             let progress = elapsed / action.duration as f64;
             state = lerp(&state, &target, ease(action.curve, progress));

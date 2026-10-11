@@ -18662,3 +18662,89 @@ Also moved by G2-3: `wheels_proof.py` N2 (the header's format version, not
 strip at `texture(3)` (`--tree-base b2fd1f9`).
 
 **Its record**: `designs/grading-2.md`'s G2-3 section.
+
+## Road map grading-2 — G2-4, the qualifier (`qualifier_proof.py` N0–N2, H1, W1, G1, S1, S1b, S2, L1, I1, M1, D1, E1, V1, B1, F1, A1, A2, R1, P0, U1, V2, K1–K8, Z1 and thirteen mutants; `qualifier_probe.swift`; `core/tests/qualifier.rs`, `core/tests/selection.rs`, `core/tests/schema_v18.rs`; spec §11 GR-13)
+
+**What it answers.** That `video.qualifier` changes nothing until set (N0:
+six unqualified frames — the card, an adjustment clip at exposure +1 over it,
+the same under an alpha matte window, the grey ramp, the hue card graded by an
+adjustment clip at saturation −1, the movie — byte-identical at 16 bits to
+`capture DIR`'s from the untouched tree's Release build), that an all-null
+qualifier is an identity (N1) and a save writes only the ranges set, at the
+header's format (N2). The rest read GR-13's ranges off script-written cards
+whose every reading the script computes itself from the bytes it wrote (HSV
+hue, C = max − min, S = C / max, V, Rec. 709 Y′; Z1 holds the rendered
+picture equal to those bytes): HUE (column x hue 360·x/1440, row y saturation
+1 − y/359, V 1), HUE50 (the same at V 0.5) and DARK (saturation 1, row y V =
+y/359), and the grey ramp. `render_frame {selection}` is the instrument: H1 a
+40° hue band selected exactly (255 at d ≤ 20°, 0 at d ≥ 40°, monotone
+between) and the graded frame B outside it and graded inside; W1 the wrap at
+0 and 350; G1 no grey picked by hue (the chroma guard, on HUE's low rows and
+the ramp); S1 a saturation band by row; S1b the same band at V 0.5, which a
+chroma reading would put at S 0.8–1; S2 the near-black guard on DARK; L1 a
+luma band on the ramp; I1 Invert; M1 a matte window across the band (the
+weight is the product); D1 the reading taken before the grade (a hue +120
+grade); E1 Show Selection never reaching `render_frame` or an export; V1 the
+menu state and tag, off after reopening; B1 black outside the clip's span and
+a shape in front left out; F1 `selection` refused by name; A1, A2 actions
+(A2 the short way round, 350 → 10 through 0, read at frame 9: a time between
+frames renders the frame it snaps to); R1 the three sentences and every bound
+accepted; P0 Paste Attributes' rule; U1 undo; V2 `ungraded` keeping the
+qualifier. K1–K8 are `qualifier_probe.swift`, built by `swift_build.build`
+over `app/Sources` beside a `default.metallib` of the tree's shader and
+`Blank.mp4` (K3 renders a frame, and a probe has no app bundle; a failed
+build is a scored FAILURE of all eight), on a project of HUE, two adjustment
+clips and a red rectangle in front: K1 `QualifierSample` against the script's
+readings (1e-9), K2 `ColorQualifier.picked` (widths kept, a grey turning hue
+off, pure red's saturation shifted to 0.7–1, luma re-centred inside 0–1, 500
+picks every level range inside 0–1 holding the pixel), K3 `QualifierPick.sample`
+answering the picture BEHIND the clip, K4 the Color sections, K5 the Hue
+checkbox, a strip drag and Reset with their undo names, K6 Show Selection's
+key, defaults and rebind, K7 `QualifierUniforms` against the shader's struct,
+K8 the `◆N` badge. The module docstring lists every row and its fixture.
+
+```
+make app                                                                      # the untouched tree, before any product edit
+RC_PROOF_APP=release python3 tools/proof/qualifier_proof.py capture tools/proof/work/qualifier-control --app <a copy of the bundle>
+python3 tools/proof/qualifier_proof.py                                        # Debug unless RC_PROOF_APP=release
+RC_PROOF_APP=release python3 tools/proof/qualifier_proof.py compare tools/proof/work/qualifier-control
+python3 tools/proof/qualifier_proof.py --mutant NAME                          # one of the thirteen below
+cd core && cargo test --release --test qualifier --test selection --test schema_v18
+```
+
+It launches its own instance on a scratch socket in a scratch home
+(`tools/proof/work/qualifier/home`), writes its fixtures into its work folder,
+performs only View ▸ Show Selection (which persists nothing), closes every
+project it opens, and removes its work folder at the start and at exit.
+`--mutant` builds a tree copy as `curves_proof` does; a core mutant also runs
+`cargo test --release --no-fail-fast --test qualifier --test selection` in the
+copy's core (row CT). MUTANT PASS only when every named row failed and no
+other scored row did; each names every row it was measured to fail.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `hue-wrap-broken` | the hue distance without the wrap at 360 | W1 G1 |
+| `softness-inside` | the fall-off inside each edge, not outside | H1 S1 S1b L1 W1 D1 |
+| `chroma-guard-removed` | no `smoothstep(0.02, 0.06, C)` on the hue range | G1 |
+| `saturation-reads-chroma` | the saturation range reads C, not C / max | S1b S2 |
+| `near-black-guard-removed` | no `smoothstep(0.03, 0.10, V)` on the saturation | S2 |
+| `hue-long-way` | no `align_hue_center` before an action's lerp | A2 CT |
+| `q-from-graded` | the weight's `q` read from the graded colour | D1 H1 |
+| `matte-not-multiplied` | a qualified pass weighs by `q` instead of `q` × coverage | M1 |
+| `selection-reaches-export` | a key with no options reads another key's `selection` | E1 |
+| `qualifier-on-any-clip` | `check_qualifier_clip` always passes | R1 CT |
+| `paste-keeps-qualifier` | Paste Attributes copies a qualifier onto a picture clip | P0 CT |
+| `selection-drops-mattes` | `selection` drops the matte layers in front too | M1 CT |
+| `pick-not-behind` | `QualifierPick.sample` renders with no `behind` | K3 |
+
+Also moved by G2-4: `look_probe.swift` B4's adjustment section list (Adjustment,
+Qualifier, then the rest), `phase8_chrome.py`'s View group (Show Selection
+after Show Ungraded), `capture_spike/inventory.json` (`toggleShowSelection:`,
+view state), `screens.py` (`video.qualifier` pinned open, the `qualifier`
+fixture, `toggleShowSelection:` among the view toggles) and screens `05h`
+(new) and `05c`, and `grading_spike/tree_bench.swift`, which gained the SA
+scene (an unqualified adjustment pass over S1 with a neutral
+`QualifierUniforms` at `buffer(1)`) and the rows KA and TA (`--tree-base
+75ebf34`).
+
+**Its record**: `designs/grading-2.md`'s G2-4 section.

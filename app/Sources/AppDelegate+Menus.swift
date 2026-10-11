@@ -441,12 +441,15 @@ extension AppDelegate {
             item(
                 "Preview Window", #selector(EditorViewController.togglePreviewWindow(_:)), "p",
                 [.command, .shift]))
-        // Grading GR3 and grading-2 G2-1 (spec §11 GR-4, GR-5, GR-10): two
-        // checkmark toggles about the preview, view state that nothing persists.
+        // Grading GR3 and grading-2 G2-1 and G2-4 (spec §11 GR-4, GR-5, GR-10,
+        // GR-13): checkmark toggles about the preview, view state that nothing
+        // persists. Show Selection has no shortcut.
         menu.addItem(
             item(
                 "Show Ungraded", #selector(EditorViewController.toggleShowUngraded(_:)), "u",
                 [.command, .control]))
+        menu.addItem(
+            item("Show Selection", #selector(EditorViewController.toggleShowSelection(_:))))
         menu.addItem(
             item(
                 "Scopes", #selector(EditorViewController.toggleScopes(_:)), "w",

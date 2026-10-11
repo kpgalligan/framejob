@@ -22,6 +22,13 @@
 //! not travel: `speed`, `enabled`, the actions, the transition, the name,
 //! the label and the source are not properties at all.
 //!
+//! **The qualifier follows the clip kind** (spec §11 GR-13): only an
+//! adjustment clip takes one, so a picture target gets none (dropped, which
+//! `paste_attributes`' description says — D2-1: a paste's answer is not
+//! the place for it), and an adjustment target keeps its own when the
+//! payload clip is a picture clip, which has none to give. Between two
+//! adjustment clips it is copied like any other video key.
+//!
 //! ### The fifth group
 //!
 //! `graphic` (G-32) copies a graphic clip's `props`, whole, onto clips
@@ -47,9 +54,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::actions_graphic::names_prop;
+use crate::edit_adjustment::is_adjustment;
 use crate::edit_paste::{absorb_media, parse_payload};
 use crate::lut::{look_media_ids, remap_look_media};
-use crate::model::{Clip, GraphicProps, Project, ShapeProps, Source, TextProps};
+use crate::model::{Clip, GraphicProps, Project, Qualifier, ShapeProps, Source, TextProps};
 use crate::model_graphic::{check_count, check_props};
 use crate::outcome::Outcome;
 use crate::patch::{Group, GROUPS};
@@ -162,8 +170,17 @@ fn replace_props(into: &mut Map<String, Value>, props: &Map<String, Value>, keep
 fn copy_group(target: &mut Clip, source: &Clip, group: Group) {
     match group {
         Group::Video => {
+            let picture_target = !is_adjustment(target);
+            let picture_source = !is_adjustment(source);
             if let (Some(into), Some(from)) = (target.video.as_mut(), &source.video) {
+                let own = into.qualifier;
                 *into = from.clone();
+                // The qualifier follows the clip kind (module doc, GR-13).
+                if picture_target {
+                    into.qualifier = Qualifier::default();
+                } else if picture_source {
+                    into.qualifier = own;
+                }
             }
         }
         Group::Audio => {

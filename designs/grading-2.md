@@ -1078,3 +1078,120 @@ now computed once per curve (`CurveTable.Spline`; `strip` builds the four channe
 the editor's stroke once per curve) instead of on every sample. Re-run on the change: `make gate`
 PASS (232 s); `RC_PROOF_APP=release curves_proof.py compare` 29/29; `catmull-rom` (K3, P6) and
 `master-channel-swapped` (M1) MUTANT PASS, no other row failing.
+
+## G2-4 — the qualifier (#262, GR-13)
+
+**What landed** (2026-10-11, in the worktree on `grading-2`, from `75ebf34`). GR-13 first
+(`designs/spec/11-decisions/grading-2.md`, its README row and Lines cells, "Amended by GR-13" on
+GR-4 and GR-6 and their README cells), from the owner's answers of 2026-10-11 to G2-4's choices
+1–13 (1–10 and 12–13 as recommended, 11 changed to the short way round) and the orchestrator's
+calls on the spec's objections 1 (a pick SHIFTS a level range inside 0–1) and 3 (Saturation
+reads HSV S = C / max with a near-black guard). GR-13 supersedes this road map's draft above
+("Qualifiers (#262), G2-4"): Saturation is not chroma, and a qualifier dropped by Paste
+Attributes is said in the tool's description, not its answer. Then `video.qualifier {hue,
+saturation, luma, invert}` on adjustment clips only, at format 18.
+- Core: `model_grade.rs` (`HueRange`, `LevelRange`, `Qualifier`, `HUE_TURN`,
+  `HUE_SOFTNESS_MAX`), `VideoProps.qualifier` after `curves`, `grade_check.rs`'s
+  `check_qualifier` (after `check_curves`), `edit_adjustment.rs`'s `check_qualifier_clip` (beside
+  `check_adjustment_video` in `patch_clips` and `check_group`), `copy_group`'s rule in
+  `edit_paste_attributes.rs`, `clamp_qualifier` in `clamp_video`, the new `actions_qualifier.rs`
+  (`align_hue_center`, called by `evaluate_clip` after `align_identity_curves`), the patch
+  template's qualifier (every range present, `invert` true), the adjustment source's `qualifier`
+  in `layer_source`, the new `recipe_selection.rs` (`LayerFacts`, `select_layers`, called by
+  `frame_recipe_opts` before the burn-in), `selection` and `behind` in `recipe_options.rs`,
+  `RC_FORMAT_VERSION` 18 and the header (its `opts_json` comment too). `LAYER_KEYS` stays 25 and
+  `video_json` takes nothing (the qualifier is skipped when neutral). No op, tool, FFI export or
+  op-table row.
+- Metal: `QualifierUniforms` (sixteen floats), `qualifierFall`, `qualifierLevel`,
+  `qualifierWeight`; `reelcut_adjust_fragment` reads `q` from the destination before step 3,
+  returns `q` × coverage as grey for a `selection` layer, and weighs `w = saturate(opacity ×
+  coverage × q)`; the stage table's step 7 names it.
+- Swift: `QualifierProps.swift` (new, 305), `RangeStripControl.swift` (new, 317),
+  `VideoPane+Qualifier.swift` (new, 160), `EditorViewController+Qualifier.swift` (new, 155:
+  `pickQualifier`, `QualifierPick`, `QualifierPickView`), `CanvasPickOverlay` extracted from
+  `CanvasEyedropperView` in `+Eyedropper`, `+Seeing`'s `toggleShowSelection`,
+  `syncShowSelection`, validator arm and tag stack (`SeeingTagStack`), `SelectionTagView`, the
+  adjustment source's `qualifier` and `selection` in `FrameRecipe.swift`, `RecipeOptions`'
+  `selection` and `behind`, `VideoProps.qualifier`, `VideoPatch.qualifier` and its dictionary,
+  `keyedCount`, the row spacer, `ClipPane`'s `.color` list, `uniforms(for:…, ignoringOpacity:)`,
+  `drawAdjustment`'s `buffer(1)`, View ▸ Show Selection and its `UIMenuTable` row, `set_video`'s
+  `qualifierClause`, `render_frame`'s `selection`, `paste_attributes`' sentence.
+- Proofs: `qualifier_proof.py` and `qualifier_probe.swift` (new); `look_probe.swift` B4 and
+  `look_proof.py`'s doc; `phase8_chrome.py`'s View group; `capture_spike/inventory.json`;
+  `screens.py` and screens `05h` (new) and `05c`; `grading_spike/tree_bench.swift`,
+  `grading_spike.py` and its README (the SA scene, KA, TA); `core/tests/qualifier.rs`,
+  `selection.rs`, `schema_v18.rs` (new) and `schema_v17.rs` (its "is 17" a `const` assertion).
+- Documents: spec §4.2, §4.3a, §5.2 (format 18), §5.4, §6 (`paste_attributes`, the adjustment
+  clip's row), §7.3, §7.4, §7.5, §7.9a, §7.10, §9 and the index; the README's Qualifiers bullet;
+  GRD-14 and GRD-15 in `docs/manual-checks.md`; the proofs README's section; the two
+  file-history ADRs; `designs/screens/README.md` (the fixture, the third view toggle).
+
+**Deviations from the phase's spec, each measured.** (1) The fields are 41 pt, not 40: at 40 a
+two-decimal value ("0.00", "1.00") measured 27 pt of text in a 26 pt frame, which screen 05c's
+layout dump named as truncated (24 problems); at 41, 0. (2) A2 reads its early frame at 0.3 s
+(frame 9, centre 356), not 0.25 s: 0.25 s is frame 7.5 at 30 fps, renders a frame either side,
+and the first Debug run found the band a column off (centre 355.33). (3) M1's matte covers the
+left THIRD (480 px, hues 0–120), not the left half: H1's band (80–160) lies wholly in the left
+half, so with a half-width matte the first `matte-not-multiplied` run SURVIVED — nothing selected
+lay outside the matte. Across the band's edge the mutant fails M1. (4) Three mutants name more
+rows than the spec's list, each measured: `hue-wrap-broken` W1 G1 (G1's 360° band needs the wrap
+too), `softness-inside` H1 S1 S1b L1 W1 D1 (W1 and D1 read the band's full-in columns),
+`q-from-graded` D1 H1 (Q's grade, saturation −1, makes the graded colour grey, so `q` from it is
+0 and H1's graded columns stay B). (5) `S` and Y′ are saturated in the shader: on the first Debug
+run S2 failed on single rows at V 0.106–0.212 because Metal's fast division put C / max an ulp past
+1, which the hard edge at 1 refused. (6) K3's probe runs beside a `default.metallib` of the tree's
+shader and `Blank.mp4`, `matte_probe.py`'s arrangement: a probe has no app bundle, so neither the
+compositor's library nor the placeholder track resolved (the first run threw in
+`AVAssetReaderVideoCompositionOutput`). (7) `ClipPane` inserts the Qualifier with a second
+`if videoPane.allAdjustment` line rather than a block, so `adjustment_proof.py`'s
+`strength-in-mixed` anchor still occurs once. (8) The 05h capture's well is `snapshot_ui`'s fill
+(`render_frame`'s picture, which the switch never reaches), so the screen shows the "Selection"
+tag and the switch, not the grey; E1 and V1 are the selection's proof. (9) `ffi_query.rs`'s
+`rc_project_frame_recipe_opts` doc, which named only the two older keys, now names all four, as the
+header's comment, the contract, does (the review's fix pass).
+
+**Verification**, 2026-10-11, AC power (`pmset -g`: powermode 0, AC Power), Apple M2 Max:
+- Control first: `make app` on the untouched tree (only GR-13's documents and the new proof
+  written), its bundle copied out of `build/` before the first code edit, then `RC_PROOF_APP=release
+  qualifier_proof.py capture tools/proof/work/qualifier-control --app <the copy>`: six frames, Z1
+  ok (B, B50 and BD equal the fixtures' bytes).
+- In the loop: `cargo test --release --test qualifier --test selection --test schema_v18 --test
+  schema_v17 --test adjustment --test recipe --test ungraded --test patch_door --test curves --test
+  schema_v2` (10, 6, 6, 5, 18, 15, 5, 9, 9, 40 passed, first run); `make lint` clean; `make
+  typecheck` (0 errors, the 4 baseline warnings); `swift_build.py typecheck
+  tools/proof/qualifier_probe.swift`; `qualifier_proof.py` on Debug, the MCP rows 23/23 and
+  K1–K8 8/8 after deviations (2), (5) and (6) (N0 is scored on Release only);
+  `seeing_proof.py --only V4,U2` (the tag stack keeps V4's hidden tag in the dump); `inventory.py
+  --check` and `spec_index_proof.py` 153/153.
+- `make gate`: PASSED in 238 s (typecheck 5 s, fmt 2 s, lint 1 s, test 139 s, app 91 s).
+- `RC_PROOF_APP=release python3 tools/proof/qualifier_proof.py compare
+  tools/proof/work/qualifier-control`, whole, on the gate's Release build and the final
+  instrument: 32/32 — N0 the six unqualified frames byte-identical at 16 bits; no `Reelcut: `
+  line, no `DEFAULTS MOVED` (`tools/proof/work/g2-4/qualifier-release.txt`).
+- Release: `adjustment_proof.py` 36/36, `seeing_proof.py` 19/19 (G1 recorded: 0.096 / 0.195
+  ms), `look_proof.py --only B4` 1/1, `phase8_chrome.py` 150/150.
+- `grading_spike.py --measure --tree --tree-base 75ebf34`, once, under heavy host load (load
+  67 before, 81 after — another session's build): KT and KA 0/1023 at both sizes; TC held
+  (1080p −0.066 ms, 2160p −0.000 ms); **TA held**: 1080p VT:SA − V0:SA −0.023 ms against 0.036,
+  2160p +0.044 ms against 0.061 (V0:SA 0.812, VT:SA 0.856 ms, its runs 0.855–0.856: a real
+  cost at 4K, inside the bound, from the reading's branch and the moved matte sample).
+- `screens.py --only 05c-clip-adjustment,05h-clip-qualifier` on the final Debug build: 7/7, both
+  looks, 0 new problems.
+- Mutants, thirteen, once each on the final instrument (Debug copies, after M1's matte moved and
+  the named rows were widened): every one MUTANT PASS, no other row failing — `hue-wrap-broken`
+  (W1 G1), `softness-inside` (H1 S1 S1b L1 W1 D1), `chroma-guard-removed` (G1),
+  `saturation-reads-chroma` (S1b S2), `near-black-guard-removed` (S2), `hue-long-way` (A2, CT
+  `--test qualifier`), `q-from-graded` (D1 H1), `matte-not-multiplied` (M1),
+  `selection-reaches-export` (E1), `qualifier-on-any-clip` (R1, CT `--test qualifier`),
+  `paste-keeps-qualifier` (P0, CT `--test qualifier`), `selection-drops-mattes` (M1, CT `--test
+  selection`), `pick-not-behind` (K3).
+
+**Owed.** GRD-14 and GRD-15, the owner's standing rows, only. Done, not owed: the `core/CLAUDE.md`
+and `app/CLAUDE.md` entries (G2-4's spec, "CLAUDE.md edits owed").
+
+**After review (G2-4).** Review 1 found three should-fixes and two nits, all applied:
+`ffi_query.rs`'s `rc_project_frame_recipe_opts` doc names all four options; the Owed line's form;
+`app/CLAUDE.md`'s canvas-mode sentence (`+ZoomRegion` is on `CanvasRegionView`, a fourth mode)
+and the eighth pipeline's GR-13 clause; `selectionArg` moved above `renderFrame`'s doc;
+`core/CLAUDE.md`'s recipe-options list. Review 2 passed. `make gate` PASS (313 s); no proof row or
+mutant re-run, since no instrument changed.

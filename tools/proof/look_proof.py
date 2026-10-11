@@ -117,7 +117,8 @@ playhead at 0.5 s, `select_inspector_tab {clip, color}`:
   Clip ▸ Look follows Motion in the main menu; B2 the validator's checkmarks,
   dashes and enabling over MG and MG-cool; B3 `summary`, `shared`, `time` and
   `op` on fixed inputs; B4 the Color sections (Light, Color, Wheels, Curves,
-  Look since grading-2 G2-3), a Warm and a None tile's one
+  Look since grading-2 G2-3; an adjustment clip's opening with Adjustment
+  then Qualifier since G2-4), a Warm and a None tile's one
   `set_video` named "Look" and the outlines, in a headless `ClipPane`.
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`; a `core/`
