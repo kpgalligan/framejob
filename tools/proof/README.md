@@ -17268,7 +17268,7 @@ matte --test matte_nest --test dissolve_nest` in the copy's own `core/`.
 | `core-routed-keeps-transition` | a routed level also fills `transition` | D0 CT |
 | `core-member-keeps-outer` | no matte-level stop | D1 CT |
 | `core-chain-inner-first` | the chain left inner first | D7 CT |
-| `mix-weights-swapped` (`Compositor.metal`) | the mix at 1 − p | D0 |
+| `mix-weights-swapped` (`Compositor.metal`) | the mix at 1 − p | D0–D8 |
 | `half-shared-target` (`Compositor+Dissolve.swift`) | the in half drawn into the out half's target | D0 |
 | `members-plain` (`Compositor+Matte.swift`) | `encodeMattes` walks its members at a depth past every chain | D6 |
 | `zoom-scale-dropped` (`Compositor.metal`) | the mix fragment's z_out and z_in both 1 | D8 |
@@ -18522,3 +18522,66 @@ other scored row did.
 | `parade-band-misplaced` | the parade's merge puts both bands in the group's first column | S3 |
 
 **Its record**: `designs/grading-2.md`'s G2-1 section.
+
+## Road map grading-2 — G2-2, the wheels (`wheels_proof.py` N0–N2, L1, G1, Y1, C1, O1, A1, J1, X1, U1, V1, P0, R1, P1–P7, Z1 and nine mutants; `wheels_probe.swift`; `core/tests/wheels.rs`, `core/tests/schema_v16.rs`; spec §11 GR-11)
+
+**What it answers.** That `video.wheels` changes nothing until set (N0: six
+wheel-less frames — the card, the card at exposure +1, an adjustment clip at
+exposure +1 over it, the ramp, the ramp under Warm, the movie — byte-identical
+at 16 bits to `capture DIR`'s from the untouched tree's Release build); that
+each wheel follows GR-11's formula on measured bytes (L1 lift, G1 gain, Y1
+gamma along a grey ramp, ±1, the held ends exact); that a push at the rim keeps
+a GREY pixel's Y′ (C1, ±1, ±2 for gamma, the only pixel GR-11 claims it for);
+that step 4c.1 runs after tone (O1), in an adjustment clip's pass as on a clip
+(J1), lerps in an action (A1), reaches an export as `render_frame` draws it
+(X1), undoes (U1), leaves under `ungraded` (V1) and pastes (P0); and that the
+two refusals speak in their sentences (R1). P1–P7 are `wheels_probe.swift`,
+built by `swift_build.build` over `app/Sources` (a failed build is a scored
+FAILURE of all seven), on a project of two cards at lift masters 0.2 / −0.2:
+P1 a puck drag through `ColorWheelControl.press` / `drag` / `release` in a
+headless `ClipPane` wired to a `ProjectDocument`'s live trio is one undo step
+"Lift" whose every update sends exactly `{wheels: {lift: {x, y}}}` to both
+clips (the masters kept), and the Color sections run Color, Wheels, Look; P2
+`apply(wheels:)`'s flag; P3 the 512-byte block with `liftX` at 464 and
+`wheelsEnabled` at 500; P4 the `◆N` badge; P5 ⌥ at a tenth for the puck and
+the strip (no jump on the strip's ⌥ press, and none on a press on its
+knob, so a double-click there is the reset alone); P6 a double-click resets x and y
+only, one step "Lift"; P7 10,000 drags past the rim land with
+x² + y² ≤ 1 + 1e-9. The module docstring lists every row and its fixture.
+
+```
+make app                                                                   # the untouched tree, before any product edit
+RC_PROOF_APP=release python3 tools/proof/wheels_proof.py capture tools/proof/work/wheels-control
+python3 tools/proof/wheels_proof.py                                        # Debug unless RC_PROOF_APP=release
+RC_PROOF_APP=release python3 tools/proof/wheels_proof.py compare tools/proof/work/wheels-control
+python3 tools/proof/wheels_proof.py --mutant NAME                          # one of the nine below
+cd core && cargo test --release --test wheels --test schema_v16
+```
+
+It launches its own instance on a scratch socket in a scratch home
+(`tools/proof/work/wheels/home`), writes its fixtures (`tone_proof.py`'s card,
+ramp and `testsrc2` movie) into its work folder, performs no menu item, closes
+every project it opens, and removes its work folder at the start and at exit.
+`--mutant` builds a tree copy as `tone_proof` does; a core mutant also runs
+`cargo test --release --no-fail-fast --test wheels --test schema_v16 --test
+ungraded` in the copy's core (row CT). MUTANT PASS only when every named row
+failed and no other scored row did.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `wheels-before-tone` | step 4c.1's block moved before 4c in the layer stage | O1 |
+| `gamma-sign` | gamma's exponent `exp2(-gamma)` → `exp2(gamma)` | Y1 C1 (the gamma push lowers its hue's channels) |
+| `push-not-luma-neutral` | `wheelOffset` pushes the full hue, not `lookHueChroma` | C1 |
+| `flag-ignores-negative` | `wheelsEnabled` only for a positive value | G1 C1 P2 (C1's 240° push is all negative) |
+| `circle-check-dropped` | `grade_check.rs`'s circle test never refuses | R1 CT |
+| `rim-tolerance-dropped` | the circle test exact, no `WHEEL_RIM_TOLERANCE` | CT (`wheels.rs`'s rim and split cases) |
+| `ungraded-misses-wheels` | `ungraded` keeps the wheels | V1 CT |
+| `adjust-without-wheels` | the adjustment pass has no step 4c.1 | J1 |
+| `puck-writes-group` | a puck write sends the wheel's master too | P1 |
+
+Also moved by G2-2 (the block's 464 → 512): `tone_probe.swift` P3,
+`look_probe.swift` L3 (and B4's section list), `clip_inspector2_probe.swift`
+T2's Color list, `phase8_chrome.py`'s uniform-size row and
+`grading_spike/tree_bench.swift` (`--tree-base REV` on `grading_spike.py`).
+
+**Its record**: `designs/grading-2.md`'s G2-2 section.

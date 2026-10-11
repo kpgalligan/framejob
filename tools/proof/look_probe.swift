@@ -53,9 +53,9 @@ do {
     let flag = MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.lookEnabled) ?? -1
     check(
         "L3 apply(look:) writes amount 0.8 and flag 1 for a look at 0.8, flag 0 for none and for "
-            + "amount 0; lookAmount and lookEnabled at 456 and 460 of 464 bytes",
+            + "amount 0; lookAmount and lookEnabled at 456 and 460 of 512 bytes",
         looked.lookAmount == 0.8 && looked.lookEnabled == 1 && none.lookEnabled == 0
-            && none.lookAmount == 0 && zero.lookEnabled == 0 && stride == 464 && amount == 456
+            && none.lookAmount == 0 && zero.lookEnabled == 0 && stride == 512 && amount == 456
             && flag == 460,
         "looked \(looked.lookAmount)/\(looked.lookEnabled); none \(none.lookEnabled); zero "
             + "\(zero.lookEnabled); stride \(stride), amount at \(amount), flag at \(flag)")
@@ -272,13 +272,14 @@ do {
             && look(cool, "image") == nil
         let imageOutline = outlined(pane(plain, ["image"]))
         check(
-            "B4 Color sections [light, color, look] (AJ: adjustment first); Warm on IM+{cool, 0.5} "
+            "B4 Color sections [light, color, wheels, look] (AJ: adjustment first); Warm on "
+                + "IM+{cool, 0.5} "
                 + "sends one set_video {look: {kind: warm}} named \"Look\" and IM reads {warm, "
                 + "0.5}; None sends {look: null}; outlines [MOVIE] Warm, [MOVIE, IM+cool] none, "
                 + "[IM] None",
-            movieSections == ["video.light", "video.color", "video.look"]
+            movieSections == ["video.light", "video.color", "video.wheels", "video.look"]
                 && adjustmentSections == ["video.adjustment", "video.light", "video.color",
-                                          "video.look"]
+                                          "video.wheels", "video.look"]
                 && tiles.count == 9 && warmOk && noneOk && movieOutline == ["Warm"]
                 && mixedOutline.isEmpty && imageOutline == ["None"],
             "sections \(movieSections) / \(adjustmentSections); tiles \(tiles.count); warm "

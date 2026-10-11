@@ -97,6 +97,18 @@ extension AgentServer {
         + "built-in kind replaces a LUT, an amount alone needs a clip that already has a "
         + "look, and {look: null} removes it. In an action's end the amount animates and a "
         + "change of kind or of LUT switches at the end)"
+    // `video.wheels`' clause (spec §11 GR-11), its own explicitly-typed local
+    // for `lookClause`'s reason. It mirrors the Color sub-tab's Wheels section
+    // (each disc's puck, master strip and field); the push the section has no
+    // field for is exact here.
+    private static let wheelsClause: String =
+        ", wheels ({lift, gamma, gain}, each {x, y, master}, each -1 to 1 and 0 = unchanged: "
+        + "x, y is the colour push, its angle the hue (0° red, 120° green, 240° blue) and its "
+        + "length the strength, and must lie inside the unit circle (x² + y² ≤ 1); master is "
+        + "the brightness; refused outside, never clamped. Any subset MERGES, so {wheels: "
+        + "{lift: {x: 0.2, y: -0.1}}} keeps lift's master and the other two wheels. Applied "
+        + "after color's tone and before look: lift moves black and holds white, gain moves "
+        + "white and holds black, gamma moves the middle and holds both ends)"
     // The three patch vocabularies, written once: every property group of
     // spec §5.2, with the ranges the ops enforce. A patch MERGES, so a key
     // left out keeps its current value and a key set to null clears an
@@ -129,6 +141,7 @@ extension AgentServer {
         + obscureClause
         + blendClause
         + motionClause
+        + wheelsClause
         + lookClause
         + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
         + "length and a component outside the range is refused by name, neither "
@@ -228,8 +241,9 @@ extension AgentServer {
                     + "canvas centre plus (x, y), scaled, then rotated about that centre, and "
                     + "crop removes edges in place without shifting the content. To animate a "
                     + "property instead, add_action and then set_action_end. On an adjustment "
-                    + "clip only color, the point filters and opacity (the grade's strength) "
-                    + "do anything, and blur, sharpen, pixelate or a blend mode is an error.",
+                    + "clip only color, wheels, the point filters and opacity (the grade's "
+                    + "strength) do anything, and blur, sharpen, pixelate or a blend mode is an "
+                    + "error.",
                 ["clips": clipsDescription, "patch": videoPatchDescription]),
             opTool(
                 "set_audio",

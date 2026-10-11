@@ -31,6 +31,27 @@ extension ColorPatch {
     }
 }
 
+extension ColorWheelPatch {
+    /// The keys the write names, and no others (spec §11 GR-11).
+    var dictionary: [String: Any] {
+        var d: [String: Any] = [:]
+        for case let (key, value?) in [("x", x), ("y", y), ("master", master)] { d[key] = value }
+        return d
+    }
+}
+
+extension ColorWheelsPatch {
+    /// The wheels the write names, each sparse; an empty wheel is left out.
+    var dictionary: [String: Any] {
+        var d: [String: Any] = [:]
+        for case let (key, wheel?) in [("lift", lift), ("gamma", gamma), ("gain", gain)]
+        where !wheel.isEmpty {
+            d[key] = wheel.dictionary
+        }
+        return d
+    }
+}
+
 extension ChromaProps {
     var dictionary: [String: Any] {
         ["key": key, "tolerance": tolerance, "softness": softness, "spill": spill]

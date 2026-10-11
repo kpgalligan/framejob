@@ -257,6 +257,14 @@ schema, §6 the op table, §7 the architecture.
   or an RGB-and-luma histogram; it opens as Waveform over Vectorscope and
   shrinks both to fit a short window. Neither is remembered: a window opens
   with both off.
+- **Colour wheels**. The Color tab's **Wheels** section has three wheels —
+  **Lift** (the shadows), **Gamma** (the middle) and **Gain** (the
+  highlights) — each a hue disc whose puck pushes that range toward a colour
+  and a strip that brightens or darkens it. The disc is turned to match the
+  vectorscope, so dragging toward a colour moves the trace toward it; hold ⌥
+  to drag at a tenth of the speed, double-click to reset. A drag is one undo
+  step, every value animates in an action, and the wheels apply after Light
+  and before a look, on a clip or an adjustment clip.
 - **Adjustment clips**. **Insert ▸ Adjustment Clip**
   places a clip that draws nothing of its own and grades everything behind
   it — its Light, Color and point filters apply to the whole picture under

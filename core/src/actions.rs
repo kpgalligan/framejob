@@ -35,7 +35,7 @@ use crate::actions_graphic::evaluate_graphic;
 use crate::edit_adjustment::{clamp_adjustment, is_adjustment};
 use crate::model::{
     Action, AudioProps, Clip, ColorAdjust, Curve, GraphicProps, Project, ShapeProps, Source,
-    TextProps, VideoProps,
+    TextProps, VideoProps, Wheels,
 };
 use crate::time::Ticks;
 
@@ -351,13 +351,29 @@ pub(crate) fn color_json(color: &ColorAdjust) -> Value {
     Value::Object(out)
 }
 
-/// A video group as JSON with its `color` through [`color_json`], so every
-/// tone key is present: what an action interpolates from, what a patch is
-/// checked against and what a split writes back.
+/// The wheels with every key present (spec §11 GR-11): all three wheels and
+/// each one's `x`, `y` and `master`, even at 0, which the file leaves out.
+pub(crate) fn wheels_json(wheels: &Wheels) -> Value {
+    let mut out = Map::new();
+    for (name, wheel) in wheels.named() {
+        let mut keys = Map::new();
+        keys.insert("x".to_string(), to_json(&wheel.x));
+        keys.insert("y".to_string(), to_json(&wheel.y));
+        keys.insert("master".to_string(), to_json(&wheel.master));
+        out.insert(name.to_string(), Value::Object(keys));
+    }
+    Value::Object(out)
+}
+
+/// A video group as JSON with its `color` through [`color_json`] and its
+/// `wheels` through [`wheels_json`], so every tone and wheel key is present:
+/// what an action interpolates from, what a patch is checked against and
+/// what a split writes back.
 pub(crate) fn video_json(video: &VideoProps) -> Value {
     let mut value = to_json(video);
     if let Value::Object(fields) = &mut value {
         fields.insert("color".to_string(), color_json(&video.color));
+        fields.insert("wheels".to_string(), wheels_json(&video.wheels));
     }
     value
 }

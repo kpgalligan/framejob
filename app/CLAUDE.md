@@ -26,9 +26,12 @@ detail there.
   `TextPatch` (with `case`, `words` and `word_style`) is `TextPatch.swift`'s,
   moved out so it could grow, and `ShapePatch` `ShapePatch.swift`'s (a pure
   move, the toll for `ReelColor`). `VideoPatch.color` is a sparse `ColorPatch`
-  (`GradeProps.swift`, which holds `ColorAdjust` (moved out of `ProjectSnapshot.swift`, grading-2 G2-0) with its neutrality helpers, and
-  `LayerUniforms.apply(tone:)`), so a row writes only its own key to every
-  selected clip. `word_style` has ONE
+  (`GradeProps.swift`, which holds `ColorAdjust` (moved out of
+  `ProjectSnapshot.swift`, grading-2 G2-0) with its neutrality helpers, and
+  `LayerUniforms.apply(tone:)`, and the wheels' `ColorWheel`, `ColorWheels`,
+  `ColorWheelPatch`, `ColorWheelsPatch`, `ColorWheelKind` and
+  `LayerUniforms.apply(wheels:)` (GR-11)), so a row writes only its own key to
+  every selected clip. `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10). `ReelAgentSocket` (road map
   14's MC2) wraps `rc_agent_socket_start` / `_release`: `start` throws the
   core's sentence, `release` is the quit's unlink-if-still-ours with no join.
@@ -736,6 +739,13 @@ the key map behind it.
   `InspectorSlider.swift` (`InspectorSliderControl`, a pure move: the 7 × 11
   block knob snapped to device pixels (CI-6) and, keyed, the mint segment
   from the action's start value and the coral playhead tick) ·
+  `ColorWheelControl.swift` (`ColorWheelControl`: a hue disc drawn at
+  `hueRotation` 103° so each hue sits near its vectorscope target, its 7 × 7
+  square puck dragged as a live edit by the pointer's delta, ⌥ a tenth, clamped
+  to the rim, double-click resets the push; spec §11 GR-11) ·
+  `WheelStripControl.swift` (`WheelStripControl`: the master strip with the
+  slider's knob, a press on the knob grabs it, elsewhere jumps, ⌥ drags relative
+  at a tenth, double-click resets) ·
   `InspectorBinding+Writes.swift` (a pure move: a write with an action
   selected goes to `set_action_end`, with `structural(video:for:)` the
   exception that sends a list of a different LENGTH, or `motion`, to the
@@ -809,18 +819,22 @@ the key map behind it.
   holding a point wins, the one painted on top) · `ActionLaneDecor.swift`
   (CI-12: the lane's hatch, fades and wedges as geometry by the timeline's
   own gates, drawn under the bands; `Curve.laneName`; `CurveGlyphView`,
-  beside the Curve popup because `OptionPopupControl` is not forked) · `VideoPane.swift` (+`Color` — the Color section, a pure move, grading GR1, writing a sparse `ColorPatch`;
-  +`Light` — the Light section, the nine tone rows (GR-2); +`Adjustment` — the
-  Adjustment section's one Strength row (`video.opacity`) and the selection's
-  adjustment tests (GR-6); +`Look` — the Look section, last in the Color
-  sub-tab (Light · Color · Look): the 3×3 gallery and an Amount row shown only
-  when every clip has a look (GR-7; `LookGallery.swift` renders its
-  thumbnails through `Exporter.renderFrame` at 256 px, 0.3 s after changes
-  settle and only while open; `LookGalleryView.swift` draws it; under the grid
-  the Imported group, a tile per `.cube` LUT in media-list order, and Import
-  LUT…, which runs `add_media` and the look as ONE "Import LUT" edit, reusing a
-  listed file, GR-8; Clip ▸ Look ▸'s LUT rows are filled when it opens by
-  `LookMenuFiller` in `AppDelegate+ClipMenus.swift`; `-RCDevLookGalleryDump`
+  beside the Curve popup because `OptionPopupControl` is not forked) ·
+  `VideoPane.swift` (+`Color` — the Color section, a pure move, grading GR1,
+  writing a sparse `ColorPatch`; +`Light` — the Light section, the nine tone
+  rows (GR-2); +`Wheels` — the Wheels section (GR-11): Lift, Gamma and Gain
+  across one row (`ColorWheelsView`), each a `ColorWheelControl` disc, a
+  `WheelStripControl` master and a field, one row mark for `video.wheels`;
+  +`Adjustment` — the Adjustment section's one Strength row (`video.opacity`)
+  and the selection's adjustment tests (GR-6); +`Look` — the Look section, last
+  in the Color sub-tab (Light · Color · Wheels · Look): the 3×3 gallery and an
+  Amount row shown only when every clip has a look (GR-7; `LookGallery.swift`
+  renders its thumbnails through `Exporter.renderFrame` at 256 px, 0.3 s after
+  changes settle and only while open; `LookGalleryView.swift` draws it; under
+  the grid the Imported group, a tile per `.cube` LUT in media-list order, and
+  Import LUT…, which runs `add_media` and the look as ONE "Import LUT" edit,
+  reusing a listed file, GR-8; Clip ▸ Look ▸'s LUT rows are filled when it opens
+  by `LookMenuFiller` in `AppDelegate+ClipMenus.swift`; `-RCDevLookGalleryDump`
   also writes `lut-<id>.png` and the manifest's `tiles`); +`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
@@ -1135,11 +1149,13 @@ the key map behind it.
   half, and the shadow pair. The coverage stays `r8Unorm`. `texture(from:)`
   wraps a buffer by its own format. Every video source decodes to
   `64RGBAHalf` (`Compositor.sourcePixelFormat`, spec §11 PR-2), clamped to
-  0…1 where the shader samples it. The uniform block's field ORDER is a contract with the
-  shader checked only by reading both, so change them in one edit; it is 116
-  floats (464 bytes), ending in the tone group (spec §11 GR-2: the nine tone
-  values, `toneEnabled`, then `lookAmount` and `lookEnabled`, spec §11 GR-7; a
-  next field adds a group of four). A layer's look is a baked 33³ `rgba16Float`
+  0…1 where the shader samples it. The uniform block's field ORDER is a contract
+  with the shader checked only by reading both, so change them in one edit; it
+  is 128 floats (512 bytes): the tone group (spec §11 GR-2: the nine tone
+  values, `toneEnabled`, then `lookAmount` and `lookEnabled`, spec §11 GR-7),
+  then the wheels group (spec §11 GR-11: lift, gamma and gain as x, y, master
+  each, `wheelsEnabled`, `curvesEnabled` for G2-3, one reserved); a next field
+  adds a group of four. A layer's look is a baked 33³ `rgba16Float`
   lattice at `texture(2)` on every layer, shadow-mask and adjustment draw
   (`LookTextures.swift`: the bake on the GPU, an LRU keyed by the look's whole
   definition from the recipe, a 2³ identity placeholder for no look or a failed

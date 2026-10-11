@@ -208,7 +208,7 @@ FAIL:
   core-routed-keeps-transition  a routed level also fills `transition`: D0 CT
   core-member-keeps-outer     no matte-level stop: D1 CT
   core-chain-inner-first      the chain left inner first: D7 CT
-  mix-weights-swapped         the mix fragment at 1 − p: D0
+  mix-weights-swapped         the mix fragment at 1 − p: D0–D8
   half-shared-target          the in half drawn into the out half's target: D0
   members-plain               `encodeMattes` walks its members at a depth past
                               every chain: D6
@@ -367,8 +367,9 @@ MUTANTS = {
     # Then the app: the mix, the halves' targets, the matte members' walk.
     "mix-weights-swapped": (
         "app/Resources/Shaders/Compositor.metal",
-        "    return mix(o, i, p);\n",
-        "    return mix(o, i, 1.0 - p);\n", ["D0"]),
+        "    return saturate(mix(o, i, p));\n",
+        "    return saturate(mix(o, i, 1.0 - p));\n",
+        ["D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8"]),
     "half-shared-target": (
         "app/Sources/Compositor+Dissolve.swift",
         "for (half, target) in zip(halves, [outgoing, incoming]) {",

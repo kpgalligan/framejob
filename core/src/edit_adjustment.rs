@@ -1,6 +1,7 @@
 //! Adjustment clips (spec §11 GR-6): a clip kind with no picture of its
-//! own. While it lasts, its `video.color` (all thirteen keys), its point
-//! filters (sepia, noir, vignette, invert) and its opacity — the STRENGTH —
+//! own. While it lasts, its `video.color` (all thirteen keys), its wheels
+//! (spec §11 GR-11), its look, its point filters (sepia, noir, vignette,
+//! invert) and its opacity — the STRENGTH —
 //! apply to everything already drawn behind it in its container, the canvas
 //! background included, and never to a track in front. The compositor's
 //! eighth pipeline does the grading by reading the target it draws into

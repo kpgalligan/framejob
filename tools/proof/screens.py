@@ -117,6 +117,8 @@ STEP_KEYS = {"call", "args", "until_absent", "within"}
 # walk never reaches it. `video.look` is pinned OPEN so 05d shows the gallery;
 # it opens Look below Color on 05b and 05c too, whose `select_inspector_tab`
 # steps therefore wait out `look_thumbnails_pending` as 05d's does.
+# `video.wheels` is pinned OPEN so 05f shows the three wheels (grading-2 G2-2);
+# it opens Wheels between Color and Look on 05b and 05c too.
 SECTIONS = {
     "audio.compressor": True, "audio.duck": True, "audio.fades": True, "audio.mix": True,
     "audio.noise": True, "audio.volume": False,
@@ -136,6 +138,7 @@ SECTIONS = {
     "video.obscure": True,
     "video.reflection": True, "video.shadow": True, "video.speed": True,
     "video.spotlight": True, "video.transform": False, "video.transition": True,
+    "video.wheels": False,
 }
 
 
@@ -242,6 +245,8 @@ FIXTURES = {
              "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
     "lut": {"path": os.path.join(FIXTURE_DIR, "Lut.reelcut"),
             "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
+    "wheels": {"path": os.path.join(FIXTURE_DIR, "Wheels.reelcut"),
+               "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -392,6 +397,8 @@ def build_fixture(mcp, name):
             ids = _look_ops(mcp, path)
         elif name == "lut":
             ids = _lut_ops(mcp, path)
+        elif name == "wheels":
+            ids = _wheels_ops(mcp, path)
         mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
@@ -572,6 +579,23 @@ def _look_ops(mcp, path):
     ids = {"video": clips[0]["id"]}
     _call(mcp, "set_video", path, clips=[ids["video"]],
           patch={"look": {"kind": "teal_orange", "amount": 0.8}})
+    return ids
+
+
+def _wheels_ops(mcp, path):
+    """Grading-2 G2-2 (spec §11 GR-11): one track, "Video", holding `speech.mov`
+    at 0 with lift pushed toward red-orange (x 0.3, y 0.2) at master 0.1 and gain
+    at master 0.2 — the Wheels section's pucks and strips off their rests (05f)."""
+    _call(mcp, "set_track", path, track=1, name="Video")
+    video = _call(mcp, "import_media", path, path=os.path.join(MEDIA, "speech.mov"))
+    _call(mcp, "add_clip", path, media=_media_id(video), track=1, at=0)
+    clips = _project(mcp, path)["clips"]
+    if len(clips) != 1:
+        raise FixtureError(f"building wheels: the project holds {len(clips)} clips, not 1")
+    ids = {"video": clips[0]["id"]}
+    _call(mcp, "set_video", path, clips=[ids["video"]],
+          patch={"wheels": {"lift": {"x": 0.3, "y": 0.2, "master": 0.1},
+                            "gain": {"master": 0.2}}})
     return ids
 
 

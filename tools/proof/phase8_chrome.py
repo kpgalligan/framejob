@@ -2436,15 +2436,20 @@ def main():
     view = submenu_items(menu.get("menu", {}), "View")
     bits = menu.get("modifierBits", {})
     check("the View menu exists and is not empty", len(view) > 3, f"{len(view)} rows")
-    check("it ENDS with a separator, the Preview Quality submenu and Preview Window — a "
-          "group of their own, because both are about the PREVIEW rather than about the "
-          "editor's own panes",
-          len(view) >= 3 and view[-3]["separator"]
-          and view[-2].get("submenu", {}).get("title") == "Preview Quality"
-          and view[-1]["title"] == "Preview Window",
-          " | ".join(r["title"] or "(separator)" for r in view[-4:]))
+    # The preview group is the rows after the LAST separator: grading GR3 and
+    # grading-2 G2-1 appended Show Ungraded and Scopes to it, so its tail is
+    # no longer Preview Window.
+    last_separator = max((i for i, r in enumerate(view) if r["separator"]), default=-1)
+    group = view[last_separator + 1:] if last_separator >= 0 else []
+    check("its LAST group, after a separator, is the Preview Quality submenu and Preview "
+          "Window, then Show Ungraded and Scopes — a group of their own, because all four "
+          "are about the PREVIEW rather than about the editor's own panes",
+          len(group) == 4
+          and group[0].get("submenu", {}).get("title") == "Preview Quality"
+          and [r["title"] for r in group[1:]] == ["Preview Window", "Show Ungraded", "Scopes"],
+          " | ".join(r["title"] or "(separator)" for r in view[last_separator:]))
 
-    quality_rows = view[-2].get("submenu", {}).get("items", []) if len(view) >= 2 else []
+    quality_rows = group[0].get("submenu", {}).get("items", []) if group else []
     check("the submenu's rows ARE `PreviewQuality.allCases`' titles, in order — the enum "
           "is the single source, so the menu cannot list a quality it has not got or spell "
           "one differently from the checkmark that validates it",
@@ -2458,7 +2463,7 @@ def main():
           all(r["key"] == "" for r in quality_rows),
           str([r["key"] for r in quality_rows]))
 
-    window_row = view[-1] if view else {}
+    window_row = group[1] if len(group) > 1 else {}
     check("Preview Window takes ⇧⌘P — the letter and BOTH modifier bits read off `NSEvent` "
           "rather than written down here, and the two that must not be set checked too",
           window_row.get("key") == "p"
@@ -3237,14 +3242,14 @@ def main():
     if compositor is None:
         check("the compositor probe answered", False, compositor_error or "")
         compositor = {}
-    check("`LayerUniforms` is 464 bytes and `ShadowUniforms` 48 — the layout contract's own "
-          "arithmetic (116 floats since grading GR2's tone group, 29 x 16; and 12 floats, "
-          "3 x 16), read from "
+    check("`LayerUniforms` is 512 bytes and `ShadowUniforms` 48 — the layout contract's own "
+          "arithmetic (128 floats since grading-2 G2-2's wheels group, 32 x 16; and 12 "
+          "floats, 3 x 16), read from "
           "`MemoryLayout` rather than counted by eye. Nothing checks the METAL half of that "
           "contract but reading it, and the twelve renders below, which come back as "
           "garbage the moment the two lists disagree",
-          compositor.get("layerUniformsSize") == 464
-          and compositor.get("layerUniformsStride") == 464
+          compositor.get("layerUniformsSize") == 512
+          and compositor.get("layerUniformsStride") == 512
           and compositor.get("shadowUniformsSize") == 48
           and compositor.get("shadowUniformsStride") == 48,
           f"layer {compositor.get('layerUniformsSize')}/"

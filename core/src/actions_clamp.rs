@@ -5,7 +5,9 @@
 //! (issue batch B87, toll A); the rule and its reasons are unchanged.
 
 use crate::audio::MAX_GAIN;
-use crate::model::{AudioProps, BlendMode, VideoProps, MAX_FILTERS, MAX_OBSCURE};
+use crate::model::{
+    AudioProps, BlendMode, VideoProps, Wheels, MAX_FILTERS, MAX_OBSCURE, WHEEL_MAX,
+};
 use crate::props_check::{
     COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, EXPOSURE_MAX,
     SCALE_MAX, SCALE_MIN, SPOT_ZOOM_MAX, TONE_MAX,
@@ -80,6 +82,7 @@ pub(crate) fn clamp_video(mut props: VideoProps, is_nest: bool) -> VideoProps {
     tone.blacks = bounded(tone.blacks, -TONE_MAX, TONE_MAX, 0.0);
     tone.vibrance = bounded(tone.vibrance, -TONE_MAX, TONE_MAX, 0.0);
     tone.fade = bounded(tone.fade, 0.0, TONE_MAX, 0.0);
+    clamp_wheels(&mut props.wheels);
     // A NaN amount is none of the look, the neutral a filter's amount has.
     if let Some(look) = props.look.as_mut() {
         look.amount = bounded(look.amount, 0.0, 1.0, 0.0);
@@ -155,6 +158,22 @@ pub(crate) fn clamp_video(mut props: VideoProps, is_nest: bool) -> VideoProps {
         props.blend = BlendMode::Normal;
     }
     props
+}
+
+/// The wheels (spec §11 GR-11): a NaN to 0, each value to ±1, and a push
+/// outside the unit circle divided by its `hypot` onto the rim — a point
+/// `grade_check.rs`'s circle test always takes (its `WHEEL_RIM_TOLERANCE`).
+fn clamp_wheels(wheels: &mut Wheels) {
+    for wheel in [&mut wheels.lift, &mut wheels.gamma, &mut wheels.gain] {
+        wheel.x = bounded(wheel.x, -WHEEL_MAX, WHEEL_MAX, 0.0);
+        wheel.y = bounded(wheel.y, -WHEEL_MAX, WHEEL_MAX, 0.0);
+        wheel.master = bounded(wheel.master, -WHEEL_MAX, WHEEL_MAX, 0.0);
+        if wheel.x * wheel.x + wheel.y * wheel.y > 1.0 {
+            let radius = wheel.x.hypot(wheel.y);
+            wheel.x /= radius;
+            wheel.y /= radius;
+        }
+    }
 }
 
 pub(crate) fn clamp_audio(mut props: AudioProps) -> AudioProps {

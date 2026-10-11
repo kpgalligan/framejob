@@ -4,8 +4,9 @@
 // price what the grading branch costs an UNGRADED layer. Compiled as
 // `main.swift` over every other file in `app/Sources` through
 // `swift_build.build(…, optimize=True)`, for the app's own `LayerUniforms`:
-// both libraries are handed the WHOLE block (116 floats, 464 bytes, asserted;
-// main's shader reads the first 104). Pipelines as `bench.swift`'s
+// both libraries are handed the WHOLE block (128 floats, 512 bytes since
+// grading-2 G2-2's wheels group, asserted; an older base's shader reads a
+// prefix of it). Pipelines as `bench.swift`'s
 // `layerState`: `kGatherFilters` false, blending as `pipelineState`,
 // `MetalRenderer.workingFormat`. `texture(0)` the picture, `texture(1)` a 1×1
 // white placeholder, `texture(2)` an identity 2³ `rgba16Float` lattice.
@@ -63,12 +64,12 @@ else { fail("usage: --lib V0=… --lib VT=… --width --height --frames --runs -
 
 // ---- the block -------------------------------------------------------------
 
-let blockBytes = 464
+let blockBytes = 512
 guard MemoryLayout<LayerUniforms>.stride == blockBytes,
-    MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.lookEnabled) == blockBytes - 4
+    MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.gradeReserved0) == blockBytes - 4
 else {
     fail("LayerUniforms is \(MemoryLayout<LayerUniforms>.stride) bytes, not \(blockBytes) "
-        + "(116 floats ending at lookEnabled)")
+        + "(128 floats ending at gradeReserved0)")
 }
 
 guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue()

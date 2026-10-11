@@ -479,6 +479,10 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   below.". `wc -l app/Sources/ProjectSnapshot.swift`: 1570 before, 1509 after;
   `GradeProps.swift` 120 → 181. The next seam: the audio group (`DuckProps`,
   `CompressorProps`, `AudioProps`) out whole to `AudioProps.swift`.
+  Grading-2's G2-2 gave it wiring only (`VideoProps.wheels`: the field, its init parameter and
+  its lenient decode; the wheel types went to `GradeProps.swift`, 181 → 343): 1509 → 1513. The
+  named seam is unchanged. `CanvasSessions.swift` took the eyedropper's `wheels: .neutral` with
+  its line count unchanged (1090), GR5a's precedent on that over-cap file.
 - `Compositor.swift`: the mattes road map's MT1 (issue batch B89) moved `// MARK: - Shadows`
   through `blurKernel`, with `ShadowSurfaces`, to `Compositor+Shadow.swift`, and `render`'s
   per-layer uniforms-and-source block to `prepare` in `CompositorEffects.swift`, a pure move gated

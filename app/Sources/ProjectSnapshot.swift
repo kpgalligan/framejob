@@ -786,6 +786,8 @@ struct VideoProps: Codable, Equatable {
     /// the canvas see the clip UN-MOVED while the picture moves (spec §5.4),
     /// which is why a drag begun mid-motion starts from the base box.
     let motion: MotionProps?
+    /// Lift, gamma and gain (spec §11 GR-11, `GradeProps.swift`).
+    let wheels: ColorWheels
     /// The clip's look (spec §11 GR-7, `LookProps.swift`); nil is none.
     let look: LookProps?
 
@@ -796,7 +798,7 @@ struct VideoProps: Codable, Equatable {
         chroma: ChromaProps? = nil, filters: [FilterProps] = [],
         reflection: ReflectionProps? = nil, spotlight: SpotlightProps? = nil,
         obscure: [ObscureProps] = [], blend: BlendMode = .normal,
-        motion: MotionProps? = nil, look: LookProps? = nil
+        motion: MotionProps? = nil, wheels: ColorWheels = .neutral, look: LookProps? = nil
     ) {
         self.x = x
         self.y = y
@@ -814,6 +816,7 @@ struct VideoProps: Codable, Equatable {
         self.obscure = obscure
         self.blend = blend
         self.motion = motion
+        self.wheels = wheels
         self.look = look
     }
 
@@ -844,6 +847,7 @@ struct VideoProps: Codable, Equatable {
         // what every clip did before it existed. Same argument again, same
         // reason version 8 needs no migrate step.
         motion = c.lenient(.motion)
+        wheels = c.lenient(.wheels, ColorWheels.neutral)
         look = c.lenient(.look)
     }
 

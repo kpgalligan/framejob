@@ -68,7 +68,8 @@ for the probe), S (CARD, saved twice for N2).
   P: P1 Light's Temperature field over two clips with exposures +1 and −1
   sends one `set_video` naming both whose patch is exactly
   `{color: {temperature: 0.5}}`; P2 `apply(tone:)` sets `toneEnabled` 1 for
-  exposure −1 alone and 0 for neutral; P3 `LayerUniforms` is 464 bytes with
+  exposure −1 alone and 0 for neutral; P3 `LayerUniforms` is 512 bytes (464
+  until grading-2 G2-2's wheels group) with
   `exposure` at 416; P4 `keyedCount` for `{video: {color: {exposure: 1}, x: 3}}`
   is 1 on Color and 1 on Picture.
 - **Z1** (CONTROL): the projects close and the log holds no `Reelcut: ` line.

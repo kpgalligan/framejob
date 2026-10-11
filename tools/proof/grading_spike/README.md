@@ -137,12 +137,14 @@ grey) K4 on the ramp; `biplanar-full-range` (Y' = code/1023, C =
 K1. The script prints `mutant NAME: killed by …` or `SURVIVED`.
 
 **`--tree` (grading GR7a).** In place of the routes, what the branch BUILT:
-V0 is `Compositor.metal` as it stood at `f407f87` (`TREE_BASE`, main at the
-branch point; `git show`, a failed show is a B0 failure) and VT is the tree's
+V0 is `Compositor.metal` as it stood at `--tree-base REV` (by default `f407f87`,
+`TREE_BASE`, main at the branch point; grading-2 G2-2 passes `4f52ead`, the
+commit before its wheels; `git show`, a failed show is a B0 failure) and VT is the tree's
 own file, unpatched — matte_spike's `--tree` pattern. B1 compiles the two;
 B2 builds `tree_bench.swift` (`-O`, over `app/Sources`), which hands BOTH
-libraries the app's whole `LayerUniforms` (116 floats, 464 bytes, asserted;
-main's shader reads the first 104), binds the picture at `texture(0)`, a 1×1
+libraries the app's whole `LayerUniforms` (128 floats, 512 bytes since
+grading-2 G2-2, asserted at `gradeReserved0`; an older base's shader reads a
+prefix of it), binds the picture at `texture(0)`, a 1×1
 white placeholder at `texture(1)` and an identity 2³ `rgba16Float` lattice at
 `texture(2)`, and builds its pipelines as `bench.swift`'s `layerState`
 (`kGatherFilters` false, the same blending, `MetalRenderer.workingFormat`).
@@ -161,6 +163,7 @@ of the same shape, `result.json`).
 python3 tools/proof/grading_spike/grading_spike.py --check --tree                    # B0–B2, KT
 python3 tools/proof/grading_spike/grading_spike.py --check --tree --mutant tree-graded
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree   # GR7a's record
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base 4f52ead   # G2-2's
 ```
 
 **Its record** is `archive/grading.md`, "GR0 — the road map and the spike"

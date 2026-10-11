@@ -607,6 +607,10 @@ fn an_end_patch_that_replaces_the_whole_video_group_falls_through_to_the_base() 
     ] {
         base["color"][key] = json!(0.0);
     }
+    // And `wheels` with all nine at 0 (spec §11 GR-11), which the stored
+    // clip leaves out when neutral.
+    let neutral = json!({"x": 0.0, "y": 0.0, "master": 0.0});
+    base["wheels"] = json!({"lift": neutral, "gamma": neutral, "gain": neutral});
     for replacement in [
         json!(5),
         json!(null),

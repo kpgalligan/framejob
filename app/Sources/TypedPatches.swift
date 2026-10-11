@@ -75,6 +75,9 @@ struct VideoPatch: Codable, Equatable {
     /// form, which removes the look. Like `motion`, it is the app's writer
     /// only; an agent's `look` reaches the core unread.
     var look: LookPatch??
+    /// `wheels` (spec §11 GR-11): sparse, as `color` is — a write names only
+    /// the wheels and keys its control owns.
+    var wheels: ColorWheelsPatch?
 
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
@@ -82,7 +85,8 @@ struct VideoPatch: Codable, Equatable {
         shadow: ShadowProps?? = nil, color: ColorPatch? = nil, chroma: ChromaProps?? = nil,
         filters: [FilterProps]? = nil, reflection: ReflectionProps?? = nil,
         spotlight: SpotlightProps?? = nil, obscure: [ObscureProps]? = nil,
-        blend: BlendMode? = nil, motion: MotionProps?? = nil, look: LookPatch?? = nil
+        blend: BlendMode? = nil, motion: MotionProps?? = nil, look: LookPatch?? = nil,
+        wheels: ColorWheelsPatch? = nil
     ) {
         self.x = x
         self.y = y
@@ -101,6 +105,7 @@ struct VideoPatch: Codable, Equatable {
         self.blend = blend
         self.motion = motion
         self.look = look
+        self.wheels = wheels
     }
 
     init(from decoder: Decoder) throws {
@@ -127,6 +132,7 @@ struct VideoPatch: Codable, Equatable {
         // `T??` fields carry does not arise here either.
         motion = c.nullable(.motion)
         look = c.nullable(.look)
+        wheels = c.lenient(.wheels)
     }
 
     var dictionary: [String: Any] {
@@ -180,6 +186,7 @@ struct VideoPatch: Codable, Equatable {
         if let look = look {
             if let look = look { d["look"] = look.dictionary } else { d["look"] = NSNull() }
         }
+        if let wheels = wheels, !wheels.isEmpty { d["wheels"] = wheels.dictionary }
         return d
     }
 

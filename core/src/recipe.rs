@@ -49,7 +49,7 @@ use serde_json::{Map, Value};
 
 use crate::actions::Evaluated;
 use crate::evaluate::{json, number, Assignment};
-use crate::model::{BlendMode, ColorAdjust, Nest, Project, Source, VideoProps};
+use crate::model::{BlendMode, ColorAdjust, Nest, Project, Source, VideoProps, Wheels};
 use crate::motion;
 use crate::nest::{Enclosing, Frame, Instance};
 use crate::recipe_graphic::graphic_source;
@@ -256,6 +256,7 @@ impl Project {
         // the one writer of layer keys, so no key is added or dropped.
         if ungraded {
             moved.color = ColorAdjust::default();
+            moved.wheels = Wheels::default();
             moved.look = None;
         }
         let video = &moved;

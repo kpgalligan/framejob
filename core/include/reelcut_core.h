@@ -117,8 +117,14 @@ extern "C" {
  * look, and the `lut` kinds (GR-8): the media kind `lut` and the look kind
  * `lut` with its `media` key, new variants an older build refuses by name.
  * A file numbered 1015 (the grading branch's builds, GR-9) is read as 15 by
- * one migration step; 16 and above, 1014 included, are newer. */
-#define RC_FORMAT_VERSION 15
+ * one migration step.
+ *
+ * Version 16 is the wheels (spec §11 GR-11): `video.wheels {lift, gamma,
+ * gain}`, each `{x, y, master}`, every key written only when not 0 and a
+ * neutral wheel not at all, so an unwheeled project writes the text it did;
+ * the reader's default is 0, so there is no migration step. 17 and above,
+ * 1014 included, are newer. */
+#define RC_FORMAT_VERSION 16
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips
@@ -266,7 +272,8 @@ char *rc_project_frame_recipe(const RcProject *p, int64_t t);
  * asks for, the two being one implementation.
  *
  * `ungraded` (spec 11 GR-4) writes every layer's `color` neutral — all
- * thirteen keys, nested and matte layers included — and adds no layer.
+ * thirteen keys — and its `wheels` neutral — all nine (spec 11 GR-11) —
+ * nested and matte layers included, and adds no layer.
  *
  * `burn_in_timecode` APPENDS a text layer (so, last: topmost) showing the
  * project timecode at `t`, spelled by the document's own timecode_frames, in

@@ -6,7 +6,8 @@
 //! Pinned here: every earlier version (1 to 14) opens stamped current; a
 //! file numbered 1015, the grading branch's builds' number, opens as 15 with
 //! its grades intact, its written text byte for byte the same file's at 15
-//! (GR-9); 16 to 1014 and every number past 1015 are refused as newer; the
+//! (GR-9); every number past the current one (16), 1014 included, and every
+//! number past 1015 are refused as newer; the
 //! KEY ORDER read off the written text (tone after `hue`, only the keys that
 //! are not 0); and the ROUND TRIP, byte for byte, of a neutral file and a
 //! toned one.
@@ -137,8 +138,8 @@ fn a_1015_file_opens_as_15_with_its_grades_intact() {
 }
 
 #[test]
-fn sixteen_to_1014_and_past_1015_are_newer() {
-    for version in [16, 500, 1014, 1016] {
+fn past_current_to_1014_and_past_1015_are_newer() {
+    for version in [RC_FORMAT_VERSION + 1, 500, 1014, 1016] {
         let message = Handle::try_from_value(&json!({ "version": version })).expect_err("newer");
         assert_eq!(
             message,

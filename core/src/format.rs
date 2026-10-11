@@ -224,9 +224,16 @@ use crate::model::{Canvas, Project};
 /// row and a LUT look — new variants, refused by name by a build that does
 /// not know them, as `adjustment` is. The experiment's builds wrote the same
 /// schema as 1015 ([`GRADING_BRANCH_VERSION`]); [`read`] reads that
-/// number as 15 in one step, [`migrate_1015_to_15`], and every number from
-/// 16 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 15;
+/// number as 15 in one step, [`migrate_1015_to_15`].
+///
+/// Version 16 is the wheels (spec §11 GR-11): [`crate::model::Wheels`] on
+/// `video.wheels` — `lift`, `gamma` and `gain`, each `{x, y, master}` —
+/// every key written only when not 0 and a neutral wheel not at all, so an
+/// unwheeled project writes exactly the text it did, and the reader's
+/// default is 0, so there is no migration step. The bump is so an older
+/// build refuses the file instead of dropping the wheels on save. Every
+/// number from 17 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 16;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;
@@ -423,7 +430,7 @@ pub fn read(json: &str) -> Result<Project, String> {
 
     // MIGRATION HOOK. Each bump adds one step here, applied in order from
     // `version` up to RC_FORMAT_VERSION, rewriting `value` in place before
-    // it is deserialized. Versions 3 through 15 needed no rewrite — every
+    // it is deserialized. Versions 3 through 16 needed no rewrite — every
     // field any of them added carries a serde default — so none has a line
     // (15's one step, `migrate_1015_to_15` above, renumbers the version
     // alone, before the gate); the next version that changes a field's

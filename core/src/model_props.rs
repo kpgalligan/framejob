@@ -123,6 +123,11 @@ pub use crate::model_matte::*;
 /// compositor bakes.
 pub use crate::model_look::*;
 
+/// Tier 2's grading vocabulary — [`Wheels`], [`Wheel`], [`WHEEL_MAX`] and
+/// [`WHEEL_RIM_TOLERANCE`] (spec §11 GR-11) — lives in `model_grade.rs` and
+/// is re-exported whole, so every `crate::model::Wheels` path resolves.
+pub use crate::model_grade::*;
+
 // ---- video properties ----------------------------------------------------
 
 /// Placement on the canvas plus the per-clip image controls. `x`/`y` are an
@@ -170,6 +175,11 @@ pub struct VideoProps {
     /// plan — therefore reads the clip UN-MOVED, which is what keeps an
     /// edit working on the numbers a person typed (spec §5.4, §7.3).
     pub motion: Option<Motion>,
+    /// Lift, gamma and gain (spec §11 GR-11, format 16), applied at step
+    /// 4c.1 after tone and before the look. Neutral writes no key, so an
+    /// unwheeled file's text is what it was.
+    #[serde(default, skip_serializing_if = "Wheels::is_neutral")]
+    pub wheels: Wheels,
     /// One of the eight built-in looks and its amount (spec §11 GR-7, format
     /// 15), applied at step 4d after tone. `None` is no look, and writes no
     /// key, so a look-less file's text is what it was.
@@ -196,6 +206,7 @@ impl Default for VideoProps {
             obscure: Vec::new(),
             blend: BlendMode::Normal,
             motion: None,
+            wheels: Wheels::default(),
             look: None,
         }
     }

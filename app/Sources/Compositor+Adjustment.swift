@@ -26,14 +26,15 @@ extension RecipeLayer {
     }
 
     /// An adjustment layer that would change nothing: its colour neutral (all
-    /// thirteen keys, which Show Ungraded writes so), no look that draws
+    /// thirteen keys, which Show Ungraded writes so), its wheels neutral (all
+    /// nine, GR-11, which Show Ungraded writes so too), no look that draws
     /// (Show Ungraded removes a look, GR-7; a LUT look whose file is missing
     /// or refused draws nothing, GR-8) and no point filter with an amount
     /// above 0. It draws nothing, so the frame is byte-identical to one
     /// without the clip (GR-6, GR-4).
     func isNeutralAdjustment(drawsLook: Bool) -> Bool {
         let point: Set<FilterKind> = [.sepia, .noir, .vignette, .invert]
-        return color.isIdentity && !drawsLook
+        return color.isIdentity && wheels.isNeutral && !drawsLook
             && !filters.contains { point.contains($0.kind) && $0.amount > 0 }
     }
 }

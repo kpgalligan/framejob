@@ -55,10 +55,12 @@ Exit 0 when every scored row passes, 1 when one fails, 2 when the host gate is
 shut. README: `tools/proof/grading_spike/README.md`.
 
 `--tree` (grading GR7a) measures what the branch built instead of the routes,
-matte_spike's `--tree` pattern: V0 is `Compositor.metal` at `TREE_BASE`
-f407f87 (main at the branch point; `git show`, a failed show is B0), VT the
-tree's own file unpatched; both compiled (B1) and timed by `tree_bench.swift`
-(B2), which hands both the app's whole 464-byte `LayerUniforms`. KT, scored at
+matte_spike's `--tree` pattern: V0 is `Compositor.metal` at `--tree-base REV`
+(default `TREE_BASE` f407f87, main at the grading branch point; grading-2 G2-2
+passes the commit before its own change; `git show`, a failed show is B0), VT
+the tree's own file unpatched; both compiled (B1) and timed by
+`tree_bench.swift` (B2), which hands both the app's whole 512-byte
+`LayerUniforms` (464 until grading-2 G2-2). KT, scored at
 both sizes: VT:S1 = V0:S1 within 1/1023 over the frame. `--measure --tree` adds
 H0, C0, F, T0 (VT:S1 − V0:S1) and TC (a RECORD: T0 ≤ `BOUND[h]` + C0, "What it
 may cost"'s UNGRADED-layer cap). Mutant `tree-graded` (VT drawn at +0.5 EV with
@@ -66,7 +68,7 @@ may cost"'s UNGRADED-layer cap). Mutant `tree-graded` (VT drawn at +0.5 EV with
 measure|mutant-NAME>/`.
 
     python3 tools/proof/grading_spike/grading_spike.py --check --tree [--mutant tree-graded]
-    python3 tools/proof/grading_spike/grading_spike.py --measure --tree
+    python3 tools/proof/grading_spike/grading_spike.py --measure --tree [--tree-base REV]
 """
 
 import argparse
@@ -654,14 +656,14 @@ def p1_rows(answers):
 
 # ---- --tree (GR7a): the tree's own shader against main's at the branch point -------
 
-def build_tree_shaders(folder):
-    shown = subprocess.run(["git", "-C", str(ROOT), "show", f"{TREE_BASE}:{SHADER}"],
+def build_tree_shaders(folder, base):
+    shown = subprocess.run(["git", "-C", str(ROOT), "show", f"{base}:{SHADER}"],
                            capture_output=True, text=True)
     if shown.returncode != 0:
-        emit("B0", "FAIL", f"git show {TREE_BASE}:{SHADER} failed: {shown.stderr.strip()[-300:]}")
+        emit("B0", "FAIL", f"git show {base}:{SHADER} failed: {shown.stderr.strip()[-300:]}")
         return None
     texts = {"V0": shown.stdout, "VT": (ROOT / SHADER).read_text()}
-    emit("B0", "PASS", f"--tree: V0 {SHADER} at {TREE_BASE} ({texts['V0'].count(chr(10))} "
+    emit("B0", "PASS", f"--tree: V0 {SHADER} at {base} ({texts['V0'].count(chr(10))} "
          f"lines), VT the tree's own, unpatched ({texts['VT'].count(chr(10))} lines; no anchor "
          "asked)")
     libs = {}
@@ -745,7 +747,7 @@ def tree_main(args):
     folder.mkdir(parents=True)
     started = datetime.datetime.now().astimezone()
     print(f"grading_spike {tag} at {started:%Y-%m-%d %H:%M %Z}, seed {args.seed}", flush=True)
-    print(f"rules: BOUND = {BOUND}; V0 = {SHADER} at {TREE_BASE}, VT = the tree's own",
+    print(f"rules: BOUND = {BOUND}; V0 = {SHADER} at {args.tree_base}, VT = the tree's own",
           flush=True)
     timing = args.measure
     facts = None
@@ -756,7 +758,7 @@ def tree_main(args):
         emit("H0", "PASS" if timing else "SKIP", detail if timing else
              f"{detail}: the host gate is shut, so every timing row is skipped")
     exposure = 0.5 if args.mutant == "tree-graded" else 0
-    libs = build_tree_shaders(folder)
+    libs = build_tree_shaders(folder, args.tree_base)
     binary = build_tree_bench() if libs else None
     answers = {}
     scored_ok = libs is not None and binary is not None
@@ -781,7 +783,7 @@ def tree_main(args):
                 emit("KT", "PASS" if entry["ok"] else "FAIL", f"{h}p {entry['variant']}: "
                      f"{entry['detail']}")
     result = {"tag": tag, "started": started.isoformat(), "seed": args.seed, "host": facts,
-              "tree_base": TREE_BASE, "rules": {"BOUND": BOUND}, "rows": ROWS,
+              "tree_base": args.tree_base, "rules": {"BOUND": BOUND}, "rows": ROWS,
               "answers": {str(h): a for h, a in answers.items()}}
     if args.measure and not timing:
         for row in ("C0", "F", "T0", "TC"):
@@ -819,6 +821,8 @@ def main():
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--tree", action="store_true",
                         help="the tree's own shader (VT) against main's at TREE_BASE (GR7a)")
+    parser.add_argument("--tree-base", default=TREE_BASE, metavar="REV",
+                        help=f"with --tree, the commit V0's shader is read at (default {TREE_BASE})")
     args = parser.parse_args()
     if args.mutant and args.measure:
         parser.error("a mutant runs with --check")

@@ -259,7 +259,10 @@ Spec §11 GR-10 is the decision; this is its summary.
 
 All at the inspector's real width: the panel is 304 pt by default (`DS.panelWidth`), resizable
 280–440 (`EditorViewController.minInspectorWidth` / `maxInspectorWidth`); the section inset is 10
-pt each side, so the content is **284 pt** wide by default and 260 pt at the minimum. The sharp
+pt each side, so the content is **284 pt** wide by default and 260 pt at the minimum. **Corrected
+in G2-2:** a section's row is 268 pt at the default pane and 244 pt at the minimum (the pane's
+scroller and insets, `DocumentPane.swift:353`, come off as well), so the 84 / 76 pt discs below
+were never available; GR-11 records the measured layout (a disc about 78 pt at the default pane). The sharp
 handoff: every chrome component square (`controlRadius`, `buttonRadius` 0); the slider knob a 7 ×
 11 pt block. A colour wheel is round because it is a picture of the hue circle, but its frame, its
 puck and its strip's knob follow the square rule.
@@ -845,3 +848,112 @@ such mutant is written.
 **Owed.** GRD-11, the owner's standing row in `docs/manual-checks.md`. Nothing else: the
 `app/CLAUDE.md` map and parity entries (`ScopeSlotView.swift` among them) are applied, and
 `designs/adr/app-file-history.md` has the panel's entry and its next seam.
+
+## G2-2 — the wheels (#260, GR-11, GR-14)
+
+**What landed** (2026-10-10, in the worktree on `grading-2`, from `4f52ead`). GR-11 and GR-14
+first (`designs/spec/11-decisions/grading-2.md`, README rows, "Amended by GR-11" lines on GR-2,
+GR-4, GR-6 and GR-7, the Lines cells), from the owner's "All as recommended" to G2-2's choices
+1–8 (choice 9 internal); then `video.wheels {lift, gamma, gain}`, each `{x, y, master}`, at format
+16.
+- Core: `model_grade.rs` (new: `Wheel`, `Wheels`, `WHEEL_MAX`, `WHEEL_RIM_TOLERANCE` 1e-9),
+  `grade_check.rs` (new: `check_wheels`, the two sentences, called from `check_video` after the
+  look), `VideoProps.wheels` before `look`, `actions::wheels_json` (all nine) inserted by
+  `video_json`, so the patch template, the evaluator and `split` see every key with no `patch.rs`
+  edit; `clamp_wheels` (NaN to 0, ±1, a push past the rim divided by its `hypot`); the recipe's
+  `wheels` key between `color` and `look` (twenty-four keys); `ungraded` writes it neutral on its
+  own line; `RC_FORMAT_VERSION` 16 and the header. No op, tool, FFI export or op-table row.
+- Metal: twelve uniforms after `lookEnabled` (116 → 128 floats, 512 bytes; `liftX` at 464,
+  `wheelsEnabled` at 500, `curvesEnabled` reserved for G2-3), `kWheelPush`/`kLift`/`kGain`/
+  `kGamma`, `wheelOffset` (the hue normalised to [0, 360) before `lookHueChroma`) and
+  `gradeWheels` (lift, then gain, then gamma) after `lookHueChroma`; step 4c.1 as a new block
+  between 4c and 4d in `layerColorPremultiplied` and between the tone `if` and the look's in
+  `reelcut_adjust_fragment`; `+ u.wheelsEnabled` in the gate sum; the stage table. Metal has no
+  `degrees()`: the angle is `atan2(y, x) * (180 / M_PI_F)`.
+- Swift: `GradeProps.swift` (`ColorWheel`, `ColorWheels`, `ColorWheelPatch`, `ColorWheelsPatch`,
+  `ColorWheelKind`, `LayerUniforms.apply(wheels:)`), `VideoProps.wheels` (wiring),
+  `RecipeLayer.wheels`, `u.apply(wheels:)`, `isNeutralAdjustment` requiring neutral wheels,
+  `VideoPatch.wheels` and its sparse dictionaries, the `◆N` count (Color counts `wheels`, Picture
+  does not), the eyedropper's suppression (`wheels: .neutral`, net 0 lines), `inspectorRow` giving
+  a `ColorWheelsView` row no trailing spacer, `ClipPane`'s `.color` registering
+  `wheelsSection()` after Color; `VideoPane+Wheels.swift` (new, 190: the section and
+  `ColorWheelsView`), `ColorWheelControl.swift` (new, 308: the disc) and
+  `WheelStripControl.swift` (new, 182: the master strip — split out of `ColorWheelControl.swift`,
+  which had reached 489 lines, so each new file holds the 400-line cap); `set_video`'s prose
+  (`wheelsClause`, and the adjustment sentence names wheels).
+- Measured layout (screen `05f`, both looks): a row's `ColorWheelsView` is 253 pt at the default
+  pane, so a column is 81.7 pt and a disc 78 pt (the spec's "≈ 72" estimate assumed a badge and
+  spacing the row does not take); about 70 pt at the 280 pt minimum, and the 112 pt cap at 440. The
+  first capture had 26 pt columns: an `InspectorRowLabel` hugs at 250, above the row stack's pull,
+  and held each column to its title; the titles hug at 1 now.
+- Proofs: `wheels_proof.py` and `wheels_probe.swift` (new); the 464 → 512 instruments
+  (`tone_probe.swift` P3, `look_probe.swift` L3 and B4's section list, `clip_inspector2_probe.swift`
+  T2, `phase8_chrome.py`, `grading_spike/tree_bench.swift`) and `grading_spike.py --tree-base`;
+  `screens.py` (`video.wheels` pinned open, the `wheels` fixture) and screens `05f` (new), `05b`,
+  `05c`; tests outside the phase's list that the new recipe key moved: `core/tests/recipe.rs`'s
+  `LAYER_KEYS` (23 → 24) and `core/tests/schema_v8.rs`'s fall-through base (`clip_state` carries
+  `wheels`).
+- Documents: spec §4.3a, §5.2 (format 16), §7.3, §7.4, §7.5, §7.9a, §7.10 and the index; the
+  README's grading bullet; GRD-12 in `docs/manual-checks.md`; the proofs README's section.
+
+**Deviations from the phase's spec, each measured.** (1) O1 adds **lift** master 0.5 on top of
+exposure +1, not gain: gain and exposure nearly commute on encoded values (the mutant
+`wheels-before-tone` drew 218 where the right order draws 219, inside ±1, so the gain row let it
+survive); lift does not (185 against about 197). (2) `gamma-sign` also fails C1, and
+`flag-ignores-negative` also fails C1 (its 240° push has x and y both negative): both are named.
+(3) C1's "the pushed hue's channel rises" is "every channel the hue holds at full rises and every
+other falls": a yellow push lifts R and G by only 2–4 levels (yellow's luma is near white's).
+(4) `WheelStripControl.swift` is its own file (above). (5) The disc is 78 pt, not ≈ 72 (above).
+
+**Verification**, 2026-10-10, AC power (`pmset -g`: powermode 0, AC Power), Apple M2 Max:
+- Control first: `make app` on the untouched tree (only the decision documents edited), then
+  `RC_PROOF_APP=release wheels_proof.py capture tools/proof/work/wheels-control`: six frames,
+  Z1 ok.
+- In the loop: `cargo test --release --test wheels --test schema_v16 --test schema_v15 --test
+  ungraded --test patch_door` (11, 5, 5, 5, 9 passed); `make lint` (clean after one clippy fix:
+  `FRAC_1_SQRT_2` for a written-out 0.7071…); `make typecheck` (0 errors, the 4 baseline
+  warnings); `swift_build.py typecheck tools/proof/wheels_probe.swift`; `wheels_proof.py` on
+  Debug 22/22 (N0 printed only); `spec_index_proof.py` 153/153.
+- `make gate`: the first run failed `--test recipe` (`LAYER_KEYS`), the second `--test
+  schema_v8` (`clip_state`'s `wheels`); after both, `cd core && cargo test --release
+  --no-fail-fast` passed every binary, and the third run PASSED in 223 s (typecheck skipped as
+  unchanged, fmt 2 s, lint 1 s, test 89 s, app 130 s with D25 and D26). After it changed:
+  `wheels_proof.py` (O1, the mutant list; `make test` does not run it), one doc comment in
+  `VideoPane+Wheels.swift` (the disc's 72 → 78 pt, with GR-11's sentence; `make typecheck` after
+  it: 0 errors, the 4 baseline warnings), screen prose and this record. So the gate's stamps
+  for typecheck, test and app are stale by a comment and a proof script, and one more `make
+  gate` is owed.
+- `RC_PROOF_APP=release python3 tools/proof/wheels_proof.py compare tools/proof/work/wheels-control`,
+  whole, on the gate's Release build and the final instrument: 23/23 — N0 the six wheel-less
+  frames byte-identical at 16 bits; no `Reelcut: ` line, no `DEFAULTS MOVED`
+  (`tools/proof/work/g2-2/wheels-release.txt`).
+- `RC_PROOF_APP=release tone_proof.py --only P1,P2,P3,P4` 4/4; `look_proof.py --only L3,B4` 2/2;
+  `clip_inspector2_proof.py` 33/33; `phase8_chrome.py` 145/150 — its uniform-size row passes at
+  512/128/32 × 16, and its five failures are the View menu's last group (Show Ungraded and Scopes
+  now follow Preview Window), rows this phase does not touch.
+- `grading_spike.py --measure --tree --tree-base 4f52ead`: KT 0/1023 at both sizes; TC held —
+  1080p T0 +0.003 ms against 0.020, 2160p −0.001 ms against 0.061 (V0 0.346 / 0.630 ms; load
+  before 48.1, another session's).
+- `screens.py --only 05b-clip-color,05c-clip-adjustment,05f-clip-wheels`: 8/8, both looks, 0 new
+  problems.
+- Mutants, nine, once each on the final instrument (Debug copies): `wheels-before-tone` (O1),
+  `gamma-sign` (Y1 C1), `push-not-luma-neutral` (C1), `flag-ignores-negative` (G1 C1 P2),
+  `circle-check-dropped` (R1 CT), `rim-tolerance-dropped` (CT: `--test wheels`, the rim and split
+  cases), `ungraded-misses-wheels` (V1 CT), `adjust-without-wheels` (J1), `puck-writes-group`
+  (P1): every one MUTANT PASS, no other row failing.
+
+**Review fixes** (fix pass 1, 2026-10-11). `phase8_chrome.py` takes the View menu's preview
+group as the rows after its last separator (Preview Quality, Preview Window, Show Ungraded,
+Scopes): 150/150. `matte_proof.py`'s `mix-weights-swapped` anchors on `return saturate(mix(o, i,
+p));` (precision PR1's wrap) and names D0–D8, every row that reads the mix: MUTANT PASS, no other
+row failing. Spec §7.3's burn-in says twenty-four layer keys; §7.5's 116 floats read as the tone
+group's history. The master strip: a press on its knob grabs it with no write, so a double-click
+there is one undo step; off the knob it stays a jump and a reset, two steps, accepted in GR-11
+(4); P5 checks the grab. `wheels_proof.py` P1–P7 on Debug 7/7, and P1–P7 with Z1 on the gate's
+Release build 8/8. The owed `make gate` PASSED in 234 s (typecheck 5 s, fmt and lint
+skipped as unchanged, test 114 s, app 115 s).
+
+**Owed.** GRD-12, the owner's standing row. The `app/CLAUDE.md` and `core/CLAUDE.md` entries
+(the compositor's 128 floats, the Wheels section, the three new Swift files, `GradeProps.swift`'s
+wheel types, `model_grade.rs`, `grade_check.rs`), applied by the orchestrator.
+

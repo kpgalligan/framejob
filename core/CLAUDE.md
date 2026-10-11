@@ -84,6 +84,11 @@ governs a module now.
   `kind: "lut"` names an imported LUT's media (`media`); `BUILT_IN` is the
   eight. `actions.rs`'s object discriminants (`kind`, `media`) switch at an
   action's end instead of interpolating.
+- `model_grade.rs` — tier 2's grading vocabulary (format 16, spec §11 GR-11): `Wheels {lift,
+  gamma, gain}`, each a `Wheel {x, y, master}`, the FIELD `VideoProps.wheels` written only when
+  not neutral and each key only when not 0; `actions::wheels_json` writes all nine for the
+  evaluator, the patch template and the recipe, as `color_json` does tone's. Re-exported whole
+  by `model_props.rs`.
 - `cube.rs` — the `.cube` reader (spec §11 GR-8): 3D only, size 2–65, the
   default domain; anything else refused by line and name. `ffi_cube.rs` — the
   four `rc_cube_*` exports. `lut.rs` — a LUT media's rules: placing one is
@@ -313,6 +318,10 @@ governs a module now.
   `video.filters[0].amount`, `video.obscure[1].x`,
   `shape.gradient.stops[0].color` — so a refusal names the entry as well as
   the field (issue #89).
+- `grade_check.rs` — tier 2's range checks (spec §11 GR-11), called from `check_video`: each
+  wheel's x, y and master −1…1, and x² + y² ≤ 1 (to `WHEEL_RIM_TOLERANCE`, 1e-9, so a rim point
+  is never refused) refused in its own sentence; `actions_clamp.rs`'s `clamp_wheels` closes an
+  action's end.
 - `edit_track.rs` — tracks, markers and the media list: the three lists a
   clip sits in. The canvas left here at road map 7's D2·3 toll. `clip_list`
   is the ONE spelling of the clips a `with_clips` refusal names — three ids

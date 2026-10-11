@@ -2,8 +2,8 @@
 //! driven through the C FFI exactly as `ReelCore.swift` drives it.
 //!
 //! The oracle is written independently of the code under test: the SAME
-//! project with every `video.color` group and every `video.look` (GR-7)
-//! removed from its JSON — on top-level clips, inside a nest, on a luma-matte
+//! project with every `video.color` group, every `video.wheels` (GR-11) and
+//! every `video.look` (GR-7) removed from its JSON — on top-level clips, inside a nest, on a luma-matte
 //! clip, on an adjustment clip and in an action's end — read back through
 //! `rc_project_from_json`. The option's recipe must be that
 //! project's recipe byte for byte, and with the option off (or misspelt) the
@@ -50,11 +50,11 @@ fn graded_shape(handle: Handle, track: u32, color: Value) -> (Handle, u32) {
     (next, id)
 }
 
-/// A graded media clip with a look on track 1; a graded shape with a filter,
+/// A graded, wheeled media clip with a look on track 1; a graded shape with a filter,
 /// a chroma key and an opacity (all kept) on track 2, with an action whose
-/// end grades it further and gives it a look; a graded shape inside a nest
+/// end grades it further, gains it and gives it a look; a graded shape inside a nest
 /// on track 3; a graded shape on a luma-matte track 4; an adjustment clip
-/// whose only grade is a look on track 5.
+/// whose only grades are a look and a gamma push on track 5.
 fn graded() -> Handle {
     let handle = Handle::new(640, 360, 30, 1).apply_all(&[
         json!({"op": "add_media", "descriptor": {
@@ -66,6 +66,7 @@ fn graded() -> Handle {
     let media_clip = last_id(&handle, "/clips");
     let handle = handle.apply(&json!({"op": "set_video", "clips": [media_clip], "patch": {
         "color": {"exposure": 1.0, "brightness": 0.1, "contrast": 0.2},
+        "wheels": {"lift": {"x": 0.3, "master": 0.1}},
         "look": {"kind": "warm", "amount": 0.8}}}));
 
     let (handle, two) = add_track(handle);
@@ -95,6 +96,7 @@ fn graded() -> Handle {
     let handle = handle.apply(
         &json!({"op": "set_action_end", "clip": toned, "action": action,
         "patch": {"video": {"color": {"saturation": 0.5, "vibrance": -0.5},
+                            "wheels": {"gain": {"master": -0.4}},
                             "look": {"kind": "cool"}}}}),
     );
 
@@ -112,11 +114,12 @@ fn graded() -> Handle {
     }));
     let adjustment = last_id(&handle, "/clips");
     handle.apply(&json!({"op": "set_video", "clips": [adjustment],
-                         "patch": {"look": {"kind": "vivid"}}}))
+                         "patch": {"look": {"kind": "vivid"},
+                                   "wheels": {"gamma": {"y": 0.5}}}}))
 }
 
-/// `value` with every `video` object's `color` and `look` removed, at every
-/// depth.
+/// `value` with every `video` object's `color`, `wheels` and `look` removed,
+/// at every depth.
 fn without_grade(value: &Value) -> Value {
     match value {
         Value::Object(map) => Value::Object(
@@ -126,6 +129,7 @@ fn without_grade(value: &Value) -> Value {
                     if key == "video" {
                         if let Value::Object(video) = &mut item {
                             video.remove("color");
+                            video.remove("wheels");
                             video.remove("look");
                         }
                     }
@@ -153,6 +157,8 @@ fn the_fixture_grades_every_role_it_claims_to() {
     assert!(!twin.contains("\"vibrance\""), "{twin}");
     assert!(text.contains("\"look\""), "{text}");
     assert!(!twin.contains("\"look\""), "{twin}");
+    assert!(text.contains("\"wheels\""), "{text}");
+    assert!(!twin.contains("\"wheels\""), "{twin}");
     let handle = graded();
     let recipe = handle.recipe(SEC / 2);
     let looked = array(&recipe, "/layers")
@@ -207,8 +213,15 @@ fn ungraded_keeps_every_other_key() {
             assert_eq!(color, &json!(0.0), "{b}");
         }
         assert_eq!(b["look"], Value::Null, "{b}");
+        for wheel in b["wheels"].as_object().expect("wheels").values() {
+            for value in wheel.as_object().expect("a wheel").values() {
+                assert_eq!(value, &json!(0.0), "{b}");
+            }
+        }
         a["color"] = Value::Null;
         b["color"] = Value::Null;
+        a["wheels"] = Value::Null;
+        b["wheels"] = Value::Null;
         a["look"] = Value::Null;
         assert_eq!(a, b);
     }

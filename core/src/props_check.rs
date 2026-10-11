@@ -31,6 +31,7 @@
 //! re-exports it, so a grep for its name finds every place a bound is read.
 
 use crate::audio::MAX_GAIN;
+use crate::grade_check::check_wheels;
 use crate::model::{
     AudioProps, Color, ShapeProps, TextProps, VideoProps, MAX_FILTERS, MAX_GRADIENT_STOPS,
     MAX_OBSCURE,
@@ -75,7 +76,7 @@ pub(crate) const TONE_MAX: f64 = 1.0;
 
 // ---- range checks --------------------------------------------------------
 
-fn finite(key: &str, value: f64) -> Result<(), String> {
+pub(crate) fn finite(key: &str, value: f64) -> Result<(), String> {
     if value.is_finite() {
         Ok(())
     } else {
@@ -83,7 +84,7 @@ fn finite(key: &str, value: f64) -> Result<(), String> {
     }
 }
 
-fn in_range(key: &str, value: f64, low: f64, high: f64) -> Result<(), String> {
+pub(crate) fn in_range(key: &str, value: f64, low: f64, high: f64) -> Result<(), String> {
     if value.is_finite() && value >= low && value <= high {
         Ok(())
     } else {
@@ -240,6 +241,8 @@ pub(crate) fn check_video(props: &VideoProps, size: Option<(f64, f64)>) -> Resul
     if let Some(look) = &props.look {
         in_range("video.look.amount", look.amount, 0.0, 1.0)?;
     }
+    // The wheels (spec §11 GR-11): tier 2's checks, `grade_check.rs`'s.
+    check_wheels(&props.wheels)?;
     if let Some(chroma) = &props.chroma {
         for channel in &chroma.key {
             in_range("video.chroma.key", *channel, 0.0, 1.0)?;

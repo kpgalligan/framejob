@@ -73,8 +73,9 @@ struct LayerUniforms {
     // `CompositorEffects.swift` fills every one of these and is where each
     // field's meaning, units and range are argued; the declarations live here
     // because the layout contract above governs the whole struct and a reader
-    // checking it against `Compositor.metal` has to see all 116 fields in one
-    // list (104 to here and the tone group's twelve at the end).
+    // checking it against `Compositor.metal` has to see all 128 fields in one
+    // list (104 to here, the tone group's twelve and the wheels' twelve at
+    // the end).
     //
     // The M3 block's 28 begin with the four floats that used to be
     // `reserved0…3`; the obscure block's 36 restored a padding tail of three,
@@ -209,6 +210,24 @@ struct LayerUniforms {
     var toneEnabled: Float = 0
     var lookAmount: Float = 0
     var lookEnabled: Float = 0
+    // The wheels (spec §11 GR-11, grading-2 G2-2): lift, gamma and gain, each
+    // x, y and master, in the model's order; then `wheelsEnabled` — 1 exactly
+    // when one of the nine is not 0, the effects gate's term (`apply(wheels:)`,
+    // `GradeProps.swift`) — `curvesEnabled`, reserved for G2-3's curves and
+    // unread until then, and one reserved. 116 + 12 = 128 floats = 512 bytes,
+    // 32 × 16.
+    var liftX: Float = 0
+    var liftY: Float = 0
+    var liftMaster: Float = 0
+    var gammaX: Float = 0
+    var gammaY: Float = 0
+    var gammaMaster: Float = 0
+    var gainX: Float = 0
+    var gainY: Float = 0
+    var gainMaster: Float = 0
+    var wheelsEnabled: Float = 0
+    var curvesEnabled: Float = 0
+    var gradeReserved0: Float = 0
 }
 
 /// The shadow pass's uniform block, mirroring `ShadowUniforms` in

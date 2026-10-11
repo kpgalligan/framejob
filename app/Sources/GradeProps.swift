@@ -179,3 +179,165 @@ extension LayerUniforms {
         toneEnabled = values.contains { $0 != 0 } ? 1 : 0
     }
 }
+
+// MARK: - The wheels (spec §11 GR-11, grading-2 G2-2)
+
+/// One wheel: the puck (`x`, `y`, inside the unit circle — its angle the hue,
+/// 0° red, its distance the strength) and `master`, each −1…1, 0 neutral.
+/// `model_grade.rs`'s `Wheel`, read leniently, each key absent at 0.
+struct ColorWheel: Codable, Hashable {
+    let x: Double
+    let y: Double
+    let master: Double
+
+    init(x: Double = 0, y: Double = 0, master: Double = 0) {
+        self.x = x
+        self.y = y
+        self.master = master
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        x = c.lenient(.x, 0)
+        y = c.lenient(.y, 0)
+        master = c.lenient(.master, 0)
+    }
+
+    static let neutral = ColorWheel()
+    var isNeutral: Bool { self == .neutral }
+}
+
+/// `video.wheels`: lift, gamma and gain, in the model's order everywhere.
+struct ColorWheels: Codable, Hashable {
+    let lift: ColorWheel
+    let gamma: ColorWheel
+    let gain: ColorWheel
+
+    init(lift: ColorWheel = .neutral, gamma: ColorWheel = .neutral, gain: ColorWheel = .neutral) {
+        self.lift = lift
+        self.gamma = gamma
+        self.gain = gain
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        lift = c.lenient(.lift, ColorWheel.neutral)
+        gamma = c.lenient(.gamma, ColorWheel.neutral)
+        gain = c.lenient(.gain, ColorWheel.neutral)
+    }
+
+    static let neutral = ColorWheels()
+    var isNeutral: Bool { self == .neutral }
+}
+
+/// What a wheel write SENDS: any of a wheel's three keys, each nil when the
+/// write does not name it. A puck sends only `x, y`, a strip or a field only
+/// `master`, so a write over several clips keeps each one's other values.
+struct ColorWheelPatch: Codable, Equatable {
+    var x: Double?
+    var y: Double?
+    var master: Double?
+
+    init(x: Double? = nil, y: Double? = nil, master: Double? = nil) {
+        self.x = x
+        self.y = y
+        self.master = master
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        x = c.lenient(.x)
+        y = c.lenient(.y)
+        master = c.lenient(.master)
+    }
+
+    var isEmpty: Bool { self == ColorWheelPatch() }
+}
+
+/// A sparse `wheels` write: the wheels it names, each sparse in turn. An
+/// action's end decodes its `wheels` through this type too, so the sub-tab's
+/// `◆N` sees exactly the keys an end holds.
+struct ColorWheelsPatch: Codable, Equatable {
+    var lift: ColorWheelPatch?
+    var gamma: ColorWheelPatch?
+    var gain: ColorWheelPatch?
+
+    init(lift: ColorWheelPatch? = nil, gamma: ColorWheelPatch? = nil, gain: ColorWheelPatch? = nil) {
+        self.lift = lift
+        self.gamma = gamma
+        self.gain = gain
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        lift = c.lenient(.lift)
+        gamma = c.lenient(.gamma)
+        gain = c.lenient(.gain)
+    }
+
+    /// The Wheels section's Reset: all nine at 0.
+    static let neutral = ColorWheelsPatch(
+        lift: ColorWheelPatch(x: 0, y: 0, master: 0),
+        gamma: ColorWheelPatch(x: 0, y: 0, master: 0),
+        gain: ColorWheelPatch(x: 0, y: 0, master: 0))
+
+    var isEmpty: Bool {
+        (lift?.isEmpty ?? true) && (gamma?.isEmpty ?? true) && (gain?.isEmpty ?? true)
+    }
+}
+
+/// The three wheels as the Wheels section's columns: each one's title (its
+/// undo name), its value in a `ColorWheels` and a patch naming it alone.
+enum ColorWheelKind: CaseIterable {
+    case lift, gamma, gain
+
+    var title: String {
+        switch self {
+        case .lift: return "Lift"
+        case .gamma: return "Gamma"
+        case .gain: return "Gain"
+        }
+    }
+
+    func wheel(_ wheels: ColorWheels) -> ColorWheel {
+        switch self {
+        case .lift: return wheels.lift
+        case .gamma: return wheels.gamma
+        case .gain: return wheels.gain
+        }
+    }
+
+    func patch(_ wheel: ColorWheelPatch) -> ColorWheelsPatch {
+        switch self {
+        case .lift: return ColorWheelsPatch(lift: wheel)
+        case .gamma: return ColorWheelsPatch(gamma: wheel)
+        case .gain: return ColorWheelsPatch(gain: wheel)
+        }
+    }
+}
+
+extension LayerUniforms {
+    /// The wheels' twelve floats (spec §11 GR-11): the nine in the model's
+    /// order, and `wheelsEnabled` 1 exactly when one of them is not 0 — a
+    /// negative value enables it as surely as a positive one. An unwheeled
+    /// layer leaves the flag at 0 and never enters step 4c.1, so it renders
+    /// byte-identical. `curvesEnabled` and the reserved float are not
+    /// touched.
+    mutating func apply(wheels: ColorWheels) {
+        let values = [
+            wheels.lift.x, wheels.lift.y, wheels.lift.master,
+            wheels.gamma.x, wheels.gamma.y, wheels.gamma.master,
+            wheels.gain.x, wheels.gain.y, wheels.gain.master,
+        ]
+        liftX = Float(wheels.lift.x)
+        liftY = Float(wheels.lift.y)
+        liftMaster = Float(wheels.lift.master)
+        gammaX = Float(wheels.gamma.x)
+        gammaY = Float(wheels.gamma.y)
+        gammaMaster = Float(wheels.gamma.master)
+        gainX = Float(wheels.gain.x)
+        gainY = Float(wheels.gain.y)
+        gainMaster = Float(wheels.gain.master)
+        wheelsEnabled = values.contains { $0 != 0 } ? 1 : 0
+    }
+}

@@ -278,6 +278,9 @@ struct RecipeLayer: Codable, Equatable {
     let cornerRadius: Double
     let shadow: ShadowProps?
     let color: ColorAdjust
+    /// Step 4c.1's wheels (spec §11 GR-11): all nine values, each at 0 when
+    /// neutral (the core always writes the key; `ungraded` writes it at 0).
+    let wheels: ColorWheels
     /// Step 4d's look (spec §11 GR-7): its amount and the definition
     /// `LookTextures` bakes; nil for no look, which the core also publishes
     /// for an amount of 0 and an ungraded frame.
@@ -320,6 +323,7 @@ struct RecipeLayer: Codable, Equatable {
         cornerRadius = c.lenient(.cornerRadius, 0)
         shadow = c.lenient(.shadow)
         color = c.lenient(.color, ColorAdjust.identity)
+        wheels = c.lenient(.wheels, ColorWheels.neutral)
         look = c.lenient(.look)
         chroma = c.lenient(.chroma)
         filters = c.lenient(.filters, [])
@@ -350,7 +354,7 @@ struct RecipeLayer: Codable, Equatable {
             x: x, y: y, scale: scale, rotation: rotation, opacity: opacity, crop: crop,
             cornerRadius: cornerRadius, shadow: shadow, color: color, chroma: chroma,
             filters: filters, reflection: reflection, spotlight: spotlight,
-            obscure: obscure, blend: blend)
+            obscure: obscure, blend: blend, wheels: wheels)
     }
 }
 

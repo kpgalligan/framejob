@@ -11,8 +11,8 @@
 //  moment someone adds a `float2` or a `float4x4` here, the two layouts stop
 //  being obviously equal and the frame silently renders with garbage
 //  uniforms. Add fields at the END, in groups of four (the struct is
-//  deliberately a multiple of 16 bytes — 116 floats, 464 bytes, as of the
-//  tone group, grading GR2), and mirror them in Swift in the same order.
+//  deliberately a multiple of 16 bytes — 128 floats, 512 bytes, as of the
+//  wheels group, grading-2 G2-2), and mirror them in Swift in the same order.
 //
 
 #include <metal_stdlib>
@@ -348,6 +348,25 @@ struct LayerUniforms {
     float toneEnabled;          // 1 when any of the nine is not 0
     float lookAmount;           // 0…1
     float lookEnabled;          // 1 when the layer has a look above 0
+    // ── Wheels (spec §11 GR-11, grading-2 G2-2): lift, gamma and gain, each
+    // x, y and master, in the model's order, applied at step 4c.1 by
+    // `gradeWheels`. `wheelsEnabled` is 1 exactly when one of the nine is
+    // not 0 and joins the effects gate's sum, so an unwheeled layer never
+    // enters 4c.1 and renders byte-identical. `curvesEnabled` is G2-3's,
+    // unread until then. Twelve floats: 116 + 12 = 128 floats = 512 bytes,
+    // and 512 is 32 × 16.
+    float liftX;                // −1…1, inside the unit circle with liftY
+    float liftY;
+    float liftMaster;           // −1…1
+    float gammaX;
+    float gammaY;
+    float gammaMaster;
+    float gainX;
+    float gainY;
+    float gainMaster;
+    float wheelsEnabled;        // 1 when any of the nine is not 0
+    float curvesEnabled;        // G2-3's; unread
+    float gradeReserved0;
 };
 
 /// A fragment's `[[position]]` in CANVAS pixels — the frame the nest clip
@@ -946,6 +965,41 @@ static inline float3 lookHueChroma(float degrees) {
     return full - dot(full, float3(0.2126, 0.7152, 0.0722));
 }
 
+// MARK: - Wheels (spec §11 GR-11)
+
+// Reelcut's own strengths (GR-11, owner choice 6; tuned by amending it): a
+// push at the rim is the whole of `lookHueChroma`; lift +1 takes black to
+// 25 %, gain ±1 is white ×1.5 / ×0.5, gamma +1 is the exponent ½.
+constant float kWheelPush = 1.0;
+constant float kLift = 0.25;
+constant float kGain = 0.5;
+constant float kGamma = 1.0;
+
+// One wheel's per-channel offset: its master plus the puck's push — the hue
+// at the puck's angle (0° red, 120° green, 240° blue: the split tone's HSV
+// ramp) less its own luma, times the puck's distance. The angle is taken
+// into [0, 360) HERE, because `lookHueChroma`'s `fmod` keeps a negative
+// sign.
+static inline float3 wheelOffset(float x, float y, float master) {
+    float h = atan2(y, x) * (180.0 / M_PI_F);
+    h = h < 0.0 ? h + 360.0 : h;
+    return master + kWheelPush * length(float2(x, y)) * lookHueChroma(h);
+}
+
+// Step 4c.1, on encoded straight colour: lift (pivots at white), then gain
+// (pivots at black), then gamma (a power, holding both ends) — the usual
+// lift/gamma/gain form. A push is luma-neutral on a grey pixel only (GR-11).
+static inline float3 gradeWheels(float3 rgb, constant LayerUniforms &u) {
+    float3 lift = wheelOffset(u.liftX, u.liftY, u.liftMaster);
+    float3 gamma = wheelOffset(u.gammaX, u.gammaY, u.gammaMaster);
+    float3 gain = wheelOffset(u.gainX, u.gainY, u.gainMaster);
+    float3 v = rgb;
+    v += lift * kLift * (1.0 - v);
+    v *= 1.0 + gain * kGain;
+    v = pow(max(v, 0.0), exp2(-gamma * kGamma));
+    return v;
+}
+
 // The split tone, a look's one block Light does not have: the shadow hue
 // weighted by (1 − Y)² and the highlight hue by Y², Y the saturated luma, at
 // a fifth of the amount. Reelcut's own strength, tuned at GR7.
@@ -982,6 +1036,10 @@ static inline float3 gradeLook(float3 rgb, texture3d<float> look, sampler samp,
 //                              content is toned like the picture around it,
 //                              and before the point filters, which act on
 //                              the toned colour
+// 4c.1 the wheels              `gradeWheels`, once per pixel (spec §11
+//                              GR-11): after tone, so a wheel refines the
+//                              exposure and white balance, and before the
+//                              look, which grades the corrected colour
 //  4d. the look                `gradeLook`, once per pixel (spec §11 GR-7):
 //                              right after tone, so a look grades the
 //                              corrected colour, and before the point filters
@@ -1130,7 +1188,8 @@ static inline float4 layerColorPremultiplied(Varyings in,
     // measuring the same as the pre-M3 shader.
     bool effects = (u.filterKind0 + u.filterKind1 + u.filterKind2 + u.filterKind3
                     + u.spotEnabled + u.clipEnabled + u.reflectionPass
-                    + u.obscureEnabled + u.toneEnabled + u.lookEnabled) > 0.5;
+                    + u.obscureEnabled + u.toneEnabled + u.lookEnabled
+                    + u.wheelsEnabled) > 0.5;
 
     float2 uv = in.uv;
     float spot = 1.0;
@@ -1310,6 +1369,13 @@ static inline float4 layerColorPremultiplied(Varyings in,
         // untoned layer never enters it.
         if (u.toneEnabled > 0.5) {
             rgb = gradeTone(rgb, u);
+        }
+
+        // (4c.1) The wheels (spec §11 GR-11): once per pixel, after tone and
+        // before the look. Behind `wheelsEnabled`, so an unwheeled layer never
+        // enters it.
+        if (u.wheelsEnabled > 0.5) {
+            rgb = gradeWheels(rgb, u);
         }
 
         // (4d) The look (spec §11 GR-7): once per pixel, right after tone and
@@ -1823,7 +1889,8 @@ fragment float4 reelcut_dissolve_fragment(ShadowVaryings in [[stage_in]],
 // An adjustment clip's layer: no texture, one full-frame quad, blending OFF.
 // It reads what is already drawn behind it — the target `encodeLayers` is
 // drawing into — un-premultiplies it, grades it as step 3's colour adjust
-// (`gradeSample`, the chroma key off), step 4c's tone, step 4d's look and
+// (`gradeSample`, the chroma key off), step 4c's tone, step 4c.1's wheels,
+// step 4d's look and
 // step 5's point filters would (the canvas's uv as the filters' local position), and
 // premultiplies it back by the destination's own alpha, so alpha is
 // preserved. The weight is the layer's opacity, its strength, times the
@@ -1839,6 +1906,9 @@ fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
     c = gradeSample(c, 1.0, u).rgb;
     if (u.toneEnabled > 0.5) {
         c = gradeTone(c, u);
+    }
+    if (u.wheelsEnabled > 0.5) {
+        c = gradeWheels(c, u);
     }
     if (u.lookEnabled > 0.5) {
         c = gradeLook(c, look, samp, u);

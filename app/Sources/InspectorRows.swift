@@ -63,8 +63,10 @@ func inspectorRow(
     // A slider is the row's stretchy element, so a row that has one gets NO
     // trailing spacer — two views hugging at the same priority would split
     // the free space and leave the slider half as wide as it should be. The
-    // Content area stretches the same way.
-    if !controls.contains(where: { $0 is InspectorSliderControl || $0 is InspectorTextArea }) {
+    // Content area and the Wheels row (GR-11) stretch the same way.
+    if !controls.contains(where: {
+        $0 is InspectorSliderControl || $0 is InspectorTextArea || $0 is ColorWheelsView
+    }) {
         let trailing = NSView()
         trailing.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         trailing.setContentCompressionResistancePriority(

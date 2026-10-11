@@ -47,6 +47,7 @@ extension MetalRenderer {
         u.saturation = Float(layer.color.saturation)
         u.hue = Float(layer.color.hue * .pi / 180)
         u.apply(tone: layer.color)
+        u.apply(wheels: layer.wheels)
         u.apply(look: layer.look)
         if let chroma = layer.chroma {
             u.chromaEnabled = 1
