@@ -91,6 +91,7 @@ mod recipe_dissolve;
 mod recipe_graphic;
 mod recipe_layer;
 mod recipe_matte;
+mod recipe_options;
 pub mod recipe_text;
 pub mod recipe_words;
 pub mod scope;

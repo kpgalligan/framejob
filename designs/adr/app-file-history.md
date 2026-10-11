@@ -472,6 +472,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `import Foundation`, a pure move; nothing lost `private`. `wc -l
   app/Sources/ProjectSnapshot.swift`: 1769 before, 1570 after; `ShapeProps.swift` is 204. The
   next seam: `ColorAdjust` out whole to `GradeProps.swift`.
+  Grading-2's G2-0 paid that seam: `ColorAdjust` (its doc line through its closing brace) went
+  whole to `GradeProps.swift`, after the `// MARK: - Grading's value types` line and before
+  `ColorPatch`, a pure move gated with G2-0's other three before any tier-2 code landed; nothing
+  widened, and only its doc's "`GradeProps.swift` has their helpers." became "Their helpers are
+  below.". `wc -l app/Sources/ProjectSnapshot.swift`: 1570 before, 1509 after;
+  `GradeProps.swift` 120 → 181. The next seam: the audio group (`DuckProps`,
+  `CompressorProps`, `AudioProps`) out whole to `AudioProps.swift`.
 - `Compositor.swift`: the mattes road map's MT1 (issue batch B89) moved `// MARK: - Shadows`
   through `blurKernel`, with `ShadowSurfaces`, to `Compositor+Shadow.swift`, and `render`'s
   per-layer uniforms-and-source block to `prepare` in `CompositorEffects.swift`, a pure move gated
@@ -544,6 +551,23 @@ to pay a toll starts from it. A file not listed has no named seam yet.
 - `AgentServer+Clips.swift`: the property doors (`// MARK: - Properties`, `set_video` …
   `set_transition_duration`) to `AgentServer+Properties.swift`. The action handlers went to
   `AgentServer+Actions.swift` in issue batch B87 phase 2.
+- `AgentServer+Render.swift`: grading-2's G2-0 moved `writeWaveform` (its two-line doc and body)
+  to the new `AgentServer+Scopes.swift`, the home of `render_frame`'s scope writers (spec §11
+  GR-5, GR-10), a pure move gated with G2-0's other three; nothing widened (both are members of
+  the same internal extension of `AgentServer`), and `renderFrame`'s doc names the new file.
+  `wc -l app/Sources/AgentServer+Render.swift`: 584 before, 563 after; `AgentServer+Scopes.swift`
+  is 37. The next seam: `// MARK: - Export` (`exportProject` through `spelled`) out whole to
+  `AgentServer+Export.swift`.
+- `AgentCatalog+Files.swift`: grading-2's G2-0 moved the rows under `// MARK: Rendering and export` (the
+  `render_frame` and `export` rows) and the five hoisted locals only they read
+  (`frameFormatNames`, `frameFormatProperty`, `burnInProperty`, `exportPresetProperty`,
+  `exportSizeProperty`) to the new `AgentCatalog+Render.swift` as `renderTools(ticks:)`, spliced
+  back in after `captionTools()` and before `record_screen`; a pure move gated with G2-0's other
+  three, the Debug catalog equal before and after, parsed and in order. Nothing widened; the
+  header doc names the rows' new home and drops its stale list of six hoisted locals. `wc -l
+  app/Sources/AgentCatalog+Files.swift`: 579 before, 377 after; `AgentCatalog+Render.swift` is
+  239. The next seam: `// MARK: Recording` (`record_screen` and its four hoisted clauses) to
+  `AgentCatalog+Recording.swift`.
 - `AgentCatalog+Clips.swift`: the action rows went to `AgentCatalog+Actions.swift` in issue batch
   B87 phase 2. The grading road map's GR1 paid the next cut: the five property rows (`set_video`,
   `set_audio`, `set_text`, `set_shape`, `set_clip`) and the nineteen hoisted locals they read went

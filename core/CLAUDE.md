@@ -486,12 +486,12 @@ governs a module now.
   `assign()`, the instruction tiling, and the decoder-budget warning
   (`MAX_CONCURRENT_VIDEO_TRACKS`). Deterministic to the byte. A pure move
   out of `evaluate.rs` (grading GR1).
-- `recipe.rs` · `recipe_layer.rs` · `recipe_text.rs` — `frame_recipe(t)`: the
+- `recipe.rs` · `recipe_layer.rs` · `recipe_options.rs` · `recipe_text.rs` — `frame_recipe(t)`: the
   layer list at one instant. `RecipeLayer` (`recipe_layer.rs`, re-exported by
   `recipe.rs`) is the twenty-three keys of a layer written in ONE place
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
-  is what a caller wanted besides `t` — the burn-in timecode, and `ungraded`
+  (`recipe_options.rs`, a pure move out of `recipe.rs` in grading-2 G2-0, re-exported by it) is what a caller wanted besides `t` — the burn-in timecode, and `ungraded`
   (spec §11 GR-4: every layer's `color` written neutral) — and is a
   recipe option, never an export override, because the override table drops
   an unknown key in silence. A layer whose `transition` or `dissolve` is non-null is

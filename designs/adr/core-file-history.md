@@ -221,6 +221,14 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   known debt. The next seam: `fit_scale` and `fill_scale` (the Fit and Fill rules, read by
   `add_clip`, `add_shape_clip`, `edit_graphic.rs` and `edit_background.rs`) out whole.
 - `evaluate.rs`: none named (the composition plan left for `plan.rs` in grading GR1).
+- `recipe.rs`: grading-2's G2-0 moved the block from `// ---- what a caller asked for` through
+  `impl RecipeOptions` (`RecipeOptions` and its reader `of`) to the new `recipe_options.rs`,
+  re-exported by `recipe.rs` (`pub use crate::recipe_options::RecipeOptions`), so
+  `ffi_query.rs` and `recipe_text.rs`'s doc link still name `crate::recipe::RecipeOptions`; a pure
+  move gated with G2-0's other three, its body identical after `cargo fmt`. Nothing widened. `wc
+  -l core/src/recipe.rs`: 548 before, 484 after; `recipe_options.rs` is 76. The next seam: the
+  content hash (`FNV_OFFSET`, `FNV_PRIME`, `fnv1a`, `content_hash`, `sorted`) out to
+  `recipe_hash.rs`.
 - `ffi_graphic.rs`: at the new-module cap with nothing crate-free left to move (`diag_json` and
   `diag_error` name `Diagnostic`; road map 10 §10.7).
 - `core/tests/add_transition_edges.rs`: at the new-file cap; gives something up before it takes

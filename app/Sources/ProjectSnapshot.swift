@@ -557,67 +557,6 @@ struct ShadowProps: Codable, Equatable {
     }
 }
 
-/// Per-clip colour controls, all centred on 0 = no change.
-struct ColorAdjust: Codable, Hashable {
-    let brightness: Double
-    let contrast: Double
-    let saturation: Double
-    /// Hue rotation in degrees.
-    let hue: Double
-    /// Tone (spec §11 GR-2): `model_props.rs`'s nine, in its order, each
-    /// absent from the file at 0. `GradeProps.swift` has their helpers.
-    let exposure: Double
-    let temperature: Double
-    let tint: Double
-    let highlights: Double
-    let shadows: Double
-    let whites: Double
-    let blacks: Double
-    let vibrance: Double
-    let fade: Double
-
-    init(
-        brightness: Double = 0, contrast: Double = 0, saturation: Double = 0, hue: Double = 0,
-        exposure: Double = 0, temperature: Double = 0, tint: Double = 0, highlights: Double = 0,
-        shadows: Double = 0, whites: Double = 0, blacks: Double = 0, vibrance: Double = 0,
-        fade: Double = 0
-    ) {
-        self.brightness = brightness
-        self.contrast = contrast
-        self.saturation = saturation
-        self.hue = hue
-        self.exposure = exposure
-        self.temperature = temperature
-        self.tint = tint
-        self.highlights = highlights
-        self.shadows = shadows
-        self.whites = whites
-        self.blacks = blacks
-        self.vibrance = vibrance
-        self.fade = fade
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        brightness = c.lenient(.brightness, 0)
-        contrast = c.lenient(.contrast, 0)
-        saturation = c.lenient(.saturation, 0)
-        hue = c.lenient(.hue, 0)
-        exposure = c.lenient(.exposure, 0)
-        temperature = c.lenient(.temperature, 0)
-        tint = c.lenient(.tint, 0)
-        highlights = c.lenient(.highlights, 0)
-        shadows = c.lenient(.shadows, 0)
-        whites = c.lenient(.whites, 0)
-        blacks = c.lenient(.blacks, 0)
-        vibrance = c.lenient(.vibrance, 0)
-        fade = c.lenient(.fade, 0)
-    }
-
-    static let identity = ColorAdjust()
-    var isIdentity: Bool { self == .identity }
-}
-
 /// Chroma key (M3). `key` is a THREE-component colour — no alpha.
 struct ChromaProps: Codable, Equatable {
     let key: [Double]

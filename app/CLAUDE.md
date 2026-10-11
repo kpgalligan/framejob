@@ -26,7 +26,7 @@ detail there.
   `TextPatch` (with `case`, `words` and `word_style`) is `TextPatch.swift`'s,
   moved out so it could grow, and `ShapePatch` `ShapePatch.swift`'s (a pure
   move, the toll for `ReelColor`). `VideoPatch.color` is a sparse `ColorPatch`
-  (`GradeProps.swift`, with `ColorAdjust`'s neutrality helpers and
+  (`GradeProps.swift`, which holds `ColorAdjust` (moved out of `ProjectSnapshot.swift`, grading-2 G2-0) with its neutrality helpers, and
   `LayerUniforms.apply(tone:)`), so a row writes only its own key to every
   selected clip. `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10). `ReelAgentSocket` (road map
@@ -102,12 +102,12 @@ detail there.
   stop the list** — a later op still runs after one, exactly as after an
   identity — and the FIRST refusal is answered only when nothing applied.
 - `ProjectSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
-  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` — the `Codable`, READ-ONLY mirror
+  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` — the `Codable`, READ-ONLY mirror
   of spec §5.2 every view draws from. `CompositionPlan.swift` (a pure move out of
   `ProjectSnapshot.swift`, grading GR1) is the plan's Swift side (spec §7.2): `PlanSegment`,
   `PlanRamp`, `PlanTrack`, `PlanInstruction` and `CompositionPlan`. `ShapeProps.swift` (a pure
   move out of `ProjectSnapshot.swift`, grading L3) holds the shape group: `StrokeProps`,
-  `GradientStop`, `Gradient` and `ShapeProps`. `ActionSnapshot.swift` (a pure move out of
+  `GradientStop`, `Gradient` and `ShapeProps`. `GradeProps.swift` holds `ColorAdjust` (a pure move out of `ProjectSnapshot.swift`, grading-2 G2-0) beside grading's other value types. `ActionSnapshot.swift` (a pure move out of
   `ProjectSnapshot.swift`, B87) holds `ActionPatch`, `ActionSnapshot` and `ActionGraphicPatch` — an
   end's `graphic.props` and `kinds`, whose `dictionary` sends `props` only. `MediaSnapshot` (a pure move out of
   `ProjectSnapshot.swift`) carries a copy's or an ffmpeg conversion's `original`, and its `name` is
@@ -1840,11 +1840,11 @@ free.
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Actions` / `Tracks`
   / `Media` / `Render` / `ExportResult` / `History` / `Silence` / `Captions` / `Audio` /
   `Background` / `Scope` / `Transitions` / `CloudCaptions` / `Recording` /
-  `Graphics`
+  `Graphics` / `Scopes`
   (+`RecordingArguments`, +`RecordingResult`, +`RecordingChrome` —
   `RecordingToolChrome`, the tool's status item, flipped by the recorder's
   `pauseDidChangeNotification` and frozen at its
-  `finishingDidBeginNotification`) — the handlers, one file per group. `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
+  `finishingDidBeginNotification`) — the handlers, one file per group. `+Scopes` is `render_frame`'s scope writers (`writeWaveform`; a pure move out of `+Render`, grading-2 G2-0). `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
   reader, the three cloud-only arguments refused by name under `apple`, the
   vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
   the network, and the result keys; `+Captions` dispatches on `engine` and is otherwise the code it was.
@@ -1895,7 +1895,7 @@ free.
   `GraphicLibrary.maxSide`), `maxCellPixels`, the painter and
   `GraphicRaster.cgImage()`. `AgentCatalog.swift` (+`Clips`, +`Properties` — the five property rows and the patch
   vocabularies, spliced in place by `propertyTools`, a pure move out of `+Clips`, grading GR1 —
-  +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Graphics`,
+  +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Render` — `render_frame` and `export`, spliced in place by `renderTools`, a pure move out of `+Files`, grading-2 G2-0 —, +`Graphics`,
   +`Declarations`)
   — the catalog, spliced in ORDER (`+Actions`' rows are appended to
   `+Clips`' array last) (`recording_probe.py` reads the last eleven
@@ -1908,7 +1908,7 @@ free.
   and so nothing to read from the table — the eleven of the Projects group,
   `AgentCatalog+Audio.swift`'s two composites and
   `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
-  left, the five other file tools, `record_screen` among them, and
+  left, the five other file tools (`AgentCatalog+Files.swift`'s `import_media`, `consolidate_media` and `record_screen`, and `AgentCatalog+Render.swift`'s `render_frame` and `export`, spliced back where they left), and
   `AgentCatalog+Graphics.swift`'s nine, after its two `opTool` rows.
   `set_text`'s clause for `case`, `words` and `word_style` is
   `AgentServer.textWordsClause` in `AgentCatalog+Captions.swift` (a pure move

@@ -133,6 +133,10 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
     other scope (parade, vectorscope, histogram — tier 2). Its MCP mirror is `render_frame
     {waveform: true}`, which writes the same trace's counts beside the PNG; the panel itself is
     view state with no tool (§7.9's exemption).
+  **Amended by GR-10** (grading-2 G2-0): the header "Waveform" becomes a slot picker in each of
+  two stacked slots, View ▸ Waveform is renamed View ▸ Scopes (⌃⌘W), "no other scope" is taken
+  up (parade, vectorscope, histogram), and `render_frame` gains `parade`, `vectorscope` and
+  `histogram` beside `waveform`. The tap, latest-wins, preview-only and 256-level rules stand.
 - **GR-6 — Adjustment clips: a clip kind with no picture that grades everything drawn behind it
   in its container, by its opacity; inert on a matte track; refused in a nest, in any transition,
   and with a neighbourhood filter or a blend.** The owner's twelve choices of 2026-10-10, each as
