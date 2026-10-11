@@ -12,6 +12,13 @@ pixel, not what a pixel means: blending stays in encoded sRGB (§7.5, MT-3), and
 and linear light are deferred. They amend MT-6, MT-8, MT-9 and G-35 the way G-35 amended G-33,
 and re-litigate nothing.
 
+PR-6..PR-8 were recorded in P2-0 of road map "precision-2" (`designs/precision-2.md`, #257),
+before any of its code, from the owner's "All as recommended" (2026-10-11) to the #257 brief's
+choices 1a, 2a, 3 (close), 4 (close) and 5 (`~/.claude/litecode/reelcut/i257-8bit-paths/I-257.md`
+§0; the answers in `…/i257-8bit-paths/answers.md`). They take up PR-5's deferral of the 10-bit
+rest: PR-6 and PR-7 amend its list, and PR-8 closes its other two items. PR-2 stands: HDR stays
+tone-mapped in the compositor.
+
 - **PR-1 — The working depth is 16-bit float, holding encoded values clamped to [0, 1] (owner,
   2026-10-09, choices 1 and 5).**
   - The render context's buffers are `kCVPixelFormatType_64RGBAHalf`.
@@ -112,3 +119,65 @@ and re-litigate nothing.
       decoded pixels within ±1 a channel;
     - where it holds only a digest (`hevc_alpha_baseline.json`'s B1/G1), it prints the digest
       unscored beside the reference's and names this decision.
+  **Amended by PR-6 and PR-7** (precision-2 P2-0): a still deeper than 8 bits a component is
+  drawn at 16-bit float (PR-6), and the reversed-clip intermediate is 10-bit (PR-7); the list is
+  not edited, and PR-8 closes its 10-bit `hevc_alpha` and 10-bit recording as not wanted.
+- **PR-6 — A still deeper than 8 bits a component is drawn at 16-bit float (owner, 2026-10-11,
+  choice 1a).**
+  - `LayerRenderers.renderImage` checks `image.bitsPerComponent > 8`. When it is, the image is
+    drawn into a 16-bit-float premultiplied RGBA sRGB context and uploaded `rgba16Float`. An
+    8-bit still takes today's path byte for byte.
+  - The decode is unchanged (`MediaCacheFiles.decodeImage`, 16 bpc kept, measured). There is no
+    shader, uniform, recipe or format change. Thumbnails and posters stay 8-bit (PR-5).
+  - Measured (the #257 brief §8; M2 Max, macOS 26.5.1, `powermode 0`, AC power): 1,024 levels
+    from the deep draw against 256; a deep 4K texture is 66.4 MB against 33.2 MB; decode+draw
+    87.5 against 87.3 ms (1080p PNG).
+  - `render_frame` keeps PR-4's mechanism: its PNG is the CGImage `AVAssetImageGenerator` hands
+    back. Whether a deep still makes that image 16-bit is NOT ESTABLISHED until P2-1's S4: a
+    stills-only project has only `CompositionBuilder.addPlaceholderIfNeeded`'s empty track (brief
+    §2, §9). The deep claim is proven through `prores_422` (S1).
+  - If S4 reads an 8-bit PNG, P2-1 stops and the point returns to the owner as an amendment of
+    PR-4's "any source is deeper". P2-1 does not append a bullet that contradicts PR-4.
+  - Amends PR-5's "still images".
+- **PR-7 — The reversed intermediate is 10-bit, carries the source's colour labels, and keeps
+  the source's exact size (owner, 2026-10-11, choice 2a; the odd-size fix with it).**
+  - An even-sized source is written as HEVC with `kVTProfileLevel_HEVC_Main10_AutoLevel` at every
+    size (no H.264), from `x420` frames, at HEVC's rate (0.12 bits/pixel/frame, 2–240 Mbps).
+  - An odd width or height is written as ProRes 422 from `x422` frames. HEVC 4:2:0 cannot hold
+    an odd size: measured, 1919×1079 → 1918×1078 on both today's renderer and the Main 10
+    variant. The brief's transcode probe wrote ProRes 422 from `x422` at 1919×1079: ffprobe of
+    `/Users/kevingalligan/devel/reelcut/tools/proof/work/i257/out/odd_pr422x422.mov` reads
+    `prores,Standard,1919,1079,yuv422p10le`, against `hevc,Main 10,1918,1078` for
+    `odd_m10x420.mov`.
+  - No `AVVideoColorPropertiesKey`. The held copy is per plane and propagates the buffer's
+    attachments, so the frames' own labels reach the file (measured: HLG kept
+    `arib-std-b67/bt2020/bt2020nc`, mean |Δ| 0.0; today's file says `bt709` ×3).
+  - The slice budget counts the held format's bytes per pixel.
+  - The digest's input gains a renderer version. §5.6's `<media id>-<digest>.mov` pattern is
+    unchanged, and `prune` removes the old sibling, so an old 8-bit reverse is never reused.
+  - Measured cost of the even-sized HEVC Main 10 path only: same wall time at 1080p and 4K, file
+    the same size or smaller, peak RSS lower; depth 872 levels / 0.466 steps against
+    219 / 2.226.
+  - Measured cost of the odd-size ProRes 422 branch (brief §8, codec cost alone): 66.8 Mbps
+    against today's 12.0 at 1080p (0.23 s against 1.16 s for 300 frames), 226.3 against 29.0 at
+    4K (0.56 s against 1.65 s for 150 frames), so roughly 5–8× today's file. On the flat
+    1919×1079 ramp fixture the file is 2,727,219 bytes against 10,812 for today's
+    (`odd_pr422x422.mov` against `odd_today.mov`). The decision accepts this cost for exact
+    size.
+  - Why the branch is rare (REASONED, not measured): a Retina capture is 2× its point size, so
+    its pixel sizes are even. Odd sizes come from 1× displays and from cropped or odd-sized
+    imported sources.
+  - If P2-2 measures the real renderer's odd-size path at any size but the source's, P2-2 stops
+    and this decision returns to the owner.
+  - PR-2 stands: HDR stays tone-mapped in the compositor; the reverse only stops mislabelling.
+  - Amends PR-5's "the reversed-clip intermediate".
+- **PR-8 — 10-bit `hevc_alpha` and 10-bit screen recording are not wanted (owner, 2026-10-11,
+  choices 3a and 4a).**
+  - `hevc_alpha`: Main 10 with alpha works (877 colour levels), but the alpha plane stays 8-bit
+    at every profile (256 levels, measured). Its content is mostly PR-5's 8-bit graphics, and
+    `prores_4444` is the deep alpha master. Players' Main 10 alpha support is unchecked.
+  - Recording: `SCRecordingOutputConfiguration` has no profile, depth or rate key (only
+    `avc1`/`hvc1` and MP4/MOV, measured). The only documented 10-bit route is the HDR10 PQ preset
+    (`captureHDRRecordingPreservedSDRHDR10`: `x420`, ITU-R 2100 PQ), which PR-2 would tone-map. A
+    self-written encoder would rebuild the recorder's segment machinery.
+  - PR-5's list is not edited; this closes those two of its deferrals.

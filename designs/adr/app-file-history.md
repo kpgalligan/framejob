@@ -641,6 +641,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   (`motionSlotMenu` and `labelDot` kept it). `wc -l app/Sources/AppDelegate+Menus.swift`: 579
   before, 494 after; `AppDelegate+ClipMenus.swift` is 104. The next seam: the View menu's
   submenus (`trackHeightMenu`, `previewQualityMenu`).
+- `ReverseRenderer.swift`: precision-2's P2-0 paid its toll before P2-2's 10-bit reverse. It
+  moved `// MARK: - Progress` (`ReverseProgressSheetController`) out whole, with `import AppKit`,
+  to `ReverseProgressSheetController.swift`, a pure move gated alone; nothing widened, and
+  `inventory.json`'s `ensureReversedMedia()` anchor re-pinned to the new file. `wc -l
+  app/Sources/ReverseRenderer.swift`: 1311 before, 1120 after;
+  `ReverseProgressSheetController.swift` is 192. The next seam: `// MARK: - Where a reversed
+  asset lives` and `// MARK: - What the composition is told` (`ReverseCache`,
+  `ReverseResolution`, `ReverseStatus`, `ReverseSource`; lines 4–331 at `19ef985`) out whole to
+  `ReverseCache.swift`.
 - `Controls.swift`: held to the sync rule with Rasterize's copy (`app/CLAUDE.md` "Shared chrome");
   7 of its lines are the SH-2 fork of `drawBar` (#101).
 - `ReelOps.swift` is exempt (a table, one row per op). `TimelineView.swift`,

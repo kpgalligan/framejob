@@ -427,8 +427,9 @@ detail there.
   `project.yml`'s post-build step from `docs/`), `manualDirectory(besideFonts:)`,
   `writeManual()` and `holdsContent`.
 - `ReverseRenderer.swift` — `Source::Media.reversed` resolved to
-  `cache/reversed/<id>-<digest>.mov`, rendered on demand behind a sheet,
-  substituted per CLIP by `CompositionBuilder`.
+  `cache/reversed/<id>-<digest>.mov`, rendered on demand behind
+  `ReverseProgressSheetController.swift`'s sheet, substituted per
+  CLIP by `CompositionBuilder`.
 - `ReverseMirror.swift` — the app's ONE spelling of the reversed mirror and
   its pivot (spec §11, D4-6), in the three units its readers hold it in:
   `MediaPeaks.window`, `TimelineView.sourceTime` and `ReverseRenderer`. The
@@ -1712,6 +1713,7 @@ free.
 - `Sheets.swift` (the `makeSheetView` builders every sheet uses) ·
   `ExportSheetController.swift` (+`Options`, +`Resolve`, +`Presets`,
   `ExportPresetsStore.swift`) · `ExportProgressSheetController.swift` ·
+  `ReverseProgressSheetController.swift` ·
   `SpeedSheetController.swift` · `RelinkSheetController.swift` ·
   `GraphicFileSheetController.swift`. A sheet
   captures a project handle and trusts it; every editor action and

@@ -1220,7 +1220,7 @@
      "gate": "app/Sources/ProjectDocument.swift `guard !jobs.isEmpty else { return }` — as above"
     }
    ],
-   "other_caller": "app/Sources/ProjectDocument.swift `func retryReversedMedia(` — the Video tab's Render Reverse button; app/Sources/ReverseRenderer.swift `document?.ensureReversedMedia()` — after the sheet closes"
+   "other_caller": "app/Sources/ProjectDocument.swift `func retryReversedMedia(` — the Video tab's Render Reverse button; app/Sources/ReverseProgressSheetController.swift `document?.ensureReversedMedia()` — after the sheet closes"
   },
   "app/Sources/ProjectDocument+Alerts.swift:27": {
    "token": "presentError",

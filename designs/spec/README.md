@@ -28,7 +28,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`04.4-timeline.md`](04.4-timeline.md) | 213 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
-| [`05.2-project-schema.md`](05.2-project-schema.md) | 478 | The project JSON schema: every persisted field (format version 16). |
+| [`05.2-project-schema.md`](05.2-project-schema.md) | 478 | The project JSON schema: every persisted field (format version 18). |
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
 | [`05.4-actions.md`](05.4-actions.md) | 119 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
 | [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
@@ -53,7 +53,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 174 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 6696 in 19 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 6768 in 19 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 
