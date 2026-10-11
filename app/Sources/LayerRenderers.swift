@@ -6,14 +6,20 @@ import UniformTypeIdentifiers
 /// The platform half of "text and shapes are described, not rasterized"
 /// (§11): a recipe carries the DESCRIPTION, and this turns it into pixels —
 /// Core Text for text, Core Graphics for shapes, ImageIO for stills — and
-/// hands the compositor a premultiplied BGRA `MTLTexture`.
+/// hands the compositor a premultiplied BGRA `MTLTexture`, with ONE exception:
+/// a still whose decoded image is deeper than 8 bits a component is drawn
+/// into a 16-bit-float premultiplied RGBA bitmap and uploaded `rgba16Float`
+/// (`deepBitmap`, spec §11 PR-6), which the layer stage samples as it does
+/// `bgra8Unorm` (PR-2).
 ///
 /// Premultiplied is not a detail: `Compositor.metal` blends source-over with
 /// `(one, one_minus_source_alpha)` and un-premultiplies these textures before
 /// applying the colour controls, so a straight-alpha texture would render
 /// with dark fringes around every glyph. `CGImageAlphaInfo.premultipliedFirst`
-/// plus `byteOrder32Little` IS BGRA-premultiplied; nothing else here is
-/// allowed to produce a texture.
+/// plus `byteOrder32Little` IS BGRA-premultiplied, and the deep still's
+/// `premultipliedLast` plus `floatComponents` and `byteOrder16Little` is
+/// premultiplied half-float RGBA; nothing else here is allowed to produce a
+/// texture.
 ///
 /// Everything is cached by the recipe's stable hash (§7.3), 64 entries LRU
 /// (§7.5) — except a graphic's texture, keyed by its SVG in a small pool of
@@ -443,8 +449,21 @@ final class LayerRenderers {
         context.fillPath()
     }
 
+    /// A still drawn at its own size. A decoded image deeper than 8 bits a
+    /// component (a 16-bit PNG or TIFF, a 10-bit HEIC) is drawn into `deepBitmap` and
+    /// uploaded `rgba16Float`, so its levels reach the 16-bit-float compositor
+    /// (spec §11 PR-6); every other still takes the 8-bit path byte for byte.
     private func renderImage(_ image: CGImage) -> Rendered? {
         let size = CGSize(width: image.width, height: image.height)
+        let deep = image.bitsPerComponent > 8
+        if deep {
+            guard size.width >= 1, size.height >= 1,
+                let context = LayerRenderers.deepBitmap(size)
+            else { return nil }
+            context.interpolationQuality = .high
+            context.draw(image, in: CGRect(origin: .zero, size: size))
+            return upload(context, size: size, pixelFormat: .rgba16Float)
+        }
         guard size.width >= 1, size.height >= 1, let context = LayerRenderers.bitmap(size)
         else { return nil }
         context.interpolationQuality = .high
@@ -454,9 +473,9 @@ final class LayerRenderers {
 
     // MARK: - Bitmaps and textures
 
-    /// A premultiplied BGRA bitmap context — the ONE pixel layout this
-    /// renderer produces, and the one `Compositor.metal` samples
-    /// (`.bgra8Unorm`).
+    /// A premultiplied BGRA bitmap context — the pixel layout this renderer
+    /// produces for everything but a deep still (`deepBitmap`), and the one
+    /// `Compositor.metal` samples (`.bgra8Unorm`).
     ///
     /// Internal rather than private since the text machinery moved to
     /// `LayerRenderersText.swift` and draws into one of these; `private` on
@@ -476,16 +495,36 @@ final class LayerRenderers {
         return context
     }
 
+    /// A 16-bit-float premultiplied RGBA bitmap context in sRGB, for a still
+    /// deeper than 8 bits a component only (spec §11 PR-6); its bytes are
+    /// `rgba16Float`'s. The same size guard as `bitmap(_:)`.
+    private static func deepBitmap(_ size: CGSize) -> CGContext? {
+        let width = Int(size.width.rounded())
+        let height = Int(size.height.rounded())
+        guard width > 0, height > 0, width <= maxTextureSide, height <= maxTextureSide,
+            let deepSpace = CGColorSpace(name: CGColorSpace.sRGB)
+        else { return nil }
+        return CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 16, bytesPerRow: 0,
+            space: deepSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                | CGBitmapInfo.floatComponents.rawValue
+                | CGBitmapInfo.byteOrder16Little.rawValue)
+    }
+
     /// Uploads a bitmap context to a texture. Row 0 of the context's memory
     /// is the TOP row of the drawing, which is also texture row 0 — the same
     /// top-left origin the crop window and the recipe's y-down canvas use, so
     /// nothing is flipped anywhere in this pipeline.
     ///
     /// Internal for `bitmap`'s reason: `renderText` ends here too.
-    func upload(_ context: CGContext, size: CGSize) -> Rendered? {
+    /// `pixelFormat` is `.rgba16Float` for a `deepBitmap` only.
+    func upload(
+        _ context: CGContext, size: CGSize, pixelFormat: MTLPixelFormat = .bgra8Unorm
+    ) -> Rendered? {
         guard let data = context.data else { return nil }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .bgra8Unorm, width: context.width, height: context.height,
+            pixelFormat: pixelFormat, width: context.width, height: context.height,
             mipmapped: false)
         descriptor.usage = [.shaderRead]
         descriptor.storageMode = .managed

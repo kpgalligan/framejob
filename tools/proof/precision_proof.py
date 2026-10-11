@@ -5,9 +5,9 @@
 MCP. Written in PR0, before any product edit, so PR1's controls are captured
 on PR0's product.
 
-    python3 tools/proof/precision_proof.py [--app PATH] [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2] [--control DIR]
+    python3 tools/proof/precision_proof.py [--app PATH] [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2,S1,S2,S4,S5,S6,S7] [--control DIR]
     python3 tools/proof/precision_proof.py capture DIR          # the CONTROL tree
-    python3 tools/proof/precision_proof.py compare DIR [--only K1,...,E2]
+    python3 tools/proof/precision_proof.py compare DIR [--only K1,...,E2,S3]
     python3 tools/proof/precision_proof.py --measure capture|compare DIR   # release-only
     python3 tools/proof/precision_proof.py --measure ab --mutant decode-8bit [--rounds N]  # release-only
     python3 tools/proof/precision_proof.py --mutant NAME [compare DIR]
@@ -31,7 +31,12 @@ The ffmpeg fixtures, made once under `tools/proof/work/precision/media/`:
 the spike's 10-bit ProRes 422 HQ ramp (`make_media.sh`'s RAMP line, every
 10-bit code 64..940 across 1920 px, 1 s), a 640×360 1 s H.264 `testsrc2`
 (copied into DIR by `capture`, so `compare` reads the same bytes) and 2 s
-ProRes 422 `testsrc2` movies at 1080p and 2160p (M1's).
+ProRes 422 `testsrc2` movies at 1080p and 2160p (M1's); and the stills
+(precision-2 P2-1, the brief's make_media.sh lines): `ramp16.png` (`rgb48be`)
+and `ramp16.tif` (`rgb48le`), 1920×1080, every column X at X/1919 of full
+scale in all three channels; `ramp8.png`, the same ramp `rgb24`; and two
+640×360 8-bit `testsrc2` stills, `still8.png` (`rgb24`) and `still8a.png`
+(`rgba`, alpha X·255/639), copied into DIR by `capture`.
 
 The scenes, on a 640×360, 30 fps canvas, black background, read at 0.5 s
 (K4 at 1.25 s), after the spike's S1–S5:
@@ -56,7 +61,8 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       `64RGBAHalf`: its `render_frame` is still an 8-bit PNG.
   R1  (PR2) `render_frame` of the 10-bit ramp on a 1920×1080 canvas is a
       16-bit PNG whose middle row's green holds ≥ 850 distinct values; with
-      `--control DIR` the control's (decoded 32BGRA) must hold ≤ 256.
+      `--control DIR` the control's (decoded 32BGRA) must hold ≤ 256; a capture
+      whose tree decoded deep (`ctl-p21`) is printed, not held to it.
   R2  (PR2) the ramp through `prores_422`: the middle row's luma against
       x/1919 is ≤ 1.0 10-bit steps RMS (`--control DIR` prints the control's).
   C1  (PR2) the H.264 clip at `video.color.brightness` −0.4: every colour
@@ -73,18 +79,68 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       the width) is ≤ 0.1 codes, where the `hevc` file's — 8-bit, the control
       that the instrument sees a staircase — is ≥ 0.3. Main 10 handed 8-bit
       frames passes the RMS halves (1.794 against 1.459) but not the tone.
+  S1  (precision-2 P2-1, spec §11 PR-6) `ramp16.png` alone on a 1920×1080
+      canvas (imported, placed at 0, trimmed to 1 s), exported `prores_422`:
+      the middle row's distinct 10-bit Y codes (columns 16…W−16) ≥ 800, its
+      luma RMS against x/1919 under the in-run 8-bit control's (`ramp8.png`,
+      the same project), its staircase tone ≤ TONE_MAX where the control's is
+      ≥ TONE_SEEN (the instrument sees a staircase). With `--control DIR` it
+      prints DIR's `stills.png16` figures and requires their distinct < 800
+      (the instrument tells the old draw from the new).
+  S2  (P2-1) the same with `ramp16.tif`, against the same 8-bit control
+      (computed once) and DIR's `stills.tif16`.
+  S4  (P2-1, PR-6; records PR-4's amendment) S1's `render_frame` PNGs: both
+      `ramp16.png`'s and `ramp8.png`'s are 8-bit — a project whose only
+      picture is a still, deep or not, renders an 8-bit frame (measured in
+      P2-1, accepted by the owner 2026-10-11; the export keeps the depth, S1).
+      The detail prints both depths and each render's middle-row distinct
+      green (`rgb48le`).
+  S5  (P2-1's fix pass; PR-4 as amended) `ramp16.png` on a track above the
+      H.264 clip on a 1920×1080 canvas, covering it: `render_frame` is an
+      8-bit PNG (only a video source makes the frame deep).
+  S6  (P2-1's fix pass) the same over the 10-bit ramp clip: a 16-bit PNG
+      whose middle row's green — the still's, which covers the frame — holds
+      ≥ MIXED_DISTINCT (850) distinct values (the deep draw reaches a 16-bit
+      frame; drawn 8-bit it holds 256).
+  S7  (P2-1's fix pass) S1 with `ramp10.heic`: `ramp16.png` drawn at 16-bit
+      float and written by ImageIO's HEIC writer (`heic10_writer.swift`, through
+      `swift_build.build`), refused as a fixture unless ffprobe reads HEVC
+      Main 10 `yuv420p10le` and its middle row holds ≥ 800 distinct 10-bit Y
+      codes. ImageIO decodes it at 10 bits a component, so it is drawn deep.
   capture: the tree's `Compositor.swift` formats recorded (`formats`, read
       from `app/Sources`; a capture without them is PR0's, both 32BGRA);
       K1–K6 rendered into DIR; E0 (CONTROL) two `h264` exports of K6's
       clip decoded to `rgb24`, their digests recorded, equal or not; the P1
       figure; the ramp's controls (the middle row's distinct green values in
       `render_frame`, and a `prores_422` export's RMS against x/1919).
+  Sc  (P2-1, CONTROL) the three stills' figures (`png16`, `tif16`, `png8`:
+      S1's reading) recorded under `capture.json`'s `stills`; `still8.png`
+      and `still8a.png` copied into DIR, each rendered alone on the 640×360
+      canvas at 0.5 s into `S3-opaque.png` and `S3-alpha.png`, and
+      `still8a.png` under `S3_COLOR` (brightness 0.1, contrast 0.5) into
+      `S3-color.png`.
+  S3c (CONTROL; `capture DIR --only S3c`, P2-1's fix pass) S3's three scenes
+      rendered into an EXISTING capture, only its `capture.json`'s `S3`
+      replaced (and `S3_tree` naming the tree): how a scene added after DIR
+      was captured gets its reference. Only a scene DIR lacks is rendered; a
+      scene `capture.json` records whose `S3-<name>.png` is in DIR at that
+      digest is kept as it is, PNG and fixture copy untouched, so the current
+      tree never replaces an older tree's reference. `ctl-p21`'s
+      `S3-color.png` was rendered so on P2-1's own Release build (its opaque
+      and alpha digests equal the control tree's).
   compare (each histogram of differences printed): K1 byte-identical to
       DIR's; K2–K5 (no video) byte-identical when this tree's output format
       is the control's (PR2 against PR1), within ±2 when it is not (PR1
       against PR0); K6 (video) byte-identical when the source format is the
       control's, and when it is not (PR2 against PR1) recorded, not scored
       (spec §11 PR-2's ±1 on video).
+  S3 (compare; P2-1) DIR's `still8.png` and `still8a.png` rendered as `capture`
+      did (opaque; the alpha ramp; the alpha ramp under `S3_COLOR`): each
+      `render_frame` is an 8-bit PNG whose `rgba` decode is byte-identical to
+      DIR's (an 8-bit still takes today's draw byte for byte), the histogram
+      printed. Only the colour scene tells an 8-bit still drawn deep from the
+      8-bit draw: the compositor un-premultiplies before the controls, so
+      the 8-bit draw's premultiplied rounding is carried through them.
   E1 (compare; the orchestrator's ruling after PR0, because E0 showed
       VideoToolbox's H.264 encode is not repeatable — two exports of one
       project differed by up to 124 levels): what `ExportWriter` hands the
@@ -165,6 +221,17 @@ built from the copy's `app/Sources`:
                    --test export_hevc_10bit` in the copy's own `core/`, and
                    FAILS naming `hevc_alpha_sits_directly_after_hevc` and
                    `it_sits_directly_after_hevc_alpha`.
+  still-eightbit   (P2-1) `renderImage`'s `let deep = …` is `false`, every
+                   still into the 8-bit bitmap: S1, S2, S6 and S7 FAIL (S4 run
+                   beside, in the mutant's `also`, printed and not required
+                   to fail).
+  still-deep-linear (P2-1) the deep bitmap's space is `linearSRGB`: S1 and S2
+                   FAIL (S4 beside).
+  still-always-deep (P2-1) `let deep = true`, every 8-bit still drawn deep
+                   (compare DIR): S3 FAILS on its colour scene. Its opaque and
+                   alpha scenes alone left it equivalent (P2-1's first run).
+A mutant's `also` rows are selected, run and printed on the MUTANT line beside
+the named ones, and are not required to fail.
 Exit 0 when every named row FAILED (caught), 1 when one passed (survived), 2
 when the control could not be performed.
 """
@@ -231,6 +298,19 @@ PROBE_DIR = BASE / "encoder-probe"
 BUILD_BOUND = 1500
 SETTINGS = "app/Sources/ExporterWriter+Settings.swift"
 TABLE = "core/src/export_table.rs"
+RENDERERS = "app/Sources/LayerRenderers.swift"
+# The stills (precision-2 P2-1): the brief's make_media.sh ramp, every column
+# X at X/(W−1) of full scale in all three channels.
+G16 = "format=gbrp16le,geq=r='X*65535/(W-1)':g='X*65535/(W-1)':b='X*65535/(W-1)'"
+STILL_RAMP = f"color=c=black:size=1920x1080:d=1,{G16}"
+G8 = "format=gbrp,geq=r='round(X*255/(W-1))':g='round(X*255/(W-1))':b='round(X*255/(W-1))'"
+STILL_RAMP8 = f"color=c=black:size=1920x1080:d=1,{G8}"
+# S1/S2: the deep ramp's distinct 10-bit Y codes on the middle row of its
+# prores_422 export (the brief: 256 levels drawn 8-bit, 1,024 drawn deep).
+STILL_DISTINCT = 800
+# S6: the deep still's middle-row distinct green in a 16-bit render_frame (R1's
+# figure for the 10-bit ramp; an 8-bit draw holds 256).
+MIXED_DISTINCT = 850
 HEVC10_ROW = ('    Preset {\n        id: "hevc_10bit",\n        name: "HEVC 10-bit (MP4)",\n'
               '        container: Container::Mp4,\n        codec: "hevc_10bit",\n'
               '        video: true,\n        alpha: false,\n        size: None,\n'
@@ -276,11 +356,24 @@ MUTANTS = {
         (TABLE, HEVC10_ROW, ""),
         (TABLE, '    Preset {\n        id: "hevc_alpha",\n',
          HEVC10_ROW + '    Preset {\n        id: "hevc_alpha",\n')]},
+    # precision-2 P2-1 (spec §11 PR-6). `also` rows run and print beside the
+    # named ones, and are not required to fail.
+    "still-always-deep": {"mode": "compare", "rows": ["S3"], "anchors": [
+        (RENDERERS, "        let deep = image.bitsPerComponent > 8\n",
+         "        let deep = true\n")]},
+    "still-eightbit": {"mode": "rows", "rows": ["S1", "S2", "S6", "S7"], "also": ["S4"],
+                       "anchors": [
+        (RENDERERS, "        let deep = image.bitsPerComponent > 8\n",
+         "        let deep = false\n")]},
+    "still-deep-linear": {"mode": "rows", "rows": ["S1", "S2"], "also": ["S4"], "anchors": [
+        (RENDERERS, "            let deepSpace = CGColorSpace(name: CGColorSpace.sRGB)\n",
+         "            let deepSpace = CGColorSpace(name: CGColorSpace.linearSRGB)\n")]},
 }
 CORE_TESTS = ("hevc_alpha_sits_directly_after_hevc", "it_sits_directly_after_hevc_alpha")
-ROWS = ["C0", "D1", "D2", "P1", "H1", "R1", "R2", "C1", "T1", "T2", "Z1"]
-CAPTURE_ROWS = ["K", "E0", "P1c", "Rc", "Z1"]
-COMPARE_ROWS = ["K1", "K2", "K3", "K4", "K5", "K6", "E1", "E2", "Z1"]
+ROWS = ["C0", "D1", "D2", "P1", "H1", "R1", "R2", "C1", "T1", "T2", "S1", "S2", "S4", "S5", "S6",
+        "S7", "Z1"]
+CAPTURE_ROWS = ["K", "E0", "P1c", "Rc", "Sc", "S3c", "Z1"]
+COMPARE_ROWS = ["K1", "K2", "K3", "K4", "K5", "K6", "E1", "E2", "S3", "Z1"]
 rows = {}
 selected = set()
 sources_folder = ROOT / "app/Sources"
@@ -389,6 +482,21 @@ class Doc:
         return [self.place("add_clip", track=track, media=media, at=i * seconds * SEC)
                 for i in range(repeats)]
 
+    def still(self, track, path):
+        """The still at `path` imported, placed at 0 on `track` and trimmed to
+        end at 1 s; its clip id, or None (`note`d)."""
+        got = self.call("import_media", path=str(path))
+        media = reply(got).get("media")
+        if media is None:
+            self.note("import_media", got if not got["ok"] else {"ok": False, "error": "no id"})
+            return None
+        clip = self.place("add_clip", track=track, media=media, at=0)
+        if clip is not None:
+            trimmed = self.call("trim_end", clip=clip, to=SEC)
+            if "made no change" not in trimmed.get("error", ""):
+                self.note("trim_end", trimmed)
+        return clip
+
     def render(self, out, t=T):
         """`render_frame` at `t` into `out`; the PNG's bytes, or None."""
         out = Path(out)
@@ -444,6 +552,97 @@ def prores_clip(height):
     return ffmpeg_make(MEDIA / f"prores422_{height}.mov", [
         "-f", "lavfi", "-i", f"testsrc2=size={width}x{height}:rate=30:duration=2",
         "-c:v", "prores_ks", "-profile:v", "2", "-pix_fmt", "yuv422p10le", *TAG])
+
+
+def still16_png():
+    return ffmpeg_make(MEDIA / "ramp16.png", [
+        "-f", "lavfi", "-i", STILL_RAMP, "-frames:v", "1", "-pix_fmt", "rgb48be"])
+
+
+def still16_tif():
+    return ffmpeg_make(MEDIA / "ramp16.tif", [
+        "-f", "lavfi", "-i", STILL_RAMP, "-frames:v", "1", "-pix_fmt", "rgb48le"])
+
+
+def still10_heic():
+    """`ramp16.png` as a 10-bit HEIC (ffmpeg cannot mux HEIF): drawn into a
+    16-bit-float bitmap and written by ImageIO's HEIC writer
+    (`heic10_writer.swift`, built through `swift_build.build`; its comment
+    has why only that route keeps 10 bits), and kept only when `ffprobe`
+    reads HEVC Main 10 `yuv420p10le` AND its middle row holds ≥
+    STILL_DISTINCT distinct 10-bit Y codes, so the fixture is 10-bit in
+    content, not only in name (P2-1's fix pass). Made only when S7 is
+    selected, never in the preflight: on None, `HEIC_REFUSED["why"]` says why,
+    and S7 scores that as a FAIL."""
+    out = MEDIA / "ramp10.heic"
+    if not out.exists():
+        source = still16_png()
+        if source is None:
+            HEIC_REFUSED["why"] = "ffmpeg did not make ramp16.png"
+            return None
+        writer = BASE / "heic10-writer" / "heic10_writer"
+        try:
+            swift_build.build(sources=[ROOT / "tools/proof/heic10_writer.swift"], output=writer,
+                              timeout=BUILD_BOUND)
+        except swift_build.SwiftBuildFailed as failure:
+            HEIC_REFUSED["why"] = f"heic10_writer did not build: {str(failure)[:300]}"
+            print(f"       {HEIC_REFUSED['why']}", flush=True)
+            return None
+        made = bounded.run([str(writer), str(source), str(out)], 120)
+        if made["rc"] != 0 or not out.exists():
+            HEIC_REFUSED["why"] = (f"heic10_writer exited {made['rc']}: "
+                                   f"{(made.get('stderr') or '')[:300]}")
+            print(f"       {HEIC_REFUSED['why']}", flush=True)
+            return None
+    probe = ffprobe(out)
+    raw = decode(out, "gray10le")
+    codes = (len({raw[(540 * 1920 + x) * 2:(540 * 1920 + x) * 2 + 2] for x in range(1920)})
+             if raw and len(raw) == 1920 * 1080 * 2 else None)
+    if (probe.get("pix_fmt") != "yuv420p10le" or probe.get("profile") != "Main 10"
+            or codes is None or codes < STILL_DISTINCT):
+        HEIC_REFUSED["why"] = (f"ramp10.heic refused: {probe.get('profile')} "
+                               f"{probe.get('pix_fmt')}, middle-row codes {codes}")
+        print(f"       {HEIC_REFUSED['why']}", flush=True)
+        out.unlink()
+        return None
+    return out
+
+
+HEIC_REFUSED = {}
+
+
+def still8_png():
+    """The 8-bit control ramp, written 8-bit directly and ROUNDED, so its 256
+    levels step at 255/(W−1) cycles a pixel as Core Graphics' 8-bit draw of
+    the 16-bit ramp does, the frequency `staircase_tone` reads. ffmpeg's own
+    `rgb48`→`rgb24` conversion truncates, which puts the steps near 256/(W−1)
+    and read a tone of 0.0301 against 1.2236 (P2-1's first capture)."""
+    return ffmpeg_make(MEDIA / "ramp8.png", [
+        "-f", "lavfi", "-i", STILL_RAMP8, "-frames:v", "1", "-pix_fmt", "rgb24"])
+
+
+def still8_opaque():
+    return ffmpeg_make(MEDIA / "still8.png", [
+        "-f", "lavfi", "-i", f"testsrc2=size={W}x{H}", "-frames:v", "1", "-pix_fmt", "rgb24"])
+
+
+def still8_alpha():
+    return ffmpeg_make(MEDIA / "still8a.png", [
+        "-f", "lavfi", "-i", f"testsrc2=size={W}x{H},format=rgba,"
+        "geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='X*255/639'",
+        "-frames:v", "1", "-pix_fmt", "rgba"])
+
+
+# The preflight's stills; `still10_heic` is not one (it needs a Swift build
+# and ImageIO's HEIC writer, so only S7 makes it, and scores its refusal).
+STILLS = (still16_png, still16_tif, still8_png, still8_opaque, still8_alpha)
+# S3's scenes: (name, fixture, `set_video` patch). `color` is the alpha-ramp
+# still under a non-identity colour control: the compositor un-premultiplies
+# before the controls, so an 8-bit still's premultiplied rounding is carried
+# through them there, and an 8-bit still drawn deep is not (P2-1's fix pass).
+S3_COLOR = {"color": {"brightness": 0.1, "contrast": 0.5}}
+S3_SCENES = (("opaque", still8_opaque, None), ("alpha", still8_alpha, None),
+             ("color", still8_alpha, S3_COLOR))
 
 
 def decode(path, pix_fmt, extra=(), frames=1):
@@ -659,6 +858,140 @@ def ramp_controls(client, out_dir):
     return distinct, rms, png_depth(png), closed
 
 
+def still_figures(client, out_dir, path, label):
+    """A still's figures (precision-2 P2-1): a 1920×1080 project holding the
+    still alone; its `render_frame` PNG's depth and middle-row distinct green
+    (`rgb48le`), and a `prores_422` export's middle-row distinct 10-bit Y
+    codes (columns 16…W−16), luma RMS against x/1919 and staircase tone
+    (amplitude, floor). (figures, closed)."""
+    doc = Doc(client, f"still-{label}", 1920, 1080)
+    doc.still(doc.first_track(), path)
+    png = doc.render(out_dir / f"still-{label}.png")
+    movie = doc.export("prores_422", out_dir / f"still-{label}.mov")
+    closed = doc.close()
+    figures = {"fixture": doc.why or "ok", "png_depth": png_depth(png), "green": None,
+               "distinct": None, "rms": None, "tone": None}
+    if png is not None:
+        raw = decode(out_dir / f"still-{label}.png", "rgb48le")
+        if raw and len(raw) == 1920 * 1080 * 6:
+            row = raw[540 * 1920 * 6:541 * 1920 * 6]
+            figures["green"] = len({row[x * 6 + 2:x * 6 + 4] for x in range(1920)})
+    if movie is not None:
+        measured = luma_row(movie, 1920, 1080)
+        codes, means = y10_columns(movie, 1920, 1080)
+        figures["distinct"] = len(set(codes[16:-16])) if codes else None
+        figures["rms"] = (round(rms_steps(measured, [x / 1919 for x in range(1920)]), 4)
+                          if measured else None)
+        figures["tone"] = [round(v, 4) for v in staircase_tone(means, 1920)] if means else None
+    return figures, closed
+
+
+def mixed_figures(client, out_dir, movie, label):
+    """S5/S6's scene (P2-1's fix pass): `ramp16.png` on a track above `movie`
+    on a 1920×1080 canvas, covering it, rendered at 0.5 s; its PNG's depth
+    and middle-row distinct green (`rgb48le`). (figures, closed)."""
+    doc = Doc(client, f"mixed-{label}", 1920, 1080)
+    doc.movie(doc.first_track(), movie)
+    doc.still(doc.new_track(), still16_png())
+    png = doc.render(out_dir / f"mixed-{label}.png")
+    closed = doc.close()
+    figures = {"fixture": doc.why or "ok", "png_depth": png_depth(png), "green": None}
+    if png is not None:
+        raw = decode(out_dir / f"mixed-{label}.png", "rgb48le")
+        if raw and len(raw) == 1920 * 1080 * 6:
+            row = raw[540 * 1920 * 6:541 * 1920 * 6]
+            figures["green"] = len({row[x * 6 + 2:x * 6 + 4] for x in range(1920)})
+    return figures, closed
+
+
+def s3_render(client, path, out, video=None):
+    """S3's scene: the 640×360 8-bit still at `path` alone on the 640×360
+    canvas, with `video` (a `set_video` patch) when given, rendered at 0.5 s
+    into `out`. (fixture why, PNG bytes, closed)."""
+    doc = Doc(client, f"S3-{out.stem}")
+    clip = doc.still(doc.first_track(), path)
+    if clip is not None and video:
+        doc.step("set_video", clips=[clip], patch=video)
+    png = doc.render(out)
+    return doc.why, png, doc.close()
+
+
+def run_s(client, state):
+    """S1, S2 and S4 (precision-2 P2-1, spec §11 PR-6): the 16-bit PNG and
+    TIFF ramps against the in-run 8-bit control `ramp8.png` (computed once),
+    and with `--control DIR` the control tree's own figures for each."""
+    closed, got = True, {}
+    wanted = (("png8", still8_png, {"S1", "S2", "S4", "S7"}), ("png16", still16_png, {"S1", "S4"}),
+              ("tif16", still16_tif, {"S2"}), ("heic10", still10_heic, {"S7"}))
+    for label, maker, rows_using in wanted:
+        if selected & rows_using:
+            path = maker()
+            if path is None:  # only still10_heic can refuse here: S7 scores it
+                got[label] = {"fixture": HEIC_REFUSED.get("why", f"{maker.__name__} made nothing")}
+                print(f"       {label} figures: {got[label]}", flush=True)
+                continue
+            got[label], ok = still_figures(client, WORK, path, label)
+            closed = ok and closed
+            print(f"       {label} figures: {got[label]}", flush=True)
+    control = state.get("stills") or {}
+    eight = got.get("png8") or {}
+    for row, label, name in (("S1", "png16", "PNG"), ("S2", "tif16", "TIFF"),
+                             ("S7", "heic10", "HEIC (10-bit)")):
+        if row not in selected:
+            continue
+        deep = got.get(label) or {}
+        figures = [deep.get("distinct"), deep.get("rms"), (deep.get("tone") or [None])[0],
+                   eight.get("rms"), (eight.get("tone") or [None])[0]]
+        distinct, rms, tone, eight_rms, eight_tone = figures
+        then = control.get(label)
+        good = (deep.get("fixture") == "ok" and eight.get("fixture") == "ok"
+                and None not in figures and distinct >= STILL_DISTINCT and rms < eight_rms
+                and tone <= TONE_MAX and eight_tone >= TONE_SEEN
+                and (then is None or (then.get("distinct") is not None
+                                      and then["distinct"] < STILL_DISTINCT)))
+        check(f"{row} a 1920×1080 {'' if row == 'S7' else '16-bit '}{name} ramp alone through prores_422: ≥ "
+              f"{STILL_DISTINCT} distinct 10-bit codes on the middle row, luma RMS against "
+              f"x/1919 under the 8-bit ramp8.png control's, staircase tone ≤ {TONE_MAX} where "
+              f"the control's is ≥ {TONE_SEEN}" + (f", and the control tree's < "
+                                                  f"{STILL_DISTINCT}" if then else ""),
+              good,
+              f"deep: fixture {deep.get('fixture')}, distinct {distinct}, RMS {rms}, tone "
+              f"{deep.get('tone')}; 8-bit control: fixture {eight.get('fixture')}, distinct "
+              f"{eight.get('distinct')}, RMS {eight_rms}, tone {eight.get('tone')}; control "
+              f"tree: {then if then is not None else 'not given (--control DIR)'}")
+    if "S4" in selected:
+        deep = got.get("png16") or {}
+        then = control.get("png16")
+        check("S4 (PR-6; PR-4 amended, the owner 2026-10-11) render_frame of a project whose "
+              "only picture is a still is an 8-bit PNG, the 16-bit ramp16.png and the 8-bit "
+              "ramp8.png alike (the export keeps the depth: S1)",
+              deep.get("png_depth") == 8 and eight.get("png_depth") == 8,
+              f"ramp16.png depth {deep.get('png_depth')} (middle-row distinct green "
+              f"{deep.get('green')}); ramp8.png depth {eight.get('png_depth')} (distinct green "
+              f"{eight.get('green')}); control tree's ramp16.png "
+              f"{'depth ' + str(then.get('png_depth')) + ', green ' + str(then.get('green')) if then else 'not given (--control DIR)'}")
+    if "S5" in selected:
+        figures, ok = mixed_figures(client, WORK, h264_clip(), "h264")
+        closed = ok and closed
+        check("S5 (PR-4 as amended by PR-6) ramp16.png over the 8-bit H.264 clip: render_frame "
+              "is an 8-bit PNG — a deep still does not make the frame deep",
+              figures["fixture"] == "ok" and figures["png_depth"] == 8,
+              f"fixture {figures['fixture']}; depth {figures['png_depth']}; middle-row distinct "
+              f"green {figures['green']}")
+    if "S6" in selected:
+        figures, ok = mixed_figures(client, WORK, ramp_clip(), "ramp10")
+        closed = ok and closed
+        green = figures["green"]
+        check(f"S6 (PR-4 as amended by PR-6) ramp16.png over the 10-bit ramp clip: render_frame "
+              f"is a 16-bit PNG and the still (covering the frame) keeps its depth in it: the "
+              f"middle row's green holds ≥ {MIXED_DISTINCT} distinct values",
+              figures["fixture"] == "ok" and figures["png_depth"] == 16 and green is not None
+              and green >= MIXED_DISTINCT,
+              f"fixture {figures['fixture']}; depth {figures['png_depth']}; middle-row distinct "
+              f"green {green}")
+    return closed
+
+
 # ---------------------------------------------------------------------------
 # The modes.
 
@@ -705,12 +1038,19 @@ def run_rows(client, state):
         closed = ok and closed
         ramp = state.get("ramp") or {}
         control = ramp.get("distinct_green")
+        # The control's ≤ 256 is PR2's: a capture whose tree decoded 32BGRA. A
+        # later capture (precision-2's `ctl-p21`) decodes deep and is printed,
+        # not held to it.
+        decoded = (state.get("formats") or PR0_FORMATS).get("source") if state else None
+        held = control is not None and decoded == PR0_FORMATS["source"]
         check("R1 render_frame of the 10-bit ramp on a 1920×1080 canvas is a 16-bit PNG whose "
-              "middle row's green holds ≥ 850 distinct values (the control, decoded 32BGRA, "
+              "middle row's green holds ≥ 850 distinct values (a 32BGRA-decoded control "
               "≤ 256)", depth == 16 and distinct is not None and distinct >= 850
-              and (control is None or control <= 256),
+              and (not held or control <= 256),
               f"bit depth {depth}; {distinct} distinct (control "
-              f"{control if control is not None else 'not given (--control DIR)'})")
+              f"{control if control is not None else 'not given (--control DIR)'}"
+              + ("" if held or control is None else f", decoded {decoded}: printed, not held "
+                 "to ≤ 256") + ")")
         check("R2 the ramp through prores_422: the middle row's luma against x/1919 is ≤ 1.0 "
               "10-bit steps RMS", rms is not None and rms <= 1.0,
               f"RMS {rms if rms is None else round(rms, 3)} (control "
@@ -719,6 +1059,8 @@ def run_rows(client, state):
         closed = run_c1(client, clip) and closed
     if selected & {"T1", "T2"}:
         closed = run_t(client) and closed
+    if selected & {"S1", "S2", "S4", "S5", "S6", "S7"}:
+        closed = run_s(client, state) and closed
     return closed
 
 
@@ -868,6 +1210,66 @@ def run_capture(client, where):
                       else round(rms, 3), "png_depth": depth}
     check("Rc CONTROL: the ramp's render and prores_422 export recorded",
           distinct is not None and rms is not None, f"{record['ramp']}")
+    stills = {}
+    for label, maker in (("png16", still16_png), ("tif16", still16_tif), ("png8", still8_png)):
+        stills[label], ok = still_figures(client, where, maker(), label)
+        closed = ok and closed
+    record["stills"] = stills
+    record["S3"] = s3_capture(client, where)
+    s3 = record["S3"]
+    closed = s3.pop("closed") and closed
+    check("Sc CONTROL: the three stills' figures (png16, tif16, png8) and S3's three 8-bit "
+          "renders recorded", all(f["fixture"] == "ok" and None not in (f["distinct"], f["rms"], f["tone"])
+                          for f in stills.values())
+          and all(r["fixture"] == "ok" and r["digest"] for r in s3.values()),
+          f"stills {stills}; S3 {s3}")
+    (where / "capture.json").write_text(json.dumps(record, indent=1, sort_keys=True))
+    return closed
+
+
+def s3_capture(client, where, keep=None):
+    """S3's scenes rendered into DIR (`S3-<name>.png`, each fixture copied
+    beside): {name: {fixture, png_depth, digest}, "closed": bool}. With
+    `keep` (S3c: the recorded `S3`), a scene recorded there whose PNG is in
+    DIR at its recorded digest is kept, not re-rendered, and a fixture copy
+    already in DIR is not replaced."""
+    s3, closed = {}, True
+    for name, maker, video in S3_SCENES:
+        recorded = (keep or {}).get(name) or {}
+        png_path = where / f"S3-{name}.png"
+        if (keep is not None and recorded.get("digest") and png_path.is_file()
+                and digest(png_path.read_bytes()) == recorded["digest"]):
+            s3[name] = recorded
+            print(f"       S3 {name}: kept DIR's reference ({recorded['digest']})", flush=True)
+            continue
+        copy = where / maker().name
+        if keep is None or not copy.exists():
+            shutil.copy2(maker(), copy)
+        why, png, ok = s3_render(client, copy, where / f"S3-{name}.png", video)
+        closed = ok and closed
+        s3[name] = {"fixture": why or "ok", "png_depth": png_depth(png), "digest": digest(png),
+                    "video": video}
+    s3["closed"] = closed
+    return s3
+
+
+def run_s3c(client, where):
+    """`capture DIR --only S3c` (P2-1's fix pass): S3's scenes DIR lacks
+    rendered into an EXISTING capture, its `capture.json`'s `S3` replaced and
+    nothing else touched — the way a scene added after DIR was captured gets
+    its reference. A scene already recorded, with its PNG in DIR at the
+    recorded digest, is kept as it was (`s3_capture`'s `keep`), so a tree
+    whose 8-bit draw changed cannot turn it into a self-comparison."""
+    try:
+        record = json.loads((where / "capture.json").read_text())
+    except (OSError, ValueError):
+        sys.exit(f"no capture at {where}; --only S3c adds to an existing capture")
+    s3 = s3_capture(client, where, keep=record.get("S3") or {})
+    closed = s3.pop("closed")
+    record["S3"], record["S3_tree"] = s3, str(sources_folder.parents[1])
+    check("S3c CONTROL: S3's three 8-bit renders recorded into the existing capture",
+          all(r["fixture"] == "ok" and r["digest"] and r["png_depth"] == 8 for r in s3.values()),
+          f"S3 {s3}; rendered on {sources_folder.parents[1]}")
     (where / "capture.json").write_text(json.dumps(record, indent=1, sort_keys=True))
     return closed
 
@@ -931,6 +1333,22 @@ def run_compare(client, where):
         closed = run_e1(client, where, clip, record, same_source) and closed
     if "E2" in selected:
         closed = run_e2(client, where, clip, same_source) and closed
+    if "S3" in selected:
+        good, lines = True, []
+        for name, maker, video in S3_SCENES:
+            file = maker().name
+            why, png, ok = s3_render(client, where / file, WORK / f"S3-{name}.png", video)
+            closed = ok and closed
+            got, want = rgba(WORK / f"S3-{name}.png"), rgba(where / f"S3-{name}.png")
+            counts = histogram(got, want) if got and want and len(got) == len(want) else {}
+            good = (good and why is None and got is not None and got == want
+                    and png_depth(png) == 8)
+            lines.append(f"{name} ({file}{', ' + json.dumps(video) if video else ''}): fixture "
+                         f"{why or 'ok'}; depth {png_depth(png)}; "
+                         f"histogram |Δ| against DIR's: channels {short(counts)}")
+        check("S3 an 8-bit still's render_frame (opaque; with an alpha ramp; the alpha ramp "
+              "under a colour control) is an 8-bit PNG byte-identical to DIR's", good,
+              "\n       ".join(lines))
     return closed
 
 
@@ -1483,16 +1901,21 @@ def main():
                 else COMPARE_ROWS if args.mode == "compare" else ROWS)
     selected = set(universe)
     if mutant:
-        selected = set(mutant["rows"]) | {"Z1"}
+        selected = set(mutant["rows"]) | set(mutant.get("also", [])) | {"Z1"}
     if args.only:
         selected = {name.strip() for name in args.only.split(",") if name.strip()} | {"Z1"}
         unknown = selected - set(universe)
         if unknown:
             print(f"unknown rows: {sorted(unknown)}")
             return 2
+    elif args.mode == "capture":
+        selected.discard("S3c")   # a whole capture records S3 under Sc
     if mutant:
+        also = mutant.get("also", [])
         print(f"precision (B94) — the {args.mutant} MUTANT ({', '.join(mutant['rows'])}"
-              f"{', PF' if mutant.get('pf') else ''} must FAIL)", flush=True)
+              f"{', PF' if mutant.get('pf') else ''} must FAIL"
+              f"{'; ' + ', '.join(also) + ' run beside, not scored' if also else ''})",
+              flush=True)
         app, copy = build_mutant(args.mutant)
         if app is None:
             print(f"mutant {args.mutant}: the control could not be performed — {copy}")
@@ -1516,7 +1939,7 @@ def main():
     remove_work()
     atexit.register(remove_work)
     HOME.mkdir(parents=True)
-    for maker in (h264_clip, ramp_clip):
+    for maker in (h264_clip, ramp_clip, *STILLS):
         if maker() is None:
             print(f"instrument failure: ffmpeg did not make {maker.__name__}'s movie")
             return 2
@@ -1554,7 +1977,9 @@ def main():
             except (OSError, ValueError):
                 print(f"  no capture.json in {args.control}; P1 prints no control", flush=True)
         try:
-            if args.mode == "capture":
+            if args.mode == "capture" and selected == {"S3c", "Z1"}:
+                closed = run_s3c(launched.client, where)
+            elif args.mode == "capture":
                 closed = run_capture(launched.client, where)
             elif args.mode == "compare":
                 closed = run_compare(launched.client, where)
@@ -1583,8 +2008,12 @@ def main():
                   f"Z1 {rows.get('Z1')}")
             return 2
         caught = not any(named.values())
+        beside = {name: rows.get(name) for name in mutant.get("also", [])}
         print(("MUTANT PASS" if caught else "MUTANT FAILURE") + f": {args.mutant} — "
-              + ", ".join(f"{k} {'passed' if v else 'FAILED'}" for k, v in named.items()))
+              + ", ".join(f"{k} {'passed' if v else 'FAILED'}" for k, v in named.items())
+              + ("; also (not scored) " + ", ".join(
+                  f"{k} {'not run' if v is None else 'passed' if v else 'FAILED'}"
+                  for k, v in beside.items()) if beside else ""))
         return 0 if caught else 1
     return 0 if passed == len(scored) else 1
 

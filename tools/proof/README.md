@@ -17775,15 +17775,18 @@ to `64RGBAHalf` (`Compositor.sourcePixelFormat`, spec §11 PR-2).
 
 ```
 python3 tools/proof/preview_display_probe.py --rows spike          # V0–V2 (PR0's spike; exit 1 is its RECORDED outcome)
-python3 tools/proof/precision_proof.py [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2] [--control DIR]
+python3 tools/proof/precision_proof.py [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2,S1,S2,S4,S5,S6,S7] [--control DIR]
 python3 tools/proof/precision_proof.py capture DIR                 # on the CONTROL tree, before any product edit
-python3 tools/proof/precision_proof.py compare DIR [--only K1,…,E2]
+python3 tools/proof/precision_proof.py capture DIR --only S3c      # S3's scenes DIR lacks into an existing capture
+python3 tools/proof/precision_proof.py compare DIR [--only K1,…,E2,S3]
 RC_PROOF_APP=release python3 tools/proof/precision_proof.py --measure capture|compare DIR   # M1, release-only
 RC_PROOF_APP=release python3 tools/proof/precision_proof.py --measure ab --mutant decode-8bit [--rounds N]   # MA, release-only
 python3 tools/proof/precision_proof.py --selftest                  # S1–S3, no app
 python3 tools/proof/precision_proof.py --mutant h264-deep|hevc-deep compare DIR
 python3 tools/proof/precision_proof.py --mutant output-8bit|hevc-no-profile|decode-8bit|no-source-clamp
 python3 tools/proof/precision_proof.py --mutant hevc10-main|hevc10-unmapped|hevc10-eightbit|row-before-hevc-alpha
+python3 tools/proof/precision_proof.py --mutant still-eightbit|still-deep-linear   # precision-2 P2-1: S1, S2 (+ S6, S7 for still-eightbit; S4 beside)
+python3 tools/proof/precision_proof.py --mutant still-always-deep compare DIR      # precision-2 P2-1: S3
 python3 tools/proof/hevc_alpha_proof.py --rows straighten          # R0, K1, R8, RH, KH
 python3 tools/proof/hevc_alpha_proof.py --measure hevc-alpha-deep   # HA, recorded
 python3 tools/proof/hevc_alpha_proof.py --mutant hevc-no-profile|bgra8-truncates|half-no-unpremultiply|half-no-fill
@@ -17953,6 +17956,55 @@ removed: C1);
 `half-no-unpremultiply` (RH) and `half-no-fill` (KH), its
 `hevc-no-profile` (B1) and `label-premultiplied` on its new anchor, and the
 four B93 probe mutants, since the fill they anchor in went generic.
+
+**precision-2 P2-1 — deep stills (spec §11 PR-6; road map
+`designs/precision-2.md`).** A still deeper than 8 bits a component is
+drawn at 16-bit float (`LayerRenderers.renderImage`'s `deepBitmap`, uploaded
+`rgba16Float`). The fixtures, made once into `work/precision/media/`:
+`ramp16.png` (`rgb48be`) and `ramp16.tif` (`rgb48le`), 1920×1080, every
+column X at X/1919 of full scale —
+`ffmpeg -f lavfi -i "color=c=black:size=1920x1080:d=1,format=gbrp16le,geq=r='X*65535/(W-1)':g='X*65535/(W-1)':b='X*65535/(W-1)'" -frames:v 1 -pix_fmt rgb48be ramp16.png`
+(PRC-4 imports it); `ramp8.png`, the same ramp written 8-bit and ROUNDED
+(`format=gbrp,geq=…round(X*255/(W-1))…`, `rgb24`), so its steps fall where
+Core Graphics' 8-bit draw puts them — ffmpeg's own `rgb48`→`rgb24`
+truncates, which puts them near 256/(W−1) cycles a pixel, and
+`staircase_tone` reads 255/(W−1) (P2-1's first control read 0.0301); and
+two 640×360 8-bit `testsrc2` stills, `still8.png` and `still8a.png` (alpha
+X·255/639); and `ramp10.heic`, `ramp16.png` drawn at 16-bit float and
+written by ImageIO's HEIC writer (`heic10_writer.swift`, built through
+`swift_build.build`; ffmpeg cannot mux HEIF, and both `sips` and the writer
+fed the PNG's own 16-bit integer image write a Main 10 file holding about
+256 levels), kept only when ffprobe reads HEVC Main 10 `yuv420p10le` with
+≥ 800 distinct 10-bit Y codes on its middle row, and made only when S7
+runs (not in the preflight): a writer that does not build or a file refused
+is S7's FAIL, naming the reason. **S1** `ramp16.png` alone on a 1920×1080 canvas exported
+`prores_422`: ≥ 800 distinct 10-bit Y codes on the middle row, luma RMS
+against x/1919 under the in-run `ramp8.png` control's, staircase tone ≤ 0.1
+where the control's is ≥ 0.3, and with `--control DIR` the control tree's
+own distinct < 800; **S2** the same with `ramp16.tif`; **S4** both stills'
+`render_frame` PNGs are 8-bit — a project whose only picture is a still,
+deep or not, renders an 8-bit frame (spec §11 PR-4 as amended by PR-6,
+accepted by the owner 2026-10-11); **S5** `ramp16.png` covering the H.264
+clip renders an 8-bit frame, and **S6** covering the 10-bit ramp clip a
+16-bit frame whose middle row's green (the still's) holds ≥ 850 distinct
+values (PR-4 as amended: only a video source makes the frame deep, and a
+deep frame keeps a deep still's depth); **S7** is S1 with `ramp10.heic`;
+**Sc** (`capture`) records the three figures under `capture.json`'s
+`stills` and renders S3's scenes into DIR; **S3** (`compare`) re-renders
+`still8.png`, `still8a.png`, and `still8a.png` under brightness 0.1 and
+contrast 0.5, from DIR's copies, each an 8-bit PNG byte-identical to DIR's.
+The control is `work/precision/ctl-p21/`, captured on P2-0's product; its
+`S3-color.png` was added by `capture DIR --only S3c` on P2-1's Release build
+(the 8-bit draw's code unchanged; that run's opaque and alpha digests equal
+the control's). S3c renders only the scenes DIR lacks: a scene `capture.json`
+records whose PNG is in DIR at that digest is kept, PNG and fixture copy
+untouched, so a later tree never replaces an older tree's reference. Mutants, once at the end on the final instrument:
+`still-eightbit` (`let deep = false`: S1, S2, S6, S7), `still-deep-linear`
+(the deep bitmap in `linearSRGB`: S1, S2), each running S4 beside in its
+`also` (run and printed, not required to fail), and `still-always-deep`
+(`let deep = true`, compare: S3, on the colour scene — the opaque and
+alpha-ramp scenes alone left it equivalent, since only a non-identity step
+after the un-premultiply carries the 8-bit draw's premultiplied rounding).
 
 ## Road map grading — GR0, the grading spike (`grading_spike/`; #258)
 

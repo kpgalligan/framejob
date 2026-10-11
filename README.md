@@ -375,9 +375,10 @@ schema, §6 the op table, §7 the architecture.
   size is the document's own, or for a GIF or APNG the format's cap fitted to
   it — and an optional loudness target and timecode burn-in over it, plus an
   offline single-frame render used for verification and by File ▸ Save Frame….
-  The picture is composited in 16-bit float and every video source decoded
-  deep, so ProRes 422, ProRes 4444 and HEVC 10-bit keep a 10-bit source's
-  gradients; H.264, HEVC and HEVC with alpha are 8-bit.
+  The picture is composited in 16-bit float, every video source decoded
+  deep and a still deeper than 8 bits (a 16-bit PNG or TIFF, a 10-bit HEIC)
+  is drawn deep, so ProRes 422, ProRes 4444 and HEVC 10-bit keep a 10-bit
+  source's gradients; H.264, HEVC and HEVC with alpha are 8-bit.
   The size the sheet and the `export` tool report is the size the file has: a
   document with an odd width or height exports one pixel smaller on that edge
   on the formats that need even dimensions (H.264, HEVC, HEVC with alpha,

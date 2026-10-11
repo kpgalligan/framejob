@@ -100,6 +100,12 @@ tone-mapped in the compositor.
   - No `depth` argument. JPEG stays 8-bit.
   - If PR2 makes an all-8-bit composition's image 16-bit, PR2 stops and this decision returns
     to the owner.
+  **Amended by PR-6** (precision-2 P2-1; its stills-only case accepted by the owner
+  2026-10-11): "any source is deeper" counts video sources only, as measured on Release in
+  P2-1: a project whose only picture is a still drawn deep (PR-6) renders an 8-bit frame (S4),
+  as does a 16-bit still covering an 8-bit H.264 clip (S5); a 16-bit still covering a 10-bit
+  clip renders a 16-bit frame that keeps the still's depth (S6: 1,920 distinct green values on
+  its middle row, 256 when the still is drawn 8-bit). Exports keep the depth (S1).
 - **PR-5 — What stays 8-bit, and the frozen references (choice 6).**
   - These stay 8-bit:
     - graphics (G-7's BGRA8);
@@ -139,6 +145,10 @@ tone-mapped in the compositor.
   - If S4 reads an 8-bit PNG, P2-1 stops and the point returns to the owner as an amendment of
     PR-4's "any source is deeper". P2-1 does not append a bullet that contradicts PR-4.
   - Amends PR-5's "still images".
+  - Measured in P2-1 (S4, 2026-10-11, Release): `render_frame` of a project whose only picture
+    is a 16-bit still is an 8-bit PNG, as is an 8-bit still's; the `prores_422` export keeps the
+    depth (S1: 862 distinct 10-bit codes on the ramp's middle row, against 512 from the old
+    draw). The owner accepted it on 2026-10-11 ("Accept it"), and PR-4 is amended to match.
 - **PR-7 — The reversed intermediate is 10-bit, carries the source's colour labels, and keeps
   the source's exact size (owner, 2026-10-11, choice 2a; the odd-size fix with it).**
   - An even-sized source is written as HEVC with `kVTProfileLevel_HEVC_Main10_AutoLevel` at every

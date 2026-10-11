@@ -291,3 +291,222 @@ input, so the stamp holds):
   `` `ReverseProgressSheetController.swift` · ``.
 
 P2-1 (deep stills, PR-6) is next, from main after this phase's merge.
+
+## P2-1 — deep stills
+
+**What landed** (2026-10-11, in the worktree on `i257`, from `34445fa`; main had not moved).
+- **The product.** `app/Sources/LayerRenderers.swift` went from 498 to 537 lines and pays no
+  toll.
+  - `renderImage` decides on one line, `let deep = image.bitsPerComponent > 8`. A deep image is
+    drawn into the new `deepBitmap(_:)` and uploaded `rgba16Float`. `deepBitmap` is 16-bit,
+    `premultipliedLast | floatComponents | byteOrder16Little`, sRGB, with `bitmap(_:)`'s size
+    guard.
+  - Every other image takes today's three statements unchanged. `bitmap(_:)` is unchanged.
+    `upload` gains `pixelFormat:`, defaulting to `.bgra8Unorm`.
+  - The file header and `bitmap`'s doc now name the deep still as the one exception.
+  - Nothing else in the product changed: no compositor, shader, decode, core, FFI, MCP or
+    format change. Thumbnails, posters and media rows stay 8-bit (PR-5).
+- **The proof.** `tools/proof/precision_proof.py` gains:
+  - the rows S1, S2 and S4, the capture row Sc and the compare row S3;
+  - the mutants `still-eightbit` and `still-deep-linear`;
+  - an `also` key on a mutant: rows run and printed beside the named ones, and not required to
+    fail;
+  - an R1 fix, below.
+- **The documents.**
+  - §7.5's sentence on deep stills.
+  - §11: PR-6's "Measured in P2-1" bullet, and an **Amended by PR-6** line under PR-4. No
+    existing bullet was edited.
+  - The `11-decisions/README.md` rows for PR-4 and PR-6, and `precision.md`'s Lines cell
+    (183 → 190).
+  - `designs/spec/README.md`'s cells: `07.5-compositor.md` 311 → 314, and `11-decisions/` 6768
+    → 6775 in 19 files.
+  - The README's Export bullet.
+  - PRC-4 in `docs/manual-checks.md`.
+  - A "precision-2 P2-1" paragraph and its commands in `tools/proof/README.md`.
+
+**S4 and the owner's ruling.** S4 read an 8-bit PNG for the deep still. `render_frame` of a
+project whose only picture is `ramp16.png` is depth 8 with the deep draw in place, as is
+`ramp8.png`'s. The export keeps the depth (S1). P2-1 stopped there, per PR-6. The owner, on
+2026-10-11: "Accept it". `render_frame` and Save Frame of a project whose only picture is a deep
+still stay 8-bit, and exports keep the depth. That is now written down:
+- PR-6's measured bullet says what S4 measured and that the owner accepted it.
+- PR-4's amendment line says "any source is deeper" counts video sources only.
+- S4 became a row that records the behaviour (both stills render 8-bit) rather than a STOP.
+
+This settles the road map's "Not established" S4 item.
+
+**The 8-bit control's fixture, changed after the first capture.** The spec's `ramp8.png` was
+the 16-bit ramp converted by ffmpeg to `rgb24`. Its first control capture read a staircase tone
+of 0.0301, under TONE_SEEN 0.3, which is step 3's "the instrument does not discriminate" stop.
+- The file is a clean, undithered staircase of 256 monotonic levels.
+- ffmpeg's `rgb48`→`rgb24` conversion truncates. That puts the steps near 256/(W−1) cycles a
+  pixel, where Core Graphics' 8-bit draw rounds and puts them at 255/(W−1), the frequency
+  `staircase_tone` reads. Columns 900–940: steps at 904, 911, 919, 926, 934 against Core
+  Graphics' 907, 915, 922, 930, 937.
+- Over the ~1,856 columns read, that offset nearly cancels the tone.
+- The orchestrator chose to write the ramp 8-bit directly and rounded:
+  `format=gbrp,geq=…round(X*255/(W-1))…`, `rgb24`. Every threshold is unchanged.
+- The new file equals round(x·255/1919) in 1920 of 1920 columns. It matches Core Graphics' 8-bit
+  draw of `ramp16.png` (the control's `still-png16.png`) in 1916 of 1920, max |Δ| 1, with the
+  steps in the same columns (900, 907, 915, 922, 930, 937).
+
+**The control** (`tools/proof/work/precision/ctl-p21/`, `RC_PROOF_APP=release … capture`, on
+P2-0's product, re-captured with the rounded fixture): 6/6.
+- Sc figures. `png16` and `tif16` each: `render_frame` depth 8, 512 distinct 10-bit codes, RMS
+  1.414, tone [1.2236, 0.0134]. `png8`: depth 8, 513 distinct, RMS 1.4157, tone
+  [1.2258, 0.0119].
+- S3's renders: `still8.png` digest `044a37f9abf253b3`, `still8a.png` `ea377c67865e0f1e`, both
+  8-bit.
+- `--only S1,S2,S4 --control ctl-p21` on the same unchanged Release tree printed 1/4: S1 and S2
+  FAIL (512 distinct), S4 recorded depth 8 for both stills, Z1 ok.
+- On the old tree the deep ramp's RMS (1.414) is already a hair under the 8-bit control's
+  (1.4157). S1 rejects the old draw on its distinct-code and tone halves; the RMS half alone
+  does not discriminate.
+
+**R1 against a deep-decoding control** (an instrument fix). The recorded run's first pass printed
+13/14: R1 failed only on its control clause, "control 1418", where the clause wants ≤ 256.
+- That clause is PR2's, written for a capture whose tree decoded 32BGRA. `ctl-p21` decodes
+  `64RGBAHalf`.
+- R1 now holds the control to ≤ 256 only when the capture's recorded `formats.source` is 32BGRA
+  (or absent, PR0's). Otherwise it prints the control "decoded …: printed, not held to ≤ 256".
+- The recorded run below is on the fixed instrument.
+
+**Verification**, 2026-10-11, AC power (`pmset -g`: powermode 0; `pmset -g batt`: AC Power,
+100 % charged). Other sessions were working: `vm.loadavg` read 2.75–50.37 around the runs and
+149.85 at the end of the mutants. No timing is claimed here.
+- `make typecheck`: exit 0, 0 errors, exactly the 4 baseline warnings; tsc clean.
+- `make app-debug`: `** BUILD SUCCEEDED **`.
+- Debug, in the loop:
+  - `--only S1,S2,S4 --control ctl-p21`: S1 and S2 ok, S4 8-bit (the STOP above).
+  - `compare ctl-p21 --only S3`: 2/2.
+  - `--selftest`: 3/3.
+- `make gate`, after the documents: PASS in 281 s (typecheck 15 s, fmt and lint skipped, test
+  174 s, app 91 s; D25 and D26 ok).
+- The R1 fix and the dropped mutant changed `precision_proof.py`, a test-step input, so the gate
+  ran again on the final tree: PASS in 107 s (test 105 s, every other step skipped). Its test
+  step: 1,367 cargo tests passed in 119 result lines, 0 failed; `spec_index_proof.py` 153/153.
+- **Recorded, Release**, `RC_PROOF_APP=release precision_proof.py --control ctl-p21`: **14/14**,
+  exit 0.
+  - C0, D1, D2, P1 (RMS 0.914, control 0.914), H1 and R1 (depth 16, 1418 distinct) passed.
+  - R2 (0.707), C1 (largest |Δ| 1), T1 and T2 (hevc_10bit 1.459, hevc 6.18; tone 0.014 against
+    0.758) passed.
+  - **S1** (PNG) and **S2** (TIFF) passed: 862 distinct 10-bit codes, RMS 0.4007, tone
+    [0.0069, 0.0063]. The 8-bit control: 513, 1.4157, [1.2258, 0.0119]. The control tree: 512,
+    1.414, [1.2236, 0.0134].
+  - **S4** passed: `ramp16.png` depth 8, distinct green 256; `ramp8.png` depth 8, 256.
+  - Z1 passed with no `Reelcut: ` line.
+- **Recorded, Release**, `RC_PROOF_APP=release precision_proof.py compare ctl-p21`: **10/10**,
+  exit 0.
+  - K1–K6 byte-identical to the control (`{0: 921600}` each), and E1 and E2 ok.
+  - **S3** ok: `still8.png` and `still8a.png` each render as an 8-bit PNG byte-identical to the
+    control's, `{0: 921600}`.
+- **Mutants** (Debug copies built by `tree_copy.build_app`, in 32–47 s):
+  - `still-eightbit` (`let deep = false`): **MUTANT PASS**. S1 and S2 FAILED (512 distinct, RMS
+    1.414, tone 1.2236). Its `also` row S4 passed (8 and 8).
+  - `still-deep-linear` (the deep bitmap in `linearSRGB`): **MUTANT PASS**. S1 and S2 FAILED
+    (846 distinct, RMS 214.9438, tone 0.024; they fail on RMS). Its `also` row S4 passed.
+  - `still-always-deep` (`let deep = true`, compare): **MUTANT FAILURE**, exit 1. S3 passed: the
+    opaque and the alpha-ramp still each rendered byte-identical to the 8-bit draw
+    (`{0: 921600}`). On those two scenes — 1:1 over black, no colour control — an 8-bit still
+    drawn into the half-float bitmap reaches the same 8-bit frame. It was dropped from
+    `MUTANTS`; the fix pass below added a scene that catches it and restored it.
+  - The mutant runs printed no `DEFAULTS MOVED`; nor did any other run.
+- The recorded runs ran with `still-always-deep` still in `MUTANTS`. Dropping it changed no row,
+  so they stood for that instrument; fix pass 1's recorded runs, below, supersede them.
+
+**Fix pass 1** (the review's findings 1–3, 2026-10-11, same host; the product unchanged).
+- **S3's colour scene (finding 1).** S3 gains a third scene: `still8a.png` under
+  `video.color` brightness 0.1 and contrast 0.5 (`S3_COLOR`). The compositor un-premultiplies
+  before the controls, so there the 8-bit draw's premultiplied rounding is carried through a
+  non-identity step, which the first two scenes never reach.
+  - Its reference: `capture ctl-p21 --only S3c` (a new capture path that renders S3's scenes
+    into an existing capture and replaces only `capture.json`'s `S3`, recording `S3_tree`), on
+    P2-1's own Release build, whose 8-bit draw is P2-0's code unchanged. That run's opaque and
+    alpha digests (`044a37f9abf253b3`, `ea377c67865e0f1e`) equal the control tree's, and the
+    rest of `capture.json` is byte-for-byte as captured. `S3-color.png`: `cbcb6961d228ca82`.
+  - `still-always-deep` restored. **MUTANT PASS**: S3 FAILED, on the colour scene alone
+    (`{0: 921138, 1: 462}`); the opaque and alpha scenes stayed `{0: 921600}`. So the "8-bit
+    path byte for byte" constraint has a mutant guarding it again.
+- **The mixed case (finding 2).** Two new rows, each `ramp16.png` on a track above a clip on a
+  1920×1080 canvas, covering it:
+  - **S5**, over the 8-bit H.264 clip: `render_frame` depth **8**, middle-row distinct green
+    256.
+  - **S6**, over the 10-bit ramp clip: depth **16**, middle-row distinct green **1,920** (the
+    still's: the 10-bit clip alone reads 1,418, R1). A deep still in a deep frame keeps its
+    depth. Under `still-eightbit` S6 reads depth 16 and 256.
+  - So "any source is deeper" counts video sources only in every case measured. PR-4's
+    amendment line (uncommitted, so corrected rather than appended to) and its index row now
+    say exactly that: S4 and S5 8-bit, S6 16-bit with the still's depth kept, and that the
+    owner's ruling covered the stills-only case. `precision.md` 190 → 193 lines;
+    `11-decisions/` 6775 → 6778.
+- **R1's title (finding 3)** now reads "(a 32BGRA-decoded control ≤ 256)".
+- **10-bit HEIC (the leftover, bounded).** ffmpeg cannot mux HEIF. Measured from `ramp16.png`,
+  reading the HEIC's middle row with ffmpeg (distinct 10-bit Y codes):
+  - `sips -s format heic`: HEVC Main 10 `yuv420p10le` tiles, but 410 codes (its default
+    quality's coding noise over an 8-bit staircase); `-s formatOptions best`: Rext 4:4:4
+    10-bit, 256 codes.
+  - ImageIO's `CGImageDestination` (`public.heic`) handed the PNG's own 16-bit INTEGER image:
+    Main 10, 256 codes at quality 0.99 (285 at 0.9, 448 at 0.75).
+  - The same writer handed the image drawn into a 16-bit-FLOAT sRGB bitmap: Main 10
+    `yuv420p10le`, **1,024 codes** at 0.99 (Display P3 the same; extended sRGB wrote 8-bit
+    Main Still Picture).
+  - ImageIO decodes that file at `bitsPerComponent` 10, so `renderImage` draws it deep.
+  - The float route is the fixture: `tools/proof/heic10_writer.swift`, built through
+    `swift_build.build`; `still10_heic` keeps `ramp10.heic` only when ffprobe reads Main 10
+    `yuv420p10le` and its middle row holds ≥ 800 codes.
+  - **S7** is S1 with it: 862 distinct 10-bit codes, RMS 0.4699, tone [0.0183, 0.0139],
+    against the 8-bit control's 513, 1.4157, [1.2258, 0.0119]. Under `still-eightbit`: 521,
+    1.4428, tone 1.0891 (FAILED). `ctl-p21` holds no HEIC figures, so S7 prints no control
+    tree; the mutant is its discrimination. This settles the "Not established" HEIF item.
+- **Verification**, on the final instrument (logs `fix1-*.log` in the batch's handoff):
+  - Debug, in the loop: `--only S5,S6` 3/3; `--only S7` 2/2 (the first S7, on the `sips`
+    fixture, failed at 567 codes — the fixture, not the draw); `compare ctl-p21 --only S3`
+    2/2; `--selftest` 3/3; `spec_index_proof.py` 153/153.
+  - **Recorded, Release**, `--control ctl-p21`: **17/17**, exit 0. S1/S2 862, 0.4007,
+    [0.0069, 0.0063]; S4 8 and 8; S5 8 (256); S6 16 (1,920); S7 as above; R1 depth 16, 1,418
+    (control 1,418, printed, not held).
+  - **Recorded, Release**, `compare ctl-p21`: **10/10**, exit 0. K1–K6 `{0: 921600}`, E1 and
+    E2 ok, S3 ok on all three scenes (`{0: 921600}` each).
+  - Mutants (Debug copies): `still-always-deep` MUTANT PASS (S3 FAILED); `still-eightbit`
+    MUTANT PASS (S1, S2, S6, S7 FAILED; S4 beside passed). `still-deep-linear` was not re-run:
+    its anchor and its rows' checks are unchanged (only S1/S2's title string was touched).
+  - No run printed `DEFAULTS MOVED`.
+
+**Fix pass 2** (review 2's findings, 2026-10-11, same host; the product changed in one comment).
+- **`ramp10.heic` out of the preflight (finding 1).** `still10_heic` is no longer in `STILLS`, so
+  R1, K1–K6, `--measure` and the other mutants no longer depend on the Swift build or ImageIO's
+  HEIC writer. `run_s` makes it only when S7 is selected, and a refusal (the writer not
+  building, exiting non-zero, or the file failing the Main 10 / ≥ 800-code check) is S7's
+  FAIL naming the reason (`HEIC_REFUSED`). Forced (the writer's build made to raise, the
+  cached file moved aside): S7 FAIL with "heic10_writer did not build: forced: …", 1/2, exit 1.
+- **S3c keeps a recorded reference (finding 2).** `s3_capture(…, keep=)` re-renders only a scene
+  DIR lacks; a scene recorded in `capture.json` whose `S3-<name>.png` is in DIR at that digest
+  is kept, and a fixture copy already in DIR is not replaced. On a scratch copy of `ctl-p21`
+  with `S3-color.png` and its row removed and `S3-alpha.png` altered by one byte: opaque kept
+  (`044a37f9abf253b3`), alpha re-rendered (`ea377c67865e0f1e`), colour rendered
+  (`cbcb6961d228ca82`), the fixture copies untouched; 2/2.
+- **Wording (finding 3).** README.md and `renderImage`'s doc comment now say a still deeper than
+  8 bits (a 16-bit PNG or TIFF, a 10-bit HEIC) is drawn deep.
+- **Verification** (logs `fix2-*.log`): `make app-debug`; Debug `--only S7` 2/2 (862, 0.4699,
+  [0.0183, 0.0139]); the forced failure above; `--selftest` 3/3; the S3c guard above; `make gate`
+  PASS (typecheck 5 s, test 127 s, app 87 s; fmt and lint skipped); Release `--only S7 --control
+  ctl-p21` 2/2, the same figures. The mutants and the whole recorded runs were not re-run: no
+  mutant anchor moved, and S7's check and the other rows' code are unchanged.
+
+**What is owed.**
+- PRC-4 (`docs/manual-checks.md`): the owner's look at a 16-bit gradient still under a strong
+  curve, in the preview and in a `prores_422` export.
+- That a deep still over 8-bit video renders an 8-bit frame (S5) is measured and recorded in
+  PR-4's amendment; the owner's ruling named only the stills-only case.
+
+**CLAUDE.md edits owed** (applied by the orchestrator; `app/CLAUDE.md` is not a gate input). In
+`app/CLAUDE.md` (lines 1242–1244), the `LayerRenderers.swift` entry's first lines become:
+```
+- `LayerRenderers.swift` · `LayerRenderersText.swift` · `LayerRenderersReveal.swift`
+  · `LayerRenderersWords.swift` · `LayerRenderersBackdrop.swift` — text,
+  shape and still descriptions to textures (premultiplied `bgra8Unorm`; a
+  still deeper than 8 bits a component is drawn at 16-bit float and
+  uploaded `rgba16Float`, spec §11 PR-6),
+```
+
+P2-2 (the 10-bit reverse, PR-7) is next, from main after this phase's merge.

@@ -475,6 +475,11 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Expect:** both ProRes files play; the gradient is smooth in each, with no band or step you cannot also see in the preview; the colours and the title are the ones the preview shows. The HEVC 10-bit file plays, smooth across the ramp, the same colours as the preview; beside it the `hevc` file may show faint bands, and the 10-bit one shows fewer or none.
 - **Source:** the precision road map's PR1 (spec §11 PR-3: the ProRes rows take the compositor's 16-bit frames) and PR3 (spec §11 PR-3: the `hevc_10bit` row writes Main 10; `precision_proof.py` T2 measures the ramp, not what the player shows).
 
+**PRC-4 — A 16-bit still grades without bands**
+- **Do:** 1. Make a 16-bit gradient still — the `ramp16.png` recipe in `tools/proof/README.md`'s "precision-2 P2-1" paragraph (or `tools/proof/work/precision/media/ramp16.png` once `precision_proof.py` has run), or a 16-bit sky exported from Lightroom or Photoshop. 2. Put it alone in a 1920×1080 project and select its clip. 3. On the Clip tab's Color sub-tab, give it a strong Master curve (an S-curve). 4. Look at the preview at View ▸ Preview Quality ▸ Full. 5. Export `prores_422` (File ▸ Export…) and open the file in QuickTime Player.
+- **Expect:** no contour bands across the gradient, in the preview or in the export.
+- **Source:** precision-2 P2-1 (spec §11 PR-6: a still deeper than 8 bits a component is drawn at 16-bit float); `precision_proof.py` S1 measures the levels through `prores_422`, not the look.
+
 ## Grading
 
 These rows are run on a Release build (`make app`), with real camera footage of your own (1080p or 4K; a face, some sky or a wall with a soft gradient, and some foliage help), in a project you can spare or a copy of one. GRD-5 and GRD-6 need a `.cube` 3D LUT you own; GRD-8 spends from your own Assistant key and budget.

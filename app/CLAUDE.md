@@ -1240,8 +1240,10 @@ the key map behind it.
   (`reelcut_dissolve_fragment`), which scales a zoom's halves about their
   anchors there. `drawLayer` is the one per-layer draw both use.
 - `LayerRenderers.swift` · `LayerRenderersText.swift` · `LayerRenderersReveal.swift`
-  · `LayerRenderersWords.swift` · `LayerRenderersBackdrop.swift` — text and
-  shape descriptions to textures,
+  · `LayerRenderersWords.swift` · `LayerRenderersBackdrop.swift` — text,
+  shape and still descriptions to textures (premultiplied `bgra8Unorm`; a
+  still deeper than 8 bits a component is drawn at 16-bit float and
+  uploaded `rgba16Float`, spec §11 PR-6),
   keyed by the recipe's `hash` (`RecipeSourceRef.cacheHash` is the WHOLE key;
   nothing here may append to it — a graphic's key is its SVG text instead,
   `LayerRenderersGraphic.swift`, in its own six-entry pool). Text draws what the recipe computed; the
