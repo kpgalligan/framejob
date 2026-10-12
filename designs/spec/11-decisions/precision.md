@@ -106,6 +106,13 @@ tone-mapped in the compositor.
   as does a 16-bit still covering an 8-bit H.264 clip (S5); a 16-bit still covering a 10-bit
   clip renders a 16-bit frame that keeps the still's depth (S6: 1,920 distinct green values on
   its middle row, 256 when the still is drawn 8-bit). Exports keep the depth (S1).
+  **Amended by PR-7** (precision-2 P2-2; accepted by the owner 2026-10-11, "Accept 16-bit"): a
+  reversed clip counts by its intermediate, which is 10-bit (HEVC Main 10, or ProRes 422 at an
+  odd size), whatever its source's depth. So a project whose only video is a reversed 8-bit
+  clip renders a 16-bit `render_frame`, Save Frame…, GIF and APNG frame; the picture's content
+  is still the 8-bit source's. Measured on Release in P2-2 (V6): the 640×360 H.264 clip alone,
+  reversed, renders a 16-bit PNG, its reverse `hevc`/Main 10/`yuv420p10le`; on the renderer
+  before PR-7 the same project rendered 8-bit, its reverse `h264`/High/`yuv420p`.
 - **PR-5 — What stays 8-bit, and the frozen references (choice 6).**
   - These stay 8-bit:
     - graphics (G-7's BGRA8);
@@ -179,6 +186,27 @@ tone-mapped in the compositor.
     imported sources.
   - If P2-2 measures the real renderer's odd-size path at any size but the source's, P2-2 stops
     and this decision returns to the owner.
+  - Measured in P2-2 (2026-10-11, the real renderer through `reverse_probe.swift`; MCP rows on
+    Release): the 10-bit ramp reverses to HEVC Main 10 `yuv420p10le` holding 860 distinct
+    10-bit Y codes at 0.592 codes RMS (V0; the old renderer: H.264, 216 at 2.545). Exported
+    `prores_422` the reversed clip reads 0.643 steps RMS against the forward clip's 0.707 (V1;
+    old 3.077). An HLG BT.2020 source's reverse keeps `arib-std-b67/bt2020/bt2020nc`, its
+    codes within 0.108 of the source's (V2; old `bt709` ×3); an HLG chroma ramp renders within
+    0.078 8-bit levels of its forward twin (V3; old 0.764, its 8-bit rounding). A reverse under
+    the pre-version name is re-rendered and pruned (V4). The 1919×1079 ramp reverses to ProRes
+    422 `yuv422p10le` at exactly 1919×1079 (V5; old H.264 1918×1078), so the odd-size stop did
+    not fire.
+  - Measured in P2-2, the cost (`precision_proof.py reverse-cost`: the probe built `-O`, three
+    reverses each, medians; AC power; load 7.7–8.7 for the old renderer, 25.9–28.7 for the
+    new, so wall times compare loosely): 2 s ProRes 1080p 0.453 → 0.474 s, 2,344,933 →
+    1,764,385 bytes (9.38 → 7.06 Mbps), peak RSS 587 → 454 MB; 2 s ProRes 2160p 0.925 → 0.916
+    s, 7,124,361 → 7,025,662 bytes (28.5 → 28.1 Mbps), 788 → 708 MB; 2 s `testsrc2` at
+    1919×1079 0.461 → 0.384 s, 2,959,786 → 17,698,683 bytes (11.84 → 70.79 Mbps, 6.0×), 589 →
+    574 MB; the 1 s ramp 0.313 → 0.317 s, 34,223 → 13,195 bytes, 333 → 263 MB.
+  - Measured in P2-2, and accepted by the owner (2026-10-11, "Accept 16-bit"): an 8-bit
+    source's reverse is Main 10 too, so a project whose only video is a reversed 8-bit clip
+    renders 16-bit frames (V6: a 16-bit PNG, the reverse `hevc`/Main 10/`yuv420p10le`); PR-4
+    is amended to match.
   - PR-2 stands: HDR stays tone-mapped in the compositor; the reverse only stops mislabelling.
   - Amends PR-5's "the reversed-clip intermediate".
 - **PR-8 — 10-bit `hevc_alpha` and 10-bit screen recording are not wanted (owner, 2026-10-11,

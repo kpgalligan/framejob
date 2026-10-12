@@ -427,9 +427,10 @@ detail there.
   `project.yml`'s post-build step from `docs/`), `manualDirectory(besideFonts:)`,
   `writeManual()` and `holdsContent`.
 - `ReverseRenderer.swift` — `Source::Media.reversed` resolved to
-  `cache/reversed/<id>-<digest>.mov`, rendered on demand behind
-  `ReverseProgressSheetController.swift`'s sheet, substituted per
-  CLIP by `CompositionBuilder`.
+  `cache/reversed/<id>-<digest>.mov`, written HEVC Main 10, or ProRes 422 at
+  an odd size, carrying the source's colour labels (spec §11 PR-7), rendered
+  on demand behind `ReverseProgressSheetController.swift`'s sheet,
+  substituted per CLIP by `CompositionBuilder`.
 - `ReverseMirror.swift` — the app's ONE spelling of the reversed mirror and
   its pivot (spec §11, D4-6), in the three units its readers hold it in:
   `MediaPeaks.window`, `TimelineView.sourceTime` and `ReverseRenderer`. The

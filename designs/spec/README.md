@@ -32,7 +32,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
 | [`05.4-actions.md`](05.4-actions.md) | 119 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
 | [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
-| [`05.6-persistence.md`](05.6-persistence.md) | 163 | The package on disk: Consolidate, bookmarks, reversed assets, caches and their markers, transcripts. |
+| [`05.6-persistence.md`](05.6-persistence.md) | 165 | The package on disk: Consolidate, bookmarks, reversed assets, caches and their markers, transcripts. |
 | **§6 — Edit operations: exact semantics** | | |
 | [`06a-edit-operations-shared-rules.md`](06a-edit-operations-shared-rules.md) | 84 | The rules every op shares: caller ticks snapped to the frame grid, an omitted argument against `null`, how to read a "refuses", the one way a patch is read, and the `scope` envelope key (the view project, the eight ops that are an error with a scope, the checks on the merged parent). |
 | [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 401 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, paste and paste attributes; nest and unnest; the patch ops; the transition ops. |
@@ -53,7 +53,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 174 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 6778 in 19 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 6806 in 19 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

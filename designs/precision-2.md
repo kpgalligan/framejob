@@ -510,3 +510,174 @@ P2-0's product, re-captured with the rounded fixture): 6/6.
 ```
 
 P2-2 (the 10-bit reverse, PR-7) is next, from main after this phase's merge.
+
+## P2-2 — the 10-bit reverse
+
+**What landed** (2026-10-11, in the worktree on `i257`, from `44b2077`).
+- **The product.** `app/Sources/ReverseRenderer.swift` went from 1,120 to 1,220 lines, under
+  the 1,311 it was before P2-0's toll, so no pure move.
+  - `ReverseRenderer.Intermediate`: `.hevcMain10` (`x420`, 3 bytes a held pixel) for an even
+    size, `.proRes422` (`x422`, 4 bytes) for an odd width or height. It is decided once in
+    `write` from the measured dimensions.
+  - `read` takes the pixel format through `walkBackwards` (32BGRA when there is no video
+    input). The adaptor's format follows.
+  - `copyBuffer` copies every plane, with no plane guard, and calls
+    `CVBufferPropagateAttachments`.
+  - `videoSettings`: HEVC pinned to `kVTProfileLevel_HEVC_Main10_AutoLevel` at HEVC's rate
+    (0.12 bits/pixel/frame, 2–240 Mbps), or ProRes 422 with only codec, width and height.
+    Neither carries `AVVideoColorPropertiesKey`.
+  - `sliceDuration` counts the intermediate's bytes a pixel.
+  - `ReverseCache.rendererVersion = 2`. The digest's input ends `|v2`.
+  - The doc comments were rewritten: the class's "What it does NOT do", the digest's, and
+    those of `bufferBudget`, `read`'s format, `videoSettings` and `sliceDuration`.
+  - No compositor, core, FFI, MCP or format change.
+- **The proof.**
+  - `tools/proof/reverse_probe.swift` (new) runs the real renderer on one file. It is built
+    through `swift_build.build` with every `app/Sources` file but `main.swift`, and its stamp
+    half is `source_mirror_probe.py` §3's.
+  - `precision_proof.py` gains:
+    - rows V0–V6;
+    - the wait (the `cache/reversed/<media>-*.mov` with no `.partial` and no sheet, ≤ 300 s);
+    - the mode `reverse-cost`;
+    - four fixtures, each kept only when ffprobe reads what it should;
+    - seven mutants.
+- **The documents.**
+  - §5.6's digest sentence ("and the renderer's version").
+  - §11: an **Amended by PR-7** paragraph under PR-4, and three "Measured in P2-2" bullets
+    under PR-7. No existing text was edited.
+  - The `11-decisions/README.md` rows for PR-4 and PR-7, and `precision.md`'s Lines cell
+    (193 → 221).
+  - `designs/spec/README.md`'s cells: `05.6-persistence.md` 163 → 165, and `11-decisions/`
+    6778 → 6806.
+  - PRC-3 in `docs/manual-checks.md`.
+  - The README's Export bullet.
+  - The "precision-2 P2-2" paragraph and its commands in `tools/proof/README.md`.
+
+**V6 and the owner's ruling (PR-4's stop).** After the product change, V6 read a 16-bit
+`render_frame`. The project held only the 8-bit H.264 clip, reversed, and its reverse is now
+`hevc`/Main 10/`yuv420p10le`. On the unchanged product the same project read 8-bit, with an
+`h264`/High/`yuv420p` reverse. P2-2 stopped there, per PR-4. The owner, on 2026-10-11:
+"Accept 16-bit".
+- The product stays as built: Main 10 at every even size, 8-bit sources included.
+- PR-4 gains an **Amended by PR-7** paragraph: a reversed clip counts by its intermediate,
+  which is 10-bit.
+- PR-7 gains the same fact as a measured bullet.
+- V6 now scores the accepted behaviour: a 16-bit PNG and an hevc Main 10 reverse. On the old
+  renderer it FAILS, as expected (8-bit, h264).
+
+**V3, made to discriminate.** The first control ran V3 on the grey HLG ramp, with the spec's
+bound of 1.0 level. It passed on the unchanged product (mean |Δ| 0.541, max 2.117).
+- On a grey ramp (Cb = Cr = 512) the matrix and primaries labels cannot move a code.
+- The old renderer converted through RGB with the source's matrix and wrote matching
+  YCbCr. Its picture was right; only its file's labels were wrong. So the only difference left
+  between the old and new renderers is 8-bit rounding.
+- V3 now uses `chroma10_hlg.mov`, the ramp with Cb rising and Cr falling across the width, and
+  its bound is **0.25** levels. That bound was set from the measurement:
+  - the old renderer reads 0.764 (max 3.86);
+  - the new one reads 0.078 (max 0.996).
+- With the chroma, V3 also catches a wrong label that changes the picture:
+  - `reverse-709-labels` reads 25.661 levels;
+  - `reverse-no-attachments`, whose file is untagged, reads 3.863.
+- V2 still holds the labels themselves.
+- This settles the road map's "Not established" V3 item: the reverse was not drawn visibly
+  flatter before PR-7, and it now matches its forward twin to 0.08 levels.
+
+**The odd-sized cost fixture** (a deviation from the spec). The spec's `prores422_odd.mov`
+(`testsrc2=size=1919x1079`) came out 1918×1078: ffmpeg negotiated 4:2:0, and ffprobe's check
+refused it. `,format=yuv444p10le` after `testsrc2` keeps the odd size, and ffprobe reads
+`prores,1919,1079,yuv422p10le`.
+
+**The controls**, on the unchanged product (Debug).
+- `--only V0..V6` on the first instrument: 3/8. V3 and V6 passed; both are covered above.
+- On the final instrument, a Debug copy whose `ReverseRenderer.swift` is `HEAD`'s: **1/8**.
+  Every V row FAILED; only Z1 passed:
+  - V0: H.264, 216 codes, 2.545 RMS.
+  - V1: 3.077 against forward 0.707.
+  - V2: `bt709` ×3.
+  - V3: 0.764.
+  - V4: the planted file used and kept; 8-bit, 151 greens.
+  - V5: 1918×1078.
+  - V6: 8-bit, h264.
+- `reverse-cost`: 12/12, on AC power, load 8.72 before and 7.68 after.
+
+**Verification**, 2026-10-11, on AC power (`pmset -g`: powermode 0; AC Power, 100 % charged).
+Other sessions were working: `vm.loadavg` read 7.7–28.7 around the runs.
+- `make typecheck`: exit 0, exactly the 4 baseline warnings; tsc clean.
+- `make app-debug`: `** BUILD SUCCEEDED **`.
+- Debug, in the loop:
+  - `--only V0..V6`: 8/8.
+  - `source_mirror_probe.py`: 40/40, its §3 on the new renderer.
+  - `--selftest`: 3/3.
+  - `spec_index_proof.py`: 153/153.
+- `make gate`: PASS in 113 s.
+  - typecheck 4 s; fmt and lint skipped; test 102 s; app 5 s.
+  - The test step: 1,367 cargo tests passed in 119 result lines, 0 failed; `spec_index_proof.py`
+    153/153.
+  - D25 and D26 ok.
+- **Recorded, Release**, `RC_PROOF_APP=release precision_proof.py --control ctl-p21`:
+  **24/24**, exit 0. Every earlier row passed: P1 0.914, R1 16-bit with 1,418 greens, R2
+  0.707. The V rows:
+  - **V0**: hevc Main 10 `yuv420p10le` 1920×1080, 860 distinct, 0.592 codes RMS; stamps 30 of
+    30, first at zero, ascending, drift 0.
+  - **V1**: reversed 0.643 against R2's 0.707; 850 distinct.
+  - **V2**: `arib-std-b67/bt2020/bt2020nc` kept, mean |Δ| 0.108 codes (Y 0.216, Cb 0, Cr 0);
+    stamps ok.
+  - **V3**: 0.078 levels (max 0.996), both renders 16-bit, the reverse labelled HLG.
+  - **V4**: `2-068be9054c801094.mov` made and the planted `2-425013cd86026698.mov` pruned;
+    16-bit, 872 greens.
+  - **V5**: ProRes 422 `yuv422p10le` at exactly 1919×1079, by ffprobe and by the natural
+    size; stamps ok. PR-7's odd-size stop did not fire.
+  - **V6**: a 16-bit PNG, the reverse `hevc`/Main 10/`yuv420p10le`.
+  - Z1 ok, with no `Reelcut: ` line.
+- **Recorded, Release**, `compare ctl-p21`: **10/10**. K1–K6 byte-identical, E1 and E2 ok, S3 ok.
+- **`reverse-cost`**, final: 12/12, exit 0, load 28.70 before and 25.92 after. The control ran
+  at about 8, so the wall times compare loosely. Medians, before → after:
+
+  | Source | Wall | Size | Rate | Peak RSS | Written as |
+  |---|---|---|---|---|---|
+  | 2 s ProRes 1080p | 0.453 → 0.474 s | 2,344,933 → 1,764,385 B | 9.38 → 7.06 Mbps | 587 → 454 MB | h264 → hevc Main 10 |
+  | 2 s ProRes 2160p | 0.925 → 0.916 s | 7,124,361 → 7,025,662 B | 28.5 → 28.1 Mbps | 788 → 708 MB | hevc Main → Main 10 |
+  | 2 s `testsrc2` 1919×1079 | 0.461 → 0.384 s | 2,959,786 → 17,698,683 B (6.0×) | 11.84 → 70.79 Mbps | 589 → 574 MB | h264 1918×1078 → ProRes 422 1919×1079 |
+  | 1 s ramp | 0.313 → 0.317 s | 34,223 → 13,195 B | — | 333 → 263 MB | h264 → hevc Main 10 |
+
+- **Mutants** (Debug copies; each **MUTANT PASS**):
+
+  | Mutant | Change | Failed | Also run, not scored |
+  |---|---|---|---|
+  | `reverse-bgra` | the reader asks for 32BGRA | V0 (818 distinct, 1.196 RMS) | V1 FAILED (2.091), V2 passed |
+  | `reverse-main` | the Main pin | V0 (Main `yuv420p`, 217 distinct) | — |
+  | `reverse-709-labels` | BT.709 colour properties | V2 (`bt709` ×3, 35.315 codes) and V3 (25.661 levels) | — |
+  | `reverse-planar-drop` | the one-plane guard | V0 (0 frames written) | — |
+  | `reverse-no-attachments` | the attachments not propagated | V2 (no tags) | V3 FAILED (3.863) |
+  | `reverse-unversioned` | the digest without `|v2` | V4 (the planted file played and kept) | — |
+  | `reverse-odd-hevc` | `Intermediate.init` always HEVC | V5 (1918×1078) | — |
+
+- No run printed `DEFAULTS MOVED`.
+
+**What is owed.**
+- PRC-3 (`docs/manual-checks.md`): the owner's look at a reversed iPhone HDR clip, and at a
+  log clip with a LUT, beside their forward twins.
+- The ProRes branch's cost on camera footage. `testsrc2` is synthetic; the road map's "Not
+  established" item stands.
+
+**Owner choices.** One, already answered: V6's 16-bit frame. The owner said "Accept 16-bit",
+recorded above and in PR-4's amendment.
+
+**CLAUDE.md edits owed** (applied by the orchestrator; `app/CLAUDE.md` is not a gate input). In
+`app/CLAUDE.md` (lines 429–432), the `ReverseRenderer.swift` entry becomes:
+```
+- `ReverseRenderer.swift` — `Source::Media.reversed` resolved to
+  `cache/reversed/<id>-<digest>.mov`, written HEVC Main 10, or ProRes 422 at
+  an odd size, carrying the source's colour labels (spec §11 PR-7), rendered
+  on demand behind `ReverseProgressSheetController.swift`'s sheet,
+  substituted per CLIP by `CompositionBuilder`.
+```
+
+**Review.** One pass, verdict pass, two nits fixed by the orchestrator: `bufferBudget`'s
+comment now says 86 frames of 1080p and 21 of 4K (512 MiB over 3 bytes a pixel), and V4
+waits for the versioned file by name (`wait_reverse(…, want=)`), since the planted file
+already matched the glob. After them: `make gate` PASS; V4 on Release 2/2; the
+`reverse-unversioned` mutant still fails V4 (now by the wait's 300 s bound). The
+`app/CLAUDE.md` entry above is applied.
+
+P2-3 (the close) is next, from main after this phase's merge.

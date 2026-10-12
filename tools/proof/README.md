@@ -17775,7 +17775,8 @@ to `64RGBAHalf` (`Compositor.sourcePixelFormat`, spec §11 PR-2).
 
 ```
 python3 tools/proof/preview_display_probe.py --rows spike          # V0–V2 (PR0's spike; exit 1 is its RECORDED outcome)
-python3 tools/proof/precision_proof.py [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2,S1,S2,S4,S5,S6,S7] [--control DIR]
+python3 tools/proof/precision_proof.py [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2,S1,S2,S4,S5,S6,S7,V0,…,V6] [--control DIR]
+python3 tools/proof/precision_proof.py reverse-cost                # precision-2 P2-2: the reverse's cost, no app
 python3 tools/proof/precision_proof.py capture DIR                 # on the CONTROL tree, before any product edit
 python3 tools/proof/precision_proof.py capture DIR --only S3c      # S3's scenes DIR lacks into an existing capture
 python3 tools/proof/precision_proof.py compare DIR [--only K1,…,E2,S3]
@@ -17787,6 +17788,9 @@ python3 tools/proof/precision_proof.py --mutant output-8bit|hevc-no-profile|deco
 python3 tools/proof/precision_proof.py --mutant hevc10-main|hevc10-unmapped|hevc10-eightbit|row-before-hevc-alpha
 python3 tools/proof/precision_proof.py --mutant still-eightbit|still-deep-linear   # precision-2 P2-1: S1, S2 (+ S6, S7 for still-eightbit; S4 beside)
 python3 tools/proof/precision_proof.py --mutant still-always-deep compare DIR      # precision-2 P2-1: S3
+python3 tools/proof/precision_proof.py --mutant reverse-bgra|reverse-main|reverse-planar-drop   # precision-2 P2-2: V0 (V1, V2 beside reverse-bgra)
+python3 tools/proof/precision_proof.py --mutant reverse-709-labels|reverse-no-attachments      # precision-2 P2-2: V2, V3 (V3 beside the second)
+python3 tools/proof/precision_proof.py --mutant reverse-unversioned|reverse-odd-hevc           # precision-2 P2-2: V4; V5
 python3 tools/proof/hevc_alpha_proof.py --rows straighten          # R0, K1, R8, RH, KH
 python3 tools/proof/hevc_alpha_proof.py --measure hevc-alpha-deep   # HA, recorded
 python3 tools/proof/hevc_alpha_proof.py --mutant hevc-no-profile|bgra8-truncates|half-no-unpremultiply|half-no-fill
@@ -18005,6 +18009,54 @@ untouched, so a later tree never replaces an older tree's reference. Mutants, on
 (`let deep = true`, compare: S3, on the colour scene — the opaque and
 alpha-ramp scenes alone left it equivalent, since only a non-identity step
 after the un-premultiply carries the 8-bit draw's premultiplied rounding).
+
+**precision-2 P2-2 — the 10-bit reverse (spec §11 PR-7; road map
+`designs/precision-2.md`).** `ReverseRenderer` reads `x420` (an odd size:
+`x422`) frames, copies every plane with the decoder's attachments, and
+writes HEVC Main 10 (an odd size: ProRes 422) with no colour properties; the
+reverse cache's digest carries `ReverseCache.rendererVersion`. V0, V2 and
+V5 run the REAL renderer through `reverse_probe.swift`
+(`reverse_probe SOURCE DEST OUT_JSON`), compiled with every `app/Sources`
+file but `main.swift` — a mutant copy's under `--mutant` — through
+`swift_build.build`; a probe that does not build is those rows' FAIL. Its
+stamp half is `source_mirror_probe.py` §3's. The fixtures, each made only
+when a row needing it runs and refused (that row's FAIL, naming it) unless
+ffprobe reads what it should: `ramp10_odd.mov` (the RAMP at 1919×1079,
+`geq=lum='64+X*876/(W-1)'`, ProRes 422 HQ); `ramp10_hlg.mov` (the ramp,
+`format=yuv420p10le,setparams=color_primaries=bt2020:color_trc=arib-std-b67:colorspace=bt2020nc`,
+`-c:v hevc_videotoolbox -profile:v main10 -pix_fmt p010le -tag:v hvc1 -b:v 20M`
+with the three `-color_*` flags); `chroma10_hlg.mov` (the same, with
+`cb='112+X*800/1919':cr='912-X*800/1919'`: on the grey ramp a wrong matrix
+or primaries label moves no code); `prores422_odd.mov` (`testsrc2`
+1919×1079 2 s through `format=yuv444p10le` — left to negotiate 4:2:0,
+ffmpeg wrote 1918×1078 — ProRes 422; `reverse-cost` only). **V0** the ramp
+reversed: hevc Main 10 `yuv420p10le` 1920×1080, ≥ 800 distinct 10-bit Y
+codes on the first frame's middle row at < 1.0 code RMS against
+64 + x·876/1919, and the stamps (the frame count, the first at 0,
+ascending, drift ≤ 1); **V1** (MCP) the ramp clip `set_reversed` and waited
+for (the `cache/reversed/<media>-*.mov` with no `.partial` and no sheet,
+≤ 300 s; on expiry `cancel_sheet` and a FAIL), exported `prores_422`: RMS ≤
+the forward clip's + 0.5 and ≥ 800 codes; **V2** the HLG ramp reversed keeps
+`arib-std-b67/bt2020/bt2020nc`, its middle row's Y, Cb, Cr within mean
+|Δ| ≤ 2.0 codes of the source's; **V3** (MCP) the chroma ramp forward and
+reversed rendered within mean |Δ| ≤ 0.25 8-bit levels (the old renderer
+read 0.764: its picture was right and rounded to 8 bits, only its labels
+were wrong, so the label mutants are what V3's chroma catches); **V4** (MCP)
+a reverse planted under the pre-version name is not used and is pruned;
+**V5** the 1919×1079 ramp reversed is ProRes 422 `yuv422p10le` at exactly
+1919×1079; **V6** (MCP) the 8-bit H.264 clip alone, reversed, renders a
+16-bit PNG and its reverse is hevc Main 10 (PR-4 as amended by PR-7, the
+owner's "Accept 16-bit"; the old renderer FAILS it, 8-bit). On the old
+renderer (a Debug copy with `ReverseRenderer.swift` from `HEAD`) every V row
+FAILED. **`reverse-cost`** builds the probe `-O` and reverses
+`prores422_1080`, `prores422_2160`, `prores422_odd` and the ramp three times
+each, one process each, printing the median wall time, bytes, Mbps, peak
+RSS, codec and size, and `pmset -g` and `vm.loadavg` before and after; exit
+0 iff every reverse completed. Mutants, once at the end on the final
+instrument: `reverse-bgra` (V0; V1, V2 beside), `reverse-main` (V0),
+`reverse-709-labels` (V2, V3), `reverse-planar-drop` (V0),
+`reverse-no-attachments` (V2; V3 beside), `reverse-unversioned` (V4) and
+`reverse-odd-hevc` (V5).
 
 ## Road map grading — GR0, the grading spike (`grading_spike/`; #258)
 

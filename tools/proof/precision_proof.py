@@ -5,7 +5,8 @@
 MCP. Written in PR0, before any product edit, so PR1's controls are captured
 on PR0's product.
 
-    python3 tools/proof/precision_proof.py [--app PATH] [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2,S1,S2,S4,S5,S6,S7] [--control DIR]
+    python3 tools/proof/precision_proof.py [--app PATH] [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2,S1,S2,S4,S5,S6,S7,V0,...,V6] [--control DIR]
+    python3 tools/proof/precision_proof.py reverse-cost          # no app; the reverse's cost
     python3 tools/proof/precision_proof.py capture DIR          # the CONTROL tree
     python3 tools/proof/precision_proof.py compare DIR [--only K1,...,E2,S3]
     python3 tools/proof/precision_proof.py --measure capture|compare DIR   # release-only
@@ -36,7 +37,14 @@ ProRes 422 `testsrc2` movies at 1080p and 2160p (M1's); and the stills
 and `ramp16.tif` (`rgb48le`), 1920×1080, every column X at X/1919 of full
 scale in all three channels; `ramp8.png`, the same ramp `rgb24`; and two
 640×360 8-bit `testsrc2` stills, `still8.png` (`rgb24`) and `still8a.png`
-(`rgba`, alpha X·255/639), copied into DIR by `capture`.
+(`rgba`, alpha X·255/639), copied into DIR by `capture`. The reverse's
+(precision-2 P2-2), each made only when a row needing it runs and kept only
+when ffprobe reads what it should (a refusal is that row's FAIL, naming it):
+`ramp10_odd.mov` (the RAMP at 1919×1079, ProRes 422 HQ), `ramp10_hlg.mov`
+(the ramp `yuv420p10le` tagged HLG BT.2020, `hevc_videotoolbox` Main 10),
+`chroma10_hlg.mov` (the same with Cb rising and Cr falling across the
+width, `CHROMA`) and `prores422_odd.mov` (`testsrc2` 1919×1079 2 s, through
+`format=yuv444p10le`, which keeps the odd size; `reverse-cost` only).
 
 The scenes, on a 640×360, 30 fps canvas, black background, read at 0.5 s
 (K4 at 1.25 s), after the spike's S1–S5:
@@ -107,6 +115,37 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       `swift_build.build`), refused as a fixture unless ffprobe reads HEVC
       Main 10 `yuv420p10le` and its middle row holds ≥ 800 distinct 10-bit Y
       codes. ImageIO decodes it at 10 bits a component, so it is drawn deep.
+  V0  (precision-2 P2-2, spec §11 PR-7) the real renderer (`reverse_probe.swift`,
+      built through `swift_build.build` with this tree's — or a mutant copy's
+      — `app/Sources`; a probe that will not build is a FAIL) reverses the
+      10-bit ramp: ffprobe hevc, Main 10, yuv420p10le, 1920×1080; the first
+      frame's middle row ≥ 800 distinct 10-bit Y codes at < 1.0 code RMS
+      against 64 + x·876/1919; `source_mirror_probe.py` §3's stamps (as many
+      frames as the source, the first at 0, ascending, drift ≤ 1).
+  V1  (P2-2, MCP) the ramp clip reversed (`set_reversed`, then the wait: the
+      `cache/reversed/<media>-*.mov` with no `.partial` and no sheet, bounded
+      by REVERSE_BOUND) and exported `prores_422`: luma RMS ≤ the forward
+      clip's (R2's, or V1's own) + V1_MARGIN, ≥ 800 distinct 10-bit Y codes.
+  V2  (P2-2) the HLG ramp reversed by the probe keeps arib-std-b67/bt2020/
+      bt2020nc, its middle row's Y, Cb, Cr within mean |Δ| ≤ V2_BOUND codes of
+      the source's; stamps as V0.
+  V3  (P2-2, MCP) the HLG chroma ramp forward at 0 and reversed at 1 s:
+      `render_frame` at 0.5 s and 1.5 s, middle rows (`rgb48le`) within mean
+      |Δ| ≤ V3_BOUND 8-bit levels (0.25, set from the measurement; the old
+      renderer read 0.764 — its picture was right, rounded to 8 bits).
+  V4  (P2-2, MCP) a reverse planted under the pre-version digest's name is
+      not used and is pruned: the `…|v2` name exists, the planted file is
+      gone, and `render_frame` holds ≥ 850 distinct green (the ramp).
+  V5  (P2-2) the 1919×1079 ramp reversed by the probe: prores, yuv422p10le,
+      exactly 1919×1079 (ffprobe and the natural size); stamps as V0.
+  V6  (P2-2; PR-4 as amended by PR-7, the owner 2026-10-11) the 8-bit H.264
+      clip alone, reversed: `render_frame` is a 16-bit PNG and the reverse
+      hevc Main 10 (the old renderer: 8-bit, h264 — an expected FAIL).
+  reverse-cost (P2-2; no DIR, no app): the probe built `-O` reverses
+      `prores422_1080`, `prores422_2160`, `prores422_odd` and the ramp three
+      times each, a process each: the median wall time, bytes, Mbps and peak
+      RSS, the codec and size, and the power and load before and after. Exit
+      0 iff every reverse completed.
   capture: the tree's `Compositor.swift` formats recorded (`formats`, read
       from `app/Sources`; a capture without them is PR0's, both 32BGRA);
       K1–K6 rendered into DIR; E0 (CONTROL) two `h264` exports of K6's
@@ -230,6 +269,15 @@ built from the copy's `app/Sources`:
   still-always-deep (P2-1) `let deep = true`, every 8-bit still drawn deep
                    (compare DIR): S3 FAILS on its colour scene. Its opaque and
                    alpha scenes alone left it equivalent (P2-1's first run).
+  reverse-bgra     (P2-2) the reader asks for 32BGRA: V0 FAILS (V1, V2 beside).
+  reverse-main     (P2-2) the Main 10 pin is Main: V0 FAILS.
+  reverse-709-labels (P2-2) BT.709 colour properties back in the HEVC
+                   settings: V2 and V3 FAIL.
+  reverse-planar-drop (P2-2) the old copy's one-plane guard: V0 FAILS.
+  reverse-no-attachments (P2-2) `CVBufferPropagateAttachments` removed: V2
+                   FAILS (V3 beside).
+  reverse-unversioned (P2-2) the digest without the `|v<version>` suffix: V4 FAILS.
+  reverse-odd-hevc (P2-2) `Intermediate.init` always `.hevcMain10`: V5 FAILS.
 A mutant's `also` rows are selected, run and printed on the MUTANT line beside
 the named ones, and are not required to fail.
 Exit 0 when every named row FAILED (caught), 1 when one passed (survived), 2
@@ -311,6 +359,29 @@ STILL_DISTINCT = 800
 # S6: the deep still's middle-row distinct green in a 16-bit render_frame (R1's
 # figure for the 10-bit ramp; an 8-bit draw holds 256).
 MIXED_DISTINCT = 850
+# The reverse (precision-2 P2-2, spec §11 PR-7). V1: 10-bit steps over the
+# forward clip's RMS. V2: 10-bit codes, mean |Δ| of the middle row's Y, Cb and
+# Cr. V3: 8-bit levels, mean |Δ| of the two renders' middle rows, on the
+# CHROMA fixture — set from P2-2's measurement (Debug, M2 Max): the old
+# renderer read 0.764 (max 3.86, its 8-bit rounding; its picture was right,
+# only its labels were wrong), the new one 0.078 (max 0.996); the spec's 1.0
+# passed both, so it was tightened to tell them apart. The wait for one
+# reverse, in seconds.
+V1_MARGIN = 0.5
+V2_BOUND = 2.0
+V3_BOUND = 0.25
+REVERSE_BOUND = 300
+REVERSE_DISTINCT = 800
+REVERSE_PROBE = ROOT / "tools/proof/reverse_probe.swift"
+REVERSE_DIR = BASE / "reverse-probe"
+REVERSER = "app/Sources/ReverseRenderer.swift"
+RAMP_ODD = ("color=c=black:size=1919x1079:rate=30:duration=1,format=yuv422p10le,"
+            "geq=lum='64+X*876/(W-1)':cb=512:cr=512")
+HLG = ["-color_primaries", "bt2020", "-color_trc", "arib-std-b67", "-colorspace", "bt2020nc"]
+HLG_TAGS = "arib-std-b67/bt2020/bt2020nc"
+CHROMA = ("color=c=black:size=1920x1080:rate=30:duration=1,format=yuv420p10le,"
+          "geq=lum='64+X*876/1919':cb='112+X*800/1919':cr='912-X*800/1919'")
+V_ROWS = ("V0", "V1", "V2", "V3", "V4", "V5", "V6")
 HEVC10_ROW = ('    Preset {\n        id: "hevc_10bit",\n        name: "HEVC 10-bit (MP4)",\n'
               '        container: Container::Mp4,\n        codec: "hevc_10bit",\n'
               '        video: true,\n        alpha: false,\n        size: None,\n'
@@ -368,10 +439,41 @@ MUTANTS = {
     "still-deep-linear": {"mode": "rows", "rows": ["S1", "S2"], "also": ["S4"], "anchors": [
         (RENDERERS, "            let deepSpace = CGColorSpace(name: CGColorSpace.sRGB)\n",
          "            let deepSpace = CGColorSpace(name: CGColorSpace.linearSRGB)\n")]},
+    # precision-2 P2-2 (spec §11 PR-7): the reverse.
+    "reverse-bgra": {"mode": "rows", "rows": ["V0"], "also": ["V1", "V2"], "anchors": [
+        (REVERSER, "                    kCVPixelBufferPixelFormatTypeKey as String: Int(pixelFormat),\n",
+         "                    kCVPixelBufferPixelFormatTypeKey as String: "
+         "Int(kCVPixelFormatType_32BGRA),\n")]},
+    "reverse-main": {"mode": "rows", "rows": ["V0"], "anchors": [
+        (REVERSER, "            AVVideoProfileLevelKey: kVTProfileLevel_HEVC_Main10_AutoLevel as "
+         "String,\n",
+         "            AVVideoProfileLevelKey: kVTProfileLevel_HEVC_Main_AutoLevel as String,\n")]},
+    "reverse-709-labels": {"mode": "rows", "rows": ["V2", "V3"], "anchors": [
+        (REVERSER, "            AVVideoCompressionPropertiesKey: compression,\n",
+         "            AVVideoColorPropertiesKey: [\n"
+         "                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,\n"
+         "                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,\n"
+         "                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,\n"
+         "            ],\n"
+         "            AVVideoCompressionPropertiesKey: compression,\n")]},
+    "reverse-planar-drop": {"mode": "rows", "rows": ["V0"], "anchors": [
+        (REVERSER, "        guard width > 0, height > 0 else { return nil }\n",
+         "        guard width > 0, height > 0, CVPixelBufferGetPlaneCount(source) <= 1 else "
+         "{ return nil }\n")]},
+    "reverse-no-attachments": {"mode": "rows", "rows": ["V2"], "also": ["V3"], "anchors": [
+        (REVERSER, "        CVBufferPropagateAttachments(source, target)\n", "")]},
+    "reverse-unversioned": {"mode": "rows", "rows": ["V4"], "anchors": [
+        (REVERSER, '        for byte in "\\(source.path)|\\(size)|\\(Int64(modified.rounded()))'
+         '|v\\(rendererVersion)".utf8 {\n',
+         '        for byte in "\\(source.path)|\\(size)|\\(Int64(modified.rounded()))".utf8 {\n')]},
+    "reverse-odd-hevc": {"mode": "rows", "rows": ["V5"], "anchors": [
+        (REVERSER, "            self = dimensions.width % 2 != 0 || dimensions.height % 2 != 0 "
+         "? .proRes422 : .hevcMain10\n",
+         "            self = .hevcMain10\n")]},
 }
 CORE_TESTS = ("hevc_alpha_sits_directly_after_hevc", "it_sits_directly_after_hevc_alpha")
 ROWS = ["C0", "D1", "D2", "P1", "H1", "R1", "R2", "C1", "T1", "T2", "S1", "S2", "S4", "S5", "S6",
-        "S7", "Z1"]
+        "S7", *V_ROWS, "Z1"]
 CAPTURE_ROWS = ["K", "E0", "P1c", "Rc", "Sc", "S3c", "Z1"]
 COMPARE_ROWS = ["K1", "K2", "K3", "K4", "K5", "K6", "E1", "E2", "S3", "Z1"]
 rows = {}
@@ -552,6 +654,75 @@ def prores_clip(height):
     return ffmpeg_make(MEDIA / f"prores422_{height}.mov", [
         "-f", "lavfi", "-i", f"testsrc2=size={width}x{height}:rate=30:duration=2",
         "-c:v", "prores_ks", "-profile:v", "2", "-pix_fmt", "yuv422p10le", *TAG])
+
+
+def checked(maker, want, refused):
+    """`maker()`'s file kept only when ffprobe reads every (key, value) in
+    `want`; else None, `refused["why"]` naming the fixture and what it read
+    (the row that needed it scores that as a FAIL), and the file removed."""
+    out = maker()
+    if out is None:
+        refused["why"] = f"ffmpeg did not make {maker.__name__}'s movie"
+        return None
+    probe = stream(out)
+    wrong = {k: probe.get(k) for k, v in want.items() if probe.get(k) != v}
+    if wrong:
+        refused["why"] = f"{out.name} refused: ffprobe read {wrong}, want {want}"
+        print(f"       {refused['why']}", flush=True)
+        out.unlink()
+        return None
+    return out
+
+
+def ramp_odd():
+    """The 10-bit ramp at 1919×1079 (V5; precision-2 P2-2), ProRes 422 HQ."""
+    return checked(lambda: ffmpeg_make(MEDIA / "ramp10_odd.mov", [
+        "-f", "lavfi", "-i", RAMP_ODD, "-c:v", "prores_ks", "-profile:v", "3",
+        "-pix_fmt", "yuv422p10le", *TAG]),
+        {"codec_name": "prores", "pix_fmt": "yuv422p10le", "width": 1919, "height": 1079},
+        ODD_REFUSED)
+
+
+def ramp_hlg():
+    """The 1920×1080 ramp as an HLG BT.2020 HEVC Main 10 movie (V2, V3), as
+    VideoToolbox writes it; kept only when ffprobe reads hevc, Main 10,
+    yuv420p10le and arib-std-b67/bt2020/bt2020nc."""
+    return checked(lambda: ffmpeg_make(MEDIA / "ramp10_hlg.mov", [
+        "-f", "lavfi", "-i", RAMP + ",format=yuv420p10le,setparams=color_primaries=bt2020:"
+        "color_trc=arib-std-b67:colorspace=bt2020nc", "-c:v", "hevc_videotoolbox",
+        "-profile:v", "main10", "-pix_fmt", "p010le", "-tag:v", "hvc1", "-b:v", "20M", *HLG]),
+        {"codec_name": "hevc", "profile": "Main 10", "pix_fmt": "yuv420p10le",
+         "color_transfer": "arib-std-b67", "color_primaries": "bt2020",
+         "color_space": "bt2020nc"}, HLG_REFUSED)
+
+
+def chroma_hlg():
+    """V3's fixture: the HLG BT.2020 HEVC Main 10 movie of `CHROMA` — the
+    10-bit luma ramp with Cb rising and Cr falling across the width, so the
+    middle row holds saturated colours, which a wrong matrix or primaries
+    label moves (on the grey ramp neither label moves a code). Kept only when
+    ffprobe reads hevc, Main 10, yuv420p10le and the HLG tags."""
+    return checked(lambda: ffmpeg_make(MEDIA / "chroma10_hlg.mov", [
+        "-f", "lavfi", "-i", CHROMA + ",setparams=color_primaries=bt2020:"
+        "color_trc=arib-std-b67:colorspace=bt2020nc", "-c:v", "hevc_videotoolbox",
+        "-profile:v", "main10", "-pix_fmt", "p010le", "-tag:v", "hvc1", "-b:v", "20M", *HLG]),
+        {"codec_name": "hevc", "profile": "Main 10", "pix_fmt": "yuv420p10le",
+         "color_transfer": "arib-std-b67", "color_primaries": "bt2020",
+         "color_space": "bt2020nc"}, HLG_REFUSED)
+
+
+def prores_odd():
+    """`reverse-cost`'s odd-sized movie: 2 s of `testsrc2` at 1919×1079, ProRes
+    422. The `format` filter keeps the size: left to negotiate 4:2:0, ffmpeg
+    wrote 1918×1078 (P2-2's control)."""
+    return checked(lambda: ffmpeg_make(MEDIA / "prores422_odd.mov", [
+        "-f", "lavfi", "-i", "testsrc2=size=1919x1079:rate=30:duration=2,format=yuv444p10le",
+        "-c:v", "prores_ks", "-profile:v", "2", "-pix_fmt", "yuv422p10le", *TAG]),
+        {"codec_name": "prores", "pix_fmt": "yuv422p10le", "width": 1919, "height": 1079},
+        ODD_REFUSED)
+
+
+ODD_REFUSED, HLG_REFUSED = {}, {}
 
 
 def still16_png():
@@ -1036,6 +1207,7 @@ def run_rows(client, state):
     if selected & {"R1", "R2"}:
         distinct, rms, depth, ok = ramp_controls(client, WORK)
         closed = ok and closed
+        FIGURES["R2"] = rms
         ramp = state.get("ramp") or {}
         control = ramp.get("distinct_green")
         # The control's ≤ 256 is PR2's: a capture whose tree decoded 32BGRA. A
@@ -1061,6 +1233,8 @@ def run_rows(client, state):
         closed = run_t(client) and closed
     if selected & {"S1", "S2", "S4", "S5", "S6", "S7"}:
         closed = run_s(client, state) and closed
+    if selected & set(V_ROWS):
+        closed = run_v(client) and closed
     return closed
 
 
@@ -1139,6 +1313,389 @@ def run_c1(client, clip):
     return closed
 
 
+# ---------------------------------------------------------------------------
+# The reverse (precision-2 P2-2, spec §11 PR-7).
+
+REVERSE_BUILT = {}
+FIGURES = {}
+
+
+def build_reverse_probe(optimize=False):
+    """`reverse_probe.swift` over `sources_folder` (this tree's `app/Sources`,
+    or a mutant copy's) as a `main.swift` of its own, through
+    `swift_build.build` — `build_encoder_probe`'s pattern — once a run.
+    (binary, None) or (None, why): a probe that will not build is the probe
+    rows' scored FAIL, never an exit."""
+    if optimize in REVERSE_BUILT:
+        return REVERSE_BUILT[optimize]
+    folder = REVERSE_DIR / ("optimized" if optimize else "plain")
+    folder.mkdir(parents=True, exist_ok=True)
+    entry = folder / "main.swift"
+    if not entry.exists() or entry.read_text() != REVERSE_PROBE.read_text():
+        entry.write_text(REVERSE_PROBE.read_text())
+    binary = folder / "reverse_probe"
+    try:
+        made = swift_build.build(sources=swift_build.app_sources(sources_folder) + [entry],
+                                 output=binary, optimize=optimize, timeout=BUILD_BOUND)
+    except swift_build.SwiftBuildFailed as error:
+        REVERSE_BUILT[optimize] = (None, "reverse_probe did not build: swiftc rc "
+                                   f"{error.rc if error.rc is not None else 'before running'}: "
+                                   f"{(list(error.diagnostics) or [str(error)])[:6]}")
+        print(f"       {REVERSE_BUILT[optimize][1]}", flush=True)
+        return REVERSE_BUILT[optimize]
+    print(f"  reverse probe{' (-O)' if optimize else ''}: "
+          f"{'up to date' if made.reused else f'built in {made.seconds:.0f} s'} from "
+          f"{sources_folder}", flush=True)
+    REVERSE_BUILT[optimize] = (binary, None)
+    return REVERSE_BUILT[optimize]
+
+
+def reverse(source, label, optimize=False, refused=None):
+    """One real reverse of `source` by the probe into `WORK/reverse-<label>.mov`:
+    the probe's JSON with `dest` added, or {"ok": False, "error": why}."""
+    if source is None:
+        return {"ok": False, "error": (refused or {}).get("why", "no fixture")}
+    binary, why = build_reverse_probe(optimize)
+    if binary is None:
+        return {"ok": False, "error": why}
+    dest, out = WORK / f"reverse-{label}.mov", WORK / f"reverse-{label}.json"
+    out.unlink(missing_ok=True)
+    ran = bounded.run([str(binary), str(source), str(dest), str(out)], REVERSE_BOUND,
+                      env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
+    try:
+        got = json.loads(out.read_text())
+    except (OSError, ValueError):
+        return {"ok": False, "error": f"no answer (rc {ran['rc']}, expired {ran['expired']}): "
+                                      f"{ran['stderr'][-300:]}"}
+    got["dest"] = dest
+    return got
+
+
+def stamps(got):
+    """`source_mirror_probe.py` §3's claims over one probe answer: as many
+    frames written as the source has, the first at zero, strictly ascending,
+    every stamp within one unit of `T − following`. (good, detail)."""
+    drift = got.get("worstDrift")
+    good = (got.get("ok") is True and (got.get("sourceFrames") or 0) > 0
+            and got.get("writtenFrames") == got.get("sourceFrames")
+            and got.get("firstIsZero") is True and got.get("ascending") is True
+            and drift is not None and drift <= 1)
+    return good, (f"stamps: {got.get('writtenFrames')} written of {got.get('sourceFrames')}, "
+                  f"first zero {got.get('firstIsZero')}, ascending {got.get('ascending')}, "
+                  f"worst drift {drift}")
+
+
+def y10_ramp(path, width=1920, height=1080):
+    """V0's reading of the 10-bit ramp: the first frame's middle-row Y codes
+    (`y10_columns`), columns 16…W−16: (distinct, RMS in codes against
+    64 + x·876/(W−1)), or (None, None)."""
+    codes, _ = y10_columns(path, width, height)
+    if not codes:
+        return None, None
+    columns = codes[16:-16]
+    ideal = [64 + x * 876 / (width - 1) for x in range(16, width - 16)]
+    rms = math.sqrt(sum((c - i) ** 2 for c, i in zip(columns, ideal)) / len(columns))
+    return len(set(columns)), rms
+
+
+def yuv_rows(path, width=1920, height=1080):
+    """The first frame as `yuv420p10le`: the middle row's Y codes, and the
+    middle row of each W/2 × H/2 chroma plane; or None."""
+    raw = decode(path, "yuv420p10le")
+    size, cw, ch = width * height, width // 2, height // 2
+    if not raw or len(raw) < (size + 2 * cw * ch) * 2:
+        return None
+    values = struct.unpack(f"<{size + 2 * cw * ch}H", raw[:(size + 2 * cw * ch) * 2])
+    y = values[(height // 2) * width:(height // 2 + 1) * width]
+    cb = values[size + (ch // 2) * cw:size + (ch // 2 + 1) * cw]
+    cr = values[size + cw * ch + (ch // 2) * cw:size + cw * ch + (ch // 2 + 1) * cw]
+    return [list(y), list(cb), list(cr)]
+
+
+def rgb48_row(path, width, height):
+    """The middle row of a PNG decoded `rgb48le`, every channel; or None."""
+    raw = decode(path, "rgb48le")
+    if not raw or len(raw) != width * height * 6:
+        return None
+    return struct.unpack(f"<{width * 3}H", raw[(height // 2) * width * 6:(height // 2 + 1)
+                                                * width * 6])
+
+
+def fnv1a(text):
+    """`ReverseCache.digest`'s FNV-1a 64 over `text`, hex zero-padded to 16."""
+    value = 0xcbf2_9ce4_8422_2325
+    for byte in text.encode():
+        value = ((value ^ byte) * 0x0000_0100_0000_01b3) & 0xFFFF_FFFF_FFFF_FFFF
+    return f"{value:016x}"
+
+
+def wait_reverse(doc, media, tag, want=None):
+    """Waits, polling every 0.25 s for at most REVERSE_BOUND, until
+    `<doc>/cache/reversed/<media>-*.mov` exists (and the file `want`, when
+    given: V4's planted file already matches the glob) with no `.partial`
+    sibling AND `snapshot_ui(window="sheet")` refuses with "no sheet
+    attached". (the files, None) or (the files, why) on expiry, after
+    `cancel_sheet`."""
+    if media is None:
+        return [], "no media to wait for"
+    folder = Path(doc.path) / "cache" / "reversed"
+    deadline = time.monotonic() + REVERSE_BOUND
+    while True:
+        files = sorted(folder.glob(f"{media}-*.mov")) if folder.is_dir() else []
+        partial = folder.is_dir() and any(folder.glob(f"{media}-*.partial"))
+        if files and not partial and (want is None or want.exists()):
+            got = doc.call("snapshot_ui", window="sheet", path=str(WORK / f"{tag}-sheet.png"))
+            if not got["ok"] and "no sheet attached" in got.get("error", ""):
+                return files, None
+        if time.monotonic() > deadline:
+            doc.call("cancel_sheet")
+            return files, (f"the reverse did not finish within {REVERSE_BOUND} s (files "
+                           f"{[f.name for f in files]}, partial {partial})")
+        time.sleep(0.25)
+
+
+def run_v(client):
+    """V0–V6 (precision-2 P2-2, spec §11 PR-7): the real renderer through
+    `reverse_probe.swift` (V0, V2, V5) and a reversed clip through the app
+    (V1, V3, V4, V6)."""
+    closed, ramp = True, ramp_clip()
+    if "V0" in selected:
+        got = reverse(ramp, "V0")
+        probe = stream(got["dest"]) if got.get("ok") else {}
+        distinct, rms = y10_ramp(got["dest"]) if got.get("ok") else (None, None)
+        timed, timing = stamps(got)
+        check(f"V0 the 10-bit ramp reversed by the real renderer is hevc, Main 10, yuv420p10le "
+              f"at 1920×1080, its first frame's middle row ≥ {REVERSE_DISTINCT} distinct 10-bit Y "
+              "codes at < 1.0 code RMS against 64 + x·876/1919, and its stamps hold "
+              "(source_mirror_probe §3)",
+              timed and probe.get("codec_name") == "hevc" and probe.get("profile") == "Main 10"
+              and probe.get("pix_fmt") == "yuv420p10le"
+              and (probe.get("width"), probe.get("height")) == (1920, 1080)
+              and distinct is not None and distinct >= REVERSE_DISTINCT and rms < 1.0,
+              f"{got.get('error') or 'rendered'}; {probe}; distinct {distinct}, RMS "
+              f"{None if rms is None else round(rms, 3)} codes; {timing}")
+    if "V1" in selected:
+        doc = Doc(client, "V1", 1920, 1080)
+        clip = (doc.movie(doc.first_track(), ramp) or [None])[0]
+        forward, whose = FIGURES.get("R2"), "R2's, this run"
+        if forward is None:
+            movie = doc.export("prores_422", WORK / "v1-forward.mov")
+            measured = luma_row(movie, 1920, 1080) if movie else None
+            forward = rms_steps(measured, [x / 1919 for x in range(1920)]) if measured else None
+            whose = "V1's own forward export"
+        doc.step("set_reversed", clip=clip, reversed=True)
+        files, late = wait_reverse(doc, getattr(doc, "media", {}).get(ramp), "v1")
+        movie = None if late else doc.export("prores_422", WORK / "v1.mov")
+        measured = luma_row(movie, 1920, 1080) if movie else None
+        rms = rms_steps(measured, [x / 1919 for x in range(1920)]) if measured else None
+        codes, _ = y10_columns(movie, 1920, 1080) if movie else (None, None)
+        distinct = len(set(codes[16:-16])) if codes else None
+        cache = stream(files[0]) if files else {}
+        closed = doc.close() and closed
+        check(f"V1 the reversed 10-bit ramp clip through prores_422: luma RMS against x/1919 ≤ "
+              f"the forward clip's + {V1_MARGIN}, and ≥ {REVERSE_DISTINCT} distinct 10-bit Y "
+              "codes on the middle row",
+              doc.ok and late is None and None not in (rms, forward, distinct)
+              and rms <= forward + V1_MARGIN and distinct >= REVERSE_DISTINCT,
+              f"fixture {doc.why or 'ok'}; wait {late or 'ok'}; reversed RMS "
+              f"{None if rms is None else round(rms, 3)}, forward "
+              f"{None if forward is None else round(forward, 3)} ({whose}); distinct {distinct}; "
+              f"the reverse file {[f.name for f in files]}: {cache}")
+    if "V2" in selected:
+        hlg = ramp_hlg()
+        got = reverse(hlg, "V2", refused=HLG_REFUSED)
+        probe = stream(got["dest"]) if got.get("ok") else {}
+        a = yuv_rows(hlg) if hlg else None
+        b = yuv_rows(got["dest"]) if got.get("ok") else None
+        mean, each = None, None
+        if a and b:
+            deltas = [[abs(x - y) for x, y in zip(p, q)] for p, q in zip(a, b)]
+            mean = sum(map(sum, deltas)) / sum(map(len, deltas))
+            each = [round(sum(d) / len(d), 3) for d in deltas]
+        timed, timing = stamps(got)
+        check(f"V2 an HLG BT.2020 ramp reversed by the real renderer keeps {HLG_TAGS}, and its "
+              f"middle row's Y, Cb and Cr codes are within mean |Δ| ≤ {V2_BOUND} of the "
+              "source's first frame",
+              timed and tags(probe) == HLG_TAGS and mean is not None and mean <= V2_BOUND,
+              f"{got.get('error') or 'rendered'}; {probe}; mean |Δ| "
+              f"{None if mean is None else round(mean, 3)} codes (Y, Cb, Cr {each}); {timing}")
+    if "V3" in selected:
+        closed = run_v3(client) and closed
+    if "V4" in selected:
+        closed = run_v4(client, ramp) and closed
+    if "V5" in selected:
+        odd = ramp_odd()
+        got = reverse(odd, "V5", refused=ODD_REFUSED)
+        probe = stream(got["dest"]) if got.get("ok") else {}
+        timed, timing = stamps(got)
+        check("V5 the 1919×1079 10-bit ramp reversed by the real renderer is prores, "
+              "yuv422p10le, at exactly 1919×1079 (ffprobe and the track's natural size), and "
+              "its stamps hold",
+              timed and probe.get("codec_name") == "prores"
+              and probe.get("pix_fmt") == "yuv422p10le"
+              and (probe.get("width"), probe.get("height")) == (1919, 1079)
+              and (got.get("width"), got.get("height")) == (1919, 1079),
+              f"{got.get('error') or 'rendered'}; {probe}; natural size {got.get('width')}×"
+              f"{got.get('height')}; {timing}")
+    if "V6" in selected:
+        clip_path = h264_clip()
+        doc = Doc(client, "V6")
+        clip = (doc.movie(doc.new_track(), clip_path) or [None])[0]
+        doc.step("set_reversed", clip=clip, reversed=True)
+        files, late = wait_reverse(doc, getattr(doc, "media", {}).get(clip_path), "v6")
+        png = None if late else doc.render(WORK / "v6.png", T)
+        cache = stream(files[0]) if files else {}
+        closed = doc.close() and closed
+        # PR-4 as amended by PR-7 (the owner, 2026-10-11, "Accept 16-bit"): a
+        # reversed clip counts by its intermediate, which is 10-bit, so this
+        # all-8-bit project renders 16-bit. On the old renderer (an 8-bit
+        # H.264 reverse) the row FAILS, as expected: depth 8, h264/High.
+        check("V6 (PR-4 as amended by PR-7) render_frame of a project whose one clip, the 8-bit "
+              "H.264 clip, is reversed is a 16-bit PNG, its reverse hevc Main 10",
+              doc.ok and late is None and png_depth(png) == 16
+              and cache.get("codec_name") == "hevc" and cache.get("profile") == "Main 10",
+              f"fixture {doc.why or 'ok'}; wait {late or 'ok'}; bit depth {png_depth(png)}; the "
+              f"reverse file {[f.name for f in files]}: "
+              f"{cache.get('codec_name')}/{cache.get('profile')}/{cache.get('pix_fmt')}")
+    return closed
+
+
+def run_v3(client):
+    """V3: the HLG chroma ramp (`chroma_hlg`) forward at 0 and the same media
+    reversed at 1 s, one Doc; `render_frame` at 0.5 s and 1.5 s, the middle
+    rows' mean |Δ|. On the old renderer the reverse's picture was right (it
+    converted through RGB and only its labels were wrong), so what tells the
+    two apart here is its 8-bit rounding; the labels themselves are V2's,
+    and a wrong label that changes the picture (`reverse-709-labels`,
+    `reverse-no-attachments`) is what the chroma moves."""
+    hlg = chroma_hlg()
+    doc = Doc(client, "V3", 1920, 1080)
+    clips = []
+    if hlg is None:
+        doc.note("ramp_hlg", {"ok": False, "error": HLG_REFUSED.get("why", "no fixture")})
+    else:
+        clips = doc.movie(doc.first_track(), hlg, repeats=2)
+    second = clips[1] if len(clips) == 2 else None
+    doc.step("set_reversed", clip=second, reversed=True)
+    files, late = wait_reverse(doc, getattr(doc, "media", {}).get(hlg), "v3")
+    a = None if late else doc.render(WORK / "v3-forward.png", T)
+    b = None if late else doc.render(WORK / "v3-reversed.png", SEC + T)
+    cache = stream(files[0]) if files else {}
+    closed = doc.close()
+    one = rgb48_row(WORK / "v3-forward.png", 1920, 1080) if a else None
+    two = rgb48_row(WORK / "v3-reversed.png", 1920, 1080) if b else None
+    mean = largest = None
+    if one and two:
+        deltas = [abs(x - y) for x, y in zip(one, two)]
+        mean, largest = sum(deltas) / len(deltas) / 257, max(deltas) / 257
+    check(f"V3 the HLG chroma ramp forward at 0.5 s and reversed at 1.5 s: render_frame's middle rows "
+          f"agree within mean |Δ| ≤ {V3_BOUND} 8-bit levels over three channels",
+          doc.ok and late is None and mean is not None and mean <= V3_BOUND,
+          f"fixture {doc.why or 'ok'}; wait {late or 'ok'}; mean |Δ| "
+          f"{None if mean is None else round(mean, 3)}, max "
+          f"{None if largest is None else round(largest, 3)} levels; depths {png_depth(a)}/"
+          f"{png_depth(b)}; the reverse file {[f.name for f in files]}: {tags(cache)} {cache}")
+    return closed
+
+
+def run_v4(client, ramp):
+    """V4: an old-named (pre-version) reverse planted in `cache/reversed/`
+    before `set_reversed` is neither used nor kept."""
+    doc = Doc(client, "V4", 1920, 1080)
+    clip = (doc.movie(doc.first_track(), ramp) or [None])[0]
+    media = getattr(doc, "media", {}).get(ramp)
+    path = next((m.get("path") for m in doc.project().get("media") or []
+                 if m.get("id") == media), None) or str(ramp)
+    info = os.stat(path)
+    named = f"{path}|{info.st_size}|{math.floor(info.st_mtime + 0.5)}"
+    old, new = fnv1a(named), fnv1a(named + "|v2")
+    folder = Path(doc.path) / "cache" / "reversed"
+    folder.mkdir(parents=True, exist_ok=True)
+    planted, fresh = folder / f"{media}-{old}.mov", folder / f"{media}-{new}.mov"
+    shutil.copy2(h264_clip(), planted)
+    doc.step("set_reversed", clip=clip, reversed=True)
+    files, late = wait_reverse(doc, media, "v4", want=fresh)
+    png = doc.render(WORK / "v4.png", T)
+    closed = doc.close()
+    row = rgb48_row(WORK / "v4.png", 1920, 1080) if png else None
+    green = len({row[x * 3 + 1] for x in range(1920)}) if row else None
+    check(f"V4 an old-named reverse planted before set_reversed is not used and is pruned: the "
+          f"versioned file exists, the planted one is gone, and render_frame at 0.5 s holds ≥ "
+          f"{MIXED_DISTINCT} distinct green values on its middle row (the ramp)",
+          doc.ok and late is None and fresh.exists() and not planted.exists()
+          and green is not None and green >= MIXED_DISTINCT,
+          f"fixture {doc.why or 'ok'}; wait {late or 'ok'}; digest input {named!r}; "
+          f"{fresh.name} exists {fresh.exists()}; planted {planted.name} exists "
+          f"{planted.exists()}; files {[f.name for f in files]}; depth {png_depth(png)}, "
+          f"distinct green {green}")
+    return closed
+
+
+def media_seconds(path):
+    ran = bounded.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
+                       "default=noprint_wrappers=1:nokey=1", str(path)], 60)
+    try:
+        return float(ran["stdout"].strip())
+    except ValueError:
+        return None
+
+
+def host_state():
+    """`pmset -g`'s power mode lines, `pmset -g batt` and `sysctl vm.loadavg`."""
+    power = bounded.run(["pmset", "-g"], 30)["stdout"]
+    modes = [line.strip() for line in power.splitlines()
+             if line.strip().split(" ")[0] in ("powermode", "lowpowermode")]
+    battery = " | ".join(line.strip() for line in
+                         bounded.run(["pmset", "-g", "batt"], 30)["stdout"].splitlines())
+    load = bounded.run(["sysctl", "vm.loadavg"], 30)["stdout"].strip()
+    return f"{'; '.join(modes)}; {battery}; {load}"
+
+
+def run_reverse_cost():
+    """`reverse-cost` (precision-2 P2-2, PR-7's measured cost): the probe
+    built `-O`; four sources reversed three times each, one probe process a
+    reverse; the median wall time, file size, rate and peak RSS. 0 iff every
+    reverse completed."""
+    print(f"precision — reverse-cost: the real renderer from {sources_folder}", flush=True)
+    print(f"  host before: {host_state()}", flush=True)
+    sources = (("prores422_1080", prores_clip(1080), None),
+               ("prores422_2160", prores_clip(2160), None),
+               ("prores422_odd", prores_odd(), ODD_REFUSED),
+               ("ramp10_1080", ramp_clip(), None))
+    done = total = 0
+    for label, source, refused in sources:
+        runs = []
+        for n in range(3):
+            total += 1
+            got = reverse(source, f"cost-{label}-{n}", optimize=True, refused=refused)
+            if got.get("ok"):
+                done += 1
+                probe = stream(got["dest"])
+                seconds = media_seconds(got["dest"])
+                got["mbps"] = (round(got["bytes"] * 8 / seconds / 1e6, 2)
+                               if seconds else None)
+                got["probe"] = (f"{probe.get('codec_name')}/{probe.get('profile')}/"
+                                f"{probe.get('pix_fmt')} {probe.get('width')}×"
+                                f"{probe.get('height')}")
+                got["dest"].unlink(missing_ok=True)
+            runs.append(got)
+            print(f"  {label} #{n + 1}: " + (
+                f"{got['seconds']:.3f} s, {got['bytes']} bytes, {got['mbps']} Mbps, peak RSS "
+                f"{got['peakRSS'] / 1e6:.1f} MB, {got['probe']}" if got.get("ok")
+                else f"FAILED — {got.get('error')}"), flush=True)
+        good = [r for r in runs if r.get("ok")]
+        if good:
+            def median(key):
+                values = sorted(r[key] for r in good if r.get(key) is not None)
+                return values[len(values) // 2] if values else None
+            print(f"  {label} median of {len(good)}: {median('seconds'):.3f} s, "
+                  f"{median('bytes')} bytes, {median('mbps')} Mbps, peak RSS "
+                  f"{(median('peakRSS') or 0) / 1e6:.1f} MB, {good[0]['probe']}", flush=True)
+    print(f"  host after: {host_state()}", flush=True)
+    print(f"{done}/{total} reverses completed")
+    return 0 if done == total else 1
+
+
 def ffprobe(path):
     ran = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
                        "stream=codec_name,profile,pix_fmt", "-of", "json", str(path)], 60)
@@ -1146,6 +1703,23 @@ def ffprobe(path):
         return (json.loads(ran["stdout"]).get("streams") or [{}])[0]
     except (ValueError, IndexError):
         return {}
+
+
+def stream(path):
+    """ffprobe's first video stream: codec, profile, pix_fmt, size and the
+    three colour tags (precision-2 P2-2); {} when it reads nothing."""
+    ran = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                       "stream=codec_name,profile,pix_fmt,width,height,color_transfer,"
+                       "color_primaries,color_space", "-of", "json", str(path)], 60)
+    try:
+        return (json.loads(ran["stdout"]).get("streams") or [{}])[0]
+    except (ValueError, IndexError):
+        return {}
+
+
+def tags(probe):
+    return (f"{probe.get('color_transfer')}/{probe.get('color_primaries')}/"
+            f"{probe.get('color_space')}")
 
 
 def major_brand(path):
@@ -1864,6 +2438,14 @@ def main_ab(rounds):
     return 0 if passed == 2 else 1
 
 
+def main_reverse_cost():
+    """`reverse-cost`: no app launched; this tree's `app/Sources`."""
+    remove_work()
+    atexit.register(remove_work)
+    HOME.mkdir(parents=True)
+    return run_reverse_cost()
+
+
 def main():
     global selected, sources_folder
     parser = argparse.ArgumentParser()
@@ -1874,11 +2456,15 @@ def main():
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--rounds", type=int, default=3, help="--measure ab's rounds")
-    parser.add_argument("mode", nargs="?", choices=("capture", "compare", "ab"))
+    parser.add_argument("mode", nargs="?", choices=("capture", "compare", "ab", "reverse-cost"))
     parser.add_argument("dir", nargs="?")
     args = parser.parse_args()
     if args.selftest:
         return selftest()
+    if args.mode == "reverse-cost":
+        if args.dir or args.only or args.measure or args.mutant or args.app or args.control:
+            parser.error("reverse-cost takes no DIR and no other option")
+        return main_reverse_cost()
     ab = args.mode == "ab"
     if ab and not (args.measure and args.mutant == "decode-8bit" and args.dir is None
                    and not args.only and args.rounds >= 1):

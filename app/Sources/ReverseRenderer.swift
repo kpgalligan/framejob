@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import VideoToolbox
 
 // MARK: - Where a reversed asset lives
 
@@ -36,10 +37,19 @@ import AppKit
 /// the wrong film. The digest is `FFmpegRewrap`'s (path, size, modification
 /// second), for its reasons: it makes the render both reusable and
 /// self-invalidating, and reading gigabytes to decide whether to re-encode
-/// gigabytes is the wrong trade.
+/// gigabytes is the wrong trade. It also covers `rendererVersion`, so a
+/// render the renderer would now write differently — the 8-bit H.264/HEVC
+/// files before spec §11 PR-7 — lands under a new name and is never reused;
+/// `prune` deletes the old sibling when the new one arrives.
 enum ReverseCache {
     /// The subdirectory of `cache/` this feature owns.
     static let directoryName = "reversed"
+
+    /// What the renderer writes, as a number in the digest. Bump it whenever
+    /// the written file changes, so every reverse already in a package is
+    /// rendered again rather than played. 2: the 10-bit intermediate with
+    /// the source's colour labels (spec §11 PR-7).
+    static let rendererVersion = 2
 
     static func directory(in cache: URL) -> URL {
         cache.appendingPathComponent(directoryName, isDirectory: true)
@@ -80,16 +90,17 @@ enum ReverseCache {
         }
     }
 
-    /// FNV-1a over path, byte size and modification second — `FFmpegRewrap`'s
-    /// digest, spelled again here rather than shared because that one is
-    /// private to its own naming scheme and this one keys a different
-    /// directory. Not a content hash, for the reason that file gives.
+    /// FNV-1a over path, byte size, modification second and `rendererVersion`
+    /// — `FFmpegRewrap`'s digest plus the version, spelled again here rather
+    /// than shared because that one is private to its own naming scheme and
+    /// this one keys a different directory. Not a content hash, for the
+    /// reason that file gives.
     private static func digest(of source: URL) -> String? {
         let attributes = try? FileManager.default.attributesOfItem(atPath: source.path)
         guard let size = (attributes?[.size] as? NSNumber)?.int64Value else { return nil }
         let modified = (attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-        for byte in "\(source.path)|\(size)|\(Int64(modified.rounded()))".utf8 {
+        for byte in "\(source.path)|\(size)|\(Int64(modified.rounded()))|v\(rendererVersion)".utf8 {
             hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01b3
         }
         let hex = String(hash, radix: 16)
@@ -364,13 +375,52 @@ final class ReverseSource {
 ///   the FORWARD asset (§7.5). The frames written here are the same coded
 ///   frames the forward file decodes to, so that one code is right for both;
 ///   baking a transform in would turn a portrait clip twice.
-/// * It does not preserve an alpha channel or a wide-gamut transfer curve. The
-///   intermediate is 8-bit BGRA into H.264/HEVC, so a reversed ProRes 4444
-///   clip loses its transparency and a reversed HDR clip is tone-mapped by the
-///   decoder rather than by the compositor. Both are the price of an
-///   intermediate small enough to live in the package; neither is silent —
-///   the picture changes visibly when the clip is reversed.
+/// * It does not preserve an alpha channel. The intermediate (spec §11 PR-7)
+///   is 10-bit 4:2:0 HEVC Main 10, or 10-bit 4:2:2 ProRes 422 when the source
+///   has an odd width or height, so a reversed ProRes 4444 clip loses its
+///   transparency — the price of an intermediate small enough to live in the
+///   package, and not silent: the picture changes visibly when the clip is
+///   reversed.
+/// * It does not convert colour. The frames are read in the source's own
+///   YCbCr at 10 bits, the held copy keeps the decoder's colour attachments,
+///   and the encoder is given no colour properties, so the file carries the
+///   source's own primaries, transfer and matrix — an HLG clip's reverse is
+///   labelled HLG — and the compositor treats it exactly as it treats the
+///   forward file (PR-2: HDR is tone-mapped there, not here).
 final class ReverseRenderer {
+
+    /// What one reverse is written as (spec §11 PR-7), from the source's
+    /// coded size. HEVC 4:2:0 cannot hold an odd size — 1919×1079 came back
+    /// 1918×1078 — and `videoSettings` says why the size must be exact, so an
+    /// odd width or height takes ProRes 422, whose file is several times
+    /// larger, for its exact size.
+    enum Intermediate: Equatable {
+        /// Even width and height: `x420` frames, HEVC Main 10.
+        case hevcMain10
+        /// An odd width or height: `x422` frames, ProRes 422.
+        case proRes422
+
+        init(_ dimensions: CMVideoDimensions) {
+            self = dimensions.width % 2 != 0 || dimensions.height % 2 != 0 ? .proRes422 : .hevcMain10
+        }
+
+        /// The format the reader is asked for, held, and handed the writer.
+        var pixelFormat: OSType {
+            switch self {
+            case .hevcMain10: return kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+            case .proRes422: return kCVPixelFormatType_422YpCbCr10BiPlanarVideoRange
+            }
+        }
+
+        /// Bytes one held pixel costs: 10-bit samples in 16-bit words, one
+        /// luma and half (4:2:0) or one (4:2:2) chroma sample a pixel.
+        var bytesPerPixel: Int {
+            switch self {
+            case .hevcMain10: return 3
+            case .proRes422: return 4
+            }
+        }
+    }
 
     /// One media file to reverse, decided on the main thread against the
     /// document's snapshot so the render loop consults nothing that can move.
@@ -427,9 +477,10 @@ final class ReverseRenderer {
 
     /// How much decoded picture may be resident at once. One slice of the
     /// source is held whole, so this is the renderer's whole memory budget and
-    /// not a soft target: half a gigabyte is two seconds of 1080p or half a
-    /// second of 4K, which keeps the per-slice reader overhead small without
-    /// making the app a memory hog while it works.
+    /// not a soft target: half a gigabyte is about 86 frames of 1080p `x420`
+    /// (under three seconds at 30 fps) or 21 of 4K, which keeps the per-slice
+    /// reader overhead small without making the app a memory hog while it
+    /// works. `sliceDuration` counts the held format's bytes.
     private static let bufferBudget = 512 * 1024 * 1024
 
     private let job: Job
@@ -484,6 +535,7 @@ final class ReverseRenderer {
         // frame is in any case the more honest source of the number the
         // encoder has to match.
         let dimensions = videoTrack.flatMap { Self.dimensions(of: asset, track: $0, limit: total) }
+        let intermediate = dimensions.map(Intermediate.init)
 
         try FileManager.default.createDirectory(
             at: partial.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -497,9 +549,13 @@ final class ReverseRenderer {
 
         var videoInput: AVAssetWriterInput?
         var adaptor: AVAssetWriterInputPixelBufferAdaptor?
-        if let dimensions = dimensions, dimensions.width > 0, dimensions.height > 0 {
+        if let dimensions = dimensions, let intermediate = intermediate, dimensions.width > 0,
+            dimensions.height > 0
+        {
             let input = AVAssetWriterInput(
-                mediaType: .video, outputSettings: Self.videoSettings(dimensions, fps: job.fps))
+                mediaType: .video,
+                outputSettings: Self.videoSettings(
+                    dimensions, fps: job.fps, intermediate: intermediate))
             input.expectsMediaDataInRealTime = false
             guard writer.canAdd(input) else {
                 throw ReverseError.failed("this Mac cannot encode the format it needs")
@@ -508,7 +564,7 @@ final class ReverseRenderer {
             adaptor = AVAssetWriterInputPixelBufferAdaptor(
                 assetWriterInput: input,
                 sourcePixelBufferAttributes: [
-                    kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
+                    kCVPixelBufferPixelFormatTypeKey as String: Int(intermediate.pixelFormat),
                     kCVPixelBufferWidthKey as String: Int(dimensions.width),
                     kCVPixelBufferHeightKey as String: Int(dimensions.height),
                     kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
@@ -536,7 +592,11 @@ final class ReverseRenderer {
         do {
             try walkBackwards(
                 asset: asset, videoTrack: videoTrack, audioTrack: audioTrack, total: total,
-                dimensions: dimensions, writer: writer, videoInput: videoInput, adaptor: adaptor,
+                dimensions: dimensions,
+                pixelFormat: videoInput == nil
+                    ? kCVPixelFormatType_32BGRA
+                    : (intermediate?.pixelFormat ?? kCVPixelFormatType_32BGRA),
+                writer: writer, videoInput: videoInput, adaptor: adaptor,
                 audioInput: audioInput, cancel: cancel, progress: progress)
         } catch {
             // A writer left in `.writing` keeps its file open and its encoder
@@ -603,9 +663,9 @@ final class ReverseRenderer {
     /// the forward file.
     private func walkBackwards(
         asset: AVURLAsset, videoTrack: AVAssetTrack?, audioTrack: AVAssetTrack?, total: CMTime,
-        dimensions: CMVideoDimensions?, writer: AVAssetWriter, videoInput: AVAssetWriterInput?,
-        adaptor: AVAssetWriterInputPixelBufferAdaptor?, audioInput: AVAssetWriterInput?,
-        cancel: CancelToken?, progress: ((Double) -> Void)?
+        dimensions: CMVideoDimensions?, pixelFormat: OSType, writer: AVAssetWriter,
+        videoInput: AVAssetWriterInput?, adaptor: AVAssetWriterInputPixelBufferAdaptor?,
+        audioInput: AVAssetWriterInput?, cancel: CancelToken?, progress: ((Double) -> Void)?
     ) throws {
         let slice = Self.sliceDuration(dimensions: dimensions, fps: job.fps)
         let seconds = max(CMTimeGetSeconds(total), 0.000_001)
@@ -688,7 +748,8 @@ final class ReverseRenderer {
             guard start < cursor else { break }
             let read = try Self.read(
                 asset: asset, range: CMTimeRange(start: start, end: cursor), limit: total,
-                videoTrack: videoTrack, audioTrack: audioTrack, cancel: cancel)
+                videoTrack: videoTrack, audioTrack: audioTrack, pixelFormat: pixelFormat,
+                cancel: cancel)
 
             if adaptor != nil {
                 for frame in read.frames.reversed() {
@@ -751,7 +812,7 @@ final class ReverseRenderer {
     /// caller's arithmetic depends on.
     private static func read(
         asset: AVURLAsset, range: CMTimeRange, limit: CMTime, videoTrack: AVAssetTrack?,
-        audioTrack: AVAssetTrack?, cancel: CancelToken?
+        audioTrack: AVAssetTrack?, pixelFormat: OSType, cancel: CancelToken?
     ) throws -> Slice {
         let reader: AVAssetReader
         do {
@@ -766,10 +827,11 @@ final class ReverseRenderer {
             let output = AVAssetReaderTrackOutput(
                 track: track,
                 outputSettings: [
-                    // The format the whole app composites in
-                    // (`Compositor.requiredPixelBufferAttributes…`), so
-                    // nothing converts between here and the encoder.
-                    kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
+                    // The intermediate's own format (`Intermediate`): 10-bit
+                    // YCbCr in the source's matrix, so nothing converts
+                    // between the decoder and the encoder and the frames
+                    // keep their depth and their colour labels (PR-7).
+                    kCVPixelBufferPixelFormatTypeKey as String: Int(pixelFormat),
                     kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
                 ])
             if reader.canAdd(output) {
@@ -841,10 +903,14 @@ final class ReverseRenderer {
     /// and a reader that starves itself. A pool of our own would recycle
     /// nothing (every buffer in a slice is live at the same time), so these
     /// are plain allocations.
+    ///
+    /// Every plane is copied — the `x420` and `x422` frames are two — and the
+    /// decoder's attachments go with them: the colour primaries, transfer
+    /// function and matrix the writer labels the file by (spec §11 PR-7).
     private static func copyBuffer(_ source: CVPixelBuffer) -> CVPixelBuffer? {
         let width = CVPixelBufferGetWidth(source)
         let height = CVPixelBufferGetHeight(source)
-        guard width > 0, height > 0, CVPixelBufferGetPlaneCount(source) <= 1 else { return nil }
+        guard width > 0, height > 0 else { return nil }
         var created: CVPixelBuffer?
         guard CVPixelBufferCreate(
             kCFAllocatorDefault, width, height, CVPixelBufferGetPixelFormatType(source),
@@ -859,16 +925,41 @@ final class ReverseRenderer {
         defer { CVPixelBufferUnlockBaseAddress(source, .readOnly) }
         guard CVPixelBufferLockBaseAddress(target, []) == kCVReturnSuccess else { return nil }
         defer { CVPixelBufferUnlockBaseAddress(target, []) }
-        guard let from = CVPixelBufferGetBaseAddress(source),
-            let to = CVPixelBufferGetBaseAddress(target)
-        else { return nil }
-        let fromStride = CVPixelBufferGetBytesPerRow(source)
-        let toStride = CVPixelBufferGetBytesPerRow(target)
+        let planes = CVPixelBufferGetPlaneCount(source)
+        guard planes == CVPixelBufferGetPlaneCount(target) else { return nil }
+        if planes == 0 {
+            guard let from = CVPixelBufferGetBaseAddress(source),
+                let to = CVPixelBufferGetBaseAddress(target)
+            else { return nil }
+            copyRows(
+                from: from, stride: CVPixelBufferGetBytesPerRow(source), to: to,
+                stride: CVPixelBufferGetBytesPerRow(target), rows: height)
+        }
+        for plane in 0..<planes {
+            guard let from = CVPixelBufferGetBaseAddressOfPlane(source, plane),
+                let to = CVPixelBufferGetBaseAddressOfPlane(target, plane)
+            else { return nil }
+            copyRows(
+                from: from, stride: CVPixelBufferGetBytesPerRowOfPlane(source, plane), to: to,
+                stride: CVPixelBufferGetBytesPerRowOfPlane(target, plane),
+                rows: min(
+                    CVPixelBufferGetHeightOfPlane(source, plane),
+                    CVPixelBufferGetHeightOfPlane(target, plane)))
+        }
+        CVBufferPropagateAttachments(source, target)
+        return target
+    }
+
+    /// `rows` rows from one buffer (or plane) to another, each the shorter of
+    /// the two strides — the padding past a row's pixels is not picture.
+    private static func copyRows(
+        from: UnsafeMutableRawPointer, stride fromStride: Int, to: UnsafeMutableRawPointer,
+        stride toStride: Int, rows: Int
+    ) {
         let rowBytes = min(fromStride, toStride)
-        for row in 0..<height {
+        for row in 0..<rows {
             memcpy(to + row * toStride, from + row * fromStride, rowBytes)
         }
-        return target
     }
 
     /// One audio sample buffer's bytes, appended to the slice's run.
@@ -1067,51 +1158,61 @@ final class ReverseRenderer {
     /// arrives, so a reversed asset that is one pixel narrower than the
     /// forward one would stretch the clip the moment it is reversed.
     ///
-    /// **The rate is generous because this is an intermediate.** Its pixels
-    /// are encoded again on the way to the export, and a stingy intermediate
-    /// is a generation of loss the user did not ask for — so roughly double
-    /// `ExporterWriter`'s delivery figures, and HEVC past 1080p where the
-    /// bitrate saving is worth the slower encode.
-    private static func videoSettings(_ dimensions: CMVideoDimensions, fps: Fps) -> [String: Any] {
+    /// **10 bits at every size (spec §11 PR-7).** HEVC pinned to Main 10 —
+    /// `ExporterWriter`'s `hevc_10bit` pin — fed the `x420` frames the reader
+    /// decoded, at HEVC's rate: generous because this is an intermediate, its
+    /// pixels encoded again on the way to the export, where a stingy one is a
+    /// generation of loss the user did not ask for. An odd size is ProRes 422
+    /// (`Intermediate`), which takes no compression dictionary.
+    ///
+    /// **No colour properties.** Given none, the writer labels the file by the
+    /// frames' own attachments, which `copyBuffer` carries, so an HLG or a
+    /// BT.2020 source is labelled as itself. Forcing BT.709 here mislabelled
+    /// those sources, and with the attachments kept it would convert them.
+    private static func videoSettings(
+        _ dimensions: CMVideoDimensions, fps: Fps, intermediate: Intermediate
+    ) -> [String: Any] {
         let width = Int(dimensions.width)
         let height = Int(dimensions.height)
+        guard intermediate == .hevcMain10 else {
+            return [
+                AVVideoCodecKey: AVVideoCodecType.proRes422,
+                AVVideoWidthKey: width,
+                AVVideoHeightKey: height,
+            ]
+        }
         let rate = fps.double > 0 ? fps.double : 30
-        let hevc = width * height > 1920 * 1080
         let bits = Int(
-            min(
-                max(Double(max(1, width * height)) * rate * (hevc ? 0.12 : 0.24), 2_000_000),
-                240_000_000))
-        var compression: [String: Any] = [
+            min(max(Double(max(1, width * height)) * rate * 0.12, 2_000_000), 240_000_000))
+        let compression: [String: Any] = [
             AVVideoAverageBitRateKey: bits,
             // A keyframe at least every two seconds, for the same reason the
             // export sets one: this file is scrubbed and seeked into on every
             // preview frame.
             AVVideoMaxKeyFrameIntervalDurationKey: 2.0,
             AVVideoExpectedSourceFrameRateKey: Int(rate.rounded()),
+            AVVideoProfileLevelKey: kVTProfileLevel_HEVC_Main10_AutoLevel as String,
         ]
-        if !hevc { compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264HighAutoLevel }
         return [
-            AVVideoCodecKey: hevc ? AVVideoCodecType.hevc : AVVideoCodecType.h264,
+            AVVideoCodecKey: AVVideoCodecType.hevc,
             AVVideoWidthKey: width,
             AVVideoHeightKey: height,
-            AVVideoColorPropertiesKey: [
-                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
-                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
-                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
-            ],
             AVVideoCompressionPropertiesKey: compression,
         ]
     }
 
     /// How much of the source one slice covers: as many frames as the budget
-    /// holds, turned back into time. An audio-only file has no frames to hold,
-    /// so it takes long slices and pays for very few readers.
+    /// holds at the held format's bytes a pixel (`Intermediate`), turned back
+    /// into time. An audio-only file has no frames to hold, so it takes long
+    /// slices and pays for very few readers.
     private static func sliceDuration(dimensions: CMVideoDimensions?, fps: Fps) -> CMTime {
         let rate = fps.double > 0 ? fps.double : 30
         guard let dimensions = dimensions, dimensions.width > 0, dimensions.height > 0 else {
             return CompositionBuilder.time(ReelTime.perSecond * 30)
         }
-        let bytes = Int(dimensions.width) * Int(dimensions.height) * 4
+        let bytes =
+            Int(dimensions.width) * Int(dimensions.height)
+            * Intermediate(dimensions).bytesPerPixel
         let frames = min(max(bufferBudget / max(1, bytes), 4), 300)
         let ticks = Ticks((Double(frames) / rate * Double(ReelTime.perSecond)).rounded())
         return CompositionBuilder.time(max(ticks, 1))
