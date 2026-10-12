@@ -514,7 +514,7 @@ def misses(frame, want, tolerance=0):
     return found
 
 
-# ---- T0: what AVFoundation does with HLG, PQ and BT.2020 tags ----------------
+# ---- T0: what step 0 does (GR-15) with HLG, PQ and BT.2020 tags -------------
 
 def tagged_movies():
     """The chart encoded once as 10-bit ProRes 422, then each tag by stream

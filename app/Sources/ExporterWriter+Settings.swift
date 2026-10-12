@@ -243,9 +243,9 @@ extension ExportWriter {
             AVVideoHeightKey: frame.height,
             AVVideoScalingModeKey: fills
                 ? AVVideoScalingModeResizeAspectFill : AVVideoScalingModeResizeAspect,
-            // The compositor works in SDR sRGB/709 and tone-maps HDR sources
-            // on the way in (§7.5), so tagging the output 709 is a statement
-            // of what the pixels ARE, not a conversion.
+            // The compositor works in SDR 709 and converts HDR sources itself
+            // at step 0 (GR-15, §7.5), so tagging the output 709 is a
+            // statement of what the pixels ARE, not a conversion.
             AVVideoColorPropertiesKey: [
                 AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
                 AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,

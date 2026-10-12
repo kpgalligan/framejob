@@ -1162,11 +1162,15 @@ the key map behind it.
   discriminant, append only) and `target(of:in:)` (the core's
   `matte_target`, for the chrome only); `TrackSnapshot.matte` decodes it
   leniently.
-- `Compositor.swift` · `Compositor+Uniforms.swift` · `Compositor+Shadow.swift` ·
-  `Compositor+Matte.swift` · `MattePlan.swift` · `Compositor+Dissolve.swift` ·
-  `Compositor+Adjustment.swift` · `DestinationPass.swift` (the destination
-  render pass as a value a shadow or a routed dissolve suspends and
-  resumes) ·
+- `Compositor.swift` · `Compositor+Sources.swift` (a layer's source texture:
+  `source(for:…)`, `texture(from:)`) · `Compositor+Input.swift` (step 0,
+  `InputStage`, `InputUniforms`, and `ConvertingCompositor`, the class a
+  composition holding an HLG, PQ or wide-gamut source is built with, spec
+  §11 GR-15) · `InputConversions.swift` · `Compositor+Uniforms.swift` ·
+  `Compositor+Shadow.swift` · `Compositor+Matte.swift` · `MattePlan.swift` ·
+  `Compositor+Dissolve.swift` · `Compositor+Adjustment.swift` ·
+  `DestinationPass.swift` (the destination render pass as a value a shadow
+  or a routed dissolve suspends and resumes) ·
   `CompositorEffects.swift` · `LayerUniforms.swift` (`LayerUniforms`,
   `ShadowUniforms`, `TransitionCode`) · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The working format is `rgba16Float`

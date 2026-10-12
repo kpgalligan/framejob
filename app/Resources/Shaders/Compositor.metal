@@ -1039,6 +1039,11 @@ static inline float3 gradeLook(float3 rgb, texture3d<float> look, sampler samp,
 // ORDER OF OPERATIONS. Fixed by the M3 contract, and each stage is where it
 // is for a reason worth keeping:
 //
+//   0. the input conversion   NOT in this function: a pass of its own before
+//                              every layer (`reelcut_input_fragment`, spec §11
+//                              GR-15), which converts an HLG, PQ or wide-gamut
+//                              SDR source into the texture this stage samples,
+//                              so every stage below sees encoded Rec. 709
 //   1. spotlight zoom remap    moves the sampling coordinate, so it can only
 //                              run BEFORE the sample
 //   2. pixelate                quantizes that same coordinate
@@ -2054,6 +2059,176 @@ fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
     float4 g = float4(c * a, a);
     float w = saturate(u.opacity * coverage * selected);
     return mix(dst, g, w);
+}
+
+// MARK: - The input pass (spec §11 GR-15)
+
+// Step 0: one source frame converted once per frame into a pooled
+// `rgba16Float` target the layer stage samples instead (`Compositor+Input
+// .swift`). Only the STANDARDS' constants live here — the BT.2100 HLG inverse
+// OETF's a, b, c; SMPTE ST 2084's m1, m2, c1, c2, c3 (as BT.2100 reproduces
+// them); the BT.2020 and BT.709 luminance weights — with the formulas' shapes.
+// Every number Reelcut chose or derived (the system gamma and gain, the
+// knee, the whites, PQ's reference white, the matrix) arrives in the uniform
+// block from `InputConversions.swift`.
+//
+// The block is mirrored FIELD FOR FIELD by `InputUniforms` in
+// `Compositor+Input.swift`, under `LayerUniforms`' layout contract (scalars
+// only, a multiple of 16 bytes: 24 floats, 96 bytes). The matrix is row-major.
+struct InputUniforms {
+    float kind;
+    float premultiplied;
+    float systemGamma;
+    float hlgGain;
+    float knee;
+    float white;
+    float nitsScale;
+    float encodePower;
+    float decodePower;
+    float reserved0;
+    float reserved1;
+    float reserved2;
+    float m00;
+    float m01;
+    float m02;
+    float m10;
+    float m11;
+    float m12;
+    float m20;
+    float m21;
+    float m22;
+    float reserved3;
+    float reserved4;
+    float reserved5;
+};
+
+// `InputUniforms.kind`, mirrored by `InputUniforms.hlg`… in Swift.
+constant int kInputHLG     = 1;
+constant int kInputPQ      = 2;
+constant int kInputSDRWide = 3;
+constant int kInputSRGB    = 4;
+
+// ITU-R BT.2100, the HLG OETF's constants: a, b = 1 − 4a, c = 0.5 − a·ln(4a).
+constant float kHlgA = 0.17883277;
+constant float kHlgB = 0.28466892;
+constant float kHlgC = 0.55991073;
+// SMPTE ST 2084 (BT.2100's PQ): m1 = 2610/16384, m2 = 2523/4096 × 128,
+// c1 = 3424/4096, c2 = 2413/4096 × 32, c3 = 2392/4096 × 32.
+constant float kPqM1 = 0.1593017578125;
+constant float kPqM2 = 78.84375;
+constant float kPqC1 = 0.8359375;
+constant float kPqC2 = 18.8515625;
+constant float kPqC3 = 18.6875;
+// IEC 61966-2-1, the sRGB EOTF's break and its two pieces' constants.
+constant float kSrgbBreak = 0.04045;
+constant float kSrgbSlope = 12.92;
+constant float kSrgbOffset = 0.055;
+constant float kSrgbGamma = 2.4;
+// Luminance weights: BT.2020's (HLG's Ys, BT.2100) and BT.709's (the lift).
+constant float3 kLuma2020 = float3(0.2627, 0.6780, 0.0593);
+constant float3 kLuma709 = float3(0.2126, 0.7152, 0.0722);
+
+// The HLG inverse OETF (BT.2100): signal → scene light, 0…1 at nominal peak.
+// Floored at 0, never capped: a signal above 1 keeps rising.
+static float3 hlgInverseOETF(float3 signal) {
+    float3 v = max(signal, 0.0);
+    float3 low = v * v / 3.0;
+    float3 high = (exp((v - kHlgC) / kHlgA) + kHlgB) / 12.0;
+    return select(high, low, v <= 0.5);
+}
+
+// The PQ EOTF (ST 2084): signal clamped to 0…1 → light, 1.0 at 10,000 cd/m².
+static float3 pqEOTF(float3 signal) {
+    float3 p = pow(clamp(signal, 0.0, 1.0), 1.0 / kPqM2);
+    return pow(max(p - kPqC1, 0.0) / (kPqC2 - kPqC3 * p), 1.0 / kPqM1);
+}
+
+// The sRGB EOTF (IEC 61966-2-1), per channel, of a signal floored at 0.
+static float3 srgbEOTF(float3 signal) {
+    float3 s = max(signal, 0.0);
+    float3 low = s / kSrgbSlope;
+    float3 high = pow((s + kSrgbOffset) / (1.0 + kSrgbOffset), kSrgbGamma);
+    return select(high, low, s <= kSrgbBreak);
+}
+
+// The uniform block's source → BT.709 matrix, row-major, applied to `c`.
+static float3 inputMatrix(constant InputUniforms &u, float3 c) {
+    return float3(dot(float3(u.m00, u.m01, u.m02), c),
+                  dot(float3(u.m10, u.m11, u.m12), c),
+                  dot(float3(u.m20, u.m21, u.m22), c));
+}
+
+// The gamut lift: a colour with a negative channel (outside Rec. 709) moves
+// toward its BT.709 luminance until its lowest channel is 0 — black when its
+// luminance is not positive. Every channel's distance from the luminance is
+// scaled alike, so its hue in linear opponent space is kept.
+static float3 inputLift(float3 l) {
+    float low = min(l.r, min(l.g, l.b));
+    if (low >= 0.0) {
+        return l;
+    }
+    float y = dot(l, kLuma709);
+    return y <= 0.0 ? float3(0.0) : y + (l - y) * (y / (y - low));
+}
+
+// The shoulder, on the largest channel m: unchanged up to the knee, then an
+// extended Reinhard roll-off reaching 1 at `white` (and 1 above it), every
+// channel scaled by the same S(m)/m so the colour's hue is kept.
+static float3 inputShoulder(float3 l, float knee, float white) {
+    float m = max(l.r, max(l.g, l.b));
+    if (m <= knee) {
+        return l;
+    }
+    float s = 1.0;
+    if (m < white) {
+        float t = (m - knee) / (1.0 - knee);
+        float tw = (white - knee) / (1.0 - knee);
+        s = knee + (1.0 - knee) * t * (1.0 + t / (tw * tw)) / (1.0 + t);
+    }
+    return l * (s / m);
+}
+
+// One texel of step 0, on STRAIGHT colour: a premultiplied source (its
+// buffer labelled so) is divided by its alpha first, with the layer stage's
+// own floor, and multiplied back after; alpha passes through. The target is
+// the source's size, so the texel is read, not sampled.
+fragment float4 reelcut_input_fragment(ShadowVaryings in [[stage_in]],
+                                       constant InputUniforms &u [[buffer(0)]],
+                                       texture2d<float> source [[texture(0)]]) {
+    float4 texel = source.read(uint2(in.position.xy));
+    float a = texel.a;
+    float3 signal = u.premultiplied > 0.5 ? texel.rgb / max(a, 1e-4) : texel.rgb;
+    int kind = int(u.kind + 0.5);
+    float3 rgb;
+    if (kind == kInputSRGB) {
+        // The sRGB arm (GR-15 as amended): the EOTF, the source's primaries
+        // to BT.709 in linear light, then the encode (`encodePower`, the
+        // inverse of the gamma ColorSync reads a converted frame through).
+        float3 linear = max(inputMatrix(u, srgbEOTF(signal)), 0.0);
+        rgb = pow(linear, u.encodePower);
+    } else if (kind == kInputSDRWide) {
+        // BT.1886's decode, the matrix, the encode; no lift and no shoulder:
+        // the layer stage's clamp bounds it (spec §11 PR-1).
+        float3 linear = inputMatrix(u, pow(max(signal, 0.0), u.decodePower));
+        rgb = pow(max(linear, 0.0), u.encodePower);
+    } else {
+        float3 light = float3(0.0);
+        if (kind == kInputHLG) {
+            // BT.2100's OOTF shape with Reelcut's system gamma, then the gain.
+            float3 e = hlgInverseOETF(signal);
+            float ys = dot(e, kLuma2020);
+            light = ys > 1e-6 ? u.hlgGain * e * pow(ys, u.systemGamma - 1.0) : float3(0.0);
+        } else if (kind == kInputPQ) {
+            // cd/m² over the reference white: reference white is 1.0.
+            light = pqEOTF(signal) * u.nitsScale;
+        }
+        float3 l = inputShoulder(inputLift(inputMatrix(u, light)), u.knee, u.white);
+        rgb = pow(max(l, 0.0), u.encodePower);
+    }
+    if (u.premultiplied > 0.5) {
+        rgb *= a;
+    }
+    return float4(rgb, a);
 }
 
 // MARK: - The look bake (spec §11 GR-7)

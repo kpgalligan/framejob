@@ -346,6 +346,10 @@ complete, the phase's proof recorded whole on Release, mutants about one per new
   choice from each buffer's transfer label (`Compositor+Input.swift`, `InputConversions.swift`,
   `reelcut_input_fragment`); the HLG, PQ and BT.2020/BT.709-transfer conversions. Before its code,
   GR-15 gains the shoulder's constants and H3's bound.
+  **Corrected after T3-1's H1 stop** (GR-15 as amended, 2026-10-12): the two properties and the
+  BT.709 colour are per composition — `ConvertingCompositor` and BT.709 only for a composition
+  holding an HLG, PQ or wide-gamut source; `Compositor` keeps both false and no colour — and an
+  sRGB-transfer source takes step 0's sRGB arm.
 - **Also owns the wording PR-2's amendment left**: spec §7.5's "HDR sources arrive tone-mapped"
   sentence, and the three code comments that repeat PR-2 — `Compositor.swift`'s
   `sourcePixelBufferAttributes` doc ("HDR still arrives tone-mapped to SDR
@@ -669,3 +673,98 @@ notes GR-20's closure of its SDR wide gamut; `designs/adr/precision.md`'s PR-2 a
 the Look gallery's thumbnails and Pick from Canvas among the generator paths; GR-8's amendment
 marks its cut quote of T0 with "…". The `app/CLAUDE.md` entry above is applied. After them:
 `spec_index_proof.py` 156/156, `make gate` PASS.
+
+## T3-1 — honest sources and Reelcut's HDR→SDR at step 0
+
+**What landed** (2026-10-11/12, in the worktree on `grading-3`, from `716720c`; GR-15 as appended
+and as amended after the H1 stop).
+- **The pure move first**: `Compositor.swift`'s `// MARK: - Sources` (`LayerSource`,
+  `source(for:…)`, `texture(from:live:)`) to `Compositor+Sources.swift` as `extension
+  MetalRenderer`; `textureCache`, `renderers` and `texture(from:live:)` widened from `private`;
+  658 → 572 lines, the new file 91. Gated alone: `make gate` PASS (300 s), `RC_PROOF_APP=release
+  precision_proof.py compare tools/proof/work/t3-1/precision-ctl --only K1…K6` 7/7.
+- **Step 0**: `InputConversions.swift` (`InputPrimaries`; `InputConversion` — HLG, PQ,
+  wide-gamut SDR and the sRGB arm, the selector by transfer through two readers, a buffer's
+  attachments and a format description's extensions, `startsConversion`, the uniforms;
+  `InputConversions`, every number Reelcut chose or derived, `toBT709` derived from the
+  chromaticities and D65, exactly the identity for BT.709); `Compositor+Input.swift`
+  (`ConvertingCompositor`; `InputUniforms`, 24 floats; `InputError`; `InputStage` — the ninth
+  pipeline, a size-keyed `rgba16Float` pool on `MattePool`'s 30-frame policy, the frame's
+  converted tracks, the pass count; `encodeInputs`); `Compositor.metal`'s input pass
+  (`reelcut_input_fragment` and its helpers, the standards' constants only; step 0 in the ORDER OF
+  OPERATIONS note); `Compositor+Sources.swift`'s `.track` takes the converted texture.
+- **The switch, per composition**: `Compositor` is no longer `final` and answers
+  `canConformColorOfSourceFrames` and `supportsHDRSourceFrames` false (today's answers, stated);
+  `ConvertingCompositor` answers both true; `serve` passes `converts:` to `render`, which runs
+  `encodeInputs` only then, after the command buffer and before `encodeMattes`.
+  `CompositionBuilder.build` collects its video tracks and asks `convertsSources` (their format
+  descriptions read by key): `ConvertingCompositor` and BT.709 colour when any answers a
+  conversion that starts one, else `Compositor` and no colour. The timing line gains `, N input
+  passes` (appended). `Compositor.swift` 600 lines, `CompositionBuilder.swift` 558.
+- **Wording PR-2 left**: `sourcePixelBufferAttributes`' doc, `ExporterWriter+Settings.swift`'s
+  output-tag comment and `ReverseRenderer.swift`'s class doc (comment-only, line-neutral); spec
+  §7.5 (the per-composition step-0 bullet, NINE pipelines from seven), §7.4's compositor row,
+  README's Export bullet, GRD-16, `lut_proof.py`'s T0 heading.
+
+**The H1 stop and its redesign.** The first code set BT.709 on every composition. The
+implementer stopped at H1 (2026-10-11): every SDR scene's pixels were identical (0 differing
+16-bit samples), but 7 of the 12 single-source scenes — untagged ProRes and H.264, matrix-only
+HEVC, the PNG still, VP9, the sRGB HEVC and Apple Log — came out with `kCGColorSpaceCoreMedia709`
+in place of the control's `sRGB` chunk or the source's ICC, and their eyedropper picks moved
+(untagged grey 0.251 → 0.286); a diagnostic build without the composition colour passed H1 12/12
+but failed H2 and H3 (HDR frames followed the source's HLG tag). The owner chose "Redesign, keep
+SDR exact" (2026-10-12); the designer measured M1–M8 in scratch (GR-15's amendment records them)
+and the switch became per composition; the owner then chose "Convert it now" for an sRGB-transfer
+clip in a converting composition (the sRGB arm). Kept from the stopped code: the pure move, the
+two controls, the instruments, GR-15's append, step 0 itself and the comment edits.
+
+**Measured** (2026-10-12, AC power, `pmset -g` powermode 0; Release unless said):
+- Controls on the untouched tree (2026-10-11, Release): `hdr_proof.py capture
+  tools/proof/work/t3-1/ctl` — H2, H3, H4, H5 and H6 FAILED (each discriminates), H1's references
+  for 12 scenes; a control-on-control `compare --only H1,Z1` 2/2 (H1 repeatable; a reversed
+  clip's intermediate differs by digest run to run, its render does not); `precision_proof.py
+  capture tools/proof/work/t3-1/precision-ctl` 6/6.
+- `RC_PROOF_APP=release python3 tools/proof/hdr_proof.py compare tools/proof/work/t3-1/ctl`:
+  14/14, no `Reelcut: ` line, no DEFAULTS MOVED. H1 12 scenes byte-identical, picks equal. H1m
+  both mixed projects' PNG bytes and picks equal the base tree's. H1s picks mixed = alone ([64,
+  64, 64], [127, 128, 128], [88, 249, 255]), export rows worst 4 levels, x=512 116 = 116; the base
+  tree picks [10, 10, 10], [62, 63, 63], [26, 243, 255] (fails, as it must). H1w picks = Apple's
+  reading of the file's labels ([64, 64, 64], [127, 128, 128], [0, 253, 255]), export grey 116 =
+  srgb alone's 116; the base tree [13, 13, 13], [54, 55, 55], [0, 251, 255] (fails). H2 frame 0 =
+  frame +5 exactly on all four, render vs export ≤ 1. H3 worst 1 level against the oracle; Apple's
+  points HLG +0.96 / −0.86 / +0.12 / 0.00, PQ −0.81 / −0.37 (bound 3). H4 383 columns, worst hue
+  gap 0.21°, every value inside the envelope (the patch [0, 144, 255] against the oracle's [0, 143,
+  255]; the control's [107, 215, 255]). H5 greys within 1, chroma inside the envelope (worst
+  sited |Δ| 4 / 3 / 7, all near black). H6 HLG pick [144, 0, 19] against its export's [143, 0,
+  20], keyed export (255, 0, 255); the base tree [158, 46, 0] (fails). R0 (record) the newest
+  recording `bt709/bt709/bt709`, the identity arm, its tags in H1. P1 23 cases through both
+  readers; P2 worst 4.9e-8; P3 worst 9.8e-4 (bound 2e-3); P4 the constants and a 96-byte block.
+- `RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --measure` (TI): the 4K HLG twin's two
+  lines report 120 and 120 input passes, averages 2.02 and 1.76 ms (worst 8.8, 3.07); the BT.709
+  twin's 0 and 0, 1.55 and 1.32 ms (worst 6.82, 3.49): a mean difference of 0.455 ms. The host was
+  loaded (loadavg 17.39 / 29.86 / 23.86 before, another session's work), so the figures are
+  recorded, not a budget.
+- `precision_proof.py compare …/precision-ctl --only K1…K6` 7/7 byte-identical; `--only V2,V3`
+  3/3 (V2 mean |Δ| 0.108 codes, V3 0.097 levels, the HLG reverse now through step 0);
+  `hevc_alpha_proof.py` 43/43; `e1_proof.py` 101/101 against the 1c3e92e reference (PR-5's frozen
+  pixels within ±1); `grading_spike.py --measure --tree --tree-base 716720c` (TC): 1080p
+  VT:S1 − V0:S1 −0.007 ms (cap 0.028), 4K −0.001 ms (cap 0.061), TA 0.001 / 0.000 ms: held.
+- `make gate` PASS (240 s, typecheck 0 errors and the 4 baseline warnings).
+- **Mutants**, once each on the final instrument (Debug copies), all caught; every failing row:
+  `no-conform` H2 H3 (and H1s H1w H4 H5 H6); `hlg-branch-moved` P3 (and H4); `matrix-transposed`
+  H3 H5 H1w P2 P3 (and H4); `shoulder-dropped` H3 H4 P3; `lift-dropped` H4 P3;
+  `no-composition-color` H2 H3 H1m (and H1s H1w H4 H6); `select-by-primaries` H1 P1 (and H1m H1w
+  H3 H4); `convert-everywhere` H1 H1m; `conform-everywhere` H1m (and H1 H1s H1w);
+  `srgb-arm-dropped` H1s P1; `srgb-starts-conversion` H1 P1 (and H1m); `srgb-wide-as-sdrwide` H1w
+  P1. Twelve, past ten, because each guards a separate decision (the spec's reason).
+
+**Owed.** GRD-16 (the owner's real iPhone HDR clip, PRC-3's HLG half, a screen recording beside
+it); the `app/CLAUDE.md` compositor entry (the orchestrator applies it). HDR10 static metadata on
+a converted frame is unmeasured (GR-15's accepted limit).
+
+**Review.** One pass, verdict pass, three nits applied by the orchestrator: `InputUniforms.encodePower`'s
+doc names the sRGB arm's 256/502; `InputStage`'s unused `init?(coder:)` removed; the sRGB arm's encode
+power is set in its own `switch` case. The `app/CLAUDE.md` compositor entry is applied. After them:
+`make typecheck` at its 4 baseline warnings, `make gate` PASS, `RC_PROOF_APP=release hdr_proof.py
+compare tools/proof/work/t3-1/ctl` 14/14 (no `Reelcut: ` complaint, no DEFAULTS MOVED), `hdr_proof.py
+--only P1,P2,P3,P4,Z1` 5/5. No mutant anchor sits on the changed lines.

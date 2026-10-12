@@ -540,6 +540,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   (`LayerSource`, `source(for:…)`, `texture(from:live:)`) out whole to `Compositor+Sources.swift`
   as an `extension MetalRenderer` (`textureCache`, `renderers` and `texture(from:live:)` lose
   `private`; `render` also calls `texture(from:)`) — where T3-1's step 0 meets a track's buffer.
+  Grading-3's T3-1 paid that seam: `// MARK: - Sources` went whole to `Compositor+Sources.swift`
+  as `extension MetalRenderer` (imports AVFoundation, CoreVideo, Metal), a pure move gated alone
+  (`make gate` PASS, `precision_proof.py` K1–K6 7/7) before step 0's wiring; `textureCache`,
+  `renderers` and `texture(from:live:)` were widened from `private`. `wc -l
+  app/Sources/Compositor.swift`: 658 before, 572 after; `Compositor+Sources.swift` 91. T3-1's
+  wiring brought the file back to 600. The next seam: `// MARK: - The Metal side` — `final class
+  MetalRenderer` whole — out to `MetalRenderer.swift`.
 - `ReelCore.swift`: the typed patches moved to `TypedPatches.swift` in issue batch B73 (#216), a
   pure move gated alone before `ReelContainer` landed; no further seam is named. The `dictionary`
   extensions went to `OpDictionaries.swift` in issue batch B52b (#190), the media helpers earlier

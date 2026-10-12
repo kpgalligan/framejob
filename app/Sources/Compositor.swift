@@ -97,7 +97,7 @@ enum CompositorError: LocalizedError {
 /// it can take no arguments — everything per-document arrives on the
 /// instruction. Requests are served on one serial queue and every exit path
 /// answers the request exactly once.
-final class Compositor: NSObject, AVVideoCompositing {
+class Compositor: NSObject, AVVideoCompositing {
 
     /// `defaults write com.kgalligan.Reelcut ReelcutCompositorTiming -bool YES`
     /// turns on the per-frame timing log — the measurement M1 step 5 is
@@ -141,14 +141,24 @@ final class Compositor: NSObject, AVVideoCompositing {
     static let sourcePixelFormat: OSType = kCVPixelFormatType_64RGBAHalf
 
     /// Metal-compatible `sourcePixelFormat`, sampled through `texture(from:)`.
-    /// AVFoundation converts anything else, and HDR still arrives tone-mapped
-    /// to SDR (`supportsHDRSourceFrames` is not implemented, so false; §7.5).
+    /// AVFoundation converts any other pixel format; for a
+    /// `ConvertingCompositor` not colour: an HDR or wide-gamut frame arrives
+    /// native and labelled, and step 0 converts it (spec §11 GR-15, §7.5).
     var sourcePixelBufferAttributes: [String: any Sendable]? {
         [
             kCVPixelBufferPixelFormatTypeKey as String: Int(Compositor.sourcePixelFormat),
             kCVPixelBufferMetalCompatibilityKey as String: true,
         ]
     }
+
+    /// Today's answers, stated: AVFoundation conforms every source to the
+    /// composition's colour, so an SDR-only project keeps its pixels and
+    /// labels. A composition holding an HLG, PQ or wide-gamut source is built
+    /// with `ConvertingCompositor` instead (`Compositor+Input.swift`, spec
+    /// §11 GR-15 as amended), which answers both true and runs step 0.
+    var canConformColorOfSourceFrames: Bool { false }
+    /// False here; true in `ConvertingCompositor` (see above).
+    var supportsHDRSourceFrames: Bool { false }
 
     var requiredPixelBufferAttributesForRenderContext: [String: any Sendable] {
         [
@@ -215,7 +225,8 @@ final class Compositor: NSObject, AVVideoCompositing {
             at: CompositionBuilder.ticks(request.compositionTime))
         do {
             try renderer.render(
-                recipe: recipe, into: destination, request: request, instruction: instruction)
+                recipe: recipe, into: destination, request: request, instruction: instruction,
+                converts: canConformColorOfSourceFrames)
             request.finish(withComposedVideoFrame: destination)
             WaveformTaps.shared.offer(destination, key: instruction?.recipeKey ?? 0)
         } catch {
@@ -246,8 +257,12 @@ final class Compositor: NSObject, AVVideoCompositing {
         }
         lock.unlock()
         if due {
-            NSLog("[reelcut] compositor: %.2f ms average, %.2f ms worst over 120 frames",
-                average, worst)
+            // Step 0's passes over the same window (spec §11 GR-15): 0 for a
+            // frame with no converted source. Appended, so the line's prefix
+            // stays what the proofs' timing pattern reads.
+            let passes = renderer?.inputs.takePassCount() ?? 0
+            NSLog("[reelcut] compositor: %.2f ms average, %.2f ms worst over 120 frames, "
+                + "%ld input passes", average, worst, passes)
         }
     }
 
@@ -285,9 +300,10 @@ final class MetalRenderer {
     /// combination itself. Built with `blending: false`, which is the whole
     /// correctness argument — see `pipelineDescriptor`.
     ///
-    /// Eight pipelines from six fragment functions: plain, plain + gather,
-    /// blend, blend + gather, the shadow, the matte resolve, the dissolve mix
-    /// and the adjustment pass (`Compositor+Adjustment.swift`, spec §11 GR-6).
+    /// Nine pipelines from seven fragment functions: plain, plain + gather,
+    /// blend, blend + gather, the shadow, the matte resolve, the dissolve mix,
+    /// the adjustment pass (`Compositor+Adjustment.swift`, spec §11 GR-6) and
+    /// the input pass (`Compositor+Input.swift`, spec §11 GR-15).
     private let blendPipeline: MTLRenderPipelineState
     private let blendGatherPipeline: MTLRenderPipelineState
     /// The full-canvas quad that draws one blurred mask as a shadow (§7.5).
@@ -300,11 +316,13 @@ final class MetalRenderer {
     let dissolvePipeline: MTLRenderPipelineState
     let adjustPipeline: MTLRenderPipelineState
     let looks: LookTextures
+    /// Step 0's pass, its targets and this frame's conversions (spec §11 GR-15).
+    let inputs: InputStage
     let sampler: MTLSamplerState
-    private let textureCache: CVMetalTextureCache
+    let textureCache: CVMetalTextureCache
     /// Bound where the shader ignores the texture (the slate): an unbound draw is undefined.
     let placeholder: MTLTexture
-    private let renderers: LayerRenderers
+    let renderers: LayerRenderers
     /// Whether this device can run `MPSImageGaussianBlur`. Every Mac the app
     /// supports can, but the check is free and a `false` here degrades to a
     /// hard-edged shadow instead of to a dropped frame.
@@ -402,7 +420,8 @@ final class MetalRenderer {
                 descriptor: MetalRenderer.pipelineDescriptor(
                     label: "Reelcut dissolve", vertex: shadowVertex, fragment: dissolveFragment)),
             let adjustPipeline = MetalRenderer.adjustPipeline(device: device, library: library),
-            let looks = LookTextures(device: device, library: library)
+            let looks = LookTextures(device: device, library: library),
+            let inputs = InputStage(device: device, library: library)
         else { return nil }
 
         let samplerDescriptor = MTLSamplerDescriptor()
@@ -445,6 +464,7 @@ final class MetalRenderer {
         self.dissolvePipeline = dissolvePipeline
         self.adjustPipeline = adjustPipeline
         self.looks = looks
+        self.inputs = inputs
         self.sampler = sampler
         self.textureCache = cache
         self.placeholder = placeholder
@@ -517,7 +537,8 @@ final class MetalRenderer {
     /// for a routed dissolve its two halves and their mix (MT-8).
     func render(
         recipe: FrameRecipe?, into destination: CVPixelBuffer,
-        request: AVAsynchronousVideoCompositionRequest, instruction: RecipeInstruction?
+        request: AVAsynchronousVideoCompositionRequest, instruction: RecipeInstruction?,
+        converts: Bool
     ) throws {
         // Every CVMetalTexture stays alive until the GPU is done with it —
         // dropping the wrapper early invalidates the MTLTexture inside it and
@@ -533,6 +554,13 @@ final class MetalRenderer {
             width: target.width, height: target.height, background: [0, 0, 0, 1])
         guard let buffer = commandQueue.makeCommandBuffer() else {
             throw CompositorError.noDestinationTexture
+        }
+        // Step 0, before anything samples a source; only in a converting
+        // composition (spec §11 GR-15).
+        inputs.beginFrame()
+        defer { inputs.endFrame() }
+        if converts, let recipe = recipe {
+            try encodeInputs(layers: recipe.layers, request: request, buffer: buffer, live: &live)
         }
         // Every matte, before the destination pass opens (spec §11 MT-6).
         var coverage = MatteCoverage(placeholder: placeholder)
@@ -568,91 +596,5 @@ final class MetalRenderer {
         // queue also paces submission: one frame in flight, no unbounded
         // queue growth when the GPU falls behind.
         buffer.waitUntilCompleted()
-    }
-
-    // MARK: - Sources
-
-    enum LayerSource {
-        /// Texture, its source size in the layer's own space, whether it is
-        /// premultiplied, and the source orientation code (0 for everything
-        /// this app rasterized itself).
-        case textured(MTLTexture, CGSize, premultiplied: Bool, orientation: Int)
-        case slate(CGSize)
-        case absent
-    }
-
-    func source(
-        for layer: RecipeLayer, request: AVAsynchronousVideoCompositionRequest,
-        instruction: RecipeInstruction?, live: inout [CVMetalTexture]
-    ) -> LayerSource {
-        switch layer.source {
-        case .track(let id):
-            guard let buffer = request.sourceFrame(byTrackID: CMPersistentTrackID(id)),
-                let texture = texture(from: buffer, live: &live)
-            else {
-                // No frame is a gap — unless the clip's FILE is gone, which
-                // spec §5.6 draws as a slate. The core cannot see a
-                // filesystem (`evaluate.rs`), so this is where the `missing`
-                // source it would otherwise have emitted comes from.
-                if instruction?.missingClips.contains(layer.clip) == true {
-                    return .slate(layer.sourceSizeCG ?? CGSize(width: 640, height: 360))
-                }
-                return .absent
-            }
-            let orientation = instruction?.sourceOrientations[id] ?? 0
-            // The recipe's `source_size` is the DISPLAY size, and the buffer
-            // is the coded one: for a quarter-turned source the two are
-            // transposed, and the fragment stage turns the sampling to match.
-            let coded = CGSize(width: texture.width, height: texture.height)
-            let size = layer.sourceSizeCG
-                ?? (orientation & 1 != 0
-                    ? CGSize(width: coded.height, height: coded.width) : coded)
-            return .textured(
-                texture, size, premultiplied: Self.declaresPremultipliedAlpha(buffer),
-                orientation: orientation)
-        case .image(let media):
-            guard let url = instruction?.mediaURLs[media],
-                let rendered = renderers.image(url: url, media: media)
-            else { return .slate(layer.sourceSizeCG ?? CGSize(width: 640, height: 360)) }
-            return .textured(
-                rendered.texture, rendered.size, premultiplied: true, orientation: 0)
-        case .text(let hash, let props, let reveal):
-            guard let rendered = renderers.text(props, hash: hash, reveal: reveal)
-            else { return .absent }
-            return .textured(
-                rendered.texture, rendered.size, premultiplied: true, orientation: 0)
-        case .shape(let hash, let props):
-            guard let rendered = renderers.shape(props, hash: hash) else { return .absent }
-            return .textured(
-                rendered.texture, rendered.size, premultiplied: true, orientation: 0)
-        case .graphic(let name, _, let frame, let props, let ctx):
-            let size = layer.sourceSizeCG ?? CGSize(width: 640, height: 360)
-            guard let drawn = renderers.graphic(name: name, frame: frame, propsJSON: props,
-                ctxJSON: ctx, size: size, recipeKey: instruction?.recipeKey ?? 0) else { return .slate(size) }
-            return .textured(drawn.texture, drawn.size, premultiplied: true, orientation: 0)
-        case .missing:
-            return .slate(layer.sourceSizeCG ?? CGSize(width: 640, height: 360))
-        case .adjustment: return .absent  // graded by `drawAdjustment`, never sampled
-        }
-    }
-
-    /// Wraps a pixel buffer as a texture through the `CVMetalTextureCache` —
-    /// zero-copy, because both sides are the same IOSurface — in the Metal
-    /// format of the buffer's own pixel format; nil for one with none.
-    private func texture(from buffer: CVPixelBuffer, live: inout [CVMetalTexture]) -> MTLTexture? {
-        let width = CVPixelBufferGetWidth(buffer)
-        let height = CVPixelBufferGetHeight(buffer)
-        guard width > 0, height > 0,
-            let format = Self.metalFormat(for: CVPixelBufferGetPixelFormatType(buffer))
-        else { return nil }
-        var wrapper: CVMetalTexture?
-        let status = CVMetalTextureCacheCreateTextureFromImage(
-            kCFAllocatorDefault, textureCache, buffer, nil, format, width, height, 0,
-            &wrapper)
-        guard status == kCVReturnSuccess, let wrapper = wrapper,
-            let texture = CVMetalTextureGetTexture(wrapper)
-        else { return nil }
-        live.append(wrapper)
-        return texture
     }
 }

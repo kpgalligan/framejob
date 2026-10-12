@@ -94,11 +94,13 @@ enum CompositionBuilder {
         // the document, exactly as the audio DSP below does.
         let reverse = ReverseSource.shared.resolution(for: recipeKey)
 
+        var videoTracks: [AVMutableCompositionTrack] = []
         for planTrack in plan.videoTracks {
             let track = try makeTrack(in: composition, mediaType: .video, id: planTrack.id)
             try fill(
                 track, segments: planTrack.segments, mediaType: .video, urls: urls,
                 reverse: reverse, assets: &assets, reversedAssets: &reversedAssets)
+            videoTracks.append(track)
         }
 
         try addPlaceholderIfNeeded(to: composition, plan: plan)
@@ -137,8 +139,16 @@ enum CompositionBuilder {
                     plan: plan, instruction: instruction, codes: codes),
                 missingClips: missing)
         }
+        // Per composition (spec §11 GR-15 as amended): one holding an HLG, PQ
+        // or wide-gamut source is converting — `ConvertingCompositor`, its
+        // frames BT.709 — and every other is built exactly as before.
+        let converts = convertsSources(videoTracks)
         let videoConfiguration = AVVideoComposition.Configuration(
-            customVideoCompositorClass: Compositor.self, frameDuration: frameDuration(plan.fps),
+            colorPrimaries: converts ? AVVideoColorPrimaries_ITU_R_709_2 : nil,
+            colorTransferFunction: converts ? AVVideoTransferFunction_ITU_R_709_2 : nil,
+            colorYCbCrMatrix: converts ? AVVideoYCbCrMatrix_ITU_R_709_2 : nil,
+            customVideoCompositorClass: converts ? ConvertingCompositor.self : Compositor.self,
+            frameDuration: frameDuration(plan.fps),
             instructions: instructions, renderScale: 1,
             renderSize: size.width >= 1 && size.height >= 1
                 ? size : CGSize(width: 1920, height: 1080))
@@ -402,6 +412,18 @@ enum CompositionBuilder {
             return CMTime(value: 1000, timescale: CMTimeScale((nominal * 1000).rounded()))
         }
         return CMTime(value: 1, timescale: 30)
+    }
+
+    /// True when any format description of `tracks` answers an
+    /// `InputConversion` whose `startsConversion` is true. Read by KEY, for
+    /// `oneFrame`'s reason; a composition track lists every inserted
+    /// source's description (measured, M5).
+    static func convertsSources(_ tracks: [AVMutableCompositionTrack]) -> Bool {
+        tracks.contains { track in
+            (keyed(track, "formatDescriptions") as? [CMFormatDescription] ?? []).contains {
+                InputConversion.choose(for: $0)?.startsConversion == true
+            }
+        }
     }
 
     /// A property by key; nil, not an exception, for one the SDK dropped.

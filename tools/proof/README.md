@@ -18862,3 +18862,46 @@ scene (an unqualified adjustment pass over S1 with a neutral
 75ebf34`).
 
 **Its record**: `archive/grading-2.md`'s G2-4 section.
+
+## Road map grading-3 — T3-1, honest sources and step 0 (`hdr_proof.py` H1, H1m, H1s, H1w, H2–H6, R0, TI, P1–P4, Z1 and twelve mutants; `hdr_probe.swift`, `hdr_pick_probe.swift`, `applelog_writer.swift`; spec §11 GR-15 as amended)
+
+`hdr_proof.py` is curves_proof.py's shape (`capture DIR` | `compare DIR [--only …]` |
+`--measure` | `--mutant NAME [--control DIR]`); its header has every row. The control
+(`capture tools/proof/work/t3-1/ctl`) was taken on 716720c's Release build before any product
+edit; H1's fixtures are copied into `DIR/media/` so every later run draws the same bytes (a
+VideoToolbox encode is not repeatable). Fixtures are made once under
+`tools/proof/work/hdr/media/`, each kept only when ffprobe reads its tags: the road map's
+1024×128 10-bit ramp (grey row 32, chroma row 96) re-tagged by `prores_metadata` + `+write_colr`
+(BT.709, untagged, HLG, PQ, BT.2020/BT.709, P3/BT.709), the same through `hevc_videotoolbox` Main
+10 (HLG, sRGB, BT.2020/BT.2020-10, P3/sRGB), `testsrc2` H.264, HEVC 8-bit, ProRes 4444, an 8-bit
+PNG and a VP9 WebM, `applelog.mov` (`applelog_writer.swift`: a passthrough rewrite with Apple
+Log's format-description label, read back), and TI's 4K twins. ffmpeg 9 writes an H.264 colour
+tag only with `setparams`; the untagged ProRes keeps the road map's bsf `unknown`, which ffprobe
+reads as `gbr/reserved/reserved`.
+
+- **The two probes.** `hdr_pick_probe.swift` is the chroma eyedropper without a window
+  (`CanvasEyedropperSession.suppression`, `Exporter.renderFrame`, `color(at:in:canvas:)`), with
+  an optional `"png"` written by `FrameWriter.write` and a `"plain"` path (an
+  `AVAssetImageGenerator` over the file itself: Apple's reading of its own labels). It uses
+  existing API only, so it is built twice: over the tree (or a mutant copy's `app/Sources`) and
+  over 716720c's `app/Sources` and `app/Resources` (`git archive` into
+  `tools/proof/work/hdr/base-716720c/`, made once), both linking the tree's unchanged core.
+  `hdr_probe.swift` (P1–P4) drives `InputConversion` through both readers, `toBT709`, and an
+  `InputStage` built from the tree's `Compositor.metal` by `makeLibrary(source:)` on half-rounded
+  inputs against the script's oracle.
+- **The oracle** (`convert`): the codes ffmpeg reads back from a fixture through the matrix its
+  tags name (limited range), then GR-15's formula with its numbers, the matrices derived from
+  the published chromaticities and D65. H4 and H5 hold the chroma rows to its envelope — the
+  oracle at the fixture's Y′, Cb and Cr codes each moved by −1, 0, +1 (27 evaluations), widened
+  by 1 level — because the decoder's chroma reconstruction differs from the sited sample by up
+  to one code, which the 1/2.4 encode amplifies near black.
+- **The STOP rows.** H1 (12 single-source SDR scenes against the control's PNG bytes and picks)
+  and H1m (two mixed projects, tree probe against base probe) stop the phase on any difference;
+  neither is ever re-baselined. H1s, H1w and H6 carry their own CONTROL: the base-tree probe must
+  fail them.
+- **R0** reads only the colour labels of the newest `Screen Recording *.mov` in
+  `~/Movies/Reelcut Recordings/`; nothing here records the screen.
+- **TI** (`--measure`, Release) launches with `-ReelcutCompositorTiming YES` on an instance per
+  twin and reads the timing line's `, N input passes` suffix.
+
+**Its record**: `designs/grading-3.md`'s T3-1 section.

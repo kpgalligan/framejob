@@ -386,7 +386,7 @@ final class ReverseSource {
 ///   and the encoder is given no colour properties, so the file carries the
 ///   source's own primaries, transfer and matrix — an HLG clip's reverse is
 ///   labelled HLG — and the compositor treats it exactly as it treats the
-///   forward file (PR-2: HDR is tone-mapped there, not here).
+///   forward file (GR-15: HDR is converted there, at step 0, not here).
 final class ReverseRenderer {
 
     /// What one reverse is written as (spec §11 PR-7), from the source's

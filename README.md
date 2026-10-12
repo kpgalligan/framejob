@@ -381,6 +381,8 @@ schema, §6 the op table, §7 the architecture.
   source's gradients — a reversed clip's too, its backwards copy rendered at
   10 bits with the source's own colour labels and exact size; H.264, HEVC
   and HEVC with alpha are 8-bit.
+  HLG and PQ sources are converted to SDR Rec. 709 by Reelcut itself, the
+  same in the preview, every export and every rendered frame.
   The size the sheet and the `export` tool report is the size the file has: a
   document with an odd width or height exports one pixel smaller on that edge
   on the formats that need even dimensions (H.264, HEVC, HEVC with alpha,

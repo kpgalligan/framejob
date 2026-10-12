@@ -94,6 +94,116 @@ opened, at design time or build time.
     path and the player at length; Apple's HLG curve beyond its four measured points; and a real
     screen recording's labels (if one is labelled Display P3 or sRGB, H1's byte identity is
     re-checked on it).
+  - **T3-1's numbers** (appended before T3-1's code; each figure below computed by
+    `tools/proof/hdr_proof.py`'s oracle, `convert`). The shader holds only the standards'
+    constants and formula shapes; every number Reelcut chose is `InputConversions.swift`'s.
+    - **HLG**: the BT.2100 inverse OETF (a = 0.17883277, b = 1 − 4a, c = 0.5 − a·ln 4a), the
+      signal floored at 0 and not capped; BT.2100's OOTF shape E·Ys^(γ − 1), Ys = 0.2627 R +
+      0.6780 G + 0.0593 B, with the **system gamma γ 0.96**; then a **gain of 1.07**. Both are
+      Reelcut's anchor to Apple's points (choice 2a), not BT.2100's nominal γ 1.2: with γ 1.2
+      the best single gain (this shoulder, its white at the gain) leaves the worst of Apple's
+      four points 9.1 levels of 255 off (0.25 at −9.1, 0.75 at +8.9), and a gain fitted to the
+      0.5 point alone leaves 0.25 at −5.9.
+    - **PQ**: the SMPTE ST 2084 EOTF as BT.2100 reproduces it (m1 = 2610/16384, m2 =
+      2523/4096 × 128, c1 = 3424/4096, c2 = 2413/4096 × 32, c3 = 2392/4096 × 32), the signal
+      clamped to [0, 1], in cd/m² divided by the **reference white 203 cd/m²** (BT.2408), so
+      reference white is 1.0 (× 10000/203).
+    - **Both, then**: the matrix to BT.709, derived from the published chromaticities and D65
+      by the standard derivation (BT.709 R 0.640 0.330, G 0.300 0.600, B 0.150 0.060; BT.2020
+      R 0.708 0.292, G 0.170 0.797, B 0.131 0.046; P3 D65, SMPTE EG 432-1, R 0.680 0.320,
+      G 0.265 0.690, B 0.150 0.060; D65 0.3127 0.3290); **the gamut lift**: when a channel is
+      negative, the colour moves toward its BT.709 luminance Y until its lowest channel is 0,
+      L = Y + (L − Y)·Y/(Y − min L) (black when Y ≤ 0), which keeps its hue in linear
+      opponent space; **the shoulder** on the largest channel m, every channel scaled by
+      S(m)/m: S(m) = m up to the **knee 0.39**, then 0.39 + 0.61·t(1 + t/tw²)/(1 + t), t = (m −
+      0.39)/0.61, tw = (W − 0.39)/0.61, reaching 1 at the **white W** (HLG 1.07, the gain at full
+      signal; PQ 1000/203, 1,000 cd/m²) and 1 above it, so highlights and colours outside
+      Rec. 709 roll off instead of clipping; then the encode, BT.1886's inverse, L^(1/2.4).
+    - **A premultiplied source** (its buffer labelled so, G-35 (b)) is un-premultiplied with
+      the layer stage's own floor, rgb / max(a, 10⁻⁴), converted, and premultiplied back;
+      alpha passes through, and a texel at alpha 0 stays finite.
+    - **The distance to Apple's measured points**, computed before measuring: HLG 0.25 / 0.5 /
+      0.75 / 1.0 at +0.93 / −0.84 / +0.17 / 0.00 levels of 255; PQ 0.5 / 0.75 at −0.79 / −0.28.
+      **H3's bound: each of Apple's six points within 3/255 of the render.**
+    - **The selector** (`InputConversion.choose`, from the buffer's attachments), in order: a
+      log transfer attachment (`kCVImageBufferLogTransferFunctionKey`) → the identity; the HLG
+      transfer → HLG; the PQ transfer → PQ (each with the primaries: BT.2020 → BT.2020, P3 D65
+      → P3 D65, BT.709 → BT.709, absent or any other → BT.2020); the BT.709, BT.2020 or sRGB
+      transfer with BT.2020 primaries → wide-gamut SDR from BT.2020, with P3 D65 primaries →
+      wide-gamut SDR from P3 D65; anything else → the identity: no pass, and the buffer's own
+      texture sampled exactly as today.
+    - **Wide-gamut SDR is converted too** (owner, 2026-10-11, "Convert it"): with
+      `supportsHDRSourceFrames` true AVFoundation no longer converts a wide-gamut source for
+      the compositor (`AVVideoCompositing.h`, `canConformColorOfSourceFrames`), so step 0
+      must, to keep it looking converted: decode L = signal^2.4 (BT.1886), the matrix, the
+      encode; no lift and no shoulder (the layer stage's clamp, PR-1). It also covers a screen
+      recording labelled Display P3, should one turn up. Measured on the control
+      (`hdr_proof.py capture` at 716720c, Release): a BT.2020/BT.709-transfer, a P3/BT.709 and
+      a BT.2020/BT.2020-10 file each drew a grey of 128 as 65 or 66 on `render_frame`.
+    - **The screen recording's labels** (owner, 2026-10-11, "Yes, read labels"): `hdr_proof.py`
+      R0 reads only the colour labels (ffprobe) of the newest existing recording in
+      `~/Movies/Reelcut Recordings/`, never its pixels, and nothing records the screen for it.
+    - **Where the owed "real screen recording's labels" check went**: R0 on the control
+      (Release, 2026-10-11) read `Screen Recording 2026-09-28 at 10.45.11.mov` as HEVC
+      `bt709/bt709/bt709`, the identity arm, so H1 holds a ramp carrying exactly those tags
+      (`rec_tags.mov`) byte-identical; how a recording looks against QuickTime Player is
+      GRD-16's.
+  - **Amended after T3-1's H1 stop** (owner, 2026-10-12, "Redesign, keep SDR exact"): **the
+    switch is per composition.** A composition whose video tracks hold a source that starts a
+    conversion — HLG, PQ, or wide-gamut SDR (BT.2020 or P3 D65 primaries with an SDR
+    transfer, the sRGB one included) — is built with `ConvertingCompositor` (both AVFoundation
+    properties true) and BT.709 colour, and a frame it composes is labelled BT.709. Every
+    other composition is built exactly as before: `Compositor`, both properties false, no
+    composition colour, no step 0, so an SDR-only project keeps its pixels and labels by
+    construction. The choice is `CompositionBuilder.convertsSources`, over each composition
+    track's format descriptions (the same selector over their extensions); every path copies
+    the built configuration, so the preview, every export and every rendered frame agree, and
+    adding or removing an HDR clip rebuilds and re-chooses.
+    - **Why** (measured in scratch, 2026-10-12, `tools/proof/work/t3-1/redesign/`): T3-1's first
+      code set BT.709 on every composition; every SDR frame's pixels were identical, but 7 of
+      H1's 12 single-source scenes (untagged ProRes and H.264, matrix-only HEVC, a PNG still,
+      VP9, sRGB HEVC, Apple Log) came out labelled `kCGColorSpaceCoreMedia709` instead of sRGB
+      or their own ICC, and the eyedropper's picks moved (grey 0.251 → 0.286); with no
+      composition colour H1 held but HDR frames followed the source's HLG tag (H2, H3 failed).
+      M1: a destination carries the render context's labels, and the context is per
+      composition, not per frame (in HLG | untagged × 2 with no colour every frame is
+      HLG-labelled). M2: writing the BT.709 triple on the destination reaches every consumer,
+      but by M1 cannot keep a mixed project's unconverted frames right by itself. M3:
+      `canConformColorOfSourceFrames` changes SDR-only mixes (in sRGB | BT.709 today conforms
+      the BT.709 clip into the sRGB context, pick 66, export 55; conformed natively 127, 115),
+      hence `Compositor` keeps today's answers. M4: beside HLG, today's class and
+      `ConvertingCompositor` + BT.709 give byte-identical generator PNGs, equal picks and equal
+      export pixels for every SDR clip measured (untagged and BT.709 ProRes, H.264 709 and
+      untagged, matrix-only HEVC, ProRes 4444, Apple Log, SMPTE-C ProRes; untagged beside PQ and
+      beside P3/709) except the sRGB-transfer HEVC (export 53 → 126, pick 62 → 139). M5: a
+      composition track's `formatDescriptions`, read by key, lists every inserted source's
+      labels (10 sources, Apple Log's log extension included).
+    - **The sRGB arm** (owner, 2026-10-12, "Convert it now"): every sRGB-transfer source takes
+      it, `InputConversion.srgb(p)` (kind 4): the IEC 61966-2-1 EOTF per channel of the signal
+      floored at 0 (s ≤ 0.04045 ? s/12.92 : ((s + 0.055)/1.055)^2.4), the source's primaries to
+      BT.709 in linear light (`toBT709(from: p)`, the identity for BT.709; p is BT.2020 or P3
+      D65 for those primaries, BT.709 for BT.709, absent or any other), the negatives clamped,
+      then the encode L^(256/502): the inverse of the gamma of Core Media's BT.709 profile
+      (`kCGColorSpaceCoreMedia709`'s TRC is `curv` 502/256, a pure power of 1.9609375, with
+      BT.709/D65 primaries), which ColorSync reads a converted frame through. No lift, no
+      shoulder. One with BT.709 or other non-wide primaries takes it only inside a converting
+      composition and never makes one (`startsConversion` false only for `.srgb(.bt709)`), so it
+      renders there as it does alone; one with P3 D65 or BT.2020 primaries is wide gamut, makes
+      its composition converting, and renders as Apple reads the file's own labels. M7 (the
+      target, `srgb.mov` alone on today's path: mid-grey exports at 115.7, picks [128, 128,
+      128], [153, 48, 0], [87, 249, 255]): the EOTF then BT.709's OETF picks 126, [153, 36, 0],
+      [82, 249, 255]; then BT.1886's inverse exports within 19 levels; then 256/502 picks all
+      three identical, exports 115.7 at mid-grey and within 3.5 (grey row) and 5.1 (chroma row)
+      levels over the rows, all near black, where VideoToolbox's sRGB → 709 conversion has a
+      toe of its own. M8 (`p3srgb.mov`, smpte432/iec61966-2-1/bt709): Apple's reading of the
+      file's own labels picks [128, 128, 128], [166, 36, 0], [0, 253, 255]; today's Reelcut
+      alone [55, 55, 55], [98, 4, 0], [0, 251, 255]; the earlier `sdrWide` reading [139, 139,
+      139], [175, 35, 0], [0, 254, 255]; `.srgb(.p3D65)` [128, 128, 128], [167, 36, 0], [0, 253,
+      255].
+    - **Accepted limits**: a source whose file's format description lacks the colour labels
+      its decoded frames carry stays on today's path (AVFoundation's conversion), since the
+      class is chosen from the descriptions; HDR10 static metadata on a converted frame is not
+      measured (no fixture carries it).
 - **GR-16 — Camera log is a setting on the media, `media.color {log, gamut, lut, detected}`,
   converted at step 0 before the chroma key and Color's four.** Choices 3a, 4a, 5a and 6
   (owner, 2026-10-11).
