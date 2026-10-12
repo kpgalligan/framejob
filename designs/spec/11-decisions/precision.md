@@ -12,12 +12,13 @@ pixel, not what a pixel means: blending stays in encoded sRGB (§7.5, MT-3), and
 and linear light are deferred. They amend MT-6, MT-8, MT-9 and G-35 the way G-35 amended G-33,
 and re-litigate nothing.
 
-PR-6..PR-8 were recorded in P2-0 of road map "precision-2" (`designs/precision-2.md`, #257),
-before any of its code, from the owner's "All as recommended" (2026-10-11) to the #257 brief's
-choices 1a, 2a, 3 (close), 4 (close) and 5 (`~/.claude/litecode/reelcut/i257-8bit-paths/I-257.md`
-§0; the answers in `…/i257-8bit-paths/answers.md`). They take up PR-5's deferral of the 10-bit
-rest: PR-6 and PR-7 amend its list, and PR-8 closes its other two items. PR-2 stands: HDR stays
-tone-mapped in the compositor.
+PR-6..PR-8 were recorded in P2-0 of road map "precision-2" (#257), before any of its code, from
+the owner's "All as recommended" (2026-10-11) to the #257 brief's choices 1a, 2a, 3 (close), 4
+(close) and 5 (`~/.claude/litecode/reelcut/i257-8bit-paths/I-257.md` §0; the answers in
+`…/i257-8bit-paths/answers.md`). That road map is closed: its condensed record is
+`designs/adr/precision-2.md`, and the original, `archive/precision-2.md`, holds each phase's
+record (P2-0–P2-3). They take up PR-5's deferral of the 10-bit rest: PR-6 and PR-7 amend its
+list, and PR-8 closes its other two items. PR-2 stands: HDR stays tone-mapped in the compositor.
 
 - **PR-1 — The working depth is 16-bit float, holding encoded values clamped to [0, 1] (owner,
   2026-10-09, choices 1 and 5).**

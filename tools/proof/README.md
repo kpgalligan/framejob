@@ -17961,10 +17961,10 @@ removed: C1);
 `hevc-no-profile` (B1) and `label-premultiplied` on its new anchor, and the
 four B93 probe mutants, since the fill they anchor in went generic.
 
-**precision-2 P2-1 — deep stills (spec §11 PR-6; road map
-`designs/precision-2.md`).** A still deeper than 8 bits a component is
-drawn at 16-bit float (`LayerRenderers.renderImage`'s `deepBitmap`, uploaded
-`rgba16Float`). The fixtures, made once into `work/precision/media/`:
+**precision-2 P2-1 — deep stills (spec §11 PR-6; its record
+`archive/precision-2.md`'s P2-1 section).** A still deeper than 8 bits a
+component is drawn at 16-bit float (`LayerRenderers.renderImage`'s
+`deepBitmap`, uploaded `rgba16Float`). The fixtures, made once into `work/precision/media/`:
 `ramp16.png` (`rgb48be`) and `ramp16.tif` (`rgb48le`), 1920×1080, every
 column X at X/1919 of full scale —
 `ffmpeg -f lavfi -i "color=c=black:size=1920x1080:d=1,format=gbrp16le,geq=r='X*65535/(W-1)':g='X*65535/(W-1)':b='X*65535/(W-1)'" -frames:v 1 -pix_fmt rgb48be ramp16.png`
@@ -18010,11 +18010,12 @@ untouched, so a later tree never replaces an older tree's reference. Mutants, on
 alpha-ramp scenes alone left it equivalent, since only a non-identity step
 after the un-premultiply carries the 8-bit draw's premultiplied rounding).
 
-**precision-2 P2-2 — the 10-bit reverse (spec §11 PR-7; road map
-`designs/precision-2.md`).** `ReverseRenderer` reads `x420` (an odd size:
-`x422`) frames, copies every plane with the decoder's attachments, and
-writes HEVC Main 10 (an odd size: ProRes 422) with no colour properties; the
-reverse cache's digest carries `ReverseCache.rendererVersion`. V0, V2 and
+**precision-2 P2-2 — the 10-bit reverse (spec §11 PR-7; its record
+`archive/precision-2.md`'s P2-2 section).** `ReverseRenderer` reads `x420`
+(an odd size: `x422`) frames, copies every plane with the decoder's
+attachments, and writes HEVC Main 10 (an odd size: ProRes 422) with no
+colour properties; the reverse cache's digest carries
+`ReverseCache.rendererVersion`. V0, V2 and
 V5 run the REAL renderer through `reverse_probe.swift`
 (`reverse_probe SOURCE DEST OUT_JSON`), compiled with every `app/Sources`
 file but `main.swift` — a mutant copy's under `--mutant` — through

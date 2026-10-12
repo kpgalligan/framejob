@@ -681,3 +681,62 @@ already matched the glob. After them: `make gate` PASS; V4 on Release 2/2; the
 `app/CLAUDE.md` entry above is applied.
 
 P2-3 (the close) is next, from main after this phase's merge.
+
+## P2-3 — the close
+
+**What landed** (2026-10-11, in the worktree on `i257`, from `aed143d`; main had not moved). No
+product or proof code:
+- This road map condensed into `designs/adr/precision-2.md`; this file moved to
+  `archive/precision-2.md` with its `archive/INDEX.md` row.
+- `designs/spec/11-decisions/precision.md`'s opening paragraph on PR-6..PR-8: the road map is
+  closed, its condensed record and this original named in place of `designs/precision-2.md`.
+- `tools/proof/README.md`'s "precision-2 P2-1" and "precision-2 P2-2" paragraphs: their record
+  is this file's P2-1 and P2-2 sections.
+
+**The review of what was left**, against the tree at `aed143d`:
+- "Not established": S4 settled in P2-1 (the owner's "Accept it", PR-4's amendment); V3 settled
+  in P2-2 (the chroma ramp, 0.078 levels); the 10-bit HEIF settled in P2-1's fix pass 1 (S7);
+  `source_mirror_probe.py` §3 on the new renderer settled in P2-2 (40/40, and V0's and V5's
+  stamps); the real renderer's one-run figures superseded by `reverse-cost`'s medians. Two stay:
+  HEVC Main 10's playback decode cost (REASONED, a known limit in the ADR) and the odd-size
+  ProRes branch's cost on camera footage (#274).
+- P2-1's "What is owed": PRC-4 stands in `docs/manual-checks.md`; S5 (a deep still over 8-bit
+  video renders 8-bit) is recorded in PR-4's amendment, with the owner's ruling naming only the
+  stills-only case (#275).
+- P2-2's "What is owed": PRC-3 stands in `docs/manual-checks.md`; the ProRes branch on camera
+  footage (#274).
+- Already in the tree: `ReverseRenderer`'s doc comment no longer says the intermediate is 8-bit
+  BGRA; §5.6's "and the renderer's version"; §7.5's deep-still sentence; the README's Export
+  bullet; `app/CLAUDE.md`'s `ReverseRenderer.swift` and `LayerRenderers.swift` entries; PRC-3 and
+  PRC-4; the `ReverseCache.swift` next cut in `designs/adr/app-file-history.md`.
+  `ReverseRenderer.swift` is 1,221 lines by `wc -l` (P2-2's record said 1,220).
+
+**Issues**, drafted for the orchestrator to file, each `ai-drafted` and `low-priority`:
+- #274: the odd-size reverse's ProRes 422 cost, measured on camera footage.
+- #275: `render_frame`, Save Frame…, GIF and APNG of a deep still are 8-bit unless a deep
+  video source is in the frame.
+
+Drafted comments: #256 (the reverse carries the source's colour labels, PR-7; a deep still is
+drawn half-float in sRGB, PR-6; tier 3 inherits both); #257's close, naming `34445fa`, `44b2077`,
+`aed143d` and this phase's commit.
+
+**Verification**, 2026-10-11, AC power (`pmset -g`: powermode 0). No app launched and no MCP
+proof run: nothing a proof drives changed.
+- `python3 tools/proof/spec_index_proof.py`: 153/153 checks passed. `precision.md`'s Lines cell
+  221 → 222, and the `11-decisions/` cell 6806 → 6807 in 19 files.
+- `python3 tools/proof/capture_spike/inventory.py --check`: 5/5, exit 0.
+- `git grep -n "designs/precision-2\.md" -- . ':!archive'`: nothing (exit 1).
+- `git grep -n "NNN-" -- designs archive` and the new ADR: only the two drafted issues'
+  placeholders, replaced by #274 and #275 once the review passed (one pass, verdict pass,
+  one nit fixed: the ADR's `reverse-no-attachments` line says V3 failed but was not scored).
+  #275 carries `ready-for-human`: it waits on the owner's ruling for S5. The root
+  `CLAUDE.md` ADR entry is applied.
+- `make gate`: PASS in 67 s (test 66 s; typecheck, fmt, lint and app skipped as unchanged). Its
+  test step: 1,367 cargo tests passed in 119 result lines, 0 failed; `inventory.py --check` 5/5
+  and `spec_index_proof.py` 153/153. This file and the ADR are not gate inputs (`gate.py`: only
+  `designs/spec/` and `docs/` count among the `*.md`), so writing this record after the run
+  changes no stamp.
+
+**Owed.** PRC-3 and PRC-4, the owner's standing rows in `docs/manual-checks.md`. The root
+`CLAUDE.md`'s "Where to look" `designs/adr/` cell gains a `precision-2` entry, the
+orchestrator's.
