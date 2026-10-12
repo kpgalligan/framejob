@@ -1164,7 +1164,9 @@ the key map behind it.
   leniently.
 - `Compositor.swift` · `Compositor+Uniforms.swift` · `Compositor+Shadow.swift` ·
   `Compositor+Matte.swift` · `MattePlan.swift` · `Compositor+Dissolve.swift` ·
-  `Compositor+Adjustment.swift` ·
+  `Compositor+Adjustment.swift` · `DestinationPass.swift` (the destination
+  render pass as a value a shadow or a routed dissolve suspends and
+  resumes) ·
   `CompositorEffects.swift` · `LayerUniforms.swift` (`LayerUniforms`,
   `ShadowUniforms`, `TransitionCode`) · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The working format is `rgba16Float`

@@ -533,6 +533,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   a pure move gated alone before the 16-bit-float working depth landed. `wc -l
   app/Sources/Compositor.swift`: 961 before, 695 after; `LayerUniforms.swift` is 267. The next
   seam: `DestinationPass` out whole.
+  Grading-3's T3-0 paid that seam: the doc comment and `struct DestinationPass` went whole to
+  `DestinationPass.swift` with `import Metal` and nothing else, a pure move gated alone before
+  any tier-3 code; nothing widened. `wc -l app/Sources/Compositor.swift`: 723 before, 658 after;
+  `DestinationPass.swift` is 66. The next seam: `MetalRenderer`'s `// MARK: - Sources`
+  (`LayerSource`, `source(for:…)`, `texture(from:live:)`) out whole to `Compositor+Sources.swift`
+  as an `extension MetalRenderer` (`textureCache`, `renderers` and `texture(from:live:)` lose
+  `private`; `render` also calls `texture(from:)`) — where T3-1's step 0 meets a track's buffer.
 - `ReelCore.swift`: the typed patches moved to `TypedPatches.swift` in issue batch B73 (#216), a
   pure move gated alone before `ReelContainer` landed; no further seam is named. The `dictionary`
   extensions went to `OpDictionaries.swift` in issue batch B52b (#190), the media helpers earlier

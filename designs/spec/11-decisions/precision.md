@@ -63,6 +63,17 @@ list, and PR-8 closes its other two items. PR-2 stands: HDR stays tone-mapped in
     - A frame decoded from video moves by about one level on 18–50 % of channels, and by
       ≥ 5 levels on ≤ 3.5 %, at sharp colour edges.
     - Values arrive unclamped (−0.46…1.47); PR-1's source clamp bounds them.
+  **Amended by GR-15** (grading-3 T3-0): "HDR stays tone-mapped to SDR" is true of one path,
+  not of every frame. Measured by the tier-3 brief (2026-10-11, a scratch instrument making the
+  app's own AVFoundation calls; `designs/grading-3.md`, "How it fits the tree"), at a grey signal
+  of 0.5: the export reader's later frames and the player arrive converted to SDR (HLG 0.3843,
+  PQ 0.7192), but the FIRST frame a decoder delivers of each HLG or PQ clip, and every frame
+  `AVAssetImageGenerator` draws (`render_frame`, Save Frame…, GIF, APNG, the Look gallery's
+  thumbnails, the eyedropper, Pick from Canvas), arrive unconverted (0.5000) and labelled BT.709;
+  a BT.2020 file with the BT.709 transfer arrives darkened on every path (0.2568). GR-15 sets
+  `canConformColorOfSourceFrames` and `supportsHDRSourceFrames` true, so every source arrives
+  native and honestly labelled, and Reelcut converts HDR to SDR itself at step 0 (from T3-1).
+  The decision "HDR reaches the output as SDR" stands; only who converts changes.
 - **PR-3 — Which exports carry the depth (choice 3).**
   - The export reader's frames are the compositor's `64RGBAHalf`. `prores_422` (10-bit 4:2:2)
     and `prores_4444` (12-bit 4:4:4:4) take them as they are.

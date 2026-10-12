@@ -426,6 +426,22 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   - Risk accepted: a LUT that expects log or linear input draws wrong on Reelcut's encoded values
     unless the footage is what the LUT was made for, and nothing warns; non-default domains, 1D and
     shaper LUTs are refused, not read.
+  **Amended by GR-15** (grading-3 T3-0): T0's "HLG and PQ draw the grey ramp UNCHANGED (no
+  transfer conversion; …)" is true of the path T0 measured, `render_frame`'s
+  `AVAssetImageGenerator`, and of the first frame a decoder delivers of each HLG or PQ clip; the
+  export reader's later frames and the player convert them to SDR (the tier-3 brief, 2026-10-11:
+  grey signal 0.5 → HLG 0.3843, PQ 0.7192; `designs/grading-3.md`, "How it fits the tree"). From
+  T3-1 every source arrives native and honestly labelled (`canConformColorOfSourceFrames`), and
+  Reelcut's step 0 converts HLG, PQ and BT.2020-with-BT.709-transfer sources to SDR Rec. 709
+  before the layer stage, so a LUT at 4d meets them converted, on every path.
+  **Amended by GR-16** (grading-3 T3-0): log is checked on a synthetic file. A ProRes file
+  labelled Apple Log reads back with `LogTransferFunction = com.apple.rec2020.apple-log` (a
+  `logs` atom; `colr` BT.2020 primaries, transfer unspecified, BT.2020 matrix) and arrives
+  unconverted on every path, so a LUT meets its log values intact; a real iPhone file is owed
+  (GRD-17). The accepted risk shrinks: from T3-2 a media's `color` setting converts camera log at
+  step 0, before the chroma key and Color's four; a `lut` media can serve as that conversion (Use
+  LUT…); and the Look section warns when a clip's media converts and its look is a LUT. A LUT
+  applied as a look still meets encoded values at 4d.
 - **GR-9 — The branch wrote project format 1015 and refused 15–1014 by name; at the merge 1015
   became 15.** The branch's `RC_FORMAT_VERSION` was **1015** (main's 14 plus a thousand), in
   `core/src/format.rs` and the header, so every main build refused a branch-made project as "made
