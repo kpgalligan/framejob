@@ -3,18 +3,32 @@ import CoreVideo
 import simd
 
 /// The primaries a converted source is read in: the gamut step 0's matrix
-/// takes to BT.709 (spec §11 GR-15).
+/// takes to BT.709 (spec §11 GR-15), and the camera gamuts of GR-16.
 enum InputPrimaries: Equatable {
-    case bt709, bt2020, p3D65
+    case bt709, bt2020, p3D65, sGamut3Cine, sGamut3, vGamut, appleWideGamut
+
+    /// A media's camera gamut (spec §11 GR-16).
+    init(_ gamut: CameraGamut) {
+        switch gamut {
+        case .bt2020: self = .bt2020
+        case .sGamut3Cine: self = .sGamut3Cine
+        case .sGamut3: self = .sGamut3
+        case .vGamut: self = .vGamut
+        case .appleWideGamut: self = .appleWideGamut
+        }
+    }
 }
 
 /// Step 0's conversion of one source (spec §11 GR-15), chosen from its
 /// buffer's colour labels: HLG or PQ to SDR Rec. 709, a wide-gamut SDR
 /// source's matrix to BT.709, or an sRGB-transfer source's sRGB arm. nil —
 /// the identity — for every other source, which is then sampled exactly as
-/// before T3-1 (no pass, its own texture).
+/// before T3-1 (no pass, its own texture). A media's Camera Log (GR-16)
+/// chooses before the labels: a maker's log curve and its camera gamut, or a
+/// `lut` media's table.
 enum InputConversion: Equatable {
     case hlg(InputPrimaries), pq(InputPrimaries), sdrWide(InputPrimaries), srgb(InputPrimaries)
+    case log(LogCurve, InputPrimaries), lut(UInt32)
 
     /// Whether a source answering this makes its composition a converting
     /// one (`ConvertingCompositor`, GR-15 as amended). False only for
@@ -41,6 +55,16 @@ enum InputConversion: Equatable {
         case Label.bt709, Label.bt2020: return wide(primaries)
         default: return nil
         }
+    }
+
+    /// GR-16's selector, over a media's Camera Log as a recipe layer's
+    /// `input` carries it: its curve and gamut (the curve's first when none
+    /// is stored), else its LUT; nil for neither.
+    static func choose(input: MediaColor) -> InputConversion? {
+        if let log = input.log, let gamut = input.effectiveGamut {
+            return .log(log, InputPrimaries(gamut))
+        }
+        return input.lut.map { .lut($0) }
     }
 
     /// The selector over a decoded frame's own attachments — the labels
@@ -126,6 +150,19 @@ enum InputConversion: Equatable {
             uniforms.white = 1
             uniforms.encodePower = 1 / InputConversions.coreMedia709Gamma
             primaries = p
+        case .log(let curve, let p):
+            uniforms.kind = InputUniforms.kind(of: curve)
+            uniforms.white = InputConversions.logWhite
+            uniforms.exposure = InputConversions.logExposure
+            let domain = InputConversions.codeDomain(curve)
+            uniforms.codeScale = domain.scale
+            uniforms.codeOffset = domain.offset
+            primaries = p
+        case .lut:
+            // The table's output is taken as encoded Rec. 709: no matrix.
+            uniforms.kind = InputUniforms.lut
+            uniforms.white = 1
+            primaries = .bt709
         }
         uniforms.premultiplied = premultiplied ? 1 : 0
         uniforms.systemGamma = InputConversions.hlgSystemGamma
@@ -165,13 +202,42 @@ enum InputConversions {
     /// amended, measured M7).
     static let coreMedia709Gamma: Float = 502.0 / 256.0
 
+    /// GR-16's display transform for camera log (choice 4a, "42%, as
+    /// planned"): 18 % grey encodes to this mid-grey (107/255, near BT.709's
+    /// 0.409), so scene light is scaled by the exposure 0.42^2.4/0.18
+    /// (≈ 0.6927) before the matrix, and the shoulder reaches 1 at the white
+    /// 64·0.42^2.4 (≈ 7.98), six stops over 18 % grey.
+    static let logMidGrey: Float = 0.42
+    static let logExposure: Float = pow(logMidGrey, displayGamma) / 0.18
+    static let logWhite: Float = 64 * pow(logMidGrey, displayGamma)
+    /// Sony's and Panasonic's curves read the STORED 10-bit code over 1023,
+    /// and a video-range file decodes to s = (code − 64)/876: their signal is
+    /// s·876/1023 + 64/1023. Apple's is the normalized signal itself (GR-16's
+    /// code domains).
+    static let videoCodeScale: Float = 876.0 / 1023.0, videoCodeOffset: Float = 64.0 / 1023.0
+
+    /// A curve's code domain as the pass's `codeScale` and `codeOffset`.
+    static func codeDomain(_ curve: LogCurve) -> (scale: Float, offset: Float) {
+        switch curve {
+        case .appleLog, .appleLog2: return (1, 0)
+        case .slog3, .vlog: return (videoCodeScale, videoCodeOffset)
+        }
+    }
+
     /// Published chromaticities (x, y) of red, green and blue: ITU-R BT.709,
-    /// ITU-R BT.2020, and P3 D65 (SMPTE EG 432-1); every white is D65.
+    /// ITU-R BT.2020, and P3 D65 (SMPTE EG 432-1); the camera gamuts from
+    /// their makers' documents (GR-16's append): Sony's S-Gamut3.Cine and
+    /// S-Gamut3, Panasonic's V-Gamut, Apple's Apple Wide Gamut. Every white
+    /// is D65.
     private static func chromaticities(_ primaries: InputPrimaries) -> [SIMD2<Double>] {
         switch primaries {
         case .bt709: return [[0.640, 0.330], [0.300, 0.600], [0.150, 0.060]]
         case .bt2020: return [[0.708, 0.292], [0.170, 0.797], [0.131, 0.046]]
         case .p3D65: return [[0.680, 0.320], [0.265, 0.690], [0.150, 0.060]]
+        case .sGamut3Cine: return [[0.766, 0.275], [0.225, 0.800], [0.089, -0.087]]
+        case .sGamut3: return [[0.730, 0.280], [0.140, 0.855], [0.100, -0.050]]
+        case .vGamut: return [[0.730, 0.280], [0.165, 0.840], [0.100, -0.030]]
+        case .appleWideGamut: return [[0.725, 0.301], [0.221, 0.814], [0.068, -0.076]]
         }
     }
 

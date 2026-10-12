@@ -85,15 +85,15 @@
 //! same times its `clips[]` are written in — not project time. A nest has
 //! no speed, so `t − nest_clip.start` is the whole mapping.
 //!
-//! **Eight ops are an `Err` with a scope**, naming themselves and the nest:
+//! **Nine ops are an `Err` with a scope**, naming themselves and the nest:
 //! `add_marker`, `set_marker`, `remove_marker` (a nest has no markers of
 //! its own — spec §5.2), `set_canvas` (a nest's size is FROZEN at the size
 //! the parent had when it was made, deliberately, and the rest of a canvas
 //! — the rate, the background, the two switches — is the document's), and
-//! `add_media`, `relink_media`, `remove_media` (a nest references the
-//! parent's `media[]` in the parent's one id space, so a media edit inside
-//! a scope is an edit OUTSIDE it wearing a scope, which is the one thing a
-//! scope exists to prevent), and `add_adjustment_clip` (an adjustment clip
+//! `add_media`, `relink_media`, `remove_media`, `set_media_color` (a nest
+//! references the parent's `media[]` in the parent's one id space, so a
+//! media edit inside a scope is an edit OUTSIDE it wearing a scope, which is
+//! the one thing a scope exists to prevent), and `add_adjustment_clip` (an adjustment clip
 //! grades what is behind it at the top level only, spec §11 GR-6).
 //! Everything else — all fifty-two — works
 //! inside a nest as it works on the timeline, `nest` and `unnest`
@@ -179,7 +179,8 @@
 //! | `set_canvas` | `rescale_clips`, false when absent, multiplies every clip's `x`, `y` and `scale` by the size ratio; an fps change re-snaps top-level and stored-nest clip starts, source-bounded durations, action spans, present base motion/text timings and a graphic's `in` and `length`, plus top-level markers, to the new grid (spec §11, D7-3, G-18). A marker a coarser grid lands on a tick an earlier stored marker already holds is dropped; size-only and same-fps edits do not resnap. |
 //! | `add_media` | Appends the `media[]` element of spec §5.2 minus its `id` (the host probes the file). A path already in the list changes nothing. An `original` (the WebM or Matroska file a playable copy was made from, spec §11 #228-O) is stored with its path trimmed; an empty one is an `Err`. A `lut` row (a `.cube` file, spec §11 GR-8) carries no video, audio, alpha or duration, or is an `Err`. |
 //! | `relink_media` | Points a media at another file; an absent or `null` bookmark clears the stale one. The `probe` the host fills is the new file's descriptor minus `path` and `bookmark`: the media takes its duration, size, rate and flags, a file of another kind is refused, and a media clip running past a shorter file's end is held to it (spec §11, #63). The probe's `original` replaces the stored one, so a probe without one clears it (#228-O). No `probe` keeps the record. |
-//! | `remove_media` | Refuses while clips still reference it unless `with_clips`, which removes those clips too. A `lut` media is no clip's source: it refuses while it is a clip's base look unless `with_clips`, which clears those looks and keeps the clips (spec §11 GR-8). |
+//! | `remove_media` | Refuses while clips still reference it unless `with_clips`, which removes those clips too. A `lut` media is no clip's source: it refuses while it is a clip's base look or a media's Camera Log unless `with_clips`, which clears those looks and conversions and keeps the clips and the media (spec §11 GR-8, GR-16). |
+//! | `set_media_color` | A video media's Camera Log (spec §11 GR-16): `color` is `{log, gamut}` (a built-in curve, its gamut defaulting to the curve's first) or `{lut}` (a `lut` media as the input conversion), converted at step 0 for every clip of the media; `null` clears it. Refused, each in its own sentence: an audio, image or LUT media; neither or both of `log` and `lut`; a `gamut` without `log` or outside the curve's pairings; a `lut` that names no `lut` media; `detected`, which import writes. `media_color.rs` holds the rules. |
 //!
 //! ### Results
 //!
@@ -640,14 +641,18 @@ pub enum Op {
         #[serde(default)]
         with_clips: bool,
     },
+    SetMediaColor {
+        media: u32,
+        color: Value,
+    },
 }
 
 /// One parsed envelope: the op, and the nest it applies INSIDE.
 ///
 /// A struct rather than a bare [`Op`] because `scope` is the envelope's
 /// key and not any op's argument — it is spelled once, it means the same
-/// thing over all sixty, and folding it into the enum would mean
-/// sixty copies of one optional field. [`Project::apply_op`] still
+/// thing over all sixty-one, and folding it into the enum would mean
+/// sixty-one copies of one optional field. [`Project::apply_op`] still
 /// takes an `&Op` and knows nothing about nests.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Envelope {
@@ -673,7 +678,7 @@ pub struct Envelope {
 /// envelope key. A `#[serde(flatten)]` wrapper is not the way round it
 /// either: serde documents `deny_unknown_fields` as unsupported with
 /// `flatten`, and it would silently stop refusing typos. Removing the key
-/// before the typed decode keeps all three — the refusal, all sixty
+/// before the typed decode keeps all three — the refusal, all sixty-one
 /// variants, and an envelope key that is not an argument.
 pub fn parse(op_json: &str) -> Result<Envelope, String> {
     let mut value: Value =
@@ -941,6 +946,7 @@ impl Project {
                 probe,
             } => self.relink_media(*media, path, bookmark.as_deref(), probe.as_ref()),
             Op::RemoveMedia { media, with_clips } => self.remove_media(*media, *with_clips),
+            Op::SetMediaColor { media, color } => self.set_media_color(*media, color),
         }
     }
 }

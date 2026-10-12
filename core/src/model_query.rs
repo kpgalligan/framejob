@@ -293,6 +293,18 @@ impl Project {
             }
         }
 
+        // A media's Camera Log (spec §11 GR-16): a file naming a pairing the
+        // curve does not take, or a conversion LUT that is not a `lut` media
+        // of the project, is refused as `set_media_color` would refuse it.
+        for media in &self.media {
+            self.check_media_color(media).map_err(|why| {
+                if why.starts_with("media ") {
+                    why
+                } else {
+                    format!("media {}: {why}", media.id)
+                }
+            })?;
+        }
         self.check_clips(&self.clips, &self.tracks, "")?;
         for nest in &self.nests {
             self.check_clips(&nest.clips, &nest.tracks, &format!(" in nest {}", nest.id))?;

@@ -93,6 +93,7 @@ enum MediaImporter {
         var height = 0
         var fps = Fps.thirty
         var hasAlpha = false
+        var color: MediaColor?
         if let track = videoTracks.first {
             let natural = (try? await track.load(.naturalSize)) ?? .zero
             let transform = (try? await track.load(.preferredTransform)) ?? .identity
@@ -105,6 +106,7 @@ enum MediaImporter {
             fps = await frameRate(of: track)
             let descriptions = (try? await track.load(.formatDescriptions)) ?? []
             hasAlpha = hasAlphaChannel(descriptions)
+            color = detectedColor(descriptions)
             // One frame through the decoder: `isPlayable` says yes to files
             // nothing here decodes (spec §11 #216).
             guard DecoderSupport.decodesFirstFrame(of: track, in: asset) else {
@@ -117,7 +119,8 @@ enum MediaImporter {
         return MediaDescriptor(
             path: url.path, bookmark: bookmarkString(for: url), kind: kind,
             duration: CompositionBuilder.ticks(duration), width: width, height: height, fps: fps,
-            hasVideo: !videoTracks.isEmpty, hasAudio: !audioTracks.isEmpty, hasAlpha: hasAlpha)
+            hasVideo: !videoTracks.isEmpty, hasAudio: !audioTracks.isEmpty, hasAlpha: hasAlpha,
+            color: color)
     }
 
     /// A track's rate as an exact rational. `nominalFrameRate` is a Float and

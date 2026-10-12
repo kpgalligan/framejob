@@ -92,6 +92,8 @@ final class ClipPane: InspectorPaneView {
             matteNote == nil ? "-" : "matte",
             // Whether every clip has a look adds or removes Look's Amount row.
             videoPane.allLooked ? "look" : "-",
+            // A LUT look over a Camera Log file adds Look's warning row (GR-16).
+            videoPane.lutOverCameraLog ? "twice" : "-",
             // The LUTs are the Look gallery's Imported tiles (GR-8 [b]).
             LookGallery.luts(in: binding.snapshot).map { "\($0.id)=\(LookGallery.lutName($0))" }
                 .joined(separator: ","),

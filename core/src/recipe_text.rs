@@ -543,6 +543,7 @@ pub(crate) fn burn_in_layer(canvas: &Canvas, t: Ticks) -> Value {
         transition: Value::Null,
         matte: Value::Null,
         dissolve: Value::Null,
+        input: Value::Null,
     }
     .object()
 }

@@ -130,7 +130,11 @@ final class MediaPane: InspectorPaneView {
         // filter can be applied to this build before it is ever shown — which
         // is what carries a search across the rebuild an import causes.
         arrange()
-        return [InspectorSection(id: "media.files", title: "Media", rows: content)]
+        let files = InspectorSection(id: "media.files", title: "Media", rows: content)
+        // Camera Log (spec §11 GR-16) acts on a video file, so it is there
+        // once the project has one (`MediaPane+CameraLog.swift`).
+        let video = binding.documentSnapshot.media.contains { $0.kind == .video }
+        return video ? [files, cameraLogSection()] : [files]
     }
 
     /// Add Media…, its ⇧⌘I hint, and the item count at the trailing edge.

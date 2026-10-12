@@ -226,7 +226,8 @@ MUTANTS = {
     "select-by-primaries": ([(INPUT_SWIFT, "        guard logTransfer == nil else { return nil }\n",
                               "        if let wide = wide(primaries) { return wide }\n")],
                             ["H1", "P1"]),
-    "convert-everywhere": ([(BUILDER, "        let converts = convertsSources(videoTracks)\n",
+    "convert-everywhere": ([(BUILDER, "        let converts = convertsSources(videoTracks) || "
+                                      "plan.convertsMedia\n",
                              "        let converts = true\n")], ["H1", "H1m"]),
     "conform-everywhere": ([
         (COMPOSITOR, "    var canConformColorOfSourceFrames: Bool { false }\n",
@@ -749,6 +750,13 @@ class Doc:
             if media[path] is None:
                 self.ok, self.why = False, f"import {Path(path).name}: {got.get('error')}"
             self._media = media
+            # T3-2 (GR-16): an Apple-Log-labelled file is converted from import;
+            # Camera Log ▸ None keeps every scene as T3-1 rendered it. Never
+            # fires on the control, whose media carry no `color`.
+            row = next((m for m in self.project().get("media") or []
+                        if m.get("id") == media[path]), {})
+            if row.get("color") is not None:
+                self.call("set_media_color", media=media[path], color=None)
         if media[path] is None:
             return None
         before = {c["id"] for c in self.project().get("clips") or []}
@@ -854,6 +862,28 @@ def base_sources():
     if made["rc"] != 0 or not (sources / "Compositor.swift").exists():
         return None, f"git archive {BASE_COMMIT} failed: {made['stderr'][-300:]}"
     return sources, None
+
+
+def base_copy(package):
+    """A copy of `package` whose `project.json` says version 18 — the base tree
+    (716720c) refuses a newer file, and every number up to 18 it reads — or
+    None and why when the package's media carry `color` (T3-2, GR-16), which
+    the base tree would drop, so its frame would not be the tree's."""
+    source = Path(package)
+    try:
+        text = (source / "project.json").read_text()
+        project = json.loads(text)
+    except (OSError, ValueError) as error:
+        return None, f"{source.name}: {error}"
+    if any(m.get("color") is not None for m in project.get("media") or []):
+        return None, f"{source.name}: a media carries color"
+    copy = source.with_name(source.stem + "-v18.reelcut")
+    if copy.exists():
+        shutil.rmtree(copy)
+    shutil.copytree(source, copy)
+    (copy / "project.json").write_text(re.sub(r'"version":\s*\d+', '"version": 18', text,
+                                              count=1))
+    return copy, None
 
 
 def run_picks(sources, picks, name="hdr_pick_probe"):
@@ -1183,7 +1213,11 @@ def run_h6(client, sources, state):
             {"tag": "ref", "package": str(ref_package), "tick": T, "clips": [ref_clip],
              "points": point}] if package and ref_package else []
     tree = run_picks(sources, asks) if asks else {"error": "not saved"}
-    base = run_picks(None, asks) if asks else {"error": "not saved"}
+    copies = [base_copy(ask["package"]) for ask in asks]
+    refused = [why for copy, why in copies if copy is None]
+    older = [dict(ask, package=str(copy)) for ask, (copy, _) in zip(asks, copies)]
+    base = ({"error": f"the base tree's copy: {'; '.join(refused)}"} if refused
+            else run_picks(None, older)) if asks else {"error": "not saved"}
 
     def pick(answer, tag):
         got = ((answer.get(tag) or {}).get("picked") or [None])[0]
@@ -1224,7 +1258,9 @@ def saved_scene(client, name, paths, width=W, height=H):
 
 def run_h1m(client, control, sources, state):
     """H1m (STOP): two mixed projects, at ticks showing no converted source:
-    the base-tree probe's and the tree probe's PNG bytes and picks equal."""
+    the base-tree probe's and the tree probe's PNG bytes and picks equal. The
+    base tree reads a version-18 copy of each package (`base_copy`, T3-2); a
+    package whose media carry `color` is a FAIL."""
     names = {n: h1_media(n, control) for n in ("srgb", "bt709", "untagged", "applelog")}
     names["hlg"] = fixture("hlg")
     scenes = [("mix_sdr", ["srgb", "bt709", "untagged"], [T, SEC + T, 2 * SEC + T]),
@@ -1239,9 +1275,14 @@ def run_h1m(client, control, sources, state):
         if package is None:
             misses.append(f"{scene}: {doc.why or 'not saved'}")
             continue
+        older, why = base_copy(package)
+        if older is None:
+            misses.append(f"{scene}: the base tree's copy: {why}")
+            continue
         for tick in ticks:
             for which in asks:
-                asks[which].append({"tag": f"{scene}@{tick}", "package": str(package),
+                asks[which].append({"tag": f"{scene}@{tick}",
+                                    "package": str(package if which == "tree" else older),
                                     "tick": tick, "clips": clips, "points": PICK_POINTS[(W, H)],
                                     "png": str(WORK / f"h1m-{which}-{scene}-{tick}.png")})
     tree = run_picks(sources, asks["tree"]) if asks["tree"] else {"error": "no scene"}

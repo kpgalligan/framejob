@@ -191,9 +191,10 @@ extension AgentServer {
                     + "supply — the media[] element of the project JSON minus its id (path, "
                     + "bookmark, kind, duration, width, height, fps [num, den], has_video, "
                     + "has_audio, has_alpha, original {path, bookmark?} — the file a .mov copy "
-                    + "or conversion was made from). Probing files is the host's job, so "
-                    + "unless you are replaying a project's own JSON, call import_media and let "
-                    + "it probe.",
+                    + "or conversion was made from — and color, a video file's Camera Log, as "
+                    + "set_media_color takes it plus detected). Probing files is the host's "
+                    + "job, so unless you are replaying a project's own JSON, call import_media "
+                    + "and let it probe.",
                 ["descriptor": "The media entry to add; only path is required."]),
             opTool(
                 "relink_media",
@@ -219,6 +220,22 @@ extension AgentServer {
                 [
                     "media": "Media id.",
                     "with_clips": "Remove the clips using it, or a LUT's looks (default false).",
+                ]),
+            opTool(
+                "set_media_color",
+                "Sets how a video file's camera log footage is converted to Rec. 709 — the "
+                    + "Media tab's Camera Log popup. Every clip of the file, and its reverse, "
+                    + "follows it; it is converted before the chroma key and every grade, and "
+                    + "Show Ungraded keeps it. color is {log, gamut?}: log apple_log (gamut "
+                    + "bt2020), apple_log2 (apple_wide_gamut), slog3 (s_gamut3_cine or "
+                    + "s_gamut3) or vlog (v_gamut), gamut defaulting to the first; or {lut: "
+                    + "media id} to convert with an imported .cube (import_media it first); or "
+                    + "null for none, which shows the log picture. An Apple Log or Apple Log 2 "
+                    + "file is set at import (get_project's media[].color shows detected: "
+                    + "true). Refused on an audio, image or LUT media.",
+                [
+                    "media": "The video media's id.",
+                    "color": "{log, gamut?}, {lut} or null to clear.",
                 ]),
         ]
         // transcribe and export_captions are `AgentCatalog+Captions.swift`'s

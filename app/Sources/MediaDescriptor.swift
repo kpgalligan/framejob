@@ -46,11 +46,15 @@ struct MediaDescriptor: Equatable {
     var hasAudio: Bool
     var hasAlpha: Bool
     var original: MediaOriginal?
+    /// Camera Log as import read it from the file's label (spec §11 GR-16):
+    /// `detected` Apple Log or Apple Log 2, else nil.
+    var color: MediaColor?
 
     init(
         path: String, bookmark: String? = nil, kind: MediaKind = .video, duration: Ticks = 0,
         width: Int = 0, height: Int = 0, fps: Fps = .thirty, hasVideo: Bool = false,
-        hasAudio: Bool = false, hasAlpha: Bool = false, original: MediaOriginal? = nil
+        hasAudio: Bool = false, hasAlpha: Bool = false, original: MediaOriginal? = nil,
+        color: MediaColor? = nil
     ) {
         self.path = path
         self.bookmark = bookmark
@@ -63,6 +67,7 @@ struct MediaDescriptor: Equatable {
         self.hasAudio = hasAudio
         self.hasAlpha = hasAlpha
         self.original = original
+        self.color = color
     }
 
     /// Re-describes an existing entry, for Relink… and for the agent's
@@ -72,7 +77,7 @@ struct MediaDescriptor: Equatable {
             path: media.path, bookmark: media.bookmark, kind: media.kind,
             duration: media.duration, width: media.width, height: media.height, fps: media.fps,
             hasVideo: media.hasVideo, hasAudio: media.hasAudio, hasAlpha: media.hasAlpha,
-            original: media.original)
+            original: media.original, color: media.color)
     }
 
     /// The descriptor under the model's own key names. `bookmark` and
@@ -92,16 +97,19 @@ struct MediaDescriptor: Equatable {
         ]
         if let bookmark = bookmark { d["bookmark"] = bookmark }
         if let original = original { d["original"] = original.dictionary }
+        if let color = color { d["color"] = color.descriptorDictionary }
         return d
     }
 
     /// The descriptor as `relink_media`'s `probe`: `dictionary` minus
-    /// `path` and `bookmark`, which are the op's own arguments (§11, #63).
-    /// It keeps `original`, so a relink records the new file's (#228-O).
+    /// `path` and `bookmark`, which are the op's own arguments (§11, #63),
+    /// and `color`, which a relink keeps (GR-16). It keeps `original`, so a
+    /// relink records the new file's (#228-O).
     var probeDictionary: [String: Any] {
         var d = dictionary
         d.removeValue(forKey: "path")
         d.removeValue(forKey: "bookmark")
+        d.removeValue(forKey: "color")
         return d
     }
 }

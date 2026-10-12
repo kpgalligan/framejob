@@ -9,7 +9,10 @@
 //! now runs past a SHORTER file's end is held to it. Without a probe the
 //! record is kept: Consolidate and the open-time re-anchor point at a copy
 //! of the same file. A probe's `original` (spec §11 #228-O) replaces the
-//! stored one, so a probe without one clears it, and no probe keeps it.
+//! stored one, so a probe without one clears it, and no probe keeps it. A
+//! probe never carries `color`, and a relink keeps the media's Camera Log
+//! (spec §11 GR-16): it is the person's reading of the footage, which a new
+//! path to the same footage does not change.
 //!
 //! Cut out of `edit_track.rs`, which keeps the media list's other two ops
 //! and the two things this one shares with `add_media`: `MEDIA_KEYS` and
@@ -46,7 +49,8 @@ impl Project {
     /// Answers, in order: `Err` for an unknown media or an empty path; `Err`
     /// for a probe that is not an object, that carries a key outside the
     /// descriptor's (or `path` or `bookmark`, which are this op's own
-    /// arguments), that does not match the schema, or whose fields
+    /// arguments, or `color`, which a relink keeps), that does not match the
+    /// schema, or whose fields
     /// `add_media` would refuse; then a REFUSAL for a file of another kind,
     /// because each clip's source kind was chosen from it.
     ///
@@ -148,7 +152,11 @@ fn read_probe(media: u32, path: &str, probe: &Value) -> Result<Media, String> {
         ));
     };
     for key in fields.keys() {
-        if !MEDIA_KEYS.contains(&key.as_str()) || key == "path" || key == "bookmark" {
+        if !MEDIA_KEYS.contains(&key.as_str())
+            || key == "path"
+            || key == "bookmark"
+            || key == "color"
+        {
             return Err(format!("unknown key \"{key}\" in a relink probe"));
         }
     }

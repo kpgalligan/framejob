@@ -317,6 +317,10 @@ struct RecipeLayer: Codable, Equatable {
     /// first; empty for most layers (`null` in the recipe). A layer in one
     /// carries no `transition` for it and draws `normal` (§11 MT-8).
     let dissolve: [RecipeLayerDissolve]
+    /// What step 0 converts this layer's source with — its media's Camera
+    /// Log (spec §11 GR-16); nil for none, when the source's own labels
+    /// decide (GR-15). Show Ungraded keeps it.
+    let input: MediaColor?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -347,6 +351,7 @@ struct RecipeLayer: Codable, Equatable {
         transition = c.lenient(.transition)
         matte = c.lenient(.matte)
         dissolve = c.lenient(.dissolve, [])
+        input = c.lenient(.input)
     }
 
     /// `sourceSize` as a size; nil for text, whose size only the renderer

@@ -18905,3 +18905,36 @@ reads as `gbr/reserved/reserved`.
   twin and reads the timing line's `, N input passes` suffix.
 
 **Its record**: `designs/grading-3.md`'s T3-1 section.
+
+## Road map grading-3 — T3-2, camera log at step 0 (`log_proof.py` LP1–LP4, L1–L9, Z1 and ten mutants; `log_probe.swift`; `applelog_writer.swift`'s `log2`; spec §11 GR-16)
+
+`log_proof.py` is hdr_proof.py's shape (`capture DIR` | `compare DIR [--only …]` | `--mutant
+NAME [--control DIR]`) and imports its decoding helpers; its header has every row. The control
+(`capture tools/proof/work/t3-2/ctl`) was taken on e76d827's Release build before any product
+edit: L9's references (each fixture alone at 0.5 s) and their media in `DIR/media/`, with
+LP1–LP4 and L1–L8 failing there. Fixtures are made once under `tools/proof/work/log/media/`,
+written by the script as raw `yuv422p10le` (each curve's encode of a scene-linear ramp on rows
+0–63, the makers' 0/18/90 % codes as three patches on rows 64–127, chroma 512) and encoded
+`prores_ks` HQ, then re-tagged by stream copy — except the untagged `vlog.mov`, kept as encoded
+(the bsf's `unknown` writes 0, which ffprobe reads as `gbr/reserved/reserved`). S-Log3 and V-Log
+store the maker's code itself; Apple Log stores P in video range (`64 + 876·P`), GR-16's code
+domains. `applelog.mov` and `applelog2.mov` are relabelled by `applelog_writer.swift` (`log2`:
+the Apple Log 2 label, primaries removed, as the SDK header asks), the label read back. The two
+`.cube` files are channel-distinct (out = 0.7r + 0.2g + 0.1b², g², 0.5b + 0.3r), 17³ and 33³.
+
+- **The oracle** (`log_convert`): the codes ffmpeg reads back, the decoded signal ROUNDED TO
+  HALF (step 0 reads an `rgba16Float` source; next to black one half-ulp is a level), then
+  GR-16's formula with the makers' constants and Reelcut's display transform, the gamut matrices
+  derived from the published chromaticities.
+- **L6** compares a reversed clip to the media's conversion of the reverse intermediate's OWN
+  codes (Y ±1, widened by 1 — H4's envelope), and to the forward render ±2 only where the
+  intermediate's code is the file's within 1: the HEVC Main 10 intermediate moved the ramp's
+  first column from 95 to 98 (S-Log3) and 196 to 199 (Apple Log), seven levels through the toe.
+- **L9** is the STOP row beside hdr_proof.py's H1 and H1m, which must hold too. hdr_proof's
+  `Doc.place` sets an Apple-Log-detected media to None after import, and its base-tree probe
+  reads a version-18 copy of each package (`base_copy`, for H1m and H6); a package whose media
+  carry `color` is a FAIL.
+- **Mutants** build a tree copy (`tree_copy.make_copy`); a core mutant replaces the copy's
+  `core` symlink with a copy of the tree's core (no `target/`), so the copy's own make builds it.
+
+**Its record**: `designs/grading-3.md`'s T3-2 section.

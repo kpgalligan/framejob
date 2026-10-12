@@ -69,9 +69,11 @@ extension MediaPane {
     func select(_ media: UInt32) {
         guard let document = binding.document, document.selectedMedia != media else { return }
         document.selectedMedia = media
-        // Only the rows draw the selection, and the Edit menu asks for it
-        // when it validates, so a redraw is the whole of the update.
+        // The rows draw the selection, and the Edit menu asks for it when it
+        // validates; the Camera Log section (spec §11 GR-16) reads it too, so
+        // the pane's controls refresh against the new row.
         rows.forEach { $0.view.needsDisplay = true }
+        refresh()
     }
 
     /// A filter that hides the selected row clears the selection, so Insert /
@@ -204,7 +206,11 @@ extension MediaPane {
         // whole file's — the timeline's clips chained with every nest's —
         // or the alert would under-count and the op would refuse.
         let users = binding.documentSnapshot.clipsUsing(media)
-        guard !users.isEmpty else {
+        // A LUT that is a media's Camera Log (spec §11 GR-16) is used too:
+        // `with_clips` clears those conversions with the looks.
+        let converted = entry.kind == .lut
+            ? binding.documentSnapshot.mediaConverted(by: media).count : 0
+        guard !users.isEmpty || converted > 0 else {
             binding.apply("Remove Media", [.removeMedia(media: media)])
             return
         }
@@ -215,13 +221,24 @@ extension MediaPane {
         let binding = self.binding
         let alert = NSAlert()
         alert.messageText = "Remove “\(entry.name)”?"
-        // A LUT's users keep their place and lose the look (spec §11 GR-8).
+        // A LUT's users keep their place and lose the look (spec §11 GR-8),
+        // and the files it converts lose their Camera Log (GR-16).
         if entry.kind == .lut {
-            alert.informativeText =
-                users.count == 1
-                ? "It is the look of 1 clip, which keeps its place and loses the look."
-                : "It is the look of \(users.count) clips, which keep their place and lose "
-                    + "the look."
+            var parts: [String] = []
+            if !users.isEmpty {
+                parts.append(
+                    users.count == 1
+                        ? "It is the look of 1 clip, which keeps its place and loses the look."
+                        : "It is the look of \(users.count) clips, which keep their place and "
+                            + "lose the look.")
+            }
+            if converted > 0 {
+                parts.append(
+                    (users.isEmpty ? "It is" : "…and")
+                        + " the Camera Log of \(converted) file\(converted == 1 ? "" : "s"), "
+                        + "which lose\(converted == 1 ? "s" : "") it.")
+            }
+            alert.informativeText = parts.joined(separator: " ")
         } else {
             alert.informativeText =
                 users.count == 1

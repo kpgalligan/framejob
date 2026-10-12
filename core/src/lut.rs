@@ -21,8 +21,10 @@
 //!   ([`Project::evaluates_as_look`]), and `actions.rs` switches `media` at
 //!   the end like a `kind`, so an id is never interpolated.
 //! - **Removing a used LUT** ([`Project::remove_lut`]) refuses naming the
-//!   clips whose base look it is, or with `with_clips` clears those looks and
-//!   keeps the clips; ends are left alone (inert by the evaluator).
+//!   clips whose base look it is and the media whose Camera Log it is (spec
+//!   §11 GR-16, `media.color.lut`), or with `with_clips` clears those looks
+//!   and conversions and keeps the clips and the media; ends are left alone
+//!   (inert by the evaluator).
 //! - **Paste** brings a LUT's row by path like any media; an id the payload
 //!   does not carry becomes no look ([`remap_look_media`]) rather than
 //!   another media's id.
@@ -203,21 +205,39 @@ impl Project {
     }
 
     /// `remove_media` for a LUT: refused naming the clips whose base look it
-    /// is unless `with_clips`, which clears those looks — on the timeline and
-    /// in every nest — and keeps the clips. Ends naming it are left: the
-    /// evaluator reads them as no look.
+    /// is and the media whose Camera Log it is (spec §11 GR-16) unless
+    /// `with_clips`, which clears those looks — on the timeline and in every
+    /// nest — and those conversions, and keeps the clips and the media. Ends
+    /// naming it are left: the evaluator reads them as no look.
     pub(crate) fn remove_lut(&self, media: u32, with_clips: bool) -> Result<Outcome, String> {
         let used: Vec<u32> = self
             .every_clip()
             .filter(|clip| base_lut(clip) == Some(media))
             .map(|clip| clip.id)
             .collect();
-        if !used.is_empty() && !with_clips {
-            return Ok(Outcome::Refused(format!(
-                "media {media} is the look of {}; pass with_clips: true to remove it and clear \
-                 their looks",
-                crate::edit_track::clip_list(&used)
-            )));
+        let converted = self.media_converted_by(media);
+        if !with_clips {
+            let looks = crate::edit_track::clip_list(&used);
+            let refusal = match (used.is_empty(), converted.is_empty()) {
+                (true, true) => None,
+                (false, true) => Some(format!(
+                    "media {media} is the look of {looks}; pass with_clips: true to remove it \
+                     and clear their looks"
+                )),
+                (true, false) => Some(format!(
+                    "media {media} is the Camera Log of {}; pass with_clips: true to remove it \
+                     and clear it",
+                    media_list(&converted)
+                )),
+                (false, false) => Some(format!(
+                    "media {media} is the look of {looks} and the Camera Log of {}; pass \
+                     with_clips: true to remove it and clear both",
+                    media_list(&converted)
+                )),
+            };
+            if let Some(refusal) = refusal {
+                return Ok(Outcome::Refused(refusal));
+            }
         }
         let mut next = self.clone();
         let clips = next
@@ -231,7 +251,23 @@ impl Project {
                 }
             }
         }
+        for row in next.media.iter_mut() {
+            if converted.contains(&row.id) {
+                row.color = None;
+            }
+        }
         next.media.retain(|m| m.id != media);
         self.finish(next)
     }
+}
+
+/// Media ids as a sentence names them, `clip_list`'s way: "media 3",
+/// "media 3 and 5", "media 3, 4, 5 and 2 more".
+fn media_list(ids: &[u32]) -> String {
+    let listed = crate::edit_track::clip_list(ids);
+    let rest = listed
+        .strip_prefix("clips ")
+        .or_else(|| listed.strip_prefix("clip "))
+        .unwrap_or(&listed);
+    format!("media {rest}")
 }

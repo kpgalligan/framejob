@@ -14,6 +14,10 @@ struct PlanSegment: Codable, Equatable {
     /// The time-pitch algorithm for a speed change, e.g. "spectral"; nil
     /// leaves AVFoundation's default.
     let pitch: String?
+    /// A video segment's media's Camera Log (spec §11 GR-16), present only
+    /// when the media converts: it makes the composition a converting one
+    /// (`CompositionPlan.convertsMedia`).
+    let input: MediaColor?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -24,6 +28,7 @@ struct PlanSegment: Codable, Equatable {
         start = c.lenient(.start, 0)
         duration = c.lenient(.duration, 0)
         pitch = c.lenient(.pitch)
+        input = c.lenient(.input)
     }
 
     /// Whether the segment needs `scaleTimeRange` — speed, or the
@@ -113,6 +118,14 @@ struct CompositionPlan: Codable, Equatable {
         audioTracks = c.lenient(.audioTracks, [])
         instructions = c.lenient(.instructions, [])
         warnings = c.lenient(.warnings, [])
+    }
+
+    /// Whether any video segment's media converts at step 0 (spec §11
+    /// GR-16): such a composition is built with `ConvertingCompositor` even
+    /// when no source's labels ask for one, and a change of setting changes
+    /// the plan, so `Playback.update` rebuilds it.
+    var convertsMedia: Bool {
+        videoTracks.contains { $0.segments.contains { $0.input != nil } }
     }
 
     /// `renderSize` as a size; the canvas default when malformed.

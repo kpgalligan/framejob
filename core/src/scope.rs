@@ -7,7 +7,7 @@
 //! — `unnest`, edit, `nest` — which is the identity on clip content but
 //! throws the nest clip's own group-level properties away.
 //!
-//! **The fix is not to teach sixty ops about nests.** It is to give
+//! **The fix is not to teach sixty-one ops about nests.** It is to give
 //! the ENVELOPE a scope, and to hand the op a project in which the nest's
 //! own tracks and clips are the top level. Then `Project::clip` keeps its
 //! one meaning, `apply_op` keeps its flat dispatch, every refusal and every
@@ -203,6 +203,7 @@ fn refused_inside(op: &Op) -> Option<&'static str> {
         Op::AddMedia { .. } => Some("add_media"),
         Op::RelinkMedia { .. } => Some("relink_media"),
         Op::RemoveMedia { .. } => Some("remove_media"),
+        Op::SetMediaColor { .. } => Some("set_media_color"),
 
         // An adjustment clip grades what is behind it at the top level only
         // (spec §11 GR-6): `check_clips` refuses one inside a nest, so the

@@ -2065,12 +2065,14 @@ fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
 
 // Step 0: one source frame converted once per frame into a pooled
 // `rgba16Float` target the layer stage samples instead (`Compositor+Input
-// .swift`). Only the STANDARDS' constants live here — the BT.2100 HLG inverse
-// OETF's a, b, c; SMPTE ST 2084's m1, m2, c1, c2, c3 (as BT.2100 reproduces
-// them); the BT.2020 and BT.709 luminance weights — with the formulas' shapes.
-// Every number Reelcut chose or derived (the system gamma and gain, the
-// knee, the whites, PQ's reference white, the matrix) arrives in the uniform
-// block from `InputConversions.swift`.
+// .swift`). Only the STANDARDS' and the MAKERS' constants live here — the
+// BT.2100 HLG inverse OETF's a, b, c; SMPTE ST 2084's m1, m2, c1, c2, c3 (as
+// BT.2100 reproduces them); the BT.2020 and BT.709 luminance weights; and the
+// camera log curves' constants from Apple's, Sony's and Panasonic's own
+// documents (spec §11 GR-16's append) — with the formulas' shapes. Every
+// number Reelcut chose or derived (the system gamma and gain, the knee, the
+// whites, PQ's reference white, log's exposure and code domains, the matrix)
+// arrives in the uniform block from `InputConversions.swift`.
 //
 // The block is mirrored FIELD FOR FIELD by `InputUniforms` in
 // `Compositor+Input.swift`, under `LayerUniforms`' layout contract (scalars
@@ -2085,9 +2087,9 @@ struct InputUniforms {
     float nitsScale;
     float encodePower;
     float decodePower;
-    float reserved0;
-    float reserved1;
-    float reserved2;
+    float exposure;
+    float codeScale;
+    float codeOffset;
     float m00;
     float m01;
     float m02;
@@ -2107,6 +2109,10 @@ constant int kInputHLG     = 1;
 constant int kInputPQ      = 2;
 constant int kInputSDRWide = 3;
 constant int kInputSRGB    = 4;
+constant int kInputAppleLog = 5;
+constant int kInputSlog3   = 6;
+constant int kInputVlog    = 7;
+constant int kInputLUT     = 8;
 
 // ITU-R BT.2100, the HLG OETF's constants: a, b = 1 − 4a, c = 0.5 − a·ln(4a).
 constant float kHlgA = 0.17883277;
@@ -2127,6 +2133,31 @@ constant float kSrgbGamma = 2.4;
 // Luminance weights: BT.2020's (HLG's Ys, BT.2100) and BT.709's (the lift).
 constant float3 kLuma2020 = float3(0.2627, 0.6780, 0.0593);
 constant float3 kLuma709 = float3(0.2126, 0.7152, 0.0722);
+// Apple Log (Apple's Apple Log 2 White Paper, September 2025, whose curve is
+// Apple Log's): R0, Rt, c, β, γ, δ of P = γ·log2(R + β) + δ above Rt and
+// c·(R − R0)² below it.
+constant float kAppleLogR0 = -0.05641088;
+constant float kAppleLogRt = 0.01;
+constant float kAppleLogC = 47.28711236;
+constant float kAppleLogBeta = 0.00964052;
+constant float kAppleLogGamma = 0.08550479;
+constant float kAppleLogDelta = 0.69336945;
+// S-Log3 (Sony's Technical Summary for S-Gamut3.Cine/S-Log3 and
+// S-Gamut3/S-Log3), in 10-bit code values: the break, black (0 %) and 18 %
+// grey, the log's scale, and the reflection at the break.
+constant float kSlog3Break = 171.2102946929;
+constant float kSlog3Black = 95.0;
+constant float kSlog3Grey = 420.0;
+constant float kSlog3Scale = 261.5;
+constant float kSlog3BreakReflection = 0.01125;
+// V-Log (Panasonic's V-Log/V-Gamut Reference Manual, Rev. 1.0): cut2, b, c,
+// d of the log piece, and the linear piece's slope and offset.
+constant float kVlogCut2 = 0.181;
+constant float kVlogB = 0.00873;
+constant float kVlogC = 0.241514;
+constant float kVlogD = 0.598206;
+constant float kVlogSlope = 5.6;
+constant float kVlogOffset = 0.125;
 
 // The HLG inverse OETF (BT.2100): signal → scene light, 0…1 at nominal peak.
 // Floored at 0, never capped: a signal above 1 keeps rising.
@@ -2149,6 +2180,31 @@ static float3 srgbEOTF(float3 signal) {
     float3 low = s / kSrgbSlope;
     float3 high = pow((s + kSrgbOffset) / (1.0 + kSrgbOffset), kSrgbGamma);
     return select(high, low, s <= kSrgbBreak);
+}
+
+// Apple Log's decoding function (the paper's): P → scene reflection R;
+// below 0, R0.
+static float3 appleLogInverse(float3 p) {
+    float span = kAppleLogRt - kAppleLogR0;
+    float pt = kAppleLogC * span * span;
+    float3 high = exp2((p - kAppleLogDelta) / kAppleLogGamma) - kAppleLogBeta;
+    float3 low = sqrt(max(p, 0.0) / kAppleLogC) + kAppleLogR0;
+    return select(select(high, low, p < pt), float3(kAppleLogR0), p < 0.0);
+}
+
+// S-Log3 to scene linear reflection (Sony's): y = code/1023.
+static float3 slog3Inverse(float3 y) {
+    float3 code = y * 1023.0;
+    float3 high = exp10((code - kSlog3Grey) / kSlog3Scale) * (0.18 + 0.01) - 0.01;
+    float3 low = (code - kSlog3Black) * kSlog3BreakReflection / (kSlog3Break - kSlog3Black);
+    return select(high, low, code < kSlog3Break);
+}
+
+// V-Log to scene linear reflection (Panasonic's §3.2): in = code/1023.
+static float3 vlogInverse(float3 v) {
+    float3 high = exp10((v - kVlogD) / kVlogC) - kVlogB;
+    float3 low = (v - kVlogOffset) / kVlogSlope;
+    return select(high, low, v < kVlogCut2);
 }
 
 // The uniform block's source → BT.709 matrix, row-major, applied to `c`.
@@ -2194,7 +2250,8 @@ static float3 inputShoulder(float3 l, float knee, float white) {
 // the source's size, so the texel is read, not sampled.
 fragment float4 reelcut_input_fragment(ShadowVaryings in [[stage_in]],
                                        constant InputUniforms &u [[buffer(0)]],
-                                       texture2d<float> source [[texture(0)]]) {
+                                       texture2d<float> source [[texture(0)]],
+                                       texture3d<float> lut [[texture(1)]]) {
     float4 texel = source.read(uint2(in.position.xy));
     float a = texel.a;
     float3 signal = u.premultiplied > 0.5 ? texel.rgb / max(a, 1e-4) : texel.rgb;
@@ -2211,6 +2268,24 @@ fragment float4 reelcut_input_fragment(ShadowVaryings in [[stage_in]],
         // the layer stage's clamp bounds it (spec §11 PR-1).
         float3 linear = inputMatrix(u, pow(max(signal, 0.0), u.decodePower));
         rgb = pow(max(linear, 0.0), u.encodePower);
+    } else if (kind >= kInputAppleLog && kind <= kInputVlog) {
+        // Camera log (GR-16): the signal into the maker's code domain, the
+        // maker's inverse to scene reflection, the exposure, the camera
+        // gamut's matrix, the lift, the shoulder, the encode.
+        float3 y = signal * u.codeScale + u.codeOffset;
+        float3 r = kind == kInputAppleLog ? appleLogInverse(y)
+                 : (kind == kInputSlog3 ? slog3Inverse(y) : vlogInverse(y));
+        float3 l = inputShoulder(inputLift(inputMatrix(u, r * u.exposure)), u.knee, u.white);
+        rgb = pow(max(l, 0.0), u.encodePower);
+    } else if (kind == kInputLUT) {
+        // A `lut` media as the input conversion (GR-16): the signal sampled
+        // trilinearly at the lattice's texel CENTRES (`gradeLook`'s way), its
+        // output taken as encoded Rec. 709.
+        constexpr sampler lutSampler(coord::normalized, filter::linear,
+                                     address::clamp_to_edge);
+        float n = float(lut.get_width());
+        float3 coord = saturate(signal) * ((n - 1.0) / n) + 0.5 / n;
+        rgb = lut.sample(lutSampler, coord).rgb;
     } else {
         float3 light = float3(0.0);
         if (kind == kInputHLG) {

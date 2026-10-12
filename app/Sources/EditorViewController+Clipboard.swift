@@ -100,10 +100,15 @@ extension EditorViewController {
             wanted.formUnion(Self.payloadMediaIDs(clip))
         }
         guard !payloadClips.isEmpty else { return nil }
+        // A wanted row's Camera Log LUT travels with it (spec §11 GR-16), so
+        // the paste lands the conversion remapped rather than dropping it.
+        for id in wanted {
+            if let lut = snapshot.media(id)?.color?.lut { wanted.insert(lut) }
+        }
 
-        // Only the rows the copied clips SHOW or look through: a media entry
-        // nothing points at would arrive in the other document as a
-        // Media-tab row the user cannot account for.
+        // Only the rows the copied clips SHOW or look through, and the LUTs
+        // those convert with: a media entry nothing points at would arrive in
+        // the other document as a Media-tab row the user cannot account for.
         let media = (root["media"] as? [[String: Any]] ?? []).filter { entry in
             guard let id = (entry["id"] as? NSNumber)?.uint32Value else { return false }
             return wanted.contains(id)

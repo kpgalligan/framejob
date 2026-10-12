@@ -51,6 +51,10 @@ use crate::time::{Fps, Ticks};
 /// own.
 pub use crate::model_props::*;
 
+/// Camera log's vocabulary (format version 19, spec §11 GR-16), a file of
+/// its own for the reason `model_props.rs` is.
+pub use crate::model_media_color::{CameraGamut, LogCurve, MediaColor};
+
 /// Linear RGBA, each channel 0..1. Alpha is premultiplied by nothing — the
 /// renderer decides.
 pub type Color = [f64; 4];
@@ -139,6 +143,11 @@ pub struct Media {
     pub has_alpha: bool,
     #[serde(default)]
     pub original: Option<MediaOriginal>,
+    /// Camera log (format version 19, spec §11 GR-16): a video media's log
+    /// curve and gamut, or the `lut` media converting it, at step 0. Written
+    /// only when set, so a media with none writes the text it did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<MediaColor>,
 }
 
 /// The file a playable copy was made from (format version 11, spec §11

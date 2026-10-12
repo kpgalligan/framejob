@@ -27,7 +27,10 @@ import Foundation
 /// A LUT (spec §11 GR-8) is no clip's source but some clips' LOOK: a clip
 /// uses a media by its source or by its base look, which is the set the
 /// core's `remove_lut` refuses with and clears (`uses(_:)`). An action end
-/// naming a LUT is not a use: removing the LUT leaves it inert.
+/// naming a LUT is not a use: removing the LUT leaves it inert. A LUT that
+/// is a media's Camera Log (spec §11 GR-16, `media.color.lut`) is used too:
+/// `remove_lut` refuses naming those media and clears them
+/// (`mediaConverted(by:)`).
 extension ProjectSnapshot {
     /// Whether `clip` shows `media` or looks through it.
     static func uses(_ clip: ClipSnapshot, _ media: UInt32) -> Bool {
@@ -54,6 +57,14 @@ extension ProjectSnapshot {
     func usesMedia(_ media: UInt32) -> Bool {
         clips.contains { Self.uses($0, media) }
             || nests.contains { nest in nest.clips.contains { Self.uses($0, media) } }
+            || !mediaConverted(by: media).isEmpty
+    }
+
+    /// The media whose Camera Log is the LUT `lut` (spec §11 GR-16), in list
+    /// order — the core's `media_converted_by`, which `remove_lut` refuses
+    /// with and clears.
+    func mediaConverted(by lut: UInt32) -> [MediaSnapshot] {
+        media.filter { $0.color?.lut == lut }
     }
 
     /// The users a SELECTION can hold: the timeline's clips only.

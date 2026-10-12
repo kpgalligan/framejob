@@ -140,9 +140,10 @@ enum CompositionBuilder {
                 missingClips: missing)
         }
         // Per composition (spec §11 GR-15 as amended): one holding an HLG, PQ
-        // or wide-gamut source is converting — `ConvertingCompositor`, its
+        // or wide-gamut source, or a media with Camera Log (GR-16, the plan's
+        // segment `input`), is converting — `ConvertingCompositor`, its
         // frames BT.709 — and every other is built exactly as before.
-        let converts = convertsSources(videoTracks)
+        let converts = convertsSources(videoTracks) || plan.convertsMedia
         let videoConfiguration = AVVideoComposition.Configuration(
             colorPrimaries: converts ? AVVideoColorPrimaries_ITU_R_709_2 : nil,
             colorTransferFunction: converts ? AVVideoTransferFunction_ITU_R_709_2 : nil,

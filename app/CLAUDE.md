@@ -54,7 +54,7 @@ detail there.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for all sixty op tools.
+  `AgentCatalog.opTool` prints for all sixty-one op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -256,7 +256,8 @@ detail there.
   left it so (G-28 (f)): it is otherwise a deleted module (G-27 (f)). Never
   call it, or any of the three bodies, from a `.graphicsDidChange` or
   `.projectGraphicsDidChange` observer.
-- `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`) ·
+- `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`, +`Color`: the
+  Apple Log and Apple Log 2 labels read at probe, spec §11 GR-16) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
   `FFmpegRewrap.swift` (+`Plan`) · `AppSupport.swift` · `DecoderSupport.swift` ·
   `ContainerRewrap.swift` (+`Writer`) · `RewrapProgress.swift` ·
@@ -1005,10 +1006,17 @@ the key map behind it.
   `MediaPaneCommands.swift` · `MediaListFilter.swift` (the find band as a
   VALUE; not persisted) · `MediaUsage.swift` (the ONE spelling of "is this
   media used", over the timeline's clips AND every nest's, a LUT counted by
-  the clips whose look it is) ·
-  `MediaReveal.swift` — the Media tab. The find band never rebuilds the pane.
-  A filter that hides the selected row clears `selectedMedia`
-  (`dropHiddenSelection`, #68).
+  the clips whose look it is and the media whose Camera Log it is) ·
+  `MediaReveal.swift` · `MediaPane+CameraLog.swift` (the Camera Log
+  section, spec §11 GR-16: `CameraLogChoice` and the popup over the row
+  selected in the list, one undo step "Camera Log") · `MediaColor.swift`
+  (`LogCurve`, `CameraGamut`, `MediaColor`, whose own decoder reads an
+  absent `detected` as false) · `EditorViewController+CameraLog.swift`
+  (Use LUT…: Import LUT…'s panel, then `add_media` and `set_media_color`
+  as one grouped step) — the Media tab. The find band never rebuilds the
+  pane. A filter that hides the selected row clears `selectedMedia`
+  (`dropHiddenSelection`, #68); a click on a row refreshes the pane, which
+  the Camera Log section reads.
 
 **Playback and rendering.**
 - `Playback.swift` (+`Meter`, +`PreviewQuality`, +`Step`, +`Scope`) — one
@@ -1165,8 +1173,11 @@ the key map behind it.
 - `Compositor.swift` · `Compositor+Sources.swift` (a layer's source texture:
   `source(for:…)`, `texture(from:)`) · `Compositor+Input.swift` (step 0,
   `InputStage`, `InputUniforms`, and `ConvertingCompositor`, the class a
-  composition holding an HLG, PQ or wide-gamut source is built with, spec
-  §11 GR-15) · `InputConversions.swift` · `Compositor+Uniforms.swift` ·
+  composition holding an HLG, PQ or wide-gamut source, or a media with
+  Camera Log, is built with, spec §11 GR-15, GR-16; a layer's `input`
+  chooses before the frame's labels) · `InputConversions.swift` (the
+  selector, `choose(input:)` for Camera Log, and every number Reelcut
+  chose) · `Compositor+Uniforms.swift` ·
   `Compositor+Shadow.swift` · `Compositor+Matte.swift` · `MattePlan.swift` ·
   `Compositor+Dissolve.swift` · `Compositor+Adjustment.swift` ·
   `DestinationPass.swift` (the destination render pass as a value a shadow
@@ -1964,7 +1975,7 @@ free.
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
-  **Every one of the sixty op tools is `opTool`'s** and carries no
+  **Every one of the sixty-one op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
   callers are the thirty APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
@@ -2000,7 +2011,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Reelcut: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all ninety
+  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all ninety-one
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

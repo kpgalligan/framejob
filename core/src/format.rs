@@ -248,8 +248,16 @@ use crate::model::{Canvas, Project};
 /// unqualified project writes exactly the text it did, and the reader's
 /// default is neutral, so there is no migration step. The bump is so an
 /// older build refuses the file instead of dropping the qualifier on save.
-/// Every number from 19 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 18;
+///
+/// Version 19 is camera log (spec §11 GR-16): [`crate::model::MediaColor`]
+/// on `media.color` — `log`, `gamut`, `lut` and `detected`, each written
+/// only when set (`detected` only when true) — the key written only when the
+/// media has a setting, so a project with no Camera Log writes exactly the
+/// text it did, and the reader's default is none, so there is no migration
+/// step. The bump is so an older build refuses the file instead of dropping
+/// the setting on save.
+/// Every number from 20 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 19;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

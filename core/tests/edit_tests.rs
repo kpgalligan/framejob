@@ -686,6 +686,7 @@ fn op_table() -> Vec<Value> {
                               "has_video": true, "has_audio": false}}),
         json!({"op": "relink_media", "media": 1, "path": "/m/moved.mov"}),
         json!({"op": "remove_media", "media": 3, "with_clips": true}),
+        json!({"op": "set_media_color", "media": 1, "color": {"log": "slog3"}}),
     ]
 }
 

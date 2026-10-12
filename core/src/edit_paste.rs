@@ -264,6 +264,11 @@ fn absorb_nests(
 /// or hand-written payload — the clip would otherwise become a dangling
 /// reference `validate` refuses) or when a row's path is empty. A look's id
 /// the payload lacks is skipped (spec §11 GR-8).
+///
+/// A row APPENDED here keeps its Camera Log (spec §11 GR-16) with its
+/// `color.lut` pointed at this project's id for that LUT, or loses its
+/// `color` when the LUT did not come with it; a row matched by path keeps
+/// its own.
 pub(crate) fn absorb_media(
     project: &mut Project,
     payload: &Payload,
@@ -271,6 +276,7 @@ pub(crate) fn absorb_media(
     looks: &[u32],
 ) -> Result<HashMap<u32, u32>, String> {
     let mut map: HashMap<u32, u32> = HashMap::new();
+    let mut appended: Vec<u32> = Vec::new();
     for (id, shown) in sources
         .iter()
         .map(|id| (*id, true))
@@ -304,10 +310,26 @@ pub(crate) fn absorb_media(
                 record.bookmark = record.bookmark.filter(|b| !b.trim().is_empty());
                 let new_id = record.id;
                 project.media.push(record);
+                appended.push(new_id);
                 new_id
             }
         };
         map.insert(id, local);
+    }
+    for row in project.media.iter_mut() {
+        if !appended.contains(&row.id) {
+            continue;
+        }
+        if let Some(lut) = row.color.and_then(|color| color.lut) {
+            match map.get(&lut) {
+                Some(local) => {
+                    if let Some(color) = row.color.as_mut() {
+                        color.lut = Some(*local);
+                    }
+                }
+                None => row.color = None,
+            }
+        }
     }
     Ok(map)
 }
@@ -315,8 +337,9 @@ pub(crate) fn absorb_media(
 /// The ids `absorb_media` resolves for `clips`, in the order they name
 /// them (a `Vec` rather than a set, so the new rows are appended and
 /// numbered reproducibly): the media each SHOWS, then the LUTs their looks
-/// name (spec §11 GR-8).
-fn wanted_media(clips: &[&Clip]) -> (Vec<u32>, Vec<u32>) {
+/// name (spec §11 GR-8) and the LUT each shown media's payload row converts
+/// with (`color.lut`, GR-16).
+fn wanted_media(clips: &[&Clip], payload: &Payload) -> (Vec<u32>, Vec<u32>) {
     let mut sources: Vec<u32> = Vec::new();
     let mut looks: Vec<u32> = Vec::new();
     for clip in clips {
@@ -329,6 +352,15 @@ fn wanted_media(clips: &[&Clip]) -> (Vec<u32>, Vec<u32>) {
             if !looks.contains(&id) {
                 looks.push(id);
             }
+        }
+    }
+    let converting = sources.iter().filter_map(|id| {
+        let row = payload.media.iter().find(|m| m.id == *id)?;
+        row.color?.lut
+    });
+    for id in converting.collect::<Vec<u32>>() {
+        if !looks.contains(&id) {
+            looks.push(id);
         }
     }
     (sources, looks)
@@ -413,7 +445,7 @@ impl Project {
             .iter()
             .chain(nests.iter().flat_map(|n| n.clips.iter()))
             .collect();
-        let (sources, looks) = wanted_media(&landing);
+        let (sources, looks) = wanted_media(&landing, &payload);
         let media = absorb_media(&mut next, &payload, &sources, &looks)?;
         let nests = absorb_nests(&mut next, &nests, &media)?;
 

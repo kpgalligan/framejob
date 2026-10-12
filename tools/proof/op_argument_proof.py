@@ -44,7 +44,7 @@ The sections, in order:
    type, an enum, a minimum, an items, a required list — must have a row that
    says so, and each row must be visible somewhere, so a row that does nothing
    is a failure too.
-3. **A stranger argument, for every op tool.** For each of the sixty:
+3. **A stranger argument, for every op tool.** For each of the sixty-one:
    one CONTROL call with every required argument spelled
    right, which must not be refused for a missing argument — that is the
    tool's required list proved SUFFICIENT against the running app; one call
@@ -125,17 +125,18 @@ WORK = os.path.join(ROOT, "tools", "proof", "work", "op-argument-probe")
 MEDIA = os.path.join(ROOT, "tools", "proof", "media", "AV.mov")
 
 # This script owns the EXACT tool count (`tools/proof/README.md`'s handover
-# rule): 60 ops plus the thirty app-state tools (G3b added the two graphic ops'
+# rule): 61 ops plus the thirty app-state tools (G3b added the two graphic ops'
 # tools, G4a the three app-state graphics tools, G4b three more, B44 close_project,
 # B84 delete_graphic, rename_graphic and restore_graphic; grading GR4a's op tool
-# add_adjustment_clip is the sixtieth op). D3 adds no tool and renames
+# add_adjustment_clip is the sixtieth op, grading-3 T3-2's set_media_color the
+# sixty-first). D3 adds no tool and renames
 # none, so it is road map 3's 75 plus phase 9's set_scope and… no: it is the
 # number the catalog has had since road map 5's E1, taken exactly here for the
 # first time. Every older script keeps its floor. It counts PRODUCT tools:
 # road map 11's dev tools (`dev_tools.py`) are in a Release catalog and not a
 # Distribution one, so section 1 counts them apart.
-PRODUCT_TOOLS = 90
-OPS = 60
+PRODUCT_TOOLS = 91
+OPS = 61
 PARITY = "Reelcut: "
 
 passed = 0
@@ -947,7 +948,7 @@ def main():
         if fragment.get("type") == "object" and "properties" not in fragment)
     check(f"the core publishes {len(doors)} arguments as an opaque object a tool takes — a "
           "caller's own patch, which deepening D1 made the core the one validator of",
-          len(doors) == 13, json.dumps(doors))
+          len(doors) == 14, json.dumps(doors))
     # The two graphic doors reach the core only through a module the
     # untitled project's graphics/ holds (road map 10 G3b: the app reads the
     # schema from it and refuses a module it cannot find). `value_for` names

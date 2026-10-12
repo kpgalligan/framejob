@@ -11,7 +11,8 @@
     {"name": "inspector", "window": "editor", "view": "inspector"}
   ],
   "after": [{"call": "select_inspector_tab", "args": {"tab": "clip"}}],
-  "expect": [{"capture": "inspector", "visible_text": "3 items"}]
+  "expect": [{"capture": "inspector", "visible_text": "3 items"},
+             {"capture": "inspector", "visible_text": "Log"}]
 }
 ```
 
@@ -30,7 +31,15 @@ order, each a bordered card with a thumbnail, the name, its length and a green
 the same glyph and length. toneB is the fixture's one unused file: no clip on
 the timeline uses it, and its row looks like the others while "Unused only" is
 off. Under the rows, the footer band holds "Consolidate…" and "Copies sources
-into the package", and the rest of the panel is empty.
+into the package".
+
+Below MEDIA is a second section, CAMERA LOG (spec §11 GR-16), there because
+the project has a video file. Its "Log" row holds a pop-up reading "None",
+dimmed because no row of the list is selected (it acts on the selected video
+file), and under it a line reads "Select a video in the list". Selecting
+speech.mov enables the pop-up — None, Apple Log, Apple Log 2, S-Log3 /
+S-Gamut3.Cine, S-Log3 / S-Gamut3, V-Log / V-Gamut, Use LUT… — and the line
+then names the file's setting, "None" here. The rest of the panel is empty.
 
 The two bands and the footer are drawn edge to edge across the panel while
 their controls keep the panel's 10 pt gutter (`MediaPane.bar`): each band is

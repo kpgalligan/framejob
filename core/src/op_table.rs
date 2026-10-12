@@ -9,7 +9,7 @@
 //!
 //! It is a module of its own because the table is a published interface —
 //! the tool catalog will read it rather than restate it — while the [`Op`]
-//! enum and the sixty-way dispatch are the implementation of that
+//! enum and the sixty-one-way dispatch are the implementation of that
 //! interface. [`OP_NAMES`] is a projection of this table and is re-exported
 //! from `edit.rs` under its old name, so no caller anywhere moved.
 //!
@@ -82,7 +82,7 @@ use Kind::*;
 
 /// How many ops there are. `edit.rs`'s enum, its dispatch and this table
 /// all have exactly this many arms.
-pub const OP_COUNT: usize = 60;
+pub const OP_COUNT: usize = 61;
 
 /// One op's row: its name, and its arguments in the order the enum declares
 /// them — which is the order the decoder lists them back in.
@@ -323,6 +323,7 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("relink_media",
        &[req("media", Id), req("path", Text), opt("bookmark", Text), opt("probe", Object)]),
     op("remove_media", &[req("media", Id), opt("with_clips", Boolean)]),
+    op("set_media_color", &[req("media", Id), req("color", Object)]),
 ];
 
 /// Every op name, in table order — a projection of [`OP_TABLE`], not a

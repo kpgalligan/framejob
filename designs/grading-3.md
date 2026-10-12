@@ -768,3 +768,134 @@ power is set in its own `switch` case. The `app/CLAUDE.md` compositor entry is a
 `make typecheck` at its 4 baseline warnings, `make gate` PASS, `RC_PROOF_APP=release hdr_proof.py
 compare tools/proof/work/t3-1/ctl` 14/14 (no `Reelcut: ` complaint, no DEFAULTS MOVED), `hdr_proof.py
 --only P1,P2,P3,P4,Z1` 5/5. No mutant anchor sits on the changed lines.
+
+## T3-2 — camera log footage at step 0 (GR-16, #264)
+
+**What landed** (2026-10-12, in the worktree on `grading-3`, from `e76d827`; GR-16 as appended
+before the code).
+- **The sources first.** T3-2's first run stopped at its step 1: Apple's paper sat behind the
+  developer login and pro.sony refused this host (403). The owner downloaded Apple's *Apple Log 2
+  White Paper* (September 2025, v1.1, whose curve is Apple Log's), Sony's *Technical Summary for
+  S-Gamut3.Cine/S-Log3 and S-Gamut3/S-Log3* and Apple's LUT download; Panasonic's *V-Log/V-Gamut
+  Reference Manual* Rev. 1.0 was fetched directly. Every constant the spec named matched. GR-16's
+  append records each document, its terms (Apple's copyright notice; none stated by Sony or
+  Panasonic), the constants, the test points, the code domains, Apple Log 2, the display transform
+  (mid-grey 0.42, the owner's "42%, as planned"), the wire and the format. Apple's
+  AppleLogToLin-v1.0.cube agrees with the paper's inverse to 3.0·10⁻⁵ (a scratch check; no Apple
+  or Sony file is in the repo).
+- **Apple Log 2 is in** (the owner's leftover rule): the paper gives Apple Wide Gamut, and the SDK
+  names the label (`kCVImageBufferLogTransferFunction_AppleLog2`, macOS 26). `log: "apple_log2"`
+  with `gamut: "apple_wide_gamut"`, detected like Apple Log, the curve shared (kind 5).
+- **Core** (format 19): `model_media_color.rs` (`LogCurve`, `CameraGamut`, `MediaColor`),
+  `media_color.rs` (`set_media_color`, the strict reader, `check_media_color`, `media_input`,
+  `media_converted_by`), `Media.color`; the 61st op (`edit.rs`, `op_table.rs` `OP_COUNT` 61,
+  `scope.rs`'s ninth refusal); `MEDIA_KEYS` 12 and `add_media`'s check; a relink probe refuses
+  `color` and a relink keeps it; `remove_lut` refuses naming the media a LUT converts and clears
+  them with `with_clips`; paste carries a shown media's conversion LUT and remaps or drops it;
+  `validate` checks every media's colour; the recipe layer's `input` (26 keys, after `look`, kept
+  by `ungraded`); a video plan segment's `input` only when its media converts. Tests:
+  `media_color.rs` (16), `schema_v19.rs` (6), `schema_v18.rs`'s pin relaxed, `recipe.rs`'s 26
+  keys, `edit_tests.rs`'s and `scope.rs`'s op tables.
+- **Swift and Metal**: `MediaColor.swift` (its own decoder: an `input` carries no `detected`);
+  `MediaSnapshot.color`, `MediaDescriptor.color` (a relink's probe drops it);
+  `MediaImporter+Color.swift`'s `detectedColor` (`MediaImporter.swift` +3, 596 lines);
+  `PlanSegment.input`, `CompositionPlan.convertsMedia`, the builder's `converts` line,
+  `RecipeLayer.input`; `InputConversions.swift` (four camera gamuts, `.log`, `.lut`,
+  `choose(input:)`, the log constants and code domains); `Compositor+Input.swift`
+  (`exposure`/`codeScale`/`codeOffset` from the three reserved floats, kinds 5–8, `encode(…,
+  lut:)` with a 1³ placeholder at `texture(1)`, `encodeInputs` input-first and the LUT through
+  `lookURLs` and `LutTextures`); `Compositor.metal` (the makers' constants, three inverse curves,
+  the log arm and the LUT arm). `Compositor.swift` and `Compositor+Sources.swift` not edited.
+- **The chrome and the agent**: the Media tab's Camera Log section (`MediaPane+CameraLog.swift`,
+  appended in `makeSections()` when the project has a video file; a click on a row refreshes it),
+  Use LUT… (`EditorViewController+CameraLog.swift`, one grouped "Camera Log" step), Remove's
+  alert counts conversions, `MediaUsage.mediaConverted(by:)`, the Look section's warning
+  (`lutOverCameraLog`, in `ClipPane`'s signature), Copy carries a conversion LUT's row;
+  `set_media_color` (handler, table line, catalog entry, `add_media`'s prose, the prompt's media
+  topic), `add_media`'s hand-read descriptor taking `color` (each key and word refused by name,
+  what it may hold the core's), the tool counts in comments.
+
+**Deviations from the spec, each measured.**
+- **Apple Log's code domain.** The spec assumed every curve reads CV = 64 + 876·s; Apple's paper
+  defines P as the normalized signal ("10 bit, full range" codes are P·1023), so Apple Log reads
+  P = s (`codeScale` 1, `codeOffset` 0) and its fixture stores 64 + 876·P (patches 196/492/661);
+  Sony's and Panasonic's stay as specified. Recorded in GR-16; GRD-17 checks a real file.
+- **The oracle rounds the decoded signal to half** before the formula (`oracle_at`): step 0 reads
+  an `rgba16Float` source, and at S-Log3's black code 95 the rounding alone is 0.84 of a level
+  (measured on Debug: render 2 against an unrounded oracle 0 at the ramp's first column).
+- **L6 compares the reverse to its own codes.** The HEVC Main 10 intermediate (PR P2-2) moved
+  the ramp's first column from code 95 to 98 (S-Log3) and 196 to 199 (Apple Log), seven levels
+  through the toe; every other of 131 samples was within 2. L6 now holds the reversed render to
+  the media's conversion of the intermediate's own codes (hdr_proof's H4 envelope, Y ±1 widened
+  by 1) at every sample, to the forward render ±2 where the intermediate's code is the file's
+  within 1, and ≥ 10 levels from unconverted.
+- **L1 samples more than the spec's grid.** On the first mutant run `slog3-breakpoint` and
+  `cine-as-709` survived L1: every 8th grey column misses S-Log3's break (code 171.2 falls between
+  columns 9 and 10), and a grey row cannot see a gamut matrix. L1 now also reads every column of
+  the first 32 and green.mov's card; both mutants then failed it (below).
+- **L8's null on none** is the agent's identity answer ("Camera Log made no change: …"), not an
+  `ok`, as every identity is (`AgentServer.performGroupedEdit`).
+- **green.mov's first build** carried only its matrix tag (bt2020nc, no primaries or transfer)
+  and rendered its card [50, 165, 73] in L3's scenes against the oracle's [61, 156, 74], while
+  L5's LUT scene matched ffmpeg within 1; remade with bt2020/bt709/bt2020nc it renders [61, 156,
+  74] exactly. L1 and L5 now also score `green_m.mov`, the same card tagged bt2020nc alone (in
+  the ProRes header and the `colr` atom, primaries and transfer unknown), against its own decode:
+  it renders [61, 156, 74], 0 levels off, in both. A scratch run on Debug (fix pass 1) over the
+  same card tagged other ways: untagged → [59, 154, 76], and the matrix in the ProRes header
+  only, no `colr` atom → [59, 154, 76], both the BT.709-coefficient decode (AVFoundation reads
+  the `colr` atom, ffmpeg the header); in the `colr` atom only → [61, 156, 74]. The old [50, 165,
+  73] is the BT.601-coefficient decode ([49, 165, 73] by the oracle) within 1, which none of
+  these taggings reproduces. Not explained (residue).
+
+**Measured** (2026-10-12, AC power, `pmset -g` powermode 0, loadavg 15.5 / 13.4 / 11.9 at the
+first recorded runs and 31.1 / 32.2 / 26.1 after the last, other sessions' work; Release unless
+said; every recorded run is on the final product and instrument):
+- Control on the untouched product tree (`make app` at e76d827's sources, Release):
+  `log_proof.py capture tools/proof/work/t3-2/ctl` — L9's references for 5 of 5 fixtures; LP1–LP4
+  and L1–L8 all FAILED (`set_media_color` unknown, the probe would not build); Z1 ok.
+- `make gate` PASS (227 s after the last product edit; typecheck at its 4 baseline warnings).
+- `RC_PROOF_APP=release python3 tools/proof/log_proof.py compare tools/proof/work/t3-2/ctl`:
+  14/14 on the final instrument (re-run after fix pass 1 added `green_m.mov`), no `Reelcut: `
+  line, no DEFAULTS MOVED. L9 5 fixtures byte-identical. L1 worst 1 level on every grey fixture
+  and 0 on both cards (`green.mov`, `green_m.mov`); the patches render [1/2/3,
+  107, 200] (0 %, 18 %, 90 %), the oracle's exactly. L2
+  {apple_log, bt2020, detected}, {apple_log2, apple_wide_gamut, detected}, none. L3 keyed with the
+  converted green [0.2385, 0.6105, 0.2901] → [255, 0, 255]; with the log green the card stays [61,
+  156, 74] (oracle [61, 156, 74]). L4 1 level from the export's grade, 48 from the unconverted
+  grade. L5 worst 1 (S-Log3) and 0 (both cards). L6 forward gap 1 / 2 where the codes agree, the
+  moved samples inside the envelope, 48 / 33 from unconverted. L7 ungraded = look-less byte for
+  byte, 48 from None. L8 every sentence. LP1 11 colours; LP2 worst 4.9·10⁻⁸; LP3 worst 9.1·10⁻⁴
+  (bound 2·10⁻³), the makers' codes within ±0.005 of reflectance; LP4 the constants, 96 bytes.
+- `RC_PROOF_APP=release python3 tools/proof/hdr_proof.py compare tools/proof/work/t3-1/ctl --only
+  H1,H1m,H2,H3,P1,P2,P3,P4,Z1`: 9/9 (H1 12 scenes byte-identical and picks equal; H1m equal to
+  the base tree, which reads version-18 copies).
+- `RC_PROOF_APP=release python3 tools/proof/hdr_proof.py compare tools/proof/work/t3-1/ctl --only
+  H6,Z1` (fix pass 1: H6's base asks read `base_copy` packages, a refused copy its reason): 2/2;
+  the tree picks [144, 0, 19] against its export's [143, 0, 20], the keyed export [255, 0, 255],
+  the base tree [158, 46, 0] (the control fails).
+- `op_argument_proof.py` on a Release instance: 159/159, 91 product tools, 14 opaque doors
+  (`set_media_color.color` the new one, its unknown key named by the core).
+- `RC_PROOF_APP=release python3 tools/proof/screens.py --only 10b-media-tab`: 6/6, 0 new layout
+  problems.
+- **Mutants** (Debug copies; a core mutant builds its own core), all caught, on the final
+  product; `slog3-breakpoint` and `cine-as-709` on L1 as widened to the toes and the card, the
+  other eight on L1's every-8th-column grid, before that widening and before fix pass 1 added
+  `green_m.mov` to L1 and L5 (each only adds samples a row can fail on); every failing row: `source-unconverted` L1 L3 L4 (and L5 L6 L7 L9); `slog3-breakpoint`
+  LP3 L1 (L1 at columns 6, 7, 9: [26, 28, 31] against [28, 30, 33]); `cine-as-709` LP2 L1 L3
+  (and LP1 LP3; the card [100, 141, 91] against [61, 156, 74]); `detection-ignores-label` L2;
+  `ungraded-drops-input` L7; `lut-no-half-texel` LP3 L5; `plan-input-dropped` L1 (and L6);
+  `labels-over-setting` L1 (and L3 L4 L5 L6 L7); `remove-lut-keeps-conversion` L8; `log2-as-log`
+  L2. Ten: the spec's nine and Apple Log 2's one. `slog3-breakpoint` and `cine-as-709` survived
+  L1 on the first run (above) and were run again after it changed; the other eight ran once.
+
+**Owed.** GRD-17 (the owner's Apple Log clip: the label, the code range, Apple's LUT) and GRD-18
+(a Sony or Panasonic clip); the `CLAUDE.md` edits (the orchestrator applies them); the green.mov
+observation above (its [50, 165, 73] is BT.601's decode, and a file whose matrix is in the ProRes
+header alone decodes with BT.709's coefficients); the reverse intermediate's toe shift: the HEVC
+Main 10 reverse (PR P2-2) stores code 98 where the file has 95 (S-Log3) and 199 where it has 196
+(Apple Log), 7 levels after the log curve, which L6's rewritten bound now absorbs.
+
+**Re-review.** Pass 2, verdict pass. One nit applied by the orchestrator: `tools/proof/README.md`
+says `base_copy` serves H1m and H6. The CLAUDE.md edits the notes owed (root, `app/`, `core/`:
+the 91 tools and 61 op tools, the Media tab, import and compositor entries, `model_media_color.rs`
+and `media_color.rs`, the recipe's twenty-six keys) are applied.

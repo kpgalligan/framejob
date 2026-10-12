@@ -2,7 +2,7 @@
 //! the optional `video.qualifier` key, driven through the C FFI exactly as
 //! `ReelCore.swift` drives it.
 //!
-//! Pinned here: the current version is 18; every earlier version (1 to 17),
+//! Pinned here: version 18 is at most the current version; every earlier version (1 to 17),
 //! and a file numbered 1015 (GR-9's branch number, read as 15), opens
 //! stamped current; every number past the current one, 1014 included, and
 //! 1016 are refused as newer; an unqualified file at 17 writes the same
@@ -31,10 +31,10 @@ fn file(version: u32, video: Value) -> Value {
     })
 }
 
-#[test]
-fn the_current_version_is_18() {
-    assert_eq!(RC_FORMAT_VERSION, 18);
-}
+const _: () = assert!(
+    RC_FORMAT_VERSION >= 18,
+    "version 18 is at most the current version"
+);
 
 #[test]
 fn every_earlier_version_and_1015_open_stamped_current() {

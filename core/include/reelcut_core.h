@@ -135,9 +135,16 @@ extern "C" {
  * softness}` in degrees, `saturation` and `luma {low, high, softness}` in
  * 0…1, each absent when off, `invert` written only when true — the key not
  * written at all when neutral, so an unqualified project writes the text it
- * did; the reader's default is neutral, so there is no migration step. 19
- * and above, 1014 included, are newer. */
-#define RC_FORMAT_VERSION 18
+ * did; the reader's default is neutral, so there is no migration step.
+ *
+ * Version 19 is camera log (spec §11 GR-16): `media.color {log, gamut, lut,
+ * detected}`, written only when set — `log` one of `apple_log`, `slog3`,
+ * `vlog`, `apple_log2`, `gamut` the camera gamut it pairs with, `lut` a
+ * `lut` media converting the file instead, `detected` only when true — so a
+ * project with no Camera Log writes the text it did; the reader's default is
+ * none, so there is no migration step. 20 and above, 1014 included, are
+ * newer. */
+#define RC_FORMAT_VERSION 19
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

@@ -41,8 +41,9 @@ const MEDIA_DIMENSION_MAX: u32 = 65536;
 /// MINUS `id`. Spelled out rather than derived from a serialized [`Media`],
 /// because the point of the list is to NAME a misspelled key — serde would
 /// silently drop `"widht"` and leave the user with a zero-width media.
-/// `edit_relink.rs` reads it too, for a relink's probe.
-pub(crate) const MEDIA_KEYS: [&str; 11] = [
+/// `edit_relink.rs` reads it too, for a relink's probe (which may not carry
+/// `color`: a relink keeps the media's Camera Log, spec §11 GR-16).
+pub(crate) const MEDIA_KEYS: [&str; 12] = [
     "path",
     "bookmark",
     "kind",
@@ -54,6 +55,7 @@ pub(crate) const MEDIA_KEYS: [&str; 11] = [
     "has_audio",
     "has_alpha",
     "original",
+    "color",
 ];
 
 // ---- helpers -------------------------------------------------------------
@@ -451,6 +453,8 @@ impl Project {
     /// negative duration, a media with pixels whose size or rate is not
     /// usable, or an `original` with an empty path. An `original` (spec §11
     /// #228-O) is stored with its path trimmed and a blank bookmark dropped.
+    /// A `color` (spec §11 GR-16) is an `Err` in `set_media_color`'s
+    /// sentences wherever that op would refuse it, `detected` aside.
     pub fn add_media(&self, descriptor: &Value) -> Result<Outcome, String> {
         let Value::Object(fields) = descriptor else {
             return Err(format!(
@@ -484,6 +488,9 @@ impl Project {
 
         media.original = normalize_original(media.original);
         check_media_fields(&media)?;
+        // A descriptor's `color` is the probe's detected Camera Log (spec §11
+        // GR-16), held to the rules `set_media_color` holds a setting to.
+        self.check_media_color(&media)?;
         let path = media.path.trim().to_string();
         if self.media.iter().any(|m| m.path == path) {
             return Ok(Outcome::Identity);

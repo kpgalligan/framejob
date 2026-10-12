@@ -11,13 +11,13 @@ use crate::evaluate::{json, number};
 use crate::model::{BlendMode, Look, VideoProps};
 use crate::nest::Frame;
 
-/// The TWENTY-FIVE keys of a recipe layer (spec §7.3), and the one place they
+/// The TWENTY-SIX keys of a recipe layer (spec §7.3), and the one place they
 /// are written.
 ///
 /// It is a struct rather than twenty lines inside [`crate::model::Project::layer`] because
 /// phase 7 gave the recipe a SECOND producer of layers — the burn-in
 /// [`crate::recipe_text::burn_in_layer`] synthesizes, which belongs to no
-/// clip — and a second literal copy of a twenty-five-key object is a copy that
+/// clip — and a second literal copy of a twenty-six-key object is a copy that
 /// drifts. It would drift SILENTLY, which is the part worth stating:
 /// `FrameRecipe.swift`'s `RecipeLayer.init(from:)` reads every key
 /// leniently and DEFAULTS a missing one with no diagnostic anywhere, so a
@@ -55,6 +55,10 @@ pub(crate) struct RecipeLayer<'a> {
     /// `null`, or the routed dissolves and zooms this layer is a half of,
     /// outermost first (`recipe_dissolve.rs`, spec §7.3, §11 MT-8).
     pub dissolve: Value,
+    /// `null`, or what step 0 converts the source with — its media's Camera
+    /// Log, `{log, gamut}` or `{lut}` (`media_color.rs`, spec §11 GR-16).
+    /// Show Ungraded keeps it: it is the file's interpretation, not a grade.
+    pub input: Value,
 }
 
 /// The layer's look as the compositor bakes and mixes it (spec §11 GR-7):
@@ -122,6 +126,7 @@ impl RecipeLayer<'_> {
         // All four curves, an identity one as `[[0, 0], [1, 1]]` (GR-12).
         out.insert("curves".to_string(), curves_json(&video.curves));
         out.insert("look".to_string(), look_json(video.look));
+        out.insert("input".to_string(), self.input);
         out.insert("chroma".to_string(), json(&video.chroma));
         out.insert("filters".to_string(), json(&video.filters));
         out.insert("reflection".to_string(), json(&video.reflection));

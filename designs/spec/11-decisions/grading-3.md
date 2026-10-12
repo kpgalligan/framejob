@@ -257,6 +257,100 @@ opened, at design time or build time.
     are tagged, wait for the owner's clips (GRD-17, GRD-18). The display transform's mid-grey is
     Reelcut's look choice, not a maker's. A user who already applies a camera LUT as a look and
     then sets Camera Log converts twice, and is only warned.
+  - **T3-2's append, before its code** (2026-10-12). Nothing above is rewritten; where a number
+    or a choice here sharpens one above, this is the record.
+    - **The sources, each read before implementing from it** (the owner downloaded them on
+      2026-10-12; the copies T3-2 read sit outside the repo, and no maker's file, table or LUT is
+      copied into the repo, a fixture or a proof's data):
+      - Apple, *Apple Log 2 White Paper*, September 2025, Part 028-00834, Version 1.1 (sha256
+        030d2441248bd5be2c2e7e766c08f41808ada8aa15fccd7bd5bb877657bf8688; its LUT download,
+        `Apple_Log_2_LUTs.zip`, a0e8f7abe32fe217b90a5ff55154986e40b949d9eb0b7d75b94daa5a70cde805),
+        downloaded by the owner from Apple Developer Downloads (the SDK header's
+        `developer.apple.com/download/all/?q=Apple%20log%20profile`).
+        It says "The Apple Log 2 color space uses the Apple Log transfer function", so its curve
+        IS Apple Log's. Terms: "Copyright © 2025 Apple Inc. All rights reserved" and Apple's
+        trademarks; nothing in it restricts implementing or using the published function, and a
+        copyright notice does not (the coordinator's ruling, 2026-10-12).
+      - Sony, *Technical Summary for S-Gamut3.Cine/S-Log3 and S-Gamut3/S-Log3* (7 pages, made
+        2014-02-15; sha256 d9c8a042e7e9e8ee248df97633b645681b5370099a508b6cee97d8bad880d5d3),
+        downloaded by the owner from pro.sony (this host's requests are refused there with 403).
+        Terms: none stated.
+      - Panasonic, *V-Log/V-Gamut Reference Manual*, Rev. 1.0, November 28, 2014 (sha256
+        d8a1837725abcca5da348b2dc6f212446db6a598cb61b093891af7ecbc0c8dcc),
+        `pro-av.panasonic.net/en/cinema_camera_varicam_eva/support/pdf/VARICAM_V-Log_V-Gamut.pdf`
+        (the owner's download is the same file). Terms: none stated.
+    - **The curves, as each document gives them** (s is the decoded, normalized signal Reelcut's
+      step 0 reads; every constant below is the document's):
+      - **Apple Log** (the paper's §Transfer function): P = γ·log2(R + β) + δ for R ≥ Rt, c·(R −
+        R0)² for R0 ≤ R < Rt, 0 below R0; R0 = −0.05641088, Rt = 0.01, c = 47.28711236, β =
+        0.00964052, γ = 0.08550479, δ = 0.69336945. Its inverse: R = 2^((P − δ)/γ) − β for P ≥ Pt,
+        √(P/c) + R0 for 0 ≤ P < Pt, R0 below 0, Pt = c·(Rt − R0)² (≈ 0.2085553). The test points:
+        0 / 18 / 90 / 1200 % → P 0.150477 / 0.488272 / 0.681686 / 1.0, which the paper prints
+        as "10 bit, full range" 154 / 500 / 697 / 1023. Apple's own AppleLogToLin-v1.0.cube (a
+        4096-entry 1D table in the same download) is within 3.0·10⁻⁵ of this inverse
+        everywhere (8.1·10⁻⁵ relative), a scratch check never committed.
+      - **S-Log3** (the summary's appendix): y = (420 + 261.5·log10((x + 0.01)/0.19))/1023 for x ≥
+        0.01125, else (x·(171.2102946929 − 95)/0.01125 + 95)/1023; its inverse x = 10^((1023·y −
+        420)/261.5)·0.19 − 0.01 for y ≥ 171.2102946929/1023, else (1023·y − 95)·0.01125/(171.2102946929
+        − 95). Test points 0 / 18 / 90 % → CV 95 / 420 / 598 (3.5 / 41 / 61 % IRE).
+      - **V-Log** (the manual's §3): out = 5.6·L + 0.125 for L < 0.01 (cut1), else 0.241514·log10(L
+        + 0.00873) + 0.598206; its inverse (in − 0.125)/5.6 for in < 0.181 (cut2), else 10^((in −
+        0.598206)/0.241514) − 0.00873, in = code/1023. Test points 0 / 18 / 90 % → 128 / 433 / 602
+        (7.3 / 42 / 61 % IRE).
+    - **The gamuts** (each D65, 0.3127 0.3290): S-Gamut3.Cine R 0.766 0.275, G 0.225 0.800, B 0.089
+      −0.087; S-Gamut3 R 0.730 0.280, G 0.140 0.855, B 0.100 −0.050; V-Gamut R 0.730 0.280, G
+      0.165 0.840, B 0.100 −0.030; Apple Log BT.2020; **Apple Wide Gamut** (the paper's) R 0.725
+      0.301, G 0.221 0.814, B 0.068 −0.076. Each matrix to BT.709 is derived from these by
+      GR-15's standard derivation (`InputConversions.toBT709`), never copied; Panasonic's
+      published V-Gamut → BT.709 matrix (1.806576 −0.695697 −0.110879 / −0.170090 1.305955
+      −0.135865 / −0.025206 −0.154468 1.179674) equals the derivation to six places.
+    - **Each curve's code domain** (the one correction to T3-2's spec: it assumed Apple's codes
+      sit where Sony's do): Sony's and Panasonic's formulas read the STORED 10-bit code CV over
+      1023 — their IRE columns are video levels (Sony's FAQ Q4: S-Log3 is written "Full
+      (Extended) range", codes 0–1023 spanning −7 to 109 IRE), so CV = 64 + 876·s and y =
+      (64 + 876·s)/1023. Apple's P is the normalized signal itself ("floating point encoding
+      normalized to the [0,1] range"), its "10 bit, full range" codes being P·1023, so in the
+      video-range file AVFoundation decodes, P = s. Step 0 reads both as y = codeScale·s +
+      codeOffset: 876/1023 and 64/1023 for S-Log3 and V-Log, 1 and 0 for Apple Log. Accepted
+      limits: a log file flagged full range is read as video range; whether a real iPhone file is
+      stored this way is GRD-17's.
+    - **Apple Log 2 is IN** (the owner's "do a leftover now when it can be done", 2026-10-12):
+      the paper gives Apple Wide Gamut's primaries and white, and the SDK names its label
+      (`kCVImageBufferLogTransferFunction_AppleLog2`, macOS 26 — the deployment target — with
+      primaries and transfer absent and the BT.2020 matrix). So `log` gains `apple_log2`, paired
+      only with `gamut: "apple_wide_gamut"`, detected at import from its label as Apple Log is,
+      and the popup gains "Apple Log 2". Its curve is Apple Log's; only the gamut differs. The
+      "Not in" line above no longer names it.
+    - **Reelcut's display transform** (choice 4a's mid-grey: the owner, 2026-10-12, "42%, as
+      planned"): scene light R × the **exposure 0.42^2.4/0.18 (≈ 0.6927)**, so 18 % grey encodes
+      to 0.42 (107/255, near BT.709's 0.409); the camera gamut's matrix; GR-15's lift; GR-15's
+      shoulder with the **knee 0.39** and the **white 64·0.42^2.4 (≈ 7.98)**, six stops over 18 %
+      grey; the encode L^(1/2.4). The test points through it: 0 % → 0, 18 % → 0.42, 90 % → ≈
+      0.785 (200/255).
+    - **Use LUT…** in step 0: the source's signal s, un-premultiplied, sampled at the lattice's
+      texel CENTRES (as `gradeLook` samples a look), trilinear, clamped to the lattice; the
+      output is taken as encoded Rec. 709 and goes on to step 3 unchanged (no exposure, matrix or
+      shoulder). A LUT that cannot be drawn (missing, refused) leaves the source unconverted.
+    - **The wire**: a recipe layer gains `input` after `look` — `{"log": "slog3", "gamut":
+      "s_gamut3_cine"}`, `{"lut": 12}`, or `null` for none, for an image, text or burn-in, and for
+      a media with no `color`; Show Ungraded keeps it. A plan video segment gains `input` ONLY
+      when its media converts, the same object, so every other plan is byte-identical; a
+      segment with `input` makes its composition converting (`CompositionPlan.convertsMedia`),
+      and the layer's `input`, when set, decides that source's conversion before its labels.
+    - **The format**: **version 19**, `media.color {log, gamut, lut, detected}`, each key written
+      only when set (`detected` only when true); no migration step.
+    - **T3-2's decisions** (the spec's, recorded): an absent `gamut` with a `log` is stored as
+      the curve's first (Apple Log BT.2020, S-Log3 S-Gamut3.Cine, V-Log V-Gamut, Apple Log 2
+      Apple Wide Gamut); `detected` is written by import only, and `set_media_color` refuses it;
+      a relink's probe may not carry `color`, and a relink keeps the stored one (as Consolidate,
+      which relinks without a probe); `remove_media` of a LUT that is a media's conversion is
+      refused naming those media, and with `with_clips` clears the conversions with the looks;
+      paste brings a pasted media's conversion LUT by path with it, and a pasted row whose LUT
+      did not come drops its `color`; the Media tab's Camera Log section acts on the row
+      selected in the list.
+    - **Accepted limits**: thumbnails on the timeline and in the Media tab show the log picture;
+      Sony's and Panasonic's own metadata is not read; a full-range-flagged log file is read as
+      video range.
 - **GR-17 — Tier 3's working arrangement: each phase gated in the `grading-3` worktree and
   merged into main alone, main's format numbers, no verdict phase; synthetic fixtures now.**
   Choice 10 and the footage answer (owner, 2026-10-11). GR-14's arrangement again: the worktree

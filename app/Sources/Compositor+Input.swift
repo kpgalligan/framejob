@@ -23,8 +23,10 @@ final class ConvertingCompositor: Compositor {
 /// place of the frame's own texture (`source(for:…)`, `Compositor+Sources
 /// .swift`). It runs only for a frame whose labels `InputConversion.choose`
 /// answers non-nil — HLG, PQ, an SDR transfer with BT.2020 or P3 D65
-/// primaries, or the sRGB transfer — and only in a `ConvertingCompositor`;
-/// every other source is sampled exactly as before.
+/// primaries, or the sRGB transfer — or whose layer carries its media's
+/// Camera Log (`input`, spec §11 GR-16: a maker's log curve, or a `lut`
+/// media's table), which decides before the labels; and only in a
+/// `ConvertingCompositor`. Every other source is sampled exactly as before.
 ///
 /// Why a pass and not arithmetic inside the sample: a conversion in a
 /// 25-tap blur would run once per tap (+3.06 ms at 4K, the tier-3 brief),
@@ -41,7 +43,8 @@ final class ConvertingCompositor: Compositor {
 /// `InputUniforms` in `Compositor.metal` under `LayerUniforms`' layout
 /// contract: scalars only, a multiple of 16 bytes (24 floats, 96 bytes).
 struct InputUniforms {
-    /// 1 HLG, 2 PQ, 3 wide-gamut SDR, 4 sRGB (`kInputHLG`… in the shader).
+    /// 1 HLG, 2 PQ, 3 wide-gamut SDR, 4 sRGB, 5 Apple Log (and Apple Log 2),
+    /// 6 S-Log3, 7 V-Log, 8 a LUT (`kInputHLG`… in the shader).
     var kind: Float = 0
     var premultiplied: Float = 0
     var systemGamma: Float = 0
@@ -55,9 +58,12 @@ struct InputUniforms {
     var encodePower: Float = 0
     /// 2.4, a wide-gamut SDR source's decode.
     var decodePower: Float = 0
-    var reserved0: Float = 0
-    var reserved1: Float = 0
-    var reserved2: Float = 0
+    /// Camera log's scale on scene light, 0.42^2.4/0.18 (spec §11 GR-16).
+    var exposure: Float = 0
+    /// Camera log's code domain: the maker's signal is `codeScale·s +
+    /// codeOffset` of the decoded signal s.
+    var codeScale: Float = 0
+    var codeOffset: Float = 0
     /// Source → BT.709, row-major.
     var m00: Float = 1, m01: Float = 0, m02: Float = 0
     var m10: Float = 0, m11: Float = 1, m12: Float = 0
@@ -67,6 +73,16 @@ struct InputUniforms {
     var reserved5: Float = 0
 
     static let hlg: Float = 1, pq: Float = 2, sdrWide: Float = 3, srgb: Float = 4
+    static let appleLog: Float = 5, slog3: Float = 6, vlog: Float = 7, lut: Float = 8
+
+    /// A curve's kind: Apple Log 2 is Apple Log's curve (its gamut differs).
+    static func kind(of curve: LogCurve) -> Float {
+        switch curve {
+        case .appleLog, .appleLog2: return appleLog
+        case .slog3: return slog3
+        case .vlog: return vlog
+        }
+    }
 
     /// Writes `matrix` (simd, column-major) into the row-major fields.
     mutating func setMatrix(_ matrix: simd_float3x3) {
@@ -103,6 +119,9 @@ final class InputStage {
 
     private let device: MTLDevice
     private let pipeline: MTLRenderPipelineState
+    /// A 1³ lattice bound at `texture(1)` when the conversion is not a LUT,
+    /// so the slot is never empty.
+    private let noLUT: MTLTexture
     private var targets: [Size: [MTLTexture]] = [:]
     /// How many of each size's targets this frame holds (the first n).
     private var taken: [Size: Int] = [:]
@@ -120,8 +139,14 @@ final class InputStage {
                     label: "Reelcut input", vertex: vertex, fragment: fragment,
                     blending: false))
         else { return nil }
+        let lattice = MTLTextureDescriptor()
+        lattice.textureType = .type3D
+        lattice.pixelFormat = .rgba16Float
+        lattice.usage = [.shaderRead]
+        guard let noLUT = device.makeTexture(descriptor: lattice) else { return nil }
         self.device = device
         self.pipeline = pipeline
+        self.noLUT = noLUT
     }
 
     /// Starts a frame: every target free, no source converted.
@@ -179,10 +204,11 @@ final class InputStage {
     }
 
     /// One conversion of `source` into `target`, encoded on `buffer`; false
-    /// when no encoder could be made.
+    /// when no encoder could be made. `lut` is a `.lut` conversion's lattice
+    /// (spec §11 GR-16), sampled at `texture(1)`.
     func encode(
         _ conversion: InputConversion, premultiplied: Bool, from source: MTLTexture,
-        into target: MTLTexture, buffer: MTLCommandBuffer
+        into target: MTLTexture, buffer: MTLCommandBuffer, lut: MTLTexture? = nil
     ) -> Bool {
         let descriptor = MTLRenderPassDescriptor()
         descriptor.colorAttachments[0].texture = target
@@ -196,6 +222,7 @@ final class InputStage {
         var u = conversion.uniforms(premultiplied: premultiplied)
         encoder.setFragmentBytes(&u, length: MemoryLayout<InputUniforms>.stride, index: 0)
         encoder.setFragmentTexture(source, index: 0)
+        encoder.setFragmentTexture(lut ?? noLUT, index: 1)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         encoder.endEncoding()
         passes += 1
@@ -213,7 +240,10 @@ extension MetalRenderer {
     /// Step 0 for one frame: each distinct composition track the recipe's
     /// layers draw from whose frame needs a conversion is converted once,
     /// before any matte or layer is drawn; `source(for:…)` then hands the
-    /// converted texture to every draw of that track.
+    /// converted texture to every draw of that track. A layer's `input` (its
+    /// media's Camera Log, spec §11 GR-16) decides before the frame's labels;
+    /// a LUT is found through the URLs its document published, and one that
+    /// cannot be drawn leaves the source unconverted.
     func encodeInputs(
         layers: [RecipeLayer], request: AVAsynchronousVideoCompositionRequest,
         buffer: MTLCommandBuffer, live: inout [CVMetalTexture]
@@ -223,12 +253,23 @@ extension MetalRenderer {
             guard case .track(let id) = layer.source, seen.insert(id).inserted,
                 let frame = request.sourceFrame(byTrackID: CMPersistentTrackID(id))
             else { continue }
-            guard let conversion = InputConversion.choose(for: frame) else { continue }
+            let conversion = layer.input.flatMap(InputConversion.choose(input:))
+                ?? InputConversion.choose(for: frame)
+            guard let conversion else { continue }
+            var lut: MTLTexture?
+            if case .lut(let media) = conversion {
+                let urls = RecipeSource.shared.lookURLs(
+                    for: request.videoCompositionInstruction as? RecipeInstruction)
+                guard let url = urls[media], let lattice = looks.luts.texture(at: url) else {
+                    continue
+                }
+                lut = lattice
+            }
             guard let source = texture(from: frame, live: &live) else { continue }
             guard let target = inputs.target(width: source.width, height: source.height),
                 inputs.encode(
                     conversion, premultiplied: Self.declaresPremultipliedAlpha(frame),
-                    from: source, into: target, buffer: buffer)
+                    from: source, into: target, buffer: buffer, lut: lut)
             else { throw InputError.noTarget }
             inputs.record(target, trackID: id)
         }

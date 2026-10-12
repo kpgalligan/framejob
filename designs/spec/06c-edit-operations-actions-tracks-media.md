@@ -98,7 +98,29 @@ The rules every op shares are §6a; the clip ops are §6b.
   alpha or duration (`a lut media has no video, audio, alpha or duration`), and `remove_media` of a
   LUT refuses while it is some clip's base look (`media 7 is the look of clip 3; pass with_clips:
   true to remove it and clear their looks`); `with_clips` then clears those looks, on the timeline
-  and in every nest, and keeps the clips; an action's end naming it is left, inert.
+  and in every nest, and keeps the clips; an action's end naming it is left, inert. The
+  descriptor may carry `color` (format 19, §11 GR-16), the Camera Log import detected (`{log:
+  "apple_log", gamut: "bt2020", detected: true}`), held to `set_media_color`'s rules as an
+  error; a relink's probe may NOT carry it (`unknown key "color" in a relink probe`), and a relink
+  keeps the stored one. A LUT that is a media's Camera Log refuses `remove_media` too (`media 7
+  is the Camera Log of media 3; pass with_clips: true to remove it and clear it`, or, with looks,
+  `media 7 is the look of clip 5 and the Camera Log of media 3; pass with_clips: true to remove
+  it and clear both`); `with_clips` clears those conversions as well.
+- **`set_media_color {media, color}`** — A video media's Camera Log (§11 GR-16): `color` is
+  `{log, gamut?}` — `apple_log` (gamut `bt2020`), `apple_log2` (`apple_wide_gamut`), `slog3`
+  (`s_gamut3_cine` or `s_gamut3`), `vlog` (`v_gamut`), an absent `gamut` stored as the curve's
+  first — or `{lut}`, a `lut` media converting the file instead; `null` clears it (an identity
+  with none). Every clip of the media, its stills and its reverse are converted at step 0
+  (§7.5), before the chroma key and every grade. What is stored has no `detected`. `Err` for an
+  unknown media (`no media with id 9`), a `color` that is not an object or `null` (`color must
+  be a json object or null, not a number`), an unknown key (`unknown key "foo" in color`) or a
+  word outside the vocabulary (serde's `unknown variant`); refused, each in its own sentence:
+  `media 2 is an audio file; Camera Log is a setting on a video file` (`an image`, `a LUT`
+  likewise), `color needs log or lut; null clears it`, `color takes log or lut, not both`,
+  `color.gamut goes with log`, `slog3 takes gamut s_gamut3_cine or s_gamut3, not v_gamut`,
+  `color.lut 9 is not a media of this project`, `color.lut 5 is a video media, not a lut`,
+  `color.detected is written by import, not set`. A `scope` is an `Err` (`set_media_color has
+  no meaning inside nest 4`): a nest shares the document's media.
 
 **This table is the SEMANTICS half of the op table, and it has a second
 half.** What an op MEANS is written here and in `core/src/edit.rs`'s module

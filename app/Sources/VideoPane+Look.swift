@@ -21,6 +21,20 @@ extension VideoPane {
         return !clips.isEmpty && clips.allSatisfy { binding.video($0).look != nil }
     }
 
+    /// Some selected clip's look is a LUT and its source file is converted
+    /// by Camera Log (spec §11 GR-16): a camera LUT applied as a look would
+    /// then convert it twice. `ClipPane`'s structure signature reads it, since
+    /// it adds or removes the warning row.
+    var lutOverCameraLog: Bool {
+        let snapshot = binding.snapshot
+        return binding.videoClips.contains { clip in
+            guard binding.video(clip).look?.kind == .lut,
+                let media = clip.source.mediaID, snapshot.media(media)?.color != nil
+            else { return false }
+            return true
+        }
+    }
+
     func lookSection(_ gallery: LookGallery) -> InspectorSection {
         let binding = self.binding
         func ids() -> [UInt32] { binding.videoClips.map(\.id) }
@@ -40,6 +54,15 @@ extension VideoPane {
                 self?.inspector?.onCommand?(#selector(EditorViewController.importLUT(_:)))
             })
         var rows: [NSView] = [view]
+        if lutOverCameraLog {
+            // A warning only: a creative LUT there is legitimate (GR-16).
+            let warning = InspectorRowLabel(
+                "This clip's file is converted by Camera Log; a camera LUT here converts it "
+                    + "twice.")
+            warning.lineBreakMode = .byWordWrapping
+            warning.maximumNumberOfLines = 0
+            rows.append(inspectorRow(nil, [warning]))
+        }
         rows += allLooked ? [
             inspectorValueRow(
                 "Amount", binding, name: "Amount", unit: "%", decimals: 0, min: 0, max: 100,

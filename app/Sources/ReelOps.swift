@@ -88,7 +88,7 @@ struct ReelOp {
 
     /// The nest this op resolves its ids INSIDE, or nil for the timeline —
     /// the envelope's `scope` key (`core/src/scope.rs`, spec §6), which is
-    /// not an argument of any op and is spelled once for all fifty-seven.
+    /// not an argument of any op and is spelled once for all sixty-one.
     ///
     /// It is a `var` with an initial value so the memberwise initialiser
     /// defaults it, which is what let every factory below stay untouched: an
@@ -140,14 +140,14 @@ extension ReelOp {
         return copy
     }
 
-    /// The seven DOCUMENT-level ops among those `core/src/scope.rs`'s
+    /// The eight DOCUMENT-level ops among those `core/src/scope.rs`'s
     /// `refused_inside` answers `"<op> has no meaning inside nest N"` to. The
-    /// eighth, `add_adjustment_clip` (spec §11 GR-6), is refused for what it
+    /// ninth, `add_adjustment_clip` (spec §11 GR-6), is refused for what it
     /// places, not because it is the document's, so it is sent scoped.
     ///
     /// **The core owns this list and this is a mirror of it**, in the same
     /// sense that the typed factories above mirror the op table: change one,
-    /// change both. It is seven names rather than a rule, so it can be
+    /// change both. It is eight names rather than a rule, so it can be
     /// checked by eye, and it is written here rather than at a call site
     /// because two copies of it is what would drift.
     ///
@@ -170,10 +170,10 @@ extension ReelOp {
     /// paths.
     static let documentLevelNames: Set<String> = [
         "add_marker", "set_marker", "remove_marker", "set_canvas", "add_media", "relink_media",
-        "remove_media",
+        "remove_media", "set_media_color",
     ]
 
-    /// True for one of the seven above — an edit about the document rather
+    /// True for one of the eight above — an edit about the document rather
     /// than about whatever container the timeline is looking at.
     var isDocumentLevel: Bool { Self.documentLevelNames.contains(name) }
 }
@@ -1230,5 +1230,26 @@ extension ReelOp {
         a.put("media", media)
         a.put("with_clips", withClips)
         return ReelOp(name: "remove_media", args: a.values)
+    }
+
+    /// A video media's Camera Log (spec §11 GR-16): `color` as
+    /// `MediaColor.opDictionary` (never `detected`, which import writes), or
+    /// nil to clear it with an explicit null.
+    static func setMediaColor(media: UInt32, color: MediaColor?) -> ReelOp {
+        var a = OpArgs()
+        a.put("media", media)
+        if let color = color {
+            a.put("color", color.opDictionary)
+        } else {
+            a.putNull("color")
+        }
+        return ReelOp(name: "set_media_color", args: a.values)
+    }
+
+    /// The same with a caller's `color` passed through unread, for the agent
+    /// (`app/CLAUDE.md`, lenient decoding): the core refuses what it cannot
+    /// take by name.
+    static func setMediaColorRaw(media: UInt32, color: Any) -> ReelOp {
+        ReelOp(name: "set_media_color", args: ["media": media, "color": color])
     }
 }

@@ -266,7 +266,7 @@ extension AgentServer {
     private func mediaDescriptor(_ object: [String: Any]) throws -> MediaDescriptor {
         let allowed: Set<String> = [
             "path", "bookmark", "kind", "duration", "width", "height", "fps", "has_video",
-            "has_audio", "has_alpha", "original",
+            "has_audio", "has_alpha", "original", "color",
         ]
         let unknown = object.keys.filter { !allowed.contains($0) }.sorted()
         if let first = unknown.first {
@@ -303,7 +303,50 @@ extension AgentServer {
             hasVideo: try boolArg(object, "has_video") ?? (kind == .video || kind == .image),
             hasAudio: try boolArg(object, "has_audio") ?? (kind == .audio),
             hasAlpha: try boolArg(object, "has_alpha") ?? false,
-            original: try mediaOriginal(object["original"]))
+            original: try mediaOriginal(object["original"]),
+            color: try mediaColor(object["color"]))
+    }
+
+    /// A descriptor's `color` (spec §11 GR-16): `{log?, gamut?, lut?,
+    /// detected?}`, or nil when absent or null. Each wrong shape and word is
+    /// refused by name; what the setting may HOLD is the core's to refuse
+    /// (`add_media` holds it to `set_media_color`'s rules).
+    private func mediaColor(_ raw: Any?) throws -> MediaColor? {
+        guard let raw = raw, !(raw is NSNull) else { return nil }
+        guard let object = raw as? [String: Any] else {
+            throw ToolError(
+                message: "descriptor.color must be a JSON object {log, gamut?} or {lut} — the "
+                    + "file's Camera Log, as set_media_color takes it, plus detected.")
+        }
+        let allowed: Set<String> = ["log", "gamut", "lut", "detected"]
+        if let first = object.keys.filter({ !allowed.contains($0) }).sorted().first {
+            throw ToolError(
+                message: "Unknown color key \"\(first)\" — allowed keys are "
+                    + allowed.sorted().joined(separator: ", ") + ".")
+        }
+        var color = MediaColor(detected: try boolArg(object, "detected") ?? false)
+        if let name = try stringArg(object, "log") {
+            guard let log = LogCurve(rawValue: name) else {
+                throw ToolError(
+                    message: "descriptor.color.log must be one of "
+                        + LogCurve.allCases.map(\.rawValue).joined(separator: ", ")
+                        + " (got \"\(name)\").")
+            }
+            color.log = log
+        }
+        if let name = try stringArg(object, "gamut") {
+            guard let gamut = CameraGamut(rawValue: name) else {
+                throw ToolError(
+                    message: "descriptor.color.gamut must be one of "
+                        + CameraGamut.allCases.map(\.rawValue).joined(separator: ", ")
+                        + " (got \"\(name)\").")
+            }
+            color.gamut = gamut
+        }
+        if object["lut"] != nil, !(object["lut"] is NSNull) {
+            color.lut = try idArg(object, "lut")
+        }
+        return color
     }
 
     /// A descriptor's `original` (spec §11 #228-O): `{path, bookmark?}`, or
@@ -409,6 +452,25 @@ extension AgentServer {
         return try editResult(
             document, "Remove Media", [.removeMedia(media: media.id, withClips: withClips)],
             ["media": Int(media.id)])
+    }
+
+    /// `set_media_color` — the Media tab's Camera Log popup
+    /// (`MediaPane+CameraLog.swift`, spec §11 GR-16): a video file's log
+    /// curve and gamut, or a `lut` media as its input conversion, or `null`
+    /// to clear it, one undo step "Camera Log". `color` goes to the core
+    /// unread (`setMediaColorRaw`), which names what it refuses; the media id
+    /// is the core's to look up too, so an unknown one is its sentence. An
+    /// absent `color` names the call, not a rule.
+    func setMediaColor(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let media = try idArg(a, "media")
+        guard let color = a["color"] else {
+            throw ToolError(
+                message: "Missing required argument: color ({log, gamut?}, {lut} or null)")
+        }
+        return try editResult(
+            document, "Camera Log", [.setMediaColorRaw(media: media, color: color)],
+            ["media": Int(media)])
     }
 }
 

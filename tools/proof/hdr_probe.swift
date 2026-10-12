@@ -43,6 +43,10 @@ func describe(_ conversion: InputConversion?) -> String {
         case .bt709: return "bt709"
         case .bt2020: return "bt2020"
         case .p3D65: return "p3D65"
+        case .sGamut3Cine: return "sGamut3Cine"
+        case .sGamut3: return "sGamut3"
+        case .vGamut: return "vGamut"
+        case .appleWideGamut: return "appleWideGamut"
         }
     }
     switch conversion {
@@ -51,6 +55,8 @@ func describe(_ conversion: InputConversion?) -> String {
     case .pq(let p): return "pq(\(name(p)))"
     case .sdrWide(let p): return "sdrWide(\(name(p)))"
     case .srgb(let p): return "srgb(\(name(p)))"
+    case .log(let curve, let p): return "log(\(curve.rawValue),\(name(p)))"
+    case .lut(let id): return "lut(\(id))"
     }
 }
 

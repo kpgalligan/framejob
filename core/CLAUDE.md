@@ -99,8 +99,17 @@ governs a module now.
 - `cube.rs` — the `.cube` reader (spec §11 GR-8): 3D only, size 2–65, the
   default domain; anything else refused by line and name. `ffi_cube.rs` — the
   four `rc_cube_*` exports. `lut.rs` — a LUT media's rules: placing one is
-  refused, removing one clears the looks that name it (the clips stay), paste
-  carries it by path.
+  refused, removing one clears the looks that name it (the clips stay) and
+  the Camera Log of the media it converts, refusing first without
+  `with_clips`; paste carries it by path.
+- `model_media_color.rs` — camera log's vocabulary (format version 19,
+  spec §11 GR-16): `LogCurve`, `CameraGamut` (`LogCurve::gamuts`, its
+  default first) and `MediaColor` (`log`, `gamut`, `lut`, `detected`, each
+  written only when set), re-exported by `model.rs` for `Media.color`.
+  `media_color.rs` — its rules: `set_media_color` (a strict reader,
+  `detected` refused), `check_media_color` (each refusal its own sentence;
+  `add_media` and `validate` call it too), `media_input` (the recipe
+  layer's and the plan segment's `input`) and `media_converted_by`.
 - `model_matte.rs` — the matte vocabulary (format version 14, spec §11 MT-1):
   `TrackMatte` (`none`, `alpha`, `alpha_inverted`, `luma`, `luma_inverted`)
   and `is_none`, re-exported through `model_props.rs`; the FIELD
@@ -193,7 +202,7 @@ governs a module now.
   `edit.rs` so no caller moved. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
   `op_schema.rs`, which carries the rows out through the FFI; the APP's
-  reader is every one of the sixty op tools in the agent catalog,
+  reader is every one of the sixty-one op tools in the agent catalog,
   which print these rows instead of restating them. **A `Bound` is
   published only where the core REFUSES outside it** — `set_canvas`'s two
   dimensions, sourced from `edit_canvas.rs`'s own constants, and
@@ -520,7 +529,7 @@ governs a module now.
 - `recipe.rs` · `recipe_layer.rs` · `recipe_options.rs` · `recipe_selection.rs` ·
   `recipe_text.rs` — `frame_recipe(t)`: the layer list at one instant. `RecipeLayer`
   (`recipe_layer.rs`, re-exported by
-  `recipe.rs`) is the twenty-five keys of a layer written in ONE place
+  `recipe.rs`) is the twenty-six keys of a layer written in ONE place
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
   (`recipe_options.rs`, a pure move out of `recipe.rs` in grading-2 G2-0, re-exported by it) is

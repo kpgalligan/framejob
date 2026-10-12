@@ -47,7 +47,13 @@ impl Project {
                 out.insert("id".to_string(), Value::from(track.id));
                 out.insert(
                     "segments".to_string(),
-                    Value::Array(track.segments.iter().map(|s| s.to_json(false)).collect()),
+                    Value::Array(
+                        track
+                            .segments
+                            .iter()
+                            .map(|s| self.video_segment(s.to_json(false)))
+                            .collect(),
+                    ),
                 );
                 Value::Object(out)
             })
@@ -129,6 +135,25 @@ impl Project {
             Value::Array(warnings.into_iter().map(Value::from).collect()),
         );
         Value::Object(out)
+    }
+
+    /// A video segment as the plan publishes it: with `input` — its media's
+    /// Camera Log, `media_color.rs`'s `media_input` — ONLY when the media
+    /// converts (spec §11 GR-16), so every other plan is byte-identical to
+    /// the one before version 19. A segment with `input` makes its
+    /// composition a converting one, and a plan change rebuilds it.
+    fn video_segment(&self, mut segment: Value) -> Value {
+        let media = segment
+            .get("media")
+            .and_then(Value::as_u64)
+            .and_then(|id| u32::try_from(id).ok());
+        if let (Some(media), Value::Object(segment)) = (media, &mut segment) {
+            let input = self.media_input(media);
+            if !input.is_null() {
+                segment.insert("input".to_string(), input);
+            }
+        }
+        segment
     }
 
     /// The instruction tiling: contiguous, non-overlapping spans covering

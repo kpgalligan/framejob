@@ -1026,6 +1026,13 @@
    ],
    "other_caller": ""
   },
+  "app/Sources/EditorViewController+CameraLog.swift:23": {
+   "token": "beginSheetModal",
+   "func": "useCameraLogLUT",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/MediaPane+CameraLog.swift `#selector(EditorViewController.useCameraLogLUT(_:))` — the Media tab's Camera Log popup's Use LUT… row (spec §11 GR-16); no menu item"
+  },
   "app/Sources/EditorViewController+Look.swift:61": {
    "token": "beginSheetModal",
    "func": "importLUT",

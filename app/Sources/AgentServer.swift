@@ -305,6 +305,7 @@ final class AgentServer {
         "consolidate_media": { $0.consolidateMedia },
         "relink_media": { $0.relinkMedia },
         "remove_media": { $0.removeMedia },
+        "set_media_color": { $0.setMediaColor },
         // Rendering and export (AgentServer+Render.swift)
         "render_frame": { $0.renderFrame },
         "export": { $0.exportProject },

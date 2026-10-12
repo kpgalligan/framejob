@@ -274,7 +274,7 @@ def main():
 
     print("\n1 — the catalog is the core's op list plus the app's own tools")
     check(f"the core declares {len(ops)} ops and every one of them is a tool",
-          len(ops) == 60 and ops <= set(tools),
+          len(ops) == 61 and ops <= set(tools),
           f"{len(ops)} ops, missing tools: {sorted(ops - set(tools))}")
     group = sorted(ops)
     envelope = {

@@ -1,5 +1,6 @@
-// applelog_writer — hdr_proof.py's Apple-Log-labelled fixture (grading-3
-// T3-1, spec §11 GR-15): `applelog_writer <in.mov> <out.mov>`.
+// applelog_writer — hdr_proof.py's and log_proof.py's Apple-Log-labelled
+// fixtures (grading-3 T3-1 and T3-2, spec §11 GR-15, GR-16):
+// `applelog_writer <in.mov> <out.mov> [log2]`.
 //
 // ffmpeg writes the code values (the ProRes ramp); this tool adds the label
 // the way AVFoundation stores it, as the tier-3 brief measured: every
@@ -8,9 +9,12 @@
 // primaries and matrix, the transfer key removed, the two verbatim
 // sample-description keys removed (so the writer writes the extensions, not
 // the input's original atom), and `LogTransferFunction` set to Apple Log.
-// It then opens what it wrote and reads the label back from the track's
-// format description. One line out: the label read back. Exit 0 only when
-// the file is written AND the label reads back as Apple Log; 1 otherwise.
+// With `log2` (T3-2) the label is Apple Log 2 instead, written as the SDK's
+// header asks for it (`CVImageBuffer.h`): the primaries removed too, the
+// BT.2020 matrix kept. It then opens what it wrote and reads the label back
+// from the track's format description. One line out: the label read back.
+// Exit 0 only when the file is written AND the label reads back as the one
+// asked for; 1 otherwise.
 
 import AVFoundation
 import CoreMedia
@@ -22,7 +26,13 @@ func fail(_ text: String) -> Never {
 }
 
 let arguments = CommandLine.arguments
-guard arguments.count == 3 else { fail("usage: applelog_writer <in.mov> <out.mov>") }
+guard arguments.count == 3 || (arguments.count == 4 && arguments[3] == "log2") else {
+    fail("usage: applelog_writer <in.mov> <out.mov> [log2]")
+}
+let log2 = arguments.count == 4
+let wanted = log2
+    ? kCVImageBufferLogTransferFunction_AppleLog2 as String
+    : kCMFormatDescriptionLogTransferFunction_AppleLog as String
 let input = URL(fileURLWithPath: arguments[1])
 let output = URL(fileURLWithPath: arguments[2])
 
@@ -39,8 +49,10 @@ extensions[kCMFormatDescriptionExtension_YCbCrMatrix as String] =
 extensions.removeValue(forKey: kCMFormatDescriptionExtension_TransferFunction as String)
 extensions.removeValue(forKey: "VerbatimSampleDescription")
 extensions.removeValue(forKey: "VerbatimISOSampleEntry")
-extensions[kCMFormatDescriptionExtension_LogTransferFunction as String] =
-    kCMFormatDescriptionLogTransferFunction_AppleLog
+if log2 {
+    extensions.removeValue(forKey: kCMFormatDescriptionExtension_ColorPrimaries as String)
+}
+extensions[kCMFormatDescriptionExtension_LogTransferFunction as String] = wanted
 let dimensions = CMVideoFormatDescriptionGetDimensions(old)
 var made: CMFormatDescription?
 guard CMVideoFormatDescriptionCreate(
@@ -102,4 +114,4 @@ let label = (back.tracks(withMediaType: .video).first?.formatDescriptions
             $0, extensionKey: kCMFormatDescriptionExtension_LogTransferFunction)
     }.map { "\($0)" } ?? "none"
 print("LogTransferFunction \(label); \(samples) samples")
-exit(label == (kCMFormatDescriptionLogTransferFunction_AppleLog as String) ? 0 : 1)
+exit(label == wanted ? 0 : 1)

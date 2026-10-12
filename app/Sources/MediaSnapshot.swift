@@ -6,7 +6,7 @@ import Foundation
 /// `URL.bookmarkData()` that survives a move. `mediaURL(for:)` in
 /// `ReelCore.swift` resolves the pair. `original` is the WebM or Matroska
 /// file a playable copy was made from (spec §11 #228-O), nil for any other
-/// media.
+/// media. `color` is its Camera Log (spec §11 GR-16), nil for none.
 struct MediaSnapshot: Codable, Equatable, Identifiable {
     let id: UInt32
     let path: String
@@ -20,12 +20,13 @@ struct MediaSnapshot: Codable, Equatable, Identifiable {
     let hasAudio: Bool
     let hasAlpha: Bool
     let original: MediaOriginal?
+    let color: MediaColor?
 
     init(
         id: UInt32, path: String, bookmark: String? = nil, kind: MediaKind = .video,
         duration: Ticks = 0, width: Int = 0, height: Int = 0, fps: Fps = .thirty,
         hasVideo: Bool = true, hasAudio: Bool = false, hasAlpha: Bool = false,
-        original: MediaOriginal? = nil
+        original: MediaOriginal? = nil, color: MediaColor? = nil
     ) {
         self.id = id
         self.path = path
@@ -39,6 +40,7 @@ struct MediaSnapshot: Codable, Equatable, Identifiable {
         self.hasAudio = hasAudio
         self.hasAlpha = hasAlpha
         self.original = original
+        self.color = color
     }
 
     init(from decoder: Decoder) throws {
@@ -55,6 +57,7 @@ struct MediaSnapshot: Codable, Equatable, Identifiable {
         hasAudio = c.lenient(.hasAudio, false)
         hasAlpha = c.lenient(.hasAlpha, false)
         original = c.lenient(.original)
+        color = c.lenient(.color)
     }
 
     /// The file's display name, for the Media tab, clip labels, the relink
