@@ -13,16 +13,18 @@ Deliberate non-goals: camera recording, multicam, color grading beyond
 per-clip controls (§11 GR-1: tier 1 of grading — tone, adjustment clips,
 looks, LUT import, an ungraded switch and one luma waveform — is in, kept by
 the owner's verdict of 2026-10-10, and tier 2's scopes, colour wheels,
-curves and qualifiers beside it, GR-10…GR-13; colour management is
-deferred, #256), audio beyond what shipped (volume, fades, duck, pan,
-compressor, noise reduction, peak normalize, the transition crossfade and
-the export's loudness target — M3 and §11 R5-2; so no EQ, mix buses or
-Audio Units, while offline voice effects are deferred rather than out), a
-plugin system (a clip
-may draw itself from a JavaScript module in its package, road map 10;
-nothing else is scriptable — §11 G-1), motion blur, stabilisation,
-optical-flow retiming and auto-reframe (heavy pixel work or ML, outside the
-compositor's one-pass shape — road map 2 §4), any platform but macOS. **Screen recording was on this list until road map 3
+curves and qualifiers beside it, GR-10…GR-13; tier 3's HDR→SDR conversion
+and camera log are in, GR-15, GR-16; linear-light blending and the HDR
+timeline are deferred, GR-18 #276, GR-19 #277; a wide-gamut working
+space for SDR projects is not wanted, GR-20), audio beyond what shipped
+(volume, fades, duck, pan, compressor, noise reduction, peak normalize, the
+transition crossfade and the export's loudness target — M3 and §11 R5-2; so
+no EQ, mix buses or Audio Units, while offline voice effects are deferred
+rather than out), a plugin system (a clip may draw itself from a JavaScript
+module in its package, road map 10; nothing else is scriptable — §11 G-1),
+motion blur, stabilisation, optical-flow retiming and auto-reframe (heavy
+pixel work or ML, outside the compositor's one-pass shape — road map 2 §4),
+any platform but macOS. **Screen recording was on this list until road map 3
 reversed it** (§11): the app records a display or a window through
 ScreenCaptureKit into a file it then imports exactly as File ▸ Open would —
 paused and resumed from the menu bar, each stretch its own file and its own

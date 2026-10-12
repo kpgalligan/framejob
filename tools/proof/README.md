@@ -18863,7 +18863,7 @@ scene (an unqualified adjustment pass over S1 with a neutral
 
 **Its record**: `archive/grading-2.md`'s G2-4 section.
 
-## Road map grading-3 — T3-1, honest sources and step 0 (`hdr_proof.py` H1, H1m, H1s, H1w, H2–H6, R0, TI, P1–P4, Z1 and twelve mutants; `hdr_probe.swift`, `hdr_pick_probe.swift`, `applelog_writer.swift`; spec §11 GR-15 as amended)
+## Road map grading-3 — T3-1, honest sources and step 0 (`hdr_proof.py` H1, H1m, H1a, H1s, H1w, H2–H7, R0, TI, P1–P4, Z1 and twelve mutants; `hdr_probe.swift`, `hdr_pick_probe.swift`, `applelog_writer.swift`; spec §11 GR-15 as amended)
 
 `hdr_proof.py` is curves_proof.py's shape (`capture DIR` | `compare DIR [--only …]` |
 `--measure` | `--mutant NAME [--control DIR]`); its header has every row. The control
@@ -18904,7 +18904,21 @@ reads as `gbr/reserved/reserved`.
 - **TI** (`--measure`, Release) launches with `-ReelcutCompositorTiming YES` on an instance per
   twin and reads the timing line's `, N input passes` suffix.
 
-**Its record**: `designs/grading-3.md`'s T3-1 section.
+**Its record**: `archive/grading-3.md`'s T3-1 section.
+
+T3-3 (the close) measured two of GR-15's open claims with two more rows, and the product was
+not edited for them. **H1a** puts prores4444 | hlg | hevc_alpha | webm on one 640×360 track and
+holds the tree probe's PNG bytes and picks at each non-HLG clip to the base tree's (716720c, a
+version-18 `base_copy`, as H1m does). Its CONTROL is that the HLG clip's PNGs differ.
+`hevc_alpha.mov` is `hevc_videotoolbox` from `bgra`, tagged by `setparams`, because the `-color_*`
+flags alone do not stick. **H7** takes `pq_plain.mov` and `pq_hdr10.mov`, libx265 lossless
+twins of the ramp, the second with `master-display` and `max-cll` naming a 4,000 cd/m² peak
+(not the conversion's own 1,000, so equal renders mean the metadata is ignored, not followed).
+Its CONTROL is ffprobe's first-frame side data and that peak, each peak line matched whole. It
+holds each grey row to the PQ oracle ±1 and the two renders' PNG bytes equal. Neither row runs
+under `capture`, `--measure` or a mutant's default selection. **TI** now also prints each
+export's wall time (`time.monotonic()` around `export`), recorded and not scored. Its record:
+`archive/grading-3.md`'s T3-3 section.
 
 ## Road map grading-3 — T3-2, camera log at step 0 (`log_proof.py` LP1–LP4, L1–L9, Z1 and ten mutants; `log_probe.swift`; `applelog_writer.swift`'s `log2`; spec §11 GR-16)
 
@@ -18937,4 +18951,4 @@ the Apple Log 2 label, primaries removed, as the SDK header asks), the label rea
 - **Mutants** build a tree copy (`tree_copy.make_copy`); a core mutant replaces the copy's
   `core` symlink with a copy of the tree's core (no `target/`), so the copy's own make builds it.
 
-**Its record**: `designs/grading-3.md`'s T3-2 section.
+**Its record**: `archive/grading-3.md`'s T3-2 section.

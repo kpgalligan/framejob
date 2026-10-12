@@ -2,9 +2,10 @@
 """Road map "grading-3", phase T3-1 (spec §11 GR-15) — honest sources and
 Reelcut's own HDR→SDR at step 0, over MCP and two probes over `app/Sources`.
 Written before any product edit, so the control is captured on the untouched
-tree.
+tree. T3-3 (the close) added H1a, H7 and TI's export wall time, measuring two
+of GR-15's unmeasured claims; the product was not edited for them.
 
-    python3 tools/proof/hdr_proof.py [--app PATH] [--only H2,H3,...]
+    python3 tools/proof/hdr_proof.py [--app PATH] [--only H1a,H2,H7,...]
     python3 tools/proof/hdr_proof.py capture DIR    # the CONTROL tree: H1's references, H2–H6 shown failing
     python3 tools/proof/hdr_proof.py compare DIR [--only H1,...]
     python3 tools/proof/hdr_proof.py --measure      # TI: step 0's 4K cost (Release figures)
@@ -39,6 +40,12 @@ ProRes 4444 with an alpha ramp — an 8-bit PNG of it, and container_import_proo
 .py's P1 VP9 WebM; `applelog.mov`, `bt709.mov` relabelled Apple Log by
 `applelog_writer.swift` (ffprobe `bt2020nc/unknown/bt2020`, the label read
 back); and, for TI only, 4K 4 s ProRes twins of the ramp, HLG and BT.709.
+For H1a: `hevc_alpha.mov`, 640×360 1 s `testsrc2` with an alpha ramp through
+`hevc_videotoolbox` from `bgra`, BT.709-tagged by `setparams` (the `-color_*`
+flags alone do not stick from `bgra`). For H7: `pq_plain.mov` and
+`pq_hdr10.mov`, the ramp through `libx265` lossless 4:2:0 10-bit with the PQ
+tags, the second with x265's `master-display` and `max-cll` (HDR10 static
+metadata naming a 4,000 cd/m² peak, not the conversion's 1,000).
 The oracle: the codes ffmpeg reads back from a fixture, through the matrix
 its tags name (limited range), then this script's own formula with GR-15's
 numbers (`convert`), the matrices derived here from the published
@@ -51,6 +58,12 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   (`set_reversed`): `render_frame` at 0 and 0.5 s byte-identical to DIR's PNGs,
   and `hdr_pick_probe.swift`'s picks at three points at 0.5 s equal to DIR's.
   R0's `rec_tags.mov` joins it when the selector's arm for its tags is nil.
+- **H1a** (T3-3; GR-15's "ProRes 4444 with alpha, the WebM rewrap, the
+  HEVC-with-alpha path" in a converting composition): prores4444 | hlg |
+  hevc_alpha | webm, 1 s each on one 640×360 track, saved; at 0.5 s into
+  each non-HLG clip the tree probe's PNG bytes and picks equal the base
+  tree's (716720c, a version-18 copy, as H1m). CONTROL: at the HLG clip the
+  tree's PNG differs from the base's (the composition converts).
 - **H2**: the HLG, PQ and HLG HEVC ramps alone, and BT.709 | HLG | BT.709 (1 s
   each): each `prores_422` export's first frame of the HDR clip equals its
   frame +5 on the grey row (every 8th column) ±1, and `render_frame` at both
@@ -72,6 +85,16 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   background: the eyedropper's pick at (256, 96) at 0.5 s equals the
   `prores_422` export's pixel there (frame 15) ±2; keyed with the probe's key
   (`set_video` chroma, tolerance 0.05), the export shows magenta there ±8.
+- **H7** (T3-3; GR-15's "HDR10 static metadata on a converted frame"):
+  CONTROL first, ffprobe's first frame of `pq_hdr10` names "Mastering display
+  metadata" and "Content light level metadata" with a 4,000 cd/m² peak
+  (`max_luminance=40000000/10000`, `max_content=4000`; the conversion assumes
+  1,000) and `pq_plain`'s none of them; then
+  each alone at 0.5 s: the grey row (every 8th column) = the PQ oracle ±1 at
+  8 bits (H3's loop), and the two renders' PNG bytes equal (lossless twins;
+  if not, the worst |Δ| is printed and held to ±1). Because the metadata's
+  peak is not the conversion's own, equal renders show the shoulder ignores
+  it rather than follows it.
 - **R0** (GR-15's owed check; NEVER records the screen, never searches the
   disk): ffprobe reads the labels of the newest-by-name `Screen Recording
   *.mov` in `~/Movies/Reelcut Recordings/` (that folder only, read-only,
@@ -84,12 +107,16 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   `prores_422` on an instance of its own, then the BT.709 twin on another;
   every compositor timing line (`[reelcut] compositor: … over 120 frames, N
   input passes`) reports 120 passes for HLG and 0 for BT.709, at least two
-  lines each; the averages, their difference and the host state are printed.
+  lines each; the averages, their difference, each export's wall time
+  (`time.monotonic()` around the `export` call, recorded, not scored) and the
+  host state are printed.
 - **P1–P4**: `hdr_probe.swift` over `app/Sources` (a probe that will not build
   is a scored FAIL of all four).
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Reelcut: ` line.
 
+H1a and H7 run in a plain run, `compare` and `--only`; never under
+`capture`, `--measure` or a mutant's default selection.
 `capture DIR` records H1's references (`DIR/h1-*.png`, `DIR/media/`,
 `DIR/capture.json` with the picks and the reverse's digest) and runs H2–H6 and
 R0, which must FAIL on the control (each discriminates). `--mutant NAME`
@@ -191,8 +218,17 @@ H1_FIXTURES = [("bt709", W, H), ("untagged", W, H), ("h264_709", SW, SH),
 H1_SUFFIX = {"still8": ".png", "webm": ".webm"}
 PICK_POINTS = {(W, H): [[256.5, 32.5], [512.5, 96.5], [900.5, 100.5]],
                (SW, SH): [[320.5, 180.5], [100.5, 60.5], [540.5, 300.5]]}
-ROWS = ["H1", "H1m", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "R0", "TI", "P1", "P2", "P3",
-        "P4", "Z1"]
+ROWS = ["H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "H7", "R0", "TI", "P1",
+        "P2", "P3", "P4", "Z1"]
+# H7's fixtures: libx265 lossless with the PQ tags; pq_hdr10 adds HDR10 static metadata
+# naming a 4,000 cd/m² peak, not the 1,000 the conversion assumes (GR-15's PQ 1000/203),
+# so equal renders mean the metadata is ignored, not followed.
+PQ_X265 = "lossless=1:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc"
+HDR10 = (":master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)"
+         "L(40000000,50):max-cll=4000,400")
+SIDE_DATA = ("Mastering display metadata", "Content light level metadata")
+# What ffprobe prints for that peak (a stale 1,000-nit fixture fails the CONTROL).
+HDR10_PEAK = ("max_luminance=40000000/10000", "max_content=4000")
 BASE_COMMIT = "716720c"
 BASE_TREE = BASE / f"base-{BASE_COMMIT}"
 INPUT_SWIFT = "app/Sources/InputConversions.swift"
@@ -577,11 +613,38 @@ def fixture(name):
             "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=2",
             "-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p", "-b:v", "500k", "-c:a", "libopus"]),
             {"codec_name": "vp9"})
+    if name == "hevc_alpha":
+        return testsrc(name, ["-vf", "format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':"
+                              "a='255*X/(W-1)',setparams=color_primaries=bt709:color_trc=bt709:"
+                              "colorspace=bt709", "-c:v", "hevc_videotoolbox", "-alpha_quality",
+                              "0.75", "-pix_fmt", "bgra", "-tag:v", "hvc1", "-b:v", "8M"],
+                       {"codec_name": "hevc", "color_transfer": "bt709",
+                        "color_primaries": "bt709"})
+    if name in ("pq_plain", "pq_hdr10"):
+        return pq_x265(name)
     if name in ("hlg4k", "bt709_4k"):
         return four_k(name)
     if name in MEDIA_REC:
         return MEDIA_REC[name]
     raise ValueError(name)
+
+
+def pq_x265(name):
+    """H7's twins: the ramp through libx265 lossless, 4:2:0 10-bit, PQ-tagged;
+    `pq_hdr10` with x265's HDR10 static metadata."""
+    source = base()
+    if source is None:
+        REFUSED[name] = REFUSED.get("base")
+        return None
+    params = PQ_X265 + (HDR10 if name == "pq_hdr10" else "")
+    made = ffmpeg_make(MEDIA / f"{name}.mov", [
+        "-i", str(source), "-vf", "format=yuv420p10le,setparams=color_primaries=bt2020:"
+        "color_trc=smpte2084:colorspace=bt2020nc", "-c:v", "libx265", "-preset", "fast",
+        "-tag:v", "hvc1", "-color_primaries", "bt2020", "-color_trc", "smpte2084",
+        "-colorspace", "bt2020nc", "-x265-params", params], 300)
+    return checked(name, made, {"codec_name": "hevc", "pix_fmt": "yuv420p10le",
+                                "color_primaries": "bt2020", "color_transfer": "smpte2084",
+                                "color_space": "bt2020nc"})
 
 
 def four_k(name):
@@ -1306,6 +1369,126 @@ def run_h1m(client, control, sources, state):
           not misses and bool(asks["tree"]), f"{misses or 'all equal'}")
 
 
+def run_h1a(client, sources, state):
+    """H1a (T3-3): alpha and WebM sources in a converting composition —
+    prores4444 | hlg | hevc_alpha | webm on one 640×360 track; at the ticks
+    showing no HLG the tree probe's PNG bytes and picks equal the base tree's
+    (a version-18 copy, as H1m); at the HLG tick the tree's PNG must differ
+    from the base's (the CONTROL: the tree's composition converts)."""
+    members = ["prores4444", "hlg", "hevc_alpha", "webm"]
+    paths = [fixture(n) for n in members]
+    name = "H1a prores4444|hlg|hevc_alpha|webm (640×360): at the non-HLG ticks the tree's PNG " \
+           "bytes and picks equal the base tree's (716720c); at the HLG tick the PNGs differ " \
+           "(CONTROL)"
+    if any(path is None for path in paths):
+        check(name, False, f"a fixture is missing: {[n for n, p in zip(members, paths) if p is None]} "
+                           f"({REFUSED})")
+        return
+    package, clips, doc = saved_scene(client, "h1a-mix", paths, SW, SH)
+    state["h1a_closed"] = doc.close()
+    if package is None:
+        check(name, False, f"not saved: {doc.why}")
+        return
+    older, why = base_copy(package)
+    if older is None:
+        check(name, False, f"the base tree's copy: {why}")
+        return
+    control_tick = SEC + T
+    ticks = [T, control_tick, 2 * SEC + T, 3 * SEC + T]
+    asks = {which: [{"tag": f"h1a@{tick}", "package": str(package if which == "tree" else older),
+                     "tick": tick, "clips": clips, "points": PICK_POINTS[(SW, SH)],
+                     "png": str(WORK / f"h1a-{which}-{tick}.png")} for tick in ticks]
+            for which in ("tree", "base")}
+    tree = run_picks(sources, asks["tree"])
+    base = run_picks(None, asks["base"])
+    misses, figures, control = [], [], None
+    for tick in ticks:
+        tag = f"h1a@{tick}"
+        a, b = tree.get(tag) or {}, base.get(tag) or {}
+        pa, pb = Path(a.get("png") or "/nonexistent"), Path(b.get("png") or "/nonexistent")
+        if not (pa.exists() and pb.exists()):
+            misses.append(f"{tag}: no PNG ({a.get('error') or tree.get('error')} / "
+                          f"{b.get('error') or base.get('error')})")
+            continue
+        same = pa.read_bytes() == pb.read_bytes()
+        differ = 0
+        if not same:
+            fa, fb = Frame(pa, SW, SH), Frame(pb, SW, SH)
+            differ = sum(1 for x, y in zip(fa.values, fb.values) if x != y)
+        figures.append(f"{tag}: PNG bytes {'equal' if same else f'differ ({differ} 16-bit samples)'}"
+                       f"; picks tree {a.get('picked')} base {b.get('picked')}")
+        if tick == control_tick:
+            control = not same
+            continue
+        if not same:
+            misses.append(f"{tag}: PNG bytes differ ({differ} 16-bit samples differ)")
+        if a.get("picked") != b.get("picked"):
+            misses.append(f"{tag}: picks {a.get('picked')} vs base {b.get('picked')}")
+    if control is not True:
+        misses.append(f"CONTROL h1a@{control_tick}: the HLG tick's PNGs "
+                      f"{'are equal' if control is False else 'were not drawn'}")
+    check(name, not misses, f"{misses or 'all equal, the control differs'}\n       "
+          + "\n       ".join(figures))
+
+
+# ---- H7 -------------------------------------------------------------------------
+
+def side_data(path):
+    """The side data ffprobe names on `path`'s first video frame, then the
+    HDR10_PEAK lines it prints."""
+    ran = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-read_intervals",
+                       "%+#1", "-show_frames", "-show_entries", "frame=side_data_list",
+                       str(path)], 60)
+    lines = {line.strip() for line in ran["stdout"].splitlines()}
+    return [name for name in SIDE_DATA if name in ran["stdout"]] + \
+        [line for line in HDR10_PEAK if line in lines]
+
+
+def run_h7(client, state):
+    """H7 (T3-3): PQ with and without HDR10 static metadata converts the same."""
+    name = "H7 PQ with and without HDR10 static metadata (4,000 cd/m² peak): ffprobe names both " \
+           "and the peak on pq_hdr10 and none on pq_plain (CONTROL); each grey row (every 8th " \
+           "column) = the PQ oracle ±1, and the two renders' PNG bytes equal"
+    plain, hdr10 = fixture("pq_plain"), fixture("pq_hdr10")
+    if plain is None or hdr10 is None:
+        check(name, False, f"refused {REFUSED}")
+        return
+    found = {"pq_plain": side_data(plain), "pq_hdr10": side_data(hdr10)}
+    control = found["pq_hdr10"] == list(SIDE_DATA + HDR10_PEAK) and not found["pq_plain"]
+    misses = [] if control else [f"CONTROL: side data {found}"]
+    figures, frames = [f"side data {found}"], {}
+    for fixture_name in ("pq_plain", "pq_hdr10"):
+        frame, source = fixture_scene(client, fixture_name)
+        if frame is None:
+            misses.append(f"{fixture_name}: {source}")
+            continue
+        frames[fixture_name] = frame
+        worst = 0
+        for x in range(0, W, 8):
+            rgb = source.rgb(x, GREY_ROW, "bt2020nc")
+            want = [code8(c) for c in convert("pq", "bt2020", rgb)[0]]
+            got = frame.px8(x, GREY_ROW)
+            worst = max(worst, max(abs(a - b) for a, b in zip(got, want)))
+            if not close_to(got, want, 1) and len(misses) < 12:
+                misses.append(f"{fixture_name} x={x} render {got} oracle {want}")
+        mid = W // 2
+        figures.append(f"{fixture_name}: worst |Δ| against the oracle {worst} levels; x={mid} "
+                       f"render {frame.px8(mid, GREY_ROW)} oracle "
+                       f"{[code8(c) for c in convert('pq', 'bt2020', source.rgb(mid, GREY_ROW, 'bt2020nc'))[0]]}")
+    if len(frames) == 2:
+        a, b = frames["pq_plain"], frames["pq_hdr10"]
+        if Path(a.path).read_bytes() == Path(b.path).read_bytes():
+            figures.append("the two renders' PNG bytes equal")
+        else:
+            worst = max((abs(round(x / 257) - round(y / 257)) for x, y in zip(a.values, b.values)),
+                        default=0)
+            figures.append(f"the two renders' PNG bytes differ; worst |Δ| {worst} levels")
+            if worst > 1:
+                misses.append(f"the renders differ by {worst} levels")
+    state["h7_side_data"] = found
+    check(name, not misses, f"{misses or 'all within'}\n       " + "\n       ".join(figures))
+
+
 def run_srgb_rows(client, control, sources, state):
     """H1s and H1w: the sRGB arm, BT.709 primaries in a converting composition
     and P3 D65 primaries alone."""
@@ -1424,6 +1607,7 @@ def run_ti(binary):
             continue
         log = WORK / f"ti-{name}.log"
         before = host_state()
+        wall = None
         launched = mcp.launch(str(binary), ["-ReelcutCompositorTiming", "YES"],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
                               log_path=str(log), timeout=CALL_BOUND)
@@ -1435,7 +1619,9 @@ def run_ti(binary):
             doc.place(path, 0)
             doc.place(path, 4 * SEC)
             start = log.stat().st_size if log.exists() else 0
+            started = time.monotonic()
             out = doc.export(f"ti-{name}") if doc.ok else None
+            wall = time.monotonic() - started
             time.sleep(1)
             with open(log, errors="replace") as handle:
                 handle.seek(start)
@@ -1449,7 +1635,9 @@ def run_ti(binary):
         averages = [float(a) for a, _, _ in lines]
         worst = [float(w) for _, w, _ in lines]
         figures.append(f"{name}: {len(lines)} lines, passes {passes}, average ms "
-                       f"{averages}, worst {worst}; host before {before}; after {host_state()}")
+                       f"{averages}, worst {worst}; export wall s "
+                       f"{'%.2f' % wall if wall is not None and out else None} (recorded, not "
+                       f"scored); host before {before}; after {host_state()}")
         if out is None or len(lines) < 2 or any(p != want for p in passes) or found:
             misses.append(f"{name}: export {'ok' if out else 'missing'}, lines {len(lines)}, "
                           f"passes {passes}, complaints {found[:2]}")
@@ -1623,6 +1811,8 @@ def main():
         selected = {"TI", "Z1"}
     else:
         selected.discard("TI")
+        if args.mutant:
+            selected -= {"H1a", "H7"}
     if args.mode == "capture":
         selected = {"H1", "H2", "H3", "H4", "H5", "H6", "R0", "Z1"}
         control.mkdir(parents=True, exist_ok=True)
@@ -1656,8 +1846,8 @@ def main():
     state = {}
     closed = True
     log = WORK / "instance.log"
-    needs_instance = bool(selected & {"H1", "H1m", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6",
-                                      "R0"})
+    needs_instance = bool(selected & {"H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5",
+                                      "H6", "H7", "R0"})
     if needs_instance:
         launched = mcp.launch(str(binary), [],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
@@ -1684,6 +1874,8 @@ def main():
                     run_h1(client, args.mode, control, sources, state, extra_h1)
                 if "H1m" in selected:
                     run_h1m(client, control, sources, state)
+                if "H1a" in selected:
+                    run_h1a(client, sources, state)
                 if selected & {"H1s", "H1w"}:
                     run_srgb_rows(client, control, sources, state)
                 if "H2" in selected:
@@ -1705,6 +1897,8 @@ def main():
                     run_h5(client, scenes, extra_h5)
                 if "H6" in selected:
                     run_h6(client, sources, state)
+                if "H7" in selected:
+                    run_h7(client, state)
             except Exception as error:  # a row that could not run is a failure
                 import traceback
                 traceback.print_exc()

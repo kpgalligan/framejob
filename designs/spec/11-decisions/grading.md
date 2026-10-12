@@ -430,7 +430,7 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   transfer conversion; …)" is true of the path T0 measured, `render_frame`'s
   `AVAssetImageGenerator`, and of the first frame a decoder delivers of each HLG or PQ clip; the
   export reader's later frames and the player convert them to SDR (the tier-3 brief, 2026-10-11:
-  grey signal 0.5 → HLG 0.3843, PQ 0.7192; `designs/grading-3.md`, "How it fits the tree"). From
+  grey signal 0.5 → HLG 0.3843, PQ 0.7192; `archive/grading-3.md`, "How it fits the tree"). From
   T3-1 every source arrives native and honestly labelled (`canConformColorOfSourceFrames`), and
   Reelcut's step 0 converts HLG, PQ and BT.2020-with-BT.709-transfer sources to SDR Rec. 709
   before the layer stage, so a LUT at 4d meets them converted, on every path.

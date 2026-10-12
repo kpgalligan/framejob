@@ -18,7 +18,8 @@ the owner's "All as recommended" (2026-10-11) to the #257 brief's choices 1a, 2a
 `…/i257-8bit-paths/answers.md`). That road map is closed: its condensed record is
 `designs/adr/precision-2.md`, and the original, `archive/precision-2.md`, holds each phase's
 record (P2-0–P2-3). They take up PR-5's deferral of the 10-bit rest: PR-6 and PR-7 amend its
-list, and PR-8 closes its other two items. PR-2 stands: HDR stays tone-mapped in the compositor.
+list, and PR-8 closes its other two items. PR-2 stands: HDR stays tone-mapped in the compositor
+(amended by GR-15: HDR still reaches the output as SDR, converted by Reelcut's own step 0).
 
 - **PR-1 — The working depth is 16-bit float, holding encoded values clamped to [0, 1] (owner,
   2026-10-09, choices 1 and 5).**
@@ -65,7 +66,7 @@ list, and PR-8 closes its other two items. PR-2 stands: HDR stays tone-mapped in
     - Values arrive unclamped (−0.46…1.47); PR-1's source clamp bounds them.
   **Amended by GR-15** (grading-3 T3-0): "HDR stays tone-mapped to SDR" is true of one path,
   not of every frame. Measured by the tier-3 brief (2026-10-11, a scratch instrument making the
-  app's own AVFoundation calls; `designs/grading-3.md`, "How it fits the tree"), at a grey signal
+  app's own AVFoundation calls; `archive/grading-3.md`, "How it fits the tree"), at a grey signal
   of 0.5: the export reader's later frames and the player arrive converted to SDR (HLG 0.3843,
   PQ 0.7192), but the FIRST frame a decoder delivers of each HLG or PQ clip, and every frame
   `AVAssetImageGenerator` draws (`render_frame`, Save Frame…, GIF, APNG, the Look gallery's
@@ -219,7 +220,8 @@ list, and PR-8 closes its other two items. PR-2 stands: HDR stays tone-mapped in
     source's reverse is Main 10 too, so a project whose only video is a reversed 8-bit clip
     renders 16-bit frames (V6: a 16-bit PNG, the reverse `hevc`/Main 10/`yuv420p10le`); PR-4
     is amended to match.
-  - PR-2 stands: HDR stays tone-mapped in the compositor; the reverse only stops mislabelling.
+  - PR-2 stands: HDR stays tone-mapped in the compositor (amended by GR-15: HDR still reaches
+    the output as SDR, converted by Reelcut's own step 0); the reverse only stops mislabelling.
   - Amends PR-5's "the reversed-clip intermediate".
 - **PR-8 — 10-bit `hevc_alpha` and 10-bit screen recording are not wanted (owner, 2026-10-11,
   choices 3a and 4a).**

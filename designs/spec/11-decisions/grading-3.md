@@ -3,13 +3,14 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map making these is in progress: `designs/grading-3.md` (T3-0 the road map, these
+The road map that made these is closed: its condensed record is `designs/adr/grading-3.md`,
+and the original, `archive/grading-3.md`, holds each phase's record (T3-0 the road map, these
 decisions and the pure move; T3-1 honest sources and Reelcut's HDR→SDR; T3-2 log footage; T3-3
 the close). The IDs continue the GR- series of [`grading.md`](grading.md) and
 [`grading-2.md`](grading-2.md), so a citation never has to say which file. GR-15…GR-20 were
 recorded in T3-0, before any tier-3 code, from the owner's answers of 2026-10-11 to the tier-3
 brief's choices: "HDR fix + log" for choice 1, "All as recommended" for choices 2–6 and 10, and
-"Synthetic now" for the footage (`designs/grading-3.md`, "The owner's choices"; the brief is
+"Synthetic now" for the footage (`archive/grading-3.md`, "The owner's choices"; the brief is
 `~/.claude/litecode/reelcut/grading-tier3/I-grading-tier3.md`, outside the repo). T3-1 and T3-2
 each add to their own entry the numbers their code needs (GR-15's shoulder and H3's bound;
 GR-16's sources' terms, constants and format number) before that code is written.
@@ -204,6 +205,16 @@ opened, at design time or build time.
       its decoded frames carry stays on today's path (AVFoundation's conversion), since the
       class is chosen from the descriptions; HDR10 static metadata on a converted frame is not
       measured (no fixture carries it).
+      - **Measured at T3-3** (`hdr_proof.py` H1a, H7; `--only H1a,H7,Z1` on Debug and on
+        Release, 3/3 each): in a converting composition (ProRes 4444 with an alpha ramp | HLG |
+        HEVC with alpha | VP9 WebM, 640×360), the tree's frames at 0.5 s into each non-HLG clip
+        are byte-identical to 716720c's, with equal picks, while the HLG clip's differ (143,449
+        16-bit samples; grey pick 0.424 converted against 0.545), so the switch holds for alpha
+        and the WebM rewrap. A PQ ramp with HDR10 static metadata naming a 4,000 cd/m² peak
+        (x265's mastering display and content light level, which ffprobe names on its first
+        frame), not the conversion's 1,000, renders byte-identical to its twin without it, each
+        grey row within 1 level of the oracle (`--only H7,Z1` on Release, 2/2): the shoulder
+        ignores the metadata. The player's first frame and the player at length are GRD-16's.
 - **GR-16 — Camera log is a setting on the media, `media.color {log, gamut, lut, detected}`,
   converted at step 0 before the chroma key and Color's four.** Choices 3a, 4a, 5a and 6
   (owner, 2026-10-11).

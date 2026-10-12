@@ -899,3 +899,75 @@ Main 10 reverse (PR P2-2) stores code 98 where the file has 95 (S-Log3) and 199 
 says `base_copy` serves H1m and H6. The CLAUDE.md edits the notes owed (root, `app/`, `core/`:
 the 91 tools and 61 op tools, the Media tab, import and compositor entries, `model_media_color.rs`
 and `media_color.rs`, the recipe's twenty-six keys) are applied.
+
+## T3-3 — the close
+
+**What landed** (2026-10-12, in the worktree on `grading-3`, from `c47d97d`). `designs/adr/grading-3.md`. This road map
+`git mv`'d to `archive/grading-3.md`, with its `archive/INDEX.md` row. Every `designs/grading-3.md` citation outside
+`archive/` now points here: §11 `grading-3.md`'s first paragraph in the closed form, `grading.md` (GR-8's amendment),
+`precision.md` (PR-2's amendment) and `tools/proof/README.md`'s two record lines. Each "PR-2 stands" outside `archive/`
+gained "(amended by GR-15…)": `precision.md`'s opening and PR-7, the PR-7 index row, and `designs/adr/precision-2.md`.
+Spec §1's non-goals sentence now names tier 3. GRD-16 gained the preview's first frame and playback to the end. GR-15
+gained one sub-bullet, "Measured at T3-3". `hdr_proof.py` gained rows H1a and H7, three fixtures (`hevc_alpha`,
+`pq_plain`, `pq_hdr10`) and TI's export wall time. No product file changed.
+
+**Measured** (2026-10-12, `powermode 0`; AC power for the Debug run and the first Release run, then battery from
+the `--measure` run on, `pmset -g batt` "Now drawing from 'Battery Power'", 99 %, and AC again for the H7 re-run;
+the host was loaded by other sessions):
+- `python3 tools/proof/hdr_proof.py --only H1a,H7,Z1` (Debug, loadavg 38.17 / 14.78 / 11.98 before): 3/3.
+- `RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --only H1a,H7,Z1` (loadavg 24.04 / 24.86 / 17.35 before):
+  3/3, with the same figures as Debug, no `Reelcut: ` line and no DEFAULTS MOVED.
+  - **H1a**: prores4444 | hlg | hevc_alpha | webm at 640×360. At 0.5 s into the ProRes 4444, HEVC-alpha and WebM
+    clips the tree's PNG bytes are equal to 716720c's and its picks are equal (e.g. HEVC alpha [0, 0.541, 0.541],
+    [0.173, 0, 0], [0, 0.863, 0.863] on both). At the HLG clip (CONTROL) the PNGs differ in 143,449 16-bit samples,
+    grey pick 0.424 (tree, converted) against 0.545 (base). So GR-15's switch holds for alpha and the WebM rewrap.
+  - **H7** in these runs carried metadata naming 1,000 cd/m² (`L(10000000,1):max-cll=1000,400`), the
+    conversion's own peak, so equal renders could not tell "ignores" from "follows"; the review caught it and H7
+    was re-run with a 4,000 cd/m² peak (below).
+- `RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --only H7,Z1` (the fix pass, `pq_hdr10` remade with
+  `L(40000000,50):max-cll=4000,400`; AC power, loadavg 28.72 / 39.30 / 38.72 before): 2/2, no `Reelcut: ` line and
+  no DEFAULTS MOVED.
+  - **H7**: ffprobe names "Mastering display metadata" and "Content light level metadata" on `pq_hdr10`'s first
+    frame with `max_luminance=40000000/10000` and `max_content=4000`, and none of them on `pq_plain`'s (CONTROL; a
+    stale 1,000-nit fixture now fails it). Each grey row is within 1 level of the PQ oracle (x=512: render
+    [183, 183, 183], oracle [183, 183, 183]). The two renders' PNG bytes are equal: with metadata naming a peak
+    other than its own 1,000 cd/m², the shoulder ignores it (#281).
+- `RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --measure`: 2/2. TI: the HLG twin had 2 lines with
+  passes [120, 120], averages 2.12 / 1.74 ms and worst 10.09 / 2.89, export wall 0.96 s. The BT.709 twin had passes
+  [0, 0], averages 1.62 / 1.29 ms and worst 6.57 / 2.29, export wall 0.95 s. The mean averages were 1.930 and
+  1.455 ms. Battery power, loadavg 21.41 / 24.27 / 17.23 before. Recorded, not a budget; with a 4K ProRes export of
+  this ramp the conversion adds no wall time that one run can see.
+- `python3 tools/proof/spec_index_proof.py` 156/156; `python3 tools/proof/capture_spike/inventory.py --check` 5/5;
+  `git grep -n "designs/grading-3.md" -- . ':!archive'` prints nothing; every `git grep -n "PR-2 stands" -- .
+  ':!archive'` hit carries the GR-15 note.
+- `make gate`: PASS (test re-run, 78 s; typecheck, fmt, lint and app skipped as byte-identical to their last pass,
+  typecheck at its 4 baseline warnings).
+- No mutants: the phase adds no product decision, and H1a's and H7's CONTROLs discriminate.
+
+**The issues** (drafted at the close, each `ai-drafted`, `low-priority`, reviewed against the tree first):
+#276 linear-light blending as an opt-in project switch (GR-18); #277 the HDR timeline: HLG output, EDR
+preview, HDR export (GR-19); #278 camera log: more curves, and S-Log3/V-Log detected from the maker's metadata;
+#279 a colour tag in the ProRes header but not the `colr` atom, green.mov's unexplained [50, 165, 73], and
+sources whose description lacks their frames' labels; #280 the 10-bit reverse's toe shift on log footage;
+#281 PQ's shoulder ignores HDR10 static metadata (H7); #282 thumbnails show the log picture; #283 a
+full-range-flagged log file is read as video range. Not filed: Apple Log 2 (built in T3-2); Apple's HLG curve
+beyond four points (moot: H3 holds Reelcut's own formula); the maker LUTs' licences (moot: none bundled); real
+footage (GRD-16…GRD-18); the player's first frame and the player at length (GRD-16, extended here); a recording's
+labels (R0 read `bt709`); the brief's scratch H.264 reader hang (a scratch instrument's).
+
+**Close comments**: #264 closed as built (T3-2, `c47d97d`, GR-16; L1–L9 on synthetic fixtures; its "done when" on
+a real clip is GRD-17/GRD-18). #256 closed: HDR sources converted honestly (GR-15, T3-1), wide gamut for SDR
+projects closed by the owner (GR-20, choice 9a), linear light → #276, HDR/EDR/HDR export → #277.
+
+**Owed.** GRD-16…GRD-18 (the owner's clips). The root `CLAUDE.md` ADR list names `grading-3` (the orchestrator
+applies it). The issues are filed and #256/#264 closed by the orchestrator, and the `#TBD-n` placeholders are
+substituted (`git grep -n "#TBD-"`).
+
+**Review and close.** Review pass 1: fix-required (H7's fixture named the conversion's own 1,000
+cd/m² peak, so it could not discriminate; two nits). One fix pass (the 4,000 cd/m² fixture, H7
+re-run on Release 2/2), re-review pass 2: pass, two nits applied by the orchestrator (the peak
+lines matched whole; a README paragraph rewrapped), after which H7 on Release 2/2 again (AC
+power). Filed: #276 (GR-18 linear light), #277 (GR-19 the HDR timeline), #278 (more log curves),
+#279 (header-only colour tags), #280 (the reverse's toe shift on log), #281 (PQ ignores HDR10
+metadata), #282 (log thumbnails), #283 (full-range log files). #264 and #256 closed. The root
+`CLAUDE.md` ADR entry is applied.
