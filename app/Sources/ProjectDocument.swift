@@ -448,7 +448,7 @@ final class ProjectDocument: NSDocument {
         // to ask for repeatedly: `MediaImporter` skips a cache whose marker
         // matches the file it was made from, and rebuilds one that has no
         // marker — a strip cut short by a save or a crash.
-        generateCaches()
+        startCaches()
         // A package can arrive without its `cache/` — copied out of a zip that
         // dropped it, or opened after someone cleaned it out — so an open is
         // as much a reason to render a reverse as ticking the box is.
@@ -818,7 +818,7 @@ final class ProjectDocument: NSDocument {
         let urls = mediaURLs()
         for media in project.snapshot.media {
             guard let url = urls[media.id] else { continue }
-            MediaImporter.generateCaches(for: media, url: url, in: cache)
+            MediaImporter.generateCaches(for: media, url: url, in: cache, urls: urls)
         }
     }
 

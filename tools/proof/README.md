@@ -18962,3 +18962,64 @@ the Apple Log 2 label, primaries removed, as the SDK header asks), the label rea
   `core` symlink with a copy of the tree's core (no `target/`), so the copy's own make builds it.
 
 **Its record**: `archive/grading-3.md`'s T3-2 section.
+
+## Issue #282 — converting media's thumbnails through step 0 (`log_thumbs_proof.py` H0, TH, T0–T8, TT, Z1 and ten mutants; `cache_pass_probe.py` S2; spec §11 GR-21)
+
+`log_thumbs_proof.py` is log_proof.py's shape (`capture DIR [--only …]` | `compare DIR [--only
+…]` | a plain run | `--measure` | `--mutant NAME [--control DIR]`) and imports log_proof's and
+hdr_proof's fixtures and decoding; its header has every row. Each project is one fixture alone
+on a 1024×128 canvas at 30 fps; a strip's `0.jpg` (rgb24 through ffmpeg) is held to
+`render_frame` at tick 0 on the grey row every 8th column, and for the log fixtures the three
+patches too.
+
+```sh
+python3 tools/proof/log_thumbs_proof.py capture tools/proof/work/i282/ctl [--only H0,Z1]  # untouched tree only
+make app-debug && python3 tools/proof/log_thumbs_proof.py [--only TH,T1,T2,T3,T4,T7,T8]
+make app && RC_PROOF_APP=release python3 tools/proof/log_thumbs_proof.py compare tools/proof/work/i282/ctl
+RC_PROOF_APP=release python3 tools/proof/log_thumbs_proof.py --measure
+python3 tools/proof/log_thumbs_proof.py --mutant <name>      # Debug copy of the tree
+python3 tools/proof/cache_pass_probe.py --only S1a,S1b,S2
+```
+
+**The control** (`tools/proof/work/i282/ctl/`, gitignored), all on eafcd52's Debug build before
+any `app/Sources` edit, 2026-10-12: T0, T4's two byte-equal packages of `bt709.mov` and T5's flat
+marker of `slog3.mov` (with their media) by the first attempt; H0 by this change's first run.
+- **T0**: every log strip left its render at the 90 % patch by ≥ 20 levels — applelog 26,
+  applelog2 26, slog3 45, vlog 43, slog3 with Use LUT 60 (worst over all points 35, 35, 48, 48,
+  64).
+- **H0** (`h0.json`): the plain generator's (`ForceSDR`) HLG strip is 11 levels off step 0 at
+  worst on the grey row (117 of 128 columns over 4; about 10 darker through the mids: green
+  thumb/render x384 68/77, x640 111/121) and PQ's 19 (84 over 4; x320 60/78 in the mids, x640
+  243/232 on the shoulder); `b2020_709` and `p3_709` 1. The first attempt's TH measured the same
+  11, 19, 1 and 1, which is what moved the owner to include HLG and PQ (GR-21).
+
+**The recorded run** (`compare`, Release, after `make gate`, 2026-10-12): 10/10. TH: HLG and PQ
+hold `{"transfer": "hlg" | "pq"}` markers and are 1 level from their render at worst, the SDR
+pair flat and 1. T1: 1, 1, 1, 1 and 2 (Use LUT) at worst, 0, 0, 0, 0 and 1 at the 90 % patch.
+T2, T3 and T7 within 2 at every step; T4's strip byte-equal to the control's; T5's `source`
+equal to the control's flat marker, `lutPath` resolving to the cube; T6's marker carrying the
+17³ cube's second and `0.jpg` rewritten (2); T8's HLG strip unchanged for 5 s after bt709's
+marker came back. No `Reelcut: ` line; no `DEFAULTS MOVED`.
+
+**TT** (Release, recorded): a 60 s 1920×1080 10-bit HEVC fixture, import → flat marker 0.5 s;
+S-Log3 set → converted marker 3.5 s.
+
+**`cache_pass_probe.py` S2** (13/13 with the rest): a held pass for `one.mov` asked with no
+input, then the same URL with S-Log3: the second's wait is bounded (superseded) and the held
+pass writes nothing once released; a third with the same input again is not bounded (CONTROL).
+
+**Mutants** (`--mutant NAME`, Debug copies, once on the final instrument, 2026-10-12; each anchor
+asserted to occur once; all ten caught, every other row passing):
+
+| Mutant | The edit | Caught by |
+|---|---|---|
+| `plain-always` | `thumbnailReader`'s guard → `guard let effective, false` | T1 (the T0 gaps again: 26, 26, 45, 43, 60), T2 (48, 64) |
+| `no-watch` | the observer's `generateCaches` → nothing | T2, T3 (no converted marker within 120 s) |
+| `flat-head` | the Camera Log head check accepts the flat stamp | T2 (no converted marker) |
+| `always-wrapped` | a plain strip's marker written as `{"source": …}` | T4 (no flat marker; bytes differ) |
+| `lut-unstamped` | the LUT's size and second never stamped | T6 (no `lutSize`) |
+| `lut-unmapped` | the one-clip media keeps the document's LUT id | T1 (slog3-lut: the build refused, no marker) |
+| `no-supersede` | the ledger's new generation on a changed input dropped | S2 (bounded false; the held pass wrote 2–4.jpg and its marker) |
+| `hdr-plain` | the reader never reads the track | TH, T7 (flat markers on HLG and PQ) |
+| `hdr-wide` | `init?(track:)` admits `.sdrWide` | TH (the SDR pair never flat) |
+| `hdr-unheld` | the nil-input head check takes only the flat stamp | T8 (hlg's `0.jpg` rewritten at the reopen) |

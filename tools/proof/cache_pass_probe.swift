@@ -6,7 +6,7 @@
 // `main.swift`, module `Reelcut`, against `libreelcut_core.a` — the swiftc
 // line `peaks_probe.py` uses. One scenario per process:
 //
-//   cache_pass_probe <request.json> <G0|G1|G2|G2c|G3|S1|R1|R2|R3|W1>
+//   cache_pass_probe <request.json> <G0|G1|G2|G2c|G3|S1|S2|R1|R2|R3|W1>
 //
 // The request names `media` (a copy of tools/proof/media) and `work` (this
 // run's directory). The answer is one JSON object on stdout, `{"rows": [...]}`,
@@ -16,7 +16,8 @@
 //
 // "The pass ended" is read through a same-URL follower enqueued through the
 // ledger straight after the pass: its task awaits the pass's and sets a
-// flag. A same-URL pass never supersedes, so the follower changes nothing.
+// flag. A same-URL pass with the same input never supersedes, so the
+// follower changes nothing.
 import AppKit
 
 let arguments = CommandLine.arguments
@@ -377,6 +378,84 @@ func heldPass() {
         + (changed.isEmpty ? "nothing" : changed.joined(separator: ", ")))
 }
 
+// MARK: - S2 — a same-URL pass with another Camera Log input supersedes (spec §11 GR-21)
+
+func inputSupersedes() {
+    let id: UInt32 = 22
+    let (_, cache) = package("pkg.reelcut")
+    let one = copyMedium("AV.mov", as: "one.mov")
+    guard let media = record(one, id: id),
+        let stamp = MediaImporter.CacheStamp.stamp(for: media, url: one)
+    else { return row("S2", false, "AV.mov did not probe or stamp") }
+    let released = Flag()
+    let holding = Flag()
+    let heldEnded = Flag()
+    ledger.enqueue(cacheDir: cache, media: id, url: one, input: nil) { previous, _, pass in
+        var held = pass
+        held.hold = {
+            guard !released.isSet, MediaImporter.thumbnailCount(for: id, in: cache) >= 2 else {
+                return
+            }
+            holding.set()
+            let cap = Date().addingTimeInterval(200)
+            while !released.isSet, Date() < cap { usleep(10_000) }
+        }
+        let fake = held
+        return Task.detached {
+            await previous?.value
+            await MediaImporter.thumbnails(for: media, url: one, stamp: stamp, into: cache,
+                                           pass: fake)
+            heldEnded.set()
+            fake.done()
+        }
+    }
+    guard waitUntil(30, { holding.isSet }) != nil else {
+        released.set()
+        return row("S2", false, "the held pass never reached its hold")
+    }
+    let slog3 = MediaColor(log: .slog3, gamut: .sGamut3Cine)
+    var changedBounded: Bool?
+    var sameBounded: Bool?
+    ledger.enqueue(cacheDir: cache, media: id, url: one, input: slog3) { previous, bounded, pass in
+        changedBounded = bounded
+        return Task.detached {
+            await MediaImporter.awaitPass(previous, bounded: bounded)
+            pass.done()
+        }
+    }
+    let strip = MediaImporter.thumbsDirectory(for: id, in: cache)
+    func snapshot() -> [String: String] {
+        var out: [String: String] = [:]
+        for name in (try? files.contentsOfDirectory(atPath: strip.path)) ?? [] {
+            let attributes = try? files.attributesOfItem(
+                atPath: strip.appendingPathComponent(name).path)
+            let inode = attributes?[.systemFileNumber] as? Int ?? -1
+            let date = (attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? -1
+            out[name] = "\(inode) \(date)"
+        }
+        return out
+    }
+    let before = snapshot()
+    released.set()
+    let ended = waitUntil(30) { heldEnded.isSet }
+    pump(1)
+    let after = snapshot()
+    let changed = Set(before.keys).union(after.keys).filter { before[$0] != after[$0] }.sorted()
+    ledger.enqueue(cacheDir: cache, media: id, url: one, input: slog3) { previous, bounded, pass in
+        sameBounded = bounded
+        return Task.detached {
+            await previous?.value
+            pass.done()
+        }
+    }
+    row("S2", changedBounded == true && sameBounded == false && ended != nil && changed.isEmpty,
+        "another input: bounded \(changedBounded.map { "\($0)" } ?? "never asked"); "
+        + "the held pass ended \(seconds(ended)) after its release and changed "
+        + (changed.isEmpty ? "nothing" : changed.joined(separator: ", "))
+        + "; CONTROL, the same input again: bounded "
+        + (sameBounded.map { "\($0)" } ?? "never asked"))
+}
+
 // MARK: - R1, R2, R3 — the peaks retry
 
 /// A text file under toneA's record: AVFoundation opens nothing.
@@ -476,6 +555,7 @@ case "G2": stripSave(deleteFrame: true)
 case "G2c": stripSave(deleteFrame: false)
 case "G3": documentSave()
 case "S1": heldPass()
+case "S2": inputSupersedes()
 case "R1": retryLands()
 case "R2": retryEnds()
 case "R3": retrySuperseded()

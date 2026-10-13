@@ -204,7 +204,8 @@ opened, at design time or build time.
     - **Accepted limits**: a source whose file's format description lacks the colour labels
       its decoded frames carry stays on today's path (AVFoundation's conversion), since the
       class is chosen from the descriptions; HDR10 static metadata on a converted frame is not
-      measured (no fixture carries it).
+      measured (no fixture carries it). — Amended by GR-21: an HLG or PQ source's thumbnails are
+      drawn through step 0.
       - **Measured at T3-3** (`hdr_proof.py` H1a, H7; `--only H1a,H7,Z1` on Debug and on
         Release, 3/3 each): in a converting composition (ProRes 4444 with an alpha ramp | HLG |
         HEVC with alpha | VP9 WebM, 640×360), the tree's frames at 0.5 s into each non-HLG clip
@@ -361,7 +362,7 @@ opened, at design time or build time.
       selected in the list.
     - **Accepted limits**: thumbnails on the timeline and in the Media tab show the log picture;
       Sony's and Panasonic's own metadata is not read; a full-range-flagged log file is read as
-      video range.
+      video range. — Amended by GR-21: thumbnails are drawn through step 0.
 - **GR-17 — Tier 3's working arrangement: each phase gated in the `grading-3` worktree and
   merged into main alone, main's format numbers, no verdict phase; synthetic fixtures now.**
   Choice 10 and the footage answer (owner, 2026-10-11). GR-14's arrangement again: the worktree
@@ -425,3 +426,32 @@ opened, at design time or build time.
   out-of-709 colours are lost, which is right for a Rec. 709 output. Wide gamut comes only as
   Rec. 2020 inside GR-19's HDR timeline. This settles, for SDR projects, the wide gamut PR-5
   deferred, without editing PR-5's list.
+- **GR-21 — A converting media's thumbnails are drawn through step 0** (#282; amends GR-15
+  and GR-16). Owner, 2026-10-12: HLG and PQ included, SDR wide gamut not.
+  - The cache pass renders a video media whose Camera Log converts, or whose video track's
+    format description answers HLG or PQ, as a one-clip project around it (its display size,
+    its rate, the media at 0, its Camera Log and LUT), through `CompositionBuilder` and the
+    generator, so the strip is the preview's picture. A Camera Log decides before the labels, as
+    step 0's does.
+  - Why HDR: H0's numbers, on the grey row of hdr_proof's 1024×128 fixtures against
+    `render_frame` at tick 0, the plain generator (`ForceSDR`) being AVFoundation's tone map and
+    not step 0's: worst |Δ| 11 levels for HLG (about 10 darker through the mids) and 19 for PQ
+    (darker in the mids, brighter on the shoulder), on 2026-10-12 in v1's TH and again in this
+    change's H0. SDR wide gamut (`.sdrWide`) and the sRGB arms stay on the plain generator: the
+    BT.2020 and P3 SDR fixtures measured within 1.
+  - The marker: the flat `CacheStamp` exactly as before for a strip drawn plain; a
+    `ConvertedThumbsStamp` for one drawn through step 0 — the `source` stamp, and the curve and
+    gamut, or the LUT's resolved path, size and modification second, or the HDR `transfer`
+    ("hlg" / "pq"). A LUT is named by its path as well as its size and second, so another LUT
+    file of the same size and second is not taken for the old one. The head check: with a Camera
+    Log, the converted marker of that input; without one, the flat stamp, or a converted marker
+    of the same `source` naming only a `transfer` (an HDR file's labels are fixed by its stamp, so
+    the no-op pass opens no picture). Every other media's strip and marker stay byte-identical.
+  - A committed change of a media's converting Camera Log (set, clear, another LUT, undo, redo,
+    `remove_media` of its LUT) starts a pass for it, superseding one already running: the cache
+    ledger starts a new generation for a changed input as it does for another file.
+  - A LUT whose file does not resolve draws the plain asset, as step 0 draws it unconverted. A
+    failed one-clip build draws the plain asset and writes no marker.
+  - Accepted limit: an HLG or PQ strip certified by a flat marker from a build before GR-21 keeps
+    its plain picture until its file changes or its cache is removed (no package in real use,
+    owner 2026-10-09).

@@ -22,6 +22,9 @@ Rows:
        and its completion ends the save.
   S1a  a pass held inside its strip does not hold a relink's pass.
   S1b  once released, the superseded pass writes nothing.
+  S2   a same-URL pass with another Camera Log input supersedes a held pass
+       (bounded wait; the held pass writes nothing more once released); a
+       third, with the same input again, does not (CONTROL; spec §11 GR-21).
   R1   a waveform pass that failed is retried in the session and lands.
   R2   a pass whose retries all fail ends (no retry loop).
   R3   a pass for another file cancels a pass waiting to retry.
@@ -50,9 +53,10 @@ ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/cache-pass"
 MEDIA = ROOT / "tools/proof/media"
 NEEDED = ("toneA.m4a", "A.mov", "AV.mov")
-ROWS = ["B0", "G0", "G1", "G2", "G2c", "G3", "S1a", "S1b", "R1", "R2", "R3", "W1"]
+ROWS = ["B0", "G0", "G1", "G2", "G2c", "G3", "S1a", "S1b", "S2", "R1", "R2", "R3", "W1"]
 SCENARIO = {"G0": "G0", "G1": "G1", "G2": "G2", "G2c": "G2c", "G3": "G3",
-            "S1a": "S1", "S1b": "S1", "R1": "R1", "R2": "R2", "R3": "R3", "W1": "W1"}
+            "S1a": "S1", "S1b": "S1", "S2": "S2", "R1": "R1", "R2": "R2", "R3": "R3",
+            "W1": "W1"}
 SCENARIO_WALL = 300
 
 # name: (the rows it must fail, [(file, before, after), ...])

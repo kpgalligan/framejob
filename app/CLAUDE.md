@@ -237,7 +237,12 @@ detail there.
   root goes at close ONLY, never at the first save, because the timeline and
   any pass in flight still hold its path (G-19 (d)). `startGraphicStore()` also observes the document's own
   `.projectDocumentDidChange` and ends with one `reconcileGraphicNames()`;
-  `stopGraphicStore()` removes that observer. `+GraphicFiles` holds the three
+  `stopGraphicStore()` removes that observer. `+ConvertedThumbnails`:
+  `startCaches()`, from `makeWindowControllers()` in place of
+  `generateCaches()`, observes the document's own `.projectDocumentDidChange`
+  and starts a cache pass for each media whose converting Camera Log differs
+  from the ledger's `lastInput` (spec §11 GR-21); `stopGraphicStore()` removes
+  that observation with the rename repair's. `+GraphicFiles` holds the three
   bodies BOTH doors call — `deleteGraphic(named:)` (refused while a clip
   draws the module, naming the clips per container),
   `renameGraphic(named:to:apply:)` (the file, its history, then one
@@ -259,7 +264,8 @@ detail there.
   call it, or any of the three bodies, from a `.graphicsDidChange` or
   `.projectGraphicsDidChange` observer.
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`, +`Color`: the
-  Apple Log and Apple Log 2 labels read at probe, spec §11 GR-16) ·
+  Apple Log and Apple Log 2 labels read at probe, spec §11 GR-16;
+  +`ThumbnailSource`: the converted strip, below) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
   `FFmpegRewrap.swift` (+`Plan`) · `AppSupport.swift` · `DecoderSupport.swift` ·
   `ContainerRewrap.swift` (+`Writer`) · `RewrapProgress.swift` ·
@@ -288,10 +294,17 @@ detail there.
   `complete.json` marker matches `CacheStamp` (the source's size and
   modification second plus the constants that size the cache — no path, so a
   moved or consolidated package keeps its caches); the marker is written
-  LAST and only for a strip the pass can vouch for. Peaks alone wrap the
-  unchanged source stamp in `PeaksStamp` version 1 and require a complete
-  selected-track decode, valid PCM coverage and a usable record-sized
-  Float32 payload; legacy or malformed peaks are unavailable until rebuilt.
+  LAST and only for a strip the pass can vouch for. A strip of a media whose
+  Camera Log converts, or whose track is HLG or PQ, is drawn through a
+  one-clip composition and step 0 (`MediaImporter+ThumbnailSource.swift`,
+  await-free: `ThumbnailInput`, `ThumbnailReader`, `ConvertedThumbsStamp`),
+  its marker the converted stamp (the source stamp plus the curve and gamut,
+  or the LUT's path, size and second, or the HDR transfer), every other
+  strip's the flat `CacheStamp`; the ledger starts a new generation for a
+  changed Camera Log input as for another file (spec §11 GR-21). Peaks alone
+  wrap the unchanged source stamp in `PeaksStamp` version 1 and require a
+  complete selected-track decode, valid PCM coverage and a usable
+  record-sized Float32 payload; legacy or malformed peaks are unavailable until rebuilt.
   A stale cache is deleted
   first and a withdrawn peaks `.bin` is POSTED at once, and a media with no
   audio withdraws its peaks and voice files the same way (#180); passes for one file

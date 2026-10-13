@@ -212,11 +212,15 @@ enum MediaImporter {
     /// A waveform pass that published nothing is retried in the same task
     /// after each of `peaksRetryDelays` while the pass is current
     /// (`retryPeaks`), so a lost waveform does not wait for the next open.
-    static func generateCaches(for media: MediaSnapshot, url: URL, in cacheDir: URL) {
+    static func generateCaches(
+        for media: MediaSnapshot, url: URL, in cacheDir: URL, urls: [UInt32: URL] = [:]
+    ) {
         guard media.kind != .lut else { return }  // a LUT has no thumbnails, peaks or speech
         DecoderSupport.enable()
-        CacheLedger.shared.enqueue(cacheDir: cacheDir, media: media.id, url: url) {
-            previous, bounded, pass in
+        let input = ThumbnailInput(media: media, urls: urls)  // spec §11 GR-21
+        CacheLedger.shared.enqueue(
+            cacheDir: cacheDir, media: media.id, url: url, input: input?.color  // = convertingColor(of:)
+        ) { previous, bounded, pass in
             Task.detached(priority: .utility) {
                 await awaitPass(previous, bounded: bounded)
                 guard pass.isCurrent() else {
@@ -226,7 +230,8 @@ enum MediaImporter {
                 // After the await: the stamp is of the file as THIS pass
                 // finds it, not as it was when the pass was asked for.
                 let stamp = CacheStamp.stamp(for: media, url: url)
-                await thumbnails(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
+                await thumbnails(
+                    for: media, url: url, stamp: stamp, into: cacheDir, pass: pass, input: input)
                 let published = await peaks(
                     for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
                 await speech(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
@@ -346,14 +351,14 @@ enum MediaImporter {
     /// finished, and what it wrote is here" and nothing weaker.
     static func thumbnails(
         for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL,
-        pass: CachePass? = nil
+        pass: CachePass? = nil, input: ThumbnailInput? = nil
     ) async {
         guard media.hasVideo else { return }
         let directory = thumbsDirectory(for: media.id, in: cacheDir)
         let marker = thumbsMarkerURL(for: media.id, in: cacheDir)
         // The head check. A nil stamp (the file cannot be stat'ed) never
         // skips, and never writes a marker below either.
-        if let stamp, readStamp(at: marker) == stamp { return }
+        if let stamp, thumbsAreCurrent(stamp, input: input, at: marker) { return }
         guard pass?.isCurrent() ?? true, ensureDirectory(directory) else { return }
         // What is on disk is the old film or a partial pass. The marker goes
         // first, then the frames (`clearThumbnails` says why in that order).
@@ -404,10 +409,8 @@ enum MediaImporter {
         // record's end, which is where an ordinary strip always ended.
         var lastTime = CompositionBuilder.time(
             max(0, media.duration - max(1, media.fps.frameDuration)))
-        if let track = (try? await asset.loadTracks(withMediaType: .video))?.first,
-            let frame = await lastFrameTime(of: track) {
-            lastTime = frame
-        }
+        let track = (try? await asset.loadTracks(withMediaType: .video))?.first
+        if let track, let frame = await lastFrameTime(of: track) { lastTime = frame }
         let last = CompositionBuilder.ticks(lastTime)
         // The seconds at or past `last` are HELD: a suffix (the times are
         // monotonic), asking for `lastTime` once, written under each of them.
@@ -417,13 +420,9 @@ enum MediaImporter {
         }
         if !held.isEmpty { times.append(lastTime) }
 
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        generator.requestedTimeToleranceBefore = CMTime(value: 1, timescale: 2)
-        generator.requestedTimeToleranceAfter = CMTime(value: 1, timescale: 2)
-        let aspect = media.height > 0 ? Double(media.width) / Double(media.height) : 16.0 / 9.0
-        generator.maximumSize = CGSize(
-            width: max(16, (thumbnailHeight * aspect).rounded()), height: thumbnailHeight)
+        let reader = thumbnailReader(for: media, asset: asset, track: track, input: input)
+        defer { reader.finish() }
+        let generator = reader.generator
 
         var sinceLastPost = 0
         frames: for await result in generator.images(for: times) {
@@ -473,9 +472,10 @@ enum MediaImporter {
         // stamp that exists; nothing certifies a strip made from a file that
         // could not be measured. The listing and the marker run inside one
         // publication, which no announced save overlaps.
-        if let stamp {
+        if let stamp, reader.certifies {
             CacheLedger.shared.publish(in: cacheDir, for: pass) {
-                if stripHolds(written, in: directory) { writeStamp(stamp, to: marker) }
+                guard stripHolds(written, in: directory) else { return }
+                writeThumbsStamp(stamp, input: reader.input, to: marker)
             }
         }
         postCacheChange(media: media.id, kind: thumbsKind, replaced: replaced)

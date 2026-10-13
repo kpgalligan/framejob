@@ -54,7 +54,8 @@ extension MediaImporter {
     /// volume no longer holds a relink AWAY from it, and when it wakes it
     /// certifies nothing. A pass for the same file keeps the generation and
     /// waits in call order, as before; the record of the last URL asked for
-    /// outlives `finish`.
+    /// outlives `finish`. A pass asked with another Camera Log `input` than
+    /// the last (spec §11 GR-21) starts a new generation the same way.
     ///
     /// **Saves.** A save of a titled document lists the package for its lazy
     /// `cache/` wrapper and later swaps the new package in, so a file written
@@ -79,7 +80,7 @@ extension MediaImporter {
 
         private let condition = NSCondition()
         private var running: [String: (ticket: Int, task: Task<Void, Never>)] = [:]
-        private var latest: [String: (generation: Int, path: String)] = [:]
+        private var latest: [String: (generation: Int, path: String, input: MediaColor?)] = [:]
         private var nextTicket = 0
         private var saves: [String: [Int: Date]] = [:]
         private var nextSave = 0
@@ -89,7 +90,7 @@ extension MediaImporter {
         /// (a superseded task), and the new pass; `make` only creates the
         /// task, under the lock.
         func enqueue(
-            cacheDir: URL, media: UInt32, url: URL,
+            cacheDir: URL, media: UInt32, url: URL, input: MediaColor? = nil,
             _ make: (Task<Void, Never>?, Bool, CachePass) -> Task<Void, Never>
         ) {
             let key = "\(cacheDir.standardizedFileURL.path)\u{0}\(media)"
@@ -99,9 +100,9 @@ extension MediaImporter {
             let previous = running[key]?.task
             var bounded = false
             var generation = latest[key]?.generation ?? 0
-            if latest[key]?.path != path {
+            if latest[key]?.path != path || latest[key]?.input != input {
                 generation += 1
-                latest[key] = (generation, path)
+                latest[key] = (generation, path, input)
                 if let previous {
                     previous.cancel()
                     bounded = true
@@ -110,6 +111,15 @@ extension MediaImporter {
             nextTicket += 1
             let pass = CachePass(key: key, generation: generation, ticket: nextTicket)
             running[key] = (nextTicket, make(previous, bounded, pass))
+        }
+
+        /// The `input` the last pass asked for `media` in `cacheDir` carried;
+        /// nil when none was asked or the last asked nil.
+        func lastInput(cacheDir: URL, media: UInt32) -> MediaColor? {
+            let key = "\(cacheDir.standardizedFileURL.path)\u{0}\(media)"
+            condition.lock()
+            defer { condition.unlock() }
+            return latest[key]?.input ?? nil
         }
 
         func isCurrent(_ pass: CachePass) -> Bool {

@@ -318,7 +318,8 @@ schema, §6 the op table, §7 the architecture.
   clip of it follows, it applies before the chroma key and every grade, and
   Show Ungraded keeps it. Apple Log is detected on import ("from the file");
   None shows the log picture. A camera LUT also applied as a look would
-  convert twice, and the Look section says so.
+  convert twice, and the Look section says so. The timeline's filmstrip and
+  the Media tab's thumbnail follow it.
 - **Output.** **File ▸ Save Frame…** (⌥⌘E) writes the frame under the
   playhead as a PNG, JPEG or HEIC still — the same writer `render_frame`
   uses, so a still saved from the menu and one an agent asked for are the
@@ -391,7 +392,8 @@ schema, §6 the op table, §7 the architecture.
   10 bits with the source's own colour labels and exact size; H.264, HEVC
   and HEVC with alpha are 8-bit.
   HLG and PQ sources are converted to SDR Rec. 709 by Reelcut itself, the
-  same in the preview, every export and every rendered frame. So is camera
+  same in the preview, every export, every rendered frame and the timeline's
+  filmstrip. So is camera
   log footage: an iPhone Apple Log or Apple Log 2 file is recognised by its
   label on import and looks like normal video at once, and S-Log3 and V-Log
   are set by hand in the Media tab's **Camera Log** section.
