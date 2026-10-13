@@ -461,6 +461,57 @@ re-review passed.
 
 ## N3 — the record
 
+**Landed** (2026-10-13, in the worktree, not committed by the implementer; the orchestrator
+commits):
+
+- The issue rule (NM-14), one substitution in place, `kpgalligan/reelcut#<digits>` →
+  `kpgalligan/framejob#<digits>`, over every file outside `archive/` that held one: 55 files,
+  112 lines, no file changing length and no line reflowed. `app/CLAUDE.md` (4 lines); ten
+  `app/Sources` files (16 `///` comment lines); `core/src/op_schema.rs` and `outcome.rs` (1
+  each) and ten `core/tests` files (14 lines), comments only, no Rust line past 79 characters;
+  `designs/spec/07.9a-agent-tools.md` (1); `designs/spec/11-decisions/chrome-inspector-keys.md`
+  (6), `deepening.md` (1) and `foundations.md` (1), name-only edits under NM-12 with no
+  "Amended by" line; `tools/proof/README.md` (12: lines 2937, 3179, 3259, 3301, 3388, 3512,
+  3900, 4034, 6696, 6746, 6783 and 8620, each read and classified as section prose, not
+  recorded output: an even count of fence lines before each, outside any code block); and 27
+  other `tools/proof/` files (55 lines of comments and docstrings, and `phase9_proof.py:1339`,
+  a string in a row's printed detail that nothing compares).
+- `tools/proof/name_residue.py`: the `r"kpgalligan/reelcut#\d+"` entry out of `KEPT_PATTERNS`,
+  which keeps `\.claude/litecode/reelcut/` and `devel/reelcut[\w-]*`; the comment above it and
+  the module docstring lose their issue-citation clauses (the comment rewrapped over its own
+  three lines); its own pin 3 → 2 (`NAME = "reelcut"` and the selftest's
+  `kept = (r"issues/reelcut#\d+",)`, each read; the dropped line was the third). The selftest's
+  `issues/reelcut#\d+` and S6's `see issues/{old}#12` stay: they exercise the mechanism in a
+  scratch repository. No other pin moved: with the citations masked, no rewritten line holds a
+  second old-name match, so `tools/proof/README.md` (199), `chrome-inspector-keys.md` (2),
+  `deepening.md` (18) and `foundations.md` (2) keep theirs.
+- Not touched: `designs/spec/11-decisions/rename.md` and `README.md` (their `kpgalligan/reelcut#N`
+  is rule text with a literal `N`, already in their pins, never matched by `\d+`),
+  `designs/adr/`, the handoffs and the brief (no `#<digits>` citation), `archive/`
+  (`TEXT_HISTORY`). No root `CLAUDE.md` edit is owed by this phase: it holds no citation, and
+  its `make test` line names `KEPT_PATTERNS`, which keeps two entries.
+
+**Measured** (each printed by the command beside it; the full outputs are in the phase's
+`04-checks.txt`):
+
+- `git grep -n -E 'kpgalligan/reelcut#[0-9]+' -- ':!archive'`: nothing.
+- `git grep -h -c -E 'kpgalligan/framejob#[0-9]+' | awk '{s+=$1}END{print s}'`: `112`; with
+  `-l`, 55 files.
+- `git diff --numstat`: added equals removed on every row; 112 and 112 over the 55 files.
+- The second-match check, the rewritten citations masked as `<CIT>` and grepped for the old
+  name: `0`.
+- `name_residue.py`: exit 0, silent. `--selftest`: `8/8 rows pass`, `PASS`.
+- `spec_index_proof.py`: `159/159 checks passed`, exit 0.
+- `make gate` PASS in 310 s with every step run: names 1 s, typecheck 7 s, fmt 3 s, lint 10 s,
+  test 178 s, app 111 s, over this record with this line as a placeholder. `make gate` ran
+  again after the line was filled in; its output is in `04-checks.txt`.
+
+**Deviations:** the comment above `KEPT_PATTERNS` is rewrapped over its same three lines (and,
+at the review's nit, the docstring bullet beside it). The review passed with two nits, both
+applied before the commit.
+
+**Owed:** phases N4..N5.
+
 ## N4 — the record
 
 ## N5 — the record

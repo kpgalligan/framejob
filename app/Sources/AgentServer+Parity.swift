@@ -34,7 +34,7 @@ import Foundation
 /// 3. It declares an argument with no description at all. **The core says
 ///    what an argument IS and the app says what it is FOR**, so an argument
 ///    nobody wrote a sentence for reaches an agent as a bare type — spec
-///    kpgalligan/reelcut#14's second user story, and the complaint
+///    kpgalligan/framejob#14's second user story, and the complaint
 ///    `AgentCatalog.declaredInput` promised this part would make.
 ///
 /// **What it still cannot see, and the instrument that can.** It reads the

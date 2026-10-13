@@ -918,7 +918,7 @@ def zoom_part(mcp):
     check(z.undo() == "Zoom to Region", "and the step under it is the zoom")
     check(z.frame(2 * SEC) == was[2 * SEC], "which restores the base frame byte for byte")
     # The whole sentence and not the word `region`, which every other refusal
-    # at this door says too: D1·5 (kpgalligan/reelcut#6) took the region raw,
+    # at this door says too: D1·5 (kpgalligan/framejob#6) took the region raw,
     # so the MEMBER refusals are the core's now
     # (`op "add_zoom_action" is not valid: bad value at "region.widht"…`,
     # proved in `tools/proof/patch_door_proof.py` §11) and this one is the
@@ -1400,7 +1400,7 @@ def schema_part(mcp):
     # agent's video patch was decoded into typed Swift structs and
     # re-serialized, so an unknown key INSIDE a nested object was dropped
     # before the core's own unknown-key check could name it, for `shadow` and
-    # `filters` as much as for a region. **D1·3 (kpgalligan/reelcut#4) closed
+    # `filters` as much as for a region. **D1·3 (kpgalligan/framejob#4) closed
     # it**: `set_video` forwards the caller's patch to the core unread, so the
     # two calls below are refused by their dotted path, and what used to be a
     # note about a standing defect is two claims. They stay HERE, beside the

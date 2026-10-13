@@ -20,7 +20,7 @@ import Foundation
 /// `.identity` and `.refused` are BOTH "the project did not change" — a
 /// refusal is not an error tier (spec #8's ninth decision) — and the
 /// difference between them is only what a caller can SAY. Deepening D2·2
-/// (kpgalligan/reelcut#10) is where that difference started reaching an
+/// (kpgalligan/framejob#10) is where that difference started reaching an
 /// agent; a person at the machine still gets the beep and, for a refusal,
 /// the sentence at the inspector's foot (spec §11 CI-10).
 

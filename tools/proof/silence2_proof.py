@@ -26,7 +26,7 @@ plan resolved for it, which a clip at a SPEED other than 1 leaves different
 from its `duration`, so `sourceTick` is given both (`core/src/evaluate.rs`,
 `core/src/edit_clip.rs`). A whole-file clip at rate 1 is the case where the
 two now agree: its duration is the media's snapped DOWN, so the segment plays
-at rate exactly 1 (spec §11, kpgalligan/reelcut#22); claim 1(d) is the row
+at rate exactly 1 (spec §11, kpgalligan/framejob#22); claim 1(d) is the row
 where they differ — a ×2 clip whose segment is EXACTLY twice its duration,
 since every site that writes a window is now held to the file (spec §11,
 D4-3) — so the walk's scale factor is not an identity everywhere.
@@ -54,7 +54,7 @@ the tree behaves (§8's (iii), claim 12's sha256 pin, is
         resampled it, two exports of the same material drifted by about
         seventeen samples, and the claim would have been measuring the
         resampler. The core now snaps a media clip's length DOWN (spec §11,
-        kpgalligan/reelcut#22, closed 2026-09-19), so the trim is GONE, the
+        kpgalligan/framejob#22, closed 2026-09-19), so the trim is GONE, the
         rate is exactly 1, and the cut export is BYTE-identical to the uncut
         one with the proposed spans excised — stronger than the tolerance
         §4g asked for. The first row of the section asserts the length the
@@ -1497,7 +1497,7 @@ def export_part(mcp, clean_default):
     timeline is the uncut export with exactly those spans excised, BYTE for
     byte.
 
-    Byte for byte rather than nearly so is what kpgalligan/reelcut#22 bought.
+    Byte for byte rather than nearly so is what kpgalligan/framejob#22 bought.
     A whole clip's duration used to be `snapped(media.duration)`, which for
     this fixture rounds UP past the end of the file, so the plan's
     `source_duration / duration` was 0.9990 rather than 1 and every segment

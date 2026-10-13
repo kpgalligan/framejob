@@ -14,7 +14,7 @@ import AppKit
 /// core unread through `rawPatchArg` below, because the core is the one
 /// validator of what a patch may carry and names the dotted path and the
 /// value in every refusal (`core/src/patch.rs`; the phase is
-/// `archive/roadmap-7.md` §2, spec kpgalligan/reelcut#1). The rule
+/// `archive/roadmap-7.md` §2, spec kpgalligan/framejob#1). The rule
 /// that replaced "check enums and types by hand at every door" is in
 /// `app/CLAUDE.md`: lenient decoding is for what the CORE wrote; nothing a
 /// caller wrote is decoded through it. D1·6 deleted the family that broke it
@@ -58,7 +58,7 @@ extension AgentServer {
     /// `[]` and `{}` are not among them and are now errors. So is a FRACTION
     /// where a whole number belongs: `3.0` is the id 3 spelled as a float,
     /// and `3.7` is not an id at all — `intValue` made it 3 in silence until
-    /// kpgalligan/reelcut#21, an edit landing on a clip nobody named.
+    /// kpgalligan/framejob#21, an edit landing on a clip nobody named.
     private func scalarArg<T>(
         _ a: [String: Any], _ key: String, _ expected: String, _ read: (Any) -> T?
     ) throws -> T? {
@@ -475,7 +475,7 @@ extension AgentServer {
 
     /// A caller-authored patch, forwarded to the core UNCHANGED — the door
     /// deepening D1 moves every property op to (`archive/roadmap-7.md`
-    /// §1, kpgalligan/reelcut#1).
+    /// §1, kpgalligan/framejob#1).
     ///
     /// It reads NOTHING about the value. The core is the one validator of
     /// what a patch may carry and names the dotted path and the value in

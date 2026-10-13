@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""kpgalligan/reelcut#37 — Return applies in the canvas text editor, and Esc
+"""kpgalligan/framejob#37 — Return applies in the canvas text editor, and Esc
 asks before dropping a change (spec §11 K-2).
 
     python3 tools/proof/text_apply_proof.py

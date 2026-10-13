@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """A stranger argument, put to all eighty-two tools (road map 7's D3·5, and
-the gate of kpgalligan/reelcut#21).
+the gate of kpgalligan/framejob#21).
 
 The startup parity check gained a FIFTH part with this ticket: every op tool's
 declared arguments must be the core's own, every argument must carry a
@@ -52,7 +52,7 @@ The sections, in order:
    naming it — the handler reads it; and one call per argument the core
    publishes, required or not, with that argument MISSPELT beside the
    control, plus one carrying two names no op has, each of which must draw
-   the GATE's sentence (kpgalligan/reelcut#21, `AgentServer+Gate.swift`):
+   the GATE's sentence (kpgalligan/framejob#21, `AgentServer+Gate.swift`):
    the tool, the stranger, and exactly what the tool takes, read back out of
    the sentence and compared to the core's row, the declarations' rows and
    the envelope's two keys. The values are derived from the core's published
@@ -84,7 +84,7 @@ The sections, in order:
 4. **A misspelt key INSIDE an opaque object is named by the CORE**, which is
    where the dotted path lives. An op ARGUMENT never reaches the core's
    decoder — the handlers read arguments one at a time and build the op
-   (spec kpgalligan/reelcut#14's twelfth decision) — so the sentence that
+   (spec kpgalligan/framejob#14's twelfth decision) — so the sentence that
    names a misspelt ARGUMENT is the app's, and the sentence that names a
    misspelt KEY is the core's, which deepening D1 made the one validator of a
    patch.

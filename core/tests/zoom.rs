@@ -571,7 +571,7 @@ fn a_region_with_no_extent_is_an_error() {
 /// member of the wrong type are each refused BY NAME, which is the
 /// envelope's "unknown keys are an error" rule reaching one level in, and
 /// what makes the region door answer the way a property patch does (D1·2,
-/// kpgalligan/reelcut#3).
+/// kpgalligan/framejob#3).
 #[test]
 fn the_region_takes_four_named_numbers_and_only_those() {
     let project = zoom_project();

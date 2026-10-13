@@ -1,4 +1,4 @@
-// kpgalligan/reelcut#117 — the canvas text editor breaks lines where the
+// kpgalligan/framejob#117 — the canvas text editor breaks lines where the
 // render does; the probe (`text_break_proof.py` builds and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own

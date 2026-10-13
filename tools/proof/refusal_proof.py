@@ -4,7 +4,7 @@ Named for the seam and not for a phase, as `patch_door_proof.py` is: what it
 proves is the answer every edit comes back with (`core/src/outcome.rs`,
 `app/Sources/ReelEdit.swift`, `CONTEXT.md`'s **Op**), and the rules that can
 say why arrive one deepening ticket at a time
-(`archive/roadmap-7.md` §4, kpgalligan/reelcut#8). Deepening D2·2
+(`archive/roadmap-7.md` §4, kpgalligan/framejob#8). Deepening D2·2
 built it with the overlap rule's section; D2·3 adds one section per rule that
 finds its voice. There is no phase number to put on that.
 
@@ -265,7 +265,7 @@ def undo_claim(s, start):
           "them registered an undo step")
 
 
-# ---- the overlap rule (D2·2, kpgalligan/reelcut#10) -----------------------
+# ---- the overlap rule (D2·2, kpgalligan/framejob#10) -----------------------
 
 
 def overlap_rule(mcp):
@@ -443,13 +443,13 @@ def several_ops(mcp):
     landed("…because the second op still ran", s.clip(second)["audio"]["volume"], volume)
 
 
-# ---- the rules D2·3 gave words to (kpgalligan/reelcut#11) ----------------
+# ---- the rules D2·3 gave words to (kpgalligan/framejob#11) ----------------
 #
 # Five rules, five sections, each shaped like `overlap_rule`. Four checks in
 # them used to be scored by a `shadowed` helper rather than by `refused`,
 # because an app-side guard asked the same question one step earlier and
 # answered in its own words: §5d, §6b, §7b and §7d. D2·4
-# (kpgalligan/reelcut#12) deleted those guards — two `with_clips` counts and
+# (kpgalligan/framejob#12) deleted those guards — two `with_clips` counts and
 # a trial-apply — and all four are `refused` now, against the CORE's
 # sentence, which is what that ticket's third criterion asks for. The
 # helper went with them; the sentences it used to assert are in road map 7
@@ -558,7 +558,7 @@ def the_track_stack(mcp):
 
     print("\n5b — a second track, so the rule stops applying")
     # `add_track` takes `index` and `name` and nothing else; the `kind` these
-    # calls used to send was dropped in silence until kpgalligan/reelcut#21's
+    # calls used to send was dropped in silence until kpgalligan/framejob#21's
     # gate, which refuses it by name.
     second = s.op("add_track")["new_tracks"][0]
     applied(s, "remove_track", "with two tracks the same call lands", track=second)
@@ -952,7 +952,7 @@ def main():
 
 # ---- the next rule's section goes here ------------------------------------
 #
-# Sections 4 to 9 are D2·3's (kpgalligan/reelcut#11) and section 10 is
+# Sections 4 to 9 are D2·3's (kpgalligan/framejob#11) and section 10 is
 # spec §11 #88's, and the shape has not changed: a fixture whose numbers are
 # hand-computed, a marker edit, the refusals with their WHOLE sentences, a
 # boundary that LANDS, and one `undo` closing the batch.
@@ -960,7 +960,7 @@ def main():
 # rules can say why and which stay identities on purpose.
 #
 # Every rule that speaks is now measured HERE as well as in
-# `core/tests/refusal.rs`: D2·4 (kpgalligan/reelcut#12) deleted the four
+# `core/tests/refusal.rs`: D2·4 (kpgalligan/framejob#12) deleted the four
 # app-side answers that stood in front of §5d, §6b, §7b and §7d, and there
 # is no `shadowed` helper any more. The clamped-edge family in
 # `Outcome::Identity`'s doc stays an identity (spec §5.5, §11 #88); a rule

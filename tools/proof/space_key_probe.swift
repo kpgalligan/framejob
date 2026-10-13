@@ -1,4 +1,4 @@
-// kpgalligan/reelcut#35 — Space toggles play wherever nothing is typing; the
+// kpgalligan/framejob#35 — Space toggles play wherever nothing is typing; the
 // probe (`space_key_proof.py` builds and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own

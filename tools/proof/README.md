@@ -2934,7 +2934,7 @@ from one tick to eleven **21/24** (the three whole-tick rows).
 
 ## Mixed audio formats on one track (`mixed_audio_probe.py`, `mixed_audio_proof.py`)
 
-kpgalligan/reelcut#34: an AAC clip then a WAV on ONE timeline track previewed
+kpgalligan/framejob#34: an AAC clip then a WAV on ONE timeline track previewed
 silent, while the WAV on a second track played. `CompositionBuilder` put every
 segment of a plan audio track into one composition track, which then carried
 two format descriptions; the preview's build is the one METERING build, every
@@ -3176,7 +3176,7 @@ for a phase**, which is the one thing about it that is not the house shape:
 what it proves is the single door every caller-authored object comes through
 (`core/src/patch.rs`, `CONTEXT.md`'s **Patch**), and the doors arrive one
 deepening ticket at a time (`archive/roadmap-7.md` §1). D1·3
-(kpgalligan/reelcut#4) built it with `set_video`'s section, at **39/39**;
+(kpgalligan/framejob#4) built it with `set_video`'s section, at **39/39**;
 D1·4 (#5) added eight more, at **199/199**; D1·5 (#6) added the last two —
 `set_action_end` and `add_zoom_action`'s region — and it is **258/258**, with
 every door the app has in it. Each door file says in a marked comment what a
@@ -3256,7 +3256,7 @@ which every refusal at that door said.
 a phase**, as the patch door is: what it proves is the answer every edit
 comes back with (`core/src/outcome.rs`, `app/Sources/ReelEdit.swift`,
 `CONTEXT.md`'s **Op**), and the rules that can say WHY arrive one deepening
-ticket at a time (`archive/roadmap-7.md` §4, kpgalligan/reelcut#8).
+ticket at a time (`archive/roadmap-7.md` §4, kpgalligan/framejob#8).
 Deepening D2·2 (#10) built it with the overlap rule's section, at
 **39/39** (40/40 after its review); D2·3 (#11) took it to **113/113** with
 one section per rule that found its voice, each a copy of `overlap_rule`;
@@ -3298,7 +3298,7 @@ said so by name** — a `shadowed` helper at §5d, §6b, §7b and §7d, where
 `AgentServer+Media.swift`'s and `AgentServer+Tracks.swift`'s `with_clips`
 guards and `AgentServer+Transitions.swift`'s trial-apply each asked the same
 question one step earlier and answered in their own words. D2·4
-(kpgalligan/reelcut#12) deleted all four, and those checks are ordinary
+(kpgalligan/framejob#12) deleted all four, and those checks are ordinary
 `refused` calls against the core's sentence now; the helper is gone with
 them, and the app's old wording is kept in road map 7 §5.4's own "what
 went" table. The gap
@@ -3385,7 +3385,7 @@ serde refuses it with the list of fields it DID expect, and that list is
 compared to the published properties; and the same op sent with NO arguments
 makes serde name the first field it could not do without, which must be one
 the schema calls required. **No argument name is written in the script**,
-which is what spec kpgalligan/reelcut#14 asks for in place of the Python
+which is what spec kpgalligan/framejob#14 asks for in place of the Python
 literals the older proofs carry. **The envelope**: neither `scope`
 nor `project` is in any published schema; the catalog injects both.
 **The kinds**: one representative argument per kind against the JSON Schema
@@ -3509,7 +3509,7 @@ behaviour stays.
 
 `python3 tools/proof/op_argument_proof.py <dir>/agent.sock`, against a running
 instance. Road map 7's D3·5, then the **argument gate** of
-kpgalligan/reelcut#21, and **the script that owns the exact tool count**
+kpgalligan/framejob#21, and **the script that owns the exact tool count**
 (77). **133/133** on 2026-09-20, when the frame-rate TERM rows landed;
 116/116 at #21; 86/86 at D3·5 (#19), 79 of those rows before the review added
 the optional half of section 3. The probe is built BEFORE the first MCP call.
@@ -3897,7 +3897,7 @@ its own fixtures (above), and then measures claims 1–11:
   carries the segment's own `source_duration` rather than assuming it equals
   the clip's duration; for a whole-file clip at rate 1 the two now AGREE —
   its duration is the media's snapped DOWN (spec §11,
-  kpgalligan/reelcut#22) — and one row asserts exactly that, the rate being 1
+  kpgalligan/framejob#22) — and one row asserts exactly that, the rate being 1
   the reason claim 11 can compare bytes. Which leaves the scale factor
   `sourceTick` divides by an identity in every row above, so **1(d)** runs
   the clean clip once more at **×2**, the one place in the suite where
@@ -4031,7 +4031,7 @@ its own fixtures (above), and then measures claims 1–11:
   to the SAMPLE and then BYTE for byte. The clip needs no trim now — the core
   snaps a media clip's length DOWN, so a whole-file clip lands on the last
   whole frame inside the file and the plan plays it at rate 1 (spec §11,
-  kpgalligan/reelcut#22); the section's first row asserts that length, which
+  kpgalligan/framejob#22); the section's first row asserts that length, which
   is what the trim used to buy. Against a build that kept the nearest snap
   the clip outruns the source, the plan plays it at 0.9990 and AVFoundation's
   resampler is what gets measured — that build scores **57/61**, taking this
@@ -6693,7 +6693,7 @@ python3 tools/proof/word_captions_chrome.py --mutant replace-empty-track    # ex
 
 ## Space is the transport's (`space_key_proof.py`, `space_key_probe.swift`)
 
-kpgalligan/reelcut#35, spec §11 K-1: a bare Space toggles play from any
+kpgalligan/framejob#35, spec §11 K-1: a bare Space toggles play from any
 focus but a field being typed into, decided by `EditorWindow.sendEvent`
 before dispatch. The probe is compiled AS `main.swift` over `app/Sources`
 (`harness/build.sh`'s swiftc line, a build failure is a scored FAILURE) with
@@ -6743,7 +6743,7 @@ python3 tools/proof/space_key_proof.py --baseline b69972e   # exit 0 = exactly S
 
 ## The text editor grows as you type (`text_edit_proof.py`, `text_edit_probe.swift`)
 
-kpgalligan/reelcut#36: the in-canvas text editor is sized, after every
+kpgalligan/framejob#36: the in-canvas text editor is sized, after every
 change, to the box the typed string will have once applied. The probe is
 compiled AS `main.swift` over `app/Sources` (`harness/build.sh`'s swiftc
 line, a build failure is a scored FAILURE) with the app's `Compositor.metal`
@@ -6780,7 +6780,7 @@ python3 tools/proof/text_edit_proof.py --baseline b76a2f3   # exit 0 = exactly t
 
 ## Return applies in the canvas text editor (`text_apply_proof.py`, `text_apply_probe.swift`)
 
-kpgalligan/reelcut#37 (spec §11 K-2): in the in-canvas text editor a bare
+kpgalligan/framejob#37 (spec §11 K-2): in the in-canvas text editor a bare
 Return applies, a Return with ⇧, ⌘, ⌥ or ⌃ is a new line, and Esc on a
 changed string asks Cancel / Revert / Apply in a sheet. The probe is
 compiled AS `main.swift` over `app/Sources` (`harness/build.sh`'s swiftc
@@ -8617,7 +8617,7 @@ run measures for its `delay`, up to window/2).
 
 ## Issue batch B3 — editor keys, undo steps, the transition ring (`editor_keys_undo_proof.py`, `editor_keys_undo_probe.swift`)
 
-kpgalligan/reelcut#59 #60 #61 #66 #68 #69. `python3
+kpgalligan/framejob#59 #60 #61 #66 #68 #69. `python3
 tools/proof/editor_keys_undo_proof.py`, no port and no running app. The probe
 is compiled AS `main.swift` over `app/Sources` (`harness/build.sh`'s swiftc
 line; a build failure is a scored FAILURE) with `Compositor.metal` built

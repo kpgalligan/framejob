@@ -290,7 +290,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   Motion. Rows take none, because they are not clickable. Bands and gutters
   still paint in `draw(_:)` and do not animate.
 - **K-1 — Space is the transport's unless the first responder is typing or
-  claims it** (kpgalligan/reelcut#35, 2026-09-24). The editor window routes
+  claims it** (kpgalligan/framejob#35, 2026-09-24). The editor window routes
   a bare Space key-down (⇧ and ⇪ allowed, any other modifier untouched)
   before dispatch: it toggles play/pause unless the first responder is an
   editable `NSTextView` — every field editor, the Text tab's area, the
@@ -305,7 +305,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   mirror: playback is view state, app/CLAUDE.md's exemption, and no play
   tool exists today; `set_playhead` stays the capability.
 - **K-2 — In the canvas text editor Return applies, a modified Return is a
-  new line, and Esc asks before dropping a change** (kpgalligan/reelcut#37,
+  new line, and Esc asks before dropping a change** (kpgalligan/framejob#37,
   2026-09-24). A bare Return or keypad Enter (⇪ allowed) commits the string
   and leaves the editor — the `set_text` it always sent, one undo step,
   nothing for an unchanged string; Return with ⇧, ⌘, ⌥ or ⌃ inserts "\n",
@@ -323,7 +323,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   MCP mirror: the keys are view state, `set_text` is the apply.
 - **K-3 — The canvas text editor lays its text out with the renderer's
   attributes at view scale; an UPPERCASE text is edited as typed**
-  (kpgalligan/reelcut#117, 2026-09-30). The font, `.kern` and paragraph
+  (kpgalligan/framejob#117, 2026-09-30). The font, `.kern` and paragraph
   style are `LayerRenderers.textAttributes` at `video.scale × canvasScale`,
   unclamped; the font is the renderer's `CTFontCreateWithName` face, its
   fallback included. The editor keeps its own ink (`DS.textStrong` on the
@@ -336,7 +336,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the input method. The 60 × 24 pt floor still widens a box narrower than
   60 pt.
 - **SH-3 — An inspector name field is the inspector's value field**
-  (kpgalligan/reelcut#171, 2026-09-30). `InspectorNameField` — the Graphic
+  (kpgalligan/framejob#171, 2026-09-30). `InspectorNameField` — the Graphic
   sub-tab's string rows, the Document tab's marker name and the clip
   header's name — is drawn as `OptionFieldControl` draws: an
   `NSColor.controlBackgroundColor` fill, a 1 pt `DS.border` stroke on
@@ -351,7 +351,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 - **CI-16 — The selected clip's obscure regions are drawn and dragged on
   the canvas; the layer's own handles outrank them, an armed modal mode's
   overlay takes every press over them, and Esc cancels any canvas drag**
-  (kpgalligan/reelcut#85, 2026-09-30). With exactly one clip selected,
+  (kpgalligan/framejob#85, 2026-09-30). With exactly one clip selected,
   unlocked, outside crop mode and the text editor, each region of the list
   AT THE PLAYHEAD (the recipe's `video.obscure`) is outlined as its box's
   quad through the layer's scale, crop and rotation — an ellipse too, as its
@@ -379,7 +379,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   handles do. Accepted: a grip under a layer handle is not reachable there,
   and an ellipse is outlined as its box.
 - **SH-4 — `StickerButton` is Rasterize's square block, drawn in place;
-  supersedes SH-1** (kpgalligan/reelcut#100, the owner, 2026-09-30). The
+  supersedes SH-1** (kpgalligan/framejob#100, the owner, 2026-09-30). The
   class, its name, its `init(title:style:target:action:)` and all 28 calls
   in 13 files stay. Its drawing and `intrinsicContentSize` are Rasterize's:
   a block on `bounds.insetBy(0.5)` at `DS.buttonRadius`, with no shadow and

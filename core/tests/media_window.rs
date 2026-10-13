@@ -1,5 +1,5 @@
 //! A media clip's window stays INSIDE its file, on the grid — spec §11
-//! (kpgalligan/reelcut#22), through the FFI.
+//! (kpgalligan/framejob#22), through the FFI.
 //!
 //! Three sites write a media clip's duration from its source:
 //! `whole_media_length` (what `add_clip` gives a clip, and therefore the room

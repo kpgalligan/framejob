@@ -513,7 +513,7 @@ fn an_unknown_blend_mode_and_an_unknown_gradient_kind_are_refused_by_the_enums()
     // and a geometry `CGGradient` has no call for are alike unrepairable —
     // so an unknown one is refused at the serde boundary rather than range
     // checked a long way from the type. Both refusals name the path in the
-    // key walk's spelling (D1·1, kpgalligan/reelcut#2; they used to open
+    // key walk's spelling (D1·1, kpgalligan/framejob#2; they used to open
     // "… patch does not match the schema:" and say nothing of where).
     let project = plain();
     let msg = project.errors(&set_video(json!({ "blend": "muliply" })));
@@ -572,7 +572,7 @@ fn an_unknown_key_inside_the_gradient_is_named_like_any_other() {
     // has to carry a stop for the same reason its `obscure` carries a
     // region: the array arm reads the FIRST element as the reference for
     // every element it is given, and an empty list is no reference at all.
-    // The path names the stop's INDEX (D1·1, kpgalligan/reelcut#2; it used
+    // The path names the stop's INDEX (D1·1, kpgalligan/framejob#2; it used
     // to read `gradient.stops.colour`), so a caller sending eight stops is
     // told which one to fix.
     let msg = refusal(json!({

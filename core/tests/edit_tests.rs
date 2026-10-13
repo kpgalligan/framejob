@@ -2293,7 +2293,7 @@ fn set_action_end_merges_and_a_null_removes_a_key() {
     assert_eq!(end, &json!({"video": {"scale": 0.6}}));
 
     // An unknown key is REFUSED by its path, exactly as a `set_video` patch
-    // is (D1·2, kpgalligan/reelcut#3). This case used to assert that the key
+    // is (D1·2, kpgalligan/framejob#3). This case used to assert that the key
     // was kept, for forward compatibility — a project written by a newer
     // build had to survive a round trip. That promise belongs to the FILE
     // reader and is still kept there (`model_tests.rs`'s

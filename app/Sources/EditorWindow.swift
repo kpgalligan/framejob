@@ -1,7 +1,7 @@
 import AppKit
 
 /// The editor's document window, and the one thing it decides: where a bare
-/// Space goes (spec §11 K-1, kpgalligan/reelcut#35).
+/// Space goes (spec §11 K-1, kpgalligan/framejob#35).
 ///
 /// **Space is the transport's unless the first responder is typing or claims
 /// it.** The window routes a bare Space key-DOWN (⇧ and ⇪ allowed, any other

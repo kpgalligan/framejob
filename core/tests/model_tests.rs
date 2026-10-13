@@ -1016,7 +1016,7 @@ fn an_action_end_patch_keeps_the_keys_it_is_given() {
     // open, the animation it described would be gone, and the loss would be
     // written back over the original.
     //
-    // This is the whole of that promise since D1·2 (kpgalligan/reelcut#3):
+    // This is the whole of that promise since D1·2 (kpgalligan/framejob#3):
     // the OP refuses `video.from_a_newer_build` by its path
     // (`edit_tests.rs`'s `set_action_end_merges_and_a_null_removes_a_key`),
     // and the reader below keeps the very same key through an open and a

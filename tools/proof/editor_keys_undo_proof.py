@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Issue batch B3 — editor keys, undo steps, the transition ring
-(kpgalligan/reelcut#59 #60 #61 #66 #68 #69).
+(kpgalligan/framejob#59 #60 #61 #66 #68 #69).
 
     python3 tools/proof/editor_keys_undo_proof.py
     python3 tools/proof/editor_keys_undo_proof.py --baseline <commit>

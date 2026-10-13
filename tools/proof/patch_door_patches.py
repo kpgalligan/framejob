@@ -24,7 +24,7 @@ from patch_door import (
 )
 
 
-# ---- set_video (D1·3, kpgalligan/reelcut#4) -------------------------------
+# ---- set_video (D1·3, kpgalligan/framejob#4) -------------------------------
 
 
 def video_door(mcp):
@@ -56,7 +56,7 @@ def video_door(mcp):
     start = undo_marker(s, lambda: s.op("set_video", clips=[clip], patch={"opacity": 0.25}))
 
     print("\n1b — a key or a value the vocabulary does not have, refused by path")
-    # The ticket's three, first (kpgalligan/reelcut#4): each of them used
+    # The ticket's three, first (kpgalligan/framejob#4): each of them used
     # to LAND. A misspelt kind arrived as the enum's first case, an
     # unknown key inside a nested object was dropped on the way through
     # the typed decoder, and a number where an object belongs read as
@@ -177,7 +177,7 @@ def video_door(mcp):
             clips=[clip], patch={"motion": {"in": {"kind": "fade", "duration": -1}}})
 
 
-# ---- set_audio (D1·4, kpgalligan/reelcut#5) -------------------------------
+# ---- set_audio (D1·4, kpgalligan/framejob#5) -------------------------------
 
 
 def audio_door(mcp):
@@ -256,7 +256,7 @@ def audio_door(mcp):
             "makeup_db": 3})
 
 
-# ---- set_text (D1·4, kpgalligan/reelcut#5) --------------------------------
+# ---- set_text (D1·4, kpgalligan/framejob#5) --------------------------------
 
 
 def text_door(mcp):
@@ -350,7 +350,7 @@ def text_door(mcp):
             clips=[clip], patch={"animation": {"in": -1}})
 
 
-# ---- set_shape (D1·4, kpgalligan/reelcut#5) -------------------------------
+# ---- set_shape (D1·4, kpgalligan/framejob#5) -------------------------------
 
 
 def shape_door(mcp):
@@ -453,7 +453,7 @@ def shape_door(mcp):
            s.clip(clip)["shape"]["fill"], [1, 0, 0, 1])
 
 
-# ---- set_clip (D1·4, kpgalligan/reelcut#5) --------------------------------
+# ---- set_clip (D1·4, kpgalligan/framejob#5) --------------------------------
 
 
 def clip_door(mcp):
@@ -504,7 +504,7 @@ def clip_door(mcp):
           "must never get")
 
 
-# ---- set_action_end (D1·5, kpgalligan/reelcut#6) -------------------------
+# ---- set_action_end (D1·5, kpgalligan/framejob#6) -------------------------
 
 
 def action_end_door(mcp):
@@ -703,7 +703,7 @@ def action_end_door(mcp):
 
 # ---- the next patch door's section goes here ------------------------------
 #
-# **There is no patch door left owed.** D1·5 (kpgalligan/reelcut#6) added the
+# **There is no patch door left owed.** D1·5 (kpgalligan/framejob#6) added the
 # sixth and last of them, `set_action_end`, so what follows is for a door a
 # LATER phase adds: an op that takes a caller-authored patch is a door here
 # the day it lands.

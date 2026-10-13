@@ -349,7 +349,7 @@ fn the_filter_budget_is_named_rather_than_silently_trimmed() {
     // filter would be dropped from the next write and the user would be
     // looking at a control that did nothing, so the op refuses.
     // Every entry names both its keys, because since D1·2
-    // (kpgalligan/reelcut#3) the door requires it — see
+    // (kpgalligan/framejob#3) the door requires it — see
     // `a_partial_filter_entry_is_refused_at_the_door_and_completed_in_a_file`
     // below, which is where the omitted `amount` went.
     let project = plain();
@@ -984,7 +984,7 @@ fn an_end_patch_rewritten_from_the_evaluated_list_flattens_its_neighbours_ramp()
 #[test]
 fn a_partial_filter_entry_is_refused_at_the_door_and_completed_in_a_file() {
     // This test used to pin the completion as a KNOWN WART, at both doors.
-    // D1·2 (kpgalligan/reelcut#3) closed the door half and left the file
+    // D1·2 (kpgalligan/framejob#3) closed the door half and left the file
     // half exactly as it was, which is the split the whole deepening is
     // about: `Filter`'s `#[serde(default)]` is for reading what somebody
     // already saved, and nothing a caller writes is read through it.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""kpgalligan/reelcut#36 — the canvas text editor grows as you type.
+"""kpgalligan/framejob#36 — the canvas text editor grows as you type.
 
     python3 tools/proof/text_edit_proof.py
     python3 tools/proof/text_edit_proof.py --baseline b76a2f3

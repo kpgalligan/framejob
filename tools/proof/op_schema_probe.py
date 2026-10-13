@@ -21,7 +21,7 @@ What it measures, all of it through the wrapper the catalog will use:
     serde refuses it with the list of fields it DID expect, and that list is
     compared to the published properties. **No argument name is written in
     this file** — the oracle is the core's own decoder, answering the built
-    binary's staticlib, which is the instrument spec kpgalligan/reelcut#14
+    binary's staticlib, which is the instrument spec kpgalligan/framejob#14
     asks for in place of the Python literals the older proofs use.
   * **`required` is a subset of the properties**, so a schema cannot demand
     an argument it does not declare — and it is the DECODER's required-ness:

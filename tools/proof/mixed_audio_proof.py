@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mixed audio formats on one track (kpgalligan/reelcut#34) — the EXPORT
+"""Mixed audio formats on one track (kpgalligan/framejob#34) — the EXPORT
 path's regression guard, driven against the built binary over MCP.
 
 This is NOT the proof of the fix. The defect was the PREVIEW's: a tapped

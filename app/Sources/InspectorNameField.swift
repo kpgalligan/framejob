@@ -12,14 +12,14 @@ import AppKit
 /// `DS.controlHeight`, one constraint, which the clip header re-pins. Its
 /// alignment rect is its frame (no insets), so a constraint places the box
 /// where it places a value field's, and the text and the field editor move
-/// with it (kpgalligan/reelcut#186).
+/// with it (kpgalligan/framejob#186).
 ///
 /// Its placeholder is kept off the cell, in a string of its own: the cell
 /// draws it, at rest and under an empty field editor, on the resting rows,
 /// and the field editor — which draws a cell's placeholder 2 pt lower — is
 /// given none. Every text change redisplays the field, so the placeholder
 /// goes with the first letter typed and comes back with the last deleted
-/// (kpgalligan/reelcut#199).
+/// (kpgalligan/framejob#199).
 final class InspectorNameField: NSTextField, OptionControl, NSTextFieldDelegate {
     private let read: () -> String
     private let write: (String) -> Void

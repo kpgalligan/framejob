@@ -99,7 +99,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 - **Media is referenced, not copied**, by path + bookmark (not
   security-scoped; the app is not sandboxed). Consolidate is M3.
 - **R2-1 — One composition audio track per source audio format**
-  (kpgalligan/reelcut#34, 2026-09-24). An audio plan track becomes one
+  (kpgalligan/framejob#34, 2026-09-24). An audio plan track becomes one
   composition track per distinct source audio format, because the preview's
   tapped item does not play a track that changes format — measured: an
   `AVPlayerItem` over a tapped track holding an AAC segment then an LPCM one

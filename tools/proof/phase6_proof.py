@@ -1332,7 +1332,7 @@ def gradient_rules_part(mcp):
           f"a geometry outside the closed enum is refused rather than decoded "
           f"leniently into `linear` — got {conic!r}")
     # The three sentences below are the CORE's since deepening D1·4
-    # (kpgalligan/reelcut#5), which took `set_shape` raw and deleted the
+    # (kpgalligan/framejob#5), which took `set_shape` raw and deleted the
     # hand-built `shapePatchArg` and `gradientArg` this phase wrote. What
     # was worth pinning then — that a key misspelt INSIDE `gradient` is
     # refused by name, which no other nested object in a patch managed — is
@@ -1384,7 +1384,7 @@ def gradient_rules_part(mcp):
           "byte — the core leaves the order alone on purpose and the renderer sorts")
 
     # A three-component stop colour, which the hand-built reader accepted and
-    # completed with an opaque alpha. Deepening D1·4 (kpgalligan/reelcut#5)
+    # completed with an opaque alpha. Deepening D1·4 (kpgalligan/framejob#5)
     # ended that: a colour is FOUR numbers at every door, the length is
     # refused by the core's own type, and the frame is the one it was — the
     # claim this check makes now, where it used to claim the opposite.
@@ -1678,8 +1678,8 @@ def actions_part(mcp):
     # and then switch to a blur with the caller told it worked.
     #
     # **All four refusals here now speak the CORE's words** (D1·3 for the two
-    # `set_video` ones, kpgalligan/reelcut#4; D1·5 for the two
-    # `set_action_end` ones, kpgalligan/reelcut#6): both doors forward the
+    # `set_video` ones, kpgalligan/framejob#4; D1·5 for the two
+    # `set_action_end` ones, kpgalligan/framejob#6): both doors forward the
     # caller's patch raw, so the sentence an agent reads is `patch.rs`'s, and
     # it carries the value sent as well as the index. Every one was written
     # against the SWIFT door's `patch.video.filters[0]` spelling and went on

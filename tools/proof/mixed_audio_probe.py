@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mixed audio formats on one track — kpgalligan/reelcut#34, measured.
+"""Mixed audio formats on one track — kpgalligan/framejob#34, measured.
 
 What happened. An AAC clip (`.m4a`) followed by a WAV on the SAME timeline
 track played its audio in the preview until the WAV, then silence; the WAV on

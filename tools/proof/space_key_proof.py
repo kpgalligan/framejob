@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""kpgalligan/reelcut#35 — Space toggles play wherever nothing is typing.
+"""kpgalligan/framejob#35 — Space toggles play wherever nothing is typing.
 
     python3 tools/proof/space_key_proof.py
     python3 tools/proof/space_key_proof.py --baseline b69972e

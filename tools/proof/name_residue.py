@@ -12,8 +12,8 @@ name case-insensitively (`git grep -n -I -i --untracked`), and every such path
 
 * a path under `HISTORY` — kept whole;
 * a line in a file under `TEXT_HISTORY` — its lines kept, its path still checked;
-* a line that one of `KEPT_PATTERNS` matches — an issue citation, or an outside
-  path that is real until the owner's renames;
+* a line that one of `KEPT_PATTERNS` matches — an outside path that is real until
+  the owner's renames;
 * a file in `COUNTED` whose matching lines, less those `KEPT_PATTERNS` already
   allows, number EXACTLY its pinned count — one over or one under fails.
 
@@ -59,11 +59,10 @@ TEXT_HISTORY: tuple[str, ...] = ("archive/", "designs/design_handoff_chrome/",
                                  "designs/design_handoff_sharp/",
                                  "designs/design_handoff_clip_inspector/")
 
-# A line one of these matches is allowed in any file: issue citations redirect since
-# the repository's rename (2026-10-13), and the two outside paths are where spec §11's
-# append-only text recorded a past worktree, a past run's file or a litecode brief.
+# A line one of these matches is allowed in any file: the two outside paths are where
+# spec §11's append-only text recorded a past worktree, a past run's file or a
+# litecode brief.
 KEPT_PATTERNS = (
-    r"kpgalligan/reelcut#\d+",
     r"\.claude/litecode/reelcut/",
     r"devel/reelcut[\w-]*",
 )
@@ -117,7 +116,7 @@ COUNTED = {
     "tools/proof/harness/main.swift": 2,
     "tools/proof/matte_spike/matte_spike.py": 1,
     "tools/proof/mcp.py": 1,
-    "tools/proof/name_residue.py": 3,
+    "tools/proof/name_residue.py": 2,
     "tools/proof/proof_defaults.py": 25,
     "tools/proof/reference_build.py": 5,
     "tools/proof/reference_build_selftest.py": 8,

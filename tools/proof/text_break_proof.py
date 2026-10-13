@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""kpgalligan/reelcut#117 — the canvas text editor breaks lines where the
+"""kpgalligan/framejob#117 — the canvas text editor breaks lines where the
 render does (spec §11 K-3).
 
     python3 tools/proof/text_break_proof.py

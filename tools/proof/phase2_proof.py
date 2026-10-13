@@ -437,7 +437,7 @@ def main():
         "and so is the same name padded, with the same label",
     )
     # The three refusals below are the CORE's since deepening D1·4
-    # (kpgalligan/reelcut#5): `set_clip` forwards the caller's patch and the
+    # (kpgalligan/framejob#5): `set_clip` forwards the caller's patch and the
     # Swift reader that used to answer `patch.label must be a string` is
     # gone. The whole sentence is asserted rather than a keyword, because a
     # keyword check for "nmae" or "string" passed against both doors and so
@@ -465,7 +465,7 @@ def main():
     check(is_error, f"a top-level name argument (no patch) is refused: {message[:60]!r}")
     check(s.clip(a)["name"] == "Talk, take 2", "and nothing changed")
     # A stray top-level `name` BESIDE a valid patch. Until
-    # kpgalligan/reelcut#21 this was measured rather than checked — the
+    # kpgalligan/framejob#21 this was measured rather than checked — the
     # server had no unknown-argument guard, so the key was dropped and the
     # identity patch made the call a "made no change" refusal. The argument
     # gate now refuses the stranger by name before the patch is read.

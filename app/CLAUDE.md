@@ -676,7 +676,7 @@ the key map behind it.
   sizes the on-canvas text editor after every keystroke from the SAME
   measurement that sizes the applied box (`LayerRenderers.measuredSize`
   placed by `canvasRect`); never give the editor a second sizing rule, or
-  the text jumps at apply (kpgalligan/reelcut#36). It also STYLES the editor
+  the text jumps at apply (kpgalligan/framejob#36). It also STYLES the editor
   from `LayerRenderers.textAttributes` at the box's view scale (spec §11 K-3):
   the render's font, kern and paragraph style, the editor's own ink.
   `+TextEditKeys` is the
@@ -1091,7 +1091,7 @@ the key map behind it.
   generator and the writer tolerate it. `+AudioTracks` builds the audio
   half: an audio plan track becomes one composition track per source stream
   format (spec §11 R2-1) — a tapped track that changes format part-way
-  STALLS the player (kpgalligan/reelcut#34), so never feed one composition
+  STALLS the player (kpgalligan/framejob#34), so never feed one composition
   track two formats. `+AudioTracks` also holds `audioParameters`, whose
   `volumeLegs` holds each composition track's envelope at its first sounding
   segment (one whose source resolved) from time 0: AVFoundation starts an
@@ -2026,7 +2026,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all ninety-one
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all ninety-one
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
@@ -2456,7 +2456,7 @@ is past a neighbour for a moment — and recovers on the next one with the
 last good frame still on screen, where a drag that spoke would interrupt the
 gesture to say what the person is already fixing with the mouse;
 `endLiveEdit` then registers no step at all. Neither is a gap to be closed
-(kpgalligan/reelcut#8's eighth decision).
+(kpgalligan/framejob#8's eighth decision).
 
 **Lenient decoding is for what the CORE wrote; nothing a caller wrote is
 decoded through it.** `ProjectSnapshot`/`MotionProps`' `lenient` and

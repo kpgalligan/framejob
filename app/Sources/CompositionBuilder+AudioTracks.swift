@@ -82,7 +82,7 @@ extension CompositionBuilder {
     ///
     /// **Why:** an `AVPlayerItem` whose tapped audio track changes format
     /// part-way — an AAC clip then a WAV — stalls (measured,
-    /// kpgalligan/reelcut#34), and `AVComposition.h` promises nothing more; the same
+    /// kpgalligan/framejob#34), and `AVComposition.h` promises nothing more; the same
     /// segments on two tracks play. A segment with no source (missing,
     /// pending reverse) joins family 0, which adopts the first real format
     /// it meets; a same-format track answers one family with the plan's id
@@ -241,7 +241,7 @@ extension CompositionBuilder {
     /// resolved; a missing or pending-reverse segment is empty time) HELD
     /// from time 0 to it.
     ///
-    /// **Why** (kpgalligan/reelcut#87, spec §11 #87; measured on a standalone
+    /// **Why** (kpgalligan/framejob#87, spec §11 #87; measured on a standalone
     /// composition read at 48 kHz): before a track's first volume ramp an
     /// audio-mix input sits at the default 1.0, and the host slews every
     /// volume change by at most full scale per 1200 frames (25 ms), starting

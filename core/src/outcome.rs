@@ -76,7 +76,7 @@ pub enum Outcome {
     /// reduce to nothing, a trim whose two clamps crossed, a rate stretch
     /// outside `SPEED_MIN`–`SPEED_MAX` — each a clamp that landed on where the clip
     /// already was, which is the case where an identity is also the honest
-    /// answer (kpgalligan/reelcut#8, decision 3); and the unreachable misses
+    /// answer (kpgalligan/framejob#8, decision 3); and the unreachable misses
     /// — a clip absent from its own track's list in `add_transition` and
     /// `set_transition_duration`, and `close_gap`'s `end <= start` guard.
     ///

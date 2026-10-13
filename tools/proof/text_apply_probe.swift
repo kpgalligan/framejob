@@ -1,4 +1,4 @@
-// kpgalligan/reelcut#37 — Return applies in the canvas text editor, and Esc
+// kpgalligan/framejob#37 — Return applies in the canvas text editor, and Esc
 // asks before dropping a change; the probe (`text_apply_proof.py` builds and
 // runs it).
 //

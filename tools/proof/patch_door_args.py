@@ -30,7 +30,7 @@ from patch_door import (
 )
 
 
-# ---- add_text_clip's `text` (D1·4, kpgalligan/reelcut#5) ------------------
+# ---- add_text_clip's `text` (D1·4, kpgalligan/framejob#5) ------------------
 
 
 def new_text_clip_door(mcp):
@@ -87,7 +87,7 @@ def new_text_clip_door(mcp):
           "…and an object patch merges over the Title preset, keeping its alignment")
 
 
-# ---- add_shape_clip's `shape` (D1·4, kpgalligan/reelcut#5) ----------------
+# ---- add_shape_clip's `shape` (D1·4, kpgalligan/framejob#5) ----------------
 
 
 def new_shape_clip_door(mcp):
@@ -144,7 +144,7 @@ def new_shape_clip_door(mcp):
           "…and an object patch merges over the default rectangle")
 
 
-# ---- set_canvas's `background` (D1·4, kpgalligan/reelcut#5) ---------------
+# ---- set_canvas's `background` (D1·4, kpgalligan/framejob#5) ---------------
 
 
 def canvas_background_door(mcp):
@@ -204,7 +204,7 @@ def canvas_background_door(mcp):
            s.project()["canvas"]["background"], [0.1, 0.2, 0.3, 0.4])
 
 
-# ---- add_background's `color` (D1·4, kpgalligan/reelcut#5) ----------------
+# ---- add_background's `color` (D1·4, kpgalligan/framejob#5) ----------------
 
 
 def background_clip_door(mcp):
@@ -243,7 +243,7 @@ def background_clip_door(mcp):
            s.clip(plate)["shape"]["fill"], [0.1, 0.2, 0.3, 1.0])
 
 
-# ---- add_zoom_action's `region` (D1·5, kpgalligan/reelcut#6) --------------
+# ---- add_zoom_action's `region` (D1·5, kpgalligan/framejob#6) --------------
 
 
 def zoom_region_door(mcp):
@@ -330,7 +330,7 @@ def zoom_region_door(mcp):
 
 # ---- the next argument door's section goes here ---------------------------
 #
-# **There is no argument door left owed.** D1·5 (kpgalligan/reelcut#6) added
+# **There is no argument door left owed.** D1·5 (kpgalligan/framejob#6) added
 # the last of them, `add_zoom_action`'s region; what follows is for an
 # argument a LATER phase adds.
 #

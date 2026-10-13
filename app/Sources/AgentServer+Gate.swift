@@ -5,7 +5,7 @@ import Foundation
 /// One comparison at dispatch, for all ninety-one tools: the keys a
 /// caller wrote against the properties the tool PUBLISHED, and every
 /// stranger refused by name before a handler reads a thing
-/// (kpgalligan/reelcut#21; the measurement behind it is
+/// (kpgalligan/framejob#21; the measurement behind it is
 /// `archive/roadmap-7.md` §11).
 ///
 /// **The defect it closes.** No handler enumerates a caller's keys. Each

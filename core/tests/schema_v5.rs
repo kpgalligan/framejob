@@ -292,7 +292,7 @@ fn an_unknown_kind_is_refused_by_the_enum_itself() {
     // to 0, so a kind nothing downstream could draw is refused at the serde
     // boundary rather than range-checked a long way from the type. The
     // refusal names the path in the key walk's spelling (D1·1,
-    // kpgalligan/reelcut#2; it used to open "text patch does not match the
+    // kpgalligan/framejob#2; it used to open "text patch does not match the
     // schema:" and say nothing of where).
     let msg = plain().errors(&set_text(json!({ "animation": { "kind": "fade" } })));
     assert!(
@@ -383,7 +383,7 @@ fn paste_attributes_carries_the_animation_and_re_checks_it() {
 fn the_animations_timings_are_snapped_to_the_frame_grid_by_the_patch_door() {
     // The core's Times rule — every tick value that reaches the model is
     // snapped first (core/CLAUDE.md) — holds for these two as of D1·2
-    // (kpgalligan/reelcut#3). It did not before: the comment beside the
+    // (kpgalligan/framejob#3). It did not before: the comment beside the
     // check in `props_check.rs` said the inspector snapped, which left an
     // agent's value sub-frame and made two callers of one op disagree.
     // The canvas is 30 fps, so a frame is 20 000 ticks.

@@ -74,7 +74,7 @@ extension AgentServer {
     /// for the geometry of a shape.
     ///
     /// **The shorthand is the one thing this reads**, and it is kept
-    /// deliberately (spec kpgalligan/reelcut#1's Out of Scope): it cannot be
+    /// deliberately (spec kpgalligan/framejob#1's Out of Scope): it cannot be
     /// ambiguous — a JSON string is never a JSON object, and there is only
     /// one thing a caller who writes bare words or a bare kind name can mean
     /// — and a string is what both tools declared for their whole lives, so

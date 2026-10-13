@@ -396,7 +396,7 @@ fn every_range_check_refuses_by_name() {
 fn a_motions_ticks_are_snapped_to_the_frame_grid_by_the_patch_door() {
     // The core's Times rule — every tick value that reaches the model is
     // snapped first (core/CLAUDE.md) — holds for these two as of D1·2
-    // (kpgalligan/reelcut#3). It did not before: the comment in
+    // (kpgalligan/framejob#3). It did not before: the comment in
     // `props_check.rs` said "the inspector snaps", which left an agent's
     // value sub-frame and made two callers of one op disagree.
     //
@@ -482,7 +482,7 @@ fn an_unknown_kind_is_refused_at_the_serde_boundary() {
     // Both enums are closed, so a misspelt kind is a schema error on the
     // way in rather than a value clamped later — there is no neutral motion
     // to fall back to. The refusal names the slot's path and the value sent
-    // (D1·1, kpgalligan/reelcut#2; it used to read "video patch does not
+    // (D1·1, kpgalligan/framejob#2; it used to read "video patch does not
     // match the schema" and say nothing of which slot).
     let handle = plain();
     let msg = handle.errors(&set_video(

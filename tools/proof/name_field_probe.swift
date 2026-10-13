@@ -1,4 +1,4 @@
-// kpgalligan/reelcut#171 — the inspector's name field is the inspector's value
+// kpgalligan/framejob#171 — the inspector's name field is the inspector's value
 // field (spec §11 SH-3); the probe (`name_field_proof.py` builds and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own

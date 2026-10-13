@@ -340,7 +340,7 @@ fn an_unknown_key_inside_a_region_is_named_like_any_other() {
 
     // Every element is checked against that one reference, not just the
     // first, so a typo hiding behind a good region is caught too. The path
-    // names the INDEX (D1·1, kpgalligan/reelcut#2; it used to read
+    // names the INDEX (D1·1, kpgalligan/framejob#2; it used to read
     // `obscure.kynd`): the caller is told which field AND which of up to
     // eight regions it got wrong, which is the spelling a patch refusal
     // uses everywhere now — `core/tests/patch_door.rs`.

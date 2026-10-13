@@ -1,7 +1,7 @@
 import AppKit
 
 /// What a key does in the in-canvas text editor (spec §11 K-2,
-/// kpgalligan/reelcut#37): a bare Return applies, a modified Return is a new
+/// kpgalligan/framejob#37): a bare Return applies, a modified Return is a new
 /// line, Esc leaves or asks.
 enum TextEditKeyRoute: Equatable {
     case apply, newline, escape

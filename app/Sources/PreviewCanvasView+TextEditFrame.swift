@@ -1,6 +1,6 @@
 import AppKit
 
-/// The in-canvas text editor's frame while typing (kpgalligan/reelcut#36).
+/// The in-canvas text editor's frame while typing (kpgalligan/framejob#36).
 ///
 /// The editor is sized from the SAME measurement that sizes the clip's box
 /// once the string is applied — `LayerRenderers.measuredSize(for:)` over the
@@ -14,7 +14,7 @@ import AppKit
 /// The wrap width is set from the same unrounded width the frame is given,
 /// not tracked from the frame (`widthTracksTextView` is off): AppKit aligns
 /// the frame to backing pixels, which could widen the wrap by up to a pixel
-/// and keep a word the render breaks (kpgalligan/reelcut#186). That width
+/// and keep a word the render breaks (kpgalligan/framejob#186). That width
 /// loses two margins, each in view points at the box's own scale: the
 /// container inset takes back the 2 canvas pixels the frame stands outside
 /// the box, and the line-fragment padding the backdrop's padding and the
@@ -25,7 +25,7 @@ import AppKit
 /// "Hello " wrapped.
 ///
 /// Inside that frame the text is laid out in the render's own attributes
-/// (spec §11 K-3, kpgalligan/reelcut#117): `LayerRenderers.textAttributes` at
+/// (spec §11 K-3, kpgalligan/framejob#117): `LayerRenderers.textAttributes` at
 /// the box's view scale, unclamped — the font, the kern and the paragraph
 /// style, so tracking, line spacing and a small or large size break lines
 /// where the render does — in the editor's own ink and with no stroke. An

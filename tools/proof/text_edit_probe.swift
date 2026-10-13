@@ -1,4 +1,4 @@
-// kpgalligan/reelcut#36 — the canvas text editor grows as you type; the probe
+// kpgalligan/framejob#36 — the canvas text editor grows as you type; the probe
 // (`text_edit_proof.py` builds and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own

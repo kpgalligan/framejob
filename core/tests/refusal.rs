@@ -221,7 +221,7 @@ fn a_refusal_tolerates_a_caller_that_passes_no_reason_channel() {
 
 // ---- the rules that found their words at D2·3 ----------------------------
 
-/// The fixture the rules of kpgalligan/reelcut#11 are asked against, at the
+/// The fixture the rules of kpgalligan/framejob#11 are asked against, at the
 /// same 600 000 fps — ONE TICK per frame — as [`overlap_project`], so every
 /// number in an expected sentence is hand-computable and no snap moves it.
 ///

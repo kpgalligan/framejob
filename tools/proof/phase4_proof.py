@@ -1118,7 +1118,7 @@ def schema_part(mcp, session):
 
     target = project["clips"][0]["id"]
     # The core's whole sentence, not a keyword. `set_text` forwards the
-    # caller's patch since deepening D1·4 (kpgalligan/reelcut#5), so the
+    # caller's patch since deepening D1·4 (kpgalligan/framejob#5), so the
     # Swift `checkTextEnums` that used to answer here is gone — and a check
     # looking only for "typewriter" passed against BOTH doors, which is how
     # an assertion survives a change it was meant to see.

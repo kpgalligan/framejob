@@ -6855,7 +6855,7 @@ FRAME_60 = 10_000                      # one frame at the recorder's 60 fps
 PICTURE_LEN = 5 * SEC                  # the picture descriptor's 5 s
 MIC_LEN = 5 * SEC + 12_000             # the microphone file, 5.02 s
 # `add_clip` snaps a clip's length to the canvas frame grid, DOWNWARD — a
-# LENGTH is bounded by the file it came from (spec §11, kpgalligan/reelcut#22),
+# LENGTH is bounded by the file it came from (spec §11, kpgalligan/framejob#22),
 # where a START is rounded to the nearest frame. Lane B's one wrong first
 # expectation, kept here as the rule rather than the number.
 MIC_LEN_SNAPPED = MIC_LEN // FRAME_30 * FRAME_30                     # 3 000 000

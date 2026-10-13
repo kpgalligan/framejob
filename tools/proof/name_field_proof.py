@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""kpgalligan/reelcut#171 — the inspector's name field is the inspector's
+"""kpgalligan/framejob#171 — the inspector's name field is the inspector's
 value field: filled, a 1 pt `DS.border` stroke, 7 pt padding, the line
 centred (spec §11 SH-3).
 

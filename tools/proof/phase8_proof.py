@@ -104,7 +104,7 @@ user count of zero and was refused by the core with a reason-less "nothing
 changed", which reached a caller as the shared "Remove Media made no
 change…" and told it nothing. `MediaUsage.swift` is the one spelling now,
 and the Media tab's alert is its only caller: deepening D2·4
-(kpgalligan/reelcut#12) deleted the agent handler's count, so what an agent
+(kpgalligan/framejob#12) deleted the agent handler's count, so what an agent
 hears is **the core's own sentence**, "media 3 is still used by clip 7; pass
 with_clips: true to remove the media and its clips". The section asserts it
 WHOLE, which is a stronger claim than the file-and-count one it replaced —
@@ -538,7 +538,7 @@ def build_fixture(session):
     media = session.op("import_media", path=os.path.join(MEDIA, "A.mov"))["media"]
     session.op("add_clip", track=back, media=media, at=0)
     # `add_track` takes `index` and `name` and nothing else; the `kind` this
-    # line used to send was dropped in silence until kpgalligan/reelcut#21's
+    # line used to send was dropped in silence until kpgalligan/framejob#21's
     # gate, which refuses it by name.
     front = session.op("add_track")["new_tracks"][0]
     session.op(

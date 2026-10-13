@@ -1336,7 +1336,7 @@ def refusal_part(mcp):
           and (refusal(mcp, "render_frame", {"t": 0, "scope": 4242}) or "").startswith(
               "render_frame does not take scope. It takes "),
           "while a scope sent to a tool that is not an op is refused by the argument gate as "
-          "a key that tool never published (kpgalligan/reelcut#21) — until then it was the "
+          "a key that tool never published (kpgalligan/framejob#21) — until then it was the "
           f"ignored extra key, read only for the ops: {stray!r}")
 
     # The seam the orchestrator measured and fixed: an EXPLICIT scope

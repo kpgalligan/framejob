@@ -18,7 +18,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `normalize_clip` with nothing it could MEASURE: the peaks are in the
   package's cache and not in the model, so that is a fact the core cannot
   have (§7). **This amends the seventh Implementation Decision of
-  kpgalligan/reelcut#8**, which had listed `set_transition_style`'s refusal
+  kpgalligan/framejob#8**, which had listed `set_transition_style`'s refusal
   and `normalize_clip`'s check among the deletions; the first is one of five
   of a shape, and deleting one of five would leave the tool surface
   inconsistent for a caller.
