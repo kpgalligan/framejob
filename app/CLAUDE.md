@@ -190,7 +190,9 @@ detail there.
   (`openPendingUndoGroup()`) opens it at the body's first registration, at the
   body's level and never while undoing or redoing; a body that registers
   nothing leaves undo and redo untouched (#167); `registerUndo` stays the one
-  registrar. `cacheDirectory` calls `packageContentsDidChangeOnDisk()` when it
+  registrar. `applyEdit(_:_:amending:)` (#272) undoes the step that ended at
+  `step` before committing, when `project` is still that handle, so a strip's
+  off-knob double-click is one step. `cacheDirectory` calls `packageContentsDidChangeOnDisk()` when it
   creates `cache/` — only if the package's date, read through a fresh `URL`
   before the create, is still `fileModificationDate`, so an outside change made before it is not absorbed — and that method re-reads the date through a fresh
   `URL`, because `fileURL` still holds the date it cached at open (#138).
@@ -754,7 +756,7 @@ the key map behind it.
   to the rim, double-click resets the push; spec §11 GR-11) ·
   `WheelStripControl.swift` (`WheelStripControl`: the master strip with the
   slider's knob, a press on the knob grabs it, elsewhere jumps, ⌥ drags relative
-  at a tenth, double-click resets) ·
+  at a tenth, double-click resets, one undo step on or off the knob, #272) ·
   `CurveEditorView.swift` (`CurveEditorView`: the curve plot — grid, diagonal,
   the other channels faint, 7 × 7 square points; a press adds a point on the
   curve and drags it, ⌫ or a double-click deletes, the arrows nudge, through
@@ -2396,8 +2398,8 @@ business logic in closure bodies. New files are capped at 400 lines; a file
 at the ~600-line cap gives something up first, as a pure move landed alone.
 
 **Undo and dirty tracking.** All document mutation flows through
-`ProjectDocument`'s entry points — `applyEdit` and the
-`beginLiveEdit`/`updateLiveEdit`/`endLiveEdit` trio for gestures.
+`ProjectDocument`'s entry points — `applyEdit`, `applyEdit(_:_:amending:)`
+and the `beginLiveEdit`/`updateLiveEdit`/`endLiveEdit` trio for gestures.
 `registerUndo` appears nowhere outside `ProjectDocument`. It overrides
 `updateChangeCount` to drop AppKit's automatic counting; the entry points
 count deterministically via `countEditChange()`. **Pitfall:** undo

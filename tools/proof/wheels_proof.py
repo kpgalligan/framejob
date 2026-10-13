@@ -77,7 +77,12 @@ tracks, lift masters 0.2 and −0.2, saved for the probe).
   with `liftX` at 464 and `wheelsEnabled` at 500; P4 `keyedCount` for `{video:
   {wheels: …, x: 3}}` is 1 on Color and 1 on Picture; P5 an ⌥ drag moves the
   puck a tenth of a plain one, and a press on the strip's knob grabs it with no
-  write, so a double-click there is the reset alone; P6 a double-click on the disc resets x and y only,
+  write, so a double-click there is the reset alone; and, on a fresh document
+  per case (#272), a double-click off the Lift strip's knob is ONE undo step
+  back to (0.2, −0.2), a reset after an edit between the clicks is its own
+  step (one undo lands on that edit's 0.5), and an identity jump (master −1,
+  press at −1) amends no older step (one undo lands on −1); P6 a double-click
+  on the disc resets x and y only,
   one step "Lift"; P7 10,000 drags past the rim at even angles each land with
   x² + y² ≤ 1 + 1e-9.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
@@ -104,6 +109,12 @@ scored row did:
   ungraded-misses-wheels  `ungraded` keeps the wheels: V1 CT
   adjust-without-wheels   the adjustment pass has no step 4c.1: J1
   puck-writes-group       a puck write sends the whole wheel: P1
+  strip-reset-not-amending  a strip's double-click always its own step
+                          (#272): P5 (case a)
+  amend-ignores-step      `applyEdit(_:_:amending:)` undoes whatever is last,
+                          an edit between the clicks included: P5 (case b)
+  amend-without-step      a strip's release keeps its handle even when the
+                          gesture made no step: P5 (case c)
 Exit 0 when every scored row passed (a mutant: caught); 1 when one failed
 (a mutant: survived); 2 when the control could not be performed.
 """
@@ -198,6 +209,18 @@ MUTANTS = {
         "                let moved = ColorWheelPatch(x: x, y: y)\n",
         "                let moved = ColorWheelPatch(x: x, y: y, master: master())\n")],
         ["P1"]),
+    "strip-reset-not-amending": ([(
+        "app/Sources/VideoPane+Wheels.swift",
+        "            binding?.amend(name, ops, step: last.step)\n",
+        "            binding?.apply(name, ops)\n")], ["P5"]),
+    "amend-ignores-step": ([(
+        "app/Sources/ProjectDocument+UndoGroup.swift",
+        "        if project === step, !isLiveEditing,",
+        "        if true, !isLiveEditing,")], ["P5"]),
+    "amend-without-step": ([(
+        "app/Sources/VideoPane+Wheels.swift",
+        "        if let after = binding?.document?.project, after !== stripStarts[kind] {\n",
+        "        if let after = binding?.document?.project {\n")], ["P5"]),
 }
 rows = {}
 selected = set(ROWS)

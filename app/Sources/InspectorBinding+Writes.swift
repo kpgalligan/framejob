@@ -266,6 +266,17 @@ extension InspectorBinding {
     func apply(_ name: String, text patch: TextPatch) { apply(name, ops(text: patch)) }
     func apply(_ name: String, shape patch: ShapePatch) { apply(name, ops(shape: patch)) }
 
+    /// `apply` as one undo step with the step that ended at `step` — undone
+    /// first when nothing has been applied since (#272, a wheel strip's
+    /// off-knob double-click; `ProjectDocument.applyEdit(_:_:amending:)`).
+    func amend(_ name: String, _ ops: [ReelOp], step: ReelProject) {
+        guard !ops.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        inspector?.onAmendEdit?(name, ops, step)
+    }
+
     /// Off-event commits (a sheet's completion, an alert's answer) — the
     /// grouped entry point is mandatory there (app/CLAUDE.md's undo pitfall).
     func applyGrouped(_ name: String, _ ops: [ReelOp]) {

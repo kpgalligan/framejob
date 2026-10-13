@@ -43,6 +43,10 @@ final class InspectorViewController: NSViewController {
     /// For commits made outside an AppKit event (a sheet or alert's
     /// completion) — `ProjectDocument.performGroupedEdit`.
     var onGroupedEdit: ((String, [ReelOp]) -> Void)?
+    /// `onEdit` as one undo step with the step that ended at the handle
+    /// given — a wheel strip's double-click off the knob (#272) —
+    /// `ProjectDocument.applyEdit(_:_:amending:)`.
+    var onAmendEdit: ((String, [ReelOp], ReelProject) -> Void)?
     var onLiveBegin: (() -> Void)?
     var onLiveUpdate: (([ReelOp]) -> Void)?
     var onLiveEnd: ((String) -> Void)?

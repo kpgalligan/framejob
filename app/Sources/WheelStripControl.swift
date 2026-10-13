@@ -6,9 +6,10 @@ import AppKit
 /// knob, the accent fill from the LEFT end as Light's ±1 rows have), dragged
 /// as a live edit. A press off the knob jumps to the pointer like every
 /// inspector slider; one on the knob grabs it where it stands, so the first
-/// click of a double-click there writes nothing and the reset is the one
-/// undo step; ⌥ held drags RELATIVE at a tenth (no jump); a double-click
-/// resets the master (`reset`). Keyed, the fill is the action ink from the action's
+/// click of a double-click there writes nothing; ⌥ held drags RELATIVE at a
+/// tenth (no jump); a double-click resets the master (`reset`), ONE undo step
+/// on or off the knob — off it, `ColorWheelsView` undoes the first click's
+/// jump before the reset (#272). Keyed, the fill is the action ink from the action's
 /// start value and the knob is in action ink; a coral tick marks the
 /// playhead's value when it differs. `press`, `drag` and `release` are the
 /// mouse handlers' bodies, internal so a probe drives the gesture.

@@ -9,9 +9,11 @@ import AppKit
 /// write over several clips keeps each one's other values and lands on an
 /// action's end when one is selected. A puck or strip drag is the live trio
 /// (one undo step named after the wheel); a field, a double-click and Reset
-/// commit once. The row never depends on a value, so a live drag never
-/// rebuilds the pane (`structureSignature` is unchanged), and it has one row
-/// mark and one mixed badge for the whole `video.wheels` key (CI-7, CI-9).
+/// commit once, and a strip's double-click off the knob first undoes its
+/// first click's jump, so it too is one step (#272). The row never depends on
+/// a value, so a live drag never rebuilds the pane (`structureSignature` is
+/// unchanged), and it has one row mark and one mixed badge for the whole
+/// `video.wheels` key (CI-7, CI-9).
 extension VideoPane {
     // MARK: Wheels
 
@@ -50,6 +52,12 @@ final class ColorWheelsView: NSView {
     var keyed: () -> Bool = { false }
     private(set) var discs: [ColorWheelControl] = []
     private(set) var strips: [WheelStripControl] = []
+    /// `document.project` at each strip's press, while its gesture runs.
+    private var stripStarts: [ColorWheelKind: ReelProject] = [:]
+    /// `document.project` after each strip's release, and when, kept only
+    /// when the gesture made a step (#272): the step a double-click's reset
+    /// amends.
+    private var stripSteps: [ColorWheelKind: (step: ReelProject, at: TimeInterval)] = [:]
 
     /// All nine of `wheels` as a patch: the row default's write.
     static func whole(_ wheels: ColorWheels) -> ColorWheelsPatch {
@@ -136,10 +144,14 @@ final class ColorWheelsView: NSView {
             write: { [weak binding] value in
                 binding?.liveUpdate(ops(kind.patch(ColorWheelPatch(master: value))))
             },
-            begin: { [weak binding] in binding?.liveBegin() },
-            end: { [weak binding] in binding?.liveEnd(name) },
-            reset: { [weak binding] in
-                binding?.apply(name, ops(kind.patch(ColorWheelPatch(master: 0))))
+            begin: { [weak self, weak binding] in self?.stripBegan(kind, binding: binding) },
+            end: { [weak self, weak binding] in
+                self?.stripEnded(kind, name: name, binding: binding)
+            },
+            reset: { [weak self, weak binding] in
+                self?.stripReset(
+                    kind, name: name, binding: binding,
+                    ops: ops(kind.patch(ColorWheelPatch(master: 0))))
             },
             enabled: { true },
             start: { [weak binding] in binding?.startValue(master) },
@@ -186,5 +198,41 @@ final class ColorWheelsView: NSView {
             field.bottomAnchor.constraint(equalTo: column.bottomAnchor),
         ])
         return column
+    }
+
+    // MARK: The strip's double-click (#272)
+
+    /// A strip's press: the handle it starts from, then the live trio.
+    private func stripBegan(_ kind: ColorWheelKind, binding: InspectorBinding?) {
+        stripStarts[kind] = binding?.document?.project
+        stripSteps[kind] = nil
+        binding?.liveBegin()
+    }
+
+    /// A strip's release: the live trio's end, then the handle it left,
+    /// kept only when the gesture registered a step (the handle moved).
+    private func stripEnded(_ kind: ColorWheelKind, name: String, binding: InspectorBinding?) {
+        binding?.liveEnd(name)
+        if let after = binding?.document?.project, after !== stripStarts[kind] {
+            stripSteps[kind] = (after, ProcessInfo.processInfo.systemUptime)
+        }
+        stripStarts[kind] = nil
+    }
+
+    /// A strip's double-click: the reset amends the step its first click
+    /// left when that release is within the double-click interval — so an
+    /// earlier gesture's step is never reused — and is its own step
+    /// otherwise.
+    private func stripReset(
+        _ kind: ColorWheelKind, name: String, binding: InspectorBinding?, ops: [ReelOp]
+    ) {
+        let last = stripSteps.removeValue(forKey: kind)
+        if let last,
+            ProcessInfo.processInfo.systemUptime - last.at <= NSEvent.doubleClickInterval
+        {
+            binding?.amend(name, ops, step: last.step)
+        } else {
+            binding?.apply(name, ops)
+        }
     }
 }

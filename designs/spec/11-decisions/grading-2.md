@@ -145,9 +145,13 @@ Concat is opened, at design time or build time.
     after the wheel. (4) The master strip: the slider's look (3 pt rail, 7 × 11 block knob, accent
     fill from the left end as Light's ±1 rows do); a press off the knob jumps like every inspector
     slider, one on the knob grabs it where it stands (no write); ⌥ held drags relative at a tenth;
-    a double-click resets master to 0, one undo step on the knob — off it the first click's jump is
-    a step of its own, so one Undo after that reset lands on the jumped value (G2-2's review,
-    accepted). Its field: 2 decimals, no unit, −1…1. (5) **The push has no typed field** — the
+    a double-click resets master to 0 and is ONE undo step on or off the knob — on the knob the
+    first click writes nothing; off it the first click's jump is undone before the reset, so one
+    Undo lands on the value before the double-click; if the project changed between the two
+    clicks the reset is its own step after the jump; on a master already at 0 the double-click
+    changes nothing and beeps, as on the knob, and Redo then offers the undone jump. (Amended by
+    #272, owner 2026-10-12; G2-2's review had accepted two steps.) Its field: 2 decimals, no
+    unit, −1…1. (5) **The push has no typed field** — the
     first inspector control without one, deliberately (two numbers per puck do not fit three
     across); it is exact through MCP. A hover tooltip on the disc reads "Hue 34° · 0.42" (or
     "Neutral"). (7) With an action selected that keys `video.wheels`: puck and knob in action ink,

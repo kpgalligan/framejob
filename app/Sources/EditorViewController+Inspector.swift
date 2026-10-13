@@ -44,6 +44,9 @@ extension EditorViewController {
         inspector.onGroupedEdit = { [weak self] name, ops in
             self?.document?.performGroupedEdit(name, ops)
         }
+        inspector.onAmendEdit = { [weak self] name, ops, step in
+            self?.document?.applyEdit(name, ops, amending: step)
+        }
         inspector.onLiveBegin = { [weak self] in self?.document?.beginLiveEdit() }
         inspector.onLiveUpdate = { [weak self] ops in self?.document?.updateLiveEdit(ops) }
         inspector.onLiveEnd = { [weak self] name in self?.document?.endLiveEdit(name) }

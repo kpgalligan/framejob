@@ -18637,7 +18637,7 @@ MUTANT line names when it failed.
 
 **Its record**: `archive/grading-2.md`'s G2-1 and G2-5 sections.
 
-## Road map grading-2 — G2-2, the wheels (`wheels_proof.py` N0–N2, L1, G1, Y1, C1, O1, A1, J1, X1, U1, V1, P0, R1, P1–P7, Z1 and nine mutants; `wheels_probe.swift`; `core/tests/wheels.rs`, `core/tests/schema_v16.rs`; spec §11 GR-11)
+## Road map grading-2 — G2-2, the wheels (`wheels_proof.py` N0–N2, L1, G1, Y1, C1, O1, A1, J1, X1, U1, V1, P0, R1, P1–P7, Z1 and twelve mutants; `wheels_probe.swift`; `core/tests/wheels.rs`, `core/tests/schema_v16.rs`; spec §11 GR-11)
 
 **What it answers.** That `video.wheels` changes nothing until set (N0: six
 wheel-less frames — the card, the card at exposure +1, an adjustment clip at
@@ -18659,8 +18659,15 @@ clips (the masters kept), and the Color sections run Color, Wheels, (Curves sinc
 `apply(wheels:)`'s flag; P3 the 512-byte block with `liftX` at 464 and
 `wheelsEnabled` at 500; P4 the `◆N` badge; P5 ⌥ at a tenth for the puck and
 the strip (no jump on the strip's ⌥ press, and none on a press on its
-knob, so a double-click there is the reset alone); P6 a double-click resets x and y
-only, one step "Lift"; P7 10,000 drags past the rim land with
+knob, so a double-click there is the reset alone), and since #272, on a fresh
+`ProjectDocument` per case, a double-click OFF the Lift strip's knob is one
+undo step back to 0.2 / −0.2, a reset after an edit between the clicks is its
+own step, and an identity jump amends no older step (its clicks run 0.1 s apart,
+so P5 fails loudly on a host whose double-click interval is under about 0.2 s,
+and the detail prints the interval; the strip's other guard, amending only
+within that interval of the release, is unmeasured and has no mutant, as the
+probe has no clock to age a release); P6 a double-click resets x and y only,
+one step "Lift"; P7 10,000 drags past the rim land with
 x² + y² ≤ 1 + 1e-9. The module docstring lists every row and its fixture.
 
 ```
@@ -18668,7 +18675,7 @@ make app                                                                   # the
 RC_PROOF_APP=release python3 tools/proof/wheels_proof.py capture tools/proof/work/wheels-control
 python3 tools/proof/wheels_proof.py                                        # Debug unless RC_PROOF_APP=release
 RC_PROOF_APP=release python3 tools/proof/wheels_proof.py compare tools/proof/work/wheels-control
-python3 tools/proof/wheels_proof.py --mutant NAME                          # one of the nine below
+python3 tools/proof/wheels_proof.py --mutant NAME                          # one of the twelve below
 cd core && cargo test --release --test wheels --test schema_v16
 ```
 
@@ -18692,6 +18699,9 @@ failed and no other scored row did.
 | `ungraded-misses-wheels` | `ungraded` keeps the wheels | V1 CT |
 | `adjust-without-wheels` | the adjustment pass has no step 4c.1 | J1 |
 | `puck-writes-group` | a puck write sends the wheel's master too | P1 |
+| `strip-reset-not-amending` | a strip's double-click always applies its reset as its own step (#272) | P5 (case a) |
+| `amend-ignores-step` | `applyEdit(_:_:amending:)` undoes whatever is last, an edit between the clicks included | P5 (case b) |
+| `amend-without-step` | a strip's release keeps its handle even when the gesture made no step | P5 (case c) |
 
 Also moved by G2-2 (the block's 464 → 512): `tone_probe.swift` P3,
 `look_probe.swift` L3 (and B4's section list), `clip_inspector2_probe.swift`

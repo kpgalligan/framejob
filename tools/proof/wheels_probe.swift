@@ -5,7 +5,8 @@
 // `main.swift`, against `libreelcut_core.a`, so every row drives the app's own
 // types: `ClipPane`, `VideoPane.wheelsSection()`, `ColorWheelsView`,
 // `ColorWheelControl`, `WheelStripControl`, `InspectorBinding`, a
-// `ProjectDocument`'s live trio and undo stack, `LayerUniforms.apply(wheels:)`
+// `ProjectDocument`'s live trio, undo stack and `applyEdit(_:_:amending:)`
+// (#272), `LayerUniforms.apply(wheels:)`
 // and `ClipSubTab.keyedCount`. The controls' gestures are driven through
 // their `press` / `drag` / `release`, the mouse handlers' own bodies. Nothing
 // private is widened.
@@ -94,7 +95,12 @@ do {
     }
 }
 
-// MARK: - P5 ⌥ moves a tenth, P7 the rim
+// MARK: - P5 ⌥ moves a tenth (its document part below), P7 the rim
+
+/// P5's standalone half — its name, verdict and detail — scored together with
+/// its document half (`p5Strip`) as ONE row, since the proof keys rows by
+/// their first word.
+var p5Standalone: (name: String, ok: Bool, detail: String) = ("P5", false, "not run")
 
 /// A disc of `side` points whose push reads (0, 0) and whose writes land in
 /// `written`.
@@ -158,7 +164,7 @@ do {
     knobbed.release()
     knobbed.press(atX: middle, fine: false, clickCount: 2)
     let doubleWrites = grabbed.values.count
-    check(
+    p5Standalone = (
         "P5 an ⌥ drag moves the puck a tenth of a plain one (\(plain) → \(fine)) and the "
             + "strip a tenth with no jump on the press (\(stripPlain) → \(stripFine)); a "
             + "press on the strip's knob writes nothing and its drag keeps the grab "
@@ -328,6 +334,115 @@ func p1p6() {
             + "undo name \(resetName), undone \(back)")
 }
 p1p6()
+
+// MARK: - P5's document half: a strip double-click off the knob (#272)
+
+/// Both clips' lift masters.
+func liftMasters(_ document: ProjectDocument, _ clips: [UInt32]) -> [Double] {
+    clips.compactMap { lift(document, $0)?.master }
+}
+
+/// One case on a FRESH document read from project P, wired as P1's plus
+/// `onAmendEdit`: an optional `setup` master on both clips, a press at `x`
+/// and its release, an optional master on both `between` the clicks, then
+/// the double-click; the masters after it, its undo name, and the masters
+/// and `canUndo` after ONE undo. The spins are 0.1 s, not P1's 0.3, so the
+/// release and the double-click stay inside `NSEvent.doubleClickInterval`
+/// even with an edit between them (the reset amends only inside it).
+func stripCase(
+    _ path: String, _ clips: [UInt32], setup: Double? = nil, x: CGFloat, between: Double? = nil
+) -> (reset: [Double], name: String, undone: [Double], more: Bool, stepped: Bool, why: String)? {
+    let document = ProjectDocument()
+    do {
+        try document.read(
+            from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+    } catch {
+        return nil
+    }
+    let inspector = InspectorViewController()
+    inspector.document = document
+    inspector.onLiveBegin = { document.beginLiveEdit() }
+    inspector.onLiveUpdate = { ops in document.updateLiveEdit(ops) }
+    inspector.onLiveEnd = { name in document.endLiveEdit(name) }
+    inspector.onEdit = { name, ops in document.applyEdit(name, ops) }
+    inspector.onAmendEdit = { name, ops, step in
+        document.applyEdit(name, ops, amending: step)
+    }
+    document.selection = Set(clips)
+    inspector.binding.invalidate()
+    let pane = ClipPane(inspector: inspector)
+    pane.binding.invalidate()
+    pane.choose(.color)
+    pane.rebuild()
+    pane.refresh()
+    let section = pane.sections.first { $0.id == "video.wheels" }
+    guard let view = section.flatMap({ walk($0).compactMap { $0 as? ColorWheelsView }.first }),
+          view.strips.count == 3
+    else { return nil }
+    let strip = view.strips[0]
+    strip.frame = NSRect(x: 0, y: 0, width: 107, height: 13)
+    func master(_ value: Double) {
+        let patch = ColorWheelsPatch(lift: ColorWheelPatch(master: value))
+        document.applyEdit("Lift", [.setVideo(clips: clips, patch: VideoPatch(wheels: patch))])
+        spin(0.1)
+        inspector.binding.invalidate()
+        pane.binding.invalidate()
+    }
+    if let setup { master(setup) }
+    let pressed = document.project
+    strip.press(atX: x, fine: false)
+    strip.release()
+    spin(0.1)
+    let stepped = document.project !== pressed
+    let jumped = liftMasters(document, clips)
+    inspector.binding.invalidate()
+    pane.binding.invalidate()
+    if let between { master(between) }
+    strip.press(atX: x, fine: false, clickCount: 2)
+    spin(0.1)
+    let reset = liftMasters(document, clips)
+    let name = document.undoManager?.undoActionName ?? "-"
+    document.undoManager?.undo()
+    spin(0.1)
+    let undone = liftMasters(document, clips)
+    let more = document.undoManager?.canUndo ?? true
+    withExtendedLifetime(pane) {}
+    return (reset, name, undone, more, stepped, "jumped \(jumped)")
+}
+
+/// P5's one row: the standalone half above and the three document cases.
+func p5Strip() {
+    let (name, standalone, detail) = p5Standalone
+    guard let path = request["package"] as? String,
+          let clips = (request["clips"] as? [NSNumber])?.map(\.uint32Value), clips.count == 2
+    else {
+        check(name, false, "the request names no package and two clips: \(request)")
+        return
+    }
+    let a = stripCase(path, clips, x: 10)
+    let b = stripCase(path, clips, x: 10, between: 0.5)
+    let c = stripCase(path, clips, setup: -1, x: -1)
+    func shown(_ got: (reset: [Double], name: String, undone: [Double], more: Bool,
+                       stepped: Bool, why: String)?) -> String {
+        guard let got else { return "the case could not be built" }
+        return "reset \(got.reset) \"\(got.name)\", undone \(got.undone), more steps "
+            + "\(got.more), first click stepped \(got.stepped), \(got.why)"
+    }
+    let goodA = a.map {
+        $0.stepped && $0.reset == [0, 0] && $0.name == "Lift" && $0.undone == [0.2, -0.2]
+            && !$0.more
+    } ?? false
+    let goodB = b.map { $0.stepped && $0.reset == [0, 0] && $0.undone == [0.5, 0.5] } ?? false
+    let goodC = c.map { !$0.stepped && $0.reset == [0, 0] && $0.undone == [-1, -1] } ?? false
+    check(
+        name + "; on a document a double-click off the Lift strip's knob is ONE undo step "
+            + "\"Lift\" back to (0.2, -0.2), a reset after an edit between the clicks is its "
+            + "own step, and an identity jump amends no older step",
+        standalone && goodA && goodB && goodC,
+        detail + "; (a) \(shown(a)); (b) \(shown(b)); (c) \(shown(c)); double-click interval "
+            + "\(NSEvent.doubleClickInterval) s")
+}
+p5Strip()
 
 let answer: [String: Any] = ["rows": rows]
 if let data = try? JSONSerialization.data(withJSONObject: answer, options: [.prettyPrinted]) {

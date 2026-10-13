@@ -68,7 +68,7 @@ The brief's spike (a scratch shader, NOT the compositor's, uncommitted; only dif
 - **The strengths and guards are first numbers**: the wheels' factors and the qualifier's chroma and near-black guards were set from fixtures, for the owner to judge on footage (GRD-12, GRD-14).
 - **A wheel's push moves a saturated pixel's luma** (GR-11's accepted risk): the push is luma-neutral on grey, not on every colour.
 - **An action between two non-identity curves of different counts switches at its end** (GR-12's accepted risk; #271).
-- **The master strip's off-knob double-click is two undo steps** (GR-11 (4), accepted at G2-2's review; #272).
+- **The master strip's off-knob double-click was two undo steps** (GR-11 (4), accepted at G2-2's review): fixed by #272's batch (owner, 2026-10-12), GR-11 (4) amended — it is one step on or off the knob.
 - **Screen 05h shows the "Selection" tag and the switch, not the grey**: `snapshot_ui`'s well is `render_frame`'s picture, which the switch never reaches; `qualifier_proof.py` E1 and V1 prove the selection.
 - **Other editors' behaviour** (wheels' feel, scope layouts, qualifier softness) is from general knowledge.
 
@@ -82,7 +82,7 @@ Filed at the close, each `ai-drafted` and `low-priority`:
 - #269: a qualifier on picture clips.
 - #270: the curves editor's extras (a histogram behind the plot, a hover readout, ⇧ axis lock).
 - #271: animating between two non-identity curves of different point counts.
-- #272: the wheels' master strip, a double-click off the knob is two undo steps.
+- #272: the wheels' master strip, a double-click off the knob is two undo steps — fixed by #272's batch (owner, 2026-10-12).
 - #273: 1,024-level scopes for 10-bit work.
 
 Commented: #256 (tier 3: what tier 2 defined on encoded values), #264 (the texture slots and where an input LUT would go), #124 (its cutout would take `texture(4)`). Left for after tier 2 (owner, 2026-10-10): #257, untouched. Closed as built: #260, #261, #262, #263.

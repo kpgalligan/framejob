@@ -56,3 +56,33 @@ extension ProjectDocument {
         pendingUndoGroup = pending
     }
 }
+
+extension ProjectDocument {
+    // MARK: Amending the last step
+
+    /// `applyEdit(actionName, ops)` after undoing the step that ended at
+    /// `step`, so the two are ONE undo step (#272, spec §11 GR-11 (4)): a
+    /// wheel strip's double-click off the knob, whose first click jumped the
+    /// master as a live gesture of its own. The undo happens only while
+    /// `project` is still that very handle — nothing has been applied since
+    /// the step ended — and with no gesture live; otherwise the commit is its
+    /// own step after the earlier one, as before.
+    ///
+    /// Calling `undo()` here is safe because NSUndoManager opens its
+    /// per-event group LAZILY, at the first registration: at a mouse-down
+    /// nothing is open yet (`groupingLevel == 0`), and the undo's `restore`
+    /// registers the redo through `registerUndo`, still the ONE registrar.
+    /// The `groupingLevel == 0`, `isUndoing`/`isRedoing` and live-edit guards
+    /// are defensive and degrade to the old two steps. Nothing here registers
+    /// or counts a change itself: `restore` counts `.changeUndone`, the
+    /// commit counts `.changeDone` and clears redo, so the change count and
+    /// the stack stay NSDocument's own. No group is opened and none flushed.
+    func applyEdit(_ actionName: String, _ ops: [ReelOp], amending step: ReelProject) {
+        if project === step, !isLiveEditing, let manager = undoManager, manager.canUndo,
+            !manager.isUndoing, !manager.isRedoing, manager.groupingLevel == 0
+        {
+            manager.undo()
+        }
+        applyEdit(actionName, ops)
+    }
+}
