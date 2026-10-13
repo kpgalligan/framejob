@@ -805,3 +805,68 @@ tools/proof/README.md | grep -c '^-|'` prints):
   `README.md`'s release URL, `08-repo-layout.md`'s root folder — go with the owner's renames.
   The `FrameJob.dmg` download link answers only after the next publish: the newest release's
   asset is still `Reelcut.dmg`.
+
+## R4 — the record
+
+**Landed** (2026-10-13, in the worktree, not committed by the implementer; the orchestrator
+commits). The GitHub repository was renamed `kpgalligan/framejob` on the owner's OK before R4
+began, and `origin` already pointed at `https://github.com/kpgalligan/framejob.git`.
+
+- `git mv designs/rename.md archive/rename.md` (this file); its row in `archive/INDEX.md`, after
+  `grading-3.md`'s.
+- `designs/adr/rename.md`, condensed from this file (template `designs/adr/grading-3.md`): the
+  status with each phase's commit (`bde8319`, `a0da14e`, `6fa50c8`, `17561e2`, and R4's), NM-1…NM-11
+  one line each, the decisions, what each phase built, the Rasterize diff, the known limits, the
+  open items, the owner's hand steps (steps 1–10 as above, numbering kept, then 11 the folder move
+  with the three-worktree repair, 12 the Claude memory folders, 13 the forced gate) and where to
+  look here.
+- `README.md` line 556: `https://github.com/kpgalligan/framejob/releases/latest/download/FrameJob.dmg`;
+  `designs/spec/08-repo-layout.md` line 4: `framejob/`.
+- `designs/spec/11-decisions/rename.md`: the intro says the road map is closed, its record
+  `designs/adr/rename.md` and the original `archive/rename.md` (one line longer: 157 → 158);
+  "The owner's choices" cited in `archive/rename.md`; NM-3's and NM-7's citations of the hand
+  steps now `designs/adr/rename.md`, "Owner's hand steps". No decision's words otherwise. The
+  Lines cells: `11-decisions/README.md` 158, `designs/spec/README.md` `7583 in 21 files`.
+- `tools/proof/budget.py`: the docstring and the `unmoved` refusal cite `designs/adr/rename.md`
+  (still "the owner's hand steps, step 3").
+- `tools/proof/name_residue.py`: the docstring names this file and the ADR; `designs/rename.md`
+  gone from `HISTORY` (`archive/` and `designs/adr/` cover both); the `KEPT_PATTERNS` comment
+  rewritten (issue citations redirect since the repository's rename, the two outside paths are
+  where §11's append-only text recorded a past worktree, run or brief); the "R4 removes these"
+  group (`README.md` 1, `designs/spec/08-repo-layout.md` 1) gone. The root `CLAUDE.md` pin is
+  the edit script's.
+- `~/.claude/litecode/reelcut/rename-r4/claude-md-edits.py` (outside the repo): root
+  `CLAUDE.md`'s issue-tracker line (`kpgalligan/framejob`), the agent note's citation
+  (`designs/adr/rename.md`), the `rename` entry in "Where to look"'s ADR list, and
+  `COUNTED["CLAUDE.md"]` 4 → 3 with its comment; never applied here.
+
+**Reviewed, needing nothing:** `docs/agents/*` (the issue tracker infers the repository from
+`git remote -v`), `CONTEXT.md`, `.github/`, every `CLAUDE.md` but root, `tools/proof/README.md`,
+`gate.py`. The three design handoff READMEs that name the old repository are history.
+
+**Deviations from the spec:** none.
+
+**Measured** (each printed by the command beside it; the full outputs are in the phase's
+`04-checks.txt`):
+
+- `python3 tools/proof/name_residue.py`: exit 0, nothing printed.
+- `python3 tools/proof/name_residue.py --selftest`: `7/7 rows pass`, `PASS`.
+- `python3 tools/proof/spec_index_proof.py`: `159/159 checks passed`, exit 0.
+- `python3 tools/proof/budget_proof.py`: `27/27`, exit 0.
+- `git grep -n "designs/rename.md" -- ':!archive/'`: only `CLAUDE.md:123` (the script's edit 2).
+- `git grep -n -i -E "kpgalligan/reelcut([^#]|$)" -- ':!archive/' ':!designs/adr/'`:
+  `CLAUDE.md:446` (the script's edit 1) and the three design handoff READMEs (history).
+- `claude-md-edits.py <tree> <scratch>`: `CLAUDE.md: 4 now, 3 after`; `app/`, `core/`,
+  `graphic/`, `mcp-proxy/CLAUDE.md` `0 now, 0 after`; `tools/proof/name_residue.py: 6 now, 6
+  after`; `designs/rename.md citations: 1 now, 0 after`; `COUNTED['CLAUDE.md'] after: 3`; exit 0.
+- `make gate`: PASS in 70 s (names pass, typecheck, fmt and lint skipped as unchanged, test pass
+  in 69 s, app skipped). This record was appended after the gate; `archive/` is outside the
+  gate's inputs and under `HISTORY` in `name_residue.py`, which exited 0 again on the final tree.
+
+**Owed:**
+
+- The CLAUDE.md edits: `python3 ~/.claude/litecode/reelcut/rename-r4/claude-md-edits.py --apply
+  <tree>` (the orchestrator's), which also sets `COUNTED["CLAUDE.md"]` to 3.
+- Two issues, filed by the orchestrator at the close: kpgalligan/rasterize#654 (Frame Job's
+  three `agent/src` lines) and #287 (`ready-for-human`), carrying the owner's hand steps 1–13 (`designs/adr/rename.md`, "Owner's hand steps") and the
+  two old-named branches `worktree-side-work` and `worktree-sign-publish`.

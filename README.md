@@ -553,7 +553,7 @@ checks the exported app (`tools/proof/published_check.py`), packs it into
 Release tagged `v<version>`. The version is `VERSION` (MAJOR.MINOR) plus the
 workflow's run number, and the build number is the run number, so bump
 `VERSION` for a new minor line. A local build reads "0.2 (0)". The newest build is always at
-`https://github.com/kpgalligan/reelcut/releases/latest/download/FrameJob.dmg`
+`https://github.com/kpgalligan/framejob/releases/latest/download/FrameJob.dmg`
 (while the repository is private, only for people with access to it).
 
 The workflow runs no tests: run `make test` and `make dist` on what you push.

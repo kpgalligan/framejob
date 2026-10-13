@@ -18,7 +18,7 @@ never a key, a header, a body or a text. Only a keyed live run points a
 **The unmoved ledger** (spec §11 NM-7): while the folder of the ledger's
 name before rename R1, `OLD_LEDGER_FOLDER`, exists, a `SpendLedger` at
 `LEDGER` refuses every request, naming the owner's guarded `mv`
-(`designs/rename.md`, "The owner's hand steps", step 3), before it makes a
+(`designs/adr/rename.md`, "Owner's hand steps", step 3), before it makes a
 folder, opens the ledger or writes any line: a folder made here would make
 that `mv` nest the old one inside it, and the month would restart at $0.
 
@@ -159,7 +159,7 @@ def unmoved(old_folder: str, new_folder: str) -> str | None:
     if not os.path.exists(old_folder):
         return None
     return (f"budget: the proofs' ledger is not moved yet: {old_folder} still exists, so this "
-            f"month's spend is not in {new_folder}. Move it first (designs/rename.md, the "
+            f"month's spend is not in {new_folder}. Move it first (designs/adr/rename.md, the "
             f"owner's hand steps, step 3): [ -e \"{new_folder}\" ] && echo \"{new_folder} exists: "
             f"merge by hand\" || mv \"{old_folder}\" \"{new_folder}\"")
 

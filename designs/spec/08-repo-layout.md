@@ -1,7 +1,7 @@
 # 8. Repo layout, build, conventions
 
 ```
-reelcut/
+framejob/
   CLAUDE.md           # points here; commands; the rules below
   Makefile            # app / test / lint / typecheck / project / run — Rasterize's, renamed
   project.yml         # xcodegen; macOS 26, arm64; document types below

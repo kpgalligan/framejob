@@ -18,7 +18,7 @@ name case-insensitively (`git grep -n -I -i --untracked`), and every such path
 
 An offence prints one line: `<path>:<n>: <text>`, `<path>: <found> lines,
 COUNTED pins <pinned>`, or `<path>: path holds the old name`. Standard library
-only. `designs/rename.md` is the road map.
+only. The road map is `archive/rename.md`; its condensed record `designs/adr/rename.md`.
 
 **The selftest** builds a scratch git repository under
 `tools/proof/work/name_residue/` and scores: S0 (CONTROL) a clean tree passes;
@@ -42,7 +42,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 WORK = os.path.join(ROOT, "tools", "proof", "work", "name_residue")
 NAME = "reelcut"
 
-# Kept whole: history (spec §11 NM-1) and the road map that records the rename.
+# Kept whole: history (spec §11 NM-1), the rename's road map and ADR among it.
 HISTORY = (
     "archive/",
     "designs/adr/",
@@ -51,12 +51,12 @@ HISTORY = (
     "designs/design_handoff_clip_inspector/",
     "designs/clip_inspector_brief/",
     ".dupscan/",
-    "designs/rename.md",
 )
 
-# A line one of these matches is allowed in any file: GitHub redirects an issue
-# citation after the repository's rename, archived files keep their names, and the
-# two outside paths are real until the owner's renames (designs/rename.md).
+# A line one of these matches is allowed in any file: issue citations redirect since
+# the repository's rename (2026-10-13), archived files keep their names, and the two
+# outside paths are where spec §11's append-only text recorded a past worktree, a past
+# run's file or a litecode brief.
 KEPT_PATTERNS = (
     r"kpgalligan/reelcut#\d+",
     r"archive/reelcut-[\w.-]+\.md",
@@ -93,14 +93,9 @@ COUNTED = {
     "designs/spec/03-window-layout.md": 2,
     "designs/spec/README.md": 1,
     "tools/proof/README.md": 200,
-    # -- R4 removes these: the repository's name, until the owner's rename (the release
-    # download URL, the layout's root folder).
-    "README.md": 1,
-    "designs/spec/08-repo-layout.md": 1,
     # -- Root CLAUDE.md: lines 43 and 45 name the design handoff folders (permanent, NM-1),
-    # line 260 the old proofs' ledger folder `budget.py` guards (permanent, NM-7), and
-    # line 446 is the issue-tracker line (R4 removes it).
-    "CLAUDE.md": 4,
+    # line 260 the old proofs' ledger folder `budget.py` guards (permanent, NM-7).
+    "CLAUDE.md": 3,
     # -- Permanent: the old generated paths stay ignored (every tree built before R1 holds them).
     ".gitignore": 2,
     # -- Permanent: tools that must name the old spelling to refuse it, find it, build or

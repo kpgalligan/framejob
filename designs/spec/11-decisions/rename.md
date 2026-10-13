@@ -3,15 +3,16 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map that makes these is open: `designs/rename.md` holds the inventory, the phases
-(R0 the plan, these decisions and the logo assets; R1 the code; R2 the mark and the icon; R3
-the documents; R4 the close) and each phase's record. NM-1…NM-11 were recorded in R0, before
+The road map that made these is closed: its condensed record is `designs/adr/rename.md`, and
+the original, `archive/rename.md`, holds the inventory, the phases (R0 the plan, these
+decisions and the logo assets; R1 the code; R2 the mark and the icon; R3 the documents; R4 the
+close) and each phase's record. NM-1…NM-11 were recorded in R0, before
 any rename code, from the owner's choices of 2026-10-12 ("'Reelcut' is a terrible name from a
 trademark perspective. The new name will be 'Frame Job'."): rename everything that spells
 Reelcut, `reelcut` or `REELCUT` and keep the generic `Reel*` names, `rc_` and `RC_*`; the
 spelling "Frame Job" for people and `FrameJob` / `framejob` for machines; no migration code,
 the old folders moved by hand; and now, in the worktree `~/devel/reelcut-rename`, phase by
-phase, each gated and merged into main alone (`designs/rename.md`, "The owner's choices").
+phase, each gated and merged into main alone (`archive/rename.md`, "The owner's choices").
 The new icon and mark are the owner's, in `designs/frame-job/`.
 
 **Stands, and nothing here re-litigates it:** every earlier decision. Where one names an old
@@ -71,7 +72,7 @@ workflow FILE, whose name does not change.
   the module name, which `NSDocumentClass` spells, held the same in every configuration. Risk
   accepted: a new bundle id is a new app to macOS — new defaults domains, new TCC rows, new
   Launch Services registrations; the old ones are left for the owner's hand steps
-  (`designs/rename.md`).
+  (`designs/adr/rename.md`, "Owner's hand steps").
 - **NM-4 — The folders and paths.** The support folder is `~/Library/Application Support/Frame
   Job/`, with `Rewrapped/`, `ExportPresets.json`, the spend folder's `spend.jsonl` and
   `anthropic-prices.json`, the key files `assemblyai-key` and `anthropic-key`, and the socket
@@ -109,8 +110,8 @@ workflow FILE, whose name does not change.
   names each of these. Risk accepted: the person's stored settings under the old keys are not
   read (NM-7).
 - **NM-7 — No migration code.** Nothing reads an old folder, an old defaults key or domain, or
-  the `.reelcut` extension; the owner moves what he wants kept by hand (`designs/rename.md`,
-  "The owner's hand steps"). Two guards only: (1) `tools/proof/budget.py` refuses every paid
+  the `.reelcut` extension; the owner moves what he wants kept by hand (`designs/adr/rename.md`,
+  "Owner's hand steps"). Two guards only: (1) `tools/proof/budget.py` refuses every paid
   request while `~/Library/Application Support/Reelcut Proofs/` exists, and the refusal names
   the guarded `mv`; without it P-3 and P-6's month would restart at $0 in a new ledger. It
   refuses before it creates or writes anything under `Frame Job Proofs/` — no folder, no ledger,
