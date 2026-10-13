@@ -67,9 +67,9 @@ KEPT_PATTERNS = (
 # Files that must keep some old spellings, each at its exact count of matching lines
 # not already allowed by KEPT_PATTERNS. Each comment says why and which phase ends it.
 COUNTED = {
-    # -- Permanent: spec §11's decision text is append-only, and its index keeps each
-    # decision's own title (NM-1).
-    "designs/spec/11-decisions/README.md": 22,
+    # -- Permanent: spec §11's decision text is append-only, and its index's decision rows
+    # keep each decision's own words (NM-1); the index's Files table says today's names.
+    "designs/spec/11-decisions/README.md": 18,
     "designs/spec/11-decisions/agent-connection.md": 18,
     "designs/spec/11-decisions/assistant.md": 11,
     "designs/spec/11-decisions/chrome-inspector-keys.md": 2,
@@ -87,34 +87,20 @@ COUNTED = {
     "designs/spec/11-decisions/recording.md": 24,
     "designs/spec/11-decisions/rename.md": 15,
     "designs/spec/11-decisions/word-captions.md": 6,
-    # -- R3 removes these: the documents R3 rewrites (README, CONTEXT, the rest of the
-    # spec, the manual checks, the proof README's how-to; its recorded results stay).
-    "CONTEXT.md": 1,
-    "README.md": 37,
-    "designs/spec/01-what-this-is.md": 1,
-    "designs/spec/02-six-ideas.md": 1,
+    # -- Permanent: a pointer to a path that keeps the old name (NM-1): the two design
+    # handoff folders, the spec's single file in git history, and the proof README's
+    # recorded results (its dated runs, result tables, quoted output and old-tree builds).
     "designs/spec/03-window-layout.md": 2,
-    "designs/spec/04.3b-inspector-media-document-assistant.md": 6,
-    "designs/spec/05.6-persistence.md": 2,
-    "designs/spec/06b-edit-operations-clips.md": 1,
-    "designs/spec/07.1-ffi-surface.md": 1,
-    "designs/spec/07.10-rust-module-map.md": 1,
-    "designs/spec/07.4-swift-file-map.md": 5,
-    "designs/spec/07.5-compositor.md": 11,
-    "designs/spec/07.7-import.md": 4,
-    "designs/spec/07.8-export.md": 1,
-    "designs/spec/07.9a-agent-tools.md": 6,
-    "designs/spec/07.9b-agent-lane-assistant.md": 7,
-    "designs/spec/08-repo-layout.md": 8,
-    "designs/spec/09-keys-and-menus.md": 4,
-    "designs/spec/10-milestones.md": 1,
-    "designs/spec/README.md": 2,
-    "docs/manual-checks.md": 65,
-    "tools/proof/README.md": 469,
-    # -- R3 removes these: the CLAUDE.md files, edited by the orchestrator, never an agent;
-    # root CLAUDE.md keeps its issue-tracker line until R4.
-    "CLAUDE.md": 6,
-    "app/CLAUDE.md": 3,
+    "designs/spec/README.md": 1,
+    "tools/proof/README.md": 200,
+    # -- R4 removes these: the repository's name, until the owner's rename (the release
+    # download URL, the layout's root folder).
+    "README.md": 1,
+    "designs/spec/08-repo-layout.md": 1,
+    # -- Root CLAUDE.md: lines 43 and 45 name the design handoff folders (permanent, NM-1),
+    # line 260 the old proofs' ledger folder `budget.py` guards (permanent, NM-7), and
+    # line 446 is the issue-tracker line (R4 removes it).
+    "CLAUDE.md": 4,
     # -- Permanent: the old generated paths stay ignored (every tree built before R1 holds them).
     ".gitignore": 2,
     # -- Permanent: tools that must name the old spelling to refuse it, find it, build or

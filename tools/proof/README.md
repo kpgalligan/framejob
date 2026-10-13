@@ -1,4 +1,4 @@
-# tools/proof — driving a built Reelcut over MCP, and rendering its chrome offscreen
+# tools/proof — driving a built Frame Job over MCP, and rendering its chrome offscreen
 
 `CLAUDE.md`'s "Verifying a build" is the standard: the app is verified by
 driving the built binary and comparing what it renders, not by reading
@@ -26,7 +26,7 @@ temp dir, and `LSREGISTER` is the one spelling of `lsregister`'s path. No proof
 binds the person's own socket (spec §11 MC-6). It also guards the defaults
 domain each instance shares with the owner (issue batch B83, #238): a script
 whose session moved a key outside AppKit's `NS*`/`Apple*` families ends with
-status 3 and `mcp: DEFAULTS MOVED …` last on stderr when no other Reelcut
+status 3 and `mcp: DEFAULTS MOVED …` last on stderr when no other Frame Job
 shares the domain, and only prints the line when one does.
 `harness/` is the offscreen renderer, described at the end.
 
@@ -36,6 +36,13 @@ result tables below name ports (`phase9_proof.py 4853`, `--port 4941`,
 `/tmp/reelcut-4823.log`): those are what ran then, and stay as written. Today
 a proof against a running instance takes the instance's socket path, and one
 that launches its own does so on a scratch socket.
+
+**Names in records.** The rename to Frame Job (spec §11 NM-1…NM-11) changed
+every name a proof uses, and this file's how-to says today's: the product
+paths, bundle ids, defaults keys, log lines, file names and flags. The dated
+runs, result tables, quoted output and old-tree builds below were made under
+the old name and stay as written (spec §11 NM-1): what they print is what ran
+then, and an old tree a proof builds still builds under its own name.
 
 Each `phase<N>_proof.py` makes its own projects under `work/` from test media
 under `media/`, and every claim is one of three kinds: a placement read back
@@ -64,7 +71,7 @@ Road map 7 part 1's extreme-time proof launches its own Release app and owns
 only that process. After `make app`, run
 `python3 tools/proof/extreme_time_proof.py`; `--app PATH` selects a
 matching alternate `.app` for an isolated mutation build. It writes temporary
-`.reelcut` packages, checks named refusal of oversized saved values and the
+`.framejob` packages, checks named refusal of oversized saved values and the
 next valid open in the same process, renders an admitted control, then checks
 edit rejection, undo/redo and save/reopen. Its speed rows (spec §11 R6-10,
 amended by #41) then open packages whose clip `speed` is 1e300, 1e-300,
@@ -275,12 +282,12 @@ of `tools/proof/work/e1-reference/tools/proof/harness/build.sh`, and takes
 `--reference DIR` for a copy kept somewhere else.
 
 Then launch YOUR OWN instance on YOUR OWN socket and only ever kill that one
-(`pgrep -f "MacOS/Reelcut"` lists them; another session may have one running).
+(`pgrep -f "MacOS/Frame Job"` lists them; another session may have one running).
 **A direct launch of the binary runs under the TERMINAL's grants** — road map
 3's R0 question 1, measured: TCC attributes a shell-launched
-`Reelcut.app/Contents/MacOS/Reelcut` to the terminal that launched it
+`Frame Job.app/Contents/MacOS/Frame Job` to the terminal that launched it
 (`responsibility_get_pid_responsible_for_pid` names the terminal, not
-Reelcut), so a Screen Recording or Microphone grant given to Reelcut.app in
+Frame Job), so a Screen Recording or Microphone grant given to Frame Job.app in
 System Settings never reaches a proof's instance, and the terminal's own
 grants are what `record_screen` runs under. That is why `recording_proof.py`'s
 granted tier prints whose grant it ran under. To get an instance that is
@@ -290,8 +297,8 @@ the log through `--stdout`/`--stderr`:
 
 ```sh
 d="$(mktemp -d)"; echo "$d"
-open -a ./build/Build/Products/Release/Reelcut.app --env RC_AGENT_SOCKET="$d/agent.sock" \
-   --stdout "$d/reelcut.log" --stderr "$d/reelcut.log" \
+open -a "./build/Build/Products/Release/Frame Job.app" --env RC_AGENT_SOCKET="$d/agent.sock" \
+   --stdout "$d/framejob.log" --stderr "$d/framejob.log" \
    --args -ApplePersistenceIgnoreState YES
 ```
 
@@ -347,7 +354,7 @@ python3 tools/proof/e2_chrome.py
 ```
 
 **Phase 9 takes a SECOND argument**, the log path, defaulting to
-`<dir>/reelcut.log` beside the socket — the path the launch line above writes.
+`<dir>/framejob.log` beside the socket — the path the launch line above writes.
 It is the only script that reads the log itself: the startup parity check logs
 and does not refuse, so phase 9's fourth part (every op tool declares `scope`)
 would leave a clean-looking server on the socket, and the count of scope-declaring
@@ -380,10 +387,10 @@ that puts WINDOWS on screen — its
 the thing it measures.
 
 The last line is `<n>/<n> checks passed`, and the exit status is non-zero if
-any failed. The log's `Reelcut agent socket listening at <dir>/agent.sock`
+any failed. The log's `Frame Job agent socket listening at <dir>/agent.sock`
 line says the instance is up (`not bound: <reason>` says why not), and the same
-log is where the startup parity check would complain — `grep "Reelcut: "
-<dir>/reelcut.log` must print nothing before a proof run means anything.
+log is where the startup parity check would complain — `grep "Frame Job: "
+<dir>/framejob.log` must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
@@ -1149,7 +1156,7 @@ remembered record's must come back nil (it was asked with a size ROW, and
 "Master" preset's whole record is compared field for field against what was
 saved, beside the record next to it that must not have grown one. What it proves is
 the MECHANISM under the PROBE BINARY's own `UserDefaults` domain, **not under
-Reelcut.app's** — no proof script in this tree has ever launched or terminated
+Frame Job.app's** — no proof script in this tree has ever launched or terminated
 the app, so "the sheet reopens on last time's choice after a relaunch" is not a
 sentence any of them can say. Two things it touches outside the tree it also
 puts back, and the restoration is scored as a check: the probe's defaults
@@ -1157,7 +1164,7 @@ domain is its own (`~/Library/Preferences/phase7probe.plist`, keyed on the
 executable name — measured: two runs of one binary share a domain and two
 binaries do not) and its one key is removed at the end, while
 `ExportPresetsStore` writes the REAL
-`~/Library/Application Support/Reelcut/ExportPresets.json`, because its path is
+`~/Library/Application Support/Frame Job/ExportPresets.json`, because its path is
 `AppSupport.directory`'s and `NSHomeDirectory()` ignores `$HOME` on macOS
 (measured) — so the script copies that file aside first and restores it in a
 `finally`.
@@ -1255,12 +1262,12 @@ phase 5's level meter, inherited by phase 7's export queue, inherited again
 here — so the file is two claims made with two different instruments, plus the
 one answer phase 8 did change over the wire.
 
-**It is the only script here that LAUNCHES Reelcut**, and section 1 is why.
+**It is the only script here that LAUNCHES Frame Job**, and section 1 is why.
 `PreviewQuality.stored()` reads `UserDefaults.standard`, so a quality can be
 put into a running app through the ARGUMENT DOMAIN at launch, exactly as
 `-ApplePersistenceIgnoreState` already travels. So the section starts TWO
 instances of the binary under test, each on a scratch socket (`mcp.launch`) —
-one with the key absent (Full), one with `-ReelcutPreviewQuality 2`
+one with the key absent (Full), one with `-FrameJobPreviewQuality 2`
 (Quarter) — builds the identical fixture through both, and byte-compares what
 comes out: three `render_frame` PNGs, an `apng` and a `gif` (both go through
 `ExporterImageSequence.swift`, which has no clock in it), and a `prores_422`
@@ -1333,9 +1340,9 @@ frame at one instant byte-identical.
 Its fixture is `media/A.mov`, `B.mov` and `C.mov`, all three already in the
 tree — three files rather than one because a second `import_media` of one path
 is an identity edit and is refused. `ffmpeg` is needed for the ProRes decode
-alone; `swiftc` and `core/target/release/libreelcut_core.a` for the two probes,
+alone; `swiftc` and `core/target/release/libframejob_core.a` for the two probes,
 whose binaries live in `work/phase8-probe/` and `work/phase8-player/`. Packages
-are `<name>-<pid>.reelcut`, phase 2's rule, and its exports are pid-named,
+are `<name>-<pid>.framejob`, phase 2's rule, and its exports are pid-named,
 phase 5's. Run it against a port that already holds an instance; it launches
 its own two beside it.
 
@@ -1550,7 +1557,7 @@ and a section that raised would leave every claim below it unrun.
 `media/`: `AV.mov` is the oracle's media clip (eight of the thirty-two rows
 mean nothing on a shape), `A.mov` is sections 6 and 9's media in nobody's use,
 and `B.mov` is only ever a PATH inside a paste payload. Its version packages are
-`work/phase9-v<n>.reelcut` at FIXED names, which is safe for phase 2's reason
+`work/phase9-v<n>.framejob` at FIXED names, which is safe for phase 2's reason
 inverted — they are never saved through the document machinery, only read — and
 it opens SIXTEEN documents in the instance (ten `new_project` — one per
 section that needs a clean fixture, and section 7 needs two — and six
@@ -1561,7 +1568,7 @@ grant.
 
 `media/` and `work/` are ignored: the movies are regenerable from the lines
 above and the projects are rebuilt on every run. Phase 2's packages are
-named `<name>-<pid>.reelcut` rather than `<name>.reelcut`, and each run
+named `<name>-<pid>.framejob` rather than `<name>.framejob`, and each run
 deletes the earlier ones under its name: a `project` path is matched against
 every document the instance has open, there is no tool that closes one, and
 once two earlier runs have left SAVED documents at a fixed path the app
@@ -1581,7 +1588,7 @@ is per SCRIPT rather than per phase** — the sentence that used to stand here
 said the phase needed neither device, which is true of one of its two scripts
 and false of the other. `phase7_chrome.py` needs neither: nothing IT makes is
 ever handed to a running app, because the harness and the probe are fresh
-processes that open a package off disk, so its packages (`work/p7-<name>.reelcut`)
+processes that open a package off disk, so its packages (`work/p7-<name>.framejob`)
 and everything under `work/chrome7/` keep fixed names and are rewritten on
 every run. `phase7_proof.py` keeps BOTH: it opens twelve documents in the
 running binary through `new_project`, at twelve pid-named package paths, for
@@ -1610,16 +1617,16 @@ wmo=…, link_args=…, link_inputs=…)` answers a `Built` (`binary`, `key`,
 is a folder's `*.swift` but `main.swift`, sorted.
 
 - **The line**: `xcrun swiftc [-D d]… [-O] [-whole-module-optimization | -j
-  <cores>] -sdk <sdk> -target arm64-apple-macos26.0 -module-name Reelcut
-  -import-objc-header app/Bridging/Reelcut-Bridging-Header.h -L
-  core/target/release -lreelcut_core <sources, entry last> [link args] -o
+  <cores>] -sdk <sdk> -target arm64-apple-macos26.0 -module-name FrameJob
+  -import-objc-header app/Bridging/FrameJob-Bridging-Header.h -L
+  core/target/release -lframejob_core <sources, entry last> [link args] -o
   <tmp>/link/<the caller's file name>`. A missing staticlib is refused,
   naming `cd core && cargo build --release`.
 - **The key** is a sha256 over the helper's own bytes, `swiftc --version`, the
   SDK's path and its `SDKSettings.json`, the argv (ROOT-relative, less the
   values of `-o`, `-j` and `-output-file-map`), the output's file name, the
   bytes of every source, of the bridging header and every header it reaches
-  by a quoted `#include` (`core/include/reelcut_core.h`), of the staticlib and
+  by a quoted `#include` (`core/include/framejob_core.h`), of the staticlib and
   each link input, the
   `DEVELOPER_DIR`, `SDKROOT`, `TOOLCHAINS` and `MACOSX_DEPLOYMENT_TARGET`
   variables, and the tree's own path (`#file` embeds it). Nothing about it is
@@ -1718,10 +1725,10 @@ python3 tools/proof/proof_app.py --mutant exe-marker|md-counted|exe-mtime-runnin
 
 **The choice.** `RC_PROOF_APP` is `debug` (the default since build
 velocity's phase 3, spec §11 V-4), `release` or a `.app` or executable path. Debug is `make app-debug`'s
-`build/Build/Products/Debug/Reelcut.app`: "Reelcut Debug",
-`com.kgalligan.Reelcut.debug`, its own defaults domain and an Alternate
-`.reelcut` handler (spec §11 V-5); `PRODUCT_NAME` stays `Reelcut`, so the
-bundle, `MacOS/Reelcut` and `pgrep -f "MacOS/Reelcut"` read the same, and
+`build/Build/Products/Debug/Frame Job Debug.app`: "Frame Job Debug",
+`com.kgalligan.FrameJob.debug`, its own defaults domain and an Alternate
+`.framejob` handler (spec §11 V-5, NM-3); `PRODUCT_NAME` is "Frame Job Debug", so the
+bundle is `Frame Job Debug.app` and its executable `MacOS/Frame Job Debug`; `pgrep -f "MacOS/Frame Job"` lists both apps, and
 the products folder tells the two apart. `proof_app.bundle(tree)` and
 `binary(tree)` answer the chosen product (a tree copy's own, for a copy);
 `domain()` the chosen bundle's `CFBundleIdentifier`. A proof that must run
@@ -1758,7 +1765,7 @@ python3 tools/proof/debug_release_proof.py      # T1–T6, C0, C1, Z1, Z2; exit 
 ```
 
 It launches Debug and Release twice (`proof_app.binary()`, each on a scratch
-socket and a scratch home, each with `-ReelcutPreviewQuality 0`, stopped by
+socket and a scratch home, each with `-FrameJobPreviewQuality 0`, stopped by
 pid) and builds one fixture over MCP on each under
 `work/debug-release/<side>/`: a 640×360 canvas, `media/A.mov`, a title, a
 timed word caption (highlight) and a graphic clip that moves with the frame.
@@ -1768,15 +1775,15 @@ T1 `tools/list` and T2 `get_project` parse equal (each side's folder spelled
 (`video_configuration_proof.same_movie`); T5 the bundles'
 `agent-catalog.json` parse equal — their bytes are reported, not scored,
 because two catalog writes by one Release executable differ in key order
-(Swift's per-process hash seed); T6 `perform_menu_item ["Reelcut"]` answers
-the same text (the name "Reelcut Debug" does not reach the menus). C0
+(Swift's per-process hash seed); T6 `perform_menu_item ["Frame Job"]` answers
+the same text (the name "Frame Job Debug" does not reach the menus). C0
 (CONTROL) the two Release instances' T3 renders are byte-equal; C1 one
 graphic prop changed on the Debug side alone is seen by T2's and T3's
-comparisons, then undone; Z1 no `Reelcut: ` line; Z2 each instance's defaults
+comparisons, then undone; Z1 no `Frame Job: ` line; Z2 each instance's defaults
 guard (`mcp._GUARDED`) names its own bundle's identifier.
 
 **The refusal.** `mcp.launch` and the launcher refuse a built product
-(`build/Build/Products/{Debug,Release,Distribution}/Reelcut.app`) when its
+(`build/Build/Products/Debug/Frame Job Debug.app`, `{Release,Distribution}/Frame Job.app`) when its
 `Contents/_CodeSignature/CodeResources` is missing or older than the newest
 input of its tree, naming the file, its time and the `make` target:
 
@@ -1792,7 +1799,7 @@ stderr and does not refuse. The inputs are `app/`, `agent/`, `core/src`,
 built staticlib, `docs/graphics-api.md` and `.d.ts`, the graphic templates,
 `project.yml` and `VERSION`, never `node_modules`, `target`, `build`, `.git`,
 `__pycache__`, a dot-file, the generated `app/Info.plist` and
-`app/Reelcut.entitlements`, or a `*.md` but `docs/graphics-api.md` (a
+`app/FrameJob.entitlements`, or a `*.md` but `docs/graphics-api.md` (a
 `CLAUDE.md` edit does not stale the app). There is no override variable.
 Accepted limit: an input another session edits during a build that then
 succeeds is older than the marker, so the app passes until the next edit.
@@ -1810,9 +1817,9 @@ an instance of another bundle (a script that started the app itself with
 the defaults guard moved <socket> from <old> to <new>, the bundle of pid
 <pid>; a write before this connect is not seen`). `defaults_proof.py` G6 is
 its proof (child `write-rehomed` under `RC_PROOF_APP=release`, status 3 with
-`DEFAULTS MOVED in com.kgalligan.reelcut.defaults-proof` last), and its
+`DEFAULTS MOVED in com.kgalligan.framejob.defaults-proof` last), and its
 `no-rehome` mutant fails G6 alone; R1 and R2 guard the `--app`'s own domain
-and name it. `proof_defaults.py`'s P3 refuses `com.kgalligan.Reelcut.debug`.
+and name it. `proof_defaults.py`'s P3 refuses `com.kgalligan.FrameJob.debug`.
 
 ## The gate (gate.py)
 
@@ -1901,11 +1908,11 @@ staticlib, opens a package from disk and `cacheDisplay`s the editor into a
 PNG — `harness/build.sh` builds it into `work/harness/` through
 `swift_build.py` (reused when every input is byte-identical to a cached
 build's, else compiled on every core; `--force` rebuilds; Fonts and Models
-recopied only when their digest changed) with `-D REELCUT_DEV_TOOLS`, as the
+recopied only when their digest changed) with `-D FRAMEJOB_DEV_TOOLS`, as the
 app's Debug and Release set it (road map 11 V0), so the harness links what the
 app links; each probe passes its own defines to `swift_build.build`, and most
 stay flag-off, as Distribution is — and pins every `UserDefaults` key the chrome reads — the
-persisted view state, the Document tab's `ReelcutInspectorRescaleClips`
+persisted view state, the Document tab's `FrameJobInspectorRescaleClips`
 checkbox and `AppleShowScrollBars` — in the argument domain, and captures on
 SETTLE rather than after a fixed number of runloop turns, so two renders of
 one package are byte-identical on one machine. Neither of those is what
@@ -1987,28 +1994,28 @@ never touches `.shared` or `AssemblyAIConfiguration.store()`**, and that is a
 rule rather than a convenience: `Harness.pinDefaults` REPLACES the argument
 domain a few lines earlier (`setVolatileDomain`), which wipes
 `-RCSecretFolder` and `-RCAssemblyAIEndpoint`, so after it `store()` is the
-person's real `FileStore` on `~/Library/Application Support/Reelcut/` — and
+person's real `FileStore` on `~/Library/Application Support/Frame Job/` — and
 Save and Remove in that window are exactly the code that would write and
 delete that file. The empty environment is why the photograph says "No API
 key is set." on a machine whose shell has a real `RC_ASSEMBLYAI_KEY` in it.
-`pinDefaults` also gained `ReelcutCaptionEngine` and
-`ReelcutAssemblyAIRegion`, pinned to `apple` and `us` on
-`ReelcutExportChoice`'s terms — ordinary use of the app writes both. Measured
+`pinDefaults` also gained `FrameJobCaptionEngine` and
+`FrameJobAssemblyAIRegion`, pinned to `apple` and `us` on
+`FrameJobExportChoice`'s terms — ordinary use of the app writes both. Measured
 on this host: 460 × 340 points at backing scale **1** for an offscreen
 window (the same as `welcome`'s), byte-identical across two processes in each
 appearance, light ≠ dark. Since road map 12 A2 the window has a second pane,
 Settings' Assistant pane, and the harness hands it a second `MemoryStore`;
-`pinDefaults` pins `ReelcutAssistantModel` to `""`, the pane's model field.
+`pinDefaults` pins `FrameJobAssistantModel` to `""`, the pane's model field.
 Since road map 13 P4 the pane ends with the month's spend line, which
 `show()` reads from the spend folder — and `pinDefaults`' wipe takes
 `-RCSpendFolder` too, so `AssistantSpend.folder()` would be the person's and
 the picture would hold their ledger (spec §11 P-5). The harness therefore
 hands the controller a spend folder that does not exist
-(`/nonexistent/reelcut-harness-spend`): the line is an empty month, answered
+(`/nonexistent/framejob-harness-spend`): the line is an empty month, answered
 synchronously, so two processes still render byte for byte the same. Since
 issue batch B74 the window opens with the MCP pane, which shows its helper's
 path; the harness hands it a fixed path that does not exist
-(`/nonexistent/Reelcut.app/Contents/Helpers/reelcut-mcp`), so the picture
+(`/nonexistent/Frame Job.app/Contents/Helpers/framejob-mcp`), so the picture
 never depends on where the tree is checked out and always shows the disabled
 button and the missing-helper sentence. The constructor, exactly as
 `cloud_captions_probe.py`'s hygiene section holds it:
@@ -2017,7 +2024,7 @@ button and the missing-helper sentence. The constructor, exactly as
     let settings = SettingsWindowController(
         store: { MemoryStore() }, assistantStore: { MemoryStore() }, environment: [:],
         spendFolder: { absentSpend },
-        mcpHelper: URL(fileURLWithPath: "/nonexistent/Reelcut.app/Contents/Helpers/reelcut-mcp"))
+        mcpHelper: URL(fileURLWithPath: "/nonexistent/Frame Job.app/Contents/Helpers/framejob-mcp"))
 ```
 
 The window is 460 × 780 points now (`cloud_captions_probe.py`'s row 18
@@ -2026,7 +2033,7 @@ measures it; issue batch B74).
 Road map 8's W4b took a fifth render target, in `settings`' shape:
 
 ```
-harness transcribe <project.reelcut> <out.png> <light|dark> <style> [replace 0|1]
+harness transcribe <project.framejob> <out.png> <light|dark> <style> [replace 0|1]
 ```
 
 renders the Generate Captions card (road map 8 §5e) over a package, hosted
@@ -2044,8 +2051,8 @@ domain seconds after the process exits (road map 8 §10.10). `<style>` is a
 selected, then `styleChanged:` — and `replace` sets the checkbox and sends
 `controlChanged:`. The preview is drawn off-Metal by
 `LayerRenderers.textBitmap`, so it is NOT black here the way the editor's
-preview well is. `pinDefaults` gained `ReelcutCaptionStyle`, pinned to
-`subtitles` on `ReelcutExportChoice`'s terms, and DEFENSIVE: no render reads
+preview well is. `pinDefaults` gained `FrameJobCaptionStyle`, pinned to
+`subtitles` on `FrameJobExportChoice`'s terms, and DEFENSIVE: no render reads
 it, since `transcribe` hands the card `MemoryDefaults` and no other mode
 builds the card. The arguments come after the
 render form's own count and every earlier caller's positions hold.
@@ -2092,8 +2099,8 @@ which is private. APPENDED after `expandSections`, in the shape phase 3 set,
 so every earlier chrome script's argument positions still hold — and
 `phase8_chrome.py` scores that fact out of the harness's own argument
 parsing rather than asserting it from memory. Phase 8 also added two
-`pinDefaults` keys (`ReelcutPreviewQuality` and
-`NSWindow Frame ReelcutPreviewWindow`); all six earlier chrome scripts were
+`pinDefaults` keys (`FrameJobPreviewQuality` and
+`NSWindow Frame FrameJobPreviewWindow`); all six earlier chrome scripts were
 re-run after they landed and scored 26, 33, 59, 81, 70 and 78 — exactly what
 they scored before, which is what says a pin took nothing away.
 
@@ -2212,7 +2219,7 @@ replaced by a naive `(w/divisor, h/divisor)` the 1920 × 1080 check still
 PASSES, and the six that fall are 999 × 666, 1001 × 667 and 1366 × 768. That is
 the argument for the odd canvases being in the list at all.
 
-**Section 6b is not a claim about Reelcut**, and it is here because the Media
+**Section 6b is not a claim about Frame Job**, and it is here because the Media
 pane's no-rebuild design rests on three properties of AppKit that nothing else
 in this suite would notice changing: hiding an arranged subview COLLAPSES it
 out of an `NSStackView`'s layout (four 20 pt rows at 3 pt spacing measure 89 pt,
@@ -2301,7 +2308,7 @@ standing failure names — nothing ever writes the key it reads — so that line
 cannot be falsified until the autosave defect above is fixed, and the two
 belong in one paragraph.
 
-Its packages (`work/p8-six.reelcut`, `p8-none`, `p8-usage`, `p8-dispatch`)
+Its packages (`work/p8-six.framejob`, `p8-none`, `p8-usage`, `p8-dispatch`)
 and everything under `work/chrome8/` keep fixed names and are rewritten on
 every run, `phase7_chrome.py`'s rule: nothing this script makes is ever handed
 to a running app, since the harness and the probe are fresh processes that
@@ -2323,8 +2330,8 @@ capture**: section 1 is the arithmetic that decides the render size, and that
 the player's composition actually GETS it is `phase8_proof.py`'s to say — not
 over MCP, which reaches no player, but through a probe of its own built the
 same way this file's are. And **the frame the panel would restore cannot be tested end to end**: the
-harness pins `NSWindow Frame ReelcutPreviewWindow` so no render depends on what
-the machine holds, and no script here launches or terminates Reelcut.app, so
+harness pins `NSWindow Frame FrameJobPreviewWindow` so no render depends on what
+the machine holds, and no script here launches or terminates Frame Job.app, so
 "the preview opens where it was left after a relaunch" is not a sentence any of
 them can say — phase 7's presets paragraph draws the same line.
 
@@ -2536,10 +2543,10 @@ since phase 7 that a probe compiled from `app/Sources` calls it with a table
 of names, and none did until this one. **1c**:
 `ProjectDocument.displayStem(of:)`, the title-bar stem the three panels
 (Export…, Save Frame…, Export Captions…) put an extension after, whose set
-is `{reelcut}` and NOT the caption set: nine rows, `Board v1.2.reelcut` →
+is `{framejob}` and NOT the caption set: nine rows, `Board v1.2.framejob` →
 `Board v1.2` and `talk.srt` → `talk.srt`. **1d**: the instance accessor over
 live documents — a fresh `ProjectDocument()` and one told it lives at
-`Board v1.2.reelcut` — because a static function nobody calls is not a fix.
+`Board v1.2.framejob` — because a static function nobody calls is not a fix.
 **1e** is a STRUCTURAL read, and it is there because a behavioural probe
 cannot see whether a panel's private method calls the helper: it reads the
 five function bodies out of the sources it compiled (B44 added the tool's
@@ -2852,7 +2859,7 @@ false opener leaves the plain refusal; a denied or restricted microphone
 opens its pane; a shell launch always asks and never writes the flag), and
 where the prompt and opener calls may live. Every mode runs under SEALED
 grant doors — real reads, and no prompt, no pane, no write of
-`ReelcutScreenRecordingAsked`. `--mutant <name>` prepares a copy of
+`FrameJobScreenRecordingAsked`. `--mutant <name>` prepares a copy of
 `app/Sources` and runs the whole thing over it; thirty-seven are named in the
 docstring, every one killed — the nine R2 ones at 811–875 of 876, R1's
 re-scored at 857–875, section 10's eight at 171–183 of `--only chrome,grants`'
@@ -2885,7 +2892,7 @@ tool's span waits for the voice-over's did-start (it measured 1.192 s
 before, with AirPods Max as the default input).
 
 Worth knowing: the built app is ad-hoc signed, so its designated requirement
-is its cdhash and a Screen Recording or Microphone grant given to Reelcut.app
+is its cdhash and a Screen Recording or Microphone grant given to Frame Job.app
 (the `open -a` line) is for THAT build — after a rebuild remove and re-add it,
 or answer the microphone prompt again. The proofs' direct launch never meets
 this, because it runs under the terminal's stable identity.
@@ -3096,7 +3103,7 @@ player reports. The instrument is `playhead_echo_probe.swift`, compiled as
 over another tree), `media_less_playback_probe.py`'s build line and tag
 scheme, every subprocess under `graphics_spike/bounded.py`, a build failure
 or a missing ffmpeg scoring every row as a FAILURE. It writes `card.mov`
-(an 8 s test card, ffmpeg) and `echo.reelcut` (432 × 280 at 30 fps, clip 3
+(an 8 s test card, ffmpeg) and `echo.framejob` (432 × 280 at 30 fps, clip 3
 at 0–3 s and clip 4 at 4–6 s) under `work/playhead-echo/` each run, opens
 the package in a real editor window and WRAPS the editor's
 `playback.onTimeChanged`, logging every tick before forwarding it. Each
@@ -3366,7 +3373,7 @@ catalog does with it is `clip_catalog_proof.py` below — so the instrument is
 answer for app STRUCTURE with no caller a script can reach: a probe compiled
 out of `app/Sources` over `harness/build.sh`'s own swiftc line, cached on
 modification times, a build failure scored as a FAILURE rather than an exit.
-**28/28** at D3·2 (#16). It needs `core/target/release/libreelcut_core.a` —
+**28/28** at D3·2 (#16). It needs `core/target/release/libframejob_core.a` —
 `make test` or `cd core && cargo build --release` first, or the build check
 fails naming the missing file.
 
@@ -3512,7 +3519,7 @@ the attribution section counts as used when the tool leaves it out and the
 stranger section leaves out of what a tool takes; and the opaque-door
 section counts 13 doors, reaching the two graphic ones by moving a
 `proof.js` into the untitled fixture's
-`<DARWIN_USER_TEMP_DIR>/Reelcut/*-graphics` root and pointing `set_graphic`
+`<DARWIN_USER_TEMP_DIR>/FrameJob/*-graphics` root and pointing `set_graphic`
 at the clip `add_graphic_clip` lands from it. The counts in the paragraphs
 below are the ones before G3b.
 
@@ -3765,7 +3772,7 @@ ask for `clip` too (where Transition lives), with its probe calling
 
 **Retiming by drag** — `python3 tools/proof/clip_inspector5_proof.py` (and `--mutant walls`, exit 0 when EXACTLY the six rows `MUTANT_EXPECTED` names fail — D1's five wall rows, the floored wall and the action ending at the off-grid clip end among them, and D2's abutting drop — in a copy whose `ActionDragSession.update` ignores `lowerWall` and `upperWall` — the far tick is then refused and the band stays): road map 9 phase 4's probe rows D1–D6 (the session's arithmetic — frame snap, both walls on a move, a start resize keeping the end and flooring at one frame, an end resize capped at the next action, the zero-length wall asked of an IN-MEMORY clip, both keys in every `op`, the two undo names and the three HUD strings exactly; the timeline in a real editor through `beginGesture` / `continueGesture` / `endGesture` — +1 s lands at 1.5–2.5 s, selected with the playhead at its new end, ONE "Move Action" step, one far tick abutting action 4, an end-grip resize under "Resize Action", a still press with no step, and a press inside a multi-selection collapsing it; the Clip tab's lane through synthesized events into its own mouse handlers — the same move, selection on release, one step, a bare click selecting, and the core REFUSING to open the `zero` fixture, which is why no lane can show a zero-length band; the hover and the grip rule; `hit(at:)`'s `.actionEdge` and `.action`; and the lane decor's fade, hatch and wedge geometry) and harness rows H1–H3, dark, `subTab` `picture` (deterministic twice; the `av` lane's bottom-left 10 pt lighter than the well and its bottom-right corner not; with action 1 selected and nothing hovered, the selected band's last 5 pt, lower half, its fill only). ~4 min with a probe and harness rebuild, ~5 min for the mutant; road map 9 §10 is the record.
 
-**The rest of the mode** — `python3 tools/proof/clip_inspector6_proof.py` (and `--mutant target`, exit 0 when EXACTLY K1's four routing rows fail — `op(video:)` per clip, the move session through the live edit, the nudge and the scrub — in a copy whose `CanvasEditTarget.op(video:clip:)` answers `.setVideo` always; the shape row, the text row, which routes through `op(text:)`, the start-state rows and the mouse-down capture row hold; and `--mutant live`, exit 0 when EXACTLY the capture row fails, in a copy whose `PreviewCanvasView.gestureTarget` reads the LIVE `editTarget`; and `--mutant push`, exit 0 when EXACTLY the scrub row and the capture row fail, in a copy whose `canvasPlayheadMoved` never writes `editTarget`): road map 9 phase 5's probe rows K1 (the target — `op(video:)` per clip, `start(of:in:)` at action 4's end against the base, `.base` for two clips; a `CanvasMoveSession`'s `ops(to:)` through `beginLiveEdit` / `updateLiveEdit` / `endLiveEdit` moving action 4's end and not the base, ONE step; the nudge in a real editor driven through the editor's own `selectAction(_:)`, to the end with the action and to the base without; the scrub — the editor's `setPlayhead` into action 4's span selects it and a nudge keys its end, and scrubbed back out keys it again; a move begun with no action selected and held while the playhead scrubs into that span, writing the BASE (the target captured at mouse-down); a text clip's width drag starting from its action's end width 600 and writing `set_action_end` ≈ 612; a shape's box drag staying `[set_shape, set_video]`), K2 (the Drop shadow switch's ops with action 1 selected — one `set_action_end` with `off: ["video.shadow"]`, ◆ at end, reading off, `paths(of:)` naming it — and Clear still a raw null that removes the key), K4 (the `mixed` badge on Shadow ▸ Blur and Compressor ▸ Ratio, not on their siblings), K5 (a header click's `isExpanded` and `content.isHidden` flip synchronously, animated or not) and K6 (Box ▸ Width has no row default; `ActionLaneView.refresh()` twice invalidates its cursor rects once, counted by an `NSWindow` subclass); then the BUILT app, launched by the script on port 4851 and killed by its own pid, rows K3 (`set_action_end {off}` stores the null; the frame at the action's end is BYTE-identical to the base shadow removed and differs from before; `off: ["video.opacity"]` and `["video.motion"]` are errors naming the path; `offf` is refused by the gate; no `Reelcut: ` line). K6's other two rows are dated re-measures in place: the floored wall in `clip_inspector5_probe.swift` (D1, so that proof is now 37 rows and its mutant expects the six rows `MUTANT_EXPECTED` names) and the strip shown, cleared and re-shown at an inspector 40 pt wider in `clip_inspector4_probe.swift` (R7). 25 rows (K1 ×9, K2 ×3, K4 ×2, K5 ×1, K6 ×2 in the probe, beside its build and count rows, and K3 ×6). Needs `make app` first. ~1.5 min with a probe rebuild, ~1.5 min for each mutant; road map 9 §12 is the record.
+**The rest of the mode** — `python3 tools/proof/clip_inspector6_proof.py` (and `--mutant target`, exit 0 when EXACTLY K1's four routing rows fail — `op(video:)` per clip, the move session through the live edit, the nudge and the scrub — in a copy whose `CanvasEditTarget.op(video:clip:)` answers `.setVideo` always; the shape row, the text row, which routes through `op(text:)`, the start-state rows and the mouse-down capture row hold; and `--mutant live`, exit 0 when EXACTLY the capture row fails, in a copy whose `PreviewCanvasView.gestureTarget` reads the LIVE `editTarget`; and `--mutant push`, exit 0 when EXACTLY the scrub row and the capture row fail, in a copy whose `canvasPlayheadMoved` never writes `editTarget`): road map 9 phase 5's probe rows K1 (the target — `op(video:)` per clip, `start(of:in:)` at action 4's end against the base, `.base` for two clips; a `CanvasMoveSession`'s `ops(to:)` through `beginLiveEdit` / `updateLiveEdit` / `endLiveEdit` moving action 4's end and not the base, ONE step; the nudge in a real editor driven through the editor's own `selectAction(_:)`, to the end with the action and to the base without; the scrub — the editor's `setPlayhead` into action 4's span selects it and a nudge keys its end, and scrubbed back out keys it again; a move begun with no action selected and held while the playhead scrubs into that span, writing the BASE (the target captured at mouse-down); a text clip's width drag starting from its action's end width 600 and writing `set_action_end` ≈ 612; a shape's box drag staying `[set_shape, set_video]`), K2 (the Drop shadow switch's ops with action 1 selected — one `set_action_end` with `off: ["video.shadow"]`, ◆ at end, reading off, `paths(of:)` naming it — and Clear still a raw null that removes the key), K4 (the `mixed` badge on Shadow ▸ Blur and Compressor ▸ Ratio, not on their siblings), K5 (a header click's `isExpanded` and `content.isHidden` flip synchronously, animated or not) and K6 (Box ▸ Width has no row default; `ActionLaneView.refresh()` twice invalidates its cursor rects once, counted by an `NSWindow` subclass); then the BUILT app, launched by the script on port 4851 and killed by its own pid, rows K3 (`set_action_end {off}` stores the null; the frame at the action's end is BYTE-identical to the base shadow removed and differs from before; `off: ["video.opacity"]` and `["video.motion"]` are errors naming the path; `offf` is refused by the gate; no `Frame Job: ` line). K6's other two rows are dated re-measures in place: the floored wall in `clip_inspector5_probe.swift` (D1, so that proof is now 37 rows and its mutant expects the six rows `MUTANT_EXPECTED` names) and the strip shown, cleared and re-shown at an inspector 40 pt wider in `clip_inspector4_probe.swift` (R7). 25 rows (K1 ×9, K2 ×3, K4 ×2, K5 ×1, K6 ×2 in the probe, beside its build and count rows, and K3 ×6). Needs `make app` first. ~1.5 min with a probe rebuild, ~1.5 min for each mutant; road map 9 §12 is the record.
 
 ## The reversed mirror, spelled once (`source_mirror_probe.py`)
 
@@ -4344,7 +4351,7 @@ here are measured against.
   to the no-motion card. A one-frame Fade In changes the first frame; a
   two-frame Fade Out changes the last drawn frame; undo restores the stored
   zeros and the matching PNGs. Run against an owned Release app on its own
-  socket, with an empty `rg 'Reelcut: ' <dir>/reelcut.log` parity scan.
+  socket, with an empty `rg 'Frame Job: ' <dir>/framejob.log` parity scan.
 
 `env RC_ASSEMBLYAI_KEY=proof-key python3 tools/proof/e2_chrome.py`, no socket,
 **52/52** after E2-27 (35/35 before it; 24/24 until the E2
@@ -4648,7 +4655,7 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --sources /
 ```
 
 Every run first takes the cloud instruments' lock (row L, issue batch B43):
-an exclusive `flock` on `<getconf DARWIN_USER_TEMP_DIR>/reelcut-cloud-captions.lock`,
+an exclusive `flock` on `<getconf DARWIN_USER_TEMP_DIR>/framejob-cloud-captions.lock`,
 which `cloud_captions_proof.py` and `word_captions_proof.py` take too. It
 waits up to `--lock-wait` seconds (default 3600), prints the wait, and
 starts `--wall` only once the lock is held.
@@ -4726,7 +4733,7 @@ back), `run` (`CloudProgress` over a table, then
 `CloudTranscriber.transcribe` itself against the fake — every
 `(fraction, detail)` it published, non-decreasing, inside its phase's band of
 its media's share, holding at the 0.95 point, ending at 1.0; and the
-`reelcut-upload-*` a cancelled, an errored and a 401'd run leave behind,
+`framejob-upload-*` a cancelled, an errored and a 401'd run leave behind,
 which is none, with a CONTROL that one was there while the body was going
 out), `cache_write` (all four initial-write/DELETE combinations against the
 loopback fake, a blocked cache folder, a marker-only failure, the next-run
@@ -4746,7 +4753,7 @@ the cap note's three readings, the button with and without a credential, a
 Mac with NO on-device model at all, the Settings window's rows and its Save /
 Verify / Remove through R6-9's disposable folder, the report card's lines,
 the bar as displayed, the estimate against a real RUN over two rounds, the
-Reelcut menu read off a real `AppDelegate`, `project.yml` diffed against
+Frame Job menu read off a real `AppDelegate`, `project.yml` diffed against
 pipeline 3's tree, and the Settings window PHOTOGRAPHED through the harness,
 two processes per appearance) and `hygiene` (the redaction, the language
 table, the empty run, the three files that construct a `CloudTranscriber`,
@@ -4883,18 +4890,18 @@ no tool, no schema and no op. `--binary` points at another build, and
 `--wall` (1800 s) bounds the run; each instance takes a scratch socket of its
 own (MC4 deleted `--port-base`).
 
-**Every instance is now launched `-ReelcutCaptionEngine assemblyai`**, which
+**Every instance is now launched `-FrameJobCaptionEngine assemblyai`**, which
 pins the SHEET's memory of what a person last chose to the wrong answer for a
 tool. R6-2 says an agent call reads that key never, and before c1-chrome an
 instance where it read `apple` could not tell a build that obeys R6-2 from
 one that does not. The tenth mutant,
 **`agent-reads-remembered-engine`** — the tool falling back to
-`UserDefaults`'s `ReelcutCaptionEngine` when a call named no engine — scores
+`UserDefaults`'s `FrameJobCaptionEngine` when a call named no engine — scores
 **110/115**, failing row 8's "the fake's log is EMPTY" and four of row 1's.
 
 It launches and kills **three** instances, each on its own port with a fake
 of its own on port 0, each killed by its own `Popen` pid in a `finally`, each
-with a row asserting `grep "Reelcut: "` finds nothing in its log — nothing in
+with a row asserting `grep "Frame Job: "` finds nothing in its log — nothing in
 this file ever reads `pgrep`, so another session's instance is none of its
 business.
 
@@ -4906,7 +4913,7 @@ business.
 The rows are 5i's 1–11 plus four of this pipeline's own: **H** a media over
 AssemblyAI's ten-hour limit (the duration rewritten in a SAVED package and
 the package reopened, since no op can make a media longer than its file);
-**T** no `reelcut-upload-*` surviving a cancelled, an errored or a refused
+**T** no `framejob-upload-*` surviving a cancelled, an errored or a refused
 run, with a CONTROL that one is there while the body is going out; **K** the
 dummy key in no app log, in none of the MCP answers and refusals the run
 accumulated, and in no file the run wrote; **X** no logged header or JSON
@@ -4990,7 +4997,7 @@ the app DID, not what the rows expected. Nothing deletes or truncates the
 ledger; an open or `unresolved` row from an earlier run is a FAIL and stops
 the next one before it calls. The run's ledger is a `LiveLedger`
 (`cloud_live_ledger.py`), so every reservation is ALSO made first in the
-proofs' ledger, `~/Library/Application Support/Reelcut Proofs/spend.jsonl`
+proofs' ledger, `~/Library/Application Support/Frame Job Proofs/spend.jsonl`
 (spec §11 P-6), at its worst case — the planned seconds at
 `AssemblyAIRates`' $0.21 + $0.02 an hour, read from
 `app/Sources/CloudEstimate.swift` — refused `budget:` past the month's $5
@@ -5086,13 +5093,13 @@ copy links the tree's staticlib); and `agent/` is COPIED without
 runs `make app` inside the copy with both keys POPPED and a dummy in each
 place, `RCDUMMY-makefile-env-proof-5d1c` for `RC_ASSEMBLYAI_KEY` and
 `RCDUMMY-makefile-env-proof-anthropic-9b3e` for `ANTHROPIC_API_KEY`. Then it
-searches every file under the copy's `build/` and `Reelcut.xcodeproj/`
+searches every file under the copy's `build/` and `FrameJob.xcodeproj/`
 **in process** for each dummy's bytes. It prints paths and booleans and
 nothing else; the person's own values are never read, printed or searched
 for.
 
 Four rows:
-- The copy's `make app` made `Reelcut.app`'s binary. A failed build holds
+- The copy's `make app` made `Frame Job.app`'s binary. A failed build holds
   nothing, and "no file holds the dummy" would be true of it for the wrong
   reason.
 - No process whose cwd or command line lies under the copy outlives its
@@ -5534,7 +5541,7 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
 No mutant run exited 2.
 
 **Run the two cloud instruments one after the other, never at once.** Both
-leave and look for `reelcut-upload-*` in the same `NSTemporaryDirectory()`:
+leave and look for `framejob-upload-*` in the same `NSTemporaryDirectory()`:
 a baseline run of both in parallel failed six probe rows (KL's three, R6-14's
 three cancel rows) and the proof's row T on each other's extracts. Run
 alone, the same tree scored 762/762 and 201/201. Since issue batch B43 the
@@ -5641,7 +5648,7 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only echo
 ```
 
 - **L** (all three instruments). An exclusive `flock` on
-  `<getconf DARWIN_USER_TEMP_DIR>/reelcut-cloud-captions.lock`, polled about
+  `<getconf DARWIN_USER_TEMP_DIR>/framejob-cloud-captions.lock`, polled about
   once a second for up to `--lock-wait` seconds (default 3600), holding
   `<pid> <script>` once held. The probe and the proof take it before a
   mutant is prepared or built; `word_captions_proof.py` before its binary
@@ -5896,7 +5903,7 @@ qualified against AVFoundation's physical track extent, not its original header.
 After `make app`, start a fresh owned Release app on a scratch socket with
 `RC_ASSEMBLYAI_KEY` unset and `-ApplePersistenceIgnoreState YES` (CLAUDE.md's
 launch block); verify its log names that socket and contains no
-`Reelcut: ` parity complaint. Then run
+`Frame Job: ` parity complaint. Then run
 `python3 tools/proof/peaks_proof.py <dir>/agent.sock`. The built-app checks use
 `detect_silence` and `normalize_clip` to distinguish pending corrupt audio,
 real silence and an audible clip, verify unchanged project JSON on refusal,
@@ -5950,7 +5957,7 @@ built at `-target arm64-apple-macos26.0` (the line
 takes nothing from `app/Sources`; it answers `words`, `sf`, `assets` and
 `cancel`, and it never calls `requestAuthorization` or `downloadAndInstall`.
 `text_probe.swift` is compiled AS `main.swift` over every file in
-`app/Sources` but the app's own, module `Reelcut`, at
+`app/Sources` but the app's own, module `FrameJob`, at
 `-target arm64-apple-macos15.0` — `peaks_probe.py:101-117`'s line — and
 answers `tokens`, `raster`, `stress` and `fonts`; it registers
 `app/Resources/Fonts` and the spike's own `fonts/` at `.process` scope with
@@ -6016,7 +6023,7 @@ builds; `rows_build.revert()` always runs after them and writes `git diff
 c874069 --stat -- core app` and `git status --short -- core app`, both
 empty, into `answers.json`. q7 runs last, on the app built from the reverted
 tree, launches its own instance on a scratch socket by PID and kills only that;
-`grep "Reelcut: " tools/proof/work/graphics_spike/reelcut.log` must
+`grep "Frame Job: " tools/proof/work/graphics_spike/framejob.log` must
 print nothing. q7 measures the package with `media/` as the STAND-IN for
 `graphics/`, which the unchanged app's whitelist cannot keep; the
 `graphics/` run is the CONTROL, expected absent.
@@ -6105,7 +6112,7 @@ C4 FAILED — which it can only do through C4's unclosed half, since
 **The proof.** `graphics_store_proof.py` is G0's q7 package rows against
 `graphics/` itself, with the built app: its own instance on a scratch
 socket, launched and stopped by PID, the log at
-`work/graphics-store/reelcut.log`. S2 `new_project {path}` leaves no
+`work/graphics-store/framejob.log`. S2 `new_project {path}` leaves no
 `graphics/`; S3 a `graphics/` made from outside while open is saved without
 "changed by another application"; S4 survives a relaunch and a save; S5 a
 Save As; S6 an autosave in place (15.1 s after the edit in the recorded
@@ -6132,7 +6139,7 @@ saved. The file has been changed by another application."
 
 The registry, the compositor case and the two op tools against the BUILT
 app: its own instance on a scratch socket, launched and stopped
-by PID, the log at `work/graphics/reelcut.log`, every child bounded
+by PID, the log at `work/graphics/framejob.log`, every child bounded
 and every wait a bounded poll. The modules are written outside a package and
 `mv`d into its `graphics/` from the shell. `bar.js` is the script's own —
 one rect at x = frame × 4, 100 wide, filled with `props.color`, no fonts, no
@@ -6430,7 +6437,7 @@ W3 (road map 8 §10.7) taught the app to decode format version 9's `case`,
 `words` and `word_style` and the recipe's `word` / `word_pop`, and to draw a
 timed page. Four instruments; each launches nothing and kills nothing, and
 the two MCP ones run on a FRESH instance each, with
-`grep "Reelcut: " <dir>/reelcut.log` printing nothing first.
+`grep "Frame Job: " <dir>/framejob.log` printing nothing first.
 
 ### The reveal toll, rendered (`reveal_toll_proof.py`)
 
@@ -6597,9 +6604,9 @@ and `redo` swaps back; G5 three refusals by name, the `place` one matched
 on "when place is true" (nit 4: "place" is a substring of "replace"); G6 `apple` +
 `one_word` over the `say` pangram; G7 `tools/list`; G8 `speech.mov` split
 at its midpoint, then `highlight` — no `trimmed`, no `skipped`, every page
-inside one clip — and `pill` with `replace: true`. Then `grep "Reelcut: "`
+inside one clip — and `pill` with `replace: true`. Then `grep "Frame Job: "`
 on its log. Row L (issue batch B43) comes first: G3's cloud engine writes
-`reelcut-upload-*`, so the proof takes the cloud probe's lock before it
+`framejob-upload-*`, so the proof takes the cloud probe's lock before it
 launches anything, waiting up to `--lock-wait` seconds (default 3600); an
 expired wait is a scored FAIL naming the holder, with no instance launched.
 
@@ -6675,7 +6682,7 @@ preview measured at the style's size, not the page's, S8's shrunk row) and
 `preview-redraws` (the key guard always true, S9). 80 s for the whole script
 with the harness already built (its rebuild, when `build.sh` finds it stale,
 is about 65 s more), 66 s a mutant. Afterwards `ls ~/Library/Preferences | grep -c
-"reelcut.harness.transcribe\|wordsheet-"` prints 0: neither half writes a
+"framejob.harness.transcribe\|wordsheet-"` prints 0: neither half writes a
 defaults suite.
 
 ```sh
@@ -6710,7 +6717,7 @@ swallowed; (g) the window is an `EditorWindow`; (h) (road map 12 A2) the
 Assistant tab's composer, shown by `showAssistant` — View ▸ Assistant's own
 method — and first responder, types the Space and play stays paused. For (h)
 the probe runs with a DUMMY key in a `-RCSecretFolder` of its own (so the
-composer shows), `-ReelcutInspectorCollapsed NO`, and `ANTHROPIC_API_KEY` and
+composer shows), `-FrameJobInspectorCollapsed NO`, and `ANTHROPIC_API_KEY` and
 `RC_ASSEMBLYAI_KEY` popped from its environment. The beep is not observable;
 (a) and (b) together are the claim that the window returned before
 `super.sendEvent`.
@@ -6811,11 +6818,11 @@ Not a proof: it BUILDS the three projects #56's "Graphics playing,
 WATCHED" check asks a person to play, through the
 built app's MCP tools (its own instance on port 4891, killed after), into
 `tools/proof/work/playback-check/` (ignored by git):
-- `Playback-1080p.reelcut` — 1920×1080 at 30 fps: `lower-third` (0–5 s),
+- `Playback-1080p.framejob` — 1920×1080 at 30 fps: `lower-third` (0–5 s),
   then `kinetic-type` (5–10 s);
-- `Playback-4K.reelcut` — 3840×2160 at 30 fps: `title-card` (0–4 s), then
+- `Playback-4K.framejob` — 3840×2160 at 30 fps: `title-card` (0–4 s), then
   `kinetic-type` (4–9 s), for the stutter and Activity Monitor memory rows;
-- `Error-card.reelcut` — a small module that throws from frame 60, so the
+- `Error-card.framejob` — a small module that throws from frame 60, so the
   error card shows from 2 s.
 
 Run `python3 tools/proof/graphics_playback_samples.py` after `make app`;
@@ -6827,7 +6834,7 @@ it replaces the three packages. Built 2026-09-25 at `0ade58c`, with a
 One script with three instruments (road map 10 §10.9 G5a; spec §11 G-15):
 
 - **The fixture, over MCP.** One owned instance on a scratch socket (its
-  log is `work/graphics-inspector/reelcut.log`) runs
+  log is `work/graphics-inspector/framejob.log`) runs
   `new_project`, `write_graphic six` (one schema entry of each type: a
   string whose default holds `{"}:`, a number 12–200, an unbounded number, a
   boolean, a colour defaulting to "#FF5A36", an enum and an asset; text drawn
@@ -6873,7 +6880,7 @@ Road map 10 §10.9 G5b; spec §11 G-16. Two instruments and one row:
   holds exactly the six modules of `graphic/tests/graphics/`, byte-equal
   (project.yml's "Copy Graphic Templates" script).
 - **The fixture, over MCP.** One owned instance on a scratch socket (its
-  log is `work/graphics-menu/reelcut.log`) runs
+  log is `work/graphics-menu/framejob.log`) runs
   `new_project {path: GM}` and `save_project`: a package with NO module.
 - **The probe** is compiled as `main.swift` over `app/Sources` on
   `harness/build.sh`'s swiftc line, with `app/Resources/Fonts`,
@@ -6921,10 +6928,10 @@ python3 tools/proof/graphics_proof.py         # → 40/40
 ## Road map 11's V0 — the dev tools are absent from Distribution (`dist_check.py`)
 
 `make dist` builds the Distribution configuration — Release without the
-Swift condition `REELCUT_DEV_TOOLS` (spec §11 V-1) — into
+Swift condition `FRAMEJOB_DEV_TOOLS` (spec §11 V-1) — into
 `build/Build/Products/Distribution/`, beside Release's product and never in
 it, then runs this check, and a failure fails `make`. The script reads each
-app's `Contents/MacOS/Reelcut` in process, as bytes, with the stdlib only,
+app's `Contents/MacOS/Frame Job` in process, as bytes, with the stdlib only,
 and prints the needle and both paths before its rows:
 
 - **D1** — the needle is read from `app/Sources/AgentServer+DevTools.swift`:
@@ -6950,7 +6957,7 @@ and prints the needle and both paths before its rows:
 - **D25–D27** (issue batch B88) — the Release app's entitlements, read as
   D14 reads Distribution's, are EXACTLY `audio-input` and the
   `get-task-allow` Xcode injects outside Distribution (what a Release
-  build's processed `Reelcut.app.xcent` holds, so a signature that is not
+  build's processed `Frame Job.app.xcent` holds, so a signature that is not
   Xcode's — a missing `get-task-allow` as much as a missing microphone —
   fails); and each app passes `codesign --verify --deep --strict`, the
   bundle being the one its executable `realpath`s into. A no-op build once
@@ -6998,7 +7005,7 @@ the canvas overlay (q1), a sheet put up by a menu item and the inventory of
 which menu items reach a sheet, a window or a modal run loop (q2), switching a
 live window's appearance (q3), and `hasAmbiguousLayout` plus the truncation
 heuristic in an `-O` build (q4). A probe built from `app/Sources` with
-`-O -wmo -D REELCUT_DEV_TOOLS`, six bounded modes, 38 scored rows, a digest.
+`-O -wmo -D FRAMEJOB_DEV_TOOLS`, six bounded modes, 38 scored rows, a digest.
 Its README has the rows, the build line and the output; the answers are in
 `archive/reelcut-roadmap-11.md`'s V1 record (condensed in
 `designs/adr/roadmap-11-dev-tools.md`). The W, S and A rows need the
@@ -7022,12 +7029,12 @@ python3 tools/proof/capture_spike/capture_spike.py [--only q1,q2,q3,q4] [--rebui
 
 The phase proof of the first dev tool, `snapshot_ui`, over `mcp.py`. It
 runs against the Release app launched fresh on its port with the pinned
-defaults the V2a spec's Verification lists (`-ReelcutInspectorWidth 304
--ReelcutTimelineHeight 300 -ReelcutInspectorCollapsed NO
--ReelcutSafeGuidesVisible NO -ReelcutTimelineTrackHeight 1
--ReelcutInspectorSection.text.animation '<false/>'`). Before the first MCP
+defaults the V2a spec's Verification lists (`-FrameJobInspectorWidth 304
+-FrameJobTimelineHeight 300 -FrameJobInspectorCollapsed NO
+-FrameJobSafeGuidesVisible NO -FrameJobTimelineTrackHeight 1
+-FrameJobInspectorSection.text.animation '<false/>'`). Before the first MCP
 call it:
-- writes two fixtures, `work/v2_snapshot/fixtures/{v2well,note}.reelcut`:
+- writes two fixtures, `work/v2_snapshot/fixtures/{v2well,note}.framejob`:
   V1's magenta-canvas well with a second shape at 3–6 s, and V1's note;
 - builds `v2_layout_probe.swift` over `harness/build.sh`'s swiftc line;
 - builds `v2_cover.swift`, a standalone opaque non-activating panel.
@@ -7079,7 +7086,7 @@ failed.
 
 **The cover** is at floating level over the editor window's frame. It is up
 for about a second per episode, twice a run, and each episode is bounded at
-60 s. Keep the pointer off the Reelcut window while this runs.
+60 s. Keep the pointer off the Frame Job window while this runs.
 
 **Named host skips:**
 - a locked console skips the O rows and F0;
@@ -7109,9 +7116,9 @@ plus `-RCSecretFolder "$PWD/tools/proof/work/v2_menu/secrets"` (the Settings
 window it opens then reads no real key store) and `-RCSpendFolder
 "$PWD/tools/proof/work/v2_menu/spend"` (its month line then reads no real
 spend ledger, spec §11 P-5; road map 13 P4). Before the first MCP call it:
-- writes three fixtures, `work/v2_menu/fixtures/menu_{a,b}.reelcut` (version
+- writes three fixtures, `work/v2_menu/fixtures/menu_{a,b}.framejob` (version
   10, 640×360 at 30 fps, one track, a shape at 0 s and one at 3 s) and
-  `menu_late.reelcut` (the first shape only), and deletes `fixtures/late.mov`;
+  `menu_late.framejob` (the first shape only), and deletes `fixtures/late.mov`;
   B is opened, then A, so A is the front project;
 - for the H rows, builds `v2_menu_probe.swift` over `harness/build.sh`'s swiftc
   line into `work/v2_menu/probe/`, with `graphic/tests/graphics/*.js` copied to
@@ -7138,7 +7145,7 @@ The 28 rows:
 - **N**: the live listing: an inventoried selector carries its verdict and
   refusal, every other one is `unclassified` (AppKit's injected items, printed
   as `selector ×count`), and every inventoried selector is live.
-- **D**: delivery with Reelcut inactive and B covered — the cover over B, then
+- **D**: delivery with Frame Job inactive and B covered — the cover over B, then
   Add Marker to B and to the implicit (front) project, Export… on B captured
   through `snapshot_ui window: sheet` and cancelled, and Settings… opened and
   captured. Each answer must read `active: false`.
@@ -7172,7 +7179,7 @@ The 28 rows:
   file panel refused by `snapshot_ui`) and cancelled with nothing changed;
   `cancel_sheet` with no sheet refused; and every answer of the run settled
   inside the 3 s bound with no modal window.
-- **L1** (#135), last: the late sheet. On `menu_late.reelcut` it adds a 2 s
+- **L1** (#135), last: the late sheet. On `menu_late.framejob` it adds a 2 s
   video media at `late.mov` (missing), a clip of it at 6 s, and reverses the
   clip — a missing file makes no reverse job, so no sheet (checked). It then
   writes `late.mov` as non-movie bytes and performs Add Marker: the edit's
@@ -7191,7 +7198,7 @@ with Edit ▸ Select All on its field (U3), and never Quit,
 Close, Save, Revert, Allow Agent Connections, New Recording or a Help item.
 
 **The cover** is up once a run, over B's frame, for about two seconds.
-**Named host skips:** Reelcut active skips every D row as `host: Reelcut
+**Named host skips:** Frame Job active skips every D row as `host: Frame Job
 active`, a locked console as `host: console locked`; R6 skips as `host: no
 window-list item` when AppKit put no window in the Window menu.
 
@@ -7209,7 +7216,7 @@ picture beside its prose and its layout problems — ready to attach to a design
 request.
 
 ```sh
-python3 tools/proof/screens.py [--app build/Build/Products/Release/Reelcut.app] \
+python3 tools/proof/screens.py [--app "build/Build/Products/Release/Frame Job.app"] \
     [--screens designs/screens] [--out tools/proof/work/screens/<YYYY-MM-DD-HHMMSS>] \
     [--only ID,…] [--compare EARLIER_OUT]
 ```
@@ -7225,7 +7232,7 @@ from `tools/proof/media/` and `graphic/tests/graphics/` by absolute path, the
 secret and spend folders are launch arguments, recents are off by argument,
 nothing records (so `Movies/` is never made), and `UserDefaults` is not moved
 by a scratch home (#238), so `PINS` is still what pins it; the one string a
-screen derives from the home, the recorder panel's "saved in ~/Movies/Reelcut
+screen derives from the home, the recorder panel's "saved in ~/Movies/Frame Job
 Recordings", is screen 16's `expect`. The app's
 binary with `-ApplePersistenceIgnoreState YES
 -RCSecretFolder <out>/../secrets -RCSpendFolder <out>/../spend
@@ -7266,17 +7273,17 @@ not changed).
 **The pins.** `PINS` is the offscreen harness's `pinDefaults`
 (`harness/main.swift:289-395`), as launch arguments
 (booleans and numbers as plist fragments, `<false/>`, `<real>304</real>`), plus
-`ReelcutInspectorSection.<id>` for every section id in `app/Sources`
+`FrameJobInspectorSection.<id>` for every section id in `app/Sources`
 (`SECTIONS`), each pinned to its FIRST-RUN state: collapsed unless
 `defaultExpanded`, except `audio.volume` and `clip.timing`, which
 `ClipPane.makeSections()`'s `expandByDefault` walk opens on the Sound and Clip
 sub-tabs and which any pin would stop — so those two are pinned open, and
 screens 09 and 10 `expect` a row inside each. Nothing is ever written with
 `defaults`. P2 holds the pins to the tree: the section ids in `app/Sources` are
-exactly `SECTIONS`'s, and every `static let …Key = "Reelcut…"/"RC…"` literal is
+exactly `SECTIONS`'s, and every `static let …Key = "FrameJob…"/"RC…"` literal is
 pinned or in `NOT_SHOWN` (with why no captured screen draws it), and every
 `NOT_SHOWN` key is such a literal. Road map 12 A1 added three such literals
-and A2 covered them: `ReelcutAssistantModel` is pinned `""` (Settings'
+and A2 covered them: `FrameJobAssistantModel` is pinned `""` (Settings'
 Assistant pane draws it as its model field), and `RCDevAssistantSend` /
 `RCDevAssistantReport`, the dev launch default no screen launches with, are
 `NOT_SHOWN`.
@@ -7301,8 +7308,8 @@ is pinned `apple` and the AssemblyAI endpoint is a dead loopback port.
 (`Sheets.swift:86`) — and Record asks for the Screen Recording and microphone
 grants. Showing it asks and records nothing. Since #137 (spec §11, "The
 recorder panel takes key only from an active Reelcut") `show()` makes it key
-only when Reelcut is active (`:332`); shown from the background it is ordered
-front without key (`:334`) and Reelcut stays inactive (`v3_tools.py`'s R3).
+only when Frame Job is active (`:332`); shown from the background it is ordered
+front without key (`:334`) and Frame Job stays inactive (`v3_tools.py`'s R3).
 But an instance that is ACTIVE when New Recording… runs still gets a key panel
 with Record on Return, and the script cannot hold its child inactive. So the
 path is still allowed only in the run's LAST screen (16), the captures follow
@@ -7312,7 +7319,7 @@ prints `recorder panel up (<look>): <ms> ms; active before New Recording…
 `active` read after `open_project`, before the perform) and each capture's
 `key` and `active`, unscored. With `active before … False` the captures must
 read `key False active False`; with `True` the look is the host state `host:
-Reelcut active before New Recording…`, not a failure. The panel goes up once
+Frame Job active before New Recording…`, not a failure. The panel goes up once
 per instance, so twice a run. Measured before #137: 134–140 ms over four runs
 with both looks from one instance, then 62–70 ms per instance with one capture
 each; the panel was key with Reelcut ACTIVE — putting it up brought Reelcut to
@@ -7331,7 +7338,7 @@ machines need not be.
 
 **Rows**, one line each as `<ID> <pass|fail|skip> — <reason>`: `P2` the pins;
 `P1.light` and `P1.dark` each launch (child alive, port bound, Welcome up,
-`grep "Reelcut: "` empty, the dev tools in `tools/list`, the marker count);
+`grep "Frame Job: "` empty, the dev tools in `tools/list`, the marker count);
 `P3.light` and `P3.dark` each instance's end (child alive and the log clean,
 read just before the child is stopped); one row per screen, scored after both
 looks — a pass needs both, and each look first prints an indented progress line
@@ -7414,9 +7421,9 @@ python3 tools/proof/v3_tools.py [--app APP] [--only L,T,R]   # → 8/8
   still titled `New Recording…`; the readings are printed; the instance is
   stopped and `recorder panel up` printed (56–60 ms before #137; 70 and 72 ms
   on 2026-09-29). **R3** (#137) makes no MCP call: from R2's readings, with
-  Reelcut inactive before New Recording…, the answer's `active` and the
+  Frame Job inactive before New Recording…, the answer's `active` and the
   capture's `active` and `key` must all be false. It skips by name as `host:
-  console locked` or `host: Reelcut active before New Recording…`. Against the
+  console locked` or `host: Frame Job active before New Recording…`. Against the
   build before the `show()` change (a `ditto` copy, `--app`) it FAILED —
   `active before New Recording… False; the answer's active True; the capture's
   active True key True` — and passed after it.
@@ -7431,7 +7438,7 @@ instead of refused).
 ## Road map 12's A0 — the assistant spike (`assistant_spike/`, `anthropic_fake.py`)
 
 The spike behind A1's plumbing: Rasterize's Bun helper (`agent/`, renamed
-`reelcut-agent`) built, placed in `Contents/Helpers` and signed by Rasterize's
+`framejob-agent`) built, placed in `Contents/Helpers` and signed by Rasterize's
 own build step, in a COPY of the tree under `work/assistant_spike/tree/`
 (`tree_copy.make_copy` with `agent=False`, the copy's own agent step removed
 from its `project.yml` before Rasterize's is spliced in) with a hook (`AssistantSpikeHook.swift`) that exists only there. It answers
@@ -7464,7 +7471,7 @@ probe"). It launches no app instance, reads no key and uses no media: every
 child gets the environment without `RC_ASSEMBLYAI_KEY` and
 `ANTHROPIC_API_KEY`. The probe is compiled AS `main.swift` over every file in
 `app/Sources` but the app's own `main.swift`, on `harness/build.sh`'s swiftc
-line with `-D REELCUT_DEV_TOOLS`, into `work/assistant_lane/probe/`, and
+line with `-D FRAMEJOB_DEV_TOOLS`, into `work/assistant_lane/probe/`, and
 rebuilt only when a source, the probe, the proof or the staticlib is newer
 than it (about 90 s when it is). It prints one `ANSWER {json}` line; nothing
 in it calls `start()`, and every row makes its own documents.
@@ -7570,7 +7577,7 @@ no row fails. An instrument that cannot run is a scored FAIL.
     the instructions.
 
 ```sh
-python3 tools/proof/assistant_helper_proof.py --dist build/Build/Products/Distribution/Reelcut.app  # 7/7
+python3 tools/proof/assistant_helper_proof.py --dist "build/Build/Products/Distribution/Frame Job.app"  # 7/7
 python3 tools/proof/assistant_helper_proof.py --mutant skip-without-bun  # P1 FAIL, exit 1
 python3 tools/proof/assistant_helper_proof.py --mutant no-fields         # P4 FAIL, exit 1
 ```
@@ -7597,7 +7604,7 @@ killed, with the helper children each started (named by ppid and path,
 `ps -o pid=,ppid=,comm=`, before the app goes).
 
 Launch A (a scratch socket, the scratch folder, the variable):
-- **A0**: no `Reelcut: ` line; the dev-tool marker counts
+- **A0**: no `Frame Job: ` line; the dev-tool marker counts
   `len(DEV_TOOLS)` = 6; the dev block is `DEV_TOOLS + ["import_media"]`.
 - **T1** (AI-5, AI-10): `new_project` A then B (B frontmost). A scripted
   `add_marker {at: 1200000, name: "A1 part 3"}` with no `project`, then text;
@@ -7629,13 +7636,13 @@ Launch A (a scratch socket, the scratch folder, the variable):
   its scripted marker at 2400000 lands on A; no file at P_X; the app lives.
 - **K1**: `proof-key` is in no MCP answer of launch A and nowhere in its log.
 
-Launch B, **W** (the launch default, `-ReelcutAssistantModel
+Launch B, **W** (the launch default, `-FrameJobAssistantModel
 claude-proof-model`, the folder, the variable, and a scratch socket whose
 folder is `0755`, so it logs `not bound`): the report is `ok`, `server_running` false, `finished`,
 with an `add_marker` `tool_result` `is_error` false and the marker in its
 `get_project`; the stand-in saw `GET /v1/models/claude-proof-model` and
 POSTs with that model and `proof-key`, no failures; the log has no
-`Reelcut: ` and no `agent socket listening at` line.
+`Frame Job: ` and no `agent socket listening at` line.
 
 Launch C, **K2** (AI-13: a scratch socket, NO `-RCSecretFolder`, the
 variable set): after `new_project`, `assistant_send`
@@ -7673,10 +7680,10 @@ stand-in or to a dead loopback port.
 
 **P** — `assistant_tab_probe.swift`, compiled AS `main.swift` over
 `app/Sources` minus `main.swift` on `harness/build.sh`'s swiftc line with `-D
-REELCUT_DEV_TOOLS` (a build failure fails every P row), `AgentLane.prepareAtLaunch()`
-first, the Release build's helper copied to `<probe dir>/Contents/Helpers/reelcut-agent`
+FRAMEJOB_DEV_TOOLS` (a build failure fails every P row), `AgentLane.prepareAtLaunch()`
+first, the Release build's helper copied to `<probe dir>/Contents/Helpers/framejob-agent`
 (a bare binary's `Bundle.main.bundleURL` is its own folder), run with
-`-RCSecretFolder` holding `probe-dummy-key`, `-ReelcutInspectorCollapsed NO`
+`-RCSecretFolder` holding `probe-dummy-key`, `-FrameJobInspectorCollapsed NO`
 and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
 - **P1** the transcript over a scripted event list: 16 entries exactly
   (a text run and a progress run each ONE entry, broken by any other event;
@@ -7779,7 +7786,7 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   scroller (P9's window and backdrop), light, `reload`ed with seven costs —
   none; priced 0.0018; priced 0.00002; partial 0.1234; partial 12.3456;
   unknown alone; priced 0.0123 then unknown: the `assistant.spend` label
-  shows a rung of `figureLadder` that fits its frame, ends `" · Reelcut's
+  shows a rung of `figureLadder` that fits its frame, ends `" · Frame Job's
   estimate"` once a response is counted, its tooltip `figureTooltip`; the
   row's width is the same for all seven; at 480 (the control) each shows
   `figure` exactly, fitting. (B54, #207) The probe runs with `--fonts
@@ -7791,16 +7798,16 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
 
 **Live A** (a scratch socket, `proof-key` in
 `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in,
-`-ReelcutInspectorCollapsed NO`), every turn through `assistant_send` /
+`-FrameJobInspectorCollapsed NO`), every turn through `assistant_send` /
 `assistant_answer` with `pane: true`, and the tab read back through
 `snapshot_ui`'s inspector dump by accessibility id (`assistant.*`):
-- **L0** no `Reelcut: ` line.
+- **L0** no `Frame Job: ` line.
 - **L1** `perform_menu_item View ▸ Assistant` → `select_inspector_tab {}`
   answers `assistant`; composer, Send and Clear visible, the no-key pointer
   and the question hidden; no layout problem inside the `AssistantView`.
 - **L2** a scripted `add_marker` turn typed into the composer: `finished`;
   the entries are exactly person, `add_marker (…`, the reply and the turn's
-  cost line (road map 13 P2: exactly `Cost: $0.0012 · Reelcut's estimate at
+  cost line (road map 13 P2: exactly `Cost: $0.0012 · Frame Job's estimate at
   LiteLLM prices (bundled table of <day>; not refreshed: no price cache is
   configured)`, the dollars from `prices.py`, `<day>` the local date of
   anthropic.json's `litellm_commit_date`); the composer is empty; Send reads
@@ -7816,7 +7823,7 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   nothing.
 - **L7** (#154, AI-17) `assistant_send {pane: true}` of two lines, a blank
   one and an indented one: `finished`; one `POST /v1/messages`, whose last
-  user text ends with `</reelcut_context>\n` and the text, intact; the
+  user text ends with `</framejob_context>\n` and the text, intact; the
   dump's last person entry is the text; the composer is empty; no layout
   problem in the tab.
 - **L8** (B47, #152, AI-19) a question through the pane: the dump's
@@ -7931,7 +7938,7 @@ failures counted apart), and scores an instrument that cannot run as a FAIL.
 
 **F and M** — `assistant_prompt_probe.swift`, compiled AS `main.swift` over
 `app/Sources` minus `main.swift` on `harness/build.sh`'s swiftc line with `-D
-REELCUT_DEV_TOOLS` (rebuilt only when stale; a build failure fails every
+FRAMEJOB_DEV_TOOLS` (rebuilt only when stale; a build failure fails every
 row), `AgentLane.prepareAtLaunch()` first. Its fixture is an untitled
 document edited through `AgentLane.submit` pinned to it: two `add_track`, a
 text clip "Welcome", two shapes, an action on the text clip, a marker, a
@@ -7941,7 +7948,7 @@ text clip "Welcome", two shapes, an action on the text clip, a marker, a
   whose whole is an assistant-catalog tool or whose every segment is an
   argument name (any depth of any `inputSchema`) or a key at any depth of
   the fixture's `get_project`; no snake_case word outside backticks but
-  `<reelcut_context>`; no withheld tool (the unconditional rows and the dev
+  `<framejob_context>`; no withheld tool (the unconditional rows and the dev
   tools) anywhere.
 - **F2** `ReelTime.perSecond == RC_TIMESCALE`, and the system prompt and
   `get_project`'s note both say it.
@@ -7970,7 +7977,7 @@ text clip "Welcome", two shapes, an action on the text clip, a marker, a
 scratch `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in), in a
 saved project with a 6 s text clip (a playhead is clamped to the project's
 end):
-- **S0** no `Reelcut: ` line.
+- **S0** no `Frame Job: ` line.
 - **S2** `set_playhead 2400000` and the text clip selected: turn 1's last user
   text is exactly the block (from `get_project`'s name and path) + `\n` +
   the person's text; after `set_playhead 4800000` and an empty selection,
@@ -7987,13 +7994,13 @@ end):
 FAIL (exit 1); a copy that did not build exits 2.
 
 **The evaluation** (`assistant_prompt_eval.py`, imported, never a child).
-Launch E: port 4880, `proof-key`, `-ReelcutAssistantModel claude-opus-5-5`,
+Launch E: port 4880, `proof-key`, `-FrameJobAssistantModel claude-opus-5-5`,
 `RC_ASSISTANT_BASE_URL` at the RELAY — a thread in the proof's own process
 on 127.0.0.1:0 that takes only `x-api-key: proof-key` (else 401, the value
 never logged), routes `GET /v1/models/*` and `POST /v1/messages*` only, and
 forwards with the real credential less `x-api-key`, `authorization`,
 `host`, `content-length`, `connection` and `accept-encoding`. Each row is its
-own saved project `E<n>.reelcut` (a background plate to 6 s; "Welcome" on
+own saved project `E<n>.framejob` (a background plate to 6 s; "Welcome" on
 Titles 0–3 s; a rectangle on Shapes 0–6 s; E5 nests it), judged by
 `get_project` placement only — "unchanged" is each clip's id, track, start,
 duration, kind and content:
@@ -8002,7 +8009,7 @@ duration, kind and content:
   → the fixture's markers. **E3** playhead 2400000, the title selected,
   "Split the selected clip at the playhead." → the title split at 2400000,
   every other clip unchanged. **E4** "Change the title to say Hello
-  Reelcut." → its content, timing kept. **E5** "Inside the nest, move the
+  Frame Job." → its content, timing kept. **E5** "Inside the nest, move the
   rectangle so it starts at 1 second." → the nested rectangle at 600000,
   duration kept, the nest clip unchanged. **E6** "Export this project as a
   movie to <abs>/E6.mp4." → every question denied (at most 3): no file,
@@ -8105,7 +8112,7 @@ python3 tools/proof/assistant_prompt_proof.py --live --cap 15           # spends
 
 ## Road map 12's A4 — the helper in both bundles (`dist_check.py` D6–D13, `dist_check_mutants.py`)
 
-Both bundles carry the assistant helper, `Contents/Helpers/reelcut-agent`,
+Both bundles carry the assistant helper, `Contents/Helpers/framejob-agent`,
 which `agent/build.sh helper` copies in and signs `--options runtime` with
 `agent/entitlements.plist` before Xcode signs the app. `dist_check.py` holds
 each bundle's helper to that contract, after D1–D5 and with none skipped:
@@ -8128,7 +8135,7 @@ that does not parse FAILs the row with the reason. Every child gets
 
 **Made to fail on purpose, scripted.** `dist_check_mutants.py` runs
 `dist_check.py` as a child once per case, with the mutated side a SKELETON
-bundle under `work/dist_check_mutants/<case>/`: `Contents/MacOS/Reelcut` a
+bundle under `work/dist_check_mutants/<case>/`: `Contents/MacOS/Frame Job` a
 symlink to the real app's untouched binary and the helper a COPY, mutated
 and re-signed ad hoc; nothing is written into `build/`. A case passes iff
 the FAIL ids equal its expected set exactly, the last line is
@@ -8144,7 +8151,7 @@ otherwise; a failed setup step is a scored FAIL naming it.
 | `extra-entitlement-release` / `-dist` | re-signed `--options runtime` with allow-jit plus `disable-library-validation` | D10 / D11 |
 | `no-entitlements-dist` | re-signed `--options runtime`, no entitlements | D11 |
 | `marker-release` / `-dist` | the needle written over the copy at the first `compaction_instructions`, re-signed as `build.sh` signs | D12 / D13 |
-| `app-entitlements-dist` (#145) | the whole Distribution app `ditto`ed to `<case>/dist/Reelcut.app` and re-signed ad hoc `--options runtime` with the pair it carried before B20, `audio-input` and `get-task-allow` | D14 |
+| `app-entitlements-dist` (#145) | the whole Distribution app `ditto`ed to `<case>/dist/Frame Job.app` and re-signed ad hoc `--options runtime` with the pair it carried before B20, `audio-input` and `get-task-allow` | D14 |
 | `app-entitlements-mic-only-release` (B88) | the whole Release app `ditto`ed and re-signed ad hoc `--options runtime` with `audio-input` alone | D25 |
 | `noop-sign-release` (B88) | the whole Release app `ditto`ed, its executable re-signed alone (`codesign -s - -f`, as Write Agent Catalog does), then a byte appended to `agent-catalog.json` — what a no-op build shipped before B88's fix | D25 D26 |
 | `seal-broken-dist` (B88) | the whole Distribution app `ditto`ed and a byte appended to `agent-catalog.json` | D27 |
@@ -8152,7 +8159,7 @@ otherwise; a failed setup step is a scored FAIL naming it.
 ```sh
 make dist                                                  # → dist_check: 27/27
 python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 23/23
-python3 tools/proof/dist_check.py --dist /nonexistent/Reelcut.app        # D3 D5 D7 D9 D11 D13 D14 D16 D18 D20 D22 D24 D27 FAIL, 14/27, exit 1
+python3 tools/proof/dist_check.py --dist "/nonexistent/Frame Job.app"    # D3 D5 D7 D9 D11 D13 D14 D16 D18 D20 D22 D24 D27 FAIL, 14/27, exit 1
 ```
 
 **Measured 2026-09-28**, every command as `(unset ANTHROPIC_API_KEY
@@ -8282,7 +8289,7 @@ dollar is `prices.py`'s, every expected date the local date of the instant.
   arrived between them, the next turn's fetched).
 - **L0–L2**, the Release app (`assistant_session_proof`'s `App`;
   `assistant_tab_proof`'s `Dump`, `open_tab`; ports 4897, 4898): no
-  `Reelcut: ` line; with `-RCSpendFolder` scratch and `-RCPriceFeed` local, a
+  `Frame Job: ` line; with `-RCSpendFolder` scratch and `-RCPriceFeed` local, a
   priming turn, the cache within 10 s, then a two-reply pane turn whose
   events carry `cost` only as `{type, cost, prices}` and `claude-opus-5-5`
   nowhere, one ledger line per `cost` with the listed keys only and no key or
@@ -8325,7 +8332,7 @@ $25 for Anthropic, $5 for AssemblyAI, the owner's numbers, constants in
 `budget.py` that nothing takes from a flag or the environment.
 
 **`budget.py`** (stdlib and `prices.py`) is the only writer of the proofs'
-ledger, `LEDGER` = `~/Library/Application Support/Reelcut Proofs/spend.jsonl`
+ledger, `LEDGER` = `~/Library/Application Support/Frame Job Proofs/spend.jsonl`
 — outside the repo, so it survives `rm -rf tools/proof/work` and a clone and
 every worktree shares it, and outside the app's spend folder (P-5). One JSON
 object per line, appended with one `os.write` to a file opened
@@ -8452,7 +8459,7 @@ command.
 
 ## Road map 13's P4 — spend in the UI (`spend_ui_proof.py`, `spend_ui_probe.swift`)
 
-The app shows two figures, each Reelcut's own estimate (spec §11 P-4, P-7):
+The app shows two figures, each Frame Job's own estimate (spec §11 P-4, P-7):
 the Assistant tab's Spend row, the transcript's sum of `cost` events since
 its last Clear (`AssistantTurnCost.figure`, `assistant.spend`), and Settings
 ▸ Assistant's month line, `spend.jsonl` folded over the UTC calendar month
@@ -8477,13 +8484,13 @@ popped; work in `work/spend_ui/`.
   within 5 s), then `AssistantSpend.record` → the sentence unchanged when
   `record` returns, then the new one within 5 s.
 - **U0–U3**, the Release app (`asp.App`, the stand-in; ports 4899, 4893):
-  no `Reelcut: ` line; a seeded `-RCSpendFolder` ledger (this UTC month's
+  no `Frame Job: ` line; a seeded `-RCSpendFolder` ledger (this UTC month's
   start + 1 s priced, the previous month's end − 1 s, one unpriced, one
-  torn) → Reelcut ▸ Settings… and `snapshot_ui window: settings`: the month
+  torn) → Frame Job ▸ Settings… and `snapshot_ui window: settings`: the month
   line equals the script's own Python fold and sentence, the note is exact,
   and neither label has a layout problem; the tab
   reads "Nothing yet", then after a two-reply and a one-reply pane turn
-  "$%.4f · Reelcut's estimate" of the tool-view dollars, and Settings,
+  "$%.4f · Frame Job's estimate" of the tool-view dollars, and Settings,
   re-captured (up to 5 s), equals the fold of the ledger as it now is; with
   the override and no `-RCSpendFolder`, "This launch keeps no spend
   ledger.", and the person's `spend.jsonl` and `anthropic-prices.json` keep
@@ -8528,7 +8535,7 @@ cancelling its reader (#74, spec §11 G-17). One owned instance on a
 scratch socket, launched with `-ApplePersistenceIgnoreState YES
 -RCFFmpegImport always -RCFFmpegPath
 <work>/standin/ffmpeg` and stopped by PID; work in `work/export-cancel/`,
-its log `reelcut.log` there. Every child runs under
+its log `framejob.log` there. Every child runs under
 `graphics_spike/bounded.py`. `--only gate,import,cancel` picks groups (Z1
 always runs); `--runs` (30) is M1's count.
 
@@ -8548,7 +8555,7 @@ always runs); `--runs` (30) is M1's count.
   `media/A.mov` to its last argument (the app's `.partial.mov`) and touches
   `standin/ffmpeg.exited` on exit. `import_media` of 4096 random bytes as
   `slow-<uuid hex>.mkv` answers ok after ≥ 45 s, kind `video`, 640×360, a
-  `.mov` directly inside `~/Library/Application Support/Reelcut/Rewrapped/`.
+  `.mov` directly inside `~/Library/Application Support/Frame Job/Rewrapped/`.
   Cleanup runs whatever the call answered and before the instance stops:
   it waits for `ffmpeg.exited` (120 s from the call), then for no
   `.partial.mov` (10 s), then deletes every Rewrapped entry starting
@@ -8564,11 +8571,11 @@ always runs); `--runs` (30) is M1's count.
   the phase read "Measuring loudness…", `outcome` `cancelled`, no file left.
   Prints the crash count.
 - **M2** every M1 latency (cancel to completion) ≤ 1.0 s.
-- **Z1** no `Reelcut: ` line in the launch's log.
+- **Z1** no `Frame Job: ` line in the launch's log.
 
 `export_cancel_probe.swift` is built like `graphics_proof.py`'s pin probe
 (every `app/Sources` file but `main.swift`, this file as `main.swift`,
-`harness/build.sh`'s swiftc line with `-D REELCUT_DEV_TOOLS`, `Fonts`,
+`harness/build.sh`'s swiftc line with `-D FRAMEJOB_DEV_TOOLS`, `Fonts`,
 `Blank.mp4` and a `default.metallib` beside it) into
 `work/export-cancel-probe/`, rebuilt when stale; a probe that will not build
 scores M0–M2 as FAILURES. `export_cancel_probe <package> <out.m4a>
@@ -8614,7 +8621,7 @@ kpgalligan/reelcut#59 #60 #61 #66 #68 #69. `python3
 tools/proof/editor_keys_undo_proof.py`, no port and no running app. The probe
 is compiled AS `main.swift` over `app/Sources` (`harness/build.sh`'s swiftc
 line; a build failure is a scored FAILURE) with `Compositor.metal` built
-beside it, and runs with `-ReelcutInspectorCollapsed NO` and
+beside it, and runs with `-FrameJobInspectorCollapsed NO` and
 `ANTHROPIC_API_KEY` / `RC_ASSEMBLYAI_KEY` popped. The driver writes four
 packages under `work/editor-keys-undo/`: `card` (`space_key_proof.py`'s
 fixture — a grey card 0–6 s, then `media/A.mov` as clip 3 at 6–12 s),
@@ -8654,7 +8661,7 @@ reaches another; keys are synthesized `NSEvent`s through `window.sendEvent`.
 
 `--baseline <commit>` builds the same probe over `git archive <commit>
 app/Sources` with `-D HARNESS_REFERENCE_BUILD` in
-`work/editor-keys-undo/baseline/`, linked to the CURRENT `libreelcut_core.a`
+`work/editor-keys-undo/baseline/`, linked to the CURRENT `libframejob_core.a`
 (valid while a batch changes nothing under `core/`), and exits 0 only when
 EXACTLY U1 U2 F1 F2 F3 C1 C2 C3 R1 R2 M2 D1 fail there and every control
 passes. Needs `media/A.mov` (a scored row when missing), no ffmpeg.
@@ -8675,7 +8682,7 @@ COPIED, because the build writes into them; `project.yml` and `Makefile` are
 copied; every other top-level directory `project.yml` names as `NAME/` (not
 after a name character) is a SYMLINK to the tree's, found by
 `build_inputs()` rather than listed by hand — today `core`, `docs` and
-`graphic`. `build` and `Reelcut.xcodeproj` are never linked. So the next
+`graphic`. `build` and `FrameJob.xcodeproj` are never linked. So the next
 build input a `project.yml` step reads is in every copy the day it lands.
 The builders: `makefile_env_proof.make_copy` (`work/makefile-env/tree`), the
 session, tab and prompt mutants (`work/<proof>/mutant/tree`), the cloud
@@ -8691,7 +8698,7 @@ the five inputs found and neither generated name; a copy's shape; `agent=False`
 leaves no `agent`; and the CONTROL that a `designs/` line in `project.yml`
 adds `designs`.
 
-**Copies of Reelcut.app and LaunchServices (B75, #223).** Xcode and
+**Copies of Frame Job.app and LaunchServices (B75, #223).** Xcode and
 `/usr/bin/open` register every `.app` they build or launch, and deleting the
 folder leaves the registration behind. So a proof removes a folder that can
 hold a built app through `tree_copy.remove_tree(path)`, which runs
@@ -8699,7 +8706,7 @@ hold a built app through `tree_copy.remove_tree(path)`, which runs
 `rmtree`; `make_copy` removes its `dest` the same way. A copy made by hand
 (`work/bNN/Reelcut-baseline.app`, a scratchpad copy) gets `lsregister -u`
 before it is deleted. `python3 tools/proof/stale_registrations.py` lists the
-Reelcut registrations whose path is gone (read only); `--unregister`, which
+Frame Job registrations whose path is gone (read only); `--unregister`, which
 is the owner's to run, unregisters only those, and never an existing path.
 
 The cloud mutants `silent-about-the-bill` (row B) and
@@ -8727,7 +8734,7 @@ in-order pairing and I2 reports neither; the old line pins caught it. The
 b7Probe row below is that case.
 
 **The format version (#77).** `words_core_proof.py` reads
-`RC_FORMAT_VERSION` from `core/include/reelcut_core.h`
+`RC_FORMAT_VERSION` from `core/include/framejob_core.h`
 (`CURRENT_VERSION`, `NEWER_VERSION = CURRENT + 1`); the version gate's and
 save-and-reopen's rows are built from the two.
 
@@ -8965,9 +8972,9 @@ move (#58).
   (control) checks that `cache/` exists after the open. P1 is an unedited
   plain save: `unsaved_changes: false`, and `version` is the header's.
   P2 and P3 add a marker and save to the document's own path, spelled as
-  opened (P2) or `<dir>/./<name>.reelcut` (P3): 1 marker on disk, and
+  opened (P2) or `<dir>/./<name>.framejob` (P3): 1 marker on disk, and
   `get_project`'s path is unchanged string for string. C1 is an edited
-  plain save. C2 (control) saves C1's document to `copy.reelcut`. C3
+  plain save. C2 (control) saves C1's document to `copy.framejob`. C3
   (control) saves an unedited document to its own path. N1 dirties a
   document, removes its `cache/` from outside, has `import_media` recreate
   it, and wants the plain save refused as "changed by another application"
@@ -9047,7 +9054,7 @@ nothing changes (#91). `make typecheck` falls from 7 warnings to 4.
   exits 1 only when exactly its rows fail.
 - **`video_configuration_proof.py <dir>/agent.sock capture|compare <dir>`**,
   `--mutant keep-frame-duration compare <dir>` — the caller owns the instance.
-  `target_bump_proof.py`'s `document()` as `<dir>/frames.reelcut`; over MCP
+  `target_bump_proof.py`'s `document()` as `<dir>/frames.framejob`; over MCP
   `render_frame` at its three ticks and `export` of `apng`, `gif`,
   `prores_422` at 30 fps; through the probe `prores_422` at 25 fps (the
   frame-rate override). Movies compare after zeroing `creation_time` and
@@ -9166,7 +9173,7 @@ made citations, and `baseline` set to the tree they were read against.
 
 **`export_cancel_proof.py` (#165).** The noise fixture is 60 s (was 300), M0's
 window floor 8.0 s (was 3.0), M2's bound 2.0 s (was 1.0). The probe is rebuilt
-when the bridging header or `core/include/reelcut_core.h` is newer than it,
+when the bridging header or `core/include/framejob_core.h` is newer than it,
 and says `probe: built …` or `probe: up to date …`; the summary line ends with
 the wall time. `--mutant no-loop-check` (the measurement loop's `guard
 !isCancelled` removed; M2 must FAIL) and `--mutant old-cancel` (#74's shape
@@ -9357,7 +9364,7 @@ API's order — then held open until the client closes it or
   `LEDGER_KEYS`; S6 in `spend_probe.swift` (`partial: true` in the ledger
   line and the tool view only for a JSON true — not for a complete event,
   not for `"partial": 1`; "Cost: at least $0.0004 (a response was cut
-  short) · …", "at least $0.0004 · Reelcut's estimate", the under-$0.0001
+  short) · …", "at least $0.0004 · Frame Job's estimate", the under-$0.0001
   forms, and unknown + partial equal to the unknown line and figure).
   `--mutant no-partial` (the catch's `emitCost(…, true)` deleted) and
   `--mutant keep-unpriced` (the clear after `finalMessage` deleted) run
@@ -9524,7 +9531,7 @@ its list stay open there.
   the probe gave no answer).
 - **`graphics_proof.py`** — G10 (after G7, on the open WG): `graphic_reference
   {project: WG}` answers `docs/graphics-api.md`, and `{project:
-  WORK/nowhere.reelcut}` is refused "No open project is at" (G-20 (e)); C7
+  WORK/nowhere.framejob}` is refused "No open project is at" (G-20 (e)); C7
   (on WG): `render_graphic` of frames `[0, 1, 2]` at 8192×8192 is refused
   naming 134217728 and 201326592 and writes no `c7.png`, CONTROL: `[0, 1]`,
   exactly the cap, draws and names "2 frame" (G-20 (d)); G11: on a new WS,
@@ -9575,7 +9582,7 @@ python3 tools/proof/graphics_proof.py --mutant store-uncapped
   `inUndoGroupIfRegistered`; `cut:` and `paste:` keep the eager group their
   text view's own registration needs.
 - **`speed_sheet_probe.py` (#109)** — builds `speed_sheet_probe.swift` over
-  `harness/build.sh`'s swiftc line (`-D REELCUT_DEV_TOOLS`) into
+  `harness/build.sh`'s swiftc line (`-D FRAMEJOB_DEV_TOOLS`) into
   `work/speed-sheet/` and drives the real sheet over `source_mirror_probe.py`
   §5's fixture: `SpeedSheetController(document:clips:)`, its view loaded, the
   rate set in the field whose delegate is the controller, and
@@ -9640,7 +9647,7 @@ loaded; nothing below needed it):
 - **`scope_playhead_probe.py` (#130)** — `scope_playhead_probe.swift` over
   `playhead_echo_probe.py`'s build (`--sources PATH`; a build or answer
   failure is a FAIL on every row; no ffmpeg, no port). Fixture:
-  `work/scope-playhead/scope.reelcut`, 640 × 360 at 30 fps, one track, no
+  `work/scope-playhead/scope.framejob`, 640 × 360 at 30 fps, one track, no
   clips, version `RC_FORMAT_VERSION` off the header; the probe adds shape A at
   0–1 s and B at 2–4 s and nests B into N. `Playback.rebuildHop` (nil in the
   app) HOLDS a rebuild's finishing block: the probe waits for it (≤ 10 s) and
@@ -9774,7 +9781,7 @@ and `grep "Reelcut: "` on its log printed nothing:
 ## Issue batch B23 — the canvas editor lays text out as the render does, the inspector's name fields (`text_break_proof.py`, `text_break_probe.swift`, `name_field_proof.py`, `name_field_probe.swift`, `graphics_inspector_proof.py --mutant name-height`; #117 #171)
 
 Both probes are compiled AS `main.swift` over `app/Sources` minus the app's
-`main.swift` on `harness/build.sh`'s swiftc line, `-D REELCUT_DEV_TOOLS`
+`main.swift` on `harness/build.sh`'s swiftc line, `-D FRAMEJOB_DEV_TOOLS`
 included; a probe that will not build is a scored FAILURE, a probe that dies
 scores every row it did not write as FAIL, and each calls only what HEAD
 `2e78a25` already had. `--baseline <commit>` builds the same probe over
@@ -9855,7 +9862,7 @@ Run on 2026-09-30 against HEAD0 `2e78a25`, every instance my own:
 
 `obscure_handles_probe.swift` is compiled AS `main.swift` over `app/Sources`
 minus the app's `main.swift` on `harness/build.sh`'s swiftc line
-(`-D REELCUT_DEV_TOOLS`), with `Compositor.metal` built beside it, and calls
+(`-D FRAMEJOB_DEV_TOOLS`), with `Compositor.metal` built beside it, and calls
 only what HEAD0 `ffae505` already had: a grip is found from the region's own
 box through `CanvasLayerBox.canvasPoint(source:)` and `canvasToView`, never
 through the new code. It runs `AgentLane.prepareAtLaunch()` first, with
@@ -9897,12 +9904,12 @@ against the stand-in (`--rehearse`) or the real API (`--live --cap D`),
 through `assistant_prompt_eval.py`'s relay (now with `keep_exchanges`: each
 forwarded POST's parsed body and reply bytes kept in memory, never on disk).
 The app launches on port 4883 with `-RCDevAssistantAutoCompact 1` (spec §11
-AI-18, compiled only with `REELCUT_DEV_TOOLS`), so every turn ends compacted;
+AI-18, compiled only with `FRAMEJOB_DEV_TOOLS`), so every turn ends compacted;
 the shipped threshold stays 300 000. The fixture burns ids to 71 first
 (`add_track` then `remove_empty_tracks`, pair after pair, under
 `MAX_TRACKS`), so every judged id has two digits and matches no number in the
 two messages. The rows (the runner's docstring has each in full): C0 no
-`Reelcut: ` line; C1 turn 1's three edits and a `render_frame`, by
+`Frame Job: ` line; C1 turn 1's three edits and a `render_frame`, by
 `get_project`; C2 one `compaction_started` below 300 000, then `compacted`,
 and the summary POST's 200 with stop_reason `compaction`; C3 the summary POST
 is turn 1's last and carries `{"type":"summarize","instructions": …}` with
@@ -10275,8 +10282,8 @@ python3 tools/proof/graphics_proof.py --mutant store-uncapped # exit 0
   `obscureStartList` asks `editTarget.start`.
 - **#188 item 1**: `obscure_handles_probe.swift` and `text_break_probe.swift`
   pin the split before `AppDelegate()` — an argument-domain
-  `ReelcutInspectorWidth` 304, `ReelcutTimelineHeight` 300,
-  `ReelcutInspectorCollapsed` false — and `text_break_probe` sets each
+  `FrameJobInspectorWidth` 304, `FrameJobTimelineHeight` 300,
+  `FrameJobInspectorCollapsed` false — and `text_break_probe` sets each
   window's content to 1600 × 1000 before its editor opens. F0's detail ends
   with `margin <shortest edge − 24> pt`: 23.0 pt.
 - **#188 item 4**: spec 04.2's CI-16 bullet is five lines; the file is 72
@@ -10377,21 +10384,21 @@ Run on 2026-09-30, the change over `ecdcbb0`, every instance my own:
 | `source_mirror_probe.py` | 40/40, exit 0 |
 | `v2_menu.py 4863` (fresh own instance) | 28 pass, 0 fail, 0 skip of 28, exit 0 — U3 "field editors 1 → 0 after delete; undo 'Delete' → clips 2"; `grep "Reelcut: "` printed nothing |
 
-## Include Reelcut windows — the recorder panel's checkbox and `record_screen`'s `include_reelcut_windows` (`recording_probe.py` section 14, 1f, 5d, 7c; `recording_proof.py` sections 0 and 1; spec §11 recording.md)
+## Include Frame Job windows — the recorder panel's checkbox and `record_screen`'s `include_framejob_windows` (`recording_probe.py` section 14, 1f, 5d, 7c; `recording_proof.py` sections 0 and 1; spec §11 recording.md)
 
 The rows are `recording_probe.py`'s (a probe compiled from `app/Sources`
 over `harness/build.sh`'s swiftc line; its docstring holds each row in
 full), and three are `recording_proof.py`'s.
 
 - **Section 14 `exclusion`** — its own process, the six older
-  `ReelcutRecording…` keys pinned and the seventh,
-  `ReelcutRecordingIncludeReelcutWindows`, not pinned and removed from
+  `FrameJobRecording…` keys pinned and the seventh,
+  `FrameJobRecordingIncludeFrameJobWindows`, not pinned and removed from
   `UserDefaults.standard` before and after the rows. **X1**:
   `RecordingExclusion.make` over four cases — off with a bundle → that
   bundle, no window; off with no bundle → nothing; on with the panel's
   window 42 → no bundle, window 42; on with no panel window (the tool's
   door) → nothing. **X2**: the shared panel with the key absent → the
-  checkbox off and the choice false; titled "Include Reelcut windows", its
+  checkbox off and the choice false; titled "Include Frame Job windows", its
   target the panel, its action `controlChanged:`, in the panel's window; on
   and `controlChanged` → the key true and the choice true; off with no
   action, then `restoreChoices()` → on. **X3**: disabled at
@@ -10399,25 +10406,25 @@ full), and three are `recording_proof.py`'s.
   over the comment-stripped sources: `presentPicker` sets
   `excludedBundleIDs` / `excludedWindowIDs` from `recordingExclusion(` and
   never names `Bundle.main.bundleIdentifier`; `startRecording` passes
-  `excluding:`, built from `choice.includeReelcutWindows` above the
+  `excluding:`, built from `choice.includeFrameJobWindows` above the
   `shareableContent` closure; `recordScreen` reads
-  `"include_reelcut_windows"` above `screenRecordingGranted` and passes it to
+  `"include_framejob_windows"` above `screenRecordingGranted` and passes it to
   `RecordingExclusion.make(` (with `panelWindowID: nil`) and to
   `RecordingChoice(`; `filter`'s display arm holds `excludingApplications:`
   and `excludingWindows:`.
-- **1f, 5d, 7c** — `RecordingChoice()`'s `includeReelcutWindows` is false;
+- **1f, 5d, 7c** — `RecordingChoice()`'s `includeFrameJobWindows` is false;
   the panel's row reads false and its title; `out["keys"]` lists seven, the
-  harness pins all seven by value (`"ReelcutRecordingIncludeReelcutWindows":
+  harness pins all seven by value (`"FrameJobRecordingIncludeFrameJobWindows":
   false`, a literal) and `screens.py`'s `PINS` carries it for P2;
-  `record_screen` declares `include_reelcut_windows`. Every probe mode that
+  `record_screen` declares `include_framejob_windows`. Every probe mode that
   pins the six keys pins the seventh false.
-- **`recording_proof.py`** — `include_reelcut_windows` is declared
+- **`recording_proof.py`** — `include_framejob_windows` is declared
   `boolean` (eleven arguments plus `project`), `{"seconds": 2,
-  "include_reelcut_windows": "yes"}` → `include_reelcut_windows must be true
+  "include_framejob_windows": "yes"}` → `include_framejob_windows must be true
   or false.`, and the ORDER row with `"display": 99` added answers the same
   sentence.
 - What no script reads is the PICTURE: a granted-tier pixel measurement of
-  Reelcut's windows in a recording is out of scope, and REC-11 in
+  Frame Job's windows in a recording is out of scope, and REC-11 in
   `docs/manual-checks.md` is the person's check.
 
 Mutants, each `--mutant <name> --only exclusion` (28 rows, the build row
@@ -10448,7 +10455,7 @@ An `ExportWriter` export rasterizes its graphics ahead on worker threads
 (`app/Sources/GraphicPrefetch.swift`, spec §11 G-26); the compositor stays
 the one writer and uses a worker's raster only on a pool miss whose texture
 key matches its own. The proof launches two owned instances one after the
-other, each on a scratch socket (OFF with `-ReelcutGraphicPrefetchOff YES`, ON without),
+other, each on a scratch socket (OFF with `-FrameJobGraphicPrefetchOff YES`, ON without),
 logs under `work/graphics-prefetch/`, every child under
 `graphics_spike/bounded.py`. Its fixture, made over MCP and saved: a 30 fps
 canvas; `heavy` (moving gradient, `feGaussianBlur`, an `<image>` of the
@@ -10458,7 +10465,7 @@ over a 5 s shape clip. Movies are `prores_422`, compared with
 `video_configuration_proof.py`'s `same_movie`.
 
 - **S0** CONTROL: two OFF exports masked-equal. **S1** the ON export
-  masked-equal to S0's. **S2** ON's `[reelcut] graphic prefetch: …` line:
+  masked-equal to S0's. **S2** ON's `[framejob] graphic prefetch: …` line:
   hits > 0 and ≥ 95% of hits + mismatched + missed. **S3** no such line in
   OFF's log. **S4** ON, `throw10` beside a heavy clip: `export` errors naming
   "throw10" and "frame 10", no file, the session's line within 10 s.
@@ -10468,7 +10475,7 @@ over a 5 s shape clip. Movies are `prores_422`, compared with
   [25, 1] and `start` 144 000, the movies masked-equal, ON's stderr line at
   ≥ 95% hits. The frame-rate override has no MCP argument, so this is the
   one row through `ExportWriter.videoComposition`'s variant.
-- **S6** MEASURED: OFF and ON wall seconds. **Z1** no `Reelcut: ` in any log.
+- **S6** MEASURED: OFF and ON wall seconds. **Z1** no `Frame Job: ` in any log.
 - `--mutant worker-frame-plus-one` (the worker asks `svg` for `frame + 1`)
   must fail S2; `--mutant unguarded` (that plus `take`'s texture-key
   comparison removed) must fail S1. Exit 0 caught, 1 survived, 2 control
@@ -10547,7 +10554,7 @@ session's DerivedData Reelcut was left alone):
   have it. A caller at playhead 0 runs exactly the code it ran before. The
   header's `selectAction` paragraph is reworded in its own seven lines, so
   `pinDefaults` is still at `:291`.
-- **`harness_playhead_proof.py`** builds one fixture, `hp.reelcut`: a grey
+- **`harness_playhead_proof.py`** builds one fixture, `hp.framejob`: a grey
   6 s card with action A (id 3, 0.5–1.5 s, opacity 0.5) and action B (id 4,
   2.0–3.5 s, x 100). It makes five renders (dark, 1440 × 862, size 1, Clip),
   as (select, playhead, action): `zero` (−1, 0), `two-a` and `two-b` (−1, 2),
@@ -10909,11 +10916,11 @@ AI-20 (amending AI-9 and AI-18). `python3 tools/proof/assistant_settings_proof.p
   `context-management-2025-06-27` beta; POSTs 2 and 4 with the
   `clear_tool_uses_20250919` edit (trigger 150000 input tokens, keep 5 tool
   uses, at least 50000) and the beta; POST 3 with `compaction`.
-- **CS3** — the Release app with `-ReelcutAssistantAutoCompact NO
-  -ReelcutAssistantClearToolResults YES -RCDevAssistantAutoCompact 1`: state
+- **CS3** — the Release app with `-FrameJobAssistantAutoCompact NO
+  -FrameJobAssistantClearToolResults YES -RCDevAssistantAutoCompact 1`: state
   finished, compaction events `['compaction_started', 'compacted']`, 2 POSTs,
   the first with the clear edit and the beta, the second with `compaction`;
-  `Reelcut: ` lines 0.
+  `Frame Job: ` lines 0.
 
 Mutants (each run printed its row FAIL, `caught`, exit 1):
 `fixed-settings` (`AssistantConfiguration.swift`'s `settingsJSON` reads
@@ -10926,8 +10933,8 @@ false, phase closed, entries 3 → 4`; `fixed-settings-app` (the same edit,
 `context_management null, beta False`.
 
 **`CHAT_PINS`.** `assistant_session_proof.App` now appends
-`-ReelcutAssistantAutoCompact YES -ReelcutAssistantAutoCompactTokens 300000
--ReelcutAssistantClearToolResults NO` for each key a launch does not set, so
+`-FrameJobAssistantAutoCompact YES -FrameJobAssistantAutoCompactTokens 300000
+-FrameJobAssistantClearToolResults NO` for each key a launch does not set, so
 no `App` launch (the session, tab, prompt, compaction and spend proofs, and
 the paid evals) reads the person's own chat settings. `screens.py`'s `PINS`
 and `harness/main.swift`'s `pinDefaults` pin the same three keys. The
@@ -11169,7 +11176,7 @@ A5's blocker, and has not been seen already.
 
 `menu_undo_probe.py [--sources DIR] [--mutant NAME] [--only IDS]` builds
 `menu_undo_probe.swift` with `relink_sheet_probe.py`'s swiftc line plus
-`-D REELCUT_DEV_TOOLS` and runs it once, killed at a 120 s wall, under
+`-D FRAMEJOB_DEV_TOOLS` and runs it once, killed at a 120 s wall, under
 `work/menu-undo/<tree|mutant-NAME>/`; no media. The fixture is
 `relink_sheet_probe`'s window with no media. It copies the general
 pasteboard before its Cut and puts it back only if no one else wrote it
@@ -11684,7 +11691,7 @@ python3 tools/proof/clip_inspector7_proof.py --mutant tag-frozen                
   still passed. Without the face guard, the fallback face would have passed P15.
 - **The clearing proof (#208, spec §11 AI-20).** `assistant_clearing_proof.py`
   (port 4886, `work/assistant_clearing/`) launches one Release app with
-  `-ReelcutAssistantAutoCompact NO -ReelcutAssistantClearToolResults YES`. It
+  `-FrameJobAssistantAutoCompact NO -FrameJobAssistantClearToolResults YES`. It
   points the app at `ClearingRelay`, a subclass of
   `assistant_prompt_eval.Relay`, and sends two turns through `assistant_send`
   without `pane`: "Add a marker called Alpha at 1 second." and "Add a marker
@@ -11813,7 +11820,7 @@ its line; `inventory.py --check` 5/5.
     throws for the file. S3 `placeImageBackground` of the 4×4 PNG's
     descriptor at `width = 70000` (`+AddClips` :236); the text is what
     `add_media` throws. S4 `consolidateAfterSave(didSave: true)` on
-    the document given `fileURL = work/probe.reelcut` and no media
+    the document given `fileURL = work/probe.framejob` and no media
     (`+Consolidate` :67); the text is what `MediaConsolidator.plan` throws.
   - A P1, P2 or X1 panel that does not attach within 3 s is an instrument
     failure (`instrument: panel did not attach within 3 s`), and so is an
@@ -12656,7 +12663,7 @@ again.
 ## Issue batch B71 — Settings' sections reordered, key labels named, explanations in ⓘ popovers (`settings_layout_probe.py` B0, L1–L8; spec §11 SH-5)
 
 - **`settings_layout_probe.py`** builds `settings_layout_probe.swift` with
-  `menu_undo_probe.py`'s swiftc line (no `-D REELCUT_DEV_TOOLS`) over
+  `menu_undo_probe.py`'s swiftc line (no `-D FRAMEJOB_DEV_TOOLS`) over
   `--sources`, into `work/settings-layout/`, and runs it once under a 120 s
   wall. The fixture is `SettingsWindowController` over two `MemoryStore`s,
   an empty environment, an absent spend folder and a scratch `UserDefaults`
@@ -12736,7 +12743,7 @@ fails with -11833 (no decoder) or -11855 (undecodable media data).
   its s16le audio equals the twin's export; R4 the P1 import errors with
   exactly the Profile 1 sentence and the media count holds; R5 AV1 by CPU
   brand (M1/M2: exactly the M3 sentence; M3 or later: import and R2's
-  checks; another brand skipped by name); R0 no `Reelcut: ` line. Every
+  checks; another brand skipped by name); R0 no `Frame Job: ` line. Every
   document is closed with `close_project`.
 
 Run on 2026-10-02 over `6682104` plus this batch's diff, `host: macOS 26.5.1
@@ -12790,14 +12797,14 @@ python3 tools/proof/codec_import_proof.py --port 4872 --mutant p0-as-p1   # R4 F
 
 The core indexes a WebM or Matroska file (`rc_container_*`) and
 `ContainerRewrap` copies its first video and audio stream, unchanged, into
-`~/Library/Application Support/Reelcut/Rewrapped/<stem>-<16 hex>.mov` with
+`~/Library/Application Support/Frame Job/Rewrapped/<stem>-<16 hex>.mov` with
 `AVAssetWriter`; the import funnel takes that path with no question when
 AVFoundation refuses a file that begins with an EBML header.
 
 - **`container_rewrap_probe.py [--mutant NAME]`** — makes its fixtures with
   ffmpeg (640×360 `testsrc2`, 2 s, a 440 Hz sine), builds
   `container_rewrap_probe.swift` with every `app/Sources/*.swift` but
-  `main.swift` over the harness's swiftc line (`-D REELCUT_DEV_TOOLS`), and
+  `main.swift` over the harness's swiftc line (`-D FRAMEJOB_DEV_TOOLS`), and
   calls `ContainerRewrap.rewrap` on each into its own scratch destination
   under `work/container-rewrap-probe/scratch/`, each call on its own thread
   and bounded at 60 s (a copy that has not returned is the row's `hung`).
@@ -12897,22 +12904,22 @@ its `UIMenuTable` row and its `inventory.json` entry.
   helper label ("/bin/sh", selectable, 420 wide) and the button below the
   blurb; L10 presses the button over a second controller whose helper is
   `/bin/sh` and whose pasteboard is a private named one
-  (`com.kgalligan.reelcut.settings-layout-probe`, released at exit), reads the
+  (`com.kgalligan.framejob.settings-layout-probe`, released at exit), reads the
   line back from it, and checks the general pasteboard's `changeCount` did not
-  move; L11 builds a third with `/nonexistent/reelcut-mcp` (disabled, the
+  move; L11 builds a third with `/nonexistent/framejob-mcp` (disabled, the
   missing sentence, a direct `copyClicked` writes nothing). Four new mutants
   (`mcp-last` L1, `grey-blurb` L9, `copy-unwired` L10, `always-enabled` L11);
   `order-swapped`'s anchor gained `mcpPane, `.
 - **`agent_socket_proof.py` K13** no longer touches the clipboard: on K it
-  runs `new_project`, `perform_menu_item ["Reelcut", "Settings…"]` (its
+  runs `new_project`, `perform_menu_item ["Frame Job", "Settings…"]` (its
   `windows_opened` holds `settings`) and `snapshot_ui {window: "settings"}`,
   and reads the layout dump: the heading, blurb 1, the helper path (the
-  launched bundle's resolved `Contents/Helpers/reelcut-mcp`), the button's
+  launched bundle's resolved `Contents/Helpers/framejob-mcp`), the button's
   title, their tops strictly ordered above `settings.assistant.info`, and no
   layout problem on them. `pasteboard_keep.swift` is deleted, and the proof
   no longer allows any SKIP. The `fixed-path` mutant still fails K13.
 - The harness's `settings` mode passes a fixed absent helper
-  (`/nonexistent/Reelcut.app/Contents/Helpers/reelcut-mcp`), so its picture
+  (`/nonexistent/Frame Job.app/Contents/Helpers/framejob-mcp`), so its picture
   does not depend on the checkout path; `cloud_captions_probe.py`'s hygiene
   row holds the new constructor text and row 18 is re-pinned at 460 × 780
   (measured twice, the same both times; under 800, so the window fits a
@@ -13040,7 +13047,7 @@ python3 tools/proof/agent_socket_proof.py --mutant waits-for-call
 ```
 ## Road map 14 — the MC1 spike (`mc1_spike/`)
 
-The spike behind MC2's socket and MC3's `reelcut-mcp`: whether an Xcode
+The spike behind MC2's socket and MC3's `framejob-mcp`: whether an Xcode
 script phase can write the catalog snapshot into the bundle before signing,
 in Release and Distribution, and the runtime fallback's cost (q1); what a
 background `open -n -g` launch costs and shows, cold, warm and quarantined
@@ -13075,7 +13082,7 @@ runs under `graphics_spike/bounded.py`. HTTP over AF_UNIX is a local
 `http.client.HTTPConnection` subclass (MC4 moves it to `mcp.py`). Only the
 proof's own pids are signalled; a quit is a pid-targeted quit event
 (`osascript -l JavaScript`, `NSRunningApplication…terminate`). Nothing under
-`~/Library/Application Support/Reelcut/` is created, written or unlinked:
+`~/Library/Application Support/Frame Job/` is created, written or unlinked:
 K10 only `lstat`s.
 
 - **P1** `agent_socket_probe.swift` (built like
@@ -13101,7 +13108,7 @@ K10 only `lstat`s.
 - **K10**, run only when P1 is ok: G with `RC_AGENT_PORT` and no
   `RC_AGENT_SOCKET` logs the interim rule, and the default `Agent/` folder and
   `agent.sock` `lstat` the same before the launch and after its quit.
-- **Z1** no `Reelcut: ` in any log; **Z2** no proof pid alive.
+- **Z1** no `Frame Job: ` in any log; **Z2** no proof pid alive.
 - `--mutant no-connect-first` (the `connect(2)` replaced by ECONNREFUSED;
   K4 must FAIL) and `--mutant no-mode-check` (the folder-mode statement
   removed; K8 must FAIL) build a `tree_copy.make_copy` copy by its own `make
@@ -13140,19 +13147,19 @@ Run on 2026-10-01 over `ffe5a9f` plus the MC2 change, every instance my own:
 
 ## Road map 14 — MC3, the proxy (`mcp_proxy_proof.py`)
 
-`reelcut-mcp` (`mcp-proxy/`, spec §11 MC-3, MC-4, MC-6) is the stdio MCP
-server bundled as `Contents/Helpers/reelcut-mcp`; `project.yml`'s "Write
+`framejob-mcp` (`mcp-proxy/`, spec §11 MC-3, MC-4, MC-6) is the stdio MCP
+server bundled as `Contents/Helpers/framejob-mcp`; `project.yml`'s "Write
 Agent Catalog" phase puts its snapshot, `Contents/Resources/agent-catalog.json`,
 in the bundle. The proof `ditto`s the Release app (`--app`) to
-`work/mcp-proxy/<run>/Reelcut.app` and drives that copy's proxy over stdin and
+`work/mcp-proxy/<run>/Frame Job.app` and drives that copy's proxy over stdin and
 stdout, as a client would; the copy is removed at the end unless Z1 finds an
 instance of it alive. Every socket is in its own
 `tempfile.mkdtemp(prefix="rcm-")` under `$TMPDIR`; an instance is any pid
-`pgrep -f <copy>/Contents/MacOS/Reelcut` prints, the only pids ever signalled
+`pgrep -f "<copy>/Contents/MacOS/Frame Job"` prints, the only pids ever signalled
 (SIGTERM, SIGKILL after 10 s), and "N instances" counts pids new since the row
 began. Children run without `ANTHROPIC_API_KEY`, `RC_ASSEMBLYAI_KEY`,
 `CLAUDECODE` or `CLAUDE_CODE_ENTRYPOINT`, under `graphics_spike/bounded.py`
-where not interactive. Nothing under `~/Library/Application Support/Reelcut/`
+where not interactive. Nothing under `~/Library/Application Support/Frame Job/`
 is created, written or unlinked (Z2 only `lstat`s), nothing is registered with
 a Claude client, and no model is called.
 
@@ -13161,7 +13168,7 @@ a Claude client, and no model is called.
   `listChanged: true`, the bundle's version), `ping`, `tools/list` = the
   snapshot's `tools` as JSON; 3 s later no instance and no socket file.
 - **X2** `tools/call get_project` with no instance: one instance, the app's
-  answer (no proxy sentence), the socket, and `reelcut-launch.log` beside it.
+  answer (no proxy sentence), the socket, and `framejob-launch.log` beside it.
   **X3** the proxy's forwarded `tools/list` and the proof's own
   HTTP-over-AF_UNIX one each equal the snapshot as JSON values.
 - **X4** two proxies on a fresh socket, calls released together (a
@@ -13179,10 +13186,10 @@ a Claude client, and no model is called.
   followed by `notifications/tools/list_changed`; CONTROL: none within 3 s when
   the stub lists the snapshot's tools with every object's keys reversed.
 - **X9** every stdout line of every proxy is JSON-RPC 2.0; **X10** no
-  `Reelcut: ` in any launch log; **Z1** no instance alive; **Z2** `lstat` of
+  `Frame Job: ` in any launch log; **Z1** no instance alive; **Z2** `lstat` of
   the person's `Agent/`, `agent.sock` and `agent.launch.lock` unchanged.
 - It writes `work/mcp-proxy/ac-mcp.json`, `docs/manual-checks.md` AC-3's
-  fixture: `mcpServers.reelcut` with the TREE's Release proxy as its command.
+  fixture: `mcpServers.framejob` with the TREE's Release proxy as its command.
 - `--mutant launch-on-list` (X1 must FAIL) and `--mutant no-lock` (X4 must
   FAIL) copy `mcp-proxy/` (no `target/`) and `core/src/mcp_versions.rs` into
   `work/mcp-proxy/mutant-<name>/`, replace one anchor found exactly once in
@@ -13232,7 +13239,7 @@ Run on 2026-10-01 over `ba8ed00` plus the MC3 change, every instance my own:
 The app's TCP listener, its FFI pair, `RC_AGENT_PORT`, `AgentServerEnabled`
 and MC-6's interim port rule are gone; the socket is the only listener, and
 Tools ▸ Copy MCP Command copies the `claude mcp add` line for the bundle's own
-`reelcut-mcp`. Every proof reaches an instance at its socket (`mcp.py`, above).
+`framejob-mcp`. Every proof reaches an instance at its socket (`mcp.py`, above).
 `agent_socket_proof.py` keeps MC2's P1, K0, K1, K3–K9, Z1 and Z2 — P1's cases
 are now `{}`, `{RC_AGENT_SOCKET: s}`, an empty `RC_AGENT_SOCKET` and a nil
 default; K3 reads an edit back over a second connection; an instance is ready
@@ -13245,7 +13252,7 @@ interim rule) and the `no-port-rule` mutant. It gains:
   `testsrc` Matroska (`-c:v mpeg4`, made in H's scratch folder) answers
   `isError` naming `Could not read` and `RCFFmpegImport` (the import half;
   since the merge with main, B73's copy refusal `MPEG-4 Part 2 video, which
-  Reelcut cannot copy out of a WebM or Matroska file` in place of `Could not
+  Frame Job cannot copy out of a WebM or Matroska file` in place of `Could not
   read`), and
   `open_project` of the same file answers `isError` within 20 s (the open
   half). No ffmpeg on the host is a FAIL.
@@ -13255,7 +13262,7 @@ interim rule) and the `no-port-rule` mutant. It gains:
   K's scratch folder — exit 3, a type that cannot be read back, is a SKIP and
   nothing else is done; then `new_project`, `perform_menu_item ["Tools", "Copy
   MCP Command"]` and one `pbpaste`, which must equal `mcpCommand` for the
-  launched bundle's `Contents/Helpers/reelcut-mcp`, an executable file; then
+  launched bundle's `Contents/Helpers/framejob-mcp`, an executable file; then
   `restore <file> <seen>`: 0 deletes the file, 4 (the clipboard changed
   meanwhile) is a SKIP that leaves it as it is, 5 is a FAIL. On any exit but 0
   the folder is kept and its path printed.
@@ -13265,7 +13272,7 @@ interim rule) and the `no-port-rule` mutant. It gains:
   `listening at` line), `agent-asks` (K12's import half: `AgentServer+Media`'s
   probe passes `mayAsk: true`), `open-asks` (K12's open half: `openProject`
   calls `makeDocument` outside `withoutAsking`) and `fixed-path` (K13:
-  `mcpHelperURL` is `/Applications/Reelcut.app/…`). `lsregister -u` runs on a
+  `mcpHelperURL` is `/Applications/Frame Job.app/…`). `lsregister -u` runs on a
   copy's built app before its tree is replaced and at the end of its run.
 
 ```sh
@@ -13311,11 +13318,11 @@ against TCP. What the merge changed in the proofs:
   by name (10 checks), as `--no-screen` skips section 5: a run that records
   nothing at all.
 - **`record_screen` takes twelve arguments** (B66's `source` and
-  `include_reelcut_windows`): `recording_proof.py` section 0 and
+  `include_framejob_windows`): `recording_proof.py` section 0 and
   `recording_probe.py` 7c count both, and `voice_over` refuses
-  `include_reelcut_windows` by name (`voiceOverScreenOnlyArguments`; spec §11
+  `include_framejob_windows` by name (`voiceOverScreenOnlyArguments`; spec §11
   recording.md).
-- **`recording_probe.py`**: Include Reelcut windows' section 14 became
+- **`recording_probe.py`**: Include Frame Job windows' section 14 became
   section 17 (B55's `leftout` holds 14); its `lock-drops-include` mutant now
   aims at `syncControlsEnabled()`'s screen-only list in
   `RecorderPanelController+VoiceOver.swift`, the one place the checkbox's
@@ -13827,7 +13834,7 @@ the step has; the frame check's arithmetic is the pure `onFrameGrid`.
   **Every prediction held:** each of the fourteen probe-mutant runs below is
   that mutant's FIRST run, and each printed MUTANT PASS. No set was
   corrected.
-- **`agent_open_proof.py` A8–A14** race a person's open of `a4.reelcut`
+- **`agent_open_proof.py` A8–A14** race a person's open of `a4.framejob`
   against an agent's call. The probe's controller is the app's own
   `ProjectDocumentController`, subclassed: `opens(of:)` notes an ask that
   answered above 0; the public open's override counts its entries and
@@ -14195,7 +14202,7 @@ the app sets `RC_AGENT_SOCKET`. No MCP tool writes `ExportPresets.json`.
   executes a probe binary, under `CFFIXED_USER_HOME=<work>/home` with that
   folder as the binary's second argument; before each run the home is
   removed and made again as `Library/Application Support` and nothing more,
-  so `Reelcut/Rewrapped` is the product's to make. `child_env` raises
+  so `Frame Job/Rewrapped` is the product's to make. `child_env` raises
   before anything is executed for a home that is not under the work folder.
   Row **H0** is the probe's first: where `AppSupport.subdirectory
   ("Rewrapped")` is and whether that is inside the home it was named; when
@@ -14208,9 +14215,9 @@ the app sets `RC_AGENT_SOCKET`. No MCP tool writes `ExportPresets.json`.
   first is the one looked in. It passes when H0 FAILS and nothing ran: for
   the probe, the `Rewrapped/` it answered is under the decoy, the binary
   printed no other row and nothing is under the decoy's
-  `Library/Application Support/Reelcut`; for the import proof, no tool was
+  `Library/Application Support/Frame Job`; for the import proof, no tool was
   called, and the decoy holds `Library/Application Support` and no
-  `Reelcut/Rewrapped`. Each was run before its script's baseline, as the
+  `Frame Job/Rewrapped`. Each was run before its script's baseline, as the
   changed binary's or script's first execution. No script of this batch was
   run in its HEAD form, and no rewrap probe binary, app instance or presets
   mode was executed without a scratch home.
@@ -14457,9 +14464,9 @@ among them.
 
 **The guard** (`mcp.py`). A record per socket path: the domain, its key
 names against salted digests (`proof_defaults.snapshot`, which runs
-`defaults export <domain> -` and nothing else), the Reelcut pids sharing the
+`defaults export <domain> -` and nothing else), the Frame Job pids sharing the
 domain then, and the pids the record owns. `scratch_socket()` records
-`com.kgalligan.Reelcut`; `launch()` re-records the binary's own bundle
+`com.kgalligan.FrameJob`; `launch()` re-records the binary's own bundle
 identifier before `Popen` and owns its child (a record that already owns a
 pid, a relaunch on the same socket, is compared first, so nothing is lost);
 `MCP()` records a socket that has no record, a handed one, under the domain
@@ -14475,9 +14482,9 @@ a script that never calls `remove_scratch`, leaves early by `sys.exit` or an
 exception, or was handed its socket. A moved key outside AppKit's `NS*` and
 `Apple*` families prints
 
-    mcp: DEFAULTS MOVED in <domain>: <names> (other Reelcut pids: <list|none>)
+    mcp: DEFAULTS MOVED in <domain>: <names> (other Frame Job pids: <list|none>)
 
-on stderr. When no other Reelcut shares the domain the handler reprints
+on stderr. When no other Frame Job shares the domain the handler reprints
 those lines last and ends the process with `os._exit(3)`; when one does, the
 line is all there is, because the write may be that instance's. Others are
 the sharing pids then and now, less every pid a record of this process has
@@ -14497,10 +14504,10 @@ returns are unchanged; the exit status changes in that one case.
 **What the guard does not reach.** A script killed by a signal, interrupted
 while a compare is running, or leaving by `os._exit` (none in `tools/proof`
 does); a script that never imports
-`mcp.py` (`dist_check.py`); a write by a Reelcut that started after the
+`mcp.py` (`dist_check.py`); a write by a Frame Job that started after the
 record and quit before the compare would be blamed on the script; a write
 by a script with two instances of its own alive, launched by its own
-`Popen`, counts the other as another Reelcut and only prints. When the guard
+`Popen`, counts the other as another Frame Job and only prints. When the guard
 ends a script, `os._exit` skips whatever would have run after its handler:
 an `atexit` handler registered before `mcp` was first imported, and the
 flush of any file the script still holds open. The script's own status (1 or
@@ -14509,8 +14516,8 @@ harness's writes at their source are not stopped: their domains are swept
 afterwards.
 
 **`defaults_proof.py`** proves the guard on a clone of the built app whose
-`CFBundleIdentifier` is `com.kgalligan.reelcut.defaults-proof`
-(`tools/proof/work/defaults-proof/Reelcut.app`, `cp -c -R`, removed through
+`CFBundleIdentifier` is `com.kgalligan.framejob.defaults-proof`
+(`tools/proof/work/defaults-proof/Frame Job.app`, `cp -c -R`, removed through
 `tree_copy.remove_tree`), so the write it makes on purpose, View ▸ Snapping
 through `perform_menu_item`, lands in that domain and none of the owner's.
 Each G row runs the script again as a `--child` that scores nothing and
@@ -14519,14 +14526,14 @@ ends `sys.exit(0)`; the parent scores its status and stderr.
 | Row | Child | Holds |
 |---|---|---|
 | C0 | — | the clone is made, its domain removed, it comes up with `perform_menu_item` and no parity complaint, and a bare launch moves no owner-visible key |
-| G1 | `write`: `mcp.launch(clone)`, `new_project`, View ▸ Snapping, `defaults_moved` as JSON, stop, `remove_scratch` | the JSON holds `ReelcutSnappingEnabled`; status 3; stderr's last line is `DEFAULTS MOVED` naming it and `none` |
+| G1 | `write`: `mcp.launch(clone)`, `new_project`, View ▸ Snapping, `defaults_moved` as JSON, stop, `remove_scratch` | the JSON holds `FrameJobSnappingEnabled`; status 3; stderr's last line is `DEFAULTS MOVED` naming it and `none` |
 | G2 | CONTROL `quiet`: `new_project`, `close_project` | status 0, no such line |
 | G3 | `write-no-remove`: never calls `remove_scratch` | status 3 |
 | G5 | `write`, while S2 (a second instance of the clone the parent started by `Popen` on its own folder, no `mcp` record) is alive | status 0; the line names S2's pid |
 | G4 | `write-handed`: `MCP(S2's socket)` only | status 3, and the key is among `defaults_moved` at the first reading after the call |
-| H1 (B84) | `absent-home`, with `CFFIXED_USER_HOME` naming an absent folder under the work folder: `mcp.launch(clone)`, the folder made (by the instance, else the child), `new_project`, `close_project`, stop, `remove_scratch`. The parent first seeds the CLONE's domain with `ReelcutDefaultsProofSeed` (`defaults write`, that domain only) and counts its keys | the record held as many keys as the parent counted; the home absent at the record and present at the compare; status 0, no such line |
+| H1 (B84) | `absent-home`, with `CFFIXED_USER_HOME` naming an absent folder under the work folder: `mcp.launch(clone)`, the folder made (by the instance, else the child), `new_project`, `close_project`, stop, `remove_scratch`. The parent first seeds the CLONE's domain with `FrameJobDefaultsProofSeed` (`defaults write`, that domain only) and counts its keys | the record held as many keys as the parent counted; the home absent at the record and present at the compare; status 0, no such line |
 | H2 (B84) | `home-removed`: the folder is there at the record and the child removes it after `stop()`, before `remove_scratch` | the same, the home present then absent |
-| R1 | the REAL build in this process: `mcp.launch`, `new_project`, `close_project`, stop, `remove_scratch` | no owner-visible key of `com.kgalligan.Reelcut` moved (one retry when another Reelcut shares the domain, then FAIL naming keys and pids) |
+| R1 | the REAL build in this process: `mcp.launch`, `new_project`, `close_project`, stop, `remove_scratch` | no owner-visible key of `com.kgalligan.FrameJob` moved (one retry when another Frame Job shares the domain, then FAIL naming keys and pids) |
 | R2 | — | the real domain across C0 and the G and H rows: no owner-visible key moved |
 
 `--mutant` reaches the children by argv: `no-compare`
@@ -14539,32 +14546,32 @@ export` inherits `CFFIXED_USER_HOME` as it did before) exactly H1, H2.
 `tools/proof`. `remove_domain(name)` is `defaults delete <name>` (0 and 1
 both accepted) THEN unlinking the plist. `refusal(name)` is asked first and
 names what is never acted on: the empty name, a name holding `/` or
-starting `.` or `-`, `NSGlobalDomain` and `Apple Global Domain`, `reelcut`,
-`reelcut-agent` and `reelcut-mcp`, `com.apple.*`, any name containing
-`rasterize`, and `com.kgalligan.Reelcut` in any case with its capital-R
+starting `.` or `-`, `NSGlobalDomain` and `Apple Global Domain`, `framejob`,
+`framejob-agent` and `framejob-mcp`, `com.apple.*`, any name containing
+`rasterize`, and `com.kgalligan.FrameJob` in any case with its capital-F
 namespace and any name that extends it without a dot
-(`com.kgalligan.Reelcut-Dev`, `com.kgalligan.ReelcutHelper`). A call on the real Preferences folder asks that rule a second
+(`com.kgalligan.FrameJob-Dev`, `com.kgalligan.FrameJobHelper`), each under the old name too (spec §11 NM-7). A call on the real Preferences folder asks that rule a second
 time under no mutant, and a scratch folder with no stand-in runner raises
 `ValueError`. A plist with no `refusal` is a proof's own by the first rule
 that holds: `executable` (a Mach-O of that name with an exec bit under
 `tools/proof/work`, the walk skipping `*.app`, `*.dSYM`, `node_modules`,
 `.git`, `Intermediates.noindex`, `target` and symlinks), `source` (the stem
 of a `*_probe.swift` under `tools/proof`), `prefix` (the name starts
-`com.kgalligan.reelcut.` or `reelcut.`, case-sensitive), `keys` (at least
-one key, every one starting `Reelcut`). The sweep, per owned name: `busy`
+`com.kgalligan.framejob.` or `framejob.`, or the old name's two, case-sensitive), `keys` (at least
+one key, every one starting `FrameJob` or the old name). The sweep, per owned name: `busy`
 (the plist is under 60 minutes old, a process of that basename is running,
 or one's bundle identifier is the name), read immediately before acting, is
 left and reported (for a probe the caller names with `--ran`, whose plist
-holds only `NS*`/`Apple*` keys, the age is not asked); else, with every key in `Reelcut*`, `RC*`, `NS*`,
+holds only `NS*`/`Apple*` keys, the age is not asked); else, with every key in `FrameJob*` (or the old name's), `RC*`, `NS*`,
 `Apple*` (or none), `remove_domain`; else `shared`, `defaults delete <name>
-<key>` for its `Reelcut*` keys only and the file never unlinked; a returned
+<key>` for its `FrameJob*` and old-name keys only and the file never unlinked; a returned
 reason is `denied` and is not worked around. The busy gate cannot see a
 write `cfprefsd` has not flushed from a process that already exited into a
 plist older than 60 minutes; `phase7_chrome.py`'s `defaults-write` then
 `defaults-read` is the only read-back in `tools/proof` (the designer's
 reading).
 
-The selftest's P1 and P2 are real, on `reelcut.proof-defaults-selftest.<pid>`
+The selftest's P1 and P2 are real, on `framejob.proof-defaults-selftest.<pid>`
 made with `defaults write`; P3–P9 run over scratch folders under `$TMPDIR`
 with a recording runner that executes nothing. Each refused name a file can
 bear has a plist and a Mach-O (a copy of `/usr/bin/true`) in a folder of its
@@ -14801,7 +14808,7 @@ running process of that name is still `busy`, and so is every name while
 `ps` does not answer. A probe added to `make test`
 and not named stays `busy` and is printed. P8 holds it: a fresh `NS`-only
 `ran-probe` is `busy` unnamed and removed when named, while `busy-probe`
-(fresh, `ReelcutA`) and the running sleeper stay `busy` though named.
+(fresh, `FrameJobA`) and the running sleeper stay `busy` though named.
 After that change `make test` (14:41:56 to 14:43:03, exit 0, 93 `test
 result: ok` lines) ended `passed 10/10`, then `sweep: removed 2, shared 0,
 busy 1, denied 0`: `removed assistant_lane_probe`, `removed
@@ -14830,7 +14837,7 @@ domain (`socket_pid` answering None, so `com.kgalligan.Reelcut`), or a
 snapshot that could not be taken (silence). So each child toggles up to
 three times, waiting up to 3 s each, and prints its record's domain, its
 owned pids, how many keys its first snapshot held, whether
-`ReelcutSnappingEnabled` was among them, how long the session took to open,
+`FrameJobSnappingEnabled` was among them, how long the session took to open,
 and for each toggle whether and when the key showed. A key that shows only
 at a later toggle FAILS its row (one that shows at none is said to have
 shown at none), and G4 also fails when the first reading
@@ -14838,7 +14845,7 @@ after the call lacks the key, which is what a handed script exiting at once
 would be compared on. The later toggles are an instrument and never a retry.
 For a real build the second cause leaves the domain right
 and the record owning no pid: the handed instance, alive when the record was
-made, then counts as another Reelcut, and a moved key is only printed unless
+made, then counts as another Frame Job, and a moved key is only printed unless
 `lsof` answers at the compare with the instance still up. So `MCP()` asks
 `lsof` twice and says on stderr when a socket's file is there and no pid
 holds it.
@@ -15116,7 +15123,7 @@ this section's end (`graphics_menu_proof.py`, spec §11 G-30).
   refusals in their exact sentences; N2 `undo` and `redo` of Rename Graphic
   each leaving no clip naming an absent module and the same frame bytes; N3
   H7's steps over the tools; Z1 the projects close and the log holds no
-  `Reelcut: ` line.
+  `Frame Job: ` line.
 - **The count** moved to 89 product tools: `op_argument_proof.py`'s
   `PRODUCT_TOOLS`, and the three names in `phase9_proof.py`'s,
   `recording_proof.py`'s and `recording_probe.py`'s `APP_STATE_TOOLS`.
@@ -15478,7 +15485,7 @@ between graphic clips) and 3 (HEVC with alpha) are their own pipelines.
   the dash within 1e-4 of 2π·300·1.001, the offset half of it, the dot
   within 0.05 of the quarter point; M3 `graphic_reference` holds
   `` `evolvePath(progress, d)` ``; Z1 the project closes and the log holds
-  no `Reelcut: ` line.
+  no `Frame Job: ` line.
 
 **What the runs printed** (2026-10-05, one host; the fix pass's runs, on
 the file with the finite checks).
@@ -15564,7 +15571,7 @@ onto clips drawn by the same module; never a default), and a flag,
   `op_nullability.rs` holds it as the fifth plain boolean.
 - **`paste_graphic_probe.py`** (not in `make test`: it compiles
   `app/Sources`). `paste_graphic_probe.swift` over
-  `harness/build.sh`'s swiftc line with `-D REELCUT_DEV_TOOLS`: a real
+  `harness/build.sh`'s swiftc line with `-D FRAMEJOB_DEV_TOOLS`: a real
   `EditorViewController` over an untitled document whose clips are placed
   by ops, its window the document's sheet window
   (`sheet_queue_probe.swift`'s set-up), `setActivationPolicy(.prohibited)`.
@@ -15736,7 +15743,7 @@ G1's line and on its last line (next section, "Gate A after phase B").
   among them, and `hevc_alpha` is an unknown preset that writes no file —
   so phase A moved no pixel where it acts, and the row is red on a tree that
   already fills or already lists the row (it is scored only under `--rows
-  size`). Z1 every project closes and the log holds no `Reelcut: ` line.
+  size`). Z1 every project closes and the log holds no `Frame Job: ` line.
 
 **The baseline**, `tools/proof/hevc_alpha_baseline.json`, was recorded
 twice on the build of main at 055a5ed, before any core or Swift edit
@@ -15758,7 +15765,7 @@ refuses that size.
 (fix pass 1 of phase A's review). Its cases are hardware H.264 and HEVC
 bitstreams, ffprobe's values for one of them, and ffmpeg's RGBA
 digests, so another Mac, another macOS or another ffmpeg can differ in
-every one of them with nothing wrong in Reelcut. (ffprobe's byte counts
+every one of them with nothing wrong in Frame Job. (ffprobe's byte counts
 for that file — the stream's `bit_rate`, the file's `size` and `bit_rate`
 — are held in the baseline and printed, and since fix pass 2 of phase B's
 review compared on no host, this one included: "B1 compares no byte
@@ -15778,7 +15785,7 @@ another commit or on another host than the file's starts the file over, so
 that baseline replaces the committed one in the working tree.
 `head` is the commit of the BUILD's tree, not of the checkout the script
 sits in: the recorder takes `--app`'s own work tree (`build_tree`: the app
-has to be `build/Build/Products/Release/Reelcut.app` at the top of a git
+has to be `build/Build/Products/Release/Frame Job.app` at the top of a git
 work tree), stamps that tree's `git rev-parse HEAD`, holds THAT tree's
 `core/` and `app/` to `git status`, and records nothing for a build
 anywhere else (a proof's tree copy has no `.git`). What it cannot see is a
@@ -16206,7 +16213,7 @@ python3 tools/proof/hevc_alpha_proof.py --rows size                  # 10/11, ex
 
 `.github/workflows/publish.yml` archives the Distribution configuration with a
 Developer ID identity, exports the archive (which signs the app a second
-time) and runs this over the exported `Reelcut.app` before it builds the DMG;
+time) and runs this over the exported `Frame Job.app` before it builds the DMG;
 a failed row fails the step and nothing is packed, notarized or released.
 `make dist` runs it too, after `dist_check.py`, over the local Distribution
 build and with no `--version` or `--build`, so the instrument is exercised on
@@ -16700,7 +16707,7 @@ Two instances, one after the other, each launched by the script under the
 scratch home `tools/proof/work/graphic-prop-action/home` and stopped by its
 own pid; everything it writes is under `tools/proof/work/graphic-prop-action/`,
 removed at the start and at exit. Instance 2 runs with the launch argument
-`-ReelcutGraphicPrefetchOff YES`, which lives in the volatile argument domain.
+`-FrameJobGraphicPrefetchOff YES`, which lives in the volatile argument domain.
 
 Under `--mutant` (rule R: 0 caught, 1 survived, 2 not performed) a row
 marked failed only because its fixture was never built is not a catch: the
@@ -16734,7 +16741,7 @@ clip's end takes `x: 30`. F1 P-on.mov equals P-off.mov (`same_movie`). F2 the
 one `graphic prefetch:` line instance 1 logged between the start of the
 P-on export and the start of the Q export says hits > 0 and mismatched 0
 (read from log offsets, since the Q export logs its own line); instance 2
-logs none. Z1 (CONTROL) no `Reelcut: ` line; each log's tail printed.
+logs none. Z1 (CONTROL) no `Frame Job: ` line; each log's tail printed.
 
 **Mutants** (rule R: 0 caught, 1 survived, 2 not performed; a tree copy built
 by its own `make app`, the one anchor asserted to occur once; instance 2, F1
@@ -17238,7 +17245,7 @@ are missing: the released or unresolved matte fails the frame (`unordered`).
 now draws the exact mix (issue batch B90 phase 4). The core routes it
 (`recipe_dissolve.rs`: the layer's `dissolve`, never its `transition`), and
 the app draws each half alone into a pool target and mixes the pair
-(`Compositor+Dissolve.swift`, `reelcut_dissolve_fragment`), a zoom's halves
+(`Compositor+Dissolve.swift`, `framejob_dissolve_fragment`), a zoom's halves
 scaled there about their anchors. The D rows of phase 1 now assert the exact
 mix and print the pre-fix prediction beside it, from the same fixtures.
 `matte_probe.py` Q3 and Q4 hold D0's and D8's fixtures, written by hand at
@@ -17837,7 +17844,7 @@ PR0's 6.46 from 32BGRA (three exports each, every one the same figure), so
 `frameForm` rounds `hevc`'s frame to 8 bits as it does `h264`'s.
 **M1** (`--measure`, release-only, recorded): `prores_422` exports of a
 typical and a heavy fixture at 1080p and 2160p, each on an instance of its
-own launched with `-ReelcutCompositorTiming YES`: the timing log's average
+own launched with `-FrameJobCompositorTiming YES`: the timing log's average
 and worst and the instance's lifetime `phys_footprint_peak`, beside the
 control's, with the implied extra buffers and the frame-time stop (1080p
 heavy average ≥ 8 ms). The memory is printed and recorded, not scored: the
@@ -18363,9 +18370,9 @@ CT).
 | `look-before-tone` | step 4d moved before 4c | O1 |
 | `amount-ignored` | `apply(look:)` writes `lookAmount` 1 | M1 A1 U2 L3 |
 | `ungraded-keeps-look` | the `ungraded` option keeps the look | U1 CT |
-| `adjustment-ignores-look` | `reelcut_adjust_fragment` has no step 4d | J1 |
+| `adjustment-ignores-look` | `framejob_adjust_fragment` has no step 4d | J1 |
 | `amount-range-dropped` | `check_video`'s look amount range check removed | R1 CT |
-| `split-ignored` | `reelcut_look_bake` skips the split tone | L5 |
+| `split-ignored` | `framejob_look_bake` skips the split tone | L5 |
 | `kindless-look-kept` | `evaluate_clip`'s look guard removed | CT |
 | `kind-drops-amount` | `LookGallery.op` adds amount 1 | G1 LM1 B3 B4 |
 | `menu-no-dash` | the validator's `.mixed` becomes `.off` | B2 |
@@ -18397,7 +18404,7 @@ note, and a bare `add_media {path, kind: lut}`; R1 every refusal file (size
 200, 1D, a domain, an input range, an unknown keyword, a keyword after the
 table, a short table, a word, `nan`, a two-number row, no size, a second size,
 a short DOMAIN_MAX, binary bytes, 32 MiB + 1) answered as `“NAME.cube” is not a
-LUT Reelcut reads: <the core's sentence>.`; R2 the accepted variants; N1 an
+LUT Frame Job reads: <the core's sentence>.`; R2 the accepted variants; N1 an
 identity of 2, 33 and 65 is the neutral bytes; S1 a channel swap of each size
 is every sample's (g, b, r) exactly; A1 half of it is the midpoint ±1; F1 three
 smooth LUTs (17, 33, 65) within ±2 of ffmpeg's trilinear `lut3d` on the same
@@ -18498,7 +18505,7 @@ timed, the fixture is what it says).
   once); it is removed through `tree_copy.remove_tree` (lsregister `-u`) and
   `git worktree prune`, in a command of its own.
 - **`measure`** (release-only kind; `RC_PROOF_APP=release`): every instance a
-  fresh `mcp.launch` with `-ReelcutCompositorTiming YES` as a launch argument
+  fresh `mcp.launch` with `-FrameJobCompositorTiming YES` (and its old spelling, for main's build) as a launch argument
   under the scratch `CFFIXED_USER_HOME` `work/gr7/run/home`, stopped by its own
   pid; no menu item is performed. Main's build (`--main`, default the
   worktree's Release binary) is resolved, freshness-checked and launched only
@@ -18534,7 +18541,7 @@ timed, the fixture is what it says).
   frame against ffmpeg's is more than 2 away; `--lut PATH` (expanded and
   resolved, refused unless a file) adds the owner's file as a recorded line,
   ffmpeg reading a safe-named copy so no `:` or `'` in its path reaches the
-  filter graph. **Z1** every project closes and no log holds `Reelcut: `.
+  filter graph. **Z1** every project closes and no log holds `Frame Job: `.
 - **`grading_spike.py --tree`** (`grading_spike/README.md`): V0 main's
   `Compositor.metal` at `f407f87`, VT the tree's own; KT (VT:S1 = V0:S1 within
   1/1023, both sizes) and, with `--measure`, C0, F, T0 and the RECORD **TC**
@@ -18910,8 +18917,8 @@ reads as `gbr/reserved/reserved`.
   neither is ever re-baselined. H1s, H1w and H6 carry their own CONTROL: the base-tree probe must
   fail them.
 - **R0** reads only the colour labels of the newest `Screen Recording *.mov` in
-  `~/Movies/Reelcut Recordings/`; nothing here records the screen.
-- **TI** (`--measure`, Release) launches with `-ReelcutCompositorTiming YES` on an instance per
+  `~/Movies/Frame Job Recordings/`; nothing here records the screen.
+- **TI** (`--measure`, Release) launches with `-FrameJobCompositorTiming YES` on an instance per
   twin and reads the timing line's `, N input passes` suffix.
 
 **Its record**: `archive/grading-3.md`'s T3-1 section.
@@ -18948,7 +18955,7 @@ the Apple Log 2 label, primaries removed, as the SDK header asks), the label rea
 
 - **The oracle** (`log_convert`): the codes ffmpeg reads back, the decoded signal ROUNDED TO
   HALF (step 0 reads an `rgba16Float` source; next to black one half-ulp is a level), then
-  GR-16's formula with the makers' constants and Reelcut's display transform, the gamut matrices
+  GR-16's formula with the makers' constants and Frame Job's display transform, the gamut matrices
   derived from the published chromaticities.
 - **L6** compares a reversed clip to the media's conversion of the reverse intermediate's OWN
   codes (Y ±1, widened by 1 — H4's envelope), and to the forward render ±2 only where the

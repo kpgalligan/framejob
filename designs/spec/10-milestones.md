@@ -4,7 +4,7 @@
 file into a project at the source's size and rate; import more; tracks;
 move / trim / split / delete / ripple; play, scrub, JKL; transform, crop
 and opacity on the canvas and in the inspector; markers; save and open
-`.reelcut`; undo; export H.264 and HEVC.
+`.framejob`; undo; export H.264 and HEVC.
 
 **M2 — Compose.** Text, shapes, transitions, audio volume / fade / duck /
 detach, freeze frame, speed, in/out range, chapters on export, the MCP

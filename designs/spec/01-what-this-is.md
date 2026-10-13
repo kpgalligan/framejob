@@ -33,6 +33,6 @@ clip; camera capture and callouts reconstructed after the fact stay out.
 **The opening flow is the point.** File > Open on a `.mov` or `.mp4` (or a
 drop on the Dock icon, or the welcome window's Open Video…) creates an
 *untitled* project sized to that file, with the file as the first clip on
-Track 1, ready to cut. Save then writes a `.reelcut` package next to the
+Track 1, ready to cut. Save then writes a `.framejob` package next to the
 source. The app is also the Alternate handler for movie, audio and image
 types so Open With… works from the Finder.

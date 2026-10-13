@@ -36,7 +36,7 @@
 | ⌘E | Export… |
 | ⌥⌘E | Save Frame… — the frame under the playhead as a PNG, JPEG or HEIC still (road map 2's phase 7a). Export…'s still-image sibling, under the same letter |
 | ⌥⌘N | New Recording… — the recorder panel (road map 3). The same item reads Stop Recording while one runs, paused included, and stops it; a nil-target action on `AppDelegate`, so it resolves with no document open, as New Project does. Pause Recording and Resume Recording are the status item's rows (R2) and File ▸ Pause Recording, directly under this item, retitled Resume Recording while paused, with no key (#98) |
-| ⌘, | Settings… — Reelcut ▸ Settings…, the app's one window for something PERSISTED beyond view state (road map 6 §5d): three panes, "MCP" (§11 MC-7), holding a visible blurb on how an MCP client reaches Reelcut, the bundled helper's path and the Copy MCP Command button, then "Assistant" (road map 12 A2), holding the Anthropic key and the model (§11 AI-8, AI-11) with no Verify, and under it "Transcription", holding the AssemblyAI key, the region and a Verify button; the Assistant and Transcription headings each carry an info button whose popover holds the pane's explanation (§11 SH-5). macOS's own place for the item and its own key; the nudge pair below is the BARE `,` and `.`, so nothing is displaced. A nil-target selector on `AppDelegate`, so it resolves with no document open, as New Project does |
+| ⌘, | Settings… — Frame Job ▸ Settings…, the app's one window for something PERSISTED beyond view state (road map 6 §5d): three panes, "MCP" (§11 MC-7), holding a visible blurb on how an MCP client reaches Frame Job, the bundled helper's path and the Copy MCP Command button, then "Assistant" (road map 12 A2), holding the Anthropic key and the model (§11 AI-8, AI-11) with no Verify, and under it "Transcription", holding the AssemblyAI key, the region and a Verify button; the Assistant and Transcription headings each carry an info button whose popover holds the pane's explanation (§11 SH-5). macOS's own place for the item and its own key; the nudge pair below is the BARE `,` and `.`, so nothing is displaced. A nil-target selector on `AppDelegate`, so it resolves with no document open, as New Project does |
 | ⌥⌘I | Toggle inspector |
 | ⌃⌘A | View ▸ Assistant — show the inspector, pick its Assistant tab and focus the composer (road map 12 A2, §11 AI-4). ⌘A is Select All and ⌥⌘A Deselect All; ⌃⌘A was free. Not a toggle: pressed on the Assistant tab it only refocuses the composer |
 | ⇧⌘P | Preview Window — a second window showing the same picture as the canvas, with no overlay (road map 2's phase 8b). A TOGGLE: the item carries a checkmark and the key both opens the window and puts it away |
@@ -63,11 +63,11 @@ a key, nothing more.
 |---|---|---|
 | — | Nothing. Phase 9 took the ⌘↓ / ⌘↑ this table claimed for it, for Clip ▸ Open Nest and Clip ▸ Close Nest, and the row has been promoted into the bound table above. Carrying a modifier does NOT keep either off the first responder — every main-menu key equivalent is offered the key-down before the window dispatches it, and what a modifier changes is only WHICH field-editor binding it displaces (here `moveToBeginningOfDocument:` / `moveToEndOfDocument:`). So the pair is validated DEAD while text is being edited, the Delete pair's precedent — otherwise ⌘↑ in an inline rename would leave the nest and discard the open field | — |
 
-Menus: Reelcut (About Reelcut, Settings… ⌘, — road map 6 §5d's window, in a
+Menus: Frame Job (About Frame Job, Settings… ⌘, — road map 6 §5d's window, in a
 separator group of its own between About and Hide, which is where macOS puts
 one; a WINDOW and not a sheet, because the key and the region belong to the
 person rather than to a document and the item has to work with no document
-open, Hide Reelcut, Hide Others, Show All, Quit Reelcut),
+open, Hide Frame Job, Hide Others, Show All, Quit Frame Job),
 File (New Project, New Recording… (road map 3 — directly under New
 Project with no separator, because both make a document out of nothing),
 Pause Recording (#98 — under New Recording…, live only while a recording
@@ -144,7 +144,7 @@ bound" table claims no row for it and every bare letter belongs to the
 editor's own `keyDown`; the queue's window sets
 `isExcludedFromWindowsMenu`, since this menu is `NSApp.windowsMenu` and
 AppKit would otherwise list it a second time under its own title — Bring All
-to Front), Help (Reelcut Help, Graphics Reference — road map 10's G5b: the
+to Front), Help (Frame Job Help, Graphics Reference — road map 10's G5b: the
 bundled `GraphicsAPI.md` opened in the person's own app, live while the
 bundle holds it, with no document needed).
 Road map 10's G5b adds **Insert**, right after Edit, holding **Graphic ▸**:

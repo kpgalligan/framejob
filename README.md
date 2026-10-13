@@ -1,4 +1,4 @@
-# Reelcut
+# Frame Job
 
 A native macOS video editor in a screencast editor's shape: open a movie, arrange it on
 layered tracks over a fixed canvas, trim, split, annotate, animate, export.
@@ -8,7 +8,7 @@ Apple Silicon, macOS 26+.
 The opening flow is the point. File ▸ Open on a `.mov` or `.mp4` (or a drop on
 the Dock icon, or the welcome window's Open Video…) creates an *untitled*
 project sized and rated to that file, with the file as the first clip on
-Track 1, ready to cut. Save then writes a `.reelcut` package next to the
+Track 1, ready to cut. Save then writes a `.framejob` package next to the
 source.
 
 The full design and implementation spec is `designs/spec/`, one file per
@@ -21,7 +21,7 @@ schema, §6 the op table, §7 the architecture.
   text, shape. Tracks stack back to front; `tracks[0]` is the back.
 - **Screen recording.** File ▸ New Recording… (⌥⌘N, or the welcome window's
   third button) opens a small floating panel: a display or a window (the
-  system picker), whether Reelcut's own windows are in a display recording
+  system picker), whether Frame Job's own windows are in a display recording
   (left out by default), a microphone with a live meter, system audio, click
   rings, 30 or 60 fps, point or pixel size, and where it lands — a new project, or
   an open document at its playhead. A 3-2-1 countdown, then a red dot with
@@ -30,7 +30,7 @@ schema, §6 the op table, §7 the architecture.
   per stretch; a stretch whose file cannot be read is left out, and the
   note names it and where its files are — and its microphone, when it
   reads, still lands in the stretch's place. The file is written to
-  `~/Movies/Reelcut Recordings/` and imported as ordinary media (undo
+  `~/Movies/Frame Job Recordings/` and imported as ordinary media (undo
   removes the clip, never the file); a microphone is a second file on its
   own Microphone track, aligned to the picture. A new project takes the
   rate you chose; a screen recording's own rate is whatever the screen did.
@@ -83,14 +83,14 @@ schema, §6 the op table, §7 the architecture.
   or send audio to the cloud transcriber (File ▸ Generate Captions… does
   that, with the price in front of you), and each message tells it the
   playhead, the selection and the open nest as they stand when you send.
-  Each turn ends with what it cost — Reelcut's own estimate at LiteLLM's
+  Each turn ends with what it cost — Frame Job's own estimate at LiteLLM's
   prices, naming the table's date, and "unknown" rather than $0 when a
   response could not be priced — and every response is one line in
-  `spend.jsonl` in Reelcut's Application Support folder (tokens and dollars,
+  `spend.jsonl` in Frame Job's Application Support folder (tokens and dollars,
   never your key or the conversation). The tab's Spend row shows what the
   conversation has cost since you last cleared it, and Settings' Assistant
   pane what this calendar month has cost (the month in UTC, as the ledger
-  records it), both Reelcut's own estimate: the Anthropic Console is the
+  records it), both Frame Job's own estimate: the Anthropic Console is the
   truth for what your account was billed. The Clip tab is a selection header
   — the clip's name, editable there for a single clip and the one place a
   name can be cleared back to what the clip shows, with its label dot — and
@@ -164,7 +164,7 @@ schema, §6 the op table, §7 the architecture.
   cloud engine sends audio off this machine, so the sheet says so before the
   button does anything: which files would be uploaded, how long they are and
   what they would cost at today's published rate. Your API key goes in
-  Reelcut ▸ Settings… (⌘,), under Transcription — a file only you can read, never a launch
+  Frame Job ▸ Settings… (⌘,), under Transcription — a file only you can read, never a launch
   argument — and what comes back is cached in the project package, one
   transcript per media file, re-used by the next run, with the copy at
   AssemblyAI deleted as soon as it has been read. If every requested media
@@ -313,7 +313,7 @@ schema, §6 the op table, §7 the architecture.
 - **Camera log**. The Media tab's **Camera Log** section sets how a video
   file's log footage becomes Rec. 709: None, Apple Log, Apple Log 2,
   S-Log3 / S-Gamut3.Cine, S-Log3 / S-Gamut3, V-Log / V-Gamut — each
-  from its maker's published curve and gamut, 18 % grey at Reelcut's 42 % —
+  from its maker's published curve and gamut, 18 % grey at Frame Job's 42 % —
   or **Use LUT…** with your own `.cube`. It is the FILE's setting: every
   clip of it follows, it applies before the chroma key and every grade, and
   Show Ungraded keeps it. Apple Log is detected on import ("from the file");
@@ -372,7 +372,7 @@ schema, §6 the op table, §7 the architecture.
   M1 or M2, VP9 Profile 1 or 3, VP8 in an MP4 or MOV) is refused at import with a sentence
   naming its codec. A WebM or MKV file (VP9, AV1, H.264 or HEVC video with Opus,
   Vorbis or AAC sound) opens with no question: its streams are copied, not re-encoded,
-  into a movie in `~/Library/Application Support/Reelcut/Rewrapped/`, after a
+  into a movie in `~/Library/Application Support/Frame Job/Rewrapped/`, after a
   check that the copy fits on the disk. A copy that takes more than a second
   shows its progress in a small window whose Cancel stops it and adds nothing.
   The media keeps the WebM's own name, and a project whose copy is gone copies
@@ -391,7 +391,7 @@ schema, §6 the op table, §7 the architecture.
   source's gradients — a reversed clip's too, its backwards copy rendered at
   10 bits with the source's own colour labels and exact size; H.264, HEVC
   and HEVC with alpha are 8-bit.
-  HLG and PQ sources are converted to SDR Rec. 709 by Reelcut itself, the
+  HLG and PQ sources are converted to SDR Rec. 709 by Frame Job itself, the
   same in the preview, every export, every rendered frame and the timeline's
   filmstrip. So is camera
   log footage: an iPhone Apple Log or Apple Log 2 file is recognised by its
@@ -431,7 +431,7 @@ schema, §6 the op table, §7 the architecture.
   follows, and Undo renames it back. A person renames, deletes and restores
   from File ▸ Rename Graphic…, Delete Graphic… and Restore Graphic Version…
   (which puts back the newest kept version); each is a small sheet that
-  shows Reelcut's reason when it refuses.
+  shows Frame Job's reason when it refuses.
 - **MCP agent** (below): one tool per edit op, plus open/new/save/read,
   import, playhead, frame render and export.
 
@@ -474,7 +474,7 @@ Treat the gesture and playback bullets above as "implemented", not as
 ```
 core/                 Rust crate (staticlib) — the model, the ops, the plan,
   include/            the recipe, export settings and the MCP server
-    reelcut_core.h    Hand-maintained C header: THE FFI contract
+    framejob_core.h   Hand-maintained C header: THE FFI contract
   src/                model.rs time.rs edit*.rs evaluate.rs agent.rs … (§7.10)
   tests/              black-box tests through the FFI
 app/
@@ -482,9 +482,9 @@ app/
   Resources/Shaders/  Compositor.metal — the per-layer compositing pass
   Bridging/           Bridging header importing the Rust FFI header
 agent/                the assistant helper: Bun and the Anthropic SDK's Tool Runner,
-                      built into Contents/Helpers/reelcut-agent (build.sh)
-mcp-proxy/            Rust crate — reelcut-mcp, the stdio MCP server MCP clients start,
-                      built into Contents/Helpers/reelcut-mcp
+                      built into Contents/Helpers/framejob-agent (build.sh)
+mcp-proxy/            Rust crate — framejob-mcp, the stdio MCP server MCP clients start,
+                      built into Contents/Helpers/framejob-mcp
 designs/              spec/ — the accepted design and spec, one file per section;
                       adr/ — condensed records
 archive/              closed road maps, verbatim (INDEX.md)
@@ -498,14 +498,14 @@ Makefile              Build orchestration
 |---|---|
 | `ReelCore.swift` · `ReelOps.swift` | the FFI and the op vocabulary: `ReelCore.swift` is the **only** `rc_*` caller (`ReelProject` — handle + lazy snapshot — `ReelTime`, `ReelSnap`, `ReelExport`, and the op-argument types), `ReelOps.swift` holds `ReelOp` and the typed op builders |
 | `ProjectSnapshot.swift` | the `Codable` mirror of the §5.2 project JSON, the plan and the recipe, plus the §5.3 placement maths |
-| `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, and the single mutation point (`applyEdit`, the live-edit trio, undo as a handle stack) |
+| `ProjectDocument.swift` | NSDocument, `.framejob` package read/write, and the single mutation point (`applyEdit`, the live-edit trio, undo as a handle stack) |
 | `MediaImporter.swift` | `AVURLAsset` probing (the one file allowed `async`/`await`), thumbnails, waveform peaks |
 | `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `LayerRenderersText.swift` · `Playback.swift` · `RecipeSource.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline — eight pipelines from six fragment functions, one of them reading the destination so a layer can blend; text/shape/image textures, a shape's gradient and the three text reveals the recipe asks for; the player and its rebuild-vs-refresh rule; the registry the compositor reads a recipe from, one slot per document and per export |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `CaptionStyle.swift` · `CaptionLooks.swift` · `CaptionPages.swift` · `Transcriber.swift` (+`Extract` `Jobs` `Languages`) · `CaptionExporter.swift` | captions in and out: the SubRip grammar, the placement every producer shares, the five word caption styles, the three looks a run may add to them (a sliding pill, a word that fills, a dim in pauses) and the pager that fills their pages to a measured width, on-device speech recognition and the cue builder over it, the extractor and the job list both engines share, and the `.srt` / `.vtt` writer |
 | `CloudTranscriber.swift` (+`Media`) · `MediaTranscript.swift` · `AssemblyAIClient.swift` (+`Session`) · `AssemblyAITranscript.swift` · `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` · `SecretStore.swift` · `CloudProgress.swift` · `CloudEstimate.swift` | captions from the cloud (road map 6): the run that groups clips by media and deletes what it fetched, the transcript cache in the package, AssemblyAI's five REST calls and their wire values, where the client speaks and what it says it is, the `0600` key file, the progress number and the price the sheet shows before the button |
 | `Exporter.swift` · `ExporterSettings.swift` · `ExporterWriter.swift` · `ExporterWriter+Settings.swift` · `ExporterAudioGain.swift` · `ExportSheetController.swift` (with `ExportSheetOptions` `ExportSheetResolve` `ExportSheetPresets` `ExportProgressSheetController`) | writing a file — two passes wherever it holds sound, the first measuring loudness — and rendering one frame offline; the settings each row becomes in AVFoundation's terms, and the loudness gain applied to the float mix and quantised once; the sheet's controls, the resolution behind them and the progress sheet |
 | `FrameWriter.swift` · `EditorViewController+SaveFrame.swift` | one composed frame to a PNG, JPEG or HEIC — a value type with no AppKit in it, called by File ▸ Save Frame… and by `render_frame` alike — and the panel that picks the URL |
-| `ExportPresetsStore.swift` · `ExportQueueController.swift` · `ExportQueueWindowController.swift` · `AppSupport.swift` | the last export choice and the named presets as a value, the queue (one job at a time, each holding the timeline as it was enqueued) and its window, and the one spelling of `~/Library/Application Support/Reelcut/` |
+| `ExportPresetsStore.swift` · `ExportQueueController.swift` · `ExportQueueWindowController.swift` · `AppSupport.swift` | the last export choice and the named presets as a value, the queue (one job at a time, each holding the timeline as it was enqueued) and its window, and the one spelling of `~/Library/Application Support/Frame Job/` |
 | `AudioTap.swift` · `AudioDSP.swift` · `LevelMeter.swift` · `LevelMeterView.swift` | the sample-level audio the plan cannot carry (noise reduction, the compressor, the mono fold, the pan) and the level meter's model and its one view |
 | `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` (+`Walls`) · `SileroVAD.swift` · `MediaSpeech.swift` | the waveform cache and the questions asked of it: a clip's own peak (Normalize) and peak × envelope (the quiet spans in Level mode) — plus the Core ML voice model and its own per-media cache, which is what Voice mode asks |
 | `Loudness.swift` | BS.1770-4 integrated loudness and true peak, and the export gain that follows |
@@ -519,7 +519,7 @@ Makefile              Build orchestration
 | `AssistantView.swift` · `AssistantTranscriptView.swift` · `AssistantComposer.swift` · `AssistantTranscript.swift` · `AssistantContextMeter.swift` · `AssistantSettingsPane.swift` · `EditorViewController+Assistant.swift` | the Assistant tab's views, which hold no conversation; the multi-line message field, with its own undo; the transcript the window keeps; the context meter; Settings' Assistant pane (key, model and chat settings); and the glue between the tab and the window's session |
 | `RecordingSetup.swift` · `ScreenRecorder.swift` (with `+Finishing` and `+Content`) · `RecordingLanding.swift` · `ProjectDocument+Recording.swift` · `RecorderPanelController.swift` (with `+Rows` and `+Recording`) · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` | screen recording (road map 3): the values, the session over ScreenCaptureKit and a second `AVCaptureSession` for the microphone, the landing as ordinary media, the floating non-activating panel with its countdown and meter, the menu-bar status item, and the `record_screen` tool |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
-| `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` (+`Cloud` `Commit` `Download` `Style` `Looks`) · `SettingsWindowController.swift` · `MCPSettingsPane.swift` | the remaining dialogs, and Reelcut ▸ Settings… (with its MCP section) |
+| `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` (+`Cloud` `Commit` `Download` `Style` `Looks`) · `SettingsWindowController.swift` · `MCPSettingsPane.swift` | the remaining dialogs, and Frame Job ▸ Settings… (with its MCP section) |
 | `Theme.swift` · `Controls.swift` · `OptionControls.swift` · `Sheets.swift` · `EditorChrome.swift` · `FileDropView.swift` | shared chrome, copied from Rasterize |
 
 ## Building
@@ -527,9 +527,9 @@ Makefile              Build orchestration
 Requires Xcode 26 or later (the macOS 26 SDK), Rust (cargo), [xcodegen](https://github.com/yonaskolb/XcodeGen), and [bun](https://bun.sh) (the assistant helper, `agent/`, is built by every `make app`, typechecked by `make typecheck` and its price function tested by `make test`; without bun they fail rather than skip).
 
 ```sh
-make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make app-debug  # the Debug app the proofs can drive: "Reelcut Debug" (its own bundle id, com.kgalligan.Reelcut.debug, and settings) → build/Build/Products/Debug/Reelcut.app, seconds after a one-file edit
-make dist       # make app, then the Distribution build (no dev tools; the assistant helper signed with the hardened runtime) → build/Build/Products/Distribution/Reelcut.app, checked (dist_check.py, then published_check.py, the check a published build gets)
+make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Frame Job.app
+make app-debug  # the Debug app the proofs can drive: "Frame Job Debug" (its own bundle id, com.kgalligan.FrameJob.debug, and settings) → build/Build/Products/Debug/Frame Job Debug.app, seconds after a one-file edit
+make dist       # make app, then the Distribution build (no dev tools; the assistant helper signed with the hardened runtime) → build/Build/Products/Distribution/Frame Job.app, checked (dist_check.py, then published_check.py, the check a published build gets)
 make run        # build and launch
 make test       # Rust core, graphics and MCP proxy tests, then the agent lane's proof (tools/proof/assistant_lane_proof.py), the prompt texts' checks (tools/proof/assistant_prompt_proof.py --probe), the price function in both readers (tools/proof/prices_proof.py, no network) and the proofs' ledger and monthly budgets (tools/proof/budget_proof.py, no network)
 make lint       # cargo clippy --all-targets -D warnings
@@ -539,7 +539,7 @@ make project    # xcodegen generate, with the base version from VERSION
 make prices     # regenerate agent/prices/anthropic.json from LiteLLM's price table (network); the file's only writer
 ```
 
-`Reelcut.xcodeproj` is generated — run `make project` after editing
+`FrameJob.xcodeproj` is generated — run `make project` after editing
 `project.yml`, and don't commit the project file. Use `make project` rather
 than a bare `xcodegen generate`: it feeds the base version from `VERSION` into
 the project, which a bare run leaves blank.
@@ -549,11 +549,11 @@ the project, which a bare run leaves blank.
 Pushing to the `publish` branch runs `.github/workflows/publish.yml`: it
 archives the Distribution configuration signed with Developer ID, exports it,
 checks the exported app (`tools/proof/published_check.py`), packs it into
-`Reelcut.dmg`, notarizes and staples the DMG, and attaches it to a GitHub
+`FrameJob.dmg`, notarizes and staples the DMG, and attaches it to a GitHub
 Release tagged `v<version>`. The version is `VERSION` (MAJOR.MINOR) plus the
 workflow's run number, and the build number is the run number, so bump
 `VERSION` for a new minor line. A local build reads "0.2 (0)". The newest build is always at
-`https://github.com/kpgalligan/reelcut/releases/latest/download/Reelcut.dmg`
+`https://github.com/kpgalligan/reelcut/releases/latest/download/FrameJob.dmg`
 (while the repository is private, only for people with access to it).
 
 The workflow runs no tests: run `make test` and `make dist` on what you push.
@@ -569,24 +569,24 @@ with its private key as a `.p12`, base64-encoded, and the export password),
 
 ## AI agent access (MCP)
 
-Reelcut serves an MCP server (streamable HTTP) on a Unix socket it binds at
-every launch, `~/Library/Application Support/Reelcut/Agent/agent.sock`. An MCP
-client reaches it through `reelcut-mcp`, the stdio helper inside the bundle,
-which lists the tools without opening Reelcut and launches it in the
+Frame Job serves an MCP server (streamable HTTP) on a Unix socket it binds at
+every launch, `~/Library/Application Support/Frame Job/Agent/agent.sock`. An MCP
+client reaches it through `framejob-mcp`, the stdio helper inside the bundle,
+which lists the tools without opening Frame Job and launches it in the
 background on the first tool call that finds it not running.
 
-**Reelcut ▸ Settings… ▸ MCP — Copy MCP Command** puts the line that registers
+**Frame Job ▸ Settings… ▸ MCP — Copy MCP Command** puts the line that registers
 the helper with Claude Code on the clipboard, with the path of the bundle you
 ran it from; the section also shows the helper's path:
 
 ```sh
-claude mcp add --scope user reelcut -- '/Applications/Reelcut.app/Contents/Helpers/reelcut-mcp'
+claude mcp add --scope user framejob -- '/Applications/Frame Job.app/Contents/Helpers/framejob-mcp'
 ```
 
 Claude Desktop takes the same helper in its `claude_desktop_config.json`:
 
 ```json
-{"mcpServers":{"reelcut":{"command":"/Applications/Reelcut.app/Contents/Helpers/reelcut-mcp"}}}
+{"mcpServers":{"framejob":{"command":"/Applications/Frame Job.app/Contents/Helpers/framejob-mcp"}}}
 ```
 
 The socket is yours alone: its folder is `0700` and the socket `0600`, so
@@ -596,8 +596,8 @@ app runs.
 To drive a build for verification, launch it with `tools/proof/proof_app.py`,
 which gives it a socket of its own (`RC_AGENT_SOCKET`) and a scratch home, so
 it never touches your own, and point `tools/proof/mcp.py`'s `MCP` or
-`reelcut-mcp` (with `RC_AGENT_SOCKET` set to the same path) at the socket it
-prints. It launches "Reelcut Debug" (`make app-debug`) unless told
+`framejob-mcp` (with `RC_AGENT_SOCKET` set to the same path) at the socket it
+prints. It launches "Frame Job Debug" (`make app-debug`) unless told
 `--app release` (`make app`), and refuses a build older than its sources:
 
 ```sh
@@ -652,7 +652,7 @@ hue rather than paints with it, is the one `[r, g, b]` in the model.
 
 | Tool | |
 |---|---|
-| `open_project {path}` | a `.reelcut` package, or any movie/sound/picture, which opens as a new untitled project around it |
+| `open_project {path}` | a `.framejob` package, or any movie/sound/picture, which opens as a new untitled project around it |
 | `new_project {path?}` | a blank 1920×1080 / 30 fps project, saved straight away when given a path; a path another open project has is refused, and nothing is created |
 | `save_project {path?}` | returns once the package is really on disk; a path another open project has is refused |
 | `close_project {discard?}` | closes a project and its window (File ▸ Close, ⌘W). Unsaved changes are refused unless `discard: true`, and so is a window with a sheet open; it writes nothing |
@@ -661,7 +661,7 @@ hue rather than paints with it, is the one `[r, g, b]` in the model.
 | `import_captions {path, track?}` | an SRT file as text clips (File ▸ Import Captions…) |
 | `consolidate_media {}` | copies every referenced file into the package (File ▸ Consolidate Media…) |
 | `set_media_color {media, color}` | a video file's Camera Log (the Media tab's Camera Log section): `{log, gamut?}`, `{lut}` or `null`; one undo step |
-| `record_screen {seconds, source?, display?, window?, microphone?, system_audio?, show_clicks?, include_reelcut_windows?, rate?, size?, place?, path?}` | records a display (index, 0 = main) or a window (a `CGWindowID`) for `seconds` and lands it as a clip at the target document's playhead — or as an untitled document rated at `rate` when nothing is open (File ▸ New Recording…). `microphone` records the default microphone to a second file on a Microphone track; `path` is a FOLDER override; `include_reelcut_windows` puts Reelcut's own windows in a display recording, which leaves them out by default. `source: "voice_over"` records the default microphone alone (the panel's Microphone Only) onto a new back Microphone track, reading only the Microphone grant. It reads the grants and never asks: the refusal names the System Settings pane, and a shell-launched instance runs under its TERMINAL's grants |
+| `record_screen {seconds, source?, display?, window?, microphone?, system_audio?, show_clicks?, include_framejob_windows?, rate?, size?, place?, path?}` | records a display (index, 0 = main) or a window (a `CGWindowID`) for `seconds` and lands it as a clip at the target document's playhead — or as an untitled document rated at `rate` when nothing is open (File ▸ New Recording…). `microphone` records the default microphone to a second file on a Microphone track; `path` is a FOLDER override; `include_framejob_windows` puts Frame Job's own windows in a display recording, which leaves them out by default. `source: "voice_over"` records the default microphone alone (the panel's Microphone Only) onto a new back Microphone track, reading only the Microphone grant. It reads the grants and never asks: the refusal names the System Settings pane, and a shell-launched instance runs under its TERMINAL's grants |
 | `transcribe {clips?, language?, place?, engine?, speakers?, vocabulary?, refresh?, style?, replace?, slide?, fill?, dim?}` | speech recognition into caption clips (File ▸ Generate Captions…). Returns the cues in ticks whether or not it places them, and `place: false` changes nothing at all. `style` is `subtitles` (the default) or a word caption style — `highlight`, `pill`, `karaoke`, `build`, `one_word` — whose pages are filled to a measured width and whose cues carry their `words`; `replace: true` swaps out the caption tracks it would have made over the same clips in the same undo step and lists them under `replaced`. `slide` (style `pill`), `fill` (`highlight`, `karaoke`, `build`) and `dim` (any word style) each add a look to the pages placed — a pill that slides between words, a word that fills as it is spoken, a fade to half in a pause — and are false unless given, never what the sheet last chose; `true` with a style it would show nothing on, or with `place: false`, is refused by name, `false` is always accepted, and a placed run that was given any of them lists the ones that were on under `looks`. `engine` is `apple` (the default, on this Mac, nothing uploaded) or `assemblyai` (the whole audio of each media file goes to AssemblyAI and is billed; the transcript is cached in the package and deleted at the far end). The on-device engine needs no grant and has no length limit; a language whose model is not installed on this Mac is refused by name and never downloaded by the tool — a person installs it from the sheet's Download row. `speakers`, `vocabulary` and `refresh` apply only to the cloud engine and are refused by name without it; with `speakers` and `subtitles`, each speaker's cues take their own colour |
 | `export_captions {track?, path, format?}` | one text track out as `.srt` or `.vtt` (File ▸ Export Captions…). The track is never guessed — with no all-text track, or more than one, it refuses and lists the candidates. A trailing `.srt` or `.vtt` in `path` becomes the format's own; any other extension is kept, as the save panel keeps it (`chart.png` → `chart.png.srt`) |
 | `detect_silence {clips?, mode?, voice_confidence?, threshold_db?, min_length?, padding?}` | the quiet spans of the timeline, which `ripple_delete_ranges` then cuts — the same detector Clip ▸ Remove Silences… uses, so an agent and the sheet propose the same cuts. It changes nothing. `mode` is `voice` (the default, the cached Silero probability against `voice_confidence`) or `level`; either way a moment the mix envelope alone puts under `threshold_db` is quiet, so mute and solo are already in the answer, and the result names any file still being analysed and any clip judged by level |
@@ -720,7 +720,7 @@ that did not land is safe to retry.
   the composition plan and the per-frame recipe, and reads a WebM or Matroska
   file's index for the import's copy; the platform decodes, composites and
   encodes.
-- The FFI surface (`core/include/reelcut_core.h`) is an opaque, **immutable**
+- The FFI surface (`core/include/framejob_core.h`) is an opaque, **immutable**
   `RcProject` handle. Every operation is pure — it returns a new handle and
   never mutates its input — which makes undo a stack of handles and makes
   publishing a handle to the compositor's queue safe. Complex data crosses as

@@ -1,4 +1,4 @@
-# Reelcut
+# Frame Job
 
 A screencast video editor. A project is a document of tracks and clips that the core edits through ops; the app and the agent both speak in those ops. This glossary holds the terms the spec and the op table use, sharpened as decisions settle them.
 

@@ -685,3 +685,123 @@ notes):
   one to three 10 ms buckets, with values that look like frames landing in the neighbouring
   bucket. This makes `screens.py`'s waveform columns differ by a pixel between runs. The
   measurement is in the R2 record's second screens compare.
+
+## R3 — the record
+
+**Landed** (2026-10-13, in the worktree, not committed by the implementer; the orchestrator
+commits):
+
+- `CONTEXT.md`'s title; `README.md`'s 37 old-name lines but line 446 (an archived road map's
+  name, KEPT) — the product's name in prose, `.framejob`, the folders under `Frame Job`, the
+  make targets' products (`Release/Frame Job.app`, `Debug/Frame Job Debug.app`,
+  `com.kgalligan.FrameJob.debug`), `FrameJob.xcodeproj`, `FrameJob.dmg`, `framejob-mcp`,
+  `framejob-agent`, `framejob_core.h` (the layout block's comment column kept), the MCP section's
+  `claude mcp add --scope user framejob -- '/Applications/Frame Job.app/…/framejob-mcp'` and its
+  JSON, `include_framejob_windows`; line 556's URL now ends `FrameJob.dmg` and keeps the
+  repository's name until R4.
+- `designs/spec/`: every old-name line of `01`, `02`, `04.3b`, `05.6`, `06b`, `07.1`, `07.10`,
+  `07.4`, `07.5` (the shader entry points `framejob_*`), `07.7`, `07.8`, `07.9a`, `07.9b`, `09`
+  (the app menu, Hide and Quit Frame Job, Frame Job Help, as `AppDelegate+Menus.swift` titles
+  them), `10`, and `README.md`'s title; `08-repo-layout.md` but its root `reelcut/`, its line 11
+  now `# framejob-core; lib name framejob_core; serde, serde_json, serde_path_to_error,
+  tiny_http, svgtypes, graphic; incremental, no LTO`. Edited in place, no paragraph rewrapped:
+  every spec file kept its line count, so no Lines cell changed.
+- `designs/spec/11-decisions/README.md`: the Files table's Holds cells on lines 16 ("Include
+  Frame Job windows"), 24 (`FRAMEJOB_DEV_TOOLS` and "Frame Job Debug"), 27 (`framejob-mcp`,
+  "launches Frame Job") and 33 ("Frame Job's own HDR→SDR"); every row under "Every decision"
+  as it was.
+- `docs/manual-checks.md`: all 65 old-name lines — menu paths `Frame Job ▸ …`, the two `open`
+  lines quoting `"build/Build/Products/Release/Frame Job.app"`, `com.kgalligan.FrameJob`,
+  `FrameJobCompositorTiming`, `[framejob] compositor`, the support and Recordings folders,
+  `framejob-mcp`, the MCP server `framejob`, `FrameJob.dmg`, `/Applications/Frame Job.app`,
+  "Include Frame Job windows", and each quoted app sentence as the code says it.
+- `tools/proof/README.md`: of its 469 counted lines, 269 rewritten and 200 kept byte for byte;
+  a "**Names in records.**" paragraph after "**Ports in records.**". Every rewritten identifier
+  was read against the code it names (`git grep` in `app/Sources`, `mcp-proxy`, `tools/proof`):
+  `framejob.log`, `framejob-launch.log`, `framejob-upload-*`,
+  `framejob-cloud-captions.lock`, `<DARWIN_USER_TEMP_DIR>/FrameJob/`, the `FrameJob*` defaults
+  keys and `-FrameJob*` launch arguments, `com.kgalligan.framejob.defaults-proof`,
+  `framejob.proof-defaults-selftest.<pid>`, `host: Frame Job active …`, "Hello Frame Job.",
+  `/nonexistent/Frame Job.app/Contents/Helpers/framejob-mcp`, `-module-name FrameJob`. Shell
+  lines naming a product quote it (`open -a "./build/…/Frame Job.app"`, `--app "…"`, `--dist
+  "…"`, `pgrep -f "<copy>/Contents/MacOS/Frame Job"`). Lines 1721–1724 (at 6fa50c8) were
+  rewritten to the truth, not substituted: Debug's product is `Frame Job Debug.app` with
+  executable `MacOS/Frame Job Debug`, and `pgrep -f "MacOS/Frame Job"` lists both apps; line
+  1779 names the Debug product apart from Release's and Distribution's. Lines that must keep
+  the old name's refusals say so without spelling it (`proof_defaults.py`'s refusal list, its
+  `prefix` and `keys` rules and the sweep's `shared` branch: "each under the old name too",
+  "or the old name"; `grading_verdict.py`'s `measure`: "and its old spelling, for main's
+  build").
+- `tools/proof/name_residue.py`, `COUNTED` only: `designs/spec/11-decisions/README.md` 22 → 18,
+  its comment now saying the decision rows keep each decision's own words and the Files table
+  says today's names; a new permanent group "a pointer to a path that keeps the old name
+  (NM-1)": `designs/spec/03-window-layout.md` 2, `designs/spec/README.md` 1,
+  `tools/proof/README.md` 200; a new group "R4 removes these": `README.md` 1,
+  `designs/spec/08-repo-layout.md` 1; the old "R3 removes these" documents block and its
+  comment gone (`CONTEXT.md` and `docs/manual-checks.md` with it). The CLAUDE.md block is the
+  orchestrator's (below).
+- `~/.claude/litecode/reelcut/rename-r3/claude-md-edits.py` (outside the repo): the five
+  CLAUDE.md edits and the matching `COUNTED` edit, never applied here.
+
+**The proof README's kept lines, by rule** (spec R3 Approach 3; 200 in all): (a) a result
+table's row 38; (b) a block or quotation reproducing what a run printed 82 (the sweep listings,
+quoted detail strings, the `refusing …` example, and line 7303's quotation of spec §11
+recording.md's own words, "The recorder panel takes key only from an active Reelcut"); (c) a
+past run's artefact 6 (`/tmp/reelcut-4823.log`, `/tmp/reelcut-4960.log`, the `.ips`,
+`work/bNN`, `work/b10` and `work/b16`'s `Reelcut-baseline.app`); (d) a sentence reporting what a
+past run printed or measured 67 (among them the B82 audit's heading and paragraph, the B83
+designer's measurements, the phase A `hevc_alpha` paragraph's guard sentences, and the
+mutation records at 1352 and 6989); (e) an old tree's path 5 (e1's reference build and its log,
+the archived cloud baseline's `.codex` path, 055a5ed's `Reelcut.app`); (e) and (f) together 1
+(line 270, the reference's pre-MC4 launch line). One more line, 3705, names
+`designs/design_handoff_reelcut_sharp/`, a folder that keeps its name (NM-1). Lines that hold a
+record part and a how-to part (a definition naming a pre-MC4 port: 7990, 8285, 8480, 9900,
+11687) keep the port and rewrite only the key or prefix.
+
+**Definition-table rows rewritten** (line numbers at 6fa50c8; six, the count `git diff -U0 --
+tools/proof/README.md | grep -c '^-|'` prints):
+
+- "Road map 12's A4 — the helper in both bundles", `dist_check_mutants.py`'s `| Case | The
+  mutation | Expected FAIL |`: 8147 (`app-entitlements-dist`, `<case>/dist/Frame Job.app`).
+- "Issue batch B83 — proofs and the owner's `UserDefaults`", `defaults_proof.py`'s `| Row |
+  Child | Holds |`: 14522 (G1, `FrameJobSnappingEnabled`), 14527 (H1,
+  `FrameJobDefaultsProofSeed`), 14529 (R1, `com.kgalligan.FrameJob`, "another Frame Job").
+- "Road map grading — GR5a and GR5b", `look_proof.py`'s `| Mutant | Edit | Must fail |`: 18366
+  (`framejob_adjust_fragment`), 18368 (`framejob_look_bake`).
+
+**Deviations from the spec:**
+
+- `designs/spec/11-decisions/README.md` line 24's cell also says "Frame Job Debug" for the
+  Debug app's name (the spec named only `FRAMEJOB_DEV_TOOLS` there); the cell names today's
+  identifiers, as the pin's comment says, and the count is the spec's 18.
+
+**Measured** (each printed by the command beside it; the full outputs are in the phase's
+`04-checks.txt`):
+
+- `python3 tools/proof/name_residue.py`: exit 0, nothing printed.
+- `python3 tools/proof/name_residue.py --selftest`: `7/7 rows pass`, `PASS`.
+- `python3 tools/proof/spec_index_proof.py`: `159/159 checks passed`, exit 0.
+- `python3 tools/proof/capture_spike/inventory.py --check`: exit 0.
+- `git diff -U0 -- tools/proof/README.md | grep '^-' | grep -v '^--- ' | grep -v -i reelcut`:
+  nothing (no line without the old name was changed).
+- the dated/run grep over the README's removed lines (`/tmp/reelcut-`, `reelcut-NNNN.log`,
+  `Reelcut-baseline`, `.ips`, a date): nothing.
+- `git diff -U0 -- tools/proof/README.md | grep -c '^-|'`: 6, the rows listed above.
+- the counter of old-name lines new since HEAD in `tools/proof/README.md`: 0 (every old-name
+  line left is an original).
+- `make gate`: PASS in 73 s (names pass, typecheck, fmt and lint skipped as unchanged, test
+  pass in 67 s, app pass). This line was added after the gate; `name_residue.py`, the gate's
+  only step that reads this file (under `HISTORY` there), exited 0 again on the final tree.
+- `claude-md-edits.py <tree> <scratch>`: `CLAUDE.md: 6 now, 4 after`, `app/CLAUDE.md: 3 now, 0
+  after`, `core/`, `graphic/`, `mcp-proxy/CLAUDE.md` `0 now, 0 after`,
+  `tools/proof/name_residue.py: 6 now, 6 after`, exit 0.
+
+**Owed:**
+
+- The CLAUDE.md edits: `python3 ~/.claude/litecode/reelcut/rename-r3/claude-md-edits.py
+  --apply <tree>` (the orchestrator's), which also sets `COUNTED["CLAUDE.md"]` to 4 and drops
+  `app/CLAUDE.md`'s pin.
+- R4: the three old-repository-name pins — root `CLAUDE.md` line 446 (the issue-tracker line),
+  `README.md`'s release URL, `08-repo-layout.md`'s root folder — go with the owner's renames.
+  The `FrameJob.dmg` download link answers only after the next publish: the newest release's
+  asset is still `Reelcut.dmg`.

@@ -201,7 +201,7 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
 - **`duplicate {clips}`** — Copies placed after the originals' span on the same tracks (⌥-drag then
   moves them).
 - **`paste {at, track?, payload}`** — Inserts the clips of a clipboard payload — `{"clips": [...],
-  "media": [...]}`, what ⌘C wrote to `com.kgalligan.reelcut.clips` — with fresh ids for the clips,
+  "media": [...]}`, what ⌘C wrote to `com.kgalligan.framejob.clips` — with fresh ids for the clips,
   their actions and any media row added. The EARLIEST clip lands exactly at `at` and the rest keep
   their offsets from it. A payload clip's `track` is a **depth from the front** (0 = front-most),
   not an id, since the ids belong to the document copied from: `track` names where depth 0 lands

@@ -1,4 +1,4 @@
-# Reelcut — design and implementation spec
+# Frame Job — design and implementation spec
 
 **The normative spec, one file per section.** It was one 4,780-line file,
 `designs/reelcut-design.md`, until 2026-09-26 (git history has it). Section numbers are

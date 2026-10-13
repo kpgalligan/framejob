@@ -287,7 +287,7 @@ detail there.
   falls through to the opt-in ffmpeg step. `RewrapProgress.swift` +
   `RewrapProgressWindowController.swift`: a click door's copy reports to a
   non-modal window shown after 1 s, which never takes the keyboard from a
-  Reelcut window, and Cancel removes the partial copy (spec §11 #228-P). A
+  Frame Job window, and Cancel removes the partial copy (spec §11 #228-P). A
   tool call passes no watch.
   `async`/`await` is confined to `MediaImporter.swift`; the await-free halves
   are the `+` files, `MediaPeakBuckets`, `MediaCacheFiles` and `MediaCacheLedger`. A cache is CURRENT when its
@@ -1191,7 +1191,7 @@ the key map behind it.
   composition holding an HLG, PQ or wide-gamut source, or a media with
   Camera Log, is built with, spec §11 GR-15, GR-16; a layer's `input`
   chooses before the frame's labels) · `InputConversions.swift` (the
-  selector, `choose(input:)` for Camera Log, and every number Reelcut
+  selector, `choose(input:)` for Camera Log, and every number Frame Job
   chose) · `Compositor+Uniforms.swift` ·
   `Compositor+Shadow.swift` · `Compositor+Matte.swift` · `MattePlan.swift` ·
   `Compositor+Dissolve.swift` · `Compositor+Adjustment.swift` ·
@@ -1867,7 +1867,7 @@ free.
   — File ▸ New
   Recording… A `.floating`, `.nonactivatingPanel` with `hidesOnDeactivate`
   false, ONE instance, no window delegate. `show()` makes it key only when
-  Reelcut is active; from the background it is ordered front without key, so
+  Frame Job is active; from the background it is ordered front without key, so
   the person's Return stays in the app in front (spec §11 recording.md, #137).
   **The panel is the only place the
   two grants are requested, and the only place System Settings is opened

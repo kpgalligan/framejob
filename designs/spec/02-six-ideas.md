@@ -1,6 +1,6 @@
 # 2. The a screencast editor model, and why it stays simple
 
-Six ideas do most of the work. Reelcut copies all six.
+Six ideas do most of the work. Frame Job copies all six.
 
 1. **One kind of track.** Every track holds any clip — video, audio,
    still, text, shape. There are no video-vs-audio track types; an

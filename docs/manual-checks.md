@@ -13,9 +13,9 @@ in both appearances (System Settings ▸ Appearance, Light then Dark).
 
 1. Build: `make app`.
 2. Open the Release app from the Finder, or with
-   `open build/Build/Products/Release/Reelcut.app`. **Not from a terminal**:
+   `open "build/Build/Products/Release/Frame Job.app"`. **Not from a terminal**:
    a terminal-launched app's permissions (Screen Recording, Microphone)
-   belong to the terminal, not to Reelcut. Only REC-3, REC-7, REC-8's
+   belong to the terminal, not to Frame Job. Only REC-3, REC-7, REC-8's
    step 6 and HS-2 launch from a terminal on purpose.
 3. Have to hand:
    - **Real footage**: a 1080p movie with sound, a long recording (twenty
@@ -26,15 +26,15 @@ in both appearances (System Settings ▸ Appearance, Light then Dark).
    - **Graphics projects** (GR): `RC_PROOF_APP=release python3 tools/proof/graphics_playback_samples.py`
      builds `Playback-1080p`, `Playback-4K`, `Error-card` and
      `Playback-4K-animated` into `tools/proof/work/playback-check/`. Rebuild them on a fresh checkout.
-   - **Keys**: your own AssemblyAI key for Cloud captions (Reelcut ▸
+   - **Keys**: your own AssemblyAI key for Cloud captions (Frame Job ▸
      Settings… ▸ Transcription) and your own Anthropic API key for the
-     Assistant (Reelcut ▸ Settings… ▸ Assistant). No script ever uses a real
+     Assistant (Frame Job ▸ Settings… ▸ Assistant). No script ever uses a real
      key.
 4. **The compositor's timing log** (PB-2, PB-3):
-   `defaults write com.kgalligan.Reelcut ReelcutCompositorTiming -bool YES`,
-   relaunch, and read it in Console.app filtered on `[reelcut] compositor`
+   `defaults write com.kgalligan.FrameJob FrameJobCompositorTiming -bool YES`,
+   relaunch, and read it in Console.app filtered on `[framejob] compositor`
    (average and worst milliseconds per 120 frames). Turn it off afterwards
-   with `defaults delete com.kgalligan.Reelcut ReelcutCompositorTiming`.
+   with `defaults delete com.kgalligan.FrameJob FrameJobCompositorTiming`.
 
 ## Reporting a failure
 
@@ -79,12 +79,12 @@ the same way.
 - **Source:** #47; step 3, #63; steps 4–5, #180; step 6, #195.
 
 **PB-7 — Waveforms have no gaps**
-- **Do:** 1. Import an AAC file, a WAV file and a recording made by Reelcut. 2. Look at each clip's waveform at M and L track height. 3. On the long recording, open Clip ▸ Remove Silences… while it is still being analysed.
+- **Do:** 1. Import an AAC file, a WAV file and a recording made by Frame Job. 2. Look at each clip's waveform at M and L track height. 3. On the long recording, open Clip ▸ Remove Silences… while it is still being analysed.
 - **Expect:** no gap or flat tail where there is sound. While decoding, the sheet names the file ("The waveform is still being analysed for …") until the decode finishes.
 - **Source:** #47 (#23).
 
 **PB-8 — A project whose media moved opens and offers Relink**
-- **Do:** Use the installed or current build, and note which `Reelcut.app` actually opened the file (its path in the Dock menu or Activity Monitor). 1. Save a project with two clips; quit. Move the `.reelcut` and its media together into a new folder, then open it from the Finder with right-click ▸ Open With ▸ Reelcut. 2. Move a media file while the project is OPEN in Reelcut, wait for an autosave, quit, and reopen it. 3. Move a media file to another volume (an external drive or a disk image), unmount it, and reopen the project.
+- **Do:** Use the installed or current build, and note which `Frame Job.app` actually opened the file (its path in the Dock menu or Activity Monitor). 1. Save a project with two clips; quit. Move the `.framejob` and its media together into a new folder, then open it from the Finder with right-click ▸ Open With ▸ Frame Job. 2. Move a media file while the project is OPEN in Frame Job, wait for an autosave, quit, and reopen it. 3. Move a media file to another volume (an external drive or a disk image), unmount it, and reopen the project.
 - **Expect:** each time, the project opens. Media that is still findable plays. Media that is gone shows slates, with the Missing media sheet offering Locate… and Relink. Never an open failure, a hang or a crash.
 - **Source:** #131 (the owner's report of 2026-09-26, not reproduced by the agents). On a failure, add to #131 which app opened the file and exactly what happened: an alert and its text, a hang, a crash, or no window.
 
@@ -95,21 +95,21 @@ the same way.
 
 **PB-10 — Real WebM and MKV files import, play in sync, scrub and export**
 - **Do:** 1. Get three real files: a YouTube VP9 WebM (e.g. from `yt-dlp -f 'bv*[ext=webm]+ba[ext=webm]'`), a Chrome screen recording (a page using `MediaRecorder`, or any site that saves a `.webm` recording) and an OBS recording saved as MKV with sound. On an M3 or later Mac, also an AV1 WebM. Make a Vorbis WebM beside them: `ffmpeg -f lavfi -i testsrc2=size=640x360:duration=10 -f lavfi -i sine=frequency=440:duration=10 -c:v libvpx-vp9 -c:a vorbis -strict -2 -ac 2 v.webm`. 2. Drop each into a project with no ffmpeg setting changed, and place it. 3. Play it, scrub across it and step with ← and →. 4. Export the project as H.264 and play the export.
-- **Expect:** each imports with no question and no alert, as a `.mov` under `~/Library/Application Support/Reelcut/Rewrapped/`. It plays with its sound in sync, every scrub and step shows a picture, and the export plays in sync. The Vorbis WebM imports the same way and plays with its sound in sync.
+- **Expect:** each imports with no question and no alert, as a `.mov` under `~/Library/Application Support/Frame Job/Rewrapped/`. It plays with its sound in sync, every scrub and step shows a picture, and the export plays in sync. The Vorbis WebM imports the same way and plays with its sound in sync.
 - **Source:** #216 (issue batch B73, spec §11 #216-R; `container_rewrap_probe.py` and `container_import_proof.py` script generated files only); Vorbis by issue batch B77 (spec §11 #228-V).
 
 **PB-11 — A long WebM or MKV copy shows its progress and can be cancelled**
-- **Do:** 1. Make or get a WebM or MKV of 2 GB or more (e.g. `ffmpeg -f lavfi -i testsrc2=size=1920x1080:rate=30:duration=1200 -f lavfi -i sine=frequency=440:duration=1200 -c:v libvpx-vp9 -b:v 12M -deadline realtime -cpu-used 8 -c:a libopus big.webm`); if a copy of it is already in `~/Library/Application Support/Reelcut/Rewrapped/`, delete it first. 2. In an open project with a text clip, choose File ▸ Add Media… and pick it with a short `.mov`; as soon as the window appears, double-click the text clip on the canvas and type, then press Escape. 3. Click into the copy window, press Escape. 4. Add the same file again and let it finish. 5. Delete its copy, quit, and open the file from the Finder with Open With ▸ Reelcut; press Cancel.
+- **Do:** 1. Make or get a WebM or MKV of 2 GB or more (e.g. `ffmpeg -f lavfi -i testsrc2=size=1920x1080:rate=30:duration=1200 -f lavfi -i sine=frequency=440:duration=1200 -c:v libvpx-vp9 -b:v 12M -deadline realtime -cpu-used 8 -c:a libopus big.webm`); if a copy of it is already in `~/Library/Application Support/Frame Job/Rewrapped/`, delete it first. 2. In an open project with a text clip, choose File ▸ Add Media… and pick it with a short `.mov`; as soon as the window appears, double-click the text clip on the canvas and type, then press Escape. 3. Click into the copy window, press Escape. 4. Add the same file again and let it finish. 5. Delete its copy, quit, and open the file from the Finder with Open With ▸ Frame Job; press Cancel.
 - **Expect:** a small "Copying Movie" window appears about a second after the copy starts, naming the file, with a moving bar, "`<copied>` of `<total>`" and Cancel. It does not take the keyboard: the typing and the first Escape reach the text editor, and the copy goes on. After the click into the window, Escape cancels: the button reads "Cancelling…", the window closes, no alert appears, the `.mov` is added and the WebM is not, and `Rewrapped/` holds no `.partial.mov`. The second import shows the window and ends with the file added; a third import of it adds it at once with no window. The Finder open shows the window in front with the keyboard, and its Cancel opens no project and shows no alert.
 - **Source:** #228 (issue batch B76, spec §11 #228-P; `container_rewrap_probe.py` C20–C30 script the copy, the doors and the Cancel, never the window on screen).
 
 **PB-12 — A WebM or MKV keeps its own name, Reveal in Finder shows it, and a deleted copy comes back**
-- **Do:** 1. Make a WebM of 2 GB or more as in PB-11 (`big.webm`), or use PB-11's; delete any copy of it in `~/Library/Application Support/Reelcut/Rewrapped/`. 2. Add it to a project, place it and save. 3. Look at its row in the Media tab and at the clip's name on the timeline; hold the pointer over the row. 4. Right-click the row ▸ Reveal in Finder. 5. Quit. In the Finder, delete its `.mov` in `Rewrapped/` (Move to Trash; do NOT empty the Trash). 6. Open the project again; let the copy finish. 7. Play the clip.
-- **Expect:** the row and the clip are named `big.webm`, not `big-<16 hex>.mov`. The tooltip's first line is "`<the WebM's path>` — copied into Reelcut's Rewrapped folder.", above the drag hint. Reveal in Finder selects the WebM, not the `.mov`. On reopening, the "Copying Movie" window appears about a second in, and when it closes the project shows no missing badge and no Missing media sheet; the clip plays from a new `.mov` in `Rewrapped/` (Reveal in Finder still shows the WebM), and the `.mov` in the Trash is left there.
+- **Do:** 1. Make a WebM of 2 GB or more as in PB-11 (`big.webm`), or use PB-11's; delete any copy of it in `~/Library/Application Support/Frame Job/Rewrapped/`. 2. Add it to a project, place it and save. 3. Look at its row in the Media tab and at the clip's name on the timeline; hold the pointer over the row. 4. Right-click the row ▸ Reveal in Finder. 5. Quit. In the Finder, delete its `.mov` in `Rewrapped/` (Move to Trash; do NOT empty the Trash). 6. Open the project again; let the copy finish. 7. Play the clip.
+- **Expect:** the row and the clip are named `big.webm`, not `big-<16 hex>.mov`. The tooltip's first line is "`<the WebM's path>` — copied into Frame Job's Rewrapped folder.", above the drag hint. Reveal in Finder selects the WebM, not the `.mov`. On reopening, the "Copying Movie" window appears about a second in, and when it closes the project shows no missing badge and no Missing media sheet; the clip plays from a new `.mov` in `Rewrapped/` (Reveal in Finder still shows the WebM), and the `.mov` in the Trash is left there.
 - **Source:** #228 (issue batch B78, spec §11 #228-O; `container_rewrap_probe.py` O31–O43 and `container_import_proof.py` M8–M11 script the name, the tooltip text, the reveal URL and the re-copy, never the window, the tooltip or Finder on screen).
 
 **PB-13 — An MKV the ffmpeg step converts copies its VP9 video, keeps its own name and steps frame by frame**
-- **Do:** 1. Make an MKV: `ffmpeg -f lavfi -i testsrc2=size=640x360:rate=30:duration=10 -f lavfi -i sine=frequency=440:duration=10 -c:v libvpx-vp9 -pix_fmt yuv420p -c:a flac v.mkv`. 2. Quit Reelcut and launch it with `open build/Build/Products/Release/Reelcut.app --args -RCFFmpegImport ask`. 3. Drop the MKV into a project and read the question; press the first button. 4. Place the clip, play it, scrub across it and step with ← and →.
+- **Do:** 1. Make an MKV: `ffmpeg -f lavfi -i testsrc2=size=640x360:rate=30:duration=10 -f lavfi -i sine=frequency=440:duration=10 -c:v libvpx-vp9 -pix_fmt yuv420p -c:a flac v.mkv`. 2. Quit Frame Job and launch it with `open "build/Build/Products/Release/Frame Job.app" --args -RCFFmpegImport ask`. 3. Drop the MKV into a project and read the question; press the first button. 4. Place the clip, play it, scrub across it and step with ← and →.
 - **Expect:** the question says the video can be copied as it is and the flac soundtrack has to be re-encoded to AAC. The Media tab row and the clip are named `v.mkv`. It plays with its sound in sync, every scrub shows a picture and every single-frame step shows a new one.
 - **Source:** #227, #233 (issue batch B80, spec §11 #227 and #233; `ffmpeg_rewrap_proof.py` scripts the plan, the copy's frame times, the original and the fallbacks on generated files, never the question, the names or playback on screen).
 
@@ -248,17 +248,17 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Source:** #48, #109.
 
 **CH-4 — The square buttons**
-- **Do:** 1. Close every document so Welcome shows, then open Reelcut ▸ Settings…. 2. In a project: File ▸ Export…, Clip ▸ Speed…, Clip ▸ Remove Silences…, File ▸ Generate Captions…, File ▸ Consolidate Media…, File ▸ New Recording…, Window ▸ Export Queue. 3. In each, hover every button, press and hold one, and look at a disabled one (Settings' Remove with no key set).
+- **Do:** 1. Close every document so Welcome shows, then open Frame Job ▸ Settings…. 2. In a project: File ▸ Export…, Clip ▸ Speed…, Clip ▸ Remove Silences…, File ▸ Generate Captions…, File ▸ Consolidate Media…, File ▸ New Recording…, Window ▸ Export Queue. 3. In each, hover every button, press and hold one, and look at a disabled one (Settings' Remove with no key set).
 - **Expect:** square buttons with no shadow. The blue one lightens slightly on hover, and the outlined one takes a faint grey fill. A press shrinks the button a little about its centre, and a disabled one is dimmed. No title is clipped and no row is cramped or off-centre, in both appearances.
 - **Source:** #100 (spec §11 SH-4).
 
 **CH-5 — Settings' info buttons**
-- **Do:** 1. Reelcut ▸ Settings…; hover each ⓘ beside "Assistant" and "Transcription", then move off. 2. Flick the pointer across an ⓘ without stopping. 3. Click one, then click elsewhere. 4. Click one, then click the same ⓘ again. 5. Rest on one until it opens, then click it and move off. 6. With Keyboard navigation on (System Settings ▸ Keyboard), Tab to an ⓘ and press Space. 7. With VoiceOver on, move to each ⓘ. 8. Close Settings with a popover up. 9. Repeat in both appearances, with Reduce motion on and off.
+- **Do:** 1. Frame Job ▸ Settings…; hover each ⓘ beside "Assistant" and "Transcription", then move off. 2. Flick the pointer across an ⓘ without stopping. 3. Click one, then click elsewhere. 4. Click one, then click the same ⓘ again. 5. Rest on one until it opens, then click it and move off. 6. With Keyboard navigation on (System Settings ▸ Keyboard), Tab to an ⓘ and press Space. 7. With VoiceOver on, move to each ⓘ. 8. Close Settings with a popover up. 9. Repeat in both appearances, with Reduce motion on and off.
 - **Expect:** a popover opens after a short beat, not on a flick across, and closes on leaving the icon; a second click on the ⓘ closes it (no flicker back open); a click on a hover-opened one keeps it open after the pointer leaves; the text is large and high-contrast, in short paragraphs, and wraps without clipping; VoiceOver says "About Assistant" / "About Transcription" and reads the text; the popover goes with the window.
 - **Source:** issue batch B71 (spec §11 SH-5).
 
 **CH-6 — Settings' MCP section**
-- **Do:** 1. On a 13" display, open Reelcut ▸ Settings… in the light appearance and read the MCP section's blurb. 2. Press Copy MCP Command. 3. Repeat in the dark appearance.
+- **Do:** 1. On a 13" display, open Frame Job ▸ Settings… in the light appearance and read the MCP section's blurb. 2. Press Copy MCP Command. 3. Repeat in the dark appearance.
 - **Expect:** the window fits on screen; the blurb is large and high-contrast; the button is below the blurb; nothing is selected or highlighted when Settings opens (the Assistant key field has focus); the status line appears after a press.
 - **Answer:** did the window fit, read clearly, open with nothing selected, and show the status line after the press, in both appearances?
 - **Source:** issue batch B74 (#222; `settings_layout_probe.py` L9, L10; spec §11 MC-7).
@@ -358,8 +358,8 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 Needs your own AssemblyAI key (Setup 3).
 
 **CC-1 — Settings and Verify**
-- **Do:** 1. Reelcut ▸ Settings… (⌘, from a document window). 2. Paste a good key, Verify; then a bad one, Verify. 3. Save; Remove. 4. If your account has the EU region, choose `eu` and generate captions.
-- **Expect:** "Key accepted" for the good key, a clear sentence for the bad one; the button row is balanced and each ⓘ's text reads; ⌘, never types a `,` nudge or into a rename; the key lands in a file in `~/Library/Application Support/Reelcut/`, and Remove feels final (the file goes). The EU region works.
+- **Do:** 1. Frame Job ▸ Settings… (⌘, from a document window). 2. Paste a good key, Verify; then a bad one, Verify. 3. Save; Remove. 4. If your account has the EU region, choose `eu` and generate captions.
+- **Expect:** "Key accepted" for the good key, a clear sentence for the bad one; the button row is balanced and each ⓘ's text reads; ⌘, never types a `,` nudge or into a rename; the key lands in a file in `~/Library/Application Support/Frame Job/`, and Remove feels final (the file goes). The EU region works.
 - **Source:** #53.
 
 **CC-2 — The sheet and a real recording**
@@ -380,7 +380,7 @@ Needs your own AssemblyAI key (Setup 3).
 ## Silence, transitions and motion
 
 **SIL-1 — Remove Silences by voice, listened to**
-- **Do:** 1. Record a narrated screencast in Reelcut; note by ear where the real pauses are. 2. Clip ▸ Remove Silences…, Voice mode, default padding (0.1 s). 3. Play every cut.
+- **Do:** 1. Record a narrated screencast in Frame Job; note by ear where the real pauses are. 2. Clip ▸ Remove Silences…, Voice mode, default padding (0.1 s). 3. Play every cut.
 - **Expect:** no clipped word at any cut.
 - **Answer:** is the padding breathing room or a clipped word? Should it be 0.05 s?
 - **Source:** #54.
@@ -410,7 +410,7 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Source:** #56.
 
 **GR-2 — Memory at 4K, and a slower machine**
-- **Do:** 1. Play `Playback-4K` with Activity Monitor open on Reelcut's memory. 2. If one is available, play it on a slower Mac, or a heavier graphic.
+- **Do:** 1. Play `Playback-4K` with Activity Monitor open on Frame Job's memory. 2. If one is available, play it on a slower Mac, or a heavier graphic.
 - **Expect / Answer:** memory stays steady (note the figure); no stutter. A stutter reopens graphics performance work.
 - **Source:** #56.
 
@@ -471,7 +471,7 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Source:** the precision road map's PR1 (spec §11 PR-1: the preview shows the compositor's 16-bit-float frames, with no EDR and no HDR flag; `preview_display_probe.py`'s spike found no script can see how the layer reads them, so this row is the check), and PR2 (spec §11 PR-2: every video source decodes to 16-bit float; `precision_proof.py` R1 measures the ramp's levels in a render, not on screen).
 
 **PRC-2 — Deep exports play and look right**
-- **Do:** 1. In a project with a full-frame shape filled with a slow black-to-white linear gradient (one edge to the other) and a title over it, export `prores_422` and then `prores_4444` (File ▸ Export…). 2. Open each file in QuickTime Player and look at it beside Reelcut's preview of the same frame. 3. In a 1920×1080 project holding the 10-bit ProRes ramp (PRC-1's step 4), export "HEVC 10-bit (MP4)" (`hevc_10bit`) and then "HEVC (MP4)" (`hevc`), and play both in QuickTime Player side by side.
+- **Do:** 1. In a project with a full-frame shape filled with a slow black-to-white linear gradient (one edge to the other) and a title over it, export `prores_422` and then `prores_4444` (File ▸ Export…). 2. Open each file in QuickTime Player and look at it beside Frame Job's preview of the same frame. 3. In a 1920×1080 project holding the 10-bit ProRes ramp (PRC-1's step 4), export "HEVC 10-bit (MP4)" (`hevc_10bit`) and then "HEVC (MP4)" (`hevc`), and play both in QuickTime Player side by side.
 - **Expect:** both ProRes files play; the gradient is smooth in each, with no band or step you cannot also see in the preview; the colours and the title are the ones the preview shows. The HEVC 10-bit file plays, smooth across the ramp, the same colours as the preview; beside it the `hevc` file may show faint bands, and the 10-bit one shows fewer or none.
 - **Source:** the precision road map's PR1 (spec §11 PR-3: the ProRes rows take the compositor's 16-bit frames) and PR3 (spec §11 PR-3: the `hevc_10bit` row writes Main 10; `precision_proof.py` T2 measures the ramp, not what the player shows).
 
@@ -535,7 +535,7 @@ These rows are run on a Release build (`make app`), with real camera footage of 
 - **Source:** the grading road map's trial task T6 (spec §11 GR-1, GR-6); the owner did not run it in the trial (GR7b). Read only after trying: it is built as an adjustment clip over the footage, graded brighter, with an ellipse shape on a matte track over it.
 
 **GRD-10 — Someone other than the owner tries the grading tasks**
-- **Do:** 1. Give someone who has not used Reelcut's grading a Release build, real camera footage and the six tasks: fix a clip that is too warm and too dark with Light alone (T1); grade a whole video with one adjustment clip (T2); give it a built-in look and set its amount (T3); import and apply a `.cube` LUT they have (T4); ask the Assistant to make the camera clips warmer and a bit brighter (T5); brighten a face inside an ellipse without being shown how (T6). 2. Watch without helping, and note where they stop, ask or guess.
+- **Do:** 1. Give someone who has not used Frame Job's grading a Release build, real camera footage and the six tasks: fix a clip that is too warm and too dark with Light alone (T1); grade a whole video with one adjustment clip (T2); give it a built-in look and set its amount (T3); import and apply a `.cube` LUT they have (T4); ask the Assistant to make the camera clips warmer and a bit brighter (T5); brighten a face inside an ellipse without being shown how (T6). 2. Watch without helping, and note where they stop, ask or guess.
 - **Expect:** each task is done without help; the owner records what they found hard and what to adjust, and files each adjustment as an issue.
 - **Source:** the owner's verdict, 2026-10-10 (GR7b): "I'll get feedback later from others and we can adjust."
 
@@ -565,13 +565,13 @@ These rows are run on a Release build (`make app`), with real camera footage of 
 - **Source:** grading-2's G2-4 (spec §11 GR-13, matte × qualifier); `qualifier_proof.py`'s M1 measures the product on a card.
 
 **GRD-16 — iPhone HDR footage**
-- **Do:** 1. Import an ordinary iPhone HDR clip (default Camera settings, HEVC) into a project of its own. 2. Look at it in the preview — with the playhead parked, paused, on the clip's first frame, and again just after Play from there; then play the composition through to its end — save a frame (File ▸ Save Frame…) and export a short GIF, and compare each side by side with the clip in QuickTime Player. 3. Export `prores_422` and step through the first frames where the clip starts in QuickTime Player. 4. Select the clip, open the Chroma Key section, press Pick from Canvas and click something green (or any distinct colour) in the frame; play. 5. Re-run PRC-3's HLG half (steps 1, 2 and 4) on this clip. 6. In another project, put a short Reelcut screen recording (File ▸ New Recording…) beside the iPhone HDR clip, and look at the recording there, in a project of its own, and in QuickTime Player.
+- **Do:** 1. Import an ordinary iPhone HDR clip (default Camera settings, HEVC) into a project of its own. 2. Look at it in the preview — with the playhead parked, paused, on the clip's first frame, and again just after Play from there; then play the composition through to its end — save a frame (File ▸ Save Frame…) and export a short GIF, and compare each side by side with the clip in QuickTime Player. 3. Export `prores_422` and step through the first frames where the clip starts in QuickTime Player. 4. Select the clip, open the Chroma Key section, press Pick from Canvas and click something green (or any distinct colour) in the frame; play. 5. Re-run PRC-3's HLG half (steps 1, 2 and 4) on this clip. 6. In another project, put a short Frame Job screen recording (File ▸ New Recording…) beside the iPhone HDR clip, and look at the recording there, in a project of its own, and in QuickTime Player.
 - **Expect:** the preview, the saved frame and the GIF all look like QuickTime Player's picture — not flat and grey, highlights rolling off rather than clipping, saturated colours not clipped; the preview's first frame, paused and on Play, is not washed out, and playback to the end stays smooth and never turns washed out; no washed-out flash on the clip's first exported frame; the key removes the colour that was picked, in the preview and in an export; PRC-3's expectations hold; the screen recording looks the same in all three places; the clip's timeline filmstrip and its Media-tab thumbnail look like the preview (spec §11 GR-21).
-- **Source:** grading-3 T3-1 (spec §11 GR-15 as amended: Reelcut's own HDR→SDR at step 0, chosen per composition, and the sRGB arm); `tools/proof/hdr_proof.py` measures synthetic ramps, not real footage, and its R0 read only a recording's labels.
+- **Source:** grading-3 T3-1 (spec §11 GR-15 as amended: Frame Job's own HDR→SDR at step 0, chosen per composition, and the sRGB arm); `tools/proof/hdr_proof.py` measures synthetic ramps, not real footage, and its R0 read only a recording's labels.
 
 **GRD-17 — Apple Log footage**
 - **Do:** 1. Import an iPhone Apple Log clip (iPhone 15 Pro or later, ProRes with Log, or Blackmagic Camera in Apple Log; or Apple Log 2 from a newer iPhone) into a project of its own. 2. Select its row in the Media tab and read the Camera Log section. 3. Set Camera Log to None, then back to the detected setting. 4. On the clip, Color: raise Brightness a little; then Look: apply Warm. 5. If you have Apple's Apple Log LUT, import it with Use LUT… and compare with the built-in conversion. 6. Note the 18 % grey patch or a face's level in the preview with the waveform open.
-- **Expect:** the clip looks like normal video on import (not flat and grey); the section reads "Apple Log — from the file" (or "Apple Log 2 — from the file"); None shows the flat log picture and the detected setting brings it back, one undo step each; the grade and the look act on the converted picture; Apple's LUT and the built-in agree closely in mid-tones (the built-in's mid-grey is Reelcut's 0.42, so they may differ in contrast); mid-grey sits near 42 % on the waveform; the clip's timeline filmstrip and its Media-tab thumbnail look like the preview — like normal video while Camera Log is set, the flat log picture with None — and follow each change of the setting (spec §11 GR-21).
+- **Expect:** the clip looks like normal video on import (not flat and grey); the section reads "Apple Log — from the file" (or "Apple Log 2 — from the file"); None shows the flat log picture and the detected setting brings it back, one undo step each; the grade and the look act on the converted picture; Apple's LUT and the built-in agree closely in mid-tones (the built-in's mid-grey is Frame Job's 0.42, so they may differ in contrast); mid-grey sits near 42 % on the waveform; the clip's timeline filmstrip and its Media-tab thumbnail look like the preview — like normal video while Camera Log is set, the flat log picture with None — and follow each change of the setting (spec §11 GR-21).
 - **Source:** grading-3 T3-2 (spec §11 GR-16: Apple Log detected from its label, converted at step 0 with Apple's published curve); `tools/proof/log_proof.py` measures synthetic ramps only, so whether a real iPhone file carries the label, and whether its code range is what GR-16 assumes, is this check's.
 
 **GRD-18 — Sony or Panasonic log footage**
@@ -581,33 +581,33 @@ These rows are run on a Release build (`make app`), with real camera footage of 
 
 ## Screen recording
 
-Launch Reelcut from the Finder or Dock unless the check says otherwise.
+Launch Frame Job from the Finder or Dock unless the check says otherwise.
 To take a permission away again: System Settings ▸ Privacy & Security, or
-`tccutil reset ScreenCapture com.kgalligan.Reelcut` (and `Microphone`).
+`tccutil reset ScreenCapture com.kgalligan.FrameJob` (and `Microphone`).
 
 **REC-1 — Record without Screen Recording permission opens Settings**
-- **Do:** 1. With Reelcut's Screen Recording permission off, File ▸ New Recording…, press Record. 2. Answer or dismiss the system prompt. 3. Press Record again.
-- **Expect:** if Reelcut has never asked on this Mac, the first press shows the system prompt, IN FRONT of the New Recording panel (not hidden behind it). Every later press opens System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, also in front of the panel, with Reelcut's row visible, and the panel's note says Settings is open at that pane. (Once Reelcut has asked, a `tccutil reset` does not bring the prompt back: the first press opens the pane, whose + adds Reelcut. That is accepted.)
+- **Do:** 1. With Frame Job's Screen Recording permission off, File ▸ New Recording…, press Record. 2. Answer or dismiss the system prompt. 3. Press Record again.
+- **Expect:** if Frame Job has never asked on this Mac, the first press shows the system prompt, IN FRONT of the New Recording panel (not hidden behind it). Every later press opens System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, also in front of the panel, with Frame Job's row visible, and the panel's note says Settings is open at that pane. (Once Frame Job has asked, a `tccutil reset` does not bring the prompt back: the first press opens the pane, whose + adds Frame Job. That is accepted.)
 - **Source:** spec §11 recording.md (Record asks once, then opens Settings).
 
 **REC-2 — Microphone permission**
-- **Do:** 1. Reset Reelcut's Microphone permission; choose a microphone in the panel; Record. 2. Deny it in Settings; Record again.
-- **Expect:** first, the system microphone prompt naming Reelcut, in front of the panel; once denied, Record opens System Settings ▸ Privacy & Security ▸ Microphone, in front of the panel.
+- **Do:** 1. Reset Frame Job's Microphone permission; choose a microphone in the panel; Record. 2. Deny it in Settings; Record again.
+- **Expect:** first, the system microphone prompt naming Frame Job, in front of the panel; once denied, Record opens System Settings ▸ Privacy & Security ▸ Microphone, in front of the panel.
 - **Source:** spec §11 recording.md; #55 R1.
 
 **REC-3 — Launched from a terminal**
-- **Do:** Run Reelcut from Terminal (as in CLAUDE.md's "Verifying a build") with the terminal lacking Screen Recording; press Record twice.
+- **Do:** Run Frame Job from Terminal (as in CLAUDE.md's "Verifying a build") with the terminal lacking Screen Recording; press Record twice.
 - **Expect:** each press shows the system prompt (for the terminal); System Settings never opens.
 - **Source:** spec §11 recording.md.
 
 **REC-4 — Picking and recording a window or display**
-- **Do:** 1. Launch Reelcut and open New Recording… straight away. 2. Choose window mode; pick a window in the system picker. 3. Record a display with Reelcut playing a timeline. 4. While another app is frontmost, change the panel's popups and switches.
-- **Expect:** no freeze on first opening; the picker presents from the panel and the choice arrives; the countdown looks right; the panel is absent from the file from the start and Reelcut's playback does not appear in it; the panel's controls work with another app in front.
+- **Do:** 1. Launch Frame Job and open New Recording… straight away. 2. Choose window mode; pick a window in the system picker. 3. Record a display with Frame Job playing a timeline. 4. While another app is frontmost, change the panel's popups and switches.
+- **Expect:** no freeze on first opening; the picker presents from the panel and the choice arrives; the countdown looks right; the panel is absent from the file from the start and Frame Job's playback does not appear in it; the panel's controls work with another app in front.
 - **Source:** #55 R1.
 
 **REC-5 — The menu bar indicator, pause and stop**
-- **Do:** 1. During a recording, check the macOS recording indicator and Reelcut's own menu bar item. 2. From the item's menu: Pause, then Resume, then Stop. 3. Record again, Pause, press ⌘Q. 4. Stop from the system indicator. 5. Play the recording across the pause.
-- **Expect:** the system indicator names Reelcut and stays up through a pause; paused shows a coral dot, a pause glyph and a frozen time; ⌘Q while paused opens the item's menu instead of quitting; Stop from either place lands the file; the panel returns only with a note; the recording has no visible cut, only the paused span missing.
+- **Do:** 1. During a recording, check the macOS recording indicator and Frame Job's own menu bar item. 2. From the item's menu: Pause, then Resume, then Stop. 3. Record again, Pause, press ⌘Q. 4. Stop from the system indicator. 5. Play the recording across the pause.
+- **Expect:** the system indicator names Frame Job and stays up through a pause; paused shows a coral dot, a pause glyph and a frozen time; ⌘Q while paused opens the item's menu instead of quitting; Stop from either place lands the file; the panel returns only with a note; the recording has no visible cut, only the paused span missing.
 - **Source:** #55 R1, R2.
 
 **REC-6 — Show Clicks**
@@ -616,12 +616,12 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Source:** #55.
 
 **REC-7 — The panel shown from the background leaves your typing alone**
-- **Do:** 1. Launch Reelcut from Terminal as in CLAUDE.md's "Verifying a build" (a scratch socket; the block prints its folder, `<dir>`) and open a project. 2. In a second Terminal tab, in the repository, run `sleep 5 && python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP("<dir>/agent.sock").call("perform_menu_item", path=["File", "New Recording…"])'`, then within the five seconds click into a TextEdit document. 3. When the panel appears, type a few words and press Return without clicking anything. 4. Click the panel's Close. 5. Click Reelcut's project window and press ⌥⌘N.
-- **Expect:** in step 3 the New Recording panel is in front of TextEdit, TextEdit keeps the focus, the words and the Return land in TextEdit, and no countdown starts. In step 4 the panel closes without bringing Reelcut's windows forward. In step 5 the panel comes up key, with Record as its default button.
-- **Source:** #137; spec §11 recording.md (the recorder panel takes key only from an active Reelcut).
+- **Do:** 1. Launch Frame Job from Terminal as in CLAUDE.md's "Verifying a build" (a scratch socket; the block prints its folder, `<dir>`) and open a project. 2. In a second Terminal tab, in the repository, run `sleep 5 && python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP("<dir>/agent.sock").call("perform_menu_item", path=["File", "New Recording…"])'`, then within the five seconds click into a TextEdit document. 3. When the panel appears, type a few words and press Return without clicking anything. 4. Click the panel's Close. 5. Click Frame Job's project window and press ⌥⌘N.
+- **Expect:** in step 3 the New Recording panel is in front of TextEdit, TextEdit keeps the focus, the words and the Return land in TextEdit, and no countdown starts. In step 4 the panel closes without bringing Frame Job's windows forward. In step 5 the panel comes up key, with Record as its default button.
+- **Source:** #137; spec §11 recording.md (the recorder panel takes key only from an active Frame Job).
 
 **REC-8 — File ▸ Pause Recording, and the item's one width**
-- **Do:** 1. Start a recording from the panel. 2. Open the File menu: Pause Recording, then open it again: Resume Recording. 3. Watch Reelcut's menu bar item through the pause and resume, and past the first minute. 4. Repeat 2–3 with the menu bar in the light look and in the dark. 5. Stop. 6. Launch Reelcut from Terminal as in REC-7 (a scratch socket in `<dir>`, the terminal holding Screen Recording); in a second Terminal tab, in the repository, run `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP("<dir>/agent.sock").call("record_screen", seconds=20)'`; while it records, choose File ▸ Pause Recording, then File ▸ Resume Recording, watching the menu bar item. 7. Run the `record_screen` line again; choose File ▸ Pause Recording, then File ▸ Stop Recording, and watch the item until it goes away.
+- **Do:** 1. Start a recording from the panel. 2. Open the File menu: Pause Recording, then open it again: Resume Recording. 3. Watch Frame Job's menu bar item through the pause and resume, and past the first minute. 4. Repeat 2–3 with the menu bar in the light look and in the dark. 5. Stop. 6. Launch Frame Job from Terminal as in REC-7 (a scratch socket in `<dir>`, the terminal holding Screen Recording); in a second Terminal tab, in the repository, run `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP("<dir>/agent.sock").call("record_screen", seconds=20)'`; while it records, choose File ▸ Pause Recording, then File ▸ Resume Recording, watching the menu bar item. 7. Run the `record_screen` line again; choose File ▸ Pause Recording, then File ▸ Stop Recording, and watch the item until it goes away.
 - **Expect:** the File item reads Pause Recording while recording and Resume Recording while paused, and is greyed out with no recording; each choice pauses or resumes as the item's own menu does (coral dot and running time, then the pause glyph and a frozen time). The item keeps one width throughout — the neighbouring menu bar items do not shift as the time ticks or the mark changes — and the title is never clipped, in either look. In step 6 the `record_screen` recording's item flips at each click, not up to a second later. In step 7 the item keeps the pause glyph and its frozen time until it disappears; the coral dot never returns.
 - **Source:** #98 (a, b); #181 (item 4, step 6); #193 (item 1, step 7); spec §11 recording.md (File ▸ Pause Recording).
 
@@ -632,12 +632,12 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 
 **REC-10 — A voice-over: your voice, the panel up, pause and resume across files**
 - **Do:** 1. With no project open (the welcome window up), File ▸ New Recording…, choose Source ▸ Microphone Only and a real microphone (not a virtual device), Record Into New Project, and press Record. 2. Through the countdown and the recording, speak and watch the panel. 3. Press the panel's Pause, wait, then Resume and speak again. 4. Press Close; press the welcome window's New Recording… button. Press Close again, then ⌘Q. 5. Choose File ▸ Stop Recording (⌥⌘N). 6. In the project that opened, put the playhead a few seconds in; New Recording…, Microphone Only, Record Into that project, Record, speak, and stop from the menu bar item's Stop Recording. Then Edit ▸ Undo. 7. Choose Microphone Only with the microphone set to Off and press Record.
-- **Expect:** with Microphone Only chosen, System Audio, Show Clicks and Size grey out and keep their values; Rate stays live; no Screen Recording prompt or System Settings pane appears. In step 2 the panel stays up the whole time: its rows are locked, the meter moves with your voice, the footnote shows the coral dot and the running time, and Record reads Stop with Pause beside it. In step 3 the button reads Resume while paused (the pause glyph and a frozen time in the footnote) and Pause again after. In step 4 Close takes the panel away and the recording carries on under the menu bar item; the welcome button shows the panel again, and ⌘Q shows it again instead of quitting. In step 5 the recording stops and opens as a new project: two `Voice-over <date> at <time>.m4a` files in `~/Movies/Reelcut Recordings/`, touching from 0 on its one track — your voice in both, the paused stretch missing. In step 6 the voice-over lands on a new back track named Microphone, starting at the playhead; Undo removes the clip and the track in one step and leaves the file. In step 7 nothing starts and the note asks you to choose a microphone. Both looks.
+- **Expect:** with Microphone Only chosen, System Audio, Show Clicks and Size grey out and keep their values; Rate stays live; no Screen Recording prompt or System Settings pane appears. In step 2 the panel stays up the whole time: its rows are locked, the meter moves with your voice, the footnote shows the coral dot and the running time, and Record reads Stop with Pause beside it. In step 3 the button reads Resume while paused (the pause glyph and a frozen time in the footnote) and Pause again after. In step 4 Close takes the panel away and the recording carries on under the menu bar item; the welcome button shows the panel again, and ⌘Q shows it again instead of quitting. In step 5 the recording stops and opens as a new project: two `Voice-over <date> at <time>.m4a` files in `~/Movies/Frame Job Recordings/`, touching from 0 on its one track — your voice in both, the paused stretch missing. In step 6 the voice-over lands on a new back track named Microphone, starting at the playhead; Undo removes the clip and the track in one step and leaves the file. In step 7 nothing starts and the note asks you to choose a microphone. Both looks.
 - **Source:** #99; spec §11 recording.md ("A voice-over is a recording with no picture").
-**REC-11 — Include Reelcut windows**
-- **Do:** 1. Open a project, File ▸ New Recording…, leave Include Reelcut windows off, and record the display showing the editor for 5 s. 2. Tick Include Reelcut windows and record again. 3. Choose Window… in Source with the box off, then with it on. 4. Quit, relaunch, and reopen the panel.
-- **Expect:** the first file holds no Reelcut window. The second shows the editor from its first frame. The New Recording panel is in neither. The picker offers no Reelcut window with the box off; with it on, it offers the editor but not the panel. The box keeps its setting.
-- **Source:** spec §11 recording.md (Include Reelcut windows).
+**REC-11 — Include Frame Job windows**
+- **Do:** 1. Open a project, File ▸ New Recording…, leave Include Frame Job windows off, and record the display showing the editor for 5 s. 2. Tick Include Frame Job windows and record again. 3. Choose Window… in Source with the box off, then with it on. 4. Quit, relaunch, and reopen the panel.
+- **Expect:** the first file holds no Frame Job window. The second shows the editor from its first frame. The New Recording panel is in neither. The picker offers no Frame Job window with the box off; with it on, it offers the editor but not the panel. The box keeps its setting.
+- **Source:** spec §11 recording.md (Include Frame Job windows).
 
 ## Assistant
 
@@ -659,18 +659,18 @@ Needs your own Anthropic API key (Setup 3).
 - **Source:** #159.
 
 **AS-4 — What a turn cost**
-- **Do:** 1. Quit Reelcut and delete `~/Library/Application Support/Reelcut/anthropic-prices.json`. 2. Relaunch; send two messages. 3. Clear; send one more. 4. Open `~/Library/Application Support/Reelcut/spend.jsonl`.
-- **Expect:** each turn ends with `Cost: $… · Reelcut's estimate at LiteLLM prices (…)`, the three reading `(bundled table of …)`, then `(fetched <today>)`, then `(cached <today>)`; the ledger has one line per response, with no key and no message text; the month's total is near the Anthropic Console's for the same calls.
+- **Do:** 1. Quit Frame Job and delete `~/Library/Application Support/Frame Job/anthropic-prices.json`. 2. Relaunch; send two messages. 3. Clear; send one more. 4. Open `~/Library/Application Support/Frame Job/spend.jsonl`.
+- **Expect:** each turn ends with `Cost: $… · Frame Job's estimate at LiteLLM prices (…)`, the three reading `(bundled table of …)`, then `(fetched <today>)`, then `(cached <today>)`; the ledger has one line per response, with no key and no message text; the month's total is near the Anthropic Console's for the same calls.
 - **Source:** road map 13 P2; spec §11 P-4, P-5.
 
 **AS-5 — What a conversation and the month cost**
-- **Do:** With your real key, open Reelcut ▸ Settings… and keep it beside the window; View ▸ Assistant (⌃⌘A). 1. Read the tab's Spend row. 2. Send two messages. 3. Clear; send one more.
-- **Expect:** the Spend row starts at "Nothing yet"; after the messages it equals the sum of those turns' `Cost:` lines ("$… · Reelcut's estimate"); Clear puts it back to "Nothing yet" and the next turn starts a new sum. Settings' month line ("<Month> <year> (UTC): $… over N responses.") grows with each response while it is open, without flickering to "Reading the spend ledger…", and is near the Anthropic Console's total for the same UTC days.
+- **Do:** With your real key, open Frame Job ▸ Settings… and keep it beside the window; View ▸ Assistant (⌃⌘A). 1. Read the tab's Spend row. 2. Send two messages. 3. Clear; send one more.
+- **Expect:** the Spend row starts at "Nothing yet"; after the messages it equals the sum of those turns' `Cost:` lines ("$… · Frame Job's estimate"); Clear puts it back to "Nothing yet" and the next turn starts a new sum. Settings' month line ("<Month> <year> (UTC): $… over N responses.") grows with each response while it is open, without flickering to "Reading the spend ledger…", and is near the Anthropic Console's total for the same UTC days.
 - **Source:** road map 13 P4; spec §11 P-4, P-7.
 
 **AS-6 — A reply cut short**
-- **Do:** With your real key, ask for something long (a paragraph about each clip) and press Stop while the reply streams. Open `~/Library/Application Support/Reelcut/spend.jsonl`, then the Anthropic Console's usage for the same minutes.
-- **Expect:** the turn ends with `Cost: at least $… (a response was cut short) · Reelcut's estimate at LiteLLM prices (…)`; the ledger's last line carries `"partial": true`; the Console's charge for that request is at least that figure, and expect it above: the streamed output is not counted (spec §11 P-8).
+- **Do:** With your real key, ask for something long (a paragraph about each clip) and press Stop while the reply streams. Open `~/Library/Application Support/Frame Job/spend.jsonl`, then the Anthropic Console's usage for the same minutes.
+- **Expect:** the turn ends with `Cost: at least $… (a response was cut short) · Frame Job's estimate at LiteLLM prices (…)`; the ledger's last line carries `"partial": true`; the Console's charge for that request is at least that figure, and expect it above: the streamed output is not counted (spec §11 P-8).
 - **Source:** issue batch B15 (#162); spec §11 P-8.
 
 **AS-7 — Selecting the conversation, and a message of several lines**
@@ -712,21 +712,21 @@ on your own account, never the spike's.
 - **Answer:** did a second `tools/list` follow the notification, and was `probe_new` callable in the same chat?
 - **Source:** road map 14 MC1 (q3, rows T1–T3 and D1).
 
-**AC-3 — Claude Code reaches Reelcut through `reelcut-mcp`**
-- **Do:** 1. `make app`, then `RC_PROOF_APP=release python3 tools/proof/mcp_proxy_proof.py` once: it writes `tools/proof/work/mcp-proxy/ac-mcp.json`, a scratch configuration whose `reelcut` server is the tree's Release `Contents/Helpers/reelcut-mcp`, with no env. 2. Quit Reelcut (every copy). 3. In a terminal, `claude --mcp-config tools/proof/work/mcp-proxy/ac-mcp.json --strict-mcp-config`. 4. Ask it to list the `reelcut` server's tools (`/mcp`). 5. Ask it to call `get_project`. 6. Quit Claude Code, and quit the Reelcut it opened.
-- **Expect:** step 4 lists Reelcut's tools with no Reelcut launched (the Dock shows none). Step 5 opens Reelcut in the background — the terminal keeps focus — and the call answers in Reelcut's own words (with no project open, "No project is open…"). Per MC1's q3, a running Reelcut newer than the bundle the proxy came from shows its own tools after the first call; whether Claude Code refetches on `list_changed` is AC-1's question.
-- **Answer:** were the tools listed before Reelcut ran, and did the first call open Reelcut without taking focus from the terminal and answer?
+**AC-3 — Claude Code reaches Frame Job through `framejob-mcp`**
+- **Do:** 1. `make app`, then `RC_PROOF_APP=release python3 tools/proof/mcp_proxy_proof.py` once: it writes `tools/proof/work/mcp-proxy/ac-mcp.json`, a scratch configuration whose `framejob` server is the tree's Release `Contents/Helpers/framejob-mcp`, with no env. 2. Quit Frame Job (every copy). 3. In a terminal, `claude --mcp-config tools/proof/work/mcp-proxy/ac-mcp.json --strict-mcp-config`. 4. Ask it to list the `framejob` server's tools (`/mcp`). 5. Ask it to call `get_project`. 6. Quit Claude Code, and quit the Frame Job it opened.
+- **Expect:** step 4 lists Frame Job's tools with no Frame Job launched (the Dock shows none). Step 5 opens Frame Job in the background — the terminal keeps focus — and the call answers in Frame Job's own words (with no project open, "No project is open…"). Per MC1's q3, a running Frame Job newer than the bundle the proxy came from shows its own tools after the first call; whether Claude Code refetches on `list_changed` is AC-1's question.
+- **Answer:** were the tools listed before Frame Job ran, and did the first call open Frame Job without taking focus from the terminal and answer?
 - **Source:** road map 14 MC3 (`mcp_proxy_proof.py` X1, X2; spec §11 MC-3, MC-4).
 
-**AC-4 — Copy MCP Command's line registers Reelcut with Claude Code**
-- **Do:** 1. Open the Reelcut you use (an installed copy, or the tree's Release build), choose Reelcut ▸ Settings…, and under MCP press Copy MCP Command. 2. Paste the line into Terminal and run it. 3. Run `claude mcp list`.
-- **Expect:** step 2 answers that `reelcut` was added; step 3 lists `reelcut` with the pasted helper path and shows it connected.
-- **Answer:** did the pasted line run as it stood, and does `claude mcp list` show `reelcut` connected?
+**AC-4 — Copy MCP Command's line registers Frame Job with Claude Code**
+- **Do:** 1. Open the Frame Job you use (an installed copy, or the tree's Release build), choose Frame Job ▸ Settings…, and under MCP press Copy MCP Command. 2. Paste the line into Terminal and run it. 3. Run `claude mcp list`.
+- **Expect:** step 2 answers that `framejob` was added; step 3 lists `framejob` with the pasted helper path and shows it connected.
+- **Answer:** did the pasted line run as it stood, and does `claude mcp list` show `framejob` connected?
 - **Source:** `agent_socket_proof.py` K13; `settings_layout_probe.py` L10; spec §11 MC-7.
 
 **AC-5 — A person's own import still asks while an agent's call runs**
-- **Do:** 1. Launch Reelcut from Terminal as in CLAUDE.md's "Verifying a build", adding `-RCFFmpegImport ask` to its arguments (ffmpeg installed), and open a project with a few seconds of media on the timeline. 2. In a second Terminal tab, in the repository, start an export over MCP: `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; print(MCP("<dir>/agent.sock").call("export", preset="h264", path="/tmp/ac5.mp4"))'`. 3. While it runs, drag onto the timeline from the Finder an `.mkv` whose video the built-in copy cannot carry, so it goes on to the ffmpeg question (since #216-R an H.264, VP9 or AV1 Matroska opens with no question; make one with `ffmpeg -f lavfi -i testsrc=duration=2 -c:v mpeg4 /tmp/ac5.mkv`). 4. Cancel the question.
-- **Expect:** the conversion question ("Reelcut cannot open …", Repackage or Convert) appears for the dragged file while the export is still being written; the export finishes either way.
+- **Do:** 1. Launch Frame Job from Terminal as in CLAUDE.md's "Verifying a build", adding `-RCFFmpegImport ask` to its arguments (ffmpeg installed), and open a project with a few seconds of media on the timeline. 2. In a second Terminal tab, in the repository, start an export over MCP: `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; print(MCP("<dir>/agent.sock").call("export", preset="h264", path="/tmp/ac5.mp4"))'`. 3. While it runs, drag onto the timeline from the Finder an `.mkv` whose video the built-in copy cannot carry, so it goes on to the ffmpeg question (since #216-R an H.264, VP9 or AV1 Matroska opens with no question; make one with `ffmpeg -f lavfi -i testsrc=duration=2 -c:v mpeg4 /tmp/ac5.mkv`). 4. Cancel the question.
+- **Expect:** the conversion question ("Frame Job cannot open …", Repackage or Convert) appears for the dragged file while the export is still being written; the export finishes either way.
 - **Answer:** did the question appear during the agent's export?
 - **Source:** road map 14 MC4 (spec §11 MC-5: a click still asks; `agent_socket_proof.py` K12 holds the tool call's half).
 
@@ -751,13 +751,13 @@ release"). These use the DOWNLOADED app, not the tree's build, and one
 appearance is enough.
 
 **REL-1 — The DMG installs and opens on another Mac**
-- **Do:** On a Mac that has never run Reelcut (or in a fresh user account), on macOS 26 and Apple silicon: 1. Download `Reelcut.dmg` from the release with a browser, so the file is quarantined. 2. Open it and drag Reelcut to Applications. 3. Double-click Reelcut in Applications. 4. Choose Reelcut ▸ About Reelcut.
+- **Do:** On a Mac that has never run Frame Job (or in a fresh user account), on macOS 26 and Apple silicon: 1. Download `FrameJob.dmg` from the release with a browser, so the file is quarantined. 2. Open it and drag Frame Job to Applications. 3. Double-click Frame Job in Applications. 4. Choose Frame Job ▸ About Frame Job.
 - **Expect:** the one "downloaded from the Internet" question, naming the developer, and no "cannot be opened", "damaged" or "unidentified developer" alert; the Welcome window; About shows the release's version with the run number in parentheses (e.g. 0.2.7 (7)).
 - **Source:** spec §11 PUB-1, PUB-5.
 
 **REL-2 — The downloaded build's microphone, recorder, assistant and MCP helper work**
-- **Do:** In the downloaded app: 1. File ▸ New Recording… with a microphone chosen; answer the Microphone and Screen Recording prompts; record a few seconds while speaking; stop. 2. Open the Assistant tab with your own Anthropic key set and send one short message. 3. Reelcut ▸ Settings… ▸ MCP ▸ Copy MCP Command; paste the line into Terminal, run it, then `claude mcp list`.
-- **Expect:** both prompts name Reelcut; your voice is in the recording's microphone file; the assistant answers (the helper did not die at launch); `claude mcp list` shows `reelcut` connected, with its path inside `/Applications/Reelcut.app`.
+- **Do:** In the downloaded app: 1. File ▸ New Recording… with a microphone chosen; answer the Microphone and Screen Recording prompts; record a few seconds while speaking; stop. 2. Open the Assistant tab with your own Anthropic key set and send one short message. 3. Frame Job ▸ Settings… ▸ MCP ▸ Copy MCP Command; paste the line into Terminal, run it, then `claude mcp list`.
+- **Expect:** both prompts name Frame Job; your voice is in the recording's microphone file; the assistant answers (the helper did not die at launch); `claude mcp list` shows `framejob` connected, with its path inside `/Applications/Frame Job.app`.
 - **Source:** spec §11 PUB-4 (`published_check.py` holds that the entitlements are there; this is whether they do their job under a Developer ID signature).
 
 **REL-3 — Permissions survive an update**
