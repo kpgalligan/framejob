@@ -604,3 +604,110 @@ edit is owed: its `make test` line names `HISTORY` without its members.
 **Owed:** phase N5.
 
 ## N5 — the record
+
+**Landed** (2026-10-13, in the worktree, not committed by the implementer; the orchestrator
+commits):
+
+- **The sweep.** `git grep -n -i reelcut 752af19 -- . ':!archive' ':!designs/design_handoff_chrome'
+  ':!designs/design_handoff_sharp' ':!designs/design_handoff_clip_inspector'
+  ':!designs/clip_inspector_brief' ':!.dupscan' ':!designs/rename-2.md'` printed 432 lines in 47
+  files. Each line outside `designs/adr/` and `designs/spec/11-decisions/` was read in its
+  paragraph and kept by class or renamed (the table below); the two folders' 161 lines are N4's
+  "Kept lines", whose per-file counts the grep matched, and none was re-read. 16 lines renamed
+  in place, one line each, no reflow: `tools/proof/README.md` 1359, 2246, 7310 (the quoted §11
+  heading, which reads Frame Job now), 7325 (both names), 10528, 13303 ("Include Frame Job
+  windows"), 14381, 14590, 14854, 15354, 15832, 15834, 15839 ("Another Frame Job"; its
+  `/Applications/Reelcut.app` kept, (p)) and 15843 (`-ReelcutExportChoice` →
+  `-FrameJobExportChoice`, N4's precedent at `designs/adr/roadmap-10-graphics.md:959`);
+  `tools/proof/assistant_spike/README.md` 50 (`framejob-agent`, the name `assistant_spike.py`
+  gives the helper today); `tools/proof/graphics_spike/README.md` 78 (`framejob.log` and
+  `grep "Frame Job: "`, what `rows_app.py` writes and greps today).
+- `tools/proof/README.md`'s "**Names in records.**" paragraph (6 lines → 8): the dated runs'
+  tables, quotes, commands as run, the paths, keys, domains and identifiers they name, and
+  old-tree builds stay as written; their prose names the product Frame Job.
+- `tools/proof/name_residue.py` (data, comments and docstring only): `HISTORY` is
+  `("designs/clip_inspector_brief/", ".dupscan/")`, its road map entry gone; the pins
+  `tools/proof/README.md` 199 → 186 (every counted line read, the table below);
+  `tools/proof/assistant_spike/README.md` and `tools/proof/graphics_spike/README.md` dropped (0
+  lines), the spike comment now naming only `silence_spike/README.md`'s past input path; new
+  `designs/adr/rename-2.md` 4 (lines 22, 23, 24 and 44: the two maps' old names, the stale
+  paths of exception (a), the issue pattern, and the old citation in Known limits; its lines 3
+  and 38 are (x)); the docstring names round 2's road map and record. `TEXT_HISTORY`,
+  `KEPT_PATTERNS`, `residue()`, the selftest and its mutants unchanged.
+- `designs/spec/11-decisions/rename.md`: one sentence at the end of the intro paragraph
+  (NM-12…NM-14, this road map closed, its record and this original), wrapped over six lines;
+  NM-12's and NM-14's citations of this road map now `archive/rename-2.md` (lines 195 and 244
+  after the intro; NM-8's and NM-14's "while that road map is open" lines stay as written).
+  241 → 246 lines; the `rename.md` Lines cell 241 → 246 and `designs/spec/README.md`'s
+  `11-decisions/` total 7669 → 7674.
+- `designs/adr/rename-2.md` (new, 61 lines): the condensed record, in `designs/adr/rename.md`'s
+  form.
+- This file `git mv`'d to `archive/rename-2.md`, and its `archive/INDEX.md` row after
+  `rename.md`'s.
+
+### The sweep's table
+
+Classes are "The rules"' letters plus (o), an input for building or running an old tree. Line
+numbers are at `752af19`. Every file outside `HISTORY` and `TEXT_HISTORY` that held the name
+there has a row.
+
+| File | Kept lines by class | Renamed in N5 |
+|---|---|---|
+| `designs/adr/` (10 files, 49 lines) | N4's "Kept lines" (above), unchanged | 0 |
+| `designs/spec/11-decisions/` (17 files, 112 lines) | N4's "Kept lines" (above), unchanged | 0 |
+| `.gitignore` | (o) 8, 11 (old trees' generated paths) | 0 |
+| `CLAUDE.md` | (s) 260 | 0 |
+| `designs/spec/README.md` | (p) 4 (`designs/reelcut-design.md`) | 0 |
+| `tools/proof/README.md` | (q) 36, 1790, 2577, 4014, 4654, 5044, 5454, 5524, 5608, 5692, 5695, 5776, 5857, 6135, 8515, 8524, 8805, 8863, 8940, 9000, 9016, 9089, 9241, 9613, 9619, 9622, 9685, 9766, 9856, 9894, 10211, 10295, 10335, 10385, 10449, 10498, 10534, 10798, 10840–10842, 10845, 10867, 10876, 10959, 11300, 11755, 12941, 13032, 13035–13036, 13299, 13471, 13623, 13676, 13684, 13699, 13703, 13744, 13779, 13807, 13860–13861, 13956, 13966, 13972, 13982, 14031, 14034, 14040, 14284, 14289, 14295, 14298, 14348, 14351, 14360, 14368, 14371, 14462, 14618, 14620–14627, 14630, 14634–14635, 14637, 14639–14641, 14643–14644, 14646, 14648, 14692–14699, 14721, 14736, 14777, 14779–14781, 14784–14787, 14873, 14894–14895, 14904, 14918, 14928, 14931–14933, 14945, 14977–14978, 15357, 15360, 15377, 15381, 15386–15387, 15610, 15807, 16166, 16194, 16202, 16531, 17604, 17687, 19009 (145); (p) 2241, 6996, 8707, 8991, 9441, 11291, 12976, 14432, 14436, 14438, 14444, 14447, 14450, 14452, 14454, 14594, 14600, 14606, 14826, 14860, 15783, 15839 (22); (s) 13624, 13747, 14125, 14153, 14156, 14161, 14376–14377, 14426, 14726, 14820, 14836, 14972, 15016, 15815 (15); (o) 261, 277, 345, 4176 (4) | 14: 1359, 2246, 7310, 7325, 10528, 13303, 14381, 14590, 14854, 15354, 15832, 15834, 15839 (with its path kept), 15843; and the paragraph at 40–45 |
+| `tools/proof/assistant_spike/README.md` | none | 1: 50 |
+| `tools/proof/budget.py` | (s) 56 | 0 |
+| `tools/proof/budget_proof.py` | (s) 43, 638 | 0 |
+| `tools/proof/cloud_captions_probe.py` | (o) 7530–7532 | 0 |
+| `tools/proof/grading_spike/grading_spike.py` | (o) 386, 670 | 0 |
+| `tools/proof/grading_verdict.py` | (o) 90, 91, 92, 654, 674; (s) 112, 936 | 0 |
+| `tools/proof/graphics_spike/README.md` | none | 1: 78 |
+| `tools/proof/harness/main.swift` | (s) 450, 459 | 0 |
+| `tools/proof/matte_spike/matte_spike.py` | (o) 216 | 0 |
+| `tools/proof/mcp.py` | (s) 240 | 0 |
+| `tools/proof/name_residue.py` | (r) 46, 217; (x) 65, 66 | 0 |
+| `tools/proof/proof_defaults.py` | (s) 17, 46, 47, 59, 60, 62, 70, 94–97, 110, 150, 153, 154, 164, 167, 168, 549, 761–763, 802, 895, 896 | 0 |
+| `tools/proof/reference_build.py` | (o) 48–50, 66, 67 | 0 |
+| `tools/proof/reference_build_selftest.py` | (o) 51, 52, 82, 84, 92, 93, 280, 281 | 0 |
+| `tools/proof/silence_spike/README.md` | (p) 41 (`~/Movies/Reelcut Recordings/`, a past run's input) | 0 |
+| `tools/proof/stale_registrations.py` | (s) 15, 53, 131, 208 | 0 |
+| `designs/adr/rename-2.md` (new in N5) | (p, r) 22, 23, 24, 44 (counted); (x) 3, 38 | — |
+| `app/ core/ graphic/ docs/ README.md CONTEXT.md agent/ mcp-proxy/` | 0 lines | 0 |
+
+**Measured** (each printed by the command beside it; the full outputs are in the phase's
+`04-checks.txt`):
+
+- `name_residue.py`: exit 0, silent. `--selftest`: `8/8 rows pass`, `PASS`.
+- `spec_index_proof.py`: `159/159 checks passed`, exit 0. `py_compile` of `name_residue.py`
+  silent.
+- The path count, `git ls-files -co --exclude-standard | grep -ic reelcut`: `0`.
+- `git grep -n 'designs/rename-2\.md' -- ':!archive'`: only
+  `designs/spec/11-decisions/rename.md` 156 and 238, the two "while that road map is open"
+  lines.
+- `git diff --numstat -- tools/proof designs/spec`: added equals removed on the two spike
+  READMEs, `designs/spec/README.md` and `11-decisions/README.md` (1 and 1 each);
+  `tools/proof/README.md` 19 and 17 (14 lines in place, the paragraph 6 → 8);
+  `name_residue.py` 10 and 13; `11-decisions/rename.md` 8 and 3 (the intro, two links).
+- `make gate` PASS in 106 s: names pass 1 s, test pass 104 s; typecheck, fmt, lint and app
+  skipped (inputs unchanged since their last pass). `archive/` is outside every gate hash, so
+  after this line was filled in only `name_residue.py` ran again: exit 0, silent.
+- The review (one should-fix, this record's (x) line number; one nit, the README pin's comment)
+  was applied in fix pass 1, and `make gate` after it: PASS in 71 s, names 1 s and test 70 s
+  run, the rest skipped. The re-review (one should-fix, this list's `name_residue.py` counts and
+  this item; one nit, the ADR's "until #287") was applied in fix pass 2, and `make gate` after
+  it: PASS in 1 s, names 1 s run, the rest skipped (`archive/` is outside every hash, and the
+  ADR's one-line edit touches no other step's input); `name_residue.py` then ran once more over
+  this item: exit 0, silent.
+
+**Deviations:** none in substance. The spike pin's comment keeps its block's `-- Permanent:` lead,
+and the new ADR pin's comment is capitalized like its neighbours. §11's intro sentence follows
+line 16 on the same line and is wrapped with it over six lines. Every rename the spec listed
+was made and no listed line was kept; no other line was renamed.
+
+**Owed:** the root `CLAUDE.md`'s "Where to look" entry for `designs/adr/rename-2.md`, applied
+by the orchestrator after the gate. #288 (filed, blocked by #287) removes the safety nets; no
+other item is unfinished.

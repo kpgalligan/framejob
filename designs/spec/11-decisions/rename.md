@@ -13,7 +13,12 @@ Reelcut, `reelcut` or `REELCUT` and keep the generic `Reel*` names, `rc_` and `R
 spelling "Frame Job" for people and `FrameJob` / `framejob` for machines; no migration code,
 the old folders moved by hand; and now, in the worktree `~/devel/reelcut-rename`, phase by
 phase, each gated and merged into main alone (`archive/rename.md`, "The owner's choices").
-The new icon and mark are the owner's, in `designs/frame-job/`.
+The new icon and mark are the owner's, in `designs/frame-job/`. NM-12…NM-14 were made by the
+second road map, "rename-2", also closed: its condensed record is `designs/adr/rename-2.md`, and
+the original, `archive/rename-2.md`, holds the inventory at `ed8f282`, the two name maps, the
+rules, the sweep's table and each phase's record (N0 the plan and these three decisions; N1 the
+archive's names; N2 the handoffs' names; N3 the issue rule; N4 the prose rule; N5 the sweep and
+the close).
 
 **Stands, and nothing here re-litigates it:** every earlier decision. Where one names an old
 identifier, path or sentence, an amendment paragraph at its end, naming the NM decision, says
@@ -187,7 +192,7 @@ workflow FILE, whose name does not change.
   "Amended by NM-n" paragraph, and `designs/adr/rename.md` where the old name is its subject),
   and a sentence the substitution would make false because its amendment changed more than
   the spelling (V-5's "`PRODUCT_NAME` stays `Reelcut`"). Why: the owner's choice of
-  2026-10-13 (`designs/rename-2.md`, "The owner's choices", item 2): the decisions read in
+  2026-10-13 (`archive/rename-2.md`, "The owner's choices", item 2): the decisions read in
   today's names, and a decision's substance is what append-only protects, not its spelling.
   Risk accepted: a decision's text is no longer byte-for-byte what was first written; git
   history holds the original, and a name-only edit is checked by reading it, not by a tool.
@@ -236,6 +241,6 @@ workflow FILE, whose name does not change.
   the plan; N1 the archive's names; N2 the handoffs' names; N3 the issue rule; N4 the prose
   rule; N5 the sweep and the close — each gated in the worktree `~/devel/reelcut-rename2`
   (branch `rename2`) and fast-forward merged into main alone. Why: the owner's choices of
-  2026-10-13, items 4 and 5 (`designs/rename-2.md`, "The owner's choices"). Risk accepted:
+  2026-10-13, items 4 and 5 (`archive/rename-2.md`, "The owner's choices"). Risk accepted:
   the safety nets and old-tree inputs keep the old name until the follow-up issue, and a
   citation's redirect depends on GitHub keeping the repository's old name free.

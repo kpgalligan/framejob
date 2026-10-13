@@ -40,9 +40,11 @@ that launches its own does so on a scratch socket.
 **Names in records.** The rename to Frame Job (spec §11 NM-1…NM-11) changed
 every name a proof uses, and this file's how-to says today's: the product
 paths, bundle ids, defaults keys, log lines, file names and flags. The dated
-runs, result tables, quoted output and old-tree builds below were made under
-the old name and stay as written (spec §11 NM-1): what they print is what ran
-then, and an old tree a proof builds still builds under its own name.
+runs below were made under the old name. Their result tables, quoted output,
+commands as run, the paths, keys, domains and identifiers they name, and
+old-tree builds stay as written (spec §11 NM-1), because what they print is
+what ran then and an old tree a proof builds still builds under its own name.
+Their prose names the product Frame Job (rename-2 N5).
 
 Each `phase<N>_proof.py` makes its own projects under `work/` from test media
 under `media/`, and every claim is one of three kinds: a placement read back
@@ -1356,7 +1358,7 @@ CHANGE BEHAVIOUR before its score was believed. The preview scale moved into
 exists to prevent — scores **69/79**: all three `render_frame` comparisons,
 both image-sequence exports, the ProRes pixels, and three of section 5's, where
 the double scaling shows as a player at 48 × 27. It is also what proves the
-launch argument reaches `PreviewQuality.stored()` INSIDE a running Reelcut,
+launch argument reaches `PreviewQuality.stored()` INSIDE a running Frame Job,
 which nothing in a clean run can observe: the Quarter instance renders 160 × 90
 where the Full one renders 640 × 360. `MediaUsage.clipsUsing` losing its nest
 walk scores **75/79**, and reproduces the pre-phase-8 defect exactly — the bare
@@ -2243,7 +2245,7 @@ anything, and the panel opens centred every time — the one thing that type's
 own doc says it must not do, since a preview window exists to be put on a
 SECOND display. The mechanism is measured in the same probe on a BARE `NSPanel`
 and a BARE `NSWindowController`, so the reading is about AppKit and not about
-Reelcut, and the probe also reports that re-asking AFTER the controller has
+Frame Job, and the probe also reports that re-asking AFTER the controller has
 taken the window answers true and sticks — which is the fix as well as the
 proof. A build that moves the one call scores 125/125 and nothing else here
 moves.
@@ -7307,7 +7309,7 @@ is pinned `apple` and the AssemblyAI endpoint is a dead loopback port.
 (`RecorderPanelController.swift:207`) whose default button is Record
 (`Sheets.swift:86`) — and Record asks for the Screen Recording and microphone
 grants. Showing it asks and records nothing. Since #137 (spec §11, "The
-recorder panel takes key only from an active Reelcut") `show()` makes it key
+recorder panel takes key only from an active Frame Job") `show()` makes it key
 only when Frame Job is active (`:332`); shown from the background it is ordered
 front without key (`:334`) and Frame Job stays inactive (`v3_tools.py`'s R3).
 But an instance that is ACTIVE when New Recording… runs still gets a key panel
@@ -7322,7 +7324,7 @@ read `key False active False`; with `True` the look is the host state `host:
 Frame Job active before New Recording…`, not a failure. The panel goes up once
 per instance, so twice a run. Measured before #137: 134–140 ms over four runs
 with both looks from one instance, then 62–70 ms per instance with one capture
-each; the panel was key with Reelcut ACTIVE — putting it up brought Reelcut to
+each; the panel was key with Frame Job ACTIVE — putting it up brought Frame Job to
 the front. Measured after it (2026-09-29): 106 ms light and 100 ms dark,
 `active before New Recording… False` for both, and each capture `key False
 active False`. **Keep your hands off the keyboard while the last screen of each
@@ -10525,7 +10527,7 @@ whose load average from other work ran 47–270:
   `MUTANTS` requires; 1 when the named row FAILed; 0 when it passed.
 
 Run on 2026-09-30, the change over `38a38ee`, every instance my own (another
-session's DerivedData Reelcut was left alone):
+session's DerivedData Frame Job was left alone):
 
 | Command | Answer |
 |---|---|
@@ -13300,7 +13302,7 @@ whole phase's table of every proof's score is the road map's MC4 record):
 
 ## The road map 14 merge into main (2026-10-02)
 
-`worktree-side-work` (road map 14, #127's prefetch, Include Reelcut windows)
+`worktree-side-work` (road map 14, #127's prefetch, Include Frame Job windows)
 merged into main at `c2b1100` (B52a–B73), whose proofs were all written
 against TCP. What the merge changed in the proofs:
 
@@ -14378,7 +14380,7 @@ None, None)".
 and compared (`cmp`) after each of the eight runs above: every comparison
 was silent, `Rewrapped/`'s own line included, which still reads
 `drwxr-xr-x@ 8 kevingalligan  staff  256 Oct  3 22:51:21 2026 .` over its
-six files dated Sep 5. Another session's Reelcut (an Xcode build) was
+six files dated Sep 5. Another session's Frame Job (an Xcode build) was
 running throughout and was not this batch's.
 
 **Left for the owner.** `tools/proof/work/b82-design-c0/` (gitignored), from
@@ -14587,7 +14589,7 @@ skips the unlink in the real Preferences folder only, since over a scratch
 folder there is no daemon and the unlink is the whole removal.
 
 Run on 2026-10-04 over `a31b9da` plus this batch's diff, macOS 26.5.1,
-Python 3.14.7, another session's Reelcut (pid 85319, an Xcode build)
+Python 3.14.7, another session's Frame Job (pid 85319, an Xcode build)
 running throughout and never this batch's.
 
 `proof_defaults.py --selftest` printed `passed 10/10`, exit 0: P1 "CONTROL:
@@ -14851,7 +14853,7 @@ made, then counts as another Frame Job, and a moved key is only printed unless
 holds it.
 
 **The miss was looked for again and not caught** (the same day, 14:28 to
-14:46, after the review; another session's Reelcut, pid 85319, running and
+14:46, after the review; another session's Frame Job, pid 85319, running and
 never signalled). With the scoring above, 52 runs of the proof printed no
 FAIL: two whole (`passed 8/8`), 40 of `--only C0,G1,G2,G3,G5,G4` (`passed
 6/6` each, 7 to 8 s), and 10 more of those under sixteen busy loops (9 to 10
@@ -15351,7 +15353,7 @@ every sheet's, so nothing is changed for it here; whether it reads as
 loose is GR-7's.
 
 **Fix pass 1** (2026-10-05, the review's two should-fixes; macOS 26.5.1,
-Python 3.14.7, another session's Reelcut, pid 85319, running throughout).
+Python 3.14.7, another session's Frame Job, pid 85319, running throughout).
 *The guard under a scratch home that is not there.* The screens line
 below, run while `tools/proof/work/b84b-screens/home` did not exist,
 printed `mcp: DEFAULTS MOVED in com.kgalligan.Reelcut:` with forty of the
@@ -15829,18 +15831,18 @@ nothing else; the `export` tool's handler,
 `ExportSheet*.swift` or `ExportQueue*.swift`. (Line numbers at 055a5ed;
 phase A's diff touches none of these files.) By a run, `mcp.py`'s guard is
 the instrument: a moved owner-visible key is a `mcp: DEFAULTS MOVED` line
-on stderr, and status 3 when no other Reelcut shares the domain. **The
+on stderr, and status 3 when no other Frame Job shares the domain. **The
 stderr of the two recordings and of the gate's red and green runs was not
-kept**, and another session's Reelcut was alive then, so a moved key would
+kept**, and another session's Frame Job was alive then, so a moved key would
 only have printed — nothing is claimed of those four runs from their
 output. Fix pass 1's run
 kept both streams apart: 11/11, exit 0, **stderr empty** (0 bytes) — no
 `DEFAULTS MOVED` line and no line saying the guard could not read the
-domain. Another Reelcut (`/Applications/Reelcut.app`, the same bundle
+domain. Another Frame Job (`/Applications/Reelcut.app`, the same bundle
 identifier) was alive during it, so a line, not status 3, is what a moved
 key would have been.
 
-**A launch argument the argument domain drops.** `-ReelcutExportChoice
+**A launch argument the argument domain drops.** `-FrameJobExportChoice
 {"preset_id":"hevc_alpha"}` is NOT taken: a value that begins with a brace
 and is not a property list is discarded, `UserDefaults` answers the owner's
 own remembered choice, and the sheet opened on it (measured on this host:

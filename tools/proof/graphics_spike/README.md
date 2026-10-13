@@ -75,7 +75,7 @@ rows, the host, the resolved crate versions, the revert and the git check;
 `frames/` (each graphic at frames 0, 30 and 150, looked at once),
 `q9/` (the two probe binaries), `q9_fonts/` (the one font both q9 renders
 use), `q7/` (the three packages and the watched folder) and
-`reelcut-4843.log`, which `grep "Reelcut: "` must leave empty. `full-run.log` is the
+`framejob.log`, which `grep "Frame Job: "` must leave empty. `full-run.log` is the
 2026-09-24 full run's printed transcript, copied there by hand, because a
 later `--only q7` replaced that run's q7 entry in `answers.json`. After the review's sandbox fix, `answers.json` is that record with its
 q6 entry replaced by an `--only q6` re-run (eighteen cases, what §10.1 q6

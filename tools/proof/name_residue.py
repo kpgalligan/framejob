@@ -20,6 +20,7 @@ name case-insensitively (`git grep -n -I -i --untracked`), and every such path
 An offence prints one line: `<path>:<n>: <text>`, `<path>: <found> lines,
 COUNTED pins <pinned>`, or `<path>: path holds the old name`. Standard library
 only. The road map is `archive/rename.md`; its condensed record `designs/adr/rename.md`.
+Round 2's are archive/rename-2.md and designs/adr/rename-2.md.
 
 **The selftest** builds a scratch git repository under
 `tools/proof/work/name_residue/` and scores: S0 (CONTROL) a clean tree passes;
@@ -45,12 +46,8 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 WORK = os.path.join(ROOT, "tools", "proof", "work", "name_residue")
 NAME = "reelcut"
 
-# Kept whole: history (spec §11 NM-1), the rename's open road map among it.
-HISTORY = (
-    "designs/clip_inspector_brief/",
-    ".dupscan/",
-    "designs/rename-2.md",
-)
+# Kept whole: history (spec §11 NM-1).
+HISTORY = ("designs/clip_inspector_brief/", ".dupscan/")
 
 # Prefixes whose LINES are kept but whose PATHS are still checked (spec §11 NM-13);
 # the three design handoff folders joined in rename-2 N2, their designers' lines kept.
@@ -104,11 +101,14 @@ COUNTED = {
     "designs/adr/roadmap-08-word-captions.md": 1,
     "designs/adr/roadmap-10-graphics.md": 2,
     "designs/adr/roadmap-11-dev-tools.md": 1,
+    # Names the old paths, maps and patterns round 2 renamed or dropped, as NM-12..NM-14 do
+    # (rename-2 N5).
+    "designs/adr/rename-2.md": 4,
     # -- Permanent: a pointer to a path that keeps the old name (NM-1): the spec's
-    # single file in git history, and the proof README's recorded results (its dated
-    # runs, result tables, quoted output and old-tree builds).
+    # single file in git history, and the proof README's recorded output, past paths and
+    # identifiers, old domains and folders, and old-tree builds (rename-2 N5).
     "designs/spec/README.md": 1,
-    "tools/proof/README.md": 199,
+    "tools/proof/README.md": 186,
     # -- Root CLAUDE.md: line 260 names the old proofs' ledger folder `budget.py`
     # guards (permanent, NM-7).
     "CLAUDE.md": 1,
@@ -116,7 +116,6 @@ COUNTED = {
     ".gitignore": 2,
     # -- Permanent: tools that must name the old spelling to refuse it, find it, build or
     # compare a tree from before R1, or read the old ledger folder (NM-6, NM-7, NM-8).
-    "tools/proof/assistant_spike/README.md": 1,
     "tools/proof/budget.py": 1,
     "tools/proof/budget_proof.py": 2,
     "tools/proof/cloud_captions_probe.py": 3,
@@ -130,9 +129,7 @@ COUNTED = {
     "tools/proof/reference_build.py": 5,
     "tools/proof/reference_build_selftest.py": 8,
     "tools/proof/stale_registrations.py": 4,
-    # -- Permanent: a spike README's line quoting a past run's output (a recorded log name
-    # or input path).
-    "tools/proof/graphics_spike/README.md": 1,
+    # -- Permanent: a spike README's line naming a past run's input path.
     "tools/proof/silence_spike/README.md": 1,
 }
 

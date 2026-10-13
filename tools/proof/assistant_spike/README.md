@@ -47,7 +47,7 @@ stand-in; nothing else. A run takes about 5 min, most of it the two builds and t
 `*.entitlements`), `project.yml` and `Makefile` copied; every other build
 input `project.yml` names but `agent` symlinked; `agent/` holding Rasterize's `package.json`, `bun.lock`,
 `tsconfig.json`, `entitlements.plist` and `src/{main,protocol}.ts` with
-`rasterize-agent` renamed `reelcut-agent` (package name, outfile, the lock's
+`rasterize-agent` renamed `framejob-agent` (package name, outfile, the lock's
 root workspace). The hook goes in `app/Sources/`, one call to it after
 `AppDelegate`'s `enabledDefaultsKey` block, and Rasterize's `Build Agent
 Helper` step (its `project.yml:173-190`, renamed) goes before `schemes:` as
