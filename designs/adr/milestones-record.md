@@ -4,7 +4,7 @@
   carried until 2026-09-17 (`fc5e07f`), moved verbatim and never maintained after. It stops at road
   map 3's R2 (2026-09-12). Its closing line, "Keep this file current as code lands", is a leftover
   from its `CLAUDE.md` days and contradicts its own header.
-- **Original:** `archive/reelcut-milestones.md` (1448 lines) — sections cited below as "orig
+- **Original:** `archive/milestones.md` (1448 lines) — sections cited below as "orig
   <entry>" (M1, M2, M3, chrome, P0–P9 for road map 2's phases, remainder, R1, R2) refer to its
   bullets. Road maps 2 and 3 keep fuller per-phase records of their own
   and their own ADRs; this file duplicates them in part.

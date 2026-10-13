@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Road map 14 MC1 — the spike: the snapshot, the launch, the client, the socket.
 
-Four questions `archive/reelcut-roadmap-14.md` (condensed in `designs/adr/roadmap-14-agent-socket.md`) asks before MC2 and MC3 are
+Four questions `archive/roadmap-14.md` (condensed in `designs/adr/roadmap-14-agent-socket.md`) asks before MC2 and MC3 are
 built, measured. **The answers are not here**: they are that document's MC1
 record. What is here is the instrument that measured them.
 

@@ -4,7 +4,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 [`README.md`](README.md).
 
 The road map that made these is closed: its condensed record is `designs/adr/roadmap-13-pricing.md`,
-and the original, `archive/reelcut-roadmap-13.md`, words them in §3 and holds what was measured in §1
+and the original, `archive/roadmap-13.md`, words them in §3 and holds what was measured in §1
 and §5.
 
 - **P-1 — Prices come from LiteLLM's table.** A committed snapshot

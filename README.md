@@ -443,7 +443,7 @@ volume/fade/duck/detach, freeze frame, speed, the in/out range and the agent —
 and **M2 and M3 are now done too**: chapters on export, nests, filters,
 reflection, spotlight, reverse, the audio DSP, GIF/APNG export, SRT captions,
 Consolidate Media and ffmpeg-assisted import. Beyond the spec,
-`archive/reelcut-roadmap-2.md`'s phases 0 through 7 have landed — the
+`archive/roadmap-2.md`'s phases 0 through 7 have landed — the
 groundwork, the cutting moves, clip identity, the screencast trio, captions
 in both directions with the built-in text animations, sound (the mono fold,
 a level meter, Normalize Clip, loudness on export and the two uncompressed

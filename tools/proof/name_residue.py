@@ -4,15 +4,16 @@ allowed to.
 
     python3 tools/proof/name_residue.py                       # exit 0 clean, 1 offences
     python3 tools/proof/name_residue.py --selftest
-    python3 tools/proof/name_residue.py --mutant ge-count|no-untracked
+    python3 tools/proof/name_residue.py --mutant ge-count|no-untracked|text-history-paths
 
 Every line of every tracked or untracked-unignored file that matches the old
 name case-insensitively (`git grep -n -I -i --untracked`), and every such path
 (`git ls-files -co --exclude-standard`), is an offence unless it is allowed:
 
 * a path under `HISTORY` — kept whole;
-* a line that one of `KEPT_PATTERNS` matches — an issue citation, an archived
-  file's name, or an outside path that is real until the owner's renames;
+* a line in a file under `TEXT_HISTORY` — its lines kept, its path still checked;
+* a line that one of `KEPT_PATTERNS` matches — an issue citation, or an outside
+  path that is real until the owner's renames;
 * a file in `COUNTED` whose matching lines, less those `KEPT_PATTERNS` already
   allows, number EXACTLY its pinned count — one over or one under fails.
 
@@ -24,11 +25,13 @@ only. The road map is `archive/rename.md`; its condensed record `designs/adr/ren
 `tools/proof/work/name_residue/` and scores: S0 (CONTROL) a clean tree passes;
 S1 a stray line in a tracked file fails; S2 a stray line in an untracked file
 fails; S3 a counted file one line over fails; S4 one line under fails; S5 a
-tracked path holding the name fails; S6 (CONTROL) a `HISTORY` path and a
-`KEPT_PATTERNS` line pass. A `--mutant` runs the selftest and must fail
-exactly its row: `ge-count` (the pin a ceiling: a counted file passes at or
-under it) S4;
-`no-untracked` (untracked files not read) S2.
+tracked path holding the name fails; S6 (CONTROL) a `HISTORY` path, a
+`TEXT_HISTORY` line and a `KEPT_PATTERNS` line pass; S7 a tracked path holding
+the name under a `TEXT_HISTORY` prefix fails. A `--mutant` runs the selftest
+and must fail exactly its row: `ge-count` (the pin a ceiling: a counted file
+passes at or under it) S4;
+`no-untracked` (untracked files not read) S2;
+`text-history-paths` (paths under `TEXT_HISTORY` exempted) S7.
 """
 
 import argparse
@@ -44,7 +47,6 @@ NAME = "reelcut"
 
 # Kept whole: history (spec §11 NM-1), the rename's road map and ADR among it.
 HISTORY = (
-    "archive/",
     "designs/adr/",
     "designs/design_handoff_reelcut/",
     "designs/design_handoff_reelcut_sharp/",
@@ -54,13 +56,14 @@ HISTORY = (
     "designs/rename-2.md",
 )
 
+# Prefixes whose LINES are kept but whose PATHS are still checked (spec §11 NM-13).
+TEXT_HISTORY: tuple[str, ...] = ("archive/",)
+
 # A line one of these matches is allowed in any file: issue citations redirect since
-# the repository's rename (2026-10-13), archived files keep their names, and the two
-# outside paths are where spec §11's append-only text recorded a past worktree, a past
-# run's file or a litecode brief.
+# the repository's rename (2026-10-13), and the two outside paths are where spec §11's
+# append-only text recorded a past worktree, a past run's file or a litecode brief.
 KEPT_PATTERNS = (
     r"kpgalligan/reelcut#\d+",
-    r"archive/reelcut-[\w.-]+\.md",
     r"\.claude/litecode/reelcut/",
     r"devel/reelcut[\w-]*",
 )
@@ -116,7 +119,7 @@ COUNTED = {
     "tools/proof/harness/main.swift": 2,
     "tools/proof/matte_spike/matte_spike.py": 1,
     "tools/proof/mcp.py": 1,
-    "tools/proof/name_residue.py": 6,
+    "tools/proof/name_residue.py": 5,
     "tools/proof/phase5_chrome.py": 1,
     "tools/proof/phase8_chrome.py": 1,
     "tools/proof/proof_defaults.py": 25,
@@ -146,7 +149,8 @@ def _historic(path, history):
     return any(path == one or (one.endswith("/") and path.startswith(one)) for one in history)
 
 
-def residue(root: str, *, history=HISTORY, kept=KEPT_PATTERNS, counted=COUNTED) -> list[str]:
+def residue(root: str, *, history=HISTORY, text_history=TEXT_HISTORY, kept=KEPT_PATTERNS,
+            counted=COUNTED) -> list[str]:
     """The offences under `root`, one string each; empty means the tree passes."""
     grep = ["grep", "-n", "-I", "-i"]
     if MUTANT != "no-untracked":
@@ -154,7 +158,7 @@ def residue(root: str, *, history=HISTORY, kept=KEPT_PATTERNS, counted=COUNTED) 
     found = {}
     for line in _git(root, *grep, "-e", NAME, "--").splitlines():
         path, number, text = line.split(":", 2)
-        if _historic(path, history):
+        if _historic(path, history + text_history):
             continue
         if any(re.search(pattern, text, re.I) for pattern in kept):
             continue
@@ -172,8 +176,9 @@ def residue(root: str, *, history=HISTORY, kept=KEPT_PATTERNS, counted=COUNTED) 
     listed = ["ls-files", "-c", "--exclude-standard"]
     if MUTANT != "no-untracked":
         listed.insert(2, "-o")
+    exempt = history + text_history if MUTANT == "text-history-paths" else history
     for path in sorted(set(_git(root, *listed).splitlines())):
-        if NAME in path.lower() and not _historic(path, history):
+        if NAME in path.lower() and not _historic(path, exempt):
             offences.append(f"{path}: path holds the old name")
     return offences
 
@@ -207,6 +212,7 @@ def selftest(mutant: str | None = None) -> int:
     results = []
     old, Old = NAME, NAME.capitalize()
     history, kept = ("history/",), (r"issues/reelcut#\d+",)
+    text_history = ("texts/",)
     counted = {"counted.txt": 2}
     two = f"{Old} one\nmiddle\n{old} two\n"
 
@@ -216,7 +222,8 @@ def selftest(mutant: str | None = None) -> int:
 
     def check(name, root, want_clean, what):
         try:
-            found = residue(root, history=history, kept=kept, counted=counted)
+            found = residue(root, history=history, text_history=text_history, kept=kept,
+                            counted=counted)
         except (OSError, RuntimeError, subprocess.SubprocessError) as error:
             row(name, False, f"{what}: the check could not run: {error}")
             return
@@ -237,12 +244,15 @@ def selftest(mutant: str | None = None) -> int:
     check("S5", _scratch("s5", {"counted.txt": two, f"{old}-notes/a.txt": "nothing\n"}), False,
           "a tracked path holding the name")
     check("S6", _scratch("s6", {"counted.txt": two, f"history/{old}-x/a.txt": f"{Old}\n",
+                                "texts/a.md": f"{Old}\n",
                                 "b.txt": f"see issues/{old}#12\n"}), True,
-          "CONTROL: a HISTORY path and a KEPT_PATTERNS line pass")
+          "CONTROL: a HISTORY path, a TEXT_HISTORY line and a KEPT_PATTERNS line pass")
+    check("S7", _scratch("s7", {"counted.txt": two, f"texts/{old}-x.md": "nothing\n"}), False,
+          "a tracked path holding the name under a TEXT_HISTORY prefix")
     shutil.rmtree(WORK, ignore_errors=True)
     failed = {name for name, ok in results if not ok}
     print(f"{len(results) - len(failed)}/{len(results)} rows pass")
-    expected = {"ge-count": {"S4"}, "no-untracked": {"S2"}}
+    expected = {"ge-count": {"S4"}, "no-untracked": {"S2"}, "text-history-paths": {"S7"}}
     if mutant:
         ok = failed == expected[mutant]
         print(f"MUTANT {'PASS' if ok else 'FAIL'}: {mutant} failed {sorted(failed)}, expected "
@@ -255,7 +265,7 @@ def selftest(mutant: str | None = None) -> int:
 def main(argv=None):
     parser = argparse.ArgumentParser(description="rename R1: the old name's residue (NM-8)")
     parser.add_argument("--selftest", action="store_true")
-    parser.add_argument("--mutant", choices=("ge-count", "no-untracked"))
+    parser.add_argument("--mutant", choices=("ge-count", "no-untracked", "text-history-paths"))
     arguments = parser.parse_args(argv)
     if arguments.selftest or arguments.mutant:
         return selftest(arguments.mutant)

@@ -43,7 +43,7 @@ extension AgentServer {
     /// it there.
     ///
     /// **`color` goes to the core UNREAD** (deepening D1·4,
-    /// `archive/reelcut-roadmap-7.md` §2.4): a colour is four numbers each
+    /// `archive/roadmap-7.md` §2.4): a colour is four numbers each
     /// 0–1 everywhere, so the three-element form `colorArg` used to fill an
     /// alpha into and the clamp it used to apply to a component outside the
     /// range are both gone, and the core names what it refused — the wrong

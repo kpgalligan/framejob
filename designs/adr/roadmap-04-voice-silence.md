@@ -2,7 +2,7 @@
 
 - **Status:** Built (S1 `1c3e92e`, 2026-09-15; proved 2026-09-19; reader review and residue closed
   2026-09-20; its #23 follow-up closed 2026-09-22). Only the person-at-the-machine checks are left.
-- **Original:** `archive/reelcut-roadmap-4.md` (1378 lines). This file cites its sections as "orig §x".
+- **Original:** `archive/roadmap-4.md` (1378 lines). This file cites its sections as "orig §x".
 - **Spec decisions:** spec §11 has five unnumbered bullets for road map 4's S0/S1, starting "The
   silence detector's second signal is a voice-activity model". In short: Silero VAD v6.2.1 runs
   through Core ML. Edges come from its 32 ms grid, and level judges only where no voice is found,

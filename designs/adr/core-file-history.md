@@ -2,7 +2,7 @@
 
 - **Status:** Closed (2026-09-26) — a history file, not a road map. Nothing in it is
   in flight; its last entry is road map 10's G1d (2026-09-25).
-- **Original:** `archive/reelcut-core-notes.md` (1,108 lines) — the full record; sections
+- **Original:** `archive/core-notes.md` (1,108 lines) — the full record; sections
   cited below as "orig §x" refer to it (section map at the end).
 - **Spec decisions:** relies on, does not introduce: #22 (a media clip's window stays
   inside its file, snapped DOWN); D4-1 (content length is one function, the plan obeys

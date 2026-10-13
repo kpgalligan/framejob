@@ -362,7 +362,7 @@ dropped). The result gains `mode`, `voice_confidence`, `judged_by_level`
 meaning. `mode: "voice"` with the model unavailable is refused with the
 sentence. The handler is `AgentServer+Silence.swift` (138); the catalog
 entry grows in `AgentCatalog+Clips.swift`, which is at 957 and over the
-cap and not in `reelcut-remaining.md` §3's ledger — so the phase pays it
+cap and not in `remaining.md` §3's ledger — so the phase pays it
 first: the two audio tools' entries (`detect_silence`, `normalize_clip`)
 move to `AgentCatalog+Audio.swift` on `AgentCatalog+Files.swift`'s
 precedent, a pure move. The parity check needs nothing: no op, no tool.

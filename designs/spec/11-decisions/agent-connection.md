@@ -4,7 +4,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 [`README.md`](README.md).
 
 The road map that made these is closed: its condensed record is
-`designs/adr/roadmap-14-agent-socket.md`, and the original, `archive/reelcut-roadmap-14.md`, words
+`designs/adr/roadmap-14-agent-socket.md`, and the original, `archive/roadmap-14.md`, words
 them in its "Decisions" section (MC-4 and MC-6 as MC0 left them; this file is the fuller text) and
 holds the tree they changed in its "What exists" section.
 

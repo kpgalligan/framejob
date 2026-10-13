@@ -712,7 +712,7 @@ extension ReelOp {
 
     /// The same op with the patch object the CALLER wrote, forwarded to the
     /// core byte for byte — the agent door's factory (deepening D1,
-    /// `archive/reelcut-roadmap-7.md` §1), beside the typed one the
+    /// `archive/roadmap-7.md` §1), beside the typed one the
     /// inspector, the canvas sessions and the menus keep using.
     ///
     /// **`patch` is `Any` rather than `[String: Any]`** so that a caller who
@@ -979,7 +979,7 @@ extension ReelOp {
     }
 
     /// The same op with the `region` the CALLER wrote, forwarded unread — the
-    /// agent door's factory (deepening D1·5, `archive/reelcut-roadmap-7.md`
+    /// agent door's factory (deepening D1·5, `archive/roadmap-7.md`
     /// §2.5). Only the region differs from the typed factory above, which is
     /// why that one delegates here, as `setCanvasRaw`'s twin does.
     ///
@@ -1027,7 +1027,7 @@ extension ReelOp {
 
     /// The end patch the CALLER wrote, forwarded to the core byte for byte —
     /// the sixth and last patch door deepening D1 moved (D1·5,
-    /// `archive/reelcut-roadmap-7.md` §2.5), and `setVideoRaw`'s five lines
+    /// `archive/roadmap-7.md` §2.5), and `setVideoRaw`'s five lines
     /// with another op name.
     ///
     /// What is different about this one is the SUBJECT the core's refusals

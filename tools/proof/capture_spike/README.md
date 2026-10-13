@@ -2,7 +2,7 @@
 
 Four questions V2's `snapshot_ui` and `perform_menu_item` cannot be designed
 without, and the instrument that measures them. **The answers are not here**:
-they are in `archive/reelcut-roadmap-11.md`'s V1 record (condensed in
+they are in `archive/roadmap-11.md`'s V1 record (condensed in
 `designs/adr/roadmap-11-dev-tools.md`), which also lists
 what they changed in V2's text. What is here is how to run it again.
 

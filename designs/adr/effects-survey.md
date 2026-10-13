@@ -1,11 +1,11 @@
 # Effects survey: transitions, effects and filters after Concat
 
 - **Status:** Survey, 2026-09-15. E1 and E2 were built by road map 5
-  (`archive/reelcut-roadmap-5.md`), which overrides this survey wherever
+  (`archive/roadmap-5.md`), which overrides this survey wherever
   the two disagree. **E3–E9 were DEFERRED by the user the same day**: "we'll
   eventually add color grading and LUT import, but not now". Nothing from
   E3–E9 is in the tree.
-- **Original:** `archive/reelcut-effects-survey.md` (1629 lines) is the full
+- **Original:** `archive/effects-survey.md` (1629 lines) is the full
   record. "orig §x" below refers to it.
 - **Spec decisions:** R5-1 is this survey's D1 (effects are closed
   vocabularies, never a runtime). R5-2..R5-5 and E2-27 came from road map 5

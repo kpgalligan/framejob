@@ -5,7 +5,7 @@
   candidate measured and retired, its smaller argument gate built (#21, 2026-09-19); the six §12.2
   continuation parts built and reviewed (2026-09-21). No user-visible feature; GitHub #1–#26 and
   #31 are all closed.
-- **Original:** `archive/reelcut-roadmap-7.md` (6577 lines) — the full record, ticket by ticket.
+- **Original:** `archive/roadmap-7.md` (6577 lines) — the full record, ticket by ticket.
   Sections cited below as "orig §x" refer to it. Code comments across `core/` and `app/Sources/`
   cite it as "road map 7 §x"; the section map at the foot resolves those.
 - **Spec decisions** (spec §11, `designs/spec/11-decisions/`, binding):

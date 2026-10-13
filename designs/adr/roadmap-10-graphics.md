@@ -2,7 +2,7 @@
 
 - **Status:** Built and merged into `main` 2026-09-25 (G0 spike, G1–G5 built;
   G6 performance deferred by the user).
-- **Original:** `archive/reelcut-roadmap-10.md` (3859 lines) — the full record;
+- **Original:** `archive/roadmap-10.md` (3859 lines) — the full record;
   sections cited below as "orig §x" refer to it. Its input was the user's
   proposal, `archive/svg-motion-components-plan.md` (ADR:
   `designs/adr/svg-motion-plan.md`).

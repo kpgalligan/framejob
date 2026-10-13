@@ -20,7 +20,7 @@ import ScreenCaptureKit
 /// probe can make.
 ///
 /// Three R0 facts shape the configuration and are restated on the fields
-/// they decide (`archive/reelcut-roadmap-3.md`, "R0 — the answers"):
+/// they decide (`archive/roadmap-3.md`, "R0 — the answers"):
 ///
 /// - **The microphone is a second file** (q2). `captureMicrophone` on the
 ///   stream writes ONE stereo track that is the SUM of system and microphone

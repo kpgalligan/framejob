@@ -2380,7 +2380,7 @@ free.
   this side fills in an alpha or clamps a component. **There is no decoder
   for a caller's object in this file and a new door does not add one** (the
   rule under Rules; what was deleted and what it measured,
-  `archive/reelcut-roadmap-7.md` §2–§3).
+  `archive/roadmap-7.md` §2–§3).
 
 **Shared chrome.** `Theme.swift` (`DS` tokens, including the three track
 heights S/M/L per kind), `Controls.swift`, `OptionControls.swift`,
@@ -2476,7 +2476,7 @@ than a patch and has no op of its own to be refused by
 exception on purpose). The hand checks this rule replaced were deleted
 rather than moved, so a new door that wants one is a door that has not been
 read; the spec says the same in §7.9, and what went and what it measured is
-`archive/reelcut-roadmap-7.md` §2–§3.
+`archive/roadmap-7.md` §2–§3.
 
 **Agent parity.** Every user-visible EDIT gets an MCP mirror: a handler, a
 catalog entry declaring `scope`, and a comment naming the UI path. Handlers

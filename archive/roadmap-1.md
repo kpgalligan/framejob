@@ -2,17 +2,17 @@
 
 > The per-milestone record the root `CLAUDE.md` carried — M1, M2, M3, the
 > chrome cleanup, and every road-map-2 and road-map-3 phase — is
-> `reelcut-milestones.md` since 2026-09-17, moved verbatim and unmaintained.
+> `milestones.md` since 2026-09-17, moved verbatim and unmaintained.
 
 **Status: M1, M2 and M3 are built. Every feature in `reelcut-design.md`'s
 milestone list (§10) is implemented and verified against a running binary.**
 What is left of the SPEC is not features: it is the half of the acceptance
 tests that needs a person at the machine, and a short list of known limits.
-What to build beyond the spec is `reelcut-roadmap-2.md`.
+What to build beyond the spec is `roadmap-2.md`.
 
 This is the companion to `reelcut-design.md`, which stays normative for the
 schemas (§5), the op table (§6) and the architecture (§7); this document never
-overrides it. `reelcut-milestones.md` holds the M1–M3 milestone record (moved out of
+overrides it. `milestones.md` holds the M1–M3 milestone record (moved out of
 `CLAUDE.md` on 2026-09-17, unmaintained); a road map's own document is the
 file to update as work lands.
 
@@ -27,7 +27,7 @@ Published as a page (the pre-M3 version, kept for the phase plan it describes):
 
 **Those are M3's numbers, kept as the record of that moment and not updated
 since** — this document is the record of M1–M3, and road map 2 has moved all
-of them. `CLAUDE.md` and `reelcut-roadmap-2.md` carry the current ones.
+of them. `CLAUDE.md` and `roadmap-2.md` carry the current ones.
 
 **Verified by driving the built binary and comparing rendered frames or
 measured audio** — the standard this project holds itself to, and the reason

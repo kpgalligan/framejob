@@ -4,7 +4,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 [`README.md`](README.md).
 
 The road map that made these is closed; its condensed record is `designs/adr/roadmap-12-assistant.md`
-(the original is `archive/reelcut-roadmap-12.md`, whose §4 made them, amended by the user's answers
+(the original is `archive/roadmap-12.md`, whose §4 made them, amended by the user's answers
 in §6).
 
 - **AI-1 — The assistant is a bundled helper, and the app never calls Anthropic itself.**

@@ -1,6 +1,6 @@
 # The graphics spike — road map 10, G0 (2026-09-24)
 
-Nine questions `archive/reelcut-roadmap-10.md` §3 asks before any graphics
+Nine questions `archive/roadmap-10.md` §3 asks before any graphics
 code is written, and the instruments that answered them. **The answers are
 not here**: they are in that document's §10.1, with §3a listing every design
 section a row changed. What is here is how to run it again.

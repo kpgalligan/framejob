@@ -6,7 +6,7 @@ import Foundation
 /// caller wrote against the properties the tool PUBLISHED, and every
 /// stranger refused by name before a handler reads a thing
 /// (kpgalligan/reelcut#21; the measurement behind it is
-/// `archive/reelcut-roadmap-7.md` §11).
+/// `archive/roadmap-7.md` §11).
 ///
 /// **The defect it closes.** No handler enumerates a caller's keys. Each
 /// reads the names it knows out of the dictionary and builds a fresh op, so

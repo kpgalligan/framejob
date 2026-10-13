@@ -2,7 +2,7 @@
 
 The questions A1 cannot be designed without, and the instrument that
 measures them. **The answers are not here**: they are in
-`archive/reelcut-roadmap-12.md` §7 ("A0 record"; condensed in
+`archive/roadmap-12.md` §7 ("A0 record"; condensed in
 `designs/adr/roadmap-12-assistant.md`), which also says what they changed in
 §5. What is here is how to run it again.
 

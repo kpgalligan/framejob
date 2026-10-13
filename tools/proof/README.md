@@ -4,7 +4,7 @@
 driving the built binary and comparing what it renders, not by reading
 code. These are the scripts that do it — an MCP script per road-map-2 phase,
 from phase 2 an offscreen-chrome script beside it, and for the fixes
-`archive/reelcut-remaining.md` records, `remaining_proof.py` over MCP and
+`archive/remaining.md` records, `remaining_proof.py` over MCP and
 `remaining_probe.py` offscreen — so a proof can be re-run after a later
 change rather than believed on the strength of a paragraph.
 
@@ -377,7 +377,7 @@ at scroll 0. It is a probe too, one that builds a bare `TimelineView`, scrolls
 it and captures through the harness's own `cacheDisplay` path; the untracked
 `work/phase9-corner-probe/` that measured the fix at the time is superseded by
 it and deleted. `remaining_probe.py` is a third probe: the app arithmetic
-behind `archive/reelcut-remaining.md`'s fixes, one section per item, and its
+behind `archive/remaining.md`'s fixes, one section per item, and its
 last section photographs a bare `TimelineView`'s filmstrip tile the same way
 `phase9_chrome.py` photographs the corner. `refusal_probe.py` is a fourth:
 the three app paths a refusal reaches that no MCP call can, driven through a
@@ -2389,7 +2389,7 @@ argument at all.
 ## Phase 9 — the corner, photographed (`phase9_chrome.py`)
 
 `python3 tools/proof/phase9_chrome.py`, **62/62**. No port, no window server
-grant, no media: route 1 of `archive/reelcut-remaining.md` §1b, a probe over
+grant, no media: route 1 of `archive/remaining.md` §1b, a probe over
 the WHOLE of `app/Sources` in `phase9_probe.py`'s shape — `harness/build.sh`'s
 own swiftc line, cached on modification times under `work/cornerprobe/<tag>/`,
 a build failure scored as a FAILURE rather than an exit — except that this one
@@ -2510,7 +2510,7 @@ are a proof-time requirement here as for `phase2_proof.py`'s PCM decode: a stand
 line, cached on modification times under
 `work/remainingprobe/<tree|mutant-hash>/`, a build failure scored as a
 FAILURE rather than an exit — for the items in
-`archive/reelcut-remaining.md` that are APP arithmetic or an app PICTURE no
+`archive/remaining.md` that are APP arithmetic or an app PICTURE no
 tool reaches. One section per item, and one binary answering all of them by
 a request `mode`, so the next item adds a `case` and a `section_…` without
 touching the others: section 1 is §2b's naming (76 checks with the build
@@ -2745,7 +2745,7 @@ subset run carries the other questions' answers forward under
 direct line, and `open -a … --env … --stdout … --stderr … --args …`) on ports
 4890 and 4891, records a few seconds of the main display for the others, and
 writes `work/spike/answers.json`. Its answers are pasted into
-`archive/reelcut-roadmap-3.md` dated; two of them overturned the plan. The
+`archive/roadmap-3.md` dated; two of them overturned the plan. The
 seventh (2026-09-12, `--only 7`, three rows of three 2 s segments) is R2's:
 pause and resume as segments over ONE running stream — the recording output
 removed at each pause and a fresh one added at each resume, with a `.screen`
@@ -3087,7 +3087,7 @@ defect and not the host.
 
 Dragging a clip flashed the playhead to 0 and back, and with the playhead
 scrolled off screen it yanked the timeline back to it
-(`archive/reelcut-app-notes.md`, "The playhead echo, 2026-09-26").
+(`archive/app-notes.md`, "The playhead echo, 2026-09-26").
 `Playback` reported its OWN seeks as playhead moves: the periodic time
 observer fires on every time jump, so a rebuild's item swap (the new item
 starts at 0) and its re-land, and the paused refresh's one-tick round trip,
@@ -3175,7 +3175,7 @@ app/CLAUDE.md's undo pitfall.
 for a phase**, which is the one thing about it that is not the house shape:
 what it proves is the single door every caller-authored object comes through
 (`core/src/patch.rs`, `CONTEXT.md`'s **Patch**), and the doors arrive one
-deepening ticket at a time (`archive/reelcut-roadmap-7.md` §1). D1·3
+deepening ticket at a time (`archive/roadmap-7.md` §1). D1·3
 (kpgalligan/reelcut#4) built it with `set_video`'s section, at **39/39**;
 D1·4 (#5) added eight more, at **199/199**; D1·5 (#6) added the last two —
 `set_action_end` and `add_zoom_action`'s region — and it is **258/258**, with
@@ -3185,7 +3185,7 @@ LATER phase's door copies; neither kind is owed one today.
 **It is four files and one script.** The sections outgrew a single file when
 D1·4's eight landed, so the split went by kind — for navigation, since a
 proof script is not held to the 400-line cap a new SOURCE module gets
-(`archive/reelcut-roadmap-7.md` §2.4 argues it; most scripts here are well
+(`archive/roadmap-7.md` §2.4 argues it; most scripts here are well
 past it):
 
 | File | What is in it |
@@ -3256,7 +3256,7 @@ which every refusal at that door said.
 a phase**, as the patch door is: what it proves is the answer every edit
 comes back with (`core/src/outcome.rs`, `app/Sources/ReelEdit.swift`,
 `CONTEXT.md`'s **Op**), and the rules that can say WHY arrive one deepening
-ticket at a time (`archive/reelcut-roadmap-7.md` §4, kpgalligan/reelcut#8).
+ticket at a time (`archive/roadmap-7.md` §4, kpgalligan/reelcut#8).
 Deepening D2·2 (#10) built it with the overlap rule's section, at
 **39/39** (40/40 after its review); D2·3 (#11) took it to **113/113** with
 one section per rule that found its voice, each a copy of `overlap_rule`;
@@ -3565,7 +3565,7 @@ reason and asserted to be the whole of the exceptions. Then **a fraction
 where a whole number belongs** — `trim_start {clip: 3.5}` and
 `delete {clips: [3.5]}` — is refused rather than truncated to clip 3, and
 `{clip: 3.0}` is still the id. Then **a TERM of a frame rate**, the 17 rows
-of 2026-09-20 that closed `archive/reelcut-remaining.md` §5's residue: the
+of 2026-09-20 that closed `archive/remaining.md` §5's residue: the
 two `[numerator, denominator]` readers took each half through `intValue`
 after the gate, so `set_canvas {fps: [29.97, 1]}` was 29 fps in silence;
 both now read through `rateTerm`, and a fraction, a zero, a negative,
@@ -3857,7 +3857,7 @@ the patch asserting its text occurs exactly once:
 2026-09-20, §2 scored 4/5: the reversed clip's waveform was loud on the LEFT,
 18 028 lit pixels against 760 on the right — the forward clip's own split
 pixel for pixel — and its `sourceTime` answered the forward clip's ticks
-exactly. `archive/reelcut-roadmap-7.md` §10.9 carries the table.
+exactly. `archive/roadmap-7.md` §10.9 carries the table.
 
 **The one-tick-high mirror is a known limit, not a defect to chase here**: a
 reversed tick `p` covers the forward file's tick `T − 1 − p` and the app
@@ -3871,7 +3871,7 @@ numbers tick-exact.
 
 Road map 4's S1 — quiet judged by Silero VAD through Core ML — and the two
 instruments §4g owes it, landed 2026-09-19 against the unmodified tree and
-widened by the READER REVIEW of 2026-09-20 (`archive/reelcut-roadmap-4.md`
+widened by the READER REVIEW of 2026-09-20 (`archive/roadmap-4.md`
 §8), whose five new sections are marked below, and again by the SCEPTIC's
 pass over that review the same day, which added four rows (one in claim 10,
 three at the foot of §8c) for the two defects the review's own fixes left —
@@ -4087,7 +4087,7 @@ modes and five processes:
   open sheet is replaced by one that says "talking" at every chunk and a
   `speech` post is made — the readout drops to No cuts and the wash to 0 —
   then the original bytes are posted back and the two cuts return. That is the
-  limit `archive/reelcut-remaining.md` §5 recorded as unprovable because "no
+  limit `archive/remaining.md` §5 recorded as unprovable because "no
   proof can drive the sheet"; this one does, the guard is gone, and a copy
   with it restored scores **64/65**. Two more (R3·1) withdraw the WAVEFORM
   with the voice cache in place: the sheet still says 2 cuts, and it no longer
@@ -4142,7 +4142,7 @@ fps on this host's fixture.
 Phases 2, 3, 3-silence and 5 and the remaining-work proof were re-run against
 the same binary and score **86, 123, 8, 88 and 79**.
 
-**The 2026-09-20 reader review** (`archive/reelcut-roadmap-4.md` §8) added
+**The 2026-09-20 reader review** (`archive/roadmap-4.md` §8) added
 eight more mutants, each a tree copy on port 4872 with the app rebuilt in it
 and the patch asserting its replaced text occurs exactly once. Six are named
 beside the rows they take, above. The other two are the review's two "without
@@ -4356,7 +4356,7 @@ here are measured against.
 `env RC_ASSEMBLYAI_KEY=proof-key python3 tools/proof/e2_chrome.py`, no socket,
 **52/52** after E2-27 (35/35 before it; 24/24 until the E2
   reader review of 2026-09-20 added nine rows, and its residue run two,
-  `archive/reelcut-roadmap-5.md` §12).
+  `archive/roadmap-5.md` §12).
 
 E2-27 extends that same script with no-motion versus zero In, zero Out and
 both-zero name-strip pixel equality; a one-frame positive wedge on each
@@ -4445,7 +4445,7 @@ fallback used for a shape, the period read as a fraction of the clip, the
 tent removed, the pivot compensation removed, the split rule removed, the
 `evaluate_clip` restore removed, the `set_action_end` refusal removed,
 `structural` not widened, `drift` using the period. Every score is in
-`archive/reelcut-roadmap-5.md` §12, with the rows each one took.
+`archive/roadmap-5.md` §12, with the rows each one took.
 
 **The E2 reader review added nineteen more** (2026-09-20, same shape, same
 scratch copy, every patch asserting one occurrence): eight NAMED mutants of
@@ -4511,7 +4511,7 @@ ordinary clip length.
 ## Road map 6 — the cloud spike (`cloud_spike/`)
 
 C0, run 2026-09-20: eight questions about AssemblyAI that
-`archive/reelcut-roadmap-6.md` §3 leaned on, MEASURED. Its own README
+`archive/roadmap-6.md` §3 leaned on, MEASURED. Its own README
 (`tools/proof/cloud_spike/README.md`) is the full one — the instrument table,
 the fixtures, the key and spend rules, the ledger's outcomes — and the
 ANSWERS are in road map 6 §3, not here.
@@ -4520,7 +4520,7 @@ ANSWERS are in road map 6 §3, not here.
 python3 tools/proof/cloud_spike/cloud_spike.py --selftest    # free, no key, loopback only
 python3 tools/proof/cloud_spike/cloud_spike.py               # all eight rows
 python3 tools/proof/cloud_spike/cloud_spike.py --only q3,q4  # a subset; the rest carry forward with their dates
-python3 tools/proof/cloud_spike/cloud_spike.py --leakcheck tools/proof/cloud_spike tools/proof/work/cloud_spike archive/reelcut-roadmap-6.md
+python3 tools/proof/cloud_spike/cloud_spike.py --leakcheck tools/proof/cloud_spike tools/proof/work/cloud_spike archive/roadmap-6.md
 ```
 
 **Nothing here is a pass.** Every row is a MEASUREMENT, and the two ways a
@@ -4968,7 +4968,7 @@ names which answered. Three free loopback ports, and one free port per fake.
 `media/speech.mov`'s 16 kHz extract is not repeatable at ALL — four extracts,
 four distinct byte strings of one length (167 930 bytes), spans 105–228 bytes
 — where the `say` AIFF over the identical code is the TWO-string,
-one-sample population `archive/reelcut-remaining.md` §5 records. The
+one-sample population `archive/remaining.md` §5 records. The
 difference is the AAC decode, not the resampler. So row 2's upload-count and
 request claims are made over `speech.mov` and its BYTE population over the
 AIFF, with the .mov's own spread printed as a row beside it, named as the
@@ -5939,7 +5939,7 @@ the litecode checks and fix-notes files hold the evidence.
 ## Road map 8 — the word captions spike (`words_spike/`)
 
 W0, run complete on 2026-09-22: the seven questions
-`archive/reelcut-roadmap-8.md` §3 asks before any word-caption code is
+`archive/roadmap-8.md` §3 asks before any word-caption code is
 written. **The answers are in that document's §10.1, and §3a lists every
 design section a row overturned.** `tools/proof/words_spike/README.md` is how
 to run it again; this paragraph is the entry in this table.
@@ -5948,7 +5948,7 @@ to run it again; this paragraph is the entry in this table.
 python3 tools/proof/words_spike/words_spike.py                  # all seven rows
 python3 tools/proof/words_spike/words_spike.py --only q4,q5     # a subset; the rest carry forward
 python3 tools/proof/words_spike/words_spike.py --leakcheck tools/proof/words_spike \
-    tools/proof/work/words_spike archive/reelcut-roadmap-8.md tools/proof/README.md
+    tools/proof/work/words_spike archive/roadmap-8.md tools/proof/README.md
 ```
 
 Five instruments. `speech_probe.swift` is a standalone `@main async` probe
@@ -5997,7 +5997,7 @@ host network state.
 ## Road map 10 — the graphics spike (`graphics_spike/`)
 
 G0, run complete on 2026-09-24: the nine questions
-`archive/reelcut-roadmap-10.md` §3 asks before any graphics code is written.
+`archive/roadmap-10.md` §3 asks before any graphics code is written.
 **The answers are in that document's §10.1, and §3a lists every design
 section a row rewrote.** `tools/proof/graphics_spike/README.md` is how to
 run it again; this paragraph is the entry in this table.
@@ -7007,7 +7007,7 @@ live window's appearance (q3), and `hasAmbiguousLayout` plus the truncation
 heuristic in an `-O` build (q4). A probe built from `app/Sources` with
 `-O -wmo -D FRAMEJOB_DEV_TOOLS`, six bounded modes, 38 scored rows, a digest.
 Its README has the rows, the build line and the output; the answers are in
-`archive/reelcut-roadmap-11.md`'s V1 record (condensed in
+`archive/roadmap-11.md`'s V1 record (condensed in
 `designs/adr/roadmap-11-dev-tools.md`). The W, S and A rows need the
 probe's window on screen and the probe active — run it with the terminal
 frontmost and the display on; otherwise they skip by name. W4a–c's answer
@@ -7450,7 +7450,7 @@ against the built app (F, T), whether `export` replaces an existing file
 (E), and what an agent edit does to a timeline drag in progress (D, a probe
 built from `app/Sources`). 32 scored rows, a digest. Its README has the rows,
 the copy, the run order and the output; the answers are in
-`archive/reelcut-roadmap-12.md` §7 (condensed in
+`archive/roadmap-12.md` §7 (condensed in
 `designs/adr/roadmap-12-assistant.md`). `anthropic_fake.py` is the stand-in, at
 the top level because A1 reuses it: `port <n>` first, a scripted reply per
 `POST /v1/messages` (SSE when the body asks to stream), and R6-9(e)'s
@@ -13055,7 +13055,7 @@ background `open -n -g` launch costs and shows, cold, warm and quarantined
 from its docs and a stdio stub, with no model call (q3); and the socket
 path's length and `tiny_http`'s `http_unix` against existing files (q4).
 `tools/proof/mc1_spike/README.md` has the rows and the instruments; **the
-answers are in `archive/reelcut-roadmap-14.md`'s MC1 record (condensed in `designs/adr/roadmap-14-agent-socket.md`)**. q1 builds only
+answers are in `archive/roadmap-14.md`'s MC1 record (condensed in `designs/adr/roadmap-14-agent-socket.md`)**. q1 builds only
 in a `tree_copy.py` copy (`work/mc1_spike/tree`), which alone gets the
 `-RCWriteCatalog` hook and the phase that ad-hoc signs the just-linked
 (unsigned: `-no_adhoc_codesign`) executable in place and runs it; q2 launches that copy's Release product from paths

@@ -205,7 +205,7 @@ lockstep are in the root `CLAUDE.md`; the full design is
   points, **28/28**; the old guard put back takes exactly the nine rows
   that press outside a lane (19/28), and the clear removed takes the
   bare-click row alone (27/28). A real mouse pressed there is
-  `reelcut-remaining.md` §4's.
+  `remaining.md` §4's.
 - `TimelineView.swift` · `MediaPeaks.swift` · `ReverseRenderer.swift` ·
   `ReverseMirror.swift` — **the timeline drew reversed clips unmirrored,
   from M3 until 2026-09-20.** A reversed clip's `in` point is measured in
@@ -2217,7 +2217,7 @@ break and never an empty cue. Three sentences of the file's header and the
 
 **`MediaCacheFiles.swift` 555 → 556.** One line, `transcriptsKind`, beside
 `speechKind`. The file was measured at 555 rather than the 550 road map 6
-§5b quoted; it is not on `reelcut-remaining.md` §3's ledger. The kind
+§5b quoted; it is not on `remaining.md` §3's ledger. The kind
 constant sits here rather than in `MediaTranscript.swift` because a
 notification's `userInfo` is where the four are compared, and the paths sit
 in `MediaTranscript.swift` because that is where a reader looks for the

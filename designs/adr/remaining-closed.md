@@ -5,7 +5,7 @@
   closure taught. What was still open became GitHub issues, and the document was deleted: its
   size ledger is `wc -l` plus the file-history ADRs' "Named next cuts", and its build settings are
   `designs/adr/rust-build-settings.md`.
-- **Original:** `archive/reelcut-remaining.md` (2088 lines) — the full record; sections cited below
+- **Original:** `archive/remaining.md` (2088 lines) — the full record; sections cited below
   as "orig §x" refer to it. Code and proofs cite §1b, §2a and §2b; those sections are summarised
   under the same names here.
 - **Spec decisions:** spec §5.6 (the cache marker); D7-1, D7-2, D7-3 (the time bounds that closed

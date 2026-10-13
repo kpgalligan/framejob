@@ -5,7 +5,7 @@ This is the "Milestone status" section the root `CLAUDE.md` carried until
 rulebook. It is a RECORD: what each milestone and phase shipped, what was
 measured, what each review found, and the limits recorded rather than fixed.
 It stops at road map 3's R2; road maps 4 and 5 keep their records in their own
-documents (`reelcut-roadmap-4.md` §8, `reelcut-roadmap-5.md` §12), and road
+documents (`roadmap-4.md` §8, `roadmap-5.md` §12), and road
 maps 2 and 3 carry per-phase records of their own that this text duplicates in
 part.
 
@@ -1368,7 +1368,7 @@ maintained.
   again; and `AVAssetImageGenerator` fails INSIDE a non-sync frame's range
   on an ffmpeg-made sparse file (−11821) while a real recording lands every
   second, which `remaining_probe.py` 5f pins. What only a person can check
-  is in `reelcut-remaining.md` §4: the picker from a non-activating panel,
+  is in `remaining.md` §4: the picker from a non-activating panel,
   whether a picked recording contains the panel (moot since R2 — it orders
   out for every source), the countdown's look, the menu bar's own
   indicator, and the microphone prompt from the signed bundle.
@@ -1440,7 +1440,7 @@ maintained.
   8, 84, 88, 167, 92, 79, 214, 79 over MCP and 26, 33, 59, 81, 70, 78, 150
   (144 on this locked console — section 4's six dispatch checks fail on
   their own precondition, the known state), 48, 62, 170 offscreen.
-  What only a person can check is in `reelcut-remaining.md` §4: the
+  What only a person can check is in `remaining.md` §4: the
   item's two menus and the glyph, the system indicator through a pause,
   the panel gone for a display source and back only with a note, ⌘Q while
   paused, and a paused recording played across its segment boundary.

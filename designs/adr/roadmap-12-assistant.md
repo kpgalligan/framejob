@@ -1,7 +1,7 @@
 # The Assistant — an AI agent in the editor (road map 12)
 
 - **Status:** Built and closed 2026-09-28. A0 the spike 2026-09-27 (`4f8d4ce`); A1 the lane (`08ab2ee`), the helper and its build (`68ccc20`) and the session (`5a88a57`) 2026-09-27; A2 the Assistant tab 2026-09-27 (`dae833a`); A3 the prompt 2026-09-27 (`172cf0c`, committed 2026-09-28); A4 `dist_check.py`'s helper rows and the close 2026-09-28 (uncommitted when this was written). Each phase was one litecode pipeline; A2's and A3's reader reviews each found one fix, landed in their commits.
-- **Original:** `archive/reelcut-roadmap-12.md` (1022 lines) is the full record. Sections cited below as "orig §x" refer to it.
+- **Original:** `archive/roadmap-12.md` (1022 lines) is the full record. Sections cited below as "orig §x" refer to it.
 - **Spec decisions:** AI-1..AI-18 in spec §11 (`designs/spec/11-decisions/assistant.md`), which stay binding:
   - AI-1: the assistant is a bundled helper, and the app never calls Anthropic itself.
   - AI-2: the helper owns no tools; every call goes through `AgentServer.execute` by way of one lane.

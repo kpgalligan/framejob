@@ -7,7 +7,7 @@
   the recipe and the picture (spec §11 W-12..W-14); phase 2 put them in the
   sheet and `transcribe` (W-15) and closed the list; phase 3 (2026-10-07,
   #245) took the dim out of the raster of a page with no backdrop (W-16).
-- **Original:** `archive/reelcut-roadmap-8.md` (2971 lines) holds the full
+- **Original:** `archive/roadmap-8.md` (2971 lines) holds the full
   record. "orig §x" below points into it.
 - **Spec decisions:** spec §11 **W-1..W-10**, and W-12..W-16 for issue batch
   B86's three looks (W-10 as the core's sentence;

@@ -2,7 +2,7 @@
 
 Applies to everything under `graphic/`, the crate that draws a graphic clip
 (road map 10: `designs/adr/roadmap-10-graphics.md`; the full design is
-`archive/reelcut-roadmap-10.md` §5a). Build commands are the root
+`archive/roadmap-10.md` §5a). Build commands are the root
 `CLAUDE.md`'s: `make test` and `make lint` run this crate after the core.
 The crate's record is road map 10 §10.4.
 

@@ -1,6 +1,6 @@
 # The MC1 spike — road map 14 (2026-10-01)
 
-Four questions `archive/reelcut-roadmap-14.md` (condensed in `designs/adr/roadmap-14-agent-socket.md`) asks before MC2 (the socket) and
+Four questions `archive/roadmap-14.md` (condensed in `designs/adr/roadmap-14-agent-socket.md`) asks before MC2 (the socket) and
 MC3 (`framejob-mcp`) are built, and the instrument that measures them. **The
 answers are not here**: they are in that document's "MC1 — spike" record,
 which also lists what they changed in MC2's and MC3's text and in spec §11.

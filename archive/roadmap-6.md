@@ -447,7 +447,7 @@ four minutes of processing and, at FLAC, 550 MB of upload.
 | §5b, `audio_track_start_ms` | "0 unless the spike says otherwise" | 0, measured: an empty edit at the head of a late track is KEPT by the extract | q4 |
 | §5d, the credential | `KeychainStore` over the login keychain | a `0600` file; `KeychainStore` deferred to a stable signing identity, `SecretStore` unchanged | q7 |
 | §5h, `project.yml` | `NSAppTransportSecurity` `NSAllowsLocalNetworking: true` | nothing: loopback HTTP is not blocked | q3 |
-| §5h, toll 1 | "`reelcut-remaining.md` §3 does not list it" | it does, at 934 | read back |
+| §5h, toll 1 | "`remaining.md` §3 does not list it" | it does, at 934 | read back |
 | §5i·2 | the upload body is a RIFF WAV of `2 × 16000 × seconds` bytes | the upload body is a FLAC stream whose decode is sample-for-sample that WAV | q2 |
 | §5i·10, §5i·17, §5i·20 | the ATS row, `KeychainStore` through `MemoryStore`, "what q6 recorded" | loopback needs no key; the file store; the `deleted_by_user` sentinel | q3, q7, q6 |
 | §8 | `pollCeiling`'s divisor and the format row were guesses | divisor 49; FLAC; `deleteTimeout` checked against 1.70 s measured | q8, q2, q6 |
@@ -1099,7 +1099,7 @@ code, so what changes afterwards is attributable:
 
 | Toll | File | Now | Cut |
 |---|---|---|---|
-| 1 | `Transcriber.swift` | 934 — over the cap since it landed, and `reelcut-remaining.md` §3 lists it at that number (this table said it did not; read back 2026-09-20) | the language block (`Language`, the two cached lists, `named`, `defaultLanguage`, `language(matching:)`, ~190) → `Transcriber+Languages.swift`; the extractor (`extractSettings`, `extractAudio`, ~130) → `Transcriber+Extract.swift`; `jobs`, `contentLength`, `hasTranscribableClip` (~110) → `Transcriber+Jobs.swift`. Widenings: `contentLength` and `extractAudio` internal, because the cloud run calls both |
+| 1 | `Transcriber.swift` | 934 — over the cap since it landed, and `remaining.md` §3 lists it at that number (this table said it did not; read back 2026-09-20) | the language block (`Language`, the two cached lists, `named`, `defaultLanguage`, `language(matching:)`, ~190) → `Transcriber+Languages.swift`; the extractor (`extractSettings`, `extractAudio`, ~130) → `Transcriber+Extract.swift`; `jobs`, `contentLength`, `hasTranscribableClip` (~110) → `Transcriber+Jobs.swift`. Widenings: `contentLength` and `extractAudio` internal, because the cloud run calls both |
 | 2 | `AgentCatalog+Files.swift` | 601 (this table said 609; read back 2026-09-20) | the three caption entries (`import_captions`, `transcribe`, `export_captions`) → `AgentCatalog+Captions.swift`, spliced where they were, `AgentCatalog+Audio.swift`'s precedent |
 | 3 | `TranscribeSheetController.swift` | 505, +≈150 to come | `finish`, `summary`, `truncationText`, `viewDidDisappear` and the menu-command extension → `TranscribeSheetController+Commit.swift` |
 
@@ -1287,7 +1287,7 @@ run is served from the cache in under a second with no upload.
 replacing nothing above it.** There is no fake to read a request log from, so
 what the app's client did is counted from the app's OWN lines: every live
 instance is launched under a `pty` (a redirected `print` is block-buffered on
-Darwin and loses the tail of the buffer — see `reelcut-remaining.md` §5),
+Darwin and loses the tail of the buffer — see `remaining.md` §5),
 drained by a thread that never raises, and `<method> <path> → <status>` is
 parsed out of those lines. Row 20 is reserved in
 `work/cloudlive/ledger.json` BEFORE the call and then made to say what the
@@ -1622,7 +1622,7 @@ which is noise — for one of those, `git show <tree>:<path> | diff - <path>`.
 | **T5** `8f1bfc9edf3a9c5c5a5ea7a32ee87173c9d1860e` | T3 plus the records and the review's one fix — the last CODE tree |
 
 T0 holds the decisions and T1–T3 hold code: every record — this section,
-`reelcut-remaining.md` §3, `reelcut-app-notes.md` and `app/CLAUDE.md` — was
+`remaining.md` §3, `app-notes.md` and `app/CLAUDE.md` — was
 written after T3, so that every number in them is one a run printed.
 
 The pipeline's reader review found one wrong sentence and it was fixed after

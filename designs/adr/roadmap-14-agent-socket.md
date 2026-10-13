@@ -7,7 +7,7 @@
   - MC3, `reelcut-mcp` (`38b9487`)
   - MC4, TCP goes and Copy MCP Command arrives (`20c947d`)
   - MC5, the close (uncommitted when this was written)
-- **Original:** `archive/reelcut-roadmap-14.md` (798 lines) is the full record. It has no section numbers, so it is cited by section name: "orig Record ▸ MC1" is its "Record" section's MC1 entry.
+- **Original:** `archive/roadmap-14.md` (798 lines) is the full record. It has no section numbers, so it is cited by section name: "orig Record ▸ MC1" is its "Record" section's MC1 entry.
 - **Spec decisions:** MC-1..MC-6 in spec §11 (`designs/spec/11-decisions/agent-connection.md`). They stay binding, and where the original's "Decisions" section words them differently, §11's text wins:
   - MC-1: the agent server listens only on a Unix socket, `~/Library/Application Support/Reelcut/Agent/agent.sock`, always, while the app runs. There is no TCP listener and no switch.
   - MC-2: the socket is bound only in its own `0700` `Agent` subfolder. The rules for that folder:

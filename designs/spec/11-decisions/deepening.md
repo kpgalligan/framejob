@@ -6,7 +6,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 - **D2-1 — A refused op says why in the CORE's words; a tool still names an
   argument the caller left out.** Deepening D2 gave every rule that refuses
   a sentence of its own and deleted the app's copies
-  (`archive/reelcut-roadmap-7.md` §4–§5), so no agent handler trial-applies
+  (`archive/roadmap-7.md` §4–§5), so no agent handler trial-applies
   an op in order to write a reason. The line between the two, drawn at D2·4
   because six handlers answer a caller before the core sees the call: **a
   check that predicts a RULE goes; a check that names the CALL stays.**
@@ -24,7 +24,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   inconsistent for a caller.
 - **D3-1 — The core says what an argument IS; the app says what it is FOR.**
   Deepening D3 made the op table a published interface
-  (`archive/reelcut-roadmap-7.md` §7–§9): `core/src/op_table.rs` holds one row
+  (`archive/roadmap-7.md` §7–§9): `core/src/op_table.rs` holds one row
   per op and one `Argument` per argument — name, `Kind`, required — and
   `rc_op_schemas` publishes it as JSON Schema, which all fifty-seven op tools
   PRINT instead of hand-writing a `"type"`, an `"enum"` or a `required` list.
@@ -50,7 +50,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   (`AgentServer+Gate.swift`): the caller's keys against the tool's published
   `inputSchema`, every stranger refused naming the tool, the strangers and
   the whole of what the tool takes. Two choices, taken with the fix
-  (`archive/reelcut-roadmap-7.md` §11.6): it covers **all seventy-seven
+  (`archive/roadmap-7.md` §11.6): it covers **all seventy-seven
   tools** and not the fifty-seven ops, because the app-state tools have the
   same defect and the comparison reads a published schema either way; and it
   speaks the **app's** sentence rather than the core's serde wording, because
@@ -88,7 +88,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   minted before this, and the one-frame floor `resnap` cannot go below still
   reach it. No persisted field changes, so `RC_FORMAT_VERSION` stays 8.
 - **D4-1 — A clip's content length is ONE function, and the plan obeys it.**
-  `archive/reelcut-roadmap-7.md` §10.3's unverified reading is confirmed:
+  `archive/roadmap-7.md` §10.3's unverified reading is confirmed:
   `evaluate.rs`'s `segment_of` held a second copy of `content_length`, and
   the two differed in the degenerate case. The `clip.duration` fallback
   there against the reader's `clip.duration.max(1)` is NOT observable —
@@ -147,7 +147,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   that tail is no longer an identity; and the one-frame floor still wins
   over the bound, which is what `evaluate.rs`'s last-line clamp stays for.
   `rate_stretch` needed no change and its vector is in
-  `archive/reelcut-roadmap-7.md` §10.8: it writes `speed = content / duration`
+  `archive/roadmap-7.md` §10.8: it writes `speed = content / duration`
   and leaves both the content length and `in` alone, so
   `round(d × (c/d)) == c` and the window it had is the window it keeps.
   No persisted field changes, so `RC_FORMAT_VERSION` stays 8.
@@ -188,7 +188,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `RC_FORMAT_VERSION` stays 8.
 - **D4-6 — the reversed mirror is APP arithmetic with ONE home, and the
   Speed sheet's readout is the core's own answer.**
-  `archive/reelcut-roadmap-7.md` §10.6's fourth decision, built as phase C.
+  `archive/roadmap-7.md` §10.6's fourth decision, built as phase C.
   The core keeps no mirror — `edit_clip.rs`'s `set_reversed` argues why: `in`
   is measured in the stream the clip PLAYS, and a second convention would
   have to be known by every trim, split and source-length reader in the

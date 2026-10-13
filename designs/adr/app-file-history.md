@@ -3,7 +3,7 @@
 - **Status:** Closed, reference only (2026-09-26). The notes stopped at the playhead-echo fix
   (`538db30`). `app/CLAUDE.md` is the live rulebook. This record holds only the reasons and traps
   that file does not state.
-- **Original:** `archive/reelcut-app-notes.md` (2,934 lines) is the full record. "orig §x" below
+- **Original:** `archive/app-notes.md` (2,934 lines) is the full record. "orig §x" below
   points to one of its headed sections or file-map rows, quoted by name.
 - **Spec decisions:** relies on D4-6 (the reversed mirror has one home, in the app), R2-1 (one
   composition audio track per source format), K-1 / K-2 (Space, and the text editor's Return/Esc),

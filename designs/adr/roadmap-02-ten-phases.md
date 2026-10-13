@@ -3,7 +3,7 @@
 - **Status:** Built. All ten phases were done between 2026-09-06 and 2026-09-10 (commits `4fb72c6`
   (phases 0 and 1), `c1b5188`, `ac7f849`, `8ec3be5`, `65d43ae`, `d2f7767`, `a16b0dd`, `5f0bc61`,
   `046603e`). Three later fixes, #34, #35 and #36/#37, were recorded under it on 2026-09-24.
-- **Original:** `archive/reelcut-roadmap-2.md` (3601 lines) is the full record. Sections cited
+- **Original:** `archive/roadmap-2.md` (3601 lines) is the full record. Sections cited
   below as "orig §x" refer to it.
 - **Spec decisions:** it introduced two unnumbered spec §11 entries. First, "`async`/`await` is
   allowed only in `MediaImporter`": speech used the callback API, and W-8 later amended this to

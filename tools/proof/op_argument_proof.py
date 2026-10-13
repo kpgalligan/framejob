@@ -74,7 +74,7 @@ The sections, in order:
    reader and the clip-list one.
 
    And **a TERM of a frame rate**, the last two readers still on `intValue`
-   after the gate (`archive/reelcut-remaining.md` §5's residue, closed
+   after the gate (`archive/remaining.md` §5's residue, closed
    2026-09-20): `set_canvas`'s pair and `add_media`'s descriptor pair both go
    through `rateTerm` now, so a fraction, a zero, a negative, `Int64.max`,
    one past u32, a string and a JSON `true` are each refused BY THEIR PATH —
@@ -864,7 +864,7 @@ def main():
           "clip must be" not in text and not names_as_missing(text, "clip"), text[:160])
 
     print("\n…and a TERM of a frame rate, which two readers still truncated")
-    # `archive/reelcut-remaining.md` §5's residue, closed 2026-09-20: the two
+    # `archive/remaining.md` §5's residue, closed 2026-09-20: the two
     # `[numerator, denominator]` readers took each half through
     # `NSNumber.intValue` AFTER the gate, so `[29.97, 1]` was 29 fps in
     # silence and a whole double past Int.max TRAPPED. Both now go through

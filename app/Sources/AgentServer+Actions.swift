@@ -45,7 +45,7 @@ extension AgentServer {
     /// edit. Requiring the key means a caller says `null` on purpose.
     ///
     /// **The region goes to the core UNREAD** (deepening D1·5,
-    /// `archive/reelcut-roadmap-7.md` §2.5). It is the one op ARGUMENT that
+    /// `archive/roadmap-7.md` §2.5). It is the one op ARGUMENT that
     /// is a caller-authored object, and `edit_zoom.rs`'s `ZoomRegion` reads
     /// it the way a patch is read: an unknown member is named beside the four
     /// the region takes, a missing one is named (there is no defensible
@@ -192,7 +192,7 @@ extension AgentServer {
     /// spec §11 CI-9).
     ///
     /// **The patch goes to the core UNREAD** (deepening D1·5,
-    /// `archive/reelcut-roadmap-7.md` §2.5) — the LAST door of the six, and
+    /// `archive/roadmap-7.md` §2.5) — the LAST door of the six, and
     /// the one that used to check the most: `checkActionPatch` walked three
     /// allowed-key sets, `checkVideoEnums` and `checkTextEnums` ran here
     /// alone, and `patchArg`'s round trip decoded the whole thing through

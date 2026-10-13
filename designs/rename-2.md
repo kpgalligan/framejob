@@ -290,7 +290,90 @@ phase that touches only `archive/` forces it, the first trap). N1 also runs
 
 ## N0 — the record
 
+**Landed** (2026-10-13, commit `0c703b4`, from `ed8f282` in the worktree):
+
+- `designs/rename-2.md` (new): this road map — the owner's choices verbatim, the inventory at
+  `ed8f282` (213 files / 2,107 lines, 72 paths), the two name maps, the rules, the traps, the
+  phases N0–N5 and these record headings.
+- `designs/spec/11-decisions/rename.md`: NM-12, NM-13 and NM-14 appended; an "Amended by NM-12
+  and NM-13" paragraph at the end of NM-1 and an "Amended by NM-14" paragraph at the end of NM-8
+  (158 → 241 lines).
+- `designs/spec/11-decisions/README.md`: the `rename.md` row (241 lines, NM-1..NM-14), the two
+  "amended by" notes, rows for NM-12..NM-14 (311 → 314 lines); `designs/spec/README.md`'s total
+  7583 → 7669.
+- `tools/proof/name_residue.py`: `designs/rename-2.md` in `HISTORY`; the pins
+  `designs/spec/11-decisions/rename.md` 15 → 33 and `designs/spec/11-decisions/README.md`
+  18 → 19, every newly counted line read first. No path moved.
+
+**Measured:** `make gate` PASS in 348 s with every step run (names 1 s, typecheck 7 s, fmt 2 s,
+lint 24 s, test 209 s, app 105 s); `name_residue.py` exit 0, silent; its selftest 7/7 and
+`PASS`; `spec_index_proof.py` 159/159. Every count in the inventory and the phases was checked
+against `ed8f282` and matched.
+
+**Review:** pass, with four nits, all applied by the orchestrator before the commit: "four"
+handoff pathspecs (not six), the `.gitignore` row's class (o) named in words, and two
+`name_residue.py` comments (the §11 block's header names NM-12's exception; the `rename.md` pin
+is re-pinned by N2 first, then N4). The nit pass re-ran `names` and `test`.
+
+**Deviations:** none in substance. NM-12..NM-14 carry their rules' kept classes and exceptions
+in the decision text, and "The owner's choices" says why NM-12 names three name-only edits
+where request item 2 asked for one exception.
+
+**Owed:** phases N1..N5.
+
 ## N1 — the record
+
+**Landed** (2026-10-13, in the worktree, not committed by the implementer; the orchestrator
+commits):
+
+- `archive/`: the 19 `git mv`s of "The archive's names" (`reelcut-roadmap.md` →
+  `roadmap-1.md`, `reelcut-roadmap-N.md` → `roadmap-N.md`, the five others without the prefix).
+  `git ls-files archive | grep -ic reelcut` prints 0. Links rewritten inside nine of them:
+  `app-notes.md` (2 lines), `milestones.md` (3), `roadmap-1.md` (4), `roadmap-2.md` (2),
+  `roadmap-3.md` (8), `roadmap-4.md` (1), `roadmap-6.md` (4), `roadmap-7.md` (5),
+  `roadmap-14.md` (2); every other hit in the archive is a `designs/reelcut-*.md` path, kept
+  (exception (a)). `archive/svg-motion-components-plan.md` and `archive/rename.md` untouched.
+- `archive/INDEX.md`: each of the 19 first-column cells is `` `<new>` (old name `<old>`) ``,
+  and the intro gains the sentence that the `reelcut-` files lost that prefix in N1, so a stale
+  `designs/reelcut-*.md` path still resolves.
+- The link rewrite, one line in place for each link: `README.md` (1 line), `app/CLAUDE.md` (2),
+  `graphic/CLAUDE.md` (1); ten `app/Sources` files (15 comment lines) and
+  `core/src/source_window.rs` (1); `designs/adr/` (21 files, 24 lines; `remaining-closed.md`'s
+  line 3 `designs/reelcut-remaining.md` kept, (a)); `designs/spec/09-keys-and-menus.md` (1) and
+  six §11 files (12 lines); `tools/proof/` (28 files, 67 lines), among them the live readers
+  `assistant_spike.py`'s `ROADMAP`, the `--leakcheck` lines of `cloud_spike/README.md`,
+  `words_spike/README.md` and `tools/proof/README.md`, and `recording_spike.py:2292`. No spec
+  file changed length. `designs/spec/11-decisions/rename.md`'s map (lines 195–198) keeps the
+  old names, (e).
+- `tools/proof/name_residue.py`: `"archive/"` out of `HISTORY` and into the new
+  `TEXT_HISTORY` (its lines kept, its paths checked); `residue()` takes `text_history`; the
+  `archive/reelcut-…` `KEPT_PATTERNS` entry and its comment clause gone; selftest S6 also holds
+  a `TEXT_HISTORY` line, new row S7 (a path holding the name under a `TEXT_HISTORY` prefix
+  fails), new mutant `text-history-paths`; docstring and `--mutant` choices name both; its own
+  pin 6 → 5 (the lines `NAME`, the two handoff `HISTORY` entries, the issue pattern and the
+  selftest's `kept`, each read). No other pin moved.
+
+**Measured** (each printed by the command beside it; the full outputs are in the phase's
+`04-checks.txt`):
+
+- The link check, `git grep -n -o -E '[A-Za-z0-9_./-]*reelcut-(roadmap(-[0-9]+)?|milestones|effects-survey|app-notes|core-notes|remaining)\.md' -- ':!designs/rename-2.md' | grep -v -E ':designs/reelcut-'`:
+  exactly 25 matches — 19 in `archive/INDEX.md` (the old-name notes) and 6 on
+  `designs/spec/11-decisions/rename.md` lines 195, 197 and 198 (NM-13's map).
+- `name_residue.py`: exit 0, silent. `--selftest`: `8/8 rows pass`, `PASS`.
+- Mutants: `text-history-paths` failed exactly `['S7']`, `ge-count` exactly `['S4']`,
+  `no-untracked` exactly `['S2']` — each `MUTANT PASS`.
+- `spec_index_proof.py` 159/159; `py_compile` of the five edited Python files clean.
+- `make gate` PASS in 230 s with every step run: names 1 s, typecheck 5 s, fmt 2 s, lint 5 s,
+  test 130 s, app 87 s.
+
+**Deviations:** none. `archive/INDEX.md`'s added sentence is wrapped over three lines to the
+paragraph's width.
+
+**Landed after the gate** (the orchestrator, root `CLAUDE.md`): in the `make test` line,
+`HISTORY, KEPT_PATTERNS and the exact COUNTED pins` → `HISTORY, TEXT_HISTORY, KEPT_PATTERNS
+and the exact COUNTED pins`; the review (pass, two nits applied before the commit).
+
+**Owed:** phases N2..N5.
 
 ## N2 — the record
 

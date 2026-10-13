@@ -2,8 +2,8 @@
 
 - **Status:** Built (M1 2026-09-05, M2 and M3 2026-09-06, commit `d3fbaa0`); closed. Every
   feature in spec §10's milestone list is implemented and was verified against a running binary.
-- **Original:** `archive/reelcut-roadmap.md` (118 lines) — sections cited below as "orig §x" refer
-  to it. The per-milestone narrative it points at is `archive/reelcut-milestones.md`, condensed in
+- **Original:** `archive/roadmap-1.md` (118 lines) — sections cited below as "orig §x" refer
+  to it. The per-milestone narrative it points at is `archive/milestones.md`, condensed in
   `designs/adr/milestones-record.md`.
 - **Spec decisions:** relies on the unnumbered M1-era entries at the head of spec §11 — AVFoundation
   not ffmpeg (opt-in rewrap, conversions outside the package); custom compositor from day one;

@@ -2,7 +2,7 @@
 
 - **Status:** C1 Built and reviewed (2026-09-21; follow-up issues #28–#33 closed by 2026-09-22).
   C2, the relay, is Deferred by the user (2026-09-21). It is designed below and not built.
-- **Original:** `archive/reelcut-roadmap-6.md` (3992 lines). It is the full record. Sections cited
+- **Original:** `archive/roadmap-6.md` (3992 lines). It is the full record. Sections cited
   below as "orig §x" refer to it.
 - **Spec decisions:** R6-1..R6-18 in spec §11 (`designs/spec/11-decisions/`), which stay binding:
   - R6-1: one command with two engines. A cloud caption is an ordinary text clip.

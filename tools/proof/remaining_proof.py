@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`archive/reelcut-remaining.md` §2a — the cache completion marker, measured
+"""`archive/remaining.md` §2a — the cache completion marker, measured
 against the built binary over MCP.
 
 §2a recorded `ProjectDocument.generateCaches`'s doc — "a cache already on

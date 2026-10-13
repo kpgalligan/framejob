@@ -3,7 +3,7 @@
 - **Status:** Built and proved (2026-09-16/17; instruments 2026-09-19; reader
   reviews 2026-09-20; issue #27 follow-up 2026-09-22). Only a person's
   watched-and-heard checks remain.
-- **Original:** `archive/reelcut-roadmap-5.md` (2678 lines) — the full record;
+- **Original:** `archive/roadmap-5.md` (2678 lines) — the full record;
   sections cited below as "orig §x" refer to it.
 - **Spec decisions:** R5-1 (effects are closed vocabularies, never a runtime),
   R5-2 (a transition's sound is a constant-power crossfade; minted
@@ -17,7 +17,7 @@
 
 ## Context
 
-Taken from `archive/reelcut-effects-survey.md` (E1 and E2 of its nine
+Taken from `archive/effects-survey.md` (E1 and E2 of its nine
 phases; E3–E9 — tone, filters, looks, adjustment clips, LUT import, voice
 effects, background removal — are DEFERRED by the user and not planned
 here). E1 made transitions usable for the editor's main job: an overlap at a

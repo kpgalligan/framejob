@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`archive/reelcut-remaining.md` — the fixes it lists, measured in the app.
+"""`archive/remaining.md` — the fixes it lists, measured in the app.
 
 The remaining-work document is the debt two road maps left behind, and the
 items in it that are APP arithmetic get their permanent proof here rather
@@ -80,7 +80,7 @@ extensions and a bare strip of `Board v1.2.framejob` is right by accident,
 which is why the static table is the killer and the live read is a wiring
 check); and `exportCaptionsCommand` alone put back on the bare strip with
 both helpers intact (only 1e fails, which is what 1e is for). The scores
-belong in `archive/reelcut-remaining.md` §2b's record and in `README.md`'s
+belong in `archive/remaining.md` §2b's record and in `README.md`'s
 section for this file, beside the tree's own count. A fourth mutant was
 1f's, when 1f read `destinationURL`: `"vtt"` removed from
 `replaceableExtensions` scored **106/108** — exactly the two `x.vtt` + srt
@@ -2032,7 +2032,7 @@ def main():
     args = parser.parse_args()
     sources = os.path.abspath(args.sources)
 
-    print("remaining — the app arithmetic archive/reelcut-remaining.md fixes\n")
+    print("remaining — the app arithmetic archive/remaining.md fixes\n")
     if sources != os.path.realpath(TREE_SOURCES):
         print(f"  (compiling against {sources}, not the tree)\n")
     binary, error = build_probe(sources)

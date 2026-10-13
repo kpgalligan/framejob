@@ -755,7 +755,7 @@ The road map is closed under root `CLAUDE.md`'s closing rule. Over `20c947d`:
 
 - **The ADR.** `designs/adr/roadmap-14-agent-socket.md` condenses this document, with
   `designs/adr/roadmap-13-pricing.md`'s headings and a "Where to look in the original" section.
-- **The move.** This document was `git mv`ed from `designs/` to `archive/reelcut-roadmap-14.md`
+- **The move.** This document was `git mv`ed from `designs/` to `archive/roadmap-14.md`
   after this record was appended, and `archive/INDEX.md` gained its row after road map 13's.
 - **The pointers.**
   - Root `CLAUDE.md`'s `designs/adr/` row lists `roadmap-14`.
@@ -765,7 +765,7 @@ The road map is closed under root `CLAUDE.md`'s closing rule. Over `20c947d`:
   - Spec §11's `agent-connection.md` header is worded as closed, the way `pricing.md`'s is, and
     its index row drops "in progress".
   - `tools/proof/README.md`, `tools/proof/mc1_spike/README.md` and `mc1_spike.py`'s docstring now
-    name `archive/reelcut-roadmap-14.md`'s MC1 record and the ADR.
+    name `archive/roadmap-14.md`'s MC1 record and the ADR.
 - **LaunchServices, measured before filing** (read-only `lsregister -dump`; nothing unregistered):
   - 136 registrations have an identifier containing `reelcut`, 101 of them
     `com.kgalligan.Reelcut`.

@@ -1549,7 +1549,7 @@ Fixed:
 - **`app/CLAUDE.md` had become a history.** Its agent entries narrated which
   ticket moved which door and what D1·6 deleted — the root `CLAUDE.md` says
   the three rulebooks "hold no status and no history", and every one of those
-  sentences was already in §2 here and in `reelcut-app-notes.md`. The map
+  sentences was already in §2 here and in `app-notes.md`. The map
   entries now state the rule and point at this document for what it cost.
 - **Two clauses that would have refused an agent who believed them.** The
   README's new paragraph said a colour is four numbers without naming
@@ -2992,7 +2992,7 @@ Fixed in the follow-up commit:
   still teach the two-outcome answer. The archive is not rewritten — that is
   what an archive is — but its header now names those two paragraphs as
   superseded, so a grep that lands there knows it is looking at 2026-09-17.
-  Same shape as D1·6's fix to `reelcut-app-notes.md`'s header.
+  Same shape as D1·6's fix to `app-notes.md`'s header.
 
 Judged not real:
 
@@ -5019,12 +5019,12 @@ defects fixed", and each has a named regression test and a "why" comment at
 the site.
 
 - **`whole_media_length` handed back an unsnapped constant**
-  (`reelcut-roadmap-2.md:443`): 3 000 000 ticks is not on a 30000/1001 grid,
+  (`roadmap-2.md:443`): 3 000 000 ticks is not on a 30000/1001 grid,
   where five seconds is 3 003 000, so **every overwrite of an imported still
   on a /1001 timeline was a silent no-op**. Fixed at `edit_clip.rs:170`;
   test `core/tests/insert.rs:331`.
 - **`roll` clamped a snapped `to` to UNSNAPPED bounds**
-  (`reelcut-roadmap-2.md:452`): both source bounds are floored divisions by a
+  (`roadmap-2.md:452`): both source bounds are floored divisions by a
   clip's speed, so a clamped roll could write a sub-frame time into two clips
   at once. Fixed at `edit_edge.rs:160` with a directional snap pair; test
   `core/tests/edge.rs:500`.
@@ -5056,7 +5056,7 @@ rather than by discovering them.
   (`edge.rs:147`, `edit_tests.rs:506`, `insert.rs:113`,
   `add_transition.rs:164`) instead of living in `core/tests/common/`.
 - **Two design documents cite `roll`'s snap-inward bounds by a stale line
-  number** — `reelcut-roadmap-5.md:228` and `reelcut-effects-survey.md:619`
+  number** — `roadmap-5.md:228` and `effects-survey.md:619`
   both say `edit_edge.rs:159-166`, and the code is at 160–167.
 
 ### 10.4 The test surface that already exists

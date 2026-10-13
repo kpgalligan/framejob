@@ -4,7 +4,7 @@
 are the plan as it was written, kept as written; "R0 — the answers" and
 "What R0 and the scouts change in R1" override them, and "R1 — the record"
 says what landed and what the review found. Road map 2 is complete
-(`reelcut-roadmap-2.md` §1) and `reelcut-remaining.md` §5 says a third road
+(`roadmap-2.md` §1) and `remaining.md` §5 says a third road
 map starts at road map 2's §4, "Considered and left out". This is the plan
 for the first thing taken off that list: **screen recording**, the feature
 spec §1 named a non-goal on day one. It is sized for **two to three sessions
@@ -151,7 +151,7 @@ is the precedent).
 | `FFmpegRewrap.canAsk` / `Transcriber.canAsk` | an agent-driven app (`-AgentServerEnabled YES`) never puts up a system prompt. |
 | `harness <welcome> …` (`tools/proof/harness/`) | the welcome window is photographable offscreen, which is how the third button is checked. `build.sh` names no frameworks — Swift auto-links what `app/Sources` imports, and phase 4's `Speech` import already rides it — so `import ScreenCaptureKit` costs the harness nothing. What the harness cannot do is CALL the framework: it is a bare Mach-O with no `Info.plist` (`Transcriber.swift:403`), so the probe builds configurations and never presents a picker or asks for content. |
 | `tools/proof/README.md`'s launch line and count rule (`:150–212`) | one instance per port, the parity log empty, and "the EXACT tool count belongs to the newest phase's script" — 74 today, asserted by `phase9_proof.py`; this phase takes 75 and phase 9's becomes a floor. |
-| `reelcut-remaining.md` §3, the size ledger | `AgentCatalog.swift` at 807 with its cut named in its own header (the FILE groups to `AgentCatalog+Files.swift`); `ProjectDocument.swift` at 1336, "a pure addition takes the `+DisplayStem` shape"; `AppDelegate.swift` 223 and `AppDelegate+Menus.swift` 499 have room. |
+| `remaining.md` §3, the size ledger | `AgentCatalog.swift` at 807 with its cut named in its own header (the FILE groups to `AgentCatalog+Files.swift`); `ProjectDocument.swift` at 1336, "a pure addition takes the `+DisplayStem` shape"; `AppDelegate.swift` 223 and `AppDelegate+Menus.swift` 499 have room. |
 
 **ScreenCaptureKit, read off the installed SDK (Xcode 26.2, macOS 26.5.1
 host, deployment target 15.0 in `project.yml`) — to verify, not to trust:**
@@ -206,7 +206,7 @@ embeds a Swift probe the way `phase9_probe.py` does, compiles it with
 `harness/build.sh`'s `swiftc` line against NOTHING from `app/Sources` (the
 spike is before the code), and prints one JSON object. Its numbers are pasted
 into R1 below before R1 is briefed, with the date and the host OS. An
-untracked spike is the debt `reelcut-remaining.md` §1 paid twice; this one is
+untracked spike is the debt `remaining.md` §1 paid twice; this one is
 tracked from its first run.*
 
 The five questions, each with the two designs it chooses between:
@@ -329,7 +329,7 @@ subprocess so a crash is a reported outcome.
    the panel on screen; a PICKER-made filter takes outcome B — the panel
    orders out for the recording's duration and Stop lives on the status
    item and the File menu — until a person checks A (§4 of
-   `reelcut-remaining.md`). Instrument note: `SCShareableContent.windows`
+   `remaining.md`). Instrument note: `SCShareableContent.windows`
    is NOT front to back; z-order comes from
    `CGWindowListCopyWindowInfo(.optionOnScreenOnly)`, and the spike's first
    version read a false "does nothing" off an occluded window.
@@ -1009,7 +1009,7 @@ promoted) and §11 (the five decisions above, in §11's words),
 `README.md` (user-facing: the menu item and the folder),
 `tools/proof/README.md` (the launch line if R0 question 1 says so; the count
 handover to 75; the "with the grant" paragraph), `project.yml`, and
-`reelcut-remaining.md` §3 (the catalog row struck, any new file near the cap
+`remaining.md` §3 (the catalog row struck, any new file near the cap
 added) and §4 (what only a person can check — below). Road map 2 §4's
 "voice-over recording" bullet is rewritten: the microphone half is now
 this phase's, and a standalone voice-over button is what remains.
@@ -1113,7 +1113,7 @@ is unplugged mid-recording; and whether `CGRequestScreenCaptureAccess()`
 returns synchronously on a first ask or only after the prompt.
 
 **What only a person at the machine can check** (for
-`reelcut-remaining.md` §4): the picker's window mode actually presenting and
+`remaining.md` §4): the picker's window mode actually presenting and
 the choice arriving; the countdown's look; that the recording does not
 contain the panel (question 3's outcome) or the status item's own menu; that
 the timeline's playback is absent from the file; the menu bar's own
@@ -1351,7 +1351,7 @@ documents against the code. Fixes routed by root file with a mutant each;
 then the lockstep pass: `record_screen`'s description, spec §7.4's file
 map and §7.9's tool list, §11's two decisions, `CLAUDE.md`'s paragraph,
 `app/CLAUDE.md`'s recorder entries, `tools/proof/README.md`, and
-`reelcut-remaining.md` §4 (what a person checks: the item's two menus, the
+`remaining.md` §4 (what a person checks: the item's two menus, the
 pause glyph, the system indicator staying up through a pause, the panel
 returning only with a note).
 
@@ -1497,7 +1497,7 @@ returning only with a note).
   swallows only a nil (a real `Err` needs 4,096 clips), `freeze()` and
   the quit guard's `openMenu()` (the probe never puts an item in the
   menu bar), and the `.starting` arm of the panel's close.
-- **What only a person can check** is in `reelcut-remaining.md` §4: the
+- **What only a person can check** is in `remaining.md` §4: the
   item's two menus and the pause glyph; the system's own indicator staying
   up through a pause; the panel gone from the moment the recording starts
   for a display source and back only with a note; ⌘Q while paused opening

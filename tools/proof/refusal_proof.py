@@ -4,7 +4,7 @@ Named for the seam and not for a phase, as `patch_door_proof.py` is: what it
 proves is the answer every edit comes back with (`core/src/outcome.rs`,
 `app/Sources/ReelEdit.swift`, `CONTEXT.md`'s **Op**), and the rules that can
 say why arrive one deepening ticket at a time
-(`archive/reelcut-roadmap-7.md` §4, kpgalligan/reelcut#8). Deepening D2·2
+(`archive/roadmap-7.md` §4, kpgalligan/reelcut#8). Deepening D2·2
 built it with the overlap rule's section; D2·3 adds one section per rule that
 finds its voice. There is no phase number to put on that.
 

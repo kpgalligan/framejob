@@ -473,7 +473,7 @@ extension AgentServer {
     /// action's end state.
     ///
     /// **The patch goes to the core UNREAD** (deepening D1·3,
-    /// `archive/reelcut-roadmap-7.md` §2.3). Decoding the object into a
+    /// `archive/roadmap-7.md` §2.3). Decoding the object into a
     /// `VideoPatch`, checking an allowed-key set, reading `motion` by hand
     /// and checking four closed enums are all `core/src/patch.rs`'s now, and
     /// its refusals name the dotted path (array indices included) and the
@@ -497,7 +497,7 @@ extension AgentServer {
     /// handles (`FadeHandleSession`).
     ///
     /// **The patch goes to the core UNREAD**, as `set_video`'s does (D1·4
-    /// after D1·3, `archive/reelcut-roadmap-7.md` §2.4). Its group holds no
+    /// after D1·3, `archive/roadmap-7.md` §2.4). Its group holds no
     /// enum at all, so what the forwarding buys here is the nested object: a
     /// `duck` or a `compressor` MERGES now instead of being replaced from
     /// defaults, and a misspelt key inside one is

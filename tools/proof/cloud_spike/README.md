@@ -1,6 +1,6 @@
 # The cloud spike — road map 6, C0 (2026-09-20)
 
-Eight questions `archive/reelcut-roadmap-6.md` §3 asks about AssemblyAI, and
+Eight questions `archive/roadmap-6.md` §3 asks about AssemblyAI, and
 the instruments that answered them. **The answers are not here**: they are in
 that document's §3, which this run rewrote into the record, with the verdict
 on every design section a row overturned. What is here is how to run it again.
@@ -14,7 +14,7 @@ ledger (the same).
 python3 tools/proof/cloud_spike/cloud_spike.py --selftest      # free, no key, loopback only
 python3 tools/proof/cloud_spike/cloud_spike.py                 # all eight rows
 python3 tools/proof/cloud_spike/cloud_spike.py --only q3,q4    # a subset; the rest carry forward
-python3 tools/proof/cloud_spike/cloud_spike.py --leakcheck tools/proof/cloud_spike tools/proof/work/cloud_spike archive/reelcut-roadmap-6.md
+python3 tools/proof/cloud_spike/cloud_spike.py --leakcheck tools/proof/cloud_spike tools/proof/work/cloud_spike archive/roadmap-6.md
 ```
 
 ## The instruments
@@ -148,7 +148,7 @@ and a literal marker.
 
 ```sh
 python3 tools/proof/cloud_spike/cloud_spike.py --leakcheck tools/proof/cloud_spike \
-    tools/proof/work/cloud_spike archive/reelcut-roadmap-6.md tools/proof/README.md CLAUDE.md
+    tools/proof/work/cloud_spike archive/roadmap-6.md tools/proof/README.md CLAUDE.md
 ```
 
 It compares IN PROCESS and prints file NAMES only — never the secret, never a
@@ -168,7 +168,7 @@ one place an upload URL is allowed to be. `clean` is the only good answer.
 ## Where the answers land
 
 `work/cloud_spike/answers.json` holds every number, and
-`archive/reelcut-roadmap-6.md` §3 holds the record read out of it: the host
+`archive/roadmap-6.md` §3 holds the record read out of it: the host
 paragraph, each row's question, **Measured** and **Verdict**, §3a what the
 spike changed in that document, and §3b the spend and the deletion, call by
 call. A subset run carries the other rows forward under `carriedForward` with

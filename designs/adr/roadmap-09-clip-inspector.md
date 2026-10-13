@@ -2,7 +2,7 @@
 
 - **Status:** Built. Phases 1, 2, 3a and 3b on 2026-09-23; phases 4 and 5 on 2026-09-24. Closed.
   What remains is a person's checks.
-- **Original:** `archive/reelcut-roadmap-9.md` (1120 lines) is the full record; "orig §x" below
+- **Original:** `archive/roadmap-9.md` (1120 lines) is the full record; "orig §x" below
   refers to it. The handoff it implemented stays at `designs/design_handoff_clip_inspector/`.
   Its README is normative for metrics, inks and behaviour, except where the decisions below
   deviate from it.

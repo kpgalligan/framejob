@@ -46,7 +46,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   nothing. The file rather than the Keychain because C0's q7 measured what
   an ad-hoc signature does to a login-keychain item: the next `make app`
   cannot read it without a modal and cannot delete it at all
-  (`archive/reelcut-roadmap-6.md` §3 q7, §5d). A build signed with a stable
+  (`archive/roadmap-6.md` §3 q7, §5d). A build signed with a stable
   identity could keep it in the Keychain, and `SecretStore` is the protocol
   that lets that be a later conformer.
   **Current product scope (2026-09-21):** users supply their own AssemblyAI
@@ -406,5 +406,5 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   foreign id comes only from a hand-edited or imported cache file; the
   risk is low. Also held by this entry: a malformed cache file's deletion
   ids cannot be recovered, and a retry needs the originating account's or
-  region's key. Source: `archive/reelcut-roadmap-6.md` §10.10, §10.20.
+  region's key. Source: `archive/roadmap-6.md` §10.10, §10.20.
   Treating a 404 as deleted is not decided here.

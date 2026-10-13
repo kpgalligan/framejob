@@ -54,7 +54,7 @@
 | ⌥-click a track header | Select every clip on that track |
 | ⌘-drag | Suppress snapping |
 
-**Proposed, not yet bound** — the keys `archive/reelcut-roadmap-2.md` asks
+**Proposed, not yet bound** — the keys `archive/roadmap-2.md` asks
 for, kept here so a phase that binds one checks this table for a conflict
 first and then promotes its row into the one above. A row here is a claim on
 a key, nothing more.

@@ -4,7 +4,7 @@
 each, which is the one place they live. There is nothing here left to pick up;
 what a next road map would be for is in §4, "Considered and left out".
 Spec §10's three milestones are done
-(`reelcut-roadmap.md` records how each was proved). This is the plan for
+(`roadmap-1.md` records how each was proved). This is the plan for
 what a capable editor still lacks, found by reading the op table, the menus,
 the key map and the code against the question "what does a cutter reach for
 and not find". It is sized for **several sessions**: ten phases, each one to
@@ -19,7 +19,7 @@ which `core/CLAUDE.md` calls "the same list" — so a phase that adds a MODULE
 updates it too, not only a phase that adds an op. A phase's record is written
 into its section in §2 when its proof exists; the `CLAUDE.md` files carry
 rules and maps only, never a status paragraph (2026-09-17).
-`reelcut-roadmap.md` is the record of M1–M3 and its "known limits" list
+`roadmap-1.md` is the record of M1–M3 and its "known limits" list
 still stands.
 
 ## 0. Rules every phase inherits

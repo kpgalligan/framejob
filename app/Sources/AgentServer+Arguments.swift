@@ -14,7 +14,7 @@ import AppKit
 /// core unread through `rawPatchArg` below, because the core is the one
 /// validator of what a patch may carry and names the dotted path and the
 /// value in every refusal (`core/src/patch.rs`; the phase is
-/// `archive/reelcut-roadmap-7.md` §2, spec kpgalligan/reelcut#1). The rule
+/// `archive/roadmap-7.md` §2, spec kpgalligan/reelcut#1). The rule
 /// that replaced "check enums and types by hand at every door" is in
 /// `app/CLAUDE.md`: lenient decoding is for what the CORE wrote; nothing a
 /// caller wrote is decoded through it. D1·6 deleted the family that broke it
@@ -474,7 +474,7 @@ extension AgentServer {
     }
 
     /// A caller-authored patch, forwarded to the core UNCHANGED — the door
-    /// deepening D1 moves every property op to (`archive/reelcut-roadmap-7.md`
+    /// deepening D1 moves every property op to (`archive/roadmap-7.md`
     /// §1, kpgalligan/reelcut#1).
     ///
     /// It reads NOTHING about the value. The core is the one validator of

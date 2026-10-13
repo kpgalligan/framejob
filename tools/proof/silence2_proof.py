@@ -32,7 +32,7 @@ since every site that writes a window is now held to the file (spec §11,
 D4-3) — so the walk's scale factor is not an identity everywhere.
 
 Three of the four deviations from §4g recorded in
-`archive/reelcut-roadmap-4.md` §8 belong to this half, each asserted here as
+`archive/roadmap-4.md` §8 belong to this half, each asserted here as
 the tree behaves (§8's (iii), claim 12's sha256 pin, is
 `silence2_probe.py`'s):
 
@@ -715,7 +715,7 @@ def clean_part(mcp):
 
 
 def offgrid_part(mcp):
-    """The reader review's R4·2 (`archive/reelcut-roadmap-4.md` §8).
+    """The reader review's R4·2 (`archive/roadmap-4.md` §8).
 
     Every other walked row in this file is at 30 or 100 fps, and 30000/1001
     would be no different: all three put a frame on a WHOLE number of ticks.
@@ -1141,7 +1141,7 @@ def refusal_part(session):
     its exact sentence.
 
     The last of the four is the reader review's finding 1
-    (`archive/reelcut-roadmap-4.md` §8): the two durations stopped going
+    (`archive/roadmap-4.md` §8): the two durations stopped going
     through `optionalTimeArg` — rightly, it snapped them — and went through
     `intArg`, which has no CEILING, so `padding: Int64.max` reached
     `refine`'s `run.start + settings.padding` and killed the app rather than
@@ -1210,7 +1210,7 @@ def refusal_part(session):
 
 
 def partial_part(mcp):
-    """The reader review's R2·1 (`archive/reelcut-roadmap-4.md` §8).
+    """The reader review's R2·1 (`archive/roadmap-4.md` §8).
 
     `writeSpeech`'s loop ends on a nil sample buffer, and a nil buffer means
     the track ran out OR the decode gave up. The second leaves the rest of the
@@ -1259,7 +1259,7 @@ def partial_part(mcp):
 
 
 def waveform_part(mcp, truth):
-    """The reader review's R3·1 (`archive/reelcut-roadmap-4.md` §8).
+    """The reader review's R3·1 (`archive/roadmap-4.md` §8).
 
     Claim 8 withholds the SPEECH cache. This withholds the WAVEFORM and keeps
     the speech, which is the case the note got wrong: `pending_peaks` folds
@@ -1452,7 +1452,7 @@ def twoclips_part(mcp):
 
 
 def duration_part(mcp):
-    """The reader review's R1·1 (`archive/reelcut-roadmap-4.md` §8).
+    """The reader review's R1·1 (`archive/roadmap-4.md` §8).
 
     `min_length` and `padding` are DURATIONS, and the sheet puts neither on
     the frame grid (`SilenceSheetController`'s unsnapped

@@ -5,7 +5,7 @@
   disagree, road map 10 holds.
 - **Original:** `archive/svg-motion-components-plan.md` (201 lines). Sections
   cited below as "orig §x" refer to its headings. The review is in
-  `archive/reelcut-roadmap-10.md` §1, and the build's ADR is
+  `archive/roadmap-10.md` §1, and the build's ADR is
   `designs/adr/roadmap-10-graphics.md`.
 - **Spec decisions:** none of its own. What survived became spec §11
   G-1..G-16 through road map 10.

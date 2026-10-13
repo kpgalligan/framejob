@@ -21,7 +21,7 @@ Road map 6 §5i's rows 1–11, plus five of this pipeline's own:
 * **2** a two-clip project over ONE media uploads ONCE, as a FLAC whose body
   decodes to the same audio the on-device engine's WAV holds. Written as a
   POPULATION and not as one comparison: this host's 16 kHz extract is not
-  bit-deterministic (`archive/reelcut-remaining.md` §5), so what is asserted
+  bit-deterministic (`archive/remaining.md` §5), so what is asserted
   is one length, at most two distinct strings differing in a single sample,
   with a CONTROL that says the instrument would notice a third. The
   result's `endpoint` is the fake's host alone, `127.0.0.1` (#94).
@@ -749,7 +749,7 @@ def row_two(instance, fake, probe):
     # NOT over `media/speech.mov`, and that is a MEASUREMENT rather than a
     # preference: its AAC track decodes to a different byte string on very
     # nearly every decode (the row below prints this run's numbers), where the
-    # `say` AIFF is the two-string population `archive/reelcut-remaining.md`
+    # `say` AIFF is the two-string population `archive/remaining.md`
     # §5 measured. A byte claim over the .mov would be a coin toss; over the
     # AIFF it is the claim road map 6 §5i·2 means.
     _, aiff = fixtures()
