@@ -10,7 +10,7 @@
     The tool's default is always `apple`.
   - R6-3: a transcript is a per-media asset in the package.
   - R6-4: we delete the uploaded transcript right away and record that we did.
-  - R6-5: the app never holds a key of Reelcut's. The key is the person's, in a `0600` file.
+  - R6-5: the app never holds a key of Frame Job's. The key is the person's, in a `0600` file.
   - R6-6: the protocol boundary is the base URL plus the credential.
   - R6-7: no `async` exception.
   - R6-8: a fallback to Universal-2 is allowed and is reported.
@@ -39,7 +39,7 @@ It also showed that the web service exists for one reason only, which is to keep
 the binary. So the real question was *who pays AssemblyAI*:
 
 - **C1:** the person brings their own key. No server is needed. This is built.
-- **C2:** Reelcut pays. A relay is then required, and it must know who is calling. This is deferred.
+- **C2:** Frame Job pays. A relay is then required, and it must know who is calling. This is deferred.
 
 ## Decisions
 
@@ -64,7 +64,7 @@ id was saved in the package (#29). Otherwise the report sends the person to the 
 (orig §4, §10.15)
 
 **The key is a `0600` file, not the Keychain (R6-5, C0 q7).** It lives at `~/Library/Application
-Support/Reelcut/assemblyai-key`, is created `0600` in a directory made `0700`, and is never chmod'ed
+Support/Frame Job/assemblyai-key`, is created `0600` in a directory made `0700`, and is never chmod'ed
 afterwards. C0 measured what happens to a login-keychain item written by one ad-hoc signature:
 - The next build blocks on a `SecurityAgent` modal, even with `kSecUseAuthenticationUIFail`.
 - It gets `errSecInvalidOwnerEdit` on delete.
@@ -102,7 +102,7 @@ C2's relay would need a configuration key of its own, not this launch argument. 
 
 **The protocol boundary is the base URL plus the credential (R6-6).** `AssemblyAIConfiguration`
 resolves the base URL: `-RCAssemblyAIEndpoint` wins, then the region default
-`ReelcutAssemblyAIRegion` (`us`/`eu`). A non-`https` base URL is accepted only for a loopback host.
+`FrameJobAssemblyAIRegion` (`us`/`eu`). A non-`https` base URL is accepted only for a loopback host.
 C0 q3 measured that ATS does not block loopback HTTP, so `project.yml` gets no ATS key. The fake
 server, the EU endpoint and a same-protocol relay are all just configurations. (orig §3 q3, §5c)
 
@@ -181,7 +181,7 @@ admitted only if every media is current and decodable. A keyless run skips the j
 reports pending deletes as deferred. (orig §5a, §10.20)
 
 **The chrome.**
-- Reelcut ▸ Settings… ⌘, is a window, not a sheet. It has one headed pane, "Transcription", with
+- Frame Job ▸ Settings… ⌘, is a window, not a sheet. It has one headed pane, "Transcription", with
   no one-tab tab bar. It holds the key field, Save/Remove, the region popup, and Verify
   (`GET /v2/transcript?limit=1`), which runs on `CloudTranscriber`'s work queue (R6-12).
 - A Verify answer belongs to the latest request and its captured inputs. When the inputs have
@@ -213,8 +213,8 @@ the sentence (R5·2). The tool never reads the sheet's remembered engine (R6-2).
 
 ## C2 — the relay (designed, deferred)
 
-**What blocks it (orig §6b):** a relay that spends Reelcut's AssemblyAI money must know who is
-calling. That needs a licence key, Sign in with Apple, an App Store receipt or a Reelcut account.
+**What blocks it (orig §6b):** a relay that spends Frame Job's AssemblyAI money must know who is
+calling. That needs a licence key, Sign in with Apple, an App Store receipt or a Frame Job account.
 None exists, and each would be a road map of its own. A rate limit is not a substitute. The user
 deferred C2 on 2026-09-21: people supply their own key, and an integrated AI offering has not been
 designed (orig §10.18).
@@ -247,7 +247,7 @@ The relay also owns these backstops:
 
 R2 is the suggested bucket, because it has no egress fee.
 
-**App side (orig §6e):** `ReelcutRelayTransport` would be a second `TranscriptTransport`
+**App side (orig §6e):** `FrameJobRelayTransport` would be a second `TranscriptTransport`
 conformer, and `CloudTranscriber` would not change. Settings gains a Provider row and a licence
 field. The fake server grows the relay protocol, and proof rows 2–11 run over both transports.
 

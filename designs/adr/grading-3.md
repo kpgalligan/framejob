@@ -2,18 +2,18 @@
 
 - **Status:** Built and closed 2026-10-12. Each phase was one litecode pipeline with its own review, worked in `~/devel/reelcut-grading3` on branch `grading-3` and merged into main alone after its gate (GR-17):
   - T3-0, the road map, GR-15…GR-20 and `DestinationPass`'s pure move (`716720c`)
-  - T3-1, honest sources and Reelcut's HDR→SDR at step 0 (GR-15) (`e76d827`)
+  - T3-1, honest sources and Frame Job's HDR→SDR at step 0 (GR-15) (`e76d827`)
   - T3-2, camera log footage (#264, GR-16, format 19) (`c47d97d`)
   - T3-3, the close: H1a, H7 and TI's export wall time, this record (the commit that moved this record to `archive/`)
 - **Original:** `archive/grading-3.md` is the full record. It has no section numbers, so it is cited by phase: "orig T3-1" is its "T3-1 — honest sources and Reelcut's HDR→SDR at step 0" section.
 - **Spec decisions:** GR-15..GR-20 in spec §11 (`designs/spec/11-decisions/grading-3.md`). They stay binding, and where the original words them differently, §11's text wins:
   - GR-15: honest sources: `ConvertingCompositor` (`canConformColorOfSourceFrames` and `supportsHDRSourceFrames` true) and BT.709 composition colour only for a composition holding an HLG, PQ or wide-gamut source; a per-source step 0 chosen by the buffer's TRANSFER label (HLG, PQ, wide-gamut SDR, the sRGB arm); the HLG inverse OETF with system gamma 0.96 and gain 1.07, PQ over reference white 203 cd/m², the derived matrix to BT.709, the gamut lift, the shoulder (knee 0.39), the encode L^(1/2.4); H3's bound, 3/255 of Apple's measured points; every other composition built exactly as before.
-  - GR-16: camera log on the media, `media.color {log, gamut, lut, detected}`, `set_media_color` (the 61st op, the 91st product tool), Apple Log and Apple Log 2 detected from their labels, S-Log3 and V-Log by hand, Use LUT…; converted at step 0 before the chroma key; Show Ungraded keeps it; the makers' curves, each document's terms and code domain; Reelcut's display transform with mid-grey 0.42; the look warning; format 19.
+  - GR-16: camera log on the media, `media.color {log, gamut, lut, detected}`, `set_media_color` (the 61st op, the 91st product tool), Apple Log and Apple Log 2 detected from their labels, S-Log3 and V-Log by hand, Use LUT…; converted at step 0 before the chroma key; Show Ungraded keeps it; the makers' curves, each document's terms and code domain; Frame Job's display transform with mid-grey 0.42; the look warning; format 19.
   - GR-17: each phase merged into main alone, main's format numbers, no verdict phase, synthetic fixtures now.
   - GR-18: linear-light blending deferred; when built, an opt-in project switch, off for every project, with its design notes (#276).
   - GR-19: the HDR timeline deferred with its design: `canvas.output`, BT.2408's SDR→HLG, the measured HDR export (#277).
   - GR-20: a wide-gamut working space for SDR projects closed as not wanted.
-  - Amended: PR-2 by GR-15 ("HDR stays tone-mapped" was true of one path; HDR still reaches the output as SDR, converted by Reelcut's own step 0); GR-8 by GR-15 (T0's "HLG and PQ … UNCHANGED" was true of the generator and a decoder's first frame) and by GR-16 (its accepted risk shrinks: log is converted at step 0, a LUT can be the input conversion, the Look section warns); `designs/adr/grading-2.md`'s line "an input LUT would be its own step before 4c" by GR-16 (it is step 0, before step 3).
+  - Amended: PR-2 by GR-15 ("HDR stays tone-mapped" was true of one path; HDR still reaches the output as SDR, converted by Frame Job's own step 0); GR-8 by GR-15 (T0's "HLG and PQ … UNCHANGED" was true of the generator and a decoder's first frame) and by GR-16 (its accepted risk shrinks: log is converted at step 0, a LUT can be the input conversion, the Look section warns); `designs/adr/grading-2.md`'s line "an input LUT would be its own step before 4c" by GR-16 (it is step 0, before step 3).
 
 ## Context
 
@@ -40,8 +40,8 @@ GR-1 deferred tier 3 "as issues, not out"; tier 1's close filed #256 (HDR above 
 ## What it built — where it lives now
 
 - Core (T3-2): `model_media_color.rs` (`LogCurve`, `CameraGamut`, `MediaColor`), `media_color.rs` (`set_media_color`, `check_media_color`, `media_input`, `media_converted_by`), `Media.color`; the 61st op in `edit.rs` and `op_table.rs`; `MEDIA_KEYS` 12; relink, `remove_lut`, paste and `validate` rules; the recipe layer's `input` (26 keys, kept by `ungraded`) and a plan video segment's `input` only when its media converts; `RC_FORMAT_VERSION` 19. Tests: `media_color.rs`, `schema_v19.rs`. T3-1 had no core change.
-- Metal: `Compositor.metal`'s `reelcut_input_fragment` (step 0, the ninth pipeline): HLG, PQ, wide-gamut SDR, sRGB, the three inverse log curves and the LUT arm, with the standards' and makers' constants only.
-- Swift: `InputConversions.swift` (the selector through two readers, `startsConversion`, every number Reelcut chose, `toBT709` derived, the camera gamuts, the code domains); `Compositor+Input.swift` (`ConvertingCompositor`, `InputUniforms`, `InputStage`, `encodeInputs`); `Compositor+Sources.swift` (T3-1's pure move); `CompositionBuilder.convertsSources`; `MediaColor.swift`, `MediaImporter+Color.swift`, `MediaPane+CameraLog.swift`, `EditorViewController+CameraLog.swift`, the Look section's `lutOverCameraLog`; `AgentServer`'s `set_media_color` handler and catalog entry.
+- Metal: `Compositor.metal`'s `framejob_input_fragment` (step 0, the ninth pipeline): HLG, PQ, wide-gamut SDR, sRGB, the three inverse log curves and the LUT arm, with the standards' and makers' constants only.
+- Swift: `InputConversions.swift` (the selector through two readers, `startsConversion`, every number Frame Job chose, `toBT709` derived, the camera gamuts, the code domains); `Compositor+Input.swift` (`ConvertingCompositor`, `InputUniforms`, `InputStage`, `encodeInputs`); `Compositor+Sources.swift` (T3-1's pure move); `CompositionBuilder.convertsSources`; `MediaColor.swift`, `MediaImporter+Color.swift`, `MediaPane+CameraLog.swift`, `EditorViewController+CameraLog.swift`, the Look section's `lutOverCameraLog`; `AgentServer`'s `set_media_color` handler and catalog entry.
 - Proofs: `hdr_proof.py` (H1, H1m, H1a, H1s, H1w, H2–H7, R0, TI, P1–P4, Z1, twelve mutants) with `hdr_probe.swift`, `hdr_pick_probe.swift` and `applelog_writer.swift`; `log_proof.py` (LP1–LP4, L1–L9, Z1, ten mutants) with `log_probe.swift`; screen `10b-media-tab`.
 - Person checks: GRD-16 (iPhone HDR footage, the preview's first frame and playback at length), GRD-17 (Apple Log), GRD-18 (Sony or Panasonic log) in `docs/manual-checks.md`.
 - Pure moves: `DestinationPass` out of `Compositor.swift` (T3-0, 723 → 658); `MetalRenderer`'s `// MARK: - Sources` to `Compositor+Sources.swift` (T3-1, 658 → 572). `designs/adr/app-file-history.md` names the next seams.
@@ -76,7 +76,7 @@ Mutants, each run once on the final instrument and all caught: T3-1's twelve (`h
 - **Thumbnails** on the timeline and in the Media tab showed the log picture (#282): closed by GR-21, which draws a converting media's thumbnails — Camera Log, HLG and PQ — through step 0. **A full-range-flagged log file** is read as video range (#283).
 - **The 10-bit reverse shifts a log toe**: code 95 → 98 (S-Log3) and 196 → 199 (Apple Log), seven levels after the curve. L6's bound absorbs it (#280).
 - **A colour tag in the ProRes header and not the `colr` atom** decodes with BT.709 coefficients ([59, 154, 76] against [61, 156, 74]). The first `green.mov`'s [50, 165, 73] (BT.601-like) is unexplained, and the file was not kept (#279).
-- **The display transform's mid-grey** is Reelcut's look choice, not a maker's. A camera LUT applied as a look over Camera Log converts twice and is only warned.
+- **The display transform's mid-grey** is Frame Job's look choice, not a maker's. A camera LUT applied as a look over Camera Log converts twice and is only warned.
 - **Timings** come from one M2 Max on a loaded host and are recorded, not budgets.
 
 ## Open items

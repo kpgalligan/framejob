@@ -63,7 +63,7 @@ history. The history moved into this record; the open items became GitHub issues
   through `ProjectDocument.displayStem`** (`ProjectDocument+DisplayStem.swift`, an extension
   because the base file was over the cap). The item's premise was half wrong and the scout caught
   it. The format popup's site wanted `CaptionExporter.renamed` over `{srt, vtt}`; the title-bar
-  site wanted `{reelcut}`; and two siblings had the same bare strip.
+  site wanted `{framejob}`; and two siblings had the same bare strip.
 - **Lesson (§2b):** both sites were PANEL-only and the MCP path was right all along, so an MCP
   check passes against the unfixed build and is not evidence. An unwired site with correct helpers
   beside it scored 60/60 on behaviour; only a STRUCTURAL read that the sites call their helpers

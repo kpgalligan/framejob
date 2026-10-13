@@ -6,9 +6,9 @@
   - P-1: prices come from LiteLLM's table; only AssemblyAI's rate is hand-kept; Anthropic's page is the cross-check.
   - P-2: a call is priced from the response's own `usage` and `model`, per `iterations` entry; unknown is never $0.
   - P-3: budgets are dollars per calendar month per service ($25 Anthropic, $5 AssemblyAI), enforced by the proofs at the worst case.
-  - P-4: spend shown in the app is Reelcut's own, and says so.
+  - P-4: spend shown in the app is Frame Job's own, and says so.
   - P-5: the spend ledger and the price cache are the person's, in the spend folder; a proof never touches them.
-  - P-6: the proofs' ledger is `~/Library/Application Support/Reelcut Proofs/spend.jsonl`; every paid proof request is reserved at its worst case there and refused past the month's budget.
+  - P-6: the proofs' ledger is `~/Library/Application Support/Frame Job Proofs/spend.jsonl`; every paid proof request is reserved at its worst case there and refused past the month's budget.
   - P-7: the app shows the conversation's cost on the Assistant tab and the UTC month's, folded from the ledger, in Settings; unpriced and unreadable lines are counted, never $0.
   - P-8: a response cut short is priced once, from what its stream had reported, and marked partial (issue batch B15, #162).
   The helper's prices and the two figures are specified in spec §7.9; the tab's Spend row in §4.3; the files are mapped in §7.4.
@@ -20,7 +20,7 @@ The user asked for three things: a spend budget, a price on every call the assis
 ## Decisions
 
 - **LiteLLM's table is the feed; a library was rejected.** `@pydantic/genai-prices` lacked `claude-opus-5-5` and `claude-fable-5-1`; the npm repackagings of LiteLLM add a lag and a dependency for four multiplications. LiteLLM's `claude-opus-5-5` row equalled Anthropic's pricing page exactly. AssemblyAI's Universal-3.5 Pro is absent from every source, so `AssemblyAIRates` stays the one hand-kept rate. (P-1; orig §1)
-- **One committed table, written only by `make prices`.** `agent/prices/anthropic.json` holds LiteLLM's 20 Anthropic rows in $/MTok with the LiteLLM commit they came from; `update.py` (stdlib) is its only writer and `make prices` a prerequisite of nothing. `prices_crosscheck.py` compares the rows Reelcut uses against the page, over the network, outside `make test`. (P-1; orig §5 P1)
+- **One committed table, written only by `make prices`.** `agent/prices/anthropic.json` holds LiteLLM's 20 Anthropic rows in $/MTok with the LiteLLM commit they came from; `update.py` (stdlib) is its only writer and `make prices` a prerequisite of nothing. `prices_crosscheck.py` compares the rows Frame Job uses against the page, over the network, outside `make test`. (P-1; orig §5 P1)
 - **The top-level `usage` is not the whole bill.** It describes only the attempt that returned the message; `usage.iterations` lists every billed attempt (a refused attempt before a fallback, a compaction pass), each at its own model. So a call is priced per iteration when there are any. Fast, priority/batch and US-only usage, a malformed count and a class whose rate a row lacks all answer `unknown`, never the base rate. (P-2; orig §1's correction, §5 P1)
 - **Two readers, one fixture.** `agent/src/pricing.ts` (the helper) and `tools/proof/prices.py` (the proofs) answer the same `agent/prices/cases.json`, both in `make test` (`prices_proof.py`), and each made to fail against the other. (P-1, P-2; orig §5 P1)
 - **The helper prices every response, at the prices in force when the turn started.** It keeps the bundled table or the spend folder's cache, refreshed at most daily from LiteLLM's raw file (or `-RCPriceFeed`, https or loopback only), and emits `prices` once per `configure` and a `cost` for every response and compaction summary. H9 measured a refresh that settled mid-turn: the turn's two `cost`s stayed bundled and the next turn's were fetched. (P-2, P-5; orig §5 P2)

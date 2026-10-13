@@ -78,7 +78,7 @@ in agreement.
 - A popup, checkbox or segmented control makes a row discrete, which gets "at end". Colour counts
   as continuous.
 - ◇ uses the single selected clip's numbering. With several clips selected, no row shows ◇. The
-  handoff says marks follow the first clip; Reelcut deviates from that.
+  handoff says marks follow the first clip; Frame Job deviates from that.
 
 **Rows read at four times through `InspectorBinding.at(_:_:)`.** The modes are `.end`, `.start`,
 `.playhead` and `.defaults`, and each is cached per clip and mode.

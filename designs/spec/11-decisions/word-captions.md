@@ -134,7 +134,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   **Format version 12**, with no migrate step, since each carries a serde
   default; the bump is what makes an older build refuse the file ("project
   format version 12 is newer than this build understands (version 11);
-  update Reelcut to open it") rather than open it, drop the three keys on
+  update Frame Job to open it") rather than open it, drop the three keys on
   read and write the loss back on the next save. `pause_dim` outside 0–1
   is refused at the patch door in the rule's own words
   (`text.word_style.pause_dim must be between 0 and 1, not 2`); the two
@@ -226,7 +226,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   and above the preview, one per line with no heading: "Slide the pill",
   "Fill words as spoken", "Dim in pauses". Each is off by default and
   REMEMBERED under its own key in the sheet's defaults
-  (`ReelcutCaptionSlide`, `ReelcutCaptionFill`, `ReelcutCaptionDim`; an
+  (`FrameJobCaptionSlide`, `FrameJobCaptionFill`, `FrameJobCaptionDim`; an
   absent key is off, so a build that remembered only a style opens with
   all three off), read when the row is built and written by a CLICK —
   never by Generate — and never read or written by a tool (R6-2 read

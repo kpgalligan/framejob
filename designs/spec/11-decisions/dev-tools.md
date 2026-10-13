@@ -7,7 +7,7 @@ The road map that made these is closed; its condensed record is
 `designs/adr/roadmap-11-dev-tools.md` (the original is `archive/roadmap-11.md`).
 V-4 and V-5 come from the build-velocity road map, now closed: `designs/adr/build-velocity.md` (the original is `archive/build-velocity.md`).
 
-- **V-1 — Dev tools are compiled only under `REELCUT_DEV_TOOLS`, and the shipping build is
+- **V-1 — Dev tools are compiled only under `FRAMEJOB_DEV_TOOLS`, and the shipping build is
   the Distribution configuration, which does not set it.** Debug and Release set the flag;
   `make app` builds Release, so every proof and agent session has the tools, and the binary
   that is verified is the optimised one rather than a Debug build that only resembles it. A
@@ -33,9 +33,9 @@ V-4 and V-5 come from the build-velocity road map, now closed: `designs/adr/buil
   `get_project` and the catalog snapshot, compared parsed), render byte-for-byte alike, and
   export alike but for the movie header's creation and modification times; Debug is used for its
   rebuild time. Risk accepted: an optimiser-only defect is seen only by the recorded run.
-- **V-5 — The Debug build is its own app: "Reelcut Debug", `com.kgalligan.Reelcut.debug`, its
-  own defaults domain, and an Alternate handler for `.reelcut`, so a double-click opens the real
-  Reelcut.** Debug-config settings only (`PRODUCT_BUNDLE_IDENTIFIER`, `RC_APP_NAME`,
+- **V-5 — The Debug build is its own app: "Frame Job Debug", `com.kgalligan.FrameJob.debug`, its
+  own defaults domain, and an Alternate handler for `.framejob`, so a double-click opens the real
+  Frame Job.** Debug-config settings only (`PRODUCT_BUNDLE_IDENTIFIER`, `RC_APP_NAME`,
   `RC_PROJECT_HANDLER_RANK`, read through `:default=` so Release and Distribution keep identical
   settings and Info.plist bytes). `PRODUCT_NAME` stays `Reelcut` (bundle, executable, module).
   The Application Support folder, its default socket and its keys stay shared; TCC grants are

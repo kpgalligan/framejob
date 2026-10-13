@@ -22,7 +22,7 @@ stands in their place.
 R5-5; §7.5's blending in encoded sRGB; MT-1..MT-9; PR-1..PR-5; "media by reference"; G-35.
 **The Concat rule** (`designs/adr/effects-survey.md`, "Licensing") stands for every phase: tone's
 formulas are textbook (the sRGB transfer functions of IEC 61966-2-1, Rec. 709 luma weights) and
-Reelcut's own numbers, and nothing of Concat is opened, at design time or build time.
+Frame Job's own numbers, and nothing of Concat is opened, at design time or build time.
 
 - **GR-1 — The grading experiment: tier 1 is IN, kept by the owner's verdict; tiers 2 and 3 are filed as issues.** Tier 1 is tone, adjustment clips, looks and `.cube` LUT import, with a way to see the
   grade: a before/after switch (View ▸ Show Ungraded, preview only) and one luma waveform. Flip and
@@ -47,7 +47,7 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
     sentence (`video.color.exposure must be between -3 and 3, not 3.5`), never clamped by the
     patch; an action's end is clamped like the other colour keys. Set by `set_video {patch:
     {color: {…}}}` (no new op, no op-table row), animated by actions like every number (§5.4).
-  - The strengths at ±1 are Reelcut's own (GR0's spike numbers, tunable at GR7): exposure ±1 is
+  - The strengths at ±1 are Frame Job's own (GR0's spike numbers, tunable at GR7): exposure ±1 is
     ×2 / ×½ on linear light; temperature ±1 is red ×2^±0.3 and blue ×2^∓0.3 on linear light; tint
     +1 is green ×2^−0.3 (towards magenta); highlights and shadows ±1 lift by ±0.25 weighted to the
     top and bottom halves of luma; whites and blacks ±1 stretch by ±15 % held at black and at
@@ -166,7 +166,7 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
     crop, corner, shadow, reflection, chroma, spotlight, obscure and motion placement are kept
     and do nothing (refusing them would make Paste Attributes fail from any moved clip); a
     motion preset's fades fade the grade.
-  - **The pass.** The compositor's eighth pipeline, `reelcut_adjust_fragment`, reads the target
+  - **The pass.** The compositor's eighth pipeline, `framejob_adjust_fragment`, reads the target
     it is drawing into (`[[color(0)]]`) with blending OFF and writes `mix(dst, graded, w)`, where
     `graded` is the un-premultiplied destination through step 4c's colour and tone and the point
     filters (the canvas's uv as their local position), re-premultiplied by the destination's own
@@ -244,7 +244,7 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
     Orange), `vivid` (Vivid), `faded` (Faded), `vintage` (Vintage), `dramatic` (Dramatic),
     `black_white` (Black & White). Each is built from Color's four keys, Light's nine (GR-2's
     strengths) and a **split tone** — a shadow hue and a highlight hue in degrees, each with an
-    amount 0…1 — with every unlisted value 0. Generic names and Reelcut's own first numbers, tuned
+    amount 0…1 — with every unlisted value 0. Generic names and Frame Job's own first numbers, tuned
     by the owner by eye at GR7:
     | kind | in plain words | blocks |
     |---|---|---|
@@ -275,7 +275,7 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   - **Step 4d** applies it once per pixel, right after 4c: the lattice sampled trilinearly at
     `saturate(rgb)·(n−1)/n + 0.5/n` and mixed in by `amount`. The texture is bound at
     **`texture(2)`** on every draw through the three fragments that run the stage
-    (`reelcut_layer_fragment`, `reelcut_layer_blend_fragment`, `reelcut_adjust_fragment`); a
+    (`framejob_layer_fragment`, `framejob_layer_blend_fragment`, `framejob_adjust_fragment`); a
     layer with no look binds a **2³ identity placeholder** and never samples it, because
     `LayerUniforms`' two reserved tone floats become `lookAmount` and `lookEnabled` (still 116
     floats, 464 bytes) and `lookEnabled` joins the effects gate's sum — GR0's route VF, so a
@@ -397,7 +397,7 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
     name**: a 1D LUT (`LUT_1D_SIZE`, `LUT_1D_INPUT_RANGE`), a size outside 2–65, a non-default
     domain or input range, any other keyword, a keyword after the table, a short or long table, a
     non-number, a file over 32 MB (`RC_CUBE_MAX_BYTES`) or not text. The import refusal reads
-    `“Film.cube” is not a LUT Reelcut reads: line 2: LUT_3D_SIZE 200 is outside 2–65.` — the file's
+    `“Film.cube” is not a LUT Frame Job reads: line 2: LUT_3D_SIZE 200 is outside 2–65.` — the file's
     name, then the parser's own sentence. Refuse rather than guess.
   - **Where it applies** (choice 8): to the layer's ENCODED values — what camera and creative LUTs
     expect — at step 4d like a built-in look (after Color and Light, before the point filters),
@@ -407,7 +407,7 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
     (`rc_cube_parse`), and keeps a least-recently-used cache of eight textures.
   - **Seeing it** (choice 9): Show Ungraded and `render_frame {ungraded}` remove a LUT look like
     every look; an export never does.
-  - **Log and HDR footage** (choice 10): Reelcut converts nothing in GR6. **Measured (GR6a's T0,
+  - **Log and HDR footage** (choice 10): Frame Job converts nothing in GR6. **Measured (GR6a's T0,
     Release, 2026-10-10)**: one 10-bit ProRes 422 chart re-tagged by stream copy. AVFoundation
     ignores the tags in the ProRes frame headers (every header-only tag drew the untagged frame's
     bytes) and reads the container's `colr` atom: tagged there, HLG and PQ draw the grey ramp
@@ -427,7 +427,7 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
     `rc_cube_free`.
   - **The Concat rule stands**: the parser is written from the `.cube` format's own description,
     and every test LUT is written by a script.
-  - Risk accepted: a LUT that expects log or linear input draws wrong on Reelcut's encoded values
+  - Risk accepted: a LUT that expects log or linear input draws wrong on Frame Job's encoded values
     unless the footage is what the LUT was made for, and nothing warns; non-default domains, 1D and
     shaper LUTs are refused, not read.
   **Amended by GR-15** (grading-3 T3-0): T0's "HLG and PQ draw the grey ramp UNCHANGED (no
@@ -436,7 +436,7 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   export reader's later frames and the player convert them to SDR (the tier-3 brief, 2026-10-11:
   grey signal 0.5 → HLG 0.3843, PQ 0.7192; `archive/grading-3.md`, "How it fits the tree"). From
   T3-1 every source arrives native and honestly labelled (`canConformColorOfSourceFrames`), and
-  Reelcut's step 0 converts HLG, PQ and BT.2020-with-BT.709-transfer sources to SDR Rec. 709
+  Frame Job's step 0 converts HLG, PQ and BT.2020-with-BT.709-transfer sources to SDR Rec. 709
   before the layer stage, so a LUT at 4d meets them converted, on every path.
   **Amended by GR-16** (grading-3 T3-0): log is checked on a synthetic file. A ProRes file
   labelled Apple Log reads back with `LogTransferFunction = com.apple.rec2020.apple-log` (a
@@ -451,7 +451,7 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
 - **GR-9 — The branch wrote project format 1015 and refused 15–1014 by name; at the merge 1015
   became 15.** The branch's `RC_FORMAT_VERSION` was **1015** (main's 14 plus a thousand), in
   `core/src/format.rs` and the header, so every main build refused a branch-made project as "made
-  by a newer Reelcut" instead of opening it and dropping its grades on the next save.
+  by a newer Frame Job" instead of opening it and dropping its grades on the next save.
   Its base version was 14: the branch read 1 to 14 and 1015, and refused a file numbered 15 to
   1014 in its own sentence (naming the numbers it reads), because a later main file
   would otherwise open and lose its new keys on save (owner choice 9). Above 1015 the existing

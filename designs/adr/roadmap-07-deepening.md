@@ -173,7 +173,7 @@ core.** Typed Swift builders stay hand-written so the compiler guards call sites
 
 **The fifth parity part (`AgentServer+Parity.swift`) compares names both ways and complains about
 prose: an undescribed argument, and a description for an argument no op has.** It reports like the
-other four (debug assert, release `NSLog "Reelcut: "`) and does not stop launch (orig §8.5).
+other four (debug assert, release `NSLog "Frame Job: "`) and does not stop launch (orig §8.5).
 
 **A generated artefact is checked by asking the thing that generated it a question it did not
 write the answer to.** Twice a constraint the app enforced silently vanished from the schema while

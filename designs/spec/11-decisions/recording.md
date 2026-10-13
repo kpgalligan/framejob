@@ -14,7 +14,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   (`adoptImported`, the two-try placement). The model learns nothing: no
   source kind, no flag, no schema bump. Every op, cache and export treats a
   recording clip as the media clip it is.
-- **The file lives in `~/Movies/Reelcut Recordings/`**, named by date and
+- **The file lives in `~/Movies/Frame Job Recordings/`**, named by date and
   time, never in the package and never in the temporary directory: an
   untitled document has no package (§5.6), and a recording is ORIGINAL
   footage, so the one place it may not go is where a cache is regenerable.
@@ -43,7 +43,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 - **A press of Record asks for Screen Recording once, and every later
   press opens System Settings at the pane** (2026-09-28). The first press
   without the grant calls `CGRequestScreenCaptureAccess`, and the panel
-  remembers it across launches in `ReelcutScreenRecordingAsked`, because
+  remembers it across launches in `FrameJobScreenRecordingAsked`, because
   the system prompt appears once per app, not once per launch; every later
   press opens `x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture`
   through `NSWorkspace` and the note says System Settings is open at that
@@ -103,19 +103,19 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   Pause Recording is a second door to pause (below) — and the panel returns
   after the landing only when it was on screen as the recording began and
   the landing's note is non-empty (a stop from the SYSTEM's own indicator —
-  Reelcut's item's Stop writes no note — a closed target, a segment left
+  Frame Job's item's Stop writes no note — a closed target, a segment left
   out as unreadable, a microphone problem, a refused resume, a file the
   landing could not place, a failure). ⌥⌘N shows it again; while it is
   hidden, the quit guard opens the item's menu rather than beeping.
   A voice-over (Microphone Only) is the exception: the panel stays up
   (2026-10-02; "A voice-over is a recording with no picture", below).
-- **The recorder panel takes key only from an active Reelcut** (#137,
-  2026-09-29). Shown with Reelcut active (File ▸ New Recording…, ⌥⌘N, the
+- **The recorder panel takes key only from an active Frame Job** (#137,
+  2026-09-29). Shown with Frame Job active (File ▸ New Recording…, ⌥⌘N, the
   welcome button), it comes to the front key, with Record on Return. Shown
-  with Reelcut in the background (a script's `perform_menu_item`, a Dock
-  quit while a tool records), it is ordered front without key: Reelcut
+  with Frame Job in the background (a script's `perform_menu_item`, a Dock
+  quit while a tool records), it is ordered front without key: Frame Job
   stays inactive, and the person's typing, Return included, stays in the
-  app in front. A click on it still works without activating Reelcut
+  app in front. A click on it still works without activating Frame Job
   (`.nonactivatingPanel`).
 - **A segment whose movie will not probe is left out** (#97, 2026-09-29).
   The walker that probes a finished recording's segments skips it and goes
@@ -206,7 +206,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `validateMenuItem`) and the status item stop the voice-over, as
   `AppDelegate+Recording.swift`'s `newRecording` routes by the panel's
   phase. **The files** are
-  `~/Movies/Reelcut Recordings/Voice-over <date> at <time>.m4a`, one file
+  `~/Movies/Frame Job Recordings/Voice-over <date> at <time>.m4a`, one file
   per stretch between pauses, as a screen recording's are — never the
   capture output's own pause into one file, which is unmeasured here and
   would give Pause a second machine. **Landing in an open project**: every
@@ -219,7 +219,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   track. **MCP**: `record_screen` gains `source`, `"screen"` (the default)
   or `"voice_over"`; with a voice-over the default microphone is implied,
   and `display`, `window`, `system_audio`, `show_clicks`, `size`,
-  `include_reelcut_windows` (added when the Include Reelcut windows decision
+  `include_framejob_windows` (added when the Include Frame Job windows decision
   below met this one) and `microphone: false` are refused by name, and only the Microphone
   permission is read. The tool's refusal order is `seconds`, then `source`
   (its value, then the screen-only arguments given — a JSON null is not
@@ -251,23 +251,23 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `~/Movies/Reelcut Recordings/Voice-over <date> at <time>.m4a` is now
   `~/Movies/Frame Job Recordings/Voice-over <date> at <time>.m4a`;
   `include_reelcut_windows` is now `include_framejob_windows`.
-- **Include Reelcut windows** (2026-09-30). The panel's checkbox under
-  Source, off by default, kept in `ReelcutRecordingIncludeReelcutWindows`;
-  `record_screen`'s `include_reelcut_windows` mirrors it, default false.
-  Off is today's rule: a display recording excludes Reelcut's application
+- **Include Frame Job windows** (2026-09-30). The panel's checkbox under
+  Source, off by default, kept in `FrameJobRecordingIncludeFrameJobWindows`;
+  `record_screen`'s `include_framejob_windows` mirrors it, default false.
+  Off is today's rule: a display recording excludes Frame Job's application
   (R0 q3), and the picker lists none of its windows. On, a display
   recording excludes no application. The one exception is a recording the
   PANEL started, which excludes the panel's own window: the panel stays on
   screen until `recordingDidStart`, after the capture's completion, and the
   file's first frame is written 86–107 ms before that completion (R0 q2).
-  The picker lists Reelcut's windows but not the panel. Pictures only:
-  Reelcut's sound stays out (`excludesCurrentProcessAudio`). A window
+  The picker lists Frame Job's windows but not the panel. Pictures only:
+  Frame Job's sound stays out (`excludesCurrentProcessAudio`). A window
   source is unaffected: `window` records the window it names, and a window
   already picked stays picked — the box governs the NEXT picker. The tool
   excludes no window. **With a voice-over** (the decision above; the two met
   when side-work merged into main, 2026-10-02) the box greys out with System
   Audio, Show Clicks and Size, its value kept, and `record_screen` refuses
-  `include_reelcut_windows` by name with `source: "voice_over"`, as it does
+  `include_framejob_windows` by name with `source: "voice_over"`, as it does
   the other screen-only arguments.
   **Amended by NM-5 and NM-6** (rename R0): the checkbox "Include Reelcut
   windows" is now "Include Frame Job windows";

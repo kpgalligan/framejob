@@ -9,11 +9,11 @@ them in its "Decisions" section (MC-4 and MC-6 as MC0 left them; this file is th
 holds the tree they changed in its "What exists" section.
 
 - **MC-1 — The agent server listens only on a Unix socket,
-  `~/Library/Application Support/Reelcut/Agent/agent.sock`, and always, while the app runs.** No
+  `~/Library/Application Support/Frame Job/Agent/agent.sock`, and always, while the app runs.** No
   TCP listener and no switch. Only processes running as the person can reach a socket in a `0700`
-  folder, and those can already read and write everything Reelcut can, so the switch guarded
+  folder, and those can already read and write everything Frame Job can, so the switch guarded
   nothing a socket leaves open; TCP's only remaining users were the proofs. Risk accepted: any
-  process running as the person can drive Reelcut while it runs, with no way to turn that off,
+  process running as the person can drive Frame Job while it runs, with no way to turn that off,
   and a client that speaks only HTTP-over-TCP cannot connect without the stdio helper.
   **Amended by NM-4** (rename R0): `~/Library/Application Support/Reelcut/Agent/agent.sock` is
   now `~/Library/Application Support/Frame Job/Agent/agent.sock`.
@@ -25,15 +25,15 @@ holds the tree they changed in its "What exists" section.
   owner unlinks it at quit. A folder that is group- or world-accessible is reported and the
   socket is not bound — the folder's mode is the whole access control, so a wrong mode is not
   worked around.
-- **MC-3 — External MCP clients reach Reelcut through `reelcut-mcp`, a stdio server inside the
+- **MC-3 — External MCP clients reach Frame Job through `framejob-mcp`, a stdio server inside the
   bundle.** It is the one supported client configuration; `README.md` gives the command. A Rust
   binary (no AppKit, no runtime to install), not the app's own binary run with a flag.
   **Amended by NM-5** (rename R0): `reelcut-mcp` is now `framejob-mcp`.
-- **MC-4 — `reelcut-mcp` never launches Reelcut to answer `initialize` or `tools/list`.**
+- **MC-4 — `framejob-mcp` never launches Frame Job to answer `initialize` or `tools/list`.**
   Opening an MCP client must not open a video editor. It answers `tools/list` from the running
   app when there is one and from its bundle's catalog snapshot when there is not, and launches
   its OWN bundle, in the background (`open -n -g`), on the first `tools/call` that finds no
-  socket — including after the person quits Reelcut mid-session. Two proxies that both find no
+  socket — including after the person quits Frame Job mid-session. Two proxies that both find no
   socket launch one instance between them: the lock is `agent.launch.lock` beside the socket,
   held from the re-check until the launched instance answers or the wait ends. A session whose
   launch timed out launches no other: its later calls that find no socket answer the timeout's
@@ -52,10 +52,10 @@ holds the tree they changed in its "What exists" section.
   exists"). Risk accepted: the assistant's `import_media` of a file AVFoundation refuses no
   longer asks the person mid-turn; it answers with the refusal, which names the setting.
 - **MC-6 — `RC_AGENT_SOCKET` overrides the socket path, and a proof always sets it.** No proof
-  binds or deletes the person's socket, and `reelcut-mcp` honours the same variable, passing it
-  to a Reelcut it launches (`open --env`), so a proof can drive the proxy against a scratch
+  binds or deletes the person's socket, and `framejob-mcp` honours the same variable, passing it
+  to a Frame Job it launches (`open --env`), so a proof can drive the proxy against a scratch
   instance. Such a launch also passes `-ApplePersistenceIgnoreState YES` and writes the
-  instance's stderr to `reelcut-launch.log` beside the socket; a launch for the person's own
+  instance's stderr to `framejob-launch.log` beside the socket; a launch for the person's own
   socket passes neither. An interim rule bound no socket for a launch that set `RC_AGENT_PORT`
   and not `RC_AGENT_SOCKET`; MC4 deleted it with `RC_AGENT_PORT`.
   **Amended by NM-5** (rename R0): `reelcut-mcp` is now `framejob-mcp`; `reelcut-launch.log` is
@@ -63,12 +63,12 @@ holds the tree they changed in its "What exists" section.
 - **MC-7 — Copy MCP Command is a button in Settings' MCP section, the window's first; the Tools
   menu is gone** (#222, issue batch B74, the owner, 2026-10-02). The section holds a visible blurb
   in two paragraphs — not an ⓘ, because the owner asked for a blurb above the button — saying how
-  an MCP client reaches Reelcut through `reelcut-mcp` (MC-1, MC-3) and that the first tool call
+  an MCP client reaches Frame Job through `framejob-mcp` (MC-1, MC-3) and that the first tool call
   opens it in the background (MC-4); then the helper's path as selectable monospace text; then
   the button, which copies MC-3's line through `AgentServer.mcpCommand`, the one spelling; then a
   status line ("Copied. Paste it into Terminal and press Return." after a press). The button is
   enabled exactly while the bundle's helper is an executable file; when it is not, the status
-  line says "reelcut-mcp is missing from this copy of Reelcut." The button is not an edit, so it
+  line says "framejob-mcp is missing from this copy of Frame Job." The button is not an edit, so it
   has no MCP mirror (spec §7.9). It is proved in two halves: a proof opens Settings with
   `perform_menu_item` and reads the section with `snapshot_ui`, and the press belongs to a probe
   over a private pasteboard, because no script caller can reach a Settings button.

@@ -4,25 +4,25 @@
   - MC0, the decisions (`b58c458`)
   - MC1, the spike (`ffe5a9f`)
   - MC2, the socket beside TCP (`ba8ed00`)
-  - MC3, `reelcut-mcp` (`38b9487`)
+  - MC3, `framejob-mcp` (`38b9487`)
   - MC4, TCP goes and Copy MCP Command arrives (`20c947d`)
   - MC5, the close (uncommitted when this was written)
 - **Original:** `archive/roadmap-14.md` (798 lines) is the full record. It has no section numbers, so it is cited by section name: "orig Record ▸ MC1" is its "Record" section's MC1 entry.
 - **Spec decisions:** MC-1..MC-6 in spec §11 (`designs/spec/11-decisions/agent-connection.md`). They stay binding, and where the original's "Decisions" section words them differently, §11's text wins:
-  - MC-1: the agent server listens only on a Unix socket, `~/Library/Application Support/Reelcut/Agent/agent.sock`, always, while the app runs. There is no TCP listener and no switch.
+  - MC-1: the agent server listens only on a Unix socket, `~/Library/Application Support/Frame Job/Agent/agent.sock`, always, while the app runs. There is no TCP listener and no switch.
   - MC-2: the socket is bound only in its own `0700` `Agent` subfolder. The rules for that folder:
     - The mode-and-owner check is of that folder, not of the support folder.
     - Only the first instance binds. A later instance that can connect leaves the socket alone; one that is refused unlinks the file and binds.
     - The owner unlinks it at quit.
     - A wrong mode is reported, not worked around.
-  - MC-3: external clients reach Reelcut through `reelcut-mcp`, a Rust stdio server inside the bundle.
-  - MC-4: `reelcut-mcp` never launches Reelcut to answer `initialize` or `tools/list`. It launches its own bundle with `open -n -g` on a `tools/call` that finds no socket, under a lock beside the socket. A session whose launch timed out launches no other.
+  - MC-3: external clients reach Frame Job through `framejob-mcp`, a Rust stdio server inside the bundle.
+  - MC-4: `framejob-mcp` never launches Frame Job to answer `initialize` or `tools/list`. It launches its own bundle with `open -n -g` on a `tools/call` that finds no socket, under a lock beside the socket. A session whose launch timed out launches no other.
   - MC-5: a tool call never raises a modal question, and a click still does. This is decided per call, where the call hands work to the importer.
   - MC-6: `RC_AGENT_SOCKET` overrides the socket path, and every proof sets it. A scratch launch also passes `-ApplePersistenceIgnoreState YES` and logs beside the socket.
 
 ## Context
 
-Before this road map, the agent server was streamable HTTP on `127.0.0.1:4817`. It was off until Tools ▸ Allow Agent Connections or `-AgentServerEnabled YES` turned it on, and when 4817 was taken it fell back silently to a port only a log line named. An MCP client lists tools once, when it starts, so a client opened before Reelcut never saw Reelcut's tools.
+Before this road map, the agent server was streamable HTTP on `127.0.0.1:4817`. It was off until Tools ▸ Allow Agent Connections or `-AgentServerEnabled YES` turned it on, and when 4817 was taken it fell back silently to a port only a log line named. An MCP client lists tools once, when it starts, so a client opened before Frame Job never saw Frame Job's tools.
 
 The TCP endpoint also checked neither `Origin` nor `Content-Type`, so while it was on, a web page could POST a tool call to it. The user chose not to file that as an issue, because this road map removes the listener.
 
@@ -42,9 +42,9 @@ Nothing had been published, so nothing migrates. (orig opening, What exists)
 - **The launch lock is held until the poll ends, and sits beside the socket.** If the lock were released straight after `open`, a second proxy's re-check would find nothing answering yet and launch a second instance. Keeping `agent.launch.lock` beside the socket gives a proof's scratch socket a lock of its own. (MC-4; orig Record ▸ MC3 deviations)
 - **A session whose launch timed out is stranded.** It launches no other instance, and its later calls answer the timeout sentence. Each session's check and launch are one critical section, after the review found two concurrent calls could both launch. (MC-4; orig Record ▸ MC3 deviations)
 - **`tools/list` waits at most 5 s for the app,** then answers from the snapshot. The app serves one request at a time, so another client's long call would otherwise hold the listing up. (MC-4; orig Record ▸ MC3 deviations)
-- **The launch is `open -n -g` of the proxy's own bundle.** MC1 measured about 1.1 s cold and 0.5 s warm, never frontmost, and the proxy waits up to 60 s. A scratch launch adds `-ApplePersistenceIgnoreState YES` and a `reelcut-launch.log` beside the socket; a launch for the person's own socket adds neither. (MC-4, MC-6; orig Record ▸ MC1 q2, ▸ MC3)
+- **The launch is `open -n -g` of the proxy's own bundle.** MC1 measured about 1.1 s cold and 0.5 s warm, never frontmost, and the proxy waits up to 60 s. A scratch launch adds `-ApplePersistenceIgnoreState YES` and a `framejob-launch.log` beside the socket; a launch for the person's own socket adds neither. (MC-4, MC-6; orig Record ▸ MC1 q2, ▸ MC3)
 - **MC-5 is decided per call, not per lane.** A process-wide "a call is running" flag would make a person's own MKV import refuse silently while any tool call ran. Instead, `import_media`, `relink_media` and `record_screen` pass `mayAsk: false`, `open_project` runs inside `MediaImporter.withoutAsking`, and every click passes `true`. (MC-5; orig Record ▸ MC4 deviations)
-- **TCP and its switch were deleted, and Tools ▸ Copy MCP Command took their place.** MC4 deleted `rc_agent_server_start` / `_stop`, `RC_AGENT_PORT`, `AgentServerEnabled` and Tools ▸ Allow Agent Connections. The new item puts the `claude mcp add --scope user reelcut -- '<bundle>/Contents/Helpers/reelcut-mcp'` line on the pasteboard, with the path resolved from the running bundle. It is not an edit, so it has no MCP mirror. (MC-1, MC-3; orig Phases ▸ MC4, Record ▸ MC4) After the merge into main, issue batch B74 moved the item into a new MCP section at the top of Settings, which also shows the helper's path, and removed the Tools menu (spec §11 MC-7, #222).
+- **TCP and its switch were deleted, and Tools ▸ Copy MCP Command took their place.** MC4 deleted `rc_agent_server_start` / `_stop`, `RC_AGENT_PORT`, `AgentServerEnabled` and Tools ▸ Allow Agent Connections. The new item puts the `claude mcp add --scope user framejob -- '<bundle>/Contents/Helpers/framejob-mcp'` line on the pasteboard, with the path resolved from the running bundle. It is not an edit, so it has no MCP mirror. (MC-1, MC-3; orig Phases ▸ MC4, Record ▸ MC4) After the merge into main, issue batch B74 moved the item into a new MCP section at the top of Settings, which also shows the helper's path, and removed the Tools menu (spec §11 MC-7, #222).
 
 ## What it built — where it lives now
 
@@ -72,7 +72,7 @@ Nothing had been published, so nothing migrates. (orig opening, What exists)
 
 ## Known limits
 
-- **Any process running as the person can drive Reelcut while it runs, and this cannot be turned off.** A client that speaks only HTTP-over-TCP needs the proxy. (MC-1's accepted risk)
+- **Any process running as the person can drive Frame Job while it runs, and this cannot be turned off.** A client that speaks only HTTP-over-TCP needs the proxy. (MC-1's accepted risk)
 - **The assistant's `import_media` of a file AVFoundation refuses no longer asks mid-turn.** It answers with the refusal, which names the setting. (MC-5's accepted risk)
 - **Refetching after `list_changed` is unmeasured.** Claude Desktop's behaviour is unknown, and Claude Code's is assumed from its documentation. AC-1 and AC-2 are the owner's checks.
 - **A quarantined ad-hoc copy launched by `open` never starts, and shows no dialog** (MC1's L3). A notarized build is not measured.
@@ -82,8 +82,8 @@ Nothing had been published, so nothing migrates. (orig opening, What exists)
 
 ## Open items
 
-- #223: proof build copies of `Reelcut.app` stay registered with LaunchServices after their folders are deleted.
-- #224: no proof quits Reelcut with an agent call in flight.
+- #223: proof build copies of `Frame Job.app` stay registered with LaunchServices after their folders are deleted.
+- #224: no proof quits Frame Job with an agent call in flight.
 - #225: a tree copy's "Build Rust Core" step rebuilds the tree's own `core/target`.
 - kpgalligan/rasterize#430: Rasterize takes this transport, if it chooses.
 - #214: `clip_catalog_proof.py`'s probe does not compile. #215: `e1_proof.py`'s reference listens on TCP alone. kpgalligan/rasterize#325 is unchanged.

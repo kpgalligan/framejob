@@ -8,7 +8,7 @@ The road map that made these is closed; its condensed record is `designs/adr/roa
 in §6).
 
 - **AI-1 — The assistant is a bundled helper, and the app never calls Anthropic itself.**
-  `Contents/Helpers/reelcut-agent` is Bun-compiled from `agent/` on the Anthropic TypeScript
+  `Contents/Helpers/framejob-agent` is Bun-compiled from `agent/` on the Anthropic TypeScript
   SDK's Tool Runner, as Rasterize builds its own (road map 12 §1, §2). It is the one TypeScript
   in the product; G-11 ("no TypeScript") governs graphic Modules and is untouched. The Swift
   side uses `Process`, pipes and GCD, so W-8's `async` confinement holds. Risk accepted: Bun in
@@ -115,7 +115,7 @@ in §6).
   shows does not bring the clip's properties forward; a click does.
 - **AI-15 — The window's live context rides on each person message; the system prompt is fixed
   for a session.** `AssistantSession.send` writes the person's text behind a
-  `<reelcut_context>` block (`AssistantLiveContext.swift`): the project's name and path, the
+  `<framejob_context>` block (`AssistantLiveContext.swift`): the project's name and path, the
   open nest, the playhead and the selection, as they are at send time. The system prompt, the
   tool-search guide and the compaction instructions are written once, in `configure`, and never
   change for the session. `configure` is the helper's only system channel and `agent/` is one
@@ -158,7 +158,7 @@ in §6).
 - **AI-18 — A proof lowers the end-of-turn compaction threshold with the dev-only launch default
   `-RCDevAssistantAutoCompact <tokens>`; the shipped threshold stays 300 000** (issue batch B26,
   #161). `AssistantConfiguration.settingsJSON()` sends `autoCompactTokens` (300 000, AI-9) as
-  `configure.settings.auto_compact_tokens`; a build with `REELCUT_DEV_TOOLS` (V-1) sends the
+  `configure.settings.auto_compact_tokens`; a build with `FRAMEJOB_DEV_TOOLS` (V-1) sends the
   knob's value instead when it is present, read from the ARGUMENT domain alone
   (`AssemblyAIConfiguration.argument`). A value that is not a whole number of 1 or more is named
   on stderr and ignored. It replaces nothing else, and a Distribution build does not compile it.
@@ -190,8 +190,8 @@ in §6).
   "Compact when context reaches N tokens", on, N a whole number from 20 000 to 900 000, 300 000
   by default (AI-9); and "Clear old tool results past 150,000 tokens", off, acting past the
   helper's fixed `CLEAR_TRIGGER_TOKENS` (150 000, `agent/src/main.ts`). They live in
-  `UserDefaults` under `ReelcutAssistantAutoCompact`, `ReelcutAssistantAutoCompactTokens` and
-  `ReelcutAssistantClearToolResults` (`AssistantChatSettings`); like the model, no tool reads or
+  `UserDefaults` under `FrameJobAssistantAutoCompact`, `FrameJobAssistantAutoCompactTokens` and
+  `FrameJobAssistantClearToolResults` (`AssistantChatSettings`); like the model, no tool reads or
   writes them (AI-11's reason). A stored value outside the range reads as 300 000; a typed one
   beeps and the field shows the stored value again. `configure.settings` carries
   `auto_compact_tokens` (null when compaction is off) and `clear_tool_results`. A change applies

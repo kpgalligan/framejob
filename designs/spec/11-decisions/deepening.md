@@ -584,7 +584,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the doc lines say one CURRENT pass per key. **The bound it keeps by
   design:** a relink away from a stuck pass starts only after the full
   30 s wait (S1a measured 30.32 s).
-- **#216 — Every Reelcut process opts in to macOS's supplemental VP9 and AV1
+- **#216 — Every Frame Job process opts in to macOS's supplemental VP9 and AV1
   decoders, and an import of a video track is a one-frame decode** (issue
   batch B72; the owner, 2026-10-02). `DecoderSupport.enable()` calls
   `VTRegisterSupplementalVideoDecoderIfAvailable` for VP9 and AV1 once per
@@ -627,7 +627,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `matroska-demuxer`** (measured): the crate reads every payload and exposes
   no file offsets, drops a BlockGroup's keyframe flag (`is_keyframe: None`),
   and its frame-at-a-time order deadlocked a single-thread writer feed.
-  **Always `.mov`**, in `~/Library/Application Support/Reelcut/Rewrapped/`
+  **Always `.mov`**, in `~/Library/Application Support/Frame Job/Rewrapped/`
   beside ffmpeg's conversions, under `FFmpegRewrap.destination(for:)`'s
   digest name, so a re-import reuses the copy: `AVAssetWriter` refuses
   Vorbis in `.mp4`, which phase 2 needs, and vp09, av01, avc1, hvc1, Opus
@@ -684,7 +684,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   file…" until the copy begins and then "`<copied>` of `<total>`", and one
   Cancel button. **It appears only when the copy is still running 1 s after
   it starts**, so a copy of a few hundred megabytes shows nothing. **It never
-  takes the keyboard from a Reelcut window:** while any window is key it is
+  takes the keyboard from a Frame Job window:** while any window is key it is
   ordered front and not made key, so typing and Escape keep reaching the
   editor during an Add Media copy; it becomes key only when no window is
   (File ▸ Open, a Finder double-click), or when the person clicks into it,
@@ -743,7 +743,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   identification header**, over the TrackEntry's; a rate of 0 or above
   10,000,000 is unreadable, as the TrackEntry rate is capped today. **A
   track whose headers do not parse** keeps #216-R's sentence ("… has Vorbis
-  audio, which Reelcut cannot copy …") and falls through to the opt-in
+  audio, which Frame Job cannot copy …") and falls through to the opt-in
   ffmpeg step. **The risks it accepts:** the movie's 1/600 s edit grid
   (a remuxed libvorbis click read 1.0017 s against ffmpeg's 1.003, 1.0027
   with a 48 kHz movie timescale), which affects every copy written before
@@ -791,8 +791,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   labels, the relink sheets, Consolidate's messages and the search all read
   `talk.webm`. **The tooltip** of a Media tab row says where the copy lives,
   on its own line above the drag hint: "`<original path>` — copied into
-  Reelcut's Rewrapped folder." while the copy's folder is
-  `…/Reelcut/Rewrapped`, and "`<original path>` — copied into this
+  Frame Job's Rewrapped folder." while the copy's folder is
+  `…/Frame Job/Rewrapped`, and "`<original path>` — copied into this
   project's package." otherwise, as after Consolidate (Q1, Q2). There is no
   badge and no path line. **Reveal in Finder** opens the original, or the
   copy when the original is gone (O11). **Relink:** the probe carries
@@ -958,7 +958,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   row's tooltip, Reveal in Finder, and `import_media`'s and
   `relink_media`'s `original` are #228-O's, unchanged, and a relink to a
   file ffmpeg converts records it. The tooltip of a re-encoded conversion
-  keeps B78's sentence, "`<original path>` — copied into Reelcut's Rewrapped
+  keeps B78's sentence, "`<original path>` — copied into Frame Job's Rewrapped
   folder." (the owner's choice 1, the default kept). **The re-copy on open
   is unchanged: the built-in copy only, never ffmpeg, never a question.** A
   missing ffmpeg-made copy stays missing (the slate, the badge, Relink…): a
@@ -1091,7 +1091,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   with `addingReportingOverflow`, only before a further packet, and an
   overflow answers false, where B80 added unchecked after every packet, the
   last included. **The risks that stay:** the note of a kept re-encode is
-  this process's own, so a second Reelcut process importing the same failing
+  this process's own, so a second Frame Job process importing the same failing
   file at the same moment still discards and re-encodes; and the wait counts
   one import's own runs, not the time it queues behind another import —
   conversions are serialised by one lock held for a whole ffmpeg run
@@ -1142,7 +1142,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   URL is not counted. `isOpening(url)` is "the count is above 0", and
   answers false when the shared controller is not this class (a proof probe
   with its own). A launch whose shared controller is not this class logs
-  `Reelcut: …`, the startup complaint every MCP proof requires absent.
+  `Frame Job: …`, the startup complaint every MCP proof requires absent.
   **`open_project`** (#231's three steps): **step A**, one main-thread
   block: a holder → `already_open`; else an open in flight → wait; else the
   file's type. **Step B** is unchanged: the read on the lane's thread

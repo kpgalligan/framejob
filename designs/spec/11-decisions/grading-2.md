@@ -104,7 +104,7 @@ Concat is opened, at design time or build time.
     **gamma** `v = max(v, 0)^(2^(−o_gamma · s_γ))` (holds both ends). This is the usual
     lift/gamma/gain form, lift then gain then the power; it is not cited as ASC CDL order (the
     CDL is slope, offset, power).
-  - **Strengths** (owner choice 6, Reelcut's own first numbers, tuned later by amending this
+  - **Strengths** (owner choice 6, Frame Job's own first numbers, tuned later by amending this
     entry, as GR-2's): full push k = 1 at the rim; lift s_l = 0.25 (master +1 lifts black to
     25 %); gain s_g = 0.5 (+1 = white ×1.5, −1 = ×0.5); gamma s_γ = 1 (+1 = exponent ½: mid-grey
     0.5 → 0.71).
@@ -139,7 +139,7 @@ Concat is opened, at design time or build time.
     counter-clockwise from 3 o'clock; every 75 % target within 12°), so dragging toward a target
     moves the trace toward it; the MCP x/y axes are not rotated (red is +x). (3) The puck: a press
     anywhere in the disc, then the puck moves by the pointer's delta (no jump); one disc radius of
-    travel is the full push; **⌥ held moves at a tenth** (a convention new to Reelcut, for the
+    travel is the full push; **⌥ held moves at a tenth** (a convention new to Frame Job, for the
     wheels only); clamped to the rim, sliding along it (the clamped point is `(x, y) / hypot(x,
     y)`); no centre detent; a double-click resets the colour (x, y) only, one undo step named
     after the wheel. (4) The master strip: the slider's look (3 pt rail, 7 × 11 block knob, accent

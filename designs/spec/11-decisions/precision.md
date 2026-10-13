@@ -19,7 +19,7 @@ the owner's "All as recommended" (2026-10-11) to the #257 brief's choices 1a, 2a
 `designs/adr/precision-2.md`, and the original, `archive/precision-2.md`, holds each phase's
 record (P2-0–P2-3). They take up PR-5's deferral of the 10-bit rest: PR-6 and PR-7 amend its
 list, and PR-8 closes its other two items. PR-2 stands: HDR stays tone-mapped in the compositor
-(amended by GR-15: HDR still reaches the output as SDR, converted by Reelcut's own step 0).
+(amended by GR-15: HDR still reaches the output as SDR, converted by Frame Job's own step 0).
 
 - **PR-1 — The working depth is 16-bit float, holding encoded values clamped to [0, 1] (owner,
   2026-10-09, choices 1 and 5).**
@@ -73,7 +73,7 @@ list, and PR-8 closes its other two items. PR-2 stands: HDR stays tone-mapped in
   thumbnails, the eyedropper, Pick from Canvas), arrive unconverted (0.5000) and labelled BT.709;
   a BT.2020 file with the BT.709 transfer arrives darkened on every path (0.2568). GR-15 sets
   `canConformColorOfSourceFrames` and `supportsHDRSourceFrames` true, so every source arrives
-  native and honestly labelled, and Reelcut converts HDR to SDR itself at step 0 (from T3-1).
+  native and honestly labelled, and Frame Job converts HDR to SDR itself at step 0 (from T3-1).
   The decision "HDR reaches the output as SDR" stands; only who converts changes.
 - **PR-3 — Which exports carry the depth (choice 3).**
   - The export reader's frames are the compositor's `64RGBAHalf`. `prores_422` (10-bit 4:2:2)
@@ -221,7 +221,7 @@ list, and PR-8 closes its other two items. PR-2 stands: HDR stays tone-mapped in
     renders 16-bit frames (V6: a 16-bit PNG, the reverse `hevc`/Main 10/`yuv420p10le`); PR-4
     is amended to match.
   - PR-2 stands: HDR stays tone-mapped in the compositor (amended by GR-15: HDR still reaches
-    the output as SDR, converted by Reelcut's own step 0); the reverse only stops mislabelling.
+    the output as SDR, converted by Frame Job's own step 0); the reverse only stops mislabelling.
   - Amends PR-5's "the reversed-clip intermediate".
 - **PR-8 — 10-bit `hevc_alpha` and 10-bit screen recording are not wanted (owner, 2026-10-11,
   choices 3a and 4a).**

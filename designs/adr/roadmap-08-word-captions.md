@@ -33,7 +33,7 @@
 ## Context
 
 Talking-head shorts and reels show speech as large, styled text on one row
-near the bottom of the frame, with each word lit as it is said. Reelcut's
+near the bottom of the frame, with each word lit as it is said. Frame Job's
 captions were subtitles only. `CaptionCues.build` threw away the per-word
 timing that both engines already produced, grouping the words into cues of
 two lines, 42 characters and 6 s. The ask (2026-09-22) was to generate this

@@ -14,14 +14,14 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   2026-09-30).
 - **SH-2 — `BlockSliderCell.drawBar` is forked from Rasterize's copy** (the
   sharp pass, 2026-09-23; the user's call: the handoff is a guideline, and a
-  working Reelcut wins). Rasterize's cell dims its two fills with
+  working Frame Job wins). Rasterize's cell dims its two fills with
   `withAlphaComponent(isEnabled ? 1 : 0.42)`. On a dynamic, translucent
   system colour that REPLACES the colour's own alpha rather than scaling it,
   so the enabled track (`DS.border`, `.separatorColor`) painted OPAQUE — the
   same solid white (dark) or black (light) as the `DS.textStrong` knob, and
   the knob vanished into the track on its right (measured in the harness:
   one 115 px run of (255, 255, 255) from the knob to the track's end).
-  Reelcut's cell dims through the context's alpha instead and fills with
+  Frame Job's cell dims through the context's alpha instead and fills with
   `.sourceOver`, so the track is the quiet grey the handoff asks for
   (measured (52, 52, 52) dark over the bar's (30, 30, 30), (230, 230, 230)
   light; the handoff's `#3a3a3a`) and the knob reads against it. It is the

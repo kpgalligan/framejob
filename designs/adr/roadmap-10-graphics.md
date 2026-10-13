@@ -34,9 +34,9 @@
 The user asked for something like Remotion: motion graphics made from code
 (2026-09-24). Here a JavaScript module returns an SVG string for a frame, and
 the result is a new clip type. An AI over MCP would create and edit most of
-these clips. A clip's code lives on disk inside the `.reelcut` package.
+these clips. A clip's code lives on disk inside the `.framejob` package.
 
-Before this, Reelcut had no scripting and no C code in the build. The core
+Before this, Frame Job had no scripting and no C code in the build. The core
 did no pixel work and had no filesystem. The design fits the feature into
 those rules. A graphic is one more producer of the premultiplied BGRA layer
 texture that text and shapes already make. So placement, actions, blend
@@ -262,7 +262,7 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   arms in `edit_split.rs`, `edit_clip_timing.rs`, `edit_edge.rs` and
   `edit_action.rs` (`GRAPHIC_NOT_A_TARGET`); tests `core/tests/graphic.rs`,
   `graphic_ffi.rs`, `schema_v10.rs`.
-- Header `core/include/reelcut_core.h` (`/* graphics */` section); Swift
+- Header `core/include/framejob_core.h` (`/* graphics */` section); Swift
   wrappers at the end of `app/Sources/ReelCore.swift`. The size toll moved
   code out first, into `RecipeSource.swift` and `MediaDescriptor.swift`.
 - App: `GraphicStore.swift` (+`Manual`, +`Import`), `GraphicScan.swift`,
@@ -814,7 +814,7 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   graphic's words as well as its look). The person's door is a new item,
   Edit ▸ Paste Graphic Properties, directly under Paste Attributes with no
   key: one op, `groups: ["graphic"]` with `skip_missing`, the undo step
-  "Paste Graphic Properties"; it is enabled when Reelcut clips are on the
+  "Paste Graphic Properties"; it is enabled when Frame Job clips are on the
   clipboard and a graphic is selected, and beeps when nothing takes the
   props. The copied map is checked for shape only, the first time a
   target takes it, so a paste nothing takes never reads it.
@@ -956,7 +956,7 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   pixels, the black pad still there, with `hevc_alpha` still an unknown
   preset (G1) — phase A moved no pixel of them. `make test` was not run
   in this phase (Gate A does not name it). One thing the proof found on
-  the way: the launch argument `-ReelcutExportChoice {"preset_id":…}` is
+  the way: the launch argument `-FrameJobExportChoice {"preset_id":…}` is
   dropped by the argument domain, so the instance read the owner's
   remembered export choice; the value is sent as a `<string>` plist
   fragment. E2 also requires the Format popup to read "H.264 (MP4)" or
@@ -973,12 +973,12 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   sheet's Escape button, whose action only dismisses; and the `export`
   tool's handler (`AgentServer+Render.swift`) reads and writes no
   default. By a run: the stderr of the two recordings and of the gate's
-  red and green runs was NOT kept, and another Reelcut was alive then,
+  red and green runs was NOT kept, and another Frame Job was alive then,
   so `mcp.py`'s guard would only have printed a moved key there, not
   failed the run — nothing is claimed of those four from their output.
   Fix pass 1's `--rows size` run kept it: 11/11, exit 0, stderr empty —
   no `mcp: DEFAULTS MOVED` line and no line saying the guard could not
-  read the domain (another Reelcut, `/Applications/Reelcut.app`, was
+  read the domain (another Frame Job, `/Applications/Reelcut.app`, was
   alive, so the line and not status 3 is what a moved key would have
   been). Not shown by the gate: a bit rate computed from the evened
   pair, the one thing of a FILE phase A moves. The default
@@ -1066,7 +1066,7 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   spec's row E1 required it untruncated, E1 scores the text and the
   tooltip and prints the cut, and room for the summary on the face — a
   line of its own, or a wider sheet, either a visible change to every
-  format's sheet — is the owner's choice. (2) Reelcut composites a
+  format's sheet — is the owner's choice. (2) Frame Job composites a
   re-imported `hevc_alpha` or `prores_4444` movie as straight alpha: a
   half-opaque red card over white comes back (191,127,127) and
   (193,129,127), where about (255,128,128) is right (the proof's line I1,

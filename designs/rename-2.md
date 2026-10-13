@@ -514,4 +514,93 @@ applied before the commit.
 
 ## N4 — the record
 
+**Landed** (2026-10-13, in the worktree, not committed by the implementer; the orchestrator
+commits):
+
+- The prose rule (NM-12) over `designs/adr/*.md` and `designs/spec/11-decisions/*.md`, each of
+  the 355 old-name lines at `def5418` (126 ADR, 229 §11) read in its paragraph and either
+  substituted in place or kept with its class: 196 lines substituted in 38 files, no file
+  changing length, no line reflowed, no "Amended by" line added. Two lines are partly
+  substituted and count as kept (`build-velocity.md` 12, `roadmap-10-graphics.md` 981).
+  ADRs, 79 lines in 21 files: `app-file-history.md` 1, `build-velocity.md` 2,
+  `effects-survey.md` 8, `grading-2.md` 1, `grading-3.md` 6, `grading.md` 5, `mattes.md` 2,
+  `precision-2.md` 1, `precision.md` 1, `remaining-closed.md` 1,
+  `roadmap-03-screen-recording.md` 6, `roadmap-06-cloud-captions.md` 8,
+  `roadmap-07-deepening.md` 1, `roadmap-08-word-captions.md` 1, `roadmap-09-clip-inspector.md`
+  1, `roadmap-10-graphics.md` 8, `roadmap-11-dev-tools.md` 6, `roadmap-12-assistant.md` 6,
+  `roadmap-13-pricing.md` 3, `roadmap-14-agent-socket.md` 10, `svg-motion-plan.md` 1. §11,
+  117 lines in 17 files: `README.md` 15 (the index rows of V-1, V-5, P-4, P-6, MC-1, MC-3, MC-4,
+  MC-6, R6-5, #228-P, G-33, GR-11 and three `recording.md` rows, each following its body),
+  `agent-connection.md` 11, `assistant.md` 5, `chrome-inspector-keys.md` 2,
+  `cloud-captions.md` 8, `deepening.md` 9, `dev-tools.md` 4, `foundations.md` 1,
+  `grading-2.md` 2, `grading-3.md` 11, `grading.md` 10, `graphics.md` 8, `precision.md` 3,
+  `pricing.md` 7, `publishing.md` 2, `recording.md` 17, `word-captions.md` 2.
+  `designs/spec/11-decisions/rename.md` and `designs/adr/rename.md`: no line substituted.
+- `tools/proof/name_residue.py`, data and comments only: `"designs/adr/"` out of `HISTORY`
+  (its comment: "the rename's open road map among it"); the §11 block's comment says its lines
+  are NM-12's kept classes after rename-2 N4, and the `rename.md` comment drops "N4 re-pins it
+  next"; §11 pins: `README.md` 19 → 4, `agent-connection.md` 18 → 7, `assistant.md` 11 → 6,
+  `chrome-inspector-keys.md` 2 → no entry, `cloud-captions.md` 11 → 3, `deepening.md` 18 → 9,
+  `dev-tools.md` 10 → 6, `foundations.md` 2 → 1, `grading-2.md` 2 → no entry, `grading-3.md`
+  12 → 1, `grading.md` 16 → 6, `graphics.md` 13 → 5, `precision.md` 3 → no entry,
+  `pricing.md` 12 → 5, `publishing.md` 5 → 3, `recording.md` 24 → 7, `rename.md` 32 → 32,
+  `word-captions.md` 6 → 4; a new ADR block, each pin new: `build-velocity.md` 1,
+  `grading-3.md` 1, `remaining-closed.md` 1, `rename.md` 30, `roadmap-08-word-captions.md` 1,
+  `roadmap-10-graphics.md` 2, `roadmap-11-dev-tools.md` 1. No other pin moved;
+  `KEPT_PATTERNS`, `TEXT_HISTORY`, the selftest and the mutants are unchanged.
+
+**Kept lines** (every line in both folders that still holds the old name; the letters are "The
+rules"' classes; (x) lines are the ones `KEPT_PATTERNS` already allows):
+
+- `designs/adr/build-velocity.md` 12 (f: "`PRODUCT_NAME` stays `Reelcut`"; its other three
+  names substituted). `grading-2.md` 3 (x). `grading-3.md` 3 (x); 8 (f: it quotes
+  `archive/grading-3.md`'s heading "T3-1 — honest sources and Reelcut's HDR→SDR at step 0",
+  which keeps the old name). `precision-2.md` 3, 17 (x). `precision.md` 19 (x).
+  `remaining-closed.md` 3 (p). `rename.md`, all (r): 1, 11, 17, 18, 25, 32, 33, 40, 53, 58, 63,
+  69, 70, 73, 94, 101, 104, 107, 110, 113, 117, 121–124, 127, 134, 135, 150, 151; and 3, 95,
+  98, 116, 139, 141, 146 (r, x). `roadmap-08-word-captions.md` 459 (q: screen 16's footnote as
+  the dated run read it). `roadmap-10-graphics.md` 865 (q); 981 (q: `/Applications/Reelcut.app`;
+  its "another Reelcut" substituted). `roadmap-11-dev-tools.md` 14 (f: the 29-byte marker,
+  kept whole).
+- `designs/spec/11-decisions/README.md` 301, 307, 308 (r); 313 (p); 314 (f, x).
+  `agent-connection.md` 18, 31, 43, 61, 75, 76, 78 (r). `assistant.md` 16, 126, 174, 207–209
+  (r). `cloud-captions.md` 60, 211, 212 (r). `deepening.md` 666, 669 (r; 669 is also the
+  "where it was" quote, (f)), 775, 829, 831, 984, 1287 (r); 977, 1283 (q: measured runs, which
+  the NM-5 amendments at 984 and 1287 say are quoted as they printed). `dev-tools.md` 19, 43,
+  44, 45, 49 (r); 40 (f). `foundations.md` 27 (r). `grading-2.md` 172 (x). `grading-3.md` 14,
+  371 (x); 219 (r). `grading.md` 236, 339, 340, 449, 466, 467 (r). `graphics.md` 35, 302, 614,
+  820 (r); 1708 (q: the owner's words of 2026-10-09, quoted). `precision.md` 10, 17, 179 (x).
+  `pricing.md` 44, 71, 91, 108 (r); 73 (s, inside NM-4 and NM-7's amendment).
+  `publishing.md` 22–24 (r). `recording.md` 23, 73, 251, 253, 272, 274, 275 (r). `rename.md`
+  10, 12, 30, 36, 63, 108, 110, 116, 122, 124, 129, 133, 137, 148, 149, 166 (r); 14, 139, 140,
+  157 (r, x); 185 (x); 189 (f); 195–204, 209, 210, 216 (p); 222, 234 (f); 237 (x).
+  `word-captions.md` 143, 292–294 (r).
+
+**Measured** (each printed by the command beside it; the full outputs are in the phase's
+`04-checks.txt`):
+
+- `git grep -n -i reelcut -- designs/adr designs/spec/11-decisions | wc -l`: `355` at
+  `def5418`, `161` after (136 counted, 25 (x)).
+- The same grep less `\.claude/litecode/reelcut/|devel/reelcut`: `136`, the sum of the new pins
+  in both folders (37 ADR, 99 §11); every line it prints is in the classification above.
+- `git diff --numstat -- designs/adr designs/spec`: 38 rows, added equals removed on each, 196
+  and 196.
+- `name_residue.py`: exit 0, silent. `--selftest`: `8/8 rows pass`, `PASS`.
+- `spec_index_proof.py`: `159/159 checks passed`, exit 0. `py_compile` of `name_residue.py`
+  clean.
+- `make gate` PASS in 106 s: names pass 1 s, test pass 104 s; typecheck, fmt, lint and app
+  skipped (inputs unchanged since their last pass), over this record with this line as a
+  placeholder. `make gate` ran again after the line was filled in; its output is in
+  `04-checks.txt`.
+
+**Deviations:** none from the spec's rules. Calls worth a reader's check: `graphics.md` 1708 is
+the owner's quoted sentence, kept as (q) rather than edited inside its quotation marks;
+`roadmap-10-graphics.md` 959's `-ReelcutExportChoice` became `-FrameJobExportChoice`, because
+the sentence states how the argument domain treats that launch argument, which today's proof
+passes as `FrameJobExportChoice`; §11's `rename.md` and the ADR `rename.md` were read line by
+line and none of their lines substituted. No root `CLAUDE.md`
+edit is owed: its `make test` line names `HISTORY` without its members.
+
+**Owed:** phase N5.
+
 ## N5 — the record

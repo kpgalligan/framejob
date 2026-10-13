@@ -20,8 +20,8 @@ The survey read it only through four read-only scout reports written in the
 scouts' own words. Nothing may be carried over at design time or at build
 time: no Rust, no `effect.wgsl`, no `effect.toml` or FFmpeg filter chain, no
 colour matrix, curve table, LUT data or other asset. A builder must not open
-those files to "match" a look. Every number a phase needs is Reelcut's own,
-chosen against Reelcut's own fixtures. When a phase says "Concat's", it means
+those files to "match" a look. Every number a phase needs is Frame Job's own,
+chosen against Frame Job's own fixtures. When a phase says "Concat's", it means
 the feature a person sees, never how Concat implements it. Concat's
 downloaded "Person" matting model (Robust Video Matting) is GPL-3.0, which is
 one more reason E9 uses Vision and ships no model. (orig §9, preamble)
@@ -29,13 +29,13 @@ one more reason E9 uses Vision and ships no model. (orig §9, preamble)
 ## Context
 
 The user asked for a review of Concat's transitions, effects and filters, a
-comparison with Reelcut, and designs for the equivalents. Concat is a
+comparison with Frame Job, and designs for the equivalents. Concat is a
 Rust/wgpu editor with a Slint UI, sold as a free CapCut replacement.
 
-What the comparison found (orig §2): **Transitions:** Reelcut was already
+What the comparison found (orig §2): **Transitions:** Frame Job was already
 ahead. Its ten kinds look the same in preview and export, while three of
 Concat's seven render as a cut or a dissolve in Concat's own preview;
-**Whole families:** Reelcut had obscure regions, spotlight, shadow,
+**Whole families:** Frame Job had obscure regions, spotlight, shadow,
 reflection, blend modes, text reveals, and a keyer with a picker and spill.
 Concat has none of them; **Breadth:** Concat was ahead, with a 13-slider
 Adjust panel, 39 named looks, 27 stylised effects, masks, flip, adjustment
@@ -195,7 +195,7 @@ lens already leaks obscured content.
 `video.look` is `{kind, amount}`, a closed set of about 24 generic names in
 six groups, tuned by eye. The core names the look and does nothing else.
 
-A new `Looks.swift` builds each look from Reelcut's own primitives and bakes
+A new `Looks.swift` builds each look from Frame Job's own primitives and bakes
 it into a 33³ `rgba16Float` 3D texture held in an LRU. The primitives: white
 balance; split tone; film curve; matte; saturation and vibrance; hue bands
 with a skin guard.
@@ -219,7 +219,7 @@ Refused: gather and remap filters, and a non-normal blend (in `check_group`,
 and stripped by `clamp_video`); any nest (in `validate`, not
 `refused_inside`); a mixed overlap with a picture clip.
 
-Every `Source` match must be classified. A new `reelcut_adjust_fragment`
+Every `Source` match must be classified. A new `framejob_adjust_fragment`
 reads `[[color(0)]]` with blending off and runs colour stages factored out
 of `layerColorPremultiplied`. The timeline bar gets no button: at the
 900 pt minimum width there is no room for one.
@@ -386,7 +386,7 @@ change with preview quality; saturation −100 inverting chroma.
 | Preamble, §0 | Status, the licence warning, the one-paragraph decision |
 | §1 | Concat read at `042688f`: transitions (1a), In/Out/Combo (1b), effect runtime (1c), the 66 packages (1d), Adjust (1e), audio (1f), vision (1g), promises it does not deliver (1h) |
 | §2 | The comparison tables, with a verdict per row |
-| §3 | Reelcut's architecture limits (file:line as of 2026-09-15) and doc drift |
+| §3 | Frame Job's architecture limits (file:line as of 2026-09-15) and doc drift |
 | §4 | D1–D7 in full |
 | §5 | The E0 spikes: voice (5a, q1–q7), vision (5b, q1–q7), build-time questions per phase (5c) |
 | §6 | E1–E9 in full: schema, core, Metal, UI, MCP, proof rows and mutants, limits. E1 and E2 are superseded by road map 5 |

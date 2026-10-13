@@ -66,7 +66,7 @@ to fit this codebase. Each change is recorded below.
   `video.motion` presets.
 - **`asset://` ids and "the asset manager" became package-relative
   files:** `graphics/<name>.js`, `graphics/fonts/` and `graphics/assets/`
-  (spec G-3). Reelcut has no asset manager, and a graphic's files travel
+  (spec G-3). Frame Job has no asset manager, and a graphic's files travel
   with the package.
 - **The frame cache is two levels, not one content hash.** The recipe hash
   says which JavaScript result to ask for, and the texture cache is keyed on

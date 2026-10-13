@@ -45,9 +45,8 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 WORK = os.path.join(ROOT, "tools", "proof", "work", "name_residue")
 NAME = "reelcut"
 
-# Kept whole: history (spec §11 NM-1), the rename's road map and ADR among it.
+# Kept whole: history (spec §11 NM-1), the rename's open road map among it.
 HISTORY = (
-    "designs/adr/",
     "designs/clip_inspector_brief/",
     ".dupscan/",
     "designs/rename-2.md",
@@ -70,31 +69,41 @@ KEPT_PATTERNS = (
 # Files that must keep some old spellings, each at its exact count of matching lines
 # not already allowed by KEPT_PATTERNS. Each comment says why and which phase ends it.
 COUNTED = {
-    # -- Permanent: spec §11's decision text is append-only but for NM-12's name-only
-    # edits, and its index's decision rows keep each decision's own words (NM-1); the
-    # index's Files table says today's names.
-    # The index: NM-13's row names the archive's old prefix (rename-2 N0); N4 re-pins.
-    "designs/spec/11-decisions/README.md": 19,
-    "designs/spec/11-decisions/agent-connection.md": 18,
-    "designs/spec/11-decisions/assistant.md": 11,
-    "designs/spec/11-decisions/chrome-inspector-keys.md": 2,
-    "designs/spec/11-decisions/cloud-captions.md": 11,
-    "designs/spec/11-decisions/deepening.md": 18,
-    "designs/spec/11-decisions/dev-tools.md": 10,
-    "designs/spec/11-decisions/foundations.md": 2,
-    "designs/spec/11-decisions/grading-2.md": 2,
-    "designs/spec/11-decisions/grading-3.md": 12,
-    "designs/spec/11-decisions/grading.md": 16,
-    "designs/spec/11-decisions/graphics.md": 13,
-    "designs/spec/11-decisions/precision.md": 3,
-    "designs/spec/11-decisions/pricing.md": 12,
-    "designs/spec/11-decisions/publishing.md": 5,
-    "designs/spec/11-decisions/recording.md": 24,
+    # -- Permanent: spec §11's decision text and index rows keep only NM-12's kept classes
+    # after its prose rule (rename-2 N4): the rename's own record (NM-1..NM-11's text,
+    # every "Amended by NM-n" paragraph and their index rows) (r), recorded output and
+    # dated runs (q), past paths and maps (p), the NM-7 old folder (s), and sentences
+    # the swap would make false (f).
+    # The index: NM-1, NM-7 and NM-8's rows (r) and NM-13's map of the old prefix (p).
+    "designs/spec/11-decisions/README.md": 4,
+    "designs/spec/11-decisions/agent-connection.md": 7,
+    "designs/spec/11-decisions/assistant.md": 6,
+    "designs/spec/11-decisions/cloud-captions.md": 3,
+    "designs/spec/11-decisions/deepening.md": 9,
+    "designs/spec/11-decisions/dev-tools.md": 6,
+    "designs/spec/11-decisions/foundations.md": 1,
+    "designs/spec/11-decisions/grading-3.md": 1,
+    "designs/spec/11-decisions/grading.md": 6,
+    "designs/spec/11-decisions/graphics.md": 5,
+    "designs/spec/11-decisions/pricing.md": 5,
+    "designs/spec/11-decisions/publishing.md": 3,
+    "designs/spec/11-decisions/recording.md": 7,
     # NM-1..NM-14 and their amendments name the old paths, maps and patterns they
     # rename or drop (rename-2 N0: NM-12..NM-14 and the NM-8 amendment); N2's link
-    # rule re-pinned it (NM-1's handoff links), and N4 re-pins it next.
+    # rule re-pinned it (NM-1's handoff links).
     "designs/spec/11-decisions/rename.md": 32,
-    "designs/spec/11-decisions/word-captions.md": 6,
+    "designs/spec/11-decisions/word-captions.md": 4,
+    # -- Permanent: the ADRs' kept lines under NM-12's prose rule (rename-2 N4): recorded
+    # output and dated runs (q), past paths (p), NM-7's old folders (s), the rename's own
+    # record (r) — all of `designs/adr/rename.md` — and sentences the swap would make
+    # false (f).
+    "designs/adr/build-velocity.md": 1,
+    "designs/adr/grading-3.md": 1,
+    "designs/adr/remaining-closed.md": 1,
+    "designs/adr/rename.md": 30,
+    "designs/adr/roadmap-08-word-captions.md": 1,
+    "designs/adr/roadmap-10-graphics.md": 2,
+    "designs/adr/roadmap-11-dev-tools.md": 1,
     # -- Permanent: a pointer to a path that keeps the old name (NM-1): the spec's
     # single file in git history, and the proof README's recorded results (its dated
     # runs, result tables, quoted output and old-tree builds).

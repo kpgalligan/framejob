@@ -5,7 +5,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 
 The road map that made these is closed: its condensed record is `designs/adr/grading-3.md`,
 and the original, `archive/grading-3.md`, holds each phase's record (T3-0 the road map, these
-decisions and the pure move; T3-1 honest sources and Reelcut's HDR→SDR; T3-2 log footage; T3-3
+decisions and the pure move; T3-1 honest sources and Frame Job's HDR→SDR; T3-2 log footage; T3-3
 the close). The IDs continue the GR- series of [`grading.md`](grading.md) and
 [`grading-2.md`](grading-2.md), so a citation never has to say which file. GR-15…GR-20 were
 recorded in T3-0, before any tier-3 code, from the owner's answers of 2026-10-11 to the tier-3
@@ -26,7 +26,7 @@ from published primaries and D65 by the standard derivation; Apple's conversion 
 a target, never copied; every fixture and test LUT is written by a script. Nothing of Concat is
 opened, at design time or build time.
 
-- **GR-15 — Honest sources: Reelcut converts HDR to SDR itself, at a new step 0; every other
+- **GR-15 — Honest sources: Frame Job converts HDR to SDR itself, at a new step 0; every other
   source is sampled exactly as today.** Choices 1a and 2a (owner, 2026-10-11).
   - **The switch:** the compositor answers `canConformColorOfSourceFrames` and
     `supportsHDRSourceFrames` true, and the video composition's colour properties are set to
@@ -56,7 +56,7 @@ opened, at design time or build time.
     layer's source. It runs only for a non-identity conversion, chosen by the buffer's TRANSFER
     label: the HLG transfer, the PQ transfer, or BT.2020 primaries with the BT.709 transfer. A
     buffer carrying a log transfer function (Apple Log's `LogTransferFunction`, with BT.2020
-    primaries and transfer "unspecified") or any transfer Reelcut does not recognise stays the
+    primaries and transfer "unspecified") or any transfer Frame Job does not recognise stays the
     identity until GR-16 assigns its conversion: T3-1 leaves Apple Log unchanged (still log).
     Every other source is sampled exactly as today, so it renders byte-identical by
     construction.
@@ -97,11 +97,11 @@ opened, at design time or build time.
     re-checked on it).
   - **T3-1's numbers** (appended before T3-1's code; each figure below computed by
     `tools/proof/hdr_proof.py`'s oracle, `convert`). The shader holds only the standards'
-    constants and formula shapes; every number Reelcut chose is `InputConversions.swift`'s.
+    constants and formula shapes; every number Frame Job chose is `InputConversions.swift`'s.
     - **HLG**: the BT.2100 inverse OETF (a = 0.17883277, b = 1 − 4a, c = 0.5 − a·ln 4a), the
       signal floored at 0 and not capped; BT.2100's OOTF shape E·Ys^(γ − 1), Ys = 0.2627 R +
       0.6780 G + 0.0593 B, with the **system gamma γ 0.96**; then a **gain of 1.07**. Both are
-      Reelcut's anchor to Apple's points (choice 2a), not BT.2100's nominal γ 1.2: with γ 1.2
+      Frame Job's anchor to Apple's points (choice 2a), not BT.2100's nominal γ 1.2: with γ 1.2
       the best single gain (this shoulder, its white at the gain) leaves the worst of Apple's
       four points 9.1 levels of 255 off (0.25 at −9.1, 0.75 at +8.9), and a gain fitted to the
       0.5 point alone leaves 0.25 at −5.9.
@@ -143,7 +143,7 @@ opened, at design time or build time.
       a BT.2020/BT.2020-10 file each drew a grey of 128 as 65 or 66 on `render_frame`.
     - **The screen recording's labels** (owner, 2026-10-11, "Yes, read labels"): `hdr_proof.py`
       R0 reads only the colour labels (ffprobe) of the newest existing recording in
-      `~/Movies/Reelcut Recordings/`, never its pixels, and nothing records the screen for it.
+      `~/Movies/Frame Job Recordings/`, never its pixels, and nothing records the screen for it.
     - **Where the owed "real screen recording's labels" check went**: R0 on the control
       (Release, 2026-10-11) read `Screen Recording 2026-09-28 at 10.45.11.mov` as HEVC
       `bt709/bt709/bt709`, the identity arm, so H1 holds a ramp carrying exactly those tags
@@ -197,7 +197,7 @@ opened, at design time or build time.
       three identical, exports 115.7 at mid-grey and within 3.5 (grey row) and 5.1 (chroma row)
       levels over the rows, all near black, where VideoToolbox's sRGB → 709 conversion has a
       toe of its own. M8 (`p3srgb.mov`, smpte432/iec61966-2-1/bt709): Apple's reading of the
-      file's own labels picks [128, 128, 128], [166, 36, 0], [0, 253, 255]; today's Reelcut
+      file's own labels picks [128, 128, 128], [166, 36, 0], [0, 253, 255]; today's Frame Job
       alone [55, 55, 55], [98, 4, 0], [0, 251, 255]; the earlier `sdrWide` reading [139, 139,
       139], [175, 35, 0], [0, 254, 255]; `.srgb(.p3D65)` [128, 128, 128], [167, 36, 0], [0, 253,
       255].
@@ -269,7 +269,7 @@ opened, at design time or build time.
   - Risk accepted: built and proved on synthetic fixtures only (choice "Synthetic now"); whether
     a real iPhone Apple Log file carries the measured label, and how real Sony and Panasonic files
     are tagged, wait for the owner's clips (GRD-17, GRD-18). The display transform's mid-grey is
-    Reelcut's look choice, not a maker's. A user who already applies a camera LUT as a look and
+    Frame Job's look choice, not a maker's. A user who already applies a camera LUT as a look and
     then sets Camera Log converts twice, and is only warned.
   - **T3-2's append, before its code** (2026-10-12). Nothing above is rewritten; where a number
     or a choice here sharpens one above, this is the record.
@@ -293,7 +293,7 @@ opened, at design time or build time.
         d8a1837725abcca5da348b2dc6f212446db6a598cb61b093891af7ecbc0c8dcc),
         `pro-av.panasonic.net/en/cinema_camera_varicam_eva/support/pdf/VARICAM_V-Log_V-Gamut.pdf`
         (the owner's download is the same file). Terms: none stated.
-    - **The curves, as each document gives them** (s is the decoded, normalized signal Reelcut's
+    - **The curves, as each document gives them** (s is the decoded, normalized signal Frame Job's
       step 0 reads; every constant below is the document's):
       - **Apple Log** (the paper's §Transfer function): P = γ·log2(R + β) + δ for R ≥ Rt, c·(R −
         R0)² for R0 ≤ R < Rt, 0 below R0; R0 = −0.05641088, Rt = 0.01, c = 47.28711236, β =
@@ -335,7 +335,7 @@ opened, at design time or build time.
       only with `gamut: "apple_wide_gamut"`, detected at import from its label as Apple Log is,
       and the popup gains "Apple Log 2". Its curve is Apple Log's; only the gamut differs. The
       "Not in" line above no longer names it.
-    - **Reelcut's display transform** (choice 4a's mid-grey: the owner, 2026-10-12, "42%, as
+    - **Frame Job's display transform** (choice 4a's mid-grey: the owner, 2026-10-12, "42%, as
       planned"): scene light R × the **exposure 0.42^2.4/0.18 (≈ 0.6927)**, so 18 % grey encodes
       to 0.42 (107/255, near BT.709's 0.409); the camera gamut's matrix; GR-15's lift; GR-15's
       shoulder with the **knee 0.39** and the **white 64·0.42^2.4 (≈ 7.98)**, six stops over 18 %
@@ -380,7 +380,7 @@ opened, at design time or build time.
     `linear.py`: white at 50 % over black is 128 encoded and 188 linear, so a "50 % black dim"
     becomes far lighter; a red → green dissolve's midpoint luminance is 0.199 encoded, below both
     ends, and 0.464 linear; multiply 50 % × 50 % grey is 64 and 61; one blur tap at a third white
-    coverage is 85 and 156). Reelcut's material is screen recordings and titles, where encoded
+    coverage is 85 and 156). Frame Job's material is screen recordings and titles, where encoded
     blending is what designers expect, so it is a preference to offer when asked, not a fix.
   - Design notes for the issue: the grade (steps 3 and 4c–4d) stays on encoded values; a linear
     pipeline decodes after the grade and before step 7, keeps the destination linear and encodes

@@ -7,7 +7,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   open. Mitigation (M3, landed): an opt-in import step that shells out to a
   user-installed ffmpeg (present at `/opt/homebrew/bin/ffmpeg` on the
   development machine) to rewrap or transcode. The conversion is written to
-  `~/Library/Application Support/Reelcut/Rewrapped/`, **not into the
+  `~/Library/Application Support/Frame Job/Rewrapped/`, **not into the
   package**, for two reasons the `FFmpegRewrap.rewrapDirectory` comment
   spells out: opening an MKV from the Finder makes an UNTITLED document, so
   the import that needs a conversion is exactly the one with no package to

@@ -11,9 +11,9 @@ and §5.
   (`agent/prices/anthropic.json`) is refreshed daily at runtime and by `make prices`. Never
   hand-kept, except AssemblyAI's Universal-3.5 Pro rate, which no online source carries
   (`AssemblyAIRates`). Anthropic's page is the cross-check. `@pydantic/genai-prices` was rejected
-  because it lacks the models Reelcut uses (road map 13 §1); the npm repackagings of LiteLLM add a
+  because it lacks the models Frame Job uses (road map 13 §1); the npm repackagings of LiteLLM add a
   lag and a dependency for four multiplications. Risk accepted: LiteLLM is a community table, and
-  a wrong row is caught only by the cross-check, which compares the models Reelcut uses.
+  a wrong row is caught only by the cross-check, which compares the models Frame Job uses.
 - **P-2 — A call is priced from the response's own `usage` and `model`, per token class, at that
   model's rates, in the helper — per `usage.iterations` entry when present, each at its own
   model, because the top-level counts describe only the attempt that returned the message and
@@ -27,10 +27,10 @@ and §5.
   They are enforced by the proofs before each request, at the worst case. Tokens are recorded for
   diagnosis and are never the budget. The budgets are the owner's numbers, committed; an agent
   never raises them.
-- **P-4 — Spend shown in the app is Reelcut's own**, from its ledger, and says so. The Anthropic
+- **P-4 — Spend shown in the app is Frame Job's own**, from its ledger, and says so. The Anthropic
   Console is the truth for the account.
 - **P-5 — The spend ledger and the price cache are the person's, and a proof never touches them.**
-  Both live in the spend folder, `~/Library/Application Support/Reelcut/` (`spend.jsonl`, one JSON
+  Both live in the spend folder, `~/Library/Application Support/Frame Job/` (`spend.jsonl`, one JSON
   line per priced response; `anthropic-prices.json`, the helper's daily copy of LiteLLM's table).
   `-RCSpendFolder <path>` replaces the folder, read from the argument domain alone (R6-9 (c)). With
   `RC_ASSISTANT_BASE_URL` set and no `-RCSpendFolder` there is NO spend folder: no ledger line is
@@ -43,7 +43,7 @@ and §5.
   fetch.
   **Amended by NM-4** (rename R0): the spend folder `~/Library/Application Support/Reelcut/` is now
   `~/Library/Application Support/Frame Job/`.
-- **P-6 — The proofs' ledger is `~/Library/Application Support/Reelcut Proofs/spend.jsonl`, and
+- **P-6 — The proofs' ledger is `~/Library/Application Support/Frame Job Proofs/spend.jsonl`, and
   every paid proof request is held to the month's budget in it before it is sent.** It is outside
   the repo, so it survives `rm -rf tools/proof/work` and a fresh clone and is shared by every
   worktree, and outside P-5's spend folder, which is the person's. `tools/proof/budget.py` is its
@@ -76,7 +76,7 @@ and §5.
   total is never restarted at $0 and the owner's `mv` never nests.
 - **P-7 — The app shows two figures: what the current conversation has cost, on the Assistant
   tab, and what the UTC calendar month has cost, in Settings ▸ Assistant; both say they are
-  Reelcut's own estimate (P-4).** The conversation figure is the transcript's sum of the `cost`
+  Frame Job's own estimate (P-4).** The conversation figure is the transcript's sum of the `cost`
   events since its last Clear or ended conversation (a key or model change): kept in memory, it
   carries across a helper restart and is shown with no spend folder. The month figure is a fold of
   the spend folder's `spend.jsonl` over the **UTC** calendar month, because the ledger's `time` is
@@ -99,7 +99,7 @@ and §5.
   The ledger line gains `"partial": true`; the turn line and the tab's Spend figure read "at
   least"; Settings' month fold sums a partial line's dollars like any priced line, unflagged.
   Where the tab's full figure does not fit its row, it reads "≥" for "at least" and "<" for
-  "under", still ending "· Reelcut's estimate" (issue batch B47, #203). Before this, a response
+  "under", still ending "· Frame Job's estimate" (issue batch B47, #203). Before this, a response
   cut short was not priced at all (#162). Risk accepted: the figure is a lower bound — the API
   sends its one `message_delta` after the last content block, so a response cut short mid-stream
   is priced from `message_start`'s counts, its input and cache tokens, and in practice none of its

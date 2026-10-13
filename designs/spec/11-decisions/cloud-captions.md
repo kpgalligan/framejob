@@ -36,9 +36,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   project. If that write and the remote delete both fail, the report says
   automatic retry is unavailable and directs the person to delete the
   transcript in their AssemblyAI dashboard.
-- **R6-5 — The app never holds an AssemblyAI key of Reelcut's.** The
+- **R6-5 — The app never holds an AssemblyAI key of Frame Job's.** The
   credential is the person's own, in a `0600` file of their own under
-  `~/Library/Application Support/Reelcut/`, or a relay's token (road map
+  `~/Library/Application Support/Frame Job/`, or a relay's token (road map
   6's C2). It is never an argument of `transcribe` — an argument is written
   into every agent transcript and every log — and never a launch argument,
   which `ps` shows to every user. `RC_ASSEMBLYAI_KEY` in the environment is
@@ -53,9 +53,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   key. The user deferred C2 until an integrated AI offering is designed;
   the relay-token alternative above remains future scope (road map 6
   §10.18).
-  **Updated 2026-09-30:** the plan is to open-source Reelcut, with every AI
+  **Updated 2026-09-30:** the plan is to open-source Frame Job, with every AI
   feature bring-your-own-key (the AssemblyAI key here, the assistant's
-  Anthropic key under AI-8). No Reelcut-run relay is planned; C2 stays iced
+  Anthropic key under AI-8). No Frame Job-run relay is planned; C2 stays iced
   (#125), and the owner called a change to this "increasingly unlikely".
   **Amended by NM-4** (rename R0): `~/Library/Application Support/Reelcut/`
   is now `~/Library/Application Support/Frame Job/` (the file keeps its
@@ -192,10 +192,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   orphaned ids, which is a new persisted shape for one case.
 - **R6-12 — The key and the region are a PERSON's settings, and no tool
   reads or writes either.** The key is R6-5's rule already: never an
-  argument, never in an answer, reachable only through Reelcut ▸ Settings…
+  argument, never in an answer, reachable only through Frame Job ▸ Settings…
   and `RC_ASSEMBLYAI_KEY`. The REGION is the same kind of thing for a
   different reason — it is a default a person sets once
-  (`ReelcutAssemblyAIRegion`, road map 6 §5d), it changes only WHERE a
+  (`FrameJobAssemblyAIRegion`, road map 6 §5d), it changes only WHERE a
   transcript is made, and a tool argument for it would let one call put a
   customer's audio in a jurisdiction the person did not choose. So the
   Settings window is the one writer and `AssemblyAIConfiguration.region` the
@@ -349,7 +349,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   transcript whose words carry the key is refused before any write. Before
   B34 only a server that put the key in the words could have made such a
   file, and the stand-in does that only in the probe's section `echo` row
-  E3, which B34 itself added. Reelcut has never been released (R6-5,
+  E3, which B34 itself added. Frame Job has never been released (R6-5,
   2026-09-30). R6-16 serves a current batch with no key at all, where no
   check is possible. DECLINED: a read-time check when a key is present,
   which would make one package current with a key and stale without one,
@@ -381,7 +381,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   every string value is seen, at any depth, and every value of a repeated
   key. The raw bytes are checked too. The refusal applies whether or not
   `TranscriptWord` decodes the field: R6-3 keeps the bytes verbatim, so a
-  field Reelcut never reads would otherwise carry an escaped key onto
+  field Frame Job never reads would otherwise carry an escaped key onto
   disk. The scan is lexical, not a `JSONSerialization` tree walk, because
   a parser keeps only a repeated key's first value. This replaces B43's
   decoded-fields check. R6-20 applies to the refusal.

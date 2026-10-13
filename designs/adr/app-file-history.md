@@ -230,7 +230,7 @@ lenient-decoding rule.
   byte-identical PNGs, so only `phase7_chrome.py`'s structural read can see the difference. A nil
   from `CGImageDestinationCreateWithURL` is two failures, reported apart: a format this Mac does
   not offer, and a file that could not be created. Renames go through `FrameWriter.renamed`,
-  `CaptionExporter.renamed` and `ProjectDocument.displayStem` (whose set is `{reelcut}`), never a
+  `CaptionExporter.renamed` and `ProjectDocument.displayStem` (whose set is `{framejob}`), never a
   bare `deletingPathExtension`. "Board v1.2" became "Board v1.jpg". Save Frame validates on
   `duration > 0`, so a text-only timeline can be saved. It reads the project in the panel's
   completion, because a panel is not a sheet and the document stays editable while it is open.

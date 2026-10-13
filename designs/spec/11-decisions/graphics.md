@@ -17,7 +17,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   reversal, as road map 3 reversed screen recording.
 - **G-2 — The engine is a separate Rust crate; the core crate keeps its two
   rules** (road map 10 §4, 2026-09-25). QuickJS and resvg live in
-  `graphic/`, a crate at the repo root. `reelcut-core` depends on it by
+  `graphic/`, a crate at the repo root. `framejob-core` depends on it by
   path, and ONE file, `core/src/ffi_graphic.rs`, calls into it; no module of
   the model, the ops, the plan or the recipe imports it. `core/src/` keeps
   "no pixel work" and "no filesystem" exactly; the `graphic` crate does
@@ -292,7 +292,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `packageContentsDidChangeOnDisk()` once, which is what keeps the next
   save from being refused as "changed by another application". An untitled
   document's folder is the app's own scratch at
-  `<NSTemporaryDirectory()>/Reelcut/<UUID>-graphics`, created eagerly,
+  `<NSTemporaryDirectory()>/FrameJob/<UUID>-graphics`, created eagerly,
   BESIDE the temporary cache root rather than under it as G-3 said —
   `cacheWrapper()` would carry a child of the cache root into `cache/` —
   and the first save carries it into the package only when it holds at
@@ -419,7 +419,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
     That is arithmetic, not a measurement.
   - The comparison is with the soft limit of 256 (`launchctl limit
     maxfiles` printed `256 unlimited` on 2026-09-29) and with the owner's
-    running Reelcut, which held 28 numbered descriptors (`lsof -p`; its
+    running Frame Job, which held 28 numbered descriptors (`lsof -p`; its
     documents were unknown).
   - Modules keep one source each and are uncapped, as before. Superseded
     by G-20 (a).
@@ -602,7 +602,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   (d) **Bounds.** At most `4 × workers` slots and 1 GiB of rasters are held
   ahead; a worker waits while either is reached. Every `start` has its
   `stop` in `Exporter.finish` and `deinit`, beside the unpin.
-  (e) **The switch.** `ReelcutGraphicPrefetchOff` (a Bool default; YES is
+  (e) **The switch.** `FrameJobGraphicPrefetchOff` (a Bool default; YES is
   the serial path) is a measurement switch, not a setting.
   (f) **Risk accepted.** Each graphic's JavaScript runs twice per frame,
   once on a worker and once on the compositor. A repeated SVG is
@@ -791,7 +791,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `"<name>" has no kept revision <revision> — kept: <revisions>`. A kept
   file whose bytes no longer hash to the revision in its name (changed by
   hand) is not a kept text (§5.6): restoring it is refused and nothing is
-  written — `graphics/history/<name>/<file> was changed outside Reelcut
+  written — `graphics/history/<name>/<file> was changed outside Frame Job
   and no longer holds the revision in its name; it is not restored — other
   kept revisions: <revisions, or "none">` — and the file is left for the
   person. Listing reads names, not bytes (hashing every kept file on
@@ -1072,7 +1072,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   ["graphic"]` and `skip_missing: true` — as the undo step "Paste Graphic
   Properties", and interprets nothing about the payload: an identity is
   the edit path's beep, and an error is its alert sheet with the core's
-  sentence and no undo step. It is enabled when Reelcut clips are on the
+  sentence and no undo step. It is enabled when Frame Job clips are on the
   clipboard and at least one selected clip is a graphic (the owner's
   choice 3); greying it exactly would mean reading the clipboard's bytes
   every time a menu opens. When several clips were copied the props come
@@ -1508,7 +1508,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   rate's 1 Mbps floor; the 0.25 % lower default rate on a larger odd
   canvas, and a Quality tier's rate where it crosses a rounding step
   ((b)), are by arithmetic. A reader that ignores the declared
-  premultiplied mode draws translucent pixels dark, **and Reelcut is such
+  premultiplied mode draws translucent pixels dark, **and Frame Job is such
   a reader**: `Compositor.swift` builds every video source as straight
   alpha and nothing in `app/Sources` reads a file's declared mode, so an
   exported `hevc_alpha` or `prores_4444` movie re-imported is multiplied
@@ -1849,5 +1849,5 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   draw both labels right (Q1). Only this host's
   encoders and decoders were measured; playback of either row in Safari,
   QuickTime Player and Final Cut is a person's check (`docs/manual-checks.md`
-  SE-9). G-33 (h)'s sentence that Reelcut is a reader that ignores the
+  SE-9). G-33 (h)'s sentence that Frame Job is a reader that ignores the
   declared mode, and its I1 figures, describe the build before this entry.

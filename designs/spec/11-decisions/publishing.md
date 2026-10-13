@@ -5,10 +5,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 
 These were made with no road map: the pipeline is Rasterize's (`~/devel/rasterize`'s
 `.github/workflows/publish.yml`), carried over on 2026-10-04, and a decision below says so
-where Reelcut's differs, and why.
+where Frame Job's differs, and why.
 
 - **PUB-1 — A build for another person's Mac is made only by GitHub Actions, on a push to the
-  `publish` branch: a Developer ID-signed, notarized, stapled `Reelcut.dmg` attached to a GitHub
+  `publish` branch: a Developer ID-signed, notarized, stapled `FrameJob.dmg` attached to a GitHub
   Release tagged `v<version>`.** `.github/workflows/publish.yml` is the whole pipeline. The
   certificate and the notarization key are secrets of the repository's `publish` environment,
   which only the `publish` branch may use; the team ID is one of them and is never written in

@@ -9,7 +9,7 @@
 - **Original:** `archive/build-velocity.md` (623 lines) is the full record. It has no section numbers, so it is cited by section name: "orig Record ▸ Phase 2" is its "Record" section's phase 2 entry.
 - **Spec decisions:** V-4 and V-5 in spec §11 (`designs/spec/11-decisions/dev-tools.md`). They stay binding, and where the original words them differently, §11's text wins:
   - V-4 (amends V-1): the edit loop and the mutant tiers drive a Debug app; the run a phase records, the gate's build and every `release_only` proof are Release. Risk accepted: an optimiser-only defect is seen only by the recorded run.
-  - V-5: the Debug build is its own app, "Reelcut Debug", `com.kgalligan.Reelcut.debug`, with its own defaults domain and an Alternate `.reelcut` handler, through Debug-only settings read with `:default=`, so Release and Distribution keep identical settings and Info.plist bytes. `PRODUCT_NAME` stays `Reelcut`.
+  - V-5: the Debug build is its own app, "Frame Job Debug", `com.kgalligan.FrameJob.debug`, with its own defaults domain and an Alternate `.framejob` handler, through Debug-only settings read with `:default=`, so Release and Distribution keep identical settings and Info.plist bytes. `PRODUCT_NAME` stays `Reelcut`.
   - W-8 is why `make typecheck` has exactly four warnings, which the gate now holds it to.
 
 ## Context
@@ -56,7 +56,7 @@ Verification was slow where agents paid for it most. `make typecheck` took 81 s 
 ## Known limits
 
 - **An input another session edits during a build that then succeeds is older than the marker**, so the app passes as fresh until the next edit. (accepted in the spec)
-- **Debug shares `~/Library/Application Support/Reelcut/` with the real app**: the keys, the spend ledger, presets and the default socket path, where a second instance binds none. Separating them would change the product. It was offered to the owner as a choice and not taken.
+- **Debug shares `~/Library/Application Support/Frame Job/` with the real app**: the keys, the spend ledger, presets and the default socket path, where a second instance binds none. Separating them would change the product. It was offered to the owner as a choice and not taken.
 - **An optimiser-only defect is seen only by the recorded Release run** (V-4's accepted risk). Recording that run on Release is a rule, not a mechanism.
 - **D27 (Distribution's seal) and the rest of dist_check run only in `make dist`**, which is not a gate step. The gate's app step reads D25 and D26 alone.
 - **The gate keeps one stamp per step.** Restoring an edit re-runs the steps the edit ran, even though the restored hashes equal an earlier pass's.
