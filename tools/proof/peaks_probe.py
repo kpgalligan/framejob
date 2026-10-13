@@ -17,6 +17,7 @@ import wave
 import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
+SPEECH = ROOT / "tools/proof/media/speech.mov"
 WORK = ROOT / "tools/proof/work/peaks-probe"
 FIXTURES = WORK / "fixtures"
 CACHE = WORK / "cache"
@@ -56,6 +57,29 @@ def wav(name, rate, channels, silent=False, duration=1):
     return path, expected
 
 
+def edges(name, rate, duration=2):
+    """Mono 16-bit PCM at 0.125 whose first frame in every 10 ms bucket is
+    0.75 (both int16-exact): a frame that crosses a bucket edge leaves a
+    bucket at 0.125, so the oracle is 0.75 in every bucket."""
+    path = FIXTURES / name
+    expected = [0.0] * (duration * 100)
+    frames = bytearray()
+    for frame in range(rate * duration):
+        level = 0.75 if frame % (rate // 100) == 0 else 0.125
+        value = round(level * 32768)
+        frames.extend(struct.pack("<h", value))
+        bucket = frame * 100 // rate
+        expected[bucket] = max(expected[bucket], abs(value) / 32768)
+    with wave.open(str(path), "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(rate)
+        out.writeframes(frames)
+    with wave.open(str(path), "rb") as source:
+        assert source.getnframes() == rate * duration
+    return path, expected
+
+
 def fixtures():
     FIXTURES.mkdir(parents=True, exist_ok=True)
     oracle = {}
@@ -64,6 +88,8 @@ def fixtures():
             name = f"{stem}{rate // 1000}.wav" if rate == 48000 else f"{stem}44.wav"
             _, oracle[name] = wav(name, rate, channels)
     _, oracle["silent48.wav"] = wav("silent48.wav", 48000, 1, silent=True)
+    _, oracle["edges48.wav"] = edges("edges48.wav", 48000)
+    _, oracle["edges44.wav"] = edges("edges44.wav", 44100)
     (FIXTURES / "expected.json").write_text(json.dumps(oracle))
     # The mono48/stereo48 names are explicit: a rate check must not silently
     # run against a differently sampled fixture.
@@ -77,9 +103,11 @@ def fixtures():
                   str(FIXTURES / "stereo48.wav"), "-c:a", "pcm_s16le", str(delayed)])
     if result.returncode: raise RuntimeError("delayed PCM edit fixture: " + result.stderr)
     delayed_aac = FIXTURES / "delayed.aac.m4a"
+    # ffmpeg 9 picks the movie timescale itself (48000 here); the row asks
+    # for the millisecond target edit list earlier ffmpeg wrote by default.
     result = run(["ffmpeg", "-y", "-v", "error", "-itsoffset", "0.25", "-i",
                   str(FIXTURES / "stereo48.wav"), "-c:a", "aac", "-b:a", "128k",
-                  str(delayed_aac)])
+                  "-movie_timescale", "1000", str(delayed_aac)])
     if result.returncode: raise RuntimeError("delayed AAC edit fixture: " + result.stderr)
     long, _ = wav("long48.wav", 48000, 1, duration=10)
     corrupt = FIXTURES / "corrupt.m4a"
@@ -93,11 +121,21 @@ def fixtures():
     truncated = FIXTURES / "truncated.wav"
     whole = (FIXTURES / "mono48.wav").read_bytes()
     truncated.write_bytes(whole[:44 + 48_000 * 2 * 6 // 10])
-    return check("fixture frame counts and codec files exist", all(
+    good = check("fixture frame counts and codec files exist", all(
         (FIXTURES / name).stat().st_size > 44 for name in
         ("mono44.wav", "mono48.wav", "stereo44.wav", "stereo48.wav",
-         "silent48.wav", "tone.aac.m4a", "delayed.mov", "delayed.aac.m4a",
-         "corrupt.m4a", "truncated.wav")))
+         "silent48.wav", "edges48.wav", "edges44.wav", "tone.aac.m4a",
+         "delayed.mov", "delayed.aac.m4a", "corrupt.m4a", "truncated.wav")))
+    # Issue #285's media: the README's speech.mov recipe (Phase 4's `say` +
+    # ffmpeg block, under "Make the test media once") writes it to media/.
+    if SPEECH.exists():
+        shutil.copyfile(SPEECH, FIXTURES / "speech.mov")
+    elif (FIXTURES / "speech.mov").exists():
+        (FIXTURES / "speech.mov").unlink()
+    return good & check("speech.mov copied from tools/proof/media", SPEECH.exists(),
+                        "" if SPEECH.exists() else
+                        f"{SPEECH} is missing: make it with tools/proof/README.md's "
+                        "speech.mov recipe (Phase 4's `say` + ffmpeg block)")
 
 
 def build(sources):

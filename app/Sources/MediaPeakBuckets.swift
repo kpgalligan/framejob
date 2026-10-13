@@ -3,8 +3,14 @@ import CoreMedia
 import Foundation
 
 extension MediaImporter {
-    /// One Float32 maximum magnitude per 10 ms of the media record. Coverage
-    /// follows decoded presentation timestamps independently of that storage
+    /// One Float32 maximum magnitude per 10 ms of the media record. A frame's
+    /// bucket follows its PTS (so leading and internal edit gaps are kept)
+    /// through an integer frame index: a buffer's PTS is rounded to a frame
+    /// once, and each frame is placed by `⌊(startFrame + f) · 100 / rate⌋`,
+    /// so where the decoder splits the PCM into buffers cannot move a frame
+    /// across a bucket edge, and the same PCM under the same record duration
+    /// always writes the same bytes (issue #285). Coverage follows decoded
+    /// presentation timestamps, in seconds, independently of that storage
     /// bound, so a shorter record cannot certify an unread track tail.
     struct PeakBuckets {
         private var buckets: [Float]
@@ -69,21 +75,28 @@ extension MediaImporter {
             }
 
             // Timestamp placement preserves genuine leading and internal edit
-            // gaps. Group adjacent frames in each bucket for a vDSP maximum;
+            // gaps. The PTS is rounded to a frame index once; every frame's
+            // bucket follows from that integer index, never from float
+            // seconds, so a buffer edge at k/100 s cannot floor to k − 1.
+            // Group adjacent frames in each bucket for a vDSP maximum;
             // values above full scale are deliberately retained.
+            let startFrame = (start * asbd.mSampleRate).rounded()
+            guard startFrame.isFinite, abs(startFrame) < 9_007_199_254_740_992 else {
+                failed = true; return false
+            }
+            func bucketOf(_ frame: Int) -> Double {
+                floor((startFrame + Double(frame))
+                      * Double(MediaImporter.peakBucketsPerSecond) / asbd.mSampleRate)
+            }
             var frame = 0
             while frame < frames {
-                let frameTime = start + Double(frame) / asbd.mSampleRate
-                let bucketDouble = floor(frameTime * Double(MediaImporter.peakBucketsPerSecond))
+                let bucketDouble = bucketOf(frame)
                 guard bucketDouble.isFinite, bucketDouble >= Double(Int.min),
                     bucketDouble < Double(Int.max) else { failed = true; return false }
                 let bucket = Int(bucketDouble)
                 var take = 1
                 while frame + take < frames {
-                    let nextTime = start + Double(frame + take) / asbd.mSampleRate
-                    if floor(nextTime * Double(MediaImporter.peakBucketsPerSecond)) != bucketDouble {
-                        break
-                    }
+                    if bucketOf(frame + take) != bucketDouble { break }
                     take += 1
                 }
                 if bucket >= 0 && bucket < buckets.count {

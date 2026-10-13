@@ -169,8 +169,24 @@ EV with `toneEnabled` 1) must fail KT. Output under
 `work/grading_spike/tree-<check|measure|mutant-tree-graded>/` (`bench-<h>.json`
 of the same shape, `result.json`).
 
+**A base with no adjustment pass (issue #284).** KA needs V0's
+`framejob_adjust_fragment`, and a base before grading GR4a's adjustment pass
+has none — the default `f407f87` among them, where the bench used to stop at
+the adjustment pipeline and R1080 and R2160 failed. B0 now says whether V0
+has the fragment; without it the bench runs with `--adjust 0` (no adjustment
+pipeline, no KA, only V0:S1, VT:S1 and V0b:S1 timed; its `k` holds only KT),
+KA is a SKIP by name at each size, and `--measure`'s TA is too, so the
+verdict is KT's. **The default stays `f407f87`**: it is GR7a's record (the
+`--measure --tree` line below), and its KT answers the question the spike
+stands for — does an UNGRADED layer draw exactly as it did before grading?
+KA belongs to a base that already has an adjustment pass, and each phase
+that needs it names that base with `--tree-base`, as G2-4 (`75ebf34`) and
+T3-1 (`716720c`) did. B94's run: at the default, KT PASS at |Δ| 0 at both
+sizes with KA SKIP; at `--tree-base bde8319`, KT and KA PASS at |Δ| 0 at both
+sizes; `tree-graded` killed by KT (|Δ| 0.1416).
+
 ```
-python3 tools/proof/grading_spike/grading_spike.py --check --tree                    # B0–B2, KT
+python3 tools/proof/grading_spike/grading_spike.py --check --tree                    # B0–B2, KT (KA SKIP at f407f87)
 python3 tools/proof/grading_spike/grading_spike.py --check --tree --mutant tree-graded
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree   # GR7a's record
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base 4f52ead   # G2-2's

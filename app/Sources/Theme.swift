@@ -1,12 +1,14 @@
 import AppKit
 
 /// Design tokens. Chrome colors come from the semantic AppKit system palette
-/// so the app matches the OS in both appearances — an image editor's chrome
-/// should stay neutral. The only fixed colors are the brand mark (welcome
-/// motif, selection marquee) and the transparency checkerboard; fonts remain
-/// the vendored Balopy faces. The chrome is square: every chrome radius token
-/// below is 0, so controls, rows, fields and panels draw with sharp corners.
-/// A clip bar is content, not chrome, and keeps `clipRadius`.
+/// so the app matches the OS in both appearances — a video editor's chrome
+/// should stay neutral. The only fixed colors are the brand inks, the clip
+/// tints, the action ink, the caption preview plate and the transparency
+/// checkerboard; the faces are the vendored ones the Type section loads
+/// (Source Sans 3, IBM Plex Mono and Darker Grotesque). The chrome is square:
+/// every chrome radius token below is 0, so controls, rows, fields and panels
+/// draw with sharp corners. A clip bar is content, not chrome, and keeps
+/// `clipRadius`.
 enum DS {
     // MARK: - Chrome colors (system palette)
 
@@ -26,12 +28,24 @@ enum DS {
 
     // MARK: - Fixed colors
 
-    /// Brand inks — used only by the welcome motif and the marquee.
+    /// Brand inks — the three colours of the Frame Job mark
+    /// (`designs/frame-job/frame-job-icon.svg`, spec §11 NM-11), which
+    /// `BrandMark` paints. They also paint the chrome's accents. Coral is
+    /// `playhead` (the playhead, the selection ring, the playhead ticks),
+    /// `marquee` (the timeline, canvas and region outlines), the range and
+    /// candidate shades, `meterClip` (the meter's clip cell, the Record button
+    /// and dot, the countdown, the context meter over 80 %), the "missing"
+    /// badge and the orange clip label. Butter is `snapGuide` (and the crop
+    /// handles) and the yellow label; forest is the green label.
     static let forest = NSColor(srgbRed: 0x1F / 255, green: 0x85 / 255, blue: 0x64 / 255, alpha: 1)
     static let butter = NSColor(srgbRed: 0xF2 / 255, green: 0xC1 / 255, blue: 0x4E / 255, alpha: 1)
     static let coral = NSColor(srgbRed: 0xF4 / 255, green: 0x65 / 255, blue: 0x3F / 255, alpha: 1)
 
-    /// The selection marquee — the app's one accent-colored canvas element.
+    /// Coral at 0.9 for outlines: the timeline's marquee (`TimelineView`),
+    /// the canvas's safe-area rings (`EditorChrome`), the obscure regions'
+    /// outlines and grips (`PreviewCanvasView+Obscure`), the zoom region's
+    /// band and frame (`EditorViewController+ZoomRegion`) and a line's
+    /// endpoint handles (`PreviewCanvasView`).
     static var marquee: NSColor { coral.withAlphaComponent(0.9) }
 
     /// Neutral checkerboard for transparency, constant across appearances so

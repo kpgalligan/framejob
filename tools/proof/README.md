@@ -5938,6 +5938,44 @@ restoring the coarse-grid pre-rejection withheld fully covered PCM. The
 pristine **80/80** run was repeated after those mutants; road map 4 §9 and
 the litecode checks and fix-notes files hold the evidence.
 
+**Issue #285 — the same PCM, the same bytes.** The probe also authors
+`edges48.wav` and `edges44.wav` (2 s mono at 0.125 whose first frame in
+every 10 ms bucket is 0.75, both int16-exact; the Python oracle is 0.75 in
+every bucket) and copies `media/speech.mov` into its fixtures — a missing
+`speech.mov` is a scored failure naming the recipe above. Its rows: eight
+concurrent `AVAssetReader` decodes of `speech.mov` give identical PCM (and it
+prints how many distinct buffer splits they came in); one decode of each of
+`edges48.wav`, `edges44.wav`, `speech.mov`, `tone.aac.m4a` and `delayed.mov`
+fed to `PeakBuckets` as decoded, cut at every bucket edge and cut into
+37-frame pieces (`CMSampleBufferCopySampleBufferForRange`) writes
+byte-identical buckets; both edge fixtures through the actual importer pass
+match the oracle in every bucket; eight concurrent actual importer passes of
+`speech.mov`, `stereo44.wav`, `tone.aac.m4a` and `delayed.mov`, each into its
+own cache, write byte-identical `.bin` files; and a buffer fed after an edit
+gap lands at its own PTS with the gap left zero. The delayed AAC fixture is
+written with `-movie_timescale 1000`: ffmpeg 9 picks the movie timescale
+itself (48000), which failed the millisecond-target row on the control run.
+
+The control, the new rows run against the unchanged float-seconds placement
+(B94), before the edit-gap row and the timescale fix: **86/94**. One failure
+was the delayed AAC fixture row (the ffmpeg 9 timescale above). The rest were
+#285's: PCM identical across 8 decodes (4 distinct splits), but the three-way
+cut differing for `edges48.wav`, `edges44.wav`, `speech.mov` and
+`tone.aac.m4a`, both edge fixtures off the oracle (`edges48.wav` buckets 29,
+33, 45, 115 at 0.125) and `speech.mov`'s eight importer passes writing **7
+distinct files** — the issue's symptom, from a buffer that starts at k/100 s
+flooring to bucket k − 1. With placement by an integer frame index the probe
+scores **95/95**. Two compiled source-copy mutants: `float-placement`
+(restoring `floor((start + f / rate) · 100)`) **88/95**, killed by the
+three-way cut of four fixtures, both edge-oracle rows and `speech.mov`'s
+concurrent passes; `index-ignores-pts` (the frame index taken from
+`acceptedFrames`) **94/95**, killed by the edit-gap row. The delayed PCM row
+cannot kill it: AVFoundation decodes `delayed.mov`'s empty edit as silence
+from PTS 0/48000, so frames fed and PTS agree there. The screen-catalog
+comparison (`screens.py --compare`) was not run, because it puts app windows
+in front of the owner; the byte-identical `.bin` rows, the cut-three-ways
+rows and the edge-fixture rows are what answer #285.
+
 ## Road map 8 — the word captions spike (`words_spike/`)
 
 W0, run complete on 2026-09-22: the seven questions

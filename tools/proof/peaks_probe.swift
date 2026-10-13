@@ -273,6 +273,17 @@ if let decoded = reader(fullURL) {
                                  stamp: fullStamp, into: cache)
         check("explicit empty edit does not demand PCM", mid > 0 &&
               MediaImporter.loadPeaks(for: full.id, in: cache) != nil)
+        // Issue #285: the frame index follows the PTS, not the frames fed so
+        // far, so the gap stays silent and the last buffer stays at its time.
+        let gapValues = buckets.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+        let gapBucket = Int((CMTimeGetSeconds(firstEnd) * 100).rounded(.up)) + 1
+        let tailBucket = Int(CMTimeGetSeconds(lastStart) * 100) + 1
+        check("a buffer after an edit gap lands at its own PTS and the gap stays zero",
+              gapBucket < tailBucket && tailBucket < Int(CMTimeGetSeconds(lastEnd) * 100)
+              && tailBucket < gapValues.count && gapValues[gapBucket] == 0
+              && gapValues[tailBucket] > 0.8,
+              "gap bucket \(gapBucket)=\(gapValues.indices.contains(gapBucket) ? gapValues[gapBucket] : -1), "
+              + "tail bucket \(tailBucket)=\(gapValues.indices.contains(tailBucket) ? gapValues[tailBucket] : -1)")
     }
     var all = MediaImporter.PeakBuckets(duration: full.duration)
     for buffer in decoded.1 { _ = all.add(buffer) }
@@ -395,6 +406,159 @@ if let truncatedRead {
           (extent <= 0.60001 && MediaImporter.loadPeaks(for: truncated.id, in: truncatedCache) != nil)
           || (extent > 0.60001 && MediaImporter.loadPeaks(for: truncated.id, in: truncatedCache) == nil),
           "track extent \(extent), reader \(truncatedRead.0)")
+}
+
+// Issue #285: a peaks file is a function of the decoded PCM, not of how the
+// decoder split it into buffers.
+func recordTicks(_ url: URL) -> Ticks {
+    let seconds = CMTimeGetSeconds(AVURLAsset(url: url).duration)
+    return seconds.isFinite && seconds > 0
+        ? Ticks((seconds * Double(ReelTime.perSecond)).rounded(.up)) : 1
+}
+func pcmBytes(_ buffers: [CMSampleBuffer]) -> Data {
+    var all = Data()
+    for buffer in buffers {
+        guard let block = CMSampleBufferGetDataBuffer(buffer) else { continue }
+        var bytes = Data(count: CMBlockBufferGetDataLength(block))
+        let length = bytes.count
+        _ = bytes.withUnsafeMutableBytes { raw in
+            CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: length,
+                                       destination: raw.baseAddress!)
+        }
+        all.append(bytes)
+    }
+    return all
+}
+func split(_ buffers: [CMSampleBuffer]) -> String {
+    buffers.map {
+        let time = CMSampleBufferGetPresentationTimeStamp($0)
+        return "\(time.value)/\(time.timescale):\(CMSampleBufferGetNumSamples($0))"
+    }.joined(separator: ",")
+}
+func sampleRate(_ buffer: CMSampleBuffer) -> Int64? {
+    guard let format = CMSampleBufferGetFormatDescription(buffer),
+        let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee,
+        asbd.mSampleRate > 0, asbd.mSampleRate == asbd.mSampleRate.rounded()
+    else { return nil }
+    return Int64(asbd.mSampleRate)
+}
+/// Each buffer cut where `cutBefore(global frame index, offset)` answers
+/// true, through `CMSampleBufferCopySampleBufferForRange`; nil when a cut
+/// fails, so a row never compares a partial stream.
+func recut(_ buffers: [CMSampleBuffer],
+           _ cutBefore: (_ index: Int64, _ offset: Int, _ rate: Int64) -> Bool)
+    -> [CMSampleBuffer]? {
+    var out: [CMSampleBuffer] = []
+    for buffer in buffers {
+        guard let rate = sampleRate(buffer) else { return nil }
+        let frames = CMSampleBufferGetNumSamples(buffer)
+        let first = CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(buffer),
+            timescale: Int32(rate), method: .roundHalfAwayFromZero).value
+        var bounds = [0]
+        for offset in 1..<max(frames, 1) where cutBefore(first + Int64(offset), offset, rate) {
+            bounds.append(offset)
+        }
+        bounds.append(frames)
+        for (from, to) in zip(bounds, bounds.dropFirst()) where to > from {
+            var piece: CMSampleBuffer?
+            guard CMSampleBufferCopySampleBufferForRange(
+                allocator: kCFAllocatorDefault, sampleBuffer: buffer,
+                sampleRange: CFRange(location: from, length: to - from),
+                sampleBufferOut: &piece) == noErr, let piece else { return nil }
+            out.append(piece)
+        }
+    }
+    return out
+}
+func bucketData(_ buffers: [CMSampleBuffer], _ duration: Ticks) -> Data? {
+    var buckets = MediaImporter.PeakBuckets(duration: duration)
+    for buffer in buffers where !buckets.add(buffer) { return nil }
+    return buckets.data
+}
+func differing(_ a: Data?, _ b: Data?) -> String {
+    guard let a, let b, a.count == b.count else {
+        return "sizes \(a?.count ?? -1)/\(b?.count ?? -1)"
+    }
+    let left = a.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+    let right = b.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+    let indices = left.indices.filter { left[$0] != right[$0] }
+    return "\(indices.count) buckets differ: " + indices.prefix(8).map {
+        "\($0) (\(left[$0]) vs \(right[$0]))" }.joined(separator: ", ")
+}
+let speechURL = root.appendingPathComponent("speech.mov")
+let lock = NSLock()
+var decodes = [(AVAssetReader.Status, [CMSampleBuffer], CMTimeRange)?](repeating: nil, count: 8)
+DispatchQueue.concurrentPerform(iterations: 8) { index in
+    let decoded = reader(speechURL)
+    lock.lock(); decodes[index] = decoded; lock.unlock()
+}
+let speechPCM = decodes.map { $0.map { pcmBytes($0.1) } }
+let splits = Set(decodes.compactMap { $0.map { split($0.1) } })
+print("  speech.mov: \(splits.count) distinct buffer splits across 8 concurrent decodes")
+check("speech.mov: 8 concurrent decodes give identical PCM",
+      decodes.allSatisfy { $0?.0 == .completed } && speechPCM.allSatisfy {
+        $0 != nil && $0 == speechPCM[0] } && (speechPCM[0]?.count ?? 0) > 0,
+      "statuses \(decodes.map { $0.map { "\($0.0.rawValue)" } ?? "nil" })")
+let threeWays: [(String, Ticks)] = [
+    ("edges48.wav", 1_200_000), ("edges44.wav", 1_200_000), ("speech.mov", recordTicks(speechURL)),
+    ("tone.aac.m4a", 600_000), ("delayed.mov", 900_000)]
+for (name, duration) in threeWays {
+    guard let decoded = reader(root.appendingPathComponent(name)), decoded.0 == .completed else {
+        check("\(name): the same PCM cut three ways writes byte-identical buckets", false,
+              "decode failed")
+        continue
+    }
+    if name == "delayed.mov", let first = decoded.1.first {
+        let time = CMSampleBufferGetPresentationTimeStamp(first)
+        print("  delayed.mov decodes from PTS \(time.value)/\(time.timescale)")
+    }
+    let asDecoded = bucketData(decoded.1, duration)
+    let atEdges = recut(decoded.1) { index, _, rate in
+        index * 100 / rate != (index - 1) * 100 / rate }
+    let pieces = recut(decoded.1) { _, offset, _ in offset % 37 == 0 }
+    let edgeData = atEdges.flatMap { bucketData($0, duration) }
+    let pieceData = pieces.flatMap { bucketData($0, duration) }
+    print("  \(name): \(decoded.1.count) decoded buffers, \(atEdges?.count ?? -1) at bucket "
+          + "edges, \(pieces?.count ?? -1) in 37-frame pieces")
+    check("\(name): the same PCM cut three ways writes byte-identical buckets",
+          asDecoded != nil && asDecoded == edgeData && asDecoded == pieceData,
+          "edges: \(differing(asDecoded, edgeData)); 37-frame: \(differing(asDecoded, pieceData))")
+}
+for name in ["edges48.wav", "edges44.wav"] {
+    let url = root.appendingPathComponent(name)
+    let m = media(url, 1_200_000)
+    let cache = directory("edges-" + name)
+    check("\(name) actual importer pass completes", awaitPeaks(m, url, stamp(m, url), cache))
+    let values = MediaImporter.loadPeaks(for: m.id, in: cache)
+    if let values, let expected = oracle[name], values.count == 200, expected.count == 200 {
+        let wrong = values.indices.filter { abs(values[$0] - expected[$0]) > 0.0001 }
+        check("\(name): every bucket matches the oracle (each bucket edge's 0.75 in its own bucket)",
+              wrong.isEmpty, "\(wrong.count) wrong: " + wrong.prefix(8).map {
+                "\($0)=\(values[$0])" }.joined(separator: ", "))
+    } else {
+        check("\(name): every bucket matches the oracle (each bucket edge's 0.75 in its own bucket)",
+              false, "values \(values?.count ?? -1), oracle \(oracle[name]?.count ?? -1)")
+    }
+}
+let concurrent: [(String, Ticks)] = [
+    ("speech.mov", recordTicks(speechURL)), ("stereo44.wav", 600_000),
+    ("tone.aac.m4a", 600_000), ("delayed.mov", 900_000)]
+for (name, duration) in concurrent {
+    let url = root.appendingPathComponent(name)
+    let m = media(url, duration)
+    let sourceStamp = stamp(m, url)
+    let caches = (0..<8).map { directory("concurrent-\(name)-\($0)") }
+    var finished = [Bool](repeating: false, count: 8)
+    DispatchQueue.concurrentPerform(iterations: 8) { index in
+        let done = awaitPeaks(m, url, sourceStamp, caches[index])
+        lock.lock(); finished[index] = done; lock.unlock()
+    }
+    let bins = caches.map { try? Data(contentsOf: MediaImporter.peaksURL(for: m.id, in: $0)) }
+    let distinct = Set(bins.compactMap { $0 }).count
+    check("\(name): 8 concurrent importer passes write byte-identical .bin files",
+          finished.allSatisfy { $0 } && bins.allSatisfy { $0 != nil && $0 == bins[0] },
+          "finished \(finished.filter { $0 }.count)/8, \(distinct) distinct files, "
+          + "\(bins.filter { $0 == nil }.count) missing")
 }
 print("\n\(passed)/\(passed + failed) checks passed")
 exit(failed == 0 ? 0 : 1)

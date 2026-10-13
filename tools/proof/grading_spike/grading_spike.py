@@ -63,7 +63,11 @@ the tree's own file unpatched; both compiled (B1) and timed by
 `LayerUniforms` (464 until grading-2 G2-2). KT, scored at
 both sizes: VT:S1 = V0:S1 within 1/1023 over the frame; KA (grading-2 G2-4):
 VT:SA = V0:SA, the scene S1 then one unqualified adjustment pass at +1 EV with a
-neutral `QualifierUniforms` at `buffer(1)`. `--measure --tree` adds
+neutral `QualifierUniforms` at `buffer(1)`. A base whose shader names no
+`framejob_adjust_fragment` (one before grading GR4a's adjustment pass, the
+default f407f87 among them) has no V0:SA: B0 says so, the bench runs with
+`--adjust 0`, and KA (and `--measure`'s TA) is a SKIP by name at each size,
+which leaves the verdict to KT (issue #284). `--measure --tree` adds
 H0, C0, F, T0 (VT:S1 − V0:S1), TC (a RECORD: T0 ≤ `BOUND[h]` + C0, "What it
 may cost"'s UNGRADED-layer cap) and TA (a RECORD: VT:SA − V0:SA ≤ `BOUND[h]` +
 the SA series' own C0). Mutant `tree-graded` (VT drawn at +0.5 EV with
@@ -665,13 +669,15 @@ def build_tree_shaders(folder, base):
                            capture_output=True, text=True)
     if shown.returncode != 0:
         emit("B0", "FAIL", f"git show {base}:{SHADER} failed: {shown.stderr.strip()[-300:]}")
-        return None
+        return None, False
     # `base` predates rename R1: its entry points take the names the bench asks for.
     texts = {"V0": shown.stdout.replace("reelcut_", "framejob_"),
              "VT": (ROOT / SHADER).read_text()}
+    # A base before grading GR4a has no adjustment pass, so no KA (#284).
+    has_adjust = "framejob_adjust_fragment" in texts["V0"]
     emit("B0", "PASS", f"--tree: V0 {SHADER} at {base} ({texts['V0'].count(chr(10))} "
-         f"lines), VT the tree's own, unpatched ({texts['VT'].count(chr(10))} lines; no anchor "
-         "asked)")
+         f"lines, {'with' if has_adjust else 'no'} framejob_adjust_fragment), VT the tree's "
+         f"own, unpatched ({texts['VT'].count(chr(10))} lines; no anchor asked)")
     libs = {}
     for name, text in texts.items():
         metal, air, lib = folder / f"{name}.metal", folder / f"{name}.air", folder / f"{name}.metallib"
@@ -682,10 +688,10 @@ def build_tree_shaders(folder, base):
         if step["expired"] or step["rc"] != 0 or not lib.exists():
             emit("B1", "FAIL", f"{name} did not compile: "
                  f"{'expired' if step['expired'] else step['stderr'][-900:]}")
-            return None
+            return None, False
         libs[name] = lib
     emit("B1", "PASS", f"{len(libs)} metallibs ({', '.join(libs)}) in {folder.relative_to(ROOT)}")
-    return libs
+    return libs, has_adjust
 
 
 def build_tree_bench():
@@ -707,13 +713,19 @@ def build_tree_bench():
     return built.binary
 
 
-def tree_bench(binary, libs, size, folder, frames, runs, warmup, seed, exposure):
+def no_adjust_reason(h, base):
+    return (f"{h}p: V0's shader at {base} names no framejob_adjust_fragment (it predates "
+            "grading GR4a's adjustment pass), so there is no V0:SA to compare")
+
+
+def tree_bench(binary, libs, size, folder, frames, runs, warmup, seed, exposure, adjust):
     w, h = size
     out = folder / f"bench-{h}.json"
     out.unlink(missing_ok=True)
     argv = [binary] + [x for name, lib in libs.items() for x in ("--lib", f"{name}={lib}")]
     argv += ["--width", w, "--height", h, "--frames", frames, "--runs", runs,
-             "--warmup", warmup, "--seed", seed, "--vt-exposure", exposure, "--out", out]
+             "--warmup", warmup, "--seed", seed, "--vt-exposure", exposure,
+             "--adjust", 1 if adjust else 0, "--out", out]
     ran = run(argv, 600)
     if ran["expired"] or ran["rc"] != 0 or not out.exists():
         emit(f"R{h}", "FAIL", f"tree_bench at {w}×{h} "
@@ -756,6 +768,8 @@ def tree_timing_rows(answers, result):
             emit("TA", "RECORD", f"{h}p VT:SA − V0:SA {ms(over_a)} against ≤ BOUND "
                  f"{BOUND[h]:.2f} ms + C0 (SA) {ms(noise_a)} = {ms(bound_a)}: "
                  + ("cap held" if over_a <= bound_a else f"cap missed by {ms(over_a - bound_a)}"))
+        else:
+            emit("TA", "SKIP", no_adjust_reason(h, result["tree_base"]))
 
 
 def tree_main(args):
@@ -777,7 +791,7 @@ def tree_main(args):
         emit("H0", "PASS" if timing else "SKIP", detail if timing else
              f"{detail}: the host gate is shut, so every timing row is skipped")
     exposure = 0.5 if args.mutant == "tree-graded" else 0
-    libs = build_tree_shaders(folder, args.tree_base)
+    libs, has_adjust = build_tree_shaders(folder, args.tree_base)
     binary = build_tree_bench() if libs else None
     answers = {}
     scored_ok = libs is not None and binary is not None
@@ -785,7 +799,7 @@ def tree_main(args):
         frames, runs, warmup = (200, 3, 5) if timing else (10, 1, 1)
         for size in SIZES:
             answer = tree_bench(binary, libs, size, folder, frames, runs, warmup, args.seed,
-                                exposure)
+                                exposure, has_adjust)
             if answer is None:
                 scored_ok = False
                 continue
@@ -793,7 +807,9 @@ def tree_main(args):
         for w, h in SIZES:
             if h not in answers:
                 continue
-            for row in ("KT", "KA"):
+            if not has_adjust:
+                emit("KA", "SKIP", no_adjust_reason(h, args.tree_base))
+            for row in ("KT", "KA") if has_adjust else ("KT",):
                 entries = [k for k in answers[h]["k"] if k["row"] == row]
                 if not entries:
                     emit(row, "FAIL", f"{h}p: tree_bench reported no {row} entry")

@@ -18,7 +18,8 @@
 // older base's fragment names no `buffer(1)` and ignores it).
 //
 //   tree_bench --lib V0=PATH --lib VT=PATH --width W --height H --frames N
-//              --runs R --warmup K --seed S --vt-exposure EV --out JSON
+//              --runs R --warmup K --seed S --vt-exposure EV [--adjust 0|1]
+//              --out JSON
 //
 // Two scenes: S1, one full-bleed picture layer, ungraded; and SA (grading-2
 // G2-4), S1 then one full-frame adjustment pass at +1 EV, unqualified. Series
@@ -29,7 +30,11 @@
 // VT:S1 against V0:S1, and KA, VT:SA against V0:SA, each within 1/1023 over
 // the whole frame, are read back before any timing. `--vt-exposure` is 0 except
 // under `grading_spike.py`'s mutant `tree-graded`, where VT's draws carry that
-// exposure with `toneEnabled` 1. The JSON has `bench-<h>.json`'s shape.
+// exposure with `toneEnabled` 1. `--adjust` is 1 by default; `--adjust 0`
+// (a base whose shader predates grading GR4a's adjustment pass and so names
+// no `framejob_adjust_fragment`, issue #284) builds no adjustment pipeline,
+// reads no KA and times only V0:S1, VT:S1 and V0b:S1. The JSON has
+// `bench-<h>.json`'s shape; under `--adjust 0` its `k` holds only KT.
 import Foundation
 import Metal
 
@@ -44,6 +49,7 @@ var libs: [String: String] = [:]
 var width = 1920, height = 1080, frames = 200, runs = 3, warmup = 5
 var seed: UInt64 = 1
 var vtExposure: Float = 0
+var adjust = true
 var outPath = ""
 do {
     var it = CommandLine.arguments.dropFirst().makeIterator()
@@ -61,6 +67,9 @@ do {
         case "--warmup": warmup = Int(value) ?? 0
         case "--seed": seed = UInt64(value) ?? 0
         case "--vt-exposure": vtExposure = Float(value) ?? 0
+        case "--adjust":
+            guard value == "0" || value == "1" else { fail("--adjust 0|1") }
+            adjust = value == "1"
         case "--out": outPath = value
         default: fail("unknown flag \(flag)")
         }
@@ -135,7 +144,8 @@ func adjustState(_ lib: String) -> MTLRenderPipelineState {
     }
 }
 
-let adjustStates = ["V0": adjustState("V0"), "VT": adjustState("VT")]
+let adjustStates: [String: MTLRenderPipelineState] =
+    adjust ? ["V0": adjustState("V0"), "VT": adjustState("VT")] : [:]
 
 let samplerDescriptor = MTLSamplerDescriptor()
 samplerDescriptor.minFilter = .linear
@@ -337,7 +347,7 @@ func readHalves(_ series: String) -> [UInt16] {
 func r4(_ v: Double) -> Double { (v * 10000).rounded() / 10000 }
 
 var kRows: [[String: Any]] = []
-for (row, scene) in [("KT", "S1"), ("KA", "SA")] {
+for (row, scene) in [("KT", "S1"), ("KA", "SA")] where adjust || scene == "S1" {
     let reference = readHalves("V0:\(scene)")
     let got = readHalves("VT:\(scene)")
     var worst: Float = 0
@@ -357,7 +367,9 @@ for (row, scene) in [("KT", "S1"), ("KA", "SA")] {
 
 // ---- timing ----------------------------------------------------------------
 
-let plan = ["V0:S1", "VT:S1", "V0b:S1", "V0:SA", "VT:SA", "V0b:SA"]
+let plan = adjust
+    ? ["V0:S1", "VT:S1", "V0b:S1", "V0:SA", "VT:SA", "V0b:SA"]
+    : ["V0:S1", "VT:S1", "V0b:S1"]
 
 func frameMilliseconds(_ name: String) -> Double {
     guard let buffer = queue.makeCommandBuffer() else { fail("command buffer") }
