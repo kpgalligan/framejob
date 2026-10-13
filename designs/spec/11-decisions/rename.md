@@ -35,6 +35,15 @@ workflow FILE, whose name does not change.
   about what it ran. Risk accepted: an old document read without this rule names a product
   that no longer exists, and an archived road map's path names (`archive/reelcut-*.md`) keep
   the old spelling.
+  **Amended by NM-12 and NM-13** (rename-2 N0): the history set changes. The archived road
+  maps' file names and the design handoffs' folder and file names no longer keep the old
+  spelling: NM-13's two maps rename them, and every link to them is rewritten (the link rule).
+  From rename-2 N4, `designs/adr/` is no longer kept whole: its prose and this folder's
+  decision text take NM-2's spelling by the prose rule, a name-only edit that NM-12 says is
+  not an amendment. `archive/`'s text, the designers' file contents, `.dupscan/`'s evidence
+  and the recorded results in `tools/proof/README.md` stay as they were, but for links
+  (NM-13) and, outside archive text, recorded output and designer files, issue citations
+  (NM-14).
 - **NM-2 — One name, four spellings.** "Frame Job" with its space wherever a person reads it;
   `FrameJob` where a CamelCase identifier is needed; `framejob` where a lower-case one is; and
   `FRAMEJOB` in upper-case macros. One exception: a space breaks it.
@@ -134,6 +143,13 @@ workflow FILE, whose name does not change.
   too many to trust to a reading; the check makes the allow-list explicit and makes any
   new or missed site fail loudly. Risk accepted: a pinned count can hide a swapped line in a
   counted file.
+  **Amended by NM-14** (rename-2 N0): the allow-list shrinks phase by phase. N1 adds
+  `TEXT_HISTORY` (prefixes whose lines are kept but whose paths are still checked; `archive/`
+  moves there from `HISTORY`) and drops the `archive/reelcut-…` pattern from `KEPT_PATTERNS`;
+  N2 gives `HISTORY` the handoffs' new folder names; N3 drops the `kpgalligan/reelcut#N`
+  pattern; N4 takes `designs/adr/` out of `HISTORY` and pins each ADR that still holds the
+  name in `COUNTED`; `designs/rename-2.md` is in `HISTORY` while that road map is open. Every
+  count stays exact.
 - **NM-9 — Five phases, the code in one.** R0 the plan; R1 the code, build, tooling, MCP
   surface and the screens catalog together, because a proof drives the app by its product
   path, socket, domain and tool names, so any split breaks every proof between the halves; R2
@@ -156,3 +172,70 @@ workflow FILE, whose name does not change.
   "Frame Job". Why: the owner's new logo. Risk accepted: the mark's colours are the icon's,
   not the theme's, in both appearances, as the old mark's were; how it looks is a person's
   check (R2's manual-checks row).
+- **NM-12 — A name-only edit of a decision is not an amendment.** An edit to this folder's
+  decision text, its index rows or `designs/adr/` that changes only how a name, a path or an
+  issue citation is spelled does not reopen or re-litigate the decision, and it adds no
+  per-edit "Amended by" line. Three such edits are the exceptions to this folder's
+  append-only rule, and no other edit is: the link rule's rewrite of a renamed path (NM-13,
+  from rename-2 N1), the issue rule's rewrite of a citation (NM-14, from rename-2 N3), and the
+  prose rule's substitution of NM-2's spelling for the old name (from rename-2 N4). The prose
+  rule: an old spelling becomes NM-2's where it names the product, or a thing that exists today
+  under the new name, and the substitution keeps the sentence true; it is kept in recorded
+  output or a quote from a dated run, a stale or past path, an outside path that is real until
+  the owner renames it (`~/devel/reelcut*`, `~/.claude/litecode/reelcut/`), an NM-7 safety net
+  or old app domain or folder, the rename's own record (the text of NM-1…NM-11, every
+  "Amended by NM-n" paragraph, and `designs/adr/rename.md` where the old name is its subject),
+  and a sentence the substitution would make false because its amendment changed more than
+  the spelling (V-5's "`PRODUCT_NAME` stays `Reelcut`"). Why: the owner's choice of
+  2026-10-13 (`designs/rename-2.md`, "The owner's choices", item 2): the decisions read in
+  today's names, and a decision's substance is what append-only protects, not its spelling.
+  Risk accepted: a decision's text is no longer byte-for-byte what was first written; git
+  history holds the original, and a name-only edit is checked by reading it, not by a tool.
+- **NM-13 — The archive and the handoffs drop the old name from their paths, and every link
+  follows.** The archive's 19 files lose the `reelcut-` prefix: `reelcut-roadmap.md` is
+  `roadmap-1.md`, `reelcut-roadmap-N.md` is `roadmap-N.md` for N 2–14, and
+  `reelcut-milestones.md`, `reelcut-effects-survey.md`, `reelcut-app-notes.md`,
+  `reelcut-core-notes.md` and `reelcut-remaining.md` drop only the prefix. The handoffs:
+  `designs/design_handoff_reelcut/` is `designs/design_handoff_chrome/` (inside it,
+  `Reelcut Editor.dc.html` is `Editor.dc.html`, `Reelcut Logo.dc.html` is `Logo.dc.html`, and
+  `logo/reelcut-{icon,mark,mark-mono}.svg` is `logo/reel-{icon,mark,mark-mono}.svg`);
+  `designs/design_handoff_reelcut_sharp/` is `designs/design_handoff_sharp/` (with
+  `design/assets/logo/reelcut-*.svg` as `reel-*.svg`); and
+  `designs/design_handoff_clip_inspector/_ds/reelcut-design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/`
+  is `_ds/design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/`. Each row is in the road map's
+  two tables. **The link rule:** every reference to a renamed path — the full path, the path
+  from `designs/`, or the bare name — is rewritten wherever it appears, archive text, decision
+  text, ADRs and designer files included, and that rewrite is the only edit archive text and
+  designer files take. Kept: (a) a path already stale at `ed8f282` (`designs/reelcut-*.md`,
+  the road maps before the archive, and `designs/reelcut-design.md`), with each archived
+  file's old name noted in `archive/INDEX.md` so these still resolve; (b) a command, pathspec
+  or path that runs against an old commit or tree; (c) the generated bundles, manifests and
+  lint configs inside designer folders (`_ds_bundle.js`, `_ds_manifest.json`,
+  `_adherence.oxlintrc.json`, `design/runtime/ds_bundle.js`); (d) recorded output; (e) a
+  renaming map's old-name column (these two maps, the road map's mapping tables and
+  `archive/INDEX.md`'s "old name" notes). A wildcard or regex such as `archive/reelcut-*.md`
+  is not a reference. Why: the owner's choices of 2026-10-13, items 1 and 3: the names go and
+  no link breaks, while the text stays what it was. Risk accepted: a link to an old name from
+  outside this repository breaks, and a generated designer file keeps a path that no longer
+  exists.
+- **NM-14 — Round 2's scope: the issue rule, what keeps the old name, the check's new shape
+  and six phases.** **The issue rule:** `kpgalligan/reelcut#N` is `kpgalligan/framejob#N`
+  everywhere except archive text, recorded output and designer files. **Kept, and why:**
+  recorded past results (mostly `tools/proof/README.md`'s quoted output), because a run
+  recorded what it printed; the old-name safety nets that match both names (`proof_defaults.py`,
+  `mcp.py`'s app-name match, `harness/main.swift`'s pinned-key mapping, `budget.py`'s NM-7
+  guard, `grading_verdict.py`'s dual log prefix and the like), until the owner's hand steps in
+  #287 are done, after which a follow-up issue removes them; and the inputs of every
+  instrument that builds a tree from before the rename (`reference_build.py`'s `tree_names`,
+  `tree_shader` and `tree_defines`, `grading_verdict.py`, `cloud_captions_probe.py`, …),
+  because that tree spells the old names. **`name_residue.py`'s new shape:** `TEXT_HISTORY`,
+  the prefixes whose lines are kept but whose paths are still checked, holding `archive/`
+  (from N1); `designs/adr/` out of `HISTORY` (from N4); `designs/rename-2.md` in `HISTORY`
+  while it is open; the `archive/reelcut-…` and `kpgalligan/reelcut#N` patterns dropped from
+  `KEPT_PATTERNS` (N1 and N3); `COUNTED` re-pinned exactly in each phase. **The phases:** N0
+  the plan; N1 the archive's names; N2 the handoffs' names; N3 the issue rule; N4 the prose
+  rule; N5 the sweep and the close — each gated in the worktree `~/devel/reelcut-rename2`
+  (branch `rename2`) and fast-forward merged into main alone. Why: the owner's choices of
+  2026-10-13, items 4 and 5 (`designs/rename-2.md`, "The owner's choices"). Risk accepted:
+  the safety nets and old-tree inputs keep the old name until the follow-up issue, and a
+  citation's redirect depends on GitHub keeping the repository's old name free.

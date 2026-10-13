@@ -51,6 +51,7 @@ HISTORY = (
     "designs/design_handoff_clip_inspector/",
     "designs/clip_inspector_brief/",
     ".dupscan/",
+    "designs/rename-2.md",
 )
 
 # A line one of these matches is allowed in any file: issue citations redirect since
@@ -67,9 +68,11 @@ KEPT_PATTERNS = (
 # Files that must keep some old spellings, each at its exact count of matching lines
 # not already allowed by KEPT_PATTERNS. Each comment says why and which phase ends it.
 COUNTED = {
-    # -- Permanent: spec §11's decision text is append-only, and its index's decision rows
-    # keep each decision's own words (NM-1); the index's Files table says today's names.
-    "designs/spec/11-decisions/README.md": 18,
+    # -- Permanent: spec §11's decision text is append-only but for NM-12's name-only
+    # edits, and its index's decision rows keep each decision's own words (NM-1); the
+    # index's Files table says today's names.
+    # The index: NM-13's row names the archive's old prefix (rename-2 N0); N4 re-pins.
+    "designs/spec/11-decisions/README.md": 19,
     "designs/spec/11-decisions/agent-connection.md": 18,
     "designs/spec/11-decisions/assistant.md": 11,
     "designs/spec/11-decisions/chrome-inspector-keys.md": 2,
@@ -85,7 +88,10 @@ COUNTED = {
     "designs/spec/11-decisions/pricing.md": 12,
     "designs/spec/11-decisions/publishing.md": 5,
     "designs/spec/11-decisions/recording.md": 24,
-    "designs/spec/11-decisions/rename.md": 15,
+    # NM-1..NM-14 and their amendments name the old paths, maps and patterns they
+    # rename or drop (rename-2 N0: NM-12..NM-14 and the NM-8 amendment); N2's link
+    # rule re-pins it first (NM-1's handoff link), then N4.
+    "designs/spec/11-decisions/rename.md": 33,
     "designs/spec/11-decisions/word-captions.md": 6,
     # -- Permanent: a pointer to a path that keeps the old name (NM-1): the two design
     # handoff folders, the spec's single file in git history, and the proof README's
