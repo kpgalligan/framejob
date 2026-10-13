@@ -172,10 +172,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     /// Frame Job > About Frame Job. The standard panel, but with the mark drawn
-    /// by `BrandMark` in place of the app icon: the icon carries the squircle
-    /// tile and its ink rule, which is right in the Dock and wrong on a panel
-    /// that is already a card. The untiled mark is what the identity handoff
-    /// asks for here (Part 1, "Files in `logo/`").
+    /// by `BrandMark` in place of the app icon: the icon carries the cream
+    /// rounded tile, which is right in the Dock and wrong on a panel that is
+    /// already a card. The panel shows the mark without its tile, and the Dock
+    /// the tiled icon (spec §11 NM-11).
     @objc func showAboutPanel(_ sender: Any?) {
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationIcon: BrandMark.image(size: 128)

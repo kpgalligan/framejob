@@ -537,3 +537,151 @@ fails the old-tree row; `proof_defaults` without the old prefixes fails P10; the
   `*_adjust_fragment`), which KA (grading-2 G2-4) asks of V0, so that base cannot pass whatever
   the names; an issue for the default.
 - The owner's hand steps above, after the merge.
+
+## R2 — the record
+
+**Landed** (2026-10-13, in the worktree, not committed by the implementer; the orchestrator
+commits):
+
+- `app/Sources/BrandMark.swift`: `BrandMark.draw(in:)` draws `designs/frame-job/frame-job-icon.svg`
+  without its tile, every coordinate as the SVG writes it (1024 viewBox, y down): `designBox`
+  824 (the SVG tile's side), `tileOrigin` 100 (the tile's x and y), the context scaled by
+  `side / designBox` and moved back by `-tileOrigin`; the four `DS.forest` corner brackets as
+  closed polygons, the `DS.butter` frame (330, 400, 364 × 224), the `DS.coral` playhead body
+  (488, 310, 48 × 424) and head (461,290)(563,290)(512,366), in the SVG's order, with no radii,
+  strokes or blend mode; the cream tile `#FBF8F1` is not drawn. `overlapInk` is gone.
+  `BrandMarkView`'s accessibility label and `BrandLockupView`'s wordmark read "Frame Job";
+  `markSize` 88 and `wordSize` 52 are unchanged; `clearSpace` is the constant 38 (the old
+  mark's 38.13, rounded), kept so the welcome column's height, and with it
+  `recording_probe.py`'s `COLUMN_SHIFT` of 3 pt, does not change. No line of the file spells
+  the old name.
+- `app/Assets.xcassets/AppIcon.appiconset/`: the old `Contents.json` and seven `icon_16.png` …
+  `icon_1024.png` deleted, and the eleven files of `designs/frame-job/AppIcon.appiconset/`
+  copied in byte for byte. `app/Assets.xcassets/Contents.json` is unchanged.
+- Comments: `WelcomeWindowController.swift`'s two clear-space comments say the lockup's fixed
+  38 pt; `AppDelegate.showAboutPanel`'s doc cites spec §11 NM-11 (the panel shows the mark
+  without its tile, the Dock the tiled icon).
+- `designs/screens/01-welcome.md`: the mark and the word "Frame Job".
+- `docs/manual-checks.md`: NAME-2 (the Dock icon, About in Light and Dark, the `.framejob`
+  package's document icon).
+- `tools/proof/name_residue.py`: the R2 `COUNTED` entries (`BrandMark.swift` 8,
+  `01-welcome.md` 2) and their comment removed.
+- `tools/proof/recording_probe.py`, section 6 only: the Swift `welcome` mode answers
+  `lockup`, the first `BrandLockupView`'s `[minX, top, width, height]` in the buttons'
+  top-left convention; 6d (v) "above the band" leaves out the render rows
+  ⌊top × scale⌋ ≤ y < ⌈(top + height) × scale⌉, names why in its label (rename R2 changed the
+  mark and the wordmark, spec §11 NM-11), prints how many lockup rows differ, and fails when no
+  lockup frame is answered. The module docstring's Section 6 paragraph and the section's header
+  line say so. Still 35 rows.
+
+**Deviations from the spec:**
+
+- The spec's last Full command asks to Read `icon_512x512@2x.png` from
+  `iconutil -c iconset` of the Release bundle's `AppIcon.icns`. That icns holds only
+  `icon_16x16`, `icon_16x16@2x`, `icon_128x128` and `icon_128x128@2x` (actool keeps the larger
+  sizes in `Assets.car`), so `icon_128x128@2x.png` (256 px) was read instead; the 1024 rendition
+  is `Assets.car`'s `icon_512x512-2x.png`, 1024 × 1024 at scale 2 (`assetutil --info`).
+- This record was appended after `make gate` passed, and the review's fix pass edited it
+  again after the fix pass's own gate. The gate's only step that reads this file is `names`,
+  which runs exactly `python3 tools/proof/name_residue.py`. That command was run again on the
+  final tree and exited 0. `designs/rename.md` is under `HISTORY` there.
+
+**Measured** (each printed by the command beside it; the full outputs are in the phase's
+`04-checks.txt`, and the second screens compare and its three-way analysis in fix pass 1's
+notes):
+
+- Baseline, untouched tree: `recording_probe.py --only welcome` 35/35.
+- M1 (the new mark, the probe not yet edited): 33/35, failing exactly `6d light: (v) above the
+  band` and `6d dark: (v) above the band`, 200 rows differing from y 221.
+- The edited instrument, recorded run: `recording_probe.py --only welcome` 35/35; the lockup's
+  frame `[254.5, 101, 211.5, 158]`, its rows y 202–517 of the 1440 × 1200 render, 200 of them
+  differing in each appearance and none outside it. Run again on the fix pass's instrument (the
+  label's range printed inclusive, the docstring re-wrapped): 35/35, the same frame and counts.
+- M3 (the mark view's frame reported as `lockup`): 33/35, failing the same two rows, "62 rows
+  differ outside it, first y [428, …]" (the wordmark), 138 lockup rows differing. Reverted.
+- M2 (`Reelcut` put back in `BrandMark.swift`'s first comment): `name_residue.py` exit 1,
+  `app/Sources/BrandMark.swift:3: /// The Reelcut mark: a viewfinder …`. Reverted; exit 0.
+- `make typecheck` exit 0 at its four baseline warnings; the harness's `welcome` light and
+  dark and `settings` light renders, Read: the four green brackets, the yellow frame, the coral
+  playhead, no tile, and "Frame Job" on one line.
+- `diff -r designs/frame-job/AppIcon.appiconset app/Assets.xcassets/AppIcon.appiconset` exit
+  0.
+- `xcrun assetutil --info` of the Debug and of the Release `Assets.car`: the `icon_*`
+  RenditionNames are exactly `icon_16x16.png`, `icon_16x16-2x.png`, `icon_32x32.png`,
+  `icon_32x32-2x.png`, `icon_128x128.png`, `icon_128x128-2x.png`, `icon_256x256.png`,
+  `icon_256x256-2x.png`, `icon_512x512.png`, `icon_512x512-2x.png`, none of the old names, plus
+  actool's `ZZZZPackedAsset-1.0.0-gamut0` and `-2.0.0-gamut0`.
+- `iconutil -c iconset` of the Release `AppIcon.icns`, `icon_128x128@2x.png` Read: the cream
+  rounded tile with the four green brackets, the yellow frame and the coral playhead.
+- `make gate` PASS (names, typecheck, test, app; fmt and lint skipped as unchanged), and again
+  on the fix pass's tree (the same four steps run).
+- `RC_PROOF_APP=release screens.py --compare tools/proof/work/screens/2026-10-13-013442`
+  (R1's capture): 36/36, 0 new problems; 89/106 byte-identical. `01-welcome.window` light and
+  dark differ in [514,221,928,489] px, the lockup. The other fifteen are in the timeline's clip
+  rows of the grading and matte screens (`05c`, `05d`, `05e` light, `05f`, `05g`, `05h`, and
+  `10c`'s timeline and window, 4 to 14156 px each).
+- A second Release capture of the same R2 tree,
+  `RC_PROOF_APP=release screens.py --compare tools/proof/work/screens/2026-10-13-022226` (the
+  first R2 capture): 36/36, 0 new problems; 91/106 byte-identical. `01-welcome` is
+  byte-identical in both looks, so the new mark draws the same every run. Fifteen captures
+  differ between the two R2 runs. They are the same fifteen screens, with `05e` dark in place of
+  `05e` light. Comparing the three runs PNG by PNG (R1, R2 first, R2 second) puts every one of
+  R1's fifteen differences in one of two kinds. Neither is stable, and neither is the mark:
+  - **A filmstrip tile, 4764–14156 px** (one to three 34 pt tiles), in `05c`, `05d`, `05f`
+    light, `05g` dark and `05h`. These differ between the two R2 runs as well. In the
+    second R2 capture of `05c` dark, one tile at x 536–603 shows the lane's colour where the
+    first run drew a frame. That is a thumbnail that had not arrived at capture time.
+    `05d` light is byte-identical between R1 and the second R2 run, so its R1 difference was
+    this run-to-run variation.
+  - **A waveform column, 4–16 px**: the top and bottom pixel of one or two 1 pt columns (x 572,
+    644 and 732 of the 2× capture). This is `10c`'s 8 px box, and also `05e` light, `05f` dark
+    and `05g` light (byte-identical between R1 and the second R2 run, so its R1 difference
+    was this run-to-run variation). Each such column takes one of two values per instance, and both builds
+    produce both values. In R1, `10c`'s light timeline has (87,99,115) at (572,438) and its dark
+    timeline has (71,84,101). The first R2 run has them the other way round. `05e` light's x 732
+    column is (189,194,200) in R1 and (181,186,193) in both R2 runs. But R1's own `05e` dark has
+    (181,186,193) there, and the second R2 run's `05f` light has (189,194,200).
+    The cause is the peaks cache, not the drawing. `screens.py` rebuilds each fixture in every
+    instance, so each instance computes `speech.mov`'s peaks again. After the second run, the
+    eight `cache/peaks/*.bin` files the dark instance wrote for `speech.mov` (571 floats each,
+    one per fixture that imports it) have five different hashes. They differ in one to three
+    10 ms buckets, and only in buckets 355, 366, 435, 452, 557 and 558. Bucket 355 is 0.1151
+    in one file and 0.1254 in another. Buckets 557/558 are 0.1131/0.12 in one and 0.12/0.1043
+    in another, which looks like frames landing in the neighbouring bucket. In the capture, the
+    clip runs from x 132 pt to 371 pt and the playhead at 1.5 s is at 195 pt, which is about
+    41.9 pt a second. At that scale the three columns that change, 286, 322 and 366 pt, read
+    buckets of about 367, 453 and 558: the varying 366, 452 and 557/558, within the scale's
+    precision. The peaks pass (`MediaImporter.writePeaks` → `PeakBuckets.add`, which places
+    frames by each decoded buffer's presentation time) does not give the same bytes twice for
+    one file. That is older than R2, and it is owed as an issue (below).
+
+**Where else the old mark's colours and shape live:**
+
+- The About panel and Welcome are the mark's only two sites.
+- The recorder panel, the status item and the empty editor draw no mark. Their coral is
+  `DS.meterClip` = `coral`, unchanged.
+- The three inks also colour the playhead, the marquee, the range shade, the snap guide, the
+  "missing" badge and the clip labels orange, yellow and green. All unchanged, because the
+  hexes are the new icon's.
+- `Theme.swift:5-6,29`'s comments ("welcome motif … marquee", "used only by…") were already
+  stale before R2: filed as #286, since the file is synced with Rasterize.
+
+**Owed:**
+
+- The CLAUDE.md edits (the orchestrator's), verbatim:
+  - `app/CLAUDE.md` line 2389–2390, replace "`BrandMark.swift` is\nReelcut's own, drawn from
+    `designs/design_handoff_reelcut/`." with "`BrandMark.swift` is\nFrame Job's own: the mark
+    of `designs/frame-job/frame-job-icon.svg` without its tile (spec §11 NM-11)." In the same
+    change, set `name_residue.py` `COUNTED["app/CLAUDE.md"]` from 4 to 3.
+  - Root `CLAUDE.md` "Where to look": add the row "| `designs/frame-job/` | The owner's Frame
+    Job icon and mark (spec §11 NM-11): `frame-job-icon.svg` is `BrandMark`'s geometry,
+    `AppIcon.appiconset` the app's icon set. |" after the `design_handoff_reelcut/` row, and
+    change that row's "The shipped chrome cleanup and identity;" to "The shipped chrome cleanup
+    and the old identity;". The root pin stays 6.
+- NAME-2, the owner's.
+- #285 (filed by the orchestrator): `speech.mov`'s peaks cache
+  is not the same from one computation to the next. One app instance, writing the same media's
+  `cache/peaks/<id>.bin` into eight fixture packages, gave five different files. They differ by
+  one to three 10 ms buckets, with values that look like frames landing in the neighbouring
+  bucket. This makes `screens.py`'s waveform columns differ by a pixel between runs. The
+  measurement is in the R2 record's second screens compare.

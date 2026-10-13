@@ -12,8 +12,8 @@ The welcome window is what Frame Job shows when no project is open: the first th
 a person sees after launching it. From here they start work — by opening a video,
 starting an empty project, or recording the screen.
 
-Top to bottom, centred on a dark ground: the Reelcut mark (a green and a yellow
-block with a red playhead through them), the word "Reelcut" in large type, the
+Top to bottom, centred on a dark ground: the Frame Job mark (four green corner
+brackets round a yellow frame, a red playhead through it), "Frame Job" in large type, the
 line "Open a file. Start cutting.", and a two-line note that opening a movie makes
 an untitled project at the movie's own size and rate, with the file as the first
 clip on Track 1. Below that sit three square buttons: "Open Video…" (filled

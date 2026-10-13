@@ -449,15 +449,20 @@ that bottom edge and compared with the laid-out frame. Nothing in the band
 changes outside the new row's x-span. Above the band every pixel row must
 equal the reference's 3 pt higher, and below it the reference's 3 pt lower,
 the strips at the two edges equal in place — no tolerance; a mismatch
-prints its count and first rows. The old two-button row lies inside the
-band and the new row's x-span. The in-band clusters are PRINTED and never
-counted as one, and a scored row asks that the reference was compiled with
-this tree's own harness. A new mode that names a type absent from the old
-tree must respect the reference guard or the build fails by name. Section 6 renders
-through the TREE's harness (`build.sh` hard-codes `app/Sources`), whatever
-`--sources` says, so a `--mutant` changes only the probe — 6a's samples and
-layout; the mutant that turns the button's action is caught by section 5's
-structural read, which is what a pixel cannot see.
+prints its count and first rows. The lockup's own rows are left out of the
+"above" comparison, because rename R2 changed the mark and the wordmark
+(spec §11 NM-11): the probe's `welcome` mode reports the lockup's frame,
+its rows are the render's from ⌊top × scale⌋ to ⌈bottom × scale⌉, how many
+of them differ is printed, and a missing frame fails the row. The old
+two-button row lies inside the band and the new row's x-span. The in-band
+clusters are PRINTED and never counted as one, and a scored row asks that
+the reference was compiled with this tree's own harness. A new mode that
+names a type absent from the old tree must respect the reference guard or
+the build fails by name. Section 6 renders through the TREE's harness
+(`build.sh` hard-codes `app/Sources`), whatever `--sources` says, so a
+`--mutant` changes only the probe — 6a's samples and layout; the mutant
+that turns the button's action is caught by section 5's structural read,
+which is what a pixel cannot see.
 
 Section 7 (`catalog`) is the toll's gate from the inside:
 `AgentServer.shared.catalogJSON()` — the very string the startup parity
@@ -4430,6 +4435,13 @@ func welcome(_ request: [String: Any]) -> [String: Any] {
         ]
     }
     out["spacing"] = Double((buttons.first?.superview as? NSStackView)?.spacing ?? -1)
+    // Rename R2 (spec §11 NM-11): the lockup's frame, top-left origin as each
+    // button's, so 6d can leave its own rows out of the "above" comparison.
+    if let lockup = descendants(BrandLockupView.self, in: root).first {
+        let frame = root.convert(lockup.bounds, from: lockup)
+        let top = root.isFlipped ? frame.minY : root.bounds.height - frame.maxY
+        out["lockup"] = [Double(frame.minX), Double(top), Double(frame.width), Double(frame.height)]
+    }
     out["contentSize"] = [Double(root.bounds.width), Double(root.bounds.height)]
     out["rootFlipped"] = root.isFlipped
     out["recentCount"] = NSDocumentController.shared.recentDocumentURLs.count
@@ -8489,7 +8501,9 @@ def close(a, b, tolerance=PIXEL):
 
 def section_welcome(binary, sources):
     print("\nSection 6 — the welcome window against the tree one commit before the button: "
-          "the three-button row and the column's 3 pt re-centring are all that changed")
+          "the three-button row and the column's 3 pt re-centring are all that changed, "
+          "besides the lockup's mark and wordmark (rename R2, spec §11 NM-11), whose rows "
+          "are left out")
     if os.path.realpath(sources) != os.path.realpath(TREE_SOURCES):
         print("  (this section renders the TREE through harness/build.sh, not --sources; a "
               "--mutant changes only the probe's own 6a layout and samples, and the renders "
@@ -8654,12 +8668,28 @@ def section_welcome(binary, sources):
               f"{derived_top} vs {laid_top}")
         now_img, was_img = images[tag], images[was]
         height = now_img.height
-        above = mismatches(now_img, was_img, range(shift, band_top), -shift) \
+        lockup = (answer or {}).get("lockup")
+        if lockup and len(lockup) == 4:
+            lockup_rows = range(math.floor(lockup[1] * scale),
+                                math.ceil((lockup[1] + lockup[3]) * scale))
+        else:
+            lockup_rows = None
+        everything = mismatches(now_img, was_img, range(shift, band_top), -shift) \
             + mismatches(now_img, was_img, range(0, shift), 0)
+        above = [y for y in everything if lockup_rows is None or y not in lockup_rows]
+        in_lockup = len(everything) - len(above)
+        rows_text = (f"y {lockup_rows.start}–{lockup_rows.stop - 1}" if lockup_rows is not None
+                     else "no lockup frame answered")
         check(f"6d {appearance}: (v) above the band every pixel row is the reference's {shift} rows "
               f"higher (y {shift}–{band_top}), and the first {shift} are equal in place — the "
-              "lockup, the headline and the paragraph moved down 3 pt and nothing else",
-              not above, f"{len(above)} rows differ, first y {sorted(above)[:12]}")
+              "headline and the paragraph moved down 3 pt and nothing else; the lockup's own rows "
+              f"({rows_text}) are left out, because rename R2 changed the mark and the wordmark "
+              "(spec §11 NM-11)",
+              lockup_rows is not None and not above,
+              f"lockup {lockup}; {len(above)} rows differ outside it, first y {sorted(above)[:12]}; "
+              f"{in_lockup} lockup rows differ")
+        print(f"      {appearance}: {in_lockup} of the lockup's rows differ from the reference's "
+              f"(left out of (v) above; lockup frame {lockup})")
         below = mismatches(now_img, was_img, range(band_bottom, height - shift), shift) \
             + mismatches(now_img, was_img, range(height - shift, height), 0)
         check(f"6d {appearance}: (v) below the band every pixel row is the reference's {shift} rows "

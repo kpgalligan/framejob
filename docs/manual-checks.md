@@ -738,6 +738,12 @@ on your own account, never the spike's.
 - **Answer:** did the double-click open Frame Job, and does Open With list Frame Job Debug as an alternate?
 - **Source:** spec §11 NM-3, V-5.
 
+**NAME-2 — The Dock icon, the About panel and the document icon carry the Frame Job mark**
+- **Do:** 1. `make app`. 2. Open the Release app from the Finder and look at the Dock icon. 3. Choose Frame Job ▸ About Frame Job, in Light and then in Dark. 4. Look at a saved `.framejob` package in the Finder's icon view at a large size, and in Get Info.
+- **Expect:** the Dock shows the cream rounded tile with four green corner brackets, a yellow frame and a coral playhead; About shows the same mark with no tile, sharp-edged, in both appearances; the package's document icon carries the new icon. An old two-block icon after a rebuild is the icon cache: log out and back in, then look again before answering.
+- **Answer:** do the Dock, the About panel (Light and Dark) and the package's document icon all show the new viewfinder mark?
+- **Source:** spec §11 NM-11, rename R2.
+
 ## Published build
 
 After a push to `publish` has made a release (README, "Publishing a

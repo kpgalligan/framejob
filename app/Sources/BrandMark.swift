@@ -1,40 +1,35 @@
 import AppKit
 
-/// The Reelcut mark: two clips overlapping with the playhead standing in the
-/// overlap. The shape is the edit — where two pieces of footage meet, and
-/// where you are in them (design handoff, Part 1 "The mark").
+/// The Frame Job mark: a viewfinder — four corner brackets framing a shot,
+/// with the playhead standing through it. The owner's
+/// `designs/frame-job/frame-job-icon.svg` without its cream tile (spec §11
+/// NM-11): the Dock shows the tiled icon, and this is what goes on a surface
+/// that is already a card.
 ///
-/// Every coordinate below is in the design's 120 × 120 box with **y measured
-/// downward from the top**, exactly as the handoff's geometry table and
-/// `logo/reelcut-mark.svg` write them, so the three can be diffed by eye.
-/// That is why the drawing entry points all require a flipped context.
+/// Every coordinate below is written exactly as the SVG writes it, in its
+/// 1024 viewBox with **y measured downward from the top**, so the two can be
+/// diffed by eye. That is why the drawing entry points all require a flipped
+/// context.
 ///
-/// Two rules the drawing keeps, both of which the mark it replaces broke:
+/// Two rules the drawing keeps:
 ///
-/// - **No blend mode anywhere.** The old `FrameMotifView` multiplied its two
-///   frames, which means anything that ignores blend modes — a PDF export, an
-///   icon compiler, a template rendering — flattens it wrong. Here the two
-///   clips share a y and a height, so their intersection is exactly a 24-wide
-///   rounded rect and is DRAWN, in the pre-multiplied ink, in draw order.
-/// - **No strokes or hairlines.** The mark has to hold at 16px, where the two
-///   clip blocks fuse into one dark bar and only the coral playhead has to
-///   stay legible; a 1pt rule would turn to mud at that size and it is the
-///   reason this direction was picked over the other four.
+/// - **No blend mode anywhere.** Anything that ignores blend modes — a PDF
+///   export, an icon compiler, a template rendering — would flatten it wrong.
+///   The shapes are drawn opaque, in the SVG's order.
+/// - **No strokes, hairlines or radii.** The SVG has none; a 1pt rule would
+///   turn to mud at small sizes.
 enum BrandMark {
-    /// The side of the design box every coordinate in `draw(in:)` is in.
-    /// The ink itself occupies x 18–102, y 20–102 of it — the optical inset
-    /// is part of the mark, so callers scale the whole box, not the ink.
-    static let designBox: CGFloat = 120
+    /// The side of the design box `draw(in:)` scales: the SVG's tile, 824 of
+    /// its 1024 viewBox. The tile's own inset is part of the mark, so callers
+    /// scale the whole box, not the ink.
+    static let designBox: CGFloat = 824
 
-    /// Forest × butter, pre-multiplied. The one fixed ink outside `DS`, and
-    /// deliberately not a token: it is the *result* of two brand inks
-    /// crossing inside the mark, not a colour the interface may reach for,
-    /// and a token would invite exactly that.
-    private static let overlapInk = NSColor(
-        srgbRed: 0x1D / 255, green: 0x65 / 255, blue: 0x1F / 255, alpha: 1)
+    /// The tile's x and y in the SVG: the box starts here, so the drawing is
+    /// moved back by it and the coordinates stay the SVG's own.
+    private static let tileOrigin: CGFloat = 100
 
     /// Draws the mark scaled to fit `rect`, preserving its aspect and
-    /// centring the 120 box inside it.
+    /// centring the tile box inside it.
     ///
     /// **The current context must be flipped** (y down), or the mark lands
     /// upside down: `BrandMarkView` is `isFlipped` and `image(size:)` asks
@@ -51,34 +46,41 @@ enum BrandMark {
             x: rect.minX + (rect.width - side) / 2,
             y: rect.minY + (rect.height - side) / 2)
         context.scaleBy(x: scale, y: scale)
+        context.translateBy(x: -tileOrigin, y: -tileOrigin)
 
-        fill(NSRect(x: 18, y: 36, width: 54, height: 52), radius: 8, DS.forest)
-        fill(NSRect(x: 48, y: 36, width: 54, height: 52), radius: 8, DS.butter)
-        fill(NSRect(x: 48, y: 36, width: 24, height: 52), radius: 8, overlapInk)
-
-        // The playhead goes on top at full opacity, never multiplied: it is
+        // The four corner brackets, each an L of 64 thickness.
+        polygon([(190, 380), (190, 190), (380, 190), (380, 254), (254, 254), (254, 380)], DS.forest)
+        polygon([(834, 380), (834, 190), (644, 190), (644, 254), (770, 254), (770, 380)], DS.forest)
+        polygon([(190, 644), (190, 834), (380, 834), (380, 770), (254, 770), (254, 644)], DS.forest)
+        polygon([(834, 644), (834, 834), (644, 834), (644, 770), (770, 770), (770, 644)], DS.forest)
+        // The frame, then the playhead on top of it at full opacity: it is
         // above the media in the mark for the same reason it is above the
-        // media in the app. Its apex meets the clips' top edge at y 36, and
-        // that contact is what stops the head reading as a floating triangle.
-        DS.coral.setFill()
-        let head = NSBezierPath()
-        head.move(to: NSPoint(x: 49.5, y: 20))
-        head.line(to: NSPoint(x: 70.5, y: 20))
-        head.line(to: NSPoint(x: 60, y: 36))
-        head.close()
-        head.fill()
-        fill(NSRect(x: 56.5, y: 20, width: 7, height: 82), radius: 3.5, DS.coral)
+        // media in the app.
+        fill(NSRect(x: 330, y: 400, width: 364, height: 224), DS.butter)
+        fill(NSRect(x: 488, y: 310, width: 48, height: 424), DS.coral)
+        polygon([(461, 290), (563, 290), (512, 366)], DS.coral)
     }
 
-    private static func fill(_ rect: NSRect, radius: CGFloat, _ color: NSColor) {
+    private static func fill(_ rect: NSRect, _ color: NSColor) {
         color.setFill()
-        NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+        NSBezierPath(rect: rect).fill()
+    }
+
+    private static func polygon(_ points: [(CGFloat, CGFloat)], _ color: NSColor) {
+        guard let first = points.first else { return }
+        color.setFill()
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: first.0, y: first.1))
+        for point in points.dropFirst() {
+            path.line(to: NSPoint(x: point.0, y: point.1))
+        }
+        path.close()
+        path.fill()
     }
 
     /// The mark as an image, `size` points square — the About panel takes an
     /// `NSImage`, not a view. Not a template image: the mark is three brand
-    /// inks and a flat tint would lose the cut. Use `logo/reelcut-mark-mono`
-    /// where tinting is applied instead.
+    /// inks and a flat tint would lose the playhead against the frame.
     static func image(size: CGFloat) -> NSImage {
         NSImage(size: NSSize(width: size, height: size), flipped: true) { rect in
             draw(in: rect)
@@ -92,7 +94,7 @@ enum BrandMark {
 /// The mark as a view, square and scaled to `size`. Nothing else about it is
 /// configurable — it is one shape in fixed inks.
 final class BrandMarkView: NSView {
-    /// The side of the square the 120 box is scaled into.
+    /// The side of the square the design box is scaled into.
     var size: CGFloat {
         didSet {
             guard size != oldValue else { return }
@@ -105,7 +107,7 @@ final class BrandMarkView: NSView {
         self.size = size
         super.init(frame: NSRect(x: 0, y: 0, width: size, height: size))
         setAccessibilityRole(.image)
-        setAccessibilityLabel("Reelcut")
+        setAccessibilityLabel("Frame Job")
     }
 
     @available(*, unavailable)
@@ -126,23 +128,24 @@ final class BrandMarkView: NSView {
 
 // MARK: - BrandLockupView
 
-/// The stacked lockup (design handoff, Part 1 "The wordmark"): the mark 88
-/// tall, a 14pt gap, then "Reelcut" in the house display face at 52, both
-/// centred. This is the welcome screen's masthead.
+/// The stacked lockup: the mark 88 tall, a 14pt gap, then "Frame Job" in
+/// the house display face at 52, both centred.
+/// This is the welcome screen's masthead.
 ///
 /// A stack view rather than hand-written constraints because the two pieces
 /// have very different widths and only one of them may set the lockup's:
 /// centring them with inequalities lets a text field answer a narrow parent
 /// by wrapping instead of resisting, and the lockup then collapses to the
-/// mark's 88pt with "Reelcut" broken over two lines.
+/// mark's 88pt with "Frame Job" broken over two lines.
 final class BrandLockupView: NSStackView {
     static let markSize: CGFloat = 88
     static let wordSize: CGFloat = 52
 
-    /// The clear space the lockup asks for on every side: one clip height,
-    /// 52 of the 120 box, so 43% of the mark's height. Callers place the
-    /// lockup with at least this much around it.
-    static var clearSpace: CGFloat { (52 / BrandMark.designBox * markSize).rounded() }
+    /// The clear space the lockup asks for on every side, a fixed 38 pt.
+    /// Callers place the lockup with at least this much around it. The value
+    /// is the one the old mark derived (38.13, rounded), kept so the welcome
+    /// column's height does not change when the mark does.
+    static var clearSpace: CGFloat { 38 }
 
     /// The gap the handoff specifies, and the `line-height` the mock's
     /// wordmark sits in — needed together, see `wordmarkTopOffset`.
@@ -156,7 +159,7 @@ final class BrandLockupView: NSStackView {
         let font = DS.display(BrandLockupView.wordSize)
         wordmark = NSTextField(
             labelWithAttributedString: NSAttributedString(
-                string: "Reelcut",
+                string: "Frame Job",
                 attributes: [
                     .font: font,
                     // -0.015em, the tracking the lockup is drawn with.
@@ -166,7 +169,7 @@ final class BrandLockupView: NSStackView {
         super.init(frame: .zero)
 
         // The mark and the word say the same thing; letting both speak would
-        // make VoiceOver read "Reelcut" twice. The label carries it.
+        // make VoiceOver read "Frame Job" twice. The label carries it.
         markView.setAccessibilityElement(false)
         // One line, always — see the class note above.
         wordmark.maximumNumberOfLines = 1

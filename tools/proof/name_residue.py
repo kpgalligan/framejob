@@ -114,10 +114,7 @@ COUNTED = {
     # -- R3 removes these: the CLAUDE.md files, edited by the orchestrator, never an agent;
     # root CLAUDE.md keeps its issue-tracker line until R4.
     "CLAUDE.md": 6,
-    "app/CLAUDE.md": 4,
-    # -- R2 removes these: the mark and its wordmark, and the welcome screen's prose of them.
-    "app/Sources/BrandMark.swift": 8,
-    "designs/screens/01-welcome.md": 2,
+    "app/CLAUDE.md": 3,
     # -- Permanent: the old generated paths stay ignored (every tree built before R1 holds them).
     ".gitignore": 2,
     # -- Permanent: tools that must name the old spelling to refuse it, find it, build or

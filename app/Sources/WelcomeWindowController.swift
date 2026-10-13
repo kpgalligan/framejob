@@ -18,7 +18,7 @@ final class WelcomeWindowController: NSWindowController {
 
     private init() {
         // 600 rather than the old 520: the lockup is taller than the motif it
-        // replaces and it asks for a clip height of clear space under it, and
+        // replaced and it asks for its fixed 38 pt of clear space under it, and
         // the window does not resize (no `.resizable`), so the content has to
         // fit at the one size it has.
         let size = NSSize(width: 720, height: 600)
@@ -104,8 +104,8 @@ final class WelcomeWindowController: NSWindowController {
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 16
-        // The mark's clear space is one clip height on every side; the window
-        // itself supplies it above, this supplies it below. The wordmark's
+        // The mark's clear space is the lockup's fixed 38 pt on every side; the
+        // window itself supplies it above, this supplies it below. The wordmark's
         // descender slack sits inside the lockup's own box, so the optical
         // gap is a little more than the minimum, which is the right way to
         // miss it.

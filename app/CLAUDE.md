@@ -2387,7 +2387,8 @@ heights S/M/L per kind), `Controls.swift`, `OptionControls.swift`,
 `Sheets.swift`, `EditorChrome.swift` (`BarView`), `FileDropView.swift`
 (Finder drops + the first responder the bare-key map needs) — copied from
 Rasterize; keep them in sync rather than forking. `BrandMark.swift` is
-Reelcut's own, drawn from `designs/design_handoff_reelcut/`.
+Frame Job's own: the mark of `designs/frame-job/frame-job-icon.svg` without
+its tile (spec §11 NM-11).
 `Controls.swift`'s `BlockSlider` is the timeline's zoom slider. Four known
 divergences, each recorded: `makeButtonRow` gives its `leading` views
 compression resistance `.defaultLow`, so a footnote gives way before a button
