@@ -74,6 +74,10 @@ and §5.
   a sentence naming the guarded `mv` to the new name, and it refuses before it creates or writes
   anything under `Frame Job Proofs/` (no folder, no ledger, no `refused` event), so the month's
   total is never restarted at $0 and the owner's `mv` never nests.
+  **Amended by NM-15** (#288): the owner moved the old proofs' ledger folder on 2026-10-13
+  (#287), so the refusal while it exists is removed: `budget.py` holds every paid request to
+  `~/Library/Application Support/Frame Job Proofs/spend.jsonl` alone, and nothing reads the old
+  folder.
 - **P-7 — The app shows two figures: what the current conversation has cost, on the Assistant
   tab, and what the UTC calendar month has cost, in Settings ▸ Assistant; both say they are
   Frame Job's own estimate (P-4).** The conversation figure is the transcript's sum of the `cost`

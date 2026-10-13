@@ -15,8 +15,8 @@ its executable into the owner's real `~/Library/Preferences/`, and the app
 writes its bundle's domain, `com.kgalligan.FrameJob` (Release) or
 `com.kgalligan.FrameJob.debug` (`make app-debug`), both refused by `refusal`
 as the old app's `com.kgalligan.Reelcut` and `com.kgalligan.Reelcut.debug`
-are (spec §11 NM-7). This file is the two halves of what is done
-about it, and it imports nothing from `tools/proof`.
+are, which an old-tree build still writes (spec §11 NM-15). This file is the
+two halves of what is done about it, and it imports nothing from `tools/proof`.
 
 **What a session moved.** `snapshot(domain)` runs `defaults export <domain>
 -` and nothing else, and answers each key's name against a digest salted per
@@ -44,7 +44,8 @@ domain, the product's own names under both its names (`frame job`, `frame job
 debug`, `framejob`, `framejob-agent`, `framejob-mcp`, `com.kgalligan.FrameJob`
 in any case and its namespace, and a name that extends it without a dot,
 `com.kgalligan.FrameJob-Dev`; and the old `reelcut`, `reelcut-agent`,
-`reelcut-mcp` and `com.kgalligan.Reelcut` the same way), Apple's, and
+`reelcut-mcp` and `com.kgalligan.Reelcut` the same way, which an old-tree run
+still writes, spec §11 NM-15), Apple's, and
 any name containing `rasterize`. A call that reaches the real
 Preferences folder asks `refusal`'s rule a second time under no mutant, and
 a scratch folder with no stand-in runner raises, so a scratch call cannot
@@ -56,8 +57,9 @@ bit under `tools/proof/work`; the walk skips `*.app`, `*.dSYM`,
 `node_modules`, `.git`, `Intermediates.noindex`, `target` and symlinks),
 `source` (the stem of a `*_probe.swift` under `tools/proof`), `prefix` (the
 name starts with one of `PREFIXES`, `com.kgalligan.framejob.` or `framejob.`,
-or the old `com.kgalligan.reelcut.` or `reelcut.`, case-sensitive), `keys`
-(at least one key, every one starting `FrameJob` or the old `Reelcut`).
+case-sensitive), `keys` (at least one key, every one starting `FrameJob` or
+the old `Reelcut`, which an old-tree probe or harness paint writes, spec §11
+NM-15).
 `unattributed` is what no rule owns and still looks like a proof's: a name
 matching `probe|harness|refute|spike`, or a `FrameJob*` or `Reelcut*` key. No
 script removes those.
@@ -96,8 +98,8 @@ it, while the control IS removed.
   `com.kgalligan.Reelcut-Dev`, `com.kgalligan.ReelcutHelper`,
   `com.kgalligan.Reelcut.debug` (the old Debug build's, spec §11 V-5), and
   `com.kgalligan.FrameJob`, `com.kgalligan.FrameJob.debug`,
-  `com.kgalligan.framejob` (spec §11 NM-7); control `com.kgalligan.framejob.x`
-  (`prefix`).
+  `com.kgalligan.framejob` (the old ones because an old-tree run still writes
+  them, spec §11 NM-15); control `com.kgalligan.framejob.x` (`prefix`).
 - **P4** global: `-g`, `-globalDomain`, `-app`, `NSGlobalDomain`, `Apple
   Global Domain`, `.GlobalPreferences`, the empty name, `a/b`; control `g`
   (`executable`).
@@ -108,7 +110,8 @@ it, while the control IS removed.
   <name> FrameJobA` and the file is kept; the same name holding `FrameJobA`
   and `NSB` is removed whole.
 - **P6** helpers: `reelcut-agent`, `reelcut-mcp`, `Reelcut`, `framejob-agent`,
-  `framejob-mcp`, `Frame Job`; control `framejob-agent-probe`.
+  `framejob-mcp`, `Frame Job` (the old ones because an old-tree run still
+  builds them, spec §11 NM-15); control `framejob-agent-probe`.
 - **P7** one name per rule (the `prefix` one
   `framejob.proof-defaults-selftest.12345`), and an `NS`-only `x-probe` owned
   by none and in `unattributed`.
@@ -120,8 +123,9 @@ it, while the control IS removed.
   started through a symlink of that name, whose path is what `ps` prints: a
   COPY of `/bin/sleep` is killed at exec on macOS 26 (exit 137, measured).
 - **P9** a scratch `preferences` with no runner raises `ValueError`.
-- **P10** the sweep removes an idle probe domain under each of the four
-  `PREFIXES` — the new two and the old two (spec §11 NM-7) — whole.
+- **P10** the sweep removes an idle probe domain under each of the two
+  `PREFIXES` — the new name's only, the old name's two having gone with spec
+  §11 NM-15 — whole.
 
 `--mutant NAME` runs the selftest alone (never the sweep) and prints `MUTANT
 PASS` when exactly its rows fail: `no-unlink` P2 (the unlink is skipped in
@@ -146,10 +150,9 @@ import tempfile
 import time
 
 APP_DOMAIN = "com.kgalligan.FrameJob"
-# The app's domain before rename R1 (spec §11 NM-7): refused as the new one is.
-OLD_APP_DOMAIN = "com.kgalligan.Reelcut"
 HARMLESS = ("NS", "Apple")                       # AppKit's key-name families
-# What a probe compiled from app/Sources writes, under either name.
+# What a probe compiled from app/Sources writes, under either name (the old one
+# from an old tree's probe or harness paint, spec §11 NM-15).
 FAMILIES = ("FrameJob", "Reelcut", "RC", "NS", "Apple")
 KEY_PREFIXES = ("FrameJob", "Reelcut")           # the product's own keys, new and old
 BUSY_MINUTES = 60
@@ -160,9 +163,10 @@ REAL_PREFERENCES = os.path.join(pwd.getpwuid(os.getuid()).pw_dir, "Library", "Pr
 WORK = os.path.join(HERE, "work")
 SOURCES = HERE
 SELFTEST_PREFIX = "framejob.proof-defaults-selftest."
-# The proofs' probe domains, under the new names and the old (spec §11 NM-7).
-PREFIXES = ("com.kgalligan.framejob.", "framejob.", "com.kgalligan.reelcut.", "reelcut.")
-# The product's own executables, and its bundle-id namespaces, under both names.
+# The proofs' probe domains, under the new names only (spec §11 NM-15).
+PREFIXES = ("com.kgalligan.framejob.", "framejob.")
+# The product's own executables, and its bundle-id namespaces, under both names
+# (the old ones because an old-tree run still writes them, spec §11 NM-15).
 EXECUTABLES = ("frame job", "frame job debug", "framejob", "framejob-agent", "framejob-mcp",
                "reelcut", "reelcut-agent", "reelcut-mcp")
 NAMESPACES = ("com.kgalligan.framejob", "com.kgalligan.reelcut")
@@ -892,8 +896,7 @@ def selftest():
 
         def p10():
             case = Case(root, "P10")
-            names = ["com.kgalligan.framejob.idle-probe", "com.kgalligan.reelcut.idle-probe",
-                     "framejob.idle-probe", "reelcut.idle-probe"]
+            names = ["com.kgalligan.framejob.idle-probe", "framejob.idle-probe"]
             for name in names:
                 case.plist(name, ["NSA"])
             recorder = Recorder()

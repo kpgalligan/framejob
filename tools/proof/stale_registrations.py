@@ -12,7 +12,8 @@ proof that deleted its copy without `lsregister -u` left the registration
 behind (the proofs now delete through `tree_copy.remove_tree`). This lists
 what is left: it parses `lsregister -dump` (bounded at 120 s) for every
 record whose identifier contains one of `NAMES`, `framejob` or the old name
-`reelcut` (any case, spec §11 NM-7), dedupes them by
+`reelcut` (any case; an old-tree build still registers the old app, spec §11
+NM-15), dedupes them by
 (identifier, path), and prints the totals (all, at missing paths, at
 existing paths) and each missing path with its identifier.
 
@@ -50,7 +51,7 @@ from mcp import LSREGISTER  # noqa: E402
 
 DUMP_TIMEOUT = 120
 CALL_TIMEOUT = 60
-NAMES = ("reelcut", "framejob")   # the product's names before and after rename R1
+NAMES = ("reelcut", "framejob")   # the product's names before and after rename R1 (NM-15)
 SEPARATOR = re.compile(r"^-{20,}$")
 FIELD = re.compile(r"^(path|identifier):\s+(.*?)\s*$")
 HANDLE = re.compile(r"\s+\(0x[0-9a-fA-F]+\)$")

@@ -14552,14 +14552,14 @@ starting `.` or `-`, `NSGlobalDomain` and `Apple Global Domain`, `framejob`,
 `framejob-agent` and `framejob-mcp`, `com.apple.*`, any name containing
 `rasterize`, and `com.kgalligan.FrameJob` in any case with its capital-F
 namespace and any name that extends it without a dot
-(`com.kgalligan.FrameJob-Dev`, `com.kgalligan.FrameJobHelper`), each under the old name too (spec §11 NM-7). A call on the real Preferences folder asks that rule a second
+(`com.kgalligan.FrameJob-Dev`, `com.kgalligan.FrameJobHelper`), each under the old name too (spec §11 NM-15: an old-tree run writes them). A call on the real Preferences folder asks that rule a second
 time under no mutant, and a scratch folder with no stand-in runner raises
 `ValueError`. A plist with no `refusal` is a proof's own by the first rule
 that holds: `executable` (a Mach-O of that name with an exec bit under
 `tools/proof/work`, the walk skipping `*.app`, `*.dSYM`, `node_modules`,
 `.git`, `Intermediates.noindex`, `target` and symlinks), `source` (the stem
 of a `*_probe.swift` under `tools/proof`), `prefix` (the name starts
-`com.kgalligan.framejob.` or `framejob.`, or the old name's two, case-sensitive), `keys` (at least
+`com.kgalligan.framejob.` or `framejob.`, case-sensitive), `keys` (at least
 one key, every one starting `FrameJob` or the old name). The sweep, per owned name: `busy`
 (the plist is under 60 minutes old, a process of that basename is running,
 or one's bundle identifier is the name), read immediately before acting, is
@@ -19032,3 +19032,60 @@ asserted to occur once; all ten caught, every other row passing):
 | `hdr-plain` | the reader never reads the track | TH, T7 (flat markers on HLG and PQ) |
 | `hdr-wide` | `init?(track:)` admits `.sdrWide` | TH (the SDR pair never flat) |
 | `hdr-unheld` | the nil-input head check takes only the flat stamp | T8 (hlg's `0.jpg` rewritten at the reopen) |
+
+## Issue #288 — the proofs' old-name safety nets dropped (`budget.py`, `budget_proof.py`, `proof_defaults.py`, `stale_registrations.py`, `name_residue.py`; spec §11 NM-15)
+
+#287's hand steps were done on 2026-10-13: the old support folder and the proofs' ledger
+folder were moved, the old app's defaults domains deleted, and no old app is installed or
+running. So each safety net's old-name half went where nothing still needs it, and stayed where
+an instrument builds or runs a commit from before rename R1, which spells the old names
+(spec §11 NM-15, amending NM-7, NM-14 and P-6).
+
+**What went.** `budget.py`'s ledger guard (NM-7's guard 1: `OLD_LEDGER_FOLDER`, `unmoved()`,
+`SpendLedger`'s `old_folder` and `_unmoved()` with its four call sites), so the file is again
+its pre-R1 self but for `LEDGER`'s new folder; `budget_proof.py`'s B1–B4, back to 23 rows;
+`proof_defaults.py`'s old probe prefixes `com.kgalligan.reelcut.` and `reelcut.` in `PREFIXES`
+(P10 now sweeps the two new prefixes), and its unused `OLD_APP_DOMAIN`.
+
+**What stayed, and why.** `proof_defaults.py`'s refusal of the old app's domains and
+executables (P3 and P6 still score them): an old-tree Release build (the e1 reference at
+`1c3e92e`, `grading_verdict.py`'s main tree at `f407f87`) writes the old app's domain. Its old
+key families in `FAMILIES` and `KEY_PREFIXES`: an old-tree probe or harness paint writes them
+into a probe's domain, which the sweep removes whole. `stale_registrations.py`'s old-name match:
+old-tree builds register the old app. And, untouched, `mcp.py`'s `wait_listening` app-name
+match, `harness/main.swift`'s old-key pin mapping and inspector-section clear,
+`grading_verdict.py`, `reference_build.py`, `reference_build_selftest.py`,
+`cloud_captions_probe.py` and the grading and matte spikes, every one an old-tree input. The
+comments and docstrings that keep the old names now cite NM-15 rather than NM-7.
+
+**Root `CLAUDE.md`** took two edits, applied by the orchestrator (an agent edits no
+`CLAUDE.md`): the ledger guard's parenthesis after the proofs' ledger path is deleted, and the
+`rename-2` row's "the safety nets kept until #288" reads "the safety nets, dropped by #288
+except where an old tree needs them (NM-15)". Its `COUNTED` row went with its last old-name
+line, as did `budget.py`'s and `budget_proof.py`'s; `proof_defaults.py` is pinned at 20 (was
+25), spec §11's `rename.md` at 40 (was 32) and this file at 190 (was 186: this section's old
+prefixes and recorded mutant output), and every other pin holds.
+
+**The run** (2026-10-13, the worktree `~/devel/framejob-i288` from `7321883`):
+
+```
+python3 -m py_compile tools/proof/budget.py tools/proof/budget_proof.py tools/proof/proof_defaults.py tools/proof/stale_registrations.py tools/proof/name_residue.py   # exit 0
+python3 tools/proof/budget_proof.py                          # 23/23, exit 0; N: the real ledger's (exists, size, mtime_ns) unchanged
+python3 tools/proof/proof_defaults.py --selftest             # passed 11/11, exit 0 (P1–P10 and P5s, as before)
+python3 tools/proof/proof_defaults.py --mutant no-refusal    # MUTANT PASS: no-refusal failed ['P3', 'P4', 'P5', 'P6'], exit 0
+python3 tools/proof/spec_index_proof.py                      # 159/159 checks passed, exit 0
+python3 tools/proof/name_residue.py --selftest               # 8/8 rows pass, PASS, exit 0
+python3 tools/proof/name_residue.py                          # exit 0, nothing printed
+```
+
+**Hand mutants**, each reverted after its run (the saved copy put back and checked with `cmp`):
+
+| Mutant | The edit | `name_residue.py` |
+|---|---|---|
+| HM1 | `budget.py`'s `OLD_LEDGER_FOLDER` line restored after `LEDGER` | exit 1: `tools/proof/budget.py:49: OLD_LEDGER_FOLDER = os.path.expanduser("~/Library/Application Support/Reelcut Proofs")` |
+| HM2 | `"reelcut."` added back to `proof_defaults.py`'s `PREFIXES` | exit 1: `tools/proof/proof_defaults.py: 21 lines, COUNTED pins 20` |
+| HM3 | root `CLAUDE.md`'s deleted ledger-guard parenthesis re-inserted | exit 1: `` CLAUDE.md:260: `Reelcut Proofs` folder exists, `budget.py` refuses every paid request, spec §11 `` alone; the saved file copied back, `cmp` byte-identical |
+
+**`make gate`** (cold, the worktree's first, 2026-10-13): `names pass 1s`, `typecheck pass 6s`
+(exactly its four baseline warnings), `fmt pass 2s`, `lint pass 25s`, `test pass 322s`,
+`app pass 123s`, `gate: PASS 479s`, exit 0.

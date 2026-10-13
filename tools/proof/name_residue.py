@@ -85,10 +85,11 @@ COUNTED = {
     "designs/spec/11-decisions/pricing.md": 5,
     "designs/spec/11-decisions/publishing.md": 3,
     "designs/spec/11-decisions/recording.md": 7,
-    # NM-1..NM-14 and their amendments name the old paths, maps and patterns they
+    # NM-1..NM-15 and their amendments name the old paths, maps and patterns they
     # rename or drop (rename-2 N0: NM-12..NM-14 and the NM-8 amendment); N2's link
-    # rule re-pinned it (NM-1's handoff links).
-    "designs/spec/11-decisions/rename.md": 32,
+    # rule re-pinned it (NM-1's handoff links); #288's NM-15 and its NM-7 amendment
+    # name the safety nets dropped and kept.
+    "designs/spec/11-decisions/rename.md": 40,
     "designs/spec/11-decisions/word-captions.md": 4,
     # -- Permanent: the ADRs' kept lines under NM-12's prose rule (rename-2 N4): recorded
     # output and dated runs (q), past paths (p), NM-7's old folders (s), the rename's own
@@ -108,16 +109,11 @@ COUNTED = {
     # single file in git history, and the proof README's recorded output, past paths and
     # identifiers, old domains and folders, and old-tree builds (rename-2 N5).
     "designs/spec/README.md": 1,
-    "tools/proof/README.md": 186,
-    # -- Root CLAUDE.md: line 260 names the old proofs' ledger folder `budget.py`
-    # guards (permanent, NM-7).
-    "CLAUDE.md": 1,
+    "tools/proof/README.md": 190,
     # -- Permanent: the old generated paths stay ignored (every tree built before R1 holds them).
     ".gitignore": 2,
     # -- Permanent: tools that must name the old spelling to refuse it, find it, build or
-    # compare a tree from before R1, or read the old ledger folder (NM-6, NM-7, NM-8).
-    "tools/proof/budget.py": 1,
-    "tools/proof/budget_proof.py": 2,
+    # compare a tree from before R1 (NM-6, NM-8, NM-15).
     "tools/proof/cloud_captions_probe.py": 3,
     "tools/proof/grading_spike/grading_spike.py": 2,
     "tools/proof/grading_verdict.py": 7,
@@ -125,7 +121,7 @@ COUNTED = {
     "tools/proof/matte_spike/matte_spike.py": 1,
     "tools/proof/mcp.py": 1,
     "tools/proof/name_residue.py": 2,
-    "tools/proof/proof_defaults.py": 25,
+    "tools/proof/proof_defaults.py": 20,
     "tools/proof/reference_build.py": 5,
     "tools/proof/reference_build_selftest.py": 8,
     "tools/proof/stale_registrations.py": 4,

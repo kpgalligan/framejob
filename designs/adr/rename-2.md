@@ -47,7 +47,7 @@ What `name_residue.py` holds now: `HISTORY` (the brief and `.dupscan/`, kept who
 
 ## Open items
 
-- #288 (`ai-drafted`, `low-priority`, blocked by #287): drop the proofs' old-name safety nets (`proof_defaults.py`, `mcp.py`'s app-name match, `harness/main.swift`'s key mapping, `budget.py`'s NM-7 guard, `budget_proof.py`, `grading_verdict.py`'s dual prefix, `stale_registrations.py`) once the hand steps are done.
+- #288 (`ai-drafted`, `low-priority`, blocked by #287): drop the proofs' old-name safety nets (`proof_defaults.py`, `mcp.py`'s app-name match, `harness/main.swift`'s key mapping, `budget.py`'s NM-7 guard, `budget_proof.py`, `grading_verdict.py`'s dual prefix, `stale_registrations.py`) once the hand steps are done. Done: spec §11 NM-15.
 - #287 (`ready-for-human`): the owner's hand steps from round 1, which #288 waits on.
 
 ## Where to look in the original

@@ -39,14 +39,6 @@ proves the real one, `budget.LEDGER`, was not created or changed.
   A5  each spike (`cloud_spike.py`, `words_spike.py`) makes its ledger with one
       `spike_ledger(` and no `aai.Ledger(`; CONTROL: the text with
       `spike_ledger(` turned back into `aai.Ledger(` fails
-  B1  the unmoved ledger (spec §11 NM-7), over a scratch home: while its
-      `Reelcut Proofs` folder exists, `reserve` raises `budget: ` naming the
-      guarded `mv` and both folders, `refusal` answers it, and the new
-      `Frame Job Proofs` folder does not exist after
-  B2  and `settle` answers False, writing nothing (still no new folder)
-  B3  CONTROL: the old folder absent, `reserve` makes the ledger, one line
-  B4  a scratch path (not `LEDGER`) is never guarded, whatever the real old
-      folder's state; at `LEDGER` the guard defaults to `OLD_LEDGER_FOLDER`
   N   `budget.LEDGER`'s existence, size and mtime unchanged
 
     python3 tools/proof/budget_proof.py                          # every row ok (make test)
@@ -83,7 +75,7 @@ UTC = datetime.timezone.utc
 SEPTEMBER = datetime.datetime(2026, 9, 15, 12, 0, 0, tzinfo=UTC)
 AUGUST = datetime.datetime(2026, 8, 31, 23, 59, 0, tzinfo=UTC)
 ROWS = ["P", "F1", "F2", "G1", "G2", "G3", "W", "S1", "S2", "S3", "S4", "U1", "U2",
-        "R1", "R2", "R3", "R4", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3", "B4", "N"]
+        "R1", "R2", "R3", "R4", "A1", "A2", "A3", "A4", "A5", "N"]
 RESULTS = []
 
 
@@ -624,75 +616,6 @@ def row_a5():
 
 
 # ---------------------------------------------------------------------------
-# Rename R1: the unmoved ledger (spec §11 NM-7), over scratch homes.
-
-
-def support(home):
-    return os.path.join(home, "Library", "Application Support")
-
-
-def unmoved_home(name, old_present):
-    """(the old folder, the new folder, the ledger path) under a fresh scratch home."""
-    home = os.path.join(WORK, name, "home")
-    shutil.rmtree(os.path.dirname(home), ignore_errors=True)
-    old = os.path.join(support(home), "Reelcut Proofs")
-    new = os.path.join(support(home), "Frame Job Proofs")
-    os.makedirs(support(home))
-    if old_present:
-        os.makedirs(old)
-    return old, new, os.path.join(new, "spend.jsonl")
-
-
-def row_b1(budget):
-    old, new, path = unmoved_home("b1", True)
-    spend = budget.SpendLedger(path, "anthropic", "budget_proof", "b1", now=at(SEPTEMBER),
-                               old_folder=old)
-    try:
-        spend.reserve(0.01, "b1")
-        raised = None
-    except budget.BudgetRefused as refused:
-        raised = str(refused)
-    said = spend.refusal(0.01)
-    named = (raised is not None and raised.startswith("budget: ") and f'mv "{old}" "{new}"'
-             in raised and said == raised)
-    made = os.path.exists(new)
-    return named and not made, (f"reserve: {raised!r:.260}; refusal the same {said == raised}; "
-                                f"{new} exists after: {made}")
-
-
-def row_b2(budget):
-    old, new, path = unmoved_home("b2", True)
-    spend = budget.SpendLedger(path, "anthropic", "budget_proof", "b2", now=at(SEPTEMBER),
-                               old_folder=old)
-    settled = spend.settle("budget_proof/b2/1/1", 0.01, "table")
-    made = os.path.exists(new)
-    return settled is False and not made, f"settle answered {settled}; {new} exists: {made}"
-
-
-def row_b3(budget):
-    old, new, path = unmoved_home("b3", False)
-    spend = budget.SpendLedger(path, "anthropic", "budget_proof", "b3", now=at(SEPTEMBER),
-                               old_folder=old)
-    rid = spend.reserve(0.01, "b3")
-    lines = lines_of(path)
-    ok = isinstance(rid, str) and len(lines) == 1 and lines[0].get("kind") == "reserve"
-    return ok, f"CONTROL: no {old}; reserve {rid!r}, {len(lines)} line(s) in {path}"
-
-
-def row_b4(budget):
-    path = scratch("b4", "spend.jsonl")
-    spend = budget.SpendLedger(path, "anthropic", "budget_proof", "b4", now=at(SEPTEMBER))
-    rid = spend.reserve(0.01, "b4")
-    real = budget.SpendLedger(budget.LEDGER, "anthropic", "budget_proof", "b4")
-    present = os.path.exists(budget.OLD_LEDGER_FOLDER)
-    ok = (spend.old_folder is None and isinstance(rid, str) and len(lines_of(path)) == 1
-          and real.old_folder == budget.OLD_LEDGER_FOLDER)
-    return ok, (f"a scratch ledger is unguarded ({spend.old_folder!r}) and reserved {rid!r} "
-                f"while {budget.OLD_LEDGER_FOLDER} exists: {present}; at LEDGER the guard "
-                f"reads {real.old_folder!r}")
-
-
-# ---------------------------------------------------------------------------
 
 
 def main():
@@ -761,10 +684,6 @@ def main():
     guarded("A3", row_a3, budget, cloud_live_ledger)
     guarded("A4", row_a4, budget, cloud_live_ledger)
     guarded("A5", row_a5)
-    guarded("B1", row_b1, budget)
-    guarded("B2", row_b2, budget)
-    guarded("B3", row_b3, budget)
-    guarded("B4", row_b4, budget)
 
     after = snapshot(budget.LEDGER)
     score("N", real == after, f"{budget.LEDGER}: (exists, size, mtime_ns) {real} before, "

@@ -15,13 +15,6 @@ line, each appended with one `os.write` to a file opened `O_APPEND|O_CREAT`
 never a key, a header, a body or a text. Only a keyed live run points a
 `SpendLedger` at `LEDGER`; rehearsals and verifications use scratch files.
 
-**The unmoved ledger** (spec §11 NM-7): while the folder of the ledger's
-name before rename R1, `OLD_LEDGER_FOLDER`, exists, a `SpendLedger` at
-`LEDGER` refuses every request, naming the owner's guarded `mv`
-(`designs/adr/rename.md`, "Owner's hand steps", step 3), before it makes a
-folder, opens the ledger or writes any line: a folder made here would make
-that `mv` nest the old one inside it, and the month would restart at $0.
-
 **The fold** for a service and a month: a `reserve` made in the month counts
 its largest `settle`'s dollars, or its `worst` while it has none; a `settle`
 with no `reserve` counts its own dollars in its own month; a `refused` counts
@@ -53,7 +46,6 @@ sys.path.insert(0, HERE)
 import prices  # noqa: E402
 
 LEDGER = os.path.expanduser("~/Library/Application Support/Frame Job Proofs/spend.jsonl")
-OLD_LEDGER_FOLDER = os.path.expanduser("~/Library/Application Support/Reelcut Proofs")
 BUDGETS = {"anthropic": 25.00, "assemblyai": 5.00}
 FORMAT = 1
 CLOUD_ESTIMATE = os.path.join(ROOT, "app", "Sources", "CloudEstimate.swift")
@@ -153,41 +145,20 @@ def fold(text, service, month, path="the ledger"):
     return total
 
 
-def unmoved(old_folder: str, new_folder: str) -> str | None:
-    """The refusal while `old_folder`, the ledger's folder before rename R1,
-    still exists; None once it is gone. Reads nothing in either folder."""
-    if not os.path.exists(old_folder):
-        return None
-    return (f"budget: the proofs' ledger is not moved yet: {old_folder} still exists, so this "
-            f"month's spend is not in {new_folder}. Move it first (designs/adr/rename.md, the "
-            f"owner's hand steps, step 3): [ -e \"{new_folder}\" ] && echo \"{new_folder} exists: "
-            f"merge by hand\" || mv \"{old_folder}\" \"{new_folder}\"")
-
-
 class SpendLedger:
     """One proof run's view of the ledger at `path` for one service. The
-    constructor touches no file. At `LEDGER`, `old_folder` defaults to
-    `OLD_LEDGER_FOLDER` (the unmoved-ledger guard); elsewhere it is unguarded
-    unless `old_folder` is given."""
+    constructor touches no file."""
 
-    def __init__(self, path, service, proof, run, now=None, old_folder=None):
+    def __init__(self, path, service, proof, run, now=None):
         if service not in BUDGETS:
             raise ValueError(f"no budget for the service {service!r}")
         self.path = str(path)
-        if old_folder is None and os.path.abspath(self.path) == os.path.abspath(LEDGER):
-            old_folder = OLD_LEDGER_FOLDER
-        self.old_folder = old_folder
         self.service = service
         self.proof = proof
         self.run = run
         self.now = now or _utc_now
         self._count = 0
         self._ids = threading.Lock()
-
-    def _unmoved(self):
-        if self.old_folder is None:
-            return None
-        return unmoved(self.old_folder, os.path.dirname(os.path.abspath(self.path)))
 
     def month(self):
         return self.now().astimezone(datetime.timezone.utc).strftime("%Y-%m")
@@ -230,10 +201,7 @@ class SpendLedger:
 
     def month_total(self):
         """This month's recorded spend: 0.0 when the file is absent;
-        BudgetRefused when it cannot be read or a line does not parse, or
-        while the ledger is unmoved."""
-        if why := self._unmoved():
-            raise BudgetRefused(why)
+        BudgetRefused when it cannot be read or a line does not parse."""
         if not os.path.exists(self.path):
             return 0.0
         try:
@@ -259,8 +227,6 @@ class SpendLedger:
     def refusal(self, worst):
         """Why a request of this worst case may not be sent, or None. Writes
         nothing."""
-        if why := self._unmoved():
-            return why
         try:
             total = self.month_total()
         except BudgetRefused as refused:
@@ -272,10 +238,7 @@ class SpendLedger:
     def reserve(self, worst, row, gate=True):
         """The reservation's id. With `gate`, refuses (one `refused` line,
         then BudgetRefused) when the month's total plus `worst` passes the
-        budget; without it, always records. While the ledger is unmoved it
-        refuses first, making and writing nothing."""
-        if why := self._unmoved():
-            raise BudgetRefused(why)
+        budget; without it, always records."""
         worst = float(worst)
         if not math.isfinite(worst) or worst < 0:
             raise BudgetRefused(f"budget: a worst case of {worst!r} cannot be reserved")
@@ -305,9 +268,7 @@ class SpendLedger:
 
     def settle(self, rid, dollars, basis, **detail):
         """Records what a reservation cost. Never raises; False when nothing
-        was written (as while the ledger is unmoved)."""
-        if self._unmoved():
-            return False
+        was written."""
         try:
             dollars = float(dollars)
             if not math.isfinite(dollars) or dollars < 0 or not isinstance(rid, str):

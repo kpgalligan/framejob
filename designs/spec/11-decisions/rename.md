@@ -137,6 +137,12 @@ workflow FILE, whose name does not change.
   would cost money or touch the owner's own preferences. Risk accepted: old preferences,
   grants, recordings and keys look gone until moved, and a `.reelcut` package opens only after
   it is renamed.
+  **Amended by NM-15** (#288): guard (1) is removed; `budget.py` no longer looks for
+  `~/Library/Application Support/Reelcut Proofs/`, and nothing reads that folder. Guard (2)
+  holds: the proof tooling still refuses and never touches the old app domains
+  (`com.kgalligan.Reelcut`, `com.kgalligan.Reelcut.debug`), because a build of a tree from
+  before rename R1 still writes them; its sweep removes the proofs' probe domains under the new
+  prefixes only.
 - **NM-8 — The residue check runs in `make test`.** From R1, `tools/proof/name_residue.py`
   (stdlib only) lists every line of every tracked or untracked-unignored file that matches
   `reelcut` case-insensitively, and every path that does, and fails on any that is not
@@ -244,3 +250,32 @@ workflow FILE, whose name does not change.
   2026-10-13, items 4 and 5 (`archive/rename-2.md`, "The owner's choices"). Risk accepted:
   the safety nets and old-tree inputs keep the old name until the follow-up issue, and a
   citation's redirect depends on GitHub keeping the repository's old name free.
+  **Amended by NM-15** (#288): #287's hand steps are done, and the safety nets' old-name halves
+  are gone except where a run of a tree from before rename R1 needs them; NM-15 lists each site
+  kept and why. `budget.py`'s NM-7 guard and the sweep's old probe prefixes are removed.
+- **NM-15 — The old-name safety nets go where nothing needs them; what an old tree writes or
+  spells stays.** **Gone:** `tools/proof/budget.py`'s ledger guard (NM-7's guard 1) and
+  `budget_proof.py`'s rows B1–B4; the sweep's old probe prefixes `com.kgalligan.reelcut.` and
+  `reelcut.` in `tools/proof/proof_defaults.py`'s `PREFIXES`, with P10's two rows for them; and
+  its unused `OLD_APP_DOMAIN`. **Kept, and why:** every site that serves an instrument building
+  or running a commit from before rename R1, which spells the old names:
+  `tools/proof/mcp.py`'s `wait_listening` app-name match (`grading_verdict.py`'s main tree at
+  `f407f87`); `tools/proof/harness/main.swift`'s old-key pin mapping and its old inspector
+  section clear (the meter and welcome comparisons paint old `app/Sources` with this harness
+  through `reference_build.py`); `tools/proof/grading_verdict.py` (`BASE = "f407f87"`: its old
+  binary, timing argument, package extension, `TIMING` regex and dual parity prefix);
+  `reference_build.py`, `reference_build_selftest.py`, `cloud_captions_probe.py`,
+  `grading_spike/grading_spike.py` and `matte_spike/matte_spike.py` (NM-14's old-tree inputs).
+  `proof_defaults.py`'s refusal of the old app's domains and executables: an old-tree Release
+  build (the e1 reference at `1c3e92e`, `grading_verdict.py`'s main tree) writes
+  `com.kgalligan.Reelcut`, an app's domain, which is refused as the new one is. Its `Reelcut*`
+  key families: an old-tree probe or harness paint writes them into a probe's domain, which the
+  sweep removes whole. `tools/proof/stale_registrations.py`'s `reelcut` match: old-tree builds
+  register `Reelcut.app`. **Why:** #287's hand steps were done on 2026-10-13: the old support
+  folder and the proofs' ledger folder were moved, the old domains deleted, and no old app is
+  installed or running; an old tree still spells the old names. **Risk accepted:** a
+  `Reelcut Proofs` folder restored from a backup is ignored, and a paid proof counts only the
+  new ledger; a stray probe domain under an old prefix is no longer swept (none existed on
+  2026-10-13). **Amends** NM-7, NM-14 and P-6. Under NM-12's prose rule the old name appears
+  here only in its kept classes: old folders, domains, prefixes and paths. A later change may
+  drop the kept sites once no instrument runs a tree from before rename R1.
