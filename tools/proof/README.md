@@ -3709,7 +3709,7 @@ lanes — #48 lists it for a person at the machine.
 ## The sharp chrome pass (`sharp_chrome.py`)
 
 `python3 tools/proof/sharp_chrome.py`, no port and no running app,
-**29/29**. The sharp handoff (`designs/design_handoff_reelcut_sharp/`,
+**29/29**. The sharp handoff (`designs/design_handoff_sharp/`,
 2026-09-23) squared every chrome radius token, kept a clip bar at 2 pt and
 put `Controls.swift`'s `BlockSlider` (a 3 pt track, a 7 × 11 pt block knob)
 in for the zoom slider. Two instruments on `e2_chrome.py`'s helpers. A

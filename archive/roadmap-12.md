@@ -139,7 +139,7 @@ assistant's next edit lands on the wrong project.
 
 - Spec §11 says there is no left panel: "Media is an inspector tab"
   (`foundations.md`). The inspector is Reelcut's only side panel.
-- **The sharp handoff forbids this outright.** `design_handoff_reelcut_sharp/README.md:4`
+- **The sharp handoff forbids this outright.** `design_handoff_sharp/README.md:4`
   says: "Do **not** add a tool rail, options bar, layers panel, **assistant panel**,
   status bar or zoom HUD to Reelcut."
 - That line was written to keep Rasterize's parts out of a Reelcut pass. The user's

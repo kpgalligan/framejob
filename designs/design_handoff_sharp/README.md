@@ -6,7 +6,7 @@
 
 ## Overview
 
-This visual pass follows on from the existing chrome-cleanup handoff (`designs/design_handoff_reelcut/`). That handoff's layout, regions, clusters, metrics and behaviour stay as specified. This one changes three things:
+This visual pass follows on from the existing chrome-cleanup handoff (`designs/design_handoff_chrome/`). That handoff's layout, regions, clusters, metrics and behaviour stay as specified. This one changes three things:
 
 1. **Corners.** Every chrome component goes square (0 radius). Timeline clips are the one exception and take **2pt**.
 2. **Slider knob.** The zoom slider's round 11pt knob becomes a 7 × 11pt block.

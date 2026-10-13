@@ -1897,7 +1897,7 @@ lockstep are in the root `CLAUDE.md`; the full design is
   a build that policed the list would refuse a newer build's project), so
   an unknown name is an error nowhere here — it draws in `DS.textStrong`.
 - The chrome cleanup's own files (the design handoff in
-  `designs/design_handoff_reelcut/`, spec §3–§4.4):
+  `designs/design_handoff_chrome/`, spec §3–§4.4):
   `EditorViewController+Toolbar.swift` (the 44 pt row; the frozen file keeps
   only the stored views, which are internal for exactly that reason),
   `TimelineBar.swift` (the 36 pt bar, its selection block, and — since
@@ -2610,7 +2610,7 @@ cannot live in the extension.
 
 ## Sharp chrome, 2026-09-23
 
-The sharp handoff (`designs/design_handoff_reelcut_sharp/`) applied: every
+The sharp handoff (`designs/design_handoff_sharp/`) applied: every
 chrome radius to 0, a clip to 2 pt, the zoom slider's system knob replaced
 by the 7 × 11 pt block. Visual only; no core, FFI, op or MCP change. The
 record is `designs/reelcut-roadmap.md` §1's row; the deviations are spec

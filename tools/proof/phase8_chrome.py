@@ -3007,7 +3007,7 @@ def main():
           f"{os.path.basename(renders['six'])} vs "
           f"{os.path.basename(renders['six-again'])}")
 
-    # 2026-09-23, the sharp pass (`design_handoff_reelcut_sharp/`): the search
+    # 2026-09-23, the sharp pass (`design_handoff_sharp/`): the search
     # field's bezel is SQUARE now (`DS.fieldRadius` 0), so its top and bottom
     # borders run edge to edge like a hairline and `full_width_rules` can no
     # longer tell them apart by the corners. The field's own 24 pt box on line

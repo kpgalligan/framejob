@@ -52,8 +52,8 @@ each line below is a claim rather than a hope:
 | SRT captions | Cues land at the right times and render |
 | Consolidate Media | Reopens after the originals are deleted and the package moved |
 | ffmpeg-assisted import | An MKV opens after rewrap; degrades cleanly with no ffmpeg |
-| Chrome cleanup + identity (`design_handoff_reelcut/`) | The chrome was RENDERED OFFSCREEN and looked at, in both appearances and at all three track sizes — see "Seeing the chrome" in `CLAUDE.md` |
-| Sharp chrome (`design_handoff_reelcut_sharp/`, 2026-09-23) | Square chrome, 2 pt clips, the zoom slider's 7 × 11 pt block knob: `tools/proof/sharp_chrome.py` 29/29 (probe + harness, both appearances, three made-to-fail runs); `phase5_chrome.py` 81/81 with the four redrawn columns masked. Deviations: spec §11 SH-1 (`StickerButton` keeps its pill) and SH-2 (the slider's track fill forked from Rasterize). A person's look is owed (remaining §4) |
+| Chrome cleanup + identity (`design_handoff_chrome/`) | The chrome was RENDERED OFFSCREEN and looked at, in both appearances and at all three track sizes — see "Seeing the chrome" in `CLAUDE.md` |
+| Sharp chrome (`design_handoff_sharp/`, 2026-09-23) | Square chrome, 2 pt clips, the zoom slider's 7 × 11 pt block knob: `tools/proof/sharp_chrome.py` 29/29 (probe + harness, both appearances, three made-to-fail runs); `phase5_chrome.py` 81/81 with the four redrawn columns masked. Deviations: spec §11 SH-1 (`StickerButton` keeps its pill) and SH-2 (the slider's track fill forked from Rasterize). A person's look is owed (remaining §4) |
 
 ## 2. What still needs a person at the machine
 

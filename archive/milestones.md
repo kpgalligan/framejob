@@ -130,7 +130,7 @@ maintained.
   kind still dissolves (`transition.rs`: `unwrap_or_default()`).
 
 - **The chrome cleanup and the new identity: done**
-  (`designs/design_handoff_reelcut/`). The three things the user named — a
+  (`designs/design_handoff_chrome/`). The three things the user named — a
   grab-bag toolbar, an out-of-place Export button, and clips you could not
   tell apart — plus the identity around them.
   **Identity**: `AppIcon.appiconset` is the two-clips-and-a-playhead mark, and

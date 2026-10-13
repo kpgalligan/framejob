@@ -1,11 +1,11 @@
 # 3. Window layout
 
 The chrome below is the one the design handoff in
-`designs/design_handoff_reelcut/` specifies; it replaced the first cut, whose
+`designs/design_handoff_chrome/` specifies; it replaced the first cut, whose
 toolbar was a grab bag, whose Export was a system pill, and whose clips had no
 visible boundary. That handoff's README is the normative source for the
 metrics; this section is the summary. The sharp pass in
-`designs/design_handoff_reelcut_sharp/` (2026-09-23) then squared every
+`designs/design_handoff_sharp/` (2026-09-23) then squared every
 chrome corner (a clip keeps 2 pt) and gave the zoom slider a block knob; its
 README is normative for radii and the knob, with the deviation in §11 SH-2
 (SH-4 squared `StickerButton`, superseding SH-1).

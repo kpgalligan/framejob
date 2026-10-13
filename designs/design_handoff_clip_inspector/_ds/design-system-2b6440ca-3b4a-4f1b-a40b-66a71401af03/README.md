@@ -13,7 +13,7 @@ A sharp-edged redesign of the chrome shared by two macOS apps from the same hous
   - `app/Sources/Theme.swift` — `DS` tokens (colors, type, metrics, motion)
   - `app/Sources/Controls.swift` — `AccentButton`, `GhostButton`, `StickerButton` (retired), `DSField`, `DividerView`, `PanelTabsView`
   - `app/Sources/ClipKindStyle.swift` — clip kind → tint / symbol / word
-  - `designs/design_handoff_reelcut/` — handoff README, `Reelcut Editor.dc.html` hi-fi mock, `Reelcut Logo.dc.html`, `logo/`
+  - `designs/design_handoff_chrome/` — handoff README, `Editor.dc.html` hi-fi mock, `Logo.dc.html`, `logo/`
   - `app/Resources/Fonts/` — vendored fonts
 - GitHub: https://github.com/kpgalligan/rasterize (branch `main`)
   - `designs/design_handoff_rasterize_ui_redesign/` — handoff README + `Rasterize Editor.dc.html` hi-fi mock (rail, options bar, layers, assistant, status bar)

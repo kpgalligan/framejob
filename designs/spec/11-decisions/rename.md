@@ -24,7 +24,7 @@ workflow FILE, whose name does not change.
 - **NM-1 — The product is Frame Job. Every spelling of the old name in the product, the build,
   the tooling and the live documents changes; history does not.** History is `archive/`,
   `designs/adr/` (but for the new ADR at the close), the design handoffs and briefs
-  (`designs/design_handoff_reelcut/`, `designs/design_handoff_reelcut_sharp/`,
+  (`designs/design_handoff_chrome/`, `designs/design_handoff_sharp/`,
   `designs/design_handoff_clip_inspector/`, `designs/clip_inspector_brief/`), `.dupscan/`, the
   recorded results in `tools/proof/README.md`, and the text of every existing decision in this
   folder. **The reading rule:** "Reelcut" in an existing decision's prose, or in any historical

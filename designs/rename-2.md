@@ -377,6 +377,88 @@ and the exact COUNTED pins`; the review (pass, two nits applied before the commi
 
 ## N2 — the record
 
+**Landed** (2026-10-13, in the worktree, not committed by the implementer; the orchestrator
+commits):
+
+- The 53 `git mv`s of "The handoffs' names": `designs/design_handoff_reelcut/` →
+  `designs/design_handoff_chrome/` (16 files; inside it `Reelcut Editor.dc.html` →
+  `Editor.dc.html`, `Reelcut Logo.dc.html` → `Logo.dc.html`, `logo/reelcut-{icon,mark,mark-mono}.svg`
+  → `logo/reel-{icon,mark,mark-mono}.svg`), `designs/design_handoff_reelcut_sharp/` →
+  `designs/design_handoff_sharp/` (20 files; `design/assets/logo/reelcut-*.svg` → `reel-*.svg`),
+  and `designs/design_handoff_clip_inspector/_ds/reelcut-design-system-2b6440ca-…/` →
+  `_ds/design-system-2b6440ca-…/` (17 files). `git ls-files -co --exclude-standard | grep -ic
+  reelcut` prints 0.
+- The link rewrite, one line in place for each link, no file changing length: the chrome
+  handoff's `README.md` (9 lines: 27, 28, 60, 61, 62, 67, 273, 281, 282), the sharp handoff's
+  `README.md` (line 9) and `design/tokens.css` (line 8), the brief's `tokens.css` (line 8), the
+  `_ds` folder's `tokens/colors.css` (line 1) and `README.md` (line 16; its `ui_kits/reelcut/`
+  is no path in this repository, kept), the six clip inspector `.dc.html` files (12 `href`/`src`
+  lines); `.dupscan/scan.json` (the `path` keys at 31 and 45, the `contextDocs` entries at 91,
+  92 and 95); `archive/app-notes.md` (1900, 2613), `archive/milestones.md` (133),
+  `archive/roadmap-1.md` (55, 56), `archive/roadmap-12.md` (142);
+  `designs/spec/03-window-layout.md` (4, 8); NM-1's history list in
+  `designs/spec/11-decisions/rename.md` (line 27, a name-only edit under NM-12, no "Amended by"
+  line); `tools/proof/README.md` (3712), `phase5_chrome.py` (318), `phase8_chrome.py` (3010),
+  `sharp_chrome.py` (2). The "Reelcut dark chrome" words leading the three `tokens.css`-style
+  comments are the designers' text, kept.
+- Kept, each read: `archive/rename.md`'s six hits — 44 (a wildcard inside the owner's verbatim
+  quote), 94 (the inventory pathspec at `ae56899`, (b)), 274 (the literal `HISTORY` tuple R1
+  ran against its tree, (b)), 673 and 678 (edit instructions matched against the R2 tree, (b)),
+  757 (what the proof README's line 3705 held at `6fa50c8`, (b)/(d)); the `_ds` folder's
+  `_adherence.oxlintrc.json`, `_ds_bundle.js` and `_ds_manifest.json` and the sharp handoff's
+  `design/runtime/ds_bundle.js`, (c); NM-13's map in `designs/spec/11-decisions/rename.md`
+  (lines 199, 200, 202, 204), (e). Root `CLAUDE.md` lines 43 and 45 were kept for the
+  orchestrator's edit after the gate, which cleared them (below).
+- `tools/proof/name_residue.py` (data only): the three handoff folders out of `HISTORY` and
+  into `TEXT_HISTORY` under their new names (their designers' lines kept, their paths checked);
+  pins `designs/spec/11-decisions/rename.md` 33 → 32, `tools/proof/README.md` 200 → 199, its
+  own 5 → 3 (`NAME`, the issue pattern and the selftest's `kept`, each read);
+  `designs/spec/03-window-layout.md`, `phase5_chrome.py`, `phase8_chrome.py` and
+  `sharp_chrome.py` unpinned (now 0 lines). Three comments lose their handoff clauses.
+
+**Measured** (each printed by the command beside it; the full outputs are in the phase's
+`04-checks.txt`):
+
+- `name_residue.py`: exit 0, silent. `--selftest`: `8/8 rows pass`, `PASS`.
+- `spec_index_proof.py`: `159/159 checks passed`, exit 0.
+- The path count, `git ls-files -co --exclude-standard | grep -ic reelcut`: `0`.
+- The link grep, `git grep -n -E 'design_handoff_reelcut|reelcut-design-system|Reelcut
+  (Editor|Logo)\.dc\.html|reelcut-(icon|mark|mark-mono)\.svg' -- ':!designs/rename-2.md'`,
+  per file: `6 archive/rename.md`, `2 CLAUDE.md`, `2 …/_adherence.oxlintrc.json`,
+  `15 …/_ds_bundle.js`, `4 designs/spec/11-decisions/rename.md` (199, 200, 202, 204). The
+  `CLAUDE.md` row was the two lines the orchestrator's edit after the gate cleared; the grep
+  now prints no `CLAUDE.md` row.
+- The designer diff, `git diff -M -U0 HEAD` over the old and new handoff folders and the
+  brief: 26 removed lines and 26 added, each a link line (9 chrome README, 1 sharp README,
+  1 sharp `tokens.css`, 1 brief `tokens.css`, 12 `.dc.html`, 1 `_ds` README, 1 `colors.css`).
+  The planned `grep -c '^-[^-]'` prints 23: the chrome README's lines 27, 28 and 67 are
+  Markdown bullets, so their removed form begins `--`; `grep -v '^--- ' | grep -c '^-'`
+  prints 26.
+- `py_compile` of the four edited Python files: silent.
+- `make gate` PASS in 74 s: names 1 s, test 72 s run; typecheck, fmt, lint and app skipped
+  (their inputs unchanged).
+
+**Deviations:**
+
+- The handoff folders went into `TEXT_HISTORY`, not `HISTORY` as N2's text above says: their
+  paths are now checked, the mechanism N1 built for `archive/`, so a handoff path holding the
+  old name fails.
+- `archive/rename.md` takes no rewrite, though N2's text lists it among the archive files:
+  each of its six hits is (a) or (b).
+
+**Landed after the gate** (the orchestrator): root `CLAUDE.md` line 43
+`` | `designs/design_handoff_reelcut/` | `` → `` | `designs/design_handoff_chrome/` | `` and
+line 45 `` | `designs/design_handoff_reelcut_sharp/` | `` → `` | `designs/design_handoff_sharp/` | ``
+(the rest of each row unchanged); in `tools/proof/name_residue.py`, `"CLAUDE.md": 3,` →
+`"CLAUDE.md": 1,` and its comment now names only line 260, the old proofs' ledger folder
+`budget.py` guards (NM-7). `make gate` after the edit: PASS in 70 s, names 1 s and test 69 s
+run; typecheck, fmt, lint and app skipped (their inputs unchanged). The review (one
+should-fix, this record; one nit, the pin comment's width) was applied in fix pass 1, and
+`make gate` after it: PASS in 69 s, names 1 s and test 68 s run, the rest skipped. The
+re-review passed.
+
+**Owed:** phases N3..N5.
+
 ## N3 — the record
 
 ## N4 — the record

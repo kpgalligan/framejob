@@ -315,7 +315,7 @@ def bar_rect(width=WIDTH, height=HEIGHT):
     return Rect("the timeline bar", 0, height - TIMELINE_H, width, BAR_H)
 
 
-# The sharp chrome pass (2026-09-23, `designs/design_handoff_reelcut_sharp/`)
+# The sharp chrome pass (2026-09-23, `designs/design_handoff_sharp/`)
 # changed four controls in this row BY DESIGN against the pre-meter tree: the
 # selection block's kind chip and the Snap box lost their radius, the zoom
 # slider became a `BlockSlider`, and S/M/L's end cells went square. Their

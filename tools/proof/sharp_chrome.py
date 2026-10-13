@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The sharp chrome pass (`designs/design_handoff_reelcut_sharp/`), offscreen.
+"""The sharp chrome pass (`designs/design_handoff_sharp/`), offscreen.
 
     python3 tools/proof/sharp_chrome.py
 

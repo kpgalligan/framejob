@@ -24,8 +24,8 @@ The mock uses **Material Symbols Outlined** as a browser stand-in for icons. Shi
 
 ## Fidelity
 
-- `Reelcut Logo.dc.html` — **high fidelity, and the vectors are exact.** The SVG and PNG files in `logo/` are the real deliverable; the HTML page is the spec sheet around them.
-- `Reelcut Editor.dc.html` — **high fidelity** for layout, metrics and the timeline's clip drawing. Interactive: switch inspector tabs, collapse sections, click clips to select, toggle Snap and Safe, change track size with S/M/L.
+- `Logo.dc.html` — **high fidelity, and the vectors are exact.** The SVG and PNG files in `logo/` are the real deliverable; the HTML page is the spec sheet around them.
+- `Editor.dc.html` — **high fidelity** for layout, metrics and the timeline's clip drawing. Interactive: switch inspector tabs, collapse sections, click clips to select, toggle Snap and Safe, change track size with S/M/L.
 
 ---
 
@@ -57,14 +57,14 @@ Total mark bounds are x 18–102, y 20–102 — the same optical inset as the R
 
 | File | What it is |
 |---|---|
-| `reelcut-mark.svg` | Vector master, 120 × 120, no tile. Use for the welcome screen, the About panel, web, print. |
-| `reelcut-mark-mono.svg` | Single-ink variant. The playhead is knocked out in paper and re-drawn in ink, so it survives as a cut line with one colour. Use for template images, the menu bar, anywhere tinting is applied. |
-| `reelcut-icon.svg` | Vector master of the app icon, 1024 × 1024, standard macOS art inset (824 of 1024), corner radius 26% of the art side, ink border scaled proportionally. |
+| `reel-mark.svg` | Vector master, 120 × 120, no tile. Use for the welcome screen, the About panel, web, print. |
+| `reel-mark-mono.svg` | Single-ink variant. The playhead is knocked out in paper and re-drawn in ink, so it survives as a cut line with one colour. Use for template images, the menu bar, anywhere tinting is applied. |
+| `reel-icon.svg` | Vector master of the app icon, 1024 × 1024, standard macOS art inset (824 of 1024), corner radius 26% of the art side, ink border scaled proportionally. |
 | `AppIcon.appiconset/` | Drop straight into `app/Assets.xcassets`, replacing the existing set. `Contents.json` plus PNGs at 16, 32, 64, 128, 256, 512, 1024 — every mac idiom slot from 16pt@1x to 512pt@2x. |
 
 ### Notes
 
-- The tile is a rounded rect, not Apple's true superellipse. If you want the exact squircle, rebuild from `reelcut-icon.svg` in Icon Composer; nothing else is affected.
+- The tile is a rounded rect, not Apple's true superellipse. If you want the exact squircle, rebuild from `reel-icon.svg` in Icon Composer; nothing else is affected.
 - **This mark holds at 16px**, which the Rasterize mark does not. The two clip blocks fuse into one dark bar at that size, but the coral playhead stays legible against it, so the 16pt slot needs no hand-tuning. That was the main argument for this direction over the other four.
 - Colours: paper `#FBF8F1`, forest `#1F8564`, butter `#F2C14E`, overlap `#1D651F`, coral `#F4653F`, ink `#101915`. Forest, butter and coral are already in `Theme.swift` as `DS.forest` / `DS.butter` / `DS.coral`.
 - **The coral is load-bearing.** `DS.playhead` is coral, `DS.marquee` is coral, and the mark's playhead is coral. Keep that alignment — it is the one thread tying the brand to the interface.
@@ -270,7 +270,7 @@ Spacing scale 2 / 3 / 6 / 8 / 10 / 12pt. Radii 3 (controls) / 4 (buttons, clips)
 5. **Clip drawing** (`TimelineView.swift`, `TimelineLayout.swift`) — the name strip, the tint wash over the filmstrip, the coral selection ring, the trim grips, the transition hatch. This is the largest single change and the one the user cares most about; do it on its own.
 6. **Inspector** (`InspectorViewController.swift`) — three tabs, the selection header, the collapsible section shell. The pane contents move from `VideoPane` / `AudioPane` / `TextPane` / `ShapePane` into sections largely as-is; the work is the shell and the kind-to-sections function, not the rows.
 7. **Media and Document tabs** (`MediaPane.swift`, `DocumentPane.swift`) — the row restyle and the footer.
-8. **Welcome screen and About panel** — swap in `reelcut-mark.svg` and the stacked wordmark.
+8. **Welcome screen and About panel** — swap in `reel-mark.svg` and the stacked wordmark.
 
 Steps 1–2 are mechanical. Steps 3–5 are the three things the user actually asked for, and each is independently shippable.
 
@@ -278,8 +278,8 @@ Steps 1–2 are mechanical. Steps 3–5 are the three things the user actually a
 
 | File | What it is |
 |---|---|
-| `Reelcut Editor.dc.html` | Hi-fi interactive mock. Switch inspector tabs, collapse sections, click clips, toggle Snap and Safe, change track size. |
-| `Reelcut Logo.dc.html` | Identity spec sheet — mark, four grounds, icon with a true-pixel size ladder, both wordmark lockups, palette. |
+| `Editor.dc.html` | Hi-fi interactive mock. Switch inspector tabs, collapse sections, click clips, toggle Snap and Safe, change track size. |
+| `Logo.dc.html` | Identity spec sheet — mark, four grounds, icon with a true-pixel size ladder, both wordmark lockups, palette. |
 | `logo/` | The vectors and the drop-in `AppIcon.appiconset`. |
 | `support.js` | Runtime the two HTML files need. Keep alongside them. |
 | `assets/reel-frame.png` | Placeholder preview frame. |

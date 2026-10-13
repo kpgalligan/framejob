@@ -48,16 +48,16 @@ NAME = "reelcut"
 # Kept whole: history (spec §11 NM-1), the rename's road map and ADR among it.
 HISTORY = (
     "designs/adr/",
-    "designs/design_handoff_reelcut/",
-    "designs/design_handoff_reelcut_sharp/",
-    "designs/design_handoff_clip_inspector/",
     "designs/clip_inspector_brief/",
     ".dupscan/",
     "designs/rename-2.md",
 )
 
-# Prefixes whose LINES are kept but whose PATHS are still checked (spec §11 NM-13).
-TEXT_HISTORY: tuple[str, ...] = ("archive/",)
+# Prefixes whose LINES are kept but whose PATHS are still checked (spec §11 NM-13);
+# the three design handoff folders joined in rename-2 N2, their designers' lines kept.
+TEXT_HISTORY: tuple[str, ...] = ("archive/", "designs/design_handoff_chrome/",
+                                 "designs/design_handoff_sharp/",
+                                 "designs/design_handoff_clip_inspector/")
 
 # A line one of these matches is allowed in any file: issue citations redirect since
 # the repository's rename (2026-10-13), and the two outside paths are where spec §11's
@@ -93,23 +93,21 @@ COUNTED = {
     "designs/spec/11-decisions/recording.md": 24,
     # NM-1..NM-14 and their amendments name the old paths, maps and patterns they
     # rename or drop (rename-2 N0: NM-12..NM-14 and the NM-8 amendment); N2's link
-    # rule re-pins it first (NM-1's handoff link), then N4.
-    "designs/spec/11-decisions/rename.md": 33,
+    # rule re-pinned it (NM-1's handoff links), and N4 re-pins it next.
+    "designs/spec/11-decisions/rename.md": 32,
     "designs/spec/11-decisions/word-captions.md": 6,
-    # -- Permanent: a pointer to a path that keeps the old name (NM-1): the two design
-    # handoff folders, the spec's single file in git history, and the proof README's
-    # recorded results (its dated runs, result tables, quoted output and old-tree builds).
-    "designs/spec/03-window-layout.md": 2,
+    # -- Permanent: a pointer to a path that keeps the old name (NM-1): the spec's
+    # single file in git history, and the proof README's recorded results (its dated
+    # runs, result tables, quoted output and old-tree builds).
     "designs/spec/README.md": 1,
-    "tools/proof/README.md": 200,
-    # -- Root CLAUDE.md: lines 43 and 45 name the design handoff folders (permanent, NM-1),
-    # line 260 the old proofs' ledger folder `budget.py` guards (permanent, NM-7).
-    "CLAUDE.md": 3,
+    "tools/proof/README.md": 199,
+    # -- Root CLAUDE.md: line 260 names the old proofs' ledger folder `budget.py`
+    # guards (permanent, NM-7).
+    "CLAUDE.md": 1,
     # -- Permanent: the old generated paths stay ignored (every tree built before R1 holds them).
     ".gitignore": 2,
     # -- Permanent: tools that must name the old spelling to refuse it, find it, build or
-    # compare a tree from before R1, read the old ledger folder (NM-6, NM-7, NM-8), or
-    # name a design handoff's folder, which keeps its name (NM-1).
+    # compare a tree from before R1, or read the old ledger folder (NM-6, NM-7, NM-8).
     "tools/proof/assistant_spike/README.md": 1,
     "tools/proof/budget.py": 1,
     "tools/proof/budget_proof.py": 2,
@@ -119,13 +117,10 @@ COUNTED = {
     "tools/proof/harness/main.swift": 2,
     "tools/proof/matte_spike/matte_spike.py": 1,
     "tools/proof/mcp.py": 1,
-    "tools/proof/name_residue.py": 5,
-    "tools/proof/phase5_chrome.py": 1,
-    "tools/proof/phase8_chrome.py": 1,
+    "tools/proof/name_residue.py": 3,
     "tools/proof/proof_defaults.py": 25,
     "tools/proof/reference_build.py": 5,
     "tools/proof/reference_build_selftest.py": 8,
-    "tools/proof/sharp_chrome.py": 1,
     "tools/proof/stale_registrations.py": 4,
     # -- Permanent: a spike README's line quoting a past run's output (a recorded log name
     # or input path).

@@ -28,7 +28,7 @@
       ]
     },
     {
-      "path": "designs/design_handoff_clip_inspector/_ds/reelcut-design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/_ds_bundle.js",
+      "path": "designs/design_handoff_clip_inspector/_ds/design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/_ds_bundle.js",
       "reason": "Generated design-system bundle in a design handoff.",
       "evidence": [
         "census: generated, low line diversity, 1 file 13047 lines"
@@ -42,7 +42,7 @@
       ]
     },
     {
-      "path": "designs/design_handoff_reelcut/support.js",
+      "path": "designs/design_handoff_chrome/support.js",
       "reason": "Generated handoff support script ('do not edit').",
       "evidence": [
         "census: generated marker 'do not edit' on line 1, 1911 lines"
@@ -88,11 +88,11 @@
     "designs/spec/README.md",
     "designs/spec/11-decisions/README.md",
     "tools/proof/README.md",
-    "designs/design_handoff_reelcut/README.md",
-    "designs/design_handoff_reelcut_sharp/README.md",
+    "designs/design_handoff_chrome/README.md",
+    "designs/design_handoff_sharp/README.md",
     "designs/design_handoff_clip_inspector/README.md",
     "designs/clip_inspector_brief/README.md",
-    "designs/design_handoff_clip_inspector/_ds/reelcut-design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/README.md",
+    "designs/design_handoff_clip_inspector/_ds/design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/README.md",
     "designs/screens/README.md",
     "graphic/tests/assets/README.md"
   ],
