@@ -252,7 +252,7 @@ fn watchdog(name: &str, seconds: u64) {
         .arg("--exact")
         .arg(name)
         .arg("--nocapture")
-        .env("REELCUT_EXTREME_CHILD", "1")
+        .env("FRAMEJOB_EXTREME_CHILD", "1")
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
@@ -280,7 +280,7 @@ fn huge_transition_paths_finish_under_watchdog() {
 
 #[test]
 fn child_huge_paths() {
-    if std::env::var_os("REELCUT_EXTREME_CHILD").is_none() {
+    if std::env::var_os("FRAMEJOB_EXTREME_CHILD").is_none() {
         return;
     }
     let half: i64 = 4_500_000_000_000_000;
@@ -313,7 +313,7 @@ fn cap_sized_pair_search_finishes_under_watchdog() {
 
 #[test]
 fn child_cap_stress() {
-    if std::env::var_os("REELCUT_EXTREME_CHILD").is_none() {
+    if std::env::var_os("FRAMEJOB_EXTREME_CHILD").is_none() {
         return;
     }
     let cut = 4_500_000_000_000_000;

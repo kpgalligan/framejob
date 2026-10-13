@@ -8,7 +8,7 @@
 //! four keys, Light's nine and a [`SplitTone`], and published in the recipe
 //! as that definition; the app bakes it on the GPU into a 33³ lattice with
 //! the layer stage's own functions and mixes it at step 4d. Nothing here is
-//! a colour table: the eight are Reelcut's own first numbers (tuned by the
+//! a colour table: the eight are Frame Job's own first numbers (tuned by the
 //! owner at GR7), built from the textbook operations tone already uses — the
 //! Concat rule (`designs/adr/effects-survey.md`) stands.
 //!

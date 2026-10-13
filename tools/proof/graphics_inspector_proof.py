@@ -8,7 +8,7 @@
 **The fixture, over MCP** (one owned instance on a scratch socket, launched and
 stopped by PID, under the scratch home `CFFIXED_USER_HOME=work/graphics-inspector/home`
 since issue batch B87 phase 3 — H0, a CONTROL, says the home took: `<home>/Library/
-Application Support` is a directory — its log at `work/graphics-inspector/reelcut.log`):
+Application Support` is a directory — its log at `work/graphics-inspector/framejob.log`):
 `new_project {path: GI}`, `write_graphic six` — a module with one entry of
 every schema type: `title` a string whose default holds `{"}:`, `size` a
 number 12–200 step 1, `offset` an unbounded number, `showBox` a boolean,
@@ -142,7 +142,7 @@ H3  (B87 phase 3) GIA light, its action (index 0) selected, the playhead at 2 s,
     track size L so the band's label shows (`0 2 2 clip - SECTIONS - 0 graphic`),
     rendered twice: byte-identical; H4 dark the same, and light ≠ dark. Kept as
     `work/graphics-inspector/gia-*.png`.
-Z1  `grep "Reelcut: "` over the log prints nothing.
+Z1  `grep "Frame Job: "` over the log prints nothing.
 
 `--mutant NAME` builds the probe over a COPY of `app/Sources` with one
 anchor of `MUTANTS[NAME]`, asserted to occur exactly once, replaced, over a
@@ -450,11 +450,11 @@ def fixture(app, work, gia=False):
     scratch home (`CFFIXED_USER_HOME`), launched and stopped by PID."""
     work.mkdir(parents=True, exist_ok=True)
     HOME.mkdir(parents=True, exist_ok=True)
-    package = work / "GI.reelcut"
+    package = work / "GI.framejob"
     shutil.rmtree(package, ignore_errors=True)
-    shutil.rmtree(work / "GIA.reelcut", ignore_errors=True)
+    shutil.rmtree(work / "GIA.framejob", ignore_errors=True)
     GIA_MADE.clear()
-    log = work / "reelcut.log"
+    log = work / "framejob.log"
     if log.exists():
         log.unlink()
     launched = mcp.launch(str(app), env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
@@ -490,7 +490,7 @@ def fixture(app, work, gia=False):
         step("set_graphic", dict(p, clips=[clips[0]["id"]], patch={"props": {"size": 90}}))
         step("save_project", p)
         if gia:
-            made = gia_fixture(step, work / "GIA.reelcut")
+            made = gia_fixture(step, work / "GIA.framejob")
             if made is not None:
                 GIA_MADE.append(made)
         ok = (wrote.get("reply") or {}).get("ok") is True
@@ -516,7 +516,7 @@ def fixture(app, work, gia=False):
 def build_probe(sources, out):
     """`swift_build.build` over `sources` with the probe as `main.swift`; the
     app's Fonts beside the binary. The binary, or None and the error lines."""
-    lib = ROOT / "core/target/release/libreelcut_core.a"
+    lib = ROOT / "core/target/release/libframejob_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     out.mkdir(parents=True, exist_ok=True)
@@ -545,7 +545,7 @@ def probe_checks(sources, out, package):
     check("the probe builds over app/Sources", binary is not None, error or "")
     if binary is None:
         return
-    copy = out / "GI-probe.reelcut"
+    copy = out / "GI-probe.framejob"
     shutil.rmtree(copy, ignore_errors=True)
     shutil.copytree(package, copy)
     request, answer = out / "request.json", out / "answer.json"
@@ -640,7 +640,7 @@ def gia_checks(binary, gia):
 def mutant(app, name):
     began = time.time()
     file, anchor, replacement, expected = MUTANTS[name]
-    with tempfile.TemporaryDirectory(prefix=f"reelcut-graphics-inspector-{name}-") as temp:
+    with tempfile.TemporaryDirectory(prefix=f"framejob-graphics-inspector-{name}-") as temp:
         temp = Path(temp)
         sources = temp / "Sources"
         shutil.copytree(ROOT / "app/Sources", sources)
@@ -690,7 +690,7 @@ def main():
         probe_checks(ROOT / "app/Sources", WORK / "probe", package)
         harness_checks(package, GIA_MADE[0] if GIA_MADE else None)
     lines = gp.complaints(log)
-    check("Z1 grep \"Reelcut: \" over the log prints nothing", not lines,
+    check("Z1 grep \"Frame Job: \" over the log prints nothing", not lines,
           "; ".join(lines[:4]))
     good = sum(1 for _, ok in RESULTS if ok)
     print(f"\n{good}/{len(RESULTS)} checks passed")

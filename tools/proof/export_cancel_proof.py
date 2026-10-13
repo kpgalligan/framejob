@@ -8,10 +8,10 @@ measurement only sets a flag — the measurement's own loop cancels its reader
 One owned instance on a scratch socket (`mcp.scratch_socket`), launched with
 `-ApplePersistenceIgnoreState YES
 -RCFFmpegImport always -RCFFmpegPath <work>/standin/ffmpeg`, stopped by PID,
-its log at `tools/proof/work/export-cancel/reelcut.log`; nothing else
+its log at `tools/proof/work/export-cancel/framejob.log`; nothing else
 is ever killed. **The instance runs in a scratch home** (issue batch B82,
 #236): `CFFIXED_USER_HOME=<work>/home`, made bare, so the `Rewrapped/` I1's
-conversion lands in is `<work>/home/Library/Application Support/Reelcut/
+conversion lands in is `<work>/home/Library/Application Support/Frame Job/
 Rewrapped/`; the gate, import and cancel groups all use that one instance.
 The M rows' probe (`export_cancel_probe`) keeps the caller's environment.
 Nothing outside `tools/proof/work/` and the scratch socket's own temporary
@@ -55,7 +55,7 @@ M1  `--runs` probe runs, each cancelling `delay` s (uniform in
     `cancelled`, `left` false. Prints the crash count.
 M2  every M1 `latency` ≤ `LATENCY_BOUND` (2.0 s; 1.0 s before B13, when two
     full runs printed 0.889 s and 0.790 s).
-Z1  `grep "Reelcut: "` over this launch's log prints nothing.
+Z1  `grep "Frame Job: "` over this launch's log prints nothing.
 
     python3 tools/proof/export_cancel_proof.py [--app PATH]
         [--only gate,import,cancel] [--runs 30] [--mutant NAME]
@@ -109,7 +109,7 @@ SOURCES = ROOT / "app/Sources"
 A_MOV = ROOT / "tools/proof/media/A.mov"
 # The instance's scratch home (B82), made bare after WORK is remade.
 HOME = WORK / "home"
-REWRAPPED = HOME / "Library/Application Support/Reelcut/Rewrapped"
+REWRAPPED = HOME / "Library/Application Support/Frame Job/Rewrapped"
 CALL_BOUND = 600
 FFMPEG_SLEEP = 45
 NOISE_SECONDS = 60
@@ -257,12 +257,12 @@ def build_probe(sources=None, probe_dir=None):
                                 str(metallib)], 300)
         if step["rc"] != 0 or not metallib.exists():
             return None, f"the shader did not build: {step['stderr'][-400:]}"
-    lib = ROOT / "core/target/release/libreelcut_core.a"
+    lib = ROOT / "core/target/release/libframejob_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
         built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
-                                  output=binary, defines=["REELCUT_DEV_TOOLS"], timeout=900)
+                                  output=binary, defines=["FRAMEJOB_DEV_TOOLS"], timeout=900)
     except swift_build.SwiftBuildFailed as error:
         return None, (f"swiftc rc {error.rc if error.rc is not None else 'before running'}: "
                       f"{(error.diagnostics or ['(no output)'])[:6]}")
@@ -329,7 +329,7 @@ def nest_kind(clip):
 
 
 def run_gate(client):
-    pkg = WORK / "gate.reelcut"
+    pkg = WORK / "gate.framejob"
     made = attempt(client, "new_project", {"path": str(pkg)})
     wrote = attempt(client, "write_graphic", {"project": str(pkg), "name": "gate",
                                               "source": GATE_JS})
@@ -436,7 +436,7 @@ def run_import(client):
     stem = f"slow-{hexed}"
     fixture = WORK / f"{stem}.mkv"
     fixture.write_bytes(os.urandom(4096))
-    pkg = WORK / "import.reelcut"
+    pkg = WORK / "import.framejob"
     made = attempt(client, "new_project", {"path": str(pkg)})
     started = time.monotonic()
     got = attempt(client, "import_media", {"project": str(pkg), "path": str(fixture)})
@@ -498,7 +498,7 @@ def build_noise_fixture(client):
     """The M fixture over MCP: the saved package, or None and why."""
     noise = WORK / "noise.wav"
     write_noise(noise, NOISE_SECONDS)
-    pkg = WORK / "noise.reelcut"
+    pkg = WORK / "noise.framejob"
     steps = [attempt(client, "new_project", {"path": str(pkg)})]
     imported = attempt(client, "import_media", {"project": str(pkg), "path": str(noise)})
     steps.append(imported)
@@ -615,7 +615,7 @@ def main():
         if binary is None:
             print(f"  probe: did not build — {why}", flush=True)
 
-    log = WORK / "reelcut.log"
+    log = WORK / "framejob.log"
     instance = Instance(args.app, log)
     pkg, pkg_why = None, "the instance did not start"
     try:
@@ -629,12 +629,12 @@ def main():
     finally:
         instance.stop()
     try:
-        complaints = [line.strip() for line in open(log) if "Reelcut: " in line]
+        complaints = [line.strip() for line in open(log) if "Frame Job: " in line]
     except OSError:
         complaints = ["the log could not be read"]
     if "cancel" in groups:
         run_cancel(binary, why, pkg, pkg_why, args.runs)
-    check("Z1 grep \"Reelcut: \" over this launch's log prints nothing",
+    check("Z1 grep \"Frame Job: \" over this launch's log prints nothing",
           not complaints and log.exists(), f"{complaints[:5]}")
 
     missing = [row for row in selected if row not in rows]

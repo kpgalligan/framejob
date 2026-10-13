@@ -24,7 +24,7 @@ const STRINGS: [&str; 24] = [
     "illumination",
     "WWW mm",
     "Hello, world!",
-    "Reelcut",
+    "Frame Job",
     "0",
     "42",
     "2026",

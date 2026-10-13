@@ -6,7 +6,7 @@ The compositor stays the one writer and the texture key decides, so an
 export with the prefetch ON must be the serial path's file, and most of its
 graphic rasters must come from the workers. Two owned instances, one after
 the other, each on a scratch socket, launched and stopped by PID, logs under
-`tools/proof/work/graphics-prefetch/`: OFF with `-ReelcutGraphicPrefetchOff
+`tools/proof/work/graphics-prefetch/`: OFF with `-FrameJobGraphicPrefetchOff
 YES`, ON without. Nothing else is ever killed. Every child runs under
 `graphics_spike/bounded.py`.
 
@@ -22,7 +22,7 @@ movies are compared with `video_configuration_proof.py`'s `same_movie`
 
 S0  CONTROL: two OFF exports of F are masked-equal;
 S1  the ON export is masked-equal to S0's;
-S2  ON's log line `[reelcut] graphic prefetch: …` for that export: hits > 0
+S2  ON's log line `[framejob] graphic prefetch: …` for that export: hits > 0
     and hits >= 95% of hits + mismatched + missed;
 S3  OFF's log has no `graphic prefetch:` line;
 S4  ON, a project whose `throw10` throws at frame 10 beside a heavy clip:
@@ -35,7 +35,7 @@ S5  the probe (`graphics_prefetch_probe.swift`, built like
     ON's stderr line has hits > 0 and hits >= 95% of hits + mismatched +
     missed. A probe that will not build is a FAIL;
 S6  MEASURED, not scored: OFF and ON wall seconds;
-Z1  `grep "Reelcut: "` over every log prints nothing.
+Z1  `grep "Frame Job: "` over every log prints nothing.
 
     python3 tools/proof/graphics_prefetch_proof.py [--app PATH]
     python3 tools/proof/graphics_prefetch_proof.py --mutant worker-frame-plus-one
@@ -175,7 +175,7 @@ class Instance:
 
     def start(self, timeout=CALL_BOUND):
         offset = self.log.stat().st_size if self.log.exists() else 0
-        extra = ["-ReelcutGraphicPrefetchOff", "YES"] if self.off else []
+        extra = ["-FrameJobGraphicPrefetchOff", "YES"] if self.off else []
         with open(self.log, "a") as out:
             self.child = subprocess.Popen(
                 [str(self.app), "-ApplePersistenceIgnoreState", "YES"] + extra,
@@ -344,7 +344,7 @@ def complaints():
     found = []
     for log in logs:
         try:
-            found += [line.strip() for line in open(log, errors="replace") if "Reelcut: " in line]
+            found += [line.strip() for line in open(log, errors="replace") if "Frame Job: " in line]
         except OSError:
             found.append(f"{log} could not be read")
     return found
@@ -384,7 +384,7 @@ def build_probe():
                                 str(metallib)], 300)
         if step["rc"] != 0 or not metallib.exists():
             return None, f"the shader did not build: {step['stderr'][-400:]}"
-    lib = ROOT / "core/target/release/libreelcut_core.a"
+    lib = ROOT / "core/target/release/libframejob_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
@@ -431,7 +431,7 @@ def run_s5(package):
 # ---- the rows ---------------------------------------------------------------
 
 def run_all(app):
-    package = WORK / "F.reelcut"
+    package = WORK / "F.framejob"
     off_log, on_log = WORK / "off.log", WORK / "on.log"
 
     off = Instance(app, off_log, off=True)
@@ -463,7 +463,7 @@ def run_all(app):
         lines_off = lines_since(off_log, 0)
         check("S3", lines_off == [], f"OFF's prefetch lines {lines_off}")
 
-        throw = WORK / "T.reelcut"
+        throw = WORK / "T.framejob"
         made_t, detail_t = graphic_project(
             client, throw, [("heavy", HEAVY_JS), ("throw10", THROW10_JS)],
             [("heavy", None), ("throw10", None)], tail=False)
@@ -505,7 +505,7 @@ def build_mutant(name):
     app, reason = tree_copy.build_app(copy, 1500)
     if app is None:
         return None, reason
-    return app / "Contents/MacOS/Reelcut", ""
+    return proof_app.executable(app), ""
 
 
 def run_mutant(name):
@@ -516,7 +516,7 @@ def run_mutant(name):
         print(f"mutant {name}: the control could not be performed — the copy was not built: "
               f"{why}")
         return 2
-    package = WORK / "M.reelcut"
+    package = WORK / "M.framejob"
     on_log = WORK / "mutant-on.log"
     movie_off = None
     if name == "unguarded":

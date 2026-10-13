@@ -18,8 +18,8 @@
 //! here, so a change in the module fails these tests instead of moving with
 //! them. Op arguments are `core/src/op_table.rs`'s.
 
-use reelcut_core::source_window::SourceBound;
-use reelcut_core::{Outcome, Project};
+use framejob_core::source_window::SourceBound;
+use framejob_core::{Outcome, Project};
 use serde_json::{json, Value};
 
 mod common;

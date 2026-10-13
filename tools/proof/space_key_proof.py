@@ -19,7 +19,7 @@ only they.
 
 S2h (road map 12 A2) is the Assistant tab's composer. The probe runs with a
 DUMMY key in a `-RCSecretFolder` of its own (so the composer shows),
-`-ReelcutInspectorCollapsed NO`, and ANTHROPIC_API_KEY and RC_ASSEMBLYAI_KEY
+`-FrameJobInspectorCollapsed NO`, and ANTHROPIC_API_KEY and RC_ASSEMBLYAI_KEY
 popped from its environment: no person's key is read.
 """
 
@@ -32,6 +32,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2_chrome as e2  # noqa: E402  (the helpers: clip, project, write_package)
+import reference_build  # noqa: E402
 import swift_build  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -85,13 +86,20 @@ def packages():
 # The probe.
 
 
-def build_shader(out):
-    """The app's own `Compositor.metal` beside the binary."""
+def build_shader(out, tree=ROOT):
+    """The app's own `Compositor.metal` beside the binary, its entry points
+    named as `tree`'s sources ask for them (`reference_build.tree_shader`)."""
     lib = os.path.join(out, "default.metallib")
     air = os.path.join(out, "Compositor.air")
-    if os.path.exists(lib) and os.path.getmtime(SHADER) < os.path.getmtime(lib):
+    source = os.path.join(out, "Compositor.metal")
+    with open(SHADER) as f:
+        text = reference_build.tree_shader(tree, f.read())
+    if not os.path.exists(source) or open(source).read() != text:
+        with open(source, "w") as f:
+            f.write(text)
+    if os.path.exists(lib) and os.path.getmtime(source) < os.path.getmtime(lib):
         return lib, None
-    step = subprocess.run(["xcrun", "-sdk", "macosx", "metal", "-c", SHADER, "-o", air],
+    step = subprocess.run(["xcrun", "-sdk", "macosx", "metal", "-c", source, "-o", air],
                           capture_output=True, text=True)
     if step.returncode != 0:
         return None, "xcrun metal failed: " + step.stderr.strip()[:300]
@@ -111,15 +119,16 @@ def build_probe(sources, out, reference=False):
         with open(entry, "w") as f:
             f.write(source)
     binary = os.path.join(out, "space-key-probe")
-    shader, why = build_shader(out)
+    shader, why = build_shader(out, os.path.dirname(os.path.dirname(sources)))
     if shader is None:
         return None, why
     swift = sorted(os.path.join(sources, n) for n in os.listdir(sources)
                    if n.endswith(".swift") and n != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    defines = ["HARNESS_REFERENCE_BUILD"] if reference else []
+    defines = reference_build.tree_defines(os.path.dirname(os.path.dirname(sources)),
+                                           ["HARNESS_REFERENCE_BUILD"] if reference else [])
     try:
         built = swift_build.build(sources=swift + [entry], output=binary, defines=defines)
     except swift_build.SwiftBuildFailed as error:
@@ -154,7 +163,7 @@ def probe_checks(sources, out, paths, reference=False):
     env.pop("ANTHROPIC_API_KEY", None)
     env.pop("RC_ASSEMBLYAI_KEY", None)
     result = subprocess.run([binary, request, answer, "-RCSecretFolder", secrets,
-                             "-ReelcutInspectorCollapsed", "NO"],
+                             "-FrameJobInspectorCollapsed", "NO"],
                             capture_output=True, text=True, timeout=300, env=env)
     if result.returncode != 0 or not os.path.exists(answer):
         check("the probe runs", False, (result.stdout + result.stderr).strip()[-400:])
@@ -178,7 +187,8 @@ def baseline(commit):
     if os.path.exists(tree):
         shutil.rmtree(tree)
     os.makedirs(tree)
-    archive = subprocess.run(["git", "-C", ROOT, "archive", commit, "app/Sources"],
+    archive = subprocess.run(["git", "-C", ROOT, "archive", commit, "app/Sources",
+                              "app/Bridging"],
                              capture_output=True)
     if archive.returncode != 0:
         print(f"BASELINE FAILURE: git archive {commit} failed: "

@@ -1,15 +1,15 @@
 [package]
-name = "reelcut-mcp"
+name = "framejob-mcp"
 version = "0.1.0"
 edition = "2021"
 publish = false
 
 [lib]
-name = "reelcut_mcp"
+name = "framejob_mcp"
 path = "src/lib.rs"
 
 [[bin]]
-name = "reelcut-mcp"
+name = "framejob-mcp"
 path = "src/main.rs"
 
 [dependencies]

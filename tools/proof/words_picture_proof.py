@@ -19,7 +19,7 @@ R6  set_text's patch description names case, words and word_style;
 R7  an UNTIMED page with a colour-only word_style equals its unstyled twin.
 
 It launches nothing and kills nothing: the caller owns the instance at the
-socket, relaunched fresh, and has checked `grep "Reelcut: " <dir>/reelcut.log`
+socket, relaunched fresh, and has checked `grep "Frame Job: " <dir>/framejob.log`
 prints nothing.
 """
 
@@ -70,7 +70,7 @@ def text_clip(clip, start, duration, text):
 
 def package(name, clips):
     """A fresh version-9 package in `work/words-picture/`, one track."""
-    path = os.path.join(WORK, f"{name}.reelcut")
+    path = os.path.join(WORK, f"{name}.framejob")
     shutil.rmtree(path, ignore_errors=True)
     os.makedirs(path)
     document = {

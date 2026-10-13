@@ -113,7 +113,7 @@ the tone is the caller's and not the instrument's. The mode's one later
 addition is `store`, four magnitudes going straight into `LevelMeterSink`
 in place of a measured file, for the one reading a buffer cannot carry.
 
-The package is written BY HAND (a `.reelcut` is a directory holding
+The package is written BY HAND (a `.framejob` is a directory holding
 `project.json`, spec §5.2) around one text clip, so nothing loads
 asynchronously and every render is deterministic — no media at all. One
 package is enough: the meter reads `LevelMeter.shared` and not the document,
@@ -223,8 +223,8 @@ BEFORE = os.path.join(CHROME, "before")
 SIGNALS = os.path.join(CHROME, "signals")
 BUILD = os.path.join(HERE, "harness", "build.sh")
 HARNESS_MAIN = os.path.join(HERE, "harness", "main.swift")
-STATICLIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
-BRIDGING = os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h")
+STATICLIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
+BRIDGING = os.path.join(ROOT, "app", "Bridging", "FrameJob-Bridging-Header.h")
 FONTS = os.path.join(ROOT, "app", "Resources", "Fonts")
 # The file whose arrival IS the meter. The reference build is the tree one
 # commit before it, and the check in section 2 is that the extracted tree
@@ -398,7 +398,7 @@ def project_json():
 
 
 def write_package():
-    path = os.path.join(CHROME, "bar.reelcut")
+    path = os.path.join(CHROME, "bar.framejob")
     os.makedirs(path, exist_ok=True)
     with open(os.path.join(path, "project.json"), "w") as f:
         json.dump(project_json(), f, indent=2)

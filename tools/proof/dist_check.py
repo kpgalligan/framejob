@@ -2,8 +2,8 @@
 """Road map 11 V0, road map 12 A4, #145, road map 14 MC3 and build velocity — the binary check `make dist` runs.
 
 The Distribution configuration is Release without the Swift condition
-`REELCUT_DEV_TOOLS` (spec §11 V-1), so its binary must hold none of the dev
-tools' code. This reads each app's `Contents/MacOS/Reelcut` in process, as
+`FRAMEJOB_DEV_TOOLS` (spec §11 V-1), so its binary must hold none of the dev
+tools' code. This reads each app's `Contents/MacOS/Frame Job` in process, as
 bytes, and looks for ONE needle: the `devToolsMarker` literal declared in
 `app/Sources/AgentServer+DevTools.swift`, read out of that file at every run.
 
@@ -19,7 +19,7 @@ on it would pass for nothing. The marker is at least 16 bytes, and the flag-on
 `devTools()` logs it, which keeps the literal live in the optimised binary.
 
 **The helper (road map 12 A4).** Both bundles carry the assistant helper,
-`Contents/Helpers/reelcut-agent`, which `agent/build.sh helper` copies in and
+`Contents/Helpers/framejob-agent`, which `agent/build.sh helper` copies in and
 signs `--options runtime` with `agent/entitlements.plist` before Xcode signs
 the app. Without `com.apple.security.cs.allow-jit` under the hardened runtime
 the helper dies at launch; with more, it holds a right it does not need. The
@@ -41,7 +41,7 @@ it, which nothing here read, because D14 reads Distribution's alone. D25
 reads the Release app's entitlements the same way and wants exactly what
 Xcode's own CodeSign gives it, the Distribution pair plus the
 `com.apple.security.get-task-allow` Xcode injects outside Distribution (the
-processed `Reelcut.app.xcent` of a Release build holds those two): an exact
+processed `Frame Job.app.xcent` of a Release build holds those two): an exact
 set, so a build signed with anything but Xcode's processed entitlements — a
 missing `get-task-allow` as much as a missing microphone — fails, and a
 no-op build cannot ship a different signature from a linking one. D26 / D27
@@ -50,7 +50,7 @@ one its executable `realpath`s into (so a skeleton reads the real app, as
 D14 does).
 
 **The MCP proxy and its snapshot (road map 14 MC3).** Both bundles carry
-`Contents/Helpers/reelcut-mcp`, which `project.yml`'s "Build MCP Proxy"
+`Contents/Helpers/framejob-mcp`, which `project.yml`'s "Build MCP Proxy"
 phase copies in and signs `--options runtime` with NO entitlements (a plain
 Rust binary needs none), and `Contents/Resources/agent-catalog.json`, which
 the "Write Agent Catalog" phase writes by running the just-built app with
@@ -112,28 +112,31 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import proof_app  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SEAM = os.path.join(ROOT, "app", "Sources", "AgentServer+DevTools.swift")
-DEFAULT_RELEASE = os.path.join(ROOT, "build", "Build", "Products", "Release", "Reelcut.app")
-DEFAULT_DIST = os.path.join(ROOT, "build", "Build", "Products", "Distribution", "Reelcut.app")
+DEFAULT_RELEASE = os.path.join(ROOT, "build", "Build", "Products", "Release", "Frame Job.app")
+DEFAULT_DIST = os.path.join(ROOT, "build", "Build", "Products", "Distribution", "Frame Job.app")
 
 # The declaration line, bare: nothing after the closing quote.
 DECLARATION = re.compile(r'^\s*static let devToolsMarker = "([^"\\\n]+)"\s*$', re.M)
 # Below this, the literal is stored inline in code and never found as bytes.
 MIN_BYTES = 16
 # The assistant helper, inside each bundle; its one entitlement (agent/entitlements.plist).
-HELPER = os.path.join("Contents", "Helpers", "reelcut-agent")
+HELPER = os.path.join("Contents", "Helpers", "framejob-agent")
 ENTITLEMENTS = {"com.apple.security.cs.allow-jit": True}
 # The Distribution app's one entitlement (#145): the microphone, never get-task-allow.
 APP_ENTITLEMENTS = {"com.apple.security.device.audio-input": True}
 # The Release app's (B88): Distribution's plus the get-task-allow Xcode injects outside it.
 RELEASE_ENTITLEMENTS = {**APP_ENTITLEMENTS, "com.apple.security.get-task-allow": True}
 # The MCP proxy and its catalog snapshot, inside each bundle (road map 14 MC3).
-PROXY = os.path.join("Contents", "Helpers", "reelcut-mcp")
+PROXY = os.path.join("Contents", "Helpers", "framejob-mcp")
 SNAPSHOT = os.path.join("Contents", "Resources", "agent-catalog.json")
 INFO_PLIST = os.path.join("Contents", "Info.plist")
-# The flag-on devHandlers table, inside the seam's `#if REELCUT_DEV_TOOLS` block.
-DEV_BLOCK = re.compile(r"^\s*#if REELCUT_DEV_TOOLS\s*$(.*?)^\s*#else\s*$", re.M | re.S)
+# The flag-on devHandlers table, inside the seam's `#if FRAMEJOB_DEV_TOOLS` block.
+DEV_BLOCK = re.compile(r"^\s*#if FRAMEJOB_DEV_TOOLS\s*$(.*?)^\s*#else\s*$", re.M | re.S)
 DEV_TABLE = re.compile(r"private static let devHandlers: \[String: ToolHandler\] = \[(.*?)\n\s*\]",
                        re.S)
 DEV_KEY = re.compile(r'^\s*"([a-z_]+)":', re.M)
@@ -177,7 +180,7 @@ def read_needle():
 
 def read_binary(app):
     """The app's executable's bytes, or None with the reason."""
-    path = os.path.join(app, "Contents", "MacOS", "Reelcut")
+    path = str(proof_app.executable(app))
     try:
         with open(path, "rb") as handle:
             return handle.read(), path
@@ -302,7 +305,7 @@ def dev_names():
         return None, f"cannot read {SEAM}: {error}"
     block = DEV_BLOCK.search(text)
     if block is None:
-        return None, f"no `#if REELCUT_DEV_TOOLS` … `#else` block in {SEAM}"
+        return None, f"no `#if FRAMEJOB_DEV_TOOLS` … `#else` block in {SEAM}"
     table = DEV_TABLE.search(block.group(1))
     if table is None:
         return None, f"no flag-on devHandlers table in {SEAM}"
@@ -352,8 +355,8 @@ def bundle_version(app):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--release", default=DEFAULT_RELEASE, help="the Release Reelcut.app")
-    parser.add_argument("--dist", default=DEFAULT_DIST, help="the Distribution Reelcut.app")
+    parser.add_argument("--release", default=DEFAULT_RELEASE, help="the Release Frame Job.app")
+    parser.add_argument("--dist", default=DEFAULT_DIST, help="the Distribution Frame Job.app")
     arguments = parser.parse_args()
 
     needle, needle_reason = read_needle()

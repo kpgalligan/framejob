@@ -45,12 +45,12 @@ case "$1" in
     bun run build
     HELPERS="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
     mkdir -p "$HELPERS"
-    cp "$AGENT/../build/agent/reelcut-agent" "$HELPERS/"
+    cp "$AGENT/../build/agent/framejob-agent" "$HELPERS/"
     IDENTITY="${EXPANDED_CODE_SIGN_IDENTITY:--}"
     TIMESTAMP=""
     if [ "$IDENTITY" != "-" ]; then TIMESTAMP="--timestamp"; fi
     codesign --force --options runtime $TIMESTAMP \
       --entitlements "$AGENT/entitlements.plist" \
-      --sign "$IDENTITY" "$HELPERS/reelcut-agent"
+      --sign "$IDENTITY" "$HELPERS/framejob-agent"
     ;;
 esac

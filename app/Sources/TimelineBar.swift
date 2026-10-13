@@ -49,9 +49,9 @@ enum TimelineBar {
 
         let size = OptionSegmentedControl(
             segments: [
-                (symbol: "reelcut.small", fallback: "S", tooltip: "Small tracks"),
-                (symbol: "reelcut.medium", fallback: "M", tooltip: "Medium tracks"),
-                (symbol: "reelcut.large", fallback: "L", tooltip: "Large tracks"),
+                (symbol: "framejob.small", fallback: "S", tooltip: "Small tracks"),
+                (symbol: "framejob.medium", fallback: "M", tooltip: "Medium tracks"),
+                (symbol: "framejob.large", fallback: "L", tooltip: "Large tracks"),
             ],
             read: { [weak owner] in owner?.trackHeightIndex ?? 1 },
             write: { [weak owner] index in owner?.onTrackHeightChanged?(index) },

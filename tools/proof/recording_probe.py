@@ -12,7 +12,7 @@ segment's readable microphone (section 14, U7, and rows in U1, U2, U6 and
 3r; #181 item 2), and issue batch B64's voice-over (#99 phase 1: section 15
 with no grant, and its granted tier 15g, which records the MICROPHONE alone
 and never the screen), and issue batch B66's voice-over doors (#99 phase 2:
-V9, V10 and section 16, `voiceover_doors`), and Include Reelcut windows
+V9, V10 and section 16, `voiceover_doors`), and Include Frame Job windows
 (section 17, `exclusion`, spec §11 recording.md).
 
 Why a probe and not an MCP script. Three of the things R1a added have no
@@ -49,7 +49,7 @@ mode runs under SEALED grant doors**: before the dispatch the probe's
 `main` puts a `RecorderGrantDoors` in `RecorderPanelController.grantDoors`
 whose three reads are real and whose two prompts, the asked-flag write and
 the System Settings opener do nothing (the opener answering false), so no
-mode can put up a prompt, open a pane or touch `ReelcutScreenRecordingAsked`.
+mode can put up a prompt, open a pane or touch `FrameJobScreenRecordingAsked`.
 It DOES call `record(_:)` — in section 5k (the R1 review's window-row
 guard), because the fix under test is that a press over the "Window…" row
 with no filter refuses at the door and reaches no capture — the tree's path
@@ -99,7 +99,7 @@ sentences differ and name "start"/"20 s" against "writing"/"10 s"
 microphone at <mic>." (finding 6); the grant sentences from a probe — which
 is launched by this script, so `getppid()` is never 1 — are the pane
 sentence as PREFIX plus the launch clause naming the parent's pid (R0 q1:
-a shell-launched Reelcut runs under the terminal's grants, and the pane
+a shell-launched Frame Job runs under the terminal's grants, and the pane
 sentence alone sent a person to grant the wrong application); and **the
 machine past `start`, driven through a faked `Session`** in a second
 request: the review measured that `SCContentFilter()` and
@@ -315,7 +315,7 @@ pinned as pure calls.
 Section 5 (`chrome`) is the CHROME's structure, lane C's 64 scratch rows
 made tracked: a probe compiled over `app/Sources` that instantiates
 `AppDelegate()` and runs `applicationWillFinishLaunching` (`phase6_chrome.py`'s
-menu instrument), with the seven `ReelcutRecording…` keys pinned in the
+menu instrument), with the seven `FrameJobRecording…` keys pinned in the
 argument domain as the harness pins them. The File menu's row after "New
 Project" is "New Recording…", key `n`, modifiers ⌥⌘, action `newRecording:`,
 target nil, exactly one; `validateMenuItem` while idle answers true and
@@ -1079,7 +1079,7 @@ Screen Recording READ is counted: D1 the Source rows end "Window…" (tag 1)
 and "Microphone Only" (tag 2), screens + 3; D2 choosing it greys System
 Audio, Show Clicks and Size with their values kept, Microphone, Rate and
 Record Into live, the size note `voiceOverSizeNote`; D3 the display key
-(a sentinel) and the set of `ReelcutRecording…` keys unchanged, the row
+(a sentinel) and the set of `FrameJobRecording…` keys unchanged, the row
 kept through `rebuildSources()` + `restoreChoices()`; D4 a display row
 brings the three back; D5 Microphone Off refuses with
 `microphoneOffSentence`, no screen read, no microphone request; D6 a
@@ -1110,17 +1110,17 @@ there:
                     (AgentServer+RecordingArguments.swift) — 64/66: D10's
                     display row and its all-five row.
 
-Section 17 (`exclusion`, Include Reelcut windows, spec §11 recording.md;
+Section 17 (`exclusion`, Include Frame Job windows, spec §11 recording.md;
 section 14 on its own branch, renumbered when it merged beside B55's)
-runs in its own process with the six older `ReelcutRecording…` keys pinned
-in the argument domain and the seventh, `ReelcutRecordingIncludeReelcutWindows`,
+runs in its own process with the six older `FrameJobRecording…` keys pinned
+in the argument domain and the seventh, `FrameJobRecordingIncludeFrameJobWindows`,
 NOT pinned — it is the key under test — and removed from
 `UserDefaults.standard` before and after the rows. X1, pure:
 `RecordingExclusion.make` over four cases — (false, "com.example.own", 42)
 → (["com.example.own"], []); (false, nil, 42) → ([], []); (true,
 "com.example.own", 42) → ([], [42]); (true, "com.example.own", nil) → ([],
 []). X2: `RecorderPanelController.shared` with the key absent → the
-checkbox off and `currentChoice().includeReelcutWindows` false; its title,
+checkbox off and `currentChoice().includeFrameJobWindows` false; its title,
 its target the panel and its action `controlChanged:`, in the panel's
 window; set on and `controlChanged(checkbox)` → the key reads true and the
 choice is true; set off with no action, then `restoreChoices()` → on. X3:
@@ -1130,19 +1130,19 @@ comment-stripped sources (`read_code`, `function_body`): `presentPicker`
 sets `excludedBundleIDs` and `excludedWindowIDs` from
 `recordingExclusion(`'s value and never names
 `Bundle.main.bundleIdentifier`; `startRecording` passes `excluding:` and
-builds the exclusion from `choice.includeReelcutWindows` above the
+builds the exclusion from `choice.includeFrameJobWindows` above the
 `shareableContent` closure; `recordScreen` reads
-`"include_reelcut_windows"` above `screenRecordingGranted` and passes it
+`"include_framejob_windows"` above `screenRecordingGranted` and passes it
 to `RecordingExclusion.make(` (with `panelWindowID: nil`) and to
 `RecordingChoice(`; and `filter`'s display arm holds
 `excludingApplications:` and `excludingWindows:`. What no row here can see
-is a recording's PICTURE with Reelcut in it — REC-11 is the person's check.
+is a recording's PICTURE with Frame Job in it — REC-11 is the person's check.
 
-**Include Reelcut windows' mutants** (section 17), measured 2026-09-30 on
+**Include Frame Job windows' mutants** (section 17), measured 2026-09-30 on
 its branch, each `--mutant <name> --only exclusion` (28 rows, the build row
 among them), against a tree scoring `--only exclusion` 28/28; each exits 1:
 
-  exclusion-ignores-include  `make`'s `if includeReelcutWindows` → `if false`
+  exclusion-ignores-include  `make`'s `if includeFrameJobWindows` → `if false`
                     (ScreenRecorder+Content.swift) — 26/28: X1's two
                     include rows.
   choice-drops-include  `currentChoice()`'s read of the checkbox deleted
@@ -1181,7 +1181,7 @@ in its pin map (R1's landing): both cross-builds are one program again.
     python3 tools/proof/recording_probe.py --only leftout   # B61's
     python3 tools/proof/recording_probe.py --only voiceover,voiceover_granted   # B64's
     python3 tools/proof/recording_probe.py --only voiceover,voiceover_doors   # B66's
-    python3 tools/proof/recording_probe.py --only exclusion   # Include Reelcut windows
+    python3 tools/proof/recording_probe.py --only exclusion   # Include Frame Job windows
     python3 tools/proof/recording_probe.py --mutant excludes
     python3 tools/proof/recording_probe.py --sources <dir> # any copy
     RC_APP_SOURCES=<dir> python3 tools/proof/recording_probe.py
@@ -1222,8 +1222,8 @@ BEFORE = os.path.join(PROBE, "before")
 RENDERS = os.path.join(PROBE, "welcome")
 BUILD = os.path.join(ROOT, "tools", "proof", "harness", "build.sh")
 HARNESS_MAIN = os.path.join(ROOT, "tools", "proof", "harness", "main.swift")
-STATICLIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
-BRIDGING = os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h")
+STATICLIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
+BRIDGING = os.path.join(ROOT, "app", "Bridging", "FrameJob-Bridging-Header.h")
 FONTS = os.path.join(ROOT, "app", "Resources", "Fonts")
 WELCOME_FILE = "app/Sources/WelcomeWindowController.swift"
 
@@ -1381,7 +1381,7 @@ func files(_ request: [String: Any]) -> [String: Any] {
         "resolution": choice.resolution.rawValue, "microphone": choice.microphone as Any,
         "newProject": choice.destination == .newProject,
         "mainDisplay": choice.source == .display(CGMainDisplayID()),
-        "includeReelcutWindows": choice.includeReelcutWindows,
+        "includeFrameJobWindows": choice.includeFrameJobWindows,
     ]
     return out
 }
@@ -3621,7 +3621,7 @@ func chrome(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.displayKey: 0, RecorderPanelController.microphoneKey: "",
         RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
         RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
-        RecorderPanelController.includeReelcutWindowsKey: false,
+        RecorderPanelController.includeFrameJobWindowsKey: false,
     ], forName: UserDefaults.argumentDomain)
     // The one call that builds the menu: `buildMainMenu()` is private.
     let delegate = AppDelegate()
@@ -3693,8 +3693,8 @@ func chrome(_ request: [String: Any]) -> [String: Any] {
     info["microphoneOff"] = choice.microphone == nil
     info["newProject"] = choice.destination == .newProject
     info["mainDisplay"] = choice.source == .display(CGMainDisplayID())
-    info["includeReelcutWindows"] = choice.includeReelcutWindows
-    info["includeReelcutTitle"] = panel.includeReelcutCheckbox.title
+    info["includeFrameJobWindows"] = choice.includeFrameJobWindows
+    info["includeFrameJobTitle"] = panel.includeFrameJobCheckbox.title
     info["idle"] = panel.phase == .idle
     info["controlsEnabled"] = panel.sourcePopup.isEnabled && panel.destinationPopup.isEnabled
     info["countdownHidden"] = panel.countdownLabel.isHidden
@@ -3721,7 +3721,7 @@ func chrome(_ request: [String: Any]) -> [String: Any] {
     out["keys"] = [RecorderPanelController.displayKey, RecorderPanelController.microphoneKey,
                    RecorderPanelController.systemAudioKey, RecorderPanelController.showClicksKey,
                    RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
-                   RecorderPanelController.includeReelcutWindowsKey]
+                   RecorderPanelController.includeFrameJobWindowsKey]
 
     // AccentButton stores its fill.
     let plain = AccentButton(title: "x", symbol: nil, fallback: "", tooltip: "", action: nil)
@@ -3928,7 +3928,7 @@ func chromePause(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.displayKey: 0, RecorderPanelController.microphoneKey: "",
         RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
         RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
-        RecorderPanelController.includeReelcutWindowsKey: false,
+        RecorderPanelController.includeFrameJobWindowsKey: false,
     ], forName: UserDefaults.argumentDomain)
     let delegate = AppDelegate()
     delegate.applicationWillFinishLaunching(
@@ -4196,7 +4196,7 @@ func filePause(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.displayKey: 0, RecorderPanelController.microphoneKey: "",
         RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
         RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
-        RecorderPanelController.includeReelcutWindowsKey: false,
+        RecorderPanelController.includeFrameJobWindowsKey: false,
     ], forName: UserDefaults.argumentDomain)
     let delegate = AppDelegate()
     delegate.applicationWillFinishLaunching(
@@ -4576,7 +4576,7 @@ func granted(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.displayKey: 0, RecorderPanelController.microphoneKey: "",
         RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
         RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
-        RecorderPanelController.includeReelcutWindowsKey: false,
+        RecorderPanelController.includeFrameJobWindowsKey: false,
         RecordingFiles.folderDefaultsKey: folder.path,
         FFmpegRewrap.policyDefaultsKey: FFmpegRewrap.Policy.never.rawValue,
         "ApplePersistenceIgnoreState": true,
@@ -4617,7 +4617,7 @@ func granted(_ request: [String: Any]) -> [String: Any] {
         filter = try ScreenRecorder.filter(
             for: .display(CGMainDisplayID()), in: content,
             excluding: RecordingExclusion.make(
-                includeReelcutWindows: false, ownBundleID: Bundle.main.bundleIdentifier,
+                includeFrameJobWindows: false, ownBundleID: Bundle.main.bundleIdentifier,
                 panelWindowID: nil))
     } catch { return ["error": "\(error)"] }
     out["filter"] = ["width": Double(filter.contentRect.width),
@@ -4700,7 +4700,7 @@ func granted(_ request: [String: Any]) -> [String: Any] {
 
 /// The doors every mode runs under (installed before the dispatch): the
 /// three READS are real, and every door that could prompt, open System
-/// Settings or write `ReelcutScreenRecordingAsked` does nothing — so no mode,
+/// Settings or write `FrameJobScreenRecordingAsked` does nothing — so no mode,
 /// the window-row mutant's fall-through and the granted tier's press
 /// included, can put up a prompt or a pane.
 func sealedDoors() -> RecorderGrantDoors {
@@ -4843,7 +4843,7 @@ func grants(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.displayKey: 0, RecorderPanelController.microphoneKey: "",
         RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
         RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
-        RecorderPanelController.includeReelcutWindowsKey: false,
+        RecorderPanelController.includeFrameJobWindowsKey: false,
     ], forName: UserDefaults.argumentDomain)
     let panel = RecorderPanelController.shared
     // show() ONCE: in .idle it rebuilds the microphone popup, which would
@@ -5021,7 +5021,7 @@ func preroll(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.displayKey: 0, RecorderPanelController.microphoneKey: "",
         RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
         RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
-        RecorderPanelController.includeReelcutWindowsKey: false,
+        RecorderPanelController.includeFrameJobWindowsKey: false,
     ], forName: UserDefaults.argumentDomain)
     let shared = ScreenRecorder.shared
     let panel = RecorderPanelController.shared
@@ -5510,7 +5510,7 @@ func voiceoverGranted(_ request: [String: Any]) -> [String: Any] {
 
 /// D1–D11 (issue batch B66) over `RecorderPanelController.shared`, NEVER
 /// shown, under a `GrantSpy`'s doors whose Screen Recording read is counted,
-/// and `AgentServer.shared`'s argument reader. The seven `ReelcutRecording…`
+/// and `AgentServer.shared`'s argument reader. The seven `FrameJobRecording…`
 /// values are put back as they were at the end, so the probe's own defaults
 /// domain is left as it was found.
 func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
@@ -5520,7 +5520,7 @@ func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.displayKey, RecorderPanelController.microphoneKey,
         RecorderPanelController.systemAudioKey, RecorderPanelController.showClicksKey,
         RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
-        RecorderPanelController.includeReelcutWindowsKey,
+        RecorderPanelController.includeFrameJobWindowsKey,
     ]
     let originals = keys.map { UserDefaults.standard.object(forKey: $0) }
     defer {
@@ -5553,7 +5553,7 @@ func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
         [
             "systemAudio": panel.systemAudioSwitch.isEnabled, "showClicks": panel.showClicksSwitch.isEnabled,
             "size": panel.sizePopup.isEnabled,
-            "includeReelcut": panel.includeReelcutCheckbox.isEnabled,
+            "includeFrameJob": panel.includeFrameJobCheckbox.isEnabled,
             "values": [
                 panel.systemAudioSwitch.state == .on ? 1 : 0, panel.showClicksSwitch.state == .on ? 1 : 0,
                 panel.sizePopup.indexOfSelectedItem,
@@ -5561,7 +5561,7 @@ func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
         ]
     }
     func recordingKeys() -> [String] {
-        UserDefaults.standard.dictionaryRepresentation().keys.filter { $0.hasPrefix("ReelcutRecording") }.sorted()
+        UserDefaults.standard.dictionaryRepresentation().keys.filter { $0.hasPrefix("FrameJobRecording") }.sorted()
     }
     out["visible"] = panel.window?.isVisible ?? true
     out["shown"] = false
@@ -5734,7 +5734,7 @@ func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
     return out
 }
 
-// ---- mode "exclusion": Include Reelcut windows (spec §11 recording.md; section 17) ----
+// ---- mode "exclusion": Include Frame Job windows (spec §11 recording.md; section 17) ----
 /// Its own process, with the six older keys pinned in the argument domain
 /// and the seventh NOT pinned — it is the key under test — and removed from
 /// `UserDefaults.standard` before and after the rows.
@@ -5747,7 +5747,7 @@ func exclusionMode(_ request: [String: Any]) -> [String: Any] {
         let bundle = row["bundle"] as? String
         let panelID = (row["panel"] as? Int).map { CGWindowID($0) }
         let made = RecordingExclusion.make(
-            includeReelcutWindows: include, ownBundleID: bundle, panelWindowID: panelID)
+            includeFrameJobWindows: include, ownBundleID: bundle, panelWindowID: panelID)
         return ["tag": row["tag"] as? String ?? "", "bundleIDs": made.bundleIDs,
                 "windowIDs": made.windowIDs.map { Int($0) }]
     }
@@ -5760,16 +5760,16 @@ func exclusionMode(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
         RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
     ], forName: UserDefaults.argumentDomain)
-    let key = RecorderPanelController.includeReelcutWindowsKey
+    let key = RecorderPanelController.includeFrameJobWindowsKey
     UserDefaults.standard.removeObject(forKey: key)
     let panel = RecorderPanelController.shared
-    let box = panel.includeReelcutCheckbox
+    let box = panel.includeFrameJobCheckbox
     panel.restoreChoices()
     var x2: [String: Any] = [:]
     x2["key"] = key
     x2["absent"] = UserDefaults.standard.object(forKey: key) == nil
     x2["offWhenAbsent"] = box.state == .off
-    x2["choiceOffWhenAbsent"] = panel.currentChoice().includeReelcutWindows == false
+    x2["choiceOffWhenAbsent"] = panel.currentChoice().includeFrameJobWindows == false
     x2["title"] = box.title
     x2["targetIsPanel"] = box.target === panel
     x2["action"] = box.action.map { NSStringFromSelector($0) } ?? ""
@@ -5777,7 +5777,7 @@ func exclusionMode(_ request: [String: Any]) -> [String: Any] {
     box.state = .on
     panel.controlChanged(box)
     x2["keyAfterOn"] = UserDefaults.standard.object(forKey: key) as? Bool as Any
-    x2["choiceAfterOn"] = panel.currentChoice().includeReelcutWindows
+    x2["choiceAfterOn"] = panel.currentChoice().includeFrameJobWindows
     box.state = .off
     panel.restoreChoices()
     x2["restoredOn"] = box.state == .on
@@ -5807,7 +5807,7 @@ guard args.count >= 3 else {
     exit(2)
 }
 // Sealed before any mode runs: no mode can prompt, open System Settings or
-// touch `ReelcutScreenRecordingAsked` (section 10's rows put spies in).
+// touch `FrameJobScreenRecordingAsked` (section 10's rows put spies in).
 RecorderPanelController.grantDoors = sealedDoors()
 var answer: [String: Any] = [:]
 do {
@@ -5895,7 +5895,7 @@ def build_probe(sources):
         os.path.join(sources, name)
         for name in os.listdir(sources)
         if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
@@ -5978,8 +5978,8 @@ def section_files(binary, sources):
           f"got {answer.get('folderPinned')!r}")
     check("1a: the key is spelled `RCRecordingFolder`",
           answer.get("keyRead") == "RCRecordingFolder", f"got {answer.get('keyRead')!r}")
-    default = os.path.expanduser("~/Movies/Reelcut Recordings")
-    check("1a: folder() without the override is `~/Movies/Reelcut Recordings` (decision 2)",
+    default = os.path.expanduser("~/Movies/Frame Job Recordings")
+    check("1a: folder() without the override is `~/Movies/Frame Job Recordings` (decision 2)",
           answer.get("folderDefault") == default, f"got {answer.get('folderDefault')!r}")
     check("1a: RecordingChoice().folder defaults to folder()",
           answer.get("choiceFolder") == default, f"got {answer.get('choiceFolder')!r}")
@@ -6011,7 +6011,7 @@ def section_files(binary, sources):
     defaults = answer.get("choiceDefaults") or {}
     for key, want in [("rate", 60), ("systemAudio", True), ("showClicks", False),
                       ("resolution", "nominal"), ("microphone", None), ("newProject", True),
-                      ("mainDisplay", True), ("includeReelcutWindows", False)]:
+                      ("mainDisplay", True), ("includeFrameJobWindows", False)]:
         check(f"1f: RecordingChoice() default {key} = {want!r}", defaults.get(key) == want,
               f"got {defaults.get(key)!r}")
 
@@ -6193,7 +6193,7 @@ def section_state(binary, sources):
           "of the launch clause", isinstance(ppid, int) and ppid != 1, f"got {ppid!r}")
     check("3h: launchClause names the launching process by pid and the two ways out",
           f"launched by another process (pid {ppid})" in clause and "the terminal's" in clause
-          and "open -a Reelcut.app" in clause, f"got {clause!r}")
+          and 'open -a "Frame Job"' in clause, f"got {clause!r}")
     check("3h: screenRecordingRefusal is the pane sentence + the clause — the pane sentence its "
           "PREFIX, so recording_proof.py's match holds",
           bool(clause) and screen == pane + clause and screen.startswith(pane)
@@ -6201,7 +6201,7 @@ def section_state(binary, sources):
     for word in ("notDetermined", "denied", "restricted"):
         text = refusal.get(word) or ""
         check(f"3h: microphoneRefusal(.{word}) keeps its head and ends with the clause",
-              text.startswith(f"The microphone is not granted to Reelcut (status: {word}). ")
+              text.startswith(f"The microphone is not granted to Frame Job (status: {word}). ")
               and text.endswith(clause) and len(text) > len(clause), f"got {text!r}")
 
     section_state_driven(binary, sources)
@@ -6849,7 +6849,7 @@ MIC_LEN = 5 * SEC + 12_000             # the microphone file, 5.02 s
 MIC_LEN_SNAPPED = MIC_LEN // FRAME_30 * FRAME_30                     # 3 000 000
 RECORDING_STEM = "Screen Recording 2026-09-10 at 14.03.22"
 MIC_STEM = "Screen Recording 2026-09-10 at 15.00.00"
-PACKAGE_TYPE = "com.kgalligan.reelcut-project"
+PACKAGE_TYPE = "com.kgalligan.framejob-project"
 DRAG_REFUSAL = "A drag is in progress; the recording can be added when it ends."
 ACTION_NAME = "Add Recording"
 # `untitled(around:)`'s microphone step: it removes the voice and keeps the
@@ -7595,12 +7595,12 @@ PANEL_ROWS = [
     ("recordFillIsClip", True), ("recordTargetIsPanel", True), ("rate", 60),
     ("resolution", "nominal"), ("systemAudio", True), ("showClicks", False),
     ("microphoneOff", True), ("newProject", True), ("mainDisplay", True),
-    ("includeReelcutWindows", False), ("includeReelcutTitle", "Include Reelcut windows"), ("idle", True),
+    ("includeFrameJobWindows", False), ("includeFrameJobTitle", "Include Frame Job windows"), ("idle", True),
     ("controlsEnabled", True), ("countdownHidden", True), ("noteHidden", True), ("meterWidth", 120),
 ]
 COMMAND_OPTION = (1 << 20) | (1 << 19)   # NSEvent.ModifierFlags.command | .option
 RECORDING_KEYS = ["displayKey", "microphoneKey", "systemAudioKey", "showClicksKey", "rateKey", "sizeKey",
-                  "includeReelcutWindowsKey"]
+                  "includeFrameJobWindowsKey"]
 
 
 def section_chrome(binary, sources):
@@ -7665,8 +7665,8 @@ def section_chrome(binary, sources):
     check("5d: … and setNote(\"\") hides it and shrinks the window back",
           rf.get("back") is True and rf.get("noteHiddenAfter") is True, f"{rf}")
     keys = answer.get("keys") or []
-    check("5d: seven distinct ReelcutRecording… keys",
-          len(set(keys)) == 7 and all(k.startswith("ReelcutRecording") for k in keys), f"{keys}")
+    check("5d: seven distinct FrameJobRecording… keys",
+          len(set(keys)) == 7 and all(k.startswith("FrameJobRecording") for k in keys), f"{keys}")
     harness = open(HARNESS_MAIN).read()
     # The pins are spelled as string LITERALS in the harness, not as
     # `RecorderPanelController.<key>`, so that a tree from before the recorder
@@ -7870,8 +7870,8 @@ def section_chrome_pause(binary, sources):
     check("5p: menuTitles(paused: true) is [Resume Recording, Stop Recording]",
           mt.get("paused") == ["Resume Recording", "Stop Recording"], f"{mt.get('paused')}")
     tt = answer.get("tooltip") or {}
-    check("5p: the tooltip says which — 'Reelcut is recording' / 'Reelcut's recording is paused'",
-          tt.get("recording") == "Reelcut is recording" and tt.get("paused") == "Reelcut's recording is paused",
+    check("5p: the tooltip says which — 'Frame Job is recording' / 'Frame Job's recording is paused'",
+          tt.get("recording") == "Frame Job is recording" and tt.get("paused") == "Frame Job's recording is paused",
           f"{tt}")
     check("5p: pauseGlyph is ❚❚ (two heavy vertical bars, U+275A)", answer.get("pauseGlyph") == PAUSE_GLYPH,
           f"{answer.get('pauseGlyph')!r}")
@@ -7977,7 +7977,7 @@ def section_chrome_pause(binary, sources):
           "(with an item it opens the item's menu — openMenu(), a structural read below)",
           rc.get("visible") is False and rc.get("itemUp") is False, f"{rc}")
     lr = answer.get("landingNoteR2") or {}
-    check("5s: landingNote's .userStopped sentence names the SYSTEM's screen-recording indicator (Reelcut's "
+    check("5s: landingNote's .userStopped sentence names the SYSTEM's screen-recording indicator (Frame Job's "
           "own item is a menu-bar item too now)",
           lr.get("userStopped") == "Stopped from the system's screen-recording indicator; the recording was "
           "added.", f"{lr.get('userStopped')!r}")
@@ -8693,7 +8693,7 @@ FILE_GROUP_ORDER = [
     "remove_media", "transcribe", "export_captions", "render_frame", "export",
 ]
 RECORD_SCREEN_ARGUMENTS = [
-    "display", "include_reelcut_windows", "microphone", "path", "place", "project", "rate",
+    "display", "include_framejob_windows", "microphone", "path", "place", "project", "rate",
     "seconds", "show_clicks", "size", "source", "system_audio", "window",
 ]
 
@@ -9725,11 +9725,11 @@ def section_voiceover_doors(binary, sources):
     after = d2.get("after") or {}
     check("D2: choosing it via controlChanged → currentChoice().source is .voiceOver",
           d2.get("source") is True and d2.get("selected") is True, f"{d2}")
-    check("D2: System Audio, Show Clicks, Size and Include Reelcut windows disabled, their values "
+    check("D2: System Audio, Show Clicks, Size and Include Frame Job windows disabled, their values "
           "unchanged (voice-row-live)",
           after.get("systemAudio") is False and after.get("showClicks") is False
-          and after.get("size") is False and after.get("includeReelcut") is False
-          and before.get("includeReelcut") is True
+          and after.get("size") is False and after.get("includeFrameJob") is False
+          and before.get("includeFrameJob") is True
           and after.get("values") == before.get("values")
           and before.get("systemAudio") is True and before.get("values") == [0, 1, 1],
           f"before {before}, after {after}")
@@ -9742,7 +9742,7 @@ def section_voiceover_doors(binary, sources):
 
     d3 = answer.get("D3") or {}
     check("D3: the display key is not written for the row (the sentinel 777 kept), and the set of "
-          "ReelcutRecording… keys is unchanged — session only",
+          "FrameJobRecording… keys is unchanged — session only",
           d3.get("display") == 777 and d3.get("keysBefore") == d3.get("keysAfter")
           and len(d3.get("keysAfter") or []) == 7, f"{d3}")
     check("D3: rebuildSources() + restoreChoices() keep the row",
@@ -9752,7 +9752,7 @@ def section_voiceover_doors(binary, sources):
     a4 = d4.get("after") or {}
     check("D4: a display row → source .display, the four enabled again",
           d4.get("display") is True and a4.get("systemAudio") is True and a4.get("showClicks") is True
-          and a4.get("size") is True and a4.get("includeReelcut") is True, f"{d4}")
+          and a4.get("size") is True and a4.get("includeFrameJob") is True, f"{d4}")
 
     d5 = answer.get("D5") or {}
     check("D5: Record with Microphone Off → idle, the note microphoneOffSentence, 0 screen reads, "
@@ -9829,7 +9829,7 @@ def section_voiceover_doors(binary, sources):
 VOICE_INFO_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>NSMicrophoneUsageDescription</key><string>The Reelcut recording probe records a short voice-over to check the recorder.</string>
+<key>NSMicrophoneUsageDescription</key><string>The Frame Job recording probe records a short voice-over to check the recorder.</string>
 </dict></plist>
 """
 
@@ -9853,7 +9853,7 @@ def build_voice_probe(sources):
         os.path.join(sources, name)
         for name in os.listdir(sources)
         if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
@@ -10003,7 +10003,7 @@ def section_voiceover_granted(binary, sources):
 
 
 # --------------------------------------------------------------------------
-# Section 17 — Include Reelcut windows (spec §11 recording.md).
+# Section 17 — Include Frame Job windows (spec §11 recording.md).
 
 EXCLUSION_CASES = [
     {"tag": "off", "include": False, "bundle": "com.example.own", "panel": 42,
@@ -10018,7 +10018,7 @@ EXCLUSION_CASES = [
 
 
 def section_exclusion(binary, sources):
-    print("\nSection 17 — Include Reelcut windows: the exclusion, the checkbox, its lock, "
+    print("\nSection 17 — Include Frame Job windows: the exclusion, the checkbox, its lock, "
           "and the two doors' reads")
     request = {"mode": "exclusion",
                "cases": [{k: c[k] for k in ("tag", "include", "bundle", "panel")}
@@ -10036,14 +10036,14 @@ def section_exclusion(binary, sources):
                   f"{case['panel']!r}) → bundleIDs {want[0]}, windowIDs {want[1]} — {case['why']}",
                   pair == want, f"got {pair}")
         x2 = answer.get("x2") or {}
-        check("X2: the key is ReelcutRecordingIncludeReelcutWindows, absent before the rows",
-              x2.get("key") == "ReelcutRecordingIncludeReelcutWindows" and x2.get("absent") is True,
+        check("X2: the key is FrameJobRecordingIncludeFrameJobWindows, absent before the rows",
+              x2.get("key") == "FrameJobRecordingIncludeFrameJobWindows" and x2.get("absent") is True,
               f"{x2.get('key')!r}, absent {x2.get('absent')!r}")
         check("X2: with the key absent the checkbox is off", x2.get("offWhenAbsent") is True,
               f"{x2.get('offWhenAbsent')!r}")
-        check("X2: … and currentChoice().includeReelcutWindows is false",
+        check("X2: … and currentChoice().includeFrameJobWindows is false",
               x2.get("choiceOffWhenAbsent") is True, f"{x2.get('choiceOffWhenAbsent')!r}")
-        check("X2: titled \"Include Reelcut windows\"", x2.get("title") == "Include Reelcut windows",
+        check("X2: titled \"Include Frame Job windows\"", x2.get("title") == "Include Frame Job windows",
               f"{x2.get('title')!r}")
         check("X2: its target is the panel and its action controlChanged:",
               x2.get("targetIsPanel") is True and x2.get("action") == "controlChanged:",
@@ -10051,7 +10051,7 @@ def section_exclusion(binary, sources):
         check("X2: it is in the panel's window", x2.get("inWindow") is True, f"{x2.get('inWindow')!r}")
         check("X2: on + controlChanged(checkbox) → the key reads true",
               x2.get("keyAfterOn") is True, f"{x2.get('keyAfterOn')!r}")
-        check("X2: … and currentChoice().includeReelcutWindows is true",
+        check("X2: … and currentChoice().includeFrameJobWindows is true",
               x2.get("choiceAfterOn") is True, f"{x2.get('choiceAfterOn')!r}")
         check("X2: set off with no action, restoreChoices() → on again (read back from the key)",
               x2.get("restoredOn") is True, f"{x2.get('restoredOn')!r}")
@@ -10080,15 +10080,15 @@ def section_exclusion(binary, sources):
     made = next((i for i, l in enumerate(start) if "recordingExclusion(" in l), None)
     lookup = next((i for i, l in enumerate(start) if "ScreenRecorder.shareableContent" in l), None)
     check("X4: startRecording passes excluding:", "excluding:" in start_text, start_text[:200])
-    check("X4: … built from choice.includeReelcutWindows ABOVE the shareableContent closure",
+    check("X4: … built from choice.includeFrameJobWindows ABOVE the shareableContent closure",
           made is not None and lookup is not None and made < lookup
-          and "choice.includeReelcutWindows" in start[made],
+          and "choice.includeFrameJobWindows" in start[made],
           f"exclusion at {made}, lookup at {lookup}")
     server = (read_code(sources, "AgentServer+Recording.swift") or "").splitlines()
     tool = function_body(server, "func recordScreen(") or []
-    read_at = next((i for i, l in enumerate(tool) if '"include_reelcut_windows"' in l), None)
+    read_at = next((i for i, l in enumerate(tool) if '"include_framejob_windows"' in l), None)
     grant_at = next((i for i, l in enumerate(tool) if "screenRecordingGranted" in l), None)
-    check("X4: recordScreen reads \"include_reelcut_windows\" above screenRecordingGranted",
+    check("X4: recordScreen reads \"include_framejob_windows\" above screenRecordingGranted",
           read_at is not None and grant_at is not None and read_at < grant_at,
           f"read at {read_at}, grant at {grant_at}")
     name = None
@@ -10111,10 +10111,10 @@ def section_exclusion(binary, sources):
     make = call(tool_text, "RecordingExclusion.make(")
     choice = call(tool_text, "RecordingChoice(")
     check("X4: … passes it to RecordingExclusion.make( with panelWindowID: nil",
-          name is not None and re.search(rf"includeReelcutWindows:\s*{name}\b", make) is not None
+          name is not None and re.search(rf"includeFrameJobWindows:\s*{name}\b", make) is not None
           and re.search(r"panelWindowID:\s*nil", make) is not None, f"{name!r}: {make!r}")
     check("X4: … and to RecordingChoice(",
-          name is not None and re.search(rf"includeReelcutWindows:\s*{name}\b", choice) is not None,
+          name is not None and re.search(rf"includeFrameJobWindows:\s*{name}\b", choice) is not None,
           f"{name!r}: {choice!r}")
     content = (read_code(sources, "ScreenRecorder+Content.swift") or "").splitlines()
     filt = "\n".join(function_body(content, "static func filter(") or [])
@@ -10480,33 +10480,33 @@ MUTANTS = {
         "        ) { [weak self] _ in self?.tick() }\n",
         "",
         "the tool's chrome observes nothing — its item flips only at the 1 Hz tick (the code before B27)"),
-    # Include Reelcut windows (spec §11 recording.md) — section 17.
+    # Include Frame Job windows (spec §11 recording.md) — section 17.
     "exclusion-ignores-include": (
         "ScreenRecorder+Content.swift",
-        "        if includeReelcutWindows {\n",
+        "        if includeFrameJobWindows {\n",
         "        if false {\n",
-        "RecordingExclusion.make ignores the box — Reelcut is always excluded (the code before)"),
+        "RecordingExclusion.make ignores the box — Frame Job is always excluded (the code before)"),
     "choice-drops-include": (
         "RecorderPanelController+Rows.swift",
-        "        choice.includeReelcutWindows = includeReelcutCheckbox.state == .on\n",
+        "        choice.includeFrameJobWindows = includeFrameJobCheckbox.state == .on\n",
         "",
-        "currentChoice() never reads the checkbox — the panel's recording excludes Reelcut whatever it says"),
+        "currentChoice() never reads the checkbox — the panel's recording excludes Frame Job whatever it says"),
     "persist-drops-include": (
         "RecorderPanelController+Rows.swift",
         "        defaults.set(\n"
-        "            includeReelcutCheckbox.state == .on, forKey: Self.includeReelcutWindowsKey)\n",
+        "            includeFrameJobCheckbox.state == .on, forKey: Self.includeFrameJobWindowsKey)\n",
         "",
         "persistChoices never writes the key — the box forgets its setting at the next show"),
     "lock-drops-include": (
         "RecorderPanelController+VoiceOver.swift",
-        "            systemAudioSwitch, showClicksSwitch, sizePopup, includeReelcutCheckbox,\n",
+        "            systemAudioSwitch, showClicksSwitch, sizePopup, includeFrameJobCheckbox,\n",
         "            systemAudioSwitch, showClicksSwitch, sizePopup,\n",
         "the checkbox stays live while a recording is in flight"),
     "tool-ignores-include": (
         "AgentServer+Recording.swift",
-        "                    includeReelcutWindows: includeReelcut,\n",
-        "                    includeReelcutWindows: false,\n",
-        "record_screen reads include_reelcut_windows and excludes Reelcut anyway"),
+        "                    includeFrameJobWindows: includeFrameJob,\n",
+        "                    includeFrameJobWindows: false,\n",
+        "record_screen reads include_framejob_windows and excludes Frame Job anyway"),
     # Issue batch B42 (#193 items 1 and 2) — F8, F9, F10.
     "finish-no-post": (
         "ScreenRecorder+Finishing.swift",

@@ -43,7 +43,7 @@ use serde_json::{json, Value};
 use common::{
     array, assert_contains, cstring, expect_string, int, parse_json, take_string, text, Handle,
 };
-use reelcut_core::ffi_query::{rc_export_presets, rc_export_sizes};
+use framejob_core::ffi_query::{rc_export_presets, rc_export_sizes};
 
 /// One row of the list as §7.8 describes it: an id the `export` tool
 /// takes, a name the popup shows, and the pixels.

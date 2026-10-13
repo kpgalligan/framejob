@@ -1,5 +1,5 @@
 /*
- * reelcut_core.h — the ONE contract between the Swift app and the Rust core.
+ * framejob_core.h — the ONE contract between the Swift app and the Rust core.
  *
  * Hand-maintained: changing any `rc_*` signature means editing the Rust
  * `ffi_*.rs` file, this header, and `app/Sources/ReelCore.swift` in lockstep.
@@ -23,8 +23,8 @@
  *  - All times are TICKS: i64 at 600000 per second (`RC_TIMESCALE`).
  */
 
-#ifndef REELCUT_CORE_H
-#define REELCUT_CORE_H
+#ifndef FRAMEJOB_CORE_H
+#define FRAMEJOB_CORE_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -684,4 +684,4 @@ void rc_agent_socket_release(void);
 }
 #endif
 
-#endif /* REELCUT_CORE_H */
+#endif /* FRAMEJOB_CORE_H */

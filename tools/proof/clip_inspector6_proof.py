@@ -29,7 +29,7 @@ Two instruments, `clip_inspector4_proof.py`'s shape:
   action's end is BYTE-identical to the same project with the base shadow
   removed and differs from the frame before; `off: ["video.opacity"]` and
   `["video.motion"]` are errors naming the path; `offf` is refused by the
-  argument gate; the log carries no `Reelcut: ` line. The script kills only
+  argument gate; the log carries no `Frame Job: ` line. The script kills only
   the process it started.
 
 `--mutant MODE` builds the probe over a COPY of `app/Sources` with one
@@ -219,7 +219,7 @@ def probe_checks(sources, out, paths):
 
 
 K3_ROWS = [
-    "K3 the app binds its own socket and its log carries no `Reelcut: ` line",
+    "K3 the app binds its own socket and its log carries no `Frame Job: ` line",
     "K3 set_action_end {off: [video.shadow]} on the shadowed card: get_project holds "
     "end.video.shadow == null",
     "K3 render_frame at the action's end (1.5 s) is BYTE-identical to the same project with the "
@@ -232,7 +232,7 @@ K3_ROWS = [
 
 def parity_lines(log_path):
     with open(log_path, encoding="utf-8", errors="replace") as log:
-        return [line.rstrip() for line in log if "Reelcut: " in line]
+        return [line.rstrip() for line in log if "Frame Job: " in line]
 
 
 def launch(log_path):
@@ -259,7 +259,7 @@ def mcp_checks(chrome):
         return
     frames = os.path.join(WORK, "frames")
     os.makedirs(frames, exist_ok=True)
-    log_path = os.path.join(WORK, "reelcut.log")
+    log_path = os.path.join(WORK, "framejob.log")
     started = launch(log_path)
     process = started.child
     try:
@@ -334,7 +334,7 @@ def mutant(mode):
     spec = MUTANTS[mode]
     expected = spec["expected"]
     began = time.time()
-    with tempfile.TemporaryDirectory(prefix=f"reelcut-clip-inspector6-{mode}-") as temp:
+    with tempfile.TemporaryDirectory(prefix=f"framejob-clip-inspector6-{mode}-") as temp:
         sources = os.path.join(temp, "Sources")
         shutil.copytree(os.path.join(ROOT, "app", "Sources"), sources)
         path = os.path.join(sources, spec["file"])

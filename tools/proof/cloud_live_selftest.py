@@ -181,7 +181,7 @@ def main():
                      f"GET /v2/transcript/{FOUND_ID} → 200"]
         proof, client, ledger, held, row = arm(
             os.path.join(folder, "a"), submitted,
-            "AssemblyAI refused the API key — check it in Reelcut ▸ Settings")
+            "AssemblyAI refused the API key — check it in Frame Job ▸ Settings")
         check("A: the arm answers FALSE, so the run stops before the real key is used",
               held is False, f"got {held!r}")
         check(f"A: the id the app's own lines named was DELETED — exactly one DELETE, of "
@@ -213,7 +213,7 @@ def main():
         print("\nB. CONTROL — the dummy arm HELD, the 401 and nothing else")
         proof, client, ledger, held, row = arm(
             os.path.join(folder, "b"), ["POST /v2/upload → 401"],
-            "AssemblyAI refused the API key — check it in Reelcut ▸ Settings")
+            "AssemblyAI refused the API key — check it in Frame Job ▸ Settings")
         check("B: CONTROL — the arm answers TRUE and nothing is deleted, because nothing "
               "was made", held is True and client.deleted == [] and client.got == [],
               f"got {held!r}, {client.deleted!r}, {client.got!r}")
@@ -236,7 +236,7 @@ def main():
               "still THERE (the reader review, H\u00b78)")
         proof, client, ledger, held, row = arm(
             os.path.join(folder, "d"), submitted,
-            "AssemblyAI refused the API key — check it in Reelcut ▸ Settings",
+            "AssemblyAI refused the API key — check it in Frame Job ▸ Settings",
             gone=False)
         check("D: the reservation closes `unresolved` — `cleanup` proves a deletion with "
               "q6's sentinel and will not call one done without it",
@@ -256,7 +256,7 @@ def main():
               "SCRUBBED")
         proof, client, ledger, held, row = arm(
             os.path.join(folder, "c"), ["POST /v2/upload → 401"],
-            f"refused: {SECRET} — check it in Reelcut ▸ Settings")
+            f"refused: {SECRET} — check it in Frame Job ▸ Settings")
         details = " ".join(detail for _, _, detail in proof.rows)
         check(f"C: CONTROL — the arm made its {len(proof.rows)} checks and no detail it "
               "built from the app's text holds the registered secret",

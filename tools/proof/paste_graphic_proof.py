@@ -50,7 +50,7 @@ Rows:
   payload with `skip_missing: true` over {C, text} alone answers "made no
   change" — the map is not read when no target takes it.
 - **Z1** (CONTROL): the project closes, and the launch's log holds no
-  `Reelcut: ` line.
+  `Frame Job: ` line.
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`), replaces
 one anchor in the copy's `AgentServer+Clips.swift` (asserted to occur once),
@@ -195,7 +195,7 @@ def paste(client, path, clips, payload, groups=None, skip=None):
 
 
 def run(client):
-    f = WORK / "F.reelcut"
+    f = WORK / "F.framejob"
 
     # T0 — the catalog (CONTROL)
     schema = (client.schemas().get("paste_attributes") or {}).get("inputSchema") or {}
@@ -392,11 +392,11 @@ def main():
             return 2
     else:
         print("B85 phase 2 — paste_attributes' graphic group over MCP", flush=True)
-    binary = app / "Contents/MacOS/Reelcut"
+    binary = proof_app.executable(app)
     if not binary.is_file():
         print(f"instrument failure: no app binary at {binary}")
         return 2
-    log = WORK / "reelcut.log"
+    log = WORK / "framejob.log"
     launched = mcp.launch(str(binary), env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
                           log_path=str(log), timeout=CALL_BOUND)
     try:
@@ -413,8 +413,8 @@ def main():
             except Exception as error:  # a row that could not run is a failure
                 closed, how = False, [f"{type(error).__name__}: {error}"]
             complaints = [line.strip() for line in open(log, errors="replace")
-                          if "Reelcut: " in line]
-            check("Z1 CONTROL: the project closes and the log holds no `Reelcut: ` line",
+                          if "Frame Job: " in line]
+            check("Z1 CONTROL: the project closes and the log holds no `Frame Job: ` line",
                   closed and not complaints, f"closed {how}; complaints {complaints}")
     finally:
         launched.stop()

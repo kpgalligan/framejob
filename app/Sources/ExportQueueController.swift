@@ -195,7 +195,7 @@ final class ExportQueueController {
     /// an observer of the shared queue is never woken by a probe's own
     /// instance. Main thread, like everything else here.
     static let didChangeNotification = Notification.Name(
-        "com.kgalligan.reelcut.exportQueueDidChange")
+        "com.kgalligan.framejob.exportQueueDidChange")
 
     /// Every job this launch still knows about, in the order they were added.
     /// A finished one stays until it is removed, because "it is done and here

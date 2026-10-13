@@ -100,7 +100,7 @@ extension CloudTranscriber {
                         + "it will be retried at the next run with an API key."
                 } else {
                     warning = "AssemblyAI has not confirmed deleting the transcript of \(target). "
-                        + "Its transcript could not be saved in the project, so Reelcut cannot "
+                        + "Its transcript could not be saved in the project, so Frame Job cannot "
                         + "retry deleting it automatically. Delete it in your AssemblyAI dashboard."
                 }
                 if held.contains(id) { warning += " It was not uploaded again in this run." }

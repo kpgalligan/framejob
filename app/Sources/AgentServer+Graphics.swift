@@ -123,7 +123,7 @@ extension AgentServer {
         guard store.module(named: name) != nil else {
             throw ToolError(
                 message: "graphics/\(name).js was written but the folder's scan does not list it "
-                    + "— graphics/ may not be readable by Reelcut, or was replaced mid-write; "
+                    + "— graphics/ may not be readable by Frame Job, or was replaced mid-write; "
                     + "get_graphic {} shows what the scan sees")
         }
         var result = moduleReport(named: name, document)

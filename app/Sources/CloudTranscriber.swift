@@ -34,7 +34,7 @@ enum TranscriptionEngine: String, CaseIterable {
 
     /// What the sheet remembers between opens (road map 6 §5a). An agent call
     /// never reads it: R6-2 says the cloud engine is asked for every time.
-    static let defaultsKey = "ReelcutCaptionEngine"
+    static let defaultsKey = "FrameJobCaptionEngine"
 
     /// The popup's words. "On this Mac" rather than "Apple" because what the
     /// person is choosing is where their audio goes, not whose recogniser it
@@ -57,7 +57,7 @@ final class CloudTranscriber {
         case credentialRequired
 
         var errorDescription: String? {
-            "No AssemblyAI API key is set. Set one in Reelcut ▸ Settings ▸ Transcription, "
+            "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings ▸ Transcription, "
                 + "or RC_ASSEMBLYAI_KEY for a proof."
         }
     }
@@ -66,7 +66,7 @@ final class CloudTranscriber {
     /// twin, and one of the queue seams app/CLAUDE.md lists. A run is
     /// network-bound minutes of somebody else's compute and must never be on
     /// main.
-    private let work = DispatchQueue(label: "com.kgalligan.reelcut.cloud-transcribe")
+    private let work = DispatchQueue(label: "com.kgalligan.framejob.cloud-transcribe")
 
     let client: AssemblyAIClient?
     /// Where `cache/transcripts/` lives for this run — the document's cache

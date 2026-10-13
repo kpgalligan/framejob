@@ -92,7 +92,7 @@ final class AssemblyAIClient {
             case .noNetwork:
                 return "No network connection"
             case .keyRefused:
-                return "AssemblyAI refused the API key — check it in Reelcut ▸ Settings"
+                return "AssemblyAI refused the API key — check it in Frame Job ▸ Settings"
             case .account(let sentence):
                 return sentence
             case .request(let sentence):
@@ -102,7 +102,7 @@ final class AssemblyAIClient {
             case .transcript(let sentence):
                 return sentence
             case .redirected(let code):
-                return "AssemblyAI answered \(code) and asked to be redirected, which Reelcut "
+                return "AssemblyAI answered \(code) and asked to be redirected, which Frame Job "
                     + "does not follow: the API key would go to another host."
             case .timedOut:
                 return "AssemblyAI did not finish the transcript in the time allowed."
@@ -111,11 +111,11 @@ final class AssemblyAIClient {
             case .malformed(let what):
                 return "AssemblyAI's answer could not be read: \(what)"
             case .submissionUnresolved(let authenticationStatus):
-                let warning = "AssemblyAI may have created a transcript, but Reelcut could not "
+                let warning = "AssemblyAI may have created a transcript, but Frame Job could not "
                     + "recover its ID. Check your AssemblyAI dashboard before retrying; the "
                     + "transcript may still be retained."
                 if authenticationStatus != nil {
-                    return "AssemblyAI refused the API key — check it in Reelcut ▸ Settings. "
+                    return "AssemblyAI refused the API key — check it in Frame Job ▸ Settings. "
                         + warning
                 }
                 return warning
@@ -157,7 +157,7 @@ final class AssemblyAIClient {
         }
         let queue = OperationQueue()
         queue.maxConcurrentOperationCount = 1
-        queue.name = "com.kgalligan.reelcut.assemblyai-delegate"
+        queue.name = "com.kgalligan.framejob.assemblyai-delegate"
         self.delegate = SessionDelegate()
         self.session = URLSession(
             configuration: configuration, delegate: delegate, delegateQueue: queue)
@@ -271,7 +271,7 @@ final class AssemblyAIClient {
     /// that interpolate one into a path go through.
     ///
     /// An id reaches this client from two places that are not this app: the
-    /// `transcript_id` of a cache file, which rides inside a `.reelcut`
+    /// `transcript_id` of a cache file, which rides inside a `.framejob`
     /// package and can be hand-edited or authored by somebody else, and a
     /// submission's own reply. `URL.appendingPathComponent` does not resolve
     /// `..` and `URLSession` sends the path as written, so

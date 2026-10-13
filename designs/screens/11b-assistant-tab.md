@@ -29,9 +29,9 @@ reported yet" on the right in small grey monospace, a thin empty bar under both
 (how full the conversation's context is), and a round-arrow Clear button at the
 right end. Just under it is a second row, "SPEND" in the same small grey
 capitals on the left and "Nothing yet" on the right in the same grey monospace:
-what this conversation has cost so far, as Reelcut estimates it at LiteLLM prices
+what this conversation has cost so far, as Frame Job estimates it at LiteLLM prices
 (its tooltip says so, and that the Anthropic Console shows what the account was
-billed). After a response it reads, for example, "$0.0018 · Reelcut's estimate",
+billed). After a response it reads, for example, "$0.0018 · Frame Job's estimate",
 "at least …" when a response could not be priced, and it goes back to "Nothing
 yet" on Clear. A hairline under the two rows separates them from the transcript,
 which fills the middle of the tab and is empty. At the foot: "Add your Anthropic API key in Settings to use

@@ -81,14 +81,14 @@ enum SpeedAudioDrop {
             let speed = clips.first.map { rate($0.speed) } ?? ceiling
             return (
                 "“\(name)” will be silent at \(speed).",
-                "Reelcut leaves a clip’s audio out above \(ceiling). The picture still plays."
+                "Frame Job leaves a clip’s audio out above \(ceiling). The picture still plays."
             )
         }
         let speeds = Set(clips.map { rate($0.speed) })
         let at = speeds.count == 1 ? (speeds.first ?? "") : "their new speeds"
         return (
             "\(clips.count) clips will be silent at \(at).",
-            "Reelcut leaves a clip’s audio out above \(ceiling). The pictures still play."
+            "Frame Job leaves a clip’s audio out above \(ceiling). The pictures still play."
         )
     }
 

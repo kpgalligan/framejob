@@ -298,7 +298,7 @@ def q1(work, fixtures, say):
     # The TCC question, asked twice: a bare Mach-O, and an ad-hoc-signed
     # hardened-runtime bundle with NO `NSSpeechRecognitionUsageDescription`.
     # `requestAuthorization` is never called in either.
-    signed = local_rows.bundle(work, "RCWordsQ1", "com.reelcut.spike.w0q1", probe, ats=False)
+    signed = local_rows.bundle(work, "RCWordsQ1", "com.framejob.spike.w0q1", probe, ats=False)
     bound = 60.0 + 2.0 * fixtures.seconds.get("pangram.wav", 10.0)
     bundled = local_rows.spoken(run_drained(
         [signed["executable"], "words", fixtures.path("pangram.wav"), LOCALE,
@@ -440,7 +440,7 @@ def q2(work, fixtures, client, ledger, scrub, say):
     if probe is None:
         return {"state": "failed", "reason": "speech_probe did not build",
                 "measured": {"build_error": error}}
-    signed = local_rows.bundle(work, "RCWordsQ2", "com.reelcut.spike.w0q2", probe, ats=False)
+    signed = local_rows.bundle(work, "RCWordsQ2", "com.framejob.spike.w0q2", probe, ats=False)
     scripts = {
         "pangram.wav": fixtures_text("pangram"),
         "talk.wav": fixtures_text("talk"),

@@ -1,8 +1,8 @@
 //! Structural-time admission through the file reader and writer, plus the
 //! rational snap boundaries used by admitted and hostile inputs.
 
-use reelcut_core::format;
-use reelcut_core::time::{self, Fps, TIMESCALE};
+use framejob_core::format;
+use framejob_core::time::{self, Fps, TIMESCALE};
 use serde_json::{json, Value};
 
 mod common;
@@ -36,7 +36,7 @@ fn reject(mutated: &Value, path: &str, value: i128) {
         Handle::try_from_value(mutated).err().as_deref(),
         Some(expected.as_str())
     );
-    let direct: reelcut_core::Project = serde_json::from_value(mutated.clone()).unwrap();
+    let direct: framejob_core::Project = serde_json::from_value(mutated.clone()).unwrap();
     assert_eq!(format::write(&direct).unwrap_err(), expected);
     assert_eq!(
         mutated.to_string(),

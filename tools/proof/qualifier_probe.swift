@@ -2,7 +2,7 @@
 // builds it through `swift_build.build` and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, against `libreelcut_core.a`, so every row drives the app's own
+// `main.swift`, against `libframejob_core.a`, so every row drives the app's own
 // types: `QualifierSample`, `ColorQualifier.picked`, `QualifierPick.sample`
 // (`Exporter.renderFrame` with `behind`), `ClipPane` and the Qualifier
 // section's checkbox, strip and Reset, `InspectorBinding`'s ops, a
@@ -224,7 +224,7 @@ else {
 func open() -> ProjectDocument? {
     let document = ProjectDocument()
     do {
-        try document.read(from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+        try document.read(from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
         document.fileURL = URL(fileURLWithPath: path)
     } catch {
         return nil

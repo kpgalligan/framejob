@@ -31,13 +31,13 @@ price feed (`assistant_helper_proof`'s `Helper` and `configure`):
       one POST, no `error` (a response already priced is never priced again)
 The built app (`assistant_session_proof`'s `App`, `Fake`, `secret_folder`;
 `assistant_tab_proof`'s `Dump` and `open_tab`):
-  L0  no `Reelcut: ` line
+  L0  no `Frame Job: ` line
   L1  `-RCSpendFolder` scratch and `-RCPriceFeed` local: a priming turn, the
       cache file within 10 s, then a two-reply pane turn whose events carry
       `cost` in its tool view and `claude-opus-5-5` nowhere; one ledger line
       per `cost` across both turns with the listed keys only, no `proof-key`
       and no message text; the last transcript entry is exactly
-      `Cost: $0.0020 · Reelcut's estimate at LiteLLM prices (fetched <day>)`
+      `Cost: $0.0020 · Frame Job's estimate at LiteLLM prices (fetched <day>)`
   L2  the override with no `-RCSpendFolder`: bundled with the problem, the
       feed hears nothing, and the person's `spend.jsonl` and
       `anthropic-prices.json` keep their existence, size and mtime (a
@@ -107,10 +107,10 @@ asp.WORK = WORK  # App, Fake and the secret folder write under this proof's fold
 atp.WORK = WORK  # and so do the layout dumps
 AGENT = os.path.join(ROOT, "agent")
 RELEASE = os.path.join(ROOT, asp.APP_PATH)
-HELPER = os.path.join(RELEASE, "Contents", "Helpers", "reelcut-agent")
+HELPER = os.path.join(RELEASE, "Contents", "Helpers", "framejob-agent")
 REDUCE_CASES = os.path.join(AGENT, "prices", "reduce_cases.json")
 PROBE_SWIFT = os.path.join(HERE, "spend_probe.swift")
-PERSON = os.path.expanduser("~/Library/Application Support/Reelcut")
+PERSON = os.path.expanduser("~/Library/Application Support/Frame Job")
 MODEL = "claude-opus-5-5"
 PROOF_MODEL = "claude-proof-model"
 NO_CACHE = "no price cache is configured"
@@ -611,11 +611,11 @@ def row_l1(fake, feed, secrets, score):
     ctx = {"folder": os.path.join(WORK, "l1"), "dumps": []}
     app = asp.App("L1", RELEASE, ["-RCSecretFolder", secrets,
                                   "-RCSpendFolder", spend, "-RCPriceFeed", url,
-                                  "-ReelcutInspectorCollapsed", "NO"], fake.base)
+                                  "-FrameJobInspectorCollapsed", "NO"], fake.base)
     try:
         app.connect()
-        complaints = [line for line in app.log().splitlines() if "Reelcut: " in line]
-        score("L0", not complaints, f"`Reelcut: ` lines {complaints[:2]}")
+        complaints = [line for line in app.log().splitlines() if "Frame Job: " in line]
+        score("L0", not complaints, f"`Frame Job: ` lines {complaints[:2]}")
         a = atp.open_tab(app, ctx)
         fake.scenario([asp.say("L1: priming.")])
         priming = app.must("assistant_send", project=a, text="L1 priming.",
@@ -653,7 +653,7 @@ def row_l1(fake, feed, secrets, score):
     usage = {"input_tokens": 100, "output_tokens": 10, "cache_creation_input_tokens": 0,
              "cache_read_input_tokens": 0}
     dollars = 2 * prices.price(usage, MODEL, prices.load(cache))["dollars"]
-    want = (f"Cost: ${dollars:.4f} · Reelcut's estimate at LiteLLM prices "
+    want = (f"Cost: ${dollars:.4f} · Frame Job's estimate at LiteLLM prices "
             f"(fetched {local_day(fetched_at)})")
     last = entries[-1] if entries else None
     good = (measured.get("state") == "finished" and len(views) == 2
@@ -674,8 +674,8 @@ def row_l2(fake, feed, secrets):
                                   "-RCPriceFeed", feed.url("/litellm.json")], fake.base)
     try:
         app.connect()
-        complaints = [line for line in app.log().splitlines() if "Reelcut: " in line]
-        a = app.must("new_project", path=os.path.join(WORK, "l2.reelcut"))["saved"]
+        complaints = [line for line in app.log().splitlines() if "Frame Job: " in line]
+        a = app.must("new_project", path=os.path.join(WORK, "l2.framejob"))["saved"]
         fake.scenario([asp.say("L2.")])
         answer = app.must("assistant_send", project=a, text="L2.", timeout=WALL_TURN)
         time.sleep(1.0)
@@ -689,7 +689,7 @@ def row_l2(fake, feed, secrets):
             and found[0].get("prices") == {"kind": "bundled", "as_of": table["litellm_commit_date"],
                                            "problem": NO_CACHE}
             and heard == 0 and after == before)
-    return good, (f"`Reelcut: ` {complaints[:1]}; costs {found}; feed GETs {heard}; person's "
+    return good, (f"`Frame Job: ` {complaints[:1]}; costs {found}; feed GETs {heard}; person's "
                   f"files before {before}, after {after}")
 
 
@@ -751,8 +751,8 @@ def stale_helper():
     os.makedirs(target)
     built = bounded.run(["/bin/sh", os.path.join(scratch, "build.sh"), "helper"], WALL_BUILD,
                         env=child_env({"TARGET_BUILD_DIR": target,
-                                       "CONTENTS_FOLDER_PATH": "Reelcut.app/Contents"}))
-    helper = os.path.join(target, "Reelcut.app", "Contents", "Helpers", "reelcut-agent")
+                                       "CONTENTS_FOLDER_PATH": "Frame Job.app/Contents"}))
+    helper = os.path.join(target, "Frame Job.app", "Contents", "Helpers", "framejob-agent")
     if built["expired"] or built["rc"] != 0 or not os.path.exists(helper):
         tail = [line for line in (built["stdout"] + built["stderr"]).splitlines()
                 if line.strip()][-3:]
@@ -794,8 +794,8 @@ def cut_helper(name):
     os.makedirs(target)
     built = bounded.run(["/bin/sh", os.path.join(scratch, "build.sh"), "helper"], WALL_BUILD,
                         env=child_env({"TARGET_BUILD_DIR": target,
-                                       "CONTENTS_FOLDER_PATH": "Reelcut.app/Contents"}))
-    helper = os.path.join(target, "Reelcut.app", "Contents", "Helpers", "reelcut-agent")
+                                       "CONTENTS_FOLDER_PATH": "Frame Job.app/Contents"}))
+    helper = os.path.join(target, "Frame Job.app", "Contents", "Helpers", "framejob-agent")
     if built["expired"] or built["rc"] != 0 or not os.path.exists(helper):
         tail = [line for line in (built["stdout"] + built["stderr"]).splitlines()
                 if line.strip()][-3:]

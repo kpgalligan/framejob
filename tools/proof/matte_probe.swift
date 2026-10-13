@@ -38,7 +38,7 @@ func openDocument(_ path: String) -> ProjectDocument? {
     let document = ProjectDocument()
     do {
         try document.read(
-            from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+            from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
         document.fileURL = URL(fileURLWithPath: path)
     } catch {
         return nil

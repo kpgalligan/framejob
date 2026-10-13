@@ -2,7 +2,7 @@
 // structurally (`word_captions_chrome.py` builds and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
 // `tools/proof/harness/build.sh`'s swiftc line — so every row drives the
 // app's own `TranscribeSheetController`. A sheet cannot be put up
 // offscreen, so what is measured is the view tree the card builds and what
@@ -362,7 +362,7 @@ if let doc = document(vertical) {
     let job = s.jobs(in: s.scope).first
     let first = s.previewView.image
     for _ in 0 ..< 5 { s.refresh() }
-    s.vocabularyField.stringValue = "Reelcut"
+    s.vocabularyField.stringValue = "Frame Job"
     s.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
     let kept = first != nil && s.previewView.image === first
     choose(.pill, on: s)
@@ -487,7 +487,7 @@ if let doc = document(vertical) {
     let second = sheet(doc, defaults: memory)
     let reopened = Look.allCases.map { second.checkbox(for: $0).state == .on }
     let older = freshDefaults()
-    older.set("pill", forKey: "ReelcutCaptionStyle")
+    older.set("pill", forKey: "FrameJobCaptionStyle")
     let third = sheet(doc, defaults: older)
     let thirdOff = Look.allCases.allSatisfy { third.checkbox(for: $0).state == .off }
     check("S13 ticking each box where it is live writes true under its key; a second sheet over "
@@ -507,7 +507,7 @@ if let doc = document(vertical) {
     let box = s.slideCheckbox
     let greyed = !box.isEnabled && box.state == .on
     let counted = s.looks.slide
-    let stillHeld = kept.bool(forKey: "ReelcutCaptionSlide")
+    let stillHeld = kept.bool(forKey: "FrameJobCaptionSlide")
     choose(.pill, on: s)
     let back = box.isEnabled && box.state == .on && s.looks.slide
     check("S14 Slide ticked on Pill, then Karaoke: the box is disabled and still ticked, "

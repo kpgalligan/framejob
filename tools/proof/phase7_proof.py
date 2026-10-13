@@ -431,7 +431,7 @@ class Raster:
 class Session:
     """One project, the shape phases 2 to 6 use.
 
-    `<name>-<pid>.reelcut`, never a fixed name: a `project` path is matched
+    `<name>-<pid>.framejob`, never a fixed name: a `project` path is matched
     against every open document and no tool closes one, so two earlier runs'
     SAVED packages would have the app answering for an old one (measured in
     phase 2). Older runs' under this name go."""
@@ -440,9 +440,9 @@ class Session:
         self.mcp = mcp
         self.name = name
         for stale in os.listdir(WORK):
-            if re.fullmatch(rf"{re.escape(name)}-\d+\.reelcut", stale):
+            if re.fullmatch(rf"{re.escape(name)}-\d+\.framejob", stale):
                 shutil.rmtree(os.path.join(WORK, stale))
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         mcp.call("new_project", path=self.path)
         self.canvas = canvas
         self.op("set_canvas", width=canvas[0], height=canvas[1],
@@ -529,7 +529,7 @@ class Session:
 
 
 def instruments_part(mcp):
-    # ffmpeg writes these, not Reelcut. The point is to score what the
+    # ffmpeg writes these, not Frame Job. The point is to score what the
     # reader and the decoder can SEE before either is pointed at a file the
     # app wrote — an alpha-blind decoder would make every claim in section 3
     # pass against a build with no alpha in it at all.

@@ -2,8 +2,8 @@ import AppKit
 
 /// Settings' MCP pane (issue batch B74, spec §11 MC-7): the first of
 /// `SettingsWindowController`'s panes. It says how an MCP client reaches
-/// Reelcut — through the bundled `reelcut-mcp` (MC-1, MC-3), which opens
-/// Reelcut in the background on the first tool call (MC-4) — shows that
+/// Frame Job — through the bundled `framejob-mcp` (MC-1, MC-3), which opens
+/// Frame Job in the background on the first tool call (MC-4) — shows that
 /// helper's path, and holds Copy MCP Command, which puts MC-3's line on the
 /// pasteboard.
 ///
@@ -17,20 +17,20 @@ import AppKit
 /// it a private one and never writes the general pasteboard.
 ///
 /// **The button is enabled exactly while the helper is executable.** A copy
-/// of Reelcut without it says so in the status line. The press is not an
+/// of Frame Job without it says so in the status line. The press is not an
 /// edit, so it has no MCP mirror (spec §7.9).
 final class MCPSettingsPane: NSStackView {
     static let paneTitle = "MCP"
     static let blurb = [
-        "An MCP client such as Claude Code uses Reelcut's tools through reelcut-mcp, a helper "
-            + "inside this app. It reaches Reelcut over a local socket that only programs you "
+        "An MCP client such as Claude Code uses Frame Job's tools through framejob-mcp, a helper "
+            + "inside this app. It reaches Frame Job over a local socket that only programs you "
             + "run can open.",
-        "If Reelcut isn't running, the first tool call opens it in the background. To add "
-            + "Reelcut to Claude Code, copy the command and run it in Terminal.",
+        "If Frame Job isn't running, the first tool call opens it in the background. To add "
+            + "Frame Job to Claude Code, copy the command and run it in Terminal.",
     ]
     static let copyTitle = "Copy MCP Command"
     static let copiedStatus = "Copied. Paste it into Terminal and press Return."
-    static let missingStatus = "reelcut-mcp is missing from this copy of Reelcut."
+    static let missingStatus = "framejob-mcp is missing from this copy of Frame Job."
     /// The Settings window's width less its two insets.
     private static let textWidth: CGFloat = 420
 

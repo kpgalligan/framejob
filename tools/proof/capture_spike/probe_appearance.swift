@@ -15,7 +15,7 @@ enum ProbeAppearance {
     }
 
     static func run(fixtures: URL, png: URL) -> (ProbeJSON, ProbeJSON) {
-        let url = fixtures.appendingPathComponent("well.reelcut")
+        let url = fixtures.appendingPathComponent("well.framejob")
         var rows: ProbeJSON = [:]
         let ids = ["A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7"]
         let system: NSAppearance.Name =

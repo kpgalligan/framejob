@@ -144,13 +144,13 @@ the whole file now scores 150/150.** What it found: the preview panel's
 called `setFrameAutosaveName` BEFORE `super.init(window:)`, and
 `NSWindowController.init(window:)` assigns its own `windowFrameAutosaveName` —
 "" unless somebody set one — to the window it is handed, wiping the name. So
-nothing ever wrote `NSWindow Frame ReelcutPreviewWindow`, the
+nothing ever wrote `NSWindow Frame FrameJobPreviewWindow`, the
 `setFrameUsingName` restore beside it could never find anything, and the panel
 opened centred every time — which is the one thing the type doc says it must
 not do, since a preview window exists to be put on a SECOND DISPLAY. The
 mechanism is measured on a BARE `NSPanel` and a BARE `NSWindowController` in
 the same probe (`autosaveMechanism`), so the reading is about AppKit and not
-about Reelcut, and the probe reports what `setFrameAutosaveName` answers when
+about Frame Job, and the probe reports what `setFrameAutosaveName` answers when
 it is re-asked AFTER the controller has taken the window (true, and the name
 sticks) — which was both the proof and the fix. The call is after
 `super.init` now and nothing else in this file moved for it. **Keep the
@@ -271,7 +271,7 @@ TALLY_Y0, TALLY_H = 114.0, 22.0
 LIST_Y0 = FIND_RULE_Y + ROW_SPACING                                   # 217
 
 # ---------------------------------------------------------------------------
-# Packages, by hand (spec §5.2). A `.reelcut` is a directory holding a
+# Packages, by hand (spec §5.2). A `.framejob` is a directory holding a
 # `project.json`, so nothing here loads asynchronously and every render is
 # deterministic.
 #
@@ -287,7 +287,7 @@ TICKS_PER_SECOND = 600_000
 
 def media(mid, name, kind="video", seconds=1.0):
     return {
-        "id": mid, "path": "/reelcut-phase8-no-such-directory/" + name,
+        "id": mid, "path": "/framejob-phase8-no-such-directory/" + name,
         "bookmark": None, "kind": kind,
         "duration": int(seconds * TICKS_PER_SECOND),
         "width": 640 if kind != "audio" else 0,
@@ -551,7 +551,7 @@ PACKAGES = {
 
 
 def write_package(name, spec):
-    path = os.path.join(WORK, "p8-" + name + ".reelcut")
+    path = os.path.join(WORK, "p8-" + name + ".framejob")
     os.makedirs(path, exist_ok=True)
     with open(os.path.join(path, "project.json"), "w") as f:
         json.dump(project_json(**spec), f, indent=2)
@@ -678,7 +678,7 @@ func openDocument(_ path: String) -> ProjectDocument? {
     let document = ProjectDocument()
     do {
         try document.read(
-            from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+            from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
         document.fileURL = URL(fileURLWithPath: path)
     } catch {
         return nil
@@ -733,7 +733,7 @@ func playerLayers(in layer: CALayer?) -> [AVPlayerLayer] {
 /// six-file fixture points at a path that does not exist, deliberately, so no
 /// thumbnail decode ever runs. A sheet is a window and it takes KEY, so the
 /// dispatch mode's editor never became key and all six of its checks fell
-/// together (measured: `key "Untitled"`, `main "p8-six.reelcut"`). The cure is
+/// together (measured: `key "Untitled"`, `main "p8-six.framejob"`). The cure is
 /// the FIXTURE and not a dismissal: `dispatch` opens a package of one SHAPE
 /// clip and no media at all, which has a duration for Export… to validate
 /// against and nothing to relink. `attachedSheet` is reported either way, so a
@@ -1416,7 +1416,7 @@ func runMedia() {
 }
 
 // ---------------------------------------------------------------------------
-// The AppKit premise. Not a claim about Reelcut at all — three claims about
+// The AppKit premise. Not a claim about Frame Job at all — three claims about
 // `NSStackView` and the field editor that the Media pane's whole no-rebuild
 // design rests on. If AppKit ever changes here, the pane silently eats
 // keystrokes and nothing else in this suite would say so.
@@ -1721,7 +1721,7 @@ INFO_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleExecutable</key><string>phase8probe</string>
-<key>CFBundleIdentifier</key><string>com.kgalligan.reelcut.phase8probe</string>
+<key>CFBundleIdentifier</key><string>com.kgalligan.framejob.phase8probe</string>
 <key>CFBundleName</key><string>Phase8Probe</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>NSPrincipalClass</key><string>NSApplication</string>
@@ -1759,7 +1759,7 @@ def build_probe():
     sources = sorted(
         os.path.join(SOURCES, name) for name in os.listdir(SOURCES)
         if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
@@ -2423,7 +2423,7 @@ def main():
     check("…and removing the key puts it back to Full, so the round trip left nothing "
           "behind on this machine",
           quality.get("afterRemoval") == 0
-          and quality.get("defaultsKey") == "ReelcutPreviewQuality",
+          and quality.get("defaultsKey") == "FrameJobPreviewQuality",
           f"{quality.get('afterRemoval')}, key {quality.get('defaultsKey')}")
 
     # ------------------------------------------------------------------
@@ -2533,7 +2533,7 @@ def main():
     check("its frame autosave name is the FIXED one, never per-document — a per-document "
           "name would mint a defaults key per project",
           p.get("frameAutosaveName") == panel_answer.get("autosaveConstant")
-          == "ReelcutPreviewWindow",
+          == "FrameJobPreviewWindow",
           f"{p.get('frameAutosaveName')!r} against "
           f"{panel_answer.get('autosaveConstant')!r}; re-set answered "
           f"{panel_answer.get('autosaveRetake')} and read back "
@@ -2541,7 +2541,7 @@ def main():
     check("…which is the name the offscreen harness pins, spelled `\"NSWindow Frame \" + "
           "name` — so this constant and `pinDefaults`' key cannot drift apart",
           "NSWindow Frame " + str(panel_answer.get("autosaveConstant"))
-          == "NSWindow Frame ReelcutPreviewWindow")
+          == "NSWindow Frame FrameJobPreviewWindow")
     check("the title carries the document's name, so two open projects' previews are told "
           "apart", p.get("title") == f"{panel_answer.get('documentName')} — Preview",
           f"{p.get('title')!r}")
@@ -2942,7 +2942,7 @@ def main():
     heights = media_answer.get("stackHeights", {})
     check("hiding an arranged subview takes it OUT of an `NSStackView`'s layout entirely: "
           "four 20 pt rows at 3 pt spacing measure 89 pt, three of them 66 — not 89 with a "
-          "gap. This is an AppKit claim, not a Reelcut one, and if it ever changes the "
+          "gap. This is an AppKit claim, not a Frame Job one, and if it ever changes the "
           "Media pane silently grows a hole",
           heights.get("allShown") == 89 and heights.get("oneHidden") == 66
           and heights.get("shownAgain") == 89,

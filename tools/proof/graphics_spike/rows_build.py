@@ -1,5 +1,5 @@
 """q1 and q9 of road map 10 §3: the spike crate as a path dependency of
-`reelcut-core`, measured against the tree at c874069, then REVERTED.
+`framejob-core`, measured against the tree at c874069, then REVERTED.
 
 Every build and test runs under `bounded.run` (600 s). The four core files
 are patched only between `patch()` and `revert()`, and `revert()` always
@@ -9,16 +9,20 @@ answer."""
 import os
 import re
 import shutil
+import sys
 
 import bounded
 from rows_local import FONTS, GRAPHICS, REPO, SPIKE, WORK, binary
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import proof_app  # noqa: E402
+
 BASE = "c874069"
 CORE = os.path.join(REPO, "core")
 OUTCOME = os.path.join(CORE, "src", "outcome.rs")
-LIB_A = os.path.join(CORE, "target", "release", "libreelcut_core.a")
-APP = os.path.join(REPO, "build", "Build", "Products", "Release", "Reelcut.app")
-APP_BINARY = os.path.join(APP, "Contents", "MacOS", "Reelcut")
+LIB_A = os.path.join(CORE, "target", "release", "libframejob_core.a")
+APP = os.path.join(REPO, "build", "Build", "Products", "Release", "Frame Job.app")
+APP_BINARY = str(proof_app.executable(APP))
 SPIKE_TOML = os.path.join(SPIKE, "Cargo.toml")
 BOUND = 600
 
@@ -228,7 +232,7 @@ def q9(say):
         target = os.path.join(bin_dir, f"q9_probe_{label}")
         argv = (["xcrun", "swiftc", "-O", "-target", "arm64-apple-macos26.0",
                  "-import-objc-header", os.path.join(SPIKE, "q9_probe.h"),
-                 "-L", os.path.join(CORE, "target", "release"), "-lreelcut_core"] + extra
+                 "-L", os.path.join(CORE, "target", "release"), "-lframejob_core"] + extra
                 + [os.path.join(SPIKE, "q9_probe.swift"), "-o", target])
         result = run(argv)
         probes[label] = {"rc": result["rc"], "seconds": result["seconds"],

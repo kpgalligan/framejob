@@ -2,7 +2,7 @@ import Foundation
 
 /// The export sheet's CONTROL CHOICES as a value, and the two places they are
 /// kept: the last one used (`UserDefaults`) and the named ones a person saves
-/// (`~/Library/Application Support/Reelcut/ExportPresets.json`).
+/// (`~/Library/Application Support/Frame Job/ExportPresets.json`).
 ///
 /// **A stored preset is what the CONTROLS said, never what the core resolved,
 /// and that is the whole design.** Road map 2's phase 7 asks for "a name →
@@ -155,7 +155,7 @@ extension ExportChoice {
     /// its rows differently) is a sheet that lies about what it will export —
     /// and one key is one thing for `tools/proof/harness/main.swift`'s
     /// `pinDefaults` to pin.
-    static let rememberedKey = "ReelcutExportChoice"
+    static let rememberedKey = "FrameJobExportChoice"
 
     /// The last choice the person actually EXPORTED with, or nil the first
     /// time. An empty string reads as nil, which is what lets the harness pin
@@ -268,7 +268,7 @@ struct ExportPresetsStore: Equatable {
         return store
     }
 
-    /// Writes the list, creating `~/Library/Application Support/Reelcut/` at
+    /// Writes the list, creating `~/Library/Application Support/Frame Job/` at
     /// `0700` (`AppSupport.ensureDirectory`) if this is the first thing to
     /// need it. Answers whether it landed, so a caller can beep; it never
     /// throws, for the reason the type doc gives.

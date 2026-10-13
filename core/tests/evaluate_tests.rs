@@ -27,8 +27,8 @@ mod common;
 use serde_json::{json, Value};
 
 use common::{array, at, flag, int, num, parse_json, text, Handle};
-use reelcut_core::model::Project;
-use reelcut_core::{Clip, Enabled, Fps, Source, VideoProps};
+use framejob_core::model::Project;
+use framejob_core::{Clip, Enabled, Fps, Source, VideoProps};
 
 // ---- the oracle's own constants ------------------------------------------
 
@@ -1851,7 +1851,7 @@ fn a_clip_whose_media_is_absent_renders_a_slate() {
     );
 
     // And the FFI will not load such a project in the first place.
-    let written = reelcut_core::format::write(&value).expect("writing does not validate");
+    let written = framejob_core::format::write(&value).expect("writing does not validate");
     let refusal = Handle::try_from_value(&parse_json(&written, "format::write")).err();
     assert_eq!(
         refusal.as_deref(),

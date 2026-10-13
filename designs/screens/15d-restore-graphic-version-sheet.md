@@ -13,7 +13,7 @@
 ```
 
 The Restore Graphic Version sheet (File ▸ Restore Graphic Version…) puts back
-the newest earlier version Reelcut kept of a graphic's code. The demo project's
+the newest earlier version Frame Job kept of a graphic's code. The demo project's
 one graphic, `lower-third`, was written twice, so one earlier version is kept.
 
 Under the title "Restore Graphic Version", a paragraph says what a restore

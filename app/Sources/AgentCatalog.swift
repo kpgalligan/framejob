@@ -274,7 +274,7 @@ extension AgentServer {
 
             tool(
                 "open_project",
-                "Opens a project and shows its window. Takes a .reelcut package, or any movie, "
+                "Opens a project and shows its window. Takes a .framejob package, or any movie, "
                     + "sound file or picture — opening one of those builds a fresh UNTITLED "
                     + "project sized and rated to it with the file as the first clip on track 1, "
                     + "exactly as double-clicking it does. Answers already_open: true when that "
@@ -284,7 +284,7 @@ extension AgentServer {
             tool(
                 "new_project",
                 "Creates a blank 1920×1080 / 30 fps project and shows its window — File ▸ New "
-                    + "Project. With path it is saved there straight away (a .reelcut extension "
+                    + "Project. With path it is saved there straight away (a .framejob extension "
                     + "is added if missing) so later calls can name it; without one it stays an "
                     + "untitled draft until save_project. Change the size and rate afterwards "
                     + "with set_canvas. A path another open project holds is refused, and "
@@ -292,7 +292,7 @@ extension AgentServer {
                 [
                     "path": [
                         "type": "string",
-                        "description": "Where to save the new project, e.g. ~/Movies/Cut.reelcut.",
+                        "description": "Where to save the new project, e.g. ~/Movies/Cut.framejob.",
                     ]
                 ]),
             tool(
@@ -305,7 +305,7 @@ extension AgentServer {
                 [
                     "path": [
                         "type": "string",
-                        "description": "Where to write the .reelcut package. Required the first "
+                        "description": "Where to write the .framejob package. Required the first "
                             + "time; otherwise the project is written back to its own file.",
                     ]
                 ]),

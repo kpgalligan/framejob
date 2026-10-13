@@ -74,7 +74,7 @@ enum RecordingDestination: Equatable {
 /// `AVCaptureDevice.uniqueID`, nil for off; `rate` is 30 or 60.
 struct RecordingChoice: Equatable {
     var source: RecordingSource = .display(CGMainDisplayID())
-    var includeReelcutWindows: Bool = false
+    var includeFrameJobWindows: Bool = false
     var microphone: String? = nil
     var systemAudio: Bool = true
     var showClicks: Bool = false
@@ -87,7 +87,7 @@ struct RecordingChoice: Equatable {
 // MARK: - Where the files go
 
 /// Decision 2 (road map 3 §0): a recording is ORIGINAL footage and lives in
-/// `~/Movies/Reelcut Recordings/`, named by date and time — never in the
+/// `~/Movies/Frame Job Recordings/`, named by date and time — never in the
 /// package (an untitled document has none) and never in the temporary
 /// directory (where a cache is regenerable and footage would be lost). The
 /// folder is created on demand, and `-RCRecordingFolder` overrides it the
@@ -100,10 +100,10 @@ enum RecordingFiles {
     static let folderDefaultsKey = "RCRecordingFolder"
 
     /// The default folder's name under `~/Movies`.
-    static let folderName = "Reelcut Recordings"
+    static let folderName = "Frame Job Recordings"
 
     /// The folder a recording goes into: the override, tilde-expanded, when
-    /// one is set; `~/Movies/Reelcut Recordings/` otherwise. Nothing is
+    /// one is set; `~/Movies/Frame Job Recordings/` otherwise. Nothing is
     /// created here — `create(_:)` is called at the moment a recording has
     /// something to put in it, `AppSupport`'s rule.
     static func folder() -> URL {
@@ -250,8 +250,8 @@ enum RecordingConfiguration {
 ///
 /// **Both refusal sentences are COMPUTED, and end with `launchClause` when
 /// it is non-empty** (R1 review, unjudged and upheld): R0 q1 measured that
-/// a shell-launched Reelcut is attributed by TCC to the TERMINAL, so a
-/// person who followed the pane sentence and granted Reelcut.app would have
+/// a shell-launched Frame Job is attributed by TCC to the TERMINAL, so a
+/// person who followed the pane sentence and granted Frame Job.app would have
 /// granted the wrong application and be refused again with no way to tell
 /// why. The pane sentence stays the PREFIX — `recording_proof.py` matches
 /// on it — and the clause names the launching process's pid.
@@ -264,7 +264,7 @@ enum RecordingGrant {
 
     /// The pane sentence alone — the prefix of `screenRecordingRefusal`.
     static let screenRecordingPaneSentence =
-        "Screen Recording is not granted to Reelcut. Turn it on in System Settings ▸ "
+        "Screen Recording is not granted to Frame Job. Turn it on in System Settings ▸ "
         + "Privacy & Security ▸ Screen & System Audio Recording, then relaunch."
 
     static var screenRecordingRefusal: String { screenRecordingPaneSentence + launchClause }
@@ -278,9 +278,9 @@ enum RecordingGrant {
     static var launchClause: String {
         let parent = getppid()
         guard parent != 1 else { return "" }
-        return " This Reelcut was launched by another process (pid \(parent)), so the grant "
+        return " This Frame Job was launched by another process (pid \(parent)), so the grant "
             + "that counts is that application's — the terminal's, for a shell launch; or "
-            + "relaunch with open -a Reelcut.app."
+            + "relaunch with open -a \"Frame Job\"."
     }
 
     /// `AVCaptureDevice.authorizationStatus(for: .audio)`. Read BEFORE any
@@ -308,7 +308,7 @@ enum RecordingGrant {
     /// in System Settings. `launchClause` follows, on the same terms as the
     /// screen sentence's.
     static func microphoneRefusal(_ status: AVAuthorizationStatus) -> String {
-        let head = "The microphone is not granted to Reelcut (status: \(name(of: status))). "
+        let head = "The microphone is not granted to Frame Job (status: \(name(of: status))). "
         switch status {
         case .notDetermined:
             return head + "Press Record in File ▸ New Recording… once to grant it." + launchClause
@@ -374,7 +374,7 @@ enum RecordingGrant {
     /// The microphone note after its pane opened: the refusal's head and
     /// fix, the opened sentence, then `launchClause`.
     static func microphoneOpenedNote(_ status: AVAuthorizationStatus) -> String {
-        "The microphone is not granted to Reelcut (status: \(name(of: status))). "
+        "The microphone is not granted to Frame Job (status: \(name(of: status))). "
             + "Turn it on in System Settings ▸ Privacy & Security ▸ Microphone, then relaunch."
             + paneOpenedSentence + launchClause
     }

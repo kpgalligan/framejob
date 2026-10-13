@@ -3,7 +3,7 @@ import AppKit
 // MARK: - BarView
 
 /// A chrome bar: the window background with a 1px hairline on one edge.
-/// Reelcut's toolbar row (spec §3, 44 pt) and, later, the timeline's own
+/// Frame Job's toolbar row (spec §3, 44 pt) and, later, the timeline's own
 /// toolbar row are both this. Copied from Rasterize's `EditorChrome.swift` —
 /// keep them in sync rather than forking.
 final class BarView: NSView {

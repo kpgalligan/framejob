@@ -1,12 +1,12 @@
 //! The persisted format: the version number, the reader's caps, and the
 //! read-any-version / write-current pair behind `project.json` in a
-//! `.reelcut` package (spec §5.6).
+//! `.framejob` package (spec §5.6).
 //!
 //! The rule this module exists to enforce: **the reader accepts every prior
 //! version, and the writer enforces the reader's caps**, so every file this
 //! build produces can be read back by this build. Any change to the
 //! persisted schema bumps [`RC_FORMAT_VERSION`] here AND the `#define` in
-//! `core/include/reelcut_core.h`, and adds a migration step in [`read`].
+//! `core/include/framejob_core.h`, and adds a migration step in [`read`].
 
 use serde_json::{json, Value};
 
@@ -414,7 +414,7 @@ fn migrate_1015_to_15(version: u64) -> u64 {
 /// forward, and validates the result. Names the reason on failure.
 ///
 /// The version is read from the raw JSON before deserializing, so a file
-/// from a newer build reports "update Reelcut" instead of a confusing
+/// from a newer build reports "update Frame Job" instead of a confusing
 /// schema error about a field this build has never heard of.
 ///
 /// That gate is also what lets the schema itself be lenient: keys this
@@ -428,7 +428,7 @@ pub fn read(json: &str) -> Result<Project, String> {
     // A version spelled as a JSON float (`2.0`) is still a version. Reading
     // it with `as_u64` alone would miss it, fall back to the current
     // version, and hand the user a schema error about a field this build
-    // has never heard of instead of "update Reelcut" — which is the whole
+    // has never heard of instead of "update Frame Job" — which is the whole
     // reason the gate is read from the raw JSON. `trunc` rather than a
     // round, so 1.9 is treated as version 1 and gets the schema error it
     // deserves rather than being refused as a version from the future.
@@ -448,7 +448,7 @@ pub fn read(json: &str) -> Result<Project, String> {
     if version > u64::from(RC_FORMAT_VERSION) {
         return Err(format!(
             "project format version {version} is newer than this build understands \
-             (version {RC_FORMAT_VERSION}); update Reelcut to open it"
+             (version {RC_FORMAT_VERSION}); update Frame Job to open it"
         ));
     }
 

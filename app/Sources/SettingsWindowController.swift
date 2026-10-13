@@ -1,6 +1,6 @@
 import AppKit
 
-/// Reelcut ▸ Settings… ⌘, — road map 6 §5d's window, and the app's first
+/// Frame Job ▸ Settings… ⌘, — road map 6 §5d's window, and the app's first
 /// piece of chrome for something PERSISTED beyond view state.
 ///
 /// **A window and not a sheet, deliberately.** A sheet belongs to a document
@@ -62,7 +62,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
 
     /// Posted after Save, Remove and a region change, so the Generate
     /// Captions sheet can re-enable its button without being reopened.
-    static let didChangeNotification = Notification.Name("ReelcutSettingsDidChange")
+    static let didChangeNotification = Notification.Name("FrameJobSettingsDidChange")
 
     /// §5d's "one pane for now", as the heading this window opens with.
     static let paneTitle = "Transcription"
@@ -373,7 +373,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         [
             "With AssemblyAI chosen in the Generate Captions sheet, the AUDIO of the files you "
                 + "are captioning is uploaded to AssemblyAI, transcribed, read back, and then "
-                + "deleted from AssemblyAI — Reelcut asks for the delete as soon as it has the "
+                + "deleted from AssemblyAI — Frame Job asks for the delete as soon as it has the "
                 + "words, and retries it at the start of the next run if it did not land. "
                 + "Nothing is uploaded until you press Generate, and captions made on this Mac "
                 + "never leave it.",
@@ -393,7 +393,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
 /// out of this change entirely.
 extension AppDelegate {
 
-    /// Reelcut ▸ Settings… ⌘, — a nil-target selector like every other item
+    /// Frame Job ▸ Settings… ⌘, — a nil-target selector like every other item
     /// in `AppDelegate+Menus.swift`, which is what lets it resolve with no
     /// document open.
     @objc func showSettings(_ sender: Any?) {

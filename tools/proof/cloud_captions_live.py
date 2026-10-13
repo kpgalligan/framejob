@@ -17,7 +17,7 @@ ledger; a reservation is written BEFORE every billable call and the gate
 refuses at $0.25 or at six transcriptions, counting an `extra` row for every
 submit or id the APP made that the ledger had not accounted for. Every
 reservation is ALSO made first in the proofs' ledger
-(`~/Library/Application Support/Reelcut Proofs/spend.jsonl`, spec §11 P-6) at
+(`~/Library/Application Support/Frame Job Proofs/spend.jsonl`, spec §11 P-6) at
 its worst case — the planned seconds at `AssemblyAIRates`' two rates added —
 and refused `budget:` past the month's $5 (P-3); it is settled there at the
 billed seconds. Before the first call the run checks that the month's budget
@@ -91,7 +91,7 @@ def dummy_arm(proof, client, binary, probe, ledger):
                     "empty) reaches the real service and is refused in the key's own "
                     "sentence",
                     text is not None and "AssemblyAI refused the API key — check it in "
-                    "Reelcut ▸ Settings" in text,
+                    "Frame Job ▸ Settings" in text,
                     scrubbed(getattr(proof, "live_scrubber", None), f"got {text!r}"))
         proof.check("20d: and the pty SAW the client's one line — `POST /v2/upload → 401`",
                     lines == ["POST /v2/upload → 401"], f"got {lines!r}")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Road map 6, C1 pipeline 3 — the cloud engine through the BUILT binary.
 
-Drives the built Reelcut (`proof_app`'s choice: `make app-debug`'s, or `make
+Drives the built Frame Job (`proof_app`'s choice: `make app-debug`'s, or `make
 app`'s under `RC_PROOF_APP=release`) over MCP against `assemblyai_fake.py` on a
 loopback socket. Nothing here calls AssemblyAI: every instance is launched
 with `-RCAssemblyAIEndpoint http://127.0.0.1:<the fake's port>` and
@@ -48,7 +48,7 @@ Road map 6 §5i's rows 1–11, plus five of this pipeline's own:
   even under `refresh`, and its cache file is left byte for byte.
 * **H** a media over AssemblyAI's ten-hour limit, refused by name before a
   byte is extracted.
-* **T** no `reelcut-upload-*` survives a cancelled, a failed or a refused
+* **T** no `framejob-upload-*` survives a cancelled, a failed or a refused
   run, with a CONTROL that one is there while the body is going out.
 * **K** the dummy key appears in no app log, no MCP answer and no file this
   run wrote but the fake's own request log.
@@ -73,13 +73,13 @@ Road map 6 §5i's rows 1–11, plus five of this pipeline's own:
   control's `text` objects and renders its frame byte for byte.
 * **L** (issue batch B43, #200 item 4) the probe's `hold_cloud_lock`, taken
   before a mutant is built or an instance launched, so this proof, the
-  probe and `word_captions_proof.py` never write `reelcut-upload-*` into
+  probe and `word_captions_proof.py` never write `framejob-upload-*` into
   one temporary folder at once. `--lock-wait` (default 3600 s) bounds the
   wait; an expired wait is a scored FAIL naming the holder, and exit 1.
 
 Five instances, each on its own scratch socket (`mcp.scratch_socket`) with
 its own fake, each killed by its own PID in a `finally`, each with a row that
-`grep "Reelcut: "` finds nothing in its log (beside its socket): A, B and C,
+`grep "Frame Job: "` finds nothing in its log (beside its socket): A, B and C,
 then **RP** (keyed) and **RQ** (no key, its own loopback fake) for row RP. Host-state
 inputs: `media/speech.mov` and `media/AV.mov`, `say`
 for the second fixture, `ffmpeg` for row 2's second decoder (the row names which decoders
@@ -230,7 +230,7 @@ def read(path):
 
 
 class Instance:
-    """One Reelcut on a scratch socket of its own, pointed at one fake.
+    """One Frame Job on a scratch socket of its own, pointed at one fake.
 
     **It kills only what it started** — `Popen`'s own pid, SIGTERM then
     SIGKILL. Nothing here reads `pgrep`: another session's instance is none
@@ -268,19 +268,19 @@ class Instance:
                 # taken `RC_ASSEMBLYAI_KEY` out.
                 env["RC_ASSEMBLYAI_KEY"] = key
         env["RC_AGENT_SOCKET"] = self.socket
-        # `-ReelcutCaptionEngine assemblyai` pins the SHEET's memory of
+        # `-FrameJobCaptionEngine assemblyai` pins the SHEET's memory of
         # what a person last chose to the wrong answer for a tool, which
         # is what makes row 8 a real row: R6-2 says an agent call reads
         # that key never, and an instance where it reads "apple" could
         # not tell a build that obeys R6-2 from one that does not.
         argv = [binary, "-ApplePersistenceIgnoreState", "YES",
-                "-ReelcutCaptionEngine", "assemblyai", "-RCSecretFolder", self.secrets]
+                "-FrameJobCaptionEngine", "assemblyai", "-RCSecretFolder", self.secrets]
         if live:
             # NO endpoint override, so the client speaks to the region's own
             # host — and the secret folder above is an EMPTY directory, which
             # is what keeps the person's real store closed (R6-9) and leaves
             # the environment as the only credential.
-            argv += ["-ReelcutAssemblyAIRegion", "us"]
+            argv += ["-FrameJobAssemblyAIRegion", "us"]
         else:
             argv += ["-RCAssemblyAIEndpoint", endpoint or fake.base]
         if live:
@@ -373,8 +373,8 @@ class Instance:
 
     def parity(self):
         complaints = [line for line in read(self.log).decode("utf-8", "replace").splitlines()
-                      if "Reelcut: " in line]
-        check(f"{self.tag}: the startup parity check said nothing — `grep \"Reelcut: \"` on "
+                      if "Frame Job: " in line]
+        check(f"{self.tag}: the startup parity check said nothing — `grep \"Frame Job: \"` on "
               f"{self.log} is empty", not complaints, "\n       ".join(complaints[:5]))
 
     def stop(self):
@@ -417,7 +417,7 @@ class Session:
     def __init__(self, instance, name):
         self.instance = instance
         self.mcp = instance.mcp
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         shutil.rmtree(self.path, ignore_errors=True)
         self.mcp.call("new_project", path=self.path)
 
@@ -540,7 +540,7 @@ def row_one_no_key(instance, fake):
     text = session.error("transcribe", engine="assemblyai")
     check("1: with no key the run is refused with 5g's own sentence",
           text is not None
-          and "No AssemblyAI API key is set. Set one in Reelcut ▸ Settings ▸ Transcription, "
+          and "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings ▸ Transcription, "
               "or RC_ASSEMBLYAI_KEY for a proof." in text,
           f"got {text!r}")
     check("1: and no request was made to find that out — the credential is read ABOVE the "
@@ -1228,7 +1228,7 @@ def row_refused_owed(instance, fake):
     print("\nRF\u00b7MCP. a refused transcript whose DELETE failed is owed to the dashboard "
           "(R6-20)")
     speech, _ = fixtures()
-    dashboard = ("Its transcript could not be saved in the project, so Reelcut cannot "
+    dashboard = ("Its transcript could not be saved in the project, so Frame Job cannot "
                  "retry deleting it automatically. Delete it in your AssemblyAI dashboard.")
     errored = "The audio could not be transcribed."
     for failing in (True, False):
@@ -1288,10 +1288,10 @@ def row_seven(instance, fake):
 
     scenario(fake)
     session.op("transcribe", engine="assemblyai", refresh=True,
-               vocabulary=["  Reelcut ", "acme", "Reelcut", "", "   "], place=False)
+               vocabulary=["  Frame Job ", "acme", "Frame Job", "", "   "], place=False)
     body = submits(fake.log())[-1]["json"]
     check("7: `vocabulary` arrives trimmed, empties dropped, de-duplicated keeping the FIRST",
-          body.get("keyterms_prompt") == ["Reelcut", "acme"],
+          body.get("keyterms_prompt") == ["Frame Job", "acme"],
           f"got {body.get('keyterms_prompt')!r}")
 
     session.op("transcribe", engine="assemblyai", refresh=True, vocabulary=[], place=False)
@@ -1541,7 +1541,7 @@ def temp_folders():
 
 
 def temp_uploads():
-    """Every `reelcut-upload-*` in either temporary folder, each named ONCE.
+    """Every `framejob-upload-*` in either temporary folder, each named ONCE.
 
     The set is what makes row T's CONTROL mean anything: it compares this
     answer taken during a run with the same answer taken before it, and a
@@ -1549,12 +1549,12 @@ def temp_uploads():
     leftover from an earlier run (R7\u00b71)."""
     found = set()
     for folder in temp_folders():
-        found.update(glob.glob(os.path.join(folder, "reelcut-upload-*")))
+        found.update(glob.glob(os.path.join(folder, "framejob-upload-*")))
     return sorted(found)
 
 
 class Watcher(threading.Thread):
-    """Globs for `reelcut-upload-*` while a run is in flight. Bounded by the
+    """Globs for `framejob-upload-*` while a run is in flight. Bounded by the
     run it watches: `stop()` is called in a `finally` (rule H)."""
 
     def __init__(self):
@@ -1610,7 +1610,7 @@ def row_t(instance, fake):
         text = session.error("transcribe", engine="assemblyai", refresh=True, place=False)
         check(f"T: the {tag} run failed, as the row needs it to",
               text is not None and expect in text, f"got {text!r}")
-        check(f"T: and left NO reelcut-upload-* behind — the `defer` covers it",
+        check(f"T: and left NO framejob-upload-* behind — the `defer` covers it",
               temp_uploads() == before, f"got {temp_uploads()!r}, before {before!r}")
 
 
@@ -2034,7 +2034,7 @@ LOSER_MARKERS = {
     4: "only applies with engine", 5: "No AssemblyAI API key is set",
     6: "10-hour limit", 7: "its earlier transcript",
 }
-NO_KEY = ("No AssemblyAI API key is set. Set one in Reelcut ▸ Settings ▸ "
+NO_KEY = ("No AssemblyAI API key is set. Set one in Frame Job ▸ Settings ▸ "
           "Transcription, or RC_ASSEMBLYAI_KEY for a proof.")
 DEFERRED = ("AssemblyAI has not confirmed deleting the transcript of media {media}; cleanup "
             "was deferred because no API key is set. Its deletion ID is retained in the "
@@ -2065,7 +2065,7 @@ def pair_copy(source, name):
     are still being written while it is copied, through `.sb-` temporaries
     that can vanish between the listing and the copy, so those are left out
     and a copy that raced one anyway is taken again (three tries)."""
-    path = os.path.join(WORK, f"pairs-{name}-{os.getpid()}.reelcut")
+    path = os.path.join(WORK, f"pairs-{name}-{os.getpid()}.framejob")
     for attempt in range(3):
         shutil.rmtree(path, ignore_errors=True)
         try:
@@ -2424,7 +2424,7 @@ def build_mutant(name, wall=900):
     The copy is `tree_copy.make_copy`'s: `app/` and `agent/` copied, every
     other build input `project.yml` names a SYMLINK to the tree's (`core`
     already built, so `project.yml`'s pre-build `cargo build --release` is a
-    no-op and the copy links the tree's `libreelcut_core.a`). The copy is
+    no-op and the copy links the tree's `libframejob_core.a`). The copy is
     built by `tree_copy.build_app` (its own `make app` or `make app-debug`),
     whose Makefile `unexport` keeps both keys out of its build database. The
     working tree is never touched."""
@@ -2445,7 +2445,7 @@ def build_mutant(name, wall=900):
     app, reason = tree_copy.build_app(root, wall, env=child_env())
     if app is None:
         return None, f"the mutant's build: {reason}"
-    return str(app / "Contents/MacOS/Reelcut"), None
+    return str(proof_app.executable(app)), None
 
 
 # --------------------------------------------------------------------------
@@ -2618,7 +2618,7 @@ def main():
     finally:
         left = [one for one in temp_uploads()]
         if left:
-            print(f"  (note: {len(left)} reelcut-upload-* left in a temporary folder)")
+            print(f"  (note: {len(left)} framejob-upload-* left in a temporary folder)")
 
     tail = ""
     if skips:

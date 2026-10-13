@@ -34,7 +34,7 @@ final class CurveTextures {
         guard let placeholder = CurveTextures.upload([0, 0, 0, 1, 1, 1, 1, 1], width: 2,
                                                      format: format, device: device)
         else { return nil }
-        placeholder.label = "Reelcut curves placeholder"
+        placeholder.label = "Frame Job curves placeholder"
         self.placeholder = placeholder
     }
 
@@ -56,7 +56,7 @@ final class CurveTextures {
         let strip = CurveTextures.upload(
             CurveTable.strip(curves), width: CurveTable.stripSize, format: format,
             device: device)
-        strip?.label = "Reelcut curves"
+        strip?.label = "Frame Job curves"
         let made = strip ?? placeholder
         cache[curves] = made
         order.append(curves)

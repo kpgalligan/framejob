@@ -75,7 +75,7 @@ MEDIA = os.path.join(HERE, "media")
 WORK = os.path.join(HERE, "work")
 
 SEC = 600_000
-HEADER = os.path.join(HERE, "..", "..", "core", "include", "reelcut_core.h")
+HEADER = os.path.join(HERE, "..", "..", "core", "include", "framejob_core.h")
 
 
 def format_version():
@@ -118,7 +118,7 @@ def digest(path):
 
 
 def copy_package(source, destination):
-    """A byte copy of a `.reelcut` package, skipping a file that vanishes
+    """A byte copy of a `.framejob` package, skipping a file that vanishes
     under `cache/` — the instance under proof writes thumbnails while the copy
     runs. `phase2_proof.py` argues the whole thing; the short version is that
     everything under `cache/` is regenerable and no part of any claim made
@@ -266,14 +266,14 @@ class Session:
 
     def __init__(self, mcp, name, open_from=None, fps=None, background=None):
         self.mcp = mcp
-        # `<name>-<pid>.reelcut`, never a fixed name: a `project` path is
+        # `<name>-<pid>.framejob`, never a fixed name: a `project` path is
         # matched against every open document and no tool closes one, so two
         # earlier runs' SAVED packages would have the app answering for an old
         # one (measured in phase 2). Older runs' under this name go.
         for stale in os.listdir(WORK):
-            if re.fullmatch(rf"{re.escape(name)}-\d+\.reelcut", stale):
+            if re.fullmatch(rf"{re.escape(name)}-\d+\.framejob", stale):
                 shutil.rmtree(os.path.join(WORK, stale))
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         if open_from is None:
             mcp.call("new_project", path=self.path)
             canvas = {"width": CANVAS[0], "height": CANVAS[1]}
@@ -648,7 +648,7 @@ def as_vtt(srt):
 
 
 def write_fixture(name):
-    """The fixture on disk, at a FIXED name. Only a `.reelcut` PACKAGE needs a
+    """The fixture on disk, at a FIXED name. Only a `.framejob` PACKAGE needs a
     per-run name — a `project` path is matched against every open document and
     nothing closes one — and a caption file is neither read nor written
     through that machinery, so overwriting it keeps `work/` from growing a
@@ -1087,7 +1087,7 @@ def schema_part(mcp, session):
     )
 
     # A version-4 fixture: the same package with the key REMOVED, not nulled.
-    fixture = os.path.join(WORK, f"textanim-v4-source-{os.getpid()}.reelcut")
+    fixture = os.path.join(WORK, f"textanim-v4-source-{os.getpid()}.framejob")
     if os.path.exists(fixture):
         shutil.rmtree(fixture)
     copy_package(session.path, fixture)

@@ -1,8 +1,8 @@
 // Road map 13 P2 — the spend probe (spec §11 P-2, P-4, P-5).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
-// `assistant_tab_proof.py`'s `build_probe` swiftc line, `-D REELCUT_DEV_TOOLS` —
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
+// `assistant_tab_proof.py`'s `build_probe` swiftc line, `-D FRAMEJOB_DEV_TOOLS` —
 // by `spend_proof.py`, which runs it with its scratch folder as the first
 // argument. It starts no app, opens no window and reads no defaults of its
 // own: every row answers `AssistantSpend` or `AssistantTranscript` directly.
@@ -54,7 +54,7 @@ func cost(
     ]
 }
 
-let tail = " · Reelcut's estimate at LiteLLM prices ("
+let tail = " · Frame Job's estimate at LiteLLM prices ("
 let bundledAsOf = "2026-09-28T06:07:45Z"
 
 // S1 — the formats.
@@ -343,13 +343,13 @@ do {
     check(&p, alone.line,
           "Cost: at least $0.0004 (a response was cut short)" + tail + "bundled table of \(day))",
           "partial line")
-    check(&p, alone.figure, "at least $0.0004 · Reelcut's estimate", "partial figure")
+    check(&p, alone.figure, "at least $0.0004 · Frame Job's estimate", "partial figure")
     var tiny = AssistantTurnCost()
     tiny.add(partial(cost("dollars", dollars: 0.00002)))
     check(&p, tiny.line,
           "Cost: under $0.0001 (a response was cut short)" + tail + "bundled table of \(day))",
           "tiny partial line")
-    check(&p, tiny.figure, "under $0.0001 · Reelcut's estimate", "tiny partial figure")
+    check(&p, tiny.figure, "under $0.0001 · Frame Job's estimate", "tiny partial figure")
     var mixed = AssistantTurnCost()
     mixed.add(cost("dollars", dollars: 0.0006))
     mixed.add(cut)

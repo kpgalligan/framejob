@@ -1,7 +1,7 @@
-//! Shared helpers for Reelcut's black-box tests.
+//! Shared helpers for Frame Job's black-box tests.
 //!
 //! Every test in `core/tests/` drives the crate the way the app does — over
-//! the C surface in `core/include/reelcut_core.h` — so this module owns the
+//! the C surface in `core/include/framejob_core.h` — so this module owns the
 //! pointer dance once: NUL-terminating the JSON that goes in, freeing every
 //! string that comes back through `rc_string_free`, freeing every handle
 //! through `rc_project_free`, and turning the header's three-way answer
@@ -44,17 +44,17 @@ use std::ptr;
 
 use serde_json::Value;
 
-use reelcut_core::ffi::{
+use framejob_core::ffi::{
     rc_project_clone, rc_project_free, rc_project_from_json, rc_project_new, rc_project_scoped,
     rc_project_to_json, rc_string_free,
 };
-use reelcut_core::ffi_edit::rc_project_apply;
-use reelcut_core::ffi_query::{
+use framejob_core::ffi_edit::rc_project_apply;
+use framejob_core::ffi_query::{
     rc_export_settings, rc_export_sizes, rc_project_clip_state, rc_project_composition_plan,
     rc_project_duration, rc_project_frame_recipe, rc_project_frame_recipe_opts,
     rc_project_snap_candidates,
 };
-use reelcut_core::model::Project;
+use framejob_core::model::Project;
 
 // ---- strings -------------------------------------------------------------
 

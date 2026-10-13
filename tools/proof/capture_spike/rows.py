@@ -15,7 +15,7 @@ and L7's label not on screen.
 """
 
 ROWS = [
-    ("B0", "q1", "instrument", None, "shader and probe built (-O -wmo, REELCUT_DEV_TOOLS)"),
+    ("B0", "q1", "instrument", None, "shader and probe built (-O -wmo, FRAMEJOB_DEV_TOOLS)"),
     ("W0", "q1", "instrument", "well", "window visible, not occluded; the layer shows a frame"),
     ("W1", "q1", "answer", "well", "cacheDisplay of the live well is not the picture"),
     ("W2", "q1", "control", "well", "M (selected vs unselected) has a non-empty core"),

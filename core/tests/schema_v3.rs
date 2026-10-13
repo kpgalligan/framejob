@@ -34,7 +34,7 @@ mod common;
 
 use serde_json::{json, Value};
 
-use reelcut_core::format::RC_FORMAT_VERSION;
+use framejob_core::format::RC_FORMAT_VERSION;
 
 use common::{array, at, by_id, flag, int, text, Handle};
 
@@ -123,7 +123,7 @@ fn a_file_one_version_newer_is_refused_with_the_exact_message() {
         msg,
         format!(
             "project format version {future} is newer than this build understands \
-             (version {current}); update Reelcut to open it"
+             (version {current}); update Frame Job to open it"
         )
     );
 }
@@ -135,7 +135,7 @@ fn the_header_states_the_same_format_version_as_the_core() {
     // scripts read the HEADER's, so a bump that moved only `format.rs` would
     // leave every proof testing the old number; this is the one place the
     // two are compared.
-    let header = include_str!("../include/reelcut_core.h");
+    let header = include_str!("../include/framejob_core.h");
     let stated = header
         .lines()
         .find_map(|line| line.strip_prefix("#define RC_FORMAT_VERSION "))

@@ -14,13 +14,13 @@ because those two together would pass against a build with 8a deleted, one
 more through a PROBE built out of `app/Sources` (section 5 below).
 
 **Section 1 is the headline, and it is a claim about ISOLATION rather than
-about effect.** `PreviewQuality` is persisted at `ReelcutPreviewQuality` in
+about effect.** `PreviewQuality` is persisted at `FrameJobPreviewQuality` in
 `UserDefaults`, and `PreviewQuality.stored()` reads
 `UserDefaults.standard` — so the setting can be put into a running app
 through the argument domain at launch, exactly as
 `-ApplePersistenceIgnoreState` already is. This script therefore launches
 **two instances of the same binary**, one with the key ABSENT (Full) and one
-with `-ReelcutPreviewQuality 2` (Quarter), drives the identical scripted
+with `-FrameJobPreviewQuality 2` (Quarter), drives the identical scripted
 sequence through both, and byte-compares what comes out:
 
 * every `render_frame` PNG, byte for byte;
@@ -82,7 +82,7 @@ inside it could tell. So section 0 EXTRACTS `enum PreviewQuality` from
 `app/Sources/EditorViewController+PreviewQuality.swift` — the app's own
 bytes, `sed`'s job done in Python, with two imports prepended and nothing
 else — compiles it with a `main.swift` of its own, and runs it twice: once
-bare and once with `-ReelcutPreviewQuality 2`. It also pins the trap under
+bare and once with `-FrameJobPreviewQuality 2`. It also pins the trap under
 that: an argument-domain value arrives as a **String**, so
 `object(forKey:) != nil` is satisfied and `integer(forKey:)` coerces it,
 which is why `stored()`'s two-call spelling is load-bearing and why an
@@ -92,7 +92,7 @@ different process, and the app's own reading of it is unobservable. What
 makes the whole thing hang together is the mutation run — under mutant 1 the
 Quarter instance renders 160 × 90 where the Full one renders 640 × 360,
 which can only happen if the launch argument reached `PreviewQuality.stored()`
-inside a running Reelcut.
+inside a running Frame Job.
 
 **Section 2 is phase 8c's defect fix, end to end, and it is the one place
 phase 8 changed an answer an agent can read.** "Is this media used" was
@@ -125,7 +125,7 @@ op and no tool, so a fourth phase in a row asserts it unchanged, and no tool
 name mentions the preview or the quality — the parity rule owes a mirror to
 every user-visible EDIT and this edits nothing. The startup parity log is
 empty for every instance this run touches, its own two included. The schema
-is still the header's `RC_FORMAT_VERSION`, read off `core/include/reelcut_core.h` at import and never copied, in
+is still the header's `RC_FORMAT_VERSION`, read off `core/include/framejob_core.h` at import and never copied, in
 `get_project` and in a saved `project.json`. And the
 three view-state calls an agent has (`set_playhead`, `set_selection`,
 `set_range`) leave the project JSON byte-identical and the frame at one
@@ -153,7 +153,7 @@ in the tree — three files rather than one because a second `import_media` of
 one path is an identity edit and is refused.
 `ffmpeg` is needed at proof time, for the ProRes comparison alone, and
 `swiftc` for section 0's enum and section 5's whole-app probe (which also
-needs `core/target/release/libreelcut_core.a` — `make test` builds it).
+needs `core/target/release/libframejob_core.a` — `make test` builds it).
 
 Run it with the socket of an instance already up; it launches two more of
 its own (each on a scratch socket under `$TMPDIR`, `mcp.launch`) and kills
@@ -202,7 +202,7 @@ TOOLS = 73
 
 # What this build writes. Phase 8 declares "no schema; view state
 # throughout", so the number is whatever the tree's header names, read at import: the copy this file carried went stale at road map 8's W1b (8 → 9).
-HEADER = os.path.join(ROOT, "core", "include", "reelcut_core.h")
+HEADER = os.path.join(ROOT, "core", "include", "framejob_core.h")
 
 
 def format_version():
@@ -218,10 +218,10 @@ def format_version():
 VERSION = format_version()
 
 # The app's own defaults key and the build under test's bundle id (Release's
-# com.kgalligan.Reelcut, Debug's com.kgalligan.Reelcut.debug). The first is
+# com.kgalligan.FrameJob, Debug's com.kgalligan.FrameJob.debug). The first is
 # read off the source in section 0 as well as spelled here, so a rename shows
 # up as a failure rather than as two files quietly disagreeing.
-DEFAULTS_KEY = "ReelcutPreviewQuality"
+DEFAULTS_KEY = "FrameJobPreviewQuality"
 BUNDLE_ID = proof_defaults.bundle_domain(BINARY) or proof_defaults.APP_DOMAIN
 
 # `AgentServer+Render.swift`'s sentence, read the way six earlier scripts
@@ -229,7 +229,7 @@ BUNDLE_ID = proof_defaults.bundle_domain(BINARY) or proof_defaults.APP_DOMAIN
 FRAME_SENTENCE = re.compile(r"Written to (\S+\.png)\.")
 
 # The startup parity check complaining, which must never appear.
-PARITY = "Reelcut: "
+PARITY = "Frame Job: "
 
 failures = []
 checks = 0
@@ -369,12 +369,12 @@ class Frame:
 
 
 class Instance:
-    """One Reelcut launched BY THIS SCRIPT, on a port of its own.
+    """One Frame Job launched BY THIS SCRIPT, on a port of its own.
 
     No proof script in this tree had ever launched the app before phase 8,
     and this one does it for one reason: `PreviewQuality` is read from
     `UserDefaults` at `Playback.init` and there is no tool that sets it, so
-    the only way a proof can put a quality into a running Reelcut is the
+    the only way a proof can put a quality into a running Frame Job is the
     argument domain at launch. `-ApplePersistenceIgnoreState` already
     travels that way (CLAUDE.md's launch line); this adds one more argument
     to the same list. The launch is `mcp.launch`, on a scratch socket.
@@ -430,7 +430,7 @@ def parity_lines(path):
 class Session:
     """One project, the shape phases 2 to 7 use.
 
-    `<name>-<pid>.reelcut`, never a fixed name: a `project` path is matched
+    `<name>-<pid>.framejob`, never a fixed name: a `project` path is matched
     against every open document and no tool closes one, so two earlier runs'
     saved packages would have the app answering for an old one."""
 
@@ -438,9 +438,9 @@ class Session:
         self.mcp = mcp
         self.name = name
         for stale in os.listdir(WORK):
-            if re.fullmatch(rf"{re.escape(name)}-\d+\.reelcut", stale):
+            if re.fullmatch(rf"{re.escape(name)}-\d+\.framejob", stale):
                 shutil.rmtree(os.path.join(WORK, stale))
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         mcp.call("new_project", path=self.path)
         self.canvas = canvas
         self.op("set_canvas", width=canvas[0], height=canvas[1], background=[0, 0, 0, 1])
@@ -993,7 +993,7 @@ import AppKit
 // composition that item is carrying — `Playback.previewComposition`'s answer,
 // which no tool can reach.
 //
-//   playerprobe <package> <tag to switch to at runtime, or -> [-ReelcutPreviewQuality N]
+//   playerprobe <package> <tag to switch to at runtime, or -> [-FrameJobPreviewQuality N]
 //
 // The positional arguments come FIRST because the launch argument stays in
 // `CommandLine.arguments` as well as reaching the argument domain.
@@ -1006,7 +1006,7 @@ app.setActivationPolicy(.prohibited)
 
 let document = ProjectDocument()
 do {
-    try document.read(from: projectURL, ofType: "com.kgalligan.reelcut-project")
+    try document.read(from: projectURL, ofType: ProjectDocument.projectTypeIdentifier)
     document.fileURL = projectURL
 } catch {
     FileHandle.standardError.write("read failed: \\(error)\\n".data(using: .utf8)!)
@@ -1087,7 +1087,7 @@ def build_player_probe():
     os.makedirs(out, exist_ok=True)
     binary = os.path.join(out, "playerprobe")
     main = os.path.join(out, "main.swift")
-    library = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    library = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(library):
         raise RuntimeError(f"{library} is missing — `make test` builds it")
     sources = sorted(

@@ -118,7 +118,7 @@ def build(mutant):
     binary = built_dir / "matte_pool_probe"
     try:
         made = swift_build.build(sources=sources + [entry], output=binary,
-                                 defines=["REELCUT_DEV_TOOLS"], timeout=900)
+                                 defines=["FRAMEJOB_DEV_TOOLS"], timeout=900)
     except swift_build.SwiftBuildFailed as error:
         return None, (f"swiftc rc {error.rc if error.rc is not None else 'before running'}: "
                       f"{(error.diagnostics or ['(no output)'])[:6]}")

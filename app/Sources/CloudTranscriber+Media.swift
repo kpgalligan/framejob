@@ -105,7 +105,7 @@ extension CloudTranscriber {
     /// `submit`, the poll that timed out, the cancel — because an extract is
     /// an input to one upload and a run that failed must leave nothing in
     /// `NSTemporaryDirectory()` behind it. `cloud_captions_probe.py`'s row T
-    /// globs for `reelcut-upload-*` during and after a failed run rather than
+    /// globs for `framejob-upload-*` during and after a failed run rather than
     /// taking this comment's word for it.
     ///
     /// **The cache file is written BEFORE its marker, and the marker only

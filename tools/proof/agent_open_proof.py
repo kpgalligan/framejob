@@ -24,7 +24,7 @@ exit. It holds the fixture, the run's packages and `home/`, and every probe
 (the baseline and each mutant) runs with `CFFIXED_USER_HOME=<work>/home`,
 which moves `AppSupport.directory` there for an unsandboxed process: nothing
 this proof copies lands in the owner's
-`~/Library/Application Support/Reelcut/Rewrapped/`, and a run killed by its
+`~/Library/Application Support/Frame Job/Rewrapped/`, and a run killed by its
 alarm leaves only the work folder, which the next run removes. A run writes
 about 4 x `--megabytes` there (the fixture and three copies, at most the
 fixture and one copy on disk at once). Not a line of `make test`.
@@ -44,7 +44,7 @@ ticks that saw a `.partial.mov` in `Rewrapped/`, and the ticks with
   any call: it must lie inside `<work>/home`, else A0 fails and A1–A14 do not
   run.
 - **A1** `open_project {big.webm}` answers a project with one media, its path
-  directly in the scratch home's `Reelcut/Rewrapped/` and on disk; the
+  directly in the scratch home's `Frame Job/Rewrapped/` and on disk; the
   call's seconds are printed, divided into before the partial was first
   seen, while it was written and after it was last seen (#235). **A2** at
   least 3 ticks saw the partial: main ran while the copy was written — a
@@ -53,7 +53,7 @@ ticks that saw a `.partial.mov` in `Rewrapped/`, and the ticks with
 - **A4** the project saved, closed, its `project.json` media path rewritten
   to `/nonexistent-b79/<name>` with `bookmark` null and the copy removed
   (`container_import_proof.py` M9's method): `open_project {package}` answers
-  a path directly in the scratch home's `Reelcut/Rewrapped/`, on disk, with
+  a path directly in the scratch home's `Frame Job/Rewrapped/`, on disk, with
   `original.path` the WebM. **A5** at least 3 ticks saw the partial. **A6**
   `live` was empty at every tick.
 - **A7** the package closed and its copy removed again; on the first tick
@@ -138,7 +138,7 @@ BUILD = os.path.join(HERE, "work", "agent-open-build")
 HOME = os.path.join(WORK, "home")
 SOURCES = os.path.join(ROOT, "app", "Sources")
 PROBE_SWIFT = os.path.join(HERE, "agent_open_probe.swift")
-LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 WALL_BUILD, WALL_RUN, WALL_FFMPEG = 900, 900, 600
 ROWS = ["A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A13",
         "A14"]
@@ -276,7 +276,7 @@ def build_probe(sources, probe_dir):
     print(f"probe: {len(swift)} sources through swift_build (up to {WALL_BUILD} s)…", flush=True)
     try:
         built = swift_build.build(sources=swift + [entry], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=WALL_BUILD)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=WALL_BUILD)
     except swift_build.SwiftBuildFailed as error:
         return None, (f"swiftc exited {error.rc if error.rc is not None else 'before running'} "
                       f"(expired {error.expired}): "

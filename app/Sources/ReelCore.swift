@@ -1,7 +1,7 @@
 import AppKit
 
 /// The ONLY file in the app that names an `rc_*` symbol. Everything the Rust
-/// core can do reaches the rest of Reelcut as typed Swift here: `ReelProject`
+/// core can do reaches the rest of Frame Job as typed Swift here: `ReelProject`
 /// (a handle plus its lazily decoded `ProjectSnapshot`), `ReelTime`, `ReelColor`,
 /// `ReelSnap`, `ReelExport`, the graphics engine's `GraphicLibrary` and
 /// `GraphicModule`, `ReelAgentSocket`, and the op ARGUMENTS an edit is built
@@ -9,7 +9,7 @@ import AppKit
 /// property types are in `OpDictionaries.swift`, for the same reason: they
 /// name no `rc_*` symbol.
 /// `ProjectSnapshot.swift` owns the read side of the same contract;
-/// `core/include/reelcut_core.h` is the contract itself.
+/// `core/include/framejob_core.h` is the contract itself.
 ///
 /// `ReelOp` and its one static factory per row of the op table are next door
 /// in `ReelOps.swift`, the size payment this file owed at 2242 lines, and

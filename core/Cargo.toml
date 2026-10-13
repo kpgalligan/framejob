@@ -1,10 +1,10 @@
 [package]
-name = "reelcut-core"
+name = "framejob-core"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "reelcut_core"
+name = "framejob_core"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]

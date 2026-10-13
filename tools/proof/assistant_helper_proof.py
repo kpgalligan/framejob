@@ -64,8 +64,8 @@ WORK = os.path.join(HERE, "work", "assistant_helper")
 AGENT = os.path.join(ROOT, "agent")
 BUILD_SH = os.path.join(AGENT, "build.sh")
 FAKE = os.path.join(HERE, "anthropic_fake.py")
-HELPER = os.path.join("Contents", "Helpers", "reelcut-agent")
-RELEASE_APP = os.path.join(ROOT, "build", "Build", "Products", "Release", "Reelcut.app")
+HELPER = os.path.join("Contents", "Helpers", "framejob-agent")
+RELEASE_APP = os.path.join(ROOT, "build", "Build", "Products", "Release", "Frame Job.app")
 MODEL = "claude-opus-5-5"
 BUN_ERROR = "error: bun is not installed"
 GUARD_EXIT = "  exit 1\n"
@@ -169,10 +169,10 @@ def p1(script):
         os.makedirs(home)
         os.makedirs(target)
         env = {"HOME": home, "PATH": "/usr/bin:/bin", "TARGET_BUILD_DIR": target,
-               "CONTENTS_FOLDER_PATH": "Reelcut.app/Contents"}
+               "CONTENTS_FOLDER_PATH": "Frame Job.app/Contents"}
         ran = run(["/bin/sh", script, mode], WALL_P1, env=env)
         first = (ran["stderr"].splitlines() or [""])[0]
-        placed = os.path.exists(os.path.join(target, "Reelcut.app", HELPER))
+        placed = os.path.exists(os.path.join(target, "Frame Job.app", HELPER))
         good = (not ran["expired"] and ran["rc"] not in (0, None)
                 and first.startswith(BUN_ERROR) and not placed)
         ok = ok and good
@@ -305,7 +305,7 @@ class Helper:
 
 def configure(base, **fields):
     message = {"type": "configure", "api_key": "proof-key", "model": MODEL,
-               "system": "Reelcut A1 part 2 proof.", "tools": [], "api_base": base,
+               "system": "Frame Job A1 part 2 proof.", "tools": [], "api_base": base,
                "settings": {"auto_compact_tokens": None, "clear_tool_results": False}}
     message.update(fields)
     return message
@@ -448,7 +448,7 @@ def p5():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--dist", help="a Distribution Reelcut.app, for P2d")
+    parser.add_argument("--dist", help="a Distribution Frame Job.app, for P2d")
     parser.add_argument("--mutant", choices=["skip-without-bun", "no-fields"],
                         help="run one row against its made-to-fail variant; it must FAIL")
     args = parser.parse_args()

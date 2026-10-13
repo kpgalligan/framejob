@@ -3,7 +3,7 @@
 // runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
 // `tools/proof/harness/build.sh`'s swiftc line — with `Fonts/`,
 // `GraphicTemplates/` and `GraphicsAPI.md` copied beside the binary (its
 // `resourceURL`, where the app finds all three). Every row drives the app's
@@ -128,14 +128,14 @@ let newItems = templateItems + [fromFileItem, fontItem, imageItem, referenceItem
     .compactMap { $0 }
 let keyed = newItems.filter { !$0.keyEquivalent.isEmpty }.map(\.title)
 check("M3 File holds Add Font to Graphics… then Add Image to Graphics… right after "
-      + "Consolidate Media…; Help holds Graphics Reference after Reelcut Help; none of the ten "
+      + "Consolidate Media…; Help holds Graphics Reference after Frame Job Help; none of the ten "
       + "new items has a key equivalent",
       fileTitles.indices.contains(consolidate + 2)
           && fileTitles[consolidate + 1] == "Add Font to Graphics…"
           && fileTitles[consolidate + 2] == "Add Image to Graphics…"
           && fontItem?.action == #selector(EditorViewController.addGraphicFont(_:))
           && imageItem?.action == #selector(EditorViewController.addGraphicImage(_:))
-          && helpTitles == ["Reelcut Help", "Graphics Reference"]
+          && helpTitles == ["Frame Job Help", "Graphics Reference"]
           && referenceItem?.action == #selector(AppDelegate.showGraphicsReference(_:))
           && newItems.count == 10 && keyed.isEmpty,
       "File \(fileTitles); Help \(helpTitles); \(newItems.count) new items; keyed \(keyed)")
@@ -174,7 +174,7 @@ check("M4 with no window the four editor selectors have no target; Graphics Refe
 func openDocument(_ url: URL) -> ProjectDocument? {
     let document = ProjectDocument()
     do {
-        try document.read(from: url, ofType: "com.kgalligan.reelcut-project")
+        try document.read(from: url, ofType: ProjectDocument.projectTypeIdentifier)
         document.fileURL = url
         return document
     } catch {

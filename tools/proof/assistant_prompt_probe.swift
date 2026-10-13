@@ -1,8 +1,8 @@
 // Road map 12 A3 — the prompt texts' probe (spec §11 AI-7, AI-9, AI-15).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
-// `tools/proof/harness/build.sh`'s swiftc line, `-D REELCUT_DEV_TOOLS` — by
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
+// `tools/proof/harness/build.sh`'s swiftc line, `-D FRAMEJOB_DEV_TOOLS` — by
 // `assistant_prompt_proof.py`, as `assistant_lane_probe.swift` is.
 //
 //   assistant_prompt_probe <work-dir>
@@ -468,26 +468,26 @@ func rowF6() {
 
 func rowF7() {
     let samples: [(AssistantLiveContext, String)] = [
-        (AssistantLiveContext(name: "Demo", path: "/tmp/Demo.reelcut", scope: 7,
+        (AssistantLiveContext(name: "Demo", path: "/tmp/Demo.framejob", scope: 7,
                               playhead: 2_400_000, selection: [3, 12]),
-         "<reelcut_context>\nname: Demo\npath: /tmp/Demo.reelcut\n"
+         "<framejob_context>\nname: Demo\npath: /tmp/Demo.framejob\n"
             + "scope: 7 (a nest is open: ids and times are its own)\n"
-            + "playhead: 2400000 (4.000 s)\nselection: 3, 12\n</reelcut_context>"),
-        (AssistantLiveContext(name: "Demo", path: "/tmp/Demo.reelcut", scope: nil,
+            + "playhead: 2400000 (4.000 s)\nselection: 3, 12\n</framejob_context>"),
+        (AssistantLiveContext(name: "Demo", path: "/tmp/Demo.framejob", scope: nil,
                               playhead: 0, selection: []),
-         "<reelcut_context>\nname: Demo\npath: /tmp/Demo.reelcut\n"
+         "<framejob_context>\nname: Demo\npath: /tmp/Demo.framejob\n"
             + "scope: none (the timeline is open)\n"
-            + "playhead: 0 (0.000 s)\nselection: none\n</reelcut_context>"),
+            + "playhead: 0 (0.000 s)\nselection: none\n</framejob_context>"),
         (AssistantLiveContext(name: "Untitled", path: nil, scope: 4,
                               playhead: 1_234_567, selection: []),
-         "<reelcut_context>\nname: Untitled\npath: none (never saved)\n"
+         "<framejob_context>\nname: Untitled\npath: none (never saved)\n"
             + "scope: 4 (a nest is open: ids and times are its own)\n"
-            + "playhead: 1234567 (2.058 s)\nselection: none\n</reelcut_context>"),
+            + "playhead: 1234567 (2.058 s)\nselection: none\n</framejob_context>"),
         (AssistantLiveContext(name: "Untitled 2", path: nil, scope: nil,
                               playhead: 600_000, selection: [9]),
-         "<reelcut_context>\nname: Untitled 2\npath: none (never saved)\n"
+         "<framejob_context>\nname: Untitled 2\npath: none (never saved)\n"
             + "scope: none (the timeline is open)\n"
-            + "playhead: 600000 (1.000 s)\nselection: 9\n</reelcut_context>"),
+            + "playhead: 600000 (1.000 s)\nselection: 9\n</framejob_context>"),
     ]
     var problems: [String] = []
     for (index, (context, expected)) in samples.enumerated() where context.text != expected {

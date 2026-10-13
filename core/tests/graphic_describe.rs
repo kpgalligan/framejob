@@ -16,7 +16,7 @@ use std::ptr;
 use serde_json::{json, Value};
 
 use common::{cstring, take_string};
-use reelcut_core::ffi_graphic::{
+use framejob_core::ffi_graphic::{
     rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_library_free,
     rc_graphic_library_new, RcGraphicLibrary,
 };

@@ -52,7 +52,7 @@ a proof. Section 8's mode is the counter-case and is declared as one: it
 photographs nothing, changes no render argument, and exists because the code
 it calls has no other caller a script can reach.
 
-The packages are written BY HAND (a `.reelcut` is a directory holding
+The packages are written BY HAND (a `.framejob` is a directory holding
 `project.json`, spec §5.2) around one clip, so nothing loads
 asynchronously and every render is deterministic — no media at all:
 
@@ -313,7 +313,7 @@ PACKAGES = {
 
 
 def write_package(package, spec):
-    path = os.path.join(WORK, package + ".reelcut")
+    path = os.path.join(WORK, package + ".framejob")
     os.makedirs(path, exist_ok=True)
     with open(os.path.join(path, "project.json"), "w") as f:
         json.dump(project_json(**spec), f, indent=2)
@@ -995,7 +995,7 @@ def main():
               "open-none", scale)
 
     # 3. The section EXISTS, under the id `TextPane.animationSection` gives
-    # it. The harness pins `ReelcutInspectorSection.text.animation` to "not
+    # it. The harness pins `FrameJobInspectorSection.text.animation` to "not
     # collapsed"; a section under any other id, or no section at all, leaves
     # the render exactly where it was.
     print("\n3. the section exists, under its own id — and is three rows tall")

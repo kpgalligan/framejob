@@ -4,7 +4,7 @@ the reader's speed bound (spec §11 R6-10, amended by #41): a clip speed
 outside ×0.1–×1000 is refused by name and value, the package is not
 rewritten, and both bounds themselves open.
 
-Owns its Reelcut process. A nonzero exit scores a startup, timeout, crash,
+Owns its Frame Job process. A nonzero exit scores a startup, timeout, crash,
 parity or assertion failure; no caller's app process is touched.
 """
 
@@ -26,11 +26,11 @@ import proof_app  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 M = 9_000_000_000_000_000
 FRAME = 20_000
-PARITY = "Reelcut: "
+PARITY = "Frame Job: "
 
 
 def package(where, name, document):
-    path = os.path.join(where, name + ".reelcut")
+    path = os.path.join(where, name + ".framejob")
     os.mkdir(path)
     with open(os.path.join(path, "project.json"), "w", encoding="utf-8") as stream:
         json.dump(document, stream)
@@ -144,12 +144,12 @@ def run(mcp, where):
     assert project(mcp) == before, "rejected edit added an undo step"
     mcp.call_with("redo", {})
     assert project(mcp) == after
-    saved_as = os.path.join(where, "saved-admitted.reelcut")
+    saved_as = os.path.join(where, "saved-admitted.framejob")
     mcp.call_with("save_project", {"path": saved_as})
     with open(os.path.join(saved_as, "project.json"), encoding="utf-8") as stream:
         persisted = json.load(stream)
     assert persisted["clips"][1]["start"] == M - 3 * FRAME
-    copy_path = os.path.join(where, "reopened.reelcut")
+    copy_path = os.path.join(where, "reopened.framejob")
     shutil.copytree(saved_as, copy_path)
     mcp.call("open_project", path=copy_path)
     assert project(mcp)["clips"][1]["start"] == M - 3 * FRAME
@@ -217,10 +217,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--app", default=str(proof_app.bundle()))
     args = parser.parse_args()
-    binary = os.path.join(args.app, "Contents", "MacOS", "Reelcut")
+    binary = str(proof_app.executable(args.app))
     if not os.path.isfile(binary):
         raise AssertionError("matching app binary is missing: " + binary)
-    with tempfile.TemporaryDirectory(prefix="reelcut-extreme-") as work:
+    with tempfile.TemporaryDirectory(prefix="framejob-extreme-") as work:
         log_path = os.path.join(work, "app.log")
         socket_path = scratch_socket()
         with open(log_path, "w", encoding="utf-8") as log:

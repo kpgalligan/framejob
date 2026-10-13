@@ -2,7 +2,7 @@
 // through `swift_build.build` and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, against `libreelcut_core.a`, so every row drives the app's own
+// `main.swift`, against `libframejob_core.a`, so every row drives the app's own
 // types: `EditorViewController.payloadMediaIDs`, `LutTextures` (and through it
 // `MediaImporter.readLUT` and the core's parser) and `RecipeSource`. Nothing
 // private is widened.
@@ -242,7 +242,7 @@ func lgOpened() -> ProjectDocument? {
     let document = ProjectDocument()
     do {
         try document.read(
-            from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+            from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
     } catch {
         return nil
     }

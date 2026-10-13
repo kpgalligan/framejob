@@ -2,42 +2,42 @@
 {
   "title": "Settings",
   "project": null,
-  "steps": [{"call": "perform_menu_item", "args": {"path": ["Reelcut", "Settings…"]}}],
+  "steps": [{"call": "perform_menu_item", "args": {"path": ["Frame Job", "Settings…"]}}],
   "captures": [{"name": "window", "window": "settings"}],
   "expect": [{"capture": "window", "visible_text": "Copy MCP Command"},
              {"capture": "window",
-              "visible_text": "An MCP client such as Claude Code uses Reelcut's tools through reelcut-mcp, a helper inside this app. It reaches Reelcut over a local socket that only programs you run can open."},
+              "visible_text": "An MCP client such as Claude Code uses Frame Job's tools through framejob-mcp, a helper inside this app. It reaches Frame Job over a local socket that only programs you run can open."},
              {"capture": "window", "visible_text": "Anthropic API key:"},
              {"capture": "window", "visible_text": "AssemblyAI API key:"},
              {"capture": "window", "visible_text": "No API key is set."},
              {"capture": "window", "visible_text": "Compact when context reaches"},
              {"capture": "window",
-              "visible_text": "Reelcut's own estimate at LiteLLM prices, from its spend ledger. The Anthropic Console shows what your account was billed."},
+              "visible_text": "Frame Job's own estimate at LiteLLM prices, from its spend ledger. The Anthropic Console shows what your account was billed."},
              {"capture": "window", "no_visible_text": "API key:"}]
 }
 ```
 
-Settings (Reelcut ▸ Settings…) has three sections, one under the other: MCP,
+Settings (Frame Job ▸ Settings…) has three sections, one under the other: MCP,
 Assistant and Transcription. The first is where a person finds how to connect
-an MCP client such as Claude Code to Reelcut (spec §11 MC-7); the second is
-where they give Reelcut an Anthropic API key, choose the model for the
+an MCP client such as Claude Code to Frame Job (spec §11 MC-7); the second is
+where they give Frame Job an Anthropic API key, choose the model for the
 Assistant tab, and set how a long conversation is kept in bounds; the third is
 where they give it an AssemblyAI API key, so that the Generate Captions sheet
 can transcribe in the cloud instead of on this Mac.
 
 The "MCP" section opens with its bold heading alone, with no ⓘ. Under it, two
 short paragraphs in 13 pt black (white in dark), visible rather than in a
-popover: "An MCP client such as Claude Code uses Reelcut's tools through
-reelcut-mcp, a helper inside this app. It reaches Reelcut over a local socket
-that only programs you run can open." and "If Reelcut isn't running, the first
-tool call opens it in the background. To add Reelcut to Claude Code, copy the
+popover: "An MCP client such as Claude Code uses Frame Job's tools through
+framejob-mcp, a helper inside this app. It reaches Frame Job over a local socket
+that only programs you run can open." and "If Frame Job isn't running, the first
+tool call opens it in the background. To add Frame Job to Claude Code, copy the
 command and run it in Terminal." Then the helper's path inside this copy of
-the app, ending `Contents/Helpers/reelcut-mcp`, in 12 pt monospace black,
+the app, ending `Contents/Helpers/framejob-mcp`, in 12 pt monospace black,
 selectable, wrapping by character when it is long. Then a "Copy MCP Command"
 button (a white square button with a thin outline), and under it an empty
 status line: after a press it reads "Copied. Paste it into Terminal and press
-Return.", and in a copy of Reelcut without the helper the button is dimmed and
-the line reads "reelcut-mcp is missing from this copy of Reelcut." Nothing in
+Return.", and in a copy of Frame Job without the helper the button is dimmed and
+the line reads "framejob-mcp is missing from this copy of Frame Job." Nothing in
 the section is selected when the window opens; the Anthropic key field has the
 focus.
 
@@ -77,7 +77,7 @@ September 2026 (UTC)." (the capture's launch keeps an empty spend folder, and th
 month is the UTC calendar month the capture was taken in). With responses recorded
 it reads, for example, "September 2026 (UTC): $0.42 over 12 responses.", and says
 how many could not be priced or could not be read rather than counting them as
-nothing. Under it, in small grey: "Reelcut's own estimate at LiteLLM prices, from
+nothing. Under it, in small grey: "Frame Job's own estimate at LiteLLM prices, from
 its spend ledger. The Anthropic Console shows what your account was billed."
 
 Under the "Transcription" heading, after a wider gap (the same gap separates

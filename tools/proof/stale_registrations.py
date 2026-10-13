@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""Issue batch B75 (#223) — the LaunchServices registrations of Reelcut
+"""Issue batch B75 (#223) — the LaunchServices registrations of Frame Job
 bundles, and the ones whose folder is gone.
 
     python3 tools/proof/stale_registrations.py                 # list (read only)
     python3 tools/proof/stale_registrations.py --unregister    # OPT-IN, see below
     python3 tools/proof/stale_registrations.py --under PATH    # either mode, PATH only
-    python3 tools/proof/stale_registrations.py --selftest      # S1–S3
+    python3 tools/proof/stale_registrations.py --selftest      # S1–S4
 
 Xcode and `/usr/bin/open` register every `.app` they build or launch, and a
 proof that deleted its copy without `lsregister -u` left the registration
 behind (the proofs now delete through `tree_copy.remove_tree`). This lists
 what is left: it parses `lsregister -dump` (bounded at 120 s) for every
-record whose identifier contains `reelcut` (any case), dedupes them by
+record whose identifier contains one of `NAMES`, `framejob` or the old name
+`reelcut` (any case, spec §11 NM-7), dedupes them by
 (identifier, path), and prints the totals (all, at missing paths, at
 existing paths) and each missing path with its identifier.
 
@@ -21,13 +22,15 @@ touched. It is the owner's to run: no proof calls it, and nothing here runs
 it without the flag. `--under PATH` limits both modes to paths under PATH.
 
 `--selftest`, in a `mkdtemp` of its own: a bundle with the identifier
-`com.kgalligan.reelcut.lsselftest.<pid>` registered with `lsregister -f`.
+`com.kgalligan.framejob.lsselftest.<pid>` registered with `lsregister -f`.
 
 * S1 — the dump lists it;
 * S2 — after the bundle is deleted and the unregister path runs with
   `--under` the temp folder, the dump no longer lists it;
 * S3 (CONTROL) — the count of registrations OUTSIDE the temp folder is the
   same before S1 and after S2: nothing else was unregistered.
+* S4 — `named` holds an identifier spelled either way, in any case, and
+  (CONTROL) not one spelled neither way.
 
 Exit 0, or 1 for a failed row or a dump that could not be read.
 """
@@ -47,14 +50,20 @@ from mcp import LSREGISTER  # noqa: E402
 
 DUMP_TIMEOUT = 120
 CALL_TIMEOUT = 60
+NAMES = ("reelcut", "framejob")   # the product's names before and after rename R1
 SEPARATOR = re.compile(r"^-{20,}$")
 FIELD = re.compile(r"^(path|identifier):\s+(.*?)\s*$")
 HANDLE = re.compile(r"\s+\(0x[0-9a-fA-F]+\)$")
 
 
+def named(identifier):
+    """Whether `identifier` contains one of `NAMES`, in any case."""
+    return any(name in identifier.lower() for name in NAMES)
+
+
 def registrations():
     """`[(identifier, path)]`, deduped and sorted, for every dump record whose
-    identifier contains `reelcut`; or `(None, reason)` when the dump fails."""
+    identifier `named` holds; or `(None, reason)` when the dump fails."""
     try:
         done = subprocess.run([LSREGISTER, "-dump"], capture_output=True, text=True,
                               errors="replace", timeout=DUMP_TIMEOUT)
@@ -69,7 +78,7 @@ def registrations():
 
     def close():
         identifier, path = record.get("identifier"), record.get("path")
-        if identifier and path and "reelcut" in identifier.lower():
+        if identifier and path and named(identifier):
             found.add((identifier, path))
 
     for line in done.stdout.splitlines():
@@ -119,7 +128,7 @@ def report(under, unregister):
     entries = [entry for entry in entries if is_under(entry[1], under)]
     missing = [entry for entry in entries if not os.path.lexists(entry[1])]
     scope = f" under {under}" if under else ""
-    print(f"reelcut registrations{scope}: {len(entries)} — "
+    print(f"Frame Job and Reelcut registrations{scope}: {len(entries)} — "
           f"{len(missing)} at missing paths, {len(entries) - len(missing)} at existing paths")
     for identifier, path in missing:
         print(f"  missing  {path}  ({identifier})")
@@ -141,7 +150,7 @@ def selftest():
         rows.append(ok)
         print(f"{ident} {'ok' if ok else 'FAIL'} — {detail}")
 
-    identifier = f"com.kgalligan.reelcut.lsselftest.{os.getpid()}"
+    identifier = f"com.kgalligan.framejob.lsselftest.{os.getpid()}"
     temp = tempfile.mkdtemp(prefix="rc-lsselftest-")
     app = os.path.join(temp, "LSSelftest.app")
     try:
@@ -194,6 +203,15 @@ def selftest():
         row("S3", after is not None and not gone,
             f"CONTROL: registrations outside the temp folder {len(outside_before)} before, "
             f"{len(outside_after)} after" + (f"; gone: {gone}" if gone else ""))
+
+        # S4
+        held = ["com.kgalligan.Reelcut", "com.kgalligan.reelcut.x", "com.kgalligan.FrameJob.debug",
+                "COM.KGALLIGAN.FRAMEJOB"]
+        missed = [one for one in held if not named(one)]
+        stray = named("com.kgalligan.rasterize")
+        row("S4", not missed and not stray,
+            f"named holds {held}: missed {missed or 'none'}; CONTROL com.kgalligan.rasterize "
+            f"held {stray}")
     except Exception as error:  # an instrument that cannot run is a FAIL
         row("S9", False, f"the selftest raised {error!r}")
     finally:
@@ -210,7 +228,7 @@ def main(argv=None):
                         help="lsregister -u the registrations at MISSING paths only")
     parser.add_argument("--under", metavar="PATH",
                         help="only registrations at paths under PATH")
-    parser.add_argument("--selftest", action="store_true", help="S1–S3 in a mkdtemp")
+    parser.add_argument("--selftest", action="store_true", help="S1–S4 in a mkdtemp")
     arguments = parser.parse_args(argv)
     if arguments.selftest:
         return selftest()

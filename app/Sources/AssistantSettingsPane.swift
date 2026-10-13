@@ -31,7 +31,7 @@ import AppKit
 ///
 /// **The month's spend (road map 13 P4, spec §11 P-7)** is the two labels
 /// under the buttons: the UTC month folded from the spend folder's ledger
-/// (`AssistantSpendMonth`) and the note that it is Reelcut's own estimate
+/// (`AssistantSpendMonth`) and the note that it is Frame Job's own estimate
 /// (P-4). The folder is a FACTORY too, so the harness hands it an absent one.
 /// `init` and `sync()` never read the ledger; `refreshSpend` does, when the
 /// window shows and after each line `AssistantSpend.record` writes while it

@@ -3,7 +3,7 @@
 // This is the program CLAUDE.md's "Seeing the chrome" section describes:
 // every file in `app/Sources` except the app's own `main.swift` is compiled
 // together with THIS file (`build.sh` has the swiftc line), linked against
-// `core/target/release/libreelcut_core.a`, and the result opens a `.reelcut`
+// `core/target/release/libframejob_core.a`, and the result opens a `.framejob`
 // package from disk through `ProjectDocument.read(from:ofType:)`, puts an
 // `EditorViewController` in an `NSWindow`, spins the runloop a few turns and
 // `cacheDisplay(in:to:)`s the content view into a PNG. That is the same paint
@@ -15,7 +15,7 @@
 // Selection, the playhead and the S/M/L size are VIEW state and are not in
 // the package, so the arguments set them:
 //
-//   harness <project.reelcut|welcome> <out.png> <light|dark>
+//   harness <project.framejob|welcome> <out.png> <light|dark>
 //           [w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document]
 //           [candidateSpans] [expandSections] [mediaFilter] [selectAction] [subTab]
 //           [seeing]
@@ -123,7 +123,7 @@
 // and that is a rule and not a convenience. `pinDefaults` REPLACES the
 // argument domain a few lines below (`setVolatileDomain`), which wipes
 // `-RCSecretFolder` and `-RCAssemblyAIEndpoint` — so after it `store()` is
-// the person's REAL `FileStore` on `~/Library/Application Support/Reelcut/`,
+// the person's REAL `FileStore` on `~/Library/Application Support/Frame Job/`,
 // and the Save and Remove buttons in this window are exactly the code that
 // would write and delete that file. The controller is also handed an EMPTY
 // environment, so `RC_ASSEMBLYAI_KEY` in the shell that launched the harness
@@ -135,7 +135,7 @@
 // does not exist, so the Assistant pane's month line is an empty month,
 // answered synchronously — the two processes' renders stay byte-identical.
 //
-//   harness transcribe <project.reelcut> <out.png> <light|dark> <style> [replace 0|1] [looks]
+//   harness transcribe <project.framejob> <out.png> <light|dark> <style> [replace 0|1] [looks]
 //
 // renders the Generate Captions card (road map 8 §5e, W4b) over a package,
 // hosted as a WINDOW's content view controller for `settings`' reason. It is
@@ -150,7 +150,7 @@
 // it, as a click does, after the style is chosen; absent or "" ticks none.
 // The preview is drawn off-Metal, so unlike the
 // editor's preview well it is not black here. `MemoryDefaults` is what the
-// popup and the boxes read and write; `ReelcutCaptionStyle`'s pin below, and
+// popup and the boxes read and write; `FrameJobCaptionStyle`'s pin below, and
 // the three look keys' beside it, are defensive.
 //
 //   harness cues <words.json> <out.json>
@@ -285,12 +285,12 @@
 // nothing the run writes back (`splitViewDidResizeSubviews` stores the pane
 // sizes) can change the next run's answer. Two renders of one package are
 // byte-identical; `tools/proof/phase2_chrome.py` checks that first. The
-// keys the app reads and the chrome does NOT draw (`ReelcutCompositorTiming`,
+// keys the app reads and the chrome does NOT draw (`FrameJobCompositorTiming`,
 // `RCFFmpegImport`, `RCFFmpegPath`) are left alone — with the exception
 // `pinDefaults` argues one key at a time: a key nothing draws is pinned anyway
 // when ORDINARY USE of the app writes it, since the render would then start
 // moving with whatever the developer last did the day some chrome grew a
-// readout of it. `ReelcutExportChoice` (phase 7) and phase 8's two are those.
+// readout of it. `FrameJobExportChoice` (phase 7) and phase 8's two are those.
 import AppKit
 import CoreText
 
@@ -315,17 +315,17 @@ enum Harness {
     /// and `DocumentPane`'s; the values are the app's own defaults.
     static func pinDefaults(sizeIndex: Int, expand: [String]) {
         var pinned: [String: Any] = [
-            "ReelcutInspectorWidth": 304.0,       // DS.panelWidth
-            "ReelcutTimelineHeight": 300.0,       // EditorViewController.defaultTimelineHeight
-            "ReelcutInspectorCollapsed": false,
-            "ReelcutTimelineTrackHeight": sizeIndex,
-            "ReelcutSnappingEnabled": true,
-            "ReelcutSafeGuidesVisible": false,
+            "FrameJobInspectorWidth": 304.0,       // DS.panelWidth
+            "FrameJobTimelineHeight": 300.0,       // EditorViewController.defaultTimelineHeight
+            "FrameJobInspectorCollapsed": false,
+            "FrameJobTimelineTrackHeight": sizeIndex,
+            "FrameJobSnappingEnabled": true,
+            "FrameJobSafeGuidesVisible": false,
             // The Document tab's "Resize clips proportionally" checkbox is
             // drawn from this key at paint time (`DocumentPane.rescaleClipsKey`),
             // so a `document` render moved with the machine's stored value
             // until it was pinned. `false` is `bool(forKey:)` of an absent key.
-            "ReelcutInspectorRescaleClips": false,
+            "FrameJobInspectorRescaleClips": false,
             // The export sheet's remembered choice (`ExportChoice`, phase 7).
             // "" is what `string(forKey:)` of an absent key reads as here —
             // the store treats an empty string as "nothing remembered" — so
@@ -343,19 +343,19 @@ enum Harness {
             // with whatever the developer last exported, and the symptom of
             // that (identical, stable, DIFFERENT output across processes) is
             // the one phase 4 spent a gate learning to read.
-            "ReelcutExportChoice": "",
+            "FrameJobExportChoice": "",
             // View ▸ Preview Quality (`PreviewQuality.defaultsKey`, phase 8a).
             // 0 is Full, which is what `integer(forKey:)` of an absent key
             // reads as and what `PreviewQuality.stored()` answers for one.
             // NOTHING the harness photographs reads it — it scales the
             // PLAYER's video composition, and the preview well is black
             // offscreen because a Metal layer has no drawable there — so this
-            // is pinned for the `ReelcutExportChoice` reason above it rather
+            // is pinned for the `FrameJobExportChoice` reason above it rather
             // than for a render: it is written by ORDINARY USE of the app on
             // the machine that runs the proofs, so the day the chrome grows a
             // readout of the current quality (a toolbar badge, say) the renders
             // would start moving with whatever the developer last chose.
-            "ReelcutPreviewQuality": 0,
+            "FrameJobPreviewQuality": 0,
             // The preview window's saved frame (phase 8b). AppKit spells the
             // key `"NSWindow Frame " + setFrameAutosaveName`'s name — measured,
             // not assumed — and "" is what an unsaved frame reads as, which is
@@ -364,7 +364,7 @@ enum Harness {
             // the harness renders the EDITOR's content view and never makes a
             // preview window at all, but ordinary use of the app writes this
             // key on every move and resize of one.
-            "NSWindow Frame ReelcutPreviewWindow": "",
+            "NSWindow Frame FrameJobPreviewWindow": "",
             // The recorder panel's seven remembered choices (road map 3, R1c:
             // `RecorderPanelController.<key>` — spelled as LITERALS here, because this
             // file must also compile against a tree from before the recorder existed
@@ -372,22 +372,22 @@ enum Harness {
             // values — the display 0 (the main one), no microphone, system
             // audio ON (the one of the seven whose absent-key reading is not
             // the default, which the panel tests by name), clicks off, 60,
-            // nominal, Reelcut's windows left out. NOTHING the harness photographs reads them: the panel
+            // nominal, Frame Job's windows left out. NOTHING the harness photographs reads them: the panel
             // is a floating `NSPanel` and never in the editor's content
-            // view. Pinned on `ReelcutExportChoice`'s terms — written by
+            // view. Pinned on `FrameJobExportChoice`'s terms — written by
             // ORDINARY USE of the app on the machine that runs the proofs,
             // every time a person changes a row — so that the day a chrome
             // grows a readout of the recorder's state the renders cannot
             // start moving with whatever the developer last recorded. The
             // panel keeps NO frame autosave name, so there is no
             // "NSWindow Frame …" key to pin for it.
-            "ReelcutRecordingDisplay": 0,
-            "ReelcutRecordingMicrophone": "",
-            "ReelcutRecordingSystemAudio": true,
-            "ReelcutRecordingShowClicks": false,
-            "ReelcutRecordingRate": 60,
-            "ReelcutRecordingSize": "nominal",
-            "ReelcutRecordingIncludeReelcutWindows": false,
+            "FrameJobRecordingDisplay": 0,
+            "FrameJobRecordingMicrophone": "",
+            "FrameJobRecordingSystemAudio": true,
+            "FrameJobRecordingShowClicks": false,
+            "FrameJobRecordingRate": 60,
+            "FrameJobRecordingSize": "nominal",
+            "FrameJobRecordingIncludeFrameJobWindows": false,
             // The two keys road map 6's chrome reads (`TranscriptionEngine.defaultsKey`
             // and `AssemblyAIConfiguration.regionKey` — spelled as LITERALS
             // here for the recorder keys' reason above, the phase-5
@@ -397,16 +397,16 @@ enum Harness {
             // region popup is drawn straight from the second of them, and
             // both are written by ORDINARY USE of the app on the machine
             // that runs the proofs — every time a person changes an engine
-            // or a region — which is `ReelcutExportChoice`'s rule exactly.
-            "ReelcutCaptionEngine": "apple",
-            "ReelcutAssemblyAIRegion": "us",
+            // or a region — which is `FrameJobExportChoice`'s rule exactly.
+            "FrameJobCaptionEngine": "apple",
+            "FrameJobAssemblyAIRegion": "us",
             // The Generate Captions card's remembered style
             // (`CaptionStyle.defaultsKey`, road map 8's W4b), kept under
             // `pinDefaults`' own rule — a key ordinary use writes, every time
             // a person picks a style — and DEFENSIVE: no render reads it, since
             // `transcribe` hands the card `MemoryDefaults` and no other mode
             // builds the card.
-            "ReelcutCaptionStyle": "subtitles",
+            "FrameJobCaptionStyle": "subtitles",
             // The card's three remembered looks (`CaptionLooks.slideKey`,
             // `.fillKey`, `.dimKey`, spec §11 W-15), on the same terms and as
             // defensive — and spelled as LITERALS, never through
@@ -414,21 +414,21 @@ enum Harness {
             // `HARNESS_REFERENCE_BUILD` guard and compiles against old
             // `app/Sources` in the reference builds. `false` is
             // `bool(forKey:)` of an absent key.
-            "ReelcutCaptionSlide": false,
-            "ReelcutCaptionFill": false,
-            "ReelcutCaptionDim": false,
+            "FrameJobCaptionSlide": false,
+            "FrameJobCaptionFill": false,
+            "FrameJobCaptionDim": false,
             // Settings' Assistant pane's model field (`AssistantConfiguration.modelKey`,
             // road map 12 A2), a literal for the recorder keys' reason: written
             // by ordinary use whenever a person chooses a model, and drawn by
             // the `settings` mode. Blank is AI-11's default.
-            "ReelcutAssistantModel": "",
+            "FrameJobAssistantModel": "",
             // The same pane's chat settings (`AssistantChatSettings`'s three
             // keys, spec §11 AI-20), literals for the same reason: written by
             // ordinary use whenever a person changes them, and drawn by the
             // `settings` mode. These are the defaults.
-            "ReelcutAssistantAutoCompact": true,
-            "ReelcutAssistantAutoCompactTokens": 300_000,
-            "ReelcutAssistantClearToolResults": false,
+            "FrameJobAssistantAutoCompact": true,
+            "FrameJobAssistantAutoCompactTokens": 300_000,
+            "FrameJobAssistantClearToolResults": false,
             // AppKit picks legacy (16 pt, always visible) or overlay scrollers
             // by whether a MOUSE is attached, and the inspector pane is 16 pt
             // narrower under the legacy kind, which moves its header's right
@@ -444,13 +444,19 @@ enum Harness {
         for id in expand where !id.isEmpty {
             pinned[InspectorSection.collapsedKeyPrefix + id] = false
         }
+        // A tree from before rename R1 (spec §11 NM-6), painted by the meter
+        // and welcome comparisons, reads each pin under its old name.
+        for (key, value) in pinned where key.contains("FrameJob") {
+            pinned[key.replacingOccurrences(of: "FrameJob", with: "Reelcut")] = value
+        }
         UserDefaults.standard.setVolatileDomain(pinned, forName: UserDefaults.argumentDomain)
         // A section's collapsed state is stored per section id; any such key
         // left in the persistent domain would re-collapse one section on one
         // machine. Drop them so `defaultExpanded` applies everywhere.
         let defaults = UserDefaults.standard
         for key in defaults.dictionaryRepresentation().keys
-        where key.hasPrefix("ReelcutInspectorSection.") {
+        where key.hasPrefix("FrameJobInspectorSection.")
+            || key.hasPrefix("ReelcutInspectorSection.") {
             defaults.removeObject(forKey: key)
         }
     }
@@ -961,7 +967,7 @@ extension Harness {
         let package = URL(fileURLWithPath: arguments[2])
         let document = ProjectDocument()
         do {
-            try document.read(from: package, ofType: "com.kgalligan.reelcut-project")
+            try document.read(from: package, ofType: ProjectDocument.projectTypeIdentifier)
             document.fileURL = package
         } catch {
             FileHandle.standardError.write("read failed: \(error)\n".data(using: .utf8)!)
@@ -1097,10 +1103,10 @@ extension Harness {
 let arguments = CommandLine.arguments
 guard arguments.count >= 4 else {
     FileHandle.standardError.write(
-        ("usage: harness <project.reelcut|welcome|settings> <out.png> <light|dark> "
+        ("usage: harness <project.framejob|welcome|settings> <out.png> <light|dark> "
             + "[w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document] "
             + "[candidateSpans] [expandSections] [mediaFilter] [selectAction] [subTab]\n"
-            + "       harness transcribe <project.reelcut> <out.png> <light|dark> <style> "
+            + "       harness transcribe <project.framejob> <out.png> <light|dark> <style> "
             + "[replace 0|1] [looks: letters of sfd]\n"
             + "       harness cues <words.json> <out.json>\n"
             + "       harness meter <request.json> <out.json>\n")
@@ -1180,11 +1186,11 @@ Harness.registerFonts(URL(fileURLWithPath: arguments[0]).deletingLastPathCompone
 // launch arguments that would have made `store()` safe.
 #if !HARNESS_REFERENCE_BUILD
 if arguments[1] == "settings" {
-    let absentSpend = URL(fileURLWithPath: "/nonexistent/reelcut-harness-spend", isDirectory: true)
+    let absentSpend = URL(fileURLWithPath: "/nonexistent/framejob-harness-spend", isDirectory: true)
     let settings = SettingsWindowController(
         store: { MemoryStore() }, assistantStore: { MemoryStore() }, environment: [:],
         spendFolder: { absentSpend },
-        mcpHelper: URL(fileURLWithPath: "/nonexistent/Reelcut.app/Contents/Helpers/reelcut-mcp"))
+        mcpHelper: URL(fileURLWithPath: "/nonexistent/Frame Job.app/Contents/Helpers/framejob-mcp"))
     settings.show()
     for _ in 0..<10 { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
     guard let root = settings.window?.contentView else { exit(3) }
@@ -1228,7 +1234,7 @@ DecoderSupport.enable()
 #endif
 let document = ProjectDocument()
 do {
-    try document.read(from: projectURL, ofType: "com.kgalligan.reelcut-project")
+    try document.read(from: projectURL, ofType: ProjectDocument.projectTypeIdentifier)
     document.fileURL = projectURL
 } catch {
     FileHandle.standardError.write("read failed: \(error)\n".data(using: .utf8)!)

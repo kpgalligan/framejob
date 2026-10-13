@@ -14,7 +14,7 @@ and compares the PNGs byte for byte.
     python3 tools/proof/reveal_toll_proof.py <socket> capture <dir>   # the CONTROL build
     python3 tools/proof/reveal_toll_proof.py <socket> compare <dir>   # the build under test
 
-`capture` writes `<dir>/frames.reelcut` fresh and keeps `<dir>/t<tick>.png`;
+`capture` writes `<dir>/frames.framejob` fresh and keeps `<dir>/t<tick>.png`;
 `compare` opens the SAME package and checks each render against those files.
 It launches nothing and kills nothing: the caller owns the instance at <socket>.
 `target_bump_proof.py` is the shape.
@@ -52,7 +52,7 @@ def check(name, ok, detail=""):
 
 
 def package(where, name, document):
-    path = os.path.join(where, name + ".reelcut")
+    path = os.path.join(where, name + ".framejob")
     os.mkdir(path)
     with open(os.path.join(path, "project.json"), "w", encoding="utf-8") as stream:
         json.dump(document, stream)
@@ -111,7 +111,7 @@ def main():
     if len(sys.argv) != 4 or sys.argv[2] not in ("capture", "compare"):
         sys.exit(__doc__)
     socket_path, mode, where = target(sys.argv), sys.argv[2], os.path.abspath(sys.argv[3])
-    project = os.path.join(where, "frames.reelcut")
+    project = os.path.join(where, "frames.framejob")
     if mode == "capture":
         shutil.rmtree(where, ignore_errors=True)
         os.makedirs(where)

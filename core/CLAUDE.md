@@ -801,7 +801,7 @@ Export names mirror the Rust method exactly.
 
 **Format changes.** Any change to persisted project state bumps
 `RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
-`core/include/reelcut_core.h`; the reader must keep accepting every prior
+`core/include/framejob_core.h`; the reader must keep accepting every prior
 version; the writer enforces the reader's caps. A bump whose new fields all
 carry a serde default needs no migrate step (versions 3 through 15 have none;
 15's one step only renumbers the branch's 1015)

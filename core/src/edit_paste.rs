@@ -17,7 +17,7 @@
 //! ```
 //!
 //! It is exactly what `EditorViewController+Clipboard.swift` puts on
-//! `NSPasteboard.general` under `com.kgalligan.reelcut.clips`: the clips
+//! `NSPasteboard.general` under `com.kgalligan.framejob.clips`: the clips
 //! copied verbatim out of the source document's own `project.json`, plus the
 //! media rows those clips name and any nest they show. Four things about it
 //! are worth stating before the code:

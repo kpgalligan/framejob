@@ -19,9 +19,9 @@ prints `mutant <name>: the control could not be performed — <why>` and exits
 
 **L** (issue batch B43, #200 item 4): before a mutant is prepared or
 anything is built, the run takes an exclusive `flock` on
-`<getconf DARWIN_USER_TEMP_DIR>/reelcut-cloud-captions.lock` — the lock this
+`<getconf DARWIN_USER_TEMP_DIR>/framejob-cloud-captions.lock` — the lock this
 probe, `cloud_captions_proof.py` and `word_captions_proof.py` take turns
-through, because all three make the app write `reelcut-upload-*` into one
+through, because all three make the app write `framejob-upload-*` into one
 `NSTemporaryDirectory()` that ignores `TMPDIR`. It waits up to
 `--lock-wait` seconds (default 3600), prints the wait, and starts `--wall`
 once it holds the lock; a wait that expires is a scored FAIL naming the
@@ -119,7 +119,7 @@ build row, SP3 and SP4·off must FAIL.
   `CloudTranscriber.transcribe` itself against the fake: every
   `(fraction, detail)` it published, non-decreasing, inside its phase's band
   of its media's share, holding at the 0.95 point; and the temporary
-  `reelcut-upload-*` a cancelled, a failed and a 401'd run leave behind,
+  `framejob-upload-*` a cancelled, a failed and a 401'd run leave behind,
   which is none, with a CONTROL that one was there while the body was in
   flight. Issue batch B35 added the submit's own line (P·submit, at the
   upload's end), the sub-megabyte spellings (P·small), and J3: a Stop
@@ -204,8 +204,8 @@ WORK = os.path.join(HERE, "work", "cloudprobe")
 TREE_SOURCES = os.path.join(ROOT, "app", "Sources")
 FAKE = os.path.join(HERE, "assemblyai_fake.py")
 HARNESS_MAIN = os.path.join(HERE, "harness", "main.swift")
-STATICLIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
-BRIDGING = os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h")
+STATICLIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
+BRIDGING = os.path.join(ROOT, "app", "Bridging", "FrameJob-Bridging-Header.h")
 FONTS = os.path.join(ROOT, "app", "Resources", "Fonts")
 
 # Pipeline 1's final working tree — this pipeline's baseline, and what the
@@ -280,13 +280,13 @@ def sleep(seconds):
 
 
 # Issue batch B43 (#200 item 4): the one lock the three instruments that
-# write `reelcut-upload-*` take turns through — this probe,
+# write `framejob-upload-*` take turns through — this probe,
 # `cloud_captions_proof.py` and `word_captions_proof.py`. The app names its
 # extracts in `NSTemporaryDirectory()`, which ignores `TMPDIR` on this host
 # (`README.md`, measured 2026-09-25), so two runs at once share one folder
 # and one row T. The lock is in the per-user folder every worktree shares,
 # and `flock` is released when its process dies.
-LOCK_NAME = "reelcut-cloud-captions.lock"
+LOCK_NAME = "framejob-cloud-captions.lock"
 
 
 def hold_cloud_lock(wait_seconds):
@@ -868,7 +868,7 @@ PROBE_RUN = r'''
 /// against the fake with every `(fraction, detail)` it published recorded in
 /// order.
 ///
-/// The extracts are the second half: this mode lists `reelcut-upload-*` in
+/// The extracts are the second half: this mode lists `framejob-upload-*` in
 /// its OWN `NSTemporaryDirectory()` before the run, once from inside the
 /// progress callback while the body is still going out (the CONTROL — the
 /// file has to be there, or "none afterwards" would be true of a run that
@@ -1013,12 +1013,12 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
     return answer
 }
 
-/// Every `reelcut-upload-*` this process's temporary directory holds. The
+/// Every `framejob-upload-*` this process's temporary directory holds. The
 /// stem is `Transcriber.extractUpload`'s own.
 func uploadLeftovers() -> [String] {
     let folder = NSTemporaryDirectory()
     let names = (try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? []
-    return names.filter { $0.hasPrefix("reelcut-upload-") }.sorted()
+    return names.filter { $0.hasPrefix("framejob-upload-") }.sorted()
 }
 
 /// `CloudProgress` with no run at all: the shares, the four phases, the
@@ -2592,7 +2592,7 @@ func chromeAgreement(_ request: [String: Any]) -> [String: Any] {
     return ["rounds": rounds]
 }
 
-/// The Reelcut menu, off a real `AppDelegate`. `buildMainMenu()` is internal
+/// The Frame Job menu, off a real `AppDelegate`. `buildMainMenu()` is internal
 /// for exactly this kind of caller; nothing here hangs a menu off `NSApp`.
 func chromeMenu(_ request: [String: Any]) -> [String: Any] {
     let menu = AppDelegate().buildMainMenu()
@@ -3359,7 +3359,7 @@ def section_stamp(binary, sources):
         "speech_models": ["universal-2"],
         "language_code": "de",
         "speaker_labels": True,
-        "keyterms_prompt": ["Reelcut"],
+        "keyterms_prompt": ["Frame Job"],
     }
     for key, value in request_changes.items():
         options = dict(BASE_OPTIONS)
@@ -3766,9 +3766,9 @@ def section_client(binary, sources):
     # Every §5c status.
     statuses = [
         (401, "keyRefused(401)", "AssemblyAI refused the API key — check it in "
-                                 "Reelcut ▸ Settings"),
+                                 "Frame Job ▸ Settings"),
         (403, "keyRefused(403)", "AssemblyAI refused the API key — check it in "
-                                 "Reelcut ▸ Settings"),
+                                 "Frame Job ▸ Settings"),
         (402, "account", "Your account balance is too low."),
         (400, "request", "Your request is malformed."),
         (302, "redirected(302)", None),
@@ -3788,7 +3788,7 @@ def section_client(binary, sources):
         "steps": [{"route": "verify", "status": 401, "body": "{}"}]}) or {}
     check("15: the 401 sentence is 5c's own",
           keyrow.get("message") == "AssemblyAI refused the API key — check it in "
-                                   "Reelcut ▸ Settings", f"got {keyrow.get('message')!r}")
+                                   "Frame Job ▸ Settings", f"got {keyrow.get('message')!r}")
     serverrow = call("status-503", {
         "call": "verify", "tuning": FAST,
         "steps": [{"route": "verify", "status": 503, "body": "{}"}]}) or {}
@@ -3918,7 +3918,7 @@ def section_client(binary, sources):
 def section_submission(binary, sources):
     print("\nR6-14. one submit, bounded exact-URL recovery, and unresolved warnings")
     url = "https://cdn.example.invalid/upload/own"
-    warning = ("AssemblyAI may have created a transcript, but Reelcut could not recover its ID. "
+    warning = ("AssemblyAI may have created a transcript, but Frame Job could not recover its ID. "
                "Check your AssemblyAI dashboard before retrying; the transcript may still be "
                "retained.")
     fast = {"submitRecoveryAttempts": 3, "submitRecoveryDelay": 0.02,
@@ -4010,7 +4010,7 @@ def section_submission(binary, sources):
     for status in (401, 403):
         run(f"list auth {status}", [lost, {"route": "list", "status": status}],
             "unresolved", 1,
-            message="AssemblyAI refused the API key — check it in Reelcut ▸ Settings. "
+            message="AssemblyAI refused the API key — check it in Frame Job ▸ Settings. "
                     + warning)
 
     speech = make_fixture()
@@ -4066,7 +4066,7 @@ def section_submission(binary, sources):
                   len(deletes) == 1 and deletes[0]["path"] == "/v2/transcript/" + tid
                   and tid in log.get("deleted", []), f"deletes {deletes!r}; ids {log!r}")
         else:
-            prefix = ("AssemblyAI refused the API key — check it in Reelcut ▸ Settings. "
+            prefix = ("AssemblyAI refused the API key — check it in Frame Job ▸ Settings. "
                       if tag == "cancel refused key" else "")
             check("R6-14: " + tag + " preserves the exact dashboard warning",
                   answer.get("message") == prefix + warning,
@@ -5243,7 +5243,7 @@ def section_cache_write(binary, sources):
         return
     media, jobs = run_media(speech, speech)
     media, jobs = media[:1], jobs[:1]
-    dashboard = ("Its transcript could not be saved in the project, so Reelcut cannot "
+    dashboard = ("Its transcript could not be saved in the project, so Frame Job cannot "
                  "retry deleting it automatically. Delete it in your AssemblyAI dashboard.")
     retry = "it will be retried at the next run with an API key."
     kept = "could not be kept in the project for reuse"
@@ -6255,7 +6255,7 @@ def section_run(binary, sources):
               f"got {[(r['path'], r.get('dripped')) for r in deletes]!r}")
 
     # --- I: a cache file's `transcript_id` is somebody ELSE's string (the
-    # reader review's R3\u00b71). It rides inside a `.reelcut` package, so a
+    # reader review's R3\u00b71). It rides inside a `.framejob` package, so a
     # hostile or hand-edited one used to put a DELETE on a path of its
     # author's choosing on the API host, with the person's key.
     hostile = {11: "../upload", 12: "a/b", 13: "?x=1", 14: "x" * 1000,
@@ -6329,7 +6329,7 @@ def section_run(binary, sources):
         check(f"T: the {tag} run fails, with its own sentence",
               answer.get("ok") is False and expected in str(answer.get("message", "")),
               f"got ok={answer.get('ok')!r} {answer.get('message')!r}")
-        check(f"T: the {tag} run left NO reelcut-upload-* behind — the `defer` covers the "
+        check(f"T: the {tag} run left NO framejob-upload-* behind — the `defer` covers the "
               "throwing exits too",
               answer.get("tempAfter") == answer.get("tempBefore"),
               f"before {answer.get('tempBefore')!r}\n       after {answer.get('tempAfter')!r}")
@@ -6536,9 +6536,9 @@ def section_hygiene(binary, sources):
           answer.get("lookupEN") == "en_us" and answer.get("lookupMissing") == "<nil>",
           f"got {answer.get('lookupEN')!r} / {answer.get('lookupMissing')!r}")
     check("S: the engine is `apple` / `assemblyai`, shown as On this Mac / AssemblyAI, "
-          "under ReelcutCaptionEngine",
+          "under FrameJobCaptionEngine",
           answer.get("engines") == [["apple", "On this Mac"], ["assemblyai", "AssemblyAI"]]
-          and answer.get("engineKey") == "ReelcutCaptionEngine",
+          and answer.get("engineKey") == "FrameJobCaptionEngine",
           f"got {answer.get('engines')!r} / {answer.get('engineKey')!r}")
     check("S: a run with NO jobs throws `nothingRecognized` and makes not one request — "
           "the janitor's empty list, no media to group, nothing uploaded to find out",
@@ -6579,7 +6579,7 @@ def section_hygiene(binary, sources):
           "absent spend folder and an absent helper",
           "SettingsWindowController(\n        store: { MemoryStore() }, assistantStore: { MemoryStore() }, "
           "environment: [:],\n        spendFolder: { absentSpend },\n        mcpHelper: "
-          "URL(fileURLWithPath: \"/nonexistent/Reelcut.app/Contents/Helpers/reelcut-mcp\"))"
+          "URL(fileURLWithPath: \"/nonexistent/Frame Job.app/Contents/Helpers/framejob-mcp\"))"
           in harness_text, "the harness's settings mode does not inject a store")
     sentences = sorted(
         name for name in os.listdir(sources)
@@ -6655,7 +6655,7 @@ def section_hygiene(binary, sources):
     # builds a `SettingsWindowController` with NO `store:` on purpose \u2014 that is
     # the row that exercises R6-9's resolution \u2014 and then pushes Save and
     # Remove through it. What keeps those two buttons off the person's own
-    # `~/Library/Application Support/Reelcut/assemblyai-key` is not the mode's
+    # `~/Library/Application Support/Frame Job/assemblyai-key` is not the mode's
     # code but its LAUNCHER, so the launcher is what is asserted here.
     swift = PROBE_SOURCE
     check("G: `chromeSettings` builds its controller with no `store:` \u2014 the CONTROL for "
@@ -6768,14 +6768,14 @@ def section_estimate(binary, sources):
          fact("a.mov", marker=marker(speaker_labels=True)), False,
          "upload:requestChanged(speakers)"),
         ("a vocabulary since",
-         fact("a.mov", marker=marker(keyterms_prompt=["Reelcut"])), False,
+         fact("a.mov", marker=marker(keyterms_prompt=["Frame Job"])), False,
          "upload:requestChanged(vocabulary)"),
         ("a different model",
          fact("a.mov", marker=marker(speech_models=["universal-2"])), False,
          "upload:requestChanged(model)"),
         ("all four at once",
          fact("a.mov", marker=marker(speech_models=["universal-2"], language_code="de",
-                                     speaker_labels=True, keyterms_prompt=["Reelcut"])),
+                                     speaker_labels=True, keyterms_prompt=["Frame Job"])),
          False, "upload:requestChanged(model,language,speakers,vocabulary)"),
         ("a media whose file will not read",
          fact("a.mov", unreadable=True), False, "unreadable"),
@@ -6952,7 +6952,7 @@ CLOUD_HINT_US = ("The audio of these files is uploaded to AssemblyAI (United Sta
 
 CLOUD_HINT_EU = CLOUD_HINT_US.replace("(United States)", "(European Union)")
 
-NO_KEY_NOTE = "No AssemblyAI API key is set — Reelcut ▸ Settings…"
+NO_KEY_NOTE = "No AssemblyAI API key is set — Frame Job ▸ Settings…"
 
 # §2's order, which is `AssemblyAILanguages.all`'s and the popup's.
 LANGUAGE_CODES = ["en", "en_au", "en_uk", "en_us", "es", "fr", "de", "it", "pt", "ar", "da",
@@ -6982,7 +6982,7 @@ def chrome_child(binary, fake, tag, request, timeout=180):
 def section_settings_verify(binary, sources):
     print("\nSV. Settings Verify owns its request and captured inputs")
     stale = "Settings changed since this check began. Verify again."
-    refusal = "AssemblyAI refused the API key — check it in Reelcut ▸ Settings"
+    refusal = "AssemblyAI refused the API key — check it in Frame Job ▸ Settings"
     scenarios = ["unchanged-success", "unchanged-refusal", "typed-key", "save-key",
                  "remove-key", "region", "older-first", "newer-first", "no-key"]
     for scenario in scenarios:
@@ -7154,7 +7154,7 @@ def section_chrome(binary, sources):
               answer.get("appleLanguageRows") == PROBE_LANGUAGE_ROWS
               and answer.get("backToAppleRows") == PROBE_LANGUAGE_ROWS,
               f"got {answer.get('backToAppleRows')!r}")
-        check("18: and the choice is written to ReelcutCaptionEngine, both ways",
+        check("18: and the choice is written to FrameJobCaptionEngine, both ways",
               answer.get("appleEngineInSuite") == "apple"
               and answer.get("engineInSuite") == "assemblyai",
               f"got {answer.get('appleEngineInSuite')!r} / {answer.get('engineInSuite')!r}")
@@ -7181,9 +7181,9 @@ def section_chrome(binary, sources):
               "given": 0}),
             ("a vocabulary, trimmed and de-duplicated",
              {"languageIndex": 0, "speakers": False, "refresh": False,
-              "vocabulary": " Reelcut , a screencast editor ,Reelcut,  , AVFoundation "},
+              "vocabulary": " Frame Job , a screencast editor ,Frame Job,  , AVFoundation "},
              {"language": "<auto>", "speakers": False,
-              "keyterms": ["Reelcut", "a screencast editor", "AVFoundation"], "refresh": False,
+              "keyterms": ["Frame Job", "a screencast editor", "AVFoundation"], "refresh": False,
               "given": 5}),
         ]
         for label, controls, want in states:
@@ -7233,7 +7233,7 @@ def section_chrome(binary, sources):
             check("18: the no-key sheet answers", False, error)
         else:
             check("18: with an EMPTY store and no environment, Generate is disabled and the "
-                  "note names Reelcut ▸ Settings…",
+                  "note names Frame Job ▸ Settings…",
                   row.get("buttonEnabled") is False and NO_KEY_NOTE in row.get("note", ""),
                   f"got {row.get('buttonEnabled')!r} / {row.get('note')!r}")
             check("18: and the sentence is the one the code publishes, not a second copy",
@@ -7293,7 +7293,7 @@ def section_chrome(binary, sources):
         else:
             check("18: the window is titled Settings and its Transcription pane OPENS with "
                   "the Transcription heading — which is what makes the tool's "
-                  "\"Reelcut ▸ Settings ▸ Transcription\" true",
+                  "\"Frame Job ▸ Settings ▸ Transcription\" true",
                   settings.get("title") == "Settings"
                   and settings.get("heading") == "Transcription"
                   and settings.get("paneTitle") == "Transcription"
@@ -7347,7 +7347,7 @@ def section_chrome(binary, sources):
             check("18: and the placeholder goes back to the empty one",
                   settings.get("removedPlaceholder") == "Paste your key",
                   f"got {settings.get('removedPlaceholder')!r}")
-            check("18: the region popup WRITES ReelcutAssemblyAIRegion and reads back",
+            check("18: the region popup WRITES FrameJobAssemblyAIRegion and reads back",
                   settings.get("regionInSuite") == "eu"
                   and settings.get("regionResolved") == "eu",
                   f"got {settings.get('regionInSuite')!r}")
@@ -7368,7 +7368,7 @@ def section_chrome(binary, sources):
         for tag, key, want in [("accepted", DUMMY_KEY, "Key accepted"),
                                ("refused", WRONG_KEY,
                                 "AssemblyAI refused the API key — check it in "
-                                "Reelcut ▸ Settings")]:
+                                "Frame Job ▸ Settings")]:
             with Fake("verify-" + tag) as one:
                 one.scenario(**({"fail": [{"route": "verify", "status": 401, "times": -1}]}
                                 if tag == "refused" else {}))
@@ -7498,17 +7498,17 @@ def section_chrome(binary, sources):
         else:
             rows = menu.get("items", [])
             found = [row for row in rows if row["title"] == "Settings…"]
-            check("18: the Reelcut menu carries one Settings… item at ⌘, with COMMAND alone, "
+            check("18: the Frame Job menu carries one Settings… item at ⌘, with COMMAND alone, "
                   "calling `showSettings:`",
-                  menu.get("menuTitle") == "Reelcut" and len(found) == 1
+                  menu.get("menuTitle") == "Frame Job" and len(found) == 1
                   and found[0]["key"] == "," and found[0]["command"] is True
                   and found[0]["action"] == "showSettings:",
                   f"got {found!r}")
             titles = [row["title"] for row in rows]
             check("18: and it sits in a separator group of its own between About and Hide, "
                   "which is where macOS puts one",
-                  titles[:5] == ["About Reelcut", "<separator>", "Settings…", "<separator>",
-                                 "Hide Reelcut"],
+                  titles[:5] == ["About Frame Job", "<separator>", "Settings…", "<separator>",
+                                 "Hide Frame Job"],
                   f"got {titles!r}")
             check("18: `,` is claimed by nothing else in the whole menu bar under COMMAND "
                   "alone — spec §9's nudge pair is the BARE key",
@@ -7525,8 +7525,14 @@ def section_chrome(binary, sources):
     else:
         # Only the blocks this row owns (#156): the build settings, build
         # phases and schemes above and below them change with other road maps.
+        # The baseline predates rename R1 (spec §11 NM-2): it is compared renamed.
+        renamed = baseline.stdout
+        for old, new in (("Reelcut.ProjectDocument", "FrameJob.ProjectDocument"),
+                         ("app/Reelcut.entitlements", "app/FrameJob.entitlements"),
+                         ("reelcut", "framejob"), ("Reelcut", "Frame Job")):
+            renamed = renamed.replace(old, new)
         diff = [line for line in difflib.unified_diff(
-            "\n".join(project_yml_blocks(baseline.stdout)).splitlines(),
+            "\n".join(project_yml_blocks(renamed)).splitlines(),
             "\n".join(project_yml_blocks(current)).splitlines(), lineterm="", n=0)
             if line and line[0] in "+-" and not line.startswith(("---", "+++"))]
         # Since this baseline: W1a's macOS 26 minimum (LSMinimumSystemVersion),
@@ -7543,13 +7549,13 @@ def section_chrome(binary, sources):
               "name strings, the two version strings, the macOS 26 minimum, the deleted "
               "Speech usage string, the microphone comment's aside and the handler rank, "
               "and NOWHERE else",
-              diff == ['-        CFBundleName: Reelcut',
-                       '-        CFBundleDisplayName: Reelcut',
+              diff == ['-        CFBundleName: Frame Job',
+                       '-        CFBundleDisplayName: Frame Job',
                        '-        CFBundleShortVersionString: "0.1.0"',
                        '-        CFBundleVersion: "1"',
                        '-        LSMinimumSystemVersion: "15.0"',
-                       '+        CFBundleName: "$(RC_APP_NAME:default=Reelcut)"',
-                       '+        CFBundleDisplayName: "$(RC_APP_NAME:default=Reelcut)"',
+                       '+        CFBundleName: "$(PRODUCT_NAME)"',
+                       '+        CFBundleDisplayName: "$(PRODUCT_NAME)"',
                        '+        CFBundleShortVersionString: $(MARKETING_VERSION)',
                        '+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)',
                        '+        LSMinimumSystemVersion: "26.0"',
@@ -7559,7 +7565,7 @@ def section_chrome(binary, sources):
                        "-        # Info.plist is generated and git-ignored, so this block is the only",
                        "-        # place it can live.",
                        "-        NSSpeechRecognitionUsageDescription:",
-                       "-          Reelcut transcribes the audio of clips you choose, on this Mac, "
+                       "-          Frame Job transcribes the audio of clips you choose, on this Mac, "
                        "to write captions.",
                        "-          Nothing is sent anywhere.",
                        "-        # recording, which speech never needed (an "

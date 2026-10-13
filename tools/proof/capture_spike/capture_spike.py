@@ -13,7 +13,7 @@ The probe is `capture_probe.swift` compiled as `main.swift` with every file in
 `app/Sources` but `main.swift` and the five `probe_*.swift` beside it, over
 `harness/build.sh`'s swiftc line plus Release's `-O -wmo`. Each mode runs as
 its own bounded child (Rule H, `graphics_spike/bounded.py`): the build 1200 s,
-a mode 180 s, `modal` 60 s. Nothing here launches Reelcut.app or an MCP
+a mode 180 s, `modal` 60 s. Nothing here launches Frame Job.app or an MCP
 server, and nothing is killed but the spike's own children and, on a
 bundle-route timeout, the processes running the bundle's own executable
 (`kill_bundled`).
@@ -87,7 +87,7 @@ PNG = os.path.join(WORK, "png")
 ANSWERS = os.path.join(WORK, "answers.json")
 APP = os.path.join(WORK, "CaptureProbe.app")
 BUNDLED = ("Fonts", "Blank.mp4", "default.metallib", "GraphicTemplates", "GraphicsAPI.md")
-INFO = {"CFBundleIdentifier": "com.kgalligan.reelcut.captureprobe",
+INFO = {"CFBundleIdentifier": "com.kgalligan.framejob.captureprobe",
         "CFBundleExecutable": "capture_probe", "CFBundleName": "CaptureProbe",
         "CFBundlePackageType": "APPL", "NSPrincipalClass": "NSApplication",
         "LSMinimumSystemVersion": "26.0", "NSHighResolutionCapable": True}
@@ -100,7 +100,7 @@ ENTRY = os.path.join(HERE, "capture_probe.swift")
 PROBE_FILES = [os.path.join(HERE, f) for f in (
     "probe_support.swift", "probe_well.swift", "probe_sheets.swift", "probe_appearance.swift",
     "probe_layout.swift")]
-LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 TICKS = 600_000
 
 # ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ def host_facts():
 
 
 def write_package(name, canvas, clips):
-    package = os.path.join(FIXTURES, f"{name}.reelcut")
+    package = os.path.join(FIXTURES, f"{name}.framejob")
     shutil.rmtree(package, ignore_errors=True)
     os.makedirs(package)
     project = {"version": 10, "canvas": canvas, "media": [],
@@ -182,11 +182,11 @@ def build(force):
     swift = sorted(os.path.join(SOURCES, n) for n in os.listdir(SOURCES)
                    if n.endswith(".swift") and n != "main.swift")
     sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    argv = (["swiftc", "-O", "-wmo", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk,
-             "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
+    argv = (["swiftc", "-O", "-wmo", "-D", "FRAMEJOB_DEV_TOOLS", "-sdk", sdk,
+             "-target", "arm64-apple-macos26.0", "-module-name", "FrameJob",
              "-import-objc-header", os.path.join(ROOT, "app", "Bridging",
-                                                  "Reelcut-Bridging-Header.h"),
-             "-L", os.path.dirname(LIB), "-lreelcut_core"]
+                                                  "FrameJob-Bridging-Header.h"),
+             "-L", os.path.dirname(LIB), "-lframejob_core"]
             + swift + PROBE_FILES + [entry, "-o", binary])
     record["argv"] = [a.replace(ROOT + "/", "") for a in argv[:16]] + [
         f"<{len(swift)} app/Sources files>", "<5 probe_*.swift>", "<probe>/main.swift", "-o",

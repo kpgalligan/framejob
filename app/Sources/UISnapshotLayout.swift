@@ -1,6 +1,6 @@
 import AppKit
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 /// `snapshot_ui`'s layout dump (road map 11's V2a): every view under a
 /// captured root, pre-order, and the problems three rules find in them.
 ///
@@ -109,7 +109,7 @@ enum UISnapshotLayout {
         return ["views": views, "problems": problems, "private_problems": privateProblems]
     }
 
-    /// `NSStringFromClass`, with a Swift module prefix (`Reelcut.`) stripped.
+    /// `NSStringFromClass`, with a Swift module prefix (`Frame Job.`) stripped.
     static func className(_ view: NSView) -> String {
         let name = NSStringFromClass(type(of: view))
         guard !name.hasPrefix("_Tt"), let dot = name.lastIndex(of: ".") else { return name }

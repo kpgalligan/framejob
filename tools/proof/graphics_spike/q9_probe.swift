@@ -1,5 +1,5 @@
 // q9 (road map 10 G0): Swift calls the throwaway `rc_graphic_spike_render`
-// linked from libreelcut_core.a. Built with `-D CONTROL`, it calls only
+// linked from libframejob_core.a. Built with `-D CONTROL`, it calls only
 // `rc_op_names`, so the two binaries' sizes differ by what the engine costs
 // once the linker keeps it. Prints ONE JSON object.
 //

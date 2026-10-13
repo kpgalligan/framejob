@@ -27,7 +27,7 @@ python3 tools/proof/assistant_spike/assistant_spike.py --only D,F           # a 
 python3 tools/proof/assistant_spike/assistant_spike.py --rasterize ~/devel/rasterize
 ```
 
-Needs `bun`, `xcodegen`, Xcode, `swiftc`, `core/target/release/libreelcut_core.a`
+Needs `bun`, `xcodegen`, Xcode, `swiftc`, `core/target/release/libframejob_core.a`
 (`cd core && cargo build --release`) and a clean read of `~/devel/rasterize`
 (read-only: files are copied from it, and bun never runs there). No ffmpeg.
 It launches the copy's two apps, each on a free port of its own, and the
@@ -38,7 +38,7 @@ stand-in; nothing else. A run takes about 5 min, most of it the two builds and t
 | File | What it is |
 |---|---|
 | `assistant_spike.py` | the runner: the copy, the builds, the signatures, the two runs, the stand-in's own F instance, the probe, scoring, `answers.json`, the digest, the exit code |
-| `AssistantSpikeHook.swift` | compiled ONLY into the copy: inert unless `-RCAssistantSpikeLog <file>`; logs the catalog, waits for a `ProjectDocument` with a file (a main-run-loop `Timer`), launches `Contents/Helpers/reelcut-agent` the way Rasterize's `AssistantHelperSession.open` does, sends `configure` (the dummy key `proof-key`, `api_base` = `RC_ASSISTANT_BASE_URL`) and one `send`, and runs each `tool_request` through `AgentServer.shared.execute`; one JSON line per step |
+| `AssistantSpikeHook.swift` | compiled ONLY into the copy: inert unless `-RCAssistantSpikeLog <file>`; logs the catalog, waits for a `ProjectDocument` with a file (a main-run-loop `Timer`), launches `Contents/Helpers/framejob-agent` the way Rasterize's `AssistantHelperSession.open` does, sends `configure` (the dummy key `proof-key`, `api_base` = `RC_ASSISTANT_BASE_URL`) and one `send`, and runs each `tool_request` through `AgentServer.shared.execute`; one JSON line per step |
 | `drag_probe.swift` | the D probe, compiled as `main.swift` over `app/Sources` minus `main.swift` on `harness/build.sh`'s swiftc line; prints one `ANSWER {"rows":[…],"measure":{…}}` line |
 | `../anthropic_fake.py` | the stand-in Messages API (top level, beside `assemblyai_fake.py`, because A1 reuses it); its docstring is its contract |
 
@@ -55,7 +55,7 @@ the last `postBuildScripts` item, once the copy's own `Build Agent Helper`
 item (its comment through its `script:` line) is removed, so the copy's
 `project.yml` holds exactly one. Every anchor must occur exactly once (B3).
 The copy, `build/` included, is made fresh every run: a kept `build/` fails
-the next build, because xcodegen rewrites `app/Reelcut.entitlements` and Xcode
+the next build, because xcodegen rewrites `app/FrameJob.entitlements` and Xcode
 refuses an entitlements file "modified during the build".
 
 **A run** (r: the copy's Release, d: its Distribution) goes: the stand-in
@@ -78,16 +78,16 @@ is the copy's Release or Distribution build.
 |---|---|
 | B1 I, B2 A, B3 I, B4 I, B5 I, B6 I | Rasterize's HEAD, `agent/` dirty, `src/*.ts` sha256, SDK and bun versions; `bun install --frozen-lockfile` after the rename (else a plain install and the lock diff); the anchors; the two builds; the probe's build |
 | H1r/d A, H2r/d A | the helper's bytes, `runtime` flag, entitlements exactly `allow-jit`; the app's strict deep verify, `runtime`, entitlements exactly `audio-input` |
-| H2t A | the tree's OWN `build/Build/Products/{Release,Distribution}/Reelcut.app` (read, never built) carry the same entitlements as the copy's, with each binary's mtime; a skip when either is absent |
+| H2t A | the tree's OWN `build/Build/Products/{Release,Distribution}/Frame Job.app` (read, never built) carry the same entitlements as the copy's, with each binary's mtime; a skip when either is absent |
 | H3 C | the tree's `dist_check.py` on the copy's two builds: full marks |
-| H4r/d A | the copy binds its port, no `Reelcut: ` line, and the hook logs `ready` from its helper |
+| H4r/d A | the copy binds its port, no `Frame Job: ` line, and the hook logs `ready` from its helper |
 | H5 C, H6 A | the Release helper launched by the runner (three-variable environment) reaches `ready` in 20 s; a copy re-signed `--options runtime` with NO entitlements does not, with its exit status and first stderr line |
 | C1r/d A, C2 A, C3 A | `catalogJSON()` bytes and tools; run d's first POST (body, tool count, tools array bytes); the assistant catalog (C2's tools minus tool search and `record_screen`, `defer_loading` stripped) counted through `count_tokens` with the key, else ESTIMATED as `[bytes/4, bytes/2.5]`, and the choice: ≤ 10000 all up front, > 10000 tool search, a straddle "undecided" |
 | F1 C | a stand-in of its own answers `x-api-key: a0-not-a-dummy` 401, adds a failure, and logs the marker, never the value |
 | T1r/d A, T2r/d A, T3r/d A | the stand-in's log (one models GET, two messages POSTs, the dummy only, no failures); the hook's order (`tool_request add_marker`, `tool_result` not an error, the scripted text, `turn_finished`) and the second POST's `tool_result` for `toolu_a0_1`; the marker in `get_project` |
 | E1 C, E2 A | `export {preset:"h264"}` to a fresh path writes `ftyp` at byte 4; onto a file holding `A0-SENTINEL\n`, the result text and whether the file became a movie with nobody asked |
 | D1 C, D2 A | `add_marker` with no gesture; `add_marker` between two ticks of a clip-body drag: present after tick 2 and after mouse-up, the clip's start, each Undo's name and the state after it |
-| L1 C | with `ANTHROPIC_API_KEY` present, its bytes in no file under `tree/build/`, `tree/Reelcut.xcodeproj/`, `work/assistant_spike/` or road map 12 (only paths printed); absent, `skip — host: no key` |
+| L1 C | with `ANTHROPIC_API_KEY` present, its bytes in no file under `tree/build/`, `tree/FrameJob.xcodeproj/`, `work/assistant_spike/` or road map 12 (only paths printed); absent, `skip — host: no key` |
 
 ## Output and exit
 

@@ -62,7 +62,7 @@ enum SecretStoreError: LocalizedError, Equatable {
 /// a reader sees the old key or the new one, never a half-written file.
 ///
 /// An EXISTING directory's mode is left alone. A person who tightened
-/// `~/Library/Application Support/Reelcut/` themselves should keep what they
+/// `~/Library/Application Support/Frame Job/` themselves should keep what they
 /// chose, and a directory the app did not create is not the app's to relax.
 final class FileStore: SecretStore {
 

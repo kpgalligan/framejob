@@ -172,7 +172,7 @@ fn a_trim_end_on_an_unmeasurable_window_is_refused_and_still_read_unbounded() {
         Handle::try_from_value(&value).err().as_deref(),
         Some(sentence)
     );
-    let direct: reelcut_core::Project =
+    let direct: framejob_core::Project =
         serde_json::from_value(value).expect("the JSON itself is well formed");
     assert_eq!(
         direct.apply(r#"{"op":"trim_end","clip":40,"to":3200000}"#),

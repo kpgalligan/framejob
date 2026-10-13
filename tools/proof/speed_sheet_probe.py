@@ -7,7 +7,7 @@ shrinks.
     python3 tools/proof/speed_sheet_probe.py [--sources DIR] [--mutant NAME]
 
 `speed_sheet_probe.swift` is built with `swift_build.py`'s line
-(`-D REELCUT_DEV_TOOLS`, the bridging header, `-lreelcut_core`) over
+(`-D FRAMEJOB_DEV_TOOLS`, the bridging header, `-lframejob_core`) over
 `--sources` into `tools/proof/work/speed-sheet/`, and run once. It drives the
 real sheet — `SpeedSheetController(document:clips:)`, its view loaded, the
 rate set in its own field and `controlTextDidEndEditing(_:)` called — over
@@ -89,12 +89,12 @@ def build(sources, here):
     swift = sorted(str(p) for p in sources.glob("*.swift") if p.name != "main.swift")
     if len(swift) < 100:
         return None, "app source set incomplete"
-    lib = ROOT / "core/target/release/libreelcut_core.a"
+    lib = ROOT / "core/target/release/libframejob_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
         swift_build.build(sources=swift + [entry], output=binary,
-                          defines=["REELCUT_DEV_TOOLS"], timeout=BUILD_WALL)
+                          defines=["FRAMEJOB_DEV_TOOLS"], timeout=BUILD_WALL)
     except swift_build.SwiftBuildFailed as error:
         if error.expired:
             return None, f"swiftc did not finish within {BUILD_WALL} s"

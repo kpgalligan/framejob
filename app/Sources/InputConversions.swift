@@ -178,12 +178,12 @@ enum InputConversion: Equatable {
     }
 }
 
-/// Every number step 0 uses that Reelcut CHOSE or DERIVED (spec §11 GR-15,
+/// Every number step 0 uses that Frame Job CHOSE or DERIVED (spec §11 GR-15,
 /// T3-1's append); the shader holds only the standards' own constants (the
 /// BT.2100 HLG inverse OETF's a, b, c, SMPTE ST 2084's m1, m2, c1–c3, the
 /// BT.2020 and BT.709 luminance weights) and the formulas' shapes.
 enum InputConversions {
-    /// HLG's system gamma and gain: Reelcut's anchor to Apple's measured
+    /// HLG's system gamma and gain: Frame Job's anchor to Apple's measured
     /// brightness (choice 2a), not BT.2100's nominal γ 1.2.
     static let hlgSystemGamma: Float = 0.96, hlgGain: Float = 1.07
     /// Where the shoulder starts, on the largest linear channel.

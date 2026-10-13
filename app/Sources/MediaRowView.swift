@@ -88,8 +88,8 @@ final class MediaRowView: NSView, NSDraggingSource {
         guard let original = entry.original else { return dragHint }
         let folder = (entry.path as NSString).deletingLastPathComponent
         let home =
-            folder.hasSuffix("/Reelcut/Rewrapped")
-            ? "Reelcut's Rewrapped folder" : "this project's package"
+            folder.hasSuffix("/\(AppSupport.folderName)/Rewrapped")
+            ? "Frame Job's Rewrapped folder" : "this project's package"
         return "\(original.path) — copied into \(home).\n" + dragHint
     }
 
@@ -302,7 +302,7 @@ final class MediaRowView: NSView, NSDraggingSource {
         mouseDownAt = nil
 
         let item = NSPasteboardItem()
-        item.setString(String(media), forType: .reelcutMedia)
+        item.setString(String(media), forType: .frameJobMedia)
         let dragged = NSDraggingItem(pasteboardWriter: item)
         dragged.setDraggingFrame(bounds, contents: dragImage())
         // The session carries the id and the pane, so the destination views
@@ -427,7 +427,7 @@ extension NSPasteboard.PasteboardType {
     /// The private type a media row drags with. Deliberately NOT `.fileURL`:
     /// the editor's root view accepts file URLs and would open the file as a
     /// new document, which is not what dragging a row inside a project means.
-    static let reelcutMedia = NSPasteboard.PasteboardType("com.kgalligan.reelcut.media")
+    static let frameJobMedia = NSPasteboard.PasteboardType("com.kgalligan.framejob.media")
 }
 
 /// What a drop onto a lane does about the room the clip needs (spec §6).

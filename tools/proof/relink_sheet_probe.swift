@@ -3,7 +3,7 @@
 // own `RelinkSheetController` and `ProjectDocument`.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` — the swiftc
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` — the swiftc
 // line `cache_pass_probe.py` uses. One process:
 //
 //   relink_sheet_probe <request.json>

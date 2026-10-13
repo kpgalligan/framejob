@@ -10,7 +10,7 @@ import AppKit
 struct RecorderGrantDoors {
     /// Whether the panel has put up the Screen Recording prompt once
     /// (spec §11 recording). Written only by a launchd-owned press.
-    static let screenRecordingAskedKey = "ReelcutScreenRecordingAsked"
+    static let screenRecordingAskedKey = "FrameJobScreenRecordingAsked"
 
     var screenGranted: () -> Bool
     var launchedByLaunchd: () -> Bool
@@ -52,7 +52,7 @@ struct RecorderGrantDoors {
 /// opened for them**, and the tool never opens it. Screen Recording is
 /// asked with `CGRequestScreenCaptureAccess()` on the FIRST press that finds
 /// it absent — the system prompt appears once per app, not per launch — and
-/// the ask is remembered in `ReelcutScreenRecordingAsked`; every later press
+/// the ask is remembered in `FrameJobScreenRecordingAsked`; every later press
 /// opens the Screen & System Audio Recording pane and the note says so.
 /// `CGRequestScreenCaptureAccess()` returns false at once on a first ask, so
 /// the refusal sentence is shown either way and the person presses Record

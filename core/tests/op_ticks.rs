@@ -10,7 +10,7 @@ mod timeline;
 mod vectors;
 
 use common::{Handle, Outcome};
-use reelcut_core::op_table::{Kind, OP_TABLE};
+use framejob_core::op_table::{Kind, OP_TABLE};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use vectors::{TickAnswer, TickCase};

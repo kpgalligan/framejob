@@ -2,7 +2,7 @@
 over MCP, and against a SECOND binary built from the tree as it stood before
 E1 landed.
 
-    python3 tools/proof/e1_proof.py <dir>/agent.sock [<reference dir>/reelcut.log] [--only audio]
+    python3 tools/proof/e1_proof.py <dir>/agent.sock [<reference dir>/framejob.log] [--only audio]
 
 Every claim here is a placement read back through `get_project`, a BYTE
 comparison of two PNGs, or a sample-for-sample comparison of two decoded
@@ -97,7 +97,7 @@ REFERENCE_TREE = os.path.join(WORK, "e1-reference")
 SEC = 600_000
 FRAME = 20_000
 CANVAS = (640, 360)
-HEADER = os.path.join(ROOT, "core", "include", "reelcut_core.h")
+HEADER = os.path.join(ROOT, "core", "include", "framejob_core.h")
 
 
 def format_version():
@@ -472,7 +472,7 @@ def canonical(value):
 class Session:
     """One project, `phase6_proof.py`'s shape.
 
-    `<name>-<pid>.reelcut`, never a fixed name: a `project` path is matched
+    `<name>-<pid>.framejob`, never a fixed name: a `project` path is matched
     against every open document and no tool closes one, so two earlier runs'
     SAVED packages would have the app answering for an old one."""
 
@@ -480,9 +480,9 @@ class Session:
         self.mcp = mcp
         self.name = name
         for stale in os.listdir(WORK):
-            if re.fullmatch(rf"{re.escape(name)}-\d+\.reelcut", stale):
+            if re.fullmatch(rf"{re.escape(name)}-\d+\.framejob", stale):
                 shutil.rmtree(os.path.join(WORK, stale))
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         if open_from is None:
             mcp.call("new_project", path=self.path)
             self.op("set_canvas", width=canvas[0], height=canvas[1],
@@ -688,7 +688,7 @@ def reference_port(log_path):
     try:
         with open(log_path, encoding="utf-8", errors="replace") as handle:
             found = re.findall(
-                r"Reelcut agent server listening on http://127\.0\.0\.1:(\d+)/mcp",
+                r"Frame Job agent server listening on http://127\.0\.0\.1:(\d+)/mcp",
                 handle.read())
     except (OSError, TypeError):
         return None
@@ -696,13 +696,13 @@ def reference_port(log_path):
 
 
 def log_is_clean(path):
-    """`grep "Reelcut: " <path>` printing nothing — the prefix the startup
+    """`grep "Frame Job: " <path>` printing nothing — the prefix the startup
     parity check complains with. A log this script cannot find is not a
     pass."""
     if not path or not os.path.exists(path):
         return False, f"{path} does not exist"
     with open(path, encoding="utf-8", errors="replace") as handle:
-        bad = [line.rstrip() for line in handle if "Reelcut: " in line]
+        bad = [line.rstrip() for line in handle if "Frame Job: " in line]
     return not bad, "; ".join(bad[:3]) if bad else "clean"
 
 
@@ -755,7 +755,7 @@ def write_v6_pair(mcp, name, kind):
     builder.card(track, grey(64), at=3 * SEC, duration=5 * SEC)
     builder.save()
     package = as_version(
-        builder.path, os.path.join(WORK, f"{name}-{os.getpid()}.reelcut"), 6)
+        builder.path, os.path.join(WORK, f"{name}-{os.getpid()}.framejob"), 6)
     # The overlap the app minted is a `cross_dissolve`; the version-6 spelling
     # this fixture is about is written in by hand.
     path = os.path.join(package, "project.json")
@@ -1183,7 +1183,7 @@ def audio_part(mcp, reference):
     # --- the version-6 export, against the reference build ---
     pair.save()
     v6_audio = as_version(
-        pair.path, os.path.join(WORK, f"e1-v6-audio-{os.getpid()}.reelcut"), 6)
+        pair.path, os.path.join(WORK, f"e1-v6-audio-{os.getpid()}.framejob"), 6)
     mine = Session.opened(mcp, v6_audio)
     once = pcm(mine.export_wav("v6-a"))
     twice = pcm(mine.export_wav("v6-b"))
@@ -1425,7 +1425,7 @@ def main():
         at = argv.index("--only")
         only = argv[at + 1] if at + 1 < len(argv) else None
         if only != "audio":
-            print("usage: e1_proof.py <dir>/agent.sock [<reference dir>/reelcut.log] "
+            print("usage: e1_proof.py <dir>/agent.sock [<reference dir>/framejob.log] "
                   "[--only audio]")
             sys.exit(2)
         del argv[at:at + 2]

@@ -13,7 +13,7 @@ struct LookBakeUniforms {
 
 /// Looks' lattices (spec §11 GR-7): each `LookDefinition` the recipe
 /// publishes, baked once on the GPU into a 33³ `rgba16Float` 3D texture by
-/// `reelcut_look_bake` — the identity lattice through the layer stage's own
+/// `framejob_look_bake` — the identity lattice through the layer stage's own
 /// colour adjust, tone and split tone — and kept in a least-recently-used
 /// cache of eight, which a project's looks fit with room for a gallery's.
 /// Step 4d samples the texture bound at `texture(2)`.
@@ -47,7 +47,7 @@ final class LookTextures {
     private var order: [LookDefinition] = []
 
     init?(device: MTLDevice, library: MTLLibrary) {
-        guard let function = library.makeFunction(name: "reelcut_look_bake"),
+        guard let function = library.makeFunction(name: "framejob_look_bake"),
             let pipeline = try? device.makeComputePipelineState(function: function),
             let queue = device.makeCommandQueue(),
             let placeholder = LookTextures.identity(device: device),
@@ -114,7 +114,7 @@ final class LookTextures {
             let buffer = queue.makeCommandBuffer(),
             let encoder = buffer.makeComputeCommandEncoder()
         else { return nil }
-        lattice.label = "Reelcut look"
+        lattice.label = "Frame Job look"
         var u = LookTextures.uniforms(definition.color)
         var b = LookBakeUniforms(
             shadowHue: Float(definition.split.shadowHue),
@@ -176,7 +176,7 @@ final class LookTextures {
             return true
         }
         guard written else { return nil }
-        texture.label = "Reelcut look placeholder"
+        texture.label = "Frame Job look placeholder"
         return texture
     }
 }

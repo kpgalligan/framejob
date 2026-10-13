@@ -162,7 +162,7 @@ def scratch_binary(work):
     q7 beside it."""
     path = os.path.join(
         scratch_rows.scratch_root(work), "w0-tree", "build", "Build", "Products",
-        "Release", "Reelcut.app", "Contents", "MacOS", "Reelcut")
+        "Release", "Frame Job.app", "Contents", "MacOS", "Frame Job")
     return path if os.path.exists(path) else None
 
 

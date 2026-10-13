@@ -51,7 +51,7 @@ Like every probe of the app: embedded Swift compiled against all of
 `app/Sources` through `swift_build.py`, `setActivationPolicy(.accessory)` and
 never activated, no screen capture and no Screen Recording grant. A build
 failure is a scored FAILURE on every row; a locked console is a named skip.
-Needs `ffmpeg`, `swiftc` and `core/target/release/libreelcut_core.a`.
+Needs `ffmpeg`, `swiftc` and `core/target/release/libframejob_core.a`.
 """
 
 import json

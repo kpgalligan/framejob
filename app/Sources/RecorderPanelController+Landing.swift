@@ -44,7 +44,7 @@ import AppKit
 /// function so a probe can pin every combination without a landing: how the
 /// recording ended when it was not this panel's own Stop (`.stopped` is the
 /// status item's Stop too; `.userStopped` is the SYSTEM's indicator, and the
-/// sentence names it so, now that Reelcut's own item is a menu-bar item as
+/// sentence names it so, now that Frame Job's own item is a menu-bar item as
 /// well); that the document the person CHOSE had closed, when the choice
 /// was a document and the landing opened a new project (R1 review — the
 /// fallback is exact, and a person who chose "Untitled 2" should not have

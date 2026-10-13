@@ -1,6 +1,6 @@
 import AppKit
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 /// `-RCDevAppearance light|dark` — a dev-only LAUNCH default (road map 11's
 /// V3): the whole app's appearance, set on `NSApp` in `main.swift` before
 /// `NSApplicationMain`, so before the first window is built.

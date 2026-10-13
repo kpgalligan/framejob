@@ -58,7 +58,7 @@
 //!     settings object is pinned key by key: the phase added ONE key, and
 //!     a key that left with it would reach Swift as a silent default.
 //! 11. **The header's list of overrides.** `rc_export_settings`' comment in
-//!     `core/include/reelcut_core.h` enumerates every key it takes, and an
+//!     `core/include/framejob_core.h` enumerates every key it takes, and an
 //!     FFI caller is entitled to trust it — so every key named there is
 //!     read back out of the header and probed. Point 5's permissiveness is
 //!     exactly what makes this necessary: a key the header names and
@@ -78,7 +78,7 @@ mod common;
 use serde_json::{json, Map, Value};
 
 use common::{array, assert_contains, at, expect_string, flag, int, num, parse_json, text, Handle};
-use reelcut_core::ffi_query::rc_export_presets;
+use framejob_core::ffi_query::rc_export_presets;
 
 /// One second in ticks (spec §5.1).
 const SECOND: i64 = 600_000;
@@ -1790,7 +1790,7 @@ fn every_settings_object_carries_every_key_swift_decodes() {
 /// sentence below it say there is no `size` key without the sentence being
 /// read as declaring one.
 fn override_keys_named_in_the_header() -> Vec<String> {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/include/reelcut_core.h");
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/include/framejob_core.h");
     let header = std::fs::read_to_string(path).expect("the C header must be readable");
 
     let mut paragraph = String::new();

@@ -3,7 +3,7 @@
 // runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
 // `tools/proof/harness/build.sh`'s swiftc line. Under `-D
 // HARNESS_REFERENCE_BUILD` it builds over an OLDER `app/Sources` (the proof's
 // `--baseline`), where `TextEditKey` does not exist, so K1 is compiled out
@@ -128,7 +128,7 @@ func runWindow() {
     let document = ProjectDocument()
     do {
         try document.read(
-            from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+            from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
     } catch {
         check("A0 the fixture opens", false, "\(error)")
         return

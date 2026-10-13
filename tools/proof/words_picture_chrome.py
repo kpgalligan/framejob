@@ -152,7 +152,7 @@ def changed_pixels(a, b):
 
 
 def package(name, text):
-    path = os.path.join(WORK, f"{name}.reelcut")
+    path = os.path.join(WORK, f"{name}.framejob")
     shutil.rmtree(path, ignore_errors=True)
     os.makedirs(path)
     document = {

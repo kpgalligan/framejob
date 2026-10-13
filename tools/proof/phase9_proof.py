@@ -126,13 +126,13 @@ with that handle once it is open.
 
 **Media.** `media/AV.mov` is read (never written) and nothing is added to
 `media/`. Every other fixture is shape cards, text and hand-written
-`.reelcut` packages under `work/`. No `ffmpeg` is needed: nothing here
+`.framejob` packages under `work/`. No `ffmpeg` is needed: nothing here
 decodes an exported movie.
 
 **The parity log.** `AgentServer`'s startup check logs and does not refuse,
 so a scope-less op tool would leave a clean-looking server on the socket.
 Part 4 of that check is re-derived over the wire in section 0 (the 55), and
-the log itself is read from `<dir>/reelcut.log` beside the socket — the path
+the log itself is read from `<dir>/framejob.log` beside the socket — the path
 `CLAUDE.md`'s own launch line writes — or from a second argument.
 
     python3 tools/proof/phase9_proof.py <dir>/agent.sock [log path]
@@ -162,7 +162,7 @@ UNUSED_MEDIA = os.path.join(HERE, "media", "A.mov")
 SPARE_MEDIA = os.path.join(HERE, "media", "B.mov")
 
 SEC = 600_000
-HEADER = os.path.join(HERE, "..", "..", "core", "include", "reelcut_core.h")
+HEADER = os.path.join(HERE, "..", "..", "core", "include", "framejob_core.h")
 
 
 def format_version():
@@ -640,10 +640,10 @@ def catalog_part(mcp):
     if not os.path.exists(LOG):
         check(False,
               f"the startup parity log is empty — no log at {LOG}; CLAUDE.md's launch line "
-              "writes <dir>/reelcut.log beside the socket, or pass the path as the second argument")
+              "writes <dir>/framejob.log beside the socket, or pass the path as the second argument")
     else:
         with open(LOG, "r", errors="replace") as handle:
-            complaints = [line.strip() for line in handle if "Reelcut: " in line]
+            complaints = [line.strip() for line in handle if "Frame Job: " in line]
         check(not complaints,
               "the startup parity log is EMPTY — that prefix is the check complaining, and "
               "phase 9 gave it a FOURTH part (every op tool declares scope), which logs "
@@ -1470,7 +1470,7 @@ def versions_part(mcp):
     os.makedirs(WORK, exist_ok=True)
 
     def package(version, extra_clips=()):
-        path = os.path.join(WORK, f"phase9-v{version}.reelcut")
+        path = os.path.join(WORK, f"phase9-v{version}.framejob")
         os.makedirs(path, exist_ok=True)
         document = {
             "version": version,
@@ -1489,7 +1489,7 @@ def versions_part(mcp):
     # clip whose `project` was a PATH STRING, which `migrate_1_to_2` rewrites
     # into a named empty Nest.
     old_nest = {"id": 4, "track": 2, "start": 2 * SEC, "duration": 2 * SEC,
-                "source": {"kind": "nest", "project": "/gone/Old Group.reelcut"},
+                "source": {"kind": "nest", "project": "/gone/Old Group.framejob"},
                 "video": {}}
     # 1 to the current version, and the grading branch's 1015 (spec §11 GR-9).
     readable = list(range(1, CURRENT_VERSION + 1)) + [GRADING_BRANCH_VERSION]
@@ -1511,7 +1511,7 @@ def versions_part(mcp):
     mcp.call_with("open_project", {"path": package(1, (old_nest,))})
     reported = project(mcp)
     check(len(reported["nests"]) == 1
-          and reported["nests"][0]["name"] == "/gone/Old Group.reelcut"
+          and reported["nests"][0]["name"] == "/gone/Old Group.framejob"
           and reported["nests"][0]["clips"] == [],
           "version 1's path-string nest clip came back as a NAMED EMPTY nest, which is what "
           "migrate_1_to_2 promises")

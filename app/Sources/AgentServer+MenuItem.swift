@@ -1,6 +1,6 @@
 import AppKit
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 /// `perform_menu_item` and `cancel_sheet` — dev tools (road map 11's V2b,
 /// spec §11 V-1..V-2): run a main-menu item by its path in a named
 /// project's window, answered after the app settles, and close the sheet it

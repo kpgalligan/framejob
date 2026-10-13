@@ -311,7 +311,7 @@ private final class Pump {
         self.label = label
         total = container.count(track)
         queue = DispatchQueue(
-            label: "com.kgalligan.reelcut.rewrap.\(label)", qos: .userInitiated)
+            label: "com.kgalligan.framejob.rewrap.\(label)", qos: .userInitiated)
     }
 
     /// Feeds the input until the track is copied, a sample fails, the

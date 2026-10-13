@@ -14,7 +14,7 @@
 
 mod common;
 
-use reelcut_core::format::{GRADING_BRANCH_VERSION, RC_FORMAT_VERSION};
+use framejob_core::format::{GRADING_BRANCH_VERSION, RC_FORMAT_VERSION};
 use serde_json::{json, Value};
 
 use common::{at, Handle};
@@ -145,7 +145,7 @@ fn past_current_to_1014_and_past_1015_are_newer() {
             message,
             format!(
                 "project format version {version} is newer than this build understands \
-                 (version {RC_FORMAT_VERSION}); update Reelcut to open it"
+                 (version {RC_FORMAT_VERSION}); update Frame Job to open it"
             )
         );
         assert!(!message.contains("grading build"), "{message}");

@@ -215,7 +215,7 @@ TOOLS = 73
 # `core/tests/schema_v6.rs`'s claim — but what THIS build saves is the
 # version the tree's own header names, read at import: the claim is that the
 # BUILT app saves what the header says, so a stale build fails it.
-HEADER = os.path.join(HERE, "..", "..", "core", "include", "reelcut_core.h")
+HEADER = os.path.join(HERE, "..", "..", "core", "include", "framejob_core.h")
 
 
 def format_version():
@@ -483,7 +483,7 @@ def box(pixels):
 class Session:
     """One project, the shape phases 2 to 5 use.
 
-    `<name>-<pid>.reelcut`, never a fixed name: a `project` path is matched
+    `<name>-<pid>.framejob`, never a fixed name: a `project` path is matched
     against every open document and no tool closes one, so two earlier runs'
     SAVED packages would have the app answering for an old one (measured in
     phase 2). Older runs' under this name go."""
@@ -492,9 +492,9 @@ class Session:
         self.mcp = mcp
         self.name = name
         for stale in os.listdir(WORK):
-            if re.fullmatch(rf"{re.escape(name)}-\d+\.reelcut", stale):
+            if re.fullmatch(rf"{re.escape(name)}-\d+\.framejob", stale):
                 shutil.rmtree(os.path.join(WORK, stale))
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         mcp.call("new_project", path=self.path)
         self.op("set_canvas", width=canvas[0], height=canvas[1],
                 background=[c / 255.0 for c in background] + [1.0])

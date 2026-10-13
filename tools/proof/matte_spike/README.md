@@ -34,7 +34,7 @@ app for `proof_app.py` to choose.
 (`git show 464a3aa:app/Resources/Shaders/Compositor.metal`; a failed show is
 a B0 failure). V1 (placeholder) and V2
 (function constant) both add `kMatte*` codes, `MatteUniforms`,
-`reelcut_matte_resolve_fragment` (it reads the matte target at the fragment's
+`framejob_matte_resolve_fragment` (it reads the matte target at the fragment's
 pixel and returns the mode's value; its pipeline is `r8Unorm` with source
 factor zero and destination factor `sourceColor`, so each matte multiplies
 into a coverage cleared to 1), a `texture2d<float> matte [[texture(1)]]` on

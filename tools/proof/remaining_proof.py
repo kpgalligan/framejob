@@ -130,7 +130,7 @@ rather than assumed.
 
 **The gate**, each mutant a COPY of the tree with the app built in the copy
 (`xcodegen generate` + the Makefile's `xcodebuild` line over HEAD's
-`libreelcut_core.a`) and the copy's binary relaunched on its own port. The
+`libframejob_core.a`) and the copy's binary relaunched on its own port. The
 first four were scored against the **69** checks this file had before 1i.
 The head check deleted from `thumbnails` scores **65/69**: 1b's "none of
 AV's four files moved" (`0.jpg`'s inode moved on the first sample), 1d's
@@ -348,14 +348,14 @@ def sweep_earlier_runs():
     """Earlier pids' packages, package copies and media copies under `work/`
     go, as every other MCP proof's Session sweeps its own name (the README's
     rule): a `project` path is matched against every open document and no
-    tool closes one, so a package is `<name>-<pid>.reelcut` and never a
+    tool closes one, so a package is `<name>-<pid>.framejob` and never a
     fixed name — and without a sweep each run leaves its three packages
     behind for ever (measured: thirty-one entries from three runs). The
     media copies go with them, because a copy of `A.mov` at a pid-named
     path means nothing to any package but that pid's."""
     mine = str(os.getpid())
     patterns = (
-        r"remaining-cache-(\d+)(-copy\d)?\.reelcut",
+        r"remaining-cache-(\d+)(-copy\d)?\.framejob",
         r"remaining-cache-(\d+)-C\d+\.mov",
         r"remaining-(\d+)-[A-Za-z-]+\.mov",
     )
@@ -383,7 +383,7 @@ class Session:
     def __init__(self, mcp, name):
         self.mcp = mcp
         self.name = name
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         if os.path.exists(self.path):
             shutil.rmtree(self.path)
         mcp.call("new_project", path=self.path)
@@ -482,16 +482,16 @@ class State:
 def catalog_part(mcp):
     if os.path.exists(LOG):
         with open(LOG, errors="replace") as handle:
-            complaints = [line for line in handle if "Reelcut: " in line]
+            complaints = [line for line in handle if "Frame Job: " in line]
         check(not complaints,
-              f"the parity log at {LOG} has no `Reelcut: ` line — the startup check "
+              f"the parity log at {LOG} has no `Frame Job: ` line — the startup check "
               f"is silent ({len(complaints)} found)")
     else:
         # Scored, not printed: a run against an instance whose log nobody
         # can read has not shown the startup check is silent, and every
         # other claim here is read against a binary that check vouches for.
         check(False, f"the parity log at {LOG} exists — without it the startup check's "
-                     "silence cannot be read (launch with `> <dir>/reelcut.log`, or "
+                     "silence cannot be read (launch with `> <dir>/framejob.log`, or "
                      "pass the log path as the second argument)")
     tools = set(mcp.tools())
     needed = {"new_project", "open_project", "import_media", "relink_media",
@@ -741,7 +741,7 @@ def part_1g(mcp, s):
           "the six cache files of AV and A are quiet after the save (two samples agree)")
     copies = {}
     for tag in ("copy1", "copy2"):
-        copy = os.path.join(WORK, f"remaining-cache-{os.getpid()}-{tag}.reelcut")
+        copy = os.path.join(WORK, f"remaining-cache-{os.getpid()}-{tag}.framejob")
         if os.path.exists(copy):
             shutil.rmtree(copy)
         shutil.copytree(session.path, copy, copy_function=shutil.copy2)

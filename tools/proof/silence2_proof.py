@@ -449,7 +449,7 @@ def expected_spans(p, seg, confidence, min_length, padding, frame,
 class Session:
     """One project, `phase3_proof.py`'s shape.
 
-    `<name>-<pid>.reelcut` under `work/`, older pids' swept: a `project` path
+    `<name>-<pid>.framejob` under `work/`, older pids' swept: a `project` path
     is matched against every open document and no tool closes one, so two
     runs' saved packages would have the app answering for an old one. The
     package is written by `new_project` itself, which is what makes
@@ -462,9 +462,9 @@ class Session:
     def __init__(self, mcp, name, fps=None):
         self.mcp = mcp
         for stale in os.listdir(WORK):
-            if re.fullmatch(rf"{re.escape(name)}-\d+\.reelcut", stale):
+            if re.fullmatch(rf"{re.escape(name)}-\d+\.framejob", stale):
                 shutil.rmtree(os.path.join(WORK, stale))
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         mcp.call("new_project", path=self.path)
         if fps is not None:
             # BEFORE any clip: `set_canvas` re-snaps clip times to the new
@@ -1147,7 +1147,7 @@ def refusal_part(session):
     `refine`'s `run.start + settings.padding` and killed the app rather than
     answering. Measured on the pre-fix binary before the fix went in:
     `Remote end closed connection without response`, crash report
-    `Reelcut-2026-09-20-051240.ips`, `EXC_BREAKPOINT` / "Swift runtime
+    `Frame Job-2026-09-20-051240.ips`, `EXC_BREAKPOINT` / "Swift runtime
     failure: arithmetic overflow" inside `SilenceDetector.refine`. This row
     asks for a refusal and a live socket."""
     print("\n10 — the voice arguments' refusals, word for word")

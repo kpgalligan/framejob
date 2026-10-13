@@ -1,7 +1,7 @@
 //! The bundle this proxy lives in, and the catalog snapshot the build wrote
 //! into it (road map 14's MC1 q1: `-RCWriteCatalog` in the "Write Agent
 //! Catalog" build phase). A proxy launches only its OWN bundle (MC-4), so a
-//! copy of Reelcut launches itself and never another copy.
+//! copy of Frame Job launches itself and never another copy.
 
 use std::path::{Path, PathBuf};
 
@@ -22,14 +22,14 @@ pub struct Snapshot {
 /// symlinks resolved; anything else is an error naming the executable.
 pub fn own_bundle() -> Result<PathBuf, String> {
     let exe = std::env::current_exe()
-        .map_err(|e| format!("reelcut-mcp cannot find its own executable: {e}"))?;
+        .map_err(|e| format!("framejob-mcp cannot find its own executable: {e}"))?;
     let exe = exe
         .canonicalize()
-        .map_err(|e| format!("reelcut-mcp cannot resolve {}: {e}", exe.display()))?;
+        .map_err(|e| format!("framejob-mcp cannot resolve {}: {e}", exe.display()))?;
     let outside = || {
         format!(
-            "reelcut-mcp is not inside a Reelcut bundle: {} is not <X>.app/Contents/Helpers/<name>, \
-             so there is no Reelcut to launch",
+            "framejob-mcp is not inside a Frame Job bundle: {} is not <X>.app/Contents/Helpers/<name>, \
+             so there is no Frame Job to launch",
             exe.display()
         )
     };

@@ -168,7 +168,7 @@ extension ProjectDocument {
                 let others = kept.filter { $0 != entry }.map(\.revision)
                 throw ReelCoreError(
                     message: "graphics/history/\(name)/\(entry.url.lastPathComponent) was "
-                        + "changed outside Reelcut and no longer holds the revision in its "
+                        + "changed outside Frame Job and no longer holds the revision in its "
                         + "name; it is not restored — other kept revisions: "
                         + (others.isEmpty ? "none" : others.joined(separator: ", ")))
             }

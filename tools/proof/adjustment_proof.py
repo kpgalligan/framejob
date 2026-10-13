@@ -2,7 +2,7 @@
 """Road map "grading", phases GR4a and GR4b (spec §11 GR-6) — adjustment
 clips end to end over MCP: `add_adjustment_clip`, the recipe's
 `{"kind":"adjustment"}` layer and the compositor's eighth pipeline
-(`reelcut_adjust_fragment`, blending OFF, reading the destination), read back
+(`framejob_adjust_fragment`, blending OFF, reading the destination), read back
 as `render_frame` bytes and exports; every refusal in its own sentence; and
 GR4b's chrome: Insert ▸ Adjustment Clip, and the Clip tab an adjustment clip
 gets (Color with Adjustment ▸ Strength, Clip, and the matte note).
@@ -19,7 +19,7 @@ Clip, which persists nothing. Every call is bounded (`CALL_BOUND`), every
 ffmpeg too (120 s). Every project is closed (`close_project`, discard).
 
 The instance is launched with three argument-domain section pins, plist
-fragments as `screens.py` sends them: `ReelcutInspectorSection.video.adjustment`
+fragments as `screens.py` sends them: `FrameJobInspectorSection.video.adjustment`
 `<false/>` (open), `.video.light` and `.video.color` `<true/>` (collapsed) —
 the stored value is COLLAPSED (`InspectorSection.swift`). S1 relies on these
 pins, not on the Color tab's first-section rule or the owner's domain.
@@ -113,7 +113,7 @@ inspector's `snapshot_ui` layout dump as `screens.py`'s `check_expect` does
 - **S4**: AJ's track made `alpha`: the dump shows "An adjustment clip on a
   matte track has no effect."
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds
-  no `Reelcut: ` line.
+  no `Frame Job: ` line.
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`; a `core/`
 mutant makes the copy's `core/` its own through `hevc_alpha_proof.own_core`),
@@ -174,9 +174,9 @@ INSERT = ["Insert", "Adjustment Clip"]
 DISABLED = "is disabled here"
 MATTE_NOTE = "An adjustment clip on a matte track has no effect."
 # Argument-domain section pins (stored value: COLLAPSED), as screens.py sends them.
-SECTION_PINS = ["-ReelcutInspectorSection.video.adjustment", "<false/>",
-                "-ReelcutInspectorSection.video.light", "<true/>",
-                "-ReelcutInspectorSection.video.color", "<true/>"]
+SECTION_PINS = ["-FrameJobInspectorSection.video.adjustment", "<false/>",
+                "-FrameJobInspectorSection.video.light", "<true/>",
+                "-FrameJobInspectorSection.video.color", "<true/>"]
 ADJUST = "app/Sources/EditorViewController+Adjustment.swift"
 OPAQUE = [("E1", "h264", "mp4"), ("E2", "hevc", "mp4"), ("E3", "hevc_10bit", "mp4"),
           ("E4", "prores_422", "mov"), ("E5", "gif", "gif")]
@@ -210,8 +210,8 @@ OVERLAP_CLAUSE = ("                    // No overlap may hold an adjustment clip
 MUTANTS = {
     "blending-on": ([(
         "app/Sources/Compositor+Adjustment.swift",
-        'label: "Reelcut adjustment", vertex: vertex, fragment: fragment, blending: false))',
-        'label: "Reelcut adjustment", vertex: vertex, fragment: fragment, blending: true))')],
+        'label: "Frame Job adjustment", vertex: vertex, fragment: fragment, blending: false))',
+        'label: "Frame Job adjustment", vertex: vertex, fragment: fragment, blending: true))')],
         ["A1"]),
     "ignores-matte": ([(SHADER, WEIGHT, "    float w = saturate(u.opacity);\n")], ["M1", "Q1"]),
     "ignores-opacity": ([(SHADER, WEIGHT,
@@ -441,7 +441,7 @@ class Doc:
 
 def opened(client, name, background):
     """A new 640 × 360 project at `name`; (Doc, its first track's id)."""
-    path = WORK / f"{name}.reelcut"
+    path = WORK / f"{name}.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path)
     doc.call("set_canvas", width=W, height=H, fps=[30, 1], background=background)
@@ -1007,7 +1007,7 @@ def tail(log, count=4):
 
 def complaints(log):
     try:
-        return [line.strip() for line in open(log, errors="replace") if "Reelcut: " in line]
+        return [line.strip() for line in open(log, errors="replace") if "Frame Job: " in line]
     except OSError:
         return [f"{log} could not be read"]
 
@@ -1063,7 +1063,7 @@ def main():
     named = MUTANTS[args.mutant][1] if args.mutant else []
     binary = Path(args.app) if args.app else proof_app.binary()
     if binary.suffix == ".app":
-        binary = binary / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(binary)
     config = proof_app.config()
     if args.mutant:
         print(f"grading GR4 — the {args.mutant} MUTANT ({' '.join(named)} must FAIL)",
@@ -1072,7 +1072,7 @@ def main():
         if app is None:
             print(f"mutant {args.mutant}: the control could not be performed — {copy}")
             return 2
-        binary = app / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(app)
     else:
         print(f"grading GR4a/GR4b — adjustment clips over MCP ({config} build {binary})",
               flush=True)
@@ -1111,7 +1111,7 @@ def main():
         mcp.remove_scratch(launched.socket_path)
     found = complaints(log)
     fixtures_ok = all(state.values())
-    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Reelcut: ` "
+    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Frame Job: ` "
           "line", closed and fixtures_ok and not found,
           f"closed {closed}; fixtures {state}; complaints {found}")
     print(f"  {log.name} tail:\n    " + "\n    ".join(tail(log)), flush=True)

@@ -52,7 +52,7 @@ Rows:
   `delete_graphic title-v1`, `undo`: `get_graphic {}` lists `title` and not
   `title-v1`, `history` names `title-v1`, the clip's `graphic.name` is
   `title-v1`, and `title.js` holds the new text (G-27 (f)).
-- **Z1**: every project closes, and the launch's log holds no `Reelcut: `
+- **Z1**: every project closes, and the launch's log holds no `Frame Job: `
   line.
 
 `--mutant rename-unreconciled` builds a COPY of the tree
@@ -182,7 +182,7 @@ def write(client, project, name, text):
 
 
 def run(client):
-    f1, f2 = WORK / "F1.reelcut", WORK / "F2.reelcut"
+    f1, f2 = WORK / "F1.framejob", WORK / "F2.framejob"
 
     # T0 — the catalog
     schemas = client.schemas()
@@ -465,11 +465,11 @@ def main():
             return 2
     else:
         print("B84 — delete, rename and restore a graphic over MCP", flush=True)
-    binary = app / "Contents/MacOS/Reelcut"
+    binary = proof_app.executable(app)
     if not binary.is_file():
         print(f"instrument failure: no app binary at {binary}")
         return 2
-    log = WORK / "reelcut.log"
+    log = WORK / "framejob.log"
     launched = mcp.launch(str(binary), env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
                           log_path=str(log), timeout=CALL_BOUND)
     try:
@@ -486,8 +486,8 @@ def main():
             except Exception as error:  # a row that could not run is a failure
                 closed, how = False, [f"{type(error).__name__}: {error}"]
             complaints = [line.strip() for line in open(log, errors="replace")
-                          if "Reelcut: " in line]
-            check("Z1 every project closes and the log holds no `Reelcut: ` line",
+                          if "Frame Job: " in line]
+            check("Z1 every project closes and the log holds no `Frame Job: ` line",
                   closed and not complaints, f"closed {how}; complaints {complaints}")
     finally:
         launched.stop()

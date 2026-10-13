@@ -48,7 +48,7 @@ TIMINGS = [
     {"start": 360000, "end": 618000},
 ]
 STYLE = {"mode": "highlight", "active_color": [1.0, 0.85, 0.0, 1.0], "active_scale": 1.2}
-HEADER = os.path.join(ROOT, "core", "include", "reelcut_core.h")
+HEADER = os.path.join(ROOT, "core", "include", "framejob_core.h")
 
 
 def format_version():
@@ -103,9 +103,9 @@ class Session:
     def __init__(self, mcp, name):
         self.mcp = mcp
         for stale in os.listdir(WORK):
-            if re.fullmatch(rf"{re.escape(name)}-\d+\.reelcut", stale):
+            if re.fullmatch(rf"{re.escape(name)}-\d+\.framejob", stale):
                 shutil.rmtree(os.path.join(WORK, stale))
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         mcp.call("new_project", path=self.path)
         self.op("set_canvas", width=640, height=360, fps=[30, 1])
 
@@ -158,7 +158,7 @@ def render(session, tick):
 
 
 def version_gate(mcp):
-    path = os.path.join(WORK, f"words-v{NEWER_VERSION}-{os.getpid()}.reelcut")
+    path = os.path.join(WORK, f"words-v{NEWER_VERSION}-{os.getpid()}.framejob")
     shutil.rmtree(path, ignore_errors=True)
     os.makedirs(path)
     with open(os.path.join(path, "project.json"), "w", encoding="utf-8") as stream:
@@ -328,7 +328,7 @@ def save_and_reopen(s):
     check("…with word_style closing every text object, after animation, case, words",
           texts and all(list(t.keys())[-4:] == ["animation", "case", "words", "word_style"]
                         for t in texts), f"{[list(t.keys())[-4:] for t in texts][:2]}")
-    copy = os.path.join(WORK, f"words-reopen-{os.getpid()}.reelcut")
+    copy = os.path.join(WORK, f"words-reopen-{os.getpid()}.framejob")
     shutil.rmtree(copy, ignore_errors=True)
     shutil.copytree(s.path, copy)
     s.mcp.call("open_project", path=copy)
@@ -398,7 +398,7 @@ MUTANTS = {
 
 def mutant(name):
     file, before, after, suite, test = MUTANTS[name]
-    with tempfile.TemporaryDirectory(prefix=f"reelcut-words-{name}-") as temp:
+    with tempfile.TemporaryDirectory(prefix=f"framejob-words-{name}-") as temp:
         core = os.path.join(temp, "core")
         shutil.copytree(os.path.join(ROOT, "core"), core,
                         ignore=shutil.ignore_patterns("target", ".git", ".DS_Store"))

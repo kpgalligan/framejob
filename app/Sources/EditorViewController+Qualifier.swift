@@ -16,7 +16,7 @@ import AppKit
 extension EditorViewController {
     /// One frame composed for one pixel: its own queue, as the eyedropper's.
     private static let qualifierPickQueue = DispatchQueue(
-        label: "com.kgalligan.reelcut.qualifier-pick", qos: .userInitiated)
+        label: "com.kgalligan.framejob.qualifier-pick", qos: .userInitiated)
 
     /// The armed mode. Nil is the answer to "is the mode on".
     var qualifierPick: QualifierPickView? {

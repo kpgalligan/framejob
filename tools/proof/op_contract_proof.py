@@ -82,7 +82,7 @@ def negative(name):
         "unsnapped-marker": "assertion `left == right` failed",
         "nearest-transition": "assertion `left == right` failed",
     }[name]
-    with tempfile.TemporaryDirectory(prefix=f"reelcut-contract-{name}-") as temp:
+    with tempfile.TemporaryDirectory(prefix=f"framejob-contract-{name}-") as temp:
         temp = Path(temp)
         core = temp / "core"
         shutil.copytree(ROOT / "core", core,

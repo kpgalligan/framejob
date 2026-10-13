@@ -3,7 +3,7 @@
 // `CacheLedger` and `ProjectDocument`.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` — the swiftc
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` — the swiftc
 // line `peaks_probe.py` uses. One scenario per process:
 //
 //   cache_pass_probe <request.json> <G0|G1|G2|G2c|G3|S1|S2|R1|R2|R3|W1>
@@ -35,7 +35,7 @@ let work = URL(fileURLWithPath: workPath, isDirectory: true)
     .appendingPathComponent(scenario, isDirectory: true)
 let files = FileManager.default
 let ledger = MediaImporter.CacheLedger.shared
-let projectType = "com.kgalligan.reelcut-project"
+let projectType = ProjectDocument.projectTypeIdentifier
 _ = NSApplication.shared
 
 var rows: [[String: Any]] = []
@@ -146,7 +146,7 @@ func package(_ name: String) -> (package: URL, cache: URL) {
 
 /// The save's swap: the old package aside, the listed copy in its place.
 func swap(_ pkg: URL, with copy: URL) -> Bool {
-    let aside = pkg.deletingLastPathComponent().appendingPathComponent("old.reelcut")
+    let aside = pkg.deletingLastPathComponent().appendingPathComponent("old.framejob")
     do {
         try files.moveItem(at: pkg, to: aside)
         try files.moveItem(at: copy, to: pkg)
@@ -172,8 +172,8 @@ fresh(work)
 /// announced to the ledger, so nothing publishes until it ends.
 func waveformSave(announced: Bool) {
     let id: UInt32 = announced ? 12 : 11
-    let (pkg, cache) = package("pkg.reelcut")
-    let listed = work.appendingPathComponent("listed.reelcut")
+    let (pkg, cache) = package("pkg.framejob")
+    let listed = work.appendingPathComponent("listed.framejob")
     let source = copyMedium("toneA.m4a", as: "toneA.m4a")
     let name = announced ? "G1" : "G0"
     guard let media = record(source, id: id) else {
@@ -212,7 +212,7 @@ func waveformSave(announced: Bool) {
 func stripSave(deleteFrame: Bool) {
     let name = deleteFrame ? "G2" : "G2c"
     let id: UInt32 = deleteFrame ? 13 : 14
-    let (_, cache) = package("pkg.reelcut")
+    let (_, cache) = package("pkg.framejob")
     let source = copyMedium("A.mov", as: "A.mov")
     guard let media = record(source, id: id),
         let stamp = MediaImporter.CacheStamp.stamp(for: media, url: source)
@@ -246,7 +246,7 @@ func stripSave(deleteFrame: Bool) {
 // MARK: - G3 — a real document's save waits for a publication
 
 func documentSave() {
-    let pkg = work.appendingPathComponent("doc.reelcut", isDirectory: true)
+    let pkg = work.appendingPathComponent("doc.framejob", isDirectory: true)
     let blank = ProjectDocument()
     do {
         let wrapper = try blank.fileWrapper(ofType: projectType)
@@ -300,7 +300,7 @@ func documentSave() {
 
 func heldPass() {
     let id: UInt32 = 21
-    let (_, cache) = package("pkg.reelcut")
+    let (_, cache) = package("pkg.framejob")
     let one = copyMedium("AV.mov", as: "one.mov")
     let two = copyMedium("AV.mov", as: "two.mov")
     if let date = (try? files.attributesOfItem(atPath: one.path))?[.modificationDate] as? Date {
@@ -382,7 +382,7 @@ func heldPass() {
 
 func inputSupersedes() {
     let id: UInt32 = 22
-    let (_, cache) = package("pkg.reelcut")
+    let (_, cache) = package("pkg.framejob")
     let one = copyMedium("AV.mov", as: "one.mov")
     guard let media = record(one, id: id),
         let stamp = MediaImporter.CacheStamp.stamp(for: media, url: one)
@@ -469,7 +469,7 @@ func textSource(_ id: UInt32, _ name: String) -> (media: MediaSnapshot, source: 
 
 func retryLands() {
     let id: UInt32 = 31
-    let (_, cache) = package("pkg.reelcut")
+    let (_, cache) = package("pkg.framejob")
     guard let text = textSource(id, "r1.m4a") else {
         return row("R1", false, "toneA.m4a did not probe")
     }
@@ -492,7 +492,7 @@ func retryLands() {
 
 func retryEnds() {
     let id: UInt32 = 32
-    let (_, cache) = package("pkg.reelcut")
+    let (_, cache) = package("pkg.framejob")
     guard let text = textSource(id, "r2.m4a") else {
         return row("R2", false, "toneA.m4a did not probe")
     }
@@ -506,7 +506,7 @@ func retryEnds() {
 
 func retrySuperseded() {
     let id: UInt32 = 33
-    let (_, cache) = package("pkg.reelcut")
+    let (_, cache) = package("pkg.framejob")
     guard let text = textSource(id, "r3.m4a"), let real = record(text.toneA, id: id) else {
         return row("R3", false, "toneA.m4a did not probe")
     }

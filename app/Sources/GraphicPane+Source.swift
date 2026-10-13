@@ -246,7 +246,7 @@ extension GraphicPane {
         let name = field.stringValue.trimmingCharacters(in: .whitespaces)
         func refuse(_ sentence: String) {
             NSAlert(error: NSError(
-                domain: "Reelcut", code: 1, userInfo: [NSLocalizedDescriptionKey: sentence]))
+                domain: "FrameJob", code: 1, userInfo: [NSLocalizedDescriptionKey: sentence]))
                 .runModal()
         }
         guard GraphicStore.isModuleName(name) else { return refuse(GraphicStore.nameSentence(name)) }

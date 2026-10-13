@@ -2,7 +2,7 @@
 // (`graphics_inspector_proof.py` builds and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
 // `tools/proof/harness/build.sh`'s swiftc line — with the app's `Fonts`
 // copied beside the binary (its `resourceURL`, where `GraphicStore` finds
 // the bundled faces). Every row drives the app's own `ProjectDocument`,
@@ -66,7 +66,7 @@ guard let path = request["package"] as? String else {
 let url = URL(fileURLWithPath: path)
 let document = ProjectDocument()
 do {
-    try document.read(from: url, ofType: "com.kgalligan.reelcut-project")
+    try document.read(from: url, ofType: ProjectDocument.projectTypeIdentifier)
     document.fileURL = url
 } catch {
     check("I0 the fixture opens", false, "\(error)")

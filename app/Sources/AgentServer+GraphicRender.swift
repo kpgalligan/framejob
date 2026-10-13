@@ -221,7 +221,7 @@ extension AgentServer {
     private func graphicSheetDestination(_ a: [String: Any], name: String) throws -> URL {
         guard let path = try stringArg(a, "path") else {
             return FileManager.default.temporaryDirectory.appendingPathComponent(
-                "reelcut-graphic-\(name)-\(UUID().uuidString.prefix(8)).png")
+                "framejob-graphic-\(name)-\(UUID().uuidString.prefix(8)).png")
         }
         guard !path.isEmpty else {
             throw ToolError(

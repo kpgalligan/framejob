@@ -29,7 +29,7 @@ use std::ptr;
 use serde_json::json;
 
 use common::{cstring, Handle, Outcome};
-use reelcut_core::ffi_edit::rc_project_apply;
+use framejob_core::ffi_edit::rc_project_apply;
 
 // ---- fixtures ------------------------------------------------------------
 

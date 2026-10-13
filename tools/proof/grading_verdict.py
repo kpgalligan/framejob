@@ -34,8 +34,8 @@ E1/E2 the ungraded export against main's and the graded against the
 ungraded, rounds alternating (mU, bU, bG) then (bG, bU, mU); F4 four graded
 full-frame layers and one adjustment clip at 1080p, the compositor's
 120-frame windows against 8 ms; T4 a frame through `work/gr7/luts/
-gr7-camera-33.cube` in Reelcut against ffmpeg's `lut3d` within ±2, with the
-CONTROL T4c; Z1 every project closes and no log holds `Reelcut: `. Exit 0 when
+gr7-camera-33.cube` in Frame Job against ffmpeg's `lut3d` within ±2, with the
+CONTROL T4c; Z1 every project closes and no log holds `Frame Job: `. Exit 0 when
 every scored row passes, 1 when one fails, 2 when H0 is shut.
 
 Mutants (each edits this driver's own behaviour): `shader-not-counted` drops
@@ -86,7 +86,10 @@ G0_LEVELS = 8
 
 WORK = HERE / "work/gr7"
 MAIN_TREE = WORK / "main"
+# BASE predates rename R1 (spec §11 NM-3): the main tree builds the old product, writes
+# the old log prefixes and reads the old launch argument, and its documents are `.reelcut`.
 MAIN_BINARY = MAIN_TREE / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
+OLD_NAMED = set()   # the main binaries in use (`measure`), whose documents are `.reelcut`
 RUN = WORK / "run"
 HOME = RUN / "home"
 MEDIA = WORK / "media"
@@ -106,7 +109,7 @@ TONE = {"exposure": 0.5, "temperature": 0.2, "tint": -0.1, "highlights": -0.2,
 F_LOOKS = ("warm", "cool", "teal_orange", "vivid")
 # precision_proof.TAG: the BT.709 tags every fixture movie carries.
 TAG = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
-TIMING = re.compile(r"\[reelcut\] compositor: ([\d.]+) ms average, ([\d.]+) ms worst")
+TIMING = re.compile(r"\[(?:reelcut|framejob)\] compositor: ([\d.]+) ms average, ([\d.]+) ms worst")
 RELEASE_ONLY = "GR7a times exports and reads the compositor's frame times"
 MENU_PATHS = ("View ▸ Show Ungraded", "View ▸ Scopes", "Insert ▸ Adjustment Clip",
               "Clip ▸ Look ▸ Warm")
@@ -502,9 +505,9 @@ class Doc:
     folder = RUN
     closed = []
 
-    def __init__(self, client, name, width=WIDTH, height=HEIGHT):
+    def __init__(self, client, name, width=WIDTH, height=HEIGHT, ext: str = ".framejob"):
         Doc.made += 1
-        self.client, self.path = client, Doc.folder / f"{Doc.made:02d}-{name}.reelcut"
+        self.client, self.path = client, Doc.folder / f"{Doc.made:02d}-{name}{ext}"
         self.width, self.height = width, height
         self.ok, self.why = True, None
         self.media = {}
@@ -602,9 +605,9 @@ class Doc:
 MUTANT = None
 
 
-def build_fixture(client, kind: str, seconds: int) -> Doc:
+def build_fixture(client, kind: str, seconds: int, ext: str = ".framejob") -> Doc:
     """U, G, F or T (the module doc); 1920×1080, 30 fps, black."""
-    doc = Doc(client, f"{kind}-{seconds}s")
+    doc = Doc(client, f"{kind}-{seconds}s", ext=ext)
     first = doc.first_track()
     if kind == "T":
         doc.movie(first, MOVIE)
@@ -648,7 +651,8 @@ LOGS = []
 def launch(binary, label):
     log = Doc.folder / f"{label}.log"
     LOGS.append(log)
-    return mcp.launch(str(binary), ["-ReelcutCompositorTiming", "YES"],
+    return mcp.launch(str(binary), ["-ReelcutCompositorTiming", "YES",
+                                    "-FrameJobCompositorTiming", "YES"],
                       env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
                       log_path=str(log), timeout=CALL_BOUND)
 
@@ -667,7 +671,8 @@ def timed_export(binary: Path, kind: str, seconds: int, label: str) -> dict:
             figures.update(fixture=f"the app did not listen at {launched.socket_path}",
                            exported=False, windows=0, closed=False)
             return figures
-        doc = build_fixture(launched.client, kind, seconds)
+        ext = ".reelcut" if Path(binary) in OLD_NAMED else ".framejob"
+        doc = build_fixture(launched.client, kind, seconds, ext)
         figures["fixture"] = doc.why or "ok"
         log = Path(launched.log_path)
         offset = log.stat().st_size
@@ -896,14 +901,14 @@ def run_t4(branch_binary, owner_lut, closed):
         lut, ffmpeg = through(CUBE, "lut")
         base = decode_rgb(neutral) if neutral else None
         if lut is None or ffmpeg is None or base is None or doc.why:
-            emit("T4", "FAIL", f"a frame was missing: neutral {base is not None}, Reelcut "
+            emit("T4", "FAIL", f"a frame was missing: neutral {base is not None}, Frame Job "
                  f"{lut is not None}, ffmpeg {ffmpeg is not None}; fixture {doc.why or 'ok'}")
         else:
             worst, at = max_delta(lut, ffmpeg)
             control, cat = max_delta(base, ffmpeg)
             figures.update(max_delta=worst, control=control)
             emit("T4", "PASS" if worst <= T4_LEVELS else "FAIL",
-                 f"{CUBE.name} (33³) at amount 1 on the movie's frame at 0.5 s: Reelcut's "
+                 f"{CUBE.name} (33³) at amount 1 on the movie's frame at 0.5 s: Frame Job's "
                  f"render_frame against ffmpeg's lut3d (trilinear) on the neutral frame, max |Δ| "
                  f"{worst} levels at {where(at)} over {WIDTH}×{HEIGHT}×3 (bound ±{T4_LEVELS})")
             emit("T4c", "PASS" if control > T4_LEVELS else "FAIL",
@@ -912,7 +917,7 @@ def run_t4(branch_binary, owner_lut, closed):
         if owner_lut is not None:
             mine, theirs = through(owner_lut, "owner")
             if mine is None or theirs is None:
-                emit("T4", "RECORD", f"the owner's {owner_lut}: a frame was missing (Reelcut "
+                emit("T4", "RECORD", f"the owner's {owner_lut}: a frame was missing (Frame Job "
                      f"{mine is not None}, ffmpeg {theirs is not None}; {doc.why or 'no refusal'})")
             else:
                 worst, at = max_delta(mine, theirs)
@@ -927,7 +932,8 @@ def run_t4(branch_binary, owner_lut, closed):
 
 def complaints(log):
     try:
-        return [line.strip() for line in open(log, errors="replace") if "Reelcut: " in line]
+        return [line.strip() for line in open(log, errors="replace")
+                if "Reelcut: " in line or "Frame Job: " in line]
     except OSError:
         return [f"{log} could not be read"]
 
@@ -955,6 +961,7 @@ def measure(args):
         proof_app.require_fresh(branch)
         if selected & {"M1", "E1", "E2"}:
             main_binary = Path(args.main) if args.main else MAIN_BINARY
+            OLD_NAMED.add(main_binary)
             if not main_binary.is_file():
                 raise proof_app.StaleApp(f"no main build at {main_binary}; run `main-tree make`")
             proof_app.require_fresh(main_binary)
@@ -1004,7 +1011,7 @@ def measure(args):
         every = all(closed) and all(ok for _, ok in Doc.closed)
         emit("Z1", "PASS" if every and not found else "FAIL",
              f"{len(Doc.closed)} projects, every one closed {every}; {len(LOGS)} logs, "
-             f"`Reelcut: ` lines {found or 'none'}")
+             f"`Frame Job: ` lines {found or 'none'}")
     if facts is not None:
         facts["load_after"] = load()
         emit("H0", "RECORD", f"load after {facts['load_after']}")

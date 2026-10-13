@@ -10,14 +10,14 @@ visible text, Copy MCP Command's press, and its missing-helper state.
     python3 tools/proof/settings_layout_probe.py [--sources DIR] [--mutant NAME] [--only IDS]
 
 `settings_layout_probe.swift` is built with `swift_build.py`'s line
-(without `-D REELCUT_DEV_TOOLS`) over `--sources` and run once, in a
+(without `-D FRAMEJOB_DEV_TOOLS`) over `--sources` and run once, in a
 process of its own, under `tools/proof/work/settings-layout/`, killed at a
 120 s wall. The fixture is `SettingsWindowController` over two
 `MemoryStore`s, an empty environment, an absent spend folder and a scratch
 `UserDefaults` suite, never shown; nothing on this Mac is read or written.
 L9 and L10 build a second controller whose MCP helper is "/bin/sh", L11 a
-third whose helper is "/nonexistent/reelcut-mcp", both over a private
-pasteboard (`com.kgalligan.reelcut.settings-layout-probe`, released at
+third whose helper is "/nonexistent/framejob-mcp", both over a private
+pasteboard (`com.kgalligan.framejob.settings-layout-probe`, released at
 exit); the general pasteboard is never written.
 Every string a row compares is a literal, never the app's own constant.
 Prints `<ID> pass|fail — <detail>` per row, then `scores: N/M`.
@@ -60,11 +60,11 @@ Rows:
        view's coordinates.
   L10  with "/bin/sh": the button is enabled and the status empty; after
        `performClick` the private pasteboard holds
-       `claude mcp add --scope user reelcut -- '/bin/sh'` and the status
+       `claude mcp add --scope user framejob -- '/bin/sh'` and the status
        "Copied. Paste it into Terminal and press Return."; the general
        pasteboard's `changeCount` is unchanged; `sync()` empties the status.
-  L11  with "/nonexistent/reelcut-mcp": the button is disabled, the status
-       reads "reelcut-mcp is missing from this copy of Reelcut.", and a
+  L11  with "/nonexistent/framejob-mcp": the button is disabled, the status
+       reads "framejob-mcp is missing from this copy of Frame Job.", and a
        direct `copyClicked(nil)` leaves the private pasteboard's
        `changeCount` unchanged.
 

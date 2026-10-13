@@ -1,9 +1,9 @@
 {
-  "name": "reelcut-agent",
+  "name": "framejob-agent",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bun build src/main.ts --compile --target=bun-darwin-arm64 --outfile ../build/agent/reelcut-agent",
+    "build": "bun build src/main.ts --compile --target=bun-darwin-arm64 --outfile ../build/agent/framejob-agent",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

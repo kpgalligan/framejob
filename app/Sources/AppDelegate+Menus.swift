@@ -92,22 +92,22 @@ extension AppDelegate {
     }
 
     private func appMenu() -> NSMenu {
-        let menu = NSMenu(title: "Reelcut")
-        menu.addItem(item("About Reelcut", #selector(AppDelegate.showAboutPanel(_:))))
+        let menu = NSMenu(title: "Frame Job")
+        menu.addItem(item("About Frame Job", #selector(AppDelegate.showAboutPanel(_:))))
         menu.addItem(.separator())
         // Road map 6 §5d: the app's first window for something PERSISTED,
         // in the place macOS puts one. ⌘, is unclaimed by spec §9's table —
         // the nudge pair is the BARE `,` and `.`.
         menu.addItem(item("Settings…", #selector(AppDelegate.showSettings(_:)), ","))
         menu.addItem(.separator())
-        menu.addItem(item("Hide Reelcut", #selector(NSApplication.hide(_:)), "h"))
+        menu.addItem(item("Hide Frame Job", #selector(NSApplication.hide(_:)), "h"))
         menu.addItem(
             item(
                 "Hide Others", #selector(NSApplication.hideOtherApplications(_:)), "h",
                 [.command, .option]))
         menu.addItem(item("Show All", #selector(NSApplication.unhideAllApplications(_:))))
         menu.addItem(.separator())
-        menu.addItem(item("Quit Reelcut", #selector(NSApplication.terminate(_:)), "q"))
+        menu.addItem(item("Quit Frame Job", #selector(NSApplication.terminate(_:)), "q"))
         return menu
     }
 
@@ -503,7 +503,7 @@ extension AppDelegate {
 
     private func helpMenu() -> NSMenu {
         let menu = NSMenu(title: "Help")
-        menu.addItem(item("Reelcut Help", #selector(NSApplication.showHelp(_:))))
+        menu.addItem(item("Frame Job Help", #selector(NSApplication.showHelp(_:))))
         menu.addItem(
             item("Graphics Reference", #selector(AppDelegate.showGraphicsReference(_:))))
         return menu

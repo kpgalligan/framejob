@@ -118,11 +118,11 @@ func pipes(_ name: String) -> Pipes {
         values.setConstantValue(&gather, type: .bool, index: 0)
         if var flag = matte { values.setConstantValue(&flag, type: .bool, index: 1) }
         do {
-            return try library.makeFunction(name: "reelcut_layer_fragment", constantValues: values)
-        } catch { fail("\(name): reelcut_layer_fragment: \(error)") }
+            return try library.makeFunction(name: "framejob_layer_fragment", constantValues: values)
+        } catch { fail("\(name): framejob_layer_fragment: \(error)") }
     }
-    guard let vertex = library.makeFunction(name: "reelcut_layer_vertex") else {
-        fail("\(name): no reelcut_layer_vertex")
+    guard let vertex = library.makeFunction(name: "framejob_layer_vertex") else {
+        fail("\(name): no framejob_layer_vertex")
     }
     func state(_ d: MTLRenderPipelineDescriptor) -> MTLRenderPipelineState {
         do { return try device.makeRenderPipelineState(descriptor: d) } catch {
@@ -133,9 +133,9 @@ func pipes(_ name: String) -> Pipes {
     let unmatted = state(layerDescriptor(vertex, fragment(matte: constantRoute ? false : nil)))
     guard name != "V0" else { return Pipes(unmatted: unmatted, matted: nil, resolve: nil) }
     let matted = constantRoute ? state(layerDescriptor(vertex, fragment(matte: true))) : unmatted
-    guard let shadowVertex = library.makeFunction(name: "reelcut_shadow_vertex"),
-        let resolveFragment = library.makeFunction(name: "reelcut_matte_resolve_fragment")
-    else { fail("\(name): no reelcut_matte_resolve_fragment") }
+    guard let shadowVertex = library.makeFunction(name: "framejob_shadow_vertex"),
+        let resolveFragment = library.makeFunction(name: "framejob_matte_resolve_fragment")
+    else { fail("\(name): no framejob_matte_resolve_fragment") }
     // The coverage pass: r8, dst = dst × src (source factor zero, destination
     // factor sourceColor), so each matte's value multiplies in.
     let d = MTLRenderPipelineDescriptor()
@@ -214,7 +214,7 @@ textBytes.withUnsafeMutableBytes { raw in
             CGColor(red: 1, green: 1, blue: 1, alpha: 1),
     ]
     let line = CTLineCreateWithAttributedString(
-        NSAttributedString(string: "REELCUT MATTE REELCUT MATTE", attributes: attributes))
+        NSAttributedString(string: "FRAMEJOB MATTE FRAMEJOB MATTE", attributes: attributes))
     var baseline = CGFloat(H) - size
     while baseline > -size {
         context.textPosition = CGPoint(x: -size * 0.3, y: baseline)

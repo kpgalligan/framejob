@@ -163,7 +163,7 @@ extension AgentServer {
                     + "AssemblyAI, a cloud service that transcribes it and is billed for it, "
                     + "and the transcript is deleted from AssemblyAI once the words have been "
                     + "read back; do not choose it for somebody else's recording without their "
-                    + "say-so. New transcription needs an API key (Reelcut ▸ Settings ▸ "
+                    + "say-so. New transcription needs an API key (Frame Job ▸ Settings ▸ "
                     + "Transcription, or RC_ASSEMBLYAI_KEY); a nonempty batch whose every "
                     + "media has a current packaged transcript can be reused without a key "
                     + "or network request, unless refresh is true. Pending remote deletion "

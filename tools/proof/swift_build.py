@@ -39,8 +39,8 @@ import bounded  # noqa: E402
 
 CACHE = ROOT / "tools/proof/work/swift-build"
 KEEP_ENTRIES = 32
-BRIDGING = ROOT / "app/Bridging/Reelcut-Bridging-Header.h"
-LIBRARY = ROOT / "core/target/release/libreelcut_core.a"
+BRIDGING = ROOT / "app/Bridging/FrameJob-Bridging-Header.h"
+LIBRARY = ROOT / "core/target/release/libframejob_core.a"
 TARGET = "arm64-apple-macos26.0"
 ENV_KEYS = ("DEVELOPER_DIR", "SDKROOT", "TOOLCHAINS", "MACOSX_DEPLOYMENT_TARGET")
 STRIPPED = ("-o", "-j", "-output-file-map")  # flags whose VALUES the key ignores
@@ -123,8 +123,8 @@ def _argv(*, sources, output, defines=(), optimize=False, wmo=False, link_args=(
     library = Path(library or LIBRARY)
     argv = ["xcrun", "swiftc"] + [x for d in defines for x in ("-D", d)] + ["-O"] * optimize
     argv += ["-whole-module-optimization"] if wmo else ["-j", str(jobs or os.cpu_count())]
-    argv += ["-sdk", _tools()["sdk"], "-target", TARGET, "-module-name", "Reelcut",
-             "-import-objc-header", str(bridging), "-L", str(library.parent), "-lreelcut_core"]
+    argv += ["-sdk", _tools()["sdk"], "-target", TARGET, "-module-name", "FrameJob",
+             "-import-objc-header", str(bridging), "-L", str(library.parent), "-lframejob_core"]
     argv += [str(s) for s in sources] + [str(a) for a in link_args] + ["-o", str(output)]
     return argv
 
@@ -262,7 +262,7 @@ def typecheck(*, sources, defines=(), timeout: float = 300):
     """(exit status, swiftc's output): `-typecheck` in batch mode on every core, no link."""
     argv = ["xcrun", "swiftc", "-typecheck", "-enable-batch-mode", "-j", str(os.cpu_count())]
     argv += [x for d in defines for x in ("-D", d)] + ["-sdk", _tools()["sdk"], "-target",
-             TARGET, "-module-name", "Reelcut", "-import-objc-header", str(BRIDGING)]
+             TARGET, "-module-name", "FrameJob", "-import-objc-header", str(BRIDGING)]
     ran = bounded.run(argv + [str(s) for s in sources], timeout, env=bounded.child_env())
     text = ran["stdout"] + ran["stderr"]
     if ran["expired"]:
@@ -327,7 +327,7 @@ def selftest():
         a, b = write("a.swift", "let a = 1\n"), write("b.swift", "let b = 2\n")
         inner = write("inner.h", "int inner(void);\n")
         header = write("bridge.h", '#include "inner.h"\n')
-        lib, extra = write("libreelcut_core.a", "lib-1"), write("extra.plist", "plist-1")
+        lib, extra = write("libframejob_core.a", "lib-1"), write("extra.plist", "plist-1")
         base = dict(sources=[a, b], output="/z/one", defines=["X"], link_inputs=[extra],
                     bridging_header=header, library=lib)
         first = cache_key(**base)

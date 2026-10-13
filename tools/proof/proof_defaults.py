@@ -12,8 +12,10 @@ session moved, by key NAME, and the removal of the proofs' own domains.
 No environment moves `UserDefaults` (the proof README's B83 section has the
 measurements): a probe compiled from app/Sources writes a domain named for
 its executable into the owner's real `~/Library/Preferences/`, and the app
-writes its bundle's domain, `com.kgalligan.Reelcut` (Release) or
-`com.kgalligan.Reelcut.debug` (`make app-debug`), both refused by `refusal`. This file is the two halves of what is done
+writes its bundle's domain, `com.kgalligan.FrameJob` (Release) or
+`com.kgalligan.FrameJob.debug` (`make app-debug`), both refused by `refusal`
+as the old app's `com.kgalligan.Reelcut` and `com.kgalligan.Reelcut.debug`
+are (spec §11 NM-7). This file is the two halves of what is done
 about it, and it imports nothing from `tools/proof`.
 
 **What a session moved.** `snapshot(domain)` runs `defaults export <domain>
@@ -21,7 +23,7 @@ about it, and it imports nothing from `tools/proof`.
 process, so a value is never held, printed or written. `moved` names the
 keys added, removed or changed between two snapshots, `owner_visible` drops
 AppKit's own (`NS*`, `Apple*`), and `sharing_pids` lists the running
-`…/Contents/MacOS/Reelcut` that share a domain. `mcp.py`'s guard is built
+`…/Contents/MacOS/Frame Job` (or `Frame Job Debug`) that share a domain. `mcp.py`'s guard is built
 from these; `defaults_proof.py` is its proof. `APP_DOMAIN` is only ever read.
 Every `defaults` this file runs — these reads, the removal recipe's delete
 and the selftest's write — runs WITHOUT `CFFIXED_USER_HOME` (`read_env`):
@@ -38,9 +40,11 @@ works only after the process that wrote the domain has exited; either half
 alone leaves a file or brings it back. `refusal(name)` is asked first and
 names every class that is never acted on: the empty name, a name `defaults`
 reads as an option or a path (`-g`, `a/b`, a leading `.`), the global
-domain, the product's own names (`reelcut`, `reelcut-agent`, `reelcut-mcp`,
-`com.kgalligan.Reelcut` in any case, its capital-R namespace, and a name
-that extends it without a dot, `com.kgalligan.Reelcut-Dev`), Apple's, and
+domain, the product's own names under both its names (`frame job`, `frame job
+debug`, `framejob`, `framejob-agent`, `framejob-mcp`, `com.kgalligan.FrameJob`
+in any case and its namespace, and a name that extends it without a dot,
+`com.kgalligan.FrameJob-Dev`; and the old `reelcut`, `reelcut-agent`,
+`reelcut-mcp` and `com.kgalligan.Reelcut` the same way), Apple's, and
 any name containing `rasterize`. A call that reaches the real
 Preferences folder asks `refusal`'s rule a second time under no mutant, and
 a scratch folder with no stand-in runner raises, so a scratch call cannot
@@ -51,17 +55,20 @@ the first rule that holds: `executable` (a Mach-O of that name with an exec
 bit under `tools/proof/work`; the walk skips `*.app`, `*.dSYM`,
 `node_modules`, `.git`, `Intermediates.noindex`, `target` and symlinks),
 `source` (the stem of a `*_probe.swift` under `tools/proof`), `prefix` (the
-name starts `com.kgalligan.reelcut.` or `reelcut.`, case-sensitive), `keys`
-(at least one key, every one starting `Reelcut`). `unattributed` is what no
-rule owns and still looks like a proof's: a name matching
-`probe|harness|refute|spike`, or a `Reelcut*` key. No script removes those.
+name starts with one of `PREFIXES`, `com.kgalligan.framejob.` or `framejob.`,
+or the old `com.kgalligan.reelcut.` or `reelcut.`, case-sensitive), `keys`
+(at least one key, every one starting `FrameJob` or the old `Reelcut`).
+`unattributed` is what no rule owns and still looks like a proof's: a name
+matching `probe|harness|refute|spike`, or a `FrameJob*` or `Reelcut*` key. No
+script removes those.
 
 **The sweep.** Per owned name, `busy` is read immediately before acting
 (the plist is under `BUSY_MINUTES` old, a process of that basename is
 running, or one's bundle identifier is the name): it is left and reported.
 Else, when every key is in `FAMILIES` (or there is none), `remove_domain`.
 Else the domain is `shared` with something else's keys: `defaults delete
-<name> <key>` for its `Reelcut*` keys only, and the file is never unlinked.
+<name> <key>` for its `FrameJob*` and `Reelcut*` keys only, and the file is
+never unlinked.
 A returned reason is reported under `denied` and never worked around. The
 busy gate cannot see a write `cfprefsd` has not flushed from a process that
 already exited into a plist older than `BUSY_MINUTES`. `make test` names the
@@ -73,7 +80,7 @@ key of a probe's own to read back; a running process of that name is still
 printed. `--list --ran NAME` prints what that sweep would do.
 
 **The selftest.** P1 and P2 are real, on a throwaway domain
-`reelcut.proof-defaults-selftest.<pid>` made with `defaults write`: P1 its
+`framejob.proof-defaults-selftest.<pid>` made with `defaults write`: P1 its
 plist exists (the control), P2 `remove_domain` answers None and the file and
 the domain are absent at once and 6 s later. P3–P9 run over scratch
 `preferences`, `work` and `sources` folders under `$TMPDIR` with a RECORDING
@@ -87,30 +94,34 @@ it, while the control IS removed.
 - **P3** the app's: `com.kgalligan.Reelcut`, `com.kgalligan.reelcut`,
   `COM.KGALLIGAN.REELCUT`, `com.kgalligan.Reelcut.helper`,
   `com.kgalligan.Reelcut-Dev`, `com.kgalligan.ReelcutHelper`,
-  `com.kgalligan.Reelcut.debug` (the Debug build's, spec §11 V-5); control
-  `com.kgalligan.reelcut.x` (`prefix`).
+  `com.kgalligan.Reelcut.debug` (the old Debug build's, spec §11 V-5), and
+  `com.kgalligan.FrameJob`, `com.kgalligan.FrameJob.debug`,
+  `com.kgalligan.framejob` (spec §11 NM-7); control `com.kgalligan.framejob.x`
+  (`prefix`).
 - **P4** global: `-g`, `-globalDomain`, `-app`, `NSGlobalDomain`, `Apple
   Global Domain`, `.GlobalPreferences`, the empty name, `a/b`; control `g`
   (`executable`).
 - **P5** Rasterize: `com.kgalligan.rasterize.jobs-probe`,
   `com.kgalligan.Rasterize`, `rasterize-probe`; control `raster-probe`.
-- **P5s** shared: an `executable`-owned plist holding `ReelcutA` and
+- **P5s** shared: an `executable`-owned plist holding `FrameJobA` and
   `toolOptions.x` is `shared`, the recorder holds only `defaults delete
-  <name> ReelcutA` and the file is kept; the same name holding `ReelcutA`
+  <name> FrameJobA` and the file is kept; the same name holding `FrameJobA`
   and `NSB` is removed whole.
-- **P6** helpers: `reelcut-agent`, `reelcut-mcp`, `Reelcut`; control
-  `reelcut-agent-probe`.
+- **P6** helpers: `reelcut-agent`, `reelcut-mcp`, `Reelcut`, `framejob-agent`,
+  `framejob-mcp`, `Frame Job`; control `framejob-agent-probe`.
 - **P7** one name per rule (the `prefix` one
-  `reelcut.proof-defaults-selftest.12345`), and an `NS`-only `x-probe` owned
+  `framejob.proof-defaults-selftest.12345`), and an `NS`-only `x-probe` owned
   by none and in `unattributed`.
 - **P8** busy: an owned plist written now, and one (owned by `keys`) named
   for a running `/bin/sleep`, are `busy` with the recorder empty, and so is
   a fresh `NS`-only `ran-probe`; with all three named in `ran`, `ran-probe`
-  alone is removed (the first holds `ReelcutA`, the second is running); the
+  alone is removed (the first holds `FrameJobA`, the second is running); the
   first with its mtime two hours back is removed. The sleeper is `/bin/sleep`
   started through a symlink of that name, whose path is what `ps` prints: a
   COPY of `/bin/sleep` is killed at exec on macOS 26 (exit 137, measured).
 - **P9** a scratch `preferences` with no runner raises `ValueError`.
+- **P10** the sweep removes an idle probe domain under each of the four
+  `PREFIXES` — the new two and the old two (spec §11 NM-7) — whole.
 
 `--mutant NAME` runs the selftest alone (never the sweep) and prints `MUTANT
 PASS` when exactly its rows fail: `no-unlink` P2 (the unlink is skipped in
@@ -134,9 +145,13 @@ import sys
 import tempfile
 import time
 
-APP_DOMAIN = "com.kgalligan.Reelcut"
+APP_DOMAIN = "com.kgalligan.FrameJob"
+# The app's domain before rename R1 (spec §11 NM-7): refused as the new one is.
+OLD_APP_DOMAIN = "com.kgalligan.Reelcut"
 HARMLESS = ("NS", "Apple")                       # AppKit's key-name families
-FAMILIES = ("Reelcut", "RC", "NS", "Apple")      # what a probe compiled from app/Sources writes
+# What a probe compiled from app/Sources writes, under either name.
+FAMILIES = ("FrameJob", "Reelcut", "RC", "NS", "Apple")
+KEY_PREFIXES = ("FrameJob", "Reelcut")           # the product's own keys, new and old
 BUSY_MINUTES = 60
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -144,8 +159,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REAL_PREFERENCES = os.path.join(pwd.getpwuid(os.getuid()).pw_dir, "Library", "Preferences")
 WORK = os.path.join(HERE, "work")
 SOURCES = HERE
-SELFTEST_PREFIX = "reelcut.proof-defaults-selftest."
-PREFIXES = ("com.kgalligan.reelcut.", "reelcut.")
+SELFTEST_PREFIX = "framejob.proof-defaults-selftest."
+# The proofs' probe domains, under the new names and the old (spec §11 NM-7).
+PREFIXES = ("com.kgalligan.framejob.", "framejob.", "com.kgalligan.reelcut.", "reelcut.")
+# The product's own executables, and its bundle-id namespaces, under both names.
+EXECUTABLES = ("frame job", "frame job debug", "framejob", "framejob-agent", "framejob-mcp",
+               "reelcut", "reelcut-agent", "reelcut-mcp")
+NAMESPACES = ("com.kgalligan.framejob", "com.kgalligan.reelcut")
 UNATTRIBUTED_NAME = re.compile(r"probe|harness|refute|spike")
 SKIP_DIRS = ("node_modules", ".git", "Intermediates.noindex", "target")
 SKIP_SUFFIXES = (".app", ".dSYM")
@@ -249,11 +269,11 @@ def _processes():
 
 
 def sharing_pids(domain):
-    """The running `*/Contents/MacOS/Reelcut` whose `bundle_domain` is
-    `domain` or None, sorted."""
+    """The running `*/Contents/MacOS/Frame Job` (or `Frame Job Debug`) whose
+    `bundle_domain` is `domain` or None, sorted."""
     found = []
     for pid, path in _processes() or []:
-        if path.endswith("/Contents/MacOS/Reelcut"):
+        if path.endswith(("/Contents/MacOS/Frame Job", "/Contents/MacOS/Frame Job Debug")):
             identifier = bundle_domain(path)
             if identifier is None or identifier == domain:
                 found.append(pid)
@@ -274,15 +294,15 @@ def _refusal(name):
     lower = name.lower()
     if lower in ("nsglobaldomain", "apple global domain"):
         return f"{name!r} is the global domain"
-    if lower in ("reelcut", "reelcut-agent", "reelcut-mcp"):
+    if lower in EXECUTABLES:
         return f"{name!r} is one of the product's own executables"
     if lower.startswith("com.apple."):
         return f"{name!r} is Apple's"
     if "rasterize" in lower:
         return f"{name!r} is Rasterize's"
-    if lower.startswith("com.kgalligan.reelcut") and not name.startswith(
-            "com.kgalligan.reelcut."):
-        return f"{name!r} is the app's own domain or in its namespace"
+    for space in NAMESPACES:
+        if lower.startswith(space) and not name.startswith(space + "."):
+            return f"{name!r} is the app's own domain or in its namespace"
     return None
 
 
@@ -492,10 +512,10 @@ def _survey(preferences=None, work=None, sources=None):
             owned.append((name, "source"))
         elif name.startswith(PREFIXES):
             owned.append((name, "prefix"))
-        elif keys and all(key.startswith("Reelcut") for key in keys):
+        elif keys and all(key.startswith(KEY_PREFIXES) for key in keys):
             owned.append((name, "keys"))
         elif UNATTRIBUTED_NAME.search(name) or any(
-                key.startswith("Reelcut") for key in keys or []):
+                key.startswith(KEY_PREFIXES) for key in keys or []):
             loose.append(name)
     return owned, loose
 
@@ -511,7 +531,7 @@ def unattributed(preferences=None, work=None, sources=None):
 
 
 def families(keys):
-    """`Reelcut:2,NS:1` for a list of key names."""
+    """`FrameJob:2,NS:1` for a list of key names."""
     if keys is None:
         return "(unreadable)"
     if not keys:
@@ -525,7 +545,8 @@ def families(keys):
 
 def plan(name, preferences=None, now=None, ran=()):
     """What the sweep would do with an owned `name` now: (`busy`, reason),
-    (`denied`, reason), (`remove`, None) or (`shared`, its `Reelcut*` keys)."""
+    (`denied`, reason), (`remove`, None) or (`shared`, its `FrameJob*` and
+    `Reelcut*` keys)."""
     preferences = REAL_PREFERENCES if preferences is None else os.fspath(preferences)
     reason = busy(name, preferences, now, ran)
     if reason:
@@ -535,7 +556,7 @@ def plan(name, preferences=None, now=None, ran=()):
         return "denied", "its plist could not be read"
     if all(key.startswith(FAMILIES) for key in keys):
         return "remove", None
-    return "shared", [key for key in keys if key.startswith("Reelcut")]
+    return "shared", [key for key in keys if key.startswith(KEY_PREFIXES)]
 
 
 def sweep(preferences=None, work=None, sources=None, run=None, now=None, ran=()):
@@ -629,10 +650,10 @@ def _untouched(root, label, name, control, control_rule):
     case = Case(root, label)
     bears_plist = "/" not in name
     bears_macho = bool(name) and "/" not in name
-    path = case.plist(name, ["ReelcutA"]) if bears_plist else None
+    path = case.plist(name, ["FrameJobA"]) if bears_plist else None
     if bears_macho:
         case.macho(name)
-    control_path = case.plist(control, ["ReelcutA", "NSB"])
+    control_path = case.plist(control, ["FrameJobA", "NSB"])
     if control_rule == "executable":
         case.macho(control)
     before = _read(path) if path else None
@@ -710,7 +731,7 @@ def selftest():
     path = _plist_path(REAL_PREFERENCES, name)
     try:
         def p1():
-            wrote = subprocess.run(["defaults", "write", name, "ReelcutSelftest", "-bool", "true"],
+            wrote = subprocess.run(["defaults", "write", name, "FrameJobSelftest", "-bool", "true"],
                                    capture_output=True, timeout=30, env=read_env())
             deadline = time.monotonic() + 10
             while not os.path.exists(path) and time.monotonic() < deadline:
@@ -739,8 +760,10 @@ def selftest():
         guarded("P3", lambda: _refused_row(
             root, "P3", ["com.kgalligan.Reelcut", "com.kgalligan.reelcut", "COM.KGALLIGAN.REELCUT",
                          "com.kgalligan.Reelcut.helper", "com.kgalligan.Reelcut-Dev",
-                         "com.kgalligan.ReelcutHelper", "com.kgalligan.Reelcut.debug"],
-            "com.kgalligan.reelcut.x", "prefix"))
+                         "com.kgalligan.ReelcutHelper", "com.kgalligan.Reelcut.debug",
+                         "com.kgalligan.FrameJob", "com.kgalligan.FrameJob.debug",
+                         "com.kgalligan.framejob"],
+            "com.kgalligan.framejob.x", "prefix"))
         guarded("P4", lambda: _refused_row(
             root, "P4", ["-g", "-globalDomain", "-app", "NSGlobalDomain", "Apple Global Domain",
                          ".GlobalPreferences", "", "a/b"], "g", "executable"))
@@ -751,33 +774,33 @@ def selftest():
         def p5s():
             problems = []
             case = Case(root, "P5s-shared")
-            kept = case.plist("shared-probe", ["ReelcutA", "toolOptions.x"])
+            kept = case.plist("shared-probe", ["FrameJobA", "toolOptions.x"])
             case.macho("shared-probe")
             before = _read(kept)
             recorder = Recorder()
             result = sweep(*case.folders(), run=recorder)
-            if result != {"removed": [], "shared": [("shared-probe", ["ReelcutA"])], "busy": [],
+            if result != {"removed": [], "shared": [("shared-probe", ["FrameJobA"])], "busy": [],
                           "denied": []}:
                 problems.append(f"sweep answered {result}")
-            if recorder.calls != [["defaults", "delete", "shared-probe", "ReelcutA"]]:
+            if recorder.calls != [["defaults", "delete", "shared-probe", "FrameJobA"]]:
                 problems.append(f"sweep ran {recorder.calls}")
             if not os.path.lexists(kept) or _read(kept) != before:
                 problems.append("the shared plist changed")
             case = Case(root, "P5s-whole")
-            gone = case.plist("shared-probe", ["ReelcutA", "NSB"])
+            gone = case.plist("shared-probe", ["FrameJobA", "NSB"])
             case.macho("shared-probe")
             result = sweep(*case.folders(), run=Recorder())
             if result["removed"] != ["shared-probe"] or os.path.lexists(gone):
-                problems.append(f"the control (ReelcutA + NSB) was not removed whole: {result}")
+                problems.append(f"the control (FrameJobA + NSB) was not removed whole: {result}")
             return not problems, ("; ".join(problems) if problems else
-                                  "ReelcutA + toolOptions.x: shared, only `defaults delete "
-                                  "shared-probe ReelcutA` recorded, the file kept; CONTROL: "
-                                  "ReelcutA + NSB removed whole")
+                                  "FrameJobA + toolOptions.x: shared, only `defaults delete "
+                                  "shared-probe FrameJobA` recorded, the file kept; CONTROL: "
+                                  "FrameJobA + NSB removed whole")
 
         guarded("P5s", p5s)
         guarded("P6", lambda: _refused_row(
-            root, "P6", ["reelcut-agent", "reelcut-mcp", "Reelcut"], "reelcut-agent-probe",
-            "executable"))
+            root, "P6", ["reelcut-agent", "reelcut-mcp", "Reelcut", "framejob-agent",
+                         "framejob-mcp", "Frame Job"], "framejob-agent-probe", "executable"))
 
         def p7():
             case = Case(root, "P7")
@@ -787,12 +810,12 @@ def selftest():
             with open(os.path.join(case.sources, "s_probe.swift"), "w") as handle:
                 handle.write("// a probe's source\n")
             case.plist(f"{SELFTEST_PREFIX}12345", ["NSA"])
-            case.plist("k", ["ReelcutA", "ReelcutB"])
+            case.plist("k", ["FrameJobA", "FrameJobB"])
             case.plist("x-probe", ["NSA"])
             owned = owned_domains(*case.folders())
             loose = unattributed(*case.folders())
-            wanted = [("e-probe", "executable"), ("k", "keys"),
-                      (f"{SELFTEST_PREFIX}12345", "prefix"), ("s_probe", "source")]
+            wanted = [("e-probe", "executable"), (f"{SELFTEST_PREFIX}12345", "prefix"),
+                      ("k", "keys"), ("s_probe", "source")]
             ok = owned == wanted and loose == ["x-probe"]
             return ok, f"owned {owned}; unattributed {loose}"
 
@@ -802,12 +825,12 @@ def selftest():
             nonlocal sleeper
             problems = []
             case = Case(root, "P8")
-            fresh = case.plist("busy-probe", ["ReelcutA"], hours_old=0)
+            fresh = case.plist("busy-probe", ["FrameJobA"], hours_old=0)
             case.macho("busy-probe")
             taken = case.plist("ran-probe", ["NSA"], hours_old=0)
             case.macho("ran-probe")
             running = f"rc-pd-sleep-{os.getpid()}"
-            old = case.plist(running, ["ReelcutA"])
+            old = case.plist(running, ["FrameJobA"])
             link = os.path.join(case.root, running)
             os.symlink("/bin/sleep", link)
             sleeper = subprocess.Popen([link, "60"], stdin=subprocess.DEVNULL,
@@ -844,13 +867,13 @@ def selftest():
                                   f"/bin/sleep of its name: {reasons.get(running)}; nothing "
                                   "recorded; ran-probe (NS only, named in `ran`) is removed "
                                   "while fresh; busy-probe named in `ran` stays busy for its "
-                                  "ReelcutA; CONTROL: busy-probe two hours old is removed")
+                                  "FrameJobA; CONTROL: busy-probe two hours old is removed")
 
         guarded("P8", p8)
 
         def p9():
             case = Case(root, "P9")
-            kept = case.plist("nine-probe", ["ReelcutA"])
+            kept = case.plist("nine-probe", ["FrameJobA"])
             case.macho("nine-probe")
             before = _read(kept)
             raised = []
@@ -866,6 +889,20 @@ def selftest():
                         f"the plist's bytes the same {_read(kept) == before}")
 
         guarded("P9", p9)
+
+        def p10():
+            case = Case(root, "P10")
+            names = ["com.kgalligan.framejob.idle-probe", "com.kgalligan.reelcut.idle-probe",
+                     "framejob.idle-probe", "reelcut.idle-probe"]
+            for name in names:
+                case.plist(name, ["NSA"])
+            recorder = Recorder()
+            result = sweep(*case.folders(), run=recorder)
+            left = [name for name in names if os.path.lexists(_plist_path(case.preferences, name))]
+            ok = sorted(result["removed"]) == names and not left
+            return ok, f"removed {result['removed']}; left {left}"
+
+        guarded("P10", p10)
     finally:
         if sleeper is not None:
             sleeper.kill()
@@ -890,7 +927,7 @@ def print_list(ran=()):
     for name, rule in owned:
         action, detail = plan(name, ran=ran)
         if action == "shared":
-            does = "shared: " + (", ".join(detail) if detail else "no Reelcut* key left")
+            does = "shared: " + (", ".join(detail) if detail else "no product key left")
         elif action == "remove":
             does = "remove"
         else:
@@ -909,7 +946,7 @@ def print_sweep(ran=()):
         print(f"  removed {name}")
     for name, keys in result["shared"]:
         print(f"  shared {name}: " + (", ".join(keys) + " deleted" if keys
-                                      else "no Reelcut* key to delete"))
+                                      else "no product key to delete"))
     for name, reason in result["busy"]:
         print(f"  busy {name}: {reason}")
     for name, reason in result["denied"]:
@@ -919,7 +956,7 @@ def print_sweep(ran=()):
 def main(argv=None):
     global MUTANT
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--selftest", action="store_true", help="P1–P9")
+    parser.add_argument("--selftest", action="store_true", help="P1–P10")
     parser.add_argument("--list", action="store_true",
                         help="the owned names and what the sweep would do; removes nothing")
     parser.add_argument("--sweep", action="store_true",

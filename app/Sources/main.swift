@@ -11,7 +11,7 @@ ProjectDocumentController.install()
 // menu bar (AppDelegate.swift) before the first event is delivered.
 let delegate = AppDelegate()
 NSApplication.shared.delegate = delegate
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 DevAppearance.apply()
 DevAssistantLaunch.installIfAsked()
 #endif

@@ -47,10 +47,10 @@ extension ScreenRecorder {
     }
 
     /// The programmatic filter. A display source leaves out what the
-    /// `RecordingExclusion` names: by default Reelcut's own application (R0
+    /// `RecordingExclusion` names: by default Frame Job's own application (R0
     /// q3: that removes 99.19 % of the excluded application's window pixels
     /// against a 0 % noise floor), so the panel can stay on screen; with
-    /// Include Reelcut windows on, no application and only the windows it
+    /// Include Frame Job windows on, no application and only the windows it
     /// lists (the panel's own). A bare probe has no bundle identifier and
     /// then excludes nothing rather than crashing. A window source is the
     /// window alone. A `.picked` source carries the picker's filter and has
@@ -147,7 +147,7 @@ enum RecordingMeter {
 // MARK: - What a display recording leaves out
 
 /// The one decision both doors and the picker read (spec §11 recording.md,
-/// Include Reelcut windows). Off: Reelcut's application, whole (no bundle
+/// Include Frame Job windows). Off: Frame Job's application, whole (no bundle
 /// identifier → nothing). On: no application, and the panel's own window
 /// when the panel started the recording (none → nothing). Pure, so the
 /// probe pins it.
@@ -158,9 +158,9 @@ struct RecordingExclusion: Equatable {
     let windowIDs: [CGWindowID]
 
     static func make(
-        includeReelcutWindows: Bool, ownBundleID: String?, panelWindowID: CGWindowID?
+        includeFrameJobWindows: Bool, ownBundleID: String?, panelWindowID: CGWindowID?
     ) -> RecordingExclusion {
-        if includeReelcutWindows {
+        if includeFrameJobWindows {
             return RecordingExclusion(bundleIDs: [], windowIDs: panelWindowID.map { [$0] } ?? [])
         }
         return RecordingExclusion(bundleIDs: ownBundleID.map { [$0] } ?? [], windowIDs: [])

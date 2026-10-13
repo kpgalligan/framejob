@@ -8,7 +8,7 @@ THAT COPY, and builds it. The tree's `project.yml`, `Makefile` and
 run's two `git` checks prove afterwards.
 
 q6's picture half drives the app the copy built — one owned instance, on its
-own port, killed by PID. `grep "Reelcut: "` on its log must print nothing
+own port, killed by PID. `grep "Frame Job: "` on its log must print nothing
 before any claim is read off a pixel.
 """
 
@@ -175,8 +175,8 @@ def q7(work, say):
     app = _run(["env", "-u", "RC_ASSEMBLYAI_KEY", "make", "app"], cwd=copy, timeout=1200)
     app_text = app["stderr"] + app["stdout"]
     binary = os.path.join(
-        copy, "build", "Build", "Products", "Release", "Reelcut.app",
-        "Contents", "MacOS", "Reelcut")
+        copy, "build", "Build", "Products", "Release", "Frame Job.app",
+        "Contents", "MacOS", "Frame Job")
     measured["make_app"] = {
         "rc": app["rc"], "blocked": app["blocked"], "seconds": app["s"],
         "errors": len(_errors(app_text)), "error_rows": _errors(app_text)[:12],
@@ -251,7 +251,7 @@ class Instance:
                 [self.binary, "-ApplePersistenceIgnoreState", "YES"],
                 stdin=subprocess.DEVNULL, stdout=log, stderr=log, env=environment,
                 start_new_session=True)
-        # The log line is `Reelcut agent socket listening at <path>`.
+        # The log line is `Frame Job agent socket listening at <path>`.
         if mcp_client.wait_listening(LOG, SOCKET, child=self.child, seconds=60):
             self.port = SOCKET
             return self.port
@@ -262,7 +262,7 @@ class Instance:
             with open(LOG) as handle:
                 # A SUBSTRING, not a prefix: every line carries a
                 # timestamp and the process name first.
-                return [line.strip() for line in handle if "Reelcut: " in line]
+                return [line.strip() for line in handle if "Frame Job: " in line]
         except OSError:
             return ["the log could not be read"]
 
@@ -317,7 +317,7 @@ def q6_picture(work, binary, say):
         preset = None
         digests = {}
         for face in FACES + [CONTROL_FACE]:
-            path = os.path.join(folder, f"{face}.reelcut")
+            path = os.path.join(folder, f"{face}.framejob")
             client.call("new_project", path=path)
             client.call("set_canvas", project=path, width=1080, height=1920)
             client.call("add_track", project=path)

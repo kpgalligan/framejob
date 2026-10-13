@@ -3,8 +3,8 @@
 // probe (`obscure_handles_probe.py` builds and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
-// `tools/proof/harness/build.sh`'s swiftc line, `-D REELCUT_DEV_TOOLS`
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
+// `tools/proof/harness/build.sh`'s swiftc line, `-D FRAMEJOB_DEV_TOOLS`
 // included — with the app's `Compositor.metal` built beside it. It calls ONLY
 // what HEAD0 (ffae505) already had — the grips are found from the regions'
 // own boxes through `CanvasLayerBox.canvasPoint(source:)` and `canvasToView`,
@@ -23,8 +23,8 @@
 //   cover    one rect region (0, 0) 760 × 420 — the cropped rect itself
 // Every row opens its own editor in the app's window (content 1600 × 1000)
 // and closes it. The split is pinned before `AppDelegate()` (B32, #188 item
-// 1): an argument-domain `ReelcutInspectorWidth` 304, `ReelcutTimelineHeight`
-// 300 and `ReelcutInspectorCollapsed` false, so F0's shortest edge does not
+// 1): an argument-domain `FrameJobInspectorWidth` 304, `FrameJobTimelineHeight`
+// 300 and `FrameJobInspectorCollapsed` false, so F0's shortest edge does not
 // follow whatever this user's defaults last saved. Gestures go through
 // `beginGesture` / `continueGesture` / `endGesture` at view points; Esc is a
 // keyCode-53 `NSEvent` through
@@ -44,8 +44,8 @@ let request = (try? JSONSerialization.jsonObject(
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
 UserDefaults.standard.setVolatileDomain(
-    ["ReelcutInspectorWidth": 304.0, "ReelcutTimelineHeight": 300.0,
-     "ReelcutInspectorCollapsed": false],
+    [EditorViewController.inspectorWidthKey: 304.0, EditorViewController.timelineHeightKey: 300.0,
+     EditorViewController.inspectorCollapsedKey: false],
     forName: UserDefaults.argumentDomain)
 let delegate = AppDelegate()
 delegate.applicationWillFinishLaunching(
@@ -90,7 +90,7 @@ func open(_ key: String, playhead: Double, action: UInt32? = nil) -> (Editor?, S
     let document = ProjectDocument()
     do {
         try document.read(
-            from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+            from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
     } catch {
         return (nil, "\(key): \(error)")
     }

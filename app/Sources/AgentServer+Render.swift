@@ -222,7 +222,7 @@ extension AgentServer {
         let requested = try requestedFrameFormat(a)
         guard let path = try stringArg(a, "path") else {
             let format = requested ?? .png
-            let name = "reelcut-frame-\(time)-\(UUID().uuidString.prefix(8))"
+            let name = "framejob-frame-\(time)-\(UUID().uuidString.prefix(8))"
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("\(name).\(format.fileExtension)")
             return (url, format)

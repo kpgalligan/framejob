@@ -152,7 +152,7 @@ def run_exports(mcp):
     os.makedirs(OUT)
     got = {}
     for name, fixture, volume, exports in PLAN:
-        path = os.path.join(OUT, f"{name}-{os.getpid()}.reelcut")
+        path = os.path.join(OUT, f"{name}-{os.getpid()}.framejob")
         mcp.call("new_project", path=path)
         try:
             media = mcp.call("import_media", project=path,

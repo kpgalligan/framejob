@@ -23,7 +23,7 @@ scored as a FAILURE on every row. Every subprocess runs under
 `playback.onTimeChanged` to log every tick it carries, then forwards it.
 
 Fixture, rewritten every run under `work/playhead-echo/`: `card.mov` (an 8 s
-test card) and `echo.reelcut`, 432 × 280 at 30 fps, clip 3 at 0–3 s and
+test card) and `echo.framejob`, 432 × 280 at 30 fps, clip 3 at 0–3 s and
 clip 4 at 4–6 s on one track, both from the card's 0.
 
 Rows (B = predicted to fail before the fix; M = no prediction, both trees'
@@ -41,7 +41,7 @@ document, the timeline and the player agree and the last report is the
 player's tick — the paused guard must not drop the pause's own callback.
 
 Needs `ffmpeg`, `swiftc`, `xcrun metal` and
-`core/target/release/libreelcut_core.a`. No port. Run from anywhere:
+`core/target/release/libframejob_core.a`. No port. Run from anywhere:
 
     python3 tools/proof/playhead_echo_probe.py [--sources PATH]
 """
@@ -99,7 +99,7 @@ def make_fixture():
          "-c:v", "h264", "-pix_fmt", "yuv420p", movie], 120)
     if made["rc"] != 0 or not os.path.exists(movie):
         return None, f"ffmpeg failed: {made['stderr'].strip()[:300]}"
-    package = os.path.join(WORK, "echo.reelcut")
+    package = os.path.join(WORK, "echo.framejob")
     shutil.rmtree(package, ignore_errors=True)
     os.makedirs(package)
 
@@ -166,7 +166,7 @@ def build_probe(sources):
         return None, why
     swift = sorted(os.path.join(sources, name) for name in os.listdir(sources)
                    if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:

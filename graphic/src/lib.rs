@@ -1,4 +1,4 @@
-//! `graphic` — Reelcut's motion-graphics engine (road map 10 §5a). Its
+//! `graphic` — Frame Job's motion-graphics engine (road map 10 §5a). Its
 //! drawing half: the font and asset Library, `rasterize` (usvg parse →
 //! resvg render → premultiplied BGRA), `measure_text`, and the Diagnostic.
 //! Its JavaScript half: a `Module` compiled once, and `svg`, which runs its

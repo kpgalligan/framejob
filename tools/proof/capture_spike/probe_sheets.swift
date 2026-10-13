@@ -46,7 +46,7 @@ enum ProbeSheets {
         let e: ProbeEditor
         do {
             e = try ProbeEditor(
-                fixtures.appendingPathComponent("well.reelcut"), select: [2], playhead: 1)
+                fixtures.appendingPathComponent("well.framejob"), select: [2], playhead: 1)
         } catch {
             for id in ids { rows[id] = probeError("open failed: \(error)") }
             return (ProbeSupport.windowFacts(nil, activation: nil), rows)

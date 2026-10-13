@@ -170,14 +170,14 @@ extension RecorderPanelController {
 
     /// The choice as the controls stand, then the filter: a picked window's
     /// is the picker's own; a display's is built from the shareable content
-    /// and leaves out what `recordingExclusion(includeReelcutWindows:)`
-    /// names (`ScreenRecorder.filter(for:in:excluding:)`) — Reelcut's own
+    /// and leaves out what `recordingExclusion(includeFrameJobWindows:)`
+    /// names (`ScreenRecorder.filter(for:in:excluding:)`) — Frame Job's own
     /// application, which keeps the document windows out of a display
-    /// recording's picture, or with Include Reelcut windows on the panel's
+    /// recording's picture, or with Include Frame Job windows on the panel's
     /// window alone. One attempt, numbered and bounded (the type doc).
     private func startRecording() {
         let choice = currentChoice()
-        let exclusion = recordingExclusion(includeReelcutWindows: choice.includeReelcutWindows)
+        let exclusion = recordingExclusion(includeFrameJobWindows: choice.includeFrameJobWindows)
         startGeneration += 1
         let generation = startGeneration
         launched = false
@@ -268,7 +268,7 @@ extension RecorderPanelController {
     /// landing has something to say — whether or not it was on screen
     /// (`show()` beeps meanwhile; `showWhenLanded` remembers, and
     /// `revealIfNoted` reads it). R1 hid it for a picked window only,
-    /// because a display's filter excludes Reelcut (R0 q3); the user asked
+    /// because a display's filter excludes Frame Job (R0 q3); the user asked
     /// for the dialog to go away whatever is recorded, and the menu bar's
     /// item is the recording's controls now. A voice-over is the exception
     /// (`hidesForRecording`): the panel stays as it was, so it is never

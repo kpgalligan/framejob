@@ -15,8 +15,8 @@ this script alone, **in a scratch home**
 `hold_cloud_lock`: `-RCAssemblyAIEndpoint`, a scratch `-RCSecretFolder`, the
 dummy key `proof-key` — nothing here reaches AssemblyAI and nothing is paid
 for), and with the sheet's remembered choices set in the ARGUMENT domain,
-which is never persisted: `-ReelcutCaptionEngine apple -ReelcutCaptionStyle
-pill -ReelcutCaptionSlide YES -ReelcutCaptionFill YES -ReelcutCaptionDim YES`.
+which is never persisted: `-FrameJobCaptionEngine apple -FrameJobCaptionStyle
+pill -FrameJobCaptionSlide YES -FrameJobCaptionFill YES -FrameJobCaptionDim YES`.
 No remembered control is clicked and no persisting menu item is performed:
 the one menu item is File ▸ Generate Captions…, whose sheet is cancelled.
 
@@ -64,7 +64,7 @@ Rows:
   frame less a label's 2 pt inset each side) and at least its intrinsic
   height, and no `problems` entry names any of the four.
 - **Z1** (CONTROL): the project closes, and the launch's log holds no
-  `Reelcut: ` line.
+  `Frame Job: ` line.
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`), replaces
 the mutant's one anchor in the copy's `app/Sources` (asserted to occur
@@ -105,7 +105,7 @@ WORK = ROOT / "tools/proof/work/word-looks-sheet"
 HOME = WORK / "home"
 FRAMES = WORK / "frames"
 SECRETS = WORK / "secrets"
-PROJECT = WORK / "looks.reelcut"
+PROJECT = WORK / "looks.framejob"
 APP = proof_app.bundle()
 SPEECH = ROOT / "tools/proof/media/speech.aiff"
 CALL_BOUND = 300
@@ -119,9 +119,9 @@ WORDS = [
     {"text": "welcome", "start": 3000, "end": 3600, "confidence": 0.93, "speaker": None},
     {"text": "back", "start": 3700, "end": 4100, "confidence": 0.95, "speaker": None},
 ]
-REMEMBERED = ["-ReelcutCaptionEngine", "apple", "-ReelcutCaptionStyle", "pill",
-              "-ReelcutCaptionSlide", "YES", "-ReelcutCaptionFill", "YES",
-              "-ReelcutCaptionDim", "YES"]
+REMEMBERED = ["-FrameJobCaptionEngine", "apple", "-FrameJobCaptionStyle", "pill",
+              "-FrameJobCaptionSlide", "YES", "-FrameJobCaptionFill", "YES",
+              "-FrameJobCaptionDim", "YES"]
 # The literals C1 and T4 hold the app's derived lists to.
 STYLE_LISTS = {"slide": "pill", "fill": "highlight, karaoke or build",
                "dim": "highlight, pill, karaoke, build or one_word"}
@@ -521,7 +521,7 @@ def run_rows(app, fake):
     env.pop("ANTHROPIC_API_KEY", None)
     log = WORK / "main.log"
     launched = mcp.launch(
-        str(app / "Contents/MacOS/Reelcut"),
+        str(proof_app.executable(app)),
         arguments=["-RCSecretFolder", str(SECRETS), "-RCAssemblyAIEndpoint", fake.base,
                    "-NSRecentDocumentsLimit", "0", *REMEMBERED],
         env=env, log_path=str(log), timeout=CALL_BOUND)
@@ -551,14 +551,14 @@ def run_rows(app, fake):
             closed = project.close()
         try:
             complaints = [line.strip() for line in open(log, errors="replace")
-                          if "Reelcut: " in line]
+                          if "Frame Job: " in line]
         except OSError as error:
             complaints = [f"the log could not be read: {error}"]
     finally:
         launched.stop()
         mcp.remove_scratch(launched.socket_path)
     if rows.get("H0"):
-        check("Z1 CONTROL: the project closes and the launch's log holds no `Reelcut: ` line",
+        check("Z1 CONTROL: the project closes and the launch's log holds no `Frame Job: ` line",
               closed is not None and closed["ok"] and not complaints,
               f"close {closed.get('error', 'ok') if closed else 'not reached'}; complaints "
               f"{complaints}")
@@ -621,8 +621,8 @@ def main():
     else:
         print("B86 phase 2 — the three looks through transcribe and in the sheet, over MCP",
               flush=True)
-    if not (app / "Contents/MacOS/Reelcut").is_file():
-        print(f"instrument failure: no app binary at {app / 'Contents/MacOS/Reelcut'}")
+    if not proof_app.executable(app).is_file():
+        print(f"instrument failure: no app binary at {proof_app.executable(app)}")
         return 2
     if not SPEECH.is_file():
         print(f"instrument failure: {SPEECH} is missing (tools/proof/README.md has its recipe)")

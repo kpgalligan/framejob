@@ -12,7 +12,7 @@
 
 mod common;
 
-use reelcut_core::format::RC_FORMAT_VERSION;
+use framejob_core::format::RC_FORMAT_VERSION;
 use serde_json::{json, Value};
 
 use common::{at, Handle};
@@ -57,7 +57,7 @@ const V11: &str = r#"{
   "media": [
     {
       "id": 1,
-      "path": "/Users/x/Library/Application Support/Reelcut/Rewrapped/talk-0123456789abcdef.mov",
+      "path": "/Users/x/Library/Application Support/Frame Job/Rewrapped/talk-0123456789abcdef.mov",
       "bookmark": "Y29weQ==",
       "kind": "video",
       "duration": 6000000,

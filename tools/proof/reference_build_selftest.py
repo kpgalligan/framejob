@@ -48,7 +48,8 @@ if name == 'cargo':
     target = pathlib.Path(args[args.index('--target-dir') + 1])
     assert '/tree/core/' in str(manifest) and manifest.is_file()
     assert args[args.index('--target') + 1] == 'aarch64-apple-darwin'
-    lib = target / 'aarch64-apple-darwin/release/libreelcut_core.a'
+    old = (manifest.parent.parent / 'app/Bridging/Reelcut-Bridging-Header.h').exists()
+    lib = target / 'aarch64-apple-darwin/release' / ('libreelcut_core.a' if old else 'libframejob_core.a')
     lib.parent.mkdir(parents=True, exist_ok=True)
     lib.write_bytes(b'historical library ' + manifest.read_bytes())
 elif name == 'swiftc':
@@ -56,7 +57,8 @@ elif name == 'swiftc':
     libdir = pathlib.Path(args[args.index('-L') + 1])
     assert '/tree/app/Bridging/' in str(header) and header.is_file()
     assert '/target/aarch64-apple-darwin/release' in str(libdir)
-    assert (libdir / 'libreelcut_core.a').is_file()
+    linked = [arg[2:] for arg in args if arg.startswith('-l')]
+    assert len(linked) == 1 and (libdir / ('lib' + linked[0] + '.a')).is_file()
     assert any('/tree/app/Sources/' in arg for arg in args)
     assert '-module-cache-path' in args and any('fmodules-cache-path=' in arg for arg in args)
     assert 'HARNESS_REFERENCE_BUILD' in args
@@ -73,14 +75,25 @@ elif name == 'swiftc':
 
 
 def fixture(folder):
+    """A repo of three commits: `old` under the names from before rename R1,
+    then `first` and `second` under the new ones."""
     root = folder / "repo"
-    write(root / "app/Sources/A.swift", "let history = 1\n")
-    write(root / "app/Bridging/Reelcut-Bridging-Header.h", "// old header\n")
+    write(root / "app/Sources/A.swift", "let history = 0\n")
+    write(root / "app/Bridging/Reelcut-Bridging-Header.h", "// old-named header\n")
     write(root / "core/src/lib.rs", "// old core\n")
-    write(root / "core/include/reelcut_core.h", "// old C API\n")
+    write(root / "core/include/reelcut_core.h", "// old-named C API\n")
     write(root / "core/Cargo.toml", "[package]\nname = 'fixture'\nversion = '0.1.0'\n")
     write(root / "core/Cargo.lock", "# lock\n")
     subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(root), "-c", "user.name=Proof", "-c",
+                    "user.email=proof@example.test", "commit", "-qm", "old"], check=True)
+    old = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+    subprocess.run(["git", "-C", str(root), "rm", "-q", "app/Bridging/Reelcut-Bridging-Header.h",
+                    "core/include/reelcut_core.h"], check=True)
+    write(root / "app/Sources/A.swift", "let history = 1\n")
+    write(root / "app/Bridging/FrameJob-Bridging-Header.h", "// old header\n")
+    write(root / "core/include/framejob_core.h", "// old C API\n")
     subprocess.run(["git", "-C", str(root), "add", "."], check=True)
     subprocess.run(["git", "-C", str(root), "-c", "user.name=Proof", "-c",
                     "user.email=proof@example.test", "commit", "-qm", "one"], check=True)
@@ -90,14 +103,14 @@ def fixture(folder):
     subprocess.run(["git", "-C", str(root), "-c", "user.name=Proof", "-c",
                     "user.email=proof@example.test", "commit", "-qm", "two"], check=True)
     second = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
-    write(root / "core/target/release/libreelcut_core.a", "current library")
+    write(root / "core/target/release/libframejob_core.a", "current library")
     harness = folder / "main.swift"
     caller = folder / "caller.py"
     fonts = folder / "Fonts"
     write(harness, "let instrument = 1\n")
     write(caller, "# caller 1\n")
     write(fonts / "face.otf", "font 1\n")
-    return root, first, second, harness, caller, fonts
+    return root, old, first, second, harness, caller, fonts
 
 
 def mutation(path):
@@ -110,12 +123,12 @@ def mutation(path):
 
 
 def unit():
-    with tempfile.TemporaryDirectory(prefix="reelcut-ref-unit-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="framejob-ref-unit-") as temporary:
         folder = Path(temporary)
         tools = folder / "tools"
         tools.mkdir()
         fake_tools(tools)
-        root, first, second, harness, caller, fonts = fixture(folder)
+        root, old, first, second, harness, caller, fonts = fixture(folder)
         builder_copy = folder / "reference_build.py"
         shutil.copyfile(reference_build.__file__, builder_copy)
         original_file = reference_build.__file__
@@ -124,7 +137,7 @@ def unit():
         os.environ["FAKE_EVENTS"] = str(folder / "events")
         os.environ["RC_ASSEMBLYAI_KEY"] = "must-not-reach-compiler"
         before = folder / "before"
-        current_lib = root / "core/target/release/libreelcut_core.a"
+        current_lib = root / "core/target/release/libframejob_core.a"
         reference_build.__file__ = str(builder_copy)
         try:
             def build(commit=first, defines=()):
@@ -153,7 +166,7 @@ def unit():
                    "warm hit preserves outputs")
 
             for label, path in (("instrument", harness), ("current source", root / "app/Sources/A.swift"),
-                                ("current header", root / "core/include/reelcut_core.h"),
+                                ("current header", root / "core/include/framejob_core.h"),
                                 ("current library", current_lib), ("font", fonts / "face.otf"),
                                 ("caller", caller), ("builder", builder_copy)):
                 old_count = len(events())
@@ -251,6 +264,29 @@ def unit():
             insist(changed and "built" in message and len(events()) == old_count + 2
                    and "-D PROBE_TWO" in swift_line() and "PROBE_ONE" not in swift_line(),
                    "a changed define invalidates the cache")
+
+            # Rename R1 (spec §11 NM-6): each tree is built under its own names.
+            def names_used(line):
+                words = line.split()
+                return (words[words.index("-module-name") + 1],
+                        Path(words[words.index("-import-objc-header") + 1]).name,
+                        [w for w in words if w.startswith("-l")],
+                        [words[i + 1] for i, w in enumerate(words) if w == "-D"])
+
+            (built_old, _, _), _ = build(old, ("FRAMEJOB_DEV_TOOLS",))
+            seen = names_used(swift_line())
+            insist(built_old and reference_build.tree_names(before / "tree")
+                   == reference_build.OLD_NAMES
+                   and seen == ("Reelcut", "Reelcut-Bridging-Header.h", ["-lreelcut_core"],
+                                ["HARNESS_REFERENCE_BUILD", "REELCUT_DEV_TOOLS"]),
+                   f"an old-named tree builds under its own names: {seen}")
+            (built_new, _, _), _ = build(second, ("FRAMEJOB_DEV_TOOLS",))
+            seen = names_used(swift_line())
+            insist(built_new and reference_build.tree_names(before / "tree")
+                   == reference_build.NEW_NAMES
+                   and seen == ("FrameJob", "FrameJob-Bridging-Header.h", ["-lframejob_core"],
+                                ["HARNESS_REFERENCE_BUILD", "FRAMEJOB_DEV_TOOLS"]),
+                   f"a new-named tree builds under the new names: {seen}")
         finally:
             reference_build.__file__ = original_file
             os.environ.clear()
@@ -262,7 +298,7 @@ def consumer_unit():
     import recording_probe as recording
 
     drift = "app/Sources/ReelCore.swift: rc_project_apply: injected compiler failure"
-    with tempfile.TemporaryDirectory(prefix="reelcut-ref-consumer-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="framejob-ref-consumer-") as temporary:
         with patch.object(phase5, "CHROME", temporary), \
              patch.object(phase5, "build_harness", return_value=(None, drift)), \
              patch.object(phase5, "gain_checks", side_effect=lambda: phase5.check("independent gain", True)):
@@ -282,7 +318,7 @@ def consumer_unit():
              patch.object(phase5, "BEFORE", str(Path(temporary) / "before")), \
              patch.object(phase5, "build_harness", return_value=("current", None)), \
              patch.object(phase5, "build_reference", return_value=(None, "revision", drift)), \
-             patch.object(phase5, "write_package", return_value="fixture.reelcut"), \
+             patch.object(phase5, "write_package", return_value="fixture.framejob"), \
              patch.object(phase5, "reading_checks", side_effect=lambda _: phase5.check("independent meter", True)), \
              patch.object(phase5, "gain_checks", side_effect=lambda: phase5.check("independent gain", True)):
             with contextlib.redirect_stdout(io.StringIO()) as output:
@@ -321,7 +357,7 @@ def integration():
     import phase5_chrome as phase5
     import recording_probe as recording
 
-    with tempfile.TemporaryDirectory(prefix="reelcut-ref-integration-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="framejob-ref-integration-") as temporary:
         folder = Path(temporary)
         mutated = folder / "main.swift"
         mutated.write_text(Path(phase5.HARNESS_MAIN).read_text()

@@ -11,7 +11,7 @@
 
 mod common;
 
-use reelcut_core::format::RC_FORMAT_VERSION;
+use framejob_core::format::RC_FORMAT_VERSION;
 use serde_json::{json, Value};
 
 use common::{at, text, Handle};

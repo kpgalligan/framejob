@@ -2,7 +2,7 @@
 // builds it through `swift_build.build` and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, against `libreelcut_core.a`, so every row drives the app's own
+// `main.swift`, against `libframejob_core.a`, so every row drives the app's own
 // types: `WaveformAnalyzer` and its four kernels, `ParadeTrace`,
 // `VectorscopeTrace`, `HistogramTrace`, `WaveformTaps`, `ScopesPanelView`,
 // `EditorViewController.toggleScopes`. The kernels are the tree's own
@@ -647,7 +647,7 @@ func s9() {
         let document = ProjectDocument()
         do {
             try document.read(
-                from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+                from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
             document.fileURL = URL(fileURLWithPath: path)
         } catch {
             return nil

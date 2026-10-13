@@ -34,8 +34,8 @@ Section 1 (naming) runs three helpers over that kind of table:
     `Board v1.2.srt` is the row a bare `deletingPathExtension` fails.
   * `ProjectDocument.displayStem(of:)` — the title-bar stem the three save
     panels (Export…, Save Frame…, Export Captions…) put their extension
-    after. Its known set is `{reelcut}`, the package's own extension, and
-    NOT the caption set: a saved `Board v1.2.reelcut` must come back as
+    after. Its known set is `{framejob}`, the package's own extension, and
+    NOT the caption set: a saved `Board v1.2.framejob` must come back as
     `Board v1.2`, an untitled document imported from `Board v1.2.mov` is
     titled `Board v1.2` and must keep its `.2`. The instance accessor is
     read off a live `ProjectDocument` as well, because a static function
@@ -76,7 +76,7 @@ The gate, as the repository requires it, ran three mutants on COPIES of
 `talk.txt`, `shot.final` and `chart.png` rows fail); `displayStem(of:)`
 reverted to the bare strip (the `Board v1.2`, `talk.srt` and `talk.mov` stem
 rows fail — and 1d's live document did NOT, because this Mac shows
-extensions and a bare strip of `Board v1.2.reelcut` is right by accident,
+extensions and a bare strip of `Board v1.2.framejob` is right by accident,
 which is why the static table is the killer and the live read is a wiring
 check); and `exportCaptionsCommand` alone put back on the bare strip with
 both helpers intact (only 1e fails, which is what 1e is for). The scores
@@ -246,7 +246,7 @@ against the 141 they were measured at.
 Run it from anywhere; it needs no port and no window server grant. The
 environment override is `RC_APP_SOURCES`, the name `phase9_chrome.py`
 uses for the same thing — one spelling for the two probes that take one,
-after this file had spelled it `REELCUT_SOURCES`:
+after this file had spelled it `FRAMEJOB_SOURCES`:
 
     python3 tools/proof/remaining_probe.py
     python3 tools/proof/remaining_probe.py --sources <dir>   # a mutant copy
@@ -386,15 +386,15 @@ func naming(_ request: [String: Any]) -> [String: Any] {
     // whatever title AppKit gives one outside a document controller — that
     // is REPORTED, and the assertion is only that the accessor is the
     // function over it. A document told its file is
-    // `<dir>/Board v1.2.reelcut` reads a `displayName` that depends on
+    // `<dir>/Board v1.2.framejob` reads a `displayName` that depends on
     // whether Finder shows extensions, and must answer `Board v1.2` either
-    // way — which is the whole point of the `{reelcut}` set.
+    // way — which is the whole point of the `{framejob}` set.
     let fresh = ProjectDocument()
     out["freshDisplayName"] = fresh.displayName.map { $0 as Any } ?? NSNull()
     out["freshStem"] = fresh.displayStem
     if let dir = request["dir"] as? String {
         let named = ProjectDocument()
-        named.fileURL = URL(fileURLWithPath: dir).appendingPathComponent("Board v1.2.reelcut")
+        named.fileURL = URL(fileURLWithPath: dir).appendingPathComponent("Board v1.2.framejob")
         out["namedDisplayName"] = named.displayName.map { $0 as Any } ?? NSNull()
         out["namedStem"] = named.displayStem
     }
@@ -990,7 +990,7 @@ def build_probe(sources):
         os.path.join(sources, name)
         for name in os.listdir(sources)
         if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
@@ -1111,21 +1111,21 @@ def destination_rows(known):
 
 
 STEM_ROWS = [
-    {"name": "Board v1.2.reelcut", "expect": "Board v1.2",
+    {"name": "Board v1.2.framejob", "expect": "Board v1.2",
      "why": "a saved package with its extension shown"},
     {"name": "Board v1.2", "expect": "Board v1.2",
      "why": "an untitled document from `Board v1.2.mov`, or a package with its "
             "extension hidden — the row a bare strip fails (`Board v1`)"},
     {"name": "Untitled Project", "expect": "Untitled Project"},
-    {"name": "x.REELCUT", "expect": "x", "why": "compared lower-cased"},
-    {"name": ".reelcut", "expect": ".reelcut",
+    {"name": "x.FRAMEJOB", "expect": "x", "why": "compared lower-cased"},
+    {"name": ".framejob", "expect": ".framejob",
      "why": "Foundation reads no extension off a dot-leading name"},
     {"name": "talk.srt", "expect": "talk.srt",
      "why": "a caption spelling is NOT this helper's to strip — the set is "
-            "`{reelcut}`, so a document literally so named is offered `talk.srt.srt`"},
+            "`{framejob}`, so a document literally so named is offered `talk.srt.srt`"},
     {"name": "talk.mov", "expect": "talk.mov",
      "why": "nor is a movie's — `defaultDraftName()` already stripped the real one"},
-    {"name": "a.reelcut.reelcut", "expect": "a.reelcut", "why": "one suffix, once"},
+    {"name": "a.framejob.framejob", "expect": "a.framejob", "why": "one suffix, once"},
     {"name": "", "expect": ""},
 ]
 
@@ -1170,8 +1170,8 @@ def section_naming(binary, sources):
                 ("name", "format", "fallback"), "renamed")
 
     print("\n  1c. `ProjectDocument.displayStem(of:)` — the title-bar stem")
-    check("the package extension the helper strips is `reelcut`",
-          answer.get("projectExtension") == "reelcut", f'{answer.get("projectExtension")}')
+    check("the package extension the helper strips is `framejob`",
+          answer.get("projectExtension") == "framejob", f'{answer.get("projectExtension")}')
     check("the untitled fallback is `defaultDraftName()`'s own spelling",
           answer.get("untitled") == "Untitled Project", f'{answer.get("untitled")}')
     check_table("stem", STEM_ROWS, answer.get("stems", []), ("name",), "stem")
@@ -1184,13 +1184,13 @@ def section_naming(binary, sources):
           "untitled fallback when AppKit has not named it yet",
           answer.get("freshStem") == expected_stem(fresh_expected), f'{answer.get("freshStem")}')
     named_name = answer.get("namedDisplayName")
-    print(f"       (a document at `Board v1.2.reelcut` is titled {named_name!r} on this Mac)")
-    check("a document whose file is `Board v1.2.reelcut` answers `Board v1.2` — whether "
+    print(f"       (a document at `Board v1.2.framejob` is titled {named_name!r} on this Mac)")
+    check("a document whose file is `Board v1.2.framejob` answers `Board v1.2` — whether "
           "Finder shows it the extension or hides it, which is the whole reason the set "
-          "is `{reelcut}`",
+          "is `{framejob}`",
           answer.get("namedStem") == "Board v1.2", f'{answer.get("namedStem")}')
     check("and its title really was one of the two spellings the helper is for",
-          named_name in ("Board v1.2.reelcut", "Board v1.2"), f"{named_name!r}")
+          named_name in ("Board v1.2.framejob", "Board v1.2"), f"{named_name!r}")
 
     print("\n  1f. `AgentServer.captionDestinationURL` — replaces exactly `knownExtensions`")
     check_table("destination", destinations, answer.get("destinations", []),
@@ -1285,11 +1285,11 @@ def section_wiring(sources):
 
 def expected_stem(name):
     """The rule restated in Python for the one check whose input the probe
-    chooses (a fresh document's title): strip a trailing `.reelcut`, once,
+    chooses (a fresh document's title): strip a trailing `.framejob`, once,
     case-insensitively, and only that."""
     lower = name.lower()
-    if lower.endswith(".reelcut") and len(name) > len(".reelcut"):
-        return name[: -len(".reelcut")]
+    if lower.endswith(".framejob") and len(name) > len(".framejob"):
+        return name[: -len(".framejob")]
     return name
 
 

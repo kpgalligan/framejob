@@ -3,7 +3,7 @@
 // speaks JSON lines over stdio (protocol.ts) and owns no tools itself: every
 // tool call goes back to the app, which runs it through the same dispatcher
 // its MCP server uses. Two apps carry agent/src/ byte for byte, Rasterize
-// and Reelcut: a change is one diff applied to both, and whatever differs
+// and Frame Job: a change is one diff applied to both, and whatever differs
 // between them arrives in `configure`.
 
 import Anthropic from "@anthropic-ai/sdk";

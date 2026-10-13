@@ -86,7 +86,7 @@ tracks, lift masters 0.2 and −0.2, saved for the probe).
   one step "Lift"; P7 10,000 drags past the rim at even angles each land with
   x² + y² ≤ 1 + 1e-9.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
-  `Reelcut: ` line.
+  `Frame Job: ` line.
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`; a `core/`
 mutant makes the copy's `core/` its own through `hevc_alpha_proof.own_core`
@@ -131,7 +131,7 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "core/include/reelcut_core.h"
+HEADER = ROOT / "core/include/framejob_core.h"
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
@@ -387,7 +387,7 @@ class Doc:
 
 def opened(client, name, width, height, background=None):
     """A new project at `name`, its canvas sized; (Doc, fixture ok)."""
-    path = WORK / f"{name}.reelcut"
+    path = WORK / f"{name}.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path, width, height)
     arguments = {"width": width, "height": height, "fps": [30, 1]}
@@ -769,7 +769,7 @@ def run_s(client, card, state):
     media = doc.media(card)
     clip = doc.place(track, media) if media is not None else None
     state["s_fixture"] = sized and clip is not None
-    plain_path = WORK / "S-plain.reelcut"
+    plain_path = WORK / "S-plain.framejob"
     saved = doc.call("save_project", path=str(plain_path))
     doc.path = plain_path
     try:
@@ -777,7 +777,7 @@ def run_s(client, card, state):
     except (OSError, ValueError):
         plain_version, plain_text = None, "unreadable"
     doc.wheels([clip], lift={"x": 0.2})
-    wheeled_path = WORK / "S-wheeled.reelcut"
+    wheeled_path = WORK / "S-wheeled.framejob"
     resaved = doc.call("save_project", path=str(wheeled_path))
     doc.path = wheeled_path
     try:
@@ -809,7 +809,7 @@ def run_p(client, card, state):
     ok = sized and a is not None and b is not None
     ok = ok and doc.wheels([a], lift={"master": 0.2})["ok"] \
         and doc.wheels([b], lift={"master": -0.2})["ok"]
-    path = WORK / "P-saved.reelcut"
+    path = WORK / "P-saved.framejob"
     ok = ok and doc.call("save_project", path=str(path))["ok"]
     doc.path = path
     closed = close(client, doc.path)
@@ -825,7 +825,7 @@ def run_probe(sources, package, clips):
     try:
         built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
                                   output=folder / "wheels_probe",
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=1200)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=1200)
     except swift_build.SwiftBuildFailed as error:
         for name in sorted(P_ROWS):
             check(f"{name} the probe builds over app/Sources", False,
@@ -862,7 +862,7 @@ def tail(log, count=4):
 
 def complaints(log):
     try:
-        return [line.strip() for line in open(log, errors="replace") if "Reelcut: " in line]
+        return [line.strip() for line in open(log, errors="replace") if "Frame Job: " in line]
     except OSError:
         return [f"{log} could not be read"]
 
@@ -943,7 +943,7 @@ def main():
     scored = [name for name in ROWS if name in selected and name not in RECORDS]
     binary = Path(args.app) if args.app else proof_app.binary()
     if binary.suffix == ".app":
-        binary = binary / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(binary)
     sources = ROOT / "app/Sources"
     config = proof_app.config()
     if args.mutant:
@@ -953,7 +953,7 @@ def main():
         if app is None:
             print(f"mutant {args.mutant}: the control could not be performed — {copy}")
             return 2
-        binary = app / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(app)
         sources = copy / "app/Sources"
         if "CT" in named:
             passed_ct, last = core_test(copy)
@@ -1022,7 +1022,7 @@ def main():
                   f"{'equal' if good else neutral.misses + missing}", flush=True)
     found = complaints(log)
     fixtures_ok = all(value for key, value in state.items() if key.endswith("fixture"))
-    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Reelcut: ` "
+    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Frame Job: ` "
           "line", closed and fixtures_ok and not found,
           f"closed {closed}; fixtures {state}; complaints {found}")
     print(f"  {log.name} tail:\n    " + "\n    ".join(tail(log)), flush=True)

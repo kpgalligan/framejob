@@ -1,7 +1,7 @@
-# Reelcut graphics — the API
+# Frame Job graphics — the API
 
 A **graphic** is a motion graphic drawn by code: one JavaScript ES module
-whose `render` returns an SVG string for each frame. Reelcut runs it in a
+whose `render` returns an SVG string for each frame. Frame Job runs it in a
 sandboxed QuickJS engine and rasterizes the SVG with resvg. The same frame
 with the same props always draws the same pixels. This page is the whole
 API. Every `js` block on it is run by a test, so the examples work as
@@ -297,7 +297,7 @@ const logo = `<image href="${asset("logo.png")}" x="40" y="40" width="200" heigh
 
 ## Fonts
 
-A graphic draws with the fonts bundled with Reelcut, plus any `.ttf` /
+A graphic draws with the fonts bundled with Frame Job, plus any `.ttf` /
 `.otf` in the project's `graphics/fonts/`. Never the system's.
 
 | family | weights |

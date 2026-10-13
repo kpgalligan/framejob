@@ -2,8 +2,8 @@
 // field (spec §11 SH-3); the probe (`name_field_proof.py` builds and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
-// `tools/proof/harness/build.sh`'s swiftc line, `-D REELCUT_DEV_TOOLS`
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
+// `tools/proof/harness/build.sh`'s swiftc line, `-D FRAMEJOB_DEV_TOOLS`
 // included (N8 and N9 ask `UISnapshotLayout`). Everything it calls exists in the
 // baseline tree too, so the proof's `--baseline` builds the same source.
 //

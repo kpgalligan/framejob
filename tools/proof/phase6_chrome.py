@@ -274,7 +274,7 @@ GRADIENT_FIXED_ROWS = 3          # Gradient, Kind, Angle
 GRADIENT_TRAILING_ROWS = 1       # Add Stop
 
 # ---------------------------------------------------------------------------
-# Packages, by hand (spec §5.2). A `.reelcut` is a directory holding a
+# Packages, by hand (spec §5.2). A `.framejob` is a directory holding a
 # `project.json`, so nothing here loads asynchronously and every render is
 # deterministic — and the fixtures are SHAPE clips with no media at all,
 # which is `phase6_proof.py`'s choice too and for the same reason: a shape
@@ -448,7 +448,7 @@ OPEN_ONLY = {"grad-angle"}
 
 
 def write_package(name, spec):
-    path = os.path.join(WORK, "p6-" + name + ".reelcut")
+    path = os.path.join(WORK, "p6-" + name + ".framejob")
     os.makedirs(path, exist_ok=True)
     with open(os.path.join(path, "project.json"), "w") as f:
         json.dump(project_json(**spec), f, indent=2)
@@ -550,7 +550,7 @@ for probe in request["validate"] as? [[String: Any]] ?? [] {
     let document = ProjectDocument()
     try! document.read(
         from: URL(fileURLWithPath: probe["package"] as! String),
-        ofType: "com.kgalligan.reelcut-project")
+        ofType: ProjectDocument.projectTypeIdentifier)
     let clips = document.project.snapshot.clips.sorted { $0.start < $1.start }
     document.selection = Set((probe["select"] as? [Int] ?? []).compactMap {
         clips.indices.contains($0) ? clips[$0].id : nil })
@@ -586,7 +586,7 @@ def build_probe():
         os.path.join(ROOT, "app", "Sources", name)
         for name in os.listdir(os.path.join(ROOT, "app", "Sources"))
         if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:

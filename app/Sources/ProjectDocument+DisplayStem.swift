@@ -10,15 +10,15 @@ import AppKit
 /// `Board v1.srt`. Measured: `("Board v1.2" as NSString).deletingPathExtension`
 /// is "Board v1".
 ///
-/// **The known set here is `{reelcut}` and nothing else** — not
+/// **The known set here is `{framejob}` and nothing else** — not
 /// `CaptionExporter.knownExtensions`' `{srt, vtt}` and not `FrameWriter`'s
 /// image spellings, however alike the lines look. Those two strip a suffix
 /// their own popup put on a name; this strips the DOCUMENT's own extension
 /// off a title-bar name, and the only extension a title bar can carry is the
 /// package's, shown or hidden as Finder's preference and the file's own flag
-/// decide: a saved `Board v1.2.reelcut` reads as "Board v1.2.reelcut" or as
+/// decide: a saved `Board v1.2.framejob` reads as "Board v1.2.framejob" or as
 /// "Board v1.2" and must come back as "Board v1.2" from both. A caption set
-/// here would turn the first into `Board v1.2.reelcut.srt`, and a document
+/// here would turn the first into `Board v1.2.framejob.srt`, and a document
 /// somebody has literally named `talk.srt` keeps its suffix and is offered
 /// `talk.srt.srt` — the honest answer for a pathological name, and the file
 /// `AgentServer.captionDestinationURL` writes for that path (`srt` is replaceable
@@ -42,11 +42,11 @@ extension ProjectDocument {
     /// both and pins them equal.
     static let untitledDisplayName = "Untitled Project"
 
-    /// `name` with a trailing `.reelcut` removed, compared lower-cased —
+    /// `name` with a trailing `.framejob` removed, compared lower-cased —
     /// `destinationURL` compares its suffix lower-cased, and Finder lets a
-    /// package be renamed `X.REELCUT` — and nothing else removed. Foundation
-    /// reads no extension off a dot-leading name (`.reelcut` comes back as
-    /// `.reelcut`, measured), so the empty-stem fallback below is reached by
+    /// package be renamed `X.FRAMEJOB` — and nothing else removed. Foundation
+    /// reads no extension off a dot-leading name (`.framejob` comes back as
+    /// `.framejob`, measured), so the empty-stem fallback below is reached by
     /// no input this session could construct; it stays because a stem of
     /// nothing is the one answer a panel cannot use.
     static func displayStem(of name: String) -> String {

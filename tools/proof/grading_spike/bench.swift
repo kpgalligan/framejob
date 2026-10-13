@@ -255,22 +255,22 @@ func pipelineState(_ vertex: MTLFunction, _ fragment: MTLFunction, format: MTLPi
     }
 }
 
-/// A layer pipeline of `lib`'s `reelcut_layer_fragment` with these constants.
+/// A layer pipeline of `lib`'s `framejob_layer_fragment` with these constants.
 func layerState(_ lib: String, _ constants: [Int: Bool],
                 format: MTLPixelFormat = workingFormat) -> MTLRenderPipelineState {
     var all = constants
     all[0] = false  // kGatherFilters: no layer here gathers
-    return pipelineState(function(lib, "reelcut_layer_vertex", all),
-                         function(lib, "reelcut_layer_fragment", all), format: format)
+    return pipelineState(function(lib, "framejob_layer_vertex", all),
+                         function(lib, "framejob_layer_fragment", all), format: format)
 }
 
-/// The adjustment pass: `reelcut_adjust_fragment` over the full-canvas quad,
+/// The adjustment pass: `framejob_adjust_fragment` over the full-canvas quad,
 /// blending OFF (it reads `[[color(0)]]` and returns the finished pixel).
 func adjustState(_ lib: String, format: MTLPixelFormat = workingFormat) -> MTLRenderPipelineState {
     var all: [Int: Bool] = [0: false]
     if lib.hasPrefix("VC") { all[2] = true; all[3] = true }
-    return pipelineState(function(lib, "reelcut_shadow_vertex", all),
-                         function(lib, "reelcut_adjust_fragment", all), format: format,
+    return pipelineState(function(lib, "framejob_shadow_vertex", all),
+                         function(lib, "framejob_adjust_fragment", all), format: format,
                          blending: false)
 }
 
@@ -399,7 +399,7 @@ let identity2 = lattice(2) { ($0, $1, $2) }
 let identity33 = lattice(33) { ($0, $1, $2) }
 let swap33 = lattice(33) { ($2, $1, $0) }
 // A smooth non-identity look: a gentle S-curve, a warm shift, a little more
-// saturation — textbook shapes, Reelcut's own numbers.
+// saturation — textbook shapes, Frame Job's own numbers.
 let smooth33 = lattice(33) { r, g, b in
     func curve(_ v: Float) -> Float { v - 0.12 * sin(2 * Float.pi * v) / (2 * Float.pi) }
     let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b

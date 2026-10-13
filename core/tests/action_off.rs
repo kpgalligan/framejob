@@ -12,7 +12,7 @@ mod common;
 use serde_json::{json, Value};
 
 use common::{assert_contains, at, take_string, Handle, Outcome};
-use reelcut_core::ffi_query::rc_op_schemas;
+use framejob_core::ffi_query::rc_op_schemas;
 
 /// Ticks per second (spec §5.1), written out so a change to the timescale
 /// fails here rather than moving with the test.

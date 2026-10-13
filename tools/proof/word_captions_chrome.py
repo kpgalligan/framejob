@@ -70,7 +70,7 @@ def check(name, good, detail=""):
 
 
 def package(name, width, height, captions=False):
-    path = WORK / f"{name}.reelcut"
+    path = WORK / f"{name}.framejob"
     shutil.rmtree(path, ignore_errors=True)
     path.mkdir(parents=True)
     tracks = [{"id": 1, "name": "Track 1"}]
@@ -303,7 +303,7 @@ MUTANTS = {
 def mutant(name):
     edits, row = MUTANTS[name]
     began = time.time()
-    with tempfile.TemporaryDirectory(prefix=f"reelcut-wordsheet-{name}-") as temp:
+    with tempfile.TemporaryDirectory(prefix=f"framejob-wordsheet-{name}-") as temp:
         sources = Path(temp) / "Sources"
         shutil.copytree(ROOT / "app/Sources", sources)
         for file, before, after in edits:

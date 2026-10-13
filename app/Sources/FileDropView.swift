@@ -21,7 +21,7 @@ class FileDropView: NSView {
 
     override var acceptsFirstResponder: Bool { true }
 
-    /// The URLs on the pasteboard this app claims — the `.reelcut` package
+    /// The URLs on the pasteboard this app claims — the `.framejob` package
     /// and every movie/audio/image type the Info.plist lists as an Alternate
     /// handler, which is exactly `ProjectDocument.readableTypes`.
     private func readableURLs(from sender: any NSDraggingInfo) -> [URL] {

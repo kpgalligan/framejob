@@ -10,7 +10,7 @@ import AppKit
 /// The socket (`AgentServer+Socket.swift`, road map 14, spec §11 MC-1) is
 /// bound at every launch, at `Agent/agent.sock` in the support folder or
 /// `RC_AGENT_SOCKET`, in a `0700` folder; it is the only listener (MC4
-/// deleted TCP). A client reaches it through the bundled `reelcut-mcp`,
+/// deleted TCP). A client reaches it through the bundled `framejob-mcp`,
 /// whose line Settings' MCP section copies (spec §11 MC-7).
 ///
 /// **This file is frozen at wiring** (app/CLAUDE.md): the lifecycle, the
@@ -130,7 +130,7 @@ final class AgentServer {
         // so Release logs the same message instead of failing silently.
         if let failure = Self.catalogParityFailure(catalog) {
             assertionFailure(failure)
-            NSLog("Reelcut: %@", failure)
+            NSLog("Frame Job: %@", failure)
         }
         preparedCatalog = catalog
         return catalog
@@ -443,7 +443,7 @@ final class AgentServer {
     ///
     /// Matching `fileURL.path` against the caller's string exactly is wrong
     /// twice over. A caller may legitimately spell the same file
-    /// `~/Movies/x.reelcut`, `/tmp/x.reelcut` or `/private/tmp/x.reelcut` —
+    /// `~/Movies/x.framejob`, `/tmp/x.framejob` or `/private/tmp/x.framejob` —
     /// and, the case that actually bit, AppKit's own save machinery can hand
     /// `fileURL` back in the OTHER spelling of that last pair, so a path that
     /// addressed the document for twenty calls suddenly answers "No open

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "reelcut-agent",
+      "name": "framejob-agent",
       "dependencies": {
         "@anthropic-ai/sdk": "^0.128.0",
       },

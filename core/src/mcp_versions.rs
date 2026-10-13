@@ -1,4 +1,4 @@
-//! The MCP protocol revisions Reelcut speaks, and how a requested one is
+//! The MCP protocol revisions Frame Job speaks, and how a requested one is
 //! answered (road map 14's MC3). One file for two readers: `agent.rs`'s
 //! `initialize` and the stdio proxy (`mcp-proxy/`), which includes this
 //! file by `#[path]`, so the app and the proxy cannot disagree. It therefore

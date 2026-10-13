@@ -188,7 +188,7 @@ MUTANTS = {
 
 def mutant(name):
     file, before, after = MUTANTS[name]
-    with tempfile.TemporaryDirectory(prefix=f"reelcut-graphics-ffi-{name}-") as temp:
+    with tempfile.TemporaryDirectory(prefix=f"framejob-graphics-ffi-{name}-") as temp:
         sources = Path(temp) / "Sources"
         shutil.copytree(ROOT / "app/Sources", sources)
         replace_once(sources / file, before, after)

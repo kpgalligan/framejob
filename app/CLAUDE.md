@@ -164,7 +164,7 @@ detail there.
 
 **The document.**
 - `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`GraphicFiles`, +`UndoGroup`, +`CacheSaves`, +`Alerts`)
-  — NSDocument, `.reelcut` package read/write, and the single mutation
+  — NSDocument, `.framejob` package read/write, and the single mutation
   point (see Undo); `applyEdit`'s `.refused` arm beeps and then posts
   `projectDocumentDidRefuse` with the `ReelRefusal` (spec §11 CI-10), which
   the editor forwards to the inspector's refusal strip. Holds the SIX pieces of view state nothing persists —
@@ -350,7 +350,7 @@ detail there.
   lane's thread since #231 — never process-wide state, so a person's own
   import still asks while a call runs. It runs `Process` on a
   serial queue, and writes conversions under `AppSupport` — the ONE spelling
-  of `~/Library/Application Support/Reelcut/` — never in the package.
+  of `~/Library/Application Support/Frame Job/` — never in the package.
   `AppSupport.ensureDirectory` is the ONE creator of that folder and of any
   folder under it: `0700` at each level it makes, an existing folder left
   alone (#108).
@@ -359,7 +359,7 @@ detail there.
   `ProjectDocument.packageContentsDidChangeOnDisk()` afterwards.
 - `GraphicStore.swift` — one document's `graphics/` (road map 10 §5f):
   where it is (`<package>/graphics`, or an untitled document's
-  `<NSTemporaryDirectory()>/Reelcut/<UUID>-graphics`, re-pointed by
+  `<NSTemporaryDirectory()>/FrameJob/<UUID>-graphics`, re-pointed by
   `packageDidMove(to:)` from the `fileURL` setter, posting
   `.graphicsLocationDidChange`), the scan (each legal `*.js` with its
   SHA-256 revision, G-13; `fonts/` validated on a throwaway
@@ -512,7 +512,7 @@ the key map behind it.
   selected clip's graphic when it is a row, a deleted one included, and
   Delete always on the first; nothing there writes a file or applies an
   op),
-  `+Clipboard` (⌘X/⌘C/⌘V over the `com.kgalligan.reelcut.clips` pasteboard,
+  `+Clipboard` (⌘X/⌘C/⌘V over the `com.kgalligan.framejob.clips` pasteboard,
   the `paste` op's payload; ⌥⌘V Paste Attributes with no `groups`; and
   Edit ▸ Paste Graphic Properties, whose `@objc` action
   `pasteGraphicProperties(_:)` lives here and sends ONE `paste_attributes`
@@ -595,7 +595,7 @@ the key map behind it.
   `refuseHeldPath` ask; it answers false when `.shared` is not this class,
   which is every proof probe but `agent_open_probe.swift`, which subclasses
   it (so it is not `final`). A launch whose shared controller is not this
-  class logs `Reelcut: `; `agent_socket_proof.py`'s `no-controller` mutant
+  class logs `Frame Job: `; `agent_socket_proof.py`'s `no-controller` mutant
   removes the `install()` line and must fail Z1.
 - `EditorWindow.swift` — the editor's `NSWindow` subclass: its `sendEvent`
   routes a bare Space to play/pause unless the first responder types or
@@ -990,7 +990,7 @@ the key map behind it.
   P-7) the Spend row 6 pt under the meter and Clear, the rule under it:
   the first rung of `AssistantTurnCost.figureLadder` of `conversationCost`
   that fits beside its title ("≥"/"<" for "at least"/"under", still ending "·
-  Reelcut's estimate", spec §11 P-8; the tooltip stays `figureTooltip`), which
+  Frame Job's estimate", spec §11 P-8; the tooltip stays `figureTooltip`), which
   `reload(_:usage:cost:)` and `apply`'s `.conversationCost` set. Accessibility ids
   `assistant.composer|send|allow|deny|question|clear|settings|nokey|spend` and
   `assistant.entry.<kind>` are what the proofs read.
@@ -1148,8 +1148,8 @@ the key map behind it.
   `svg`, records every report and draws every card (G-8), so the file is
   the serial path's. One `NSCondition` guards everything; a worker never
   waits holding an unfinished entry, so `take`'s wait always ends.
-  `ReelcutGraphicPrefetchOff` (YES) is the measurement switch; each session
-  logs one `[reelcut] graphic prefetch: …` line once it is stopped and its
+  `FrameJobGraphicPrefetchOff` (YES) is the measurement switch; each session
+  logs one `[framejob] graphic prefetch: …` line once it is stopped and its
   last worker has exited.
 - `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
   leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
@@ -1270,7 +1270,7 @@ the key map behind it.
   walks a layer list — the canvas's in `render`, a group's members in
   `encodeMattes` — and draws each routed dissolve's two halves into two pool
   targets, then mixes them onto the pass with the seventh pipeline
-  (`reelcut_dissolve_fragment`), which scales a zoom's halves about their
+  (`framejob_dissolve_fragment`), which scales a zoom's halves about their
   anchors there. `drawLayer` is the one per-layer draw both use.
 - `LayerRenderers.swift` · `LayerRenderersText.swift` · `LayerRenderersReveal.swift`
   · `LayerRenderersWords.swift` · `LayerRenderersBackdrop.swift` — text,
@@ -1444,7 +1444,7 @@ free.
 - `CaptionLooks.swift` — the three LOOKS a run may add to a word style's
   pages (spec §11 W-15): `CaptionLooks` (`slide`, `fill`, `dim`; `.none`;
   `dimDepth` 0.5, the `pause_dim` a ticked Dim writes; the three remembered
-  keys `ReelcutCaptionSlide` / `Fill` / `Dim`, read and written by the
+  keys `FrameJobCaptionSlide` / `Fill` / `Dim`, read and written by the
   sheet alone), `Look` (the tool's argument names; `title`, `defaultsKey`,
   and `isLive(for:)` DERIVED from the style's own `wordStyle` — a slide
   needs a pill, a fill `build` or an upcoming colour that is not the active
@@ -1473,7 +1473,7 @@ free.
   `NSMenuItem`s carrying `representedObject`, because `addItem(withTitle:)`
   REMOVES a same-titled row).
 - `CloudTranscriber.swift` (+`Report`, +`Media`) — `TranscriptionEngine` (`apple` |
-  `assemblyai`, persisted under `ReelcutCaptionEngine`) and the cloud engine
+  `assemblyai`, persisted under `FrameJobCaptionEngine`) and the cloud engine
   over the SAME `Transcriber.Job` / `Outcome` / `CancelToken`. `run` is its
   serial queue and the main-thread completion; `transcribe` is the
   synchronous body — the janitor FIRST, the jobs grouped by MEDIA, each
@@ -1799,7 +1799,7 @@ free.
   enables the button exactly while the helper is executable, and says
   `missingStatus` when it is not; a press writes the line and says
   `copiedStatus` until the next `sync()`. Not an edit, so no MCP mirror.
-- `SettingsWindowController.swift` — Reelcut ▸ Settings… ⌘,, the app's one
+- `SettingsWindowController.swift` — Frame Job ▸ Settings… ⌘,, the app's one
   window for something PERSISTED beyond view state, with
   `extension AppDelegate { showSettings }` at its foot
   (`CaptionImporter.swift`'s command-at-the-foot precedent, which is why
@@ -2024,7 +2024,7 @@ free.
   rather than a sentence `opTool` drops in silence. Parts 1 to 3 stay in the
   frozen file with the private dispatch table they read and part 4 in
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
-  debug, log `Reelcut: ` in release and start the server either way.
+  debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
   (kpgalligan/reelcut#21): one comparison in `dispatch`, for all ninety-one
   product tools, of a caller's keys against the schema the tool published, every
@@ -2055,12 +2055,12 @@ free.
   alone, one that REFUSES is unlinked, anything else is left alone — then
   `ReelAgentSocket.start` with the prepared catalog and the frozen file's
   `agentToolTrampoline`, and sets `boundSocketPath` (`isRunning` reads it)
-  after a bind. It never alerts: one log line, `Reelcut agent socket
-  listening at <path>` or `Reelcut agent socket not bound: <reason>`, never
-  the `Reelcut: ` prefix. `unbindSocket` (all of `applicationWillTerminate`)
+  after a bind. It never alerts: one log line, `Frame Job agent socket
+  listening at <path>` or `Frame Job agent socket not bound: <reason>`, never
+  the `Frame Job: ` prefix. `unbindSocket` (all of `applicationWillTerminate`)
   releases with no join. `mcpHelperURL` is this bundle's own
-  `Contents/Helpers/reelcut-mcp` and `mcpCommand(helperPath:)` the
-  `claude mcp add --scope user reelcut -- '<path>'` line Settings' MCP
+  `Contents/Helpers/framejob-mcp` and `mcpCommand(helperPath:)` the
+  `claude mcp add --scope user framejob -- '<path>'` line Settings' MCP
   pane copies (spec §11 MC-7; each `'` written `'\''`). The mode check, the connect,
   the listening line and `mcpHelperURL` are each one statement that
   `agent_socket_proof.py`'s mutants replace.
@@ -2069,11 +2069,11 @@ free.
   ARGUMENT domain only, the launch writes `{"version":…,"tools":…}` — the
   bundle's short version and `AgentServer.shared.preparedCatalog` verbatim —
   atomically to `<path>` and exits before `NSApplicationMain`; a nil catalog
-  or a failed write is one stderr line, `reelcut catalog snapshot: …`, and
+  or a failed write is one stderr line, `framejob catalog snapshot: …`, and
   exit 1. `project.yml`'s "Write Agent Catalog" phase runs the just-built
   binary (ad-hoc signed in place first) this way to put
-  `Contents/Resources/agent-catalog.json` in the bundle, which `reelcut-mcp`
-  lists from while no Reelcut runs; `dist_check.py` D21–D24 check it.
+  `Contents/Resources/agent-catalog.json` in the bundle, which `framejob-mcp`
+  lists from while no Frame Job runs; `dist_check.py` D21–D24 check it.
 - `AgentLane.swift` — every tool call's one door (road map 12 A1, spec §11
   AI-2, AI-3, AI-5, AI-12): the MCP trampoline's `serve` (server thread,
   synchronous) and the assistant session's `submit` (returns at once; one
@@ -2163,7 +2163,7 @@ free.
   `day` in the local zone) and, summed over a conversation, the tab's Spend
   `figure` ("Nothing yet", "at least …", "unknown …", never $0) with its
   `figureTooltip`. A partial `cost` makes the turn line `Cost: at least $… (a
-  response was cut short) · …` and the figure `at least $… · Reelcut's
+  response was cut short) · …` and the figure `at least $… · Frame Job's
   estimate` (`lowerBound`), unless a response was unknown, which keeps today's
   words. Road map 13 P4: `record` posts `didRecordNotification`
   (object nil) exactly when it wrote a line; `number` (a JSON number, not a
@@ -2187,14 +2187,14 @@ free.
   `AssemblyAIConfiguration.argument`, the argument domain alone) → a
   `FileStore` named `anthropic-key`; else `RC_ASSISTANT_BASE_URL` set → an
   EMPTY `MemoryStore`; else the one `AppSupport.directory` line. The store
-  first, `ANTHROPIC_API_KEY` second. `model()` is `ReelcutAssistantModel`,
+  first, `ANTHROPIC_API_KEY` second. `model()` is `FrameJobAssistantModel`,
   else `claude-opus-5-5`; no tool reads or writes it. `didChangeNotification`
   (`userInfo[changeKey]` "key", "model" or "settings") is posted by Settings'
   Assistant pane alone. `AssistantChatSettings` is the person's chat settings
-  (spec §11 AI-20): `ReelcutAssistantAutoCompact` (absent = on),
-  `ReelcutAssistantAutoCompactTokens` (a whole number in 20 000–900 000;
+  (spec §11 AI-20): `FrameJobAssistantAutoCompact` (absent = on),
+  `FrameJobAssistantAutoCompactTokens` (a whole number in 20 000–900 000;
   absent or outside = `defaultCompactTokens`, 300 000, the one such constant,
-  AI-9) and `ReelcutAssistantClearToolResults` (absent = off), with `load`,
+  AI-9) and `FrameJobAssistantClearToolResults` (absent = off), with `load`,
   `save` and `helperJSON` (null tokens when off); no tool reads or writes
   them. `settingsJSON()` sends `AssistantChatSettings.load(from:)`'s
   `helperJSON` (read there exactly once). In a dev build,
@@ -2220,7 +2220,7 @@ free.
   its length bound. Backticks hold identifiers only; literals go in double
   quotes; no menu path is written by hand. A new tool needs a topic here or
   F4 fails.
-- `AssistantLiveContext.swift` — the `<reelcut_context>` block each person
+- `AssistantLiveContext.swift` — the `<framejob_context>` block each person
   message carries (spec §11 AI-15): the project's name and path, the open
   nest, the playhead in ticks and seconds, the selection ascending, each
   label a key of `get_project`'s answer; `init(document:)` is main only. The
@@ -2229,7 +2229,7 @@ free.
   (spec §11 GR-6), mirroring Insert ▸ Adjustment Clip.
 - `AgentServer+DevTools.swift` — the dev tools' seam (road map 11, spec
   §11 V-1/V-2): the handler table, catalog rows and off-main set compiled
-  only under `REELCUT_DEV_TOOLS`, which Debug and Release set and
+  only under `FRAMEJOB_DEV_TOOLS`, which Debug and Release set and
   Distribution does not. The frozen file merges them (`withDevHandlers`, a
   union) and `catalogJSON()` splices the rows in BEFORE the file tools. It
   holds `devToolsMarker`, the string `tools/proof/dist_check.py` requires in

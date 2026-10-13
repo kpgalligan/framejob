@@ -237,7 +237,7 @@ func measured(_ p: TextProps) -> Double { Double(LayerRenderers.measuredSize(for
 typealias Look = CaptionLooks.Look
 /// The three remembered keys, as LITERALS: the probe's own spelling of them.
 let lookKeys: [(Look, String)] = [
-    (.slide, "ReelcutCaptionSlide"), (.fill, "ReelcutCaptionFill"), (.dim, "ReelcutCaptionDim"),
+    (.slide, "FrameJobCaptionSlide"), (.fill, "FrameJobCaptionFill"), (.dim, "FrameJobCaptionDim"),
 ]
 /// A box clicked the way AppKit clicks it: its state, then its action with
 /// the box as the sender.
@@ -249,7 +249,7 @@ func tick(_ look: Look, on sheet: TranscribeSheetController, _ on: Bool = true) 
 /// A sheet over defaults that remember AssemblyAI: the cloud state.
 func cloudSheet(_ document: ProjectDocument) -> TranscribeSheetController {
     let defaults = freshDefaults()
-    defaults.set("assemblyai", forKey: "ReelcutCaptionEngine")
+    defaults.set("assemblyai", forKey: "FrameJobCaptionEngine")
     return sheet(document, defaults: defaults)
 }
 /// The style's preset REBUILT here, field by field, with only `look`'s field

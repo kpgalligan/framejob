@@ -34,7 +34,7 @@ enum AssemblyAIConfiguration {
     static let secretFolderArgument = "RCSecretFolder"
 
     /// The persisted region, the Settings window's popup.
-    static let regionKey = "ReelcutAssemblyAIRegion"
+    static let regionKey = "FrameJobAssemblyAIRegion"
 
     /// The environment override, read only when the store has nothing
     /// (R6-5, R6-9 (d)).

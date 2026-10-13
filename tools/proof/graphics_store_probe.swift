@@ -2,7 +2,7 @@
 // watcher, driven through the app's own `GraphicStore` and `ProjectDocument`.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
 // `tools/proof/harness/build.sh`'s swiftc line. It MEASURES and prints one
 // JSON object; `graphics_store_probe.py` scores it with oracles of its own
 // (hashlib for every revision, its own literals for every sentence).
@@ -106,7 +106,7 @@ func inode(_ url: URL) -> Int {
     ((try? files.attributesOfItem(atPath: url.path))?[.systemFileNumber] as? Int) ?? -1
 }
 
-let projectType = "com.kgalligan.reelcut-project"
+let projectType = ProjectDocument.projectTypeIdentifier
 
 /// A saved package with `project.json` and nothing else.
 func scratchPackage(_ name: String) -> URL {
@@ -230,7 +230,7 @@ answer["w8"] = row
 
 // MARK: - W2 — a package without graphics/, and a graphics/ made from outside
 
-let p = scratchPackage("W2.reelcut")
+let p = scratchPackage("W2.framejob")
 var packageCallbacks = 0
 let ps = GraphicStore(package: p, seed: nil, bundledFonts: fontsDir)
 ps.folderDidAppear = { packageCallbacks += 1 }
@@ -268,7 +268,7 @@ answer["w10"] = row
 
 // MARK: - W11 — the package moves
 
-let p2 = work.appendingPathComponent("W11.reelcut", isDirectory: true)
+let p2 = work.appendingPathComponent("W11.framejob", isDirectory: true)
 try? files.removeItem(at: p2)
 try? files.copyItem(at: p, to: p2)
 let locationMark = locationPosts.count
@@ -290,7 +290,7 @@ ps.stop()
 
 // MARK: - W9 — the app's own first write creates the folder
 
-let p9 = scratchPackage("W9.reelcut")
+let p9 = scratchPackage("W9.framejob")
 var w9Callbacks = 0
 let ws = GraphicStore(package: p9, seed: nil, bundledFonts: fontsDir)
 ws.folderDidAppear = { w9Callbacks += 1 }
@@ -549,7 +549,7 @@ answer["w12"] = ["posts": since(mark, s)]
 
 // MARK: - C1..C4 — the document, its whitelist and its lifetime
 
-let c = scratchPackage("C1.reelcut")
+let c = scratchPackage("C1.framejob")
 try? files.createDirectory(
     at: c.appendingPathComponent("graphics"), withIntermediateDirectories: false)
 let xSource = "export function render() { return '<svg/>' } // C\n"
@@ -586,7 +586,7 @@ do {
     c2.autosavedContentsFileURL = c
     c2.startGraphicStore()
     let root = c2.graphicStore?.folderURL
-    var r = written(c2, to: work.appendingPathComponent("C2-saved.reelcut"), original: nil)
+    var r = written(c2, to: work.appendingPathComponent("C2-saved.framejob"), original: nil)
     r["file_url_nil"] = c2.fileURL == nil
     r["folder"] = root?.path ?? NSNull()
     r["copied"] = root.map { present($0.appendingPathComponent("x.js")) } ?? false
@@ -599,7 +599,7 @@ c2.graphicStore?.stop()
 
 let c3 = ProjectDocument()
 c3.startGraphicStore()
-var r3 = written(c3, to: work.appendingPathComponent("C3-saved.reelcut"), original: nil)
+var r3 = written(c3, to: work.appendingPathComponent("C3-saved.framejob"), original: nil)
 r3["root_exists"] = c3.graphicStore.map { present($0.folderURL) } ?? false
 answer["c3"] = r3
 let c3Root = c3.graphicStore?.folderURL
@@ -635,7 +635,7 @@ let c5b = ProjectDocument()
 c5b.startGraphicStore()
 try? c5b.graphicStore?.write(name: "m", source: moduleSource)
 let c5bRoot = c5b.graphicStore?.folderURL
-let c5Package = work.appendingPathComponent("C5-saved.reelcut", isDirectory: true)
+let c5Package = work.appendingPathComponent("C5-saved.framejob", isDirectory: true)
 try? files.removeItem(at: c5Package)
 do {
     let wrapper = try c5b.fileWrapper(ofType: projectType)
@@ -675,7 +675,7 @@ c6a.close()
 r6["closed_root_after"] = c6aRoot.map(present) ?? true
 let c6b = ProjectDocument()
 let c6bRoot = seedTranscript(c6b)
-let c6Package = work.appendingPathComponent("C6-saved.reelcut", isDirectory: true)
+let c6Package = work.appendingPathComponent("C6-saved.framejob", isDirectory: true)
 try? files.removeItem(at: c6Package)
 let packaged = c6Package.appendingPathComponent("cache/transcripts/9.json")
 do {
@@ -919,8 +919,8 @@ if let root = h6.graphicStore?.folderURL { historyRoots.append(root) }
 let h6Text = moduleText("h6")
 writeModule(h6, "old", h6Text)
 _ = placeGraphic(h6, h6Track, "old", at: 0)
-let h6Package = work.appendingPathComponent("H6.reelcut", isDirectory: true)
-let h6Control = work.appendingPathComponent("H6-control.reelcut", isDirectory: true)
+let h6Package = work.appendingPathComponent("H6.framejob", isDirectory: true)
+let h6Control = work.appendingPathComponent("H6-control.framejob", isDirectory: true)
 try? files.removeItem(at: h6Package)
 try? files.removeItem(at: h6Control)
 row = [:]
@@ -1079,7 +1079,7 @@ answer["h11"] = row
 h11.close()
 
 // H12 — start() drops a module's current text from its history
-let h12Package = scratchPackage("H12.reelcut")
+let h12Package = scratchPackage("H12.framejob")
 let h12Graphics = h12Package.appendingPathComponent("graphics", isDirectory: true)
 try? files.createDirectory(at: h12Graphics, withIntermediateDirectories: true)
 let (h12Old, h12Current) = (moduleText("h12 old"), moduleText("h12 current"))
@@ -1164,7 +1164,7 @@ h14.close()
 // H15 — the state a crash inside moveModule leaves when the old name had kept texts: the file
 // at the new name, the pair journalled, history/old/ still there. Built by hand (G-28 (f)).
 // Then, in the same package, the default restore G-28 (f) speaks of: it writes the OLDER text.
-let h15Package = work.appendingPathComponent("H15.reelcut", isDirectory: true)
+let h15Package = work.appendingPathComponent("H15.framejob", isDirectory: true)
 try? files.removeItem(at: h15Package)
 try? files.copyItem(at: h6Control, to: h15Package)
 let h15Graphics = h15Package.appendingPathComponent("graphics")
@@ -1404,7 +1404,7 @@ if let root = c7.graphicStore?.folderURL { historyRoots.append(root) }
 let (c7a, c7b) = (moduleText("c7 a"), moduleText("c7 b"))
 writeModule(c7, "m", c7a)
 writeModule(c7, "m", c7b)
-let c7Package = work.appendingPathComponent("C7-saved.reelcut", isDirectory: true)
+let c7Package = work.appendingPathComponent("C7-saved.framejob", isDirectory: true)
 try? files.removeItem(at: c7Package)
 row = ["texts": [c7a, c7b]]
 do {

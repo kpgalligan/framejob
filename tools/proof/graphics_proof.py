@@ -9,7 +9,7 @@ end to end — and G5b (§10.9), W1: a font landed from the shell in a
 module-less `graphics/` reaches the library through the store's own post.
 
 One owned instance on a scratch socket (`mcp.scratch_socket`), launched and
-stopped by PID, with its log at `tools/proof/work/graphics/reelcut.log`;
+stopped by PID, with its log at `tools/proof/work/graphics/framejob.log`;
 nothing else is ever killed. Every child runs under `graphics_spike/bounded.py`, and every wait is
 a bounded poll. The G3 rows' modules are written OUTSIDE a package and `mv`d
 into its `graphics/` from the shell; the G rows write through `write_graphic`.
@@ -43,7 +43,7 @@ K2  `save_project {path: P1b}`: `P1b/graphics/bar.js` present, frame 30
 T1  `set_canvas {fps: [30000, 1001]}`: frame 30 at tick 600 600
     byte-identical to the 30 fps canvas's frame 30;
 K3  an untitled `new_project`, `bar.js` moved into its new
-    `<DARWIN_USER_TEMP_DIR>/Reelcut/*-graphics` root, a clip added,
+    `<DARWIN_USER_TEMP_DIR>/FrameJob/*-graphics` root, a clip added,
     `save_project {path: P2}`, relaunch, `open_project`: frame 30 identical;
 A1  a transparent canvas plus `callout`, exported as `prores_4444`, decoded
     at 2 s with ffmpeg: alpha 0 at (0,0) and 255 at (1300,432), the stroke;
@@ -124,7 +124,7 @@ C6  (B8, G-19 (b)) `{name: bar, frame: 150, format: svg}`, past bar's 120
     — a frame past the length is drawn, as a longer clip draws it (G-9);
 G10 (issue batch B19, #105; spec §11 G-20 (e); after G7, on the open WG)
     `graphic_reference {project: WG}` is ok and its text is
-    `docs/graphics-api.md`; `{project: WORK/nowhere.reelcut}` is an error
+    `docs/graphics-api.md`; `{project: WORK/nowhere.framejob}` is an error
     containing "No open project is at";
 C7  (B19, G-20 (d); on WG) `render_graphic {name: bar, frames: [0, 1, 2],
     width: 8192, height: 8192, path: WORK/c7.png}` is an error naming
@@ -211,7 +211,7 @@ Q5  (B68) `warnsheet`: an `ExportProgressSheetController(… graphics: set)`,
     its view loaded and `viewDidAppear()` called, the run loop spun until the
     reflected `didFinish`: the reflected `statusLabel` ends ` 2 graphic
     warnings (hover for details).` and its toolTip holds Q4's two lines;
-Z1  `grep "Reelcut: "` over every launch's log prints nothing.
+Z1  `grep "Frame Job: "` over every launch's log prints nothing.
 
     python3 tools/proof/graphics_proof.py [--app PATH]
     python3 tools/proof/graphics_proof.py --mutant frame-plus-one
@@ -454,12 +454,12 @@ def temp_roots():
     """The untitled roots under `getconf DARWIN_USER_TEMP_DIR`, which TMPDIR
     does not move (G3a measured it)."""
     base = bounded.run(["getconf", "DARWIN_USER_TEMP_DIR"], 30)["stdout"].strip()
-    return set(glob.glob(os.path.join(base, "Reelcut", "*-graphics")))
+    return set(glob.glob(os.path.join(base, "FrameJob", "*-graphics")))
 
 
 def complaints(log):
     try:
-        return [line.strip() for line in open(log) if "Reelcut: " in line]
+        return [line.strip() for line in open(log) if "Frame Job: " in line]
     except OSError:
         return ["the log could not be read"]
 
@@ -682,9 +682,9 @@ def run_p1_p2(client, p1):
 
 
 def run(app):
-    log = WORK / "reelcut.log"
-    wg, ng, nf = (WORK / f"{n}.reelcut" for n in ("WG", "NG", "NF"))
-    p1, p1b, p2, pf, pa = (WORK / f"{n}.reelcut" for n in ("P1", "P1b", "P2", "F", "A"))
+    log = WORK / "framejob.log"
+    wg, ng, nf = (WORK / f"{n}.framejob" for n in ("WG", "NG", "NF"))
+    p1, p1b, p2, pf, pa = (WORK / f"{n}.framejob" for n in ("P1", "P1b", "P2", "F", "A"))
     instance = Instance(app, log)
     try:
         client = instance.start()
@@ -800,17 +800,17 @@ def run(app):
         run_c(client, wg)
         run_c7(client, wg)
         run_i(client, wg)
-        run_loop(client, WORK / "LP.reelcut")
-        run_g11(client, WORK / "WS.reelcut")
+        run_loop(client, WORK / "LP.framejob")
+        run_g11(client, WORK / "WS.framejob")
         # A fresh instance, K3's pattern: the untitled draft is the implicit
         # target of every call.
         instance.stop()
         client = instance.start()
         run_g8(client, nf)
         run_e(client, p1)
-        run_e4(client, WORK / "E4.reelcut")
-        run_x1(client, WORK / "PW.reelcut")
-        make_pq(client, WORK / "PQ.reelcut")
+        run_e4(client, WORK / "E4.framejob")
+        run_x1(client, WORK / "PW.framejob")
+        make_pq(client, WORK / "PQ.framejob")
     finally:
         instance.stop()
     return log
@@ -1140,7 +1140,7 @@ def run_i(client, wg):
           saved["ok"] and all(present) and clean is False,
           f"save {saved}, present {present}, unsaved_changes {clean}")
 
-    fresh = WORK / "IE.reelcut"
+    fresh = WORK / "IE.framejob"
     made = attempt(client, "new_project", {"path": str(fresh)})
     font = attempt(client, "import_graphic_font", {"project": str(fresh), "path": str(OSWALD)})
     library = (font.get("reply") or {}).get("library_families") or []
@@ -1157,7 +1157,7 @@ def run_i(client, wg):
           f"new {made['ok']}, import {font}, write {wrote.get('ok')}, says {text!r}, lit {lit}")
 
     run_i5(client, fresh)
-    run_w1(client, WORK / "IW.reelcut")
+    run_w1(client, WORK / "IW.framejob")
 
 
 def run_i5(client, ie):
@@ -1556,7 +1556,7 @@ def build_pin_probe(sources_dir=ROOT / "app/Sources", out=PIN_PROBE_DIR):
                                 str(metallib)], 300)
         if step["rc"] != 0 or not metallib.exists():
             return None, f"the shader did not build: {step['stderr'][-400:]}"
-    lib = ROOT / "core/target/release/libreelcut_core.a"
+    lib = ROOT / "core/target/release/libframejob_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
@@ -1578,8 +1578,8 @@ def run_probe(binary, mode, pin, tag, package=None):
     if binary is None:
         return {"error": "the probe did not build"}, b""
     movie = WORK / f"{tag}.mov"
-    source = package or WORK / "PQ.reelcut"
-    package = WORK / f"{tag}.reelcut"
+    source = package or WORK / "PQ.framejob"
+    package = WORK / f"{tag}.framejob"
     shutil.rmtree(package, ignore_errors=True)
     shutil.copytree(source, package)
     got = bounded.run([str(binary), str(package), mode, pin, str(movie)], 600)
@@ -1633,7 +1633,7 @@ def run_q4(binary, why, control):
     """Q4 (B68, G-24 (c)) — the queue's row over PW: the count straight after
     the Exported sentence, and the list in the row's tooltip. `control` is
     Q1's `queue pin` message (None when not run). The probe's answer."""
-    answer, _ = run_probe(binary, "warnqueue", "pin", "q4-warnqueue", WORK / "PW.reelcut")
+    answer, _ = run_probe(binary, "warnqueue", "pin", "q4-warnqueue", WORK / "PW.framejob")
     message = str(answer.get("message", ""))
     lead = "Exported “q4-warnqueue.mov”. 2 graphic warnings."
     check("Q4 warnqueue: the completed job's message starts \"Exported “…”. 2 graphic warnings.\" "
@@ -1650,7 +1650,7 @@ def run_q4(binary, why, control):
 def run_q5(binary, why):
     """Q5 (B68, G-24 (c)) — the progress sheet over PW: the finish line ends
     with the count and the hover note, its tooltip the list. The answer."""
-    answer, _ = run_probe(binary, "warnsheet", "pin", "q5-warnsheet", WORK / "PW.reelcut")
+    answer, _ = run_probe(binary, "warnsheet", "pin", "q5-warnsheet", WORK / "PW.framejob")
     status = str(answer.get("status", ""))
     check("Q5 warnsheet: the sheet's finish line ends \" 2 graphic warnings (hover for "
           "details).\" and its tooltip lists nofont (Nope Sans) and late (Late Sans)",
@@ -1674,11 +1674,11 @@ def run_g10(client, wg):
     Whether its control half (the open WG answers the doc) held."""
     doc = DOC_MD.read_bytes().decode("utf-8")
     named = attempt(client, "graphic_reference", {"project": str(wg)})
-    nowhere = WORK / "nowhere.reelcut"
+    nowhere = WORK / "nowhere.framejob"
     stray = attempt(client, "graphic_reference", {"project": str(nowhere)})
     control = named["ok"] and named.get("reply") == doc
     check("G10 graphic_reference {project: WG} answers docs/graphics-api.md; {project: "
-          "nowhere.reelcut} is refused \"No open project is at\" (G-20 (e))",
+          "nowhere.framejob} is refused \"No open project is at\" (G-20 (e))",
           control and not stray["ok"] and "No open project is at" in stray.get("error", ""),
           f"WG ok {named['ok']} equals doc {named.get('reply') == doc} "
           f"{named.get('error', '')!r}, nowhere {stray}")
@@ -1801,7 +1801,7 @@ def build_mutant(file, anchor, replacement):
     app, reason = tree_copy.build_app(copy, 1500)
     if app is None:
         return None, reason
-    return app / "Contents/MacOS/Reelcut", ""
+    return proof_app.executable(app), ""
 
 
 def probe_mutant(app, name):
@@ -1814,10 +1814,10 @@ def probe_mutant(app, name):
     if not app.exists():
         print(f"probe mutant {name}: the control could not be performed — no app at {app}")
         return 2
-    instance = Instance(app, WORK / "reelcut-probe-mutant.log")
+    instance = Instance(app, WORK / "framejob-probe-mutant.log")
     try:
         client = instance.start()
-        held, setup = make_pw(client, WORK / "PW.reelcut") if client else (False, "no launch")
+        held, setup = make_pw(client, WORK / "PW.framejob") if client else (False, "no launch")
     finally:
         instance.stop()
     if not held:
@@ -1868,7 +1868,7 @@ def main():
             print(f"mutant {args.mutant}: the control could not be performed — the copy was "
                   f"not built: {why}")
             return 2
-        instance = Instance(binary, WORK / "reelcut.log")
+        instance = Instance(binary, WORK / "framejob.log")
         try:
             client = instance.start()
             if client is None:
@@ -1877,18 +1877,18 @@ def main():
                       f"did not launch")
                 return 2
             if args.mutant == "frame-plus-one":
-                _, _, f30, f31 = run_p1_p2(client, WORK / "M.reelcut")
+                _, _, f30, f31 = run_p1_p2(client, WORK / "M.framejob")
                 why = ("P1 did not hold" if not rows.get("P1") else
                        "frame 30 was not rendered" if f30 is None else
                        "frame 31 was not rendered" if f31 is None else "")
             elif args.mutant == "store-uncapped":
-                why = "" if run_g11(client, WORK / "WS.reelcut") else \
+                why = "" if run_g11(client, WORK / "WS.framejob") else \
                     "the 17 writes, the m00 settle or the m00 control did not hold"
             elif args.mutant == "warnings-per-frame":
-                why = "" if run_x1(client, WORK / "PW.reelcut") else \
+                why = "" if run_x1(client, WORK / "PW.framejob") else \
                     "PW (two modules, two clips, saved) was not made"
             else:
-                wg = WORK / "WG.reelcut"
+                wg = WORK / "WG.framejob"
                 if not setup_bar(client, wg):
                     why = "new_project and write_graphic bar did not hold"
                 elif args.mutant == "sheet-uncapped":
@@ -1918,7 +1918,7 @@ def main():
     run_q4(binary, because, control)
     run_q5(binary, because)
     found = complaints(log)
-    check("Z1 grep \"Reelcut: \" over every launch's log prints nothing", found == [],
+    check("Z1 grep \"Frame Job: \" over every launch's log prints nothing", found == [],
           f"{found[:5]}")
     passed = sum(1 for name in ROWS if rows.get(name))
     print(f"{passed}/{len(ROWS)}")

@@ -42,7 +42,7 @@ def original():
 
 
 def package(where, name, value):
-    path = os.path.join(where, name + ".reelcut")
+    path = os.path.join(where, name + ".framejob")
     os.mkdir(path)
     with open(os.path.join(path, "project.json"), "w", encoding="utf-8") as stream:
         json.dump(value, stream)
@@ -56,7 +56,7 @@ def project(mcp):
 def check_parity(log_path):
     with open(log_path, encoding="utf-8", errors="replace") as stream:
         lines = stream.read().splitlines()
-    complaints = [line for line in lines if "Reelcut: " in line]
+    complaints = [line for line in lines if "Frame Job: " in line]
     assert not complaints, "startup parity complained: " + " | ".join(complaints)
     return lines
 
@@ -137,12 +137,12 @@ def run(mcp, where):
     changed_with_undo(mcp, "unnest", {"clip": 4}, opened)
 
     after = project(mcp)
-    saved = os.path.join(where, "saved.reelcut")
+    saved = os.path.join(where, "saved.framejob")
     mcp.call_with("save_project", {"path": saved})
     with open(os.path.join(saved, "project.json"), encoding="utf-8") as stream:
         persisted = json.load(stream)
     assert persisted["canvas"]["fps"] == [24, 1]
-    reopened = os.path.join(where, "reopened.reelcut")
+    reopened = os.path.join(where, "reopened.framejob")
     shutil.copytree(saved, reopened)
     mcp.call("open_project", path=reopened)
     assert project(mcp) == after, "reopen lost normalized times"
@@ -153,9 +153,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--app", default=str(proof_app.bundle()))
     args = parser.parse_args()
-    binary = os.path.join(args.app, "Contents", "MacOS", "Reelcut")
+    binary = str(proof_app.executable(args.app))
     assert os.path.isfile(binary), "matching app binary is missing: " + binary
-    with tempfile.TemporaryDirectory(prefix="reelcut-frame-grid-") as work:
+    with tempfile.TemporaryDirectory(prefix="framejob-frame-grid-") as work:
         log_path = os.path.join(work, "app.log")
         socket_path = scratch_socket()
         with open(log_path, "w", encoding="utf-8") as log:

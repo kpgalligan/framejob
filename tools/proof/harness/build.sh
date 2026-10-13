@@ -3,10 +3,10 @@
 #
 # Compiles every app/Sources/*.swift except the app's main.swift together
 # with tools/proof/harness/main.swift (last, so its top-level code is the
-# entry point), links core/target/release/libreelcut_core.a, and puts the
+# entry point), links core/target/release/libframejob_core.a, and puts the
 # binary in tools/proof/work/harness/harness with the app's Fonts and Models
 # copied beside it (the harness registers the fonts at launch). It compiles
-# with `-D REELCUT_DEV_TOOLS`, as the app's Debug and Release do, so the
+# with `-D FRAMEJOB_DEV_TOOLS`, as the app's Debug and Release do, so the
 # harness links what the app links. The build goes through
 # tools/proof/swift_build.py (issue batch B88): reused when every input is
 # byte-identical to a cached build's, else compiled on every core; `--force`
@@ -30,7 +30,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 root="$(cd "$here/../../.." && pwd)"
 out="$root/tools/proof/work/harness"
 bin="$out/harness"
-lib="$root/core/target/release/libreelcut_core.a"
+lib="$root/core/target/release/libframejob_core.a"
 
 if [ ! -f "$lib" ]; then
     echo "build.sh: $lib is missing — run 'cd core && cargo build --release' first" >&2
@@ -50,7 +50,7 @@ done
 
 force=()
 [ "${1:-}" = "--force" ] && force=(--force)
-python3 "$root/tools/proof/swift_build.py" build --output "$bin" --define REELCUT_DEV_TOOLS \
+python3 "$root/tools/proof/swift_build.py" build --output "$bin" --define FRAMEJOB_DEV_TOOLS \
     ${force[@]+"${force[@]}"} "${sources[@]}" "$here/main.swift" >/dev/null
 
 # sha256 over the sorted "relative path, content sha256" of every file in $1.

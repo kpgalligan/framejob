@@ -5,7 +5,9 @@
     python3 tools/proof/gate.py [--force] [--wait SECONDS]
     python3 tools/proof/gate.py --selftest | --mutant no-tools|stamp-always|md-counted|warning-count
 
-Five steps, serially, stopping at the first failure: `typecheck` (`make
+Six steps, serially, stopping at the first failure: `names`
+(`name_residue.py`, spec §11 NM-8: no line or path spells the old name
+outside its allow-list; every file is its input, `*.md` included), `typecheck` (`make
 typecheck`, passing only with no `error:` and exactly TYPECHECK_BASELINE's
 warnings, by file and message), `fmt` (`cargo fmt --check` in core, graphic,
 mcp-proxy), `lint` (`make lint`), `test` (`make test`) and `app` (`make app`,
@@ -44,9 +46,10 @@ ROOT = Path(__file__).resolve().parents[2]
 HERE = "tools/proof/gate.py"
 GATE = ROOT / "build/gate"
 ALWAYS = (HERE, "Makefile")
-STEPS = ("typecheck", "fmt", "lint", "test", "app")
-BOUNDS = {"typecheck": 300, "fmt": 120, "lint": 600, "test": 900, "app": 1500}
+STEPS = ("names", "typecheck", "fmt", "lint", "test", "app")
+BOUNDS = {"names": 120, "typecheck": 300, "fmt": 120, "lint": 600, "test": 900, "app": 1500}
 COMMANDS = {
+    "names": [["python3", "tools/proof/name_residue.py"]],
     "typecheck": [["make", "typecheck"]],
     "fmt": [["cargo", "fmt", "--check"]] * 3,
     "lint": [["make", "lint"]],
@@ -56,6 +59,7 @@ COMMANDS = {
 FOLDERS = {"fmt": ("core", "graphic", "mcp-proxy")}
 # The step's own files: folders and files, then which `*.md` count (none, unless named).
 STEP_INPUTS = {
+    "names": (("",), ("",)),
     "typecheck": (("app/Sources", "app/Bridging", "core/include", "agent"), ()),
     "fmt": (("core", "graphic", "mcp-proxy"), ()),
     "lint": (("core", "graphic", "mcp-proxy"), ()),
@@ -210,8 +214,9 @@ def release_signature(log):
     """dist_check's D25 and D26 over the Release app `make app` just built."""
     sys.path.insert(0, str(ROOT / "tools/proof"))
     import dist_check  # noqa: E402 — the app step alone reads it
+    import proof_app  # noqa: E402
 
-    exe = os.path.join(dist_check.DEFAULT_RELEASE, "Contents", "MacOS", "Reelcut")
+    exe = str(proof_app.executable(dist_check.DEFAULT_RELEASE))
     rows = (("D25 the Release app's entitlements are exactly audio-input and get-task-allow",
              dist_check.entitlements(os.path.realpath(exe), dist_check.RELEASE_ENTITLEMENTS)),
             ("D26 the Release app passes codesign --verify --deep --strict",
@@ -309,28 +314,28 @@ def selftest(mutant=None):
     # One file of each input class, and the steps a substituted digest must move.
     every = set(STEPS)
     classes = [
-        ("M1", "app/Sources/Clip.swift", {"typecheck", "test", "app"}),
-        ("M1", "app/Bridging/x.h", {"typecheck", "test", "app"}),
-        ("M1", "core/include/reelcut_core.h", every),
-        ("M1", "agent/src/agent.ts", {"typecheck", "test", "app"}),
-        ("M2", "core/src/lib.rs", {"fmt", "lint", "test", "app"}),
-        ("M2", "graphic/src/lib.rs", {"fmt", "lint", "test", "app"}),
-        ("M2", "mcp-proxy/Cargo.toml", {"fmt", "lint", "test", "app"}),
-        ("M3", "project.yml", {"test", "app"}),
-        ("M3", "VERSION", {"test", "app"}),
-        ("M3", "app/Resources/Shaders/Compositor.metal", {"test", "app"}),
-        ("M3", "docs/graphics-api.md", {"test", "app"}),
-        ("M3", "docs/graphics-api.d.ts", {"test", "app"}),
-        ("M3", "tools/proof/dist_check.py", {"test", "app"}),
-        ("M3", "tools/proof/mcp.py", {"test"}),
-        ("M3", "designs/spec/x.md", {"test"}),
-        ("M3", "docs/manual-checks.md", {"test"}),
+        ("M1", "app/Sources/Clip.swift", {"names", "typecheck", "test", "app"}),
+        ("M1", "app/Bridging/x.h", {"names", "typecheck", "test", "app"}),
+        ("M1", "core/include/framejob_core.h", every),
+        ("M1", "agent/src/agent.ts", {"names", "typecheck", "test", "app"}),
+        ("M2", "core/src/lib.rs", {"names", "fmt", "lint", "test", "app"}),
+        ("M2", "graphic/src/lib.rs", {"names", "fmt", "lint", "test", "app"}),
+        ("M2", "mcp-proxy/Cargo.toml", {"names", "fmt", "lint", "test", "app"}),
+        ("M3", "project.yml", {"names", "test", "app"}),
+        ("M3", "VERSION", {"names", "test", "app"}),
+        ("M3", "app/Resources/Shaders/Compositor.metal", {"names", "test", "app"}),
+        ("M3", "docs/graphics-api.md", {"names", "test", "app"}),
+        ("M3", "docs/graphics-api.d.ts", {"names", "test", "app"}),
+        ("M3", "tools/proof/dist_check.py", {"names", "test", "app"}),
+        ("M3", "tools/proof/mcp.py", {"names", "test"}),
+        ("M3", "designs/spec/x.md", {"names", "test"}),
+        ("M3", "docs/manual-checks.md", {"names", "test"}),
         ("M4", "archive/x.md", set()),
         ("M4", "archive/x.py", set()),
-        ("M4", "README.md", set()),
-        ("M5", "core/CLAUDE.md", set()),
-        ("M5", "app/CLAUDE.md", set()),
-        ("M6", "designs/adr/x.md", set()),
+        ("M4", "README.md", {"names"}),
+        ("M5", "core/CLAUDE.md", {"names"}),
+        ("M5", "app/CLAUDE.md", {"names"}),
+        ("M6", "designs/adr/x.md", {"names"}),
         ("M7", HERE, every),
         ("M7", "Makefile", every),
     ]

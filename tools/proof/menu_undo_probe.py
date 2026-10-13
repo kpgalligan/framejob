@@ -8,7 +8,7 @@ such a target's action is still one step (F1).
     python3 tools/proof/menu_undo_probe.py [--sources DIR] [--mutant NAME] [--only IDS]
 
 `menu_undo_probe.swift` is built with `swift_build.py`'s line
-plus `-D REELCUT_DEV_TOOLS` (`UIMenu` exists only there, as `v2_menu.py`
+plus `-D FRAMEJOB_DEV_TOOLS` (`UIMenu` exists only there, as `v2_menu.py`
 builds its probe) over `--sources` and run once, in a process of its own,
 under `tools/proof/work/menu-undo/`, killed at a 120 s wall. No media. Prints
 `<ID> pass|fail — <detail>` per row, then the probe's `pasteboard:` answer
@@ -87,7 +87,7 @@ def run(command, **kw):
 
 def build(sources, here):
     """(binary, None) or (None, why): `swift_build.build` with
-    `-D REELCUT_DEV_TOOLS`."""
+    `-D FRAMEJOB_DEV_TOOLS`."""
     entry = here / "main.swift"
     shutil.copyfile(ROOT / "tools/proof/menu_undo_probe.swift", entry)
     binary = here / "menu-undo-probe"
@@ -95,7 +95,7 @@ def build(sources, here):
     if len(swift) < 100:
         return None, "app source set incomplete"
     try:
-        swift_build.build(sources=swift + [entry], output=binary, defines=["REELCUT_DEV_TOOLS"])
+        swift_build.build(sources=swift + [entry], output=binary, defines=["FRAMEJOB_DEV_TOOLS"])
     except swift_build.SwiftBuildFailed as error:
         return None, "swiftc: " + "; ".join(error.diagnostics[:8])
     return binary, None

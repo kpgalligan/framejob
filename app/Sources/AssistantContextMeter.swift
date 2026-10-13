@@ -130,7 +130,7 @@ final class AssistantContextMeterView: NSView {
 }
 
 /// The Assistant tab's Spend row (road map 13 P4, spec §11 P-7): a "Spend"
-/// micro label and what the conversation has cost so far, as Reelcut
+/// micro label and what the conversation has cost so far, as Frame Job
 /// estimates it (`AssistantTurnCost.figure`, or its shorter rung where that
 /// does not fit, P-8), laid out like the meter's label row.
 final class AssistantConversationCostView: NSView {

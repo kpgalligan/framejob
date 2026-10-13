@@ -126,7 +126,7 @@ final class LutTextures {
             return true
         }
         guard written else { return nil }
-        texture.label = "Reelcut LUT"
+        texture.label = "Frame Job LUT"
         return texture
     }
 }

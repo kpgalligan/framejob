@@ -2,12 +2,12 @@
 // AI-14, AI-17, AI-19).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
-// `tools/proof/harness/build.sh`'s swiftc line, `-D REELCUT_DEV_TOOLS` — by
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
+// `tools/proof/harness/build.sh`'s swiftc line, `-D FRAMEJOB_DEV_TOOLS` — by
 // `assistant_tab_proof.py`, which copies the built helper to
-// `<probe dir>/Contents/Helpers/reelcut-agent` (a bare binary's
+// `<probe dir>/Contents/Helpers/framejob-agent` (a bare binary's
 // `Bundle.main.bundleURL` is its own folder) and runs it with a DUMMY key in
-// `-RCSecretFolder`, `-ReelcutInspectorCollapsed NO`, and
+// `-RCSecretFolder`, `-FrameJobInspectorCollapsed NO`, and
 // `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9` (nothing listens there; no row
 // here sends a message). In every mode it first registers every face in
 // `--fonts <dir>` (the app's `app/Resources/Fonts`; a bare binary has no
@@ -80,7 +80,7 @@
 //       scroller, light, for seven costs (none; priced 0.0018 and 0.00002;
 //       partial 0.1234 and 12.3456; unknown alone; priced 0.0123 then
 //       unknown): the label shows a rung of `figureLadder` that fits its
-//       frame, ends " · Reelcut's estimate" once a response is counted, its
+//       frame, ends " · Frame Job's estimate" once a response is counted, its
 //       tooltip `figureTooltip`; the row's width the same for all seven; at
 //       480 (the control) each shows `figure`; and (#207) the label's face is
 //       IBMPlexMono-Regular, `--fonts` was given, and the shipped
@@ -155,7 +155,7 @@ func rowP1() {
         ["type": "turn_started"],
         ["type": "text_delta", "text": "Hel"], ["type": "text_delta", "text": "lo."],
         ["type": "tool_call", "name": "add_marker",
-         "arguments": ["project": "/tmp/A.reelcut", "name": "P1", "at": 1_200_000]],
+         "arguments": ["project": "/tmp/A.framejob", "name": "P1", "at": 1_200_000]],
         ["type": "tool_result", "name": "add_marker", "is_error": false, "summary": "ok"],
         ["type": "tool_result", "name": "export", "is_error": true, "summary": "no media"],
         ["type": "text_delta", "text": "Again"],
@@ -390,7 +390,7 @@ func rowP6(_ editor: EditorViewController) {
         row("P6", false, "no Assistant view attached")
         return
     }
-    let helper = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/reelcut-agent")
+    let helper = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/framejob-agent")
     var notes: [String] = ["helper \(FileManager.default.isExecutableFile(atPath: helper.path))"]
     guard case .success(let first) = editor.assistantSession() else {
         if case .failure(let error) = editor.assistantSession() {
@@ -431,7 +431,7 @@ func rowP6(_ editor: EditorViewController) {
 // MARK: - P7 Settings' Assistant pane
 
 func rowP7() {
-    let suiteName = "com.kgalligan.reelcut.assistant-tab-probe"
+    let suiteName = "com.kgalligan.framejob.assistant-tab-probe"
     UserDefaults().removePersistentDomain(forName: suiteName)
     guard let suite = UserDefaults(suiteName: suiteName) else {
         row("P7", false, "no suite")
@@ -867,7 +867,7 @@ func rowP10() {
     // by the legacy name; `.string` is what the pasteboard reads it back as.
     let plain = NSPasteboard.PasteboardType("NSStringPboardType")
     let types = transcript.textView.writablePasteboardTypes
-    let board = NSPasteboard(name: NSPasteboard.Name("com.kgalligan.reelcut.p10." + UUID().uuidString))
+    let board = NSPasteboard(name: NSPasteboard.Name("com.kgalligan.framejob.p10." + UUID().uuidString))
     board.clearContents()
     let wrote = transcript.textView.writeSelection(to: board, types: types)
     let copied = board.string(forType: .string)
@@ -1303,7 +1303,7 @@ func rowP15() {
         return
     }
     let label = spend.figureLabel
-    let suffix = " · Reelcut's estimate"
+    let suffix = " · Frame Job's estimate"
     let wantedFace = "IBMPlexMono-Regular"
     let face = label.font?.fontName ?? "none"
     let faceOK = face == wantedFace

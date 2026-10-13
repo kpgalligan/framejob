@@ -18,14 +18,14 @@ The probe `spend_ui_probe.swift` (over `app/Sources`, `assistant_tab_proof`'s
       then the new one within 5 s; the note exact
 The built app (`assistant_session_proof`'s `App`, `Fake`, `secret_folder`;
 `assistant_tab_proof`'s `Dump` and `open_tab`), a dummy key, the stand-in:
-  U0  no `Reelcut: ` line
+  U0  no `Frame Job: ` line
   U1  a seeded `-RCSpendFolder` ledger (the current UTC month's start + 1 s,
       the previous month's end − 1 s, one unpriced line, one torn line):
-      Reelcut ▸ Settings…, `snapshot_ui window: settings` → the month line
+      Frame Job ▸ Settings…, `snapshot_ui window: settings` → the month line
       equals this script's own fold and sentence, the note is exact, and
       neither label has a layout problem
   U2  the tab's `assistant.spend` reads "Nothing yet"; a two-reply pane turn
-      and a one-reply turn → "$%.4f · Reelcut's estimate" of the tool-view
+      and a one-reply turn → "$%.4f · Frame Job's estimate" of the tool-view
       dollars; Settings, re-captured (polled up to 5 s), equals the fold of
       the ledger as it now is
   U3  the override with no `-RCSpendFolder`: "This launch keeps no spend
@@ -80,10 +80,10 @@ PROBE_SWIFT = os.path.join(HERE, "spend_ui_probe.swift")
 WALL_TURN, WALL_SETTLE = 60, 5
 PROBE_ROWS = ["M1", "M2", "M3", "C1", "C2", "C3"]
 PROBE_TZ = "America/Los_Angeles"
-NOTE = ("Reelcut's own estimate at LiteLLM prices, from its spend ledger. The Anthropic "
+NOTE = ("Frame Job's own estimate at LiteLLM prices, from its spend ledger. The Anthropic "
         "Console shows what your account was billed.")
 NO_LEDGER = "This launch keeps no spend ledger."
-SETTINGS = ["Reelcut", "Settings…"]
+SETTINGS = ["Frame Job", "Settings…"]
 MUTANTS = {
     # name: (the literal, its replacement, the rows that must FAIL)
     "local-month": ("TimeZone.gmt", "TimeZone.current", ["M1", "M3"]),
@@ -234,12 +234,12 @@ def rows_u(fake, secrets, score):
     folder = os.path.join(WORK, "u")
     tab = {"folder": folder, "dumps": []}
     app = asp.App("U", RELEASE, ["-RCSecretFolder", secrets,
-                                 "-RCSpendFolder", spend, "-ReelcutInspectorCollapsed", "NO"],
+                                 "-RCSpendFolder", spend, "-FrameJobInspectorCollapsed", "NO"],
                   fake.base)
     try:
         app.connect()
-        complaints = [line for line in app.log().splitlines() if "Reelcut: " in line]
-        score("U0", not complaints, f"`Reelcut: ` lines {complaints[:2]}")
+        complaints = [line for line in app.log().splitlines() if "Frame Job: " in line]
+        score("U0", not complaints, f"`Frame Job: ` lines {complaints[:2]}")
 
         # U1
         try:
@@ -273,7 +273,7 @@ def rows_u(fake, secrets, score):
             found = sp.costs(one.get("events", [])) + sp.costs(two.get("events", []))
             dollars = [e.get("cost", {}).get("dollars") for e in found]
             priced = all(e.get("cost", {}).get("kind") == "dollars" for e in found)
-            want_tab = (f"${sum(dollars):.4f} · Reelcut's estimate" if priced and found
+            want_tab = (f"${sum(dollars):.4f} · Frame Job's estimate" if priced and found
                         else None)
             dump = atp.Dump(app, a, "u2-after")
             tab_text = dump.shown_text("assistant.spend")
@@ -298,8 +298,8 @@ def row_u3(fake, secrets, run_before):
                   fake.base)
     try:
         app.connect()
-        complaints = [line for line in app.log().splitlines() if "Reelcut: " in line]
-        a = app.must("new_project", path=os.path.join(WORK, "u3.reelcut"))["saved"]
+        complaints = [line for line in app.log().splitlines() if "Frame Job: " in line]
+        a = app.must("new_project", path=os.path.join(WORK, "u3.framejob"))["saved"]
         app.must("perform_menu_item", project=a, path=SETTINGS)
         dump = settings_until(app, NO_LEDGER, "u3")
         got = dump.text("settings.assistant.spend")
@@ -307,7 +307,7 @@ def row_u3(fake, secrets, run_before):
         app.stop()
     after = sp.person_state()
     good = not complaints and got == NO_LEDGER and after == before and after == run_before
-    return good, (f"`Reelcut: ` {complaints[:1]}; month line {got!r}; the person's files before "
+    return good, (f"`Frame Job: ` {complaints[:1]}; month line {got!r}; the person's files before "
                   f"the run {run_before}, before this launch {before}, after {after}")
 
 

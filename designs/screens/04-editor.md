@@ -15,7 +15,7 @@ a person spends most of their time in, watching the preview while arranging clip
 on the timeline.
 
 The toolbar shows the playhead at "00:00:02:15" of "00:00:05:07". The preview
-shows the frame under the playhead: a navy video frame, the white word "Reelcut"
+shows the frame under the playhead: a navy video frame, the white word "Frame Job"
 inside a white ellipse outline over it, and a lower-third title in the bottom left
 — a dark box with an orange bar at its left edge, "Jane Doe" in bold and "Director
 of Photography" beneath. The inspector reads "Select a clip to edit its
@@ -24,7 +24,7 @@ properties." because nothing is selected.
 The timeline shows four tracks, each a named row with the eye, speaker, lock and
 headphone icons: Music, holding a green audio clip "toneA.m4a" with a pale level
 line across it, its waveform band; Shapes, a teal clip "Ellipse"; Graphics, a taller teal clip "Graphic";
-and Titles, an orange clip "Reelcut". Each clip's name sits in a darker strip
+and Titles, an orange clip "Frame Job". Each clip's name sits in a darker strip
 along its top with a small icon for its kind. The red playhead is at about the
 2.5-second mark, a thin line through every track.
 

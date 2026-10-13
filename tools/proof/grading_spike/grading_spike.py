@@ -24,7 +24,7 @@ through every `texture2d<float> source` signature and `source, samp` call by
 token rewrite, BT.709 video-range YCbCr → RGB in `layerSample`). Every grading
 variant appends 16 floats to `LayerUniforms`, takes `texture3d<float> look
 [[texture(2)]]` on both layer entry points and the stage, and gains the
-helpers; each TL variant (and VE) appends `reelcut_adjust_fragment`, which
+helpers; each TL variant (and VE) appends `framejob_adjust_fragment`, which
 reads `[[color(0)]]` with blending off. Every anchor must occur exactly once
 and every token rewrite must hit its pinned count; otherwise B0 fails naming
 it. Each is compiled with `xcrun metal` (B1); `bench.swift` is built over
@@ -230,7 +230,7 @@ ADJUST = """
 // Tone and look over what is already drawn: reads the destination through
 // `[[color(0)]]` and returns the finished pixel, so its pipeline is built with
 // blending OFF. Its strength is the block's opacity.
-fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
+fragment float4 framejob_adjust_fragment(ShadowVaryings in [[stage_in]],
                                         constant LayerUniforms &u [[buffer(0)]],
                                         sampler samp [[sampler(0)]],
                                         texture3d<float> look [[texture(2)]],
@@ -382,7 +382,8 @@ def build_shaders(folder, mutant):
         emit("B0", "FAIL", f"git show {SHADER_COMMIT}:{SHADER} failed: "
              f"{shown.stderr.strip()[-300:]}")
         return None
-    source = shown.stdout
+    # The commit predates rename R1: its entry points take the names the bench asks for.
+    source = shown.stdout.replace("reelcut_", "framejob_")
     texts = {"V0": source}
     for variant in GRADING + ("VB",):
         try:
@@ -419,7 +420,7 @@ def build_bench():
         entry.write_text(source)
     try:
         built = swift_build.build(sources=swift_build.app_sources() + [entry],
-                                  output=folder / "grading_bench", defines=["REELCUT_DEV_TOOLS"],
+                                  output=folder / "grading_bench", defines=["FRAMEJOB_DEV_TOOLS"],
                                   optimize=True, timeout=1200)
     except swift_build.SwiftBuildFailed as error:
         emit("B2", "FAIL", f"the bench did not build (-O): {error} {error.diagnostics[:6]}")
@@ -665,7 +666,9 @@ def build_tree_shaders(folder, base):
     if shown.returncode != 0:
         emit("B0", "FAIL", f"git show {base}:{SHADER} failed: {shown.stderr.strip()[-300:]}")
         return None
-    texts = {"V0": shown.stdout, "VT": (ROOT / SHADER).read_text()}
+    # `base` predates rename R1: its entry points take the names the bench asks for.
+    texts = {"V0": shown.stdout.replace("reelcut_", "framejob_"),
+             "VT": (ROOT / SHADER).read_text()}
     emit("B0", "PASS", f"--tree: V0 {SHADER} at {base} ({texts['V0'].count(chr(10))} "
          f"lines), VT the tree's own, unpatched ({texts['VT'].count(chr(10))} lines; no anchor "
          "asked)")
@@ -695,7 +698,7 @@ def build_tree_bench():
     try:
         built = swift_build.build(sources=swift_build.app_sources() + [entry],
                                   output=folder / "grading_tree_bench",
-                                  defines=["REELCUT_DEV_TOOLS"], optimize=True, timeout=1200)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], optimize=True, timeout=1200)
     except swift_build.SwiftBuildFailed as error:
         emit("B2", "FAIL", f"tree_bench did not build (-O): {error} {error.diagnostics[:6]}")
         return None

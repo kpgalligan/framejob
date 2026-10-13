@@ -73,7 +73,7 @@ enum AssistantPrompt {
 
     /// The system prompt, fixed for the session (AI-15).
     static let system: String = [
-        "You are the assistant built into Reelcut, a video editor for macOS. You act on the "
+        "You are the assistant built into Frame Job, a video editor for macOS. You act on the "
             + "project open in your own window, through its tools. Leave `project` out of every "
             + "call: a call naming another project is refused. The person sees each change as "
             + "it lands, and each tool call is one step they can undo.",

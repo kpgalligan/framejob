@@ -31,7 +31,7 @@ constant float3 kLumaWeights = float3(0.2126, 0.7152, 0.0722);
 // x scaled to 256; the level is Y′ of the saturated colour rounded to 0…255,
 // so level 255 is exactly "an 8-bit file writes 255" (Y′ ≥ 254.5/255) and
 // level 0 is Y′ < 0.5/255. `counts` is `column * 256 + level`.
-kernel void reelcut_waveform_bin(texture2d<half, access::read> frame [[texture(0)]],
+kernel void framejob_waveform_bin(texture2d<half, access::read> frame [[texture(0)]],
                                  device atomic_uint *counts [[buffer(0)]],
                                  uint2 gid [[thread_position_in_grid]]) {
     uint width = frame.get_width();
@@ -64,7 +64,7 @@ constant uint kParadeCopies = 2u;
 // group, non-zero only; a group spanning more (some groups of a frame under
 // 1792 px wide) adds globally, as the waveform does. Taken in G2-1 because the global
 // parade's 4K time sat within 7 % of GR-10's bound.
-kernel void reelcut_parade_bin(texture2d<half, access::read> frame [[texture(0)]],
+kernel void framejob_parade_bin(texture2d<half, access::read> frame [[texture(0)]],
                                device atomic_uint *counts [[buffer(0)]],
                                uint2 gid [[thread_position_in_grid]],
                                uint index [[thread_index_in_threadgroup]],
@@ -128,7 +128,7 @@ static inline uint2 chromaBins(float3 rgb) {
 // The vectorscope: `counts` is `crBin * 256 + cbBin`. The central 64 × 64
 // bins (96..<160 on both axes) are counted per threadgroup and merged once
 // per group, non-zero only; every other bin globally.
-kernel void reelcut_vectorscope_bin(texture2d<half, access::read> frame [[texture(0)]],
+kernel void framejob_vectorscope_bin(texture2d<half, access::read> frame [[texture(0)]],
                                     device atomic_uint *counts [[buffer(0)]],
                                     uint2 gid [[thread_position_in_grid]],
                                     uint index [[thread_index_in_threadgroup]],
@@ -162,7 +162,7 @@ kernel void reelcut_vectorscope_bin(texture2d<half, access::read> frame [[textur
 
 // The histogram: `counts` is `plane * 256 + level`, plane 0 R′, 1 G′, 2 B′,
 // 3 Y′, counted per threadgroup and merged once per group, non-zero only.
-kernel void reelcut_histogram_bin(texture2d<half, access::read> frame [[texture(0)]],
+kernel void framejob_histogram_bin(texture2d<half, access::read> frame [[texture(0)]],
                                   device atomic_uint *counts [[buffer(0)]],
                                   uint2 gid [[thread_position_in_grid]],
                                   uint index [[thread_index_in_threadgroup]],

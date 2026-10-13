@@ -4,7 +4,7 @@
 // `EditorViewController` and `ProjectDocument`.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` — the swiftc
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` — the swiftc
 // line `relink_sheet_probe.py` uses. One process:
 //
 //   sheet_queue_probe <request.json>
@@ -326,7 +326,7 @@ if let wide {
 
 // The row's own document is given a file URL (no media) before the call.
 func planText() -> String? {
-    doc.fileURL = work.appendingPathComponent("probe.reelcut", isDirectory: true)
+    doc.fileURL = work.appendingPathComponent("probe.framejob", isDirectory: true)
     do { _ = try MediaConsolidator.plan(for: doc) } catch { return error.localizedDescription }
     return nil
 }

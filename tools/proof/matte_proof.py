@@ -162,7 +162,7 @@ un-nested frame U.
 - **D8**: D0 with a `zoom`: inside the centred in-box (z_in = 0.75 + 0.25p of
   the canvas, 4 px kept from its edges) G = 255(1−p), R = 255p (pre: G =
   255(1−p)²); outside it G = 255(1−p), R ≤ 2.
-- **Z1** (CONTROL): the log holds no `Reelcut: ` line; its tail is printed.
+- **Z1** (CONTROL): the log holds no `Frame Job: ` line; its tail is printed.
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`; a `core/`
 anchor makes the copy's `core/` its own through `hevc_alpha_proof.own_core`),
@@ -553,7 +553,7 @@ def shape(doc, track, patch):
 
 def run_p(client, movie, state):
     """Project P's rows. Answers whether the project closed."""
-    p = WORK / "P.reelcut"
+    p = WORK / "P.framejob"
     made = attempt(client, "new_project", {"path": str(p)})
     doc = Doc(client, p)
     sized = canvas(doc)
@@ -697,7 +697,7 @@ def run_p(client, movie, state):
 
 def run_l(client, movie, state):
     """Project L's rows. Answers whether the project closed."""
-    path = WORK / "L.reelcut"
+    path = WORK / "L.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path)
     sized = canvas(doc, background=[0.4, 0.2, 0.1, 1])
@@ -833,7 +833,7 @@ def track_mattes(doc):
 
 def run_n(client, movie, state):
     """Project N's rows (N1–N4, N6). Answers whether the project closed."""
-    path = WORK / "N.reelcut"
+    path = WORK / "N.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path)
     sized = canvas(doc)
@@ -922,7 +922,7 @@ def run_n(client, movie, state):
 
 def run_n5(client, movie, state):
     """Row N5: a matted nest holding its own matte pair cuts by the product."""
-    path = WORK / "N5.reelcut"
+    path = WORK / "N5.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path)
     sized = canvas(doc)
@@ -960,7 +960,7 @@ def run_n5(client, movie, state):
 
 def run_n7(client, state):
     """Row N7: a split nest clip in a dissolve, each half its own matte."""
-    path = WORK / "N7.reelcut"
+    path = WORK / "N7.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path)
     sized = canvas(doc, background=[0, 0, 0, 1])
@@ -1024,7 +1024,7 @@ def run_n7(client, state):
 
 def run_t(client, state):
     """Rows T2 and T3: a dissolve between two matted clips."""
-    path = WORK / "T.reelcut"
+    path = WORK / "T.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path)
     sized = canvas(doc, background=[0.4, 0.2, 0.1, 1])
@@ -1089,7 +1089,7 @@ def run_t(client, state):
 
 def run_t1(client, state):
     """Row T1: a dissolve between two matte clips shapes the matte."""
-    path = WORK / "T1.reelcut"
+    path = WORK / "T1.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path)
     sized = canvas(doc, background=[0, 0, 0, 1])
@@ -1132,7 +1132,7 @@ def run_t1(client, state):
 
 def run_s(client, state):
     """Rows S1 and RF1: the matted clip's shadow and reflection."""
-    path = WORK / "S.reelcut"
+    path = WORK / "S.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path)
     sized = canvas(doc, background=[0.4, 0.2, 0.1, 1])
@@ -1239,7 +1239,7 @@ def decoded(movie, n):
 
 def run_e(client, state):
     """Rows E1–E7: every export preset draws the matte as render_frame does."""
-    path = WORK / "E.reelcut"
+    path = WORK / "E.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path)
     sized = canvas(doc, background=[0.4, 0.2, 0.1, 1])
@@ -1309,7 +1309,7 @@ WINDOW_MODULE = ("export const meta = { name: \"Window\", durationInFrames: 30 }
 
 def run_f(client, log, state):
     """Row F1: a graphic on the matte track is prefetched for an export."""
-    path = WORK / "F.reelcut"
+    path = WORK / "F.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path)
     sized = canvas(doc, background=[0.4, 0.2, 0.1, 1])
@@ -1405,7 +1405,7 @@ def linear_transition(doc, clip, **arguments):
 def d_project(client, name):
     """A new project at the proof's canvas, background black; (doc, whether
     it was made and sized, its first track's id)."""
-    path = WORK / f"{name}.reelcut"
+    path = WORK / f"{name}.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path)
     sized = canvas(doc, background=[0, 0, 0, 1])
@@ -1771,7 +1771,7 @@ def tail(log, count=4):
 
 def complaints(log):
     try:
-        return [line.strip() for line in open(log, errors="replace") if "Reelcut: " in line]
+        return [line.strip() for line in open(log, errors="replace") if "Frame Job: " in line]
     except OSError:
         return [f"{log} could not be read"]
 
@@ -1849,7 +1849,7 @@ def main():
     scored = [name for name in ROWS if name in selected]
     binary = Path(args.app)
     if binary.suffix == ".app":
-        binary = binary / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(binary)
     if args.mutant:
         print(f"mattes MT2/MT3 — the {args.mutant} MUTANT ({' '.join(named)} must FAIL)",
               flush=True)
@@ -1857,7 +1857,7 @@ def main():
         if app is None:
             print(f"mutant {args.mutant}: the control could not be performed — {copy}")
             return 2
-        binary = app / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(app)
         if "CT" in named:
             passed_ct, last = core_test(copy)
             rows["CT"] = passed_ct
@@ -1918,7 +1918,7 @@ def main():
         launched.stop()
         mcp.remove_scratch(launched.socket_path)
     found = complaints(log)
-    check("Z1 CONTROL: the projects close and the log holds no `Reelcut: ` line",
+    check("Z1 CONTROL: the projects close and the log holds no `Frame Job: ` line",
           closed and not found, f"closed {closed}; complaints {found}")
     print(f"  {log.name} tail:\n    " + "\n    ".join(tail(log)), flush=True)
     # A host skip (E3 on a Mac with no HEVC-with-alpha encoder) is named

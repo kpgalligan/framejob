@@ -81,8 +81,8 @@ struct WaveformTrace: Equatable {
     }
 }
 
-/// The scopes' GPU passes (`Waveform.metal`: `reelcut_waveform_bin`,
-/// `reelcut_parade_bin`, `reelcut_vectorscope_bin`, `reelcut_histogram_bin`;
+/// The scopes' GPU passes (`Waveform.metal`: `framejob_waveform_bin`,
+/// `framejob_parade_bin`, `framejob_vectorscope_bin`, `framejob_histogram_bin`;
 /// spec §11 GR-5, GR-10): one thread per pixel, each kind into a counts
 /// buffer of its own, under GR-10's counting rule.
 ///
@@ -106,8 +106,8 @@ final class WaveformAnalyzer {
 
     /// Each kind's kernel.
     static let functions: [ScopeKind: String] = [
-        .waveform: "reelcut_waveform_bin", .parade: "reelcut_parade_bin",
-        .vectorscope: "reelcut_vectorscope_bin", .histogram: "reelcut_histogram_bin",
+        .waveform: "framejob_waveform_bin", .parade: "framejob_parade_bin",
+        .vectorscope: "framejob_vectorscope_bin", .histogram: "framejob_histogram_bin",
     ]
 
     let device: MTLDevice

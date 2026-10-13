@@ -8,7 +8,7 @@ probe".
           its `#endif`), before the `NSApplicationMain` line
   L1–L9   the probe's rows (`assistant_lane_probe.swift`, compiled over
           `app/Sources` minus `main.swift` through `swift_build.py` with
-          `-D REELCUT_DEV_TOOLS`, reused when every input is byte-identical
+          `-D FRAMEJOB_DEV_TOOLS`, reused when every input is byte-identical
           to a cached build's); L6 also
           requires every `AssistantPrompt.coreTools` name in the assistant's
           catalog (A1 part 3)
@@ -74,7 +74,7 @@ SCRATCH = os.path.join(WORK, "scratch")
 SOURCES = os.path.join(ROOT, "app", "Sources")
 MAIN = os.path.join(SOURCES, "main.swift")
 PROBE_SWIFT = os.path.join(HERE, "assistant_lane_probe.swift")
-LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 PREPARE = "AgentLane.prepareAtLaunch()"
 WALL_BUILD, WALL_RUN = 900, 300
 
@@ -237,7 +237,7 @@ def build_probe(sources=None, probe_dir=None):
     print(f"probe: {len(swift)} sources through swift_build (up to {WALL_BUILD} s)…", flush=True)
     try:
         built = swift_build.build(sources=swift + [entry], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=WALL_BUILD)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=WALL_BUILD)
     except swift_build.SwiftBuildFailed as error:
         return None, (f"swiftc exited {error.rc if error.rc is not None else 'before running'} "
                       f"(expired {error.expired}): "

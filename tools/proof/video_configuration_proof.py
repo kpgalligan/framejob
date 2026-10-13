@@ -5,7 +5,7 @@ through, an `AVVideoComposition.Configuration` draws exactly what the
 
 The fixture is `target_bump_proof.py`'s `document()` — a media clip
 (`tools/proof/media/A.mov`; a missing file FAILS by name), a text clip and a
-shape clip on three tracks — written as `<dir>/frames.reelcut` by `capture`
+shape clip on three tracks — written as `<dir>/frames.framejob` by `capture`
 and opened again by `compare`.
 
     python3 tools/proof/video_configuration_proof.py <socket> capture <dir>   # the CONTROL tree
@@ -63,7 +63,7 @@ RESOURCES = os.path.join(ROOT, "app", "Resources")
 PROBE_SWIFT = os.path.join(HERE, "video_configuration_probe.swift")
 PROBE_WORK = os.path.join(HERE, "work", "video_configuration_probe")
 PROBE_DIR = os.path.join(PROBE_WORK, "tree")
-LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 A_MOV = os.path.join(ROOT, "tools", "proof", "media", "A.mov")
 WRITTEN = re.compile(r"Written to (\S+\.png)\.")
 EXPORTS = ("apng", "gif", "prores_422")
@@ -212,7 +212,7 @@ def build_probe(sources=None, probe_dir=None):
     print(f"probe: {len(swift)} sources through swift_build (up to {WALL_BUILD} s)…", flush=True)
     try:
         built = swift_build.build(sources=swift + [entry], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=WALL_BUILD)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=WALL_BUILD)
     except swift_build.SwiftBuildFailed as error:
         return None, (f"swiftc exited {error.rc if error.rc is not None else 'before running'} "
                       f"(expired {error.expired}): "
@@ -259,7 +259,7 @@ def capture(socket_path, where):
     shutil.rmtree(where, ignore_errors=True)
     os.makedirs(where)
     package(where, "frames", document())
-    project = os.path.join(where, "frames.reelcut")
+    project = os.path.join(where, "frames.framejob")
     mcp = MCP(socket_path)
     mcp.call("open_project", path=project)
     for tick in TICKS:
@@ -300,7 +300,7 @@ def kept_of(where, stem):
 
 
 def compare_probe(where, binary, why, row_id="V7"):
-    project = os.path.join(where, "frames.reelcut")
+    project = os.path.join(where, "frames.framejob")
     kept = os.path.join(where, "probe-prores25.mov")
     if binary is None:
         score(row_id, False, f"the probe did not build: {why}", instrument=True)
@@ -323,7 +323,7 @@ def compare_probe(where, binary, why, row_id="V7"):
 
 
 def compare(socket_path, where):
-    project = os.path.join(where, "frames.reelcut")
+    project = os.path.join(where, "frames.framejob")
     if not os.path.isdir(project):
         sys.exit(f"no control package at {project}; run capture on the control tree first")
     out_dir = os.path.join(where, "compare")

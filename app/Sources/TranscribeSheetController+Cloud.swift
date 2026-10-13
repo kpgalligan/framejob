@@ -28,7 +28,7 @@ extension TranscribeSheetController {
 
     /// The note under the button when no credential resolves — §5e's
     /// sentence, and it names the window that fixes it.
-    static let noKeyNote = "No AssemblyAI API key is set — Reelcut ▸ Settings…"
+    static let noKeyNote = "No AssemblyAI API key is set — Frame Job ▸ Settings…"
 
     // MARK: - The engine and its languages
 

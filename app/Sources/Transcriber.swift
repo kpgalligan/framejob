@@ -203,7 +203,7 @@ final class Transcriber {
     // MARK: - Running
 
     private let work = DispatchQueue(
-        label: "com.kgalligan.reelcut.transcribe", qos: .userInitiated)
+        label: "com.kgalligan.framejob.transcribe", qos: .userInitiated)
 
     init() {}
 

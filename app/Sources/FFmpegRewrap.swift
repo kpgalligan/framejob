@@ -34,7 +34,7 @@ import Foundation
 /// `UserDefaults`, `ask` (the default), `always` or `never`.
 ///
 /// **Never in the document package.** See `rewrapDirectory` for why the
-/// converted file lands in Application Support and not in the `.reelcut`
+/// converted file lands in Application Support and not in the `.framejob`
 /// bundle.
 ///
 /// The orchestration is `assist(_:mayAsk:planned:reencodingVP9:)`;
@@ -177,9 +177,9 @@ enum FFmpegRewrap {
 
     // MARK: - Where the converted file goes
 
-    /// `~/Library/Application Support/Reelcut/Rewrapped/`.
+    /// `~/Library/Application Support/Frame Job/Rewrapped/`.
     ///
-    /// **Why not inside the `.reelcut` package**, which is what spec §11's
+    /// **Why not inside the `.framejob` package**, which is what spec §11's
     /// one-line sketch says. Two reasons, both discovered in the code:
     ///
     /// 1. There is frequently no package. Opening an MKV from the Finder
@@ -209,7 +209,7 @@ enum FFmpegRewrap {
     /// The two path components were spelled here, privately, until road map
     /// 2's phase 7 needed the same folder for `ExportPresets.json`. They are
     /// `AppSupport`'s now — one home for `~/Library/Application
-    /// Support/Reelcut/`, which is where the argument above still lives; this
+    /// Support/Frame Job/`, which is where the argument above still lives; this
     /// only names the subfolder. The directory itself is still created by
     /// `convert`, at the moment there is something to put in it.
     static var rewrapDirectory: URL? {
@@ -303,7 +303,7 @@ enum FFmpegRewrap {
     private static func ask(_ plan: Plan) -> Bool {
         let alert = NSAlert()
         alert.alertStyle = .informational
-        alert.messageText = "Reelcut cannot open “\(plan.source.lastPathComponent)”."
+        alert.messageText = "Frame Job cannot open “\(plan.source.lastPathComponent)”."
         alert.informativeText = plan.consentText
         alert.addButton(withTitle: plan.isStreamCopy ? "Repackage" : "Convert")
         alert.addButton(withTitle: "Cancel")

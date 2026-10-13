@@ -730,6 +730,14 @@ on your own account, never the spike's.
 - **Answer:** did the question appear during the agent's export?
 - **Source:** road map 14 MC4 (spec §11 MC-5: a click still asks; `agent_socket_proof.py` K12 holds the tool call's half).
 
+## The name
+
+**NAME-1 — Finder opens a `.framejob` with Frame Job; the Debug app stays the Alternate**
+- **Do:** 1. `make app` and `make app-debug`. 2. Rename a saved project's package to end in `.framejob`. 3. Double-click it in the Finder. 4. Right-click it and open the Open With submenu.
+- **Expect:** step 3 opens it in Frame Job (the Release build), not Frame Job Debug; step 4 lists Frame Job as the default and Frame Job Debug as another choice.
+- **Answer:** did the double-click open Frame Job, and does Open With list Frame Job Debug as an alternate?
+- **Source:** spec §11 NM-3, V-5.
+
 ## Published build
 
 After a push to `publish` has made a release (README, "Publishing a

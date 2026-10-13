@@ -8,7 +8,7 @@ is pointed at the relay of `assistant_prompt_eval.py` (imported), which
 forwards to the stand-in (`--rehearse`) or the real API (`--live`). Two turns
 go through the tab's composer (`assistant_send` with `pane`):
 
-  T1  "Change the title's text to Hello Reelcut, rename the Shapes track to
+  T1  "Change the title's text to Hello Frame Job, rename the Shapes track to
       Boxes, and add a marker called Intro at 1 second. Then render the frame
       at 1 second and tell me in one sentence what it shows. For later: the
       outro will start at 4.5 seconds, but don't mark it yet."
@@ -16,7 +16,7 @@ go through the tab's composer (`assistant_send` with `pane`):
 
 At a threshold of 1 token (AI-18) every turn ends compacted. The rows:
 
-  C0  no `Reelcut: ` line
+  C0  no `Frame Job: ` line
   C1  turn 1 finished, rendered a frame, and its three edits are placed —
       nothing else changed (`get_project`)
   C2  turn 1 compacted: one `compaction_started` below the shipped 300 000,
@@ -89,7 +89,7 @@ ANCHOR = '"compaction_instructions": AssistantPrompt.compactionInstructions,'
 MUTATED = '"compaction_instructions": AssistantPrompt.compactionInstructions + " Be brief.",'
 ROWS = ["C0", "C1", "C2", "C3", "C4", "C5", "C6", "H", "K"]
 TURN1_ROWS = ["C1", "C2", "C3", "C4"]
-T1 = ("Change the title's text to Hello Reelcut, rename the Shapes track to Boxes, and add a "
+T1 = ("Change the title's text to Hello Frame Job, rename the Shapes track to Boxes, and add a "
       "marker called Intro at 1 second. Then render the frame at 1 second and tell me in one "
       "sentence what it shows. For later: the outro will start at 4.5 seconds, but don't mark "
       "it yet.")
@@ -258,10 +258,10 @@ def build_fixture(app, path):
 
 
 def summary_text(ids, turn):
-    text = (f"The title clip {ids['title']} on track {ids['titles']} now reads Hello Reelcut. "
+    text = (f"The title clip {ids['title']} on track {ids['titles']} now reads Hello Frame Job. "
             f"Track {ids['shapes']} (Shapes) was renamed Boxes; it holds the red rectangle clip "
             f"{ids['shape']}. Marker {ids['next']} Intro is at 600000 ticks (1 s). The frame "
-            f"rendered at 1 s shows Hello Reelcut over the red rectangle. The outro will start at "
+            f"rendered at 1 s shows Hello Frame Job over the red rectangle. The outro will start at "
             f"4.5 seconds (2700000 ticks)")
     return text + (", not marked yet." if turn == 1 else f"; marker {ids['next'] + 1} Outro "
                                                          "is there now.")
@@ -287,7 +287,7 @@ def script(turn, ids, wrong):
         edits = {"content": [
             {"type": "tool_use", "id": "toolu_c1a", "name": "set_text",
              "input": {"clips": [ids["title"]],
-                       "patch": {"content": "Hello" if wrong else "Hello Reelcut"}}},
+                       "patch": {"content": "Hello" if wrong else "Hello Frame Job"}}},
             {"type": "tool_use", "id": "toolu_c1b", "name": "set_track",
              "input": {"track": ids["shapes"], "name": "Boxes"}},
             {"type": "tool_use", "id": "toolu_c1c", "name": "add_marker",
@@ -432,7 +432,7 @@ def row_c1(ctx):
     key = ("timeline", ids["title"])
     sig_before, sig_after = ev.clip_signatures(before), ev.clip_signatures(after)
     was, now = sig_before.get(key), sig_after.get(key)
-    wanted = was[:4] + ("Hello Reelcut",) if was else None
+    wanted = was[:4] + ("Hello Frame Job",) if was else None
     others = ({k: v for k, v in sig_before.items() if k != key}
               == {k: v for k, v in sig_after.items() if k != key})
     names_before, names_after = track_names(before), track_names(after)
@@ -517,7 +517,7 @@ def row_c4(ctx):
         (f"title clip id {ids['title']}", re.search(rf"\b{ids['title']}\b", text)),
         (f"Shapes track id {ids['shapes']}", re.search(rf"\b{ids['shapes']}\b", text)),
         (f"Intro marker id {intro_id}", re.search(rf"\b{intro_id}\b", text)),
-        ("Hello Reelcut", "hello reelcut" in text.lower()),
+        ("Hello Frame Job", "hello framejob" in text.lower()),
         ("Boxes", "boxes" in text.lower()),
         ("Intro", "intro" in text.lower()),
         ("the frame", re.search(r"\b(frame|render\w*)\b", text, re.I)),
@@ -631,7 +631,7 @@ def converse(asp, atp, app_path, secrets, relay, texts, folder, stand_in, wrong,
     try:
         app = asp.App("C", app_path,
                       ["-RCSecretFolder", secrets,
-                       "-ReelcutInspectorCollapsed", "NO", "-ReelcutAssistantModel", MODEL,
+                       "-FrameJobInspectorCollapsed", "NO", "-FrameJobAssistantModel", MODEL,
                        "-RCDevAssistantAutoCompact", str(KNOB)], relay.base)
     except Exception:
         relay.stop()  # the `finally` below is not reached; main scores the setup failure
@@ -640,9 +640,9 @@ def converse(asp, atp, app_path, secrets, relay, texts, folder, stand_in, wrong,
     try:
         app.connect()
         app.mcp.timeout = TURN_SECONDS + 120
-        complaints = [l for l in app.log().splitlines() if "Reelcut: " in l]
-        score("C0", not complaints, f"`Reelcut: ` lines {complaints[:2]}")
-        ids = build_fixture(app, os.path.join(folder, "C.reelcut"))
+        complaints = [l for l in app.log().splitlines() if "Frame Job: " in l]
+        score("C0", not complaints, f"`Frame Job: ` lines {complaints[:2]}")
+        ids = build_fixture(app, os.path.join(folder, "C.framejob"))
         ctx["ids"] = ids
         print(f"fixture: {ids}", flush=True)
 

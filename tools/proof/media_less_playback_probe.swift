@@ -6,7 +6,7 @@
 //
 //     media_less_playback_probe <graphic> <text> <shape> <image> <empty>
 //
-// Each argument is a `.reelcut` package. Each is opened in a real editor
+// Each argument is a `.framejob` package. Each is opened in a real editor
 // window, as the app opens one (`read`, `fileURL` BEFORE
 // `makeWindowControllers()` so `startGraphicStore()` finds `graphics/`), and
 // the editor's OWN player is read: its item, the Play/Pause validator, the
@@ -24,7 +24,7 @@ NSApplication.shared.setActivationPolicy(.accessory)
 // Preview Quality pinned to Full in the argument domain, so a stored Half
 // cannot halve the buffer this probe measures.
 UserDefaults.standard.setVolatileDomain(
-    ["ReelcutPreviewQuality": 0], forName: UserDefaults.argumentDomain)
+    ["FrameJobPreviewQuality": 0], forName: UserDefaults.argumentDomain)
 
 /// The displayed buffer's 40 × 40 grid: the mean of (r + g + b) / 3 a pixel
 /// in integers, each channel 0…255 — a 32BGRA buffer's bytes, or a

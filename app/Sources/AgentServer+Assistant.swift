@@ -1,6 +1,6 @@
 import AppKit
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 /// `assistant_send` and `assistant_answer` — dev tools (road map 12 A1, spec
 /// §11 V-1..V-2): type a message into a project window's assistant session
 /// and wait for its turn, and answer the ask-first question it stopped on

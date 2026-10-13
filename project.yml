@@ -1,11 +1,11 @@
-name: Reelcut
+name: FrameJob
 options:
   bundleIdPrefix: com.kgalligan
   deploymentTarget:
     macOS: "26.0"
   createIntermediateGroups: true
 
-# Distribution is Release without REELCUT_DEV_TOOLS (spec §11 V-1): `make dist`
+# Distribution is Release without FRAMEJOB_DEV_TOOLS (spec §11 V-1): `make dist`
 # builds it and checks the binary; Debug and Release carry the dev tools.
 configs:
   Debug: debug
@@ -13,7 +13,7 @@ configs:
   Distribution: release
 
 targets:
-  Reelcut:
+  FrameJob:
     type: application
     platform: macOS
     sources:
@@ -36,17 +36,20 @@ targets:
         buildPhase: sources
     settings:
       base:
-        PRODUCT_NAME: Reelcut
+        PRODUCT_NAME: "Frame Job"
+        # The module NSDocumentClass names, the same in every configuration: a
+        # PRODUCT_NAME with a space would derive Frame_Job (spec §11 NM-3).
+        PRODUCT_MODULE_NAME: FrameJob
         # The Rust core is built for the host arch only; for a universal app,
         # cargo-build both targets and lipo them, then widen this.
         ARCHS: arm64
         SWIFT_VERSION: "5.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        SWIFT_OBJC_BRIDGING_HEADER: app/Bridging/Reelcut-Bridging-Header.h
+        SWIFT_OBJC_BRIDGING_HEADER: app/Bridging/FrameJob-Bridging-Header.h
         LIBRARY_SEARCH_PATHS:
           - $(PROJECT_DIR)/core/target/release
         OTHER_LDFLAGS:
-          - -lreelcut_core
+          - -lframejob_core
         MTL_LANGUAGE_REVISION: UseDeploymentTarget
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
         ENABLE_HARDENED_RUNTIME: "YES"
@@ -65,20 +68,21 @@ targets:
       # condition; `$(inherited)` keeps the project-level DEBUG in Debug.
       configs:
         Debug:
-          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) REELCUT_DEV_TOOLS"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) FRAMEJOB_DEV_TOOLS"
           # Xcode 26 splits a Debug executable into a stub and __preview.dylib,
           # and Write Agent Catalog's `codesign -s - -f "$exe"` fails on the split.
           ENABLE_DEBUG_DYLIB: "NO"
-          # The Debug build is its own app (spec §11 V-5): "Reelcut Debug", its
-          # own bundle id and defaults domain, and an Alternate `.reelcut`
-          # handler, so a double-click opens the real Reelcut. Info.plist reads
-          # the two RC_ settings through `:default=`, so Release and
-          # Distribution, which set neither, keep their settings and bytes.
-          PRODUCT_BUNDLE_IDENTIFIER: com.kgalligan.Reelcut.debug
-          RC_APP_NAME: "Reelcut Debug"
+          # The Debug build is its own app (spec §11 V-5, NM-3): "Frame Job
+          # Debug", its own bundle id and defaults domain, and an Alternate
+          # `.framejob` handler, so a double-click opens the real Frame Job.
+          # Info.plist reads PRODUCT_NAME for both names and the RC_ setting
+          # through `:default=`, so Release and Distribution, which take the
+          # base PRODUCT_NAME and leave the handler rank unset, keep theirs.
+          PRODUCT_NAME: "Frame Job Debug"
+          PRODUCT_BUNDLE_IDENTIFIER: com.kgalligan.FrameJob.debug
           RC_PROJECT_HANDLER_RANK: Alternate
         Release:
-          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) REELCUT_DEV_TOOLS"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) FRAMEJOB_DEV_TOOLS"
         # Distribution is the build that ships (spec §11 V-1), and notarization
         # refuses the get-task-allow Xcode injects by default, so it is signed
         # with `entitlements` alone (#145, tools/proof/dist_check.py D14).
@@ -87,8 +91,8 @@ targets:
     info:
       path: app/Info.plist
       properties:
-        CFBundleName: "$(RC_APP_NAME:default=Reelcut)"
-        CFBundleDisplayName: "$(RC_APP_NAME:default=Reelcut)"
+        CFBundleName: "$(PRODUCT_NAME)"
+        CFBundleDisplayName: "$(PRODUCT_NAME)"
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: "26.0"
@@ -108,19 +112,19 @@ targets:
         # entitlement: its prompt is triggered by the first capture or by
         # CGRequestScreenCaptureAccess().
         NSMicrophoneUsageDescription:
-          Reelcut records the microphone you choose alongside a screen recording, into
+          Frame Job records the microphone you choose alongside a screen recording, into
           a file of its own beside the movie. Nothing is sent anywhere.
         UTExportedTypeDeclarations:
-          - UTTypeIdentifier: com.kgalligan.reelcut-project
-            UTTypeDescription: Reelcut Project
+          - UTTypeIdentifier: com.kgalligan.framejob-project
+            UTTypeDescription: Frame Job Project
             UTTypeConformsTo: [com.apple.package]
             UTTypeTagSpecification:
-              public.filename-extension: [reelcut]
+              public.filename-extension: [framejob]
         CFBundleDocumentTypes:
-          - CFBundleTypeName: Reelcut Project
-            LSItemContentTypes: [com.kgalligan.reelcut-project]
+          - CFBundleTypeName: Frame Job Project
+            LSItemContentTypes: [com.kgalligan.framejob-project]
             CFBundleTypeRole: Editor
-            NSDocumentClass: Reelcut.ProjectDocument
+            NSDocumentClass: FrameJob.ProjectDocument
             LSTypeIsPackage: true
             LSHandlerRank: "$(RC_PROJECT_HANDLER_RANK:default=Owner)"
           # Opening a media file makes an UNTITLED project sized to it with
@@ -129,35 +133,35 @@ targets:
           - CFBundleTypeName: QuickTime Movie
             LSItemContentTypes: [com.apple.quicktime-movie]
             CFBundleTypeRole: Editor
-            NSDocumentClass: Reelcut.ProjectDocument
+            NSDocumentClass: FrameJob.ProjectDocument
             LSHandlerRank: Alternate
           - CFBundleTypeName: MPEG-4 Movie
             LSItemContentTypes: [public.mpeg-4, com.apple.m4v-video]
             CFBundleTypeRole: Editor
-            NSDocumentClass: Reelcut.ProjectDocument
+            NSDocumentClass: FrameJob.ProjectDocument
             LSHandlerRank: Alternate
           - CFBundleTypeName: Movie
             LSItemContentTypes: [public.movie]
             CFBundleTypeRole: Editor
-            NSDocumentClass: Reelcut.ProjectDocument
+            NSDocumentClass: FrameJob.ProjectDocument
             LSHandlerRank: Alternate
           - CFBundleTypeName: Audio
             LSItemContentTypes:
               [com.apple.m4a-audio, public.mp3, com.microsoft.waveform-audio, public.aiff-audio]
             CFBundleTypeRole: Editor
-            NSDocumentClass: Reelcut.ProjectDocument
+            NSDocumentClass: FrameJob.ProjectDocument
             LSHandlerRank: Alternate
           - CFBundleTypeName: Image
             LSItemContentTypes: [public.png, public.jpeg, public.heic]
             CFBundleTypeRole: Editor
-            NSDocumentClass: Reelcut.ProjectDocument
+            NSDocumentClass: FrameJob.ProjectDocument
             LSHandlerRank: Alternate
     # The hardened-runtime entitlement the microphone needs (road map 3, R0's
     # second surprise: a bare swiftc probe never needs it, the signed app
     # does). The file is GENERATED by xcodegen from these properties, like
     # app/Info.plist, and git-ignored beside it.
     entitlements:
-      path: app/Reelcut.entitlements
+      path: app/FrameJob.entitlements
       properties:
         com.apple.security.device.audio-input: true
     preBuildScripts:
@@ -182,7 +186,7 @@ targets:
           # core/target (#225). Unset, both builds are the same build.
           env -u MACOSX_DEPLOYMENT_TARGET -u SDKROOT cargo build --release
         outputFiles:
-          - $(PROJECT_DIR)/core/target/release/libreelcut_core.a
+          - $(PROJECT_DIR)/core/target/release/libframejob_core.a
     # The graphics reference (road map 10's G4a): `graphic_reference` reads
     # GraphicsAPI.md, and a package's graphics/ gets both as API.md and
     # API.d.ts. Copied under new names, so not a resources-phase entry.
@@ -243,18 +247,18 @@ targets:
           cargo build --release
           HELPERS="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
           mkdir -p "$HELPERS"
-          cp "$PROJECT_DIR/mcp-proxy/target/release/reelcut-mcp" "$HELPERS/"
+          cp "$PROJECT_DIR/mcp-proxy/target/release/framejob-mcp" "$HELPERS/"
           IDENTITY="${EXPANDED_CODE_SIGN_IDENTITY:--}"
           TIMESTAMP=""
           if [ "$IDENTITY" != "-" ]; then TIMESTAMP="--timestamp"; fi
           codesign --force --options runtime $TIMESTAMP \
-            --sign "$IDENTITY" "$HELPERS/reelcut-mcp"
-      # The catalog snapshot reelcut-mcp lists from while no Reelcut runs
+            --sign "$IDENTITY" "$HELPERS/framejob-mcp"
+      # The catalog snapshot framejob-mcp lists from while no Frame Job runs
       # (MC-4; MC1 q1): the just-linked executable, ad-hoc signed alone in place
       # because the linker leaves it unsigned and arm64 kills an unsigned exec,
       # run with -RCWriteCatalog (AgentCatalogSnapshot.swift), then the bundle
       # signed again as Xcode's CodeSign signs it. It fails on a non-zero exit
-      # and on any `Reelcut: ` line, the parity check complaining.
+      # and on any `Frame Job: ` line, the parity check complaining.
       - name: Write Agent Catalog
         basedOnDependencyAnalysis: false
         script: |
@@ -275,7 +279,7 @@ targets:
             echo "error: the catalog writer exited $rc"
             exit 1
           fi
-          if printf '%s\n' "$output" | grep -q 'Reelcut: '; then
+          if printf '%s\n' "$output" | grep -q 'Frame Job: '; then
             echo "error: the catalog writer's output holds the parity check's complaint"
             exit 1
           fi
@@ -300,10 +304,10 @@ targets:
           - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
 
 schemes:
-  Reelcut:
+  FrameJob:
     build:
       targets:
-        Reelcut: all
+        FrameJob: all
     run:
       config: Release
     # Product > Archive never ships the dev tools.

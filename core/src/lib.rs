@@ -1,10 +1,10 @@
-//! `reelcut_core` — the decision-making half of Reelcut.
+//! `framejob_core` — the decision-making half of Frame Job.
 //!
 //! Rust decides, AVFoundation and Metal do (spec §7): this crate holds the
 //! project value, every edit, and the plans and recipes the app renders
 //! from. It touches no pixel and no audio sample.
 //!
-//! The one contract with the app is `core/include/reelcut_core.h`; the
+//! The one contract with the app is `core/include/framejob_core.h`; the
 //! `ffi*` modules implement it and are the only place `extern "C"` appears.
 //! Everything complex crosses as UTF-8 JSON, which keeps the header small
 //! and gives the embedded MCP agent the same vocabulary for free.

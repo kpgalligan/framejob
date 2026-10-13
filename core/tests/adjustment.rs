@@ -11,7 +11,7 @@ mod common;
 use serde_json::{json, Value};
 
 use common::{array, by_id, Handle, Outcome};
-use reelcut_core::format::RC_FORMAT_VERSION;
+use framejob_core::format::RC_FORMAT_VERSION;
 
 /// Ticks per second (spec §5.1).
 const SEC: i64 = 600_000;

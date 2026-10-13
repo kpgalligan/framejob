@@ -1,8 +1,8 @@
 // Road map 13 P4 — the spend UI probe (spec §11 P-4, P-7).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
-// `assistant_tab_proof.py`'s `build_probe` swiftc line, `-D REELCUT_DEV_TOOLS` —
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
+// `assistant_tab_proof.py`'s `build_probe` swiftc line, `-D FRAMEJOB_DEV_TOOLS` —
 // by `spend_ui_proof.py`, which runs it with `TZ=America/Los_Angeles` (so a
 // month taken in the local zone would differ from UTC's at both edges) and its
 // scratch folder as the first argument. Every spend folder here is inside the
@@ -158,7 +158,7 @@ do {
         check(&p, AssistantSpendMonth.amount(dollars), want, "amount \(dollars)")
     }
     check(&p, AssistantSpendMonth.note,
-          "Reelcut's own estimate at LiteLLM prices, from its spend ledger. The Anthropic "
+          "Frame Job's own estimate at LiteLLM prices, from its spend ledger. The Anthropic "
             + "Console shows what your account was billed.", "note")
     row("M2", p, "\(cases.count) sentences and \(amounts.count) amounts exactly, and the note")
 }
@@ -199,13 +199,13 @@ do {
     transcript.take(["type": "turn_started"])
     transcript.take(cost("dollars", dollars: 0.001))
     transcript.take(["type": "turn_finished"])
-    check(&p, transcript.conversationCost.figure, "$0.0020 · Reelcut's estimate", "two turns")
+    check(&p, transcript.conversationCost.figure, "$0.0020 · Frame Job's estimate", "two turns")
     let costChanges = changes.compactMap { change -> String? in
         if case .conversationCost(let c) = change { return c.figure }
         return nil
     }
-    check(&p, costChanges, ["$0.0006 · Reelcut's estimate", "$0.0010 · Reelcut's estimate",
-                            "$0.0020 · Reelcut's estimate"], "one change per cost event")
+    check(&p, costChanges, ["$0.0006 · Frame Job's estimate", "$0.0010 · Frame Job's estimate",
+                            "$0.0020 · Frame Job's estimate"], "one change per cost event")
     changes = []
     transcript.clear()
     check(&p, transcript.conversationCost.figure, "Nothing yet", "after clear")
@@ -218,9 +218,9 @@ do {
     }
 
     transcript.take(cost("unknown", detail: "not in the table"))
-    check(&p, transcript.conversationCost.figure, "unknown · Reelcut's estimate", "unknown alone")
+    check(&p, transcript.conversationCost.figure, "unknown · Frame Job's estimate", "unknown alone")
     transcript.take(cost("dollars", dollars: 0.0006))
-    check(&p, transcript.conversationCost.figure, "at least $0.0006 · Reelcut's estimate",
+    check(&p, transcript.conversationCost.figure, "at least $0.0006 · Frame Job's estimate",
           "unknown then priced")
     changes = []
     transcript.endConversation(note: "C1 ended.")
@@ -238,15 +238,15 @@ do {
 
     var tiny = AssistantTurnCost()
     tiny.add(cost("dollars", dollars: 0.00002))
-    check(&p, tiny.figure, "under $0.0001 · Reelcut's estimate", "tiny priced")
+    check(&p, tiny.figure, "under $0.0001 · Frame Job's estimate", "tiny priced")
     tiny.add(cost("unknown"))
-    check(&p, tiny.figure, "unknown · Reelcut's estimate", "tiny priced then unknown")
+    check(&p, tiny.figure, "unknown · Frame Job's estimate", "tiny priced then unknown")
     var edge = AssistantTurnCost()
     edge.add(cost("dollars", dollars: 0.00005))
     edge.add(cost("unknown"))
-    check(&p, edge.figure, "at least $0.0001 · Reelcut's estimate", "at the 0.00005 edge")
+    check(&p, edge.figure, "at least $0.0001 · Frame Job's estimate", "at the 0.00005 edge")
     check(&p, AssistantTurnCost.figureTooltip,
-          "What this conversation's responses cost at LiteLLM prices, as Reelcut estimates it. "
+          "What this conversation's responses cost at LiteLLM prices, as Frame Job estimates it. "
             + "The Anthropic Console shows what your account was billed.", "tooltip")
     row("C1", p, "Nothing yet → $0.0020 over two turns, one change per cost; clear and "
         + "endConversation emit .conversationCost before .usage and reset to Nothing yet; "
@@ -266,13 +266,13 @@ do {
     view.reload([], usage: AssistantContextUsage(), cost: AssistantTurnCost())
     check(&p, label?.stringValue, "Nothing yet", "reload with no cost")
     view.reload([], usage: AssistantContextUsage(), cost: cost1)
-    check(&p, label?.stringValue, "$0.0123 · Reelcut's estimate", "reload with a cost")
+    check(&p, label?.stringValue, "$0.0123 · Frame Job's estimate", "reload with a cost")
     var cost2 = cost1
     cost2.add(cost("unknown"))
     view.apply(.conversationCost(cost2))
-    check(&p, label?.stringValue, "at least $0.0123 · Reelcut's estimate", "apply")
+    check(&p, label?.stringValue, "at least $0.0123 · Frame Job's estimate", "apply")
     view.apply(.usage(AssistantContextUsage(used: 10, limit: 100, reported: true)))
-    check(&p, label?.stringValue, "at least $0.0123 · Reelcut's estimate", "a usage change")
+    check(&p, label?.stringValue, "at least $0.0123 · Frame Job's estimate", "a usage change")
     view.apply(.cleared)
     view.apply(.conversationCost(AssistantTurnCost()))
     check(&p, label?.stringValue, "Nothing yet", "reset")
@@ -304,7 +304,7 @@ do {
     noFolder.refreshSpend()
     check(&p, noFolder.spendLabel.stringValue, "This launch keeps no spend ledger.", "no folder")
     check(&p, noFolder.spendNoteLabel.stringValue,
-          "Reelcut's own estimate at LiteLLM prices, from its spend ledger. The Anthropic "
+          "Frame Job's own estimate at LiteLLM prices, from its spend ledger. The Anthropic "
             + "Console shows what your account was billed.", "the note")
     w1.orderOut(nil)
 

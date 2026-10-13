@@ -2,7 +2,7 @@
 // preview well of a live, on-screen editor under `cacheDisplay`, and three
 // ways of putting a still under the canvas overlay for a capture.
 //
-// `well.reelcut`: a 640 × 360 canvas on a magenta background, one yellow
+// `well.framejob`: a 640 × 360 canvas on a magenta background, one yellow
 // 320 × 180 rectangle (clip 2, 0–3 s), selected, the playhead at 1 s. The
 // still that stands in for `render_frame`'s picture is a synthetic 640 × 360
 // image of four quadrants — red, green / blue, white — so where it lands is
@@ -112,7 +112,7 @@ enum ProbeWell {
         let e: ProbeEditor
         do {
             e = try ProbeEditor(
-                fixtures.appendingPathComponent("well.reelcut"), select: [2], playhead: 1)
+                fixtures.appendingPathComponent("well.framejob"), select: [2], playhead: 1)
         } catch {
             let why = probeError("open failed: \(error)")
             for id in ["W0", "W1", "W2", "W3", "W4a", "W4b", "W4c", "W5", "W6"] { rows[id] = why }
@@ -346,7 +346,7 @@ enum ProbeWell {
 
     /// The harness's case: an editor in a window never ordered front.
     static func harnessCase(_ fixtures: URL, _ png: URL) -> ProbeJSON {
-        let url = fixtures.appendingPathComponent("well.reelcut")
+        let url = fixtures.appendingPathComponent("well.framejob")
         let document = ProjectDocument()
         do {
             try document.read(from: url, ofType: ProjectDocument.projectTypeIdentifier)

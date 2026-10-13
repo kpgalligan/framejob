@@ -28,7 +28,7 @@ def check(name, condition, detail=""):
 class Session:
     def __init__(self, mcp, name):
         self.mcp = mcp
-        self.path = str(WORK / f"{name}-{os.getpid()}.reelcut")
+        self.path = str(WORK / f"{name}-{os.getpid()}.framejob")
         mcp.call("new_project", path=self.path)
 
     def op(self, name, **args):
@@ -71,7 +71,7 @@ def wait_for(predicate, seconds=40):
 
 def main():
     WORK.mkdir(parents=True, exist_ok=True)
-    for old in WORK.glob("*.reelcut"):
+    for old in WORK.glob("*.framejob"):
         shutil.rmtree(old)
     check("source probe fixtures exist", all((FIXTURES / name).exists() for name in
           ("corrupt.m4a", "silent48.wav", "stereo48.wav")))

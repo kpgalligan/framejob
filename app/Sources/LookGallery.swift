@@ -30,7 +30,7 @@ final class LookGallery {
     static let tiles: [LookKind?] = [nil] + LookKind.builtIns.map { Optional($0) }
     static let thumbnailWidth = 256
     static let settle: TimeInterval = 0.3
-    #if REELCUT_DEV_TOOLS
+    #if FRAMEJOB_DEV_TOOLS
     /// A launch default naming a folder: each completed generation N writes
     /// `<folder>/<N>/<tile>.png` and then `<folder>/<N>/manifest.json`.
     static let dumpKey = "RCDevLookGalleryDump"
@@ -83,7 +83,7 @@ final class LookGallery {
 
     /// The one serial queue the generations render on (a one-frame render
     /// queue, beside the eyedropper's and Save Frame's).
-    private static let queue = DispatchQueue(label: "com.kgalligan.Reelcut.lookGallery")
+    private static let queue = DispatchQueue(label: "com.kgalligan.framejob.lookGallery")
     /// Every gallery, weakly, for `playheadMoved(in:)`. Main thread.
     private static let live = NSHashTable<LookGallery>.weakObjects()
 
@@ -179,7 +179,7 @@ final class LookGallery {
         let urls = document.mediaURLs()
         let graphics = GraphicRegistry.shared.snapshot(for: document.recipeKey)
         var dump: URL?
-        #if REELCUT_DEV_TOOLS
+        #if FRAMEJOB_DEV_TOOLS
         if let folder = UserDefaults.standard.string(forKey: Self.dumpKey), !folder.isEmpty {
             dump = URL(fileURLWithPath: folder).appendingPathComponent(String(number))
         }

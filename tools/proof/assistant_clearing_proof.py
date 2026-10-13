@@ -3,8 +3,8 @@
 — issue batch B54 (#208; spec §11 AI-20).
 
 One built app (`proof_app`'s choice, Debug unless `RC_PROOF_APP=release`; on a scratch socket, spec §11 MC-6; a dummy
-`-RCSecretFolder`, `-ReelcutAssistantModel claude-opus-5-5`,
-`-ReelcutAssistantAutoCompact NO`, `-ReelcutAssistantClearToolResults YES`)
+`-RCSecretFolder`, `-FrameJobAssistantModel claude-opus-5-5`,
+`-FrameJobAssistantAutoCompact NO`, `-FrameJobAssistantClearToolResults YES`)
 is pointed at `ClearingRelay`, a subclass of `assistant_prompt_eval.py`'s
 relay (imported), which forwards to the stand-in (`--rehearse`) or the real
 API (`--live`). Two turns go through `assistant_send` without `pane` (CS3's
@@ -24,7 +24,7 @@ about $1.91. On turn B it also replaces `context_management.edits` with
 be seen to clear; the shipped 150,000-token trigger is out of $3's reach.
 The rows:
 
-  X0  no `Reelcut: ` line
+  X0  no `Frame Job: ` line
   X1  every turn-A and turn-B body, as the app sent it, has
       `context_management == {"edits": [CLEAR_EDIT]}` and the
       `context-management-2025-06-27` beta; turn A made at least one POST
@@ -53,7 +53,7 @@ The rows:
 `--refused` (with `--rehearse`) has the relay answer turn B's POSTs 400
 `context_management.edits.0.trigger: rehearsal refusal` without forwarding:
 X4 must SKIP. `--mutant clearing-off` launches with
-`-ReelcutAssistantClearToolResults NO` and runs the rehearsal: rule R — exit 1
+`-FrameJobAssistantClearToolResults NO` and runs the rehearsal: rule R — exit 1
 when X1 FAILs, 0 when it passes, 2 when X1 is never scored, was refused on
 the cap or the budget, or any row is an instrument failure. A rehearsal or
 mutant spends against a scratch ledger (`work/assistant_clearing/<mode>/
@@ -485,8 +485,8 @@ def converse(release, relay, folder, stand_in, clearing, key):
     try:
         app = asp.App("X", release,
                       ["-RCSecretFolder", asp.secret_folder(),
-                       "-ReelcutAssistantModel", MODEL, "-ReelcutAssistantAutoCompact", "NO",
-                       "-ReelcutAssistantClearToolResults", "YES" if clearing else "NO"],
+                       "-FrameJobAssistantModel", MODEL, "-FrameJobAssistantAutoCompact", "NO",
+                       "-FrameJobAssistantClearToolResults", "YES" if clearing else "NO"],
                       relay.base)
     except Exception:
         relay.stop()  # the `finally` below is not reached; main scores the setup failure
@@ -495,7 +495,7 @@ def converse(release, relay, folder, stand_in, clearing, key):
     try:
         app.connect()
         app.mcp.timeout = TURN_SECONDS + 120
-        path = os.path.join(folder, "X.reelcut")
+        path = os.path.join(folder, "X.framejob")
         if os.path.exists(path):
             shutil.rmtree(path, ignore_errors=True)
         project = app.must("new_project", path=path)["saved"]
@@ -512,8 +512,8 @@ def converse(release, relay, folder, stand_in, clearing, key):
             stand_in.scenario(scenario("B"))
         ctx["sentB"] = send(app, relay, project, "B", TB)
         ctx["afterB"] = read()
-        complaints = [line for line in app.log().splitlines() if "Reelcut: " in line]
-        score("X0", not complaints, f"`Reelcut: ` lines {complaints[:2]}")
+        complaints = [line for line in app.log().splitlines() if "Frame Job: " in line]
+        score("X0", not complaints, f"`Frame Job: ` lines {complaints[:2]}")
         judged("X1", relay, {"turnA", "turnB"}, row_x1, ctx)
         judged("X2", relay, {"turnA"}, row_x2, ctx)
         judged("X3", relay, {"turnA"}, row_x3, ctx)

@@ -16,9 +16,9 @@ use std::ffi::c_char;
 use std::ptr;
 
 use common::take_string;
-use reelcut_core::cube::{Cube, CUBE_SIZE_MAX, CUBE_SIZE_MIN};
-use reelcut_core::ffi_cube::{rc_cube_copy_rgb, rc_cube_free, rc_cube_parse, rc_cube_size};
-use reelcut_core::format::RC_CUBE_MAX_BYTES;
+use framejob_core::cube::{Cube, CUBE_SIZE_MAX, CUBE_SIZE_MIN};
+use framejob_core::ffi_cube::{rc_cube_copy_rgb, rc_cube_free, rc_cube_parse, rc_cube_size};
+use framejob_core::format::RC_CUBE_MAX_BYTES;
 
 /// The output the test tables give input `(r, g, b)` of a size-`n` lattice:
 /// distinct per channel and per point, so a transposed axis cannot pass.
@@ -278,7 +278,7 @@ fn a_file_that_is_not_text_is_refused() {
 #[test]
 fn the_size_cap_is_thirty_two_mib_and_the_header_states_it() {
     assert_eq!(RC_CUBE_MAX_BYTES, 32 * 1024 * 1024);
-    let header = include_str!("../include/reelcut_core.h");
+    let header = include_str!("../include/framejob_core.h");
     let stated = header
         .lines()
         .find_map(|line| line.strip_prefix("#define RC_CUBE_MAX_BYTES "))

@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
-//! `reelcut_mcp` — the stdio MCP server bundled as
-//! `Reelcut.app/Contents/Helpers/reelcut-mcp` (road map 14's MC3, spec §11
+//! `framejob_mcp` — the stdio MCP server bundled as
+//! `Frame Job.app/Contents/Helpers/framejob-mcp` (road map 14's MC3, spec §11
 //! MC-3, MC-4, MC-6). An MCP client starts it; it speaks newline-delimited
 //! JSON-RPC on stdin and stdout and reaches the running app over the agent
 //! server's Unix socket. It answers `initialize` and `ping` itself, answers
@@ -9,7 +9,7 @@
 //! on the first `tools/call` that finds no socket.
 //!
 //! stdout carries protocol only; anything else this process says goes to
-//! stderr, each line starting `reelcut-mcp: ` (never `Reelcut: `, the
+//! stderr, each line starting `framejob-mcp: ` (never `Frame Job: `, the
 //! parity check's prefix). The module map is `mcp-proxy/CLAUDE.md`.
 
 pub mod bundle;
@@ -39,7 +39,7 @@ pub fn run() -> ! {
             Ok(0) => break,
             Ok(_) => session::dispatch(&line, &session, &out),
             Err(error) => {
-                eprintln!("reelcut-mcp: stdin: {error}");
+                eprintln!("framejob-mcp: stdin: {error}");
                 break;
             }
         }

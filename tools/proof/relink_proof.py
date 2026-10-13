@@ -145,12 +145,12 @@ def snapshot(s):
 def part_r0(s):
     if os.path.exists(LOG):
         with open(LOG, errors="replace") as handle:
-            complaints = [line for line in handle if "Reelcut: " in line]
-        check(not complaints, f"the parity log at {LOG} has no `Reelcut: ` line "
+            complaints = [line for line in handle if "Frame Job: " in line]
+        check(not complaints, f"the parity log at {LOG} has no `Frame Job: ` line "
                               f"({len(complaints)} found)")
     else:
         check(False, f"the parity log at {LOG} exists (launch with "
-                     "`> <dir>/reelcut.log`, or pass it as the second argument)")
+                     "`> <dir>/framejob.log`, or pass it as the second argument)")
     schema = s.mcp.schemas()["relink_media"]["inputSchema"]
     properties = set(schema.get("properties", {}))
     check("probe" not in properties,
@@ -170,7 +170,7 @@ def part_r0(s):
 
 
 def part_r1(s):
-    s.package = os.path.join(WORK, f"relink-{os.getpid()}.reelcut")
+    s.package = os.path.join(WORK, f"relink-{os.getpid()}.framejob")
     s.mcp.call("new_project", path=s.package)
     imported = op(s, "import_media", path=copy_of("A.mov", "A"))
     s.media = imported["media"]

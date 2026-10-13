@@ -60,7 +60,7 @@ import UniformTypeIdentifiers
 /// Thumbnails post repeatedly as they accumulate, so an observer must be
 /// cheap: mark the lane dirty and redraw, never rebuild the timeline.
 extension Notification.Name {
-    static let mediaCacheDidChange = Notification.Name("ReelcutMediaCacheDidChange")
+    static let mediaCacheDidChange = Notification.Name("FrameJobMediaCacheDidChange")
 }
 
 extension MediaImporter {

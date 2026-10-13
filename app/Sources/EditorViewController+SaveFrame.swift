@@ -63,7 +63,7 @@ extension EditorViewController {
     /// One frame composed for one file is a decode, not a redraw — the
     /// eyedropper's argument for its own queue, and the same answer here.
     private static let frameGrabQueue = DispatchQueue(
-        label: "com.kgalligan.reelcut.saveframe", qos: .userInitiated)
+        label: "com.kgalligan.framejob.saveframe", qos: .userInitiated)
 
     // MARK: - The command
 

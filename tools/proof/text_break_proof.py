@@ -8,7 +8,7 @@ render does (spec §11 K-3).
 
 One instrument, the probe `text_break_probe.swift`, compiled AS `main.swift`
 over every file in `app/Sources` but the app's own `main.swift` on
-`swift_build.py`'s line, `-D REELCUT_DEV_TOOLS` included, with the
+`swift_build.py`'s line, `-D FRAMEJOB_DEV_TOOLS` included, with the
 app's `Compositor.metal` built into a `default.metallib` beside it (a probe
 that will not build is a scored FAILURE, never an exit). In the app's own
 window it opens the in-canvas editor over one text clip per fixture and
@@ -71,13 +71,14 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2_chrome as e2  # noqa: E402  (video_props, project, write_package)
 import text_edit_proof as te  # noqa: E402  (build_shader)
+import reference_build  # noqa: E402
 import swift_build  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 WORK = os.path.join(HERE, "work", "text-break")
 PROBE_SWIFT = os.path.join(HERE, "text_break_probe.swift")
-HEADER = os.path.join(ROOT, "core", "include", "reelcut_core.h")
+HEADER = os.path.join(ROOT, "core", "include", "framejob_core.h")
 TICKS = e2.TICKS
 
 ROWS = [
@@ -211,17 +212,19 @@ def build_probe(sources, out):
         with open(entry, "w") as f:
             f.write(source)
     binary = os.path.join(out, "text-break-probe")
-    shader, why = te.build_shader(out)
+    shader, why = te.build_shader(out, os.path.dirname(os.path.dirname(sources)))
     if shader is None:
         return None, why
     swift = sorted(os.path.join(sources, n) for n in os.listdir(sources)
                    if n.endswith(".swift") and n != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
         built = swift_build.build(sources=swift + [entry], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=900)
+                                  defines=reference_build.tree_defines(
+                                      os.path.dirname(os.path.dirname(sources)),
+                                      ["FRAMEJOB_DEV_TOOLS"]), timeout=900)
     except swift_build.SwiftBuildFailed as error:
         if error.expired:
             return None, "swiftc expired after 900 s"
@@ -285,7 +288,8 @@ def baseline(commit):
         print(f"baseline {commit}: the control could not be performed — {why}")
         return 2
 
-    archive = subprocess.run(["git", "-C", ROOT, "archive", commit, "app/Sources"],
+    archive = subprocess.run(["git", "-C", ROOT, "archive", commit, "app/Sources",
+                              "app/Bridging"],
                              capture_output=True)
     if archive.returncode != 0:
         return not_performed(f"git archive {commit} failed: "

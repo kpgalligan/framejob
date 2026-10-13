@@ -87,7 +87,7 @@ Rows:
   the recording itself, which answers 2 before it launches anything — and
   the baseline file is byte for byte what it was.
 - **Z1** (CONTROL): every project closes, and no launch's log holds a
-  `Reelcut: ` line.
+  `Frame Job: ` line.
 
 `--only ROWS` scores H0, Z1 and the named rows alone.
 
@@ -161,7 +161,7 @@ HOME = WORK / "home"
 FRAMES = WORK / "frames"
 APP = proof_app.bundle()
 BASELINE = ROOT / "tools/proof/word_looks_baseline.json"
-HEADER = ROOT / "core/include/reelcut_core.h"
+HEADER = ROOT / "core/include/framejob_core.h"
 CALL_BOUND = 120
 SEC = 600_000
 FRAME = 20_000
@@ -308,7 +308,7 @@ def text_clip(clip, index, text):
 
 def package(name, version, pages, background):
     """A fresh hand-written package: one track, one 3 s clip per page."""
-    path = WORK / f"{name}.reelcut"
+    path = WORK / f"{name}.framejob"
     shutil.rmtree(path, ignore_errors=True)
     path.mkdir(parents=True)
     document = {
@@ -833,7 +833,7 @@ def dim_rows(looks):
 
 
 def row_s1(client):
-    path = WORK / "S.reelcut"
+    path = WORK / "S.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     project = reply(attempt(client, "get_project", {"project": str(path)})).get("project") or {}
     track = (project.get("tracks") or [{}])[0].get("id")
@@ -925,7 +925,7 @@ class Instance:
     def __init__(self, app, label):
         self.log = WORK / f"{label}.log"
         self.launched = mcp.launch(
-            str(app / "Contents/MacOS/Reelcut"),
+            str(proof_app.executable(app)),
             env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
             log_path=str(self.log), timeout=CALL_BOUND)
         self.client = self.launched.client
@@ -936,7 +936,7 @@ class Instance:
     def complaints(self):
         try:
             return [line.strip() for line in open(self.log, errors="replace")
-                    if "Reelcut: " in line]
+                    if "Frame Job: " in line]
         except OSError as error:
             return [f"the log could not be read: {error}"]
 
@@ -1000,7 +1000,7 @@ def run_rows(app, mutant):
             second.stop()
     if rows.get("H0"):
         bad = [c.get("error") for c in closes if not c["ok"]]
-        check("Z1 CONTROL: every project closes and no launch's log holds a `Reelcut: ` line",
+        check("Z1 CONTROL: every project closes and no launch's log holds a `Frame Job: ` line",
               not bad and not complaints, f"closes {bad}; complaints {complaints}")
     return True
 
@@ -1105,8 +1105,8 @@ def main():
         print("B86 phase 1 — recording fixture B's baseline", flush=True)
     else:
         print("B86 phase 1 — the three word-caption looks over MCP", flush=True)
-    if not (app / "Contents/MacOS/Reelcut").is_file():
-        print(f"instrument failure: no app binary at {app / 'Contents/MacOS/Reelcut'}")
+    if not proof_app.executable(app).is_file():
+        print(f"instrument failure: no app binary at {proof_app.executable(app)}")
         return 2
     if args.record_baseline:
         return record(app, source_changes())

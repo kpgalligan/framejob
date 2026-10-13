@@ -362,7 +362,7 @@ if !FileManager.default.fileExists(atPath: fixture.path) {
     answer["renderer"] = ["skipped": "\(fixture.path) is not there"]
 } else if let probed = try? MediaImporter.probeBlocking(url: fixture) {
     let work = FileManager.default.temporaryDirectory
-        .appendingPathComponent("reelcut-source-mirror-\(ProcessInfo.processInfo.processIdentifier)")
+        .appendingPathComponent("framejob-source-mirror-\(ProcessInfo.processInfo.processIdentifier)")
     try? FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
     let destination = work.appendingPathComponent("reversed.mov")
     let job = ReverseRenderer.Job(
@@ -598,7 +598,7 @@ def build_probe():
         os.path.join(ROOT, "app", "Sources", name)
         for name in os.listdir(os.path.join(ROOT, "app", "Sources"))
         if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:

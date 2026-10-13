@@ -50,8 +50,8 @@ scratch home**, `CFFIXED_USER_HOME=tools/proof/work/hevc-alpha/<launch>/home`,
 and every package, PNG and export is under `tools/proof/work/hevc-alpha/`,
 which is removed at the start and at exit. It is launched with every key of
 `screens.py`'s `PINS` as a launch argument (never written),
-`ReelcutInspectorWidth` replaced by 280 (the inspector's narrowest) and
-`ReelcutExportChoice` by `{"preset_id":"hevc_alpha"}` — sent as
+`FrameJobInspectorWidth` replaced by 280 (the inspector's narrowest) and
+`FrameJobExportChoice` by `{"preset_id":"hevc_alpha"}` — sent as
 `<string>…</string>`, because the argument domain DROPS a value that begins
 with a brace and is not a property list, and the sheet then opens on the
 owner's own remembered choice (measured: it did). Two menu-driven things
@@ -64,7 +64,7 @@ caller is `ExportSheetController.commit(queue:)` — those two buttons;
 dismisses, and the `export` tool's handler (`AgentServer+Render.swift`)
 reads and writes no default. What a RUN shows of it is `mcp.py`'s guard: a
 moved owner-visible key is a `mcp: DEFAULTS MOVED` line on stderr, and
-status 3 when no other Reelcut shares the domain — so a run's stderr is
+status 3 when no other Frame Job shares the domain — so a run's stderr is
 kept beside its score. Every export is one second, and the largest frame
 written is 1296 × 728.
 
@@ -202,13 +202,13 @@ Rows (◆ = also Gate A's):
 - **E3**, not in a session of the full rows' own: once per row of the core's
   preset table (`core/src/export_table.rs`, each `id` and `name` read from
   the source, so a row added there is covered), a launch with
-  `ReelcutExportChoice` pinned to that row alone and one fixture, CLEAR;
+  `FrameJobExportChoice` pinned to that row alone and one fixture, CLEAR;
   File ▸ Export…, `snapshot_ui` of the sheet, `cancel_sheet`: the Format
   popup reads the row's name (the pin took), exactly one text's tooltip is
   its whole text (the footnote), it is on a line of its own above the
   buttons (not in "Add to Queue"'s row, its frame's bottom at or above that
   button's top), no `truncated` problem names it, the project closes and the
-  log holds no `Reelcut: ` line. Two more launches are scored the same way,
+  log holds no `Frame Job: ` line. Two more launches are scored the same way,
   the footnotes a Quality tier and a loudness target lengthen: `h264` at
   "High" (its footnote must hold "kbps audio") and `hevc_alpha` at "Maximum"
   with −14 LUFS (it must hold "kbps audio", "LUFS" and "alpha"). Each
@@ -290,13 +290,13 @@ One that does not build is a scored failure of M1, T1, T2, R0 and K1.
   preset with no file. So phase A moved no pixel where it acts, and the row
   is red on a tree that already fills or already lists the row.
 - ◆ **Z1**: every project closes, and the launch's log holds no
-  `Reelcut: ` line.
+  `Frame Job: ` line.
 
 **Controls**, no build. `--control plain-hevc-reader` scores A1's and A2's
 pixel readers over `hevc` exports of CLEAR and FAINT: both must FAIL (a
 plain HEVC file's alphas are all 255, and ffprobe cannot tell the two rows
 apart). `--control sheet-default` launches with `screens.py`'s own empty
-`ReelcutExportChoice`: E1 must FAIL (the sheet opens on H.264).
+`FrameJobExportChoice`: E1 must FAIL (the sheet opens on H.264).
 
 **Mutants**, each ONE `tree_copy.make_copy` with every named anchor
 asserted to occur exactly once and replaced, built by the copy's own `make app-debug` (`make app` under
@@ -372,7 +372,7 @@ because the claim is then incomplete: the instrument, not the product. A
 control or a mutant names none of those three rows and runs in full there
 (L2, where a mutant names it, likewise without the columns clause).
 `head` is the commit of the BUILD's tree, not of this checkout: `--app` has
-to be `build/Build/Products/{Release,Debug}/Reelcut.app` at the top of a git
+to be `build/Build/Products/{Release,Debug}/Frame Job.app` at the top of a git
 work tree (`build_tree`), `head` is that tree's `git rev-parse HEAD`, the `git
 status` above is that tree's, and a build anywhere else — a proof's tree
 copy has no `.git` — is not recorded.
@@ -670,14 +670,14 @@ class Session:
         self.out.mkdir()
         arguments = ["-NSRecentDocumentsLimit", "0"]
         for key, value in PINS:
-            if key == "ReelcutInspectorWidth":
+            if key == "FrameJobInspectorWidth":
                 value = "<real>280</real>"
-            elif key == "ReelcutExportChoice" and self.choice is not None:
+            elif key == "FrameJobExportChoice" and self.choice is not None:
                 value = self.choice
             arguments += [f"-{key}", value]
         environment = {"CFFIXED_USER_HOME": str(self.home)}
         environment.update(self.env)
-        self.launched = mcp.launch(str(self.app / "Contents/MacOS/Reelcut"),
+        self.launched = mcp.launch(str(proof_app.executable(self.app)),
                                    arguments=arguments, env=bounded.child_env(environment),
                                    log_path=str(self.log), timeout=CALL_BOUND)
         self.client = self.launched.client
@@ -694,7 +694,7 @@ class Session:
 def shapes(s, name, width, height, background, card, fill, opacity=None, kind="rectangle"):
     """A new project with one card (or another shape `kind`) for a second;
     its package."""
-    path = s.dir / f"{name}.reelcut"
+    path = s.dir / f"{name}.framejob"
     must(s.client, "new_project", {"path": str(path)})
     must(s.client, "set_canvas", {"project": str(path), "width": width, "height": height,
                                   "background": background})
@@ -730,7 +730,7 @@ def picture(s, name, width, height, clear=False):
         must(s.client, "set_canvas", {"project": str(png), "background": [0, 0, 0, 0]})
         must(s.client, "set_video", {"project": str(png), "clips": [clip],
                                      "patch": {"scale": 0.5}})
-    package = s.dir / f"{name}.reelcut"
+    package = s.dir / f"{name}.framejob"
     must(s.client, "save_project", {"project": str(png), "path": str(package)})
     return package
 
@@ -941,7 +941,7 @@ def host_text(stamp):
 
 def build_tree(app):
     """The git work tree a build sits in — `<tree>/build/Build/Products/
-    {Release,Debug}/Reelcut.app`, where `make app` or `make app-debug` puts it —
+    {Release,Debug}/Frame Job.app`, where `make app` or `make app-debug` puts it —
     or None when `app` is anywhere else or `<tree>` is not the top of a work tree. A proof's tree
     COPY is not one: it has no `.git`, and `git` would answer for the tree
     around it."""
@@ -972,7 +972,7 @@ def record(s, today):
     tree = build_tree(s.app)
     if tree is None:
         print(f"NOT RECORDED: the build's commit cannot be read — {s.app} is not "
-              "build/Build/Products/{Release,Debug}/Reelcut.app at the top of a git work tree")
+              "build/Build/Products/{Release,Debug}/Frame Job.app at the top of a git work tree")
         return None
     head, dirty = unchanged_build(tree)
     if dirty:
@@ -1529,7 +1529,7 @@ def sheet_launch(label, app, choice):
         notes, cut = footnote_of(views, problems)
         closed, how = close_all(s)
         complaints = [line.strip() for line in open(s.log, errors="replace")
-                      if "Reelcut: " in line]
+                      if "Frame Job: " in line]
         return {"format": read_sheet(views, problems)["format"],
                 "notes": [(v["text"], v["intrinsic"][0], v["frame"][2], own)
                           for v, own in notes],
@@ -1672,7 +1672,7 @@ def build_probe(optimized=False):
                 built = swift_build.build(sources=swift_build.app_sources(PROBE_SOURCES)
                                           + [entry],
                                           output=folder / "alpha-mode-probe",
-                                          defines=["REELCUT_DEV_TOOLS"], optimize=optimized,
+                                          defines=["FRAMEJOB_DEV_TOOLS"], optimize=optimized,
                                           wmo=optimized, timeout=900)
             PROBE[kind] = (built.binary, None)
             print(f"  probe {'reused' if built.reused else f'built in {built.seconds} s'}",
@@ -1708,7 +1708,7 @@ def reimport(s, movie, label, size=(640, 360)):
     """`movie` imported into a new project of `size` (640 × 360 unless asked)
     on an opaque white background, `render_frame` at 0.5 s: the frame's
     Raster."""
-    package = s.dir / f"{label}.reelcut"
+    package = s.dir / f"{label}.framejob"
     project = str(package)
     must(s.client, "new_project", {"path": project})
     s.fx[label] = package
@@ -2109,8 +2109,8 @@ def session(label, app, body, full, choice=CHOICE, env=None, baseline=None, fore
                 print(f"  FAIL could not go on: {type(error).__name__}: {error}", flush=True)
             closed, how = close_all(s) if s.fx else (False, ["no fixture was made"])
             complaints = [line.strip() for line in open(s.log, errors="replace")
-                          if "Reelcut: " in line]
-            check("Z1 every project closes and the log holds no `Reelcut: ` line",
+                          if "Frame Job: " in line]
+            check("Z1 every project closes and the log holds no `Frame Job: ` line",
                   closed and not complaints, f"closed {how}; complaints {complaints}")
     finally:
         s.stop()
@@ -2469,7 +2469,7 @@ def main():
     except Exception as error:  # no chip, no macOS version or no ffmpeg to name
         print(f"instrument failure: the host could not be read: {error}")
         return 2
-    binary = Path(args.app) / "Contents/MacOS/Reelcut"
+    binary = proof_app.executable(Path(args.app))
     if not args.mutant and args.rows != "straighten" and not binary.is_file():
         print(f"instrument failure: no app binary at {binary}")
         return 2

@@ -5,12 +5,12 @@ proved against the running app.
 
     python3 tools/proof/close_project_proof.py <dir>/agent.sock [--log PATH]
 
-`--log` defaults to `<dir>/reelcut.log`. The app is a Release build
+`--log` defaults to `<dir>/framejob.log`. The app is a Release build
 (the rows use the dev tools `snapshot_ui`, `perform_menu_item` and
 `cancel_sheet`) at the socket, FRESH for each run: every row writes its own
 package under `work/close_project/`, wiped at the start.
 
-- **T1** — no `Reelcut: ` line in the log (the startup parity check).
+- **T1** — no `Frame Job: ` line in the log (the startup parity check).
 - **K1** — `close_project` declares exactly `{discard, project}`: `discard`
   a boolean, nothing required.
 - **C1** — 60 cycles of `new_project {path: c<NN>}` → `close_project
@@ -125,7 +125,7 @@ def canonical(path):
 
 
 def package(name):
-    return os.path.join(WORK, f"{name}.reelcut")
+    return os.path.join(WORK, f"{name}.framejob")
 
 
 def thread_count(pid):
@@ -170,11 +170,11 @@ def text_clip_project(app, path):
 def row_t1(log):
     try:
         with open(log, errors="replace") as f:
-            lines = [line.rstrip() for line in f if "Reelcut: " in line]
+            lines = [line.rstrip() for line in f if "Frame Job: " in line]
     except OSError as error:
         score("T1", False, f"the log {log} could not be read: {error}")
         return
-    score("T1", not lines, f"{len(lines)} `Reelcut: ` line(s) in {log}"
+    score("T1", not lines, f"{len(lines)} `Frame Job: ` line(s) in {log}"
           + (f": {lines[:3]!r}" if lines else ""))
 
 
@@ -340,7 +340,7 @@ def row_s1(app, a, b, holder):
     first = app.refusal("save_project", {"project": b, "path": a})
     second = app.refusal("save_project", {"project": b, "path": spelled})
     want_first = held_sentence(holder, a, "save_project")
-    want_second = held_sentence(holder, spelled + ".reelcut", "save_project")
+    want_second = held_sentence(holder, spelled + ".framejob", "save_project")
     gone = app.refusal("get_project", {"project": b})
     b_after = app.call("get_project", {"project": b}).get("path") if gone is None else gone
     with open(os.path.join(a, "project.json"), "rb") as f:

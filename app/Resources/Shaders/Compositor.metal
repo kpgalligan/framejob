@@ -297,7 +297,7 @@ struct LayerUniforms {
     // the obscure block left behind, so phase 6 added zero bytes to this
     // struct — which is what that tail exists for.
     //
-    // Read only by `reelcut_layer_blend_fragment`. The plain entry point
+    // Read only by `framejob_layer_blend_fragment`. The plain entry point
     // never looks at it, and a layer whose mode is `normal` is drawn by the
     // plain one, so this field is 0 on nearly every draw of nearly every
     // frame.
@@ -430,7 +430,7 @@ static inline float2 rotate2(float2 v, float radians) {
     return float2(c * v.x - s * v.y, s * v.x + c * v.y);
 }
 
-vertex Varyings reelcut_layer_vertex(uint vid [[vertex_id]],
+vertex Varyings framejob_layer_vertex(uint vid [[vertex_id]],
                                      constant LayerUniforms &u [[buffer(0)]]) {
     float2 canvas = max(float2(u.canvasWidth, u.canvasHeight), float2(1.0));
     float2 srcSize = max(float2(u.sourceWidth, u.sourceHeight), float2(1.0));
@@ -927,7 +927,7 @@ static inline float3 gradeEncode(float3 c) {
 // Tone, on straight colour: exposure and white balance in LOCAL linear light
 // — decoded, multiplied and re-encoded here, a colour transform like
 // `hueRotate`, not the whole-pipeline linear light §7.5 and PR-5 defer — and
-// the curve and saturation shapes on encoded values. At ±1 (Reelcut's own
+// the curve and saturation shapes on encoded values. At ±1 (Frame Job's own
 // strengths, GR-2): exposure ×2^±1 on linear light; temperature red ×2^±0.3
 // and blue ×2^∓0.3; tint +1 green ×2^−0.3; highlights and shadows ±0.25
 // weighted to the top and bottom halves of luma; whites and blacks a ±15 %
@@ -969,7 +969,7 @@ static inline float3 lookHueChroma(float degrees) {
 
 // MARK: - Wheels (spec §11 GR-11)
 
-// Reelcut's own strengths (GR-11, owner choice 6; tuned by amending it): a
+// Frame Job's own strengths (GR-11, owner choice 6; tuned by amending it): a
 // push at the rim is the whole of `lookHueChroma`; lift +1 takes black to
 // 25 %, gain ±1 is white ×1.5 / ×0.5, gamma +1 is the exponent ½.
 constant float kWheelPush = 1.0;
@@ -1017,14 +1017,14 @@ static inline float3 gradeCurves(float3 rgb, texture2d<float> strip, sampler sam
 
 // The split tone, a look's one block Light does not have: the shadow hue
 // weighted by (1 − Y)² and the highlight hue by Y², Y the saturated luma, at
-// a fifth of the amount. Reelcut's own strength, tuned at GR7.
+// a fifth of the amount. Frame Job's own strength, tuned at GR7.
 static inline float3 lookSplitTone(float3 rgb, constant LookBakeUniforms &b) {
     float y = saturate(dot(rgb, float3(0.2126, 0.7152, 0.0722)));
     return rgb + 0.2 * (b.shadowAmount * (1.0 - y) * (1.0 - y) * lookHueChroma(b.shadowHue)
                         + b.highlightAmount * y * y * lookHueChroma(b.highlightHue));
 }
 
-// Step 4d: the look's lattice (`LookTextures`, baked by `reelcut_look_bake`
+// Step 4d: the look's lattice (`LookTextures`, baked by `framejob_look_bake`
 // below) sampled trilinearly at the texel CENTRES' span — so an identity
 // lattice of any size returns its input — and mixed in by `lookAmount`.
 static inline float3 gradeLook(float3 rgb, texture3d<float> look, sampler samp,
@@ -1040,7 +1040,7 @@ static inline float3 gradeLook(float3 rgb, texture3d<float> look, sampler samp,
 // is for a reason worth keeping:
 //
 //   0. the input conversion   NOT in this function: a pass of its own before
-//                              every layer (`reelcut_input_fragment`, spec §11
+//                              every layer (`framejob_input_fragment`, spec §11
 //                              GR-15), which converts an HLG, PQ or wide-gamut
 //                              SDR source into the texture this stage samples,
 //                              so every stage below sees encoded Rec. 709
@@ -1511,7 +1511,7 @@ static inline float4 layerColorPremultiplied(Varyings in,
     // (in the vertex stage), which is why no offscreen intermediate exists
     // for a timeline pair. A dissolve or zoom with a nested half never reaches
     // here as a transition: it is routed through two offscreen halves and
-    // `reelcut_dissolve_fragment` (spec §11 MT-8).
+    // `framejob_dissolve_fragment` (spec §11 MT-8).
     int kind = int(u.transitionKind + 0.5);
     float p = clamp(u.transitionProgress, 0.0, 1.0);
     bool incoming = u.transitionIncoming > 0.5;
@@ -1600,7 +1600,7 @@ static inline float4 layerColorPremultiplied(Varyings in,
 // colour handed straight to the pipeline's fixed-function source-over. Every
 // layer whose blend mode is `normal` still comes through here, and so does
 // every shadow MASK pass, whatever the layer's mode (`encodeShadow`).
-fragment float4 reelcut_layer_fragment(Varyings in [[stage_in]],
+fragment float4 framejob_layer_fragment(Varyings in [[stage_in]],
                                        constant LayerUniforms &u [[buffer(0)]],
                                        texture2d<float> source [[texture(0)]],
                                        sampler samp [[sampler(0)]],
@@ -1723,7 +1723,7 @@ static inline float4 blendPremultiplied(int mode, float4 src, float4 dst) {
 /// were corrected then; this one, where the formula actually lives, was
 /// missed until an audit found it. `maskState` stays because it costs
 /// nothing and names what a mask pass means, not because it is load-bearing.
-fragment float4 reelcut_layer_blend_fragment(Varyings in [[stage_in]],
+fragment float4 framejob_layer_blend_fragment(Varyings in [[stage_in]],
                                              constant LayerUniforms &u [[buffer(0)]],
                                              texture2d<float> source [[texture(0)]],
                                              sampler samp [[sampler(0)]],
@@ -1792,14 +1792,14 @@ struct ShadowVaryings {
 
 // No uniforms: the quad is the whole canvas, which in clip space is the unit
 // square doubled and flipped, the same for every shadow ever drawn.
-vertex ShadowVaryings reelcut_shadow_vertex(uint vid [[vertex_id]]) {
+vertex ShadowVaryings framejob_shadow_vertex(uint vid [[vertex_id]]) {
     float2 corner = kQuad[vid];
     ShadowVaryings out;
     out.position = float4(corner.x * 2.0 - 1.0, 1.0 - corner.y * 2.0, 0.0, 1.0);
     return out;
 }
 
-fragment float4 reelcut_shadow_fragment(ShadowVaryings in [[stage_in]],
+fragment float4 framejob_shadow_fragment(ShadowVaryings in [[stage_in]],
                                         constant ShadowUniforms &u [[buffer(0)]],
                                         texture2d<float> mask [[texture(0)]],
                                         sampler samp [[sampler(0)]]) {
@@ -1841,7 +1841,7 @@ struct MatteUniforms {
 // coverage are both the destination's size, so the pixel is read, not
 // sampled. Luma is Rec. 709 over the premultiplied colour, the saturation
 // stage's weights, so a transparent pixel counts as black.
-fragment float4 reelcut_matte_resolve_fragment(ShadowVaryings in [[stage_in]],
+fragment float4 framejob_matte_resolve_fragment(ShadowVaryings in [[stage_in]],
                                                constant MatteUniforms &u [[buffer(0)]],
                                                texture2d<float> mask [[texture(0)]]) {
     float4 m = mask.read(uint2(in.position.xy));
@@ -1898,7 +1898,7 @@ static inline float4 zoomedHalf(texture2d<float> picture, sampler samp, float2 c
 // nothing is resampled; a zoom scales each half about its anchor by the
 // vertex stage's own ramps (out 1 → 1.25, in 0.75 → 1), the fragment taken
 // into CANVAS pixels first, as every canvas measurement here is.
-fragment float4 reelcut_dissolve_fragment(ShadowVaryings in [[stage_in]],
+fragment float4 framejob_dissolve_fragment(ShadowVaryings in [[stage_in]],
                                           constant DissolveUniforms &u [[buffer(0)]],
                                           texture2d<float> outgoing [[texture(0)]],
                                           texture2d<float> incoming [[texture(1)]],
@@ -2018,7 +2018,7 @@ static inline float qualifierWeight(float3 c, constant QualifierUniforms &q) {
 // (spec §11 GR-13), read from the destination BEFORE the grade so the grade
 // never moves what it selects. With `q.selection` set the pass writes
 // `q` × coverage as opaque grey instead (Show Selection).
-fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
+fragment float4 framejob_adjust_fragment(ShadowVaryings in [[stage_in]],
                                         constant LayerUniforms &u [[buffer(0)]],
                                         constant QualifierUniforms &q [[buffer(1)]],
                                         float4 dst [[color(0)]],
@@ -2070,7 +2070,7 @@ fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
 // BT.2100 reproduces them); the BT.2020 and BT.709 luminance weights; and the
 // camera log curves' constants from Apple's, Sony's and Panasonic's own
 // documents (spec §11 GR-16's append) — with the formulas' shapes. Every
-// number Reelcut chose or derived (the system gamma and gain, the knee, the
+// number Frame Job chose or derived (the system gamma and gain, the knee, the
 // whites, PQ's reference white, log's exposure and code domains, the matrix)
 // arrives in the uniform block from `InputConversions.swift`.
 //
@@ -2248,7 +2248,7 @@ static float3 inputShoulder(float3 l, float knee, float white) {
 // buffer labelled so) is divided by its alpha first, with the layer stage's
 // own floor, and multiplied back after; alpha passes through. The target is
 // the source's size, so the texel is read, not sampled.
-fragment float4 reelcut_input_fragment(ShadowVaryings in [[stage_in]],
+fragment float4 framejob_input_fragment(ShadowVaryings in [[stage_in]],
                                        constant InputUniforms &u [[buffer(0)]],
                                        texture2d<float> source [[texture(0)]],
                                        texture3d<float> lut [[texture(1)]]) {
@@ -2289,7 +2289,7 @@ fragment float4 reelcut_input_fragment(ShadowVaryings in [[stage_in]],
     } else {
         float3 light = float3(0.0);
         if (kind == kInputHLG) {
-            // BT.2100's OOTF shape with Reelcut's system gamma, then the gain.
+            // BT.2100's OOTF shape with Frame Job's system gamma, then the gain.
             float3 e = hlgInverseOETF(signal);
             float ys = dot(e, kLuma2020);
             light = ys > 1e-6 ? u.hlgGain * e * pow(ys, u.systemGamma - 1.0) : float3(0.0);
@@ -2314,7 +2314,7 @@ fragment float4 reelcut_input_fragment(ShadowVaryings in [[stage_in]],
 // tone, then the split tone. Each runs only when its block is not neutral,
 // so a neutral definition writes the identity exactly. `LookTextures`
 // dispatches it once per definition and caches the texture.
-kernel void reelcut_look_bake(texture3d<float, access::write> lattice [[texture(0)]],
+kernel void framejob_look_bake(texture3d<float, access::write> lattice [[texture(0)]],
                               constant LayerUniforms &u [[buffer(0)]],
                               constant LookBakeUniforms &b [[buffer(1)]],
                               uint3 gid [[thread_position_in_grid]]) {

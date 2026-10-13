@@ -161,7 +161,7 @@ struct LayerUniforms {
     /// three floats the obscure block's padding tail left behind, so phase 6
     /// added zero bytes to this struct — which is what that tail is for.
     ///
-    /// Read only by `reelcut_layer_blend_fragment`, which is the pipeline a
+    /// Read only by `framejob_layer_blend_fragment`, which is the pipeline a
     /// layer gets when this is not 0. Every other draw — including every
     /// shadow MASK pass, whatever the layer's mode — goes through the plain
     /// entry point, which never looks at it.

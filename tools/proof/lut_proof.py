@@ -44,7 +44,7 @@ Project H (CHART on its first track, 30 fps 640×360, background black):
   {look: {kind: "lut", media: N}}}` with its own id; `add_media {descriptor:
   {path, kind: "lut"}}` with no other key lands a `lut` row with no video.
 - **R1**: each refusal file's `import_media` error ends with `“NAME.cube” is
-  not a LUT Reelcut reads: <the core's sentence>.`, and the media count is
+  not a LUT Frame Job reads: <the core's sentence>.`, and the media count is
   unchanged.
 - **R2**: the accepted variants (a BOM, CRLF, TITLE, comments, blank lines,
   the default DOMAIN_MIN/DOMAIN_MAX/LUT_3D_INPUT_RANGE; tabs) import as `lut`.
@@ -83,7 +83,7 @@ Project H (CHART on its first track, 30 fps 640×360, background black):
   A by path, matches B by path, and remaps the base look to H2's A and the
   end to H2's B.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds
-  no `Reelcut: ` line.
+  no `Frame Job: ` line.
 - **P2, T1, T2, P3**: `lut_probe.swift`, built by `swift_build.build` over
   `app/Sources` (a failed build is a scored FAILURE of all four): P2
   `EditorViewController.payloadMediaIDs`; T1 a size-2 asymmetric file through
@@ -191,8 +191,8 @@ LG_ROWS = {"LG1", "LG2", "LM4"}
 # The rows that need project LG built (and LG0 saved for the probe).
 LG_NEEDED = LG_ROWS | {"P5", "P6", "P7"}
 DUMP = WORK / "dump"
-LG0 = WORK / "LG0.reelcut"
-LG_WORK = WORK / "LG-work.reelcut"
+LG0 = WORK / "LG0.framejob"
+LG_WORK = WORK / "LG-work.framejob"
 IMPORT_BUTTON = "Import LUT…"
 LOOK_MENU = ["Clip", "Look"]
 GALLERY = "app/Sources/LookGallery.swift"
@@ -202,7 +202,7 @@ TAGS = [("bt709", "bt709", "bt709", "bt709"),
         ("hlg", "bt2020", "arib-std-b67", "bt2020nc"),
         ("pq", "bt2020", "smpte2084", "bt2020nc"),
         ("untagged", "unknown", "unknown", "unknown")]
-NOT_A_LUT = "is not a LUT Reelcut reads: "
+NOT_A_LUT = "is not a LUT Frame Job reads: "
 LUT_TEXTURES = "app/Sources/LutTextures.swift"
 # name: ([(file, anchor, replacement), …], the rows that must fail)
 MUTANTS = {
@@ -482,7 +482,7 @@ class Doc:
 
 
 def opened(client, name):
-    path = WORK / f"{name}.reelcut"
+    path = WORK / f"{name}.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path)
     doc.call("set_canvas", width=W, height=H, fps=[30, 1], background=[0, 0, 0, 1])
@@ -642,7 +642,7 @@ def run_h(client, chart, owner_lut, state):
             if got["ok"]:
                 doc.call("undo")
     check("R1 every refusal file's import_media error ends with “NAME.cube” is not a LUT "
-          "Reelcut reads: <the core's sentence>., and the media count is unchanged",
+          "Frame Job reads: <the core's sentence>., and the media count is unchanged",
           not wrong and len(doc.media_rows()) == count, f"wrong {wrong[:4]}")
 
     # R2
@@ -823,7 +823,7 @@ def run_m1_c1_d1(doc, clip, ids, base, a_frame):
           f"{relinked.get('error', 'ok')}; back {same_pixels(back, a_frame)}")
 
     # C1
-    saved_path = WORK / "H-saved.reelcut"
+    saved_path = WORK / "H-saved.framejob"
     saved = doc.call("save_project", path=str(saved_path))
     doc.path = saved_path
     consolidated = doc.call("consolidate_media")
@@ -1062,7 +1062,7 @@ def run_probe(sources):
     entry.write_text(PROBE.read_text())
     try:
         built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
-                                  output=folder / "lut_probe", defines=["REELCUT_DEV_TOOLS"],
+                                  output=folder / "lut_probe", defines=["FRAMEJOB_DEV_TOOLS"],
                                   timeout=1200)
     except swift_build.SwiftBuildFailed as error:
         for name in sorted(selected & PROBE_ROWS):
@@ -1114,7 +1114,7 @@ def tail(log, count=4):
 
 def complaints(log):
     try:
-        return [line.strip() for line in open(log, errors="replace") if "Reelcut: " in line]
+        return [line.strip() for line in open(log, errors="replace") if "Frame Job: " in line]
     except OSError:
         return [f"{log} could not be read"]
 
@@ -1190,7 +1190,7 @@ def main():
     scored = [name for name in ROWS if name in selected and name not in RECORDS]
     binary = Path(args.app) if args.app else proof_app.binary()
     if binary.suffix == ".app":
-        binary = binary / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(binary)
     sources = ROOT / "app/Sources"
     config = proof_app.config()
     if args.mutant:
@@ -1200,7 +1200,7 @@ def main():
         if app is None:
             print(f"mutant {args.mutant}: the control could not be performed — {copy}")
             return 2
-        binary = app / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(app)
         sources = copy / "app/Sources"
         if "CT" in named:
             passed_ct, last = core_test(copy)
@@ -1242,7 +1242,7 @@ def main():
         run_probe(sources)
     found = complaints(log) if log.exists() else []
     fixtures_ok = all(value for key, value in state.items() if key.endswith("fixture"))
-    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Reelcut: ` "
+    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Frame Job: ` "
           "line", closed and fixtures_ok and not found,
           f"closed {closed}; fixtures {state}; complaints {found}")
     if log.exists():

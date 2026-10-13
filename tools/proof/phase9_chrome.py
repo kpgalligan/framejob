@@ -119,7 +119,7 @@ point, flags and click count `TimelineContentView.mouseDown` would have
 computed, which is the frozen file's one line and is not under test.
 
 Run it from anywhere; it needs no port and no window server grant, only
-`core/target/release/libreelcut_core.a` from `make test`:
+`core/target/release/libframejob_core.a` from `make test`:
 
     python3 tools/proof/phase9_chrome.py
     python3 tools/proof/phase9_chrome.py --mutant init-order
@@ -627,7 +627,7 @@ def build_probe(sources_dir, probe_dir):
         os.path.join(sources_dir, name)
         for name in os.listdir(sources_dir)
         if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
@@ -644,7 +644,7 @@ def build_probe(sources_dir, probe_dir):
 
 def run_probe(binary, probe_dir):
     out = os.path.join(probe_dir, "shots")
-    package = os.path.join(probe_dir, "probe.reelcut")
+    package = os.path.join(probe_dir, "probe.framejob")
     start = time.time()
     result = subprocess.run([binary, out, FONTS, package], capture_output=True, text=True)
     elapsed = time.time() - start

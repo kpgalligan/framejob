@@ -4,7 +4,7 @@
 
     python3 tools/proof/save_project_proof.py <dir>/agent.sock [--log PATH]
 
-`--log` defaults to `<dir>/reelcut.log`. The app is a Release build at the
+`--log` defaults to `<dir>/framejob.log`. The app is a Release build at the
 socket, FRESH for each run: every row writes its own package under
 `work/save_project/` (`v2_snapshot.write_package`'s shape at `"version": 9`,
 640×360 at 30 fps, one track, no clips, and NO `cache/`), and a package an
@@ -19,18 +19,18 @@ document's path as the caller wrote it (P3). Measured on the baseline build
 (B10's G2): P1, P3 and C1 fail; the issue's "locked" refusal did not
 reproduce.
 
-- **T1** — no `Reelcut: ` line in the log (the startup parity check).
+- **T1** — no `Frame Job: ` line in the log (the startup parity check).
 - **P0** (control) — `cache/` exists after `open_project`.
 - **P1** — an unedited `save_project {project}` answers `unsaved_changes:
   false`, and `project.json`'s `version` is the header's `RC_FORMAT_VERSION`.
 - **P2** — `add_marker {at: 600000}`, then `save_project {project, path: <own
   path>}` answers; the file holds 1 marker and `get_project`'s `path` is
   unchanged, string for string.
-- **P3** — P2 with `path` spelled `<dir>/./<name>.reelcut`.
+- **P3** — P2 with `path` spelled `<dir>/./<name>.framejob`.
 - **C1** — an edited document's `save_project {project}` leaves 1 marker on
   disk (the issue's case 1 once an edit has dirtied the document; B10's
   design took it for a control, and the baseline fails it).
-- **C2** (control) — C1's document saved to a new `copy.reelcut` holds 1
+- **C2** (control) — C1's document saved to a new `copy.framejob` holds 1
   marker there, and `get_project` names it.
 - **C3** (control) — an unedited document saved to its own path (the old
   workaround `screens.py` used).
@@ -77,7 +77,7 @@ def score(rid, ok, detail):
 
 def package(name):
     """A fresh version-9 package with no `cache/`."""
-    path = os.path.join(WORK, f"{name}.reelcut")
+    path = os.path.join(WORK, f"{name}.framejob")
     v2_snapshot.write_package(path, dict(CANVAS), [])
     project_json = os.path.join(path, "project.json")
     with open(project_json) as f:
@@ -104,11 +104,11 @@ def add_marker(mcp, path):
 def row_t1(log):
     try:
         with open(log, errors="replace") as f:
-            lines = [line.rstrip() for line in f if "Reelcut: " in line]
+            lines = [line.rstrip() for line in f if "Frame Job: " in line]
     except OSError as error:
         score("T1", False, f"the log {log} could not be read: {error}")
         return
-    score("T1", not lines, f"{len(lines)} `Reelcut: ` line(s) in {log}"
+    score("T1", not lines, f"{len(lines)} `Frame Job: ` line(s) in {log}"
           + (f": {lines[:3]!r}" if lines else ""))
 
 
@@ -164,18 +164,18 @@ def row_c1_c2(mcp):
               "(want 1)")
     except ToolError as error:
         score("C1", False, f"edited save_project {{project}} refused: {error}")
-    copy = os.path.join(WORK, "copy.reelcut")
+    copy = os.path.join(WORK, "copy.framejob")
     shutil.rmtree(copy, ignore_errors=True)
     try:
         mcp.call_with("save_project", {"project": path, "path": copy})
     except ToolError as error:
-        score("C2", False, f"save_project {{project, path: copy.reelcut}} refused: {error}")
+        score("C2", False, f"save_project {{project, path: copy.framejob}} refused: {error}")
         return
     count = len(on_disk(copy).get("markers", [])) if os.path.isdir(copy) else None
     reported = mcp.call_with("get_project", {"project": copy}).get("path")
     named = canonical(reported) == canonical(copy)
     score("C2", count == 1 and named,
-          f"copy.reelcut holds {count} marker(s) (want 1); get_project path {reported!r} "
+          f"copy.framejob holds {count} marker(s) (want 1); get_project path {reported!r} "
           f"names it: {named}")
 
 

@@ -76,7 +76,7 @@ extension Transcriber {
         url: URL, seconds: Double
     ) {
         let destination = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("reelcut-transcribe-\(UUID().uuidString).wav")
+            .appendingPathComponent("framejob-transcribe-\(UUID().uuidString).wav")
         let range = CMTimeRange(
             start: CompositionBuilder.time(job.sourceIn),
             duration: CompositionBuilder.time(max(1, job.sourceLength)))
@@ -281,7 +281,7 @@ extension Transcriber {
         url: URL, name: String, cancel: CancelToken, progress: ((Int) -> Void)? = nil,
         flac: (URL, URL, CancelToken) throws -> Void = Transcriber.writeFLAC
     ) throws -> Upload {
-        let stem = "reelcut-upload-\(UUID().uuidString)"
+        let stem = "framejob-upload-\(UUID().uuidString)"
         let wav = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("\(stem).wav")
         let frames = try extractAudio(

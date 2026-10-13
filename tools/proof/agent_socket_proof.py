@@ -12,7 +12,7 @@ holds the socket's line alone. Logs go to
 build, the probe, `osascript`, `lsof`, `ffmpeg`,
 `tree_copy.build_app`) runs under `graphics_spike/bounded.py`. HTTP over AF_UNIX is
 `mcp.UnixHTTPConnection`. Nothing is signalled but this script's own pids,
-and nothing under `~/Library/Application Support/Reelcut/` is created,
+and nothing under `~/Library/Application Support/Frame Job/` is created,
 written or unlinked.
 
 P1  (probe) `AgentServer.socketPlan`: `.bind(default)` for `{}`; `.bind(s)`
@@ -44,17 +44,17 @@ K12 (spec §11 MC-5) H, launched with `-RCFFmpegImport ask -RCFFmpegPath
     <which ffmpeg>`, over an `MCP(..., timeout=20)` client: `import_media` of
     a 1 s `testsrc` Matroska (`-c:v mpeg4`, made under H's scratch folder)
     answers `isError` with B73's copy refusal (`MPEG-4 Part 2 video, which
-    Reelcut cannot copy out of a WebM or Matroska file`, spec §11 #216-R;
+    Frame Job cannot copy out of a WebM or Matroska file`, spec §11 #216-R;
     `Could not read` before the merge with main) and `RCFFmpegImport` in its
     text (the import half); `open_project` of the same file answers `isError`
     within 20 s (the open half). No ffmpeg on the host is a FAIL.
 K13 (spec §11 MC-7) Settings' MCP section, on K, with no clipboard
-    involved: `new_project` (a scratch path); `perform_menu_item ["Reelcut",
+    involved: `new_project` (a scratch path); `perform_menu_item ["Frame Job",
     "Settings…"]`, whose `windows_opened` must include `settings`; then
     `snapshot_ui {window: "settings"}` and its layout dump:
     `settings.mcp.heading` reads "MCP", `settings.mcp.blurb.1` the first
     paragraph's literal, `settings.mcp.helper` the launched bundle's resolved
-    `Contents/Helpers/reelcut-mcp` (an executable file of 200 characters or
+    `Contents/Helpers/framejob-mcp` (an executable file of 200 characters or
     fewer, snapshot_ui's text cap), and `settings.mcp.copy` "Copy MCP
     Command"; their frame tops are strictly ordered heading < blurb.1 <
     helper < copy < `settings.assistant.info`; none of those ids has a layout
@@ -94,7 +94,7 @@ K15 (spec §11 #231, issue batch B81) a quit with an `open_project` READ in
     would put a save sheet up) and N2 quits by the same event. A call that
     answered before the quit is a FAIL that names `--k15-megabytes`. Both
     folders are removed when the row ends.
-Z1  no `Reelcut: ` in any log.  Z2  no proof pid alive.
+Z1  no `Frame Job: ` in any log.  Z2  no proof pid alive.
 
     python3 tools/proof/agent_socket_proof.py [--app PATH] [--k15-megabytes N]
         [--mutant no-connect-first|no-mode-check|tcp-listener|agent-asks|
@@ -108,7 +108,7 @@ against that build: `no-connect-first` (K4 must FAIL), `no-mode-check` (K8),
 `listening at` line), `agent-asks` (K12's import half: `AgentServer+Media`'s
 probe passes `mayAsk: true`), `open-asks` (K12's open half: `openProject`
 calls `makeDocument` outside `withoutAsking`) and `fixed-path` (K13:
-`mcpHelperURL` is `/Applications/Reelcut.app/…`) and `waits-for-call` (K14
+`mcpHelperURL` is `/Applications/Frame Job.app/…`) and `waits-for-call` (K14
 AND K15: `applicationWillTerminate` joins a `get_project` served on a
 background thread before it unbinds, so main waits on the lane lock the
 in-flight export or open holds, while that call's completion waits for main;
@@ -116,7 +116,7 @@ K6 and K7 fail too, as expected. It is `async` plus a semaphore, never
 `DispatchQueue.global().sync`: GCD runs a `sync` block inline on the calling
 thread, so `serve` would see the main thread and skip the lock) and
 `no-controller` (Z1: `main.swift` installs no `ProjectDocumentController`,
-so the launch logs the `Reelcut: ` complaint, spec §11 #234). `lsregister -u`
+so the launch logs the `Frame Job: ` complaint, spec §11 #234). `lsregister -u`
 is run on a copy's built app before its tree is replaced and at the end of
 its run. A mutant run exits 0 when every row it names FAILED (caught), 1
 when one passed (survived), 2 when the control could not be performed.
@@ -151,7 +151,7 @@ WORK = ROOT / "tools/proof/work/agent-socket"
 APP = proof_app.binary()
 PROBE_SOURCE = ROOT / "tools/proof/agent_socket_probe.swift"
 SOURCES = ROOT / "app/Sources"
-SUPPORT = Path.home() / "Library/Application Support/Reelcut"
+SUPPORT = Path.home() / "Library/Application Support/Frame Job"
 MAX_PATH = 103
 LAUNCH_BOUND = 60
 QUIT_BOUND = 20
@@ -159,9 +159,9 @@ K12_BOUND = 20
 NEVER_ASKS = "RCFFmpegImport"
 # What B73's built-in Matroska copy answers for K12's mpeg4 fixture, before
 # the opt-in ffmpeg step a tool call never asks for (spec §11 #216-R, MC-5).
-COPY_REFUSAL = "MPEG-4 Part 2 video, which Reelcut cannot copy out of a WebM or Matroska file"
+COPY_REFUSAL = "MPEG-4 Part 2 video, which Frame Job cannot copy out of a WebM or Matroska file"
 TCP_LISTENER = (
-    "        NSLog(\"Reelcut agent socket listening at %@\", path)\n"
+    "        NSLog(\"Frame Job agent socket listening at %@\", path)\n"
     "        let leaked = socket(AF_INET, SOCK_STREAM, 0)\n"
     "        var leakedAddress = sockaddr_in()\n"
     "        leakedAddress.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)\n"
@@ -185,7 +185,7 @@ MUTANTS = {
                       "folderInfo.st_mode) }\n",
                       ""),
     "tcp-listener": ("K11", None, "AgentServer+Socket.swift",
-                     "        NSLog(\"Reelcut agent socket listening at %@\", path)\n",
+                     "        NSLog(\"Frame Job agent socket listening at %@\", path)\n",
                      TCP_LISTENER),
     "agent-asks": ("K12", "import", "AgentServer+Media.swift",
                    "        MediaImporter.probe(url: url, mayAsk: false) { result in\n",
@@ -199,8 +199,8 @@ MUTANTS = {
                   "        let made = try controller.makeDocument("
                   "withContentsOf: url, ofType: known.type)\n"),
     "fixed-path": ("K13", None, "AgentServer+Socket.swift",
-                   "        Bundle.main.bundleURL.appendingPathComponent(\"Contents/Helpers/reelcut-mcp\")\n",
-                   "        URL(fileURLWithPath: \"/Applications/Reelcut.app/Contents/Helpers/reelcut-mcp\")\n"),
+                   "        Bundle.main.bundleURL.appendingPathComponent(\"Contents/Helpers/framejob-mcp\")\n",
+                   "        URL(fileURLWithPath: \"/Applications/Frame Job.app/Contents/Helpers/framejob-mcp\")\n"),
     # A join: main waits while a real background thread waits on the lane
     # lock, which the in-flight export holds; the export's completion is
     # delivered on main (Exporter.swift), so the quit cannot complete. Not
@@ -271,12 +271,12 @@ def call(path, tool, arguments, timeout=60):
 
 
 def answers(path):
-    """True when `initialize` over the socket answers as Reelcut."""
+    """True when `initialize` over the socket answers as Frame Job."""
     try:
         result = rpc(path, "initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
                                           "clientInfo": {"name": "agent-socket-proof",
                                                          "version": "1"}})
-        return result.get("serverInfo", {}).get("name") == "reelcut"
+        return result.get("serverInfo", {}).get("name") == "framejob"
     except Exception:
         return False
 
@@ -328,7 +328,7 @@ class Instance:
         while time.monotonic() < deadline:
             time.sleep(0.25)
             text = self.log.read_text(errors="replace")
-            line = re.search(r"Reelcut agent socket (listening at .*|not bound: .*)", text)
+            line = re.search(r"Frame Job agent socket (listening at .*|not bound: .*)", text)
             if line:
                 self.socket_line = line.group(1).strip()
                 print(f"  {self.name}: PID {self.child.pid}; socket {self.socket_line}",
@@ -400,12 +400,12 @@ def build_probe(sources, probe_dir):
     entry = probe_dir / "main.swift"
     if not entry.exists() or entry.read_text() != PROBE_SOURCE.read_text():
         entry.write_text(PROBE_SOURCE.read_text())
-    lib = ROOT / "core/target/release/libreelcut_core.a"
+    lib = ROOT / "core/target/release/libframejob_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
         built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
-                                  output=binary, defines=["REELCUT_DEV_TOOLS"], timeout=900)
+                                  output=binary, defines=["FRAMEJOB_DEV_TOOLS"], timeout=900)
     except swift_build.SwiftBuildFailed as error:
         return None, (f"swiftc rc {error.rc if error.rc is not None else 'before running'}: "
                       f"{(error.diagnostics or ['(no output)'])[:6]}")
@@ -491,7 +491,7 @@ def row_k12(app):
         check("K12", False, f"H did not bind: {h.socket_line!r}")
         h.stop()
         return
-    project = os.path.join(folder, "k12.reelcut")
+    project = os.path.join(folder, "k12.framejob")
     try:
         call(sock, "new_project", {"path": project})
         error_i, text_i, seconds_i = k12_call(sock, "import_media",
@@ -510,8 +510,8 @@ def row_k12(app):
           f"open half {open_ok} (isError {error_o}, {seconds_o} s: {text_o[:160]!r})")
 
 
-K13_BLURB = ("An MCP client such as Claude Code uses Reelcut's tools through reelcut-mcp, a "
-             "helper inside this app. It reaches Reelcut over a local socket that only programs "
+K13_BLURB = ("An MCP client such as Claude Code uses Frame Job's tools through framejob-mcp, a "
+             "helper inside this app. It reaches Frame Job over a local socket that only programs "
              "you run can open.")
 K13_IDS = ["settings.mcp.heading", "settings.mcp.blurb.1", "settings.mcp.helper",
            "settings.mcp.copy", "settings.assistant.info"]
@@ -520,7 +520,7 @@ K13_IDS = ["settings.mcp.heading", "settings.mcp.blurb.1", "settings.mcp.helper"
 def row_k13(app):
     folder = scratch_folder()
     sock = os.path.join(folder, "agent.sock")
-    helper = str(Path(app).resolve().parents[1] / "Helpers/reelcut-mcp")
+    helper = str(Path(app).resolve().parents[1] / "Helpers/framejob-mcp")
     executable = os.path.isfile(helper) and os.access(helper, os.X_OK)
     k = Instance("k", app, sock)
     up = k.start()
@@ -528,9 +528,9 @@ def row_k13(app):
         if not up or k.socket_line != f"listening at {sock}":
             check("K13", False, f"K did not bind: {k.socket_line!r}")
             return
-        project = call(sock, "new_project", {"path": os.path.join(folder, "k13.reelcut")})["saved"]
+        project = call(sock, "new_project", {"path": os.path.join(folder, "k13.framejob")})["saved"]
         opened = call(sock, "perform_menu_item", {"project": project,
-                                                  "path": ["Reelcut", "Settings…"]})
+                                                  "path": ["Frame Job", "Settings…"]})
         kinds = [w.get("kind") for w in opened.get("windows_opened", [])]
         answer = call(sock, "snapshot_ui", {"window": "settings",
                                             "path": os.path.join(folder, "k13.png")})
@@ -577,7 +577,7 @@ def row_k14(app):
         if not up or m.socket_line != f"listening at {sock}":
             check("K14", False, f"M did not bind: {m.socket_line!r}")
             return
-        project = call(sock, "new_project", {"path": os.path.join(folder, "k14.reelcut")})["saved"]
+        project = call(sock, "new_project", {"path": os.path.join(folder, "k14.framejob")})["saved"]
         tracks = call(sock, "get_project", {"project": project})["project"].get("tracks", [])
         if not tracks:
             call(sock, "add_track", {"project": project})
@@ -673,7 +673,7 @@ def row_k15(app, megabytes):
         shutil.rmtree(folder, ignore_errors=True)
         folder.mkdir(parents=True)
     support = home / "Library/Application Support"
-    rewrapped = support / "Reelcut/Rewrapped"
+    rewrapped = support / "Frame Job/Rewrapped"
     scratch = {"CFFIXED_USER_HOME": str(home)}
     sock = os.path.join(scratch_folder(), "agent.sock")
     n = Instance("n", app, sock, env=scratch)
@@ -846,7 +846,7 @@ def run_rows(app, megabytes=K15_MEGABYTES):
     row_k11(a)
 
     # K3 — an edit over one connection is read back over a second.
-    project = str(WORK / f"k3-{os.getpid()}.reelcut")
+    project = str(WORK / f"k3-{os.getpid()}.framejob")
     shutil.rmtree(project, ignore_errors=True)
     try:
         first, second = mcp.MCP(path, timeout=60), mcp.MCP(path, timeout=60)
@@ -971,9 +971,9 @@ def finish_z():
         instance.stop()
     leaked = [line for instance in INSTANCES if instance.log.exists()
               for line in instance.log.read_text(errors="replace").splitlines()
-              if "Reelcut: " in line]
+              if "Frame Job: " in line]
     check("Z1", not leaked, f"{len(INSTANCES)} logs; " + (repr(leaked[:3]) if leaked else
-                                                         "no `Reelcut: ` line"))
+                                                         "no `Frame Job: ` line"))
     alive = []
     for instance in INSTANCES:
         if instance.child is None:
@@ -1018,7 +1018,7 @@ def build_mutant_app(name):
     app, reason = tree_copy.build_app(made, 1500)
     if app is None:
         return None, reason
-    return app / "Contents/MacOS/Reelcut", ""
+    return proof_app.executable(app), ""
 
 
 def main():

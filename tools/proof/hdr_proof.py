@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Road map "grading-3", phase T3-1 (spec §11 GR-15) — honest sources and
-Reelcut's own HDR→SDR at step 0, over MCP and two probes over `app/Sources`.
+Frame Job's own HDR→SDR at step 0, over MCP and two probes over `app/Sources`.
 Written before any product edit, so the control is captured on the untouched
 tree. T3-3 (the close) added H1a, H7 and TI's export wall time, measuring two
 of GR-15's unmeasured claims; the product was not edited for them.
@@ -20,7 +20,7 @@ at exit. The fixtures are made once under `tools/proof/work/hdr/media/` and
 kept; `capture` copies H1's into `DIR/media/`, and every later run reads H1's
 from there, so the control and the tree draw the same bytes (a VideoToolbox
 encode is not repeatable). No menu item is performed and no default written:
-`--measure` passes `-ReelcutCompositorTiming YES` as a launch argument. Every
+`--measure` passes `-FrameJobCompositorTiming YES` as a launch argument. Every
 call is bounded (`CALL_BOUND`), every ffmpeg and ffprobe too. Every project is
 closed (`close_project`, discard). This script NEVER records the screen.
 
@@ -97,7 +97,7 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   it rather than follows it.
 - **R0** (GR-15's owed check; NEVER records the screen, never searches the
   disk): ffprobe reads the labels of the newest-by-name `Screen Recording
-  *.mov` in `~/Movies/Reelcut Recordings/` (that folder only, read-only,
+  *.mov` in `~/Movies/Frame Job Recordings/` (that folder only, read-only,
   labels only: its pixels are never imported, rendered or copied), the
   selector's arm for them (`arm`, Approach 3's table) is printed, and
   `rec_tags.mov` — the ramp as `srgb.mov` is made, carrying exactly those
@@ -105,7 +105,7 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   recording on disk; GRD-16", scored nothing.
 - **TI** (`--measure`, mutants): the 4K HLG twin placed twice (8 s) exported
   `prores_422` on an instance of its own, then the BT.709 twin on another;
-  every compositor timing line (`[reelcut] compositor: … over 120 frames, N
+  every compositor timing line (`[framejob] compositor: … over 120 frames, N
   input passes`) reports 120 passes for HLG and 0 for BT.709, at least two
   lines each; the averages, their difference, each export's wall time
   (`time.monotonic()` around the `export` call, recorded, not scored) and the
@@ -113,7 +113,7 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
 - **P1–P4**: `hdr_probe.swift` over `app/Sources` (a probe that will not build
   is a scored FAIL of all four).
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
-  `Reelcut: ` line.
+  `Frame Job: ` line.
 
 H1a and H7 run in a plain run, `compare` and `--only`; never under
 `capture`, `--measure` or a mutant's default selection.
@@ -150,6 +150,7 @@ sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
 import proof_app  # noqa: E402
+import reference_build  # noqa: E402
 import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 
@@ -161,7 +162,7 @@ CONTROL = "tools/proof/work/t3-1/ctl"
 PICK_PROBE = ROOT / "tools/proof/hdr_pick_probe.swift"
 MATH_PROBE = ROOT / "tools/proof/hdr_probe.swift"
 WRITER = ROOT / "tools/proof/applelog_writer.swift"
-RECORDINGS = Path.home() / "Movies" / "Reelcut Recordings"
+RECORDINGS = Path.home() / "Movies" / "Frame Job Recordings"
 CALL_BOUND = 300
 BUILD_BOUND = 1500
 REVERSE_BOUND = 300
@@ -209,7 +210,7 @@ APPLE = {"hlg": [(0.25, 0.215), (0.5, 0.384), (0.75, 0.604), (1.0, 1.0)],
          "pq": [(0.5, 0.719), (0.75, 1.0)]}
 APPLE_BOUND = 3
 PATCH = (0.42, 0.84, 1.17)
-TIMING = re.compile(r"\[reelcut\] compositor: ([\d.]+) ms average, ([\d.]+) ms worst over 120 "
+TIMING = re.compile(r"\[framejob\] compositor: ([\d.]+) ms average, ([\d.]+) ms worst over 120 "
                     r"frames(?:, (\d+) input passes)?")
 # H1's SDR fixtures: (name, canvas width, height).
 H1_FIXTURES = [("bt709", W, H), ("untagged", W, H), ("h264_709", SW, SH),
@@ -788,7 +789,7 @@ def digest(path):
 class Doc:
     def __init__(self, client, name, width, height):
         self.client, self.width, self.height = client, width, height
-        self.path = WORK / f"{name}.reelcut"
+        self.path = WORK / f"{name}.framejob"
         self.made = attempt(client, "new_project", {"path": str(self.path)})["ok"]
         self.call("set_canvas", width=width, height=height, fps=[30, 1])
         c = self.project().get("canvas") or {}
@@ -849,7 +850,7 @@ class Doc:
         return out
 
     def save(self, name):
-        path = WORK / f"{name}.reelcut"
+        path = WORK / f"{name}.framejob"
         got = self.call("save_project", path=str(path))
         if got["ok"]:
             self.path = path
@@ -900,25 +901,26 @@ def build_probe(source, sources, name):
     if step["rc"] != 0 or not library.exists():
         return None, f"the shader did not build: {step['stderr'][-400:]}"
     try:
+        defines = reference_build.tree_defines(Path(sources).parents[1], ["FRAMEJOB_DEV_TOOLS"])
         built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
-                                  output=folder / name, defines=["REELCUT_DEV_TOOLS"],
-                                  timeout=BUILD_BOUND)
+                                  output=folder / name, defines=defines, timeout=BUILD_BOUND)
     except swift_build.SwiftBuildFailed as error:
         return None, f"{error} {error.diagnostics[:6]}"
     return built.binary, None
 
 
 def base_sources():
-    """716720c's `app/Sources` (and `app/Resources`), by `git archive` into
+    """716720c's `app/Sources` (and `app/Resources`, and `app/Bridging`, whose
+    name says which dev-tools flag the tree spells), by `git archive` into
     BASE_TREE, made once and kept; None and why when the archive fails."""
     sources = BASE_TREE / "app/Sources"
-    if (sources / "Compositor.swift").exists():
+    if (sources / "Compositor.swift").exists() and (BASE_TREE / "app/Bridging").is_dir():
         return sources, None
     tree_copy.remove_tree(str(BASE_TREE)) if BASE_TREE.exists() else None
     BASE_TREE.mkdir(parents=True)
     archive = BASE / f"base-{BASE_COMMIT}.tar"
     made = bounded.run(["git", "-C", str(ROOT), "archive", "-o", str(archive), BASE_COMMIT,
-                        "app/Sources", "app/Resources"], 120)
+                        "app/Sources", "app/Resources", "app/Bridging"], 120)
     if made["rc"] == 0:
         made = bounded.run(["tar", "-xf", str(archive), "-C", str(BASE_TREE)], 120)
     archive.unlink(missing_ok=True)
@@ -940,7 +942,7 @@ def base_copy(package):
         return None, f"{source.name}: {error}"
     if any(m.get("color") is not None for m in project.get("media") or []):
         return None, f"{source.name}: a media carries color"
-    copy = source.with_name(source.stem + "-v18.reelcut")
+    copy = source.with_name(source.stem + "-v18.framejob")
     if copy.exists():
         shutil.rmtree(copy)
     shutil.copytree(source, copy)
@@ -1608,7 +1610,7 @@ def run_ti(binary):
         log = WORK / f"ti-{name}.log"
         before = host_state()
         wall = None
-        launched = mcp.launch(str(binary), ["-ReelcutCompositorTiming", "YES"],
+        launched = mcp.launch(str(binary), ["-FrameJobCompositorTiming", "YES"],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
                               log_path=str(log), timeout=CALL_BOUND)
         try:
@@ -1630,7 +1632,7 @@ def run_ti(binary):
         finally:
             launched.stop()
             mcp.remove_scratch(launched.socket_path)
-        found = [l for l in open(log, errors="replace") if "Reelcut: " in l]
+        found = [l for l in open(log, errors="replace") if "Frame Job: " in l]
         passes = [None if p == "" else int(p) for _, _, p in lines]
         averages = [float(a) for a, _, _ in lines]
         worst = [float(w) for _, w, _ in lines]
@@ -1753,7 +1755,7 @@ def tail(log, count=4):
 
 def complaints(log):
     try:
-        return [line.strip() for line in open(log, errors="replace") if "Reelcut: " in line]
+        return [line.strip() for line in open(log, errors="replace") if "Frame Job: " in line]
     except OSError:
         return [f"{log} could not be read"]
 
@@ -1824,7 +1826,7 @@ def main():
     named = MUTANTS[args.mutant][1] if args.mutant else []
     binary = Path(args.app) if args.app else proof_app.binary()
     if binary.suffix == ".app":
-        binary = binary / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(binary)
     sources = ROOT / "app/Sources"
     config = proof_app.config()
     if args.mutant:
@@ -1834,7 +1836,7 @@ def main():
         if app is None:
             print(f"mutant {args.mutant}: the control could not be performed — {copy}")
             return 2
-        binary = app / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(app)
         sources = copy / "app/Sources"
     else:
         what = args.mode or ("measure" if args.measure else "run")
@@ -1914,7 +1916,7 @@ def main():
     found = complaints(log) if needs_instance else []
     fixtures_ok = all(v for k, v in state.items() if k.endswith("fixture"))
     closed = closed and all(v for k, v in state.items() if k.endswith("closed"))
-    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Reelcut: ` "
+    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Frame Job: ` "
           "line", closed and fixtures_ok and not found,
           f"closed {closed}; state {{{', '.join(f'{k}: {v}' for k, v in state.items() if k != 'h1_record')}}}; "
           f"refused {REFUSED or 'none'}; complaints {found}")

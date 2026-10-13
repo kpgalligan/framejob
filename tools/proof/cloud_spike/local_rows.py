@@ -27,7 +27,7 @@ if PROOF not in sys.path:
 import tree_copy  # noqa: E402
 
 TARGET = ["-O", "-target", "arm64-apple-macos26.0"]
-Q7_SERVICE = "com.reelcut.spike.q7"
+Q7_SERVICE = "com.framejob.spike.q7"
 Q7_ACCOUNT = "spike"
 
 
@@ -152,8 +152,8 @@ def q3(work, here):
         if binary is None:
             return {"state": "failed", "reason": "ats_probe did not build",
                     "measured": {"build_error": error}}
-        plain = bundle(work, "RCSpikeQ3", "com.reelcut.spike.q3", binary, ats=False)
-        keyed = bundle(work, "RCSpikeQ3Keyed", "com.reelcut.spike.q3keyed", binary, ats=True)
+        plain = bundle(work, "RCSpikeQ3", "com.framejob.spike.q3", binary, ats=False)
+        keyed = bundle(work, "RCSpikeQ3Keyed", "com.framejob.spike.q3keyed", binary, ats=True)
         rows = {}
         for label, runner in (("bare", binary), ("bundle_no_key", plain["executable"]),
                               ("bundle_local_networking", keyed["executable"])):

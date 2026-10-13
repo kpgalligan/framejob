@@ -5,7 +5,7 @@ import VideoToolbox
 /// A WebM or Matroska file opened by a built-in rewrap (spec §11 #216-R):
 /// the core indexes the container (`ReelContainer`) and its first video and
 /// audio streams are copied, unchanged, into a QuickTime movie under
-/// `~/Library/Application Support/Reelcut/Rewrapped/`, the folder ffmpeg's
+/// `~/Library/Application Support/Frame Job/Rewrapped/`, the folder ffmpeg's
 /// conversions use, by `FFmpegRewrap.destination(for:)`'s digest name — so a
 /// second import of the same file reuses the copy.
 ///
@@ -191,7 +191,7 @@ enum ContainerRewrap {
     static func unsupported(fileName: String, kind: String, codecID: String, encoded: Bool)
         -> String
     {
-        let tail = "which Reelcut cannot copy out of a WebM or Matroska file."
+        let tail = "which Frame Job cannot copy out of a WebM or Matroska file."
         if encoded {
             return "\(fileName) has a compressed or encrypted \(kind) track, \(tail)"
         }

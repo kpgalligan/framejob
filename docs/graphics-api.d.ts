@@ -1,4 +1,4 @@
-// Reelcut graphics — the API as TypeScript declarations (road map 10, G-11).
+// Frame Job graphics — the API as TypeScript declarations (road map 10, G-11).
 // The prose is `graphics-api.md` beside this file (in a package's
 // `graphics/`, `API.md`); this file types it, as GLOBAL declarations: the
 // standard library is already in scope in a graphic, and a module imports

@@ -5,7 +5,7 @@
 // `Fonts`, `Blank.mp4` and a `default.metallib` of the app's own shader beside
 // the binary — `graphics_pin_probe.swift`'s build.
 //
-//     export_cancel_probe <package.reelcut> <out.m4a> <delay|-1>
+//     export_cancel_probe <package.framejob> <out.m4a> <delay|-1>
 //
 // It opens the package as the app does (`read`, `fileURL`), exports
 // `audio_m4a` through `Exporter().export(… urls: doc.mediaURLs() …)` and
@@ -36,7 +36,7 @@ func finish() -> Never {
 
 guard arguments.count == 4, let delay = Double(arguments[3]) else {
     answer["outcome"] = "failure"
-    answer["error"] = "usage: <package.reelcut> <out.m4a> <delay|-1>"
+    answer["error"] = "usage: <package.framejob> <out.m4a> <delay|-1>"
     finish()
 }
 let packageURL = URL(fileURLWithPath: arguments[1])
@@ -47,7 +47,7 @@ NSApplication.shared.setActivationPolicy(.prohibited)
 
 let document = ProjectDocument()
 do {
-    try document.read(from: packageURL, ofType: "com.kgalligan.reelcut-project")
+    try document.read(from: packageURL, ofType: ProjectDocument.projectTypeIdentifier)
 } catch {
     answer["outcome"] = "failure"
     answer["error"] = "the package would not open: \(error.localizedDescription)"

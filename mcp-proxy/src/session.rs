@@ -3,7 +3,7 @@
 //! check (road map 14's MC3, spec §11 MC-4).
 //!
 //! **What is answered here and what is forwarded.** `initialize` and `ping`
-//! never touch the socket, so a client starts with no Reelcut running and a
+//! never touch the socket, so a client starts with no Frame Job running and a
 //! `ping` is answered while a long call holds the app. `tools/list` is the
 //! app's when it answers within `LIST_READ_TIMEOUT` and the bundle's
 //! snapshot otherwise; it never launches anything (MC-4). `tools/call`
@@ -158,10 +158,10 @@ impl Session {
                         state.check_due = false;
                         return answer;
                     }
-                    _ => format!("Reelcut's tools/list at {} held no tools", path.display()),
+                    _ => format!("Frame Job's tools/list at {} held no tools", path.display()),
                 },
                 Ok(None) => format!(
-                    "Reelcut answered tools/list at {} with no body",
+                    "Frame Job answered tools/list at {} with no body",
                     path.display()
                 ),
                 Err(reason) => reason,
@@ -216,7 +216,7 @@ impl Session {
                         if reason.starts_with(launch::TIMEOUT_OPENING) {
                             self.state().stranded = Some(stranded_sentence(&reason, &path));
                         }
-                        eprintln!("reelcut-mcp: {reason}");
+                        eprintln!("framejob-mcp: {reason}");
                         return out.write(&call_error(id, &reason));
                     }
                 }
@@ -225,7 +225,7 @@ impl Session {
         match socket::post(&path, message, None) {
             Ok(Some(answer)) => out.write(&answer),
             Ok(None) => {
-                return out.write(&call_error(id, "Reelcut answered the call with no body"))
+                return out.write(&call_error(id, "Frame Job answered the call with no body"))
             }
             Err(reason) => return out.write(&call_error(id, &reason)),
         }
@@ -238,7 +238,8 @@ impl Session {
         if !self.state().check_due {
             return;
         }
-        let ask = json!({"jsonrpc": "2.0", "id": "reelcut-mcp-list-check", "method": "tools/list"});
+        let ask =
+            json!({"jsonrpc": "2.0", "id": "framejob-mcp-list-check", "method": "tools/list"});
         let live = match socket::post(path, &ask, None) {
             Ok(Some(answer)) => answer
                 .pointer("/result/tools")
@@ -246,7 +247,7 @@ impl Session {
                 .cloned(),
             Ok(None) => None,
             Err(reason) => {
-                eprintln!("reelcut-mcp: the list check: {reason}");
+                eprintln!("framejob-mcp: the list check: {reason}");
                 None
             }
         };
@@ -274,7 +275,7 @@ fn initialize(id: Value, message: &Value) -> Value {
         json!({
             "protocolVersion": mcp_versions::negotiate(requested),
             "capabilities": {"tools": {"listChanged": true}},
-            "serverInfo": {"name": "reelcut", "version": version},
+            "serverInfo": {"name": "framejob", "version": version},
         }),
     )
 }
@@ -289,7 +290,7 @@ fn forward_other(id: Value, method: &str, message: &Value) -> Value {
     }
     match socket::post(&path, message, None) {
         Ok(Some(answer)) => answer,
-        Ok(None) => error(id, -32603, "Reelcut answered with no body"),
+        Ok(None) => error(id, -32603, "Frame Job answered with no body"),
         Err(reason) => error(id, -32603, &reason),
     }
 }

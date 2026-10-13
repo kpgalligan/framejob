@@ -496,7 +496,7 @@ extension EditorViewController {
         // The title with the package's own extension off and NOTHING else
         // off — `ProjectDocument+DisplayStem.swift` says why the bare strip
         // that stood here lost the `.2` of "Board v1.2", and why its known
-        // set is `{reelcut}` where the popup's below is `{srt, vtt}`. It is
+        // set is `{framejob}` where the popup's below is `{srt, vtt}`. It is
         // also the popup's fallback for a field emptied to nothing.
         let stem = document.displayStem
         let panel = NSSavePanel()

@@ -15,7 +15,7 @@ struct AssistantLiveContext: Equatable {
     let selection: [UInt32]
 
     /// The block's element name; the system prompt interpolates it.
-    static let tag = "reelcut_context"
+    static let tag = "framejob_context"
 
     init(name: String, path: String?, scope: UInt32?, playhead: Ticks, selection: [UInt32]) {
         self.name = name

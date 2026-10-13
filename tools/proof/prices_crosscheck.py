@@ -53,7 +53,7 @@ CELL = re.compile(r"^\$([0-9]+(?:\.[0-9]+)?) / MTok$")
 
 
 def fetch():
-    request = urllib.request.Request(PAGE, headers={"User-Agent": "reelcut-prices-crosscheck"})
+    request = urllib.request.Request(PAGE, headers={"User-Agent": "framejob-prices-crosscheck"})
     with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
         return response.read().decode("utf-8")
 

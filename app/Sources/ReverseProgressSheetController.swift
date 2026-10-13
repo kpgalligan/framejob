@@ -86,7 +86,7 @@ final class ReverseProgressSheetController: NSViewController {
         closeButton.isEnabled = false
 
         view = makeSheetView(
-            title: "Reversing", hint: "AVFoundation cannot play a clip backwards, so Reelcut "
+            title: "Reversing", hint: "AVFoundation cannot play a clip backwards, so Frame Job "
                 + "renders the reversed frames once and keeps them in the project package.",
             content: content, buttonRow: makeButtonRow(cancel: stopButton, apply: closeButton))
     }

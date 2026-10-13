@@ -204,7 +204,7 @@ final class RecorderStatusItem: NSObject {
     /// The button's tooltip, which says which of the two states the item
     /// is showing.
     static func tooltip(paused: Bool) -> String {
-        paused ? "Reelcut's recording is paused" : "Reelcut is recording"
+        paused ? "Frame Job's recording is paused" : "Frame Job is recording"
     }
 
     /// `m:ss`, and `h:mm:ss` past an hour. Pure, so a probe can pin it.

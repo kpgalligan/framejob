@@ -4,8 +4,8 @@
 // the vetoed-field case recorded.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, with `-D REELCUT_DEV_TOOLS` (`UIMenu` exists
-// only there), against `libreelcut_core.a`. One process:
+// `main.swift`, module `FrameJob`, with `-D FRAMEJOB_DEV_TOOLS` (`UIMenu` exists
+// only there), against `libframejob_core.a`. One process:
 //
 //   menu_undo_probe
 //

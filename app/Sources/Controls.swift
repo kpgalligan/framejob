@@ -485,7 +485,7 @@ final class BlockSliderCell: NSSliderCell {
         let track = NSRect(
             x: rect.minX, y: rect.midY - Self.trackHeight / 2,
             width: rect.width, height: Self.trackHeight)
-        // Reelcut's one fork of Rasterize's copy (spec §11 SH-2): the disabled
+        // Frame Job's one fork of Rasterize's copy (spec §11 SH-2): the disabled
         // dim is the context's alpha, because `withAlphaComponent` REPLACES the
         // translucent `DS.border`'s own alpha and painted the track in the
         // knob's solid ink. `.sourceOver`, so the translucent track blends.

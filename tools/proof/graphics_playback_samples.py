@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Builds the playback-check projects (issue #56, "Graphics playing,
 WATCHED"; issue batch B87 phase 3's `Playback-4K-animated`, the GR-8 row in
-docs/manual-checks.md) through a Reelcut's MCP tools.
+docs/manual-checks.md) through a Frame Job's MCP tools.
 
 The instance is launched by PID through `mcp.launch` under the scratch home
 `CFFIXED_USER_HOME=tools/proof/work/playback-check/home` and does no persisting
@@ -14,7 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO = Path("/Users/kevingalligan/devel/reelcut")
+REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools/proof"))
 sys.path.insert(0, str(REPO / "tools/proof/graphics_spike"))
 import bounded  # noqa: E402
@@ -24,7 +24,7 @@ import proof_app  # noqa: E402
 APP = proof_app.binary()
 OUT = REPO / "tools/proof/work/playback-check"
 HOME = OUT / "home"
-LOG = OUT / "reelcut.log"
+LOG = OUT / "framejob.log"
 FIX = REPO / "graphic/tests/graphics"
 
 THROWS = """export const meta = { name: "Throws at frame 60", durationInFrames: 150 };
@@ -102,19 +102,19 @@ def main():
     try:
         fx = lambda n: (n, (FIX / f"{n}.js").read_text())
         print("1080p30:")
-        build(c, OUT / "Playback-1080p.reelcut", None,
+        build(c, OUT / "Playback-1080p.framejob", None,
               [fx("lower-third"), fx("kinetic-type")])
         print("4K:")
-        build(c, OUT / "Playback-4K.reelcut", {"width": 3840, "height": 2160},
+        build(c, OUT / "Playback-4K.framejob", {"width": 3840, "height": 2160},
               [fx("title-card"), fx("kinetic-type")])
         print("error card:")
-        build(c, OUT / "Error-card.reelcut", None, [("throws-at-60", THROWS)])
+        build(c, OUT / "Error-card.framejob", None, [("throws-at-60", THROWS)])
         print("4K animated (GR-8):")
-        build(c, OUT / "Playback-4K-animated.reelcut", {"width": 3840, "height": 2160},
+        build(c, OUT / "Playback-4K-animated.framejob", {"width": 3840, "height": 2160},
               [fx("title-card"), fx("kinetic-type")],
               ends={"title-card": {"from": "#00c853", "to": "#ffd60a"},
                     "kinetic-type": {"stagger": 20, "accent": "#2d7ff9"}})
-        bad = [line.strip() for line in LOG.read_text().splitlines() if "Reelcut: " in line]
+        bad = [line.strip() for line in LOG.read_text().splitlines() if "Frame Job: " in line]
         print("parity complaints:", bad or "none")
     finally:
         launched.stop()

@@ -14,7 +14,7 @@ use common::ebml::{
     cluster, file, info, opus_head, opus_packet, payload, simple_block, tracks, vp9_keyframe,
     Lacing, Opened, Track,
 };
-use reelcut_core::container::{AUDIO, VIDEO};
+use framejob_core::container::{AUDIO, VIDEO};
 
 /// An H.264 track whose frames sit at `times` ms (in file order) in one
 /// Cluster per frame, each Cluster at the frame's own time.

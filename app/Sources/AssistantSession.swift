@@ -54,7 +54,7 @@ final class AssistantSession {
     private let fromHelper = Pipe()
     /// Every write to the helper, in order, off main: a result carrying a
     /// render can be more than a pipe buffer holds.
-    private let writeQueue = DispatchQueue(label: "com.kgalligan.reelcut.assistant.write")
+    private let writeQueue = DispatchQueue(label: "com.kgalligan.framejob.assistant.write")
     private let input: HelperInput
     /// Touched only on the readability handler's thread.
     private var lineBuffer = Data()
@@ -107,7 +107,7 @@ final class AssistantSession {
         guard let key = AssistantConfiguration.credential(store: store) else {
             return failure(
                 "No Anthropic API key is set. The assistant uses the person's own key (spec "
-                    + "§11 AI-8): the anthropic-key file in Reelcut's Application Support "
+                    + "§11 AI-8): the anthropic-key file in Frame Job's Application Support "
                     + "folder, or ANTHROPIC_API_KEY.")
         }
         // Read, never prepared here (AI-3): a launch that skipped
@@ -121,7 +121,7 @@ final class AssistantSession {
                     + "cannot start.")
         }
         let executable = Bundle.main.bundleURL
-            .appendingPathComponent("Contents/Helpers/reelcut-agent")
+            .appendingPathComponent("Contents/Helpers/framejob-agent")
         guard FileManager.default.isExecutableFile(atPath: executable.path) else {
             return failure("The assistant helper is not in this build.")
         }

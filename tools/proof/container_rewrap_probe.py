@@ -123,7 +123,7 @@ nothing.
 Issue batch B82 (#236): the probe runs in a scratch home. Every run of a
 probe binary is `run_probe`, under `CFFIXED_USER_HOME=<work>/home`, remade
 before each run as `Library/Application Support` and nothing more, so the
-product's `Rewrapped/` is `<work>/home/Library/Application Support/Reelcut/
+product's `Rewrapped/` is `<work>/home/Library/Application Support/Frame Job/
 Rewrapped/` and the product makes it itself. `child_env` refuses a home
 that is not under the work folder before anything is executed; swiftc,
 xcrun, ffmpeg and ffprobe keep the caller's environment. Row H0, scored
@@ -135,7 +135,7 @@ control could not be performed (exit 2). `--control decoy-home` runs the
 baseline binary under a SECOND scratch home, `<work>/decoy-home`, while
 naming `<work>/home` to it: CONTROL PASS when H0 fails, the `Rewrapped/` it
 answered is under the decoy, the binary printed no other row, and nothing
-is under the decoy's `Library/Application Support/Reelcut`. O42 no longer
+is under the decoy's `Library/Application Support/Frame Job`. O42 no longer
 needs the home Trash: it passes when `isInside`'s cases hold, the copy and
 a path in the scratch `fakeTrash` that does not exist are not trashed, and
 either FileManager answered a Trash for the copy's volume and
@@ -459,7 +459,7 @@ PROFILE1 = ("p8.webm is VP9 Profile 1 video, which this Mac cannot decode; "
             "VP9 Profiles 0 and 2 import.")
 VP8 = "p9.webm is VP8 video, which this Mac cannot decode."
 AV1 = "p7.webm is AV1 video, which needs an M3 or later Mac."
-VORBIS = "p21.webm has Vorbis audio, which Reelcut cannot copy out of a WebM or Matroska file."
+VORBIS = "p21.webm has Vorbis audio, which Frame Job cannot copy out of a WebM or Matroska file."
 
 
 def tail(text, limit=300):
@@ -541,7 +541,7 @@ def build(sources, probe_dir):
         return None, "app source set incomplete"
     try:
         built = swift_build.build(sources=swift + [entry], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=900)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=900)
     except swift_build.SwiftBuildFailed as error:
         if error.expired:
             return None, "swiftc expired after 900 s"
@@ -556,7 +556,7 @@ def run_probe(binary, jobs, home=HOME):
     executes a probe binary: under `CFFIXED_USER_HOME=home`, which is HOME
     or, for `--control decoy-home`, DECOY, and with HOME as its second
     argument either way. The run's home is removed first and made again as
-    `Library/Application Support` and nothing more, so `Reelcut/Rewrapped`
+    `Library/Application Support` and nothing more, so `Frame Job/Rewrapped`
     is the product's to make."""
     if home not in (HOME, DECOY):
         raise ValueError(f"{home} is neither the scratch home nor the decoy")
@@ -1083,7 +1083,7 @@ def score_original(get, row):
         f"{a.get('after')!r} (the copy {a.get('copy')!r})")
     a = get("O35")
     wanted = {"none": HINT,
-              "rewrapped": f"{TALK} — copied into Reelcut's Rewrapped folder.\n{HINT}",
+              "rewrapped": f"{TALK} — copied into Frame Job's Rewrapped folder.\n{HINT}",
               "packaged": f"{TALK} — copied into this project's package.\n{HINT}"}
     row("O35", a.get("hint") == HINT and all(a.get(k) == v for k, v in wanted.items()),
         f"tooltips {[a.get(k) for k in ('none', 'rewrapped', 'packaged')]!r}")
@@ -1195,15 +1195,15 @@ def control_decoy(binary, made):
     print(("  ok   " if took else "  FAIL ") + f"H0 {detail}", flush=True)
     answered = (answers.get("H0") or {}).get("rewrapped")
     others = sorted(set(answers) - {"H0"})
-    reelcut = DECOY / "Library/Application Support/Reelcut"
-    left = sorted(str(p.relative_to(DECOY)) for p in reelcut.rglob("*"))
+    framejob = DECOY / "Library/Application Support/Frame Job"
+    left = sorted(str(p.relative_to(DECOY)) for p in framejob.rglob("*"))
     good = ("H0" in answers and not took and under(answered, DECOY) and not others and not left)
     print(f"{'CONTROL PASS' if good else 'CONTROL FAIL'}: decoy-home — H0 "
           f"{'answered' if 'H0' in answers else 'NOT answered'} and "
           f"{'passed' if took else 'failed'}; the Rewrapped/ it answered is under {DECOY}: "
           f"{under(answered, DECOY)}; other rows from the binary: {others or 'none'} (exit "
           f"{result['rc']}, expired {result['expired']}); under the decoy's "
-          f"Library/Application Support/Reelcut: {left or 'nothing'}", flush=True)
+          f"Library/Application Support/Frame Job: {left or 'nothing'}", flush=True)
     return good, result
 
 

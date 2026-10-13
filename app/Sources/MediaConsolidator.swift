@@ -1,10 +1,10 @@
 import AppKit
 
 /// File ▸ Consolidate Media… — copies every file the project references into
-/// `media/` inside the `.reelcut` package and relinks the project at the
+/// `media/` inside the `.framejob` package and relinks the project at the
 /// copies (spec §5.6, road map Phase 6).
 ///
-/// Reelcut REFERENCES media by default (§4.2, §11): a project is a small
+/// Frame Job REFERENCES media by default (§4.2, §11): a project is a small
 /// JSON file pointing at whatever the footage happens to live on. Consolidate
 /// is the one command that trades that for self-containment — the package
 /// becomes the whole edit, so it can be handed to someone else or archived
@@ -120,7 +120,7 @@ enum MediaConsolidator {
             switch self {
             case .untitled:
                 return "Save the project first — Consolidate Media copies files into the "
-                    + ".reelcut package, and a project that has never been saved does not have "
+                    + ".framejob package, and a project that has never been saved does not have "
                     + "one yet."
             case .noMedia:
                 return "This project references no media files."

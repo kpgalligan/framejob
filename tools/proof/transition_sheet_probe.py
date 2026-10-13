@@ -48,7 +48,7 @@ Sections:
 Mutation-tested on the working tree with the probe rebuilt; the scores are
 in `tools/proof/README.md`.
 
-Needs `ffmpeg`, `swiftc` and `core/target/release/libreelcut_core.a`. No port.
+Needs `ffmpeg`, `swiftc` and `core/target/release/libframejob_core.a`. No port.
 Run from anywhere:
 
     python3 tools/proof/transition_sheet_probe.py
@@ -331,7 +331,7 @@ def build_probe():
         shutil.copy2(PLACEHOLDER, placeholder)
     sources = sorted(os.path.join(SOURCES, name) for name in os.listdir(SOURCES)
                      if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:

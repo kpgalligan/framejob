@@ -31,7 +31,7 @@ from typing import NamedTuple
 
 KEY_ENV = "RC_ASSEMBLYAI_KEY"
 BASE_DEFAULT = "https://api.assemblyai.com"
-USER_AGENT = "reelcut-cloud-spike"
+USER_AGENT = "framejob-cloud-spike"
 SELFTEST_KEY = "selftest-dummy"
 LOOPBACK_PREFIX = "http://127.0.0.1:"
 SPEECH_MODELS = ["universal-3-5-pro", "universal-2"]

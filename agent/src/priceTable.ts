@@ -210,7 +210,7 @@ export async function refreshPrices(current: LoadedPrices, o: PriceOptions): Pro
     let data: unknown;
     try {
       const response = await fetch(feed, {
-        headers: { "user-agent": "reelcut-agent" },
+        headers: { "user-agent": "framejob-agent" },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (!response.ok) return withProblem(current, `fetching ${feed}: HTTP ${response.status}`);

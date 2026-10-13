@@ -18,7 +18,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 use common::{cstring, take_string};
-use reelcut_core::ffi_graphic::{
+use framejob_core::ffi_graphic::{
     rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_library_add_asset,
     rc_graphic_library_add_font, rc_graphic_library_families, rc_graphic_library_free,
     rc_graphic_library_new, rc_graphic_rasterize, rc_graphic_svg, RcGraphic, RcGraphicLibrary,
@@ -462,9 +462,9 @@ fn one_max_side_in_the_engine_the_core_and_the_header() {
     // the one place the three are compared.
     assert_eq!(
         graphic::MAX_SIDE,
-        reelcut_core::model_graphic::GRAPHIC_MAX_SIDE
+        framejob_core::model_graphic::GRAPHIC_MAX_SIDE
     );
-    let header = include_str!("../include/reelcut_core.h");
+    let header = include_str!("../include/framejob_core.h");
     let stated = header
         .lines()
         .find_map(|line| line.strip_prefix("#define RC_GRAPHIC_MAX_SIDE "))
@@ -479,7 +479,7 @@ fn one_max_props_in_the_engine_and_the_core() {
     // app needs none. This is the one place the two are compared.
     assert_eq!(
         graphic::MAX_PROPS,
-        reelcut_core::model_graphic::GRAPHIC_MAX_PROPS
+        framejob_core::model_graphic::GRAPHIC_MAX_PROPS
     );
 }
 
@@ -490,7 +490,7 @@ fn one_max_options_in_the_engine_and_the_core() {
     // two are compared.
     assert_eq!(
         graphic::MAX_OPTIONS,
-        reelcut_core::model_graphic::GRAPHIC_MAX_OPTIONS
+        framejob_core::model_graphic::GRAPHIC_MAX_OPTIONS
     );
 }
 
@@ -501,7 +501,7 @@ fn one_max_string_in_the_engine_and_the_core() {
     // are compared.
     assert_eq!(
         graphic::MAX_STRING,
-        reelcut_core::model_graphic::GRAPHIC_MAX_STRING
+        framejob_core::model_graphic::GRAPHIC_MAX_STRING
     );
 }
 
@@ -512,7 +512,7 @@ fn one_type_list_in_the_engine_and_the_core() {
     // two are compared, as slices so a length change fails here, not the build.
     assert_eq!(
         graphic::TYPES.as_slice(),
-        reelcut_core::model_graphic::GRAPHIC_TYPES.as_slice()
+        framejob_core::model_graphic::GRAPHIC_TYPES.as_slice()
     );
 }
 

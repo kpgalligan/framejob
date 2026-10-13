@@ -131,7 +131,7 @@ final class PreviewWindowController: NSWindowController {
     /// One name for every document. See the type doc: per-document would grow
     /// the defaults domain a key at a time. AppKit stores it under
     /// `"NSWindow Frame " + name`, which is the key the offscreen harness pins.
-    static let frameAutosaveName = "ReelcutPreviewWindow"
+    static let frameAutosaveName = "FrameJobPreviewWindow"
 
     /// The transport whose keys this window forwards. Weak: the editor owns
     /// this controller, and a strong link back would be a cycle.
@@ -181,7 +181,7 @@ final class PreviewWindowController: NSWindowController {
         // `windowFrameAutosaveName` — "" unless somebody set one — onto the
         // window it is handed, so a name set on the panel BEFORE this line is
         // silently wiped. Nothing then ever writes `NSWindow Frame
-        // ReelcutPreviewWindow`, the `setFrameUsingName` above can only ever
+        // FrameJobPreviewWindow`, the `setFrameUsingName` above can only ever
         // answer false, and the panel opens centred every time — which is the
         // one thing this type must not do, since a preview window is opened to
         // put the picture on a SECOND DISPLAY. Measured, both halves: the name

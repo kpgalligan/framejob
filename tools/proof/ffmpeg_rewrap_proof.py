@@ -21,7 +21,7 @@ at exit. It holds the fixtures, the wrapper, `home/` and `t/`, and the probe
 runs with `CFFIXED_USER_HOME=<work>/home` and the launch arguments
 `-RCFFmpegImport always -RCFFmpegPath <work>/tools/ffmpeg` (it writes no
 `UserDefaults`), so nothing this proof converts lands in the owner's
-`~/Library/Application Support/Reelcut/Rewrapped/`. Nothing outside
+`~/Library/Application Support/Frame Job/Rewrapped/`. Nothing outside
 `tools/proof/work/` is written or deleted.
 
 **The build folder**, `tools/proof/work/ffmpeg-rewrap-build/`, is kept
@@ -70,7 +70,7 @@ Rows:
   `import_media {v0a.mkv}` answers `original` = v0a.mkv, `get_project`'s
   media has `original.path`, `close_project`. **O3** O1's descriptor added
   to a project: `MediaSnapshot.name` is `v0.mkv`, the tooltip's first line
-  is "`<v0.mkv's path>` — copied into Reelcut's Rewrapped folder." and
+  is "`<v0.mkv's path>` — copied into Frame Job's Rewrapped folder." and
   `revealURL(for:)` is v0.mkv.
 - **O4** a project of O1's descriptor with its path `/nonexistent-b80/<name>`,
   no bookmark, and the conversion discarded:
@@ -172,7 +172,7 @@ BUILD = os.path.join(HERE, "work", "ffmpeg-rewrap-build")
 HOME = os.path.join(WORK, "home")
 SOURCES = os.path.join(ROOT, "app", "Sources")
 PROBE_SWIFT = os.path.join(HERE, "ffmpeg_rewrap_probe.swift")
-LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 WALL_BUILD, WALL_RUN, WALL_FFMPEG = 900, 900, 120
 ROWS = ["F0", "O1", "O2", "O3", "O4", "O5", "T1", "T2", "T3",
         "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "G1", "C1", "P1",
@@ -428,7 +428,7 @@ def build_probe(sources, probe_dir):
     print(f"probe: {len(swift)} sources through swift_build (up to {WALL_BUILD} s)…", flush=True)
     try:
         built = swift_build.build(sources=swift + [entry], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=WALL_BUILD)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=WALL_BUILD)
     except swift_build.SwiftBuildFailed as error:
         return None, (f"swiftc exited {error.rc if error.rc is not None else 'before running'} "
                       f"(expired {error.expired}): "

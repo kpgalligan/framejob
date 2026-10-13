@@ -3,7 +3,7 @@
 
 `.github/workflows/publish.yml` (spec §11 PUB-1..PUB-5) archives the
 Distribution configuration with a Developer ID identity, EXPORTS the archive
-— which signs the app again — and runs this over the exported `Reelcut.app`
+— which signs the app again — and runs this over the exported `Frame Job.app`
 before it builds the DMG. Apple's notary refuses a missing hardened runtime,
 a missing secure timestamp, `get-task-allow` and a signature that is not
 Developer ID; it says nothing about the rest, and each of these ships a
@@ -14,7 +14,7 @@ broken or wrong app in a DMG that notarizes cleanly:
   grant is refused however the person answers the prompt (road map 3, R0);
 * the assistant helper without `com.apple.security.cs.allow-jit`: it dies at
   launch under the hardened runtime ("Ran out of executable memory");
-* `reelcut-mcp` missing or holding an entitlement it has no use for;
+* `framejob-mcp` missing or holding an entitlement it has no use for;
 * the catalog snapshot missing, at another version than the bundle's, or
   naming a dev tool;
 * the bundle's two version numbers not the ones the workflow computed.
@@ -90,7 +90,7 @@ def info_strings(app):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--app", required=True, help="the Reelcut.app about to be packed")
+    parser.add_argument("--app", required=True, help="the Frame Job.app about to be packed")
     parser.add_argument("--version", help="the CFBundleShortVersionString it must carry")
     parser.add_argument("--build", help="the CFBundleVersion it must carry")
     arguments = parser.parse_args()

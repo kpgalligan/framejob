@@ -67,7 +67,7 @@ LICENCE_FILES = [
 
 def build_text_probe(work):
     """`tools/proof/peaks_probe.py:101-117`'s swiftc line: every file in
-    `app/Sources` but the app's own `main.swift`, module `Reelcut`, the
+    `app/Sources` but the app's own `main.swift`, module `FrameJob`, the
     bridging header, and the staticlib."""
     folder = os.path.join(work, "bin", "text")
     os.makedirs(folder, exist_ok=True)
@@ -85,9 +85,9 @@ def build_text_probe(work):
     library = os.path.join(ROOT, "core", "target", "release")
     command = [
         "swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
-        "-module-name", "Reelcut", "-import-objc-header",
-        os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-        "-L", library, "-lreelcut_core", *sources, entry, "-o", binary]
+        "-module-name", "FrameJob", "-import-objc-header",
+        os.path.join(ROOT, "app", "Bridging", "FrameJob-Bridging-Header.h"),
+        "-L", library, "-lframejob_core", *sources, entry, "-o", binary]
     result = local_rows.run_bounded(command, timeout=900)
     if result["rc"] != 0 or not os.path.exists(binary):
         lines = [line for line in (result["stderr"] or "").splitlines() if ": error:" in line]

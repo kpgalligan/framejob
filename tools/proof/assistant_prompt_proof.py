@@ -14,11 +14,11 @@ A3 (spec §11 AI-7, AI-9, AI-15).
           no app, no bun — the line `make test` runs.
 Launch S (the built app `proof_app` picks, a scratch socket, a dummy
 `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in):
-  S0  no `Reelcut: ` line
+  S0  no `Frame Job: ` line
   S1  POST 1's system is `system`, a blank line, `search_guide`
   S2  the live context: in a saved project with the playhead at 2400000 and
       the text clip selected, turn 1's last user text is the exact
-      <reelcut_context> block, a newline and the person's text; after the
+      <framejob_context> block, a newline and the person's text; after the
       playhead moves and the selection empties, turn 2 carries the new block
       and its `messages[0]` is turn 1's (append-only, AI-9)
   S3  a reply of 300000 input tokens makes the next POST, the summary,
@@ -83,13 +83,13 @@ WORK = os.path.join(HERE, "work", "assistant_prompt")
 PROBE_DIR = os.path.join(WORK, "probe")
 SOURCES = os.path.join(ROOT, "app", "Sources")
 PROBE_SWIFT = os.path.join(HERE, "assistant_prompt_probe.swift")
-LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 WALL_BUILD, WALL_RUN, WALL_TURN = 900, 300, 60
 PROBE_ROWS = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "M1", "M2", "M3", "M4", "M5",
               "M6"]
 EVAL_ROWS = ["E1", "E2", "E3", "E4", "E5", "E6", "H", "K"]
 SEND = "AssistantPrompt.message(text, document: document)"
-TAG = "reelcut_context"
+TAG = "framejob_context"
 
 
 def child_env():
@@ -128,7 +128,7 @@ def build_probe():
     print(f"probe: {len(swift)} sources through swift_build (up to {WALL_BUILD} s)…", flush=True)
     try:
         built = swift_build.build(sources=swift + [entry], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=WALL_BUILD)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=WALL_BUILD)
     except swift_build.SwiftBuildFailed as error:
         return None, (f"swiftc exited {error.rc if error.rc is not None else 'before running'} "
                       f"(expired {error.expired}): "
@@ -213,7 +213,7 @@ def contains_text(value, needle):
 
 def s_setup(asp, app, folder):
     """A saved project with a text clip; answers (project path, clip id)."""
-    path = os.path.join(folder, "S.reelcut")
+    path = os.path.join(folder, "S.framejob")
     shutil.rmtree(path, ignore_errors=True)
     saved = app.must("new_project", path=path)["saved"]
     project = app.must("get_project", project=saved)["project"]
@@ -310,8 +310,8 @@ def launch_s(asp, app_path, secrets, fake, texts, score, guarded, only_s2=False)
     try:
         app.connect()
         if not only_s2:
-            complaints = [l for l in app.log().splitlines() if "Reelcut: " in l]
-            score("S0", not complaints, f"`Reelcut: ` lines {complaints[:2]}")
+            complaints = [l for l in app.log().splitlines() if "Frame Job: " in l]
+            score("S0", not complaints, f"`Frame Job: ` lines {complaints[:2]}")
         ctx["saved"], ctx["clip"] = s_setup(asp, app, folder)
         guarded("S2", row_s2, asp, app, fake, ctx)
         if not only_s2:
@@ -497,7 +497,7 @@ def main():
                 stand_in = fake
             print(spend.describe(), flush=True)
             for name in os.listdir(folder) if os.path.isdir(folder) else []:
-                if name.endswith(".reelcut") or name.endswith(".mp4"):
+                if name.endswith(".framejob") or name.endswith(".mp4"):
                     shutil.rmtree(os.path.join(folder, name), ignore_errors=True)
                     if os.path.exists(os.path.join(folder, name)):
                         os.remove(os.path.join(folder, name))
@@ -505,7 +505,7 @@ def main():
             posts_before = stand_in_posts()
             app = asp.App("E", release,
                           ["-RCSecretFolder", secrets,
-                           "-ReelcutAssistantModel", "claude-opus-5-5"], relay.base)
+                           "-FrameJobAssistantModel", "claude-opus-5-5"], relay.base)
             try:
                 app.connect()
                 app.mcp.timeout = ev.TURN_SECONDS + 120

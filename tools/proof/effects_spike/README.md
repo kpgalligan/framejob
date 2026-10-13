@@ -106,7 +106,7 @@ the tree:
   `/System/Library/Fonts/Helvetica.ttc` (a title card, a code card),
   `testsrc2`, and `../media/A.mov` upscaled.
 - **app UI, no person**: `../work/chrome4/shape-open.png` (a harness render of
-  Reelcut's chrome) letterboxed to 1920×1080, and `../work/chrome3/open-two.png`
+  Frame Job's chrome) letterboxed to 1920×1080, and `../work/chrome3/open-two.png`
   scrolled top to bottom over 60 s as `job_ui_60s.mov`.
 - **screen recordings**: `../work/spike/q7-immediate-1.mov`, `q4-rate-60.mov`,
   `q7-mic-builtin-1.mov`, `q4-size-best_pixels.mov` — road map 3's R0

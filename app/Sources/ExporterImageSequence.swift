@@ -292,7 +292,7 @@ final class ImageSequenceWriter: ExportPipeline {
     /// it on the main one. Serial because the frames go into the destination
     /// in order.
     private let queue = DispatchQueue(
-        label: "com.kgalligan.reelcut.export.images", qos: .userInitiated)
+        label: "com.kgalligan.framejob.export.images", qos: .userInitiated)
 
     /// Guards what the render queue and the main thread both touch.
     private let lock = NSLock()

@@ -31,7 +31,7 @@ extension AgentServer {
     /// The arguments a voice-over refuses by name: everything that only a
     /// picture or the stream reads.
     static let voiceOverScreenOnlyArguments = [
-        "display", "window", "system_audio", "show_clicks", "size", "include_reelcut_windows",
+        "display", "window", "system_audio", "show_clicks", "size", "include_framejob_windows",
     ]
 
     /// `source`, default `screen`; an unknown value refused with the

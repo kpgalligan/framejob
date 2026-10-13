@@ -164,7 +164,7 @@ def build_harness(sources, out):
     """`swift_build.build` over `sources` — the tree's own for a
     normal run, the mutant copy for `--mutant`. A harness that will not build
     is a scored failure."""
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     os.makedirs(out, exist_ok=True)
@@ -265,7 +265,7 @@ def harness_checks(sources, out, chrome):
 
 def mutant():
     began = time.time()
-    with tempfile.TemporaryDirectory(prefix="reelcut-clip-inspector4-reset-") as temp:
+    with tempfile.TemporaryDirectory(prefix="framejob-clip-inspector4-reset-") as temp:
         sources = os.path.join(temp, "Sources")
         shutil.copytree(os.path.join(ROOT, "app", "Sources"), sources)
         path = os.path.join(sources, MUTANT_FILE)

@@ -244,7 +244,7 @@ extension RecipeLayer {
     }
 
     /// True when this layer must be drawn by the fragment stage that READS
-    /// the destination — `reelcut_layer_blend_fragment`, on a pipeline with
+    /// the destination — `framejob_layer_blend_fragment`, on a pipeline with
     /// fixed-function blending disabled (format version 6).
     ///
     /// `normal` is not merely the default here, it is the fast path: the
@@ -302,7 +302,7 @@ extension MetalRenderer {
     /// blend entry point is the exception; the two call sites that want it
     /// name it, which is also what makes them findable.
     static func layerFragment(
-        _ library: MTLLibrary, name: String = "reelcut_layer_fragment", gather: Bool
+        _ library: MTLLibrary, name: String = "framejob_layer_fragment", gather: Bool
     ) -> MTLFunction? {
         let values = MTLFunctionConstantValues()
         var flag = gather

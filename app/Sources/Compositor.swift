@@ -99,10 +99,10 @@ enum CompositorError: LocalizedError {
 /// answers the request exactly once.
 class Compositor: NSObject, AVVideoCompositing {
 
-    /// `defaults write com.kgalligan.Reelcut ReelcutCompositorTiming -bool YES`
+    /// `defaults write com.kgalligan.FrameJob FrameJobCompositorTiming -bool YES`
     /// turns on the per-frame timing log — the measurement M1 step 5 is
     /// verified with ("playback stays at 60 fps on a 1080p source").
-    static let timingDefaultsKey = "ReelcutCompositorTiming"
+    static let timingDefaultsKey = "FrameJobCompositorTiming"
 
     private static let timingEnabled = UserDefaults.standard.bool(forKey: timingDefaultsKey)
 
@@ -110,7 +110,7 @@ class Compositor: NSObject, AVVideoCompositing {
     /// calls `startRequest` from its own threads and expects the work to be
     /// asynchronous, and a serial queue is what keeps GPU submission ordered.
     private let renderQueue = DispatchQueue(
-        label: "com.kgalligan.reelcut.compositor", qos: .userInitiated)
+        label: "com.kgalligan.framejob.compositor", qos: .userInitiated)
 
     private let renderer: MetalRenderer?
     private let lock = NSLock()
@@ -261,7 +261,7 @@ class Compositor: NSObject, AVVideoCompositing {
             // frame with no converted source. Appended, so the line's prefix
             // stays what the proofs' timing pattern reads.
             let passes = renderer?.inputs.takePassCount() ?? 0
-            NSLog("[reelcut] compositor: %.2f ms average, %.2f ms worst over 120 frames, "
+            NSLog("[framejob] compositor: %.2f ms average, %.2f ms worst over 120 frames, "
                 + "%ld input passes", average, worst, passes)
         }
     }
@@ -295,7 +295,7 @@ final class MetalRenderer {
     /// `Collection.needsGather` for which layers get it.
     private let gatherPipeline: MTLRenderPipelineState
     /// The two blend specializations (format version 6): the same two
-    /// fragment stages compiled from `reelcut_layer_blend_fragment`, which
+    /// fragment stages compiled from `framejob_layer_blend_fragment`, which
     /// reads the destination through `[[color(0)]]` and computes the
     /// combination itself. Built with `blending: false`, which is the whole
     /// correctness argument — see `pipelineDescriptor`.
@@ -376,27 +376,27 @@ final class MetalRenderer {
         let library = (try? device.makeDefaultLibrary(bundle: Bundle.main))
             ?? device.makeDefaultLibrary()
         guard let library = library,
-            let vertexFunction = library.makeFunction(name: "reelcut_layer_vertex"),
+            let vertexFunction = library.makeFunction(name: "framejob_layer_vertex"),
             let fragmentFunction = MetalRenderer.layerFragment(library, gather: false),
             let gatherFunction = MetalRenderer.layerFragment(library, gather: true),
             let blendFunction = MetalRenderer.layerFragment(
-                library, name: "reelcut_layer_blend_fragment", gather: false),
+                library, name: "framejob_layer_blend_fragment", gather: false),
             let blendGatherFunction = MetalRenderer.layerFragment(
-                library, name: "reelcut_layer_blend_fragment", gather: true),
-            let shadowVertex = library.makeFunction(name: "reelcut_shadow_vertex"),
-            let shadowFragment = library.makeFunction(name: "reelcut_shadow_fragment"),
-            let resolveFragment = library.makeFunction(name: "reelcut_matte_resolve_fragment"),
-            let dissolveFragment = library.makeFunction(name: "reelcut_dissolve_fragment")
+                library, name: "framejob_layer_blend_fragment", gather: true),
+            let shadowVertex = library.makeFunction(name: "framejob_shadow_vertex"),
+            let shadowFragment = library.makeFunction(name: "framejob_shadow_fragment"),
+            let resolveFragment = library.makeFunction(name: "framejob_matte_resolve_fragment"),
+            let dissolveFragment = library.makeFunction(name: "framejob_dissolve_fragment")
         else { return nil }
 
         guard
             let pipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.pipelineDescriptor(
-                    label: "Reelcut layer", vertex: vertexFunction,
+                    label: "Frame Job layer", vertex: vertexFunction,
                     fragment: fragmentFunction)),
             let gatherPipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.pipelineDescriptor(
-                    label: "Reelcut layer, gathering", vertex: vertexFunction,
+                    label: "Frame Job layer, gathering", vertex: vertexFunction,
                     fragment: gatherFunction)),
             // Blending OFF on both blend states: the fragment stage returns
             // the finished pixel, and a fixed-function pass over it would
@@ -404,21 +404,21 @@ final class MetalRenderer {
             // says nothing — see `pipelineDescriptor`.
             let blendPipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.pipelineDescriptor(
-                    label: "Reelcut layer, blending", vertex: vertexFunction,
+                    label: "Frame Job layer, blending", vertex: vertexFunction,
                     fragment: blendFunction, blending: false)),
             let blendGatherPipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.pipelineDescriptor(
-                    label: "Reelcut layer, blending and gathering", vertex: vertexFunction,
+                    label: "Frame Job layer, blending and gathering", vertex: vertexFunction,
                     fragment: blendGatherFunction, blending: false)),
             let shadowPipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.pipelineDescriptor(
-                    label: "Reelcut shadow", vertex: shadowVertex, fragment: shadowFragment)),
+                    label: "Frame Job shadow", vertex: shadowVertex, fragment: shadowFragment)),
             let matteResolvePipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.matteResolveDescriptor(
                     vertex: shadowVertex, fragment: resolveFragment)),
             let dissolvePipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.pipelineDescriptor(
-                    label: "Reelcut dissolve", vertex: shadowVertex, fragment: dissolveFragment)),
+                    label: "Frame Job dissolve", vertex: shadowVertex, fragment: dissolveFragment)),
             let adjustPipeline = MetalRenderer.adjustPipeline(device: device, library: library),
             let looks = LookTextures(device: device, library: library),
             let inputs = InputStage(device: device, library: library)
@@ -484,7 +484,7 @@ final class MetalRenderer {
     ///
     /// **`blending: false` is for a programmable-blend pipeline, and it is a
     /// correctness requirement rather than an optimisation.**
-    /// `reelcut_layer_blend_fragment` reads the destination itself and returns
+    /// `framejob_layer_blend_fragment` reads the destination itself and returns
     /// the finished pixel, so leaving the fixed-function stage on would blend
     /// that finished pixel into the destination a SECOND time. Metal builds
     /// the pipeline either way — no error, no validation warning, no log —

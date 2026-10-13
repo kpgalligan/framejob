@@ -1,5 +1,5 @@
 /* q9's probe header (road map 10 G0). The throwaway export is declared HERE
- * and never in core/include/reelcut_core.h; the two others are the core's
+ * and never in core/include/framejob_core.h; the two others are the core's
  * own, for the CONTROL build and for freeing. */
 #include <stddef.h>
 #include <stdint.h>

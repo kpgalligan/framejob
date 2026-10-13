@@ -1,7 +1,7 @@
 # The MC1 spike — road map 14 (2026-10-01)
 
 Four questions `archive/reelcut-roadmap-14.md` (condensed in `designs/adr/roadmap-14-agent-socket.md`) asks before MC2 (the socket) and
-MC3 (`reelcut-mcp`) are built, and the instrument that measures them. **The
+MC3 (`framejob-mcp`) are built, and the instrument that measures them. **The
 answers are not here**: they are in that document's "MC1 — spike" record,
 which also lists what they changed in MC2's and MC3's text and in spec §11.
 What is here is how to run it again.
@@ -18,7 +18,7 @@ What is here is how to run it again.
   signature.
 - **q2 — the launch.** From `open -n -g <bundle>` to the server answering
   `initialize`: cold, warm and on a quarantined copy; whether the frontmost
-  app changes; which Reelcut windows are on screen. TCP stands in for the
+  app changes; which Frame Job windows are on screen. TCP stands in for the
   socket (MC2 is not built; both start in `applicationDidFinishLaunching`).
 - **q3 — the client.** Whether Claude Code refetches on
   `notifications/tools/list_changed`, answered from its own MCP docs page
@@ -40,7 +40,7 @@ python3 tools/proof/mc1_spike/mc1_spike.py --only q1,q2    # the builds and the 
 
 Needs `cargo` (and tiny_http 0.12.0 and serde_json in the cargo cache: the
 crate builds `--offline`), `swiftc`, `xcodegen`, `bun`, `xcodebuild`, a built
-core (`core/target/release/libreelcut_core.a`), and for D1 the network. q1
+core (`core/target/release/libframejob_core.a`), and for D1 the network. q1
 builds the app twice in Release and once in Distribution in
 `work/mc1_spike/tree` (a `tree_copy.py` copy, which alone gets
 `CatalogWriterHook.swift`, the `mc1WriteCatalogIfAsked()` line in
@@ -55,7 +55,7 @@ Rules it keeps: every child runs in its own process group under a wall-clock
 bound (`graphics_spike/bounded.py`; the stub's interactive session has its own
 bound and `killpg`), without `ANTHROPIC_API_KEY`, `CLAUDECODE` or
 `CLAUDE_CODE_ENTRYPOINT`; no `claude -p`, no `claude mcp`, no API request;
-nothing is created under `~/Library/Application Support/Reelcut/`, and
+nothing is created under `~/Library/Application Support/Frame Job/`, and
 nothing is registered in a Claude Code or Claude Desktop configuration.
 
 It writes `work/mc1_spike/answers.json` (`{date, run, carried, rows: {<id>:
@@ -78,7 +78,7 @@ It writes `work/mc1_spike/answers.json` (`{date, run, carried, rows: {<id>:
 
 | ID | Question | What it measures | Kind |
 |---|---|---|---|
-| S1 | q4 | byte lengths: the product path on this host, the longest `/Users/<name>` that fits 103 bytes, `$TMPDIR` + `reelcut-XXXXXXXX/agent.sock`, `<worktree>/tools/proof/work/<12 chars>/agent.sock` | answered |
+| S1 | q4 | byte lengths: the product path on this host, the longest `/Users/<name>` that fits 103 bytes, `$TMPDIR` + `framejob-XXXXXXXX/agent.sock`, `<worktree>/tools/proof/work/<12 chars>/agent.sock` | answered |
 | S2 | q4 | bind at 103-, 104- and 105-byte paths: result and error | answered |
 | S3 | q4 | a fresh bind; the socket file's mode under the umask | answered |
 | S4 | q4 | bind over a live server's path | answered |
@@ -88,7 +88,7 @@ It writes `work/mc1_spike/answers.json` (`{date, run, carried, rows: {<id>:
 | S8 | q4 | an HTTP/1.1 POST over the socket is answered | pass/fail |
 | S9 | q4 | `server_addr().to_ip()` for a unix listener | answered |
 | S10 | q4 | `unblock()` then join returns | pass/fail |
-| S11 | q4 | mode and owner of `~/Library/Application Support/Reelcut/`, whether `Agent/` exists (read only) | answered |
+| S11 | q4 | mode and owner of `~/Library/Application Support/Frame Job/`, whether `Agent/` exists (read only) | answered |
 | B1 | q1 | each anchor (`main.swift`, `project.yml`) found exactly once | pass/fail |
 | B2–B4 | q1 | full `make app`, incremental `make app`, the Distribution `xcodebuild`: success, wall s, the phase's ms and its ad-hoc sign's ms | pass/fail |
 | B5 | q1 | each bundle's snapshot parses as `{version, tools}` at the bundle's version | pass/fail |
@@ -98,7 +98,7 @@ It writes `work/mc1_spike/answers.json` (`{date, run, carried, rows: {<id>:
 | B8 | q1 | `dist_check.py` on the copy's two bundles | pass/fail |
 | B9 | q1 | the Release snapshot's `tools` against a live `tools/list` (q2's first warm instance), as JSON and compactly re-serialised | pass/fail |
 | B10 | q1 | the fallback: the binary with `-RCWriteCatalog` on a fresh copy and three warm runs; exit 0, equal to the build's | pass/fail |
-| B11 | q1 | no `Reelcut: ` line in any phase's writer output | pass/fail |
+| B11 | q1 | no `Frame Job: ` line in any phase's writer output | pass/fail |
 | B12 | q1 | each product's final signature is Xcode's, not the phase's: another CDHash than the phase printed, Info.plist bound, resources sealed, `runtime` in the flags | pass/fail |
 | H0 | q2 | console state | answered |
 | L0 | q2 | CONTROL: polling a port nothing listens on expires at 2 s | pass/fail |
@@ -106,8 +106,8 @@ It writes `work/mc1_spike/answers.json` (`{date, run, carried, rows: {<id>:
 | L2 | q2 | warm launch ×3 on one copy, after an unscored priming launch | answered |
 | L3 | q2 | a quarantined copy: `spctl` verdict, a process, an answer within 60 s, CoreServicesUIAgent's on-screen windows | answered |
 | L4 | q2 | the frontmost app's pid unchanged at the answer and at +2 s | pass/fail |
-| L5 | q2 | Reelcut's on-screen windows at the answer and at +2 s | answered |
-| L6 | q2 | no `Reelcut: ` line in any launch's log | pass/fail |
+| L5 | q2 | Frame Job's on-screen windows at the answer and at +2 s | answered |
+| L6 | q2 | no `Frame Job: ` line in any launch's log | pass/fail |
 | L7 | q2 | 3 × max(L1) ≤ 60 s | pass/fail |
 | C1 | q3 | `claude --version` (skip `host: claude not on PATH`) | answered |
 | D1 | q3 | the sentences of `https://code.claude.com/docs/en/mcp` naming `list_changed` (skip `host: no network`) | answered/fail |

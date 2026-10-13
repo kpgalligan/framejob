@@ -25,7 +25,7 @@ from rows_local import REPO, SPIKE, WORK
 sys.path.insert(0, os.path.join(REPO, "tools", "proof"))
 import mcp  # noqa: E402
 
-LOG = os.path.join(WORK, "reelcut.log")
+LOG = os.path.join(WORK, "framejob.log")
 Q7 = os.path.join(WORK, "q7")
 CALL_BOUND = 60
 
@@ -68,7 +68,7 @@ class Instance:
 def complaints():
     try:
         with open(LOG) as handle:
-            return [line.strip() for line in handle if "Reelcut: " in line]
+            return [line.strip() for line in handle if "Frame Job: " in line]
     except OSError:
         return ["the log could not be read"]
 
@@ -163,7 +163,7 @@ def q7(say):
     os.makedirs(Q7)
     if os.path.exists(LOG):
         os.remove(LOG)
-    p1, p2, p3 = (os.path.join(Q7, f"{n}.reelcut") for n in ("P1", "P2", "P3"))
+    p1, p2, p3 = (os.path.join(Q7, f"{n}.framejob") for n in ("P1", "P2", "P3"))
     instance = Instance(say)
     try:
         client = instance.start()

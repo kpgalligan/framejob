@@ -6,7 +6,7 @@
 // Inert unless the `UserDefaults` string `RCAssistantSpikeLog` names a file.
 // Then it logs the catalog, waits (a main-run-loop Timer, never a sleep or a
 // semaphore on main) for a `ProjectDocument` that has a file, launches
-// `Contents/Helpers/reelcut-agent` the way Rasterize's
+// `Contents/Helpers/framejob-agent` the way Rasterize's
 // `AssistantHelperSession.open` does, configures it with the dummy key
 // `proof-key`, sends one message, and runs each `tool_request` through
 // `AgentServer.shared.execute`. Every step is one JSON line in the log.
@@ -14,8 +14,8 @@ import AppKit
 
 enum AssistantSpikeHook {
     private static var logURL: URL?
-    private static let logQueue = DispatchQueue(label: "reelcut.a0-spike.log")
-    private static let writeQueue = DispatchQueue(label: "reelcut.a0-spike.write")
+    private static let logQueue = DispatchQueue(label: "framejob.a0-spike.log")
+    private static let writeQueue = DispatchQueue(label: "framejob.a0-spike.write")
     private static var process: Process?
     private static var toHelper: Pipe?
     private static var lineBuffer = Data()
@@ -61,7 +61,7 @@ enum AssistantSpikeHook {
     }
 
     private static func launch(tools: [Any]) {
-        let helper = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/reelcut-agent")
+        let helper = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/framejob-agent")
         let executable = FileManager.default.isExecutableFile(atPath: helper.path)
         log(["event": "helper", "path": helper.path, "executable": executable])
         guard executable else {
@@ -99,7 +99,7 @@ enum AssistantSpikeHook {
         log(["event": "launched", "pid": Int(process.processIdentifier)])
         var configure: [String: Any] = [
             "type": "configure", "api_key": "proof-key", "model": "claude-opus-5-5",
-            "system": "Reelcut A0 spike.", "tools": tools,
+            "system": "Frame Job A0 spike.", "tools": tools,
             "settings": ["auto_compact_tokens": NSNull(), "clear_tool_results": false],
         ]
         if let base = ProcessInfo.processInfo.environment["RC_ASSISTANT_BASE_URL"],

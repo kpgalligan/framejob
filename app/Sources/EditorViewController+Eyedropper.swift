@@ -82,7 +82,7 @@ extension EditorViewController {
     /// queue, so a pick cannot be stuck behind an export's build or make the
     /// next preview rebuild wait behind it.
     private static let eyedropperQueue = DispatchQueue(
-        label: "com.kgalligan.reelcut.eyedropper", qos: .userInitiated)
+        label: "com.kgalligan.framejob.eyedropper", qos: .userInitiated)
 
     /// The armed eyedropper. Nil is the answer to "is the mode on".
     var chromaEyedropper: CanvasEyedropperView? {

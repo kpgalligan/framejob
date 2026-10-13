@@ -15,8 +15,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde_json::Value;
 
-use reelcut_core::container::RcContainerSample;
-use reelcut_core::ffi_container::{
+use framejob_core::container::RcContainerSample;
+use framejob_core::ffi_container::{
     rc_container_describe, rc_container_free, rc_container_open, rc_container_retime,
     rc_container_sample, rc_container_sample_count,
 };
@@ -419,7 +419,7 @@ pub fn opus_head() -> Vec<u8> {
 /// numbered so tests running in parallel never share one.
 pub fn write_temp(name: &str, bytes: &[u8]) -> PathBuf {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
-    let dir = std::env::temp_dir().join(format!("reelcut-container-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("framejob-container-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("temporary folder");
     let path = dir.join(format!("{}-{name}", NEXT.fetch_add(1, Ordering::Relaxed)));
     std::fs::write(&path, bytes).expect("temporary file");
@@ -427,7 +427,7 @@ pub fn write_temp(name: &str, bytes: &[u8]) -> PathBuf {
 }
 
 /// An open `RcContainer`, freed on drop.
-pub struct Opened(*mut reelcut_core::container::Container);
+pub struct Opened(*mut framejob_core::container::Container);
 
 impl Drop for Opened {
     fn drop(&mut self) {

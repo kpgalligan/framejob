@@ -299,7 +299,7 @@ def mutant(mode):
     spec = MUTANTS[mode]
     expected = spec["expected"]
     began = time.time()
-    with tempfile.TemporaryDirectory(prefix=f"reelcut-clip-inspector7-{mode}-") as temp:
+    with tempfile.TemporaryDirectory(prefix=f"framejob-clip-inspector7-{mode}-") as temp:
         sources = os.path.join(temp, "Sources")
         shutil.copytree(os.path.join(ROOT, "app", "Sources"), sources)
         path = os.path.join(sources, spec["file"])

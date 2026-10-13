@@ -5,19 +5,19 @@
 
 `--only` takes row letters (`T,N,O,C,F,A,L,P`); omitted, every row runs. The
 app is the Release build at the socket, launched with the pinned defaults of the
-V2a spec's Verification (`-ReelcutInspectorWidth 304 -ReelcutTimelineHeight
-300 …`), fresh for each run; `--log` defaults to `<dir>/reelcut.log`.
+V2a spec's Verification (`-FrameJobInspectorWidth 304 -FrameJobTimelineHeight
+300 …`), fresh for each run; `--log` defaults to `<dir>/framejob.log`.
 
 **The cover.** The O rows and F0 put an opaque, non-activating panel
 (`v2_cover.swift`, built here) over the editor window's frame so the editor
 reads OCCLUDED, and capture it there. The panel is at floating level and
 covers that region of the person's screen for the episode, each under 60 s.
-**Keep the pointer off the Reelcut window while this runs**, and expect the
+**Keep the pointer off the Frame Job window while this runs**, and expect the
 grey rectangle; nothing is ever activated. A locked console skips the O rows
 and F0 by name.
 
 Before the first MCP call the script writes its two fixtures
-(`work/v2_snapshot/fixtures/{v2well,note}.reelcut`, version 10) and builds the
+(`work/v2_snapshot/fixtures/{v2well,note}.framejob`, version 10) and builds the
 layout probe (`v2_layout_probe.swift` over `swift_build.py`'s line)
 and the cover; a build that fails is a scored FAIL of the rows that need it.
 Every child is bounded (`graphics_spike/bounded.py`) and only this script's
@@ -63,11 +63,11 @@ FIXTURES = os.path.join(WORK, "fixtures")
 PNG = os.path.join(WORK, "png")
 PROBE_DIR = os.path.join(WORK, "probe")
 SOURCES = os.path.join(ROOT, "app", "Sources")
-LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 TICKS = 600_000
 PLAYHEAD = 600_000
-WELL = os.path.join(FIXTURES, "v2well.reelcut")
-NOTE = os.path.join(FIXTURES, "note.reelcut")
+WELL = os.path.join(FIXTURES, "v2well.framejob")
+NOTE = os.path.join(FIXTURES, "note.framejob")
 PROPERTIES = {"window", "view", "appearance", "path", "fill_preview", "layout", "project"}
 REGIONS = ["toolbar", "preview", "inspector", "timeline"]
 EPISODE = 60
@@ -180,7 +180,7 @@ def build_probe():
     binary = os.path.join(PROBE_DIR, "v2_layout_probe")
     try:
         built = swift_build.build(sources=swift + [entry], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=1200)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=1200)
     except swift_build.SwiftBuildFailed as error:
         return None, ("probe did not build: swiftc exited "
                       f"{error.rc if error.rc is not None else 'before running'} (expired "
@@ -392,13 +392,13 @@ def rows_t(mcp, log):
         props = set(schema.get("properties", {}))
         parity = []
         if os.path.exists(log):
-            parity = [line for line in open(log, errors="replace") if "Reelcut: " in line]
+            parity = [line for line in open(log, errors="replace") if "Frame Job: " in line]
         marker = dev_marker_count(log)
         ok = (props == PROPERTIES and schema.get("required", []) == [] and "scope" not in props
               and os.path.exists(log) and parity == [] and marker == len(DEV_TOOLS))
         score("T1", "pass" if ok else "fail",
               f"properties {sorted(props)}, required {schema.get('required')}, scope "
-              f"{'scope' in props}; `Reelcut: ` lines {len(parity)} in {log}; marker count "
+              f"{'scope' in props}; `Frame Job: ` lines {len(parity)} in {log}; marker count "
               f"{marker} (want {len(DEV_TOOLS)})")
     stranger = "v2_stranger_key"
     try:
@@ -559,7 +559,7 @@ def rows_c(mcp):
         ({"window": "welcome", "view": "toolbar"}, ["view", "welcome"]),
         ({"window": "sheet", "project": WELL}, ["sheet"]),
         ({"window": "editor", "project": WELL, "path": missing}, [os.path.dirname(missing)]),
-        ({"window": "editor", "project": "/no/such/v2.reelcut"}, ["/no/such/v2.reelcut"]),
+        ({"window": "editor", "project": "/no/such/v2.framejob"}, ["/no/such/v2.framejob"]),
     ]
     bad = []
     for arguments, words in cases:
@@ -900,7 +900,7 @@ def main():
             inactive = sum(1 for c in captures if c["window_facts"]["active"] is False)
             score("O5", "pass", f"{inactive} of {len(captures)} captures had active false")
         else:
-            score("O5", "skip", f"host: Reelcut active for every capture ({len(captures)})")
+            score("O5", "skip", f"host: Frame Job active for every capture ({len(captures)})")
 
     for rid in selected:
         if rid not in states:

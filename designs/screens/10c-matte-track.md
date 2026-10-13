@@ -19,7 +19,7 @@
 A matte pair (spec §11 MT-7): what a person sees once a track is switched to "matte
 for the track below" with Track ▸ Matte. The `matte` fixture has three tracks, back to
 front: Video (`speech.mov`, a navy card with speech), Window (a white 320×120 rectangle,
-an Alpha matte, so it cuts Video) and Stray (a text clip "Reelcut", an Inverted Luma
+an Alpha matte, so it cuts Video) and Stray (a text clip "Frame Job", an Inverted Luma
 matte with another matte behind it, so it cuts nothing). The Window clip is selected and
 the Clip tab's Picture sub-tab is open.
 

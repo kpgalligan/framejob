@@ -23,7 +23,7 @@ renamed back by renaming it again. Then "Graphic:" with a pop-up reading
 that typing replaces it. Bottom left, in small grey type, what a name may hold:
 "lowercase letters, digits and -"; bottom right, "Cancel" and "Rename". Rename
 is dimmed, as captured, because the field still holds the graphic's own name;
-it lights once the name differs. When Reelcut refuses a name — one already
+it lights once the name differs. When Frame Job refuses a name — one already
 taken, one that breaks the rule — its sentence appears under the two rows and
 the sheet stays open; that is not captured here.
 

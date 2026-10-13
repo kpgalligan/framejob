@@ -16,8 +16,8 @@
 // thread with every earlier row intact — never a hang.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
-// `tools/proof/harness/build.sh`'s swiftc line, `-D REELCUT_DEV_TOOLS` — by
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
+// `tools/proof/harness/build.sh`'s swiftc line, `-D FRAMEJOB_DEV_TOOLS` — by
 // `ffmpeg_rewrap_proof.py`, on `agent_open_probe.swift`'s pattern: a
 // `.prohibited` process, `AgentLane.prepareAtLaunch()`, every import made on a
 // background thread while main spins its run loop.
@@ -376,7 +376,7 @@ do {
 
 do {
     let v0a = fixture("v0a.mkv")
-    let package = work.appendingPathComponent("o2.reelcut").path
+    let package = work.appendingPathComponent("o2.framejob").path
     let made = call("new_project", ["path": package])
     let imported = call("import_media", ["project": package, "path": v0a.path])
     let read = call("get_project", ["project": package])
@@ -400,7 +400,7 @@ do {
     let media = added?.snapshot.media.first
     let tip = media.map { MediaRowView.toolTip(for: $0) } ?? ""
     let line = tip.split(separator: "\n").first.map(String.init) ?? ""
-    let wanted = "\(v0.path) — copied into Reelcut's Rewrapped folder."
+    let wanted = "\(v0.path) — copied into Frame Job's Rewrapped folder."
     let reveal = media.flatMap { revealURL(for: $0) }?.path
     row("O3", media?.name == "v0.mkv" && line == wanted
         && reveal.map(canonical) == canonical(v0.path),

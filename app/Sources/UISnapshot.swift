@@ -1,6 +1,6 @@
 import AppKit
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 /// `snapshot_ui`'s main-thread half (road map 11's V2a, spec §11 V-1..V-3):
 /// which window and which view a call means, the facts about that window,
 /// the temporary staging a capture needs, and one `cacheDisplay` pass.

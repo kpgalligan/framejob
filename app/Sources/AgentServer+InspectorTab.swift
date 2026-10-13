@@ -1,6 +1,6 @@
 import AppKit
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 /// `select_inspector_tab` — a dev tool (road map 11's V3, spec §11 V-1..V-2):
 /// pick the inspector's tab, and the Clip tab's sub-tab, in a project's
 /// editor window, so `snapshot_ui` can capture what a click there shows.

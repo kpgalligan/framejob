@@ -48,7 +48,7 @@
 
 mod common;
 
-use reelcut_core::format::RC_FORMAT_VERSION;
+use framejob_core::format::RC_FORMAT_VERSION;
 use serde_json::{json, Value};
 
 use common::{array, assert_contains, at, num, text, Handle};
@@ -194,7 +194,7 @@ fn a_version_one_nest_path_becomes_a_named_empty_nest() {
         "tracks": [{ "id": 1 }],
         "clips": [{
             "id": 2, "track": 1, "start": 0, "duration": SEC,
-            "source": { "kind": "nest", "project": "Intro.reelcut" }
+            "source": { "kind": "nest", "project": "Intro.framejob" }
         }],
         "next_id": 3
     }))
@@ -207,7 +207,7 @@ fn a_version_one_nest_path_becomes_a_named_empty_nest() {
     assert_eq!(
         at(&project, "/nests/0"),
         &json!({
-            "id": 3, "name": "Intro.reelcut", "width": 1280, "height": 720,
+            "id": 3, "name": "Intro.framejob", "width": 1280, "height": 720,
             "tracks": [], "clips": []
         }),
         "the nest carries the path as its name and the file's canvas"

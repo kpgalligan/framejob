@@ -308,7 +308,7 @@ if !supported.contains(where: { $0.identifier.lowercased() == lower })
 // ---- P5: the sheet's Download row ------------------------------------------
 
 func sheetRow() {
-    let suite = "reelcut.speech-engine-probe.\(ProcessInfo.processInfo.processIdentifier)"
+    let suite = "framejob.speech-engine-probe.\(ProcessInfo.processInfo.processIdentifier)"
     guard let defaults = UserDefaults(suiteName: suite) else {
         check("P5 sheet", false, "no defaults suite")
         return

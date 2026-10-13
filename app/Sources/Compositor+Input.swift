@@ -35,8 +35,8 @@ final class ConvertingCompositor: Compositor {
 /// sample the converted texture, and the chroma key, Color's four and the
 /// grade (steps 3–4d) see converted values.
 ///
-/// The pass is the shadow pass's full-frame quad (`reelcut_shadow_vertex`)
-/// and `reelcut_input_fragment`, which READS the source texel at its own
+/// The pass is the shadow pass's full-frame quad (`framejob_shadow_vertex`)
+/// and `framejob_input_fragment`, which READS the source texel at its own
 /// pixel (the target is the frame's coded size), blending off.
 
 /// The input pass's uniform block, mirrored FIELD FOR FIELD by
@@ -132,11 +132,11 @@ final class InputStage {
     private var passes = 0
 
     init?(device: MTLDevice, library: MTLLibrary) {
-        guard let vertex = library.makeFunction(name: "reelcut_shadow_vertex"),
-            let fragment = library.makeFunction(name: "reelcut_input_fragment"),
+        guard let vertex = library.makeFunction(name: "framejob_shadow_vertex"),
+            let fragment = library.makeFunction(name: "framejob_input_fragment"),
             let pipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.pipelineDescriptor(
-                    label: "Reelcut input", vertex: vertex, fragment: fragment,
+                    label: "Frame Job input", vertex: vertex, fragment: fragment,
                     blending: false))
         else { return nil }
         let lattice = MTLTextureDescriptor()
@@ -217,7 +217,7 @@ final class InputStage {
         guard let encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor) else {
             return false
         }
-        encoder.label = "Reelcut input"
+        encoder.label = "Frame Job input"
         encoder.setRenderPipelineState(pipeline)
         var u = conversion.uniforms(premultiplied: premultiplied)
         encoder.setFragmentBytes(&u, length: MemoryLayout<InputUniforms>.stride, index: 0)

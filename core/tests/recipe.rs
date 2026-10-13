@@ -23,7 +23,7 @@ mod common;
 use serde_json::{json, Value};
 
 use common::{array, at, num, take_string, text, Handle, Outcome};
-use reelcut_core::ffi::rc_timecode_format;
+use framejob_core::ffi::rc_timecode_format;
 
 /// The twenty-six keys of a recipe layer (spec §7.3), sorted. Written out rather than
 /// read off a drawn layer, because a burn-in matching a drawn layer that has

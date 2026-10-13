@@ -4,7 +4,7 @@
 //
 // `v2_menu.py` copies it to `work/v2_menu/probe/main.swift` and compiles it
 // LAST with every file in `app/Sources` but `main.swift`, over
-// `harness/build.sh`'s swiftc line (`-D REELCUT_DEV_TOOLS`), so the walk, the
+// `harness/build.sh`'s swiftc line (`-D FRAMEJOB_DEV_TOOLS`), so the walk, the
 // refusal and the table are the ones the app ships. `AppDelegate().
 // buildMainMenu()` is built and never hung on `NSApp.mainMenu`, nothing is
 // validated, and no window opens; `GraphicTemplates/` beside the binary

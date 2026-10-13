@@ -10,7 +10,7 @@ extension AgentServer {
     // MARK: - Opening
 
     /// `open_project` — File ▸ Open… (`AppDelegate`'s nil-target
-    /// `openDocument:`). Takes a `.reelcut` package OR any movie, sound file
+    /// `openDocument:`). Takes a `.framejob` package OR any movie, sound file
     /// or picture the app handles: opening one of those builds a fresh
     /// untitled project sized and rated to it with the file as the first clip
     /// (spec §1), which is exactly what `ProjectDocument.read(from:ofType:)`
@@ -54,7 +54,7 @@ extension AgentServer {
         }
         guard let document = made as? ProjectDocument else {
             throw ToolError(
-                message: "\(url.lastPathComponent) did not open as a Reelcut project.")
+                message: "\(url.lastPathComponent) did not open as a Frame Job project.")
         }
         let landed: String? = try afterPersonOpen {
             // A document that came to hold the path during the read wins:
@@ -252,7 +252,7 @@ extension AgentServer {
     }
 
     /// An output path as the tools take one: `~` expanded, and the extension
-    /// the format actually needs (a `.reelcut` package without its extension
+    /// the format actually needs (a `.framejob` package without its extension
     /// is not a package, and an `.mp4` written to a name ending `.mov` claims
     /// a container it does not have).
     ///
@@ -284,7 +284,7 @@ extension AgentServer {
     /// (`FrameWriter.Format.heic` is `UTType.heic` for the measured reason
     /// recorded there), so a file called `scene.heif` keeps its name.
     private static let replaceableExtensions: Set<String> = [
-        "mov", "mp4", "m4v", "m4a", "mp3", "wav", "aif", "aiff", "caf", "reelcut", "srt", "vtt",
+        "mov", "mp4", "m4v", "m4a", "mp3", "wav", "aif", "aiff", "caf", "framejob", "srt", "vtt",
         "png", "jpg", "jpeg", "heic", "gif",
     ]
 

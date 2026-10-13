@@ -6,7 +6,7 @@ import AppKit
 ///
 /// The clipboard is one pasteboard type and two ops that read it. Copy writes
 /// the selection as the `paste` op's payload (the module doc of
-/// `core/src/edit_paste.rs` is its schema) under `com.kgalligan.reelcut.clips`;
+/// `core/src/edit_paste.rs` is its schema) under `com.kgalligan.framejob.clips`;
 /// Paste hands that payload straight back to the core, which does all the
 /// deciding — fresh ids, media matched by path, the overlap rule, the frame
 /// grid — and Paste Attributes and Paste Graphic Properties hand the SAME
@@ -34,9 +34,9 @@ import AppKit
 /// back onto two lanes.
 extension EditorViewController {
     /// The private pasteboard type the payload travels under. Private on
-    /// purpose: a Reelcut clip is not a flavour of anything else, and a paste
+    /// purpose: a Frame Job clip is not a flavour of anything else, and a paste
     /// from another app is a beep, not a guess.
-    static let clipsPasteboardType = NSPasteboard.PasteboardType("com.kgalligan.reelcut.clips")
+    static let clipsPasteboardType = NSPasteboard.PasteboardType("com.kgalligan.framejob.clips")
 
     // MARK: - Copy
 
@@ -147,7 +147,7 @@ extension EditorViewController {
         let start = clips.first?.start ?? 0
         let end = clips.map { $0.end }.max() ?? start
         let count = clips.count == 1 ? "1 clip" : "\(clips.count) clips"
-        return "Reelcut — \(count), "
+        return "Frame Job — \(count), "
             + ReelTime.format(start, fps: canvas.fps, frames: frames) + " to "
             + ReelTime.format(end, fps: canvas.fps, frames: frames)
     }

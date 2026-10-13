@@ -14,8 +14,8 @@ mod common;
 use serde_json::{json, Map, Value};
 
 use common::{array, assert_contains, at, int, num, Handle, Outcome};
-use reelcut_core::model_graphic::{GRAPHIC_MAX_SIDE, GRAPHIC_MIN_SIDE};
-use reelcut_core::op_table::OP_TABLE;
+use framejob_core::model_graphic::{GRAPHIC_MAX_SIDE, GRAPHIC_MIN_SIDE};
+use framejob_core::op_table::OP_TABLE;
 
 /// G-12's shared colour fixture, the engine's test file.
 const COLOURS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../graphic/tests/colours.json");

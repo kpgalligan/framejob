@@ -21,8 +21,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use serde_json::{json, Value};
 
 use common::{cstring, take_string};
-use reelcut_core::agent::{self, AgentConfig, MAX_SOCKET_PATH_BYTES};
-use reelcut_core::ffi_agent::{
+use framejob_core::agent::{self, AgentConfig, MAX_SOCKET_PATH_BYTES};
+use framejob_core::ffi_agent::{
     rc_agent_socket_release, rc_agent_socket_start, rc_agent_string_create,
 };
 
@@ -61,7 +61,7 @@ fn tools() -> Value {
 
 fn config() -> AgentConfig {
     AgentConfig {
-        name: "reelcut-test".to_string(),
+        name: "framejob-test".to_string(),
         version: "9.9.9".to_string(),
         tools: tools(),
         handler: Box::new(|_, _| Some(r#"{"content":[],"isError":false}"#.to_string())),
@@ -99,7 +99,7 @@ const INITIALIZE: &str =
 fn answers(path: &Path) -> bool {
     let (status, body) = post_unix(path, INITIALIZE);
     let value: Value = serde_json::from_str(&body).expect("initialize answers JSON");
-    status.contains(" 200 ") && value["result"]["serverInfo"]["name"] == "reelcut-test"
+    status.contains(" 200 ") && value["result"]["serverInfo"]["name"] == "framejob-test"
 }
 
 fn ino(path: &Path) -> u64 {
@@ -119,7 +119,7 @@ fn binds_at_0600_and_answers_initialize_over_the_socket() {
     let (status, body) = post_unix(&path, INITIALIZE);
     assert!(status.contains(" 200 "), "{status}");
     let value: Value = serde_json::from_str(&body).expect("JSON");
-    assert_eq!(value["result"]["serverInfo"]["name"], "reelcut-test");
+    assert_eq!(value["result"]["serverInfo"]["name"], "framejob-test");
     assert_eq!(value["result"]["serverInfo"]["version"], "9.9.9");
     server.shutdown();
     assert!(!path.exists(), "its own file is unlinked at shutdown");
@@ -224,7 +224,7 @@ fn the_ffi_pair_binds_once_and_releases_its_file() {
     let folder = Folder::new();
     let path = folder.sock();
     let path_c = cstring(path.to_str().expect("UTF-8 path"));
-    let name = cstring("reelcut-test");
+    let name = cstring("framejob-test");
     let version = cstring("9.9.9");
     let catalog = cstring(&tools().to_string());
     let start = || {

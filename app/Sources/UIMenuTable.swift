@@ -1,6 +1,6 @@
 import AppKit
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 /// `perform_menu_item`'s allow-table (road map 11's V2b): one row per
 /// selector in `tools/proof/capture_spike/inventory.json`, in its order, with
 /// the verdict V1's inventory read for it — `none` (spelled `.plain`, so no

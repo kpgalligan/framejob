@@ -24,8 +24,8 @@ which alone gets `CatalogWriterHook.swift`, the `main.swift` line and the
 `project.yml` phase. Every child runs in its own process group under a
 wall-clock bound (`graphics_spike/bounded.py`), without `ANTHROPIC_API_KEY`,
 `CLAUDECODE` or `CLAUDE_CODE_ENTRYPOINT`. No model call, no API request,
-nothing written under `~/Library/Application Support/Reelcut/`, and no
-Reelcut process killed whose command line does not hold
+nothing written under `~/Library/Application Support/Frame Job/`, and no
+Frame Job process killed whose command line does not hold
 `tools/proof/work/mc1_spike/`.
 
 Writes `work/mc1_spike/answers.json`, prints one line per row and a digest.
@@ -60,6 +60,7 @@ sys.path.insert(0, PROOF)
 
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = os.path.join(PROOF, "work", "mc1_spike")
@@ -73,8 +74,8 @@ WINDOWS_PROBE = os.path.join(WORK, "windows_probe")
 HOOK = os.path.join(HERE, "CatalogWriterHook.swift")
 STUB = os.path.join(HERE, "stub_mcp.py")
 SEAM = os.path.join(ROOT, "app", "Sources", "AgentServer+DevTools.swift")
-RELEASE = os.path.join(TREE, "build", "Build", "Products", "Release", "Reelcut.app")
-DIST = os.path.join(TREE, "build", "Build", "Products", "Distribution", "Reelcut.app")
+RELEASE = os.path.join(TREE, "build", "Build", "Products", "Release", "Frame Job.app")
+DIST = os.path.join(TREE, "build", "Build", "Products", "Distribution", "Frame Job.app")
 SNAPSHOT = os.path.join("Contents", "Resources", "agent-catalog.json")
 DOCS_URL = "https://code.claude.com/docs/en/mcp"
 
@@ -107,7 +108,7 @@ PHASE = r"""      - name: MC1 Spike Write Agent Catalog
             exit 1
           fi"""
 # The Makefile's `dist` recipe's xcodebuild line, run in the copy.
-DIST_BUILD = ["xcodebuild", "-project", "Reelcut.xcodeproj", "-scheme", "Reelcut",
+DIST_BUILD = ["xcodebuild", "-project", "FrameJob.xcodeproj", "-scheme", "FrameJob",
               "-configuration", "Distribution", "-derivedDataPath", "build", "build"]
 
 QUESTION_ROWS = {
@@ -161,10 +162,10 @@ def describe(result):
 
 def q4():
     home = os.path.expanduser("~")
-    suffix = "/Library/Application Support/Reelcut/Agent/agent.sock"
+    suffix = "/Library/Application Support/Frame Job/Agent/agent.sock"
     product = home + suffix
     tmpdir = os.environ.get("TMPDIR") or tempfile.gettempdir()
-    tmp_path = os.path.join(tmpdir, "reelcut-XXXXXXXX", "agent.sock")
+    tmp_path = os.path.join(tmpdir, "framejob-XXXXXXXX", "agent.sock")
     work_path = os.path.join(ROOT, "tools", "proof", "work", "x" * 12, "agent.sock")
     longest = 103 - len("/Users/") - len(suffix.encode())
     lengths = {
@@ -205,7 +206,7 @@ def q4():
         else:
             score_socket(answer, mask)
 
-    support = os.path.join(home, "Library", "Application Support", "Reelcut")
+    support = os.path.join(home, "Library", "Application Support", "Frame Job")
     agent = os.path.join(support, "Agent")
     try:
         info = os.stat(support)
@@ -428,7 +429,7 @@ def q1():
     row("B7", "pass" if all(v["rc"] == 0 for v in verify.values()) else "fail", verify,
         "codesign --verify --strict --deep on both bundles")
 
-    tampered = os.path.join(WORK, "q1", "b7c", "Reelcut.app")
+    tampered = os.path.join(WORK, "q1", "b7c", "Frame Job.app")
     copied = ditto(RELEASE, tampered)
     target = os.path.join(tampered, SNAPSHOT)
     if copied["rc"] != 0 or not os.path.isfile(target):
@@ -451,7 +452,7 @@ def q1():
     row("B8", "pass" if check["rc"] == 0 else "fail", {"rc": check["rc"], "last": last[0]},
         "dist_check.py on the copy's two bundles")
 
-    fresh = os.path.join(WORK, "q1", "b10", "Reelcut.app")
+    fresh = os.path.join(WORK, "q1", "b10", "Frame Job.app")
     copied = ditto(RELEASE, fresh)
     if copied["rc"] != 0 or "Release" not in snapshots:
         row("B10", "error", None, f"no fresh copy or no build snapshot: {describe(copied)}")
@@ -462,7 +463,7 @@ def q1():
             out = os.path.join(WORK, "q1", "b10", f"out-{index}.json")
             if os.path.exists(out):
                 os.remove(out)
-            result = run([os.path.join(fresh, "Contents", "MacOS", "Reelcut"), "-RCWriteCatalog", out], 120)
+            result = run([str(proof_app.executable(fresh)), "-RCWriteCatalog", out], 120)
             try:
                 with open(out, "rb") as handle:
                     raw = handle.read()
@@ -474,8 +475,8 @@ def q1():
                          "bytes_equal": raw == built["raw"],
                          "sorted_keys_equal": parsed is not None
                          and sorted_dump(parsed) == sorted_dump(built["parsed"]),
-                         "reelcut_lines": [line for line in (result["stderr"] or "").splitlines()
-                                           if "Reelcut: " in line]})
+                         "framejob_lines": [line for line in (result["stderr"] or "").splitlines()
+                                           if "Frame Job: " in line]})
         ok = all(r["rc"] == 0 and r["json_equal"] for r in runs)
         row("B10", "pass" if ok else "fail", runs,
             "fallback: fresh " + str(runs[0]["wall_s"]) + " s, warm "
@@ -491,12 +492,12 @@ def q1():
             missing.append(ident)
             continue
         found[ident] = [line for out in build["outputs"] for line in out.splitlines()
-                        if "Reelcut: " in line]
+                        if "Frame Job: " in line]
     if missing:
         row("B11", "error", found, f"no phase output block in {missing}'s log")
     else:
         row("B11", "pass" if not any(found.values()) else "fail", found,
-            "no `Reelcut: ` line in any phase's writer output")
+            "no `Frame Job: ` line in any phase's writer output")
 
     # B12: the product's final signature is Xcode's CodeSign, not the phase's
     # ad-hoc one: another CDHash than the phase printed, the Info.plist bound,
@@ -626,7 +627,7 @@ def processes():
 
 
 def owned_pids(bundle):
-    executable = os.path.join(bundle, "Contents", "MacOS", "Reelcut")
+    executable = str(proof_app.executable(bundle))
     return [pid for pid, command in processes() if executable in command and OWNED in command]
 
 
@@ -723,9 +724,9 @@ def launch(bundle, label, want_tools=False, bound=60.0):
         result.setdefault("stopped", []).append({"pid": pid, "how": stop(pid)})
     try:
         with open(log, encoding="utf-8", errors="replace") as handle:
-            result["reelcut_lines"] = [line for line in handle if "Reelcut: " in line]
+            result["framejob_lines"] = [line for line in handle if "Frame Job: " in line]
     except OSError:
-        result["reelcut_lines"] = None
+        result["framejob_lines"] = None
     mcp.remove_scratch(port)
     return result
 
@@ -733,7 +734,7 @@ def launch(bundle, label, want_tools=False, bound=60.0):
 def q2():
     q2_rows = QUESTION_ROWS["q2"]
     problem = ensure_windows_probe()
-    if problem or not os.path.isfile(os.path.join(RELEASE, "Contents", "MacOS", "Reelcut")):
+    if problem or not os.path.isfile(str(proof_app.executable(RELEASE))):
         reason = problem or f"no Release product at {RELEASE}: run q1 first"
         for ident in q2_rows:
             row(ident, "error", None, reason)
@@ -754,7 +755,7 @@ def q2():
     launches = []
     cold = []
     for index in range(1, 4):
-        bundle = os.path.join(WORK, "q2", f"cold-{stamp}-{index}", "Reelcut.app")
+        bundle = os.path.join(WORK, "q2", f"cold-{stamp}-{index}", "Frame Job.app")
         copied = ditto(RELEASE, bundle)
         if copied["rc"] != 0:
             cold.append({"error": describe(copied)})
@@ -769,7 +770,7 @@ def q2():
         row("L1", "answered", figures,
             f"cold, each on a fresh ditto copy: {figures} s (no `purge`: it needs root)")
 
-    warm_bundle = os.path.join(WORK, "q2", "warm", "Reelcut.app")
+    warm_bundle = os.path.join(WORK, "q2", "warm", "Frame Job.app")
     copied = ditto(RELEASE, warm_bundle)
     live = None
     if copied["rc"] != 0:
@@ -785,7 +786,7 @@ def q2():
             f"warm, three launches of one copy after an unscored priming launch "
             f"({prime.get('seconds')} s): {figures} s")
 
-    quarantined = os.path.join(WORK, "q2", f"quarantine-{stamp}", "Reelcut.app")
+    quarantined = os.path.join(WORK, "q2", f"quarantine-{stamp}", "Frame Job.app")
     copied = ditto(RELEASE, quarantined)
     if copied["rc"] != 0:
         row("L3", "error", None, f"the quarantined copy failed: {describe(copied)}")
@@ -818,32 +819,32 @@ def q2():
                if entry.get("front_at_answer") != entry.get("front_before")
                or entry.get("front_at_plus2") != entry.get("front_before")]
     names = dict(processes())
-    fronts = [{"label": e["label"], "reelcut_pid": e.get("pid"),
+    fronts = [{"label": e["label"], "framejob_pid": e.get("pid"),
                "before": e.get("front_before"), "at_answer": e.get("front_at_answer"),
                "at_plus2": e.get("front_at_plus2"),
-               "reelcut_frontmost": e.get("pid") in (e.get("front_at_answer"), e.get("front_at_plus2")),
+               "framejob_frontmost": e.get("pid") in (e.get("front_at_answer"), e.get("front_at_plus2")),
                "front_commands": {str(p): os.path.basename(names.get(p, "?").split(" -")[0])
                                   for p in {e.get("front_before"), e.get("front_at_answer"),
                                             e.get("front_at_plus2")} if p}}
               for e in measured]
     row("L4", "pass" if measured and not changed else "fail",
         {"launches": len(measured), "front_changed": changed,
-         "reelcut_ever_frontmost": [f["label"] for f in fronts if f["reelcut_frontmost"]],
+         "framejob_ever_frontmost": [f["label"] for f in fronts if f["framejob_frontmost"]],
          "fronts": fronts},
         f"frontmost pid unchanged at the answer and at +2 s in {len(measured) - len(changed)}"
-        f"/{len(measured)} launches; Reelcut itself frontmost in "
-        f"{sum(1 for f in fronts if f['reelcut_frontmost'])}")
+        f"/{len(measured)} launches; Frame Job itself frontmost in "
+        f"{sum(1 for f in fronts if f['framejob_frontmost'])}")
     row("L5", "answered",
         [{"label": e["label"], "at_answer": e.get("onscreen_at_answer"),
           "at_plus2": e.get("onscreen_at_plus2")} for e in measured],
-        "Reelcut's on-screen windows per launch: "
+        "Frame Job's on-screen windows per launch: "
         + ", ".join(f"{len(e.get('onscreen_at_answer') or [])}/{len(e.get('onscreen_at_plus2') or [])}"
                     for e in measured) + " (at the answer / at +2 s)")
-    lines = {e["label"]: e.get("reelcut_lines") for e in launches if e.get("reelcut_lines")}
-    unread = [e["label"] for e in launches if e.get("reelcut_lines") is None]
+    lines = {e["label"]: e.get("framejob_lines") for e in launches if e.get("framejob_lines")}
+    unread = [e["label"] for e in launches if e.get("framejob_lines") is None]
     row("L6", "pass" if not lines and not unread else "fail", {"lines": lines, "unread": unread},
-        f"no `Reelcut: ` line in {len(launches)} launch logs" if not lines and not unread
-        else "a launch log holds a `Reelcut: ` line or could not be read")
+        f"no `Frame Job: ` line in {len(launches)} launch logs" if not lines and not unread
+        else "a launch log holds a `Frame Job: ` line or could not be read")
     cold_figures = [c.get("seconds") for c in cold]
     if cold_figures and all(f is not None for f in cold_figures):
         worst = max(cold_figures)
@@ -1112,7 +1113,7 @@ def main(argv=None):
         elif question == "q1":
             q1()
             if "q2" not in chosen:
-                bundle = os.path.join(WORK, "q1", "b9", "Reelcut.app")
+                bundle = os.path.join(WORK, "q1", "b9", "Frame Job.app")
                 problem = ensure_windows_probe()
                 copied = ditto(RELEASE, bundle)
                 if problem or copied["rc"] != 0:

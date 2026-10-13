@@ -1,6 +1,6 @@
 import AppKit
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 /// The sheet half of road map 11's V2b: what the settle after a
 /// `perform_menu_item` or a `cancel_sheet` watches, and how `cancel_sheet`
 /// closes the sheet an agent opened.

@@ -112,7 +112,7 @@ def head_core():
     env = bounded.child_env()
     env.pop("CARGO_TARGET_DIR", None)
     built = run(["cargo", "build", "--release"], 1800, cwd=ROOT / "core", env=env)
-    lib = ROOT / "core/target/release/libreelcut_core.a"
+    lib = ROOT / "core/target/release/libframejob_core.a"
     ok = built["rc"] == 0 and lib.exists()
     emit("B0", ok, f"HEAD: cargo build --release rc {built['rc']} in {built['seconds']:.0f} s"
          + (" EXPIRED" if built["expired"] else "")
@@ -151,7 +151,7 @@ def mutant_core(name):
     env = bounded.child_env()
     env.pop("CARGO_TARGET_DIR", None)
     built = run(["cargo", "build", "--release", "--offline"], 1800, cwd=TREE / "core", env=env)
-    lib = TREE / "core/target/release/libreelcut_core.a"
+    lib = TREE / "core/target/release/libframejob_core.a"
     ok = exact and built["rc"] == 0 and lib.exists()
     emit("B0", ok, f"{name}: diff is exactly its {len(expected)} lines: {exact} · cargo rc "
          f"{built['rc']} in {built['seconds']:.0f} s" + (" EXPIRED" if built["expired"] else "")
@@ -192,8 +192,8 @@ def build_probe(lib_dir, probe_dir):
             return None
     try:
         built = swift_build.build(sources=swift_build.app_sources() + [entry], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"], optimize=True, wmo=True,
-                                  library=lib_dir / "libreelcut_core.a", timeout=1800)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], optimize=True, wmo=True,
+                                  library=lib_dir / "libframejob_core.a", timeout=1800)
     except swift_build.SwiftBuildFailed as error:
         emit("B1", False, f"swiftc rc {error.rc if error.rc is not None else 'before running'} "
              f"expired {error.expired}: "

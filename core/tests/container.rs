@@ -14,7 +14,7 @@ use common::ebml::{
     block_group, cluster, cluster_unknown, element, file, info, master, opus_head, opus_packet,
     payload, simple_block, tracks, uint, vp9_keyframe, write_temp, Lacing, Track, CUES,
 };
-use reelcut_core::container::{Container, RcContainerSample, AUDIO, VIDEO};
+use framejob_core::container::{Container, RcContainerSample, AUDIO, VIDEO};
 
 /// The bytes a sample's index entry points at, read from the file itself.
 fn bytes_at(file: &[u8], s: &RcContainerSample) -> Vec<u8> {
@@ -301,7 +301,7 @@ fn each_refusal_names_what_it_could_not_read() {
     );
     let missing = common::ebml::open("missing", b"");
     assert!(missing.is_err());
-    let path = std::env::temp_dir().join("reelcut-no-such-file.webm");
+    let path = std::env::temp_dir().join("framejob-no-such-file.webm");
     let unopened = Container::open(Path::new(&path))
         .err()
         .expect("no file, no container");
@@ -473,7 +473,7 @@ fn hostile_bytes_never_panic() {
         // caught by the FFI's guard.
         if let Ok(mut c) = Container::open(&path) {
             let _ = c.describe();
-            let _ = c.retime(reelcut_core::Fps { num: 30, den: 1 });
+            let _ = c.retime(framejob_core::Fps { num: 30, den: 1 });
             for track in [VIDEO, AUDIO] {
                 for i in 0..c.sample_count(track) {
                     let s = c.sample(track, i).expect("every counted sample reads");

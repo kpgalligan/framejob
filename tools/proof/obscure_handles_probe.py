@@ -10,7 +10,7 @@ the press's state back with no step.
 
 `obscure_handles_probe.swift` is compiled AS `main.swift` over `--sources`
 (default `app/Sources`) minus the app's `main.swift`, on `swift_build.py`'s
-line (`-D REELCUT_DEV_TOOLS`, the bridging header, `-lreelcut_core`),
+line (`-D FRAMEJOB_DEV_TOOLS`, the bridging header, `-lframejob_core`),
 with `Compositor.metal` built into a `default.metallib` beside it
 (`editor_keys_undo_proof.build_shader`), and run once over four packages this
 script writes under `work/obscure-handles/fixtures/` at the header's
@@ -88,12 +88,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2_chrome as e2  # noqa: E402  (video_props, project, write_package)
 import editor_keys_undo_proof as eku  # noqa: E402  (build_shader)
+import reference_build  # noqa: E402
 import swift_build  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/obscure-handles"
 PROBE = ROOT / "tools/proof/obscure_handles_probe.swift"
-HEADER = ROOT / "core/include/reelcut_core.h"
+HEADER = ROOT / "core/include/framejob_core.h"
 HARNESS = ROOT / "tools/proof/harness/build.sh"
 PROBE_ROWS = ["F0", "D0", "D1", "M1", "M2", "M3", "X0", "X1", "T1", "G1", "C1", "C2", "L1"]
 CONTROLS = ["F0", "D0", "C1", "C2"]
@@ -187,18 +188,20 @@ def build(sources, here):
     entry = here / "main.swift"
     shutil.copyfile(PROBE, entry)
     binary = here / "obscure-handles-probe"
-    shader, why = eku.build_shader(str(here))
+    shader, why = eku.build_shader(str(here), sources.parents[1])
     if shader is None:
         return None, why
     swift = sorted(str(p) for p in sources.glob("*.swift") if p.name != "main.swift")
     if len(swift) < 100:
         return None, f"app source set incomplete ({len(swift)} files in {sources})"
-    lib = ROOT / "core/target/release/libreelcut_core.a"
+    lib = ROOT / "core/target/release/libframejob_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
         swift_build.build(sources=swift + [entry], output=binary,
-                          defines=["REELCUT_DEV_TOOLS"], timeout=BUILD_WALL)
+                          defines=reference_build.tree_defines(sources.parents[1],
+                                                               ["FRAMEJOB_DEV_TOOLS"]),
+                          timeout=BUILD_WALL)
     except swift_build.SwiftBuildFailed as error:
         if error.expired:
             return None, f"swiftc did not finish within {BUILD_WALL} s"
@@ -244,8 +247,8 @@ def mutate(sources, name, dest):
 def archive(commit, dest):
     """app/Sources at `commit` under `dest`; the reason when it failed."""
     dest.mkdir(parents=True)
-    got = subprocess.run(["git", "-C", str(ROOT), "archive", commit, "app/Sources"],
-                         capture_output=True)
+    got = subprocess.run(["git", "-C", str(ROOT), "archive", commit, "app/Sources",
+                          "app/Bridging"], capture_output=True)
     if got.returncode:
         return f"git archive {commit} failed: {got.stderr.decode(errors='replace').strip()}"
     untar = subprocess.run(["tar", "-x", "-C", str(dest)], input=got.stdout,
@@ -327,7 +330,7 @@ def main():
             return not_performed(why)
         sources = here / "src/app/Sources"
         print(f"BASELINE {args.baseline}: app/Sources in {sources.relative_to(ROOT)}, "
-              "linked to the current libreelcut_core.a")
+              "linked to the current libframejob_core.a")
     elif args.mutant:
         why = mutate(sources, args.mutant, here / "Sources")
         if why:

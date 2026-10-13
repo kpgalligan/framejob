@@ -3,7 +3,9 @@
 `commit` may name a commit or a tree object (a pipeline's final working tree);
 the tree's `graphic/` is archived beside its core when it has one, because the
 core names it as a path dependency. `defines` are `-D` flags on the swiftc line
-and part of the cache key."""
+and part of the cache key; `FRAMEJOB_DEV_TOOLS` among them is the tree's own
+flag (`tree_defines`). A tree from before the rename (spec §11 NM-6) is built
+under its own names: `tree_names` reads them off its bridging header."""
 
 import hashlib
 import io
@@ -14,17 +16,60 @@ import shutil
 import subprocess
 import tarfile
 import time
+from dataclasses import dataclass
 from typing import Sequence
 
 
 TARGET = "aarch64-apple-darwin"
 SWIFT_TARGET = "arm64-apple-macos26.0"
-FLAGS = ("-target", SWIFT_TARGET, "-module-name", "Reelcut",
-         "-D", "HARNESS_REFERENCE_BUILD")
+FLAGS = ("-target", SWIFT_TARGET, "-D", "HARNESS_REFERENCE_BUILD")
 OVERRIDES = ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTUP_TOOLCHAIN", "RUSTC", "CARGO", "CC", "CFLAGS",
              "DEVELOPER_DIR", "SWIFTFLAGS", "SDKROOT", "MACOSX_DEPLOYMENT_TARGET")
 OVERRIDE_PREFIXES = ("CARGO_TARGET_", "CARGO_PROFILE_")
 NOTE = "this tree's own harness/main.swift, so both renders come out of one program"
+
+
+@dataclass(frozen=True)
+class TreeNames:
+    """What a tree calls its module, bridging header, core header, staticlib,
+    dev-tools flag and document type."""
+    module: str
+    bridging: str
+    header: str
+    staticlib: str
+    dev_tools: str
+    project_type: str
+
+
+NEW_NAMES = TreeNames("FrameJob", "app/Bridging/FrameJob-Bridging-Header.h",
+                      "core/include/framejob_core.h", "libframejob_core.a", "FRAMEJOB_DEV_TOOLS",
+                      "com.kgalligan.framejob-project")
+# A tree from before rename R1 (spec §11 NM-6): its own names, kept to build it.
+OLD_NAMES = TreeNames("Reelcut", "app/Bridging/Reelcut-Bridging-Header.h",
+                      "core/include/reelcut_core.h", "libreelcut_core.a", "REELCUT_DEV_TOOLS",
+                      "com.kgalligan.reelcut-project")
+
+
+def tree_names(tree: Path) -> TreeNames:
+    """The old names when `tree` holds the old bridging header, else the new ones."""
+    return OLD_NAMES if (Path(tree) / OLD_NAMES.bridging).exists() else NEW_NAMES
+
+
+def tree_defines(tree: Path, defines: Sequence[str]) -> list[str]:
+    """`defines` with `FRAMEJOB_DEV_TOOLS` spelled as `tree` spells its flag."""
+    names = tree_names(tree)
+    return [names.dev_tools if d == NEW_NAMES.dev_tools else d for d in defines]
+
+
+def tree_shader(tree: Path, text: str) -> str:
+    """Metal source `text` with its `framejob_` entry points named as `tree`'s
+    Swift asks for them (`reelcut_` in a tree from before the rename)."""
+    return text.replace("framejob_", "reelcut_") if tree_names(tree) is OLD_NAMES else text
+
+
+def link_flag(names: TreeNames) -> str:
+    """The `-l` flag naming `names.staticlib`."""
+    return "-l" + names.staticlib.removeprefix("lib").removesuffix(".a")
 
 
 def _files(root):
@@ -74,7 +119,7 @@ def _inputs(root, harness_main, fonts, proof_script):
              ("core/include", root / "core/include"),
              ("core/Cargo.toml", root / "core/Cargo.toml"),
              ("core/Cargo.lock", root / "core/Cargo.lock"),
-             ("core/staticlib", root / "core/target/release/libreelcut_core.a"),
+             ("core/staticlib", root / "core/target/release" / NEW_NAMES.staticlib),
              ("harness", harness_main), ("builder", __file__),
              ("caller", proof_script), ("Fonts", fonts)]
     return _digest(paths)
@@ -156,13 +201,14 @@ def build_reference(*, root: str, before: str, commit: str,
         with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
             tar.extractall(tree, filter="data")
         core = tree / "core"
+        names = tree_names(tree)
         target_dir = before / "target"
         module_dir = before / "modules"
         module_dir.mkdir()
         child_env = env.copy()
         child_env["CLANG_MODULE_CACHE_PATH"] = str(module_dir / "clang")
         child_env["SWIFT_MODULE_CACHE_PATH"] = str(module_dir / "swift")
-        lib = target_dir / TARGET / "release/libreelcut_core.a"
+        lib = target_dir / TARGET / "release" / names.staticlib
         _run(["cargo", "build", "--release", "--locked", "--manifest-path",
               str(core / "Cargo.toml"), "--target", TARGET, "--target-dir",
               str(target_dir)], env=child_env, log=before / "cargo.log")
@@ -170,12 +216,12 @@ def build_reference(*, root: str, before: str, commit: str,
             raise RuntimeError(f"cargo succeeded without {lib}")
         sources = sorted(str(p) for p in (tree / "app/Sources").glob("*.swift")
                          if p.name != "main.swift")
-        swift = ["swiftc", "-sdk", sdk, *FLAGS, *[x for d in defines for x in ("-D", d)],
-                 "-import-objc-header",
-                 str(tree / "app/Bridging/Reelcut-Bridging-Header.h"),
+        swift = ["swiftc", "-sdk", sdk, *FLAGS, "-module-name", names.module,
+                 *[x for d in tree_defines(tree, defines) for x in ("-D", d)],
+                 "-import-objc-header", str(tree / names.bridging),
                  "-module-cache-path", str(module_dir / "swift"),
                  "-Xcc", f"-fmodules-cache-path={module_dir / 'clang'}",
-                 "-L", str(lib.parent), "-lreelcut_core", *sources,
+                 "-L", str(lib.parent), link_flag(names), *sources,
                  harness_main, "-o", str(binary)]
         _run(swift, env=child_env, log=before / "swiftc.log")
         if not binary.is_file() or not os.access(binary, os.X_OK):

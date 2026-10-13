@@ -39,8 +39,8 @@ mod common;
 use serde_json::{json, Map, Value};
 
 use common::{take_string, Handle};
-use reelcut_core::ffi_query::rc_op_schemas;
-use reelcut_core::op_table::{Argument, Kind, OpRow, OP_NAMES, OP_TABLE};
+use framejob_core::ffi_query::rc_op_schemas;
+use framejob_core::op_table::{Argument, Kind, OpRow, OP_NAMES, OP_TABLE};
 
 /// The export's answer, parsed. Every call frees the string it read, which
 /// is the header's rule for every `char *` the library hands back.

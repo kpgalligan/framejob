@@ -3,8 +3,11 @@
 /mcp-proxy/target/
 /agent/node_modules/
 /build/
+/FrameJob.xcodeproj/
+# The old name's generated copies, left in every tree built before the rename (R1).
 /Reelcut.xcodeproj/
 /app/Info.plist
+/app/FrameJob.entitlements
 /app/Reelcut.entitlements
 xcuserdata/
 .DS_Store

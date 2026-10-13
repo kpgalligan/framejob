@@ -33,7 +33,7 @@ fn corpus() -> Vec<String> {
         "mm",
         "Hello",
         "world",
-        "Reelcut",
+        "Frame Job",
     ];
     const BITS: &[&str] = &[
         "0",

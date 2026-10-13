@@ -1,6 +1,6 @@
-//! The built `reelcut-mcp`, black-box, over its stdin and stdout (road map
+//! The built `framejob-mcp`, black-box, over its stdin and stdout (road map
 //! 14's MC3). Each test copies the binary into a fake bundle of its own,
-//! `<tmp>/rcm-<pid>-<n>/Fake.app/Contents/Helpers/reelcut-mcp`, beside a
+//! `<tmp>/rcm-<pid>-<n>/Fake.app/Contents/Helpers/framejob-mcp`, beside a
 //! snapshot, and points `RC_AGENT_SOCKET` into the same folder; a stub
 //! server is `tiny_http`'s `Server::http_unix`, the app's own transport.
 //!
@@ -24,8 +24,8 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
-use reelcut_mcp::launch::{open_arguments, LAUNCH_LOG_NAME};
-use reelcut_mcp::mcp_versions::LATEST_VERSION;
+use framejob_mcp::launch::{open_arguments, LAUNCH_LOG_NAME};
+use framejob_mcp::mcp_versions::LATEST_VERSION;
 
 static NEXT: AtomicUsize = AtomicUsize::new(0);
 
@@ -49,8 +49,8 @@ impl Fixture {
         let resources = dir.join("Fake.app/Contents/Resources");
         std::fs::create_dir_all(&helpers).expect("the fake bundle is made");
         std::fs::create_dir_all(&resources).expect("the fake bundle is made");
-        let exe = helpers.join("reelcut-mcp");
-        std::fs::copy(env!("CARGO_BIN_EXE_reelcut-mcp"), &exe).expect("the binary is copied");
+        let exe = helpers.join("framejob-mcp");
+        std::fs::copy(env!("CARGO_BIN_EXE_framejob-mcp"), &exe).expect("the binary is copied");
         let snapshot = json!({"version": "7.7.7", "tools": tools});
         std::fs::write(resources.join("agent-catalog.json"), snapshot.to_string())
             .expect("the snapshot is written");
@@ -78,7 +78,7 @@ impl Fixture {
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
              <plist version=\"1.0\"><dict>\n\
              <key>CFBundleExecutable</key><string>fake</string>\n\
-             <key>CFBundleIdentifier</key><string>test.reelcut-mcp.fake</string>\n\
+             <key>CFBundleIdentifier</key><string>test.framejob-mcp.fake</string>\n\
              <key>CFBundlePackageType</key><string>APPL</string>\n\
              </dict></plist>\n",
         )
@@ -372,7 +372,7 @@ fn initialize_negotiates_and_reports_the_snapshot_version() {
     );
     assert_eq!(
         known["result"]["serverInfo"],
-        json!({"name": "reelcut", "version": "7.7.7"})
+        json!({"name": "framejob", "version": "7.7.7"})
     );
     proxy.request(2, "initialize", json!({"protocolVersion": "1999-01-01"}));
     let unknown = proxy.next(Duration::from_secs(5));
@@ -472,7 +472,7 @@ fn no_list_changed_when_the_live_list_differs_only_in_key_order() {
         snapshot_tools()
     );
     let raw = format!(
-        "{{\"result\":{{\"tools\":{}}},\"jsonrpc\":\"2.0\",\"id\":\"reelcut-mcp-list-check\"}}",
+        "{{\"result\":{{\"tools\":{}}},\"jsonrpc\":\"2.0\",\"id\":\"framejob-mcp-list-check\"}}",
         reversed(&snapshot_tools())
     );
     let base = lister(snapshot_tools(), Duration::ZERO);
@@ -624,7 +624,7 @@ fn concurrent_calls_in_one_session_launch_at_most_once_when_none_answers() {
         .collect();
     texts.sort_by_key(|text| text.contains("will not launch another"));
     assert!(
-        texts[0].starts_with("Reelcut did not answer at "),
+        texts[0].starts_with("Frame Job did not answer at "),
         "{texts:?}"
     );
     assert!(!texts[0].contains("will not launch another"), "{texts:?}");
@@ -646,7 +646,7 @@ fn concurrent_calls_in_one_session_launch_at_most_once_when_none_answers() {
 #[test]
 fn outside_a_bundle_a_call_is_an_error_naming_the_executable() {
     let fixture = Fixture::new();
-    let exe = PathBuf::from(env!("CARGO_BIN_EXE_reelcut-mcp"))
+    let exe = PathBuf::from(env!("CARGO_BIN_EXE_framejob-mcp"))
         .canonicalize()
         .expect("the binary resolves");
     let mut proxy = Proxy::start(&exe, &fixture.socket);
@@ -657,7 +657,7 @@ fn outside_a_bundle_a_call_is_an_error_naming_the_executable() {
     let text = called["result"]["content"][0]["text"]
         .as_str()
         .expect("a text");
-    assert!(text.contains("not inside a Reelcut bundle"), "{text}");
+    assert!(text.contains("not inside a Frame Job bundle"), "{text}");
     assert!(text.contains(&exe.display().to_string()), "{text}");
     proxy.request(2, "initialize", json!({"protocolVersion": "2025-06-18"}));
     assert_eq!(
@@ -668,7 +668,7 @@ fn outside_a_bundle_a_call_is_an_error_naming_the_executable() {
 
 #[test]
 fn open_arguments_for_a_scratch_socket_and_the_persons() {
-    let bundle = Path::new("/tmp/x/Reelcut.app");
+    let bundle = Path::new("/tmp/x/Frame Job.app");
     let socket = Path::new("/tmp/s/agent.sock");
     let scratch: Vec<String> = open_arguments(bundle, socket, true)
         .into_iter()
@@ -684,7 +684,7 @@ fn open_arguments_for_a_scratch_socket_and_the_persons() {
             "RC_AGENT_SOCKET=/tmp/s/agent.sock",
             "--stderr",
             log.as_str(),
-            "/tmp/x/Reelcut.app",
+            "/tmp/x/Frame Job.app",
             "--args",
             "-ApplePersistenceIgnoreState",
             "YES"
@@ -694,5 +694,5 @@ fn open_arguments_for_a_scratch_socket_and_the_persons() {
         .into_iter()
         .map(|a| a.into_string().expect("UTF-8"))
         .collect();
-    assert_eq!(persons, ["-n", "-g", "/tmp/x/Reelcut.app"]);
+    assert_eq!(persons, ["-n", "-g", "/tmp/x/Frame Job.app"]);
 }

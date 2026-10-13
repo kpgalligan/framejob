@@ -27,7 +27,7 @@ mod common;
 use serde_json::{json, Value};
 
 use common::{expect_string, parse_json, text, Handle};
-use reelcut_core::ffi_query::rc_export_presets;
+use framejob_core::ffi_query::rc_export_presets;
 
 /// One second in ticks (spec §5.1).
 const SECOND: i64 = 600_000;

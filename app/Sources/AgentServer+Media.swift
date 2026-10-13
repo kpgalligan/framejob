@@ -130,7 +130,7 @@ extension AgentServer {
             FFmpegRewrap.tools() != nil
         else { return nil }
         return "An installed ffmpeg could convert it, but a tool call never asks "
-            + "(RCFFmpegImport is ask): launch Reelcut with -RCFFmpegImport always, "
+            + "(RCFFmpegImport is ask): launch Frame Job with -RCFFmpegImport always, "
             + "or import it from the app's window."
     }
 

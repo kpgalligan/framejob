@@ -34,9 +34,9 @@ struct CaptionLooks: Equatable {
     /// key is off. Read when the row is built and written by a click
     /// (`TranscribeSheetController+Looks.swift`); the tool never reads them
     /// (R6-2 read across).
-    static let slideKey = "ReelcutCaptionSlide"
-    static let fillKey = "ReelcutCaptionFill"
-    static let dimKey = "ReelcutCaptionDim"
+    static let slideKey = "FrameJobCaptionSlide"
+    static let fillKey = "FrameJobCaptionFill"
+    static let dimKey = "FrameJobCaptionDim"
 
     /// One look. The raw value is `transcribe`'s argument name.
     enum Look: String, CaseIterable {

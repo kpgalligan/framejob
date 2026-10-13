@@ -42,7 +42,7 @@ extension RecorderPanelController {
     static func hidesForRecording(_ source: RecordingSource) -> Bool { source != .voiceOver }
 
     /// Every control unlocked only while idle; the four screen-only ones
-    /// (Include Reelcut windows among them, set only here) greyed besides
+    /// (Include Frame Job windows among them, set only here) greyed besides
     /// while Microphone Only is chosen, their values kept.
     func syncControlsEnabled() {
         let idle = phase == .idle
@@ -53,7 +53,7 @@ extension RecorderPanelController {
         for control in controls { control.isEnabled = idle }
         let screenOnly = idle && !voiceOverSelected
         let screenControls: [NSControl] = [
-            systemAudioSwitch, showClicksSwitch, sizePopup, includeReelcutCheckbox,
+            systemAudioSwitch, showClicksSwitch, sizePopup, includeFrameJobCheckbox,
         ]
         for control in screenControls {
             control.isEnabled = screenOnly

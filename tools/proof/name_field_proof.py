@@ -9,7 +9,7 @@ centred (spec §11 SH-3).
 
 **The probe**, `name_field_probe.swift`, compiled AS `main.swift` over every
 file in `app/Sources` but the app's own `main.swift` on `swift_build.py`'s
-line, `-D REELCUT_DEV_TOOLS` included (a probe that will not build is
+line, `-D FRAMEJOB_DEV_TOOLS` included (a probe that will not build is
 a scored FAILURE, never an exit), and run once per look, `light` then `dark`
 (`NSApp.appearance` set before any view is built, the app's fonts
 registered). In an offscreen window: an `InspectorNameField` "HHHH" at 170 ×
@@ -102,6 +102,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2_chrome as e2  # noqa: E402  (video_props, project, write_package)
+import reference_build  # noqa: E402
 import swift_build  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -109,7 +110,7 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 WORK = os.path.join(HERE, "work", "name-field")
 PROBE_SWIFT = os.path.join(HERE, "name_field_probe.swift")
 HARNESS_BUILD = os.path.join(HERE, "harness", "build.sh")
-HEADER = os.path.join(ROOT, "core", "include", "reelcut_core.h")
+HEADER = os.path.join(ROOT, "core", "include", "framejob_core.h")
 FONTS = os.path.join(ROOT, "app", "Resources", "Fonts")
 TICKS = e2.TICKS
 LOOKS = ["light", "dark"]
@@ -217,12 +218,14 @@ def build_probe(sources, out):
     binary = os.path.join(out, "name-field-probe")
     swift = sorted(os.path.join(sources, n) for n in os.listdir(sources)
                    if n.endswith(".swift") and n != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
         built = swift_build.build(sources=swift + [entry], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=900)
+                                  defines=reference_build.tree_defines(
+                                      os.path.dirname(os.path.dirname(sources)),
+                                      ["FRAMEJOB_DEV_TOOLS"]), timeout=900)
     except swift_build.SwiftBuildFailed as error:
         errors = [line for line in error.diagnostics if ": error:" in line]
         return None, "swiftc failed:\n       " + "\n       ".join(
@@ -354,7 +357,8 @@ def baseline(commit):
         print(f"baseline {commit}: the control could not be performed — {why}")
         return 2
 
-    archive = subprocess.run(["git", "-C", ROOT, "archive", commit, "app/Sources"],
+    archive = subprocess.run(["git", "-C", ROOT, "archive", commit, "app/Sources",
+                              "app/Bridging"],
                              capture_output=True)
     if archive.returncode != 0:
         return not_performed(f"git archive {commit} failed: "

@@ -1,12 +1,12 @@
-APP := Reelcut
+APP := FrameJob
 BUILD_DIR := build
-APP_PATH := $(BUILD_DIR)/Build/Products/Release/$(APP).app
+APP_PATH := $(BUILD_DIR)/Build/Products/Release/Frame Job.app
 # The Distribution configuration's product (`make dist`): Release without
-# REELCUT_DEV_TOOLS, in its own products folder beside Release's.
-DIST_PATH := $(BUILD_DIR)/Build/Products/Distribution/$(APP).app
-# The Debug configuration's product (`make app-debug`): "Reelcut Debug",
-# com.kgalligan.Reelcut.debug (spec §11 V-5), in its own products folder.
-DEBUG_APP_PATH := $(BUILD_DIR)/Build/Products/Debug/$(APP).app
+# FRAMEJOB_DEV_TOOLS, in its own products folder beside Release's.
+DIST_PATH := $(BUILD_DIR)/Build/Products/Distribution/Frame Job.app
+# The Debug configuration's product (`make app-debug`): "Frame Job Debug",
+# com.kgalligan.FrameJob.debug (spec §11 V-5), in its own products folder.
+DEBUG_APP_PATH := $(BUILD_DIR)/Build/Products/Debug/Frame Job Debug.app
 
 # `xcodebuild` records every task's ENVIRONMENT in its build database under
 # build/Build/Intermediates.noindex/XCBuildData/, so a `make app` from a shell
@@ -39,8 +39,10 @@ rust:
 # on a throwaway domain, its refusals over scratch folders, then the sweep of
 # the proofs' own idle domains, and of the two probes this target ran, out of
 # `~/Library/Preferences`; no app.
-# `mcp-proxy` is road map 14's `reelcut-mcp`, its tests black-box over the
-# built binary's stdin and stdout.
+# `mcp-proxy` is road map 14's `framejob-mcp`, its tests black-box over the
+# built binary's stdin and stdout. `name_residue.py` (spec §11 NM-8) fails
+# on any line or path spelling the old name that its allow-list does not
+# hold; its selftest runs first.
 test: rust
 	cd core && cargo test --release
 	cd graphic && cargo test --release
@@ -55,6 +57,8 @@ test: rust
 	python3 tools/proof/proof_app.py --selftest
 	python3 tools/proof/gate.py --selftest
 	python3 tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe
+	python3 tools/proof/name_residue.py --selftest
+	python3 tools/proof/name_residue.py
 
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings
@@ -83,15 +87,15 @@ app-debug: rust project
 	xcodebuild -project $(APP).xcodeproj -scheme $(APP) -configuration Debug \
 		-derivedDataPath $(BUILD_DIR) COMPILER_INDEX_STORE_ENABLE=NO build
 
-# Builds the Distribution configuration (Release without REELCUT_DEV_TOOLS,
+# Builds the Distribution configuration (Release without FRAMEJOB_DEV_TOOLS,
 # spec §11 V-1) beside Release's product, then runs the binary check: the
 # dev-tools marker must be absent from Distribution's binary and present in
 # Release's, which is its positive control; and each bundle's assistant helper
-# (Contents/Helpers/reelcut-agent) must be present, signed with the hardened
+# (Contents/Helpers/framejob-agent) must be present, signed with the hardened
 # runtime, hold exactly the allow-jit entitlement and not hold the marker
 # (road map 12 A4, D6–D13); and the Distribution app must be signed with
 # exactly the audio-input entitlement, never get-task-allow (#145, D14); and
-# each bundle's MCP proxy (Contents/Helpers/reelcut-mcp) must be present,
+# each bundle's MCP proxy (Contents/Helpers/framejob-mcp) must be present,
 # signed with the hardened runtime and hold no entitlements, and its catalog
 # snapshot (Contents/Resources/agent-catalog.json) must be at the bundle's
 # version, Release's naming every dev tool and Distribution's none (road map
@@ -116,16 +120,16 @@ gate:
 	python3 tools/proof/gate.py $(GATE_ARGS)
 
 # Fast compile check of the Swift sources without a full Xcode build.
-# `-D REELCUT_DEV_TOOLS` as Debug and Release set it (project.yml); the
+# `-D FRAMEJOB_DEV_TOOLS` as Debug and Release set it (project.yml); the
 # flag-OFF path, what Distribution ships, is compiled only by `make dist`.
 # The last line is agent/'s `tsc --noEmit`, through bun (agent/build.sh),
 # which fails rather than skips when bun is missing.
 typecheck:
 	swiftc -typecheck -enable-batch-mode -j "$$(sysctl -n hw.logicalcpu)" \
-		-D REELCUT_DEV_TOOLS \
+		-D FRAMEJOB_DEV_TOOLS \
 		-sdk "$$(xcrun --show-sdk-path --sdk macosx)" \
 		-target arm64-apple-macos26.0 \
-		-import-objc-header app/Bridging/Reelcut-Bridging-Header.h \
+		-import-objc-header app/Bridging/FrameJob-Bridging-Header.h \
 		app/Sources/*.swift
 	/bin/sh agent/build.sh typecheck
 

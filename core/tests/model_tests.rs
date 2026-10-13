@@ -13,7 +13,7 @@
 //! - the timecode and frame-snapping tables, against values derived by hand
 //!   in the comments — never against what the implementation happens to do;
 //! - the NULL-safety sweep over EVERY export declared in
-//!   `core/include/reelcut_core.h`, with the list of exports read out of the
+//!   `core/include/framejob_core.h`, with the list of exports read out of the
 //!   header itself so a new export cannot quietly skip the sweep.
 
 mod common;
@@ -25,33 +25,33 @@ use std::ptr;
 use serde_json::{json, Value};
 
 use common::{array, assert_contains, at, cstring, expect_string, take_string, Handle};
-use reelcut_core::container::RcContainerSample;
-use reelcut_core::ffi::{
+use framejob_core::container::RcContainerSample;
+use framejob_core::ffi::{
     rc_normalise_color, rc_project_clone, rc_project_free, rc_project_from_json, rc_project_new,
     rc_project_scoped, rc_project_to_json, rc_string_free, rc_time_snap_to_frame,
     rc_timecode_format, rc_timecode_parse,
 };
-use reelcut_core::ffi_agent::{
+use framejob_core::ffi_agent::{
     rc_agent_socket_release, rc_agent_socket_start, rc_agent_string_create,
 };
-use reelcut_core::ffi_container::{
+use framejob_core::ffi_container::{
     rc_container_describe, rc_container_free, rc_container_open, rc_container_retime,
     rc_container_sample, rc_container_sample_count,
 };
-use reelcut_core::ffi_cube::{rc_cube_copy_rgb, rc_cube_free, rc_cube_parse, rc_cube_size};
-use reelcut_core::ffi_edit::rc_project_apply;
-use reelcut_core::ffi_graphic::{
+use framejob_core::ffi_cube::{rc_cube_copy_rgb, rc_cube_free, rc_cube_parse, rc_cube_size};
+use framejob_core::ffi_edit::rc_project_apply;
+use framejob_core::ffi_graphic::{
     rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_library_add_asset,
     rc_graphic_library_add_font, rc_graphic_library_families, rc_graphic_library_free,
     rc_graphic_library_new, rc_graphic_rasterize, rc_graphic_svg,
 };
-use reelcut_core::ffi_query::{
+use framejob_core::ffi_query::{
     rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_op_schemas,
     rc_project_clip_state, rc_project_composition_plan, rc_project_duration,
     rc_project_frame_recipe, rc_project_frame_recipe_opts, rc_project_snap_candidates,
     rc_snap_resolve, rc_speed_limits,
 };
-use reelcut_core::format::RC_FORMAT_VERSION;
+use framejob_core::format::RC_FORMAT_VERSION;
 
 /// Every `TransitionKind`, every `ShapeKind`, every `Curve` — the wire
 /// spellings from spec §5.2. A variant added to the model without a line
@@ -257,7 +257,7 @@ fn full_project() -> Value {
     // both states of `outline`, `backdrop` and `width`.
     let mut clip22 = base_clip(22, 5, 0, 3_000_000, json!({ "kind": "text" }));
     clip22["text"] = json!({
-        "content": "Reelcut", "font": "SourceSans3-Bold", "size": 96.0,
+        "content": "Frame Job", "font": "SourceSans3-Bold", "size": 96.0,
         "color": [1.0, 0.9, 0.2, 1.0], "align": "left", "valign": "bottom",
         "line_spacing": 1.25, "tracking": 2.5,
         "outline": { "width": 2.0, "color": [0.0, 0.0, 0.0, 1.0] },
@@ -1070,7 +1070,7 @@ fn a_newer_format_version_is_refused_and_says_so() {
         &format!("version {future} is newer than this build understands"),
     );
     assert_contains(&msg, &format!("(version {current})"));
-    assert_contains(&msg, "update Reelcut");
+    assert_contains(&msg, "update Frame Job");
 
     // The gate reads the RAW json, so it has to cope with however the
     // writer that produced the file spelled the number. A version written
@@ -1838,7 +1838,7 @@ fn text_that_is_not_utf8_is_reported_rather_than_crashing() {
 /// Reads the export names out of the C header. The header is the contract,
 /// so it — not a list in this file — decides what the sweep must cover.
 fn exports_declared_in_the_header() -> Vec<String> {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/include/reelcut_core.h");
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/include/framejob_core.h");
     let text = std::fs::read_to_string(path).expect("the C header must be readable");
     let code = strip_c_comments(&text);
 
@@ -2344,7 +2344,7 @@ fn null_safety_sweep_covers_every_export_in_the_header() {
     assert_eq!(
         declared, swept,
         "the header and the NULL-safety sweep disagree: an export declared in \
-         core/include/reelcut_core.h but never called with NULL here (or the \
+         core/include/framejob_core.h but never called with NULL here (or the \
          other way round) is exactly the bug this test exists to catch"
     );
 }

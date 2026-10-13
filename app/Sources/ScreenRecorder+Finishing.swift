@@ -60,7 +60,7 @@ extension ScreenRecorder {
     /// recording (the tool's status item) freezes at a stop from ANY door,
     /// File ▸ Stop Recording over a tool's paused recording included (#193).
     static let finishingDidBeginNotification =
-        Notification.Name("ReelcutRecorderFinishingDidBegin")
+        Notification.Name("FrameJobRecorderFinishingDidBegin")
 
     /// The one finishing path, from `.recording` or `.paused`. `reason` is
     /// what `RecordingResult.stoppedBy` will say; a failure, if any, is

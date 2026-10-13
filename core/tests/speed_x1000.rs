@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 
 mod common;
 use common::{array, by_id, int, num, take_string, Handle, Outcome};
-use reelcut_core::ffi_query::rc_speed_limits;
+use framejob_core::ffi_query::rc_speed_limits;
 
 const SEC: i64 = 600_000;
 const FRAME: i64 = SEC / 30;

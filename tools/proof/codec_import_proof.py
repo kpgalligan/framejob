@@ -14,7 +14,7 @@ stream, copied into a 640×360 30 fps 2 s `testsrc2` VP9 Profile 0 MP4 and
 its H.264 twin; a VP9 Profile 1 (4:4:4) MP4; an AV1 MP4.
 
 Rows:
-- **R0**: no `Reelcut: ` line in the instance's log (the parity check).
+- **R0**: no `Frame Job: ` line in the instance's log (the parity check).
 - **R1**: `import_media` of the VP9 P0 file answers `has_video`, 640×360,
   `[30, 1]` and `has_audio`, and `add_clip` places it.
 - **R2**: `render_frame` at 0.5 s is byte-identical twice, differs from
@@ -98,7 +98,7 @@ def av1_sentence(name):
 def check_parity(log_path):
     with open(log_path, encoding="utf-8", errors="replace") as stream:
         lines = stream.read().splitlines()
-    return lines, [line for line in lines if "Reelcut: " in line]
+    return lines, [line for line in lines if "Frame Job: " in line]
 
 
 def read(path):
@@ -133,7 +133,7 @@ def frame_rows(row_id, shots):
 
 
 def new_project(mcp, where, name):
-    path = os.path.join(where, f"{name}.reelcut")
+    path = os.path.join(where, f"{name}.framejob")
     mcp.call("new_project", path=path)
     return path
 
@@ -264,11 +264,11 @@ def main():
     parser.add_argument("--mutant", choices=["p1-as-p0", "p0-as-p1"])
     parser.add_argument("--app", default=str(proof_app.bundle()))
     args = parser.parse_args()
-    binary = os.path.join(args.app, "Contents", "MacOS", "Reelcut")
+    binary = str(proof_app.executable(args.app))
     if not os.path.isfile(binary):
         print("instrument failure: no app binary at " + binary)
         return 2
-    with tempfile.TemporaryDirectory(prefix="reelcut-codec-import-") as work:
+    with tempfile.TemporaryDirectory(prefix="framejob-codec-import-") as work:
         fixtures = make_fixtures(work)
         log_path = os.path.join(work, "app.log")
         socket_path = scratch_socket()
@@ -284,7 +284,7 @@ def main():
                 run(MCP(socket_path, timeout=180), work, fixtures, args.mutant)
                 complaints = check_parity(log_path)[1]
                 row("R0", not complaints,
-                    "no `Reelcut: ` line in the log" if not complaints
+                    "no `Frame Job: ` line in the log" if not complaints
                     else " | ".join(complaints))
             finally:
                 if app.poll() is None:

@@ -1,7 +1,7 @@
 """The dev tools (road map 11, spec §11 V-1..V-3; road map 12 A1), named once
 for every proof.
 
-A dev tool is compiled only under `REELCUT_DEV_TOOLS` (Debug and Release, never
+A dev tool is compiled only under `FRAMEJOB_DEV_TOOLS` (Debug and Release, never
 Distribution), so a Release catalog holds the PRODUCT tools plus these and a
 Distribution one holds the product tools alone. A script that asserts an exact
 set of tools subtracts `DEV_TOOLS` first; `op_argument_proof.py` counts them
@@ -18,7 +18,7 @@ import re
 DEV_TOOLS = ["snapshot_ui", "perform_menu_item", "cancel_sheet", "select_inspector_tab",
              "assistant_send", "assistant_answer"]
 
-MARKER = re.compile(r"Reelcut agent server: reelcut-dev-tools-compiled-in, (\d+) dev tools")
+MARKER = re.compile(r"Frame Job agent server: framejob-dev-tools-compiled-in, (\d+) dev tools")
 
 
 def dev_marker_count(log_path):

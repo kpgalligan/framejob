@@ -21,8 +21,8 @@ count rather than passing vacuously.
   `op_argument_proof.py` at 77 (`tools/proof/README.md`'s handover) — with
   `record_screen` declaring exactly its
   twelve arguments (issue batch B66 added `source`, a string whose enum is
-  `["screen", "voice_over"]`, and the recorder's Include Reelcut windows
-  option added `include_reelcut_windows`, a boolean) plus the injected
+  `["screen", "voice_over"]`, and the recorder's Include Frame Job windows
+  option added `include_framejob_windows`, a boolean) plus the injected
   `project`, `seconds` its only required
   one, and NO `scope`: it is an app-state tool like `transcribe`, and
   `AgentCatalog.tool` injects `scope` for the core's op names only. Exactly
@@ -349,7 +349,7 @@ microphone that lands carries no such key, and the source read of the key.
 It is Release-only (`RELEASE_ONLY`, spec §11 V-4, V-5): the instance it
 launches is the Release app whatever `RC_PROOF_APP` says (a Debug path is
 refused), because Screen Recording and Microphone grants are per bundle
-identifier and "Reelcut Debug" has none of Reelcut's. Start the instance at
+identifier and "Frame Job Debug" has none of Frame Job's. Start the instance at
 the socket the same way: `python3 tools/proof/proof_app.py launch --app release`.
 """
 
@@ -391,7 +391,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 # Release bundle's grants, which a Debug build (its own identifier) lacks.
 RELEASE_ONLY = "Screen Recording and Microphone grants are per bundle identifier"
 APP = str(proof_app.bundle(release_only=RELEASE_ONLY))
-BINARY = os.path.join(APP, "Contents", "MacOS", "Reelcut")
+BINARY = str(proof_app.executable(APP))
 SOURCES = os.path.join(ROOT, "app", "Sources")
 FIXTURES = os.path.join(WORK, "recordingproof")
 SHORT_VIDEO = os.path.join(FIXTURES, "short-video.mov")
@@ -443,7 +443,7 @@ APP_STATE_TOOLS = {
 # them.
 RECORD_PROPERTIES = {
     "display", "window", "seconds", "microphone", "system_audio", "show_clicks", "rate",
-    "size", "place", "path", "include_reelcut_windows",
+    "size", "place", "path", "include_framejob_windows",
     # Issue batch B66 (#99 phase 2): what is recorded — the screen or a voice-over.
     "source",
 }
@@ -452,10 +452,10 @@ RECORD_PROPERTIES = {
 # `screenRecordingRefusal`, which appends the launch clause (the launching
 # process's pid) when the app was not started by launchd.
 SCREEN_SENTENCE = (
-    "Screen Recording is not granted to Reelcut. Turn it on in System Settings ▸ "
+    "Screen Recording is not granted to Frame Job. Turn it on in System Settings ▸ "
     "Privacy & Security ▸ Screen & System Audio Recording, then relaunch.")
 # `RecordingGrant.microphoneRefusal`'s head, with the status word captured.
-MIC_SENTENCE = re.compile(r"^The microphone is not granted to Reelcut \(status: (\w+)\)\. ")
+MIC_SENTENCE = re.compile(r"^The microphone is not granted to Frame Job \(status: (\w+)\)\. ")
 MIC_STATUS_WORDS = {"notDetermined", "denied", "restricted"}
 # The two fixes a microphone refusal names, followed (under a shell launch)
 # by the launch clause — so the tail is matched as CONTAINED, not as the end.
@@ -498,7 +498,7 @@ NOTHING_TO_UNDO = "There is nothing to undo."
 # reads it.
 FRAME_SENTENCE = re.compile(r"Written to (\S+\.png)\.")
 # The startup parity check complaining — which must never appear.
-PARITY = "Reelcut: "
+PARITY = "Frame Job: "
 # Black, as ffmpeg's signalstats reports a video-range PNG rendered black.
 BLACK_YAVG = 16.0
 # `core/src/format.rs`'s cap, the one refusal in the placement's trial a
@@ -664,11 +664,11 @@ def frontmost_path(mcp):
 
 
 def new_document(mcp, name):
-    """A saved document, `<name>-<pid>.reelcut` under `DOCS`, so every later
+    """A saved document, `<name>-<pid>.framejob` under `DOCS`, so every later
     call can name it by `project`: an untitled draft has no path, and the
     granted instance holds several documents at once."""
     os.makedirs(DOCS, exist_ok=True)
-    path = os.path.join(DOCS, f"{name}-{os.getpid()}.reelcut")
+    path = os.path.join(DOCS, f"{name}-{os.getpid()}.framejob")
     if os.path.exists(path):
         shutil.rmtree(path)
     mcp.call_with("new_project", {"path": path})
@@ -734,12 +734,12 @@ def luma_average(png):
 
 
 class Instance:
-    """One Reelcut launched BY THIS SCRIPT, on a scratch socket of its own.
+    """One Frame Job launched BY THIS SCRIPT, on a scratch socket of its own.
 
     No proof script in this tree had ever launched the app before phase 8,
     and this one does it for one reason: `PreviewQuality` is read from
     `UserDefaults` at `Playback.init` and there is no tool that sets it, so
-    the only way a proof can put a quality into a running Reelcut is the
+    the only way a proof can put a quality into a running Frame Job is the
     argument domain at launch. `-ApplePersistenceIgnoreState` already
     travels that way (CLAUDE.md's launch line); this adds one more argument
     to the same list. The launch is `mcp.launch`.
@@ -811,7 +811,7 @@ def catalog_part(mcp):
                        ("rate", "integer"), ("size", "string"), ("path", "string"),
                        ("microphone", "boolean"), ("system_audio", "boolean"),
                        ("show_clicks", "boolean"), ("place", "boolean"),
-                       ("include_reelcut_windows", "boolean"), ("source", "string")):
+                       ("include_framejob_windows", "boolean"), ("source", "string")):
         check(schema["properties"].get(name, {}).get("type") == kind,
               f"{name} is declared {kind}")
     check(schema["properties"].get("rate", {}).get("enum") == [30, 60],
@@ -821,7 +821,7 @@ def catalog_part(mcp):
     check(schema["properties"].get("source", {}).get("enum") == ["screen", "voice_over"],
           "source's enum is [screen, voice_over] (B66)")
     description = [tool for tool in listed if tool["name"] == "record_screen"][0]["description"]
-    for phrase in ("File ▸ New Recording…", "Reelcut Recordings", "new_project", "Microphone",
+    for phrase in ("File ▸ New Recording…", "Frame Job Recordings", "new_project", "Microphone",
                    "REFUSAL ORDER", "mic_problem", "Add Microphone", "launching process",
                    "Stop Recording", "The recording was saved at",
                    # R2d: the status item's two menus and the undo step a
@@ -886,9 +886,9 @@ def refusal_part(mcp):
             "size huge is refused listing both")
     refused({"seconds": 2, "display": -1}, "display must be 0 or more (got -1).",
             "a negative display index is refused before any lookup")
-    refused({"seconds": 2, "include_reelcut_windows": "yes"},
-            "include_reelcut_windows must be true or false.",
-            "a non-boolean include_reelcut_windows is refused by type")
+    refused({"seconds": 2, "include_framejob_windows": "yes"},
+            "include_framejob_windows must be true or false.",
+            "a non-boolean include_framejob_windows is refused by type")
 
     # A `project` naming nothing open: `target(_:)`'s own sentence, which
     # must STAND — never a silent fall-through to a fresh document. The
@@ -897,10 +897,10 @@ def refusal_part(mcp):
     # that (the old row read a document nothing adds to).
     front_before = frontmost_path(mcp)
     asked = time.monotonic()
-    message = refusal(mcp, "record_screen", {"seconds": 2, "project": "/nowhere/x.reelcut"})
+    message = refusal(mcp, "record_screen", {"seconds": 2, "project": "/nowhere/x.framejob"})
     elapsed = time.monotonic() - asked
     check(message is not None and NO_OPEN_PROJECT.match(message)
-          and "/nowhere/x.reelcut" in message,
+          and "/nowhere/x.framejob" in message,
           f"a project naming nothing open is refused by name, and stands: {message!r}")
     # Measured on this instance: `NSApp.orderedDocuments.first` is the
     # launch-time untitled document whatever is opened later (an agent-driven
@@ -928,15 +928,15 @@ def refusal_part(mcp):
     refused({"seconds": 2, "size": "huge", "display": 99},
             'size must be one of nominal, best (got "huge").',
             "ORDER: size huge wins over display 99")
-    refused({"seconds": 2, "include_reelcut_windows": "yes", "display": 99},
-            "include_reelcut_windows must be true or false.",
-            "ORDER: a non-boolean include_reelcut_windows wins over display 99")
+    refused({"seconds": 2, "include_framejob_windows": "yes", "display": 99},
+            "include_framejob_windows must be true or false.",
+            "ORDER: a non-boolean include_framejob_windows wins over display 99")
     message = refusal(mcp, "record_screen",
-                      {"seconds": 2, "rate": 24, "project": "/nowhere/x.reelcut"})
+                      {"seconds": 2, "rate": 24, "project": "/nowhere/x.framejob"})
     check(message == "rate must be 30 or 60 (got 24).",
           f"ORDER: rate 24 wins over a project naming nothing: {message!r}")
     message = refusal(mcp, "record_screen",
-                      {"seconds": 2, "display": 99, "project": "/nowhere/x.reelcut"})
+                      {"seconds": 2, "display": 99, "project": "/nowhere/x.framejob"})
     check(message is not None and NO_OPEN_PROJECT.match(message) is not None,
           f"ORDER: the project's by-name refusal wins over display 99 — the target is "
           f"resolved above the grant and the lookup: {message!r}")
@@ -945,7 +945,7 @@ def refusal_part(mcp):
     # grant absent its sentence comes first; with it, the project refusal
     # is what shows the check was passed rather than skipped.
     message = refusal(mcp, "record_screen",
-                      {"seconds": 2, "microphone": True, "project": "/nowhere/x.reelcut"})
+                      {"seconds": 2, "microphone": True, "project": "/nowhere/x.framejob"})
     named = MIC_SENTENCE.match(message or "")
     if named:
         word = named.group(1)
@@ -956,7 +956,7 @@ def refusal_part(mcp):
         check(fix in message,
               f"…and names the fix for {word} (the launch clause may follow it): {message!r}")
         check(refusal(mcp, "record_screen",
-                      {"seconds": 0, "microphone": True, "project": "/nowhere/x.reelcut"})
+                      {"seconds": 0, "microphone": True, "project": "/nowhere/x.framejob"})
               == "seconds must be 1…600 (got 0).",
               "ORDER: seconds 0 wins over the microphone grant")
     else:
@@ -967,7 +967,7 @@ def refusal_part(mcp):
         check(not (message or "").startswith("The microphone is not granted"),
               "…and the answer is not the microphone sentence")
         check(refusal(mcp, "record_screen",
-                      {"seconds": 0, "microphone": True, "project": "/nowhere/x.reelcut"})
+                      {"seconds": 0, "microphone": True, "project": "/nowhere/x.framejob"})
               == "seconds must be 1…600 (got 0).",
               "ORDER: seconds 0 wins over the microphone stage either way")
 
@@ -1000,7 +1000,7 @@ def refusal_part(mcp):
             "rate must be 30 or 60 (got 24).",
             "a JSON null is not given: size: null is no stranger, and rate answers")
     message = refusal(mcp, "record_screen",
-                      {"seconds": 2, "source": "voice_over", "project": "/nowhere/x.reelcut"})
+                      {"seconds": 2, "source": "voice_over", "project": "/nowhere/x.framejob"})
     if named:
         check(MIC_SENTENCE.match(message or "") is not None,
               f"a voice-over reads the Microphone grant, absent here, before the project: "
@@ -1440,7 +1440,7 @@ def display_probe():
 
 def responsible_application(pid=None):
     """The ancestor of `pid` (this process by default) that launchd started
-    — the application whose grants a shell-launched Reelcut runs under
+    — the application whose grants a shell-launched Frame Job runs under
     (R0 q1). "?" for a pid that cannot be walked."""
     pid = os.getpid() if pid is None else pid
     name = "?"
@@ -1588,7 +1588,7 @@ def granted_tier(mcp):
         # The second precondition, read off the LAUNCHED instance — the one
         # the microphone rows run on — with the same never-records call.
         mic = refusal(instance.mcp, "record_screen",
-                      {"seconds": 1, "microphone": True, "project": "/nowhere/x.reelcut"})
+                      {"seconds": 1, "microphone": True, "project": "/nowhere/x.framejob"})
         authorized = mic is not None and NO_OPEN_PROJECT.match(mic) is not None
         port_pid = socket_pid(SOCKET)
         print(f"  granted tier: {BINARY} launched by this script at {instance.socket}, "
@@ -2051,7 +2051,7 @@ def voice_tier(mcp):
     entitled = "com.apple.security.device.audio-input" in subprocess.run(
         ["codesign", "-d", "--entitlements", "-", APP], capture_output=True, text=True).stdout
     gate = refusal(mcp, "record_screen",
-                   {"seconds": 1, "source": "voice_over", "project": "/nowhere/x.reelcut"})
+                   {"seconds": 1, "source": "voice_over", "project": "/nowhere/x.framejob"})
     authorized = gate is not None and NO_OPEN_PROJECT.match(gate) is not None
     if not (entitled and authorized):
         skip("the voice-over rows: "

@@ -1,4 +1,4 @@
-//! Launching Reelcut for a `tools/call` that found no socket (spec §11
+//! Launching Frame Job for a `tools/call` that found no socket (spec §11
 //! MC-4): its own bundle, in the background (`open -n -g`), at most one
 //! instance between all the proxies that find no socket at once.
 //!
@@ -10,8 +10,8 @@
 //!
 //! **A scratch socket** (`RC_AGENT_SOCKET` set, MC-6) is passed to the
 //! instance with `open --env`, with `-ApplePersistenceIgnoreState YES` and
-//! its stderr written to `reelcut-launch.log` beside the socket; the
-//! person's own socket gets none of these, so their Reelcut opens as theirs.
+//! its stderr written to `framejob-launch.log` beside the socket; the
+//! person's own socket gets none of these, so their Frame Job opens as theirs.
 
 use std::ffi::OsString;
 use std::fs::{DirBuilder, OpenOptions};
@@ -29,9 +29,9 @@ pub const DEFAULT_WAIT_SECS: u64 = 60;
 /// The launch lock's name, beside the socket.
 pub const LOCK_NAME: &str = "agent.launch.lock";
 /// A scratch launch's stderr, beside the socket.
-pub const LAUNCH_LOG_NAME: &str = "reelcut-launch.log";
+pub const LAUNCH_LOG_NAME: &str = "framejob-launch.log";
 /// How every timeout sentence begins (`Session` recognises one by it).
-pub const TIMEOUT_OPENING: &str = "Reelcut did not answer at ";
+pub const TIMEOUT_OPENING: &str = "Frame Job did not answer at ";
 /// How often the wait asks the socket.
 const POLL: Duration = Duration::from_millis(50);
 

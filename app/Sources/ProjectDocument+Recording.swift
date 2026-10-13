@@ -103,7 +103,8 @@ extension ProjectDocument {
         guard let document = try controller.openUntitledDocumentAndDisplay(false)
             as? ProjectDocument
         else {
-            throw ReelCoreError(message: "The untitled document did not open as a Reelcut project.")
+            throw ReelCoreError(
+                message: "The untitled document did not open as a Frame Job project.")
         }
         var notes: [String] = []
         do {

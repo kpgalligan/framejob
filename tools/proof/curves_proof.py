@@ -90,7 +90,7 @@ whose middles are 0.6 and 0.4, saved for the probe).
   `app/Sources` (a failed build is a scored FAILURE of all eleven), on
   project P; each row's sentence is the probe's.
 - **Z1** (CONTROL): the fixtures hold (the ramp's frame a 16-bit PNG), the
-  projects close and the log holds no `Reelcut: ` line.
+  projects close and the log holds no `Frame Job: ` line.
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`; a `core/`
 mutant makes the copy's `core/` its own through `hevc_alpha_proof.own_core`
@@ -139,7 +139,7 @@ from hevc_alpha_proof import own_core  # noqa: E402
 WORK = ROOT / "tools/proof/work/curves"
 HOME = WORK / "home"
 PROBE = ROOT / "tools/proof/curves_probe.swift"
-HEADER = ROOT / "core/include/reelcut_core.h"
+HEADER = ROOT / "core/include/framejob_core.h"
 CALL_BOUND = 300
 BUILD_BOUND = 1500
 SEC = 600_000
@@ -456,7 +456,7 @@ class Doc:
 
 def opened(client, name, width, height, background=None):
     """A new project at `name`, its canvas sized; (Doc, fixture ok)."""
-    path = WORK / f"{name}.reelcut"
+    path = WORK / f"{name}.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path, width, height)
     arguments = {"width": width, "height": height, "fps": [30, 1]}
@@ -938,7 +938,7 @@ def run_s(client, card, state):
     media = doc.media(card)
     clip = doc.place(track, media) if media is not None else None
     state["s_fixture"] = sized and clip is not None
-    plain_path = WORK / "S-plain.reelcut"
+    plain_path = WORK / "S-plain.framejob"
     saved = doc.call("save_project", path=str(plain_path))
     doc.path = plain_path
     try:
@@ -947,7 +947,7 @@ def run_s(client, card, state):
         plain_version, plain_text = None, "unreadable"
     red = [[0, 0], [0.5, 0.7], [1, 1]]
     doc.curves([clip], red=red)
-    curved_path = WORK / "S-curved.reelcut"
+    curved_path = WORK / "S-curved.framejob"
     resaved = doc.call("save_project", path=str(curved_path))
     doc.path = curved_path
     try:
@@ -979,7 +979,7 @@ def run_p(client, card, state):
     ok = sized and a is not None and b is not None
     ok = ok and doc.curves([a], master=[[0, 0], [0.5, 0.6], [1, 1]])["ok"] \
         and doc.curves([b], master=[[0, 0], [0.5, 0.4], [1, 1]])["ok"]
-    path = WORK / "P-saved.reelcut"
+    path = WORK / "P-saved.framejob"
     ok = ok and doc.call("save_project", path=str(path))["ok"]
     doc.path = path
     closed = close(client, doc.path)
@@ -995,7 +995,7 @@ def run_probe(sources, package, clips):
     try:
         built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
                                   output=folder / "curves_probe",
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=1200)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=1200)
     except swift_build.SwiftBuildFailed as error:
         for name in sorted(P_ROWS):
             check(f"{name} the probe builds over app/Sources", False,
@@ -1050,7 +1050,7 @@ def tail(log, count=4):
 
 def complaints(log):
     try:
-        return [line.strip() for line in open(log, errors="replace") if "Reelcut: " in line]
+        return [line.strip() for line in open(log, errors="replace") if "Frame Job: " in line]
     except OSError:
         return [f"{log} could not be read"]
 
@@ -1130,7 +1130,7 @@ def main():
     scored = [name for name in ROWS if name in selected and name not in RECORDS]
     binary = Path(args.app) if args.app else proof_app.binary()
     if binary.suffix == ".app":
-        binary = binary / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(binary)
     sources = ROOT / "app/Sources"
     config = proof_app.config()
     if args.mutant:
@@ -1140,7 +1140,7 @@ def main():
         if app is None:
             print(f"mutant {args.mutant}: the control could not be performed — {copy}")
             return 2
-        binary = app / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(app)
         sources = copy / "app/Sources"
         if "CT" in named:
             passed_ct, last = core_test(copy)
@@ -1210,7 +1210,7 @@ def main():
                   f"{'equal' if good else neutral.misses + missing}", flush=True)
     found = complaints(log)
     fixtures_ok = all(value for key, value in state.items() if key.endswith("fixture"))
-    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Reelcut: ` "
+    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Frame Job: ` "
           "line", closed and fixtures_ok and not found,
           f"closed {closed}; fixtures {state}; complaints {found}")
     print(f"  {log.name} tail:\n    " + "\n    ".join(tail(log)), flush=True)

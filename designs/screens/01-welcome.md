@@ -8,7 +8,7 @@
 }
 ```
 
-The welcome window is what Reelcut shows when no project is open: the first thing
+The welcome window is what Frame Job shows when no project is open: the first thing
 a person sees after launching it. From here they start work — by opening a video,
 starting an empty project, or recording the screen.
 

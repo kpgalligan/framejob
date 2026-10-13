@@ -5,7 +5,7 @@ amending AI-9 and AI-18).
 The probe `assistant_settings_probe.swift` (over `app/Sources`,
 `assistant_tab_proof`'s `build_probe` line), run with the stand-in's dummy
 `proof-key` in `-RCSecretFolder` (`assistant_session_proof.secret_folder`),
-`-ReelcutInspectorCollapsed NO` and `RC_ASSISTANT_BASE_URL` at the stand-in:
+`-FrameJobInspectorCollapsed NO` and `RC_ASSISTANT_BASE_URL` at the stand-in:
   CS1  `AssistantChatSettings` over a fresh suite (defaults, the range's
        ends either side, null when off, round-trip), `settingsJSON(defaults:
        suite)` over stored (false, 40,000, true) = {null, true}, and the pane
@@ -26,12 +26,12 @@ The probe `assistant_settings_probe.swift` (over `app/Sources`,
        `compaction`, POST 4 without
 The built app (`assistant_session_proof`'s `App`, `proof_app`'s choice, a scratch socket),
 launched with
-`-ReelcutAssistantAutoCompact NO -ReelcutAssistantClearToolResults YES
+`-FrameJobAssistantAutoCompact NO -FrameJobAssistantClearToolResults YES
 -RCDevAssistantAutoCompact 1`:
   CS3  `new_project`, then `assistant_send` against a reply and a compaction
        reply: `finished` with `compaction_started` and `compacted` (the knob
        wins over the switch, AI-18 as amended); 2 POSTs, the first with the
-       clear edit and the beta, the second with `compaction`; no `Reelcut: `
+       clear edit and the beta, the second with `compaction`; no `Frame Job: `
        line and no stand-in failure
 
     python3 tools/proof/assistant_settings_proof.py
@@ -166,7 +166,7 @@ def rows_probe(score, fake, secrets, sources=None, label=""):
                    dict(asp.say("CS2: two."), input_tokens=50_000),
                    compaction_reply("CS2: the conversation so far, summarised."),
                    dict(asp.say("CS2: three."), input_tokens=950_000)])
-    ran = bounded.run([binary, "-RCSecretFolder", secrets, "-ReelcutInspectorCollapsed", "NO"],
+    ran = bounded.run([binary, "-RCSecretFolder", secrets, "-FrameJobInspectorCollapsed", "NO"],
                       WALL_RUN, cwd=probe_dir,
                       env=asp.child_env({"RC_ASSISTANT_BASE_URL": fake.base}))
     answer = None
@@ -218,13 +218,13 @@ def row_cs3(app_path, fake, secrets, tag="CS3"):
                    compaction_reply("CS3: the conversation so far, summarised.")])
     app = asp.App(tag, app_path,
                   ["-RCSecretFolder", secrets,
-                   "-ReelcutAssistantAutoCompact", "NO", "-ReelcutAssistantClearToolResults",
+                   "-FrameJobAssistantAutoCompact", "NO", "-FrameJobAssistantClearToolResults",
                    "YES", "-RCDevAssistantAutoCompact", "1"], fake.base)
     try:
         app.connect()
-        a = app.must("new_project", path=os.path.join(folder, "CS3.reelcut"))["saved"]
+        a = app.must("new_project", path=os.path.join(folder, "CS3.framejob"))["saved"]
         answer = app.must("assistant_send", project=a, text="CS3 one turn.", timeout=WALL_TURN)
-        complaints = [line for line in app.log().splitlines() if "Reelcut: " in line]
+        complaints = [line for line in app.log().splitlines() if "Frame Job: " in line]
     finally:
         app.stop()
     events = answer.get("events", []) if isinstance(answer, dict) else []
@@ -239,7 +239,7 @@ def row_cs3(app_path, fake, secrets, tag="CS3"):
           and not failures)
     briefs = "; ".join(f"POST {i + 1}: {post_brief(p)}" for i, p in enumerate(posts))
     return ok, (f"{asp.brief(answer)}; compaction events {order}; {len(posts)} POSTs "
-                f"({briefs}); `Reelcut: ` lines {complaints[:2]}; stand-in failures "
+                f"({briefs}); `Frame Job: ` lines {complaints[:2]}; stand-in failures "
                 f"{failures[:2]}")
 
 

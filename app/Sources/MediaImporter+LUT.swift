@@ -34,7 +34,7 @@ extension MediaImporter {
 
     /// The `media[]` descriptor of a `.cube` file, once the core has read it
     /// whole. A file it refuses is `ImportError.undecodable` in GR-8's words
-    /// — `“Film.cube” is not a LUT Reelcut reads: line 2: LUT_3D_SIZE 200 is
+    /// — `“Film.cube” is not a LUT Frame Job reads: line 2: LUT_3D_SIZE 200 is
     /// outside 2–65.` — and so is a file that cannot be opened, in
     /// `unreadable`'s words: `undecodable` is final, where `unreadable` would
     /// offer the file to the ffmpeg step (`invitesFFmpeg`).
@@ -44,7 +44,7 @@ extension MediaImporter {
         } catch let refused as ReelCoreError {
             throw ImportError.undecodable(
                 url,
-                sentence: "“\(url.lastPathComponent)” is not a LUT Reelcut reads: "
+                sentence: "“\(url.lastPathComponent)” is not a LUT Frame Job reads: "
                     + "\(refused.message).")
         } catch {
             throw ImportError.undecodable(

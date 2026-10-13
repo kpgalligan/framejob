@@ -231,6 +231,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "framejob-core"
+version = "0.1.0"
+dependencies = [
+ "graphic",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "sha2",
+ "svgtypes",
+ "tiny_http",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -449,19 +462,6 @@ dependencies = [
  "bytemuck",
  "font-types",
  "once_cell",
-]
-
-[[package]]
-name = "reelcut-core"
-version = "0.1.0"
-dependencies = [
- "graphic",
- "serde",
- "serde_json",
- "serde_path_to_error",
- "sha2",
- "svgtypes",
- "tiny_http",
 ]
 
 [[package]]

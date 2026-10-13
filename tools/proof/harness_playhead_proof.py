@@ -10,7 +10,7 @@ render asked for at 2 s was taken at 0 (README B32, #188 item 5). The harness
 now sets the asked playhead again after its settle turns, through the editor's
 own `setPlayhead`, and re-applies `selectAction` after it.
 
-One fixture, `work/harness-playhead/hp.reelcut`: a grey 6 s card, clip 2, with
+One fixture, `work/harness-playhead/hp.framejob`: a grey 6 s card, clip 2, with
 action A (id 3) over 0.5–1.5 s ending `{video: {opacity: 0.5}}` and action B
 (id 4) over 2.0–3.5 s ending `{video: {x: 100}}`. Five renders, dark,
 1440 × 862, size 1, the Clip tab, as (select, playhead s, action): `zero`
@@ -121,7 +121,7 @@ def build(mutant: str | None) -> tuple[str | None, str]:
     binary = os.path.join(here, "harness")
     try:
         built = swift_build.build(sources=sources + [copy], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"])
+                                  defines=["FRAMEJOB_DEV_TOOLS"])
     except swift_build.SwiftBuildFailed as error:
         return None, "swiftc failed: " + "\n".join(error.diagnostics).strip()[-600:]
     resources = os.path.join(ROOT, "app", "Resources")

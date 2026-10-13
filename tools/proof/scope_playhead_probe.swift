@@ -4,7 +4,7 @@
 // as `main.swift`, with the app's `Fonts`, `Blank.mp4` and a `default.metallib`
 // of the app's own shader beside it — `playhead_echo_probe.swift`'s build.
 //
-//     scope_playhead_probe <scope.reelcut>
+//     scope_playhead_probe <scope.framejob>
 //
 // The package is opened in a real editor window and the editor's own
 // `playback.onTimeChanged` is WRAPPED, as the echo probe wraps it: every tick it
@@ -26,7 +26,7 @@ final class ProbeDocumentController: NSDocumentController {
 _ = ProbeDocumentController()
 NSApplication.shared.setActivationPolicy(.accessory)
 UserDefaults.standard.setVolatileDomain(
-    ["ReelcutPreviewQuality": 0], forName: UserDefaults.argumentDomain)
+    ["FrameJobPreviewQuality": 0], forName: UserDefaults.argumentDomain)
 
 func spin(_ seconds: Double) {
     let deadline = Date().addingTimeInterval(seconds)
@@ -37,7 +37,7 @@ func spin(_ seconds: Double) {
 
 let args = CommandLine.arguments
 guard args.count == 2 else {
-    print("usage: scope_playhead_probe <scope.reelcut>")
+    print("usage: scope_playhead_probe <scope.framejob>")
     exit(2)
 }
 

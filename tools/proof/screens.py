@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Road map 11's V3 — the screen catalog, captured from a Reelcut of its own.
+"""Road map 11's V3 — the screen catalog, captured from a Frame Job of its own.
 
     python3 tools/proof/screens.py [--app APP] [--screens DIR]
         [--out DIR] [--only ID,…] [--compare EARLIER_OUT]
@@ -51,9 +51,9 @@ PNG against the same name in an earlier run (not scored). Exit 0 iff no row
 failed.
 
 **The recorder panel.** File ▸ New Recording… puts up a non-activating panel
-whose default button is Record. Shown with Reelcut in the background it no
+whose default button is Record. Shown with Frame Job in the background it no
 longer takes key (spec §11, "The recorder panel takes key only from an active
-Reelcut", #137), but an instance that is ACTIVE when New Recording… runs
+Frame Job", #137), but an instance that is ACTIVE when New Recording… runs
 still gets a key panel with Record on Return, and this script cannot hold its
 child inactive. So it is allowed only in the LAST screen run, its captures
 follow the perform at once, and the instance is stopped right after them;
@@ -163,41 +163,41 @@ def _plist(value):
 # the argument domain parses into typed values. A scratch home does not move
 # `UserDefaults` (#238), so these pins are still what pins it.
 PINS = [(key, _plist(value)) for key, value in [
-    ("ReelcutInspectorWidth", 304.0),
-    ("ReelcutTimelineHeight", 300.0),
-    ("ReelcutInspectorCollapsed", False),
-    ("ReelcutTimelineTrackHeight", 1),
-    ("ReelcutSnappingEnabled", True),
-    ("ReelcutSafeGuidesVisible", False),
-    ("ReelcutInspectorRescaleClips", False),
-    ("ReelcutExportChoice", ""),
-    ("ReelcutPreviewQuality", 0),
-    ("NSWindow Frame ReelcutPreviewWindow", ""),
-    ("ReelcutRecordingDisplay", 0),
-    ("ReelcutRecordingMicrophone", ""),
-    ("ReelcutRecordingSystemAudio", True),
-    ("ReelcutRecordingShowClicks", False),
-    ("ReelcutRecordingRate", 60),
-    ("ReelcutRecordingSize", "nominal"),
-    ("ReelcutRecordingIncludeReelcutWindows", False),
-    ("ReelcutCaptionEngine", "apple"),
-    ("ReelcutAssemblyAIRegion", "us"),
-    ("ReelcutCaptionStyle", "subtitles"),
-    ("ReelcutCaptionSlide", False),
-    ("ReelcutCaptionFill", False),
-    ("ReelcutCaptionDim", False),
-    ("ReelcutAssistantModel", ""),
-    ("ReelcutAssistantAutoCompact", True),
-    ("ReelcutAssistantAutoCompactTokens", 300000),
-    ("ReelcutAssistantClearToolResults", False),
+    ("FrameJobInspectorWidth", 304.0),
+    ("FrameJobTimelineHeight", 300.0),
+    ("FrameJobInspectorCollapsed", False),
+    ("FrameJobTimelineTrackHeight", 1),
+    ("FrameJobSnappingEnabled", True),
+    ("FrameJobSafeGuidesVisible", False),
+    ("FrameJobInspectorRescaleClips", False),
+    ("FrameJobExportChoice", ""),
+    ("FrameJobPreviewQuality", 0),
+    ("NSWindow Frame FrameJobPreviewWindow", ""),
+    ("FrameJobRecordingDisplay", 0),
+    ("FrameJobRecordingMicrophone", ""),
+    ("FrameJobRecordingSystemAudio", True),
+    ("FrameJobRecordingShowClicks", False),
+    ("FrameJobRecordingRate", 60),
+    ("FrameJobRecordingSize", "nominal"),
+    ("FrameJobRecordingIncludeFrameJobWindows", False),
+    ("FrameJobCaptionEngine", "apple"),
+    ("FrameJobAssemblyAIRegion", "us"),
+    ("FrameJobCaptionStyle", "subtitles"),
+    ("FrameJobCaptionSlide", False),
+    ("FrameJobCaptionFill", False),
+    ("FrameJobCaptionDim", False),
+    ("FrameJobAssistantModel", ""),
+    ("FrameJobAssistantAutoCompact", True),
+    ("FrameJobAssistantAutoCompactTokens", 300000),
+    ("FrameJobAssistantClearToolResults", False),
     ("AppleShowScrollBars", "Always"),
-]] + [(f"ReelcutInspectorSection.{sid}", _plist(collapsed))
+]] + [(f"FrameJobInspectorSection.{sid}", _plist(collapsed))
       for sid, collapsed in sorted(SECTIONS.items())]
 
-# A `static let …Key = "(Reelcut|RC)…"` literal no captured screen draws,
+# A `static let …Key = "(FrameJob|RC)…"` literal no captured screen draws,
 # and why. P2 requires every such literal in PINS or here.
 NOT_SHOWN = {
-    "ReelcutCompositorTiming": "a diagnostic switch for the compositor's timing log; nothing "
+    "FrameJobCompositorTiming": "a diagnostic switch for the compositor's timing log; nothing "
                                "on screen reads it",
     "RCFFmpegImport": "the opt-in ffmpeg rewrap policy, read at import; the fixtures import "
                       ".mov and .m4a files AVFoundation opens itself, and no screen shows it",
@@ -210,13 +210,13 @@ NOT_SHOWN = {
                           "(DevAssistantLaunch.swift); no screen launches with it",
     "RCDevAssistantReport": "the report path beside RCDevAssistantSend; no screen launches "
                             "with it",
-    "ReelcutScreenRecordingAsked": "whether the panel has put up the Screen Recording prompt "
+    "FrameJobScreenRecordingAsked": "whether the panel has put up the Screen Recording prompt "
                                    "once; read only by a press of Record, which no screen makes",
     "RC_AGENT_SOCKET": "an environment variable, the agent server's socket path; each launch "
                        "here sets it to a scratch socket, and nothing on screen shows it",
     "RCWriteCatalog": "an argument-domain build step that writes the catalog snapshot and "
                       "exits before any window; no screen launches with it",
-    "ReelcutGraphicPrefetchOff": "a measurement switch that draws every graphic on the "
+    "FrameJobGraphicPrefetchOff": "a measurement switch that draws every graphic on the "
                                  "compositor's queue alone; no screen shows it",
     "RCDevLookGalleryDump": "a dev launch default naming a folder the Look gallery writes "
                             "its thumbnails to (look_proof.py's G rows); no screen launches "
@@ -235,25 +235,25 @@ KNOWN = {
 }
 
 FIXTURES = {
-    "empty": {"path": os.path.join(FIXTURE_DIR, "Empty.reelcut"), "clips": []},
-    "demo": {"path": os.path.join(FIXTURE_DIR, "Demo.reelcut"),
+    "empty": {"path": os.path.join(FIXTURE_DIR, "Empty.framejob"), "clips": []},
+    "demo": {"path": os.path.join(FIXTURE_DIR, "Demo.framejob"),
              "clips": ["video", "text", "graphic", "shape", "tone"],
              "media": ["speech.mov", "toneA.m4a", "toneB.m4a"], "sound": ["video", "tone"]},
-    "animated": {"path": os.path.join(FIXTURE_DIR, "Animated.reelcut"), "clips": ["graphic"]},
-    "matte": {"path": os.path.join(FIXTURE_DIR, "Matte.reelcut"),
+    "animated": {"path": os.path.join(FIXTURE_DIR, "Animated.framejob"), "clips": ["graphic"]},
+    "matte": {"path": os.path.join(FIXTURE_DIR, "Matte.framejob"),
               "clips": ["video", "window", "stray"], "media": ["speech.mov"],
               "sound": ["video"]},
-    "adjust": {"path": os.path.join(FIXTURE_DIR, "Adjust.reelcut"),
+    "adjust": {"path": os.path.join(FIXTURE_DIR, "Adjust.framejob"),
                "clips": ["video", "adjustment"], "media": ["speech.mov"], "sound": ["video"]},
-    "look": {"path": os.path.join(FIXTURE_DIR, "Look.reelcut"),
+    "look": {"path": os.path.join(FIXTURE_DIR, "Look.framejob"),
              "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
-    "lut": {"path": os.path.join(FIXTURE_DIR, "Lut.reelcut"),
+    "lut": {"path": os.path.join(FIXTURE_DIR, "Lut.framejob"),
             "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
-    "wheels": {"path": os.path.join(FIXTURE_DIR, "Wheels.reelcut"),
+    "wheels": {"path": os.path.join(FIXTURE_DIR, "Wheels.framejob"),
                "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
-    "curves": {"path": os.path.join(FIXTURE_DIR, "Curves.reelcut"),
+    "curves": {"path": os.path.join(FIXTURE_DIR, "Curves.framejob"),
                "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
-    "qualifier": {"path": os.path.join(FIXTURE_DIR, "Qualifier.reelcut"),
+    "qualifier": {"path": os.path.join(FIXTURE_DIR, "Qualifier.framejob"),
                   "clips": ["video", "adjustment"], "media": ["speech.mov"],
                   "sound": ["video"]},
 }
@@ -311,7 +311,7 @@ def launch(app, out, look=None):
     shutil.rmtree(spend, ignore_errors=True)
     if os.path.exists(spend):
         raise LaunchError(f"{spend} is still there after it was removed")
-    argv = [os.path.join(app, "Contents", "MacOS", "Reelcut"),
+    argv = [str(proof_app.executable(app)),
             "-ApplePersistenceIgnoreState", "YES",
             "-RCSecretFolder", secrets, "-RCSpendFolder", spend,
             "-RCAssemblyAIEndpoint", "http://127.0.0.1:9",
@@ -364,7 +364,7 @@ def parity_lines(out, look=None):
     path = log_path(out, look)
     if not os.path.exists(path):
         return [f"no {os.path.basename(path)}"]
-    return [line.rstrip() for line in open(path, errors="replace") if "Reelcut: " in line]
+    return [line.rstrip() for line in open(path, errors="replace") if "Frame Job: " in line]
 
 
 # ---------------------------------------------------------------------------
@@ -453,7 +453,7 @@ def _demo_ops(mcp, path):
     _call(mcp, "add_clip", path, media=_media_id(video), track=tracks["Video"], at=0)
     ids["video"] = clip_on("Video")
     _call(mcp, "add_text_clip", path, track=tracks["Titles"], at=0, duration=5 * SECOND,
-          text="Reelcut")
+          text="Frame Job")
     ids["text"] = clip_on("Titles")
     with open(GRAPHIC_SOURCE) as handle:
         source = handle.read()
@@ -545,7 +545,7 @@ def _matte_ops(mcp, path):
     # Filled, so the preview shows the video through a solid window.
     _call(mcp, "set_shape", path, clips=[ids["window"]], patch={"fill": [1.0, 1.0, 1.0, 1.0]})
     _call(mcp, "add_text_clip", path, track=tracks["Stray"], at=0, duration=5 * SECOND,
-          text="Reelcut")
+          text="Frame Job")
     ids["stray"] = clip_on("Stray")
     _call(mcp, "set_track", path, track=tracks["Window"], matte="alpha")
     _call(mcp, "set_track", path, track=tracks["Stray"], matte="luma_inverted")
@@ -924,7 +924,7 @@ class Run:
         notes = [f"pid {self.child.pid} alive {alive}", f"socket {bound}",
                  f"scratch home {home} took (its Library/Application Support is a directory) "
                  f"{homed}",
-                 f"welcome {welcome}", f"`Reelcut: ` lines {len(parity)}",
+                 f"welcome {welcome}", f"`Frame Job: ` lines {len(parity)}",
                  f"dev tools missing {missing}", f"marker count {marker} (want {len(DEV_TOOLS)})"]
         self.score(rid, "pass" if ok else "fail", "; ".join(notes))
         return None if ok else "; ".join(notes)
@@ -937,7 +937,7 @@ class Run:
                 continue
             text = open(os.path.join(SOURCES, name), encoding="utf-8").read()
             declared |= set(re.findall(r'id: "([a-z]+\.[a-zA-Z.]+)", title:', text))
-            literals |= set(re.findall(r'static let \w*Key = "((?:Reelcut|RC)[^"]*)"', text))
+            literals |= set(re.findall(r'static let \w*Key = "((?:FrameJob|RC)[^"]*)"', text))
         pinned = {key for key, _ in PINS} | {APPEARANCE_KEY}
         problems = []
         if declared != set(SECTIONS):
@@ -959,7 +959,7 @@ class Run:
         alive = self.child is not None and self.child.poll() is None
         parity = parity_lines(self.out, self.look)
         self.p3 = (alive and not parity,
-                   f"child alive {alive}; `Reelcut: ` lines {len(parity)}"
+                   f"child alive {alive}; `Frame Job: ` lines {len(parity)}"
                    + (f" ({parity[0][:120]})" if parity else ""))
 
     def finish(self):
@@ -1036,7 +1036,7 @@ class Run:
                 answer = self.snap(arguments)
                 captures.append((cap, look, answer))
         except BaseException:
-            # The recorder panel is key when Reelcut was active before it, and
+            # The recorder panel is key when Frame Job was active before it, and
             # its Return is Record: a failed capture stops the instance NOW,
             # not at finish(). The script cannot hold its child inactive.
             if performed_recorder is not None:
@@ -1229,11 +1229,11 @@ def sha256_file(path):
 
 def write_markdown(run, scores, digest):
     app = run.args.app
-    binary = os.path.join(app, "Contents", "MacOS", "Reelcut")
+    binary = str(proof_app.executable(app))
     mtime = (datetime.datetime.fromtimestamp(os.path.getmtime(binary)).isoformat(timespec="seconds")
              if os.path.exists(binary) else "missing")
     lines = [
-        "# Reelcut screens",
+        "# Frame Job screens",
         "",
         f"- Captured: {datetime.datetime.now().isoformat(timespec='seconds')}",
         f"- App: `{app}` (binary modified {mtime})",

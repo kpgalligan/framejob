@@ -23,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// AppKit calls this only when the app is launched or reactivated with no
     /// documents open, so it cannot race a launch-time file open the way a
-    /// check in `applicationDidFinishLaunching` would. Reelcut has no blank
+    /// check in `applicationDidFinishLaunching` would. Frame Job has no blank
     /// untitled document at launch: the welcome window (spec §3) offers Open
     /// Video…, New Project and Recent instead.
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
@@ -171,7 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
-    /// Reelcut > About Reelcut. The standard panel, but with the mark drawn
+    /// Frame Job > About Frame Job. The standard panel, but with the mark drawn
     /// by `BrandMark` in place of the app icon: the icon carries the squircle
     /// tile and its ink rule, which is right in the Dock and wrong on a panel
     /// that is already a card. The untiled mark is what the identity handoff

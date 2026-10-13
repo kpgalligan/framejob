@@ -11,7 +11,7 @@
 //
 // **Where it runs.** Only an `ExportWriter` export with a pinned set and a
 // graphic in range (`Exporter.startGraphicPrefetch`); never GIF/APNG, a
-// one-frame render or the preview. `ReelcutGraphicPrefetchOff` (YES) is the
+// one-frame render or the preview. `FrameJobGraphicPrefetchOff` (YES) is the
 // measurement switch back to the serial path.
 //
 // **The grid.** A worker walks `range.start + i × frameDuration` on the
@@ -35,7 +35,7 @@ import Foundation
 final class GraphicPrefetch: @unchecked Sendable {
     static let shared = GraphicPrefetch()
     /// YES draws every graphic on the compositor's queue alone.
-    static let offDefaultsKey = "ReelcutGraphicPrefetchOff"
+    static let offDefaultsKey = "FrameJobGraphicPrefetchOff"
     /// The rasters held ahead, at most.
     static let maxHeldBytes = 1 << 30
     /// Above `graphic::STACK_BYTES` (1 MiB).
@@ -147,7 +147,7 @@ final class GraphicPrefetch: @unchecked Sendable {
             let thread = Thread { [self] in self.work(session) }
             thread.stackSize = Self.workerStackBytes
             thread.qualityOfService = .userInitiated
-            thread.name = "reelcut.graphic-prefetch"
+            thread.name = "framejob.graphic-prefetch"
             thread.start()
         }
     }
@@ -364,7 +364,7 @@ final class GraphicPrefetch: @unchecked Sendable {
     private func logLine(_ session: Session) -> String? {
         guard !session.logged else { return nil }
         session.logged = true
-        return "[reelcut] graphic prefetch: key \(session.key), \(session.workerCount) workers, "
+        return "[framejob] graphic prefetch: key \(session.key), \(session.workerCount) workers, "
             + "\(session.framesWithGraphics) frames with graphics, \(session.hits) hits, "
             + "\(session.mismatched) mismatched, \(session.missed) missed, "
             + "\(session.unused) unused"

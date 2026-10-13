@@ -27,7 +27,7 @@ import ScreenCaptureKit
 /// and the countdown's Cancel, can be clicked with the application about to
 /// be recorded still FRONTMOST — the panel is off screen once the recording
 /// runs (below), so this is for the seconds before it, when activating
-/// Reelcut would put its document windows over the target; `.floating` so
+/// Frame Job would put its document windows over the target; `.floating` so
 /// it stays above that thing; `hidesOnDeactivate = false`
 /// because `NSPanel` defaults it TRUE (`PreviewWindowController` measured it)
 /// and a recorder panel that vanished the moment the person switched to the
@@ -49,7 +49,7 @@ import ScreenCaptureKit
 /// and the status item is the
 /// recording's whole chrome — Pause, Resume and Stop are its menu; File ▸
 /// Stop Recording still stops. R1 kept a DISPLAY recording's panel up, its
-/// filter excluding Reelcut (R0 q3), and hid only a PICKED window's; the
+/// filter excluding Frame Job (R0 q3), and hid only a PICKED window's; the
 /// user asked for the dialog to go away whatever is recorded, and a panel
 /// whose one live control was a Stop the menu bar also has earned nothing
 /// on screen. It comes back after the landing ONLY when it was on screen
@@ -62,7 +62,7 @@ import ScreenCaptureKit
 /// `hiddenForRecording` (R1 review) — the welcome window's button reaches
 /// it — because a panel un-hidden into the recording would be in the file;
 /// the quit guard goes through `revealControls()` instead (`+Pause.swift`).
-/// **It takes key only from an active Reelcut** (spec §11, #137): shown from
+/// **It takes key only from an active Frame Job** (spec §11, #137): shown from
 /// the background it is ordered front without key, so Return stays with
 /// the app in front. **A voice-over stays UP** (#99): nothing is filmed, so
 /// the rows lock, the meter stays live, Record reads Stop with a Pause /
@@ -105,8 +105,8 @@ import ScreenCaptureKit
 /// countdown's end and cannot move either way; what the freeze buys is that
 /// the row on screen and the destination in the choice agree.
 ///
-/// Every choice persists under a `ReelcutRecording…` key (written on change,
-/// read on show); the harness pins all seven on `ReelcutExportChoice`'s terms.
+/// Every choice persists under a `FrameJobRecording…` key (written on change,
+/// read on show); the harness pins all seven on `FrameJobExportChoice`'s terms.
 /// `.picked` is the one source that cannot persist — a filter is not a
 /// value — so a reopened panel with a picked window keeps the row only while
 /// the filter is still held; Microphone Only persists for the session only.
@@ -115,13 +115,13 @@ final class RecorderPanelController: NSWindowController {
 
     // MARK: - Defaults keys
 
-    static let displayKey = "ReelcutRecordingDisplay"
-    static let microphoneKey = "ReelcutRecordingMicrophone"
-    static let systemAudioKey = "ReelcutRecordingSystemAudio"
-    static let showClicksKey = "ReelcutRecordingShowClicks"
-    static let rateKey = "ReelcutRecordingRate"
-    static let sizeKey = "ReelcutRecordingSize"
-    static let includeReelcutWindowsKey = "ReelcutRecordingIncludeReelcutWindows"
+    static let displayKey = "FrameJobRecordingDisplay"
+    static let microphoneKey = "FrameJobRecordingMicrophone"
+    static let systemAudioKey = "FrameJobRecordingSystemAudio"
+    static let showClicksKey = "FrameJobRecordingShowClicks"
+    static let rateKey = "FrameJobRecordingRate"
+    static let sizeKey = "FrameJobRecordingSize"
+    static let includeFrameJobWindowsKey = "FrameJobRecordingIncludeFrameJobWindows"
 
     // MARK: - Metrics and vocabulary
 
@@ -155,8 +155,8 @@ final class RecorderPanelController: NSWindowController {
     // The controls — internal rather than private because the recording flow
     // lives in an extension in another file, and `private` does not cross one.
     let sourcePopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    let includeReelcutCheckbox = NSButton(
-        checkboxWithTitle: "Include Reelcut windows", target: nil, action: nil)
+    let includeFrameJobCheckbox = NSButton(
+        checkboxWithTitle: "Include Frame Job windows", target: nil, action: nil)
     let microphonePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let meterView = LevelMeterView(meter: ScreenRecorder.shared.meter)
     let systemAudioSwitch = NSSwitch()
@@ -230,7 +230,7 @@ final class RecorderPanelController: NSWindowController {
 
         let content = NSStackView()
         card = makeSheetView(
-            hint: "The recording is saved as a movie in the Reelcut Recordings folder and "
+            hint: "The recording is saved as a movie in the Frame Job Recordings folder and "
                 + "added to the project you choose at the playhead, or opened as a new "
                 + "project at the rate you pick.",
             content: content,

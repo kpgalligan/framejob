@@ -452,14 +452,14 @@ class Session:
 
     def __init__(self, mcp, name):
         self.mcp = mcp
-        # `<name>-<pid>.reelcut`, never a fixed name: a `project` path is
+        # `<name>-<pid>.framejob`, never a fixed name: a `project` path is
         # matched against every open document and no tool closes one, so an
         # earlier run's SAVED package would have the app answering for it.
         for stale in os.listdir(WORK):
-            if re.fullmatch(rf"{re.escape(name)}-\d+\.reelcut", stale):
+            if re.fullmatch(rf"{re.escape(name)}-\d+\.framejob", stale):
                 shutil.rmtree(os.path.join(WORK, stale))
         self.name = name
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         mcp.call("new_project", path=self.path)
 
     def op(self, name, **kwargs):

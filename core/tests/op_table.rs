@@ -37,7 +37,7 @@ mod common;
 use serde_json::{json, Value};
 
 use common::{assert_contains, Handle};
-use reelcut_core::op_table::{Kind, OpRow, OP_COUNT, OP_NAMES, OP_TABLE};
+use framejob_core::op_table::{Kind, OpRow, OP_COUNT, OP_NAMES, OP_TABLE};
 
 /// The project every probe is applied to. Its contents do not matter: a
 /// probe reads the DECODER's answer, and an op that decodes and then fails

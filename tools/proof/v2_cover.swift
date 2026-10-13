@@ -1,6 +1,6 @@
 // tools/proof/v2_cover.swift — road map 11's V2a: an opaque panel put over a
-// screen rect so the Reelcut editor under it reads OCCLUDED, without ever
-// activating this process or Reelcut.
+// screen rect so the Frame Job editor under it reads OCCLUDED, without ever
+// activating this process or Frame Job.
 //
 //   v2_cover <x> <y> <w> <h> <seconds> <release-file>
 //

@@ -205,7 +205,7 @@ final class ScopeSlotView: NSView {
     }
 }
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 extension ScopeSlotView: UISnapshotParts {
     /// The picker draws its item itself, so the layout dump names it:
     /// `scopes.<top|bottom>.picker`, its text the pick's title.

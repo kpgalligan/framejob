@@ -1,6 +1,6 @@
 import AppKit
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 /// `snapshot_ui` — a dev tool (road map 11's V2a, spec §11 V-1..V-3): the
 /// app's windows listed, or one of them captured through `cacheDisplay` as
 /// an MCP image block and a PNG on disk, with a layout dump beside it.
@@ -211,7 +211,7 @@ extension AgentServer {
         _ path: String?, _ window: UISnapshot.WindowKind, _ region: UISnapshot.Region?
     ) throws -> URL {
         guard let path else {
-            let name = ["reelcut-ui", window.rawValue, region?.rawValue].compactMap { $0 }
+            let name = ["framejob-ui", window.rawValue, region?.rawValue].compactMap { $0 }
                 .joined(separator: "-")
             return FileManager.default.temporaryDirectory
                 .appendingPathComponent("\(name)-\(UUID().uuidString.prefix(8)).png")

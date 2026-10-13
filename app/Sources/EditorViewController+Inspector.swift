@@ -60,8 +60,8 @@ extension EditorViewController {
             self, selector: #selector(documentDidRefuse(_:)),
             name: .projectDocumentDidRefuse, object: document)
 
-        timeline?.registerForDraggedTypes([.reelcutMedia])
-        previewCanvas?.registerForDraggedTypes([.reelcutMedia])
+        timeline?.registerForDraggedTypes([.frameJobMedia])
+        previewCanvas?.registerForDraggedTypes([.frameJobMedia])
         refreshInspector(isLive: false)
     }
 

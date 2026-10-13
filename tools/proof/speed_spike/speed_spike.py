@@ -9,7 +9,7 @@ owner's screen; no app instance is launched and no MCP call is made. Every
 child runs under `graphics_spike/bounded.py` (rule H): its own process group,
 a hard wall-clock bound, and an expiry is the row's answer.
 
-H0      host: model and CPU, macOS, load, other `MacOS/Reelcut` PIDs (load is
+H0      host: model and CPU, macOS, load, other `MacOS/Frame Job` PIDs (load is
         repeated on every timed row).
 B0      scratch core: `core/` and `graphic/` copied to work/speed_spike/tree/,
         HEAD's one `SPEED_MAX` line (matched by pattern, whatever its value)
@@ -75,7 +75,7 @@ TREE = WORK / "tree"
 FIXTURES = WORK / "fixtures"
 OUT = WORK / "out"
 PROBE_SOURCE = ROOT / "tools/proof/speed_spike/speed_probe.swift"
-RECORDINGS = Path.home() / "Movies/Reelcut Recordings"
+RECORDINGS = Path.home() / "Movies/Frame Job Recordings"
 SPEECH_AIFF = ROOT / "tools/proof/media/speech.aiff"
 HOUR = 3600
 SPEED_PATTERN = re.compile(r"^pub\(crate\) const SPEED_MAX: f64 = ([0-9.]+);$", re.MULTILINE)
@@ -134,13 +134,13 @@ def git_status():
 def host_row(score):
     model = run(["sysctl", "-n", "hw.model", "machdep.cpu.brand_string"], 30)["stdout"].split("\n")
     macos = run(["sw_vers", "-productVersion"], 30)["stdout"].strip()
-    pids = run(["pgrep", "-f", "MacOS/Reelcut"], 30)["stdout"].split()
+    pids = run(["pgrep", "-f", "MacOS/Frame Job"], 30)["stdout"].split()
     data = {"model": model[0].strip() if model else "", "cpu": model[1].strip() if len(model) > 1 else "",
-            "macos": macos, "load": load(), "other_reelcut_pids": len(pids)}
+            "macos": macos, "load": load(), "other_framejob_pids": len(pids)}
     results["host"] = data
     if score:
         emit("H0", "ok", f"{data['model']} · {data['cpu']} · macOS {macos} · load {data['load']} · "
-             f"other MacOS/Reelcut PIDs {len(pids)}", data)
+             f"other MacOS/Frame Job PIDs {len(pids)}", data)
 
 
 # ---- sources ------------------------------------------------------------------
@@ -379,7 +379,7 @@ def scratch_core(score):
     env = bounded.child_env()
     env.pop("CARGO_TARGET_DIR", None)
     built = run(["cargo", "build", "--release", "--offline"], 1800, cwd=TREE / "core", env=env)
-    lib = TREE / "core/target/release/libreelcut_core.a"
+    lib = TREE / "core/target/release/libframejob_core.a"
     ok = one_line and built["rc"] == 0 and lib.exists()
     which = ("none expected, HEAD already says 1000.0" if unchanged
              else f"exactly `{head_line}` → 1000.0")
@@ -423,17 +423,17 @@ def build_probe(lib_dir, probe_dir, score):
             emit("B1", "FAIL", f"the shader did not build: {step['stderr'][-400:]}", instrument=True)
             return None
     swift = sorted(p for p in (ROOT / "app/Sources").glob("*.swift") if p.name != "main.swift")
-    lib = lib_dir / "libreelcut_core.a"
-    headers = [ROOT / "app/Bridging/Reelcut-Bridging-Header.h", ROOT / "core/include/reelcut_core.h"]
+    lib = lib_dir / "libframejob_core.a"
+    headers = [ROOT / "app/Bridging/FrameJob-Bridging-Header.h", ROOT / "core/include/framejob_core.h"]
     if binary.exists() and all(p.stat().st_mtime < binary.stat().st_mtime
                                for p in swift + [entry, lib] + headers):
         emit("B1", "ok", f"probe up to date — {binary} (linked to {lib_dir})")
         return binary
     sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    built = run(["swiftc", "-D", "REELCUT_DEV_TOOLS", "-O", "-whole-module-optimization",
-                 "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-                 "-import-objc-header", ROOT / "app/Bridging/Reelcut-Bridging-Header.h",
-                 "-L", lib_dir, "-lreelcut_core"] + swift + [entry, "-o", binary], 1800)
+    built = run(["swiftc", "-D", "FRAMEJOB_DEV_TOOLS", "-O", "-whole-module-optimization",
+                 "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "FrameJob",
+                 "-import-objc-header", ROOT / "app/Bridging/FrameJob-Bridging-Header.h",
+                 "-L", lib_dir, "-lframejob_core"] + swift + [entry, "-o", binary], 1800)
     if built["rc"] != 0 or not binary.exists():
         errors = [line for line in built["stderr"].splitlines() if ": error:" in line]
         emit("B1", "FAIL", f"swiftc rc {built['rc']} expired {built['expired']}: "
@@ -877,8 +877,8 @@ def main():
     if needs_probe:
         if args.stock_core:
             lib_dir = ROOT / "core/target/release"
-            if not (lib_dir / "libreelcut_core.a").exists():
-                emit("B1", "FAIL", f"{lib_dir}/libreelcut_core.a is missing — cd core && cargo "
+            if not (lib_dir / "libframejob_core.a").exists():
+                emit("B1", "FAIL", f"{lib_dir}/libframejob_core.a is missing — cd core && cargo "
                      "build --release", instrument=True)
                 lib_dir = None
             probe_dir = WORK / "probe-stock"

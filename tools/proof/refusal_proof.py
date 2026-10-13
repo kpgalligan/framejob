@@ -116,7 +116,7 @@ def shown(message):
 class Session:
     """One project, the shape every script here uses.
 
-    `<name>-<pid>.reelcut`, never a fixed name: a `project` path is matched
+    `<name>-<pid>.framejob`, never a fixed name: a `project` path is matched
     against every open document and no tool closes one, so an earlier run's
     SAVED package would have the app answering for an old one (measured in
     phase 2). Older runs' under this name go."""
@@ -125,9 +125,9 @@ class Session:
         self.mcp = mcp
         self.name = name
         for stale in os.listdir(WORK):
-            if re.fullmatch(rf"{re.escape(name)}-\d+\.reelcut", stale):
+            if re.fullmatch(rf"{re.escape(name)}-\d+\.framejob", stale):
                 shutil.rmtree(os.path.join(WORK, stale))
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         mcp.call("new_project", path=self.path)
         self.op("set_canvas", width=canvas[0], height=canvas[1], fps=fps)
 

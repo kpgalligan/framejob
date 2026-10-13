@@ -28,7 +28,7 @@ mod common;
 use serde_json::{json, Value};
 
 use common::{array, assert_contains, at, by_id, flag, int, num, source_in, text, Handle, Outcome};
-use reelcut_core::OP_NAMES;
+use framejob_core::OP_NAMES;
 
 /// One frame of the 30 fps canvas every fixture but [`overlap_project`] uses.
 /// 600 000 ticks per second (spec §5.1), so 30 fps is 20 000 ticks.

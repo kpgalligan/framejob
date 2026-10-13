@@ -24,7 +24,7 @@ pub const LIST_READ_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_BODY_BYTES: usize = 8 * 1024 * 1024;
 
 /// `RC_AGENT_SOCKET` when set and not empty, else
-/// `$HOME/Library/Application Support/Reelcut/Agent/agent.sock` (MC-1).
+/// `$HOME/Library/Application Support/Frame Job/Agent/agent.sock` (MC-1).
 pub fn socket_path() -> Result<PathBuf, String> {
     if let Some(path) = std::env::var_os(SOCKET_ENV).filter(|path| !path.is_empty()) {
         return Ok(PathBuf::from(path));
@@ -32,7 +32,7 @@ pub fn socket_path() -> Result<PathBuf, String> {
     let home = std::env::var_os("HOME")
         .filter(|home| !home.is_empty())
         .ok_or_else(|| "HOME is not set, so the agent socket's path is unknown".to_string())?;
-    Ok(PathBuf::from(home).join("Library/Application Support/Reelcut/Agent/agent.sock"))
+    Ok(PathBuf::from(home).join("Library/Application Support/Frame Job/Agent/agent.sock"))
 }
 
 /// True when `RC_AGENT_SOCKET` is set and not empty: a scratch instance,
@@ -47,7 +47,7 @@ pub enum Reach {
     /// Something accepted the connection.
     Answers,
     /// No file at the path, or a file nothing listens on (a quit's or a
-    /// crash's leftover): Reelcut is not running there.
+    /// crash's leftover): Frame Job is not running there.
     Absent,
     /// Anything else, in a sentence.
     Unreachable(String),
@@ -66,7 +66,7 @@ pub fn reach(path: &Path) -> Reach {
             Reach::Absent
         }
         Err(error) => Reach::Unreachable(format!(
-            "could not connect to Reelcut at {}: {error}",
+            "could not connect to Frame Job at {}: {error}",
             path.display()
         )),
     }
@@ -83,7 +83,7 @@ pub fn post(
 ) -> Result<Option<Value>, String> {
     let shown = path.display();
     let mut stream = UnixStream::connect(path)
-        .map_err(|e| format!("could not connect to Reelcut at {shown}: {e}"))?;
+        .map_err(|e| format!("could not connect to Frame Job at {shown}: {e}"))?;
     stream
         .set_read_timeout(read_timeout)
         .map_err(|e| format!("could not set a read timeout on {shown}: {e}"))?;
@@ -98,21 +98,21 @@ pub fn post(
         .write_all(head.as_bytes())
         .and_then(|()| stream.write_all(&body))
         .and_then(|()| stream.flush())
-        .map_err(|e| format!("could not write to Reelcut at {shown}: {e}"))?;
+        .map_err(|e| format!("could not write to Frame Job at {shown}: {e}"))?;
     let mut reader = BufReader::new(stream);
     let (status, body) = read_response(&mut reader).map_err(|e| match e.kind() {
         ErrorKind::WouldBlock | ErrorKind::TimedOut => format!(
-            "Reelcut did not answer at {shown} within {} s",
+            "Frame Job did not answer at {shown} within {} s",
             read_timeout.map_or(0, |t| t.as_secs())
         ),
-        _ => format!("could not read Reelcut's answer at {shown}: {e}"),
+        _ => format!("could not read Frame Job's answer at {shown}: {e}"),
     })?;
     match status {
         200 => serde_json::from_slice(&body)
             .map(Some)
-            .map_err(|e| format!("Reelcut's answer at {shown} is not JSON: {e}")),
+            .map_err(|e| format!("Frame Job's answer at {shown} is not JSON: {e}")),
         202 => Ok(None),
-        code => Err(format!("Reelcut answered HTTP {code}")),
+        code => Err(format!("Frame Job answered HTTP {code}")),
     }
 }
 

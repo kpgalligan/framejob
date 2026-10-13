@@ -61,7 +61,7 @@ section 1 fails, section 4's `mixed` 3.5 s row fails while both CONTROLs pass,
 and section 3 passes. Every player row prints `before`, `after` and
 `peakLeftDB`, so the record carries which form this host showed.
 
-Needs `ffmpeg`, `swiftc`, `xcrun metal` and `core/target/release/libreelcut_core.a`.
+Needs `ffmpeg`, `swiftc`, `xcrun metal` and `core/target/release/libframejob_core.a`.
 No port. Run from anywhere:
 
     python3 tools/proof/mixed_audio_probe.py [--sources PATH]
@@ -86,7 +86,7 @@ SOURCES = os.path.join(ROOT, "app", "Sources")
 SHADER = os.path.join(ROOT, "app", "Resources", "Shaders", "Compositor.metal")
 FONTS = os.path.join(ROOT, "app", "Resources", "Fonts")
 PLACEHOLDER = os.path.join(ROOT, "app", "Resources", "Blank.mp4")
-HEADER = os.path.join(ROOT, "core", "include", "reelcut_core.h")
+HEADER = os.path.join(ROOT, "core", "include", "framejob_core.h")
 
 SEC = 600_000
 CLIP = 1_200_000  # every clip is 2 s
@@ -173,11 +173,11 @@ PACKAGES = {
 
 
 def make_package(name):
-    """One hand-written `.reelcut`, `preview_validity_probe.py`'s shape: media
+    """One hand-written `.framejob`, `preview_validity_probe.py`'s shape: media
     rows as `import_media` would write them for a 2 s audio file, one clip per
     placement."""
     placements, track_count = PACKAGES[name]
-    package = os.path.join(WORK, f"{name}.reelcut")
+    package = os.path.join(WORK, f"{name}.framejob")
     shutil.rmtree(package, ignore_errors=True)
     os.makedirs(package)
     files = []
@@ -424,7 +424,7 @@ def build_probe(sources):
         return None, why
     swift = sorted(os.path.join(sources, name) for name in os.listdir(sources)
                    if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:

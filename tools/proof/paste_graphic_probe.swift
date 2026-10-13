@@ -4,8 +4,8 @@
 // main menu.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, with `-D REELCUT_DEV_TOOLS` (`UIMenu` exists
-// only there), against `libreelcut_core.a`. One process:
+// `main.swift`, module `FrameJob`, with `-D FRAMEJOB_DEV_TOOLS` (`UIMenu` exists
+// only there), against `libframejob_core.a`. One process:
 //
 //   paste_graphic_probe
 //
@@ -44,7 +44,7 @@ func row(_ id: String, _ pass: Bool, _ detail: String, instrument: Bool = false)
 let general = NSPasteboard.general
 let generalCount = general.changeCount
 let board = NSPasteboard(
-    name: NSPasteboard.Name("com.kgalligan.reelcut.proof.paste-graphic.\(getpid())"))
+    name: NSPasteboard.Name("com.kgalligan.framejob.proof.paste-graphic.\(getpid())"))
 board.clearContents()
 
 var document: ProjectDocument?

@@ -27,12 +27,12 @@ extension Notification.Name {
     /// the names, sorted (all of them when the library moved — so EMPTY
     /// when it moved in a folder holding no module); `[libraryKey]`:
     /// whether it moved.
-    static let graphicsDidChange = Notification.Name("ReelcutGraphicsDidChange")
+    static let graphicsDidChange = Notification.Name("FrameJobGraphicsDidChange")
 
     /// Posted on main by a `GraphicStore` (object: the store) when the first
     /// save, or a Save As, moved its folder (`packageDidMove(to:)`).
     static let graphicsLocationDidChange = Notification.Name(
-        "ReelcutGraphicsLocationDidChange")
+        "FrameJobGraphicsLocationDidChange")
 }
 
 final class GraphicStore {
@@ -90,7 +90,7 @@ final class GraphicStore {
     private var seed: URL?
     private let scanLock = NSLock()
     private var storedScan = GraphicScan.empty
-    private let queue = DispatchQueue(label: "com.kgalligan.reelcut.graphics")
+    private let queue = DispatchQueue(label: "com.kgalligan.framejob.graphics")
 
     private typealias Outcome = (
         scan: GraphicScan, names: [String], library: Bool, folderAppeared: Bool
@@ -112,7 +112,7 @@ final class GraphicStore {
     init(package: URL?, seed: URL?, bundledFonts: URL) {
         let folder = package?.appendingPathComponent(Self.folderName, isDirectory: true)
             ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            .appendingPathComponent("Reelcut", isDirectory: true)
+            .appendingPathComponent("FrameJob", isDirectory: true)
             .appendingPathComponent(UUID().uuidString + "-graphics", isDirectory: true)
         self.package = package
         self.seed = package == nil ? seed : nil

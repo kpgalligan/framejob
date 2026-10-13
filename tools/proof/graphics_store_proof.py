@@ -4,11 +4,11 @@
 itself rather than `media/` as the stand-in.
 
 One owned instance on a scratch socket, launched and stopped by PID, with its log
-at `tools/proof/work/graphics-store/reelcut.log`; nothing else is
+at `tools/proof/work/graphics-store/framejob.log`; nothing else is
 ever killed. Every child runs under `graphics_spike/bounded.py`, and every
 wait is a bounded poll.
 
-S1  `grep "Reelcut: "` over every launch's log prints nothing;
+S1  `grep "Frame Job: "` over every launch's log prints nothing;
 S2  `new_project {path: P1}` leaves `P1/graphics` ABSENT (G-14);
 S3  `mkdir P1/graphics` + `mv x.js` in from outside while open, >= 1 s of
     `get_project` polling, `add_track`, `save_project`: the save is NOT
@@ -20,7 +20,7 @@ S5  `save_project {path: P1b}` (Save As): `P1b/graphics/x.js` present;
 S6  `mv y.js` in, `add_track`, then an AUTOSAVE in place (project.json's
     mtime polled for at most 180 s): `x.js` and `y.js` present;
 S7  `new_project` with no path makes exactly one new untitled root
-    (`<NSTemporaryDirectory()>/Reelcut/*-graphics` — TMPDIR does not move that
+    (`<NSTemporaryDirectory()>/FrameJob/*-graphics` — TMPDIR does not move that
     directory, measured), `mv u.js` into it, `save_project {path: P2}`:
     `P2/graphics/u.js` present;
 S8  `new_project {path: P3}`, `add_track`, `save_project`: saved, and
@@ -145,19 +145,19 @@ def temp_roots():
     """The untitled roots in the directory the APP's NSTemporaryDirectory()
     answers — `getconf DARWIN_USER_TEMP_DIR`, which TMPDIR does not move."""
     base = bounded.run(["getconf", "DARWIN_USER_TEMP_DIR"], 30)["stdout"].strip()
-    return set(glob.glob(os.path.join(base, "Reelcut", "*-graphics")))
+    return set(glob.glob(os.path.join(base, "FrameJob", "*-graphics")))
 
 
 def complaints(log):
     try:
-        return [line.strip() for line in open(log) if "Reelcut: " in line]
+        return [line.strip() for line in open(log) if "Frame Job: " in line]
     except OSError:
         return ["the log could not be read"]
 
 
 def run(app):
-    log = WORK / "reelcut.log"
-    p1, p1b, p2, p3 = (WORK / f"{n}.reelcut" for n in ("P1", "P1b", "P2", "P3"))
+    log = WORK / "framejob.log"
+    p1, p1b, p2, p3 = (WORK / f"{n}.framejob" for n in ("P1", "P1b", "P2", "P3"))
     texts = {n: f"export function render() {{ return '<svg/>' }} // {n}\n"
              for n in ("x.js", "y.js", "u.js", "v.js")}
     instance = Instance(app, log)
@@ -264,7 +264,7 @@ def main():
     (WORK / "tmp").mkdir(parents=True)
     log = run(args.app)
     found = complaints(log)
-    check("S1 grep \"Reelcut: \" over every launch's log prints nothing", found == [],
+    check("S1 grep \"Frame Job: \" over every launch's log prints nothing", found == [],
           f"{found[:5]}")
     passed = sum(1 for name in ROWS if rows.get(name))
     print(f"{passed}/{len(ROWS)}")

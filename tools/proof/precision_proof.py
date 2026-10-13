@@ -25,7 +25,7 @@ refused (exit 2), never read against this tree's formats. The instance runs in a
 `CFFIXED_USER_HOME=tools/proof/work/precision/run/home`; every package, PNG
 and movie of a run is under `tools/proof/work/precision/run/`, removed at the
 start and at exit. DIR (a capture) is kept. No menu item is performed, no
-default is written: `--measure` passes `-ReelcutCompositorTiming YES` as a
+default is written: `--measure` passes `-FrameJobCompositorTiming YES` as a
 launch argument. Every call is bounded (`CALL_BOUND`), every ffmpeg too.
 
 The ffmpeg fixtures, made once under `tools/proof/work/precision/media/`:
@@ -229,7 +229,7 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
   --selftest (no app): `app_tree` reads a scratch tree's formats from an app
       under its `build/Build/Products`, refuses an app outside any tree, and
       the default (no `--app`) is this tree's (rows S1–S3).
-  Z1  the projects close and the log holds no `Reelcut: ` line.
+  Z1  the projects close and the log holds no `Frame Job: ` line.
 
 `--mutant NAME` (PR1; spec B94) builds ONE `tree_copy.make_copy` with each
 named anchor asserted to occur exactly once and replaced, by the copy's own
@@ -324,7 +324,7 @@ RAMP = ("color=c=black:size=1920x1080:rate=30:duration=1,format=yuv422p10le,"
 CARD = [0.2, 0.6, 0.9, 1]
 GRADIENT = {"kind": "linear", "angle": 0, "stops": [{"at": 0, "color": [0, 0, 0, 1]},
                                                     {"at": 1, "color": [1, 1, 1, 1]}]}
-TIMING = re.compile(r"\[reelcut\] compositor: ([\d.]+) ms average, ([\d.]+) ms worst")
+TIMING = re.compile(r"\[framejob\] compositor: ([\d.]+) ms average, ([\d.]+) ms worst")
 # 3840×2160 IOSurface sizes the spike measured (S-precision.md §7): one
 # 64RGBAHalf buffer less one 32BGRA buffer.
 PER_BUFFER = {2160: 66_355_264 - 33_177_664, 1080: (66_355_264 - 33_177_664) // 4}
@@ -515,7 +515,7 @@ class Doc:
 
     def __init__(self, client, name, width=W, height=H):
         Doc.made += 1
-        self.client, self.path = client, WORK / f"{Doc.made:02d}-{name}.reelcut"
+        self.client, self.path = client, WORK / f"{Doc.made:02d}-{name}.framejob"
         self.width, self.height = width, height
         self.ok, self.why = True, None
         self.note("new_project", attempt(client, "new_project", {"path": str(self.path)}))
@@ -2122,7 +2122,7 @@ def m1_measure(binary, kind, height, label=""):
     """One M1 export, on an instance of its own so its lifetime
     `phys_footprint_peak` is this fixture's; (its figures, its log)."""
     log = WORK / f"m1-{kind}-{height}{label}.log"
-    launched = mcp.launch(str(binary), ["-ReelcutCompositorTiming", "YES"],
+    launched = mcp.launch(str(binary), ["-FrameJobCompositorTiming", "YES"],
                           env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
                           log_path=str(log), timeout=CALL_BOUND)
     try:
@@ -2305,7 +2305,7 @@ def selftest():
         (tree / "app/Sources/Compositor.swift").write_text(
             "    static let outputPixelFormat: OSType = kCVPixelFormatType_TEST_OUT\n"
             "    static let sourcePixelFormat: OSType = kCVPixelFormatType_TEST_SRC\n")
-        inside = tree / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
+        inside = tree / "build/Build/Products/Release/Frame Job.app/Contents/MacOS/Frame Job"
         inside.parent.mkdir(parents=True)
         inside.write_text("")
         found = app_tree(inside)
@@ -2314,10 +2314,10 @@ def selftest():
             found == tree and formats == {"output": "kCVPixelFormatType_TEST_OUT",
                                           "source": "kCVPixelFormatType_TEST_SRC"},
             f"tree {found}; formats {formats}")
-        outside = scratch / "elsewhere/Reelcut.app/Contents/MacOS/Reelcut"
+        outside = scratch / "elsewhere/Frame Job.app/Contents/MacOS/Frame Job"
         outside.parent.mkdir(parents=True)
         outside.write_text("")
-        bare = scratch / "bare/build/Build/Products/Debug/Reelcut.app/Contents/MacOS/Reelcut"
+        bare = proof_app.executable(scratch / "bare/build/Build/Products/Debug/Frame Job Debug.app")
         bare.parent.mkdir(parents=True)
         bare.write_text("")
         ran = bounded.run([sys.executable, str(Path(__file__).resolve()), "--app", str(outside),
@@ -2341,7 +2341,7 @@ def selftest():
 
 def complaints(log):
     try:
-        return [line.strip() for line in open(log, errors="replace") if "Reelcut: " in line]
+        return [line.strip() for line in open(log, errors="replace") if "Frame Job: " in line]
     except OSError:
         return [f"{log} could not be read"]
 
@@ -2426,12 +2426,12 @@ def main_ab(rounds):
         print("instrument failure: ffmpeg did not make M1's 2160p movie")
         return 2
     try:
-        closed, logs = run_ab(tree_binary, app / "Contents/MacOS/Reelcut", rounds)
+        closed, logs = run_ab(tree_binary, proof_app.executable(app), rounds)
     except Exception as error:  # a row that could not run is a failure
         print(f"  instrument error: {type(error).__name__}: {error}", flush=True)
         closed, logs = False, []
     found = [line for log in logs for line in complaints(log)]
-    check("Z1 CONTROL: the projects close and no log holds a `Reelcut: ` line",
+    check("Z1 CONTROL: the projects close and no log holds a `Frame Job: ` line",
           closed and not found, f"closed {closed}; complaints {found}")
     passed = sum(1 for name in ("MA", "Z1") if rows.get(name))
     print(f"{passed}/2")
@@ -2510,7 +2510,7 @@ def main():
     binary = Path(args.app or proof_app.binary(
         release_only=RELEASE_ONLY if args.measure else None))
     if binary.suffix == ".app":
-        binary = binary / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(binary)
     if not binary.is_file():
         print(f"instrument failure: no app binary at {binary}")
         return 2
@@ -2542,7 +2542,7 @@ def main():
             print(f"  instrument error: {type(error).__name__}: {error}", flush=True)
             closed = False
         found = [line for log in logs for line in complaints(log)]
-        check("Z1 CONTROL: the projects close and no log holds a `Reelcut: ` line",
+        check("Z1 CONTROL: the projects close and no log holds a `Frame Job: ` line",
               closed and not found, f"closed {closed}; complaints {found}")
         passed = sum(1 for name in ("M1", "Z1") if rows.get(name))
         print(f"{passed}/2")
@@ -2578,7 +2578,7 @@ def main():
         launched.stop()
         mcp.remove_scratch(launched.socket_path)
     found = complaints(log)
-    check("Z1 CONTROL: the projects close and the log holds no `Reelcut: ` line",
+    check("Z1 CONTROL: the projects close and the log holds no `Frame Job: ` line",
           closed and not found, f"closed {closed}; complaints {found}")
     print(f"  {log.name} tail:\n    " + "\n    ".join(tail(log)), flush=True)
     scored = [name for name in universe if name in selected]

@@ -8,7 +8,7 @@ scored FAILURE of every row, never an exit), runs it under
 it measured against oracles of its own — hashlib for every revision, this
 file's literals for every sentence:
 
-W1  an untitled store makes its root under `NSTemporaryDirectory()/Reelcut/`
+W1  an untitled store makes its root under `NSTemporaryDirectory()/FrameJob/`
     at start(), scans empty, never calls back and never posts (TMPDIR does not
     move that directory on this host, measured; the probe reports it and
     removes every root it made);
@@ -335,7 +335,7 @@ def build(sources, out, seconds):
 def score(a, work):
     # NSTemporaryDirectory() ignores TMPDIR on this host, so the root is
     # scored against the directory the probe itself reports.
-    tmp = str((Path(a.get("tmp", "/nonexistent")) / "Reelcut").resolve()) + "/"
+    tmp = str((Path(a.get("tmp", "/nonexistent")) / "FrameJob").resolve()) + "/"
 
     def under_tmp(path):
         return isinstance(path, str) and str(Path(path).resolve()).startswith(tmp)
@@ -344,7 +344,7 @@ def score(a, work):
     check("W1 the untitled root is made in the temporary directory at start(), empty, silent",
           w1.get("exists") is True and under_tmp(w1.get("folder"))
           and str(w1.get("folder", "")).endswith("-graphics")
-          and Path(w1.get("folder", "")).parent.name == "Reelcut"
+          and Path(w1.get("folder", "")).parent.name == "FrameJob"
           and w1.get("empty") is True and w1.get("callbacks") == 0 and w1.get("posts") == 0,
           f"{w1}")
 
@@ -570,7 +570,7 @@ def score(a, work):
           and h2.get("kept_revisions") == [sha(ta)] and h2.get("edited") is False
           and re.fullmatch(rf"\d{{6}}-{sha(tb)}\.js", tampered) is not None
           and h2.get("tampered") == (
-              f"graphics/history/r/{tampered} was changed outside Reelcut and no longer "
+              f"graphics/history/r/{tampered} was changed outside Frame Job and no longer "
               "holds the revision in its name; it is not restored — other kept revisions: "
               f"{sha(ta)}")
           and h2.get("third") not in (None, ta, tb)
@@ -1048,7 +1048,7 @@ MUTANTS = {
 def mutant(name):
     """Rule R: 0 caught, 1 survived, 2 the control was not performed."""
     file, before, after, anchor = MUTANTS[name]
-    with tempfile.TemporaryDirectory(prefix=f"reelcut-graphics-store-{name}-") as temp:
+    with tempfile.TemporaryDirectory(prefix=f"framejob-graphics-store-{name}-") as temp:
         sources = Path(temp) / "Sources"
         try:
             shutil.copytree(ROOT / "app/Sources", sources)

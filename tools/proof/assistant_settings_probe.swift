@@ -2,11 +2,11 @@
 // AI-20, amending AI-9 and AI-18).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
-// `assistant_tab_proof.build_probe`'s swiftc line, `-D REELCUT_DEV_TOOLS` — by
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
+// `assistant_tab_proof.build_probe`'s swiftc line, `-D FRAMEJOB_DEV_TOOLS` — by
 // `assistant_settings_proof.py`, which copies the built helper to
-// `<probe dir>/Contents/Helpers/reelcut-agent` and runs it with the stand-in's
-// allow-listed dummy key in `-RCSecretFolder`, `-ReelcutInspectorCollapsed NO`
+// `<probe dir>/Contents/Helpers/framejob-agent` and runs it with the stand-in's
+// allow-listed dummy key in `-RCSecretFolder`, `-FrameJobInspectorCollapsed NO`
 // and `RC_ASSISTANT_BASE_URL` at `anthropic_fake.py`, scripted with CS2's four
 // replies. The three chat-settings keys are NEVER probe arguments: the
 // argument domain would shadow the pane's writes. `build_probe` names every
@@ -123,7 +123,7 @@ func describe(_ json: [String: Any]) -> String {
 // MARK: - CS1
 
 func rowCS1() {
-    let suiteName = "com.kgalligan.reelcut.assistant-settings-probe"
+    let suiteName = "com.kgalligan.framejob.assistant-settings-probe"
     UserDefaults().removePersistentDomain(forName: suiteName)
     guard let suite = UserDefaults(suiteName: suiteName) else {
         row("CS1", false, "no suite")

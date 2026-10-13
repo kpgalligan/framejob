@@ -10,7 +10,7 @@ import Foundation
 ///
 /// **P-5, the rule this file keeps.** The ledger (`spend.jsonl`) and the price
 /// cache (`anthropic-prices.json`) are the person's, in the spend folder,
-/// Reelcut's own folder in Application Support. `-RCSpendFolder <path>`,
+/// Frame Job's own folder in Application Support. `-RCSpendFolder <path>`,
 /// read from the ARGUMENT domain alone (`AssemblyAIConfiguration.argument`,
 /// R6-9 (c)), replaces it. With `RC_ASSISTANT_BASE_URL` set and no
 /// `-RCSpendFolder` there is no spend folder: nothing is written and the
@@ -29,7 +29,7 @@ enum AssistantSpend {
     /// Posted by `record` (object nil, on its caller's thread — main in the
     /// app) each time it writes a ledger line; Settings' month figure
     /// re-reads the ledger on it (spec §11 P-7).
-    static let didRecordNotification = Notification.Name("ReelcutSpendDidRecord")
+    static let didRecordNotification = Notification.Name("FrameJobSpendDidRecord")
 
     /// The token counts a ledger line keeps from a `usage` or an iteration.
     private static let countKeys = [
@@ -268,7 +268,7 @@ struct AssistantTurnCost: Equatable {
         }
         // A fetched table was refreshed; its problem is the cache write.
         if let problem { source += (kind == "fetched" ? "; " : "; not refreshed: ") + problem }
-        return "Cost: \(amount) · Reelcut's estimate at LiteLLM prices (\(source))"
+        return "Cost: \(amount) · Frame Job's estimate at LiteLLM prices (\(source))"
     }
 
     /// The Assistant tab's Spend row (spec §11 P-7): "Nothing yet" before any
@@ -277,7 +277,7 @@ struct AssistantTurnCost: Equatable {
     /// priced and the part shows; else "unknown".
     var figure: String {
         guard responses > 0 else { return "Nothing yet" }
-        let estimate = " · Reelcut's estimate"
+        let estimate = " · Frame Job's estimate"
         if firstUnknown == nil {
             return (partial ? Self.lowerBound(dollars) : Self.amount(dollars)) + estimate
         }
@@ -289,7 +289,7 @@ struct AssistantTurnCost: Equatable {
     /// ["Nothing yet"] before any response; else [figure], plus, when figure
     /// starts "at least " or "under ", figure with that prefix replaced by
     /// "≥" or "<" (no space). Every rung after a response ends
-    /// " · Reelcut's estimate".
+    /// " · Frame Job's estimate".
     var figureLadder: [String] {
         let full = figure
         for (long, short) in [("at least ", "≥"), ("under ", "<")] where full.hasPrefix(long) {
@@ -299,7 +299,7 @@ struct AssistantTurnCost: Equatable {
     }
 
     static let figureTooltip =
-        "What this conversation's responses cost at LiteLLM prices, as Reelcut estimates it. "
+        "What this conversation's responses cost at LiteLLM prices, as Frame Job estimates it. "
         + "The Anthropic Console shows what your account was billed."
 
     /// `$%.4f`, or `under $0.0001` for a positive amount that would round to 0.

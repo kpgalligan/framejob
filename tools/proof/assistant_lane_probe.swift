@@ -9,8 +9,8 @@
 // (#149, spec §11 AI-16).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
-// `tools/proof/harness/build.sh`'s swiftc line, `-D REELCUT_DEV_TOOLS` — by
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
+// `tools/proof/harness/build.sh`'s swiftc line, `-D FRAMEJOB_DEV_TOOLS` — by
 // `assistant_lane_proof.py`. Because it cannot see `app/Sources/main.swift`,
 // the launch path itself is the proof's L0, not a row here.
 //
@@ -246,7 +246,7 @@ func rowL2() {
     closeAll()
     let a = newDocument()
     let b = newDocument()
-    let bPath = path("L2-B.reelcut")
+    let bPath = path("L2-B.framejob")
     remove(bPath)
     let saved = wait(submit("save_project", ["path": bPath], b, Hook([true])), 60)
     guard !isError(saved), b.fileURL != nil else {
@@ -283,7 +283,7 @@ func rowL3() {
     closeAll()
     let a = newDocument()
     let b = newDocument()
-    let bPath = path("L3-B.reelcut")
+    let bPath = path("L3-B.framejob")
     remove(bPath)
     let saved = wait(submit("save_project", ["path": bPath], b, Hook([true])), 60)
     b.showWindows()
@@ -362,8 +362,8 @@ func rowL5() {
     let e = newDocument()
     let p = path("L5-fresh.mp4")
     let s = path("L5-sentinel.mp4")
-    let q = path("L5-Q.reelcut")
-    let r = path("L5-R.reelcut")
+    let q = path("L5-Q.framejob")
+    let r = path("L5-R.framejob")
     for file in [p, s, q, r] { remove(file) }
     let sentinel = Data("L5-SENTINEL\n".utf8)
     FileManager.default.createFile(atPath: s, contents: sentinel)

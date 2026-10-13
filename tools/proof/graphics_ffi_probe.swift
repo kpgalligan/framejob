@@ -1,7 +1,7 @@
 // Road map 10, G1d — the graphics engine through `ReelCore.swift`.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
 // `tools/proof/harness/build.sh`'s swiftc line — so it drives the app's own
 // wrappers: `GraphicLibrary`, `GraphicModule`, `GraphicRaster`. It MEASURES
 // and prints one JSON object; `graphics_ffi_probe.py` scores it against

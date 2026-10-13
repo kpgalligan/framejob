@@ -3,7 +3,7 @@
 //!
 //! The struct field names ARE the JSON keys: this file is the schema, and
 //! `serde_json::to_string_pretty` of a [`Project`] is exactly the
-//! `project.json` inside a `.reelcut` package. Declaration order is the
+//! `project.json` inside a `.framejob` package. Declaration order is the
 //! serialized key order, so it follows the spec's example.
 //!
 //! Nothing here edits, and nothing here reads: editing lives in

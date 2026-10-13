@@ -4,8 +4,8 @@
 // #234): rows A8–A14.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
-// `tools/proof/harness/build.sh`'s swiftc line, `-D REELCUT_DEV_TOOLS` — by
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
+// `tools/proof/harness/build.sh`'s swiftc line, `-D FRAMEJOB_DEV_TOOLS` — by
 // `agent_open_proof.py`, on `assistant_lane_probe.swift`'s pattern: a
 // `.prohibited` process, `AgentLane.prepareAtLaunch()`, and every call made
 // through `AgentLane.shared.serve` from a background thread while main spins
@@ -493,7 +493,7 @@ do {
 
 // MARK: - A4–A6: the re-copy on open
 
-let package = (work as NSString).appendingPathComponent("a4.reelcut")
+let package = (work as NSString).appendingPathComponent("a4.framejob")
 try? manager.removeItem(atPath: package)
 
 /// Removes the copy at `path` when it is a file directly in the scratch
@@ -533,7 +533,7 @@ do {
         && (media.map { inRewrapped($0.path) } ?? false) && onDisk
         && original == canonical(fixture.path),
         "saved \(brief(saved).prefix(60)); closed \(brief(closed).prefix(60)); project.json "
-            + "rewritten \(broken); copy removed \(removed); open_project {a4.reelcut}: "
+            + "rewritten \(broken); copy removed \(removed); open_project {a4.framejob}: "
             + "\(brief(reopened).prefix(80)); path \(media?.path ?? "nil") on disk \(onDisk), "
             + "original \(media?.original ?? "nil"); \(ticksLine("a4"))")
     row("A5", count("a4", "partial_ticks") >= partialFloor,
@@ -562,7 +562,7 @@ do {
     row("A7", !isError(closed) && removed && stubbed && !isError(raced)
         && body(raced)["already_open"] as? Bool == true && holders == 1,
         "closed \(brief(closed).prefix(60)); copy removed \(removed); a stub document added "
-            + "mid-read \(stubbed); open_project {a4.reelcut}: already_open "
+            + "mid-read \(stubbed); open_project {a4.framejob}: already_open "
             + "\(alreadyOpen(raced)) (\(brief(raced).prefix(60))); "
             + "\(holders) open documents at the package's path; \(ticksLine("a7"))")
 }
@@ -630,7 +630,7 @@ do {
     let thread = personThread()
     row("A8", entered && !isError(result) && body(result)["already_open"] as? Bool == true
         && end.one && end.clean && race.opens(packageURL) == 1 && thread.offMain,
-        "openDocument(nil) with the panel answering a4.reelcut: the open's override entered "
+        "openDocument(nil) with the panel answering a4.framejob: the open's override entered "
             + "\(race.opens(packageURL)) time(s); open_project mid-read: already_open "
             + "\(alreadyOpen(result)) (\(brief(result).prefix(60))); " + end.line
             + "; " + thread.line)
@@ -743,7 +743,7 @@ do {
     row("A14", isError(result) && text(result).contains(refusal)
         && text(result).contains("new_project did not write there")
         && before != nil && before == after && end.one && end.clean && open == 1,
-        "the person-style open, held until the call answers; new_project {path: a4.reelcut}: "
+        "the person-style open, held until the call answers; new_project {path: a4.framejob}: "
             + "\(brief(result).prefix(160)); project.json's bytes unchanged "
             + "\(before != nil && before == after) (\(before?.count ?? -1) → "
             + "\(after?.count ?? -1)); then " + end.line + "; \(open) open project(s) in all")

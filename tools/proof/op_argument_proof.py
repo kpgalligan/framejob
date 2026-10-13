@@ -100,7 +100,7 @@ the app.
 
     make app-debug
     python3 tools/proof/proof_app.py launch   # prints folder, socket, log, pid
-    grep "Reelcut: " <dir>/reelcut.log     # must print nothing
+    grep "Frame Job: " <dir>/framejob.log     # must print nothing
     python3 tools/proof/op_argument_proof.py <dir>/agent.sock
 """
 
@@ -137,7 +137,7 @@ MEDIA = os.path.join(ROOT, "tools", "proof", "media", "AV.mov")
 # Distribution one, so section 1 counts them apart.
 PRODUCT_TOOLS = 91
 OPS = 61
-PARITY = "Reelcut: "
+PARITY = "Frame Job: "
 
 passed = 0
 failed = 0
@@ -272,7 +272,7 @@ def build_probe():
         os.path.join(ROOT, "app", "Sources", name)
         for name in os.listdir(os.path.join(ROOT, "app", "Sources"))
         if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
@@ -414,7 +414,7 @@ def temp_roots():
     §10.6 G3a)."""
     base = subprocess.run(["getconf", "DARWIN_USER_TEMP_DIR"], capture_output=True,
                           text=True, timeout=30).stdout.strip()
-    return set(glob.glob(os.path.join(base, "Reelcut", "*-graphics")))
+    return set(glob.glob(os.path.join(base, "FrameJob", "*-graphics")))
 
 
 def mv_in(folder, name, text):

@@ -13,7 +13,7 @@
 // `texture(3)` an identity 2×1 `rgba32Float` curve strip (grading-2 G2-3's;
 // an older base's shader names no `texture(3)` and ignores it).
 // The adjustment pass's pipelines are `adjustPipeline`'s (the shadow vertex
-// stage, `reelcut_adjust_fragment`, blending OFF) with a NEUTRAL
+// stage, `framejob_adjust_fragment`, blending OFF) with a NEUTRAL
 // `QualifierUniforms` bound at fragment `buffer(1)` (grading-2 G2-4's; an
 // older base's fragment names no `buffer(1)` and ignores it).
 //
@@ -105,8 +105,8 @@ func function(_ lib: String, _ name: String) -> MTLFunction {
 
 func layerState(_ lib: String) -> MTLRenderPipelineState {
     let d = MTLRenderPipelineDescriptor()
-    d.vertexFunction = function(lib, "reelcut_layer_vertex")
-    d.fragmentFunction = function(lib, "reelcut_layer_fragment")
+    d.vertexFunction = function(lib, "framejob_layer_vertex")
+    d.fragmentFunction = function(lib, "framejob_layer_fragment")
     d.colorAttachments[0].pixelFormat = workingFormat
     d.colorAttachments[0].isBlendingEnabled = true
     d.colorAttachments[0].rgbBlendOperation = .add
@@ -126,8 +126,8 @@ let states = ["V0": layerState("V0"), "VT": layerState("VT")]
 /// fragment, blending OFF.
 func adjustState(_ lib: String) -> MTLRenderPipelineState {
     let d = MTLRenderPipelineDescriptor()
-    d.vertexFunction = function(lib, "reelcut_shadow_vertex")
-    d.fragmentFunction = function(lib, "reelcut_adjust_fragment")
+    d.vertexFunction = function(lib, "framejob_shadow_vertex")
+    d.fragmentFunction = function(lib, "framejob_adjust_fragment")
     d.colorAttachments[0].pixelFormat = workingFormat
     d.colorAttachments[0].isBlendingEnabled = false
     do { return try device.makeRenderPipelineState(descriptor: d) } catch {

@@ -63,7 +63,7 @@ final class AgentLane {
         do {
             try AgentServer.shared.prepareCatalog()
         } catch {
-            NSLog("Reelcut: %@", error.localizedDescription)
+            NSLog("Frame Job: %@", error.localizedDescription)
         }
     }
 
@@ -109,7 +109,7 @@ final class AgentLane {
         var entry =
             queues[key]
             ?? LaneQueue(
-                queue: DispatchQueue(label: "com.kgalligan.reelcut.agent-lane"), calls: 0)
+                queue: DispatchQueue(label: "com.kgalligan.framejob.agent-lane"), calls: 0)
         entry.calls += 1
         queues[key] = entry
         return entry.queue

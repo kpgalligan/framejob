@@ -20,16 +20,16 @@ after the first five were answered and the scouts had read the SDK; the
 five are re-runnable exactly as they were):
 
 1. **TCC attribution of a shell-launched binary.** Every proof launches
-   `Reelcut.app/Contents/MacOS/Reelcut` from a shell; TCC attributes a
+   `Frame Job.app/Contents/MacOS/Frame Job` from a shell; TCC attributes a
    process to its RESPONSIBLE process (`responsibility_get_pid_responsible_for_pid`,
-   the API tccd itself uses), so a grant given to "Reelcut" in System
+   the API tccd itself uses), so a grant given to "Frame Job" in System
    Settings may never reach that instance. The built app is launched both
    ways — the README's direct line, and `open -a … --env … --stdout …
    --stderr … --args …` — each confirmed alive on its port over MCP, and
    each one's responsible process read. Outcome A: the direct launch is
    responsible for itself; nothing changes. Outcome B: the direct launch is
    attributed to the TERMINAL, so a proof under the direct line needs the
-   grant on the terminal and a proof under `open` needs it on Reelcut.app;
+   grant on the terminal and a proof under `open` needs it on Frame Job.app;
    the README's launch line for this phase says which.
 2. **What `SCRecordingOutput` writes with `capturesAudio` and
    `captureMicrophone` both on** — how many audio tracks, in which ORDER,
@@ -116,14 +116,14 @@ five are re-runnable exactly as they were):
    `stopCapture`/`startCapture` per segment instead (R1's arm path, twice).
 
 Run it from the repository (it needs the built app at
-`build/Build/Products/Release/Reelcut.app` for question 1 and never runs
+`build/Build/Products/Release/Frame Job.app` for question 1 and never runs
 `make app`); recordings go under `tools/proof/work/spike/` and are four to
 six seconds each:
 
     python3 tools/proof/recording_spike.py            # all seven
     python3 tools/proof/recording_spike.py --only 2,5 # a subset, same JSON shape
 
-It launches Reelcut on ports 4890 and 4891, ONE AT A TIME (an `open -a` of a
+It launches Frame Job on ports 4890 and 4891, ONE AT A TIME (an `open -a` of a
 bundle that already has a running instance activates that instance instead
 of launching a second), records the pids it launched and kills exactly
 those. A recording that never finishes is a timeout, never a hang: every
@@ -145,11 +145,12 @@ import wave
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "tools", "proof"))
 from mcp import MCP, remove_scratch, scratch_socket, wait_listening  # noqa: E402
+import proof_app  # noqa: E402
 
 WORK = os.path.join(ROOT, "tools", "proof", "work", "spike")
-APP = os.path.join(ROOT, "build", "Build", "Products", "Release", "Reelcut.app")
-BINARY = os.path.join(APP, "Contents", "MacOS", "Reelcut")
-PARITY = "Reelcut: "
+APP = os.path.join(ROOT, "build", "Build", "Products", "Release", "Frame Job.app")
+BINARY = str(proof_app.executable(APP))
+PARITY = "Frame Job: "
 
 # ---------------------------------------------------------------------------
 # The probe. One Swift source, one mode per subprocess, one JSON line each.
@@ -157,8 +158,8 @@ PARITY = "Reelcut: "
 INFO_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleName</key><string>reelcut-recording-spike</string>
-<key>NSMicrophoneUsageDescription</key><string>The Reelcut recording spike measures what ScreenCaptureKit writes for a microphone.</string>
+<key>CFBundleName</key><string>framejob-recording-spike</string>
+<key>NSMicrophoneUsageDescription</key><string>The Frame Job recording spike measures what ScreenCaptureKit writes for a microphone.</string>
 </dict></plist>
 """
 
@@ -455,7 +456,7 @@ func record(_ spec: [String: Any]) -> [String: Any] {
     catch { out["addRecordingOutput"] = "threw: \(error)"; out["error"] = "addRecordingOutput threw"; return out }
 
     if micOutput != "none" {
-        let queue = DispatchQueue(label: "reelcut.spike.micmeter")
+        let queue = DispatchQueue(label: "framejob.spike.micmeter")
         let type: SCStreamOutputType = micOutput == "microphone" ? .microphone : .audio
         do { try stream.addStreamOutput(session, type: type, sampleHandlerQueue: queue); out["addStreamOutput"] = "ok" }
         catch { out["addStreamOutput"] = "threw: \(error)" }
@@ -737,7 +738,7 @@ func grabFrame(filter: SCContentFilter, config: SCStreamConfiguration, timeout: 
     let grabber = FrameGrabber()
     var report: [String: Any] = [:]
     let stream = SCStream(filter: filter, configuration: config, delegate: grabber)
-    let queue = DispatchQueue(label: "reelcut.spike.frames")
+    let queue = DispatchQueue(label: "framejob.spike.frames")
     do { try stream.addStreamOutput(grabber, type: .screen, sampleHandlerQueue: queue) }
     catch { report["error"] = "addStreamOutput threw: \(error)"; return (grabber, report) }
     let lock = NSLock()
@@ -1290,7 +1291,7 @@ func pauseResume(_ spec: [String: Any]) -> [String: Any] {
     let stream = SCStream(filter: filter, configuration: config, delegate: segments)
     if countFrames {
         do {
-            try stream.addStreamOutput(segments, type: .screen, sampleHandlerQueue: DispatchQueue(label: "reelcut.spike.frames"))
+            try stream.addStreamOutput(segments, type: .screen, sampleHandlerQueue: DispatchQueue(label: "framejob.spike.frames"))
             out["addStreamOutput"] = "ok"
         } catch { out["addStreamOutput"] = "threw: \(error)" }
     }
@@ -1610,13 +1611,13 @@ def record(binary, name, seconds=5, fps=60, system_audio=False, mic=False,
 
 
 # ---------------------------------------------------------------------------
-# Question 1: which process TCC would attribute a launched Reelcut to.
+# Question 1: which process TCC would attribute a launched Frame Job to.
 
 
-def reelcut_pids():
+def framejob_pids():
     """Processes whose executable IS the built binary — `pgrep -f` also
     matches any shell whose command line merely mentions the path."""
-    result = subprocess.run(["pgrep", "-f", "MacOS/Reelcut"], capture_output=True, text=True)
+    result = subprocess.run(["pgrep", "-f", "MacOS/Frame Job"], capture_output=True, text=True)
     pids = set()
     for p in result.stdout.split():
         comm = subprocess.run(["ps", "-o", "comm=", "-p", p], capture_output=True, text=True).stdout.strip()
@@ -1695,13 +1696,13 @@ def question_1(binary, shell):
     if not os.path.exists(BINARY):
         answer.update(outcome="unmeasured", reason=f"{BINARY} is missing — run `make app` first")
         return answer
-    others = reelcut_pids()
+    others = framejob_pids()
     answer["instancesRunningBefore"] = sorted(others)
     launched = []
     direct_socket, open_socket = scratch_socket(), scratch_socket()
     try:
         # (a) the README's direct line.
-        log_a = os.path.join(WORK, "reelcut-direct.log")
+        log_a = os.path.join(WORK, "framejob-direct.log")
         with open(log_a, "wb") as handle:
             process = subprocess.Popen(
                 [BINARY, "-ApplePersistenceIgnoreState", "YES"],
@@ -1717,9 +1718,9 @@ def question_1(binary, shell):
         answer["direct"] = direct
         # (b) through LaunchServices, after (a) is gone — `open -a` of a bundle
         # with a running instance would activate that instance instead.
-        log_b = os.path.join(WORK, "reelcut-open.log")
+        log_b = os.path.join(WORK, "framejob-open.log")
         open(log_b, "wb").close()
-        before = reelcut_pids()
+        before = framejob_pids()
         opened = subprocess.run(
             ["open", "-a", APP, "--env", f"RC_AGENT_SOCKET={open_socket}", "--stdout", log_b,
              "--stderr", log_b, "--args", "-ApplePersistenceIgnoreState", "YES"],
@@ -1731,13 +1732,13 @@ def question_1(binary, shell):
         pid = None
         deadline = time.time() + 30
         while time.time() < deadline and pid is None:
-            new = reelcut_pids() - before
+            new = framejob_pids() - before
             if new:
                 pid = min(new)
             else:
                 time.sleep(0.2)
         if pid is None:
-            via_open["error"] = "no new Reelcut pid appeared within 30 s of `open`"
+            via_open["error"] = "no new Frame Job pid appeared within 30 s of `open`"
         else:
             launched.append(pid)
             via_open.update(instance_facts(binary, pid, log_b, open_socket,
@@ -1754,7 +1755,7 @@ def question_1(binary, shell):
         remove_scratch(direct_socket)
         remove_scratch(open_socket)
     answer["launchedPids"] = launched
-    answer["instancesRunningAfter"] = sorted(reelcut_pids())
+    answer["instancesRunningAfter"] = sorted(framejob_pids())
     direct_r = answer.get("direct", {}).get("responsible", {})
     open_r = answer.get("viaOpen", {}).get("responsible", {})
     if "responsibleForItself" not in direct_r:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Road map 8, W4a — word-caption GENERATION through the built binary.
 
-Launches its own Reelcut on a scratch socket, pointed at its own
+Launches its own Frame Job on a scratch socket, pointed at its own
 `assemblyai_fake.py` (`-RCAssemblyAIEndpoint`, a scratch `-RCSecretFolder` and
 the dummy key `proof-key` — nothing here reaches AssemblyAI), drives it over
 MCP, and kills both by PID in a `finally`:
@@ -29,7 +29,7 @@ MCP, and kills both by PID in a `finally`:
   clip, both clips read; then `pill` with `replace: true` replaces that track.
 * **L** (issue batch B43, #200 item 4) `cloud_captions_probe.py`'s
   `hold_cloud_lock`, taken first: G3's cloud engine writes
-  `reelcut-upload-*` into the one temporary folder the cloud probe and proof
+  `framejob-upload-*` into the one temporary folder the cloud probe and proof
   use, so the three take turns. `--lock-wait` (default 3600 s) bounds the
   wait; an expired wait is a scored FAIL naming the holder, and exit 1 with
   no instance launched.
@@ -91,7 +91,7 @@ def fresh(*parts):
 
 
 class Instance:
-    """One Reelcut, started here and stopped here by its own PID."""
+    """One Frame Job, started here and stopped here by its own PID."""
 
     def __init__(self, fake):
         self.socket = scratch_socket()
@@ -115,8 +115,8 @@ class Instance:
     def parity(self):
         with open(self.log, "rb") as stream:
             lines = stream.read().decode("utf-8", "replace").splitlines()
-        complaints = [line for line in lines if "Reelcut: " in line]
-        check(f"the startup parity check said nothing — `grep \"Reelcut: \"` on {self.log} "
+        complaints = [line for line in lines if "Frame Job: " in line]
+        check(f"the startup parity check said nothing — `grep \"Frame Job: \"` on {self.log} "
               "is empty", not complaints, "\n       ".join(complaints[:5]))
 
     def stop(self):
@@ -135,7 +135,7 @@ class Instance:
 class Session:
     def __init__(self, instance, name):
         self.mcp = instance.mcp
-        self.path = os.path.join(WORK, f"{name}.reelcut")
+        self.path = os.path.join(WORK, f"{name}.framejob")
         shutil.rmtree(self.path, ignore_errors=True)
         self.mcp.call("new_project", path=self.path)
 

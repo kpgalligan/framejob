@@ -62,7 +62,7 @@ func spin(until done: () -> Bool, timeout: Double) -> Bool {
 
 let document = ProjectDocument()
 do {
-    try document.read(from: packageURL, ofType: "com.kgalligan.reelcut-project")
+    try document.read(from: packageURL, ofType: ProjectDocument.projectTypeIdentifier)
 } catch {
     answer["outcome"] = "error"
     answer["error"] = "the package would not open: \(error.localizedDescription)"

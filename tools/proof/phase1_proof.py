@@ -44,7 +44,7 @@ class Session:
 
     def __init__(self, mcp, name):
         self.mcp = mcp
-        self.path = os.path.join(WORK, f"{name}.reelcut")
+        self.path = os.path.join(WORK, f"{name}.framejob")
         if os.path.exists(self.path):
             shutil.rmtree(self.path)
         mcp.call("new_project", path=self.path)

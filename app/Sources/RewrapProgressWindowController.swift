@@ -3,7 +3,7 @@ import AppKit
 /// The WebM or Matroska copy's progress window (spec §11 #228-P): a small
 /// titled panel, the same for every click door, with the bar, the file's
 /// name, how much is copied and one Cancel. It is non-modal and never takes
-/// the keyboard from a Reelcut window: it shows only when the copy is still
+/// the keyboard from a Frame Job window: it shows only when the copy is still
 /// running `showDelay` after it started, ordered front without becoming key
 /// while any window is key (made key only when none is — File ▸ Open, a
 /// Finder double-click), so typing and Escape keep reaching the editor
@@ -81,7 +81,7 @@ final class RewrapProgressWindowController: NSWindowController {
 
         let view = makeSheetView(
             title: "Copying “\(progress.source.lastPathComponent)”",
-            hint: "Reelcut copies the video and sound of a WebM or MKV file into a movie once, "
+            hint: "Frame Job copies the video and sound of a WebM or MKV file into a movie once, "
                 + "without re-encoding. Importing the same file again uses the copy.",
             content: content, buttonRow: makeButtonRow(cancel: cancelButton, apply: apply))
         window?.contentView = view
@@ -138,7 +138,7 @@ final class RewrapProgressWindowController: NSWindowController {
         }
         if let window, !window.isVisible, Date().timeIntervalSince(started) >= Self.showDelay {
             window.center()
-            // Never take the keyboard from a Reelcut window (spec §11
+            // Never take the keyboard from a Frame Job window (spec §11
             // #228-P): a click into the panel makes it key. An inactive app
             // has no key window, so it gets the panel ordered front, not key.
             if NSApp.isActive && NSApp.keyWindow == nil {

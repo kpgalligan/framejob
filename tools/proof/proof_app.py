@@ -32,15 +32,17 @@ WORK = ROOT / "tools/proof/work/proof_app"
 ENV = "RC_PROOF_APP"
 DEFAULT = "debug"       # spec §11 V-4: the loop drives Debug; release_only pins Release
 MAKE_TARGET = {"debug": "app-debug", "release": "app"}
-DOMAINS = {"debug": "com.kgalligan.Reelcut.debug", "release": "com.kgalligan.Reelcut"}
+DOMAINS = {"debug": "com.kgalligan.FrameJob.debug", "release": "com.kgalligan.FrameJob"}
 FOLDER = {"debug": "Debug", "release": "Release"}
+# Each configuration's product, and its executable's name (spec §11 NM-3).
+PRODUCTS = {"Debug": "Frame Job Debug", "Release": "Frame Job", "Distribution": "Frame Job"}
 FOLDER_TARGET = {"Debug": "app-debug", "Release": "app", "Distribution": "dist"}
 WALKED = ("app", "agent", "mcp-proxy/src", "core/src", "graphic/src")
-LISTED = ("mcp-proxy/Cargo.*", "core/Cargo.*", "graphic/Cargo.*", "core/include/reelcut_core.h",
-          "core/target/release/libreelcut_core.a", "docs/graphics-api.md",
+LISTED = ("mcp-proxy/Cargo.*", "core/Cargo.*", "graphic/Cargo.*", "core/include/framejob_core.h",
+          "core/target/release/libframejob_core.a", "docs/graphics-api.md",
           "docs/graphics-api.d.ts", "graphic/tests/graphics/*.js", "project.yml", "VERSION")
 SKIPPED_DIRS = {"node_modules", "target", "build", ".git", "__pycache__"}
-SKIPPED_FILES = {"app/Info.plist", "app/Reelcut.entitlements"}
+SKIPPED_FILES = {"app/Info.plist", "app/FrameJob.entitlements"}
 KEPT_MD = "docs/graphics-api.md"
 EXPECTED = {"exe-marker": {"F3", "F4"}, "md-counted": {"F5"},
             "exe-mtime-running": {"R1", "R2"}}
@@ -76,12 +78,19 @@ def _bundle_of(path):
     return path.parents[2] if path.parent.name == "MacOS" else path
 
 
+def executable(app):
+    """A bundle's executable: `Contents/MacOS/` and the bundle's own stem."""
+    app = Path(app)
+    return app / "Contents/MacOS" / app.stem
+
+
 def bundle(tree=ROOT, release_only=None):
     """`RC_PROOF_APP`'s path in the repo, else the chosen product under `tree`."""
     chosen, (_, path) = config(release_only), _choice()
     if path is not None and Path(tree).resolve() == ROOT:
         return _bundle_of(path)
-    return Path(tree) / "build/Build/Products" / FOLDER[chosen] / "Reelcut.app"
+    folder = FOLDER[chosen]
+    return Path(tree) / "build/Build/Products" / folder / f"{PRODUCTS[folder]}.app"
 
 
 def binary(tree=ROOT, release_only=None):
@@ -90,7 +99,7 @@ def binary(tree=ROOT, release_only=None):
     if path is not None and Path(tree).resolve() == ROOT and path.parent.name == "MacOS":
         config(release_only)        # a Debug path is refused for a release_only proof
         return path
-    return bundle(tree, release_only) / "Contents/MacOS/Reelcut"
+    return executable(bundle(tree, release_only))
 
 
 def domain(release_only=None):
@@ -109,8 +118,9 @@ def _product(path):
     """(tree, configuration folder, bundle) of a built product's path, else None."""
     path = Path(os.path.abspath(path))
     app = _bundle_of(path)
-    if app.name != "Reelcut.app" or (app != path and path.parts[-3:] != (
-            "Contents", "MacOS", "Reelcut")):
+    name = PRODUCTS.get(app.parent.name)
+    if name is None or app.name != f"{name}.app" or (app != path and path.parts[-3:] != (
+            "Contents", "MacOS", name)):
         return None
     products = app.parent.parent
     if (app.parent.name not in FOLDER_TARGET or products.name != "Products"
@@ -160,7 +170,7 @@ def _stale(path):
     if (product := _product(path)) is None:
         return None
     tree, folder, app = product
-    exe, target = app / "Contents/MacOS/Reelcut", FOLDER_TARGET[folder]
+    exe, target = executable(app), FOLDER_TARGET[folder]
     marker = exe if MUTANT == "exe-marker" else app / "Contents/_CodeSignature/CodeResources"
     try:
         built = marker.stat().st_mtime
@@ -226,12 +236,12 @@ BASE = float(int(time.time()) - 10000)
 def _tree(name, folder="Debug", marker=True, exe=100, built=100, newer=()):
     """Inputs at BASE, skipped files at +500, the exe and marker, then `newer`."""
     files = {"app/Sources/a.swift": 0, "app/CLAUDE.md": 0, "docs/graphics-api.md": 0,
-             "project.yml": 0, "agent/src/x.ts": 0, "core/target/release/libreelcut_core.a": 0,
+             "project.yml": 0, "agent/src/x.ts": 0, "core/target/release/libframejob_core.a": 0,
              "agent/node_modules/y.js": 500, "app/Info.plist": 500, "app/.DS_Store": 500,
-             "app/Reelcut.entitlements": 500, "core/target/debug/z.o": 500, "README.md": 500}
-    app = WORK / name / "build/Build/Products" / folder / "Reelcut.app"
+             "app/FrameJob.entitlements": 500, "core/target/debug/z.o": 500, "README.md": 500}
+    app = WORK / name / "build/Build/Products" / folder / f"{PRODUCTS[folder]}.app"
     stamps = {**{WORK / name / one: when for one, when in {**files, **dict(newer)}.items()},
-              app / "Contents/MacOS/Reelcut": exe}
+              executable(app): exe}
     if marker:
         stamps[app / "Contents/_CodeSignature/CodeResources"] = built
     for path, when in stamps.items():
@@ -265,8 +275,8 @@ def selftest(mutant=None):
             return f"ValueError: {error}"
 
     try:
-        said = refusal(_tree("fresh") / "Contents/MacOS/Reelcut")
-        row("F1", said is None and refusal(WORK / "fresh/build/Build/Products/Debug/Reelcut.app")
+        said = refusal(executable(_tree("fresh")))
+        row("F1", said is None and refusal(WORK / "fresh/build/Build/Products/Debug/Frame Job Debug.app")
             is None, f"fresh, with node_modules, Info.plist, a dot-file, target/ newer: {said}")
         said = refusal(_tree("stale", newer=[("app/Sources/a.swift", 200)])) or ""
         row("F2", f"app/Sources/a.swift (modified {_when(BASE + 200)}) is newer than its last "
@@ -282,16 +292,16 @@ def selftest(mutant=None):
         said = refusal(_tree("api-md", newer=[("docs/graphics-api.md", 200)])) or ""
         row("F6", "docs/graphics-api.md (modified" in said, said)
 
-        exe = _tree("running", exe=300, built=300) / "Contents/MacOS/Reelcut"
+        exe = executable(_tree("running", exe=300, built=300))
         said = running_verdict(BASE + 200, exe, pid=4242)
         row("R1", said is None, f"started after the newest input, rewritten since: {said}")
         exe = _tree("relaunch", exe=300, built=300, newer=[("app/Sources/a.swift", 250)])
-        said = running_verdict(BASE + 200, exe / "Contents/MacOS/Reelcut", pid=4242) or ""
+        said = running_verdict(BASE + 200, executable(exe), pid=4242) or ""
         row("R2", said == "relaunch pid 4242 after `make app-debug`: app/Sources/a.swift "
             f"(modified {_when(BASE + 250)}) is newer than the instance (started "
             f"{_when(BASE + 200)})", said)
         exe = _tree("running-stale", newer=[("app/Sources/a.swift", 250)])
-        said = running_verdict(BASE + 300, exe / "Contents/MacOS/Reelcut", pid=4242) or ""
+        said = running_verdict(BASE + 300, executable(exe), pid=4242) or ""
         row("R3", said.startswith("refusing "), f"started after the input, product stale: {said}")
 
         named = {one: refusal(_tree(f"target-{one}", folder=one, newer=[("project.yml", 200)]))
@@ -300,19 +310,19 @@ def selftest(mutant=None):
             and str(named["Release"]).endswith("`make app`")
             and str(named["Distribution"]).endswith("`make dist`"), f"{MAKE_TARGET}; {named}")
 
-        debug_app = WORK / "stale/build/Build/Products/Debug/Reelcut.app"
-        release_app = WORK / "target-Release/build/Build/Products/Release/Reelcut.app"
+        debug_app = WORK / "stale/build/Build/Products/Debug/Frame Job Debug.app"
+        release_app = WORK / "target-Release/build/Build/Products/Release/Frame Job.app"
         products = ROOT / "build/Build/Products"
-        exe = debug_app / "Contents/MacOS/Reelcut"
+        exe = executable(debug_app)
         cases = [("unset", (None, config), DEFAULT),
-                 ("debug", ("debug", bundle), products / "Debug/Reelcut.app"),
+                 ("debug", ("debug", bundle), products / "Debug/Frame Job Debug.app"),
                  ("release", ("release", binary),
-                  products / "Release" / exe.relative_to(debug_app.parent)),
+                  products / "Release/Frame Job.app/Contents/MacOS/Frame Job"),
                  ("a Debug .app", (debug_app, config), "debug"),
                  ("its bundle", (debug_app, bundle), debug_app),
                  ("its executable", (exe, binary), exe),
                  ("a tree copy", ("debug", bundle, WORK / "copy"),
-                  WORK / "copy/build/Build/Products/Debug/Reelcut.app"),
+                  WORK / "copy/build/Build/Products/Debug/Frame Job Debug.app"),
                  ("bogus", ("bogus", config), "ValueError: RC_PROOF_APP='bogus' is not debug, "
                   "release or a .app or executable path")]
         wrong = {name: got for name, call, want in cases if (got := chosen(*call)) != want}
@@ -320,7 +330,7 @@ def selftest(mutant=None):
         why = {"release_only": "needs a grant"}
         seen = {"debug": chosen("debug", bundle, **why), "a Debug path": chosen(debug_app, bundle,
                 **why), "a Release path": chosen(release_app, bundle, **why)}
-        row("E2", seen["debug"] == products / "Release/Reelcut.app"
+        row("E2", seen["debug"] == products / "Release/Frame Job.app"
             and str(seen["a Debug path"]).endswith("Release-only: needs a grant")
             and seen["a Release path"] == release_app, f"release_only: {seen}")
 
@@ -333,10 +343,10 @@ def selftest(mutant=None):
                               (ROOT / "project.yml").read_text(), re.M)
         row("D2", declared == [DOMAINS["debug"]], f"project.yml's bundle identifiers {declared}")
 
-        loose = WORK / "loose/Reelcut.app"
+        loose = WORK / "loose/Frame Job Debug.app"
         shutil.copytree(debug_app, loose)
-        row("C1", refusal(loose) is None and running_verdict(0, loose / "Contents/MacOS/Reelcut")
-            is None and _product("/Applications/Reelcut.app/Contents/MacOS/Reelcut") is None,
+        row("C1", refusal(loose) is None and running_verdict(0, executable(loose))
+            is None and _product("/Applications/Frame Job.app/Contents/MacOS/Frame Job") is None,
             "CONTROL: a stale copy outside build/Build/Products, and /Applications', not checked")
     finally:
         os.environ.pop(ENV, None) if saved is None else os.environ.__setitem__(ENV, saved)

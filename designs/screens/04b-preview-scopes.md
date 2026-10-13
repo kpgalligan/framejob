@@ -31,7 +31,7 @@ two slots open as Waveform over Vectorscope.
 The preview pane has given its right-hand 248 points to the Scopes panel, a fixed
 column between the picture and the inspector, the pane's full height; the picture
 has shrunk to fit what is left and is otherwise the frame of `04-editor` — the navy
-video frame, the "Reelcut" ellipse and the "Jane Doe" lower third. Nothing in the
+video frame, the "Frame Job" ellipse and the "Jane Doe" lower third. Nothing in the
 demo is graded, so Show Ungraded changes no pixel here; what shows it is on is the
 small grey "Ungraded" tag in the top-left corner of the pane, in the margin above
 the picture.
@@ -46,7 +46,7 @@ left reading 100, 50 and 0 against faint horizontal lines at 100, 75, 50, 25 and
 0 %. In the well, the frame's luma as a white density on a log scale: x is the
 picture's columns, y the brightness. The black canvas around the card is a solid
 white line along the bottom of the well, the navy card a second line just above it
-in the middle columns, and the white ellipse, "Reelcut" and the title's text bright
+in the middle columns, and the white ellipse, "Frame Job" and the title's text bright
 dots at the top with a faint scatter of in-between levels from their anti-aliased
 edges. Red marks run along the bottom edge over every column where at least 0.5 %
 of the pixels are black (level 0), and along the top edge over the columns of the

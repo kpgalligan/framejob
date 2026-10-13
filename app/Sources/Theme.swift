@@ -170,7 +170,7 @@ enum DS {
     // MARK: - Metrics (the chrome cleanup)
 
     /// The window's own two bars. `optionsBarHeight` is also 36 and they are
-    /// deliberately separate names: Rasterize's options bar and Reelcut's
+    /// deliberately separate names: Rasterize's options bar and Frame Job's
     /// timeline bar are the same height for the same reason, not the same
     /// thing.
     static let toolbarHeight: CGFloat = 44

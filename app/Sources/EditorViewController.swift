@@ -46,12 +46,12 @@ final class EditorViewController: NSViewController {
 
     /// Pane sizes and the toolbar toggles. View state, so `UserDefaults` and
     /// not the project (spec §5.2's last bullet).
-    static let inspectorWidthKey = "ReelcutInspectorWidth"
-    static let timelineHeightKey = "ReelcutTimelineHeight"
-    static let inspectorCollapsedKey = "ReelcutInspectorCollapsed"
-    static let safeGuidesKey = "ReelcutSafeGuidesVisible"
-    static let snappingKey = "ReelcutSnappingEnabled"
-    static let trackHeightKey = "ReelcutTimelineTrackHeight"
+    static let inspectorWidthKey = "FrameJobInspectorWidth"
+    static let timelineHeightKey = "FrameJobTimelineHeight"
+    static let inspectorCollapsedKey = "FrameJobInspectorCollapsed"
+    static let safeGuidesKey = "FrameJobSafeGuidesVisible"
+    static let snappingKey = "FrameJobSnappingEnabled"
+    static let trackHeightKey = "FrameJobTimelineTrackHeight"
 
     // MARK: - Model
 

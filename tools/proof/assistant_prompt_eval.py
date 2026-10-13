@@ -443,7 +443,7 @@ ASKS = {
     "E1": "Put a marker called Intro at 3 seconds.",
     "E2": "Undo that.",
     "E3": "Split the selected clip at the playhead.",
-    "E4": "Change the title to say Hello Reelcut.",
+    "E4": "Change the title to say Hello Frame Job.",
     "E5": "Inside the nest, move the rectangle so it starts at 1 second.",
     "E6": "Export this project as a movie to {path}.",
 }
@@ -526,7 +526,7 @@ def script(row, ids, wrong, export_path=None):
         arguments = {"at": 2400000} if wrong else {"clips": [ids["title"]], "at": 2400000}
         return [use("toolu_e3", "split", arguments), say("Split.")]
     if row == "E4":
-        content = "Hello" if wrong else "Hello Reelcut"
+        content = "Hello" if wrong else "Hello Frame Job"
         return [use("toolu_e4", "set_text", {"clips": [ids["title"]],
                                              "patch": {"content": content}}), say("Changed.")]
     if row == "E5":
@@ -618,7 +618,7 @@ class Evaluation:
                                          f"{type(error).__name__}: {error}")
 
     def e1_e2(self):
-        ids = build_fixture(self.app, os.path.join(self.folder, "E1.reelcut"))
+        ids = build_fixture(self.app, os.path.join(self.folder, "E1.framejob"))
         before = self.project(ids)
         self.scenario("E1", ids)
         answer, why = self.send("E1", ids["project"], ASKS["E1"])
@@ -643,7 +643,7 @@ class Evaluation:
                               f"{marker_list(before)}", answer.get("events", []))
 
     def e3(self):
-        ids = build_fixture(self.app, os.path.join(self.folder, "E3.reelcut"))
+        ids = build_fixture(self.app, os.path.join(self.folder, "E3.framejob"))
         self.app.must("set_playhead", project=ids["project"], t=2400000)
         self.app.must("set_selection", project=ids["project"], clips=[ids["title"]])
         before = self.project(ids)
@@ -664,7 +664,7 @@ class Evaluation:
                     answer.get("events", []))
 
     def e4(self):
-        ids = build_fixture(self.app, os.path.join(self.folder, "E4.reelcut"))
+        ids = build_fixture(self.app, os.path.join(self.folder, "E4.framejob"))
         before = clip_signatures(self.project(ids))
         self.scenario("E4", ids)
         answer, why = self.send("E4", ids["project"], ASKS["E4"])
@@ -673,7 +673,7 @@ class Evaluation:
         after = clip_signatures(self.project(ids))
         key = ("timeline", ids["title"])
         was, now = before.get(key), after.get(key)
-        wanted = was[:4] + ("Hello Reelcut",) if was else None
+        wanted = was[:4] + ("Hello Frame Job",) if was else None
         others = {k: v for k, v in before.items() if k != key} == \
             {k: v for k, v in after.items() if k != key}
         ok = now is not None and now == wanted and others
@@ -681,7 +681,7 @@ class Evaluation:
                               f"{others}", answer.get("events", []))
 
     def e5(self):
-        ids = build_fixture(self.app, os.path.join(self.folder, "E5.reelcut"), nest=True)
+        ids = build_fixture(self.app, os.path.join(self.folder, "E5.framejob"), nest=True)
         before = clip_signatures(self.project(ids))
         self.scenario("E5", ids)
         answer, why = self.send("E5", ids["project"], ASKS["E5"])
@@ -698,7 +698,7 @@ class Evaluation:
                               f"every other clip unchanged {others}", answer.get("events", []))
 
     def e6(self):
-        ids = build_fixture(self.app, os.path.join(self.folder, "E6.reelcut"))
+        ids = build_fixture(self.app, os.path.join(self.folder, "E6.framejob"))
         path = os.path.join(os.path.abspath(self.folder), "E6.mp4")
         if os.path.exists(path):
             os.remove(path)

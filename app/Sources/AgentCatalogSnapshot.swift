@@ -7,13 +7,13 @@ import Foundation
 /// exits before `NSApplicationMain`, so no window, Dock icon or socket ever
 /// appears. `project.yml`'s "Write Agent Catalog" phase runs the just-built
 /// binary this way to put `Contents/Resources/agent-catalog.json` in the
-/// bundle, which `reelcut-mcp` answers `tools/list` from while no Reelcut
+/// bundle, which `framejob-mcp` answers `tools/list` from while no Frame Job
 /// runs (MC1 q1 measured the phase; `tools/proof/dist_check.py` D21–D24 check
 /// the file).
 ///
 /// The key is read from the ARGUMENT domain only, so no persisted default
 /// can turn an ordinary launch into a writer. A failure is one stderr line,
-/// `reelcut catalog snapshot: …`, and exit 1 — never the `Reelcut: `
+/// `framejob catalog snapshot: …`, and exit 1 — never the `Frame Job: `
 /// prefix, which is the parity check's (the phase fails on that too).
 enum AgentCatalogSnapshot {
     static let argumentKey = "RCWriteCatalog"
@@ -45,7 +45,7 @@ enum AgentCatalogSnapshot {
     }
 
     private static func fail(_ reason: String) -> Never {
-        FileHandle.standardError.write(Data("reelcut catalog snapshot: \(reason)\n".utf8))
+        FileHandle.standardError.write(Data("framejob catalog snapshot: \(reason)\n".utf8))
         exit(1)
     }
 }

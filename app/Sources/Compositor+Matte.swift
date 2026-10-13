@@ -181,14 +181,14 @@ struct MatteCoverage {
 extension MetalRenderer {
 
     /// The resolve pipeline: the shadow pass's full-frame quad and
-    /// `reelcut_matte_resolve_fragment`, into `r8Unorm`, with source factor
+    /// `framejob_matte_resolve_fragment`, into `r8Unorm`, with source factor
     /// ZERO and destination factor `sourceColor` — the coverage is cleared
     /// to 1 and each matte's value multiplies into it.
     static func matteResolveDescriptor(
         vertex: MTLFunction, fragment: MTLFunction
     ) -> MTLRenderPipelineDescriptor {
         let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.label = "Reelcut matte resolve"
+        descriptor.label = "Frame Job matte resolve"
         descriptor.vertexFunction = vertex
         descriptor.fragmentFunction = fragment
         descriptor.colorAttachments[0].pixelFormat = .r8Unorm

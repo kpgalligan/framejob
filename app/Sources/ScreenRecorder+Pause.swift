@@ -128,7 +128,7 @@ extension ScreenRecorder {
     /// `resume()` that succeeded does — never on a throw — so a view of the
     /// paused state (the tool's status item) flips at the moment from any
     /// door rather than at its own next tick (#181).
-    static let pauseDidChangeNotification = Notification.Name("ReelcutRecorderPauseDidChange")
+    static let pauseDidChangeNotification = Notification.Name("FrameJobRecorderPauseDidChange")
 
     /// MAIN THREAD, synchronous. `.recording` → `.paused`; `.paused` throws
     /// `.alreadyPaused` (`.notRecording`'s sentence would be false while

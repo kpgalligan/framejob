@@ -15,8 +15,8 @@ mod common;
 use serde_json::{json, Value};
 
 use common::{assert_contains, take_string, Handle};
-use reelcut_core::ffi_query::rc_op_names;
-use reelcut_core::OP_NAMES;
+use framejob_core::ffi_query::rc_op_names;
+use framejob_core::OP_NAMES;
 
 /// The export's answer, parsed. Every call frees the string it read, which
 /// is the header's rule for every `char *` the library hands back.

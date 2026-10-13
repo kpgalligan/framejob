@@ -35,7 +35,7 @@ What is claimed, section by section:
     3  **the remembered choice and the named presets**, in TWO PROCESSES: one
        writes through `ExportChoice.remember()` and `ExportPresetsStore.write()`
        and exits, a second reads them back. **This proves the MECHANISM under
-       the PROBE BINARY's own `UserDefaults` domain, not under Reelcut.app's** —
+       the PROBE BINARY's own `UserDefaults` domain, not under Frame Job.app's** —
        no proof script in this tree has ever launched or terminated the app, so
        "the sheet reopens on last time's choice after a relaunch" is not a
        thing any of them can say. What is bought here is that the record
@@ -159,7 +159,7 @@ answer stay under `tools/proof/work/chrome7/`.
 **Section 3's three probe runs are in a scratch home** (issue batch B82,
 #236): `CFFIXED_USER_HOME=tools/proof/work/chrome7/presets-home`, removed and
 made bare when the section starts, so `ExportPresetsStore` writes
-`<presets-home>/Library/Application Support/Reelcut/ExportPresets.json` and the
+`<presets-home>/Library/Application Support/Frame Job/ExportPresets.json` and the
 owner's real `ExportPresets.json` is only ever `stat`ed: its existence, size
 and modification time are compared before and after the section. The three
 modes (`defaults-write`, `defaults-read`, `defaults-clean`) are reached only
@@ -263,7 +263,7 @@ ABOVE_Y1 = 500
 ACCENT_X0, ACCENT_Y0, ACCENT_W, ACCENT_H = 1336, 15, 10, 14
 
 # ---------------------------------------------------------------------------
-# Packages, by hand (spec §5.2). A `.reelcut` is a directory holding a
+# Packages, by hand (spec §5.2). A `.framejob` is a directory holding a
 # `project.json`, so nothing here loads asynchronously and every render is
 # deterministic. Every fixture is a SHAPE card with no media at all: a shape
 # clip needs no decode, gives the Document tab everything it draws, and
@@ -362,7 +362,7 @@ PACKAGES = {
 
 
 def write_package(name, spec):
-    path = os.path.join(WORK, "p7-" + name + ".reelcut")
+    path = os.path.join(WORK, "p7-" + name + ".framejob")
     os.makedirs(path, exist_ok=True)
     with open(os.path.join(path, "project.json"), "w") as f:
         json.dump(project_json(**spec), f, indent=2)
@@ -483,7 +483,7 @@ func openDocument(_ path: String) -> ProjectDocument? {
     let document = ProjectDocument()
     do {
         try document.read(
-            from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+            from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
     } catch {
         return nil
     }
@@ -1119,7 +1119,7 @@ def build_probe():
         os.path.join(ROOT, "app", "Sources", name)
         for name in os.listdir(os.path.join(ROOT, "app", "Sources"))
         if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
@@ -1734,7 +1734,7 @@ def main():
     # ------------------------------------------------------------------
     # 3. The remembered choice and the named presets, in two processes.
     print("\n3. the remembered choice and the named presets, across a process boundary")
-    print("      (the probe binary's OWN defaults domain, never Reelcut.app's — see the "
+    print("      (the probe binary's OWN defaults domain, never Frame Job.app's — see the "
           "header)")
     print("      (in a scratch home, `presets-home`; the real ExportPresets.json is only "
           "`stat`ed)")
@@ -1746,7 +1746,7 @@ def main():
         """(exists, size, mtime_ns) of the owner's real file, by `stat` alone."""
         try:
             info = os.stat(os.path.expanduser(
-                "~/Library/Application Support/Reelcut/ExportPresets.json"))
+                "~/Library/Application Support/Frame Job/ExportPresets.json"))
         except OSError:
             return (False, None, None)
         return (True, info.st_size, info.st_mtime_ns)
@@ -1809,17 +1809,17 @@ def main():
             read_answer = {}
         check("the writing process wrote the presets file, under "
               "`AppSupport.directory` — one spelling of "
-              "`~/Library/Application Support/Reelcut/`, which is what `AppSupport.swift` "
+              "`~/Library/Application Support/Frame Job/`, which is what `AppSupport.swift` "
               "exists for",
               write_answer.get("wrote") is True
               and write_answer.get("presetsURL", "").endswith(
-                  "/Library/Application Support/Reelcut/ExportPresets.json"),
+                  "/Library/Application Support/Frame Job/ExportPresets.json"),
               f"{write_answer.get('presetsURL')}")
         raw = write_answer.get("rawDefaults", "")
         check("the remembered choice is ONE `UserDefaults` key holding the whole record as "
               "JSON, not nine keys — half a remembered choice is a sheet that lies about "
               "what it will export",
-              write_answer.get("defaultsKey") == "ReelcutExportChoice"
+              write_answer.get("defaultsKey") == "FrameJobExportChoice"
               and raw.startswith("{") and raw.endswith("}") and "preset_id" in raw,
               f"{write_answer.get('defaultsKey')} = {raw[:96]}…")
         check("…and `remember()` DROPS the name: the remembered choice is nobody's preset, "

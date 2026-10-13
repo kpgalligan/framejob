@@ -72,7 +72,7 @@ final class SileroVAD {
         let first = unavailableReason == nil
         if first { unavailableReason = reason }
         availabilityLock.unlock()
-        if first { print("Reelcut: voice model unavailable — \(reason)") }
+        if first { print("Frame Job: voice model unavailable — \(reason)") }
     }
 
     /// A fresh instance, or nil (and `markUnavailable`d) for a nil URL or a

@@ -2,7 +2,7 @@
 // headroom, cost and two-thread stress, and q6's font registry reading.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` — the root
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` — the root
 // `CLAUDE.md`'s rule for app ARITHMETIC and app STRUCTURE no script can reach.
 // `tools/proof/peaks_probe.py:101-117` is the swiftc line it is built with.
 //

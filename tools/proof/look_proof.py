@@ -86,7 +86,7 @@ black).
   lattice (its definition read off the core's recipe) answers B > R at grey
   0.2 and R > B at grey 0.8.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
-  `Reelcut: ` line (either instance's).
+  `Frame Job: ` line (either instance's).
 
 GR5b — project MG, 30 fps 640×360: MOVIE at 0 with `{warm, 0.5}` and IM (CARD)
 at 2 s on the first track, TX (a text clip) at 2 s on a second, AJ (an
@@ -197,8 +197,8 @@ B_ROWS = {"B1", "B2", "B3", "B4"}
 MG_NEEDED = MG_ROWS | {"G3", "B2", "B3", "B4"}
 DUMP = WORK / "dump"
 DUMP_CLOSED = WORK / "dump-closed"
-MG = WORK / "MG.reelcut"
-MG_COOL = WORK / "MG-cool.reelcut"
+MG = WORK / "MG.framejob"
+MG_COOL = WORK / "MG-cool.framejob"
 LOOK_MENU = ["Clip", "Look"]
 DISABLED = "is disabled here"
 TILE_NAMES = ["None", "Warm", "Cool", "Teal & Orange", "Vivid", "Faded", "Vintage", "Dramatic",
@@ -210,10 +210,10 @@ def pins(closed, dump):
     """The argument-domain pins (stored value: COLLAPSED), the inspector's
     width (screens.py's 304, so the gallery's rows do not follow a width the
     domain holds), and the dump folder."""
-    return ["-ReelcutInspectorWidth", "<real>304</real>",
-            "-ReelcutInspectorSection.video.look", "<true/>" if closed else "<false/>",
-            "-ReelcutInspectorSection.video.light", "<true/>",
-            "-ReelcutInspectorSection.video.color", "<true/>",
+    return ["-FrameJobInspectorWidth", "<real>304</real>",
+            "-FrameJobInspectorSection.video.look", "<true/>" if closed else "<false/>",
+            "-FrameJobInspectorSection.video.light", "<true/>",
+            "-FrameJobInspectorSection.video.color", "<true/>",
             "-RCDevLookGalleryDump", str(dump)]
 
 
@@ -412,7 +412,7 @@ class Doc:
 def opened(client, name, background=None):
     """A new 640 × 360 project at `name` holding `media`'s one clip on its
     first track; (Doc, sized)."""
-    path = WORK / f"{name}.reelcut"
+    path = WORK / f"{name}.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path)
     arguments = {"width": W, "height": H, "fps": [30, 1]}
@@ -540,7 +540,7 @@ def run_h(client, chart, neutral, state):
           f"core {core}; catalog {listed} ({start!r})")
 
     # P1 (the look-less half)
-    plain_path = WORK / "H-plain.reelcut"
+    plain_path = WORK / "H-plain.framejob"
     saved_plain = doc.call("save_project", path=str(plain_path))
     doc.path = plain_path
     try:
@@ -565,7 +565,7 @@ def run_h(client, chart, neutral, state):
 
     # P1 (the looked half)
     set_vintage = doc.look(ids, {"kind": "vintage", "amount": 0.8})
-    looked_path = WORK / "H-looked.reelcut"
+    looked_path = WORK / "H-looked.framejob"
     saved_looked = doc.call("save_project", path=str(looked_path))
     doc.path = looked_path
     try:
@@ -1040,7 +1040,7 @@ def run_probe(sources, shader, state):
     entry.write_text(PROBE.read_text())
     try:
         built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
-                                  output=folder / "look_probe", defines=["REELCUT_DEV_TOOLS"],
+                                  output=folder / "look_probe", defines=["FRAMEJOB_DEV_TOOLS"],
                                   timeout=1200)
     except swift_build.SwiftBuildFailed as error:
         for name in sorted(selected & (L_ROWS | B_ROWS)):
@@ -1082,7 +1082,7 @@ def tail(log, count=4):
 
 def complaints(log):
     try:
-        return [line.strip() for line in open(log, errors="replace") if "Reelcut: " in line]
+        return [line.strip() for line in open(log, errors="replace") if "Frame Job: " in line]
     except OSError:
         return [f"{log} could not be read"]
 
@@ -1162,7 +1162,7 @@ def main():
     scored = [name for name in ROWS if name in selected and name not in RECORDS]
     binary = Path(args.app) if args.app else proof_app.binary()
     if binary.suffix == ".app":
-        binary = binary / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(binary)
     sources, shader = ROOT / "app/Sources", ROOT / SHADER
     config = proof_app.config()
     if args.mutant:
@@ -1172,7 +1172,7 @@ def main():
         if app is None:
             print(f"mutant {args.mutant}: the control could not be performed — {copy}")
             return 2
-        binary = app / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(app)
         sources, shader = copy / "app/Sources", copy / SHADER
         if "CT" in named:
             passed_ct, last = core_test(copy)
@@ -1244,7 +1244,7 @@ def main():
                   f"{'equal' if good else neutral.misses + missing}", flush=True)
     found = [line for path in logs if path.exists() for line in complaints(path)]
     fixtures_ok = all(value for key, value in state.items() if key.endswith("fixture"))
-    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Reelcut: ` "
+    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Frame Job: ` "
           "line", closed and fixtures_ok and not found,
           f"closed {closed}; fixtures {state}; complaints {found}")
     if log.exists():

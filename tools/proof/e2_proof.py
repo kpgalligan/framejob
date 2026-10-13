@@ -75,7 +75,7 @@ SEC = 600_000
 FRAME = 20_000
 CANVAS = (640, 360)
 VERSION = 8
-HEADER = os.path.join(ROOT, "core", "include", "reelcut_core.h")
+HEADER = os.path.join(ROOT, "core", "include", "framejob_core.h")
 
 
 def format_version():
@@ -340,7 +340,7 @@ def canonical(value):
 class Session:
     """One project, `phase6_proof.py`'s shape.
 
-    `<name>-<pid>.reelcut`, never a fixed name: a `project` path is matched
+    `<name>-<pid>.framejob`, never a fixed name: a `project` path is matched
     against every open document and no tool closes one, so two earlier runs'
     SAVED packages would have the app answering for an old one."""
 
@@ -348,9 +348,9 @@ class Session:
         self.mcp = mcp
         self.name = name
         for stale in os.listdir(WORK):
-            if re.fullmatch(rf"{re.escape(name)}-\d+\.reelcut", stale):
+            if re.fullmatch(rf"{re.escape(name)}-\d+\.framejob", stale):
                 shutil.rmtree(os.path.join(WORK, stale))
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         if open_from is None:
             mcp.call("new_project", path=self.path)
             self.op("set_canvas", width=canvas[0], height=canvas[1],
@@ -667,7 +667,7 @@ def instance_part(mcp, socket_path):
     bad = []
     if os.path.exists(path):
         with open(path, encoding="utf-8", errors="replace") as handle:
-            bad = [line.rstrip() for line in handle if "Reelcut: " in line]
+            bad = [line.rstrip() for line in handle if "Frame Job: " in line]
     check(os.path.exists(path) and not bad,
           f"the parity log is empty ({'; '.join(bad[:2]) if bad else path})")
 
@@ -679,7 +679,7 @@ def schema_part(mcp):
     print("\n1 — the schema: what a file means, what a save writes, what is refused")
     builder, card = card_session(mcp, "e2-v7-src")
     builder.save()
-    v7 = as_version(builder.path, os.path.join(WORK, f"e2-v7-{os.getpid()}.reelcut"), 7)
+    v7 = as_version(builder.path, os.path.join(WORK, f"e2-v7-{os.getpid()}.framejob"), 7)
     session = Session.opened(mcp, v7)
     clip = session.project()["clips"][0]["id"]
     check(session.clip(clip)["video"]["motion"] is None,
@@ -730,9 +730,9 @@ def schema_part(mcp):
             patch={"video": {"x": 50}})
     base.save()
     plain = as_version(
-        base.path, os.path.join(WORK, f"e2-endpatch-plain-{os.getpid()}.reelcut"), VERSION)
+        base.path, os.path.join(WORK, f"e2-endpatch-plain-{os.getpid()}.framejob"), VERSION)
     carried = as_version(
-        base.path, os.path.join(WORK, f"e2-endpatch-motion-{os.getpid()}.reelcut"), VERSION)
+        base.path, os.path.join(WORK, f"e2-endpatch-motion-{os.getpid()}.framejob"), VERSION)
     path = os.path.join(carried, "project.json")
     with open(path, encoding="utf-8") as handle:
         project = json.load(handle)
@@ -775,9 +775,9 @@ def schema_part(mcp):
     set_motion(zero_src, zero_clip, motion(during=slot("pulse", 1.0, 1.0)))
     zero_src.save()
     zero = as_version(
-        zero_src.path, os.path.join(WORK, f"e2-period-zero-{os.getpid()}.reelcut"), VERSION)
+        zero_src.path, os.path.join(WORK, f"e2-period-zero-{os.getpid()}.framejob"), VERSION)
     none = as_version(
-        zero_src.path, os.path.join(WORK, f"e2-period-none-{os.getpid()}.reelcut"), VERSION)
+        zero_src.path, os.path.join(WORK, f"e2-period-none-{os.getpid()}.framejob"), VERSION)
     for package, value in [(zero, 0), (none, None)]:
         path = os.path.join(package, "project.json")
         with open(path, encoding="utf-8") as handle:
@@ -1248,7 +1248,7 @@ def zero_edges_part(mcp):
     check((session.frame(first), session.frame(last)) == control,
           "zero In/Out render byte-identically to no motion at first and last frames")
     saved = session.save()
-    copy = os.path.join(WORK, f"e2-zero-reopen-{os.getpid()}.reelcut")
+    copy = os.path.join(WORK, f"e2-zero-reopen-{os.getpid()}.framejob")
     if os.path.exists(copy):
         shutil.rmtree(copy)
     shutil.copytree(session.path, copy)

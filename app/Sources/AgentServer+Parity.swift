@@ -51,7 +51,7 @@ import Foundation
 /// size (app/CLAUDE.md) and this is the longest of the five parts — part 4
 /// is `AgentServer+Scope.swift`'s for the feature it is about, and parts 1
 /// to 3 stay beside the private dispatch table they read. Its reporting is
-/// identical to all four: an assertion in debug, a `Reelcut: ` line in
+/// identical to all four: an assertion in debug, a `Frame Job: ` line in
 /// release, and the server starts either way.
 extension AgentServer {
 

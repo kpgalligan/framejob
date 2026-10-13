@@ -15,7 +15,7 @@ V1 + the placeholder route (both layer entry points take `texture(1)` and step
 7 multiplies the layer's coverage by its sample at the fragment's
 canvas-normalised position, always); V2 + the function-constant route (the same
 multiply behind `kMatte [[function_constant(1)]]`). Both add `MatteUniforms` and
-`reelcut_matte_resolve_fragment`. Every patch is applied at an anchor that must
+`framejob_matte_resolve_fragment`. Every patch is applied at an anchor that must
 occur EXACTLY once; a missing or repeated anchor is the scored FAILURE row B0.
 Each is compiled with `xcrun metal` (B1). `bench.swift` is built over
 `app/Sources` (for the app's own `LayerUniforms`) through
@@ -140,7 +140,7 @@ struct MatteUniforms {
 
 // One matte's value at this pixel, multiplied into the r8 coverage by the
 // pipeline (source factor zero, destination factor sourceColor).
-fragment float4 reelcut_matte_resolve_fragment(ShadowVaryings in [[stage_in]],
+fragment float4 framejob_matte_resolve_fragment(ShadowVaryings in [[stage_in]],
                                                constant MatteUniforms &u [[buffer(0)]],
                                                texture2d<float> mask [[texture(0)]]) {
     float4 m = mask.read(uint2(in.position.xy));
@@ -212,7 +212,8 @@ def build_shaders(folder, mutant, tree=False):
     if shown.returncode != 0:
         emit("B0", "FAIL", f"git show {SHADER_COMMIT}:{SHADER} failed: {shown.stderr.strip()[-300:]}")
         return None
-    source = shown.stdout
+    # The commit predates rename R1: its entry points take the names the bench asks for.
+    source = shown.stdout.replace("reelcut_", "framejob_")
     texts = {"V0": source}
     if tree:
         texts["VT"] = (ROOT / SHADER).read_text()
@@ -251,7 +252,7 @@ def build_bench():
         entry.write_text(source)
     try:
         built = swift_build.build(sources=swift_build.app_sources() + [entry],
-                                  output=folder / "matte_bench", defines=["REELCUT_DEV_TOOLS"],
+                                  output=folder / "matte_bench", defines=["FRAMEJOB_DEV_TOOLS"],
                                   optimize=True, timeout=1200)
     except swift_build.SwiftBuildFailed as error:
         emit("B2", "FAIL", f"the bench did not build (-O): {error.diagnostics[:6]}")

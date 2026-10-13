@@ -218,7 +218,7 @@ private final class TranscriptTextView: NSTextView {
     }
 }
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 extension AssistantTranscriptView: UISnapshotParts {
     /// One `assistant.entry.<kind>` part per entry, for the layout dump.
     func snapshotParts() -> [UISnapshotPart] {

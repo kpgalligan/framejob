@@ -2,8 +2,8 @@
 //
 // The Keychain from an ad-hoc-signed bundle, one step per process so a modal
 // nobody can click is a TIMEOUT of that step and not a lost run. It stores
-// `spike-dummy` under service `com.reelcut.spike.q7`, account `spike`, and
-// never touches `com.kgalligan.reelcut.assemblyai` — the service C1 would
+// `spike-dummy` under service `com.framejob.spike.q7`, account `spike`, and
+// never touches `com.kgalligan.framejob.assemblyai` — the service C1 would
 // use — nor reads any other item.
 //
 //   keychain_probe <add|read|read-noui|attrs|delete> [--dp]
@@ -26,7 +26,7 @@ func emit(_ object: [String: Any]) -> Never {
     exit(0)
 }
 
-let service = "com.reelcut.spike.q7"
+let service = "com.framejob.spike.q7"
 let account = "spike"
 let secret = "spike-dummy"
 

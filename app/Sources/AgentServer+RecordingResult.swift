@@ -307,13 +307,13 @@ extension AgentServer {
 
     /// The clause both of the tool's timeout sentences end with, and the
     /// recorder's own arm timeout gets it too: macOS 15 periodically puts up
-    /// a consent alert — whether to keep letting Reelcut bypass the system
+    /// a consent alert — whether to keep letting Frame Job bypass the system
     /// window picker — which is a prompt neither `CGPreflightScreenCaptureAccess`
     /// (still true) nor this tool can see, and a capture waiting behind it
     /// looks exactly like a recorder that hung.
     static let recordingAlertClause =
         " A system alert about screen recording may be waiting on the screen — macOS "
-        + "periodically asks whether to keep allowing Reelcut to record, and neither the "
+        + "periodically asks whether to keep allowing Frame Job to record, and neither the "
         + "preflight nor this tool can see that prompt; answer it and call again."
 
     /// The start's failure as the caller reads it: the recorder's sentence,

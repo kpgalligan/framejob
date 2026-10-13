@@ -5,12 +5,12 @@ in a copy gets its copy from.
     python3 tools/proof/tree_copy.py --selftest
 
 A proof that builds a mutant app must not build in the tree: xcodegen writes
-`Reelcut.xcodeproj/`, `app/Info.plist` and `app/Reelcut.entitlements`, and
+`FrameJob.xcodeproj/`, `app/Info.plist` and `app/FrameJob.entitlements`, and
 the helper's build step runs `bun install` and `bun build`, which write into
 `agent/`. So the copy's `app/` and `agent/` are COPIED (`COPIED`), and every
 other build input is a SYMLINK to the tree's — `core` already built, so
 `project.yml`'s pre-build `cargo build --release` is a no-op and the copy
-links the tree's `libreelcut_core.a`.
+links the tree's `libframejob_core.a`.
 
 **The build inputs are derived from `project.yml`, not listed by hand.**
 `build_inputs` answers every top-level directory of the tree (no leading
@@ -19,7 +19,7 @@ preceded by a name character — `app/Sources`, `$PROJECT_DIR/core`,
 `"$PROJECT_DIR/agent/build.sh"`. So a build step that reads a new top-level
 directory is linked into every copy the day it lands, and no builder's copy
 can miss it (#146: `graphics_proof.py`'s copy missed `agent/` and `docs/`).
-`GENERATED` (`build`, `Reelcut.xcodeproj`) is never linked: a copy writes
+`GENERATED` (`build`, `FrameJob.xcodeproj`) is never linked: a copy writes
 its own.
 
 `make_copy(dest, agent=True)`, in order: remove `dest` (`remove_tree`), make it; copy `app/`
@@ -33,7 +33,7 @@ Rasterize's `agent/` in its place.
 **A copy builds through `build_app(dest, seconds, env=None,
 release_only=None)`** (issue batch B88): `make app-debug` or `make app` in
 `dest`, as `proof_app.config(release_only)` chooses (`RC_PROOF_APP`), under
-`bounded.run`'s wall-clock bound, answering `(the copy's Reelcut.app, None)`
+`bounded.run`'s wall-clock bound, answering `(the copy's Frame Job.app, None)`
 or `(None, reason)`: the target, its status, whether it expired, and its
 first six `error:` lines (else its output's tail). A build that succeeded
 prints one line with its target and its seconds.
@@ -86,7 +86,7 @@ WORK = os.path.join(ROOT, "tools", "proof", "work", "tree_copy")
 
 COPIED = ("app", "agent")                      # the build writes into these, so copied
 COPIED_FILES = ("project.yml", "Makefile", "VERSION")   # what `make project` reads
-GENERATED = ("build", "Reelcut.xcodeproj")     # never linked
+GENERATED = ("build", "FrameJob.xcodeproj")     # never linked
 
 
 def build_inputs(project_yml=None):
@@ -186,7 +186,7 @@ def build_app(dest, seconds, env=None, release_only=None):
     except ValueError as error:
         return None, str(error)
     built = bounded.run(["make", target], seconds, cwd=str(dest), env=env)
-    if built["rc"] != 0 or built["expired"] or not (app / "Contents/MacOS/Reelcut").exists():
+    if built["rc"] != 0 or built["expired"] or not proof_app.executable(app).exists():
         output = built["stdout"] + built["stderr"]
         errors = [line for line in output.splitlines() if "error:" in line]
         return None, (f"make {target} rc {built['rc']} (expired {built['expired']}, "
@@ -295,7 +295,7 @@ def selftest():
     try:
         ls = os.path.join(WORK, "ls")
         plist = ('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict>'
-                 '<key>CFBundleIdentifier</key><string>test.reelcut.treecopy.t5</string>'
+                 '<key>CFBundleIdentifier</key><string>test.framejob.treecopy.t5</string>'
                  '</dict></plist>\n')
         seen = os.path.join(ls, "Seen.app")
         hidden = os.path.join(ls, "build", "Intermediates.noindex", "Hidden.app")

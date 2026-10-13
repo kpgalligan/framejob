@@ -11,7 +11,7 @@ final class DocumentPane: InspectorPaneView {
     /// Whether a size change rescales the clips with it (§6's
     /// `rescale_clips`). A UI preference, not a project value, so it lives in
     /// `UserDefaults` and rides along with the next size edit.
-    static let rescaleClipsKey = "ReelcutInspectorRescaleClips"
+    static let rescaleClipsKey = "FrameJobInspectorRescaleClips"
 
     /// **This whole pane reads `binding.documentSnapshot` / `documentCanvas`
     /// / `documentProject` and never `binding.snapshot`** (road map 2's phase

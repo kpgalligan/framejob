@@ -1,13 +1,13 @@
 import Foundation
 
-/// `~/Library/Application Support/Reelcut/` — the ONE place the app spells its
+/// `~/Library/Application Support/Frame Job/` — the ONE place the app spells its
 /// own support directory.
 ///
 /// Two things live under it and they arrived a phase apart:
 /// `Rewrapped/`, the ffmpeg conversions `FFmpegRewrap` writes (spec §11, and
 /// that file's `rewrapDirectory` doc argues at length why they are not in the
 /// document package), and `ExportPresets.json`, the named export presets road
-/// map 2's phase 7 added. Neither is document state — a `.reelcut` package
+/// map 2's phase 7 added. Neither is document state — a `.framejob` package
 /// holds `project.json` and `cache` and drops anything else on the next save —
 /// and neither is regenerable from the project, which is the pair of facts
 /// that puts both here rather than in the package or in `NSTemporaryDirectory`.
@@ -35,9 +35,9 @@ import Foundation
 /// they never used.
 enum AppSupport {
     /// The app's folder name inside Application Support. The one literal.
-    static let folderName = "Reelcut"
+    static let folderName = "Frame Job"
 
-    /// `~/Library/Application Support/Reelcut/`, or nil on the sandboxed or
+    /// `~/Library/Application Support/Frame Job/`, or nil on the sandboxed or
     /// broken installs where `FileManager` cannot answer. Nil is a refusal
     /// every caller already has to handle: a conversion that cannot be filed
     /// is not attempted, and export presets degrade to none.

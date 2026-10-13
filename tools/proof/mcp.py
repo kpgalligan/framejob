@@ -1,9 +1,9 @@
 """A minimal MCP streamable-HTTP client over the app's Unix socket, enough to
-drive Reelcut's agent, and the one launcher the proofs share.
+drive Frame Job's agent, and the one launcher the proofs share.
 
 Road map 14's MC4 deleted the TCP listener: an instance is reached ONLY at
 the socket `RC_AGENT_SOCKET` names, and a proof never binds the person's own
-(`~/Library/Application Support/Reelcut/Agent/agent.sock`, spec §11 MC-6).
+(`~/Library/Application Support/Frame Job/Agent/agent.sock`, spec §11 MC-6).
 `scratch_socket()` makes a `0700` folder under `$TMPDIR` for one instance,
 `launch()` starts a binary on it and waits for the socket's log line, and
 `remove_scratch()` deletes the folder afterwards.
@@ -19,10 +19,10 @@ refuse). Both raise `proof_app.StaleApp`, naming the file, its time and the
 **The defaults guard** (issue batch B83, #238). No environment moves
 `UserDefaults`, so every instance a proof drives shares its bundle's
 defaults domain with the owner. The guarded domain is the bundle under
-test's: `com.kgalligan.Reelcut` for Release, `com.kgalligan.Reelcut.debug`
+test's: `com.kgalligan.FrameJob` for Release, `com.kgalligan.FrameJob.debug`
 for Debug (`make app-debug`, spec §11 V-5). A record per socket path holds
 that domain's key names against salted digests (`proof_defaults.snapshot`,
-`defaults export` only) and the other Reelcut pids sharing it:
+`defaults export` only) and the other Frame Job pids sharing it:
 `scratch_socket()` records `proof_app.domain()`, the app `RC_PROOF_APP`
 chooses, `launch()` re-records the binary's own and owns its child, and
 `MCP()` records a socket it was handed. A socket `scratch_socket()` made and
@@ -37,7 +37,7 @@ told every key of the domain moved (issue batch B84; `defaults_proof.py`
 H1, H2). `remove_scratch()` compares, and one
 `atexit` handler compares every record still held. A moved key outside
 AppKit's `NS*`/`Apple*` families prints `mcp: DEFAULTS MOVED in <domain>:
-<names> (other Reelcut pids: <list|none>)` on stderr; when no other Reelcut
+<names> (other Frame Job pids: <list|none>)` on stderr; when no other Frame Job
 shares the domain the script ENDS with status `DEFAULTS_EXIT` and those
 lines last, and when one does it only prints. A value is never printed.
 `defaults_proof.py` is its proof. A handed socket whose file is there and
@@ -108,7 +108,7 @@ class MCP:
             {
                 "protocolVersion": "2025-06-18",
                 "capabilities": {},
-                "clientInfo": {"name": "reelcut-proof", "version": "1"},
+                "clientInfo": {"name": "framejob-proof", "version": "1"},
             },
         )
         self._notify("notifications/initialized")
@@ -228,15 +228,17 @@ def remove_scratch(socket_path):
 
 
 def log_beside(socket_path):
-    """`<the socket's folder>/reelcut.log`."""
-    return os.path.join(os.path.dirname(str(socket_path)), "reelcut.log")
+    """`<the socket's folder>/framejob.log`."""
+    return os.path.join(os.path.dirname(str(socket_path)), "framejob.log")
 
 
 def wait_listening(log_path, socket_path, child=None, seconds=60, offset=0):
-    """True once the log, read from byte `offset`, holds `Reelcut agent
+    """True once the log, read from byte `offset`, holds `Frame Job agent
     socket listening at <socket_path>`; False on a `not bound` line, when
-    `child` exits, or at the deadline."""
-    want = f"Reelcut agent socket listening at {socket_path}"
+    `child` exits, or at the deadline. A build of a tree from before rename R1
+    (`grading_verdict.py`'s main tree) says the same under its old name."""
+    names = ("Frame Job", "Reelcut")
+    wants = tuple(f"{name} agent socket listening at {socket_path}" for name in names)
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         try:
@@ -246,9 +248,9 @@ def wait_listening(log_path, socket_path, child=None, seconds=60, offset=0):
         except OSError:
             text = ""
         for line in text.splitlines():
-            if line.rstrip().endswith(want):
+            if line.rstrip().endswith(wants):
                 return True
-            if "Reelcut agent socket not bound: " in line:
+            if any(f"{name} agent socket not bound: " in line for name in names):
                 return False
         if child is not None and child.poll() is not None:
             return False
@@ -374,7 +376,7 @@ def _guard_handed(socket_path):
     it, else the app's, that pid owned. When the socket's file is there and
     `lsof` names no pid for it, asked twice, that is said on stderr: the
     record then guards the app's domain and cannot tell the handed instance
-    from another Reelcut, so a moved key is only printed unless `lsof` names
+    from another Frame Job, so a moved key is only printed unless `lsof` names
     the pid at the compare. A pid whose bundle identifier cannot be read is
     said too: the record then guards the app's domain. A record that owns no
     pid (one `scratch_socket()` made) is re-homed (`_rehome`) when the
@@ -402,7 +404,7 @@ def _guard_handed(socket_path):
         elif os.path.exists(socket_path):
             _say(f"mcp: the defaults guard found no pid holding {socket_path}; it guards "
                  f"{proof_defaults.APP_DOMAIN} and cannot tell this instance from another "
-                 "Reelcut, so a moved key is only printed unless `lsof` names it at the compare")
+                 "Frame Job, so a moved key is only printed unless `lsof` names it at the compare")
         _record(socket_path, domain or proof_defaults.APP_DOMAIN, own=[pid])
     except Exception as error:
         _off(socket_path, error)
@@ -422,7 +424,7 @@ def defaults_moved(socket_path):
 
 
 def _moved_line(domain, names, others):
-    return (f"mcp: DEFAULTS MOVED in {domain}: {', '.join(names)} (other Reelcut pids: "
+    return (f"mcp: DEFAULTS MOVED in {domain}: {', '.join(names)} (other Frame Job pids: "
             f"{', '.join(str(pid) for pid in others) or 'none'})")
 
 
@@ -472,7 +474,7 @@ def _exit_failed(lines):
 def _defaults_at_exit():
     """Registered at import, so it runs after any handler a script registers
     later: finishes every record still held, then fails the script when a
-    moved key has no other Reelcut to be blamed on."""
+    moved key has no other Frame Job to be blamed on."""
     for socket_path in list(_GUARDED):
         try:
             _finish(socket_path, _GUARDED.pop(socket_path))

@@ -42,7 +42,7 @@ runs it with `nil` (the build's own result) or with `ProbeFault` (a failed
 build). S13–S15 force both cases, and a row that expects a report now requires
 one (`all_at`'s `at_least`): an empty log used to pass.
 
-Fixture, rewritten every run under `work/scope-playhead/`: `scope.reelcut`,
+Fixture, rewritten every run under `work/scope-playhead/`: `scope.framejob`,
 640 × 360 at 30 fps, black, one track, no clips — the probe itself adds shape A
 at 0–1 s and shape B at 2–4 s and nests B into N at 2–4 s. No media, so no
 ffmpeg: S8–S11 are `playhead_echo_probe.py`'s rows without its movie.
@@ -62,7 +62,7 @@ with the block held (N's plan empties), the held block run (a stale
 generation) → no item, `restoring` false, kept at 1 s, heard at least once,
 every tick 1 s.
 
-Needs `swiftc`, `xcrun metal` and `core/target/release/libreelcut_core.a`. No
+Needs `swiftc`, `xcrun metal` and `core/target/release/libframejob_core.a`. No
 port. Run from anywhere:
 
     python3 tools/proof/scope_playhead_probe.py [--sources PATH]
@@ -88,7 +88,7 @@ PROBE_SWIFT = os.path.join(HERE, "scope_playhead_probe.swift")
 SHADER = os.path.join(ROOT, "app", "Resources", "Shaders", "Compositor.metal")
 FONTS = os.path.join(ROOT, "app", "Resources", "Fonts")
 PLACEHOLDER = os.path.join(ROOT, "app", "Resources", "Blank.mp4")
-HEADER = os.path.join(ROOT, "core", "include", "reelcut_core.h")
+HEADER = os.path.join(ROOT, "core", "include", "framejob_core.h")
 
 TICKS = 600_000
 
@@ -122,7 +122,7 @@ def format_version():
 def make_fixture():
     """(package, None) or (None, reason)."""
     os.makedirs(WORK, exist_ok=True)
-    package = os.path.join(WORK, "scope.reelcut")
+    package = os.path.join(WORK, "scope.framejob")
     shutil.rmtree(package, ignore_errors=True)
     os.makedirs(package)
     try:
@@ -185,7 +185,7 @@ def build_probe(sources):
         return None, why
     swift = sorted(os.path.join(sources, name) for name in os.listdir(sources)
                    if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:

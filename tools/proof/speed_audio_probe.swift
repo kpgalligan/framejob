@@ -6,7 +6,7 @@
 // and `AgentServer`.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` — the swiftc
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` — the swiftc
 // line `sheet_queue_probe.py` uses. One process:
 //
 //   speed_audio_probe <request.json>
@@ -95,13 +95,13 @@ let ceilingText = rateText(limits.audioMax)
 func oneMessage(_ name: String, _ speed: String) -> String {
     "“\(name)” will be silent at \(speed)."
 }
-let oneDetail = "Reelcut leaves a clip’s audio out above \(ceilingText). The picture still plays."
+let oneDetail = "Frame Job leaves a clip’s audio out above \(ceilingText). The picture still plays."
 func manyMessage(_ count: Int, _ speed: String?) -> String {
     speed.map { "\(count) clips will be silent at \($0)." }
         ?? "\(count) clips will be silent at their new speeds."
 }
 let manyDetail =
-    "Reelcut leaves a clip’s audio out above \(ceilingText). The pictures still play."
+    "Frame Job leaves a clip’s audio out above \(ceilingText). The pictures still play."
 func agentNote(_ id: UInt32, _ name: String) -> String {
     "Clip \(id) (“\(name)”) now plays above \(ceilingText), so its audio is left out: it is "
         + "silent in the preview and the export."

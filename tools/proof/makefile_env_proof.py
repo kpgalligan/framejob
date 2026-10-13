@@ -26,7 +26,7 @@ environment is built from `os.environ` with both keys POPPED and
 `RCDUMMY-makefile-env-proof-anthropic-9b3e` put in their places; the
 person's own values are never read, printed, searched for or written. The
 search afterwards is IN PROCESS — the bytes of each dummy against the bytes
-of every file under the copy's `build/` and `Reelcut.xcodeproj/` — and
+of every file under the copy's `build/` and `FrameJob.xcodeproj/` — and
 nothing but paths and booleans is ever printed.
 
 **The tree is never touched.** Everything happens in a COPY at
@@ -35,15 +35,15 @@ and `agent/` (without `node_modules`, because the helper's build step runs
 `bun install` and `bun build`, which write into it) are COPIED, and every
 other build input `project.yml` names is a SYMLINK to the tree's (`core`
 already built, so `project.yml`'s pre-build `cargo build --release` is a
-no-op and the copy links the tree's `libreelcut_core.a`).
+no-op and the copy links the tree's `libframejob_core.a`).
 
 The four rows:
 
-* the build made `Reelcut.app`'s binary — a failed build holds nothing, and
+* the build made `Frame Job.app`'s binary — a failed build holds nothing, and
   "no file holds the dummy" would be true of it for the wrong reason;
 * no process whose cwd or command line lies under the copy outlives its
   `make app` (the sweep below);
-* no file under the copy's `build/` or `Reelcut.xcodeproj/` holds the
+* no file under the copy's `build/` or `FrameJob.xcodeproj/` holds the
   AssemblyAI dummy's bytes;
 * no file there holds the Anthropic dummy's bytes.
 
@@ -81,6 +81,7 @@ import signal
 import sys
 import time
 
+import proof_app
 import tree_copy
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "graphics_spike"))
@@ -160,8 +161,8 @@ def make_copy(mutant):
 def build(root, wall):
     """`make app` inside the copy, with the dummy exported. Answers the
     binary's path, or None and a reason."""
-    binary = os.path.join(root, "build", "Build", "Products", "Release", "Reelcut.app",
-                          "Contents", "MacOS", "Reelcut")
+    binary = str(proof_app.executable(
+        os.path.join(root, "build", "Build", "Products", "Release", "Frame Job.app")))
     started = time.time()
     run = bounded.run(["make", "app"], wall, cwd=root, env=child_env())
     if run["expired"]:
@@ -272,14 +273,14 @@ def listed(processes):
 
 def holders(root):
     """For each dummy, every file under the copy's `build/` and
-    `Reelcut.xcodeproj/` whose BYTES hold it, as paths relative to the copy.
+    `FrameJob.xcodeproj/` whose BYTES hold it, as paths relative to the copy.
 
     In process, with `open(..., 'rb')` and `in`: nothing is shelled out to,
     so a dummy is never a process argument and never reaches a log."""
     needles = {one["dummy"]: one["dummy"].encode("utf-8") for one in KEYS}
     found = {dummy: [] for dummy in needles}
     scanned = 0
-    for folder in ("build", "Reelcut.xcodeproj"):
+    for folder in ("build", "FrameJob.xcodeproj"):
         base = os.path.join(root, folder)
         for here, _, names in os.walk(base):
             for name in names:
@@ -337,7 +338,7 @@ def main():
         print(f"  sweep: killed {len(killed)} process(es) of the copy: {killed}")
     swept = not survivors and why is None
     sweep_reason = why or ("still running: " + listed(survivors) if survivors else "")
-    check("the copy's `make app` built Reelcut.app's binary — a failed build holds nothing, "
+    check("the copy's `make app` built Frame Job.app's binary — a failed build holds nothing, "
           "and \"no file holds the dummy\" would be true of it for the wrong reason",
           binary is not None, reason or "")
     check("no process whose cwd or command line lies under the copy outlives its `make app`",
@@ -349,7 +350,7 @@ def main():
     found, scanned = holders(root)
     for one in KEYS:
         held = found[one["dummy"]]
-        check(f"no file under the copy's build/ or Reelcut.xcodeproj/ holds the "
+        check(f"no file under the copy's build/ or FrameJob.xcodeproj/ holds the "
               f"{one['label']} dummy ({scanned} files read)",
               not held, "held by:\n       " + "\n       ".join(held[:8]))
 

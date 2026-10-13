@@ -53,15 +53,15 @@ enum ProbeSupport {
             app.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])?.rawValue ?? "unknown"
         UserDefaults.standard.setVolatileDomain(
             [
-                "ReelcutInspectorWidth": 304.0,
-                "ReelcutTimelineHeight": 300.0,
-                "ReelcutInspectorCollapsed": false,
-                "ReelcutTimelineTrackHeight": 1,
-                "ReelcutSnappingEnabled": true,
-                "ReelcutSafeGuidesVisible": false,
-                "ReelcutInspectorRescaleClips": false,
-                "ReelcutExportChoice": "",
-                "ReelcutPreviewQuality": 0,
+                "FrameJobInspectorWidth": 304.0,
+                "FrameJobTimelineHeight": 300.0,
+                "FrameJobInspectorCollapsed": false,
+                "FrameJobTimelineTrackHeight": 1,
+                "FrameJobSnappingEnabled": true,
+                "FrameJobSafeGuidesVisible": false,
+                "FrameJobInspectorRescaleClips": false,
+                "FrameJobExportChoice": "",
+                "FrameJobPreviewQuality": 0,
                 "AppleShowScrollBars": "Always",
                 InspectorSection.collapsedKeyPrefix + "text.animation": false,
             ], forName: UserDefaults.argumentDomain)
@@ -131,14 +131,14 @@ enum ProbeSupport {
         ]
     }
 
-    /// The `activation` mode: `well.reelcut` opened as every mode opens it,
+    /// The `activation` mode: `well.framejob` opened as every mode opens it,
     /// then `activate` — whether this launch can become the active app with
     /// the editor key, and how many windows it shows (one: no untitled one).
     static func runActivation(fixtures: URL) -> (ProbeJSON, ProbeJSON) {
         let e: ProbeEditor
         do {
             e = try ProbeEditor(
-                fixtures.appendingPathComponent("well.reelcut"), select: [2], playhead: 1)
+                fixtures.appendingPathComponent("well.framejob"), select: [2], playhead: 1)
         } catch {
             return (windowFacts(nil, activation: nil), ["X0": probeError("open failed: \(error)")])
         }

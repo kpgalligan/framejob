@@ -150,7 +150,7 @@ def build_probe(sources, out):
     binary = os.path.join(out, "clip-inspector-probe")
     swift = sorted(os.path.join(sources, n) for n in os.listdir(sources)
                    if n.endswith(".swift") and n != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
@@ -339,7 +339,7 @@ def harness_checks(chrome, probe):
 
 def mutant():
     began = time.time()
-    with tempfile.TemporaryDirectory(prefix="reelcut-clip-inspector-entry-") as temp:
+    with tempfile.TemporaryDirectory(prefix="framejob-clip-inspector-entry-") as temp:
         sources = os.path.join(temp, "Sources")
         shutil.copytree(os.path.join(ROOT, "app", "Sources"), sources)
         path = os.path.join(sources, MUTANT_FILE)

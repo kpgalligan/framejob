@@ -119,7 +119,7 @@ extension AgentServer {
             + "mic_path, mic_duration, mic_offset and mic_problem on the same terms as the "
             + "top level for THAT segment's files, plus media, clip, mic_media and mic_clip "
             + "when they are known); stopped_by — stopped for the tool's own stop and for a "
-            + "person's Stop from Reelcut's menu-bar item or the File menu, user_stopped "
+            + "person's Stop from Frame Job's menu-bar item or the File menu, user_stopped "
             + "for the system's own screen-recording indicator, system_stopped for a "
             + "display that slept; landed (document or new_project); note, when "
             + "there is something to say; project, the usual summary; and for a document "
@@ -145,7 +145,7 @@ extension AgentServer {
             + "Microphone, in one undo step (Add Recording); as a new project the first file "
             + "IS the document, 1920×1080 at rate, and the later files touch it on its one "
             + "track. display, window, system_audio, show_clicks, size and "
-            + "include_reelcut_windows are refused by name with source voice_over, and so is microphone: false (true is implied); "
+            + "include_framejob_windows are refused by name with source voice_over, and so is microphone: false (true is implied); "
             + "source is read right after seconds, and only the Microphone grant is read — "
             + "never the Screen Recording one. The result's path is the first .m4a, its "
             + "width and height 0, with no mic_path, and mic_offset 0; a microphone that "
@@ -175,7 +175,7 @@ extension AgentServer {
         rows += [
             tool(
                 "consolidate_media",
-                "Copies every file the project references into media/ inside the .reelcut "
+                "Copies every file the project references into media/ inside the .framejob "
                     + "package and relinks the project at the copies — File ▸ Consolidate "
                     + "Media…. Afterwards the package is the whole edit: it can be moved or "
                     + "archived and still open with its original footage deleted. The project "
@@ -257,7 +257,7 @@ extension AgentServer {
             tool(
                 "record_screen",
                 "Records the screen for seconds and lands the movie as ORDINARY MEDIA — File "
-                    + "▸ New Recording…, without the panel. The file goes to ~/Movies/Reelcut "
+                    + "▸ New Recording…, without the panel. The file goes to ~/Movies/Frame Job "
                     + "Recordings (or the folder path names), named Screen Recording "
                     + "<date> at <time>.mov, and is then imported exactly as import_media "
                     + "imports a file: a media entry, and with place (the default) one clip "
@@ -284,10 +284,10 @@ extension AgentServer {
                     + "(and the Microphone grant when microphone is true) must already be held "
                     + "by this process — the panel is where somebody grants them — and a "
                     + "missing one is refused by name with the System Settings pane in the "
-                    + "sentence. A Reelcut launched from a shell runs under the TERMINAL's "
+                    + "sentence. A Frame Job launched from a shell runs under the TERMINAL's "
                     + "grants, not the app icon's, and both refusals then also name the "
                     + "launching process (its pid) and the way out — relaunch with open -a "
-                    + "Reelcut.app, or grant the terminal. THE REFUSAL ORDER is fixed: your own "
+                    + "\"Frame Job\", or grant the terminal. THE REFUSAL ORDER is fixed: your own "
                     + "mistakes first (seconds missing or outside 1…600, display and window "
                     + "both given, a rate or size outside the vocabulary, microphone: true "
                     + "without the Microphone grant, a project naming nothing open), then the "
@@ -308,15 +308,15 @@ extension AgentServer {
                             + "window — or voice_over, the default microphone alone with no "
                             + "picture (the panel's Microphone Only). With voice_over, "
                             + "display, window, system_audio, show_clicks, size, "
-                            + "include_reelcut_windows and microphone: false are refused "
+                            + "include_framejob_windows and microphone: false are refused "
                             + "by name.",
                     ],
                     "display": [
                         "type": "integer", "minimum": 0,
                         "description": "Which display, as an index into the shareable "
-                            + "displays with 0 the MAIN display (default 0). Reelcut's own "
+                            + "displays with 0 the MAIN display (default 0). Frame Job's own "
                             + "windows are left out of a display recording unless "
-                            + "include_reelcut_windows is true, so by default the app's "
+                            + "include_framejob_windows is true, so by default the app's "
                             + "panel and editor are not in the picture. Exclusive with "
                             + "window.",
                     ],
@@ -338,7 +338,7 @@ extension AgentServer {
                     "system_audio": [
                         "type": "boolean",
                         "description": "Capture what the system plays — every application but "
-                            + "Reelcut, so the timeline can play meanwhile and not be in "
+                            + "Frame Job, so the timeline can play meanwhile and not be in "
                             + "it — as the movie's one stereo 48 kHz track (default true). "
                             + "false writes a movie with no audio track, and has_audio "
                             + "reports false.",
@@ -348,12 +348,12 @@ extension AgentServer {
                         "description": "Draw a circle around each mouse click (default "
                             + "false). The cursor itself is always in the picture.",
                     ],
-                    // The recorder panel's Include Reelcut windows checkbox.
-                    "include_reelcut_windows": [
+                    // The recorder panel's Include Frame Job windows checkbox.
+                    "include_framejob_windows": [
                         "type": "boolean",
-                        "description": "Put Reelcut's own windows — the editor, the preview — "
+                        "description": "Put Frame Job's own windows — the editor, the preview — "
                             + "in a DISPLAY recording (default false, which leaves them out). "
-                            + "Reelcut's own sound stays out either way, and with window it "
+                            + "Frame Job's own sound stays out either way, and with window it "
                             + "changes nothing: that window is recorded on its own.",
                     ],
                     "rate": [
@@ -381,7 +381,7 @@ extension AgentServer {
                     ],
                     "path": [
                         "type": "string",
-                        "description": "A FOLDER to record into instead of ~/Movies/Reelcut "
+                        "description": "A FOLDER to record into instead of ~/Movies/Frame Job "
                             + "Recordings, created if it does not exist. The file's name is "
                             + "always the dated one — this names the folder, never the file — "
                             + "and the answer's path is the file that was written. Trimmed; "

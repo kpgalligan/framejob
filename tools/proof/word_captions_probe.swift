@@ -3,7 +3,7 @@
 //
 // Compiled AS `main.swift`, with `word_captions_support.swift` beside it, over
 // every file in `app/Sources` but the app's own `main.swift`, module
-// `Reelcut`, against `libreelcut_core.a` —
+// `FrameJob`, against `libframejob_core.a` —
 // `tools/proof/harness/build.sh`'s swiftc line — so every row calls the
 // app's own `CaptionPages`, `CaptionStyle` and `CaptionCues`. The WIDTH
 // checks measure through `LayerRenderers.measuredSize(for:)` of

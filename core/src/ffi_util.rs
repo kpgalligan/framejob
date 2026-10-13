@@ -29,7 +29,7 @@ pub(crate) unsafe fn set_message(out: *mut *mut c_char, msg: &str) {
     }
     let sanitized = msg.replace('\0', " ");
     let cstring = CString::new(sanitized)
-        .unwrap_or_else(|_| CString::new("reelcut-core error").expect("static string"));
+        .unwrap_or_else(|_| CString::new("framejob-core error").expect("static string"));
     unsafe {
         *out = cstring.into_raw();
     }

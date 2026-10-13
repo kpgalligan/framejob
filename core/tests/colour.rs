@@ -11,7 +11,7 @@ use std::ptr;
 use serde_json::Value;
 
 use common::{cstring, take_string};
-use reelcut_core::ffi::rc_normalise_color;
+use framejob_core::ffi::rc_normalise_color;
 
 /// G-12's shared colour fixture, the engine's test file.
 const COLOURS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../graphic/tests/colours.json");

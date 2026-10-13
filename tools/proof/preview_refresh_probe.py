@@ -80,7 +80,7 @@ transport lands on the end tick and the layer shows black).
      × 255 — and any other format leaves no mean, which fails the rows that
      read it.
 
-Needs `ffmpeg`, `swiftc`, `xcrun metal` and `core/target/release/libreelcut_core.a`.
+Needs `ffmpeg`, `swiftc`, `xcrun metal` and `core/target/release/libframejob_core.a`.
 No port. Run from anywhere:
 
     python3 tools/proof/preview_refresh_probe.py
@@ -152,7 +152,7 @@ def make_fixture():
             capture_output=True, text=True)
         if result.returncode != 0:
             return None, f"ffmpeg failed: {result.stderr.strip()[:300]}"
-    package = os.path.join(WORK, "refresh.reelcut")
+    package = os.path.join(WORK, "refresh.framejob")
     os.makedirs(package, exist_ok=True)
     project = {
         "version": 8,
@@ -187,7 +187,7 @@ NSApplication.shared.setActivationPolicy(.accessory)
 // to Full in the argument domain, so a previous run's section 6 cannot leak
 // into this one's picture.
 UserDefaults.standard.setVolatileDomain(
-    ["ReelcutPreviewQuality": 0], forName: UserDefaults.argumentDomain)
+    ["FrameJobPreviewQuality": 0], forName: UserDefaults.argumentDomain)
 
 func spin(_ seconds: Double) {
     let deadline = Date().addingTimeInterval(seconds)
@@ -428,7 +428,7 @@ def build_probe():
         return None, why
     sources = sorted(os.path.join(SOURCES, name) for name in os.listdir(SOURCES)
                      if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:

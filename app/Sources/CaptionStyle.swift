@@ -38,7 +38,7 @@ enum CaptionStyle: String, CaseIterable {
     /// The remembered choice (road map 8 §5e): read and written by the
     /// sheet's Style popup alone (W4b); an agent call never reads it (R6-2's
     /// rule for the engine, read across).
-    static let defaultsKey = "ReelcutCaptionStyle"
+    static let defaultsKey = "FrameJobCaptionStyle"
 
     var displayName: String {
         switch self {

@@ -81,8 +81,8 @@ extension CompositionBuilder {
     /// One plan audio track split by source format, in segment order.
     ///
     /// **Why:** an `AVPlayerItem` whose tapped audio track changes format
-    /// part-way — an AAC clip then a WAV — stalls (measured, kpgalligan/
-    /// reelcut#34), and `AVComposition.h` promises nothing more; the same
+    /// part-way — an AAC clip then a WAV — stalls (measured,
+    /// kpgalligan/reelcut#34), and `AVComposition.h` promises nothing more; the same
     /// segments on two tracks play. A segment with no source (missing,
     /// pending reverse) joins family 0, which adopts the first real format
     /// it meets; a same-format track answers one family with the plan's id

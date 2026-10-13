@@ -221,7 +221,7 @@ enum FrameWriter {
             case .unwritable(let format, let url):
                 return "Could not write \(format.displayName) to \(url.path). "
                     + "The file could not be created there — check that the folder exists "
-                    + "and that Reelcut is allowed to write into it."
+                    + "and that Frame Job is allowed to write into it."
             case .flattenFailed(let url):
                 return "Could not flatten the frame onto black for \(url.path)."
             case .encodingFailed(let format, let url):

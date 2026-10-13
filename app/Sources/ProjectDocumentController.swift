@@ -46,16 +46,16 @@ class ProjectDocumentController: NSDocumentController {
     static func install() {
         let controller = ProjectDocumentController()
         if NSDocumentController.shared !== controller {
-            NSLog("Reelcut: %@", "a document controller existed before ProjectDocumentController "
+            NSLog("Frame Job: %@", "a document controller existed before ProjectDocumentController "
                 + "was installed, so an open in flight is not counted (spec §11 #234)")
         }
     }
 
     /// The startup complaint when the shared controller is not this class
-    /// (the `Reelcut: ` prefix every MCP proof requires absent).
+    /// (the `Frame Job: ` prefix every MCP proof requires absent).
     static func complainUnlessShared() {
         guard !(NSDocumentController.shared is ProjectDocumentController) else { return }
-        NSLog("Reelcut: %@", "the shared document controller is not ProjectDocumentController, "
+        NSLog("Frame Job: %@", "the shared document controller is not ProjectDocumentController, "
             + "so open_project cannot see a window's open in flight (spec §11 #234)")
     }
 

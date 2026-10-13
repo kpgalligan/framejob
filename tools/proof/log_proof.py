@@ -88,7 +88,7 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   rendered at 0.5 s byte-equal to DIR's PNGs. hdr_proof's H1 and H1m are the
   other half, run by that script.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
-  `Reelcut: ` line.
+  `Frame Job: ` line.
 
 `capture DIR` records L9's references (`DIR/l9-*.png`, `DIR/media/`) and runs
 the other rows, which must FAIL on the control. `--mutant NAME` builds a COPY
@@ -549,7 +549,7 @@ class Doc(hdr.Doc):
 
     def __init__(self, client, name, width=W, height=H):
         self.client, self.width, self.height = client, width, height
-        self.path = WORK / f"{name}.reelcut"
+        self.path = WORK / f"{name}.framejob"
         self.made = attempt(client, "new_project", {"path": str(self.path)})["ok"]
         self.call("set_canvas", width=width, height=height, fps=[30, 1])
         c = self.project().get("canvas") or {}
@@ -605,7 +605,7 @@ class Doc(hdr.Doc):
         return out
 
     def save(self, name):
-        path = WORK / f"{name}.reelcut"
+        path = WORK / f"{name}.framejob"
         got = self.call("save_project", path=str(path))
         if got["ok"]:
             self.path = path
@@ -1119,7 +1119,7 @@ def build_probe(sources, name="log_probe"):
     entry.write_text(PROBE.read_text())
     try:
         built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
-                                  output=folder / name, defines=["REELCUT_DEV_TOOLS"],
+                                  output=folder / name, defines=["FRAMEJOB_DEV_TOOLS"],
                                   timeout=BUILD_BOUND)
     except swift_build.SwiftBuildFailed as error:
         return None, f"{error} {error.diagnostics[:6]}"
@@ -1273,7 +1273,7 @@ def main():
     named = MUTANTS[args.mutant][1] if args.mutant else []
     binary = Path(args.app) if args.app else proof_app.binary()
     if binary.suffix == ".app":
-        binary = binary / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(binary)
     sources = ROOT / "app/Sources"
     config = proof_app.config()
     if args.mutant:
@@ -1283,7 +1283,7 @@ def main():
         if app is None:
             print(f"mutant {args.mutant}: the control could not be performed — {copy}")
             return 2
-        binary = app / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(app)
         sources = copy / "app/Sources"
     else:
         print(f"grading-3 T3-2 — camera log over MCP ({args.mode or 'run'}, {config} build "
@@ -1326,7 +1326,7 @@ def main():
         run_probe(sources)
     found = hdr.complaints(log) if needs_instance else []
     closed = closed and all(v for k, v in state.items() if k.endswith("closed"))
-    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Reelcut: ` "
+    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Frame Job: ` "
           "line", closed and not found and not REFUSED,
           f"closed {closed}; refused {REFUSED or 'none'}; complaints {found}")
     if needs_instance:

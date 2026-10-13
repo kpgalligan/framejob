@@ -56,6 +56,7 @@ sys.path.insert(0, os.path.join(PROOF, "graphics_spike"))
 sys.path.insert(0, PROOF)
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = os.path.join(PROOF, "work", "assistant_spike")
@@ -66,12 +67,12 @@ ANSWERS = os.path.join(WORK, "answers.json")
 FAKE = os.path.join(PROOF, "anthropic_fake.py")
 HOOK = os.path.join(HERE, "AssistantSpikeHook.swift")
 DRAG = os.path.join(HERE, "drag_probe.swift")
-ROADMAP = os.path.join(ROOT, "archive", "reelcut-roadmap-12.md")
-LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+ROADMAP = os.path.join(ROOT, "archive/reelcut-roadmap-12.md")
+LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 PRODUCTS = os.path.join(TREE, "build", "Build", "Products")
-APPS = {"r": os.path.join(PRODUCTS, "Release", "Reelcut.app"),
-        "d": os.path.join(PRODUCTS, "Distribution", "Reelcut.app")}
-HELPER = os.path.join("Contents", "Helpers", "reelcut-agent")
+APPS = {"r": os.path.join(PRODUCTS, "Release", "Frame Job.app"),
+        "d": os.path.join(PRODUCTS, "Distribution", "Frame Job.app")}
+HELPER = os.path.join("Contents", "Helpers", "framejob-agent")
 TICKS = 600_000
 MODEL = "claude-opus-5-5"
 SCRIPTED_TEXT = "A0 stand-in: the marker is in."
@@ -197,7 +198,7 @@ def replace_once(text, old, new, anchors, label):
 def make_tree(rasterize):
     """The copy, `tree_copy.make_copy(TREE, agent=False)`, made fresh every
     run with its `build/`: a kept `build/` fails the next build, because
-    xcodegen rewrites `app/Reelcut.entitlements` and Xcode refuses an
+    xcodegen rewrites `app/FrameJob.entitlements` and Xcode refuses an
     entitlements file "modified during the build". Answers (anchors,
     agent_copied, error)."""
     anchors = {}
@@ -214,14 +215,14 @@ def make_tree(rasterize):
             shutil.copy2(os.path.join(source, one), os.path.join(agent, one))
         agent_copied = True
         package = open(os.path.join(agent, "package.json")).read()
-        package = replace_once(package, '"name": "rasterize-agent"', '"name": "reelcut-agent"',
+        package = replace_once(package, '"name": "rasterize-agent"', '"name": "framejob-agent"',
                                anchors, "package.json name")
         package = replace_once(package, "--outfile ../build/agent/rasterize-agent",
-                               "--outfile ../build/agent/reelcut-agent", anchors,
+                               "--outfile ../build/agent/framejob-agent", anchors,
                                "package.json outfile")
         open(os.path.join(agent, "package.json"), "w").write(package)
         lock = open(os.path.join(agent, "bun.lock")).read()
-        lock = replace_once(lock, '"name": "rasterize-agent",', '"name": "reelcut-agent",',
+        lock = replace_once(lock, '"name": "rasterize-agent",', '"name": "framejob-agent",',
                             anchors, "bun.lock root workspace")
         open(os.path.join(agent, "bun.lock"), "w").write(lock)
 
@@ -246,7 +247,7 @@ def make_tree(rasterize):
             step_lines[-1].strip().startswith("--sign"))
         step = "\n".join(step_lines)
         anchors["step's rasterize-agent spellings (2)"] = int(step.count("rasterize-agent") == 2)
-        step = step.replace("rasterize-agent", "reelcut-agent")
+        step = step.replace("rasterize-agent", "framejob-agent")
         yml_path = os.path.join(TREE, "project.yml")
         yml = open(yml_path).read()
         # The copy's own agent step goes first, so Rasterize's is the one.
@@ -304,11 +305,11 @@ def build_app(kind):
     if kind == "r":
         argv = ["make", "app"]
     else:
-        argv = ["xcodebuild", "-project", "Reelcut.xcodeproj", "-scheme", "Reelcut",
+        argv = ["xcodebuild", "-project", "FrameJob.xcodeproj", "-scheme", "FrameJob",
                 "-configuration", "Distribution", "-derivedDataPath", "build", "build"]
     print(f"build {kind}: {' '.join(argv)} (up to {WALL_BUILD} s)…", flush=True)
     built = run(argv, WALL_BUILD, cwd=TREE)
-    binary = os.path.join(app, "Contents", "MacOS", "Reelcut")
+    binary = str(proof_app.executable(app))
     ok = built["rc"] == 0 and os.path.exists(binary)
     record = {"argv": argv, "rc": built["rc"], "seconds": built["seconds"],
               "expired": built["expired"], "binary": os.path.exists(binary)}
@@ -331,11 +332,11 @@ def build_probe():
     swift = sorted(os.path.join(sources, n) for n in os.listdir(sources)
                    if n.endswith(".swift") and n != "main.swift")
     sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    argv = (["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk,
-             "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
+    argv = (["swiftc", "-D", "FRAMEJOB_DEV_TOOLS", "-sdk", sdk,
+             "-target", "arm64-apple-macos26.0", "-module-name", "FrameJob",
              "-import-objc-header", os.path.join(ROOT, "app", "Bridging",
-                                                  "Reelcut-Bridging-Header.h"),
-             "-L", os.path.dirname(LIB), "-lreelcut_core"] + swift + [entry, "-o", binary])
+                                                  "FrameJob-Bridging-Header.h"),
+             "-L", os.path.dirname(LIB), "-lframejob_core"] + swift + [entry, "-o", binary])
     print(f"probe: building (up to {WALL_PROBE_BUILD} s)…", flush=True)
     built = run(argv, WALL_PROBE_BUILD)
     record = {"rc": built["rc"], "seconds": built["seconds"], "expired": built["expired"],
@@ -401,9 +402,9 @@ def app_signature_row(kind):
             f"entitlements {facts['entitlements']}", facts)
 
 
-TREE_APPS = {"r": os.path.join(ROOT, "build", "Build", "Products", "Release", "Reelcut.app"),
+TREE_APPS = {"r": os.path.join(ROOT, "build", "Build", "Products", "Release", "Frame Job.app"),
              "d": os.path.join(ROOT, "build", "Build", "Products", "Distribution",
-                               "Reelcut.app")}
+                               "Frame Job.app")}
 
 
 def tree_signature_row(built):
@@ -413,7 +414,7 @@ def tree_signature_row(built):
     measured = {}
     for kind in ("r", "d"):
         app = TREE_APPS[kind]
-        binary = os.path.join(app, "Contents", "MacOS", "Reelcut")
+        binary = str(proof_app.executable(app))
         if not os.path.exists(binary):
             return "skip", f"host: no tree build at {app}", {"missing": app}
         measured[kind] = {
@@ -451,7 +452,7 @@ def launch_helper_bare(path, seconds=20):
     for reader in readers:
         reader.start()
     configure = {"type": "configure", "api_key": "proof-key", "model": MODEL,
-                 "system": "Reelcut A0 spike.", "tools": [],
+                 "system": "Frame Job A0 spike.", "tools": [],
                  "api_base": "http://127.0.0.1:9",
                  "settings": {"auto_compact_tokens": None, "clear_tool_results": False}}
     try:
@@ -549,10 +550,10 @@ def one_run(kind):
     folder = os.path.join(RUNS, kind)
     shutil.rmtree(folder, ignore_errors=True)
     os.makedirs(folder)
-    project_path = os.path.join(folder, "a0.reelcut")
+    project_path = os.path.join(folder, "a0.framejob")
     hook_log = os.path.join(folder, "hook.jsonl")
     record = {"folder": folder, "project": project_path}
-    binary = os.path.join(app, "Contents", "MacOS", "Reelcut")
+    binary = str(proof_app.executable(app))
     if not os.path.exists(binary):
         record["error"] = "no app binary"
         return record
@@ -606,7 +607,7 @@ def one_run(kind):
         if kind == "r":
             record["export"] = exports(client, folder, project_path)
         record["app_log_parity"] = [l for l in open(log_path, errors="replace")
-                                    if "Reelcut: " in l]
+                                    if "Frame Job: " in l]
         status, raw = http("GET", base + "/__control/log")
         record["fake_log"] = json.loads(raw) if status == 200 else {"status": status}
     except Exception as error:  # noqa: BLE001 — a run's failure is its rows' failure
@@ -903,7 +904,7 @@ def l1():
     if not key:
         return "skip", "host: no key", {"key": "absent"}
     needle = key.encode()
-    places = [os.path.join(TREE, "build"), os.path.join(TREE, "Reelcut.xcodeproj"), WORK]
+    places = [os.path.join(TREE, "build"), os.path.join(TREE, "FrameJob.xcodeproj"), WORK]
     held, scanned = [], 0
     for place in places:
         for here, dirs, names in os.walk(place):
@@ -1038,7 +1039,7 @@ def main():
             bare_dir = os.path.join(WORK, "h6")
             shutil.rmtree(bare_dir, ignore_errors=True)
             os.makedirs(bare_dir)
-            bare = os.path.join(bare_dir, "reelcut-agent")
+            bare = os.path.join(bare_dir, "framejob-agent")
             shutil.copy2(helper_r, bare)
             signed = run(["codesign", "--force", "--options", "runtime", "--sign", "-", bare], 60)
             facts6 = codesign_facts(bare)

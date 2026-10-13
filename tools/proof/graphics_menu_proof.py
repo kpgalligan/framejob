@@ -12,7 +12,7 @@ their one sheet — against the built app and a probe.
 its own, launched and stopped by PID, **in a scratch home**
 (`CFFIXED_USER_HOME=tools/proof/work/graphics-menu/home`, the way
 `graphics_files_proof.py` launches), its log at
-`work/graphics-menu/reelcut.log`. No persisting menu item is performed and
+`work/graphics-menu/framejob.log`. No persisting menu item is performed and
 no sheet is confirmed over MCP. At the start and at exit the home, the
 packages, the captures and a mutant's tree copy are removed; what stays in
 `work/graphics-menu/` is the probe's build (`probe/`) and the last log.
@@ -38,7 +38,7 @@ M2  `AppDelegate().buildMainMenu()`: Insert right after Edit, holding
     separator, From File…; each template's `representedObject` a URL whose
     bytes equal the source file;
 M3  File holds Add Font to Graphics… then Add Image to Graphics… right after
-    Consolidate Media…; Help holds Graphics Reference after Reelcut Help; none
+    Consolidate Media…; Help holds Graphics Reference after Frame Job Help; none
     of the ten new items has a key equivalent;
 M4  with no window `NSApp.target(forAction:)` is nil for the four editor
     selectors; `validateMenuItem` is true for Graphics Reference and false
@@ -144,7 +144,7 @@ S2  after `set_selection {clips: []}`, for each item: `perform_menu_item`
     `cancel_sheet` answers `how: cancel_button` and a null `sheet`;
     afterwards `get_graphic {}`'s modules and `history` and every clip's
     `graphic.name` are as before and `unsaved_changes` is false;
-Z1  both projects close, and `grep "Reelcut: "` over the log prints nothing.
+Z1  both projects close, and `grep "Frame Job: "` over the log prints nothing.
 
 Made to fail by hand (G5b's record): `|| outcome.library` removed from
 `GraphicStore.drain()` fails `graphics_proof.py`'s W1 and I4; From File…
@@ -207,7 +207,7 @@ import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics-menu"
 HOME = WORK / "home"
-LOG = WORK / "reelcut.log"
+LOG = WORK / "framejob.log"
 APP = proof_app.binary()
 PROBE_SWIFT = ROOT / "tools/proof/graphics_menu_probe.swift"
 TEMPLATES = ROOT / "graphic/tests/graphics"
@@ -217,7 +217,7 @@ RED_PNG = ROOT / "graphic/tests/assets/red.png"
 CALL_BOUND = 120
 SECOND = 600000
 PROBE_ROWS = [f"M{n}" for n in range(2, 21)]
-KEPT = ("probe", "reelcut.log")     # what a run leaves in WORK
+KEPT = ("probe", "framejob.log")     # what a run leaves in WORK
 
 SHEET_FILE = "GraphicFileSheetController.swift"
 NEST_LINE = "        if act == .rename, document.scope != nil { return false }\n"
@@ -314,7 +314,7 @@ def remove_leftovers():
         else:
             entry.unlink(missing_ok=True)
     probe = WORK / "probe"
-    for entry in list(probe.glob("*.reelcut")) + [probe / "scratch"]:
+    for entry in list(probe.glob("*.framejob")) + [probe / "scratch"]:
         shutil.rmtree(entry, ignore_errors=True)
 
 
@@ -362,7 +362,7 @@ def clip_names(client, project):
 def fixture(client):
     """GM and GF over MCP, saved. `(GM, GF, facts, None)`, or three Nones and
     why. `facts`: the timeline clip `t`, the nested clip `n`, the `nest`."""
-    gm, gf = WORK / "GM.reelcut", WORK / "GF.reelcut"
+    gm, gf = WORK / "GM.framejob", WORK / "GF.framejob"
     for package in (gm, gf):
         shutil.rmtree(package, ignore_errors=True)
     made = gp.attempt(client, "new_project", {"path": str(gm)})
@@ -420,7 +420,7 @@ def build_probe(out, sources=ROOT / "app/Sources"):
     """`swift_build.build` with the probe as `main.swift` over
     `sources`; the three resources beside the binary. The binary, or None and
     the error."""
-    lib = ROOT / "core/target/release/libreelcut_core.a"
+    lib = ROOT / "core/target/release/libframejob_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     out.mkdir(parents=True, exist_ok=True)
@@ -458,7 +458,7 @@ def probe_checks(package, files, sources=ROOT / "app/Sources", out=WORK / "probe
         return []
     copies = {}
     for tag, source in (("GM-probe", package), ("GM-bare", package), ("GF-files", files)):
-        copy = out / f"{tag}.reelcut"
+        copy = out / f"{tag}.framejob"
         shutil.rmtree(copy, ignore_errors=True)
         shutil.copytree(source, copy)
         copies[tag] = copy
@@ -617,7 +617,7 @@ def session(app, rows):
     finally:
         stop(launched)
     lines = gp.complaints(LOG)
-    check("Z1 both projects close and grep \"Reelcut: \" over the log prints nothing",
+    check("Z1 both projects close and grep \"Frame Job: \" over the log prints nothing",
           made and all(c["ok"] for c in closes) and not lines,
           f"closes {[c.get('error', 'ok') for c in closes]}; " + "; ".join(lines[:4]))
     return made
@@ -640,7 +640,7 @@ def probe_mutant(app, name):
     performed."""
     row = PROBE_MUTANTS[name][3]
     answered = []
-    with tempfile.TemporaryDirectory(prefix=f"reelcut-graphics-menu-{name}-") as temp:
+    with tempfile.TemporaryDirectory(prefix=f"framejob-graphics-menu-{name}-") as temp:
         sources = Path(temp) / "Sources"
         try:
             shutil.copytree(ROOT / "app/Sources", sources)
@@ -699,7 +699,7 @@ def build_app_mutant(name):
     app, reason = tree_copy.build_app(copy, 1500)
     if app is None:
         return None, reason
-    return app / "Contents/MacOS/Reelcut", ""
+    return proof_app.executable(app), ""
 
 
 def app_mutant(name):

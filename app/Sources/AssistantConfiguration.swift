@@ -35,7 +35,7 @@ enum AssistantConfiguration {
     static let baseURLVariable = "RC_ASSISTANT_BASE_URL"
 
     /// The persisted model, Settings' Assistant pane from A2.
-    static let modelKey = "ReelcutAssistantModel"
+    static let modelKey = "FrameJobAssistantModel"
 
     /// AI-11's default.
     static let defaultModel = "claude-opus-5-5"
@@ -46,7 +46,7 @@ enum AssistantConfiguration {
     /// with compaction off, for a proof (AI-18).
     static func settingsJSON(defaults: UserDefaults = .standard) -> [String: Any] {
         var json = AssistantChatSettings.load(from: defaults).helperJSON
-        #if REELCUT_DEV_TOOLS
+        #if FRAMEJOB_DEV_TOOLS
         if let tokens = devAutoCompactTokens(defaults: defaults) {
             json["auto_compact_tokens"] = tokens
         }
@@ -135,7 +135,7 @@ extension AssistantConfiguration {
     /// or model change ends each window's conversation, since a session keeps
     /// what it was opened with (road map 12 A2); a chat-settings change is
     /// written to each open session and ends nothing (AI-20).
-    static let didChangeNotification = Notification.Name("ReelcutAssistantConfigurationDidChange")
+    static let didChangeNotification = Notification.Name("FrameJobAssistantConfigurationDidChange")
 
     /// The notification's `userInfo` key; its value is "key", "model" or
     /// "settings".
@@ -143,7 +143,7 @@ extension AssistantConfiguration {
 }
 
 /// The person's chat settings (spec §11 AI-20), Rasterize's two under
-/// Reelcut's keys: end-of-turn compaction past a threshold (AI-9), and the
+/// Frame Job's keys: end-of-turn compaction past a threshold (AI-9), and the
 /// API's clearing of old tool results past the helper's fixed trigger. Kept
 /// in `UserDefaults`; no tool reads or writes them (AI-11's reason).
 struct AssistantChatSettings: Equatable {
@@ -153,11 +153,11 @@ struct AssistantChatSettings: Equatable {
     /// `agent/src/main.ts`'s `CLEAR_TRIGGER_TOKENS` (the settings proof's CS1).
     static let clearTriggerTokens = 150_000
     /// Bool; absent = true.
-    static let autoCompactKey = "ReelcutAssistantAutoCompact"
+    static let autoCompactKey = "FrameJobAssistantAutoCompact"
     /// Int; absent or outside the range = the default.
-    static let autoCompactTokensKey = "ReelcutAssistantAutoCompactTokens"
+    static let autoCompactTokensKey = "FrameJobAssistantAutoCompactTokens"
     /// Bool; absent = false.
-    static let clearToolResultsKey = "ReelcutAssistantClearToolResults"
+    static let clearToolResultsKey = "FrameJobAssistantClearToolResults"
 
     var autoCompact = true
     var autoCompactTokens = defaultCompactTokens
@@ -193,7 +193,7 @@ struct AssistantChatSettings: Equatable {
     }
 }
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 extension AssistantConfiguration {
     /// `-RCDevAssistantAutoCompact <tokens>` — a dev-only LAUNCH default
     /// (spec §11 AI-18): the end-of-turn compaction threshold a proof lowers,

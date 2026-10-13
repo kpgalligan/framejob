@@ -2,8 +2,8 @@
 // render does; the probe (`text_break_proof.py` builds and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
-// `tools/proof/harness/build.sh`'s swiftc line, `-D REELCUT_DEV_TOOLS`
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
+// `tools/proof/harness/build.sh`'s swiftc line, `-D FRAMEJOB_DEV_TOOLS`
 // included. Everything it calls exists in the baseline tree too (it reads the
 // render's attributes through `LayerRenderers.attributedString` at scale 1 and
 // scales them itself, never through `textAttributes`), so the proof's
@@ -25,8 +25,8 @@
 // as FAIL.
 //
 // The split is pinned before `AppDelegate()` (B32, #188 item 1): an
-// argument-domain `ReelcutInspectorWidth` 304, `ReelcutTimelineHeight` 300
-// and `ReelcutInspectorCollapsed` false, so the canvas's scale does not
+// argument-domain `FrameJobInspectorWidth` 304, `FrameJobTimelineHeight` 300
+// and `FrameJobInspectorCollapsed` false, so the canvas's scale does not
 // follow whatever this user's defaults last saved; and every window is set
 // to content 1600 × 1000 before its editor opens.
 //
@@ -52,8 +52,8 @@ let out = URL(fileURLWithPath: CommandLine.arguments[2])
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
 UserDefaults.standard.setVolatileDomain(
-    ["ReelcutInspectorWidth": 304.0, "ReelcutTimelineHeight": 300.0,
-     "ReelcutInspectorCollapsed": false],
+    [EditorViewController.inspectorWidthKey: 304.0, EditorViewController.timelineHeightKey: 300.0,
+     EditorViewController.inspectorCollapsedKey: false],
     forName: UserDefaults.argumentDomain)
 let delegate = AppDelegate()
 delegate.applicationWillFinishLaunching(
@@ -186,7 +186,7 @@ func open(_ key: String, label: String) -> Session? {
     let document = ProjectDocument()
     do {
         try document.read(
-            from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+            from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
     } catch {
         check("\(label) the fixture opens", false, "\(error)")
         return nil

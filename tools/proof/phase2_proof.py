@@ -28,7 +28,7 @@ MEDIA = os.path.join(HERE, "media")
 WORK = os.path.join(HERE, "work")
 
 SEC = 600_000
-HEADER = os.path.join(HERE, "..", "..", "core", "include", "reelcut_core.h")
+HEADER = os.path.join(HERE, "..", "..", "core", "include", "framejob_core.h")
 
 
 def format_version():
@@ -75,7 +75,7 @@ def canonical(value):
 
 
 def copy_package(source, destination):
-    """A byte copy of a `.reelcut` package, tolerating the cache's churn.
+    """A byte copy of a `.framejob` package, tolerating the cache's churn.
 
     The package being copied is OPEN in the instance under proof, and that
     instance writes thumbnails while the copy runs: each one goes to
@@ -109,7 +109,7 @@ class Session:
 
     def __init__(self, mcp, name, open_from=None):
         self.mcp = mcp
-        # Every package is `<name>-<pid>.reelcut`, never a fixed name, because
+        # Every package is `<name>-<pid>.framejob`, never a fixed name, because
         # a `project` path is matched against EVERY open document and there
         # is no tool that closes one: once two earlier runs have left SAVED
         # documents at a fixed path, the app answers for an old one (measured
@@ -118,9 +118,9 @@ class Session:
         # third run is fine). Older runs' packages under the same name go, as
         # phase 1's do.
         for stale in os.listdir(WORK):
-            if re.fullmatch(rf"{re.escape(name)}-\d+\.reelcut", stale):
+            if re.fullmatch(rf"{re.escape(name)}-\d+\.framejob", stale):
                 shutil.rmtree(os.path.join(WORK, stale))
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         if open_from is None:
             mcp.call("new_project", path=self.path)
             self.mcp.call("set_canvas", project=self.path, width=640, height=360)
@@ -357,7 +357,7 @@ def main():
     )
 
     # A version-2 fixture: the same package with the three keys REMOVED.
-    fixture = os.path.join(WORK, "schema-v2-source.reelcut")
+    fixture = os.path.join(WORK, "schema-v2-source.framejob")
     if os.path.exists(fixture):
         shutil.rmtree(fixture)
     copy_package(s.path, fixture)

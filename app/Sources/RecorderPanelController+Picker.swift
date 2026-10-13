@@ -16,8 +16,8 @@ extension RecorderPanelController {
     // MARK: - The window picker
 
     /// `SCContentSharingPicker` in single-window mode, what
-    /// `recordingExclusion(includeReelcutWindows:)` names excluded from the
-    /// LIST — Reelcut's application with Include Reelcut windows off, the
+    /// `recordingExclusion(includeFrameJobWindows:)` names excluded from the
+    /// LIST — Frame Job's application with Include Frame Job windows off, the
     /// panel's own window alone with it on (spec §11 recording.md).
     /// `excludedBundleIDs` is documented "for picking" and says nothing about
     /// capture (R0 q3), which is why R1 hid the panel for a picked window
@@ -27,7 +27,7 @@ extension RecorderPanelController {
     /// answers.
     func presentPicker() {
         let exclusion = recordingExclusion(
-            includeReelcutWindows: includeReelcutCheckbox.state == .on)
+            includeFrameJobWindows: includeFrameJobCheckbox.state == .on)
         let picker = SCContentSharingPicker.shared
         if !pickerObserved {
             picker.add(self)
@@ -43,13 +43,13 @@ extension RecorderPanelController {
     }
 
     /// What a display recording and the picker leave out (spec §11
-    /// recording.md, Include Reelcut windows): Reelcut's application with
+    /// recording.md, Include Frame Job windows): Frame Job's application with
     /// the box off; with it on, the panel's own window, which is on screen
     /// until `recordingDidStart` — after the file's first frame (R0 q2).
-    func recordingExclusion(includeReelcutWindows: Bool) -> RecordingExclusion {
+    func recordingExclusion(includeFrameJobWindows: Bool) -> RecordingExclusion {
         let number = window?.windowNumber ?? 0
         return RecordingExclusion.make(
-            includeReelcutWindows: includeReelcutWindows,
+            includeFrameJobWindows: includeFrameJobWindows,
             ownBundleID: Bundle.main.bundleIdentifier,
             panelWindowID: number > 0 ? CGWindowID(clamping: number) : nil)
     }

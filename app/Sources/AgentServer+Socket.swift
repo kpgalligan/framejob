@@ -8,9 +8,9 @@ import Foundation
 /// through `AgentLane.serve`'s one lock (AI-2).
 ///
 /// **Bound at every launch, and never an alert.** No person asked for it,
-/// so a launch that cannot bind logs one line, `Reelcut agent socket not
-/// bound: <reason>`, and carries on; a bound one logs `Reelcut agent socket
-/// listening at <path>`. Neither line carries the `Reelcut: ` prefix, which
+/// so a launch that cannot bind logs one line, `Frame Job agent socket not
+/// bound: <reason>`, and carries on; a bound one logs `Frame Job agent socket
+/// listening at <path>`. Neither line carries the `Frame Job: ` prefix, which
 /// is the parity check's alone.
 ///
 /// **The path** (`socketPlan`) is `RC_AGENT_SOCKET` when it is set and not
@@ -47,7 +47,7 @@ extension AgentServer {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0"
     }
 
-    /// `~/Library/Application Support/Reelcut/Agent/agent.sock` — the path
+    /// `~/Library/Application Support/Frame Job/Agent/agent.sock` — the path
     /// only; creates nothing.
     static var defaultSocketPath: String? {
         AppSupport.subdirectory("Agent")?.appendingPathComponent("agent.sock").path
@@ -83,7 +83,7 @@ extension AgentServer {
         do {
             let catalog = try prepareCatalog()
             try ReelAgentSocket.start(
-                path: path, serverName: "reelcut", version: Self.serverVersion,
+                path: path, serverName: "framejob", version: Self.serverVersion,
                 toolsJSON: catalog, handler: agentToolTrampoline,
                 context: Unmanaged.passUnretained(self).toOpaque())
         } catch {
@@ -91,20 +91,20 @@ extension AgentServer {
             return
         }
         boundSocketPath = path
-        NSLog("Reelcut agent socket listening at %@", path)
+        NSLog("Frame Job agent socket listening at %@", path)
     }
 
     /// The bundled stdio helper (road map 14's MC3), inside this app's own
     /// bundle wherever it was launched from.
     static var mcpHelperURL: URL {
-        Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/reelcut-mcp")
+        Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/framejob-mcp")
     }
 
     /// The line Settings' MCP section copies: Claude Code's `mcp add`
     /// for the helper at `helperPath`, single-quoted for a POSIX shell.
     static func mcpCommand(helperPath: String) -> String {
         let quoted = helperPath.replacingOccurrences(of: "'", with: "'\\''")
-        return "claude mcp add --scope user reelcut -- '\(quoted)'"
+        return "claude mcp add --scope user framejob -- '\(quoted)'"
     }
 
     /// For `applicationWillTerminate`: unlinks the socket only if it is
@@ -114,7 +114,7 @@ extension AgentServer {
     }
 
     private static func logSocketNotBound(_ reason: String) {
-        NSLog("Reelcut agent socket not bound: %@", reason)
+        NSLog("Frame Job agent socket not bound: %@", reason)
     }
 
     /// MC-2 before the bind: the folder made and checked, then whatever is

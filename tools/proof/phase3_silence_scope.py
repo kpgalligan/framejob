@@ -87,9 +87,9 @@ def build(mcp):
 
     Returns the project path and the two clip ids, back (audible) first."""
     for stale in os.listdir(WORK) if os.path.isdir(WORK) else []:
-        if re.fullmatch(r"silence-scope-\d+\.reelcut", stale):
+        if re.fullmatch(r"silence-scope-\d+\.framejob", stale):
             shutil.rmtree(os.path.join(WORK, stale))
-    path = os.path.join(WORK, f"silence-scope-{os.getpid()}.reelcut")
+    path = os.path.join(WORK, f"silence-scope-{os.getpid()}.framejob")
     mcp.call("new_project", path=path)
     mcp.call("set_canvas", project=path, width=CANVAS[0], height=CANVAS[1])
     media = mcp.call("import_media", project=path, path=os.path.join(MEDIA, "silence.mov"))["media"]

@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Road map 14's MC3, against the built app: `reelcut-mcp`, the bundled stdio
+"""Road map 14's MC3, against the built app: `framejob-mcp`, the bundled stdio
 MCP server (spec §11 MC-3, MC-4, MC-6), driven as a client drives it, over its
 stdin and stdout.
 
 The app `proof_app.bundle()` chooses (`--app`; Debug unless `RC_PROOF_APP=release`) is
-`ditto`ed to `work/mcp-proxy/<run>/Reelcut.app` and every proxy is that copy's
-`Contents/Helpers/reelcut-mcp`, so the bundle a proxy launches is the copy; the copy is removed at the end unless Z1 finds an
+`ditto`ed to `work/mcp-proxy/<run>/Frame Job.app` and every proxy is that copy's
+`Contents/Helpers/framejob-mcp`, so the bundle a proxy launches is the copy; the copy is removed at the end unless Z1 finds an
 instance of it alive. Every socket is in its own
 `tempfile.mkdtemp(prefix="rcm-")` under `$TMPDIR`, passed as `RC_AGENT_SOCKET`
 (MC1: a path under `tools/proof/work/` can pass 103 bytes). An instance is any
-pid `pgrep -f <copy>/Contents/MacOS/Reelcut` prints, and those are the only
+pid `pgrep -f <copy>/Contents/MacOS/Frame Job` prints, and those are the only
 pids ever signalled (SIGTERM, SIGKILL after 10 s); "N instances" counts the
 pids new since the row began. Children run without `ANTHROPIC_API_KEY`,
 `RC_ASSEMBLYAI_KEY`, `CLAUDECODE` or `CLAUDE_CODE_ENTRYPOINT`, under
 `graphics_spike/bounded.py` where they are not interactive. Nothing under
-`~/Library/Application Support/Reelcut/` is created, written or unlinked —
+`~/Library/Application Support/Frame Job/` is created, written or unlinked —
 Z2 only `lstat`s — nothing is registered with Claude Code or Claude Desktop,
 and no model is called.
 
@@ -25,7 +25,7 @@ X1  no instance: `initialize` (the negotiated version, `listChanged: true`,
     JSON; 3 s later no instance and no socket file.
 X2  `tools/call get_project` with no instance: one instance appears, the
     answer is the app's (not a proxy sentence), the socket exists, and
-    `<socket folder>/reelcut-launch.log` exists.
+    `<socket folder>/framejob-launch.log` exists.
 X3  the proxy's forwarded `tools/list`, and the proof's own HTTP-over-AF_UNIX
     `tools/list`, each equal the snapshot's `tools` as JSON values.
 X4  two proxies on a fresh socket, each `tools/call get_project` released
@@ -47,14 +47,14 @@ X8  a stub, `tools/list` first served from the snapshot (the stub started
     when the stub lists other tools; CONTROL: none within 3 s when the stub
     lists the snapshot's tools with every object's keys reversed.
 X9  every stdout line of every proxy parses as JSON-RPC 2.0.
-X10 no `Reelcut: ` in any launch log.
+X10 no `Frame Job: ` in any launch log.
 Z1  no instance alive.  Z2  `lstat` of `~/Library/Application
-    Support/Reelcut/Agent`, `…/agent.sock` and `…/agent.launch.lock` is
+    Support/Frame Job/Agent`, `…/agent.sock` and `…/agent.launch.lock` is
     identical before and after.
 
 It also writes `work/mcp-proxy/ac-mcp.json`, `docs/manual-checks.md` AC-3's
-fixture: an `mcpServers.reelcut` entry whose command is the chosen app's
-`Contents/Helpers/reelcut-mcp` (the TREE's Release under `RC_PROOF_APP=release`,
+fixture: an `mcpServers.framejob` entry whose command is the chosen app's
+`Contents/Helpers/framejob-mcp` (the TREE's Release under `RC_PROOF_APP=release`,
 as AC-3 runs it), with no env.
 
     python3 tools/proof/mcp_proxy_proof.py [--app PATH]
@@ -100,10 +100,10 @@ import proof_app  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/mcp-proxy"
 APP = proof_app.bundle()
-SUPPORT = Path.home() / "Library/Application Support/Reelcut"
+SUPPORT = Path.home() / "Library/Application Support/Frame Job"
 PERSON_PATHS = [SUPPORT / "Agent", SUPPORT / "Agent/agent.sock",
                 SUPPORT / "Agent/agent.launch.lock"]
-PROXY_RELATIVE = "Contents/Helpers/reelcut-mcp"
+PROXY_RELATIVE = "Contents/Helpers/framejob-mcp"
 SNAPSHOT_RELATIVE = "Contents/Resources/agent-catalog.json"
 MAX_PATH = 103
 CALL_BOUND = 90
@@ -111,12 +111,12 @@ DROP = ("ANTHROPIC_API_KEY", "RC_ASSEMBLYAI_KEY", "CLAUDECODE", "CLAUDE_CODE_ENT
         "RC_AGENT_SOCKET", "RC_MCP_LAUNCH_WAIT")
 # How a proxy-side failure of a call begins (mcp-proxy/src): an answer that
 # begins with none of these is the app's.
-PROXY_SENTENCES = ("Reelcut did not answer at ", "could not connect to Reelcut",
-                   "reelcut-mcp is not inside", "/usr/bin/open ", "could not run /usr/bin/open",
-                   "Reelcut answered HTTP", "Reelcut answered the call with no body",
+PROXY_SENTENCES = ("Frame Job did not answer at ", "could not connect to Frame Job",
+                   "framejob-mcp is not inside", "/usr/bin/open ", "could not run /usr/bin/open",
+                   "Frame Job answered HTTP", "Frame Job answered the call with no body",
                    "could not make ", "could not open ", "could not lock ",
-                   "could not write to Reelcut", "could not read Reelcut's answer",
-                   "Reelcut's answer at ", "HOME is not set")
+                   "could not write to Frame Job", "could not read Frame Job's answer",
+                   "Frame Job's answer at ", "HOME is not set")
 # name → (the row it must fail, file in mcp-proxy/src, before — exactly once, after)
 MUTANTS = {
     "launch-on-list": ("X1", "session.rs",
@@ -158,7 +158,7 @@ class Copy:
     def __init__(self, app):
         self.app = Path(app)
         self.real = os.path.realpath(self.app)
-        self.exe = str(self.app / "Contents/MacOS/Reelcut")
+        self.exe = str(proof_app.executable(self.app))
         self.proxy = str(self.app / PROXY_RELATIVE)
         snapshot = json.loads((self.app / SNAPSHOT_RELATIVE).read_text())
         self.tools = snapshot["tools"]
@@ -205,7 +205,7 @@ def scratch_folder(mode=None):
 # ---- a proxy, driven over stdin and stdout -------------------------------------
 
 class Proxy:
-    """One `reelcut-mcp` child: every stdout line is kept with its monotonic
+    """One `framejob-mcp` child: every stdout line is kept with its monotonic
     stamp, parsed or not, for X9."""
 
     def __init__(self, exe, sock, extra=None):
@@ -466,7 +466,7 @@ def run_rows(copy):
     tools = ((listed or {}).get("result") or {}).get("tools")
     good = (result.get("protocolVersion") == "2025-06-18"
             and (result.get("capabilities") or {}).get("tools", {}).get("listChanged") is True
-            and result.get("serverInfo") == {"name": "reelcut", "version": copy.version}
+            and result.get("serverInfo") == {"name": "framejob", "version": copy.version}
             and (ping or {}).get("result") == {} and tools == copy.tools
             and not new and not exists)
     check("X1", good, f"initialize {result.get('protocolVersion')} listChanged "
@@ -487,7 +487,7 @@ def run_rows(copy):
     stamp, called = p2.answer(call_id, CALL_BOUND)
     time.sleep(1)
     x2_pids = copy.pids() - before
-    log = os.path.join(folders["x2"], "reelcut-launch.log")
+    log = os.path.join(folders["x2"], "framejob-launch.log")
     is_error, text = call_text(called)
     took = round(stamp - sent, 2) if stamp else None
     is_socket = os.path.exists(socks["x2"]) and stat.S_ISSOCK(os.lstat(socks["x2"]).st_mode)
@@ -566,7 +566,7 @@ def run_rows(copy):
     second_s = (stamp - sent) if stamp else None
     time.sleep(2)
     x6_pids = copy.pids() - before
-    timeout = (f"Reelcut did not answer at {socks['x6']} within 5 s of launching "
+    timeout = (f"Frame Job did not answer at {socks['x6']} within 5 s of launching "
                f"{copy.real}")
     stranded = (f"{timeout}; that instance may still be running, so this session will not "
                 f"launch another — quit it and check {folders['x6']}")
@@ -643,12 +643,12 @@ def run_rows(copy):
           f"{count} lines from {len(PROXIES)} proxies; bad {bad_lines[:3]}")
 
     # X10 — no parity complaint in any launch log.
-    logs = [os.path.join(folder, "reelcut-launch.log") for folder in folders.values()]
+    logs = [os.path.join(folder, "framejob-launch.log") for folder in folders.values()]
     logs = [log for log in logs if os.path.exists(log)]
     leaked = [line for log in logs for line in Path(log).read_text(errors="replace").splitlines()
-              if "Reelcut: " in line]
+              if "Frame Job: " in line]
     check("X10", logs and not leaked, f"{len(logs)} launch logs; "
-          + (repr(leaked[:3]) if leaked else "no `Reelcut: ` line"))
+          + (repr(leaked[:3]) if leaked else "no `Frame Job: ` line"))
 
 
 def row_x8(copy, socks):
@@ -689,18 +689,19 @@ def row_x8(copy, socks):
 
 def write_ac_fixture():
     command = str(APP / PROXY_RELATIVE)
-    fixture = {"mcpServers": {"reelcut": {"command": command, "args": []}}}
+    fixture = {"mcpServers": {"framejob": {"command": command, "args": []}}}
     WORK.mkdir(parents=True, exist_ok=True)
     (WORK / "ac-mcp.json").write_text(json.dumps(fixture, indent=2) + "\n")
 
 
 def make_copy(app, run):
-    """`ditto` the app to work/mcp-proxy/<run>/Reelcut.app; the path or None and why."""
+    """`ditto` the app to work/mcp-proxy/<run>/<its own name>.app, whose
+    executable follows that name; the path or None and why."""
     try:
-        proof_app.require_fresh(Path(app) / "Contents/MacOS/Reelcut")
+        proof_app.require_fresh(proof_app.executable(Path(app)))
     except proof_app.StaleApp as error:
         return None, str(error)
-    target = WORK / run / "Reelcut.app"
+    target = WORK / run / Path(app).name
     tree_copy.remove_tree(target.parent)
     target.parent.mkdir(parents=True)
     done = bounded.run(["ditto", str(app), str(target)], 300, env=child_env())
@@ -734,7 +735,7 @@ def build_mutant(name, run, app):
           flush=True)
     built = bounded.run(["cargo", "build", "--release", "--offline"], 900,
                         cwd=str(base / "mcp-proxy"), env=child_env())
-    binary = base / "mcp-proxy/target/release/reelcut-mcp"
+    binary = base / "mcp-proxy/target/release/framejob-mcp"
     if built["rc"] != 0 or not binary.exists():
         return None, f"cargo rc {built['rc']}: {built['stderr'].strip()[-600:]}"
     copy, why = make_copy(app, run)
@@ -808,7 +809,7 @@ def main():
             check("Z1", False, "no copy")
         if not alive:  # a copy is a whole app; one with a live instance is left to inspect
             # `open` registered the copy with LaunchServices, which would
-            # otherwise keep a Reelcut.app at a deleted path in its database.
+            # otherwise keep a Frame Job.app at a deleted path in its database.
             if copy is not None:
                 bounded.run([LSREGISTER, "-u", str(copy.app)], 60, env=child_env())
             shutil.rmtree(WORK / run, ignore_errors=True)

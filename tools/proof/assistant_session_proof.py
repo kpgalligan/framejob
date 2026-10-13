@@ -9,7 +9,7 @@ dev-only launch default `-RCDevAssistantSend` / `-RCDevAssistantReport`.
 
 Launch A (a scratch socket, a scratch `-RCSecretFolder` holding the
 dummy key, `RC_ASSISTANT_BASE_URL` at the stand-in):
-  A0  no `Reelcut: ` line; the dev-tool marker counts len(DEV_TOOLS); the dev
+  A0  no `Frame Job: ` line; the dev-tool marker counts len(DEV_TOOLS); the dev
       block is DEV_TOOLS + ["import_media"]
   T1  a scripted add_marker lands on the window's own project (A, with B
       frontmost), answered `finished`; one MCP undo removes it (AI-5, AI-10)
@@ -112,8 +112,7 @@ from mcp import MCP, remove_scratch, scratch_socket, wait_listening  # noqa: E40
 WORK = os.path.join(HERE, "work", "assistant_session")
 FAKE = os.path.join(HERE, "anthropic_fake.py")
 APP_PATH = os.path.relpath(proof_app.bundle(), ROOT)   # the app RC_PROOF_APP chooses
-BINARY = os.path.join("Contents", "MacOS", "Reelcut")
-HELPER_SUFFIX = "Contents/Helpers/reelcut-agent"
+HELPER_SUFFIX = "Contents/Helpers/framejob-agent"
 PREPARE = "AgentLane.prepareAtLaunch()"
 KEY = "proof-key"
 DEFAULT_MODEL = "claude-opus-5-5"
@@ -138,9 +137,9 @@ MUTANTS: dict[str, tuple[str | None, str | None, str, str | None]] = {
 # The person's chat settings (spec §11 AI-20) at their defaults, as launch
 # arguments: `App` appends each one whose `-Key` its arguments do not set, so no
 # proof launch reads the person's own threshold or clearing switch.
-CHAT_PINS = [("-ReelcutAssistantAutoCompact", "YES"),
-             ("-ReelcutAssistantAutoCompactTokens", "300000"),
-             ("-ReelcutAssistantClearToolResults", "NO")]
+CHAT_PINS = [("-FrameJobAssistantAutoCompact", "YES"),
+             ("-FrameJobAssistantAutoCompactTokens", "300000"),
+             ("-FrameJobAssistantClearToolResults", "NO")]
 
 
 def child_env(extra=None):
@@ -234,7 +233,7 @@ def helper_children(pid):
 
 
 class App:
-    """One Reelcut, in its own process group, logging to work/, on a scratch
+    """One Frame Job, in its own process group, logging to work/, on a scratch
     socket (`mcp.scratch_socket`) whose folder is `folder_mode`: 0755 binds
     nothing (MC-2), which is how a launch has no MCP server."""
 
@@ -249,7 +248,7 @@ class App:
         arguments = list(arguments) + [part for key, value in CHAT_PINS
                                        if key not in arguments for part in (key, value)]
         self.child = subprocess.Popen(
-            [os.path.join(app, BINARY), "-ApplePersistenceIgnoreState", "YES"] + arguments,
+            [str(proof_app.executable(app)), "-ApplePersistenceIgnoreState", "YES"] + arguments,
             stdout=self.handle, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, env=env,
             start_new_session=True)
         self.answers = []  # every MCP answer's raw text, for K1
@@ -383,20 +382,20 @@ def brief(answer):
 
 
 def row_a0(app, ctx):
-    complaints = [l for l in app.log().splitlines() if "Reelcut: " in l]
+    complaints = [l for l in app.log().splitlines() if "Frame Job: " in l]
     marker = dev_marker_count(app.log_path)
     names = list(app.mcp.schemas())
     at = names.index(DEV_TOOLS[0]) if DEV_TOOLS[0] in names else len(names)
     block = names[at:at + len(DEV_TOOLS) + 1]
     ctx["catalog"] = names
     ok = not complaints and marker == len(DEV_TOOLS) == 6 and block == DEV_TOOLS + ["import_media"]
-    return ok, (f"`Reelcut: ` lines {complaints[:2]}; marker {marker} of {len(DEV_TOOLS)}; "
+    return ok, (f"`Frame Job: ` lines {complaints[:2]}; marker {marker} of {len(DEV_TOOLS)}; "
                 f"dev block {block}")
 
 
 def row_t1(app, fake, ctx):
-    a = app.must("new_project", path=os.path.join(ctx["folder"], "A.reelcut"))["saved"]
-    b = app.must("new_project", path=os.path.join(ctx["folder"], "B.reelcut"))["saved"]
+    a = app.must("new_project", path=os.path.join(ctx["folder"], "A.framejob"))["saved"]
+    b = app.must("new_project", path=os.path.join(ctx["folder"], "B.framejob"))["saved"]
     ctx["A"] = a
     ctx["B"] = b
     front = app.must("get_project").get("path")
@@ -627,7 +626,7 @@ def stopped_turn(answer, tool, sentence):
 
 def row_sx(app, fake, ctx):
     b = ctx.get("B") or app.must(
-        "new_project", path=os.path.join(ctx["folder"], "B.reelcut"))["saved"]
+        "new_project", path=os.path.join(ctx["folder"], "B.framejob"))["saved"]
     app.must("add_text_clip", project=b, track=1, at=0, duration=SX_SECONDS * 600000)
     path = os.path.join(ctx["folder"], "SX.mp4")
     fake.scenario([use("toolu_sx", "export", {"preset": "h264", "path": path},
@@ -689,7 +688,7 @@ def long_fixture(ten):
 def row_st(app, fake, ctx):
     import speech_engine_proof  # the fixtures' one maker
     pangram, ten, _, _ = speech_engine_proof.make_fixtures()
-    check = app.must("new_project", path=os.path.join(ctx["folder"], "C-check.reelcut"))["saved"]
+    check = app.must("new_project", path=os.path.join(ctx["folder"], "C-check.framejob"))["saved"]
     track = app.must("get_project", project=check)["project"]["tracks"][0]["id"]
     media = app.must("import_media", project=check, path=pangram)["media"]
     app.must("add_clip", project=check, track=track, media=media, at=0)
@@ -699,7 +698,7 @@ def row_st(app, fake, ctx):
             return None, f"on-device transcription on this Mac: {setup[:160]!r}"
         return False, f"the setup transcribe over the pangram failed: {setup[:200]!r}"
     long, seconds = long_fixture(ten)
-    c = app.must("new_project", path=os.path.join(ctx["folder"], "C.reelcut"))["saved"]
+    c = app.must("new_project", path=os.path.join(ctx["folder"], "C.framejob"))["saved"]
     track = app.must("get_project", project=c)["project"]["tracks"][0]["id"]
     media = app.must("import_media", project=c, path=long)["media"]
     app.must("add_clip", project=c, track=track, media=media, at=0)
@@ -735,7 +734,7 @@ def row_w(app_path, fake, secrets):
               ["-RCSecretFolder", secrets,
                "-RCDevAssistantSend", "Put a marker at two seconds.",
                "-RCDevAssistantReport", report_path,
-               "-ReelcutAssistantModel", PROOF_MODEL], fake.base, folder_mode=0o755)
+               "-FrameJobAssistantModel", PROOF_MODEL], fake.base, folder_mode=0o755)
     try:
         deadline = time.monotonic() + WALL_REPORT
         while time.monotonic() < deadline and not os.path.exists(report_path):
@@ -759,7 +758,7 @@ def row_w(app_path, fake, secrets):
     marks = [(m.get("time"), m.get("name")) for m in project.get("markers", [])]
     posts_ok = bool(sent) and all((r.get("body") or {}).get("model") == PROOF_MODEL
                                   and credential(r) == KEY for r in sent)
-    complaints = [l for l in log_text.splitlines() if "Reelcut: " in l]
+    complaints = [l for l in log_text.splitlines() if "Frame Job: " in l]
     listening = "agent socket listening at" in log_text
     good = (report.get("ok") is True and report.get("server_running") is False
             and report.get("state") == "finished" and len(results) == 1
@@ -771,7 +770,7 @@ def row_w(app_path, fake, secrets):
                   f"{report.get('text')!r}; add_marker results "
                   f"{[r.get('is_error') for r in results]}; marker {(1200000, 'W marker') in marks}; "
                   f"GETs {gets}; {len(sent)} POSTs with {PROOF_MODEL} and the dummy {posts_ok}; "
-                  f"failures {log.get('failures')}; `Reelcut: ` {complaints[:1]}; "
+                  f"failures {log.get('failures')}; `Frame Job: ` {complaints[:1]}; "
                   f"listening {listening}")
 
 

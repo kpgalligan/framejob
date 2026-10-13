@@ -49,7 +49,7 @@ the app.
 
     make app-debug
     python3 tools/proof/proof_app.py launch   # prints folder, socket, log, pid
-    grep "Reelcut: " <dir>/reelcut.log     # must print nothing
+    grep "Frame Job: " <dir>/framejob.log     # must print nothing
     python3 tools/proof/op_catalog_proof.py <dir>/agent.sock
 """
 
@@ -154,7 +154,7 @@ def build_probe():
         os.path.join(ROOT, "app", "Sources", name)
         for name in os.listdir(os.path.join(ROOT, "app", "Sources"))
         if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:

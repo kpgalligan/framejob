@@ -49,7 +49,7 @@ E·4 Insert ▸ Shape brings an item that plays, E·5 undo takes it away again.
 [pic] rows read the displayed buffer and are skipped BY NAME on a locked
 console, which displays nothing in any layer; every other row is scored.
 
-Needs `swiftc`, `xcrun metal` and `core/target/release/libreelcut_core.a`.
+Needs `swiftc`, `xcrun metal` and `core/target/release/libframejob_core.a`.
 No port, no ffmpeg. Run from anywhere:
 
     python3 tools/proof/media_less_playback_probe.py [--sources PATH]
@@ -139,7 +139,7 @@ def clip(source, **extra):
 
 
 def write_package(name, clips, media=(), graphics=None):
-    package = os.path.join(WORK, f"{name}.reelcut")
+    package = os.path.join(WORK, f"{name}.framejob")
     shutil.rmtree(package, ignore_errors=True)
     os.makedirs(package)
     project = {
@@ -231,7 +231,7 @@ def build_probe(sources):
         return None, why
     swift = sorted(os.path.join(sources, name) for name in os.listdir(sources)
                    if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:

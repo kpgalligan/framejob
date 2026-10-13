@@ -84,7 +84,7 @@ final class Playback {
     /// The documented rebuild seam: building a composition opens asset tracks,
     /// which touches the disk and must never block a gesture.
     private let rebuildQueue = DispatchQueue(
-        label: "com.kgalligan.reelcut.rebuild", qos: .userInitiated)
+        label: "com.kgalligan.framejob.rebuild", qos: .userInitiated)
 
     private(set) var built: BuiltComposition?
     /// The plan the CURRENT item was built from; nil before the first build.

@@ -130,5 +130,5 @@ extension Notification.Name {
     /// `.graphicsDidChange` from the document's store; `userInfo` carries
     /// the store's `namesKey` and `libraryKey` through. The editor refreshes
     /// the paused frame on it.
-    static let projectGraphicsDidChange = Notification.Name("ReelcutProjectGraphicsDidChange")
+    static let projectGraphicsDidChange = Notification.Name("FrameJobProjectGraphicsDidChange")
 }

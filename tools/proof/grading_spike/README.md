@@ -17,7 +17,7 @@ perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.
 **Release-only kind.** It times the GPU, so its bench is always an optimised
 build (`swift_build.build(…, optimize=True)`), never a Debug one (spec §11
 V-4). It launches no app, so it takes no `release_only=` argument. `build()`
-needs `core/target/release/libreelcut_core.a`. `--measure` also needs `ffmpeg`
+needs `core/target/release/libframejob_core.a`. `--measure` also needs `ffmpeg`
 (with `prores_ks` and `libx265`) for D1's two fixtures, made once under
 `work/grading_spike/media/` and reused.
 
@@ -65,7 +65,7 @@ otherwise B0 fails naming it.
   identity 2³ `rgba16Float` lattice at amount 0.
 - **VE** — VF-TL with exposure and white balance on encoded values, only to
   price the linear-light step.
-- **The adjustment fragment** `reelcut_adjust_fragment` is appended to each TL
+- **The adjustment fragment** `framejob_adjust_fragment` is appended to each TL
   library (and VE): it reads `[[color(0)]]`, un-premultiplies, applies tone and
   look, and mixes by the block's opacity; its pipeline has blending OFF.
 - **VB** (#258): `kBiplanar [[function_constant(4)]]` and `texture2d<float>
@@ -153,7 +153,7 @@ grading-2 G2-3; a base's shader that names no `texture(3)` ignores it), and buil
 its pipelines as `bench.swift`'s `layerState`
 (`kGatherFilters` false, the same blending, `MetalRenderer.workingFormat`)
 and, since grading-2 G2-4, the adjustment pass's as `adjustPipeline`'s (the
-shadow vertex stage, `reelcut_adjust_fragment`, blending OFF) with a neutral
+shadow vertex stage, `framejob_adjust_fragment`, blending OFF) with a neutral
 `QualifierUniforms` at fragment `buffer(1)` (a base's fragment that names no
 `buffer(1)` ignores it). Two scenes over a copy of `bench.swift`'s
 `halfPicture`: S1, and SA (S1 then one full-frame adjustment pass at +1 EV,

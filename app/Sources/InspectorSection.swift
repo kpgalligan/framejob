@@ -12,7 +12,7 @@ import AppKit
 /// mean anything. Flipping that spelling would invert every saved panel.
 final class InspectorSection: NSView {
     /// `UserDefaults` key prefix; the suffix is the section's stable id.
-    static let collapsedKeyPrefix = "ReelcutInspectorSection."
+    static let collapsedKeyPrefix = "FrameJobInspectorSection."
 
     let id: String
     let title: String

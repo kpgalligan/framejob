@@ -249,7 +249,7 @@ def harness_checks(sources, out, paths):
 
 def mutant():
     began = time.time()
-    with tempfile.TemporaryDirectory(prefix="reelcut-clip-inspector5-walls-") as temp:
+    with tempfile.TemporaryDirectory(prefix="framejob-clip-inspector5-walls-") as temp:
         sources = os.path.join(temp, "Sources")
         shutil.copytree(os.path.join(ROOT, "app", "Sources"), sources)
         path = os.path.join(sources, MUTANT_FILE)

@@ -47,7 +47,7 @@ track's first segment of positive duration, sounding or not) in
 Exit 0 means caught: both `missing-first` and
 `pending-first`'s first-25 ms rows FAIL while both sections' CONTROL rows
 pass; 1 means it survived; 2 means the control could not be performed (the
-copy was not built or not launched, its log has a `Reelcut: ` parity line, or
+copy was not built or not launched, its log has a `Frame Job: ` parity line, or
 a CONTROL row failed). Only that child is ever terminated, by its PID.
 """
 
@@ -63,6 +63,7 @@ from array import array
 
 import mixed_audio_probe as probe
 import mcp as mcp_client
+import proof_app
 from mcp import MCP, target
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -100,9 +101,9 @@ class Session:
         self.mcp = mcp
         self.name = name
         for stale in os.listdir(WORK):
-            if re.fullmatch(rf"{re.escape(name)}-\d+\.reelcut", stale):
+            if re.fullmatch(rf"{re.escape(name)}-\d+\.framejob", stale):
                 shutil.rmtree(os.path.join(WORK, stale))
-        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.reelcut")
+        self.path = os.path.join(WORK, f"{name}-{os.getpid()}.framejob")
         mcp.call("new_project", path=self.path)
         self.op("set_canvas", width=640, height=360)
 
@@ -332,14 +333,14 @@ def build_mutant(name):
     app, reason = tree_copy.build_app(made, 1500)
     if app is None:
         return None, reason
-    return str(app / "Contents/MacOS/Reelcut"), ""
+    return str(proof_app.executable(app)), ""
 
 
 def parity_lines(log_path):
     """The startup parity check's complaints in the child's log."""
     try:
         with open(log_path, errors="replace") as handle:
-            return [line for line in handle.read().splitlines() if "Reelcut: " in line]
+            return [line for line in handle.read().splitlines() if "Frame Job: " in line]
     except OSError:
         return []
 

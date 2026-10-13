@@ -12,8 +12,8 @@ read them before writing code on that side:
   exports, format versioning, tests.
 - `app/CLAUDE.md` — Swift rules: file map (which files are frozen), undo and
   dirty tracking, agent parity, state flow, hygiene.
-- `mcp-proxy/CLAUDE.md` — `reelcut-mcp`'s rules: module map, stdout as
-  protocol only, what never launches Reelcut, the launch lock, tests.
+- `mcp-proxy/CLAUDE.md` — `framejob-mcp`'s rules: module map, stdout as
+  protocol only, what never launches Frame Job, the launch lock, tests.
 
 **These files are the rulebook, and they hold no status and no
 history.** A road map in progress lives in `designs/`, and its own document
@@ -39,7 +39,7 @@ comment citing "road map N §x" refers to the archived original.
 | `designs/spec/` | **The normative spec, one file per section — never read it whole.** Start at its `README.md` (the index: each file, its size, what it answers), then read only the file you need; "spec §7.3" is `07.3-frame-recipe.md`. §5 schemas, §6 op table, §7 architecture, §9 keys and menus, §10 acceptance steps, §11 decisions already made — not to be re-litigated, indexed by ID in `11-decisions/README.md`. An ADR cites §11's IDs; it never replaces them. |
 | GitHub issues | **What is left**, and the one place it is kept: open defects, proof residue, candidates, accepted limits, work the user deferred (`gh issue list`), and one-off asks of the owner — a spend, a choice, a permission an agent was refused (`--label ready-for-human`). Nothing open is tracked in a document. |
 | `docs/manual-checks.md` | **What only a person at the machine can confirm**, as a standing list the owner runs periodically and before every release — not open work, so not an issue. A change that creates such a check adds or edits its row in the same change. |
-| `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `roadmap-11` the dev tools (snapshot_ui, perform_menu_item, the screen catalog) and `make dist` · `roadmap-12` the assistant (the bundled helper, the agent lane, withheld and ask-first tools, the Assistant tab and its prompt) · `roadmap-13` pricing and spend (LiteLLM's table, the price function in the helper and the proofs, the spend ledger, the proofs' budgets, the tab's and Settings' spend figures) · `roadmap-14` the agent socket (the Unix socket, `reelcut-mcp` and its catalog snapshot, a tool call never asking, Copy MCP Command) · `mattes` the matte track (MT-1..MT-7): a track that cuts the one behind it, the recipe's matte roles, the compositor's matte pass, the chrome · `precision` the 16-bit-float compositor, deep decode and the 10-bit exports (PR-1..PR-5) · `precision-2` the paths PR-5 left 8-bit (PR-6..PR-8, #257): a deep still drawn at 16-bit float, the 10-bit reverse (HEVC Main 10, ProRes 422 at an odd size) keeping the source's colour labels, 10-bit `hevc_alpha` and recording not wanted · `grading` the grading road map (GR-1..GR-9): tone at step 4c, adjustment clips, looks and `.cube` LUTs at 4d, Show Ungraded and the waveform, the owner's trial and verdict, and format 15's renumbering of the branch's 1015 · `grading-2` grading tier 2 (GR-10..GR-14): the scopes and their counting rule, the wheels at 4c.1, the curves' strip at 4c.2, qualifiers and Show Selection on adjustment clips, formats 16–18 · `grading-3` grading tier 3 (GR-15..GR-20): honest sources and Reelcut's own HDR→SDR at step 0 (`ConvertingCompositor`, chosen per composition), camera log on the media (`media.color`, `set_media_color`, Apple Log and Apple Log 2 detected, format 19), linear light and the HDR timeline deferred, wide gamut for SDR projects not wanted · `build-velocity` the probe builder (`swift_build.py`), the Debug app and its identity, the stale refusals (`proof_app.py`), Debug against Release, the gate · `app-file-history` / `core-file-history` why a file or module is cut where it is, and its named next cut · `rust-build-settings` why release builds are incremental with no LTO · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
+| `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `roadmap-11` the dev tools (snapshot_ui, perform_menu_item, the screen catalog) and `make dist` · `roadmap-12` the assistant (the bundled helper, the agent lane, withheld and ask-first tools, the Assistant tab and its prompt) · `roadmap-13` pricing and spend (LiteLLM's table, the price function in the helper and the proofs, the spend ledger, the proofs' budgets, the tab's and Settings' spend figures) · `roadmap-14` the agent socket (the Unix socket, `framejob-mcp` and its catalog snapshot, a tool call never asking, Copy MCP Command) · `mattes` the matte track (MT-1..MT-7): a track that cuts the one behind it, the recipe's matte roles, the compositor's matte pass, the chrome · `precision` the 16-bit-float compositor, deep decode and the 10-bit exports (PR-1..PR-5) · `precision-2` the paths PR-5 left 8-bit (PR-6..PR-8, #257): a deep still drawn at 16-bit float, the 10-bit reverse (HEVC Main 10, ProRes 422 at an odd size) keeping the source's colour labels, 10-bit `hevc_alpha` and recording not wanted · `grading` the grading road map (GR-1..GR-9): tone at step 4c, adjustment clips, looks and `.cube` LUTs at 4d, Show Ungraded and the waveform, the owner's trial and verdict, and format 15's renumbering of the branch's 1015 · `grading-2` grading tier 2 (GR-10..GR-14): the scopes and their counting rule, the wheels at 4c.1, the curves' strip at 4c.2, qualifiers and Show Selection on adjustment clips, formats 16–18 · `grading-3` grading tier 3 (GR-15..GR-20): honest sources and Reelcut's own HDR→SDR at step 0 (`ConvertingCompositor`, chosen per composition), camera log on the media (`media.color`, `set_media_color`, Apple Log and Apple Log 2 detected, format 19), linear light and the HDR timeline deferred, wide gamut for SDR projects not wanted · `build-velocity` the probe builder (`swift_build.py`), the Debug app and its identity, the stale refusals (`proof_app.py`), Debug against Release, the gate · `app-file-history` / `core-file-history` why a file or module is cut where it is, and its named next cut · `rust-build-settings` why release builds are incremental with no LTO · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
 | `designs/design_handoff_reelcut_sharp/` | The sharp pass (2026-09-23): square chrome, 2 pt clips, the zoom slider's block knob. Its README is normative for radii and the knob, with spec §11 SH-2 as the deviation (SH-4 squared `StickerButton`, superseding SH-1). |
 | `designs/design_handoff_clip_inspector/` | The clip inspector handoff road map 9 built from; `designs/adr/roadmap-09-clip-inspector.md` records the deviations. |
@@ -51,13 +51,13 @@ comment citing "road map N §x" refers to the archived original.
 ## Commands
 
 ```sh
-make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make app-debug  # make rust + make project + xcodebuild Debug → build/Build/Products/Debug/Reelcut.app, "Reelcut Debug" (com.kgalligan.Reelcut.debug; seconds after a one-file edit)
-make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release, cd mcp-proxy && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe, with the assistant's credential rows and the support folder's `0700` rows), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks), tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network) and tools/proof/budget_proof.py (the proofs' ledger and the monthly budgets, over scratch ledgers, no network) and tools/proof/capture_spike/inventory.py --check (the menu inventory's sites, found by token and enclosing function, and its other citations, found by anchor, against app/Sources; no app) and tools/proof/spec_index_proof.py (the spec indexes' Lines cells against `wc -l`, and a row for every spec file; no app) and tools/proof/swift_build.py --selftest (the probe builder's key, reuse and digest check, and that no proof carries its own app swiftc line; one tiny build, no app) and tools/proof/proof_app.py --selftest (the stale-app refusal, the app choice and the Debug bundle id against project.yml, over scratch trees; no app) and tools/proof/gate.py --selftest (the gate's input classes, its stamp rule and its warning baseline, over synthetic digests; no tree, no app) and tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe (the defaults removal recipe on a throwaway domain, its refusals over scratch folders, then the sweep of the proofs' own idle domains, and of the two probes this target ran, out of `~/Library/Preferences`; no app)
+make app        # cargo build --release + xcodegen + xcodebuild → "build/Build/Products/Release/Frame Job.app"
+make app-debug  # make rust + make project + xcodebuild Debug → "build/Build/Products/Debug/Frame Job Debug.app", "Frame Job Debug" (com.kgalligan.FrameJob.debug; seconds after a one-file edit)
+make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release, cd mcp-proxy && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe, with the assistant's credential rows and the support folder's `0700` rows), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks), tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network) and tools/proof/budget_proof.py (the proofs' ledger and the monthly budgets, over scratch ledgers, no network) and tools/proof/capture_spike/inventory.py --check (the menu inventory's sites, found by token and enclosing function, and its other citations, found by anchor, against app/Sources; no app) and tools/proof/spec_index_proof.py (the spec indexes' Lines cells against `wc -l`, and a row for every spec file; no app) and tools/proof/swift_build.py --selftest (the probe builder's key, reuse and digest check, and that no proof carries its own app swiftc line; one tiny build, no app) and tools/proof/proof_app.py --selftest (the stale-app refusal, the app choice and the Debug bundle id against project.yml, over scratch trees; no app) and tools/proof/gate.py --selftest (the gate's input classes, its stamp rule and its warning baseline, over synthetic digests; no tree, no app) and tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe (the defaults removal recipe on a throwaway domain, its refusals over scratch folders, then the sweep of the proofs' own idle domains, and of the two probes this target ran, out of `~/Library/Preferences`; no app) and tools/proof/name_residue.py --selftest then tools/proof/name_residue.py (no line or path spells the old name outside its allow-list: HISTORY, KEPT_PATTERNS and the exact COUNTED pins, spec §11 NM-8; no app)
 make lint       # cargo clippy --all-targets -- -D warnings, in core/, graphic/ then mcp-proxy/
-make typecheck  # swiftc -typecheck -D REELCUT_DEV_TOOLS of app/Sources/*.swift in batch mode on every core (seconds) — the ONLY authoritative Swift check, then agent/'s `tsc --noEmit` (through bun)
-make gate       # the one Full verification command: typecheck (exactly its four baseline warnings), cargo fmt --check, lint, test, app (and the Release app's entitlements and seal, dist_check D25/D26); serial, stops at the first failure, skips a step whose inputs and tools are byte-identical to its last pass (build/gate/)
-make project    # xcodegen generate with VERSION injected — never run a bare xcodegen, it leaves the version blank (Reelcut.xcodeproj is generated; project.yml is the source of truth)
+make typecheck  # swiftc -typecheck -D FRAMEJOB_DEV_TOOLS of app/Sources/*.swift in batch mode on every core (seconds) — the ONLY authoritative Swift check, then agent/'s `tsc --noEmit` (through bun)
+make gate       # the one Full verification command: names (tools/proof/name_residue.py, spec §11 NM-8; every file, `*.md` included, is its input), typecheck (exactly its four baseline warnings), cargo fmt --check, lint, test, app (and the Release app's entitlements and seal, dist_check D25/D26); serial, stops at the first failure, skips a step whose inputs and tools are byte-identical to its last pass (build/gate/)
+make project    # xcodegen generate with VERSION injected — never run a bare xcodegen, it leaves the version blank (FrameJob.xcodeproj is generated; project.yml is the source of truth)
 make run        # make app, then launch
 make dist       # make app, then the Distribution build (no dev tools, spec §11 V-1), tools/proof/dist_check.py and tools/proof/published_check.py (the check the publish workflow runs over the app it packs, spec §11 PUB-4)
 make prices     # NETWORK: regenerate agent/prices/anthropic.json from LiteLLM (spec §11 P-1); its only writer, never run by another target
@@ -87,7 +87,7 @@ make prices     # NETWORK: regenerate agent/prices/anthropic.json from LiteLLM (
   its `bun test` (through `prices_proof.py`). All need bun, and
   without it they fail with an `error: bun is not installed` line rather
   than skipping.
-- `Reelcut.xcodeproj` is generated; never commit it. xcodegen and
+- `FrameJob.xcodeproj` is generated; never commit it. xcodegen and
   `make typecheck` both glob `app/Sources/`, so a new Swift file needs no
   registration anywhere.
 - **A build for another Mac comes only from a push to the `publish` branch**
@@ -109,18 +109,17 @@ core/                Rust staticlib — the model, the ops, the plan, the recipe
 graphic/             Rust crate — the graphics engine (road map 10): a Module run in
   src/                 sandboxed QuickJS returns SVG per frame; rasterize (usvg →
   tests/               resvg → BGRA), measure_text. graphic/CLAUDE.md has its rules
-mcp-proxy/           Rust crate — `reelcut-mcp` (road map 14 MC3, spec §11 MC-3): the stdio
+mcp-proxy/           Rust crate — `framejob-mcp` (road map 14 MC3, spec §11 MC-3): the stdio
   src/                 MCP server bundled in Contents/Helpers; answers initialize, ping and
-  tests/               tools/list itself (the build's catalog snapshot when no Reelcut runs),
+  tests/               tools/list itself (the build's catalog snapshot when no Frame Job runs),
                        forwards the rest over the agent socket and launches its own bundle
                        for a tools/call. std + serde_json; mcp-proxy/CLAUDE.md has its rules
 agent/               the assistant helper (AI-1): Bun, the Anthropic SDK's Tool Runner
-  src/                 meant to be byte-identical to ~/devel/rasterize/agent/src/, one
-                       diff applied to both; NOT YET: Rasterize lacks road map 12 §2's
-                       change, road map 13's pricing.ts / pricing.test.ts and P2's
-                       priceTable.ts / priceTable.test.ts, the protocol's prices and
-                       cost events, #162's partial `cost`, and tsconfig's
-                       resolveJsonModule until kpgalligan/rasterize#325 lands.
+  src/                 byte-identical to ~/devel/rasterize/agent/src/ (`diff -r` exited 0
+                       on 2026-10-13), one diff applied to both; but for NM-10's three
+                       lines (main.ts's comment, priceTable.test.ts's scratch prefix,
+                       priceTable.ts's user-agent `framejob-agent`), recorded in
+                       designs/rename.md for Rasterize to apply.
                        What the apps differ in arrives in `configure`
   prices/              anthropic.json (LiteLLM's Anthropic rows, $/MTok; written only by
                        `make prices` → update.py; bundled into the helper), cases.json
@@ -132,7 +131,7 @@ app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
   Resources/Shaders/   Compositor.metal — the per-layer compositing pass
   Resources/Models/    silero_vad.mlmodelc, vendored compiled (PROVENANCE.md)
-  Bridging/            the bridging header importing core/include/reelcut_core.h
+  Bridging/            the bridging header importing core/include/framejob_core.h
 designs/             the spec, adr/ (condensed records), the handoffs — the table above
 archive/             closed road maps and histories, verbatim; INDEX.md — read only when asked
 docs/agents/         what the engineering skills read: tracker, labels, domain docs
@@ -158,7 +157,7 @@ pixel or sample work in Rust; no ffmpeg dependency in the product.
 
 ### FFI contract
 
-- `core/include/reelcut_core.h` is a **hand-maintained** C header, the single
+- `core/include/framejob_core.h` is a **hand-maintained** C header, the single
   contract between the worlds. **The FFI is three files in lockstep**: a Rust
   `#[no_mangle]` export, its entry in the header, and its wrapper in
   `app/Sources/ReelCore.swift` — **the only file that calls `rc_*`**.
@@ -256,7 +255,9 @@ else is what bloats files:
   needs its explicit flags (`--live --cap <dollars>`); the file's presence
   spends nothing. Every paid proof request is also held to the month's
   budget (spec §11 P-3, P-6) in
-  `~/Library/Application Support/Reelcut Proofs/spend.jsonl`; an agent never
+  `~/Library/Application Support/Frame Job Proofs/spend.jsonl` (while the old
+  `Reelcut Proofs` folder exists, `budget.py` refuses every paid request, spec §11
+  NM-7); an agent never
   edits it, raises a budget, or points a verification at it.
 - **A check only a person at the machine can make is a row in
   `docs/manual-checks.md`**, added in the change that creates it — never a
@@ -270,7 +271,7 @@ else is what bloats files:
 
 The app is verified by driving the built binary over MCP and comparing what
 it renders — not by reading code. Launch your own instance on your own socket
-and only ever kill that one (`pgrep -f "MacOS/Reelcut"` lists them, Debug
+and only ever kill that one (`pgrep -f "MacOS/Frame Job"` lists them, Debug
 and Release alike; the products folder tells them apart; another session may
 have one running):
 
@@ -281,14 +282,14 @@ python3 tools/proof/proof_app.py launch   # prints folder, socket, log, pid
 
 Each later command names the printed folder literally
 (`mcp.MCP("<dir>/agent.sock")`, `python3 tools/proof/phaseN_proof.py
-<dir>/agent.sock`, `grep "Reelcut: " <dir>/reelcut.log`), because a shell
+<dir>/agent.sock`, `grep "Frame Job: " <dir>/framejob.log`), because a shell
 variable does not survive from one agent command to the next; stop it by the
 pid the launcher prints.
 
-The log line `Reelcut agent socket listening at <dir>/agent.sock` says it is
+The log line `Frame Job agent socket listening at <dir>/agent.sock` says it is
 up (`not bound: <reason>` says why not). Drive it with `tools/proof/mcp.py`'s
 `mcp.MCP("<dir>/agent.sock")` (streamable HTTP over the Unix socket), or with
-the bundled stdio helper `reelcut-mcp` with `RC_AGENT_SOCKET` set to the same
+the bundled stdio helper `framejob-mcp` with `RC_AGENT_SOCKET` set to the same
 path: one tool per §6 op, each taking the `scope`
 envelope key, plus the app-state tools — `open_project`, `new_project`,
 `save_project`, `close_project`, `get_project`, `import_media`,
@@ -318,20 +319,20 @@ Release-only proofs pass `release_only=` (`git grep release_only= tools/proof`);
 recording_proof's socket instance is started with
 `python3 tools/proof/proof_app.py launch --app release`.
 
-**Before trusting any MCP proof, `grep "Reelcut: " <dir>/reelcut.log`
+**Before trusting any MCP proof, `grep "Frame Job: " <dir>/framejob.log`
 must print nothing** — that prefix is the startup parity check complaining.
 On a Debug build the same complaint is an `assertionFailure` that traps first
 (`AgentServer.prepareCatalog`), so `make app-debug` fails at Write Agent
 Catalog with `Fatal error: …` instead of logging the line.
 
 A proof's instance shares its bundle's defaults domain (the owner's
-`com.kgalligan.Reelcut` for a Release build, `com.kgalligan.Reelcut.debug`
+`com.kgalligan.FrameJob` for a Release build, `com.kgalligan.FrameJob.debug`
 for a Debug build, spec §11 V-5): no
 environment moves `UserDefaults` (#238). Never perform a persisting menu item
 (View ▸ Snapping, Safe Areas, Hide Inspector, Timeline Track Height, Preview
 Quality) on either build: `mcp.py` ends the script with status 3 and
 `DEFAULTS MOVED` last on stderr when its session moved a key and no other
-Reelcut shares the domain, and only prints the line when one does;
+Frame Job shares the domain, and only prints the line when one does;
 `defaults_proof.py` is its proof. The guard reads the domain with
 `CFFIXED_USER_HOME` taken out of `defaults`' environment
 (`proof_defaults.read_env`), so a proof run under a scratch home that does
@@ -393,7 +394,7 @@ probes for it and skips its granted tier by name, and a capture is never
 trusted until it is checked non-black. The way to LOOK at the chrome is
 **`tools/proof/harness/`**: it compiles every file in `app/Sources` except
 `main.swift` with a `main.swift` of its own, links the staticlib, opens a
-`.reelcut` package, puts an `EditorViewController` in an `NSWindow` and
+`.framejob` package, puts an `EditorViewController` in an `NSWindow` and
 `cacheDisplay`s it into a PNG at the display's backing scale — the same paint
 path the window uses, no TCC grant, either appearance, captured on SETTLE.
 The preview well comes out as the canvas background (an `AVPlayerLayer` or

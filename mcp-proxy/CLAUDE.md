@@ -1,8 +1,8 @@
 # mcp-proxy/CLAUDE.md — the stdio MCP proxy's rules
 
 Applies to everything under `mcp-proxy/`, the crate that builds
-`reelcut-mcp`: the stdio MCP server bundled as
-`Reelcut.app/Contents/Helpers/reelcut-mcp`, which external MCP clients start
+`framejob-mcp`: the stdio MCP server bundled as
+`Frame Job.app/Contents/Helpers/framejob-mcp`, which external MCP clients start
 (road map 14's MC3, spec §11 MC-3, MC-4, MC-6; the record is
 `designs/adr/roadmap-14-agent-socket.md`). Build commands are the root `CLAUDE.md`'s:
 `make test` and `make lint` run this crate after the core and the graphics
@@ -17,7 +17,7 @@ entitlements, as `agent/build.sh helper` signs the assistant's helper.
   `session::dispatch`; stdin's end exits at once without waiting for a call
   in flight). It also includes `core/src/mcp_versions.rs` by `#[path]` as
   `mcp_versions`, so the proxy and the app negotiate from ONE list.
-- `main.rs` — `fn main() { reelcut_mcp::run() }` and nothing else.
+- `main.rs` — `fn main() { framejob_mcp::run() }` and nothing else.
 - `session.rs` — `dispatch` (a blank line skipped; unparsable `-32700` and a
   batch `-32600`, both with a null id; a notification or a response dropped
   and never forwarded; every request on its own thread), `Output` (stdout
@@ -34,7 +34,7 @@ entitlements, as `agent/build.sh helper` signs the assistant's helper.
   the launch are one critical section per session (`Session.launching`), so
   concurrent calls that found no socket launch at most once between them.
 - `socket.rs` — `socket_path` (`RC_AGENT_SOCKET` when not empty, else
-  `$HOME/Library/Application Support/Reelcut/Agent/agent.sock`), `is_scratch`,
+  `$HOME/Library/Application Support/Frame Job/Agent/agent.sock`), `is_scratch`,
   `reach` (`Answers`; `Absent` for `NotFound` or `ConnectionRefused`;
   `Unreachable` otherwise), and `post`: one `POST /mcp HTTP/1.1` with
   `Connection: close`, its body read by `Content-Length` or CHUNKED —
@@ -43,7 +43,7 @@ entitlements, as `agent/build.sh helper` signs the assistant's helper.
 - `launch.rs` — `ensure_running`: the socket's folder made if missing
   (`0700`), `agent.launch.lock` beside the socket taken with `File::lock`,
   the re-check, `/usr/bin/open` with `open_arguments` (pure: `-n -g`, and for
-  a scratch socket `--env RC_AGENT_SOCKET=…`, `--stderr <folder>/reelcut-launch.log`
+  a scratch socket `--env RC_AGENT_SOCKET=…`, `--stderr <folder>/framejob-launch.log`
   and `--args -ApplePersistenceIgnoreState YES`), and the 50 ms poll until the
   socket answers or `launch_wait()` (`RC_MCP_LAUNCH_WAIT`, else 60 s) runs out
   with `timeout_sentence`.
@@ -56,9 +56,9 @@ entitlements, as `agent/build.sh helper` signs the assistant's helper.
 ## Rules
 
 - **stdout is protocol only.** Every other word goes to stderr, each line
-  starting `reelcut-mcp: `; never `Reelcut: `, which is the app's parity
+  starting `framejob-mcp: `; never `Frame Job: `, which is the app's parity
   check's prefix and which every proof reads as a complaint.
-- **`initialize`, `ping` and `tools/list` never launch Reelcut** (MC-4);
+- **`initialize`, `ping` and `tools/list` never launch Frame Job** (MC-4);
   `mcp_proxy_proof.py`'s X1 and its `launch-on-list` mutant hold it.
 - **The launch lock is held until the poll ends.** Released before it, a
   second proxy's re-check would find nothing answering yet and launch a
@@ -68,7 +68,7 @@ entitlements, as `agent/build.sh helper` signs the assistant's helper.
 - **No read timeout on a forwarded call**: an `export` may take minutes.
   Only the session's `tools/list` passes `LIST_READ_TIMEOUT`, because the app
   serves one request at a time and another client's long call would hold it.
-- **A proxy launches only its OWN bundle**, so a copy of Reelcut launches
+- **A proxy launches only its OWN bundle**, so a copy of Frame Job launches
   itself; outside a bundle a call answers the sentence naming the executable.
 - `#![forbid(unsafe_code)]` stays in `lib.rs` and `main.rs`; every `src/`
   file stays under 400 lines.

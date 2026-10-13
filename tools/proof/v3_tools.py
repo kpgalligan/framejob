@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Road map 11's V3 — the two app additions the screen catalog needs, proved
-against a Reelcut of its own: `select_inspector_tab` (a dev tool) and
+against a Frame Job of its own: `select_inspector_tab` (a dev tool) and
 `snapshot_ui`'s `recorder` window kind.
 
     python3 tools/proof/v3_tools.py [--app APP] [--only L,T,R]
@@ -18,10 +18,10 @@ panel, reads its refusals and stops the instance at once — an instance that
 was active when it ran still gets a key panel with Record on Return; the
 time from the perform's answer to the child's exit is printed as `recorder
 panel up`. `R3` (#137) makes no MCP call: from R2's readings, the panel
-shown with Reelcut in the background must leave it so — the perform's answer
+shown with Frame Job in the background must leave it so — the perform's answer
 `active` false and the capture's `active` and `key` false (spec §11, "The
-recorder panel takes key only from an active Reelcut"). It is a named host
-skip when the console is locked or Reelcut was active before New
+recorder panel takes key only from an active Frame Job"). It is a named host
+skip when the console is locked or Frame Job was active before New
 Recording…. Rows print as `<ID> <pass|fail|skip> — <reason>`, then `scores:`
 and `digest:`. Exit 0 iff no row failed.
 
@@ -138,7 +138,7 @@ class Proof:
                   and "scope" not in props)
         ok = (alive and welcome and not parity and marker == len(DEV_TOOLS)
               and block == DEV_TOOLS + ["import_media"] and shaped)
-        notes = [f"alive {alive}", f"welcome {welcome}", f"`Reelcut: ` lines {len(parity)}",
+        notes = [f"alive {alive}", f"welcome {welcome}", f"`Frame Job: ` lines {len(parity)}",
                  f"marker count {marker} (want {len(DEV_TOOLS)})", f"block {block}",
                  f"select_inspector_tab properties {sorted(props)} required "
                  f"{schema.get('required')}", f"fixture {sorted(self.ids)}"]
@@ -292,7 +292,7 @@ class Proof:
             return
         before, active, facts = self.r2["before"], self.r2["active"], self.r2["facts"]
         if before is True:
-            score("R3", "skip", f"host: Reelcut active before New Recording… ({before})")
+            score("R3", "skip", f"host: Frame Job active before New Recording… ({before})")
             return
         if before is not False:
             score("R3", "fail", f"the listing's active before New Recording… read {before!r}, "

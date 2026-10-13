@@ -140,7 +140,7 @@ extension MediaImporter {
     /// four alerts. `app/CLAUDE.md` names import as one of the documented
     /// `DispatchQueue` seams.
     private static let importQueue = DispatchQueue(
-        label: "com.kgalligan.reelcut.import", qos: .userInitiated)
+        label: "com.kgalligan.framejob.import", qos: .userInitiated)
 
     /// The synchronous face of `probe` for the rest of the app: the result
     /// arrives on the main thread, so the caller can go straight to
@@ -331,7 +331,7 @@ extension MediaImporter {
         Thread.current.threadDictionary[withoutAskingKey] as? Bool ?? false
     }
 
-    private static let withoutAskingKey = "com.kgalligan.reelcut.import.withoutAsking"
+    private static let withoutAskingKey = "com.kgalligan.framejob.import.withoutAsking"
 
     /// Runs `body` with `probeBlocking` on THIS thread never asking and
     /// never passing a watch — the scope a tool call's synchronous document

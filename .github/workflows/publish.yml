@@ -1,4 +1,4 @@
-# Builds, signs (Developer ID), notarizes and publishes Reelcut.dmg as a
+# Builds, signs (Developer ID), notarizes and publishes FrameJob.dmg as a
 # GitHub Release on every push to the `publish` branch (spec §11 PUB-1..PUB-5).
 # Rasterize's workflow, renamed, with three differences: the archive is the
 # Distribution configuration (no dev tools, spec §11 V-1), the Metal toolchain
@@ -51,7 +51,7 @@ jobs:
       # Builds the assistant's agent helper (agent/) in the Xcode post-build step.
       - uses: oven-sh/setup-bun@v2
 
-      # core/ builds graphic/ as a path dependency; mcp-proxy/ is reelcut-mcp.
+      # core/ builds graphic/ as a path dependency; mcp-proxy/ is framejob-mcp.
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
@@ -64,9 +64,9 @@ jobs:
           # under RUNNER_TEMP are exported here for the later steps.
           {
             echo "KEYCHAIN=$RUNNER_TEMP/signing.keychain-db"
-            echo "ARCHIVE=$RUNNER_TEMP/Reelcut.xcarchive"
+            echo "ARCHIVE=$RUNNER_TEMP/FrameJob.xcarchive"
             echo "EXPORT=$RUNNER_TEMP/export"
-            echo "DMG=$RUNNER_TEMP/Reelcut.dmg"
+            echo "DMG=$RUNNER_TEMP/FrameJob.dmg"
           } >> "$GITHUB_ENV"
           BASE="$(tr -d '[:space:]' < VERSION)"
           # macOS versions are at most three integers; the run number is the third.
@@ -98,7 +98,7 @@ jobs:
           security find-identity -v -p codesigning "$KEYCHAIN"
 
       # Distribution is the configuration that ships (spec §11 V-1): Release
-      # without REELCUT_DEV_TOOLS, and without the get-task-allow notarization
+      # without FRAMEJOB_DEV_TOOLS, and without the get-task-allow notarization
       # refuses. The two helpers are signed by their own build steps with the
       # identity given here, before Xcode signs the app around them.
       - name: Archive
@@ -107,7 +107,7 @@ jobs:
         run: |
           make project
           xcodebuild archive \
-            -project Reelcut.xcodeproj -scheme Reelcut -configuration Distribution \
+            -project FrameJob.xcodeproj -scheme FrameJob -configuration Distribution \
             -destination 'generic/platform=macOS' \
             -derivedDataPath build \
             -archivePath "$ARCHIVE" \
@@ -127,7 +127,7 @@ jobs:
             -archivePath "$ARCHIVE" \
             -exportOptionsPlist .github/ExportOptions.plist \
             -exportPath "$EXPORT"
-          APP="$EXPORT/Reelcut.app"
+          APP="$EXPORT/Frame Job.app"
           codesign --verify --deep --strict --verbose=2 "$APP"
           codesign -dvv "$APP" 2>&1 | grep -E '^(Authority|TeamIdentifier|Timestamp|Runtime)'
           python3 tools/proof/published_check.py --app "$APP" \
@@ -137,9 +137,9 @@ jobs:
         run: |
           STAGE="$RUNNER_TEMP/dmg"
           mkdir -p "$STAGE"
-          cp -R "$EXPORT/Reelcut.app" "$STAGE/"
+          cp -R "$EXPORT/Frame Job.app" "$STAGE/"
           ln -s /Applications "$STAGE/Applications"
-          hdiutil create -volname Reelcut -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+          hdiutil create -volname "Frame Job" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
           codesign --sign "Developer ID Application" --timestamp --keychain "$KEYCHAIN" "$DMG"
 
       - name: Notarize
@@ -174,7 +174,7 @@ jobs:
           else
             gh release create "$TAG" "$DMG" \
               --target "$GITHUB_SHA" \
-              --title "Reelcut $VERSION" \
+              --title "Frame Job $VERSION" \
               --generate-notes
           fi
 

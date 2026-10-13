@@ -1,6 +1,6 @@
 import AppKit
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 /// `perform_menu_item`'s main-thread half (road map 11's V2b): the main
 /// menu's leaves, a path looked up in it, whether an item may be run at all,
 /// which object answers it in a NAMED window's responder chain, whether that

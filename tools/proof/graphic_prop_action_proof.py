@@ -64,7 +64,7 @@ Instance 1 (the prefetch on, the default), project P:
 - **N1**: v2 written again, the graphic clip nested; with `scope` = the
   nest's id, `{x: 30}` on the nested clip's action lands and the nest's
   clip shows `props.x` 30 and `kinds.x` "number".
-Instance 2 (`-ReelcutGraphicPrefetchOff YES`, a launch argument, so the
+Instance 2 (`-FrameJobGraphicPrefetchOff YES`, a launch argument, so the
 volatile argument domain): P saved and copied before P-on.mov was written,
 opened and exported as P-off.mov.
 - **F1**: P-on.mov and P-off.mov are the same movie (creation times
@@ -72,7 +72,7 @@ opened and exported as P-off.mov.
 - **F2**: the ONE `graphic prefetch:` line instance 1 logged between the
   start of the P-on export and the start of the Q export says hits > 0 and
   mismatched 0; instance 2's log holds no such line.
-- **Z1** (CONTROL): neither log holds a `Reelcut: ` line; the tail of each
+- **Z1** (CONTROL): neither log holds a `Frame Job: ` line; the tail of each
   log (the instances' stdout and stderr) is printed.
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`; a `core/`
@@ -294,15 +294,15 @@ def tail(log, count=4):
 
 def complaints(log):
     try:
-        return [line.strip() for line in open(log, errors="replace") if "Reelcut: " in line]
+        return [line.strip() for line in open(log, errors="replace") if "Frame Job: " in line]
     except OSError:
         return [f"{log} could not be read"]
 
 
 def run_p(client, log, state):
     """Instance 1's rows. Answers whether every project it opened closed."""
-    p = WORK / "P.reelcut"
-    q = WORK / "Q.reelcut"
+    p = WORK / "P.framejob"
+    q = WORK / "Q.framejob"
     made = attempt(client, "new_project", {"path": str(p)})
 
     # T0 — the gate (CONTROL)
@@ -395,7 +395,7 @@ def run_p(client, log, state):
     saved = attempt(client, "save_project", {"project": str(p)})
     copied = False
     if saved["ok"]:
-        shutil.copytree(p, WORK / "P-off.reelcut")
+        shutil.copytree(p, WORK / "P-off.framejob")
         copied = True
     state["p_start"] = log_size(log)
     state["p_on"], state["p_on_error"] = export(client, p, WORK / "P-on.mov")
@@ -525,7 +525,7 @@ def run_p(client, log, state):
 
 
 def launch(binary, log, off):
-    arguments = ["-ReelcutGraphicPrefetchOff", "YES"] if off else []
+    arguments = ["-FrameJobGraphicPrefetchOff", "YES"] if off else []
     return mcp.launch(str(binary), arguments,
                       env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
                       log_path=str(log), timeout=CALL_BOUND)
@@ -586,7 +586,7 @@ def main():
             return 2
     else:
         print("B87 phase 2 — an action animates a graphic's props, over MCP", flush=True)
-    binary = app / "Contents/MacOS/Reelcut"
+    binary = proof_app.executable(app)
     if not binary.is_file():
         print(f"instrument failure: no app binary at {binary}")
         return 2
@@ -617,7 +617,7 @@ def main():
             if client is not None:
                 print(f"  instance 2 (prefetch OFF) PID {second.child.pid} at "
                       f"{second.socket_path}", flush=True)
-            package = WORK / "P-off.reelcut"
+            package = WORK / "P-off.framejob"
             opened = attempt(client, "open_project", {"path": str(package)})
             off_ok, off_error = export(client, package, off_movie) if opened["ok"] \
                 else (False, opened.get("error"))
@@ -642,7 +642,7 @@ def main():
               f"P-on lines {lines}; awaited {state.get('p_awaited')}; OFF lines {off_lines}")
     found = complaints(on_log) + (complaints(off_log) if off_log.exists() else [])
     if rows.get("H0"):
-        check("Z1 CONTROL: the projects close and no log holds a `Reelcut: ` line",
+        check("Z1 CONTROL: the projects close and no log holds a `Frame Job: ` line",
               closed and not found, f"closed {closed}; complaints {found}")
     for log in (on_log, off_log):
         if log.exists():

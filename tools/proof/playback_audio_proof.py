@@ -51,7 +51,7 @@ WORK = os.path.join(HERE, "work", "playback_audio")
 PROBE_DIR = os.path.join(WORK, "probe")
 SOURCES = os.path.join(ROOT, "app", "Sources")
 PROBE_SWIFT = os.path.join(HERE, "playback_audio_probe.swift")
-LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 WALL_BUILD, WALL_RUN = 900, 300
 ROWS = ["N1", "N2", "N3", "N4", "M1", "M2", "M3", "M4", "M5"]
 
@@ -118,7 +118,7 @@ def build_probe(sources=None, probe_dir=None):
     print(f"probe: {len(swift)} sources through swift_build (up to {WALL_BUILD} s)…", flush=True)
     try:
         built = swift_build.build(sources=swift + [entry], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=WALL_BUILD)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=WALL_BUILD)
     except swift_build.SwiftBuildFailed as error:
         return None, (f"swiftc exited {error.rc if error.rc is not None else 'before running'} "
                       f"(expired {error.expired}): "

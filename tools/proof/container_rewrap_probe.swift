@@ -41,7 +41,7 @@
 //
 // Issue batch B82 (#236): the probe runs in a scratch home
 // (`CFFIXED_USER_HOME`, set by container_rewrap_probe.py), so the product's
-// `Rewrapped/` is `<scratch-home>/Library/Application Support/Reelcut/
+// `Rewrapped/` is `<scratch-home>/Library/Application Support/Frame Job/
 // Rewrapped/`, which the product makes itself. Row H0 answers where
 // `AppSupport.subdirectory("Rewrapped")` is and whether that is inside
 // `<scratch-home>`; when it is not the probe exits before it reads the jobs
@@ -918,10 +918,10 @@ func runOriginalRows(_ job: [String: Any]) {
         let original = MediaOriginal(path: "/Users/x/Movies/talk.webm")
         let none = MediaSnapshot(id: 1, path: "/Users/x/Movies/talk.mov")
         let rewrapped = MediaSnapshot(
-            id: 2, path: "/Users/x/Library/Application Support/Reelcut/Rewrapped/talk-0a.mov",
+            id: 2, path: "/Users/x/Library/Application Support/Frame Job/Rewrapped/talk-0a.mov",
             original: original)
         let packaged = MediaSnapshot(
-            id: 3, path: "/Users/x/Edit.reelcut/media/talk-0a.mov", original: original)
+            id: 3, path: "/Users/x/Edit.framejob/media/talk-0a.mov", original: original)
         emit("ROW", [
             "id": "O35", "none": MediaRowView.toolTip(for: none),
             "rewrapped": MediaRowView.toolTip(for: rewrapped),
@@ -1006,7 +1006,7 @@ func runOriginalRows(_ job: [String: Any]) {
     // O40: the wiring — `read(from:ofType:)` of a package on main.
     do {
         discardCopies()
-        let package = scratch.appendingPathComponent("o40.reelcut")
+        let package = scratch.appendingPathComponent("o40.framejob")
         try? manager.createDirectory(at: package, withIntermediateDirectories: true)
         let written = (try? missing.json.write(
             to: package.appendingPathComponent("project.json"), atomically: true, encoding: .utf8))

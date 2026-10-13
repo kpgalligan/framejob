@@ -204,7 +204,7 @@ def pangram_fixture():
 def mutant(name):
     edits, row = MUTANTS[name]
     began = time.time()
-    with tempfile.TemporaryDirectory(prefix=f"reelcut-word-captions-{name}-") as temp:
+    with tempfile.TemporaryDirectory(prefix=f"framejob-word-captions-{name}-") as temp:
         sources = Path(temp) / "Sources"
         shutil.copytree(ROOT / "app/Sources", sources)
         for file, before, after in edits:

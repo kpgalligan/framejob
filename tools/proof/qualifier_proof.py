@@ -108,7 +108,7 @@ front, saved for the probe).
   `app/Sources` (a failed build is a scored FAILURE of all eight), on project
   P; each row's sentence is the probe's.
 - **Z1** (CONTROL): the fixtures hold (B, B50 and BD are the fixtures'
-  bytes), the projects close and the log holds no `Reelcut: ` line.
+  bytes), the projects close and the log holds no `Frame Job: ` line.
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`; a `core/`
 mutant makes the copy's `core/` its own through `hevc_alpha_proof.own_core`
@@ -148,7 +148,7 @@ from hevc_alpha_proof import own_core  # noqa: E402
 WORK = ROOT / "tools/proof/work/qualifier"
 HOME = WORK / "home"
 PROBE = ROOT / "tools/proof/qualifier_probe.swift"
-HEADER = ROOT / "core/include/reelcut_core.h"
+HEADER = ROOT / "core/include/framejob_core.h"
 CALL_BOUND = 300
 BUILD_BOUND = 1500
 SEC = 600_000
@@ -483,7 +483,7 @@ class Doc:
 
 def opened(client, name, width, height, background=None):
     """A new project at `name`, its canvas sized; (Doc, fixture ok)."""
-    path = WORK / f"{name}.reelcut"
+    path = WORK / f"{name}.framejob"
     made = attempt(client, "new_project", {"path": str(path)})
     doc = Doc(client, path, width, height)
     arguments = {"width": width, "height": height, "fps": [30, 1]}
@@ -1073,7 +1073,7 @@ def run_q(client, media, neutral, state):
     off_views = doc.preview("v1-off")
     tag_off = shown_off(off_views)
     doc.menu(SHOW)
-    reopen_path = WORK / "Q-saved.reelcut"
+    reopen_path = WORK / "Q-saved.framejob"
     saved = doc.call("save_project", path=str(reopen_path))
     doc.path = reopen_path
     closed = close(client, doc.path)
@@ -1144,7 +1144,7 @@ def run_s(client, media, state):
     front = doc.new_track()
     adj = doc.adjustment(front) if front is not None else None
     state["s_fixture"] = sized and clip is not None and adj is not None
-    plain_path = WORK / "S-plain.reelcut"
+    plain_path = WORK / "S-plain.framejob"
     saved = doc.call("save_project", path=str(plain_path))
     doc.path = plain_path
     try:
@@ -1152,7 +1152,7 @@ def run_s(client, media, state):
     except (OSError, ValueError):
         plain_version, plain_text = None, "unreadable"
     doc.qualify([adj], hue=H1_HUE, luma={})
-    ranged_path = WORK / "S-qualified.reelcut"
+    ranged_path = WORK / "S-qualified.framejob"
     resaved = doc.call("save_project", path=str(ranged_path))
     doc.path = ranged_path
     try:
@@ -1190,7 +1190,7 @@ def run_p(client, media, state):
     shape = doc.rectangle(shape_track, 200, 200, [1, 0, 0, 1]) if shape_track else None
     ok = sized and None not in (clip, adj, second, shape)
     ok = ok and doc.qualify([adj], hue=H1_HUE)["ok"]
-    path = WORK / "P-saved.reelcut"
+    path = WORK / "P-saved.framejob"
     ok = ok and doc.call("save_project", path=str(path))["ok"]
     doc.path = path
     closed = close(client, doc.path)
@@ -1229,7 +1229,7 @@ def run_probe(sources, package, ids):
     try:
         built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
                                   output=folder / "qualifier_probe",
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=1200)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=1200)
     except swift_build.SwiftBuildFailed as error:
         for name in sorted(K_ROWS):
             check(f"{name} the probe builds over app/Sources", False,
@@ -1283,7 +1283,7 @@ def tail(log, count=4):
 
 def complaints(log):
     try:
-        return [line.strip() for line in open(log, errors="replace") if "Reelcut: " in line]
+        return [line.strip() for line in open(log, errors="replace") if "Frame Job: " in line]
     except OSError:
         return [f"{log} could not be read"]
 
@@ -1363,7 +1363,7 @@ def main():
     scored = [name for name in ROWS if name in selected and name not in RECORDS]
     binary = Path(args.app) if args.app else proof_app.binary()
     if binary.suffix == ".app":
-        binary = binary / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(binary)
     sources = ROOT / "app/Sources"
     config = proof_app.config()
     if args.mutant:
@@ -1373,7 +1373,7 @@ def main():
         if app is None:
             print(f"mutant {args.mutant}: the control could not be performed — {copy}")
             return 2
-        binary = app / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(app)
         sources = copy / "app/Sources"
         if "CT" in named:
             passed_ct, last = core_test(copy)
@@ -1443,7 +1443,7 @@ def main():
                   f"{'equal' if good else neutral.misses + missing}", flush=True)
     found = complaints(log)
     fixtures_ok = all(value for key, value in state.items() if key.endswith("fixture"))
-    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Reelcut: ` "
+    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Frame Job: ` "
           "line", closed and fixtures_ok and not found,
           f"closed {closed}; fixtures {state}; complaints {found}")
     print(f"  {log.name} tail:\n    " + "\n    ".join(tail(log)), flush=True)

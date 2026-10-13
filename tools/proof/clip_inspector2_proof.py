@@ -342,7 +342,7 @@ def harness_checks(chrome, probe):
 
 def mutant():
     began = time.time()
-    with tempfile.TemporaryDirectory(prefix="reelcut-clip-inspector2-tabs-") as temp:
+    with tempfile.TemporaryDirectory(prefix="framejob-clip-inspector2-tabs-") as temp:
         sources = os.path.join(temp, "Sources")
         shutil.copytree(os.path.join(ROOT, "app", "Sources"), sources)
         path = os.path.join(sources, MUTANT_FILE)

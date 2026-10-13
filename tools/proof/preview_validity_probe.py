@@ -56,7 +56,7 @@ absorbing rows, and every row of section 4, the preview black at all four
 times exactly as reported — and the bound widened from one tick to eleven
 scores 21/24, the three whole-tick rows.
 
-Needs `ffmpeg`, `swiftc`, `xcrun metal` and `core/target/release/libreelcut_core.a`.
+Needs `ffmpeg`, `swiftc`, `xcrun metal` and `core/target/release/libframejob_core.a`.
 No port. Run from anywhere:
 
     python3 tools/proof/preview_validity_probe.py
@@ -140,7 +140,7 @@ def make_fixture():
             capture_output=True, text=True)
         if result.returncode != 0:
             return None, f"ffmpeg failed for {name}: {result.stderr.strip()[:300]}"
-    package = os.path.join(WORK, "overrun.reelcut")
+    package = os.path.join(WORK, "overrun.framejob")
     os.makedirs(package, exist_ok=True)
 
     def media(entry, name):
@@ -423,7 +423,7 @@ def build_probe():
         return None, why
     sources = sorted(os.path.join(SOURCES, name) for name in os.listdir(SOURCES)
                      if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:

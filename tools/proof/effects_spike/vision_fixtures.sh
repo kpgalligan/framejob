@@ -29,7 +29,7 @@ $FF -y -v error -f lavfi -i "color=c=0xf4f1ea:s=1920x1080" \
 $FF -y -v error -f lavfi -i "testsrc2=s=1920x1080" -frames:v 1 frames/testsrc2.png
 # tools/proof/media's test clip, upscaled
 $FF -y -v error -ss 1 -i "$ROOT/tools/proof/media/A.mov" -vf "scale=1920:1080:flags=bicubic" -frames:v 1 frames/media_A.png
-# Reelcut's own chrome, an offscreen harness render (road map 2, phase 4): app UI, no person
+# Frame Job's own chrome, an offscreen harness render (road map 2, phase 4): app UI, no person
 W="$ROOT/tools/proof/work"
 $FF -y -v error -i "$W/chrome4/shape-open.png" \
   -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=0x9a9a9a" -frames:v 1 frames/screen_app_ui.png
@@ -73,7 +73,7 @@ $FF -y -v error -loop 1 -framerate 30 -i "$MUSE" -t 60 \
 $FF -y -v error -stream_loop 40 -i "$REC/q7-immediate-1.mov" -t 60 -an \
   -vf "fps=30,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=yuv420p" \
   -c:v libx264 -preset veryfast -crf 20 -g 60 video/job_screen_60s.mov
-# q2's job, screencast with no person: Reelcut's chrome (a 2880x3000 harness
+# q2's job, screencast with no person: Frame Job's chrome (a 2880x3000 harness
 # render) scrolled top to bottom over 60 s, 1080p30
 $FF -y -v error -loop 1 -framerate 30 -i "$W/chrome3/open-two.png" -t 60 \
   -vf "scale=1920:-2,crop=1920:1080:0:'(ih-1080)*t/60',format=yuv420p" \

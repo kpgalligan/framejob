@@ -251,8 +251,8 @@ extension MetalRenderer {
         guard let mask = device.makeTexture(descriptor: descriptor),
             let blurred = device.makeTexture(descriptor: descriptor)
         else { return nil }
-        mask.label = "Reelcut shadow mask"
-        blurred.label = "Reelcut shadow blur"
+        mask.label = "Frame Job shadow mask"
+        blurred.label = "Frame Job shadow blur"
         let surfaces = ShadowSurfaces(mask: mask, blurred: blurred)
         shadowSurfaces = surfaces
         return surfaces

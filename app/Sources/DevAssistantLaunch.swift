@@ -1,6 +1,6 @@
 import AppKit
 
-#if REELCUT_DEV_TOOLS
+#if FRAMEJOB_DEV_TOOLS
 /// `-RCDevAssistantSend <text> -RCDevAssistantReport <path>` — a dev-only
 /// LAUNCH default (road map 12 A1): one assistant turn in a launch that may
 /// have no MCP server at all, which no MCP tool can drive. Once the app has

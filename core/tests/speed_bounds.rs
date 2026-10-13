@@ -119,7 +119,7 @@ fn no_edit_can_carry_an_out_of_range_speed() {
     // than a project nobody could open again.
     let mut p = fixture();
     p["clips"][0]["speed"] = json!(5000.0);
-    let project: reelcut_core::Project =
+    let project: framejob_core::Project =
         serde_json::from_value(p).expect("the JSON itself is well formed");
     assert_eq!(
         project.apply(r#"{"op":"move_clip","clips":[3],"delta":20000}"#),

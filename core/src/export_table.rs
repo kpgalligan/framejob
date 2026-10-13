@@ -1,4 +1,4 @@
-//! The export table: the closed set of files Reelcut can write, and
+//! The export table: the closed set of files Frame Job can write, and
 //! nothing whatever about writing one of them (spec §7.8).
 //!
 //! Split out of `export.rs` under the size rule (core/CLAUDE.md: a module
@@ -50,7 +50,7 @@ use serde_json::{Map, Value};
 
 use crate::time::Fps;
 
-/// The containers Reelcut writes. Kept as an enum rather than a string so
+/// The containers Frame Job writes. Kept as an enum rather than a string so
 /// the container, its UTI, its network-optimization default and whether it
 /// can hold sound at all are decided in exactly one exhaustive place.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

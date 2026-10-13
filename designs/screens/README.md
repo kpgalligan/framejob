@@ -1,9 +1,9 @@
 # The screen catalog
 
-One Markdown file per Reelcut screen: how to reach it, what to capture, and a
+One Markdown file per Frame Job screen: how to reach it, what to capture, and a
 description of it for someone who has never seen the app — the text a design
 request carries beside the pictures. `tools/proof/screens.py` reads every file
-here, drives its own Reelcut into each screen over MCP and the dev tools, and
+here, drives its own Frame Job into each screen over MCP and the dev tools, and
 writes the PNGs (light and dark) and one `screens.md` pairing each picture with
 its prose into `tools/proof/work/screens/<date>/`. The prose lives here so it
 changes with the screens; the pictures are made fresh each run and are not kept
@@ -92,11 +92,11 @@ Built by `screens.py` on the first screen that names one, into
 `tools/proof/work/screens/fixtures/`, from `tools/proof/media/` (made by
 `tools/proof/README.md`'s recipe). All are 960 × 540 at 30 fps on black.
 
-- `empty` — `Empty.reelcut`: one track, "Track 1", no clips.
-- `demo` — `Demo.reelcut`: five tracks, back to front Video, Titles, Graphics,
+- `empty` — `Empty.framejob`: one track, "Track 1", no clips.
+- `demo` — `Demo.framejob`: five tracks, back to front Video, Titles, Graphics,
   Shapes and Music, one clip each, all starting at 0:
   - `video` — `media/speech.mov` (5.2 s, a navy card with speech);
-  - `text` — a text clip reading "Reelcut", 5 s;
+  - `text` — a text clip reading "Frame Job", 5 s;
   - `graphic` — `graphic/tests/graphics/lower-third.js` as the module
     `lower-third`, 5 s. The module is written twice, an earlier text first
     (the file plus one trailing comment line), so `demo` holds one kept
@@ -111,34 +111,34 @@ Built by `screens.py` on the first screen that names one, into
   `demo` is ready once both sound clips' (`video`'s and `tone`'s) peaks are
   cached: `screens.py` polls `detect_silence` in level mode until it answers
   no `pending_peaks`, so every capture draws the Music clip's waveform band.
-- `animated` — `Animated.reelcut` (issue batch B87 phase 3): one track,
+- `animated` — `Animated.framejob` (issue batch B87 phase 3): one track,
   "Graphics", holding one clip, `graphic` — `lower-third` at 0, 5 s — with one
   action at clip 1–3 s whose end keys `size` 96, `accent` "#2d7ff9" and
   `boxed` false (`set_action_end`'s graphic group, spec §11 G-34). A playhead
   inside the span selects the action (CI-1), so the Graphic tab shows the
   action's end.
-- `matte` — `Matte.reelcut` (mattes MT4, spec §11 MT-7): three tracks, back to
+- `matte` — `Matte.framejob` (mattes MT4, spec §11 MT-7): three tracks, back to
   front Video, Window and Stray, one clip each, all starting at 0: `video` —
   `media/speech.mov`; `window` — a white-filled rectangle, 5 s, on an `alpha`
-  matte track (it cuts Video); `stray` — a text clip reading "Reelcut", 5 s, on
+  matte track (it cuts Video); `stray` — a text clip reading "Frame Job", 5 s, on
   a `luma_inverted` matte track with a matte behind it (it cuts nothing). Ready
   once `video`'s peaks are cached.
-- `adjust` — `Adjust.reelcut` (grading GR4b, spec §11 GR-6): two tracks, back
+- `adjust` — `Adjust.framejob` (grading GR4b, spec §11 GR-6): two tracks, back
   to front Video and Adjustment, one clip each, both starting at 0: `video` —
   `media/speech.mov`; `adjustment` — an adjustment clip, 5 s, at saturation −1
   and opacity 0.75 (Strength 75%), so it greys three quarters of the video
   behind it. Ready once `video`'s peaks are cached.
-- `look` — `Look.reelcut` (grading GR5b, spec §11 GR-7): one track, "Video",
+- `look` — `Look.framejob` (grading GR5b, spec §11 GR-7): one track, "Video",
   holding `video` — `media/speech.mov` at 0 with the look `{teal_orange, 0.8}`
   — so the Look section outlines Teal & Orange and shows its Amount row at 80%.
   Ready once `video`'s peaks are cached.
-- `lut` — `Lut.reelcut` (grading GR6b, spec §11 GR-8 [b]): `look`'s one track,
+- `lut` — `Lut.framejob` (grading GR6b, spec §11 GR-8 [b]): `look`'s one track,
   "Video", holding `video` — `media/speech.mov` at 0 — then two size-2 `.cube`
   files the script writes into the fixtures folder, "Warm Print.cube" and
   "Bleach.cube", imported in that order after it, and the clip's look `{lut,
   Warm Print, 0.8}` — so the Look section shows an Imported group of two tiles
   with Warm Print outlined. Ready once `video`'s peaks are cached.
-- `qualifier` — `Qualifier.reelcut` (grading-2 G2-4, spec §11 GR-13): `adjust`'s
+- `qualifier` — `Qualifier.framejob` (grading-2 G2-4, spec §11 GR-13): `adjust`'s
   two tracks and clips, the adjustment clip at full strength with the
   qualifier hue {25, 30, 15} and saturation {0.15, 1, 0.05}, so only the
   video's warm, saturated pixels go grey. Ready once `video`'s peaks are

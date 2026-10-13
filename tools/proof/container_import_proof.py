@@ -14,7 +14,7 @@ kills only that process.
 **The instance runs in a scratch home** (issue batch B82, #236):
 `CFFIXED_USER_HOME=tools/proof/work/container-import/home`, a bare folder
 with no `Library`, so its `Rewrapped/` is
-`<home>/Library/Application Support/Reelcut/Rewrapped/` and every copy the
+`<home>/Library/Application Support/Frame Job/Rewrapped/` and every copy the
 rows make lands there. There is no launch without one. The work folder is
 removed at the start and at exit; the fixtures, the packages and the log are
 in a temporary directory, and the scratch socket in one of its own. Nothing
@@ -32,7 +32,7 @@ Rows:
   the scratch home (`agent_socket_proof.py` K15's C0). When it fails the
   instance is stopped, no tool is called, and the run prints `passed 0/1`
   and exits 1.
-- **M0**: no `Reelcut: ` line in the instance's log (the parity check).
+- **M0**: no `Frame Job: ` line in the instance's log (the parity check).
 - **M1**: `import_media` of P1 answers a `.mov` directly inside
   `Rewrapped/` named `p1-<16 hex>.mov`, 640×360, `[30, 1]`, `has_audio`.
 - **M2**: on a canvas at five times the media's rate (`render_frame` snaps
@@ -78,7 +78,7 @@ then it prints MUTANT PASS and exits 0. Rows print `<ID> ok|FAIL|skip —
 `--control decoy-home` (B82) launches the instance under a SECOND scratch
 home, `…/container-import/decoy-home`: H0, which looks in the first, must
 FAIL, no tool may be called, and the decoy must hold
-`Library/Application Support` and no `Reelcut/Rewrapped` under it. Then it
+`Library/Application Support` and no `Frame Job/Rewrapped` under it. Then it
 prints CONTROL PASS and exits 0; else CONTROL FAIL, exit 1.
 """
 
@@ -106,7 +106,7 @@ SEC = 600_000
 WORK = os.path.join(ROOT, "tools", "proof", "work", "container-import")
 HOME, DECOY = os.path.join(WORK, "home"), os.path.join(WORK, "decoy-home")
 SUPPORT = os.path.join("Library", "Application Support")
-REWRAPPED = os.path.join(HOME, SUPPORT, "Reelcut", "Rewrapped")
+REWRAPPED = os.path.join(HOME, SUPPORT, "Frame Job", "Rewrapped")
 DIGEST_NAME = re.compile(r"^[A-Za-z0-9_-]+-[0-9a-f]{16}\.mov$")
 
 rows = []
@@ -154,7 +154,7 @@ def remove_work():
 def check_parity(log_path):
     with open(log_path, encoding="utf-8", errors="replace") as stream:
         lines = stream.read().splitlines()
-    return lines, [line for line in lines if "Reelcut: " in line]
+    return lines, [line for line in lines if "Frame Job: " in line]
 
 
 def listing():
@@ -167,7 +167,7 @@ def read(path):
 
 
 def new_project(mcp, where, name, opened):
-    path = os.path.join(where, f"{name}.reelcut")
+    path = os.path.join(where, f"{name}.framejob")
     mcp.call("new_project", path=path)
     opened.append(path)
     return path
@@ -437,7 +437,7 @@ def main():
                            "tool may be called")
     parser.add_argument("--app", default=str(proof_app.bundle()))
     args = parser.parse_args()
-    binary = os.path.join(args.app, "Contents", "MacOS", "Reelcut")
+    binary = str(proof_app.executable(args.app))
     if not os.path.isfile(binary):
         print("instrument failure: no app binary at " + binary)
         return 2
@@ -448,7 +448,7 @@ def main():
     home = DECOY if args.control else HOME
     support = os.path.join(HOME, SUPPORT)
     took = called = False
-    with tempfile.TemporaryDirectory(prefix="reelcut-container-import-") as work:
+    with tempfile.TemporaryDirectory(prefix="framejob-container-import-") as work:
         fixtures = make_fixtures(work)
         log_path = os.path.join(work, "app.log")
         socket_path = scratch_socket()
@@ -473,7 +473,7 @@ def main():
                     run(MCP(socket_path, timeout=300), work, fixtures, args.mutant)
                     complaints = check_parity(log_path)[1]
                     row("M0", not complaints,
-                        "no `Reelcut: ` line in the log" if not complaints
+                        "no `Frame Job: ` line in the log" if not complaints
                         else " | ".join(complaints))
             finally:
                 if app.poll() is None:
@@ -486,12 +486,12 @@ def main():
                 remove_scratch(socket_path)
     if args.control:
         decoy_support = os.path.isdir(os.path.join(DECOY, SUPPORT))
-        decoy_rewrapped = os.path.exists(os.path.join(DECOY, SUPPORT, "Reelcut", "Rewrapped"))
+        decoy_rewrapped = os.path.exists(os.path.join(DECOY, SUPPORT, "Frame Job", "Rewrapped"))
         good = not took and not called and decoy_support and not decoy_rewrapped
         print(f"{'CONTROL PASS' if good else 'CONTROL FAIL'}: {args.control} — H0 "
               f"{'passed' if took else 'failed'}; a tool was called: {called}; "
               f"{os.path.join(DECOY, SUPPORT)} is a directory: {decoy_support}; "
-              f"Reelcut/Rewrapped under it: {decoy_rewrapped}")
+              f"Frame Job/Rewrapped under it: {decoy_rewrapped}")
         return 0 if good else 1
     passed = sum(1 for _, ok in rows if ok)
     scored = sum(1 for _, ok in rows if ok is not None)

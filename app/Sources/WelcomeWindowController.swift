@@ -27,7 +27,7 @@ final class WelcomeWindowController: NSWindowController {
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false)
-        window.title = "Reelcut"
+        window.title = "Frame Job"
         window.center()
         super.init(window: window)
 

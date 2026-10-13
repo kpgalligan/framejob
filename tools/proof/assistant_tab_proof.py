@@ -3,12 +3,12 @@
 AI-14, AI-17, AI-19).
 
 P — the probe `assistant_tab_probe.swift`, compiled over `app/Sources` minus
-`main.swift` on `swift_build.py`'s line (`-D REELCUT_DEV_TOOLS`; a
+`main.swift` on `swift_build.py`'s line (`-D FRAMEJOB_DEV_TOOLS`; a
 probe that does not build is a scored FAIL on every P row), with the built
-app's helper (`proof_app`'s choice) copied to `<probe dir>/Contents/Helpers/reelcut-agent`, run
+app's helper (`proof_app`'s choice) copied to `<probe dir>/Contents/Helpers/framejob-agent`, run
 with `--fonts app/Resources/Fonts` (the shipped faces registered, #207), a
 DUMMY key in a `-RCSecretFolder` of its own,
-`-ReelcutInspectorCollapsed NO` and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
+`-FrameJobInspectorCollapsed NO` and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   P1  the transcript's mapping over a scripted event list (runs, every
       sentence, usage, the three answers)
   P2  the context meter's three figures, and its ladders for 5,000 of
@@ -91,7 +91,7 @@ DUMMY key in a `-RCSecretFolder` of its own,
       scroller, light, for seven costs — none; priced 0.0018 and 0.00002;
       partial 0.1234 and 12.3456; unknown alone; priced 0.0123 then unknown —
       shows a rung of `figureLadder` that fits its frame, ending " ·
-      Reelcut's estimate" once a response is counted, its tooltip
+      Frame Job's estimate" once a response is counted, its tooltip
       `figureTooltip`, the row's width the same for all seven; at 480 (the
       control) each shows `figure`, fitting; and (#207) the label's face is
       IBMPlexMono-Regular, `--fonts` was given and the shipped
@@ -101,7 +101,7 @@ DUMMY key in a `-RCSecretFolder` of its own,
 Live A (a scratch socket, the dummy `proof-key` in `-RCSecretFolder`,
 `RC_ASSISTANT_BASE_URL` at `anthropic_fake.py`), every turn through
 the tab's own controls (`assistant_send` / `assistant_answer` with `pane`):
-  L0  no `Reelcut: ` line
+  L0  no `Frame Job: ` line
   L1  `perform_menu_item View ▸ Assistant` shows the tab; the inspector dump
       has the composer and Send visible, the no-key pointer and the question
       hidden, and no layout problem inside the tab
@@ -121,7 +121,7 @@ the tab's own controls (`assistant_send` / `assistant_answer` with `pane`):
       stand-in hears nothing
   L7  (AI-17, #154) a multi-line message through the pane (two lines, a
       blank one, an indented one): finished; one POST whose last user text
-      ends with `</reelcut_context>\n` and the text, intact; the dump's last
+      ends with `</framejob_context>\n` and the text, intact; the dump's last
       person entry is the text; the composer is empty; no tab problem
   L8  (AI-19, #152) a question through the pane: the dump's
       `inspector.assistant.badge` visible on the Assistant tab, and on the
@@ -212,9 +212,9 @@ asp.WORK = WORK  # its App, Fake and secret folder write under this proof's fold
 PROBE_DIR = os.path.join(WORK, "probe")
 PROBE_SWIFT = os.path.join(HERE, "assistant_tab_probe.swift")
 SOURCES = os.path.join(ROOT, "app", "Sources")
-LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 RELEASE = os.path.join(ROOT, asp.APP_PATH)
-HELPER = os.path.join(RELEASE, "Contents", "Helpers", "reelcut-agent")
+HELPER = os.path.join(RELEASE, "Contents", "Helpers", "framejob-agent")
 FONTS = os.path.join(ROOT, "app", "Resources", "Fonts")
 FORWARD = "session.onEvent ="
 WALL_BUILD, WALL_RUN, WALL_TURN = 900, 300, 60
@@ -303,12 +303,12 @@ def build_probe(sources=None, probe_dir=None):
                       f"`make {proof_app.MAKE_TARGET[proof_app.config()]}` first")
     helpers = os.path.join(probe_dir, "Contents", "Helpers")
     os.makedirs(helpers, exist_ok=True)
-    shutil.copy2(HELPER, os.path.join(helpers, "reelcut-agent"))
+    shutil.copy2(HELPER, os.path.join(helpers, "framejob-agent"))
     swift = swift_build.app_sources(sources)
     print(f"probe: {len(swift)} sources through swift_build (up to {WALL_BUILD} s)…", flush=True)
     try:
         built = swift_build.build(sources=swift + [entry], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=WALL_BUILD)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=WALL_BUILD)
     except swift_build.SwiftBuildFailed as error:
         return None, (f"swiftc exited {error.rc if error.rc is not None else 'before running'} "
                       f"(expired {error.expired}): "
@@ -342,7 +342,7 @@ def rows_p(score, binary=None, only=None):
                       instrument=only is not None)
             return
     ran = bounded.run([binary, "--fonts", FONTS, "-RCSecretFolder", probe_secrets(),
-                       "-ReelcutInspectorCollapsed", "NO"], WALL_RUN,
+                       "-FrameJobInspectorCollapsed", "NO"], WALL_RUN,
                       cwd=os.path.dirname(binary),
                       env=child_env({"RC_ASSISTANT_BASE_URL": "http://127.0.0.1:9"}))
     answer = None
@@ -378,7 +378,7 @@ def row_p8(score, fake, secrets, binary=None):
     fake.scenario([asp.use("toolu_p8", "export", {"preset": "h264", "path": path}),
                    asp.say("P8: closed.")])
     ran = bounded.run([binary, "--close", path, "-RCSecretFolder", secrets,
-                       "-ReelcutInspectorCollapsed", "NO"], WALL_RUN,
+                       "-FrameJobInspectorCollapsed", "NO"], WALL_RUN,
                       cwd=os.path.dirname(binary),
                       env=child_env({"RC_ASSISTANT_BASE_URL": fake.base}))
     answer = None
@@ -413,7 +413,7 @@ def row_p14(score, fake, secrets, binary=None):
                    asp.use("toolu_p14b", "export", {"preset": "h264", "path": path}),
                    asp.say("P14: stopped.")])
     ran = bounded.run([binary, "--badge", path, "--fonts", FONTS,
-                       "-RCSecretFolder", secrets, "-ReelcutInspectorCollapsed", "NO"],
+                       "-RCSecretFolder", secrets, "-FrameJobInspectorCollapsed", "NO"],
                       WALL_RUN, cwd=os.path.dirname(binary),
                       env=child_env({"RC_ASSISTANT_BASE_URL": fake.base}))
     answer = None
@@ -509,7 +509,7 @@ def bundled_cost_line(replies):
     dollars = replies * prices.price(usage, asp.DEFAULT_MODEL, table)["dollars"]
     instant = table["litellm_commit_date"]
     day = datetime.datetime.fromisoformat(instant.replace("Z", "+00:00")).astimezone()
-    return (f"Cost: ${dollars:.4f} · Reelcut's estimate at LiteLLM prices (bundled table of "
+    return (f"Cost: ${dollars:.4f} · Frame Job's estimate at LiteLLM prices (bundled table of "
             f"{day.strftime('%Y-%m-%d')}; not refreshed: no price cache is configured)")
 
 
@@ -523,7 +523,7 @@ def fmt_entries(entries):
 
 def open_tab(app, ctx):
     """New project A, then View ▸ Assistant in its window."""
-    a = app.must("new_project", path=os.path.join(ctx["folder"], "A.reelcut"))["saved"]
+    a = app.must("new_project", path=os.path.join(ctx["folder"], "A.framejob"))["saved"]
     ctx["A"] = a
     ctx["menu"] = app.must("perform_menu_item", project=a, path=["View", "Assistant"])
     ctx["tab"] = app.must("select_inspector_tab", project=a).get("tab")
@@ -531,8 +531,8 @@ def open_tab(app, ctx):
 
 
 def row_l0(app, ctx):
-    complaints = [l for l in app.log().splitlines() if "Reelcut: " in l]
-    return not complaints, f"`Reelcut: ` lines {complaints[:2]}"
+    complaints = [l for l in app.log().splitlines() if "Frame Job: " in l]
+    return not complaints, f"`Frame Job: ` lines {complaints[:2]}"
 
 
 def row_l1(app, ctx):
@@ -708,7 +708,7 @@ def row_l7(app, fake, ctx):
             else:
                 texts = [b.get("text") for b in content or [] if b.get("type") == "text"]
                 last = texts[-1] if texts else None
-    intact = isinstance(last, str) and last.endswith("</reelcut_context>\n" + L7_TEXT)
+    intact = isinstance(last, str) and last.endswith("</framejob_context>\n" + L7_TEXT)
     dump = Dump(app, a, "l7")
     ctx["dumps"].append(dump.text)
     person = [t for k, t in dump.entries() if k == "person"]
@@ -770,7 +770,7 @@ def row_k(app, ctx):
 
 
 def row_n1(fake):
-    app = asp.App("B", RELEASE, ["-ReelcutInspectorCollapsed", "NO"], fake.base)
+    app = asp.App("B", RELEASE, ["-FrameJobInspectorCollapsed", "NO"], fake.base)
     try:
         app.connect()
         project = app.must("new_project").get("path")
@@ -899,10 +899,10 @@ def main():
                 print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
                       f"the mutant did not build: {why}", flush=True)
                 return 2
-            # One log per mutant, so each launch's "Reelcut: " grep is kept.
+            # One log per mutant, so each launch's "Frame Job: " grep is kept.
             app = asp.App(f"mutant-{args.mutant}", built,
                           ["-RCSecretFolder",
-                           secrets, "-ReelcutInspectorCollapsed", "NO"],
+                           secrets, "-FrameJobInspectorCollapsed", "NO"],
                           fake.base)
             try:
                 app.connect()
@@ -919,10 +919,10 @@ def main():
                 print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
                       f"the mutant did not build: {why}", flush=True)
                 return 2
-            # One log per mutant, so each launch's "Reelcut: " grep is kept.
+            # One log per mutant, so each launch's "Frame Job: " grep is kept.
             app = asp.App(f"mutant-{args.mutant}", built,
                           ["-RCSecretFolder",
-                           secrets, "-ReelcutInspectorCollapsed", "NO"],
+                           secrets, "-FrameJobInspectorCollapsed", "NO"],
                           fake.base)
             try:
                 app.connect()
@@ -944,7 +944,7 @@ def main():
                 score("P14", False, f"the instrument could not run: {type(error).__name__}: "
                                     f"{error}", instrument=True)
             app = asp.App("A", RELEASE, ["-RCSecretFolder",
-                                         secrets, "-ReelcutInspectorCollapsed", "NO"],
+                                         secrets, "-FrameJobInspectorCollapsed", "NO"],
                           fake.base)
             live = ("L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "K")
             try:

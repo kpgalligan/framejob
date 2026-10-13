@@ -6,7 +6,7 @@
 // order and text, Copy MCP Command's press, and its missing-helper state.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a`. One process,
+// `main.swift`, module `FrameJob`, against `libframejob_core.a`. One process,
 // no arguments. Its answer is one JSON object on stdout, `{"rows": [...]}`,
 // each row `{"id", "pass", "detail"}`; `settings_layout_probe.py` prints and
 // scores them.
@@ -15,8 +15,8 @@
 // environment, an absent spend folder and a scratch `UserDefaults` suite; the
 // window is never shown. L9 and L10 build a second controller whose MCP
 // helper is "/bin/sh" and L11 a third whose helper is
-// "/nonexistent/reelcut-mcp", both over a private pasteboard
-// (`com.kgalligan.reelcut.settings-layout-probe`, released at exit); the
+// "/nonexistent/framejob-mcp", both over a private pasteboard
+// (`com.kgalligan.framejob.settings-layout-probe`, released at exit); the
 // general pasteboard is never written. Every string a row compares is a
 // LITERAL, never the app's own constant, so a changed constant is a changed
 // answer. Rows:
@@ -46,11 +46,11 @@
 //      wraps at 420; the button reads "Copy MCP Command" and, after layout,
 //      sits below the last blurb in the root view's coordinates.
 //   L10 with "/bin/sh": the button is enabled and the status empty; a
-//      `performClick` puts `claude mcp add --scope user reelcut -- '/bin/sh'`
+//      `performClick` puts `claude mcp add --scope user framejob -- '/bin/sh'`
 //      on the private pasteboard and the copied sentence in the status; the
 //      general pasteboard's `changeCount` does not move; `sync()` empties the
 //      status.
-//   L11 with "/nonexistent/reelcut-mcp": the button is disabled, the status
+//   L11 with "/nonexistent/framejob-mcp": the button is disabled, the status
 //      is the missing sentence, and a direct `copyClicked(nil)` leaves the
 //      private pasteboard's `changeCount` where it was.
 import AppKit
@@ -97,13 +97,13 @@ func enterExit(_ type: NSEvent.EventType) -> NSEvent? {
         context: nil, eventNumber: 0, trackingNumber: 0, userData: nil)
 }
 
-let suiteName = "com.kgalligan.reelcut.settings-layout-probe"
+let suiteName = "com.kgalligan.framejob.settings-layout-probe"
 UserDefaults().removePersistentDomain(forName: suiteName)
 guard let suite = UserDefaults(suiteName: suiteName) else {
     row("L1", false, "no suite")
     finish()
 }
-let absentSpend = URL(fileURLWithPath: "/nonexistent/reelcut-settings-layout-spend", isDirectory: true)
+let absentSpend = URL(fileURLWithPath: "/nonexistent/framejob-settings-layout-spend", isDirectory: true)
 let controller = SettingsWindowController(
     store: { MemoryStore() }, assistantStore: { MemoryStore() }, defaults: suite,
     environment: [:], spendFolder: { absentSpend })
@@ -299,7 +299,7 @@ do {
 
 // MARK: - L9 the MCP pane's order and text
 
-let pasteboard = NSPasteboard(name: NSPasteboard.Name("com.kgalligan.reelcut.settings-layout-probe"))
+let pasteboard = NSPasteboard(name: NSPasteboard.Name("com.kgalligan.framejob.settings-layout-probe"))
 probePasteboard = pasteboard
 let shController = SettingsWindowController(
     store: { MemoryStore() }, assistantStore: { MemoryStore() }, defaults: suite,
@@ -315,9 +315,9 @@ do {
     let ordered = arranged.count == expectedOrder.count
         && zip(arranged, expectedOrder).allSatisfy { $0 === $1 }
     let blurbs = [
-        "An MCP client such as Claude Code uses Reelcut's tools through reelcut-mcp, a helper inside "
-            + "this app. It reaches Reelcut over a local socket that only programs you run can open.",
-        "If Reelcut isn't running, the first tool call opens it in the background. To add Reelcut to "
+        "An MCP client such as Claude Code uses Frame Job's tools through framejob-mcp, a helper inside "
+            + "this app. It reaches Frame Job over a local socket that only programs you run can open.",
+        "If Frame Job isn't running, the first tool call opens it in the background. To add Frame Job to "
             + "Claude Code, copy the command and run it in Terminal.",
     ]
     let texts = shPane.blurbLabels.map(\.stringValue)
@@ -355,7 +355,7 @@ do {
     shPane.sync()
     let statusAfterSync = shPane.statusLabel.stringValue
     row("L10", enabled && emptyBefore == ""
-            && copied == "claude mcp add --scope user reelcut -- '/bin/sh'"
+            && copied == "claude mcp add --scope user framejob -- '/bin/sh'"
             && status == "Copied. Paste it into Terminal and press Return."
             && generalBefore == generalAfter && statusAfterSync == "",
         "enabled \(enabled), status before \"\(emptyBefore)\"; copied \"\(copied)\"; status \"\(status)\"; "
@@ -368,14 +368,14 @@ do {
     let missing = SettingsWindowController(
         store: { MemoryStore() }, assistantStore: { MemoryStore() }, defaults: suite,
         environment: [:], spendFolder: { absentSpend },
-        mcpHelper: URL(fileURLWithPath: "/nonexistent/reelcut-mcp"), pasteboard: pasteboard)
+        mcpHelper: URL(fileURLWithPath: "/nonexistent/framejob-mcp"), pasteboard: pasteboard)
     let pane = missing.mcpPane
     let disabled = !pane.copyButton.isEnabled
     let status = pane.statusLabel.stringValue
     let before = pasteboard.changeCount
     pane.copyClicked(nil)
     let after = pasteboard.changeCount
-    row("L11", disabled && status == "reelcut-mcp is missing from this copy of Reelcut." && before == after,
+    row("L11", disabled && status == "framejob-mcp is missing from this copy of Frame Job." && before == after,
         "disabled \(disabled); status \"\(status)\"; probe changeCount \(before) → \(after)")
 }
 

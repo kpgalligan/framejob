@@ -2,27 +2,27 @@
 """Issue batch B83 (#238) — `mcp.py`'s defaults guard, proved on a clone of the
 built app, and the real build's own session measured.
 
-    python3 tools/proof/defaults_proof.py [--app <Reelcut.app>] [--only ROWS]
+    python3 tools/proof/defaults_proof.py [--app <Frame Job.app>] [--only ROWS]
     python3 tools/proof/defaults_proof.py --mutant no-compare|no-exit|home-followed|no-rehome
 
 No environment moves `UserDefaults`, so an instance a proof launches shares
-its bundle's domain with the owner: `com.kgalligan.Reelcut` for Release,
-`com.kgalligan.Reelcut.debug` for Debug (spec §11 V-5). `mcp.py` snapshots that domain by key
+its bundle's domain with the owner: `com.kgalligan.FrameJob` for Release,
+`com.kgalligan.FrameJob.debug` for Debug (spec §11 V-5). `mcp.py` snapshots that domain by key
 name when a socket is made, launched on or handed over, compares when the
 session ends, and ENDS the script with status 3 and `mcp: DEFAULTS MOVED …`
 last on stderr when a key outside AppKit's `NS*`/`Apple*` families moved and
-no other Reelcut shares the domain (with one, it only prints). This proof
+no other Frame Job shares the domain (with one, it only prints). This proof
 makes that happen on purpose, and never on the owner's domain.
 
 **The clone.** `--app` (`proof_app.bundle()`, the app `RC_PROOF_APP` chooses,
 by default) is cloned to
-`tools/proof/work/defaults-proof/Reelcut.app` (`cp -c -R`, else a copy) and
-its `CFBundleIdentifier` replaced with `com.kgalligan.reelcut.defaults-proof`,
+`tools/proof/work/defaults-proof/Frame Job.app` (`cp -c -R`, else a copy) and
+its `CFBundleIdentifier` replaced with `com.kgalligan.framejob.defaults-proof`,
 so its instances write that domain and none of the owner's. The one route to
 an owner-visible write is `perform_menu_item`: `["View", "Snapping"]` writes
-`ReelcutSnappingEnabled`. The real `com.kgalligan.Reelcut` domain is only
+`FrameJobSnappingEnabled`. The real `com.kgalligan.FrameJob` domain is only
 ever read (`defaults export`), and no value or digest is printed; so is the
-Debug build's `com.kgalligan.Reelcut.debug`.
+Debug build's `com.kgalligan.FrameJob.debug`.
 
 Each G row runs this script again as a `--child` that scores nothing and
 ends `sys.exit(0)`; the parent scores its status, stdout and stderr.
@@ -32,7 +32,7 @@ ends `sys.exit(0)`; the parent scores its status, stdout and stderr.
   catalog, no parity complaint and no owner-visible key moved.
 - **G1** child `write` (`mcp.launch(clone)`, `new_project`, View ▸ Snapping,
   `defaults_moved` printed as JSON, stop, `remove_scratch`): the JSON holds
-  `ReelcutSnappingEnabled`; status 3; stderr's last line is `DEFAULTS MOVED`
+  `FrameJobSnappingEnabled`; status 3; stderr's last line is `DEFAULTS MOVED`
   naming the key and `none`.
 - **G2** CONTROL, child `quiet` (`new_project`, `close_project`): status 0
   and no such line.
@@ -40,21 +40,21 @@ ends `sys.exit(0)`; the parent scores its status, stdout and stderr.
   status 3, by the `atexit` handler finishing the record still held.
 - **G6** (issue batch B88) child `write-rehomed`, run with
   `RC_PROOF_APP=release`: it calls `mcp.scratch_socket()` (a record of
-  `com.kgalligan.Reelcut`, read only), starts the clone itself by `Popen` on
+  `com.kgalligan.FrameJob`, read only), starts the clone itself by `Popen` on
   that socket, builds `MCP(socket)` and toggles as G1 does, then stops the
   clone by pid and calls `remove_scratch`: the record was re-homed to the
   clone's domain (`mcp._rehome`, said on stderr), so status 3 and stderr's
-  last line is `DEFAULTS MOVED in com.kgalligan.reelcut.defaults-proof`.
+  last line is `DEFAULTS MOVED in com.kgalligan.framejob.defaults-proof`.
 - **G5** child `write` while S2 is alive, a second instance of the clone the
   parent started itself by `Popen` on its own folder (no `mcp` record):
-  status 0, and the line names S2's pid. Another Reelcut shares the domain,
+  status 0, and the line names S2's pid. Another Frame Job shares the domain,
   so the guard prints and does not fail.
 - **G4** child `write-handed`, which only builds `MCP(S2's socket)`: status
   3, and the key is among `defaults_moved` at the first reading after the
   call. A script handed its socket is guarded by the record `MCP()` makes,
   and its exit is the one compare with no `stop()` in front of it.
 - **H1** (issue batch B84) a scratch home that does not exist yet. The
-  parent seeds the CLONE's domain with `ReelcutDefaultsProofSeed` (`defaults
+  parent seeds the CLONE's domain with `FrameJobDefaultsProofSeed` (`defaults
   write` on the clone's domain only; refused for any other), counts its
   keys, and runs child `absent-home` with `CFFIXED_USER_HOME` naming an
   absent folder under the work folder: `mcp.launch(clone)` (the record),
@@ -69,9 +69,9 @@ ends `sys.exit(0)`; the parent scores its status, stdout and stderr.
   Same four claims, the home present then absent.
 - **R1** the REAL build (`--app`), in this process: `mcp.launch`,
   `new_project`, `close_project`, stop, `remove_scratch`. No owner-visible
-  key of its bundle's domain (`com.kgalligan.Reelcut`, or
-  `com.kgalligan.Reelcut.debug` for a Debug build; the detail names it)
-  moved. If one did and another Reelcut shares the
+  key of its bundle's domain (`com.kgalligan.FrameJob`, or
+  `com.kgalligan.FrameJob.debug` for a Debug build; the detail names it)
+  moved. If one did and another Frame Job shares the
   domain, one retry; then FAIL naming the keys and the pids.
 - **R2** that domain across C0 and the G and H rows: no owner-visible key
   moved (no retry).
@@ -81,7 +81,7 @@ writes the opposite of what the instance read when the project's window was
 made; a toggle onto the value already stored would move nothing. So each
 child toggles up to `TOGGLES` times, waiting up to `WAIT` seconds each, and
 prints its record's domain, its owned pids, how many keys its first snapshot
-held, whether `ReelcutSnappingEnabled` was among them, how long the session
+held, whether `FrameJobSnappingEnabled` was among them, how long the session
 took to open, and for each toggle whether and when the key showed. A key
 that shows only at a later toggle FAILS its row (one that shows at none is
 said to have shown at none), and G4 also fails when the first reading after
@@ -142,11 +142,11 @@ import proof_defaults  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "defaults-proof")
-CLONE = os.path.join(WORK, "Reelcut.app")
-CLONE_DOMAIN = "com.kgalligan.reelcut.defaults-proof"
-KEY = "ReelcutSnappingEnabled"
+CLONE = os.path.join(WORK, "Frame Job.app")
+CLONE_DOMAIN = "com.kgalligan.framejob.defaults-proof"
+KEY = "FrameJobSnappingEnabled"
 MARK = "mcp: DEFAULTS MOVED in "
-SEED = "ReelcutDefaultsProofSeed"
+SEED = "FrameJobDefaultsProofSeed"
 HOME_KINDS = ("absent-home", "home-removed")
 ROWS = ["C0", "G1", "G2", "G3", "G6", "G5", "G4", "H1", "H2", "R1", "R2"]
 EXPECTED = {"no-compare": {"G1", "G3", "G6", "G4", "G5"}, "no-exit": {"G1", "G3", "G6", "G4"},
@@ -157,7 +157,7 @@ TOGGLES, WAIT = 3, 3.0
 
 
 def binary_of(app):
-    return os.path.join(app, "Contents", "MacOS", "Reelcut")
+    return str(proof_app.executable(app))
 
 
 def child_env():
@@ -217,7 +217,7 @@ def child(kind, target, mutant):
     if client is None:
         print("NOT UP", flush=True)
     else:
-        project = os.path.join(WORK, f"{kind}-{os.getpid()}.reelcut")
+        project = os.path.join(WORK, f"{kind}-{os.getpid()}.framejob")
         client.call("new_project", path=project)
         if kind == "quiet" or kind in HOME_KINDS:
             client.call("close_project", project=project, discard=True)
@@ -354,7 +354,10 @@ def shape(answer):
 
 
 def make_clone(app):
-    """None, or why the clone could not be made."""
+    """None, or why the clone could not be made. The clone keeps the app's own
+    bundle name, which its executable's name follows (Debug: "Frame Job Debug")."""
+    global CLONE
+    CLONE = os.path.join(WORK, os.path.basename(os.path.normpath(app)))
     tree_copy.remove_tree(WORK)
     os.makedirs(WORK)
     try:
@@ -392,7 +395,7 @@ def start_s2():
     if len(socket_path.encode()) > mcp.MAX_SOCKET_PATH:
         shutil.rmtree(folder, ignore_errors=True)
         return None, None, None, f"{socket_path} is over {mcp.MAX_SOCKET_PATH} bytes"
-    log_path = os.path.join(folder, "reelcut.log")
+    log_path = os.path.join(folder, "framejob.log")
     env = child_env()
     env["RC_AGENT_SOCKET"] = socket_path
     with open(log_path, "ab") as out:
@@ -440,7 +443,7 @@ def seed_clone():
 def parity(log_path):
     try:
         with open(log_path, errors="replace") as handle:
-            return [line.strip() for line in handle if "Reelcut: " in line]
+            return [line.strip() for line in handle if "Frame Job: " in line]
     except OSError as error:
         return [f"the log could not be read: {error}"]
 
@@ -454,7 +457,7 @@ def real_session(app, index):
         if started.client is None:
             reason = "the real build did not come up within 60 s"
         else:
-            project = os.path.join(WORK, f"r1-{index}.reelcut")
+            project = os.path.join(WORK, f"r1-{index}.framejob")
             started.client.call("new_project", path=project)
             started.client.call("close_project", project=project, discard=True)
     except Exception as error:
@@ -469,7 +472,7 @@ def real_session(app, index):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--app", default=None,
-                        help="the built Reelcut.app (default: proof_app.bundle())")
+                        help="the built Frame Job.app (default: proof_app.bundle())")
     parser.add_argument("--only", help="rows to run, comma-separated (C0 runs for any G row)")
     parser.add_argument("--mutant", choices=sorted(EXPECTED))
     parser.add_argument("--child", nargs=2, metavar=("KIND", "TARGET"), help=argparse.SUPPRESS)
@@ -512,7 +515,7 @@ def main():
             problems = []
             stale = proof_defaults.sharing_pids(CLONE_DOMAIN)
             if stale:
-                problems.append(f"a Reelcut that may share {CLONE_DOMAIN} is running: {stale}")
+                problems.append(f"a Frame Job that may share {CLONE_DOMAIN} is running: {stale}")
             reason = make_clone(app) if not stale else "not made"
             if reason:
                 problems.append(reason)
@@ -581,7 +584,7 @@ def main():
                 problems.append(f"status is not {mcp.DEFAULTS_EXIT}")
             last = answer["lines"][-1] if answer["lines"] else ""
             if not (last.startswith(MARK + CLONE_DOMAIN + ":") and KEY in last
-                    and last.endswith("(other Reelcut pids: none)")):
+                    and last.endswith("(other Frame Job pids: none)")):
                 problems.append(f"stderr's last line is not DEFAULTS MOVED naming {KEY} and none")
             return problems
 
@@ -624,7 +627,7 @@ def main():
                 problems.append("status is not 0")
             pid = str(s2.pid)
             named = [line for line in answer["marks"]
-                     if KEY in line and pid in line.rsplit("(other Reelcut pids: ", 1)[-1]
+                     if KEY in line and pid in line.rsplit("(other Frame Job pids: ", 1)[-1]
                      .rstrip(")").split(", ")]
             if not named:
                 problems.append(f"no DEFAULTS MOVED line names {KEY} and S2's pid {pid}")
@@ -691,7 +694,7 @@ def main():
                 row("R1", not visible,
                     f"the real build, new_project and close_project, guarding {real}: moved "
                     f"{names}; owner-visible {visible}" + ("; after one retry" if retried else "")
-                    + f"; other Reelcut pids sharing {real} now: {pids or 'none'}")
+                    + f"; other Frame Job pids sharing {real} now: {pids or 'none'}")
 
         if "R2" in wanted:
             if before is None or after is None:
@@ -701,7 +704,7 @@ def main():
                 visible = proof_defaults.owner_visible(names)
                 row("R2", not visible,
                     f"{real} ({len(after)} keys) across C0 and the G and H rows: moved "
-                    f"{names}; owner-visible {visible}; other Reelcut pids sharing it now: "
+                    f"{names}; owner-visible {visible}; other Frame Job pids sharing it now: "
                     f"{proof_defaults.sharing_pids(real) or 'none'}")
     finally:
         stop_s2(s2, s2_socket)

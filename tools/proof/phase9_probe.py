@@ -252,7 +252,7 @@ def build_probe():
         os.path.join(ROOT, "app", "Sources", name)
         for name in os.listdir(os.path.join(ROOT, "app", "Sources"))
         if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
@@ -269,7 +269,7 @@ def build_probe():
 
 def run_probe(binary):
     out = os.path.join(PROBE, "answer.json")
-    package = os.path.join(PROBE, "probe.reelcut")
+    package = os.path.join(PROBE, "probe.framejob")
     result = subprocess.run([binary, out, package], capture_output=True, text=True)
     if result.returncode != 0 or not os.path.exists(out):
         return None, (result.stderr.strip().splitlines() or ["(no output)"])[-1]

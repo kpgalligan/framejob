@@ -5,7 +5,7 @@
 // and a `default.metallib` of the app's own shader beside the binary —
 // `export_cancel_probe.swift`'s build.
 //
-//     video_configuration_probe <package.reelcut> <out.mov>
+//     video_configuration_probe <package.framejob> <out.mov>
 //
 // It opens the package as the app does (`read`, `fileURL`) and exports
 // `prores_422` with the export sheet's frame-rate override at 25 fps
@@ -31,7 +31,7 @@ func finish() -> Never {
 
 guard arguments.count == 3 else {
     answer["outcome"] = "failure"
-    answer["error"] = "usage: <package.reelcut> <out.mov>"
+    answer["error"] = "usage: <package.framejob> <out.mov>"
     finish()
 }
 let packageURL = URL(fileURLWithPath: arguments[1])
@@ -41,7 +41,7 @@ NSApplication.shared.setActivationPolicy(.prohibited)
 
 let document = ProjectDocument()
 do {
-    try document.read(from: packageURL, ofType: "com.kgalligan.reelcut-project")
+    try document.read(from: packageURL, ofType: ProjectDocument.projectTypeIdentifier)
 } catch {
     answer["outcome"] = "failure"
     answer["error"] = "the package would not open: \(error.localizedDescription)"

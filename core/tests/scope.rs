@@ -633,7 +633,7 @@ fn every_refused_name_is_an_op_the_table_knows() {
     // The refusal message quotes a name, and a name that is not in the op
     // table would be a lie the compiler cannot catch. `rc_op_names` is the
     // table as the host reads it.
-    use reelcut_core::OP_NAMES;
+    use framejob_core::OP_NAMES;
     assert_eq!(OP_NAMES.len(), 61, "a scope is an envelope key, not an op");
     for (name, _) in refused() {
         assert!(
@@ -895,7 +895,7 @@ fn every_op_in_the_table_works_inside_a_nest_except_the_nine() {
     // CLASSIFICATION true — that the fifty-two actually apply against a
     // real nest and come back through `validate` on the merged parent, and
     // that exactly nine do not.
-    use reelcut_core::OP_NAMES;
+    use framejob_core::OP_NAMES;
     let base = every_kind();
     let table = every_op();
 

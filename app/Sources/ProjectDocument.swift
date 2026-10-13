@@ -1,5 +1,5 @@
-// The app module is named "Reelcut", so project.yml sets
-// NSDocumentClass = "Reelcut.ProjectDocument" on every CFBundleDocumentTypes
+// The app module is named "Frame Job", so project.yml sets
+// NSDocumentClass = "FrameJob.ProjectDocument" on every CFBundleDocumentTypes
 // entry — the package type AND the movie/audio/image Alternate entries that
 // make File > Open on a `.mov` build a project (spec §1).
 
@@ -16,7 +16,7 @@ extension Notification.Name {
     /// committed yet: observers doing expensive work (a composition rebuild,
     /// a full timeline reload) skip those and refresh once on the final
     /// `false` (app/CLAUDE.md, spec §7.6).
-    static let projectDocumentDidChange = Notification.Name("ReelcutProjectDocumentDidChange")
+    static let projectDocumentDidChange = Notification.Name("FrameJobProjectDocumentDidChange")
 
     /// Posted by `ProjectDocument` (object: the document) when the set of
     /// pre-rendered reversed assets on disk changes — a render finished,
@@ -28,12 +28,12 @@ extension Notification.Name {
     /// `Playback` would keep playing the composition it already built —
     /// slates and all. The editor answers this by dropping the item and
     /// rebuilding.
-    static let reversedMediaDidChange = Notification.Name("ReelcutReversedMediaDidChange")
+    static let reversedMediaDidChange = Notification.Name("FrameJobReversedMediaDidChange")
 
     /// Posted by `applyEdit` (object: the document) when the core REFUSED a
     /// person's edit; `userInfo["refusal"]` is the `ReelRefusal`, whose
     /// sentence the inspector's foot shows (spec §11 CI-10).
-    static let projectDocumentDidRefuse = Notification.Name("ReelcutProjectDocumentDidRefuse")
+    static let projectDocumentDidRefuse = Notification.Name("FrameJobProjectDocumentDidRefuse")
 }
 
 /// The document, and **the single mutation point**. Every edit in the app —
@@ -280,8 +280,8 @@ final class ProjectDocument: NSDocument {
     // MARK: - Types
 
     /// The package UTI, exported by project.yml.
-    static let projectTypeIdentifier = "com.kgalligan.reelcut-project"
-    static let projectFileExtension = "reelcut"
+    static let projectTypeIdentifier = "com.kgalligan.framejob-project"
+    static let projectFileExtension = "framejob"
 
     private static let projectFileName = "project.json"
     private static let cacheDirectoryName = "cache"
@@ -346,7 +346,7 @@ final class ProjectDocument: NSDocument {
 
     /// The media file this untitled document was built from, if any. Only
     /// used to name the draft and to point the save panel at the file's own
-    /// folder ("Save then writes a `.reelcut` package next to the source").
+    /// folder ("Save then writes a `.framejob` package next to the source").
     private(set) var importSourceURL: URL?
 
     /// Where regenerable caches go while the document has no file yet.
@@ -378,7 +378,7 @@ final class ProjectDocument: NSDocument {
 
     /// Opening a NON-package type leaves the document UNTITLED: the movie is
     /// the *source*, not this document's file, so ⌘S must prompt for a
-    /// `.reelcut` location next to it (spec §1).
+    /// `.framejob` location next to it (spec §1).
     ///
     /// NSDocument assigns `fileURL` and `fileType` around
     /// `read(from:ofType:)`, and there is no hook in between —
@@ -518,7 +518,7 @@ final class ProjectDocument: NSDocument {
         clampViewState()
     }
 
-    /// The `.reelcut` package (spec §5.6). Only `project.json` is read: the
+    /// The `.framejob` package (spec §5.6). Only `project.json` is read: the
     /// `cache/` directory is regenerable and is NEVER required to open — a
     /// missing or damaged one costs nothing but a redrawn filmstrip.
     ///
@@ -708,7 +708,7 @@ final class ProjectDocument: NSDocument {
     }
 
     /// Save/Save As on an untitled document opens next to the file it was
-    /// built from, named after it — spec §1's "Save then writes a `.reelcut`
+    /// built from, named after it — spec §1's "Save then writes a `.framejob`
     /// package next to the source".
     override func prepareSavePanel(_ savePanel: NSSavePanel) -> Bool {
         if let source = importSourceURL {
@@ -762,7 +762,7 @@ final class ProjectDocument: NSDocument {
         }
         if let existing = temporaryCacheDirectory { return existing }
         let directory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            .appendingPathComponent("Reelcut", isDirectory: true)
+            .appendingPathComponent("FrameJob", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         temporaryCacheDirectory = directory
         return directory

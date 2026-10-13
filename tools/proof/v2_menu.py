@@ -11,19 +11,19 @@ with the V2b spec's Verification line (V2a's pinned defaults plus `-RCSecretFold
 `work/v2_menu/secrets` and `-RCSpendFolder` under `work/v2_menu/spend` —
 it opens Settings, whose month line would otherwise read the person's
 ledger, spec §11 P-5), fresh for each run; `--log` defaults to
-`<dir>/reelcut.log`.
+`<dir>/framejob.log`.
 
 **The cover.** The D rows put `v2_cover.swift`'s opaque, non-activating
 panel (built by `v2_snapshot.build_cover`) over project B's editor so it
-reads OCCLUDED, and deliver menu items there with Reelcut inactive — the
+reads OCCLUDED, and deliver menu items there with Frame Job inactive — the
 case an agent is in while a person works in other apps. One episode, under
-60 s. **Keep the pointer off the Reelcut windows while this runs**; nothing
-is ever activated. Reelcut active skips every D row as `host: Reelcut
+60 s. **Keep the pointer off the Frame Job windows while this runs**; nothing
+is ever activated. Frame Job active skips every D row as `host: Frame Job
 active`; a locked console as `host: console locked`.
 
 Before the first MCP call the script writes three fixtures
-(`work/v2_menu/fixtures/menu_{a,b}.reelcut`, version 10, 640×360 at 30 fps,
-one track, a shape at 0 s and one at 3 s; `menu_late.reelcut`, the same with
+(`work/v2_menu/fixtures/menu_{a,b}.framejob`, version 10, 640×360 at 30 fps,
+one track, a shape at 0 s and one at 3 s; `menu_late.framejob`, the same with
 the first shape only), deletes `fixtures/late.mov` and, for the H rows, builds
 `v2_menu_probe.swift` over `swift_build.py`'s line into
 `work/v2_menu/probe/` with the graphic templates beside it. A build that
@@ -32,7 +32,7 @@ the front project). Every readback is a relative count from `get_project`.
 H5 is #133's case in the probe: an item whose own target does not answer
 its action has no target and is disabled.
 
-**L1 (#135), the late sheet, runs last.** It opens `menu_late.reelcut`, adds
+**L1 (#135), the late sheet, runs last.** It opens `menu_late.framejob`, adds
 a 2 s video media at `late.mov` (missing) and a clip of it at 6 s, and
 reverses the clip: a missing file makes no reverse job, so no sheet (checked).
 It then writes `late.mov` as non-movie bytes, so the reverse render fails and
@@ -82,13 +82,13 @@ FIXTURES = os.path.join(WORK, "fixtures")
 PNG = os.path.join(WORK, "png")
 PROBE_DIR = os.path.join(WORK, "probe")
 SOURCES = os.path.join(ROOT, "app", "Sources")
-LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 TEMPLATES = os.path.join(ROOT, "graphic", "tests", "graphics")
 TICKS = 600_000
 PLAYHEAD = 600_000
-A = os.path.join(FIXTURES, "menu_a.reelcut")
-B = os.path.join(FIXTURES, "menu_b.reelcut")
-LATE = os.path.join(FIXTURES, "menu_late.reelcut")
+A = os.path.join(FIXTURES, "menu_a.framejob")
+B = os.path.join(FIXTURES, "menu_b.framejob")
+LATE = os.path.join(FIXTURES, "menu_late.framejob")
 LATE_MOVIE = os.path.join(FIXTURES, "late.mov")
 PROPERTIES = {"perform_menu_item": {"path", "project"}, "cancel_sheet": {"project"}}
 STRANGER = "v2_stranger_key"
@@ -147,7 +147,7 @@ def build_probe():
     binary = os.path.join(PROBE_DIR, "v2_menu_probe")
     try:
         built = swift_build.build(sources=swift + [entry], output=binary,
-                                  defines=["REELCUT_DEV_TOOLS"], timeout=1200)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=1200)
     except swift_build.SwiftBuildFailed as error:
         return None, ("probe did not build: swiftc exited "
                       f"{error.rc if error.rc is not None else 'before running'} (expired "
@@ -275,11 +275,11 @@ def rows_t(mcp, log):
         notes.append(f"{name} properties {sorted(props)} required {schema.get('required')}")
     parity = []
     if os.path.exists(log):
-        parity = [line for line in open(log, errors="replace") if "Reelcut: " in line]
+        parity = [line for line in open(log, errors="replace") if "Frame Job: " in line]
     marker = dev_marker_count(log)
     ok = ok and os.path.exists(log) and parity == [] and marker == len(DEV_TOOLS)
     score("T1", "pass" if ok else "fail",
-          "; ".join(notes) + f"; `Reelcut: ` lines {len(parity)}; marker count {marker} "
+          "; ".join(notes) + f"; `Frame Job: ` lines {len(parity)}; marker count {marker} "
           f"(want {len(DEV_TOOLS)})")
     notes, ok = [], True
     for name in PROPERTIES:
@@ -381,7 +381,7 @@ def rows_n(mcp):
 
 
 # ---------------------------------------------------------------------------
-# D: delivery with Reelcut inactive and B covered.
+# D: delivery with Frame Job inactive and B covered.
 
 
 def editor_row(mcp, path):
@@ -416,7 +416,7 @@ def run_d(mcp, cover):
     active = listing(mcp, B)["active"]
     if active is not False:
         for rid in ["D0", "D1", "D2", "D3", "D4"]:
-            score(rid, "skip", "host: Reelcut active")
+            score(rid, "skip", "host: Frame Job active")
         return
     d0 = cover.up and covered is not None and covered.get("occluded") is True
     score("D0", "pass" if d0 else "fail",
@@ -460,7 +460,7 @@ def run_d(mcp, cover):
           f"{c['button']!r}, sheet after {c['sheet']}, settled {c['settled']} in "
           f"{c['settle_ms']} ms")
 
-    r = perform(mcp, ["Reelcut", "Settings…"])
+    r = perform(mcp, ["Frame Job", "Settings…"])
     opened = [w for w in r["windows_opened"] if w.get("kind") == "settings"]
     captured = None
     if opened:

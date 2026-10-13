@@ -118,8 +118,8 @@ asks.
 - q7 never writes to the tree. It rsyncs a copy, moves the target pins in THAT
   COPY, and builds it; `git status --short -- app core project.yml Makefile
   tools/proof/harness` prints nothing after a full run.
-- One owned app instance, on port 4831, killed by PID. `grep "Reelcut: "
-  /tmp/reelcut-4831.log` must print nothing before any claim is read off a
+- One owned app instance, on port 4831, killed by PID. `grep "Frame Job: "
+  /tmp/framejob-4831.log` must print nothing before any claim is read off a
   pixel.
 
 ## Exit codes

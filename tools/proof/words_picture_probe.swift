@@ -1,7 +1,7 @@
 // Road map 8, W3 — the word-caption picture's app-side probe.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
 // `tools/proof/harness/build.sh`'s swiftc line — so it measures the
 // renderer's own code: `measuredSize`, `layout(for:)`, `drawWords`,
 // `renderTextBitmap`, `wordHeadroom`, `laidContent`, `contentEdit` and

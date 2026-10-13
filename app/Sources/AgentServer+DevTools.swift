@@ -1,10 +1,10 @@
 import Foundation
 
-// MARK: - The dev-tools seam: tools compiled only under REELCUT_DEV_TOOLS
+// MARK: - The dev-tools seam: tools compiled only under FRAMEJOB_DEV_TOOLS
 
 /// Where the dev tools live (road map 11, spec §11 V-1 and V-2).
 ///
-/// **The flag.** `REELCUT_DEV_TOOLS` is a Swift compilation condition that
+/// **The flag.** `FRAMEJOB_DEV_TOOLS` is a Swift compilation condition that
 /// Debug and Release set and the Distribution configuration does not
 /// (`project.yml`), so every proof and agent session, which launch Release,
 /// has the dev tools and the binary `make dist` builds has none of their
@@ -44,7 +44,7 @@ extension AgentServer {
             if merged[name] != nil {
                 let msg = "dev tool \(name) reuses a product tool's name"
                 assertionFailure(msg)
-                NSLog("Reelcut: %@", msg)
+                NSLog("Frame Job: %@", msg)
                 continue
             }
             merged[name] = handler
@@ -56,10 +56,10 @@ extension AgentServer {
     /// assistant withholds each one (spec §11 AI-7, `AssistantToolTable`).
     static var devToolNames: Set<String> { Set(devHandlers.keys) }
 
-    #if REELCUT_DEV_TOOLS
+    #if FRAMEJOB_DEV_TOOLS
     // dist_check.py parses the next line (D1) and requires it bare — nothing after the
     // closing quote — at least 16 bytes, present in Release's binary, absent from Distribution's.
-    static let devToolsMarker = "reelcut-dev-tools-compiled-in"
+    static let devToolsMarker = "framejob-dev-tools-compiled-in"
 
     private static let devHandlers: [String: ToolHandler] = [
         // AgentServer+Snapshot.swift
@@ -82,14 +82,14 @@ extension AgentServer {
     /// `perform_menu_item` and `cancel_sheet` (V2b), `select_inspector_tab`
     /// (V3), `assistant_send` and `assistant_answer` (road map 12 A1). The
     /// log is what keeps `devToolsMarker` in the optimised binary; it never
-    /// says `Reelcut: `, the prefix a proof reads as the parity check
+    /// says `Frame Job: `, the prefix a proof reads as the parity check
     /// complaining.
     func devTools() -> [[String: Any]] {
         let rows: [[String: Any]] = [
             snapshotUITool(), performMenuItemTool(), cancelSheetTool(), selectInspectorTabTool(),
             assistantSendTool(), assistantAnswerTool(),
         ]
-        NSLog("Reelcut agent server: %@, %ld dev tools", Self.devToolsMarker, rows.count)
+        NSLog("Frame Job agent server: %@, %ld dev tools", Self.devToolsMarker, rows.count)
         return rows
     }
     #else

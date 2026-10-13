@@ -68,7 +68,7 @@ import swift_build  # noqa: E402
 WORK = ROOT / "tools/proof/work/matte_probe"
 PROBE_SOURCE = ROOT / "tools/proof/matte_probe.swift"
 SHADER = ROOT / "app/Resources/Shaders/Compositor.metal"
-HEADER = ROOT / "core/include/reelcut_core.h"
+HEADER = ROOT / "core/include/framejob_core.h"
 SEC = 600_000
 W, H = 1920, 1080
 BOX_SLOP = 1.5
@@ -177,7 +177,7 @@ def split_nest(kind):
 
 
 def package(name, clips, nests=None):
-    path = WORK / f"{name}.reelcut"
+    path = WORK / f"{name}.framejob"
     path.mkdir(parents=True, exist_ok=True)
     project = {
         "version": format_version(),
@@ -210,7 +210,7 @@ def build(mutant):
     binary = built_dir / "matte_probe"
     try:
         made = swift_build.build(sources=swift_build.app_sources() + [entry], output=binary,
-                                 defines=["REELCUT_DEV_TOOLS"], timeout=900)
+                                 defines=["FRAMEJOB_DEV_TOOLS"], timeout=900)
     except swift_build.SwiftBuildFailed as error:
         return None, (f"swiftc rc {error.rc if error.rc is not None else 'before running'}: "
                       f"{(error.diagnostics or ['(no output)'])[:6]}")

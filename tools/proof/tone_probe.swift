@@ -2,7 +2,7 @@
 // through `swift_build.build` and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, against `libreelcut_core.a`, so every row drives the app's own
+// `main.swift`, against `libframejob_core.a`, so every row drives the app's own
 // types: `ClipPane`, `VideoPane.lightSection()`, `InspectorBinding`,
 // `LayerUniforms.apply(tone:)`, `ClipSubTab.keyedCount`. Nothing private is
 // widened.
@@ -102,7 +102,7 @@ func p1() {
     let document = ProjectDocument()
     do {
         try document.read(
-            from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+            from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
     } catch {
         check("P1 project P opens", false, "\(error)")
         return

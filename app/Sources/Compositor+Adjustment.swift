@@ -4,7 +4,7 @@ import Metal
 /// The adjustment pass (spec §11 GR-6): an adjustment clip has no picture of
 /// its own, so its layer is not drawn from a texture. `encodeLayers` hands it
 /// here instead of to `prepare`, and the eighth pipeline,
-/// `reelcut_adjust_fragment`, reads the target it is drawing into through
+/// `framejob_adjust_fragment`, reads the target it is drawing into through
 /// `[[color(0)]]` — everything already drawn behind the clip in its
 /// container, the canvas background included — and writes it back graded by
 /// the layer's colour, tone, wheels, curves, look and point filters, by
@@ -61,16 +61,16 @@ extension RecipeLayer {
 extension MetalRenderer {
 
     /// The adjustment pipeline: the shadow pass's full-frame quad and
-    /// `reelcut_adjust_fragment`, blending OFF, into the working format.
+    /// `framejob_adjust_fragment`, blending OFF, into the working format.
     static func adjustPipeline(
         device: MTLDevice, library: MTLLibrary
     ) -> MTLRenderPipelineState? {
-        guard let vertex = library.makeFunction(name: "reelcut_shadow_vertex"),
-            let fragment = library.makeFunction(name: "reelcut_adjust_fragment")
+        guard let vertex = library.makeFunction(name: "framejob_shadow_vertex"),
+            let fragment = library.makeFunction(name: "framejob_adjust_fragment")
         else { return nil }
         return try? device.makeRenderPipelineState(
             descriptor: pipelineDescriptor(
-                label: "Reelcut adjustment", vertex: vertex, fragment: fragment, blending: false))
+                label: "Frame Job adjustment", vertex: vertex, fragment: fragment, blending: false))
     }
 
     /// One adjustment layer graded into `pass`, `matte` the coverage cutting

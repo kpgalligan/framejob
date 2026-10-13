@@ -19,10 +19,10 @@ import Foundation
 /// **The read is off main.** `read` folds on `queue`, one serial queue, and
 /// answers on main; the pane shows only its latest read's answer.
 enum AssistantSpendMonth {
-    static let queue = DispatchQueue(label: "com.kgalligan.reelcut.spend-month")
+    static let queue = DispatchQueue(label: "com.kgalligan.framejob.spend-month")
     static let zone = TimeZone.gmt
     static let note =
-        "Reelcut's own estimate at LiteLLM prices, from its spend ledger. The Anthropic "
+        "Frame Job's own estimate at LiteLLM prices, from its spend ledger. The Anthropic "
         + "Console shows what your account was billed."
 
     /// One month's lines, folded.

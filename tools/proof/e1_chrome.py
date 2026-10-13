@@ -6,7 +6,7 @@ offscreen.
 Two instruments, neither of which is a photograph of a running app:
 
 * **the harness** (`tools/proof/harness/`) compiles every file in
-  `app/Sources` with a `main.swift` of its own, opens a `.reelcut` package,
+  `app/Sources` with a `main.swift` of its own, opens a `.framejob` package,
   puts an `EditorViewController` in an `NSWindow` and `cacheDisplay`s it into
   a PNG — the same paint path the window uses, no TCC grant. It is run on
   THIS tree and on the REFERENCE tree (`1c3e92e`, the commit before E1's
@@ -161,7 +161,7 @@ def project(version, clips):
 
 
 def write_package(name, body):
-    path = os.path.join(CHROME, name + ".reelcut")
+    path = os.path.join(CHROME, name + ".framejob")
     os.makedirs(path, exist_ok=True)
     with open(os.path.join(path, "project.json"), "w", encoding="utf-8") as handle:
         json.dump(body, handle, indent=2)
@@ -479,7 +479,7 @@ func dump(_ item: NSMenuItem) -> [String: Any] {
 func opened(_ path: String) -> ProjectDocument {
     let document = ProjectDocument()
     try! document.read(
-        from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+        from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
     return document
 }
 
@@ -720,7 +720,7 @@ def build_probe():
         os.path.join(ROOT, "app", "Sources", name)
         for name in os.listdir(os.path.join(ROOT, "app", "Sources"))
         if name.endswith(".swift") and name != "main.swift")
-    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    lib = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:

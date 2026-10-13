@@ -10,7 +10,7 @@ renders a package from disk, and every claim here is a BYTE comparison of two
 PNGs it wrote — a diff of pixels, then where those pixels landed measured
 against rectangles derived from the app's own layout constants.
 
-The packages are written BY HAND (a `.reelcut` is a directory holding
+The packages are written BY HAND (a `.framejob` is a directory holding
 `project.json`, spec §5.2) around one TEXT clip, so nothing loads
 asynchronously and every render is deterministic — no media at all:
 
@@ -179,7 +179,7 @@ PACKAGES = {
 
 
 def write_package(package, spec):
-    path = os.path.join(WORK, package + ".reelcut")
+    path = os.path.join(WORK, package + ".framejob")
     os.makedirs(path, exist_ok=True)
     with open(os.path.join(path, "project.json"), "w") as f:
         json.dump(project_json(**spec), f, indent=2)

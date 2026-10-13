@@ -6,7 +6,7 @@ measured through the app's own sources, with ⌥⌘V held to what it was.
     python3 tools/proof/paste_graphic_probe.py [--sources DIR] [--mutant NAME] [--only IDS]
 
 `paste_graphic_probe.swift` is built with `swift_build.py`'s line
-(`-D REELCUT_DEV_TOOLS`: `UIMenu` exists only there) over `--sources` and run
+(`-D FRAMEJOB_DEV_TOOLS`: `UIMenu` exists only there) over `--sources` and run
 once, in a process of its own, under `tools/proof/work/paste-graphic/probe/`,
 killed at a 120 s wall. No media, no module file, no instance, no MCP. Every
 Copy and paste goes over a PRIVATE named pasteboard the probe releases at
@@ -135,12 +135,12 @@ def build(sources, here):
     swift = sorted(str(p) for p in sources.glob("*.swift") if p.name != "main.swift")
     if len(swift) < 100:
         return None, "app source set incomplete"
-    lib = ROOT / "core/target/release/libreelcut_core.a"
+    lib = ROOT / "core/target/release/libframejob_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
         swift_build.build(sources=swift + [entry], output=binary,
-                          defines=["REELCUT_DEV_TOOLS"], timeout=900)
+                          defines=["FRAMEJOB_DEV_TOOLS"], timeout=900)
     except swift_build.SwiftBuildFailed as error:
         if error.expired:
             return None, "swiftc: no answer within 900 s"

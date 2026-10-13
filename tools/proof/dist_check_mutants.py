@@ -6,14 +6,14 @@ seal rows (D25–D27), each made to fail on purpose.
     python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]
 
 Every case runs `dist_check.py` as a child with one side a SKELETON bundle,
-`work/dist_check_mutants/<case>/Reelcut.app`: `Contents/MacOS/Reelcut` a
+`work/dist_check_mutants/<case>/Frame Job.app`: `Contents/MacOS/Frame Job` a
 symlink to the real app's untouched binary, and COPIES (never links) of the
-real `Contents/Info.plist`, `Contents/Helpers/reelcut-agent`,
-`Contents/Helpers/reelcut-mcp` and `Contents/Resources/agent-catalog.json`,
+real `Contents/Info.plist`, `Contents/Helpers/framejob-agent`,
+`Contents/Helpers/framejob-mcp` and `Contents/Resources/agent-catalog.json`,
 for every mutation: the helper or the proxy mutated and re-signed ad hoc, or
 the snapshot removed, re-versioned or swapped for the OTHER side's. The
 other side is the real app. Nothing is written into `build/`. Four cases
-mutate a whole bundle, the real app `ditto`ed to `<case>/<side>/Reelcut.app`:
+mutate a whole bundle, the real app `ditto`ed to `<case>/<side>/Frame Job.app`:
 `app-entitlements` re-signs Distribution ad hoc with HEAD's pair
 (`audio-input` and `get-task-allow`, #145), which D14 must refuse;
 `app-entitlements-mic-only` re-signs Release with `audio-input` alone, which
@@ -46,6 +46,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import dist_check  # noqa: E402
+import proof_app  # noqa: E402
 
 ROOT = dist_check.ROOT
 WORK = os.path.join(HERE, "work", "dist_check_mutants")
@@ -149,7 +150,7 @@ def skeleton(case_dir, side, real, mutation, needle):
     """A skeleton bundle for one side, its helper, proxy or snapshot mutated;
     returns its path."""
     real_app = real[side]
-    app = os.path.join(case_dir, side, "Reelcut.app")
+    app = os.path.join(case_dir, side, "Frame Job.app")
     if mutation in WHOLE:
         try:
             done = subprocess.run(["ditto", real_app, app], capture_output=True, timeout=300,
@@ -160,7 +161,7 @@ def skeleton(case_dir, side, real, mutation, needle):
             raise SetupError(f"ditto {real_app} exit {done.returncode}: "
                              f"{done.stderr.decode('utf-8', 'replace').strip()[:300]}")
         if mutation == "noop-sign":
-            sign(os.path.join(app, "Contents", "MacOS", "Reelcut"))
+            sign(str(proof_app.executable(app)))
         if mutation in ("noop-sign", "seal-broken"):
             try:
                 with open(os.path.join(app, dist_check.SNAPSHOT), "ab") as handle:
@@ -178,10 +179,10 @@ def skeleton(case_dir, side, real, mutation, needle):
         return app
     macos = os.path.join(app, "Contents", "MacOS")
     os.makedirs(macos)
-    binary = os.path.join(real_app, "Contents", "MacOS", "Reelcut")
+    binary = str(proof_app.executable(real_app))
     if not os.path.isfile(binary):
         raise SetupError(f"no binary at {binary}")
-    os.symlink(binary, os.path.join(macos, "Reelcut"))
+    os.symlink(binary, os.path.join(macos, "Frame Job"))
     proxy_and_snapshot(case_dir, app, real_app, real[OTHER[side]], mutation)
     if mutation == "no-helper":
         return app
@@ -250,9 +251,9 @@ def run_case(name, sides, mutation, expected, real, needle):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--release", default=dist_check.DEFAULT_RELEASE,
-                        help="the Release Reelcut.app")
+                        help="the Release Frame Job.app")
     parser.add_argument("--dist", default=dist_check.DEFAULT_DIST,
-                        help="the Distribution Reelcut.app")
+                        help="the Distribution Frame Job.app")
     arguments = parser.parse_args()
     real = {"release": os.path.abspath(arguments.release),
             "dist": os.path.abspath(arguments.dist)}

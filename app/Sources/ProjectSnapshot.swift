@@ -155,7 +155,7 @@ enum ReelJSON {
     }
 
     /// Encoder for the rare Swift → core direction. NOT the persistence
-    /// path: `.reelcut` stores `rc_project_to_json`'s own bytes, never a
+    /// path: `.framejob` stores `rc_project_to_json`'s own bytes, never a
     /// re-encoded snapshot, so the core stays the single writer of the file
     /// format.
     static func encoder() -> JSONEncoder {

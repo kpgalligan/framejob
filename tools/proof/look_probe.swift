@@ -2,12 +2,12 @@
 // through `swift_build.build` and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, against `libreelcut_core.a`, so every row drives the app's own
+// `main.swift`, against `libframejob_core.a`, so every row drives the app's own
 // types: `LookTextures` (its placeholder and its bake), `LayerUniforms.apply
 // (look:)`, `ReelProject.recipe(at:)` and `RecipeLook`. The shader is the
 // tree's `Compositor.metal`, read from `request.json`'s `shader` and compiled
 // by `makeLibrary(source:)` together with the three probe kernels below, so
-// `gradeLook` and `reelcut_look_bake` are the tree's own functions. Nothing
+// `gradeLook` and `framejob_look_bake` are the tree's own functions. Nothing
 // private is widened.
 //
 //   look_probe <request.json> <answer.json>
@@ -86,7 +86,7 @@ func bOpened(_ key: String) -> ProjectDocument? {
     let document = ProjectDocument()
     do {
         try document.read(
-            from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+            from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
     } catch {
         return nil
     }

@@ -8,7 +8,7 @@
 
 import Foundation
 
-let fixedDefault = "/probe/Reelcut/Agent/agent.sock"
+let fixedDefault = "/probe/Frame Job/Agent/agent.sock"
 let scratchSocket = "/probe/scratch/agent.sock"
 
 let cases: [(name: String, environment: [String: String], defaultPath: String?)] = [

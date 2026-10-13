@@ -449,3 +449,91 @@ the trees differ by those three lines.
 
 **Verified:** see the phase's checks (`tools/proof/spec_index_proof.py`, the amendment count,
 that nothing outside `designs/` changed, and `make gate`).
+
+## R1 — the record
+
+**Landed** (2026-10-13, in the worktree, not committed by the implementer; the orchestrator
+commits):
+
+- **Build:** `project.yml` (project, target and scheme `FrameJob`; `PRODUCT_NAME` "Frame Job",
+  Debug "Frame Job Debug"; `PRODUCT_MODULE_NAME: FrameJob` at the target; `CFBundleName` and
+  `CFBundleDisplayName` read `$(PRODUCT_NAME)`, `RC_APP_NAME` gone; NM-3's UTI, extension, type
+  names, entitlements path and `NSDocumentClass: FrameJob.ProjectDocument` ×6; `-lframejob_core`;
+  `framejob-mcp`; the catalog step greps `Frame Job: `), the `Makefile` (`APP := FrameJob`, the
+  three product paths spelled and quoted, `-D FRAMEJOB_DEV_TOOLS`, `make test`'s last two lines
+  `name_residue.py --selftest` and `name_residue.py`), the publish workflow's contents
+  (`FrameJob.xcarchive`, `FrameJob.dmg`, `-volname "Frame Job"`, title "Frame Job $VERSION"),
+  `.gitignore` (the new generated paths, the old two kept).
+- **Renamed by `git mv`:** `app/Bridging/FrameJob-Bridging-Header.h`,
+  `core/include/framejob_core.h` (guards `FRAMEJOB_BRIDGING_HEADER_H`, `FRAMEJOB_CORE_H`).
+- **Crates:** `framejob-core` (lib `framejob_core`), `framejob-mcp` (lib `framejob_mcp`, bin);
+  both `Cargo.lock`s rewritten by `cargo build --release`; every `core/tests/*.rs` and the
+  proxy's tests follow; `cargo fmt` reordered the renamed `use` lines.
+- **app/:** every spelling but `BrandMark.swift` (R2): NM-4's folders and temporary root, NM-5's
+  sentences, socket name, helper names, log prefixes, `include_framejob_windows` (no alias; the
+  argument gate refuses the old name by name, measured), NM-6's keys, notifications, labels,
+  shader entry points; `MediaRowView`'s Rewrapped test reads `AppSupport.folderName`; the
+  `open -a` advice is spelled `open -a "Frame Job"`. Two lines rewrapped in files under 400
+  lines; no file at or over 600 lines gained a line.
+- **agent/:** `package.json`, `bun.lock`, `build.sh`, `prices/update.py` and NM-10's three lines.
+- **tools/:** every file but `tools/proof/README.md`. `proof_app.py`'s `PRODUCTS` and
+  `executable()` (every proof that built `Contents/MacOS/<name>` from an app path calls it; a
+  copy of an app keeps its bundle's own name); `reference_build.py`'s `TreeNames`,
+  `tree_names`, `tree_defines` (and `tree_shader`, below); `gate.py`'s `names` step;
+  `budget.py`'s NM-7 guard (`unmoved`, `OLD_LEDGER_FOLDER`, `old_folder`) and
+  `budget_proof.py` B1–B4; `proof_defaults.py`'s both-name refusals, prefixes, key prefixes and
+  P10; `stale_registrations.py`'s `NAMES` and S4; the harness's pins under both names; every
+  old-tree builder routed through `tree_names`; the two spikes and `grading_verdict.py` per
+  the spec; the new `tools/proof/name_residue.py` (NM-8).
+- **designs/screens/**, **docs/graphics-api.md** and **.d.ts**, and `docs/manual-checks.md`'s
+  NAME-1.
+
+**Deviations from the spec** (each read against what an old-tree instrument needs):
+
+- `reference_build.tree_shader(tree, text)`: the archive builders that compile OLD
+  `app/Sources` beside the CURRENT `Compositor.metal` (`editor_keys_undo_proof.py`,
+  `space_key_proof.py`, `text_apply_proof.py`, `text_edit_proof.py`, and through them
+  `obscure_handles_probe.py`, `text_break_proof.py`) now name the shader's entry points as the
+  tree's Swift asks for them; without it an old tree's compositor finds no `reelcut_*`.
+- `mcp.wait_listening` accepts the old ready and not-bound lines too: `grading_verdict.py`'s
+  main tree (f407f87) is launched through `mcp.launch` and says them under its old name.
+- `obscure_handles_probe.swift` and `text_break_probe.swift` pin their three defaults keys
+  through `EditorViewController`'s own key constants, and every probe opens a package with
+  `ProjectDocument.projectTypeIdentifier`, so one probe source reads the same against an old
+  tree and the new one.
+- `cloud_captions_probe.py`'s row 18 compares its baseline's `project.yml` blocks renamed
+  (four replacements), so its expected diff stays the one it was.
+- `budget.unmoved`'s refusal is worded "the proofs' ledger is not moved yet", and names the
+  guarded `mv` with both folders; `stale_registrations.py` gains a pure S4 row for the two
+  names rather than a second registered bundle.
+- `name_residue.py`'s `ge-count` mutant makes the pin a ceiling (`pinned >= found`), the
+  reading under which it fails S4 as the spec names; `COUNTED` also pins `mcp.py`,
+  `cloud_captions_probe.py`, `phase5_chrome.py`, `phase8_chrome.py`, `sharp_chrome.py` (a
+  design handoff's folder name), `graphics_spike/README.md` and `silence_spike/README.md`
+  (a recorded log name and a recorded input path, both restored).
+
+**Measured** (each printed by the command beside it; the full outputs are in the phase's
+`04-checks.txt`): `make gate` PASS (names, typecheck at its four warnings, fmt, lint, test,
+app); `make dist` D1–D27 and `published_check.py` 15/15 over "Frame Job.app"; on Release:
+`defaults_proof.py` 11/11, `debug_release_proof.py` 10/10, `mcp_proxy_proof.py` 14/14,
+`agent_socket_proof.py` 17/17, `makefile_env_proof.py` 4/4, `assistant_helper_proof.py` 6/6,
+`spend_proof.py` 21/21, `screens.py` 36/36, `recording_proof.py --no-screen` 151/151 (section 5
+skipped by name), `log_thumbs_proof.py` 7/8, `matte_spike.py --check --tree` all rows,
+`grading_spike.py --check --tree --tree-base bde8319` all rows; `reference_build_selftest.py
+--integration` all rows; mutants: `name_residue` `ge-count` S4 and `no-untracked` S2; the
+budget guard removed fails B1 B2, the guard after `_open` fails B1; `tree_names` always new
+fails the old-tree row; `proof_defaults` without the old prefixes fails P10; the gate's
+`names` inputs without `*.md` fails M3's three `.md` rows, M4, M5 and M6.
+
+**Owed:**
+
+- The CLAUDE.md edits (the orchestrator's; listed verbatim in the phase's notes), and with them
+  `COUNTED`'s CLAUDE.md pins: root 6, `app/` 4, `core/` 0, `mcp-proxy/` 0.
+- `log_thumbs_proof.py` TH needs `tools/proof/work/i282/ctl/h0.json`, captured on the
+  untouched pre-#282 tree; this worktree has none, so TH failed on that alone (its own
+  comparison held: HLG, PQ and the SDR pair worst |Δ| 1).
+- `grading_spike.py --check --tree` at its default base f407f87 failed R1080/R2160: the
+  shader at f407f87 has no adjustment fragment (`git show` of it lists seven entry points, none
+  `*_adjust_fragment`), which KA (grading-2 G2-4) asks of V0, so that base cannot pass whatever
+  the names; an issue for the default.
+- The owner's hand steps above, after the merge.

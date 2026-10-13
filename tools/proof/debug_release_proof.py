@@ -6,11 +6,11 @@ the Release app does (spec §11 V-4, which amends V-1).
 
 It launches three instances of this tree's built products, each from
 `proof_app.binary()` (Debug, then Release twice), each on its own scratch
-socket and scratch home (`CFFIXED_USER_HOME`), each with `-ReelcutPreviewQuality
+socket and scratch home (`CFFIXED_USER_HOME`), each with `-FrameJobPreviewQuality
 0` pinned (the one defaults key on a scored path), and stops each by its own
 pid. A stale product is refused by `mcp.launch` before anything starts:
 `make app-debug` and `make app` first. On each it builds one fixture over MCP
-at `work/debug-release/<side>/fixture.reelcut`: a 640×360 canvas, `media/A.mov`
+at `work/debug-release/<side>/fixture.framejob`: a 640×360 canvas, `media/A.mov`
 as a video clip, a text clip, a timed word caption (highlight) and a graphic
 clip whose picture moves with the frame.
 
@@ -19,16 +19,16 @@ clip whose picture moves with the frame.
   T3  `render_frame` PNGs byte-equal at five times
   T4  a ProRes 422 export of the in/out range masked-equal
       (`video_configuration_proof.same_movie`: `mvhd`/`tkhd`/`mdhd` times zeroed)
-  T5  the two bundles' `Resources/agent-catalog.json` (the snapshot `reelcut-mcp`
+  T5  the two bundles' `Resources/agent-catalog.json` (the snapshot `framejob-mcp`
       lists from) parse equal; their bytes are reported, not scored: the
       writer's key order is Swift's per-process hash seed, so two runs of one
       Release executable differ in bytes too
-  T6  `perform_menu_item ["Reelcut"]` answers the same text on both (the
-      bundle's name, "Reelcut Debug", does not reach the menus)
+  T6  `perform_menu_item ["Frame Job"]` answers the same text on both (the
+      bundle's name, "Frame Job Debug", does not reach the menus)
   C0  CONTROL: two Release instances, T3's five renders byte-equal
   C1  sensitivity: one graphic prop changed on the Debug side alone is seen
       by T2's and T3's comparisons (then undone)
-  Z1  no `Reelcut: ` line in any instance's log (the parity check)
+  Z1  no `Frame Job: ` line in any instance's log (the parity check)
   Z2  each instance's `mcp._GUARDED` record names its own bundle's
       `CFBundleIdentifier`, and Debug's and Release's differ
 
@@ -101,12 +101,12 @@ class Side:
         self.binary = chosen_binary(config)
         self.bundle = self.binary.parents[2]
         self.folder = WORK / name
-        self.project = str(self.folder / "fixture.reelcut")
+        self.project = str(self.folder / "fixture.framejob")
         socket_path = mcp.scratch_socket()
         home = os.path.join(os.path.dirname(socket_path), "home")
         os.makedirs(home)
         env = {**mcp._child_env(), "CFFIXED_USER_HOME": home}
-        self.launched = mcp.launch(self.binary, ["-ReelcutPreviewQuality", "0"], env=env,
+        self.launched = mcp.launch(self.binary, ["-FrameJobPreviewQuality", "0"], env=env,
                                    socket_path=socket_path, seconds=60)
         self.socket = socket_path
         self.client = self.launched.client
@@ -169,13 +169,13 @@ class Side:
 
     def menu(self):
         try:
-            return f"answer: {self.call('perform_menu_item', path=['Reelcut'])}"
+            return f"answer: {self.call('perform_menu_item', path=['Frame Job'])}"
         except mcp.ToolError as error:
             return f"refusal: {error}"
 
     def log_complaints(self):
         with open(self.launched.log_path, errors="replace") as handle:
-            return [line.rstrip() for line in handle if "Reelcut: " in line]
+            return [line.rstrip() for line in handle if "Frame Job: " in line]
 
     def bundle_id(self):
         with open(self.bundle / "Contents/Info.plist", "rb") as handle:
@@ -229,7 +229,7 @@ def main():
             f"{'equal' if parsed[0] == parsed[1] else 'different'}; bytes "
             f"{'equal' if texts[0] == texts[1] else 'differ'} (not scored: key order)")
         a, b = debug.menu(), release.menu()
-        row("T6", a == b and "About Reelcut" in a and "Reelcut Debug" not in a,
+        row("T6", a == b and "About Frame Job" in a and "Frame Job Debug" not in a,
             f"{'same' if a == b else 'different'}: {a!r}" + ("" if a == b else f" vs {b!r}"))
 
         off = differing(shots["release"], shots["release-b"])
@@ -250,7 +250,7 @@ def main():
             side.launched.stop()
 
     complaints = {side.name: side.log_complaints() for side in sides}
-    row("Z1", not any(complaints.values()), f"`Reelcut: ` lines: "
+    row("Z1", not any(complaints.values()), f"`Frame Job: ` lines: "
         f"{ {name: lines[:3] for name, lines in complaints.items() if lines} or 'none'}")
     guarded = {side.name: (mcp._GUARDED.get(side.socket, {}).get("domain"), side.bundle_id())
                for side in sides}

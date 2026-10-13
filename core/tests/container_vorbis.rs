@@ -13,7 +13,7 @@ use serde_json::Value;
 use common::ebml::{cluster, file, info, simple_block, tracks, write_temp, Lacing, Track};
 use common::vorbis::{codec_private, comment, packet, private, Ident};
 use common::vorbis_setup::{Class, Codebook, Floor, Lengths, Mapping, Mode, Residue, Setup};
-use reelcut_core::container::{Container, AUDIO};
+use framejob_core::container::{Container, AUDIO};
 
 const FFMPEG: &[u8] = include_bytes!("fixtures/vorbis/ffmpeg.webm");
 const LIBVORBIS: &[u8] = include_bytes!("fixtures/vorbis/libvorbis.webm");

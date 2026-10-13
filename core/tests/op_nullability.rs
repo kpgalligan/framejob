@@ -2,7 +2,7 @@
 mod common;
 
 use common::{Handle, Outcome};
-use reelcut_core::op_table::{Kind, OpRow, OP_TABLE};
+use framejob_core::op_table::{Kind, OpRow, OP_TABLE};
 use serde_json::{json, Value};
 
 const PLAIN: [(&str, &str); 5] = [

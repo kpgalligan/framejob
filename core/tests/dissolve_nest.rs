@@ -14,7 +14,7 @@ mod common;
 use serde_json::{json, Value};
 
 use common::{array, Handle};
-use reelcut_core::format::RC_FORMAT_VERSION;
+use framejob_core::format::RC_FORMAT_VERSION;
 
 /// Ticks per second (spec §5.1), written out so a change to the timescale
 /// fails here rather than moving with the tests.

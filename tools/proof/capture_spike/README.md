@@ -29,7 +29,7 @@ python3 tools/proof/capture_spike/capture_spike.py --activation     # the activa
 `work/capture_spike/CaptureProbe.app` after the build: the binary as
 `Contents/MacOS/capture_probe`; `Fonts/`, `Blank.mp4`, `default.metallib`,
 `GraphicTemplates/` and `GraphicsAPI.md` in `Contents/Resources/`; an
-`Info.plist` (`com.kgalligan.reelcut.captureprobe`, `NSPrincipalClass
+`Info.plist` (`com.kgalligan.framejob.captureprobe`, `NSPrincipalClass
 NSApplication`, `LSMinimumSystemVersion 26.0`); signed ad hoc with
 `codesign --force --sign -`. A failed assembly or signing fails B0 as
 `bundle: <why>`. The default route, `--route bundle`, launches each mode
@@ -46,7 +46,7 @@ with no. `--bundle-only` checks the bundle without launching it:
 `plutil -lint`, `codesign --verify --strict`, the executable the built
 binary (compared with both signatures removed, since `codesign` rewrites the
 linker's), every resource present. `--activation` runs the probe's
-`activation` mode (`ProbeSupport.runActivation`: `well.reelcut` opened,
+`activation` mode (`ProbeSupport.runActivation`: `well.framejob` opened,
 `activate`, and the count of visible windows) over `direct`, the CONTROL,
 then `bundle`, 60 s each, and prints `activation <route>: active <bool> in
 <ms|None> ms, key <bool>, visible windows <n>`; exit 0 when the bundle route
@@ -60,7 +60,7 @@ front for the length of the run (about 3 minutes in full; `--activation`
 about a minute and a half), so run it only when nobody is typing at the Mac.
 `--route direct` does not take focus.
 
-Needs `swiftc`, `xcrun metal` and `core/target/release/libreelcut_core.a`
+Needs `swiftc`, `xcrun metal` and `core/target/release/libframejob_core.a`
 (`cd core && cargo build --release`). No port, no ffmpeg, no MCP.
 
 **Run it with the terminal frontmost, the display on, a backing-scale-2
@@ -99,10 +99,10 @@ The probe is `capture_probe.swift` compiled LAST with every file in
 `harness/build.sh`'s swiftc line plus Release's two settings:
 
 ```sh
-swiftc -O -wmo -D REELCUT_DEV_TOOLS -sdk "$(xcrun --show-sdk-path --sdk macosx)" \
-    -target arm64-apple-macos26.0 -module-name Reelcut \
-    -import-objc-header app/Bridging/Reelcut-Bridging-Header.h \
-    -L core/target/release -lreelcut_core <app/Sources/*.swift but main.swift> \
+swiftc -O -wmo -D FRAMEJOB_DEV_TOOLS -sdk "$(xcrun --show-sdk-path --sdk macosx)" \
+    -target arm64-apple-macos26.0 -module-name FrameJob \
+    -import-objc-header app/Bridging/FrameJob-Bridging-Header.h \
+    -L core/target/release -lframejob_core <app/Sources/*.swift but main.swift> \
     tools/proof/capture_spike/probe_*.swift <probe>/main.swift -o <probe>/capture_probe
 ```
 
@@ -135,7 +135,7 @@ control row failed; `1`: one did; `2`: a row has no state
 (`SPIKE INCOMPLETE: <ids>`).
 
 `work/capture_spike/` is untracked: `probe/` (the binary, its `main.swift`,
-the resources, the `sources.txt` stamp), `fixtures/{well,note}.reelcut`
+the resources, the `sources.txt` stamp), `fixtures/{well,note}.framejob`
 (written every run at format version 10), `png/<mode>/*.png` (every capture a
 row read) and `answers.json` (host, build, rows with their measurements, the
 inventory table, the digest).
@@ -143,7 +143,7 @@ inventory table, the digest).
 ## What it never does
 
 It never uses `screencapture` or ScreenCaptureKit (spec §11 V-3), never
-launches Reelcut.app or an MCP server, never changes anything under `app/`,
+launches Frame Job.app or an MCP server, never changes anything under `app/`,
 `core/` or the build, and never kills a process it did not start: every child
 runs in its own process group under `graphics_spike/bounded.py` and only that
 group is killed on expiry (the build 1200 s, a mode 180 s, `modal` 60 s). A

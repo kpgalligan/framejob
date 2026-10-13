@@ -71,7 +71,7 @@ extension FFmpegRewrap {
         var consentText: String {
             let size = ByteCountFormatter.string(fromByteCount: estimatedBytes, countStyle: .file)
             let tail =
-                "\n\nThe original file is left exactly where it is; Reelcut imports the "
+                "\n\nThe original file is left exactly where it is; Frame Job imports the "
                 + "converted copy from its Application Support folder."
             if isStreamCopy {
                 return "\(source.lastPathComponent) is in a container AVFoundation will not open, "

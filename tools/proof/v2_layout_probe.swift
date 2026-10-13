@@ -3,7 +3,7 @@
 //
 // `v2_snapshot.py` copies it to `work/v2_snapshot/probe/main.swift` and
 // compiles it LAST with every file in `app/Sources` but `main.swift`, over
-// `harness/build.sh`'s swiftc line (`-D REELCUT_DEV_TOOLS`), so the rules
+// `harness/build.sh`'s swiftc line (`-D FRAMEJOB_DEV_TOOLS`), so the rules
 // measured are the ones the app ships. It prints exactly one stdout line,
 // `ANSWER <json>`: `{"P1": {"ok": Bool, "detail": String}, … "P7": …}`.
 //

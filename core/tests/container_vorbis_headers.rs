@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use common::ebml::{cluster, file, info, simple_block, tracks, Lacing, Track};
 use common::vorbis::{codec_private, comment, packet, packets, private, Ident};
 use common::vorbis_setup::{Codebook, Floor, Lengths, Mapping, Mode, Residue, Setup};
-use reelcut_core::container::AUDIO;
+use framejob_core::container::AUDIO;
 
 const LIBVORBIS: &[u8] = include_bytes!("fixtures/vorbis/libvorbis.webm");
 

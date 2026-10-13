@@ -2,7 +2,7 @@
 // #66 #68 #69); the probe (`editor_keys_undo_proof.py` builds and runs it).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
-// `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
+// `main.swift`, module `FrameJob`, against `libframejob_core.a` —
 // `tools/proof/harness/build.sh`'s swiftc line. It names nothing the fix
 // added, so the SAME source builds over the untouched tree (the proof's
 // `--baseline`, `-D HARNESS_REFERENCE_BUILD`), where the fixed rows fail.
@@ -78,7 +78,7 @@ func opened(_ key: String) -> ProjectDocument? {
     let document = ProjectDocument()
     do {
         try document.read(
-            from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+            from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
     } catch {
         check("X0 the \(key) fixture opens", false, "\(error)")
         return nil

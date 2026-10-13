@@ -77,11 +77,11 @@ final class ExportWriter {
     /// Separate queues rather than one shared serial queue: the audio pump
     /// must not sit behind a 4K frame being appended.
     private let videoQueue = DispatchQueue(
-        label: "com.kgalligan.reelcut.export.video", qos: .userInitiated)
+        label: "com.kgalligan.framejob.export.video", qos: .userInitiated)
     private let audioQueue = DispatchQueue(
-        label: "com.kgalligan.reelcut.export.audio", qos: .userInitiated)
+        label: "com.kgalligan.framejob.export.audio", qos: .userInitiated)
     private let chapterQueue = DispatchQueue(
-        label: "com.kgalligan.reelcut.export.chapters", qos: .userInitiated)
+        label: "com.kgalligan.framejob.export.chapters", qos: .userInitiated)
 
     /// Guards everything the pumps and the main thread both touch.
     private let lock = NSLock()

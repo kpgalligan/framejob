@@ -81,8 +81,8 @@ enum ProbeLayout {
         l6["intrinsic_h"] = Double(wrapping.intrinsicContentSize.height)
         rows["L6"] = l6
 
-        // The editor: note.reelcut's text clip selected, the Text sub-tab.
-        let url = fixtures.appendingPathComponent("note.reelcut")
+        // The editor: note.framejob's text clip selected, the Text sub-tab.
+        let url = fixtures.appendingPathComponent("note.framejob")
         guard let e = try? ProbeEditor(url, select: [2], playhead: 0.5) else {
             rows["L3"] = probeError("open failed")
             rows["L7"] = probeError("open failed")

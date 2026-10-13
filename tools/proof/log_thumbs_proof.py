@@ -85,7 +85,7 @@ Rows:
   import call to the flat marker; then S-Log3 set: seconds from
   `set_media_color` to the converted marker.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
-  `Reelcut: ` line.
+  `Frame Job: ` line.
 - **S2** (`--mutant no-supersede` only): `cache_pass_probe.py --only S2` over
   the copy's `app/Sources`.
 
@@ -222,7 +222,7 @@ class Doc(hdr.Doc):
 
     def __init__(self, client, name):
         self.client, self.width, self.height = client, W, H
-        self.path = WORK / f"{name}.reelcut"
+        self.path = WORK / f"{name}.framejob"
         self._media = {}
         self.made = attempt(client, "new_project", {"path": str(self.path)})["ok"]
         self.call("set_canvas", width=W, height=H, fps=[30, 1])
@@ -933,7 +933,7 @@ def main():
     HOME.mkdir(parents=True)
     binary = Path(args.app) if args.app else proof_app.binary()
     if binary.suffix == ".app":
-        binary = binary / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(binary)
     config = proof_app.config()
     if args.mutant:
         print(f"#282 — the {args.mutant} MUTANT ({' '.join(named)} must FAIL)", flush=True)
@@ -946,7 +946,7 @@ def main():
                 print(f"mutant {args.mutant}: the control could not be performed — S2 not "
                       "scored")
                 return 2
-        binary = app / "Contents/MacOS/Reelcut"
+        binary = proof_app.executable(app)
     else:
         print(f"#282 — converting media's thumbnails over MCP ({args.mode or 'run'}, {config} "
               f"build {binary})", flush=True)
@@ -1002,7 +1002,7 @@ def main():
             mcp.remove_scratch(launched.socket_path)
     found = hdr.complaints(log) if needs_instance else []
     closed = closed and all(v for k, v in state.items() if k.endswith("closed"))
-    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Reelcut: ` "
+    check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Frame Job: ` "
           "line", closed and not found and not refused(),
           f"closed {closed}; refused {refused() or 'none'}; complaints {found}")
     if needs_instance:

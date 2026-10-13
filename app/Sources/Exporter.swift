@@ -94,7 +94,7 @@ final class Exporter {
     /// `Playback`'s, and a queue of its own so an export cannot make the next
     /// preview rebuild wait behind it.
     private let buildQueue = DispatchQueue(
-        label: "com.kgalligan.reelcut.export", qos: .userInitiated)
+        label: "com.kgalligan.framejob.export", qos: .userInitiated)
 
     /// Whatever is writing this export: the `AVAssetWriter` path or the
     /// ImageIO one, behind the three calls `Exporter` makes of either

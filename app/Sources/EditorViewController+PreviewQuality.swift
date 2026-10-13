@@ -71,7 +71,7 @@ enum PreviewQuality: Int, CaseIterable {
     /// View state, so `UserDefaults` and not the project (spec §5.2's last
     /// bullet), and pinned by the offscreen harness like every other key the
     /// app reads (`tools/proof/harness/main.swift`).
-    static let defaultsKey = "ReelcutPreviewQuality"
+    static let defaultsKey = "FrameJobPreviewQuality"
 
     /// What a new `Playback` starts at. An absent key — and a stored number
     /// outside the three cases, which is what a downgrade after a future

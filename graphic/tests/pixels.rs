@@ -102,7 +102,7 @@ fn four_threads_draw_identical_bytes() {
         80,
         "<rect width=\"240\" height=\"80\" fill=\"#123456\" fill-opacity=\"0.4\"/>\
          <text x=\"10\" y=\"56\" font-family=\"Montserrat\" font-weight=\"800\" \
-         font-size=\"48\" fill=\"#fff\">Reelcut</text>",
+         font-size=\"48\" fill=\"#fff\">Frame Job</text>",
     );
     let handles: Vec<_> = (0..4)
         .map(|_| {

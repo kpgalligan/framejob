@@ -318,7 +318,7 @@ fn finite(value: f64, fallback: f64) -> f64 {
 
 /// Turns `(x, y)` by `degrees` CLOCKWISE. Canvas space is y-down (spec
 /// §5.3), so the textbook rotation matrix already turns clockwise on screen
-/// — which is what a positive `rotation` means everywhere else in Reelcut,
+/// — which is what a positive `rotation` means everywhere else in Frame Job,
 /// and what `Compositor.metal`'s `rotate2` does with the same sign.
 ///
 /// `pub(crate)` because it is the crate's ONE rotation: `edit_zoom.rs`
