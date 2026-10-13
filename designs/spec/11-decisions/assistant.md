@@ -13,6 +13,8 @@ in §6).
   in the product; G-11 ("no TypeScript") governs graphic Modules and is untouched. The Swift
   side uses `Process`, pipes and GCD, so W-8's `async` confinement holds. Risk accepted: Bun in
   every `make app`, and a nested executable of H1's size, signed separately.
+  **Amended by NM-5** (rename R0): `Contents/Helpers/reelcut-agent` is now
+  `Contents/Helpers/framejob-agent`.
 - **AI-2 — The helper owns no tools; every call goes through `AgentServer.execute` by way of
   one lane.** An `AgentLane` holds one lock around every tool call from either caller, the MCP
   trampoline and the assistant session; the trampoline's call to it is the only wiring change
@@ -121,6 +123,7 @@ in §6).
   unchanged prefix and the prompt cache; and the playhead and selection change between turns.
   Risk accepted: about sixty tokens on every message, and the block is the state at send time,
   so after its own edits the model re-reads with `get_project`.
+  **Amended by NM-5** (rename R0): `<reelcut_context>` is now `<framejob_context>`.
 - **AI-16 — Stop stops a running `export` or on-device `transcribe`; any other running call
   finishes.** Each call the session submits carries a per-call token through
   `AgentLane.submit`, and Stop cancels the running call's token. The lane answers a call whose
@@ -168,6 +171,7 @@ in §6).
   the knob.
   **Amended 2026-10-01, by AI-20 (#151)**: the knob replaces the person's threshold (300 000
   unless changed in Settings), and wins even with compaction turned off.
+  **Amended by NM-6** (rename R0): `REELCUT_DEV_TOOLS` is now `FRAMEJOB_DEV_TOOLS`.
 - **AI-19 — While the window's assistant waits on an ask-first question, the Assistant tab's
   title wears a dot, whichever tab is showing** (issue batch B47, #152; the owner's choice,
   2026-09-30: "badge the Assistant tab's title"). The dot is its own view over the strip
@@ -200,3 +204,7 @@ in §6).
   far configured clearing off (`assistant_helper_proof.py`, `spend_proof.py`, the spike) and the
   unchanged helper builds the request, so a capped live clearing proof is owed, and the owner
   decides its spend.
+  **Amended by NM-6** (rename R0): `ReelcutAssistantAutoCompact` is now
+  `FrameJobAssistantAutoCompact`; `ReelcutAssistantAutoCompactTokens` is now
+  `FrameJobAssistantAutoCompactTokens`; `ReelcutAssistantClearToolResults` is now
+  `FrameJobAssistantClearToolResults`.

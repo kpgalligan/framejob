@@ -57,6 +57,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   feature bring-your-own-key (the AssemblyAI key here, the assistant's
   Anthropic key under AI-8). No Reelcut-run relay is planned; C2 stays iced
   (#125), and the owner called a change to this "increasingly unlikely".
+  **Amended by NM-4** (rename R0): `~/Library/Application Support/Reelcut/`
+  is now `~/Library/Application Support/Frame Job/` (the file keeps its
+  name, `assemblyai-key`).
 - **R6-6 — The protocol boundary is the base URL and the credential.** The
   client speaks AssemblyAI's REST API to `AssemblyAIConfiguration`'s base
   URL; the stand-in server, the EU endpoint and a same-protocol relay are
@@ -205,6 +208,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   than guessed at here. The
   Settings window's **Verify** runs on `CloudTranscriber`'s own `work`
   queue, one of the seams `app/CLAUDE.md` lists, and adds no queue (R6-7).
+  **Amended by NM-5 and NM-6** (rename R0): "Reelcut ▸ Settings…" is now
+  "Frame Job ▸ Settings…"; `ReelcutAssemblyAIRegion` is now
+  `FrameJobAssemblyAIRegion`.
 - **R6-13 — The estimate never counts a HELD media as "to upload", and
   never hides its price.** R6-11 holds a media whose earlier remote delete
   is unconfirmed: this run will not upload it, so counting it among the

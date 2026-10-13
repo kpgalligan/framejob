@@ -32,6 +32,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   JavaScriptCore in Swift plus resvg over FFI. The graph's licences (road
   map 10 §4) are MIT, Apache-2.0 OR MIT and BSD-3-Clause; no copyleft code,
   and no code from Remotion.
+  **Amended by NM-6** (rename R0): `reelcut-core` is now `framejob-core`.
 - **G-3 — A graphic's source is a FILE in the package, and is not an undo
   step** (road map 10 §4, 2026-09-25). The code lives at
   `graphics/<name>.js`, and `<name>` matches `^[a-z0-9][a-z0-9-]{0,62}$`, so
@@ -297,6 +298,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   and the first save carries it into the package only when it holds at
   least one entry. An untitled document restored from autosave has its
   saved `graphics/` copied into a fresh root.
+  **Amended by NM-4** (rename R0):
+  `<NSTemporaryDirectory()>/Reelcut/<UUID>-graphics` is now
+  `<NSTemporaryDirectory()>/FrameJob/<UUID>-graphics`.
 - **G-15 — The Graphic sub-tab: what it shows for several clips, and what a
   write sends** (road map 10 §10.9 G5a, 2026-09-25).
   (a) **Several clips.** The sub-tab exists when EVERY selected clip is a
@@ -607,6 +611,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   frame's worker did. Why: the compositor's queue is serial, and the
   rasterization is most of a heavy graphic's time; moving only the raster
   keeps G-8's reports and G-5's purity where they were.
+  **Amended by NM-6** (rename R0): `ReelcutGraphicPrefetchOff` is now
+  `FrameJobGraphicPrefetchOff`.
 - **G-27 — Deleting a graphic is refused while a clip draws it; the deleted
   text is kept, and that kept text is what marks the name as deleted**
   (issue #103, 2026-10-04, issue batch B84).
@@ -810,6 +816,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   **Risk accepted:** an edit made while the project was closed, or two
   saves within a tenth of a second, keeps nothing extra; an eleventh text
   drops the oldest for good.
+  **Amended by NM-5** (rename R0): the refusal's "was changed outside
+  Reelcut" is now "was changed outside Frame Job".
 - **G-30 — File ▸ Rename Graphic…, Delete Graphic… and Restore Graphic
   Version… are one small sheet over G-27..G-29's three bodies; a refusal
   is the body's own sentence, shown in the sheet** (issue #103,

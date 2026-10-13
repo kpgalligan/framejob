@@ -20,6 +20,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   footage, so the one place it may not go is where a cache is regenerable.
   Consolidate carries it in on the same terms as any other file.
   `-RCRecordingFolder` overrides the folder for a proof.
+  **Amended by NM-4** (rename R0): `~/Movies/Reelcut Recordings/` is now
+  `~/Movies/Frame Job Recordings/`.
 - **The canvas takes the recorder's RATE; the media record takes the
   file's.** ScreenCaptureKit delivers a frame only when the screen changes,
   so its files are variable-rate and the probe honestly reports something
@@ -68,6 +70,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   System Settings are another process's normal windows — the person found
   the Screen Recording prompt hidden behind the panel. The next press that
   goes on, a granted microphone's answer, and `show()` float it again.
+  **Amended by NM-6** (rename R0): `ReelcutScreenRecordingAsked` is now
+  `FrameJobScreenRecordingAsked`.
 - **Microphone and system audio are two sources and stay two FILES.**
   Measured (road map 3's R0): with both on, `SCRecordingOutput` writes ONE
   stereo track that is their SUM, inseparable and clipping when both are
@@ -243,6 +247,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   nil. No readable file is a failure: the first left-out error wrapped as
   `.filesKept(e, movie: "", microphone: <the files on disk, comma-joined>)`.
   `stoppedBy` is always `.stopped`.
+  **Amended by NM-4 and NM-5** (rename R0):
+  `~/Movies/Reelcut Recordings/Voice-over <date> at <time>.m4a` is now
+  `~/Movies/Frame Job Recordings/Voice-over <date> at <time>.m4a`;
+  `include_reelcut_windows` is now `include_framejob_windows`.
 - **Include Reelcut windows** (2026-09-30). The panel's checkbox under
   Source, off by default, kept in `ReelcutRecordingIncludeReelcutWindows`;
   `record_screen`'s `include_reelcut_windows` mirrors it, default false.
@@ -261,3 +269,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   Audio, Show Clicks and Size, its value kept, and `record_screen` refuses
   `include_reelcut_windows` by name with `source: "voice_over"`, as it does
   the other screen-only arguments.
+  **Amended by NM-5 and NM-6** (rename R0): the checkbox "Include Reelcut
+  windows" is now "Include Frame Job windows";
+  `ReelcutRecordingIncludeReelcutWindows` is now
+  `FrameJobRecordingIncludeFrameJobWindows`; `include_reelcut_windows` is
+  now `include_framejob_windows`.

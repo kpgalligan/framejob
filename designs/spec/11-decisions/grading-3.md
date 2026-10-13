@@ -216,6 +216,8 @@ opened, at design time or build time.
         frame), not the conversion's 1,000, renders byte-identical to its twin without it, each
         grey row within 1 level of the oracle (`--only H7,Z1` on Release, 2/2): the shoulder
         ignores the metadata. The player's first frame and the player at length are GRD-16's.
+  **Amended by NM-4** (rename R0): `~/Movies/Reelcut Recordings/` is now
+  `~/Movies/Frame Job Recordings/` (the folder `hdr_proof.py` R0 reads).
 - **GR-16 — Camera log is a setting on the media, `media.color {log, gamut, lut, detected}`,
   converted at step 0 before the chroma key and Color's four.** Choices 3a, 4a, 5a and 6
   (owner, 2026-10-11).

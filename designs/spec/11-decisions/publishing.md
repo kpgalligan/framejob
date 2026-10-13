@@ -19,6 +19,9 @@ where Reelcut's differs, and why.
   tested as whoever pushed it left it; there is no updater, so a person re-downloads to update;
   and while the repository is private a release's DMG is downloadable only by people with access
   to it.
+  **Amended by NM-3** (rename R0): `Reelcut.dmg` is now `FrameJob.dmg` (NM-2's exception: GitHub
+  rewrites a space in a release asset's name to a dot); the DMG's volume name Reelcut is now
+  "Frame Job", and the release's title "Reelcut <version>" is now "Frame Job <version>".
 - **PUB-2 — The version is `<MAJOR.MINOR>.<run number>`, the build number is the run number, and
   the base is the `VERSION` file at the root, exactly as in Rasterize (the owner's choice,
   2026-10-04).** `make project` passes the file to xcodegen as `RC_BASE_VERSION`, `project.yml`

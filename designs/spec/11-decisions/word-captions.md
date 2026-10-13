@@ -140,6 +140,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   (`text.word_style.pause_dim must be between 0 and 1, not 2`); the two
   booleans are refused only by kind. `set_text` is the door (W-10 stands:
   nothing in the inspector writes `word_style`).
+  **Amended by NM-5** (rename R0): "update Reelcut to open it" is now
+  "update Frame Job to open it" (`core/src/format.rs`'s "newer" refusal).
 - **W-13 — The recipe carries three more computed answers, `word_glide`,
   `word_fill` and `word_dim`, and still no timing** (W-4). They ride on
   every text layer's `source` after `word_pop`, each 0..1 or null, all null
@@ -287,6 +289,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
     app-side writer of `word_style`, and nothing in the inspector turns a
     look on or off for a page already placed (`set_text` is the agent's
     door, W-12).
+  **Amended by NM-6** (rename R0): `ReelcutCaptionSlide` is now
+  `FrameJobCaptionSlide`; `ReelcutCaptionFill` is now
+  `FrameJobCaptionFill`; `ReelcutCaptionDim` is now `FrameJobCaptionDim`.
 - **W-16 — The dim is the text layer's opacity in the compositor when the
   page has no backdrop, and one transparency layer in the bitmap when it
   has one** (issue batch B86 phase 3, #245; the owner, 2026-10-07: build

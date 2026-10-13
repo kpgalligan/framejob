@@ -662,6 +662,12 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   ffmpeg's conversion already does; the Media tab names the copy, not the
   original (amended by #228-O); the copy lives outside the package until Consolidate.
   **Amended by #228-V** (issue batch B77): Vorbis is copied.
+  **Amended by NM-4 and NM-5** (rename R0):
+  `~/Library/Application Support/Reelcut/Rewrapped/` is now
+  `~/Library/Application Support/Frame Job/Rewrapped/`; a codec that is not
+  copied is refused in a sentence ending "… which Frame Job cannot copy out
+  of a WebM or Matroska file.", where it was "… which Reelcut cannot copy
+  out of a WebM or Matroska file.".
 - **#228-P — A person's WebM or Matroska copy shows its progress in a small
   window with Cancel, and a tool call's copy shows nothing** (issue batch
   B76, #228 part 1; the owner, 2026-10-03, O1–O8). **Every click door
@@ -766,6 +772,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   plus the sample of ffmpeg's plain decode of `p22.webm` that first passes
   0.3) / 48000, held to 0.0001 s; the row prints ffmpeg's timeline reading
   and its difference beside it, held to nothing.
+  **Amended by NM-5** (rename R0): "… has Vorbis audio, which Reelcut cannot
+  copy …" is now "… has Vorbis audio, which Frame Job cannot copy …".
 - **#228-O — A WebM or Matroska copy remembers its original: the media
   is named after it, Reveal in Finder opens it, a relink to another WebM
   records the new one, and a copy that is gone is copied again on open**
@@ -818,6 +826,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   on an agent's `open_project` freezes the window, as #228-P's does (amended
   by #231: it no longer does); the
   copy's folder is still Application Support until #226.
+  **Amended by NM-5** (rename R0): the tooltip's "copied into Reelcut's
+  Rewrapped folder." is now "copied into Frame Job's Rewrapped folder."; the
+  folder it is shown for, `…/Reelcut/Rewrapped`, is now
+  `…/Frame Job/Rewrapped`.
 - **#232 — A WebM or Matroska copy's movie timescale is the least common
   multiple of 600 and its tracks' timescales, so a track's start no longer
   rounds to 1/600 s** (issue batch B79; amends #216-R's Timing and #228-V's
@@ -969,6 +981,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   file with no ffmpeg run (O5). With the re-copy sent through the whole
   import funnel (`--mutant recopy-ffmpeg`) O4 fails: the log gains a line
   and `Rewrapped/` a file.
+  **Amended by NM-5** (rename R0): the tooltip's "copied into Reelcut's
+  Rewrapped folder." is now "copied into Frame Job's Rewrapped folder."; the
+  measured run above is quoted as it printed.
 - **#227 — The opt-in ffmpeg step copies a VP9 Profile 0 or 2 video stream
   instead of re-encoding it, only when the copy's frame times are exact,
   which the product checks on the copy itself before keeping it; every
@@ -1269,3 +1284,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   no-recheck` (step C's holder check off) fails A7 and A10, and `--mutant
   open-on-main` fails A8 and A10–A13 beside its B79 rows, because on the
   main thread the wait's deadline is at once.
+  **Amended by NM-5** (rename R0): the startup complaint `Reelcut: …` is now
+  `Frame Job: …`; a project is a `.framejob` package (NM-3), so A14's mutant
+  now reads "Timed out saving a4.framejob."; the measured runs above are
+  quoted as they printed.

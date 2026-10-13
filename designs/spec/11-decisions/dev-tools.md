@@ -16,6 +16,7 @@ V-4 and V-5 come from the build-velocity road map, now closed: `designs/adr/buil
   Distribution binary and present in the Release one, and fails otherwise. The agent server
   itself (§7.9) is a product feature and stays in every build; only the dev tools go. Risk
   accepted: the flag-off path is compiled by `make dist` alone, not by `make typecheck`.
+  **Amended by NM-6** (rename R0): `REELCUT_DEV_TOOLS` is now `FRAMEJOB_DEV_TOOLS`.
 - **V-2 — A dev tool is not an op and not a user-visible edit, but it is an ordinary tool.** It
   has no UI path to mirror, so the agent-parity rule asks nothing of it; it goes through the same
   catalog, handler table, argument gate and startup parity check as every product tool, merged
@@ -39,3 +40,12 @@ V-4 and V-5 come from the build-velocity road map, now closed: `designs/adr/buil
   settings and Info.plist bytes). `PRODUCT_NAME` stays `Reelcut` (bundle, executable, module).
   The Application Support folder, its default socket and its keys stay shared; TCC grants are
   per id, so a TCC-dependent proof is Release-only.
+  **Amended by NM-3** (rename R0): "Reelcut Debug" is now "Frame Job Debug"
+  (`Frame Job Debug.app`, executable `Frame Job Debug`); `com.kgalligan.Reelcut.debug` is now
+  `com.kgalligan.FrameJob.debug`; `.reelcut` is now `.framejob`; the real Reelcut is now the
+  real Frame Job (`com.kgalligan.FrameJob`); `RC_APP_NAME` is now gone: Debug sets
+  `PRODUCT_NAME` to "Frame Job Debug", `CFBundleName` and `CFBundleDisplayName` read
+  `$(PRODUCT_NAME)`, and `RC_PROJECT_HANDLER_RANK` stays, read through `:default=`;
+  "`PRODUCT_NAME` stays `Reelcut` (bundle, executable, module)" is now `PRODUCT_NAME`
+  `Frame Job` in Release and Distribution, the bundle and executable following it in every
+  configuration, and the module `FrameJob` in every configuration through `PRODUCT_MODULE_NAME`.

@@ -41,6 +41,8 @@ and §5.
   localhost or ::1. A turn is priced with the prices in force at its `turn_started`; a refresh that
   settles mid-turn applies from the next turn. Risk accepted: two sessions opened at once may both
   fetch.
+  **Amended by NM-4** (rename R0): the spend folder `~/Library/Application Support/Reelcut/` is now
+  `~/Library/Application Support/Frame Job/`.
 - **P-6 — The proofs' ledger is `~/Library/Application Support/Reelcut Proofs/spend.jsonl`, and
   every paid proof request is held to the month's budget in it before it is sent.** It is outside
   the repo, so it survives `rm -rf tools/proof/work` and a fresh clone and is shared by every
@@ -65,6 +67,13 @@ and §5.
   helper requests none of them); a torn or hand-broken line stops every paid proof until a person
   repairs it. A keyed run of either road map 6 or 8 spike (`cloud_spike/`, `words_spike/`) reserves
   here too, through `cloud_live_ledger.spike_ledger`, beside its own $2.00 ledger (#163).
+  **Amended by NM-4 and NM-7** (rename R0):
+  `~/Library/Application Support/Reelcut Proofs/spend.jsonl` is now
+  `~/Library/Application Support/Frame Job Proofs/spend.jsonl`; while
+  `~/Library/Application Support/Reelcut Proofs/` exists, `budget.py` refuses every paid request in
+  a sentence naming the guarded `mv` to the new name, and it refuses before it creates or writes
+  anything under `Frame Job Proofs/` (no folder, no ledger, no `refused` event), so the month's
+  total is never restarted at $0 and the owner's `mv` never nests.
 - **P-7 — The app shows two figures: what the current conversation has cost, on the Assistant
   tab, and what the UTC calendar month has cost, in Settings ▸ Assistant; both say they are
   Reelcut's own estimate (P-4).** The conversation figure is the transcript's sum of the `cost`
@@ -79,6 +88,8 @@ and §5.
   is counted and said, never added as $0 (P-2); a line that cannot be read is counted and said; a
   launch with no spend folder (P-5) says it keeps no ledger. Risk accepted: near the turn of a
   month the UTC month differs from the person's local calendar month by up to a day.
+  **Amended by NM-5** (rename R0): "Reelcut's own estimate" is now "Frame Job's own estimate"
+  (Settings' month note, "Frame Job's own estimate at LiteLLM prices, from its spend ledger.").
 - **P-8 — A response cut short is priced once, from what its stream had reported, and marked
   partial.** The helper holds the SDK's accumulating snapshot of the response in flight
   (`message_start`'s counts and model, and each `message_delta`'s counts) until `finalMessage`
@@ -94,3 +105,4 @@ and §5.
   is priced from `message_start`'s counts, its input and cache tokens, and in practice none of its
   streamed output; how the API bills an aborted stream is manual check AS-6's; the month line does
   not say that a line was partial.
+  **Amended by NM-5** (rename R0): "· Reelcut's estimate" is now "· Frame Job's estimate".

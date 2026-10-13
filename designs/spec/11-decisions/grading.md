@@ -233,6 +233,7 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   Qualifier section after Adjustment; the pass's weight becomes `opacity × matte × q`, `q` the
   qualifier's reading of the destination before the grade; Paste Attributes drops a qualifier
   onto a picture clip and an adjustment target keeps its own from a picture clip.
+  **Amended by NM-6** (rename R0): `reelcut_adjust_fragment` is now `framejob_adjust_fragment`.
 - **GR-7 — Looks: `video.look {kind, amount}`, eight built-ins defined in the core as data,
   baked on the GPU into a 33³ `rgba16Float` lattice and mixed at step 4d.** The owner's thirteen
   choices of 2026-10-10, each as recommended, the eighth look Black & White (not Night); GR5a
@@ -335,6 +336,9 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   **Amended by GR-12** (grading-2 G2-3): the order becomes Color's four, Light, the wheels, the
   curves (step 4c.2), the look, the point filters. The bake is unchanged and the curves are the
   clip's own.
+  **Amended by NM-6** (rename R0): `reelcut_layer_fragment` is now `framejob_layer_fragment`;
+  `reelcut_layer_blend_fragment` is now `framejob_layer_blend_fragment`; `reelcut_adjust_fragment`
+  is now `framejob_adjust_fragment`.
 - **GR-8 — `.cube` LUTs: a LUT is MEDIA of kind `lut`, parsed by the core, applied as
   `video.look {kind: "lut", media, amount}` at step 4d to the layer's encoded values.** The
   owner's eleven choices (GR6, 2026-10-10, "all as recommended"); [b] marks what GR6b builds.
@@ -442,6 +446,8 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   step 0, before the chroma key and Color's four; a `lut` media can serve as that conversion (Use
   LUT…); and the Look section warns when a clip's media converts and its look is a LUT. A LUT
   applied as a look still meets encoded values at 4d.
+  **Amended by NM-5** (rename R0): the import refusal `“Film.cube” is not a LUT Reelcut reads: …`
+  is now `“Film.cube” is not a LUT Frame Job reads: …`.
 - **GR-9 — The branch wrote project format 1015 and refused 15–1014 by name; at the merge 1015
   became 15.** The branch's `RC_FORMAT_VERSION` was **1015** (main's 14 plus a thousand), in
   `core/src/format.rs` and the header, so every main build refused a branch-made project as "made
@@ -457,3 +463,5 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   the number), so branch-made projects still open. The base-version constant and the gap refusal
   are gone, and 16 and above, 1014 included, are "newer". Risk accepted: a project the owner saved on
   the grading branch opened only there until the merge (he kept his trial projects as copies).
+  **Amended by NM-5** (rename R0): the "newer" refusal's "update Reelcut to open it" is now "update
+  Frame Job to open it", so "made by a newer Reelcut" is now "made by a newer Frame Job".
