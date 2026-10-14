@@ -2,7 +2,7 @@ import Foundation
 
 /// What `export`'s answer carries beyond the resolved settings: facts about
 /// the file that was written, read off the `Exporter` once it has finished
-/// (`AgentServer+Render.swift`'s `exportProject` adds them to its result).
+/// (`AgentServer+Export.swift`'s `exportProject` adds them to its result).
 extension AgentServer {
 
     /// What the export's sound MEASURED, for the result — nil, and then the

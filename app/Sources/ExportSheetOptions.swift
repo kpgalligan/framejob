@@ -34,7 +34,7 @@ extension ExportSheetController {
     /// limit: a sanity range so a mistyped digit cannot ask the encoder for a
     /// 300 000-pixel frame.
     /// Internal, not private: the agent's `export` refuses a custom size
-    /// outside it by name (`AgentServer+Render.swift`), and one constant is
+    /// outside it by name (`AgentServer+Export.swift`), and one constant is
     /// how the sheet and the tool cannot disagree.
     static let sizeRange = 16...8192
 

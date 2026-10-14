@@ -606,6 +606,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   Grading-2's G2-4 gave `renderFrame` `selection` (its reader `selectionArg`, the
   adjustment-clip check and its sentence): 567 → 595, five lines under the cap, so the named seam
   is the next thing it gives up before it takes anything more.
+  Issue batch B97's phase A paid it: `// MARK: - Export` (`exportProject` through `spelled`,
+  with `exportSizeArg`, `wholeEdge` and `coreRefusal`) moved byte for byte to the new
+  `AgentServer+Export.swift`, a pure move gated alone before #275's change to `renderFrame`;
+  nothing widened (every moved `private` member is read only by the moved code, and both halves
+  are members of the same internal extension of `AgentServer`), and `assistant_session_proof.py`'s
+  `no-export-stop` mutant names the new file. `wc -l app/Sources/AgentServer+Render.swift`:
+  595 before, 288 after; `AgentServer+Export.swift` is 311. No next seam is named.
 - `AgentCatalog+Files.swift`: grading-2's G2-0 moved the rows under `// MARK: Rendering and export` (the
   `render_frame` and `export` rows) and the five hoisted locals only they read
   (`frameFormatNames`, `frameFormatProperty`, `burnInProperty`, `exportPresetProperty`,

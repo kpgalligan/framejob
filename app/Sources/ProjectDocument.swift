@@ -109,7 +109,7 @@ final class ProjectDocument: NSDocument {
     ///    `scope` first — `ExportSheetController.init`, which simply captures
     ///    no range, so the card's Range popup is the disabled "Whole project"
     ///    it already is on a document that has none; and the `export` tool's
-    ///    handler (`AgentServer+Render.swift`), which owes the same answer in
+    ///    handler (`AgentServer+Export.swift`), which owes the same answer in
     ///    a sentence.
     ///
     /// **Refusing rather than mapping is the decision, and the mapping is the

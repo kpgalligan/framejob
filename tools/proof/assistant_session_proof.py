@@ -128,7 +128,7 @@ ECHO = "key-echo control: " + KEY
 # that must FAIL, a text that row's detail must hold or None)
 MUTANTS: dict[str, tuple[str | None, str | None, str, str | None]] = {
     "no-prepare": ("main.swift", PREPARE, "W", None),
-    "no-export-stop": ("AgentServer+Render.swift",
+    "no-export-stop": ("AgentServer+Export.swift",
                        "stop?.onCancel { [weak exporter] in exporter?.cancel() }", "SX", None),
     "no-transcribe-stop": ("AgentServer+Captions.swift",
                            "stop?.onCancel { token.cancel() }", "ST", LATE),

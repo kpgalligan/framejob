@@ -61,7 +61,7 @@ or Add to Queue is ever pressed**: the remembered export choice has one
 writer, `ExportChoice.remember()` (`ExportPresetsStore.swift`), whose one
 caller is `ExportSheetController.commit(queue:)` — those two buttons;
 `cancel_sheet` presses the sheet's Escape button, whose action only
-dismisses, and the `export` tool's handler (`AgentServer+Render.swift`)
+dismisses, and the `export` tool's handler (`AgentServer+Export.swift`)
 reads and writes no default. What a RUN shows of it is `mcp.py`'s guard: a
 moved owner-visible key is a `mcp: DEFAULTS MOVED` line on stderr, and
 status 3 when no other Frame Job shares the domain — so a run's stderr is
