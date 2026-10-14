@@ -5,10 +5,10 @@
 MCP. Written in PR0, before any product edit, so PR1's controls are captured
 on PR0's product.
 
-    python3 tools/proof/precision_proof.py [--app PATH] [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2,S1,S2,S4,S5,S6,S7,V0,...,V6] [--control DIR]
+    python3 tools/proof/precision_proof.py [--app PATH] [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2,S1,S2,S4,...,S8,S10,S14,S15,S16,V0,...,V6] [--control DIR]
     python3 tools/proof/precision_proof.py reverse-cost          # no app; the reverse's cost
     python3 tools/proof/precision_proof.py capture DIR          # the CONTROL tree
-    python3 tools/proof/precision_proof.py compare DIR [--only K1,...,E2,S3]
+    python3 tools/proof/precision_proof.py compare DIR [--only K1,...,E2,S3,S11]
     python3 tools/proof/precision_proof.py --measure capture|compare DIR   # release-only
     python3 tools/proof/precision_proof.py --measure ab --mutant decode-8bit [--rounds N]  # release-only
     python3 tools/proof/precision_proof.py --mutant NAME [compare DIR]
@@ -94,18 +94,22 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       the same project), its staircase tone ≤ TONE_MAX where the control's is
       ≥ TONE_SEEN (the instrument sees a staircase). With `--control DIR` it
       prints DIR's `stills.png16` figures and requires their distinct < 800
-      (the instrument tells the old draw from the new).
+      (the instrument tells the old draw from the new) — unless DIR holds Sd
+      (captured by B97's instrument, after PR-6, so drawn deep): printed then,
+      not held, as R1 treats a deep-decoded control.
   S2  (P2-1) the same with `ramp16.tif`, against the same 8-bit control
       (computed once) and DIR's `stills.tif16`.
-  S4  (P2-1, PR-6; records PR-4's amendment) S1's `render_frame` PNGs: both
-      `ramp16.png`'s and `ramp8.png`'s are 8-bit — a project whose only
-      picture is a still, deep or not, renders an 8-bit frame (measured in
-      P2-1, accepted by the owner 2026-10-11; the export keeps the depth, S1).
-      The detail prints both depths and each render's middle-row distinct
-      green (`rgb48le`).
-  S5  (P2-1's fix pass; PR-4 as amended) `ramp16.png` on a track above the
-      H.264 clip on a 1920×1080 canvas, covering it: `render_frame` is an
-      8-bit PNG (only a video source makes the frame deep).
+  S4  (issue batch B97, spec §11 PR-9; P2-1 read 8-bit here, PR-6) S1's
+      `render_frame` PNGs: `ramp16.png`'s is a 16-bit PNG whose middle row's
+      green holds ≥ MIXED_DISTINCT distinct values (`rgb48le`), and whose RGB
+      scaled to 8 bits (round(v/257)) is within ±1 a channel of the `--control`
+      tree's 8-bit `still-png16.png` (mean and max |Δ| printed; no control is a
+      FAIL), and its `sips -g profile` equals `ramp8.png`'s (the generator's,
+      same run); `ramp8.png`'s is an 8-bit PNG.
+  S5  (B97, PR-9; P2-1's fix pass read 8-bit) `ramp16.png` on a track above
+      the H.264 clip on a 1920×1080 canvas, covering it: `render_frame` is a
+      16-bit PNG, green ≥ MIXED_DISTINCT, within ±1 of the control tree's
+      `mixed-h264.png` the same way.
   S6  (P2-1's fix pass) the same over the 10-bit ramp clip: a 16-bit PNG
       whose middle row's green — the still's, which covers the frame — holds
       ≥ MIXED_DISTINCT (850) distinct values (the deep draw reaches a 16-bit
@@ -115,6 +119,29 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       `swift_build.build`), refused as a fixture unless ffprobe reads HEVC
       Main 10 `yuv420p10le` and its middle row holds ≥ 800 distinct 10-bit Y
       codes. ImageIO decodes it at 10 bits a component, so it is drawn deep.
+  S8  (B97, PR-9) `ramp16.png` at 0–1 s then the H.264 clip at 1–2 s on one
+      track, rendered at 1.5 s (the still not on the frame): an 8-bit PNG
+      byte-identical to the same frame after the still is deleted (the clip
+      left at 1 s), so a deep still elsewhere in the project changes nothing.
+  S10 (B97, recorded) `render_frame format: heic` of `ramp16.png` alone;
+      `sips -g bitsPerSample` printed; scored only on the file being written.
+  S14 (B97, PR-9) the H.264 clip on track 1 at 0 at `set_video` scale 3 (it
+      sits at native size, §5.3, so it fills the canvas only so) and
+      `ramp16.png` above it at scale 0.5, on a 1920×1080 canvas: `render_frame` at T and
+      T+1/60 s (off the 30 fps grid), then the still deleted and rendered at
+      T, T+1/60 and T+1/30. Each deep render is a 16-bit PNG whose OUTER
+      columns (0–399 and 1520–1919, every row), scaled to 8 bits, are within
+      ±1 of the still-less render at the same time — the reader reads the
+      generator's frame time. Fixture guard: the still-less renders at T and
+      T+1/30 differ in those columns.
+  S15 (B97, PR-9) the same scene over `ramp10_hlg.mov` (a converting
+      composition, spec §11 GR-15), at T, then the still deleted, at T: both
+      16-bit PNGs, their `sips -g profile` equal (the reader's space is the
+      generator's), the outer columns within ±1 at 8-bit scaling. A refused
+      HLG fixture is a FAIL.
+  S16 (B97, PR-9) `render_frame max_width 960` of `ramp16.png` alone on a
+      1920×1080 canvas: a 960×540 16-bit PNG whose middle row holds > 256
+      distinct greens (the reader scales, keeping depth).
   V0  (precision-2 P2-2, spec §11 PR-7) the real renderer (`reverse_probe.swift`,
       built through `swift_build.build` with this tree's — or a mutant copy's
       — `app/Sources`; a probe that will not build is a FAIL) reverses the
@@ -158,6 +185,13 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       canvas at 0.5 s into `S3-opaque.png` and `S3-alpha.png`, and
       `still8a.png` under `S3_COLOR` (brightness 0.1, contrast 0.5) into
       `S3-color.png`.
+  Sd  (B97, CONTROL) into DIR: a `gif` export and a `render_frame format:
+      jpeg` of `ramp16.png` alone, an `apng` export of `ramp8.png` alone, S5's
+      scene as `mixed-h264.png` (its control picture), and an `apng` export of
+      the 10-bit ramp clip alone at the first of SD_SIZES whose file ffprobe
+      reads 8-bit — today's `sized` redraw seen — the size recorded in
+      `capture.json`'s `Sd` (`no-redraw` when none does), with every file's
+      digest.
   S3c (CONTROL; `capture DIR --only S3c`, P2-1's fix pass) S3's three scenes
       rendered into an EXISTING capture, only its `capture.json`'s `S3`
       replaced (and `S3_tree` naming the tree): how a scene added after DIR
@@ -180,6 +214,11 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       printed. Only the colour scene tells an 8-bit still drawn deep from the
       8-bit draw: the compositor un-premultiplies before the controls, so
       the 8-bit draw's premultiplied rounding is carried through them.
+  S11 (compare; B97, PR-9) Sd's files made again on this tree, each
+      byte-identical to DIR's: GIF and JPEG stay 8-bit, an APNG with no deep
+      still is today's, and so is a deep video source's APNG at the recorded
+      size (that file skipped by name when DIR recorded `no-redraw`). A DIR
+      captured before B97 has no Sd: a FAIL.
   E1 (compare; the orchestrator's ruling after PR0, because E0 showed
       VideoToolbox's H.264 encode is not repeatable — two exports of one
       project differed by up to 124 levels): what `ExportWriter` hands the
@@ -278,6 +317,22 @@ built from the copy's `app/Sources`:
                    FAILS (V3 beside).
   reverse-unversioned (P2-2) the digest without the `|v<version>` suffix: V4 FAILS.
   reverse-odd-hevc (P2-2) `Intermediate.init` always `.hevcMain10`: V5 FAILS.
+  deep-always      (B97, PR-9) `DeepStillFrame.shows` answers true: D1 and S8
+                   FAIL.
+  deep-project-wide (B97) `shows` reads every image media of the project
+                   (`project.snapshot`) instead of the recipe at the frame
+                   times: S8 FAILS.
+  jpeg-deep        (B97) JPEG's `carriesDepth` true (compare DIR): S11 FAILS.
+  reader-space-swapped (B97) `DeepStillFrame.read`'s two colour-space
+                   branches exchanged: S4 and S15 FAIL.
+  reader-unscaled  (B97) `read` ignores `maxWidth`: S16 FAILS.
+  reader-next-frame (B97) `read`'s range starts one `frameDuration` late: S14
+                   FAILS.
+  A survivor of jpeg-deep (the format's bytes do not move) or of
+  reader-space-swapped when S15 printed the sRGB tag for the generator is
+  recorded as equivalent; S11 and S15 stay as the guards. GIF and APNG have
+  no depth decision (ImageIO writes both at 8 bits a component, measured in
+  B97), so S11's GIF and APNG files are their guard.
 A mutant's `also` rows are selected, run and printed on the MUTANT line beside
 the named ones, and are not required to fail.
 Exit 0 when every named row FAILED (caught), 1 when one passed (survived), 2
@@ -376,6 +431,7 @@ REVERSE_PROBE = ROOT / "tools/proof/reverse_probe.swift"
 REVERSE_DIR = BASE / "reverse-probe"
 REVERSER = "app/Sources/ReverseRenderer.swift"
 REVERSE_CACHE = "app/Sources/ReverseCache.swift"
+DEEP = "app/Sources/DeepStillFrame.swift"
 RAMP_ODD = ("color=c=black:size=1919x1079:rate=30:duration=1,format=yuv422p10le,"
             "geq=lum='64+X*876/(W-1)':cb=512:cr=512")
 HLG = ["-color_primaries", "bt2020", "-color_trc", "arib-std-b67", "-colorspace", "bt2020nc"]
@@ -471,12 +527,43 @@ MUTANTS = {
         (REVERSER, "            self = dimensions.width % 2 != 0 || dimensions.height % 2 != 0 "
          "? .proRes422 : .hevcMain10\n",
          "            self = .hevcMain10\n")]},
+    # Issue batch B97 (spec §11 PR-9): a frame showing a deep still, read
+    # through the export's reader.
+    "deep-always": {"mode": "rows", "rows": ["D1", "S8"], "anchors": [
+        (DEEP, "        for layer in recipe.layers {\n",
+         "        if recipe.layers.count >= 0 { return true }\n"
+         "        for layer in recipe.layers {\n")]},
+    "deep-project-wide": {"mode": "rows", "rows": ["S8"], "anchors": [
+        (DEEP, "        guard let recipe = project.recipe(at: max(0, t), options: options) else "
+         "{ return false }\n"
+         "        for layer in recipe.layers {\n"
+         "            guard case .image(let media) = layer.source, let url = urls[media] else "
+         "{ continue }\n",
+         "        for item in project.snapshot.media where item.kind == .image {\n"
+         "            guard let url = urls[item.id] else { continue }\n")]},
+    "jpeg-deep": {"mode": "compare", "rows": ["S11"], "anchors": [
+        ("app/Sources/FrameWriter.swift",
+         "    var carriesDepth: Bool {\n        switch self {\n        case .png, .heic: return "
+         "true\n        case .jpeg: return false\n",
+         "    var carriesDepth: Bool {\n        switch self {\n        case .png, .heic: return "
+         "true\n        case .jpeg: return true\n")]},
+    "reader-space-swapped": {"mode": "rows", "rows": ["S4", "S15"], "anchors": [
+        (DEEP, "        if built.videoConfiguration.colorPrimaries == nil {\n",
+         "        if built.videoConfiguration.colorPrimaries != nil {\n")]},
+    "reader-unscaled": {"mode": "rows", "rows": ["S16"], "anchors": [
+        (DEEP, "        let size = Exporter.scaledSize(built.videoComposition.renderSize, "
+         "to: maxWidth)\n",
+         "        let size = built.videoComposition.renderSize\n")]},
+    "reader-next-frame": {"mode": "rows", "rows": ["S14"], "anchors": [
+        (DEEP, "            start: CompositionBuilder.time(max(0, t)),\n",
+         "            start: CMTimeAdd(\n                CompositionBuilder.time(max(0, t)), "
+         "built.videoConfiguration.frameDuration),\n")]},
 }
 CORE_TESTS = ("hevc_alpha_sits_directly_after_hevc", "it_sits_directly_after_hevc_alpha")
 ROWS = ["C0", "D1", "D2", "P1", "H1", "R1", "R2", "C1", "T1", "T2", "S1", "S2", "S4", "S5", "S6",
-        "S7", *V_ROWS, "Z1"]
-CAPTURE_ROWS = ["K", "E0", "P1c", "Rc", "Sc", "S3c", "Z1"]
-COMPARE_ROWS = ["K1", "K2", "K3", "K4", "K5", "K6", "E1", "E2", "S3", "Z1"]
+        "S7", "S8", "S10", "S14", "S15", "S16", *V_ROWS, "Z1"]
+CAPTURE_ROWS = ["K", "E0", "P1c", "Rc", "Sc", "Sd", "S3c", "Z1"]
+COMPARE_ROWS = ["K1", "K2", "K3", "K4", "K5", "K6", "E1", "E2", "S3", "S11", "Z1"]
 rows = {}
 selected = set()
 sources_folder = ROOT / "app/Sources"
@@ -600,22 +687,26 @@ class Doc:
                 self.note("trim_end", trimmed)
         return clip
 
-    def render(self, out, t=T):
-        """`render_frame` at `t` into `out`; the PNG's bytes, or None."""
+    def render(self, out, t=T, **extra):
+        """`render_frame` at `t` into `out` (`extra` its other arguments,
+        `max_width`); the PNG's bytes, or None."""
         out = Path(out)
         if out.exists():
             out.unlink()
-        got = self.call("render_frame", t=t, path=str(out))
+        got = self.call("render_frame", t=t, path=str(out), **extra)
         if not (got["ok"] and out.exists()):
             print(f"       render {out.name}: {got.get('error', 'no file')}", flush=True)
             return None
         return out.read_bytes()
 
-    def export(self, preset, out, **extra):
+    def export(self, preset, out, size="document", **extra):
+        """`export` of `preset` at `size` (a Size row id, or [width, height])
+        into `out`; the path, or None. The reply is kept as `exported`."""
         out = Path(out)
         if out.exists():
             out.unlink()
-        got = self.call("export", preset=preset, path=str(out), size="document", **extra)
+        got = self.call("export", preset=preset, path=str(out), size=size, **extra)
+        self.exported = reply(got)
         if not (got["ok"] and out.exists()):
             print(f"       export {out.name}: {got.get('error', 'no file')}", flush=True)
             return None
@@ -1076,6 +1167,283 @@ def mixed_figures(client, out_dir, movie, label):
     return figures, closed
 
 
+def against_control(path, state, name, width=1920, height=1080):
+    """S4/S5's picture (B97, PR-9): this run's 16-bit PNG at `path`, its RGB
+    scaled to 8 bits (round(v/257)), against the control tree's 8-bit render
+    `name` in the `--control` DIR (`state["_dir"]`): {good (every channel
+    within ±1), detail (mean and max |Δ|)}."""
+    folder = state.get("_dir")
+    if not folder:
+        return {"good": False, "detail": "picture: no control tree (--control DIR)"}
+    deep, then = decode(path, "rgb48le"), decode(Path(folder) / name, "rgb24")
+    count = width * height * 3
+    if not deep or not then or len(deep) != count * 2 or len(then) != count:
+        return {"good": False, "detail": f"picture: {path.name} or DIR's {name} did not decode "
+                f"at {width}×{height} ({len(deep or b'')} and {len(then or b'')} bytes)"}
+    values = struct.unpack(f"<{count}H", deep)
+    deltas = [abs((v + 128) // 257 - b) for v, b in zip(values, then)]
+    largest, mean = max(deltas), sum(deltas) / count
+    return {"good": largest <= 1,
+            "detail": f"picture against the control tree's {name} (8-bit): mean |Δ| {mean:.4f}, "
+                      f"max |Δ| {largest} (±1 allowed)"}
+
+
+def profile(path):
+    """`sips -g profile`'s answer for `path` (the embedded profile's name),
+    or None when sips reads none."""
+    if not Path(path).exists():
+        return None
+    ran = bounded.run(["sips", "-g", "profile", str(path)], 60)
+    found = [line.split(":", 1)[1].strip() for line in (ran.get("stdout") or "").splitlines()
+             if line.strip().startswith("profile:")]
+    return found[0] if found else None
+
+
+# S14/S15: the columns a half-scale still leaves showing the video under it,
+# on the 1920×1080 canvas (the still covers 480…1439).
+OUTER = (range(0, 400), range(1520, 1920))
+
+
+def outer_columns(path, width=1920, height=1080):
+    """`path`'s OUTER columns, every row, as 8-bit values (the `rgb48le`
+    decode's round(v/257); an 8-bit PNG decodes to v·257, so it is exact), or
+    None."""
+    raw = decode(path, "rgb48le")
+    if not raw or len(raw) != width * height * 6:
+        return None
+    values = struct.unpack(f"<{width * height * 3}H", raw)
+    out = []
+    for y in range(height):
+        base = y * width * 3
+        for span in OUTER:
+            out.extend((v + 128) // 257 for v in values[base + span.start * 3:base + span.stop * 3])
+    return out
+
+
+def outer_delta(a, b):
+    """(mean, max) |Δ| of two outer-column lists, or None."""
+    if a is None or b is None or len(a) != len(b) or not a:
+        return None
+    deltas = [abs(x - y) for x, y in zip(a, b)]
+    return sum(deltas) / len(deltas), max(deltas)
+
+
+def apng_figures(path):
+    """An APNG's stream `pix_fmt` and read frame count (ffprobe), and its first
+    frame's middle-row distinct green (`rgb48le`); {} keys None when unread."""
+    ran = bounded.run(["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
+                       "-show_entries", "stream=codec_name,pix_fmt,width,height,nb_read_frames",
+                       "-of", "json", str(path)], 120)
+    try:
+        probe = (json.loads(ran["stdout"]).get("streams") or [{}])[0]
+    except (ValueError, IndexError):
+        probe = {}
+    green = None
+    width, height = probe.get("width"), probe.get("height")
+    if width and height:
+        raw = decode(path, "rgb48le")
+        if raw and len(raw) >= width * height * 6:
+            row = raw[(height // 2) * width * 6:(height // 2 + 1) * width * 6]
+            green = len({row[x * 6 + 2:x * 6 + 4] for x in range(width)})
+    frames = probe.get("nb_read_frames")
+    return {"codec": probe.get("codec_name"), "pix_fmt": probe.get("pix_fmt"),
+            "size": [width, height], "frames": int(frames) if frames else None, "green": green}
+
+
+def s8_project(client, label):
+    """S8's project: `ramp16.png` at 0–1 s and the H.264 clip at 1–2 s on one
+    track of a 1920×1080 canvas; (doc, the still's clip id)."""
+    doc = Doc(client, label, 1920, 1080)
+    track = doc.first_track()
+    still = doc.still(track, still16_png())
+    got = doc.call("import_media", path=str(h264_clip()))
+    media = reply(got).get("media")
+    if media is None:
+        doc.note("import_media", got if not got["ok"] else {"ok": False, "error": "no id"})
+    else:
+        doc.place("add_clip", track=track, media=media, at=SEC)
+    return doc, still
+
+
+def still_alone(client, label, path):
+    """`path` alone on a 1920×1080 canvas (placed at 0, trimmed to 1 s)."""
+    doc = Doc(client, label, 1920, 1080)
+    doc.still(doc.first_track(), path)
+    return doc
+
+
+PIX_EIGHT = ("rgba", "rgb24")
+# Sd: the sizes tried, in order, for the 10-bit ramp clip's APNG until one's
+# file reads 8-bit — today's `sized` redraw seen (the generator missed the size).
+SD_SIZES = ([961, 541], [959, 539], [641, 361])
+
+
+def run_pr9(client):
+    """S8, S10, S14, S15 and S16 (issue batch B97, spec §11 PR-9)."""
+    closed = True
+    if "S8" in selected:
+        doc, still = s8_project(client, "S8")
+        with_still = doc.render(WORK / "s8-with.png", SEC + SEC // 2)
+        doc.step("delete", clips=[still])
+        left = [(c.get("start"), c.get("duration")) for c in doc.project().get("clips") or []]
+        without = doc.render(WORK / "s8-without.png", SEC + SEC // 2)
+        check("S8 (PR-9) ramp16.png at 0–1 s then the H.264 clip at 1–2 s, at 1.5 s (the still "
+              "not drawn): an 8-bit PNG byte-identical to the same frame with the still deleted",
+              doc.ok and with_still is not None and png_depth(with_still) == 8
+              and with_still == without and left == [(SEC, SEC)],
+              f"fixture {doc.why or 'ok'}; depth {png_depth(with_still)}; with the still "
+              f"{digest(with_still)}, deleted {digest(without)} (depth {png_depth(without)}); "
+              f"clips left {left}")
+        closed = doc.close() and closed
+    if "S10" in selected:
+        doc = still_alone(client, "S10", still16_png())
+        out = WORK / "s10.heic"
+        got = doc.call("render_frame", t=T, path=str(out), format="heic")
+        bits = bounded.run(["sips", "-g", "bitsPerSample", str(out)], 60) if out.exists() else {}
+        sample = [line.strip() for line in (bits.get("stdout") or "").splitlines()
+                  if "bitsPerSample" in line]
+        check("S10 (PR-9, recorded: scored only on the file being written) render_frame "
+              "format heic of ramp16.png alone; sips's bitsPerSample printed",
+              doc.ok and got["ok"] and out.exists(),
+              f"fixture {doc.why or 'ok'}; {got.get('error', 'written')}; sips: "
+              f"{sample or 'nothing read'}")
+        closed = doc.close() and closed
+    if "S14" in selected:
+        closed = run_s14(client) and closed
+    if "S15" in selected:
+        closed = run_s15(client) and closed
+    if "S16" in selected:
+        doc = still_alone(client, "S16", still16_png())
+        png = doc.render(WORK / "s16.png", max_width=960)
+        raw = decode(WORK / "s16.png", "rgb48le") if png else None
+        green = (len({raw[270 * 960 * 6 + x * 6 + 2:270 * 960 * 6 + x * 6 + 4] for x in range(960)})
+                 if raw and len(raw) == 960 * 540 * 6 else None)
+        size = list(struct.unpack(">II", png[16:24])) if png else None
+        check("S16 (PR-9) render_frame max_width 960 of ramp16.png alone on a 1920×1080 canvas "
+              "is a 960×540 16-bit PNG whose middle row holds > 256 distinct greens",
+              doc.ok and png_depth(png) == 16 and size == [960, 540] and (green or 0) > 256,
+              f"fixture {doc.why or 'ok'}; depth {png_depth(png)}; size {size}; middle-row "
+              f"distinct green {green}")
+        closed = doc.close() and closed
+    return closed
+
+
+def half_still_over(client, label, movie, fill=None):
+    """S14/S15's scene: `movie` on track 1 at 0 (at `set_video` scale `fill`
+    when given: a 640×360 clip sits at native size, §5.3, so only scale 3
+    reaches the outer columns) and `ramp16.png` on a track above it at scale
+    0.5 (centred, so the OUTER columns show the movie alone), on a 1920×1080
+    canvas; (doc, the still's clip id)."""
+    doc = Doc(client, label, 1920, 1080)
+    placed = doc.movie(doc.first_track(), movie)
+    if fill is not None and placed and placed[0] is not None:
+        doc.step("set_video", clips=[placed[0]], patch={"scale": fill})
+    still = doc.still(doc.new_track(), still16_png())
+    if still is not None:
+        doc.step("set_video", clips=[still], patch={"scale": 0.5})
+    return doc, still
+
+
+def run_s14(client):
+    """S14 (PR-9): the reader reads the frame the generator does, at the
+    frame time and off the 30 fps grid."""
+    doc, still = half_still_over(client, "S14", h264_clip(), fill=3)
+    times = {"T": T, "T+1/60": T + SEC // 60, "T+1/30": T + SEC // 30}
+    deep = {k: doc.render(WORK / f"s14-deep-{i}.png", times[k]) for i, k in
+            enumerate(("T", "T+1/60"))}
+    doc.step("delete", clips=[still])
+    flat = {k: doc.render(WORK / f"s14-flat-{i}.png", t) for i, (k, t) in enumerate(times.items())}
+    lines, good = [], doc.ok and still is not None
+    for i, k in enumerate(("T", "T+1/60")):
+        delta = outer_delta(outer_columns(WORK / f"s14-deep-{i}.png") if deep[k] else None,
+                            outer_columns(WORK / f"s14-flat-{i}.png") if flat[k] else None)
+        good = good and png_depth(deep[k]) == 16 and delta is not None and delta[1] <= 1
+        lines.append(f"at {k}: depth {png_depth(deep[k])}, outer columns against the still-less "
+                     f"render (depth {png_depth(flat[k])}) " + (
+                         f"mean |Δ| {delta[0]:.4f}, max |Δ| {delta[1]}" if delta else "unread"))
+    guard = outer_delta(outer_columns(WORK / "s14-flat-0.png") if flat["T"] else None,
+                        outer_columns(WORK / "s14-flat-2.png") if flat["T+1/30"] else None)
+    good = good and guard is not None and guard[1] > 0
+    lines.append("fixture guard, still-less T against T+1/30: " + (
+        f"mean |Δ| {guard[0]:.4f}, max |Δ| {guard[1]}" if guard else "unread"))
+    check("S14 (PR-9) the H.264 clip under ramp16.png at scale 0.5, rendered at T and T+1/60 "
+          "(off the grid): each a 16-bit PNG whose outer columns, scaled to 8 bits, are within "
+          "±1 of the still-less render at the same time; the still-less renders at T and "
+          "T+1/30 differ there (the fixture moves)",
+          good, f"fixture {doc.why or 'ok'}; " + "; ".join(lines))
+    return doc.close()
+
+
+def run_s15(client):
+    """S15 (PR-9): a converting composition (the HLG ramp) under a deep still
+    keeps the generator's colour space and picture outside it."""
+    movie = ramp_hlg()
+    if movie is None:
+        check("S15 (PR-9) the HLG ramp under ramp16.png at scale 0.5 (a converting "
+              "composition): a 16-bit PNG with the still-less render's profile and outer "
+              "columns within ±1", False, f"fixture refused: {HLG_REFUSED.get('why')}")
+        return True
+    doc, still = half_still_over(client, "S15", movie)
+    deep = doc.render(WORK / "s15-deep.png")
+    doc.step("delete", clips=[still])
+    flat = doc.render(WORK / "s15-flat.png")
+    tagged = [profile(WORK / "s15-deep.png") if deep else None,
+              profile(WORK / "s15-flat.png") if flat else None]
+    delta = outer_delta(outer_columns(WORK / "s15-deep.png") if deep else None,
+                        outer_columns(WORK / "s15-flat.png") if flat else None)
+    check("S15 (PR-9) the HLG ramp under ramp16.png at scale 0.5 (a converting composition), "
+          "at T, against the same frame with the still deleted: both 16-bit PNGs, sips "
+          "profiles equal, outer columns within ±1 at 8-bit scaling",
+          doc.ok and still is not None and png_depth(deep) == 16 and png_depth(flat) == 16
+          and tagged[0] is not None and tagged[0] == tagged[1] and delta is not None
+          and delta[1] <= 1,
+          f"fixture {doc.why or 'ok'}; depths {png_depth(deep)} and {png_depth(flat)}; "
+          f"profiles {tagged[0]!r} (with the still, the reader) and {tagged[1]!r} (without, "
+          f"the generator); outer columns " + (
+              f"mean |Δ| {delta[0]:.4f}, max |Δ| {delta[1]}" if delta else "unread"))
+    return doc.close()
+
+
+def sd_files(client, out_dir, sizes, pick=True):
+    """Sd's files (B97, the CONTROL for S11) written into `out_dir`: a `gif`
+    export and a `render_frame` JPEG of ramp16.png alone, an `apng` export of
+    ramp8.png alone, and the 10-bit ramp clip's `apng` at the first of `sizes`
+    whose file ffprobe reads 8-bit (`pick`, the capture), or at `sizes[0]`
+    whatever it reads (S11, at the size DIR recorded). ({name: file name},
+    the size or "no-redraw", detail, closed)."""
+    closed, files, lines = True, {}, []
+    doc = still_alone(client, "Sd-16", still16_png())
+    if doc.export("gif", out_dir / "sd-gif16.gif") is not None:
+        files["gif16"] = "sd-gif16.gif"
+    got = doc.call("render_frame", t=T, path=str(out_dir / "sd-jpeg16.jpg"), format="jpeg")
+    if got["ok"] and (out_dir / "sd-jpeg16.jpg").exists():
+        files["jpeg16"] = "sd-jpeg16.jpg"
+    lines.append(f"ramp16.png alone: fixture {doc.why or 'ok'}; jpeg {got.get('error', 'ok')}")
+    closed = doc.close() and closed
+    doc = still_alone(client, "Sd-8", still8_png())
+    if doc.export("apng", out_dir / "sd-apng8.png") is not None:
+        files["apng8"] = "sd-apng8.png"
+    lines.append(f"ramp8.png alone: fixture {doc.why or 'ok'}")
+    closed = doc.close() and closed
+    doc = Doc(client, "Sd-10", 1920, 1080)
+    doc.movie(doc.first_track(), ramp_clip())
+    chosen = "no-redraw"
+    for size in sizes:
+        out = out_dir / "sd-apng10.png"
+        movie = doc.export("apng", out, size=size)
+        figures = apng_figures(movie) if movie else {}
+        lines.append(f"10-bit ramp clip at {size}: {figures} (export at "
+                     f"{doc.exported.get('width')}×{doc.exported.get('height')})")
+        if movie is not None and (not pick or figures.get("pix_fmt") in PIX_EIGHT):
+            chosen, files["apng10"] = size, "sd-apng10.png"
+            break
+    if chosen == "no-redraw" and (out_dir / "sd-apng10.png").exists():
+        (out_dir / "sd-apng10.png").unlink()
+    lines.append(f"fixture {doc.why or 'ok'}")
+    closed = doc.close() and closed
+    return files, chosen, "; ".join(lines), closed
+
+
 def s3_render(client, path, out, video=None):
     """S3's scene: the 640×360 8-bit still at `path` alone on the 640×360
     canvas, with `video` (a `set_video` patch) when given, rendered at 0.5 s
@@ -1116,40 +1484,54 @@ def run_s(client, state):
                    eight.get("rms"), (eight.get("tone") or [None])[0]]
         distinct, rms, tone, eight_rms, eight_tone = figures
         then = control.get(label)
+        # A capture with Sd is B97's or later, so its tree drew stills deep
+        # (PR-6): its figures are printed, not held to < STILL_DISTINCT (R1's rule).
+        held = then is not None and "Sd" not in state
         good = (deep.get("fixture") == "ok" and eight.get("fixture") == "ok"
                 and None not in figures and distinct >= STILL_DISTINCT and rms < eight_rms
                 and tone <= TONE_MAX and eight_tone >= TONE_SEEN
-                and (then is None or (then.get("distinct") is not None
-                                      and then["distinct"] < STILL_DISTINCT)))
+                and (not held or (then.get("distinct") is not None
+                                  and then["distinct"] < STILL_DISTINCT)))
         check(f"{row} a 1920×1080 {'' if row == 'S7' else '16-bit '}{name} ramp alone through prores_422: ≥ "
               f"{STILL_DISTINCT} distinct 10-bit codes on the middle row, luma RMS against "
               f"x/1919 under the 8-bit ramp8.png control's, staircase tone ≤ {TONE_MAX} where "
               f"the control's is ≥ {TONE_SEEN}" + (f", and the control tree's < "
-                                                  f"{STILL_DISTINCT}" if then else ""),
+                                                  f"{STILL_DISTINCT}" if held else ""),
               good,
               f"deep: fixture {deep.get('fixture')}, distinct {distinct}, RMS {rms}, tone "
               f"{deep.get('tone')}; 8-bit control: fixture {eight.get('fixture')}, distinct "
               f"{eight.get('distinct')}, RMS {eight_rms}, tone {eight.get('tone')}; control "
-              f"tree: {then if then is not None else 'not given (--control DIR)'}")
+              f"tree: {then if then is not None else 'not given (--control DIR)'}"
+              + ("" if held or then is None else " (a capture with Sd drew deep: printed, "
+                 "not held)"))
     if "S4" in selected:
         deep = got.get("png16") or {}
-        then = control.get("png16")
-        check("S4 (PR-6; PR-4 amended, the owner 2026-10-11) render_frame of a project whose "
-              "only picture is a still is an 8-bit PNG, the 16-bit ramp16.png and the 8-bit "
-              "ramp8.png alike (the export keeps the depth: S1)",
-              deep.get("png_depth") == 8 and eight.get("png_depth") == 8,
-              f"ramp16.png depth {deep.get('png_depth')} (middle-row distinct green "
-              f"{deep.get('green')}); ramp8.png depth {eight.get('png_depth')} (distinct green "
-              f"{eight.get('green')}); control tree's ramp16.png "
-              f"{'depth ' + str(then.get('png_depth')) + ', green ' + str(then.get('green')) if then else 'not given (--control DIR)'}")
+        green = deep.get("green")
+        picture = against_control(WORK / "still-png16.png", state, "still-png16.png")
+        tagged = [profile(WORK / f"still-{label}.png") for label in ("png16", "png8")]
+        check(f"S4 (PR-9, the owner 2026-10-13) render_frame of a project whose only picture is "
+              f"the 16-bit ramp16.png is a 16-bit PNG whose middle row's green holds ≥ "
+              f"{MIXED_DISTINCT} distinct values and whose RGB, scaled to 8 bits, is within ±1 "
+              f"of the control tree's 8-bit render, and whose colour profile (sips) is "
+              f"ramp8.png's (the generator's, same run); ramp8.png's is an 8-bit PNG",
+              deep.get("png_depth") == 16 and green is not None and green >= MIXED_DISTINCT
+              and picture["good"] and eight.get("png_depth") == 8
+              and tagged[0] is not None and tagged[0] == tagged[1],
+              f"ramp16.png depth {deep.get('png_depth')} (middle-row distinct green {green}); "
+              f"{picture['detail']}; ramp8.png depth {eight.get('png_depth')} (distinct green "
+              f"{eight.get('green')}); profiles {tagged[0]!r} and {tagged[1]!r}")
     if "S5" in selected:
         figures, ok = mixed_figures(client, WORK, h264_clip(), "h264")
         closed = ok and closed
-        check("S5 (PR-4 as amended by PR-6) ramp16.png over the 8-bit H.264 clip: render_frame "
-              "is an 8-bit PNG — a deep still does not make the frame deep",
-              figures["fixture"] == "ok" and figures["png_depth"] == 8,
+        green = figures["green"]
+        picture = against_control(WORK / "mixed-h264.png", state, "mixed-h264.png")
+        check(f"S5 (PR-9) ramp16.png over the 8-bit H.264 clip: render_frame is a 16-bit PNG "
+              f"whose middle row's green holds ≥ {MIXED_DISTINCT} distinct values and whose "
+              f"RGB, scaled to 8 bits, is within ±1 of the control tree's 8-bit render",
+              figures["fixture"] == "ok" and figures["png_depth"] == 16 and green is not None
+              and green >= MIXED_DISTINCT and picture["good"],
               f"fixture {figures['fixture']}; depth {figures['png_depth']}; middle-row distinct "
-              f"green {figures['green']}")
+              f"green {green}; {picture['detail']}")
     if "S6" in selected:
         figures, ok = mixed_figures(client, WORK, ramp_clip(), "ramp10")
         closed = ok and closed
@@ -1234,6 +1616,8 @@ def run_rows(client, state):
         closed = run_t(client) and closed
     if selected & {"S1", "S2", "S4", "S5", "S6", "S7"}:
         closed = run_s(client, state) and closed
+    if selected & {"S8", "S10", "S14", "S15", "S16"}:
+        closed = run_pr9(client) and closed
     if selected & set(V_ROWS):
         closed = run_v(client) and closed
     return closed
@@ -1798,6 +2182,20 @@ def run_capture(client, where):
                           for f in stills.values())
           and all(r["fixture"] == "ok" and r["digest"] for r in s3.values()),
           f"stills {stills}; S3 {s3}")
+    files, size, detail, ok = sd_files(client, where, SD_SIZES)
+    closed = ok and closed
+    mixed, ok = mixed_figures(client, where, h264_clip(), "h264")
+    closed = ok and closed
+    record["Sd"] = {"files": {name: digest((where / file).read_bytes())
+                              for name, file in files.items()},
+                    "apng10_size": size, "mixed_h264": mixed}
+    check("Sd CONTROL (B97): a gif export and a render_frame JPEG of ramp16.png, an apng "
+          "export of ramp8.png, the 10-bit ramp clip's apng at a size today's resize redraws "
+          "(or no-redraw), and S5's mixed-h264.png, into DIR",
+          {"gif16", "jpeg16", "apng8"} <= set(files) and mixed["fixture"] == "ok"
+          and (where / "mixed-h264.png").exists(),
+          f"files {record['Sd']['files']}; 10-bit apng size {size}; mixed-h264 {mixed}; "
+          f"{detail}")
     (where / "capture.json").write_text(json.dumps(record, indent=1, sort_keys=True))
     return closed
 
@@ -1924,6 +2322,38 @@ def run_compare(client, where):
         check("S3 an 8-bit still's render_frame (opaque; with an alpha ramp; the alpha ramp "
               "under a colour control) is an 8-bit PNG byte-identical to DIR's", good,
               "\n       ".join(lines))
+    if "S11" in selected:
+        closed = run_s11(client, where, record) and closed
+    return closed
+
+
+def run_s11(client, where, record):
+    """S11 (B97, PR-9): Sd's files made again on this tree, each byte-identical
+    to DIR's — GIF and JPEG stay 8-bit, an APNG with no deep still is today's,
+    and a deep video source's APNG at a size the resize redraws is too (skipped
+    by name when DIR recorded `no-redraw`)."""
+    sd = record.get("Sd")
+    if not sd:
+        check("S11 GIF, JPEG and still-less APNG files byte-identical to DIR's", False,
+              "DIR has no Sd (captured before B97)")
+        return True
+    size = sd.get("apng10_size")
+    redraw = size not in (None, "no-redraw")
+    if not redraw:
+        skip("S11's 10-bit apng", "DIR recorded no-redraw: no size made today's resize redraw")
+    files, _, detail, closed = sd_files(client, WORK, [size] if redraw else [], pick=False)
+    good, lines = True, []
+    for name, want in sorted(sd.get("files", {}).items()):
+        got = (WORK / files[name]).read_bytes() if name in files else None
+        same = got is not None and digest(got) == want
+        good = good and same
+        lines.append(f"{name}: {digest(got)} against DIR's {want} "
+                     f"({'byte-identical' if same else 'DIFFERENT'}"
+                     + (f", {len(got)} bytes" if got is not None else ", not written") + ")")
+    check("S11 (PR-9) a gif export and a render_frame JPEG of ramp16.png, an apng export of "
+          "ramp8.png" + (f", and the 10-bit ramp clip's apng at {size}" if redraw else "")
+          + ": each file byte-identical to DIR's", good and bool(sd.get("files")),
+          "\n       ".join(lines + [detail]))
     return closed
 
 
@@ -2563,6 +2993,7 @@ def main():
                 state = json.loads((Path(args.control) / "capture.json").read_text())
             except (OSError, ValueError):
                 print(f"  no capture.json in {args.control}; P1 prints no control", flush=True)
+            state["_dir"] = str(Path(args.control).resolve())
         try:
             if args.mode == "capture" and selected == {"S3c", "Z1"}:
                 closed = run_s3c(launched.client, where)

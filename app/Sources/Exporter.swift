@@ -516,14 +516,16 @@ final class Exporter {
     /// is the only way a proof script can photograph a burn-in at all.
     ///
     /// `graphics` is pinned on the frame's own key, as `export` pins it on
-    /// its own; nil draws every graphic's slate.
+    /// its own; nil draws every graphic's slate. `deepStill` is the caller's
+    /// decision (`DeepStillFrame.shows`, spec §11 PR-9): true reads the frame
+    /// through `DeepStillFrame.read`'s reader instead of the generator.
     static func renderFrame(
         project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?,
-        options: RecipeOptions = .none, graphics: GraphicSet? = nil
+        options: RecipeOptions = .none, graphics: GraphicSet? = nil, deepStill: Bool = false
     ) -> CGImage? {
         renderFrameReported(
             project: project, urls: urls, at: t, maxWidth: maxWidth, options: options,
-            graphics: graphics
+            graphics: graphics, deepStill: deepStill
         ).image
     }
 
@@ -531,7 +533,7 @@ final class Exporter {
     /// drawn — read off the key's pin before it is dropped.
     static func renderFrameReported(
         project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?,
-        options: RecipeOptions, graphics: GraphicSet?
+        options: RecipeOptions, graphics: GraphicSet?, deepStill: Bool = false
     ) -> RenderedFrame {
         // No videoTracks is NOT a refusal: CompositionBuilder gives a
         // timeline of nothing but text, shapes and images a placeholder track
@@ -558,6 +560,11 @@ final class Exporter {
         } catch {
             return RenderedFrame(image: nil, graphics: GraphicRegistry.shared.reports(for: key))
         }
+        if deepStill {
+            return RenderedFrame(
+                image: DeepStillFrame.read(built, at: t, maxWidth: maxWidth),
+                graphics: GraphicRegistry.shared.reports(for: key))
+        }
 
         let generator = AVAssetImageGenerator(asset: built.composition)
         generator.videoComposition = built.videoComposition
@@ -577,7 +584,7 @@ final class Exporter {
 
     /// `size` capped to `maxWidth`, aspect kept, never upscaled and never
     /// zero in either axis.
-    private static func scaledSize(_ size: CGSize, to maxWidth: Int) -> CGSize {
+    static func scaledSize(_ size: CGSize, to maxWidth: Int) -> CGSize {
         guard size.width >= 1, size.height >= 1 else {
             return CGSize(width: maxWidth, height: maxWidth)
         }

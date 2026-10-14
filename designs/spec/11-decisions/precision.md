@@ -21,6 +21,10 @@ record (P2-0–P2-3). They take up PR-5's deferral of the 10-bit rest: PR-6 and 
 list, and PR-8 closes its other two items. PR-2 stands: HDR stays tone-mapped in the compositor
 (amended by GR-15: HDR still reaches the output as SDR, converted by Frame Job's own step 0).
 
+PR-9 was recorded in issue batch B97 (#275) from the owner's choice of 2026-10-13 ("Go with 1":
+read the frame the way video export does), after its mechanism was measured and before the rest
+of its code; it amends PR-4 and PR-6.
+
 - **PR-1 — The working depth is 16-bit float, holding encoded values clamped to [0, 1] (owner,
   2026-10-09, choices 1 and 5).**
   - The render context's buffers are `kCVPixelFormatType_64RGBAHalf`.
@@ -126,6 +130,13 @@ list, and PR-8 closes its other two items. PR-2 stands: HDR stays tone-mapped in
   is still the 8-bit source's. Measured on Release in P2-2 (V6): the 640×360 H.264 clip alone,
   reversed, renders a 16-bit PNG, its reverse `hevc`/Main 10/`yuv420p10le`; on the renderer
   before PR-7 the same project rendered 8-bit, its reverse `h264`/High/`yuv420p`.
+  **Amended by PR-9** (B97, the owner 2026-10-13): a frame whose recipe draws a still deeper
+  than 8 bits a component is read through export's reader instead of the generator, so it is
+  deep in `render_frame` and Save Frame…: a 16-bit PNG, a 10-bit HEIC (S10); S4 and S5 above now
+  read 16-bit. GIF, APNG and JPEG stay 8-bit, and every other frame is still the generator's.
+  PR-7's "GIF and APNG frame" above holds for the frame only: ImageIO writes a multi-frame GIF
+  or APNG FILE at 8 bits a component whatever the frames' depth (measured in B97), so PR-7's
+  depth reaches `render_frame` and Save Frame… alone.
 - **PR-5 — What stays 8-bit, and the frozen references (choice 6).**
   - These stay 8-bit:
     - graphics (G-7's BGRA8);
@@ -169,6 +180,9 @@ list, and PR-8 closes its other two items. PR-2 stands: HDR stays tone-mapped in
     is a 16-bit still is an 8-bit PNG, as is an 8-bit still's; the `prores_422` export keeps the
     depth (S1: 862 distinct 10-bit codes on the ramp's middle row, against 512 from the old
     draw). The owner accepted it on 2026-10-11 ("Accept it"), and PR-4 is amended to match.
+  **Amended by PR-9** (B97, the owner 2026-10-13): `render_frame` of a frame showing a deep
+  still no longer takes PR-4's mechanism: it is read through export's reader, 16-bit; the
+  still's draw is unchanged.
 - **PR-7 — The reversed intermediate is 10-bit, carries the source's colour labels, and keeps
   the source's exact size (owner, 2026-10-11, choice 2a; the odd-size fix with it).**
   - An even-sized source is written as HEVC with `kVTProfileLevel_HEVC_Main10_AutoLevel` at every
@@ -233,3 +247,48 @@ list, and PR-8 closes its other two items. PR-2 stands: HDR stays tone-mapped in
     (`captureHDRRecordingPreservedSDRHDR10`: `x420`, ITU-R 2100 PQ), which PR-2 would tone-map. A
     self-written encoder would rebuild the recorder's segment machinery.
   - PR-5's list is not edited; this closes those two of its deferrals.
+- **PR-9 — A frame showing a deep still is read deep, through export's reader (owner,
+  2026-10-13, #275; APNG left out by the owner 2026-10-14).**
+  - `render_frame` and File ▸ Save Frame… (PNG, HEIC) of a frame whose recipe draws a still
+    deeper than 8 bits a component come out deep: a 16-bit PNG, a 10-bit HEIC (the reader's
+    image is 16-bit; ImageIO's HEIC writer keeps 10, S10). GIF, APNG and JPEG stay 8-bit, and every
+    frame with no deep still — so every all-8-bit project — keeps the generator's path byte for
+    byte (PR-4's guarantee).
+  - The mechanism: `DeepStillFrame.shows` asks the RECIPE at the frame time (a still elsewhere
+    on the timeline, or one Show Selection leaves out, does not count; one the recipe draws
+    counts whatever its opacity, crop or cover) whether an `image` layer's file is deep
+    (`kCGImagePropertyDepth` of its first image above 8, the header twin of PR-6's
+    `bitsPerComponent > 8`). When it is and the format keeps depth, `Exporter.renderFrame` reads
+    the frame with `DeepStillFrame.read` instead of `AVAssetImageGenerator`: an
+    `AVAssetReaderVideoCompositionOutput` at `Compositor.outputPixelFormat` (`64RGBAHalf`, export's
+    own two settings) over one frame's range starting at the frame time, its first sample copied
+    into a 16-bit-float CGImage, and the reading cancelled on the thread that read it (G-17).
+    With `max_width` below the canvas it is redrawn at the generator's size into a 16-bit-float
+    context.
+  - Why not the generator: `AVAssetImageGenerator` hands back a 16-bit image only when every
+    video track of the composition is deep, measured in B97's first pass. A 10-bit carrier track
+    beside an 8-bit one, or beside the stills-only placeholder, left the image 8-bit; only a
+    composition whose sole video track was the carrier read 16-bit. A deep still over 8-bit
+    video (S5) cannot reach that, so the carrier was dropped for the reader.
+  - APNG stays 8-bit, as GIF does: ImageIO's PNG destination writes a file of more than one
+    frame at 8 bits a component whatever it is handed (measured in B97 on macOS 26.5.1: float16
+    and int16 RGBA frames give a 16-bit one-frame PNG and an 8-bit `rgba` or `rgb24` APNG, with
+    or without the APNG properties; the product's APNG of `ramp16.png` read through the reader
+    was `rgba`, 256 greens). Frame Job writing its own 16-bit APNG encoder was not wanted
+    (owner, 2026-10-14: "APNG is quite niche. I don't care about it."), so an image-sequence
+    export never asks.
+  - The colour space: `sRGB IEC61966-2.1`, the generator's tag, when the composition converts
+    nothing (no output primaries); a converting composition (GR-15) keeps its buffer's own RGB
+    space from the buffer's attachments, BT.709 when there is none.
+  - What stays: JPEG frames, GIF and APNG exports (8-bit, as before); the preview, movie
+    exports, the eyedropper, Pick from Canvas, the look gallery, `snapshot_ui`, thumbnails and
+    posters, which never ask. There is no `depth` argument.
+  - Measured in B97 (Release, 2026-10-14, `precision_proof.py` against the control
+    `ctl-b97`, captured on the tree before any PR-9 code): S4, `ramp16.png` alone, a 16-bit PNG
+    with 1,920 distinct middle-row greens (256 before), its RGB scaled to 8 bits equal to the
+    control's render (max |Δ| 0), profile `sRGB IEC61966-2.1` as the generator's; S5, over the
+    8-bit H.264 clip, the same (1,920, max |Δ| 0); S14, the clip under a half-scale still, the
+    uncovered columns within ±1 (mean 0.491) of the still-less render at the frame time and off
+    the 30 fps grid; S15, over an HLG clip (converting), the generator's `HDTV` profile and max
+    |Δ| 0; S16, `max_width 960`, a 960×540 16-bit PNG; D1 and S8 8-bit, and every all-8-bit
+    render, GIF, JPEG and APNG byte-identical to the control (K1–K6, S3, S11).

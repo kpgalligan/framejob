@@ -52,7 +52,10 @@ import UniformTypeIdentifiers
 /// flatten belongs to JPEG ALONE — PNG and HEIC both carry alpha, so nothing
 /// is thrown away in those two, and adding a flatten to them would destroy
 /// information the format was chosen for. The panel's hint carries the same
-/// sentence, because a silent flatten is the thing being avoided.
+/// sentence, because a silent flatten is the thing being avoided. JPEG is
+/// also the one that holds 8 bits a component whatever it is handed, which is
+/// why `Format.carriesDepth` is false for it alone and no frame grabbed for a
+/// JPEG is read through the reader (spec §11 PR-9).
 ///
 /// **The quality is 0.9, not `MediaImporter.writeJPEG`'s 0.7.** Those two
 /// numbers answer different questions: a filmstrip thumbnail is 54 px tall and
@@ -375,5 +378,18 @@ enum FrameWriter {
             throw WriteError.flattenFailed(url)
         }
         return flattened
+    }
+}
+
+extension FrameWriter.Format {
+    /// True where the container keeps more than 8 bits a component — PNG
+    /// (16-bit) and HEIC — so a frame grabbed for it is read through the
+    /// reader when it shows a deep still (`DeepStillFrame`, spec §11 PR-9);
+    /// JPEG is 8-bit, so its frame is built exactly as before.
+    var carriesDepth: Bool {
+        switch self {
+        case .png, .heic: return true
+        case .jpeg: return false
+        }
     }
 }

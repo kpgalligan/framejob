@@ -485,6 +485,11 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Expect:** no contour bands across the gradient, in the preview or in the export.
 - **Source:** precision-2 P2-1 (spec §11 PR-6: a still deeper than 8 bits a component is drawn at 16-bit float); `precision_proof.py` S1 measures the levels through `prores_422`, not the look.
 
+**PRC-5 — A saved frame of a 16-bit still is 16-bit and looks like the preview**
+- **Do:** 1. Put PRC-4's 16-bit gradient still alone in a 1920×1080 project, and in a second project put it at half size (the Clip tab's Scale at 50 %) over an ordinary 8-bit movie. 2. In each, park the playhead on the still and choose File ▸ Save Frame…, once as PNG and once as JPEG. 3. In Finder, Get Info on each file (or `sips -g bitsPerSample <file>` in Terminal), and open each in Preview beside Frame Job's preview of the same frame.
+- **Expect:** each PNG is 16 bits a sample and each JPEG 8; both look like Frame Job's preview — the same brightness and colour, no tint, nothing shifted — and the PNG's gradient shows no bands.
+- **Source:** issue batch B97 (spec §11 PR-9: a frame showing a deep still is read through export's reader); `precision_proof.py` S4, S5 and S14 measure the depth and the pixels against the generator's render, not how a viewer shows the file.
+
 ## Grading
 
 These rows are run on a Release build (`make app`), with real camera footage of your own (1080p or 4K; a face, some sky or a wall with a soft gradient, and some foliage help), in a project you can spare or a copy of one. GRD-5 and GRD-6 need a `.cube` 3D LUT you own; GRD-8 spends from your own Assistant key and budget.

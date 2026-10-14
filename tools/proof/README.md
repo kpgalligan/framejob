@@ -17822,11 +17822,11 @@ to `64RGBAHalf` (`Compositor.sourcePixelFormat`, spec §11 PR-2).
 
 ```
 python3 tools/proof/preview_display_probe.py --rows spike          # V0–V2 (PR0's spike; exit 1 is its RECORDED outcome)
-python3 tools/proof/precision_proof.py [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2,S1,S2,S4,S5,S6,S7,V0,…,V6] [--control DIR]
+python3 tools/proof/precision_proof.py [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2,S1,S2,S4,S5,S6,S7,S8,S10,S14,S15,S16,V0,…,V6] [--control DIR]
 python3 tools/proof/precision_proof.py reverse-cost                # precision-2 P2-2: the reverse's cost, no app
 python3 tools/proof/precision_proof.py capture DIR                 # on the CONTROL tree, before any product edit
 python3 tools/proof/precision_proof.py capture DIR --only S3c      # S3's scenes DIR lacks into an existing capture
-python3 tools/proof/precision_proof.py compare DIR [--only K1,…,E2,S3]
+python3 tools/proof/precision_proof.py compare DIR [--only K1,…,E2,S3,S11]
 RC_PROOF_APP=release python3 tools/proof/precision_proof.py --measure capture|compare DIR   # M1, release-only
 RC_PROOF_APP=release python3 tools/proof/precision_proof.py --measure ab --mutant decode-8bit [--rounds N]   # MA, release-only
 python3 tools/proof/precision_proof.py --selftest                  # S1–S3, no app
@@ -17838,6 +17838,9 @@ python3 tools/proof/precision_proof.py --mutant still-always-deep compare DIR   
 python3 tools/proof/precision_proof.py --mutant reverse-bgra|reverse-main|reverse-planar-drop   # precision-2 P2-2: V0 (V1, V2 beside reverse-bgra)
 python3 tools/proof/precision_proof.py --mutant reverse-709-labels|reverse-no-attachments      # precision-2 P2-2: V2, V3 (V3 beside the second)
 python3 tools/proof/precision_proof.py --mutant reverse-unversioned|reverse-odd-hevc           # precision-2 P2-2: V4; V5
+python3 tools/proof/precision_proof.py --mutant deep-always|deep-project-wide   # B97 (PR-9): D1 and S8; S8
+python3 tools/proof/precision_proof.py --mutant jpeg-deep compare DIR          # B97: S11
+python3 tools/proof/precision_proof.py --mutant reader-space-swapped|reader-unscaled|reader-next-frame   # B97: S4 and S15; S16; S14
 python3 tools/proof/hevc_alpha_proof.py --rows straighten          # R0, K1, R8, RH, KH
 python3 tools/proof/hevc_alpha_proof.py --measure hevc-alpha-deep   # HA, recorded
 python3 tools/proof/hevc_alpha_proof.py --mutant hevc-no-profile|bgra8-truncates|half-no-unpremultiply|half-no-fill
@@ -18105,6 +18108,38 @@ instrument: `reverse-bgra` (V0; V1, V2 beside), `reverse-main` (V0),
 `reverse-709-labels` (V2, V3), `reverse-planar-drop` (V0),
 `reverse-no-attachments` (V2; V3 beside), `reverse-unversioned` (V4) and
 `reverse-odd-hevc` (V5).
+
+**B97 (#275, spec §11 PR-9) — a frame showing a deep still, read deep.**
+`render_frame` and File ▸ Save Frame… (PNG, HEIC) of a frame whose recipe
+draws a still deeper than 8 bits are read through export's reader
+(`DeepStillFrame.read`: an `AVAssetReaderVideoCompositionOutput` at
+`64RGBAHalf` over one frame's range) instead of `AVAssetImageGenerator`,
+which is 16-bit only when every video track is deep (a 10-bit carrier
+track beside an 8-bit one left it 8-bit — the batch's first pass). GIF,
+APNG and JPEG stay 8-bit: ImageIO writes a PNG of more than one frame at 8
+bits a component whatever it is handed (measured, macOS 26.5.1), and the
+owner left APNG out. The control is `tools/proof/work/precision/ctl-b97`,
+captured on Phase A's Release app (1246112) before any PR-9 code; never
+recapture it.
+
+```
+python3 tools/proof/precision_proof.py --only D1,S4,S5,S6,S8,S10,S14,S15,S16 --control tools/proof/work/precision/ctl-b97
+python3 tools/proof/precision_proof.py compare tools/proof/work/precision/ctl-b97 --only K1,K2,K3,K4,K5,K6,S3,S11
+python3 tools/proof/precision_proof.py --mutant deep-always|deep-project-wide|reader-space-swapped|reader-unscaled|reader-next-frame --control tools/proof/work/precision/ctl-b97
+python3 tools/proof/precision_proof.py --mutant jpeg-deep compare tools/proof/work/precision/ctl-b97
+```
+
+Recorded on Release (2026-10-14): S4 a 16-bit PNG, 1,920 distinct middle-row
+greens, mean and max |Δ| 0 against the control's 8-bit render, profile
+`sRGB IEC61966-2.1` as `ramp8.png`'s generator render; S5 (over the 8-bit
+H.264 clip) 16-bit, 1,920 greens, max |Δ| 0; S14 (the clip at scale 3 —
+640×360 sits at native size, §5.3 — under a half-scale still) 16-bit, the
+uncovered columns within max |Δ| 1 (mean 0.491) of the still-less 8-bit
+render at T and at T+1/60, the guard moving (max 254 between frames); S15
+(the HLG ramp, a converting composition) 16-bit with the generator's
+`HDTV` profile, max |Δ| 0; S16 `max_width 960` a 960×540 16-bit PNG, 960
+greens; S10's HEIC `bitsPerSample: 10`; D1, S8 and compare's K1–K6, S3 and
+S11 unchanged.
 
 ## Road map grading — GR0, the grading spike (`grading_spike/`; #258)
 

@@ -1354,7 +1354,8 @@ the key map behind it.
   `ExporterImageSequence.swift` ·
   `ExporterErrors.swift` · `ExporterGraphics.swift` — the writer
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
-  size have one path) and the one-frame offline render. An export is TWO
+  size have one path) and the one-frame offline render (the generator, or
+  `DeepStillFrame.read`'s reader for a frame showing a deep still, §11 PR-9). An export is TWO
   passes wherever the file holds sound: a measurement build of its own in
   32-bit float, then the write: un-normalised from a 16-bit decode (a mix
   past full scale clips there, and `mixClipped` says so); normalised from the
@@ -1411,6 +1412,9 @@ the key map behind it.
   loop — cancelling a reader under a running `copyNextSampleBuffer` crashed
   the process. Never call `cancelReading` from another thread while a loop
   reads; a read that never returns is not woken (spec §11 G-17).
+- `DeepStillFrame.swift` — whether a frame's recipe draws a still deeper than
+  8 bits (`shows`), and `read`: that frame through export's reader
+  (`AVAssetReaderVideoCompositionOutput` at `64RGBAHalf`), spec §11 PR-9.
 - `FrameWriter.swift` — a `CGImage` and a format in, a URL out, no panel:
   Save Frame and `render_frame` both call it, so their PNGs are
   byte-identical by construction. PNG keeps a NIL properties dictionary

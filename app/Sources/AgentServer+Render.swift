@@ -2,8 +2,9 @@ import AppKit
 import UniformTypeIdentifiers
 
 /// The agent's two output tools: `render_frame`, the verification hook the
-/// whole project's end-to-end checking depends on, and `export`, which writes
-/// a file through the same `Exporter` the sheet uses.
+/// whole project's end-to-end checking depends on, here, and `export`, which
+/// writes a file through the same `Exporter` the sheet uses, in
+/// `AgentServer+Export.swift`.
 ///
 /// Both run on the SERVER thread (`AgentServer.offMainTools`): each blocks on
 /// decode or encode for as long as the work takes, and freezing the UI —
@@ -129,10 +130,14 @@ extension AgentServer {
         // own two the same way.
         let (url, format) = try frameDestination(a, at: time)
         // Off the main thread by construction — `Exporter.renderFrame` opens
-        // asset tracks and decodes, and says so.
+        // asset tracks and decodes, and says so. A PNG or HEIC of a frame
+        // showing a deep still is read through the reader (spec §11 PR-9), by
+        // Save Frame's own expression.
         let rendered = Exporter.renderFrameReported(
             project: project, urls: urls, at: time, maxWidth: maxWidth, options: options,
-            graphics: graphics)
+            graphics: graphics,
+            deepStill: format.carriesDepth
+                && DeepStillFrame.shows(project, urls: urls, at: time, options: options))
         guard let image = rendered.image else {
             throw ToolError(
                 message: "No frame at \(time). Either the time is past the end of the timeline, "

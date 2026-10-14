@@ -43,6 +43,11 @@ import AppKit
 /// unrelated commands in one line for no gain; both are named in
 /// `app/CLAUDE.md`'s seam list.
 ///
+/// **A frame showing a deep still is saved deep** (spec §11 PR-9): a PNG or
+/// HEIC of one asks `renderFrame` to read it through the reader, with the same
+/// expression `render_frame` uses (`DeepStillFrame.shows`), so the two still
+/// write one frame's bytes; a JPEG never does.
+///
 /// The hop back does nothing on success: a save panel that has written the
 /// file the person named has said everything it has to say. A failure gets an
 /// alert naming the path, which is why `FrameWriter` throws rather than
@@ -188,8 +193,13 @@ extension EditorViewController {
         let graphics = GraphicRegistry.shared.snapshot(for: document.recipeKey)
         EditorViewController.frameGrabQueue.async { [weak self] in
             let result: Result<URL, Error>
+            // `render_frame`'s expression, so the two stay one frame's bytes.
+            let deep =
+                format.carriesDepth
+                && DeepStillFrame.shows(project, urls: urls, at: time, options: .none)
             if let image = Exporter.renderFrame(
-                project: project, urls: urls, at: time, maxWidth: nil, graphics: graphics)
+                project: project, urls: urls, at: time, maxWidth: nil, graphics: graphics,
+                deepStill: deep)
             {
                 result = Result { try FrameWriter.write(image, as: format, to: url) }
             } else {
