@@ -37,9 +37,13 @@ from it, `hlg_hevc.mov` (the HLG tags), `srgb.mov` (bt709/iec61966-2-1/bt709)
 and `b2020_2020.mov` (bt2020/bt2020-10/bt2020nc); 640×360 1 s `testsrc2`
 movies — H.264 BT.709 and untagged, HEVC 8-bit tagged with the matrix only,
 ProRes 4444 with an alpha ramp — an 8-bit PNG of it, and container_import_proof
-.py's P1 VP9 WebM; `applelog.mov`, `bt709.mov` relabelled Apple Log by
-`applelog_writer.swift` (ffprobe `bt2020nc/unknown/bt2020`, the label read
-back); and, for TI only, 4K 4 s ProRes twins of the ramp, HLG and BT.709.
+.py's P1 VP9 WebM (the BT.709 H.264 and the ProRes 4444 through
+`bt709_fixture.make`, issue #292: `setparams` on the input and the tags on the
+output, kept — a cached file too — only when ffprobe reads bt709 ×3 and the
+first frame reads back against its own graph); `applelog.mov`, `bt709.mov`
+relabelled Apple Log by `applelog_writer.swift` (ffprobe
+`bt2020nc/unknown/bt2020`, the label read back); and, for TI only, 4K 4 s
+ProRes twins of the ramp, HLG and BT.709.
 For H1a: `hevc_alpha.mov`, 640×360 1 s `testsrc2` with an alpha ramp through
 `hevc_videotoolbox` from `bgra`, BT.709-tagged by `setparams` (the `-color_*`
 flags alone do not stick from `bgra`). For H7: `pq_plain.mov` and
@@ -156,6 +160,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
+import bt709_fixture  # noqa: E402
 import mcp  # noqa: E402
 import proof_app  # noqa: E402
 import reference_build  # noqa: E402
@@ -183,7 +188,6 @@ SW, SH = 640, 360
 BASE_FILTER = ("color=c=black:size=1024x128:rate=30:duration=1,format=yuv422p10le,"
                "geq=lum='64+X*876/(W-1)':cb='if(lt(Y,64),512,112+X*800/(W-1))':"
                "cr='if(lt(Y,64),512,912-X*800/(W-1))'")
-TAG709 = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
 # name: (primaries, transfer, matrix) for prores_metadata and colr; None = untagged.
 RETAGS = {"bt709": ("bt709", "bt709", "bt709"),
           "untagged": None,
@@ -570,6 +574,20 @@ def testsrc(name, extra, want, suffix=".mov", source="testsrc2"):
         "-f", "lavfi", "-i", f"{source}=size={SW}x{SH}:rate=30:duration=1", *extra], 300), want)
 
 
+def bt709(name, suffix, vf, codec, want, pix_fmt):
+    """A 640×360 1 s `testsrc2` BT.709 fixture through `bt709_fixture.make`
+    (issue #292): `vf`, ending in its SETPARAMS, on the input, the tags on
+    the output; kept, a cached file too, only when ffprobe reads `want` and
+    bt709 ×3 and the first frame reads back against its own graph; else None,
+    REFUSED[name] the maker's reason."""
+    made, why = bt709_fixture.make(MEDIA / f"{name}{suffix}", [
+        "-f", "lavfi", "-i", f"testsrc2=size={SW}x{SH}:rate=30:duration=1", "-vf", vf],
+        codec, want, pix_fmt, 300)
+    if made is None:
+        REFUSED[name] = why
+    return made
+
+
 def applelog():
     out = MEDIA / "applelog.mov"
     if not out.exists():
@@ -603,11 +621,10 @@ def fixture(name):
     if name == "applelog":
         return applelog()
     if name == "h264_709":
-        return testsrc(name, ["-vf", "setparams=color_primaries=bt709:color_trc=bt709:"
-                              "colorspace=bt709", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                              "-crf", "18", *TAG709],
-                       {"codec_name": "h264", "color_space": "bt709", "color_transfer": "bt709",
-                        "color_primaries": "bt709"}, ".mp4")
+        return bt709(name, ".mp4", bt709_fixture.SETPARAMS,
+                     ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18"],
+                     {"codec_name": "h264", "pix_fmt": "yuv420p", "width": SW, "height": SH},
+                     "yuv420p")
     if name == "h264_untagged":
         return testsrc(name, ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18"],
                        {"codec_name": "h264"}, ".mp4")
@@ -628,12 +645,10 @@ def fixture(name):
             "-f", "lavfi", "-i", f"testsrc2=size={SW}x{SH}:rate=1:duration=1", "-frames:v", "1",
             "-pix_fmt", "rgb24"]), {"pix_fmt": "rgb24"})
     if name == "prores4444":
-        return testsrc(name, ["-vf", "format=yuva444p10le,geq=lum='lum(X,Y)':cb='cb(X,Y)':"
-                              "cr='cr(X,Y)':a='X*1023/(W-1)',setparams=color_primaries=bt709:"
-                              "color_trc=bt709:colorspace=bt709", "-c:v", "prores_ks",
-                              "-profile:v", "4", "-pix_fmt", "yuva444p10le", *TAG709],
-                       {"codec_name": "prores", "pix_fmt": "yuva444p12le",
-                        "color_transfer": "bt709"})
+        return bt709(name, ".mov", "format=yuva444p10le,geq=lum='lum(X,Y)':cb='cb(X,Y)':"
+                     f"cr='cr(X,Y)':a='X*1023/(W-1)',{bt709_fixture.SETPARAMS}",
+                     ["-c:v", "prores_ks", "-profile:v", "4", "-pix_fmt", "yuva444p10le"],
+                     {"codec_name": "prores", "pix_fmt": "yuva444p12le"}, "yuv444p10le")
     if name == "webm":
         return checked(name, ffmpeg_make(MEDIA / "webm.webm", [
             "-f", "lavfi", "-i", f"testsrc2=size={SW}x{SH}:rate=30:duration=2",

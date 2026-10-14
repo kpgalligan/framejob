@@ -18,8 +18,10 @@ perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.
 build (`swift_build.build(…, optimize=True)`), never a Debug one (spec §11
 V-4). It launches no app, so it takes no `release_only=` argument. `build()`
 needs `core/target/release/libframejob_core.a`. `--measure` also needs `ffmpeg`
-(with `prores_ks` and `libx265`) for D1's two fixtures, made once under
-`work/grading_spike/media/` and reused.
+(with `prores_ks` and `libx265`) for D1's two fixtures, made under
+`work/grading_spike/media/` and reused only while `bt709_fixture.make` keeps
+them (issue #292: `setparams` on the input, bt709 ×3 read back by ffprobe and
+the first frame read back against its own graph).
 
 **Files.**
 

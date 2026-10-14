@@ -22,13 +22,17 @@ Every project is closed (`close_project`, discard).
 Fixtures, written by this script (as `wheels_proof.py`'s): CARD, a 640×360
 grey-128 PNG; RAMP, a 1920×360 PNG whose column x is round(255·x/1919); MOVIE,
 a 2 s 640×360 30 fps ffmpeg `testsrc2` H.264 file; DEEP, a 2 s 1920×360 black
-10-bit ProRes 422 HQ file, placed UNDER the ramp (covered by it), so the
-ramp's `render_frame` is a 16-bit PNG (spec §11 PR-4: 16-bit when any source
-is deeper) whose inputs are still the ramp's exact 8-bit codes. Frames are
-taken at t = 0.5 s unless a row says otherwise; v is the uncurved render's
-own value at the sample, so every formula is over measured bytes. The oracle
-is this script's own Fritsch–Carlson (`fc`), written from the paper (SIAM J.
-Numer. Anal. 17(2), 1980) as GR-12 states it, independent of `CurveTable`.
+10-bit ProRes 422 HQ file made through `bt709_fixture.make` (issue #292:
+`setparams` on its input and the tags on its output, kept only when ffprobe
+reads bt709 ×3 and its first frame reads back against its own graph; a
+refusal is an instrument failure, exit 2), placed UNDER the ramp (covered by
+it), so the ramp's `render_frame` is a 16-bit PNG (spec §11 PR-4: 16-bit
+when any source is deeper) whose inputs are still the ramp's exact 8-bit
+codes. Frames are taken at t = 0.5 s unless a row says otherwise; v is the
+uncurved render's own value at the sample, so every formula is over measured
+bytes. The oracle is this script's own Fritsch–Carlson (`fc`), written from
+the paper (SIAM J. Numer. Anal. 17(2), 1980) as GR-12 states it, independent
+of `CurveTable`.
 
 Projects, each 30 fps: C (640×360, CARD), R (1920×360, DEEP under RAMP), M
 (640×360, MOVIE, background black), S (CARD, saved twice for N2), A1–A3
@@ -130,6 +134,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
+import bt709_fixture  # noqa: E402
 import mcp  # noqa: E402
 import proof_app  # noqa: E402
 import swift_build  # noqa: E402
@@ -159,7 +164,6 @@ R_ROWS = {"K1", "K3", "C1"}
 M_ROWS = {"X1"}
 A_ROWS = {"A1", "A2", "A3"}
 P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11"}
-TAG = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
 SHADER = "app/Resources/Shaders/Compositor.metal"
 TABLE = "app/Sources/CurveTable.swift"
 TEXTURES = "app/Sources/CurveTextures.swift"
@@ -478,13 +482,13 @@ def fixtures():
     made = bounded.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i",
                         f"testsrc2=size={CARD_W}x{CARD_H}:rate=30:duration=2",
                         "-c:v", "libx264", "-pix_fmt", "yuv420p", str(movie)], 120)
-    deep = WORK / "deep.mov"
-    made_deep = bounded.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i",
-                             f"color=c=black:size={RAMP_W}x{RAMP_H}:rate=30:duration=2",
-                             "-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le",
-                             *TAG, str(deep)], 120)
-    return (card, ramp, movie if made["rc"] == 0 and movie.exists() else None,
-            deep if made_deep["rc"] == 0 and deep.exists() else None)
+    deep, deep_why = bt709_fixture.make(
+        WORK / "deep.mov", ["-f", "lavfi", "-i", f"color=c=black:size={RAMP_W}x{RAMP_H}:"
+                            f"rate=30:duration=2,{bt709_fixture.SETPARAMS}"],
+        ["-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le"],
+        {"codec_name": "prores", "pix_fmt": "yuv422p10le", "width": RAMP_W, "height": RAMP_H},
+        "yuv422p10le", 120)
+    return (card, ramp, movie if made["rc"] == 0 and movie.exists() else None, deep, deep_why)
 
 
 # ---- N0: the uncurved frames --------------------------------------------------
@@ -1154,9 +1158,10 @@ def main():
     if not binary.is_file():
         print(f"instrument failure: no app binary at {binary}")
         return 2
-    card, ramp, movie, deep = fixtures()
+    card, ramp, movie, deep, deep_why = fixtures()
     if movie is None or deep is None:
-        print("instrument failure: ffmpeg did not make the testsrc2 or the deep movie")
+        print("instrument failure: ffmpeg did not make the testsrc2 or the deep movie"
+              + (f": {deep_why}" if deep is None else ""))
         return 2
     neutral = Neutral(args.mode, folder)
     log = WORK / "instance.log"

@@ -18587,8 +18587,12 @@ timed, the fixture is what it says).
   when M1, E1 or E2 is selected, so `--only H0,F4,T4,Z1` and `--only T4 --lut
   PATH` need no main build. The movie is `work/gr7/media/testsrc2_1080_10s.mp4`
   (ffmpeg `testsrc2` 1920×1080, 30 fps, 10 s, libx264 yuv420p CRF 18, BT.709
-  tags); the LUT `work/gr7/luts/gr7-camera-33.cube` is written from textbook
-  maths only (33³, red fastest: a smoothstep S-curve mixed at 0.5, gains 1.06 /
+  tags: since issue #292, `setparams` on the input as well as the tags on the
+  output, through `bt709_fixture.make`, which keeps a movie, a cached one too,
+  only when ffprobe reads bt709 ×3 and its first frame reads back against its
+  own graph within 2.0 8-bit levels a plane); the LUT
+  `work/gr7/luts/gr7-camera-33.cube` is written from textbook maths only (33³,
+  red fastest: a smoothstep S-curve mixed at 0.5, gains 1.06 /
   1.0 / 0.92, saturation 1.2 about the Rec. 709 luma, a clamp). Fixtures
   (1920×1080, 30 fps, black): **U** the movie `seconds/10` times on track 1 and
   again on track 2 at scale 0.5, (480, −270); **G** U with every clip at GR0's
@@ -19380,3 +19384,103 @@ python3 tools/proof/name_residue.py                          # exit 0, nothing p
 **`make gate`** (cold, the worktree's first, 2026-10-13): `names pass 1s`, `typecheck pass 6s`
 (exactly its four baseline warnings), `fmt pass 2s`, `lint pass 25s`, `test pass 322s`,
 `app pass 123s`, `gate: PASS 479s`, exit 0.
+
+## Issue #292 — four proofs' BT.709 fixtures tagged on the input (bt709_fixture.py --selftest and four mutants; hdr_proof, curves_proof, grading_verdict, grading_spike)
+
+B98 (#290) found that ffmpeg's `-colorspace`/`-color_primaries`/`-color_trc` given to the output
+alone leave primaries and transfer `unknown` (ProRes, and here H.264 and HEVC too), and fixed
+precision_proof's fixtures. Four more proofs made BT.709 fixtures the same way. Each now goes
+through `tools/proof/bt709_fixture.py`'s `make(out, graph, codec, want, pix_fmt, seconds)`,
+which is precision_proof's `tagged`/`read_back` rule parametrised by path:
+- `make` refuses a graph without `SETPARAMS` (`setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709`)
+  before ffmpeg runs.
+- It makes `out` from `[*graph, *codec, *TAG]` through a `partial-` file, renamed into place.
+- It keeps `out`, a cached file too, only when ffprobe reads `want` and bt709 ×3, and the first
+  frame read back against the fixture's own graph rendered raw has a mean |Δ| ≤ 2.0 8-bit levels
+  on each of Y, Cb and Cr (10-bit codes ÷ 4).
+- A refused file is removed and made once more. A second refusal is `(None, reason)`.
+
+The callers:
+- **hdr_proof**: `h264_709` and `prores4444` go through `make`, with their argv unchanged, so their
+  cached files are validated, not remade. A refusal sets `REFUSED[name]` to the maker's reason.
+- **curves_proof**: `deep.mov` takes `SETPARAMS` on its lavfi input. A refusal is the instrument
+  failure, exit 2, with the reason.
+- **grading_verdict**: `make_movie`. A refusal prints the instrument failure, and Z1 fails.
+- **grading_spike**: D1's two fixtures. A refusal is `D1 FAIL`, with the reason.
+
+```
+python3 tools/proof/bt709_fixture.py --selftest                       # S1–S4 scored, S5 a RECORD
+python3 tools/proof/bt709_fixture.py --selftest --mutant NAME         # guard-dropped | tags-unchecked | readback-unchecked | no-remake
+```
+
+**The old fixtures' tags** (`ffprobe … stream=color_space,color_transfer,color_primaries -of csv=p=0`,
+made by the old instruments on 2026-10-14):
+- hdr's `h264_709.mp4` and `prores4444.mov`: `bt709,bt709,bt709`. They already had `setparams` in
+  their `-vf`.
+- curves' `deep.mov` (its work folder is removed at exit, so its old argv was run again into a
+  scratch file): `bt709,unknown,unknown`.
+- grading_verdict's `testsrc2_1080_10s.mp4`: `bt709,unknown,unknown`.
+- grading_spike's `prores422-10bit.mov` and `hevc420-10bit.mp4`: `bt709,unknown,unknown`.
+
+**The run** (2026-10-14, the worktree `~/devel/framejob-b100` from `f3c7a8f`, Release built from the
+untouched tree before any edit; no product file changed):
+
+```
+python3 -m py_compile tools/proof/bt709_fixture.py tools/proof/hdr_proof.py tools/proof/curves_proof.py tools/proof/grading_verdict.py tools/proof/grading_spike/grading_spike.py   # exit 0
+python3 tools/proof/bt709_fixture.py --selftest                        # 4/4 ok, exit 0
+python3 tools/proof/bt709_fixture.py --selftest --mutant guard-dropped       # caught: S1 FAIL, exit 0
+python3 tools/proof/bt709_fixture.py --selftest --mutant tags-unchecked      # caught: S3 FAIL, exit 0
+python3 tools/proof/bt709_fixture.py --selftest --mutant readback-unchecked  # caught: S4 FAIL, exit 0
+python3 tools/proof/bt709_fixture.py --selftest --mutant no-remake           # caught: S3, S4 FAIL, exit 0
+```
+
+- **S1**: a graph without SETPARAMS returned None. The reason names SETPARAMS, and no file was left.
+- **S2**: the proper graph was kept: bt709/bt709/bt709 (transfer/primaries/space), read-back means
+  1.477, 1.629, 1.648. Those are 64×64 `testsrc2` frames through ProRes 422 HQ, the same in every
+  kept case.
+- **S3**: a file pre-written with smpte170m tags ×3 was refused on its tags (read-back holds on it,
+  so only the tag check catches it) and made again. The kept file reads bt709 ×3.
+- **S4**: a grey `color` file tagged bt709 ×3 was refused on read-back (61.993, 40.313, 39.627) and
+  made again. The kept file's sha256 is `9222eee653962856…`, not the stale file's `c8d29cbbc3f0c896…`.
+- **S5** (RECORD): TAG on the output only gives ProRes `None/None/bt709`. ffprobe reports no
+  primaries and no transfer.
+
+**Targeted fixture commands** (the interface's one-liners):
+- `hdr_proof.fixture("h264_709")` and `fixture("prores4444")`: both kept, `REFUSED` `{}`. Means
+  0.166, 0.207, 0.202 and 0.009, 0.017, 0.017. Neither was remade: each is byte-identical to
+  ctl-b99's copy.
+- `grading_verdict.make_movie()`: the cached movie was refused (primaries and transfer `unknown`)
+  and made again. It was kept at bt709 ×3, means 0.138, 0.137, 0.133. Its sha256 went from
+  `43d9d16f48b7e468…` to `bed352e5c9ecd50c…`.
+- `grading_spike.fixtures()`: both cached files were refused (primaries and transfer `unknown`) and
+  made again, then kept at bt709 ×3. Means: `prores422-10bit.mov` 0.094, 0.072, 0.080;
+  `hevc420-10bit.mp4` 0.452, 0.623, 0.622.
+
+**Before and after** (Release; every log has no `Frame Job: ` line and no `DEFAULTS MOVED`):
+
+| Proof | Before (old instrument, old fixtures) | After (new maker) |
+|---|---|---|
+| hdr `capture` | `ctl-b99`, exit 0, Z1 refused none | `ctl-b100`, exit 0, `h264_709.mp4` and `prores4444.mov` kept bt709 ×3 |
+| hdr `compare ctl-b100 --only H1,H1a,Z1` | — | 3/3, exit 0 |
+| `cmp` ctl-b99 / ctl-b100 | — | all 24 `h1-*.png` byte-identical; 11 of 12 `media/` files byte-identical, and the 12th is `reversed-intermediate.mov`, the app's reverse output, which H1 itself reports as differing from run to run |
+| curves `capture` | `curves-ctl-b99`, exit 0 | `curves-ctl-b100`, exit 0; `deep.mov` kept bt709 ×3, means 0.000 ×3 |
+| curves `compare curves-ctl-b99` | — | 29/29, exit 0: N0's seven frames byte-identical in 16-bit samples |
+| curves `compare curves-ctl-b100` | — | 29/29, exit 0 |
+| grading_verdict `--only H0,G0,T4,Z1` | all pass: T4 2, T4c 56, G0 87 | all pass: T4 2, T4c 55, G0 87; the movie kept |
+| grading_spike `--measure` | — | all scored rows pass; D1 both fixtures kept (the means above) |
+
+What moved in curves: N0 compares decoded samples, and they held. But the PNG files of `ramp.png`
+and `ramp-looked.png`, the frames with `deep.mov` under the ramp, differ in bytes between
+`curves-ctl-b99` and `curves-ctl-b100`. In ctl-b99 they carry an `sRGB` chunk; in ctl-b100 they
+carry an `iCCP` named `kCGColorSpaceCoreMedia709` (and a shorter `eXIf`). The rgba64le decode of
+each pair is identical. The five card and movie frames are byte-identical.
+
+D1 after (RECORD, frames per second, median of three runs, 60 frames of 3840×2160):
+
+| Fixture | 32BGRA | 64RGBAHalf | x420 | x422 |
+|---|---|---|---|---|
+| `prores422_10` | 196.7 | 279.5 | 177.6 | 416.1 |
+| `hevc420_10` | 204.6 | 276.4 | 341.1 | 304.9 |
+
+The load average was high during these runs, because other sessions shared the host: 56.76 before
+B3, 29.78 before A4, 25.58 before A5. H0 passed each time.

@@ -27,7 +27,12 @@ times). Each instance runs under the scratch `CFFIXED_USER_HOME`
 `work/gr7/run/home`, performs no menu item (M1 reads the listing only), and is
 stopped by its own pid. Main's build (`--main`, default the throwaway
 worktree's Release binary) is resolved, freshness-checked and launched only
-when M1, E1 or E2 is selected. H0 the host gate (`grading_spike.host_gate`);
+when M1, E1 or E2 is selected. The movie `work/gr7/media/testsrc2_1080_10s.mp4`
+is made through `bt709_fixture.make` (issue #292): `setparams` on its input
+and the tags on its output, kept — a cached movie too — only when ffprobe
+reads bt709 ×3 and its first frame reads back against its own graph, so a
+movie tagged on the output only is refused and made again (a second refusal
+is an instrument failure, Z1's FAIL). H0 the host gate (`grading_spike.host_gate`);
 M1 the menu listings of main's and the branch's instances; G0 fixture G
 renders more than 8 levels away from fixture U and holds one adjustment clip;
 E1/E2 the ungraded export against main's and the graded against the
@@ -61,6 +66,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE / "graphics_spike"))
 sys.path.insert(0, str(HERE / "grading_spike"))
 import bounded  # noqa: E402
+import bt709_fixture  # noqa: E402
 import grading_spike  # noqa: E402
 import mcp  # noqa: E402
 import proof_app  # noqa: E402
@@ -107,8 +113,6 @@ WIDTH, HEIGHT = 1920, 1080
 TONE = {"exposure": 0.5, "temperature": 0.2, "tint": -0.1, "highlights": -0.2,
         "shadows": 0.2, "whites": 0.1, "blacks": -0.1, "vibrance": 0.2, "fade": 0.1}
 F_LOOKS = ("warm", "cool", "teal_orange", "vivid")
-# precision_proof.TAG: the BT.709 tags every fixture movie carries.
-TAG = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
 TIMING = re.compile(r"\[(?:reelcut|framejob)\] compositor: ([\d.]+) ms average, ([\d.]+) ms worst")
 RELEASE_ONLY = "GR7a times exports and reads the compositor's frame times"
 MENU_PATHS = ("View ▸ Show Ungraded", "View ▸ Scopes", "Insert ▸ Adjustment Clip",
@@ -409,19 +413,16 @@ def main_tree(action):
 # ---- media and the LUT ----------------------------------------------------------------
 
 def make_movie():
-    if MOVIE.exists():
-        return MOVIE
-    MEDIA.mkdir(parents=True, exist_ok=True)
-    partial = MEDIA / f"partial-{MOVIE.name}"
-    made = bounded.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-f", "lavfi", "-i",
-                        f"testsrc2=size={WIDTH}x{HEIGHT}:rate=30:duration={MOVIE_SECONDS}",
-                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", *TAG,
-                        str(partial)], 600)
-    if made["rc"] != 0 or made["expired"] or not partial.exists():
-        print(f"instrument failure: ffmpeg could not make {MOVIE.name}: {made['stderr'][-400:]}")
-        return None
-    partial.rename(MOVIE)
-    return MOVIE
+    """MOVIE through `bt709_fixture.make` (issue #292), or None."""
+    made, why = bt709_fixture.make(
+        MOVIE, ["-f", "lavfi", "-i", f"testsrc2=size={WIDTH}x{HEIGHT}:rate=30:"
+                f"duration={MOVIE_SECONDS},{bt709_fixture.SETPARAMS}"],
+        ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18"],
+        {"codec_name": "h264", "pix_fmt": "yuv420p", "width": WIDTH, "height": HEIGHT},
+        "yuv420p", 600)
+    if made is None:
+        print(f"instrument failure: {why}")
+    return made
 
 
 def camera(r, g, b):

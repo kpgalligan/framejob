@@ -95,6 +95,7 @@ ROOT = PROOF.parents[1]
 sys.path.insert(0, str(PROOF))
 sys.path.insert(0, str(PROOF / "graphics_spike"))
 import bounded  # noqa: E402
+import bt709_fixture  # noqa: E402
 import swift_build  # noqa: E402
 
 # ---- the rules' constants (archive/grading.md, "GR0's rules") -----------------
@@ -503,25 +504,27 @@ FIXTURES = (
     ("hevc420_10", "hevc420-10bit.mp4",
      ["-c:v", "libx265", "-preset", "ultrafast", "-pix_fmt", "yuv420p10le", "-tag:v", "hvc1"]),
 )
+# What ffprobe must read of each fixture beside 3840×2160 and bt709 ×3 (issue #292).
+D1_WANT = {"prores422_10": ("prores", "yuv422p10le"), "hevc420_10": ("hevc", "yuv420p10le")}
 
 
 def fixtures():
+    """D1's fixtures through `bt709_fixture.make` (issue #292): `setparams` on
+    the input, the tags on the output, each kept — a cached file too — only
+    when ffprobe reads its codec, pix_fmt, 3840×2160 and bt709 ×3 and its
+    first frame reads back against its own graph; a refusal is D1's FAIL."""
     media = WORK / "media"
-    media.mkdir(parents=True, exist_ok=True)
     made = {}
     for key, name, codec in FIXTURES:
-        path = media / name
-        if not path.exists():
-            partial = media / f"partial-{name}"
-            ran = run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                       "-f", "lavfi", "-i", "testsrc2=size=3840x2160:rate=30:duration=2"] + codec
-                      + ["-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
-                         partial], 300)
-            if ran["expired"] or ran["rc"] != 0 or not partial.exists():
-                emit("D1", "FAIL", f"ffmpeg could not make {name}: "
-                     f"{'expired' if ran['expired'] else ran['stderr'][-400:]}")
-                return None
-            partial.rename(path)
+        codec_name, pix_fmt = D1_WANT[key]
+        path, why = bt709_fixture.make(
+            media / name, ["-f", "lavfi", "-i", "testsrc2=size=3840x2160:rate=30:duration=2,"
+                           f"{bt709_fixture.SETPARAMS}"], codec,
+            {"codec_name": codec_name, "pix_fmt": pix_fmt, "width": 3840, "height": 2160},
+            pix_fmt, 300)
+        if path is None:
+            emit("D1", "FAIL", why)
+            return None
         made[key] = path
     return made
 
