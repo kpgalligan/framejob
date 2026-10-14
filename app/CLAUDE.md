@@ -447,6 +447,10 @@ detail there.
   an odd size, carrying the source's colour labels (spec §11 PR-7), rendered
   on demand behind `ReverseProgressSheetController.swift`'s sheet,
   substituted per CLIP by `CompositionBuilder`.
+- `ReverseCache.swift` — `ReverseCache`, `ReverseResolution`, `ReverseStatus`
+  and `ReverseSource`, moved whole out of `ReverseRenderer.swift` (issue
+  batch B96): where a reversed asset lives (its digest name and pruning) and
+  what the composition is told.
 - `ReverseMirror.swift` — the app's ONE spelling of the reversed mirror and
   its pivot (spec §11, D4-6), in the three units its readers hold it in:
   `MediaPeaks.window`, `TimelineView.sourceTime` and `ReverseRenderer`. The

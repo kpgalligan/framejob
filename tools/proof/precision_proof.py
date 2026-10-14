@@ -375,6 +375,7 @@ REVERSE_DISTINCT = 800
 REVERSE_PROBE = ROOT / "tools/proof/reverse_probe.swift"
 REVERSE_DIR = BASE / "reverse-probe"
 REVERSER = "app/Sources/ReverseRenderer.swift"
+REVERSE_CACHE = "app/Sources/ReverseCache.swift"
 RAMP_ODD = ("color=c=black:size=1919x1079:rate=30:duration=1,format=yuv422p10le,"
             "geq=lum='64+X*876/(W-1)':cb=512:cr=512")
 HLG = ["-color_primaries", "bt2020", "-color_trc", "arib-std-b67", "-colorspace", "bt2020nc"]
@@ -463,7 +464,7 @@ MUTANTS = {
     "reverse-no-attachments": {"mode": "rows", "rows": ["V2"], "also": ["V3"], "anchors": [
         (REVERSER, "        CVBufferPropagateAttachments(source, target)\n", "")]},
     "reverse-unversioned": {"mode": "rows", "rows": ["V4"], "anchors": [
-        (REVERSER, '        for byte in "\\(source.path)|\\(size)|\\(Int64(modified.rounded()))'
+        (REVERSE_CACHE, '        for byte in "\\(source.path)|\\(size)|\\(Int64(modified.rounded()))'
          '|v\\(rendererVersion)".utf8 {\n',
          '        for byte in "\\(source.path)|\\(size)|\\(Int64(modified.rounded()))".utf8 {\n')]},
     "reverse-odd-hevc": {"mode": "rows", "rows": ["V5"], "anchors": [

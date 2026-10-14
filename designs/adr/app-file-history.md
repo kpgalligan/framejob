@@ -670,7 +670,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `ReverseProgressSheetController.swift` is 192. The next seam: `// MARK: - Where a reversed
   asset lives` and `// MARK: - What the composition is told` (`ReverseCache`,
   `ReverseResolution`, `ReverseStatus`, `ReverseSource`; lines 4–331 at `19ef985`) out whole to
-  `ReverseCache.swift`.
+  `ReverseCache.swift`. Issue batch B96 paid that seam before GR-23's log reverse: lines 1–341
+  at `7765ba8` (the three imports through `ReverseSource`'s closing brace) moved byte for byte
+  to `ReverseCache.swift`, a pure move gated alone; nothing widened, and
+  `precision_proof.py`'s `reverse-unversioned` mutant re-anchored to the new file. `wc -l
+  app/Sources/ReverseRenderer.swift`: 1221 before, 883 after; `ReverseCache.swift` is 341. The
+  next seam: the audio helpers (`appendAudioBytes` … `audioSample`) out to
+  `ReverseRenderer+Audio.swift`, which widens their `private`.
 - `Controls.swift`: held to the sync rule with Rasterize's copy (`app/CLAUDE.md` "Shared chrome");
   7 of its lines are the SH-2 fork of `drawBar` (#101).
 - `ReelOps.swift` is exempt (a table, one row per op). `TimelineView.swift`,
