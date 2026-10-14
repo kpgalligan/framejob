@@ -547,6 +547,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   app/Sources/Compositor.swift`: 658 before, 572 after; `Compositor+Sources.swift` 91. T3-1's
   wiring brought the file back to 600. The next seam: `// MARK: - The Metal side` — `final class
   MetalRenderer` whole — out to `MetalRenderer.swift`.
+  Issue batch B95 paid that seam: `// MARK: - The Metal side` and `final class MetalRenderer` went
+  whole to `MetalRenderer.swift` with `Compositor.swift`'s five imports (AVFoundation, AppKit,
+  CoreVideo, Metal, MetalPerformanceShaders), a pure move gated alone before GR-22's range wiring;
+  nothing widened (nothing at file scope was `private`). `adjustment_proof.py`'s `front-graded`
+  and `matte_proof.py`'s `source-drawn` anchors were re-pinned to the new file. `wc -l
+  app/Sources/Compositor.swift`: 600 before, 280 after; `MetalRenderer.swift` is 325. No further
+  seam is named.
 - `ReelCore.swift`: the typed patches moved to `TypedPatches.swift` in issue batch B73 (#216), a
   pure move gated alone before `ReelContainer` landed; no further seam is named. The `dictionary`
   extensions went to `OpDictionaries.swift` in issue batch B52b (#190), the media helpers earlier

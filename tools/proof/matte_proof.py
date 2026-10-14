@@ -269,7 +269,7 @@ MUTANTS = {
         "    alpha *= matteCover;",
         "    alpha *= 1.0 + 0.0 * matteCover;", ["A1", "A2", "L1"]),
     "source-drawn": (
-        "app/Sources/Compositor.swift",
+        "app/Sources/MetalRenderer.swift",
         "        let canvasLayers = layers.filter { $0.matte?.into == nil }",
         "        let canvasLayers = layers.filter { $0.matte?.into == nil || true }",
         ["A1", "B0", "MM"]),

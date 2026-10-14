@@ -1185,8 +1185,11 @@ the key map behind it.
   discriminant, append only) and `target(of:in:)` (the core's
   `matte_target`, for the chrome only); `TrackSnapshot.matte` decodes it
   leniently.
-- `Compositor.swift` · `Compositor+Sources.swift` (a layer's source texture:
-  `source(for:…)`, `texture(from:)`) · `Compositor+Input.swift` (step 0,
+- `Compositor.swift` · `MetalRenderer.swift` (`final class MetalRenderer`:
+  the device, the pipelines, the caches and `render`; a pure move out of
+  `Compositor.swift`, issue batch B95) · `Compositor+Sources.swift` (a
+  layer's source texture: `source(for:…)`, `texture(from:)`) ·
+  `Compositor+Input.swift` (step 0,
   `InputStage`, `InputUniforms`, and `ConvertingCompositor`, the class a
   composition holding an HLG, PQ or wide-gamut source, or a media with
   Camera Log, is built with, spec §11 GR-15, GR-16; a layer's `input`

@@ -218,7 +218,7 @@ MUTANTS = {
                           "    float w = saturate(matte.sample(samp, local).r);\n")],
                         ["O1", "O2"]),
     "front-graded": ([(
-        "app/Sources/Compositor.swift",
+        "app/Sources/MetalRenderer.swift",
         "        let canvasLayers = layers.filter { $0.matte?.into == nil }\n",
         "        let canvasLayers = layers.filter { $0.matte?.into == nil && !$0.isAdjustment }\n"
         "            + layers.filter { $0.matte?.into == nil && $0.isAdjustment }\n")], ["G1"]),
