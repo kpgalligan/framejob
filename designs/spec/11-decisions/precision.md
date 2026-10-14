@@ -242,6 +242,13 @@ measurement of the unchanged product; it amends PR-7.
   - Amends PR-5's "the reversed-clip intermediate".
   - **Amended by PR-10** (B98, #289): an odd-size reverse of a media flagged full range reads
     `422YpCbCr10BiPlanarFullRange` frames, not `x422`.
+  - **Accepted limit** (owner, 2026-10-14, #280): the HEVC Main 10 intermediate moves a log
+    clip's toe up 3 codes (S-Log3 95 → 98, Apple Log 196 → 199; about 7 levels after the curve),
+    every other sample within 2. Measured in B96 (4bea569, `log_proof.py reverse-variants`): the
+    rate is the cause, not 4:2:0. 2× rate leaves 1–3 codes at 2× the file, 4× rate 1–2 at 4×
+    (867 MB/min at 2160p30), 4:2:2 HEVC no better at 1×; ProRes 422 HQ costs 32×. Nothing held
+    ±1 within 2× the size, so the rate stays; `log_proof.py` L6 holds the reversed render to the
+    intermediate's own codes.
 - **PR-8 — 10-bit `hevc_alpha` and 10-bit screen recording are not wanted (owner, 2026-10-11,
   choices 3a and 4a).**
   - `hevc_alpha`: Main 10 with alpha works (877 colour levels), but the alpha plane stays 8-bit
@@ -327,6 +334,6 @@ measurement of the unchanged product; it amends PR-7.
   - Not reached, and left open: a VP9 MP4's track carries no `FullRangeVideo` extension (its
     range is in `vpcC` alone, measured), so GR-22's flag reads `slog3_fr_vp9` as video range and
     its reverse is still read video-range `x422` (toe 90, spread 28, as before). Reading that
-    flag from `vpcC` is GR-22's reader, not this decision's; `log_proof.py`'s `L13_OPEN` holds
-    the pair (#291).
+    flag from `vpcC` is GR-22's reader, not this decision's; `log_proof.py`'s `L13_OPEN` held
+    the pair (#291) — closed by GR-23 (issue batch B99, #291).
   - Amends PR-7.

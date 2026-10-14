@@ -80,6 +80,17 @@ Rows:
   bt709's flat marker lands again, hlg's `0.jpg` (inode, mtime_ns) and
   `complete.json` bytes stay as they were before the reopen for 5 s (the
   no-op pass holds an HDR strip without opening its asset's picture).
+- **T9** (issue batch B99, #291, spec §11 GR-23): log_proof's
+  `slog3_fr_vp9e.mp4` and `slog3_vr_vp9e.mp4` (S-Log3 set on both, the
+  full-range clip at 0 and the video-range one at 2 s) and `bt709.mov`
+  (imported, no clip) in one project: the full-range marker is `wrapped`
+  with `fullRange` true and the video-range marker's keys are exactly
+  `source`, `log` and `gamut`, each `0.jpg` = its render ±4; saved, closed,
+  the full-range `complete.json` rewritten without `fullRange` (the marker a
+  build before B99 wrote) and bt709's deleted, reopened: `fullRange` true
+  lands again, `0.jpg`'s (inode, mtime_ns) moved, and = the render ±4;
+  saved, closed, bt709's marker deleted again, reopened: once bt709's flat
+  marker lands, both VP9 strips stay unchanged for 5 s (T8's method).
 - **TT** (`--measure`, recorded and not scored): a 60 s 1920×1080 10-bit
   HEVC (libx265, `ultrafast`, default GOP) file imported: seconds from the
   import call to the flat marker; then S-Log3 set: seconds from
@@ -90,8 +101,8 @@ Rows:
   the copy's `app/Sources`.
 
 `capture DIR` runs H0, T0, T4 and T5's capture (`--only` scores and writes
-only the rows named). `compare DIR` runs TH, T1–T8 and Z1. A plain run is TH,
-T1, T2, T3, T6, T7, T8 and Z1 (`--only` adds T4 or T5, read against
+only the rows named). `compare DIR` runs TH, T1–T9 and Z1. A plain run is TH,
+T1, T2, T3, T6, T7, T8, T9 and Z1 (`--only` adds T4 or T5, read against
 `--control`). `--mutant NAME` builds a COPY of the tree
 (`tree_copy.make_copy`), applies its edits (each anchor asserted to occur
 exactly once), builds it by the copy's own `make app-debug` (`make app` under
@@ -151,7 +162,8 @@ T1_CASES = [("applelog", "applelog", None, ("apple_log", "bt2020")),
             ("slog3", "slog3", SLOG3, ("slog3", "s_gamut3_cine")),
             ("vlog", "vlog", {"log": "vlog"}, ("vlog", "v_gamut")),
             ("slog3-lut", "slog3", "lut", None)]
-ROWS = ["H0", "TH", "T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "TT", "S2", "Z1"]
+ROWS = ["H0", "TH", "T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "TT", "S2",
+        "Z1"]
 RECORDS = {"TT"}
 SOURCE_SWIFT = "app/Sources/MediaImporter+ThumbnailSource.swift"
 WATCH_SWIFT = "app/Sources/ProjectDocument+ConvertedThumbnails.swift"
@@ -167,8 +179,7 @@ MUTANTS = {
                    "urls: urls)\n",
                    "            _ = (media, url, cache, urls)\n")], ["T2", "T3"]),
     "flat-head": ([(SOURCE_SWIFT,
-                    "        return readConverted(at: marker) == ConvertedThumbsStamp(stamp, "
-                    "input: input)\n",
+                    "        return readConverted(at: marker) == current\n",
                     "        return readStamp(at: marker) == stamp\n")], ["T2"]),
     "always-wrapped": ([(SOURCE_SWIFT,
                          "        guard let input else { return writeStamp(stamp, to: marker) }\n",
@@ -194,6 +205,16 @@ MUTANTS = {
     "hdr-unheld": ([(SOURCE_SWIFT,
                      "                || readConverted(at: marker)?.holdsHDR(of: stamp) == true\n",
                      "                || false\n")], ["T8"]),
+    # B99 (#291, spec §11 GR-23): the marker never records the range, then
+    # the head check never reads it.
+    "range-unstamped": ([(SOURCE_SWIFT,
+                          "        self.fullRange = fullRange && input.readsRange ? true : nil\n",
+                          "        self.fullRange = nil\n")], ["T9"]),
+    "range-head-blind": ([(SOURCE_SWIFT,
+                           "        let fullRange = track.map(CompositionBuilder.isFullRange) "
+                           "== true\n",
+                           "        let fullRange = track.map { _ in false } == true\n")],
+                         ["T9"]),
 }
 rows = {}
 selected = set()
@@ -804,6 +825,137 @@ def run_t8(client, state):
           + (f"; misses {misses}" if misses else ""))
 
 
+# ---- T9 (B99, #291) -------------------------------------------------------------
+
+T9_TITLE = ("T9 a full-range VP9 S-Log3 strip's marker records fullRange; a video-range one's "
+            "is source, log and gamut alone; a marker without fullRange is drawn again at the "
+            f"next open, and an unchanged reopen holds both strips for {T8_HOLD} s (each ±4)")
+
+
+def wants_range(full):
+    """T9's markers: S-Log3 / S-Gamut3.Cine with `fullRange` true (`full`), or
+    exactly `source`, `log` and `gamut`."""
+    curve = wrapped("slog3", "s_gamut3_cine")
+
+    def holds(marker):
+        if not curve(marker):
+            return False
+        if full:
+            return marker.get("fullRange") is True
+        return set(marker) == {"source", "log", "gamut"}
+    return holds
+
+
+def t9_compare(doc, media, at, tag, notes, misses, label):
+    """`media`'s 0.jpg against the render at `at` ±4."""
+    worst, _, size = compare(doc, media, doc.render(tag, t=at))
+    notes.append(f"{label} worst {worst} ({size})")
+    if worst is None or worst > TOLERANCE:
+        misses.append(f"{label}: worst {worst}")
+
+
+def t9_hold(doc, ids, before, misses, notes):
+    """T8's method: every strip in `ids` stays as `before` for T8_HOLD s."""
+    end, moved = time.monotonic() + T8_HOLD, {}
+    while time.monotonic() < end and len(moved) < len(ids):
+        for name, media in ids.items():
+            now = strip_state(doc, media)
+            if name not in moved and now != before[name]:
+                moved[name] = "gone" if now is None else (
+                    "0.jpg rewritten" if now[:2] != before[name][:2] else "complete.json changed")
+        time.sleep(0.1)
+    notes.append(f"unchanged reopen over {T8_HOLD} s: {moved or 'both unchanged'}")
+    misses.extend(f"{name}: {why}" for name, why in moved.items())
+
+
+def run_t9(client, state):
+    """T9 (B99): each step's miss is scored and the row goes on; only a step
+    the next one needs (the project, a strip, a save, a reopen) stops it."""
+    misses, notes = [], []
+    full_path, video_path = lp.fixture("slog3_fr_vp9e"), lp.fixture("slog3_vr_vp9e")
+    trigger_path = hdr.fixture("bt709")
+    if not (full_path and video_path and trigger_path):
+        check(T9_TITLE, False, f"refused {refused()}")
+        return
+    at = {"full": 0, "video": 2 * hdr.SEC}
+    doc = Doc(client, "t9")
+    full_clip = doc.place(full_path, at=at["full"]) if doc.ok else None
+    video_clip = doc.place(video_path, at=at["video"]) if full_clip is not None else None
+    trigger = doc.media_id(trigger_path) if video_clip is not None else None
+    ids = {"full": doc._media.get(full_path), "video": doc._media.get(video_path)}
+    before, stop = None, None
+    if trigger is None or not (doc.color(ids["full"], SLOG3) and doc.color(ids["video"], SLOG3)):
+        stop = f"setup: {doc.why}"
+    else:
+        # 1 and 2: the full-range marker records its range; the video-range
+        # one is today's shape.
+        for name in ("full", "video"):
+            marker, why = wait_marker(doc, ids[name], wants_range(name == "full"))
+            if marker is None:
+                misses.append(f"{name} range: {why}")
+                continue
+            notes.append(f"{name} range {shape(marker)[:90]}")
+            t9_compare(doc, ids[name], at[name], f"t9-{name}", notes, misses, f"{name} range")
+        landed, why = wait_marker(doc, trigger, flat)
+        if landed is None:
+            stop = f"bt709: {why}"
+        elif not doc.call("save_project")["ok"]:
+            stop = "save_project refused"
+        else:
+            before = strip_state(doc, ids["full"])
+    state["t9 closed"] = doc.close()
+    if stop or before is None:
+        check(T9_TITLE, False,
+              "; ".join(notes) + f"; misses {misses + [stop or 'no full-range strip']}")
+        return
+    # 3 and 4: the marker a build before B99 wrote is drawn again.
+    marker_path = doc.strip(ids["full"]) / "complete.json"
+    old = json.loads(marker_path.read_text())
+    notes.append(f"the marker rewritten without fullRange (it held {old.get('fullRange')})")
+    marker_path.write_text(json.dumps({k: v for k, v in old.items() if k != "fullRange"}))
+    (doc.strip(trigger) / "complete.json").unlink(missing_ok=True)
+    opened = attempt(client, "open_project", {"path": str(doc.path)})
+    held = None
+    if not opened["ok"]:
+        stop = f"open_project: {opened.get('error')}"
+    else:
+        marker, why = wait_marker(doc, ids["full"], wants_range(True))
+        now = strip_state(doc, ids["full"])
+        redrawn = now is not None and now[:2] != before[:2]
+        notes.append(f"the stale marker: {shape(marker)[:90] if marker else why}; 0.jpg "
+                     f"rewritten {redrawn}")
+        if marker is None or not redrawn:
+            misses.append(f"stale marker: fullRange landed {marker is not None}, 0.jpg "
+                          f"rewritten {redrawn}")
+        else:
+            t9_compare(doc, ids["full"], at["full"], "t9-redrawn", notes, misses, "redrawn")
+        landed, why = wait_marker(doc, trigger, flat)
+        if landed is None:
+            stop = f"bt709 after the first reopen: {why}"
+        elif not doc.call("save_project")["ok"]:
+            stop = "save_project refused after the first reopen"
+        else:
+            held = {name: strip_state(doc, media) for name, media in ids.items()}
+        state["t9 reopened closed"] = doc.close()
+    if stop or held is None or None in held.values():
+        check(T9_TITLE, False,
+              "; ".join(notes) + f"; misses {misses + [stop or 'no strip held']}")
+        return
+    # 5: an unchanged reopen holds both strips.
+    (doc.strip(trigger) / "complete.json").unlink(missing_ok=True)
+    opened = attempt(client, "open_project", {"path": str(doc.path)})
+    if not opened["ok"]:
+        misses.append(f"open_project again: {opened.get('error')}")
+    else:
+        landed, why = wait_marker(doc, trigger, flat)
+        if landed is None:
+            misses.append(f"bt709 after the second reopen: {why}")
+        else:
+            t9_hold(doc, ids, held, misses, notes)
+        state["t9 held closed"] = doc.close()
+    check(T9_TITLE, not misses, "; ".join(notes) + (f"; misses {misses}" if misses else ""))
+
+
 # ---- TT -------------------------------------------------------------------------
 
 def tt_fixture():
@@ -916,13 +1068,13 @@ def main():
     elif capture:
         selected = {"H0", "T0", "T4", "T5", "Z1"}
     elif args.mode == "compare":
-        selected = {"TH", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "Z1"}
+        selected = {"TH", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "Z1"}
     elif args.measure:
         selected = {"TT", "Z1"}
     elif args.mutant:
         selected = set(named) | ({"Z1"} if "S2" not in named else set())
     else:
-        selected = {"TH", "T1", "T2", "T3", "T6", "T7", "T8", "Z1"}
+        selected = {"TH", "T1", "T2", "T3", "T6", "T7", "T8", "T9", "Z1"}
     if "H0" in selected and not capture:
         print("H0 runs in capture only")
         return 2
@@ -990,6 +1142,8 @@ def main():
                     run_t7(client, state)
                 if "T8" in selected:
                     run_t8(client, state)
+                if "T9" in selected:
+                    run_t9(client, state)
                 if "TT" in selected:
                     run_tt(client, state)
             except Exception as error:  # a row that could not run is a failure

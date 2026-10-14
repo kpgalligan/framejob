@@ -113,9 +113,17 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   toe worst is ≤ HOLD_BOUND (1) and its spread ≤ 2 (fixed before the run).
   L13 passes when the four odd fixtures (pairs `slog3_fr_odd`/`slog3_vr_odd`
   and `slog3_fr_vp9`/`slog3_vr_vp9`) are all REACHED and each not in
-  `L13_OPEN` HOLDS (a fixture there is printed beside its issue). One not
+  `L13_OPEN` HOLDS (a fixture there is printed beside its issue; empty since
+  issue batch B99, which closed the VP9 pair's #291). One not
   REACHED is an instrument failure, named in REFUSED. `slog3_fr_422` (the
   even HEVC 4:2:2 file: the HEVC branch, #280) is printed and not scored.
+- **L14** (issue batch B99, #291, spec §11 GR-23): `slog3_fr_vp9e.mp4`,
+  `slog3_vr_vp9e.mp4` and `slog3_fr_webm.webm` (the last imported through
+  `ContainerRewrap`) with S-Log3 set at 0.5 s, scored as L10 but to ±2: L1's
+  grey-row points and the patches = the oracle at the file's own decoded codes
+  ±2 at 8 bits (the VP9 decode: the same codes from VP9 and from HEVC part by
+  up to 0.88 of a level untransformed, 1.25 under S-Log3), the code domain by
+  the file's range flag — step 0's read of a VP9 track's `vpcC` range bit.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
@@ -136,11 +144,17 @@ lossless `main422-10`, `hvc1`; 4:2:0 HEVC cannot hold an odd height), tagged
 as `slog3_fr`; `slog3_fr_vp9.mp4` (`pc`) and `slog3_vr_vp9.mp4` (`tv`),
 1024×129 `yuv420p10le` VP9 Profile 2 (libvpx-vp9 lossless), their tags
 printed and not required; and `slog3_fr_422.mov`, 1024×128 as
-`slog3_fr_odd`. Each is wanted with its codec, profile, pix_fmt and size,
+`slog3_fr_odd`. B99's (#291, L14) are the VP9 pair at 1024×128,
+`slog3_fr_vp9e.mp4` (`pc`) and `slog3_vr_vp9e.mp4` (`tv`), and
+`slog3_fr_webm.webm`, the same full-range VP9 stream in WebM, its tags
+printed and not required. Each is wanted with its codec, profile, pix_fmt and size,
 and read back as above. Mutants: `full-range-ignored` (L10, L12),
-`apple-log-rescaled` (L11), `range-from-reverse` (L12), and B98's
+`apple-log-rescaled` (L11), `range-from-reverse` (L12), B98's
 `odd-range-ignored` (L13: `Intermediate.pixelFormat(fullRange:)` answers the
-video-range `x422` whatever the flag, spec §11 PR-10).
+video-range `x422` whatever the flag, spec §11 PR-10), and B99's
+`vp9-range-ignored` (L13, L14: `isFullRange`'s fallback answers false in
+place of `vp9FullRange(of:)`) and `vpcc-wrong-byte` (L13, L14: the bit read
+from byte 7, the colour primaries, in place of byte 6, spec §11 GR-23).
 
     python3 tools/proof/log_proof.py reverse-variants [--variant base,rate2,...]
 
@@ -259,7 +273,7 @@ SETTINGS = {"slog3": {"log": "slog3", "gamut": "s_gamut3_cine"}, "vlog": {"log":
             "green_m": {"log": "slog3", "gamut": "s_gamut3_cine"}}
 L9_FIXTURES = ["slog3", "vlog", "applelog", "applelog2", "green"]
 ROWS = ["LP1", "LP2", "LP3", "LP4", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10",
-        "L11", "L12", "L13", "Z1"]
+        "L11", "L12", "L13", "L14", "Z1"]
 LP_ROWS = {"LP1", "LP2", "LP3", "LP4"}
 # B95 (spec §11 GR-22): HEVC Main 10 4:2:0 fixtures (libx265, lossless) flagged
 # full (`pc`) or video (`tv`) range, the curve's signal stored as the 10-bit
@@ -274,9 +288,16 @@ RANGE_FIXTURES = {"slog3_fr": ("slog3", "pc", ("bt2020", "bt709", "bt2020nc")),
                   "slog3_vr_odd": ("slog3", "tv", ("bt2020", "bt709", "bt2020nc")),
                   "slog3_fr_vp9": ("slog3", "pc", None),
                   "slog3_vr_vp9": ("slog3", "tv", None),
-                  "slog3_fr_422": ("slog3", "pc", ("bt2020", "bt709", "bt2020nc"))}
+                  "slog3_fr_422": ("slog3", "pc", ("bt2020", "bt709", "bt2020nc")),
+                  # B99 (#291), L14's: the VP9 pair at an even size, and the
+                  # full-range one in WebM (the `ContainerRewrap` route).
+                  "slog3_fr_vp9e": ("slog3", "pc", None),
+                  "slog3_vr_vp9e": ("slog3", "tv", None),
+                  "slog3_fr_webm": ("slog3", "pc", None)}
 RANGE_SETTINGS = {"slog3_fr": SETTINGS["slog3"], "slog3_vr": SETTINGS["slog3"],
-                  "vlog_fr": SETTINGS["vlog"], "applelog_fr": {"log": "apple_log"}}
+                  "vlog_fr": SETTINGS["vlog"], "applelog_fr": {"log": "apple_log"},
+                  "slog3_fr_vp9e": SETTINGS["slog3"], "slog3_vr_vp9e": SETTINGS["slog3"],
+                  "slog3_fr_webm": SETTINGS["slog3"]}
 # B98 (#289): a range fixture's shape, (width, height, pix_fmt, encoder argv,
 # codec_name, profile, extension); a name not here is RANGE_DEFAULT, B95's.
 X265 = ["-c:v", "libx265", "-x265-params", "lossless=1:log-level=error"]
@@ -289,19 +310,23 @@ VP9 = ("yuv420p10le", ["-c:v", "libvpx-vp9", "-lossless", "1", "-profile:v", "2"
        "Profile 2", ".mp4")
 RANGE_SHAPES = {"slog3_fr_odd": (W, ODD_H, *HEVC422), "slog3_vr_odd": (W, ODD_H, *HEVC422),
                 "slog3_fr_vp9": (W, ODD_H, *VP9), "slog3_vr_vp9": (W, ODD_H, *VP9),
-                "slog3_fr_422": (W, H, *HEVC422)}
+                "slog3_fr_422": (W, H, *HEVC422),
+                "slog3_fr_vp9e": (W, H, *VP9), "slog3_vr_vp9e": (W, H, *VP9),
+                "slog3_fr_webm": (W, H, *VP9[:4], ".webm")}
 # The VP9 fixtures' tags are printed, not required (their range is).
-TAGS_PRINTED = {"slog3_fr_vp9", "slog3_vr_vp9"}
+TAGS_PRINTED = {"slog3_fr_vp9", "slog3_vr_vp9", "slog3_fr_vp9e", "slog3_vr_vp9e",
+                "slog3_fr_webm"}
 # L13 (B98, #289): the odd fixtures scored, in pairs (full range, its
 # video-range twin); `slog3_fr_422` printed only. L13_OPEN: fixture → the
 # issue a range-independent or unfixed pair was filed as; such a fixture is
 # scored on REACHED alone, its hold figures printed beside the reference.
 L13_PAIRS = (("slog3_fr_odd", "slog3_vr_odd"), ("slog3_fr_vp9", "slog3_vr_vp9"))
 L13_PRINTED = ("slog3_fr_422",)
-# B98's VP9 pair: an MP4's VP9 track carries no `FullRangeVideo` extension, so
-# GR-22's flag (`CompositionBuilder.isFullRange`) reads it as video range and
-# PR-10's full-range read never fires (measured after PR-10: toe 90, spread 28).
-L13_OPEN: dict[str, str] = {"slog3_fr_vp9": "#291", "slog3_vr_vp9": "#291"}
+# Empty since B99 (#291, spec §11 GR-23): B98's VP9 pair was here because an
+# MP4's VP9 track carries no `FullRangeVideo` extension, so GR-22's flag read
+# it as video range (measured after PR-10: toe 90, spread 28); the flag now
+# reads the track's `vpcC` range bit, and the pair is scored.
+L13_OPEN: dict[str, str] = {}
 L13_SPREAD = 2
 # The read-back points: one ramp column on GREY_ROW and the 18 % patch.
 READBACK_X = 512
@@ -312,6 +337,7 @@ SOURCES_SWIFT = "app/Sources/Compositor+Sources.swift"
 COLOR_SWIFT = "app/Sources/MediaImporter+Color.swift"
 SHADER = "app/Resources/Shaders/Compositor.metal"
 BUILDER_SWIFT = "app/Sources/CompositionBuilder.swift"
+RANGE_SWIFT = "app/Sources/CompositionBuilder+SourceRange.swift"
 # name: ([(file, anchor, replacement), …], the rows that must fail).
 MUTANTS = {
     "source-unconverted": ([(SOURCES_SWIFT,
@@ -375,6 +401,15 @@ MUTANTS = {
     "odd-range-ignored": ([("app/Sources/ReverseRenderer.swift",
                             "                return kCVPixelFormatType_422YpCbCr10BiPlanarFullRange\n",
                             "                return pixelFormat\n")], ["L13"]),
+    # B99 (#291, spec §11 GR-23): a VP9 track's `vpcC` range bit unread, then
+    # read from the wrong byte (7, the colour primaries).
+    "vp9-range-ignored": ([(RANGE_SWIFT,
+                            "        return vp9FullRange(of: description) ?? false\n",
+                            "        return false\n")], ["L13", "L14"]),
+    "vpcc-wrong-byte": ([(RANGE_SWIFT,
+                          "        return record[record.startIndex + 6] & 1 == 1\n",
+                          "        return record[record.startIndex + 7] & 1 == 1\n")],
+                        ["L13", "L14"]),
 }
 # B96 (#280): the reverse's intermediate variants, each one edit to the plain
 # `.hevcMain10` path of ReverseRenderer.swift (`reverse-variants`). The rate
@@ -1397,10 +1432,11 @@ def range_oracle(curve, gamut, codes, full_decode, domain, matrix="bt2020nc"):
                                                      for c in signal_])]
 
 
-def range_rows(client, row, names):
+def range_rows(client, row, names, bound=1):
     """Each of `names` with its Camera Log at 0.5 s against the oracle at its
-    OWN decoded codes, in its range, with the domain by its flag: (misses,
-    worst, the 0 % patch's render and its video-domain oracle)."""
+    OWN decoded codes, in its range, with the domain by its flag, within
+    `bound` levels at 8 bits: (misses, worst). The 0 % patch's render, its
+    oracle and its video-domain oracle are printed, not returned."""
     misses, worst, figures = [], {}, {}
     for name in names:
         curve, flag, _ = RANGE_FIXTURES[name]
@@ -1416,7 +1452,7 @@ def range_rows(client, row, names):
         gaps = [(x, y, v, range_oracle(curve, gamut, yuv.codes(x, y), full,
                                        code_domain(curve, full))) for x, y, v in points]
         worst[name] = max(spread(v, o) for _, _, v, o in gaps)
-        bad = [(x, y, v, o) for x, y, v, o in gaps if spread(v, o) > 1]
+        bad = [(x, y, v, o) for x, y, v, o in gaps if spread(v, o) > bound]
         if bad:
             misses.append(f"{name}: {len(bad)} samples off, e.g. {bad[:3]}")
         x0 = PATCH_X[0]
@@ -1436,6 +1472,22 @@ def run_l10(client):
           "full range) with Camera Log at 0.5 s: L1's grey-row points and the patches = the "
           "oracle at the file's own decoded codes ±1 at 8 bits, the code domain by the range "
           "flag (GR-22)", not misses, f"worst {worst}; {misses}")
+
+
+def run_l14(client):
+    # Bound 2, not L10's 1: the VP9 decode itself. The same codes decoded
+    # from VP9 and from HEVC part by up to 0.88 of a level with no Camera Log
+    # (where GR-23 changes nothing) and by 1.25 under S-Log3, tagged or not
+    # (issue batch B99's measurement; the orchestrator's ruling). A range
+    # misread is 28 levels off, so the bound still tells the two apart.
+    misses, worst = range_rows(client, "L14", ("slog3_fr_vp9e", "slog3_vr_vp9e", "slog3_fr_webm"),
+                               bound=2)
+    check("L14 slog3_fr_vp9e.mp4, slog3_vr_vp9e.mp4 and slog3_fr_webm.webm (VP9 Profile 2, "
+          "flagged full, video, full range; the WebM rewrapped) with S-Log3 at 0.5 s: L1's "
+          "grey-row points and the patches = the oracle at the file's own decoded codes ±2 at "
+          "8 bits (the VP9 decode, GR-23), the code domain by the range flag (GR-23: a VP9 "
+          "track's `vpcC` bit)",
+          not misses, f"worst {worst}; {misses}")
 
 
 def run_l11(client):
@@ -2037,7 +2089,8 @@ def main():
                 for name, run in (("L1", run_l1), ("L2", run_l2), ("L3", run_l3),
                                   ("L4", run_l4), ("L5", run_l5), ("L6", run_l6),
                                   ("L7", run_l7), ("L8", run_l8), ("L10", run_l10),
-                                  ("L11", run_l11), ("L12", run_l12), ("L13", run_l13)):
+                                  ("L11", run_l11), ("L12", run_l12), ("L13", run_l13),
+                                  ("L14", run_l14)):
                     if name in selected:
                         run(client)
             except Exception as error:  # a row that could not run is a failure

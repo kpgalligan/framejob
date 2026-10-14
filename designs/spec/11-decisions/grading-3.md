@@ -465,6 +465,8 @@ opened, at design time or build time.
   - Accepted limit: an HLG or PQ strip certified by a flat marker from a build before GR-21 keeps
     its plain picture until its file changes or its cache is removed (no package in real use,
     owner 2026-10-09).
+  - Amended by GR-23: the converted marker of an S-Log3 or V-Log media from a full-range source
+    also carries `fullRange: true`, and the head check reads that range for those media alone.
 - **GR-22 — A log file's code domain follows its media's range flag** (#283; amends GR-16).
   - The range is the media's forward video track's `kCMFormatDescriptionExtension_FullRangeVideo`.
     It is read when the composition is built and carried per instruction, per track, as
@@ -485,3 +487,48 @@ opened, at design time or build time.
     oracle is 0 (2); after it, L10 is within 1 level on the full-range S-Log3 and V-Log files and
     their video-range twin, L11 (full-range Apple Log) within 1, and a reversed full-range clip's
     0 % patch renders 5, 22 levels from the video-domain reading.
+  - Amended by GR-23: a VP9 track, whose format description has no `FullRangeVideo` key, takes
+    its range from its `vpcC` record; a strip GR-21 certified before GR-23 for a full-range
+    S-Log3 or V-Log media is drawn again.
+- **GR-23 — A VP9 track's range is read from its `vpcC` record** (issue batch B99, #291; amends
+  GR-21, GR-22 and PR-10).
+  - The range flag (`CompositionBuilder.isFullRange`) is the first format description's
+    `kCMFormatDescriptionExtension_FullRangeVideo` when the key is present. When it is absent,
+    it is the `videoFullRangeFlag` of a version-1 `vpcC` record (the VP codec ISOBMFF binding:
+    version, three flag bytes, profile, level, then bitDepth:4 | chromaSubsampling:3 |
+    videoFullRangeFlag:1, byte 6). Otherwise it is video range. The key wins whenever present,
+    so HEVC, ProRes and every other track read as before.
+  - All three VP9 routes carry `vpcC`: a VP9 MP4, opened as is; the WebM/Matroska rewrap, whose
+    record the core writes (`container_codec.rs`'s `vpcc()`, the Colour element's Range over the
+    keyframe's colour-range bit, #216-R); and ffmpeg's opt-in copy into MP4 (#227).
+  - Every reader of the flag follows: step 0's log code domain (GR-22), PR-10's odd-size reverse
+    and GR-21's strips. The reverse's renderer version is 4 (PR-7's digest rule), so a reverse
+    already in a package is rendered again.
+  - The marker: a converted marker of an S-Log3 or V-Log media (the curves whose code domain
+    follows the range) from a full-range source carries `fullRange: true`; the head check reads
+    the range for those inputs alone, from the file's first video track's format description,
+    with no picture decoded. A strip certified without the field is drawn again, which closes
+    GR-22's strip limit for these media. Every other marker is byte-identical to before, and a
+    plain, HDR, LUT or Apple Log head check opens no asset.
+  - No op, FFI, recipe, format or catalog change.
+  - Accepted limits: a `vpcC` of another version reads as video range. A full-range HEVC S-Log3
+    or V-Log strip drawn after GR-22 is drawn once more, for its new field.
+  - Measured (the control, issue batch B99, Debug, before the code): `log_proof.py` L13's
+    `slog3_fr_vp9` (1024×129, VP9 MP4, `pc`) reversed with toe worst 90 (column 0: 95 → 159)
+    and a spread of 28 from its forward render, its video-range twin within 1; L14 with S-Log3
+    set rendered `slog3_fr_vp9e.mp4` and `slog3_fr_webm.webm` 28 levels off the oracle (0 %
+    patch [28, 28, 28] against [0, 0, 0]: the video-domain reading), `slog3_vr_vp9e.mp4` within
+    1. `log_thumbs_proof.py` T9: the full-range VP9 strip's marker was `source`, `log` and
+    `gamut` alone, and a reopen did not draw it again (`0.jpg` not rewritten); the video-range
+    strip's marker had that shape and its `0.jpg` was within 1 of its render.
+  - Measured after (Debug, the same commands): L13's `slog3_fr_vp9` holds (ProRes 422 1024×129,
+    toe worst 1, 95 → 146, spread 2) and its twin is unchanged; L14 renders the 0 % patch of
+    `slog3_fr_vp9e.mp4` and `slog3_fr_webm.webm` [0, 0, 0] (the oracle's), each file's worst 2
+    levels, at 8 samples on the grey row (at x 400, 158 against 160), and
+    `slog3_vr_vp9e.mp4`'s 1. The 2 is the VP9 decode, not the range: the same codes in HEVC
+    (`slog3_fr`) and in VP9 render up to 0.88 of a level apart with no Camera Log and 1.25 with
+    S-Log3 (a diagnostic run, tagged or untagged alike), so L14 holds a VP9-decoded file to ±2,
+    not L10's ±1 (a misread range is 28 off), and passes. T9 holds: the full-range marker carries
+    `fullRange: true`, the video-range one is `source`, `log` and `gamut`, the marker rewritten
+    without the field was drawn again (`0.jpg` rewritten, within 1 of its render), and an
+    unchanged reopen held both strips for 5 s.

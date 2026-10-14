@@ -49,8 +49,9 @@ enum ReverseCache {
     /// the written file changes, so every reverse already in a package is
     /// rendered again rather than played. 2: the 10-bit intermediate with
     /// the source's colour labels (spec §11 PR-7). 3: an odd-size reverse of
-    /// full-range media read as full-range frames (spec §11 PR-10).
-    static let rendererVersion = 3
+    /// full-range media read as full-range frames (spec §11 PR-10). 4: a VP9
+    /// media's range read from its `vpcC` (spec §11 GR-23).
+    static let rendererVersion = 4
 
     static func directory(in cache: URL) -> URL {
         cache.appendingPathComponent(directoryName, isDirectory: true)

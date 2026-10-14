@@ -299,7 +299,8 @@ detail there.
   one-clip composition and step 0 (`MediaImporter+ThumbnailSource.swift`,
   await-free: `ThumbnailInput`, `ThumbnailReader`, `ConvertedThumbsStamp`),
   its marker the converted stamp (the source stamp plus the curve and gamut,
-  or the LUT's path, size and second, or the HDR transfer), every other
+  or the LUT's path, size and second, or the HDR transfer, and `fullRange`
+  for a full-range S-Log3 or V-Log source (GR-23)), every other
   strip's the flat `CacheStamp`; the ledger starts a new generation for a
   changed Camera Log input as for another file (spec §11 GR-21). Peaks alone
   wrap the unchanged source stamp in `PeaksStamp` version 1 and require a
@@ -1085,7 +1086,8 @@ the key map behind it.
 - `CompositionBuilder.swift` (+`InstructionRanges`, +`AudioTracks`,
   +`SourceRange`: a log media's range flag, read once per build from its
   forward video track and carried per instruction as
-  `RecipeInstruction.fullRangeTracks`, spec §11 GR-22) — the
+  `RecipeInstruction.fullRangeTracks`, spec §11 GR-22, and a VP9 track's
+  `vpcC` bit when the key is absent, GR-23) — the
   app's ONE builder of the video composition, from an
   `AVVideoComposition.Configuration` it keeps on
   `BuiltComposition.videoConfiguration` (#91; a variant — Preview Quality's

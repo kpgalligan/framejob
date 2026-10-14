@@ -358,7 +358,7 @@ enum MediaImporter {
         let marker = thumbsMarkerURL(for: media.id, in: cacheDir)
         // The head check. A nil stamp (the file cannot be stat'ed) never
         // skips, and never writes a marker below either.
-        if let stamp, thumbsAreCurrent(stamp, input: input, at: marker) { return }
+        if let stamp, thumbsAreCurrent(stamp, input: input, url: url, at: marker) { return }
         guard pass?.isCurrent() ?? true, ensureDirectory(directory) else { return }
         // What is on disk is the old film or a partial pass. The marker goes
         // first, then the frames (`clearThumbnails` says why in that order).
@@ -475,7 +475,7 @@ enum MediaImporter {
         if let stamp, reader.certifies {
             CacheLedger.shared.publish(in: cacheDir, for: pass) {
                 guard stripHolds(written, in: directory) else { return }
-                writeThumbsStamp(stamp, input: reader.input, to: marker)
+                writeThumbsStamp(stamp, input: reader.input, fullRange: reader.fullRange, to: marker)
             }
         }
         postCacheChange(media: media.id, kind: thumbsKind, replaced: replaced)

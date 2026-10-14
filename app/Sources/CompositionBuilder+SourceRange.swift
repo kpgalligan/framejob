@@ -12,11 +12,12 @@ import AVFoundation
 /// even size is written from `x420` codes the decoder already rescaled; an odd
 /// size of a full-range media from full-range `x422` frames (spec §11 PR-10),
 /// which the ProRes writer stores in video range: log_proof L13 read the file's
-/// 95 as 146 in the intermediate, as L12 reads it through HEVC. A VP9 MP4
-/// carries its range in `vpcC` alone, not in this key, so it reads as video
-/// range here (L13, measured). Only media a video segment converts with a log
-/// curve are read, so a composition with none reads nothing and every
-/// instruction's set is empty.
+/// 95 as 146 in the intermediate, as L12 reads it through HEVC. A VP9 track
+/// carries its range in its `vpcC` record and not in the key, so the record
+/// is read when the key is absent (spec §11 GR-23): a VP9 MP4 as is, a
+/// rewrapped WebM and ffmpeg's copy all carry one (log_proof L13, L14). Only
+/// media a video segment converts with a log curve are read, so a
+/// composition with none reads nothing and every instruction's set is empty.
 extension CompositionBuilder {
 
     /// The media of `plan`'s log-converting video segments whose forward video
@@ -60,15 +61,36 @@ extension CompositionBuilder {
         return result
     }
 
-    /// Whether `track`'s first format description carries
-    /// `kCMFormatDescriptionExtension_FullRangeVideo` true; absent or false is
-    /// video range. Read by KEY, for `oneFrame`'s reason.
+    /// Whether `track`'s first format description is full range: its
+    /// `kCMFormatDescriptionExtension_FullRangeVideo` when present, else its
+    /// `vpcC` record's bit (`vp9FullRange`), else video range (spec §11
+    /// GR-23). Read by KEY, for `oneFrame`'s reason.
     static func isFullRange(_ track: AVAssetTrack) -> Bool {
         guard let description = (keyed(track, "formatDescriptions") as? [CMFormatDescription])?
             .first
         else { return false }
-        return CMFormatDescriptionGetExtension(
+        if let flag = CMFormatDescriptionGetExtension(
             description, extensionKey: kCMFormatDescriptionExtension_FullRangeVideo) as? Bool
-            == true
+        {
+            return flag
+        }
+        return vp9FullRange(of: description) ?? false
+    }
+
+    /// The `videoFullRangeFlag` of a VP9 description's `vpcC` record (the VP
+    /// codec ISOBMFF binding, version 1: version, three flag bytes, profile,
+    /// level, then bitDepth:4 | chromaSubsampling:3 | videoFullRangeFlag:1 —
+    /// the layout `container_codec.rs`'s `vpcc()` writes). Nil when the
+    /// record is absent, shorter than 7 bytes or another version.
+    static func vp9FullRange(of description: CMFormatDescription) -> Bool? {
+        guard
+            let atoms = CMFormatDescriptionGetExtension(
+                description,
+                extensionKey: kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms)
+                as? [String: Any],
+            let record = atoms["vpcC"] as? Data, record.count >= 7,
+            record[record.startIndex] == 1
+        else { return nil }
+        return record[record.startIndex + 6] & 1 == 1
     }
 }

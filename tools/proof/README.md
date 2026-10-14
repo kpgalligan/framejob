@@ -19186,6 +19186,83 @@ driven tree's `ReverseCache.swift`.
   29/29.
 - `… compare tools/proof/work/precision/ctl-b98`: 11/11, S11's four files byte-identical.
 
+### Issue batch B99 — a VP9 track's range read from its `vpcC` (L13, L14, T9 and four mutants; spec §11 GR-23, #291)
+
+```
+python3 tools/proof/log_proof.py --only L13,L14,Z1                 # Debug; the recorded run is RC_PROOF_APP=release
+python3 tools/proof/log_thumbs_proof.py --only T9,Z1
+python3 tools/proof/log_proof.py --mutant vp9-range-ignored --only L13,L14,Z1
+python3 tools/proof/log_proof.py --mutant vpcc-wrong-byte --only L13,L14,Z1
+python3 tools/proof/log_thumbs_proof.py --mutant range-unstamped      # T9 must FAIL
+python3 tools/proof/log_thumbs_proof.py --mutant range-head-blind     # T9 must FAIL
+```
+
+Three more range fixtures, written by their `RANGE_SHAPES` rows and read back as B95's:
+- `slog3_fr_vp9e.mp4` and `slog3_vr_vp9e.mp4`: B98's VP9 pair at 1024×128 (`yuv420p10le` VP9
+  Profile 2, libvpx-vp9 lossless), `pc` and `tv`, untagged.
+- `slog3_fr_webm.webm`: the same full-range stream in WebM, so the import takes the
+  `ContainerRewrap` route and the core writes its `vpcC`.
+
+**L14.** The three with S-Log3 at 0.5 s, scored as L10 but to ±2: L1's grey-row points and the
+patches = the oracle at the file's own decoded codes ±2 at 8 bits, the code domain by the file's
+range flag. The bound is 2, not L10's 1, for the VP9 decode (`range_rows`' `bound`, the
+orchestrator's ruling on the measurement under "After" below); a misread range is 28 off.
+**L13** now scores its VP9 pair: `L13_OPEN` is empty. **T9** (`log_thumbs_proof.py`): the two
+VP9e files with S-Log3 (the full-range clip at 0, the video-range one at 2 s) and `bt709.mov`
+in one project. The full-range marker must carry `fullRange: true` and the video-range one be
+`source`, `log` and `gamut` alone, each `0.jpg` = its render ±4. A marker rewritten without
+`fullRange` (what a build before B99 wrote) must be drawn again at the next open; an unchanged
+reopen must hold both strips for 5 s (T8's method).
+
+**On the unchanged product** (Debug, the control):
+- `log_proof.py --only L13,L14,Z1`: 1/3. L13 FAILED on `slog3_fr_vp9` (toe worst 90, 95 → 159,
+  spread 28); its twin held (1, 95 → 95, spread 1). L14 FAILED: `slog3_fr_vp9e` and
+  `slog3_fr_webm` worst 28 (0 % patch [28, 28, 28] against the oracle's [0, 0, 0], the
+  video-domain reading), `slog3_vr_vp9e` worst 1. Z1 ok.
+- `log_thumbs_proof.py --only T9,Z1`: 1/2. T9 FAILED: the full-range marker was `gamut` and
+  `log` alone (no `fullRange` within 120 s), the rewritten marker was not drawn again (`0.jpg`
+  not rewritten); the video-range marker had the right shape, worst 1; the unchanged reopen held
+  both. Z1 ok.
+
+**After spec §11 GR-23** (Debug):
+- `log_proof.py --only L13,L14,Z1`: 3/3. L13 ok: `slog3_fr_vp9` holds (ProRes 422 1024×129,
+  toe worst 1, 95 → 146, spread 2). L14 ok at its bound of 2: the full-range files' 0 % patch
+  is [0, 0, 0], the oracle's (the video-domain oracle [28, 28, 28]), each file's worst 2 levels
+  at 8 samples on the grey row (at x 400, 158 against 160); `slog3_vr_vp9e` worst 1. Z1 ok.
+- The 2 is the VP9 decode, not the range read. A diagnostic run (not an instrument) rendered the
+  same codes as HEVC (`slog3_fr`) and as VP9 (`slog3_fr_vp9e`): with no Camera Log, where B99
+  changes nothing, the two part by up to 0.88 of a level on the grey row; with S-Log3 by 1.25.
+  A copy of the VP9 file tagged bt2020/bt709/bt2020nc, as `slog3_fr` is, parted by the same
+  1.25 and missed the oracle at the same 8 samples. Against L10's bound of 1 L14 failed on
+  these 8 samples alone, so L14 is held to 2.
+- `log_thumbs_proof.py --only T9,Z1`: 2/2. T9 ok: the full-range marker carries
+  `fullRange: true`, worst 1; the video-range marker is `source`, `log` and `gamut`, worst 1;
+  the rewritten marker was drawn again (`0.jpg` rewritten, worst 1); the unchanged reopen held
+  both strips for 5 s.
+
+**Recorded runs** (Release, after the gate's `make app`; no `Frame Job: ` line, no `DEFAULTS
+MOVED`):
+- `RC_PROOF_APP=release python3 tools/proof/log_proof.py`: 18/18. L14 ok at its bound of 2
+  (worst 2, 1 and 2; the full-range 0 % patch [0, 0, 0] on both, the video-domain oracle
+  [28, 28, 28]). L13 ok (`slog3_fr_vp9` toe 1, 95 → 146, spread 2);
+  L10 worst 1 on each file; L12's 0 % patch [5, 5, 5], 22 levels outside the video-domain
+  envelope; LP1–LP4, L1–L8, L11 and Z1 ok.
+- `RC_PROOF_APP=release python3 tools/proof/log_thumbs_proof.py --only T1,T2,T3,T6,T7,T8,T9,Z1`:
+  8/8, T9 with the Debug figures above. TH, T4 and T5 need the #282 control, which this worktree
+  does not hold.
+- `RC_PROOF_APP=release python3 tools/proof/precision_proof.py --only V4`: 2/2, renderer
+  version 4 in the digest input, the planted old-version file pruned.
+
+**Mutants** (Debug, each MUTANT PASS, no other row failed):
+- `vp9-range-ignored` (`isFullRange`'s fallback answers false) and `vpcc-wrong-byte` (the bit
+  read from byte 7): L13 FAILED (`slog3_fr_vp9` back to not holding) and L14 FAILED at its
+  bound of 2 (the full-range files at worst 28, 143 samples off each).
+- `range-unstamped` (the marker's `fullRange` always nil): T9 FAILED, no `fullRange` marker.
+- `range-head-blind` (the head check's range read answers false): T9 FAILED, the rewritten
+  marker was not drawn again.
+- `flat-head`, rerun for its new anchor (`return readConverted(at: marker) == current`): T2
+  FAILED.
+
 ## Issue #282 — converting media's thumbnails through step 0 (`log_thumbs_proof.py` H0, TH, T0–T8, TT, Z1 and ten mutants; `cache_pass_probe.py` S2; spec §11 GR-21)
 
 `log_thumbs_proof.py` is log_proof.py's shape (`capture DIR [--only …]` | `compare DIR [--only

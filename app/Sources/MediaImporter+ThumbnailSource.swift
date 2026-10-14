@@ -5,7 +5,9 @@ import AVFoundation
 /// labelled HLG or PQ — a one-clip composition around it, through
 /// `CompositionBuilder` and step 0, so the strip is the preview's picture.
 /// The strip's marker says which: the flat `CacheStamp` for a plain strip,
-/// exactly as before, and a `ConvertedThumbsStamp` for a converted one.
+/// exactly as before, and a `ConvertedThumbsStamp` for a converted one, which
+/// records `fullRange` for an S-Log3 or V-Log media from a full-range source
+/// (spec §11 GR-23), so a strip certified without it is drawn again.
 ///
 /// Await-free (spec §11 W-8): the track's labels are read by key, as
 /// `CompositionBuilder.convertsSources` reads them, and the awaiting stays in
@@ -56,6 +58,16 @@ struct ThumbnailInput: Equatable {
         transfer = found
     }
 
+    /// Whether the strip's picture follows the source's range: S-Log3 and
+    /// V-Log, whose code domain does (`InputConversions.codeDomain`); not
+    /// Apple Log, a LUT or an HDR transfer.
+    var readsRange: Bool {
+        switch color?.log {
+        case .slog3, .vlog: return true
+        default: return false
+        }
+    }
+
     /// The media's `color` when step 0 converts it, else nil — without URLs,
     /// so the document's observer and the cache ledger key on it.
     static func convertingColor(of media: MediaSnapshot) -> MediaColor? {
@@ -70,7 +82,10 @@ struct ThumbnailInput: Equatable {
 /// `CacheStamp`, and what converted it — the curve and gamut, or the LUT
 /// named by its resolved path, size and modification second (so another
 /// file of the same size and second is not taken for it), or the HDR
-/// transfer. Nil fields are omitted on disk.
+/// transfer; and `fullRange` true for a `readsRange` input from a source
+/// flagged full range (spec §11 GR-23). Nil fields are omitted on disk, so
+/// every other marker is the shape it was before, and a marker written
+/// before GR-23 decodes with no `fullRange`.
 struct ConvertedThumbsStamp: Codable, Equatable {
     let source: MediaImporter.CacheStamp
     let log: LogCurve?
@@ -79,8 +94,9 @@ struct ConvertedThumbsStamp: Codable, Equatable {
     let lutSize: Int64?
     let lutModified: Int64?
     let transfer: HDRTransfer?
+    let fullRange: Bool?
 
-    init(_ source: MediaImporter.CacheStamp, input: ThumbnailInput) {
+    init(_ source: MediaImporter.CacheStamp, input: ThumbnailInput, fullRange: Bool) {
         self.source = source
         let curve = input.color?.log
         log = curve
@@ -91,6 +107,7 @@ struct ConvertedThumbsStamp: Codable, Equatable {
         lutSize = file?.size
         lutModified = file?.modified
         transfer = input.transfer
+        self.fullRange = fullRange && input.readsRange ? true : nil
     }
 
     /// The file's byte size and modification second, rounded as
@@ -120,6 +137,9 @@ struct ThumbnailReader {
     /// False only when a converting input's one-clip build failed: the
     /// strip is then the plain asset's and no marker certifies it.
     let certifies: Bool
+    /// What the marker records as `fullRange`: a `readsRange` input over a
+    /// track flagged full range (`CompositionBuilder.isFullRange`).
+    let fullRange: Bool
     /// The `RecipeSource` key the one-clip composition reads; nil on the
     /// plain path.
     let recipeKey: Int?
@@ -146,17 +166,19 @@ extension MediaImporter {
         input: ThumbnailInput?
     ) -> ThumbnailReader {
         let effective = input ?? track.flatMap(ThumbnailInput.init(track:))
+        let fullRange =
+            effective?.readsRange == true && track.map(CompositionBuilder.isFullRange) == true
         guard let effective, effective.color?.lut == nil || effective.lutURL != nil else {
             return ThumbnailReader(
                 generator: plainGenerator(for: media, asset: asset), input: effective,
-                certifies: true, recipeKey: nil)
+                certifies: true, fullRange: fullRange, recipeKey: nil)
         }
         let key = RecipeSource.shared.register()
         guard let built = oneClip(media, url: asset.url, input: effective, key: key) else {
             RecipeSource.shared.unregister(key)
             return ThumbnailReader(
                 generator: plainGenerator(for: media, asset: asset), input: effective,
-                certifies: false, recipeKey: nil)
+                certifies: false, fullRange: fullRange, recipeKey: nil)
         }
         let generator = AVAssetImageGenerator(asset: built.composition)
         generator.videoComposition = built.videoComposition
@@ -164,31 +186,43 @@ extension MediaImporter {
         // transform (`renderFrameReported` says why not twice).
         configure(generator, for: media, transform: false)
         return ThumbnailReader(
-            generator: generator, input: effective, certifies: true, recipeKey: key)
+            generator: generator, input: effective, certifies: true, fullRange: fullRange,
+            recipeKey: key)
     }
 
     /// The marker's head check. With a Camera Log, the converted marker of
-    /// that input. Without one, the flat stamp, or a converted marker of the
-    /// same source naming only a `transfer`: an HDR file's labels are fixed
-    /// by its stamp, so the no-op pass opens no picture to ask them again.
+    /// that input — and, for S-Log3 or V-Log alone, of `url`'s range, read
+    /// from its first video track's format description (no picture
+    /// decoded; spec §11 GR-23). Without one, the flat stamp, or a converted
+    /// marker of the same source naming only a `transfer`: an HDR file's
+    /// labels are fixed by its stamp, so the no-op pass opens no picture to
+    /// ask them again.
     static func thumbsAreCurrent(
-        _ stamp: CacheStamp, input: ThumbnailInput?, at marker: URL
+        _ stamp: CacheStamp, input: ThumbnailInput?, url: URL, at marker: URL
     ) -> Bool {
         guard let input else {
             return readStamp(at: marker) == stamp
                 || readConverted(at: marker)?.holdsHDR(of: stamp) == true
         }
-        return readConverted(at: marker) == ConvertedThumbsStamp(stamp, input: input)
+        var assets: [UInt32: AVURLAsset] = [:]
+        let track =
+            input.readsRange
+            ? CompositionBuilder.assetTrack(at: url, key: 0, mediaType: .video, assets: &assets)
+            : nil
+        let fullRange = track.map(CompositionBuilder.isFullRange) == true
+        let current = ConvertedThumbsStamp(stamp, input: input, fullRange: fullRange)
+        return readConverted(at: marker) == current
     }
 
     /// The flat stamp for a plain strip, exactly as before; the converted
-    /// marker for one drawn through step 0.
+    /// marker for one drawn through step 0, with the reader's `fullRange`.
     @discardableResult
     static func writeThumbsStamp(
-        _ stamp: CacheStamp, input: ThumbnailInput?, to marker: URL
+        _ stamp: CacheStamp, input: ThumbnailInput?, fullRange: Bool, to marker: URL
     ) -> Bool {
         guard let input else { return writeStamp(stamp, to: marker) }
-        return writeStamp(ConvertedThumbsStamp(stamp, input: input), to: marker)
+        return writeStamp(
+            ConvertedThumbsStamp(stamp, input: input, fullRange: fullRange), to: marker)
     }
 
     /// `readStamp`'s sibling for the converted shape; nil for a flat marker.
