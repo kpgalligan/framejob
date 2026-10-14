@@ -44,7 +44,16 @@ when ffprobe reads what it should (a refusal is that row's FAIL, naming it):
 (the ramp `yuv420p10le` tagged HLG BT.2020, `hevc_videotoolbox` Main 10),
 `chroma10_hlg.mov` (the same with Cb rising and Cr falling across the
 width, `CHROMA`) and `prores422_odd.mov` (`testsrc2` 1919×1079 2 s, through
-`format=yuv444p10le`, which keeps the odd size; `reverse-cost` only).
+`format=yuv444p10le`, which keeps the odd size; `reverse-cost` only). The
+bt709 movies of five makers (the H.264 clip, the ramp, `prores_clip`'s two
+heights and the two odd ones; issue batch B98, #290) are made through
+`tagged`: TAG on the output and `SETPARAMS` on the lavfi input (given to the
+output alone, ffmpeg wrote `colorspace` and left primaries and transfer
+`unknown`), each kept only when ffprobe reads bt709 ×3 with its codec, pix_fmt and size and
+`read_back` holds — its first frame against its own lavfi graph rendered raw,
+mean |Δ| ≤ READBACK_MEAN 8-bit levels on each of Y, Cb and Cr. A refused
+file, a stale cached one included, is removed and made once more; a second
+refusal of the clip or the ramp is the preflight's exit 2, naming it.
 
 The scenes, on a 640×360, 30 fps canvas, black background, read at 0.5 s
 (K4 at 1.25 s), after the spike's S1–S5:
@@ -161,7 +170,8 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       |Δ| ≤ V3_BOUND 8-bit levels (0.25, set from the measurement; the old
       renderer read 0.764 — its picture was right, rounded to 8 bits).
   V4  (P2-2, MCP) a reverse planted under the pre-version digest's name is
-      not used and is pruned: the `…|v2` name exists, the planted file is
+      not used and is pruned: the `…|v<rendererVersion>` name (read from the
+      driven tree's `ReverseCache.swift`) exists, the planted file is
       gone, and `render_frame` holds ≥ 850 distinct green (the ramp).
   V5  (P2-2) the 1919×1079 ramp reversed by the probe: prores, yuv422p10le,
       exactly 1919×1079 (ffprobe and the natural size); stamps as V0.
@@ -374,6 +384,16 @@ T = SEC // 2
 W, H = 640, 360
 RELEASE_ONLY = "M1 measures the compositor's frame times and the app's memory"
 TAG = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
+# Issue batch B98 (#290): the TAG fixtures' tags given to ffmpeg's INPUT as well
+# (given to the output alone, ProRes wrote `colorspace` and left primaries and
+# transfer `unknown`; B95: an output-only tag can convert the codes), and what
+# ffprobe must read back. READBACK_MEAN: a fixture's first frame against its
+# own lavfi graph rendered raw, mean |Δ| per plane in 8-bit levels (10-bit
+# codes ÷ 4), fixed before the run.
+SETPARAMS = "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+TAG_WANT = {"color_primaries": "bt709", "color_transfer": "bt709", "color_space": "bt709"}
+READBACK_MEAN = 2.0
+TAG_REFUSED = {}
 RAMP = ("color=c=black:size=1920x1080:rate=30:duration=1,format=yuv422p10le,"
         "geq=lum='64+X*876/1919':cb=512:cr=512")
 CARD = [0.2, 0.6, 0.9, 1]
@@ -730,22 +750,99 @@ def ffmpeg_make(out, argv):
 
 
 def h264_clip():
-    return ffmpeg_make(MEDIA / "testsrc2_640.mp4", [
-        "-f", "lavfi", "-i", f"testsrc2=size={W}x{H}:rate=30:duration=1",
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", *TAG])
+    return tagged("testsrc2_640.mp4", [
+        "-f", "lavfi", "-i", f"testsrc2=size={W}x{H}:rate=30:duration=1,{SETPARAMS}"],
+        ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18"],
+        {"codec_name": "h264", "pix_fmt": "yuv420p", "width": W, "height": H}, TAG_REFUSED)
 
 
 def ramp_clip():
-    return ffmpeg_make(MEDIA / "ramp10_prores422hq.mov", [
-        "-f", "lavfi", "-i", RAMP, "-c:v", "prores_ks", "-profile:v", "3",
-        "-pix_fmt", "yuv422p10le", *TAG])
+    return tagged("ramp10_prores422hq.mov", ["-f", "lavfi", "-i", f"{RAMP},{SETPARAMS}"],
+                  ["-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le"],
+                  {"codec_name": "prores", "pix_fmt": "yuv422p10le", "width": 1920,
+                   "height": 1080}, TAG_REFUSED)
 
 
 def prores_clip(height):
     width = height * 16 // 9
-    return ffmpeg_make(MEDIA / f"prores422_{height}.mov", [
-        "-f", "lavfi", "-i", f"testsrc2=size={width}x{height}:rate=30:duration=2",
-        "-c:v", "prores_ks", "-profile:v", "2", "-pix_fmt", "yuv422p10le", *TAG])
+    return tagged(f"prores422_{height}.mov", [
+        "-f", "lavfi", "-i", f"testsrc2=size={width}x{height}:rate=30:duration=2,{SETPARAMS}"],
+        ["-c:v", "prores_ks", "-profile:v", "2", "-pix_fmt", "yuv422p10le"],
+        {"codec_name": "prores", "pix_fmt": "yuv422p10le", "width": width, "height": height},
+        TAG_REFUSED)
+
+
+# The planar layouts `read_back` reads: bytes a sample, chroma subsampling.
+PLANAR = {"yuv420p": (1, 2, 2), "yuv422p10le": (2, 2, 1)}
+
+
+def planes(raw, pix_fmt, width, height):
+    """`raw` (one frame) as its Y, Cb and Cr sample lists, chroma sized by
+    ceil, or None when it is short."""
+    size, sub_x, sub_y = PLANAR[pix_fmt]
+    cw, ch = -(-width // sub_x), -(-height // sub_y)
+    counts = (width * height, cw * ch, cw * ch)
+    if not raw or len(raw) < size * sum(counts):
+        return None
+    values = struct.unpack(f"<{sum(counts)}{'H' if size == 2 else 'B'}",
+                           raw[:size * sum(counts)])
+    return [values[:counts[0]], values[counts[0]:counts[0] + counts[1]],
+            values[counts[0] + counts[1]:]]
+
+
+def read_back(out, graph, pix_fmt):
+    """(held, detail): `out`'s first frame decoded to `pix_fmt` against the
+    first frame of `graph` (the fixture's own input argv) rendered raw to
+    `pix_fmt` with no encode, by mean |Δ| per plane in 8-bit levels (10-bit
+    codes ÷ 4); held when each of Y, Cb and Cr is ≤ READBACK_MEAN."""
+    probe = stream(out)
+    width, height = probe.get("width"), probe.get("height")
+    if not width or not height:
+        return False, f"ffprobe read no size from {out.name}"
+    try:
+        raw = subprocess.run(["ffmpeg", "-v", "error", *graph, "-frames:v", "1", "-f",
+                              "rawvideo", "-pix_fmt", pix_fmt, "-"], capture_output=True,
+                             timeout=300, env=bounded.child_env()).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        raw = None
+    written, stored = (planes(raw, pix_fmt, width, height),
+                       planes(decode(out, pix_fmt), pix_fmt, width, height))
+    if written is None or stored is None:
+        return False, (f"read back {pix_fmt}: the graph's frame {'ok' if written else 'short'}, "
+                       f"{out.name}'s {'ok' if stored else 'short'}")
+    scale = 4 if PLANAR[pix_fmt][0] == 2 else 1
+    means = [sum(abs(a - b) for a, b in zip(w, s)) / len(w) / scale
+             for w, s in zip(written, stored)]
+    return (all(m <= READBACK_MEAN for m in means),
+            "read-back mean |Δ| Y, Cb, Cr " + ", ".join(f"{m:.3f}" for m in means)
+            + " 8-bit levels")
+
+
+def tagged(name, graph, codec, want, refused):
+    """`MEDIA/name`, made from `[*graph, *codec, *TAG]` and kept only when
+    ffprobe reads `want` and TAG_WANT and `read_back` holds (issue batch B98,
+    #290). A refused file, a stale cached one included, is removed and made
+    once more; a second refusal is None, `refused["why"]` naming it."""
+    if name in TAGGED:
+        return TAGGED[name]
+    out, need = MEDIA / name, {**want, **TAG_WANT}
+    for attempt in (1, 2):
+        made = ffmpeg_make(out, [*graph, *codec, *TAG])
+        if made is None:
+            refused["why"] = f"ffmpeg did not make {name}"
+            continue
+        probe = stream(made)
+        wrong = {k: probe.get(k, "unknown") for k, v in need.items() if probe.get(k) != v}
+        held, detail = (False, "not read") if wrong else read_back(made, graph, want["pix_fmt"])
+        if held:
+            print(f"       {name} kept: {tags(probe)}; {detail}", flush=True)
+            TAGGED[name] = made
+            return made
+        refused["why"] = (f"{name} refused (attempt {attempt}): ffprobe read "
+                          f"{wrong or 'as wanted'}, want {need}; {detail}")
+        print(f"       {refused['why']}", flush=True)
+        out.unlink(missing_ok=True)
+    return None
 
 
 def checked(maker, want, refused):
@@ -768,11 +865,10 @@ def checked(maker, want, refused):
 
 def ramp_odd():
     """The 10-bit ramp at 1919×1079 (V5; precision-2 P2-2), ProRes 422 HQ."""
-    return checked(lambda: ffmpeg_make(MEDIA / "ramp10_odd.mov", [
-        "-f", "lavfi", "-i", RAMP_ODD, "-c:v", "prores_ks", "-profile:v", "3",
-        "-pix_fmt", "yuv422p10le", *TAG]),
-        {"codec_name": "prores", "pix_fmt": "yuv422p10le", "width": 1919, "height": 1079},
-        ODD_REFUSED)
+    return tagged("ramp10_odd.mov", ["-f", "lavfi", "-i", f"{RAMP_ODD},{SETPARAMS}"],
+                  ["-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le"],
+                  {"codec_name": "prores", "pix_fmt": "yuv422p10le", "width": 1919,
+                   "height": 1079}, ODD_REFUSED)
 
 
 def ramp_hlg():
@@ -807,14 +903,15 @@ def prores_odd():
     """`reverse-cost`'s odd-sized movie: 2 s of `testsrc2` at 1919×1079, ProRes
     422. The `format` filter keeps the size: left to negotiate 4:2:0, ffmpeg
     wrote 1918×1078 (P2-2's control)."""
-    return checked(lambda: ffmpeg_make(MEDIA / "prores422_odd.mov", [
-        "-f", "lavfi", "-i", "testsrc2=size=1919x1079:rate=30:duration=2,format=yuv444p10le",
-        "-c:v", "prores_ks", "-profile:v", "2", "-pix_fmt", "yuv422p10le", *TAG]),
+    return tagged("prores422_odd.mov", [
+        "-f", "lavfi", "-i",
+        f"testsrc2=size=1919x1079:rate=30:duration=2,format=yuv444p10le,{SETPARAMS}"],
+        ["-c:v", "prores_ks", "-profile:v", "2", "-pix_fmt", "yuv422p10le"],
         {"codec_name": "prores", "pix_fmt": "yuv422p10le", "width": 1919, "height": 1079},
         ODD_REFUSED)
 
 
-ODD_REFUSED, HLG_REFUSED = {}, {}
+ODD_REFUSED, HLG_REFUSED, TAGGED = {}, {}, {}
 
 
 def still16_png():
@@ -1983,6 +2080,17 @@ def run_v3(client):
     return closed
 
 
+def renderer_version():
+    """`ReverseCache.rendererVersion` as the driven app's tree writes it
+    (issue batch B98: V4 read a hard-coded 2 before), or None."""
+    try:
+        text = (Path(sources_folder).parents[1] / REVERSE_CACHE).read_text()
+    except OSError:
+        return None
+    found = re.search(r"static let rendererVersion = (\d+)\n", text)
+    return int(found.group(1)) if found else None
+
+
 def run_v4(client, ramp):
     """V4: an old-named (pre-version) reverse planted in `cache/reversed/`
     before `set_reversed` is neither used nor kept."""
@@ -1993,7 +2101,8 @@ def run_v4(client, ramp):
                  if m.get("id") == media), None) or str(ramp)
     info = os.stat(path)
     named = f"{path}|{info.st_size}|{math.floor(info.st_mtime + 0.5)}"
-    old, new = fnv1a(named), fnv1a(named + "|v2")
+    version = renderer_version()
+    old, new = fnv1a(named), fnv1a(f"{named}|v{version}")
     folder = Path(doc.path) / "cache" / "reversed"
     folder.mkdir(parents=True, exist_ok=True)
     planted, fresh = folder / f"{media}-{old}.mov", folder / f"{media}-{new}.mov"
@@ -2009,8 +2118,8 @@ def run_v4(client, ramp):
           f"{MIXED_DISTINCT} distinct green values on its middle row (the ramp)",
           doc.ok and late is None and fresh.exists() and not planted.exists()
           and green is not None and green >= MIXED_DISTINCT,
-          f"fixture {doc.why or 'ok'}; wait {late or 'ok'}; digest input {named!r}; "
-          f"{fresh.name} exists {fresh.exists()}; planted {planted.name} exists "
+          f"fixture {doc.why or 'ok'}; wait {late or 'ok'}; digest input {named!r}, renderer "
+          f"version {version}; {fresh.name} exists {fresh.exists()}; planted {planted.name} exists "
           f"{planted.exists()}; files {[f.name for f in files]}; depth {png_depth(png)}, "
           f"distinct green {green}")
     return closed
@@ -2956,7 +3065,12 @@ def main():
     remove_work()
     atexit.register(remove_work)
     HOME.mkdir(parents=True)
-    for maker in (h264_clip, ramp_clip, *STILLS):
+    for maker in (h264_clip, ramp_clip):
+        if maker() is None:
+            print(f"instrument failure: {maker.__name__}'s movie refused — "
+                  f"{TAG_REFUSED.get('why')}")
+            return 2
+    for maker in STILLS:
         if maker() is None:
             print(f"instrument failure: ffmpeg did not make {maker.__name__}'s movie")
             return 2

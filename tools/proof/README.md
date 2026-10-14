@@ -19113,6 +19113,79 @@ do not (2, 3, 90 at 0.99/1.01×). ProRes 422 is 1, 1, 90 at 20.6/20.4×, and 422
 31.9/32.1×. Every `x422` read of the full-range `slog3_fr` lands up to 90 codes off. The
 table is `designs/adr/grading-3.md`'s #280 bullet, and the choice is put to the owner.
 
+### Issue batch B98 — an odd-size full-range reverse, measured on the product path (L13 and one mutant; spec §11 PR-10, #289)
+
+```
+python3 tools/proof/log_proof.py --only L13,Z1                   # Debug; the recorded run is RC_PROOF_APP=release
+python3 tools/proof/log_proof.py --only L10,L12,L13,Z1           # the range rows together
+python3 tools/proof/log_proof.py --mutant odd-range-ignored      # L13 must FAIL
+```
+
+Five more range fixtures, each written by its `RANGE_SHAPES` row and read back the same way as
+B95's:
+- `slog3_fr_odd.mov` and `slog3_vr_odd.mov`: 1024×129 `yuv422p10le` HEVC Rext (libx265 lossless
+  `main422-10`, `hvc1`; 4:2:0 HEVC cannot hold an odd height), `pc` and `tv`, tagged as `slog3_fr`.
+- `slog3_fr_vp9.mp4` and `slog3_vr_vp9.mp4`: 1024×129 `yuv420p10le` VP9 Profile 2 (libvpx-vp9
+  lossless), `pc` and `tv`. Their tags are printed, not required.
+- `slog3_fr_422.mov`: 1024×128, shaped like `slog3_fr_odd` (the HEVC branch, printed only).
+
+`hdr_proof.py`'s `Yuv` sizes chroma by ceil, so an odd 4:2:0 height decodes.
+
+**L13.** Each odd fixture alone, with no Camera Log, is rendered at 0.5 s forward and then reversed
+(`set_reversed`, the intermediate kept). The row prints the intermediate's codec, pix_fmt, size and
+range, `toe`'s worst |Y₁₅ − expected| (expected in the intermediate's own range flag), column 0's
+file → intermediate code, and the reversed render's worst spread from the forward one.
+- REACHED: the fixture was kept and imported, both renders decoded, and the intermediate exists and
+  decoded.
+- HOLDS: the intermediate is ProRes 422 `yuv422p10le` at exactly 1024×129, its toe is ≤ 1, and its
+  spread is ≤ 2. These bounds were fixed before the run.
+- Pass: all four odd fixtures are REACHED, and each one not in `L13_OPEN` HOLDS.
+
+**On the unchanged product** (Debug, the control; 1/2, Z1 ok):
+- `slog3_fr_odd` and `slog3_fr_vp9` did not hold: toe worst 90, column 0 95 → 159 (expected 145),
+  spread 27 and 28.
+- Their video-range twins held: worst 1, 95 → 95, spread 1.
+- `slog3_fr_422` (HEVC branch): worst 3, 95 → 148, spread 1.
+- Both pairs reproduced #289.
+
+**After spec §11 PR-10** (an odd size flagged full range reads full-range `x422`; renderer
+version 3):
+- `slog3_fr_odd` holds: ProRes 422 1024×129 range tv, toe worst 1, 95 → 146, spread 1.
+- `slog3_fr_vp9` is unchanged (toe 90, spread 28). A VP9 MP4's format description carries no
+  `FullRangeVideo` extension (measured), so GR-22's flag reads it as video range. The VP9 pair is in
+  `L13_OPEN`, beside its issue (#291).
+
+**Recorded runs** (Release, after the gate's `make app`):
+- `RC_PROOF_APP=release python3 tools/proof/log_proof.py`: 17/17. L13 ok with the figures above.
+  L10 worst 1 on each file. L12's 0 % patch [5, 5, 5], 22 levels outside the video-domain envelope.
+  No `Frame Job: ` line.
+- The mutant `odd-range-ignored` (`pixelFormat(fullRange:)` answers the video-range `x422`):
+  MUTANT PASS, run once on Debug. L13 FAILED in the copy, with `slog3_fr_odd` back at toe 90,
+  95 → 159, spread 27. L9 and Z1 also failed there, for a host reason: this worktree has no L9
+  control `tools/proof/work/t3-2/ctl`, so its five fixtures were refused as missing.
+
+**#290, precision_proof's TAG.** The bt709 fixtures (the H.264 clip, the ramp, `prores_clip` at
+both heights, `ramp10_odd`, `prores422_odd`) now take `SETPARAMS` on the lavfi input as well as TAG
+on the output. Given to the output alone, ProRes wrote `colorspace` and left primaries and transfer
+`unknown`.
+- Each fixture is kept only when ffprobe reads bt709 ×3, its codec, pix_fmt and size, and
+  `read_back` holds: the first frame against the fixture's own lavfi graph rendered raw, mean |Δ|
+  ≤ 2.0 8-bit levels on each of Y, Cb and Cr.
+- A stale cached file is refused and made once more. A second refusal of the clip or the ramp is
+  the preflight's exit 2.
+- Without SETPARAMS the preflight exited 2, naming the two `unknown` tags.
+- Read-back means (Y/Cb/Cr): `testsrc2_640.mp4` 0.166/0.207/0.202, the ramps 0, `prores422_1080`
+  0.072/0.066/0.061, `_2160` 0.094/0.072/0.080, `prores422_odd` 0.182/0.196/0.212.
+
+**The control is now `tools/proof/work/precision/ctl-b98`**, captured on Release before any
+`app/Sources` edit. Against `ctl-b97`, a compare on the new fixtures moved S11's 10-bit ramp APNG
+(`b0d2821dd0ba7527` against `5017219a66e3c4bd`); every other file was byte-identical. So use
+`ctl-b98` wherever B97's commands above name `ctl-b97`. V4 now reads `rendererVersion` from the
+driven tree's `ReverseCache.swift`.
+- `RC_PROOF_APP=release python3 tools/proof/precision_proof.py --control tools/proof/work/precision/ctl-b98`:
+  29/29.
+- `… compare tools/proof/work/precision/ctl-b98`: 11/11, S11's four files byte-identical.
+
 ## Issue #282 — converting media's thumbnails through step 0 (`log_thumbs_proof.py` H0, TH, T0–T8, TT, Z1 and ten mutants; `cache_pass_probe.py` S2; spec §11 GR-21)
 
 `log_thumbs_proof.py` is log_proof.py's shape (`capture DIR [--only …]` | `compare DIR [--only

@@ -100,6 +100,22 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   at the video-range intermediate's own codes under the media's full-range
   domain at every sample, and ≥ 10 levels at the 0 % patch from the same
   envelope under the video domain.
+- **L13** (issue batch B98, #289): the odd-size range fixtures through the
+  product, no Camera Log: each alone at 0.5 s forward, then reversed
+  (`set_reversed`, the intermediate kept, L12's way). Per fixture it prints
+  the file's shape, the intermediate's codec, pix_fmt, size and range, `toe`'s
+  worst |Y₁₅ − expected| over `toe_points()` (expected in the intermediate's
+  own range flag, `expected_y`) and where, column 0's file → intermediate
+  code, and the reversed render's worst `spread` from the forward one over
+  `samples()`. A fixture is REACHED when it was kept, imported, both renders
+  decoded and the intermediate exists and decoded; a REACHED fixture HOLDS
+  when its intermediate is `prores` `yuv422p10le` at exactly 1024×129, its
+  toe worst is ≤ HOLD_BOUND (1) and its spread ≤ 2 (fixed before the run).
+  L13 passes when the four odd fixtures (pairs `slog3_fr_odd`/`slog3_vr_odd`
+  and `slog3_fr_vp9`/`slog3_vr_vp9`) are all REACHED and each not in
+  `L13_OPEN` HOLDS (a fixture there is printed beside its issue). One not
+  REACHED is an instrument failure, named in REFUSED. `slog3_fr_422` (the
+  even HEVC 4:2:2 file: the HEVC branch, #280) is printed and not scored.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
@@ -112,8 +128,19 @@ and the tags are given to ffmpeg's INPUT as well as its output (given to the
 output alone, ffmpeg converts the codes at encode), and each is kept only when
 ffprobe reads its range and tags and `source_yuv` reads back the written code
 at column 512 of the grey row and at the 18 % patch; a refused one is its
-rows' FAIL, naming the code read. Mutants: `full-range-ignored` (L10, L12),
-`apple-log-rescaled` (L11), `range-from-reverse` (L12).
+rows' FAIL, naming the code read. B98's (#289, L13) are written the same
+way, each by its `RANGE_SHAPES` row (size, pix_fmt, encoder, codec, profile,
+extension; a name not there is B95's): `slog3_fr_odd.mov` (`pc`) and
+`slog3_vr_odd.mov` (`tv`), 1024×129 `yuv422p10le` HEVC Rext (libx265
+lossless `main422-10`, `hvc1`; 4:2:0 HEVC cannot hold an odd height), tagged
+as `slog3_fr`; `slog3_fr_vp9.mp4` (`pc`) and `slog3_vr_vp9.mp4` (`tv`),
+1024×129 `yuv420p10le` VP9 Profile 2 (libvpx-vp9 lossless), their tags
+printed and not required; and `slog3_fr_422.mov`, 1024×128 as
+`slog3_fr_odd`. Each is wanted with its codec, profile, pix_fmt and size,
+and read back as above. Mutants: `full-range-ignored` (L10, L12),
+`apple-log-rescaled` (L11), `range-from-reverse` (L12), and B98's
+`odd-range-ignored` (L13: `Intermediate.pixelFormat(fullRange:)` answers the
+video-range `x422` whatever the flag, spec §11 PR-10).
 
     python3 tools/proof/log_proof.py reverse-variants [--variant base,rate2,...]
 
@@ -232,7 +259,7 @@ SETTINGS = {"slog3": {"log": "slog3", "gamut": "s_gamut3_cine"}, "vlog": {"log":
             "green_m": {"log": "slog3", "gamut": "s_gamut3_cine"}}
 L9_FIXTURES = ["slog3", "vlog", "applelog", "applelog2", "green"]
 ROWS = ["LP1", "LP2", "LP3", "LP4", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10",
-        "L11", "L12", "Z1"]
+        "L11", "L12", "L13", "Z1"]
 LP_ROWS = {"LP1", "LP2", "LP3", "LP4"}
 # B95 (spec §11 GR-22): HEVC Main 10 4:2:0 fixtures (libx265, lossless) flagged
 # full (`pc`) or video (`tv`) range, the curve's signal stored as the 10-bit
@@ -240,9 +267,42 @@ LP_ROWS = {"LP1", "LP2", "LP3", "LP4"}
 RANGE_FIXTURES = {"slog3_fr": ("slog3", "pc", ("bt2020", "bt709", "bt2020nc")),
                   "slog3_vr": ("slog3", "tv", ("bt2020", "bt709", "bt2020nc")),
                   "vlog_fr": ("vlog", "pc", None),
-                  "applelog_fr": ("apple_log", "pc", None)}
+                  "applelog_fr": ("apple_log", "pc", None),
+                  # B98 (#289), L13's: odd-size twins of each range, and the
+                  # even HEVC 4:2:2 file (the HEVC branch, printed only).
+                  "slog3_fr_odd": ("slog3", "pc", ("bt2020", "bt709", "bt2020nc")),
+                  "slog3_vr_odd": ("slog3", "tv", ("bt2020", "bt709", "bt2020nc")),
+                  "slog3_fr_vp9": ("slog3", "pc", None),
+                  "slog3_vr_vp9": ("slog3", "tv", None),
+                  "slog3_fr_422": ("slog3", "pc", ("bt2020", "bt709", "bt2020nc"))}
 RANGE_SETTINGS = {"slog3_fr": SETTINGS["slog3"], "slog3_vr": SETTINGS["slog3"],
                   "vlog_fr": SETTINGS["vlog"], "applelog_fr": {"log": "apple_log"}}
+# B98 (#289): a range fixture's shape, (width, height, pix_fmt, encoder argv,
+# codec_name, profile, extension); a name not here is RANGE_DEFAULT, B95's.
+X265 = ["-c:v", "libx265", "-x265-params", "lossless=1:log-level=error"]
+RANGE_DEFAULT = (W, H, "yuv420p10le", [*X265, "-profile:v", "main10", "-tag:v", "hvc1"],
+                 "hevc", "Main 10", ".mov")
+ODD_H = 129
+HEVC422 = ("yuv422p10le", [*X265, "-profile:v", "main422-10", "-tag:v", "hvc1"], "hevc", "Rext",
+           ".mov")
+VP9 = ("yuv420p10le", ["-c:v", "libvpx-vp9", "-lossless", "1", "-profile:v", "2"], "vp9",
+       "Profile 2", ".mp4")
+RANGE_SHAPES = {"slog3_fr_odd": (W, ODD_H, *HEVC422), "slog3_vr_odd": (W, ODD_H, *HEVC422),
+                "slog3_fr_vp9": (W, ODD_H, *VP9), "slog3_vr_vp9": (W, ODD_H, *VP9),
+                "slog3_fr_422": (W, H, *HEVC422)}
+# The VP9 fixtures' tags are printed, not required (their range is).
+TAGS_PRINTED = {"slog3_fr_vp9", "slog3_vr_vp9"}
+# L13 (B98, #289): the odd fixtures scored, in pairs (full range, its
+# video-range twin); `slog3_fr_422` printed only. L13_OPEN: fixture → the
+# issue a range-independent or unfixed pair was filed as; such a fixture is
+# scored on REACHED alone, its hold figures printed beside the reference.
+L13_PAIRS = (("slog3_fr_odd", "slog3_vr_odd"), ("slog3_fr_vp9", "slog3_vr_vp9"))
+L13_PRINTED = ("slog3_fr_422",)
+# B98's VP9 pair: an MP4's VP9 track carries no `FullRangeVideo` extension, so
+# GR-22's flag (`CompositionBuilder.isFullRange`) reads it as video range and
+# PR-10's full-range read never fires (measured after PR-10: toe 90, spread 28).
+L13_OPEN: dict[str, str] = {"slog3_fr_vp9": "#291", "slog3_vr_vp9": "#291"}
+L13_SPREAD = 2
 # The read-back points: one ramp column on GREY_ROW and the 18 % patch.
 READBACK_X = 512
 RANGE_CHECKED = {}
@@ -310,6 +370,11 @@ MUTANTS = {
                              "assets: &assets)\n",
                              "        let fullRange = fullRangeMedia(plan: plan, urls: urls, "
                              "assets: &reversedAssets)\n")], ["L12"]),
+    # B98 (#289, spec §11 PR-10): the odd-size reverse reads video-range `x422`
+    # whatever the media's range flag, as before PR-10.
+    "odd-range-ignored": ([("app/Sources/ReverseRenderer.swift",
+                            "                return kCVPixelFormatType_422YpCbCr10BiPlanarFullRange\n",
+                            "                return pixelFormat\n")], ["L13"]),
 }
 # B96 (#280): the reverse's intermediate variants, each one edit to the plain
 # `.hevcMain10` path of ReverseRenderer.swift (`reverse-variants`). The rate
@@ -670,22 +735,25 @@ def range_code(curve, r):
     return min(1023, max(0, round(1023 * encode_curve(curve, r))))
 
 
-def raw_range(curve):
-    """One yuv420p10le frame of `curve`'s ramp and patches as range_code
-    stores them: (bytes, the ramp's codes, the three patches' codes)."""
-    ramp = [range_code(curve, RMAX * x / (W - 1)) for x in range(W)]
+def raw_range(curve, width=W, height=H, sub_x=2, sub_y=2):
+    """One 10-bit planar frame (chroma subsampled by `sub_x`, `sub_y`, sized
+    by ceil) of `curve`'s ramp (rows below 64) and patches (the rest) as
+    range_code stores them: (bytes, the ramp's codes, the three patches'
+    codes)."""
+    ramp = [range_code(curve, RMAX * x / (width - 1)) for x in range(width)]
     patches = [range_code(curve, r) for r in REFLECTANCE]
     luma = []
-    for y in range(H):
-        luma += ramp if y < 64 else [patches[min(2, x * 3 // W)] for x in range(W)]
-    chroma = [512] * (W // 2 * (H // 2))
+    for y in range(height):
+        luma += ramp if y < 64 else [patches[min(2, x * 3 // width)] for x in range(width)]
+    chroma = [512] * (-(-width // sub_x) * -(-height // sub_y))
     return struct.pack(f"<{len(luma) + 2 * len(chroma)}H", *luma, *chroma, *chroma), ramp, patches
 
 
 def range_stream(path):
-    """ffprobe's codec, profile, pix_fmt, range and tags of `path`'s video."""
+    """ffprobe's codec, profile, pix_fmt, size, range and tags of `path`'s
+    video."""
     ran = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
-                       "stream=codec_name,profile,pix_fmt,color_range,color_space,"
+                       "stream=codec_name,profile,pix_fmt,width,height,color_range,color_space,"
                        "color_transfer,color_primaries", "-of", "json", str(path)], 60)
     try:
         return json.loads(ran["stdout"])["streams"][0]
@@ -699,24 +767,28 @@ def range_fixture(name):
     point and one patch; else None, REFUSED[name] naming the code read. The
     range and the tags are given to the INPUT as well as the output: given to
     the output alone, ffmpeg converts the codes at encode (B95's
-    objection)."""
+    objection). A RANGE_SHAPES name (B98) is written at its size, pix_fmt,
+    encoder and extension, and wanted with its codec, profile and size."""
     if name in RANGE_CHECKED:
         return RANGE_CHECKED[name]
     curve, flag, tagset = RANGE_FIXTURES[name]
-    raw, ramp, patches = raw_range(curve)
-    out = MEDIA / f"{name}.mov"
+    width, height, pix_fmt, encoder, codec, profile, extension = \
+        RANGE_SHAPES.get(name, RANGE_DEFAULT)
+    sub_x, sub_y = (1, 1) if "444" in pix_fmt else (2, 1) if "422" in pix_fmt else (2, 2)
+    raw, ramp, patches = raw_range(curve, width, height, sub_x, sub_y)
+    out = MEDIA / f"{name}{extension}"
     tags = [] if tagset is None else ["-color_primaries", tagset[0], "-color_trc", tagset[1],
                                       "-colorspace", tagset[2]]
     if not out.exists():
         MEDIA.mkdir(parents=True, exist_ok=True)
         source = MEDIA / f"{name}.yuv"
         source.write_bytes(raw)
+        # `-pix_fmt` sits after the codec's first pair, where B95's argv had it.
         made = bounded.run(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt",
-                            "yuv420p10le", "-s", f"{W}x{H}", "-r", "30", "-color_range", flag,
-                            *tags, "-stream_loop", "29", "-i", str(source), "-c:v", "libx265",
-                            "-x265-params", "lossless=1:log-level=error", "-pix_fmt",
-                            "yuv420p10le", "-profile:v", "main10", "-tag:v", "hvc1",
-                            "-color_range", flag, *tags, str(out)], 300)
+                            pix_fmt, "-s", f"{width}x{height}", "-r", "30", "-color_range", flag,
+                            *tags, "-stream_loop", "29", "-i", str(source), *encoder[:4],
+                            "-pix_fmt", pix_fmt, *encoder[4:], "-color_range", flag, *tags,
+                            str(out)], 300)
         source.unlink(missing_ok=True)
         if made["rc"] != 0 or not out.exists():
             REFUSED[name] = f"ffmpeg {name}: rc {made['rc']} {made['stderr'][-300:]}"
@@ -724,30 +796,32 @@ def range_fixture(name):
             RANGE_CHECKED[name] = None
             return None
     probe = range_stream(out)
-    want = {"codec_name": "hevc", "profile": "Main 10", "pix_fmt": "yuv420p10le",
-            "color_range": flag}
+    want = {"codec_name": codec, "profile": profile, "pix_fmt": pix_fmt, "color_range": flag}
+    if name in RANGE_SHAPES:
+        want.update({"width": width, "height": height})
     if tagset is not None:
         want.update({"color_primaries": tagset[0], "color_transfer": tagset[1],
                      "color_space": tagset[2]})
     wrong = {k: probe.get(k) for k, v in want.items() if probe.get(k) != v}
-    if tagset is None:
+    if tagset is None and name not in TAGS_PRINTED:
         wrong.update({k: probe.get(k) for k in ("color_primaries", "color_transfer",
                                                  "color_space")
                       if probe.get(k, "unknown") != "unknown"})
-    yuv = None if wrong else source_yuv(out)
+    yuv = None if wrong else source_yuv(out, height)
     read = (yuv.codes(READBACK_X, GREY_ROW)[0], yuv.codes(PATCH_X[1], PATCH_ROW)[0]) \
         if yuv else None
     written = (ramp[READBACK_X], patches[1])
     if wrong or read != written:
-        REFUSED[name] = (f"{name}.mov refused: ffprobe read {wrong or 'as wanted'}; read back Y "
+        REFUSED[name] = (f"{out.name} refused: ffprobe read {wrong or 'as wanted'}; read back Y "
                          f"{read} at ({READBACK_X}, {GREY_ROW}) and ({PATCH_X[1]}, {PATCH_ROW}), "
                          f"written {written}")
         print(f"       {REFUSED[name]}", flush=True)
         out.unlink(missing_ok=True)
         RANGE_CHECKED[name] = None
         return None
-    print(f"       {name}.mov kept: {hdr.tags(probe)} range {probe.get('color_range')}, read "
-          f"back Y {read} = written", flush=True)
+    print(f"       {out.name} kept: {probe.get('codec_name')} {probe.get('profile')} "
+          f"{probe.get('pix_fmt')} {probe.get('width')}×{probe.get('height')}, {hdr.tags(probe)} "
+          f"range {probe.get('color_range')}, read back Y {read} = written", flush=True)
     RANGE_CHECKED[name] = out
     return out
 
@@ -865,8 +939,8 @@ def samples(png_frame):
     return [(x, y, png_frame.px8(x, y)) for x, y in sample_points()]
 
 
-def source_yuv(path):
-    got = hdr.yuv_frames(path, W, H)
+def source_yuv(path, height=H):
+    got = hdr.yuv_frames(path, W, height)
     return got[0] if got else None
 
 
@@ -1431,6 +1505,87 @@ def run_l12(client):
           f"{codes}")
 
 
+# ---- L13 (B98, #289) ------------------------------------------------------------
+
+L13_TITLE = ("L13 odd-size full-range sources reversed through the product (no Camera Log, "
+             "0.5 s): each odd fixture REACHED, and each not in L13_OPEN HOLDS — a ProRes 422 "
+             f"yuv422p10le intermediate at exactly {W}×{ODD_H}, toe worst ≤ {HOLD_BOUND} in the "
+             f"intermediate's own range, the reversed render within {L13_SPREAD} of the forward "
+             "one at every sample")
+
+
+def l13_fixture(client, name):
+    """One L13 fixture forward and reversed: its figures, with `reached` and
+    `holds`, and `why` when it was not reached."""
+    width, height = RANGE_SHAPES[name][:2]
+    path = fixture(name)
+    if path is None:
+        return {"reached": False, "why": f"refused: {REFUSED.get(name)}"}
+    probe = range_stream(path)
+    made = {}
+
+    def reverse(doc, clip, tag=f"l13-{name}-rev"):
+        got = doc.call("set_reversed", clip=clip, reversed=True)
+        if not got["ok"]:
+            made["late"] = f"set_reversed: {got.get('error')}"
+            return made["late"]
+        files, late = wait_reverse(doc, tag)
+        made["late"] = late
+        if files:
+            kept = WORK / f"{tag}-intermediate.mov"
+            shutil.copy2(files[0], kept)
+            made["file"] = kept
+        return late
+    forward, why_f = scene(client, name, f"l13-{name}-fwd", None)
+    backward, why_b = scene(client, name, f"l13-{name}-rev", None, reverse)
+    middle = hdr.yuv_frames(made["file"], W, height, 16) if made.get("file") else None
+    figures = {"file": f"{probe.get('codec_name')} {probe.get('profile')} "
+                       f"{probe.get('pix_fmt')} {probe.get('width')}×{probe.get('height')} "
+                       f"range {probe.get('color_range')} tags {hdr.tags(probe)}"}
+    if forward is None or backward is None or middle is None or made.get("late"):
+        return {**figures, "reached": False,
+                "why": f"forward {why_f}; reversed {why_b}; reverse {made.get('late')}; "
+                       f"intermediate {made.get('file')} decoded {middle is not None}"}
+    inter = range_stream(made["file"])
+    worst, where, column0 = toe(name, made["file"], height)
+    gap = max(spread(f[2], b[2]) for f, b in zip(samples(forward), samples(backward)))
+    shape = (inter.get("codec_name"), inter.get("pix_fmt"), inter.get("width"),
+             inter.get("height"))
+    holds = (shape == ("prores", "yuv422p10le", width, height)
+             and worst is not None and worst <= HOLD_BOUND and gap <= L13_SPREAD)
+    return {**figures, "reached": True, "holds": holds,
+            "intermediate": f"{shape[0]} {shape[1]} {shape[2]}×{shape[3]} range "
+                            f"{inter.get('color_range')}",
+            "toe": f"worst {worst} at {where}, column 0 file → intermediate {column0}",
+            "spread": gap}
+
+
+def run_l13(client):
+    """L13 (issue batch B98, #289): each odd fixture and `slog3_fr_422`
+    forward and reversed with no Camera Log; REACHED and HOLDS as the
+    module's docstring says."""
+    results, failed = {}, []
+    for name in [n for pair in L13_PAIRS for n in pair] + list(L13_PRINTED):
+        got = l13_fixture(client, name)
+        results[name] = got
+        scored = name not in L13_PRINTED
+        open_ = L13_OPEN.get(name)
+        verdict = ("not reached" if not got["reached"] else "holds" if got["holds"]
+                   else "does not hold")
+        print(f"       {name} ({'scored' if scored and not open_ else open_ or 'printed only'}): "
+              f"{verdict}; {got}", flush=True)
+        if not scored:
+            continue
+        if not got["reached"]:
+            REFUSED[name] = f"L13 not reached: {got['why']}"
+            failed.append(f"{name} not reached")
+        elif not got["holds"] and not open_:
+            failed.append(f"{name} does not hold")
+    pairs = {f"{fr}/{vr}": (results[fr].get("holds"), results[vr].get("holds"))
+             for fr, vr in L13_PAIRS}
+    check(L13_TITLE, not failed, f"pairs (full, video) hold {pairs}; failed {failed or 'none'}")
+
+
 # ---- L9 -------------------------------------------------------------------------
 
 def run_l9(client, mode, control, state):
@@ -1644,11 +1799,17 @@ def run_reverse(binary, source, out, extra=()):
     return got, (range_stream(out) if got.get("ok") and out.exists() else {})
 
 
-def expected_y(name, code):
-    """The intermediate's expected Y for the file's Y `code`: the code itself,
-    or, for the full-range `slog3_fr`, its video-range code (GR-22)."""
-    return round(64 + 876 * code / 1023) if RANGE_FIXTURES.get(name, (0, "tv"))[1] == "pc" \
-        else code
+def expected_y(name, code, intermediate_range="tv"):
+    """The intermediate's expected Y for the file's Y `code`: the code itself
+    when the file's range flag is the intermediate's; a full-range file's
+    video-range code in a video-range intermediate (GR-22); a video-range
+    file's full-range code, clamped, in a full-range one."""
+    file_range = RANGE_FIXTURES.get(name, (0, "tv"))[1]
+    if file_range == intermediate_range:
+        return code
+    if file_range == "pc":
+        return round(64 + 876 * code / 1023)
+    return min(1023, max(0, round((code - 64) * 1023 / 876)))
 
 
 def toe_points():
@@ -1656,14 +1817,17 @@ def toe_points():
     return sample_points() + [(x, GREY_ROW) for x in range(32) if x % 8]
 
 
-def toe(name, intermediate):
+def toe(name, intermediate, height=H):
     """(worst |Y₁₅ − expected|, where, column 0's (file Y, intermediate Y))
-    of `intermediate` against the log fixture `name`, or (None, why, None)."""
-    source = source_yuv(fixture(name)) if fixture(name) else None
-    middle = hdr.yuv_frames(intermediate, W, H, 16)
+    of `intermediate` against the log fixture `name`, or (None, why, None);
+    the expected code in the intermediate's own range flag."""
+    source = source_yuv(fixture(name), height) if fixture(name) else None
+    middle = hdr.yuv_frames(intermediate, W, height, 16)
     if source is None or middle is None:
         return None, f"{name}: the file or the intermediate did not decode", None
-    gaps = [(abs(middle[15].codes(x, y)[0] - expected_y(name, source.codes(x, y)[0])), (x, y))
+    within = "pc" if range_stream(intermediate).get("color_range") == "pc" else "tv"
+    gaps = [(abs(middle[15].codes(x, y)[0]
+                 - expected_y(name, source.codes(x, y)[0], within)), (x, y))
             for x, y in toe_points()]
     worst, where = max(gaps)
     return worst, where, (source.codes(0, GREY_ROW)[0], middle[15].codes(0, GREY_ROW)[0])
@@ -1873,7 +2037,7 @@ def main():
                 for name, run in (("L1", run_l1), ("L2", run_l2), ("L3", run_l3),
                                   ("L4", run_l4), ("L5", run_l5), ("L6", run_l6),
                                   ("L7", run_l7), ("L8", run_l8), ("L10", run_l10),
-                                  ("L11", run_l11), ("L12", run_l12)):
+                                  ("L11", run_l11), ("L12", run_l12), ("L13", run_l13)):
                     if name in selected:
                         run(client)
             except Exception as error:  # a row that could not run is a failure

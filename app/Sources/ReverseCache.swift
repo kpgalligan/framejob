@@ -48,8 +48,9 @@ enum ReverseCache {
     /// What the renderer writes, as a number in the digest. Bump it whenever
     /// the written file changes, so every reverse already in a package is
     /// rendered again rather than played. 2: the 10-bit intermediate with
-    /// the source's colour labels (spec §11 PR-7).
-    static let rendererVersion = 2
+    /// the source's colour labels (spec §11 PR-7). 3: an odd-size reverse of
+    /// full-range media read as full-range frames (spec §11 PR-10).
+    static let rendererVersion = 3
 
     static func directory(in cache: URL) -> URL {
         cache.appendingPathComponent(directoryName, isDirectory: true)

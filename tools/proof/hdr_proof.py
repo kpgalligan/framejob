@@ -731,7 +731,7 @@ class Yuv:
 
     def __init__(self, raw, width, height, sub_x, sub_y):
         n = width * height
-        cw, ch = width // sub_x, height // sub_y
+        cw, ch = -(-width // sub_x), -(-height // sub_y)
         values = struct.unpack(f"<{n + 2 * cw * ch}H", raw[:2 * (n + 2 * cw * ch)])
         self.y, self.cb, self.cr = values[:n], values[n:n + cw * ch], values[n + cw * ch:]
         self.width, self.cw, self.sx, self.sy = width, cw, sub_x, sub_y
@@ -778,7 +778,7 @@ def yuv_frames(path, width, height, count=1):
     fmt = "yuv420p10le" if "420" in probe.get("pix_fmt", "") else "yuv422p10le"
     sub_y = 2 if fmt == "yuv420p10le" else 1
     raw = decode(path, fmt, count)
-    size = 2 * (width * height + 2 * (width // 2) * (height // sub_y))
+    size = 2 * (width * height + 2 * -(-width // 2) * -(-height // sub_y))
     if not raw or len(raw) < size * count:
         return None
     return [Yuv(raw[i * size:(i + 1) * size], width, height, 2, sub_y) for i in range(count)]

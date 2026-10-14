@@ -59,7 +59,8 @@ final class ReverseRenderer {
     enum Intermediate: Equatable {
         /// Even width and height: `x420` frames, HEVC Main 10.
         case hevcMain10
-        /// An odd width or height: `x422` frames, ProRes 422.
+        /// An odd width or height: `x422` frames, ProRes 422 — full-range
+        /// frames when the source is flagged full range (PR-10).
         case proRes422
 
         init(_ dimensions: CMVideoDimensions) {
@@ -72,6 +73,18 @@ final class ReverseRenderer {
             case .hevcMain10: return kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
             case .proRes422: return kCVPixelFormatType_422YpCbCr10BiPlanarVideoRange
             }
+        }
+
+        /// The format for a source whose forward video track is flagged
+        /// `fullRange` (GR-22's flag, spec §11 PR-10): ProRes 422 reads
+        /// full-range `x422`, because a full-range file read as video-range
+        /// `x422` came back up to 90 codes off (log_proof L13, #289). The HEVC
+        /// branch reads `pixelFormat` whatever the flag.
+        func pixelFormat(fullRange: Bool) -> OSType {
+            if fullRange && self == .proRes422 {
+                return kCVPixelFormatType_422YpCbCr10BiPlanarFullRange
+            }
+            return pixelFormat
         }
 
         /// Bytes one held pixel costs: 10-bit samples in 16-bit words, one
@@ -198,6 +211,7 @@ final class ReverseRenderer {
         // encoder has to match.
         let dimensions = videoTrack.flatMap { Self.dimensions(of: asset, track: $0, limit: total) }
         let intermediate = dimensions.map(Intermediate.init)
+        let fullRange = videoTrack.map(CompositionBuilder.isFullRange) ?? false
 
         try FileManager.default.createDirectory(
             at: partial.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -214,6 +228,7 @@ final class ReverseRenderer {
         if let dimensions = dimensions, let intermediate = intermediate, dimensions.width > 0,
             dimensions.height > 0
         {
+            let format = intermediate.pixelFormat(fullRange: fullRange)
             let input = AVAssetWriterInput(
                 mediaType: .video,
                 outputSettings: Self.videoSettings(
@@ -226,7 +241,7 @@ final class ReverseRenderer {
             adaptor = AVAssetWriterInputPixelBufferAdaptor(
                 assetWriterInput: input,
                 sourcePixelBufferAttributes: [
-                    kCVPixelBufferPixelFormatTypeKey as String: Int(intermediate.pixelFormat),
+                    kCVPixelBufferPixelFormatTypeKey as String: Int(format),
                     kCVPixelBufferWidthKey as String: Int(dimensions.width),
                     kCVPixelBufferHeightKey as String: Int(dimensions.height),
                     kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
@@ -257,7 +272,8 @@ final class ReverseRenderer {
                 dimensions: dimensions,
                 pixelFormat: videoInput == nil
                     ? kCVPixelFormatType_32BGRA
-                    : (intermediate?.pixelFormat ?? kCVPixelFormatType_32BGRA),
+                    : (intermediate?.pixelFormat(fullRange: fullRange)
+                        ?? kCVPixelFormatType_32BGRA),
                 writer: writer, videoInput: videoInput, adaptor: adaptor,
                 audioInput: audioInput, cancel: cancel, progress: progress)
         } catch {

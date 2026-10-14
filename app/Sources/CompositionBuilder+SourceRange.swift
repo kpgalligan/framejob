@@ -8,10 +8,15 @@ import AVFoundation
 /// 64/1023, and a full-range one to s = CV/1023, so their signal is s itself.
 /// The compositor sees a decoded frame and never the file, so the flag is read
 /// here, from the media's FORWARD video track — a reversed clip's intermediate
-/// is written in video range from codes the decoder already rescaled, and
-/// follows its media (GR-16's convention). Only media a video segment converts
-/// with a log curve are read, so a composition with none reads nothing and
-/// every instruction's set is empty.
+/// is written in video range, and follows its media (GR-16's convention). An
+/// even size is written from `x420` codes the decoder already rescaled; an odd
+/// size of a full-range media from full-range `x422` frames (spec §11 PR-10),
+/// which the ProRes writer stores in video range: log_proof L13 read the file's
+/// 95 as 146 in the intermediate, as L12 reads it through HEVC. A VP9 MP4
+/// carries its range in `vpcC` alone, not in this key, so it reads as video
+/// range here (L13, measured). Only media a video segment converts with a log
+/// curve are read, so a composition with none reads nothing and every
+/// instruction's set is empty.
 extension CompositionBuilder {
 
     /// The media of `plan`'s log-converting video segments whose forward video

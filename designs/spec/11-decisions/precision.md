@@ -25,6 +25,9 @@ PR-9 was recorded in issue batch B97 (#275) from the owner's choice of 2026-10-1
 read the frame the way video export does), after its mechanism was measured and before the rest
 of its code; it amends PR-4 and PR-6.
 
+PR-10 was recorded in issue batch B98 (#289), before its code, from `log_proof.py` L13's
+measurement of the unchanged product; it amends PR-7.
+
 - **PR-1 — The working depth is 16-bit float, holding encoded values clamped to [0, 1] (owner,
   2026-10-09, choices 1 and 5).**
   - The render context's buffers are `kCVPixelFormatType_64RGBAHalf`.
@@ -237,6 +240,8 @@ of its code; it amends PR-4 and PR-6.
   - PR-2 stands: HDR stays tone-mapped in the compositor (amended by GR-15: HDR still reaches
     the output as SDR, converted by Frame Job's own step 0); the reverse only stops mislabelling.
   - Amends PR-5's "the reversed-clip intermediate".
+  - **Amended by PR-10** (B98, #289): an odd-size reverse of a media flagged full range reads
+    `422YpCbCr10BiPlanarFullRange` frames, not `x422`.
 - **PR-8 — 10-bit `hevc_alpha` and 10-bit screen recording are not wanted (owner, 2026-10-11,
   choices 3a and 4a).**
   - `hevc_alpha`: Main 10 with alpha works (877 colour levels), but the alpha plane stays 8-bit
@@ -292,3 +297,36 @@ of its code; it amends PR-4 and PR-6.
     the 30 fps grid; S15, over an HLG clip (converting), the generator's `HDTV` profile and max
     |Δ| 0; S16, `max_width 960`, a 960×540 16-bit PNG; D1 and S8 8-bit, and every all-8-bit
     render, GIF, JPEG and APNG byte-identical to the control (K1–K6, S3, S11).
+- **PR-10 — An odd-size reverse of full-range media reads full-range frames (issue batch B98,
+  #289).**
+  - An odd-size reverse (PR-7's ProRes 422 branch) of a media whose forward video track is
+    flagged full range — GR-22's flag, `kCMFormatDescriptionExtension_FullRangeVideo`, read by
+    `CompositionBuilder.isFullRange` — asks the reader for, holds and hands the writer
+    `kCVPixelFormatType_422YpCbCr10BiPlanarFullRange` frames
+    (`ReverseRenderer.Intermediate.pixelFormat(fullRange:)`). Every other reverse reads as PR-7
+    says: an even size `x420`, an odd video-range size `x422`. The HEVC branch's read is not
+    changed (its intermediate is #280's open choice).
+  - The renderer version is 3 (`ReverseCache.rendererVersion`), so every reverse already in a
+    package is rendered again under a new name and the old sibling pruned (PR-7's digest rule).
+  - No op, FFI, recipe, format or catalog change.
+  - Why: measured by `log_proof.py` L13 on the unchanged product (Debug, 2026-10-14). The S-Log3
+    ramp and patches stored as 1023·y at 1024×129, no Camera Log, forward and reversed at 0.5 s.
+    A full-range file's odd-size reverse read `x422` came back shifted: `slog3_fr_odd` (HEVC Rext
+    4:2:2, flagged `pc`) and `slog3_fr_vp9` (VP9 Profile 2 4:2:0, `pc`) each wrote a ProRes 422
+    `yuv422p10le` 1024×129 intermediate whose Y was up to 90 codes from the file's code in the
+    intermediate's range (column 0: 95 → 159 against 145), and whose reversed render was 27 and
+    28 8-bit levels from the forward one. Their video-range twins (`slog3_vr_odd`,
+    `slog3_vr_vp9`) held: worst 1 code, 95 → 95, renders within 1 level. B96's
+    `reverse-variants` had seen the same 90 codes on every `x422` read of a full-range 4:2:0
+    file (#289).
+  - Measured after the change (Debug, 2026-10-14, `log_proof.py --only L10,L12,L13,Z1`):
+    `slog3_fr_odd`'s intermediate is ProRes 422 `yuv422p10le` 1024×129 flagged video range, its
+    toe worst 1 code (column 0: 95 → 146), its reversed render within 1 level of the forward
+    one; its twin unchanged (worst 1, spread 1); L10 and L12 unchanged (worst 1 on each file;
+    L12's 0 % patch [5, 5, 5]).
+  - Not reached, and left open: a VP9 MP4's track carries no `FullRangeVideo` extension (its
+    range is in `vpcC` alone, measured), so GR-22's flag reads `slog3_fr_vp9` as video range and
+    its reverse is still read video-range `x422` (toe 90, spread 28, as before). Reading that
+    flag from `vpcC` is GR-22's reader, not this decision's; `log_proof.py`'s `L13_OPEN` holds
+    the pair (#291).
+  - Amends PR-7.
