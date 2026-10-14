@@ -19267,6 +19267,73 @@ MOVED`):
 - `flat-head`, rerun for its new anchor (`return readConverted(at: marker) == current`): T2
   FAILED.
 
+### Issue batch B101 — AV1's range measured (L15) and the VP9 decode gap measured outside the reader (`decode-gap`) (#293, #294; spec §11 GR-23)
+
+```
+python3 tools/proof/log_proof.py --only L15,Z1        # a probe row: builds av1_range_probe.swift, launches no app
+python3 tools/proof/log_proof.py decode-gap           # builds decode_gap_probe.swift, launches no app
+```
+
+**AV1 fixtures** (`AV1_FIXTURES`): one 64×64 1 s lavfi grey frame through libsvtav1
+`yuv420p10le`. They are `av1_fr.mp4` (`pc`, `-movflags -write_colr`), `av1_fr_colr.mp4` (`pc`,
+`+write_colr`), `av1_vr.mp4` (`tv`, `-write_colr`), `av1_fr_webm.webm` (`pc`) and
+`av1_vr_webm.webm` (`tv`). Each is kept only when ffprobe reads `av1` and its range, and the
+file holds a `colr` box exactly when `+write_colr`.
+
+**L15** (`av1_range_probe.swift` over `app/Sources`, `DecoderSupport.enable()`, no picture
+decoded). For each fixture it prints the first format description's `FullRangeVideo` key, the
+`av1C` and `colr` atoms, `av1C`'s first 8 bytes and the description's extension keys, and it
+answers `CompositionBuilder.isFullRange`:
+- An MP4 is opened as it is.
+- A WebM is copied by `ContainerRewrapWriter.write` into a scratch `.mov`. The precheck is
+  skipped, because it refuses AV1 without hardware decode.
+- Each of `SYNTHETIC_AV1`'s twelve records is written field by field by `av1c()` (the AV1
+  Bitstream spec's §5.5, a sequence-header OBU with `obu_has_size_field` and a leb128 size). It
+  becomes the only colour source of a one-sample `.mov`: `av1_fr.mp4`'s first compressed sample
+  re-described as `av01` with `{av1C: record}`. The passthrough read answers an empty marker
+  buffer first, so the probe takes the first buffer holding a sample.
+
+L15 passes when every full-range item answers true, every video-range item false, and every
+synthetic record its own `color_range`, but the two profile 2 range-1 records scored at their
+accepted answer, false. The timing case's `num_ticks_per_picture_minus_1` 1000
+is a 19-bit uvlc, and its range is 1.
+
+**The control** (the tree before any edit, Debug): `--only L15,Z1` 2/2. Every fixture's
+description carries the key: `true` on `av1_fr`, `av1_fr_colr` and `av1_fr_webm`, `false` on
+`av1_vr` and `av1_vr_webm`. The rewrap's description holds the core's `av1C` alone (atoms
+`['av1C']`), so AVFoundation reads the key from the sequence header itself. Nine synthetic
+records got the key, matching their `color_range`. `profile 2, 12-bit` got none (and no
+`BitsPerComponent`) and answers false, which is right for its range 0. On those ten, no product
+code landed: GR-24 was not written, `isFullRange` is unchanged, and L15 stays as a guard with no
+mutant.
+
+**The fix pass** (Debug, `--only L15,Z1` 2/2) added `profile 2, 12-bit, range 1` and `profile 2,
+10-bit, range 1`. Both got no key and no `BitsPerComponent`, and both answer false: a full-range
+Professional-profile AV1 reads as video range. The owner accepted this as a known limit
+(2026-10-14, spec §11 GR-23): both records are scored False, so a change in AVFoundation's answer
+fails L15.
+
+**`decode-gap`** (`decode_gap_probe.swift`, `DecoderSupport.enable()` before any reader). It
+reads the first frame of `slog3_fr.mov`, `slog3_vr.mov` (HEVC) and `slog3_fr_vp9e.mp4`,
+`slog3_vr_vp9e.mp4` (VP9) at `x420`, `xf20`, `64RGBAHalf`, `128RGBAFloat` and `64RGBALE`, at
+159 points (`sample_points()` and the grey row's first 32 columns). The rule is in the module's
+docstring. The run (2026-10-14) exited 0, with no reader error:
+- In each file's own range (`xf20` for `pc`, `x420` for `tv`), 0 of 159 points differ from the
+  written codes, for VP9 and HEVC alike. In the other range, 157 of 159 differ (the decoder's
+  rescale: worst |ΔY| 51 into `x420`, 59 into `xf20`), identically for both codecs.
+- VP9 against HEVC of the same codes and range: `64RGBAHalf` 0.000 levels at every point, and
+  `128RGBAFloat` 0.000. `64RGBALE` is within 0.004 (and within 0.061 of HEVC's `64RGBAHalf`).
+- The verdict is **neither**. The reader's frames are the same for both codecs, so the 0.88-level
+  gap B99 measured between the two renders arises after the reader, between the composition and
+  the compositor's source frames. L14 keeps its bound of 2, and no format change is indicated.
+
+**Recorded run** (Release, after the gate's `make app`; no `Frame Job: ` line, no `DEFAULTS
+MOVED`): `RC_PROOF_APP=release python3 tools/proof/log_proof.py` 19/19 (re-run after the
+owner's ruling). L15 holds 17 items, misses none, open none: the two profile 2 range-1 records
+are scored at their accepted answer (key absent, false, want false). L10 has worst 1 on each file, and L14 has worst 2, 1 and 2 (the full-range 0 % patch
+[0, 0, 0], the video-domain oracle [28, 28, 28]). L13 holds both pairs, and L12's 0 % patch is
+[5, 5, 5], 22 levels apart.
+
 ## Issue #282 — converting media's thumbnails through step 0 (`log_thumbs_proof.py` H0, TH, T0–T8, TT, Z1 and ten mutants; `cache_pass_probe.py` S2; spec §11 GR-21)
 
 `log_thumbs_proof.py` is log_proof.py's shape (`capture DIR [--only …]` | `compare DIR [--only
@@ -19484,3 +19551,56 @@ D1 after (RECORD, frames per second, median of three runs, 60 frames of 3840×21
 
 The load average was high during these runs, because other sessions shared the host: 56.76 before
 B3, 29.78 before A4, 25.58 before A5. H0 passed each time.
+
+## Issue #295 — a rendered frame's colour label, measured (`frame_label_proof.py` F1–F11, E1, E2, Z1; issue batch B101; no product code, no decision)
+
+```
+python3 tools/proof/frame_label_proof.py [--only F5,F6,...]        # Debug; the recorded run is RC_PROOF_APP=release
+```
+
+This script measures what label a written frame carries, and whether a colour-managed read tells
+two labels apart. It decides nothing. The rule is the owner's choice (#295). Each written file
+is decoded raw to `rgb48le` by ffmpeg, which applies no profile. It is
+decoded again after `sips --matchTo "/System/Library/ColorSync/Profiles/sRGB Profile.icc"`
+(a JPEG or HEIC goes through `sips -s format png` first). The script prints the mean and max |Δ|
+between the two in 8-bit levels (the 16-bit sample / 257). `sips` writes its matched file at
+8 bits, so for a 16-bit file the raw → matched Δ includes the 16 → 8 rounding.
+
+The fixtures are 320×180, 30 fps, 1 s, made once in `work/frame_label/media/`. `h264_none.mp4`
+and `prores_none.mov` are untagged (ffprobe unknown ×3). `h264_709.mp4` and `prores_709.mov` are
+made through `bt709_fixture.make` (bt709 ×3). `still8.png` is opaque rgb24, and `still16.png` is
+an rgb48be ramp. Each scene is rendered at 0.5 s on a 320×180 canvas.
+
+**The run** (Release, 2026-10-14, after the gate's `make app`; 14/14, exit 0; no `Frame Job: `
+line, no `DEFAULTS MOVED`; Debug gave the same figures):
+
+| Row | Scene | Depth | Label | Raw → matched mean / max |
+|---|---|---|---|---|
+| F1 | `h264_none` alone | 8 | `sRGB` chunk | 0.0 / 0.0 |
+| F2 | `h264_709` alone | 8 | `iCCP` `kCGColorSpaceCoreMedia709` | 1.999 / 11.0 |
+| F3 | `prores_none` alone | 16 | `sRGB` chunk | 0.513 / 1.518 |
+| F4 | `prores_709` alone | 16 | `iCCP` `kCGColorSpaceCoreMedia709` | 2.116 / 11.428 |
+| F5 | `still8` fully covering `prores_none` | 16 | `sRGB` chunk | 0.46 / 1.128 |
+| F6 | `still8` fully covering `prores_709` | 16 | `iCCP` `kCGColorSpaceCoreMedia709` | 1.021 / 10.747 |
+| F7 | `still8` fully covering `h264_709` | 8 | `iCCP` `kCGColorSpaceCoreMedia709` | 0.626 / 10.988 |
+| F8 | `still8` alone | 8 | `sRGB` chunk | 0.0 / 0.0 |
+| F9 | `still16` alone | 16 | `sRGB` chunk | 0.542 / 1.486 |
+| F10 | `prores_709`, `{log: slog3}` | 16 | `iCCP` `kCGColorSpaceCoreMedia709` | 2.66 / 11.444 |
+| F11 | F1 as `jpeg` / `heic` | 8 | `sRGB IEC61966-2.1` (`sips`) | 0.0 / 0.0 both |
+| F11 | F2 as `jpeg` / `heic` | 8 | `HDTV` (`sips`) | 2.179 / 10.996, 2.174 / 11.0 |
+
+Every PNG also carries an `eXIf` chunk. Pairs: F5/F6 raw |Δ| 0.0 / 0.0 (identical pixels) and
+matched 0.623 / 10.984, so a colour-managed reader shows #295's two frames differently, up to 11
+levels in the darks. F1/F2 raw 7.865 / 41.84 (the untagged source decodes differently) and
+matched 8.282 / 47.805. **E1**: an `h264` export of F1's and F2's projects is tagged
+`bt709/bt709/bt709` (transfer/primaries/matrix) for both. **E2**: an `apng` export follows the
+sources as `render_frame` does: F1's has an `sRGB` chunk, F2's an `iCCP`
+`kCGColorSpaceCoreMedia709`.
+
+Three proofs compare a written frame's whole-file bytes against a reference captured on an
+earlier tree, so a label change would move their references. They are `log_proof.py` L9
+(`compare DIR`), `hdr_proof.py` H1 (`compare DIR`) and `precision_proof.py` S11 (Sd's files). A
+`git grep` of the proofs with a `capture` mode for `read_bytes()` and `digest(` comparisons found
+them. The N0 rows (curves, look, qualifier, tone, wheels), precision K1–K6 and S3, and
+`hevc_alpha_proof`'s rasters compare decoded samples, and `screens.py` and `log_thumbs_proof.py`
+T4 compare files `render_frame`'s writer does not write.

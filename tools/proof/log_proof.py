@@ -121,9 +121,28 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   `slog3_vr_vp9e.mp4` and `slog3_fr_webm.webm` (the last imported through
   `ContainerRewrap`) with S-Log3 set at 0.5 s, scored as L10 but to ±2: L1's
   grey-row points and the patches = the oracle at the file's own decoded codes
-  ±2 at 8 bits (the VP9 decode: the same codes from VP9 and from HEVC part by
+  ±2 at 8 bits (the same codes rendered from VP9 and from HEVC part by
   up to 0.88 of a level untransformed, 1.25 under S-Log3), the code domain by
   the file's range flag — step 0's read of a VP9 track's `vpcC` range bit.
+- **L15** (issue batch B101, #293; a probe row, no instance): `av1_range_probe.swift`
+  over `app/Sources` reads each AV1 fixture's first format description — the
+  `FullRangeVideo` key, the `av1C` and `colr` atoms, `av1C`'s first 8 bytes,
+  the extension keys — and answers `CompositionBuilder.isFullRange`: the MP4s
+  as they are, the WebMs through the built-in rewrap's writer
+  (`ContainerRewrapWriter.write`, the precheck skipped: it refuses AV1
+  without hardware decode). Each `SYNTHETIC_AV1` record, written field by
+  field by `av1c()` (the AV1 Bitstream spec's §5.5), is `av1_fr.mp4`'s first
+  compressed sample re-described with it and written as a one-sample `.mov`.
+  No picture is decoded (AV1 does not decode on an M1/M2). L15 passes when
+  every full-range item answers true, every video-range item false and every
+  synthetic record its own `color_range`, but the two profile 2 range-1
+  records, which answer false. It passed on the untouched tree (B101's
+  control): AVFoundation sets the key from `av1C` itself in profiles 0 and 1,
+  so no product code landed, and L15 stays as a guard with no mutant. B101's
+  fix pass added two full-range profile 2 records (12 and 10 bits): profile 2
+  gets no key and answers false, which the owner accepted as a known limit
+  (2026-10-14, spec §11 GR-23, #293), so both are scored False and a change
+  in AVFoundation's answer fails L15.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
@@ -147,7 +166,12 @@ printed and not required; and `slog3_fr_422.mov`, 1024×128 as
 `slog3_fr_odd`. B99's (#291, L14) are the VP9 pair at 1024×128,
 `slog3_fr_vp9e.mp4` (`pc`) and `slog3_vr_vp9e.mp4` (`tv`), and
 `slog3_fr_webm.webm`, the same full-range VP9 stream in WebM, its tags
-printed and not required. Each is wanted with its codec, profile, pix_fmt and size,
+printed and not required. B101's (#293, L15) are `AV1_FIXTURES`: one 64×64
+1 s lavfi grey frame through libsvtav1 `yuv420p10le`, `av1_fr.mp4` (`pc`,
+`-write_colr`), `av1_fr_colr.mp4` (`pc`, `+write_colr`), `av1_vr.mp4` (`tv`,
+`-write_colr`), `av1_fr_webm.webm` (`pc`) and `av1_vr_webm.webm` (`tv`), each
+kept only when ffprobe reads `av1` and its range and the file holds a `colr`
+box exactly when `+write_colr`. Each is wanted with its codec, profile, pix_fmt and size,
 and read back as above. Mutants: `full-range-ignored` (L10, L12),
 `apple-log-rescaled` (L11), `range-from-reverse` (L12), B98's
 `odd-range-ignored` (L13: `Intermediate.pixelFormat(fullRange:)` answers the
@@ -184,6 +208,25 @@ reads that, the size and 2 s — the temporal grain stops an average-rate
 encoder from undershooting, so a ratio there reads as a rate ratio. Exit 0
 when every reverse completed; an unbuilt or failed variant is printed by
 name.
+
+    python3 tools/proof/log_proof.py decode-gap
+
+`decode-gap` (issue batch B101, #294) launches no app. `decode_gap_probe.swift`,
+built over `app/Sources`, calls `DecoderSupport.enable()` and reads the first
+frame of `slog3_fr.mov`, `slog3_vr.mov` (HEVC) and `slog3_fr_vp9e.mp4`,
+`slog3_vr_vp9e.mp4` (VP9) through `AVAssetReaderTrackOutput` at each of
+`x420`, `xf20`, `64RGBAHalf`, `128RGBAFloat` and `64RGBALE`, at
+`sample_points()` and the grey row's first 32 columns. It prints each
+file's biplanar codes against the codes it was written with (its own range:
+`xf20` for `pc`, `x420` for `tv`), and per RGB format VP9 against HEVC of the
+same codes and range in 8-bit levels (1/255). The verdict, B101's rule:
+**decoder** when VP9's own-range codes differ from the written ones at a point
+where HEVC's equal them; else **conversion** when VP9's `64RGBAHalf` is more
+than 0.5 of a level from HEVC's (naming any other format within 0.5); else
+**neither**. A reader error at `x420`, `xf20` or `64RGBAHalf` is an
+instrument failure: exit 1 and no verdict; one at `128RGBAFloat` or
+`64RGBALE` is printed. B101's run: **neither** — every own-range code exact
+and VP9's `64RGBAHalf` equal to HEVC's at every point (0.000 levels).
 
 `capture DIR` records L9's references (`DIR/l9-*.png`, `DIR/media/`) and runs
 the other rows, which must FAIL on the control. `--mutant NAME` builds a COPY
@@ -273,8 +316,10 @@ SETTINGS = {"slog3": {"log": "slog3", "gamut": "s_gamut3_cine"}, "vlog": {"log":
             "green_m": {"log": "slog3", "gamut": "s_gamut3_cine"}}
 L9_FIXTURES = ["slog3", "vlog", "applelog", "applelog2", "green"]
 ROWS = ["LP1", "LP2", "LP3", "LP4", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10",
-        "L11", "L12", "L13", "L14", "Z1"]
+        "L11", "L12", "L13", "L14", "L15", "Z1"]
 LP_ROWS = {"LP1", "LP2", "LP3", "LP4"}
+# The rows a probe answers with no instance (B101 adds L15).
+PROBE_ROWS = LP_ROWS | {"L15"}
 # B95 (spec §11 GR-22): HEVC Main 10 4:2:0 fixtures (libx265, lossless) flagged
 # full (`pc`) or video (`tv`) range, the curve's signal stored as the 10-bit
 # code 1023·y (Apple's P as 1023·P). name: (curve, range, tags or None).
@@ -338,6 +383,23 @@ COLOR_SWIFT = "app/Sources/MediaImporter+Color.swift"
 SHADER = "app/Resources/Shaders/Compositor.metal"
 BUILDER_SWIFT = "app/Sources/CompositionBuilder.swift"
 RANGE_SWIFT = "app/Sources/CompositionBuilder+SourceRange.swift"
+# B101 (#293, L15): AV1 fixtures, each one 64×64 1 s lavfi grey frame
+# (libsvtav1, yuv420p10le). name: (range flag, `-movflags` value or None,
+# container). A fixture is kept only when ffprobe reads `av1` and its range
+# and the file holds a `colr` box exactly when `+write_colr`.
+AV1_FIXTURES = {"av1_fr": ("pc", "-write_colr", ".mp4"),
+                "av1_fr_colr": ("pc", "+write_colr", ".mp4"),
+                "av1_vr": ("tv", "-write_colr", ".mp4"),
+                "av1_fr_webm": ("pc", None, ".webm"),
+                "av1_vr_webm": ("tv", None, ".webm")}
+AV1_PROBE = ROOT / "tools/proof/av1_range_probe.swift"
+# B101 (#294): `decode-gap`'s probe, fixtures, formats and verdict bound.
+GAP_PROBE = ROOT / "tools/proof/decode_gap_probe.swift"
+GAP_FIXTURES = ("slog3_fr", "slog3_vr", "slog3_fr_vp9e", "slog3_vr_vp9e")
+GAP_PAIRS = (("slog3_fr", "slog3_fr_vp9e"), ("slog3_vr", "slog3_vr_vp9e"))
+GAP_FORMATS = ("x420", "xf20", "64RGBAHalf", "128RGBAFloat", "64RGBALE")
+GAP_REQUIRED = ("x420", "xf20", "64RGBAHalf")
+GAP_BOUND = 0.5
 # name: ([(file, anchor, replacement), …], the rows that must fail).
 MUTANTS = {
     "source-unconverted": ([(SOURCES_SWIFT,
@@ -1475,18 +1537,22 @@ def run_l10(client):
 
 
 def run_l14(client):
-    # Bound 2, not L10's 1: the VP9 decode itself. The same codes decoded
-    # from VP9 and from HEVC part by up to 0.88 of a level with no Camera Log
-    # (where GR-23 changes nothing) and by 1.25 under S-Log3, tagged or not
-    # (issue batch B99's measurement; the orchestrator's ruling). A range
-    # misread is 28 levels off, so the bound still tells the two apart.
+    # Bound 2, not L10's 1: the same codes rendered from VP9 and from HEVC
+    # part by up to 0.88 of a level with no Camera Log (where GR-23 changes
+    # nothing) and by 1.25 under S-Log3, tagged or not (issue batch B99's
+    # measurement; the orchestrator's ruling). Issue batch B101's
+    # `decode-gap` verdict is "neither": VP9's own-range biplanar codes are
+    # the written ones and its 64RGBAHalf reader frames equal HEVC's at every
+    # point (#294, spec §11 GR-23), so the gap is not the decoder's or the
+    # reader's conversion. A range misread is 28 levels off, so the bound
+    # still tells the two apart.
     misses, worst = range_rows(client, "L14", ("slog3_fr_vp9e", "slog3_vr_vp9e", "slog3_fr_webm"),
                                bound=2)
     check("L14 slog3_fr_vp9e.mp4, slog3_vr_vp9e.mp4 and slog3_fr_webm.webm (VP9 Profile 2, "
           "flagged full, video, full range; the WebM rewrapped) with S-Log3 at 0.5 s: L1's "
           "grey-row points and the patches = the oracle at the file's own decoded codes ±2 at "
-          "8 bits (the VP9 decode, GR-23), the code domain by the range flag (GR-23: a VP9 "
-          "track's `vpcC` bit)",
+          "8 bits (the VP9 render gap, GR-23; not the decoder's or the reader's, B101 "
+          "#294), the code domain by the range flag (GR-23: a VP9 track's `vpcC` bit)",
           not misses, f"worst {worst}; {misses}")
 
 
@@ -1636,6 +1702,270 @@ def run_l13(client):
     pairs = {f"{fr}/{vr}": (results[fr].get("holds"), results[vr].get("holds"))
              for fr, vr in L13_PAIRS}
     check(L13_TITLE, not failed, f"pairs (full, video) hold {pairs}; failed {failed or 'none'}")
+
+
+# ---- L15 (B101, #293) -----------------------------------------------------------
+
+def av1_fixture(name):
+    """An AV1_FIXTURES file under MEDIA, made when missing; the path, or None
+    with REFUSED[name] saying why."""
+    if name in RANGE_CHECKED:
+        return RANGE_CHECKED[name]
+    flag, movflags, extension = AV1_FIXTURES[name]
+    out = MEDIA / f"{name}{extension}"
+    if not out.exists():
+        MEDIA.mkdir(parents=True, exist_ok=True)
+        flags = ["-movflags", movflags] if movflags else []
+        made = bounded.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                            "color=c=gray:size=64x64:rate=30:duration=1", "-c:v", "libsvtav1",
+                            "-pix_fmt", "yuv420p10le", "-color_range", flag, *flags, str(out)],
+                           120, env=bounded.child_env({"SVT_LOG": "1"}))
+        if made["rc"] != 0 or not out.exists():
+            REFUSED[name] = f"ffmpeg {name}: rc {made['rc']} {made['stderr'][-300:]}"
+            out.unlink(missing_ok=True)
+            RANGE_CHECKED[name] = None
+            return None
+    probe = range_stream(out)
+    colr = b"colr" in out.read_bytes()
+    wrong = {k: probe.get(k) for k, v in (("codec_name", "av1"), ("color_range", flag))
+             if probe.get(k) != v}
+    if wrong or colr != (movflags == "+write_colr"):
+        REFUSED[name] = (f"{out.name} refused: ffprobe read {wrong or 'as wanted'}; colr box "
+                         f"{colr}, wanted {movflags == '+write_colr'}")
+        print(f"       {REFUSED[name]}", flush=True)
+        out.unlink(missing_ok=True)
+        RANGE_CHECKED[name] = None
+        return None
+    RANGE_CHECKED[name] = out
+    return out
+
+
+class BitWriter:
+    """The AV1 bitstream's f(n) and uvlc(), most significant bit first."""
+
+    def __init__(self):
+        self.bits = []
+
+    def f(self, value, n):
+        self.bits += [(value >> i) & 1 for i in range(n - 1, -1, -1)]
+
+    def uvlc(self, value):
+        """value + 1 = 2^z + v: z zeros, a one, then v in z bits (§4.10.3)."""
+        z = (value + 1).bit_length() - 1
+        self.f(0, z)
+        self.f(1, 1)
+        self.f(value + 1 - (1 << z), z)
+
+    def payload(self):
+        """The bits with trailing_bits(): a one, then zeros to a byte."""
+        bits = self.bits + [1]
+        bits += [0] * (-len(bits) % 8)
+        return bytes(int("".join(map(str, bits[i:i + 8])), 2) for i in range(0, len(bits), 8))
+
+
+def leb128(value):
+    out = bytearray()
+    while True:
+        byte, value = value & 0x7F, value >> 7
+        out.append(byte | (0x80 if value else 0))
+        if not value:
+            return bytes(out)
+
+
+def av1c(profile=0, reduced=False, timing=None, model=None, delay=False, points=((0, 8, 0),),
+         frame_id=False, order_hint=False, choose_sct=True, force_sct=1, high=True,
+         twelve=False, mono=False, colours=(1, 1, 1), full=1):
+    """An `av1C` record (marker 1, version 1) whose configOBUs are one
+    sequence header OBU with `obu_has_size_field` and a leb128 size, written
+    field by field as the AV1 Bitstream spec's §5.5 reads them. `timing`:
+    (num_units_in_display_tick, time_scale, num_ticks_per_picture_minus_1 or
+    None for equal_picture_interval 0); `model`: buffer_delay_length_minus_1
+    + 1, or None for no decoder model; `points`: (operating_point_idc,
+    seq_level_idx, decoder_model_present_for_this_op); `colours`: (primaries,
+    transfer, matrix) or None for no colour description; `full`: the
+    color_range bit, where one is written."""
+    w = BitWriter()
+    w.f(profile, 3)
+    w.f(int(reduced), 1)  # still_picture, set with reduced_still_picture_header
+    w.f(int(reduced), 1)
+    if reduced:
+        w.f(points[0][1], 5)
+    else:
+        w.f(int(timing is not None), 1)
+        if timing is not None:
+            tick, scale, ticks = timing
+            w.f(tick, 32)
+            w.f(scale, 32)
+            w.f(int(ticks is not None), 1)
+            if ticks is not None:
+                w.uvlc(ticks)
+            w.f(int(model is not None), 1)
+            if model is not None:
+                w.f(model - 1, 5)
+                w.f(1001, 32)  # num_units_in_decoding_tick
+                w.f(31, 5)  # buffer_removal_time_length_minus_1
+                w.f(31, 5)  # frame_presentation_time_length_minus_1
+        w.f(int(delay), 1)
+        w.f(len(points) - 1, 5)
+        for idc, level, present in points:
+            w.f(idc, 12)
+            w.f(level, 5)
+            if level > 7:
+                w.f(1, 1)  # seq_tier
+            if model is not None:
+                w.f(present, 1)
+                if present:
+                    w.f(300, model)  # decoder_buffer_delay
+                    w.f(600, model)  # encoder_buffer_delay
+                    w.f(1, 1)  # low_delay_mode_flag
+            if delay:
+                w.f(1, 1)  # initial_display_delay_present_for_this_op
+                w.f(9, 4)
+    w.f(5, 4)  # frame_width_bits_minus_1
+    w.f(5, 4)
+    w.f(63, 6)  # max_frame_width_minus_1: 64×64
+    w.f(63, 6)
+    if not reduced:
+        w.f(int(frame_id), 1)
+        if frame_id:
+            w.f(5, 4)  # delta_frame_id_length_minus_2
+            w.f(2, 3)  # additional_frame_id_length_minus_1
+    w.f(0b011, 3)  # use_128x128_superblock, enable_filter_intra, enable_intra_edge_filter
+    if not reduced:
+        w.f(0b1111, 4)  # interintra, masked compound, warped motion, dual filter
+        w.f(int(order_hint), 1)
+        if order_hint:
+            w.f(0b11, 2)  # enable_jnt_comp, enable_ref_frame_mvs
+        w.f(int(choose_sct), 1)
+        if not choose_sct:
+            w.f(force_sct, 1)
+        if choose_sct or force_sct:
+            w.f(0, 1)  # seq_choose_integer_mv
+            w.f(1, 1)  # seq_force_integer_mv
+        if order_hint:
+            w.f(6, 3)  # order_hint_bits_minus_1
+    w.f(0b011, 3)  # enable_superres, enable_cdef, enable_restoration
+    # color_config (§5.5.2)
+    w.f(int(high), 1)
+    if profile == 2 and high:
+        w.f(int(twelve), 1)
+    if profile != 1:
+        w.f(int(mono), 1)
+    w.f(int(colours is not None), 1)
+    for value in colours or ():
+        w.f(value, 8)
+    if mono:
+        sub = (1, 1)
+        w.f(full, 1)
+    elif colours == (1, 13, 0):
+        sub = (0, 0)  # color_range implied 1: no bit
+    else:
+        w.f(full, 1)
+        sub = (1, 1) if profile == 0 or twelve else (0, 0) if profile == 1 else (1, 0)
+        if profile == 2 and twelve:
+            w.f(1, 1)  # subsampling_x
+            w.f(1, 1)  # subsampling_y
+        if sub == (1, 1):
+            w.f(0, 2)  # chroma_sample_position
+    if not mono:
+        w.f(0, 1)  # separate_uv_delta_q
+    w.f(0, 1)  # film_grain_params_present
+    payload = w.payload()
+    tier = int(points[0][1] > 7)
+    head = bytes([0x81, profile << 5 | points[0][1],
+                  tier << 7 | int(high) << 6 | int(twelve) << 5 | int(mono) << 4
+                  | sub[0] << 3 | sub[1] << 2, 0])
+    return (head + bytes([0x0A]) + leb128(len(payload)) + payload).hex()
+
+
+# (label, av1C hex, the color_range it carries). Each one differs from its
+# neighbours in the branch it takes through §5.5; the timing case's
+# num_ticks_per_picture_minus_1 1000 is a 19-bit uvlc, so a mis-sized read
+# moves every later field.
+SYNTHETIC_AV1 = [
+    ("range 1", av1c(full=1), True),
+    ("range 0", av1c(full=0), False),
+    ("timing, decoder model, two operating points", av1c(
+        timing=(1001, 30000, 1000), model=10, points=((0x103, 9, 1), (0x101, 4, 0)), full=1),
+     True),
+    ("initial_display_delay_present", av1c(delay=True, full=1), True),
+    ("reduced_still_picture_header", av1c(reduced=True, full=1), True),
+    ("mono_chrome", av1c(mono=True, full=1), True),
+    ("profile 1, (1, 13, 0): range implied 1", av1c(profile=1, high=False, colours=(1, 13, 0)),
+     True),
+    ("profile 2, 12-bit", av1c(profile=2, twelve=True, full=0), False),
+    # accepted limit (owner, 2026-10-14; spec §11 GR-23, #293): profile 2 gets no
+    # FullRangeVideo key, so a full-range one reads as video range
+    ("profile 2, 12-bit, range 1", av1c(profile=2, twelve=True, full=1), False),
+    ("profile 2, 10-bit, range 1", av1c(profile=2, full=1), False),
+    ("frame ids, order hint, screen content forced", av1c(
+        frame_id=True, order_hint=True, choose_sct=False, force_sct=1, full=0), False),
+    ("no colour description", av1c(colours=None, full=1), True),
+]
+# L15_OPEN: synthetic label → why its isFullRange is printed beside its
+# expectation and not scored (it is still scored on being answered). Empty:
+# the two profile 2 range-1 records B101's fix pass added are scored at their
+# accepted answer, false (owner, 2026-10-14; spec §11 GR-23, #293), so a
+# change in AVFoundation's answer fails L15.
+L15_OPEN: dict[str, str] = {}
+
+L15_TITLE = ("L15 AV1 (issue batch B101, #293): each fixture's first format description "
+             "read (the FullRangeVideo key, the av1C and colr atoms) and isFullRange = its "
+             "range flag (the MP4s as is, the WebMs through the built-in rewrap), and each "
+             "synthetic av1C answers its color_range (profile 2 scored at its accepted limit, false)")
+
+
+def run_l15(sources):
+    """L15: the probe over `sources`, on the AV1 fixtures and SYNTHETIC_AV1."""
+    items, want, misses, open_ = [], {}, [], {}
+    for name, (flag, _, extension) in AV1_FIXTURES.items():
+        path = av1_fixture(name)
+        if path is None:
+            misses.append(f"{name}: {REFUSED.get(name)}")
+            continue
+        items.append({"label": name, "kind": "webm" if extension == ".webm" else "file",
+                      "path": str(path)})
+        want[name] = flag == "pc"
+    base = av1_fixture("av1_fr")
+    if base is not None:
+        for label, record, expected in SYNTHETIC_AV1:
+            items.append({"label": f"synthetic {label}", "kind": "record", "record": record})
+            want[f"synthetic {label}"] = expected
+            if label in L15_OPEN:
+                open_[f"synthetic {label}"] = L15_OPEN[label]
+    binary, why = build_probe(sources, name="av1_range_probe", probe=AV1_PROBE)
+    if binary is None:
+        check(L15_TITLE, False, f"the probe did not build: {why}")
+        return
+    request, answer = WORK / "av1-probe.json", WORK / "av1-probe-answer.json"
+    answer.unlink(missing_ok=True)
+    request.write_text(json.dumps({"scratch": str(WORK / "av1-scratch"), "base": str(base),
+                                   "items": items}))
+    ran = bounded.run([str(binary), str(request), str(answer)], 300,
+                      env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
+    try:
+        answered = {a["label"]: a for a in json.loads(answer.read_text())["items"]}
+    except (OSError, ValueError, KeyError):
+        answered = {}
+        misses.append(f"no answer (rc {ran['rc']}, expired {ran['expired']}): "
+                      f"{(ran['stdout'] + ran['stderr']).strip()[-300:]}")
+    for label, expected in want.items():
+        got = answered.get(label)
+        if got is None:
+            misses.append(f"{label}: not answered")
+            continue
+        if "error" in got:
+            print(f"       {label}: error {got['error']}", flush=True)
+            misses.append(f"{label}: {got['error']}")
+            continue
+        print(f"       {label}: key {got['key']}, av1C {got['av1C']} (head {got['head']}), colr "
+              f"atom {got['colr']}, atoms {got['atoms']}, extensions {got['extensions']}; "
+              f"isFullRange {got['fullRange']}, want {expected}"
+              f"{'; ' + open_[label] if label in open_ else ''}", flush=True)
+        if got["fullRange"] != expected and label not in open_:
+            misses.append(f"{label}: isFullRange {got['fullRange']}, want {expected}")
+    check(L15_TITLE, not misses, f"{len(want)} items; misses {misses or 'none'}; "
+          f"open {sorted(open_) or 'none'}")
 
 
 # ---- L9 -------------------------------------------------------------------------
@@ -1971,6 +2301,122 @@ def run_variants(names):
     return 0 if not failed else 1
 
 
+# ---- decode-gap (issue batch B101, #294) ----------------------------------------
+
+def gap_points():
+    """sample_points() and every column of the grey row's first 32."""
+    return list(dict.fromkeys(sample_points() + [(x, GREY_ROW) for x in range(32)]))
+
+
+def written_codes(name):
+    """The (Y, Cb, Cr) a GAP_FIXTURES file was written with at gap_points()."""
+    _, ramp, patches = raw_range(RANGE_FIXTURES[name][0])
+    return {(x, y): (ramp[x] if y < 64 else patches[min(2, x * 3 // W)], 512, 512)
+            for x, y in gap_points()}
+
+
+def levels(a, b, points):
+    """The largest |a − b| over `points` and R, G, B, in 8-bit levels (1/255),
+    and where."""
+    return max((max(abs(p - q) for p, q in zip(a[pt], b[pt])) * 255, pt) for pt in points)
+
+
+def run_decode_gap():
+    """`decode-gap`: the four fixtures' first frames at each GAP_FORMATS
+    format, through `decode_gap_probe.swift`; the figures and the verdict
+    (B101's rule, in the module's docstring). Exit 0 with a verdict line; 1,
+    and no verdict, when a GAP_REQUIRED read failed; 2 when the instrument
+    could not run."""
+    print(f"B101 decode-gap — {', '.join(GAP_FIXTURES)} at {', '.join(GAP_FORMATS)}; launches "
+          "no app", flush=True)
+    paths = {n: fixture(n) for n in GAP_FIXTURES}
+    missing = [n for n, p in paths.items() if p is None]
+    if missing:
+        print(f"instrument failure: fixtures refused {missing}: {REFUSED}")
+        return 2
+    binary, why = build_probe(ROOT / "app/Sources", name="decode_gap_probe", probe=GAP_PROBE)
+    if binary is None:
+        print(f"instrument failure: the probe did not build: {why}")
+        return 2
+    points = gap_points()
+    request, answer = WORK / "gap-probe.json", WORK / "gap-probe-answer.json"
+    answer.unlink(missing_ok=True)
+    request.write_text(json.dumps({
+        "fixtures": [{"name": n, "path": str(p)} for n, p in paths.items()],
+        "formats": list(GAP_FORMATS), "points": [list(p) for p in points]}))
+    ran = bounded.run([str(binary), str(request), str(answer)], 300,
+                      env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
+    try:
+        answered = json.loads(answer.read_text())["rows"]
+    except (OSError, ValueError, KeyError):
+        print(f"instrument failure: no answer (rc {ran['rc']}, expired {ran['expired']}): "
+              f"{(ran['stdout'] + ran['stderr']).strip()[-300:]}")
+        return 2
+    got, errors = {}, {}
+    for row in answered:
+        key = (row["fixture"], row["format"])
+        if "error" in row:
+            errors[key] = row["error"]
+        else:
+            got[key] = {(x, y): tuple(v) for x, y, v in row["values"]}
+    for (name, fmt), error in errors.items():
+        print(f"  {name} at {fmt}: reader error {error}", flush=True)
+    unread = [(n, f) for n in GAP_FIXTURES for f in GAP_REQUIRED if (n, f) not in got]
+    if unread:
+        print(f"instrument failure: no read at {unread}; no verdict")
+        return 1
+    print("\n  biplanar codes against the written ones (Y, Cb, Cr):", flush=True)
+    exact = {}
+    for name in GAP_FIXTURES:
+        own = "xf20" if RANGE_FIXTURES[name][1] == "pc" else "x420"
+        written = written_codes(name)
+        for fmt in ("x420", "xf20"):
+            values = got[(name, fmt)]
+            off = [(pt, values[pt], written[pt]) for pt in points if values[pt] != written[pt]]
+            worst = max((abs(v[0] - w[0]) for _, v, w in off), default=0)
+            if fmt == own:
+                exact[name] = {pt for pt in points if values[pt] == written[pt]}
+            print(f"    {name} {fmt}{' (its own range)' if fmt == own else ''}: {len(off)} of "
+                  f"{len(points)} points differ, worst |ΔY| {worst}; e.g. {off[:3]}", flush=True)
+    decoder = [(vp9, pt) for hevc, vp9 in GAP_PAIRS for pt in points
+               if pt in exact[hevc] and pt not in exact[vp9]]
+    print("\n  RGB, VP9 against HEVC of the same codes and range (8-bit levels):", flush=True)
+    rgb = [f for f in GAP_FORMATS if f not in ("x420", "xf20")]
+    gaps = {}
+    for hevc, vp9 in GAP_PAIRS:
+        for fmt in rgb:
+            if (vp9, fmt) not in got or (hevc, fmt) not in got:
+                print(f"    {vp9} vs {hevc} at {fmt}: not read", flush=True)
+                continue
+            gaps[(vp9, fmt)] = levels(got[(vp9, fmt)], got[(hevc, fmt)], points)
+            half_vs = levels(got[(vp9, fmt)], got[(hevc, "64RGBAHalf")], points)
+            hevc_vs = levels(got[(hevc, fmt)], got[(hevc, "64RGBAHalf")], points)
+            print(f"    {vp9} vs {hevc} at {fmt}: max {gaps[(vp9, fmt)][0]:.3f} at "
+                  f"{gaps[(vp9, fmt)][1]}; VP9 {fmt} vs HEVC 64RGBAHalf {half_vs[0]:.3f}; HEVC "
+                  f"{fmt} vs its 64RGBAHalf {hevc_vs[0]:.3f}", flush=True)
+            at = gaps[(vp9, fmt)][1]
+            print(f"      at {at}: VP9 {[round(c * 255, 3) for c in got[(vp9, fmt)][at]]}, "
+                  f"HEVC {[round(c * 255, 3) for c in got[(hevc, fmt)][at]]}", flush=True)
+    half_gap = max(gaps[(vp9, "64RGBAHalf")][0] for _, vp9 in GAP_PAIRS)
+    if decoder:
+        verdict = (f"decoder — VP9's own-range biplanar codes differ from the written ones at "
+                   f"{len(decoder)} point(s) where HEVC's equal them, e.g. {decoder[:3]}")
+    elif half_gap > GAP_BOUND:
+        better = [f for f in rgb if f != "64RGBAHalf"
+                  and all((vp9, f) in gaps and gaps[(vp9, f)][0] <= GAP_BOUND
+                          for _, vp9 in GAP_PAIRS)]
+        verdict = (f"conversion — VP9's biplanar codes are exact, its 64RGBAHalf is "
+                   f"{half_gap:.3f} levels from HEVC's; "
+                   + (f"{', '.join(better)} bring(s) it within {GAP_BOUND} (PR-2's "
+                      "sourcePixelFormat; not changed here)" if better else
+                      f"no other format brings it within {GAP_BOUND}: an accepted limit"))
+    else:
+        verdict = (f"neither — VP9's biplanar codes are exact and its 64RGBAHalf is within "
+                   f"{GAP_BOUND} of HEVC's ({half_gap:.3f})")
+    print(f"\n  verdict: {verdict}", flush=True)
+    return 0
+
+
 # ---- the run --------------------------------------------------------------------
 
 def remove_work():
@@ -2011,7 +2457,8 @@ def build_mutant(name):
 def main():
     global selected
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", nargs="?", choices=["capture", "compare", "reverse-variants"])
+    parser.add_argument("mode", nargs="?",
+                        choices=["capture", "compare", "reverse-variants", "decode-gap"])
     parser.add_argument("folder", nargs="?")
     parser.add_argument("--app", default=None)
     parser.add_argument("--only", help="comma-separated rows to run and score")
@@ -2030,6 +2477,11 @@ def main():
         atexit.register(remove_work)
         HOME.mkdir(parents=True)
         return run_variants([n for n in REVERSE_VARIANTS if n in names])
+    if args.mode == "decode-gap":
+        remove_work()
+        atexit.register(remove_work)
+        HOME.mkdir(parents=True)
+        return run_decode_gap()
     if args.mode and not args.folder:
         print(f"{args.mode} needs a folder")
         return 2
@@ -2071,7 +2523,7 @@ def main():
     state = {}
     closed = True
     log = WORK / "instance.log"
-    needs_instance = bool(selected - LP_ROWS - {"Z1"})
+    needs_instance = bool(selected - PROBE_ROWS - {"Z1"})
     if needs_instance:
         launched = mcp.launch(str(binary), [],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
@@ -2103,6 +2555,8 @@ def main():
             mcp.remove_scratch(launched.socket_path)
     if selected & LP_ROWS:
         run_probe(sources)
+    if "L15" in selected:
+        run_l15(sources)
     found = hdr.complaints(log) if needs_instance else []
     closed = closed and all(v for k, v in state.items() if k.endswith("closed"))
     check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Frame Job: ` "

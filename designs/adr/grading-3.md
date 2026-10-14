@@ -106,6 +106,8 @@ Filed at the close, each `ai-drafted` and `low-priority`:
 - #282: thumbnails show the log picture of a converting media — closed by GR-21 (thumbnails through step 0, HLG and PQ included).
 - #283: a full-range-flagged log file is read as video range — closed by GR-22 (issue batch B95).
 - #291: a VP9 track's range flag is not read — closed by GR-23 (issue batch B99).
+- #293: an AV1 track's range — measured in issue batch B101: AV1 in profiles 0 and 1 carries `FullRangeVideo`, read by AVFoundation from its `av1C`, but profile 2 gets no key, so a full-range profile 2 AV1 reads as video range; no code; the owner accepted it as a known limit (2026-10-14), closed (GR-23's "Measured (issue batch B101, #293)"; `log_proof.py` L15 stays as a guard).
+- #294: the VP9 gap L14 allows — measured in issue batch B101 (`log_proof.py decode-gap`): verdict **neither**, since VP9's reader codes and `64RGBAHalf` frames equal HEVC's, so the cause lies between the reader and the compositor's source frames; left open for the owner with the figures (GR-23's "Measured (issue batch B101, #294)").
 
 Closed: #264 as built (T3-2, `c47d97d`, GR-16); its "done when" on a real clip is GRD-17 and GRD-18. #256 is closed into GR-15 (HDR sources converted honestly, T3-1), GR-20 (wide gamut for SDR projects, closed by the owner, choice 9a), #276 (linear light) and #277 (HDR, EDR and HDR export).
 

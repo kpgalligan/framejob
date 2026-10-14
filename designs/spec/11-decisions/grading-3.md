@@ -532,3 +532,35 @@ opened, at design time or build time.
     `fullRange: true`, the video-range one is `source`, `log` and `gamut`, the marker rewritten
     without the field was drawn again (`0.jpg` rewritten, within 1 of its render), and an
     unchanged reopen held both strips for 5 s.
+  - Measured (issue batch B101, #293): AV1 in profiles 0 and 1 carries `FullRangeVideo`, so
+    GR-23's fallback is not needed for it; profile 2 does not. `log_proof.py` L15
+    (`av1_range_probe.swift`, descriptions only, on the tree before any edit) read the key on
+    every AV1 fixture (libsvtav1 `yuv420p10le`, profile 0): `true` on `av1_fr.mp4`,
+    `av1_fr_colr.mp4` and the rewrapped `av1_fr_webm.webm`, `false` on `av1_vr.mp4` and the
+    rewrapped `av1_vr_webm.webm`, each answering its range flag. Only `av1_fr_colr.mp4` holds a
+    `colr` box, and the rewrap's description holds only the core's `av1C`, so AVFoundation reads
+    the key from the `av1C` sequence header itself. Twelve synthetic `av1C` records, each the
+    only colour source of a one-sample movie: the nine in profiles 0 and 1 (range 1, range 0,
+    timing info with a uvlc, a decoder model and two operating points, an initial display delay,
+    a reduced still-picture header, monochrome, profile 1's (1, 13, 0) implied range, frame ids
+    with order hints and forced screen content, and no colour description) each got the key and
+    answered their own `color_range`. The three in profile 2 (12 bits range 0, 12 bits range 1,
+    10 bits range 1) got no `FullRangeVideo` key and no `BitsPerComponent`, and each answered
+    false: right for the range-0 one, wrong for both range-1 ones. Accepted limit (owner,
+    2026-10-14): a full-range Professional-profile (profile 2) AV1 track reads as video range,
+    so step 0, PR-10's reverse and GR-21's strips read it so; there is no GR-24 and no `av1C`
+    parser. The evidence is synthetic records only, because this Mac does not decode AV1 and
+    its ffmpeg (libsvtav1, profile 0 only) cannot write profile 2. It is accepted because the
+    case is rare and cannot be tested on real media here. No product code changed. L15 scores
+    the two profile 2 range-1 records at today's answer, false, so a change in AVFoundation's
+    answer fails it and is noticed.
+  - Measured (issue batch B101, #294; `log_proof.py decode-gap`, no app): the first frame of
+    `slog3_fr.mov` and `slog3_vr.mov` (HEVC) and `slog3_fr_vp9e.mp4` and `slog3_vr_vp9e.mp4`
+    (VP9), read by `AVAssetReaderTrackOutput` at 159 points (every 8th column of the grey row,
+    its first 32 columns, and the three patches). In each file's own range (`xf20` for `pc`,
+    `x420` for `tv`), all 159 points match the written codes, for VP9 and for HEVC alike. VP9's
+    `64RGBAHalf` and `128RGBAFloat` frames equal HEVC's at every point (0.000 levels), and its
+    `64RGBALE` frames are within 0.004 of a level. The verdict is **neither**: the gap B99
+    measured is not in the decoder's output or in the reader's conversion to `64RGBAHalf`, so
+    requesting another pixel format cannot remove it, and L14 keeps its bound of 2. Where the
+    gap does arise (between the reader and the compositor's source frames) is not measured.
