@@ -683,7 +683,19 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `precision_proof.py`'s `reverse-unversioned` mutant re-anchored to the new file. `wc -l
   app/Sources/ReverseRenderer.swift`: 1221 before, 883 after; `ReverseCache.swift` is 341. The
   next seam: the audio helpers (`appendAudioBytes` … `audioSample`) out to
-  `ReverseRenderer+Audio.swift`, which widens their `private`.
+  `ReverseRenderer+Audio.swift`, which widens their `private`. Issue batch B98 paid it before
+  #289's full-range read: lines 627–787 at `f6d28ce` (`appendAudioBytes`, `// MARK: - Audio`,
+  the LPCM settings and `audioFormat`, `audioFrames`, `audioBlocks`, `reversedFrames`,
+  `audioSample`) moved byte for byte into `extension ReverseRenderer` in
+  `ReverseRenderer+Audio.swift` with `import AVFoundation`, a pure move gated alone; each moved
+  `private static` became internal and nothing else changed, and every `log_proof.py` and
+  `precision_proof.py` anchor in the file still occurs once. `wc -l
+  app/Sources/ReverseRenderer.swift`: 883 before, 721 after; `ReverseRenderer+Audio.swift` is
+  165. The next seam, which brings it under the cap: `// MARK: - Reading one slice` (`read`,
+  `copyBuffer`, `copyRows`; lines 447–626 after the move) out whole to
+  `ReverseRenderer+Read.swift`, widening their `private`, with `precision_proof.py`'s reverse
+  mutants whose anchors live there (`reverse-bgra`, `reverse-planar-drop`,
+  `reverse-no-attachments`) re-anchored to the new file.
 - `Controls.swift`: held to the sync rule with Rasterize's copy (`app/CLAUDE.md` "Shared chrome");
   7 of its lines are the SH-2 fork of `drawBar` (#101).
 - `ReelOps.swift` is exempt (a table, one row per op). `TimelineView.swift`,

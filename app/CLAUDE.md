@@ -447,6 +447,9 @@ detail there.
   an odd size, carrying the source's colour labels (spec §11 PR-7), rendered
   on demand behind `ReverseProgressSheetController.swift`'s sheet,
   substituted per CLIP by `CompositionBuilder`.
+- `ReverseRenderer+Audio.swift` — the reverse's audio: its LPCM settings,
+  slice bytes, reversed blocks and sample buffers, moved whole out of
+  `ReverseRenderer.swift` (issue batch B98).
 - `ReverseCache.swift` — `ReverseCache`, `ReverseResolution`, `ReverseStatus`
   and `ReverseSource`, moved whole out of `ReverseRenderer.swift` (issue
   batch B96): where a reversed asset lives (its digest name and pruning) and
