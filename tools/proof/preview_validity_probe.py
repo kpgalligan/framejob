@@ -296,7 +296,8 @@ case "ranges":
             requiredTrackIDs: (instruction.requiredSourceTrackIDs ?? []).map { ($0 as! NSNumber).intValue },
             recipeKey: instruction.recipeKey, mediaURLs: instruction.mediaURLs,
             sourceOrientations: instruction.sourceOrientations,
-            missingClips: instruction.missingClips)
+            missingClips: instruction.missingClips,
+            fullRangeTracks: instruction.fullRangeTracks)
     }
     let plain = AVVideoComposition(configuration: planConfiguration)
     answer["planRanges"] = validity(plain, built.composition)

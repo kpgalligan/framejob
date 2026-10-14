@@ -1075,7 +1075,10 @@ the key map behind it.
   timeline of only graphics, text, shapes or images has no plan track and
   plays over the builder's placeholder (road map 10 §10.8,
   `media_less_playback_probe.py`).
-- `CompositionBuilder.swift` (+`InstructionRanges`, +`AudioTracks`) — the
+- `CompositionBuilder.swift` (+`InstructionRanges`, +`AudioTracks`,
+  +`SourceRange`: a log media's range flag, read once per build from its
+  forward video track and carried per instruction as
+  `RecipeInstruction.fullRangeTracks`, spec §11 GR-22) — the
   app's ONE builder of the video composition, from an
   `AVVideoComposition.Configuration` it keeps on
   `BuiltComposition.videoConfiguration` (#91; a variant — Preview Quality's
@@ -1195,7 +1198,8 @@ the key map behind it.
   Camera Log, is built with, spec §11 GR-15, GR-16; a layer's `input`
   chooses before the frame's labels) · `InputConversions.swift` (the
   selector, `choose(input:)` for Camera Log, and every number Frame Job
-  chose) · `Compositor+Uniforms.swift` ·
+  chose — a log curve's code domain by its media's range flag, GR-22) ·
+  `Compositor+Uniforms.swift` ·
   `Compositor+Shadow.swift` · `Compositor+Matte.swift` · `MattePlan.swift` ·
   `Compositor+Dissolve.swift` · `Compositor+Adjustment.swift` ·
   `DestinationPass.swift` (the destination render pass as a value a shadow

@@ -128,8 +128,9 @@ enum InputConversion: Equatable {
     }
 
     /// The pass's uniform block for this conversion; `premultiplied` is the
-    /// buffer's own label (spec §11 G-35 (b)).
-    func uniforms(premultiplied: Bool) -> InputUniforms {
+    /// buffer's own label (spec §11 G-35 (b)), `fullRange` its media's range
+    /// flag (spec §11 GR-22, `RecipeInstruction.fullRangeTracks`).
+    func uniforms(premultiplied: Bool, fullRange: Bool = false) -> InputUniforms {
         let primaries: InputPrimaries
         var uniforms = InputUniforms()
         switch self {
@@ -154,7 +155,7 @@ enum InputConversion: Equatable {
             uniforms.kind = InputUniforms.kind(of: curve)
             uniforms.white = InputConversions.logWhite
             uniforms.exposure = InputConversions.logExposure
-            let domain = InputConversions.codeDomain(curve)
+            let domain = InputConversions.codeDomain(curve, fullRange: fullRange)
             uniforms.codeScale = domain.scale
             uniforms.codeOffset = domain.offset
             primaries = p
@@ -216,11 +217,13 @@ enum InputConversions {
     /// code domains).
     static let videoCodeScale: Float = 876.0 / 1023.0, videoCodeOffset: Float = 64.0 / 1023.0
 
-    /// A curve's code domain as the pass's `codeScale` and `codeOffset`.
-    static func codeDomain(_ curve: LogCurve) -> (scale: Float, offset: Float) {
+    /// A curve's code domain as the pass's `codeScale` and `codeOffset`. A
+    /// full-range file decodes to s = code/1023, so Sony's and Panasonic's
+    /// signal is s itself there (spec §11 GR-22); Apple's is (1, 0) in both.
+    static func codeDomain(_ curve: LogCurve, fullRange: Bool) -> (scale: Float, offset: Float) {
         switch curve {
         case .appleLog, .appleLog2: return (1, 0)
-        case .slog3, .vlog: return (videoCodeScale, videoCodeOffset)
+        case .slog3, .vlog: return fullRange ? (1, 0) : (videoCodeScale, videoCodeOffset)
         }
     }
 

@@ -50,11 +50,16 @@ final class RecipeInstruction: NSObject, AVVideoCompositionInstructionProtocol {
     /// clip's segment came from and `urls` says which of those resolved.
     /// These get the slate instead of nothing.
     let missingClips: Set<UInt32>
+    /// Composition video track ids whose segment across THIS instruction is a
+    /// full-range media (spec §11 GR-22): a log curve's code domain follows
+    /// it. Per instruction for `sourceOrientations`' reason; empty when no
+    /// segment converts with a log curve.
+    let fullRangeTracks: Set<Int>
 
     init(
         timeRange: CMTimeRange, requiredTrackIDs: [Int], recipeKey: Int,
         mediaURLs: [UInt32: URL], sourceOrientations: [Int: Int],
-        missingClips: Set<UInt32>
+        missingClips: Set<UInt32>, fullRangeTracks: Set<Int> = []
     ) {
         self.timeRange = timeRange
         self.requiredSourceTrackIDs = requiredTrackIDs.map {
@@ -64,6 +69,7 @@ final class RecipeInstruction: NSObject, AVVideoCompositionInstructionProtocol {
         self.mediaURLs = mediaURLs
         self.sourceOrientations = sourceOrientations
         self.missingClips = missingClips
+        self.fullRangeTracks = fullRangeTracks
         super.init()
     }
 

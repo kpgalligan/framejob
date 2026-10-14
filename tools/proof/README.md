@@ -19010,6 +19010,39 @@ the Apple Log 2 label, primaries removed, as the SDK header asks), the label rea
 
 **Its record**: `archive/grading-3.md`'s T3-2 section.
 
+### Issue batch B95 — a log file's code domain by its range flag (L10–L12 and three mutants; spec §11 GR-22, #283)
+
+Four HEVC Main 10 4:2:0 fixtures, `libx265` lossless in `.mov` (`hvc1`), 1024×128, 1 s: the
+curve's ramp and patches stored as the code 1023·y (Apple's P as 1023·P), chroma 512.
+`slog3_fr.mov` is flagged full range (`pc`) and tagged bt2020/bt709/bt2020nc, `slog3_vr.mov`
+holds the same codes flagged video range (`tv`), and `vlog_fr.mov` and `applelog_fr.mov` are
+full range and untagged. The range and the tags are given to ffmpeg's INPUT as well as its
+output: given to the output alone, ffmpeg converts the codes at encode (B95's objection).
+Each fixture is kept only when ffprobe reads its range and tags and `source_yuv` reads back
+the written code at column 512 of the grey row and at the 18 % patch. A refused fixture is a
+FAIL of its rows, naming the code read.
+
+- **L10** `slog3_fr`, `slog3_vr`, `vlog_fr` with Camera Log against the oracle at each file's
+  own decoded codes (a full-range file s = Y/1023), the domain by the flag. **L11**
+  `applelog_fr` at (1, 0), a guard row. **L12** a reversed `slog3_fr` clip: L6's envelope at
+  the video-range intermediate's codes under the full-range domain, and ≥ 10 levels at the 0 %
+  patch from the video-domain envelope.
+- **The control** (`capture tools/proof/work/b95/ctl`, Debug at df4b35c, before the product
+  edit): L10 FAILED (worst 28 levels on `slog3_fr`, 27 on `vlog_fr`, 1 on `slog3_vr`; the
+  0 % patch rendered [28, 28, 28] against the oracle's [0, 0, 0]); L12 FAILED (115 samples off,
+  0 % patch [29, 29, 29] inside the video-domain envelope); L11 passed; every other row passed.
+  The intermediate is video range and rescaled: Y 95 → 146, 553 → 539.
+- **After the fix** (Debug, `compare … --only L1,L6,L10,L11,L12,Z1`): 6/6, L10 worst 1 on each
+  file, L12 0 % patch [5, 5, 5], 22 levels outside the video-domain envelope.
+- **Mutants** (Debug, `--control tools/proof/work/b95/ctl`): `full-range-ignored` (the S-Log3
+  and V-Log arm ignores the flag) 15/17, L10 and L12 FAILED; `apple-log-rescaled` (Apple Log in
+  full range takes 1023/876, −64/876) 16/17, L11 FAILED (worst 28); `range-from-reverse` (the
+  range read through `reversedAssets`, the intermediate's) 16/17, L12 FAILED. All three MUTANT
+  PASS, no other row failed.
+- **The recorded run** (`RC_PROOF_APP=release … compare tools/proof/work/b95/ctl`, after the
+  gate's `make app`): 17/17 — LP1–LP4, L1–L12 and Z1; L10 worst 1 on each file, L11 worst 1,
+  L12 0 % patch [5, 5, 5] (22 levels outside the video-domain envelope); no `Frame Job: ` line.
+
 ## Issue #282 — converting media's thumbnails through step 0 (`log_thumbs_proof.py` H0, TH, T0–T8, TT, Z1 and ten mutants; `cache_pass_probe.py` S2; spec §11 GR-21)
 
 `log_thumbs_proof.py` is log_proof.py's shape (`capture DIR [--only …]` | `compare DIR [--only

@@ -205,10 +205,12 @@ final class InputStage {
 
     /// One conversion of `source` into `target`, encoded on `buffer`; false
     /// when no encoder could be made. `lut` is a `.lut` conversion's lattice
-    /// (spec §11 GR-16), sampled at `texture(1)`.
+    /// (spec §11 GR-16), sampled at `texture(1)`; `fullRange` is the source
+    /// media's range flag, which a log curve's code domain follows (GR-22).
     func encode(
         _ conversion: InputConversion, premultiplied: Bool, from source: MTLTexture,
-        into target: MTLTexture, buffer: MTLCommandBuffer, lut: MTLTexture? = nil
+        into target: MTLTexture, buffer: MTLCommandBuffer, lut: MTLTexture? = nil,
+        fullRange: Bool = false
     ) -> Bool {
         let descriptor = MTLRenderPassDescriptor()
         descriptor.colorAttachments[0].texture = target
@@ -219,7 +221,7 @@ final class InputStage {
         }
         encoder.label = "Frame Job input"
         encoder.setRenderPipelineState(pipeline)
-        var u = conversion.uniforms(premultiplied: premultiplied)
+        var u = conversion.uniforms(premultiplied: premultiplied, fullRange: fullRange)
         encoder.setFragmentBytes(&u, length: MemoryLayout<InputUniforms>.stride, index: 0)
         encoder.setFragmentTexture(source, index: 0)
         encoder.setFragmentTexture(lut ?? noLUT, index: 1)
@@ -243,7 +245,8 @@ extension MetalRenderer {
     /// converted texture to every draw of that track. A layer's `input` (its
     /// media's Camera Log, spec §11 GR-16) decides before the frame's labels;
     /// a LUT is found through the URLs its document published, and one that
-    /// cannot be drawn leaves the source unconverted.
+    /// cannot be drawn leaves the source unconverted. A track's range flag
+    /// comes from the instruction (`fullRangeTracks`, GR-22).
     func encodeInputs(
         layers: [RecipeLayer], request: AVAsynchronousVideoCompositionRequest,
         buffer: MTLCommandBuffer, live: inout [CVMetalTexture]
@@ -266,10 +269,12 @@ extension MetalRenderer {
                 lut = lattice
             }
             guard let source = texture(from: frame, live: &live) else { continue }
+            let fullRange = (request.videoCompositionInstruction as? RecipeInstruction)?
+                .fullRangeTracks.contains(id) == true
             guard let target = inputs.target(width: source.width, height: source.height),
                 inputs.encode(
                     conversion, premultiplied: Self.declaresPremultipliedAlpha(frame),
-                    from: source, into: target, buffer: buffer, lut: lut)
+                    from: source, into: target, buffer: buffer, lut: lut, fullRange: fullRange)
             else { throw InputError.noTarget }
             inputs.record(target, trackID: id)
         }

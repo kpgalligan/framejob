@@ -326,8 +326,8 @@ opened, at design time or build time.
       normalized to the [0,1] range"), its "10 bit, full range" codes being P·1023, so in the
       video-range file AVFoundation decodes, P = s. Step 0 reads both as y = codeScale·s +
       codeOffset: 876/1023 and 64/1023 for S-Log3 and V-Log, 1 and 0 for Apple Log. Accepted
-      limits: a log file flagged full range is read as video range; whether a real iPhone file is
-      stored this way is GRD-17's.
+      limits: a log file flagged full range is read as video range — Amended by GR-22; whether a
+      real iPhone file is stored this way is GRD-17's.
     - **Apple Log 2 is IN** (the owner's "do a leftover now when it can be done", 2026-10-12):
       the paper gives Apple Wide Gamut's primaries and white, and the SDK names its label
       (`kCVImageBufferLogTransferFunction_AppleLog2`, macOS 26 — the deployment target — with
@@ -364,7 +364,7 @@ opened, at design time or build time.
       selected in the list.
     - **Accepted limits**: thumbnails on the timeline and in the Media tab show the log picture;
       Sony's and Panasonic's own metadata is not read; a full-range-flagged log file is read as
-      video range. — Amended by GR-21: thumbnails are drawn through step 0.
+      video range — Amended by GR-22. — Amended by GR-21: thumbnails are drawn through step 0.
 - **GR-17 — Tier 3's working arrangement: each phase gated in the `grading-3` worktree and
   merged into main alone, main's format numbers, no verdict phase; synthetic fixtures now.**
   Choice 10 and the footage answer (owner, 2026-10-11). GR-14's arrangement again: the worktree
@@ -457,3 +457,23 @@ opened, at design time or build time.
   - Accepted limit: an HLG or PQ strip certified by a flat marker from a build before GR-21 keeps
     its plain picture until its file changes or its cache is removed (no package in real use,
     owner 2026-10-09).
+- **GR-22 — A log file's code domain follows its media's range flag** (#283; amends GR-16).
+  - The range is the media's forward video track's `kCMFormatDescriptionExtension_FullRangeVideo`.
+    It is read when the composition is built and carried per instruction, per track, as
+    orientation is. Absent means video range, the behaviour before this decision.
+  - In a full-range file, AVFoundation decodes s = CV/1023, so S-Log3 and V-Log take y = s
+    (codeScale 1, codeOffset 0). Video range is unchanged (876/1023 and 64/1023).
+  - Apple Log and Apple Log 2 are (1, 0) in both ranges, because P is the normalized signal.
+  - A reverse follows its media's range. Its intermediate is written in video range from codes
+    the decoder has rescaled.
+  - Unchanged: Use LUT… (sampled at s, per GR-16's append), and HLG, PQ and every SDR arm (the
+    decoder applies the range).
+  - Thumbnails drawn through step 0 (GR-21) follow it.
+  - Accepted limits: a file written in one range but flagged as the other is read by its flag. A
+    strip GR-21 certified before GR-22 keeps its picture until its file or setting changes (no
+    package is in real use).
+  - Measured (issue batch B95, `log_proof.py` L10–L12 on HEVC Main 10 fixtures, Release): before
+    this decision a full-range S-Log3 file's 0 % patch rendered 28 levels (V-Log 29) where the
+    oracle is 0 (2); after it, L10 is within 1 level on the full-range S-Log3 and V-Log files and
+    their video-range twin, L11 (full-range Apple Log) within 1, and a reversed full-range clip's
+    0 % patch renders 5, 22 levels from the video-domain reading.

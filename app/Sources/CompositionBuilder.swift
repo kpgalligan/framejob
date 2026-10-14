@@ -120,6 +120,7 @@ enum CompositionBuilder {
         // without knowing anything about assets.
         let codes = orientationCodes(plan: plan, urls: urls, assets: &assets)
         let missing = missingClips(plan: plan, urls: urls, reverse: reverse)
+        let fullRange = fullRangeMedia(plan: plan, urls: urls, assets: &assets)
 
         let size = plan.renderSizeCG
         let ranges = instructionRanges(plan, ending: composition.duration)
@@ -137,7 +138,9 @@ enum CompositionBuilder {
                 recipeKey: recipeKey, mediaURLs: urls,
                 sourceOrientations: trackOrientations(
                     plan: plan, instruction: instruction, codes: codes),
-                missingClips: missing)
+                missingClips: missing,
+                fullRangeTracks: fullRangeTracks(
+                    plan: plan, instruction: instruction, media: fullRange))
         }
         // Per composition (spec §11 GR-15 as amended): one holding an HLG, PQ
         // or wide-gamut source, or a media with Camera Log (GR-16, the plan's

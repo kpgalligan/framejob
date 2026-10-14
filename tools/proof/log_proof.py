@@ -87,8 +87,33 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   Log (`applelog` and `applelog2`, detected on the tree, set to None)
   rendered at 0.5 s byte-equal to DIR's PNGs. hdr_proof's H1 and H1m are the
   other half, run by that script.
+- **L10** (issue batch B95, spec §11 GR-22): `slog3_fr.mov`, `slog3_vr.mov`
+  and `vlog_fr.mov` with Camera Log at 0.5 s, L1's grey-row points and the
+  patches = the oracle at each file's OWN decoded codes ±1 at 8 bits, the code
+  domain by its range flag: a full-range file decodes s = Y/1023 (and
+  (C − 512)/1023) and S-Log3 and V-Log take y = s; a video-range one is
+  GR-16's.
+- **L11** (B95): `applelog_fr.mov` with `{log: apple_log}` set by hand = the
+  oracle at (1, 0) ±1, a guard row (Apple Log is (1, 0) in both ranges; it
+  passes on the control).
+- **L12** (B95): a reversed `slog3_fr.mov` clip with Camera Log: L6's envelope
+  at the video-range intermediate's own codes under the media's full-range
+  domain at every sample, and ≥ 10 levels at the 0 % patch from the same
+  envelope under the video domain.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
+
+B95's fixtures (1024×128, 1 s, HEVC Main 10 4:2:0, libx265 lossless, `.mov`
+`hvc1`): the curve's ramp and patches stored as the code 1023·y (Apple's P as
+1023·P), chroma 512. `slog3_fr.mov` flagged full range (`pc`) and tagged
+bt2020/bt709/bt2020nc, `slog3_vr.mov` the same codes flagged video range
+(`tv`), `vlog_fr.mov` and `applelog_fr.mov` full range and untagged. The range
+and the tags are given to ffmpeg's INPUT as well as its output (given to the
+output alone, ffmpeg converts the codes at encode), and each is kept only when
+ffprobe reads its range and tags and `source_yuv` reads back the written code
+at column 512 of the grey row and at the 18 % patch; a refused one is its
+rows' FAIL, naming the code read. Mutants: `full-range-ignored` (L10, L12),
+`apple-log-rescaled` (L11), `range-from-reverse` (L12).
 
 `capture DIR` records L9's references (`DIR/l9-*.png`, `DIR/media/`) and runs
 the other rows, which must FAIL on the control. `--mutant NAME` builds a COPY
@@ -176,13 +201,27 @@ SETTINGS = {"slog3": {"log": "slog3", "gamut": "s_gamut3_cine"}, "vlog": {"log":
             "green": {"log": "slog3", "gamut": "s_gamut3_cine"},
             "green_m": {"log": "slog3", "gamut": "s_gamut3_cine"}}
 L9_FIXTURES = ["slog3", "vlog", "applelog", "applelog2", "green"]
-ROWS = ["LP1", "LP2", "LP3", "LP4", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "Z1"]
+ROWS = ["LP1", "LP2", "LP3", "LP4", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10",
+        "L11", "L12", "Z1"]
 LP_ROWS = {"LP1", "LP2", "LP3", "LP4"}
+# B95 (spec §11 GR-22): HEVC Main 10 4:2:0 fixtures (libx265, lossless) flagged
+# full (`pc`) or video (`tv`) range, the curve's signal stored as the 10-bit
+# code 1023·y (Apple's P as 1023·P). name: (curve, range, tags or None).
+RANGE_FIXTURES = {"slog3_fr": ("slog3", "pc", ("bt2020", "bt709", "bt2020nc")),
+                  "slog3_vr": ("slog3", "tv", ("bt2020", "bt709", "bt2020nc")),
+                  "vlog_fr": ("vlog", "pc", None),
+                  "applelog_fr": ("apple_log", "pc", None)}
+RANGE_SETTINGS = {"slog3_fr": SETTINGS["slog3"], "slog3_vr": SETTINGS["slog3"],
+                  "vlog_fr": SETTINGS["vlog"], "applelog_fr": {"log": "apple_log"}}
+# The read-back points: one ramp column on GREY_ROW and the 18 % patch.
+READBACK_X = 512
+RANGE_CHECKED = {}
 INPUT_SWIFT = "app/Sources/InputConversions.swift"
 STAGE_SWIFT = "app/Sources/Compositor+Input.swift"
 SOURCES_SWIFT = "app/Sources/Compositor+Sources.swift"
 COLOR_SWIFT = "app/Sources/MediaImporter+Color.swift"
 SHADER = "app/Resources/Shaders/Compositor.metal"
+BUILDER_SWIFT = "app/Sources/CompositionBuilder.swift"
 # name: ([(file, anchor, replacement), …], the rows that must fail).
 MUTANTS = {
     "source-unconverted": ([(SOURCES_SWIFT,
@@ -223,6 +262,24 @@ MUTANTS = {
                       "detected: true)\n",
                       "                return MediaColor(log: .appleLog, gamut: .bt2020, "
                       "detected: true)\n")], ["L2"]),
+    # B95 (spec §11 GR-22).
+    "full-range-ignored": ([(INPUT_SWIFT,
+                             "        case .slog3, .vlog: return fullRange ? (1, 0) : "
+                             "(videoCodeScale, videoCodeOffset)\n",
+                             "        case .slog3, .vlog: return (videoCodeScale, "
+                             "videoCodeOffset)\n")], ["L10", "L12"]),
+    "apple-log-rescaled": ([(INPUT_SWIFT,
+                             "        case .appleLog, .appleLog2: return (1, 0)\n",
+                             "        case .appleLog, .appleLog2:\n"
+                             "            return fullRange ? (1023.0 / 876.0, -64.0 / 876.0) : "
+                             "(1, 0)\n")], ["L11"]),
+    # `reversedAssets` holds, per media, the reverse's intermediate a reversed
+    # clip reads: the range is then read from the intermediate, not the media.
+    "range-from-reverse": ([(BUILDER_SWIFT,
+                             "        let fullRange = fullRangeMedia(plan: plan, urls: urls, "
+                             "assets: &assets)\n",
+                             "        let fullRange = fullRangeMedia(plan: plan, urls: urls, "
+                             "assets: &reversedAssets)\n")], ["L12"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -478,6 +535,8 @@ def relabel(name, source, mode):
 
 def fixture(name):
     """`name`'s file under MEDIA, made when missing; None when refused."""
+    if name in RANGE_FIXTURES:
+        return range_fixture(name)
     if name in FIXTURES:
         curve, tagset, mode = FIXTURES[name]
         made = encode(f"{name}-ramp" if mode else name, raw_ramp(curve), tagset)
@@ -528,6 +587,93 @@ def fixture(name):
             return None
         return out
     raise ValueError(name)
+
+
+def range_code(curve, r):
+    """A range fixture's stored 10-bit code: 1023·y (Apple's 1023·P)."""
+    return min(1023, max(0, round(1023 * encode_curve(curve, r))))
+
+
+def raw_range(curve):
+    """One yuv420p10le frame of `curve`'s ramp and patches as range_code
+    stores them: (bytes, the ramp's codes, the three patches' codes)."""
+    ramp = [range_code(curve, RMAX * x / (W - 1)) for x in range(W)]
+    patches = [range_code(curve, r) for r in REFLECTANCE]
+    luma = []
+    for y in range(H):
+        luma += ramp if y < 64 else [patches[min(2, x * 3 // W)] for x in range(W)]
+    chroma = [512] * (W // 2 * (H // 2))
+    return struct.pack(f"<{len(luma) + 2 * len(chroma)}H", *luma, *chroma, *chroma), ramp, patches
+
+
+def range_stream(path):
+    """ffprobe's codec, profile, pix_fmt, range and tags of `path`'s video."""
+    ran = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                       "stream=codec_name,profile,pix_fmt,color_range,color_space,"
+                       "color_transfer,color_primaries", "-of", "json", str(path)], 60)
+    try:
+        return json.loads(ran["stdout"])["streams"][0]
+    except (ValueError, KeyError, IndexError):
+        return {}
+
+
+def range_fixture(name):
+    """A RANGE_FIXTURES file, kept only when ffprobe reads its range (and its
+    tags, or none) and `source_yuv` reads back the written code at one ramp
+    point and one patch; else None, REFUSED[name] naming the code read. The
+    range and the tags are given to the INPUT as well as the output: given to
+    the output alone, ffmpeg converts the codes at encode (B95's
+    objection)."""
+    if name in RANGE_CHECKED:
+        return RANGE_CHECKED[name]
+    curve, flag, tagset = RANGE_FIXTURES[name]
+    raw, ramp, patches = raw_range(curve)
+    out = MEDIA / f"{name}.mov"
+    tags = [] if tagset is None else ["-color_primaries", tagset[0], "-color_trc", tagset[1],
+                                      "-colorspace", tagset[2]]
+    if not out.exists():
+        MEDIA.mkdir(parents=True, exist_ok=True)
+        source = MEDIA / f"{name}.yuv"
+        source.write_bytes(raw)
+        made = bounded.run(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt",
+                            "yuv420p10le", "-s", f"{W}x{H}", "-r", "30", "-color_range", flag,
+                            *tags, "-stream_loop", "29", "-i", str(source), "-c:v", "libx265",
+                            "-x265-params", "lossless=1:log-level=error", "-pix_fmt",
+                            "yuv420p10le", "-profile:v", "main10", "-tag:v", "hvc1",
+                            "-color_range", flag, *tags, str(out)], 300)
+        source.unlink(missing_ok=True)
+        if made["rc"] != 0 or not out.exists():
+            REFUSED[name] = f"ffmpeg {name}: rc {made['rc']} {made['stderr'][-300:]}"
+            out.unlink(missing_ok=True)
+            RANGE_CHECKED[name] = None
+            return None
+    probe = range_stream(out)
+    want = {"codec_name": "hevc", "profile": "Main 10", "pix_fmt": "yuv420p10le",
+            "color_range": flag}
+    if tagset is not None:
+        want.update({"color_primaries": tagset[0], "color_transfer": tagset[1],
+                     "color_space": tagset[2]})
+    wrong = {k: probe.get(k) for k, v in want.items() if probe.get(k) != v}
+    if tagset is None:
+        wrong.update({k: probe.get(k) for k in ("color_primaries", "color_transfer",
+                                                 "color_space")
+                      if probe.get(k, "unknown") != "unknown"})
+    yuv = None if wrong else source_yuv(out)
+    read = (yuv.codes(READBACK_X, GREY_ROW)[0], yuv.codes(PATCH_X[1], PATCH_ROW)[0]) \
+        if yuv else None
+    written = (ramp[READBACK_X], patches[1])
+    if wrong or read != written:
+        REFUSED[name] = (f"{name}.mov refused: ffprobe read {wrong or 'as wanted'}; read back Y "
+                         f"{read} at ({READBACK_X}, {GREY_ROW}) and ({PATCH_X[1]}, {PATCH_ROW}), "
+                         f"written {written}")
+        print(f"       {REFUSED[name]}", flush=True)
+        out.unlink(missing_ok=True)
+        RANGE_CHECKED[name] = None
+        return None
+    print(f"       {name}.mov kept: {hdr.tags(probe)} range {probe.get('color_range')}, read "
+          f"back Y {read} = written", flush=True)
+    RANGE_CHECKED[name] = out
+    return out
 
 
 def l9_media(name, control):
@@ -1067,6 +1213,145 @@ def run_l8(client):
           "with_clips; a scope is an Err", not misses, "; ".join(misses))
 
 
+# ---- L10, L11, L12 (B95, spec §11 GR-22) --------------------------------------
+
+def code_domain(curve, full):
+    """GR-22's code domain: S-Log3 and V-Log by the file's range flag, Apple
+    Log (1, 0) in both."""
+    if full or curve in ("apple_log", "apple_log2"):
+        return 1.0, 0.0
+    return VIDEO_SCALE, VIDEO_OFFSET
+
+
+def rgb_full(luma, cb, cr, matrix):
+    """10-bit full-range codes → R'G'B': s = Y/1023, (C − 512)/1023."""
+    kr, kb = hdr.KR_KB[matrix]
+    yy, pb, pr = luma / 1023, (cb - 512) / 1023, (cr - 512) / 1023
+    r = yy + 2 * (1 - kr) * pr
+    b = yy + 2 * (1 - kb) * pb
+    g = (yy - kr * r - kb * b) / (1 - kr - kb)
+    return [r, g, b]
+
+
+def range_oracle(curve, gamut, codes, full_decode, domain, matrix="bt2020nc"):
+    """The 8-bit oracle at one pixel's codes: decoded in the file's range,
+    rounded to half (`oracle_at`'s reason), then y = scale·s + offset under
+    `domain` and GR-16's formula."""
+    rgb = rgb_full(*codes, matrix) if full_decode else hdr.rgb_of(*codes, matrix)
+    scale, offset = domain
+    signal_ = [hdr.half(c) for c in rgb]
+    return [code8(c) for c in display(curve, gamut, [decode_curve(curve, c * scale + offset)
+                                                     for c in signal_])]
+
+
+def range_rows(client, row, names):
+    """Each of `names` with its Camera Log at 0.5 s against the oracle at its
+    OWN decoded codes, in its range, with the domain by its flag: (misses,
+    worst, the 0 % patch's render and its video-domain oracle)."""
+    misses, worst, figures = [], {}, {}
+    for name in names:
+        curve, flag, _ = RANGE_FIXTURES[name]
+        full = flag == "pc"
+        got, why = scene(client, name, f"{row.lower()}-{name}", RANGE_SETTINGS[name])
+        path = fixture(name)
+        yuv = source_yuv(path) if path else None
+        if got is None or yuv is None or why:
+            misses.append(f"{name}: {why or REFUSED.get(name) or 'no decode'}")
+            continue
+        gamut = RANGE_SETTINGS[name].get("gamut") or GAMUTS[curve][0]
+        points = samples(got) + [(x, GREY_ROW, got.px8(x, GREY_ROW)) for x in range(32) if x % 8]
+        gaps = [(x, y, v, range_oracle(curve, gamut, yuv.codes(x, y), full,
+                                       code_domain(curve, full))) for x, y, v in points]
+        worst[name] = max(spread(v, o) for _, _, v, o in gaps)
+        bad = [(x, y, v, o) for x, y, v, o in gaps if spread(v, o) > 1]
+        if bad:
+            misses.append(f"{name}: {len(bad)} samples off, e.g. {bad[:3]}")
+        x0 = PATCH_X[0]
+        figures[name] = {"0% patch render": got.px8(x0, PATCH_ROW),
+                         "oracle": range_oracle(curve, gamut, yuv.codes(x0, PATCH_ROW), full,
+                                                code_domain(curve, full)),
+                         "video-domain oracle": range_oracle(
+                             curve, gamut, yuv.codes(x0, PATCH_ROW), full,
+                             (VIDEO_SCALE, VIDEO_OFFSET))}
+        print(f"       {name} ({flag}): worst {worst[name]}; {figures[name]}", flush=True)
+    return misses, worst
+
+
+def run_l10(client):
+    misses, worst = range_rows(client, "L10", ("slog3_fr", "slog3_vr", "vlog_fr"))
+    check("L10 slog3_fr.mov, slog3_vr.mov and vlog_fr.mov (HEVC Main 10, flagged full, video, "
+          "full range) with Camera Log at 0.5 s: L1's grey-row points and the patches = the "
+          "oracle at the file's own decoded codes ±1 at 8 bits, the code domain by the range "
+          "flag (GR-22)", not misses, f"worst {worst}; {misses}")
+
+
+def run_l11(client):
+    misses, worst = range_rows(client, "L11", ("applelog_fr",))
+    check("L11 applelog_fr.mov (Apple Log's P as 1023·P, flagged full range) with {log: "
+          "apple_log} = the oracle at (1, 0) ±1 at 8 bits (a guard row: Apple Log is (1, 0) in "
+          "both ranges)", not misses, f"worst {worst}; {misses}")
+
+
+def range_envelope(curve, gamut, codes, domain):
+    """L6's envelope at a video-range intermediate's codes (Y moved by −1, 0,
+    +1, widened by 1 level) under `domain`: (low, high)."""
+    luma, cb, cr = codes
+    outs = [range_oracle(curve, gamut, (luma + d, cb, cr), False, domain) for d in (-1, 0, 1)]
+    return ([min(o[i] for o in outs) - 1 for i in range(3)],
+            [max(o[i] for o in outs) + 1 for i in range(3)])
+
+
+L12_TITLE = ("L12 a reversed slog3_fr.mov clip with Camera Log at 0.5 s: L6's envelope at the "
+             "intermediate's own codes under the media's full-range domain (1, 0) at every "
+             "sample, and ≥ 10 levels at the 0 % patch from the same envelope under the video "
+             "domain")
+
+
+def run_l12(client):
+    name = "slog3_fr"
+    curve = RANGE_FIXTURES[name][0]
+    gamut = RANGE_SETTINGS[name]["gamut"]
+    made = {}
+
+    def reverse(doc, clip, tag="l12-rev"):
+        got = doc.call("set_reversed", clip=clip, reversed=True)
+        if not got["ok"]:
+            return f"set_reversed: {got.get('error')}"
+        files, late = wait_reverse(doc, tag)
+        if files:
+            kept = WORK / f"{tag}-intermediate.mov"
+            shutil.copy2(files[0], kept)
+            made["file"] = kept
+        return late
+    backward, why = scene(client, name, "l12-rev", RANGE_SETTINGS[name], reverse)
+    middle = hdr.yuv_frames(made["file"], W, H, 16) if made.get("file") else None
+    source = source_yuv(fixture(name)) if fixture(name) else None
+    if backward is None or middle is None or source is None or why:
+        check(L12_TITLE, False,
+              f"{why}; intermediate {made.get('file')}; decoded {middle is not None}")
+        return
+    full = code_domain(curve, True)
+    off = []
+    for x, y, back in samples(backward):
+        low, high = range_envelope(curve, gamut, middle[15].codes(x, y), full)
+        if not all(lo <= v <= hi for v, lo, hi in zip(back, low, high)):
+            off.append(((x, y), back, (low, high), middle[15].codes(x, y)[0]))
+    x0 = PATCH_X[0]
+    back0 = backward.px8(x0, PATCH_ROW)
+    vlow, vhigh = range_envelope(curve, gamut, middle[15].codes(x0, PATCH_ROW),
+                                 (VIDEO_SCALE, VIDEO_OFFSET))
+    apart = max(max(lo - v, v - hi) for v, lo, hi in zip(back0, vlow, vhigh))
+    probe = range_stream(made["file"])
+    codes = {f"({x}, {y})": (source.codes(x, y)[0], middle[15].codes(x, y)[0])
+             for x, y in ((x0, PATCH_ROW), (PATCH_X[1], PATCH_ROW), (READBACK_X, GREY_ROW))}
+    check(L12_TITLE,
+          not off and apart >= 10,
+          f"off {len(off)}, e.g. {off[:4]}; 0 % patch {back0}, video-domain envelope "
+          f"{(vlow, vhigh)}, apart {apart}; intermediate {probe.get('codec_name')} "
+          f"{probe.get('pix_fmt')} range {probe.get('color_range')}; Y file → intermediate "
+          f"{codes}")
+
+
 # ---- L9 -------------------------------------------------------------------------
 
 def run_l9(client, mode, control, state):
@@ -1311,7 +1596,8 @@ def main():
                     run_l9(client, args.mode, control, state)
                 for name, run in (("L1", run_l1), ("L2", run_l2), ("L3", run_l3),
                                   ("L4", run_l4), ("L5", run_l5), ("L6", run_l6),
-                                  ("L7", run_l7), ("L8", run_l8)):
+                                  ("L7", run_l7), ("L8", run_l8), ("L10", run_l10),
+                                  ("L11", run_l11), ("L12", run_l12)):
                     if name in selected:
                         run(client)
             except Exception as error:  # a row that could not run is a failure

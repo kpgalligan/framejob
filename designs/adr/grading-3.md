@@ -73,9 +73,9 @@ Mutants, each run once on the final instrument and all caught: T3-1's twelve (`h
 - **The player's first frame and the player at length** are REASONED fixed, because they go through the same conversion. The reader and the generator are measured; the preview is GRD-16's.
 - **A source whose format description lacks its frames' labels** stays on AVFoundation's path, since the class is chosen from the descriptions (GR-15; #279).
 - **The PQ shoulder ignores HDR10 static metadata** (H7, measured with metadata naming 4,000 cd/m² against the conversion's 1,000; #281).
-- **Thumbnails** on the timeline and in the Media tab showed the log picture (#282): closed by GR-21, which draws a converting media's thumbnails — Camera Log, HLG and PQ — through step 0. **A full-range-flagged log file** is read as video range (#283).
+- **Thumbnails** on the timeline and in the Media tab showed the log picture (#282): closed by GR-21, which draws a converting media's thumbnails — Camera Log, HLG and PQ — through step 0. **A full-range-flagged log file** was read as video range (#283): closed by GR-22 (issue batch B95), which takes S-Log3's and V-Log's code domain from the media's range flag; log_proof's L10–L12 measure it.
 - **The 10-bit reverse shifts a log toe**: code 95 → 98 (S-Log3) and 196 → 199 (Apple Log), seven levels after the curve. L6's bound absorbs it (#280).
-- **A colour tag in the ProRes header and not the `colr` atom** decodes with BT.709 coefficients ([59, 154, 76] against [61, 156, 74]). The first `green.mov`'s [50, 165, 73] (BT.601-like) is unexplained, and the file was not kept (#279).
+- **A colour tag in the ProRes header and not the `colr` atom** decodes with BT.709 coefficients ([59, 154, 76] against [61, 156, 74]). The first `green.mov`'s [50, 165, 73] (BT.601-like) is explained by B95's measurement: `prores_ks` given `-colorspace bt2020nc` on the encode itself converts the card's codes at encode (462/466/470 → 473/463/465), and [50, 165, 73] is the BT.2020nc oracle at those stored codes, so it was ffmpeg's conversion of the fixture, not a BT.601 decode by Frame Job. Its BT.2020nc decode means that file carried a `colr` atom (inferred; it was not kept). That file, re-made, has no `colr` atom and renders [47, 162, 75], the BT.709-coefficient oracle at its own codes; the header-only tagging still renders [59, 154, 76]. Whether to read a ProRes header's tags is put to the owner (#279).
 - **The display transform's mid-grey** is Frame Job's look choice, not a maker's. A camera LUT applied as a look over Camera Log converts twice and is only warned.
 - **Timings** come from one M2 Max on a loaded host and are recorded, not budgets.
 
@@ -89,7 +89,7 @@ Filed at the close, each `ai-drafted` and `low-priority`:
 - #280: the 10-bit reverse's toe shift on log footage.
 - #281: PQ's shoulder ignores HDR10 static metadata.
 - #282: thumbnails show the log picture of a converting media — closed by GR-21 (thumbnails through step 0, HLG and PQ included).
-- #283: a full-range-flagged log file is read as video range.
+- #283: a full-range-flagged log file is read as video range — closed by GR-22 (issue batch B95).
 
 Closed: #264 as built (T3-2, `c47d97d`, GR-16); its "done when" on a real clip is GRD-17 and GRD-18. #256 is closed into GR-15 (HDR sources converted honestly, T3-1), GR-20 (wide gamut for SDR projects, closed by the owner, choice 9a), #276 (linear light) and #277 (HDR, EDR and HDR export).
 
