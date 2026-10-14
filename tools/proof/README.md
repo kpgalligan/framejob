@@ -18977,6 +18977,18 @@ under `capture`, `--measure` or a mutant's default selection. **TI** now also pr
 export's wall time (`time.monotonic()` around `export`), recorded and not scored. Its record:
 `archive/grading-3.md`'s T3-3 section.
 
+**Issue batch B96 (#281)** gave H7 two more fixtures and Apple's own reading.
+`pq_hdr10_600.mov` names a 600 cd/m² mastering display with MaxCLL 600, and `pq_hdr10_cll.mov`
+the 4,000 cd/m² display with MaxCLL 1,000, which separates the two fields; each has its own
+CONTROL peak lines, read back by ffprobe. H7 holds all four grey rows to the PQ oracle ±1 and
+every render's PNG bytes to `pq_plain`'s. It prints, unscored, Apple's reading of each file
+(`hdr_pick_probe.swift`'s `plain` request, an `AVAssetImageGenerator` frame with no
+composition, as H1w's oracle) at the grey row's every 64th column, and each HDR10 file's worst
+|Δ| against `pq_plain`'s. The recorded run (`RC_PROOF_APP=release … --only H7,Z1`, after the
+gate's `make app`; Debug the same): 2/2. The four renders are byte-equal, each worst 1 level
+against the oracle. Apple's four readings are equal (worst |Δ| 0), [0, 2, 10, 25, 44, 68, 98,
+134, 180, 221, 244, 254, 255, 255, 255, 255] at x = 0, 64, …, 960. No `Frame Job: ` line.
+
 ## Road map grading-3 — T3-2, camera log at step 0 (`log_proof.py` LP1–LP4, L1–L9, Z1 and ten mutants; `log_probe.swift`; `applelog_writer.swift`'s `log2`; spec §11 GR-16)
 
 `log_proof.py` is hdr_proof.py's shape (`capture DIR` | `compare DIR [--only …]` | `--mutant
@@ -19042,6 +19054,29 @@ FAIL of its rows, naming the code read.
 - **The recorded run** (`RC_PROOF_APP=release … compare tools/proof/work/b95/ctl`, after the
   gate's `make app`): 17/17 — LP1–LP4, L1–L12 and Z1; L10 worst 1 on each file, L11 worst 1,
   L12 0 % patch [5, 5, 5] (22 levels outside the video-domain envelope); no `Frame Job: ` line.
+
+### Issue batch B96 — the reverse's intermediate variants (`log_proof.py reverse-variants`; #280)
+
+`python3 tools/proof/log_proof.py reverse-variants [--variant base,rate2,…]` launches no app.
+Each of nine variants is one edit to the plain `.hevcMain10` path of `ReverseRenderer.swift`
+(`REVERSE_VARIANTS`, each anchor asserted once). They are `base`, `x422` (fed `x422`), `main422`
+(and HEVC Main 4:2:2 10), `rate2`/`rate4`/`rate8` (`bits` × k after its clamps), `quality`
+(`AVVideoQualityKey` 1.0), `prores422` and `prores422hq`. For each one it copies the tree
+(`tree_copy.make_copy` → `WORK/variant-<name>`), builds `reverse_probe.swift` over the copy's
+`app/Sources` (`build_probe(…, probe=REVERSE_PROBE)`), and reverses `slog3`, `applelog`,
+`slog3_fr`, `detail_1080` and `detail_2160`. The detail fixtures are 2 s of `testsrc2` with
+temporal grain, ProRes 422 HQ, untagged, each checked by ffprobe. On each log fixture it reads
+the worst |Y₁₅ − expected| over samples()' 131 points and the grey row's columns 0–31 (expected:
+the file's Y; for `slog3_fr`, round(64 + 876·Y/1023), GR-22). On each detail fixture it reads
+bytes and MB/min beside Apple's published ProRes rates, and the ratio to `base`. A variant holds
+at ≤ 1 and qualifies when it also costs ≤ 2.0× `base`, both bounds fixed before the run.
+
+The recorded run (exit 0, every reverse completed): no variant qualifies. Today's `base` is
+worst 3 on all three log fixtures (column 0 95 → 98, 196 → 199). The rate variants close the
+video-range toe (×2: 1, 1, 3 at 1.99/2.01×; ×4: 1, 1, 2 at 3.98/4.06×). `x422` and HEVC 4:2:2
+do not (2, 3, 90 at 0.99/1.01×). ProRes 422 is 1, 1, 90 at 20.6/20.4×, and 422 HQ 0, 0, 90 at
+31.9/32.1×. Every `x422` read of the full-range `slog3_fr` lands up to 90 codes off. The
+table is `designs/adr/grading-3.md`'s #280 bullet, and the choice is put to the owner.
 
 ## Issue #282 — converting media's thumbnails through step 0 (`log_thumbs_proof.py` H0, TH, T0–T8, TT, Z1 and ten mutants; `cache_pass_probe.py` S2; spec §11 GR-21)
 

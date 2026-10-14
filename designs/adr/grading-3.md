@@ -72,9 +72,24 @@ Mutants, each run once on the final instrument and all caught: T3-1's twelve (`h
 - **Synthetic fixtures only.** Real iPhone HDR, Apple Log and Sony or Panasonic files are GRD-16…GRD-18. Whether a real Apple Log file carries the label and video-range codes is GRD-17's.
 - **The player's first frame and the player at length** are REASONED fixed, because they go through the same conversion. The reader and the generator are measured; the preview is GRD-16's.
 - **A source whose format description lacks its frames' labels** stays on AVFoundation's path, since the class is chosen from the descriptions (GR-15; #279).
-- **The PQ shoulder ignores HDR10 static metadata** (H7, measured with metadata naming 4,000 cd/m² against the conversion's 1,000; #281).
+- **The PQ shoulder ignores HDR10 static metadata** (H7, measured with metadata naming 4,000 cd/m² against the conversion's 1,000; #281). Issue batch B96 added a 600 cd/m² display with MaxCLL 600 and the 4,000 cd/m² display with MaxCLL 1,000: all four PQ ramps render byte-identical, each grey row within 1 level of the oracle, and Apple's own reading of each file (`AVAssetImageGenerator`, no composition) is identical too, worst |Δ| 0 at the grey row's every 64th column (`hdr_proof.py --only H7,Z1`, Debug and Release, 2/2 each). Whether the white should follow the metadata is put to the owner (issue batch B96).
 - **Thumbnails** on the timeline and in the Media tab showed the log picture (#282): closed by GR-21, which draws a converting media's thumbnails — Camera Log, HLG and PQ — through step 0. **A full-range-flagged log file** was read as video range (#283): closed by GR-22 (issue batch B95), which takes S-Log3's and V-Log's code domain from the media's range flag; log_proof's L10–L12 measure it.
 - **The 10-bit reverse shifts a log toe**: code 95 → 98 (S-Log3) and 196 → 199 (Apple Log), seven levels after the curve. L6's bound absorbs it (#280).
+  Issue batch B96 measured the intermediate's variants (`log_proof.py reverse-variants`: a probe over a tree copy, no app; worst |Y₁₅ − expected| on `slog3` / `applelog` / `slog3_fr` over 131 points and the toe's columns 0–31; MB per minute and ratio to today's on 2 s grain-detail ProRes 422 HQ fixtures). Fixed before the run: a variant holds at ≤ 1 on all three, and qualifies when it also costs ≤ 2.0× today's. None qualified, so the choice is put to the owner (issue batch B96):
+
+  | Variant | Worst toe | Holds | MB/min 1080p30 | MB/min 2160p30 | Ratio 1080 / 2160 |
+  |---|---|---|---|---|---|
+  | today's (HEVC Main 10, `x420`) | 3, 3, 3 | no | 54 | 213 | 1.00 / 1.00 |
+  | HEVC Main 10 fed `x422` | 2, 3, 90 | no | 54 | 216 | 0.99 / 1.01 |
+  | HEVC Main 4:2:2 10 | 2, 3, 90 | no | 54 | 215 | 0.99 / 1.01 |
+  | rate ×2 | 1, 1, 3 | no | 108 | 429 | 1.99 / 2.01 |
+  | rate ×4 | 1, 1, 2 | no | 215 | 867 | 3.98 / 4.06 |
+  | rate ×8 | 1, 1, 2 | no | 437 | 1742 | 8.08 / 8.16 |
+  | quality 1.0 | 1, 1, 2 | no | 3399 | 13633 | 62.86 / 63.86 |
+  | ProRes 422 | 1, 1, 90 | no | 1113 | 4343 | 20.58 / 20.35 |
+  | ProRes 422 HQ | 0, 0, 90 | no | 1722 | 6843 | 31.85 / 32.06 |
+
+  The cause is the rate, not the `x420` feed: more bits close the video-range toe, and 4:2:2 alone does not. Every `x422` read of the full-range `slog3_fr` (4:2:0 HEVC) lands up to 90 codes off (column 0: 95 → 159 or 161 against 145), and no lossy HEVC variant gets that file within 1 (best 2).
 - **A colour tag in the ProRes header and not the `colr` atom** decodes with BT.709 coefficients ([59, 154, 76] against [61, 156, 74]). The first `green.mov`'s [50, 165, 73] (BT.601-like) is explained by B95's measurement: `prores_ks` given `-colorspace bt2020nc` on the encode itself converts the card's codes at encode (462/466/470 → 473/463/465), and [50, 165, 73] is the BT.2020nc oracle at those stored codes, so it was ffmpeg's conversion of the fixture, not a BT.601 decode by Frame Job. Its BT.2020nc decode means that file carried a `colr` atom (inferred; it was not kept). That file, re-made, has no `colr` atom and renders [47, 162, 75], the BT.709-coefficient oracle at its own codes; the header-only tagging still renders [59, 154, 76]. Whether to read a ProRes header's tags is put to the owner (#279).
 - **The display transform's mid-grey** is Frame Job's look choice, not a maker's. A camera LUT applied as a look over Camera Log converts twice and is only warned.
 - **Timings** come from one M2 Max on a loaded host and are recorded, not budgets.

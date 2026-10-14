@@ -115,6 +115,35 @@ at column 512 of the grey row and at the 18 % patch; a refused one is its
 rows' FAIL, naming the code read. Mutants: `full-range-ignored` (L10, L12),
 `apple-log-rescaled` (L11), `range-from-reverse` (L12).
 
+    python3 tools/proof/log_proof.py reverse-variants [--variant base,rate2,...]
+
+`reverse-variants` (issue batch B96, #280) launches no app. For each of
+`REVERSE_VARIANTS`, in order — `base` (none), `x422` (`.hevcMain10` fed
+`x422`, 4 bytes a pixel), `main422` (and HEVC Main 4:2:2 10), `rate2`,
+`rate4`, `rate8` (`bits` × k AFTER its clamps, at most 240 Mbps), `quality`
+(`AVVideoQualityKey` 1.0 for the rate), `prores422` (every size ProRes
+422), `prores422hq` (and its codec 422 HQ), each one edit to the plain
+`.hevcMain10` path of `ReverseRenderer.swift` — it copies the tree
+(`tree_copy.make_copy` → `WORK/variant-<name>`, each anchor asserted once),
+builds `reverse_probe.swift` over the copy's `app/Sources` and reverses
+`slog3`, `applelog`, `slog3_fr`, `detail_1080` and `detail_2160`. It prints
+the intermediate's codec/profile/pix_fmt; each detail fixture's bytes and
+MB (10⁶ bytes) per minute beside Apple's published ProRes 422 / 422 HQ
+rates (Apple ProRes White Paper, 29.97 fps); the ratio to `base`'s bytes;
+and, for each log fixture, the worst |Y₁₅ − expected| over samples()' 131
+points and grey-row columns 0–31, where, and column 0's codes file →
+intermediate (expected: the file's Y; for `slog3_fr`, round(64 +
+876·Y/1023), GR-22). A variant HOLDS when every log fixture's worst is ≤ 1,
+and QUALIFIES when it holds and both ratios are ≤ 2.0 (fixed before the
+run); the choice is the qualifier with the smallest 2160 ratio, a tie within
+5 % to the earlier. The detail fixtures (`MEDIA/detail_1080.mov`,
+`detail_2160.mov`): 2 s of `testsrc2` with `noise=alls=6:allf=t+u`,
+`prores_ks -profile:v 3`, `yuv422p10le`, untagged, kept only when ffprobe
+reads that, the size and 2 s — the temporal grain stops an average-rate
+encoder from undershooting, so a ratio there reads as a rate ratio. Exit 0
+when every reverse completed; an unbuilt or failed variant is printed by
+name.
+
 `capture DIR` records L9's references (`DIR/l9-*.png`, `DIR/media/`) and runs
 the other rows, which must FAIL on the control. `--mutant NAME` builds a COPY
 of the tree (`tree_copy.make_copy`), applies its edits (each anchor asserted
@@ -153,6 +182,7 @@ HOME = WORK / "home"
 MEDIA = BASE / "media"
 CONTROL = "tools/proof/work/t3-2/ctl"
 PROBE = ROOT / "tools/proof/log_probe.swift"
+REVERSE_PROBE = ROOT / "tools/proof/reverse_probe.swift"
 WRITER = ROOT / "tools/proof/applelog_writer.swift"
 CALL_BOUND = 300
 BUILD_BOUND = 1500
@@ -281,6 +311,52 @@ MUTANTS = {
                              "        let fullRange = fullRangeMedia(plan: plan, urls: urls, "
                              "assets: &reversedAssets)\n")], ["L12"]),
 }
+# B96 (#280): the reverse's intermediate variants, each one edit to the plain
+# `.hevcMain10` path of ReverseRenderer.swift (`reverse-variants`). The rate
+# variants scale `bits` AFTER its clamps: the log fixtures sit at the 2 Mbps
+# floor, where scaling the 0.12 factor would leave rate2 a no-op.
+REVERSER = "app/Sources/ReverseRenderer.swift"
+X420_LINE = "            case .hevcMain10: return kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange\n"
+X420_BYTES = "            case .hevcMain10: return 3\n"
+MAIN10_LINE = ("            AVVideoProfileLevelKey: kVTProfileLevel_HEVC_Main10_AutoLevel as "
+               "String,\n")
+RATE_LINE = "            AVVideoAverageBitRateKey: bits,\n"
+INIT_LINE = ("            self = dimensions.width % 2 != 0 || dimensions.height % 2 != 0 ? "
+             ".proRes422 : .hevcMain10\n")
+PRORES_LINE = "                AVVideoCodecKey: AVVideoCodecType.proRes422,\n"
+X422_EDITS = [(REVERSER, X420_LINE, X420_LINE.replace("420YpCbCr", "422YpCbCr")),
+              (REVERSER, X420_BYTES, "            case .hevcMain10: return 4\n")]
+PRORES_EDIT = (REVERSER, INIT_LINE, "            self = .proRes422\n")
+REVERSE_VARIANTS = {
+    "base": [],
+    "x422": X422_EDITS,
+    "main422": X422_EDITS + [(REVERSER, MAIN10_LINE,
+                              MAIN10_LINE.replace("Main10_AutoLevel", "Main42210_AutoLevel"))],
+    **{f"rate{k}": [(REVERSER, RATE_LINE,
+                     f"            AVVideoAverageBitRateKey: min(bits * {k}, 240_000_000),\n")]
+       for k in (2, 4, 8)},
+    "quality": [(REVERSER, RATE_LINE, "            AVVideoQualityKey: 1.0,\n")],
+    "prores422": [PRORES_EDIT],
+    "prores422hq": [PRORES_EDIT, (REVERSER, PRORES_LINE,
+                                  PRORES_LINE.replace("proRes422,", "proRes422HQ,"))],
+}
+# The log fixtures each variant reverses, and the cost fixtures: 2 s of grain
+# detail, 10-bit ProRes 422 HQ, untagged. The temporal grain stops an
+# average-rate encoder from undershooting, so a ratio there reads as a rate
+# ratio.
+VARIANT_LOGS = ["slog3", "applelog", "slog3_fr"]
+DETAIL = {"detail_1080": (1920, 1080), "detail_2160": (3840, 2160)}
+DETAIL_SECONDS = 2
+# Apple's published target rates (Apple ProRes White Paper, its 29.97 fps
+# table), Mbit/s: ProRes 422 and 422 HQ — the size estimate's source.
+APPLE_PRORES = {"detail_1080": (117, 176), "detail_2160": (471, 707)}
+# Fixed before any run (the spec): a variant HOLDS when every log fixture's
+# worst |Y₁₅ − expected| is ≤ 1, and QUALIFIES when it holds and both detail
+# ratios to `base` are ≤ 2.0; the choice is the qualifier with the smallest
+# 2160 ratio, a tie within 5 % going to the earlier one.
+HOLD_BOUND = 1
+RATIO_BOUND = 2.0
+TIE = 0.05
 rows = {}
 selected = set(ROWS)
 REFUSED = {}
@@ -779,11 +855,14 @@ def frame(png):
     return f if f and f.ok else None
 
 
+def sample_points():
+    """The grey row's every 8th column and the three patch centres."""
+    return [(x, GREY_ROW) for x in range(0, W, 8)] + [(x, PATCH_ROW) for x in PATCH_X]
+
+
 def samples(png_frame):
-    """The render's 8-bit values at the grey row's every 8th column and the
-    three patch centres: [(x, y, rgb8)]."""
-    points = [(x, GREY_ROW) for x in range(0, W, 8)] + [(x, PATCH_ROW) for x in PATCH_X]
-    return [(x, y, png_frame.px8(x, y)) for x, y in points]
+    """The render's 8-bit values at sample_points(): [(x, y, rgb8)]."""
+    return [(x, y, png_frame.px8(x, y)) for x, y in sample_points()]
 
 
 def source_yuv(path):
@@ -1395,13 +1474,14 @@ def run_l9(client, mode, control, state):
 
 # ---- LP1–LP4 --------------------------------------------------------------------
 
-def build_probe(sources, name="log_probe"):
-    """`log_probe.swift` as `main.swift` over `sources` (an `app/Sources`).
-    (binary, None) or (None, why)."""
+def build_probe(sources, name="log_probe", probe=PROBE):
+    """`probe` (`log_probe.swift`, or B96's `reverse_probe.swift`) as
+    `main.swift` over `sources` (an `app/Sources`). (binary, None) or (None,
+    why)."""
     folder = WORK / name
     folder.mkdir(parents=True, exist_ok=True)
     entry = folder / "main.swift"
-    entry.write_text(PROBE.read_text())
+    entry.write_text(probe.read_text())
     try:
         built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
                                   output=folder / name, defines=["FRAMEJOB_DEV_TOOLS"],
@@ -1491,6 +1571,190 @@ def run_probe(sources):
             check(row["name"], row["ok"], row.get("detail", ""))
 
 
+# ---- reverse-variants (issue batch B96, #280) ----------------------------------
+
+def detail_fixture(name):
+    """A DETAIL file under MEDIA, made when missing: 2 s of `testsrc2` with
+    temporal grain, ProRes 422 HQ, untagged; kept only when ffprobe reads
+    prores / yuv422p10le, its size and 2 s."""
+    width, height = DETAIL[name]
+    out = MEDIA / f"{name}.mov"
+    if not out.exists():
+        MEDIA.mkdir(parents=True, exist_ok=True)
+        made = bounded.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                            f"testsrc2=size={width}x{height}:rate=30:duration={DETAIL_SECONDS},"
+                            "noise=alls=6:allf=t+u,format=yuv422p10le", "-c:v", "prores_ks",
+                            "-profile:v", "3", "-pix_fmt", "yuv422p10le", "-color_primaries",
+                            "unknown", "-color_trc", "unknown", "-colorspace", "unknown",
+                            str(out)], 600)
+        if made["rc"] != 0 or not out.exists():
+            REFUSED[name] = f"ffmpeg {name}: rc {made['rc']} {made['stderr'][-300:]}"
+            out.unlink(missing_ok=True)
+            return None
+    ran = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                       "stream=codec_name,pix_fmt,width,height,duration", "-of", "json",
+                       str(out)], 60)
+    try:
+        probe = json.loads(ran["stdout"])["streams"][0]
+    except (ValueError, KeyError, IndexError):
+        probe = {}
+    good = (probe.get("codec_name") == "prores" and probe.get("pix_fmt") == "yuv422p10le"
+            and (probe.get("width"), probe.get("height")) == (width, height)
+            and abs(float(probe.get("duration") or 0) - DETAIL_SECONDS) < 0.05)
+    if not good:
+        REFUSED[name] = f"{out.name} refused: ffprobe read {probe}"
+        print(f"       {REFUSED[name]}", flush=True)
+        out.unlink(missing_ok=True)
+        return None
+    print(f"       {out.name} kept: {probe}", flush=True)
+    return out
+
+
+def variant_copy(variant):
+    """The tree copied to WORK/variant-<name> with the variant's edits, each
+    anchor asserted to occur exactly once: (copy, None) or (None, why)."""
+    made, reason = tree_copy.make_copy(str(WORK / f"variant-{variant}"))
+    if made is None:
+        return None, reason
+    copy = Path(made)
+    for path, anchor, replacement in REVERSE_VARIANTS[variant]:
+        target = copy / path
+        if not target.resolve().is_relative_to(WORK):
+            return None, f"{path} in the copy is the tree's own file"
+        text = target.read_text()
+        if text.count(anchor) != 1:
+            return None, f"the anchor occurs {text.count(anchor)} times in {path}: {anchor!r}"
+        target.write_text(text.replace(anchor, replacement))
+    return copy, None
+
+
+def run_reverse(binary, source, out, extra=()):
+    """`reverse_probe SOURCE DEST JSON [extra]`: (its JSON answer, the
+    intermediate's ffprobe codec/profile/pix_fmt/range)."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    answer = out.with_suffix(".json")
+    answer.unlink(missing_ok=True)
+    ran = bounded.run([str(binary), str(source), str(out), str(answer), *extra], REVERSE_BOUND,
+                      env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
+    try:
+        got = json.loads(answer.read_text())
+    except (OSError, ValueError):
+        got = {"ok": False, "error": f"no answer (rc {ran['rc']}, expired {ran['expired']}): "
+                                     f"{(ran['stdout'] + ran['stderr']).strip()[-300:]}"}
+    return got, (range_stream(out) if got.get("ok") and out.exists() else {})
+
+
+def expected_y(name, code):
+    """The intermediate's expected Y for the file's Y `code`: the code itself,
+    or, for the full-range `slog3_fr`, its video-range code (GR-22)."""
+    return round(64 + 876 * code / 1023) if RANGE_FIXTURES.get(name, (0, "tv"))[1] == "pc" \
+        else code
+
+
+def toe_points():
+    """sample_points() and the grey row's columns 0–31."""
+    return sample_points() + [(x, GREY_ROW) for x in range(32) if x % 8]
+
+
+def toe(name, intermediate):
+    """(worst |Y₁₅ − expected|, where, column 0's (file Y, intermediate Y))
+    of `intermediate` against the log fixture `name`, or (None, why, None)."""
+    source = source_yuv(fixture(name)) if fixture(name) else None
+    middle = hdr.yuv_frames(intermediate, W, H, 16)
+    if source is None or middle is None:
+        return None, f"{name}: the file or the intermediate did not decode", None
+    gaps = [(abs(middle[15].codes(x, y)[0] - expected_y(name, source.codes(x, y)[0])), (x, y))
+            for x, y in toe_points()]
+    worst, where = max(gaps)
+    return worst, where, (source.codes(0, GREY_ROW)[0], middle[15].codes(0, GREY_ROW)[0])
+
+
+def stream_text(probe):
+    return f"{probe.get('codec_name')}/{probe.get('profile')}/{probe.get('pix_fmt')}"
+
+
+def mb_per_minute(size):
+    return size / DETAIL_SECONDS * 60 / 1e6
+
+
+def apple_note(name):
+    a, hq = APPLE_PRORES[name]
+    return (f"Apple's published ProRes 422 / 422 HQ at {name[7:]}p29.97: {a} / {hq} Mbit/s = "
+            f"{a * 60 / 8:.0f} / {hq * 60 / 8:.0f} MB/min")
+
+
+def run_variants(names):
+    """`reverse-variants`: each variant built and run on the log and detail
+    fixtures; the table printed. Exit 0 when every reverse completed."""
+    print(f"B96 reverse-variants — {', '.join(names)}; launches no app", flush=True)
+    logs = {n: fixture(n) for n in VARIANT_LOGS}
+    details = {n: detail_fixture(n) for n in DETAIL}
+    missing = [n for n, p in {**logs, **details}.items() if p is None]
+    if missing:
+        print(f"instrument failure: fixtures refused {missing}: {REFUSED}")
+        return 2
+    results, failed = {}, []
+    for variant in names:
+        print(f"\n  variant {variant}: {len(REVERSE_VARIANTS[variant])} edit(s)", flush=True)
+        copy, why = variant_copy(variant)
+        binary = None
+        if copy is not None:
+            binary, why = build_probe(copy / "app/Sources", f"reverse_probe_{variant}",
+                                      REVERSE_PROBE)
+        if binary is None:
+            print(f"    UNBUILT {variant}: {why}", flush=True)
+            failed.append(f"{variant} (unbuilt)")
+            continue
+        got = {"bytes": {}, "toe": {}, "stream": None}
+        for name, path in {**logs, **details}.items():
+            out = WORK / f"variant-{variant}-out" / f"{name}.mov"
+            answer, probe = run_reverse(binary, path, out)
+            if not answer.get("ok"):
+                print(f"    FAILED {variant} on {name}: {answer.get('error')}", flush=True)
+                failed.append(f"{variant} on {name}")
+                continue
+            if name in DETAIL:
+                got["bytes"][name] = answer["bytes"]
+                got["stream"] = got["stream"] or stream_text(probe)
+                print(f"    {name}: {stream_text(probe)} range {probe.get('color_range')}, "
+                      f"{answer['bytes']} bytes, {mb_per_minute(answer['bytes']):.0f} MB/min, "
+                      f"{answer.get('seconds', 0):.1f} s ({apple_note(name)})", flush=True)
+            else:
+                worst, where, column0 = toe(name, out)
+                got["toe"][name] = worst
+                print(f"    {name}: {stream_text(probe)} range {probe.get('color_range')}; worst "
+                      f"|Y15 − expected| {worst} at {where}; column 0 file → intermediate "
+                      f"{column0}", flush=True)
+            out.unlink(missing_ok=True)
+        results[variant] = got
+    base = results.get("base", {}).get("bytes", {})
+    print("\n  variant      stream                          holds  MB/min 1080  MB/min 2160  "
+          "ratio 1080  ratio 2160  qualifies", flush=True)
+    qualifiers = []
+    for variant, got in results.items():
+        toes = [got["toe"].get(n) for n in VARIANT_LOGS]
+        holds = all(v is not None and v <= HOLD_BOUND for v in toes)
+        sizes = [got["bytes"].get(n) for n in DETAIL]
+        ratios = [s / base[n] if s and base.get(n) else None for s, n in zip(sizes, DETAIL)]
+        qualifies = holds and all(r is not None and r <= RATIO_BOUND for r in ratios)
+        if qualifies:
+            qualifiers.append((variant, ratios[1]))
+        cells = [f"{mb_per_minute(s):11.0f}" if s else f"{'—':>11}" for s in sizes] + \
+            [f"{r:10.2f}" if r is not None else f"{'—':>10}" for r in ratios]
+        print(f"  {variant:<12} {str(got['stream']):<31} {'yes' if holds else 'no':<6} "
+              f"{'  '.join(cells)}  {'yes' if qualifies else 'no'}   (worst toe {toes})",
+              flush=True)
+    if qualifiers:
+        smallest = min(r for _, r in qualifiers)
+        choice = next(v for v, r in qualifiers if r <= smallest * (1 + TIE))
+        print(f"  the choice by B96's rule: {choice}", flush=True)
+    else:
+        print("  no variant qualifies (branch Q)", flush=True)
+    if failed:
+        print(f"  unbuilt or failed: {', '.join(failed)}", flush=True)
+    return 0 if not failed else 1
+
+
 # ---- the run --------------------------------------------------------------------
 
 def remove_work():
@@ -1531,13 +1795,25 @@ def build_mutant(name):
 def main():
     global selected
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", nargs="?", choices=["capture", "compare"])
+    parser.add_argument("mode", nargs="?", choices=["capture", "compare", "reverse-variants"])
     parser.add_argument("folder", nargs="?")
     parser.add_argument("--app", default=None)
     parser.add_argument("--only", help="comma-separated rows to run and score")
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
     parser.add_argument("--control", default=CONTROL)
+    parser.add_argument("--variant", help="reverse-variants: comma-separated variants to run")
     args = parser.parse_args()
+    if args.mode == "reverse-variants":
+        names = [n.strip() for n in (args.variant or ",".join(REVERSE_VARIANTS)).split(",")
+                 if n.strip()]
+        unknown = [n for n in names if n not in REVERSE_VARIANTS]
+        if unknown:
+            print(f"unknown variants: {unknown}")
+            return 2
+        remove_work()
+        atexit.register(remove_work)
+        HOME.mkdir(parents=True)
+        return run_variants([n for n in REVERSE_VARIANTS if n in names])
     if args.mode and not args.folder:
         print(f"{args.mode} needs a folder")
         return 2

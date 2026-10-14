@@ -45,7 +45,10 @@ For H1a: `hevc_alpha.mov`, 640×360 1 s `testsrc2` with an alpha ramp through
 flags alone do not stick from `bgra`). For H7: `pq_plain.mov` and
 `pq_hdr10.mov`, the ramp through `libx265` lossless 4:2:0 10-bit with the PQ
 tags, the second with x265's `master-display` and `max-cll` (HDR10 static
-metadata naming a 4,000 cd/m² peak, not the conversion's 1,000).
+metadata naming a 4,000 cd/m² peak, not the conversion's 1,000); issue batch
+B96 (#281) added `pq_hdr10_600.mov` (a 600 cd/m² display, MaxCLL 600) and
+`pq_hdr10_cll.mov` (the 4,000 cd/m² display, MaxCLL 1,000), which separates
+the two fields.
 The oracle: the codes ffmpeg reads back from a fixture, through the matrix
 its tags name (limited range), then this script's own formula with GR-15's
 numbers (`convert`), the matrices derived here from the published
@@ -85,16 +88,21 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   background: the eyedropper's pick at (256, 96) at 0.5 s equals the
   `prores_422` export's pixel there (frame 15) ±2; keyed with the probe's key
   (`set_video` chroma, tolerance 0.05), the export shows magenta there ±8.
-- **H7** (T3-3; GR-15's "HDR10 static metadata on a converted frame"):
-  CONTROL first, ffprobe's first frame of `pq_hdr10` names "Mastering display
-  metadata" and "Content light level metadata" with a 4,000 cd/m² peak
-  (`max_luminance=40000000/10000`, `max_content=4000`; the conversion assumes
-  1,000) and `pq_plain`'s none of them; then
-  each alone at 0.5 s: the grey row (every 8th column) = the PQ oracle ±1 at
-  8 bits (H3's loop), and the two renders' PNG bytes equal (lossless twins;
-  if not, the worst |Δ| is printed and held to ±1). Because the metadata's
-  peak is not the conversion's own, equal renders show the shoulder ignores
-  it rather than follows it.
+- **H7** (T3-3; GR-15's "HDR10 static metadata on a converted frame"; B96
+  for #281): CONTROL first, ffprobe's first frame of each of `pq_hdr10`,
+  `pq_hdr10_600` and `pq_hdr10_cll` names "Mastering display metadata" and
+  "Content light level metadata" with its own peaks (`max_luminance=
+  40000000/10000` and `max_content=4000`; 6000000/10000 and 600;
+  40000000/10000 and 1000; the conversion assumes 1,000) and `pq_plain`'s
+  none of them; then each of the four alone at 0.5 s: the grey row (every
+  8th column) = the PQ oracle ±1 at 8 bits (H3's loop), and every render's
+  PNG bytes equal pq_plain's (lossless twins; if not, the worst |Δ| is
+  printed and held to ±1). Because no metadata peak is the conversion's own,
+  equal renders show the shoulder ignores it rather than follows it.
+  Printed, unscored: Apple's reading of each file (`hdr_pick_probe.swift`'s
+  `plain` request, as H1w's oracle) at the grey row every 64th column, and
+  each HDR10 file's worst |Δ| against `pq_plain`'s — whether Apple's own
+  reading follows the metadata, and which field.
 - **R0** (GR-15's owed check; NEVER records the screen, never searches the
   disk): ffprobe reads the labels of the newest-by-name `Screen Recording
   *.mov` in `~/Movies/Frame Job Recordings/` (that folder only, read-only,
@@ -223,13 +231,31 @@ ROWS = ["H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "H7", "R
         "P2", "P3", "P4", "Z1"]
 # H7's fixtures: libx265 lossless with the PQ tags; pq_hdr10 adds HDR10 static metadata
 # naming a 4,000 cd/m² peak, not the 1,000 the conversion assumes (GR-15's PQ 1000/203),
-# so equal renders mean the metadata is ignored, not followed.
+# so equal renders mean the metadata is ignored, not followed. Issue batch B96 (#281)
+# added two: pq_hdr10_600 (a 600 cd/m² mastering display and MaxCLL 600, both below
+# the conversion's white) and pq_hdr10_cll (the 4,000 cd/m² display with MaxCLL 1,000),
+# which separates the two fields in Apple's reading.
 PQ_X265 = "lossless=1:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc"
-HDR10 = (":master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)"
-         "L(40000000,50):max-cll=4000,400")
+HDR10_DISPLAY = ":master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)"
+# name: (the mastering display's maximum luminance in x265's 0.0001 cd/m², MaxCLL).
+HDR10_FIXTURES = {"pq_hdr10": (40000000, 4000), "pq_hdr10_600": (6000000, 600),
+                  "pq_hdr10_cll": (40000000, 1000)}
+H7_FIXTURES = ["pq_plain"] + list(HDR10_FIXTURES)
 SIDE_DATA = ("Mastering display metadata", "Content light level metadata")
-# What ffprobe prints for that peak (a stale 1,000-nit fixture fails the CONTROL).
-HDR10_PEAK = ("max_luminance=40000000/10000", "max_content=4000")
+
+
+def hdr10_params(name):
+    """x265's HDR10 static metadata for `name` (an HDR10_FIXTURES key)."""
+    luminance, cll = HDR10_FIXTURES[name]
+    return f"{HDR10_DISPLAY}L({luminance},50):max-cll={cll},400"
+
+
+def hdr10_peak(name):
+    """What ffprobe prints for `name`'s peaks (a stale fixture fails the CONTROL)."""
+    luminance, cll = HDR10_FIXTURES[name]
+    return (f"max_luminance={luminance}/10000", f"max_content={cll}")
+
+
 BASE_COMMIT = "716720c"
 BASE_TREE = BASE / f"base-{BASE_COMMIT}"
 INPUT_SWIFT = "app/Sources/InputConversions.swift"
@@ -621,7 +647,7 @@ def fixture(name):
                               "0.75", "-pix_fmt", "bgra", "-tag:v", "hvc1", "-b:v", "8M"],
                        {"codec_name": "hevc", "color_transfer": "bt709",
                         "color_primaries": "bt709"})
-    if name in ("pq_plain", "pq_hdr10"):
+    if name in H7_FIXTURES:
         return pq_x265(name)
     if name in ("hlg4k", "bt709_4k"):
         return four_k(name)
@@ -631,13 +657,13 @@ def fixture(name):
 
 
 def pq_x265(name):
-    """H7's twins: the ramp through libx265 lossless, 4:2:0 10-bit, PQ-tagged;
-    `pq_hdr10` with x265's HDR10 static metadata."""
+    """H7's fixtures: the ramp through libx265 lossless, 4:2:0 10-bit, PQ-tagged;
+    each HDR10_FIXTURES name with its x265 HDR10 static metadata."""
     source = base()
     if source is None:
         REFUSED[name] = REFUSED.get("base")
         return None
-    params = PQ_X265 + (HDR10 if name == "pq_hdr10" else "")
+    params = PQ_X265 + (hdr10_params(name) if name in HDR10_FIXTURES else "")
     made = ffmpeg_make(MEDIA / f"{name}.mov", [
         "-i", str(source), "-vf", "format=yuv420p10le,setparams=color_primaries=bt2020:"
         "color_trc=smpte2084:colorspace=bt2020nc", "-c:v", "libx265", "-preset", "fast",
@@ -1435,31 +1461,35 @@ def run_h1a(client, sources, state):
 
 # ---- H7 -------------------------------------------------------------------------
 
-def side_data(path):
+def side_data(path, peak=()):
     """The side data ffprobe names on `path`'s first video frame, then the
-    HDR10_PEAK lines it prints."""
+    `peak` lines (`hdr10_peak`) it prints."""
     ran = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-read_intervals",
                        "%+#1", "-show_frames", "-show_entries", "frame=side_data_list",
                        str(path)], 60)
     lines = {line.strip() for line in ran["stdout"].splitlines()}
     return [name for name in SIDE_DATA if name in ran["stdout"]] + \
-        [line for line in HDR10_PEAK if line in lines]
+        [line for line in peak if line in lines]
 
 
-def run_h7(client, state):
-    """H7 (T3-3): PQ with and without HDR10 static metadata converts the same."""
-    name = "H7 PQ with and without HDR10 static metadata (4,000 cd/m² peak): ffprobe names both " \
-           "and the peak on pq_hdr10 and none on pq_plain (CONTROL); each grey row (every 8th " \
-           "column) = the PQ oracle ±1, and the two renders' PNG bytes equal"
-    plain, hdr10 = fixture("pq_plain"), fixture("pq_hdr10")
-    if plain is None or hdr10 is None:
+def run_h7(client, sources, state):
+    """H7 (T3-3; B96 for #281): PQ with and without HDR10 static metadata
+    converts the same; Apple's own reading of each file printed beside it."""
+    name = "H7 PQ with and without HDR10 static metadata (4,000 cd/m² display and MaxCLL; 600 " \
+           "and 600; 4,000 and MaxCLL 1,000): ffprobe names the side data and each fixture's " \
+           "own peaks, and none on pq_plain (CONTROL); each of the four grey rows (every 8th " \
+           "column) = the PQ oracle ±1, and the four renders' PNG bytes equal"
+    paths = {n: fixture(n) for n in H7_FIXTURES}
+    if any(path is None for path in paths.values()):
         check(name, False, f"refused {REFUSED}")
         return
-    found = {"pq_plain": side_data(plain), "pq_hdr10": side_data(hdr10)}
-    control = found["pq_hdr10"] == list(SIDE_DATA + HDR10_PEAK) and not found["pq_plain"]
+    found = {n: side_data(paths[n], hdr10_peak(n) if n in HDR10_FIXTURES else ())
+             for n in H7_FIXTURES}
+    control = not found["pq_plain"] and all(
+        found[n] == list(SIDE_DATA + hdr10_peak(n)) for n in HDR10_FIXTURES)
     misses = [] if control else [f"CONTROL: side data {found}"]
     figures, frames = [f"side data {found}"], {}
-    for fixture_name in ("pq_plain", "pq_hdr10"):
+    for fixture_name in H7_FIXTURES:
         frame, source = fixture_scene(client, fixture_name)
         if frame is None:
             misses.append(f"{fixture_name}: {source}")
@@ -1477,17 +1507,42 @@ def run_h7(client, state):
         figures.append(f"{fixture_name}: worst |Δ| against the oracle {worst} levels; x={mid} "
                        f"render {frame.px8(mid, GREY_ROW)} oracle "
                        f"{[code8(c) for c in convert('pq', 'bt2020', source.rgb(mid, GREY_ROW, 'bt2020nc'))[0]]}")
-    if len(frames) == 2:
-        a, b = frames["pq_plain"], frames["pq_hdr10"]
-        if Path(a.path).read_bytes() == Path(b.path).read_bytes():
-            figures.append("the two renders' PNG bytes equal")
-        else:
+    if len(frames) == len(H7_FIXTURES):
+        a = frames["pq_plain"]
+        for other in HDR10_FIXTURES:
+            b = frames[other]
+            if Path(a.path).read_bytes() == Path(b.path).read_bytes():
+                figures.append(f"pq_plain's and {other}'s render PNG bytes equal")
+                continue
             worst = max((abs(round(x / 257) - round(y / 257)) for x, y in zip(a.values, b.values)),
                         default=0)
-            figures.append(f"the two renders' PNG bytes differ; worst |Δ| {worst} levels")
+            figures.append(f"pq_plain's and {other}'s render PNG bytes differ; worst |Δ| {worst} "
+                           "levels")
             if worst > 1:
-                misses.append(f"the renders differ by {worst} levels")
+                misses.append(f"{other}'s render differs from pq_plain's by {worst} levels")
+    # Unscored (B96, #281): Apple's reading of each file's own labels and side
+    # data — `hdr_pick_probe.swift`'s `plain` request (H1w's oracle), an
+    # AVAssetImageGenerator frame with no composition — at the grey row, every
+    # 64th column, and each one's worst |Δ| against pq_plain's.
+    points = [[x + 0.5, GREY_ROW + 0.5] for x in range(0, W, 64)]
+    apple = run_picks(sources, [{"tag": n, "plain": str(paths[n]), "tick": T, "clips": [],
+                                 "points": points} for n in H7_FIXTURES])
+    read = {}
+    for n in H7_FIXTURES:
+        row = apple.get(n) or {}
+        got = row.get("picked")
+        read[n] = [[code8(c) for c in one] if one else None for one in got] if got else None
+        figures.append(f"Apple's reading of {n} (x = 0, 64, …, 960; unscored): "
+                       f"{read[n] if read[n] is not None else row.get('error') or apple.get('error')}")
+    for n in HDR10_FIXTURES:
+        a, b = read.get("pq_plain"), read.get(n)
+        if a is None or b is None or any(p is None or q is None for p, q in zip(a, b)):
+            figures.append(f"Apple's reading, {n} against pq_plain: not read")
+            continue
+        worst = max(max(abs(x - y) for x, y in zip(p, q)) for p, q in zip(a, b))
+        figures.append(f"Apple's reading, {n} against pq_plain: worst |Δ| {worst} levels")
     state["h7_side_data"] = found
+    state["h7_apple"] = read
     check(name, not misses, f"{misses or 'all within'}\n       " + "\n       ".join(figures))
 
 
@@ -1900,7 +1955,7 @@ def main():
                 if "H6" in selected:
                     run_h6(client, sources, state)
                 if "H7" in selected:
-                    run_h7(client, state)
+                    run_h7(client, sources, state)
             except Exception as error:  # a row that could not run is a failure
                 import traceback
                 traceback.print_exc()

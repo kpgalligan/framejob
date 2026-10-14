@@ -216,6 +216,14 @@ opened, at design time or build time.
         frame), not the conversion's 1,000, renders byte-identical to its twin without it, each
         grey row within 1 level of the oracle (`--only H7,Z1` on Release, 2/2): the shoulder
         ignores the metadata. The player's first frame and the player at length are GRD-16's.
+        Measured in issue batch B96 (#281; `hdr_proof.py --only H7,Z1` on Debug and on Release,
+        2/2 each): two more twins — a 600 cd/m² mastering display with MaxCLL 600, and the
+        4,000 cd/m² display with MaxCLL 1,000, each peak read back by ffprobe — also render
+        byte-identical to the plain PQ ramp, all four grey rows within 1 level of the oracle; and
+        Apple's own reading of each file (an `AVAssetImageGenerator` frame with no composition,
+        `hdr_pick_probe.swift`'s `plain`) is the same for all four at the grey row's every 64th
+        column (worst |Δ| 0 levels against the plain file), so Apple's generator reading
+        follows neither field either (the player was not measured).
   **Amended by NM-4** (rename R0): `~/Movies/Reelcut Recordings/` is now
   `~/Movies/Frame Job Recordings/` (the folder `hdr_proof.py` R0 reads).
 - **GR-16 — Camera log is a setting on the media, `media.color {log, gamut, lut, detected}`,
