@@ -32,7 +32,7 @@ branch changed the picture would fail it. What is NOT measured, here or in
 `phase7_chrome.py`, is that File ▸ Save Frame… writes the same bytes:
 `renderAndWriteFrame` is private, a save panel cannot be driven over MCP or
 offscreen, and no proof in this tree can press a menu item. That identity is
-STRUCTURAL — one `FrameWriter.write`, reached by both callers — which is
+STRUCTURAL — one `FrameWriter.writeFrame`, reached by both callers — which is
 exactly why phase 7a put the write in a value type with no AppKit in it, and
 a construction is the only thing that can carry it.
 
@@ -613,7 +613,10 @@ def sentence_part(mcp):
     # chunk list, across two processes), so no byte comparison in this project
     # could see the difference. `phase7_chrome.py`'s structural read of
     # `destinationProperties != nil` is the assertion that catches that one.
-    check(picture.chunks == ["IHDR", "sRGB", "eXIf", "IDAT", "IEND"],
+    # The colour chunk is spec §11 PR-11's BT.709 label (issue batch B102): an
+    # `iCCP` profile, `kCGColorSpaceCoreMedia709`, where this frame carried an
+    # `sRGB` chunk before it.
+    check(picture.chunks == ["IHDR", "iCCP", "eXIf", "IDAT", "IEND"],
           f"…and its chunks are exactly what a NIL properties dictionary writes "
           f"(measured on macOS 26.5.1: {picture.chunks})")
 
@@ -655,7 +658,7 @@ def writer_part(mcp):
     # nothing in either script is: `renderAndWriteFrame` is private, a save
     # panel cannot be driven over MCP or offscreen, and no proof can press a
     # menu item. That identity is STRUCTURAL — both callers reach the one
-    # `FrameWriter.write`, which is the whole reason phase 7a put the write in
+    # `FrameWriter.writeFrame`, which is the whole reason phase 7a put the write in
     # a value type with no AppKit in it (`FrameWriter.swift`'s own doc,
     # `AgentServer+Render.swift`, and road map 2's phase-7a paragraph all say
     # so). True by construction, and a construction is what has to carry it.

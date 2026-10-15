@@ -19558,6 +19558,9 @@ B3, 29.78 before A4, 25.58 before A5. H0 passed each time.
 python3 tools/proof/frame_label_proof.py [--only F5,F6,...]        # Debug; the recorded run is RC_PROOF_APP=release
 ```
 
+Issue batch B102 made this script spec §11 PR-11's pin (every row scored to the BT.709 label);
+see "Issue batch B102" below. What follows is B101's measurement.
+
 This script measures what label a written frame carries, and whether a colour-managed read tells
 two labels apart. It decides nothing. The rule is the owner's choice (#295). Each written file
 is decoded raw to `rgb48le` by ffmpeg, which applies no profile. It is
@@ -19604,3 +19607,137 @@ earlier tree, so a label change would move their references. They are `log_proof
 them. The N0 rows (curves, look, qualifier, tone, wheels), precision K1–K6 and S3, and
 `hevc_alpha_proof`'s rasters compare decoded samples, and `screens.py` and `log_thumbs_proof.py`
 T4 compare files `render_frame`'s writer does not write.
+
+## Issue batch B102 — every rendered frame labelled BT.709 (`frame_label_proof.py` F0–F11, E1–E3, P1, P2, Z1 and five mutants; `hdr_proof.py`'s `relabel-in-renderframe`; #295, spec §11 PR-11) and the VP9 render gap placed (`log_proof.py composition-gap`, `composition_gap_probe.swift`; #294, spec §11 GR-23)
+
+```
+python3 tools/proof/frame_label_proof.py [--only F0,F9,F11,E2,E3,Z1]      # Debug; the recorded run is RC_PROOF_APP=release
+python3 tools/proof/frame_label_proof.py capture DIR                       # the control: every image file and capture.json into DIR
+python3 tools/proof/frame_label_proof.py compare DIR                       # adds P1, P2 and E3's pixels
+python3 tools/proof/frame_label_proof.py same-pixels A B                   # no app
+python3 tools/proof/frame_label_proof.py --mutant NAME --only ROWS,Z1      # gif-flipped: compare DIR --mutant gif-flipped
+python3 tools/proof/hdr_proof.py --mutant relabel-in-renderframe --control DIR --only H1,Z1   # DIR captured after PR-11
+python3 tools/proof/log_proof.py composition-gap                           # saves its packages on an instance, stops it, then the probe
+```
+
+**`frame_label_proof.py` is PR-11's pin.** B101 wrote it as a measurement; B102 scores every
+row to the decision. A PNG or APNG must carry an `iCCP` named `kCGColorSpaceCoreMedia709` (B101's
+F2 control). A JPEG or HEIC must carry `sips` profile `HDTV`. A GIF must carry none: no `ICCRGBG1`
+extension, and `sips` reads it as `sRGB IEC61966-2.1` (PR-11's GIF clause). Each row also holds
+B101's depth. F0 is a source scan of `app/Sources` (a mutant's copy's):
+`AgentServer+Render.swift` and `EditorViewController+SaveFrame.swift` must call
+`FrameWriter.writeFrame(` and never `FrameWriter.write(`, and `ExporterImageSequence.swift` must
+call `FrameWriter.labelled(`. F6 adds the pair rule: F5 and F6 carry equal labels, and their raw
+and matched reads are equal. F11 now covers F9's frame as well (its HEIC is 10-bit). E3 is a
+`gif` export of F1's and F2's projects; in `compare DIR` its raw decode must equal DIR's. P1: every
+image file in DIR is written again and decodes raw (`rgba64le`) to DIR's. P2: a file whose DIR copy
+already carried its PR-11 label is byte-identical to it.
+
+**The control** (Debug, the tree before any product edit, `capture work/b102/label-ctl`): 7/16.
+It failed exactly F0, F1, F3, F5, F6, F8, F9, F11 and E2:
+- F1, F3, F5, F8 and F9 carried an `sRGB` chunk.
+- F6 failed the pair rule: F5 `sRGB`, F6 `iCCP`, matched 0.623 / 10.984.
+- F11's misses were F1's and F9's JPEG and HEIC (`sRGB IEC61966-2.1`; F9's HEIC is 10-bit).
+- E2: F1's APNG carried an `sRGB` chunk.
+
+F2, F4, F7, F10, E1 and E3 passed. E3's GIFs have no `ICCRGBG1` extension (both `GIF87a` with the
+`NETSCAPE` loop block), so a GIF carries no label and `GIF_LABEL` records what `sips` assumes. A
+first capture scored E3 against no label; the GIF reading was added and the control captured
+again, with the figures above.
+
+**After PR-11** (Debug, `compare work/b102/label-ctl`): 18/18.
+- Every PNG and APNG carries `iCCP` `kCGColorSpaceCoreMedia709`, and every JPEG and HEIC
+  carries `HDTV`, at B101's depths.
+- F5/F6: the labels are equal, raw 0.0 / 0.0, matched 0.0 / 0.0.
+- P1: all 20 files decode raw to the control's (max |Δ| 0), F9's 16-bit PNG and 10-bit HEIC
+  among them. So A4's default `frameSpace` holds, and `itur_709` was not needed.
+- P2: the 10 files whose control already carried their label are byte-identical: `f2`, `f4`,
+  `f6`, `f7` and `f10.png`, F2's JPEG, HEIC and APNG, and both GIFs.
+- E3: both GIFs decode raw equal to the control's.
+
+**The frozen byte references** (Debug; each captured on the control into `work/b102/<name>-ctl`
+first):
+- `log_proof.py compare work/b102/log-ctl --only L9,Z1`: L9 FAILED on `vlog`, `applelog` and
+  `applelog2` (PNG bytes differ, 0 16-bit samples differ). `slog3` and `green` were already
+  `iCCP`.
+- `hdr_proof.py compare work/b102/hdr-ctl --only H1,Z1`: H1 FAILED on `untagged`,
+  `h264_untagged`, `hevc8_matrix`, `still8`, `webm`, `srgb` and `applelog`, at 0 and at 0.5 s
+  (0 samples differ in each). The picks were equal. The reverse's intermediate digest also
+  differed; it is printed and not scored.
+- `precision_proof.py compare work/b102/prec-ctl --only S11,Z1`: S11 FAILED on `jpeg16` and
+  `apng8`. `gif16` and `apng10` (already BT.709) were byte-identical.
+
+Each was captured again into `work/b102/<name>-after`. Then `frame_label_proof.py same-pixels`
+was run on each `-ctl` and `-after` pair. `log`: 5 compared, 3 labels moved, pixels moved in none.
+`hdr`: 24 compared, 14 labels moved, none. `prec`: 21 compared (Sd's files and the rest of that
+capture's PNGs and fixtures), 15 labels moved, none.
+
+**Mutants** (Debug, each MUTANT PASS, no other named row failed):
+- `render-unlabelled` (`render_frame` calls `write`; `--only F0,F1,Z1`): F0 and F1 FAILED.
+- `saveframe-unlabelled` (Save Frame… calls `write`; `--only F0,Z1`): F0 FAILED.
+- `apng-unlabelled` (`.apng`'s `carriesLabel` false; `--only E2,Z1`): E2 FAILED (F1's APNG
+  `sRGB`).
+- `label-itur709` (`frameSpace` is `CGColorSpace.itur_709`; `--only F1,F2,Z1`): F1 and F2 FAILED,
+  each `iCCP 'kCGColorSpaceITUR_709'` with a `cICP` chunk.
+- `gif-flipped` (`.gif`'s `carriesLabel` true; `compare work/b102/label-ctl`): E3 FAILED, with P1
+  and P2 beside it. F1's GIF moved by mean 0.807 and max 98.63 levels: ImageIO converts a
+  non-sRGB frame into a GIF's sRGB palette. So the mutant is caught, not equivalent, and "left as
+  it is" is what keeps a GIF's pixels.
+- `hdr_proof.py --mutant relabel-in-renderframe --control work/b102/hdr-after --only H1,Z1` (the
+  label applied inside `Exporter.renderFrame`): H1 FAILED on the eyedropper's picks (`untagged`'s
+  first pick 0.286 against 0.251; `h264_untagged`, `hevc8_matrix`, `webm` and others moved too).
+
+`precision_proof.py`'s `reader-space-swapped` is retired: its anchor, `DeepStillFrame.read`'s two
+colour-space branches, is deleted.
+
+**`composition-gap`** (`log_proof.py`, #294). Each GAP_FIXTURES file is placed alone on a
+1024×128 30 fps canvas, with Camera Log None and with S-Log3, saved, and the instance stopped.
+`composition_gap_probe.swift`, over `app/Sources` and beside the tree's `default.metallib`, then
+reads the frame at 0.5 s at the 159 `gap_points()` at three stages:
+- `tap`: the first source frame handed to a probe compositor.
+- `reader`: `AVAssetReaderVideoCompositionOutput` over the built composition.
+- `generator`: `Exporter.renderFrame`, drawn in its own space.
+
+The verdict rule is fixed before the run (GAP_BOUND 0.5): the first stage that parts names the
+verdict. It ran on the control tree (Debug) and again after PR-11, with the same figures (VP9
+against HEVC, worst in 8-bit levels):
+
+| Pair, Camera Log | tap | reader | generator |
+|---|---|---|---|
+| `slog3_fr_vp9e` / `slog3_fr`, None | 0.000 | 0.125 at (1016, 32) | 0.623 at (1000, 32) |
+| `slog3_fr_vp9e` / `slog3_fr`, S-Log3 | 0.000 | 0.000 | 0.529 at (14, 32) |
+| `slog3_vr_vp9e` / `slog3_vr`, None | 0.000 | 0.125 at (1016, 32) | 0.623 at (840, 32) |
+| `slog3_vr_vp9e` / `slog3_vr`, S-Log3 | 0.000 | 0.000 | 0.529 at (4, 32) |
+
+- Both sides' tap frames are `RGhA` 1024×128. HEVC's carry BT.2020 / BT.709 / BT.2020 and
+  QuickTime's `nclc` (9,1,9) space. VP9's carry BT.709 ×3, `HDTV`, `ColorInfoGuessedBy
+  VideoToolbox`.
+- With Camera Log None, HEVC is built with `ConvertingCompositor` (BT.2020 primaries) and VP9 with
+  `Compositor`. With S-Log3, both use `ConvertingCompositor`.
+- The generator's image is 16-bit for each HEVC file and 8-bit for each VP9 file
+  (`kCGColorSpaceSRGB` with Camera Log None, `kCGColorSpaceCoreMedia709` with S-Log3).
+
+The verdict is **generator**. The gap L14 allows is `render_frame`'s 8-bit image of a VP9 file.
+The compositor's output agrees, so an export does not have the gap. The fix
+that would remove it is to read such a frame through export's reader, as PR-9 does for a deep
+still. That fix lives in `Exporter.swift`, is a PR-4 amendment, and is outside B102's list; the
+owner chose it (2026-10-14, #294), so it lands in the next batch. Until then L14 keeps its bound of 2, and its comment, its label
+and the module docstring cite B102. On Debug after PR-11, `log_proof.py --only L10,L13,L14,Z1`
+was 4/4: L10 worst 1 on each file; L13 holds both pairs; L14 worst 2, 1 and 2.
+
+**Recorded runs** (Release, after the gate's `make app`; no `Frame Job: ` line, no `DEFAULTS
+MOVED`):
+- `RC_PROOF_APP=release python3 tools/proof/frame_label_proof.py`: 16/16 (F0–F11, E1–E3, Z1),
+  with the Debug figures above (F5/F6 matched 0.0 / 0.0; F1/F2 raw 7.865 / 41.84).
+- `RC_PROOF_APP=release python3 tools/proof/log_proof.py`: 19/19. L14 is at its bound of 2:
+  worst 2, 1 and 2, the full-range 0 % patch [0, 0, 0], the video-domain oracle [28, 28, 28].
+  L10 worst 1 on each file, L11 worst 1.
+- `RC_PROOF_APP=release python3 tools/proof/precision_proof.py --only
+  S4,S5,S10,S14,S15,S16,Z1`: 5/7. S4 and S5 failed only for "no control tree (--control DIR)".
+  The same run with `--only S4,S5,Z1 --control tools/proof/work/b102/prec-ctl` was 3/3: each
+  within ±1 of the control's render (mean 0.476), S4's profiles `HDTV` and `HDTV` (the reader's
+  and the generator's, both now PR-11's label). In the first run: S10 a 10-bit HEIC; S14 max 1
+  at T and T+1/60; S15 profiles `HDTV` and `HDTV`, max 0; S16 960×540, 960 greens.
+- `python3 tools/proof/proof_app.py launch --app release`, then `python3
+  tools/proof/phase7_proof.py <dir>/agent.sock`: 92/92. The PNG's chunks are `['IHDR', 'iCCP',
+  'eXIf', 'IDAT', 'IEND']`.

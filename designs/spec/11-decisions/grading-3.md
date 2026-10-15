@@ -564,3 +564,25 @@ opened, at design time or build time.
     measured is not in the decoder's output or in the reader's conversion to `64RGBAHalf`, so
     requesting another pixel format cannot remove it, and L14 keeps its bound of 2. Where the
     gap does arise (between the reader and the compositor's source frames) is not measured.
+  - Measured (issue batch B102, #294; `log_proof.py composition-gap`, Debug, on the tree before
+    any B102 code and again after it, the same figures): each of `slog3_fr.mov`, `slog3_vr.mov`
+    (HEVC) and `slog3_fr_vp9e.mp4`, `slog3_vr_vp9e.mp4` (VP9) alone on a 1024×128 canvas, with
+    Camera Log None and with S-Log3, saved, and read by `composition_gap_probe.swift` at 0.5 s at
+    the 159 `decode-gap` points, VP9 against HEVC. The compositor's source frames (a probe
+    compositor in the built configuration's place, the built class's three answers copied) are
+    `RGhA` 1024×128 in both and equal at every point (0.000 levels). The compositor's output (an
+    `AVAssetReaderVideoCompositionOutput` over the built composition) is equal under S-Log3
+    (0.000) and within 0.125 of a level with Camera Log None, where the HEVC file (tagged
+    BT.2020) is built with `ConvertingCompositor` and the untagged VP9 file (VideoToolbox's
+    guessed BT.709) with `Compositor`. `render_frame`'s image (`Exporter.renderFrame`, read in its
+    own space) parts: worst 0.623 of a level with Camera Log None (at x 1000 and 840 on the grey
+    row) and 0.529 with S-Log3 (at x 14 and 4), because `AVAssetImageGenerator` hands back an
+    8-bit image of each VP9 file and a 16-bit one of each HEVC file. The verdict is
+    **generator**: the gap L14 allows is the 8-bit rounding of a VP9 frame in `render_frame` and
+    Save Frame… (the generator's image of each VP9 file is 8-bit and of each HEVC file 16-bit, as
+    `composition-gap` printed; why the generator answers 8-bit for VP9 was not measured). It is not in Frame Job's compositor,
+    and an export, which reads the compositor's output, does not have it. The fix that would
+    remove it: read a frame whose composition holds a 10-bit VP9 track through export's reader,
+    as PR-9 does for a deep still (`DeepStillFrame.read`), which is a PR-4 amendment of its own.
+    The owner chose that fix (2026-10-14, #294), to land with its PR-4 amendment in the batch
+    after B102; until then L14 keeps its bound of 2.

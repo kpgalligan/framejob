@@ -130,6 +130,18 @@ enum ImageSequenceFormat {
         }
     }
 
+    /// True where the file carries its frames' colour label, so each frame is
+    /// labelled BT.709 first (`FrameWriter.labelled`, spec §11 PR-11). A GIF
+    /// carries none — ImageIO writes no `ICCRGBG1` extension and reads every
+    /// GIF as sRGB (measured, `frame_label_proof.py` E3) — so its frames are
+    /// left as they are.
+    var carriesLabel: Bool {
+        switch self {
+        case .gif: return false
+        case .apng: return true
+        }
+    }
+
     /// The destination's type. Taken from `UTType` rather than spelled as a
     /// literal so it cannot drift from the UTI `export.rs` puts in
     /// `file_type` — the same identifier the save panel derives the
@@ -455,7 +467,8 @@ final class ImageSequenceWriter: ExportPipeline {
                 "The frame at \(timecode) could not be rendered, so the "
                     + "\(format.displayName) was not written.")
         }
-        CGImageDestinationAddImage(sink, Self.sized(image, to: frameSize), frameProperties)
+        let frame = format.carriesLabel ? FrameWriter.labelled(image) : image
+        CGImageDestinationAddImage(sink, Self.sized(frame, to: frameSize), frameProperties)
         return nil
     }
 

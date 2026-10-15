@@ -1419,12 +1419,15 @@ the key map behind it.
   reads; a read that never returns is not woken (spec §11 G-17).
 - `DeepStillFrame.swift` — whether a frame's recipe draws a still deeper than
   8 bits (`shows`), and `read`: that frame through export's reader
-  (`AVAssetReaderVideoCompositionOutput` at `64RGBAHalf`), spec §11 PR-9.
+  (`AVAssetReaderVideoCompositionOutput` at `64RGBAHalf`), spec §11 PR-9; its
+  image is in `FrameWriter.frameSpace` (§11 PR-11).
 - `FrameWriter.swift` — a `CGImage` and a format in, a URL out, no panel:
-  Save Frame and `render_frame` both call it, so their PNGs are
-  byte-identical by construction. PNG keeps a NIL properties dictionary
-  (anything added changes the file); JPEG flattens onto BLACK at 0.9; HEIC is
-  `UTType.heic`, never `public.heif`.
+  Save Frame and `render_frame` both call `writeFrame`, so their PNGs are
+  byte-identical by construction; `writeFrame` labels a rendered frame BT.709
+  (`frameSpace`, §11 PR-11; `labelled` does the same for an APNG's frames),
+  and `write` is for snapshots, sheets and tiles. PNG keeps a NIL properties
+  dictionary (anything added changes the file); JPEG flattens onto BLACK at
+  0.9; HEIC is `UTType.heic`, never `public.heif`.
 
 **Captions.** A caption is an ordinary text clip, which is what makes burn-in
 free.

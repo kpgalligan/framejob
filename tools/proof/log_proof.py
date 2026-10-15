@@ -86,7 +86,10 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
 - **L9** (STOP; `compare DIR` and mutants): each fixture alone with no Camera
   Log (`applelog` and `applelog2`, detected on the tree, set to None)
   rendered at 0.5 s byte-equal to DIR's PNGs. hdr_proof's H1 and H1m are the
-  other half, run by that script.
+  other half, run by that script. Since issue batch B102 (spec §11 PR-11)
+  `render_frame` labels every frame BT.709, so a DIR captured before B102
+  fails L9 on labels alone (`frame_label_proof.py same-pixels DIR NEW` shows
+  the pixels equal).
 - **L10** (issue batch B95, spec §11 GR-22): `slog3_fr.mov`, `slog3_vr.mov`
   and `vlog_fr.mov` with Camera Log at 0.5 s, L1's grey-row points and the
   patches = the oracle at each file's OWN decoded codes ±1 at 8 bits, the code
@@ -122,8 +125,11 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   `ContainerRewrap`) with S-Log3 set at 0.5 s, scored as L10 but to ±2: L1's
   grey-row points and the patches = the oracle at the file's own decoded codes
   ±2 at 8 bits (the same codes rendered from VP9 and from HEVC part by
-  up to 0.88 of a level untransformed, 1.25 under S-Log3), the code domain by
-  the file's range flag — step 0's read of a VP9 track's `vpcC` range bit.
+  up to 0.88 of a level untransformed, 1.25 under S-Log3: issue batch B102's
+  `composition-gap` placed it in the generator, whose image of the VP9 file
+  is 8-bit where the HEVC file's is 16-bit; the fix is owed, #294), the
+  code domain by the file's range flag — step 0's read of a VP9 track's
+  `vpcC` range bit.
 - **L15** (issue batch B101, #293; a probe row, no instance): `av1_range_probe.swift`
   over `app/Sources` reads each AV1 fixture's first format description — the
   `FullRangeVideo` key, the `av1C` and `colr` atoms, `av1C`'s first 8 bytes,
@@ -227,6 +233,30 @@ than 0.5 of a level from HEVC's (naming any other format within 0.5); else
 instrument failure: exit 1 and no verdict; one at `128RGBAFloat` or
 `64RGBALE` is printed. B101's run: **neither** — every own-range code exact
 and VP9's `64RGBAHalf` equal to HEVC's at every point (0.000 levels).
+
+    python3 tools/proof/log_proof.py composition-gap
+
+`composition-gap` (issue batch B102, #294) launches the app once to make its
+packages, stops it, then builds `composition_gap_probe.swift` over
+`app/Sources` (`DecoderSupport.enable()` first) beside the tree's
+`Compositor.metal` as `default.metallib`. Each GAP_FIXTURES file is
+placed alone on a W×H 30 fps canvas, once with Camera Log None and once with
+S-Log3 (`set_media_color`, RANGE_SETTINGS), saved (`Doc.save`) and closed.
+The probe reads each package's frame at T over `gap_points()` at three
+stages: `tap`, the first source frame handed to a probe-local compositor
+(the built configuration with only `customVideoCompositorClass` swapped; the
+built class's `sourcePixelBufferAttributes`, `canConformColorOfSourceFrames`
+and `supportsHDRSourceFrames` copied); `reader`, an
+`AVAssetReaderVideoCompositionOutput` over the built composition at
+`Compositor.outputPixelFormat`; and `generator`, `Exporter.renderFrame` drawn
+in its image's own space. Per GAP_PAIRS pair and setting it prints VP9
+against HEVC's worst |Δ| in 8-bit levels at each stage and where, and each
+side's compositor class, track labels and tap format, size and attachments.
+The verdict, fixed before the run (GAP_BOUND 0.5), names the first stage
+that parts: the tap parts (or its formats differ): **source frames**; else
+the reader: **compositor**; else the generator: **generator**; else **not
+reproduced**. Exit 0 with a verdict; 1 when a stage could not be read; 2 when
+the instrument could not run.
 
 `capture DIR` records L9's references (`DIR/l9-*.png`, `DIR/media/`) and runs
 the other rows, which must FAIL on the control. `--mutant NAME` builds a COPY
@@ -400,6 +430,10 @@ GAP_PAIRS = (("slog3_fr", "slog3_fr_vp9e"), ("slog3_vr", "slog3_vr_vp9e"))
 GAP_FORMATS = ("x420", "xf20", "64RGBAHalf", "128RGBAFloat", "64RGBALE")
 GAP_REQUIRED = ("x420", "xf20", "64RGBAHalf")
 GAP_BOUND = 0.5
+# B102 (#294): `composition-gap`'s probe, its two settings and its stages in order.
+COMPOSITION_PROBE = ROOT / "tools/proof/composition_gap_probe.swift"
+GAP_SETTINGS = ("none", "slog3")
+GAP_STAGES = (("tap", "source frames"), ("reader", "compositor"), ("generator", "generator"))
 # name: ([(file, anchor, replacement), …], the rows that must fail).
 MUTANTS = {
     "source-unconverted": ([(SOURCES_SWIFT,
@@ -1544,15 +1578,20 @@ def run_l14(client):
     # `decode-gap` verdict is "neither": VP9's own-range biplanar codes are
     # the written ones and its 64RGBAHalf reader frames equal HEVC's at every
     # point (#294, spec §11 GR-23), so the gap is not the decoder's or the
-    # reader's conversion. A range misread is 28 levels off, so the bound
-    # still tells the two apart.
+    # reader's conversion. Issue batch B102's `composition-gap` verdict is
+    # "generator": the compositor's frames agree (S-Log3 0.000 levels), and
+    # `AVAssetImageGenerator` hands `render_frame` an 8-bit image of the VP9
+    # file where the HEVC one's is 16-bit, up to 0.62 of a level apart; the
+    # fix (export's reader, #294) is owed, so the bound stays 2 until it lands.
+    # A range misread is 28 levels off, so the bound still tells the two apart.
     misses, worst = range_rows(client, "L14", ("slog3_fr_vp9e", "slog3_vr_vp9e", "slog3_fr_webm"),
                                bound=2)
     check("L14 slog3_fr_vp9e.mp4, slog3_vr_vp9e.mp4 and slog3_fr_webm.webm (VP9 Profile 2, "
           "flagged full, video, full range; the WebM rewrapped) with S-Log3 at 0.5 s: L1's "
           "grey-row points and the patches = the oracle at the file's own decoded codes ±2 at "
-          "8 bits (the VP9 render gap, GR-23; not the decoder's or the reader's, B101 "
-          "#294), the code domain by the range flag (GR-23: a VP9 track's `vpcC` bit)",
+          "8 bits (the VP9 render gap, GR-23: the generator's 8-bit image of a VP9 file, "
+          "B101 and B102, #294), the code domain by the range flag (GR-23: a VP9 track's "
+          "`vpcC` bit)",
           not misses, f"worst {worst}; {misses}")
 
 
@@ -2417,6 +2456,152 @@ def run_decode_gap():
     return 0
 
 
+# ---- composition-gap (issue batch B102, #294) -----------------------------------
+
+def gap_packages(binary):
+    """Each GAP_FIXTURES file alone, with each GAP_SETTINGS, saved and closed on
+    an instance of its own, stopped before the probe runs: ({(name, setting):
+    package}, why or None)."""
+    paths = {n: fixture(n) for n in GAP_FIXTURES}
+    missing = [n for n, p in paths.items() if p is None]
+    if missing:
+        return {}, f"fixtures refused {missing}: {REFUSED}"
+    log = WORK / "instance.log"
+    launched = mcp.launch(str(binary), [], env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
+                          log_path=str(log), timeout=CALL_BOUND)
+    packages, closed = {}, True
+    try:
+        if launched.client is None:
+            return {}, f"the app did not listen at {launched.socket_path}"
+        print(f"  instance PID {launched.child.pid} at {launched.socket_path}", flush=True)
+        for name, path in paths.items():
+            for setting in GAP_SETTINGS:
+                tag = f"cg-{name}-{setting}"
+                doc = Doc(launched.client, tag)
+                clip = doc.place(path) if doc.ok else None
+                media = doc._media.get(path)
+                color = None if setting == "none" else RANGE_SETTINGS[name]
+                why = None
+                if clip is not None and (color is not None
+                                         or doc.row(media).get("color") is not None):
+                    set_to = doc.color(media, color)
+                    why = None if set_to["ok"] else f"set_media_color: {set_to.get('error')}"
+                saved = doc.save(f"{tag}-saved") if clip is not None and not why else None
+                closed = doc.close() and closed
+                packages[(name, setting)] = saved
+                if saved is None:
+                    print(f"  {tag}: not saved ({why or doc.why})", flush=True)
+    finally:
+        launched.stop()
+        mcp.remove_scratch(launched.socket_path)
+    found = hdr.complaints(log)
+    print(f"  instance stopped; every project closed {closed}; complaints {found or 'none'}",
+          flush=True)
+    if found or not closed:
+        return {}, f"closed {closed}; complaints {found}"
+    return packages, None
+
+
+def run_composition_gap(binary):
+    """`composition-gap`: the figures and the verdict (the module's docstring)."""
+    print(f"B102 composition-gap — {', '.join(GAP_FIXTURES)} with Camera Log None and S-Log3, "
+          f"read at {', '.join(s for s, _ in GAP_STAGES)} ({proof_app.config()} build {binary})",
+          flush=True)
+    if not binary.is_file():
+        print(f"instrument failure: no app binary at {binary}")
+        return 2
+    packages, why = gap_packages(binary)
+    if why or any(p is None for p in packages.values()):
+        print(f"instrument failure: {why or 'a package was not saved'}")
+        return 2
+    probe, why = build_probe(ROOT / "app/Sources", name="composition_gap_probe",
+                             probe=COMPOSITION_PROBE)
+    if probe is None:
+        print(f"instrument failure: the probe did not build: {why}")
+        return 2
+    # The compositor's shaders beside the binary, as hdr_proof.build_probe
+    # puts them: a bare binary's main bundle is its folder.
+    resources = ROOT / "app/Resources"
+    air, library = probe.parent / "Compositor.air", probe.parent / "default.metallib"
+    shutil.copy2(resources / "Blank.mp4", probe.parent / "Blank.mp4")
+    step = bounded.run(["xcrun", "-sdk", "macosx", "metal", "-c",
+                        str(resources / "Shaders/Compositor.metal"), "-o", str(air)], 300)
+    if step["rc"] == 0:
+        step = bounded.run(["xcrun", "-sdk", "macosx", "metallib", str(air), "-o", str(library)],
+                           300)
+    if step["rc"] != 0 or not library.exists():
+        print(f"instrument failure: the shader did not build: {step['stderr'][-400:]}")
+        return 2
+    points = gap_points()
+    request, answer = WORK / "cg-probe.json", WORK / "cg-probe-answer.json"
+    answer.unlink(missing_ok=True)
+    request.write_text(json.dumps({
+        "frames": [{"tag": f"{n}|{s}", "package": str(p), "tick": T}
+                   for (n, s), p in packages.items()],
+        "points": [list(p) for p in points]}))
+    ran = bounded.run([str(probe), str(request), str(answer)], 300,
+                      env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
+    try:
+        answered = {r["tag"]: r for r in json.loads(answer.read_text())["rows"]}
+    except (OSError, ValueError, KeyError):
+        print(f"instrument failure: no answer (rc {ran['rc']}, expired {ran['expired']}): "
+              f"{(ran['stdout'] + ran['stderr']).strip()[-300:]}")
+        return 2
+    unread, parted = [], []
+    for hevc, vp9 in GAP_PAIRS:
+        for setting in GAP_SETTINGS:
+            sides = {n: answered.get(f"{n}|{setting}") or {} for n in (hevc, vp9)}
+            print(f"\n  {vp9} against {hevc}, Camera Log {setting}:", flush=True)
+            for name, row in sides.items():
+                tap = row.get("tap") or {}
+                print(f"    {name}: compositor {row.get('compositor')}; track {row.get('track')}; "
+                      f"tap {tap.get('format')} {tap.get('width')}×{tap.get('height')} "
+                      f"attachments {tap.get('attachments')}"
+                      + (f"; error {row.get('error') or tap.get('error')}"
+                         if row.get("error") or tap.get("error") else "")
+                      + f"; generator {(row.get('generator') or {}).get('space')} "
+                      f"{(row.get('generator') or {}).get('bits')}-bit", flush=True)
+            first = None
+            for stage, verdict in GAP_STAGES:
+                a = (sides[vp9].get(stage) or {}).get("values")
+                b = (sides[hevc].get(stage) or {}).get("values")
+                if stage == "tap" and (sides[vp9].get("tap") or {}).get("format") != \
+                        (sides[hevc].get("tap") or {}).get("format"):
+                    print(f"    {stage}: formats differ", flush=True)
+                    first = first or verdict
+                    continue
+                if not a or not b:
+                    print(f"    {stage}: not read (VP9 "
+                          f"{(sides[vp9].get(stage) or {}).get('error', 'no values')}; HEVC "
+                          f"{(sides[hevc].get(stage) or {}).get('error', 'no values')})",
+                          flush=True)
+                    unread.append(f"{vp9}/{hevc} {setting} {stage}")
+                    continue
+                va = {(x, y): tuple(v) for x, y, v in a}
+                vb = {(x, y): tuple(v) for x, y, v in b}
+                worst, at = levels(va, vb, points)
+                print(f"    {stage}: worst |Δ| {worst:.3f} levels at {at} (VP9 "
+                      f"{[round(c * 255, 3) for c in va[at]]}, HEVC "
+                      f"{[round(c * 255, 3) for c in vb[at]]})", flush=True)
+                if worst > GAP_BOUND and first is None:
+                    first = verdict
+            print(f"    first stage past {GAP_BOUND}: {first or 'none'}", flush=True)
+            if first:
+                parted.append((next(i for i, (_, v) in enumerate(GAP_STAGES) if v == first),
+                               first, f"{vp9}/{hevc} {setting}"))
+    if unread:
+        print(f"\n  not read: {unread}; no verdict")
+        return 1
+    if parted:
+        earliest = min(parted)[1]
+        where = [w for _, v, w in parted if v == earliest]
+        verdict = f"{earliest} — VP9 and HEVC part first there, in {where}"
+    else:
+        verdict = f"not reproduced — every stage within {GAP_BOUND} for every pair and setting"
+    print(f"\n  verdict: {verdict}", flush=True)
+    return 0
+
+
 # ---- the run --------------------------------------------------------------------
 
 def remove_work():
@@ -2458,7 +2643,8 @@ def main():
     global selected
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", nargs="?",
-                        choices=["capture", "compare", "reverse-variants", "decode-gap"])
+                        choices=["capture", "compare", "reverse-variants", "decode-gap",
+                                 "composition-gap"])
     parser.add_argument("folder", nargs="?")
     parser.add_argument("--app", default=None)
     parser.add_argument("--only", help="comma-separated rows to run and score")
@@ -2482,6 +2668,13 @@ def main():
         atexit.register(remove_work)
         HOME.mkdir(parents=True)
         return run_decode_gap()
+    if args.mode == "composition-gap":
+        remove_work()
+        atexit.register(remove_work)
+        HOME.mkdir(parents=True)
+        binary = Path(args.app) if args.app else proof_app.binary()
+        return run_composition_gap(proof_app.executable(binary) if binary.suffix == ".app"
+                                   else binary)
     if args.mode and not args.folder:
         print(f"{args.mode} needs a folder")
         return 2

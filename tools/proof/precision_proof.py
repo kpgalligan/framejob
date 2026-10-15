@@ -228,7 +228,11 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       byte-identical to DIR's: GIF and JPEG stay 8-bit, an APNG with no deep
       still is today's, and so is a deep video source's APNG at the recorded
       size (that file skipped by name when DIR recorded `no-redraw`). A DIR
-      captured before B97 has no Sd: a FAIL.
+      captured before B97 has no Sd: a FAIL. Since issue batch B102 (spec
+      §11 PR-11) the JPEG and `ramp8.png`'s APNG carry the BT.709 label, so a
+      DIR captured before B102 fails S11 on those two, on labels alone
+      (`frame_label_proof.py same-pixels DIR NEW` shows the pixels equal); the
+      GIF and the 10-bit clip's APNG, already labelled BT.709, are unchanged.
   E1 (compare; the orchestrator's ruling after PR0, because E0 showed
       VideoToolbox's H.264 encode is not repeatable — two exports of one
       project differed by up to 124 levels): what `ExportWriter` hands the
@@ -333,16 +337,16 @@ built from the copy's `app/Sources`:
                    (`project.snapshot`) instead of the recipe at the frame
                    times: S8 FAILS.
   jpeg-deep        (B97) JPEG's `carriesDepth` true (compare DIR): S11 FAILS.
-  reader-space-swapped (B97) `DeepStillFrame.read`'s two colour-space
-                   branches exchanged: S4 and S15 FAIL.
   reader-unscaled  (B97) `read` ignores `maxWidth`: S16 FAILS.
   reader-next-frame (B97) `read`'s range starts one `frameDuration` late: S14
                    FAILS.
-  A survivor of jpeg-deep (the format's bytes do not move) or of
-  reader-space-swapped when S15 printed the sRGB tag for the generator is
-  recorded as equivalent; S11 and S15 stay as the guards. GIF and APNG have
-  no depth decision (ImageIO writes both at 8 bits a component, measured in
-  B97), so S11's GIF and APNG files are their guard.
+  A survivor of jpeg-deep (the format's bytes do not move) is recorded as
+  equivalent; S11 stays the guard. GIF and APNG have no depth decision
+  (ImageIO writes both at 8 bits a component, measured in B97), so S11's GIF
+  and APNG files are their guard. B97's `reader-space-swapped` was retired
+  in issue batch B102: its anchor, `DeepStillFrame.read`'s two colour-space
+  branches, is gone (the reader's image is in `FrameWriter.frameSpace`, spec
+  §11 PR-11).
 A mutant's `also` rows are selected, run and printed on the MUTANT line beside
 the named ones, and are not required to fail.
 Exit 0 when every named row FAILED (caught), 1 when one passed (survived), 2
@@ -567,9 +571,6 @@ MUTANTS = {
          "true\n        case .jpeg: return false\n",
          "    var carriesDepth: Bool {\n        switch self {\n        case .png, .heic: return "
          "true\n        case .jpeg: return true\n")]},
-    "reader-space-swapped": {"mode": "rows", "rows": ["S4", "S15"], "anchors": [
-        (DEEP, "        if built.videoConfiguration.colorPrimaries == nil {\n",
-         "        if built.videoConfiguration.colorPrimaries != nil {\n")]},
     "reader-unscaled": {"mode": "rows", "rows": ["S16"], "anchors": [
         (DEEP, "        let size = Exporter.scaledSize(built.videoComposition.renderSize, "
          "to: maxWidth)\n",

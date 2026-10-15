@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
-"""Issue #295 (issue batch B101) — what colour label a rendered frame carries,
-measured; no product code is changed by it.
+"""Spec §11 PR-11's pin (issue batch B102, #295): every frame Frame Job writes
+as an image file carries the one BT.709 label, its pixels unchanged. Issue
+batch B101 wrote this script as a measurement (what label a written frame
+carried, which followed the sources); B102 scores every row to PR-11.
 
     python3 tools/proof/frame_label_proof.py [--app PATH] [--only F1,F5,...]
+    python3 tools/proof/frame_label_proof.py capture DIR    # the CONTROL tree: every image file kept in DIR
+    python3 tools/proof/frame_label_proof.py compare DIR [--only ...]   # adds P1, P2 and E3's pixels
+    python3 tools/proof/frame_label_proof.py same-pixels A B            # no app
+    python3 tools/proof/frame_label_proof.py [compare DIR] --mutant NAME
 
-`render_frame` (and Save Frame…, the same writer) labels its file from the
-composition's source tags: issue #292 found a frame whose sources were all
-covered carry an `iCCP` profile named `kCGColorSpaceCoreMedia709` once the
-covered movie was tagged BT.709, and an `sRGB` chunk while it was untagged.
-This script prints, per case, the label each written file carries, and
-whether a colour-managed read tells two labels apart: each file is decoded
-raw to `rgb48le` by ffmpeg (which applies no profile) and again after `sips
---matchTo` the system's sRGB profile, and the two compared (mean and max
-|Δ| in 8-bit levels, the 16-bit sample / 257).
+Each written file's label is read off the file (a PNG's `sRGB` or `iCCP` chunk
+and the profile's name, else `sips -g profile`). Each file is decoded raw to
+`rgb48le` by ffmpeg (which applies no profile) and again after `sips
+--matchTo` the system's sRGB profile, and the two compared (mean and max |Δ|
+in 8-bit levels, the 16-bit sample / 257) — B101's colour-managed read, still
+printed.
 
 Launches the app `proof_app` picks (Debug unless `RC_PROOF_APP=release`) on
 a scratch socket of its own and stops only that process. **The instance runs
@@ -31,28 +34,62 @@ yuv422p10le, unknown ×3), `still8.png` (an opaque rgb24 testsrc2 frame) and
 `still16.png` (an rgb48be ramp, written here). A fixture is kept only when
 ffprobe reads what it should; a refusal is an instrument failure (exit 2).
 
+PR-11's label: a PNG's (and an APNG's) `iCCP` named `LABEL_NAME`, exactly as
+B101's F2 control carried it (the space the generator gives a BT.709-tagged
+source); a JPEG's and a HEIC's `sips` profile `HDTV`; a GIF's `GIF_LABEL`
+(PR-11's GIF clause, from E3's control).
+
 Rows (each scene on a 320×180 30 fps canvas, rendered at 0.5 s):
+- **F0** (no app): a scan of `app/Sources` (a mutant's copy's): `AgentServer+
+  Render.swift` and `EditorViewController+SaveFrame.swift` each call
+  `FrameWriter.writeFrame(` and never `FrameWriter.write(`, and
+  `ExporterImageSequence.swift` calls `FrameWriter.labelled(`.
 - **F1–F4**: `h264_none`, `h264_709`, `prores_none`, `prores_709` alone.
 - **F5, F6**: `still8` fully covering `prores_none` / `prores_709` (#295's
   case); **F7**: `still8` over `h264_709`; **F8**: `still8` alone.
 - **F9**: `still16` alone (spec §11 PR-9's reader).
 - **F10**: `prores_709` with `{log: slog3}` (a converting composition).
-- **F11**: F1's and F2's frames written as `jpeg` and `heic`.
-- **E1**: an `h264` export of F1's and F2's projects: ffprobe's tags.
-- **E2**: an `apng` export of the same two: the file's label.
+  Each of F1–F10 passes when its PNG carries the label at its `DEPTH`
+  (B101's table). **F6** also holds the pair rule: F5 and F6 carry equal
+  labels, and their raw and matched reads are equal (|Δ| 0).
+- **F11**: F1's, F2's and F9's frames written as `jpeg` and `heic`: profile
+  `HDTV`, at `F11_DEPTH`.
+- **E1**: an `h264` export of F1's and F2's projects: ffprobe's tags (read,
+  printed).
+- **E2**: an `apng` export of the same two: the file's `iCCP` is the label.
+- **E3**: a `gif` export of the same two: its label is `GIF_LABEL`, and in
+  `compare DIR` its raw decode equals DIR's GIF.
+- **P1** (`compare DIR`): every image file DIR holds is written again and its
+  raw decode (`rgba64le`) equals DIR's.
+- **P2** (`compare DIR`): a file whose DIR copy already carried its PR-11
+  label is byte-identical to it.
 - **Z1** (CONTROL): no `Frame Job: ` line, every project closed.
 
-Each row prints the file's depth; a PNG's `sRGB` chunk or its `iCCP` and the
-profile's name (or `sips -g profile` for the rest); and the raw-against-
-matched mean and max |Δ|. The pairs F1/F2 and F5/F6 print the raw Δ between
-the two files and the matched Δ between their matched reads. A row passes
-when it was reached and read: this is a measurement, not a rule (none is
-decided; README "Issue #295"). Exit 0 when every row passes.
+`capture DIR` runs every row (the control is expected to FAIL F0, F1, F3, F5,
+F6, F8, F9, F11 and E2) and copies every image file it wrote, with
+`capture.json` (each file's label), into DIR. `same-pixels A B` launches no
+app: every `png`, `jpg`, `heic` and `gif` present in both folders is decoded
+raw (`rgba64le`), the max |Δ| printed beside both labels; it passes when at
+least one file was compared and every max |Δ| is 0.
+
+`--mutant NAME` follows log_proof.py's `build_mutant`: a COPY of the tree
+(`tree_copy.make_copy`), each anchor asserted to occur exactly once, built
+by the copy's own `make app-debug` (`make app` under `RC_PROOF_APP=release`);
+every row runs on it (F0 scans the copy). MUTANT PASS when every named row
+FAILED. `gif-flipped` runs as `compare DIR --mutant gif-flipped` against the
+control's capture, so E3's pixels and P1 also score; when E3's control shows
+a GIF carries no label and the flip moves neither E3's label nor its pixels,
+the survivor is recorded as an equivalent mutant (precision_proof.py's
+`jpeg-deep` wording), E3 and P1 staying the guards.
+
+Exit 0 when every scored row passes (a mutant: caught); 1 when one failed (a
+mutant: survived); 2 when the control could not be performed.
 """
 
 import argparse
 import atexit
 import json
+import shutil
 import struct
 import sys
 import zlib
@@ -71,14 +108,28 @@ import tree_copy  # noqa: E402
 BASE = ROOT / "tools/proof/work/frame_label"
 WORK = BASE / "run"
 HOME = WORK / "home"
+SCRATCH = WORK / "decoded"
 MEDIA = BASE / "media"
 CALL_BOUND = 300
 TOOL_BOUND = 120
+BUILD_BOUND = 1500
 W, H = 320, 180
 SEC = 600_000
 T = SEC // 2
 SRGB = "/System/Library/ColorSync/Profiles/sRGB Profile.icc"
-ROWS = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "E1", "E2", "Z1"]
+ROWS = ["F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "E1", "E2",
+        "E3", "P1", "P2", "Z1"]
+COMPARE_ROWS = {"P1", "P2"}
+IMAGE_SUFFIXES = {".png", ".jpg", ".heic", ".gif"}
+# PR-11's label: a PNG's `iCCP` profile name as B101's F2 control carried it,
+# and `sips`'s profile name for a JPEG and a HEIC (B101's F11 of F2).
+LABEL_NAME = "kCGColorSpaceCoreMedia709"
+PNG_LABEL = f"iCCP '{LABEL_NAME}'"
+SIPS_LABEL = "HDTV"
+# PR-11's GIF clause, from E3's control (B102, the unchanged tree): a GIF
+# export carries no colour label (no `ICCRGBG1` extension; `sips` reads the
+# sRGB ImageIO assumes for every GIF), so a GIF is left as it is.
+GIF_LABEL = "no ICC extension; sips profile 'sRGB IEC61966-2.1'"
 # row: (label, [fixtures back to front], Camera Log of the first or None)
 SCENES = {"F1": ("h264_none alone", ["h264_none"], None),
           "F2": ("h264_709 alone", ["h264_709"], None),
@@ -90,6 +141,43 @@ SCENES = {"F1": ("h264_none alone", ["h264_none"], None),
           "F8": ("still8 alone", ["still8"], None),
           "F9": ("still16 alone", ["still16"], None),
           "F10": ("prores_709 with {log: slog3}", ["prores_709"], {"log": "slog3"})}
+# Each row's PNG depth, B101's table (PR-11 moves the label alone).
+DEPTH = {"F1": 8, "F2": 8, "F3": 16, "F4": 16, "F5": 16, "F6": 16, "F7": 8, "F8": 8, "F9": 16,
+         "F10": 16}
+# F11's `sips` bitsPerSample: JPEG 8; HEIC 8, but 10 for F9's deep still (PR-9's S10).
+F11_DEPTH = {("F1", "jpeg"): "8", ("F1", "heic"): "8", ("F2", "jpeg"): "8",
+             ("F2", "heic"): "8", ("F9", "jpeg"): "8", ("F9", "heic"): "10"}
+RENDER_SWIFT = "app/Sources/AgentServer+Render.swift"
+SAVE_SWIFT = "app/Sources/EditorViewController+SaveFrame.swift"
+SEQUENCE_SWIFT = "app/Sources/ExporterImageSequence.swift"
+WRITER_SWIFT = "app/Sources/FrameWriter.swift"
+# name: ([(file, anchor, replacement), …], the rows that must fail).
+MUTANTS = {
+    # render_frame writes through the unlabelled `write`.
+    "render-unlabelled": ([(RENDER_SWIFT,
+                            "            try FrameWriter.writeFrame(image, as: format, to: url)\n",
+                            "            try FrameWriter.write(image, as: format, to: url)\n")],
+                          ["F0", "F1"]),
+    # Save Frame… writes through the unlabelled `write` (no proof can press it).
+    "saveframe-unlabelled": ([(SAVE_SWIFT,
+                               "                result = Result { try FrameWriter.writeFrame(image, "
+                               "as: format, to: url) }\n",
+                               "                result = Result { try FrameWriter.write(image, as: "
+                               "format, to: url) }\n")], ["F0"]),
+    # An APNG's frames left as they are.
+    "apng-unlabelled": ([(SEQUENCE_SWIFT, "        case .apng: return true\n",
+                          "        case .apng: return false\n")], ["E2"]),
+    # `frameSpace` as the other variant A4 names, `CGColorSpace.itur_709`.
+    "label-itur709": ([(WRITER_SWIFT,
+                        "        return CVImageBufferCreateColorSpaceFromAttachments(attachments)?"
+                        ".takeRetainedValue()\n            ?? CGColorSpace(name: "
+                        "CGColorSpace.itur_709)!\n",
+                        "        return CGColorSpace(name: CGColorSpace.itur_709)!\n")],
+                      ["F1", "F2"]),
+    # A GIF's frames labelled too (run as `compare DIR --mutant gif-flipped`).
+    "gif-flipped": ([(SEQUENCE_SWIFT, "        case .gif: return false\n",
+                      "        case .gif: return true\n")], ["E3"]),
+}
 UNKNOWN = {"color_primaries": "unknown", "color_transfer": "unknown", "color_space": "unknown"}
 rows = {}
 selected = set(ROWS)
@@ -235,7 +323,13 @@ def label(path):
     ran = bounded.run(["sips", "-g", "profile", "-g", "bitsPerSample", str(path)], TOOL_BOUND)
     lines = dict(line.strip().split(": ", 1) for line in ran["stdout"].splitlines()
                  if ": " in line)
-    return lines.get("bitsPerSample"), f"sips profile '{lines.get('profile')}'"
+    text = f"sips profile '{lines.get('profile')}'"
+    if Path(path).suffix.lower() == ".gif":
+        # A GIF's only colour label is an `ICCRGBG1` application extension;
+        # without one, ImageIO (and so `sips`) reads it as sRGB (B102's E3).
+        carried = b"ICCRGBG1" in Path(path).read_bytes()
+        text = f"{'an' if carried else 'no'} ICC extension; {text}"
+    return lines.get("bitsPerSample"), text
 
 
 def decoded(path):
@@ -351,18 +445,35 @@ class Doc:
                                                        "discard": True})["ok"]
 
 
+def png_labelled(figures, depth):
+    """(passes, why): `figures`' file carries PR-11's PNG label at `depth`."""
+    if figures is None or figures["raw"] is None:
+        return False, "not read"
+    misses = []
+    if not figures["label"].startswith(PNG_LABEL):
+        misses.append(f"label {figures['label']!r}, not {PNG_LABEL!r}")
+    if figures["depth"] != depth:
+        misses.append(f"depth {figures['depth']}, not {depth}")
+    return not misses, "; ".join(misses)
+
+
 def run(client, media, state):
-    """Every selected row; True when every project closed."""
+    """Every selected row; True when every project closed. Every image file
+    written is listed in state["files"] ({name: path})."""
     closed = True
     frames = {}
-    keep = {"F1", "F2"} if selected & {"F11", "E1", "E2"} else set()
+    files = state.setdefault("files", {})
+    keep = {"F1", "F2"} if selected & {"F11", "E1", "E2", "E3", "P1", "P2"} else set()
+    if selected & {"F11", "P1", "P2"}:
+        keep.add("F9")
     docs = {}
+    verdicts = {}
     for row, (title, names, color) in SCENES.items():
         if row not in selected and row not in keep:
             continue
         missing = [n for n in names if n not in media]
         if missing:
-            check(f"{row} {title}", False, f"fixtures refused: {missing}")
+            verdicts[row] = (title, False, f"fixtures refused: {missing}")
             continue
         doc = Doc(client, row.lower())
         for index, name in enumerate(names):
@@ -374,28 +485,54 @@ def run(client, media, state):
         else:
             closed = doc.close() and closed
         figures = read(png) if png else None
+        if png:
+            files[png.name] = png
         frames[row] = figures
-        good = figures is not None and figures["raw"] is not None and figures["delta"] is not None
-        check(f"{row} {title}: the frame's label and its colour-managed read",
-              good, shown(figures) if figures else f"not reached: {doc.why or 'no render'}")
+        good, why = png_labelled(figures, DEPTH[row])
+        verdicts[row] = (title, good, (shown(figures) if figures else
+                                       f"not reached: {doc.why or 'no render'}")
+                         + (f"\n       {why}" if why else ""))
     for first, second in (("F1", "F2"), ("F5", "F6")):
         a, b = frames.get(first), frames.get(second)
-        if a and b and (first in selected or second in selected):
-            print(f"       pair {first}/{second}: raw |Δ| mean/max {delta(a['raw'], b['raw'])}; "
-                  f"matched |Δ| mean/max {delta(a['matched'], b['matched'])}", flush=True)
-    if "F11" in selected:
+        if a and b:
+            raw, match = delta(a["raw"], b["raw"]), delta(a["matched"], b["matched"])
+            print(f"       pair {first}/{second}: labels {a['label']!r} / {b['label']!r}; raw "
+                  f"|Δ| mean/max {raw}; matched |Δ| mean/max {match}", flush=True)
+            if second == "F6" and "F6" in verdicts:
+                title, good, detail = verdicts["F6"]
+                pair = (a["label"] == b["label"] and raw is not None and raw[1] == 0
+                        and match is not None and match[1] == 0)
+                verdicts["F6"] = (title, good and pair, detail + (
+                    "" if pair else f"\n       the pair rule fails: F5/F6 labels "
+                    f"{a['label']!r} / {b['label']!r}, raw {raw}, matched {match}"))
+    if "F6" in verdicts and not (frames.get("F5") and frames.get("F6")):
+        title, _, detail = verdicts["F6"]
+        verdicts["F6"] = (title, False, detail + "\n       the pair rule needs F5 and F6 read")
+    for row, (title, good, detail) in verdicts.items():
+        if row in selected:
+            depth = DEPTH[row]
+            check(f"{row} {title}: labelled {PNG_LABEL} (PR-11) at depth {depth}"
+                  + ("; F5/F6's pair equal" if row == "F6" else ""), good, detail)
+    if selected & {"F11", "P1", "P2"}:
         figures, misses = {}, []
-        for row in ("F1", "F2"):
+        for row in ("F1", "F2", "F9"):
             for kind in ("jpeg", "heic"):
                 doc = docs.get(row)
                 out = doc.render(f"{row.lower()}-{kind}", format=kind) if doc else None
                 got = read(out) if out else None
+                if out:
+                    files[out.name] = out
                 figures[f"{row} {kind}"] = shown(got) if got else None
+                want = F11_DEPTH[(row, kind)]
                 if got is None or got["raw"] is None:
-                    misses.append(f"{row} {kind}")
-        check("F11 F1's and F2's frames as jpeg and heic: their labels", not misses,
+                    misses.append(f"{row} {kind}: not read")
+                elif got["label"] != f"sips profile '{SIPS_LABEL}'" or str(got["depth"]) != want:
+                    misses.append(f"{row} {kind}: {got['label']}, depth {got['depth']} (want "
+                                  f"'{SIPS_LABEL}', {want})")
+        check(f"F11 F1's, F2's and F9's frames as jpeg and heic: profile '{SIPS_LABEL}' (PR-11) "
+              "at F11_DEPTH", not misses,
               "; ".join(f"{k}: {v}" for k, v in figures.items()) + (
-                  f"; not read {misses}" if misses else ""))
+                  f"\n       misses {misses}" if misses else ""))
     if "E1" in selected:
         figures = {}
         for row in ("F1", "F2"):
@@ -403,19 +540,174 @@ def run(client, media, state):
             figures[row] = bt709_fixture.tags(bt709_fixture.stream(out)) if out else None
         check("E1 an h264 export of F1's and F2's projects: ffprobe's tags (transfer/primaries/"
               "matrix)", all(figures.values()), f"{figures}")
-    if "E2" in selected:
-        figures = {}
+    if selected & {"E2", "P1", "P2"}:
+        figures, misses = {}, []
         for row in ("F1", "F2"):
             out = docs[row].export(f"{row.lower()}-apng", "apng", "png") if row in docs else None
+            if out:
+                files[out.name] = out
+            text = label(out)[1] if out else None
             figures[row] = (f"{label(out)}; chunks {[k for k, _ in png_chunks(out)][:8]}"
                             if out else None)
-        check("E2 an apng export of F1's and F2's projects: the file's label", all(
-            figures.values()), f"{figures}")
+            if text is None or not text.startswith(PNG_LABEL):
+                misses.append(f"{row}: {text}")
+        check(f"E2 an apng export of F1's and F2's projects: the file's iCCP is {PNG_LABEL} "
+              "(PR-11)", not misses, f"{figures}" + (f"\n       misses {misses}" if misses
+                                                      else ""))
+    if selected & {"E3", "P1", "P2"}:
+        figures, misses = {}, []
+        for row in ("F1", "F2"):
+            out = docs[row].export(f"{row.lower()}-gif", "gif", "gif") if row in docs else None
+            if out:
+                files[out.name] = out
+            text = label(out)[1] if out else None
+            line = f"{label(out)}" if out else "not written"
+            if text != GIF_LABEL:
+                misses.append(f"{row}: label {text!r}, not {GIF_LABEL!r}")
+            if state.get("control") is not None and out:
+                want = state["control"] / out.name
+                gap = delta(decode_full(out), decode_full(want)) if want.exists() else None
+                line += f"; raw |Δ| mean/max against DIR's {gap}"
+                if gap is None or gap[1] != 0:
+                    misses.append(f"{row}: raw decode against DIR's {gap}")
+            figures[row] = line
+        check(f"E3 a gif export of F1's and F2's projects: label {GIF_LABEL!r} (PR-11's GIF "
+              "clause)" + ("; raw decode equal to DIR's" if state.get("control") else ""),
+              not misses, f"{figures}" + (f"\n       misses {misses}" if misses else ""))
     for doc in docs.values():
         closed = doc.close() and closed
     state["closed"] = closed
     return closed
 
+
+# ---- F0, P1, P2, same-pixels ----------------------------------------------------
+
+def run_f0(sources):
+    """F0: the source scan."""
+    misses = []
+    for name in (RENDER_SWIFT, SAVE_SWIFT):
+        text = (sources / Path(name).name).read_text()
+        if "FrameWriter.writeFrame(" not in text:
+            misses.append(f"{Path(name).name} does not call FrameWriter.writeFrame(")
+        if "FrameWriter.write(" in text:
+            misses.append(f"{Path(name).name} calls FrameWriter.write(")
+    if "FrameWriter.labelled(" not in (sources / Path(SEQUENCE_SWIFT).name).read_text():
+        misses.append("ExporterImageSequence.swift does not call FrameWriter.labelled(")
+    check("F0 render_frame and Save Frame… write through FrameWriter.writeFrame and never "
+          "FrameWriter.write; the image sequence calls FrameWriter.labelled (a source scan of "
+          f"{sources})", not misses, f"{misses or 'all three as PR-11 says'}")
+
+
+def decode_full(path):
+    """`path`'s first frame, every sample, as `rgba64le` (ffmpeg applies no
+    profile); a JPEG or HEIC through `sips -s format png` first. None when it
+    does not read."""
+    if path is None or not Path(path).exists():
+        return None
+    source = Path(path)
+    if source.suffix.lower() in (".jpg", ".jpeg", ".heic"):
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        source = SCRATCH / f"{source.parent.name}-{source.stem}-{source.suffix[1:]}-full.png"
+        source.unlink(missing_ok=True)
+        bounded.run(["sips", "-s", "format", "png", str(path), "--out", str(source)], TOOL_BOUND)
+    return bt709_fixture.decode(source, "rgba64le") if source.exists() else None
+
+
+def pr11_label(name):
+    """The label PR-11 gives a file of this name."""
+    suffix = Path(name).suffix.lower()
+    if suffix == ".gif":
+        return GIF_LABEL
+    if suffix == ".png":
+        return PNG_LABEL
+    return f"sips profile '{SIPS_LABEL}'"
+
+
+def carries(text, name):
+    want = pr11_label(name)
+    return text is not None and (text.startswith(want) if want == PNG_LABEL else text == want)
+
+
+def run_p(control, files):
+    """P1 and P2 against DIR's capture."""
+    try:
+        recorded = json.loads((control / "capture.json").read_text())["labels"]
+    except (OSError, ValueError, KeyError):
+        check("P1 every image file DIR holds is written again with an equal raw decode", False,
+              f"{control} has no capture.json")
+        check("P2 every file whose DIR copy carried its PR-11 label is byte-identical", False,
+              f"{control} has no capture.json")
+        return
+    p1, p2, lines = [], [], []
+    for name, then in sorted(recorded.items()):
+        now = files.get(name)
+        want = control / name
+        if now is None:
+            p1.append(f"{name}: not written")
+            continue
+        gap = delta(decode_full(now), decode_full(want))
+        same = now.read_bytes() == want.read_bytes()
+        lines.append(f"{name}: raw |Δ| mean/max {gap}; label {then!r} → {label(now)[1]!r}; "
+                     f"bytes {'identical' if same else 'differ'}")
+        if gap is None or gap[1] != 0:
+            p1.append(f"{name}: {gap}")
+        if carries(then, name) and not same:
+            p2.append(name)
+    print("       " + "\n       ".join(lines), flush=True)
+    check(f"P1 every image file {control.name} holds ({len(recorded)}) is written again with "
+          "an equal raw decode (rgba64le, max |Δ| 0)", not p1 and bool(recorded), f"{p1 or 'all equal'}")
+    carried = [n for n, t in recorded.items() if carries(t, n)]
+    check(f"P2 every file whose {control.name} copy carried its PR-11 label ({len(carried)}: "
+          f"{carried}) is byte-identical to it", not p2, f"{p2 or 'all identical'}")
+
+
+def same_pixels(a, b):
+    """`same-pixels A B`: exit 0 when at least one file was compared and every
+    max |Δ| is 0."""
+    names = sorted(n.name for n in a.iterdir() if n.suffix.lower() in IMAGE_SUFFIXES
+                   and (b / n.name).exists())
+    print(f"B102 same-pixels — {a} against {b}: {len(names)} files in both; launches no app",
+          flush=True)
+    moved, unread, changed = [], [], 0
+    for name in names:
+        gap = delta(decode_full(a / name), decode_full(b / name))
+        la, lb = label(a / name)[1], label(b / name)[1]
+        changed += la != lb
+        print(f"  {name}: raw |Δ| mean/max {gap}; labels {la!r} → {lb!r}"
+              + ("" if la != lb else " (unchanged)"), flush=True)
+        if gap is None:
+            unread.append(name)
+        elif gap[1] != 0:
+            moved.append(name)
+    print(f"  {len(names)} compared, {changed} labels moved, pixels moved in {moved or 'none'}, "
+          f"unread {unread or 'none'}")
+    return 0 if names and not moved and not unread else 1
+
+
+# ---- the mutants (log_proof.py's build_mutant) ----------------------------------
+
+def build_mutant(name):
+    edits, _ = MUTANTS[name]
+    made, reason = tree_copy.make_copy(str(WORK / "mutant"))
+    if made is None:
+        return None, reason
+    copy = Path(made)
+    for path, anchor, replacement in edits:
+        target = copy / path
+        if target.is_symlink() or not target.resolve().is_relative_to(WORK):
+            return None, f"{path} in the copy is the tree's own file"
+        text = target.read_text()
+        if text.count(anchor) != 1:
+            return None, f"the anchor occurs {text.count(anchor)} times in {path}: {anchor!r}"
+        target.write_text(text.replace(anchor, replacement))
+    print(f"  building the copy ({len(edits)} edit(s), each anchor found once)…", flush=True)
+    app, reason = tree_copy.build_app(copy, BUILD_BOUND)
+    if app is None:
+        return None, reason
+    return app, copy
+
+
+# ---- the run --------------------------------------------------------------------
 
 def remove_work():
     if WORK.exists():
@@ -425,32 +717,64 @@ def remove_work():
 def main():
     global selected
     parser = argparse.ArgumentParser()
+    parser.add_argument("mode", nargs="?", choices=["capture", "compare", "same-pixels"])
+    parser.add_argument("folders", nargs="*")
     parser.add_argument("--app", default=None)
     parser.add_argument("--only", help="comma-separated rows to run and score")
+    parser.add_argument("--mutant", choices=sorted(MUTANTS))
     args = parser.parse_args()
+    if args.mode == "same-pixels":
+        if len(args.folders) != 2:
+            print("same-pixels needs two folders")
+            return 2
+        remove_work()
+        atexit.register(remove_work)
+        return same_pixels(*((ROOT / f).resolve() for f in args.folders))
+    if args.mode and len(args.folders) != 1:
+        print(f"{args.mode} needs one folder")
+        return 2
+    control = (ROOT / args.folders[0]).resolve() if args.mode else None
     if args.only:
         selected = {name.strip() for name in args.only.split(",") if name.strip()}
         unknown = selected - set(ROWS)
         if unknown:
             print(f"unknown rows: {sorted(unknown)}")
             return 2
+    if args.mutant == "gif-flipped" and args.mode != "compare":
+        print("gif-flipped runs as compare DIR --mutant gif-flipped")
+        return 2
+    if args.mode != "compare":
+        selected -= COMPARE_ROWS
     remove_work()
     atexit.register(remove_work)
     HOME.mkdir(parents=True)
+    named = MUTANTS[args.mutant][1] if args.mutant else []
     binary = Path(args.app) if args.app else proof_app.binary()
     if binary.suffix == ".app":
         binary = proof_app.executable(binary)
-    print(f"B101 #295 — a rendered frame's colour label ({proof_app.config()} build {binary})",
-          flush=True)
+    sources = ROOT / "app/Sources"
+    if args.mutant:
+        print(f"B102 #295 — the {args.mutant} MUTANT ({' '.join(named)} must FAIL)", flush=True)
+        app, copy = build_mutant(args.mutant)
+        if app is None:
+            print(f"mutant {args.mutant}: the control could not be performed — {copy}")
+            return 2
+        binary = proof_app.executable(app)
+        sources = copy / "app/Sources"
+    else:
+        print(f"B102 #295 — every rendered frame labelled BT.709, spec §11 PR-11 "
+              f"({args.mode or 'run'}, {proof_app.config()} build {binary})", flush=True)
     if not binary.is_file():
         print(f"instrument failure: no app binary at {binary}")
         return 2
+    if "F0" in selected:
+        run_f0(sources)
     media = fixtures()
     if REFUSED:
         print(f"instrument failure: fixtures refused {REFUSED}")
         return 2
     log = WORK / "instance.log"
-    state = {}
+    state = {"control": control if args.mode == "compare" else None}
     launched = mcp.launch(str(binary), [], env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
                           log_path=str(log), timeout=CALL_BOUND)
     closed = True
@@ -469,13 +793,41 @@ def main():
     finally:
         launched.stop()
         mcp.remove_scratch(launched.socket_path)
+    files = state.get("files", {})
+    if args.mode == "compare" and selected & COMPARE_ROWS:
+        run_p(control, files)
     found = hdr.complaints(log)
     check("Z1 CONTROL: every project closed and the log holds no `Frame Job: ` line",
           closed and not found, f"closed {closed}; complaints {found}")
     print(f"  {log.name} tail:\n    " + "\n    ".join(hdr.tail(log)), flush=True)
+    if args.mode == "capture":
+        control.mkdir(parents=True, exist_ok=True)
+        labels = {}
+        for name, path in files.items():
+            shutil.copy2(path, control / name)
+            labels[name] = label(path)[1]
+        (control / "capture.json").write_text(json.dumps(
+            {"tree": str(ROOT), "config": proof_app.config(), "labels": labels}, indent=1))
+        print(f"  captured {len(labels)} image files into {control}", flush=True)
     scored = [name for name in ROWS if name in rows]
     passed = sum(1 for name in scored if rows.get(name))
     print(f"{passed}/{len(scored)}")
+    if args.mode == "capture":
+        print(f"captured; on the control FAILED: {[n for n in scored if not rows[n]]}")
+    if args.mutant:
+        missing = [name for name in named if name not in rows]
+        if missing:
+            print(f"mutant {args.mutant}: the control could not be performed — rows not "
+                  f"reached {missing}")
+            return 2
+        survived = [name for name in named if rows.get(name)]
+        others = [name for name in scored if not rows.get(name) and name not in named]
+        caught = not survived
+        print(f"{'MUTANT PASS' if caught else 'MUTANT FAILURE'}: {args.mutant} — "
+              f"{' '.join(named)} {'all FAILED' if not survived else 'did not all fail'} in the "
+              f"copy (survived: {', '.join(survived) or 'none'}; other rows failed: "
+              f"{', '.join(others) or 'none'})")
+        return 0 if caught else 1
     return 0 if passed == len(scored) else 1
 
 

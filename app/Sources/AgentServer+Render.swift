@@ -40,7 +40,8 @@ extension AgentServer {
     /// **The write is `FrameWriter`'s, and that is the point of it** (road map
     /// 2's phase 7a). This handler used to hold its own
     /// `CGImageDestination` — which made File ▸ Save Frame… and this tool two
-    /// encoders that happened to agree — and now both call one `write`. That
+    /// encoders that happened to agree — and now both call one `writeFrame`
+    /// (it labels the frame BT.709, spec §11 PR-11). That
     /// is what makes "Save Frame's PNG is byte-identical to `render_frame`'s"
     /// a fact about the code rather than a claim, and it is the only way the
     /// line can ever be checked: a save panel cannot be driven over MCP or
@@ -144,7 +145,7 @@ extension AgentServer {
                     + "the media is missing, or the timeline is empty.")
         }
         do {
-            try FrameWriter.write(image, as: format, to: url)
+            try FrameWriter.writeFrame(image, as: format, to: url)
         } catch {
             // `FrameWriter.WriteError` names the path and the format in every
             // case it has, so the message passes through as it was written.

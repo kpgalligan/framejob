@@ -127,6 +127,13 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
+Issue batch B102 (spec §11 PR-11): `render_frame` labels every frame BT.709
+at the write, so a DIR captured before B102 fails H1 on labels alone (its
+PNGs' `sRGB` chunks are `iCCP` now; `frame_label_proof.py same-pixels DIR
+NEW` shows the pixels equal). The mutant `relabel-in-renderframe` (H1)
+applies the label inside `Exporter.renderFrame` instead, which moves the
+eyedropper's picks; it runs against a capture made after PR-11.
+
 H1a and H7 run in a plain run, `compare` and `--only`; never under
 `capture`, `--measure` or a mutant's default selection.
 `capture DIR` records H1's references (`DIR/h1-*.png`, `DIR/media/`,
@@ -312,6 +319,15 @@ MUTANTS = {
                                "        case Label.primaries2020: return .sdrWide(.bt2020)\n"
                                "        case Label.p3D65: return .sdrWide(.p3D65)\n")],
                              ["H1w", "P1"]),
+    # B102 (spec §11 PR-11): the BT.709 label applied inside `Exporter.renderFrame`
+    # instead of at the write, so the eyedropper reads a relabelled frame. Run
+    # with `--control` a capture made after PR-11 (B102's `hdr-after`).
+    "relabel-in-renderframe": ([("app/Sources/Exporter.swift",
+                                 "        return RenderedFrame(image: image, graphics: "
+                                 "GraphicRegistry.shared.reports(for: key))\n",
+                                 "        return RenderedFrame(image: image.map(FrameWriter.labelled), "
+                                 "graphics: GraphicRegistry.shared.reports(for: key))\n")],
+                               ["H1"]),
 }
 rows = {}
 selected = set(ROWS)

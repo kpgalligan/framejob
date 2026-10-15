@@ -28,6 +28,10 @@ of its code; it amends PR-4 and PR-6.
 PR-10 was recorded in issue batch B98 (#289), before its code, from `log_proof.py` L13's
 measurement of the unchanged product; it amends PR-7.
 
+PR-11 was recorded in issue batch B102 (#295), before its code, from the owner's choice of
+2026-10-14 ("BT.709 always"), after issue batch B101 measured what label a rendered frame
+carried; it amends PR-4 and PR-9.
+
 - **PR-1 — The working depth is 16-bit float, holding encoded values clamped to [0, 1] (owner,
   2026-10-09, choices 1 and 5).**
   - The render context's buffers are `kCVPixelFormatType_64RGBAHalf`.
@@ -140,6 +144,10 @@ measurement of the unchanged product; it amends PR-7.
   PR-7's "GIF and APNG frame" above holds for the frame only: ImageIO writes a multi-frame GIF
   or APNG FILE at 8 bits a component whatever the frames' depth (measured in B97), so PR-7's
   depth reaches `render_frame` and Save Frame… alone.
+  **Amended by PR-11** (B102, the owner 2026-10-14): every such frame's FILE carries the one
+  BT.709 label, `FrameWriter.frameSpace`, whatever its sources (`render_frame`, Save Frame… as
+  PNG, JPEG and HEIC, APNG frames); a GIF carries no colour label and is left as it is. The
+  depth and the pixels are unchanged.
 - **PR-5 — What stays 8-bit, and the frozen references (choice 6).**
   - These stay 8-bit:
     - graphics (G-7's BGRA8);
@@ -291,7 +299,9 @@ measurement of the unchanged product; it amends PR-7.
     export never asks.
   - The colour space: `sRGB IEC61966-2.1`, the generator's tag, when the composition converts
     nothing (no output primaries); a converting composition (GR-15) keeps its buffer's own RGB
-    space from the buffer's attachments, BT.709 when there is none.
+    space from the buffer's attachments, BT.709 when there is none. **Amended by PR-11** (B102):
+    the reader's image is built in `FrameWriter.frameSpace`, the BT.709 label every rendered
+    frame's file carries, in both cases; its pixels are the buffer's, as before.
   - What stays: JPEG frames, GIF and APNG exports (8-bit, as before); the preview, movie
     exports, the eyedropper, Pick from Canvas, the look gallery, `snapshot_ui`, thumbnails and
     posters, which never ask. There is no `depth` argument.
@@ -337,3 +347,48 @@ measurement of the unchanged product; it amends PR-7.
     flag from `vpcC` is GR-22's reader, not this decision's; `log_proof.py`'s `L13_OPEN` held
     the pair (#291) — closed by GR-23 (issue batch B99, #291).
   - Amends PR-7.
+- **PR-11 — Every rendered frame's file is labelled BT.709 (owner, 2026-10-14, #295: "BT.709
+  always").**
+  - Every frame Frame Job writes as an image file carries one colour label,
+    `FrameWriter.frameSpace`, whatever its sources: `render_frame` and File ▸ Save Frame… as
+    PNG, JPEG and HEIC (deep or not), and every frame of an APNG export. `frameSpace` is the
+    space `CVImageBufferCreateColorSpaceFromAttachments` makes of the BT.709 primaries, transfer
+    function and matrix, which is the space the generator already gives a frame of a
+    BT.709-tagged source: an `iCCP` named `kCGColorSpaceCoreMedia709` in a PNG or APNG, `sips`'s
+    profile `HDTV` in a JPEG or HEIC. If that call answers nil, `frameSpace` is
+    `CGColorSpace.itur_709`.
+  - GIF: a GIF export carries no colour label. ImageIO writes no `ICCRGBG1` extension and reads
+    every GIF as sRGB, whatever space its frames were in (measured on the tree before PR-11,
+    `frame_label_proof.py` E3). So a GIF's frames are left as they are
+    (`ImageSequenceFormat.carriesLabel` is false for `.gif`).
+  - Pixels are unchanged. The label is applied by `CGImage.copy(colorSpace:)` at the write
+    (`FrameWriter.writeFrame` for `render_frame` and Save Frame…, `FrameWriter.labelled` for an
+    APNG's frames before `sized`), never inside `Exporter.renderFrame`. So the eyedropper, Pick
+    from Canvas, the scopes, `snapshot_ui` and thumbnails still read a frame in its own space
+    (GR-15's H1 stop). `sized` and JPEG's flatten draw in the image's own space, which is then
+    the label, so neither converts. `DeepStillFrame.read` builds its image in `frameSpace`.
+  - `FrameWriter.write` stays unlabelled for `snapshot_ui`, `render_graphic`'s sheets and the
+    look gallery's tiles. A PNG's properties dictionary stays nil: the label comes only from the
+    image's colour space.
+  - Why: BT.709 is the composition's working space (GR-15 builds a converting composition's
+    colour as BT.709) and every movie export's tag (issue batch B101's `frame_label_proof.py`
+    E1: an `h264` export of an untagged source and of a BT.709 one are both bt709 ×3). Before
+    PR-11 the label followed the sources even when they were hidden: #295's two frames have
+    identical pixels (F5/F6 raw |Δ| 0) but read up to 10.98 levels apart once matched to sRGB.
+  - No op, FFI, recipe, format or catalog change. No depth changes (PR-4, PR-9).
+  - Measured (issue batch B102, Debug, `frame_label_proof.py compare` against the control
+    `label-ctl`, captured on the tree before any PR-11 code): the default `frameSpace` holds, so
+    `itur_709` was not needed. Every PNG and APNG (F1–F10, E2) carries `iCCP`
+    `kCGColorSpaceCoreMedia709`, as B101's F2 control did, and every JPEG and HEIC (F11: F1's,
+    F2's and F9's frames) carries `HDTV`, at B101's depths (F9's 16-bit PNG, its 10-bit HEIC).
+    Every one of the 20 files decodes raw to the control's pixels (P1, max |Δ| 0, F9's deep
+    frames included). The 10 whose control already carried their PR-11 label, both GIFs among
+    them, are byte-identical (P2). #295's pair now carries one label: F5/F6 matched |Δ| 0 (0.623 / 10.984
+    before). On the control, F0, F1, F3, F5, F6, F8, F9, F11 and E2 failed and E3 passed (a GIF
+    has no `ICCRGBG1` extension). Labelling a GIF's frames anyway (`gif-flipped`) moves its
+    pixels (F1's GIF by up to 98.63 levels, mean 0.807): ImageIO converts a non-sRGB frame into
+    its palette's sRGB, so "left as they are" keeps a GIF's pixels. The frozen byte references
+    moved on labels alone: `log_proof.py` L9 (3 of 5 PNGs), `hdr_proof.py` H1 (14 of 24) and
+    `precision_proof.py` S11 (the JPEG and `ramp8.png`'s APNG), each decoded raw equal to its
+    control (`frame_label_proof.py same-pixels`, max |Δ| 0).
+  - Amends PR-4 and PR-9.

@@ -14,7 +14,10 @@
 //
 // Two optional keys (grading-3 T3-1, revision 2): `"png"`, a path the composed
 // frame is written to through `FrameWriter.write(_:as: .png, to:)` (what
-// `render_frame` writes with), and `"plain"`, a media file read INSTEAD of a
+// `render_frame` writes with, minus spec §11 PR-11's BT.709 label, which
+// `render_frame` applies through `FrameWriter.writeFrame` since issue batch
+// B102; it stays `write` so the probe still builds on older trees), and
+// `"plain"`, a media file read INSTEAD of a
 // package: its own frame from an `AVAssetImageGenerator` over the plain asset
 // (no composition) — Apple's reading of the file's own labels (H1w's oracle) —
 // picked with the same `color(at:in:canvas:)` on a canvas the frame's size.

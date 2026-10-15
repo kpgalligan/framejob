@@ -5,7 +5,8 @@ import AppKit
 ///
 /// **What is here is the URL and the thread; the WRITE is `FrameWriter`'s.**
 /// That split is the feature's whole point: `render_frame` calls the same
-/// `FrameWriter.write`, so the two paths cannot produce different bytes for
+/// `FrameWriter.writeFrame`, which labels the frame BT.709 (spec §11 PR-11)
+/// and writes it, so the two paths cannot produce different bytes for
 /// one frame, and a proof script — which can drive the agent but can never
 /// press a menu item or type into a save panel — is still measuring what this
 /// command does. Anything about the picture that ends up in this file instead
@@ -201,7 +202,7 @@ extension EditorViewController {
                 project: project, urls: urls, at: time, maxWidth: nil, graphics: graphics,
                 deepStill: deep)
             {
-                result = Result { try FrameWriter.write(image, as: format, to: url) }
+                result = Result { try FrameWriter.writeFrame(image, as: format, to: url) }
             } else {
                 result = .failure(SaveFrameError.noFrame)
             }

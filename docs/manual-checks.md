@@ -485,10 +485,15 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Expect:** no contour bands across the gradient, in the preview or in the export.
 - **Source:** precision-2 P2-1 (spec §11 PR-6: a still deeper than 8 bits a component is drawn at 16-bit float); `precision_proof.py` S1 measures the levels through `prores_422`, not the look.
 
-**PRC-5 — A saved frame of a 16-bit still is 16-bit and looks like the preview**
+**PRC-5 — A saved frame of a 16-bit still is 16-bit and looks like its export**
 - **Do:** 1. Put PRC-4's 16-bit gradient still alone in a 1920×1080 project, and in a second project put it at half size (the Clip tab's Scale at 50 %) over an ordinary 8-bit movie. 2. In each, park the playhead on the still and choose File ▸ Save Frame…, once as PNG and once as JPEG. 3. In Finder, Get Info on each file (or `sips -g bitsPerSample <file>` in Terminal), and open each in Preview beside Frame Job's preview of the same frame.
-- **Expect:** each PNG is 16 bits a sample and each JPEG 8; both look like Frame Job's preview — the same brightness and colour, no tint, nothing shifted — and the PNG's gradient shows no bands.
-- **Source:** issue batch B97 (spec §11 PR-9: a frame showing a deep still is read through export's reader); `precision_proof.py` S4, S5 and S14 measure the depth and the pixels against the generator's render, not how a viewer shows the file.
+- **Expect:** each PNG is 16 bits a sample and each JPEG 8; both look like the same frame in a `prores_422` export of it opened in QuickTime Player — the same brightness and colour, no tint, nothing shifted — and the PNG's gradient shows no bands.
+- **Source:** issue batch B97 (spec §11 PR-9: a frame showing a deep still is read through export's reader); `precision_proof.py` S4, S5 and S14 measure the depth and the pixels against the generator's render, not how a viewer shows the file. Issue batch B102 (spec §11 PR-11) labels every saved frame BT.709, as every movie export is tagged, so the comparison is with an export rather than the preview.
+
+**PRC-6 — A saved frame of an untagged H.264 clip looks like its export in the darks**
+- **Do:** 1. Import an ordinary untagged H.264 movie (a phone or screen-capture clip whose `ffprobe` colour tags read `unknown`) into a project of its own size and park the playhead on a frame with dark areas. 2. Choose File ▸ Save Frame… three times, as PNG, JPEG and HEIC. 3. Export the project with the `h264` preset. 4. Open the three stills in Preview, each beside the export paused on the same frame in QuickTime Player.
+- **Expect:** every still looks the same as the export in the darks and shadows: no lifted or crushed blacks, no tint, the same brightness overall.
+- **Source:** issue batch B102 (spec §11 PR-11: every rendered frame's file is labelled BT.709, the tag every movie export carries); `frame_label_proof.py` F1 and F11 measure the label and the pixels, not how a viewer shows the file.
 
 ## Grading
 

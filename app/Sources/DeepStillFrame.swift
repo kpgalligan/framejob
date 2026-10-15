@@ -55,8 +55,8 @@ enum DeepStillFrame {
     /// frame's range. `cancelReading` runs here, on the thread that called
     /// `copyNextSampleBuffer`, after it returned (G-17), and the caller's
     /// `RecipeSource` key is still registered. The image owns a copy of the
-    /// rows. Its space is the generator's sRGB tag when the composition
-    /// converts nothing; a converting one keeps the buffer's own space.
+    /// rows. Its space is `FrameWriter.frameSpace`, the BT.709 label every
+    /// rendered frame's file carries (spec §11 PR-11), its pixels the buffer's.
     static func read(_ built: BuiltComposition, at t: Ticks, maxWidth: Int?) -> CGImage? {
         guard let reader = try? AVAssetReader(asset: built.composition) else { return nil }
         reader.timeRange = CMTimeRange(
@@ -77,7 +77,7 @@ enum DeepStillFrame {
         guard let sample = sample, let buffer = CMSampleBufferGetImageBuffer(sample) else {
             return nil
         }
-        guard let image = image(of: buffer, space: space(of: buffer, built)) else { return nil }
+        guard let image = image(of: buffer, space: FrameWriter.frameSpace) else { return nil }
         guard let maxWidth = maxWidth, maxWidth > 0 else { return image }
         let size = Exporter.scaledSize(built.videoComposition.renderSize, to: maxWidth)
         let width = max(1, Int(size.width)), height = max(1, Int(size.height))
@@ -96,22 +96,6 @@ enum DeepStillFrame {
     private static let bitmapInfo =
         CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.floatComponents.rawValue
         | CGBitmapInfo.byteOrder16Little.rawValue
-
-    /// sRGB when the composition converts nothing (the generator's tag); a
-    /// converting one's buffer space when it is RGB, else BT.709.
-    private static func space(of buffer: CVImageBuffer, _ built: BuiltComposition) -> CGColorSpace {
-        if built.videoConfiguration.colorPrimaries == nil {
-            return CGColorSpace(name: CGColorSpace.sRGB)!
-        }
-        if let attachments = CVBufferCopyAttachments(buffer, .shouldPropagate),
-            let tagged = CVImageBufferCreateColorSpaceFromAttachments(attachments)?
-                .takeRetainedValue(),
-            tagged.model == .rgb
-        {
-            return tagged
-        }
-        return CGColorSpace(name: CGColorSpace.itur_709)!
-    }
 
     /// A CGImage owning a copy of `buffer`'s rows.
     private static func image(of buffer: CVImageBuffer, space: CGColorSpace) -> CGImage? {

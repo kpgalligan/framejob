@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreVideo
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
@@ -378,6 +379,39 @@ enum FrameWriter {
             throw WriteError.flattenFailed(url)
         }
         return flattened
+    }
+}
+
+extension FrameWriter {
+    /// The BT.709 label every rendered frame's file carries (spec §11 PR-11):
+    /// the space `CVImageBufferCreateColorSpaceFromAttachments` makes of the
+    /// BT.709 primaries, transfer function and matrix — the space the
+    /// generator already gives a frame of a BT.709-tagged source,
+    /// `kCGColorSpaceCoreMedia709` — else `CGColorSpace.itur_709`.
+    static let frameSpace: CGColorSpace = {
+        let attachments =
+            [
+                kCVImageBufferColorPrimariesKey: kCVImageBufferColorPrimaries_ITU_R_709_2,
+                kCVImageBufferTransferFunctionKey: kCVImageBufferTransferFunction_ITU_R_709_2,
+                kCVImageBufferYCbCrMatrixKey: kCVImageBufferYCbCrMatrix_ITU_R_709_2,
+            ] as CFDictionary
+        return CVImageBufferCreateColorSpaceFromAttachments(attachments)?.takeRetainedValue()
+            ?? CGColorSpace(name: CGColorSpace.itur_709)!
+    }()
+
+    /// `image` labelled `frameSpace`, its pixels untouched; `image` itself
+    /// when the copy cannot be made.
+    static func labelled(_ image: CGImage) -> CGImage {
+        image.copy(colorSpace: frameSpace) ?? image
+    }
+
+    /// `write(labelled(image), as: format, to: url)`: the one writer of
+    /// `render_frame` and File ▸ Save Frame… (PR-11). `write` itself stays
+    /// unlabelled for `snapshot_ui`, `render_graphic`'s sheets and the look
+    /// gallery's tiles.
+    @discardableResult
+    static func writeFrame(_ image: CGImage, as format: Format, to url: URL) throws -> URL {
+        try write(labelled(image), as: format, to: url)
     }
 }
 
