@@ -90,8 +90,11 @@ governs a module now.
   evaluator, the patch template and the recipe, as `color_json` does tone's. Format 17 (GR-12)
   adds `Curves {master, red, green, blue}`, each an optional list of 2–16 `[x, y]` points
   (`CurvePoint`), the FIELD `VideoProps.curves` written only when not the identity
-  (`curve_is_identity`: every y = x, from x 0 to x 1); `actions_curves.rs`'s `curves_json`
-  writes all four, an absent one as `IDENTITY_CURVE`. Format 18 (GR-13) adds `Qualifier {hue,
+  (`curve_is_identity`: every y = x, from x 0 to x 1); format 20 (GR-32) adds `hue_hue` and
+  `hue_sat` (`[hue, value]` points, 0 ≤ hue < 360) and `CurveDomain` (each channel's identity,
+  neutral and value range; `named()` and `named_mut()` give each channel's), a hue curve the
+  identity when every value is its neutral; `actions_curves.rs`'s `curves_json` writes all
+  six, an absent one as its domain's identity. Format 18 (GR-13) adds `Qualifier {hue,
   saturation, luma, invert}` (`HueRange {center, width, softness}` in degrees, `LevelRange
   {low, high, softness}` 0–1, a range `None` when off), the FIELD `VideoProps.qualifier`,
   written only when not neutral; it acts only on an adjustment clip. Re-exported whole by
@@ -338,7 +341,8 @@ governs a module now.
   wheel's x, y and master −1…1, and x² + y² ≤ 1 (to `WHEEL_RIM_TOLERANCE`, 1e-9, so a rim point
   is never refused) refused in its own sentence; `actions_clamp.rs`'s `clamp_wheels` closes an
   action's end. `check_curves` (GR-12): 2–16 points, x and y 0…1, x strictly rising, each in
-  its own sentence; `clamp_curves` closes an action's end. `check_qualifier` (GR-13): each
+  its own sentence, a hue curve's x 0 ≤ x < 360 and its value in its domain (GR-32);
+  `clamp_curves` closes an action's end per domain. `check_qualifier` (GR-13): each
   bound in its own sentence, low ≤ high; `clamp_qualifier` closes an action's end;
   `edit_adjustment.rs`'s `check_qualifier_clip` refuses one on any other clip.
 - `edit_track.rs` — tracks, markers and the media list: the three lists a
@@ -486,11 +490,12 @@ governs a module now.
   never looks at the clip for them; this bounds every value such a patch
   can carry and forces `normal` on a nest clip), with `bounded` /
   `finite_or`; a pure move out of `actions.rs` (issue batch B87, toll A).
-- `actions_curves.rs` — `curves_json` (all four curves, an absent one
-  as the identity, for `video_json`'s callers) and
-  `align_identity_curves` (spec §11 GR-12: an identity curve meeting a
-  curve of another count in an action takes that curve's x's, its ends
-  at 0 and 1, so a grade animates from neutral; any other count change
+- `actions_curves.rs` — `curves_json` (all six curves, an absent one
+  as its domain's identity, for `video_json`'s callers) and
+  `align_identity_curves` (spec §11 GR-12, GR-32: an identity curve
+  meeting a curve of another count in an action takes that curve's x's,
+  its ends at 0 and 1 on a tone curve and every value the neutral on a
+  hue curve, so a grade animates from neutral; any other count change
   switches at the end, the list rule).
 - `actions_qualifier.rs` — `align_hue_center` (spec §11 GR-13): before
   the lerp, an action's target hue centre moves by ±360 when the two

@@ -274,7 +274,12 @@ schema, §6 the op table, §7 the architecture.
   point with ⌫ or a double-click, nudge it with the arrow keys, or type its
   In and Out. Each edit is one undo step; the curves animate in an action
   (from or to straight, too) and apply after the wheels and before a look,
-  on a clip or an adjustment clip.
+  on a clip or an adjustment clip. The **Hue** and **Sat** cells edit two
+  hue curves over a spectrum strip: drag a point up or down to turn that hue
+  (Hue vs Hue — "make the greens more teal", keeping its brightness) or to
+  saturate or mute it (Hue vs Sat); greys are never tinted. Hover the plot to
+  read the value under the pointer ("In 0.42 → Out 0.47", "Hue 34° → +12°"),
+  and hold ⇧ while dragging to keep a point on one axis.
 - **Qualifiers**. An adjustment clip's Color tab has a **Qualifier** section
   that narrows its grade to the pixels of one colour: a **Hue** band, a
   **Saturation** band and a **Luma** band, each with a soft edge, and

@@ -116,3 +116,95 @@ nothing of Concat is opened, at design time or build time.
   - **Not:** no format, op, FFI or tool-count change.
   - Risk accepted: a pixel whose `255·zoom·c` lies within 1e-3 of 127.5 or −128.5 may fall
     either side of the edge between the GPU and a CPU count; S6 allows that band, nothing else.
+- **GR-32 — Hue curves: `video.curves.hue_hue` (Hue vs Hue) and `.hue_sat` (Hue vs Sat) on a
+  periodic Fritsch–Carlson spline, applied after the channel curves at step 4c.2 through the
+  strip's second row behind `hueCurvesEnabled`; the Hue and Sat cells, the hover readout and the
+  ⇧ axis lock; format 20.** Recorded in T4-2 before its code; it settles GR-24's T4-2 item to the
+  point and amends GR-2, GR-4, GR-6, GR-7 and GR-12. The owner's choices (2026-10-14, every one
+  as recommended): (1) a hue identity is spelled `[[0, n], [180, n]]` and its two points are
+  drawn; (2) the spectrum strip sits inside the square's bottom 10 pt, so the row's height and
+  every tone capture are unchanged; (3) six equal cells at 11 pt, 10 pt only if a label does not
+  fit; (4) the readout's text and placement below; (5) the hue grid every 60°; (6) points do not
+  cross the wrap; (7) hue nudges 1° (⇧ 10°), gain 0.01 (⇧ 0.1), the minimum gap 0.1°.
+  - **The keys.** `video.curves.hue_hue` and `video.curves.hue_sat`, each 2–16 points `[hue,
+    value]`, hue in degrees, 0 ≤ hue < 360, strictly rising. Hue vs Hue's value is a shift in
+    degrees, −180…180 (0 none); Hue vs Sat's a gain, 0…2 (1 none). Model and JSON order: master,
+    red, green, blue, hue_hue, hue_sat. A hue curve is the identity when it has at least one
+    point and every value is its neutral, whatever its x's; it is written absent and normalised
+    away by `set_video` (an identity patch on an uncurved clip "made no change"), and kept in an
+    action's END as "animate to neutral" (GR-12's rule). An absent hue curve is spelled
+    `IDENTITY_HUE_SHIFT` `[[0, 0], [180, 0]]` / `IDENTITY_HUE_GAIN` `[[0, 1], [180, 1]]` in the
+    recipe and in an action's `clip_state`. No op, no op-table row, no tool, no FFI export.
+  - **Refusals**, in model order then point order, never clamped by a patch: the count sentence
+    as GR-12's (`video.curves.hue_hue needs 2 to 16 points, not 17`); `video.curves.hue_hue[2].x
+    must be at least 0 and below 360, not 360`; the values by the range sentence
+    (`video.curves.hue_hue[1].y must be between -180 and 180, not 200`;
+    `video.curves.hue_sat[0].y must be between 0 and 2, not 2.5`); the rising sentence as GR-12's.
+  - **An action's end is clamped:** NaN removes the channel; x to 0…360, then a channel whose last
+    x is 360 or whose x's do not strictly rise is removed; values to their range; identities
+    removed. Two hue curves of the same count lerp per point (x linearly, no wrap); an identity
+    meeting a curve of another count takes that curve's x's with the neutral value; any other
+    count change switches at the end (T4-3 changes that).
+  - **The spline**: Fritsch–Carlson made periodic: secants δk for k = 0…n−1, δ(n−1) from
+    (x(n−1), y(n−1)) to (x0 + 360, y0); every tangent is interior (indices mod n): 0 where
+    δ(k−1)·δk ≤ 0, else their mean; then for k = 0…n−1 in order (the wrap segment last) the
+    flat-secant and α² + β² > 9 rules; cubic Hermite inside a segment (x < x0 or ≥ x(n−1) uses
+    the wrap segment); clamped to the domain's value range. The tone spline is unchanged bit for
+    bit. Swift only (`CurveTable.swift`), as GR-12.
+  - **The strip** becomes 1,024 × 2 (`rgba32Float`, or `rgba16Float` without 32-bit filtering).
+    Row 0 is GR-12's composites, sampled at y 0.25 (exact in y, so every tone render is
+    unchanged); row 1's texel i is (shift(i·360/1023)/360 turns, gain(i·360/1023), 0, 1), sampled
+    at x `(h/360)·(n−1)/n + 0.5/n`, y 0.75. The placeholder is 2 × 2: row 0 (0,0,0,1), (1,1,1,1);
+    row 1 (0,1,0,1) twice, bound when all six channels are the identity or an upload fails (then
+    both flags are 0).
+  - **The step**: step 4c.2's second half, after the channel curves and before the look, in the
+    layer stage and the adjustment pass, on encoded values. c = saturate(rgb); h its HSV hue
+    (GR-13's formula, one helper shared with `qualifierWeight`), C = max − min of c; row 1 is
+    sampled at h once, so the gain is read at the ORIGINAL hue. The shift applies only when |turns|
+    > 1e-6, then `mix(Y709, out, gain)` only when |gain − 1| > 1e-6, and the result is
+    `mix(rgb, out, smoothstep(0.02, 0.06, C))` (GR-13's chroma guard: a grey is never tinted).
+    `hueCurvesEnabled` (GR-11's reserved float, the block stays 128 floats) is 1 exactly when a
+    hue curve is not the identity and joins the effects gate's sum; `curvesEnabled` now means "a
+    tone curve is not the identity".
+  - **The shift is an HSV-hue move in the curve's direction** (+ = red → yellow → green, the
+    spectrum strip's left to right), not Color's `hueRotate`, which turns HSV hue against its
+    label's sign and by an amount that varies by hue. With Y the Rec. 709 luma of rgb and Cr =
+    max(rgb) − min(rgb): d = Cr·`lookHueChroma`(h + degrees); k is the largest value in [0, 1]
+    keeping every channel of Y + k·d inside [min(0, min rgb), max(1, max rgb)]; out = Y + k·d.
+    Where C ≥ 0.06 the step's float output has HSV hue exactly h + degrees (mod 360) and exactly
+    the input's Y; k < 1 gives up only chroma (toward the same-luma grey, which keeps hue), and
+    only where the shifted colour at that luma would leave [0, 1]. The gain then scales chroma
+    about the same Y (Color's Saturation; hue kept for gain > 0). In 8-bit output the measured
+    HSV hue is within ±1° of h + degrees at output chroma ≥ 64/255 and within ±2° on every column
+    of a hue sweep under ±40° (a spec-time model over 720 columns: worst 0.54° at +40 and 0.47° at
+    −40 at chroma ≥ 64, 1.18° at −40 over all; luma within 0.46 levels). The readout's "+12°" is
+    therefore the pixel's HSV shift.
+  - **Extends GR-4**: `ungraded` neutralises all six. **GR-6**: the adjustment pass applies them,
+    and a neutral adjustment clip is one whose six curves are the identity. **GR-7**: the order
+    is Color's four, Light, the wheels, the channel curves, the hue curves, the look. Paste
+    Attributes carries them with `video.curves`.
+  - **The editor.** The picker is Master · Red · Green · Blue · Hue · Sat, six equal cells. A hue
+    channel's plot is the view's square less its bottom 10 pt (an 8 pt spectrum strip, 2 pt gap):
+    the strip draws `NSColor(hue: t, saturation: 1, brightness: 1)` per column, 0° left and 360°
+    right; the grid has verticals every 60°, horizontals at quarters and the neutral middle line
+    in place of the diagonal; the faint other channels are only those of the same domain; points
+    never cross 0°/360°; an identity hue channel's two points are drawn, and a press adds a point
+    at the neutral (GR-12's working-list rule). The In/Out fields: tone 3 decimals 0–1; In on a
+    hue curve "°", 1 decimal, 0–359.9; Out on Hue "°", 1 decimal, −180…180; Out on Sat "×", 2
+    decimals, 0–2.
+  - **The hover readout** (#270): while the pointer is over the plot (and during a drag), a label
+    in mono 9 on the chrome background at 0.85 with 2 pt padding sits at the pointer + (8, 8),
+    flipped inward at the plot's edges; x is the pointer's model x, y the curve's value there:
+    `In 0.42 → Out 0.47` (2 decimals) on a tone curve, `Hue 34° → +12°` (whole degrees, "+" for
+    ≥ 0, "−" U+2212 below) on Hue, `Hue 34° → ×0.80` on Sat. None outside the plot, the strip
+    included. View state: no model, no format, no tool (§7.9's exemption).
+  - **The ⇧ axis lock**: the first drag event with ⇧ held whose travel from the press is ≥ 4 pt
+    picks the axis (|Δx| ≥ |Δy| horizontal) for the rest of the gesture; while ⇧ is held the other
+    coordinate is the grabbed point's origin (before the axis is picked the point stays put);
+    without ⇧ the point follows the pointer. ⌥ and ⇧ combine. The arrow keys' ⇧ is unchanged.
+  - **Format 20**: the keys are optional, with no migration step; the bump stops an older build
+    dropping them on save. A file numbered 1–19 (and 1015) opens and is stamped 20; 21 and above,
+    1014 included, are newer.
+  - **Not:** Hue vs Luma; dragging a point across 0°/360°; a change to Color's Hue (`hueRotate`).
+  - Risk accepted: the hue curves' strengths are first numbers, judged by GRD-13 on real
+    footage; a hue curve between two counts switches at the action's end until T4-3.

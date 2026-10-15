@@ -1,7 +1,8 @@
 //! Tier 2's range checks (spec §11 GR-11), called from `props_check.rs`'s
 //! `check_video`: each wheel's `x`, `y` and `master` −1…1, and its push
 //! inside the unit circle; and each curve's 2–16 points, x and y 0…1, x
-//! strictly rising (GR-12); and the qualifier's ranges, each bound in its
+//! strictly rising (GR-12), a hue curve's x 0 ≤ x < 360 and its value in
+//! its domain's range (GR-32); and the qualifier's ranges, each bound in its
 //! own sentence and low ≤ high (GR-13).
 //!
 //! The rule is `props_check.rs`'s: a value out of range is NAMED in the
@@ -12,8 +13,8 @@
 //! make one — is never refused; the sentence still says `≤ 1`.
 
 use crate::model::{
-    Curves, Qualifier, Wheels, CURVE_POINTS_MAX, CURVE_POINTS_MIN, HUE_SOFTNESS_MAX, HUE_TURN,
-    WHEEL_MAX, WHEEL_RIM_TOLERANCE,
+    CurveDomain, Curves, Qualifier, Wheels, CURVE_POINTS_MAX, CURVE_POINTS_MIN, HUE_SOFTNESS_MAX,
+    HUE_TURN, WHEEL_MAX, WHEEL_RIM_TOLERANCE,
 };
 use crate::props_check::in_range;
 
@@ -42,10 +43,12 @@ pub(crate) fn check_wheels(wheels: &Wheels) -> Result<(), String> {
 
 /// `Ok` when every curve holds 2–16 points, each x and y 0…1 (bounds
 /// inclusive) and x strictly rising; the first refusal otherwise, in model
-/// order (master, red, green, blue), then point order, indices 0-based
-/// (GR-12). An identity curve passes: `set_video` drops it after this.
+/// order (master, red, green, blue, hue_hue, hue_sat), then point order,
+/// indices 0-based (GR-12). A hue curve's x is 0 ≤ x < 360 and its value
+/// within its domain's range (GR-32). An identity curve passes: `set_video`
+/// drops it after this.
 pub(crate) fn check_curves(curves: &Curves) -> Result<(), String> {
-    for (name, curve) in curves.named() {
+    for (name, domain, curve) in curves.named() {
         let Some(points) = curve else {
             continue;
         };
@@ -56,9 +59,17 @@ pub(crate) fn check_curves(curves: &Curves) -> Result<(), String> {
                 points.len()
             ));
         }
+        let (low, high) = domain.value_range();
         for (index, point) in points.iter().enumerate() {
-            in_range(&format!("{key}[{index}].x"), point[0], 0.0, 1.0)?;
-            in_range(&format!("{key}[{index}].y"), point[1], 0.0, 1.0)?;
+            if domain == CurveDomain::Tone {
+                in_range(&format!("{key}[{index}].x"), point[0], 0.0, 1.0)?;
+            } else if !(point[0].is_finite() && point[0] >= 0.0 && point[0] < HUE_TURN) {
+                return Err(format!(
+                    "{key}[{index}].x must be at least 0 and below {HUE_TURN}, not {}",
+                    point[0]
+                ));
+            }
+            in_range(&format!("{key}[{index}].y"), point[1], low, high)?;
             if index > 0 && point[0] <= points[index - 1][0] {
                 return Err(format!(
                     "{key}[{index}].x ({}) must be greater than {key}[{}].x ({})",

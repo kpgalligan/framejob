@@ -6,9 +6,9 @@
 
 use crate::audio::MAX_GAIN;
 use crate::model::{
-    AudioProps, BlendMode, CurvePoint, Curves, HueRange, LevelRange, Qualifier, VideoProps, Wheels,
-    CURVE_POINTS_MAX, CURVE_POINTS_MIN, HUE_SOFTNESS_MAX, HUE_TURN, MAX_FILTERS, MAX_OBSCURE,
-    WHEEL_MAX,
+    AudioProps, BlendMode, CurveDomain, CurvePoint, Curves, HueRange, LevelRange, Qualifier,
+    VideoProps, Wheels, CURVE_POINTS_MAX, CURVE_POINTS_MIN, HUE_SOFTNESS_MAX, HUE_TURN,
+    MAX_FILTERS, MAX_OBSCURE, WHEEL_MAX,
 };
 use crate::props_check::{
     COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, EXPOSURE_MAX,
@@ -184,15 +184,12 @@ fn clamp_wheels(wheels: &mut Wheels) {
 /// NaN removed; a channel with fewer than 2 or more than 16 points, or whose
 /// x's do not strictly rise after the clamp, removed; then every identity
 /// channel removed, so an action that ends on the identity ends uncurved.
+/// A hue curve (GR-32) clamps its x's to 0…360 and is removed when its last
+/// x is 360, and its values to its domain's range.
 fn clamp_curves(curves: &mut Curves) {
-    for curve in [
-        &mut curves.master,
-        &mut curves.red,
-        &mut curves.green,
-        &mut curves.blue,
-    ] {
+    for (domain, curve) in curves.named_mut() {
         if let Some(points) = curve.as_mut() {
-            if !clamp_points(points) {
+            if !clamp_points(points, domain) {
                 *curve = None;
             }
         }
@@ -201,16 +198,25 @@ fn clamp_curves(curves: &mut Curves) {
 }
 
 /// One channel's points clamped in place; false when the channel must go.
-fn clamp_points(points: &mut [CurvePoint]) -> bool {
+fn clamp_points(points: &mut [CurvePoint], domain: CurveDomain) -> bool {
     if !(CURVE_POINTS_MIN..=CURVE_POINTS_MAX).contains(&points.len()) {
         return false;
     }
+    let x_high = if domain == CurveDomain::Tone {
+        1.0
+    } else {
+        HUE_TURN
+    };
+    let (low, high) = domain.value_range();
     for point in points.iter_mut() {
         if point.iter().any(|value| value.is_nan()) {
             return false;
         }
-        point[0] = point[0].clamp(0.0, 1.0);
-        point[1] = point[1].clamp(0.0, 1.0);
+        point[0] = point[0].clamp(0.0, x_high);
+        point[1] = point[1].clamp(low, high);
+    }
+    if domain != CurveDomain::Tone && points.last().is_some_and(|last| last[0] >= HUE_TURN) {
+        return false;
     }
     points.windows(2).all(|pair| pair[1][0] > pair[0][0])
 }

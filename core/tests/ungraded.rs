@@ -118,7 +118,8 @@ fn graded() -> Handle {
     handle.apply(&json!({"op": "set_video", "clips": [adjustment],
                          "patch": {"look": {"kind": "vivid"},
                                    "wheels": {"gamma": {"y": 0.5}},
-                                   "curves": {"blue": [[0, 0], [0.5, 0.6], [1, 1]]}}}))
+                                   "curves": {"blue": [[0, 0], [0.5, 0.6], [1, 1]],
+                                              "hue_sat": [[0, 0.5], [180, 1.5]]}}}))
 }
 
 /// `value` with every `video` object's `color`, `wheels`, `curves` and `look` removed,
@@ -226,9 +227,15 @@ fn ungraded_keeps_every_other_key() {
         }
         a["color"] = Value::Null;
         b["color"] = Value::Null;
-        let identity = json!([[0.0, 0.0], [1.0, 1.0]]);
-        for curve in b["curves"].as_object().expect("curves").values() {
-            assert_eq!(curve, &identity, "{b}");
+        let identity = |name: &str| match name {
+            "hue_hue" => json!([[0.0, 0.0], [180.0, 0.0]]),
+            "hue_sat" => json!([[0.0, 1.0], [180.0, 1.0]]),
+            _ => json!([[0.0, 0.0], [1.0, 1.0]]),
+        };
+        let curves = b["curves"].as_object().expect("curves");
+        assert_eq!(curves.len(), 6, "{b}");
+        for (name, curve) in curves {
+            assert_eq!(curve, &identity(name), "{b}");
         }
         a["wheels"] = Value::Null;
         b["wheels"] = Value::Null;

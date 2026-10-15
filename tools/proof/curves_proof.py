@@ -4,7 +4,11 @@ over MCP: `set_video {patch: {curves: {master|red|green|blue: [[x, y], …]}}}`,
 the recipe's `curves`, and the compositor's step 4c.2 behind `curvesEnabled`
 in the layer stage and the adjustment pass, through the 1,024-texel strip at
 `texture(3)`, read back as `render_frame` bytes and one export; then the
-probe's rows over `app/Sources`.
+probe's rows over `app/Sources`. Road map "grading-4", phase T4-2 (spec §11
+GR-32) adds the hue curves, `video.curves.hue_hue` and `.hue_sat`, through
+the strip's second row behind `hueCurvesEnabled` (rows H1–H16), the editor's
+hover readout and ⇧ axis lock and the Hue and Sat cells (probe rows
+P12–P19), and four tone-curved frames to N0.
 
     python3 tools/proof/curves_proof.py [--app PATH] [--only K1,C1,...]
     python3 tools/proof/curves_proof.py capture DIR    # the uncurved control, before any product edit
@@ -20,7 +24,9 @@ performed. Every call is bounded (`CALL_BOUND`), every ffmpeg too (120 s).
 Every project is closed (`close_project`, discard).
 
 Fixtures, written by this script (as `wheels_proof.py`'s): CARD, a 640×360
-grey-128 PNG; RAMP, a 1920×360 PNG whose column x is round(255·x/1919); MOVIE,
+grey-128 PNG; HUE, a 720×120 PNG whose column x is HSV(x/2°, 1, 1) in 8
+bits; GREY, a 720×120 grey ramp (column x round(255·x/719)); TINTED and
+ROSE, 720×120 cards of (130, 128, 128) and (153, 102, 102); RAMP, a 1920×360 PNG whose column x is round(255·x/1919); MOVIE,
 a 2 s 640×360 30 fps ffmpeg `testsrc2` H.264 file; DEEP, a 2 s 1920×360 black
 10-bit ProRes 422 HQ file made through `bt709_fixture.make` (issue #292:
 `setparams` on its input and the tags on its output, kept only when ffprobe
@@ -41,7 +47,9 @@ whose middles are 0.6 and 0.4, saved for the probe).
 - **N0** (`compare DIR` only; scored on Release, printed elsewhere): seven
   frames with no curve — card, card-toned (exposure +1), card-wheeled (lift
   master 0.5), card-adjusted (an adjustment clip at exposure +1 over the
-  card), ramp, ramp-looked (Warm), movie — decoded at 16 bits a channel are
+  card), ramp, ramp-looked (Warm), movie — and since T4-2 four with tone
+  curves only — card-curved (M1's two), card-adjusted-curved (J1's), ramp-curved
+  (K1's) and movie-curved (X1's) — decoded at 16 bits a channel are
   byte-identical to `capture DIR`'s, taken on the untouched tree's Release
   build.
 - **N1** (C): master `[[0,0],[0.5,0.5],[1,1]]` answers "made no change",
@@ -90,9 +98,40 @@ whose middles are 0.6 and 0.4, saved for the probe).
 - **R1** (C): 17 points, red[2].x 1.2 and a master x falling are refused by
   their three sentences, the project unchanged; a curve with points at
   exactly x 0 and 1 and y 0 and 1 is accepted.
-- **P1–P11**: `curves_probe.swift`, built by `swift_build.build` over
-  `app/Sources` (a failed build is a scored FAILURE of all eleven), on
-  project P; each row's sentence is the probe's.
+- **H1** (H, HUE): hue_hue `[[0,0],[60,0],[120,40],[180,0]]`: every column
+  at hue ≤ 55° or ≥ 185° is the uncurved bytes, the rest the oracle ±1 (the
+  oracle: this script's periodic Fritsch–Carlson `fc_periodic`, its strip
+  `HueStrip` and the step `hue_step`, from GR-32's sentences, applied to the
+  uncurved render's own value). **H2**: hue_sat `[[0,1],[60,1],[120,0],[180,1]]`
+  the same, the 120° column grey. **H3** (GREY, TINTED): hue_hue +90 and
+  hue_sat 0 change no byte (the chroma guard). **H4**: the wrap
+  `[[10,40],[180,0],[350,-20]]`: hue 0°, 5° and 355° per the oracle ±1, its
+  shift at 0° exactly 10°. **H6**: an adjustment clip with H1's and H2's
+  curves = the clip curved directly ±1. **H7**: the five refusals by their
+  sentences, the project unchanged; an identity hue patch "made no change".
+  **H8** (two projects): a same-count action at 0.5 s = the static middle
+  curve ±1; none → H2's = the half curve ±1. **H9**: `render_frame
+  {ungraded}` with both set = the uncurved bytes. **H12** (ROSE and H15's
+  frames): Rec. 709 luma kept ±1 under +90° and on every HUE column under
+  ±40°. **H13**: hue_hue +60 with hue_sat 0 at 60°: the red column is the
+  oracle with the gain read at its own hue (not grey). **H14**: red
+  `[[0,0],[1,0]]` then H2's hue_sat: the yellow column turns green and so
+  grey. **H15** (independent of the oracle: hues by `colorsys`): under
+  hue_hue ±40 every column's signed HSV-hue change is the value ±1° at output
+  chroma ≥ 64 and ±2° everywhere, and the 120° column lands in (120°, 180°]
+  under +40 and [80°, 120°) under −40. **H16** (a RECORD, PASS whenever it
+  measures): Color's Hue +40 on HUE, the 0° and 120° columns' signed change
+  and its direction against the label's sign.
+- **P1–P19**: `curves_probe.swift`, built by `swift_build.build` over
+  `app/Sources` (a failed build is a scored FAILURE of every P row), P1–P11
+  and P16–P17 on project P; each row's sentence is the probe's. T4-2's: P7
+  the strip 1,024 × 2 and the 2 × 2 placeholder; P12 the periodic spline
+  against `fc_periodic` on 200 seeded hue curves per domain, 1e-9; P13 the
+  two flags; P14 the ⇧ lock; P15 the readout's text at three points; P16
+  the six cells and a Hue gesture in degrees, one step; P17 the In and Out
+  fields' units and clamps across Red → Hue → Sat → Red; P18 a hue point
+  held inside 0…359.9; P19 the six labels fit their cells at the 230 pt
+  plot.
 - **Z1** (CONTROL): the fixtures hold (the ramp's frame a 16-bit PNG), the
   projects close and the log holds no `Frame Job: ` line.
 
@@ -115,12 +154,25 @@ CT). MUTANT PASS when every named row FAILED and no other scored row did:
   adjust-without-curves    the adjustment pass has no step 4c.2: J1
   identity-kept            `set_video` stores an identity curve: N1 CT
   identity-not-aligned     no identity alignment in an action: A2 A3 CT
+  hue-wrap-dropped         a hue curve flat outside its first and last x: H4 P12
+  hue-from-graded          the gain sampled at the turned hue: H13
+  hue-shift-reversed       the turn's degrees negated: H15 H1 H4 H13
+  luma-not-kept            the turn as HSV(h + degrees, S, V): H12 H1 H4 H13
+  gamut-limit-dropped      k fixed at 1: H15 H12 H1 H4 H13
+  chroma-guard-dropped     no chroma guard on the hue curves: H3
+  hue-before-channel-curves  the hue curves before the channel curves: H14
+  row-0-at-centre          row 0 sampled at y 0.5: K1 C1 M1 O1
+(A turn edit fails every row whose oracle turns a colour — H1, H4, H13 — and
+row 0 at y 0.5 every tone row, O1 too: each is named, as it fails by
+construction.)
+  shift-lock-ignored       the drag's ⇧ ignored: P14
 Exit 0 when every scored row passed (a mutant: caught); 1 when one failed
 (a mutant: survived); 2 when the control could not be performed.
 """
 
 import argparse
 import atexit
+import colorsys
 import json
 import math
 import re
@@ -154,19 +206,24 @@ RAMP_W, RAMP_H = 1920, 360
 GREY = 128
 CHANNELS = ["master", "red", "green", "blue"]
 NEUTRAL = ["card", "card-toned", "card-wheeled", "card-adjusted", "ramp", "ramp-looked",
-           "movie"]
+           "movie", "card-curved", "card-adjusted-curved", "ramp-curved", "movie-curved"]
+HUE_W, HUE_H = 720, 120
 ROWS = ["N0", "N1", "N2", "K1", "K3", "C1", "M1", "O1", "A1", "A2", "A3", "J1", "X1", "U1",
-        "V1", "P0", "R1", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11",
-        "Z1"]
-RECORDS = set()
+        "V1", "P0", "R1", "H1", "H2", "H3", "H4", "H6", "H7", "H8", "H9", "H12", "H13", "H14",
+        "H15", "H16", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11",
+        "P12", "P13", "P14", "P15", "P16", "P17", "P18", "P19", "Z1"]
+RECORDS = {"H16"}
 C_ROWS = {"N1", "M1", "O1", "J1", "U1", "V1", "P0", "R1"}
 R_ROWS = {"K1", "K3", "C1"}
 M_ROWS = {"X1"}
 A_ROWS = {"A1", "A2", "A3"}
-P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11"}
+H_ROWS = {"H1", "H2", "H3", "H4", "H6", "H7", "H8", "H9", "H12", "H13", "H14", "H15", "H16"}
+P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13",
+          "P14", "P15", "P16", "P17", "P18", "P19"}
 SHADER = "app/Resources/Shaders/Compositor.metal"
 TABLE = "app/Sources/CurveTable.swift"
 TEXTURES = "app/Sources/CurveTextures.swift"
+EDITOR = "app/Sources/CurveEditorView.swift"
 STEP_4C1 = ("        // (4c.1) The wheels (spec §11 GR-11): once per pixel, after tone and\n"
             "        // before the look. Behind `wheelsEnabled`, so an unwheeled layer never\n"
             "        // enters it.\n"
@@ -182,6 +239,16 @@ STEP_4C2 = ("        // (4c.2) The curves (spec §11 GR-12): once per pixel, aft
 ADJUST_4C2 = ("    if (u.curvesEnabled > 0.5) {\n"
               "        c = gradeCurves(c, curves, samp);\n"
               "    }\n")
+STEP_HUE = ("        // (4c.2) The hue curves (spec §11 GR-32): once per pixel, after the\n"
+            "        // channel curves and before the look, through the strip's second row.\n"
+            "        // Behind `hueCurvesEnabled`, so a layer without them never enters it.\n"
+            "        if (u.hueCurvesEnabled > 0.5) {\n"
+            "            rgb = gradeHueCurves(rgb, curves, samp);\n"
+            "        }\n\n")
+HUE_GAIN = ("    if (abs(curve.g - 1.0) > 1e-6) {\n"
+            "        out = mix(float3(dot(out, float3(0.2126, 0.7152, 0.0722))), out, curve.g);\n"
+            "    }\n")
+HUE_RETURN = "    return y + max(k, 0.0) * d;\n"
 # name: ([(file, anchor, replacement), …], the rows that must fail)
 MUTANTS = {
     "catmull-rom": ([
@@ -229,6 +296,57 @@ MUTANTS = {
         "core/src/actions.rs",
         "            align_identity_curves(&mut state, &mut target);\n",
         "")], ["A2", "A3", "CT"]),
+    # T4-2 (spec §11 GR-32): one per decision.
+    "hue-wrap-dropped": ([(
+        TABLE,
+        "            if x < xs[0] {\n"
+        "                x += period\n"
+        "            } else if x < xs[n - 1] {\n",
+        "            if x < xs[0] {\n"
+        "                return ranged(ys[0])\n"
+        "            } else if x >= xs[n - 1] {\n"
+        "                return ranged(ys[n - 1])\n"
+        "            } else {\n")], ["H4", "P12"]),
+    "hue-from-graded": ([(
+        SHADER, HUE_GAIN,
+        "    float3 o = saturate(out);\n"
+        "    float omx = max(o.r, max(o.g, o.b));\n"
+        "    float oh = hsvHue(o, omx, omx - min(o.r, min(o.g, o.b)));\n"
+        "    float gain = strip.sample(samp, float2((oh / 360.0) * ((n - 1.0) / n) + 0.5 / n,"
+        " 0.75)).g;\n"
+        "    if (abs(gain - 1.0) > 1e-6) {\n"
+        "        out = mix(float3(dot(out, float3(0.2126, 0.7152, 0.0722))), out, gain);\n"
+        "    }\n")], ["H13"]),
+    "hue-shift-reversed": ([(
+        SHADER,
+        "        out = gradeHueShift(out, h, 360.0 * curve.r);\n",
+        "        out = gradeHueShift(out, h, -360.0 * curve.r);\n")], ["H15", "H1", "H4", "H13"]),
+    "luma-not-kept": ([(
+        SHADER, HUE_RETURN,
+        "    float s = mx > 0.0 ? (mx - mn) / mx : 0.0;\n"
+        "    float3 full = saturate(abs(fmod(fmod(hue + degrees + 360.0, 360.0) / 60.0"
+        " + float3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0);\n"
+        "    return mx * mix(float3(1.0), full, s);\n")], ["H12", "H1", "H4", "H13"]),
+    "gamut-limit-dropped": ([(SHADER, HUE_RETURN, "    return y + d;\n")],
+                            ["H15", "H12", "H1", "H4", "H13"]),
+    "chroma-guard-dropped": ([(
+        SHADER,
+        "    return mix(rgb, out, smoothstep(0.02, 0.06, chroma));\n",
+        "    return out;\n")], ["H3"]),
+    "hue-before-channel-curves": ([
+        (SHADER, STEP_HUE, ""),
+        (SHADER, STEP_4C2, STEP_HUE + STEP_4C2)], ["H14"]),
+    "row-0-at-centre": ([(
+        SHADER,
+        "    return float3(strip.sample(samp, float2(at.r, 0.25)).r,\n"
+        "                  strip.sample(samp, float2(at.g, 0.25)).g,\n"
+        "                  strip.sample(samp, float2(at.b, 0.25)).b);\n",
+        "    return float3(strip.sample(samp, float2(at.r, 0.5)).r,\n"
+        "                  strip.sample(samp, float2(at.g, 0.5)).g,\n"
+        "                  strip.sample(samp, float2(at.b, 0.5)).b);\n")],
+        ["K1", "C1", "M1", "O1"]),
+    "shift-lock-ignored": ([(EDITOR, "        if lock {\n", "        if lock && false {\n")],
+                           ["P14"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -306,6 +424,158 @@ def fc(points, x):
     return min(max(y, 0.0), 1.0)
 
 
+def fc_periodic(points, x, low, high, period=360.0):
+    """GR-32's periodic Fritsch–Carlson at `x`, clamped to `low`…`high`:
+    n secants, the last from the last point to the first one period on;
+    every tangent the mean of the secants either side of it (indices mod n),
+    or 0 where they differ in sign or one is 0; per segment in order, the
+    wrap segment last, a flat secant zeroes both tangents, else α² + β² > 9
+    scales both by 3/√(α² + β²); outside the first and last x, the wrap
+    segment. Written from the paper as GR-32 states it, not from
+    `CurveTable`."""
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    n = len(points)
+    x = math.fmod(x, period)
+    if x < 0:
+        x += period
+
+    def run(k):
+        return (xs[k + 1] if k < n - 1 else xs[0] + period) - xs[k]
+
+    d = [(ys[(k + 1) % n] - ys[k]) / run(k) if run(k) > 0 else 0.0 for k in range(n)]
+    m = [0.0 if d[k - 1] * d[k] <= 0 else (d[k - 1] + d[k]) / 2 for k in range(n)]
+    for k in range(n):
+        j = (k + 1) % n
+        if d[k] == 0:
+            m[k] = m[j] = 0.0
+            continue
+        a, b = m[k] / d[k], m[j] / d[k]
+        s = a * a + b * b
+        if s > 9:
+            t = 3 / math.sqrt(s)
+            m[k], m[j] = t * a * d[k], t * b * d[k]
+    if x < xs[0]:
+        x += period
+        k = n - 1
+    elif x >= xs[-1]:
+        k = n - 1
+    else:
+        k = max(i for i in range(n - 1) if xs[i] <= x)
+    j = (k + 1) % n
+    h = run(k)
+    t = (x - xs[k]) / h
+    y = ((2 * t ** 3 - 3 * t ** 2 + 1) * ys[k] + (t ** 3 - 2 * t ** 2 + t) * h * m[k]
+         + (-2 * t ** 3 + 3 * t ** 2) * ys[j] + (t ** 3 - t ** 2) * h * m[j])
+    return min(max(y, low), high)
+
+
+SHIFT_IDENTITY = [[0, 0], [180, 0]]
+GAIN_IDENTITY = [[0, 1], [180, 1]]
+STRIP_N = 1024
+
+
+def luma(rgb):
+    return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+
+
+def hsv_hue(c):
+    """GR-13's HSV hue of a saturated colour, degrees, 0 with no chroma."""
+    mx, mn = max(c), min(c)
+    chroma = mx - mn
+    if chroma <= 0:
+        return 0.0
+    r, g, b = c
+    if mx == r:
+        return 60 * math.fmod((g - b) / chroma + 6, 6)
+    if mx == g:
+        return 60 * ((b - r) / chroma + 2)
+    return 60 * ((r - g) / chroma + 4)
+
+
+def hue_chroma(degrees):
+    """The fully saturated hue less its Rec. 709 luma (`lookHueChroma`)."""
+    full = [min(max(abs(math.fmod(degrees / 60 + o, 6) - 3) - 1, 0), 1) for o in (0, 4, 2)]
+    y = luma(full)
+    return [f - y for f in full]
+
+
+class HueStrip:
+    """Row 1 of the strip as GR-32 fills it — texel i the shift in turns and
+    the gain at hue 360·i/1023 — sampled linearly at the texel-centre span."""
+
+    def __init__(self, shift, gain):
+        hues = [360 * i / (STRIP_N - 1) for i in range(STRIP_N)]
+        self.turns = [fc_periodic(shift, h, -180, 180) / 360 for h in hues]
+        self.gains = [fc_periodic(gain, h, 0, 2) for h in hues]
+
+    def at(self, h):
+        pos = h / 360 * (STRIP_N - 1)
+        i = min(int(math.floor(pos)), STRIP_N - 1)
+        f = pos - i
+        j = min(i + 1, STRIP_N - 1)
+        return (self.turns[i] + (self.turns[j] - self.turns[i]) * f,
+                self.gains[i] + (self.gains[j] - self.gains[i]) * f)
+
+
+def hue_shift(rgb, hue, degrees):
+    """GR-32's turn: Cr along the hue `hue + degrees` less its luma, added to
+    the luma, scaled by the largest k ≤ 1 keeping every channel inside
+    [min(0, min rgb), max(1, max rgb)]."""
+    y = luma(rgb)
+    mx, mn = max(rgb), min(rgb)
+    d = [(mx - mn) * v for v in hue_chroma(math.fmod(hue + degrees + 360, 360))]
+    lo, hi = min(0.0, mn), max(1.0, mx)
+    k = 1.0
+    for v in d:
+        if v > 0:
+            k = min(k, (hi - y) / v)
+        elif v < 0:
+            k = min(k, (lo - y) / v)
+    return [y + max(k, 0.0) * v for v in d]
+
+
+def smoothstep(e0, e1, x):
+    t = min(max((x - e0) / (e1 - e0), 0.0), 1.0)
+    return t * t * (3 - 2 * t)
+
+
+def hue_step(rgb, strip):
+    """Step 4c.2's second half on an encoded colour (floats), as GR-32 states
+    it: the hue read once, the turn, then the gain about the luma, weighted
+    by the chroma guard."""
+    c = [min(max(v, 0.0), 1.0) for v in rgb]
+    chroma = max(c) - min(c)
+    h = hsv_hue(c)
+    turns, gain = strip.at(h)
+    out = list(rgb)
+    if abs(turns) > 1e-6:
+        out = hue_shift(out, h, 360 * turns)
+    if abs(gain - 1) > 1e-6:
+        y = luma(out)
+        out = [y + (v - y) * gain for v in out]
+    w = smoothstep(0.02, 0.06, chroma)
+    return [a + (b - a) * w for a, b in zip(rgb, out)]
+
+
+def hue_codes(pixel, strip, tone=None):
+    """The 8-bit codes `hue_step` makes of an uncurved 8-bit `pixel`, with
+    `tone` (per-channel functions) applied first when given."""
+    rgb = [v / 255 for v in pixel]
+    if tone is not None:
+        rgb = [f(v) for f, v in zip(tone, rgb)]
+    return tuple(code(v) for v in hue_step(rgb, strip))
+
+
+def signed_hue_change(before, after):
+    """The HSV hue change from 8-bit `before` to `after` (colorsys), in
+    degrees, wrapped into (−180, 180]."""
+    a = colorsys.rgb_to_hsv(*[v / 255 for v in before])[0] * 360
+    b = colorsys.rgb_to_hsv(*[v / 255 for v in after])[0] * 360
+    change = (b - a) % 360
+    return change - 360 if change > 180 else change
+
+
 def half_step(value):
     """One half-float step at `value` (0…1), in 16-bit levels."""
     if value <= 2 ** -14:
@@ -328,6 +598,26 @@ def write_png(path, width, height, value_of_x):
                      + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
                      + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
     return path
+
+
+def write_rgb_png(path, width, height, rgb_of_x):
+    """An 8-bit RGB PNG, untagged, whose column x is the colour `rgb_of_x(x)`."""
+    row = bytes([0]) + b"".join(bytes(rgb_of_x(x)) for x in range(width))
+    raw = row * height
+
+    def chunk(kind, data):
+        body = kind + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
+
+    path.write_bytes(b"\x89PNG\r\n\x1a\n"
+                     + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+                     + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
+    return path
+
+
+def hue_column(x):
+    """HUE's column x: HSV(x / 2 degrees, 1, 1) in 8 bits."""
+    return tuple(round(255 * v) for v in colorsys.hsv_to_rgb(x / 2 / 360, 1, 1))
 
 
 def png_depth(path):
@@ -565,8 +855,22 @@ def run_c(client, card, neutral, state):
     adjusted = doc.color([adjustment], exposure=1) if adjustment else {"ok": False}
     neutral.take(doc, "card-adjusted") if adjusted["ok"] else None
     removed = doc.call("remove_track", track=front, with_clips=True) if front else {"ok": False}
+    # The tone curves (T4-2): M1's two and J1's adjustment curve, held byte-identical too.
+    toned_curves = doc.curves(ids, master=[[0, 0], [0.5, 0.25], [1, 1]],
+                              red=[[0, 0], [0.25, 0.75], [1, 1]]) if fixture else {"ok": False}
+    curved = neutral.take(doc, "card-curved") if toned_curves["ok"] else None
+    doc.uncurve(ids)
+    front = doc.new_track() if fixture else None
+    adjustment = doc.added("add_adjustment_clip", track=front, at=0, duration=2 * SEC) \
+        if front is not None else None
+    adjust_curved = doc.curves([adjustment], master=[[0, 0], [0.5, 0.25], [1, 1]]) \
+        if adjustment else {"ok": False}
+    neutral.take(doc, "card-adjusted-curved") if adjust_curved["ok"] else None
+    removed_curved = doc.call("remove_track", track=front, with_clips=True) if front \
+        else {"ok": False}
     fixture = (fixture and exposed is not None and wheeled is not None and adjusted["ok"]
-               and removed["ok"])
+               and removed["ok"] and curved is not None and adjust_curved["ok"]
+               and removed_curved["ok"])
     state["c_fixture"] = fixture
     print(f"  C: card clip {clip}, uncurved value {v} (written {GREY})", flush=True)
     if neutral.mode == "capture" or not fixture:
@@ -795,7 +1099,11 @@ def run_r(client, ramp, deep, neutral, state):
         if fixture else {"ok": False}
     neutral.take(doc, "ramp-looked") if looked["ok"] else None
     doc.call("set_video", clips=ids, patch={"look": None})
-    fixture = fixture and looked["ok"]
+    k1_curve = doc.curves(ids, master=[[0, 0], [64 / 255, 40 / 255], [192 / 255, 215 / 255],
+                                       [1, 1]]) if fixture else {"ok": False}
+    neutral.take(doc, "ramp-curved") if k1_curve["ok"] else None
+    doc.uncurve(ids)
+    fixture = fixture and looked["ok"] and k1_curve["ok"]
     state["r_fixture"] = fixture
     print(f"  R: ramp clip {clip} over deep clip {under}; the frame's PNG depth "
           f"{png_depth(base.path) if base else None}", flush=True)
@@ -876,6 +1184,304 @@ def run_r(client, ramp, deep, neutral, state):
     return close(client, doc.path)
 
 
+# ---- projects H: the hue curves (T4-2, spec §11 GR-32) -------------------------
+
+HUE_CURVES = ["hue_hue", "hue_sat"]
+S1 = [[0, 0], [60, 0], [120, 40], [180, 0]]
+G2 = [[0, 1], [60, 1], [120, 0], [180, 1]]
+
+
+def hue_doc(client, name, picture, width=HUE_W, height=HUE_H):
+    """A new project showing `picture`; (Doc, clip, its uncurved frame)."""
+    doc, sized = opened(client, name, width, height)
+    track = (doc.tracks() or [{}])[0].get("id")
+    media = doc.media(picture)
+    clip = doc.place(track, media) if media is not None else None
+    base = doc.frame(f"{name}-base") if clip is not None else None
+    return doc, clip, (base if sized and clip is not None else None)
+
+
+def curved(doc, ids, tag, **channels):
+    """The frame with `channels` set, then every curve removed; (ok, Frame)."""
+    got = doc.curves(ids, **channels)
+    frame = doc.frame(tag) if got["ok"] else None
+    doc.curves(ids, **{c: None for c in CHANNELS + HUE_CURVES})
+    if not got["ok"]:
+        print(f"       set {tag}: {got.get('error')}", flush=True)
+    return got["ok"], frame
+
+
+def column_misses(frame, want_of, columns=range(HUE_W), tolerance=1):
+    """Each HUE column's middle-row pixel of `frame` against `want_of(x)`."""
+    if frame is None:
+        return ["the frame is missing"]
+    y = HUE_H // 2
+    return [f"x {x} (hue {x / 2}): {frame.px(x, y)} vs {want_of(x)}" for x in columns
+            if not close_to(frame.px(x, y), want_of(x), tolerance)]
+
+
+def run_h(client, state):
+    hue = write_rgb_png(WORK / "hue.png", HUE_W, HUE_H, hue_column)
+    grey = write_png(WORK / "grey-ramp.png", HUE_W, HUE_H, lambda x: round(255 * x / (HUE_W - 1)))
+    tinted = write_rgb_png(WORK / "tinted.png", HUE_W, HUE_H, lambda x: (130, 128, 128))
+    rose = write_rgb_png(WORK / "rose.png", HUE_W, HUE_H, lambda x: (153, 102, 102))
+    closed = True
+    y = HUE_H // 2
+    doc, clip, base = hue_doc(client, "H", hue)
+    fixture = base is not None and all(close_to(base.px(x, y), hue_column(x))
+                                       for x in range(HUE_W))
+    state["h_fixture"] = fixture
+    print(f"  H: HUE clip {clip}; the uncurved columns hold HSV(x/2, 1, 1) ±1: {fixture}",
+          flush=True)
+    if not fixture:
+        return close(client, doc.path) and False
+    ids = [clip]
+    plain = [base.px(x, y) for x in range(HUE_W)]
+
+    # H1, H2
+    if "H1" in selected:
+        ok, frame = curved(doc, ids, "h1", hue_hue=S1)
+        strip = HueStrip(S1, GAIN_IDENTITY)
+        untouched = [x for x in range(HUE_W) if x / 2 <= 55 or x / 2 >= 185]
+        moved = [x for x in range(HUE_W) if 55 < x / 2 < 185]
+        stray = [x for x in untouched if frame is None or frame.px(x, y) != plain[x]]
+        misses = column_misses(frame, lambda x: hue_codes(plain[x], strip), moved)
+        check(f"H1 hue_hue {S1}: the {len(untouched)} columns at hue ≤ 55° or ≥ 185° are the "
+              f"uncurved bytes, the {len(moved)} between are the oracle ±1",
+              ok and not stray and not misses,
+              f"changed outside {stray[:5]}; {misses[:3] or 'all within'}")
+    if "H2" in selected:
+        ok, frame = curved(doc, ids, "h2", hue_sat=G2)
+        strip = HueStrip(SHIFT_IDENTITY, G2)
+        untouched = [x for x in range(HUE_W) if x / 2 <= 55 or x / 2 >= 185]
+        moved = [x for x in range(HUE_W) if 55 < x / 2 < 185]
+        stray = [x for x in untouched if frame is None or frame.px(x, y) != plain[x]]
+        misses = column_misses(frame, lambda x: hue_codes(plain[x], strip), moved)
+        green = frame.px(240, y) if frame else None
+        grey_at_120 = green is not None and max(green) - min(green) <= 1
+        check(f"H2 hue_sat {G2}: the columns at hue ≤ 55° or ≥ 185° are the uncurved bytes, "
+              f"the rest the oracle ±1, and hue 120 is grey ({green})",
+              ok and not stray and not misses and grey_at_120,
+              f"changed outside {stray[:5]}; {misses[:3] or 'all within'}")
+
+    # H4
+    if "H4" in selected:
+        wrap = [[10, 40], [180, 0], [350, -20]]
+        ok, frame = curved(doc, ids, "h4", hue_hue=wrap)
+        strip = HueStrip(wrap, GAIN_IDENTITY)
+        columns = [0, 10, 710]
+        values = {x: round(fc_periodic(wrap, x / 2, -180, 180), 3) for x in columns}
+        misses = column_misses(frame, lambda x: hue_codes(plain[x], strip), columns)
+        check(f"H4 the wrap {wrap}: hue 0°, 5° and 355° follow the periodic oracle ±1 (its "
+              f"shifts there {values[0]}°, {values[10]}°, {values[710]}°)",
+              ok and not misses and abs(values[0] - 10) < 1e-9,
+              f"{misses or 'all within'}; got {[frame.px(x, y) if frame else None for x in columns]}")
+
+    # H6
+    if "H6" in selected:
+        ok, direct = curved(doc, ids, "h6-direct", hue_hue=S1, hue_sat=G2)
+        front = doc.new_track()
+        adjustment = doc.added("add_adjustment_clip", track=front, at=0, duration=2 * SEC) \
+            if front is not None else None
+        set_adjust = doc.curves([adjustment], hue_hue=S1, hue_sat=G2) if adjustment \
+            else {"ok": False}
+        adjusted = doc.frame("h6-adjusted") if set_adjust["ok"] else None
+        if front is not None:
+            doc.call("remove_track", track=front, with_clips=True)
+        misses = column_misses(adjusted, lambda x: direct.px(x, y)) if direct \
+            else ["no direct frame"]
+        differs = direct is not None and any(direct.px(x, y) != plain[x] for x in range(HUE_W))
+        check("H6 an adjustment clip with H1's and H2's curves over HUE renders the clip "
+              "curved directly, ±1 at every column", ok and set_adjust["ok"] and not misses
+              and differs, f"adjustment {set_adjust.get('error', 'ok')}; "
+              f"{misses[:3] or 'all within'}; differs {differs}")
+
+    # H7
+    if "H7" in selected:
+        before = doc.project()
+        seventeen = [[i * 20, 10] for i in range(17)]
+        cases = [
+            ({"hue_hue": seventeen}, "video.curves.hue_hue needs 2 to 16 points, not 17"),
+            ({"hue_hue": [[0, 0], [100, 10], [360, 0]]},
+             "video.curves.hue_hue[2].x must be at least 0 and below 360, not 360"),
+            ({"hue_hue": [[0, 0], [100, 200]]},
+             "video.curves.hue_hue[1].y must be between -180 and 180, not 200"),
+            ({"hue_sat": [[0, 2.5], [100, 1]]},
+             "video.curves.hue_sat[0].y must be between 0 and 2, not 2.5"),
+            ({"hue_hue": [[0, 0], [120, 10], [90, 5]]},
+             "video.curves.hue_hue[2].x (90) must be greater than video.curves.hue_hue[1].x "
+             "(120)"),
+        ]
+        answers = [doc.curves(ids, **patch) for patch, _ in cases]
+        for got in answers:
+            if got["ok"]:
+                doc.call("undo")
+        unchanged = doc.project() == before
+        identity = doc.curves(ids, hue_hue=[[10, 0], [200, 0]], hue_sat=[[0, 1], [300, 1]])
+        if identity["ok"]:
+            doc.call("undo")
+        refused = all(not got["ok"] and want in got.get("error", "")
+                      for got, (_, want) in zip(answers, cases))
+        check("H7 the five hue refusals by their sentences, the project unchanged, and an "
+              "identity hue patch \"made no change\"",
+              refused and unchanged and not identity["ok"]
+              and "made no change" in identity.get("error", ""),
+              "; ".join(repr(got.get("error") or "accepted") for got in answers)
+              + f"; unchanged {unchanged}; identity {identity.get('error') or 'accepted'}")
+
+    # H9
+    if "H9" in selected:
+        pushed = doc.curves(ids, hue_hue=S1, hue_sat=G2)
+        graded = doc.frame("h9-plain")
+        ungraded = doc.frame("h9-ungraded", ungraded=True)
+        doc.curves(ids, **{c: None for c in HUE_CURVES})
+        check("H9 render_frame {ungraded: true} with both hue curves set is the uncurved bytes, "
+              "and the plain frame is not", pushed["ok"] and same_pixels(ungraded, base)
+              and graded is not None and not same_pixels(graded, base),
+              f"set {pushed.get('error', 'ok')}; ungraded {same_pixels(ungraded, base)}")
+
+    # H13
+    if "H13" in selected:
+        shift, gain = [[0, 60], [180, 60]], [[0, 1], [30, 1], [60, 0], [90, 1]]
+        ok, frame = curved(doc, ids, "h13", hue_hue=shift, hue_sat=gain)
+        want = hue_codes(plain[0], HueStrip(shift, gain))
+        got = frame.px(0, y) if frame else None
+        check(f"H13 hue_hue +60 with hue_sat 0 at 60°: the red column is the oracle with the "
+              f"gain read at its own hue 0° (want {want}, got {got}; not grey)",
+              ok and got is not None and close_to(got, want) and max(got) - min(got) > 32)
+
+    # H14
+    if "H14" in selected:
+        red = [[0, 0], [1, 0]]
+        ok, frame = curved(doc, ids, "h14", red=red, hue_sat=G2)
+        tone = [lambda v: fc(red, v), lambda v: v, lambda v: v]
+        want = hue_codes(plain[120], HueStrip(SHIFT_IDENTITY, G2), tone)
+        got = frame.px(120, y) if frame else None
+        check(f"H14 red [[0,0],[1,0]] then hue_sat 0 at 120°: the yellow column turns green "
+              f"first and so grey (want {want}, got {got})",
+              ok and got is not None and close_to(got, want) and max(got) - min(got) <= 1)
+
+    # H15, then H12 over its frames
+    turned = {}
+    if selected & {"H15", "H12"}:
+        for value in (40, -40):
+            ok, frame = curved(doc, ids, f"h15{value:+d}", hue_hue=[[0, value], [180, value]])
+            turned[value] = frame if ok else None
+    if "H15" in selected:
+        rows_ok, notes = True, []
+        for value, frame in turned.items():
+            if frame is None:
+                rows_ok = False
+                notes.append(f"{value:+d}: no frame")
+                continue
+            worst_strong, worst_all, strong = 0.0, 0.0, 0
+            for x in range(HUE_W):
+                out = frame.px(x, y)
+                error = abs(signed_hue_change(plain[x], out) - value)
+                worst_all = max(worst_all, error)
+                if max(out) - min(out) >= 64:
+                    strong += 1
+                    worst_strong = max(worst_strong, error)
+            green = colorsys.rgb_to_hsv(*[v / 255 for v in frame.px(240, y)])[0] * 360
+            lands = 120 < green <= 180 if value > 0 else 80 <= green < 120
+            rows_ok = rows_ok and worst_strong <= 1 and worst_all <= 2 and lands
+            notes.append(f"{value:+d}: worst {worst_strong:.3f}° over {strong} columns at "
+                         f"output chroma ≥ 64, {worst_all:.3f}° over all {HUE_W}; green → "
+                         f"{green:.2f}°")
+        check("H15 hue_hue ±40 on HUE, hues by colorsys: every column's signed HSV-hue change "
+              "is the value ±1° at output chroma ≥ 64 and ±2° everywhere; green lands in "
+              "(120°, 180°] under +40 and [80°, 120°) under −40", rows_ok, "; ".join(notes))
+    if "H12" in selected:
+        rose_doc, rose_clip, rose_base = hue_doc(client, "H12", rose)
+        ok, rose_frame = curved(rose_doc, [rose_clip], "h12", hue_hue=[[0, 90], [180, 90]]) \
+            if rose_base is not None else (False, None)
+        closed = close(client, rose_doc.path) and closed
+        cy = HUE_H // 2
+        rose_in = luma(rose_base.px(360, cy)) if rose_base else None
+        rose_out = luma(rose_frame.px(360, cy)) if rose_frame else None
+        rose_hue = signed_hue_change(rose_base.px(360, cy), rose_frame.px(360, cy)) \
+            if rose_base and rose_frame else None
+        worst = 0.0
+        for frame in turned.values():
+            if frame is None:
+                worst = float("inf")
+                continue
+            for x in range(HUE_W):
+                worst = max(worst, abs(luma(frame.px(x, y)) - luma(plain[x])))
+        rose_kept = rose_in is not None and rose_out is not None and abs(rose_out - rose_in) <= 1
+        check(f"H12 Rec. 709 luma kept ±1: the (153,102,102) card under +90° ({rose_in} → "
+              f"{rose_out}, hue {rose_hue}°) and every HUE column under ±40° (worst "
+              f"{worst:.3f} levels)", ok and rose_kept and worst <= 1)
+
+    # H16 (a record)
+    if "H16" in selected:
+        tinted_hue = doc.color(ids, hue=40)
+        frame = doc.frame("h16") if tinted_hue["ok"] else None
+        doc.color(ids, hue=0)
+        notes = []
+        for x in (0, 240):
+            if frame is None:
+                break
+            change = signed_hue_change(plain[x], frame.px(x, y))
+            direction = "with" if change > 0 else "against"
+            notes.append(f"the {x / 2:.0f}° column moves {change:+.2f}° ({direction} the "
+                         f"label's +40)")
+        check("H16 RECORD Color's Hue +40 on HUE (no curves): " + "; ".join(notes or ["no frame"]),
+              frame is not None)
+    closed = close(client, doc.path) and closed
+
+    # H3, on its own two projects
+    if "H3" in selected:
+        results = []
+        for name, picture in (("H3-grey", grey), ("H3-tinted", tinted)):
+            g_doc, g_clip, g_base = hue_doc(client, name, picture)
+            ok, frame = curved(g_doc, [g_clip], name, hue_hue=[[0, 90], [180, 90]],
+                               hue_sat=[[0, 0], [180, 0]]) if g_base is not None \
+                else (False, None)
+            results.append((name, ok and same_pixels(frame, g_base)))
+            closed = close(client, g_doc.path) and closed
+        check("H3 the grey ramp and a (130,128,128) card under hue_hue +90 and hue_sat 0 are "
+              "byte-identical (the chroma guard)", all(good for _, good in results),
+              f"{results}")
+
+    # H8, on its own two projects
+    if "H8" in selected:
+        results = []
+        a_doc, a_clip, a_base = hue_doc(client, "H8a", hue)
+        if a_base is not None:
+            ok, want = curved(a_doc, [a_clip], "h8a-static",
+                              hue_hue=[[0, 0], [60, 0], [120, 60], [180, 0]])
+            a_doc.curves([a_clip], hue_hue=S1)
+            made = acted_on(a_doc, a_clip, {"hue_hue": [[0, 0], [60, 0], [120, 80], [180, 0]]})
+            mid = a_doc.frame("h8a-mid", t=SEC // 2)
+            misses = column_misses(mid, lambda x: want.px(x, y)) if want else ["no static"]
+            results.append(("same count", ok and made and not misses, misses[:3]))
+        closed = close(client, a_doc.path) and closed
+        b_doc, b_clip, b_base = hue_doc(client, "H8b", hue)
+        if b_base is not None:
+            ok, want = curved(b_doc, [b_clip], "h8b-static",
+                              hue_sat=[[0, 1], [60, 1], [120, 0.5], [180, 1]])
+            made = acted_on(b_doc, b_clip, {"hue_sat": G2})
+            mid = b_doc.frame("h8b-mid", t=SEC // 2)
+            misses = column_misses(mid, lambda x: want.px(x, y)) if want else ["no static"]
+            results.append(("from none", ok and made and not misses, misses[:3]))
+        closed = close(client, b_doc.path) and closed
+        check("H8 a same-count hue action at 0.5 s is the static middle curve ±1, and an "
+              "action from no curve to H2's is the half curve ±1",
+              len(results) == 2 and all(good for _, good, _ in results), f"{results}")
+    return closed
+
+
+def acted_on(doc, clip, curves):
+    """A 1 s action at 0 on `clip` whose end sets `curves`; ok."""
+    added = doc.call("add_action", clip=clip, at=0, duration=SEC)
+    actions = doc.clip(clip).get("actions") or []
+    action = actions[0].get("id") if len(actions) == 1 else None
+    ended = doc.call("set_action_end", clip=clip, action=action,
+                     patch={"video": {"curves": curves}}) if action else {"ok": False}
+    return added["ok"] and ended["ok"]
+
+
 # ---- project M: the movie and an export --------------------------------------
 
 def decoded(movie, n):
@@ -897,6 +1503,11 @@ def run_m(client, movie, neutral, state):
     clip = doc.place(a_track, media) if media is not None else None
     base = neutral.take(doc, "movie")
     fixture = sized and clip is not None and base is not None
+    x1_curves = doc.curves([clip], master=[[0, 0], [0.25, 0.1], [0.75, 0.9], [1, 1]],
+                           red=[[0, 0], [0.5, 0.7], [1, 1]]) if fixture else {"ok": False}
+    neutral.take(doc, "movie-curved") if x1_curves["ok"] else None
+    doc.uncurve([clip])
+    fixture = fixture and x1_curves["ok"]
     state["m_fixture"] = fixture
     if neutral.mode == "capture" or not fixture:
         return close(client, doc.path) and fixture
@@ -1026,7 +1637,30 @@ def run_probe(sources, package, clips):
         inputs = [i / 63 for i in range(64)]
         oracle.append({"points": points, "inputs": inputs,
                        "values": [fc(points, x) for x in inputs]})
-    request.write_text(json.dumps({"package": str(package), "clips": clips, "oracle": oracle}))
+    # P12's: 200 seeded hue curves in each domain, the periodic oracle's
+    # values at 64 hues each.
+    hue_oracle = []
+    for domain, low, high in (("hue_shift", -180.0, 180.0), ("hue_gain", 0.0, 2.0)):
+        for _ in range(200):
+            seed = (seed * 6364136223846793005 + 1442695040888963407) % 2 ** 64
+            count = 2 + seed % 15
+            xs, ys = [], []
+            for _ in range(count):
+                seed = (seed * 6364136223846793005 + 1442695040888963407) % 2 ** 64
+                xs.append(0.5 + (seed >> 11) / 2 ** 53)
+            for _ in range(count):
+                seed = (seed * 6364136223846793005 + 1442695040888963407) % 2 ** 64
+                ys.append(low + (high - low) * (seed >> 11) / 2 ** 53)
+            total = sum(xs) * (1 + 0.02 * (seed % 7))
+            at, points = 0.0, []
+            for step, y in zip(xs, ys):
+                points.append([359.0 * at / total, y])
+                at += step
+            inputs = [i * 360 / 64 + 0.37 for i in range(64)] + [0.0, 359.95]
+            hue_oracle.append({"domain": domain, "points": points, "inputs": inputs,
+                               "values": [fc_periodic(points, x, low, high) for x in inputs]})
+    request.write_text(json.dumps({"package": str(package), "clips": clips, "oracle": oracle,
+                                   "hue_oracle": hue_oracle}))
     ran = bounded.run([str(built.binary), str(request), str(answer)], 300,
                       env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
     try:
@@ -1184,6 +1818,8 @@ def main():
                 closed = run_m(launched.client, movie, neutral, state) and closed
             if not capture and selected & A_ROWS:
                 closed = run_a(launched.client, card, state) and closed
+            if not capture and selected & H_ROWS:
+                closed = run_h(launched.client, state) and closed
             if "N2" in selected:
                 closed = run_s(launched.client, card, state) and closed
             if selected & P_ROWS:
@@ -1204,8 +1840,8 @@ def main():
     if "N0" in selected:
         missing = [name for name in NEUTRAL if name not in neutral.seen]
         good = not neutral.misses and not missing
-        title = (f"N0 the seven curve-less frames are byte-identical (16 bits a channel) to "
-                 f"{args.folder}")
+        title = (f"N0 the {len(NEUTRAL)} frames with no hue curve are byte-identical (16 bits a "
+                 f"channel) to {args.folder}")
         if config == "release" or args.mutant:
             check(title, good, f"misses {neutral.misses}; not taken {missing}")
         else:

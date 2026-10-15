@@ -142,9 +142,15 @@ extern "C" {
  * `vlog`, `apple_log2`, `gamut` the camera gamut it pairs with, `lut` a
  * `lut` media converting the file instead, `detected` only when true — so a
  * project with no Camera Log writes the text it did; the reader's default is
- * none, so there is no migration step. 20 and above, 1014 included, are
- * newer. */
-#define RC_FORMAT_VERSION 19
+ * none, so there is no migration step.
+ *
+ * Version 20 is the hue curves (spec §11 GR-32): `video.curves` gains
+ * `hue_hue` (a shift in degrees, -180…180) and `hue_sat` (a gain, 0…2),
+ * each a list of 2–16 `[hue, value]` points with 0 ≤ hue < 360, a channel
+ * written only when not the identity, so a project with no hue curve writes
+ * the text it did; the reader's default is the identity, so there is no
+ * migration step. 21 and above, 1014 included, are newer. */
+#define RC_FORMAT_VERSION 20
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

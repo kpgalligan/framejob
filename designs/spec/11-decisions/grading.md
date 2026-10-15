@@ -91,6 +91,9 @@ Frame Job's own numbers, and nothing of Concat is opened, at design time or buil
   stays 128 floats); the Color sub-tab gains a Curves section after Wheels. The tone keys' rules
   (an identity written absent, refused not clamped, an action's end clamped) are copied for
   `video.curves`.
+  **Amended by GR-32** (grading-4 T4-2): `curvesEnabled` now means a tone curve is not the
+  identity, and the reserved float `gradeReserved0` becomes `hueCurvesEnabled` (the block stays
+  128 floats); the same rules are copied for `video.curves.hue_hue` and `.hue_sat`.
 - **GR-3 — Precision: grading runs on PR-1's float pipeline; blending stays encoded (§7.5).**
   Every stage between layers is `rgba16Float` and every video source decodes deep (PR-1, PR-2),
   so a stacked grade keeps its levels by construction (GR0's P1: −1 EV then +1 EV through
@@ -121,6 +124,8 @@ Frame Job's own numbers, and nothing of Concat is opened, at design time or buil
   (all four channels `[[0, 0], [1, 1]]`) on every layer.
   **Amended by GR-13** (grading-2 G2-4): `ungraded` keeps `video.qualifier`, so a neutral
   adjustment clip with a qualifier still draws nothing.
+  **Amended by GR-32** (grading-4 T4-2): `ungraded` writes all six curves as the identity,
+  `hue_hue` and `hue_sat` included.
 - **GR-5 — The luma waveform: the composited preview frame, in a panel beside the preview, and
   no export path.**
   - **What it reads:** the composited, encoded (sRGB) preview frame at Preview Quality's size —
@@ -234,6 +239,9 @@ Frame Job's own numbers, and nothing of Concat is opened, at design time or buil
   qualifier's reading of the destination before the grade; Paste Attributes drops a qualifier
   onto a picture clip and an adjustment target keeps its own from a picture clip.
   **Amended by NM-6** (rename R0): `reelcut_adjust_fragment` is now `framejob_adjust_fragment`.
+  **Amended by GR-32** (grading-4 T4-2): the adjustment pass runs the hue curves after the
+  channel curves, as the layer stage does, and a neutral adjustment clip is one whose six curves
+  are the identity.
 - **GR-7 — Looks: `video.look {kind, amount}`, eight built-ins defined in the core as data,
   baked on the GPU into a 33³ `rgba16Float` lattice and mixed at step 4d.** The owner's thirteen
   choices of 2026-10-10, each as recommended, the eighth look Black & White (not Night); GR5a
@@ -339,6 +347,8 @@ Frame Job's own numbers, and nothing of Concat is opened, at design time or buil
   **Amended by NM-6** (rename R0): `reelcut_layer_fragment` is now `framejob_layer_fragment`;
   `reelcut_layer_blend_fragment` is now `framejob_layer_blend_fragment`; `reelcut_adjust_fragment`
   is now `framejob_adjust_fragment`.
+  **Amended by GR-32** (grading-4 T4-2): the order becomes Color's four, Light, the wheels, the
+  channel curves, the hue curves (both step 4c.2), the look, the point filters.
 - **GR-8 — `.cube` LUTs: a LUT is MEDIA of kind `lut`, parsed by the core, applied as
   `video.look {kind: "lut", media, amount}` at step 4d to the layer's encoded values.** The
   owner's eleven choices (GR6, 2026-10-10, "all as recommended"); [b] marks what GR6b builds.

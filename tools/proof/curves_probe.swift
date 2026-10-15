@@ -1,5 +1,6 @@
 // Road map "grading-2", phase G2-3 — the curves' probe (`curves_proof.py`
-// builds it through `swift_build.build` and runs it).
+// builds it through `swift_build.build` and runs it); grading-4 T4-2 (spec §11
+// GR-32) adds P12–P19 and amends P7 for the two-row strip.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, against `libframejob_core.a`, so every row drives the app's own
@@ -15,10 +16,11 @@
 //
 // `request.json` names `package`, a project the proof saved over MCP with two
 // CARD clips whose master curves are [[0,0],[0.5,0.6],[1,1]] and
-// [[0,0],[0.5,0.4],[1,1]], `clips`, their ids, and `oracle`, 200 seeded
-// curves with the proof's own Fritsch–Carlson values at 64 inputs each. One
-// JSON object out: `rows`, each a name, ok and detail, the name starting
-// with its P-number.
+// [[0,0],[0.5,0.4],[1,1]], `clips`, their ids, `oracle`, 200 seeded
+// curves with the proof's own Fritsch–Carlson values at 64 inputs each, and
+// `hue_oracle`, 200 seeded hue curves in each hue domain with the proof's own
+// periodic values at 66 hues each. One JSON object out: `rows`, each a name,
+// ok and detail, the name starting with its P-number.
 import AppKit
 import Metal
 
@@ -123,43 +125,223 @@ do {
 }
 
 do {
-    let curves = ColorCurves(
-        master: pts([[0, 0.05], [0.3, 0.2], [0.7, 0.85], [1, 0.95]]),
-        red: pts([[0, 0], [0.5, 0.7], [1, 1]]), blue: pts([[0, 0.1], [1, 1]]))
+    let master = pts([[0, 0.05], [0.3, 0.2], [0.7, 0.85], [1, 0.95]])
+    let red = pts([[0, 0], [0.5, 0.7], [1, 1]])
+    let blue = pts([[0, 0.1], [1, 1]])
+    let shift = pts([[10, 40], [180, 0], [350, -20]])
+    let curves = ColorCurves(master: master, red: red, blue: blue, hueHue: shift)
     if let device = MTLCreateSystemDefaultDevice(), let textures = CurveTextures(device: device) {
         let strip = textures.texture(for: curves)
         let want = CurveTable.strip(curves)
+        let n = CurveTable.stripSize
         var got = [Float](repeating: -1, count: want.count)
-        if strip.pixelFormat == .rgba32Float {
+        if strip.pixelFormat == .rgba32Float, got.count == n * 8 {
             got.withUnsafeMutableBytes { bytes in
                 strip.getBytes(bytes.baseAddress!, bytesPerRow: strip.width * 16,
-                               from: MTLRegionMake2D(0, 0, strip.width, 1), mipmapLevel: 0)
+                               from: MTLRegionMake2D(0, 0, strip.width, 2), mipmapLevel: 0)
             }
         }
-        var holder = [Float](repeating: -1, count: 8)
+        // Row 0 is G2-3's composites, computed here from the splines alone;
+        // row 1 the hue curves at 360·i/1023 (GR-32).
+        var row0 = true
+        var row1 = true
+        for i in 0..<n where got.count == n * 8 {
+            let x = Double(i) / Double(n - 1)
+            let m = CurveTable.value(master, at: x)
+            let composite: [Float] = [
+                Float(CurveTable.value(red, at: m)), Float(m), Float(CurveTable.value(blue, at: m)), 1,
+            ]
+            if Array(got[(4 * i)..<(4 * i + 4)]) != composite { row0 = false }
+            let hue = 360 * Double(i) / Double(n - 1)
+            let hues: [Float] = [
+                Float(CurveTable.value(shift, at: hue, domain: .hueShift) / 360), 1, 0, 1,
+            ]
+            if Array(got[(4 * (n + i))..<(4 * (n + i) + 4)]) != hues { row1 = false }
+        }
+        var holder = [Float](repeating: -1, count: 16)
         let placeholder = textures.placeholder
-        if placeholder.pixelFormat == .rgba32Float {
+        if placeholder.pixelFormat == .rgba32Float, placeholder.height == 2 {
             holder.withUnsafeMutableBytes { bytes in
                 placeholder.getBytes(bytes.baseAddress!, bytesPerRow: 32,
-                                     from: MTLRegionMake2D(0, 0, 2, 1), mipmapLevel: 0)
+                                     from: MTLRegionMake2D(0, 0, 2, 2), mipmapLevel: 0)
             }
         }
         let same = textures.texture(for: curves) === strip
         let identity = textures.texture(for: .identity) === placeholder
         check(
-            "P7 the strip is rgba32Float \(CurveTable.stripSize)×1 on a 32-bit-filtering device "
-                + "and reads back CurveTable.strip exactly; the placeholder is the 2×1 identity",
+            "P7 the strip is rgba32Float \(CurveTable.stripSize)×2 on a 32-bit-filtering device "
+                + "and reads back CurveTable.strip exactly, row 0 the composites and row 1 the "
+                + "hue curves; the placeholder is the 2×2 identity",
             device.supports32BitFloatFiltering && strip.pixelFormat == .rgba32Float
-                && strip.width == CurveTable.stripSize && strip.height == 1 && got == want
-                && placeholder.width == 2 && placeholder.height == 1
-                && holder == [0, 0, 0, 1, 1, 1, 1, 1] && same && identity,
+                && strip.width == CurveTable.stripSize && strip.height == 2 && got == want
+                && row0 && row1 && placeholder.width == 2 && placeholder.height == 2
+                && holder == [0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1] && same && identity,
             "filtering \(device.supports32BitFloatFiltering), format \(strip.pixelFormat.rawValue), "
-                + "\(strip.width)×\(strip.height), equal \(got == want), placeholder "
-                + "\(placeholder.width)×\(placeholder.height) \(holder), cached \(same), identity "
-                + "→ placeholder \(identity)")
+                + "\(strip.width)×\(strip.height), equal \(got == want), row 0 \(row0), row 1 "
+                + "\(row1), placeholder \(placeholder.width)×\(placeholder.height) \(holder), "
+                + "cached \(same), identity → placeholder \(identity)")
     } else {
         check("P7 a Metal device and the strip cache exist", false)
     }
+}
+
+// MARK: - P12 the periodic spline, P13 the flags (spec §11 GR-32)
+
+do {
+    let oracle = request["hue_oracle"] as? [[String: Any]] ?? []
+    var worst = 0.0
+    var through = 0.0
+    for entry in oracle {
+        let domain: CurveDomain = entry["domain"] as? String == "hue_shift" ? .hueShift : .hueGain
+        let points = pts((entry["points"] as? [[Double]]) ?? [])
+        let spline = CurveTable.Spline(points, domain: domain)
+        let inputs = entry["inputs"] as? [Double] ?? []
+        let values = entry["values"] as? [Double] ?? []
+        for (x, want) in zip(inputs, values) {
+            worst = max(worst, abs(spline.value(at: x) - want))
+        }
+        for point in points { through = max(through, abs(spline.value(at: point.x) - point.y)) }
+    }
+    check(
+        "P12 CurveTable's periodic spline equals the proof's oracle within 1e-9 on "
+            + "\(oracle.count) seeded hue curves (worst \(worst)) and passes through every "
+            + "point (worst \(through))",
+        oracle.count == 400 && worst <= 1e-9 && through <= 1e-9,
+        "worst \(worst), through \(through)")
+}
+
+do {
+    func flags(_ curves: ColorCurves) -> (Float, Float) {
+        var u = LayerUniforms()
+        u.apply(curves: curves)
+        return (u.curvesEnabled, u.hueCurvesEnabled)
+    }
+    let hue = flags(ColorCurves(hueHue: pts([[0, 0], [120, 30]])))
+    let sat = flags(ColorCurves(hueSat: pts([[0, 1], [120, 0.5]])))
+    let tone = flags(ColorCurves(red: pts([[0, 0], [0.5, 0.7], [1, 1]])))
+    let both = flags(ColorCurves(red: pts([[0, 0.1], [1, 1]]), hueSat: pts([[0, 0], [9, 1]])))
+    let neutral = ColorCurves(
+        hueHue: pts([[10, 0], [200, 0], [300, 0]]), hueSat: pts([[0, 1], [90, 1]]))
+    let none = flags(neutral)
+    let offset = MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.hueCurvesEnabled) ?? -1
+    check(
+        "P13 apply(curves:) sets hueCurvesEnabled 1 for a hue curve alone and curvesEnabled for "
+            + "a tone curve alone, both for both, neither for hue identities of any x's "
+            + "(hueCurvesEnabled at byte 508 of 512)",
+        hue == (0, 1) && sat == (0, 1) && tone == (1, 0) && both == (1, 1) && none == (0, 0)
+            && neutral.isIdentity && offset == 508
+            && MemoryLayout<LayerUniforms>.stride == 512,
+        "hue \(hue), sat \(sat), tone \(tone), both \(both), identities \(none), offset "
+            + "\(offset)")
+}
+
+// MARK: - P14 the ⇧ lock, P15 the readout, P18 the wrap's edges, P19 the labels
+
+/// A plot of its own over `list` on `channel`, 254 pt square; its current
+/// list (what a write or commit last sent).
+final class Plot {
+    let state = CurveEditorState()
+    var list: [CurvePoint]
+    var writes = 0
+    // Strong captures: the probe keeps every plot for its whole run, so a
+    // view outliving its `Plot` (P15's) still reads its list.
+    lazy var view = CurveEditorView(
+        state: state, read: { _ in self.list }, start: { _ in nil },
+        write: { self.list = $0; self.writes += 1 }, begin: {}, end: {},
+        commit: { self.list = $0; self.writes += 1 })
+
+    init(_ channel: CurveChannel, _ list: [CurvePoint]) {
+        self.list = list
+        state.channel = channel
+        view.frame = NSRect(x: 0, y: 0, width: 254, height: 254)
+    }
+
+    /// Press on `point`, drag by each offset in turn, release; the moved
+    /// point (index `index`).
+    func gesture(_ point: CurvePoint, _ index: Int, by offsets: [(CGFloat, CGFloat)],
+                 lock: Bool) -> CurvePoint {
+        let at = view.screen(point)
+        view.press(at: at)
+        for (dx, dy) in offsets {
+            view.drag(to: NSPoint(x: at.x + dx, y: at.y + dy), fine: false, lock: lock)
+        }
+        view.release()
+        return list[index]
+    }
+}
+
+do {
+    let start = pts([[0, 0], [0.5, 0.6], [1, 1]])
+    let middle = start[1]
+    let diagonal = Plot(.master, start).gesture(middle, 1, by: [(30, 20)], lock: true)
+    let held = Plot(.master, start).gesture(middle, 1, by: [(30, 5), (30, 60)], lock: true)
+    let upright = Plot(.master, start).gesture(middle, 1, by: [(5, 30)], lock: true)
+    let short = Plot(.master, start)
+    let still = short.gesture(middle, 1, by: [(2, 2)], lock: true)
+    let free = Plot(.master, start).gesture(middle, 1, by: [(30, 20)], lock: false)
+    check(
+        "P14 the ⇧ lock: a diagonal drag keeps y exactly, an axis once picked holds, a mostly "
+            + "vertical one keeps x exactly, under 4 pt nothing moves, and without ⇧ both move",
+        diagonal.y == middle.y && diagonal.x > middle.x && held.y == middle.y
+            && upright.x == middle.x && upright.y > middle.y && still == middle
+            && short.writes == 0 && free.x > middle.x && free.y > middle.y,
+        "diagonal \(diagonal), held \(held), upright \(upright), short \(still) "
+            + "(\(short.writes) writes), free \(free)")
+}
+
+do {
+    let tone = Plot(.master, pts([[0, 0], [0.5, 0.6], [1, 1]])).view
+    let shift = Plot(.hueHue, pts([[0, 0], [90, -12], [180, 0]])).view
+    let gain = Plot(.hueSat, pts([[0, 1], [120, 0.8], [240, 1]])).view
+    let a = tone.readout(at: tone.screen(CurvePoint(x: 0.5, y: 0.6)))
+    let b = shift.readout(at: shift.screen(CurvePoint(x: 90, y: -12)))
+    let c = gain.readout(at: gain.screen(CurvePoint(x: 120, y: 0.8)))
+    let strip = shift.readout(at: NSPoint(x: 100, y: 8))
+    let outside = tone.readout(at: NSPoint(x: 300, y: 100))
+    check(
+        "P15 the readout reads \"In 0.50 → Out 0.60\", \"Hue 90° → −12°\" and "
+            + "\"Hue 120° → ×0.80\" at three points, and nothing over the strip or off the plot",
+        a == "In 0.50 → Out 0.60" && b == "Hue 90° → \u{2212}12°" && c == "Hue 120° → ×0.80"
+            && strip == nil && outside == nil,
+        "\(String(describing: a)), \(String(describing: b)), \(String(describing: c)), strip "
+            + "\(String(describing: strip)), outside \(String(describing: outside))")
+}
+
+do {
+    let plot = Plot(.hueHue, pts([[0, 0], [120, 30], [240, 0]]))
+    let last = plot.gesture(CurvePoint(x: 240, y: 0), 2, by: [(400, 0)], lock: false)
+    let first = plot.gesture(CurvePoint(x: 0, y: 0), 0, by: [(-400, 0)], lock: false)
+    let top = plot.gesture(CurvePoint(x: 120, y: 30), 1, by: [(0, 900)], lock: false)
+    let sat = Plot(.hueSat, pts([[0, 1], [180, 1.5]]))
+    let ceiling = sat.gesture(CurvePoint(x: 180, y: 1.5), 1, by: [(0, 900)], lock: false)
+    check(
+        "P18 a hue curve's last point stops at 359.9 and its first at 0 (no crossing the wrap), "
+            + "a shift at 180 and a gain at 2",
+        last.x == 359.9 && first.x == 0 && top.y == 180 && ceiling.y == 2,
+        "last \(last), first \(first), top \(top), gain \(ceiling)")
+}
+
+do {
+    let state = CurveEditorState()
+    let picker = CurveChannelPicker(state: state, curves: { .identity })
+    // The picker spans the plot less 3 pt each side: 224 pt at the 230 pt plot.
+    picker.frame = NSRect(x: 0, y: 0, width: 230 - 6, height: CurveChannelPicker.height)
+    var tight: [String] = []
+    var widths: [String] = []
+    for (index, channel) in CurveChannel.allCases.enumerated() {
+        let width = NSAttributedString(
+            string: channel.title,
+            attributes: [.font: DS.sans(CurveChannelPicker.labelSize, weight: .semibold)]
+        ).size().width
+        let cell = picker.cellRect(index).width
+        widths.append("\(channel.title) \(String(format: "%.1f", width))/\(cell)")
+        if width > cell - 2 { tight.append(channel.title) }
+    }
+    check(
+        "P19 at the 230 pt plot each of the six labels fits its cell less 2 pt at "
+            + "\(CurveChannelPicker.labelSize) pt",
+        CurveChannel.allCases.count == 6 && tight.isEmpty,
+        "\(widths.joined(separator: ", ")); too wide \(tight)")
 }
 
 do {
@@ -185,7 +367,7 @@ func master(_ document: ProjectDocument, _ id: UInt32, _ channel: CurveChannel =
 guard let path = request["package"] as? String,
       let clips = (request["clips"] as? [NSNumber])?.map(\.uint32Value), clips.count == 2
 else {
-    for name in ["P1", "P2", "P3", "P4", "P9", "P10", "P11"] {
+    for name in ["P1", "P2", "P3", "P4", "P9", "P10", "P11", "P16", "P17"] {
         check("\(name) the request names the package and two clips", false, "\(request)")
     }
     finish()
@@ -210,7 +392,7 @@ func open() -> ProjectDocument? {
 }
 
 guard let document = open() else {
-    for name in ["P1", "P2", "P3", "P4", "P9", "P10", "P11"] {
+    for name in ["P1", "P2", "P3", "P4", "P9", "P10", "P11", "P16", "P17"] {
         check("\(name) project P opens", false)
     }
     finish()
@@ -237,7 +419,7 @@ let order = Array(ids.drop { $0 != "video.color" }.prefix(4))
 let view = pane.sections.first { $0.id == "video.curves" }
     .flatMap { walk($0).compactMap { $0 as? CurvesView }.first }
 guard let view else {
-    for name in ["P1", "P2", "P3", "P4", "P9", "P10", "P11"] {
+    for name in ["P1", "P2", "P3", "P4", "P9", "P10", "P11", "P16", "P17"] {
         check("\(name) the Color tab has a Curves section", false, "sections \(ids)")
     }
     finish()
@@ -458,6 +640,118 @@ do {
         "quiet \(quiet), points \(pairs(waiting)), selected \(String(describing: selected)), "
             + "sent \(String(describing: sent)), stored \(pairs(stored)), after "
             + "\(String(describing: still))")
+}
+
+// MARK: - P16 the six cells, and a hue channel in the inspector
+
+do {
+    reset()
+    let titles = CurveChannel.allCases.map(\.title)
+    let cells = (0..<CurveChannel.allCases.count).map { view.picker.cellRect($0).width }
+    editor.deselect()
+    editor.state.channel = .hueHue
+    pane.refresh()
+    let canUndo = document.undoManager?.canUndo ?? false
+    editor.press(at: editor.screen(CurvePoint(x: 100, y: 0)))
+    editor.release()
+    settle()
+    let quiet = updates.isEmpty && edits.isEmpty
+        && (document.undoManager?.canUndo ?? false) == canUndo
+    reset()
+    let point = editor.screen(CurvePoint(x: 100, y: 0))
+    editor.press(at: point)
+    editor.drag(to: NSPoint(x: point.x, y: point.y + 30), fine: false)
+    editor.release()
+    settle()
+    let sent = updates.last.flatMap { shape($0, .hueHue) }
+    let stored = master(document, clips[0], .hueHue)
+    let name = document.undoManager?.undoActionName ?? "-"
+    let gestures = begins
+    let names = ended
+    document.undoManager?.undo()
+    settle()
+    let undone = clips.map { master(document, $0, .hueHue) }
+    editor.deselect()
+    editor.state.channel = .master
+    pane.refresh()
+    let middle = sent.flatMap { $0.count == 3 ? $0[1] : nil } ?? []
+    check(
+        "P16 six equal cells Master · Red · Green · Blue · Hue · Sat; on Hue a press and "
+            + "release writes nothing, and a press and drag writes hue_hue in degrees in ONE "
+            + "step \"Curves\" (sent \(sent ?? []))",
+        titles == ["Master", "Red", "Green", "Blue", "Hue", "Sat"]
+            && Set(cells.map { Int($0.rounded()) }).count <= 2 && quiet && gestures == 1
+            && names == ["Curves"] && name == "Curves" && middle.count == 2
+            && abs(middle[0] - 100) < 1 && middle[1] > 30 && middle[1] < 60
+            && pairs(stored) == sent! && undone.allSatisfy(CurveDomain.hueShift.isIdentity),
+        "titles \(titles), cells \(cells), quiet \(quiet), begins \(gestures), ended \(names), "
+            + "undo \(name), stored \(pairs(stored)), undone \(undone.map(pairs))")
+}
+
+// MARK: - P17 the In and Out fields follow the domain
+
+do {
+    let fields = walk(view).compactMap { $0 as? CurvePointField }
+    func shown(_ field: CurvePointField) -> [OptionFieldControl] {
+        field.subviews.compactMap { $0 as? OptionFieldControl }.filter { !$0.isHidden }
+    }
+    func text(_ field: CurvePointField) -> String {
+        shown(field).first.flatMap { walk($0).compactMap { $0 as? NSTextField }.first }?
+            .stringValue ?? "-"
+    }
+    func enter(_ field: CurvePointField, _ value: String) {
+        guard let control = shown(field).first,
+              let box = walk(control).compactMap({ $0 as? NSTextField }).first
+        else { return }
+        box.stringValue = value
+        _ = control.control(box, textView: NSTextView(),
+                            doCommandBy: #selector(NSResponder.insertNewline(_:)))
+        settle()
+        refreshOptionControls(in: view)
+    }
+    func pick(_ channel: CurveChannel, _ point: CurvePoint) {
+        editor.deselect()
+        editor.state.channel = channel
+        pane.refresh()
+        editor.press(at: editor.screen(point))
+        editor.release()
+        settle()
+        refreshOptionControls(in: view)
+    }
+    func one() -> Bool { fields.count == 2 && fields.allSatisfy { shown($0).count == 1 } }
+    func setup(_ patch: ColorCurvesPatch) {
+        document.applyEdit("Setup", [.setVideo(clips: clips, patch: VideoPatch(curves: patch))])
+        settle()
+    }
+    let tone3 = #"^\d\.\d{3}$"#
+    pick(.red, CurvePoint(x: 1, y: 1))
+    let red = (text(fields.first!), text(fields.last!), one())
+    setup(.channel(.hueHue, pts([[0, 0], [120, 30], [240, 0]])))
+    pick(.hueHue, CurvePoint(x: 240, y: 0))
+    let hueBefore = (text(fields.first!), one())
+    enter(fields.first!, "400")
+    let hueAfter = (text(fields.first!), master(document, clips[0], .hueHue).last?.x ?? -1)
+    setup(.channel(.hueSat, pts([[0, 1], [180, 0.5]])))
+    pick(.hueSat, CurvePoint(x: 180, y: 0.5))
+    let satBefore = (text(fields.last!), one())
+    enter(fields.last!, "3")
+    let satAfter = (text(fields.last!), master(document, clips[0], .hueSat).last?.y ?? -1)
+    pick(.red, CurvePoint(x: 1, y: 1))
+    let back = (text(fields.first!), one())
+    editor.deselect()
+    editor.state.channel = .master
+    pane.refresh()
+    setup(ColorCurvesPatch(hueHue: .some(nil), hueSat: .some(nil)))
+    check(
+        "P17 the fields follow the domain: Red shows 3 decimals; on Hue In shows \"°\" and 400 "
+            + "clamps to 359.9; on Sat Out shows \"×\" and 3 clamps to 2; back on Red 3 decimals "
+            + "again; exactly one field control visible in each",
+        fields.count == 2 && red.0.range(of: tone3, options: .regularExpression) != nil
+            && red.1.range(of: tone3, options: .regularExpression) != nil && red.2
+            && hueBefore == ("240.0°", true) && hueAfter == ("359.9°", 359.9)
+            && satBefore == ("0.50×", true) && satAfter == ("2.00×", 2)
+            && back.0.range(of: tone3, options: .regularExpression) != nil && back.1,
+        "red \(red), hue \(hueBefore) → \(hueAfter), sat \(satBefore) → \(satAfter), back \(back)")
 }
 
 // MARK: - P10 where a write lands inside an action, and Reset there

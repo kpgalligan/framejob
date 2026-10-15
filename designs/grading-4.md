@@ -996,3 +996,144 @@ at 0.75 against the orchestrator's 0.85 ruling, and this record still calling th
 unmoved) and two nits; fix pass 1 closed all four. The second: pass, two nits (the proof
 README's T3 paragraph now states its 0.85 bound; this Residue's near-grey pairs say which is
 the tree's), both applied by the orchestrator with the owed `app/CLAUDE.md` edits above.
+
+## T4-2 — hue curves and the curve editor's extras
+
+**What landed** (2026-10-15, in the worktree on `grading-4`, from `a8ef6fd`). First the control:
+`curves_proof.py`'s N0 gained four tone-curved frames (M1's card, J1's adjustment clip, K1's
+ramp, X1's movie) and `RC_PROOF_APP=release python3 tools/proof/curves_proof.py capture
+tools/proof/work/t4-2/ctl` took all eleven on `make app` of the untouched product (exit 0, Z1
+ok). Then GR-32 in `designs/spec/11-decisions/grading-4.md`, written before any code, with its
+index row and the "Amended by GR-32" lines under GR-2, GR-4, GR-6 and GR-7 (`grading.md`) and
+GR-12 (`grading-2.md`); then:
+- **Core** (format 20): `model_grade.rs` gains `CurveDomain` (`Tone`, `HueShift`, `HueGain`:
+  identity, neutral, value range), `HUE_SHIFT_MAX`, `HUE_GAIN_MAX`, `IDENTITY_HUE_SHIFT`,
+  `IDENTITY_HUE_GAIN`, `Curves.hue_hue` / `.hue_sat` with their serde skip functions, and
+  domain-aware `named()`, `named_mut()`, `is_identity()` and `drop_identities()`;
+  `grade_check.rs`'s `check_curves` refuses a hue x outside 0 ≤ x < 360 and a value outside its
+  domain; `actions_clamp.rs` clamps per domain (x to 0…360, a last x of 360 removes the channel);
+  `actions_curves.rs` writes six and aligns a hue identity on the other's x's at the neutral;
+  `RC_FORMAT_VERSION` 20 in `format.rs` and the header. No op, op-table row, tool or FFI export.
+- **Swift**: `CurveProps.swift` (`CurveDomain`, six `CurveChannel`s with "Hue" and "Sat",
+  `ColorCurves.hueHue` / `.hueSat`, `toneIsIdentity`, `hueIsIdentity`, `ColorCurvesPatch`'s two,
+  `apply(curves:)` setting both flags); `CurveTable.swift` (the periodic spline,
+  `periodicTangents`, `Spline(_:domain:)`, the strip's second row); `CurveTextures.swift`
+  (1,024 × 2, the 2 × 2 placeholder, `upload(height:)`); `LayerUniforms.swift`
+  (`gradeReserved0` → `hueCurvesEnabled`); both placeholder fallbacks zero both flags;
+  `Compositor.metal` (`hsvHue`, shared with `qualifierWeight`; `gradeCurves` at y 0.25;
+  `gradeHueShift`, `gradeHueCurves`; the gate's sum; the layer stage and the adjustment pass;
+  the order-of-operations comment); `CurvePlotDecor.swift` (new: the hue grid, the spectrum
+  strip, the readout); `CurveEditorView.swift` (model units per domain, the hue plot over its
+  strip, the ⇧ lock, the hover readout); `VideoPane+Curves.swift` (`CurvePointField` with one
+  `OptionFieldControl` per domain, `CurveAxis`, six cells, `curvesReset` per domain);
+  `InspectorBinding+Writes.swift` (the END/BASE rule per domain);
+  `AgentCatalog+Properties.swift`'s `curvesClause`.
+- **Sizes** (`wc -l` after): `CurveEditorView.swift` 531, `CurvePlotDecor.swift` 107,
+  `CurveProps.swift` 322 (no `CurvePatch.swift` move needed), `CurveTable.swift` 242,
+  `CurveTextures.swift` 103, `VideoPane+Curves.swift` 392, `InspectorBinding+Writes.swift` 303,
+  `LayerUniforms.swift` 307, `CompositorEffects.swift` 449, `Compositor+Adjustment.swift` 113,
+  `AgentCatalog+Properties.swift` 320; `model_grade.rs` 377, `grade_check.rs` 119,
+  `actions_curves.rs` 91, `actions_clamp.rs` 293, `model_props.rs` 551 (+1), `format.rs` 499.
+- **Instruments**: `curves_proof.py` H1–H16 (H16 a RECORD) over a 720 × 120 hue sweep and three
+  small cards, N0's four new frames, nine mutants; `curves_probe.swift` P7 amended, P12–P19;
+  `core/tests/hue_curves.rs` and `schema_v20.rs` (new), `schema_v19.rs`'s pin a `const`
+  assertion, `curves.rs`, `ungraded.rs` (its adjustment clip also carries a hue curve) and
+  `schema_v8.rs` at six channels. Moved by the rename of the block's last float:
+  `wheels_probe.swift` P3 and `grading_spike/tree_bench.swift` (and its README line).
+- **Documents**: spec §5.2 (format 20), §5.4, §7.3, §7.5, §7.9a, §4.3a, §7.10, §7.4 and the spec
+  index's Lines cells; the screen catalog's 05g prose; GRD-13's steps 9–11; the README's Curves
+  bullet; `tools/proof/README.md`'s G2-3 section.
+
+**Deviations from the spec, recorded.**
+- P19 failed at 11 pt ("Master" 37.9 pt in a 38 pt cell at the 230 pt plot, against the 36 it
+  may take), so the cells are 10 pt (owner choice 3's fallback); P19 passes at 10 pt.
+- H3's ramp is a 720 × 120 grey ramp in a project of its own (GREY), not project R's 1,920-wide
+  RAMP over the deep clip; the near-grey card is beside it, as the spec says.
+- H13's "not grey" is chroma > 32 levels: red turned +60° with its luma kept is (58, 58, 0), whose
+  chroma is 58, under the 64 first written.
+- P15's hue-shift string is a negative one ("Hue 90° → −12°"), so it also pins U+2212.
+- The readout shows a hue's whole degree modulo 360 (359.6 reads "0°").
+- `CurveTable.value(_:at:domain:)` is one function with `domain` defaulting to `.tone`, so every
+  existing `value(_:at:)` call is unchanged.
+
+**Verification** (2026-10-15, M2 Max; `pmset -g`: "powermode 0", "Now drawing from 'AC
+Power'"):
+- In the loop: `cd core && cargo fmt && cargo test --release --test hue_curves --test
+  schema_v20 --test schema_v19 --test curves --test ungraded --test schema_v8` exit 0 (9, 8, 5,
+  6, 18 and 5 passed); `make lint` exit 0 (after one `is_none_or` clippy fix); `make
+  typecheck` exit 0 with the four baseline warnings; `swift_build.py typecheck --define
+  FRAMEJOB_DEV_TOOLS tools/proof/curves_probe.swift` exit 0; `make app-debug` then
+  `curves_proof.py --only …` (the spec's list) 17/26 at first — every H row and K1 C1 M1 J1 passed,
+  and the probe crashed on a released `Plot` (an `unowned` capture), fixed — then P19 failed at
+  11 pt (above); the whole script on Debug then 48/48. `spec_index_proof.py` 162/162,
+  `name_residue.py` exit 0.
+- `make gate`: PASS in 249 s (names 1 s, typecheck 6 s, fmt 2 s, lint 1 s, test 139 s, app 99 s
+  with D25 and D26 ok); the test log has 123 `test result: ok` lines and no FAILED, and
+  `spec_index_proof.py` 162/162 among its steps. After the mutants' lists and this record, a
+  second `make gate`: PASS in 96 s (names 1 s, test 94 s; typecheck, fmt, lint and app skipped
+  as unchanged).
+- Recorded, on the gate's Release build: `RC_PROOF_APP=release python3
+  tools/proof/curves_proof.py compare tools/proof/work/t4-2/ctl`: exit 0, **49/49**, N0 the
+  eleven frames byte-identical at 16 bits, Z1 no `Frame Job: ` line, no `DEFAULTS MOVED`.
+  H15: under +40 the worst HSV-hue error 0.540° over all 720 columns (all at output chroma ≥ 64),
+  green → 159.92°; under −40 0.624° over the 651 columns at output chroma ≥ 64 and 1.176° over
+  all 720, green → 80.00°. H12: the (153, 102, 102) card's luma 112.84 → 112.79 under +90°
+  (its hue moved +90.59°), the sweep's worst luma change 0.488 levels. H4: the oracle's shifts
+  10.0° at 0°, 30.625° at 5°, −10.625° at 355°.
+- `RC_PROOF_APP=release python3 tools/proof/qualifier_proof.py`: exit 0, 31/31 (`qualifierWeight`
+  reading its hue through `hsvHue`).
+- `python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base a8ef6fd`:
+  exit 0, every scored row PASS; KT and KA max |Δ| 0.0 at 1080p and 2160p; TC 0.002 ms
+  (1080p, cap 0.069) and −0.001 ms (2160p, cap 0.061); TA 0.002 ms (1080p, cap 0.081) and
+  0.008 ms (2160p, cap 0.060). `vm.loadavg` 96.36 57.31 38.59 before and 161.04 81.10 48.54
+  after (other sessions' builds).
+
+**H16, Color's Hue, for the record**: on the gate's Release build Color's Hue +40 moves the 0°
+column −55.52° and the 120° column −22.63°, both against the label's sign (the spec's
+`hueRotate` model: −55.5°, −22.6°). Unchanged here (see Residue).
+
+**Mutants** (`python3 tools/proof/curves_proof.py --mutant NAME`, each on its own tree copy's
+Debug build, once, at the end):
+
+| Mutant | Must fail | Answer |
+|---|---|---|
+| `hue-wrap-dropped` | H4 P12 | MUTANT PASS (46/48; P12's worst 332.37) |
+| `hue-from-graded` | H13 | MUTANT PASS (47/48; red → (54, 54, 54)) |
+| `hue-shift-reversed` | H15 H1 H4 H13 | MUTANT PASS (44/48) |
+| `luma-not-kept` | H12 H1 H4 H13 | MUTANT PASS (44/48; the card's luma 112.84 → 143.79, the sweep's worst 121.584 levels) |
+| `gamut-limit-dropped` | H15 H12 H1 H4 H13 | MUTANT PASS (43/48; the sweep's worst luma change 26.236 levels) |
+| `chroma-guard-dropped` | H3 | MUTANT PASS (47/48) |
+| `hue-before-channel-curves` | H14 | MUTANT PASS (47/48; yellow → (0, 255, 0)) |
+| `row-0-at-centre` | K1 C1 M1 O1 | MUTANT PASS (44/48) |
+| `shift-lock-ignored` | P14 | MUTANT PASS (47/48) |
+
+`hue-shift-reversed`, `luma-not-kept`, `gamut-limit-dropped` and `row-0-at-centre` first answered
+MUTANT FAILURE with every row the spec named failed, because other rows failed by construction:
+each turn edit also fails H1, H4 and H13 (their oracle turns a colour), and row 0 at y 0.5 also
+fails O1 (a tone row). Those rows were added to the four's must-fail lists (a deviation from the
+spec's lists) and the four re-run, each MUTANT PASS as above.
+
+**Owed.**
+- The `app/CLAUDE.md` and `core/CLAUDE.md` edits, exact text in the phase's notes (the
+  orchestrator's): the Curves files' map lines (`CurveProps.swift`, `CurveTable.swift`,
+  `CurveTextures.swift`, `CurveEditorView.swift`, `VideoPane+Curves.swift`, the new
+  `CurvePlotDecor.swift`), the `LayerUniforms` block line, and `core/CLAUDE.md`'s
+  `model_grade.rs`, `grade_check.rs` and `actions_curves.rs` entries.
+- GRD-13's steps 9–11 are the owner's, on real footage.
+
+**Residue** (for the orchestrator to file).
+- Color's Hue turns HSV hue against its label's sign and by an amount that varies by hue (H16
+  above: +40 moves red −55.52° and green −22.63°), against every other hue degree in the app
+  (the qualifier, the wheels, the split tone, these hue curves, the spectrum strip) and CSS
+  `hue-rotate`. Changing it changes every existing project's Color Hue render, so it is the
+  owner's call, not this phase's.
+  The owner chose (2026-10-15): fix it with this phase's exact HSV shift (`gradeHueShift`), so
+  +40 moves every hue +40° keeping luma; old projects' Color Hue renders change. It lands as
+  phase T4-2b, its decision first.
+- `designs/spec/07.9a-agent-tools.md` grew to 576 lines (#297).
+
+**Review.** One lc-reviewer pass, verdict pass: no blockers, no should-fixes. Two nits, both
+applied by the orchestrator: `CurveEditorView`'s dead `nudge` / `bigNudge` statics removed
+(`minGap` kept, `curves_probe.swift` reads it), and the curves catalog clause now says a grey
+or near-grey up to chroma 0.02 is left alone and the effect fades in up to 0.06. The owed
+`app/CLAUDE.md` and `core/CLAUDE.md` edits above were applied by the orchestrator.

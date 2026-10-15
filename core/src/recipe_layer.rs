@@ -123,7 +123,7 @@ impl RecipeLayer<'_> {
         out.insert("color".to_string(), color_json(&video.color));
         // All nine wheel values, each at 0 when neutral (spec §11 GR-11).
         out.insert("wheels".to_string(), wheels_json(&video.wheels));
-        // All four curves, an identity one as `[[0, 0], [1, 1]]` (GR-12).
+        // All six curves, an identity one as its domain's (GR-12, GR-32).
         out.insert("curves".to_string(), curves_json(&video.curves));
         out.insert("look".to_string(), look_json(video.look));
         out.insert("input".to_string(), self.input);

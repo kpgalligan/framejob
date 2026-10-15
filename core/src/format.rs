@@ -256,8 +256,15 @@ use crate::model::{Canvas, Project};
 /// text it did, and the reader's default is none, so there is no migration
 /// step. The bump is so an older build refuses the file instead of dropping
 /// the setting on save.
-/// Every number from 20 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 19;
+///
+/// Version 20 is the hue curves (spec §11 GR-32): `video.curves` gains
+/// `hue_hue` and `hue_sat`, each a list of 2–16 `[hue, value]` points, a
+/// channel written only when not the identity, so a project with no hue
+/// curve writes exactly the text it did, and the reader's default is the
+/// identity, so there is no migration step. The bump is so an older build
+/// refuses the file instead of dropping the hue curves on save.
+/// Every number from 21 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 20;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

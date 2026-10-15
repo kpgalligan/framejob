@@ -32,10 +32,11 @@ clip with its waveform band; the timeline bar reads "speech.mov" over
 
 The inspector: the name field, the actions row and lane, the four sub-tabs with
 Color selected, then the pane scrolled so the CURVES section is at the top, open,
-its summary "adjusted" beside a Reset button. Its one row starts with four square
-cells — Master, Red, Green, Blue — with Master chosen (framed and labelled in the
-strong text colour); a small dot sits under Master and under Red, the two
-channels that are not straight. Below them the plot, a square the width of the
+its summary "adjusted" beside a Reset button. Its one row starts with six equal
+cells — Master, Red, Green, Blue, Hue, Sat (the last two the hue curves, spec §11
+GR-32, in 10 pt labels) — with Master chosen (framed and labelled in the strong
+text colour); a small dot sits under Master and under Red, the two channels that
+are not straight. Below them the plot, a square the width of the
 row (about 254 pt at the default pane): a 4 × 4 grid, the straight diagonal, a
 faint red curve lifted at the bottom-left, and the Master S-curve in the strong
 text colour through four small hollow square points, the two ends at the corners.

@@ -1,11 +1,15 @@
 import AppKit
 
-// MARK: - The curve editor (spec §11 GR-12, grading-2 G2-3)
+// MARK: - The curve editor (spec §11 GR-12, grading-2 G2-3; GR-32, grading-4 T4-2)
 
 /// The curve plot: a square with a 4 × 4 grid, the identity diagonal, the
 /// other channels faint behind the edited one, the edited curve in its
 /// channel's tint (`CurveTable.value`, the strip's own spline) and its
-/// points as 7 × 7 squares, the selected one filled.
+/// points as 7 × 7 squares, the selected one filled. A hue channel (GR-32)
+/// plots in its domain's units — hue 0…360 across, the shift −180…180 or
+/// the gain 0…2 up — over `CurvePlotDecor`'s hue grid and spectrum strip,
+/// the faint others only those of its own domain; its points never cross
+/// 0°/360°.
 ///
 /// **Gestures** (owner choices 2–4): a press on a point grabs it where it
 /// stands (no jump) and a drag moves it, held `minGap` inside each
@@ -22,14 +26,40 @@ import AppKit
 /// handlers' bodies, internal so a probe drives them as the mouse and
 /// keyboard do.
 ///
+/// **⇧ axis lock** (#270): the first drag event with ⇧ held whose travel
+/// from the press is at least `lockTravel` picks the axis it moved most
+/// along for the rest of the gesture; while ⇧ is held the other coordinate
+/// stays the grabbed point's (before the axis is picked the point stays
+/// put), and without it the point follows the pointer. ⌥ and ⇧ combine.
+/// **Hover readout** (#270): while the pointer is over the plot, and during
+/// a drag, `CurvePlotDecor`'s label reads the pointer's x and the curve's
+/// value there (`readout(at:)`); none outside the plot, the strip included.
+///
 /// **First responder only while a point is selected**: a press on the plot
 /// takes it, and deselecting returns it to the content view (#60's
 /// pattern); a key it does not use goes on up the chain, so Space still
 /// plays and the editor's bare keys still work.
 final class CurveEditorView: NSView, OptionControl {
-    static let minGap = 0.001, nudge = 0.01, bigNudge = 0.1
+    /// The tone domain's gap (`CurveDomain` holds every domain's gap and nudges).
+    static let minGap = 0.001
     static let maxPoints = 16
+    /// How far the pointer must travel from the press, in points, before ⇧
+    /// picks the axis.
+    static let lockTravel: CGFloat = 4
     private static let inset: CGFloat = 4, handle: CGFloat = 7, reach: CGFloat = 5
+
+    /// One drag in flight: the list being dragged, the dragged point's
+    /// unclamped position, the pointer's last location, and for the ⇧ lock
+    /// the press's location, the point's position at the press and the axis
+    /// once picked.
+    private struct Gesture {
+        var list: [CurvePoint]
+        var target: CurvePoint
+        var last: NSPoint
+        let press: NSPoint
+        let origin: CurvePoint
+        var axis: CurveAxis?
+    }
 
     let state: CurveEditorState
     private let read: (CurveChannel) -> [CurvePoint]
@@ -43,12 +73,14 @@ final class CurveEditorView: NSView, OptionControl {
     /// Called when the selected point or the list changes, so the section's
     /// fields and Delete button follow.
     var onSelection: () -> Void = {}
-    /// The gesture in flight: the list being dragged, the dragged point's
-    /// unclamped position and the pointer's last location.
-    private var dragged: (list: [CurvePoint], target: CurvePoint, last: NSPoint)?
+    /// The gesture in flight.
+    private var dragged: Gesture?
     /// The point the first click of a double-click added, which its second
     /// click must not delete.
     private var added: Int?
+    /// The pointer over the view, for the readout; nil when it is away.
+    private var hovered: NSPoint?
+    private var hoverArea: NSTrackingArea?
 
     init(
         state: CurveEditorState, read: @escaping (CurveChannel) -> [CurvePoint],
@@ -74,14 +106,17 @@ final class CurveEditorView: NSView, OptionControl {
     /// back as an identity of another count, the read-back otherwise.
     var points: [CurvePoint] {
         let back = read(state.channel)
-        guard let working = state.working, Self.holds(working, over: back) else { return back }
+        guard let working = state.working, holds(working, over: back) else { return back }
         return working
     }
 
     /// Whether `working` stands for `back`: an identity of another count.
-    private static func holds(_ working: [CurvePoint], over back: [CurvePoint]) -> Bool {
-        ColorCurves.isIdentity(back) && back.count != working.count
+    private func holds(_ working: [CurvePoint], over back: [CurvePoint]) -> Bool {
+        domain.isIdentity(back) && back.count != working.count
     }
+
+    /// The edited channel's domain.
+    var domain: CurveDomain { state.channel.domain }
 
     /// The selected point, nil with none.
     var selectedPoint: CurvePoint? {
@@ -97,7 +132,7 @@ final class CurveEditorView: NSView, OptionControl {
     var canDelete: Bool { state.selected != nil && points.count > 2 }
 
     func refresh() {
-        if let working = state.working, !Self.holds(working, over: read(state.channel)) {
+        if let working = state.working, !holds(working, over: read(state.channel)) {
             state.working = nil
         }
         if let index = state.selected, !points.indices.contains(index) { state.selected = nil }
@@ -122,22 +157,42 @@ final class CurveEditorView: NSView, OptionControl {
 
     // MARK: Geometry
 
-    private var plot: NSRect {
+    /// The square, inset: the tone plot whole, a hue plot over its strip.
+    private var square: NSRect {
         let side = min(bounds.width, bounds.height)
         return NSRect(x: bounds.minX, y: bounds.minY, width: side, height: side)
             .insetBy(dx: Self.inset, dy: Self.inset)
     }
 
+    /// Where the curve is drawn: the square, less its bottom strip and gap on
+    /// a hue channel.
+    var plot: NSRect {
+        let s = square
+        guard domain.period != nil else { return s }
+        let below = CurvePlotDecor.stripHeight + CurvePlotDecor.stripGap
+        return NSRect(x: s.minX, y: s.minY + below, width: s.width, height: s.height - below)
+    }
+
+    /// A hue channel's spectrum strip, under its plot.
+    private var strip: NSRect {
+        let s = square
+        return NSRect(x: s.minX, y: s.minY, width: s.width, height: CurvePlotDecor.stripHeight)
+    }
+
+    /// A point in the domain's units on screen: x from `lower.x` across
+    /// `span.x`, y from `lower.y` up `span.y` (0…1 both on a tone curve).
     func screen(_ point: CurvePoint) -> NSPoint {
         let p = plot
-        return NSPoint(x: p.minX + CGFloat(point.x) * p.width,
-                       y: p.minY + CGFloat(point.y) * p.height)
+        let (low, span) = (domain.lower, domain.span)
+        return NSPoint(x: p.minX + CGFloat((point.x - low.x) / span.x) * p.width,
+                       y: p.minY + CGFloat((point.y - low.y) / span.y) * p.height)
     }
 
     private func model(_ point: NSPoint) -> CurvePoint {
         let p = plot
-        return CurvePoint(x: Double((point.x - p.minX) / max(p.width, 1)),
-                          y: Double((point.y - p.minY) / max(p.height, 1)))
+        let (low, span) = (domain.lower, domain.span)
+        return CurvePoint(x: low.x + Double((point.x - p.minX) / max(p.width, 1)) * span.x,
+                          y: low.y + Double((point.y - p.minY) / max(p.height, 1)) * span.y)
     }
 
     /// The index of the point within `reach` of `point`, the nearest first.
@@ -149,12 +204,17 @@ final class CurveEditorView: NSView, OptionControl {
         return list.indices.filter { distance($0) <= Self.reach }.min { distance($0) < distance($1) }
     }
 
-    /// `point` held `minGap` inside its neighbours' x and inside 0…1.
-    static func clamped(_ point: CurvePoint, at index: Int, in list: [CurvePoint]) -> CurvePoint {
-        let low = max(index > 0 ? list[index - 1].x + minGap : 0, 0)
-        let high = min(index < list.count - 1 ? list[index + 1].x - minGap : 1, 1)
+    /// `point` held the domain's `minGap` inside its neighbours' x and inside
+    /// the domain (0…1 both on a tone curve; a hue point 0…359.9 across, so
+    /// it never crosses the wrap).
+    static func clamped(
+        _ point: CurvePoint, at index: Int, in list: [CurvePoint], domain: CurveDomain = .tone
+    ) -> CurvePoint {
+        let (lower, upper, gap) = (domain.lower, domain.upper, domain.minGap)
+        let low = max(index > 0 ? list[index - 1].x + gap : lower.x, lower.x)
+        let high = min(index < list.count - 1 ? list[index + 1].x - gap : upper.x, upper.x)
         let x = low <= high ? min(max(point.x, low), high) : list[index].x
-        return CurvePoint(x: x, y: min(max(point.y, 0), 1))
+        return CurvePoint(x: x, y: min(max(point.y, lower.y), upper.y))
     }
 
     // MARK: Gesture
@@ -170,7 +230,8 @@ final class CurveEditorView: NSView, OptionControl {
             }
             added = clickCount >= 2 ? added : nil
             select(index)
-            dragged = (list, list[index], point)
+            dragged = Gesture(
+                list: list, target: list[index], last: point, press: point, origin: list[index])
             begin()
             return
         }
@@ -180,38 +241,56 @@ final class CurveEditorView: NSView, OptionControl {
             return
         }
         let at = model(point)
+        let (domain, lower, upper) = (self.domain, self.domain.lower.x, self.domain.upper.x)
         let index = list.firstIndex { $0.x > at.x } ?? list.count
-        let low = index > 0 ? list[index - 1].x + Self.minGap : 0
-        let high = index < list.count ? list[index].x - Self.minGap : 1
-        let x = min(max(at.x, max(low, 0)), min(high, 1))
-        guard max(low, 0) <= min(high, 1) else {
+        let low = index > 0 ? list[index - 1].x + domain.minGap : lower
+        let high = index < list.count ? list[index].x - domain.minGap : upper
+        let x = min(max(at.x, max(low, lower)), min(high, upper))
+        guard max(low, lower) <= min(high, upper) else {
             NSSound.beep()
             return
         }
-        // On a straight channel the point lies exactly on y = x; on a curve
-        // it lies on the curve, so adding it changes nothing it passes through.
-        let straight = ColorCurves.isIdentity(list)
-        let new = CurvePoint(x: x, y: straight ? x : CurveTable.value(list, at: x))
+        // On a straight channel the point lies exactly on y = x (a hue
+        // channel's on its neutral); on a curve it lies on the curve, so
+        // adding it changes nothing it passes through.
+        let straight = domain.isIdentity(list)
+        let new = CurvePoint(
+            x: x,
+            y: straight ? domain.neutral ?? x : CurveTable.value(list, at: x, domain: domain))
         var next = list
         next.insert(new, at: index)
         added = index
         select(index)
-        dragged = (next, new, point)
+        dragged = Gesture(list: next, target: new, last: point, press: point, origin: new)
         begin()
         if straight { state.working = next } else { write(next) }
         needsDisplay = true
     }
 
-    func drag(to point: NSPoint, fine: Bool) {
+    func drag(to point: NSPoint, fine: Bool, lock: Bool = false) {
         guard var gesture = dragged, let index = state.selected,
               gesture.list.indices.contains(index)
         else { return }
         let p = plot
+        let span = domain.span
         let scale = fine ? 0.1 : 1
-        gesture.target.x += Double((point.x - gesture.last.x) / max(p.width, 1)) * scale
-        gesture.target.y += Double((point.y - gesture.last.y) / max(p.height, 1)) * scale
+        gesture.target.x += Double((point.x - gesture.last.x) / max(p.width, 1)) * scale * span.x
+        gesture.target.y += Double((point.y - gesture.last.y) / max(p.height, 1)) * scale * span.y
         gesture.last = point
-        let moved = Self.clamped(gesture.target, at: index, in: gesture.list)
+        var aim = gesture.target
+        if lock {
+            let dx = point.x - gesture.press.x
+            let dy = point.y - gesture.press.y
+            if gesture.axis == nil, hypot(dx, dy) >= Self.lockTravel {
+                gesture.axis = abs(dx) >= abs(dy) ? .x : .y
+            }
+            switch gesture.axis {
+            case .x?: aim.y = gesture.origin.y
+            case .y?: aim.x = gesture.origin.x
+            case nil: aim = gesture.origin
+            }
+        }
+        let moved = Self.clamped(aim, at: index, in: gesture.list, domain: domain)
         let changed = moved != gesture.list[index]
         gesture.list[index] = moved
         dragged = gesture
@@ -247,7 +326,7 @@ final class CurveEditorView: NSView, OptionControl {
         added = nil
         let unwritten = state.working != nil
         state.working = nil
-        if !(unwritten && ColorCurves.isIdentity(list)) { commit(list) }
+        if !(unwritten && domain.isIdentity(list)) { commit(list) }
         deselect()
     }
 
@@ -258,7 +337,7 @@ final class CurveEditorView: NSView, OptionControl {
         var list = points
         guard list.indices.contains(index) else { return }
         let target = CurvePoint(x: x ?? list[index].x, y: y ?? list[index].y)
-        let moved = Self.clamped(target, at: index, in: list)
+        let moved = Self.clamped(target, at: index, in: list, domain: domain)
         guard moved != list[index] else { return }
         list[index] = moved
         added = nil
@@ -279,10 +358,52 @@ final class CurveEditorView: NSView, OptionControl {
         press(at: convert(event.locationInWindow, from: nil), clickCount: event.clickCount)
     }
     override func mouseDragged(with event: NSEvent) {
-        drag(to: convert(event.locationInWindow, from: nil),
-             fine: event.modifierFlags.contains(.option))
+        let point = convert(event.locationInWindow, from: nil)
+        drag(to: point, fine: event.modifierFlags.contains(.option),
+             lock: event.modifierFlags.contains(.shift))
+        hover(at: point)
     }
     override func mouseUp(with event: NSEvent) { release() }
+
+    // MARK: Hover
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverArea { removeTrackingArea(hoverArea) }
+        let area = NSTrackingArea(
+            rect: .zero, options: [.mouseEnteredAndExited, .mouseMoved, .activeInActiveApp,
+                                   .inVisibleRect],
+            owner: self)
+        addTrackingArea(area)
+        hoverArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        hover(at: convert(event.locationInWindow, from: nil))
+    }
+    override func mouseMoved(with event: NSEvent) {
+        hover(at: convert(event.locationInWindow, from: nil))
+    }
+    override func mouseExited(with event: NSEvent) { hover(at: nil) }
+
+    /// The pointer is at `point` (nil: away): the readout follows it.
+    func hover(at point: NSPoint?) {
+        guard point != hovered else { return }
+        hovered = point
+        needsDisplay = true
+    }
+
+    /// The readout for the pointer at `point`: the model x there (held in
+    /// the domain) and the edited curve's value at it; nil outside the plot.
+    func readout(at point: NSPoint) -> String? {
+        let p = plot
+        guard p.width > 8, p.contains(point) else { return nil }
+        let (domain, lower, upper) = (self.domain, self.domain.lower.x, self.domain.upper.x)
+        let x = min(max(model(point).x, lower), upper)
+        let list = dragged?.list ?? points
+        let y = CurveTable.value(list, at: x, domain: domain)
+        return CurvePlotDecor.readoutText(domain, x: x, y: y)
+    }
 
     // MARK: Keys
 
@@ -296,15 +417,15 @@ final class CurveEditorView: NSView, OptionControl {
         guard flags.subtracting([.shift, .capsLock, .numericPad, .function]).isEmpty else {
             return false
         }
-        let step = flags.contains(.shift) ? Self.bigNudge : Self.nudge
+        let step = flags.contains(.shift) ? domain.bigNudge : domain.nudge
         let point = points[index]
         switch scalar {
         case 0x7F, 0x08, UInt32(NSDeleteFunctionKey):
             deleteSelected()
-        case UInt32(NSUpArrowFunctionKey): place(y: point.y + step)
-        case UInt32(NSDownArrowFunctionKey): place(y: point.y - step)
-        case UInt32(NSLeftArrowFunctionKey): place(x: point.x - step)
-        case UInt32(NSRightArrowFunctionKey): place(x: point.x + step)
+        case UInt32(NSUpArrowFunctionKey): place(y: point.y + step.y)
+        case UInt32(NSDownArrowFunctionKey): place(y: point.y - step.y)
+        case UInt32(NSLeftArrowFunctionKey): place(x: point.x - step.x)
+        case UInt32(NSRightArrowFunctionKey): place(x: point.x + step.x)
         case 27: deselect()
         default: return false
         }
@@ -321,28 +442,37 @@ final class CurveEditorView: NSView, OptionControl {
     override func draw(_ dirtyRect: NSRect) {
         let p = plot
         guard p.width > 8 else { return }
+        let domain = self.domain
         NSColor.controlBackgroundColor.setFill()
         p.fill()
-        // The 4 × 4 grid and the identity diagonal.
-        DS.border.setFill()
-        for k in 1..<4 {
-            let t = CGFloat(k) / 4
-            backingAlignedRect(NSRect(x: p.minX + t * p.width, y: p.minY, width: 1,
-                                      height: p.height), options: .alignAllEdgesNearest).fill()
-            backingAlignedRect(NSRect(x: p.minX, y: p.minY + t * p.height, width: p.width,
-                                      height: 1), options: .alignAllEdgesNearest).fill()
+        if domain.period != nil {
+            // The hue grid, its neutral line, and the spectrum strip below.
+            CurvePlotDecor.drawHueGrid(in: p, view: self)
+            CurvePlotDecor.drawHueStrip(in: strip, view: self)
+        } else {
+            // The 4 × 4 grid and the identity diagonal.
+            DS.border.setFill()
+            for k in 1..<4 {
+                let t = CGFloat(k) / 4
+                backingAlignedRect(NSRect(x: p.minX + t * p.width, y: p.minY, width: 1,
+                                          height: p.height), options: .alignAllEdgesNearest).fill()
+                backingAlignedRect(NSRect(x: p.minX, y: p.minY + t * p.height, width: p.width,
+                                          height: 1), options: .alignAllEdgesNearest).fill()
+            }
+            let diagonal = NSBezierPath()
+            diagonal.move(to: NSPoint(x: p.minX, y: p.minY))
+            diagonal.line(to: NSPoint(x: p.maxX, y: p.maxY))
+            diagonal.lineWidth = 1
+            DS.borderStrong.setStroke()
+            diagonal.stroke()
         }
-        let diagonal = NSBezierPath()
-        diagonal.move(to: NSPoint(x: p.minX, y: p.minY))
-        diagonal.line(to: NSPoint(x: p.maxX, y: p.maxY))
-        diagonal.lineWidth = 1
-        DS.borderStrong.setStroke()
-        diagonal.stroke()
 
-        // The other channels, faint, where they are not the identity.
-        for channel in CurveChannel.allCases where channel != state.channel {
+        // The other channels of the same domain, faint, where they are not
+        // the identity.
+        for channel in CurveChannel.allCases
+        where channel != state.channel && channel.domain == domain {
             let list = read(channel)
-            guard !ColorCurves.isIdentity(list) else { continue }
+            guard !domain.isIdentity(list) else { continue }
             stroke(list, color: channel.tint.withAlphaComponent(0.35), width: 1)
         }
         let isKeyed = keyed()
@@ -376,18 +506,21 @@ final class CurveEditorView: NSView, OptionControl {
         let frame = NSBezierPath(rect: p.insetBy(dx: -0.5, dy: -0.5))
         frame.lineWidth = 1
         frame.stroke()
+        if let hovered, let text = readout(at: hovered) {
+            CurvePlotDecor.drawReadout(text, at: hovered, in: p)
+        }
     }
 
     /// The curve through `list`, one segment per point of plot width.
     private func stroke(_ list: [CurvePoint], color: NSColor, width: CGFloat, dashed: Bool = false) {
         let p = plot
         let steps = max(Int(p.width.rounded()), 2)
-        let spline = CurveTable.Spline(list)
+        let domain = self.domain
+        let spline = CurveTable.Spline(list, domain: domain)
         let path = NSBezierPath()
         for step in 0...steps {
-            let x = Double(step) / Double(steps)
-            let at = NSPoint(x: p.minX + CGFloat(x) * p.width,
-                             y: p.minY + CGFloat(spline.value(at: x)) * p.height)
+            let x = domain.lower.x + Double(step) / Double(steps) * domain.span.x
+            let at = screen(CurvePoint(x: x, y: spline.value(at: x)))
             if step == 0 { path.move(to: at) } else { path.line(to: at) }
         }
         path.lineWidth = width

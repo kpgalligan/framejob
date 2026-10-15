@@ -44,8 +44,8 @@ extension RecipeLayer {
 
     /// An adjustment layer that would change nothing: its colour neutral (all
     /// thirteen keys, which Show Ungraded writes so), its wheels neutral (all
-    /// nine, GR-11, which Show Ungraded writes so too), its curves the
-    /// identity (GR-12, the same), no look that draws
+    /// nine, GR-11, which Show Ungraded writes so too), its six curves the
+    /// identity (GR-12, GR-32, the same), no look that draws
     /// (Show Ungraded removes a look, GR-7; a LUT look whose file is missing
     /// or refused draws nothing, GR-8) and no point filter with an amount
     /// above 0. It draws nothing, so the frame is byte-identical to one
@@ -96,7 +96,10 @@ extension MetalRenderer {
         u.chromaEnabled = 0
         if look == nil { u.lookEnabled = 0 }
         let curves = looks.curves.texture(for: layer.curves)
-        if curves === looks.curves.placeholder { u.curvesEnabled = 0 }
+        if curves === looks.curves.placeholder {
+            u.curvesEnabled = 0
+            u.hueCurvesEnabled = 0
+        }
         guard let encoder = pass.open() else { throw MatteError.noTarget }
         encoder.setRenderPipelineState(adjustPipeline)
         encoder.setFragmentBytes(&u, length: MemoryLayout<LayerUniforms>.stride, index: 0)

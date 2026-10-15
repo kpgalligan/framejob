@@ -80,8 +80,9 @@ extension InspectorBinding {
             base.obscure = obscure
             animatable.obscure = nil
         }
-        // A curve is a list too (spec §11 GR-12), with one more case that
-        // still animates: an identity curve on either side, which the core
+        // A curve is a list too (spec §11 GR-12, GR-32), with one more case
+        // that still animates: an identity curve on either side (its domain's
+        // identity: a hue curve's every value neutral), which the core
         // aligns to the other's x's (`align_identity_curves`). So a channel
         // goes to the END when its new count is the edited one's, or either
         // the edited or the new list is the identity, and to the BASE only
@@ -92,8 +93,8 @@ extension InspectorBinding {
             for channel in CurveChannel.allCases {
                 guard case .some(.some(let list)) = curves.entry(channel) else { continue }
                 let edited = editedCurve(clip, channel)
-                if list.count == edited.count || ColorCurves.isIdentity(edited)
-                    || ColorCurves.isIdentity(list)
+                if list.count == edited.count || channel.domain.isIdentity(edited)
+                    || channel.domain.isIdentity(list)
                 {
                     continue
                 }

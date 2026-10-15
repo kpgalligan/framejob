@@ -401,10 +401,14 @@ extension MetalRenderer {
         let urls = layer.look?.media == nil ? [:] : RecipeSource.shared.lookURLs(for: instruction)
         let look = looks.lattice(for: layer.look, urls: urls)
         if look == nil { uniforms.lookEnabled = 0 }
-        // The curves' strip (GR-12): the placeholder for none — or for a
-        // strip that could not be uploaded, which draws the layer uncurved.
+        // The curves' strip (GR-12, GR-32): the placeholder for none — or for
+        // a strip that could not be uploaded, which draws the layer uncurved,
+        // tone and hue alike.
         let curves = looks.curves.texture(for: layer.curves)
-        if curves === looks.curves.placeholder { uniforms.curvesEnabled = 0 }
+        if curves === looks.curves.placeholder {
+            uniforms.curvesEnabled = 0
+            uniforms.hueCurvesEnabled = 0
+        }
         return PreparedLayer(
             uniforms: uniforms, texture: texture, look: look ?? looks.placeholder, curves: curves)
     }

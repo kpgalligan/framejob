@@ -283,6 +283,11 @@ Concat is opened, at design time or build time.
   - Risk accepted: an action between two non-identity curves of different counts switches at its
     end rather than animating, and a point added or deleted on such a keyed curve lands on the
     clip's base.
+  **Amended by GR-32** (grading-4 T4-2): the "Not" line's hue-against-hue and
+  hue-against-saturation curves and its hover readout are lifted, and so is the Curves section's
+  "no ⇧ axis lock": `video.curves` gains `hue_hue` and `hue_sat` (a periodic spline, the strip's
+  second row, `hueCurvesEnabled`), the picker six cells, the editor a hover readout and a ⇧ axis
+  lock; `curvesEnabled` now means a tone curve is not the identity; format 20.
 - **GR-13 — Qualifiers: `video.qualifier {hue, saturation, luma, invert}` on adjustment clips
   only, a weight `q` read from the destination BEFORE the grade and multiplied into the
   adjustment pass's `w`; Show Selection, Pick from Canvas and `render_frame {selection}`;

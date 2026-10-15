@@ -32,7 +32,8 @@ detail there.
   `ColorWheelPatch`, `ColorWheelsPatch`, `ColorWheelKind` and
   `LayerUniforms.apply(wheels:)` (GR-11)); `VideoPatch.curves` is
   `CurveProps.swift`'s `ColorCurvesPatch`, beside `CurvePoint`,
-  `CurveChannel`, `ColorCurves` and `LayerUniforms.apply(curves:)` (GR-12; a
+  `CurveDomain`, `CurveChannel`, `ColorCurves` and
+  `LayerUniforms.apply(curves:)` (GR-12, the hue curves GR-32; a
   pure move out of `GradeProps.swift`, grading-4 T4-0); `VideoPatch.qualifier` is
   `QualifierProps.swift`'s `ColorQualifierPatch`, beside `ColorQualifier`,
   `QualifierUniforms` and the pick's `QualifierSample` (GR-13), so a row writes
@@ -779,12 +780,17 @@ the key map behind it.
   `WheelStripControl.swift` (`WheelStripControl`: the master strip with the
   slider's knob, a press on the knob grabs it, elsewhere jumps, ⌥ drags relative
   at a tenth, double-click resets, one undo step on or off the knob, #272) ·
-  `CurveEditorView.swift` (`CurveEditorView`: the curve plot — grid, diagonal,
-  the other channels faint, 7 × 7 square points; a press adds a point on the
-  curve and drags it, ⌫ or a double-click deletes, the arrows nudge, through
-  `press` / `drag` / `release` / `key`; first responder only while a point is
-  selected; its `CurveEditorState` is `VideoPane+Curves.swift`'s, kept on
-  `ClipPane`; spec §11 GR-12) ·
+  `CurveEditorView.swift` (`CurveEditorView`: the curve plot in its channel's
+  domain units — grid, diagonal (a hue curve's neutral line over its spectrum
+  strip), the other channels of the same domain faint, 7 × 7 square points; a
+  press adds a point on the curve and drags it, ⇧ locks the drag to an axis,
+  ⌫ or a double-click deletes, the arrows nudge, through `press` / `drag` /
+  `release` / `key`, and the hover readout through `hover(at:)` /
+  `readout(at:)`; first responder only while a point is selected; its
+  `CurveEditorState` is `VideoPane+Curves.swift`'s, kept on `ClipPane`; spec
+  §11 GR-12, GR-32) · `CurvePlotDecor.swift` (what the plot draws besides its
+  curves: a hue curve's grid and spectrum strip, and the readout's text and
+  label; spec §11 GR-32) ·
   `RangeStripControl.swift` (a qualifier range's strip: knobs for the edges,
   squares for the softness, the body moves it, ⌥ a tenth, each a live gesture;
   spec §11 GR-13) · `InspectorBinding+Writes.swift` (a pure move: a write with
@@ -866,10 +872,12 @@ the key map behind it.
   rows (GR-2); +`Wheels` — the Wheels section (GR-11): Lift, Gamma and Gain
   across one row (`ColorWheelsView`), each a `ColorWheelControl` disc, a
   `WheelStripControl` master and a field, one row mark for `video.wheels`;
-  +`Curves` — the Curves section (GR-12): the channel picker
-  (`CurveChannelPicker`), the plot and the selected point's In/Out fields
-  (`CurvePointField`) in one row (`CurvesView`), one row mark for
-  `video.curves`, `CurveEditorState`, and `InspectorBinding.curvesReset`;
+  +`Curves` — the Curves section (GR-12, GR-32): the channel picker
+  (`CurveChannelPicker`, six cells with Hue and Sat), the plot and the
+  selected point's In/Out fields (`CurvePointField`, one `OptionFieldControl`
+  per `CurveDomain`, the matching one shown) in one row (`CurvesView`), one
+  row mark for `video.curves`, `CurveEditorState`, and
+  `InspectorBinding.curvesReset`;
   +`Qualifier` — the Qualifier section (GR-13), adjustment clips only, after
   Adjustment: a strip and three fields per range, Invert, Pick from Canvas and
   Show Selection; +`Adjustment` — the Adjustment section's one Strength row
@@ -1233,18 +1241,21 @@ the key map behind it.
   is 128 floats (512 bytes): the tone group (spec §11 GR-2: the nine tone
   values, `toneEnabled`, then `lookAmount` and `lookEnabled`, spec §11 GR-7),
   then the wheels group (spec §11 GR-11: lift, gamma and gain as x, y, master
-  each, `wheelsEnabled`, `curvesEnabled`, spec §11 GR-12, one reserved); a next
+  each, `wheelsEnabled`, `curvesEnabled`, spec §11 GR-12, `hueCurvesEnabled`,
+  spec §11 GR-32); a next
   field adds a group of four. A layer's look is a baked 33³ `rgba16Float`
   lattice at `texture(2)` on every layer, shadow-mask and adjustment draw
   (`LookTextures.swift`: the bake on the GPU, an LRU keyed by the look's whole
   definition from the recipe, a 2³ identity placeholder for no look or a failed
   bake; `LookProps.swift`: `LookProps`, `LookPatch`, `SplitTone`, the recipe's
   `RecipeLook`; `LookKind.builtIns` is the eight the gallery and menu offer). A
-  layer's curves are a 1,024 × 1 `rgba32Float` strip at `texture(3)` on every
-  layer, shadow-mask and adjustment draw (`CurveTextures.swift`, held by
-  `LookTextures` as `curves`: an LRU of eight keyed by `ColorCurves`, a 2 × 1
-  identity placeholder; `CurveTable.swift`: the Fritsch–Carlson spline the strip
-  and the editor both draw from).
+  layer's curves are a 1,024 × 2 `rgba32Float` strip at `texture(3)` on every
+  layer, shadow-mask and adjustment draw — row 0 the tone composites, row 1 the
+  hue curves (spec §11 GR-32) — (`CurveTextures.swift`, held by
+  `LookTextures` as `curves`: an LRU of eight keyed by `ColorCurves`, a 2 × 2
+  identity placeholder; `CurveTable.swift`: the Fritsch–Carlson spline and its
+  periodic form for the hue curves, which the strip and the editor both draw
+  from).
   An imported LUT's look (GR-8) binds the `.cube` file's own lattice instead
   (`LutTextures.swift`: read through `MediaImporter+LUT.swift` and the core's
   `rc_cube_*`, cached by path and modification date, nothing bound — the clip

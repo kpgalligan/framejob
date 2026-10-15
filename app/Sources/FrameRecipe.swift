@@ -289,9 +289,9 @@ struct RecipeLayer: Codable, Equatable {
     /// Step 4c.1's wheels (spec §11 GR-11): all nine values, each at 0 when
     /// neutral (the core always writes the key; `ungraded` writes it at 0).
     let wheels: ColorWheels
-    /// Step 4c.2's curves (spec §11 GR-12): all four, an identity one as
-    /// `[[0, 0], [1, 1]]` (the core always writes the key; `ungraded` writes
-    /// all four so). Absent or malformed reads as the identity.
+    /// Step 4c.2's curves (spec §11 GR-12, GR-32): all six, an identity one
+    /// as its domain's (the core always writes the key; `ungraded` writes all
+    /// six so). Absent or malformed reads as the identity.
     let curves: ColorCurves
     /// Step 4d's look (spec §11 GR-7): its amount and the definition
     /// `LookTextures` bakes; nil for no look, which the core also publishes

@@ -18910,6 +18910,54 @@ strip at `texture(3)` (`--tree-base b2fd1f9`).
 
 **Its record**: `archive/grading-2.md`'s G2-3 section.
 
+**Grading-4 T4-2 (spec §11 GR-32): the hue curves and the editor's extras.**
+The same script, extended rather than written again. N0 gains four
+tone-curved frames (M1's card, J1's adjustment clip, K1's ramp, X1's movie),
+captured on the untouched tree first, so the strip's second row and
+`hueCurvesEnabled` are proven to change no tone render
+(`tools/proof/work/t4-2/ctl`). H1–H16 run on HUE (a 720×120 sweep, column x
+HSV(x/2°, 1, 1)) and three small cards, against the script's own periodic
+Fritsch–Carlson (`fc_periodic`), strip (`HueStrip`) and step (`hue_step`):
+H1 Hue vs Hue moves only its wedge (the rest byte-equal), H2 Hue vs Sat at 0
+greys only its wedge, H3 a grey ramp and a near-grey card change no byte (the
+chroma guard), H4 the wrap through 0°, H6 the adjustment pass, H7 the five
+refusals and an identity patch, H8 same-count and from-none actions, H9
+`ungraded`, H12 Rec. 709 luma kept, H13 the gain read at the original hue,
+H14 the hue curves after the channel curves, H15 the HSV-hue change measured
+by `colorsys` alone (±1° at output chroma ≥ 64, ±2° everywhere, green's
+direction), and H16 a RECORD of Color's Hue +40's direction on the same
+sweep. P7 now reads the 1,024 × 2 strip and the 2 × 2 placeholder; P12 the
+periodic spline against `fc_periodic` (200 seeded curves per hue domain,
+1e-9); P13 the two flags; P14 the ⇧ lock; P15 the readout's three strings;
+P16 the six cells and a Hue drag in degrees, one step; P17 the fields' units
+and clamps across Red → Hue → Sat → Red; P18 a hue point held in 0…359.9;
+P19 the six labels fit at the 230 pt plot (10 pt).
+
+```
+make app                                                                   # the untouched tree, before any product edit
+RC_PROOF_APP=release python3 tools/proof/curves_proof.py capture tools/proof/work/t4-2/ctl
+python3 tools/proof/curves_proof.py --only H1,H2,H3,H4,H6,H7,H8,H9,H12,H13,H14,H15,H16,P12,P13,P14,P15,P16,P17,P18,P19,Z1
+RC_PROOF_APP=release python3 tools/proof/curves_proof.py compare tools/proof/work/t4-2/ctl
+cd core && cargo test --release --test hue_curves --test schema_v20
+```
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `hue-wrap-dropped` | a hue curve flat outside its first and last x (no wrap segment) | H4 P12 |
+| `hue-from-graded` | the gain sampled again at the turned hue | H13 |
+| `hue-shift-reversed` | the turn's degrees negated | H15 H1 H4 H13 |
+| `luma-not-kept` | the turn as HSV(h + degrees, S, V) | H12 H1 H4 H13 |
+| `gamut-limit-dropped` | k fixed at 1 | H15 H12 H1 H4 H13 |
+| `chroma-guard-dropped` | the hue curves' result not weighted by the chroma guard | H3 |
+| `hue-before-channel-curves` | the hue block moved before 4c.2's channel curves in the layer stage | H14 |
+| `row-0-at-centre` | `gradeCurves` samples the strip at y 0.5, between its rows | K1 C1 M1 O1 |
+| `shift-lock-ignored` | the drag's ⇧ ignored | P14 |
+
+Also moved by T4-2: `wheels_probe.swift` P3 and
+`grading_spike/tree_bench.swift` read the block's last float as
+`hueCurvesEnabled` (it was `gradeReserved0`). **Its record**:
+`designs/grading-4.md`'s T4-2 section.
+
 ## Road map grading-2 — G2-4, the qualifier (`qualifier_proof.py` N0–N2, H1, W1, G1, S1, S1b, S2, L1, I1, M1, D1, E1, V1, B1, F1, A1, A2, R1, P0, U1, V2, K1–K8, Z1 and thirteen mutants; `qualifier_probe.swift`; `core/tests/qualifier.rs`, `core/tests/selection.rs`, `core/tests/schema_v18.rs`; spec §11 GR-13)
 
 **What it answers.** That `video.qualifier` changes nothing until set (N0:

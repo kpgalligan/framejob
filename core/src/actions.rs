@@ -369,8 +369,8 @@ pub(crate) fn wheels_json(wheels: &Wheels) -> Value {
 
 /// A video group as JSON with its `color` through [`color_json`], its
 /// `wheels` through [`wheels_json`] and its `curves` through `curves_json`
-/// (all four, an absent one as the identity, GR-12), so every tone, wheel
-/// and curve key is present: what an action interpolates from, what a patch
+/// (all six, an absent one as its identity, GR-12, GR-32), so every tone,
+/// wheel and curve key is present: what an action interpolates from, what a patch
 /// is checked against and what a split writes back.
 pub(crate) fn video_json(video: &VideoProps) -> Value {
     let mut value = to_json(video);

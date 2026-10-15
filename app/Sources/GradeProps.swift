@@ -321,7 +321,7 @@ extension LayerUniforms {
     /// order, and `wheelsEnabled` 1 exactly when one of them is not 0 — a
     /// negative value enables it as surely as a positive one. An unwheeled
     /// layer leaves the flag at 0 and never enters step 4c.1, so it renders
-    /// byte-identical. `curvesEnabled` and the reserved float are not
+    /// byte-identical. `curvesEnabled` and `hueCurvesEnabled` are not
     /// touched.
     mutating func apply(wheels: ColorWheels) {
         let values = [

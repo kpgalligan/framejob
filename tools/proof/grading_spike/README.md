@@ -147,7 +147,8 @@ a failed show is a B0 failure) and VT is the tree's
 own file, unpatched — matte_spike's `--tree` pattern. B1 compiles the two;
 B2 builds `tree_bench.swift` (`-O`, over `app/Sources`), which hands BOTH
 libraries the app's whole `LayerUniforms` (128 floats, 512 bytes since
-grading-2 G2-2, asserted at `gradeReserved0`; an older base's shader reads a
+grading-2 G2-2, asserted at `hueCurvesEnabled`, `gradeReserved0` before
+grading-4 T4-2; an older base's shader reads a
 prefix of it), binds the picture at `texture(0)`, a 1×1
 white placeholder at `texture(1)`, an identity 2³ `rgba16Float` lattice at
 `texture(2)` and an identity 2×1 `rgba32Float` curve strip at `texture(3)` (since

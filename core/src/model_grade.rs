@@ -23,6 +23,15 @@
 //! when one channel is not the identity; `actions_curves.rs`'s
 //! `curves_json` writes all four, an absent one as [`IDENTITY_CURVE`].
 //!
+//! Format 20 (spec §11 GR-32) adds the two hue curves, `hue_hue` (a shift
+//! in degrees, −180…180) and `hue_sat` (a gain, 0…2), each a list of 2–16
+//! `[hue, value]` points with 0 ≤ hue < 360 on a periodic spline. Every
+//! channel has a [`CurveDomain`]: what its x's and values may be, its
+//! identity and its neutral. A hue curve is the identity when every value is
+//! its neutral, whatever its x's ([`CurveDomain::is_identity`]); an absent
+//! one is spelled [`IDENTITY_HUE_SHIFT`] or [`IDENTITY_HUE_GAIN`] by
+//! `curves_json`, which now writes all six.
+//!
 //! Format 18 (spec §11 GR-13) adds [`Qualifier`], the `video.qualifier` an
 //! ADJUSTMENT clip carries — a [`HueRange`] in degrees, two [`LevelRange`]s
 //! (saturation and luma) in 0…1, each `None` when off, and `invert` —
@@ -134,9 +143,92 @@ pub fn points_are_identity(points: &[CurvePoint]) -> bool {
     }
 }
 
+/// The most a Hue vs Hue value may turn, in degrees either way (spec §11
+/// GR-32): `hue_hue`'s values are −180…180, 0 neutral.
+pub const HUE_SHIFT_MAX: f64 = 180.0;
+
+/// The most a Hue vs Sat value may scale chroma (GR-32): `hue_sat`'s values
+/// are 0…2, 1 neutral.
+pub const HUE_GAIN_MAX: f64 = 2.0;
+
+/// The Hue vs Hue identity's spelling: what `curves_json` writes for an
+/// absent `hue_hue`, and what an action's Reset writes to its end.
+pub const IDENTITY_HUE_SHIFT: [CurvePoint; 2] = [[0.0, 0.0], [180.0, 0.0]];
+
+/// The Hue vs Sat identity's spelling, as [`IDENTITY_HUE_SHIFT`].
+pub const IDENTITY_HUE_GAIN: [CurvePoint; 2] = [[0.0, 1.0], [180.0, 1.0]];
+
+/// What a curve channel's numbers mean (spec §11 GR-32): a tone curve maps
+/// 0…1 to 0…1; a hue curve maps a hue (0 ≤ x < 360, periodic) to a shift in
+/// degrees or a gain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CurveDomain {
+    Tone,
+    HueShift,
+    HueGain,
+}
+
+impl CurveDomain {
+    /// The identity's shortest spelling in this domain.
+    pub fn identity(self) -> &'static [CurvePoint] {
+        match self {
+            CurveDomain::Tone => &IDENTITY_CURVE,
+            CurveDomain::HueShift => &IDENTITY_HUE_SHIFT,
+            CurveDomain::HueGain => &IDENTITY_HUE_GAIN,
+        }
+    }
+
+    /// Whether a present list is this domain's identity: a tone curve's
+    /// [`points_are_identity`]; a hue curve with at least one point whose
+    /// every value is the neutral, whatever its x's.
+    pub fn is_identity(self, points: &[CurvePoint]) -> bool {
+        match self.neutral() {
+            None => points_are_identity(points),
+            Some(neutral) => !points.is_empty() && points.iter().all(|p| p[1] == neutral),
+        }
+    }
+
+    /// The value that changes nothing: none for a tone curve (its identity
+    /// is y = x), 0 for a shift, 1 for a gain.
+    pub fn neutral(self) -> Option<f64> {
+        match self {
+            CurveDomain::Tone => None,
+            CurveDomain::HueShift => Some(0.0),
+            CurveDomain::HueGain => Some(1.0),
+        }
+    }
+
+    /// The bounds of a point's value (y), both inclusive.
+    pub fn value_range(self) -> (f64, f64) {
+        match self {
+            CurveDomain::Tone => (0.0, 1.0),
+            CurveDomain::HueShift => (-HUE_SHIFT_MAX, HUE_SHIFT_MAX),
+            CurveDomain::HueGain => (0.0, HUE_GAIN_MAX),
+        }
+    }
+
+    /// Whether an absent or present channel is this domain's identity.
+    fn is_identity_option(self, curve: &Option<Vec<CurvePoint>>) -> bool {
+        curve
+            .as_deref()
+            .is_none_or(|points| self.is_identity(points))
+    }
+}
+
+/// Whether `hue_hue` is the identity (absent, or every value 0): not written.
+pub fn hue_shift_is_identity(curve: &Option<Vec<CurvePoint>>) -> bool {
+    CurveDomain::HueShift.is_identity_option(curve)
+}
+
+/// Whether `hue_sat` is the identity (absent, or every value 1): not written.
+pub fn hue_gain_is_identity(curve: &Option<Vec<CurvePoint>>) -> bool {
+    CurveDomain::HueGain.is_identity_option(curve)
+}
+
 /// The four tone curves (spec §11 GR-12): `master` first, applied to all
-/// three channels, then each colour's own, `channel(master(v))`. `None` is
-/// the identity.
+/// three channels, then each colour's own, `channel(master(v))`; then the
+/// two hue curves (GR-32), Hue vs Hue and Hue vs Sat, read at the hue the
+/// tone curves leave. `None` is the identity.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Curves {
@@ -148,6 +240,10 @@ pub struct Curves {
     pub green: Option<Vec<CurvePoint>>,
     #[serde(skip_serializing_if = "curve_is_identity")]
     pub blue: Option<Vec<CurvePoint>>,
+    #[serde(skip_serializing_if = "hue_shift_is_identity")]
+    pub hue_hue: Option<Vec<CurvePoint>>,
+    #[serde(skip_serializing_if = "hue_gain_is_identity")]
+    pub hue_sat: Option<Vec<CurvePoint>>,
 }
 
 impl Curves {
@@ -155,16 +251,30 @@ impl Curves {
     pub fn is_identity(&self) -> bool {
         self.named()
             .iter()
-            .all(|(_, curve)| curve_is_identity(curve))
+            .all(|(_, domain, curve)| domain.is_identity_option(curve))
     }
 
-    /// The four channels with their names, in model order.
-    pub fn named(&self) -> [(&'static str, &Option<Vec<CurvePoint>>); 4] {
+    /// The six channels with their names and domains, in model order.
+    pub fn named(&self) -> [(&'static str, CurveDomain, &Option<Vec<CurvePoint>>); 6] {
         [
-            ("master", &self.master),
-            ("red", &self.red),
-            ("green", &self.green),
-            ("blue", &self.blue),
+            ("master", CurveDomain::Tone, &self.master),
+            ("red", CurveDomain::Tone, &self.red),
+            ("green", CurveDomain::Tone, &self.green),
+            ("blue", CurveDomain::Tone, &self.blue),
+            ("hue_hue", CurveDomain::HueShift, &self.hue_hue),
+            ("hue_sat", CurveDomain::HueGain, &self.hue_sat),
+        ]
+    }
+
+    /// The six channels with their domains, mutable, in model order.
+    pub fn named_mut(&mut self) -> [(CurveDomain, &mut Option<Vec<CurvePoint>>); 6] {
+        [
+            (CurveDomain::Tone, &mut self.master),
+            (CurveDomain::Tone, &mut self.red),
+            (CurveDomain::Tone, &mut self.green),
+            (CurveDomain::Tone, &mut self.blue),
+            (CurveDomain::HueShift, &mut self.hue_hue),
+            (CurveDomain::HueGain, &mut self.hue_sat),
         ]
     }
 
@@ -172,13 +282,8 @@ impl Curves {
     /// identity patch on an uncurved clip is an identity) and what an
     /// action's end evaluates to.
     pub fn drop_identities(&mut self) {
-        for curve in [
-            &mut self.master,
-            &mut self.red,
-            &mut self.green,
-            &mut self.blue,
-        ] {
-            if curve_is_identity(curve) {
+        for (domain, curve) in self.named_mut() {
+            if domain.is_identity_option(curve) {
                 *curve = None;
             }
         }
@@ -186,7 +291,8 @@ impl Curves {
 }
 
 /// One turn of the hue circle, in degrees: a [`HueRange`]'s `center` and
-/// `width` are 0…360 (GR-13), the centre wrapping (360 is 0).
+/// `width` are 0…360 (GR-13), the centre wrapping (360 is 0); a hue curve's
+/// x is 0 ≤ x < 360 (GR-32).
 pub const HUE_TURN: f64 = 360.0;
 
 /// The most a hue range's softness may be, in degrees (GR-13): half a turn,

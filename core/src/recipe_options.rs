@@ -40,7 +40,7 @@ pub struct RecipeOptions {
     pub burn_in_timecode: bool,
     /// Every layer's `video.color` neutral (all thirteen keys), its wheels
     /// neutral (all nine, spec §11 GR-11), its curves the identity (all
-    /// four, GR-12) and its look removed, nested and matte layers included:
+    /// six, GR-12, GR-32) and its look removed, nested and matte layers included:
     /// the picture as if no clip were graded. A qualifier is kept (spec §11
     /// GR-13): with its clip's grade neutral it draws nothing anyway.
     pub ungraded: bool,

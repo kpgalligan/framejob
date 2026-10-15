@@ -9,8 +9,8 @@
 //! an identity curve (absent included) aligned to the other's x's, both
 //! ways, and kept in an end patch as "animate to neutral"; other count
 //! changes switching at the end; an end clamped (a point out of range, a
-//! count out of range, x falling); the recipe's `curves` key (all four,
-//! after `wheels`); `paste_attributes`, an adjustment clip and a split
+//! count out of range, x falling); the recipe's `curves` key (all six, the
+//! hue curves' identities included, spec §11 GR-32, after `wheels`); `paste_attributes`, an adjustment clip and a split
 //! carrying the curves; and an unknown channel named. What a curve does to
 //! a pixel is `tools/proof/curves_proof.py`'s.
 
@@ -273,7 +273,7 @@ fn an_end_is_clamped() {
 }
 
 #[test]
-fn the_recipe_carries_all_four_after_the_wheels() {
+fn the_recipe_carries_all_six_after_the_wheels() {
     let handle = project().apply(&set_curves(json!({"green": [[0, 0.1], [1, 1]]})));
     let layer = layer(&handle, 10, SEC);
     let keys: Vec<&str> = layer
@@ -286,15 +286,28 @@ fn the_recipe_carries_all_four_after_the_wheels() {
     assert_eq!(keys[wheels + 1], "curves");
     assert_eq!(keys[wheels + 2], "look");
     let identity = json!([[0.0, 0.0], [1.0, 1.0]]);
+    let shift = json!([[0.0, 0.0], [180.0, 0.0]]);
+    let gain = json!([[0.0, 1.0], [180.0, 1.0]]);
     assert_eq!(
         layer["curves"],
         json!({"master": identity, "red": identity, "green": [[0.0, 0.1], [1.0, 1.0]],
-               "blue": identity})
+               "blue": identity, "hue_hue": shift, "hue_sat": gain})
+    );
+    let names: Vec<&str> = layer["curves"]
+        .as_object()
+        .expect("curves")
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(
+        names,
+        ["master", "red", "green", "blue", "hue_hue", "hue_sat"]
     );
     let plain = self::layer(&project(), 10, SEC);
     assert_eq!(
         plain["curves"],
-        json!({"master": identity, "red": identity, "green": identity, "blue": identity})
+        json!({"master": identity, "red": identity, "green": identity, "blue": identity,
+               "hue_hue": shift, "hue_sat": gain})
     );
 }
 

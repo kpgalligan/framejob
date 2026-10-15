@@ -611,11 +611,12 @@ fn an_end_patch_that_replaces_the_whole_video_group_falls_through_to_the_base() 
     // clip leaves out when neutral.
     let neutral = json!({"x": 0.0, "y": 0.0, "master": 0.0});
     base["wheels"] = json!({"lift": neutral, "gamma": neutral, "gain": neutral});
-    // And `curves` with all four as the identity (spec §11 GR-12), which the
-    // stored clip leaves out.
+    // And `curves` with all six as the identity (spec §11 GR-12, GR-32),
+    // which the stored clip leaves out.
     let identity = json!([[0.0, 0.0], [1.0, 1.0]]);
-    base["curves"] =
-        json!({"master": identity, "red": identity, "green": identity, "blue": identity});
+    base["curves"] = json!({"master": identity, "red": identity, "green": identity,
+        "blue": identity, "hue_hue": [[0.0, 0.0], [180.0, 0.0]],
+        "hue_sat": [[0.0, 1.0], [180.0, 1.0]]});
     for replacement in [
         json!(5),
         json!(null),

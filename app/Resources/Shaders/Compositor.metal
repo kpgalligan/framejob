@@ -353,10 +353,11 @@ struct LayerUniforms {
     // `gradeWheels`. `wheelsEnabled` is 1 exactly when one of the nine is
     // not 0 and joins the effects gate's sum, so an unwheeled layer never
     // enters 4c.1 and renders byte-identical. `curvesEnabled` (spec §11
-    // GR-12, grading-2 G2-3) is 1 exactly when one of the four curves is not
-    // the identity and joins the same sum, so an uncurved layer never enters
-    // 4c.2 and never samples `texture(3)`. Twelve floats: 116 + 12 = 128
-    // floats = 512 bytes, and 512 is 32 × 16.
+    // GR-12, grading-2 G2-3) is 1 exactly when one of the four tone curves is
+    // not the identity, and `hueCurvesEnabled` (spec §11 GR-32, grading-4
+    // T4-2) exactly when a hue curve is not; both join the same sum, so a
+    // layer without them never enters 4c.2 and never samples `texture(3)`.
+    // Twelve floats: 116 + 12 = 128 floats = 512 bytes, and 512 is 32 × 16.
     float liftX;                // −1…1, inside the unit circle with liftY
     float liftY;
     float liftMaster;           // −1…1
@@ -367,8 +368,8 @@ struct LayerUniforms {
     float gainY;
     float gainMaster;
     float wheelsEnabled;        // 1 when any of the nine is not 0
-    float curvesEnabled;        // 1 when any curve is not the identity
-    float gradeReserved0;
+    float curvesEnabled;        // 1 when any tone curve is not the identity
+    float hueCurvesEnabled;     // 1 when a hue curve is not the identity
 };
 
 /// A fragment's `[[position]]` in CANVAS pixels — the frame the nest clip
@@ -1002,17 +1003,87 @@ static inline float3 gradeWheels(float3 rgb, constant LayerUniforms &u) {
     return v;
 }
 
+// The HSV hue of an encoded, saturated colour in degrees, [0, 360), 0 when
+// it has no chroma (spec §11 GR-13's formula, one helper for the qualifier and
+// the hue curves): `mx` its largest channel, `chroma` max − min.
+static inline float hsvHue(float3 c, float mx, float chroma) {
+    float hue = 0.0;
+    if (chroma > 0.0) {
+        if (mx == c.r) {
+            hue = 60.0 * fmod((c.g - c.b) / chroma + 6.0, 6.0);
+        } else if (mx == c.g) {
+            hue = 60.0 * ((c.b - c.r) / chroma + 2.0);
+        } else {
+            hue = 60.0 * ((c.r - c.g) / chroma + 4.0);
+        }
+    }
+    return hue;
+}
+
 // Step 4c.2, on encoded straight colour (spec §11 GR-12): each channel
 // through its own composite curve, `channel(master(v))`, which `CurveTable`
-// wrote into the n × 1 strip at `texture(3)` — red's in the texels' r, green's
-// in g, blue's in b — sampled linearly at the texel CENTRES' span (4d's
-// rule), so the strip's first and last texels are exactly v = 0 and 1.
+// wrote into row 0 of the n × 2 strip at `texture(3)` — red's in the texels'
+// r, green's in g, blue's in b — sampled linearly at the texel CENTRES' span
+// (4d's rule), so the strip's first and last texels are exactly v = 0 and 1,
+// and at row 0's centre (y 0.25, exact in y, GR-32).
 static inline float3 gradeCurves(float3 rgb, texture2d<float> strip, sampler samp) {
     float n = float(strip.get_width());
     float3 at = saturate(rgb) * ((n - 1.0) / n) + 0.5 / n;
-    return float3(strip.sample(samp, float2(at.r, 0.5)).r,
-                  strip.sample(samp, float2(at.g, 0.5)).g,
-                  strip.sample(samp, float2(at.b, 0.5)).b);
+    return float3(strip.sample(samp, float2(at.r, 0.25)).r,
+                  strip.sample(samp, float2(at.g, 0.25)).g,
+                  strip.sample(samp, float2(at.b, 0.25)).b);
+}
+
+// Hue vs Hue's turn (spec §11 GR-32): an HSV-hue move of `degrees` in the
+// curve's direction (+ is red → yellow → green), keeping Rec. 709 luma. The
+// colour's own chroma Cr (max − min) along the fully saturated hue
+// `hue + degrees` less its luma (`lookHueChroma`), added to its luma Y; k,
+// the largest value in [0, 1] keeping every channel inside [min(0, min rgb),
+// max(1, max rgb)], gives up chroma (toward the same-luma grey, which keeps
+// the hue) only where the turned colour at that luma would leave the range.
+// Not Color's `hueRotate`, which turns HSV hue against its sign.
+static inline float3 gradeHueShift(float3 rgb, float hue, float degrees) {
+    float y = dot(rgb, float3(0.2126, 0.7152, 0.0722));
+    float mx = max(rgb.r, max(rgb.g, rgb.b));
+    float mn = min(rgb.r, min(rgb.g, rgb.b));
+    float3 d = (mx - mn) * lookHueChroma(fmod(hue + degrees + 360.0, 360.0));
+    float lo = min(0.0, mn);
+    float hi = max(1.0, mx);
+    float k = 1.0;
+    for (int i = 0; i < 3; ++i) {
+        if (d[i] > 0.0) {
+            k = min(k, (hi - y) / d[i]);
+        } else if (d[i] < 0.0) {
+            k = min(k, (lo - y) / d[i]);
+        }
+    }
+    return y + max(k, 0.0) * d;
+}
+
+// Step 4c.2's second half, on encoded straight colour (spec §11 GR-32): the
+// hue curves, after the channel curves and before the look. The colour's HSV
+// hue h (`hsvHue`, of the saturated colour) is read ONCE and row 1 of the
+// strip sampled there (y 0.75, the texel-centre rule in x): Hue vs Hue's
+// turn in r (turns), Hue vs Sat's gain in g, both at the ORIGINAL hue. The
+// turn applies only when it is not ~0, then the gain about Rec. 709 luma
+// (Color's Saturation) only when it is not ~1, and the result is weighted by
+// GR-13's chroma guard, so a grey or near-grey, whose hue is noise, is never
+// tinted.
+static inline float3 gradeHueCurves(float3 rgb, texture2d<float> strip, sampler samp) {
+    float3 c = saturate(rgb);
+    float mx = max(c.r, max(c.g, c.b));
+    float chroma = mx - min(c.r, min(c.g, c.b));
+    float h = hsvHue(c, mx, chroma);
+    float n = float(strip.get_width());
+    float4 curve = strip.sample(samp, float2((h / 360.0) * ((n - 1.0) / n) + 0.5 / n, 0.75));
+    float3 out = rgb;
+    if (abs(curve.r) > 1e-6) {
+        out = gradeHueShift(out, h, 360.0 * curve.r);
+    }
+    if (abs(curve.g - 1.0) > 1e-6) {
+        out = mix(float3(dot(out, float3(0.2126, 0.7152, 0.0722))), out, curve.g);
+    }
+    return mix(rgb, out, smoothstep(0.02, 0.06, chroma));
 }
 
 // The split tone, a look's one block Light does not have: the shadow hue
@@ -1062,7 +1133,10 @@ static inline float3 gradeLook(float3 rgb, texture3d<float> look, sampler samp,
 //                              look, which grades the corrected colour
 // 4c.2 the curves              `gradeCurves`, once per pixel (spec §11
 //                              GR-12): after the wheels and before the look,
-//                              through the strip at `texture(3)`
+//                              through the strip at `texture(3)`; then the
+//                              hue curves, `gradeHueCurves` (spec §11 GR-32):
+//                              after the channel curves, at the hue they
+//                              leave, through the strip's second row
 //  4d. the look                `gradeLook`, once per pixel (spec §11 GR-7):
 //                              right after tone, so a look grades the
 //                              corrected colour, and before the point filters
@@ -1216,7 +1290,7 @@ static inline float4 layerColorPremultiplied(Varyings in,
     bool effects = (u.filterKind0 + u.filterKind1 + u.filterKind2 + u.filterKind3
                     + u.spotEnabled + u.clipEnabled + u.reflectionPass
                     + u.obscureEnabled + u.toneEnabled + u.lookEnabled
-                    + u.wheelsEnabled + u.curvesEnabled) > 0.5;
+                    + u.wheelsEnabled + u.curvesEnabled + u.hueCurvesEnabled) > 0.5;
 
     float2 uv = in.uv;
     float spot = 1.0;
@@ -1410,6 +1484,13 @@ static inline float4 layerColorPremultiplied(Varyings in,
         // `curvesEnabled`, so an uncurved layer never enters it.
         if (u.curvesEnabled > 0.5) {
             rgb = gradeCurves(rgb, curves, samp);
+        }
+
+        // (4c.2) The hue curves (spec §11 GR-32): once per pixel, after the
+        // channel curves and before the look, through the strip's second row.
+        // Behind `hueCurvesEnabled`, so a layer without them never enters it.
+        if (u.hueCurvesEnabled > 0.5) {
+            rgb = gradeHueCurves(rgb, curves, samp);
         }
 
         // (4d) The look (spec §11 GR-7): once per pixel, right after tone and
@@ -1977,16 +2058,7 @@ static inline float qualifierWeight(float3 c, constant QualifierUniforms &q) {
     float chroma = mx - mn;
     float w = 1.0;
     if (q.hueEnabled > 0.5) {
-        float hue = 0.0;
-        if (chroma > 0.0) {
-            if (mx == c.r) {
-                hue = 60.0 * fmod((c.g - c.b) / chroma + 6.0, 6.0);
-            } else if (mx == c.g) {
-                hue = 60.0 * ((c.b - c.r) / chroma + 2.0);
-            } else {
-                hue = 60.0 * ((c.r - c.g) / chroma + 4.0);
-            }
-        }
+        float hue = hsvHue(c, mx, chroma);
         float d = abs(hue - q.hueCenter);
         d = min(d, 360.0 - d);
         w *= qualifierFall(d, 0.5 * q.hueWidth, q.hueSoftness);
@@ -2010,7 +2082,7 @@ static inline float qualifierWeight(float3 c, constant QualifierUniforms &q) {
 // It reads what is already drawn behind it — the target `encodeLayers` is
 // drawing into — un-premultiplies it, grades it as step 3's colour adjust
 // (`gradeSample`, the chroma key off), step 4c's tone, step 4c.1's wheels,
-// step 4c.2's curves, step 4d's look and
+// step 4c.2's curves and hue curves, step 4d's look and
 // step 5's point filters would (the canvas's uv as the filters' local position), and
 // premultiplies it back by the destination's own alpha, so alpha is
 // preserved. The weight is the layer's opacity, its strength, times the
@@ -2047,6 +2119,9 @@ fragment float4 framejob_adjust_fragment(ShadowVaryings in [[stage_in]],
     }
     if (u.curvesEnabled > 0.5) {
         c = gradeCurves(c, curves, samp);
+    }
+    if (u.hueCurvesEnabled > 0.5) {
+        c = gradeHueCurves(c, curves, samp);
     }
     if (u.lookEnabled > 0.5) {
         c = gradeLook(c, look, samp, u);

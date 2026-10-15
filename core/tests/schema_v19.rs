@@ -2,7 +2,7 @@
 //! optional `media.color` key, driven through the C FFI exactly as
 //! `ReelCore.swift` drives it.
 //!
-//! Pinned here: the current version is 19; every earlier version (1 to 18),
+//! Pinned here: the current version is at least 19; every earlier version (1 to 18),
 //! and a file numbered 1015 (GR-9's branch number, read as 15), opens
 //! stamped current; every number past the current one, 1014 included, and
 //! 1016 are refused as newer; a file with no Camera Log at 18 writes the
@@ -40,10 +40,10 @@ fn file(version: u32, color: Value) -> Value {
     })
 }
 
-#[test]
-fn the_current_version_is_19() {
-    assert_eq!(RC_FORMAT_VERSION, 19);
-}
+const _: () = assert!(
+    RC_FORMAT_VERSION >= 19,
+    "version 19 is at most the current version"
+);
 
 #[test]
 fn every_earlier_version_and_1015_open_stamped_current() {

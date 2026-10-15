@@ -83,10 +83,10 @@ else { fail("usage: --lib V0=… --lib VT=… --width --height --frames --runs -
 
 let blockBytes = 512
 guard MemoryLayout<LayerUniforms>.stride == blockBytes,
-    MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.gradeReserved0) == blockBytes - 4
+    MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.hueCurvesEnabled) == blockBytes - 4
 else {
     fail("LayerUniforms is \(MemoryLayout<LayerUniforms>.stride) bytes, not \(blockBytes) "
-        + "(128 floats ending at gradeReserved0)")
+        + "(128 floats ending at hueCurvesEnabled)")
 }
 
 guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue()

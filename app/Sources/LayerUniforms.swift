@@ -214,9 +214,11 @@ struct LayerUniforms {
     // x, y and master, in the model's order; then `wheelsEnabled` — 1 exactly
     // when one of the nine is not 0, the effects gate's term (`apply(wheels:)`,
     // `GradeProps.swift`) — `curvesEnabled`, 1 exactly when one of the four
-    // curves is not the identity, the gate's next term (`apply(curves:)`, spec
-    // §11 GR-12; the curves themselves are the strip at `texture(3)`), and one
-    // reserved. 116 + 12 = 128 floats = 512 bytes, 32 × 16.
+    // tone curves is not the identity, the gate's next term (`apply(curves:)`,
+    // spec §11 GR-12; the curves themselves are the strip at `texture(3)`),
+    // and `hueCurvesEnabled`, 1 exactly when a hue curve is not the identity,
+    // the gate's last term (spec §11 GR-32; the strip's second row).
+    // 116 + 12 = 128 floats = 512 bytes, 32 × 16.
     var liftX: Float = 0
     var liftY: Float = 0
     var liftMaster: Float = 0
@@ -228,7 +230,7 @@ struct LayerUniforms {
     var gainMaster: Float = 0
     var wheelsEnabled: Float = 0
     var curvesEnabled: Float = 0
-    var gradeReserved0: Float = 0
+    var hueCurvesEnabled: Float = 0
 }
 
 /// The shadow pass's uniform block, mirroring `ShadowUniforms` in

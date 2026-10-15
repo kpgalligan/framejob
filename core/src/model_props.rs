@@ -126,8 +126,9 @@ pub use crate::model_look::*;
 /// Tier 2's grading vocabulary — [`Wheels`], [`Wheel`], [`WHEEL_MAX`] and
 /// [`WHEEL_RIM_TOLERANCE`] (spec §11 GR-11), and [`Curves`], [`CurvePoint`],
 /// [`CURVE_POINTS_MIN`], [`CURVE_POINTS_MAX`] and [`IDENTITY_CURVE`] (GR-12),
-/// and [`Qualifier`], [`HueRange`], [`LevelRange`], [`HUE_TURN`] and
-/// [`HUE_SOFTNESS_MAX`] (GR-13) — lives in `model_grade.rs` and is
+/// [`CurveDomain`], [`HUE_SHIFT_MAX`], [`HUE_GAIN_MAX`] and the hue
+/// identities (GR-32), and [`Qualifier`], [`HueRange`], [`LevelRange`],
+/// [`HUE_TURN`] and [`HUE_SOFTNESS_MAX`] (GR-13) — lives in `model_grade.rs` and is
 /// re-exported whole, so every `crate::model::Wheels` path resolves.
 pub use crate::model_grade::*;
 
@@ -183,9 +184,9 @@ pub struct VideoProps {
     /// unwheeled file's text is what it was.
     #[serde(default, skip_serializing_if = "Wheels::is_neutral")]
     pub wheels: Wheels,
-    /// The tone curves (spec §11 GR-12, format 17), applied at step 4c.2
-    /// after the wheels and before the look. The identity writes no key, so
-    /// an uncurved file's text is what it was.
+    /// The tone curves (spec §11 GR-12, format 17) and the hue curves (GR-32,
+    /// format 20), applied at step 4c.2 after the wheels and before the look.
+    /// The identity writes no key, so an uncurved file's text is what it was.
     #[serde(default, skip_serializing_if = "Curves::is_identity")]
     pub curves: Curves,
     /// Which pixels an ADJUSTMENT clip grades (spec §11 GR-13, format 18):

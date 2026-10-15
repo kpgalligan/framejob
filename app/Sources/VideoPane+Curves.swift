@@ -2,7 +2,9 @@ import AppKit
 
 /// The Color sub-tab's **Curves** section (spec §11 GR-12, grading-2 G2-3):
 /// the channel picker, the curve plot and the selected point's In and Out
-/// fields with its Delete button, in one row (`CurvesView`).
+/// fields with its Delete button, in one row (`CurvesView`). The picker's
+/// Hue and Sat cells edit the hue curves (spec §11 GR-32) in the same plot,
+/// in their own units.
 ///
 /// Every write sends the edited channel's WHOLE list (a list replaces, GR-12)
 /// to every selected clip through `binding.ops(video:)`, so it lands on an
@@ -40,11 +42,12 @@ extension VideoPane {
 }
 
 extension InspectorBinding {
-    /// Reset's ops for `channels` (GR-12): a clip outside an action has them
-    /// removed from its base (`null`); a clip inside one has each channel
-    /// whose edited curve is not the identity written to the end AS the
-    /// identity, which an end keeps as "animate to neutral" — a `null` there
-    /// would only stop animating it. None when nothing would change.
+    /// Reset's ops for `channels` (GR-12, GR-32): a clip outside an action
+    /// has them removed from its base (`null`); a clip inside one has each
+    /// channel whose edited curve is not its domain's identity written to the
+    /// end AS that identity, which an end keeps as "animate to neutral" — a
+    /// `null` there would only stop animating it. None when nothing would
+    /// change.
     func curvesReset(_ channels: [CurveChannel]) -> [ReelOp] {
         var ops: [ReelOp] = []
         var bases: [UInt32] = []
@@ -53,7 +56,7 @@ extension InspectorBinding {
                 bases.append(clip.id)
                 continue
             }
-            let named = channels.filter { !ColorCurves.isIdentity(editedCurve(clip, $0)) }
+            let named = channels.filter { !$0.domain.isIdentity(editedCurve(clip, $0)) }
             if !named.isEmpty {
                 ops += self.ops(video: VideoPatch(curves: .neutral(named)), for: clip)
             }
@@ -88,7 +91,8 @@ final class CurveEditorState {
 /// The Curves row: the channel picker over the plot, square, the row's width
 /// less nothing (the row's gutter is already off it) and never past
 /// `maxPlot` — about 254 pt at the default pane, 230 at the narrowest — then
-/// the selected point's In and Out (3 decimals, 0–1, blank and disabled with
+/// the selected point's In and Out (on a tone curve 3 decimals, 0–1; on a
+/// hue curve In in degrees and Out in degrees or ×; blank and disabled with
 /// no point) and Delete. Hugging 1: the row's stretchy element
 /// (`inspectorRow` gives it no trailing spacer).
 final class CurvesView: NSView {
@@ -128,10 +132,12 @@ final class CurvesView: NSView {
 
         let editor = self.editor
         let inField = CurvePointField(
+            axis: .x, domain: { state.channel.domain },
             read: { [weak editor] in editor?.selectedPoint?.x },
             write: { [weak editor] value in editor?.place(x: value) },
             onEdit: { [weak binding] in binding?.edited() })
         let outField = CurvePointField(
+            axis: .y, domain: { state.channel.domain },
             read: { [weak editor] in editor?.selectedPoint?.y },
             write: { [weak editor] value in editor?.place(y: value) },
             onEdit: { [weak binding] in binding?.edited() })
@@ -190,7 +196,7 @@ final class CurvesView: NSView {
         binding?.edited()
     }
 
-    /// The section's Reset (all four) or a cell's "Reset <Channel>": one
+    /// The section's Reset (all six) or a cell's "Reset <Channel>": one
     /// commit "Curves" of `InspectorBinding.curvesReset`, nothing when it
     /// would change nothing.
     func reset(_ channels: [CurveChannel]) {
@@ -202,25 +208,41 @@ final class CurvesView: NSView {
     }
 }
 
-/// One of the point's two fields: `OptionFieldControl` (3 decimals, 0–1)
-/// while a point is selected, and a blank, disabled box of the same size
-/// while none is.
+/// A point's axis: In is x, Out is y.
+enum CurveAxis { case x, y }
+
+/// One of the point's two fields: an `OptionFieldControl` per domain (spec
+/// §11 GR-32), each fixed at its build with that domain's unit, decimals and
+/// range for its axis — tone 3 decimals 0–1; In on a hue curve "°" 1 decimal
+/// 0–359.9; Out "°" 1 decimal −180…180 on Hue, "×" 2 decimals 0–2 on Sat —
+/// the one matching `domain()` shown while a point is selected, and a blank,
+/// disabled box of the same size while none is.
 final class CurvePointField: NSView, OptionControl {
-    private let field: OptionFieldControl
+    private let fields: [(domain: CurveDomain, control: OptionFieldControl)]
     private let blank = NSView()
     private let read: () -> Double?
+    private let domain: () -> CurveDomain
 
-    init(read: @escaping () -> Double?, write: @escaping (Double) -> Void,
+    init(axis: CurveAxis, domain: @escaping () -> CurveDomain,
+         read: @escaping () -> Double?, write: @escaping (Double) -> Void,
          onEdit: @escaping () -> Void) {
         self.read = read
-        field = OptionFieldControl(
-            width: InspectorMetrics.fieldWidth, unit: "", decimals: 3, min: 0, max: 1,
-            read: { read() ?? 0 }, write: write, enabled: { read() != nil }, onEdit: onEdit)
+        self.domain = domain
+        fields = [CurveDomain.tone, .hueShift, .hueGain].map { d in
+            let (unit, decimals) = Self.format(d, axis)
+            let low = axis == .x ? d.lower.x : d.lower.y
+            let high = axis == .x ? d.upper.x : d.upper.y
+            let control = OptionFieldControl(
+                width: InspectorMetrics.fieldWidth, unit: unit, decimals: decimals, min: low,
+                max: high, read: { read() ?? 0 }, write: write,
+                enabled: { read() != nil && domain() == d }, onEdit: onEdit)
+            return (d, control)
+        }
         super.init(frame: .zero)
         blank.wantsLayer = true
         blank.layer?.borderWidth = 1
         blank.alphaValue = 0.42
-        for view in [field, blank] {
+        for view in fields.map(\.control) + [blank] {
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)
             NSLayoutConstraint.activate([
@@ -238,11 +260,24 @@ final class CurvePointField: NSView, OptionControl {
         fatalError("CurvePointField does not support NSCoder")
     }
 
-    override var intrinsicContentSize: NSSize { field.intrinsicContentSize }
+    /// A domain's unit and decimals on `axis`.
+    private static func format(_ domain: CurveDomain, _ axis: CurveAxis) -> (String, Int) {
+        switch (domain, axis) {
+        case (.tone, _): return ("", 3)
+        case (_, .x), (.hueShift, .y): return ("°", 1)
+        case (.hueGain, .y): return ("×", 2)
+        }
+    }
+
+    override var intrinsicContentSize: NSSize { fields[0].control.intrinsicContentSize }
 
     func refresh() {
         let active = read() != nil
-        field.isHidden = !active
+        let shown = domain()
+        for (d, control) in fields {
+            control.isHidden = !(active && d == shown)
+            control.refresh()
+        }
         blank.isHidden = active
         effectiveAppearance.performAsCurrentDrawingAppearance {
             blank.layer?.borderColor = DS.border.cgColor
@@ -256,12 +291,18 @@ final class CurvePointField: NSView, OptionControl {
     }
 }
 
-/// The channel picker (owner choice 5): four square text cells, Master · Red
-/// · Green · Blue, the chosen one framed and labelled in its channel's tint,
-/// a 3 pt dot under each channel that is not the identity, and "Reset
-/// <Channel>" in each cell's context menu (choice 7).
+/// The channel picker (owner choice 5): six equal text cells, Master · Red
+/// · Green · Blue · Hue · Sat (spec §11 GR-32), the chosen one framed and
+/// labelled in its channel's tint, a 3 pt dot under each channel that is not
+/// its domain's identity, and "Reset <Channel>" in each cell's context menu
+/// (choice 7). The labels are 10 pt (`labelSize`).
 final class CurveChannelPicker: NSView, OptionControl {
     static let height: CGFloat = 24
+    /// The cells' label size (GR-32 owner choice 3: 11 pt while every label
+    /// fits its cell less 2 pt at the 230 pt plot, else 10). Six cells at 11
+    /// pt leave "Master" 37.9 pt of a 38 pt cell (`curves_probe.swift` P19,
+    /// T4-2), so 10.
+    static let labelSize: CGFloat = 10
     private let state: CurveEditorState
     private let curves: () -> ColorCurves
     var onSelect: (CurveChannel) -> Void = { _ in }
@@ -307,7 +348,7 @@ final class CurveChannelPicker: NSView, OptionControl {
             title: "Reset \(channel.title)", action: #selector(resetPicked(_:)), keyEquivalent: "")
         item.target = self
         item.representedObject = channel.rawValue
-        item.isEnabled = !ColorCurves.isIdentity(curves().points(channel))
+        item.isEnabled = !channel.domain.isIdentity(curves().points(channel))
         menu.autoenablesItems = false
         menu.addItem(item)
         return menu
@@ -336,13 +377,13 @@ final class CurveChannelPicker: NSView, OptionControl {
             let label = NSAttributedString(
                 string: channel.title,
                 attributes: [
-                    .font: DS.sans(11, weight: .semibold),
+                    .font: DS.sans(Self.labelSize, weight: .semibold),
                     .foregroundColor: chosen ? channel.tint : DS.textMuted,
                 ])
             let size = label.size()
             label.draw(at: NSPoint(x: (rect.midX - size.width / 2).rounded(),
                                    y: rect.midY - size.height / 2 + 2))
-            if !ColorCurves.isIdentity(current.points(channel)) {
+            if !channel.domain.isIdentity(current.points(channel)) {
                 channel.tint.setFill()
                 NSRect(x: (rect.midX - 1.5).rounded(), y: rect.minY + 3, width: 3, height: 3).fill()
             }
