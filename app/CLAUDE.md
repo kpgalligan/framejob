@@ -1171,16 +1171,21 @@ the key map behind it.
   `ProjectSnapshot.swift`; the canvas hit-tests through `CanvasLayerBox`.
 - `WaveformAnalyzer.swift` (the four scopes' GPU passes over
   `Resources/Shaders/Waveform.metal`: waveform, parade, vectorscope, histogram;
-  `WaveformTrace`) · `ScopeTraces.swift` (`ScopeKind`, `ParadeTrace`,
-  `VectorscopeTrace`, `HistogramTrace`, `ScopeTrace`, their JSON; spec §11
-  GR-10) · `WaveformTap.swift` (`WaveformTaps`: `Compositor.serve` offers each
-  composed frame by recipe key; one command buffer per frame for the shown
-  kinds; one pass in flight per key and one pending slot the newest frame
-  replaces) · `ScopesPanelView.swift` (View ▸ Scopes' panel: two slots with
-  pickers, the shrink-to-fit layout and its 360 pt floor, `UngradedTagView`,
-  `SelectionTagView`) · `ScopeSlotView.swift` (a slot: the picker, the caption,
-  the body and its readouts) ·
-  `WaveformTraceView.swift` · `ParadeView.swift` · `VectorscopeView.swift` ·
+  `WaveformTrace`; pass-keyed, the kind-keyed forms ×1 wrappers) ·
+  `ScopeTraces.swift` (`ScopeKind`, `ScopePass` — a kind and, for the
+  vectorscope, its zoom, spec §11 GR-31 — `ParadeTrace`, `VectorscopeTrace`
+  with its zoom and off-plot count, `HistogramTrace`, `ScopeTrace`, their
+  JSON; spec §11 GR-10) · `WaveformTap.swift` (`WaveformTaps`:
+  `Compositor.serve` offers each composed frame by recipe key; one command
+  buffer per frame for the shown passes, not kinds, so two vectorscope zooms
+  are two passes; one pass in flight per key and one pending slot the newest
+  frame replaces) · `ScopesPanelView.swift` (View ▸ Scopes' panel: two slots
+  with pickers, the shrink-to-fit layout and its 360 pt floor,
+  `zoom(_:slot:)`, `UngradedTagView`, `SelectionTagView`) ·
+  `ScopeSlotView.swift` (a slot: the picker, the caption, the body and its
+  readouts, and the vectorscope's zoom, kept across a pick away and back) ·
+  `WaveformTraceView.swift` · `ParadeView.swift` · `VectorscopeView.swift`
+  (its rim ticks, and `VectorscopeZoomCells`, the "1× 2× 4×" cells) ·
   `HistogramView.swift` (the slot bodies) ·
   `EditorViewController+Adjustment.swift` (Insert ▸ Adjustment Clip, spec §11
   GR-6: its span — In/Out, else the selection, else the timeline — the
@@ -2515,8 +2520,9 @@ follow the canonical shape: `target(a)` → validate ids → `performGroupedEdit
 → `jsonResult`; failures throw `ToolError` and return in-band
 (`isError: true`). View state and preferences are the one exemption, and it
 is a decision: Preview Quality, the preview window, Show Ungraded and the
-Scopes panel and its slot picks (spec §11 GR-4, GR-5, GR-10; `render_frame
-{ungraded, waveform, parade, vectorscope, histogram}` is the capability), the export queue, the
+Scopes panel and its slot picks and zooms (spec §11 GR-4, GR-5, GR-10, GR-31;
+`render_frame {ungraded, waveform, parade, vectorscope, vectorscope_zoom,
+histogram}` is the capability), the export queue, the
 Media tab's search and sort, the Assistant tab (view state; the dev tool
 `select_inspector_tab` shows it in a Release build, and the assistant's own
 calls already are tool calls) and Settings' Assistant pane (the key, the model

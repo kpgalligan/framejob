@@ -18,6 +18,31 @@ enum ScopeKind: String, CaseIterable {
     }
 }
 
+/// One pass the analyser runs: a scope and, for the vectorscope, its zoom
+/// (spec §11 GR-31). Every other kind's zoom is 1, so a set of passes holds
+/// one pass per kind but the vectorscope, which may hold one per zoom (two
+/// vectorscope slots at different zooms).
+struct ScopePass: Hashable {
+    let kind: ScopeKind
+    /// 1 for every kind but `.vectorscope`.
+    let zoom: Int
+
+    init(_ kind: ScopeKind, zoom: Int = 1) {
+        self.kind = kind
+        self.zoom = kind == .vectorscope ? zoom : 1
+    }
+
+    /// `passes` in the order every pass, delivery and sentence runs:
+    /// `ScopeKind.allCases`, then zoom ascending.
+    static func ordered(_ passes: Set<ScopePass>) -> [ScopePass] {
+        passes.sorted { a, b in
+            let ka = ScopeKind.allCases.firstIndex(of: a.kind) ?? 0
+            let kb = ScopeKind.allCases.firstIndex(of: b.kind) ?? 0
+            return ka != kb ? ka < kb : a.zoom < b.zoom
+        }
+    }
+}
+
 /// One frame's RGB parade (GR-10): R′, G′ and B′ each binned as
 /// `WaveformTrace` bins Y′ — 256 column bins × 256 levels of the saturated
 /// encoded values — so each channel IS a waveform trace, with its marks and
@@ -70,17 +95,27 @@ struct ParadeTrace: Equatable {
 /// `Cr = (R′ − Y′)/1.5748` of the saturated encoded values, Y′ being GR-5's,
 /// in 256 × 256 bins centred on neutral — `bin = clamp(128 + round(255·c),
 /// 0, 255)` — so a grey is mid-bin 128. Cb runs right and Cr up.
+///
+/// **At a zoom** (GR-31) the bins are `128 + round(255·zoom·c)`: clamped at
+/// ×1 as above, and at ×2 and ×4 a pixel whose bin falls off 0…255 is not
+/// counted; `offPlot` is how many were not.
 struct VectorscopeTrace: Equatable {
     static let bins = 256
     /// The neutral bin on both axes.
     static let centre = 128
     /// The bins the kernel counts in threadgroup memory on both axes.
     static let central = 96..<160
+    /// The zooms a slot and `render_frame {vectorscope_zoom}` offer.
+    static let zooms = [1, 2, 4]
 
     /// `counts[crBin * bins + cbBin]`.
     let counts: [UInt32]
     let width: Int
     let height: Int
+    /// The zoom the counts were binned at.
+    var zoom: Int = 1
+    /// Pixels not counted, off the plot: `width·height − Σcounts`, 0 at ×1.
+    var offPlot: Int = 0
 
     /// Rec. 709 Cb and Cr of an encoded colour, each 0…1 component.
     static func chroma(r: Double, g: Double, b: Double) -> (cb: Double, cr: Double) {
@@ -88,9 +123,17 @@ struct VectorscopeTrace: Equatable {
         return ((b - luma) / 1.8556, (r - luma) / 1.5748)
     }
 
-    /// A Cb or Cr value's bin, as the kernel bins it.
+    /// A Cb or Cr value's bin, as the kernel bins it at ×1.
     static func bin(_ c: Double) -> Int {
         min(bins - 1, max(0, centre + Int((255 * c).rounded())))
+    }
+
+    /// A Cb or Cr value's bin at `zoom`, as the kernel bins it: at ×1
+    /// `bin(_:)`, clamped; above it nil when the bin is off the plot.
+    static func bin(_ c: Double, zoom: Int) -> Int? {
+        guard zoom > 1 else { return bin(c) }
+        let raw = centre + Int((255 * Double(zoom) * c).rounded())
+        return (0..<bins).contains(raw) ? raw : nil
     }
 
     /// The six 75 % colour-bar targets, computed through `chroma`.
@@ -116,9 +159,19 @@ struct VectorscopeTrace: Equatable {
     /// The neutral bin's share of the frame, in percent.
     var neutralPercent: Double { 100 * Double(neutral) / Double(max(width * height, 1)) }
 
+    /// The share of the frame left off the plot, in percent.
+    var offPlotPercent: Double { 100 * Double(offPlot) / Double(max(width * height, 1)) }
+
+    /// A target's bins at `zoom`, or nil when either is off the plot.
+    static func targetBins(cb: Double, cr: Double, zoom: Int) -> (cb: Int, cr: Int)? {
+        guard let x = bin(cb, zoom: zoom), let y = bin(cr, zoom: zoom) else { return nil }
+        return (x, y)
+    }
+
     /// What `render_frame {vectorscope}` writes: the counts as 256 arrays by
-    /// Cr bin, each indexed by Cb bin, the neutral count, the targets' bins
-    /// and the skin line.
+    /// Cr bin, each indexed by Cb bin, the neutral count, the zoom and the
+    /// off-plot count, the targets' bins at the zoom (null off the plot) and
+    /// the skin line.
     func json() -> [String: Any] {
         let side = Self.bins
         let byCr = (0..<side).map { cr in
@@ -126,11 +179,13 @@ struct VectorscopeTrace: Equatable {
         }
         var targets: [String: Any] = [:]
         for target in Self.targets {
-            targets[target.name] = [Self.bin(target.cb), Self.bin(target.cr)]
+            let at = Self.targetBins(cb: target.cb, cr: target.cr, zoom: zoom)
+            targets[target.name] = at.map { [$0.cb, $0.cr] as Any } ?? NSNull()
         }
         return [
             "bins": side, "centre": Self.centre, "width": width, "height": height,
             "matrix": "Rec. 709", "values": "encoded", "counts": byCr, "neutral": neutral,
+            "zoom": zoom, "off_plot": offPlot,
             "targets": targets, "skin_line_degrees": Self.skinLineDegrees,
         ]
     }

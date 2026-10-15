@@ -78,10 +78,13 @@
 //                      `ungraded` (View ▸ Show Ungraded on), `ramp` (every
 //                      slot shows a fixed trace of its kind: a 256 × 360 grey
 //                      ramp's waveform, parade and histogram, and a
-//                      vectorscope of lines from neutral to the six targets),
-//                      and `top=<kind>` / `bottom=<kind>` (a slot's pick,
-//                      through the panel's own `pick`), or "-"/absent for
-//                      none. The toggles go through the editor's own
+//                      vectorscope of lines from neutral to the six targets,
+//                      at each zoom, stopping at the plot's edge),
+//                      `top=<kind>` / `bottom=<kind>` (a slot's pick,
+//                      through the panel's own `pick`) and `topzoom=<1|2|4>`
+//                      / `bottomzoom=<1|2|4>` (a slot's vectorscope zoom,
+//                      through the panel's own `zoom`, grading-4 T4-1), or
+//                      "-"/absent for none. The toggles go through the editor's own
 //                      commands; the panel's tap is then detached, so no live
 //                      frame can replace the fixed traces and the capture is
 //                      deterministic. With `scopes`, stdout gets `seeing
@@ -89,6 +92,8 @@
 //                      Y W H` per visible slot (its body's rect: for a
 //                      vectorscope, the square) and, when a waveform slot
 //                      shows, `seeing trace X Y W H` (the first one's body),
+//                      and one `seeing cells <top|bottom> X Y W H` per
+//                      visible vectorscope slot (its zoom cells' rect),
 //                      each in points, top-left origin. APPENDED, for
 //                      `tools/proof/seeing_proof.py` and `scopes_proof.py`;
 //                      compiled out of a `-D HARNESS_REFERENCE_BUILD`
@@ -1036,8 +1041,15 @@ extension Harness {
     /// unknown item.
     static func applySeeing(_ items: [String], to controller: EditorViewController) -> Int32? {
         var picks: [(Int, ScopeKind)] = []
+        var zooms: [(Int, Int)] = []
         for item in items where !["scopes", "ungraded", "ramp"].contains(item) {
             let parts = item.split(separator: "=", maxSplits: 1).map(String.init)
+            if parts.count == 2, let slot = ["topzoom", "bottomzoom"].firstIndex(of: parts[0]),
+                let zoom = Int(parts[1]), VectorscopeTrace.zooms.contains(zoom)
+            {
+                zooms.append((slot, zoom))
+                continue
+            }
             guard parts.count == 2, let slot = ["top", "bottom"].firstIndex(of: parts[0]),
                 let kind = ScopeKind(rawValue: parts[1])
             else {
@@ -1050,6 +1062,7 @@ extension Harness {
         if items.contains("ungraded") { controller.toggleShowUngraded(nil) }
         guard let panel = controller.scopesPanel else { return nil }
         for (slot, kind) in picks { panel.pick(kind, slot: slot) }
+        for (slot, zoom) in zooms { panel.zoom(zoom, slot: slot) }
         controller.view.layoutSubtreeIfNeeded()
         if let key = controller.document?.recipeKey { WaveformTaps.shared.detach(key: key) }
         if items.contains("ramp") { panel.show(rampTraces()) }
@@ -1068,34 +1081,45 @@ extension Harness {
         if let waveform = panel.slotViews.first(where: { !$0.isHidden && $0.kind == .waveform }) {
             print("seeing trace \(rect(waveform.body))")
         }
+        for slot in panel.slotViews where !slot.isHidden {
+            guard let vectorscope = slot.body as? VectorscopeView else { continue }
+            print("seeing cells \(slot.name) \(rect(vectorscope.cells))")
+        }
         return nil
     }
 
-    /// The `ramp` item's fixed traces: a 256 × 360 grey ramp's waveform,
-    /// parade and histogram, and lines from neutral to the six targets.
-    static func rampTraces() -> [ScopeKind: ScopeTrace] {
+    /// The `ramp` item's fixed traces, by pass: a 256 × 360 grey ramp's
+    /// waveform, parade and histogram, and at each zoom lines from neutral
+    /// toward the six targets, stopping at the plot's edge.
+    static func rampTraces() -> [ScopePass: ScopeTrace] {
         let side = WaveformTrace.columns
         var diagonal = [UInt32](repeating: 0, count: side * side)
         for column in 0..<side { diagonal[column * side + column] = 360 }
-        var vectors = [UInt32](repeating: 0, count: side * side)
-        for target in VectorscopeTrace.targets {
-            let cb = VectorscopeTrace.bin(target.cb) - VectorscopeTrace.centre
-            let cr = VectorscopeTrace.bin(target.cr) - VectorscopeTrace.centre
-            let steps = max(abs(cb), abs(cr), 1)
-            for step in 0...steps {
-                let x = VectorscopeTrace.centre + cb * step / steps
-                let y = VectorscopeTrace.centre + cr * step / steps
-                vectors[y * side + x] = 360
-            }
-        }
-        return [
-            .waveform: .waveform(WaveformTrace(counts: diagonal, width: side, height: 360)),
-            .parade: .parade(ParadeTrace(counts: diagonal + diagonal + diagonal, width: side,
-                                         height: 360)),
-            .vectorscope: .vectorscope(VectorscopeTrace(counts: vectors, width: side, height: 360)),
-            .histogram: .histogram(HistogramTrace(
+        var traces: [ScopePass: ScopeTrace] = [
+            ScopePass(.waveform): .waveform(WaveformTrace(
+                counts: diagonal, width: side, height: 360)),
+            ScopePass(.parade): .parade(ParadeTrace(
+                counts: diagonal + diagonal + diagonal, width: side, height: 360)),
+            ScopePass(.histogram): .histogram(HistogramTrace(
                 counts: [UInt32](repeating: 360, count: 4 * side), width: side, height: 360)),
         ]
+        for zoom in VectorscopeTrace.zooms {
+            var vectors = [UInt32](repeating: 0, count: side * side)
+            for target in VectorscopeTrace.targets {
+                let cb = Int((255 * Double(zoom) * target.cb).rounded())
+                let cr = Int((255 * Double(zoom) * target.cr).rounded())
+                let steps = max(abs(cb), abs(cr), 1)
+                for step in 0...steps {
+                    let x = VectorscopeTrace.centre + cb * step / steps
+                    let y = VectorscopeTrace.centre + cr * step / steps
+                    guard (0..<side).contains(x), (0..<side).contains(y) else { break }
+                    vectors[y * side + x] = 360
+                }
+            }
+            traces[ScopePass(.vectorscope, zoom: zoom)] = .vectorscope(VectorscopeTrace(
+                counts: vectors, width: side, height: 360, zoom: zoom))
+        }
+        return traces
     }
 }
 #endif

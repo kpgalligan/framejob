@@ -18648,7 +18648,7 @@ listing read from main's instance) M1; `grading_spike.py --check --tree
 **Its record** is `archive/grading.md`'s "GR7a" section, with every figure's
 command, host, power and load.
 
-## Road map grading-2 — G2-1, the scopes (`scopes_proof.py` S1–S10, T1, T2, M1–M4, H1–H3, Z1 and eleven mutants; `scopes_probe.swift`; spec §11 GR-10)
+## Road map grading-2 — G2-1, the scopes (`scopes_proof.py` S1–S14, T1–T3, M1–M4, H1–H4, Z1 and sixteen mutants; `scopes_probe.swift`; spec §11 GR-10, grading-4 T4-1's GR-26 and GR-31)
 
 **What it answers.** That the parade, the vectorscope and the histogram count
 what the person sees, by GR-10's arithmetic and its counting rule, in time;
@@ -18690,10 +18690,36 @@ and dark, each byte-identical twice; trace pixels in every body; and the slot
 rects the harness prints (`seeing panel …`, `seeing slot …`) at panes of about
 460, 755 and 305 pt. The module docstring lists every row and its fixture.
 
+**Grading-4 T4-1** (spec §11 GR-26's same-bin add, GR-31's zoom) added a sixth
+fixture, a flat (0.8, 0.1, 0.1) red, to S6, T1, T2 and T3, and these rows. S6
+also compares the vectorscope at ×2 and ×4 with a CPU count of the fixture's
+own half floats (Y′, Cb and Cr in `Float` as the shader computes them):
+`off_plot` between the CPU's definite off-plot pixels and those plus its ties
+(within 1e-3 of the plot's edges, 127.5 and −128.5), the occupied bins within
+±1 both ways, the gradient crossing the edge at both zooms. S11 a near-grey
+card (every (128 ± 5)/255 combination) spreading 2× and 4× at the zoom. S12
+75 % red counted at ×1 and off the plot at ×2, and every kind's ×1 counts
+equal to an analyser over `git show 31f3aa1:app/Resources/Shaders/Waveform.metal`
+(the proof writes it beside the probe) on the six fixtures, the six 75 % cards
+and pure red. S13 (MCP) `render_frame {vectorscope: true, vectorscope_zoom: 4}`:
+its JSON's `zoom`, its bins and its exact `off_plot` against this script's ×4
+bins of the PNG, null targets, the zoomed sentence, and the two refusals. S14
+the panel's zoom in an `EditorViewController`: per slot, re-attaching its pass
+with one ask for a frame, two vectorscope passes at ×1 and ×4 delivered
+through one tap and each shown in its slot, kept across hide and show and a
+pick away and back, no `UserDefaults` key, ×1 in a new controller. T1 adds the
+vectorscope at ×2 and ×4 to its scored scopes. T3 is T2's shape for the
+vectorscope: the tree's ×1 pass against its one `bool central = ` line forced
+to `false`, scored on the fixture where the forced-global vectorscope is
+slowest, the tree's time ≤ 0.85 × the global one's (the same-bin add rescues
+the flat fixtures T1 caught the global vectorscope on). H4 the harness's `topzoom=2|4` light and dark, each
+byte-identical twice and unlike ×1, and the `seeing cells …` rect 4 pt in from
+the square's bottom-right corner.
+
 ```
 python3 tools/proof/scopes_proof.py                  # Debug unless RC_PROOF_APP=release
 python3 tools/proof/scopes_proof.py --only S1,M1     # run and score only these rows
-python3 tools/proof/scopes_proof.py --mutant NAME    # one of the eleven below
+python3 tools/proof/scopes_proof.py --mutant NAME    # one of the sixteen below
 ```
 
 It launches its own instance on a scratch socket in a scratch home
@@ -18702,7 +18728,7 @@ PNG with a white and a black quarter) into its work folder, performs only View
 ▸ Scopes (which persists nothing, and is turned off again), closes the
 project it opens, and removes its work folder at the start and at exit.
 `--mutant` builds a tree copy as `seeing_proof` does, builds the probe over the
-copy's `app/Sources` and shader, skips H1–H3 (the harness builds the tree's
+copy's `app/Sources` and shader, skips H1–H4 (the harness builds the tree's
 own sources), and reports MUTANT PASS only when every named row failed and no
 other scored row did, but a row the mutant tolerates (`TOLERATED`), which the
 MUTANT line names when it failed.
@@ -18712,16 +18738,27 @@ MUTANT line names when it failed.
 | `cb-cr-swapped` | the kernel puts Cr on the Cb axis | S1 M1 |
 | `bt601` | the vectorscope's matrix is BT.601's | S1 M1 |
 | `bins-edged` | the chroma bins floor instead of round | S1 S2 |
-| `vectorscope-global` | every vectorscope pixel adds globally | T1 |
+| `vectorscope-global` | every vectorscope pixel adds globally | T3; T1 tolerated (GR-26's same-bin add rescues the flat fixtures T1 caught it on) |
 | `histogram-global` | every histogram pixel adds globally | T1 |
 | `histogram-luma-601` | the histogram's Y′ takes BT.601's weights | S5 |
 | `pick-persisted` | a slot's pick is written to `UserDefaults` | S9 |
-| `tap-first-kind-only` | the tap measures only the first shown kind | S7 S8 |
+| `tap-first-kind-only` | the tap runs only the first shown pass (re-anchored on `encode(passes, …)` in T4-1) | S7 S8; S14 tolerated (its two vectorscope passes go through one tap) |
 | `slots-not-shrunk` | the slot bodies stay at their preferred heights | S10 |
 | `parade-band-misplaced` | the parade's merge puts both bands in the group's first column | S3 |
 | `parade-global` | every parade group adds globally (`bool banded = false;`) | T2; T1 tolerated (the forced-global parade measured 1.15 ms at 4K on flat in G2-5, 1.019–1.042 in G2-1, at or over T1's 1.1 ms) |
+| `zoom-in-drawing-only` | the kernel bins every zoom at ×1 | S11 S12 S13; S6 tolerated (its zoomed half is the same off-plot count) |
+| `off-plot-clamped` | a pixel off the plot is clamped to the edge, as at ×1 | S6 S12 S13; T1 tolerated (1.67 ms at ×4 on the gradient in the brief's bench) |
+| `same-bin-add-dropped` | the same-bin add's branch is never taken | T1; T3 tolerated (the flat red, about 7.2 ms in the tree and its forced-global twin alike, becomes T3's slowest fixture) |
+| `zoom-persisted` | a slot's zoom is written to `UserDefaults` | S14 |
+| `render-ignores-zoom` | `writeScopes` always gets zoom 1 | S13 |
 
-**Its record**: `archive/grading-2.md`'s G2-1 and G2-5 sections.
+S12 holds every ×1 count to the T4-0 tree's shader, so the mutants of the ×1
+counting (`cb-cr-swapped`, `bt601`, `bins-edged`, `histogram-luma-601`,
+`parade-band-misplaced`) tolerate S12; `bins-edged` tolerates S11 too, whose
+×2 and ×4 extents are measured against ×1's.
+
+**Its record**: `archive/grading-2.md`'s G2-1 and G2-5 sections, and
+`designs/grading-4.md`'s T4-1 section.
 
 ## Road map grading-2 — G2-2, the wheels (`wheels_proof.py` N0–N2, L1, G1, Y1, C1, O1, A1, J1, X1, U1, V1, P0, R1, P1–P7, Z1 and twelve mutants; `wheels_probe.swift`; `core/tests/wheels.rs`, `core/tests/schema_v16.rs`; spec §11 GR-11)
 

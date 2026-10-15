@@ -808,3 +808,191 @@ applied by the orchestrator: this record's Verification line now cites a printed
 line instead of an unrecorded power claim, and the `names` gate step re-ran after this file's last
 edit. The adversary raised no objection; its one note (the extra ")" the owed `app/CLAUDE.md`
 text leaves on line 37) was carried into the owed edit.
+
+## T4-1 — scopes: the same-bin add and the vectorscope zoom
+
+**What landed** (2026-10-14, in the worktree on `grading-4`, from `31f3aa1`). GR-31 in
+`designs/spec/11-decisions/grading-4.md`, written before any code, with its index row, the
+"Amended by GR-31" line under GR-10 in `grading-2.md` and ", amended by GR-31" on GR-10's index row;
+then:
+- **The kernel** (`Waveform.metal`): `framejob_vectorscope_bin` takes `constant uint &zoom
+  [[buffer(1)]]`. `chromaBins(rgb, zoom)` branches on the uniform: ×1 keeps GR-10's clamped
+  `int2(round(255.0 * c))` verbatim, ×2 and ×4 bin `int2(round(255.0 * float(zoom) * c))`
+  unclamped, and the kernel drops a pixel whose bin is off 0…255. GR-26's same-bin add: a lane
+  with a non-central bin carries it (else a `kNoBin` sentinel: off the frame, off the plot or
+  counted in the centre), and outside the in-frame branch `simd_broadcast_first`, `simd_sum` and
+  `simd_all` add a SIMD group's shared bin once; the central 64 × 64 threadgroup path is
+  unchanged. The waveform, parade and histogram kernels are untouched.
+- **Swift**: `ScopePass` (a kind and, for the vectorscope, its zoom) in `ScopeTraces.swift`;
+  `VectorscopeTrace` gains `zoom`, `offPlot`, `zooms`, `bin(_:zoom:)`, `targetBins`,
+  `offPlotPercent` and the JSON's `zoom`, `off_plot` and null off-plot `targets`;
+  `WaveformAnalyzer`'s `encode`, `trace` and `analyze` are pass-keyed (the zoom a `setBytes` at
+  index 1 for a vectorscope pass), the kind-keyed forms kept as ×1 wrappers (`byKind`);
+  `WaveformTaps` carries passes (`attach(key:passes:)`, `attachedPasses`; the kind forms kept);
+  `VectorscopeView` draws an off-plot target as a 6 pt rim tick and hosts
+  `VectorscopeZoomCells`; `ScopeSlotView` holds `zoom`, `onZoom` and `pass` (its dev-tools
+  snapshot part `scopes.<slot>.zoom`); `ScopesPanelView` gains `zoom(_:slot:)`, `shownPasses` and
+  a pass-keyed `show`. `render_frame {vectorscope_zoom}` (`AgentServer+Render.swift`,
+  `writeScopes` in `AgentServer+Scopes.swift`, the catalog row in `AgentCatalog+Render.swift`).
+- **No** core, FFI, op, format or tool-count change; no file at the cap (`wc -l` after:
+  `ScopeTraces.swift` 269, `WaveformAnalyzer.swift` 312, `WaveformTap.swift` 207,
+  `VectorscopeView.swift` 236, `ScopeSlotView.swift` 244, `ScopesPanelView.swift` 264,
+  `AgentServer+Render.swift` 310, `AgentServer+Scopes.swift` 81, `AgentCatalog+Render.swift` 286).
+- **Instruments**: `scopes_probe.swift` (the sixth fixture; S6 at ×2 and ×4 against a CPU count;
+  S11, S12, S14; T1's ×2 and ×4 variants; T3; T2 and T3 share one `forcedGlobal` helper);
+  `scopes_proof.py` (rows S11–S14, T3, H4; five mutants; `vectorscope-global` now T3's;
+  `tap-first-kind-only` re-anchored on `analyzer.encode(passes, frame: texture, into: buffer)`);
+  the harness's `topzoom=`/`bottomzoom=`, pass-keyed `rampTraces` (a vectorscope trace per zoom,
+  its lines stopping at the plot's edge) and `seeing cells`.
+- **Documents**: spec §4.2's Vectorscope paragraph, §7.9a's `render_frame`, the spec index's
+  Lines cells, the README's Scopes bullet, the screen catalog's 04b prose, GRD-11's two added
+  steps, and `tools/proof/README.md`'s scopes section.
+
+**Deviation from the spec, recorded**: S6's tie band sits at the plot's two real edges,
+`255·zoom·c` = 127.5 and −128.5 (`128 + round(v)` leaves 0…255 past them; round halves away from
+zero), not "±127.5".
+
+**Verification** (2026-10-14, M2 Max; `pmset -g` as T1 printed it: "powermode 0 | Now drawing
+from 'AC Power'"; `vm.loadavg` 49.56 40.71 26.34 before the recorded run: other sessions' builds
+were running):
+- In the loop: `make typecheck` exit 0, 0 errors, the 4 baseline warnings;
+  `swift_build.py typecheck --define FRAMEJOB_DEV_TOOLS` of `scopes_probe.swift` and
+  `waveform_probe.swift` exit 0; `make app-debug` BUILD SUCCEEDED; `scopes_proof.py --only
+  S1,S2,S6,S11,S12,S13,S14,T1,T2,T3,M1,M3` on Debug: 10/12 (S14 FAILED: the app's shared tap has
+  no analyser in a probe, so the instrument now drives a tap over the probe's own; T3 FAILED, see
+  below); then `--only S14,T3` 2/2; `--only H1,H2,H3,H4` 4/4. `spec_index_proof.py` 162/162,
+  `name_residue.py` exit 0.
+- `make gate`: PASS in 263 s (names 1 s, typecheck 6 s, fmt and lint skipped as unchanged, test
+  124 s, app 131 s with D25 and D26 ok); the test log has 121 `test result: ok` lines and no
+  FAILED, and `spec_index_proof.py` 162/162 among its proof steps.
+- Recorded, on the gate's Release build: `RC_PROOF_APP=release python3
+  tools/proof/scopes_proof.py`: exit 0, **26/26**, Z1 no `Frame Job: ` line, no `DEFAULTS MOVED`.
+  S13: `off_plot` 147960 against this script's 147960, every target null, the refusals
+  "render_frame: vectorscope_zoom must be 1, 2 or 4 (got 3)." and "render_frame:
+  vectorscope_zoom needs vectorscope: true." H4: the cells at [1073, 288, 46, 16] in a
+  [899, 84, 224, 224] square, light and dark, each zoom byte-identical twice and unlike ×1.
+- `RC_PROOF_APP=release python3 tools/proof/seeing_proof.py --only P1,…,P7`: exit 0, 7/7 (the
+  tap's kind wrapper, `waveform_probe.swift`).
+
+**T1 at 4K, the recorded run** (ms; GR-26's six fixtures, flat · flat-red · gradient · near-grey
+· noise · ramp):
+
+| Pass | flat | flat-red | gradient | near-grey | noise | ramp | worst |
+|---|---|---|---|---|---|---|---|
+| vectorscope ×1 | 0.322 | 0.357 | 0.400 | 0.407 | 0.417 | 0.452 | 0.452 |
+| vectorscope ×2 | 0.319 | 0.332 | 0.318 | 0.401 | 0.320 | 0.394 | 0.401 |
+| vectorscope ×4 | 0.320 | 0.332 | 0.278 | 0.354 | 0.313 | 0.356 | 0.356 |
+| parade | 0.445 | 0.628 | 0.438 | 0.688 | 0.624 | 0.675 | 0.688 |
+| histogram | 0.668 | 0.563 | 0.374 | 0.216 | 0.189 | 0.194 | 0.668 |
+
+The flat saturated red, 7.29–7.33 ms in the brief's bench on the shipped kernel, is 0.357 ms at
+×1 in the app's pass. T2 (flat): banded 0.442, global 1.150, ratio 0.385.
+
+**T3, and its bound.** The tree's ×1 vectorscope against its `bool central = false;` twin, on
+the six 4K fixtures, scored on the one where the forced-global build is slowest. Before the
+review, three runs on the tree against the then-shared 0.75 bound:
+
+| Run | load (`vm.loadavg`) | slowest forced-global fixture | tree | global | ratio | row at 0.75 |
+|---|---|---|---|---|---|---|
+| Debug loop, first | not recorded (the ruling: about 50) | near-grey | 0.455 | 0.571 | 0.796 | FAILED |
+| Debug loop, `--only S14,T3` | not recorded (the ruling: about 50) | near-grey | 0.408 | 0.578 | 0.706 | ok |
+| Release, first recorded | 49.56 40.71 26.34 | near-grey | 0.411 | 0.578 | 0.712 | ok |
+
+A row that fails one run in three on the unchanged tree is a flaky instrument, so the
+orchestrator's ruling (2026-10-15) gave T3 its own bound, **0.85** (`T3_RATIO_MAX` in
+`scopes_proof.py`; T2 keeps 0.75): under the `vectorscope-global` mutant the two builds are the
+same shader, so its ratio is 1.0 by construction and only its noise spreads it, while the tree
+measured 0.706–0.796 under heavy load; 0.85 sits between them with margin on both sides. It is
+not moved again without a new measurement. After the change (fix pass 1, 2026-10-15, after a
+`make app-debug` the stale-app refusal asked for):
+
+| Run | load (`vm.loadavg`) before | slowest forced-global fixture | tree | global | ratio | row at 0.85 |
+|---|---|---|---|---|---|---|
+| Debug `--only T3`, 1 | 6.48 18.55 27.48 | near-grey | 0.411 | 0.532 | 0.772 | ok |
+| Debug `--only T3`, 2 | 5.24 16.14 26.02 | near-grey | 0.411 | 0.567 | 0.725 | ok |
+| Debug `--only T3`, 3 | 24.86 19.54 26.55 | near-grey | 0.412 | 0.579 | 0.712 | ok |
+| `--mutant vectorscope-global` | 22.45 20.25 26.36 | near-grey | 0.645 | 0.532 | 1.213 | FAILED: MUTANT PASS (21/22, T3 alone) |
+| Release, recorded (repeat) | 21.55 25.37 27.91 | near-grey | 0.412 | 0.577 | 0.713 | ok, run 26/26 |
+
+The repeated recorded run (`RC_PROOF_APP=release python3 tools/proof/scopes_proof.py`, after
+the fix pass's `make gate`): exit 0, **26/26**, Z1 no `Frame Job: ` line, no `DEFAULTS MOVED`;
+T1's worst 4K figures parade 0.625 (noise), vectorscope ×1 0.420 (noise), ×2 0.353 (noise), ×4
+0.321 (flat), histogram 0.667 (flat); T2 (flat-red) banded 0.634, global 1.154, ratio 0.549.
+
+In the first recorded run the forced-global vectorscope was FASTER than the tree's on four
+fixtures (flat 0.273 against 0.325, flat-red 0.383 / 0.411, noise 0.310 / 0.366, ramp 0.383 /
+0.457) and slower only on near-grey and the gradient; the repeat agrees (flat 0.386 / 0.541,
+noise 0.348 / 0.476, ramp 0.457 / 0.712, near-grey 0.577 / 0.412).
+
+**Mutants** (`python3 tools/proof/scopes_proof.py --mutant NAME`, each on its own tree copy's
+Debug build, bounded; the five new and the three the spec named, once at the end):
+
+| Mutant | Must fail | Answer |
+|---|---|---|
+| `zoom-in-drawing-only` | S11 S12 S13 | MUTANT PASS (S6 tolerated, failed) |
+| `off-plot-clamped` | S6 S12 S13 | MUTANT PASS (T1 tolerated, passed) |
+| `same-bin-add-dropped` | T1 | MUTANT PASS (T3 tolerated, failed: flat-red 7.172 tree / 7.248 global, ratio 0.99; T1's ×1 flat-red 7.166 ms) |
+| `zoom-persisted` | S14 | MUTANT PASS |
+| `render-ignores-zoom` | S13 | MUTANT PASS |
+| `bins-edged` | S1 S2 | MUTANT PASS (S11 and S12 tolerated, both failed: ×1's extent 9 bins against ×2's 20) |
+| `tap-first-kind-only` (re-anchored) | S7 S8 | MUTANT PASS (S14 tolerated, failed) |
+| `vectorscope-global` | T3 | MUTANT PASS (T1 tolerated, passed) |
+
+`same-bin-add-dropped` and `bins-edged` first answered MUTANT FAILURE, each for a row its edit
+fails by construction (T3; S11); both were added to `TOLERATED` with their reasons and the two
+re-run. The other eight old mutants (`cb-cr-swapped`, `bt601`, `histogram-global`,
+`histogram-luma-601`, `pick-persisted`, `slots-not-shrunk`, `parade-band-misplaced`,
+`parade-global`) were not re-run; S12 is tolerated for the ×1-counting ones by reasoning, unrun.
+
+**Owed.**
+- The `app/CLAUDE.md` edits (the orchestrator's): the scopes entry, lines 1172–1184 (from
+  "- `WaveformAnalyzer.swift` (the four scopes' GPU passes over" to "`HistogramView.swift` (the
+  slot bodies) ·"), becomes
+
+```
+- `WaveformAnalyzer.swift` (the four scopes' GPU passes over
+  `Resources/Shaders/Waveform.metal`: waveform, parade, vectorscope, histogram;
+  `WaveformTrace`; pass-keyed, the kind-keyed forms ×1 wrappers) ·
+  `ScopeTraces.swift` (`ScopeKind`, `ScopePass` — a kind and, for the
+  vectorscope, its zoom, spec §11 GR-31 — `ParadeTrace`, `VectorscopeTrace`
+  with its zoom and off-plot count, `HistogramTrace`, `ScopeTrace`, their
+  JSON; spec §11 GR-10) · `WaveformTap.swift` (`WaveformTaps`:
+  `Compositor.serve` offers each composed frame by recipe key; one command
+  buffer per frame for the shown passes, not kinds, so two vectorscope zooms
+  are two passes; one pass in flight per key and one pending slot the newest
+  frame replaces) · `ScopesPanelView.swift` (View ▸ Scopes' panel: two slots
+  with pickers, the shrink-to-fit layout and its 360 pt floor,
+  `zoom(_:slot:)`, `UngradedTagView`, `SelectionTagView`) ·
+  `ScopeSlotView.swift` (a slot: the picker, the caption, the body and its
+  readouts, and the vectorscope's zoom, kept across a pick away and back) ·
+  `WaveformTraceView.swift` · `ParadeView.swift` · `VectorscopeView.swift`
+  (its rim ticks, and `VectorscopeZoomCells`, the "1× 2× 4×" cells) ·
+  `HistogramView.swift` (the slot bodies) ·
+```
+
+  and the Agent-parity rule's lines 2518–2519, from "Scopes panel and its slot picks (spec §11
+  GR-4, GR-5, GR-10;" to "is the capability), the export queue, the", become
+
+```
+Scopes panel and its slot picks and zooms (spec §11 GR-4, GR-5, GR-10, GR-31;
+`render_frame {ungraded, waveform, parade, vectorscope, vectorscope_zoom,
+histogram}` is the capability), the export queue, the
+```
+- GRD-11's two added steps (the zoom on a face and a grey card, the ticks' legibility; a
+  solid-colour slide playing with the vectorscope shown) are the owner's, before the release.
+
+**Residue** (for the orchestrator to file; not this phase's, by the ruling).
+- Whether the vectorscope's central 64 × 64 threadgroup path still pays for itself now that
+  GR-26's same-bin add makes flat frames cheap: in both recorded runs the forced-global build
+  was faster on flat, noise and ramp (and on flat-red in the first), the tree faster only on
+  near-grey (tree 0.411 against global 0.578, then 0.412 against 0.577) and, in the first
+  run, slightly on the gradient; every figure is well under GR-10's 1.1 ms (T1's worst
+  vectorscope ×1 at 4K 0.452 and 0.420). Filed as #296.
+- `designs/spec/07.9a-agent-tools.md` at 572 lines (562 before), past the spec README's ~500-line
+  split threshold. Filed as #297.
+
+**Review.** Two lc-reviewer passes. The first: fix-required, two should-fixes (T3 still scored
+at 0.75 against the orchestrator's 0.85 ruling, and this record still calling the bound
+unmoved) and two nits; fix pass 1 closed all four. The second: pass, two nits (the proof
+README's T3 paragraph now states its 0.85 bound; this Residue's near-grey pairs say which is
+the tree's), both applied by the orchestrator with the owed `app/CLAUDE.md` edits above.

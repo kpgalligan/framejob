@@ -4,7 +4,8 @@ import AppKit
 /// the faint "Rec. 709 · encoded" caption at its right, the picked scope's
 /// body, and — for the waveform and the histogram — the two clipping
 /// readouts. Its height is its kind's chrome plus `bodyHeight`, which the
-/// panel's layout rule sets.
+/// panel's layout rule sets. It also holds the vectorscope's zoom (spec §11
+/// GR-31), which outlives a pick of another scope: its pass is `pass`.
 final class ScopeSlotView: NSView {
     static let inset: CGFloat = 12
     static let headerTop: CGFloat = 10
@@ -55,6 +56,18 @@ final class ScopeSlotView: NSView {
         }
     }
     var onPick: ((ScopeKind) -> Void)?
+    /// The vectorscope's zoom (1, 2 or 4), pushed into a vectorscope body and
+    /// kept across a pick of another scope and back.
+    var zoom: Int = 1 {
+        didSet {
+            guard zoom != oldValue else { return }
+            (body as? VectorscopeView)?.zoom = zoom
+        }
+    }
+    /// A click on the vectorscope's zoom cells.
+    var onZoom: ((Int) -> Void)?
+    /// The pass this slot shows: its kind and, for the vectorscope, its zoom.
+    var pass: ScopePass { ScopePass(kind, zoom: zoom) }
     private(set) var body: NSView = WaveformTraceView()
 
     private lazy var picker = OptionPopupControl(
@@ -161,7 +174,12 @@ final class ScopeSlotView: NSView {
         switch kind {
         case .waveform: body = WaveformTraceView()
         case .parade: body = ParadeView()
-        case .vectorscope: body = VectorscopeView()
+        case .vectorscope:
+            let vectorscope = VectorscopeView()
+            vectorscope.zoom = zoom
+            vectorscope.onZoom = { [weak self] zoom in self?.onZoom?(zoom) }
+            vectorscope.cells.setAccessibilityIdentifier("scopes.\(name).zoom")
+            body = vectorscope
         case .histogram: body = HistogramView()
         }
         body.setAccessibilityIdentifier("scopes.\(name).trace")
@@ -208,9 +226,19 @@ final class ScopeSlotView: NSView {
 #if FRAMEJOB_DEV_TOOLS
 extension ScopeSlotView: UISnapshotParts {
     /// The picker draws its item itself, so the layout dump names it:
-    /// `scopes.<top|bottom>.picker`, its text the pick's title.
+    /// `scopes.<top|bottom>.picker`, its text the pick's title; and with a
+    /// vectorscope body, `scopes.<top|bottom>.zoom`, its text the zoom ("4×")
+    /// and its rect the three cells'.
     func snapshotParts() -> [UISnapshotPart] {
-        [UISnapshotPart(id: "scopes.\(name).picker", text: kind.title, rect: picker.frame)]
+        var parts = [
+            UISnapshotPart(id: "scopes.\(name).picker", text: kind.title, rect: picker.frame)
+        ]
+        if let vectorscope = body as? VectorscopeView {
+            parts.append(UISnapshotPart(
+                id: "scopes.\(name).zoom", text: "\(zoom)×",
+                rect: vectorscope.cells.convert(vectorscope.cells.bounds, to: self)))
+        }
+        return parts
     }
 }
 #endif

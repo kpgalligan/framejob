@@ -14,10 +14,11 @@
 //  adds globally; the parade counts each 8-px-wide threadgroup's two column
 //  bins in threadgroup memory (GR-10's fallback, taken in G2-1); the
 //  vectorscope counts its central 64 × 64 bins (where grey and near-grey
-//  pixels land) in threadgroup memory and the rest globally; the histogram
-//  counts in threadgroup memory. Each threadgroup merges its counts once,
-//  and a threadgroup kernel guards its pixel read rather than returning
-//  before its barriers.
+//  pixels land) in threadgroup memory and the rest globally, a non-central
+//  bin shared by a whole SIMD group added once (GR-26's same-bin add: a flat
+//  saturated colour); the histogram counts in threadgroup memory. Each
+//  threadgroup merges its counts once, and a threadgroup kernel guards its
+//  pixel read rather than returning before its barriers.
 //
 
 #include <metal_stdlib>
@@ -116,20 +117,34 @@ kernel void framejob_parade_bin(texture2d<half, access::read> frame [[texture(0)
     }
 }
 
-// Rec. 709 Cb and Cr of a saturated encoded colour, each as its bin: 256 bins
-// centred on neutral, `bin = clamp(128 + round(255·c), 0, 255)`, so a grey is
-// mid-bin 128 and never on an edge between two bins.
-static inline uint2 chromaBins(float3 rgb) {
+// Rec. 709 Cb and Cr of a saturated encoded colour, each as its bin at
+// `zoom` (GR-10, GR-31): 256 bins centred on neutral, `bin = 128 +
+// round(255·zoom·c)`, so a grey is mid-bin 128 and never on an edge between
+// two bins. At ×1 the bins are clamped to 0…255, GR-10's rule, through its
+// own expression (never `255·zoom·c` with zoom 1: fast math may reassociate
+// a runtime product), so every ×1 trace is the one the T4-0 tree counted. At
+// ×2 and ×4 they are not clamped, and a bin outside 0…255 is off the plot.
+static inline int2 chromaBins(float3 rgb, uint zoom) {
     float luma = dot(rgb, kLumaWeights);
     float2 c = float2((rgb.b - luma) / 1.8556, (rgb.r - luma) / 1.5748);
-    return uint2(clamp(int2(128) + int2(round(255.0 * c)), int2(0), int2(255)));
+    if (zoom == 1u) {
+        return clamp(int2(128) + int2(round(255.0 * c)), int2(0), int2(255));
+    }
+    return int2(128) + int2(round(255.0 * float(zoom) * c));
 }
 
-// The vectorscope: `counts` is `crBin * 256 + cbBin`. The central 64 × 64
-// bins (96..<160 on both axes) are counted per threadgroup and merged once
-// per group, non-zero only; every other bin globally.
+// A lane with no global bin to add: off the frame, off the plot, or counted
+// in the centre.
+constant uint kNoBin = 0xFFFFFFFFu;
+
+// The vectorscope: `counts` is `crBin * 256 + cbBin`, `zoom` 1, 2 or 4
+// (GR-31; a pixel off the plot at ×2 and ×4 is not counted). The central
+// 64 × 64 bins (96..<160 on both axes) are counted per threadgroup and
+// merged once per group, non-zero only; every other bin globally, once per
+// SIMD group when all of its lanes share the bin (GR-26), else per pixel.
 kernel void framejob_vectorscope_bin(texture2d<half, access::read> frame [[texture(0)]],
                                     device atomic_uint *counts [[buffer(0)]],
+                                    constant uint &zoom [[buffer(1)]],
                                     uint2 gid [[thread_position_in_grid]],
                                     uint index [[thread_index_in_threadgroup]],
                                     uint2 group [[threads_per_threadgroup]]) {
@@ -139,16 +154,31 @@ kernel void framejob_vectorscope_bin(texture2d<half, access::read> frame [[textu
         atomic_store_explicit(&centre[i], 0u, memory_order_relaxed);
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
+    uint bin = kNoBin;
     if (gid.x < frame.get_width() && gid.y < frame.get_height()) {
-        uint2 bins = chromaBins(saturate(float3(frame.read(gid).rgb)));
-        bool central = all(bins >= 96u) && all(bins < 160u);
-        if (central) {
-            atomic_fetch_add_explicit(&centre[(bins.y - 96u) * 64u + (bins.x - 96u)], 1u,
-                                      memory_order_relaxed);
-        } else {
-            atomic_fetch_add_explicit(&counts[bins.y * 256u + bins.x], 1u,
-                                      memory_order_relaxed);
+        int2 raw = chromaBins(saturate(float3(frame.read(gid).rgb)), zoom);
+        if (all(raw >= int2(0)) && all(raw <= int2(255))) {
+            uint2 bins = uint2(raw);
+            bool central = all(bins >= 96u) && all(bins < 160u);
+            if (central) {
+                atomic_fetch_add_explicit(&centre[(bins.y - 96u) * 64u + (bins.x - 96u)], 1u,
+                                          memory_order_relaxed);
+            } else {
+                bin = bins.y * 256u + bins.x;
+            }
         }
+    }
+    // GR-26's same-bin add, outside the in-frame branch so every lane of the
+    // SIMD group reaches it: a group whose lanes all share one global bin
+    // adds their count once; otherwise each lane with a bin adds alone.
+    uint lead = simd_broadcast_first(bin);
+    uint lanes = simd_sum(bin != kNoBin ? 1u : 0u);
+    if (simd_all(bin == lead)) {
+        if (simd_is_first() && lead != kNoBin) {
+            atomic_fetch_add_explicit(&counts[lead], lanes, memory_order_relaxed);
+        }
+    } else if (bin != kNoBin) {
+        atomic_fetch_add_explicit(&counts[bin], 1u, memory_order_relaxed);
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
     for (uint i = index; i < 4096u; i += threads) {

@@ -59,7 +59,9 @@ Cb running right and Cr up. A faint cross marks neutral at its centre, where the
 black canvas and the white text all land as one bright dot; the navy card is a
 short smear from the centre towards the box labelled B. Six small square boxes mark
 the 75 % colour-bar targets, labelled R, Mg, B, Cy, G and Yl, and a faint line runs
-from the centre up and to the left to the edge: the skin line. The vectorscope has
+from the centre up and to the left to the edge: the skin line. In the square's
+bottom-right corner three small square cells read "1×", "2×" and "4×", sharing their
+borders, the "1×" cell filled: the zoom, which a window opens at. The vectorscope has
 no readouts.
 
 This window's pane is shorter than the two slots' full sizes (a 200 pt waveform and

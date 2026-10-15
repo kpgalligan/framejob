@@ -183,7 +183,18 @@ extension AgentServer {
                             + "256 × 256 bins centred on neutral (bin 128). The text says what "
                             + "share of pixels is neutral, and <image path>.vectorscope.json "
                             + "holds the counts (256 arrays by Cr bin, indexed by Cb bin), the "
-                            + "six 75 % targets' bins and the skin line's angle. Default false.",
+                            + "zoom, off_plot (the pixels left off the plot at a zoom, 0 at 1), "
+                            + "the six 75 % targets' bins at the zoom (null off the plot) and the "
+                            + "skin line's angle. Default false.",
+                    ],
+                    // A vectorscope slot's zoom cells, "1× 2× 4×" (spec §11 GR-31).
+                    "vectorscope_zoom": [
+                        "type": "integer", "enum": [1, 2, 4],
+                        "description": "The vectorscope's zoom, as a vectorscope slot's 1× 2× "
+                            + "4× cells: each pixel is binned 128 + round(255 × zoom × Cb) (and "
+                            + "Cr), so ×2 and ×4 spread a near-grey picture over more bins; at "
+                            + "2 and 4 a pixel off the plot is not counted and the text says "
+                            + "what share lie off it. Needs vectorscope: true. Default 1.",
                     ],
                     "histogram": [
                         "type": "boolean",

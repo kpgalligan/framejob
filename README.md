@@ -253,7 +253,8 @@ schema, §6 the op table, §7 the architecture.
   never for an export — and **View ▸ Scopes** (⌃⌘W) puts two scopes beside
   the preview, each slot picking a luma waveform (red marks where highlights
   and shadows clip, and the share of the frame clipping at each end), an RGB
-  parade, a Rec. 709 vectorscope with its colour-bar targets and skin line,
+  parade, a Rec. 709 vectorscope with its colour-bar targets and skin line
+  (its 1× 2× 4× cells zoom in on a near-grey picture, counted at the zoom),
   or an RGB-and-luma histogram; it opens as Waveform over Vectorscope and
   shrinks both to fit a short window. Neither is remembered: a window opens
   with both off.

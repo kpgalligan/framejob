@@ -7,25 +7,29 @@ import AppKit
 ///
 /// A pure move out of `AgentServer+Render.swift` in grading-2's G2-0 (then
 /// `writeWaveform`, whose sentence the waveform's still is byte for byte);
-/// G2-1 widened it to the parade, the vectorscope and the histogram.
+/// G2-1 widened it to the parade, the vectorscope and the histogram, and
+/// grading-4 T4-1 gave the vectorscope its zoom (spec §11 GR-31).
 extension AgentServer {
 
-    /// `render_frame {waveform, parade, vectorscope, histogram}`: one analyse
-    /// of `image` for every kind in `kinds`, each kind's trace written to
+    /// `render_frame {waveform, parade, vectorscope, histogram,
+    /// vectorscope_zoom}`: one analyse of `image` for every kind in `kinds`,
+    /// the vectorscope at `vectorscopeZoom`, each kind's trace written to
     /// `<path>.<kind>.json`, and one sentence per kind in `ScopeKind.allCases`
     /// order.
-    static func writeScopes(_ kinds: [ScopeKind], of image: CGImage, beside url: URL) throws
-        -> String
-    {
+    static func writeScopes(
+        _ kinds: [ScopeKind], vectorscopeZoom: Int, of image: CGImage, beside url: URL
+    ) throws -> String {
         let asked = Set(kinds)
-        guard let traces = WaveformAnalyzer.shared?.analyze(image: image, kinds: asked),
-            asked.allSatisfy({ traces[$0] != nil })
+        let passes = Set(kinds.map { ScopePass($0, zoom: vectorscopeZoom) })
+        guard let byPass = WaveformAnalyzer.shared?.analyze(image: image, passes: passes),
+            passes.allSatisfy({ byPass[$0] != nil })
         else {
             let names = ScopeKind.allCases.filter(asked.contains).map(\.rawValue)
             throw ToolError(
                 message: "Wrote \(url.path), but its \(names.joined(separator: ", ")) could not "
                     + "be measured: the GPU pass did not run.")
         }
+        let traces = WaveformAnalyzer.byKind(byPass)
         var sentences: [String] = []
         for kind in ScopeKind.allCases {
             guard let trace = traces[kind] else { continue }
@@ -59,6 +63,11 @@ extension AgentServer {
                 + "\(channels[0].1) %, green in \(channels[1].0) % and \(channels[1].1) %, blue in "
                 + "\(channels[2].0) % and \(channels[2].1) %; its 3 × 256 × 256 counts are in "
                 + "\(file.path)."
+        case .vectorscope(let trace) where trace.zoom > 1:
+            return "Vectorscope at ×\(trace.zoom) (Rec. 709 Cb and Cr of the encoded values): "
+                + "\(spelled(trace.neutralPercent)) % of pixels are neutral and "
+                + "\(spelled(trace.offPlotPercent)) % lie off the plot; its 256 × 256 counts are "
+                + "in \(file.path)."
         case .vectorscope(let trace):
             return "Vectorscope (Rec. 709 Cb and Cr of the encoded values): "
                 + "\(spelled(trace.neutralPercent)) % of pixels are neutral; its 256 × 256 "

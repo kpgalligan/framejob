@@ -6,13 +6,15 @@ import Metal
 /// compositor offers every finished preview frame (`Compositor.serve`, one
 /// line after `finish(withComposedVideoFrame:)`), and a window whose panel is
 /// shown has a tap on its document's `RecipeSource` key, attached with the
-/// set of scopes its slots show. A key with no tap — every export's, every
+/// set of passes its slots show (`ScopePass`: a scope and, for the
+/// vectorscope, its zoom, spec §11 GR-31). A key with no tap — every export's, every
 /// offline frame's, and a document's with the panel hidden — costs one locked
 /// dictionary read, so the passes run only while the panel is shown.
 ///
-/// **One command buffer per offered frame** holds every shown kind's pass
+/// **One command buffer per offered frame** holds every shown pass
 /// (`WaveformAnalyzer.encode(_:frame:into:)`), and one delivery hands the
-/// panel every kind's trace from that one frame.
+/// panel every pass's trace from that one frame: two vectorscope slots at
+/// different zooms are two passes, at one zoom one.
 ///
 /// **Latest wins.** At most one pass is in flight per key, and ONE pending
 /// frame waits beside it: a frame offered while a pass is in flight replaces
@@ -37,9 +39,9 @@ final class WaveformTaps {
         /// Which attach this is, so a pass begun for an earlier one is not
         /// delivered to a later one.
         let token: Int
-        /// The scopes to measure, never empty.
-        let kinds: Set<ScopeKind>
-        let onTraces: ([ScopeKind: ScopeTrace]) -> Void
+        /// The passes to run, never empty.
+        let passes: Set<ScopePass>
+        let onTraces: ([ScopePass: ScopeTrace]) -> Void
         var inFlight = false
         var pending: CVPixelBuffer?
     }
@@ -63,29 +65,45 @@ final class WaveformTaps {
         textureCache = cache
     }
 
-    /// Starts measuring `kinds` of `key`'s frames; `onTraces` runs on the
-    /// main thread with every kind's trace of one frame. Attaching an attached
-    /// key replaces its kinds and its callback (a pass begun for the old
-    /// attach is dropped when it completes); an empty set detaches it.
+    /// Starts running `passes` over `key`'s frames; `onTraces` runs on the
+    /// main thread with every pass's trace of one frame. Attaching an
+    /// attached key replaces its passes and its callback (a pass begun for
+    /// the old attach is dropped when it completes); an empty set detaches
+    /// it.
+    func attach(
+        key: Int, passes: Set<ScopePass>,
+        onTraces: @escaping ([ScopePass: ScopeTrace]) -> Void
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !passes.isEmpty else {
+            taps.removeValue(forKey: key)
+            return
+        }
+        taps[key] = Tap(token: nextToken, passes: passes, onTraces: onTraces)
+        nextToken += 1
+    }
+
+    /// `kinds`' ×1 passes, their traces keyed by kind.
     func attach(
         key: Int, kinds: Set<ScopeKind>,
         onTraces: @escaping ([ScopeKind: ScopeTrace]) -> Void
     ) {
+        attach(key: key, passes: Set(kinds.map { ScopePass($0) })) { traces in
+            onTraces(WaveformAnalyzer.byKind(traces))
+        }
+    }
+
+    /// The passes `key` is attached with, or nil when it has no tap.
+    func attachedPasses(key: Int) -> Set<ScopePass>? {
         lock.lock()
         defer { lock.unlock() }
-        guard !kinds.isEmpty else {
-            taps.removeValue(forKey: key)
-            return
-        }
-        taps[key] = Tap(token: nextToken, kinds: kinds, onTraces: onTraces)
-        nextToken += 1
+        return taps[key]?.passes
     }
 
     /// The kinds `key` is attached with, or nil when it has no tap.
     func attachedKinds(key: Int) -> Set<ScopeKind>? {
-        lock.lock()
-        defer { lock.unlock() }
-        return taps[key]?.kinds
+        attachedPasses(key: key).map { Set($0.map(\.kind)) }
     }
 
     /// Stops it, emptying the pending slot; a pass in flight is dropped when
@@ -112,16 +130,16 @@ final class WaveformTaps {
         tap.inFlight = true
         taps[key] = tap
         lock.unlock()
-        start(frame, key: key, token: tap.token, kinds: tap.kinds)
+        start(frame, key: key, token: tap.token, passes: tap.passes)
     }
 
-    private func start(_ frame: CVPixelBuffer, key: Int, token: Int, kinds: Set<ScopeKind>) {
+    private func start(_ frame: CVPixelBuffer, key: Int, token: Int, passes: Set<ScopePass>) {
         let width = CVPixelBufferGetWidth(frame)
         let height = CVPixelBufferGetHeight(frame)
         guard let analyzer, let wrapper = wrap(frame),
             let texture = CVMetalTextureGetTexture(wrapper),
             let buffer = queue?.makeCommandBuffer(),
-            let counts = analyzer.encode(kinds, frame: texture, into: buffer)
+            let counts = analyzer.encode(passes, frame: texture, into: buffer)
         else {
             finished(key: key, token: token, traces: nil)
             return
@@ -129,12 +147,12 @@ final class WaveformTaps {
         buffer.addCompletedHandler { [weak self] done in
             // The frame and its wrapper live until the GPU is done reading them.
             withExtendedLifetime((wrapper, frame)) {}
-            var traces: [ScopeKind: ScopeTrace]?
+            var traces: [ScopePass: ScopeTrace]?
             if done.status == .completed {
-                var read: [ScopeKind: ScopeTrace] = [:]
-                for kind in ScopeKind.allCases {
-                    guard let buffer = counts[kind] else { continue }
-                    read[kind] = analyzer.trace(kind, of: buffer, width: width, height: height)
+                var read: [ScopePass: ScopeTrace] = [:]
+                for pass in ScopePass.ordered(passes) {
+                    guard let buffer = counts[pass] else { continue }
+                    read[pass] = analyzer.trace(pass, of: buffer, width: width, height: height)
                 }
                 traces = read
             }
@@ -145,7 +163,7 @@ final class WaveformTaps {
 
     /// One pass over: the pending frame starts next, and the traces hop to
     /// main.
-    private func finished(key: Int, token: Int, traces: [ScopeKind: ScopeTrace]?) {
+    private func finished(key: Int, token: Int, traces: [ScopePass: ScopeTrace]?) {
         lock.lock()
         guard var tap = taps[key], tap.token == token else {
             lock.unlock()
@@ -156,12 +174,12 @@ final class WaveformTaps {
         tap.inFlight = next != nil
         taps[key] = tap
         lock.unlock()
-        if let next { start(next, key: key, token: token, kinds: tap.kinds) }
+        if let next { start(next, key: key, token: token, passes: tap.passes) }
         guard let traces else { return }
         DispatchQueue.main.async { [weak self] in self?.deliver(traces, key: key, token: token) }
     }
 
-    private func deliver(_ traces: [ScopeKind: ScopeTrace], key: Int, token: Int) {
+    private func deliver(_ traces: [ScopePass: ScopeTrace], key: Int, token: Int) {
         lock.lock()
         let onTraces = taps[key].flatMap { $0.token == token ? $0.onTraces : nil }
         lock.unlock()

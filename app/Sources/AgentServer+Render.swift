@@ -25,6 +25,19 @@ extension AgentServer {
         return UInt32(value)
     }
 
+    /// `render_frame`'s `vectorscope_zoom`: absent is 1; 1, 2 or 4, and only
+    /// beside `vectorscope: true` (`measured`); refused by name otherwise.
+    private func vectorscopeZoomArg(_ a: [String: Any], measured: Bool) throws -> Int {
+        guard let zoom = try intArg(a, "vectorscope_zoom") else { return 1 }
+        guard VectorscopeTrace.zooms.contains(zoom) else {
+            throw ToolError(message: "vectorscope_zoom must be 1, 2 or 4 (got \(zoom)).")
+        }
+        guard measured else {
+            throw ToolError(message: "vectorscope_zoom needs vectorscope: true.")
+        }
+        return zoom
+    }
+
     /// `render_frame` — the offline twin of the preview: an
     /// `AVAssetImageGenerator` over the SAME `AVComposition` +
     /// `AVVideoComposition` an export writes, so what comes back is what the
@@ -70,7 +83,10 @@ extension AgentServer {
     /// measure the frame just written through the panel's own analyser, once
     /// for all of them, and write each beside the image as
     /// `<path>.<scope>.json` with a sentence each, in that order
-    /// (`writeScopes`, in `AgentServer+Scopes.swift`).
+    /// (`writeScopes`, in `AgentServer+Scopes.swift`). `vectorscope_zoom`
+    /// (1, 2 or 4, spec §11 GR-31) is a slot's zoom cells' mirror: the
+    /// vectorscope counted at that zoom. Anything else is refused by name,
+    /// and so is the zoom without `vectorscope: true`, both before the render.
     ///
     /// **`selection` is View ▸ Show Selection's mirror** (spec §11 GR-13): an
     /// adjustment clip's id, a recipe option like `ungraded` — the clip's
@@ -126,6 +142,7 @@ extension AgentServer {
         for kind in ScopeKind.allCases where try boolArg(a, kind.rawValue) ?? false {
             scopes.append(kind)
         }
+        let vectorscopeZoom = try vectorscopeZoomArg(a, measured: scopes.contains(.vectorscope))
         // Resolved BEFORE the render, so a mistyped folder is answered in a
         // millisecond rather than after a decode: `exportProject` orders its
         // own two the same way.
@@ -176,7 +193,8 @@ extension AgentServer {
             text += " " + Self.graphicSentence(report)
         }
         if !scopes.isEmpty {
-            text += " " + (try Self.writeScopes(scopes, of: image, beside: url))
+            text += " " + (try Self.writeScopes(
+                scopes, vectorscopeZoom: vectorscopeZoom, of: image, beside: url))
         }
         text += " Written to \(url.path)."
         return try callResult(

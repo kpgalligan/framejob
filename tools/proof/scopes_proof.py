@@ -2,7 +2,9 @@
 """Road map "grading-2", phase G2-1 (spec §11 GR-10) — the scopes: the RGB
 parade, the Rec. 709 vectorscope and the R′G′B′Y′ histogram beside the luma
 waveform, View ▸ Scopes' two slots, and `render_frame {parade, vectorscope,
-histogram}`.
+histogram}`; road map "grading-4", phase T4-1 (GR-26, GR-31) — the
+vectorscope's same-bin add, its zoom ×1/×2/×4 counted at the zoom, and
+`render_frame {vectorscope_zoom}`.
 
     python3 tools/proof/scopes_proof.py [--app PATH] [--only S1,M1,...]
     python3 tools/proof/scopes_proof.py --mutant NAME
@@ -36,8 +38,12 @@ kernels compiled from the tree's `Waveform.metal`):
 - **S4**: a 256-wide grey ramp's histogram is flat in all four planes.
 - **S5**: on noise the histogram's Y′ plane equals the waveform's column sums
   and its readouts the waveform's; the parade marks fall at 0.5 % per channel.
-- **S6**: every kind's counts total the pixels (×3, ×4) on GR-10's five
-  fixtures, at sizes the threadgroup does not divide.
+- **S6**: every kind's counts total the pixels (×3, ×4) at ×1 on GR-26's six
+  fixtures (GR-10's five and a flat (0.8, 0.1, 0.1) red), at sizes the
+  threadgroup does not divide; at ×2 and ×4 the vectorscope against a CPU
+  count of the same half floats: `off_plot` between its definite off-plot
+  pixels and those plus its ties (within 1e-3 of the edges 127.5 and −128.5),
+  occupied bins within ±1 both ways, the gradient crossing both zooms' edges.
 - **S7**: latest wins with two kinds shown: both come back in each reading,
   the third frame's delivered once.
 - **S8**: the tap's reading of a 64RGBAHalf buffer equals `analyze(image:
@@ -51,11 +57,22 @@ kernels compiled from the tree's `Waveform.metal`):
   460, 570 and 1000: the bottom slot iff ≥ 360, bodies and chrome within the
   pane, preferred bodies when they fit, else one factor, a vectorscope side
   ≤ 224.
-- **T1**: each scope's GPU time at 1080p and 4K on the five fixtures, through
+- **S11**: a near-grey card (every (128 ± 5)/255 channel combination): its Cb
+  and Cr extents at ×2 and ×4 are 2× and 4× ×1's, ±1 bin.
+- **S12**: 75 % red counts every pixel at ×1 and none at ×2, `off_plot` the
+  pixels; at ×1 all four kinds' counts equal an analyser over the T4-0 tree's
+  shader (`git show 31f3aa1:…/Waveform.metal`) on the six fixtures, the six
+  75 % cards and pure red.
+- **S14**: the panel's zoom: both slots ×1 on open; a zoom re-attaches that
+  slot's pass and asks for one frame; vectorscope ×1 over ×4 is two passes,
+  each slot showing its own zoom's trace; kept across hide and show and a pick
+  away and back; no defaults key; a new controller ×1.
+- **T1**: each scope's GPU time at 1080p and 4K on the six fixtures, through
   an IOSurface 64RGBAHalf wrap as the tap's, median of 10 after 2 warm-ups.
-  Scored: the worst 4K figure of each of parade, vectorscope and histogram
-  ≤ 1.1 ms (GR-10). The waveform and the waveform + vectorscope pair are
-  recorded, with `pmset -g`'s power lines.
+  Scored: the worst 4K figure of each of parade, histogram and the
+  vectorscope at ×1, ×2 and ×4 ≤ 1.1 ms (GR-10, GR-26, GR-31). The waveform
+  and the waveform + vectorscope pair are recorded, with `pmset -g`'s power
+  lines.
 - **T2**: the tree's parade against the same shader with its one
   `bool banded = ` line forced to `false` (every group adding globally),
   timed back to back on the five 4K fixtures as T1 times them. Scored: on the
@@ -64,6 +81,11 @@ kernels compiled from the tree's `Waveform.metal`):
   running (T1 alone cannot: the global parade sits about T1's 1.1 ms). The
   other fixtures are recorded; banding gains nothing on them. A shader with no
   such line, or more than one, is a FAILURE, never a skip.
+- **T3**: T2's shape for the vectorscope: the tree's ×1 pass against the same
+  shader with its one `bool central = ` line forced to `false`, on the six 4K
+  fixtures. Scored: on the fixture where the forced-global vectorscope is
+  slowest, the tree's time ≤ 0.85 × the global one's (GR-26's same-bin add
+  rescues the flat fixtures T1 used to catch a global vectorscope on).
 
 **MCP rows** (project S):
 - **M1**: `render_frame` with all four booleans: four sentences in
@@ -78,6 +100,11 @@ kernels compiled from the tree's `Waveform.metal`):
 - **M4**: `snapshot_ui`: a 248 pt panel; the pickers' parts read Waveform and
   Vectorscope; the bottom slot shows exactly when the pane is ≥ 360 pt; the
   vectorscope body is square, its side ≤ 224, centred in its slot.
+- **S13**: `render_frame {vectorscope: true, vectorscope_zoom: 4}`: the JSON's
+  `zoom` 4, its occupied bins within ±1 of this script's ×4 bins of the PNG,
+  `off_plot` exactly this script's (the six coloured bars), every target null,
+  the zoomed sentence; `vectorscope_zoom: 3`, and 2 without `vectorscope`,
+  refused naming `vectorscope_zoom`.
 
 **Harness rows** (not under `--mutant`: the harness builds the tree's own
 sources), over project S saved:
@@ -90,30 +117,45 @@ sources), over project S saved:
   below 360 (twice: the opening picks, and a vectorscope on top): the printed
   slot rects lie inside the panel, the bottom slot appears iff the pane is
   ≥ 360 pt, and a vectorscope is square and centred.
+- **H4**: the top vectorscope at `topzoom=2` and `4` over the ramp traces,
+  light and dark, each byte-identical twice and unlike the same look's ×1;
+  the printed `seeing cells` rect (46 × 16) 4 pt in from the square's
+  bottom-right corner.
 - **Z1** (CONTROL): the fixture holds, the project closes and the log holds
   no `Frame Job: ` line.
 
-`--mutant NAME`, one of the eleven below, builds a COPY of the tree
+`--mutant NAME`, one of the sixteen below, builds a COPY of the tree
 (`tree_copy.make_copy`), applies its edits (each anchor asserted to occur
 exactly once), builds it by the copy's own `make app-debug` (`make app` under
-`RC_PROOF_APP=release`) and runs every row but H1–H3 on it, the probe built
+`RC_PROOF_APP=release`) and runs every row but H1–H4 on it, the probe built
 over the copy's `app/Sources` and its shader. MUTANT PASS when every named
 row FAILED and no other scored row did, but a row the mutant tolerates
 (`TOLERATED`), which the MUTANT line names when it failed:
   cb-cr-swapped        the kernel puts Cr on the Cb axis: S1 M1
   bt601                the vectorscope's matrix is BT.601's: S1 M1
   bins-edged           the chroma bins floor instead of round: S1 S2
-  vectorscope-global   every vectorscope pixel adds globally: T1
+  vectorscope-global   every vectorscope pixel adds globally: T3 (T1 tolerated)
   histogram-global     every histogram pixel adds globally: T1
   histogram-luma-601   the histogram's Y′ takes BT.601's weights: S5
   pick-persisted       a pick is written to UserDefaults: S9
-  tap-first-kind-only  the tap measures only the first shown kind: S7 S8
+  tap-first-kind-only  the tap runs only the first shown pass: S7 S8 (S14
+                       tolerated)
   slots-not-shrunk     the bodies stay at their preferred heights: S10
   parade-band-misplaced  the parade's merge puts both bands in the group's
                        first column: S3
   parade-global        every parade group adds globally: T2 (T1 tolerated: the
                        forced-global parade measured 1.15 ms at 4K on flat in
                        G2-5 (1.019–1.042 in G2-1), at or over T1's 1.1 ms)
+  zoom-in-drawing-only the kernel bins every zoom at ×1: S11 S12 S13 (S6
+                       tolerated)
+  off-plot-clamped     an off-plot pixel is clamped to the edge: S6 S12 S13 (T1
+                       tolerated)
+  same-bin-add-dropped the same-bin add's branch is never taken: T1 (T3
+                       tolerated)
+  zoom-persisted       a slot's zoom is written to UserDefaults: S14
+  render-ignores-zoom  `writeScopes` always gets zoom 1: S13
+The mutants of the ×1 counting tolerate S12, which holds every ×1 count to
+the T4-0 tree's shader. `TOLERATED` gives each tolerated row's reason.
 Exit 0 when every scored row passed (a mutant: caught); 1 when one failed
 (a mutant: survived); 2 when the control could not be performed.
 """
@@ -152,13 +194,23 @@ T = SEC // 2
 W, H = 640, 360
 BOUND_MS = 1.1
 RATIO_MAX = 0.75
+# T3's own bound (orchestrator's ruling, 2026-10-15): under `vectorscope-global`
+# the two builds are the same shader, so the mutant's ratio is 1.0 by
+# construction (its noise is the only spread); the tree measured 0.706-0.796
+# under heavy load, failing 0.75 one run in three. 0.85 sits between them with
+# margin on both sides. Not moved again without a new measurement.
+T3_RATIO_MAX = 0.85
 KINDS = ["waveform", "parade", "vectorscope", "histogram"]
-ROWS = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "T1", "T2", "M1", "M2",
-        "M3", "M4", "H1", "H2", "H3", "Z1"]
-S_ROWS = {"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "T1", "T2"}
-M_ROWS = {"M1", "M2", "M3", "M4"}
-H_ROWS = {"H1", "H2", "H3"}
+ROWS = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "S13", "S14",
+        "T1", "T2", "T3", "M1", "M2", "M3", "M4", "H1", "H2", "H3", "H4", "Z1"]
+S_ROWS = {"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "S14", "T1",
+          "T2", "T3"}
+M_ROWS = {"M1", "M2", "M3", "M4", "S13"}
+H_ROWS = {"H1", "H2", "H3", "H4"}
 SCOPES = ["View", "Scopes"]
+ZOOMS = [1, 2, 4]
+# The T4-0 tree, whose ×1 counts S12 holds the tree's to.
+BASELINE = "31f3aa1"
 VECTOR = "    float2 c = float2((rgb.b - luma) / 1.8556, (rgb.r - luma) / 1.5748);\n"
 # name: ([(file, anchor, replacement), …], the rows that must fail)
 MUTANTS = {
@@ -175,7 +227,7 @@ MUTANTS = {
         SHADER, "int2(round(255.0 * c))", "int2(floor(255.0 * c))")], ["S1", "S2"]),
     "vectorscope-global": ([(
         SHADER, "bool central = all(bins >= 96u) && all(bins < 160u);",
-        "bool central = false;")], ["T1"]),
+        "bool central = false;")], ["T3"]),
     "histogram-global": ([(
         SHADER, "atomic_fetch_add_explicit(&local[plane * 256u + levels[plane]], 1u,",
         "atomic_fetch_add_explicit(&counts[plane * 256u + levels[plane]], 1u,")], ["T1"]),
@@ -188,8 +240,8 @@ MUTANTS = {
         "        UserDefaults.standard.set(kind.rawValue, forKey: \"RCScopePick\\(slot)\")\n")],
         ["S9"]),
     "tap-first-kind-only": ([(
-        "app/Sources/WaveformTap.swift", "analyzer.encode(kinds, frame: texture, into: buffer)",
-        "analyzer.encode(Set(ScopeKind.allCases.filter(kinds.contains).prefix(1)), "
+        "app/Sources/WaveformTap.swift", "analyzer.encode(passes, frame: texture, into: buffer)",
+        "analyzer.encode(Set(ScopePass.ordered(passes).prefix(1)), "
         "frame: texture, into: buffer)")], ["S7", "S8"]),
     "slots-not-shrunk": ([(
         "app/Sources/ScopesPanelView.swift",
@@ -201,9 +253,57 @@ MUTANTS = {
     "parade-global": ([(
         SHADER, "bool banded = last - first < kParadeBands;", "bool banded = false;")],
         ["T2"]),
+    "zoom-in-drawing-only": ([(
+        SHADER, "chromaBins(saturate(float3(frame.read(gid).rgb)), zoom);",
+        "chromaBins(saturate(float3(frame.read(gid).rgb)), 1u);")], ["S11", "S12", "S13"]),
+    "off-plot-clamped": ([(
+        SHADER, "    return int2(128) + int2(round(255.0 * float(zoom) * c));\n",
+        "    return clamp(int2(128) + int2(round(255.0 * float(zoom) * c)), int2(0), int2(255));\n")],
+        ["S6", "S12", "S13"]),
+    "same-bin-add-dropped": ([(
+        SHADER, "    if (simd_all(bin == lead)) {\n", "    if (false) {\n")], ["T1"]),
+    "zoom-persisted": ([(
+        "app/Sources/ScopesPanelView.swift", "        slots[slot].zoom = zoom\n",
+        "        slots[slot].zoom = zoom\n"
+        "        UserDefaults.standard.set(zoom, forKey: \"RCScopeZoom\\(slot)\")\n")],
+        ["S14"]),
+    "render-ignores-zoom": ([(
+        "app/Sources/AgentServer+Render.swift",
+        "scopes, vectorscopeZoom: vectorscopeZoom, of: image, beside: url)",
+        "scopes, vectorscopeZoom: 1, of: image, beside: url)")], ["S13"]),
 }
-# A row a mutant may fail BECAUSE of it, besides the rows it must fail.
-TOLERATED = {"parade-global": ["T1"]}
+# A row a mutant may fail BECAUSE of it, besides the rows it must fail, each
+# with its reason.
+TOLERATED = {
+    # The forced-global parade measured 1.15 ms at 4K on flat in G2-5
+    # (1.019–1.042 in G2-1), at or over T1's 1.1 ms.
+    "parade-global": ["T1"],
+    # Every vectorscope pixel adding globally is T1's 1.1 ms on the
+    # near-grey and noise fixtures or under it, by the host's clock; T3 is
+    # the row that holds it (GR-26's same-bin add rescues the flat ones).
+    "vectorscope-global": ["T1"],
+    # S6's zoomed half is the same off-plot count against a CPU count:
+    # a kernel that bins every zoom at ×1 leaves nothing off the plot.
+    "zoom-in-drawing-only": ["S6"],
+    # Clamped to the edge, the ×4 gradient piles every off-plot pixel on
+    # the rim's global bins: 1.67 ms in the brief's bench.
+    "off-plot-clamped": ["T1"],
+    # Without the same-bin add the flat red is about 7.2 ms in the tree and
+    # in its forced-global twin alike (its bin is not central in either), so
+    # T3's slowest fixture becomes it, at a ratio near 1.
+    "same-bin-add-dropped": ["T3"],
+    # S14's vectorscope ×1 over ×4 is two passes of one kind through the
+    # same tap: the first pass alone leaves the bottom slot without a trace.
+    "tap-first-kind-only": ["S14"],
+    # S12(b) holds every ×1 count to the T4-0 tree's shader, so a mutant of
+    # the ×1 counting fails it too; and S11 measures ×2 and ×4 against ×1's
+    # extent, which flooring at ×1 alone narrows by a bin.
+    "bins-edged": ["S11", "S12"],
+    "cb-cr-swapped": ["S12"],
+    "bt601": ["S12"],
+    "histogram-luma-601": ["S12"],
+    "parade-band-misplaced": ["S12"],
+}
 rows = {}
 selected = set(ROWS)
 
@@ -256,6 +356,12 @@ def bin_of(c):
 def bins_of(r, g, b):
     cb, cr = chroma(r, g, b)
     return bin_of(cb), bin_of(cr)
+
+
+def zoomed_bins_of(r, g, b, zoom):
+    """GR-31's bins at `zoom` > 1: (cb, cr), or None off the plot."""
+    raw = [128 + half_away(255 * zoom * c) for c in chroma(r, g, b)]
+    return tuple(raw) if all(0 <= v <= 255 for v in raw) else None
 
 
 # ---- pixels -------------------------------------------------------------------
@@ -416,6 +522,9 @@ def run_mcp(client, bars, state):
           not refused["ok"] and "vectorscope" in refused.get("error", ""),
           f"answer {refused.get('error') or 'ACCEPTED'!r}")
 
+    # S13
+    s13(doc)
+
     # M2, M4
     wave = files["waveform"]
     target = (wave.get("highlights"), wave.get("shadows"))
@@ -455,6 +564,50 @@ def run_mcp(client, bars, state):
     return closed, (saved if stored["ok"] else None)
 
 
+def s13(doc):
+    """`render_frame {vectorscope: true, vectorscope_zoom: 4}` against this
+    script's ×4 bins of the PNG, and the zoom's two refusals."""
+    png = WORK / "s13.png"
+    got = doc.call("render_frame", t=T, path=str(png), vectorscope=True, vectorscope_zoom=4)
+    text = got["reply"] if got["ok"] and isinstance(got["reply"], str) else ""
+    body = scope_json(png, "vectorscope")
+    said = re.search(r"Vectorscope at ×4 \(Rec\. 709 Cb and Cr of the encoded values\): "
+                     r"\d+\.\d % of pixels are neutral and \d+\.\d % lie off the plot; its "
+                     r"256 × 256 counts are in \S+\.vectorscope\.json\. Written to \S+\.png\.$",
+                     text)
+    raw = decode(png, W, H) if got["ok"] and png.exists() else None
+    want, off = set(), 0
+    if raw is not None:
+        for at in range(0, len(raw), 4):
+            one = zoomed_bins_of(raw[at] / 255, raw[at + 1] / 255, raw[at + 2] / 255, 4)
+            if one is None:
+                off += 1
+            else:
+                want.add(one)
+    counts = body.get("counts") or []
+    have = {(cb, cr) for cr, row in enumerate(counts) for cb, n in enumerate(row) if n}
+    agree = raw is not None and bool(have) and bool(want) and all(
+        min(max(abs(a[0] - b[0]), abs(a[1] - b[1])) for b in other) <= 1
+        for one, other in ((have, want), (want, have)) for a in one)
+    targets = body.get("targets") or {}
+    three = doc.call("render_frame", t=T, vectorscope=True, vectorscope_zoom=3)
+    bare = doc.call("render_frame", t=T, vectorscope_zoom=2)
+    refused = [not r["ok"] and "vectorscope_zoom" in r.get("error", "") for r in (three, bare)]
+    check("S13 render_frame {vectorscope: true, vectorscope_zoom: 4}: the JSON's zoom is 4, its "
+          "occupied bins within ±1 of this script's ×4 bins of the PNG, off_plot exactly this "
+          "script's off-plot pixels (the six coloured bars), every target null, the zoomed "
+          "sentence; vectorscope_zoom 3, and 2 without vectorscope, refused naming "
+          "vectorscope_zoom",
+          said is not None and body.get("zoom") == 4 and agree and raw is not None
+          and body.get("off_plot") == off and off > 0
+          and sorted(targets) == ["B", "Cy", "G", "Mg", "R", "Yl"]
+          and all(v is None for v in targets.values()) and all(refused),
+          f"text {text[-200:]!r}; zoom {body.get('zoom')}; off_plot {body.get('off_plot')} vs "
+          f"{off}; bins {sorted(have)[:6]} vs {sorted(want)[:6]}; targets "
+          f"{targets}; refusals {three.get('error') or 'ACCEPTED'!r} / "
+          f"{bare.get('error') or 'ACCEPTED'!r}")
+
+
 # ---- the probe ------------------------------------------------------------------
 
 def power():
@@ -488,22 +641,28 @@ def score_s1(body):
           f"misses {misses[:6]}; skin line {angle}")
 
 
+T1_SCORED = ("parade", "vectorscope", "vectorscope-x2", "vectorscope-x4", "histogram")
+
+
 def score_t1(body):
     figures = (body.get("records") or {}).get("T1") or {}
     worst = {}
-    for scope in ("parade", "vectorscope", "histogram", "waveform", "waveform+vectorscope"):
+    for scope in T1_SCORED + ("waveform", "waveform+vectorscope"):
         values = (figures.get("4K") or {}).get(scope) or {}
-        worst[scope] = (max(values.values()), max(values, key=values.get)) if values else None
+        whole = len(values) == 6
+        worst[scope] = ((max(values.values()), max(values, key=values.get)) if whole else None)
     for size in ("1080p", "4K"):
         for scope, values in sorted((figures.get(size) or {}).items()):
             note(f"T1 {size} {scope}: " + ", ".join(f"{k} {v:.3f}" for k, v in
                                                     sorted(values.items())) + " ms")
     note(f"T1 host: {figures.get('gpu')}; " + " | ".join(power()))
-    scored = [worst.get(s) for s in ("parade", "vectorscope", "histogram")]
-    check(f"T1 the worst 4K GPU time of each scope is ≤ {BOUND_MS} ms (GR-10): parade "
-          f"{worst.get('parade')}, vectorscope {worst.get('vectorscope')}, histogram "
-          f"{worst.get('histogram')} (recorded: waveform {worst.get('waveform')}, waveform + "
-          f"vectorscope {worst.get('waveform+vectorscope')})",
+    scored = [worst.get(s) for s in T1_SCORED]
+    check(f"T1 the worst 4K GPU time over GR-26's six fixtures of each scope, the vectorscope at "
+          f"each zoom, is ≤ {BOUND_MS} ms (GR-10, GR-26, GR-31): parade {worst.get('parade')}, "
+          f"vectorscope ×1 {worst.get('vectorscope')}, ×2 {worst.get('vectorscope-x2')}, ×4 "
+          f"{worst.get('vectorscope-x4')}, histogram {worst.get('histogram')} (recorded: "
+          f"waveform {worst.get('waveform')}, waveform + vectorscope "
+          f"{worst.get('waveform+vectorscope')})",
           all(w is not None and w[0] <= BOUND_MS for w in scored))
 
 
@@ -514,7 +673,7 @@ def score_t2(body):
         note(f"T2 4K {name}: banded {pair.get('banded')}, global {pair.get('global')} ms")
     banded = [pair.get("banded") for pair in pairs.values()]
     global_ = [pair.get("global") for pair in pairs.values()]
-    whole = (len(pairs) == 5 and not figures.get("anchor") and not figures.get("error")
+    whole = (len(pairs) == 6 and not figures.get("anchor") and not figures.get("error")
              and all(isinstance(v, (int, float)) for v in banded + global_))
     # The fixture where the forced-global parade is slowest, the one banding is for.
     at = max(pairs, key=lambda name: pairs[name].get("global")) if whole else None
@@ -528,6 +687,42 @@ def score_t2(body):
           ratio is not None and worst_b <= RATIO_MAX * worst_g,
           "" if whole else f"anchor {figures.get('anchor')}; error {figures.get('error')}; "
           f"fixtures {sorted(pairs)}; host {figures.get('gpu')}")
+
+
+def score_t3(body):
+    """T2's shape for the vectorscope: the tree's ×1 pass against the same
+    shader with its one `bool central = ` line forced to `false`."""
+    figures = (body.get("records") or {}).get("T3") or {}
+    pairs = figures.get("4K") or {}
+    for name, pair in sorted(pairs.items()):
+        note(f"T3 4K {name}: tree {pair.get('tree')}, global {pair.get('global')} ms")
+    tree = [pair.get("tree") for pair in pairs.values()]
+    global_ = [pair.get("global") for pair in pairs.values()]
+    whole = (len(pairs) == 6 and not figures.get("anchor") and not figures.get("error")
+             and all(isinstance(v, (int, float)) for v in tree + global_))
+    # The fixture where the forced-global vectorscope is slowest, the one the
+    # central threadgroup counts are for.
+    at = max(pairs, key=lambda name: pairs[name].get("global")) if whole else None
+    worst_t = pairs[at].get("tree") if whole else None
+    worst_g = pairs[at].get("global") if whole else None
+    ratio = worst_t / worst_g if whole and worst_g else None
+    check(f"T3 on the fixture where the forced-global vectorscope is slowest, the tree's 4K time "
+          f"is ≤ {T3_RATIO_MAX} × the global one's (the central threadgroup path is the one "
+          f"running): {at}, tree {worst_t}, global {worst_g}, "
+          f"ratio {None if ratio is None else round(ratio, 3)}",
+          ratio is not None and worst_t <= T3_RATIO_MAX * worst_g,
+          "" if whole else f"anchor {figures.get('anchor')}; error {figures.get('error')}; "
+          f"fixtures {sorted(pairs)}; host {figures.get('gpu')}")
+
+
+def baseline_shader(folder):
+    """The T4-0 tree's `Waveform.metal`, written beside the probe, or None."""
+    ran = bounded.run(["git", "-C", str(ROOT), "show", f"{BASELINE}:{SHADER}"], 60)
+    if ran["rc"] != 0 or not ran["stdout"]:
+        return None
+    path = folder / "baseline-Waveform.metal"
+    path.write_text(ran["stdout"])
+    return path
 
 
 def run_probe(sources, package):
@@ -549,7 +744,9 @@ def run_probe(sources, package):
     if answer.exists():
         answer.unlink()
     shader = sources.parent / "Resources/Shaders/Waveform.metal"
-    request.write_text(json.dumps({"package": str(package), "shader": str(shader)}))
+    baseline = baseline_shader(folder)
+    request.write_text(json.dumps({"package": str(package), "shader": str(shader),
+                                   "baseline_shader": str(baseline) if baseline else ""}))
     ran = bounded.run([str(built.binary), str(request), str(answer)], 600,
                       env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
     try:
@@ -563,8 +760,10 @@ def run_probe(sources, package):
         score_t1(body)
     if "T2" in selected:
         score_t2(body)
+    if "T3" in selected:
+        score_t3(body)
     for name in scored:
-        if name in ("S1", "T1", "T2"):
+        if name in ("S1", "T1", "T2", "T3"):
             continue
         mine = [r for r in answered if r["name"].split()[0] == name]
         if not mine:
@@ -579,16 +778,18 @@ def harness(binary, package, out, look, height, items):
     ran = subprocess.run([binary, str(package), str(out), look, "1440", str(height), "-1", "0",
                           "1", "clip", "-", "-", "-", "-", "-", items],
                          capture_output=True, text=True, timeout=300)
-    panel, slots = None, []
+    panel, slots, cells = None, [], {}
     for line in ran.stdout.splitlines():
         parts = line.split()
         if line.startswith("seeing panel "):
             panel = [float(v) for v in parts[2:6]]
         elif line.startswith("seeing slot "):
             slots.append((parts[2], parts[3], [float(v) for v in parts[4:8]]))
+        elif line.startswith("seeing cells "):
+            cells[parts[2]] = [float(v) for v in parts[3:7]]
     if ran.returncode != 0 or not out.exists() or panel is None:
         return None, (ran.stdout + ran.stderr).strip()[-400:] or "no panel line"
-    return (panel, slots), None
+    return (panel, slots, cells), None
 
 
 def bright(path, rect, kind, scale_from=1440):
@@ -649,7 +850,7 @@ def harness_checks(package):
                              height, items)
         if got is None:
             break
-        panel, slots = got
+        panel, slots, _ = got
         px, py, pw, ph = panel
         inside = all(r[0] >= px - 0.5 and r[0] + r[2] <= px + pw + 0.5 and r[1] >= py - 0.5
                      and r[1] + r[3] <= py + ph + 0.5 for _, _, r in slots)
@@ -662,6 +863,7 @@ def harness_checks(package):
                      [(n, k, r) for n, k, r in slots]))
     if error:
         check("H3 the harness renders the scopes at three pane heights", False, error)
+        zoom_checks(binary, package)
         return
     panes = [s[1] for s in seen]
     spread = (any(400 <= p <= 520 for p in panes) and any(p >= 700 for p in panes)
@@ -673,6 +875,54 @@ def harness_checks(package):
           and seen[3][5],
           " | ".join(f"window {s[0]}: pane {s[1]}, inside {s[2]}, bottom rule {s[3]}, "
                      f"square {s[4]}, {s[6]}" for s in seen))
+    zoom_checks(binary, package)
+
+
+def zoom_checks(binary, package):
+    """H4: the top vectorscope at ×2 and ×4 over the ramp traces, light and
+    dark, each byte-identical twice and unlike the same look at ×1, and the
+    zoom cells in the square's bottom-right corner (GR-31)."""
+    captures, corner, error = {}, [], None
+    if not binary:
+        check("H4 the harness renders the zoomed vectorscope", False, "the harness did not build")
+        return
+    for look in ("light", "dark"):
+        for zoom in ZOOMS:
+            items = "scopes,ramp,top=vectorscope" + (f",topzoom={zoom}" if zoom > 1 else "")
+            pair = []
+            for n in (1, 2):
+                out = WORK / f"h4-{look}-x{zoom}-{n}.png"
+                got, error = harness(binary, package, out, look, 1100, items)
+                if got is None:
+                    break
+                pair.append(out.read_bytes())
+                if n == 1:
+                    square = next((r for name, kind, r in got[1]
+                                   if name == "top" and kind == "vectorscope"), None)
+                    cells = got[2].get("top")
+                    placed = (square is not None and cells is not None
+                              and abs(cells[2] - 46) <= 0.5 and abs(cells[3] - 16) <= 0.5
+                              and abs((cells[0] + cells[2]) - (square[0] + square[2] - 4)) <= 0.5
+                              and abs((cells[1] + cells[3]) - (square[1] + square[3] - 4)) <= 0.5)
+                    corner.append((look, zoom, placed, square, cells))
+            if error:
+                break
+            captures[(look, zoom)] = pair
+        if error:
+            break
+    if error:
+        check("H4 the harness renders the zoomed vectorscope", False, error)
+        return
+    twice = {f"{look}×{zoom}": len(p) == 2 and p[0] == p[1] for (look, zoom), p in captures.items()}
+    unlike = {f"{look}×{zoom}": captures[(look, zoom)][0] != captures[(look, 1)][0]
+              for look in ("light", "dark") for zoom in (2, 4)}
+    check("H4 the top vectorscope at ×2 and ×4 over the ramp traces, light and dark: each "
+          "byte-identical twice and unlike the same look's ×1; the zoom cells (46 × 16) 4 pt in "
+          "from the square's bottom-right corner",
+          all(twice.values()) and len(twice) == 6 and all(unlike.values())
+          and all(c[2] for c in corner) and len(corner) == 6,
+          f"twice {twice}; unlike ×1 {unlike}; cells "
+          + " | ".join(f"{c[0]} ×{c[1]}: square {c[3]}, cells {c[4]}" for c in corner))
 
 
 # ---- the run ------------------------------------------------------------------

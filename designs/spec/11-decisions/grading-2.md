@@ -82,6 +82,9 @@ Concat is opened, at design time or build time.
   added once" (0.281–0.282 ms on that fixture). Its code and the app-pass T1 land in T4-1.
   **Amended by GR-29** (grading-4 T4-0): "so a 1,024-level scope stays possible" is closed: a
   1,024-level scope is not wanted (#273).
+  **Amended by GR-31** (grading-4 T4-1): the vectorscope zooms ×1, ×2 and ×4, per slot, binned
+  `128 + round(255·zoom·c)`, clamped at ×1 as above and not counted off the plot at ×2 and ×4;
+  the targets become rim ticks off the plot; `render_frame` gains `vectorscope_zoom`.
 - **GR-11 — Wheels: `video.wheels {lift, gamma, gain}`, each a Cartesian colour push `{x, y}`
   and a `master`, applied at step 4c.1 after tone and before the look, in the layer stage and the
   adjustment pass; format 16.** Recorded in G2-2 before its code, from the owner's "All as

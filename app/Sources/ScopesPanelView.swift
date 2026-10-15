@@ -12,20 +12,24 @@ struct ScopeSlotLayout: Equatable {
 /// picker. Off, it is zero wide and hidden and the canvas takes the pane. Its
 /// contents are a 248 pt block pinned to its leading edge and clipped, so a
 /// zero width never asks a constraint for a negative one. Shown, its window's
-/// tap (`WaveformTaps`) is attached with the kinds its visible slots show —
-/// one pass per kind, so one scope in both slots costs one — and hidden, or
-/// out of its window, detached.
+/// tap (`WaveformTaps`) is attached with the passes its visible slots show —
+/// one pass per kind and zoom, so one scope in both slots costs one, and two
+/// vectorscopes at different zooms two (spec §11 GR-31) — and hidden, or out
+/// of its window, detached.
 ///
 /// **The layout rule** (owner, 2026-10-10, GR-10 as amended in G2-1): when
 /// the pane cannot hold both slots' bodies at their preferred heights, both
 /// shrink by one factor to fit, the vectorscope square and centred; below
 /// `twoSlotMinHeight` only the top slot shows. A layout pass that shows or
-/// hides the bottom slot, and every pick, re-attach the tap with the new
-/// kinds and ask for a frame (`onNeedsFrame`), so no slot waits empty.
+/// hides the bottom slot, and every pick and zoom, re-attach the tap with
+/// the new passes and ask for a frame (`onNeedsFrame`), so no slot waits
+/// empty.
 ///
-/// **Nothing here persists** (GR-5, GR-10): a new window starts with the
-/// panel off and the picks at `openingPicks`; a pick lasts while the window
-/// is open and has no `UserDefaults` key and no MCP tool.
+/// **Nothing here persists** (GR-5, GR-10, GR-31): a new window starts with
+/// the panel off, the picks at `openingPicks` and every zoom ×1; a pick or a
+/// zoom lasts while the window is open (a zoom across a pick of another scope
+/// and back, and across hide and show) and has no `UserDefaults` key and no
+/// MCP tool (`render_frame {vectorscope_zoom}` is the capability).
 final class ScopesPanelView: NSView {
     static let width: CGFloat = 248
     static let openingPicks: [ScopeKind] = [.waveform, .vectorscope]
@@ -87,6 +91,9 @@ final class ScopesPanelView: NSView {
     /// its slot shows.
     var shownKinds: Set<ScopeKind> { Set(picks.prefix(showsBottomSlot ? 2 : 1)) }
 
+    /// The passes the visible slots show: each one's kind and zoom.
+    var shownPasses: Set<ScopePass> { Set(slots.prefix(showsBottomSlot ? 2 : 1).map(\.pass)) }
+
     /// The slot views, top first (for the instruments that read their
     /// bodies' rects).
     var slotViews: [ScopeSlotView] { slots }
@@ -116,10 +123,24 @@ final class ScopesPanelView: NSView {
         onNeedsFrame?()
     }
 
-    /// The traces to draw; nil is "no frame yet" (the readouts say "—").
-    func show(_ traces: [ScopeKind: ScopeTrace]?) {
+    /// Slot `slot`'s vectorscope zoom from now on (1, 2 or 4; anything else
+    /// ignored). Its body is cleared until the next reading, as a pick's is.
+    func zoom(_ zoom: Int, slot: Int) {
+        guard slots.indices.contains(slot), VectorscopeTrace.zooms.contains(zoom),
+            slots[slot].zoom != zoom
+        else { return }
+        slots[slot].zoom = zoom
+        slots[slot].show(nil)
+        guard key != nil else { return }
+        attach()
+        onNeedsFrame?()
+    }
+
+    /// The traces to draw, by pass; nil is "no frame yet" (the readouts say
+    /// "—").
+    func show(_ traces: [ScopePass: ScopeTrace]?) {
         for slot in slots {
-            slot.show(traces?[slot.kind])
+            slot.show(traces?[slot.pass])
         }
     }
 
@@ -157,7 +178,7 @@ final class ScopesPanelView: NSView {
 
     private func attach() {
         guard let key else { return }
-        WaveformTaps.shared.attach(key: key, kinds: shownKinds) { [weak self] traces in
+        WaveformTaps.shared.attach(key: key, passes: shownPasses) { [weak self] traces in
             self?.show(traces)
         }
     }
@@ -168,6 +189,7 @@ final class ScopesPanelView: NSView {
         for (index, slot) in slots.enumerated() {
             slot.kind = picks[index]
             slot.onPick = { [weak self] kind in self?.pick(kind, slot: index) }
+            slot.onZoom = { [weak self] zoom in self?.zoom(zoom, slot: index) }
             slot.translatesAutoresizingMaskIntoConstraints = false
             content.addSubview(slot)
         }

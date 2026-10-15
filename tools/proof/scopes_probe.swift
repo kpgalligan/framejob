@@ -1,5 +1,6 @@
 // Road map "grading-2", phase G2-1 — the scopes' probe (`scopes_proof.py`
-// builds it through `swift_build.build` and runs it).
+// builds it through `swift_build.build` and runs it); grading-4 T4-1 added
+// the vectorscope's zoom (spec §11 GR-31) and its same-bin add (GR-26).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, against `libframejob_core.a`, so every row drives the app's own
@@ -11,12 +12,14 @@
 //
 //   scopes_probe <request.json> <answer.json>
 //
-// `request.json` names `shader` (the tree's `Waveform.metal`) and `package`, a
-// project the proof saved over MCP. One JSON object out: `rows` (S2–S10, each
-// a name, ok and detail, the name starting with its row id), `data` (S1's
-// bins, which the proof scores against its own BT.709 arithmetic) and
-// `records` (T1's GPU times, which the proof scores against GR-10's bound, and
-// T2's banded and forced-global parade times, which it scores as a ratio).
+// `request.json` names `shader` (the tree's `Waveform.metal`),
+// `baseline_shader` (the T4-0 tree's, `31f3aa1`, which S12 compares ×1 counts
+// against) and `package`, a project the proof saved over MCP. One JSON object
+// out: `rows` (S2–S14, each a name, ok and detail, the name starting with its
+// row id), `data` (S1's bins, which the proof scores against its own BT.709
+// arithmetic) and `records` (T1's GPU times, which the proof scores against
+// GR-10's bound; T2's banded and forced-global parade times and T3's tree and
+// forced-global vectorscope times, which it scores as ratios).
 import AppKit
 import CoreVideo
 import Metal
@@ -58,7 +61,7 @@ let library = device.flatMap { device -> MTLLibrary? in
 }
 guard let device, let library, let analyzer = WaveformAnalyzer(device: device, library: library)
 else {
-    for name in ["S2", "S3", "S4", "S5", "S6", "S7", "S8"] {
+    for name in ["S2", "S3", "S4", "S5", "S6", "S7", "S8", "S11", "S12"] {
         check("\(name) the four kernels compile from \(shaderPath)", false,
               "device \(device != nil), library \(library != nil) \(compileError)")
     }
@@ -80,13 +83,8 @@ struct SplitMix {
 
 typealias Fill = (Int, Int) -> (Float, Float, Float)
 
-/// A `width` × `height` rgba16Float texture whose pixel (x, y) is `rgb(x, y)`.
-func texture(_ width: Int, _ height: Int, _ rgb: Fill) -> MTLTexture? {
-    let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-        pixelFormat: .rgba16Float, width: width, height: height, mipmapped: false)
-    descriptor.usage = [.shaderRead]
-    descriptor.storageMode = .managed
-    guard let made = device.makeTexture(descriptor: descriptor) else { return nil }
+/// The RGBA half floats of a `width` × `height` fill, row by row.
+func halves(_ width: Int, _ height: Int, _ rgb: Fill) -> [Float16] {
     var halves = [Float16](repeating: 1, count: width * height * 4)
     for y in 0..<height {
         for x in 0..<width {
@@ -97,6 +95,21 @@ func texture(_ width: Int, _ height: Int, _ rgb: Fill) -> MTLTexture? {
             halves[at + 2] = Float16(b)
         }
     }
+    return halves
+}
+
+/// A `width` × `height` rgba16Float texture whose pixel (x, y) is `rgb(x, y)`.
+func texture(_ width: Int, _ height: Int, _ rgb: Fill) -> MTLTexture? {
+    texture(width, height, halves: halves(width, height, rgb))
+}
+
+/// A `width` × `height` rgba16Float texture holding `halves`.
+func texture(_ width: Int, _ height: Int, halves: [Float16]) -> MTLTexture? {
+    let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+        pixelFormat: .rgba16Float, width: width, height: height, mipmapped: false)
+    descriptor.usage = [.shaderRead]
+    descriptor.storageMode = .managed
+    guard let made = device.makeTexture(descriptor: descriptor) else { return nil }
     halves.withUnsafeBytes { bytes in
         if let base = bytes.baseAddress {
             made.replace(
@@ -136,7 +149,8 @@ func pixelBuffer(_ width: Int, _ height: Int, _ rgb: Fill) -> CVPixelBuffer? {
     return buffer
 }
 
-/// GR-10's five fixtures at `width` × `height`, each a fill.
+/// GR-10's six fixtures (GR-26 added the flat saturated red) at `width` ×
+/// `height`, each a fill.
 func fixtures(_ width: Int, _ height: Int) -> [(String, Fill)] {
     var nearGrey = SplitMix(state: 7)
     var noise = SplitMix(state: 11)
@@ -152,6 +166,7 @@ func fixtures(_ width: Int, _ height: Int) -> [(String, Fill)] {
         }),
         ("gradient", { x, y in (Float(x) / Float(width), Float(y) / Float(height), 0.4) }),
         ("noise", { _, _ in (noise.unit(999), noise.unit(999), noise.unit(999)) }),
+        ("flat-red", { _, _ in (0.8, 0.1, 0.1) }),
     ]
 }
 
@@ -161,6 +176,20 @@ func analyze(_ made: MTLTexture?, _ kinds: Set<ScopeKind>) -> [ScopeKind: ScopeT
 
 func vectorscope(_ traces: [ScopeKind: ScopeTrace]?) -> VectorscopeTrace? {
     if case .vectorscope(let trace)? = traces?[.vectorscope] { return trace }
+    return nil
+}
+/// The vectorscope of `made` at `zoom`, through `analyzer` (the tree's by
+/// default).
+func vectorscope(
+    _ made: MTLTexture?, zoom: Int, through other: WaveformAnalyzer? = nil
+) -> VectorscopeTrace? {
+    let pass = ScopePass(.vectorscope, zoom: zoom)
+    let through = other ?? analyzer
+    if case .vectorscope(let trace)? = made.flatMap({
+        through.analyze(texture: $0, passes: [pass])
+    })?[pass] {
+        return trace
+    }
     return nil
 }
 func parade(_ traces: [ScopeKind: ScopeTrace]?) -> ParadeTrace? {
@@ -182,6 +211,15 @@ func occupied(_ trace: VectorscopeTrace?) -> [[Int]] {
     return trace.counts.enumerated().compactMap { index, count in
         count > 0
             ? [index % VectorscopeTrace.bins, index / VectorscopeTrace.bins, Int(count)] : nil
+    }
+}
+
+/// Whether every bin of `a` lies within ±1 bin on each axis of one of `b`'s.
+func near(_ a: Set<[Int]>, _ b: Set<[Int]>) -> Bool {
+    a.allSatisfy { one in
+        (-1...1).contains { dx in
+            (-1...1).contains { dy in b.contains([one[0] + dx, one[1] + dy]) }
+        }
     }
 }
 
@@ -335,20 +373,68 @@ do {
             + "G low \(g.marks(high: false)) B \(b.marks(high: true))")
 }
 
-// MARK: - S6 every pass counts every pixel
+// MARK: - S6 every pass counts every pixel; ×2 and ×4 against a CPU count
+
+/// A CPU count of `pixels` (RGBA half floats) at `zoom`, binned as the kernel
+/// bins: the saturated values, Y′, Cb and Cr in `Float` as the shader
+/// computes them, then `128 + round(255·zoom·c)`. The plot's edges sit at
+/// `255·zoom·c` = 127.5 and −128.5 (the raw bin leaves 0…255 past them); a
+/// pixel within `tieBand` of one on either axis is a TIE, which either side
+/// may count. `bins` holds the counted pixels' bins, `edge` the ties' bins
+/// clamped to the plot, `off` the pixels definitely off it.
+struct CPUCount {
+    static let tieBand = 1e-3
+    var bins = Set<[Int]>()
+    var edge = Set<[Int]>()
+    var off = 0
+    var ties = 0
+
+    init(_ pixels: [Float16], zoom: Int) {
+        let scale = 255 * Double(zoom)
+        func past(_ v: Double, by margin: Double) -> Bool {
+            v > 127.5 + margin || v < -128.5 - margin
+        }
+        for at in stride(from: 0, to: pixels.count, by: 4) {
+            let r = min(max(Float(pixels[at]), 0), 1)
+            let g = min(max(Float(pixels[at + 1]), 0), 1)
+            let b = min(max(Float(pixels[at + 2]), 0), 1)
+            let luma: Float = 0.2126 * r + 0.7152 * g + 0.0722 * b
+            let cb: Float = (b - luma) / 1.8556
+            let cr: Float = (r - luma) / 1.5748
+            let v = [scale * Double(cb), scale * Double(cr)]
+            let bin = v.map { min(255, max(0, 128 + Int($0.rounded()))) }
+            if v.contains(where: { past($0, by: Self.tieBand) }) {
+                off += 1
+            } else if v.contains(where: { past($0, by: -Self.tieBand) }) {
+                ties += 1
+                edge.insert(bin)
+            } else {
+                bins.insert(bin)
+            }
+        }
+    }
+}
 
 do {
     var misses: [String] = []
+    var zoomed: [String] = []
+    var crossed = true
     for (width, height) in [(1001, 537), (333, 77)] {
         for (name, fill) in fixtures(width, height) {
-            let traces = analyze(texture(width, height, fill), Set(ScopeKind.allCases))
+            let fixture = halves(width, height, fill)
+            let made = texture(width, height, halves: fixture)
+            let traces = analyze(made, Set(ScopeKind.allCases))
             let pixels = UInt64(width * height)
             for kind in ScopeKind.allCases {
                 let counts: [UInt32]
                 switch traces?[kind] {
                 case .waveform(let t)?: counts = t.counts
                 case .parade(let t)?: counts = t.counts
-                case .vectorscope(let t)?: counts = t.counts
+                case .vectorscope(let t)?:
+                    counts = t.counts
+                    if t.offPlot != 0 || t.zoom != 1 {
+                        misses.append("\(width)×\(height) \(name) ×1: zoom \(t.zoom), off \(t.offPlot)")
+                    }
                 case .histogram(let t)?: counts = t.counts
                 case nil: counts = []
                 }
@@ -358,12 +444,137 @@ do {
                     misses.append("\(width)×\(height) \(name) \(kind.rawValue): \(total) ≠ \(want)")
                 }
             }
+            for zoom in [2, 4] {
+                let where_ = "\(width)×\(height) \(name) ×\(zoom)"
+                let cpu = CPUCount(fixture, zoom: zoom)
+                if name == "gradient", width == 1001, cpu.off == 0 || cpu.bins.isEmpty {
+                    crossed = false
+                }
+                guard let gpu = vectorscope(made, zoom: zoom) else {
+                    misses.append("\(where_): no trace")
+                    continue
+                }
+                let total = gpu.counts.reduce(0) { $0 + Int($1) }
+                let have = Set(occupied(gpu).map { Array($0.prefix(2)) })
+                zoomed.append("\(where_) off \(gpu.offPlot) (cpu \(cpu.off)+\(cpu.ties) ties)")
+                if gpu.zoom != zoom || gpu.offPlot != Int(pixels) - total
+                    || gpu.offPlot < cpu.off || gpu.offPlot > cpu.off + cpu.ties
+                {
+                    misses.append(
+                        "\(where_): zoom \(gpu.zoom), off \(gpu.offPlot), counted \(total), cpu off "
+                            + "\(cpu.off) ties \(cpu.ties)")
+                }
+                if !near(have, cpu.bins.union(cpu.edge)) || !near(cpu.bins, have) {
+                    misses.append(
+                        "\(where_): bins apart (gpu \(have.count), cpu \(cpu.bins.count), first gpu "
+                            + "strays \(have.filter { !near([$0], cpu.bins.union(cpu.edge)) }.prefix(3)), "
+                            + "cpu strays \(cpu.bins.filter { !near([$0], have) }.prefix(3)))")
+                }
+            }
         }
     }
     check(
-        "S6 every kind's counts total the pixels (×3 the parade, ×4 the histogram) on GR-10's "
-            + "five fixtures at 1001 × 537 and 333 × 77",
-        misses.isEmpty, "misses \(misses.prefix(8))")
+        "S6 every kind's counts total the pixels (×3 the parade, ×4 the histogram) at ×1 on "
+            + "GR-26's six fixtures at 1001 × 537 and 333 × 77; at ×2 and ×4 the vectorscope's "
+            + "off_plot lies between a CPU count's definite off-plot pixels and those plus its "
+            + "edge ties, its occupied bins within ±1 of the CPU's both ways, and the gradient "
+            + "crosses the plot's edge at both zooms",
+        misses.isEmpty && crossed,
+        "crossed \(crossed); misses \(misses.prefix(8)); "
+            + zoomed.filter { $0.contains("gradient") || $0.contains("flat-red") }.joined(separator: "; "))
+}
+
+// MARK: - S11 a near-grey card spreads at the zoom
+
+do {
+    // Every (128 ± 5)/255 channel combination, 11³ pixels.
+    let steps = 11
+    let card: Fill = { x, _ in
+        func level(_ i: Int) -> Float { Float(123 + i) / 255 }
+        return (level(x / (steps * steps)), level((x / steps) % steps), level(x % steps))
+    }
+    let made = texture(steps * steps * steps, 1, card)
+    var extents: [Int: (cb: Int, cr: Int)] = [:]
+    for zoom in VectorscopeTrace.zooms {
+        let bins = occupied(vectorscope(made, zoom: zoom))
+        guard !bins.isEmpty else { continue }
+        let cbs = bins.map { $0[0] }
+        let crs = bins.map { $0[1] }
+        extents[zoom] = ((cbs.max() ?? 0) - (cbs.min() ?? 0), (crs.max() ?? 0) - (crs.min() ?? 0))
+    }
+    let one = extents[1]
+    let spread = one.map { one in
+        [2, 4].allSatisfy { zoom in
+            guard let at = extents[zoom] else { return false }
+            return abs(at.cb - zoom * one.cb) <= 1 && abs(at.cr - zoom * one.cr) <= 1
+        }
+    } ?? false
+    check(
+        "S11 a near-grey card (every (128 ± 5)/255 channel combination): its Cb and Cr extents "
+            + "at ×2 and ×4 are 2× and 4× ×1's, ±1 bin",
+        extents.count == 3 && (one?.cb ?? 0) > 0 && spread,
+        "extents (cb, cr) by zoom: "
+            + extents.sorted { $0.key < $1.key }.map { "×\($0.key) \($0.value)" }.joined(separator: ", "))
+}
+
+// MARK: - S12 off the plot at ×2; ×1 identical to the T4-0 tree's
+
+do {
+    // (a) 75 % red: Cr bin 224 at ×1, raw 319 at ×2.
+    let red = texture(16, 16) { _, _ in (0.75, 0, 0) }
+    let one = vectorscope(red, zoom: 1)
+    let two = vectorscope(red, zoom: 2)
+    let sum = { (trace: VectorscopeTrace?) in trace?.counts.reduce(0) { $0 + Int($1) } ?? -1 }
+    let offAtTwo = sum(one) == 256 && one?.offPlot == 0 && sum(two) == 0 && two?.offPlot == 256
+    // (b) every kind at ×1 byte-equal to an analyser over the T4-0 shader.
+    var baselineError = ""
+    let baseline: WaveformAnalyzer? = {
+        guard let path = request["baseline_shader"] as? String,
+            let text = try? String(contentsOfFile: path, encoding: .utf8)
+        else {
+            baselineError = "no baseline_shader in the request"
+            return nil
+        }
+        do {
+            let made = try device.makeLibrary(source: text, options: nil)
+            return WaveformAnalyzer(device: device, library: made)
+        } catch {
+            baselineError = "the baseline shader does not compile: \(error)"
+            return nil
+        }
+    }()
+    var differ: [String] = []
+    var compared = 0
+    if let baseline {
+        let (width, height) = (1001, 537)
+        var cards: [(String, Fill)] = fixtures(width, height)
+        let bars: [(String, (Float, Float, Float))] = [
+            ("75-R", (0.75, 0, 0)), ("75-G", (0, 0.75, 0)), ("75-B", (0, 0, 0.75)),
+            ("75-Cy", (0, 0.75, 0.75)), ("75-Mg", (0.75, 0, 0.75)), ("75-Yl", (0.75, 0.75, 0)),
+            ("red", (1, 0, 0)),
+        ]
+        for (name, rgb) in bars { cards.append((name, { _, _ in rgb })) }
+        let all = Set(ScopeKind.allCases)
+        for (name, fill) in cards {
+            let made = texture(width, height, fill)
+            let tree = made.flatMap { analyzer.analyze(texture: $0, kinds: all) }
+            let then = made.flatMap { baseline.analyze(texture: $0, kinds: all) }
+            compared += 1
+            for kind in ScopeKind.allCases {
+                let a = tree?[kind]
+                let b = then?[kind]
+                if a == nil || a != b { differ.append("\(name) \(kind.rawValue)") }
+            }
+        }
+    }
+    check(
+        "S12 75 % red counts every pixel at ×1 and none at ×2 (off_plot the pixels); at ×1 all "
+            + "four kinds' counts equal an analyser over the T4-0 tree's Waveform.metal on the six "
+            + "fixtures, the six 75 % cards and pure red",
+        offAtTwo && baseline != nil && compared == 13 && differ.isEmpty,
+        "75 % red ×1 sum \(sum(one)) off \(one?.offPlot ?? -1), ×2 sum \(sum(two)) off "
+            + "\(two?.offPlot ?? -1); baseline \(baseline != nil) \(baselineError); compared "
+            + "\(compared); differ \(differ.prefix(8))")
 }
 
 // MARK: - S7 latest wins with two kinds shown
@@ -515,20 +726,20 @@ do {
 
 // MARK: - T1 the passes' GPU time (scored by the proof)
 
-/// The median GPU time of `kinds` over `frame`, in ms. A burst of sixteen
+/// The median GPU time of `passes` over `frame`, in ms. A burst of sixteen
 /// passes committed back to back first, unread, so the GPU's clock is up as it
 /// is under playback: measured cold, one at a time, the figures swung two- to
 /// threefold between runs. Then the twelve passes one at a time, each waited
 /// on, since buffers committed together run two at once and each one's own
 /// time doubles.
 func gpuMedian(
-    _ analyzer: WaveformAnalyzer, _ kinds: Set<ScopeKind>, _ frame: MTLTexture,
+    _ analyzer: WaveformAnalyzer, _ passes: Set<ScopePass>, _ frame: MTLTexture,
     _ queue: MTLCommandQueue
 ) -> Double? {
     var burst: [MTLCommandBuffer] = []
     for _ in 0..<16 {
         guard let buffer = queue.makeCommandBuffer(),
-            analyzer.encode(kinds, frame: frame, into: buffer) != nil
+            analyzer.encode(passes, frame: frame, into: buffer) != nil
         else { continue }
         buffer.commit()
         burst.append(buffer)
@@ -537,7 +748,7 @@ func gpuMedian(
     var times: [Double] = []
     for _ in 0..<12 {
         guard let buffer = queue.makeCommandBuffer(),
-            analyzer.encode(kinds, frame: frame, into: buffer) != nil
+            analyzer.encode(passes, frame: frame, into: buffer) != nil
         else { continue }
         buffer.commit()
         buffer.waitUntilCompleted()
@@ -550,9 +761,12 @@ func gpuMedian(
 do {
     var cache: CVMetalTextureCache?
     CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cache)
-    let variants: [(String, Set<ScopeKind>)] = [
-        ("parade", [.parade]), ("vectorscope", [.vectorscope]), ("histogram", [.histogram]),
-        ("waveform", [.waveform]), ("waveform+vectorscope", [.waveform, .vectorscope]),
+    let variants: [(String, Set<ScopePass>)] = [
+        ("parade", [ScopePass(.parade)]), ("vectorscope", [ScopePass(.vectorscope)]),
+        ("vectorscope-x2", [ScopePass(.vectorscope, zoom: 2)]),
+        ("vectorscope-x4", [ScopePass(.vectorscope, zoom: 4)]),
+        ("histogram", [ScopePass(.histogram)]), ("waveform", [ScopePass(.waveform)]),
+        ("waveform+vectorscope", [ScopePass(.waveform), ScopePass(.vectorscope)]),
     ]
     var figures: [String: Any] = ["gpu": device.name]
     if let cache, let queue = device.makeCommandQueue() {
@@ -565,8 +779,8 @@ do {
                     kCFAllocatorDefault, cache, frame, nil, .rgba16Float, width, height, 0,
                     &wrapper)
                 guard let wrapper, let made = CVMetalTextureGetTexture(wrapper) else { continue }
-                for (variant, kinds) in variants {
-                    if let median = gpuMedian(analyzer, kinds, made, queue) {
+                for (variant, passes) in variants {
+                    if let median = gpuMedian(analyzer, passes, made, queue) {
                         bySize[variant, default: [:]][name] = median
                     }
                 }
@@ -578,63 +792,72 @@ do {
     records["T1"] = figures
 }
 
-// MARK: - T2 the banded parade against the forced-global one (scored by the proof)
+// MARK: - T2 and T3: a threadgroup path against its forced-global twin (scored by the proof)
 
-// The tree's shader again, with its one `bool banded = ` line forced to
-// `false`, so every parade group adds globally. The tree's parade and the
-// forced-global one are timed back to back on each 4K fixture; the proof
-// holds the banded time, on the fixture where the forced-global parade is
-// slowest, to a fraction of the global one, which is what says the banded
-// path is the one running (T1 alone cannot: the global parade sits about
-// GR-10's 1.1 ms).
-do {
+/// The tree's shader again, with its one line starting `prefix` forced to
+/// `forced`, timed against the tree's own pass back to back on each 4K
+/// fixture: the record's `4K` holds `{fixture: {mine: ms, "global": ms}}`,
+/// or it holds `anchor` (not exactly one such line) or `error`.
+func forcedGlobal(
+    prefix: String, forced: String, pass: ScopePass, mine: String
+) -> [String: Any] {
     let text = (try? String(contentsOfFile: shaderPath, encoding: .utf8)) ?? ""
     var lines = text.components(separatedBy: "\n")
-    let prefix = "bool banded = "
     let matches = lines.indices.filter {
         lines[$0].trimmingCharacters(in: .whitespaces).hasPrefix(prefix)
     }
-    if matches.count != 1 {
-        records["T2"] = ["anchor": "\(matches.count) lines start `\(prefix)`"]
-    } else {
-        lines[matches[0]] = "    bool banded = false;"
-        var error = ""
-        var global: WaveformAnalyzer?
-        do {
-            let forced = try device.makeLibrary(source: lines.joined(separator: "\n"), options: nil)
-            global = WaveformAnalyzer(device: device, library: forced)
-            if global == nil { error = "the forced-global WaveformAnalyzer is nil" }
-        } catch let failure {
-            error = "the forced-global shader does not compile: \(failure)"
-        }
-        var cache: CVMetalTextureCache?
-        CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cache)
-        let queue = device.makeCommandQueue()
-        if let global, let cache, let queue {
-            var byFixture: [String: [String: Double]] = [:]
-            let (width, height) = (3840, 2160)
-            for (name, fill) in fixtures(width, height) {
-                guard let frame = pixelBuffer(width, height, fill) else { continue }
-                var wrapper: CVMetalTexture?
-                CVMetalTextureCacheCreateTextureFromImage(
-                    kCFAllocatorDefault, cache, frame, nil, .rgba16Float, width, height, 0,
-                    &wrapper)
-                guard let wrapper, let made = CVMetalTextureGetTexture(wrapper) else { continue }
-                var pair: [String: Double] = [:]
-                pair["banded"] = gpuMedian(analyzer, [.parade], made, queue)
-                pair["global"] = gpuMedian(global, [.parade], made, queue)
-                byFixture[name] = pair
-                withExtendedLifetime(wrapper) {}
-            }
-            records["T2"] = ["gpu": device.name, "4K": byFixture]
-        } else {
-            if error.isEmpty {
-                error = "cache \(cache != nil), queue \(queue != nil)"
-            }
-            records["T2"] = ["error": error]
-        }
+    guard matches.count == 1 else { return ["anchor": "\(matches.count) lines start `\(prefix)`"] }
+    lines[matches[0]] = forced
+    var error = ""
+    var global: WaveformAnalyzer?
+    do {
+        let library = try device.makeLibrary(source: lines.joined(separator: "\n"), options: nil)
+        global = WaveformAnalyzer(device: device, library: library)
+        if global == nil { error = "the forced-global WaveformAnalyzer is nil" }
+    } catch let failure {
+        error = "the forced-global shader does not compile: \(failure)"
     }
+    var cache: CVMetalTextureCache?
+    CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cache)
+    let queue = device.makeCommandQueue()
+    guard let global, let cache, let queue else {
+        return ["error": error.isEmpty ? "cache \(cache != nil), queue \(queue != nil)" : error]
+    }
+    var byFixture: [String: [String: Double]] = [:]
+    let (width, height) = (3840, 2160)
+    for (name, fill) in fixtures(width, height) {
+        guard let frame = pixelBuffer(width, height, fill) else { continue }
+        var wrapper: CVMetalTexture?
+        CVMetalTextureCacheCreateTextureFromImage(
+            kCFAllocatorDefault, cache, frame, nil, .rgba16Float, width, height, 0, &wrapper)
+        guard let wrapper, let made = CVMetalTextureGetTexture(wrapper) else { continue }
+        var pair: [String: Double] = [:]
+        pair[mine] = gpuMedian(analyzer, [pass], made, queue)
+        pair["global"] = gpuMedian(global, [pass], made, queue)
+        byFixture[name] = pair
+        withExtendedLifetime(wrapper) {}
+    }
+    return ["gpu": device.name, "4K": byFixture]
 }
+
+// T2: the parade's one `bool banded = ` line forced to `false`, so every
+// parade group adds globally. The proof holds the banded time, on the
+// fixture where the forced-global parade is slowest, to a fraction of the
+// global one, which is what says the banded path is the one running (T1
+// alone cannot: the global parade sits about GR-10's 1.1 ms).
+records["T2"] = forcedGlobal(
+    prefix: "bool banded = ", forced: "    bool banded = false;", pass: ScopePass(.parade),
+    mine: "banded")
+
+// T3 (grading-4 T4-1): the vectorscope's one `bool central = ` line forced
+// to `false`, so every pixel goes to the global bins. GR-26's same-bin add
+// rescues the flat fixtures T1 used to catch that on, so the proof holds the
+// tree's ×1 time, on the fixture where the forced-global vectorscope is
+// slowest, to a fraction of the global one: the central threadgroup path is
+// the one running.
+records["T3"] = forcedGlobal(
+    prefix: "bool central = ", forced: "            bool central = false;",
+    pass: ScopePass(.vectorscope), mine: "tree")
 
 // MARK: - S9 the panel: picks, no defaults, the 360 pt floor
 
@@ -736,5 +959,144 @@ func s9() {
             + steps.joined(separator: " | "))
 }
 s9()
+
+// MARK: - S14 the panel's zoom: per slot, re-attached, kept, never saved
+
+func s14() {
+    guard let path = request["package"] as? String else {
+        check("S14 the request names a package", false, "\(request)")
+        return
+    }
+    func open() -> (ProjectDocument, EditorViewController, NSWindow)? {
+        let document = ProjectDocument()
+        do {
+            try document.read(
+                from: URL(fileURLWithPath: path), ofType: ProjectDocument.projectTypeIdentifier)
+            document.fileURL = URL(fileURLWithPath: path)
+        } catch {
+            return nil
+        }
+        let controller = EditorViewController(document: document)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1440, height: 1000),
+            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        window.contentViewController = controller
+        controller.viewWillAppear()
+        controller.viewDidAppear()
+        controller.refreshFromDocument(isLive: false)
+        return (document, controller, window)
+    }
+    func settle(_ controller: EditorViewController) {
+        for _ in 0..<10 {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+            controller.view.layoutSubtreeIfNeeded()
+        }
+    }
+    guard let (document, controller, window) = open(), let panel = controller.scopesPanel else {
+        check("S14 the package opens with a scopes panel", false, path)
+        return
+    }
+    settle(controller)
+    let before = UserDefaults.standard.dictionaryRepresentation() as NSDictionary
+    let key = document.recipeKey
+    let slots = panel.slotViews
+    var steps: [String] = []
+    var ok = slots.map(\.zoom) == [1, 1]
+    steps.append("opening zooms \(slots.map(\.zoom))")
+    controller.toggleScopes(nil)
+    settle(controller)
+    var asks = 0
+    let wired = panel.onNeedsFrame
+    panel.onNeedsFrame = {
+        asks += 1
+        wired?()
+    }
+    func attached() -> Set<ScopePass> { WaveformTaps.shared.attachedPasses(key: key) ?? [] }
+    func describe(_ passes: Set<ScopePass>) -> String {
+        ScopePass.ordered(passes).map { "\($0.kind.rawValue)×\($0.zoom)" }.joined(separator: "+")
+    }
+    // A zoom on the bottom (vectorscope) slot: re-attached, one ask, the top
+    // slot unchanged.
+    var asked = asks
+    panel.zoom(4, slot: 1)
+    settle(controller)
+    let zoomed = attached()
+    let wantZoomed: Set<ScopePass> = [ScopePass(.waveform), ScopePass(.vectorscope, zoom: 4)]
+    let cells = (slots[1].body as? VectorscopeView)?.cells.zoom
+    ok = ok && zoomed == wantZoomed && asks - asked == 1 && slots[0].zoom == 1
+        && slots[1].zoom == 4 && cells == 4 && panel.shownPasses == wantZoomed
+    steps.append("bottom ×4: attached \(describe(zoomed)), asks +\(asks - asked), cells \(cells ?? -1)")
+    // A zoom outside 1, 2, 4 is ignored.
+    asked = asks
+    panel.zoom(3, slot: 1)
+    ok = ok && slots[1].zoom == 4 && asks == asked
+    // Both slots vectorscope, ×1 over ×4: two passes, each slot its own trace.
+    panel.pick(.vectorscope, slot: 0)
+    settle(controller)
+    let both = attached()
+    let wantBoth: Set<ScopePass> = [
+        ScopePass(.vectorscope), ScopePass(.vectorscope, zoom: 4),
+    ]
+    // The app's shared tap has no analyser in a probe (no default library),
+    // so the panel's passes go through a tap over the probe's own: one frame
+    // of a gradient, both passes' traces delivered together, then shown.
+    var delivered: [ScopePass: ScopeTrace]?
+    let local = WaveformTaps(analyzer: analyzer)
+    let localKey = 990_114
+    local.attach(key: localKey, passes: panel.shownPasses) { traces in delivered = traces }
+    if let frame = pixelBuffer(320, 180, { x, y in (Float(x) / 320, Float(y) / 180, 0.4) }) {
+        local.offer(frame, key: localKey)
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline, delivered == nil {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+        }
+    }
+    local.detach(key: localKey)
+    panel.show(delivered)
+    let shown = slots.map { ($0.body as? VectorscopeView)?.trace?.zoom }
+    let offTop = (slots[0].body as? VectorscopeView)?.trace?.offPlot
+    let offBottom = (slots[1].body as? VectorscopeView)?.trace?.offPlot
+    ok = ok && both == wantBoth && delivered?.count == 2 && shown == [1, 4] && offTop == 0
+    steps.append(
+        "vectorscope ×1 over ×4: attached \(describe(both)), delivered "
+            + "\(describe(Set(delivered?.keys.map { $0 } ?? []))), shown zooms \(shown), off "
+            + "\(offTop ?? -1) / \(offBottom ?? -1)")
+    // Kept across hide and show, and a pick away and back.
+    controller.toggleScopes(nil)
+    settle(controller)
+    controller.toggleScopes(nil)
+    settle(controller)
+    let afterShow = slots.map(\.zoom)
+    panel.pick(.parade, slot: 1)
+    settle(controller)
+    let away = attached()
+    panel.pick(.vectorscope, slot: 1)
+    settle(controller)
+    let back = slots[1].zoom
+    let backBody = (slots[1].body as? VectorscopeView)?.zoom
+    ok = ok && afterShow == [1, 4] && away == [ScopePass(.vectorscope), ScopePass(.parade)]
+        && back == 4 && backBody == 4 && attached() == wantBoth
+    steps.append(
+        "after hide/show \(afterShow); picked away \(describe(away)); back ×\(back), body "
+            + "×\(backBody ?? -1)")
+    controller.toggleScopes(nil)
+    settle(controller)
+    let after = UserDefaults.standard.dictionaryRepresentation() as NSDictionary
+    let moved = Set((before.allKeys + after.allKeys).compactMap { $0 as? String }).filter {
+        (before[$0] as? NSObject) != (after[$0] as? NSObject)
+    }
+    window.close()
+    let fresh = open()
+    let restarted = fresh?.1.scopesPanel?.slotViews.map(\.zoom)
+    fresh?.2.close()
+    check(
+        "S14 both slots ×1 on open; a zoom re-attaches that slot's pass and asks for one frame, "
+            + "the other slot unchanged; vectorscope ×1 over ×4 attaches two passes and each slot "
+            + "shows its own zoom's trace; the zoom lasts across hide and show and a pick away and "
+            + "back; no UserDefaults key moves; a new controller is ×1",
+        ok && moved.isEmpty && restarted == [1, 1],
+        steps.joined(separator: " | ") + "; moved \(moved.sorted()); restarted \(restarted ?? [])")
+}
+s14()
 
 finish()
