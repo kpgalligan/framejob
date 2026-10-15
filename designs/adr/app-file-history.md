@@ -503,6 +503,18 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   overlay and `QualifierPick.sample`). `EditorViewController+Eyedropper.swift` (322 → 339) gave
   its overlay's body to `CanvasPickOverlay`, which `CanvasEyedropperView` and the new
   `QualifierPickView` subclass. `ProjectSnapshot.swift`'s named seam is unchanged.
+- `GradeProps.swift`: grading-4's T4-0 paid the seam G2-3 named. The curve types, from
+  `// MARK: - The curves (spec §11 GR-12, grading-2 G2-3)` through the `apply(curves:)`
+  extension's closing brace (`CurvePoint`, `CurveChannel`, `ColorCurves`, `ColorCurvesPatch`,
+  `LayerUniforms.apply(curves:)`), went whole to `CurveProps.swift` with `import AppKit`, and the
+  blank line before the block went too: a pure move gated alone before any tier-4 code, diffed
+  byte-equal against `git show HEAD:app/Sources/GradeProps.swift`. Nothing widened (the block
+  uses `KeyedDecodingContainer.lenient`/`.nullable`, `DS.textStrong` and `ParadeView.tints`,
+  all internal), and no proof anchor moved (`tone_proof.py` and `wheels_proof.py` anchor the tone
+  and wheel lines, which stay). `wc -l app/Sources/GradeProps.swift`: 526 before, 343 after;
+  `CurveProps.swift` is 184. The next seams: `GradeProps.swift`'s `// MARK: - The wheels` block
+  out whole to `WheelProps.swift`; and `CurveProps.swift`'s `ColorCurvesPatch` out whole to
+  `CurvePatch.swift`, should T4-2 or T4-3 carry it past ~400.
 - `Compositor.swift`: the mattes road map's MT1 (issue batch B89) moved `// MARK: - Shadows`
   through `blurKernel`, with `ShadowSurfaces`, to `Compositor+Shadow.swift`, and `render`'s
   per-layer uniforms-and-source block to `prepare` in `CompositorEffects.swift`, a pure move gated

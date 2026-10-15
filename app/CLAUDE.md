@@ -30,11 +30,12 @@ detail there.
   `ProjectSnapshot.swift`, grading-2 G2-0) with its neutrality helpers, and
   `LayerUniforms.apply(tone:)`, and the wheels' `ColorWheel`, `ColorWheels`,
   `ColorWheelPatch`, `ColorWheelsPatch`, `ColorWheelKind` and
-  `LayerUniforms.apply(wheels:)` (GR-11), and the curves' `CurvePoint`,
-  `CurveChannel`, `ColorCurves`, `ColorCurvesPatch` and
-  `LayerUniforms.apply(curves:)` (GR-12); `VideoPatch.qualifier` is
+  `LayerUniforms.apply(wheels:)` (GR-11)); `VideoPatch.curves` is
+  `CurveProps.swift`'s `ColorCurvesPatch`, beside `CurvePoint`,
+  `CurveChannel`, `ColorCurves` and `LayerUniforms.apply(curves:)` (GR-12; a
+  pure move out of `GradeProps.swift`, grading-4 T4-0); `VideoPatch.qualifier` is
   `QualifierProps.swift`'s `ColorQualifierPatch`, beside `ColorQualifier`,
-  `QualifierUniforms` and the pick's `QualifierSample` (GR-13)), so a row writes
+  `QualifierUniforms` and the pick's `QualifierSample` (GR-13), so a row writes
   only its own key to every selected clip. `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10). `ReelAgentSocket` (road map
   14's MC2) wraps `rc_agent_socket_start` / `_release`: `start` throws the
@@ -109,7 +110,7 @@ detail there.
   stop the list** — a later op still runs after one, exactly as after an
   identity — and the FIRST refusal is answered only when nothing applied.
 - `ProjectSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
-  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` — the `Codable`, READ-ONLY mirror
+  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` · `CurveProps.swift` — the `Codable`, READ-ONLY mirror
   of spec §5.2 every view draws from. `CompositionPlan.swift` (a pure move out of
   `ProjectSnapshot.swift`, grading GR1) is the plan's Swift side (spec §7.2): `PlanSegment`,
   `PlanRamp`, `PlanTrack`, `PlanInstruction` and `CompositionPlan`. `ShapeProps.swift` (a pure

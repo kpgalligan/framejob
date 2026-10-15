@@ -76,6 +76,12 @@ Concat is opened, at design time or build time.
     (REASONED from the brief's spike), off the render queue and latest-wins, so a slow pass
     drops scope frames rather than stalling playback, but it still takes GPU time from the
     compositor.
+  **Amended by GR-26** (grading-4 T4-0): the time bound's fixtures become six, a flat saturated
+  colour (0.8, 0.1, 0.1) added, on which the shipped vectorscope kernel measured 7.29–7.33 ms at
+  4K; and the counting rule gains "a non-central vectorscope bin shared by a whole SIMD group is
+  added once" (0.281–0.282 ms on that fixture). Its code and the app-pass T1 land in T4-1.
+  **Amended by GR-29** (grading-4 T4-0): "so a 1,024-level scope stays possible" is closed: a
+  1,024-level scope is not wanted (#273).
 - **GR-11 — Wheels: `video.wheels {lift, gamma, gain}`, each a Cartesian colour push `{x, y}`
   and a `master`, applied at step 4c.1 after tone and before the look, in the layer stage and the
   adjustment pass; format 16.** Recorded in G2-2 before its code, from the owner's "All as
@@ -389,3 +395,8 @@ Concat is opened, at design time or build time.
     no qualifier on picture clips (later issues).
   - Risk accepted: both guards are first numbers, judged by GRD-14 on real footage; the reading
     is of encoded values (tier 3 #256 would be a second reading, not a reinterpretation).
+  **Amended by GR-24** (grading-4 T4-0): the "Not" line's cleanup blur of the selection is lifted
+  (T4-4, `video.qualifier.blur`) and its hue-against-hue and hue-against-saturation curves are
+  lifted (T4-2). GR-6 is unchanged: the blur filter on an adjustment clip stays refused.
+  **Amended by GR-28** (grading-4 T4-0): "no qualifier on picture clips (later issues)" is
+  closed: a qualifier on picture clips is not wanted (#269).

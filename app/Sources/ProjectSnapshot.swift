@@ -788,7 +788,7 @@ struct VideoProps: Codable, Equatable {
     let motion: MotionProps?
     /// Lift, gamma and gain (spec §11 GR-11, `GradeProps.swift`).
     let wheels: ColorWheels
-    /// The tone curves (spec §11 GR-12, `GradeProps.swift`).
+    /// The tone curves (spec §11 GR-12, `CurveProps.swift`).
     let curves: ColorCurves
     /// An adjustment clip's qualifier (spec §11 GR-13, `QualifierProps.swift`).
     let qualifier: ColorQualifier
