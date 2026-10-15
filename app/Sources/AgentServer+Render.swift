@@ -131,14 +131,12 @@ extension AgentServer {
         // own two the same way.
         let (url, format) = try frameDestination(a, at: time)
         // Off the main thread by construction — `Exporter.renderFrame` opens
-        // asset tracks and decodes, and says so. A PNG or HEIC of a frame
-        // showing a deep still is read through the reader (spec §11 PR-9), by
-        // Save Frame's own expression.
+        // asset tracks and decodes, and says so. A PNG or HEIC keeps depth, so
+        // `Exporter` reads a frame showing a deep still or a deep VP9 track
+        // through the reader (spec §11 PR-9, PR-12); Save Frame passes the same.
         let rendered = Exporter.renderFrameReported(
             project: project, urls: urls, at: time, maxWidth: maxWidth, options: options,
-            graphics: graphics,
-            deepStill: format.carriesDepth
-                && DeepStillFrame.shows(project, urls: urls, at: time, options: options))
+            graphics: graphics, keepsDepth: format.carriesDepth)
         guard let image = rendered.image else {
             throw ToolError(
                 message: "No frame at \(time). Either the time is past the end of the timeline, "

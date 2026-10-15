@@ -122,14 +122,16 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   even HEVC 4:2:2 file: the HEVC branch, #280) is printed and not scored.
 - **L14** (issue batch B99, #291, spec §11 GR-23): `slog3_fr_vp9e.mp4`,
   `slog3_vr_vp9e.mp4` and `slog3_fr_webm.webm` (the last imported through
-  `ContainerRewrap`) with S-Log3 set at 0.5 s, scored as L10 but to ±2: L1's
-  grey-row points and the patches = the oracle at the file's own decoded codes
-  ±2 at 8 bits (the same codes rendered from VP9 and from HEVC part by
-  up to 0.88 of a level untransformed, 1.25 under S-Log3: issue batch B102's
-  `composition-gap` placed it in the generator, whose image of the VP9 file
-  is 8-bit where the HEVC file's is 16-bit; the fix is owed, #294), the
-  code domain by the file's range flag — step 0's read of a VP9 track's
-  `vpcC` range bit.
+  `ContainerRewrap`) with S-Log3 set at 0.5 s, scored as L10: L1's grey-row
+  points and the patches = the oracle at the file's own decoded codes ±1 at
+  8 bits, the code domain by the file's range flag — step 0's read of a VP9
+  track's `vpcC` range bit. From B99 to B102 the bound was 2: the same codes
+  rendered from VP9 and from HEVC parted by up to 0.88 of a level
+  untransformed and 1.25 under S-Log3, which issue batch B102's
+  `composition-gap` placed in the generator, whose image of the VP9 file is
+  8-bit where the HEVC file's is 16-bit. Since issue batch B103 (#294, spec
+  §11 PR-12) such a frame is read through export's reader, and the bound is
+  1 again.
 - **L15** (issue batch B101, #293; a probe row, no instance): `av1_range_probe.swift`
   over `app/Sources` reads each AV1 fixture's first format description — the
   `FullRangeVideo` key, the `av1C` and `colr` atoms, `av1C`'s first 8 bytes,
@@ -149,6 +151,28 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   gets no key and answers false, which the owner accepted as a known limit
   (2026-10-14, spec §11 GR-23, #293), so both are scored False and a change
   in AVFoundation's answer fails L15.
+- **L16** (issue batch B103, #294, spec §11 PR-12; a probe row, no instance):
+  `deep_video_probe.swift` over `app/Sources` reads each file's first format
+  description — its media subtype, its `BitsPerComponent` extension, its
+  `vpcC` record's first 8 bytes — and answers `DeepVideoFrame.isDeep`:
+  true for `slog3_fr_vp9e.mp4`, `slog3_vr_vp9e.mp4`, the odd
+  `slog3_fr_vp9.mp4` and `slog3_fr_webm.webm` (rewrapped by
+  `ContainerRewrap.rewrap`, its precheck included), false for
+  `vp9_8bit.mp4`, `slog3_fr.mov` (HEVC Main 10), `slog3_fr_422.mov` (HEVC
+  Rext) and `slog3.mov` (ProRes 422 HQ). A probe that does not build is the
+  row's FAIL (the control's answer).
+- **L17** (B103): `slog3_fr_vp9e.mp4`, `slog3_vr_vp9e.mp4` and
+  `slog3_fr_webm.webm` alone, no Camera Log, at 0.5 s, and the mixed project
+  (`vp9_8bit.mp4` at 0, `slog3_fr_vp9e.mp4` at 1 s on one track) at 1.5 s:
+  each `render_frame` PNG has IHDR bit depth 16. Unscored, it prints the
+  depth of `slog3_fr.mov`, `slog3_fr_422.mov`, `slog3.mov` and
+  `vp9_8bit.mp4` alone — the generator's depth per codec.
+- **L18** (B103; L9's modes: `capture DIR`, `compare DIR`, mutants): the
+  frames PR-12 leaves to the generator — `slog3_fr.mov` alone,
+  `vp9_8bit.mp4` alone and the mixed project at 0.5 s as PNGs, and
+  `slog3_fr_vp9e.mp4` alone as `format: "jpeg"` — byte-equal to DIR's.
+  `capture` copies their media into `DIR/media/`, each extension kept, and
+  every later L18 reads them from there.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
@@ -178,13 +202,26 @@ printed and not required. B101's (#293, L15) are `AV1_FIXTURES`: one 64×64
 `-write_colr`), `av1_fr_webm.webm` (`pc`) and `av1_vr_webm.webm` (`tv`), each
 kept only when ffprobe reads `av1` and its range and the file holds a `colr`
 box exactly when `+write_colr`. Each is wanted with its codec, profile, pix_fmt and size,
-and read back as above. Mutants: `full-range-ignored` (L10, L12),
+and read back as above. B103's (#294, L16–L18) is `vp9_8bit.mp4`: 1 s of
+lavfi `testsrc2` at 1024×128, 30 fps, libvpx-vp9 lossless Profile 0
+`yuv420p`, kept only when ffprobe reads `vp9`, `Profile 0`, `yuv420p` and
+1024×128. Mutants: `full-range-ignored` (L10, L12),
 `apple-log-rescaled` (L11), `range-from-reverse` (L12), B98's
 `odd-range-ignored` (L13: `Intermediate.pixelFormat(fullRange:)` answers the
 video-range `x422` whatever the flag, spec §11 PR-10), and B99's
 `vp9-range-ignored` (L13, L14: `isFullRange`'s fallback answers false in
 place of `vp9FullRange(of:)`) and `vpcc-wrong-byte` (L13, L14: the bit read
 from byte 7, the colour primaries, in place of byte 6, spec §11 GR-23).
+B103's (#294, spec §11 PR-12; each run with `--only` its rows and Z1, the
+"also" rows printed, not required): `vp9-deep-never` (L14, L16, L17:
+`DeepVideoFrame.isDeep` answers false), `vp9-depth-eight` (L16, L18 also:
+the depth test is `>= 8`), `vpcc-depth-nibble` (L14, L16, L17: the depth
+read as byte 6's low nibble, the chroma and range bits), `vp9-track-wide`
+(L18: `shows` counts the composition track by any description it lists, not
+its segment at the frame time) and `vp9-jpeg-deep` (L18: `render_frame`
+passes `keepsDepth: true` for JPEG too). `isDeep`'s VP9 subtype guard has no
+mutant: no fixture but VP9 carries a `vpcC` atom (L16 prints each file's), so
+removing it changes no answer.
 
     python3 tools/proof/log_proof.py reverse-variants [--variant base,rate2,...]
 
@@ -346,10 +383,10 @@ SETTINGS = {"slog3": {"log": "slog3", "gamut": "s_gamut3_cine"}, "vlog": {"log":
             "green_m": {"log": "slog3", "gamut": "s_gamut3_cine"}}
 L9_FIXTURES = ["slog3", "vlog", "applelog", "applelog2", "green"]
 ROWS = ["LP1", "LP2", "LP3", "LP4", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10",
-        "L11", "L12", "L13", "L14", "L15", "Z1"]
+        "L11", "L12", "L13", "L14", "L15", "L16", "L17", "L18", "Z1"]
 LP_ROWS = {"LP1", "LP2", "LP3", "LP4"}
-# The rows a probe answers with no instance (B101 adds L15).
-PROBE_ROWS = LP_ROWS | {"L15"}
+# The rows a probe answers with no instance (B101 adds L15, B103 L16).
+PROBE_ROWS = LP_ROWS | {"L15", "L16"}
 # B95 (spec §11 GR-22): HEVC Main 10 4:2:0 fixtures (libx265, lossless) flagged
 # full (`pc`) or video (`tv`) range, the curve's signal stored as the 10-bit
 # code 1023·y (Apple's P as 1023·P). name: (curve, range, tags or None).
@@ -434,6 +471,22 @@ GAP_BOUND = 0.5
 COMPOSITION_PROBE = ROOT / "tools/proof/composition_gap_probe.swift"
 GAP_SETTINGS = ("none", "slog3")
 GAP_STAGES = (("tap", "source frames"), ("reader", "compositor"), ("generator", "generator"))
+# B103 (#294, spec §11 PR-12): the 8-bit VP9 file (lavfi testsrc2, libvpx-vp9
+# lossless Profile 0, yuv420p), L16's probe and its items (label → kind,
+# whether `DeepVideoFrame.isDeep` must answer true), L17's deep renders and
+# its printed codecs, and the mixed project (`vp9_8bit` at 0, `slog3_fr_vp9e`
+# at 1 s on one track).
+VP9_8BIT = "vp9_8bit"
+DEEP_PROBE = ROOT / "tools/proof/deep_video_probe.swift"
+L16_ITEMS = {"slog3_fr_vp9e": ("file", True), "slog3_vr_vp9e": ("file", True),
+             "slog3_fr_vp9": ("file", True), "slog3_fr_webm": ("webm", True),
+             VP9_8BIT: ("file", False), "slog3_fr": ("file", False),
+             "slog3_fr_422": ("file", False), "slog3": ("file", False)}
+L17_DEEP = ("slog3_fr_vp9e", "slog3_vr_vp9e", "slog3_fr_webm")
+L17_PRINTED = ("slog3_fr", "slog3_fr_422", "slog3", VP9_8BIT)
+MIXED = (VP9_8BIT, "slog3_fr_vp9e")
+DEEP_SWIFT = "app/Sources/DeepVideoFrame.swift"
+RENDER_SWIFT = "app/Sources/AgentServer+Render.swift"
 # name: ([(file, anchor, replacement), …], the rows that must fail).
 MUTANTS = {
     "source-unconverted": ([(SOURCES_SWIFT,
@@ -506,6 +559,25 @@ MUTANTS = {
                           "        return record[record.startIndex + 6] & 1 == 1\n",
                           "        return record[record.startIndex + 7] & 1 == 1\n")],
                         ["L13", "L14"]),
+    # B103 (#294, spec §11 PR-12): `isDeep` never true; 8 bits counted deep;
+    # the depth read from the low nibble (chroma and range, ≤ 7 for every
+    # fixture); the composition track counted by any description it lists
+    # instead of its segment at the frame time; JPEG asked to keep depth.
+    "vp9-deep-never": ([(DEEP_SWIFT, "        return record[record.startIndex + 6] >> 4 > 8\n",
+                         "        return false\n")], ["L14", "L16", "L17"]),
+    "vp9-depth-eight": ([(DEEP_SWIFT, "        return record[record.startIndex + 6] >> 4 > 8\n",
+                          "        return record[record.startIndex + 6] >> 4 >= 8\n")], ["L16"]),
+    "vpcc-depth-nibble": ([(DEEP_SWIFT, "        return record[record.startIndex + 6] >> 4 > 8\n",
+                            "        return record[record.startIndex + 6] & 0x0f > 8\n")],
+                          ["L14", "L16", "L17"]),
+    "vp9-track-wide": ([(DEEP_SWIFT,
+                         "            if let shown = description(of: track, at: time), "
+                         "isDeep(shown) { return true }\n",
+                         "            if (CompositionBuilder.keyed(track, \"formatDescriptions\") "
+                         "as? [CMFormatDescription] ?? []).contains(where: isDeep) "
+                         "{ return true }\n")], ["L18"]),
+    "vp9-jpeg-deep": ([(RENDER_SWIFT, "            graphics: graphics, keepsDepth: format.carriesDepth)\n",
+                        "            graphics: graphics, keepsDepth: true)\n")], ["L18"]),
 }
 # B96 (#280): the reverse's intermediate variants, each one edit to the plain
 # `.hevcMain10` path of ReverseRenderer.swift (`reverse-variants`). The rate
@@ -840,6 +912,8 @@ def fixture(name):
         return checked(name, encode("green_m", raw_green(), (None, None, "bt2020nc")),
                        {"pix_fmt": "yuv422p10le", "color_primaries": "unknown",
                         "color_transfer": "unknown", "color_space": "bt2020nc"})
+    if name == VP9_8BIT:
+        return vp9_8bit_fixture()
     if name in ("lut17", "lut33"):
         out = MEDIA / f"{name}.cube"
         if not out.exists():
@@ -957,11 +1031,19 @@ def range_fixture(name):
     return out
 
 
+def media_extension(name):
+    """The extension `fixture(name)` writes: a range fixture's by its shape,
+    `vp9_8bit`'s `.mp4`, every other `.mov`."""
+    if name in RANGE_FIXTURES:
+        return RANGE_SHAPES.get(name, RANGE_DEFAULT)[6]
+    return ".mp4" if name == VP9_8BIT else ".mov"
+
+
 def l9_media(name, control):
-    """L9's fixture: DIR's copy when DIR holds one (compare, mutants), else
-    MEDIA's (capture copies it into DIR)."""
+    """L9's (and L18's) fixture: DIR's copy when DIR holds one (compare,
+    mutants), else MEDIA's (capture copies it into DIR, its extension kept)."""
     if control is not None:
-        copy = control / "media" / f"{name}.mov"
+        copy = control / "media" / f"{name}{media_extension(name)}"
         if copy.exists():
             return copy
         REFUSED[name] = f"{copy} is missing from the control"
@@ -1571,27 +1653,22 @@ def run_l10(client):
 
 
 def run_l14(client):
-    # Bound 2, not L10's 1: the same codes rendered from VP9 and from HEVC
-    # part by up to 0.88 of a level with no Camera Log (where GR-23 changes
-    # nothing) and by 1.25 under S-Log3, tagged or not (issue batch B99's
-    # measurement; the orchestrator's ruling). Issue batch B101's
-    # `decode-gap` verdict is "neither": VP9's own-range biplanar codes are
-    # the written ones and its 64RGBAHalf reader frames equal HEVC's at every
-    # point (#294, spec §11 GR-23), so the gap is not the decoder's or the
-    # reader's conversion. Issue batch B102's `composition-gap` verdict is
-    # "generator": the compositor's frames agree (S-Log3 0.000 levels), and
-    # `AVAssetImageGenerator` hands `render_frame` an 8-bit image of the VP9
-    # file where the HEVC one's is 16-bit, up to 0.62 of a level apart; the
-    # fix (export's reader, #294) is owed, so the bound stays 2 until it lands.
-    # A range misread is 28 levels off, so the bound still tells the two apart.
+    # Bound 1, L10's, since issue batch B103 (#294, spec §11 PR-12). From B99
+    # to B102 it was 2: the same codes rendered from VP9 and from HEVC parted
+    # by up to 0.88 of a level with no Camera Log and 1.25 under S-Log3
+    # (B99's measurement). B101's `decode-gap` placed the gap after the
+    # reader, and B102's `composition-gap` in the generator, whose image of a
+    # VP9 file is 8-bit where an HEVC file's is 16-bit; PR-12 reads a frame
+    # showing a deep VP9 track through export's reader instead. A range
+    # misread is 28 levels off, so the bound tells the two apart either way;
+    # `bound` stays a parameter of range_rows.
     misses, worst = range_rows(client, "L14", ("slog3_fr_vp9e", "slog3_vr_vp9e", "slog3_fr_webm"),
-                               bound=2)
+                               bound=1)
     check("L14 slog3_fr_vp9e.mp4, slog3_vr_vp9e.mp4 and slog3_fr_webm.webm (VP9 Profile 2, "
           "flagged full, video, full range; the WebM rewrapped) with S-Log3 at 0.5 s: L1's "
-          "grey-row points and the patches = the oracle at the file's own decoded codes ±2 at "
-          "8 bits (the VP9 render gap, GR-23: the generator's 8-bit image of a VP9 file, "
-          "B101 and B102, #294), the code domain by the range flag (GR-23: a VP9 track's "
-          "`vpcC` bit)",
+          "grey-row points and the patches = the oracle at the file's own decoded codes ±1 at "
+          "8 bits (the frame read through export's reader, PR-12, #294), the code domain by "
+          "the range flag (GR-23: a VP9 track's `vpcC` bit)",
           not misses, f"worst {worst}; {misses}")
 
 
@@ -2007,6 +2084,205 @@ def run_l15(sources):
           f"open {sorted(open_) or 'none'}")
 
 
+# ---- L16, L17, L18 (B103, #294, spec §11 PR-12) --------------------------------
+
+def vp9_8bit_fixture():
+    """`MEDIA/vp9_8bit.mp4`: 1 s of lavfi `testsrc2` at W×H and 30 fps through
+    libvpx-vp9 lossless Profile 0, `yuv420p`; kept only when ffprobe reads
+    `vp9`, `Profile 0`, `yuv420p` and W×H; else None, REFUSED naming what it
+    read."""
+    name = VP9_8BIT
+    if name in RANGE_CHECKED:
+        return RANGE_CHECKED[name]
+    out = MEDIA / f"{name}.mp4"
+    if not out.exists():
+        MEDIA.mkdir(parents=True, exist_ok=True)
+        made = bounded.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                            f"testsrc2=size={W}x{H}:rate=30:duration=1", "-c:v", "libvpx-vp9",
+                            "-lossless", "1", "-profile:v", "0", "-pix_fmt", "yuv420p", str(out)],
+                           300)
+        if made["rc"] != 0 or not out.exists():
+            REFUSED[name] = f"ffmpeg {name}: rc {made['rc']} {made['stderr'][-300:]}"
+            out.unlink(missing_ok=True)
+            RANGE_CHECKED[name] = None
+            return None
+    probe = range_stream(out)
+    want = {"codec_name": "vp9", "profile": "Profile 0", "pix_fmt": "yuv420p", "width": W,
+            "height": H}
+    wrong = {k: probe.get(k) for k, v in want.items() if probe.get(k) != v}
+    if wrong:
+        REFUSED[name] = f"{out.name} refused: ffprobe read {wrong}"
+        print(f"       {REFUSED[name]}", flush=True)
+        out.unlink(missing_ok=True)
+        RANGE_CHECKED[name] = None
+        return None
+    RANGE_CHECKED[name] = out
+    return out
+
+
+def png_depth(path):
+    """A PNG's IHDR bit depth, or None."""
+    data = Path(path).read_bytes()[:25] if path else b""
+    return data[24] if len(data) == 25 and data[:8] == b"\x89PNG\r\n\x1a\n" else None
+
+
+def placed_render(client, tag, paths, t=T, jpeg=False):
+    """`paths` placed on one track 1 s apart (the first at 0), any Camera Log
+    import detected cleared (L9's way), rendered at `t` as a PNG, or a JPEG
+    (`format: "jpeg"`): (the file or None, why, closed)."""
+    doc = Doc(client, tag)
+    for index, path in enumerate(paths):
+        clip = doc.place(path, at=index * SEC) if doc.ok else None
+        if clip is None:
+            break
+        media = doc._media.get(path)
+        if doc.row(media).get("color") is not None:
+            doc.color(media, None)
+    out = None
+    if doc.ok and not jpeg:
+        out = doc.render(tag, t=t)
+    elif doc.ok:
+        out = WORK / f"{tag}.jpg"
+        out.unlink(missing_ok=True)
+        got = doc.call("render_frame", t=t, path=str(out), format="jpeg")
+        if not (got["ok"] and out.exists()):
+            print(f"       render {tag}: {got.get('error', 'no file')}", flush=True)
+            out = None
+    closed = doc.close()
+    return out, (doc.why or (None if out else "no render")), closed
+
+
+L16_TITLE = ("L16 (issue batch B103, #294, spec §11 PR-12; a probe row): DeepVideoFrame.isDeep "
+             "over each file's first format description is true for the 10-bit VP9 files "
+             "(slog3_fr_vp9e, slog3_vr_vp9e, the odd slog3_fr_vp9, the WebM rewrapped) and false "
+             "for 8-bit VP9, HEVC Main 10, HEVC Rext and ProRes 422 HQ")
+
+
+def run_l16(sources):
+    """L16: `deep_video_probe.swift` over `sources`, on L16_ITEMS."""
+    items, want, misses = [], {}, []
+    for name, (kind, deep) in L16_ITEMS.items():
+        path = fixture(name)
+        if path is None:
+            misses.append(f"{name}: {REFUSED.get(name)}")
+            continue
+        items.append({"label": name, "kind": kind, "path": str(path)})
+        want[name] = deep
+    binary, why = build_probe(sources, name="deep_video_probe", probe=DEEP_PROBE)
+    if binary is None:
+        check(L16_TITLE, False, f"the probe did not build: {why}")
+        return
+    request, answer = WORK / "deep-probe.json", WORK / "deep-probe-answer.json"
+    answer.unlink(missing_ok=True)
+    request.write_text(json.dumps({"scratch": str(WORK / "deep-scratch"), "items": items}))
+    ran = bounded.run([str(binary), str(request), str(answer)], 300,
+                      env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
+    try:
+        answered = {a["label"]: a for a in json.loads(answer.read_text())["items"]}
+    except (OSError, ValueError, KeyError):
+        answered = {}
+        misses.append(f"no answer (rc {ran['rc']}, expired {ran['expired']}): "
+                      f"{(ran['stdout'] + ran['stderr']).strip()[-300:]}")
+    for label, expected in want.items():
+        got = answered.get(label)
+        if got is None:
+            misses.append(f"{label}: not answered")
+            continue
+        if "error" in got:
+            print(f"       {label}: error {got['error']}", flush=True)
+            misses.append(f"{label}: {got['error']}")
+            continue
+        print(f"       {label} ({L16_ITEMS[label][0]}): subtype {got['subtype']}, "
+              f"bitsPerComponent {got['bitsPerComponent']}, vpcC {got['vpcC']}; deep "
+              f"{got['deep']}, want {expected}", flush=True)
+        if got["deep"] != expected:
+            misses.append(f"{label}: deep {got['deep']}, want {expected}")
+    check(L16_TITLE, not misses, f"{len(want)} items; misses {misses or 'none'}")
+
+
+def run_l17(client, state):
+    """L17: the deep VP9 renders' PNG bit depth (16), alone and in the mixed
+    project at T + 1 s; the other codecs' printed, not scored."""
+    misses, depths = [], {}
+    for name in (*L17_DEEP, *L17_PRINTED):
+        path = fixture(name)
+        if path is None:
+            depths[name] = None
+            misses.append(f"{name}: {REFUSED.get(name)}")
+            continue
+        png, why, state[f"l17_{name}_closed"] = placed_render(client, f"l17-{name}", [path])
+        depths[name] = png_depth(png)
+        if why:
+            misses.append(f"{name}: {why}")
+    paths = [fixture(name) for name in MIXED]
+    mixed = "mixed at 1.5 s"
+    if None in paths:
+        depths[mixed] = None
+        misses.append(f"{mixed}: a fixture was refused")
+    else:
+        png, why, state["l17_mixed_closed"] = placed_render(client, "l17-mixed", paths,
+                                                            t=T + SEC)
+        depths[mixed] = png_depth(png)
+        if why:
+            misses.append(f"{mixed}: {why}")
+    print(f"       PNG bit depth, scored: "
+          f"{ {k: depths[k] for k in (*L17_DEEP, mixed)} }; printed (the generator's per "
+          f"codec): { {k: depths[k] for k in L17_PRINTED} }", flush=True)
+    shallow = [k for k in (*L17_DEEP, mixed) if depths.get(k) != 16]
+    check("L17 (issue batch B103, #294, spec §11 PR-12) slog3_fr_vp9e.mp4, slog3_vr_vp9e.mp4 and "
+          "slog3_fr_webm.webm alone, and the mixed project (vp9_8bit.mp4 at 0, slog3_fr_vp9e.mp4 "
+          "at 1 s) at 1.5 s, no Camera Log: render_frame writes a PNG of IHDR bit depth 16",
+          not shallow and not misses, f"not 16: {shallow or 'none'}; misses {misses or 'none'}")
+
+
+# L18's renders: (tag, fixtures placed 1 s apart, time, JPEG?).
+L18_CASES = (("l18-slog3_fr", ("slog3_fr",), T, False),
+             ("l18-vp9_8bit", (VP9_8BIT,), T, False),
+             ("l18-mixed", MIXED, T, False),
+             ("l18-slog3_fr_vp9e-jpeg", ("slog3_fr_vp9e",), T, True))
+
+
+def run_l18(client, mode, control, state):
+    """L18 (L9's modes): the frames PR-12 leaves to the generator, byte-equal
+    to DIR's."""
+    misses, captured = [], 0
+    for tag, names, t, jpeg in L18_CASES:
+        paths = [l9_media(name, None if mode == "capture" else control) for name in names]
+        if None in paths:
+            misses.append(f"{tag}: {[REFUSED.get(n) for n in names]}")
+            continue
+        if mode == "capture":
+            (control / "media").mkdir(parents=True, exist_ok=True)
+            for path in paths:
+                shutil.copy2(path, control / "media" / path.name)
+        out, why, state[f"{tag}_closed"] = placed_render(client, tag, paths, t=t, jpeg=jpeg)
+        if out is None:
+            misses.append(f"{tag}: {why}")
+            continue
+        want = control / out.name
+        if mode == "capture":
+            shutil.copy2(out, want)
+            captured += 1
+            print(f"       {tag}: captured {out.stat().st_size} bytes"
+                  f"{'' if jpeg else f', PNG depth {png_depth(out)}'}", flush=True)
+        elif not want.exists():
+            misses.append(f"{tag}: no control file")
+        elif out.read_bytes() != want.read_bytes():
+            misses.append(f"{tag}: bytes differ ({out.stat().st_size} against "
+                          f"{want.stat().st_size}"
+                          f"{'' if jpeg else f'; PNG depth {png_depth(out)} against {png_depth(want)}'})")
+        else:
+            print(f"       {tag}: byte-identical ({out.stat().st_size} bytes)", flush=True)
+    if mode == "capture":
+        print(f"  L18 references captured for {captured} of {len(L18_CASES)} frames "
+              f"{misses or ''}", flush=True)
+        state["capture_ok"] = state.get("capture_ok", True) and not misses
+        return
+    check(f"L18 (issue batch B103, #294, spec §11 PR-12) slog3_fr.mov alone, vp9_8bit.mp4 alone "
+          f"and the mixed project at 0.5 s (PNG), and slog3_fr_vp9e.mp4 alone as JPEG, render "
+          f"byte-identical to {control.name}'s", not misses, f"{misses}")
+
+
 # ---- L9 -------------------------------------------------------------------------
 
 def run_l9(client, mode, control, state):
@@ -2018,7 +2294,7 @@ def run_l9(client, mode, control, state):
             continue
         if mode == "capture":
             (control / "media").mkdir(parents=True, exist_ok=True)
-            shutil.copy2(path, control / "media" / f"{name}.mov")
+            shutil.copy2(path, control / "media" / path.name)
         doc = Doc(client, f"l9-{name}")
         clip = doc.place(path) if doc.ok else None
         media = doc._media.get(path)
@@ -2688,7 +2964,7 @@ def main():
     if args.mode == "capture":
         control.mkdir(parents=True, exist_ok=True)
     if args.mode is None and not args.mutant:
-        selected -= {"L9"}
+        selected -= {"L9", "L18"}
     remove_work()
     atexit.register(remove_work)
     HOME.mkdir(parents=True)
@@ -2731,6 +3007,10 @@ def main():
                 if "L9" in selected and args.mode in ("capture", "compare") or (
                         "L9" in selected and args.mutant):
                     run_l9(client, args.mode, control, state)
+                if "L18" in selected and (args.mode in ("capture", "compare") or args.mutant):
+                    run_l18(client, args.mode, control, state)
+                if "L17" in selected:
+                    run_l17(client, state)
                 for name, run in (("L1", run_l1), ("L2", run_l2), ("L3", run_l3),
                                   ("L4", run_l4), ("L5", run_l5), ("L6", run_l6),
                                   ("L7", run_l7), ("L8", run_l8), ("L10", run_l10),
@@ -2750,6 +3030,8 @@ def main():
         run_probe(sources)
     if "L15" in selected:
         run_l15(sources)
+    if "L16" in selected:
+        run_l16(sources)
     found = hdr.complaints(log) if needs_instance else []
     closed = closed and all(v for k, v in state.items() if k.endswith("closed"))
     check("Z1 CONTROL: the fixtures hold, the projects close and the log holds no `Frame Job: ` "
@@ -2760,7 +3042,7 @@ def main():
     if args.mode == "capture":
         (control / "capture.json").write_text(json.dumps({"tree": str(ROOT), "config": config},
                                                          indent=1))
-        shown = [n for n in ROWS if n in rows and n not in ("L9", "Z1")]
+        shown = [n for n in ROWS if n in rows and n not in ("L9", "L18", "Z1")]
         failing = [n for n in shown if not rows[n]]
         print(f"captured into {args.folder}; on the control FAILED: {failing} (passed, so not "
               f"discriminating: {[n for n in shown if rows[n]]})")

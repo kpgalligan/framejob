@@ -391,7 +391,8 @@ schema, §6 the op table, §7 the architecture.
   source's gradients — a reversed clip's too, its backwards copy rendered at
   10 bits with the source's own colour labels and exact size; H.264, HEVC
   and HEVC with alpha are 8-bit. A rendered or saved frame showing a deep
-  still is a 16-bit PNG or a 10-bit HEIC; GIF, APNG and JPEG are 8-bit.
+  still or a 10-bit VP9 clip is a 16-bit PNG or a 10-bit HEIC; GIF, APNG
+  and JPEG are 8-bit.
   HLG and PQ sources are converted to SDR Rec. 709 by Frame Job itself, the
   same in the preview, every export, every rendered frame and the timeline's
   filmstrip. So is camera

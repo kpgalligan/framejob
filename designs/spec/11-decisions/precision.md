@@ -32,6 +32,10 @@ PR-11 was recorded in issue batch B102 (#295), before its code, from the owner's
 2026-10-14 ("BT.709 always"), after issue batch B101 measured what label a rendered frame
 carried; it amends PR-4 and PR-9.
 
+PR-12 was recorded in issue batch B103 (#294), before its product code, from the owner's choice
+of 2026-10-14 ("fix it") and `log_proof.py`'s control on the unchanged product (L14, L16, L17);
+it amends PR-4 and PR-9.
+
 - **PR-1 — The working depth is 16-bit float, holding encoded values clamped to [0, 1] (owner,
   2026-10-09, choices 1 and 5).**
   - The render context's buffers are `kCVPixelFormatType_64RGBAHalf`.
@@ -148,6 +152,10 @@ carried; it amends PR-4 and PR-9.
   BT.709 label, `FrameWriter.frameSpace`, whatever its sources (`render_frame`, Save Frame… as
   PNG, JPEG and HEIC, APNG frames); a GIF carries no colour label and is left as it is. The
   depth and the pixels are unchanged.
+  **Amended by PR-12** (B103, the owner 2026-10-14): a frame whose recipe shows a VP9 track of
+  more than 8 bits is read through export's reader too, so it is deep in `render_frame` and
+  Save Frame… (PNG, HEIC), however many other video tracks the composition holds. The
+  generator's 8-bit image of such a file (B102's `composition-gap`) no longer reaches a frame.
 - **PR-5 — What stays 8-bit, and the frozen references (choice 6).**
   - These stay 8-bit:
     - graphics (G-7's BGRA8);
@@ -305,6 +313,10 @@ carried; it amends PR-4 and PR-9.
   - What stays: JPEG frames, GIF and APNG exports (8-bit, as before); the preview, movie
     exports, the eyedropper, Pick from Canvas, the look gallery, `snapshot_ui`, thumbnails and
     posters, which never ask. There is no `depth` argument.
+  **Amended by PR-12** (B103, the owner 2026-10-14): the reader also reads a frame whose recipe
+  shows a deep VP9 track (`DeepVideoFrame`), and the question is asked in `Exporter` after the
+  composition is built: callers pass `keepsDepth` (`carriesDepth`), no longer `deepStill`.
+  Everything else here stands.
   - Measured in B97 (Release, 2026-10-14, `precision_proof.py` against the control
     `ctl-b97`, captured on the tree before any PR-9 code): S4, `ramp16.png` alone, a 16-bit PNG
     with 1,920 distinct middle-row greens (256 before), its RGB scaled to 8 bits equal to the
@@ -391,4 +403,44 @@ carried; it amends PR-4 and PR-9.
     moved on labels alone: `log_proof.py` L9 (3 of 5 PNGs), `hdr_proof.py` H1 (14 of 24) and
     `precision_proof.py` S11 (the JPEG and `ramp8.png`'s APNG), each decoded raw equal to its
     control (`frame_label_proof.py same-pixels`, max |Δ| 0).
+  - Amends PR-4 and PR-9.
+- **PR-12 — A frame showing a deep VP9 track is read deep, through export's reader (owner,
+  2026-10-14, #294: "fix it").**
+  - `render_frame` and File ▸ Save Frame… as PNG or HEIC, of a frame whose recipe at the frame
+    time names a track whose composition segment there reads a VP9 file of more than 8 bits (the
+    `vpcC` record's bitDepth), go through `DeepStillFrame.read`, PR-9's reader: a 16-bit PNG, a
+    10-bit HEIC, labelled by PR-11.
+  - JPEG stays 8-bit. GIF and APNG never ask.
+  - These keep the generator byte for byte: an 8-bit VP9 file, HEVC, ProRes, a VP9 clip
+    elsewhere on the timeline, and a reversed VP9 clip (its composition reads PR-7's 10-bit
+    intermediate, not the VP9 file; held by construction, not measured).
+  - Why VP9 alone: the control's depths (`log_proof.py` L17, Debug, 2026-10-14, the unchanged
+    product): `render_frame` of the 10-bit VP9 files alone (`slog3_fr_vp9e.mp4`,
+    `slog3_vr_vp9e.mp4`, the rewrapped `slog3_fr_webm.webm`) wrote 8-bit PNGs, as did the mixed
+    project (8-bit VP9 at 0, `slog3_fr_vp9e.mp4` at 1 s) at 1.5 s, while HEVC Main 10
+    (`slog3_fr.mov`), HEVC Rext (`slog3_fr_422.mov`) and ProRes 422 HQ (`slog3.mov`) alone wrote
+    16-bit PNGs, and 8-bit VP9 an 8-bit one. No other codec the generator reads 8-bit was found.
+    AV1 does not decode on the host these measurements ran on (an M2 Max, macOS 26.5.1;
+    `DecoderSupport`, B101), so no AV1 depth was measured and AV1 is not in the rule.
+  - Why `vpcC`: every VP9 MP4 writes the record, and so does the built-in rewrap
+    (`container_codec.rs`'s `vpcc()`) for a WebM, as GR-23 reads its range bit from the same
+    record (version 1, bitDepth the high nibble of byte 6). A record shorter than 7 bytes or of
+    another version is not deep.
+  - The mechanism: `render_frame` and Save Frame… pass their format's `carriesDepth` as
+    `keepsDepth`, and `Exporter.renderFrameReported` asks `DeepVideoFrame.reads` after the
+    composition is built: PR-9's still (`DeepStillFrame.shows`), else this track test. Every
+    other caller passes nothing and keeps the generator.
+  - No op, FFI, recipe, format or catalog change. No `depth` argument.
+  - Measured on the control (`log_proof.py capture`, `log-ctl`): L14 at ±1 failed (worst 2 on
+    `slog3_fr_vp9e` and `slog3_fr_webm`, 8 samples each off by 2, e.g. 158 against 160 at
+    column 400; 1 on `slog3_vr_vp9e`), and L16's probe did not build.
+  - Measured after the change (Debug, 2026-10-14, `log_proof.py compare log-ctl --only
+    L9,L14,L16,L17,L18,Z1`, 6/6): L14 worst 1 on each VP9 file; L16's eight answers as wanted,
+    the 10-bit files' `vpcC` byte 6 `a3` or `a2` (bitDepth 10) and `vp9_8bit`'s `82` (8), the
+    HEVC and ProRes files without a `vpcC`; L17 a 16-bit PNG for each VP9 file alone and for the
+    mixed project at 1.5 s; L18 byte-identical to the control (`slog3_fr.mov` and `vp9_8bit.mp4`
+    alone and the mixed project at 0.5 s, 16-, 8- and 8-bit PNGs; `slog3_fr_vp9e.mp4` as JPEG);
+    L9 byte-identical. PR-9's rows hold (`precision_proof.py --only D1,S8,S10,S14,S15,S16,Z1`,
+    7/7). A JPEG asked to keep depth (`vp9-jpeg-deep`) writes the same bytes (5,099), so JPEG's
+    `carriesDepth` false is equivalent there, as PR-9's `jpeg-deep` was.
   - Amends PR-4 and PR-9.

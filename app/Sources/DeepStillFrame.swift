@@ -3,12 +3,13 @@ import CoreVideo
 import ImageIO
 
 /// Whether a frame shows a still deeper than 8 bits a component, and how such
-/// a frame is read (issue batch B97, spec §11 PR-9): the question
-/// `render_frame` and File ▸ Save Frame… (PNG, HEIC) answer before they ask
-/// `Exporter.renderFrame` for `deepStill`, and the reader it then reads the
-/// frame through instead of `AVAssetImageGenerator`, whose image is 16-bit
-/// only when every video track of the composition is deep. GIF and APNG
-/// never ask: ImageIO writes both at 8 bits a component.
+/// a frame is read (issue batch B97, spec §11 PR-9): the question `Exporter`
+/// asks through `DeepVideoFrame.reads` when its caller's format keeps depth
+/// (`render_frame` and File ▸ Save Frame… as PNG or HEIC), and the reader it
+/// then reads the frame through instead of `AVAssetImageGenerator`, whose
+/// image is 16-bit only when every video track of the composition is deep.
+/// `read` also reads a frame showing a deep VP9 track (issue batch B103, PR-12).
+/// GIF and APNG never ask: ImageIO writes both at 8 bits a component.
 ///
 /// It asks the RECIPE, not the project: a deep still elsewhere on the
 /// timeline, or one Show Selection leaves out (`options`), is not on the

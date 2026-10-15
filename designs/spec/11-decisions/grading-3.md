@@ -585,4 +585,6 @@ opened, at design time or build time.
     remove it: read a frame whose composition holds a 10-bit VP9 track through export's reader,
     as PR-9 does for a deep still (`DeepStillFrame.read`), which is a PR-4 amendment of its own.
     The owner chose that fix (2026-10-14, #294), to land with its PR-4 amendment in the batch
-    after B102; until then L14 keeps its bound of 2.
+    after B102. It landed as PR-12 (issue batch B103), and L14 holds ±1 again: on Debug,
+    `log_proof.py compare` against B103's control, worst 1 on `slog3_fr_vp9e`, `slog3_vr_vp9e`
+    and `slog3_fr_webm` (2, 1 and 2 at ±2 before), each VP9 file's `render_frame` a 16-bit PNG.

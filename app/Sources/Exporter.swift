@@ -516,16 +516,16 @@ final class Exporter {
     /// is the only way a proof script can photograph a burn-in at all.
     ///
     /// `graphics` is pinned on the frame's own key, as `export` pins it on
-    /// its own; nil draws every graphic's slate. `deepStill` is the caller's
-    /// decision (`DeepStillFrame.shows`, spec §11 PR-9): true reads the frame
-    /// through `DeepStillFrame.read`'s reader instead of the generator.
+    /// its own; nil draws every graphic's slate. `keepsDepth` is the caller's
+    /// format (`carriesDepth`): when true and `DeepVideoFrame.reads` the frame (a deep still,
+    /// PR-9, or a deep VP9 track, PR-12), `DeepStillFrame.read`'s reader reads it.
     static func renderFrame(
         project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?,
-        options: RecipeOptions = .none, graphics: GraphicSet? = nil, deepStill: Bool = false
+        options: RecipeOptions = .none, graphics: GraphicSet? = nil, keepsDepth: Bool = false
     ) -> CGImage? {
         renderFrameReported(
             project: project, urls: urls, at: t, maxWidth: maxWidth, options: options,
-            graphics: graphics, deepStill: deepStill
+            graphics: graphics, keepsDepth: keepsDepth
         ).image
     }
 
@@ -533,7 +533,7 @@ final class Exporter {
     /// drawn — read off the key's pin before it is dropped.
     static func renderFrameReported(
         project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?,
-        options: RecipeOptions, graphics: GraphicSet?, deepStill: Bool = false
+        options: RecipeOptions, graphics: GraphicSet?, keepsDepth: Bool = false
     ) -> RenderedFrame {
         // No videoTracks is NOT a refusal: CompositionBuilder gives a
         // timeline of nothing but text, shapes and images a placeholder track
@@ -560,7 +560,7 @@ final class Exporter {
         } catch {
             return RenderedFrame(image: nil, graphics: GraphicRegistry.shared.reports(for: key))
         }
-        if deepStill {
+        if keepsDepth, DeepVideoFrame.reads(project, built, urls: urls, at: t, options: options) {
             return RenderedFrame(
                 image: DeepStillFrame.read(built, at: t, maxWidth: maxWidth),
                 graphics: GraphicRegistry.shared.reports(for: key))

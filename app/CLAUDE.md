@@ -1360,7 +1360,8 @@ the key map behind it.
   `ExporterErrors.swift` · `ExporterGraphics.swift` — the writer
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render (the generator, or
-  `DeepStillFrame.read`'s reader for a frame showing a deep still, §11 PR-9). An export is TWO
+  `DeepStillFrame.read`'s reader for a frame showing a deep still, §11 PR-9,
+  or a deep VP9 track, §11 PR-12). An export is TWO
   passes wherever the file holds sound: a measurement build of its own in
   32-bit float, then the write: un-normalised from a 16-bit decode (a mix
   past full scale clips there, and `mixClipped` says so); normalised from the
@@ -1418,9 +1419,15 @@ the key map behind it.
   the process. Never call `cancelReading` from another thread while a loop
   reads; a read that never returns is not woken (spec §11 G-17).
 - `DeepStillFrame.swift` — whether a frame's recipe draws a still deeper than
-  8 bits (`shows`), and `read`: that frame through export's reader
-  (`AVAssetReaderVideoCompositionOutput` at `64RGBAHalf`), spec §11 PR-9; its
-  image is in `FrameWriter.frameSpace` (§11 PR-11).
+  8 bits (`shows`), and `read`: a deep frame through export's reader
+  (`AVAssetReaderVideoCompositionOutput` at `64RGBAHalf`), spec §11 PR-9 and
+  PR-12; its image is in `FrameWriter.frameSpace` (§11 PR-11).
+- `DeepVideoFrame.swift` — the one question `Exporter.renderFrameReported`
+  asks after the build when its caller passes `keepsDepth` (`carriesDepth`:
+  `render_frame` and Save Frame… as PNG or HEIC): `reads` is PR-9's deep still
+  or `shows`, a recipe `track` layer whose composition segment at the frame
+  time reads a VP9 file whose `vpcC` bitDepth is above 8 (`isDeep`), spec §11
+  PR-12.
 - `FrameWriter.swift` — a `CGImage` and a format in, a URL out, no panel:
   Save Frame and `render_frame` both call `writeFrame`, so their PNGs are
   byte-identical by construction; `writeFrame` labels a rendered frame BT.709

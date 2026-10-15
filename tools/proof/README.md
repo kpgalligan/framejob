@@ -19741,3 +19741,77 @@ MOVED`):
 - `python3 tools/proof/proof_app.py launch --app release`, then `python3
   tools/proof/phase7_proof.py <dir>/agent.sock`: 92/92. The PNG's chunks are `['IHDR', 'iCCP',
   'eXIf', 'IDAT', 'IEND']`.
+
+### Issue batch B103 — a frame showing a deep VP9 track read deep (`log_proof.py` L14 at ±1, L16, L17, L18 and five mutants; `deep_video_probe.swift`; #294, spec §11 PR-12)
+
+```
+python3 tools/proof/log_proof.py capture tools/proof/work/b103/log-ctl --only L9,L14,L16,L17,L18,Z1   # the control, on the tree before any product edit
+python3 tools/proof/log_proof.py compare tools/proof/work/b103/log-ctl --only L9,L14,L16,L17,L18,Z1
+python3 tools/proof/log_proof.py --only L16,Z1                                                       # the probe row alone, no instance
+python3 tools/proof/log_proof.py --mutant NAME --control tools/proof/work/b103/log-ctl --only ROWS,Z1
+python3 tools/proof/precision_proof.py --only D1,S8,S10,S14,S15,S16,Z1                               # PR-9's path, now asked in Exporter
+```
+
+**The rows.** L14 is scored at ±1 again (`range_rows`' `bound` stays a parameter). L16 builds
+`deep_video_probe.swift` over `app/Sources` and reads each file's first format description: its
+subtype, its `BitsPerComponent` extension, its `vpcC` record's first 8 bytes, and
+`DeepVideoFrame.isDeep`. The WebM goes through `ContainerRewrap.rewrap`, import's own route with
+its precheck. L17 asks `render_frame` for each 10-bit VP9 file alone and for the mixed project
+(`vp9_8bit.mp4` at 0, `slog3_fr_vp9e.mp4` at 1 s, one track) at 1.5 s, and wants a PNG of IHDR
+bit depth 16; it prints, unscored, the generator's depth for HEVC Main 10, HEVC Rext, ProRes
+422 HQ and 8-bit VP9. L18 runs where L9 runs and wants the frames PR-12 leaves to the generator
+byte-identical to the control's: `slog3_fr.mov`, `vp9_8bit.mp4` and the mixed project at 0.5 s
+as PNGs, and `slog3_fr_vp9e.mp4` as `format: "jpeg"`. `capture` copies their media into
+`DIR/media/`, each extension kept (`l9_media` now finds a fixture by `media_extension`).
+
+**The control** (Debug, the tree before any product edit, `capture work/b103/log-ctl`): L14, L16
+and L17 FAILED; L9 and L18 captured 5 and 4 references; Z1 ok.
+- L14 at ±1: worst 2, 1 and 2 (`slog3_fr_vp9e`, `slog3_vr_vp9e`, `slog3_fr_webm`), 8 samples off
+  on each full-range file, e.g. 158 against 160 at (400, 32).
+- L16: the probe did not build (`cannot find 'DeepVideoFrame' in scope`).
+- L17 PNG depths: the three 10-bit VP9 files 8, the mixed project at 1.5 s 8; printed,
+  `slog3_fr` 16, `slog3_fr_422` 16, `slog3` 16, `vp9_8bit` 8. No codec but VP9 rendered 8-bit
+  from a deep file, so the rule is VP9's alone (the spec's STOP did not apply).
+- L18's references: `slog3_fr` 6,718 bytes (16-bit PNG), `vp9_8bit` and the mixed project 32,507
+  bytes each (8-bit), the JPEG 5,099 bytes.
+
+**After PR-12** (Debug, `compare work/b103/log-ctl --only L9,L14,L16,L17,L18,Z1`): 6/6.
+- L14 worst 1 on each VP9 file; the full-range 0 % patch [0, 0, 0], the video-domain oracle
+  [28, 28, 28].
+- L16: the four 10-bit VP9 items deep (`vpcC` `010000000215a302`, `…a202` for the video-range
+  file, the WebM's `010000000200a302`), `vp9_8bit` not (`0100000000158202`), and `slog3_fr`,
+  `slog3_fr_422` (`hvc1`, `BitsPerComponent` 10) and `slog3` (`apch`, 12) not, with no `vpcC`.
+- L17: every scored depth 16; the printed depths as on the control.
+- L18 and L9 byte-identical.
+
+`precision_proof.py --only D1,S8,S10,S14,S15,S16,Z1` (Debug): 7/7.
+
+**Mutants** (Debug, each `--control work/b103/log-ctl`):
+- `vp9-deep-never` (`--only L14,L16,L17,Z1`): MUTANT PASS; L14 worst 2, 1, 2, L16 the four VP9
+  files not deep, L17 all four 8-bit.
+- `vp9-depth-eight` (`--only L16,L18,Z1`): MUTANT PASS; L16 `vp9_8bit` deep; L18 also failed,
+  `vp9_8bit` and the mixed project 16-bit (61,216 bytes against 32,507).
+- `vpcc-depth-nibble` (`--only L14,L16,L17,Z1`): MUTANT PASS, as `vp9-deep-never`.
+- `vp9-track-wide` (`--only L18,Z1`): MUTANT PASS; the mixed project at 0.5 s 16-bit (61,216
+  bytes against 32,507), every other L18 frame byte-identical.
+- `vp9-jpeg-deep` (`AgentServer+Render.swift` passes `keepsDepth: true`; `--only L18,Z1`):
+  survived, the JPEG byte-identical (5,099 bytes). Recorded as equivalent, as
+  `precision_proof.py`'s `jpeg-deep` was: the JPEG's bytes do not move when it is read through
+  the reader (why was not measured), and L18 stays the guard.
+
+`isDeep`'s VP9 subtype guard has no mutant: no fixture but VP9 carries a `vpcC` atom (L16 prints
+`absent` for the others), so removing it changes no answer. `composition_gap_probe.swift` and
+`decode-gap` are unchanged: their generator stage still calls `renderFrame` without
+`keepsDepth`, so their generator stage is still `AVAssetImageGenerator`'s image (not re-run in B103).
+
+**Recorded runs** (Release, after the gate's `make app`; no `Frame Job: ` line, no `DEFAULTS
+MOVED`):
+- `RC_PROOF_APP=release python3 tools/proof/log_proof.py`: 21/21. L14 worst 1, 1 and 1 (the
+  full-range 0 % patch [0, 0, 0], the video-domain oracle [28, 28, 28]); L16 the eight answers
+  as on Debug; L17's scored depths all 16, the printed ones `slog3_fr` 16, `slog3_fr_422` 16,
+  `slog3` 16, `vp9_8bit` 8; L10 worst 1 on each file, L11 worst 1; L13 and L15 hold.
+- `RC_PROOF_APP=release python3 tools/proof/log_proof.py compare tools/proof/work/b103/log-ctl
+  --only L9,L18,Z1`: 3/3, every L9 and L18 file byte-identical to the Debug control.
+- `RC_PROOF_APP=release python3 tools/proof/precision_proof.py --only
+  D1,S8,S10,S14,S15,S16,Z1`: 7/7 (S10's HEIC `bitsPerSample: 10`; S16 960×540, depth 16, 960
+  greens).
