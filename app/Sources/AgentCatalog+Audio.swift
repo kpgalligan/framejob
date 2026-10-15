@@ -3,9 +3,10 @@ import Foundation
 // MARK: - Catalog: audio
 
 /// The catalog's AUDIO half: `detect_silence` and `normalize_clip`, the two
-/// composite tools road map 2's phases 3 and 5 added — neither is an op, and
-/// both read the same cached waveform `SilenceDetector` and `AudioNormalize`
-/// share.
+/// composite tools road map 2's phases 3 and 5 added, and `sync_audio`, the
+/// third (road map "audio-sync", AS-1) — none of the three is an op, and all
+/// read the same cached waveform `SilenceDetector`, `AudioNormalize` and
+/// `AudioSync` share.
 ///
 /// A pure move out of `AgentCatalog+Clips.swift`, road map 4's toll 2, landed
 /// first and alone. `AgentCatalog+Files.swift`'s header is the model: the two
@@ -122,6 +123,41 @@ extension AgentServer {
                             + "the format, with a decibel of room for the inter-sample peaks "
                             + "a lossy encoder can add. Above 0 is a request to clip and is "
                             + "refused rather than clamped.",
+                    ],
+                ], required: ["clips"]),
+            // Road map "audio-sync" AS-1 (spec §11 SY-1..SY-5): Clip ▸
+            // Synchronize Audio's mirror, a composite like the two above.
+            tool(
+                "sync_audio",
+                "Lines up clips that play sound by their sound — Clip ▸ Synchronize Audio. "
+                    + "One clip, the anchor, stays where it is; every other clip moves along "
+                    + "its own track by a whole number of frames so its sound plays at the "
+                    + "same moment as the anchor's. The match is made on each file's cached "
+                    + "waveform (where the sound RISES, so gain, microphone and room do not "
+                    + "matter) by cross-correlation; a match must reach correlation 0.25 and "
+                    + "stand 1.5× above the next best lag more than 0.5 s away. All or "
+                    + "nothing, one undo step: when any clip cannot be matched — no sound, "
+                    + "still being analysed, playing at a speed other than ×1 or reversed, "
+                    + "two clips on one track, no clear match, a move that would start "
+                    + "before 0, never play beside the anchor or overlap another clip on its "
+                    + "track — nothing moves and every reason is named. The answer reports "
+                    + "each moved clip's offset (anchor source minus clip source, in ticks), "
+                    + "delta, new start, correlation and confidence (the peak ratio), and "
+                    + "the clock drift measured between the two over at least 60 s of "
+                    + "overlap (drift_ppm, drift_ms); drift is reported, not corrected. A "
+                    + "second call answers moved: false and \"already in sync\".",
+                [
+                    "clips": [
+                        "type": "array", "items": ["type": "integer"], "minItems": 2,
+                        "description": "The clips to line up, at least two, each on its own "
+                            + "track.",
+                    ],
+                    "anchor": [
+                        "type": "integer",
+                        "description": "The clip that stays put; one of clips. Default: "
+                            + "among the clips with pictures (all of them when none has), "
+                            + "the earliest start, then the rearmost track, then the lowest "
+                            + "id.",
                     ],
                 ], required: ["clips"]),
         ]

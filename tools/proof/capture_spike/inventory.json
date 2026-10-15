@@ -411,7 +411,14 @@
   "normalizeClips:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift `func normalizeClips(`"
+    "app/Sources/EditorViewController+Audio.swift `func normalizeClips(`"
+   ],
+   "note": "an edit"
+  },
+  "synchronizeAudio:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Audio.swift `func synchronizeAudio(`"
    ],
    "note": "an edit"
   },

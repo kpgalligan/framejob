@@ -396,8 +396,10 @@ log is where the startup parity check would complain — `grep "Frame Job: "
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **89** since issue batch B84's three
-graphics-file tools (86 from B44's `close_project`, 85 from road map 10's
+`op_argument_proof.py` asserts **92** since road map audio-sync AS-1's
+`sync_audio` (91 from grading-3 T3-2's `set_media_color`, 90 from grading
+GR4a's `add_adjustment_clip`, 89 from issue batch B84's three
+graphics-file tools, 86 from B44's `close_project`, 85 from road map 10's
 G4b, 82 from G4a, 79 from G3b, 77 from D3·5), and
 every script before it keeps
 a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
@@ -20024,3 +20026,49 @@ MOVED`):
 - `RC_PROOF_APP=release python3 tools/proof/precision_proof.py --only
   D1,S8,S10,S14,S15,S16,Z1`: 7/7 (S10's HEIC `bitsPerSample: 10`; S16 960×540, depth 16, 960
   greens).
+
+## Road map audio-sync — AS-1, Synchronize Audio and `sync_audio` (`audio_sync_proof.py` S1–S16, P1–P6 and eight mutants; `audio_sync_probe.swift`; spec §11 SY-1..SY-5)
+
+```
+python3 tools/proof/proof_app.py launch                                     # Debug while iterating
+python3 tools/proof/audio_sync_proof.py <dir>/agent.sock [--only S1,P3,...]  # the recorded run: RC_PROOF_APP=release
+python3 tools/proof/audio_sync_proof.py --mutants                           # probe-only, no app
+```
+
+**Media**, written by the script into `tools/proof/work/audio-sync/fixtures/` (Python `wave`,
+16 kHz mono, seeded; reused while the `-v1` names exist): a 150 s SOURCE of noise and tone
+bursts; RECORDER, SOURCE delayed by 50133 samples (3.1333125 s, off the 10 ms grid and chosen so
+S1's and S2's starts sit within 0.01 frame of a whole 30 fps frame), −9 dB, a one-pole low-pass
+and −40 dBFS noise; UNRELATED, the same from another seed; DRIFT, SOURCE resampled by
+k = 1 + 200e-6 (so (1 − 1/k)·10⁶ = 199.96 ppm in the tool's sign); CAMERA, ffmpeg's mux of SOURCE
+(`pcm_s16le`, so no encoder priming moves it) under `color` video, libx264 30 fps. Each media's
+`cache/peaks/<id>.bin` is waited for (60 s).
+
+**Rows.** S1–S16 over MCP, each project closed with `discard`; "unchanged" is `get_project`'s
+project key-sorted and equal before and after, and the top undo step not "Synchronize Audio":
+S1 camera at 10 s → the recorder on exactly frame 206, one undo back; S2 a named recorder anchor
+→ the camera on frame 694; S3 unrelated, S4 a still, S5 audio off, S6 ×2 and reversed, S7 one
+track, S8 before 0, S9 windows that never meet, S11 a nest, S12 one clip, S16 an own-track
+neighbour (no dissolve added) — each refused in its sentence, unchanged; S10 the drift fixture
+within ±50 ppm and S1's |drift| ≤ 50; S13 a second call `moved: false`, "already in sync", no
+step; S14 `perform_menu_item ["Clip", "Synchronize Audio"]` lands where S1 did; S15 the catalog
+row (no `scope`; `clips` minItems 2 and required, `anchor`, `project`). P1–P6 are the probe's,
+built by `swift_build.build` over `app/Sources` (a failed build FAILs all six): delta
+arithmetic, the anchor rule, FFT against brute force and a known lag, the thresholds and the
+no-runner-up case, drift on stretched arrays (100 ppm at exactly the 6,000-bucket minimum held to
+±50), and the four placement refusals with an abutting neighbour allowed, and silence named
+on the silent clip alone (a silent anchor once, not against its movers).
+
+**Mutants** (`--mutants`, probe-only: each copies `app/Sources` under
+`work/audio-sync/mutants/<name>/`, its `before` asserted once, the probe rebuilt under a 900 s
+wall and run under 240 s; killed when every named row fails): `lag-sign` (P1),
+`anchor-inverted` (P2), `ratio-dropped` (P4), `before-zero-dropped`, `overlap-dropped`,
+`same-track-dropped`, `neighbour-dropped` (P6), `ppm-scale` (P5).
+
+**Debug runs** (2026-10-15): P1–P6 6/6; S1–S16 16/16 — S1 r 0.493, q 3.06, offset −1,881,359
+against −1,879,987.5, drift −14.6 ppm; S3 r 0.14, q 1.10; S10 172.2 ppm against 199.96.
+
+**Recorded runs** (Release, after the gate's `make app`; no `Frame Job: ` line): `audio_sync_proof.py
+<dir>/agent.sock` 22/22, the same readings, S10's match r 0.307, q 1.82; `--mutants` 8/8 killed
+(a copy that does not build is a failed control: the first run's `neighbour-dropped` edit did not
+compile and was rewritten).

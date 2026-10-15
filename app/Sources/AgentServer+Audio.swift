@@ -1,7 +1,10 @@
 import AppKit
 
-/// The agent's sound tools. One so far: `normalize_clip`, the mirror of
-/// Normalize Clip (road map 2 phase 5c).
+/// The agent's sound tools: `normalize_clip`, the mirror of Normalize Clip
+/// (road map 2 phase 5c), and `sync_audio`, the mirror of Clip ▸ Synchronize
+/// Audio (road map "audio-sync", AS-1; spec §11 SY-1..SY-5), which takes the
+/// same posture — `AudioSync.read` + `plan`, the menu's own pair, and nothing
+/// measured here; on the main thread for `normalize_clip`'s reason.
 ///
 /// It is an APP-STATE composite rather than an op, for `detect_silence`'s
 /// reason exactly: the level it measures comes from `cache/peaks/<media
@@ -116,6 +119,73 @@ extension AgentServer {
                 + "says where."
         }
         return try editResult(document, "Normalize", plan.ops, fields)
+    }
+
+    /// `sync_audio` — Clip ▸ Synchronize Audio (`EditorViewController
+    /// .synchronizeAudio`). All or nothing (SY-1): a refusal names every
+    /// reason and moves nothing; a plan with no move (already in sync)
+    /// answers `moved: false` and makes no undo step; otherwise one
+    /// `move_clip` per mover, one step. Each mover's row carries its match
+    /// and its measured drift (SY-5), which AS-1 reports and does not correct.
+    func syncAudio(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clips = try clipsArg(a, "clips", document)
+        var anchor: UInt32?
+        if try intArg(a, "anchor") != nil {
+            let named = try idArg(a, "anchor")
+            guard clips.contains(named) else {
+                throw ToolError(
+                    message: "anchor must be one of clips: clip \(named) is not in clips.")
+            }
+            anchor = named
+        }
+        guard let input = AudioSync.read(from: document, clips: clips, anchor: anchor) else {
+            throw ToolError(
+                message: "The project's audio plan could not be read, so there is no sound to "
+                    + "line up.")
+        }
+        switch AudioSync.plan(input) {
+        case .refused(let problems):
+            let reasons = problems.map { $0.description }.joined(separator: " ")
+            throw ToolError(message: "Synchronize Audio was refused: \(reasons)")
+        case .planned(let anchorClip, let synced, let ops):
+            var fields: [String: Any] = [
+                "anchor": Int(anchorClip),
+                "synced": synced.map(Self.syncedRow),
+            ]
+            guard !ops.isEmpty else {
+                fields["ok"] = true
+                fields["moved"] = false
+                fields["note"] = "already in sync"
+                fields["project"] = summary(document)
+                return try jsonResult(fields)
+            }
+            fields["moved"] = true
+            return try editResult(document, "Synchronize Audio", ops, fields)
+        }
+    }
+
+    /// One mover's row of `sync_audio`'s answer.
+    private static func syncedRow(_ row: AudioSync.Synced) -> [String: Any] {
+        var result: [String: Any] = [
+            "clip": Int(row.clip),
+            "media": Int(row.media),
+            "offset": row.lag,
+            "delta": row.delta,
+            "start": row.start,
+            "correlation": row.correlation,
+            "confidence": row.ratio.isFinite ? row.ratio : NSNull(),
+        ]
+        switch row.drift {
+        case .measured(let drift):
+            result["drift_ppm"] = drift.ppm
+            result["drift_ms"] = drift.milliseconds
+        case .notMeasured(let note):
+            result["drift_ppm"] = NSNull()
+            result["drift_ms"] = NSNull()
+            result["drift_note"] = note
+        }
+        return result
     }
 
     /// `peak_db`, in the button's own unit, refused by name.

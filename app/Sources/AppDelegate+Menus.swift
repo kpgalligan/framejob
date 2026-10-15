@@ -277,6 +277,10 @@ extension AppDelegate {
         // `normalize_clip` description names as this command's UI path. Three
         // spellings of one command is how the halves drift.
         menu.addItem(item("Normalize", #selector(EditorViewController.normalizeClips(_:))))
+        // Road map "audio-sync" AS-1, beside Normalize: the UI path
+        // `sync_audio` names. No key equivalent, for Normalize's reason.
+        menu.addItem(
+            item("Synchronize Audio", #selector(EditorViewController.synchronizeAudio(_:))))
         menu.addItem(
             item(
                 "Add Action", #selector(EditorViewController.addActionAtPlayhead(_:)), "k",

@@ -98,7 +98,10 @@ Select After Playhead, Select All on Track), Clip (Split, Trim Start, Trim
 End, Freeze Frame, Detach Audio, Normalize (road map 2's phase 5, beside
 Detach Audio because those two are the menu's only sound commands; no key
 equivalent, and it duplicates the Audio section's button deliberately —
-a command reachable from a pane alone can be lost), Add Action, Speed…,
+a command reachable from a pane alone can be lost), Synchronize Audio (road
+map "audio-sync" AS-1, §11 SY-1..SY-5: the selected clips that play sound
+lined up by their sound, one anchor kept, one undo step; enabled with two or
+more such clips; no key equivalent; its mirror is `sync_audio`), Add Action, Speed…,
 Close Gap, Remove
 Silences…, Transition ▸, Motion ▸ (In ▸ / Out ▸ / During ▸, each the kinds
 and None; no key equivalent), Look ▸ (the eight looks, a separator, then the

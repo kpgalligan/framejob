@@ -191,12 +191,12 @@ final class AgentServer {
     /// and `prepareCatalog()` checks the two sets match on every launch.
     ///
     /// One entry per row of the op table (spec §6, and the module doc of
-    /// `core/src/edit.rs`) plus the thirty tools that are not ops: the
+    /// `core/src/edit.rs`) plus the thirty-one tools that are not ops: the
     /// project-level ones spec §7.9 names, the five view-state and history
     /// mirrors beside them (`set_range`, `set_selection`, `set_scope`,
     /// `undo`, `redo`), the composites later phases added —
     /// `detect_silence`, `transcribe`, `import_captions`, `export_captions`,
-    /// `normalize_clip` — road map 3's `record_screen`, and road map 10's
+    /// `normalize_clip`, `sync_audio` — road map 3's `record_screen`, and road map 10's
     /// nine graphics tools (`write_graphic`, `get_graphic`,
     /// `graphic_reference`, `render_graphic`, `import_graphic_font`,
     /// `import_graphic_asset`, `delete_graphic`, `rename_graphic`,
@@ -283,6 +283,7 @@ final class AgentServer {
         "detect_silence": { $0.detectSilence },
         // Sound (AgentServer+Audio.swift)
         "normalize_clip": { $0.normalizeClip },
+        "sync_audio": { $0.syncAudio },
         // Captions (AgentServer+Captions.swift)
         "transcribe": { $0.transcribe },
         "export_captions": { $0.exportCaptions },

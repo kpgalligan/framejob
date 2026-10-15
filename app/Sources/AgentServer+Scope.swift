@@ -110,14 +110,14 @@ extension AgentServer {
     /// That is the whole rule, and it is the one that makes every other piece
     /// agree with itself. `get_project` reports the open container, so the
     /// ids a caller reads back are that container's; `render_frame` draws it;
-    /// `detect_silence` and `normalize_clip` compute from
+    /// `detect_silence`, `normalize_clip` and `sync_audio` compute from
     /// `ProjectDocument.editedProject`'s plan, which is that container's too;
     /// and `ProjectDocument.addressed(_:)` already stamps the open nest onto
     /// every op the APP sends, so an agent that inherits it is doing exactly
     /// what the person at the keyboard does. The alternative — the argument
     /// or nothing — was written first and thrown away: it made
     /// `get_project` list clips that the very next op could not name, and it
-    /// would have left the two composites resolving their ids in one
+    /// would have left the three composites resolving their ids in one
     /// container and reading their plan from another.
     ///
     /// What it costs is the spelling of "edit the timeline while I am looking

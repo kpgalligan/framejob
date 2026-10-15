@@ -314,6 +314,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** the note reads "Transparent — kept by 3 export formats." uncut; the footnote reads "HEVC_ALPHA · MOV · alpha" whole, on a line of its own above the buttons, and resting the pointer on it shows the same line; for both files, the title's edges are clean in every player, with no dark fringe and no line at the frame's edge.
 - **Source:** #103, #242, spec §11 G-33, G-35.
 
+**SE-10 — Synchronize Audio on real camera and recorder footage**
+- **Do:** 1. Record one take on a camera (its own microphone) and a separate recorder at once, starting them a few seconds apart; clap once near the start. 2. Import both, put the camera clip on one track and the recorder on another anywhere, select both and choose Clip ▸ Synchronize Audio. 3. Mute the camera clip's audio and play the start, the middle and the end of the take; then unmute it and listen to the two together. 4. Try it on a take longer than 10 minutes, and on two clips that are not the same take.
+- **Expect:** the recorder moves and the camera stays; the clap and the speech line up with the picture by eye and ear at the start; the two together sound like one recording, not an echo (a frame is 33 ms at 30 fps, so a slight doubling can remain); one ⌘Z puts the recorder back. Two unrelated clips beep and the inspector's foot says "no matching sound found …", nothing moved. On a long take the end may drift by a few frames: AS-1 measures drift (`sync_audio`'s `drift_ms`) but does not correct it.
+- **Answer:** does the result line up by eye and ear, and how far has the end of a long take drifted?
+- **Source:** road map "audio-sync" (`designs/audio-sync.md`), spec §11 SY-1..SY-5.
+
 ## Captions
 
 **CAP-1 — Text reveals and legibility**

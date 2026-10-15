@@ -1793,6 +1793,17 @@ free.
 - `AudioNormalize.swift` — Normalize Clip as a value type: peaks in, ops out,
   measured PRE-FADER from the plan segment, REPLACING `volume` so a second
   press is a no-op, always to BASE props.
+- `AudioSync.swift` · `AudioSyncMatch.swift` — Synchronize Audio (spec §11
+  SY-1..SY-5), `AudioNormalize`'s shape: `read` takes the plan segments and
+  the peaks caches once, `plan` is pure and answers frame-snapped
+  `move_clip` ops (one undo step) or one refusal naming every reason. It
+  refuses what the core would quietly change — a start before 0 (the core
+  clamps) and an overlap on the mover's own track (the core adds a
+  dissolve). `AudioSyncMatch` is the pure signal arithmetic: onset
+  envelopes, the per-lag normalised FFT correlation, SY-3's confidence and
+  SY-5's drift. `EditorViewController+Audio` holds the Clip menu's sound
+  commands (Normalize, moved whole out of the frozen file, and Synchronize
+  Audio) with their validator arms.
 - `LevelMeter.swift` · `LevelMeterView.swift` · `Loudness.swift` — the meter
   reads the DSP tap that already exists and multiplies by the plan's
   envelope; a second `PostEffects` tap cannot be built (one
@@ -2052,9 +2063,9 @@ free.
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
   **Every one of the sixty-one op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the thirty APP-STATE tools, which have no op behind them
+  callers are the thirty-one APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
-  `AgentCatalog+Audio.swift`'s two composites and
+  `AgentCatalog+Audio.swift`'s three composites and
   `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
   left, the five other file tools (`AgentCatalog+Files.swift`'s `import_media`, `consolidate_media` and `record_screen`, and `AgentCatalog+Render.swift`'s `render_frame` and `export`, spliced back where they left), and
   `AgentCatalog+Graphics.swift`'s nine, after its two `opTool` rows.
