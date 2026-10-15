@@ -341,6 +341,12 @@ impl Project {
             matte,
             dissolve,
             input,
+            // No blend on an ungraded frame (GR-4, GR-34).
+            curve_blends: if ungraded {
+                &[]
+            } else {
+                &evaluated.curve_blends
+            },
         }
         .object()
     }

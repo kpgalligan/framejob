@@ -1,6 +1,8 @@
 // Road map "grading-2", phase G2-3 — the curves' probe (`curves_proof.py`
 // builds it through `swift_build.build` and runs it); grading-4 T4-2 (spec §11
-// GR-32) adds P12–P19 and amends P7 for the two-row strip.
+// GR-32) adds P12–P19 and amends P7 for the two-row strip; T4-3 (spec §11
+// GR-34) adds P20–P21 and amends P10 (a count change inside an action lands on
+// the END).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, against `libframejob_core.a`, so every row drives the app's own
@@ -183,6 +185,112 @@ do {
     } else {
         check("P7 a Metal device and the strip cache exist", false)
     }
+}
+
+// MARK: - P20 the blend form, P21 the blended strip (spec §11 GR-34)
+
+do {
+    // The app's own key strategy (`ProjectSnapshot.swift`'s decoder).
+    func decoded(_ json: String) -> ColorCurves? {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try? decoder.decode(ColorCurves.self, from: Data(json.utf8))
+    }
+    let tone = decoded(#"""
+        {"master": {"from": [[0, 0], [0.5, 0.3], [1, 1]],
+                    "to": [[0, 0], [0.2, 0.35], [0.5, 0.6], [0.8, 0.9], [1, 1]], "t": 0.25},
+         "red": [[0, 0], [1, 1]], "green": [[0, 0], [1, 1]], "blue": [[0, 0], [1, 1]],
+         "hue_hue": [[0, 0], [180, 0]], "hue_sat": [[0, 1], [180, 1]]}
+        """#)
+    let hue = decoded(#"""
+        {"hue_hue": {"from": [[0, 0], [120, 40], [240, 0]],
+                     "to": [[0, 0], [60, -30], [120, 0], [200, 30], [300, 0]], "t": 0.5}}
+        """#)
+    // A blend whose from is the identity is still a blend: both flags read it.
+    let neutralFrom = decoded(#"""
+        {"red": {"from": [[0, 0], [1, 1]], "to": [[0, 0], [0.5, 0.7], [0.8, 0.9], [1, 1]],
+                 "t": 0.5},
+         "hue_sat": {"from": [[0, 1], [180, 1]], "to": [[0, 0.5], [120, 1], [240, 0.5]], "t": 2}}
+        """#)
+    let malformed = decoded(#"""
+        {"master": {"from": [[0, 0.2]], "to": [[0, 0], [0.5, 0.6], [1, 1]], "t": 0.5},
+         "red": {"from": [[0, 0], [0.5, 0.6], [1, 1]], "t": 0.5},
+         "hue_hue": {"from": [[0, 10], [120, 40]], "to": [[0, 0], [90, 20], [180, 0]],
+                     "t": "half"}}
+        """#)
+    func flags(_ curves: ColorCurves?) -> (Float, Float) {
+        var u = LayerUniforms()
+        if let curves { u.apply(curves: curves) }
+        return (u.curvesEnabled, u.hueCurvesEnabled)
+    }
+    let master = tone?.blends[.master]
+    let hueBlend = hue?.blends[.hueHue]
+    let clamped = neutralFrom?.blends[.hueSat]?.t
+    check(
+        "P20 a blended channel decodes as its from points with the blend kept (t 0.25), not "
+            + "the identity, curvesEnabled / hueCurvesEnabled 1 (a hue blend, and blends whose "
+            + "from is the identity, t clamped to 1); a malformed blend is the identity",
+        tone.map { pairs($0.master) } == [[0, 0], [0.5, 0.3], [1, 1]]
+            && master.map { pairs($0.from) } == [[0, 0], [0.5, 0.3], [1, 1]]
+            && master.map { $0.to.count } == 5 && master?.t == 0.25
+            && tone?.blends.count == 1 && tone?.isIdentity == false && flags(tone) == (1, 0)
+            && hue.map { pairs($0.hueHue) } == [[0, 0], [120, 40], [240, 0]]
+            && hueBlend?.t == 0.5 && hueBlend?.to.count == 5 && flags(hue) == (0, 1)
+            && neutralFrom?.blends.count == 2 && clamped == 1 && flags(neutralFrom) == (1, 1)
+            && malformed?.isIdentity == true && malformed?.blends.isEmpty == true
+            && flags(malformed) == (0, 0),
+        "tone \(String(describing: tone)), hue \(String(describing: hue)), neutral from "
+            + "\(String(describing: neutralFrom)), malformed \(String(describing: malformed))")
+}
+
+do {
+    let fromM = pts([[0, 0], [0.5, 0.3], [1, 1]])
+    let toM = pts([[0, 0], [0.2, 0.35], [0.5, 0.6], [0.8, 0.9], [1, 1]])
+    let fromR = pts([[0, 0.1], [0.6, 0.5], [1, 0.9]])
+    let toR = pts([[0, 0], [0.3, 0.5], [0.7, 0.6], [1, 1]])
+    let fromH = pts([[0, 0], [120, 40], [240, 0]])
+    let toH = pts([[0, 0], [60, -30], [120, 0], [200, 30], [300, 0]])
+    let blue = pts([[0, 0.05], [1, 0.95]])
+    func blended(_ t: Double) -> ColorCurves {
+        ColorCurves(
+            master: fromM, red: fromR, blue: blue, hueHue: fromH,
+            blends: [
+                .master: CurveBlend(from: fromM, to: toM, t: t),
+                .red: CurveBlend(from: fromR, to: toR, t: t),
+                .hueHue: CurveBlend(from: fromH, to: toH, t: t),
+            ])
+    }
+    let t = 0.25
+    let n = CurveTable.stripSize
+    let got = CurveTable.strip(blended(t))
+    var oracle = [Float](repeating: 1, count: n * 8)
+    func mix(_ a: Double, _ b: Double) -> Double { (1 - t) * a + t * b }
+    for i in 0..<n {
+        let x = Double(i) / Double(n - 1)
+        let m = mix(CurveTable.value(fromM, at: x), CurveTable.value(toM, at: x))
+        oracle[4 * i] = Float(mix(CurveTable.value(fromR, at: m), CurveTable.value(toR, at: m)))
+        oracle[4 * i + 1] = Float(m)
+        oracle[4 * i + 2] = Float(CurveTable.value(blue, at: m))
+        let h = 360 * Double(i) / Double(n - 1)
+        let shift = mix(
+            CurveTable.value(fromH, at: h, domain: .hueShift),
+            CurveTable.value(toH, at: h, domain: .hueShift))
+        oracle[4 * (n + i)] = Float(shift / 360)
+        oracle[4 * (n + i) + 1] = 1
+        oracle[4 * (n + i) + 2] = 0
+    }
+    let zero = CurveTable.strip(blended(0))
+        == CurveTable.strip(ColorCurves(master: fromM, red: fromR, blue: blue, hueHue: fromH))
+    let one = CurveTable.strip(blended(1))
+        == CurveTable.strip(ColorCurves(master: toM, red: toR, blue: blue, hueHue: toH))
+    let plain = CurveTable.strip(ColorCurves(master: fromM, red: fromR, blue: blue, hueHue: fromH))
+    let differ = zip(got, oracle).filter { $0 != $1 }.count
+    check(
+        "P21 CurveTable.strip of Master, Red and Hue blends at t 0.25 equals the per-texel "
+            + "oracle (1 − t)·A + t·B from CurveTable.value of the two lists exactly; t 0 and t 1 "
+            + "are the plain strips of from and to exactly",
+        got.count == n * 8 && differ == 0 && zero && one && got != plain,
+        "\(differ) texels differ; t 0 \(zero), t 1 \(one), differs from from's \(got != plain)")
 }
 
 // MARK: - P12 the periodic spline, P13 the flags (spec §11 GR-32)
@@ -799,11 +907,11 @@ do {
     settle()
     let resetNone = binding.curvesReset(CurveChannel.allCases)
     check(
-        "P10 inside an action a count change between two curves lands on the base, the same "
-            + "count, an identity new list or an identity edited one on the end; Reset writes "
+        "P10 inside an action a count change between two curves, the same count, an identity "
+            + "new list and an identity edited one all land on the end (GR-34); Reset writes "
             + "the identity curve (not null) to the end for exactly the non-identity channels "
             + "(A: end-only master, B: base-only red) and nothing when all four are identity",
-        a1 == "set_video" && a2 == "set_action_end" && a3 == "set_action_end"
+        a1 == "set_action_end" && a2 == "set_action_end" && a3 == "set_action_end"
             && a4 == "set_action_end" && gotA && gotB && resetNone.isEmpty,
         "4 points \(a1), same count \(a2), identity new \(a3), identity edited \(a4); reset A "
             + "\(resetA), B \(resetB), none \(resetNone.map(\.json))")

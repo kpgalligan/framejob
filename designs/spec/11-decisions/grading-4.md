@@ -211,6 +211,9 @@ nothing of Concat is opened, at design time or build time.
   **Amended by GR-33** (grading-4 T4-2b): its "Not: … a change to Color's Hue (`hueRotate`)" is
   lifted; Color's Hue now calls this entry's `gradeHueShift`, wrapped and unguarded, and
   `hueRotate` is gone.
+  **Amended by GR-34** (grading-4 T4-3): "any other count change switches at the end (T4-3
+  changes that)" and the risk's last clause are replaced: inside an action two non-identity hue
+  curves of different counts blend their values, `(1−t)·a(h) + t·b(h)`, in their units.
 - **GR-33 — Color's Hue turns HSV hue by GR-32's exact shift: + is red → yellow → green, Rec. 709
   luma kept.** Recorded in T4-2b before its code, from the owner's answer of 2026-10-15 to
   T4-2's H16 ("Fix with the new exact shift (Recommended)"); it amends GR-2 and GR-32.
@@ -244,3 +247,42 @@ nothing of Concat is opened, at design time or build time.
     `gradeHueShift`'s body or to the hue curves.
   - Risk accepted: the shift costs more than the matrix per tap on a blurred layer (13 taps); not
     measured.
+- **GR-34 — Inside an action, a curve channel whose two ends are non-identity curves of
+  different point counts renders `(1−t)·a(x) + t·b(x)`, the two curves' VALUES blended; the core
+  publishes the pair and t, Swift's strip blends the two splines; a count change inside an action
+  lands on its END.** Recorded in T4-3 before its code; it settles GR-24's T4-3 item (#271) to
+  the point and amends GR-12 and GR-32. The owner's choices (as recommended): (1) a split inside a
+  blending action keeps the start curve on the head; (2) a point added or deleted with an action
+  selected goes to the END.
+  - **The rule.** In an action whose eased progress is t = `ease(action.curve, progress)`, a
+    channel whose held (start) curve `a` and whose clamped end curve `b` are both non-identity and
+    have different point counts renders, at every x, `(1 − t)·a(x) + t·b(x)`, a and b each its own
+    spline (GR-12's, or GR-32's periodic one for a hue curve, in its units: degrees for Hue vs
+    Hue, a gain for Hue vs Sat). It is exact at both ends: t = 0 is a, t = 1 is b. Two curves of
+    the same count keep §5.4's per-point lerp, and an identity meeting another count keeps
+    GR-12's alignment, so every render those reach is byte-identical.
+  - **Where the blend lives.** Only in the recipe's `curves` and in `clip_state`'s
+    `video.curves`, and only for 0 < t < 1: the channel is `{"from": [[x, y], …], "to": [[x, y],
+    …], "t": t}` (keys in that order) where it is otherwise a point list. Outside an action, at
+    t = 0 and from the action's end on, the channel is plain points, so t = 0 is today's bytes
+    and the end is `b`. The blend is never in a file: the model, `get_project`, a split, a paste
+    and the patch template hold points. The evaluated `VideoProps` holds `from` (the list rule
+    holds the list at its start value), so the inspector and every other reader of the evaluated
+    props see `a` until the end. `ungraded` publishes no blend (GR-4). Swift decodes a blended
+    channel as its `from` points plus the blend, and the strip samples it as the blend of its two
+    splines, in Double before the Float store; a channel's strip at t = 0 and t = 1 is the plain
+    strip of `from` and of `to`, bit for bit.
+  - **The inspector's write rule** (owner choice 2): with an action selected, every curve write
+    goes to the action's END, a count change included (CI-2's rule for every other edit); the
+    curve is then keyed and blends over the action. GR-12's BASE branch for a count change between
+    two curves is gone.
+  - **A split** (owner choice 1) inside a blending action writes the evaluated points as the
+    head's end (`state_patch`), which is `a`, so the head holds `a` and no longer changes; the
+    tail's base is `a` and its action blends `a → b` over the remainder. No jump at the cut.
+  - **Not:** no format, FFI, op, op-table, tool or `LayerUniforms` change; no spline in Rust; no
+    resampling of either curve (#271's resampling moves the curve at the action's start: GR-24's
+    measurement); no blend for `video.filters` or `video.obscure`; the editor does not draw the
+    blended curve.
+  - Risk accepted: the halfway frames of a mismatch differ from what a per-point lerp of a
+    resampled pair would give (the tier-4 brief measured p95 190 ten-bit levels on random pairs);
+    a split's head no longer changes.

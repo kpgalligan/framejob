@@ -7,7 +7,9 @@ import Metal
 /// which step 4c.2 samples at `texture(3)` — `rgba32Float`, or
 /// `rgba16Float` on a device without 32-bit float filtering (REASONED never
 /// on an Apple-silicon Mac; still under one 10-bit level). Kept in a
-/// least-recently-used cache of `capacity`, keyed by the curves, held by
+/// least-recently-used cache of `capacity`, keyed by the curves — their
+/// `blends` included (spec §11 GR-34), so a blended channel makes a new strip
+/// every frame of its action, as any animated curve does — held by
 /// `LookTextures` beside the looks' cache.
 ///
 /// **The placeholder** is a 2 × 2 identity strip: row 0 (0, 0, 0, 1) and

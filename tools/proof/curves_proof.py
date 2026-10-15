@@ -9,7 +9,10 @@ GR-32) adds the hue curves, `video.curves.hue_hue` and `.hue_sat`, through
 the strip's second row behind `hueCurvesEnabled` (rows H1–H16), the editor's
 hover readout and ⇧ axis lock and the Hue and Sat cells (probe rows
 P12–P19), and four tone-curved frames to N0. Phase T4-2b (spec §11 GR-33)
-scores Color's Hue, now GR-32's exact shift, as H16–H19.
+scores Color's Hue, now GR-32's exact shift, as H16–H19. Phase T4-3 (spec §11
+GR-34) scores a blend between curves of different point counts as B1–B4, the
+blend's decoding and strip as P20–P21, amends P10 (a count change inside an
+action lands on the END), and adds seven action frames to N0.
 
     python3 tools/proof/curves_proof.py [--app PATH] [--only K1,C1,...]
     python3 tools/proof/curves_proof.py capture DIR    # the uncurved control, before any product edit
@@ -45,15 +48,18 @@ of `CurveTable`.
 Projects, each 30 fps: C (640×360, CARD), R (1920×360, DEEP under RAMP), M
 (640×360, MOVIE, background black), S (CARD, saved twice for N2), A1–A3
 (CARD, one action each), P (two CARD clips on two tracks with master curves
-whose middles are 0.6 and 0.4, saved for the probe).
+whose middles are 0.6 and 0.4, saved for the probe), B (1920×360, DEEP under
+RAMP, for B1 and B3), B2 (HUE) and B4 (CARD).
 - **N0** (`compare DIR` only; scored on Release, printed elsewhere): seven
   frames with no curve — card, card-toned (exposure +1), card-wheeled (lift
   master 0.5), card-adjusted (an adjustment clip at exposure +1 over the
   card), ramp, ramp-looked (Warm), movie — and since T4-2 four with tone
   curves only — card-curved (M1's two), card-adjusted-curved (J1's), ramp-curved
-  (K1's) and movie-curved (X1's) — decoded at 16 bits a channel are
-  byte-identical to `capture DIR`'s, taken on the untouched tree's Release
-  build.
+  (K1's) and movie-curved (X1's) — and since T4-3 seven inside or at the ends
+  of an action — A1's, A2's and A3's 0.5 s frames, H8's two 0.5 s frames and
+  B1's 0 s and 1.5 s frames — decoded at 16 bits a channel are byte-identical
+  to `capture DIR`'s, taken on the untouched tree's Release build. A capture,
+  and a compare scoring N0, run A1–A3, H8 and B1 whatever `--only` names.
 - **N1** (C): master `[[0,0],[0.5,0.5],[1,1]]` answers "made no change",
   `get_project` holds no `curves`, and the frame is unchanged.
 - **N2** (S): saved uncurved, `project.json` holds no `curves`; saved with red
@@ -135,7 +141,23 @@ whose middles are 0.6 and 0.4, saved for the probe).
   wrap). **H19** (NEAR, its own project): Color's Hue +40 moves the centre
   pixel off its input bytes and its colorsys hue lands in (0°, 60°] (no
   chroma guard).
-- **P1–P19**: `curves_probe.swift`, built by `swift_build.build` over
+- **B1** (B, 16-bit): base master `B_FROM` (3 points), a 1 s linear action to
+  `B_TO` (5 points): at 0.3 s and 0.5 s (frame-aligned: `render_frame` snaps
+  `t` to the 30 fps grid, so 0.25 s would be 0.2667 s) every 16th column's
+  three 16-bit channels within one 10-bit level of `(1−t)·fc(a, v) +
+  t·fc(b, v)` (v the written code, as K1); at 0 s and 1.5 s byte-equal at 16
+  bits to the static `a` and `b` frames. **B2** (HUE): hue_hue `B2_FROM` (3) →
+  `B2_TO` (5): at 0.3 s every column the oracle ±1 (`hue_step` over a strip
+  whose row 1 is the blend of `fc_periodic` of both, `BlendStrip`); 0 s and
+  1.5 s byte-equal to the statics. **B3** (B): same count, different x's,
+  `[[0,0],[0.2,0.6],[1,1]]` → `[[0,0],[0.8,0.5],[1,1]]`: the 0.5 s lerp
+  `[[0,0],[0.5,0.55],[1,1]]` is first asserted not the identity (a scored
+  failure if it is), then the frame is within one 10-bit level of `fc` of it
+  at every 16th column and more than 8 ten-bit levels from the value blend
+  at some column. **B4** (B4): `split` at 0.5 s inside a 3 → 5 action: every
+  `video.curves` channel and every action end's `curves` channel, in
+  `get_project` and in the saved `project.json`, is a list of `[x, y]` pairs.
+- **P1–P21**: `curves_probe.swift`, built by `swift_build.build` over
   `app/Sources` (a failed build is a scored FAILURE of every P row), P1–P11
   and P16–P17 on project P; each row's sentence is the probe's. T4-2's: P7
   the strip 1,024 × 2 and the 2 × 2 placeholder; P12 the periodic spline
@@ -144,7 +166,12 @@ whose middles are 0.6 and 0.4, saved for the probe).
   the six cells and a Hue gesture in degrees, one step; P17 the In and Out
   fields' units and clamps across Red → Hue → Sat → Red; P18 a hue point
   held inside 0…359.9; P19 the six labels fit their cells at the 230 pt
-  plot.
+  plot. T4-3's: P10 amended (a count change between two curves inside an
+  action lands on the END); P20 the blend form decodes (points = from, the
+  blend kept, not the identity, both flags 1; a malformed blend the
+  identity); P21 `CurveTable.strip` of Master, Red and Hue blends at t 0.25
+  equals a per-texel oracle from `CurveTable.value` of the two lists exactly,
+  and t 0 / t 1 the plain strips of from / to exactly.
 - **Z1** (CONTROL): the fixtures hold (the ramp's frame a 16-bit PNG), the
   projects close and the log holds no `Frame Job: ` line.
 
@@ -154,8 +181,8 @@ and links the tree's `core/tests`), applies its edits (each anchor asserted
 to occur exactly once), builds it by the copy's own `make app-debug` (`make
 app` under `RC_PROOF_APP=release`) and runs every row on it, the probe built
 over the copy's `app/Sources`. A core mutant also runs `cargo test --release
---no-fail-fast --test curves --test ungraded` in the copy's own `core/` (row
-CT). MUTANT PASS when every named row FAILED and no other scored row did:
+--no-fail-fast --test curves --test ungraded --test curve_blend --test
+hue_curves` in the copy's own `core/` (row CT). MUTANT PASS when every named row FAILED and no other scored row did:
   catmull-rom              interior tangents (y(k+1) − y(k−1)) / (x(k+1) − x(k−1)),
                            no Fritsch–Carlson limit: K3 P6
   master-channel-swapped   the strip holds master(channel(v)): M1
@@ -187,6 +214,15 @@ construction.)
 (T4-2b: `luma-not-kept` and `gamut-limit-dropped` edit `gradeHueShift`, which
 Color's Hue now calls too, so H16 fails by construction; `hue-shift-reversed`
 turns only the curve, so H17's comparison fails by construction.)
+  blend-t-inverted         the core writes 1 − t: B1 B2 CT
+  same-count-blended       the core's count test dropped: B3 CT A1 A2 H8
+  mismatch-still-switches  `curve_blends` returns nothing: B1 B2 CT
+  blend-written-to-file    `edit_split.rs`'s `state_patch` writes the blend: B4 CT
+  strip-ignores-blend      the strip samples `from` only: B1 B2 P21
+  write-rule-kept          the inspector's BASE branch for a count change
+                           restored: P10
+(T4-3: `same-count-blended` blends every same-count and aligned action, so A1,
+A2 and H8, whose oracles are the per-point lerp, fail by construction.)
 Exit 0 when every scored row passed (a mutant: caught); 1 when one failed
 (a mutant: survived); 2 when the control could not be performed.
 """
@@ -227,13 +263,15 @@ RAMP_W, RAMP_H = 1920, 360
 GREY = 128
 CHANNELS = ["master", "red", "green", "blue"]
 NEUTRAL = ["card", "card-toned", "card-wheeled", "card-adjusted", "ramp", "ramp-looked",
-           "movie", "card-curved", "card-adjusted-curved", "ramp-curved", "movie-curved"]
+           "movie", "card-curved", "card-adjusted-curved", "ramp-curved", "movie-curved",
+           "a1-mid", "a2-mid", "a3-mid", "h8a-mid", "h8b-mid", "b1-start", "b1-end"]
 HUE_W, HUE_H = 720, 120
 NEAR = (132, 128, 128)
 ROWS = ["N0", "N1", "N2", "K1", "K3", "C1", "M1", "O1", "A1", "A2", "A3", "J1", "X1", "U1",
         "V1", "P0", "R1", "H1", "H2", "H3", "H4", "H6", "H7", "H8", "H9", "H12", "H13", "H14",
-        "H15", "H16", "H17", "H18", "H19", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11",
-        "P12", "P13", "P14", "P15", "P16", "P17", "P18", "P19", "Z1"]
+        "H15", "H16", "H17", "H18", "H19", "B1", "B2", "B3", "B4", "P1", "P2", "P3", "P4", "P5",
+        "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14", "P15", "P16", "P17", "P18",
+        "P19", "P20", "P21", "Z1"]
 RECORDS = set()
 C_ROWS = {"N1", "M1", "O1", "J1", "U1", "V1", "P0", "R1"}
 R_ROWS = {"K1", "K3", "C1"}
@@ -241,11 +279,14 @@ M_ROWS = {"X1"}
 A_ROWS = {"A1", "A2", "A3"}
 H_ROWS = {"H1", "H2", "H3", "H4", "H6", "H7", "H8", "H9", "H12", "H13", "H14", "H15", "H16",
           "H17", "H18", "H19"}
+B_ROWS = {"B1", "B2", "B3", "B4"}
 P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13",
-          "P14", "P15", "P16", "P17", "P18", "P19"}
+          "P14", "P15", "P16", "P17", "P18", "P19", "P20", "P21"}
 SHADER = "app/Resources/Shaders/Compositor.metal"
 TABLE = "app/Sources/CurveTable.swift"
 TEXTURES = "app/Sources/CurveTextures.swift"
+CURVES_CORE = "core/src/actions_curves.rs"
+WRITES = "app/Sources/InspectorBinding+Writes.swift"
 EDITOR = "app/Sources/CurveEditorView.swift"
 STEP_4C1 = ("        // (4c.1) The wheels (spec §11 GR-11): once per pixel, after tone and\n"
             "        // before the look. Behind `wheelsEnabled`, so an unwheeled layer never\n"
@@ -384,6 +425,54 @@ MUTANTS = {
         SHADER, COLOR_SHIFT,
         "        rgb = mix(rgb, gradeHueShift(rgb, hsvHue(rgb, mx, chroma), turn),\n"
         "                  smoothstep(0.02, 0.06, chroma));\n")], ["H19"]),
+    # T4-3 (spec §11 GR-34): one per decision.
+    "blend-t-inverted": ([(
+        CURVES_CORE,
+        "        fields.insert(\"t\".to_string(), to_json(&blend.t));\n",
+        "        fields.insert(\"t\".to_string(), to_json(&(1.0 - blend.t)));\n")],
+        ["B1", "B2", "CT"]),
+    "same-count-blended": ([(
+        CURVES_CORE,
+        "            if from.len() == to.len() {\n",
+        "            if false {\n")], ["B3", "CT", "A1", "A2", "H8"]),
+    "mismatch-still-switches": ([(
+        CURVES_CORE,
+        "    if t.is_nan() || t <= 0.0 || t >= 1.0 {\n",
+        "    if true {\n")], ["B1", "B2", "CT"]),
+    "blend-written-to-file": ([(
+        "core/src/edit_split.rs",
+        "    out.insert(\"video\".to_string(), actions::video_json(&evaluated.video));\n",
+        "    let mut video = actions::video_json(&evaluated.video);\n"
+        "    video[\"curves\"] = crate::actions_curves::blended_curves_json(\n"
+        "        &evaluated.video.curves,\n"
+        "        &evaluated.curve_blends,\n"
+        "    );\n"
+        "    out.insert(\"video\".to_string(), video);\n")], ["B4", "CT"]),
+    "strip-ignores-blend": ([(
+        TABLE,
+        "            return (1 - t) * from.value(at: x) + t * to.value(at: x)\n",
+        "            return from.value(at: x) + 0 * to.value(at: x)\n")], ["B1", "B2", "P21"]),
+    "write-rule-kept": ([(
+        WRITES,
+        "        // Motion is not an animation target (the core refuses it in\n",
+        "        if let curves = patch.curves {\n"
+        "            var moved = ColorCurvesPatch()\n"
+        "            var kept = curves\n"
+        "            for channel in CurveChannel.allCases {\n"
+        "                guard case .some(.some(let list)) = curves.entry(channel) else { continue }\n"
+        "                let edited = editedCurve(clip, channel)\n"
+        "                if list.count == edited.count || channel.domain.isIdentity(edited)\n"
+        "                    || channel.domain.isIdentity(list)\n"
+        "                {\n"
+        "                    continue\n"
+        "                }\n"
+        "                moved = moved.setting(channel, .some(list))\n"
+        "                kept = kept.setting(channel, nil)\n"
+        "            }\n"
+        "            if !moved.isEmpty { base.curves = moved }\n"
+        "            animatable.curves = kept.isEmpty ? nil : kept\n"
+        "        }\n"
+        "        // Motion is not an animation target (the core refuses it in\n")], ["P10"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -827,8 +916,13 @@ class Neutral:
     def __init__(self, mode, folder):
         self.mode, self.folder, self.misses, self.seen = mode, folder, [], []
 
-    def take(self, doc, name):
-        frame = doc.frame(f"neutral-{name}")
+    def every(self):
+        """True when every N0 frame is wanted: a capture, or a compare that
+        scores N0, so the action rows run whatever `--only` names."""
+        return self.mode == "capture" or (self.mode == "compare" and "N0" in selected)
+
+    def take(self, doc, name, t=T):
+        frame = doc.frame(f"neutral-{name}", t=t)
         self.seen.append(name)
         if frame is None:
             self.misses.append(f"{name}: no frame")
@@ -1059,32 +1153,32 @@ def acted(doc, clip, end):
     return added["ok"] and ended["ok"], actions
 
 
-def run_a(client, card, state):
+def run_a(client, card, neutral, state):
     closed = True
     lo, hi = [[0, 0], [0.5, 0.4], [1, 1]], [[0, 0], [0.5, 0.8], [1, 1]]
     six, six5 = [[0, 0], [0.5, 0.6], [1, 1]], [[0, 0], [0.5, 0.65], [1, 1]]
 
-    if "A1" in selected:
+    if "A1" in selected or neutral.every():
         doc, clip, base, _ = card_doc(client, "A1", card)
         state["a1_fixture"] = base is not None
         ids = [clip]
         want = static_frame(doc, ids, "a1-static", six) if base else None
         set_base = doc.curves(ids, master=lo) if base else {"ok": False}
         made, _ = acted(doc, clip, hi) if base else (False, [])
-        mid = doc.frame("a1-mid", t=SEC // 2)
+        mid = neutral.take(doc, "a1-mid", t=SEC // 2)
         misses = grid_misses(mid, lambda x, y: want.px(x, y)) if want else ["no static frame"]
         check("A1 base master middle 0.4, a 1 s action to 0.8: at 0.5 s the frame equals the "
               "static 0.6 curve's, ±1", set_base["ok"] and made and not misses
               and not same_pixels(want, base), "; ".join(misses[:3]) or "all within")
         closed = close(client, doc.path) and closed
 
-    if "A2" in selected:
+    if "A2" in selected or neutral.every():
         doc, clip, base, _ = card_doc(client, "A2", card)
         state["a2_fixture"] = base is not None
         ids = [clip]
         want = static_frame(doc, ids, "a2-static", six5) if base else None
         made, _ = acted(doc, clip, hi) if base else (False, [])
-        mid = doc.frame("a2-mid", t=SEC // 2)
+        mid = neutral.take(doc, "a2-mid", t=SEC // 2)
         misses = grid_misses(mid, lambda x, y: want.px(x, y)) if want else ["no static frame"]
         check("A2 no curve, a 1 s action to master middle 0.8: at 0.5 s the frame equals the "
               "static 0.65 curve's (the identity aligned to the end's x's), ±1",
@@ -1092,7 +1186,7 @@ def run_a(client, card, state):
               "; ".join(misses[:3]) or "all within")
         closed = close(client, doc.path) and closed
 
-    if "A3" in selected:
+    if "A3" in selected or neutral.every():
         doc, clip, base, _ = card_doc(client, "A3", card)
         state["a3_fixture"] = base is not None
         ids = [clip]
@@ -1102,7 +1196,7 @@ def run_a(client, card, state):
         actions = doc.clip(clip).get("actions") or [{}]
         end = (((actions[0].get("end") or {}).get("video") or {}).get("curves") or {})
         kept = end.get("master") == [[0, 0], [1, 1]]
-        mid = doc.frame("a3-mid", t=SEC // 2)
+        mid = neutral.take(doc, "a3-mid", t=SEC // 2)
         after = doc.frame("a3-after", t=SEC + SEC // 2)
         misses = grid_misses(mid, lambda x, y: want.px(x, y)) if want else ["no static frame"]
         check("A3 base master middle 0.8, an end of [[0,0],[1,1]]: the end keeps the key, at "
@@ -1273,7 +1367,7 @@ def hue_of(pixel):
     return colorsys.rgb_to_hsv(*[v / 255 for v in pixel])[0] * 360
 
 
-def run_h(client, state):
+def run_h(client, state, neutral):
     hue = write_rgb_png(WORK / "hue.png", HUE_W, HUE_H, hue_column)
     grey = write_png(WORK / "grey-ramp.png", HUE_W, HUE_H, lambda x: round(255 * x / (HUE_W - 1)))
     tinted = write_rgb_png(WORK / "tinted.png", HUE_W, HUE_H, lambda x: (130, 128, 128))
@@ -1554,7 +1648,7 @@ def run_h(client, state):
               f"{results}")
 
     # H8, on its own two projects
-    if "H8" in selected:
+    if "H8" in selected or neutral.every():
         results = []
         a_doc, a_clip, a_base = hue_doc(client, "H8a", hue)
         if a_base is not None:
@@ -1562,7 +1656,7 @@ def run_h(client, state):
                               hue_hue=[[0, 0], [60, 0], [120, 60], [180, 0]])
             a_doc.curves([a_clip], hue_hue=S1)
             made = acted_on(a_doc, a_clip, {"hue_hue": [[0, 0], [60, 0], [120, 80], [180, 0]]})
-            mid = a_doc.frame("h8a-mid", t=SEC // 2)
+            mid = neutral.take(a_doc, "h8a-mid", t=SEC // 2)
             misses = column_misses(mid, lambda x: want.px(x, y)) if want else ["no static"]
             results.append(("same count", ok and made and not misses, misses[:3]))
         closed = close(client, a_doc.path) and closed
@@ -1571,7 +1665,7 @@ def run_h(client, state):
             ok, want = curved(b_doc, [b_clip], "h8b-static",
                               hue_sat=[[0, 1], [60, 1], [120, 0.5], [180, 1]])
             made = acted_on(b_doc, b_clip, {"hue_sat": G2})
-            mid = b_doc.frame("h8b-mid", t=SEC // 2)
+            mid = neutral.take(b_doc, "h8b-mid", t=SEC // 2)
             misses = column_misses(mid, lambda x: want.px(x, y)) if want else ["no static"]
             results.append(("from none", ok and made and not misses, misses[:3]))
         closed = close(client, b_doc.path) and closed
@@ -1589,6 +1683,200 @@ def acted_on(doc, clip, curves):
     ended = doc.call("set_action_end", clip=clip, action=action,
                      patch={"video": {"curves": curves}}) if action else {"ok": False}
     return added["ok"] and ended["ok"]
+
+
+# ---- projects B: curves of different counts (T4-3, spec §11 GR-34) -----------
+
+B_FROM = [[0, 0], [0.5, 0.3], [1, 1]]
+B_TO = [[0, 0], [0.2, 0.35], [0.45, 0.5], [0.75, 0.9], [1, 1]]
+B2_FROM = [[0, 0], [120, 40], [240, 0]]
+B2_TO = [[0, 0], [60, -30], [120, 0], [200, 30], [300, 0]]
+B3_FROM = [[0, 0], [0.2, 0.6], [1, 1]]
+B3_TO = [[0, 0], [0.8, 0.5], [1, 1]]
+# The blend's sample times: frame-aligned at 30 fps (`render_frame` snaps `t`
+# to the frame grid, so 0.25 s would land on 0.2667 s), t 0.3 and 0.5.
+B_TIMES = [(SEC * 3 // 10, 0.3), (SEC // 2, 0.5)]
+
+
+class BlendStrip(HueStrip):
+    """Row 1 of the strip for Hue vs Hue blended (GR-34): texel i the shift
+    `(1 − t)·a(h) + t·b(h)` in turns, each its own `fc_periodic`."""
+
+    def __init__(self, a, b, t):
+        hues = [360 * i / (STRIP_N - 1) for i in range(STRIP_N)]
+        self.turns = [((1 - t) * fc_periodic(a, h, -180, 180) + t * fc_periodic(b, h, -180, 180))
+                      / 360 for h in hues]
+        self.gains = [fc_periodic(GAIN_IDENTITY, h, 0, 2) for h in hues]
+
+
+def same_deep(a, b):
+    """Two frames' 16-bit decodes byte-equal."""
+    if a is None or b is None:
+        return False
+    one = decode(a.path, a.width, a.height, deep=True)
+    two = decode(b.path, b.width, b.height, deep=True)
+    return one is not None and one == two
+
+
+def is_tone_identity(points):
+    return (points[0][0] == 0 and points[-1][0] == 1
+            and all(p[1] == p[0] for p in points))
+
+
+def ramp_levels(frame, want_of, y):
+    """Every 16th ramp column's three 16-bit channels against `want_of(v)` (v
+    the code the ramp wrote, 0…1); the misses past one 10-bit level and the
+    largest distance seen, in 10-bit levels."""
+    misses, worst = [], 0.0
+    if frame is None:
+        return ["the frame is missing"], float("inf")
+    for x in range(0, RAMP_W, 16):
+        v = round(255 * x / (RAMP_W - 1)) / 255
+        want = want_of(v)
+        got = frame.px16(x, y)
+        level = max(abs(c / 65535 - want) * 1023 for c in got)
+        worst = max(worst, level)
+        if level > 1:
+            misses.append(f"x {x} (v {round(v * 255)}): {got} vs {want:.5f}, {level:.2f} levels")
+    return misses, worst
+
+
+def is_points(value):
+    """A channel stored as a list of [x, y] number pairs."""
+    return isinstance(value, list) and len(value) >= 2 and all(
+        isinstance(p, list) and len(p) == 2
+        and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in p)
+        for p in value)
+
+
+def curve_channels(project):
+    """Every `video.curves` channel of every clip and every action end's
+    `curves` channel: (where, value) pairs."""
+    found = []
+    for c in project.get("clips") or []:
+        for name, value in ((c.get("video") or {}).get("curves") or {}).items():
+            found.append((f"clip {c.get('id')} {name}", value))
+        for action in c.get("actions") or []:
+            end = ((action.get("end") or {}).get("video") or {}).get("curves") or {}
+            for name, value in end.items():
+                found.append((f"clip {c.get('id')} action {action.get('id')} end {name}", value))
+    return found
+
+
+def run_b(client, card, ramp, deep, neutral, state):
+    closed = True
+    every = neutral.every()
+
+    # B1 and B3, on a ramp over the deep clip (a 16-bit frame).
+    if every or selected & {"B1", "B3"}:
+        doc, sized = opened(client, "B", RAMP_W, RAMP_H)
+        back = (doc.tracks() or [{}])[0].get("id")
+        deep_media = doc.media(deep)
+        under = doc.place(back, deep_media) if deep_media is not None else None
+        front = doc.new_track() if under is not None else None
+        media = doc.media(ramp)
+        clip = doc.place(front, media) if media is not None and front is not None else None
+        y = RAMP_H // 2
+        base = doc.frame("b-base") if clip is not None else None
+        fixture = sized and clip is not None and base is not None and png_depth(base.path) == 16
+        state["b_fixture"] = fixture
+        ids = [clip]
+        if fixture and (every or "B1" in selected):
+            static_b = static_frame(doc, ids, "b1-static-b", B_TO)
+            static_a = static_frame(doc, ids, "b1-static-a", B_FROM)
+            set_a = doc.curves(ids, master=B_FROM)
+            made, actions = acted(doc, clip, B_TO)
+            start = neutral.take(doc, "b1-start", t=0)
+            mids = [(t, doc.frame(f"b1-{t}", t=at)) for at, t in B_TIMES]
+            end = neutral.take(doc, "b1-end", t=SEC + SEC // 2)
+            notes, good = [], set_a["ok"] and made
+            for t, frame in mids:
+                misses, worst = ramp_levels(
+                    frame, lambda v, t=t: (1 - t) * fc(B_FROM, v) + t * fc(B_TO, v), y)
+                good = good and not misses
+                notes.append(f"t {t}: worst {worst:.3f} levels, {misses[:2] or 'all within'}")
+            ends = same_deep(start, static_a) and same_deep(end, static_b)
+            check(f"B1 master {B_FROM} → {B_TO} over a 1 s linear action: at 0.3 s and 0.5 s "
+                  "every 16th ramp column within one 10-bit level of (1−t)·fc(a, v) + t·fc(b, v); "
+                  "at 0 s and 1.5 s byte-equal (16 bits) to the static a and b frames",
+                  good and ends, "; ".join(notes) + f"; ends equal {ends}")
+            if actions:
+                doc.call("remove_action", clip=clip, action=actions[0].get("id"))
+            doc.uncurve(ids)
+        if fixture and "B3" in selected:
+            lerped = [[a[0] + (b[0] - a[0]) * 0.5, a[1] + (b[1] - a[1]) * 0.5]
+                      for a, b in zip(B3_FROM, B3_TO)]
+            not_identity = not is_tone_identity(lerped)
+            set_a = doc.curves(ids, master=B3_FROM)
+            made, actions = acted(doc, clip, B3_TO)
+            mid = doc.frame("b3-mid", t=SEC // 2)
+            misses, worst = ramp_levels(mid, lambda v: fc(lerped, v), y)
+            _, apart = ramp_levels(mid, lambda v: 0.5 * fc(B3_FROM, v) + 0.5 * fc(B3_TO, v), y)
+            check(f"B3 a same-count action {B3_FROM} → {B3_TO} (its 0.5 s lerp {lerped} is not "
+                  "the identity) is the per-point lerp at 0.5 s within one 10-bit level, and more "
+                  "than 8 ten-bit levels from the value blend somewhere",
+                  not_identity and set_a["ok"] and made and not misses and apart > 8,
+                  f"lerp not identity {not_identity}; worst {worst:.3f} levels "
+                  f"{misses[:2] or 'all within'}; furthest from the value blend {apart:.2f}")
+            if actions:
+                doc.call("remove_action", clip=clip, action=actions[0].get("id"))
+            doc.uncurve(ids)
+        closed = close(client, doc.path) and closed
+
+    # B2, on HUE.
+    if "B2" in selected:
+        hue = write_rgb_png(WORK / "hue-b.png", HUE_W, HUE_H, hue_column)
+        doc, clip, base = hue_doc(client, "B2", hue)
+        y = HUE_H // 2
+        ids = [clip]
+        if base is not None:
+            plain = [base.px(x, y) for x in range(HUE_W)]
+            ok_b, static_b = curved(doc, ids, "b2-static-b", hue_hue=B2_TO)
+            ok_a, static_a = curved(doc, ids, "b2-static-a", hue_hue=B2_FROM)
+            set_a = doc.curves(ids, hue_hue=B2_FROM)
+            made = acted_on(doc, clip, {"hue_hue": B2_TO})
+            start = doc.frame("b2-start", t=0)
+            at, t = B_TIMES[0]
+            mid = doc.frame("b2-mid", t=at)
+            end = doc.frame("b2-end", t=SEC + SEC // 2)
+            strip = BlendStrip(B2_FROM, B2_TO, t)
+            misses = column_misses(mid, lambda x: hue_codes(plain[x], strip))
+            ends = same_deep(start, static_a) and same_deep(end, static_b)
+            moved = mid is not None and static_a is not None and not same_pixels(mid, static_a)
+            check(f"B2 hue_hue {B2_FROM} → {B2_TO} over a 1 s action: at 0.3 s every column the "
+                  "oracle over a strip blending both curves ±1; 0 s and 1.5 s byte-equal to the "
+                  "statics", ok_a and ok_b and set_a["ok"] and made and not misses and ends
+                  and moved, f"{misses[:3] or 'all within'}; ends equal {ends}; mid differs "
+                  f"from a {moved}")
+        else:
+            check("B2 the HUE project was made", False)
+        closed = close(client, doc.path) and closed
+
+    # B4, a split inside a blending action, on the card.
+    if "B4" in selected:
+        doc, clip, base, _ = card_doc(client, "B4", card)
+        ids = [clip]
+        set_a = doc.curves(ids, master=B_FROM) if base else {"ok": False}
+        made, _ = acted(doc, clip, B_TO) if base else (False, [])
+        split = doc.call("split", clips=ids, at=SEC // 2) if made else {"ok": False}
+        live = curve_channels(doc.project())
+        saved_path = WORK / "B4-saved.framejob"
+        saved = doc.call("save_project", path=str(saved_path))
+        doc.path = saved_path
+        try:
+            filed = curve_channels(json.loads((saved_path / "project.json").read_text()))
+        except (OSError, ValueError):
+            filed = []
+        bad = [f"{where}: {value}" for where, value in live + filed if not is_points(value)]
+        check("B4 split at 0.5 s inside a 3 → 5 point action: every video.curves channel and "
+              "every action end's curves channel is a list of [x, y] pairs, in get_project and "
+              "in the saved project.json",
+              set_a["ok"] and made and split["ok"] and saved["ok"] and len(live) >= 3
+              and len(filed) >= 3 and not bad,
+              f"split {split.get('error', 'ok')}; {len(live)} live, {len(filed)} filed; "
+              f"not points {bad[:3]}")
+        closed = close(client, doc.path) and closed
+    return closed
 
 
 # ---- project M: the movie and an export --------------------------------------
@@ -1840,7 +2128,8 @@ def build_mutant(name):
 
 def core_test(copy):
     ran = bounded.run(["cargo", "test", "--release", "--no-fail-fast", "--test", "curves",
-                       "--test", "ungraded"], 900, cwd=str(copy / "core"))
+                       "--test", "ungraded", "--test", "curve_blend", "--test", "hue_curves"],
+                      900, cwd=str(copy / "core"))
     lines = (ran["stdout"] + ran["stderr"]).strip().splitlines()
     failed = [line.strip() for line in lines if line.strip().startswith("`--test ")]
     return ran["rc"] == 0 and not ran["expired"], failed or lines[-3:]
@@ -1893,7 +2182,8 @@ def main():
             passed_ct, last = core_test(copy)
             rows["CT"] = passed_ct
             print(("  ok   " if passed_ct else "  FAIL ") + "CT cargo test --test curves "
-                  "--test ungraded in the copy's core\n       " + " | ".join(last), flush=True)
+                  "--test ungraded --test curve_blend --test hue_curves in the copy's core\n"
+                  "       " + " | ".join(last), flush=True)
             scored.append("CT")
     else:
         print(f"grading-2 G2-3 — curves over MCP ({args.mode or 'run'}, {config} build "
@@ -1925,10 +2215,12 @@ def main():
                 closed = run_r(launched.client, ramp, deep, neutral, state) and closed
             if capture or "N0" in selected or selected & M_ROWS:
                 closed = run_m(launched.client, movie, neutral, state) and closed
-            if not capture and selected & A_ROWS:
-                closed = run_a(launched.client, card, state) and closed
-            if not capture and selected & H_ROWS:
-                closed = run_h(launched.client, state) and closed
+            if neutral.every() or selected & A_ROWS:
+                closed = run_a(launched.client, card, neutral, state) and closed
+            if neutral.every() or selected & H_ROWS:
+                closed = run_h(launched.client, state, neutral) and closed
+            if neutral.every() or selected & B_ROWS:
+                closed = run_b(launched.client, card, ramp, deep, neutral, state) and closed
             if "N2" in selected:
                 closed = run_s(launched.client, card, state) and closed
             if selected & P_ROWS:
@@ -1949,8 +2241,8 @@ def main():
     if "N0" in selected:
         missing = [name for name in NEUTRAL if name not in neutral.seen]
         good = not neutral.misses and not missing
-        title = (f"N0 the {len(NEUTRAL)} frames with no hue curve are byte-identical (16 bits a "
-                 f"channel) to {args.folder}")
+        title = (f"N0 the {len(NEUTRAL)} frames with no hue curve and no blend are "
+                 f"byte-identical (16 bits a channel) to {args.folder}")
         if config == "release" or args.mutant:
             check(title, good, f"misses {neutral.misses}; not taken {missing}")
         else:

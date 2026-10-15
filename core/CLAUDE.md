@@ -491,12 +491,16 @@ governs a module now.
   can carry and forces `normal` on a nest clip), with `bounded` /
   `finite_or`; a pure move out of `actions.rs` (issue batch B87, toll A).
 - `actions_curves.rs` — `curves_json` (all six curves, an absent one
-  as its domain's identity, for `video_json`'s callers) and
+  as its domain's identity, for `video_json`'s callers),
   `align_identity_curves` (spec §11 GR-12, GR-32: an identity curve
   meeting a curve of another count in an action takes that curve's x's,
   its ends at 0 and 1 on a tone curve and every value the neutral on a
-  hue curve, so a grade animates from neutral; any other count change
-  switches at the end, the list rule).
+  hue curve, so a grade animates from neutral), and `CurveBlend`,
+  `curve_blends` and `blended_curves_json` (spec §11 GR-34: two
+  non-identity curves of different counts in an action blend their
+  values — the evaluator names each such channel with its clamped end
+  curve and the eased t in `Evaluated.curve_blends`, and only the recipe
+  layer and `clip_state` write it, as `{from, to, t}`; never a file).
 - `actions_qualifier.rs` — `align_hue_center` (spec §11 GR-13): before
   the lerp, an action's target hue centre moves by ±360 when the two
   centres are more than 180° apart, so the centre animates the short

@@ -10,8 +10,8 @@
 //! below 360, the value range, x rising), every bound that is legal
 //! accepted; an action between hue curves of one count lerping per point
 //! (x linearly); an identity aligned to the other's x's with the neutral
-//! value, both ways, and kept in an end patch; other count changes switching
-//! at the end; an end clamped (x to 0…360 then a last x of 360 removed,
+//! value, both ways, and kept in an end patch; other count changes blending
+//! their values (spec §11 GR-34); an end clamped (x to 0…360 then a last x of 360 removed,
 //! values to their range, x not rising removed); `ungraded` neutralising
 //! both; and `paste_attributes` and an adjustment clip carrying them. What a
 //! hue curve does to a pixel is `tools/proof/curves_proof.py`'s.
@@ -248,13 +248,16 @@ fn a_hue_identity_is_aligned_to_the_other_both_ways() {
 }
 
 #[test]
-fn other_count_changes_switch_at_the_end() {
+fn other_count_changes_blend_their_values() {
     let base = project().apply(&set_curves(json!({"hue_sat": [[0, 0.5], [180, 1.5]]})));
     let handle = acting(base, json!({"hue_sat": [[0, 1], [120, 0], [240, 1]]}));
-    assert!(close(
-        &state(&handle, "hue_sat", SEC / 2),
-        &[[0.0, 0.5], [180.0, 1.5]]
-    ));
+    let mid = state(&handle, "hue_sat", SEC / 2);
+    assert!(close(&mid["from"], &[[0.0, 0.5], [180.0, 1.5]]), "{mid}");
+    assert!(
+        close(&mid["to"], &[[0.0, 1.0], [120.0, 0.0], [240.0, 1.0]]),
+        "{mid}"
+    );
+    assert_eq!(mid["t"], json!(0.5));
     assert!(close(
         &state(&handle, "hue_sat", 2 * SEC),
         &[[0.0, 1.0], [120.0, 0.0], [240.0, 1.0]]

@@ -274,7 +274,8 @@ schema, §6 the op table, §7 the architecture.
   speed), move the end points to set the black and white points, delete a
   point with ⌫ or a double-click, nudge it with the arrow keys, or type its
   In and Out. Each edit is one undo step; the curves animate in an action
-  (from or to straight, too) and apply after the wheels and before a look,
+  between any point counts (from or to straight, too) and apply after the
+  wheels and before a look,
   on a clip or an adjustment clip. The **Hue** and **Sat** cells edit two
   hue curves over a spectrum strip: drag a point up or down to turn that hue
   (Hue vs Hue — "make the greens more teal", keeping its brightness) or to

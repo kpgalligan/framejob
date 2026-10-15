@@ -544,6 +544,7 @@ pub(crate) fn burn_in_layer(canvas: &Canvas, t: Ticks) -> Value {
         matte: Value::Null,
         dissolve: Value::Null,
         input: Value::Null,
+        curve_blends: &[],
     }
     .object()
 }

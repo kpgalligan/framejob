@@ -186,7 +186,7 @@ fn clamp_wheels(wheels: &mut Wheels) {
 /// channel removed, so an action that ends on the identity ends uncurved.
 /// A hue curve (GR-32) clamps its x's to 0…360 and is removed when its last
 /// x is 360, and its values to its domain's range.
-fn clamp_curves(curves: &mut Curves) {
+pub(crate) fn clamp_curves(curves: &mut Curves) {
     for (domain, curve) in curves.named_mut() {
         if let Some(points) = curve.as_mut() {
             if !clamp_points(points, domain) {

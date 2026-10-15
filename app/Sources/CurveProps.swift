@@ -147,10 +147,22 @@ enum CurveChannel: String, CaseIterable {
     }
 }
 
+/// A channel blended inside an action (spec §11 GR-34): the recipe's and
+/// `clip_state`'s `{"from": [[x, y], …], "to": [[x, y], …], "t": t}` for two
+/// non-identity curves of different point counts, drawn as
+/// `(1 − t)·from(x) + t·to(x)` by the strip. Never in a file.
+struct CurveBlend: Hashable, Decodable {
+    let from: [CurvePoint]
+    let to: [CurvePoint]
+    let t: Double
+}
+
 /// `video.curves`: the four tone curves and the two hue curves (spec §11
 /// GR-32), each a list of 2–16 points with x strictly rising. Read
 /// leniently: an absent, null or malformed channel is its domain's identity,
-/// as the core writes an absent one.
+/// as the core writes an absent one. A blended channel (GR-34) holds its
+/// `from` points, with the blend in `blends`; a malformed blend is the
+/// identity. `blends` is never encoded.
 struct ColorCurves: Codable, Hashable {
     let master: [CurvePoint]
     let red: [CurvePoint]
@@ -158,6 +170,12 @@ struct ColorCurves: Codable, Hashable {
     let blue: [CurvePoint]
     let hueHue: [CurvePoint]
     let hueSat: [CurvePoint]
+    /// The channels blended at this instant, each with its two lists and t.
+    let blends: [CurveChannel: CurveBlend]
+
+    private enum CodingKeys: String, CodingKey {
+        case master, red, green, blue, hueHue, hueSat
+    }
 
     /// The tone identity's shortest spelling, `[[0, 0], [1, 1]]`.
     static let identityCurve = [CurvePoint(x: 0, y: 0), CurvePoint(x: 1, y: 1)]
@@ -166,7 +184,8 @@ struct ColorCurves: Codable, Hashable {
         master: [CurvePoint] = identityCurve, red: [CurvePoint] = identityCurve,
         green: [CurvePoint] = identityCurve, blue: [CurvePoint] = identityCurve,
         hueHue: [CurvePoint] = CurveDomain.hueShift.identity,
-        hueSat: [CurvePoint] = CurveDomain.hueGain.identity
+        hueSat: [CurvePoint] = CurveDomain.hueGain.identity,
+        blends: [CurveChannel: CurveBlend] = [:]
     ) {
         self.master = master
         self.red = red
@@ -174,20 +193,31 @@ struct ColorCurves: Codable, Hashable {
         self.blue = blue
         self.hueHue = hueHue
         self.hueSat = hueSat
+        self.blends = blends
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        func channel(_ key: CodingKeys, _ domain: CurveDomain) -> [CurvePoint] {
+        var blends: [CurveChannel: CurveBlend] = [:]
+        func channel(_ key: CodingKeys, _ name: CurveChannel) -> [CurvePoint] {
+            let domain = name.domain
+            if let blend: CurveBlend = c.lenient(key) {
+                guard blend.from.count >= 2, blend.to.count >= 2, blend.t.isFinite else {
+                    return domain.identity
+                }
+                blends[name] = CurveBlend(from: blend.from, to: blend.to, t: min(max(blend.t, 0), 1))
+                return blend.from
+            }
             let points: [CurvePoint] = c.lenient(key, domain.identity)
             return points.count >= 2 ? points : domain.identity
         }
-        master = channel(.master, .tone)
-        red = channel(.red, .tone)
-        green = channel(.green, .tone)
-        blue = channel(.blue, .tone)
-        hueHue = channel(.hueHue, .hueShift)
-        hueSat = channel(.hueSat, .hueGain)
+        master = channel(.master, .master)
+        red = channel(.red, .red)
+        green = channel(.green, .green)
+        blue = channel(.blue, .blue)
+        hueHue = channel(.hueHue, .hueHue)
+        hueSat = channel(.hueSat, .hueSat)
+        self.blends = blends
     }
 
     static let identity = ColorCurves()
@@ -199,14 +229,19 @@ struct ColorCurves: Codable, Hashable {
         return first.x == 0 && last.x == 1 && curve.allSatisfy { $0.y == $0.x }
     }
 
-    /// The four tone curves all the identity: `curvesEnabled` is 0.
+    /// The four tone curves all the identity and none blended:
+    /// `curvesEnabled` is 0.
     var toneIsIdentity: Bool {
-        [CurveChannel.master, .red, .green, .blue].allSatisfy { Self.isIdentity(points($0)) }
+        [CurveChannel.master, .red, .green, .blue].allSatisfy {
+            blends[$0] == nil && Self.isIdentity(points($0))
+        }
     }
 
-    /// Both hue curves the identity: `hueCurvesEnabled` is 0.
+    /// Both hue curves the identity and neither blended: `hueCurvesEnabled`
+    /// is 0.
     var hueIsIdentity: Bool {
-        CurveDomain.hueShift.isIdentity(hueHue) && CurveDomain.hueGain.isIdentity(hueSat)
+        blends[.hueHue] == nil && blends[.hueSat] == nil
+            && CurveDomain.hueShift.isIdentity(hueHue) && CurveDomain.hueGain.isIdentity(hueSat)
     }
 
     /// All six the identity: the strip is the placeholder.

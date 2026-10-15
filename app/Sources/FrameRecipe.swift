@@ -291,7 +291,9 @@ struct RecipeLayer: Codable, Equatable {
     let wheels: ColorWheels
     /// Step 4c.2's curves (spec §11 GR-12, GR-32): all six, an identity one
     /// as its domain's (the core always writes the key; `ungraded` writes all
-    /// six so). Absent or malformed reads as the identity.
+    /// six so). Absent or malformed reads as the identity. A channel blended
+    /// inside an action (GR-34) is `{from, to, t}`, read as its `from` points
+    /// with the blend in `blends`.
     let curves: ColorCurves
     /// Step 4d's look (spec §11 GR-7): its amount and the definition
     /// `LookTextures` bakes; nil for no look, which the core also publishes

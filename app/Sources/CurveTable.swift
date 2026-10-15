@@ -22,6 +22,13 @@ import Foundation
 /// α² + β² > 9 rules per segment in order, the wrap segment last; outside the
 /// first and last x, the wrap segment; clamped to the domain's value range.
 /// The tone spline is unchanged bit for bit.
+///
+/// **A blended channel** (spec §11 GR-34, two non-identity curves of
+/// different point counts inside an action) is sampled in the strip as
+/// `(1 − t)·A(x) + t·B(x)`, A and B its two splines, each already clamped to
+/// its domain, in Double before the Float store; at t 0 and 1 that is the
+/// plain strip of either list, bit for bit. The editor draws the channel's
+/// `from` points, never the blend.
 enum CurveTable {
     static let stripSize = 1024
 
@@ -111,27 +118,52 @@ enum CurveTable {
         }
     }
 
-    /// The six channels' splines, so `strip` builds each once.
-    private struct Splines {
-        let master: Spline
-        let red: Spline
-        let green: Spline
-        let blue: Spline
-        let hueHue: Spline
-        let hueSat: Spline
+    /// One channel as the strip samples it: its spline, or for a blended
+    /// channel (GR-34) the blend of its `from` and `to` splines at `t`.
+    private struct Channel {
+        let from: Spline
+        let to: Spline?
+        let t: Double
 
-        init(_ curves: ColorCurves) {
-            master = Spline(curves.master)
-            red = Spline(curves.red)
-            green = Spline(curves.green)
-            blue = Spline(curves.blue)
-            hueHue = Spline(curves.hueHue, domain: .hueShift)
-            hueSat = Spline(curves.hueSat, domain: .hueGain)
+        init(_ curves: ColorCurves, _ channel: CurveChannel) {
+            if let blend = curves.blends[channel] {
+                from = Spline(blend.from, domain: channel.domain)
+                to = Spline(blend.to, domain: channel.domain)
+                t = blend.t
+            } else {
+                from = Spline(curves.points(channel), domain: channel.domain)
+                to = nil
+                t = 0
+            }
+        }
+
+        func value(at x: Double) -> Double {
+            guard let to else { return from.value(at: x) }
+            return (1 - t) * from.value(at: x) + t * to.value(at: x)
         }
     }
 
-    private static func value(_ spline: Spline, at x: Double) -> Double {
-        spline.value(at: x)
+    /// The six channels, so `strip` builds each spline once.
+    private struct Splines {
+        let master: Channel
+        let red: Channel
+        let green: Channel
+        let blue: Channel
+        let hueHue: Channel
+        let hueSat: Channel
+
+        init(_ curves: ColorCurves) {
+            master = Channel(curves, .master)
+            red = Channel(curves, .red)
+            green = Channel(curves, .green)
+            blue = Channel(curves, .blue)
+            hueHue = Channel(curves, .hueHue)
+            hueSat = Channel(curves, .hueSat)
+        }
+    }
+
+    private static func value(_ channel: Channel, at x: Double) -> Double {
+        channel.value(at: x)
     }
 
     /// The Fritsch–Carlson tangents of the points `(xs[k], ys[k])`.
@@ -214,7 +246,9 @@ enum CurveTable {
     /// `channel(master(i / (size − 1)))` in r, g and b and 1 in a; row 1's
     /// (spec §11 GR-32) the hue curves at the hue h = 360·i / (size − 1):
     /// Hue vs Hue's shift in turns (degrees / 360) in r, Hue vs Sat's gain in
-    /// g, 0 in b and 1 in a.
+    /// g, 0 in b and 1 in a. A blended channel (GR-34) is its two splines'
+    /// blend wherever it is read: row 0's master and channel, row 1's shift
+    /// and gain.
     static func strip(_ curves: ColorCurves, size: Int = stripSize) -> [Float] {
         let curves = Splines(curves)
         let n = max(size, 2)

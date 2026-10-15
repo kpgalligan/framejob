@@ -288,6 +288,12 @@ Concat is opened, at design time or build time.
   "no ⇧ axis lock": `video.curves` gains `hue_hue` and `hue_sat` (a periodic spline, the strip's
   second row, `hueCurvesEnabled`), the picker six cells, the editor a hover readout and a ⇧ axis
   lock; `curvesEnabled` now means a tone curve is not the identity; format 20.
+  **Amended by GR-34** (grading-4 T4-3): "Any other count change switches at the end" is
+  replaced: inside an action two non-identity curves of different counts render `(1−t)·a(x) +
+  t·b(x)`, the recipe and `clip_state` carrying `{from, to, t}`. The inspector's BASE branch and
+  "(the filters' rule)" are gone: a curve write with an action selected always goes to the END.
+  The "Not" line's "no resampling" stands (nothing is resampled; the values blend, so no spline
+  is needed in the core), and the risk is replaced by GR-34's.
 - **GR-13 — Qualifiers: `video.qualifier {hue, saturation, luma, invert}` on adjustment clips
   only, a weight `q` read from the destination BEFORE the grade and multiplied into the
   adjustment pass's `w`; Show Selection, Pick from Canvas and `render_frame {selection}`;

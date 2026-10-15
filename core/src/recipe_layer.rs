@@ -6,7 +6,7 @@
 use serde_json::{Map, Value};
 
 use crate::actions::{color_json, wheels_json};
-use crate::actions_curves::curves_json;
+use crate::actions_curves::{blended_curves_json, CurveBlend};
 use crate::evaluate::{json, number};
 use crate::model::{BlendMode, Look, VideoProps};
 use crate::nest::Frame;
@@ -59,6 +59,10 @@ pub(crate) struct RecipeLayer<'a> {
     /// Log, `{log, gamut}` or `{lut}` (`media_color.rs`, spec §11 GR-16).
     /// Show Ungraded keeps it: it is the file's interpretation, not a grade.
     pub input: Value,
+    /// The curve channels blended at this instant (spec §11 GR-34), written
+    /// into `curves` as `{from, to, t}`; empty for an ungraded frame and the
+    /// burn-in.
+    pub curve_blends: &'a [CurveBlend],
 }
 
 /// The layer's look as the compositor bakes and mixes it (spec §11 GR-7):
@@ -123,8 +127,12 @@ impl RecipeLayer<'_> {
         out.insert("color".to_string(), color_json(&video.color));
         // All nine wheel values, each at 0 when neutral (spec §11 GR-11).
         out.insert("wheels".to_string(), wheels_json(&video.wheels));
-        // All six curves, an identity one as its domain's (GR-12, GR-32).
-        out.insert("curves".to_string(), curves_json(&video.curves));
+        // All six curves, an identity one as its domain's (GR-12, GR-32), a
+        // blended one as `{from, to, t}` (GR-34).
+        out.insert(
+            "curves".to_string(),
+            blended_curves_json(&video.curves, self.curve_blends),
+        );
         out.insert("look".to_string(), look_json(video.look));
         out.insert("input".to_string(), self.input);
         out.insert("chroma".to_string(), json(&video.chroma));

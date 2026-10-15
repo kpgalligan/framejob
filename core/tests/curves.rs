@@ -8,7 +8,8 @@
 //! and 1 accepted; an action between curves of one count lerping per point;
 //! an identity curve (absent included) aligned to the other's x's, both
 //! ways, and kept in an end patch as "animate to neutral"; other count
-//! changes switching at the end; an end clamped (a point out of range, a
+//! changes blending their values (spec §11 GR-34, `curve_blend.rs` pins the
+//! rest); an end clamped (a point out of range, a
 //! count out of range, x falling); the recipe's `curves` key (all six, the
 //! hue curves' identities included, spec §11 GR-32, after `wheels`); `paste_attributes`, an adjustment clip and a split
 //! carrying the curves; and an unknown channel named. What a curve does to
@@ -233,12 +234,13 @@ fn an_identity_curve_is_aligned_to_the_other_both_ways() {
 }
 
 #[test]
-fn other_count_changes_switch_at_the_end() {
+fn other_count_changes_blend_their_values() {
     let base = project().apply(&set_curves(json!({"master": [[0, 0.1], [1, 0.9]]})));
     let handle = acting(base, json!({"master": [[0, 0], [0.5, 0.8], [1, 1]]}));
     assert_eq!(
         state(&handle, "master", SEC / 2),
-        json!([[0.0, 0.1], [1.0, 0.9]])
+        json!({"from": [[0.0, 0.1], [1.0, 0.9]],
+               "to": [[0.0, 0.0], [0.5, 0.8], [1.0, 1.0]], "t": 0.5})
     );
     assert_eq!(
         state(&handle, "master", 2 * SEC),

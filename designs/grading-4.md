@@ -1255,3 +1255,105 @@ orchestrator's ruling adding them to this phase (the rotted `WEIGHT` anchor, the
 comment); fix pass 1 closed both. The second: pass, one nit (this Residue heading), applied by
 the orchestrator. The adversary's one objection (−400 against −40 could not score the wrap; H18
 is −500 against −140) was taken into the final spec. No `CLAUDE.md` edit was owed.
+
+## T4-3 — curves of different point counts blend their values
+
+**What landed** (2026-10-15, in the worktree on `grading-4`, from `d22f8e2`), #271. First GR-34
+in `designs/spec/11-decisions/grading-4.md`, written before any code, with its index row, the
+"Amended by GR-34" lines under GR-32 and GR-12 (`grading-2.md`) and the index's GR-12 and GR-32
+rows; then the instrument and its control on the untouched product (below); then:
+- **Core**: `actions_curves.rs` gains `CurveBlend`, `curve_blends` (the channels whose held and
+  clamped end curves are both non-identity with different counts, empty unless 0 < t < 1 or when
+  the end's curves do not decode) and `blended_curves_json` (`curves_json` with each blended
+  channel as `{from, to, t}`, byte-identical with no blends), and its module doc;
+  `actions_clamp.rs`'s `clamp_curves` is `pub(crate)`; `actions.rs` (wiring, 570 lines) keeps the
+  spanning action's merged target and eased t, fills `Evaluated.curve_blends` (`#[serde(skip)]`)
+  only when the state decoded as `VideoProps`, and writes `clip_state`'s `video.curves` through
+  `blended_curves_json`; `recipe_layer.rs`'s `RecipeLayer.curve_blends` feeds `object()`'s
+  `curves`; `recipe.rs` (wiring, 528) passes `&[]` when `ungraded`; `recipe_text.rs`'s burn-in
+  passes `&[]` (550). `patch.rs`'s template, `edit_split.rs`'s `state_patch` and the evaluator's
+  base state stay on `curves_json`.
+- **Core tests**: `core/tests/curve_blend.rs` (new, nine tests: a 3 → 5 Master action at 0, SEC/2
+  and 2·SEC with `clip_state` equal to the layer; ease_in's t 0.25; a 3 → 5 `hue_hue`; a
+  same-count pair whose SEC/2 lerp is asserted not the identity, and an identity-aligned one,
+  publishing only points; a 17-point end never blending; `ungraded` the identity six; an
+  adjustment clip's layer; a split mid-blend storing only point lists with the tail starting on
+  `from` and still blending; Master same-count beside Red mismatched). `curves.rs`'s and
+  `hue_curves.rs`'s `other_count_changes_switch_at_the_end` became
+  `other_count_changes_blend_their_values`.
+- **Swift**: `CurveProps.swift` (357 lines) gains `CurveBlend`, `ColorCurves.blends` with explicit
+  `CodingKeys`, the blend's decoding (both lists ≥ 2 points, t finite, clamped to 0…1; malformed
+  is the identity) and the identity tests reading blends; `CurveTable.swift`'s strip samples a
+  blended channel as `(1 − t)·A(x) + t·B(x)` through a private `Channel`; `CurveTextures.swift`'s
+  doc (the LRU key includes the blends); `InspectorBinding+Writes.swift` drops the curves BASE
+  branch (owner choice 2); docs in `VideoPane+Curves.swift` and `FrameRecipe.swift` (400 lines);
+  `AgentCatalog+Properties.swift`'s curves clause ("two curves of different point counts blend
+  their values across the action", 322 lines).
+- **Instruments**: `curves_proof.py` B1–B4, `BlendStrip`, N0's seven new frames, CT running
+  `--test curve_blend --test hue_curves` too, six mutants; `curves_probe.swift` P20, P21 and P10
+  amended.
+- **Documents**: spec §5.4, §7.3, §7.5, §7.10 (`actions_curves.rs`), §4.3a, §7.9a (one sentence
+  replaced, no line added), the spec indexes' Lines cells; GRD-13's step 12; the README's Curves
+  bullet; `tools/proof/README.md`'s T4-3 paragraph.
+
+**Deviations.**
+- B1's and B2's blend frames are at 0.3 s (t 0.3), not 0.25 s: `render_frame` snaps `t` to the
+  30 fps grid (`AgentServer+Arguments.swift`'s `snappedTick`), so 0.25 s (7.5 frames) would
+  render at 0.2667 s. The 1 s linear action and the 0.5 s frame are as specified; `blend-t-inverted`
+  is still caught (B1 at 0.3 s was 122.397 ten-bit levels off), and the core's ease_in test pins
+  t 0.25.
+- `same-count-blended`'s list gained A1, A2 and H8 (its first run: MUTANT FAILURE, those three the
+  only other rows failing): the mutant blends every same-count and aligned action, whose oracles
+  are the per-point lerp, so they fail by construction. Rerun once with the list amended: MUTANT
+  PASS.
+- The probe's P20 decodes with `.convertFromSnakeCase`, the app's own key strategy
+  (`ProjectSnapshot.swift`); its first targeted run used a plain `JSONDecoder` and failed on
+  `hue_hue`, an instrument error fixed before any scored run.
+
+**The control** (on the untouched product, after the instrument edit and before any product
+edit): `make app` exit 0, then `RC_PROOF_APP=release python3 tools/proof/curves_proof.py capture
+tools/proof/work/t4-3/ctl`: exit 0, 18 frames captured, Z1 ok, no `DEFAULTS MOVED`.
+
+**Verification** (2026-10-15, M2 Max; `pmset -g`: "powermode 0", "Now drawing from 'AC
+Power'"):
+- In the loop: `cargo test --release --test curve_blend --test curves --test hue_curves --test
+  ungraded` 9 + 9 + 8 + 5 passed; `make lint` exit 0; `make typecheck` exit 0, the four baseline
+  warnings; the probe's `swift_build.py typecheck` exit 0; `make app-debug` then
+  `curves_proof.py --only N1,A1,A2,A3,H8,B1,B2,B3,B4,P10,P20,P21,Z1` 12/13 (P20's instrument
+  error, above), then `--only P20,Z1` 2/2; `spec_index_proof.py` 162/162.
+- `make gate`: PASS in 377 s (names 1 s, typecheck 7 s, fmt 2 s, lint 2 s, test 211 s, app
+  153 s); after the mutant list and the documents changed, `make gate` again: PASS in 85 s
+  (names 1 s, test 82 s, the rest skipped as unchanged).
+- Recorded, on the gate's Release build: `RC_PROOF_APP=release python3
+  tools/proof/curves_proof.py compare tools/proof/work/t4-3/ctl`: exit 0, **59/59**, N0's 18
+  frames byte-identical at 16 bits to the control (A1–A3's and H8's 0.5 s frames and B1's ends
+  among them), Z1 no `Frame Job: ` line, no `DEFAULTS MOVED`. B1: worst 0.489 ten-bit levels at
+  t 0.3 and 0.499 at t 0.5, both ends byte-equal; B2: every column within ±1, ends byte-equal;
+  B3: worst 0.495 levels from the lerp, 124.90 levels from the value blend; B4: 4 channels live
+  and 4 filed, all point lists.
+
+**Mutants** (`python3 tools/proof/curves_proof.py --mutant NAME`, each on its own tree copy's
+Debug build, once, at the end):
+
+| Mutant | Must fail | Answer |
+|---|---|---|
+| `blend-t-inverted` | B1 B2 CT | MUTANT PASS (56/59; CT `--test curve_blend`) |
+| `same-count-blended` | B3 CT A1 A2 H8 | first run MUTANT FAILURE (B3 CT failed, A1 A2 H8 too); list amended, rerun MUTANT PASS (54/59) |
+| `mismatch-still-switches` | B1 B2 CT | MUTANT PASS (56/59; CT `--test curve_blend`, `--test curves`, `--test hue_curves`) |
+| `blend-written-to-file` | B4 CT | MUTANT PASS (57/59; the head's end master stored as `{from, to, t}`) |
+| `strip-ignores-blend` | B1 B2 P21 | MUTANT PASS (55/58) |
+| `write-rule-kept` | P10 | MUTANT PASS (57/58) |
+
+**Owed.**
+- `CLAUDE.md` edits (the orchestrator's): `core/CLAUDE.md`'s `actions_curves.rs` entry, and
+  `app/CLAUDE.md`'s `InspectorBinding+Writes.swift` line and `CurveProps.swift` types line (the
+  exact text is in the phase's implementation notes).
+- How a blend looks on footage is GRD-13's step 12.
+
+**Residue.** Nothing to file.
+
+**Review.** One lc-reviewer pass, verdict pass: no blockers, no should-fixes. Its one nit (that
+§7.3's `curves` bullet should say `clip_state` carries the same object) was already met — the
+bullet's next sentence says so — so nothing changed. The adversary's one objection (B3's pair
+lerped to the identity at 0.5 s, so it could not catch `same-count-blended`) was taken into the
+final spec. The three owed `CLAUDE.md` edits were applied by the orchestrator.

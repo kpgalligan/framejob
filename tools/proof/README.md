@@ -18997,6 +18997,51 @@ H17's comparison fails by construction); `luma-not-kept` and
 `gamut-limit-dropped` gain H16 (they edit `gradeHueShift`, which Color's Hue
 now calls). **Its record**: `designs/grading-4.md`'s T4-2b section.
 
+**Grading-4 T4-3 (spec §11 GR-34): curves of different point counts blend.**
+Inside an action, a channel whose two ends are non-identity curves of
+different counts is published as `{from, to, t}` and drawn as
+`(1 − t)·a(x) + t·b(x)`. Rows: B1 (B, DEEP under RAMP, a 16-bit frame) master
+3 → 5 points over a 1 s linear action, every 16th column's three 16-bit
+channels within one 10-bit level of `(1−t)·fc(a, v) + t·fc(b, v)` at 0.3 s and
+0.5 s (frame-aligned: `render_frame` snaps `t` to the 30 fps grid, so 0.25 s
+would land on 0.2667 s), and byte-equal at 16 bits to the static `a` and `b`
+frames at 0 s and 1.5 s; B2 (HUE) hue_hue 3 → 5 at 0.3 s against `hue_step`
+over `BlendStrip` (row 1 the blend of both `fc_periodic`s) ±1 at every column,
+the ends byte-equal; B3 a same-count pair whose 0.5 s lerp is first asserted
+not the identity, then the frame within one 10-bit level of `fc` of the lerp
+and more than 8 levels from the value blend somewhere; B4 `split` at 0.5 s
+inside a 3 → 5 action, every stored curves channel (`get_project` and the
+saved `project.json`) a list of `[x, y]` pairs. The probe's P20 (the blend
+form decodes as `from` plus the blend; malformed is the identity) and P21
+(`CurveTable.strip` of three blends at t 0.25 equals a per-texel oracle
+exactly, t 0 and 1 the plain strips) are new and P10 now expects a count
+change inside an action on the END. N0 gains seven action frames (A1–A3's and
+H8's two 0.5 s frames, B1's 0 s and 1.5 s), so its control is recaptured
+before any product edit; a capture or a compare scoring N0 runs A1–A3, H8 and
+B1 whatever `--only` names. CT runs `--test curve_blend --test hue_curves`
+beside `--test curves --test ungraded`.
+
+```
+make app                                                                   # the untouched product
+RC_PROOF_APP=release python3 tools/proof/curves_proof.py capture tools/proof/work/t4-3/ctl
+make app-debug                                                             # after the edits
+python3 tools/proof/curves_proof.py --only N1,A1,A2,A3,H8,B1,B2,B3,B4,P10,P20,P21,Z1
+RC_PROOF_APP=release python3 tools/proof/curves_proof.py compare tools/proof/work/t4-3/ctl
+```
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `blend-t-inverted` | the core writes 1 − t | B1 B2 CT |
+| `same-count-blended` | the core's count test dropped | B3 CT A1 A2 H8 |
+| `mismatch-still-switches` | `curve_blends` returns nothing | B1 B2 CT |
+| `blend-written-to-file` | `edit_split.rs`'s `state_patch` writes the blend | B4 CT |
+| `strip-ignores-blend` | the strip samples `from` only | B1 B2 P21 |
+| `write-rule-kept` | the inspector's BASE branch for a count change restored | P10 |
+
+`same-count-blended` lists A1, A2 and H8 too: it blends every same-count and
+aligned action, whose oracles are the per-point lerp, so they fail by
+construction. **Its record**: `designs/grading-4.md`'s T4-3 section.
+
 ## Road map grading-2 — G2-4, the qualifier (`qualifier_proof.py` N0–N2, H1, W1, G1, S1, S1b, S2, L1, I1, M1, D1, E1, V1, B1, F1, A1, A2, R1, P0, U1, V2, K1–K8, Z1 and thirteen mutants; `qualifier_probe.swift`; `core/tests/qualifier.rs`, `core/tests/selection.rs`, `core/tests/schema_v18.rs`; spec §11 GR-13)
 
 **What it answers.** That `video.qualifier` changes nothing until set (N0:

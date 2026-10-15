@@ -31,7 +31,9 @@ use serde::Serialize;
 use serde_json::{Map, Number, Value};
 
 use crate::actions_clamp::{clamp_audio, clamp_video};
-use crate::actions_curves::{align_identity_curves, curves_json};
+use crate::actions_curves::{
+    align_identity_curves, blended_curves_json, curve_blends, curves_json, CurveBlend,
+};
 use crate::actions_graphic::evaluate_graphic;
 use crate::actions_qualifier::align_hue_center;
 use crate::edit_adjustment::{clamp_adjustment, is_adjustment};
@@ -65,6 +67,11 @@ pub struct Evaluated {
     /// The clip's graphic with its `props` evaluated (G-34), its other
     /// fields as stored; `None` on a clip that is not a graphic.
     pub graphic: Option<GraphicProps>,
+    /// The curve channels blended inside the spanning action (spec §11
+    /// GR-34), whose `video.curves` hold each one's `from`; empty outside
+    /// an action and at its ends.
+    #[serde(skip)]
+    pub curve_blends: Vec<CurveBlend>,
 }
 
 // ---- curves --------------------------------------------------------------
@@ -406,6 +413,9 @@ impl Project {
         let mut state = Value::Object(fields);
 
         let actions = ordered_actions(clip);
+        // The spanning action's merged target and eased progress, for the
+        // curve blends (spec §11 GR-34).
+        let mut spanning: Option<(Value, f64)> = None;
         for action in &actions {
             let end = action.start.saturating_add(action.duration);
             if action.duration > 0 && end <= clip_t {
@@ -424,7 +434,9 @@ impl Project {
             align_hue_center(&mut state, &mut target);
             let elapsed = clip_t.saturating_sub(action.start) as f64;
             let progress = elapsed / action.duration as f64;
-            state = lerp(&state, &target, ease(action.curve, progress));
+            let eased = ease(action.curve, progress);
+            state = lerp(&state, &target, eased);
+            spanning = Some((target, eased));
         }
 
         // Motion is NOT an animation target (format version 8, spec §5.4).
@@ -465,10 +477,11 @@ impl Project {
         // count, say) loses that whole group rather than failing: the
         // evaluator has no way to report, and a base-props frame is far
         // better than a missing one.
-        let evaluated_video = state
+        let decoded_video = state
             .get("video")
-            .and_then(|v| serde_json::from_value::<VideoProps>(v.clone()).ok())
-            .unwrap_or(base_video);
+            .and_then(|v| serde_json::from_value::<VideoProps>(v.clone()).ok());
+        let decoded = decoded_video.is_some();
+        let evaluated_video = decoded_video.unwrap_or(base_video);
         let evaluated_audio = state
             .get("audio")
             .and_then(|v| serde_json::from_value::<AudioProps>(v.clone()).ok())
@@ -480,20 +493,28 @@ impl Project {
                 .unwrap_or(base)
         });
 
+        // The clip is in hand here, so the one non-range bound `clamp_video`
+        // applies — a nest may not blend — is decided from the source rather
+        // than guessed from the props. An adjustment clip's end is closed the
+        // same way (spec §11 GR-6).
+        let video = {
+            let video = clamp_video(evaluated_video, matches!(clip.source, Source::Nest { .. }));
+            if is_adjustment(clip) {
+                clamp_adjustment(video)
+            } else {
+                video
+            }
+        };
+        // Two non-identity curves of different counts blend (GR-34), from
+        // the final clamped curves — only when the state decoded: a failed
+        // decode falls back to the base props, which no action blends from.
+        let curve_blends = match spanning {
+            Some((target, eased)) if decoded => curve_blends(&video.curves, &target, eased),
+            _ => Vec::new(),
+        };
+
         Evaluated {
-            // The clip is in hand here, so the one non-range bound
-            // `clamp_video` applies — a nest may not blend — is decided from
-            // the source rather than guessed from the props.
-            // An adjustment clip's end is closed the same way (spec §11 GR-6).
-            video: {
-                let video =
-                    clamp_video(evaluated_video, matches!(clip.source, Source::Nest { .. }));
-                if is_adjustment(clip) {
-                    clamp_adjustment(video)
-                } else {
-                    video
-                }
-            },
+            video,
             audio: clamp_audio(evaluated_audio),
             text: evaluated_text,
             // Shapes are not animatable in version 1: the §5.4 patch is a
@@ -501,6 +522,7 @@ impl Project {
             // through untouched.
             shape: clip.shape.clone(),
             graphic: evaluate_graphic(clip, clip_t),
+            curve_blends,
         }
     }
 
@@ -531,7 +553,14 @@ impl Project {
             "in_action".to_string(),
             in_action.map(Value::from).unwrap_or(Value::Null),
         );
-        out.insert("video".to_string(), video_json(&evaluated.video));
+        // The curves as the recipe layer writes them, a blended channel as
+        // `{from, to, t}` (GR-34).
+        let mut video = video_json(&evaluated.video);
+        if let Value::Object(fields) = &mut video {
+            let curves = blended_curves_json(&evaluated.video.curves, &evaluated.curve_blends);
+            fields.insert("curves".to_string(), curves);
+        }
+        out.insert("video".to_string(), video);
         out.insert("audio".to_string(), to_json(&evaluated.audio));
         out.insert("text".to_string(), to_json(&evaluated.text));
         out.insert("shape".to_string(), to_json(&evaluated.shape));

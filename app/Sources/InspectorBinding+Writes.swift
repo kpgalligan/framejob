@@ -80,30 +80,13 @@ extension InspectorBinding {
             base.obscure = obscure
             animatable.obscure = nil
         }
-        // A curve is a list too (spec §11 GR-12, GR-32), with one more case
-        // that still animates: an identity curve on either side (its domain's
-        // identity: a hue curve's every value neutral), which the core
-        // aligns to the other's x's (`align_identity_curves`). So a channel
-        // goes to the END when its new count is the edited one's, or either
-        // the edited or the new list is the identity, and to the BASE only
-        // for a count change between two curves.
-        if let curves = patch.curves {
-            var moved = ColorCurvesPatch()
-            var kept = curves
-            for channel in CurveChannel.allCases {
-                guard case .some(.some(let list)) = curves.entry(channel) else { continue }
-                let edited = editedCurve(clip, channel)
-                if list.count == edited.count || channel.domain.isIdentity(edited)
-                    || channel.domain.isIdentity(list)
-                {
-                    continue
-                }
-                moved = moved.setting(channel, .some(list))
-                kept = kept.setting(channel, nil)
-            }
-            if !moved.isEmpty { base.curves = moved }
-            animatable.curves = kept.isEmpty ? nil : kept
-        }
+        // A curve is a list too (spec §11 GR-12, GR-32), but not this rule's:
+        // every count animates (GR-34). The same count lerps per point, an
+        // identity on either side is aligned to the other's x's
+        // (`align_identity_curves`), and two curves of different counts blend
+        // their values (`curve_blends`). So a curve write with an action
+        // selected always goes to the END, a point added or deleted included,
+        // and the curve is keyed and blends over the action.
         // Motion is not an animation target (the core refuses it in
         // `set_action_end`), so it ALWAYS lands on the base props.
         if patch.motion != nil {

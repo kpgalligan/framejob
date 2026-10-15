@@ -32,7 +32,8 @@ detail there.
   `ColorWheelPatch`, `ColorWheelsPatch`, `ColorWheelKind` and
   `LayerUniforms.apply(wheels:)` (GR-11)); `VideoPatch.curves` is
   `CurveProps.swift`'s `ColorCurvesPatch`, beside `CurvePoint`,
-  `CurveDomain`, `CurveChannel`, `ColorCurves` and
+  `CurveDomain`, `CurveChannel`, `CurveBlend` (a channel blended inside an
+  action, spec §11 GR-34; `ColorCurves.blends`, never encoded), `ColorCurves` and
   `LayerUniforms.apply(curves:)` (GR-12, the hue curves GR-32; a
   pure move out of `GradeProps.swift`, grading-4 T4-0); `VideoPatch.qualifier` is
   `QualifierProps.swift`'s `ColorQualifierPatch`, beside `ColorQualifier`,
@@ -795,8 +796,9 @@ the key map behind it.
   squares for the softness, the body moves it, ⌥ a tenth, each a live gesture;
   spec §11 GR-13) · `InspectorBinding+Writes.swift` (a pure move: a write with
   an action selected goes to `set_action_end`, with `structural(video:for:)` the
-  exception that sends a list of a different LENGTH, or `motion`, to the
-  BASE props, and `structural(audio:for:)` the one that sends pan, mono,
+  exception that sends a `filters` or `obscure` list of a different LENGTH, or
+  `motion`, to the BASE props (a curve never: every count animates, spec §11
+  GR-34), and `structural(audio:for:)` the one that sends pan, mono,
   compressor, noise reduction, duck and keep-pitch there (CI-3);
   `ops(graphic:entries:clips:schema:)` / `ops(graphic:for:clips:schema:)` are G-34 (l)'s split: the base
   write keeps G-15 (b)'s nulls (`patchProps`), the end write carries the values and the module's schema,

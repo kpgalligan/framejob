@@ -8,8 +8,8 @@ import AppKit
 ///
 /// Every write sends the edited channel's WHOLE list (a list replaces, GR-12)
 /// to every selected clip through `binding.ops(video:)`, so it lands on an
-/// action's end when one is selected — or on the base, for a count change
-/// between two curves (`structural(video:for:)`). A drag is the live trio and
+/// action's end when one is selected, a count change included (spec §11
+/// GR-34: two curves of different counts blend). A drag is the live trio and
 /// every other edit one commit, each one undo step named "Curves". The row
 /// never depends on a value, so a live drag never rebuilds the pane, and it
 /// has one row mark and one mixed badge for the whole `video.curves` key
