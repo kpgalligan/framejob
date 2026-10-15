@@ -29,7 +29,7 @@ use crate::export::describe;
 use crate::model::{
     AudioProps, Chroma, Compressor, Filter, HueRange, LevelRange, Look, LookKind, Motion,
     ObscureRegion, Qualifier, Reflection, Shadow, ShapeProps, Spotlight, TextProps, VideoProps,
-    LOOK_DEFAULT_AMOUNT,
+    LOOK_DEFAULT_AMOUNT, QUALIFIER_BLUR_MAX,
 };
 
 // ---- property groups -----------------------------------------------------
@@ -110,13 +110,15 @@ impl Group {
                     media: Some(0),
                     amount: LOOK_DEFAULT_AMOUNT,
                 }),
-                // Every range present and `invert` true, so the walk sees
-                // inside each and `invert` is a known key (spec §11 GR-13).
+                // Every range present, `invert` true and a `blur`, so the
+                // walk sees inside each and `invert` and `blur` are known
+                // keys (spec §11 GR-13, GR-35).
                 qualifier: Qualifier {
                     hue: Some(HueRange::default()),
                     saturation: Some(LevelRange::default()),
                     luma: Some(LevelRange::default()),
                     invert: true,
+                    blur: QUALIFIER_BLUR_MAX,
                 },
                 ..VideoProps::default()
             }),

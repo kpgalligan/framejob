@@ -149,8 +149,14 @@ extern "C" {
  * each a list of 2–16 `[hue, value]` points with 0 ≤ hue < 360, a channel
  * written only when not the identity, so a project with no hue curve writes
  * the text it did; the reader's default is the identity, so there is no
- * migration step. 21 and above, 1014 included, are newer. */
-#define RC_FORMAT_VERSION 20
+ * migration step.
+ *
+ * Version 21 is the qualifier's cleanup blur (spec §11 GR-35):
+ * `video.qualifier` gains `blur`, 0…1, written only when above 0, so a
+ * project with no blurred qualifier writes the text it did; the reader's
+ * default is 0, so there is no migration step. 22 and above, 1014
+ * included, are newer. */
+#define RC_FORMAT_VERSION 21
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

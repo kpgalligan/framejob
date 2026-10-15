@@ -3,7 +3,7 @@
 //! inside the unit circle; and each curve's 2–16 points, x and y 0…1, x
 //! strictly rising (GR-12), a hue curve's x 0 ≤ x < 360 and its value in
 //! its domain's range (GR-32); and the qualifier's ranges, each bound in its
-//! own sentence and low ≤ high (GR-13).
+//! own sentence and low ≤ high (GR-13), then its `blur` 0…1 (GR-35).
 //!
 //! The rule is `props_check.rs`'s: a value out of range is NAMED in the
 //! rule's own sentence, never clamped (an action's end is clamped instead,
@@ -14,7 +14,7 @@
 
 use crate::model::{
     CurveDomain, Curves, Qualifier, Wheels, CURVE_POINTS_MAX, CURVE_POINTS_MIN, HUE_SOFTNESS_MAX,
-    HUE_TURN, WHEEL_MAX, WHEEL_RIM_TOLERANCE,
+    HUE_TURN, QUALIFIER_BLUR_MAX, WHEEL_MAX, WHEEL_RIM_TOLERANCE,
 };
 use crate::props_check::in_range;
 
@@ -88,7 +88,8 @@ pub(crate) fn check_curves(curves: &Curves) -> Result<(), String> {
 /// 0…180; each level range's `low`, `high` and `softness` 0…1 and `low ≤
 /// high`. The first refusal otherwise, in the order hue (centre, width,
 /// softness), saturation (low, high, softness, then the order), luma the
-/// same. A bound is compared exactly, so 360, 180, 0 and 1 all pass.
+/// same; then `blur` 0…1 (GR-35), last. A bound is compared exactly, so
+/// 360, 180, 0 and 1 all pass.
 pub(crate) fn check_qualifier(qualifier: &Qualifier) -> Result<(), String> {
     if let Some(hue) = &qualifier.hue {
         in_range("video.qualifier.hue.center", hue.center, 0.0, HUE_TURN)?;
@@ -115,5 +116,10 @@ pub(crate) fn check_qualifier(qualifier: &Qualifier) -> Result<(), String> {
             ));
         }
     }
-    Ok(())
+    in_range(
+        "video.qualifier.blur",
+        qualifier.blur,
+        0.0,
+        QUALIFIER_BLUR_MAX,
+    )
 }

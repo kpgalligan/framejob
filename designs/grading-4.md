@@ -1357,3 +1357,127 @@ Debug build, once, at the end):
 bullet's next sentence says so — so nothing changed. The adversary's one objection (B3's pair
 lerped to the identity at 0.5 s, so it could not catch `same-count-blended`) was taken into the
 final spec. The three owed `CLAUDE.md` edits were applied by the orchestrator.
+
+## T4-4 — the qualifier's cleanup blur
+
+**What landed** (2026-10-15, in the worktree on `grading-4`, from `ac874f6`), #268. First the
+instrument and its control on the untouched product (below), then GR-35 in
+`designs/spec/11-decisions/grading-4.md`, written before any code, with its index row, the
+"Amended by GR-35" line under GR-13 (`grading-2.md`) and the index's GR-13 row; then:
+- **Core**: `model_grade.rs` (394 lines) gains `Qualifier.blur` (after `invert`, written only when
+  above 0), `QUALIFIER_BLUR_MAX` and `is_neutral` counting the blur, and its module doc's format-21
+  paragraph; `grade_check.rs`'s `check_qualifier` checks the blur last, in `in_range`'s sentence;
+  `actions_clamp.rs`'s `clamp_qualifier` takes a non-finite blur to 0, then 0…1;
+  `actions_qualifier.rs` (70) gains `qualifier_json` (the qualifier with `"blur"` always present);
+  `actions.rs` (wiring, 574) writes a non-neutral `qualifier` through it in `video_json`;
+  `patch.rs`'s template names `blur: QUALIFIER_BLUR_MAX`; `format.rs` and the header: format 21.
+  `recipe.rs`, `edit_paste_attributes.rs` and `edit_adjustment.rs` needed no edit: they act on the
+  whole `Qualifier`.
+- **Core tests**: `core/tests/qualifier_blur.rs` (new, nine tests: written only above 0 and after
+  `invert`; a blur alone stored, `{blur: 0}` there an identity; the media clip refused; 0 and 1
+  accepted, 1.5 and −0.1 refused in the sentence, a bad luma named before a bad blur; the recipe
+  carrying `blur` only above 0, a blur-0 recipe and a file spelling `"blur": 0` byte-identical to
+  none, `ungraded` and `selection` keeping it; a linear 0 → 0.5 action 0.25 at SEC/2 in
+  `clip_state` and the recipe and 0.5 after, 0.2 → 0.6 at 0.4; a qualifier turned on switching at
+  the end; ends of 3 and −2 clamped to 1 and 0; Paste Attributes copying it);
+  `core/tests/schema_v21.rs` (new, five); `schema_v20.rs`'s version test became a `const`
+  assertion (the schema_v19 precedent).
+- **Swift**: `QualifierProps.swift` (344) gains `ColorQualifier.blur` (lenient, default 0),
+  `blurSigmaMax` (24), `blursSelection`, `selectionSigma(canvasPerDest:)` and the summary's
+  "blur N%", `ColorQualifierPatch.blur` (Reset writes 0), and `QualifierUniforms.blurred` in place
+  of `reserved`; `Compositor+Selection.swift` (new, 128): `QualifierSurfaces`,
+  `qualifierMapPipeline`, the static `encodeSelectionMap` and `selectionMap`;
+  `Compositor+Adjustment.swift` (126): `drawAdjustment` takes the map path after the neutral guard
+  and binds `texture(0)` (the map, or the placeholder); `MetalRenderer.swift` (335): the stored
+  pipeline and pair, built beside `adjustPipeline`; `Compositor+Shadow.swift`'s `blurKernel(sigma:)`
+  widened from `private` to internal (one kernel cache); `VideoPane+Qualifier.swift` (168): the Blur
+  row after Invert; `OpDictionaries.swift` writes `blur`; `AgentCatalog+Properties.swift` (324) and
+  `AgentCatalog+Render.swift` (287): the prose. Metal: `QualifierUniforms.blurred`,
+  `framejob_qualifier_map_fragment`, and the adjust fragment's `texture(0)` arm.
+- **Instruments**: `qualifier_proof.py` N0's two qualified frames, project NC and Q1–Q6,
+  `Doc.unqualify` writing `blur: 0`, CT running `--test qualifier_blur` too, eight mutants;
+  `qualifier_probe.swift` K9 and K10; `grading_spike/tree_bench.swift`'s SQ series and
+  `grading_spike.py`'s TB.
+- **Documents**: spec §5.2 (format 21), §5.4, §6 (`06b`), §7.3, §7.5 (the tenth pipeline: §7.5
+  counts the input pass), §7.9a (words replaced in place; the file stays 576 lines), §4.3a, §7.4,
+  §7.10, the spec indexes' Lines cells; the README's Qualifiers bullet; GRD-14's step 9; screen
+  `05h`'s prose; `tools/proof/README.md`'s T4-4 paragraph; `grading_spike/README.md`.
+
+**Owner choices**, each as recommended (GR-35): the row shows 0–100 % like every Amount row; 100 %
+is σ 24 canvas pixels; the row is the house slider and field (no ⌥-fine drag or double-click to 0,
+which only the range strips have); a blur with no range is kept and saved and draws nothing.
+
+**Deviations.**
+- N0's two qualified frames are set and then UNDONE, not cleared with `Doc.unqualify`: the control
+  was captured on the untouched tree, where `unqualify`'s new `blur: 0` would be an unknown key.
+- `blur-zero-breaks-pass` names N0, which a plain `--mutant` run never scores (N0 needs `compare
+  DIR`), so it runs as `RC_PROOF_APP=release qualifier_proof.py compare tools/proof/work/t4-4/ctl
+  --mutant blur-zero-breaks-pass`, holding the copy's Release build to the Release control.
+- `MetalRenderer.swift`'s own count was already "nine pipelines from seven fragment functions"
+  (it counts the input pass, as §7.5 does), so it and §7.5 now say ten from eight; `app/CLAUDE.md`
+  counts without the input pass, so its owed text says nine from seven.
+
+**The control** (on the untouched product, after the N0 instrument edit and before any product
+edit): `make app` exit 0, then `RC_PROOF_APP=release python3 tools/proof/qualifier_proof.py
+capture tools/proof/work/t4-4/ctl`: exit 0, 8 frames captured, Z1 ok, no `DEFAULTS MOVED`.
+
+**Verification** (2026-10-15, M2 Max; `pmset -g`: "powermode 0", "Now drawing from 'AC Power'";
+`vm.loadavg` 24–58 during the bench):
+- In the loop: `cargo test --release --test qualifier_blur --test qualifier --test selection
+  --test schema_v21 --test schema_v20 --test schema_v18` 9 + 10 + 6 + 5 + 5 + 5 passed; `make
+  lint` exit 0; `make typecheck` exit 0, the four baseline warnings; `swift_build.py typecheck`
+  of the probe (with `FRAMEJOB_DEV_TOOLS`) and of `tree_bench.swift` exit 0; `make app-debug` then
+  `qualifier_proof.py --only N1,N2,H1,M1,E1,Q1,Q2,Q3,Q4,Q5,Q6,K7,K9,K10,Z1` 15/15;
+  `spec_index_proof.py` 162/162; `name_residue.py` exit 0.
+- `make gate`: PASS in 282 s (names 1 s, typecheck 7 s, fmt 4 s, lint 2 s, test 169 s, app 99 s).
+  After the mutant list and the documents changed, `make gate` again: PASS in 69 s (names 1 s,
+  test 68 s, the rest skipped as unchanged).
+- Recorded, on the gate's Release build: `RC_PROOF_APP=release python3
+  tools/proof/qualifier_proof.py compare tools/proof/work/t4-4/ctl`: exit 0, **40/40**, N0's eight
+  frames byte-identical at 16 bits to the control (`hue-qualified` and `hue-selection` among them),
+  Z1 no `Frame Job: ` line, no `DEFAULTS MOVED`. Q1's variances: 16256.25 at blur 0, 799.70 at
+  0.05, 113.10 at 0.15, 19.78 at 0.4. Q2: max |Δ| 1.078 levels, mean 0.336 against oracle(6)
+  (bound 4 and 1); Q3 worst 1 level (bound 2); Q4: nothing lit right of the edge, left of it max
+  1.078, mean 0.338; Q5: max 1.078, mean 0.336 at 0.5 s and max 1.005, mean 0.334 at 1.5 s.
+- `python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base ac874f6`: exit
+  0; KT and KA PASS at |Δ| 0 at both sizes; TA −0.000 ms at 1080p and −0.002 ms at 2160p (cap
+  held); **TB**, over VT:SQ (the qualified pass inline: 0.249 ms at 1080p, 0.958 ms at 2160p):
+  1080p σ 2 +0.121 ms, σ 8 +0.098 ms, σ 24 +0.095 ms; 2160p σ 2 +0.480 ms, σ 8 +0.355 ms, σ 24
+  +0.323 ms; the SA noise floor 0.000 ms at both. As the brief found, a small σ costs more than a
+  large one; each 4K figure is below the brief's session-2 figure for the same σ (+0.645–0.650,
+  +0.490–0.501 and +0.452–0.461 ms, a scratch bench's).
+
+**Mutants** (`python3 tools/proof/qualifier_proof.py --mutant NAME`, each on its own tree copy's
+Debug build, once, at the end; `blur-zero-breaks-pass` as the deviation above says):
+
+| Mutant | Must fail | Answer |
+|---|---|---|
+| `selection-shows-unblurred` | Q1 Q2 Q4 Q5 | MUTANT PASS (35/39) |
+| `grade-reads-inline-q` | Q3 | MUTANT PASS (38/39) |
+| `sigma-not-scaled` | K9 | MUTANT PASS (38/39) |
+| `blur-zero-breaks-pass` | N0 | MUTANT PASS (39/40; `hue-qualified` 4,240 of 2,073,600 16-bit samples differ, `hue-selection` equal: the map's `r16Float` rounds `q` as the `rgba16Float` target already does, so only the graded frame's `mix` sees it) |
+| `coverage-blurred` | Q4 | MUTANT PASS (38/39) |
+| `colour-blurred-not-q` | Q1 Q2 Q4 Q5 | first run MUTANT FAILURE (Q2 Q4 Q5 failed, Q1 too: the 5 × 5 average is the same at every blur, so the selection's variance read 502.37 at 0.05, 0.15 and 0.4); list amended with Q1, rerun MUTANT PASS (35/39) |
+| `blur-ignored-by-neutral` | CT Q6 | MUTANT PASS (38/40; CT `--test qualifier_blur`) |
+| `blur-not-interpolated` | CT Q5 | MUTANT PASS (38/40; CT `--test qualifier_blur`) |
+
+**Owed.**
+- `CLAUDE.md` edits (the orchestrator's), exact text in the phase's implementation notes:
+  `app/CLAUDE.md`'s compositor entry (`Compositor+Selection.swift` in the file list, the
+  `r16Float` selection pair in the working-format paragraph, nine pipelines from seven fragment
+  functions with the map pass) and its `QualifierProps.swift` line; `core/CLAUDE.md`'s
+  `model_grade.rs` (format 21), `grade_check.rs` and `actions_qualifier.rs` (`qualifier_json`)
+  entries.
+- How the blur cleans a real skin pick, and 4K playback with it on: GRD-14's step 9.
+
+**Residue.** Nothing to file.
+
+**Review.** One lc-reviewer pass, verdict pass: no blockers, no should-fixes, three nits. Two
+applied by the orchestrator: `VideoPane+Qualifier.swift`'s file doc re-wrapped, and
+`qualifier_blur.rs`'s fixture writes `RC_FORMAT_VERSION` instead of a literal version (its 9
+tests re-run, ok). The third — the map pass's encoder failing leaving a stale map read as
+blurred — is left: it needs a device already failing, and the rest of the compositor has the
+same exposure. The adversary's one objection (Q4's oracle built from the matted selection would
+fail a correct product) was taken into the final spec. The owed `app/CLAUDE.md` and
+`core/CLAUDE.md` edits were applied by the orchestrator; `app/CLAUDE.md` counts the pipelines
+without the input pass (nine from seven), `MetalRenderer.swift` and §7.5 with it (ten from eight).

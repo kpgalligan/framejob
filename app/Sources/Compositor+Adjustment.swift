@@ -15,7 +15,9 @@ import Metal
 /// stage; the clip's stored transform, crop, shadow and the rest do nothing.
 /// A layer the recipe marks `selection` (Show Selection) writes `q` × the
 /// coverage as opaque grey instead, even when its grade is neutral or its
-/// strength 0.
+/// strength 0. A blurred qualifier (spec §11 GR-35) reads `q` from the
+/// selection map `Compositor+Selection.swift` makes, bound at `texture(0)`
+/// with `blurred` set; every other pass binds the placeholder there, unread.
 ///
 /// **Blending is OFF** (`pipelineDescriptor`'s doc, the B6 lesson): the
 /// fragment returns the finished pixel, and a fixed-function pass over it
@@ -80,7 +82,9 @@ extension MetalRenderer {
     /// marked `selection`, which always draws (GR-13). The chroma key is
     /// off: it opens a hole in a layer's own picture, and there is none. The
     /// pass's own pipeline is bound again after the draw, so the next layer
-    /// inherits the state `DestinationPass.open()` promises.
+    /// inherits the state `DestinationPass.open()` promises. A blurred
+    /// qualifier's map is made first, after the neutral guard, which breaks
+    /// the pass (GR-35); an unblurred one never touches it.
     func drawAdjustment(
         _ layer: RecipeLayer, matte: MTLTexture, canvas: RecipeCanvas, urls: [UInt32: URL],
         pass: inout DestinationPass
@@ -100,10 +104,19 @@ extension MetalRenderer {
             u.curvesEnabled = 0
             u.hueCurvesEnabled = 0
         }
+        var selectionTexture = placeholder
+        if blurSupported,
+            let sigma = layer.qualifier.selectionSigma(canvasPerDest: u.canvasPerDestX),
+            let map = selectionMap(q, sigma: sigma, pass: &pass)
+        {
+            q.blurred = 1
+            selectionTexture = map
+        }
         guard let encoder = pass.open() else { throw MatteError.noTarget }
         encoder.setRenderPipelineState(adjustPipeline)
         encoder.setFragmentBytes(&u, length: MemoryLayout<LayerUniforms>.stride, index: 0)
         encoder.setFragmentBytes(&q, length: MemoryLayout<QualifierUniforms>.stride, index: 1)
+        encoder.setFragmentTexture(selectionTexture, index: 0)
         encoder.setFragmentTexture(matte, index: 1)
         encoder.setFragmentTexture(look ?? looks.placeholder, index: 2)
         encoder.setFragmentTexture(curves, index: 3)

@@ -77,8 +77,8 @@ extension QualifierWrite {
 }
 
 extension ColorQualifierPatch {
-    /// The ranges the write names, and `invert` when it names it (spec §11
-    /// GR-13).
+    /// The ranges the write names, and `invert` and `blur` when it names
+    /// them (spec §11 GR-13, GR-35).
     var dictionary: [String: Any] {
         func levels(_ l: QualifierLevels) -> [String: Any] {
             ["low": l.low, "high": l.high, "softness": l.softness]
@@ -92,6 +92,7 @@ extension ColorQualifierPatch {
         if let saturation { d["saturation"] = saturation.dictionary(levels) }
         if let luma { d["luma"] = luma.dictionary(levels) }
         if let invert { d["invert"] = invert }
+        if let blur { d["blur"] = blur }
         return d
     }
 }

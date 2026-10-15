@@ -12,8 +12,8 @@ a citation never has to say which file. GR-24…GR-30 were recorded in T4-0, bef
 code, from the owner's answers of 2026-10-14 to the tier-4 brief's choices, every one the
 recommended answer (`designs/grading-4.md`, "The owner's choices"; the brief is
 `~/.claude/litecode/reelcut/grading-tier4/I-grading-tier4.md` and the answers `answers.md` beside
-it, outside the repo). T4-1…T4-4 each record their numbers as a new entry (GR-31 on) or as
-Amended-by lines before their code.
+it, outside the repo). T4-1…T4-4 each record their numbers as a new entry (GR-31 on; T4-4's is
+GR-35) or as Amended-by lines before their code.
 
 **Stands, and nothing here re-litigates it:** R5-1 (closed vocabularies, never a runtime);
 PR-1…PR-12; MT-1…MT-9; GR-1; GR-3 (blending stays encoded); GR-6 (the blur FILTER on an
@@ -286,3 +286,45 @@ nothing of Concat is opened, at design time or build time.
   - Risk accepted: the halfway frames of a mismatch differ from what a per-point lerp of a
     resampled pair would give (the tier-4 brief measured p95 190 ten-bit levels on random pairs);
     a split's head no longer changes.
+- **GR-35 — The qualifier's cleanup blur: `video.qualifier.blur` 0…1, a Gaussian of q with
+  σ = 24·blur canvas pixels; format 21.** Recorded in T4-4 before its code; it settles GR-24's
+  T4-4 item (#268) and amends GR-13. The owner's choices (as recommended): (1) the inspector shows
+  0–100 %, like every Amount row; (2) 100 % is σ 24 canvas pixels, the blur filter's 24 px reach
+  and the brief's largest measured σ; (3) the row is the house slider and field, reset by its
+  default and the section's Reset (no ⌥-fine drag, no double-click to 0: only the range strips
+  have them); (4) a blur set with no range is kept and saved and draws nothing.
+  - **The key.** `video.qualifier.blur`, 0 off, bounds 0…1 inclusive, refused never clamped, in
+    `in_range`'s sentence (`video.qualifier.blur must be between 0 and 1, not 1.5`), checked after
+    luma. Written only when above 0, after `invert`. Neutral is no range, not inverted and blur 0,
+    so a blur alone is kept, saved, refused on a picture clip like any non-neutral qualifier, and
+    draws nothing.
+  - **Actions.** An action's end is clamped (non-finite → 0, then 0…1). Inside an action the blur
+    interpolates whenever both states hold a qualifier, an absent blur reading 0; a qualifier
+    turned on switches at the end, as a range does.
+  - **Follows the qualifier.** Show Ungraded, Paste Attributes and Pick from Canvas: the blur goes
+    where the qualifier goes, and a pick leaves it alone.
+  - **The unit.** σ = 24·blur CANVAS pixels; Swift divides by `canvasPerDest`, so a Half or Quarter
+    preview blurs the same share of the picture as an export. The core never computes σ.
+  - **The path.** The map path runs when a range is on, blur > 0, σ_dest = 24·blur/canvasPerDest
+    ≥ 0.5 and MPS is supported (σ capped at 100); otherwise the pass is today's inline path,
+    byte-identical. On the map path the adjustment pass suspends the destination pass, renders q
+    from the target into an `r16Float` destination-sized map, blurs it with
+    `MPSImageGaussianBlur` (`.clamp`, the shadow's kernel cache, σ quantised to a quarter pixel)
+    into its pair, and resumes with `.load`; the adjust fragment then reads the blurred q at
+    `texture(0)` instead of computing it, behind `blurred` (the block's reserved float, so
+    `QualifierUniforms` stays 64 bytes). Full resolution, not half (choice 6a).
+  - **Only q is blurred, never the coverage.** The matte coverage is multiplied after, unblurred:
+    a matte track's edge is its own. Show Selection and `render_frame {selection}` draw the blurred
+    q × coverage.
+  - **Memory and cost.** The pair, 2 × 16.6 MB at 4K, is held per renderer once drawn and replaced
+    when the destination's size changes. The pass's cost is `grading_spike.py`'s TB (the
+    adjustment pass with the blur on, over the inline qualifier), recorded in T4-4's record.
+  - **GR-6 is unchanged:** the blur FILTER on an adjustment clip stays refused; this is a key
+    inside `video.qualifier`.
+  - **Format 21:** the key is optional, with no migration step; the bump stops an older build
+    dropping it on save. A file numbered 1–20 (and 1015) opens and is stamped 21; 22 and above,
+    1014 included, are newer.
+  - **Not:** no half-resolution map; no denoise, clean black or clean white (Resolve's other
+    Matte Finesse controls); no blur of the matte; no ⌥-fine or double-click on the house slider.
+  - Risk accepted: 24 px is a first number, judged by GRD-14 on real footage; a blurred qualifier
+    is a real share of a heavy 4K frame's headroom, paid only by a clip that uses it.

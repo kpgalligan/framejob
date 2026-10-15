@@ -21,6 +21,11 @@
 // `point` and `pixel` (the HUE fixture's bytes there), and `samples`, the
 // proof's own GR-13 readings of ten colours. One JSON object out: `rows`,
 // each a name, ok and detail, the name starting with its K-number.
+//
+// Grading-4 T4-4 (spec §11 GR-35) adds K9, `ColorQualifier.selectionSigma`'s
+// arithmetic (Preview Quality is a persisting menu item and `render_frame`
+// never sees it, so a reduced preview's σ is the probe's), and K10, the
+// section's Blur row, Reset's blur, the pick, the summary and the block.
 import AppKit
 import Metal
 
@@ -193,6 +198,29 @@ do {
             && block.enabled == 1 && block.selection == 1 && block.hueEnabled == 1
             && block.hueCenter == 120 && neutral.enabled == 0,
         "stride \(MemoryLayout<QualifierUniforms>.stride); swift \(swift); shader \(fields)")
+}
+
+// MARK: - K9 the blur's σ (T4-4)
+
+do {
+    let hue = QualifierHue(center: 120, width: 40, softness: 20)
+    let half = ColorQualifier(hue: hue, blur: 0.5)
+    let full = half.selectionSigma(canvasPerDest: 1)
+    let halved = half.selectionSigma(canvasPerDest: 2)
+    let quarter = half.selectionSigma(canvasPerDest: 4)
+    let zero = ColorQualifier(hue: hue).selectionSigma(canvasPerDest: 1)
+    let tiny = ColorQualifier(hue: hue, blur: 0.01).selectionSigma(canvasPerDest: 1)
+    let rangeless = ColorQualifier(blur: 0.5).selectionSigma(canvasPerDest: 1)
+    let capped = ColorQualifier(hue: hue, blur: 1).selectionSigma(canvasPerDest: 0.2)
+    func show(_ v: Float?) -> String { v.map { "\($0)" } ?? "nil" }
+    check(
+        "K9 selectionSigma: blur 0.5 with hue on is σ 12 at canvasPerDest 1, 6 at 2 and 3 at "
+            + "4 (a Half or Quarter preview blurs the same share of the picture); nil at blur 0, "
+            + "at blur 0.01 and canvasPerDest 1, and with no range; blur 1 at 0.2 is capped at 100",
+        full == 12 && halved == 6 && quarter == 3 && zero == nil && tiny == nil
+            && rangeless == nil && capped == 100,
+        "1: \(show(full)), 2: \(show(halved)), 4: \(show(quarter)); blur 0 \(show(zero)), "
+            + "0.01 \(show(tiny)), no range \(show(rangeless)); capped \(show(capped))")
 }
 
 do {
@@ -379,6 +407,61 @@ do {
             + "\(String(describing: tick)); drag begins \(begins) ended \(ended) updates "
             + "\(updates.count) whole \(whole) → \(String(describing: moved)); reset "
             + "\(edits.map(\.0)) \(String(describing: cleared))")
+}
+
+// MARK: - K10 the Blur row (T4-4)
+
+do {
+    let section = pane.sections.first { $0.id == "video.qualifier" }
+    // The row's field is the section's last: after the ranges' nine and before
+    // the Pick row, which has none.
+    let control = section.flatMap { walk($0).compactMap { $0 as? OptionFieldControl }.last }
+    let field = control.flatMap { walk($0).compactMap { $0 as? NSTextField }.first }
+    document.applyEdit(
+        "Setup",
+        [.setVideo(clips: [first], patch: VideoPatch(qualifier: ColorQualifierPatch(
+            hue: .set(QualifierHue(center: 120, width: 40, softness: 20)), blur: 0)))])
+    settle()
+    reset()
+    let shown = field?.stringValue ?? "-"
+    field?.stringValue = "40"
+    if let control, let field {
+        _ = control.control(
+            field, textView: NSTextView(), doCommandBy: #selector(NSResponder.insertNewline(_:)))
+    }
+    settle()
+    let sent = edits.count == 1 ? qualifierOf(edits[0].1) : nil
+    let sentName = edits.first?.0 ?? "-"
+    let rowOk = sent.map { Set($0.keys) == ["blur"] && ($0["blur"] as? Double).map { near($0, 0.4) }
+        == true } == true && sentName == "Qualifier Blur" && edits.count == 1
+        && near(qualifierNow().blur, 0.4) && document.undoManager?.undoActionName == "Qualifier Blur"
+    let summary = qualifierNow().summary
+    // Reset through the section header, as K5 does.
+    reset()
+    let header = section.map { walk($0.header) } ?? []
+    header.compactMap { $0 as? OptionButtonControl }.first { !$0.isHidden }?.mouseDown(with: click())
+    settle()
+    let cleared = edits.count == 1 ? qualifierOf(edits[0].1) : nil
+    let resetOk = edits.first?.0 == "Qualifier"
+        && (cleared?["blur"] as? Double).map { $0 == 0 } == true && qualifierNow().isNeutral
+    let picked = ColorQualifier(hue: QualifierHue(center: 120, width: 40, softness: 20), blur: 0.3)
+        .picked(QualifierSample([1, 0.5, 0]))
+    let pickOk = picked.blur == nil && picked.dictionary["blur"] == nil
+    let alone = ColorQualifier(blur: 0.2)
+    let block = QualifierUniforms(
+        ColorQualifier(hue: QualifierHue(center: 120, width: 40, softness: 20), blur: 1),
+        selection: true)
+    check(
+        "K10 the section's Blur row sends {qualifier: {blur: 0.4}} named \"Qualifier Blur\" "
+            + "(one undo step); Reset's ops carry blur 0; picked writes no blur; the summary "
+            + "is \"hue · blur 40%\"; a blur-only ColorQualifier is not neutral; "
+            + "QualifierUniforms(…).blurred is 0",
+        rowOk && resetOk && pickOk && summary == "hue · blur 40%" && !alone.isNeutral
+            && block.blurred == 0,
+        "field showed \"\(shown)\"; sent \(sentName) \(String(describing: sent)); edits "
+            + "\(edits.count); summary \"\(summary)\"; reset \(String(describing: cleared)); "
+            + "pick \(picked.dictionary); blur-only neutral \(alone.isNeutral); blurred "
+            + "\(block.blurred)")
 }
 
 // MARK: - K6 Show Selection: no defaults, the document's key, the rebind

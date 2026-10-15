@@ -97,8 +97,10 @@ governs a module now.
   six, an absent one as its domain's identity. Format 18 (GR-13) adds `Qualifier {hue,
   saturation, luma, invert}` (`HueRange {center, width, softness}` in degrees, `LevelRange
   {low, high, softness}` 0–1, a range `None` when off), the FIELD `VideoProps.qualifier`,
-  written only when not neutral; it acts only on an adjustment clip. Re-exported whole by
-  `model_props.rs`.
+  written only when not neutral; it acts only on an adjustment clip. Format 21 (GR-35)
+  adds `Qualifier.blur` (0…1, written only when above 0, after `invert`) and
+  `QUALIFIER_BLUR_MAX`; `is_neutral` counts it, so a blur alone is kept. Re-exported whole
+  by `model_props.rs`.
 - `cube.rs` — the `.cube` reader (spec §11 GR-8): 3D only, size 2–65, the
   default domain; anything else refused by line and name. `ffi_cube.rs` — the
   four `rc_cube_*` exports. `lut.rs` — a LUT media's rules: placing one is
@@ -343,7 +345,8 @@ governs a module now.
   action's end. `check_curves` (GR-12): 2–16 points, x and y 0…1, x strictly rising, each in
   its own sentence, a hue curve's x 0 ≤ x < 360 and its value in its domain (GR-32);
   `clamp_curves` closes an action's end per domain. `check_qualifier` (GR-13): each
-  bound in its own sentence, low ≤ high; `clamp_qualifier` closes an action's end;
+  bound in its own sentence, low ≤ high, then `blur` 0…1 last (GR-35); `clamp_qualifier`
+  closes an action's end (a non-finite blur to 0, then 0…1);
   `edit_adjustment.rs`'s `check_qualifier_clip` refuses one on any other clip.
 - `edit_track.rs` — tracks, markers and the media list: the three lists a
   clip sits in. The canvas left here at road map 7's D2·3 toll. `clip_list`
@@ -501,7 +504,10 @@ governs a module now.
   values — the evaluator names each such channel with its clamped end
   curve and the eased t in `Evaluated.curve_blends`, and only the recipe
   layer and `clip_state` write it, as `{from, to, t}`; never a file).
-- `actions_qualifier.rs` — `align_hue_center` (spec §11 GR-13): before
+- `actions_qualifier.rs` — `qualifier_json` (spec §11 GR-35): a qualifier
+  with its `blur` present even at 0, which `actions.rs`'s `video_json` writes
+  for a non-neutral one so the blur animates from 0; and `align_hue_center`
+  (spec §11 GR-13): before
   the lerp, an action's target hue centre moves by ±360 when the two
   centres are more than 180° apart, so the centre animates the short
   way round (350 → 10 through 0); `clamp_qualifier` brings it back

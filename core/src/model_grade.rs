@@ -39,6 +39,11 @@
 //! where the adjustment pass grades; on any other clip `set_video` refuses
 //! it (`edit_adjustment.rs`) and the recipe never publishes it.
 //!
+//! Format 21 (spec §11 GR-35) adds the qualifier's `blur`, 0…1 (0 off),
+//! written only when above 0 and counted by [`Qualifier::is_neutral`], so a
+//! blur alone is kept. The compositor blurs q by a Gaussian of σ = 24·blur
+//! CANVAS pixels; the unit's conversion is Swift's, never the core's.
+//!
 //! Re-exported whole by `model_props.rs`, which `model.rs` re-exports whole
 //! in turn, so `crate::model::Wheels` resolves like every other property
 //! type.
@@ -104,7 +109,8 @@ impl Wheels {
     }
 }
 
-/// Whether a wheel key is neutral, and so left out of the file.
+/// Whether a wheel key or the qualifier's `blur` is neutral, and so left out
+/// of the file.
 fn is_zero(value: &f64) -> bool {
     *value == 0.0
 }
@@ -341,10 +347,14 @@ impl Default for LevelRange {
     }
 }
 
+/// The most a qualifier's `blur` may be (spec §11 GR-35): 0…1, 0 off.
+pub const QUALIFIER_BLUR_MAX: f64 = 1.0;
+
 /// The qualifier (spec §11 GR-13, format 18): which of the destination's
 /// pixels an adjustment clip grades. A range that is `None` is off and
 /// passes everything; the weight is the product of the present ranges, then
-/// its complement when `invert` is set.
+/// its complement when `invert` is set. `blur` (format 21, GR-35) softens
+/// that weight by a Gaussian before the pass reads it.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Qualifier {
@@ -356,13 +366,20 @@ pub struct Qualifier {
     pub luma: Option<LevelRange>,
     #[serde(skip_serializing_if = "is_false")]
     pub invert: bool,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub blur: f64,
 }
 
 impl Qualifier {
-    /// No range and not inverted: `video.qualifier` is not written, and the
-    /// adjustment pass weighs every pixel as it did before the key existed.
+    /// No range, not inverted and no blur (GR-35): `video.qualifier` is not
+    /// written, and the adjustment pass weighs every pixel as it did before
+    /// the key existed.
     pub fn is_neutral(&self) -> bool {
-        self.hue.is_none() && self.saturation.is_none() && self.luma.is_none() && !self.invert
+        self.hue.is_none()
+            && self.saturation.is_none()
+            && self.luma.is_none()
+            && !self.invert
+            && self.blur == 0.0
     }
 
     /// The two level ranges with their names, in model order.

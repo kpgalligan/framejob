@@ -25,10 +25,11 @@ final class MetalRenderer {
     /// combination itself. Built with `blending: false`, which is the whole
     /// correctness argument — see `pipelineDescriptor`.
     ///
-    /// Nine pipelines from seven fragment functions: plain, plain + gather,
+    /// Ten pipelines from eight fragment functions: plain, plain + gather,
     /// blend, blend + gather, the shadow, the matte resolve, the dissolve mix,
-    /// the adjustment pass (`Compositor+Adjustment.swift`, spec §11 GR-6) and
-    /// the input pass (`Compositor+Input.swift`, spec §11 GR-15).
+    /// the adjustment pass (`Compositor+Adjustment.swift`, spec §11 GR-6), the
+    /// selection map (`Compositor+Selection.swift`, spec §11 GR-35) and the
+    /// input pass (`Compositor+Input.swift`, spec §11 GR-15).
     private let blendPipeline: MTLRenderPipelineState
     private let blendGatherPipeline: MTLRenderPipelineState
     /// The full-canvas quad that draws one blurred mask as a shadow (§7.5).
@@ -40,6 +41,8 @@ final class MetalRenderer {
     /// The routed dissolve's mix (spec §11 MT-8, `Compositor+Dissolve.swift`).
     let dissolvePipeline: MTLRenderPipelineState
     let adjustPipeline: MTLRenderPipelineState
+    /// The blurred qualifier's map pass (spec §11 GR-35, `Compositor+Selection.swift`).
+    let qualifierMapPipeline: MTLRenderPipelineState
     let looks: LookTextures
     /// Step 0's pass, its targets and this frame's conversions (spec §11 GR-15).
     let inputs: InputStage
@@ -57,6 +60,10 @@ final class MetalRenderer {
     /// drawn, so a project without shadows allocates nothing, and replaced
     /// when the canvas size changes.
     var shadowSurfaces: ShadowSurfaces?
+    /// The blurred qualifier's map and its pair, sized to the destination —
+    /// see `Compositor+Selection.swift`. Nil until the first blurred qualifier
+    /// is drawn, and replaced when the destination's size changes.
+    var qualifierSurfaces: QualifierSurfaces?
     /// `MPSImageGaussianBlur` bakes its sigma in at init, so a kernel built
     /// per frame would build a new one on every tick of the blur slider.
     /// Keyed by sigma quantized to a quarter pixel — finer than anyone can
@@ -145,6 +152,8 @@ final class MetalRenderer {
                 descriptor: MetalRenderer.pipelineDescriptor(
                     label: "Frame Job dissolve", vertex: shadowVertex, fragment: dissolveFragment)),
             let adjustPipeline = MetalRenderer.adjustPipeline(device: device, library: library),
+            let qualifierMapPipeline = MetalRenderer.qualifierMapPipeline(
+                device: device, library: library),
             let looks = LookTextures(device: device, library: library),
             let inputs = InputStage(device: device, library: library)
         else { return nil }
@@ -188,6 +197,7 @@ final class MetalRenderer {
         self.mattePool = MattePool(device: device)
         self.dissolvePipeline = dissolvePipeline
         self.adjustPipeline = adjustPipeline
+        self.qualifierMapPipeline = qualifierMapPipeline
         self.looks = looks
         self.inputs = inputs
         self.sampler = sampler

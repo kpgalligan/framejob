@@ -70,7 +70,11 @@ default f407f87 among them) has no V0:SA: B0 says so, the bench runs with
 which leaves the verdict to KT (issue #284). `--measure --tree` adds
 H0, C0, F, T0 (VT:S1 − V0:S1), TC (a RECORD: T0 ≤ `BOUND[h]` + C0, "What it
 may cost"'s UNGRADED-layer cap) and TA (a RECORD: VT:SA − V0:SA ≤ `BOUND[h]` +
-the SA series' own C0). Mutant `tree-graded` (VT drawn at +0.5 EV with
+the SA series' own C0). Grading-4 T4-4 (spec §11 GR-35) adds TB, a RECORD at
+both sizes: tree_bench's VT:SQ2, VT:SQ8 and VT:SQ24 (the adjustment pass reading
+a selection map blurred at σ 2, 8 and 24 destination pixels) each less VT:SQ
+(the same pass with the qualifier inline), beside the SA noise floor (C0's, the
+S1 one when there is no SA). Mutant `tree-graded` (VT drawn at +0.5 EV with
 `toneEnabled` 1) must fail KT. Output under `work/grading_spike/tree-<check|
 measure|mutant-NAME>/`.
 
@@ -773,6 +777,17 @@ def tree_timing_rows(answers, result):
                  + ("cap held" if over_a <= bound_a else f"cap missed by {ms(over_a - bound_a)}"))
         else:
             emit("TA", "SKIP", no_adjust_reason(h, result["tree_base"]))
+        # grading-4 T4-4 (GR-35): the qualified pass with the blur on, over the
+        # same pass inline, beside the SA noise floor (S1's without SA).
+        if "VT:SQ" in f:
+            floor = figures[str(h)].get("noise_C0_SA", noise)
+            inline = f["VT:SQ"][0]
+            blurred = {sigma: f[f"VT:SQ{sigma}"][0] - inline for sigma in (2, 8, 24)}
+            figures[str(h)].update({"overhead_TB": {str(k): v for k, v in blurred.items()},
+                                    "noise_TB": floor})
+            emit("TB", "RECORD", f"{h}p over VT:SQ {ms(inline)} (the qualifier inline): "
+                 + ", ".join(f"σ {sigma} {ms(d)}" for sigma, d in blurred.items())
+                 + f"; noise floor {ms(floor)}")
 
 
 def tree_main(args):
@@ -825,7 +840,7 @@ def tree_main(args):
               "tree_base": args.tree_base, "rules": {"BOUND": BOUND}, "rows": ROWS,
               "answers": {str(h): a for h, a in answers.items()}}
     if args.measure and not timing:
-        for row in ("C0", "F", "T0", "TC", "TA"):
+        for row in ("C0", "F", "T0", "TC", "TA", "TB"):
             emit(row, "SKIP", "the host gate is shut (H0)")
     elif timing and scored_ok and len(answers) == len(SIZES):
         tree_timing_rows(answers, result)

@@ -263,8 +263,14 @@ use crate::model::{Canvas, Project};
 /// curve writes exactly the text it did, and the reader's default is the
 /// identity, so there is no migration step. The bump is so an older build
 /// refuses the file instead of dropping the hue curves on save.
-/// Every number from 21 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 20;
+///
+/// Version 21 is the qualifier's cleanup blur (spec §11 GR-35):
+/// `video.qualifier` gains `blur`, 0…1, written only when above 0, so a
+/// project with no blurred qualifier writes exactly the text it did, and the
+/// reader's default is 0, so there is no migration step. The bump is so an
+/// older build refuses the file instead of dropping the blur on save.
+/// Every number from 22 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 21;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

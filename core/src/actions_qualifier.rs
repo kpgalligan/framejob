@@ -1,6 +1,6 @@
-//! The qualifier's one rule for action evaluation (spec §11 GR-13), beside
-//! `actions.rs` rather than in it (that file is near the cap), as GR-12's
-//! `actions_curves.rs` is.
+//! The qualifier's two rules for action evaluation (spec §11 GR-13, GR-35),
+//! beside `actions.rs` rather than in it (that file is near the cap), as
+//! GR-12's `actions_curves.rs` is.
 //!
 //! §5.4 interpolates numbers, so an animated hue centre from 350 to 10
 //! would sweep the long way round, through the greens and blues at 180.
@@ -12,8 +12,27 @@
 //! (355, then 0, then 5). Two centres exactly 180 apart have no shorter
 //! arc and go linearly. Only the target of the action the time is INSIDE
 //! is touched: an ended action's end is merged as written.
+//!
+//! [`qualifier_json`] writes a qualifier with its `blur` always present
+//! (GR-35), where the file leaves a 0 out: §5.4's lerp walks only its FROM
+//! side's keys, so a blur absent there would not animate from 0 and would
+//! jump at the end. `actions.rs`'s `video_json` writes a non-neutral
+//! qualifier through it; a neutral one stays absent, so a qualifier turned
+//! on still switches at the end, as a range does.
 
 use serde_json::Value;
+
+use crate::actions::to_json;
+use crate::model::Qualifier;
+
+/// `qualifier` as JSON with `"blur"` always present, even at 0 (module doc).
+pub(crate) fn qualifier_json(qualifier: &Qualifier) -> Value {
+    let mut value = to_json(qualifier);
+    if let Value::Object(fields) = &mut value {
+        fields.insert("blur".to_string(), to_json(&qualifier.blur));
+    }
+    value
+}
 
 /// The `video.qualifier.hue.center` number of an action state, mutably.
 fn center(state: &mut Value) -> Option<&mut Value> {

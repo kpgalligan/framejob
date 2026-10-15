@@ -38,8 +38,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   (`add_transition` either half, `set_transition` with a kind, `set_transition_style` with a key),
   and the overlap rule refuses any overlap holding one, each in GR-6's sentence; blur, sharpen,
   pixelate and a blend mode on it are **errors** from `set_video`, `paste` and `paste_attributes`.
-  Its `video.qualifier` (§11 GR-13) narrows the grade to the pixels it selects; on any other
-  clip a qualifier is an **error** from the same three.
+  Its `video.qualifier` (§11 GR-13) narrows the grade to the pixels it selects, softened by its
+  `blur` (§11 GR-35); on any other clip a qualifier, a blur alone included, is an **error** from
+  the same three.
 - **`add_background {media?, color?=white, duration?=the timeline's length}`** — A backdrop on a NEW
   back-most track, starting at 0 and named "Background". With `media`, that file placed as
   `add_clip` would place it but for its SCALE — the right source kind, audio props when it has

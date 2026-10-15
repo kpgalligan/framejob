@@ -28,37 +28,65 @@ struct QualifierLevels: Codable, Hashable {
 
 /// `video.qualifier` (format 18): which of the destination's pixels an
 /// adjustment clip grades. A range that is nil is off; `invert` takes the
-/// complement of the product.
+/// complement of the product; `blur` (format 21, spec §11 GR-35), 0…1,
+/// softens the product by a Gaussian of σ = 24·blur canvas pixels.
 struct ColorQualifier: Codable, Hashable {
     var hue: QualifierHue?
     var saturation: QualifierLevels?
     var luma: QualifierLevels?
     var invert: Bool
+    var blur: Double
 
     init(
         hue: QualifierHue? = nil, saturation: QualifierLevels? = nil,
-        luma: QualifierLevels? = nil, invert: Bool = false
+        luma: QualifierLevels? = nil, invert: Bool = false, blur: Double = 0
     ) {
         self.hue = hue
         self.saturation = saturation
         self.luma = luma
         self.invert = invert
+        self.blur = blur
     }
 
     /// Lenient, like every reader of the core's JSON: an absent or malformed
-    /// range is off, an absent `invert` is false.
+    /// range is off, an absent `invert` is false, an absent `blur` 0.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         hue = c.lenient(.hue)
         saturation = c.lenient(.saturation)
         luma = c.lenient(.luma)
         invert = c.lenient(.invert, false)
+        blur = c.lenient(.blur, 0)
     }
 
-    /// No range and not inverted: no key, and the pass weighs as before.
+    /// No range, not inverted, no blur: no key, and the pass weighs as before.
     static let none = ColorQualifier()
 
-    var isNeutral: Bool { hue == nil && saturation == nil && luma == nil && !invert }
+    var isNeutral: Bool {
+        hue == nil && saturation == nil && luma == nil && !invert && blur == 0
+    }
+
+    /// σ at blur 1, in CANVAS pixels (GR-35, owner choice 2): the blur
+    /// filter's 24 px reach.
+    static let blurSigmaMax: Double = 24
+
+    /// Whether the pass blurs q (GR-35): a range on and a blur above 0. A blur
+    /// with no range is kept and saved, and draws nothing.
+    var blursSelection: Bool {
+        (hue != nil || saturation != nil || luma != nil) && blur > 0
+    }
+
+    /// The Gaussian's σ in DESTINATION pixels: blur · 24 canvas pixels over
+    /// `canvasPerDest`, so a Half or Quarter preview blurs the same share of
+    /// the picture as an export; capped at `MetalRenderer.maxShadowSigma`.
+    /// Nil — today's inline pass, byte-identical — unless `blursSelection`
+    /// and σ ≥ `MetalRenderer.minShadowSigma`.
+    func selectionSigma(canvasPerDest: Float) -> Float? {
+        guard blursSelection, canvasPerDest > 0 else { return nil }
+        let sigma = Float(blur * Self.blurSigmaMax) / canvasPerDest
+        guard sigma >= MetalRenderer.minShadowSigma else { return nil }
+        return min(sigma, MetalRenderer.maxShadowSigma)
+    }
 
     /// The level range `range` names (nil for `.hue`).
     func levels(_ range: QualifierRange) -> QualifierLevels? {
@@ -74,9 +102,12 @@ struct ColorQualifier: Codable, Hashable {
         range == .hue ? hue != nil : levels(range) != nil
     }
 
-    /// The section's summary: "off", or the ranges on, plus " · inverted".
+    /// The section's summary: "off" only when neutral, or the ranges on, plus
+    /// " · inverted", plus "blur N%" (whole percent) when the blur is above 0.
     var summary: String {
-        let parts = QualifierRange.allCases.filter(isOn).map(\.short) + (invert ? ["inverted"] : [])
+        let blurred = blur > 0 ? ["blur \(Int((blur * 100).rounded()))%"] : []
+        let parts = QualifierRange.allCases.filter(isOn).map(\.short)
+            + (invert ? ["inverted"] : []) + blurred
         return parts.isEmpty ? "off" : parts.joined(separator: " · ")
     }
 }
@@ -137,27 +168,32 @@ enum QualifierWrite<T: Codable & Equatable>: Equatable, Codable {
 /// `QualifierWrite.on`'s empty object.
 private enum QualifierNoKeys: CodingKey {}
 
-/// `VideoPatch.qualifier`: the ranges a write names, and `invert`.
+/// `VideoPatch.qualifier`: the ranges a write names, `invert` and `blur`.
 struct ColorQualifierPatch: Codable, Equatable {
     var hue: QualifierWrite<QualifierHue>?
     var saturation: QualifierWrite<QualifierLevels>?
     var luma: QualifierWrite<QualifierLevels>?
     var invert: Bool?
+    var blur: Double?
 
     init(
         hue: QualifierWrite<QualifierHue>? = nil, saturation: QualifierWrite<QualifierLevels>? = nil,
-        luma: QualifierWrite<QualifierLevels>? = nil, invert: Bool? = nil
+        luma: QualifierWrite<QualifierLevels>? = nil, invert: Bool? = nil, blur: Double? = nil
     ) {
         self.hue = hue
         self.saturation = saturation
         self.luma = luma
         self.invert = invert
+        self.blur = blur
     }
 
-    /// The section's Reset: every range off and Invert off.
-    static let reset = ColorQualifierPatch(hue: .off, saturation: .off, luma: .off, invert: false)
+    /// The section's Reset: every range off, Invert off and Blur 0.
+    static let reset = ColorQualifierPatch(
+        hue: .off, saturation: .off, luma: .off, invert: false, blur: 0)
 
-    var isEmpty: Bool { hue == nil && saturation == nil && luma == nil && invert == nil }
+    var isEmpty: Bool {
+        hue == nil && saturation == nil && luma == nil && invert == nil && blur == nil
+    }
 
     /// A write of one level range.
     static func levels(_ range: QualifierRange, _ write: QualifierWrite<QualifierLevels>)
@@ -196,10 +232,13 @@ struct QualifierUniforms {
     var invert: Float = 0
     var selection: Float = 0
     var enabled: Float = 0
-    var reserved: Float = 0
+    /// 1 when the pass reads q from the blurred map at `texture(0)` instead
+    /// of computing it (spec §11 GR-35); set only by `drawAdjustment`.
+    var blurred: Float = 0
 
     /// `q`'s block, `enabled` 1 exactly when the qualifier is not neutral,
     /// so an unqualified pass skips the reading and weighs as it did.
+    /// `blurred` stays 0: only `drawAdjustment` knows whether a map was made.
     init(_ q: ColorQualifier, selection: Bool) {
         if let hue = q.hue {
             hueEnabled = 1

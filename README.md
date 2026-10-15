@@ -290,9 +290,11 @@ schema, §6 the op table, §7 the architecture.
   or press **Pick from Canvas** and click the colour in the picture behind
   it. **Show Selection** (also View ▸ Show Selection) shows what is picked —
   white where the grade applies, black where it does not — in the preview
-  only, never in an export. Greys are never picked by hue, a matte track
-  above the clip limits it to a shape, and a range animates in an action,
-  the hue the short way round the colour wheel.
+  only, never in an export. **Blur** softens a speckled selection on noisy
+  footage into a smooth one (Show Selection shows it smoothed). Greys are
+  never picked by hue, a matte track above the clip limits it to a shape
+  with its own edge, and a range or the blur animates in an action, the hue
+  the short way round the colour wheel.
 - **Adjustment clips**. **Insert ▸ Adjustment Clip**
   places a clip that draws nothing of its own and grades everything behind
   it — its Light, Color and point filters apply to the whole picture under

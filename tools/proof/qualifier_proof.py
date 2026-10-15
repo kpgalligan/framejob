@@ -5,7 +5,9 @@ invert}}}` on an adjustment clip, the recipe's adjustment `qualifier`, the
 adjustment pass's `q` (read from the destination before the grade, times
 the opacity and the matte), `render_frame {selection}`, View ▸ Show
 Selection and its tag, read back as `render_frame` bytes and two exports;
-then the probe's rows over `app/Sources`.
+then the probe's rows over `app/Sources`. Grading-4 T4-4 (spec §11 GR-35)
+adds the qualifier's cleanup blur, `video.qualifier.blur`: N0's two qualified
+frames, project NC and rows Q1–Q6, probe rows K9 and K10, and eight mutants.
 
     python3 tools/proof/qualifier_proof.py [--app PATH] [--only H1,S1,...]
     python3 tools/proof/qualifier_proof.py capture DIR    # the unqualified control, before any product edit
@@ -26,7 +28,8 @@ Fixtures, written by this script: CARD, a 640×360 grey-128 PNG; RAMP, a
 1920×360 PNG whose column x is grey round(255·x/1919); HUE, a 1440×360 PNG
 whose column x is HSV hue 360·x/1440 and row y saturation 1 − y/359 at V 1;
 HUE50, the same at V 0.5; DARK, 1440×360, column x the hue as HUE, saturation
-1, row y V = y/359; MOVIE, a 2 s 640×360 30 fps ffmpeg `testsrc2` H.264 file.
+1, row y V = y/359; NOISE, a 640×360 PNG each of whose pixels is (0, 255, 0) or
+(255, 0, 0) by the top bit of a seeded 64-bit LCG (50 %); MOVIE, a 2 s 640×360 30 fps ffmpeg `testsrc2` H.264 file.
 Every reading (hue, C, S, V, Y′) is the oracle's (`reading`, GR-13's
 formulas) of the fixture's own bytes, which Z1 holds equal to the rendered
 picture behind the adjustment clip. Frames are taken at t = 0.5 s unless a
@@ -38,12 +41,18 @@ clip at Color saturation −1 in front; B is Q's frame before the adjustment
 clip, G0 its graded frame with no qualifier), R (1920×360, RAMP and an
 adjustment clip), M (640×360, MOVIE, black), S (CARD and an adjustment clip,
 saved twice for N2), P (HUE, two adjustment clips and a red rectangle in
-front, saved for the probe).
-- **N0** (`compare DIR` only; scored on Release, printed elsewhere): six
-  unqualified frames — card, card-adjusted (C's adjustment clip), card-matted
-  (the same under a rectangle on an alpha matte track over its left half),
-  ramp, hue (G0), movie — decoded at 16 bits a channel are byte-identical to
-  `capture DIR`'s, taken on the untouched tree's Release build.
+front, saved for the probe), NC (640×360, NOISE and an adjustment clip at
+Color saturation −1 with hue {120, 40, 0}: green selected, red not).
+"oracle(σ)" is a separable Gaussian, in Python, of the blur-0 selection's
+bytes, its edges clamped, σ quantised as `blurKernel` does (round(4σ)/4), the
+kernel 4σ either side.
+- **N0** (`compare DIR` only; scored on Release and under `--mutant`, printed
+  elsewhere): eight frames — card, card-adjusted (C's adjustment clip),
+  card-matted (the same under a rectangle on an alpha matte track over its left
+  half), ramp, hue (G0), hue-qualified and hue-selection (H1's graded frame and
+  its selection, a qualifier with no blur), movie — decoded at 16 bits a
+  channel are byte-identical to `capture DIR`'s, taken on the untouched tree's
+  Release build.
 - **N1** (C): `{qualifier: {hue: null, saturation: null, luma: null}}` answers
   "made no change" and `get_project` holds no `qualifier`.
 - **N2** (S): saved unqualified, `project.json` holds no `qualifier`; saved
@@ -104,8 +113,23 @@ front, saved for the probe).
 - **U1** (Q): undo after H1's qualifier brings G0's bytes back, redo H1's.
 - **V2** (Q): with H1's qualifier, `{ungraded}` is B's bytes and `{ungraded,
   selection}` is H1's selection's.
-- **K1–K8**: `qualifier_probe.swift`, built by `swift_build.build` over
-  `app/Sources` (a failed build is a scored FAILURE of all eight), on project
+- **Q1** (NC): the selection's variance at blur 0, 0.05, 0.15 and 0.4 falls,
+  each below half the one before.
+- **Q2** (NC): blur 0.25's selection = oracle(6): max |Δ| ≤ 4 levels, mean
+  |Δ| ≤ 1 (the bound written before measuring).
+- **Q3** (NC): blur 0.25's graded frame = round(B + (G − B)·s/255) ±2 at every
+  pixel (B the fixture, G the unqualified graded frame, s Q2's selection).
+- **Q4** (NC): a 320×360 white rectangle on an alpha matte track over the left
+  half: blur 0.25's selection is 0 at every x ≥ 321 and, at x ≤ 318, within
+  Q2's bound of Q2's own oracle(6) — the matte cuts the coverage and leaves q
+  unchanged, so never an oracle of Q4's matted selection.
+- **Q5** (NC): a 1 s linear action from blur 0 to `{blur: 0.5}`: at 0.5 s
+  within Q2's bound of oracle(6), at 1.5 s of oracle(12).
+- **Q6** (NC): blur 1.5 and −0.1 refused in their sentence, `{blur: 0.3}` on the
+  media clip refused naming it, the project unchanged; 0 and 1 accepted; saved
+  with blur 0.25, `video.qualifier.blur` is 0.25 and `version` the header's.
+- **K1–K10**: `qualifier_probe.swift`, built by `swift_build.build` over
+  `app/Sources` (a failed build is a scored FAILURE of all ten), on project
   P; each row's sentence is the probe's.
 - **Z1** (CONTROL): the fixtures hold (B, B50 and BD are the fixtures'
   bytes), the projects close and the log holds no `Frame Job: ` line.
@@ -116,8 +140,10 @@ and links the tree's `core/tests`), applies its edits (each anchor asserted
 to occur exactly once), builds it by the copy's own `make app-debug` (`make
 app` under `RC_PROOF_APP=release`) and runs every row on it, the probe built
 over the copy's `app/Sources`. A core mutant also runs `cargo test --release
---no-fail-fast --test qualifier --test selection` in the copy's own `core/`
-(row CT). MUTANT PASS when every named row FAILED and no other scored row
+--no-fail-fast --test qualifier --test selection --test qualifier_blur` in the
+copy's own `core/` (row CT). A mutant whose names include N0
+(`blur-zero-breaks-pass`) runs as `compare DIR --mutant NAME` under
+`RC_PROOF_APP=release`, so N0 is held to the Release control. MUTANT PASS when every named row FAILED and no other scored row
 did; the names are every row each mutant was measured to fail (MUTANTS).
 Exit 0 when every scored row passed (a mutant: caught); 1 when one failed
 (a mutant: survived); 2 when the control could not be performed.
@@ -127,6 +153,7 @@ import argparse
 import atexit
 import colorsys
 import json
+import math
 import re
 import shutil
 import struct
@@ -163,18 +190,25 @@ HUE_W, HUE_H = 1440, 360
 M1_EDGE = HUE_W // 3
 GREY = 128
 SHOW = ["View", "Show Selection"]
-NEUTRAL = ["card", "card-adjusted", "card-matted", "ramp", "hue", "movie"]
+NEUTRAL = ["card", "card-adjusted", "card-matted", "ramp", "hue", "hue-qualified",
+           "hue-selection", "movie"]
 ROWS = ["N0", "N1", "N2", "H1", "W1", "G1", "S1", "S1b", "S2", "L1", "I1", "M1", "D1", "E1",
-        "V1", "B1", "F1", "A1", "A2", "R1", "P0", "U1", "V2", "K1", "K2", "K3", "K4", "K5",
-        "K6", "K7", "K8", "Z1"]
+        "V1", "B1", "F1", "A1", "A2", "R1", "P0", "U1", "V2", "Q1", "Q2", "Q3", "Q4", "Q5",
+        "Q6", "K1", "K2", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K10", "Z1"]
 RECORDS = set()
 C_ROWS = {"N1", "F1", "R1", "P0"}
 Q_ROWS = {"H1", "W1", "G1", "S1", "S1b", "S2", "I1", "M1", "D1", "E1", "V1", "B1", "A1",
           "A2", "U1", "V2"}
 R_ROWS = {"G1", "L1"}
-K_ROWS = {"K1", "K2", "K3", "K4", "K5", "K6", "K7", "K8"}
+K_ROWS = {"K1", "K2", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K10"}
+NC_ROWS = {"Q1", "Q2", "Q3", "Q4", "Q5", "Q6"}
 SHADER = "app/Resources/Shaders/Compositor.metal"
 WEIGHT = "    float w = saturate(u.opacity * coverage * selected);\n"
+SHOWN = "        return float4(float3(saturate(selected * coverage)), 1.0);\n    }\n"
+SELECTION = "app/Sources/Compositor+Selection.swift"
+MAP_READ = "    float4 dst = destination.read(uint2(in.position.xy));\n"
+MAP_WEIGHT = "    return float4(qualifierWeight(c, q), 0.0, 0.0, 1.0);\n"
+KERNEL = "        let blur = sigma >= MetalRenderer.minShadowSigma ? blurKernel(sigma: sigma) : nil\n"
 # name: ([(file, anchor, replacement), …], the rows that must fail)
 MUTANTS = {
     "hue-wrap-broken": ([(
@@ -234,6 +268,79 @@ MUTANTS = {
         "app/Sources/EditorViewController+Qualifier.swift",
         "        let options = RecipeOptions(behind: clip)\n",
         "        let options = RecipeOptions()\n")], ["K3"]),
+    # grading-4 T4-4 (spec §11 GR-35), the qualifier's cleanup blur.
+    "selection-shows-unblurred": ([(
+        SHADER,
+        "        selected = q.blurred > 0.5 ? selectionMap.read(uint2(in.position.xy)).r\n",
+        "        selected = false ? selectionMap.read(uint2(in.position.xy)).r\n")],
+        ["Q1", "Q2", "Q4", "Q5"]),
+    "grade-reads-inline-q": ([(
+        SHADER, SHOWN,
+        SHOWN + "    if (q.enabled > 0.5) {\n        selected = qualifierWeight(c, q);\n    }\n")],
+        ["Q3"]),
+    "sigma-not-scaled": ([(
+        "app/Sources/QualifierProps.swift",
+        "        let sigma = Float(blur * Self.blurSigmaMax) / canvasPerDest\n",
+        "        let sigma = Float(blur * Self.blurSigmaMax)\n")], ["K9"]),
+    "blur-zero-breaks-pass": ([(
+        "app/Sources/Compositor+Adjustment.swift",
+        "            let sigma = layer.qualifier.selectionSigma(canvasPerDest: u.canvasPerDestX),\n",
+        "            !layer.qualifier.isNeutral,\n"
+        "            case let sigma = layer.qualifier.selectionSigma(\n"
+        "                canvasPerDest: u.canvasPerDestX) ?? 0,\n")], ["N0"]),
+    "coverage-blurred": ([
+        (SHADER,
+         "                                               texture2d<float> destination "
+         "[[texture(0)]]) {\n",
+         "                                               texture2d<float> destination "
+         "[[texture(0)]],\n"
+         "                                               texture2d<float> matte "
+         "[[texture(1)]]) {\n"),
+        (SHADER, MAP_WEIGHT,
+         "    constexpr sampler edge(filter::linear, address::clamp_to_edge);\n"
+         "    float2 uv = in.position.xy / float2(destination.get_width(), "
+         "destination.get_height());\n"
+         "    return float4(qualifierWeight(c, q) * matte.sample(edge, uv).r, 0.0, 0.0, 1.0);\n"),
+        (SHADER, WEIGHT,
+         "    float w = saturate(u.opacity * (q.blurred > 0.5 ? 1.0 : coverage) * selected);\n"),
+        (SHADER, SHOWN,
+         "        return float4(float3(saturate(selected * (q.blurred > 0.5 ? 1.0 : coverage))), "
+         "1.0);\n    }\n"),
+        (SELECTION, "    struct QualifierSurfaces {\n",
+         "    nonisolated(unsafe) static var mutantCoverage: MTLTexture?\n"
+         "    struct QualifierSurfaces {\n"),
+        (SELECTION, "            encoder.setFragmentTexture(target, index: 0)\n",
+         "            encoder.setFragmentTexture(target, index: 0)\n"
+         "            encoder.setFragmentTexture(MetalRenderer.mutantCoverage, index: 1)\n"),
+        ("app/Sources/Compositor+Adjustment.swift",
+         "        var selectionTexture = placeholder\n",
+         "        var selectionTexture = placeholder\n"
+         "        MetalRenderer.mutantCoverage = matte\n")], ["Q4"]),
+    "colour-blurred-not-q": ([
+        (SHADER, MAP_READ,
+         "    float4 dst = float4(0.0);\n"
+         "    int2 last = int2(destination.get_width(), destination.get_height()) - 1;\n"
+         "    for (int dy = -2; dy <= 2; ++dy) {\n"
+         "        for (int dx = -2; dx <= 2; ++dx) {\n"
+         "            int2 at = clamp(int2(in.position.xy) + int2(dx, dy), int2(0), last);\n"
+         "            dst += destination.read(uint2(at));\n"
+         "        }\n"
+         "    }\n"
+         "    dst /= 25.0;\n"),
+        (SELECTION, KERNEL, "        let blur: MPSImageGaussianBlur? = nil\n")],
+        # Q1 measured too: the average is the same at every blur, so the
+        # variance stops falling (its first run, T4-4's record).
+        ["Q1", "Q2", "Q4", "Q5"]),
+    "blur-ignored-by-neutral": ([(
+        "core/src/model_grade.rs",
+        "            && !self.invert\n            && self.blur == 0.0\n",
+        "            && !self.invert\n")], ["CT", "Q6"]),
+    "blur-not-interpolated": ([(
+        "core/src/actions.rs",
+        "        if !video.qualifier.is_neutral() {\n"
+        "            fields.insert(\"qualifier\".to_string(), qualifier_json(&video.qualifier));\n"
+        "        }\n",
+        "")], ["CT", "Q5"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -339,6 +446,20 @@ def hue_pixel(v_of_row=None, s_of_row=None):
 
 
 HUE_PIXEL = hue_pixel(s_of_row=lambda y: 1 - y / (HUE_H - 1))
+
+
+def noise_pixel(seed=0x7E44_4B1A):
+    """NOISE's pixel function: each pixel pure green or pure red, by the top
+    bit of a 64-bit LCG seeded with `seed` (50 % each)."""
+    bits = bytearray(CARD_W * CARD_H)
+    state = seed
+    for i in range(len(bits)):
+        state = (state * 6364136223846793005 + 1442695040888963407) & 0xFFFF_FFFF_FFFF_FFFF
+        bits[i] = state >> 63
+    return lambda x, y: (0, 255, 0) if bits[y * CARD_W + x] else (255, 0, 0)
+
+
+NOISE_PIXEL = noise_pixel()
 HUE50_PIXEL = hue_pixel(v_of_row=lambda y: 0.5, s_of_row=lambda y: 1 - y / (HUE_H - 1))
 DARK_PIXEL = hue_pixel(v_of_row=lambda y: y / (HUE_H - 1))
 
@@ -444,7 +565,7 @@ class Doc:
         return self.call("set_video", clips=clips, patch={"qualifier": ranges})
 
     def unqualify(self, clips):
-        return self.qualify(clips, hue=None, saturation=None, luma=None, invert=False)
+        return self.qualify(clips, hue=None, saturation=None, luma=None, invert=False, blur=0)
 
     def menu(self, path):
         return self.call("perform_menu_item", path=path)
@@ -505,12 +626,13 @@ def fixtures():
     hue = write_rgb_png(WORK / "hue.png", HUE_W, HUE_H, HUE_PIXEL)
     hue50 = write_rgb_png(WORK / "hue50.png", HUE_W, HUE_H, HUE50_PIXEL)
     dark = write_rgb_png(WORK / "dark.png", HUE_W, HUE_H, DARK_PIXEL)
+    noise = write_rgb_png(WORK / "noise.png", CARD_W, CARD_H, NOISE_PIXEL)
     movie = WORK / "testsrc2.mp4"
     made = bounded.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i",
                         f"testsrc2=size={CARD_W}x{CARD_H}:rate=30:duration=2",
                         "-c:v", "libx264", "-pix_fmt", "yuv420p", str(movie)], 120)
     return {"card": card, "ramp": ramp, "hue": hue, "hue50": hue50, "dark": dark,
-            "movie": movie if made["rc"] == 0 and movie.exists() else None}
+            "noise": noise, "movie": movie if made["rc"] == 0 and movie.exists() else None}
 
 
 # ---- N0: the unqualified frames -----------------------------------------------
@@ -522,8 +644,8 @@ class Neutral:
     def __init__(self, mode, folder):
         self.mode, self.folder, self.misses, self.seen = mode, folder, [], []
 
-    def take(self, doc, name):
-        frame = doc.frame(f"neutral-{name}")
+    def take(self, doc, name, **options):
+        frame = doc.frame(f"neutral-{name}", **options)
         self.seen.append(name)
         if frame is None:
             self.misses.append(f"{name}: no frame")
@@ -787,6 +909,14 @@ def run_q(client, media, neutral, state):
     adj = doc.adjustment(front) if front is not None else None
     graded = doc.video([adj], color={"saturation": -1}) if adj else {"ok": False}
     g0 = neutral.take(doc, "hue") if graded["ok"] else None
+    # N0's two qualified frames (T4-4: a qualifier with no blur draws as it
+    # did): H1's graded frame and its selection, then undone, so the rows
+    # below start unqualified on any tree.
+    n0_set = doc.qualify([adj], hue=H1_HUE) if g0 is not None else {"ok": False}
+    if n0_set["ok"]:
+        neutral.take(doc, "hue-qualified")
+        neutral.take(doc, "hue-selection", selection=adj)
+        doc.call("undo")
     hue_clip = doc.clip(clip)
     covers = (hue_clip.get("start", 1) == 0
               and hue_clip.get("duration", 0) >= 2 * SEC + SEC // 2)
@@ -1115,6 +1245,205 @@ def decoded(movie, n):
     return (raw, n) if len(raw) == HUE_W * HUE_H * 4 else (None, "no frame decoded")
 
 
+# ---- project NC: the noisy card and the cleanup blur (T4-4) -------------------
+
+NC_HUE = {"center": 120, "width": 40, "softness": 0}
+# Q2's bound, written before measuring: the selection against the oracle.
+Q2_MAX, Q2_MEAN = 4, 1.0
+
+
+def gaussian(values, width, height, sigma):
+    """`values` (row-major) blurred by a separable Gaussian of `sigma`
+    quantised as `blurKernel` quantises it (round(4σ)/4), its edges clamped
+    (MPS's `.clamp`), the kernel 4σ either side, normalised: the oracle."""
+    sigma = round(4 * sigma) / 4
+    radius = max(1, math.ceil(4 * sigma))
+    kernel = [math.exp(-(i * i) / (2 * sigma * sigma)) for i in range(-radius, radius + 1)]
+    total = sum(kernel)
+    kernel = [k / total for k in kernel]
+
+    def line(seq):
+        n = len(seq)
+        padded = [seq[0]] * radius + list(seq) + [seq[-1]] * radius
+        out = [0.0] * n
+        for i, k in enumerate(kernel):
+            out = [o + k * v for o, v in zip(out, padded[i:i + n])]
+        return out
+    rows = [line(values[y * width:(y + 1) * width]) for y in range(height)]
+    columns = [line([rows[y][x] for y in range(height)]) for x in range(width)]
+    return [columns[x][y] for y in range(height) for x in range(width)]
+
+
+def greys(frame):
+    return [frame.raw[i] for i in range(0, len(frame.raw), 4)] if frame else []
+
+
+def variance(values):
+    mean = sum(values) / len(values)
+    return sum((v - mean) ** 2 for v in values) / len(values)
+
+
+def against(frame, oracle, columns=None):
+    """(max |Δ|, mean |Δ|) of `frame`'s greys against `oracle`, over the
+    columns `columns` keeps (all when None)."""
+    got = greys(frame)
+    if not got or not oracle:
+        return math.inf, math.inf
+    deltas = [abs(got[i] - oracle[i]) for i in range(len(got))
+              if columns is None or columns(i % CARD_W)]
+    return max(deltas), sum(deltas) / len(deltas)
+
+
+def run_nc(client, media, state):
+    """Q1–Q6 on NC: NOISE, an adjustment clip at Color saturation −1 with hue
+    {120, 40, 0} (green selected, red not)."""
+    doc, sized = opened(client, "NC", CARD_W, CARD_H)
+    back = (doc.tracks() or [{}])[0].get("id")
+    noise = doc.media(media["noise"])
+    clip = doc.place(back, noise) if noise is not None else None
+    b = doc.frame("nc-b")
+    front = doc.new_track() if clip is not None else None
+    adj = doc.adjustment(front) if front is not None else None
+    graded = doc.video([adj], color={"saturation": -1}) if adj else {"ok": False}
+    g = doc.frame("nc-g") if graded["ok"] else None
+    ranged = doc.qualify([adj], hue=NC_HUE) if graded["ok"] else {"ok": False}
+    sel0 = doc.frame("nc-sel0", selection=adj) if ranged["ok"] else None
+    binary = sel0 is not None and set(greys(sel0)) <= {0, 255}
+    fixture = (sized and clip is not None and matches_fixture(b, NOISE_PIXEL, step=1)
+               and g is not None and binary)
+    state["nc_fixture"] = fixture
+    print(f"  NC: noise clip {clip}, adjustment clip {adj}; B the fixture "
+          f"{matches_fixture(b, NOISE_PIXEL, step=1)}, the blur-0 selection binary {binary}",
+          flush=True)
+    if not fixture:
+        return close(client, doc.path) and False
+    ids = [adj]
+    base = [float(v) for v in greys(sel0)]
+    oracle6 = gaussian(base, CARD_W, CARD_H, 6)
+
+    # Q1
+    variances = [(0, variance(greys(sel0)))]
+    set_ok = True
+    for blur in (0.05, 0.15, 0.4):
+        set_ok = doc.qualify(ids, blur=blur)["ok"] and set_ok
+        frame = doc.frame(f"q1-{blur}", selection=adj)
+        variances.append((blur, variance(greys(frame)) if frame else math.inf))
+    falling = all(b2[1] < b1[1] / 2 for b1, b2 in zip(variances, variances[1:]))
+    check("Q1 the selection's variance at blur 0, 0.05, 0.15 and 0.4 falls, each below half "
+          "the one before", set_ok and falling,
+          "; ".join(f"blur {blur}: {v:.2f}" for blur, v in variances))
+
+    # Q2, Q3
+    quarter = doc.qualify(ids, blur=0.25)
+    sel25 = doc.frame("q2-selection", selection=adj)
+    graded25 = doc.frame("q3-graded")
+    worst, mean = against(sel25, oracle6)
+    check(f"Q2 blur 0.25's selection = the oracle's Gaussian (σ 6) of the blur-0 selection: max "
+          f"|Δ| ≤ {Q2_MAX} levels, mean ≤ {Q2_MEAN}",
+          quarter["ok"] and worst <= Q2_MAX and mean <= Q2_MEAN,
+          f"set {quarter.get('error', 'ok')}; max {worst:.3f}, mean {mean:.4f}")
+    q3_misses, q3_worst = [], 0
+    if graded25 is not None and sel25 is not None:
+        for y in range(CARD_H):
+            for x in range(CARD_W):
+                s_ = sel25.grey(x, y)
+                bp, gp, got = b.px(x, y), g.px(x, y), graded25.px(x, y)
+                for c in range(3):
+                    want = round(bp[c] + (gp[c] - bp[c]) * s_ / 255)
+                    off = abs(got[c] - want)
+                    q3_worst = max(q3_worst, off)
+                    if off > 2 and len(q3_misses) < 4:
+                        q3_misses.append(f"({x},{y}) ch {c}: {got[c]} vs {want} (s {s_})")
+    check("Q3 blur 0.25's graded frame = round(B + (G − B)·s/255) ±2 at every pixel (s Q2's "
+          "selection, G the unqualified graded frame)",
+          graded25 is not None and sel25 is not None and not q3_misses,
+          f"worst {q3_worst}; {q3_misses or 'all within'}")
+
+    # Q4 — the matte cuts the coverage and leaves q unchanged: the expected
+    # value left of the edge is blur(q) × 1, Q2's oracle, never an oracle of
+    # Q4's own matted selection.
+    matte_track = doc.new_track()
+    window = doc.rectangle(matte_track, CARD_W // 2, CARD_H, [1, 1, 1, 1], x=-CARD_W // 4) \
+        if matte_track is not None else None
+    matted = doc.call("set_track", track=matte_track, matte="alpha") if window \
+        else {"ok": False}
+    q4 = doc.frame("q4-selection", selection=adj) if matted["ok"] else None
+    doc.call("remove_track", track=matte_track, with_clips=True) if matte_track else None
+    lit = [(x, y) for y in range(CARD_H) for x in range(321, CARD_W)
+           if q4 is not None and q4.grey(x, y) != 0]
+    inside_worst, inside_mean = against(q4, oracle6, columns=lambda x: x <= 318)
+    check(f"Q4 a 320×360 alpha matte over the left half: blur 0.25's selection is 0 at every x "
+          f"≥ 321 and within Q2's bound of Q2's oracle (σ 6, unmatted) at x ≤ 318",
+          matted["ok"] and q4 is not None and not lit and inside_worst <= Q2_MAX
+          and inside_mean <= Q2_MEAN,
+          f"matte {matted.get('error', 'ok')}; lit right of the edge {len(lit)} "
+          f"{lit[:3]}; left max {inside_worst:.3f}, mean {inside_mean:.4f}")
+
+    # Q5
+    doc.qualify(ids, blur=0)
+    added = doc.call("add_action", clip=adj, at=0, duration=SEC)
+    actions = doc.clip(adj).get("actions") or []
+    action = actions[0].get("id") if len(actions) == 1 else None
+    ended = doc.call("set_action_end", clip=adj, action=action,
+                     patch={"video": {"qualifier": {"blur": 0.5}}}) if action \
+        else {"ok": False}
+    late = SEC + SEC // 2
+    mid = doc.frame("q5-mid", selection=adj)
+    after = doc.frame("q5-after", t=late, selection=adj)
+    if action:
+        doc.call("remove_action", clip=adj, action=action)
+    oracle12 = gaussian(base, CARD_W, CARD_H, 12)
+    mid_worst, mid_mean = against(mid, oracle6)
+    late_worst, late_mean = against(after, oracle12)
+    check("Q5 a 1 s linear action from blur 0 to 0.5: at 0.5 s the selection is within Q2's "
+          "bound of the oracle at σ 6, at 1.5 s of the oracle at σ 12",
+          added["ok"] and ended["ok"] and mid_worst <= Q2_MAX and mid_mean <= Q2_MEAN
+          and late_worst <= Q2_MAX and late_mean <= Q2_MEAN,
+          f"action {added.get('error', 'ok')}, end {ended.get('error', 'ok')}; at 0.5 s max "
+          f"{mid_worst:.3f}, mean {mid_mean:.4f}; at 1.5 s max {late_worst:.3f}, mean "
+          f"{late_mean:.4f}")
+
+    # Q6
+    doc.qualify(ids, blur=0.25)
+    before = doc.project()
+    high = doc.qualify(ids, blur=1.5)
+    low = doc.qualify(ids, blur=-0.1)
+    on_media = doc.qualify([clip], blur=0.3)
+    unchanged = doc.project() == before
+    for got in (high, low, on_media):
+        if got["ok"]:
+            doc.call("undo")
+    zero = doc.qualify(ids, blur=0)
+    if zero["ok"]:
+        doc.call("undo")
+    one = doc.qualify(ids, blur=1)
+    if one["ok"]:
+        doc.call("undo")
+    wants = ["video.qualifier.blur must be between 0 and 1, not 1.5",
+             "video.qualifier.blur must be between 0 and 1, not -0.1",
+             f"clip {clip} is not an adjustment clip and cannot take a qualifier"]
+    answers = [high, low, on_media]
+    refused = all(not got["ok"] and want in got.get("error", "")
+                  for got, want in zip(answers, wants))
+    saved_path = WORK / "NC-saved.framejob"
+    saved = doc.call("save_project", path=str(saved_path))
+    doc.path = saved_path
+    try:
+        version, stored, _ = saved_qualifier(saved_path, adj)
+    except (OSError, ValueError):
+        version, stored = None, None
+    header = format_version()
+    check(f"Q6 blur 1.5 and -0.1 are refused in their sentence and {{blur: 0.3}} on the media "
+          f"clip naming it, the project unchanged; 0 and 1 are accepted; saved with blur 0.25, "
+          f"video.qualifier.blur is 0.25 and version {header} (the header's)",
+          refused and unchanged and zero["ok"] and one["ok"] and saved["ok"]
+          and (stored or {}).get("blur") == 0.25 and version == header,
+          "; ".join(repr(got.get("error") or "accepted") for got in answers)
+          + f"; unchanged {unchanged}; 0 {zero.get('error', 'accepted')}; 1 "
+          f"{one.get('error', 'accepted')}; saved {stored}, version {version}")
+    return close(client, doc.path)
+
+
 # ---- project M: the movie ----------------------------------------------------
 
 def run_m(client, media, neutral, state):
@@ -1326,7 +1655,8 @@ def build_mutant(name):
 
 def core_test(copy):
     ran = bounded.run(["cargo", "test", "--release", "--no-fail-fast", "--test", "qualifier",
-                       "--test", "selection"], 900, cwd=str(copy / "core"))
+                       "--test", "selection", "--test", "qualifier_blur"], 900,
+                      cwd=str(copy / "core"))
     lines = (ran["stdout"] + ran["stderr"]).strip().splitlines()
     failed = [line.strip() for line in lines if line.strip().startswith("`--test ")]
     return ran["rc"] == 0 and not ran["expired"], failed or lines[-3:]
@@ -1379,7 +1709,8 @@ def main():
             passed_ct, last = core_test(copy)
             rows["CT"] = passed_ct
             print(("  ok   " if passed_ct else "  FAIL ") + "CT cargo test --test qualifier "
-                  "--test selection in the copy's core\n       " + " | ".join(last), flush=True)
+                  "--test selection --test qualifier_blur in the copy's core\n       "
+                  + " | ".join(last), flush=True)
             scored.append("CT")
     else:
         print(f"grading-2 G2-4 — qualifiers over MCP ({args.mode or 'run'}, {config} build "
@@ -1414,6 +1745,8 @@ def main():
                 closed = run_m(launched.client, media, neutral, state) and closed
             if "N2" in selected:
                 closed = run_s(launched.client, media, state) and closed
+            if not capture and selected & NC_ROWS:
+                closed = run_nc(launched.client, media, state) and closed
             if selected & K_ROWS:
                 package, ids = run_p(launched.client, media, state)
                 closed = closed and package is not None
@@ -1432,7 +1765,7 @@ def main():
     if "N0" in selected:
         missing = [name for name in NEUTRAL if name not in neutral.seen]
         good = not neutral.misses and not missing
-        title = (f"N0 the six unqualified frames are byte-identical (16 bits a channel) to "
+        title = (f"N0 the {len(NEUTRAL)} control frames are byte-identical (16 bits a channel) to "
                  f"{args.folder}")
         if config == "release" or args.mutant:
             check(title, good, f"misses {neutral.misses}; not taken {missing}")

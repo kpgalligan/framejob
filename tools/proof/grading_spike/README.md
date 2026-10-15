@@ -168,7 +168,19 @@ V0b:S1|, and |V0:SA − V0b:SA|), F, T0 (VT:S1 − V0:S1), **TC** (a RECORD: T0 
 `BOUND[h]` + C0 at 1080 and 2160 — "What it may cost"'s UNGRADED-layer cap,
 +0.02 ms and +0.06 ms) and **TA** (a RECORD: VT:SA − V0:SA ≤ `BOUND[h]` + the
 SA series' C0 — what the qualifier costs an unqualified adjustment pass). Mutant `tree-graded` (`--vt-exposure 0.5`: VT's draws carry +0.5
-EV with `toneEnabled` 1) must fail KT. Output under
+EV with `toneEnabled` 1) must fail KT.
+
+**The SQ series and TB (grading-4 T4-4, spec §11 GR-35).** Every plan also
+times four VT-only series: VT:SQ (S1, then the adjustment pass at +1 EV with
+hue {120, 40, 20} computed inline) and VT:SQ2, VT:SQ8 and VT:SQ24 (S1, the
+encoder ended, the app's own `MetalRenderer.encodeSelectionMap` with
+`MetalRenderer.qualifierMapPipeline` over VT's library into an `r16Float` pair
+and an `MPSImageGaussianBlur` at σ 2, 8 or 24 destination pixels, `.clamp`,
+then the pass resumed with `.load` and the same adjustment pass reading the
+blurred map, `blurred` 1). `--measure --tree` adds **TB** (a RECORD at both
+sizes): each VT:SQσ − VT:SQ — what the cleanup blur adds to a qualified
+adjustment pass — beside the SA noise floor (S1's with no SA). KT, KA and TA
+are unchanged. Output under
 `work/grading_spike/tree-<check|measure|mutant-tree-graded>/` (`bench-<h>.json`
 of the same shape, `result.json`).
 
@@ -195,6 +207,7 @@ perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base 4f52ead   # G2-2's
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base b2fd1f9   # G2-3's
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base 75ebf34   # G2-4's
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base ac874f6   # T4-4's TB
 ```
 
 **Its record** is `archive/grading.md`, "GR0 — the road map and the spike"

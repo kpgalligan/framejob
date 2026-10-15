@@ -414,3 +414,8 @@ Concat is opened, at design time or build time.
   lifted (T4-2). GR-6 is unchanged: the blur filter on an adjustment clip stays refused.
   **Amended by GR-28** (grading-4 T4-0): "no qualifier on picture clips (later issues)" is
   closed: a qualifier on picture clips is not wanted (#269).
+  **Amended by GR-35** (grading-4 T4-4): `video.qualifier` gains `blur`, 0…1 (0 off, written
+  only when above 0), a Gaussian of q with σ = 24·blur canvas pixels, taken at full resolution in
+  an `r16Float` map pass the adjustment pass reads at `texture(0)` (`blurred`, the block's
+  reserved float); the coverage is never blurred; Show Selection and `render_frame {selection}`
+  draw the blurred q × coverage; neutral now also needs blur 0; format 21.

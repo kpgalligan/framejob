@@ -35,7 +35,7 @@ use crate::actions_curves::{
     align_identity_curves, blended_curves_json, curve_blends, curves_json, CurveBlend,
 };
 use crate::actions_graphic::evaluate_graphic;
-use crate::actions_qualifier::align_hue_center;
+use crate::actions_qualifier::{align_hue_center, qualifier_json};
 use crate::edit_adjustment::{clamp_adjustment, is_adjustment};
 use crate::model::{
     Action, AudioProps, Clip, ColorAdjust, Curve, GraphicProps, Project, ShapeProps, Source,
@@ -378,13 +378,17 @@ pub(crate) fn wheels_json(wheels: &Wheels) -> Value {
 /// `wheels` through [`wheels_json`] and its `curves` through `curves_json`
 /// (all six, an absent one as its identity, GR-12, GR-32), so every tone,
 /// wheel and curve key is present: what an action interpolates from, what a patch
-/// is checked against and what a split writes back.
+/// is checked against and what a split writes back. A non-neutral
+/// `qualifier` goes through `qualifier_json`, its `blur` present (GR-35).
 pub(crate) fn video_json(video: &VideoProps) -> Value {
     let mut value = to_json(video);
     if let Value::Object(fields) = &mut value {
         fields.insert("color".to_string(), color_json(&video.color));
         fields.insert("wheels".to_string(), wheels_json(&video.wheels));
         fields.insert("curves".to_string(), curves_json(&video.curves));
+        if !video.qualifier.is_neutral() {
+            fields.insert("qualifier".to_string(), qualifier_json(&video.qualifier));
+        }
     }
     value
 }

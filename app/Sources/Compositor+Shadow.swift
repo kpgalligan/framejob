@@ -258,7 +258,10 @@ extension MetalRenderer {
         return surfaces
     }
 
-    private func blurKernel(sigma: Float) -> MPSImageGaussianBlur? {
+    /// The shared kernel for `sigma` (quantised to a quarter pixel), or nil
+    /// where MPS does not run. Internal, not private: the blurred qualifier's
+    /// map (`Compositor+Selection.swift`, spec §11 GR-35) shares the cache.
+    func blurKernel(sigma: Float) -> MPSImageGaussianBlur? {
         guard blurSupported else { return nil }
         let key = Int((sigma * 4).rounded())
         if let hit = blurKernels[key] { return hit }

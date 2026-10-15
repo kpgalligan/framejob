@@ -36,8 +36,10 @@ detail there.
   action, spec §11 GR-34; `ColorCurves.blends`, never encoded), `ColorCurves` and
   `LayerUniforms.apply(curves:)` (GR-12, the hue curves GR-32; a
   pure move out of `GradeProps.swift`, grading-4 T4-0); `VideoPatch.qualifier` is
-  `QualifierProps.swift`'s `ColorQualifierPatch`, beside `ColorQualifier`,
-  `QualifierUniforms` and the pick's `QualifierSample` (GR-13), so a row writes
+  `QualifierProps.swift`'s `ColorQualifierPatch`, beside `ColorQualifier` (its
+  `blur`, `blursSelection` and `selectionSigma`, GR-35), `QualifierUniforms`
+  (`blurred`, set only by `drawAdjustment`) and the pick's `QualifierSample`
+  (GR-13), so a row writes
   only its own key to every selected clip. `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10). `ReelAgentSocket` (road map
   14's MC2) wraps `rc_agent_socket_start` / `_release`: `start` throws the
@@ -1227,6 +1229,8 @@ the key map behind it.
   `Compositor+Uniforms.swift` ·
   `Compositor+Shadow.swift` · `Compositor+Matte.swift` · `MattePlan.swift` ·
   `Compositor+Dissolve.swift` · `Compositor+Adjustment.swift` ·
+  `Compositor+Selection.swift` (the blurred qualifier's selection map, spec §11
+  GR-35) ·
   `DestinationPass.swift` (the destination render pass as a value a shadow
   or a routed dissolve suspends and resumes) ·
   `CompositorEffects.swift` · `LayerUniforms.swift` (`LayerUniforms`,
@@ -1235,7 +1239,9 @@ the key map behind it.
   (`MetalRenderer.workingFormat`, from `Compositor.outputPixelFormat`,
   `64RGBAHalf`; spec §11 PR-1): every layer, blend, shadow and dissolve
   pipeline's attachment, the destination, each matte composite and dissolve
-  half, and the shadow pair. The coverage stays `r8Unorm`. `texture(from:)`
+  half, and the shadow pair. The coverage stays `r8Unorm`, and the blurred
+  qualifier's selection map and its pair (`QualifierSurfaces`, the
+  destination's size, spec §11 GR-35) are `r16Float`. `texture(from:)`
   wraps a buffer by its own format. Every video source decodes to
   `64RGBAHalf` (`Compositor.sourcePixelFormat`, spec §11 PR-2), clamped to
   0…1 where the shader samples it. The uniform block's field ORDER is a contract
@@ -1261,12 +1267,17 @@ the key map behind it.
   An imported LUT's look (GR-8) binds the `.cube` file's own lattice instead
   (`LutTextures.swift`: read through `MediaImporter+LUT.swift` and the core's
   `rc_cube_*`, cached by path and modification date, nothing bound — the clip
-  drawn ungraded — when the file is missing). **Eight pipelines from six
+  drawn ungraded — when the file is missing). **Nine pipelines from seven
   fragment functions** (the eighth, `Compositor+Adjustment.swift`'s, is an
   adjustment clip's full-frame pass reading the destination, blending off, its
   weight times the qualifier's `q` (`QualifierUniforms` at `buffer(1)`) and a
   layer marked `selection` writing `q` × coverage as opaque grey instead; spec
-  §11 GR-6, GR-13): the two programmable-blend pipelines MUST be built with
+  §11 GR-6, GR-13; the ninth, `Compositor+Selection.swift`'s map pass, renders
+  a blurred qualifier's `q` into an `r16Float` destination-sized map that
+  `MPSImageGaussianBlur` blurs (the shadow's `blurKernel` cache) and the
+  adjustment pass reads at `texture(0)` behind `blurred`, the destination pass
+  suspended and resumed as a shadow's; the coverage is never blurred; spec §11
+  GR-35): the two programmable-blend pipelines MUST be built with
   fixed-function blending OFF, or the finished pixel is blended twice —
   invisible over an opaque destination, so a proof of it reads the ALPHA channel
   over a translucent one. A shadow's silhouette pass takes `maskState`, the

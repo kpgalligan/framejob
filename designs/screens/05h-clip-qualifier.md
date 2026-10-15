@@ -55,6 +55,8 @@ ticked checkbox and a white-to-red ramp, dimmed left of a knob at 0.15, with
 its fall-off square just left of it and the high knob at the red end; under it
 "Low 0.15", "High 1.00", "Soft 0.05". The Luma row is unticked: its black-to-white
 strip dimmed, its fields grey (0.00, 1.00, 0.10). Then an unticked Invert, then
+the Blur row (grading-4 T4-4, spec §11 GR-35): the house slider at its left end
+and the field "0%" with its quick-pick chevron, then
 the "Pick from Canvas" button beside a ticked "Show Selection". The LIGHT
 section follows, open, summary "neutral", its first two rows Exposure and
 Temperature at the bottom of the capture.

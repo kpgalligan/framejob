@@ -19042,7 +19042,7 @@ RC_PROOF_APP=release python3 tools/proof/curves_proof.py compare tools/proof/wor
 aligned action, whose oracles are the per-point lerp, so they fail by
 construction. **Its record**: `designs/grading-4.md`'s T4-3 section.
 
-## Road map grading-2 — G2-4, the qualifier (`qualifier_proof.py` N0–N2, H1, W1, G1, S1, S1b, S2, L1, I1, M1, D1, E1, V1, B1, F1, A1, A2, R1, P0, U1, V2, K1–K8, Z1 and thirteen mutants; `qualifier_probe.swift`; `core/tests/qualifier.rs`, `core/tests/selection.rs`, `core/tests/schema_v18.rs`; spec §11 GR-13)
+## Road map grading-2 — G2-4, the qualifier (`qualifier_proof.py` N0–N2, H1, W1, G1, S1, S1b, S2, L1, I1, M1, D1, E1, V1, B1, F1, A1, A2, R1, P0, U1, V2, Q1–Q6, K1–K10, Z1 and twenty-one mutants; `qualifier_probe.swift`; `core/tests/qualifier.rs`, `core/tests/selection.rs`, `core/tests/schema_v18.rs`, `core/tests/qualifier_blur.rs`; spec §11 GR-13, GR-35)
 
 **What it answers.** That `video.qualifier` changes nothing until set (N0:
 six unqualified frames — the card, an adjustment clip at exposure +1 over it,
@@ -19125,6 +19125,46 @@ fixture, `toggleShowSelection:` among the view toggles) and screens `05h`
 scene (an unqualified adjustment pass over S1 with a neutral
 `QualifierUniforms` at `buffer(1)`) and the rows KA and TA (`--tree-base
 75ebf34`).
+
+**Grading-4 T4-4 (spec §11 GR-35): the qualifier's cleanup blur,
+`video.qualifier.blur`.** N0 gains two frames, eight in all: H1's graded
+frame and its selection (`hue-qualified`, `hue-selection`), a qualifier with
+no blur, set and undone so the capture runs on any tree (control
+`tools/proof/work/t4-4/ctl`, taken on ac874f6's Release build). `Doc.unqualify`
+also writes `blur: 0`. Project NC is NOISE (640×360, each pixel pure green or
+pure red by a seeded 64-bit LCG's top bit) under an adjustment clip at Color
+saturation −1 with hue {120, 40, 0}, so the blur-0 selection is binary; its
+oracle(σ) is a Python separable Gaussian of that selection's bytes (edges
+clamped, σ quantised to round(4σ)/4 as `blurKernel` does, 4σ either side). Q1
+the selection's variance falling at blur 0, 0.05, 0.15, 0.4, each below half
+the one before; Q2 blur 0.25 against oracle(6), max |Δ| ≤ 4 levels and mean ≤ 1
+(written before measuring); Q3 the graded frame = round(B + (G − B)·s/255) ±2;
+Q4 a matte over the left half: 0 at every x ≥ 321 (the coverage never blurred)
+and Q2's oracle at x ≤ 318 (the matte cuts the coverage, not q); Q5 an action
+0 → 0.5: oracle(6) at 0.5 s, oracle(12) at 1.5 s; Q6 the bounds' sentences, a
+blur alone refused on the media clip, the saved key and version. The probe's
+K9 is `ColorQualifier.selectionSigma` (12, 6 and 3 at canvasPerDest 1, 2 and 4;
+nil at blur 0, below σ 0.5 and with no range; capped at 100) — a reduced
+preview's σ is the probe's, since Preview Quality persists and `render_frame`
+never sees it — and K10 the section's Blur row ("Qualifier Blur", one step),
+Reset's `blur: 0`, the pick leaving the blur alone, the summary "hue · blur
+40%", a blur alone not neutral and `blurred` 0 from the initializer. CT adds
+`--test qualifier_blur`; a mutant naming N0 runs as `compare DIR --mutant NAME`
+under `RC_PROOF_APP=release`. `grading_spike/tree_bench.swift` gained the SQ
+series and `grading_spike.py --measure --tree` the TB record (the pass's cost
+with the blur on; `grading_spike/README.md`). **Its record**:
+`designs/grading-4.md`'s T4-4 section.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `selection-shows-unblurred` | the adjust fragment's map arm never taken | Q1 Q2 Q4 Q5 |
+| `grade-reads-inline-q` | the grade weighs by the inline `q`, Show Selection by the map | Q3 |
+| `sigma-not-scaled` | σ not divided by `canvasPerDest` | K9 |
+| `blur-zero-breaks-pass` | the map path for every qualified pass, MPS skipped at σ 0 | N0 |
+| `coverage-blurred` | the map holds `q` × coverage and the pass multiplies none | Q4 |
+| `colour-blurred-not-q` | the map averages a 5 × 5 neighbourhood of colour, MPS skipped | Q1 Q2 Q4 Q5 |
+| `blur-ignored-by-neutral` | the core's `is_neutral` ignores the blur | CT Q6 |
+| `blur-not-interpolated` | `video_json` without `qualifier_json` | CT Q5 |
 
 **Its record**: `archive/grading-2.md`'s G2-4 section.
 

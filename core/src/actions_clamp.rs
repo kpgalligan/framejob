@@ -8,7 +8,7 @@ use crate::audio::MAX_GAIN;
 use crate::model::{
     AudioProps, BlendMode, CurveDomain, CurvePoint, Curves, HueRange, LevelRange, Qualifier,
     VideoProps, Wheels, CURVE_POINTS_MAX, CURVE_POINTS_MIN, HUE_SOFTNESS_MAX, HUE_TURN,
-    MAX_FILTERS, MAX_OBSCURE, WHEEL_MAX,
+    MAX_FILTERS, MAX_OBSCURE, QUALIFIER_BLUR_MAX, WHEEL_MAX,
 };
 use crate::props_check::{
     COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, EXPOSURE_MAX,
@@ -226,7 +226,8 @@ fn clamp_points(points: &mut [CurvePoint], domain: CurveDomain) -> bool {
 /// each level 0…1 — the hue centre taken `rem_euclid 360` (so a centre an
 /// action moved past 360 or below 0 on the short way round,
 /// `actions_qualifier.rs`, comes back onto the circle), and a level range
-/// whose `low` passed its `high` closed at `high = low`.
+/// whose `low` passed its `high` closed at `high = low`. The `blur` (GR-35):
+/// non-finite → 0, then 0…1.
 fn clamp_qualifier(qualifier: &mut Qualifier) {
     if let Some(hue) = qualifier.hue {
         qualifier.hue = clamp_hue(hue);
@@ -236,6 +237,11 @@ fn clamp_qualifier(qualifier: &mut Qualifier) {
             *range = clamp_level(level);
         }
     }
+    qualifier.blur = if qualifier.blur.is_finite() {
+        qualifier.blur.clamp(0.0, QUALIFIER_BLUR_MAX)
+    } else {
+        0.0
+    };
 }
 
 /// One hue range clamped, or `None` when it must go.

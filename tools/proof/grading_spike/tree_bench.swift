@@ -35,8 +35,19 @@
 // no `framejob_adjust_fragment`, issue #284) builds no adjustment pipeline,
 // reads no KA and times only V0:S1, VT:S1 and V0b:S1. The JSON has
 // `bench-<h>.json`'s shape; under `--adjust 0` its `k` holds only KT.
+//
+// Grading-4 T4-4 (spec §11 GR-35) adds four VT-only series to every plan, for
+// the qualifier's cleanup blur: VT:SQ, S1 then the adjustment pass at +1 EV
+// with hue {120, 40, 20} computed inline; and VT:SQ2, VT:SQ8 and VT:SQ24, S1,
+// the encoder ended, `MetalRenderer.encodeSelectionMap` (the app's own map
+// pass, with `MetalRenderer.qualifierMapPipeline` over VT's library) into an
+// `r16Float` pair with an `MPSImageGaussianBlur` at σ 2, 8 or 24 destination
+// pixels (`.clamp`), then the pass resumed with `.load` and the same
+// adjustment pass reading the blurred map (`blurred` 1). `grading_spike.py`'s
+// TB is each VT:SQσ − VT:SQ.
 import Foundation
 import Metal
+import MetalPerformanceShaders
 
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data("tree_bench: \(message)\n".utf8))
@@ -146,6 +157,12 @@ func adjustState(_ lib: String) -> MTLRenderPipelineState {
 
 let adjustStates: [String: MTLRenderPipelineState] =
     adjust ? ["V0": adjustState("V0"), "VT": adjustState("VT")] : [:]
+/// VT's adjustment state for the SQ series, which run in every plan: VT is the
+/// tree's own shader, so it always has the pass.
+let qualifiedState = adjustStates["VT"] ?? adjustState("VT")
+/// The app's own map pipeline over VT's library (T4-4).
+guard let mapState = MetalRenderer.qualifierMapPipeline(device: device, library: libraries["VT"]!)
+else { fail("VT: the selection map pipeline would not build") }
 
 let samplerDescriptor = MTLSamplerDescriptor()
 samplerDescriptor.minFilter = .linear
@@ -248,6 +265,23 @@ let identityStrip: MTLTexture = {
 }()
 let destination = texture2D(workingFormat, W, H, target: true)
 let background = MTLClearColor(red: 0.2, green: 0.4, blue: 0.6, alpha: 1)
+/// The SQσ series' pair, as `Compositor+Selection.swift` allocates it.
+let selectionSurfaces: MetalRenderer.QualifierSurfaces = {
+    let d = MTLTextureDescriptor.texture2DDescriptor(
+        pixelFormat: .r16Float, width: W, height: H, mipmapped: false)
+    d.usage = [.renderTarget, .shaderRead, .shaderWrite]
+    d.storageMode = .private
+    guard let map = device.makeTexture(descriptor: d), let blurred = device.makeTexture(descriptor: d)
+    else { fail("the selection pair") }
+    return MetalRenderer.QualifierSurfaces(map: map, blurred: blurred)
+}()
+/// One kernel per SQσ series, `.clamp` as `blurKernel(sigma:)` makes it.
+let selectionBlurs: [Int: MPSImageGaussianBlur] = Dictionary(
+    uniqueKeysWithValues: [2, 8, 24].map { sigma in
+        let kernel = MPSImageGaussianBlur(device: device, sigma: Float(sigma))
+        kernel.edgeMode = .clamp
+        return (sigma, kernel)
+    })
 
 // ---- encoding --------------------------------------------------------------
 
@@ -284,11 +318,12 @@ func adjustBlock() -> LayerUniforms {
     return u
 }
 
-/// One frame of `series` ("V0:S1", "VT:SA", …).
+/// One frame of `series` ("V0:S1", "VT:SA", "VT:SQ8", …).
 func encode(_ series: String, _ buffer: MTLCommandBuffer) {
     let parts = series.split(separator: ":").map(String.init)
     let lib = parts[0] == "VT" ? "VT" : "V0"
-    let adjusted = parts.count > 1 && parts[1] == "SA"
+    let scene = parts.count > 1 ? parts[1] : "S1"
+    let adjusted = scene == "SA"
     var block = fullBleed(graded: lib == "VT")
     let d = MTLRenderPassDescriptor()
     d.colorAttachments[0].texture = destination
@@ -320,7 +355,45 @@ func encode(_ series: String, _ buffer: MTLCommandBuffer) {
         e.setFragmentTexture(identityStrip, index: 3)
         e.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
     }
-    e.endEncoding()
+    guard scene.hasPrefix("SQ") else {
+        e.endEncoding()
+        return
+    }
+    // T4-4: the qualified adjustment pass, inline (SQ) or through the blurred
+    // map (SQσ), the pass broken and resumed as `drawAdjustment` does.
+    var q = QualifierUniforms(
+        ColorQualifier(hue: QualifierHue(center: 120, width: 40, softness: 20)), selection: false)
+    var adjust = adjustBlock()
+    var pass = e
+    var map: MTLTexture = placeholder
+    if let sigma = Int(scene.dropFirst(2)) {
+        guard let blur = selectionBlurs[sigma] else { fail("no kernel for σ \(sigma)") }
+        e.endEncoding()
+        map = MetalRenderer.encodeSelectionMap(
+            q, from: destination, into: selectionSurfaces, pipeline: mapState, blur: blur,
+            buffer: buffer)
+        q.blurred = 1
+        let resume = MTLRenderPassDescriptor()
+        resume.colorAttachments[0].texture = destination
+        resume.colorAttachments[0].loadAction = .load
+        resume.colorAttachments[0].storeAction = .store
+        guard let reopened = buffer.makeRenderCommandEncoder(descriptor: resume) else {
+            fail("encoder")
+        }
+        reopened.setFragmentSamplerState(sampler, index: 0)
+        pass = reopened
+    }
+    pass.setRenderPipelineState(qualifiedState)
+    withUnsafeBytes(of: &adjust) { bytes in
+        pass.setFragmentBytes(bytes.baseAddress!, length: blockBytes, index: 0)
+    }
+    pass.setFragmentBytes(&q, length: MemoryLayout<QualifierUniforms>.stride, index: 1)
+    pass.setFragmentTexture(map, index: 0)
+    pass.setFragmentTexture(placeholder, index: 1)
+    pass.setFragmentTexture(identity2, index: 2)
+    pass.setFragmentTexture(identityStrip, index: 3)
+    pass.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+    pass.endEncoding()
 }
 
 // ---- KT: the readback, before any timing -------------------------------------
@@ -367,9 +440,10 @@ for (row, scene) in [("KT", "S1"), ("KA", "SA")] where adjust || scene == "S1" {
 
 // ---- timing ----------------------------------------------------------------
 
-let plan = adjust
+let selectionPlan = ["VT:SQ", "VT:SQ2", "VT:SQ8", "VT:SQ24"]
+let plan = (adjust
     ? ["V0:S1", "VT:S1", "V0b:S1", "V0:SA", "VT:SA", "V0b:SA"]
-    : ["V0:S1", "VT:S1", "V0b:S1"]
+    : ["V0:S1", "VT:S1", "V0b:S1"]) + selectionPlan
 
 func frameMilliseconds(_ name: String) -> Double {
     guard let buffer = queue.makeCommandBuffer() else { fail("command buffer") }

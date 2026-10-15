@@ -2,7 +2,7 @@
 //! `video.curves.hue_hue` and `.hue_sat`, driven through the C FFI exactly
 //! as `ReelCore.swift` drives it.
 //!
-//! Pinned here: the current version is 20; every earlier version (1 to 19),
+//! Pinned here: the current version is at least 20; every earlier version (1 to 19),
 //! and a file numbered 1015 (GR-9's branch number, read as 15), opens
 //! stamped current; every number past the current one, 1014 included, and
 //! 1016 are refused as newer; a file with no hue curve at 19 writes the
@@ -39,10 +39,10 @@ fn file(version: u32, curves: Value) -> Value {
     })
 }
 
-#[test]
-fn the_current_version_is_20() {
-    assert_eq!(RC_FORMAT_VERSION, 20);
-}
+const _: () = assert!(
+    RC_FORMAT_VERSION >= 20,
+    "version 20 is at most the current version"
+);
 
 #[test]
 fn every_earlier_version_and_1015_open_stamped_current() {

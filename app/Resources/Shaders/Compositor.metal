@@ -2012,7 +2012,9 @@ fragment float4 framejob_dissolve_fragment(ShadowVaryings in [[stage_in]],
 // of four — enabled, then its three numbers (hue in degrees, the two levels
 // in 0…1) — then `invert`, `selection` (draw `q` × coverage as grey instead
 // of grading: Show Selection), `enabled` (0 skips the reading, so an
-// unqualified pass weighs exactly as it did) and one reserved.
+// unqualified pass weighs exactly as it did) and `blurred` (1: read `q` from
+// the blurred map at `texture(0)` instead of computing it, spec §11 GR-35;
+// the block's one reserved float until then).
 struct QualifierUniforms {
     float hueEnabled;
     float hueCenter;
@@ -2029,7 +2031,7 @@ struct QualifierUniforms {
     float invert;
     float selection;
     float enabled;
-    float reserved;
+    float blurred;
 };
 
 // 1 at or inside `edge`, falling to 0 across `softness` OUTSIDE it by
@@ -2078,6 +2080,22 @@ static inline float qualifierWeight(float3 c, constant QualifierUniforms &q) {
     return q.invert > 0.5 ? 1.0 - w : w;
 }
 
+// MARK: - The selection map (spec §11 GR-35)
+
+// The qualifier's cleanup blur, first half: `q` of every destination pixel,
+// read as the adjustment pass reads it (un-premultiplied, saturated), into an
+// `r16Float` map of the destination's size (`Compositor+Selection.swift`),
+// which `MPSImageGaussianBlur` then blurs into its pair. Only `q`: the
+// coverage is multiplied after, unblurred, by the adjustment pass.
+fragment float4 framejob_qualifier_map_fragment(ShadowVaryings in [[stage_in]],
+                                               constant QualifierUniforms &q [[buffer(0)]],
+                                               texture2d<float> destination [[texture(0)]]) {
+    float4 dst = destination.read(uint2(in.position.xy));
+    float a = saturate(dst.a);
+    float3 c = saturate(dst.rgb / max(a, 1e-4));
+    return float4(qualifierWeight(c, q), 0.0, 0.0, 1.0);
+}
+
 // MARK: - The adjustment pass (spec §11 GR-6)
 
 // An adjustment clip's layer: no texture, one full-frame quad, blending OFF.
@@ -2090,12 +2108,16 @@ static inline float qualifierWeight(float3 c, constant QualifierUniforms &q) {
 // preserved. The weight is the layer's opacity, its strength, times the
 // matte coverage sampled as step 7c samples it, times the qualifier's `q`
 // (spec §11 GR-13), read from the destination BEFORE the grade so the grade
-// never moves what it selects. With `q.selection` set the pass writes
-// `q` × coverage as opaque grey instead (Show Selection).
+// never moves what it selects — or, with `q.blurred` set, read from the
+// blurred map at `texture(0)` the selection pass made from that same
+// destination (spec §11 GR-35). With `q.selection` set the pass writes
+// `q` × coverage as opaque grey instead (Show Selection); the coverage is
+// never blurred.
 fragment float4 framejob_adjust_fragment(ShadowVaryings in [[stage_in]],
                                         constant LayerUniforms &u [[buffer(0)]],
                                         constant QualifierUniforms &q [[buffer(1)]],
                                         float4 dst [[color(0)]],
+                                        texture2d<float> selectionMap [[texture(0)]],
                                         texture2d<float> matte [[texture(1)]],
                                         texture3d<float> look [[texture(2)]],
                                         texture2d<float> curves [[texture(3)]],
@@ -2107,7 +2129,8 @@ fragment float4 framejob_adjust_fragment(ShadowVaryings in [[stage_in]],
     float coverage = matte.sample(samp, local).r;
     float selected = 1.0;
     if (q.enabled > 0.5) {
-        selected = qualifierWeight(c, q);
+        selected = q.blurred > 0.5 ? selectionMap.read(uint2(in.position.xy)).r
+            : qualifierWeight(c, q);
     }
     if (q.selection > 0.5) {
         return float4(float3(saturate(selected * coverage)), 1.0);

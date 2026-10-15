@@ -7,10 +7,11 @@ import AppKit
 /// Per range two rows — its checkbox (Hue, Saturation, Luma) in the label
 /// column then its strip (`RangeStripControl`), then three captioned fields
 /// (Centre, Width, Soft in whole degrees; Low, High, Soft to two decimals) —
-/// then Invert, then Pick from Canvas and the Show Selection switch, both
-/// sent to the editor as commands (`EditorViewController+Qualifier.swift`,
-/// `+Seeing`). A checkbox writes `{}` or `null` (one step named after the
-/// range); a strip drag is the live trio; a field one commit; each sends the
+/// then Invert, then Blur (spec §11 GR-35: the house slider and field,
+/// 0–100 %, one step "Qualifier Blur"), then Pick from Canvas and the Show
+/// Selection switch, both sent to the editor as commands
+/// (`EditorViewController+Qualifier.swift`, `+Seeing`). A checkbox writes
+/// `{}` or `null` (one step named after the range); a strip drag is the live trio; a field one commit; each sends the
 /// WHOLE range to every selected clip, the first clip's values being the
 /// ones shown (the mixed badge says when the others differ). Every row
 /// writes `video.qualifier`, so a keyed action marks them all as one key.
@@ -33,6 +34,13 @@ extension VideoPane {
                 read: { qualifier().invert },
                 ops: { ops(ColorQualifierPatch(invert: $0)) },
                 mixed: { binding.mixedVideo { $0.qualifier.invert } }))
+        rows.append(
+            inspectorValueRow(
+                "Blur", binding, name: "Qualifier Blur", unit: "%", decimals: 0, min: 0,
+                max: 100, quick: [0, 25, 50, 75, 100],
+                read: { qualifier().blur * 100 },
+                ops: { ops(ColorQualifierPatch(blur: $0 / 100)) },
+                mixed: { binding.mixedVideo { $0.qualifier.blur } }))
         let pick = OptionButtonControl(
             title: "Pick from Canvas",
             action: { [weak self] in
