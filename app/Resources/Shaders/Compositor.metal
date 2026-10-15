@@ -518,19 +518,59 @@ static inline float roundedBoxDistance(float2 p, float2 halfSize, float radius) 
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
 }
 
-static inline float3 hueRotate(float3 c, float radians) {
-    float cs = cos(radians);
-    float sn = sin(radians);
-    float3 r = float3(0.299 + 0.701 * cs + 0.168 * sn,
-                      0.587 - 0.587 * cs + 0.330 * sn,
-                      0.114 - 0.114 * cs - 0.497 * sn);
-    float3 g = float3(0.299 - 0.299 * cs - 0.328 * sn,
-                      0.587 + 0.413 * cs + 0.035 * sn,
-                      0.114 - 0.114 * cs + 0.292 * sn);
-    float3 b = float3(0.299 - 0.300 * cs + 1.250 * sn,
-                      0.587 - 0.588 * cs - 1.050 * sn,
-                      0.114 + 0.886 * cs - 0.203 * sn);
-    return float3(dot(c, r), dot(c, g), dot(c, b));
+// MARK: - Hue (spec §11 GR-13, GR-32, GR-33)
+
+// The fully saturated hue `degrees` (the textbook HSV ramp) less its own
+// Rec. 709 luma: a push towards that hue that moves no brightness.
+static inline float3 lookHueChroma(float degrees) {
+    float3 full = saturate(abs(fmod(degrees / 60.0 + float3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0);
+    return full - dot(full, float3(0.2126, 0.7152, 0.0722));
+}
+
+// The HSV hue of an encoded, saturated colour in degrees, [0, 360), 0 when
+// it has no chroma (spec §11 GR-13's formula, one helper for the qualifier,
+// the hue curves and Color's Hue): `mx` its largest channel, `chroma`
+// max − min. Step 3's Color Hue passes an unclamped colour (GR-33); the
+// formula holds for any colour with chroma > 0.
+static inline float hsvHue(float3 c, float mx, float chroma) {
+    float hue = 0.0;
+    if (chroma > 0.0) {
+        if (mx == c.r) {
+            hue = 60.0 * fmod((c.g - c.b) / chroma + 6.0, 6.0);
+        } else if (mx == c.g) {
+            hue = 60.0 * ((c.b - c.r) / chroma + 2.0);
+        } else {
+            hue = 60.0 * ((c.r - c.g) / chroma + 4.0);
+        }
+    }
+    return hue;
+}
+
+// Hue vs Hue's turn (spec §11 GR-32): an HSV-hue move of `degrees` in the
+// curve's direction (+ is red → yellow → green), keeping Rec. 709 luma. The
+// colour's own chroma Cr (max − min) along the fully saturated hue
+// `hue + degrees` less its luma (`lookHueChroma`), added to its luma Y; k,
+// the largest value in [0, 1] keeping every channel inside [min(0, min rgb),
+// max(1, max rgb)], gives up chroma (toward the same-luma grey, which keeps
+// the hue) only where the turned colour at that luma would leave the range.
+// Color's Hue (step 3) calls it too, its degrees wrapped into [0, 360) and
+// with no chroma guard (spec §11 GR-33).
+static inline float3 gradeHueShift(float3 rgb, float hue, float degrees) {
+    float y = dot(rgb, float3(0.2126, 0.7152, 0.0722));
+    float mx = max(rgb.r, max(rgb.g, rgb.b));
+    float mn = min(rgb.r, min(rgb.g, rgb.b));
+    float3 d = (mx - mn) * lookHueChroma(fmod(hue + degrees + 360.0, 360.0));
+    float lo = min(0.0, mn);
+    float hi = max(1.0, mx);
+    float k = 1.0;
+    for (int i = 0; i < 3; ++i) {
+        if (d[i] > 0.0) {
+            k = min(k, (hi - y) / d[i]);
+        } else if (d[i] < 0.0) {
+            k = min(k, (lo - y) / d[i]);
+        }
+    }
+    return y + max(k, 0.0) * d;
 }
 
 // MARK: - The M3 effect helpers
@@ -541,9 +581,10 @@ static inline float3 hueRotate(float3 c, float radians) {
 ///
 /// It exists so that a filter which gathers neighbours gathers the SAME KIND
 /// of pixel as the centre one. Every stage inside it is either affine in rgb
-/// (brightness, contrast, saturation, hue) or a smooth function of the
-/// sampled colour (the spill), which is what makes the blur below exact
-/// rather than approximate — see the order-of-operations note.
+/// (brightness, contrast, saturation) or a continuous function of the
+/// sampled colour (the spill, and the hue turn, spec §11 GR-33), which is
+/// what makes the blur below exact rather than approximate — see the
+/// order-of-operations note.
 struct LayerSample {
     float3 rgb;
     float alpha;
@@ -573,7 +614,17 @@ static inline LayerSample gradeSample(float3 rgb, float alpha,
     float luma = dot(rgb, float3(0.2126, 0.7152, 0.0722));
     rgb = mix(float3(luma), rgb, 1.0 + u.saturation);
     if (abs(u.hue) > 1e-4) {
-        rgb = hueRotate(rgb, u.hue);
+        // Color's Hue (spec §11 GR-33): GR-32's exact HSV-hue shift, + red →
+        // yellow → green, Rec. 709 luma kept. The degrees are wrapped into
+        // [0, 360) first, since `lookHueChroma`'s `fmod` keeps a negative
+        // sign; the hue is read once from the colour as the saturation leaves
+        // it, unclamped, and there is no chroma guard (a constant turn tints
+        // nothing, and a grey comes back as its luma).
+        float degrees = u.hue * (180.0 / M_PI_F);
+        float turn = degrees - 360.0 * floor(degrees / 360.0);
+        float mx = max(rgb.r, max(rgb.g, rgb.b));
+        float chroma = mx - min(rgb.r, min(rgb.g, rgb.b));
+        rgb = gradeHueShift(rgb, hsvHue(rgb, mx, chroma), turn);
     }
 
     LayerSample out;
@@ -926,9 +977,9 @@ static inline float3 gradeEncode(float3 c) {
 }
 
 // Tone, on straight colour: exposure and white balance in LOCAL linear light
-// — decoded, multiplied and re-encoded here, a colour transform like
-// `hueRotate`, not the whole-pipeline linear light §7.5 and PR-5 defer — and
-// the curve and saturation shapes on encoded values. At ±1 (Frame Job's own
+// — decoded, multiplied and re-encoded here, a colour transform like Color's
+// hue turn, not the whole-pipeline linear light §7.5 and PR-5 defer — and the
+// curve and saturation shapes on encoded values. At ±1 (Frame Job's own
 // strengths, GR-2): exposure ×2^±1 on linear light; temperature red ×2^±0.3
 // and blue ×2^∓0.3; tint +1 green ×2^−0.3; highlights and shadows ±0.25
 // weighted to the top and bottom halves of luma; whites and blacks a ±15 %
@@ -960,13 +1011,6 @@ struct LookBakeUniforms {
     float highlightHue;
     float highlightAmount;
 };
-
-// The fully saturated hue `degrees` (the textbook HSV ramp) less its own
-// Rec. 709 luma: a push towards that hue that moves no brightness.
-static inline float3 lookHueChroma(float degrees) {
-    float3 full = saturate(abs(fmod(degrees / 60.0 + float3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0);
-    return full - dot(full, float3(0.2126, 0.7152, 0.0722));
-}
 
 // MARK: - Wheels (spec §11 GR-11)
 
@@ -1003,23 +1047,6 @@ static inline float3 gradeWheels(float3 rgb, constant LayerUniforms &u) {
     return v;
 }
 
-// The HSV hue of an encoded, saturated colour in degrees, [0, 360), 0 when
-// it has no chroma (spec §11 GR-13's formula, one helper for the qualifier and
-// the hue curves): `mx` its largest channel, `chroma` max − min.
-static inline float hsvHue(float3 c, float mx, float chroma) {
-    float hue = 0.0;
-    if (chroma > 0.0) {
-        if (mx == c.r) {
-            hue = 60.0 * fmod((c.g - c.b) / chroma + 6.0, 6.0);
-        } else if (mx == c.g) {
-            hue = 60.0 * ((c.b - c.r) / chroma + 2.0);
-        } else {
-            hue = 60.0 * ((c.r - c.g) / chroma + 4.0);
-        }
-    }
-    return hue;
-}
-
 // Step 4c.2, on encoded straight colour (spec §11 GR-12): each channel
 // through its own composite curve, `channel(master(v))`, which `CurveTable`
 // wrote into row 0 of the n × 2 strip at `texture(3)` — red's in the texels'
@@ -1032,32 +1059,6 @@ static inline float3 gradeCurves(float3 rgb, texture2d<float> strip, sampler sam
     return float3(strip.sample(samp, float2(at.r, 0.25)).r,
                   strip.sample(samp, float2(at.g, 0.25)).g,
                   strip.sample(samp, float2(at.b, 0.25)).b);
-}
-
-// Hue vs Hue's turn (spec §11 GR-32): an HSV-hue move of `degrees` in the
-// curve's direction (+ is red → yellow → green), keeping Rec. 709 luma. The
-// colour's own chroma Cr (max − min) along the fully saturated hue
-// `hue + degrees` less its luma (`lookHueChroma`), added to its luma Y; k,
-// the largest value in [0, 1] keeping every channel inside [min(0, min rgb),
-// max(1, max rgb)], gives up chroma (toward the same-luma grey, which keeps
-// the hue) only where the turned colour at that luma would leave the range.
-// Not Color's `hueRotate`, which turns HSV hue against its sign.
-static inline float3 gradeHueShift(float3 rgb, float hue, float degrees) {
-    float y = dot(rgb, float3(0.2126, 0.7152, 0.0722));
-    float mx = max(rgb.r, max(rgb.g, rgb.b));
-    float mn = min(rgb.r, min(rgb.g, rgb.b));
-    float3 d = (mx - mn) * lookHueChroma(fmod(hue + degrees + 360.0, 360.0));
-    float lo = min(0.0, mn);
-    float hi = max(1.0, mx);
-    float k = 1.0;
-    for (int i = 0; i < 3; ++i) {
-        if (d[i] > 0.0) {
-            k = min(k, (hi - y) / d[i]);
-        } else if (d[i] < 0.0) {
-            k = min(k, (lo - y) / d[i]);
-        }
-    }
-    return y + max(k, 0.0) * d;
 }
 
 // Step 4c.2's second half, on encoded straight colour (spec §11 GR-32): the
@@ -1120,6 +1121,7 @@ static inline float3 gradeLook(float3 rgb, texture3d<float> look, sampler samp,
 //   2. pixelate                quantizes that same coordinate
 //   3. sample, or the slate    `layerSample` — un-premultiply, chroma key
 //                              and spill, brightness/contrast/saturation/hue
+//                              (the hue by `gradeHueShift`, spec §11 GR-33)
 //   4. blur, then sharpen      gather neighbours, each one through (3)
 //  4b. obscure the regions     colour only, and AFTER the sharpen: see below
 //  4c. tone                    `gradeTone`, once per pixel (spec §11 GR-2):

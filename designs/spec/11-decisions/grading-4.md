@@ -5,12 +5,12 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 
 The road map that makes these is in progress at `designs/grading-4.md`; its own sections hold each
 phase's record (T4-0 the road map, these decisions and the pure move; T4-1 the scopes; T4-2 the
-hue curves and the curve editor's extras; T4-3 curves of different counts; T4-4 the qualifier's
-cleanup blur; T4-5 the close). The IDs continue the GR- series of [`grading.md`](grading.md),
-[`grading-2.md`](grading-2.md) and [`grading-3.md`](grading-3.md), so a citation never has to say
-which file. GR-24…GR-30 were recorded in T4-0, before any tier-4 code, from the owner's answers of
-2026-10-14 to the tier-4 brief's choices, every one the recommended answer
-(`designs/grading-4.md`, "The owner's choices"; the brief is
+hue curves and the curve editor's extras; T4-2b Color's Hue; T4-3 curves of different counts;
+T4-4 the qualifier's cleanup blur; T4-5 the close). The IDs continue the GR- series of
+[`grading.md`](grading.md), [`grading-2.md`](grading-2.md) and [`grading-3.md`](grading-3.md), so
+a citation never has to say which file. GR-24…GR-30 were recorded in T4-0, before any tier-4
+code, from the owner's answers of 2026-10-14 to the tier-4 brief's choices, every one the
+recommended answer (`designs/grading-4.md`, "The owner's choices"; the brief is
 `~/.claude/litecode/reelcut/grading-tier4/I-grading-tier4.md` and the answers `answers.md` beside
 it, outside the repo). T4-1…T4-4 each record their numbers as a new entry (GR-31 on) or as
 Amended-by lines before their code.
@@ -208,3 +208,39 @@ nothing of Concat is opened, at design time or build time.
   - **Not:** Hue vs Luma; dragging a point across 0°/360°; a change to Color's Hue (`hueRotate`).
   - Risk accepted: the hue curves' strengths are first numbers, judged by GRD-13 on real
     footage; a hue curve between two counts switches at the action's end until T4-3.
+  **Amended by GR-33** (grading-4 T4-2b): its "Not: … a change to Color's Hue (`hueRotate`)" is
+  lifted; Color's Hue now calls this entry's `gradeHueShift`, wrapped and unguarded, and
+  `hueRotate` is gone.
+- **GR-33 — Color's Hue turns HSV hue by GR-32's exact shift: + is red → yellow → green, Rec. 709
+  luma kept.** Recorded in T4-2b before its code, from the owner's answer of 2026-10-15 to
+  T4-2's H16 ("Fix with the new exact shift (Recommended)"); it amends GR-2 and GR-32.
+  - **Why:** `hueRotate`, the matrix Color's Hue (`video.color.hue`) ran at step 3 since M3,
+    turns HSV hue AGAINST its label's sign and by an amount that varies by hue (T4-2's H16 for
+    the record: +40 moved red −55.52° and green −22.63°), so the Color tab's Hue and Hue vs Hue
+    disagreed about which way is +.
+  - **The step.** Color's Hue is GR-32's exact HSV-hue shift wherever step 3's colour adjust
+    runs, all through `gradeSample`: the layer stage (every blur, sharpen, pixelate and region
+    tap, and the missing-media slate), the adjustment pass and the look bake. +h moves every
+    pixel's HSV hue +h° (red → yellow → green), keeping its Rec. 709 luma; chroma is given up
+    only to stay in range (GR-32's k).
+  - **The value** stays degrees in the model, the uniform stays radians, and any finite value is
+    taken modulo 360 in `gradeSample` before the shift (`degrees − 360·floor(degrees/360)`, into
+    [0, 360)); an action lerps degrees as before. The hue is read ONCE, by GR-13's formula, from
+    the colour as step 3's saturation leaves it, unclamped (the formula holds for any colour with
+    chroma > 0, and degrees 0 is the identity for any colour). No chroma guard: a constant turn
+    tints nothing, and a grey (chroma 0) is returned as its luma. |hue| ≤ 1e-4 rad skips the step,
+    so a layer whose Hue is 0 renders byte-identical.
+  - **What follows with no edit.** Every built-in look has hue 0 (`core/src/model_look.rs`'s
+    `definition`), so every look lattice is unchanged; the Look gallery's thumbnails render
+    through `Exporter.renderFrame` and follow. Old projects' Color Hue renders change, with no
+    migration and no format bump (owner, 2026-10-15: old files need no compatibility care), since
+    the stored meaning (degrees) does not.
+  - **Scored** by `tools/proof/curves_proof.py` H16–H19: ±40 by colorsys (direction, amount and
+    luma), ±40 against a constant Hue vs Hue curve, −500 against −140 (both wrap to 220°;
+    unwrapped, the shift's argument falls below −60 for hues under 80°, where `lookHueChroma`'s
+    sign-keeping `fmod` differs; a pair like −400/−40 never leaves (−60, 360) and cannot score the
+    wrap), and a near-grey (132, 128, 128) still turned.
+  - **Not:** no core, FFI, format, op, tool, `LayerUniforms` or Swift-model change; no change to
+    `gradeHueShift`'s body or to the hue curves.
+  - Risk accepted: the shift costs more than the matrix per tap on a blurred layer (13 taps); not
+    measured.

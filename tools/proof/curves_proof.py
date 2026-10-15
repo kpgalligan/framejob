@@ -8,7 +8,8 @@ probe's rows over `app/Sources`. Road map "grading-4", phase T4-2 (spec §11
 GR-32) adds the hue curves, `video.curves.hue_hue` and `.hue_sat`, through
 the strip's second row behind `hueCurvesEnabled` (rows H1–H16), the editor's
 hover readout and ⇧ axis lock and the Hue and Sat cells (probe rows
-P12–P19), and four tone-curved frames to N0.
+P12–P19), and four tone-curved frames to N0. Phase T4-2b (spec §11 GR-33)
+scores Color's Hue, now GR-32's exact shift, as H16–H19.
 
     python3 tools/proof/curves_proof.py [--app PATH] [--only K1,C1,...]
     python3 tools/proof/curves_proof.py capture DIR    # the uncurved control, before any product edit
@@ -26,7 +27,8 @@ Every project is closed (`close_project`, discard).
 Fixtures, written by this script (as `wheels_proof.py`'s): CARD, a 640×360
 grey-128 PNG; HUE, a 720×120 PNG whose column x is HSV(x/2°, 1, 1) in 8
 bits; GREY, a 720×120 grey ramp (column x round(255·x/719)); TINTED and
-ROSE, 720×120 cards of (130, 128, 128) and (153, 102, 102); RAMP, a 1920×360 PNG whose column x is round(255·x/1919); MOVIE,
+ROSE, 720×120 cards of (130, 128, 128) and (153, 102, 102); NEAR, a 720×120
+card of (132, 128, 128) (T4-2b); RAMP, a 1920×360 PNG whose column x is round(255·x/1919); MOVIE,
 a 2 s 640×360 30 fps ffmpeg `testsrc2` H.264 file; DEEP, a 2 s 1920×360 black
 10-bit ProRes 422 HQ file made through `bt709_fixture.make` (issue #292:
 `setparams` on its input and the tags on its output, kept only when ffprobe
@@ -119,9 +121,20 @@ whose middles are 0.6 and 0.4, saved for the probe).
   grey. **H15** (independent of the oracle: hues by `colorsys`): under
   hue_hue ±40 every column's signed HSV-hue change is the value ±1° at output
   chroma ≥ 64 and ±2° everywhere, and the 120° column lands in (120°, 180°]
-  under +40 and [80°, 120°) under −40. **H16** (a RECORD, PASS whenever it
-  measures): Color's Hue +40 on HUE, the 0° and 120° columns' signed change
-  and its direction against the label's sign.
+  under +40 and [80°, 120°) under −40. T4-2b's (spec §11 GR-33), each
+  restoring Hue 0 after: **H16** (hues by `colorsys`): under Color's Hue ±40
+  (no curves) every column's signed HSV-hue change is the value ±1° at output
+  chroma ≥ 64 and ±2° everywhere, Rec. 709 luma within ±1 level of the
+  uncurved column's; under +40 the 0° column lands in (0°, 60°] and the 120°
+  column in (120°, 180°], under −40 the 120° column in [80°, 120°). **H17**:
+  Color's Hue ±40 = hue_hue `[[0, ±40], [180, ±40]]` (H15's frames when H15
+  ran) ±1 at every column. **H18**: Color's Hue −500 = Color's Hue −140 ±1 at
+  every column (both wrap to 220°; unwrapped, the shift's argument falls
+  below −60 for hues under 80°, where `lookHueChroma`'s sign-keeping `fmod`
+  differs; a pair like −400/−40 never leaves (−60, 360) and cannot score the
+  wrap). **H19** (NEAR, its own project): Color's Hue +40 moves the centre
+  pixel off its input bytes and its colorsys hue lands in (0°, 60°] (no
+  chroma guard).
 - **P1–P19**: `curves_probe.swift`, built by `swift_build.build` over
   `app/Sources` (a failed build is a scored FAILURE of every P row), P1–P11
   and P16–P17 on project P; each row's sentence is the probe's. T4-2's: P7
@@ -156,9 +169,9 @@ CT). MUTANT PASS when every named row FAILED and no other scored row did:
   identity-not-aligned     no identity alignment in an action: A2 A3 CT
   hue-wrap-dropped         a hue curve flat outside its first and last x: H4 P12
   hue-from-graded          the gain sampled at the turned hue: H13
-  hue-shift-reversed       the turn's degrees negated: H15 H1 H4 H13
-  luma-not-kept            the turn as HSV(h + degrees, S, V): H12 H1 H4 H13
-  gamut-limit-dropped      k fixed at 1: H15 H12 H1 H4 H13
+  hue-shift-reversed       the turn's degrees negated: H15 H1 H4 H13 H17
+  luma-not-kept            the turn as HSV(h + degrees, S, V): H12 H1 H4 H13 H16
+  gamut-limit-dropped      k fixed at 1: H15 H12 H1 H4 H13 H16
   chroma-guard-dropped     no chroma guard on the hue curves: H3
   hue-before-channel-curves  the hue curves before the channel curves: H14
   row-0-at-centre          row 0 sampled at y 0.5: K1 C1 M1 O1
@@ -166,6 +179,14 @@ CT). MUTANT PASS when every named row FAILED and no other scored row did:
 row 0 at y 0.5 every tone row, O1 too: each is named, as it fails by
 construction.)
   shift-lock-ignored       the drag's ⇧ ignored: P14
+  color-hue-reversed       Color's degrees negated before the wrap: H16 H17 H19
+  color-hue-unwrapped      Color's raw degrees passed, no wrap (the −500/−140
+                           pair): H18
+  color-hue-guarded        Color's turn mixed back by smoothstep(0.02, 0.06,
+                           chroma): H19
+(T4-2b: `luma-not-kept` and `gamut-limit-dropped` edit `gradeHueShift`, which
+Color's Hue now calls too, so H16 fails by construction; `hue-shift-reversed`
+turns only the curve, so H17's comparison fails by construction.)
 Exit 0 when every scored row passed (a mutant: caught); 1 when one failed
 (a mutant: survived); 2 when the control could not be performed.
 """
@@ -208,16 +229,18 @@ CHANNELS = ["master", "red", "green", "blue"]
 NEUTRAL = ["card", "card-toned", "card-wheeled", "card-adjusted", "ramp", "ramp-looked",
            "movie", "card-curved", "card-adjusted-curved", "ramp-curved", "movie-curved"]
 HUE_W, HUE_H = 720, 120
+NEAR = (132, 128, 128)
 ROWS = ["N0", "N1", "N2", "K1", "K3", "C1", "M1", "O1", "A1", "A2", "A3", "J1", "X1", "U1",
         "V1", "P0", "R1", "H1", "H2", "H3", "H4", "H6", "H7", "H8", "H9", "H12", "H13", "H14",
-        "H15", "H16", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11",
+        "H15", "H16", "H17", "H18", "H19", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11",
         "P12", "P13", "P14", "P15", "P16", "P17", "P18", "P19", "Z1"]
-RECORDS = {"H16"}
+RECORDS = set()
 C_ROWS = {"N1", "M1", "O1", "J1", "U1", "V1", "P0", "R1"}
 R_ROWS = {"K1", "K3", "C1"}
 M_ROWS = {"X1"}
 A_ROWS = {"A1", "A2", "A3"}
-H_ROWS = {"H1", "H2", "H3", "H4", "H6", "H7", "H8", "H9", "H12", "H13", "H14", "H15", "H16"}
+H_ROWS = {"H1", "H2", "H3", "H4", "H6", "H7", "H8", "H9", "H12", "H13", "H14", "H15", "H16",
+          "H17", "H18", "H19"}
 P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13",
           "P14", "P15", "P16", "P17", "P18", "P19"}
 SHADER = "app/Resources/Shaders/Compositor.metal"
@@ -249,6 +272,9 @@ HUE_GAIN = ("    if (abs(curve.g - 1.0) > 1e-6) {\n"
             "        out = mix(float3(dot(out, float3(0.2126, 0.7152, 0.0722))), out, curve.g);\n"
             "    }\n")
 HUE_RETURN = "    return y + max(k, 0.0) * d;\n"
+COLOR_DEGREES = "        float degrees = u.hue * (180.0 / M_PI_F);\n"
+COLOR_WRAP = "        float turn = degrees - 360.0 * floor(degrees / 360.0);\n"
+COLOR_SHIFT = "        rgb = gradeHueShift(rgb, hsvHue(rgb, mx, chroma), turn);\n"
 # name: ([(file, anchor, replacement), …], the rows that must fail)
 MUTANTS = {
     "catmull-rom": ([
@@ -320,15 +346,16 @@ MUTANTS = {
     "hue-shift-reversed": ([(
         SHADER,
         "        out = gradeHueShift(out, h, 360.0 * curve.r);\n",
-        "        out = gradeHueShift(out, h, -360.0 * curve.r);\n")], ["H15", "H1", "H4", "H13"]),
+        "        out = gradeHueShift(out, h, -360.0 * curve.r);\n")],
+        ["H15", "H1", "H4", "H13", "H17"]),
     "luma-not-kept": ([(
         SHADER, HUE_RETURN,
         "    float s = mx > 0.0 ? (mx - mn) / mx : 0.0;\n"
         "    float3 full = saturate(abs(fmod(fmod(hue + degrees + 360.0, 360.0) / 60.0"
         " + float3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0);\n"
-        "    return mx * mix(float3(1.0), full, s);\n")], ["H12", "H1", "H4", "H13"]),
+        "    return mx * mix(float3(1.0), full, s);\n")], ["H12", "H1", "H4", "H13", "H16"]),
     "gamut-limit-dropped": ([(SHADER, HUE_RETURN, "    return y + d;\n")],
-                            ["H15", "H12", "H1", "H4", "H13"]),
+                            ["H15", "H12", "H1", "H4", "H13", "H16"]),
     "chroma-guard-dropped": ([(
         SHADER,
         "    return mix(rgb, out, smoothstep(0.02, 0.06, chroma));\n",
@@ -347,6 +374,16 @@ MUTANTS = {
         ["K1", "C1", "M1", "O1"]),
     "shift-lock-ignored": ([(EDITOR, "        if lock {\n", "        if lock && false {\n")],
                            ["P14"]),
+    # T4-2b (spec §11 GR-33): Color's Hue, one per decision.
+    "color-hue-reversed": ([(
+        SHADER, COLOR_DEGREES,
+        "        float degrees = -u.hue * (180.0 / M_PI_F);\n")], ["H16", "H17", "H19"]),
+    "color-hue-unwrapped": ([(SHADER, COLOR_WRAP, "        float turn = degrees;\n")],
+                            ["H18"]),
+    "color-hue-guarded": ([(
+        SHADER, COLOR_SHIFT,
+        "        rgb = mix(rgb, gradeHueShift(rgb, hsvHue(rgb, mx, chroma), turn),\n"
+        "                  smoothstep(0.02, 0.06, chroma));\n")], ["H19"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -1220,11 +1257,28 @@ def column_misses(frame, want_of, columns=range(HUE_W), tolerance=1):
             if not close_to(frame.px(x, y), want_of(x), tolerance)]
 
 
+def coloured(doc, ids, tag, hue):
+    """The frame with Color's Hue at `hue` degrees, then Hue 0 again; a
+    Frame, or None."""
+    got = doc.color(ids, hue=hue)
+    frame = doc.frame(tag) if got["ok"] else None
+    doc.color(ids, hue=0)
+    if not got["ok"]:
+        print(f"       set {tag}: {got.get('error')}", flush=True)
+    return frame
+
+
+def hue_of(pixel):
+    """The colorsys HSV hue of an 8-bit pixel, in degrees."""
+    return colorsys.rgb_to_hsv(*[v / 255 for v in pixel])[0] * 360
+
+
 def run_h(client, state):
     hue = write_rgb_png(WORK / "hue.png", HUE_W, HUE_H, hue_column)
     grey = write_png(WORK / "grey-ramp.png", HUE_W, HUE_H, lambda x: round(255 * x / (HUE_W - 1)))
     tinted = write_rgb_png(WORK / "tinted.png", HUE_W, HUE_H, lambda x: (130, 128, 128))
     rose = write_rgb_png(WORK / "rose.png", HUE_W, HUE_H, lambda x: (153, 102, 102))
+    near = write_rgb_png(WORK / "near.png", HUE_W, HUE_H, lambda x: NEAR)
     closed = True
     y = HUE_H // 2
     doc, clip, base = hue_doc(client, "H", hue)
@@ -1413,22 +1467,77 @@ def run_h(client, state):
               f"{rose_out}, hue {rose_hue}°) and every HUE column under ±40° (worst "
               f"{worst:.3f} levels)", ok and rose_kept and worst <= 1)
 
-    # H16 (a record)
+    # H16, H17 and H18: Color's Hue (spec §11 GR-33), no curves set
+    color_turned = {}
+    if selected & {"H16", "H17"}:
+        for value in (40, -40):
+            color_turned[value] = coloured(doc, ids, f"h16{value:+d}", value)
     if "H16" in selected:
-        tinted_hue = doc.color(ids, hue=40)
-        frame = doc.frame("h16") if tinted_hue["ok"] else None
-        doc.color(ids, hue=0)
-        notes = []
-        for x in (0, 240):
+        rows_ok, notes = True, []
+        for value, frame in color_turned.items():
             if frame is None:
-                break
-            change = signed_hue_change(plain[x], frame.px(x, y))
-            direction = "with" if change > 0 else "against"
-            notes.append(f"the {x / 2:.0f}° column moves {change:+.2f}° ({direction} the "
-                         f"label's +40)")
-        check("H16 RECORD Color's Hue +40 on HUE (no curves): " + "; ".join(notes or ["no frame"]),
-              frame is not None)
+                rows_ok = False
+                notes.append(f"{value:+d}: no frame")
+                continue
+            worst_strong, worst_all, strong, worst_luma = 0.0, 0.0, 0, 0.0
+            for x in range(HUE_W):
+                out = frame.px(x, y)
+                error = abs(signed_hue_change(plain[x], out) - value)
+                worst_all = max(worst_all, error)
+                worst_luma = max(worst_luma, abs(luma(out) - luma(plain[x])))
+                if max(out) - min(out) >= 64:
+                    strong += 1
+                    worst_strong = max(worst_strong, error)
+            red, green = hue_of(frame.px(0, y)), hue_of(frame.px(240, y))
+            lands = (0 < red <= 60 and 120 < green <= 180) if value > 0 \
+                else 80 <= green < 120
+            rows_ok = rows_ok and worst_strong <= 1 and worst_all <= 2 and worst_luma <= 1 \
+                and lands
+            notes.append(f"{value:+d}: worst {worst_strong:.3f}° over {strong} columns at "
+                         f"output chroma ≥ 64, {worst_all:.3f}° over all {HUE_W}; luma worst "
+                         f"{worst_luma:.3f} levels; red → {red:.2f}°, green → {green:.2f}°")
+        check("H16 Color's Hue ±40 on HUE (no curves), hues by colorsys: every column's signed "
+              "HSV-hue change is the value ±1° at output chroma ≥ 64 and ±2° everywhere, "
+              "Rec. 709 luma kept ±1; under +40 red lands in (0°, 60°] and green in "
+              "(120°, 180°], under −40 green in [80°, 120°)", rows_ok, "; ".join(notes))
+    if "H17" in selected:
+        results = []
+        for value in (40, -40):
+            curve = turned.get(value)
+            if curve is None:
+                ok, curve = curved(doc, ids, f"h17{value:+d}", hue_hue=[[0, value], [180, value]])
+                curve = curve if ok else None
+            misses = column_misses(color_turned.get(value), lambda x: curve.px(x, y)) \
+                if curve is not None else ["no hue_hue frame"]
+            results.append((value, misses[:3]))
+        check("H17 Color's Hue ±40 on HUE renders hue_hue [[0, ±40], [180, ±40]] ±1 at every "
+              "column", all(not misses for _, misses in results),
+              "; ".join(f"{value:+d}: {misses or 'all within'}" for value, misses in results))
+    if "H18" in selected:
+        far = coloured(doc, ids, "h18-500", -500)
+        wrapped = coloured(doc, ids, "h18-140", -140)
+        misses = column_misses(far, lambda x: wrapped.px(x, y)) if wrapped is not None \
+            else ["no −140 frame"]
+        differs = wrapped is not None and any(wrapped.px(x, y) != plain[x] for x in range(HUE_W))
+        check("H18 Color's Hue −500 renders Color's Hue −140 ±1 at every column (both wrap to "
+              "220°)", not misses and differs, f"{misses[:3] or 'all within'}; −140 differs "
+              f"from plain {differs}")
     closed = close(client, doc.path) and closed
+
+    # H19, on its own project
+    if "H19" in selected:
+        n_doc, n_clip, n_base = hue_doc(client, "H19", near)
+        frame = coloured(n_doc, [n_clip], "h19", 40) if n_base is not None else None
+        closed = close(client, n_doc.path) and closed
+        cx, cy = HUE_W // 2, HUE_H // 2
+        before = n_base.px(cx, cy) if n_base is not None else None
+        after = frame.px(cx, cy) if frame is not None else None
+        turned_to = hue_of(after) if after is not None else None
+        check(f"H19 a near-grey {NEAR} card under Color's Hue +40: the centre moves off its "
+              f"input bytes ({before} → {after}) and its colorsys hue lands in (0°, 60°] "
+              f"({turned_to if turned_to is None else round(turned_to, 2)}°)",
+              before is not None and close_to(before, NEAR) and after is not None
+              and tuple(after) != NEAR and 0 < turned_to <= 60)
 
     # H3, on its own two projects
     if "H3" in selected:

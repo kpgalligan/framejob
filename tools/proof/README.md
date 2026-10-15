@@ -18958,6 +18958,45 @@ Also moved by T4-2: `wheels_probe.swift` P3 and
 `hueCurvesEnabled` (it was `gradeReserved0`). **Its record**:
 `designs/grading-4.md`'s T4-2 section.
 
+**Grading-4 T4-2b (spec §11 GR-33): Color's Hue by the exact HSV shift.**
+Color's Hue now calls T4-2's `gradeHueShift`, so the record H16 becomes a
+scored row and three join it, all on HUE with no curves set, each restoring
+Hue 0 after: H16 Color's Hue ±40 by `colorsys` alone (every column's signed
+HSV-hue change the value ±1° at output chroma ≥ 64 and ±2° everywhere,
+Rec. 709 luma within ±1 level, under +40 the 0° column in (0°, 60°] and the
+120° column in (120°, 180°], under −40 the 120° column in [80°, 120°)); H17
+Color's Hue ±40 equal to hue_hue `[[0, ±40], [180, ±40]]` (H15's frames)
+±1 at every column; H18 Color's Hue −500 equal to −140 ±1 at every column
+(both wrap to 220°; unwrapped, the shift's argument falls below −60 for hues
+under 80°, where `lookHueChroma`'s sign-keeping `fmod` differs, while a pair
+like −400/−40 never leaves (−60, 360) and cannot score the wrap); H19 NEAR, a
+720×120 card of (132, 128, 128) in its own project, whose centre under +40
+moves off its input bytes with its colorsys hue in (0°, 60°] (no chroma
+guard). The control is the same rows on the unchanged tree's Debug build,
+where H16, H17 and H19 FAIL (the old matrix turns against the label) and H18
+passes (the matrix is periodic in 360°). N0's eleven frames all have Hue 0,
+so `tools/proof/work/t4-2/ctl` stands and nothing is recaptured.
+
+```
+make app-debug                                                             # the unchanged tree: the control
+python3 tools/proof/curves_proof.py --only H16,H17,H18,H19,Z1             # H16 H17 H19 FAIL, H18 ok
+make app-debug                                                             # after the shader edit
+python3 tools/proof/curves_proof.py --only H12,H15,H16,H17,H18,H19,Z1
+RC_PROOF_APP=release python3 tools/proof/curves_proof.py compare tools/proof/work/t4-2/ctl
+RC_PROOF_APP=release python3 tools/proof/qualifier_proof.py                # D1: Color's Hue +120 in the adjustment pass
+```
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `color-hue-reversed` | Color's degrees negated before the wrap | H16 H17 H19 |
+| `color-hue-unwrapped` | Color's raw degrees passed, no wrap (the −500/−140 pair) | H18 |
+| `color-hue-guarded` | Color's turn mixed back by `smoothstep(0.02, 0.06, chroma)` | H19 |
+
+Changed lists: `hue-shift-reversed` gains H17 (it turns only the curve, so
+H17's comparison fails by construction); `luma-not-kept` and
+`gamut-limit-dropped` gain H16 (they edit `gradeHueShift`, which Color's Hue
+now calls). **Its record**: `designs/grading-4.md`'s T4-2b section.
+
 ## Road map grading-2 — G2-4, the qualifier (`qualifier_proof.py` N0–N2, H1, W1, G1, S1, S1b, S2, L1, I1, M1, D1, E1, V1, B1, F1, A1, A2, R1, P0, U1, V2, K1–K8, Z1 and thirteen mutants; `qualifier_probe.swift`; `core/tests/qualifier.rs`, `core/tests/selection.rs`, `core/tests/schema_v18.rs`; spec §11 GR-13)
 
 **What it answers.** That `video.qualifier` changes nothing until set (N0:

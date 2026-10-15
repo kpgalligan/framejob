@@ -94,6 +94,9 @@ Frame Job's own numbers, and nothing of Concat is opened, at design time or buil
   **Amended by GR-32** (grading-4 T4-2): `curvesEnabled` now means a tone curve is not the
   identity, and the reserved float `gradeReserved0` becomes `hueCurvesEnabled` (the block stays
   128 floats); the same rules are copied for `video.curves.hue_hue` and `.hue_sat`.
+  **Amended by GR-33** (grading-4 T4-2b): the Color section's Hue row now turns HSV hue by GR-32's
+  exact shift (+ is red → yellow → green, Rec. 709 luma kept), and `hueRotate` is gone; "a local
+  colour transform like `hueRotate`" above reads as "like Color's hue turn".
 - **GR-3 — Precision: grading runs on PR-1's float pipeline; blending stays encoded (§7.5).**
   Every stage between layers is `rgba16Float` and every video source decodes deep (PR-1, PR-2),
   so a stacked grade keeps its levels by construction (GR0's P1: −1 EV then +1 EV through

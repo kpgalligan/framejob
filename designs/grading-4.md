@@ -478,6 +478,9 @@ from GR-31 on):
   place after the channel curves; its "Not" line's hue curves and hover readout lifted, and "no ⇧
   axis lock" in its editor rules); GR-4 (Show Ungraded neutralises the hue curves); GR-6 (the
   adjustment pass applies them); GR-7 (the order: the hue curves before the look).
+- **T4-2b:** GR-33 (new, from the owner's answer of 2026-10-15 to T4-2's H16): Color's Hue turns
+  HSV hue by GR-32's exact shift, + red → yellow → green, Rec. 709 luma kept, the degrees wrapped,
+  no chroma guard; Amended-by lines on GR-2 (`grading.md`) and GR-32.
 - **T4-3:** GR-12's accepted risk ("switches at its end"), its "Not … resampling" line and its
   inspector write rule, replaced by the blend.
 - **T4-4:** GR-13's key (`video.qualifier.blur`, the pass, its cost, Show Selection blurred).
@@ -518,6 +521,7 @@ complete, the phase's proof recorded whole on Release, mutants about one per new
 | T4-0 | This road map; `11-decisions/grading-4.md` with GR-24…GR-30, its README rows and Lines cells; the Amended-by lines on GR-10 and GR-13 and tier 2's ADR; the toll: `GradeProps.swift`'s curve types out to `CurveProps.swift` | Renders byte-identical; `make test` unchanged; the Debug catalog equal. No mutants: a pure move adds no decision. |
 | T4-1 | **Scopes** (#265, GR-26): the vectorscope's same-bin add; zoom ×1/×2/×4 counted at the zoom, off-plot pixels not counted; rim ticks; the corner cells; `render_frame {vectorscope_zoom}`; GR-10 amended; no format change | A near-grey card spreads ×2 and ×4; off-plot not counted; T1 with six fixtures at every zoom ≤ 1.1 ms; every ×1 trace identical to today's |
 | T4-2 | **Hue curves and the editor extras** (#267, #270 (2)(3)): `video.curves.hue_hue`, `.hue_sat`; the strip's second row; `hueCurvesEnabled`; the periodic spline; Hue and Sat cells; the hover readout; ⇧ lock; format 20 | A hue-wheel card moves only its wedge; a grey ramp unchanged; the wrap at 0°; an uncurved layer byte-identical; the ⇧ lock and readout in the probe |
+| T4-2b | **Color's Hue by the exact HSV shift** (GR-33, the owner's answer to T4-2's H16): `gradeSample`'s hue calls `gradeHueShift`, wrapped, unguarded; `hueRotate` removed; no core, format or tool change | H16 scored (±40 by colorsys, luma kept), H17 = a constant Hue vs Hue, H18 −500 = −140, H19 a near-grey turned; the control fails H16 H17 H19 on the unchanged tree; Hue 0 byte-identical (N0) |
 | T4-3 | **Curves of different counts** (#271): the evaluator's blend for a count mismatch, the recipe's blend form, the strip's blend, the inspector's write rule; no format change | Start and end exact; the halfway strip = the mean of the two; same-count actions byte-identical to T4-2 |
 | T4-4 | **The qualifier's cleanup blur** (#268): `video.qualifier.blur`, the q-map pass and its Gaussian, Show Selection blurred; format 21 | A noisy card's selection smoothed; blur 0 byte-identical; `render_frame {selection}` = the blurred q; the adjustment pass's cost recorded |
 | T4-5 | **The close**: ADR, archive, `archive/INDEX.md`; #265 #267 #268 #270 #271 closed as built; #266 #269 #273 closed per the choices | — |
@@ -1129,7 +1133,7 @@ spec's lists) and the four re-run, each MUTANT PASS as above.
   owner's call, not this phase's.
   The owner chose (2026-10-15): fix it with this phase's exact HSV shift (`gradeHueShift`), so
   +40 moves every hue +40° keeping luma; old projects' Color Hue renders change. It lands as
-  phase T4-2b, its decision first.
+  phase T4-2b, its decision first (done in T4-2b).
 - `designs/spec/07.9a-agent-tools.md` grew to 576 lines (#297).
 
 **Review.** One lc-reviewer pass, verdict pass: no blockers, no should-fixes. Two nits, both
@@ -1137,3 +1141,117 @@ applied by the orchestrator: `CurveEditorView`'s dead `nudge` / `bigNudge` stati
 (`minGap` kept, `curves_probe.swift` reads it), and the curves catalog clause now says a grey
 or near-grey up to chroma 0.02 is left alone and the effect fades in up to 0.06. The owed
 `app/CLAUDE.md` and `core/CLAUDE.md` edits above were applied by the orchestrator.
+
+## T4-2b — Color's Hue by the exact HSV shift
+
+**What landed** (2026-10-15, in the worktree on `grading-4`, from `510f181`), from the owner's
+answer to T4-2's H16 ("Fix with the new exact shift (Recommended)"). First GR-33 in
+`designs/spec/11-decisions/grading-4.md`, written before any code, with its index row, the
+"Amended by GR-33" lines under GR-32 (its "Not: … a change to Color's Hue" lifted) and GR-2
+(`grading.md`), and the index's GR-2 and GR-32 rows; then the instrument and its control on the
+unchanged product (below); then:
+- **Shader** (`Compositor.metal`): `hueRotate` deleted; `lookHueChroma`, `hsvHue` and
+  `gradeHueShift` moved, their code unchanged, from the Looks, Wheels and curves sections to
+  where `hueRotate` stood, under `// MARK: - Hue (spec §11 GR-13, GR-32, GR-33)`; `gradeSample`'s
+  hue branch, still behind |hue| > 1e-4 rad, takes the uniform's radians to degrees, wraps them
+  by `degrees − 360·floor(degrees/360)` into [0, 360), reads the HSV hue once from the colour as
+  the saturation leaves it (unclamped) and calls `gradeHueShift`, with no chroma guard. Comments:
+  `LayerSample`'s doc (the hue turn is a continuous function of the colour, like the spill),
+  `gradeTone`'s ("like Color's hue turn"), `hsvHue`'s (step 3 passes an unclamped colour),
+  `gradeHueShift`'s last line (Color's Hue calls it too, wrapped, unguarded) and the
+  order-of-operations step 3 line (GR-33). Every `gradeSample` caller follows with no edit: the
+  layer stage's every tap (blur, sharpen, pixelate, regions), the slate, the adjustment pass and
+  the look bake (which runs it only when the hue is not 0; no built-in look sets one).
+- **Swift**: `AgentCatalog+Properties.swift`'s `video.color` clause says hue is in degrees and a
+  positive hue turns every colour's HSV hue that far, red → yellow → green, keeping its Rec. 709
+  luma (321 lines). No model, uniform, core, FFI, format, op or tool change: the value stays
+  degrees, the uniform radians.
+- **Instruments**: `curves_proof.py` H16 scored (out of `RECORDS`, now empty), H17–H19 new, the
+  NEAR fixture (a 720 × 120 card of (132, 128, 128)), three mutants, and H17 added to
+  `hue-shift-reversed`'s list, H16 to `luma-not-kept`'s and `gamut-limit-dropped`'s.
+- **Documents**: spec §7.5 (the tone line's "like Color's hue turn"; step 3's Hue calls the same
+  `gradeHueShift`), §4.3a (the Color section's hue row), §5.2 (`hue` is degrees of HSV-hue turn,
+  taken modulo 360), the spec index's Lines cells; the README's Color bullet;
+  `tools/proof/README.md`'s T4-2b paragraph.
+
+**Who else uses Color's Hue, and whether it changes.** Every renderer of `video.color.hue` goes
+through `gradeSample`, so every picture with a non-zero Hue changes and every picture with Hue 0
+is byte-identical (N0 below): the preview, `render_frame`, Save Frame, every export, the
+adjustment pass and the Look gallery's thumbnails (through `Exporter.renderFrame`). Unchanged,
+no edit: the built-in looks (all hue 0, `core/src/model_look.rs`'s `definition`, so every
+lattice is the same), `core/src/actions.rs` (lerps degrees), `actions_clamp.rs` and
+`props_check.rs` (any finite value), `VideoPane+Color.swift`'s −180…180 row,
+`Compositor+Uniforms.swift` and `LookTextures.swift` (degrees to radians), the chroma-key
+eyedropper (it neutralises Color while it picks), `seeing_proof.py` (asserts only graded ≠
+neutral) and `qualifier_proof.py`'s D1 (self-consistent). No frozen byte reference holds a
+non-zero Color Hue, so nothing is recaptured.
+
+**The control** (on the unchanged product's Debug build, after the instrument edit and before
+the shader edit): `make app-debug`, then `python3 tools/proof/curves_proof.py --only
+H16,H17,H18,H19,Z1`: exit 1, 2/5 — H16 FAIL (+40: the worst column 98.225° off, red → 304.48°,
+green → 97.37°, luma worst 33.199 levels; −40: worst 97.009°, red → 23.23°, green → 175.20°,
+luma worst 36.825), H17 FAIL (+40: x 0 (241, 0, 223) against the curve's (79, 52, 0)), H18 ok
+(the matrix is periodic in 360°), H19 FAIL ((132, 128, 128) → (132, 127, 131), hue 312.0°), Z1
+ok. As expected: H16, H17 and H19 fail and H18 passes.
+
+**Verification** (2026-10-15, M2 Max; `pmset -g`: "powermode 0", "Now drawing from 'AC
+Power'"):
+- In the loop: `make typecheck` exit 0 with the four baseline warnings; `make app-debug` exit 0
+  (the shader compiled); `python3 tools/proof/curves_proof.py --only
+  H12,H15,H16,H17,H18,H19,Z1` exit 0, 7/7; `spec_index_proof.py` 162/162; `name_residue.py`
+  exit 0.
+- `make gate`: PASS in 227 s (names 1 s, typecheck 5 s, fmt and lint skipped as unchanged,
+  test 117 s, app 104 s).
+- Recorded, on the gate's Release build: `RC_PROOF_APP=release python3
+  tools/proof/curves_proof.py compare tools/proof/work/t4-2/ctl`: exit 0, **53/53**, N0 the
+  eleven Hue-0 frames byte-identical at 16 bits to T4-2's control, Z1 no `Frame Job: ` line, no
+  `DEFAULTS MOVED`. H16: under +40 the worst HSV-hue error 0.540° over all 720 columns (all at
+  output chroma ≥ 64), luma worst 0.488 levels, red → 39.49°, green → 159.92°; under −40 0.624°
+  over the 651 columns at output chroma ≥ 64 and 1.176° over all 720, luma worst 0.465, red →
+  319.90°, green → 80.00° — H15's numbers to the thousandth, as H17 (all 720 columns within ±1
+  of the constant curve's, both signs) says they must be. H18: −500 and −140 within ±1 at every
+  column. H19: (132, 128, 128) → (130, 129, 126), hue 45.0°.
+- `RC_PROOF_APP=release python3 tools/proof/qualifier_proof.py`: exit 0, 31/31 (D1, Color's
+  Hue +120 in the adjustment pass, ok).
+
+**Mutants** (`python3 tools/proof/curves_proof.py --mutant NAME`, each on its own tree copy's
+Debug build, once, at the end; every one MUTANT PASS at its first run, no list changed after):
+
+| Mutant | Must fail | Answer |
+|---|---|---|
+| `color-hue-reversed` | H16 H17 H19 | MUTANT PASS (49/52; +40 sends red to 319.90°, the near-grey to hue 330.0°) |
+| `color-hue-unwrapped` | H18 | MUTANT PASS (51/52; at x 0 −500 gives (176, 6, 176) against −140's (0, 58, 174)) |
+| `color-hue-guarded` | H19 | MUTANT PASS (51/52; the near-grey stays (132, 128, 128)) |
+| `hue-shift-reversed` | H15 H1 H4 H13 H17 | MUTANT PASS (47/52) |
+| `luma-not-kept` | H12 H1 H4 H13 H16 | MUTANT PASS (47/52; H16's hues exact, its luma worst 121.584 levels) |
+| `gamut-limit-dropped` | H15 H12 H1 H4 H13 H16 | MUTANT PASS (46/52; H16's worst 18.346°, luma worst 26.236 levels) |
+
+The three changed lists are as the spec set them: `hue-shift-reversed` turns only the curve, so
+H17's comparison fails by construction; `luma-not-kept` and `gamut-limit-dropped` edit
+`gradeHueShift`, which Color's Hue now calls, so H16 fails by construction.
+
+**Owed.**
+- No `CLAUDE.md` edit: no map entry or rule names `hueRotate` or Color's hue.
+- How a Color Hue turn looks on footage is GRD-13's step 9 (the same function); no new
+  `docs/manual-checks.md` row.
+
+**Residue.** Nothing to file.
+- Not measured: the shift's cost per tap against the matrix's on a blurred layer (13 taps), the
+  risk GR-33 accepts; not filed, since the decision accepts it.
+- Found while checking every proof's mutant anchors against the edited shader, and done in this
+  phase (fix pass 1, the orchestrator's ruling): `adjustment_proof.py`'s `WEIGHT` anchor
+  (`float w = saturate(u.opacity * matte.sample(samp, local).r);`, used by its `ignores-matte`
+  and `ignores-opacity` mutants) occurred 0 times in `Compositor.metal` at `510f181` too — the
+  adjustment pass reads `saturate(u.opacity * coverage * selected)` since G2-4 (`c948fad`), so
+  those two mutants could not build. `WEIGHT` is re-anchored on that line (once in the shader;
+  every other `adjustment_proof` anchor occurs exactly once), `ignores-matte` writing
+  `saturate(u.opacity * selected)` and `ignores-opacity` `saturate(coverage * selected)`. Each
+  ran once on its tree copy's Debug build: `ignores-matte` MUTANT PASS (34/36, M1 and Q1
+  failed, no other row), `ignores-opacity` MUTANT PASS (34/36, O1 and O2 failed, no other row);
+  no list changed. `GradeProps.swift`'s `hue` doc comment now names GR-33's HSV-hue shift.
+
+**Review.** Two lc-reviewer passes. The first: fix-required, two should-fixes, both the
+orchestrator's ruling adding them to this phase (the rotted `WEIGHT` anchor, the `hue` doc
+comment); fix pass 1 closed both. The second: pass, one nit (this Residue heading), applied by
+the orchestrator. The adversary's one objection (−400 against −40 could not score the wrap; H18
+is −500 against −140) was taken into the final spec. No `CLAUDE.md` edit was owed.

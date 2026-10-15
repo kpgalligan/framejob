@@ -245,7 +245,8 @@ schema, §6 the op table, §7 the architecture.
   exposure (±3 stops, on linear light), temperature and tint (white balance,
   also on linear light), highlights, shadows, whites, blacks, vibrance and a
   fade, and the Color section beside it keeps brightness, contrast,
-  saturation and hue. Each slider writes only its own setting, so several
+  saturation and hue (a positive hue turns every colour toward yellow and
+  green, its brightness kept). Each slider writes only its own setting, so several
   clips keep their own other values; every one animates in an action, draws
   the same in the preview, stills and every export, and an untouched clip
   renders exactly as before. **View ▸ Show Ungraded** (⌃⌘U) shows the

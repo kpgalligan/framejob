@@ -196,7 +196,7 @@ OUTSIDE = [(36, 180), (244, 180), (140, 76), (140, 284)]
 Q_INSIDE = [(140, 180), (80, 120), (200, 240)]
 Q_OUTSIDE = [(280, 100), (480, 260), (20, 20), (560, 340)]
 SHADER = "app/Resources/Shaders/Compositor.metal"
-WEIGHT = "    float w = saturate(u.opacity * matte.sample(samp, local).r);\n"
+WEIGHT = "    float w = saturate(u.opacity * coverage * selected);\n"
 NEST_REFUSAL = ("        // An adjustment clip grades the top level only (spec §11 GR-6).\n"
                 "        if let Some(found) = selected.iter().find(|c| is_adjustment(c)) {\n"
                 "            return Ok(Outcome::Refused(adjustment_cannot_nest(found.id)));\n"
@@ -213,9 +213,9 @@ MUTANTS = {
         'label: "Frame Job adjustment", vertex: vertex, fragment: fragment, blending: false))',
         'label: "Frame Job adjustment", vertex: vertex, fragment: fragment, blending: true))')],
         ["A1"]),
-    "ignores-matte": ([(SHADER, WEIGHT, "    float w = saturate(u.opacity);\n")], ["M1", "Q1"]),
+    "ignores-matte": ([(SHADER, WEIGHT, "    float w = saturate(u.opacity * selected);\n")], ["M1", "Q1"]),
     "ignores-opacity": ([(SHADER, WEIGHT,
-                          "    float w = saturate(matte.sample(samp, local).r);\n")],
+                          "    float w = saturate(coverage * selected);\n")],
                         ["O1", "O2"]),
     "front-graded": ([(
         "app/Sources/MetalRenderer.swift",

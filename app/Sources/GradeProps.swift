@@ -7,7 +7,7 @@ struct ColorAdjust: Codable, Hashable {
     let brightness: Double
     let contrast: Double
     let saturation: Double
-    /// Hue rotation in degrees.
+    /// The HSV-hue shift in degrees, + red → yellow → green, Rec. 709 luma kept (spec §11 GR-33).
     let hue: Double
     /// Tone (spec §11 GR-2): `model_props.rs`'s nine, in its order, each
     /// absent from the file at 0. Their helpers are below.
