@@ -1481,3 +1481,49 @@ same exposure. The adversary's one objection (Q4's oracle built from the matted 
 fail a correct product) was taken into the final spec. The owed `app/CLAUDE.md` and
 `core/CLAUDE.md` edits were applied by the orchestrator; `app/CLAUDE.md` counts the pipelines
 without the input pass (nine from seven), `MetalRenderer.swift` and §7.5 with it (ten from eight).
+
+## T4-5 — the close
+
+**What landed** (2026-10-15, in the worktree on `grading-4`, from `23832cf`).
+`designs/adr/grading-4.md`. This road map `git mv`'d to `archive/grading-4.md`, with its
+`archive/INDEX.md` row. Every `designs/grading-4.md` citation outside `archive/` now points here:
+§11 `grading-4.md`'s first paragraph in the closed form and its line naming "The owner's
+choices", and `tools/proof/README.md`'s five record lines (T4-1, T4-2, T4-2b, T4-3, T4-4). Spec
+§1's non-goals sentence now names tier 4. `designs/adr/grading-2.md` gained Amended-by notes
+under GR-10 (GR-26, GR-29, GR-31), GR-12 (GR-32, GR-34), GR-13 (GR-24, GR-35, GR-28) and "The
+spline lives in Swift only" (GR-34), and "— closed by …" on its "switches at its end" limit and
+on #265–#271 and #273. The spec indexes' Lines cells follow (`01-what-this-is.md` 38 → 42,
+`11-decisions/grading-4.md` 330 → 331, the `11-decisions/` folder 8448 → 8449 in 22 files). No
+product, core, Swift, shader or proof-script file changed.
+
+**Verification** (2026-10-15):
+- `python3 tools/proof/spec_index_proof.py`: exit 0, 162/162.
+- `python3 tools/proof/name_residue.py`: exit 0, no output.
+- `git grep -n "designs/grading-4\.md" -- . ':!archive'`: prints nothing.
+- `git status --porcelain`: `RM designs/grading-4.md -> archive/grading-4.md` (the rename staged, this section unstaged on top of it).
+- `make gate`: PASS in 72 s (names 1 s, test 70 s; typecheck, fmt, lint and app skipped as
+  byte-identical to their last pass); the test log has 126 `test result: ok` lines and no FAILED,
+  and `spec_index_proof.py` 162/162 among its steps. This line was written after the gate passed
+  (`archive/` is outside every gate step's inputs).
+- No mutants: the phase adds no product decision.
+
+**The issues.** None filed by this stage. Reviewed against the tree and the tracker (read-only):
+#265, #267, #268, #270 and #271 are closed as completed, #266, #269 and #273 as not planned; #296
+and #297 (filed at T4-1) are open. Closed as built: #265 (T4-1, GR-26, GR-31), #267 (T4-2, GR-32),
+#268 (T4-4, GR-35), #270's hover readout and ⇧ axis lock (T4-2, GR-32), #271 (T4-3, GR-34); not
+wanted: #266 (GR-27), #269 (GR-28), #273 (GR-29) and #270's histogram behind the plot (GR-30).
+Not filed: Hue vs Luma (choice 5a "not now"; it follows on the strip's row, if asked); a second,
+qualified grade on a picture clip ("a later issue only if asked", GR-28); dragging a hue point
+across 0°/360° (GR-32's "Not"); GPU clock state in T1 ("Found while reading" 4: T1 already warms
+with G2-1's burst, and T3 has its own bound); the shift's per-tap cost on a blurred layer (GR-33
+accepts it); the stale-map nit (`designs/adr/grading-4.md`'s Known limits); every "Not
+established" item, each settled by a phase's spec or left to a GRD row.
+
+**Owed.** GRD-11, GRD-13 and GRD-14's tier-4 steps (the owner's, on real footage). The root
+`CLAUDE.md` ADR list names `grading-4` (the orchestrator applies it).
+
+**Review.** One lc-reviewer pass, verdict pass: no blockers, no should-fixes; two nits, both
+applied by the orchestrator (this section's `git status` line; the ADR's T3 row leading with the
+first recorded run). The adversary raised no objection; its two small points (GR-24 named in the
+grading-2 ADR's GR-13 note, #270's two halves) were applied by the implementer. The root
+`CLAUDE.md` gained the `grading-4` clause in its ADR list, applied by the orchestrator.

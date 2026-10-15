@@ -16,7 +16,11 @@ the owner's verdict of 2026-10-10, and tier 2's scopes, colour wheels,
 curves and qualifiers beside it, GR-10…GR-13; tier 3's HDR→SDR conversion
 and camera log are in, GR-15, GR-16; linear-light blending and the HDR
 timeline are deferred, GR-18 #276, GR-19 #277; a wide-gamut working
-space for SDR projects is not wanted, GR-20), audio beyond what shipped
+space for SDR projects is not wanted, GR-20; tier 4's vectorscope zoom,
+hue curves, the blend between curves of different point counts and the
+qualifier's cleanup blur are in, GR-24, GR-31…GR-35, while an Offset
+wheel, a qualifier on picture clips, 1,024-level scopes and a histogram
+behind the curves are not wanted, GR-27…GR-30), audio beyond what shipped
 (volume, fades, duck, pan, compressor, noise reduction, peak normalize, the
 transition crossfade and the export's loudness target — M3 and §11 R5-2; so
 no EQ, mix buses or Audio Units, while offline voice effects are deferred

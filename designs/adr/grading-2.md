@@ -10,9 +10,12 @@
 - **Original:** `archive/grading-2.md` is the full record. It has no section numbers, so it is cited by phase: "orig G2-3" is its "G2-3 — the curves" section.
 - **Spec decisions:** GR-10..GR-14 in spec §11 (`designs/spec/11-decisions/grading-2.md`), with the amendments they wrote into tier 1's entries (`designs/spec/11-decisions/grading.md`). They stay binding, and where the original words them differently, §11's text wins:
   - GR-10: the scopes — an RGB parade, a Rec. 709 vectorscope (bins centred on neutral, the six 75 % targets and the skin line from the matrix) and an R′G′B′Y′ histogram beside the waveform, in two stacked slots of View ▸ Scopes (⌃⌘W), opening Waveform over Vectorscope, the bottom slot hidden below 360 pt of pane; the counting rule (never one global atomic per pixel into a shared bin); the time bound, ≤ 1.1 ms of GPU per analysed 4K frame per scope, the worst of five fixtures, replacing #263's; `render_frame {parade, vectorscope, histogram}`; 256 levels.
+    - Amended by GR-26, GR-29 and GR-31 (grading-4 T4-0, T4-1): a flat saturated colour is the bound's sixth fixture and a non-central vectorscope bin shared by a whole SIMD group is added once; 1,024-level scopes are not wanted; the vectorscope zooms ×1, ×2 and ×4, counted at the zoom with off-plot pixels not counted, and `render_frame {vectorscope_zoom}`.
   - GR-11: wheels, `video.wheels {lift, gamma, gain}`, each a Cartesian push `{x, y}` inside the unit circle and a `master`, at step 4c.1 after tone and before the look, on encoded values; `LayerUniforms` 116 → 128 floats; ⌥ fine-drag (wheels only); no typed field for the push; format 16. Not: no Offset wheel, no linear-light wheels.
   - GR-12: curves, `video.curves {master, red, green, blue}`, 2–16 `[x, y]` points on a Fritsch–Carlson monotone spline, `channel(master(v))`, at step 4c.2 through a 1,024-texel `rgba32Float` strip at `texture(3)`; identity absent; the spline in Swift; format 17. Not: no hue-vs curves, no histogram behind the plot, no hover readout, no resampling between curves of different counts.
+    - Amended by GR-32 and GR-34 (grading-4 T4-2, T4-3): hue curves, the hover readout and ⇧ axis lock are built, and curves of different counts blend; GR-30 keeps no histogram behind the plot.
   - GR-13: qualifiers, `video.qualifier {hue, saturation, luma, invert}` on adjustment clips only, `q` read from the destination before the grade and multiplied into the pass's `w`; HSV S with a near-black guard and the hue's chroma guard; `QualifierUniforms` at `buffer(1)`; Show Selection (the `selection` option) and Pick from Canvas (the `behind` option); Paste Attributes drops a qualifier onto a picture clip; format 18. Not: no cleanup blur, no qualifier on picture clips.
+    - Amended by GR-24, GR-35 and GR-28 (grading-4 T4-0, T4-4): GR-24 lifts the "Not" line's cleanup blur and GR-35 builds it; a qualifier on picture clips is not wanted.
   - GR-14: each phase merged into main alone, main's format numbers 16, 17, 18, no verdict phase.
   - Amended: GR-2 (`LayerUniforms` grows to 128; the Color sub-tab's sections), GR-4 (`ungraded` neutralises wheels and curves and keeps the qualifier), GR-5 (by GR-10: the slot picker, View ▸ Scopes, three more booleans), GR-6 (the adjustment clip's Color sub-tab gains Qualifier, Wheels and Curves; `w` gains `q`), GR-7 (the order gains the wheels and curves between Light and the look).
 
@@ -29,6 +32,7 @@ GR-1 kept tier 1 and deferred tiers 2 and 3 "as issues, not out"; tier 1's close
 - **The wheels are analytic in the shader, not folded into the curve strip**: an animated wheel would re-bake the strip every frame, and the spike priced them at nothing measurable. One growth of `LayerUniforms`, twelve floats to 128 (512 bytes): the nine numbers, `wheelsEnabled`, `curvesEnabled` and one reserved. (orig G2-2)
 - **Curves are a 1D `rgba32Float` strip of 1,024 texels at `texture(3)`, not the look's lattice and not uniforms.** The lattice slot holds the look or the LUT, so curves in it would need a bake per (curve, look) pair and an imported LUT would lose its size; a 33³ lattice is up to 3 levels off an analytic curve; uniforms would be 128 floats plus a segment search per pixel. The spike measured ≤ 0.154 of a 10-bit level for the strip on a steep curve against ≤ 0.5 for `rgba16Float`, half-float storage's floor. (orig "Curves (#261), G2-3: a 1D strip…")
 - **The spline lives in Swift only** (`CurveTable.swift`), used by the editor's drawing and the strip's upload. The core stores, checks and interpolates the points and never samples the spline: no FFI export, `ReelCore.swift` untouched. The cost is GR-12's accepted risk: two non-identity curves of different counts cannot be resampled, so an action between them switches at its end. (orig G2-3)
+  - Amended by GR-34 (grading-4 T4-3): two non-identity curves of different counts now blend their values, `(1−t)·a(x) + t·b(x)`, published by the core as `{from, to, t}` and blended by Swift's strip, so the action no longer switches at its end; still no spline in Rust and no FFI.
 - **An identity curve is absent**, and an action aligns identity channels before the lerp (`align_identity_curves`), so Reset leaves the file as it was and a curve animates from the identity. (orig G2-3)
 - **The qualifier attaches to adjustment clips only** (choice 4a), and `q` is read from the DESTINATION before the grade: "the skin" means the skin as it is, not as the grade made it. Saturation is HSV S = C / max with a near-black guard, and the hue fades out below a small chroma, so a grey is never picked by hue. `QualifierUniforms` (sixteen floats) sits at `buffer(1)` of the adjustment pass, so `LayerUniforms` did not grow for it. The recipe gained two options, `selection` (Show Selection: the clip's `q` as grey, layers in front of it left out) and `behind` (Pick from Canvas samples the picture behind the clip). An action's hue centre goes the short way round (choice 11 as the owner changed it): 350 → 10 passes 0. (orig G2-4)
 - **Each phase merged into main alone, at main's format numbers** (GR-14): 16 wheels, 17 curves, 18 qualifiers, optional keys with no migration step; the scopes changed no project file. Tier 1's branch format (GR-9) was not repeated, since tier 2 was not an experiment. (orig "Where the work happens")
@@ -68,7 +72,7 @@ The brief's spike (a scratch shader, NOT the compositor's, uncommitted; only dif
 - **32-bit float filtering on M1** is REASONED from the GPU family; the fallback to `rgba16Float` is in `CurveTextures.swift:33`, still under half a 10-bit level.
 - **The strengths and guards are first numbers**: the wheels' factors and the qualifier's chroma and near-black guards were set from fixtures, for the owner to judge on footage (GRD-12, GRD-14).
 - **A wheel's push moves a saturated pixel's luma** (GR-11's accepted risk): the push is luma-neutral on grey, not on every colour.
-- **An action between two non-identity curves of different counts switches at its end** (GR-12's accepted risk; #271).
+- **An action between two non-identity curves of different counts switches at its end** (GR-12's accepted risk; #271) — closed by GR-34 (grading-4 T4-3).
 - **The master strip's off-knob double-click was two undo steps** (GR-11 (4), accepted at G2-2's review): fixed by #272's batch (owner, 2026-10-12), GR-11 (4) amended — it is one step on or off the knob.
 - **Screen 05h shows the "Selection" tag and the switch, not the grey**: `snapshot_ui`'s well is `render_frame`'s picture, which the switch never reaches; `qualifier_proof.py` E1 and V1 prove the selection.
 - **Other editors' behaviour** (wheels' feel, scope layouts, qualifier softness) is from general knowledge.
@@ -76,15 +80,15 @@ The brief's spike (a scratch shader, NOT the compositor's, uncommitted; only dif
 ## Open items
 
 Filed at the close, each `ai-drafted` and `low-priority`:
-- #265: vectorscope zoom.
-- #266: an Offset wheel.
-- #267: hue-vs-hue and hue-vs-saturation curves.
-- #268: a cleanup blur of the qualifier's selection.
-- #269: a qualifier on picture clips.
-- #270: the curves editor's extras (a histogram behind the plot, a hover readout, ⇧ axis lock).
-- #271: animating between two non-identity curves of different point counts.
+- #265: vectorscope zoom — closed by GR-31 (grading-4 T4-1).
+- #266: an Offset wheel — closed as not wanted (GR-27).
+- #267: hue-vs-hue and hue-vs-saturation curves — closed by GR-32 (grading-4 T4-2).
+- #268: a cleanup blur of the qualifier's selection — closed by GR-35 (grading-4 T4-4).
+- #269: a qualifier on picture clips — closed as not wanted (GR-28).
+- #270: the curves editor's extras (a histogram behind the plot, a hover readout, ⇧ axis lock) — the hover readout and ⇧ axis lock closed by GR-32 (grading-4 T4-2); the histogram behind the plot closed as not wanted (GR-30).
+- #271: animating between two non-identity curves of different point counts — closed by GR-34 (grading-4 T4-3).
 - #272: the wheels' master strip, a double-click off the knob is two undo steps — fixed by #272's batch (owner, 2026-10-12).
-- #273: 1,024-level scopes for 10-bit work.
+- #273: 1,024-level scopes for 10-bit work — closed as not wanted (GR-29).
 
 Commented: #256 (tier 3: what tier 2 defined on encoded values), #264 (the texture slots and where an input LUT would go), #124 (its cutout would take `texture(4)`). Left for after tier 2 (owner, 2026-10-10): #257, untouched. Closed as built: #260, #261, #262, #263.
 

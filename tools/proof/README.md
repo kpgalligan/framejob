@@ -18758,7 +18758,7 @@ counting (`cb-cr-swapped`, `bt601`, `bins-edged`, `histogram-luma-601`,
 ×2 and ×4 extents are measured against ×1's.
 
 **Its record**: `archive/grading-2.md`'s G2-1 and G2-5 sections, and
-`designs/grading-4.md`'s T4-1 section.
+`archive/grading-4.md`'s T4-1 section.
 
 ## Road map grading-2 — G2-2, the wheels (`wheels_proof.py` N0–N2, L1, G1, Y1, C1, O1, A1, J1, X1, U1, V1, P0, R1, P1–P7, Z1 and twelve mutants; `wheels_probe.swift`; `core/tests/wheels.rs`, `core/tests/schema_v16.rs`; spec §11 GR-11)
 
@@ -18956,7 +18956,7 @@ cd core && cargo test --release --test hue_curves --test schema_v20
 Also moved by T4-2: `wheels_probe.swift` P3 and
 `grading_spike/tree_bench.swift` read the block's last float as
 `hueCurvesEnabled` (it was `gradeReserved0`). **Its record**:
-`designs/grading-4.md`'s T4-2 section.
+`archive/grading-4.md`'s T4-2 section.
 
 **Grading-4 T4-2b (spec §11 GR-33): Color's Hue by the exact HSV shift.**
 Color's Hue now calls T4-2's `gradeHueShift`, so the record H16 becomes a
@@ -18995,7 +18995,7 @@ RC_PROOF_APP=release python3 tools/proof/qualifier_proof.py                # D1:
 Changed lists: `hue-shift-reversed` gains H17 (it turns only the curve, so
 H17's comparison fails by construction); `luma-not-kept` and
 `gamut-limit-dropped` gain H16 (they edit `gradeHueShift`, which Color's Hue
-now calls). **Its record**: `designs/grading-4.md`'s T4-2b section.
+now calls). **Its record**: `archive/grading-4.md`'s T4-2b section.
 
 **Grading-4 T4-3 (spec §11 GR-34): curves of different point counts blend.**
 Inside an action, a channel whose two ends are non-identity curves of
@@ -19040,7 +19040,7 @@ RC_PROOF_APP=release python3 tools/proof/curves_proof.py compare tools/proof/wor
 
 `same-count-blended` lists A1, A2 and H8 too: it blends every same-count and
 aligned action, whose oracles are the per-point lerp, so they fail by
-construction. **Its record**: `designs/grading-4.md`'s T4-3 section.
+construction. **Its record**: `archive/grading-4.md`'s T4-3 section.
 
 ## Road map grading-2 — G2-4, the qualifier (`qualifier_proof.py` N0–N2, H1, W1, G1, S1, S1b, S2, L1, I1, M1, D1, E1, V1, B1, F1, A1, A2, R1, P0, U1, V2, Q1–Q6, K1–K10, Z1 and twenty-one mutants; `qualifier_probe.swift`; `core/tests/qualifier.rs`, `core/tests/selection.rs`, `core/tests/schema_v18.rs`, `core/tests/qualifier_blur.rs`; spec §11 GR-13, GR-35)
 
@@ -19153,7 +19153,7 @@ Reset's `blur: 0`, the pick leaving the blur alone, the summary "hue · blur
 under `RC_PROOF_APP=release`. `grading_spike/tree_bench.swift` gained the SQ
 series and `grading_spike.py --measure --tree` the TB record (the pass's cost
 with the blur on; `grading_spike/README.md`). **Its record**:
-`designs/grading-4.md`'s T4-4 section.
+`archive/grading-4.md`'s T4-4 section.
 
 | Mutant | Edit | Must fail |
 |---|---|---|

@@ -3,14 +3,15 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map that makes these is in progress at `designs/grading-4.md`; its own sections hold each
-phase's record (T4-0 the road map, these decisions and the pure move; T4-1 the scopes; T4-2 the
-hue curves and the curve editor's extras; T4-2b Color's Hue; T4-3 curves of different counts;
-T4-4 the qualifier's cleanup blur; T4-5 the close). The IDs continue the GR- series of
+The road map that made these is closed: its condensed record is `designs/adr/grading-4.md`,
+and the original, `archive/grading-4.md`, holds each phase's record (T4-0 the road map, these
+decisions and the pure move; T4-1 the scopes; T4-2 the hue curves and the curve editor's extras;
+T4-2b Color's Hue; T4-3 curves of different counts; T4-4 the qualifier's cleanup blur; T4-5 the
+close). The IDs continue the GR- series of
 [`grading.md`](grading.md), [`grading-2.md`](grading-2.md) and [`grading-3.md`](grading-3.md), so
 a citation never has to say which file. GR-24…GR-30 were recorded in T4-0, before any tier-4
 code, from the owner's answers of 2026-10-14 to the tier-4 brief's choices, every one the
-recommended answer (`designs/grading-4.md`, "The owner's choices"; the brief is
+recommended answer (`archive/grading-4.md`, "The owner's choices"; the brief is
 `~/.claude/litecode/reelcut/grading-tier4/I-grading-tier4.md` and the answers `answers.md` beside
 it, outside the repo). T4-1…T4-4 each record their numbers as a new entry (GR-31 on; T4-4's is
 GR-35) or as Amended-by lines before their code.
