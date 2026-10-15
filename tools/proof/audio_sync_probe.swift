@@ -1,4 +1,4 @@
-// Road map "audio-sync", AS-1 (spec §11 SY-1..SY-5) — Synchronize Audio's
+// Road map "audio-sync", AS-1 and AS-2 (spec §11 SY-1..SY-10) — Synchronize Audio's
 // arithmetic, measured through the app's own `AudioSyncMatch` and
 // `AudioSync` with no document, no window and no disk.
 //
@@ -23,13 +23,28 @@
 //   P4  the thresholds (SY-3) at their boundaries; unrelated arrays are not
 //       confident; two equal 300-bucket arrays have no runner-up and plan to
 //       "too little room"; a runner-up ≤ 0 is ratio +∞ and confident.
-//   P5  drift (SY-5) on smooth arrays stretched by known ratios, within
-//       ±50 ppm, including 100 ppm at exactly `driftMinimumOverlapBuckets`;
-//       one bucket under it is not measured.
+//   P5  drift (SY-7) on smooth arrays stretched by known ratios, within
+//       ±5 ppm, including 100 ppm at exactly `driftMinimumOverlapBuckets`;
+//       one bucket under it is not measured; a mover that sounds only in its
+//       first 3,000 of 15,000 buckets is not measured (the span rule); a
+//       6,000-bucket overlap where only the two end windows can match is not
+//       measured, naming 2 windows (the count rule, checked first).
 //   P6  the refusals (SY-4): before 0, windows that never meet, two clips on
 //       one track, a neighbour on the mover's track; a neighbour that only
 //       abuts the new window is not refused; a silent anchor is named once,
 //       and not against the movers, and a silent mover is named alone.
+//   P7  correction (SY-6, SY-10): a +1,000 ppm mover (it lengthens) and a
+//       −1,000 ppm one (it shortens): the set_speed rate within 5 ppm of s/k,
+//       keep_pitch false, delta the hand-worked snap(zeroA + 6000·c − S + I·k)
+//       — the centre-line delta printed as a control at least 2 frames away —
+//       and the ops in SY-10's order; a neighbour abutting the old end with
+//       delta 0 is refused, the same neighbour 10 frames later is not.
+//   P8  SY-8's boundaries (4.99 vs 5.0 ms, a drift just over, exactly at and
+//       just under 3× its uncertainty, a new speed
+//       0.0019 vs 0.0021 from ×1), a 20 ppm drift left with its note; a
+//       reading at speed 1/k with the drifted onsets makes no op, one at
+//       ×0.9999 is set to within 5 ppm of 1/k; `rateProblem` at ×2, ×1.002,
+//       ×1.0021, ×0.998, ×0.9979.
 import Foundation
 
 var rows: [[String: Any]] = []
@@ -65,13 +80,47 @@ func shifted(_ anchor: [Float], by shift: Int, count: Int, seed: UInt64) -> [Flo
 let fps = Fps(num: 30, den: 1)
 let bucket: Ticks = 6000
 
+/// A reading whose in point is `(start − zero)·speed`, so that its zero is
+/// `start − in/speed` as `AudioSync.read` writes it.
 func reading(
     _ clip: UInt32, track: Int, start: Ticks, end: Ticks, zero: Ticks, video: Bool = false,
-    onsets: [Float] = [], neighbours: [AudioSync.Neighbour] = []
+    onsets: [Float] = [], neighbours: [AudioSync.Neighbour] = [], speed: Double = 1
 ) -> AudioSync.Reading {
     AudioSync.Reading(
         clip: clip, media: clip + 100, trackIndex: track, start: start, end: end, zero: zero,
-        hasVideo: video, onsets: onsets, neighbours: neighbours)
+        hasVideo: video, onsets: onsets, neighbours: neighbours, speed: speed,
+        sourceIn: Ticks((Double(start - zero) * speed).rounded()))
+}
+
+/// A smooth signal: Gaussian bumps (σ 2 buckets) at seeded moments.
+struct Bumps {
+    var at: [Double] = []
+    var amp: [Double] = []
+    init(seed: UInt64, length: Double) {
+        var lcg = LCG(state: seed)
+        var t = 0.0
+        while t < length {
+            t += 4 + lcg.next() * 16
+            at.append(t)
+            amp.append(0.2 + lcg.next())
+        }
+    }
+    /// Samples `f(m·k + c)` for m in 0..<count.
+    func sample(count: Int, k: Double, c: Double) -> [Float] {
+        var out = [Double](repeating: 0, count: count)
+        for (t, a) in zip(at, amp) {
+            let centre = (t - c) / k
+            let low = max(0, Int(centre - 12))
+            let high = min(count - 1, Int(centre + 12))
+            guard low <= high else { continue }
+            for m in low...high {
+                let d = Double(m) * k + c - t
+                out[m] += a * exp(-d * d / 8)
+            }
+        }
+        let mean = out.reduce(0, +) / Double(max(count, 1))
+        return out.map { Float($0 - mean) }
+    }
 }
 
 func describe(_ plan: AudioSync.Plan) -> String {
@@ -265,36 +314,6 @@ do {
 // MARK: - P5 drift
 
 do {
-    /// A smooth signal: Gaussian bumps (σ 2 buckets) at seeded moments.
-    struct Bumps {
-        var at: [Double] = []
-        var amp: [Double] = []
-        init(seed: UInt64, length: Double) {
-            var lcg = LCG(state: seed)
-            var t = 0.0
-            while t < length {
-                t += 4 + lcg.next() * 16
-                at.append(t)
-                amp.append(0.2 + lcg.next())
-            }
-        }
-        /// Samples `f(m·k + c)` for m in 0..<count.
-        func sample(count: Int, k: Double, c: Double) -> [Float] {
-            var out = [Double](repeating: 0, count: count)
-            for (t, a) in zip(at, amp) {
-                let centre = (t - c) / k
-                let low = max(0, Int(centre - 12))
-                let high = min(count - 1, Int(centre + 12))
-                guard low <= high else { continue }
-                for m in low...high {
-                    let d = Double(m) * k + c - t
-                    out[m] += a * exp(-d * d / 8)
-                }
-            }
-            let mean = out.reduce(0, +) / Double(max(count, 1))
-            return out.map { Float($0 - mean) }
-        }
-    }
     let signal = Bumps(seed: 51, length: 16_500)
     let anchor = signal.sample(count: 16_000, k: 1, c: 0)
     let minimum = AudioSyncMatch.driftMinimumOverlapBuckets
@@ -319,19 +338,45 @@ do {
             continue
         }
         let wantMs = want * 1e-6 * Double(overlap.count) * 10
-        let ok = abs(drift.ppm - want) <= 50 && abs(drift.milliseconds - wantMs) <= 50e-6
+        let ok = abs(drift.ppm - want) <= 5 && abs(drift.milliseconds - wantMs) <= 5e-6
             * Double(overlap.count) * 10
         if !ok { good = false }
         notes.append(
-            "\(name): \(String(format: "%.1f", drift.ppm)) ppm (want "
-                + "\(String(format: "%.1f", want)) ±50), \(String(format: "%.2f", drift.milliseconds)) "
-                + "ms (want \(String(format: "%.2f", wantMs)))")
+            "\(name): \(String(format: "%.2f", drift.ppm)) ppm (want "
+                + "\(String(format: "%.2f", want)) ±5), \(String(format: "%.3f", drift.milliseconds)) "
+                + "ms (want \(String(format: "%.3f", wantMs))), ±"
+                + "\(String(format: "%.3f", drift.errorMilliseconds)) ms over \(drift.windows) windows")
     }
     let short = AudioSyncMatch.drift(
         anchor: anchor, mover: signal.sample(count: 16_000, k: 1.0001, c: 1000), lag: 1000,
         overlap: 1000..<(1000 + minimum - 1))
     if case .measured = short { good = false }
     notes.append("one bucket under the minimum: \(short)")
+
+    // Sound only in the mover's first 3,000 buckets: the windows that match
+    // sit at the overlap's start, too close together for a line.
+    var early = signal.sample(count: 16_000, k: 1, c: 50)
+    for m in 3000..<early.count { early[m] = 0 }
+    let narrow = AudioSyncMatch.drift(anchor: anchor, mover: early, lag: 50, overlap: 50..<15_000)
+    if narrow != .notMeasured(
+        "the windows that matched cover too little of the overlap to measure drift.") {
+        good = false
+    }
+    notes.append("sound in the first 3,000 of 15,000 only: \(narrow)")
+
+    // A 6,000-bucket overlap [1000, 7000) at lag 1000 whose mover sounds only
+    // in its first and last 350 buckets: windows [0, 2000) and [4000, 6000)
+    // of it can match; every other window's ±100 search stays ≥ 50 buckets
+    // clear of the sound. The two windows span 4,000 ≥ (6000 − 2000)/2, so
+    // the span rule would pass: the note must be the count's.
+    var ends = signal.sample(count: 16_000, k: 1, c: 1000)
+    for m in ends.indices where !(m < 350 || (m >= 5650 && m < 6000)) { ends[m] = 0 }
+    let two = AudioSyncMatch.drift(
+        anchor: anchor, mover: ends, lag: 1000, overlap: 1000..<(1000 + minimum))
+    if two != .notMeasured("only 2 of the overlap's windows matched; drift needs at least 3.") {
+        good = false
+    }
+    notes.append("only the two end windows can match: \(two)")
     row("P5", good, notes.joined(separator: "; "))
 }
 
@@ -425,6 +470,215 @@ do {
     }
     notes.append("silent mover: \(describe(silentMover))")
     row("P6", good, notes.joined(separator: "; "))
+}
+
+// MARK: - P7 correction
+
+/// "name(arg=value, …)" for each op, keys sorted.
+func opList(_ ops: [ReelOp]) -> String {
+    ops.map { op in
+        op.name + "(" + op.args.keys.sorted().map { "\($0)=\(op.args[$0]!)" }
+            .joined(separator: ", ") + ")"
+    }.joined(separator: ", ")
+}
+
+do {
+    // The anchor plays f(a) for a in [0, 8000) from 150 s (zeroA 90 000 000,
+    // in 0). The mover's file is 20,000 buckets, silent for its first 12,000
+    // (so the in point lies far ahead of the overlap, which is what makes the
+    // pivot matter) and then f(m·k − 12000). It is trimmed to in I =
+    // 3 000 000 (5 s) and starts at S = 3 000 000 (zero 0), d = 117 s.
+    let signal = Bumps(seed: 71, length: 8_100)
+    let anchorOnsets = signal.sample(count: 8_000, k: 1, c: 0)
+    let zeroA: Ticks = 90_000_000
+    let c = -12_000.0
+    let frame: Ticks = 20_000
+    let anchor = reading(
+        1, track: 0, start: zeroA, end: zeroA + 48_000_000, zero: zeroA, video: true,
+        onsets: anchorOnsets)
+    func moverFile(_ k: Double) -> [Float] {
+        var file = signal.sample(count: 20_000, k: k, c: c)
+        for m in 0..<12_000 { file[m] = 0 }
+        return file
+    }
+    var good = true
+    var notes: [String] = []
+    // (name, k, the hand-worked delta, the centre-line delta, the ops' names
+    // in SY-10's order). delta = snap(zeroA + 6000·c − S + I·k) =
+    // snap(15 000 000 + 3 000 000·k):
+    //   k 1.001: 18 003 000 = frame 900.15 → 18 000 000 (0.35 frame from an edge);
+    //   k 0.999: 17 997 000 = frame 899.85 → 18 000 000 (0.35 frame from an edge).
+    // The centre-line delta (aMid 4000, lag 4000 − 16000/k, zeroN 0):
+    //   k 1.001: 114 000 000 − 95 904 096 = 18 095 904 → 18 100 000 (5 frames off);
+    //   k 0.999: 114 000 000 − 96 096 096 = 17 903 904 → 17 900 000 (5 frames off).
+    let cases: [(String, Double, Ticks, Ticks, [String])] = [
+        ("+1000 ppm (lengthens)", 1.001, 18_000_000, 18_100_000, ["move_clip", "set_speed"]),
+        ("−1000 ppm (shortens)", 0.999, 18_000_000, 17_900_000, ["set_speed", "move_clip"]),
+    ]
+    for (name, k, want, centreLine, order) in cases {
+        let moverOnsets = moverFile(k)
+        let mover = reading(
+            2, track: 1, start: 3_000_000, end: 120_000_000, zero: 0, onsets: moverOnsets)
+        let coarse = AudioSyncMatch.match(anchor: anchorOnsets, mover: moverOnsets)
+        let coarseDelta = coarse.map {
+            ReelTime.snapToFrame(zeroA + Ticks(($0.lag * 6000).rounded()), fps: fps)
+        }
+        let plan = AudioSync.plan(
+            AudioSync.Input(readings: [anchor, mover], problems: [], anchor: nil, fps: fps))
+        let control = abs(centreLine - want) >= 2 * frame
+        guard case .planned(_, let synced, let ops) = plan, let one = synced.first else {
+            good = false
+            notes.append("\(name): \(describe(plan))")
+            continue
+        }
+        let speedOp = ops.first { $0.name == "set_speed" }
+        let rate = speedOp?.args["rate"] as? Double ?? .nan
+        let keep = speedOp?.args["keep_pitch"] as? Bool
+        let moveDelta = ops.first { $0.name == "move_clip" }?.args["delta"] as? Ticks
+        let rateOK = abs(rate * k - 1) <= 5e-6
+        let ok = rateOK && keep == false && one.delta == want && moveDelta == want
+            && ops.map { $0.name } == order && one.correction == .apply(speed: rate) && control
+        if !ok { good = false }
+        notes.append(
+            "\(name): rate \(String(format: "%.7f", rate)) (want 1/k "
+                + "\(String(format: "%.7f", 1 / k)) ±5 ppm), keep_pitch \(keep.map(String.init) ?? "nil"), "
+                + "delta \(one.delta) (want \(want)), duration \(one.duration); ops \(opList(ops)) "
+                + "(want \(order)); control: centre-line delta \(centreLine), AS-1 delta "
+                + "\(coarseDelta.map(String.init) ?? "nil") (r "
+                + "\(coarse.map { String(format: "%.3f", $0.correlation) } ?? "nil"), q "
+                + "\(coarse.map { String(format: "%.2f", $0.ratio) } ?? "nil")), drift \(one.drift)")
+    }
+    // The neighbour: k 1.001 at S 21 000 000 (zero 18 000 000, I 3 000 000)
+    // puts delta at snap(3 000) = 0; d 117 000 000 grows to about
+    // 117 120 000, so a neighbour from the old end 138 000 000 is overlapped
+    // and one 10 frames later (138 200 000) is not.
+    let moverOnsets = moverFile(1.001)
+    func withNeighbour(_ at: Ticks) -> AudioSync.Plan {
+        AudioSync.plan(
+            AudioSync.Input(
+                readings: [
+                    anchor,
+                    reading(
+                        2, track: 1, start: 21_000_000, end: 138_000_000, zero: 18_000_000,
+                        onsets: moverOnsets,
+                        neighbours: [AudioSync.Neighbour(clip: 99, start: at, end: 150_000_000)]),
+                ], problems: [], anchor: nil, fps: fps))
+    }
+    let abutting = withNeighbour(138_000_000)
+    let later = withNeighbour(138_000_000 + 10 * frame)
+    if refusal(abutting) != "clip 2: would overlap clip 99 on its track." { good = false }
+    if case .planned(_, let synced, let ops) = later,
+       synced.first?.delta == 0, ops.map({ $0.name }) == ["set_speed"] {
+        notes.append("neighbour 10 frames later: \(describe(later)), ops \(opList(ops))")
+    } else {
+        good = false
+        notes.append("neighbour 10 frames later: \(describe(later))")
+    }
+    notes.append("neighbour abutting the old end, delta 0: \(describe(abutting))")
+    row("P7", good, notes.joined(separator: "; "))
+}
+
+// MARK: - P8 the decision and the band
+
+do {
+    typealias D = AudioSyncMatch.Drift
+    func fit(ms: Double, rate: Double, error: Double) -> AudioSyncMatch.DriftAnswer {
+        .measured(
+            D(ppm: rate * 1e6, milliseconds: ms, rate: rate, intercept: 0,
+              errorMilliseconds: error, windows: 10))
+    }
+    var good = true
+    var notes: [String] = []
+    func expect(_ name: String, _ got: AudioSync.Correction, _ want: AudioSync.Correction) {
+        if got != want { good = false }
+        notes.append("\(name): \(got)")
+    }
+    func applies(_ name: String, _ got: AudioSync.Correction, _ want: Double) {
+        if case .apply(let speed) = got, abs(speed - want) <= 1e-12 {
+            notes.append("\(name): \(got)")
+        } else {
+            good = false
+            notes.append("\(name): \(got) (want apply ×\(want))")
+        }
+    }
+    let one = AudioSync.correction
+    expect("4.99 ms", one(fit(ms: 4.99, rate: 1e-4, error: 0.1), 1),
+           .leave(note: "a drift of 4.99 ms over the overlap is under the 5 ms Synchronize "
+               + "Audio corrects."))
+    applies("5.0 ms ±1", one(fit(ms: 5.0, rate: 1e-4, error: 1.0), 1), 1 - 1e-4)
+    // max(5, 3 × error): at 5 ms with ±1.7 the 3× test (5.1) is the one that bites.
+    expect("5.0 ms ±1.7", one(fit(ms: 5.0, rate: 1e-4, error: 1.7), 1),
+           .leave(note: "a drift of 5.00 ms over the overlap is under 3 times its "
+               + "uncertainty (±1.70 ms), so it cannot be told from no drift."))
+    applies("30 ms ±9.99 (just over 3×)", one(fit(ms: 30, rate: 2e-4, error: 9.99), 1),
+            1 - 2e-4)
+    applies("30 ms ±10 (exactly 3×)", one(fit(ms: 30, rate: 2e-4, error: 10), 1), 1 - 2e-4)
+    expect("30 ms ±10.01 (just under 3×)", one(fit(ms: 30, rate: 2e-4, error: 10.01), 1),
+           .leave(note: "a drift of 30.00 ms over the overlap is under 3 times its "
+               + "uncertainty (±10.01 ms), so it cannot be told from no drift."))
+    expect("−30 ms ±10.01", one(fit(ms: -30, rate: -2e-4, error: 10.01), 1),
+           .leave(note: "a drift of -30.00 ms over the overlap is under 3 times its "
+               + "uncertainty (±10.01 ms), so it cannot be told from no drift."))
+    applies("new speed 0.0019 from ×1", one(fit(ms: 100, rate: 0.0019, error: 0.1), 1), 1 - 0.0019)
+    expect("new speed 0.0021 from ×1", one(fit(ms: 100, rate: 0.0021, error: 0.1), 1),
+           .leave(note: "correcting it would play the clip at ×0.9979, beyond the 0.2% "
+               + "Synchronize Audio corrects."))
+    // 20 ppm over a 6,000-bucket overlap: 20e-6 × 60 000 ms = 1.2 ms.
+    expect("20 ppm", one(fit(ms: 1.2, rate: 20e-6, error: 0.3), 1),
+           .leave(note: "a drift of 1.20 ms over the overlap is under the 5 ms Synchronize "
+               + "Audio corrects."))
+    expect("not measured", one(.notMeasured("x"), 1), .leave(note: nil))
+
+    // A mover whose file holds f(m·k − 4000) (k 1.001), already playing at
+    // 1/k: on its timeline grid its bucket j is the anchor's j − 4000, so it
+    // is in sync where zeroN = zeroA − 24 000 000 = 12 000 000 — no op.
+    let signal = Bumps(seed: 81, length: 16_500)
+    let anchorOnsets = signal.sample(count: 16_000, k: 1, c: 0)
+    let k = 1.001
+    let drifted = signal.sample(count: 20_000, k: k, c: -4000)
+    let anchor = reading(
+        1, track: 0, start: 36_000_000, end: 132_000_000, zero: 36_000_000, video: true,
+        onsets: anchorOnsets)
+    func resync(_ speed: Double) -> AudioSync.Plan {
+        AudioSync.plan(
+            AudioSync.Input(
+                readings: [
+                    anchor,
+                    reading(
+                        2, track: 1, start: 15_000_000, end: 15_000_000 + 117_120_000,
+                        zero: 12_000_000, onsets: drifted, speed: speed),
+                ], problems: [], anchor: nil, fps: fps))
+    }
+    let settled = resync(1 / k)
+    if case .planned(_, let synced, let ops) = settled, ops.isEmpty,
+       case .leave = synced.first?.correction {
+        notes.append("at 1/k: \(describe(settled)), drift \(synced.first!.drift)")
+    } else {
+        good = false
+        notes.append("at 1/k: \(describe(settled)) (want no op)")
+    }
+    let near = resync(0.9999)
+    if case .planned(_, _, let ops) = near,
+       let rate = ops.first(where: { $0.name == "set_speed" })?.args["rate"] as? Double,
+       abs(rate * k - 1) <= 5e-6 {
+        notes.append("at ×0.9999: \(opList(ops)) (want rate 1/k ±5 ppm)")
+    } else {
+        good = false
+        notes.append("at ×0.9999: \(describe(near)) (want a set_speed to 1/k ±5 ppm)")
+    }
+
+    let band: [(Double, Bool)] = [(2, false), (1.002, true), (1.0021, false), (0.998, true),
+                                  (0.9979, false)]
+    for (rate, inside) in band {
+        let problem = AudioSync.rateProblem(rate)
+        if (problem == nil) != inside { good = false }
+        notes.append("×\(rate): \(problem ?? "matched")")
+    }
+    if AudioSync.rateProblem(2) != "plays at ×2; Synchronize Audio lines up clips playing at "
+        + "×1 or within 0.2% of it." {
+        good = false
+    }
+    row("P8", good, notes.joined(separator: "; "))
 }
 
 let data = (try? JSONSerialization.data(withJSONObject: ["rows": rows], options: [.sortedKeys]))

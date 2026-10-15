@@ -137,15 +137,22 @@ extension AgentServer {
                     + "matter) by cross-correlation; a match must reach correlation 0.25 and "
                     + "stand 1.5× above the next best lag more than 0.5 s away. All or "
                     + "nothing, one undo step: when any clip cannot be matched — no sound, "
-                    + "still being analysed, playing at a speed other than ×1 or reversed, "
-                    + "two clips on one track, no clear match, a move that would start "
-                    + "before 0, never play beside the anchor or overlap another clip on its "
-                    + "track — nothing moves and every reason is named. The answer reports "
-                    + "each moved clip's offset (anchor source minus clip source, in ticks), "
-                    + "delta, new start, correlation and confidence (the peak ratio), and "
-                    + "the clock drift measured between the two over at least 60 s of "
-                    + "overlap (drift_ppm, drift_ms); drift is reported, not corrected. A "
-                    + "second call answers moved: false and \"already in sync\".",
+                    + "still being analysed, playing more than 0.2% away from ×1, at a "
+                    + "rate other than its speed, or reversed, two clips on one track, no clear match, a move that would "
+                    + "start before 0, never play beside the anchor or overlap another clip "
+                    + "on its track — nothing moves and every reason is named. Over at least "
+                    + "60 s of overlap the clock drift between the two is measured as a line "
+                    + "through many windows and CORRECTED with set_speed (keep_pitch false, "
+                    + "a resample) so the clip's sound stays under the anchor's along the "
+                    + "whole overlap — unless it is under 5 ms or under 3× its uncertainty "
+                    + "(drift_error_ms), or would need a speed more than 0.2% from ×1, when "
+                    + "it is left and "
+                    + "drift_note says why. The answer reports each moved clip's offset "
+                    + "(anchor source minus clip source, in ticks), delta, new start, "
+                    + "correlation and confidence (the peak ratio), speed (after the "
+                    + "command), drift_ppm, drift_ms, drift_error_ms, drift_corrected and "
+                    + "residual_ms (the error left when corrected, the drift itself when "
+                    + "not). A second call answers moved: false and \"already in sync\".",
                 [
                     "clips": [
                         "type": "array", "items": ["type": "integer"], "minItems": 2,

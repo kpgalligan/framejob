@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Road map "audio-sync", AS-1 (spec §11 SY-1..SY-5) — Clip ▸ Synchronize Audio
-and `sync_audio`, over MCP against a running instance, then the probe's rows
-over `app/Sources`.
+"""Road map "audio-sync", AS-1 and AS-2 (spec §11 SY-1..SY-10) — Clip ▸
+Synchronize Audio and `sync_audio`, over MCP against a running instance, then
+the probe's rows over `app/Sources`.
 
     python3 tools/proof/audio_sync_proof.py <dir>/agent.sock [--only S1,P3,...]
     python3 tools/proof/audio_sync_proof.py [<dir>/agent.sock] --mutants
@@ -10,7 +10,7 @@ The instance is the caller's (`proof_app.py launch`; Debug while iterating,
 `RC_PROOF_APP=release` for the recorded run). Every package and fixture is
 under `tools/proof/work/audio-sync/`; every project is closed (`close_project`,
 discard). The only menu item performed is Clip ▸ Synchronize Audio, which
-persists nothing.
+persists nothing. S18 decodes two `audio_wav` exports with `ffmpeg`.
 
 Fixtures (Python `wave`, 16 kHz mono, seeded): SOURCE, 150 s of irregular
 noise and tone bursts over a quiet floor; RECORDER, SOURCE delayed by
@@ -27,8 +27,9 @@ Rows (30 fps; "unchanged" is `get_project`'s project, key-sorted, equal
 before and after, and the last undo step not "Synchronize Audio"):
   S1   camera at 10 s, recorder at 0 on a second track: the recorder lands on
        exactly frame 206 (unsnapped 6.8666875 s), the camera unmoved, `moved`
-       true and `anchor` the camera; one `undo` names "Synchronize Audio" and
-       puts the recorder back at 0.
+       true and `anchor` the camera; its row `drift_corrected` false, `speed`
+       1 and `|drift_ms|` < 5 (no drift to correct); one `undo` names
+       "Synchronize Audio" and puts the recorder back at 0.
   S2   camera at 0, recorder at 20 s, `anchor` the recorder: the camera lands
        on exactly frame 694 (unsnapped 23.1333125 s), the recorder unmoved.
   S3   camera and UNRELATED: refused "no matching sound found", unchanged.
@@ -43,8 +44,10 @@ before and after, and the last undo step not "Synchronize Audio"):
        unchanged.
   S9   camera trimmed to [10 s, 20 s), recorder front-trimmed to start at
        100 s: refused "would not play at any moment", unchanged.
-  S10  camera at 10 s and DRIFT: `drift_ppm` within ±50 of the fixture's;
-       S1's `|drift_ppm|` ≤ 50.
+  S10  camera at 10 s and DRIFT: corrected (`drift_corrected` true), the
+       clip's `keep_pitch` false and its speed s within SY-7's 2 ms over the
+       150 s overlap (`|s·k − 1|·150,000 ≤ 2`), the recorder on frame 206;
+       one `undo` restores speed 1 and start 0.
   S11  the recorder nested: refused "is a nest", unchanged.
   S12  one clip: refused "needs at least two clips", unchanged.
   S13  S1's call again: `moved` false, `note` "already in sync", no undo step.
@@ -55,16 +58,25 @@ before and after, and the last undo step not "Synchronize Audio"):
   S16  the recorder's track holds a 2 s text clip ending 1 s after where S1's
        recorder lands, the recorder placed after it: refused "would overlap
        clip M on its track", unchanged, no transition anywhere.
-  P1–P6  `audio_sync_probe.swift`, built by `swift_build.build` over
-       `app/Sources` (a failed build is a scored FAIL of all six); each row's
-       sentence is the probe's.
+  S17  S10's call again on the corrected recorder: `moved` false, "already in
+       sync", `|drift_ms|` ≤ 2, and no new step (one `undo` still restores
+       speed 1 and start 0).
+  S18  after S10, the camera's audio off, `export` `audio_wav`, decoded by
+       ffmpeg to 16 kHz mono; 1 ms abs-max envelopes against SOURCE placed at
+       10 s, the lag on [12 s, 22 s) and [148 s, 158 s) by brute force over
+       ±40 ms with parabolic refinement: |Δlag| ≤ 3 ms and each |lag| ≤ 20 ms.
+       Control: `set_speed` rate 1 on the recorder, exported again: |Δlag| ≥
+       20 ms.
+  P1–P8  `audio_sync_probe.swift`, built by `swift_build.build` over
+       `app/Sources` (a failed build is a scored FAIL of all eight); each
+       row's sentence is the probe's.
 
-`--mutants`: the eight below, probe-only. Each copies `app/Sources` under
+`--mutants`: the eighteen below, probe-only. Each copies `app/Sources` under
 `work/audio-sync/mutants/<name>/`, applies its edit (its `before` asserted to
 occur exactly once), rebuilds the probe (900 s wall) and runs it (240 s wall);
 killed when a named row fails; a copy that does not build or answer is a failed
 control, never a kill. Exit 0 when every scored row passed (with
-`--mutants`, when all eight were killed); 1 otherwise.
+`--mutants`, when all eighteen were killed); 1 otherwise.
 """
 
 import argparse
@@ -98,8 +110,9 @@ SEC = 600_000
 FRAME = SEC // 30
 BUILD_WALL = 900
 RUN_WALL = 240
-S_ROWS = [f"S{n}" for n in range(1, 17)]
-P_ROWS = [f"P{n}" for n in range(1, 7)]
+S_ROWS = [f"S{n}" for n in range(1, 19)]
+P_ROWS = [f"P{n}" for n in range(1, 9)]
+ENVELOPE = RATE // 1000              # samples per 1 ms envelope bucket
 
 # name: (the rows it must fail, file, before, after)
 MUTANTS = {
@@ -119,7 +132,31 @@ MUTANTS = {
                            "ids.count > 1 else { continue }", "ids.count > 99 else { continue }"),
     "neighbour-dropped": (["P6"], "AudioSync.swift",
                           "start < $0.end && $0.start < end", "false && $0.start < end"),
-    "ppm-scale": (["P5"], "AudioSyncMatch.swift", "rate * 1e6", "rate * 1e9"),
+    "ppm-scale": (["P5"], "AudioSyncDrift.swift", "rate * 1e6", "rate * 1e9"),
+    "min-windows-dropped": (["P5"], "AudioSyncDrift.swift",
+                            "guard centres.count >= driftMinimumWindows else {",
+                            "guard centres.count >= driftMinimumWindows || true else {"),
+    "small-drift-corrected": (["P8"], "AudioSync+Correction.swift",
+                              "abs(fit.milliseconds) < minimumCorrectionMilliseconds",
+                              "abs(fit.milliseconds) < 0"),
+    "uncertain-corrected": (["P8"], "AudioSync+Correction.swift",
+                            "abs(fit.milliseconds) < minimumSignificance * fit.errorMilliseconds",
+                            "abs(fit.milliseconds) < 0 * fit.errorMilliseconds"),
+    "rate-limit-dropped": (["P8"], "AudioSync+Correction.swift",
+                           "guard inBand(corrected) else {",
+                           "guard inBand(corrected) || true else {"),
+    "speed-not-compounded": (["P8"], "AudioSync+Correction.swift",
+                             "speed * (1 - fit.rate)", "1 * (1 - fit.rate)"),
+    "resample-dropped": (["P8"], "AudioSyncDrift.swift",
+                         "guard speed != 1, speed.isFinite", "guard speed == 1, speed.isFinite"),
+    "rate-sign": (["P7"], "AudioSync+Correction.swift",
+                  "speed * (1 - fit.rate)", "speed * (1 + fit.rate)"),
+    "order-inverted": (["P7"], "AudioSync+Correction.swift",
+                       "if newDuration > duration {", "if newDuration < duration {"),
+    "end-unchecked": (["P7"], "AudioSync.swift",
+                      "if delta != 0 || newDuration != duration,", "if delta != 0,"),
+    "pivot-dropped": (["P7"], "AudioSync.swift",
+                      "delta = correctedDelta(", "_ = correctedDelta("),
 }
 
 results = {}
@@ -305,13 +342,86 @@ def recorder_row(answer, clip):
     return next((r for r in answer.get("synced", []) if r["clip"] == clip), {})
 
 
+# ---- the exported mix (S18) ----------------------------------------------------
+
+
+def envelope(samples):
+    """1 ms abs-max buckets of 16 kHz samples."""
+    return [max(abs(v) for v in samples[i:i + ENVELOPE])
+            for i in range(0, len(samples) - ENVELOPE + 1, ENVELOPE)]
+
+
+def wav_samples(path):
+    """The file decoded by ffmpeg to 16 kHz mono signed 16-bit, as floats."""
+    out = path.with_suffix(".s16")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(path), "-ac", "1", "-ar", str(RATE),
+                    "-f", "s16le", str(out)], check=True, timeout=300)
+    data = array.array("h", out.read_bytes())
+    return [v / 32768 for v in data]
+
+
+def window_lag(mix, source, start_ms, end_ms, offset_ms=10_000, reach=40):
+    """The lag L in ms (the mix's sound plays L ms after SOURCE placed at
+    `offset_ms`) over [start_ms, end_ms), by normalised correlation at every
+    whole ms in ±reach, refined parabolically; (lag, peak r)."""
+    xs = mix[start_ms:end_ms]
+    mx = sum(xs) / len(xs)
+    xc = [x - mx for x in xs]
+    ex = math.sqrt(sum(x * x for x in xc))
+    scores = []
+    for lag in range(-reach, reach + 1):
+        ys = source[start_ms - offset_ms - lag:end_ms - offset_ms - lag]
+        my = sum(ys) / len(ys)
+        yc = [y - my for y in ys]
+        ey = math.sqrt(sum(y * y for y in yc))
+        scores.append(sum(a * b for a, b in zip(xc, yc)) / (ex * ey) if ex and ey else 0)
+    best = max(range(len(scores)), key=lambda i: scores[i])
+    offset = 0.0
+    if 0 < best < len(scores) - 1:
+        left, centre, right = scores[best - 1], scores[best], scores[best + 1]
+        bend = left - 2 * centre + right
+        if bend < 0:
+            offset = max(-0.5, min(0.5, 0.5 * (left - right) / bend))
+    return best - reach + offset, scores[best]
+
+
+def exported_drift(session, cam, recorder, files):
+    """S18: (ok, detail) over the corrected mix and the rate-1 control."""
+    source = envelope(wav_samples(Path(files["source"])))
+    session.op("set_enabled", clip=cam, audio=False)
+
+    def measure(tag):
+        out = WORK / f"s18-{tag}-{os.getpid()}.wav"
+        if out.exists():
+            out.unlink()
+        session.op("export", preset="audio_wav", path=str(out))
+        mix = envelope(wav_samples(out))
+        early = window_lag(mix, source, 12_000, 22_000)
+        late = window_lag(mix, source, 148_000, 158_000)
+        return early, late
+
+    speed = session.clip(recorder).get("speed")
+    if speed == 1:
+        # Not corrected: a `set_speed` to 1 would be an identity, which the
+        # tool answers as an error — there is no control to run.
+        return False, f"the recorder plays at ×1 (S10's drift was not corrected); no control"
+    (e1, r1), (l1, q1) = measure("corrected")
+    session.op("set_speed", clip=recorder, rate=1)
+    (e2, r2), (l2, q2) = measure("control")
+    change, control = l1 - e1, l2 - e2
+    ok = (abs(change) <= 3 and abs(e1) <= 20 and abs(l1) <= 20 and abs(control) >= 20)
+    return ok, (f"corrected: lag {e1:.2f} ms (r {r1:.3f}) on [12 s, 22 s), {l1:.2f} ms (r "
+                f"{q1:.3f}) on [148 s, 158 s), Δ {change:.2f} ms (want |Δ| ≤ 3, each |lag| ≤ "
+                f"20); control at rate 1: {e2:.2f} ms (r {r2:.3f}), {l2:.2f} ms (r {q2:.3f}), "
+                f"Δ {control:.2f} ms (want |Δ| ≥ 20)")
+
+
 # ---- the MCP rows --------------------------------------------------------------
 
 
 def mcp_rows(sock, wanted, files):
     mcp = MCP(sock)
     want = set(wanted)
-    s1_drift = None
 
     if want & {"S1", "S10", "S13", "S14"}:
         a = Session(mcp, "sync-a", files)
@@ -320,18 +430,23 @@ def mcp_rows(sock, wanted, files):
             rec = a.place("recorder", 0, 1)
             answer = a.sync(clips=[cam, rec])
             row = recorder_row(answer, rec)
-            s1_drift = row.get("drift_ppm")
             landed = a.start(rec)
             undone = a.op("undo")["undone"]
             back = a.start(rec)
             if "S1" in want:
+                drift_ms = row.get("drift_ms")
                 score("S1", answer.get("moved") is True and answer.get("anchor") == cam
                       and landed == 206 * FRAME and a.start(cam) == 10 * SEC
-                      and undone == "Synchronize Audio" and back == 0,
+                      and undone == "Synchronize Audio" and back == 0
+                      and row.get("drift_corrected") is False and row.get("speed") == 1
+                      and drift_ms is not None and abs(drift_ms) < 5,
                       f"recorder at {landed} (want {206 * FRAME}, frame 206), camera at "
                       f"{a.start(cam)}, offset {row.get('offset')} (unsnapped "
                       f"{-DELAY / RATE * SEC:.1f}), r {row.get('correlation')}, confidence "
-                      f"{row.get('confidence')}; undo {undone!r} → {back}")
+                      f"{row.get('confidence')}; drift {row.get('drift_ppm')} ppm, {drift_ms} ms "
+                      f"(want |·| < 5), ±{row.get('drift_error_ms')} ms, corrected "
+                      f"{row.get('drift_corrected')}, speed {row.get('speed')}, note "
+                      f"{row.get('drift_note')!r}; undo {undone!r} → {back}")
             if "S13" in want:
                 a.op("redo")
                 again = a.sync(clips=[cam, rec])
@@ -351,20 +466,59 @@ def mcp_rows(sock, wanted, files):
         finally:
             a.close()
 
-    if "S10" in want:
+    if want & {"S10", "S17", "S18"}:
         h = Session(mcp, "sync-h", files)
         try:
             cam = h.place("camera", 10 * SEC, 0)
             drift = h.place("drift", 0, 1)
             answer = h.sync(clips=[cam, drift])
             row = recorder_row(answer, drift)
-            ppm = row.get("drift_ppm")
-            ok = (ppm is not None and abs(ppm - DRIFT_PPM) <= 50 and s1_drift is not None
-                  and abs(s1_drift) <= 50)
-            score("S10", ok, f"drift fixture {ppm} ppm (want {DRIFT_PPM:.2f} ±50), "
-                  f"{row.get('drift_ms')} ms, note {row.get('drift_note')!r}, r "
-                  f"{row.get('correlation')}, confidence {row.get('confidence')}; S1 {s1_drift} "
-                  "ppm (want |·| ≤ 50)")
+            clip = h.clip(drift)
+            speed = clip.get("speed")
+            keep = (clip.get("audio") or {}).get("keep_pitch")
+            landed = clip.get("start")
+            undone = h.op("undo")["undone"]
+            back = h.clip(drift)
+            h.op("redo")
+            if "S10" in want:
+                spread = abs(speed * DRIFT_K - 1) * 150_000 if speed else None
+                ok = (answer.get("moved") is True and row.get("drift_corrected") is True
+                      and keep is False and spread is not None and spread <= 2
+                      and landed == 206 * FRAME and undone == "Synchronize Audio"
+                      and back.get("speed") == 1 and back.get("start") == 0)
+                score("S10", ok, f"drift fixture {row.get('drift_ppm')} ppm (true "
+                      f"{DRIFT_PPM:.2f}), {row.get('drift_ms')} ms ±{row.get('drift_error_ms')} "
+                      f"ms; corrected {row.get('drift_corrected')}, note "
+                      f"{row.get('drift_note')!r}; speed {speed} (want 1/k {1 / DRIFT_K:.7f}; "
+                      f"|s·k − 1|·150 000 = {spread} ms, want ≤ 2), keep_pitch {keep}, recorder "
+                      f"at {landed} (want {206 * FRAME}, frame 206), duration "
+                      f"{clip.get('duration')}, r {row.get('correlation')}, confidence "
+                      f"{row.get('confidence')}; undo {undone!r} → speed {back.get('speed')}, "
+                      f"start {back.get('start')}")
+            if "S17" in want:
+                again = h.sync(clips=[cam, drift])
+                again_row = recorder_row(again, drift)
+                residual = again_row.get("drift_ms")
+                once = h.op("undo")["undone"]
+                after_one = h.clip(drift)
+                h.op("redo")
+                score("S17", again.get("moved") is False and again.get("note") == "already in sync"
+                      and residual is not None and abs(residual) <= 2
+                      and once == "Synchronize Audio" and after_one.get("speed") == 1
+                      and after_one.get("start") == 0,
+                      f"moved {again.get('moved')}, note {again.get('note')!r}, re-measured "
+                      f"{again_row.get('drift_ppm')} ppm, {residual} ms (want |·| ≤ 2) "
+                      f"±{again_row.get('drift_error_ms')} ms, corrected "
+                      f"{again_row.get('drift_corrected')}, drift note "
+                      f"{again_row.get('drift_note')!r}; one undo ({once!r}) → speed "
+                      f"{after_one.get('speed')}, start {after_one.get('start')} (S10's step, not a "
+                      "second)")
+            if "S18" in want:
+                try:
+                    ok, detail = exported_drift(h, cam, drift, files)
+                except ToolError as error:  # scored here, so the session goes on
+                    ok, detail = False, f"a tool refused: {error}"
+                score("S18", ok, detail)
         finally:
             h.close()
 

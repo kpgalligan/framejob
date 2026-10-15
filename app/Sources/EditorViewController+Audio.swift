@@ -54,8 +54,10 @@ extension EditorViewController {
     /// rule. The scope is the selection's clips `AudioNormalize.canOffer`
     /// passes, so a title or a nest picked alongside is not asked about. A
     /// refusal beeps and puts every reason at the inspector's foot (spec §11
-    /// CI-10); a selection already in sync is no ops and beeps. Drift is the
-    /// tool's to report in AS-1, not the menu's.
+    /// CI-10); a selection already in sync is no ops and beeps. A drift the
+    /// plan corrects is applied here too, as the same `set_speed` in the same
+    /// undo step (SY-6); the menu shows no drift figure — the inspector's
+    /// speed is what changed.
     @objc func synchronizeAudio(_ sender: Any?) {
         guard let document = document else { return }
         let snapshot = document.editedProject.snapshot

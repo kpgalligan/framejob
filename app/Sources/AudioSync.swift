@@ -1,10 +1,11 @@
 import Foundation
 
-/// Clip ▸ Synchronize Audio and `sync_audio` (road map "audio-sync", AS-1;
-/// spec §11 SY-1..SY-5): selected clips that play sound are lined up by their
-/// sound. One ANCHOR stays where it is and every other clip moves by a
-/// frame-snapped `move_clip`, all as one undo step — or the whole command
-/// refuses, naming every reason at once (SY-1).
+/// Clip ▸ Synchronize Audio and `sync_audio` (road map "audio-sync", AS-1 and
+/// AS-2; spec §11 SY-1..SY-10): selected clips that play sound are lined up by
+/// their sound. One ANCHOR stays where it is and every other clip moves by a
+/// frame-snapped `move_clip`, its clock drift corrected by a `set_speed`, all
+/// as one undo step — or the whole command refuses, naming every reason at
+/// once (SY-1).
 ///
 /// `AudioNormalize`'s shape: `read` takes everything off the document once
 /// (the edited project's snapshot and plan, and each file's cached waveform),
@@ -13,17 +14,32 @@ import Foundation
 /// The signal arithmetic is `AudioSyncMatch`'s.
 ///
 /// **Time.** A reading's `zero` is the project tick at which its file's
-/// source tick 0 would play (`segment.start − segment.sourceIn`), so a sound
-/// at bucket `b` of a file plays at `zero + b·6000`. A mover whose sound at
-/// bucket `m` is the anchor's at `m + lag` lines up when its zero becomes
-/// `zeroA + lag·6000`: `delta = zeroA − zeroN + lag·6000`, snapped to the
-/// frame grid (SY-4), because the model stores no sub-frame time.
+/// source tick 0 would play (`segment.start − round(segment.sourceIn /
+/// speed)`), and its onsets are resampled onto its timeline grid
+/// (`AudioSyncMatch.resampled`, bucket k = source bucket k·speed; the onsets
+/// themselves at ×1), so a sound at timeline bucket `b` plays at `zero +
+/// b·6000`. A mover whose sound at bucket `m` is the anchor's at `m + lag`
+/// lines up when its zero becomes `zeroA + lag·6000`: `delta = zeroA − zeroN
+/// + lag·6000`, snapped to the frame grid (SY-4), because the model stores no
+/// sub-frame time.
+///
+/// **Drift** (SY-6, SY-7). Over the overlap the coarse delta gives, the lag
+/// is fitted as a line, `lag(a) = c + ρ·a` (a an anchor bucket). Corrected
+/// (SY-8), the mover's speed becomes `s' = s·(1 − ρ)` and, since `set_speed`
+/// keeps its start S and in point I, source tick μ plays at `S + δ + (μ −
+/// I)/s'` — on the anchor's line everywhere when `δ = snapToFrame(round(zeroA
+/// + 6000·c/(1 − ρ) − S + I/s'))` (`correctedDelta`). Left uncorrected, it is
+/// placed by the line's value at the overlap's centre aMid, `delta =
+/// snapToFrame(zeroA − zeroN + round((c + ρ·aMid)·6000))`; not measured, by
+/// the coarse lag. Snapping leaves one constant offset of at most half a
+/// frame.
 ///
 /// **What it refuses rather than lets the core decide** (SY-4): `move_clip`
 /// clamps the earliest clip at 0, and on an overlap within the overlap rule
 /// it ADDS a cross dissolve instead of refusing — so a mover that would have
 /// to start before the timeline, or would land on another clip of its own
-/// track, is refused here, by name.
+/// track, is refused here, by name — on the FINAL span, after any change of
+/// speed (SY-10).
 enum AudioSync {
 
     // MARK: - Vocabulary
@@ -60,6 +76,10 @@ enum AudioSync {
         let hasVideo: Bool
         let onsets: [Float]
         let neighbours: [Neighbour]
+        /// The clip's playback rate, within SY-9's band.
+        let speed: Double
+        /// Its first audio segment's in point, in source ticks.
+        let sourceIn: Ticks
     }
 
     /// Everything a run reads, taken off the document once.
@@ -72,7 +92,8 @@ enum AudioSync {
     }
 
     /// One mover's answer: its lag in ticks, the frame-snapped move, where it
-    /// lands, how sure the match was and what drift it measured.
+    /// lands, how sure the match was, what drift it measured, and its speed,
+    /// duration and correction after the command.
     struct Synced: Equatable {
         let clip: UInt32
         let media: UInt32
@@ -82,6 +103,9 @@ enum AudioSync {
         let correlation: Double
         let ratio: Double
         let drift: AudioSyncMatch.DriftAnswer
+        let speed: Double
+        let duration: Ticks
+        let correction: Correction
     }
 
     enum Plan {
@@ -156,12 +180,13 @@ enum AudioSync {
                 let scaled = segments.first { $0.isTimeScaled } ?? first
                 let rate = clip.speed != 1
                     ? clip.speed : Double(scaled.sourceDuration) / Double(max(scaled.duration, 1))
-                problems.append(
-                    Problem(
-                        clip: id,
-                        reason: "plays at ×\(String(format: "%g", rate)); Synchronize Audio "
-                            + "lines up clips playing at ×1."))
-                continue
+                // At speed 1 a time-scaled segment is a stretch the clip's
+                // speed does not say, so neither `zero` nor `set_speed` can
+                // read it: refused, as AS-1 did (SY-9).
+                if let problem = rateProblem(rate) ?? (clip.speed == 1 ? stretched(rate) : nil) {
+                    problems.append(Problem(clip: id, reason: problem))
+                    continue
+                }
             }
             if case .media(_, _, true) = clip.source {
                 problems.append(
@@ -197,8 +222,9 @@ enum AudioSync {
                     clip: id, media: first.media,
                     trackIndex: snapshot.tracks.firstIndex { $0.id == clip.track } ?? 0,
                     start: clip.start, end: clip.start + clip.duration,
-                    zero: first.start - first.sourceIn, hasVideo: pictured.contains(id),
-                    onsets: onsets, neighbours: neighbours))
+                    zero: first.start - Ticks((Double(first.sourceIn) / clip.speed).rounded()),
+                    hasVideo: pictured.contains(id), onsets: onsets, neighbours: neighbours,
+                    speed: clip.speed, sourceIn: first.sourceIn))
         }
         return Input(
             readings: readings, problems: problems, anchor: anchor, fps: snapshot.canvas.fps)
@@ -220,7 +246,7 @@ enum AudioSync {
         }
     }
 
-    // MARK: - Planning (SY-1, SY-3, SY-4, SY-5)
+    // MARK: - Planning (SY-1, SY-3, SY-4, SY-6..SY-10)
 
     /// The ops, or every reason there are none. All or nothing: one problem
     /// anywhere refuses the whole command.
@@ -259,6 +285,7 @@ enum AudioSync {
         let silent = "has no sound that rises anywhere to line up by."
         let anchorSilent = !anchor.onsets.contains { $0 != 0 }
         if anchorSilent { problems.append(Problem(clip: anchor.clip, reason: silent)) }
+        let anchorOnsets = AudioSyncMatch.resampled(anchor.onsets, speed: anchor.speed)
 
         let bucket = Double(MediaPeaks.bucketTicks)
         var synced: [Synced] = []
@@ -269,7 +296,8 @@ enum AudioSync {
                 continue
             }
             if anchorSilent { continue }
-            guard let match = AudioSyncMatch.match(anchor: anchor.onsets, mover: mover.onsets)
+            let moverOnsets = AudioSyncMatch.resampled(mover.onsets, speed: mover.speed)
+            guard let match = AudioSyncMatch.match(anchor: anchorOnsets, mover: moverOnsets)
             else {
                 problems.append(Problem(clip: mover.clip, reason: silent))
                 continue
@@ -295,9 +323,33 @@ enum AudioSync {
                 continue
             }
             let lagTicks = Ticks((match.lag * bucket).rounded())
-            let delta = ReelTime.snapToFrame(anchor.zero - mover.zero + lagTicks, fps: input.fps)
+            let coarse = ReelTime.snapToFrame(anchor.zero - mover.zero + lagTicks, fps: input.fps)
+            let lower = Int(
+                MediaPeaks.bucketIndex(max(anchor.start, mover.start + coarse) - anchor.zero))
+            let upper = Int(
+                MediaPeaks.bucketIndex(min(anchor.end, mover.end + coarse) - anchor.zero))
+            let window = max(0, lower)..<max(0, lower, upper)
+            let drift = AudioSyncMatch.drift(
+                anchor: anchorOnsets, mover: moverOnsets, lag: match.lag, overlap: window)
+            let correction = Self.correction(for: drift, speed: mover.speed)
+            var delta = coarse
+            var newSpeed: Double?
+            if case .measured(let fit) = drift {
+                let centre = Double(window.lowerBound + window.upperBound) / 2
+                let line = Ticks(((fit.intercept + fit.rate * centre) * bucket).rounded())
+                delta = ReelTime.snapToFrame(anchor.zero - mover.zero + line, fps: input.fps)
+                if case .apply(let speed) = correction {
+                    newSpeed = speed
+                    delta = correctedDelta(
+                        anchor: anchor, mover: mover, drift: fit, speed: speed, fps: input.fps)
+                }
+            }
+            let duration = mover.end - mover.start
+            let newDuration = newSpeed.map {
+                durationAtSpeed(duration, from: mover.speed, to: $0, fps: input.fps)
+            } ?? duration
             let start = mover.start + delta
-            let end = mover.end + delta
+            let end = start + newDuration
             guard start >= 0 else {
                 let seconds = Double(-start) / Double(ReelTime.perSecond)
                 problems.append(
@@ -317,24 +369,22 @@ enum AudioSync {
                             + "\(anchor.clip) plays."))
                 continue
             }
-            if delta != 0,
+            if delta != 0 || newDuration != duration,
                let hit = mover.neighbours.first(where: { start < $0.end && $0.start < end }) {
                 problems.append(
                     Problem(
                         clip: mover.clip, reason: "would overlap clip \(hit.clip) on its track."))
                 continue
             }
-            let lower = Int(MediaPeaks.bucketIndex(overlapStart - anchor.zero))
-            let upper = Int(MediaPeaks.bucketIndex(overlapEnd - anchor.zero))
-            let drift = AudioSyncMatch.drift(
-                anchor: anchor.onsets, mover: mover.onsets, lag: match.lag,
-                overlap: max(0, lower)..<max(0, lower, upper))
             synced.append(
                 Synced(
                     clip: mover.clip, media: mover.media, lag: lagTicks, delta: delta,
                     start: start, correlation: match.correlation, ratio: match.ratio,
-                    drift: drift))
-            if delta != 0 { ops.append(.moveClip(clips: [mover.clip], delta: delta)) }
+                    drift: drift, speed: newSpeed ?? mover.speed, duration: newDuration,
+                    correction: correction))
+            ops += Self.ops(
+                clip: mover.clip, delta: delta, from: mover.speed, to: newSpeed,
+                duration: duration, newDuration: newDuration)
         }
         guard problems.isEmpty else { return .refused(problems) }
         return .planned(anchor: anchor.clip, synced: synced, ops: ops)

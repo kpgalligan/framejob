@@ -123,10 +123,12 @@ extension AgentServer {
 
     /// `sync_audio` — Clip ▸ Synchronize Audio (`EditorViewController
     /// .synchronizeAudio`). All or nothing (SY-1): a refusal names every
-    /// reason and moves nothing; a plan with no move (already in sync)
-    /// answers `moved: false` and makes no undo step; otherwise one
-    /// `move_clip` per mover, one step. Each mover's row carries its match
-    /// and its measured drift (SY-5), which AS-1 reports and does not correct.
+    /// reason and moves nothing; a plan with no op (already in sync)
+    /// answers `moved: false` and makes no undo step; otherwise each
+    /// mover's `move_clip` and, when its drift is corrected, its `set_speed`
+    /// (SY-6, SY-10), all one step. Each mover's row carries its match, its
+    /// measured drift (SY-7), the speed it plays at after the command and
+    /// whether the drift was corrected, with the residual left (SY-8).
     func syncAudio(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
@@ -176,14 +178,31 @@ extension AgentServer {
             "correlation": row.correlation,
             "confidence": row.ratio.isFinite ? row.ratio : NSNull(),
         ]
+        result["speed"] = row.speed
         switch row.drift {
         case .measured(let drift):
             result["drift_ppm"] = drift.ppm
             result["drift_ms"] = drift.milliseconds
+            result["drift_error_ms"] = Self.jsonLevel(drift.errorMilliseconds)
         case .notMeasured(let note):
             result["drift_ppm"] = NSNull()
             result["drift_ms"] = NSNull()
+            result["drift_error_ms"] = NSNull()
+            result["residual_ms"] = NSNull()
             result["drift_note"] = note
+        }
+        switch row.correction {
+        case .apply:
+            result["drift_corrected"] = true
+            if case .measured(let drift) = row.drift {
+                result["residual_ms"] = Self.jsonLevel(drift.errorMilliseconds)
+            }
+        case .leave(let note):
+            result["drift_corrected"] = false
+            if case .measured(let drift) = row.drift {
+                result["residual_ms"] = drift.milliseconds
+            }
+            if let note = note { result["drift_note"] = note }
         }
         return result
     }

@@ -3,10 +3,12 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map that made these is `designs/audio-sync.md` (open: AS-1 lines clips up and measures
+The road map that made these is closed (2026-10-15): its condensed record is
+`designs/adr/audio-sync.md`, the original `archive/audio-sync.md` (AS-1 lines clips up and measures
 drift, AS-2 corrects it). SY-1…SY-5 were recorded in AS-1, before its code, from the owner's three
 answers of 2026-10-15 (quoted verbatim in the road map): placement frame-snapped; the clip with
-video stays and the audio moves; drift reported first, correction straight after.
+video stays and the audio moves; drift reported first, correction straight after. SY-6…SY-10 were
+recorded in AS-2 before its code; SY-8 was amended by the owner's choice after AS-2's STOP.
 
 **Stands, and nothing here re-litigates it:** the overlap rule and `move_clip` (foundations,
 spec §6); D2-1 (a composite that measures nothing makes no op and says why); #42's one-delta
@@ -79,3 +81,77 @@ never silence; the menu and the tool call the same `read` + `plan`).
   100.0 asked (P5, 2026-10-15). AS-1's drift fixture (a recorder resampled by +200 ppm, so
   199.96 ppm in this sign) measured 172.2 ppm over 150 s (S10, Debug and Release), and the
   undrifted recorder −14.6 ppm (S1).
+
+- **SY-6 — Correction is `set_speed {clip, rate, keep_pitch: false}`; no new op (amends SY-1,
+  SY-5).** AS-2 corrects each mover's clock drift with the existing op. **Why it is exact:** the
+  model stores `speed` as an f64 (JSON round-trips it); the plan's segment is `source_duration =
+  round(duration·speed)` over `duration`, integer ticks at 600,000/s, so the played rate is exact
+  to one tick per clip length (0.03 ppm on 60 s), and `CompositionBuilder.fill` scales it with
+  `scaleTimeRange` at that ratio. `rate_stretch` is not used: it derives the rate from a
+  frame-snapped end (about 555 ppm on a 60 s clip). **Pitch:** `keep_pitch: false` is the plan's
+  `pitch: "off"`, AVFoundation's `.varispeed` — a resample (≤ 2,000 ppm is ≤ 3.5 cents) with
+  none of `.spectral`'s phase-vocoder processing; `AUDIO_SPEED_MAX` and `SpeedAudioDrop` never
+  apply at ≤ ×1.002. **The pivot:** each reading's onsets are resampled to its timeline grid
+  (`AudioSyncMatch.resampled`: bucket k is source bucket k·speed, linearly interpolated); the
+  fitted line (SY-7) is `lag(a) = c + ρ·a`, a an anchor bucket and lag the anchor's bucket minus
+  the mover's; the new speed is `s' = s·(1 − ρ)`. `set_speed` keeps `start` S and `in` I, so
+  source tick μ then plays at `S + δ + (μ − I)/s'`, which is exact along the whole line when `δ =
+  snapToFrame(round(zeroA + 6000·c/(1 − ρ) − S + I/s'))`. Snapping leaves one constant offset of
+  at most half a frame (SY-4). A drift measured but not corrected places the mover by the line's
+  value at the overlap's centre bucket aMid: `lag = c + ρ·aMid`, `δ = snapToFrame(zeroA − zeroN +
+  round(lag·6000))`; a drift not measured places it by AS-1's coarse lag. The menu shows nothing
+  new; the inspector shows the speed the correction wrote.
+
+- **SY-7 — Drift is a least-squares line through many windows (supersedes SY-5's two windows;
+  SY-5's 6,000-bucket minimum stays).** Windows of 2,000 buckets start at the overlap's start
+  every `max(500, ⌈(|O| − 2000)/63⌉)` buckets, plus one flush with its end (at most 64); each is
+  searched ±100 buckets around the coarse lag, refined parabolically and kept when r ≥ 0.25. The
+  lags are fitted by ordinary least squares against each window's centre: ρ is the slope, c the
+  intercept, and `errorMilliseconds` is the slope's standard error × √(2000 / step) × |O| × 10 —
+  the factor counts windows that share buckets as no more independent data than they are, and
+  applies whenever the step is under 2,000. It is not measured unless at least 3 windows matched
+  ("only N of the overlap's windows matched; drift needs at least 3.") and their centres span at
+  least (|O| − 2000)/2 ("the windows that matched cover too little of the overlap to measure
+  drift."); the count is checked first. `ppm = ρ·10⁶`, `milliseconds = ρ·|O|·10` (SY-5's
+  units). **Tolerance:** the probe's smooth arrays within ±5 ppm, including at the 6,000-bucket
+  minimum (P5); the drift fixture's applied speed within 2 ms over its 150 s overlap (`|s·k − 1|
+  · 150,000 ≤ 2`, S10); the re-measured residual `|drift_ms| ≤ 2` (S17); the exported mix's lag
+  changing by at most 3 ms across the overlap (S18). **Calibration rule:** if S10 misses — its
+  2 ms bound, or the drift left as uncertain — the phase stops and reports the run's numbers;
+  the step is not changed and the tolerance is not loosened.
+
+- **SY-8 — When a drift is corrected, and what the answer says.** A measured drift is corrected
+  when `|drift_ms| ≥ max(5, 3 × drift_error_ms)` and the new speed stays in SY-9's band. In this
+  order: `|milliseconds| < 5` is left as too small to matter ("a drift of X ms over the overlap is
+  under the 5 ms Synchronize Audio corrects."); `|milliseconds| < 3 × errorMilliseconds` is left
+  as not distinguishable from its uncertainty ("a drift of X ms over the overlap is under 3 times
+  its uncertainty (±Y ms), so it cannot be told from no drift."); a new speed `s·(1 − ρ)` more
+  than 0.002 from 1 is left as outside the band ("correcting it would play the clip at ×N, beyond
+  the 0.2% Synchronize Audio corrects."); otherwise it is applied. **The significance test is the
+  owner's choice of 2026-10-15**, replacing an absolute cap (`errorMilliseconds > 2` left) that
+  the spec first carried: on S10's fixture (true +199.96 ppm over 150 s) the line measured
+  197.358 ppm, 29.60 ms, whose correction would leave about 0.39 ms, but its conservative
+  uncertainty (SY-7's √(2000/step) widening kept) was ±2.134 ms, so the cap left a drift
+  fourteen times its own uncertainty uncorrected. The uncertainty is reported as
+  `drift_error_ms`, never used as a cap; the tolerances that check the RESULT (SY-7's) stand. A drift not measured is left with its
+  own note. Each `sync_audio` row adds `speed` (the speed after the command), `drift_corrected`,
+  `drift_error_ms` (null when not measured), `residual_ms` (corrected: `drift_error_ms`; left:
+  `drift_ms`; not measured: null) and `drift_note` (when not measured, or when left with a note).
+  `moved` is true when any op is made; no ops is `moved: false`, "already in sync".
+
+- **SY-9 — The rate band (amends SY-4's ×N refusal).** A clip within `|rate − 1| ≤ 0.002` (its
+  `speed`, else its first time-scaled segment's ratio) is matched at its rate; outside it, it is
+  refused "plays at ×N; Synchronize Audio lines up clips playing at ×1 or within 0.2% of it.";
+  a reversed clip is still refused, and so is a clip whose speed is ×1 but whose segment is
+  time-scaled, as AS-1 refused it ("plays at ×N though its speed is ×1; Synchronize Audio lines
+  up clips whose speed is the rate they play at."): its zero and `set_speed` read the speed, not
+  the stretch (AS-2's review). A mover already corrected re-measures about 0 and answers
+  "already in sync" with no undo step; an anchor at a near-1 rate is resampled the same way.
+
+- **SY-10 — The corrected mover's span (amends SY-4).** Its new duration is `content =
+  round(d·s)`, `max(snapToFrame(round(content/s')), one frame)` — the core's `set_speed` without
+  its hold to the file (the core stays the backstop). Start ≥ 0, meeting the anchor and the
+  own-track neighbour check are made on the FINAL span `[S + δ, S + δ + d')`, the neighbour check
+  whenever δ ≠ 0 or d' ≠ d. The op order keeps every intermediate span inside the old or the
+  final one: when d' > d, `move_clip` then `set_speed`; otherwise `set_speed` then `move_clip`;
+  each only when it changes something. The list is one undo step, "Synchronize Audio".

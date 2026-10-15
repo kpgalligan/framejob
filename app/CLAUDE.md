@@ -1793,15 +1793,20 @@ free.
 - `AudioNormalize.swift` — Normalize Clip as a value type: peaks in, ops out,
   measured PRE-FADER from the plan segment, REPLACING `volume` so a second
   press is a no-op, always to BASE props.
-- `AudioSync.swift` · `AudioSyncMatch.swift` — Synchronize Audio (spec §11
-  SY-1..SY-5), `AudioNormalize`'s shape: `read` takes the plan segments and
-  the peaks caches once, `plan` is pure and answers frame-snapped
-  `move_clip` ops (one undo step) or one refusal naming every reason. It
-  refuses what the core would quietly change — a start before 0 (the core
-  clamps) and an overlap on the mover's own track (the core adds a
-  dissolve). `AudioSyncMatch` is the pure signal arithmetic: onset
-  envelopes, the per-lag normalised FFT correlation, SY-3's confidence and
-  SY-5's drift. `EditorViewController+Audio` holds the Clip menu's sound
+- `AudioSync.swift` (+`Correction`) · `AudioSyncMatch.swift` ·
+  `AudioSyncDrift.swift` — Synchronize Audio (spec §11 SY-1..SY-10),
+  `AudioNormalize`'s shape: `read` takes the plan segments and the peaks
+  caches once, `plan` is pure and answers frame-snapped `move_clip` ops,
+  with a `set_speed {keep_pitch: false}` (a resample) per mover whose drift
+  passes SY-8's significance test, all one undo step, or one refusal naming
+  every reason. It refuses what the core would quietly change — a start
+  before 0 (the core clamps) and an overlap on the mover's own track, judged
+  on the FINAL span after the speed change (the core adds a dissolve).
+  `AudioSyncMatch` is the pure signal arithmetic: onset envelopes, the
+  per-lag normalised FFT correlation and SY-3's confidence;
+  `AudioSyncDrift` fits the drift as a line through many windows (SY-7);
+  `+Correction` decides whether to correct it, the ±0.2% band and the op
+  order. `EditorViewController+Audio` holds the Clip menu's sound
   commands (Normalize, moved whole out of the frozen file, and Synchronize
   Audio) with their validator arms.
 - `LevelMeter.swift` · `LevelMeterView.swift` · `Loudness.swift` — the meter

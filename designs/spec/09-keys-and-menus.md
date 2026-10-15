@@ -99,9 +99,11 @@ End, Freeze Frame, Detach Audio, Normalize (road map 2's phase 5, beside
 Detach Audio because those two are the menu's only sound commands; no key
 equivalent, and it duplicates the Audio section's button deliberately —
 a command reachable from a pane alone can be lost), Synchronize Audio (road
-map "audio-sync" AS-1, §11 SY-1..SY-5: the selected clips that play sound
-lined up by their sound, one anchor kept, one undo step; enabled with two or
-more such clips; no key equivalent; its mirror is `sync_audio`), Add Action, Speed…,
+map "audio-sync" AS-1 and AS-2, §11 SY-1..SY-10: the selected clips that play
+sound lined up by their sound, one anchor kept, each mover's clock drift
+corrected by a speed change in the same undo step; it shows no drift figure,
+the inspector's speed is what changes; enabled with two or more such clips;
+no key equivalent; its mirror is `sync_audio`), Add Action, Speed…,
 Close Gap, Remove
 Silences…, Transition ▸, Motion ▸ (In ▸ / Out ▸ / During ▸, each the kinds
 and None; no key equivalent), Look ▸ (the eight looks, a separator, then the

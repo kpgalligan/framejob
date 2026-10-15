@@ -467,11 +467,12 @@ which is what a pixel cannot see.
 Section 7 (`catalog`) is the toll's gate from the inside:
 `AgentServer.shared.catalogJSON()` — the very string the startup parity
 check reads — parsed for its 75 names, the 55 core ops (`ReelOp.coreNames()`)
-plus the twenty app-state tools; the LAST eleven in the order the old file
+plus the twenty app-state tools; the LAST twelve in the order the old file
 had them (`import_media`, `import_captions`, `consolidate_media`,
 `add_media`, `relink_media`, `remove_media`, `transcribe`,
-`export_captions`, `render_frame`, `export` — `df6b916^`'s order — then
-`record_screen`); `scope` on every op tool's schema and on none of the
+`export_captions`, `render_frame`, `export` — `df6b916^`'s order — with
+`set_media_color`, which c47d97d added among the media rows, after
+`remove_media`, then `record_screen`); `scope` on every op tool's schema and on none of the
 twenty, `record_screen`'s among them; and `record_screen`'s declared
 argument names. 7d (R2d): the tool's description names the two menus'
 rows, `pauses`, `segments`, `started_at`, `mic_offset`, `mic_problem`, the
@@ -8717,10 +8718,11 @@ APP_STATE_TOOLS = [
     "render_graphic", "import_graphic_font", "import_graphic_asset", "close_project",
     "delete_graphic", "rename_graphic", "restore_graphic", "sync_audio",
 ]
-# `git show df6b916^:app/Sources/AgentCatalog.swift`'s last ten rows, in order.
+# `git show df6b916^:app/Sources/AgentCatalog.swift`'s last ten rows, in order,
+# with `set_media_color` (c47d97d) after `remove_media`.
 FILE_GROUP_ORDER = [
     "import_media", "import_captions", "consolidate_media", "add_media", "relink_media",
-    "remove_media", "transcribe", "export_captions", "render_frame", "export",
+    "remove_media", "set_media_color", "transcribe", "export_captions", "render_frame", "export",
 ]
 RECORD_SCREEN_ARGUMENTS = [
     "display", "include_framejob_windows", "microphone", "path", "place", "project", "rate",
@@ -8753,11 +8755,12 @@ def section_catalog(binary, sources):
           f"extra {sorted(set(names) - set(ops) - set(APP_STATE_TOOLS))}")
     check("7a: no app-state tool is also an op", not set(APP_STATE_TOOLS) & set(ops),
           f"{sorted(set(APP_STATE_TOOLS) & set(ops))}")
-    check("7b: the LAST eleven are the old file's ten file rows in its order, then record_screen",
-          names[-11:] == FILE_GROUP_ORDER + ["record_screen"], f"{names[-11:]}")
+    check("7b: the LAST twelve are the old file's ten file rows in its order, set_media_color "
+          "after remove_media, then record_screen",
+          names[-12:] == FILE_GROUP_ORDER + ["record_screen"], f"{names[-12:]}")
     check("7b: … so everything before them is the groups that stayed and the clip rows — none "
-          "of the ten appears earlier", not set(FILE_GROUP_ORDER) & set(names[:-11]),
-          f"{sorted(set(FILE_GROUP_ORDER) & set(names[:-11]))}")
+          "of the eleven appears earlier", not set(FILE_GROUP_ORDER) & set(names[:-12]),
+          f"{sorted(set(FILE_GROUP_ORDER) & set(names[:-12]))}")
     by = {t.get("name"): t for t in tools}
     without = [n for n in ops if not (by.get(n) or {}).get("hasScope")]
     check("7c: every op tool's schema declares `scope`", not without, f"without: {without}")

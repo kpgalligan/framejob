@@ -20072,3 +20072,49 @@ against −1,879,987.5, drift −14.6 ppm; S3 r 0.14, q 1.10; S10 172.2 ppm agai
 <dir>/agent.sock` 22/22, the same readings, S10's match r 0.307, q 1.82; `--mutants` 8/8 killed
 (a copy that does not build is a failed control: the first run's `neighbour-dropped` edit did not
 compile and was rewritten).
+
+## Road map audio-sync — AS-2, drift corrected (`audio_sync_proof.py` S1–S18, P1–P8 and eighteen mutants; `audio_sync_probe.swift`; spec §11 SY-6..SY-10)
+
+The same script and fixtures as AS-1 above; AS-2 changed four rows and added four.
+
+**Rows changed.** S1 also asks that the undrifted recorder's row says `drift_corrected` false,
+`speed` 1 and `|drift_ms|` < 5. S10 now asks that the DRIFT fixture is corrected: the clip's
+`keep_pitch` false and its speed s within SY-7's 2 ms over the 150 s overlap (`|s·k − 1|·150,000 ≤
+2`), the recorder still on frame 206, and one undo restoring speed 1 and start 0. P5 holds drift
+to ±5 ppm (the line through many windows, SY-7) and adds the two not-measured rules: a mover that
+sounds only in its first 3,000 of 15,000 buckets (the span rule) and a 6,000-bucket overlap where
+only the two end windows can match (the count rule, whose note names 2 windows — the control that
+the case passed the span rule).
+
+**Rows added.** S17 S10's call again: `moved` false, "already in sync", the re-measured `|drift_ms|`
+≤ 2, and one undo still restores speed 1 and start 0 (no second step). S18 the exported mix:
+after S10 the camera's audio off, `export` `audio_wav`, ffmpeg to 16 kHz mono, 1 ms abs-max
+envelopes against SOURCE placed at 10 s, the lag on [12 s, 22 s) and [148 s, 158 s) by brute
+force over ±40 ms with parabolic refinement: |Δlag| ≤ 3 ms and each |lag| ≤ 20 ms; the control
+sets the recorder to rate 1 and exports again, |Δlag| ≥ 20 ms (when the recorder was not
+corrected there is no control to run and the row fails by name rather than ending the session).
+P7 the correction on Bumps arrays drifting ±1,000 ppm: the `set_speed` rate within 5 ppm of
+s/k, `keep_pitch` false, delta equal to the hand-worked `snapToFrame(zeroA + 6000·c − S + I·k)`
+(the centre-line delta printed 5 frames away as the control), the ops in SY-10's order (move then
+speed when the clip grows, speed then move when it shrinks), and a neighbour abutting the old end
+with delta 0 refused, the same neighbour 10 frames later not. P8 SY-8's rule (the owner's
+significance test, 2026-10-15): 4.99 against 5.0 ms, 5.0 ms at ±1.7 left by the 3× test, 30 ms
+at ±9.99 and ±10 corrected and at ±10.01 left, a new speed 0.0019 against 0.0021 from ×1, a 20 ppm
+drift left with its note; a reading already at 1/k makes no op, one at ×0.9999 is set to within
+5 ppm of 1/k; `rateProblem` at ×2, ×1.002, ×1.0021, ×0.998, ×0.9979.
+
+**Mutants added** (the AS-1 eight kept, `ppm-scale` now in `AudioSyncDrift.swift`):
+`min-windows-dropped` (P5); `small-drift-corrected`, `uncertain-corrected`, `rate-limit-dropped`,
+`speed-not-compounded`, `resample-dropped` (P8); `rate-sign`, `order-inverted`,
+`end-unchecked`, `pivot-dropped` (P7).
+
+**Debug runs** (2026-10-15): P1–P8 8/8; S1, S6, S10, S13, S17, S18 6/6 after the owner's
+significance test (the first S10 run left the drift as uncertain under the first SY-8 and stopped
+the phase: 197.358 ppm, 29.60 ms ±2.13 ms).
+
+**Recorded runs** (Release, after the gate's `make app`; no `Frame Job: ` line):
+`audio_sync_proof.py <dir>/agent.sock` 26/26 — S10 197.358 ppm, 29.60 ms ±2.13 ms, corrected to
+×0.99980264 (0.39 ms over 150 s), frame 206; S17 re-measured 0.19 ms, "already in sync"; S18 the
+mix's lag −2.20 / −2.53 ms (Δ −0.33), the ×1 control +24.09 / −2.39 ms (Δ −26.49); `--mutants`
+18/18 killed, no failed control. S18's absolute bound reads the export against SOURCE, and the
+export's audio offset differs by path (#298).
