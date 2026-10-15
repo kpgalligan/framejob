@@ -20118,3 +20118,130 @@ the phase: 197.358 ppm, 29.60 ms ±2.13 ms).
 mix's lag −2.20 / −2.53 ms (Δ −0.33), the ×1 control +24.09 / −2.39 ms (Δ −26.49); `--mutants`
 18/18 killed, no failed control. S18's absolute bound reads the export against SOURCE, and the
 export's audio offset differs by path (#298).
+
+## Issue #298 — the export's audio offsets, measured (`export_offset_proof.py` Z0–Z3, R1–R2, E1–E23, L1–L9; `export_offset_probe.swift`, `export_offset_writer.swift`; no product code, no decision)
+
+```
+python3 tools/proof/export_offset_proof.py [<dir>/agent.sock] [--only Z0,L4,...]   # Debug; the recorded run is RC_PROOF_APP=release
+```
+
+This script measures where every export path puts a sample relative to the timeline, and the
+stage where each offset enters. It decides nothing; phase 2's fix is specified from this record.
+Z0, Z2 and L1–L9 need no app. The others need the instance's socket, and asking for them without
+one exits 2. Work is under `work/export-offset/`. The fixtures are in `fixtures/`, carry `-v1` in
+their names, and are made once.
+
+**Fixtures.** Each is 10 s long with a click on every frame F of 15, 39, …, 279 at 30 fps (each a
+whole sample at 16 and 48 kHz). A click is a Hann pulse 1 ms wide with amplitude 0.5, centred on
+F/30 s. `clicks16` and `clicks48` are mono s16 WAVs written by Python's `wave`. `clicks48-lead37`
+moves every click 37 samples later (Z1). `cam-pcm48` and `cam-aac48` come from
+`export_offset_writer.swift`: AVFoundation's 320×180 30 fps H.264 movie with no frame reordering,
+white on the click frames, and 48 kHz mono sound (LPCM s16, or AAC at 128 kbps). `cam-ff16` is
+`audio_sync_proof.py`'s CAMERA recipe over `clicks16`: lavfi grey, libx264, `pcm_s16le`.
+
+**Locating.** The script takes the largest |x| within ±60 ms of the expected time. It then runs a
+normalised correlation with the click template, at the read's own rate, over ±1 ms, with
+parabolic refinement. A click with r < 0.5 counts as not found. A WAV is read by Python's `wave`
+alone; a movie is read by ffmpeg at its own rate, with edit lists honoured. Expected timeline
+time is `start + (c − in)/speed` from `get_project`'s clip. The 320×180 movie sits unscaled on
+the 640×360 canvas, so a flash fills a quarter of the frame, and the video rows' flash threshold
+is 128 × that quarter.
+
+**The run** (Release, 2026-10-15, after `make gate` PASS and its `make app`; 38/38, exit 0; no
+`Frame Job: ` line, no `DEFAULTS MOVED`; a Debug pass of every row earlier the same day gave the
+same figures):
+
+Controls. **Z0**: every fixture read back finds all 12 clicks. The worst |Δ| is 0.0000 ms for
+every fixture but `cam-aac48`, which is 0.0007 ms. Both writer movies flash on exactly the click
+frames, with pts on the frame (0.0000 ms). **Z2**: on synthetic trains with clicks at +0.0, +0.3
+and +0.7 sample, the worst |Δ| is 0.00001 ms. **Z1**: lead37 − E4 = +0.7708 ms, against
+37/48 000 s = 0.7708 ms.
+
+| Row | Media | Placed at | Edit | Preset | Found | Median (ms) | Spread (ms) | Min r |
+|---|---|---|---|---|---|---|---|---|
+| E1 | clicks16 | 0 | ×1 | audio_wav | 12/12 | +0.000 | 0.000 | 1.000 |
+| E2 | clicks16 | F206 | ×1 | audio_wav | 12/12 | +25.646 | 0.000 | 1.000 |
+| E3 | clicks16 | 10 s | ×1 | audio_wav | 12/12 | +37.917 | 0.000 | 1.000 |
+| E4 | clicks48 | F206 | ×1 | audio_wav | 12/12 | +0.000 | 0.000 | 1.000 |
+| E5 | clicks16 | F206 | ×0.99999 varispeed | audio_wav | 12/12 | −2.854 | 0.000 | 0.999 |
+| E6 | clicks48 | F206 | ×0.99999 varispeed | audio_wav | 12/12 | −0.958 | 0.000 | 0.999 |
+| E7 | clicks16 | F206 | ×0.5 varispeed | audio_wav | 12/12 | −5.792 | 0.000 | 0.903 |
+| E8 | clicks48 | F206 | ×0.5 varispeed | audio_wav | 12/12 | −1.938 | 0.000 | 0.903 |
+| E9 | clicks48 | F206 | ×0.5 keep pitch | audio_wav | 12/12 | +2.311 | 12.341 | 0.720 |
+| E10 | clicks16 | F206 | ×0.99999 keep pitch | audio_wav | 12/12 | +19.180 | 34.398 | 0.999 |
+| E11 | clicks48 | F206 | ×2 keep pitch | audio_wav | 12/12 | −0.693 | 16.764 | 0.779 |
+| E12 | clicks16 | F206 | ×0.5 keep pitch | audio_wav | 12/12 | +2.959 | 9.593 | 0.822 |
+| E13 | cam-pcm48 | 10 s | ×1 | audio_wav | 12/12 | +0.000 | 0.000 | 1.000 |
+| E14 | cam-aac48 | 10 s | ×1 | audio_wav | 12/12 | −0.000 | 0.001 | 1.000 |
+| E15 | cam-ff16 | 10 s | ×1 | audio_wav | 12/12 | +37.917 | 0.000 | 1.000 |
+| E16 | cam-pcm48 | 10 s | ×1 | prores_422 | 12/12 | +0.000 | 0.000 | 1.000 |
+| E17 | cam-aac48 | 10 s | ×1 | prores_422 | 12/12 | −0.000 | 0.001 | 1.000 |
+| E18 | cam-pcm48 | 10 s | ×1 | h264 | 12/12 | −0.000 | 0.000 | 1.000 |
+| E19 | cam-aac48 | 10 s | ×1 | h264 | 12/12 | −0.000 | 0.001 | 1.000 |
+| E20 | clicks48 | F206 | `loudness_lufs: -16` | audio_wav | 12/12 | +0.000 | 0.000 | 1.000 |
+| E21 | clicks48 | F206 | `pan: -0.5` | audio_wav | 12/12 | +0.000 | 0.000 | 1.000 |
+| E22 | clicks48 | F206 | `noise_reduction: 0.5` | audio_wav | 12/12 | +10.667 | 0.000 | 1.000 |
+| E23 | clicks48 | F206 | in/out 5 s–15 s | audio_wav | 10/10 | +0.000 | 0.000 | 1.000 |
+
+Against phase 2's target (printed, not scored), these rows met it: E1, E4, E6, E13, E14, E16–E21,
+E23, and E9, E11 and E12 on the keep-pitch bound. These missed it: E2, E3, E5, E7, E8, E10 and
+E15. On E16–E19 all 12 flashes land on their timeline frames (315, 339, …, 579), and click − flash
+is between −0.001 and +0.000 ms. E22 − E4 = +10.667 ms, against 512/48 000 s = 10.667 ms (off by
++0.001 ms).
+
+L table (the probe; the clip at F206 unless named; medians in ms, spreads 0.000 unless given):
+
+| Fixture | asset48 (L1) | native (L2) | comp (L3) | mix (L4) | export (L5) |
+|---|---|---|---|---|---|
+| clicks16 | +0.000 | +0.000 (16 kHz) | +26.854 | +25.646 | +25.646 |
+| clicks48 | +0.000 | +0.000 | +0.000 | +0.000 | +0.000 |
+| cam-pcm48 | +0.000 | +0.000 | +0.000 | +0.000 | +0.000 |
+| cam-aac48 | −0.000 | −0.000 | −0.000 | −0.000 | −0.000 |
+| cam-ff16 | +0.000 | +0.000 (16 kHz) | +26.854 | +25.646 | +25.646 |
+
+- **L6** (L4 at ×1 with the inputs' algorithm set to nil, varispeed, spectral or timeDomain):
+  clicks16 is +25.646 under all four, and clicks48 is +0.000 under all four.
+- **L7** (L3 read at 16 000 / 44 100 / 48 000 Hz): clicks16 reads +0.021 / −8.813 / +26.854, and
+  clicks48 reads −0.042 / +3.402 / +0.000.
+- **L8** (comp = mix = export in every case):
+  - clicks16: ×0.99999 varispeed −2.854; ×0.99999 keep pitch +19.180 (spread 34.398); ×0.5
+    varispeed −5.792; ×0.5 keep pitch +2.959 (spread 9.593).
+  - clicks48: −0.958; +4.757 (spread 8.478); −1.938; +2.311 (spread 12.341), in the same order.
+- **L9** (L4 with the clip at 0 / F206 / 10 s): clicks16 is +0.000 / +25.646 / +37.917, clicks48
+  is +0.000 / +0.000 / +0.000, and cam-ff16 is +0.000 / +25.646 / +37.917.
+
+Every read's first presentation time was 0.
+
+**Where each offset enters** (the first stage of asset48 → comp → mix → export that moves more
+than 0.1 ms; native against asset48 is +0.000 for every fixture, so the decoder's own SRC adds
+nothing):
+- **×1, a 48 kHz source** (WAV, AVFoundation LPCM or AAC movie; WAV, ProRes or H.264 export):
+  none. Every stage is within 0.1 ms, and the picture is on its frame with the click on it.
+- **×1, a 16 kHz source** (WAV, or the ffmpeg-muxed camera): **comp**. The offset grows with the
+  clip's composition start: +0.000 at 0, +25.646 at F206, +37.917 at 10 s. The same composition
+  read at 16 kHz gives +0.021, and read at 44.1 kHz gives −8.813. Neither file decode moves a
+  click (asset48 and native are both +0.000), and neither does the time-pitch algorithm (L6). So
+  the offset is AVFoundation's sample-rate conversion of a 16 kHz segment inserted at a non-zero
+  composition time, read out at another rate. The camera's "extra ~12 ms" in #298 is this
+  placement dependence (10 s against F206), not its edit list. Comp's +26.854 against mix's
+  +25.646 is the one difference the mix stage makes, and the writer adds nothing (mix =
+  export).
+- **Varispeed** (`keep_pitch: false`): **comp**. The offset is −0.958 / −1.938 ms at 48 kHz for
+  ×0.99999 / ×0.5, and −2.854 / −5.792 at 16 kHz, a fixed offset with no spread.
+- **Keep pitch** (`.spectral`): **comp**. The clicks' positions spread by 8.478–34.398 ms within
+  the clip, at 48 kHz as well as 16 kHz, so this is a timing smear and not a fixed offset.
+- **Loudness gain, pan tap, in/out range**: none (E20, E21, E23 equal E4).
+- **Noise reduction**: its documented 512-sample delay, measured at +10.667 ms.
+
+**Z3** (the S18 method against ground truth): on E2's file, `locate` gives +25.646 ms. S18's
+`window_lag` gives +25.348 ms (r 0.813) against the fixture placed at the whole-ms 6867 ms. Taking
+out the −0.333 ms rounding (the clip starts at 6866.667 ms) gives +25.681 ms, so S18 − locate is
++0.035 ms: the S18 method agrees with ground truth to 0.035 ms here. **R1/R2** reproduce #298
+exactly: ×1 gives +25.71 ms (r 0.939), and ×0.99999 varispeed gives −2.81 ms (r 0.940), on
+[12 s, 22 s).
+
+**#299** (×0.99999 with keep pitch): E10 and L8 show its stage. At ×0.99999 under `.spectral`,
+the clicks spread by 34.398 ms (16 kHz) and 8.478 ms (48 kHz) inside a 10 s clip. They enter at
+the composition read and are carried unchanged through the mix and the writer. The 48 kHz
+fixture shows the spread too, so it comes from the time-pitch algorithm and not from #298's
+sample-rate conversion.
