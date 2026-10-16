@@ -20405,3 +20405,90 @@ the clicks spread by 34.398 ms (16 kHz) and 8.478 ms (48 kHz) inside a 10 s clip
 the composition read and are carried unchanged through the mix and the writer. The 48 kHz
 fixture shows the spread too, so it comes from the time-pitch algorithm and not from #298's
 sample-rate conversion.
+
+## Issue #298 phase 2 — the export's audio offsets, fixed and pinned (`export_offset_proof.py` Z0–Z3, R1–R2, E1–E31, L1–L9, X1–X8 and seven mutants; `export_offset_probe.swift`; `core/tests/pitch_band.rs`; spec §11 SY-23..SY-27)
+
+```
+python3 tools/proof/export_offset_proof.py [<dir>/agent.sock] [--only X1,E24,...]   # Debug; the recorded run is RC_PROOF_APP=release
+python3 tools/proof/export_offset_proof.py --mutants                              # probe-only, no app
+```
+
+Phase 2 removed the offsets phase 1 located, at their causes: a non-48 kHz source is read from a
+48 kHz copy (`AudioRateCopy`, SY-23), a time-scaled `off` segment reads its source 575 ticks early
+and a noise-reduced track is placed 6,400 ticks early (`CompositionBuilder.placement(of:shift:)`,
+SY-24, SY-25), and keep pitch at 0.98–1.02 plays `time_domain` (`evaluate.rs`'s `Pitch`, SY-26).
+The script is now the standing pin (SY-27): every E, R and X row is scored, not printed against a
+target.
+
+**New fixtures** (made once, `-v1`): `clicks44` (the click WAV at 44.1 kHz); `clicks44-aac` (.m4a)
+and `clicks44-mp3` (.mp3), clicks44 through ffmpeg at 192 kbps; `clicks44-late` (.mov), 11 s of grey
+H.264 with clicks44 as `pcm_s16le` from 0.5 s (`-itsoffset 0.5`) — Z0 requires ffprobe's audio
+`start_time` 0.500 ± 0.001, and its clicks are expected 0.5 s later in the source
+(`SOURCE_OFFSET`). **The copies** outlive a code change, so `clear_rate_copies()` removes
+`FrameJob/AudioRate48` under `$TMPDIR` and `getconf DARWIN_USER_TEMP_DIR` before the first probe
+run or app row, and `--mutants` before `before` and each mutant's run.
+
+**Rows added.** E24 clicks44 F206 ×1; E25 clicks16 at 60 s ×1; E26 clicks44-aac F206 ×1; E27
+clicks48 at 0, `noise_reduction 0.5`; E28 clicks48 F206 ×0.25 varispeed; E29 clicks48 F206 ×0.9 keep
+pitch (#299's residue); E30 clicks44-mp3 F206 ×1 (a residue, ok when measured); E31 clicks44-late
+F206 ×1. X1–X8 are the probe's in-process `audio_wav` exports (`export_offset_probe <out> <fixtures>
+[all|L|X]`), each pinned: X1 clicks16 F206 ×1; X2 clicks44 F206 ×1; X3 clicks48 F206 ×0.5
+varispeed; X4 clicks48 F206 noise reduction 0.5; X5 the same at 0; X6 clicks16 F206 ×0.99999 keep
+pitch; X7 clicks48 F206 ×1; X8 clicks44-late F206 ×1. **The pin:** |median| ≤ 1.0 ms and spread ≤
+0.5 ms with ≥ 10 of 12 found; E9, E11, E12 and E29 (keep pitch outside the band) |median| ≤ 5.0 ms;
+E16–E19 every flash on its timeline frame and every |click − flash| ≤ 1.0 ms; R1/R2 |lag| ≤ 1.0 ms
+with r ≥ 0.8. `audio_sync_proof.py`'s S18 is retargeted: the early |lag| ≤ 1.0 ms, the late ≤ 3 ms.
+
+**The run** (Release, 2026-10-16, after `make gate` PASS and its `make app`; 54/54, exit 0; no
+`Frame Job: ` line, no `DEFAULTS MOVED`; run first, so every copy the later proofs read was this
+code's). Re-run whole on Release after the review's fix pass, which starts the copy's read where a
+leading empty edit ends: 54/54 again, E31 and X8 moving from −0.576 to +0.023 ms and every other row
+unchanged; the table has the re-run's numbers:
+
+| Row | Media | At | Edit | Median (ms) | Spread (ms) | Phase 1 |
+|---|---|---|---|---|---|---|
+| E1 / E2 / E3 | clicks16 | 0 / F206 / 10 s | ×1 | +0.000 / +0.000 / +0.000 | 0.000 | +0.000 / +25.646 / +37.917 |
+| E25 | clicks16 | 60 s | ×1 | +0.000 | 0.000 | — |
+| E24 / E26 | clicks44 WAV / AAC | F206 | ×1 | +0.023 / +0.023 | 0.000 / 0.001 | — |
+| E30 | clicks44 MP3 | F206 | ×1 | +13.084 (residue, #306) | 0.000 | — |
+| E31 | clicks44-late | F206 | ×1 | +0.023 | 0.000 | — |
+| E5 / E6 | clicks16 / clicks48 | F206 | ×0.99999 varispeed | −0.001 / −0.001 | 0.001 | −2.854 / −0.958 |
+| E7 / E8 | clicks16 / clicks48 | F206 | ×0.5 varispeed | −0.021 / −0.021 | 0.000 | −5.792 / −1.938 |
+| E28 | clicks48 | F206 | ×0.25 varispeed | −0.062 | 0.000 | — |
+| E10 | clicks16 | F206 | ×0.99999 keep pitch | +0.010 | 0.138 | +19.180 (34.398) |
+| E9 / E12 | clicks48 / clicks16 | F206 | ×0.5 keep pitch | +2.311 / +2.169 | 12.341 / 12.361 | +2.311 / +2.959 |
+| E11 | clicks48 | F206 | ×2 keep pitch | −0.693 | 16.764 | −0.693 |
+| E29 | clicks48 | F206 | ×0.9 keep pitch | +3.170 | 7.458 | — |
+| E13 / E14 / E15 | cam-pcm48 / cam-aac48 / cam-ff16 | 10 s | ×1 | +0.000 / −0.000 / +0.000 | 0.000 / 0.001 / 0.000 | E15 +37.917 |
+| E16–E19 | cam movies, ProRes 422 and H.264 | 10 s | ×1 | ±0.000 | ≤ 0.001 | the same |
+| E20 / E21 / E23 | clicks48 | F206 | loudness / pan / in-out | +0.000 | 0.000 | the same |
+| E22 / E27 | clicks48 | F206 / 0 | noise reduction 0.5 | +0.001 / +0.001 | 0.000 | E22 +10.667 |
+
+E16–E19's twelve flashes land on frames 315, 339, …, 579, their timeline frames, with click −
+flash between −0.001 and +0.000 ms. E22 − E4 is +0.001 ms. Z0, Z2 as in phase 1 (clicks44 0.0000
+ms, clicks44-aac 0.0006 ms, clicks44-late start_time 0.500000 s); Z1 +0.7708 ms; Z3 S18 − locate
++0.013 ms. **R1** +0.04 ms (r 0.938) and **R2** +0.09 ms (r 0.940), where #298 reported +25.71 and
+−2.81. **X1–X8**: +0.000, +0.023, −0.021, +0.001, +0.001, +0.010 (spread 0.138), +0.000, +0.023 ms.
+**L rows:** every stage of every ×1 fixture reads ±0.000 (L1–L5, L6 under all four algorithms, L9
+at 0, F206 and 10 s); L7 reads −0.042 / +3.402 / +0.000 for both clicks16 and clicks48 at 16 000 /
+44 100 / 48 000 Hz (the 16 kHz source now reads like the 48 kHz one, through its copy); L8 comp =
+mix = export in every case: ×0.99999 varispeed −0.001, keep pitch +0.010; ×0.5 varispeed −0.021,
+keep pitch +2.169 (clicks16) and +2.311 (clicks48). "Where each offset enters": nowhere for every
+×1, varispeed and in-band keep-pitch chain; ×0.5 keep pitch at comp (`.spectral`, #299).
+
+**`audio_sync_proof.py`** (Release, the same instance, 44/44, exit 0): S18's corrected mix reads
+0.70 ms (r 0.925) on [12 s, 22 s) and 0.85 ms (r 0.886) on [148 s, 158 s), Δ 0.15 ms; the control
+at rate 1 −1.44 / −28.05 ms, Δ −26.61 ms. **`mixed_audio_proof.py`** (Release, 22/22) and
+**`mixed_audio_probe.py`** (37/37) pass with the copied 44.1 kHz WAV.
+
+**Mutants** (`--mutants`, `before` passing every X row): M1 `needsCopy` false — X1 +25.646, X2
+−8.304 (X8 failed too), killed; M2 varispeed lead 0 — X3 −1.938, killed; M3 noise lead on every
+track — X7 −10.667, killed; M4 noise lead 0 — X4 +10.667, killed; M5 no head cut before the track's
+0 — X5 +10.667, killed; M6 the source clamped at 0 with no empty head — X3 −1.938, killed; **M9 the
+copy's gap padding removed** — X8 0/12 found, killed: the copy's read starts where the fixture's 0.5
+s empty edit ends, so the padding is what writes that edit, and without it no click is within
+`locate`'s ±60 ms of its place, since the edit's 0.5 s is not written. Before the fix pass
+`AVAssetReaderTrackOutput` filled the edit itself, from presentation time 0 and at the wrong length
+(X8 −0.576), and M9 survived. 7/7 killed, with the same numbers for M1–M6 after the fix pass. The
+core's by hand, each reverted: M7 the band never `TimeDomain` — `pitch_band.rs` fails 2 of 4; M8
+`place` comparing keep pitch (`Off` against not) — fails 1 of 4; both killed.

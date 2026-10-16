@@ -15,7 +15,10 @@ all five points of 2026-10-15 and the owner's choice of the head trim (SY-16). S
 recorded in AS-3's second fix pass, before its code, from the owner's "Ask, then apply" of
 2026-10-15, which resolved SY-14's calibration stop. SY-20 and SY-21 were recorded in round 2's
 AS-4 before its code, from point 4 of the owner's "Go ahead"; SY-21's slice and robust filter and
-SY-22 were recorded after AS-4's stop, from the orchestrator's ruling of 2026-10-16.
+SY-22 were recorded after AS-4's stop, from the orchestrator's ruling of 2026-10-16. SY-23…SY-27
+were recorded in #298's phase 2 before its code: the export's audio offsets phase 1 measured and
+located (`tools/proof/export_offset_proof.py`), removed at their causes; their numbers are the
+designer's scratch measurement of 2026-10-16, SY-22's precedent.
 
 **Stands, and nothing here re-litigates it:** the overlap rule and `move_clip` (foundations,
 spec §6); D2-1 (a composite that measures nothing makes no op and says why); #42's one-delta
@@ -511,3 +514,64 @@ never silence; the menu and the tool call the same `read` + `plan`).
   proven by no row. **The dev hold:** a Debug or Release build's dev-only launch default
   `-RCDevSyncHold <seconds>` holds the menu's background run that long before `plan`, so a proof
   can reach the sheet (S25 edits under it, S26 cancels it); Distribution has no such default.
+
+- **SY-23 — Non-48 kHz audio is read from a 48 kHz copy (#298 phase 2).** **The cause:** an empty
+  edit before a non-48 kHz segment on its composition track is rate-converted wrongly, so the
+  segment's sound lands off its place by an amount that grows with the placement. The designer's
+  scratch measurement, 2026-10-16, read at 48 kHz: 16 kHz +3.833 ms at 1 s, +26.854 at frame 206,
+  +39.125 at 10 s, lost past ±60 ms at 60 s; 44.1 kHz −1.215 at 1 s, −12.685 at 10 s; 22.05 kHz
+  +51.084 at 60 s; 32 kHz +58.625 at 60 s; 96 kHz −0.010 everywhere; 48 kHz 0. The same segment at
+  0, after a contiguous 16 kHz segment, or with the gap filled by real 16 kHz silence reads
+  ≤ 0.021 ms. Every copy read +0.000 (16 kHz) / +0.023 (44.1 kHz, WAV and AAC) / +0.045 (22.05 kHz)
+  ms at 0, frame 206, 10 s and 60 s. **The copy** (`AudioRateCopy`): LPCM 24-bit signed integer,
+  48 kHz, `min(source channels, 2)` channels, CAF, keyed by the FILE — `<16-hex FNV-1a of
+  "path|size|mtime-second|v<version>">.caf` — in `NSTemporaryDirectory()/FrameJob/AudioRate48/`:
+  regenerable, outside the package, purged by the OS, and not a §5.6 cache entry. It is made on
+  first need by the build on its own queue (blocking), serialised process-wide by one lock with an
+  unlocked existence check first, written to `<name>.partial-<pid>.caf` and moved into place by
+  `rename(2)`. **Its timing:** the copy's sample 0 is the source audio track's time 0 — the read
+  starts where an empty edit at the track's time 0 ends (`loadSegment(forTrackTime:)`, waited for),
+  because the reader fills that edit itself at the wrong length (a 0.5 s edit before a 44.1 kHz
+  track read −0.576 ms, and +0.023 once the read starts after it); a gap before or between the
+  reader's buffers, that edit included, is written as zeros, and a buffer that starts before 0 or
+  overlaps the one before (by more than one sample) abandons the copy. A failed or abandoned copy
+  falls back to the source with one `NSLog` line that never starts with "Frame Job: ". **Its
+  cost:** 1.66 s and 494 MiB for 30 min of stereo 44.1 kHz AAC, accepted as one blocking first
+  build. `rate != 48000` converts every other rate, 96 kHz included. A reversed clip already reads
+  a 48 kHz intermediate (`ReverseRenderer+Audio.swift`), so its branch stays first. Video never
+  reads the copy. Pre-making the copy in the import's cache pass and pruning the folder are not
+  done.
+
+- **SY-24 — The varispeed lead.** A time-scaled segment on a plan audio track whose pitch is `off`
+  reads its source 575 ticks (46 samples at 48 kHz) earlier. Measured (the designer's scratch,
+  2026-10-16), the output was early by −0.958 (×0.99999), −1.938 (×0.5), −3.896 (×0.25), −9.772
+  (×0.1), −0.469 (×2) and −0.224 (×4) ms, the same at 0, frame 206 and 30 s and with an in point of
+  2 s; with 575 ticks the residual is at most 0.189 ms (×0.1). A segment whose in point is under
+  the lead starts with empty time instead — its head cut by the timeline ticks that bring the read
+  to source 0, and their share of source — since 48 kHz empties are exact. ×1 segments are
+  untouched: the algorithm was measured inert at ×1.
+
+- **SY-25 — The noise reducer's lead.** A composition track whose tap runs noise reduction has its
+  media placed 6,400 ticks (512 samples at 48 kHz, `AudioNoiseReductionStage.window`) earlier,
+  the reducer's one-window delay. Volume ramps apply AFTER a PreEffects tap (measured: a step at
+  2.95 s with a 100 ms delay tap passed the click delayed to 3.0 s), so fades now align with the
+  sound. **Accepted:** a clip starting under 10.667 ms loses that much of its head; the track's
+  last 10.667 ms stays unheard as before (a tap is not pulled past its track's end, measured); a
+  cut between clips of different amounts switches the reducer 10.667 ms early.
+
+- **SY-26 — Keep pitch at a near-unity speed plays `time_domain`.** Keep pitch at 0.98 ≤ speed ≤
+  1.02 (speed ≠ 1) plays `time_domain`; the plan names it (`evaluate.rs`'s `Pitch`, three names:
+  `spectral`, `time_domain`, `off`), and a plan audio track holds one pitch NAME (amends §11 #190's
+  split by `keep_pitch`). Measured (the designer's scratch, 2026-10-16): `.spectral` drifts within
+  a clip (×0.999 +0.343 → +56.665 ms over 60 s; ×0.9 → +43.4; ×1.01 → +13.9) and `.timeDomain` is
+  bounded (×0.999 −0.021, ×0.99 −0.287, ×1.01 +0.239, ×0.98 −0.594, ×1.02 +0.469 median; ×0.9
+  −3.3, ×0.5 −32.8). Outside the band `.spectral` stays; #299 stays open for it.
+
+- **SY-27 — The tolerance, and the preview.** `export_offset_proof.py` pins every export path:
+  |median| ≤ 1.0 ms and spread ≤ 0.5 ms for ×1, varispeed, in-band keep pitch, LPCM and AAC
+  sources, gain, pan, noise reduction and range exports; |median| ≤ 5.0 ms for keep pitch outside
+  the band; the video presets' flashes on exactly their timeline frames with every |click − flash|
+  ≤ 1.0 ms. MP3's decoder delay is a filed residue, measured and not pinned. The preview plays the
+  same composition (the copy and the leads apply); its output latency and its behaviour at a
+  44.1 kHz output device are unmeasured (phase 1's L7: a 48 kHz composition read at 44,100 Hz is
+  +3.402 ms at frame 206), so the manual check SE-13 is run at both device rates.

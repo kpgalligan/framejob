@@ -89,8 +89,10 @@ before and after, and the last undo step not "Synchronize Audio"):
   S18  after S10, the camera's audio off, `export` `audio_wav`, decoded by
        ffmpeg to 16 kHz mono; 1 ms abs-max envelopes against SOURCE placed at
        10 s, the lag on [12 s, 22 s) and [148 s, 158 s) by brute force over
-       ±40 ms with parabolic refinement: |Δlag| ≤ 3 ms and each |lag| ≤ 20 ms.
-       Control: `set_speed` rate 1 on the recorder, exported again: |Δlag| ≥
+       ±40 ms with parabolic refinement: |Δlag| ≤ 3 ms, the early |lag| ≤
+       1.0 ms and the late |lag| ≤ 3 ms (#298 phase 2: the 16 kHz recorder is
+       read from its 48 kHz copy, SY-23, and varispeed leads by 46 samples,
+       SY-24). Control: `set_speed` rate 1 on the recorder, exported again: |Δlag| ≥
        20 ms.
        S10 and S17 print `drift_on`, `drift_windows`, the error and the
        call's wall seconds.
@@ -811,10 +813,10 @@ def exported_drift(session, cam, recorder, files):
     session.op("set_speed", clip=recorder, rate=1)
     (e2, r2), (l2, q2) = measure("control")
     change, control = l1 - e1, l2 - e2
-    ok = (abs(change) <= 3 and abs(e1) <= 20 and abs(l1) <= 20 and abs(control) >= 20)
+    ok = (abs(change) <= 3 and abs(e1) <= 1.0 and abs(l1) <= 3 and abs(control) >= 20)
     return ok, (f"corrected: lag {e1:.2f} ms (r {r1:.3f}) on [12 s, 22 s), {l1:.2f} ms (r "
-                f"{q1:.3f}) on [148 s, 158 s), Δ {change:.2f} ms (want |Δ| ≤ 3, each |lag| ≤ "
-                f"20); control at rate 1: {e2:.2f} ms (r {r2:.3f}), {l2:.2f} ms (r {q2:.3f}), "
+                f"{q1:.3f}) on [148 s, 158 s), Δ {change:.2f} ms (want |Δ| ≤ 3, early |lag| ≤ "
+                f"1.0, late |lag| ≤ 3); control at rate 1: {e2:.2f} ms (r {r2:.3f}), {l2:.2f} ms (r {q2:.3f}), "
                 f"Δ {control:.2f} ms (want |Δ| ≥ 20)")
 
 

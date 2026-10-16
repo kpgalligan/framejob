@@ -155,9 +155,14 @@ extension CompositionBuilder {
                 assets: &assets, reversedAssets: &reversedAssets)
             for family in families {
                 let track = try makeTrack(in: composition, mediaType: .audio, id: family.id)
+                let trackDSP = dsp.isEmpty
+                    ? nil : AudioTrackDSP(segments: family.segments, parameters: dsp)
                 try fill(
                     track, segments: family.segments, mediaType: .audio, urls: urls,
-                    reverse: reverse, assets: &assets, reversedAssets: &reversedAssets)
+                    reverse: reverse, assets: &assets, reversedAssets: &reversedAssets,
+                    shift: AudioShift.of(
+                        segments: family.segments,
+                        usesNoiseReduction: trackDSP?.usesNoiseReduction ?? false))
                 let sink = metering ? LevelMeterSink() : nil
                 if let sink = sink {
                     meters.append(
@@ -169,9 +174,7 @@ extension CompositionBuilder {
                     audioParameters(
                         for: track, segments: family.segments, ramps: planTrack.ramps,
                         onset: family.sounding.map(\.lowerBound).min(),
-                        dsp: dsp.isEmpty
-                            ? nil : AudioTrackDSP(segments: family.segments, parameters: dsp),
-                        meter: sink))
+                        dsp: trackDSP, meter: sink))
             }
         }
         return (inputParameters, meters)

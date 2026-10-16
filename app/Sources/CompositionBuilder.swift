@@ -111,9 +111,13 @@ enum CompositionBuilder {
         // change to them as structural and rebuilds, exactly as it already
         // does for a volume change — volume IS in the plan, as ramps.
         let dsp = AudioDSPSource.shared.parameters(for: recipeKey)
+        // A non-48 kHz source's audio is read from its 48 kHz copy (SY-23).
+        let audioURLs = Self.audioURLs(
+            plan: plan, urls: urls, reverse: reverse, assets: &assets)
+        var audioAssets = assets.filter { audioURLs[$0.key] == urls[$0.key] }
         let (inputParameters, meters) = try addAudioTracks(
-            to: composition, plan: plan, urls: urls, reverse: reverse, dsp: dsp,
-            metering: metering, assets: &assets, reversedAssets: &reversedAssets)
+            to: composition, plan: plan, urls: audioURLs, reverse: reverse, dsp: dsp,
+            metering: metering, assets: &audioAssets, reversedAssets: &reversedAssets)
 
         // Source orientation is read once per media and then attached per
         // instruction, so the compositor can turn a rotated source's sampling
@@ -266,19 +270,23 @@ enum CompositionBuilder {
     /// stretched over the rest — §7.2's freeze idiom inside one segment,
     /// BEFORE the speed step below, which scales the `sourceDuration` it
     /// always did. Video only; a covered range takes the one insert it always took.
+    ///
+    /// **An audio track's media goes in where `placement(of:shift:)` says**:
+    /// the plan's place moved by the track's leads (SY-24, SY-25). Video
+    /// passes `.none`, which places every segment exactly where the plan does.
     static func fill(
         _ track: AVMutableCompositionTrack, segments: [PlanSegment], mediaType: AVMediaType,
         urls: [UInt32: URL], reverse: ReverseResolution, assets: inout [UInt32: AVURLAsset],
-        reversedAssets: inout [UInt32: AVURLAsset]
+        reversedAssets: inout [UInt32: AVURLAsset], shift: AudioShift = .none
     ) throws {
         var cursor: Ticks = 0
         for segment in segments {
-            if segment.start > cursor {
+            guard let place = placement(of: segment, shift: shift) else { continue }
+            if place.at > cursor {
                 track.insertEmptyTimeRange(
-                    CMTimeRange(start: time(cursor), duration: time(segment.start - cursor)))
-                cursor = segment.start
+                    CMTimeRange(start: time(cursor), duration: time(place.at - cursor)))
+                cursor = place.at
             }
-            guard segment.duration > 0 else { continue }
 
             guard let source = resolveSource(
                 for: segment, mediaType: mediaType, urls: urls, reverse: reverse,
@@ -288,14 +296,17 @@ enum CompositionBuilder {
                 // been rendered: hold the place with empty time so every later
                 // segment keeps its timeline position, and let the compositor
                 // draw the slate the recipe asks for.
-                track.insertEmptyTimeRange(
-                    CMTimeRange(start: time(cursor), duration: time(segment.duration)))
-                cursor = segment.start + segment.duration
+                let end = max(cursor, segment.start + segment.duration - shift.trackLead)
+                if end > cursor {
+                    track.insertEmptyTimeRange(
+                        CMTimeRange(start: time(cursor), duration: time(end - cursor)))
+                }
+                cursor = end
                 continue
             }
 
             let requested = CMTimeRange(
-                start: time(segment.sourceIn), duration: time(segment.sourceDuration))
+                start: time(place.sourceIn), duration: time(place.sourceDuration))
             do {
                 if mediaType == .video, let tail = heldTail(segment, of: source) {
                     if tail.covered > 0 {
@@ -318,10 +329,10 @@ enum CompositionBuilder {
                 // Speed, and the freeze-frame idiom (one source frame
                 // stretched to the still's whole length, §7.2).
                 track.scaleTimeRange(
-                    CMTimeRange(start: time(cursor), duration: time(segment.sourceDuration)),
-                    toDuration: time(segment.duration))
+                    CMTimeRange(start: time(cursor), duration: time(place.sourceDuration)),
+                    toDuration: time(place.duration))
             }
-            cursor = segment.start + segment.duration
+            cursor = place.at + place.duration
         }
     }
 

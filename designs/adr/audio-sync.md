@@ -109,8 +109,8 @@ Round 2 began when the owner tried it on a real project and it refused: a phone 
 ## Known limits
 
 - **Frame-snapped placement.** After correction, one constant offset of up to half a frame remains (SY-4, the owner's answer 1).
-- **The export's audio offsets (#298).** A ×1 clip is late in an `audio_wav` export: +25.7 ms for a WAV, +37.9 ms for a camera `.mov`. A near-×1 varispeed clip is about 2–3 ms early. The measured gap between the two paths is about 28 ms, on the same 16 kHz WAV at ×1 and at varispeed; against this fixture's camera, an ffmpeg-muxed `.mov` with PCM audio, a corrected recorder exports about 40 ms ahead, a figure not confirmed for real camera files. The preview was not measured.
-- **Keep pitch at a near-×1 rate (#299).** Synchronize Audio never uses it.
+- **The export's audio offsets (#298) — fixed in its phase 2** (spec §11 SY-23..SY-27): a non-48 kHz source is read from a 48 kHz copy, varispeed and the noise reducer are led by their fixed delays, and keep pitch near ×1 plays `time_domain`. On Release (2026-10-16) the 16 kHz recorder exports at +0.04 ms (×1) and +0.09 ms (×0.99999 varispeed), where #298 reported +25.71 and −2.81; S18's corrected mix reads 0.70 ms early in the take and 0.85 ms late; every pinned path in `export_offset_proof.py` is within 1.0 ms. An MP3 source is +13.084 ms (its decoder delay, #306). The preview plays the same composition but its output is not measured (SE-13).
+- **Keep pitch at a near-×1 rate (#299).** Synchronize Audio never uses it. Since #298's phase 2, keep pitch at 0.98–1.02 plays `time_domain` (×0.99999: +0.010 ms, spread 0.138); outside the band `.spectral` still smears (×0.9: +3.170 ms, spread 7.458), and #299 stays open for it.
 - **A large drift can defeat the coarse match (#300)** — fixed in round 2: on the features ±1,000 ppm over 160 s matches confidently (P18), and #300 is closed.
 - **Real footage: the owner's one pair, otherwise synthetic.** The owner's camera and recorder are rows S20, S21, S23 and S24 (gitignored, never committed); every other fixture is generated. Their offset has no 1 ms ground truth, and PHAT cannot refine it (#303). Real footage at large is SE-10's.
 - **The owner's files keep the coarse offset (#303)**; the refinement reads only the overlap's centre 30 s (#302); features-only drift loses about 20 ppm when a 120 s take's last third is unrelated sound (#304); a file under 64 ms reads "still being analysed" for good (#301).
@@ -120,7 +120,7 @@ Round 2 began when the owner tried it on a real project and it refused: a phone 
 ## Open items
 
 Filed at AS-2's close, each `ai-drafted` and `low-priority`:
-- #298: the export's per-path audio offsets.
+- #298: the export's per-path audio offsets (closed by its phase 2, SY-23..SY-27).
 - #299: Speed with Keep pitch at ×0.99999 stops matching its source in the export.
 - #300: a large drift over a long take can defeat the coarse match.
 
@@ -132,7 +132,7 @@ Round 2: #300 closed at AS-4 (P18). Filed at AS-4's close, each `ai-drafted` and
 - #303: the owner's files are not refined (PHAT z 8–9 under `clearZ` 15).
 - #304: features-only drift loses about 20 ppm when the last third of a 120 s take is unrelated sound.
 
-#298 and #299 stay open; neither is round 2's.
+#298 and #299 stayed open; neither was round 2's. #298's phase 2 closed #298 (SY-23..SY-27) and filed #306 (an MP3 source's decoder delay); #299 stays open for keep pitch outside 0.98–1.02.
 
 ## Where to look in the original
 

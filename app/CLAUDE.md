@@ -1099,8 +1099,18 @@ the key map behind it.
   timeline of only graphics, text, shapes or images has no plan track and
   plays over the builder's placeholder (road map 10 §10.8,
   `media_less_playback_probe.py`).
+- `AudioRateCopy.swift` — a non-48 kHz audio source is read from a
+  file-keyed 24-bit 48 kHz CAF copy in `NSTemporaryDirectory()/FrameJob/
+  AudioRate48/` (spec §11 SY-23: AVFoundation's rate conversion after an
+  empty edit drifts with placement, #298); the copy's sample 0 is the
+  source track's time 0 (a leading empty edit is skipped and zero-padded),
+  made blocking on the first build that needs it; reversed-only media are
+  not copied.
 - `CompositionBuilder.swift` (+`InstructionRanges`, +`AudioTracks`,
-  +`SourceRange`: a log media's range flag, read once per build from its
+  +`AudioPlacement`: where an audio segment is inserted, with the varispeed
+  source lead (575 ticks, SY-24) and the noise-reduction track lead (6,400
+  ticks, SY-25); `build` substitutes `AudioRateCopy`'s URLs for the audio
+  pass; +`SourceRange`: a log media's range flag, read once per build from its
   forward video track and carried per instruction as
   `RecipeInstruction.fullRangeTracks`, spec §11 GR-22, and a VP9 track's
   `vpcC` bit when the key is absent, GR-23) — the
@@ -1382,7 +1392,7 @@ the key map behind it.
   line, so it stays one integer literal.
 - `AudioTap.swift` · `AudioDSP.swift` — the `MTAudioProcessingTap` playback
   and export share, and the four sample-level effects: noise reduction (a
-  512-sample delay), the compressor, the mono fold (BEFORE the pan, or it is
+  512-sample delay the builder leads by, SY-25), the compressor, the mono fold (BEFORE the pan, or it is
   algebraically self-cancelling) and pan (constant-power, unity at centre).
   A track whose clips ask for none is bit-identical.
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·

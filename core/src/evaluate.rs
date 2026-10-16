@@ -75,6 +75,43 @@ pub(crate) fn number(value: f64) -> Value {
     Value::from(if value.is_finite() { value } else { 0.0 })
 }
 
+// ---- the time-pitch algorithm -------------------------------------------
+
+/// The time-pitch algorithm a plan audio segment plays at (spec §11 SY-26):
+/// keep pitch at a near-unity speed is `time_domain`, whose drift within a
+/// clip is bounded where `spectral`'s grows; keep pitch elsewhere is
+/// `spectral`, and keep pitch off is `off` (varispeed).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Pitch {
+    Spectral,
+    TimeDomain,
+    Off,
+}
+
+/// The near-unity band, inclusive, in which keep pitch plays `time_domain`.
+pub(crate) const PITCH_TIME_DOMAIN_MIN: f64 = 0.98;
+pub(crate) const PITCH_TIME_DOMAIN_MAX: f64 = 1.02;
+
+impl Pitch {
+    pub(crate) fn of(keep_pitch: bool, speed: f64) -> Pitch {
+        if !keep_pitch {
+            Pitch::Off
+        } else if speed != 1.0 && (PITCH_TIME_DOMAIN_MIN..=PITCH_TIME_DOMAIN_MAX).contains(&speed) {
+            Pitch::TimeDomain
+        } else {
+            Pitch::Spectral
+        }
+    }
+
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Pitch::Spectral => "spectral",
+            Pitch::TimeDomain => "time_domain",
+            Pitch::Off => "off",
+        }
+    }
+}
+
 // ---- the A/B assignment --------------------------------------------------
 
 /// One clip's contribution to the composition: a source range placed at a
@@ -88,7 +125,7 @@ pub(crate) struct Segment {
     source_duration: Ticks,
     start: Ticks,
     duration: Ticks,
-    keep_pitch: bool,
+    pitch: Pitch,
 }
 
 impl Segment {
@@ -110,10 +147,7 @@ impl Segment {
         if audio {
             // The time-pitch algorithm name Swift sets on the segment when
             // a speed change would otherwise transpose the clip.
-            out.insert(
-                "pitch".to_string(),
-                Value::from(if self.keep_pitch { "spectral" } else { "off" }),
-            );
+            out.insert("pitch".to_string(), Value::from(self.pitch.name()));
         }
         Value::Object(out)
     }
@@ -154,12 +188,12 @@ pub(crate) struct Assignment<'a> {
 ///
 /// With the overlap rule (§6: at most one neighbour per side, at most half
 /// the shorter clip) two tracks per timeline track is the most a timeline
-/// clip can ever need — four on an audio track whose overlapping clips mix
-/// both pitch settings (`match_pitch` below). A nest clip is the exception: it stands for a whole
+/// clip can ever need — six on an audio track whose overlapping clips mix
+/// the three pitch names (`match_pitch` below). A nest clip is the exception: it stands for a whole
 /// stack, so it needs as many as the nest's own tracks do.
 ///
 /// With `match_pitch` (audio) a track is free only if its last segment has
-/// the same `keep_pitch`, so every plan audio track has ONE `pitch`, Swift's
+/// the same `pitch`, so every plan audio track has ONE `pitch`, Swift's
 /// first-segment read of it holds, and each clip keeps its own pitch setting
 /// (spec §11 #190, #211).
 fn place<'a>(
@@ -170,9 +204,9 @@ fn place<'a>(
     match_pitch: bool,
 ) -> u32 {
     let free = tracks.iter().position(|t| {
-        t.segments.last().is_none_or(|s| {
-            s.end() <= segment.start && (!match_pitch || s.keep_pitch == segment.keep_pitch)
-        })
+        t.segments
+            .last()
+            .is_none_or(|s| s.end() <= segment.start && (!match_pitch || s.pitch == segment.pitch))
     });
     match free.and_then(|i| tracks.get_mut(i)) {
         Some(track) => {
@@ -270,7 +304,7 @@ impl Project {
             // A structural fact about the segment, so it comes from the
             // base props: the time-pitch algorithm is chosen when the
             // composition is built, not per frame.
-            keep_pitch: clip.audio.map(|a| a.keep_pitch).unwrap_or(true),
+            pitch: Pitch::of(clip.audio.map(|a| a.keep_pitch).unwrap_or(true), clip.speed),
         })
     }
 

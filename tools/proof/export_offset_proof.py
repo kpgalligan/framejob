@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Issue #298 phase 1 — where every export path places a sample relative to
-the timeline, measured against sample-exact click fixtures, and the stage
-(file, AVFoundation decode/SRC, composition insert, mix, time-pitch, writer)
-where each offset enters. No product code and no decision: phase 2's fix is
-specified from what this prints.
+"""Issue #298 — where every export path places a sample relative to the
+timeline, measured against sample-exact click fixtures. Phase 1 measured the
+offsets and the stage (file, AVFoundation decode/SRC, composition insert,
+mix, time-pitch, writer) where each enters; phase 2 removed them at their
+causes (spec §11 SY-23..SY-27) and this is now the standing pin: every E, R
+and X row is scored against SY-27's tolerance.
 
-    python3 tools/proof/export_offset_proof.py [<dir>/agent.sock] [--only ID,ID,...]
+    python3 tools/proof/export_offset_proof.py [<dir>/agent.sock] [--only ID,ID,...] [--mutants]
 
-Z0, Z2 and L1–L9 need no app; every other row needs the running instance's
+Z0, Z2, L1–L9 and X1–X8 need no app; every other row needs the running instance's
 socket (`proof_app.py launch`; `--app release` for the recorded run) and the
 script exits 2 when one is asked for without it. Rows print
 `<ID> ok|FAIL — <detail>`, then the E and L tables, then `scores: n/m`; exit
@@ -23,6 +24,13 @@ at 30 fps — multiples of 3, so each frame start is a whole sample at 16 and
 48 kHz): a Hann pulse 1 ms wide, amplitude 0.5, centred on F/30 s,
 v(n) = 0.25·(1 + cos(π(n − c)/h)) for |n − c| < h, h = rate/2000 samples.
   clicks16 / clicks48     mono s16 WAV at 16 / 48 kHz (`write_clicks_wav`)
+  clicks44                the same at 44.1 kHz
+  clicks44-aac / -mp3     clicks44 through ffmpeg: `-c:a aac -b:a 192k` (.m4a),
+                          `-c:a libmp3lame -b:a 192k` (.mp3)
+  clicks44-late           an 11 s grey 320×180 H.264 movie from 0 with clicks44
+                          as pcm_s16le from 0.5 s (`-itsoffset 0.5`): its audio
+                          track starts 0.5 s in (SOURCE_OFFSET), Z0 checks
+                          ffprobe's start_time 0.500 ± 0.001
   clicks48-lead37         clicks48 with every click 37 samples later (Z1)
   cam-pcm48 / cam-aac48   `export_offset_writer.swift`: AVFoundation's H.264
                           movie, white on the click frames, 48 kHz mono LPCM
@@ -30,18 +38,31 @@ v(n) = 0.25·(1 + cos(π(n − c)/h)) for |n − c| < h, h = rate/2000 samples.
   cam-ff16                `audio_sync_proof.py`'s CAMERA recipe over clicks16
                           (lavfi gray, libx264 30 fps, pcm_s16le, -shortest)
 
+The 48 kHz copies (SY-23) outlive a code change, so `clear_rate_copies()`
+removes `FrameJob/AudioRate48` under `$TMPDIR` and under `getconf
+DARWIN_USER_TEMP_DIR` before the first probe run or app row, and `--mutants`
+before its `before` and before each mutant's X run.
+
 `locate` finds each click near its expected time: the sample of largest |x|
 within ±60 ms, then the normalised correlation with the click template at
 the read's rate over ±1 ms of it, refined parabolically; a click whose best
 r is under 0.5 is not found. Expected timeline time of a click at source
-time c: `start + (c − in)/speed` from `get_project`'s clip; in an `in_out`
-export, minus the in point.
+time c: `start + (c + SOURCE_OFFSET − in)/speed` from `get_project`'s clip; in
+an `in_out` export, minus the in point.
+
+SY-27's pin (`pinned`): |median| ≤ 1.0 ms and spread ≤ 0.5 ms with ≥ 10 of
+12 found, for ×1, varispeed, in-band keep pitch, LPCM/AAC, gain, pan, noise
+reduction and range rows; |median| ≤ 5.0 ms for keep pitch outside the band
+(KEEP_ROWS: E9, E11, E12, E29); the video presets' flashes on exactly their
+timeline frames with every |click − flash| ≤ 1.0 ms.
 
 Rows:
   Z0  each fixture read back (`read_wav` / `read_ffmpeg`) finds all 12
-      clicks within 0.05 ms of the written times (0.5 ms for cam-aac48); the
-      writer's movies flash on exactly CLICK_FRAMES (pts F/30 ± 1 ms);
-      cam-ff16 is flat grey and checked for sound only
+      clicks within 0.05 ms of the written times (0.5 ms for cam-aac48 and
+      clicks44-aac); the writer's movies flash on exactly CLICK_FRAMES (pts
+      F/30 ± 1 ms); cam-ff16 is flat grey and checked for sound only;
+      clicks44-late's audio start_time is 0.500 ± 0.001 s (else the fixture
+      is a failure); clicks44-mp3 is read by E30 alone
   Z1  E4's project with clicks48-lead37: its median − E4's = 37/48 000 s
       ± 0.05 ms
   Z2  `locate` on synthetic 48 kHz trains with clicks at +0.0, +0.3, +0.7
@@ -51,20 +72,33 @@ Rows:
       over the file's click span); `window_lag` takes a whole-ms offset, so
       the start is rounded and the rounding taken back out of the lag
   R1  `audio_sync_proof.fixtures()`'s RECORDER at frame 206, ×1, `audio_wav`,
-      S18's `window_lag` on [12 s, 22 s) (#298 reported +25.71 ms)
+      S18's `window_lag` on [12 s, 22 s) (#298 reported +25.71 ms); ok with
+      r ≥ 0.8 and |lag| ≤ 1.0 ms
   R2  the same at `set_speed {rate: 0.99999, keep_pitch: false}` (#298:
-      −2.81 ms)
-  E1–E23  one project each (`E_ROWS`), exported and located; ok when the
-      export completed and ≥ 10 of 12 clicks were found (E23: all 10 of its
-      in-range clicks); the detail prints the median and spread of
-      found − expected, the count, the least r and `target met|missed`
-      against phase 2's target (not scored here)
+      −2.81 ms), the same pin
+  E1–E31  one project each (`E_ROWS`), exported and located; ok when the
+      export completed, ≥ 10 of 12 clicks were found (E23: all 10 of its
+      in-range clicks) and SY-27's pin holds; E30 (MP3, the decoder delay's
+      residue) is ok when measured, its detail labelled residue. The detail
+      prints the median and spread of found − expected, the count, the
+      least r and the pin
   L1–L9  `export_offset_probe.swift`'s stage reads (its header lists them),
       each located; ok when every read completed and found ≥ 10 of 12. A
-      probe that does not build or answer FAILS all nine
+      probe that does not build or answer FAILS every L and X row asked
+  X1–X8  the probe's in-process `audio_wav` exports (its header lists them),
+      each located and pinned: ≥ 10 found, |median| ≤ 1.0 ms, spread ≤ 0.5 ms
 Under the L table, per fixture and speed, the first stage of
 asset48 → comp → mix → export whose median moves by more than 0.1 ms from
 the stage before it, and native against asset48 (the decoder's SRC).
+
+`--mutants` (`audio_sync_proof.py`'s pattern): each copies `app/Sources`
+under `work/export-offset/mutants/<name>/`, applies its edit (its `before`
+asserted to occur exactly once), rebuilds the probe (900 s wall) and runs its
+X group (240 s wall); killed when every named row fails. `before` — the
+unmutated tree — runs exactly once first and must pass every X row; a copy
+that does not build or answer is a failed control, never a kill. M7 and M8
+are the core's (`core/tests/pitch_band.rs`), run by hand. Exit 0 when every
+mutant was killed.
 """
 
 import argparse
@@ -111,11 +145,20 @@ TARGET_MS = 1.0
 TARGET_SPREAD_MS = 0.5
 KEEP_TARGET_MS = 5.0
 NR_DELAY_MS = 512 / 48_000 * 1000
+SOURCE_OFFSET = {"clicks44-late": 0.5}  # s: where the fixture's audio track starts
+FIXTURE_FILES = {
+    "clicks16": "clicks16-v1.wav", "clicks48": "clicks48-v1.wav",
+    "clicks48-lead37": "clicks48-lead37-v1.wav", "clicks44": "clicks44-v1.wav",
+    "clicks44-aac": "clicks44-aac-v1.m4a", "clicks44-mp3": "clicks44-mp3-v1.mp3",
+    "clicks44-late": "clicks44-late-v1.mov", "cam-pcm48": "cam-pcm48-v1.mov",
+    "cam-aac48": "cam-aac48-v1.mov", "cam-ff16": "cam-ff16-v1.mov",
+}
 FLASH_SHARE = (320 * 180) / (640 * 360)  # the movie's share of the canvas
 
 Z_ROWS = ["Z0", "Z1", "Z2", "Z3"]
 R_ROWS = ["R1", "R2"]
 L_ROWS = [f"L{n}" for n in range(1, 10)]
+X_ROWS = [f"X{n}" for n in range(1, 9)]
 
 # row: (fixture, start ticks, edit, preset). An edit: None (×1),
 # ("speed", rate, keep_pitch), ("loudness", lufs), ("pan", value), ("nr", value),
@@ -144,13 +187,43 @@ E_ROWS = {
     "E21": ("clicks48", F206, ("pan", -0.5), "audio_wav"),
     "E22": ("clicks48", F206, ("nr", 0.5), "audio_wav"),
     "E23": ("clicks48", F206, ("range", 5 * SEC, 15 * SEC), "audio_wav"),
+    "E24": ("clicks44", F206, None, "audio_wav"),
+    "E25": ("clicks16", 60 * SEC, None, "audio_wav"),
+    "E26": ("clicks44-aac", F206, None, "audio_wav"),
+    "E27": ("clicks48", 0, ("nr", 0.5), "audio_wav"),
+    "E28": ("clicks48", F206, ("speed", 0.25, False), "audio_wav"),
+    "E29": ("clicks48", F206, ("speed", 0.9, True), "audio_wav"),
+    "E30": ("clicks44-mp3", F206, None, "audio_wav"),
+    "E31": ("clicks44-late", F206, None, "audio_wav"),
 }
 E_IDS = list(E_ROWS)
-KEEP_ROWS = {"E9", "E10", "E11", "E12"}
+KEEP_ROWS = {"E9", "E11", "E12", "E29"}
+RESIDUE_ROWS = {"E30"}
 VIDEO_ROWS = {"E16", "E17", "E18", "E19"}
 EXTENSIONS = {"audio_wav": "wav", "prores_422": "mov", "h264": "mp4"}
-ALL_ROWS = Z_ROWS + R_ROWS + E_IDS + L_ROWS
-NO_APP = {"Z0", "Z2"} | set(L_ROWS)
+ALL_ROWS = Z_ROWS + R_ROWS + E_IDS + L_ROWS + X_ROWS
+NO_APP = {"Z0", "Z2"} | set(L_ROWS) | set(X_ROWS)
+
+# name: (the X rows it must fail, file, before, after)
+MUTANTS = {
+    "M1-no-copy": (["X1", "X2"], "AudioRateCopy.swift",
+                   "signature.sampleRate != Double(sampleRate)", "false"),
+    "M2-no-varispeed-lead": (["X3"], "CompositionBuilder+AudioPlacement.swift",
+                             "static let varispeedSourceLead: Ticks = 575",
+                             "static let varispeedSourceLead: Ticks = 0"),
+    "M3-noise-lead-everywhere": (["X7"], "CompositionBuilder+AudioPlacement.swift",
+                                 "trackLead: usesNoiseReduction ? noiseReductionLead : 0,",
+                                 "trackLead: noiseReductionLead,"),
+    "M4-no-noise-lead": (["X4"], "CompositionBuilder+AudioPlacement.swift",
+                         "Ticks(AudioNoiseReductionStage.window) * ReelTime.perSecond / 48_000",
+                         "0"),
+    "M5-no-head-cut": (["X5"], "CompositionBuilder+AudioPlacement.swift",
+                       "let cut = max(0, -at0, sourceCut)", "let cut = max(0, sourceCut)"),
+    "M6-source-clamp": (["X3"], "CompositionBuilder+AudioPlacement.swift",
+                        "let in0 = sourceIn - lead", "let in0 = max(0, sourceIn - lead)"),
+    "M9-no-gap-padding": (["X8"], "AudioRateCopy.swift",
+                          "if start - end > 1 {", "if false && start - end > 1 {"),
+}
 
 results = {}
 e_table = []
@@ -206,8 +279,7 @@ def write_clicks_wav(path: Path, rate: int, lead: int = 0) -> None:
 
 
 def fixture_path(name):
-    ext = "wav" if name.startswith("clicks") else "mov"
-    return FIXTURES / f"{name}-v1.{ext}"
+    return FIXTURES / FIXTURE_FILES[name]
 
 
 def build_writer():
@@ -224,7 +296,7 @@ def make_fixtures():
     FIXTURES.mkdir(parents=True, exist_ok=True)
     made = {}
     for name, rate, lead in [("clicks16", 16_000, 0), ("clicks48", 48_000, 0),
-                             ("clicks48-lead37", 48_000, LEAD)]:
+                             ("clicks48-lead37", 48_000, LEAD), ("clicks44", 44_100, 0)]:
         path = fixture_path(name)
         if not path.exists():
             write_clicks_wav(path, rate, lead)
@@ -251,7 +323,61 @@ def make_fixtures():
             path.unlink(missing_ok=True)
             raise
     made["cam-ff16"] = path
+    for name, codec in [("clicks44-aac", ["-c:a", "aac", "-b:a", "192k"]),
+                        ("clicks44-mp3", ["-c:a", "libmp3lame", "-b:a", "192k"])]:
+        path = fixture_path(name)
+        if not path.exists():
+            try:
+                run(["ffmpeg", "-v", "error", "-y", "-i", made["clicks44"], *codec, path])
+            except FixtureError:
+                path.unlink(missing_ok=True)
+                raise
+        made[name] = path
+    path = fixture_path("clicks44-late")
+    if not path.exists():
+        try:
+            run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                 "color=c=gray:s=320x180:r=30:d=11", "-itsoffset", "0.5", "-i",
+                 made["clicks44"], "-map", "0:v", "-map", "1:a", "-c:v", "libx264",
+                 "-pix_fmt", "yuv420p", "-c:a", "pcm_s16le", path])
+        except FixtureError:
+            path.unlink(missing_ok=True)
+            raise
+    made["clicks44-late"] = path
     return made
+
+
+def audio_start_time(path):
+    """ffprobe's start_time of the first audio stream, in seconds."""
+    ran = run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries",
+               "stream=start_time", "-of", "csv=p=0", path])
+    return float(ran["stdout"].strip().split(",")[0])
+
+
+# ---- the 48 kHz copies (SY-23) -------------------------------------------------
+
+
+def rate_copy_dirs():
+    """`FrameJob/AudioRate48` under `$TMPDIR` (when set) and under `getconf
+    DARWIN_USER_TEMP_DIR`: the app's `NSTemporaryDirectory()` is one of them."""
+    roots = []
+    if os.environ.get("TMPDIR"):
+        roots.append(Path(os.environ["TMPDIR"]))
+    ran = bounded.run(["getconf", "DARWIN_USER_TEMP_DIR"], 30)
+    if ran["rc"] == 0 and ran["stdout"].strip():
+        roots.append(Path(ran["stdout"].strip()))
+    out = []
+    for root in roots:
+        folder = root / "FrameJob" / "AudioRate48"
+        if folder not in out:
+            out.append(folder)
+    return out
+
+
+def clear_rate_copies():
+    """Removes every 48 kHz copy, so what is measured is the current code's."""
+    for folder in rate_copy_dirs():
+        shutil.rmtree(folder, ignore_errors=True)
 
 
 _fixtures = None
@@ -450,16 +576,19 @@ class Session:
             pass
 
 
-def expected_times(clip, in_point=None):
+def expected_times(clip, in_point=None, fixture=None):
     """Each click's expected time in the file, (source s, file s); clicks
     outside the clip's window, or outside [in, out) of an in/out export, are
-    left out."""
+    left out. A fixture whose audio starts late has its clicks that much
+    later in the source (SOURCE_OFFSET)."""
     start = clip["start"] / SEC
     source_in = clip["source"].get("in", 0) / SEC
     speed = clip.get("speed", 1) or 1
     end = start + clip["duration"] / SEC
+    offset = SOURCE_OFFSET.get(fixture, 0.0)
     out = []
     for c in CLICKS:
+        c = c + offset
         t = start + (c - source_in) / speed
         if not (start <= t < end):
             continue
@@ -509,7 +638,7 @@ def run_e(mcp, row, fixture_override=None):
         session.op("export", **export)
     finally:
         session.close()
-    pairs = expected_times(placed, in_point)
+    pairs = expected_times(placed, in_point, fixture)
     expected = [t for _, t in pairs]
     samples, rate = read_any(out)
     found = locate(samples, rate, expected)
@@ -536,29 +665,41 @@ def run_e(mcp, row, fixture_override=None):
     return result
 
 
+def pinned(s):
+    """SY-27's exact pin over a located summary: (ok, sentence)."""
+    if s is None or s["median_ms"] is None:
+        return False, "pin missed (nothing found)"
+    met = (s["found"] >= 10 and abs(s["median_ms"]) <= TARGET_MS
+           and s["spread_ms"] <= TARGET_SPREAD_MS)
+    return met, ("pin " + ("met" if met else "missed")
+                 + f" (≥ 10 found, |median| ≤ {TARGET_MS} ms, spread ≤ {TARGET_SPREAD_MS} ms)")
+
+
 def e_target(row, r):
-    """'target met|missed' against phase 2's target (not scored here)."""
+    """SY-27's pin for one E row: (ok, sentence)."""
+    if row in RESIDUE_ROWS:
+        return r["found"] >= 10, ("residue, not pinned (the MP3 decoder's delay): "
+                                  + ("measured" if r["found"] >= 10 else "not measured"))
     if r["median_ms"] is None:
-        return "target missed (nothing found)"
-    if row == "E22":
-        base = _e_cache.get(("E4", None))
-        if base and base["median_ms"] is not None:
-            delta = r["median_ms"] - base["median_ms"]
-            return (f"E22 − E4 {delta:+.3f} ms against 512/48 000 s = {NR_DELAY_MS:.3f} ms "
-                    f"(off by {delta - NR_DELAY_MS:+.3f} ms)")
-        return "E4 not measured: no difference"
+        return False, "pin missed (nothing found)"
     if row in KEEP_ROWS:
-        return "target " + ("met" if abs(r["median_ms"]) <= KEEP_TARGET_MS else "missed") \
-            + f" (|median| ≤ {KEEP_TARGET_MS} ms)"
+        met = abs(r["median_ms"]) <= KEEP_TARGET_MS
+        return met, "pin " + ("met" if met else "missed") + f" (|median| ≤ {KEEP_TARGET_MS} ms)"
     if row in VIDEO_ROWS:
         av = r.get("av_ms") or []
         on_frame = r.get("flash_frames") == r.get("expected_frames")
         av_ok = bool(av) and max(abs(v) for v in av) <= TARGET_MS
-        return "target " + ("met" if on_frame and av_ok else "missed") \
-            + f" (flash on its timeline frame {on_frame}, |click − flash| ≤ {TARGET_MS} ms {av_ok})"
-    met = abs(r["median_ms"]) <= TARGET_MS and r["spread_ms"] <= TARGET_SPREAD_MS
-    return "target " + ("met" if met else "missed") \
-        + f" (|median| ≤ {TARGET_MS} ms, spread ≤ {TARGET_SPREAD_MS} ms)"
+        return on_frame and av_ok, ("pin " + ("met" if on_frame and av_ok else "missed")
+                                    + f" (flash on its timeline frame {on_frame}, "
+                                    f"|click − flash| ≤ {TARGET_MS} ms {av_ok})")
+    met, sentence = pinned(r)
+    if row == "E22":
+        base = _e_cache.get(("E4", None))
+        if base and base["median_ms"] is not None:
+            delta = r["median_ms"] - base["median_ms"]
+            sentence += (f"; E22 − E4 {delta:+.3f} ms (the reducer's {NR_DELAY_MS:.3f} ms, "
+                         "led by SY-25)")
+    return met, sentence
 
 
 def e_row(mcp, row):
@@ -571,8 +712,9 @@ def e_row(mcp, row):
         e_table.append((row, E_ROWS[row], None))
         return
     need = r["of"] if row == "E23" else 10
-    ok = r["found"] >= need and (row != "E23" or r["of"] == 10)
-    detail = f"{r['fixture']} {r['preset']} → {r['rate']} Hz; {describe(r)}; {e_target(row, r)}"
+    met, sentence = e_target(row, r)
+    ok = r["found"] >= need and (row != "E23" or r["of"] == 10) and met
+    detail = f"{r['fixture']} {r['preset']} → {r['rate']} Hz; {describe(r)}; {sentence}"
     if row in VIDEO_ROWS:
         av = r.get("av_ms") or []
         detail += (f"; flashes {len(r['flashes'])} on frames {r['flash_frames']} (timeline "
@@ -589,13 +731,13 @@ def e_row(mcp, row):
 def z0():
     files = fixtures()
     notes, ok = [], True
-    for name in ["clicks16", "clicks48", "clicks48-lead37", "cam-pcm48", "cam-aac48",
-                 "cam-ff16"]:
+    for name in ["clicks16", "clicks48", "clicks48-lead37", "clicks44", "clicks44-aac",
+                 "cam-pcm48", "cam-aac48", "cam-ff16"]:
         samples, rate = read_any(files[name])
         lead = LEAD / 48_000 if name == "clicks48-lead37" else 0
         expected = [c + lead for c in CLICKS]
         s = summary(locate(samples, rate, expected), expected)
-        tolerance = 0.5 if name == "cam-aac48" else 0.05
+        tolerance = 0.5 if name in ("cam-aac48", "clicks44-aac") else 0.05
         worst = max((abs(d) for d in s["diffs"]), default=None)
         good = s["found"] == 12 and worst is not None and worst <= tolerance
         ok &= good
@@ -609,6 +751,10 @@ def z0():
             ok &= good
             notes.append(f"{name} flashes on {frames == CLICK_FRAMES and 'CLICK_FRAMES' or frames}"
                          f" (pts off its frame ≤ {fmt(off, 4)} ms)")
+    start = audio_start_time(files["clicks44-late"])
+    good = abs(start - SOURCE_OFFSET["clicks44-late"]) <= 0.001
+    ok &= good
+    notes.append(f"clicks44-late audio start_time {start:.6f} s (want 0.500 ± 0.001)")
     score("Z0", ok, "; ".join(notes))
 
 
@@ -685,9 +831,10 @@ def r_rows(mcp, wanted):
             out.unlink(missing_ok=True)
             session.op("export", preset="audio_wav", path=str(out))
             lag, r = window_lag(envelope(wav_samples(out)), source, 12_000, 22_000)
-            score(row, r >= 0.8, f"{'×1' if row == 'R1' else '×0.99999 keep_pitch false'}: "
-                  f"S18 lag {lag:+.2f} ms (r {r:.3f}) on [12 s, 22 s); #298 reported "
-                  f"{issue[row]} ms")
+            score(row, r >= 0.8 and abs(lag) <= TARGET_MS,
+                  f"{'×1' if row == 'R1' else '×0.99999 keep_pitch false'}: "
+                  f"S18 lag {lag:+.2f} ms (r {r:.3f}) on [12 s, 22 s) (want |lag| ≤ "
+                  f"{TARGET_MS} ms, r ≥ 0.8); #298 reported {issue[row]} ms")
     finally:
         session.close()
 
@@ -695,40 +842,41 @@ def r_rows(mcp, wanted):
 # ---- L rows (the probe) --------------------------------------------------------
 
 
-def build_probe():
-    """(binary, None) or (None, why): every `app_sources()` file plus the probe
-    as `main.swift`, `Blank.mp4` beside (`playback_audio_proof.py`'s pattern)."""
-    PROBE_DIR.mkdir(parents=True, exist_ok=True)
-    entry = PROBE_DIR / "main.swift"
+def build_probe(sources=None, here=PROBE_DIR):
+    """(binary, None) or (None, why): every `app_sources(sources)` file plus the
+    probe as `main.swift`, `Blank.mp4` beside (`playback_audio_proof.py`'s
+    pattern)."""
+    here.mkdir(parents=True, exist_ok=True)
+    entry = here / "main.swift"
     source = PROBE_SWIFT.read_text()
     if not entry.exists() or entry.read_text() != source:
         entry.write_text(source)
-    blank = PROBE_DIR / "Blank.mp4"
+    blank = here / "Blank.mp4"
     if not blank.exists():
         shutil.copy2(BLANK, blank)
-    binary = PROBE_DIR / "export_offset_probe"
+    binary = here / "export_offset_probe"
     try:
-        swift_build.build(sources=swift_build.app_sources() + [entry], output=binary,
+        swift_build.build(sources=swift_build.app_sources(sources) + [entry], output=binary,
                           defines=["FRAMEJOB_DEV_TOOLS"], timeout=BUILD_WALL)
     except swift_build.SwiftBuildFailed as error:
         return None, "the probe did not build: " + "; ".join(error.diagnostics[:6])
     return binary, None
 
 
-def run_probe(binary):
+def run_probe(binary, group="all", runs=PROBE_RUNS):
     """({row: probe row}, manifest, None) or (None, None, why)."""
-    shutil.rmtree(PROBE_RUNS, ignore_errors=True)
-    PROBE_RUNS.mkdir(parents=True)
-    ran = bounded.run([str(binary), str(PROBE_RUNS), str(FIXTURES)], RUN_WALL,
+    shutil.rmtree(runs, ignore_errors=True)
+    runs.mkdir(parents=True)
+    ran = bounded.run([str(binary), str(runs), str(FIXTURES), group], RUN_WALL,
                       cwd=str(binary.parent))
-    (PROBE_RUNS / "stderr.txt").write_text(ran["stderr"])
+    (runs / "stderr.txt").write_text(ran["stderr"])
     if ran["expired"]:
         return None, None, f"the probe ran past {RUN_WALL} s and was killed"
     for line in ran["stdout"].splitlines():
         if line.startswith("ANSWER "):
             try:
                 rows = {r["id"]: r for r in json.loads(line[len("ANSWER "):]).get("rows", [])}
-                manifest = json.loads((PROBE_RUNS / "manifest.json").read_text())
+                manifest = json.loads((runs / "manifest.json").read_text())
             except (OSError, ValueError) as error:
                 return None, None, f"the probe's answer or manifest could not be read: {error}"
             return rows, manifest, None
@@ -747,7 +895,8 @@ def measure_read(entry):
         samples = read_f32(path, rate)
     start = entry["start_ticks"] / SEC
     speed = entry["speed"] or 1
-    expected = [start + c / speed for c in CLICKS]
+    offset = SOURCE_OFFSET.get(entry["fixture"], 0.0)
+    expected = [start + (c + offset) / speed for c in CLICKS]
     return summary(locate(samples, rate, expected), expected)
 
 
@@ -755,21 +904,9 @@ def chain_key(entry):
     return entry["variant"].split("+")[0]
 
 
-def l_rows(wanted):
-    try:
-        fixtures()
-    except FixtureError as error:
-        for row in wanted:
-            score(row, False, f"the fixtures could not be made: {error}")
-        return
-    binary, why = build_probe()
-    rows = manifest = None
-    if binary is not None:
-        rows, manifest, why = run_probe(binary)
-    if rows is None:
-        for row in wanted:
-            score(row, False, why)
-        return
+def probe_scores(manifest, rows, wanted, table=None):
+    """{row: (ok, detail)} for the L and X rows in `wanted`, from one probe
+    run's manifest; the measured reads are appended to `table` when given."""
     measured = []
     for entry in manifest:
         try:
@@ -780,19 +917,55 @@ def l_rows(wanted):
             print(f"  unreadable: {entry.get('path')}: {error}", flush=True)
             s = None
         measured.append((entry, s))
-        l_table.append((entry, s))
+        if table is not None:
+            table.append((entry, s))
+    out = {}
     for row in wanted:
         probe_row = rows.get(row, {"ok": False, "detail": "the probe did not answer it"})
         mine = [(e, s) for e, s in measured if e["row"] == row]
         short = [f"{e['fixture']} {e['stage']} {e['variant']}" for e, s in mine
                  if s is None or s["found"] < 10]
         ok = probe_row["ok"] and bool(mine) and not short
-        medians = ", ".join(
-            f"{e['fixture']} {e['stage']} {e['variant']} {fmt(s['median_ms'])}"
-            for e, s in mine if s is not None)
-        score(row, ok, f"probe: {probe_row['detail']}; under 10 found: {short or 'none'}; "
-                       f"medians (ms): {medians}")
-    print_where(measured)
+        if row in X_ROWS:
+            pins = [pinned(s) for _, s in mine]
+            ok = ok and all(met for met, _ in pins)
+            medians = "; ".join(
+                f"{e['fixture']} {e['variant']} {describe(s)}, {pin[1]}"
+                for (e, s), pin in zip(mine, pins) if s is not None)
+        else:
+            medians = ", ".join(
+                f"{e['fixture']} {e['stage']} {e['variant']} {fmt(s['median_ms'])}"
+                for e, s in mine if s is not None)
+        out[row] = (ok, f"probe: {probe_row['detail']}; under 10 found: {short or 'none'}; "
+                        f"medians (ms): {medians}")
+    return out, measured
+
+
+def l_rows(wanted):
+    """The probe's L and X rows in `wanted`, from one run of the group they
+    need."""
+    try:
+        fixtures()
+    except FixtureError as error:
+        for row in wanted:
+            score(row, False, f"the fixtures could not be made: {error}")
+        return
+    has_l = any(row in L_ROWS for row in wanted)
+    has_x = any(row in X_ROWS for row in wanted)
+    group = "all" if has_l and has_x else "L" if has_l else "X"
+    binary, why = build_probe()
+    rows = manifest = None
+    if binary is not None:
+        rows, manifest, why = run_probe(binary, group)
+    if rows is None:
+        for row in wanted:
+            score(row, False, why)
+        return
+    scored, measured = probe_scores(manifest, rows, wanted, l_table)
+    for row in wanted:
+        score(row, *scored[row])
+    if has_l:
+        print_where(measured)
 
 
 def print_where(measured):
@@ -834,7 +1007,7 @@ def print_where(measured):
 def print_tables():
     if e_table:
         print("\nE table (found − expected, ms):", flush=True)
-        print("| Row | Media | At | Edit | Preset | Found | Median | Spread | Min r | Target |")
+        print("| Row | Media | At | Edit | Preset | Found | Median | Spread | Min r | Pin |")
         print("|---|---|---|---|---|---|---|---|---|---|")
         for row, (fixture, at, edit, preset), r in e_table:
             edit_text = "×1" if edit is None else " ".join(str(x) for x in edit)
@@ -844,7 +1017,7 @@ def print_tables():
                 continue
             print(f"| {row} | {fixture} | {at / SEC:.4f} s | {edit_text} | {preset} | "
                   f"{r['found']}/{r['of']} | {fmt(r['median_ms'])} | {fmt(r['spread_ms'])} | "
-                  f"{r['min_r']:.3f} | {e_target(row, r)} |")
+                  f"{r['min_r']:.3f} | {e_target(row, r)[1]} |")
     if l_table:
         print("\nL table (found − expected, ms):", flush=True)
         print("| Row | Fixture | Stage | Variant | Rate | Found | Median | Spread | Min r | "
@@ -866,11 +1039,77 @@ def print_tables():
 # ---- main ----------------------------------------------------------------------
 
 
+def mutant_x(sources, here):
+    """{X row: (ok, detail)} from the probe built over `sources` and run on
+    its X group, or (None, why) when it does not build or answer."""
+    clear_rate_copies()
+    binary, why = build_probe(sources, here / "probe")
+    if binary is None:
+        return None, why
+    rows, manifest, why = run_probe(binary, "X", here / "runs")
+    if rows is None:
+        return None, why
+    scored, _ = probe_scores(manifest, rows, X_ROWS)
+    return scored, None
+
+
+def mutants():
+    try:
+        fixtures()
+    except FixtureError as error:
+        print(f"mutants: CONTROL FAILED — the fixtures could not be made: {error}")
+        return 1
+    before, why = mutant_x(None, WORK / "mutants" / "before")
+    if before is None:
+        print(f"before: CONTROL FAILED — {why[:300]}")
+        return 1
+    failing = [row for row in X_ROWS if not before[row][0]]
+    print(f"before: X rows failing {failing or 'none'}", flush=True)
+    for row in failing:
+        print(f"    {row}: {before[row][1][:300]}")
+    if failing:
+        print("mutants: CONTROL FAILED — the unmutated tree fails X rows")
+        return 1
+    killed = []
+    for name, (named, file, old, new) in MUTANTS.items():
+        here = WORK / "mutants" / name
+        if here.exists():
+            shutil.rmtree(here)
+        sources = here / "Sources"
+        shutil.copytree(ROOT / "app/Sources", sources)
+        path = sources / file
+        text = path.read_text()
+        if text.count(old) != 1:
+            print(f"mutant {name}: CONTROL FAILED — `{old}` found {text.count(old)} times")
+            continue
+        path.write_text(text.replace(old, new))
+        rows, why = mutant_x(sources, here)
+        if rows is None:
+            print(f"mutant {name}: CONTROL FAILED — {why[:300]}")
+            continue
+        failed = [row for row in named if not rows[row][0]]
+        others = [row for row in X_ROWS if row not in named and not rows[row][0]]
+        caught = len(failed) == len(named)
+        if caught:
+            killed.append(name)
+        print(f"mutant {name}: {'killed' if caught else 'SURVIVED'} — named {named} failed "
+              f"{failed}; other rows failing {others}", flush=True)
+        for row in named:
+            print(f"    {row}: {rows[row][1][:400]}")
+    print(f"mutants: {len(killed)}/{len(MUTANTS)} killed (M7, M8: core/tests/pitch_band.rs, "
+          "by hand)")
+    return 0 if len(killed) == len(MUTANTS) else 1
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("socket", nargs="?")
     parser.add_argument("--only", help="comma-separated row ids")
+    parser.add_argument("--mutants", action="store_true")
     args = parser.parse_args()
+    if args.mutants:
+        WORK.mkdir(parents=True, exist_ok=True)
+        return mutants()
     wanted = args.only.split(",") if args.only else list(ALL_ROWS)
     unknown = [row for row in wanted if row not in ALL_ROWS]
     if unknown:
@@ -889,6 +1128,12 @@ def main():
             z0()
         except (FixtureError, OSError, ValueError, wave.Error) as error:
             score("Z0", False, f"{type(error).__name__}: {error}")
+
+    probe_wanted = [row for row in L_ROWS + X_ROWS if row in wanted]
+    if needs_app or probe_wanted:
+        # Before the first probe run or app row: every copy measured is this
+        # code's (SY-23's copies outlive a change to it).
+        clear_rate_copies()
 
     if needs_app:
         try:
@@ -918,9 +1163,8 @@ def main():
                               key=lambda r: (r != "E4", E_IDS.index(r))):
                 e_row(mcp, row)
 
-    l_wanted = [row for row in L_ROWS if row in wanted]
-    if l_wanted:
-        l_rows(l_wanted)
+    if probe_wanted:
+        l_rows(probe_wanted)
 
     print_tables()
     passed = sum(1 for row in wanted if results.get(row, (False,))[0])

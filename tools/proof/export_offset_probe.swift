@@ -1,12 +1,16 @@
-// Issue #298 phase 1 — where an exported sample lands, stage by stage. The
-// in-process instrument behind `export_offset_proof.py`'s L1–L9.
+// Issue #298 — where an exported sample lands, stage by stage. The
+// in-process instrument behind `export_offset_proof.py`'s L1–L9 (phase 1)
+// and X1–X8 (phase 2's pins).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a`, through
 // `swift_build.build` (the proof's `build_probe`, `playback_audio_proof.py`'s
 // pattern), with `Blank.mp4` beside the binary:
 //
-//     export_offset_probe <out-dir> <fixtures-dir>
+//     export_offset_probe <out-dir> <fixtures-dir> [all|L|X]
+//
+// The third argument picks the row group (default `all`): `L` runs L1–L9,
+// `X` runs X1–X8 (what `--mutants` runs).
 //
 // It decodes each fixture's sound at each stage of the export path and writes
 // what it read; it locates nothing — the proof locates every click in what is
@@ -53,14 +57,23 @@
 //   L8     L3, L4, L5 at ×0.99999 and ×0.5, keep_pitch false and true
 //          (clicks16, clicks48)
 //   L9     L4 with the clip at 0, F206 and 10 s (clicks16, clicks48, cam-ff16)
+//
+//   X1–X8  the in-process `audio_wav` export (the export stage), pinned by the
+//          proof (spec §11 SY-27): X1 clicks16 F206 ×1; X2 clicks44 F206 ×1;
+//          X3 clicks48 F206 ×0.5 keep false; X4 clicks48 F206 noise reduction
+//          0.5 (`set_audio`); X5 clicks48 at 0 noise reduction 0.5; X6
+//          clicks16 F206 ×0.99999 keep true; X7 clicks48 F206 ×1; X8
+//          clicks44-late F206 ×1 (its audio, 0.5 s into the movie)
 import AVFoundation
 import AppKit
 
 NSApplication.shared.setActivationPolicy(.prohibited)
 
 let arguments = CommandLine.arguments
-guard arguments.count == 3 else {
-    FileHandle.standardError.write(Data("usage: export_offset_probe <out-dir> <fixtures-dir>\n".utf8))
+let group = arguments.count == 4 ? arguments[3] : "all"
+guard arguments.count == 3 || arguments.count == 4, ["all", "L", "X"].contains(group) else {
+    FileHandle.standardError.write(
+        Data("usage: export_offset_probe <out-dir> <fixtures-dir> [all|L|X]\n".utf8))
     exit(2)
 }
 let outDir = URL(fileURLWithPath: arguments[1], isDirectory: true)
@@ -71,6 +84,7 @@ let fixtureFiles: [String: String] = [
     "clicks16": "clicks16-v1.wav", "clicks48": "clicks48-v1.wav",
     "cam-pcm48": "cam-pcm48-v1.mov", "cam-aac48": "cam-aac48-v1.mov",
     "cam-ff16": "cam-ff16-v1.mov",
+    "clicks44": "clicks44-v1.wav", "clicks44-late": "clicks44-late-v1.mov",
 ]
 let allFixtures = ["clicks16", "clicks48", "cam-pcm48", "cam-aac48", "cam-ff16"]
 let wavFixtures = ["clicks16", "clicks48"]
@@ -90,7 +104,10 @@ func writeAnswer() {
     let manifestData = (try? JSONSerialization.data(
         withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])) ?? Data("[]".utf8)
     try? manifestData.write(to: outDir.appendingPathComponent("manifest.json"))
-    let rows = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9"].map { id -> [String: Any] in
+    let lRows = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9"]
+    let xRows = ["X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8"]
+    let ids = group == "L" ? lRows : group == "X" ? xRows : lRows + xRows
+    let rows = ids.map { id -> [String: Any] in
         let reads = rowReads[id] ?? 0
         let errors = rowErrors[id] ?? []
         return [
@@ -250,9 +267,10 @@ struct Placed {
     let urls: [UInt32: URL]
 }
 
-func place(_ fixture: String, at: Ticks, rate: Double? = nil, keepPitch: Bool = true) throws
-    -> Placed
-{
+func place(
+    _ fixture: String, at: Ticks, rate: Double? = nil, keepPitch: Bool = true,
+    noiseReduction: Double? = nil
+) throws -> Placed {
     var project = try apply(base, .setCanvas(width: 640, height: 360, fps: Fps(num: 30, den: 1)))
     let media = project.snapshot.nextId
     project = try apply(project, .addMedia(descriptor: try descriptor(fixtureURL(fixture))))
@@ -262,6 +280,10 @@ func place(_ fixture: String, at: Ticks, rate: Double? = nil, keepPitch: Bool = 
     guard project.snapshot.clip(clip) != nil else { throw ProbeError("add_clip minted no clip") }
     if let rate = rate {
         project = try apply(project, .setSpeed(clip: clip, rate: rate, keepPitch: keepPitch))
+    }
+    if let noiseReduction = noiseReduction {
+        project = try apply(
+            project, .setAudio(clips: [clip], patch: AudioPatch(noiseReduction: noiseReduction)))
     }
     guard let placed = project.snapshot.clip(clip) else { throw ProbeError("the clip is gone") }
     var urls: [UInt32: URL] = [:]
@@ -407,13 +429,17 @@ func readMix(
 }
 
 /// The in-process `audio_wav` export, the main run loop spun until it ends.
-func readExport(_ row: String, _ fixture: String, rate speed: Double? = nil, keep: Bool = true) {
-    let variant = speedTag(speed, keep: keep)
+func readExport(
+    _ row: String, _ fixture: String, at: Ticks = f206, rate speed: Double? = nil,
+    keep: Bool = true, noiseReduction: Double? = nil, tag: String = ""
+) {
+    let variant = speedTag(speed, keep: keep) + tag
     let placed: Placed
     do {
-        placed = try place(fixture, at: f206, rate: speed, keepPitch: keep)
+        placed = try place(
+            fixture, at: at, rate: speed, keepPitch: keep, noiseReduction: noiseReduction)
     } catch {
-        record(row, fixture, "export", variant, rate: 48_000, start: f206,
+        record(row, fixture, "export", variant, rate: 48_000, start: at,
                speed: speed ?? 1) { _ in throw error }
         return
     }
@@ -443,34 +469,51 @@ func readExport(_ row: String, _ fixture: String, rate speed: Double? = nil, kee
 
 // MARK: - The rows
 
-for fixture in allFixtures {
-    readTrack("L1", fixture, stage: "asset48")
-    readTrack("L2", fixture, stage: "native")
-    readComp("L3", fixture)
-    readMix("L4", fixture)
-    readExport("L5", fixture)
-}
-for fixture in wavFixtures {
-    let overrides: [(AVAudioTimePitchAlgorithm?, String)] = [
-        (nil, "nil"), (.varispeed, "varispeed"), (.spectral, "spectral"),
-        (.timeDomain, "timeDomain"),
-    ]
-    for override in overrides { readMix("L6", fixture, override: override) }
-    for readRate in [16_000, 44_100, 48_000] {
-        readComp("L7", fixture, readRate: readRate, tag: "+rate-\(readRate)")
+func lRows() {
+    for fixture in allFixtures {
+        readTrack("L1", fixture, stage: "asset48")
+        readTrack("L2", fixture, stage: "native")
+        readComp("L3", fixture)
+        readMix("L4", fixture)
+        readExport("L5", fixture)
     }
-    for speed in [0.99999, 0.5] {
-        for keep in [false, true] {
-            readComp("L8", fixture, rate: speed, keep: keep)
-            readMix("L8", fixture, rate: speed, keep: keep)
-            readExport("L8", fixture, rate: speed, keep: keep)
+    for fixture in wavFixtures {
+        let overrides: [(AVAudioTimePitchAlgorithm?, String)] = [
+            (nil, "nil"), (.varispeed, "varispeed"), (.spectral, "spectral"),
+            (.timeDomain, "timeDomain"),
+        ]
+        for override in overrides { readMix("L6", fixture, override: override) }
+        for readRate in [16_000, 44_100, 48_000] {
+            readComp("L7", fixture, readRate: readRate, tag: "+rate-\(readRate)")
+        }
+        for speed in [0.99999, 0.5] {
+            for keep in [false, true] {
+                readComp("L8", fixture, rate: speed, keep: keep)
+                readMix("L8", fixture, rate: speed, keep: keep)
+                readExport("L8", fixture, rate: speed, keep: keep)
+            }
+        }
+    }
+    for fixture in ["clicks16", "clicks48", "cam-ff16"] {
+        for (at, name) in [(Ticks(0), "0"), (f206, "F206"), (10 * second, "10s")] {
+            readMix("L9", fixture, at: at, tag: "+at-\(name)")
         }
     }
 }
-for fixture in ["clicks16", "clicks48", "cam-ff16"] {
-    for (at, name) in [(Ticks(0), "0"), (f206, "F206"), (10 * second, "10s")] {
-        readMix("L9", fixture, at: at, tag: "+at-\(name)")
-    }
+
+func xRows() {
+    // Each variant names its row, so no X file overwrites an L5 or L8 one.
+    readExport("X1", "clicks16", tag: "+X1")
+    readExport("X2", "clicks44", tag: "+X2")
+    readExport("X3", "clicks48", rate: 0.5, keep: false, tag: "+X3")
+    readExport("X4", "clicks48", noiseReduction: 0.5, tag: "+X4-nr-0.5")
+    readExport("X5", "clicks48", at: 0, noiseReduction: 0.5, tag: "+X5-nr-0.5-at-0")
+    readExport("X6", "clicks16", rate: 0.99999, keep: true, tag: "+X6")
+    readExport("X7", "clicks48", tag: "+X7")
+    readExport("X8", "clicks44-late", tag: "+X8")
 }
+
+if group != "X" { lRows() }
+if group != "L" { xRows() }
 writeAnswer()
 exit(0)
