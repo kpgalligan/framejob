@@ -101,11 +101,12 @@ extension AudioSync {
     /// The move that puts a mover set to `speed` in sync along the fitted
     /// line (SY-6): `set_speed` keeps its start S and in point I, so source
     /// tick μ plays at `S + δ + (μ − I)/s'`, which is where the anchor plays
-    /// the same sound when `δ = zeroA + 6000·c/(1 − ρ) − S + I/s'`; snapped.
+    /// the same sound when `δ = zeroA + 75·c/(1 − ρ) − S + I/s'` (c in
+    /// samples, 75 ticks each, SY-21); snapped.
     static func correctedDelta(
         anchor: Reading, mover: Reading, drift: AudioSyncMatch.Drift, speed: Double, fps: Fps
     ) -> Ticks {
-        let shift = Double(MediaPeaks.bucketTicks) * drift.intercept / (1 - drift.rate)
+        let shift = Double(AudioSyncPHAT.sampleTicks) * drift.intercept / (1 - drift.rate)
         let exact = Double(anchor.zero) + shift - Double(mover.start)
             + Double(mover.sourceIn) / speed
         return ReelTime.snapToFrame(Ticks(exact.rounded()), fps: fps)

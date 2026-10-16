@@ -2,14 +2,14 @@ import Accelerate
 import Foundation
 
 /// Synchronize Audio's signal arithmetic (road maps "audio-sync" and
-/// "audio-sync-2"; spec §11 SY-5, SY-12..SY-14, SY-17, SY-18): two files'
+/// "audio-sync-2"; spec §11 SY-12..SY-14, SY-17, SY-18, SY-21): two files'
 /// cached features (and, when both hold speech, their speech masks) in,
 /// candidate lags and their confidence out.
 ///
 /// It is pure — no AppKit, no document, no disk. `AudioSync.read` hands it
 /// each file's `cache/sync/<media id>.bin` frames (`SyncFeatures`: 26 MFCCs
-/// per 16 ms of SOURCE time) and its `cache/peaks/<media id>.bin` onsets, and
-/// `AudioSync.find` and `plan` turn what it answers into ops or a refusal.
+/// per 16 ms of SOURCE time), and `AudioSync.find` and `plan` turn what it
+/// answers into ops or a refusal.
 ///
 /// **The coarse match is on FEATURES** (SY-12). Each stretch compared is
 /// standardised per coefficient — gain, microphone and room move a
@@ -27,17 +27,14 @@ import Foundation
 /// own speech frames and every other frame is 0, so only frames that are
 /// speech in both correlate; otherwise every frame counts, as above.
 ///
-/// **Drift** still runs on the waveform's ONSETS until round 2's AS-4 —
-/// `onsets` here, the line fitted through many windows and the resampling
-/// of a near-×1 clip's onsets in `AudioSyncDrift.swift` (SY-6, SY-7) — with
-/// `refine` and `minimumCorrelation` shared from here.
+/// **Drift** runs on the same features (SY-21): each of its windows is one
+/// `search` with a narrower `radius`, the line through them fitted in
+/// `AudioSyncDrift.swift`, and each window refined on the samples by
+/// `AudioSyncPHAT.swift` (SY-20), which shares `refine` from here.
 enum AudioSyncMatch {
 
-    // MARK: - The numbers (SY-7, SY-12..SY-14)
+    // MARK: - The numbers (SY-12..SY-14)
 
-    /// The lowest normalised correlation a drift window may have (SY-7; once
-    /// SY-3's match threshold, which SY-12 superseded).
-    static let minimumCorrelation = 0.25
     /// 2 s of frames: a played window under it is not searched, and a file
     /// under it is too short to match.
     static let minimumStretchFrames = 125
@@ -76,26 +73,6 @@ enum AudioSyncMatch {
     /// What a search correlated (SY-17).
     enum MatchedOn: String {
         case speech, sound
-    }
-
-    // MARK: - Onsets
-
-    /// The mean-free onset envelope of a peaks array.
-    static func onsets(_ peaks: [Float]) -> [Float] {
-        guard !peaks.isEmpty else { return [] }
-        var result = [Float](repeating: 0, count: peaks.count)
-        var previous = 20 * log10(max(Double(peaks[0]), 1e-5))
-        var sum = 0.0
-        for index in 1..<peaks.count {
-            let level = 20 * log10(max(Double(peaks[index]), 1e-5))
-            let rise = max(0, level - previous)
-            result[index] = Float(rise)
-            sum += rise
-            previous = level
-        }
-        let mean = Float(sum / Double(peaks.count))
-        for index in result.indices { result[index] -= mean }
-        return result
     }
 
     // MARK: - The feature search (SY-12, SY-14)
@@ -266,12 +243,14 @@ enum AudioSyncMatch {
     /// stretches, frame-major on the timeline grid, with their speech masks
     /// (nil without the model); `offset` the anchor stretch's first frame
     /// minus the mover's, which makes a stretch lag file-relative;
-    /// `placementLag` the file-relative lag at which the mover already sits.
-    /// Speech only when both masks hold `minimumSpeechFrames` true frames.
+    /// `placementLag` the file-relative lag at which the mover already sits,
+    /// and `radius` how near it the near placement must lie (drift's windows
+    /// search a narrower one, SY-21). Speech only when both masks hold
+    /// `minimumSpeechFrames` true frames.
     /// nil when either stretch is silent or no lag overlaps enough to score.
     static func search(
         anchor: [Float], mover: [Float], anchorSpeech: [Bool]?, moverSpeech: [Bool]?,
-        offset: Int, placementLag: Double
+        offset: Int, placementLag: Double, radius: Int = placementRadiusFrames
     ) -> SearchResult? {
         let width = SyncFeatures.coefficients
         func spoken(_ mask: [Bool]?) -> Bool {
@@ -328,7 +307,7 @@ enum AudioSyncMatch {
         where scored[index] && scored[index - 1] && scored[index + 1]
             && c[index] > c[index - 1] && c[index] > c[index + 1] {
             let lag = Double(index - (nb - 1) + offset)
-            guard abs(lag - placementLag) <= Double(placementRadiusFrames) else { continue }
+            guard abs(lag - placementLag) <= Double(radius) else { continue }
             if near.map({ c[index] > c[$0] }) ?? true { near = index }
         }
         return SearchResult(
@@ -337,8 +316,8 @@ enum AudioSyncMatch {
     }
 
     /// `frames` on the timeline grid of a clip playing at `speed`:
-    /// `resampled`'s rule applied to each frame vector — frame k is source
-    /// frame k·speed, interpolated linearly. The frames themselves at ×1.
+    /// frame k is source frame k·speed, each coefficient interpolated
+    /// linearly between its two neighbours. The frames themselves at ×1.
     static func resampledFrames(_ frames: [Float], speed: Double) -> [Float] {
         let width = SyncFeatures.coefficients
         let count = frames.count / width
@@ -373,77 +352,8 @@ enum AudioSyncMatch {
         return min(0.5, max(-0.5, offset))
     }
 
-    /// `c[L] = Σ x[m+L]·y[m]` for L from −(ny−1) to nx−1, at index L + ny − 1,
-    /// by a zero-padded real FFT (`vDSP_fft_zrip`, as `AudioDSP.swift` uses
-    /// it: DC packed in real[0], Nyquist in imaginary[0]).
-    static func crossCorrelation(_ x: [Float], _ y: [Float]) -> [Double] {
-        let nx = x.count
-        let ny = y.count
-        let lags = nx + ny - 1
-        var log2n = 1
-        while (1 << log2n) < lags { log2n += 1 }
-        let n = 1 << log2n
-        let half = n / 2
-        guard let setup = vDSP_create_fftsetup(vDSP_Length(log2n), FFTRadix(kFFTRadix2)) else {
-            return direct(x, y)
-        }
-        defer { vDSP_destroy_fftsetup(setup) }
-
-        func spectrum(_ values: [Float]) -> ([Float], [Float]) {
-            var padded = [Float](repeating: 0, count: n)
-            padded.replaceSubrange(0..<values.count, with: values)
-            var real = [Float](repeating: 0, count: half)
-            var imaginary = [Float](repeating: 0, count: half)
-            real.withUnsafeMutableBufferPointer { re in
-                imaginary.withUnsafeMutableBufferPointer { im in
-                    var split = DSPSplitComplex(realp: re.baseAddress!, imagp: im.baseAddress!)
-                    padded.withUnsafeBufferPointer { source in
-                        source.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: half) {
-                            vDSP_ctoz($0, 2, &split, 1, vDSP_Length(half))
-                        }
-                    }
-                    vDSP_fft_zrip(
-                        setup, &split, 1, vDSP_Length(log2n), FFTDirection(kFFTDirection_Forward))
-                }
-            }
-            return (real, imaginary)
-        }
-
-        let (xr, xi) = spectrum(x)
-        let (yr, yi) = spectrum(y)
-        // X · conj(Y). DC and Nyquist are real and multiply on their own.
-        var real = [Float](repeating: 0, count: half)
-        var imaginary = [Float](repeating: 0, count: half)
-        real[0] = xr[0] * yr[0]
-        imaginary[0] = xi[0] * yi[0]
-        for bin in 1..<half {
-            real[bin] = xr[bin] * yr[bin] + xi[bin] * yi[bin]
-            imaginary[bin] = xi[bin] * yr[bin] - xr[bin] * yi[bin]
-        }
-        var circular = [Float](repeating: 0, count: n)
-        real.withUnsafeMutableBufferPointer { re in
-            imaginary.withUnsafeMutableBufferPointer { im in
-                var split = DSPSplitComplex(realp: re.baseAddress!, imagp: im.baseAddress!)
-                vDSP_fft_zrip(
-                    setup, &split, 1, vDSP_Length(log2n), FFTDirection(kFFTDirection_Inverse))
-                circular.withUnsafeMutableBufferPointer { out in
-                    out.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: half) {
-                        vDSP_ztoc(&split, 1, $0, 2, vDSP_Length(half))
-                    }
-                }
-            }
-        }
-        // Each forward spectrum is scaled by 2 and the inverse by n.
-        let scale = 1 / (4 * Double(n))
-        var result = [Double](repeating: 0, count: lags)
-        for index in 0..<lags {
-            let lag = index - (ny - 1)
-            result[index] = Double(circular[lag >= 0 ? lag : n + lag]) * scale
-        }
-        return result
-    }
-
-    /// The same sums, one by one: the fallback when no FFT setup can be made.
+    /// `c[L] = Σ x[m+L]·y[m]`, one by one: `summedCorrelation`'s fallback, a
+    /// coefficient at a time, when no FFT setup can be made.
     private static func direct(_ x: [Float], _ y: [Float]) -> [Double] {
         let ny = y.count
         var result = [Double](repeating: 0, count: x.count + ny - 1)

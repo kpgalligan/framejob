@@ -419,9 +419,9 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController+Audio.swift `func synchronizeAudio(`",
-    "app/Sources/EditorViewController+Audio.swift:122"
+    "app/Sources/EditorViewController+Audio.swift:81"
    ],
-   "note": "a weak match asks Apply / Cancel in an alert sheet (SY-19); otherwise an edit"
+   "note": "presentAsSheet(AudioSyncSheetController), the Synchronizing Audio sheet while the plan runs off main (SY-22); its answer is an edit, or a weak match asks Apply / Cancel in an alert sheet (SY-19, reached_after)"
   },
   "showSpeedSheet:": {
    "verdict": "sheet",
@@ -944,13 +944,26 @@
    ],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+Audio.swift:122": {
-   "token": "beginSheetModal",
-   "func": "askToApplyWeakMatch",
+  "app/Sources/EditorViewController+Audio.swift:81": {
+   "token": "presentAsSheet",
+   "func": "synchronizeAudio",
    "reached_from": [
     "synchronizeAudio:"
    ],
    "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+Audio.swift:156": {
+   "token": "beginSheetModal",
+   "func": "askToApplyWeakMatch",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "synchronizeAudio:",
+     "via": "app/Sources/EditorViewController+Audio.swift `self.finishSynchronizeAudio(plan, asked: asked, scope: scope, document: document)`",
+     "gate": "app/Sources/EditorViewController+Audio.swift `guard !weak.isEmpty else {` — the Synchronizing Audio sheet's plan has weak moves"
+    }
+   ],
    "other_caller": ""
   },
   "app/Sources/EditorViewController+Export.swift:108": {

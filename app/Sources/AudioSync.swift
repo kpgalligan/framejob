@@ -1,41 +1,45 @@
 import Foundation
 
 /// Clip ▸ Synchronize Audio and `sync_audio` (road maps "audio-sync", AS-1 and
-/// AS-2, and "audio-sync-2", AS-3; spec §11 SY-1..SY-19): selected clips that
+/// AS-2, and "audio-sync-2", AS-3 and AS-4; spec §11 SY-1..SY-21): selected clips that
 /// play sound are lined up by their sound. One ANCHOR stays where it is and every other clip moves by a
 /// frame-snapped `move_clip`, its clock drift corrected by a `set_speed`, all
 /// as one undo step — or the whole command refuses, naming every reason at
 /// once (SY-1).
 ///
 /// `AudioNormalize`'s shape: `read` takes everything off the document once
-/// (the edited project's snapshot and plan, and each file's cached waveform,
-/// sync features and speech probabilities), and `plan` is pure — readings
+/// (the edited project's snapshot and plan, and each file's cached sync
+/// features, samples and speech probabilities), and `plan` is pure — readings
 /// in, ops or a refusal out. The menu item and the tool call the same pair,
 /// so neither measures anything of its own. The signal arithmetic is
-/// `AudioSyncMatch`'s, where to look and what to choose
+/// `AudioSyncMatch`'s, the sub-frame refinement `AudioSyncPHAT`'s (SY-20),
+/// where to look and what to choose
 /// `AudioSync+Search.swift`'s, and which planned moves are only WEAK — asked
 /// about, never applied silently (SY-18, SY-19) — `AudioSync+Weak.swift`'s.
 ///
 /// **Time.** A reading's `zero` is the project tick at which its file's
 /// source tick 0 would play (`segment.start − round(segment.sourceIn /
-/// speed)`), and its features and onsets are resampled onto its timeline
-/// grid (frame k = source frame k·speed; themselves at ×1), and so are its
-/// speech masks (SY-17, frame k = source frame round(k·speed)), so a sound at
-/// timeline frame `f` plays at `zero + f·9600`. A mover whose sound at frame
-/// `m` is the anchor's at `m + lag` lines up when its zero becomes `zeroA +
-/// lag·9600`: `delta = zeroA − zeroN + lag·9600`, snapped to the frame grid
-/// (SY-4), because the model stores no sub-frame time. Drift still runs on
-/// the onsets, 6,000 ticks a bucket.
+/// speed)`), and its features are resampled onto its timeline grid (frame k
+/// = source frame k·speed; themselves at ×1), and so are its speech masks
+/// (SY-17, frame k = source frame round(k·speed)), so a sound at timeline
+/// frame `f` plays at `zero + f·9600`; its samples are read at `t·speed`
+/// where they are used (SY-20). A mover whose sound at frame `m` is the
+/// anchor's at `m + lag` lines up when its zero becomes `zeroA + lag·9600`:
+/// `delta = zeroA − zeroN + lag·9600`, snapped to the frame grid (SY-4),
+/// because the model stores no sub-frame time.
 ///
-/// **Drift** (SY-6, SY-7). Over the overlap the coarse delta gives, the lag
-/// is fitted as a line, `lag(a) = c + ρ·a` (a an anchor bucket). Corrected
+/// **Drift and the refinement** (SY-6, SY-20, SY-21). Over the overlap the
+/// coarse delta gives, the lag is fitted as a line, `lag(a) = c + ρ·a` (a an
+/// anchor timeline sample, 75 ticks each, c in samples); not measured, the
+/// line is the coarse lag. PHAT along it over the overlap's centre 30 s
+/// shifts c by a clear peak's sub-sample shift, else c stands. Corrected
 /// (SY-8), the mover's speed becomes `s' = s·(1 − ρ)` and, since `set_speed`
 /// keeps its start S and in point I, source tick μ plays at `S + δ + (μ −
 /// I)/s'` — on the anchor's line everywhere when `δ = snapToFrame(round(zeroA
-/// + 6000·c/(1 − ρ) − S + I/s'))` (`correctedDelta`). Left uncorrected, it is
+/// + 75·c/(1 − ρ) − S + I/s'))` (`correctedDelta`). Left uncorrected, it is
 /// placed by the line's value at the overlap's centre aMid, `delta =
-/// snapToFrame(zeroA − zeroN + round((c + ρ·aMid)·6000))`; not measured, by
-/// the coarse lag. Snapping leaves one constant offset of at most half a
+/// snapToFrame(zeroA − zeroN + round((c + ρ·aMid)·75))`; not measured, by
+/// the (refined) lag. Snapping leaves one constant offset of at most half a
 /// frame.
 ///
 /// **The head trim** (SY-16, the owner's choice): a mover that would start
@@ -71,7 +75,7 @@ enum AudioSync {
 
     /// One clip that can be matched: where it sits, where its file's tick 0
     /// plays, whether it has pictures (the anchor rule, SY-2), its file's
-    /// onsets and sync features, and the clips it shares its track with.
+    /// samples and sync features, and the clips it shares its track with.
     struct Reading: Equatable {
         let clip: UInt32
         let media: UInt32
@@ -80,7 +84,8 @@ enum AudioSync {
         let end: Ticks
         let zero: Ticks
         let hasVideo: Bool
-        let onsets: [Float]
+        /// Its file's 8 kHz samples (`cache/sync/<id>.pcm`) on the SOURCE grid.
+        let samples: [Int16]
         /// Its file's `SyncFeatures` frames on the SOURCE grid, frame-major.
         let features: [Float]
         /// Which of those frames are speech (SY-17), one per frame on the
@@ -102,14 +107,19 @@ enum AudioSync {
         let fps: Fps
     }
 
-    /// One mover's answer: its lag in ticks, the frame-snapped move, where it
-    /// lands, how sure the match was and how it was found, what drift it
-    /// measured, its speed, duration and correction after the command, and
-    /// the head it lost to start at 0 (SY-16).
+    /// One mover's answer: its lag in ticks (refined, at the overlap's
+    /// centre), the coarse lag and the refinement (SY-20), the frame-snapped
+    /// move, where it lands, how sure the match was and how it was found,
+    /// what drift it measured, its speed, duration and correction after the
+    /// command, and the head it lost to start at 0 (SY-16).
     struct Synced: Equatable {
         let clip: UInt32
         let media: UInt32
         let lag: Ticks
+        /// The coarse match's lag in ticks, before the refinement.
+        let coarseLag: Ticks
+        /// The PHAT refinement over the overlap; nil when none ran.
+        let refinement: AudioSyncPHAT.Refinement?
         let delta: Ticks
         let start: Ticks
         /// The chosen lag's z-score (SY-12).
@@ -141,15 +151,14 @@ enum AudioSync {
 
     // MARK: - Reading
 
-    /// Reads the edited project's snapshot, plan, peaks, sync features and
-    /// (with the voice model) speech probabilities for `clips` (nil:
+    /// Reads the edited project's snapshot, plan, sync features and samples
+    /// and (with the voice model) speech probabilities for `clips` (nil:
     /// the document's selection). nil only when the plan cannot be read; a
     /// clip that cannot be matched is a `Problem`.
     static func read(from document: ProjectDocument, clips: [UInt32]?, anchor: UInt32?)
         -> Input? {
         guard let plan = document.editedProject.plan else { return nil }
         let snapshot = document.editedProject.snapshot
-        let loader = MediaPeaks.Loader(cacheDirectory: document.cacheDirectory)
 
         var audio: [UInt32: [PlanSegment]] = [:]
         for track in plan.audioTracks {
@@ -164,7 +173,7 @@ enum AudioSync {
             }
         }
 
-        var onsetsByMedia: [UInt32: [Float]] = [:]
+        var samplesByMedia: [UInt32: [Int16]] = [:]
         var featuresByMedia: [UInt32: [Float]] = [:]
         var speechByMedia: [UInt32: [Float]] = [:]
         let voice = SileroVAD.isAvailable
@@ -224,16 +233,24 @@ enum AudioSync {
                 ?? document.cacheDirectory.flatMap {
                     MediaImporter.loadSpeech(for: first.media, in: $0)
                 }
-            let waveform = loader.peaks(for: first.media)
-            guard let peaks = waveform, let features = cached, !voice || probabilities != nil
+            let pcm = samplesByMedia[first.media] ?? document.cacheDirectory.flatMap {
+                MediaImporter.loadSyncSamples(for: first.media, in: $0)
+            }
+            // The samples are the features' own: a count that disagrees is a
+            // pass not finished, read as not written.
+            let written = cached.flatMap { features in
+                pcm.flatMap {
+                    SyncFeatures.frameCount(samples: $0.count)
+                        == features.count / SyncFeatures.coefficients ? $0 : nil
+                }
+            }
+            guard let features = cached, let samples = written, !voice || probabilities != nil
             else {
                 // The waveform can be on the timeline while the features
                 // and speech that land after it are not: say which.
-                let missing = waveform == nil
-                    ? " — its waveform has not been written yet."
-                    : cached == nil
-                        ? " for Synchronize Audio — its sound features have not been written yet."
-                        : " for Synchronize Audio — its speech has not been detected yet."
+                let missing = written == nil
+                    ? " for Synchronize Audio — its sound features have not been written yet."
+                    : " for Synchronize Audio — its speech has not been detected yet."
                 problems.append(
                     Problem(
                         clip: id,
@@ -241,6 +258,7 @@ enum AudioSync {
                 continue
             }
             featuresByMedia[first.media] = features
+            samplesByMedia[first.media] = samples
             if let probabilities { speechByMedia[first.media] = probabilities }
             let frames = features.count / SyncFeatures.coefficients
             guard frames >= AudioSyncMatch.minimumStretchFrames else {
@@ -255,8 +273,6 @@ enum AudioSync {
                             + "sound."))
                 continue
             }
-            let onsets = onsetsByMedia[first.media] ?? AudioSyncMatch.onsets(peaks)
-            onsetsByMedia[first.media] = onsets
             let neighbours = snapshot.clips
                 .filter { $0.track == clip.track && $0.id != id }
                 .map { Neighbour(clip: $0.id, start: $0.start, end: $0.start + $0.duration) }
@@ -266,7 +282,7 @@ enum AudioSync {
                     trackIndex: snapshot.tracks.firstIndex { $0.id == clip.track } ?? 0,
                     start: clip.start, end: clip.start + clip.duration,
                     zero: first.start - Ticks((Double(first.sourceIn) / clip.speed).rounded()),
-                    hasVideo: pictured.contains(id), onsets: onsets, features: features,
+                    hasVideo: pictured.contains(id), samples: samples, features: features,
                     speech: probabilities.map { AudioSyncMatch.speechMask($0, frames: frames) },
                     neighbours: neighbours,
                     speed: clip.speed, sourceIn: first.sourceIn))
@@ -330,13 +346,15 @@ enum AudioSync {
         let silent = "has no sound to line up by."
         let anchorSilent = AudioSyncMatch.isSilent(anchor.features)
         if anchorSilent { problems.append(Problem(clip: anchor.clip, reason: silent)) }
-        let anchorOnsets = AudioSyncMatch.resampled(anchor.onsets, speed: anchor.speed)
         let anchorFrames = AudioSyncMatch.resampledFrames(anchor.features, speed: anchor.speed)
         let anchorSpeech = anchor.speech.map {
             AudioSyncMatch.resampledMask($0, speed: anchor.speed)
         }
 
-        let bucket = Double(MediaPeaks.bucketTicks)
+        let hop = Double(SyncFeatures.hop)
+        let sample = Double(AudioSyncPHAT.sampleTicks)
+        // SY-22: one setup for every refinement this plan makes.
+        let fft = AudioSyncPHAT.FFT(log2n: AudioSyncPHAT.planLog2n)
         var synced: [Synced] = []
         var ops: [ReelOp] = []
         for mover in readings where mover.clip != anchor.clip {
@@ -345,7 +363,6 @@ enum AudioSync {
                 continue
             }
             if anchorSilent { continue }
-            let moverOnsets = AudioSyncMatch.resampled(mover.onsets, speed: mover.speed)
             let moverFrames = AudioSyncMatch.resampledFrames(mover.features, speed: mover.speed)
             let moverSpeech = mover.speech.map {
                 AudioSyncMatch.resampledMask($0, speed: mover.speed)
@@ -363,20 +380,44 @@ enum AudioSync {
             }
             let lagTicks = Ticks((found.lag * Double(SyncFeatures.frameTicks)).rounded())
             let coarse = ReelTime.snapToFrame(anchor.zero - mover.zero + lagTicks, fps: input.fps)
-            let lower = Int(
-                MediaPeaks.bucketIndex(max(anchor.start, mover.start + coarse) - anchor.zero))
-            let upper = Int(
-                MediaPeaks.bucketIndex(min(anchor.end, mover.end + coarse) - anchor.zero))
+            let lower = frameIndex(max(anchor.start, mover.start + coarse) - anchor.zero)
+            let upper = frameIndex(min(anchor.end, mover.end + coarse) - anchor.zero)
             let window = max(0, lower)..<max(0, lower, upper)
-            let drift = AudioSyncMatch.drift(
-                anchor: anchorOnsets, mover: moverOnsets, lag: Double(lagTicks) / bucket,
-                overlap: window)
-            let correction = Self.correction(for: drift, speed: mover.speed)
+            var drift = AudioSyncMatch.drift(
+                anchor: anchorFrames, mover: moverFrames, anchorSpeech: anchorSpeech,
+                moverSpeech: moverSpeech, anchorSamples: anchor.samples,
+                moverSamples: mover.samples, anchorSpeed: anchor.speed, moverSpeed: mover.speed,
+                lag: found.lag, overlap: window, fft: fft)
+            // SY-20: PHAT along the line over the overlap's centre 30 s.
+            var line = AudioSyncPHAT.Line(intercept: found.lag * hop, rate: 0)
+            if case .measured(let fit) = drift {
+                line = AudioSyncPHAT.Line(intercept: fit.intercept, rate: fit.rate)
+            }
+            let refinement = AudioSyncPHAT.refine(
+                anchor: anchor.samples, anchorSpeed: anchor.speed, mover: mover.samples,
+                moverSpeed: mover.speed, line: line, region: region(window), fft: fft)
+            var refinedTicks = lagTicks
             var delta = coarse
+            if let refinement, refinement.clear {
+                if case .measured(let fit) = drift {
+                    drift = .measured(
+                        AudioSyncMatch.Drift(
+                            ppm: fit.ppm, milliseconds: fit.milliseconds, rate: fit.rate,
+                            intercept: fit.intercept + refinement.shift,
+                            errorMilliseconds: fit.errorMilliseconds, windows: fit.windows,
+                            on: fit.on))
+                } else {
+                    refinedTicks = Ticks(((found.lag * hop + refinement.shift) * sample).rounded())
+                    delta = ReelTime.snapToFrame(
+                        anchor.zero - mover.zero + refinedTicks, fps: input.fps)
+                }
+            }
+            let correction = Self.correction(for: drift, speed: mover.speed)
             var newSpeed: Double?
             if case .measured(let fit) = drift {
-                let centre = Double(window.lowerBound + window.upperBound) / 2
-                let line = Ticks(((fit.intercept + fit.rate * centre) * bucket).rounded())
+                let centre = Double(window.lowerBound + window.upperBound) / 2 * hop
+                let line = Ticks(((fit.intercept + fit.rate * centre) * sample).rounded())
+                refinedTicks = line
                 delta = ReelTime.snapToFrame(anchor.zero - mover.zero + line, fps: input.fps)
                 if case .apply(let speed) = correction {
                     newSpeed = speed
@@ -425,7 +466,8 @@ enum AudioSync {
             }
             synced.append(
                 Synced(
-                    clip: mover.clip, media: mover.media, lag: lagTicks, delta: delta,
+                    clip: mover.clip, media: mover.media, lag: refinedTicks,
+                    coarseLag: lagTicks, refinement: refinement, delta: delta,
                     start: start, confidence: found.confidence, search: found.search,
                     chosenBy: found.chosenBy, matchedOn: found.matchedOn,
                     candidates: found.candidates, drift: drift,
@@ -438,5 +480,25 @@ enum AudioSync {
         }
         guard problems.isEmpty else { return .refused(problems) }
         return .planned(anchor: anchor.clip, synced: synced, ops: ops)
+    }
+
+    /// The anchor timeline frame holding `ticks` after its zero: `⌊ticks /
+    /// frameTicks⌋`.
+    private static func frameIndex(_ ticks: Ticks) -> Int {
+        let step = SyncFeatures.frameTicks
+        let quotient = ticks / step
+        return Int(ticks % step < 0 ? quotient - 1 : quotient)
+    }
+
+    /// SY-20's region: `overlap` (anchor timeline frames) in samples, its
+    /// centre `maximumRegionSamples` when it is longer.
+    private static func region(_ overlap: Range<Int>) -> Range<Int> {
+        let hop = SyncFeatures.hop
+        let low = overlap.lowerBound * hop
+        let high = overlap.upperBound * hop
+        let cap = AudioSyncPHAT.maximumRegionSamples
+        guard high - low > cap else { return low..<high }
+        let start = (low + high) / 2 - cap / 2
+        return start..<(start + cap)
     }
 }

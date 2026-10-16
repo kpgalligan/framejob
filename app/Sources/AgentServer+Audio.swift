@@ -4,7 +4,7 @@ import AppKit
 /// (road map 2 phase 5c), and `sync_audio`, the mirror of Clip ▸ Synchronize
 /// Audio (road map "audio-sync", AS-1; spec §11 SY-1..SY-5), which takes the
 /// same posture — `AudioSync.read` + `plan`, the menu's own pair, and nothing
-/// measured here; on the main thread for `normalize_clip`'s reason.
+/// measured here.
 ///
 /// It is an APP-STATE composite rather than an op, for `detect_silence`'s
 /// reason exactly: the level it measures comes from `cache/peaks/<media
@@ -22,11 +22,15 @@ import AppKit
 /// algorithm" exists to prevent, and a proof that measured the tool would then
 /// be saying nothing about the button.
 ///
-/// It stays on the MAIN thread, and so out of `AgentServer.offMainTools`, on
-/// that set's stated criterion — "waits for something the main thread has to
-/// deliver or must not be doing", not "touches the disk". Reading a few
-/// hundred KB of peaks and making one arithmetic pass over it waits on
-/// nothing, which is the case `detect_silence` argues at length beside it.
+/// `normalize_clip` stays on the MAIN thread, and so out of
+/// `AgentServer.offMainTools`, on that set's stated criterion — "waits for
+/// something the main thread has to deliver or must not be doing", not
+/// "touches the disk". Reading a few hundred KB of peaks and making one
+/// arithmetic pass over it waits on nothing, which is the case
+/// `detect_silence` argues at length beside it. **`sync_audio` is the
+/// exception** (spec §11 SY-22): its `plan` is seconds of signal arithmetic
+/// on a long take, which the main thread must not be doing, so it is an
+/// off-main tool — the read and the commit hop to main, the plan does not.
 extension AgentServer {
 
     /// `normalize_clip` — the Audio section's Normalize button
@@ -135,25 +139,49 @@ extension AgentServer {
     /// menu's own test) answers `moved: false` with `weak` and a note and
     /// changes nothing, unless `accept_weak` is true — the Weak match sheet's
     /// Apply (SY-19).
+    ///
+    /// Off the main thread (SY-22, `AgentServer.offMainTools`): the
+    /// arguments and `read` on main, `plan` here on the server's thread, then
+    /// back on main the stale test — the project or scope changed meanwhile
+    /// is an error, the Synchronizing Audio sheet's own rule — and the answer.
     func syncAudio(_ a: [String: Any]) throws -> String {
-        let document = try target(a)
-        let clips = try clipsArg(a, "clips", document)
-        let acceptWeak = try boolArg(a, "accept_weak") ?? false
-        var anchor: UInt32?
-        if try intArg(a, "anchor") != nil {
-            let named = try idArg(a, "anchor")
-            guard clips.contains(named) else {
-                throw ToolError(
-                    message: "anchor must be one of clips: clip \(named) is not in clips.")
+        let (document, input, acceptWeak, asked, scope) = try onMain {
+            () throws -> (ProjectDocument, AudioSync.Input, Bool, ReelProject, UInt32?) in
+            let document = try self.target(a)
+            let clips = try self.clipsArg(a, "clips", document)
+            let acceptWeak = try self.boolArg(a, "accept_weak") ?? false
+            var anchor: UInt32?
+            if try self.intArg(a, "anchor") != nil {
+                let named = try self.idArg(a, "anchor")
+                guard clips.contains(named) else {
+                    throw ToolError(
+                        message: "anchor must be one of clips: clip \(named) is not in clips.")
+                }
+                anchor = named
             }
-            anchor = named
+            guard let input = AudioSync.read(from: document, clips: clips, anchor: anchor) else {
+                throw ToolError(
+                    message: "The project's audio plan could not be read, so there is no "
+                        + "sound to line up.")
+            }
+            return (document, input, acceptWeak, document.project, document.scope)
         }
-        guard let input = AudioSync.read(from: document, clips: clips, anchor: anchor) else {
-            throw ToolError(
-                message: "The project's audio plan could not be read, so there is no sound to "
-                    + "line up.")
+        let plan = AudioSync.plan(input)
+        return try onMain {
+            guard document.project === asked, document.scope == scope else {
+                throw ToolError(
+                    message: "the project changed while Synchronize Audio was matching, so "
+                        + "nothing moved. Call sync_audio again.")
+            }
+            return try self.syncAnswer(plan, document: document, acceptWeak: acceptWeak)
         }
-        switch AudioSync.plan(input) {
+    }
+
+    /// `sync_audio`'s answer to `plan`, on the main thread: the refusal, the
+    /// already-in-sync and weak answers, or the edit.
+    private func syncAnswer(_ plan: AudioSync.Plan, document: ProjectDocument, acceptWeak: Bool)
+        throws -> String {
+        switch plan {
         case .refused(let problems):
             let reasons = problems.map { $0.description }.joined(separator: " ")
             throw ToolError(message: "Synchronize Audio was refused: \(reasons)")
@@ -190,6 +218,9 @@ extension AgentServer {
             "clip": Int(row.clip),
             "media": Int(row.media),
             "offset": row.lag,
+            "coarse_offset": row.coarseLag,
+            "refined": row.refinement?.clear == true ? "phat" : "coarse",
+            "refine_confidence": row.refinement.map { Self.jsonLevel($0.z) } ?? NSNull(),
             "delta": row.delta,
             "start": row.start,
             "confidence": row.confidence,
@@ -207,10 +238,14 @@ extension AgentServer {
             result["drift_ppm"] = drift.ppm
             result["drift_ms"] = drift.milliseconds
             result["drift_error_ms"] = Self.jsonLevel(drift.errorMilliseconds)
+            result["drift_on"] = drift.on.rawValue
+            result["drift_windows"] = drift.windows
         case .notMeasured(let note):
             result["drift_ppm"] = NSNull()
             result["drift_ms"] = NSNull()
             result["drift_error_ms"] = NSNull()
+            result["drift_on"] = NSNull()
+            result["drift_windows"] = NSNull()
             result["residual_ms"] = NSNull()
             result["drift_note"] = note
         }

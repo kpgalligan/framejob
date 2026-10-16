@@ -96,7 +96,9 @@ final class AgentServer {
     /// recorder, whose every callback is hopped to main, for up to ten
     /// minutes — `import_media`'s case again, and longer. `open_project`
     /// reads the file here, a WebM's copy included, so main is not held for
-    /// its length (spec §11 #231). Each hops back through `onMain` for every
+    /// its length (spec §11 #231). `sync_audio`'s plan is seconds of signal
+    /// arithmetic on a long take, which main must not be doing (SY-22). Each
+    /// hops back through `onMain` for every
     /// document touch, so the single-mutation-point rule is untouched.
     ///
     /// The criterion is NOT "touches the disk", which is why
@@ -105,7 +107,7 @@ final class AgentServer {
     /// main thread and each says so in its own handler.
     private static let productOffMainTools: Set<String> = [
         "import_media", "relink_media", "render_frame", "export", "save_project", "new_project",
-        "transcribe", "record_screen", "render_graphic", "open_project",
+        "transcribe", "record_screen", "render_graphic", "open_project", "sync_audio",
     ]
     // The dev tools' members join here (AgentServer+DevTools.swift).
     static let offMainTools = productOffMainTools.union(devOffMainTools)

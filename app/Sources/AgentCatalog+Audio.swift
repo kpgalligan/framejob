@@ -4,9 +4,9 @@ import Foundation
 
 /// The catalog's AUDIO half: `detect_silence` and `normalize_clip`, the two
 /// composite tools road map 2's phases 3 and 5 added, and `sync_audio`, the
-/// third (road map "audio-sync", AS-1) — none of the three is an op, and all
-/// read the same cached waveform `SilenceDetector`, `AudioNormalize` and
-/// `AudioSync` share (`AudioSync` also its sync features, AS-3).
+/// third (road map "audio-sync", AS-1) — none of the three is an op. The
+/// first two read the cached waveform `SilenceDetector` and `AudioNormalize`
+/// share; `AudioSync` reads its sync features and samples instead (AS-3, AS-4).
 ///
 /// A pure move out of `AgentCatalog+Clips.swift`, road map 4's toll 2, landed
 /// first and alone. `AgentCatalog+Files.swift`'s header is the model: the two
@@ -28,6 +28,13 @@ extension AgentServer {
         let speechFloor = String(format: "%g", seconds(AudioSyncMatch.minimumSpeechFrames))
         let radius = String(format: "%.0f", seconds(AudioSyncMatch.placementRadiusFrames))
         let shortest = String(format: "%g", seconds(AudioSyncMatch.minimumStretchFrames))
+        // The refinement's and drift's numbers (SY-20, SY-21), from the constants.
+        let rate = Double(SyncFeatures.sampleRate)
+        let reach = String(format: "%g", Double(AudioSyncPHAT.reachSamples) / rate * 1000)
+        let region = String(format: "%g", Double(AudioSyncPHAT.maximumRegionSamples) / rate)
+        let band = String(format: "%g–%g Hz", AudioSyncPHAT.lowHertz, AudioSyncPHAT.highHertz)
+        let driftOverlap = String(format: "%g", seconds(AudioSyncMatch.driftMinimumOverlapFrames))
+        let driftWindow = String(format: "%g", seconds(AudioSyncMatch.driftWindowFrames))
         return [
             tool(
                 "detect_silence",
@@ -172,20 +179,33 @@ extension AgentServer {
                     + "match chosen, a trim that would leave under a frame, never playing "
                     + "beside the anchor or overlapping another clip on its track — nothing "
                     + "moves and every reason is named. Over at least "
-                    + "60 s of overlap the clock drift between the two is measured as a line "
-                    + "through many windows and CORRECTED with set_speed (keep_pitch false, "
+                    + "\(driftOverlap) s of overlap the clock drift between the two is measured "
+                    + "as a line through many \(driftWindow) s windows, each matched on the "
+                    + "features and then refined by GCC-PHAT on the samples, and CORRECTED "
+                    + "with set_speed (keep_pitch false, "
                     + "a resample) so the clip's sound stays under the anchor's along the "
                     + "whole overlap — unless it is under 5 ms or under 3× its uncertainty "
                     + "(drift_error_ms), or would need a speed more than 0.2% from ×1, when "
                     + "it is left and "
-                    + "drift_note says why. The answer reports each moved clip's offset "
-                    + "(anchor source minus clip source, in ticks), delta, new start, "
+                    + "drift_note says why. Each match's offset is then refined below a frame "
+                    + "by GCC-PHAT on the files' cached 8 kHz samples, over the \(band) "
+                    + "speech band and at most \(region) s of the overlap, within ±\(reach) ms "
+                    + "of the match; without a clear peak there (confidence ≥ "
+                    + "\(String(format: "%g", AudioSyncPHAT.clearZ))) the coarse offset is "
+                    + "kept. The refinement never changes the confidence or the tier, and the "
+                    + "move stays a whole number of frames. The answer reports each moved "
+                    + "clip's offset (anchor source minus clip source at the overlap's centre, "
+                    + "refined, in ticks), coarse_offset (the match before the refinement), "
+                    + "refined (\"phat\" or \"coarse\"), refine_confidence (the PHAT peak's "
+                    + "z-score; null when none ran), delta, new start, "
                     + "confidence (the chosen lag's z-score), search (\"played\" or "
                     + "\"whole\"), chosen_by (\"confidence\" or \"placement\", the weak tier), "
                     + "matched_on (\"speech\" or \"sound\"), candidates "
                     + "([{offset, delta, confidence}]), trimmed (the ticks cut off its head, "
                     + "0 when none), speed (after the command), drift_ppm, drift_ms, "
-                    + "drift_error_ms, drift_corrected and residual_ms (the error left when "
+                    + "drift_error_ms, drift_on (\"features\" or \"phat\": which points the "
+                    + "line was fitted through), drift_windows, drift_corrected and "
+                    + "residual_ms (the error left when "
                     + "corrected, the drift itself when not); every answer also carries weak "
                     + "(the clip ids of its weak moves, [] when none). A second call answers "
                     + "moved: false and \"already in sync\".",

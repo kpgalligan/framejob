@@ -3,16 +3,19 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map that made these is closed (2026-10-15): its condensed record is
-`designs/adr/audio-sync.md`, the original `archive/audio-sync.md` (AS-1 lines clips up and measures
-drift, AS-2 corrects it). SY-1…SY-5 were recorded in AS-1, before its code, from the owner's three
+Both road maps that made these are closed (2026-10-15 and 2026-10-16): their condensed record is
+`designs/adr/audio-sync.md`, the originals `archive/audio-sync.md` (AS-1 lines clips up and measures
+drift, AS-2 corrects it) and `archive/audio-sync-2.md` (AS-3 matches on features, AS-4 refines,
+moves drift onto the features and takes the plan off the main thread). SY-1…SY-5 were recorded in AS-1, before its code, from the owner's three
 answers of 2026-10-15 (quoted verbatim in the road map): placement frame-snapped; the clip with
 video stays and the audio moves; drift reported first, correction straight after. SY-6…SY-10 were
 recorded in AS-2 before its code; SY-8 was amended by the owner's choice after AS-2's STOP. SY-11…SY-16 were
-recorded in round 2's AS-3 (`designs/audio-sync-2.md`) before its code, from the owner's "Go ahead" to
+recorded in round 2's AS-3 (`archive/audio-sync-2.md`) before its code, from the owner's "Go ahead" to
 all five points of 2026-10-15 and the owner's choice of the head trim (SY-16). SY-17…SY-19 were
 recorded in AS-3's second fix pass, before its code, from the owner's "Ask, then apply" of
-2026-10-15, which resolved SY-14's calibration stop.
+2026-10-15, which resolved SY-14's calibration stop. SY-20 and SY-21 were recorded in round 2's
+AS-4 before its code, from point 4 of the owner's "Go ahead"; SY-21's slice and robust filter and
+SY-22 were recorded after AS-4's stop, from the orchestrator's ruling of 2026-10-16.
 
 **Stands, and nothing here re-litigates it:** the overlap rule and `move_clip` (foundations,
 spec §6); D2-1 (a composite that measures nothing makes no op and says why); #42's one-delta
@@ -32,7 +35,9 @@ never silence; the menu and the tool call the same `read` + `plan`).
   (`editedProject`), as `normalize_clip` does. AS-2 corrects drift; AS-1 only measures it
   (SY-5). **Amended by SY-11 (AS-3):** the match measures each file's cached sync FEATURES
   (`cache/sync/<media id>.bin`, SY-11) as well as its waveform; the waveform's onsets still carry
-  drift (SY-5/SY-7) until AS-4. Nothing else here changes.
+  drift (SY-5/SY-7) until AS-4. Nothing else here changes. **Amended by SY-20 and SY-21 (AS-4):** no
+  peaks are read at all: the features carry the match and the drift, and the decoded samples
+  (`cache/sync/<media id>.pcm`) the refinement.
 
 - **SY-2 — The anchor.** A caller may name `anchor`, which must be one of `clips` (refused by
   name otherwise). Without one: among the clips that have pictures — a video segment of positive
@@ -60,7 +65,8 @@ never silence; the menu and the tool call the same `read` + `plan`).
   Release), and an unrelated recording r 0.14, q 1.10 (S3). **Superseded for the coarse match by SY-12 and
   SY-13 (AS-3):** the onset envelope, its 1,000-bucket overlap, its ±50-bucket runner-up, the
   peak ratio and the 200-bucket file minimum are gone. Its r ≥ 0.25 stays as SY-7's per-window
-  floor (`minimumCorrelation`), and the onsets stay as drift's input.
+  floor (`minimumCorrelation`), and the onsets stay as drift's input. **Amended by SY-21 (AS-4):**
+  its onsets are no longer drift's input, and the r ≥ 0.25 floor went with them.
 
 - **SY-4 — Placement on the frame grid, and what is refused before the core sees it.** `lag` is
   the anchor's bucket minus the mover's bucket of the same sound; the mover's `delta` is
@@ -92,7 +98,8 @@ never silence; the menu and the tool call the same `read` + `plan`).
   it holds and each value tried is recorded here. At 6,000 it held: 100.4 ppm measured for
   100.0 asked (P5, 2026-10-15). AS-1's drift fixture (a recorder resampled by +200 ppm, so
   199.96 ppm in this sign) measured 172.2 ppm over 150 s (S10, Debug and Release), and the
-  undrifted recorder −14.6 ppm (S1).
+  undrifted recorder −14.6 ppm (S1). **Superseded by SY-21 (AS-4):** drift is measured on the
+  features and refined by PHAT; the 60 s minimum (3,750 frames) and its sentence stay.
 
 - **SY-6 — Correction is `set_speed {clip, rate, keep_pitch: false}`; no new op (amends SY-1,
   SY-5).** AS-2 corrects each mover's clock drift with the existing op. **Why it is exact:** the
@@ -112,7 +119,10 @@ never silence; the menu and the tool call the same `read` + `plan`).
   at most half a frame (SY-4). A drift measured but not corrected places the mover by the line's
   value at the overlap's centre bucket aMid: `lag = c + ρ·aMid`, `δ = snapToFrame(zeroA − zeroN +
   round(lag·6000))`; a drift not measured places it by AS-1's coarse lag. The menu shows nothing
-  new; the inspector shows the speed the correction wrote.
+  new; the inspector shows the speed the correction wrote. **Amended by SY-21 (AS-4):** the
+  features (and their masks) are what is resampled, not the onsets, and the line's `a` is an anchor
+  timeline SAMPLE (8 kHz) with c in samples, so `δ = snapToFrame(round(zeroA + 75·c/(1 − ρ) − S +
+  I/s'))` and the centre line places by `round((c + ρ·aMid)·75)`, aMid the overlap's centre sample.
 
 - **SY-7 — Drift is a least-squares line through many windows (supersedes SY-5's two windows;
   SY-5's 6,000-bucket minimum stays).** Windows of 2,000 buckets start at the overlap's start
@@ -130,7 +140,10 @@ never silence; the menu and the tool call the same `read` + `plan`).
   · 150,000 ≤ 2`, S10); the re-measured residual `|drift_ms| ≤ 2` (S17); the exported mix's lag
   changing by at most 3 ms across the overlap (S18). **Calibration rule:** if S10 misses — its
   2 ms bound, or the drift left as uncertain — the phase stops and reports the run's numbers;
-  the step is not changed and the tolerance is not loosened.
+  the step is not changed and the tolerance is not loosened. **Superseded by SY-21 (AS-4):** the
+  windows are 1,250 feature frames matched on the features, then refined by PHAT; the 60 s
+  minimum, the count rule then the span rule and their sentences, the √(window/step) widening and
+  the tolerances (P5, S10, S17, S18) stay.
 
 - **SY-8 — When a drift is corrected, and what the answer says.** A measured drift is corrected
   when `|drift_ms| ≥ max(5, 3 × drift_error_ms)` and the new speed stays in SY-9's band. In this
@@ -149,7 +162,12 @@ never silence; the menu and the tool call the same `read` + `plan`).
   own note. Each `sync_audio` row adds `speed` (the speed after the command), `drift_corrected`,
   `drift_error_ms` (null when not measured), `residual_ms` (corrected: `drift_error_ms`; left:
   `drift_ms`; not measured: null) and `drift_note` (when not measured, or when left with a note).
-  `moved` is true when any op is made; no ops is `moved: false`, "already in sync".
+  `moved` is true when any op is made; no ops is `moved: false`, "already in sync". **Re-checked
+  in AS-4 (Release, 2026-10-16), the 5 ms and the 3× unchanged:** on the features and PHAT the
+  drift fixture (S10, true +199.96 ppm over 150 s) read 199.920 ppm, 29.978 ms ±0.022 ms (about
+  1,400 times its uncertainty) and was corrected to ×0.99980008, 0.006 ms from the truth over the
+  overlap; the undrifted recorder (S1) read −0.077 ppm, −0.012 ms, left under 5 ms; S10's corrected
+  recorder re-measured 0.084 ppm, 0.013 ms (S17), "already in sync". No fixture was misclassified.
 
 - **SY-9 — The rate band (amends SY-4's ×N refusal).** A clip within `|rate − 1| ≤ 0.002` (its
   `speed`, else its first time-scaled segment's ratio) is matched at its rate; outside it, it is
@@ -159,6 +177,10 @@ never silence; the menu and the tool call the same `read` + `plan`).
   up clips whose speed is the rate they play at."): its zero and `set_speed` read the speed, not
   the stretch (AS-2's review). A mover already corrected re-measures about 0 and answers
   "already in sync" with no undo step; an anchor at a near-1 rate is resampled the same way.
+  **Re-checked in AS-4 (2026-10-16), the 0.2% unchanged:** the probe's ±1,000 ppm pairs over 160 s
+  (P18, #300's case) were matched confidently and corrected inside the band (`set_speed` 0.9990011
+  and 1.0010010 for 1/k 0.9990010 and 1.0010010); P8's ×1.002 / ×1.0021 and ×0.998 / ×0.9979
+  boundaries hold.
 
 - **SY-10 — The corrected mover's span (amends SY-4).** Its new duration is `content =
   round(d·s)`, `max(snapToFrame(round(content/s')), one frame)` — the core's `set_speed` without
@@ -194,7 +216,15 @@ never silence; the menu and the tool call the same `read` + `plan`).
   reads "still being analysed" for good rather than "too short to match" (AS-3's review, finding
   6; recorded, not handled). **Amended by SY-17 (AS-3's second fix pass):** the same retry also
   runs `speech` once, straight after the features, with the same stamp, so a file whose speech
-  pass failed with its waveform gets its VAD probabilities in the same session too.
+  pass failed with its waveform gets its VAD probabilities in the same session too. **Amended by
+  SY-20 (AS-4):** the marker's version is 2, and the pass also keeps the samples it fed the
+  extractor as `cache/sync/<media id>.pcm` (int16 little-endian mono at 8 kHz, each `round(clamp(x,
+  −1, 1)·32767)`; 16 KB a second, about 58 MB an hour), written after the `.bin` and before the
+  marker inside the same publish; a failed write removes both files. A `.pcm` is read only under a
+  current-version marker, its size a positive even number of bytes, and the features are current
+  only when it is; clearing removes the marker, then both files. A version-1 marker is another
+  version, so its media reads "still being analysed" until the next cache pass rewrites both — no
+  migration.
 
 - **SY-12 — The feature match and its confidence (supersedes SY-3 for the coarse match).** The
   two stretches compared (SY-13) are taken onto the timeline grid (SY-6's resampling, applied to
@@ -370,3 +400,114 @@ never silence; the menu and the tool call the same `read` + `plan`).
   match, naming the move** (the orchestrator's ruling): the catalog's description and the weak
   answer's note both say so, and there is no per-argument ask-first machinery in the assistant's
   lane (AI-7 names tools, not arguments); the edit is one undo step.
+
+- **SY-20 — The GCC-PHAT refinement (round 2's AS-4; point 4 of the owner's "Go ahead").** Each
+  chosen match's offset is refined on the two files' decoded samples (`cache/sync/<id>.pcm`, SY-11
+  as amended). The REGION is the coarse overlap — the anchor timeline frames both clips play once
+  the mover sits at the coarse delta — ×128, in anchor timeline samples, centred and capped at
+  240,000 samples (30 s). Along the LINE `lag(a) = c + ρ·a` (a an anchor timeline sample at 8 kHz;
+  c and ρ the measured drift's, SY-21, else c the coarse lag ×128 and ρ 0), the anchor's samples
+  over the region and the mover's at `a·(1 − ρ) − c`, each read at `position·speed` of its file
+  by linear interpolation (0 outside it), are correlated by band-limited GCC-PHAT: one zero-padded
+  `vDSP_fft_zrip` each (the least power of two holding every lag), the cross-spectrum `X·conj(Y)`
+  kept only on bins whose frequency `k·8000/n` lies in [300, 3,400] Hz (the speech band), each
+  divided by its magnitude (0 under 1e-20), DC and Nyquist 0, and one inverse. Its z is taken over
+  EVERY lag, as SY-12's. The PEAK is the highest r within ±384 samples (±3 feature frames, 48 ms)
+  of the line; it is CLEAR when its z ≥ 8, it lies strictly inside the reach and it is strictly
+  above both neighbours. A clear peak, refined parabolically (SY-3's ±0.5), shifts the line's
+  intercept (or, not measured, the coarse lag) by its sub-sample shift, so the true lag is
+  `line(a) + shift`. Without a clear peak, or with a region under 16,000 samples (2 s), or a slice
+  all zero, the coarse value stands: the FALLBACK, which is a designed answer, not a failure.
+  **Why only near the coarse lag:** GCC-PHAT whitens every bin, so any shared stretch can own its
+  global peak however little of the speech it holds: round 2's analysis ran whole-file GCC-PHAT
+  on the owner's files (`pcm.py`, the AS-3 handoff) and it was fooled by a burst, where the summed
+  MFCC correlation found the owner's offset. PHAT is the refiner, never the finder. **The tier is
+  untouched:** `confidence`, `chosen_by`, the candidates and SY-18's tiers are the coarse match's,
+  and placement stays frame-snapped (SY-4). **The answer:** each `sync_audio` row's `offset` is the
+  refined lag at the overlap's centre in ticks (the line's value there when drift was measured),
+  and it adds `coarse_offset` (the coarse lag, ticks), `refined` ("phat" when the peak was clear,
+  else "coarse"), `refine_confidence` (the peak's z; null when no refinement ran) and `drift_on`
+  (SY-21). **Calibration rule:** `clearZ` 8 is initial. The positives (S1, S2, S8, S10, S19, the
+  probe's planted delay in P16, and P17) must be clear, and the negatives (S22, S23, P16's
+  unrelated pips) must not; on a misclassification only `clearZ` moves, to a value that classifies
+  them all, every value tried recorded here and in the road map; when none does the phase stops and
+  reports every printed z. S20 and S21 (the owner's files) are recorded, never calibration inputs:
+  they have no 1 ms ground truth and hold only about 5 s of clear speech. **Calibrated (AS-4,
+  Debug, 2026-10-16):** at 8, S23 (a null) read z 10.24 and was clear — a misclassification; 15 was
+  tried and classifies every fixture (positives S1 433.8, S2 433.5, S8 433.9, S10 423.3, S19 131.5 and 187.9 (two runs),
+  P16's planted delay 162.5, P17 514.1 and 516.0; negatives S22 4.03, S23 10.24, P16's unrelated
+  pips 4.71). The owner's files read 9.00 (S20) and 9.01 (S21), so they keep the coarse offset.
+
+- **SY-21 — Drift on the features, each window refined by PHAT (supersedes SY-5's and SY-7's
+  onsets; amends SY-6's units).** Drift's inputs are the readings' timeline-grid features and
+  speech masks (SY-12, SY-17) and their samples (SY-20), the coarse lag in frames and the overlap O
+  in anchor timeline frames. Under 3,750 frames (60 s) it is not measured, with SY-5's sentence
+  ("the two play together for under 60 s, too short to measure drift."). Windows of 1,250 frames
+  (20 s) start at O's start every `max(312, ⌈(|O| − 1250)/63⌉)` frames, plus one flush with O's
+  end (at most 64). **Stage 1, the features:** each window is searched by `search` (SY-12, SY-17)
+  against the mover's frames `[s − round(lag) − 62, s − round(lag) + 1250 + 62)` clamped to its
+  file (the masks sliced alike), so every lag within the search overlaps the whole anchor window,
+  its near placement taken within ±62 frames (0.992 s) of the coarse lag; a window whose near
+  placement is missing or under z 6 is skipped. A kept window gives the point (its centre ×128,
+  its near placement's lag ×128), in samples. When at least 3 windows are kept they pass through
+  the ROBUST filter below; then SY-7's count rule (at least 3 windows, the count the survivors')
+  then its span rule (their centres spanning at least (|O| − 1250)/2 frames), with their
+  sentences, then an ordinary least-squares line F through the survivors. **Stage 2, PHAT:** each
+  kept window is refined (SY-20) along F over its own samples (the window ×128); each CLEAR one
+  gives the point (centre ×128, F(centre) + shift). When at least 3 are clear they pass through the
+  same filter; when at least 3 survive and their centres span at least (|O| − 1250)·128/2 samples,
+  those points are refitted by least squares; otherwise F stands. **The robust filter:** the
+  Theil–Sen line (its slope b the median of `(yⱼ − yᵢ)/(xⱼ − xᵢ)` over every pair with xⱼ ≠ xᵢ, its
+  intercept the median of `y − b·x`; a median the middle value, or the mean of the middle two),
+  the residuals r about it and `MAD = median |r|`; a point is an inlier when `|r| ≤ max(3 × 1.4826
+  × MAD, 1 sample)`. **Why the slice is wider** (the implementer's runs, 2026-10-16): with equal
+  1,250-frame slices the overlap shrinks as `1250 − |d|` away from the coarse lag, and that
+  triangular envelope pulled every window's peak toward it (about σ²/W, 0.02 frame): P7 read
+  986.6 ppm for 999 (its `set_speed` 12.4 ppm off, P7 failed), P8's ×0.9999 and P12's +1,000 ppm
+  cases failed, and P5's clean cases read 199.21, −148.83 and 95.88 ppm (for 199.96, −150.02,
+  99.99). Widened: 200.18, −150.01, 0.05 and 99.99; P7 0.9990022 for 0.9990010 and 1.0010019 for
+  1.0010010; P8 and P12 pass. **Why the robust filter** (the STOP of 2026-10-16): with the
+  mover's frames 4,000–7,000 seeded noise (P5), the windows only partly in noise passed the z
+  floor (z 12.8–16.9) with lag errors of 0.06–0.42 frame, and the least-squares line read 211.43
+  ppm for 199.96; no window floor short of the clean windows' own z band (17.3–17.7) helped.
+  Fitting each point at its window's matched-sound centroid read 209.68 (the error is the noise's,
+  not the point's place), so it was not taken. Theil–Sen with MAD inliers read 201.06 (15 of 21
+  windows); −150 ppm with noise −150.09, a 2,000–3,500 gap 201.10, +1,000 ppm with noise 998.47,
+  noise at the end 202.06; every k from 2 to 6 passed and 7 or more failed (5.79 ppm off). **Units:** ρ is samples per sample and c samples
+  at anchor timeline sample 0; `ppm = ρ·10⁶`, `milliseconds = ρ·|O|·128/8`, and
+  `errorMilliseconds` the slope's standard error × √(1250/step) (when the step is under 1,250) ×
+  |O|·128/8. **The answer** adds `drift_on` ("features" | "phat"; null when not measured) and
+  `drift_windows` (the windows the line was fitted through; null when not measured). **Calibration
+  rule:** S10's 2 ms, S17's 2 ms, P5's ±5 ppm and S18's 3 ms stand; on a miss only the window floor
+  `driftWindowZ` (6) may move, every value tried recorded here; a miss that no value fixes stops
+  the phase. The inlier scale k (`driftInlierScale`) is FIXED at 3 and the floor at 1 sample: a
+  miss is a stop, never a new k (the measured passing band, 2–6, is recorded above).
+
+- **SY-22 — The call's cost and its background run (AS-4, the orchestrator's ruling of
+  2026-10-16).** **The budget:** a whole sync of a one-hour pair — the cached features and samples
+  of both files loaded, then `plan` — costs at most 1.5 s of CPU on Release (-O, whole module),
+  measured by the probe's P19 behind `--cost` on a generated one-hour pips pair (written under the
+  gitignored `tools/proof/work/audio-sync/cost/` and removed after). The designer's scratch
+  measurement (host load 36–76): `plan` 2.177 s, of which drift 1.803 s over 64 PHAT windows; one
+  30 s refine 27.3 ms of which `vDSP_create_fftsetup` (log2n 19) was 24.0 ms; each file's `.bin` and
+  `.pcm` load 0.035 s. **The reuse:** `plan` makes ONE `AudioSyncPHAT.FFT` (a vDSP setup of log2n 19,
+  524,288 ≥ 2 × 240,000 − 1) before its movers and lends it to every drift window's refinement and
+  the final one; each correlation still transforms at its OWN least power of two, so its bins, r, z
+  and SY-20's `clearZ` are unchanged; with it the scratch `plan` was 0.891 s. `summedCorrelation`
+  keeps its own setups. **The background run:** `read` stays on the main thread (it reads the
+  document; its loads are cheap) and `plan`, pure, runs on a background queue. **The menu** puts up
+  a Synchronizing Audio sheet ("Matching the sound of N clips…", an indeterminate bar, "Nothing
+  moves until the match is found; Cancel leaves everything as it is.", Cancel) while `plan` runs,
+  so the window never beach-balls and every editor action, Synchronize Audio included, is disabled
+  while it is up; Cancel drops the late answer and changes nothing. When the answer comes, the
+  sheet goes, and it is applied only when the document's project and scope are still the ones
+  `read` took (the weak sheet's test, SY-19); otherwise it beeps and puts "the project changed
+  while Synchronize Audio was matching, so nothing moved. Choose Synchronize Audio again." at the
+  inspector's foot. A weak answer then asks as SY-19 says. **`sync_audio`** joins the server's
+  off-main tools: the read and the stale test run on the main thread, `plan` on the server's thread,
+  and a project changed meanwhile is the error "the project changed while Synchronize Audio was
+  matching, so nothing moved. Call sync_audio again."; the call still blocks until it answers.
+  The lane admits one call at a time, so no script can edit during one: the MCP stale test is
+  proven by no row. **The dev hold:** a Debug or Release build's dev-only launch default
+  `-RCDevSyncHold <seconds>` holds the menu's background run that long before `plan`, so a proof
+  can reach the sheet (S25 edits under it, S26 cancels it); Distribution has no such default.

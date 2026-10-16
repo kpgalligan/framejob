@@ -4,7 +4,8 @@ import AppKit
 /// here whole out of `EditorViewController.swift` with its validator arm, as
 /// that body's own comment asked a second sound command to do, and
 /// Synchronize Audio (road map "audio-sync", AS-1; spec §11 SY-1..SY-5), with
-/// its Weak match sheet (road map "audio-sync-2", AS-3; SY-18, SY-19).
+/// its Weak match sheet (road map "audio-sync-2", AS-3; SY-18, SY-19) and its
+/// Synchronizing Audio sheet (AS-4; SY-22).
 extension EditorViewController {
 
     /// Clip ▸ Normalize (road map 2 phase 5c) — the menu half of the Audio
@@ -60,19 +61,52 @@ extension EditorViewController {
     /// undo step (SY-6); the menu shows no drift figure — the inspector's
     /// speed is what changed. A plan with WEAK moves (SY-18,
     /// `AudioSync.weakMoves`, the tool's own test) is asked about first in
-    /// the Weak match sheet (SY-19); with no window or a sheet already up it
-    /// beeps.
+    /// the Weak match sheet (SY-19). `read` runs here, on the main thread;
+    /// `plan` runs off it under the Synchronizing Audio sheet (SY-22), and
+    /// its answer is applied in `finishSynchronizeAudio` only to the project
+    /// and scope `read` took. With no window or a sheet already up it beeps.
     @objc func synchronizeAudio(_ sender: Any?) {
         guard let document = document else { return }
         let snapshot = document.editedProject.snapshot
         let ids = selectedClips.filter { AudioNormalize.canOffer($0, in: snapshot) }.map { $0.id }
         guard ids.count >= 2,
-              let input = AudioSync.read(from: document, clips: ids, anchor: nil)
+              let input = AudioSync.read(from: document, clips: ids, anchor: nil),
+              let window = view.window, window.attachedSheet == nil
         else {
             NSSound.beep()
             return
         }
-        switch AudioSync.plan(input) {
+        let asked = document.project
+        let scope = document.scope
+        presentAsSheet(
+            AudioSyncSheetController(input: input) { [weak self, weak document] plan in
+                guard let self, let document else { return }
+                self.finishSynchronizeAudio(plan, asked: asked, scope: scope, document: document)
+            })
+    }
+
+    /// The Synchronizing Audio sheet's answer (SY-22): refused, with a beep
+    /// and a sentence at the inspector's foot, when the document's project or
+    /// scope is no longer the one `read` took (the weak sheet's own test);
+    /// otherwise what the menu did before the plan moved off main, with
+    /// `performGroupedEdit` for `applyEdit` — a queue's completion is not an
+    /// AppKit event (app/CLAUDE.md's undo pitfall).
+    private func finishSynchronizeAudio(
+        _ plan: AudioSync.Plan, asked: ReelProject, scope: UInt32?, document: ProjectDocument
+    ) {
+        guard document.project === asked, document.scope == scope else {
+            NSSound.beep()
+            NotificationCenter.default.post(
+                name: .projectDocumentDidRefuse, object: document,
+                userInfo: [
+                    "refusal": ReelRefusal(
+                        op: "sync_audio",
+                        reason: "the project changed while Synchronize Audio was matching, so "
+                            + "nothing moved. Choose Synchronize Audio again.")
+                ])
+            return
+        }
+        switch plan {
         case .refused(let problems):
             NSSound.beep()
             let reason = problems.map { $0.description }.joined(separator: " ")
@@ -86,7 +120,7 @@ extension EditorViewController {
             }
             let weak = AudioSync.weakMoves(synced)
             guard !weak.isEmpty else {
-                document.applyEdit("Synchronize Audio", ops)
+                document.performGroupedEdit("Synchronize Audio", ops)
                 return
             }
             guard let window = view.window, window.attachedSheet == nil else {

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Road maps "audio-sync" (AS-1, AS-2) and "audio-sync-2" (AS-3) — spec §11
-SY-1..SY-19 — Clip ▸ Synchronize Audio and `sync_audio`, over MCP against a
+"""Road maps "audio-sync" (AS-1, AS-2) and "audio-sync-2" (AS-3, AS-4) — spec
+§11 SY-1..SY-22 — Clip ▸ Synchronize Audio and `sync_audio`, over MCP against a
 running instance, then the probe's rows over `app/Sources`.
 
     python3 tools/proof/audio_sync_proof.py <dir>/agent.sock [--only S1,P3,...]
     python3 tools/proof/audio_sync_proof.py [<dir>/agent.sock] --mutants
+    python3 tools/proof/audio_sync_proof.py --cost    # P19 alone: SY-22's budget
 
 The instance is the caller's (`proof_app.py launch`; Debug while iterating,
 `RC_PROOF_APP=release` for the recorded run). Every package and fixture is
@@ -45,8 +46,11 @@ before and after, and the last undo step not "Synchronize Audio"):
   S1   camera at 10 s, recorder at 0 on a second track: the recorder lands on
        exactly frame 206 (unsnapped 6.8666875 s), the camera unmoved, `moved`
        true and `anchor` the camera; its row `drift_corrected` false, `speed`
-       1 and `|drift_ms|` < 5 (no drift to correct); one `undo` names
-       "Synchronize Audio" and puts the recorder back at 0.
+       1 and `|drift_ms|` < 5 (no drift to correct); `refined` "phat" and
+       `|offset − truth| ≤ 600` ticks (1 ms; truth −1,879,987.5, SY-20),
+       `coarse_offset` printed; one `undo` names "Synchronize Audio" and puts
+       the recorder back at 0. Every synced row prints `refined`, its z and
+       both offsets.
   S2   camera at 0, recorder at 20 s, `anchor` the recorder: the camera lands
        on exactly frame 694 (unsnapped 23.1333125 s), the recorder unmoved.
   S3   camera and UNRELATED: refused "no matching sound found", or answered
@@ -88,13 +92,16 @@ before and after, and the last undo step not "Synchronize Audio"):
        ±40 ms with parabolic refinement: |Δlag| ≤ 3 ms and each |lag| ≤ 20 ms.
        Control: `set_speed` rate 1 on the recorder, exported again: |Δlag| ≥
        20 ms.
+       S10 and S17 print `drift_on`, `drift_windows`, the error and the
+       call's wall seconds.
   S19  CAMERA2 placed at 0, trimmed to in 29.72 s for 25.52 s and moved to
        2 s; RECORDER2 at 0 trimmed to in 147.63 s for 17.34 s and moved to 0,
        on track 1; default anchor: the recorder lands on exactly
        snap(cam.start − cam.in + rec.in − 118.70 s) (from read-back values;
        1.2 s, a whole frame, so the snap's boundaries lie half a frame either
        side of the truth — SY-15 as amended), `search` "played", the camera
-       unmoved.
+       unmoved; `refined` "phat" and `|offset − truth| ≤ 600` ticks (truth
+       −118.70 s).
   S20  the OWNER's files placed as the owner placed them (camera at 0 from
        29.72 s for 25.52 s; recorder at 0 from 147.63 s for 17.34 s on track
        1), default anchor: first without `accept_weak`, `moved` false, `weak`
@@ -120,18 +127,40 @@ before and after, and the last undo step not "Synchronize Audio"):
        `perform_menu_item ["Clip", "Synchronize Audio"]` answers a sheet;
        `snapshot_ui {window: "sheet"}`'s layout texts hold "Weak match…",
        "Apply" and "Cancel"; `cancel_sheet` answers `cancel_button`, "Cancel"
-       and no sheet; unchanged, no step.
+       and no sheet; unchanged, no step. The Synchronizing Audio sheet comes
+       first (SY-22): `snapshot_ui` is polled every 0.25 s (≤ 600 s) until the
+       sheet's texts no longer hold "Synchronizing Audio".
        S23 and S24 are a scored FAIL when either OWNER file is absent.
-  P1–P15 `audio_sync_probe.swift`, built by `swift_build.build` over
-       `app/Sources` (a failed build is a scored FAIL of all fifteen); each
+       S20 and S21 print `refined`, `refine_confidence` and both offsets, and
+       pass with `refined` either "phat" or "coarse" (SY-20's fallback); S22
+       and S23 also need `refined` "coarse" on the mover's row.
+       S14 polls `perform_menu_item` with no path every 0.1 s (≤ 600 s) until
+       the window has no sheet, and prints the wait.
+  S25  (its own instance, launched with `-RCDevSyncHold 3`, stopped by its
+       pid) S1's placement, both selected, the menu item: a sheet whose texts
+       hold "Synchronizing Audio" and "Cancel"; the item again is refused "is
+       disabled here"; the camera moved a frame under it (control: the sheet
+       still up after the move); once the sheet goes (≤ 600 s) the recorder is
+       still at 0, the camera at 10 s + 1 frame, the top step the move's, and
+       the editor's texts hold "Refused: the project changed while
+       Synchronize Audio was matching".
+  S26  (the same instance) a fresh S1 placement: the menu item, `cancel_sheet`
+       answers "Cancel" and no sheet; 4 s later nothing changed and no new
+       step. Control: the menu item again, waited out, lands the recorder on
+       frame 206.
+  P1–P18 `audio_sync_probe.swift`, built by `swift_build.build` over
+       `app/Sources` (a failed build is a scored FAIL of all eighteen); each
        row's sentence is the probe's.
+  P19  (`--cost` only) the probe built -O whole-module and run with `cost
+       work/audio-sync/cost`: SY-22's ≤ 1.5 s of CPU for a one-hour pair; the
+       folder is removed after.
 
-`--mutants`: the thirty-two below, probe-only. Each copies `app/Sources` under
+`--mutants`: the thirty-nine below, probe-only. Each copies `app/Sources` under
 `work/audio-sync/mutants/<name>/`, applies its edit (its `before` asserted to
 occur exactly once), rebuilds the probe (900 s wall) and runs it (240 s wall);
 killed when a named row fails; a copy that does not build or answer is a failed
 control, never a kill. Exit 0 when every scored row passed (with
-`--mutants`, when all thirty-two were killed); 1 otherwise.
+`--mutants`, when all thirty-nine were killed); 1 otherwise.
 """
 
 import argparse
@@ -150,6 +179,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/proof"))
+import mcp as mcp_client  # noqa: E402
+import proof_app  # noqa: E402
 import swift_build  # noqa: E402
 from mcp import MCP, ToolError  # noqa: E402
 
@@ -165,13 +196,16 @@ SEC = 600_000
 FRAME = SEC // 30
 BUILD_WALL = 900
 RUN_WALL = 240
-S_ROWS = [f"S{n}" for n in range(1, 25)]
+SHEET_WAIT = 600                     # s: a sheet's poll bound, mcp.py's call timeout
+COST = WORK / "cost"                 # P19's one-hour fixture, removed when it ends
+HOLD = 3                             # s: S25's and S26's -RCDevSyncHold
+S_ROWS = [f"S{n}" for n in range(1, 27)]
 OWNER = ROOT / "tools/proof/media/owner-sync"
 OWNER_FILES = {"owner_camera": OWNER / "IMG_0018.MOV", "owner_recorder": OWNER / "record.aifc"}
 UTTER_AT = 31.2                      # s, in CAMERA2
 UTTER_GAP = 118.70                   # s, recorder − camera for UTTER (1,899,200 samples)
 OWNER_GAP = 118.68                   # s, the owner's recorder − camera (round 2's request)
-P_ROWS = [f"P{n}" for n in range(1, 16)]
+P_ROWS = [f"P{n}" for n in range(1, 19)]
 ENVELOPE = RATE // 1000              # samples per 1 ms envelope bucket
 
 # name: (the rows it must fail, file, before, after)
@@ -193,7 +227,7 @@ MUTANTS = {
                            "ids.count > 1 else { continue }", "ids.count > 99 else { continue }"),
     "neighbour-dropped": (["P6"], "AudioSync.swift",
                           "start < $0.end && $0.start < end", "false && $0.start < end"),
-    "ppm-scale": (["P5"], "AudioSyncDrift.swift", "rate * 1e6", "rate * 1e9"),
+    "ppm-scale": (["P5"], "AudioSyncDrift.swift", "ppm: rate * 1e6,", "ppm: rate * 1e9,"),
     "min-windows-dropped": (["P5"], "AudioSyncDrift.swift",
                             "guard centres.count >= driftMinimumWindows else {",
                             "guard centres.count >= driftMinimumWindows || true else {"),
@@ -208,8 +242,9 @@ MUTANTS = {
                            "guard inBand(corrected) || true else {"),
     "speed-not-compounded": (["P8"], "AudioSync+Correction.swift",
                              "speed * (1 - fit.rate)", "1 * (1 - fit.rate)"),
-    "resample-dropped": (["P8"], "AudioSyncDrift.swift",
-                         "guard speed != 1, speed.isFinite", "guard speed == 1, speed.isFinite"),
+    "resample-dropped": (["P8"], "AudioSyncMatch.swift",
+                         "guard speed != 1, speed.isFinite, speed > 0, count > 1 else { return frames }",
+                         "guard speed == 1, speed.isFinite, speed > 0, count > 1 else { return frames }"),
     "rate-sign": (["P7"], "AudioSync+Correction.swift",
                   "speed * (1 - fit.rate)", "speed * (1 + fit.rate)"),
     "order-inverted": (["P7"], "AudioSync+Correction.swift",
@@ -227,7 +262,7 @@ MUTANTS = {
     "plausible-floor-dropped": (["P11"], "AudioSync+Search.swift",
                                 "near.z >= AudioSyncMatch.plausibleZ", "near.z >= -Double.infinity"),
     "radius-dropped": (["P11"], "AudioSyncMatch.swift",
-                       "guard abs(lag - placementLag) <= Double(placementRadiusFrames) else { continue }",
+                       "guard abs(lag - placementLag) <= Double(radius) else { continue }",
                        "guard abs(lag - placementLag) >= 0 else { continue }"),
     "played-first-dropped": (["P11"], "AudioSync+Search.swift",
                              "        if playable {\n", "        if playable && false {\n"),
@@ -273,6 +308,29 @@ MUTANTS = {
                      "guard row.chosenBy == .placement && false else { return false }"),
     "weak-unchanged-listed": (["P15"], "AudioSync+Weak.swift",
                               "return row.delta != 0 || row.trimmed > 0", "return true"),
+    # AS-4 (SY-20, SY-21)
+    "phat-clear-z": (["P16"], "AudioSyncPHAT.swift",
+                     "static let clearZ = 15.0", "static let clearZ = 0.0"),
+    "phat-edge-dropped": (["P16"], "AudioSyncPHAT.swift",
+                          "let clear = z >= clearZ && abs(lag) < reachSamples\n",
+                          "let clear = z >= clearZ\n"),
+    "phat-reach-dropped": (["P16"], "AudioSyncPHAT.swift",
+                           "        let low = max(0, zero - reachSamples)\n"
+                           "        let high = min(lags - 1, zero + reachSamples)\n",
+                           "        let low = 0\n"
+                           "        let high = lags - 1\n"),
+    "phat-shift-dropped": (["P17"], "AudioSync.swift",
+                           "if let refinement, refinement.clear {",
+                           "if let refinement, refinement.clear && false {"),
+    "drift-window-z": (["P5"], "AudioSyncDrift.swift",
+                       "found.z >= driftWindowZ", "found.z >= -Double.infinity"),
+    "drift-phat-dropped": (["P17"], "AudioSyncDrift.swift",
+                           "if phatCentres.count >= driftMinimumWindows,",
+                           "if phatCentres.count >= driftMinimumWindows && false,"),
+    # AS-4's amendment (SY-21's robust filter)
+    "drift-inliers-dropped": (["P5"], "AudioSyncDrift.swift",
+                              "return r.map { abs($0) <= threshold }",
+                              "return r.map { _ in true }"),
 }
 
 results = {}
@@ -575,19 +633,24 @@ def recorder_row(answer, clip):
 
 
 def match_text(row):
-    """A synced row's match: its z, how it was found, its candidates."""
+    """A synced row's match: its z, how it was found, its candidates, and its
+    refinement (SY-20): `refined`, its z, the refined and the coarse offset."""
     candidates = ", ".join(f"{c.get('offset', 0) / SEC:+.3f} s z {c.get('confidence', 0):.2f}"
                            for c in row.get("candidates", []))
     return (f"z {row.get('confidence')}, {row.get('search')}/{row.get('chosen_by')} on "
-            f"{row.get('matched_on')}, candidates [{candidates}], trimmed {row.get('trimmed')}")
+            f"{row.get('matched_on')}, candidates [{candidates}], trimmed {row.get('trimmed')}; "
+            f"refined {row.get('refined')!r} (z {row.get('refine_confidence')}), offset "
+            f"{row.get('offset')}, coarse_offset {row.get('coarse_offset')}")
 
 
-def not_applied(session, label, mover, **kwargs):
+def not_applied(session, label, mover, refined=None, **kwargs):
     """(ok, detail): sync_audio, called without `accept_weak`, either refused
     "no matching sound found" or answered `moved: false` with `mover` in
-    `weak` (SY-18) — no row chosen by confidence either way — the project
-    unchanged and no Synchronize Audio step. A call that moved anything is
-    undone after it is described."""
+    `weak` (SY-18) — no row chosen by confidence either way, and with
+    `refined` the mover's row (when there is one) refined so (S22's and S23's
+    "coarse", SY-20's negatives) — the
+    project unchanged and no Synchronize Audio step. A call that moved
+    anything is undone after it is described."""
     before = session.text()
     try:
         answer, message = session.sync(**kwargs), None
@@ -609,7 +672,8 @@ def not_applied(session, label, mover, **kwargs):
         how = "weak, not applied"
         ok = (answer.get("ok") is True and answer.get("moved") is False
               and mover in answer.get("weak", [])
-              and not any(r.get("chosen_by") == "confidence" for r in rows))
+              and not any(r.get("chosen_by") == "confidence" for r in rows)
+              and (refined is None or recorder_row(answer, mover).get("refined") == refined))
         said = (f"weak {answer.get('weak')}, {match_text(recorder_row(answer, mover))}; note "
                 f"{answer.get('note')!r}")
     ok = ok and before == after and step != "Synchronize Audio"
@@ -641,6 +705,39 @@ def reversed_owner_recorder():
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(OWNER_FILES["owner_recorder"]),
                         "-af", "areverse", str(out)], check=True, timeout=300)
     return out
+
+
+def wait_no_sheet(session, bound=SHEET_WAIT):
+    """Seconds until the editor's window has no sheet (polled every 0.1 s
+    through `perform_menu_item`'s listing), or None past `bound`."""
+    began = time.monotonic()
+    while time.monotonic() - began < bound:
+        listing = session.op("perform_menu_item")
+        if ((listing.get("window") or {}).get("sheet")) is None:
+            return time.monotonic() - began
+        time.sleep(0.1)
+    return None
+
+
+def sheet_texts(session):
+    """The visible texts of the window's sheet (`snapshot_ui`'s layout), or
+    None (or empty) when no sheet can be captured."""
+    picture = WORK / f"sheet-{os.getpid()}.png"
+    try:
+        shot = session.op("snapshot_ui", window="sheet", path=str(picture))
+        with open(shot.get("layout_path") or "") as handle:
+            return [v.get("text") for v in json.load(handle)["views"]
+                    if not v.get("hidden") and v.get("text")]
+    except (ToolError, OSError, ValueError, KeyError):
+        return None
+
+
+def editor_texts(session):
+    picture = WORK / f"editor-{os.getpid()}.png"
+    shot = session.op("snapshot_ui", window="editor", path=str(picture))
+    with open(shot.get("layout_path") or "") as handle:
+        return [v.get("text") for v in json.load(handle)["views"]
+                if not v.get("hidden") and v.get("text")]
 
 
 def snap(ticks):
@@ -740,16 +837,23 @@ def mcp_rows(sock, wanted, files):
             back = a.start(rec)
             if "S1" in want:
                 drift_ms = row.get("drift_ms")
+                truth = -DELAY / RATE * SEC
+                offset = row.get("offset")
                 score("S1", answer.get("moved") is True and answer.get("anchor") == cam
                       and landed == 206 * FRAME and a.start(cam) == 10 * SEC
                       and undone == "Synchronize Audio" and back == 0
                       and row.get("drift_corrected") is False and row.get("speed") == 1
-                      and drift_ms is not None and abs(drift_ms) < 5,
+                      and drift_ms is not None and abs(drift_ms) < 5
+                      and row.get("refined") == "phat" and offset is not None
+                      and abs(offset - truth) <= 600,
                       f"recorder at {landed} (want {206 * FRAME}, frame 206), camera at "
-                      f"{a.start(cam)}, offset {row.get('offset')} (unsnapped "
-                      f"{-DELAY / RATE * SEC:.1f}), {match_text(row)}; drift "
+                      f"{a.start(cam)}, offset {offset} (want {truth:.1f} ±600, 1 ms; "
+                      f"|Δ| {abs((offset or 0) - truth):.1f}), coarse_offset "
+                      f"{row.get('coarse_offset')} (|Δ| "
+                      f"{abs((row.get('coarse_offset') or 0) - truth):.1f}), {match_text(row)}; drift "
                       f"{row.get('drift_ppm')} ppm, {drift_ms} ms "
-                      f"(want |·| < 5), ±{row.get('drift_error_ms')} ms, corrected "
+                      f"(want |·| < 5), ±{row.get('drift_error_ms')} ms on {row.get('drift_on')} "
+                      f"over {row.get('drift_windows')} windows, corrected "
                       f"{row.get('drift_corrected')}, speed {row.get('speed')}, note "
                       f"{row.get('drift_note')!r}; undo {undone!r} → {back}")
             if "S13" in want:
@@ -764,10 +868,12 @@ def mcp_rows(sock, wanted, files):
             if "S14" in want:
                 a.op("set_selection", clips=[cam, rec])
                 menu = a.op("perform_menu_item", path=["Clip", "Synchronize Audio"])
-                score("S14", a.start(rec) == landed == 206 * FRAME
+                waited = wait_no_sheet(a)
+                score("S14", waited is not None and a.start(rec) == landed == 206 * FRAME
                       and a.start(cam) == 10 * SEC,
-                      f"menu → recorder at {a.start(rec)} (S1 {landed}); "
-                      f"answer keys {sorted(menu) if isinstance(menu, dict) else menu}")
+                      f"menu → sheet {menu.get('sheet') if isinstance(menu, dict) else menu!r}, "
+                      f"gone after {waited if waited is None else round(waited, 2)} s; recorder "
+                      f"at {a.start(rec)} (S1 {landed})")
         finally:
             a.close()
 
@@ -776,7 +882,9 @@ def mcp_rows(sock, wanted, files):
         try:
             cam = h.place("camera", 10 * SEC, 0)
             drift = h.place("drift", 0, 1)
+            began = time.monotonic()
             answer = h.sync(clips=[cam, drift])
+            wall = time.monotonic() - began
             row = recorder_row(answer, drift)
             clip = h.clip(drift)
             speed = clip.get("speed")
@@ -793,7 +901,8 @@ def mcp_rows(sock, wanted, files):
                       and back.get("speed") == 1 and back.get("start") == 0)
                 score("S10", ok, f"drift fixture {row.get('drift_ppm')} ppm (true "
                       f"{DRIFT_PPM:.2f}), {row.get('drift_ms')} ms ±{row.get('drift_error_ms')} "
-                      f"ms; corrected {row.get('drift_corrected')}, note "
+                      f"ms on {row.get('drift_on')} over {row.get('drift_windows')} windows "
+                      f"(the call {wall:.2f} s); corrected {row.get('drift_corrected')}, note "
                       f"{row.get('drift_note')!r}; speed {speed} (want 1/k {1 / DRIFT_K:.7f}; "
                       f"|s·k − 1|·150 000 = {spread} ms, want ≤ 2), keep_pitch {keep}, recorder "
                       f"at {landed} (want {206 * FRAME}, frame 206), duration "
@@ -801,7 +910,9 @@ def mcp_rows(sock, wanted, files):
                       f"{back.get('speed')}, "
                       f"start {back.get('start')}")
             if "S17" in want:
+                began = time.monotonic()
                 again = h.sync(clips=[cam, drift])
+                again_wall = time.monotonic() - began
                 again_row = recorder_row(again, drift)
                 residual = again_row.get("drift_ms")
                 once = h.op("undo")["undone"]
@@ -813,7 +924,9 @@ def mcp_rows(sock, wanted, files):
                       and after_one.get("start") == 0,
                       f"moved {again.get('moved')}, note {again.get('note')!r}, re-measured "
                       f"{again_row.get('drift_ppm')} ppm, {residual} ms (want |·| ≤ 2) "
-                      f"±{again_row.get('drift_error_ms')} ms, corrected "
+                      f"±{again_row.get('drift_error_ms')} ms on {again_row.get('drift_on')} "
+                      f"over {again_row.get('drift_windows')} windows (the call "
+                      f"{again_wall:.2f} s), corrected "
                       f"{again_row.get('drift_corrected')}, drift note "
                       f"{again_row.get('drift_note')!r}; one undo ({once!r}) → speed "
                       f"{after_one.get('speed')}, start {after_one.get('start')} (S10's step, not a "
@@ -860,7 +973,8 @@ def mcp_rows(sock, wanted, files):
         try:
             cam = c.place("camera", 0, 0)
             other = c.place("unrelated", 0, 1)
-            ok, detail = not_applied(c, "unrelated, both at 0", other, clips=[cam, other])
+            ok, detail = not_applied(c, "unrelated, both at 0", other, refined="coarse",
+                                     clips=[cam, other])
             score("S22", ok, detail)
         finally:
             c.close()
@@ -990,12 +1104,17 @@ def mcp_rows(sock, wanted, files):
             answer = k.sync(clips=[cam, rec])
             row = recorder_row(answer, rec)
             landed = k.start(rec)
+            truth = -round(UTTER_GAP * SEC)
+            offset = row.get("offset")
             score("S19", landed == want_start and row.get("search") == "played"
-                  and k.start(cam) == cam_start and answer.get("anchor") == cam,
+                  and k.start(cam) == cam_start and answer.get("anchor") == cam
+                  and row.get("refined") == "phat" and offset is not None
+                  and abs(offset - truth) <= 600,
                   f"camera at {cam_start} in {cam_in}, recorder in {rec_in}: recorder at {landed} "
                   f"(want {want_start}, frame {want_start // FRAME}; unsnapped {exact}), "
-                  f"recorder − camera {-(row.get('offset') or 0) / SEC:.4f} s (true {UTTER_GAP}); "
-                  f"{match_text(row)}; camera at {k.start(cam)}")
+                  f"recorder − camera {-(offset or 0) / SEC:.5f} s (true {UTTER_GAP}; offset "
+                  f"{offset}, want {truth} ±600), coarse {-(row.get('coarse_offset') or 0) / SEC:.5f} "
+                  f"s; {match_text(row)}; camera at {k.start(cam)}")
         finally:
             k.close()
 
@@ -1075,7 +1194,7 @@ def mcp_rows(sock, wanted, files):
                 counts = (speech_frames(o, o.media("owner_camera"), cam),
                           speech_frames(o, o.media("owner_reversed"), rev))
                 ok, detail = not_applied(o, "the owner's recorder reversed", rev,
-                                         clips=[cam, rev])
+                                         refined="coarse", clips=[cam, rev])
                 score("S23", ok and min(counts) >= 125,
                       f"speech frames in the played windows: camera {counts[0]}, reversed "
                       f"recorder {counts[1]} (each ≥ 125); {detail}")
@@ -1097,15 +1216,16 @@ def mcp_rows(sock, wanted, files):
                 before = o.text()
                 menu = o.op("perform_menu_item", path=["Clip", "Synchronize Audio"])
                 up = menu.get("sheet") is not None
-                picture = WORK / f"s24-sheet-{os.getpid()}.png"
-                texts = []
-                try:
-                    shot = o.op("snapshot_ui", window="sheet", path=str(picture))
-                    with open(shot.get("layout_path") or "") as handle:
-                        texts = [v.get("text") for v in json.load(handle)["views"]
-                                 if not v.get("hidden") and v.get("text")]
-                except (ToolError, OSError, ValueError, KeyError) as error:
-                    texts = [f"(no layout: {error})"]
+                # The Synchronizing Audio sheet first (SY-22), then the weak one.
+                began = time.monotonic()
+                texts = None
+                while time.monotonic() - began < SHEET_WAIT:
+                    texts = sheet_texts(o)
+                    if texts and not any("Synchronizing Audio" in x for x in texts):
+                        break
+                    time.sleep(0.25)
+                waited = time.monotonic() - began
+                texts = texts or ["(no layout)"]
                 message = next((t for t in texts if "Weak match" in t), None)
                 cancelled = o.op("cancel_sheet")
                 down = (cancelled.get("how") == "cancel_button"
@@ -1113,15 +1233,112 @@ def mcp_rows(sock, wanted, files):
                         and "sheet" in cancelled and cancelled["sheet"] is None)
                 after = o.text()
                 step = o.last_step()
+                # A short plan can be over before the menu answers: the weak
+                # sheet seen after it is the sheet the menu brought up.
+                up = up or message is not None
                 score("S24", up and message is not None and "Apply" in texts
                       and "Cancel" in texts and down and before == after
                       and step != "Synchronize Audio",
-                      f"menu → sheet {menu.get('sheet')!r}; texts {texts[:6]}; cancel_sheet "
+                      f"menu → sheet {menu.get('sheet')!r}; the weak sheet after {waited:.2f} s; "
+                      f"texts {texts[:6]}; cancel_sheet "
                       f"{cancelled.get('how')} {cancelled.get('button')!r} → sheet "
                       f"{cancelled.get('sheet')!r}; unchanged {before == after}; last step "
                       f"{step!r}")
             finally:
                 o.close()
+
+
+# ---- the Synchronizing Audio sheet (S25, S26; SY-22) ------------------------------
+
+
+def held_rows(wanted, files):
+    """S25 and S26 on an instance of their own, launched with `-RCDevSyncHold
+    3` so the sheet stays up long enough to act under; stopped by its pid."""
+    launched = mcp_client.launch(str(proof_app.binary()), ["-RCDevSyncHold", str(HOLD)])
+    try:
+        if launched.client is None:
+            for row in wanted:
+                score(row, False, f"instrument failure: no instance at {launched.socket_path}")
+            return
+        print(f"  held instance PID {launched.child.pid} at {launched.socket_path}", flush=True)
+        client = launched.client
+        if "S25" in wanted:
+            s = Session(client, "sync-s25", files)
+            try:
+                cam = s.place("camera", 10 * SEC, 0)
+                rec = s.place("recorder", 0, 1)
+                s.op("set_selection", clips=[cam, rec])
+                menu = s.op("perform_menu_item", path=["Clip", "Synchronize Audio"])
+                texts = sheet_texts(s) or []
+                try:
+                    s.op("perform_menu_item", path=["Clip", "Synchronize Audio"])
+                    again = "ran"
+                except ToolError as error:
+                    again = str(error)
+                s.op("move_clip", clips=[cam], delta=FRAME)
+                still = ((s.op("perform_menu_item").get("window") or {}).get("sheet")) is not None
+                waited = wait_no_sheet(s)
+                # The foot first: `last_step`'s undo and redo would clear it.
+                foot = editor_texts(s)
+                step = s.last_step()
+                said = next((x for x in foot if x.startswith("Refused: the project changed "
+                                                             "while Synchronize Audio")), None)
+                ok = (menu.get("sheet") is not None and "Synchronizing Audio" in texts
+                      and "Cancel" in texts and "is disabled here" in again
+                      and waited is not None and s.start(rec) == 0
+                      and s.start(cam) == 10 * SEC + FRAME and step == "Move Clip"
+                      and said is not None
+                      and said.startswith("Refused: the project changed while Synchronize "
+                                          "Audio was matching"))
+                detail = (f"menu → sheet {menu.get('sheet')!r}, texts {texts[:5]}; again: "
+                          f"{' '.join(again.split())[:160]}; camera moved a frame under the "
+                          f"sheet (control: the sheet still up after the move, {still}); gone "
+                          f"after {waited if waited is None else round(waited, 2)} s; recorder at "
+                          f"{s.start(rec)} (want 0), camera at {s.start(cam)} (want "
+                          f"{10 * SEC + FRAME}), top step {step!r}; foot {said!r}")
+                score("S25", ok and still, detail if still else "instrument failure: " + detail)
+            finally:
+                s.close()
+        if "S26" in wanted:
+            s = Session(client, "sync-s26", files)
+            try:
+                cam = s.place("camera", 10 * SEC, 0)
+                rec = s.place("recorder", 0, 1)
+                # `last_step`'s undo and redo reset the selection: asked first.
+                top = s.last_step()
+                s.op("set_selection", clips=[cam, rec])
+                before = s.text()
+                menu = s.op("perform_menu_item", path=["Clip", "Synchronize Audio"])
+                cancelled = s.op("cancel_sheet")
+                time.sleep(HOLD + 1)
+                after = s.text()
+                step = s.last_step()
+                s.op("set_selection", clips=[cam, rec])
+                s.op("perform_menu_item", path=["Clip", "Synchronize Audio"])
+                waited = wait_no_sheet(s)
+                landed = s.start(rec)
+                ok = (menu.get("sheet") is not None and cancelled.get("button") == "Cancel"
+                      and cancelled.get("sheet") is None and before == after and step == top
+                      and waited is not None and landed == 206 * FRAME)
+                score("S26", ok, f"menu → sheet {menu.get('sheet')!r}; cancel_sheet "
+                      f"{cancelled.get('how')} {cancelled.get('button')!r} → sheet "
+                      f"{cancelled.get('sheet')!r}; {HOLD + 1} s later unchanged {before == after}, "
+                      f"top step {step!r} (was {top!r}); control: the menu again, gone after "
+                      f"{waited if waited is None else round(waited, 2)} s, recorder at {landed} "
+                      f"(want {206 * FRAME})")
+            finally:
+                s.close()
+        quiet = [line for line in Path(launched.log_path).read_text(errors="replace").splitlines()
+                 if "Frame Job: " in line]
+        if quiet:  # its startup parity check complained: the rows it ran are not to be trusted
+            print("  held instance's log: " + " | ".join(quiet[:3]), flush=True)
+            for row in wanted:
+                if row in results:
+                    score(row, False, "instrument failure: the held instance's log has "
+                          f"{len(quiet)} 'Frame Job: ' line(s), first {quiet[0]!r}; the row "
+                          f"had said: {results[row][1][:200]}")
+    finally:
+        launched.stop()
 
 
 # ---- the probe -----------------------------------------------------------------
@@ -1153,6 +1370,39 @@ def probe_rows(sources, here):
         why = f"no answer (exit {ran.returncode}): {ran.stderr[-300:]}"
         return {row: (False, why) for row in P_ROWS}
     return {row: answered.get(row, (False, "the probe did not answer it")) for row in P_ROWS}
+
+
+def cost():
+    """P19 alone (SY-22): the probe built as Release builds (-O, whole
+    module), run with `cost <COST>`; no socket."""
+    here = WORK / "cost-probe"
+    if here.exists():
+        shutil.rmtree(here)
+    here.mkdir(parents=True)
+    entry = here / "main.swift"
+    shutil.copyfile(PROBE, entry)
+    binary = here / "audio-sync-cost"
+    try:
+        swift_build.build(sources=swift_build.app_sources() + [entry], output=binary,
+                          optimize=True, wmo=True, timeout=BUILD_WALL)
+    except swift_build.SwiftBuildFailed as error:
+        score("P19", False, "the probe did not build: " + "; ".join(error.diagnostics[:6]))
+        return 1
+    try:
+        ran = subprocess.run([str(binary), "cost", str(COST)], capture_output=True, text=True,
+                             timeout=1800)
+    except subprocess.TimeoutExpired:
+        shutil.rmtree(COST, ignore_errors=True)
+        score("P19", False, "no answer within 1800 s")
+        return 1
+    shutil.rmtree(COST, ignore_errors=True)
+    try:
+        answered = {r["id"]: (r["pass"], r["detail"]) for r in json.loads(ran.stdout)["rows"]}
+    except (ValueError, KeyError):
+        score("P19", False, f"no answer (exit {ran.returncode}): {ran.stderr[-300:]}")
+        return 1
+    score("P19", *answered.get("P19", (False, "the probe did not answer it")))
+    return 0 if results["P19"][0] else 1
 
 
 def mutants():
@@ -1192,10 +1442,14 @@ def main():
     parser.add_argument("socket", nargs="?")
     parser.add_argument("--only", help="comma-separated row ids")
     parser.add_argument("--mutants", action="store_true")
+    parser.add_argument("--cost", action="store_true",
+                        help="P19 alone: SY-22's budget on the -O whole-module probe")
     args = parser.parse_args()
     WORK.mkdir(parents=True, exist_ok=True)
     if args.mutants:
         return mutants()
+    if args.cost:
+        return cost()
     wanted = args.only.split(",") if args.only else S_ROWS + P_ROWS
     unknown = [row for row in wanted if row not in S_ROWS + P_ROWS]
     if unknown:
@@ -1208,7 +1462,10 @@ def main():
             return 2
         files = {**fixtures(), **fixtures2(), **OWNER_FILES}
         try:
-            mcp_rows(args.socket, s_wanted, files)
+            mcp_rows(args.socket, [row for row in s_wanted if row not in ("S25", "S26")], files)
+            held = [row for row in s_wanted if row in ("S25", "S26")]
+            if held:
+                held_rows(held, files)
         except Exception as error:  # an instrument failure is a scored FAIL of the rest
             for row in s_wanted:
                 if row not in results:

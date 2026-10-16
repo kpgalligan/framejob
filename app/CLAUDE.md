@@ -323,7 +323,8 @@ detail there.
   waits for one being written; a failed waveform pass is retried in the
   session after 2 s and 10 s, and a retry that publishes also runs the sync
   features and speech passes once. The cache order is thumbnails → peaks →
-  sync features (`cache/sync/`, `MediaImporter+SyncFeatures.swift`) → speech.
+  sync features (`cache/sync/<id>.bin` and the 8 kHz `<id>.pcm`,
+  `MediaImporter+SyncFeatures.swift`) → speech.
   `thumbnails` holds a
   video track's last frame past its end, from the track's last SAMPLE's time.
   `FFmpegRewrap+Plan.swift` (a pure move, issue batch B80) holds the plan,
@@ -1796,10 +1797,15 @@ free.
   measured PRE-FADER from the plan segment, REPLACING `volume` so a second
   press is a no-op, always to BASE props.
 - `AudioSync.swift` (+`Correction`, +`Search`, +`Weak`) · `AudioSyncMatch.swift`
-  · `AudioSyncDrift.swift` · `SyncFeatures.swift` — Synchronize Audio (spec §11
-  SY-1..SY-19), `AudioNormalize`'s shape: `read` takes the plan segments, the
-  peaks, the sync features (standardised MFCC frames, `SyncFeatures`) and the
-  speech caches once. `+Search` matches the PLAYED windows first, then the
+  · `AudioSyncDrift.swift` · `AudioSyncPHAT.swift` · `SyncFeatures.swift` ·
+  `AudioSyncSheetController.swift` — Synchronize Audio (spec §11 SY-1..SY-22,
+  ADR `audio-sync`), `AudioNormalize`'s shape: `read` takes the plan
+  segments, the sync features (standardised MFCC frames, `SyncFeatures`), the
+  8 kHz samples and the speech caches once; `plan` is pure and runs OFF the
+  main thread — the menu behind the Synchronizing Audio sheet
+  (`AudioSyncSheetController`, Cancel), `sync_audio` as an `offMainTools`
+  member — and its ops are applied on main only if the project and scope are
+  still the ones read. `+Search` matches the PLAYED windows first, then the
   whole files, on speech frames only when both hold enough (SY-17), and sorts
   a match into confident (applied) or weak (near the placement; never applied
   silently — the menu asks in a Weak match sheet, `sync_audio` needs
@@ -1813,7 +1819,10 @@ free.
   mover's own track, which is refused, judged on the FINAL span.
   `AudioSyncMatch` is the pure signal arithmetic: the summed feature
   correlation, its z-score confidence and the speech masks;
-  `AudioSyncDrift` fits the drift as a line through many windows (SY-7);
+  `AudioSyncPHAT` refines a match by GCC-PHAT on the speech band within
+  ±48 ms (SY-20; the coarse offset stands when no clear peak); `AudioSyncDrift`
+  fits the drift as a robust line (Theil–Sen, MAD inliers) through feature
+  windows, then PHAT per window (SY-21);
   `+Correction` decides whether to correct it, the ±0.2% band and the op
   order. `EditorViewController+Audio` holds the Clip menu's sound
   commands (Normalize, moved whole out of the frozen file, and Synchronize
@@ -2123,7 +2132,7 @@ free.
   explicit path through `AgentServer.canonical`. `offMainTools` names the
   handlers that wait for something the main thread must deliver
   (`import_media`, `transcribe`, `record_screen`, `export`,
-  `render_graphic`, `open_project`, …); the criterion
+  `render_graphic`, `open_project`, `sync_audio`, …); the criterion
   is "waits on main" or, for `open_project`, "must not hold main for a
   read" (spec §11 #231), not "touches the disk". `open_project`'s two
   main-thread steps also wait, up to `AgentServer.personOpenWait` (30 s)

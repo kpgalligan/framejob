@@ -20234,6 +20234,51 @@ class the amendment named. `--mutants` 32/32 killed, no failed control;
 231/231; `recording_probe.py --only catalog` 31/31; `cache_pass_probe.py` 13/13;
 `v2_menu.py --only H` 5/5; `capture_spike/inventory.py --check` 5/5.
 
+## Road map audio-sync-2 — AS-4, the GCC-PHAT refinement, drift on the features, the background run (`audio_sync_proof.py` S1–S26, P1–P19 and thirty-nine mutants; `audio_sync_probe.swift`; spec §11 SY-20..SY-22)
+
+```
+python3 tools/proof/audio_sync_proof.py <dir>/agent.sock [--only S1,P16,...]   # Debug; the recorded run is RC_PROOF_APP=release
+python3 tools/proof/audio_sync_proof.py --cost                                  # P19 alone: SY-22's budget (about 3 min, most of it the -O build)
+python3 tools/proof/audio_sync_proof.py --mutants                               # the 39 mutants, probe-only (hours; run it in the background)
+```
+
+The same script as AS-1..AS-3. Each synced row now prints `refined`, its z (`refine_confidence`),
+`offset` (the refined lag) and `coarse_offset`. **S1** and **S19** need `refined` "phat" and the
+offset within 600 ticks (1 ms) of the truth (−1,879,987.5; −118.70 s). **S20** and **S21** (the
+owner's files) print the refinement and pass with either "phat" or "coarse" (SY-20's fallback),
+keeping their T bound. **S22** and **S23** need "coarse" on the mover's row. **S10** and **S17**
+print `drift_on`, `drift_windows`, the error and the call's wall seconds. The menu's plan now runs
+under the Synchronizing Audio sheet off the main thread: **S14** polls `perform_menu_item` with no
+path every 0.1 s (≤ 600 s) until the window has no sheet, and **S24** polls `snapshot_ui {window:
+"sheet"}` every 0.25 s until the sheet's texts no longer hold "Synchronizing Audio" (the weak
+sheet). **S25** and **S26** run on an instance of their own, launched with the dev-only launch
+default **`-RCDevSyncHold 3`** (a Debug or Release build holds the menu's background run that many
+seconds before the plan; Distribution has no such default), stopped by its pid: S25 moves the camera
+a frame under the sheet and needs the stale refusal at the inspector's foot ("Refused: the project
+changed while Synchronize Audio was matching…"), nothing synced, the menu item "is disabled here"
+while the sheet is up; S26 cancels the sheet and needs nothing changed, then a waited-out run that
+lands as S1's.
+
+The probe's **P5** is drift on smooth features (±5 ppm, the minimum, the span and count rules) with
+two AS-4 cases: the mover's frames 4,000–7,000 seeded ±1 noise (the robust filter's case) and the
+two end windows with the rest noise (the window floor's). **P16** is the PHAT unit (against a naive
+DFT, a planted 37.4-sample delay, unrelated pips, a lag at the reach, a decoy at +2,000, the nil
+cases); **P17** the refinement through `plan` (1.204 s, a +200 ppm pair, the same with a noise
+gap, features-only and with samples); **P18** #300's case (±1,000 ppm over 160 s). **P19** runs only
+for `cost <dir>`: one hour of pips written under `work/audio-sync/cost/cache/sync/` (removed after),
+timed as `sync_audio` spends it, the total ≤ 1.5 s of thread CPU, built -O whole-module by
+`--cost`. Mutants added (seven): `phat-clear-z`, `phat-edge-dropped`, `phat-reach-dropped` (P16);
+`phat-shift-dropped`, `drift-phat-dropped` (P17); `drift-window-z`, `drift-inliers-dropped` (P5);
+`ppm-scale`, `resample-dropped`, `radius-dropped` re-anchored.
+
+**Recorded runs** (Release, 2026-10-16, after `make gate` passed; own instance, no `Frame Job: `
+line): 44/44 (S1–S26, P1–P18). S1's offset 31.5 ticks from the truth (coarse 841.5), PHAT z 434.2;
+S19 118.70005 s for 118.70 (z 183.8); S10 199.920 ppm on phat, corrected to ×0.99980008, the whole
+call 0.23 s; S20/S21 "coarse" at z 8.84/8.06, T 118.7000 s; S22 z 4.52 and S23 z 10.20 "coarse"
+(`clearZ` 15; 8 misclassified S23). P19: 0.793 s of CPU (loads 0.061, `plan` 0.731) for a one-hour
+pair. `--mutants` 39/39 killed, no failed control. `recording_probe.py --only catalog` 31/31. The calibration table and the stop are in
+`designs/adr/audio-sync.md` and `archive/audio-sync-2.md`'s AS-4 record.
+
 ## Issue #298 — the export's audio offsets, measured (`export_offset_proof.py` Z0–Z3, R1–R2, E1–E23, L1–L9; `export_offset_probe.swift`, `export_offset_writer.swift`; no product code, no decision)
 
 ```
