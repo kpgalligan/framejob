@@ -16208,7 +16208,7 @@ L1–L3 among the passes, O5 "38 of 38 captures had active false", no
 `Reelcut: ` line; and `screens.py --only 12-export-sheet` under a scratch
 home, light then dark: 6 pass of 6, 0 new problems, each dump 60 records
 with the key on every one and the footnote's `"H264 · MP4"` as both its
-text and its tooltip. Spec §7.9a's sentence on what a record holds now
+text and its tooltip. Spec §7.9c's sentence on what a record holds now
 names the tooltip.
 
 **What is not proved here.** Any other Mac's encoders; playback in Safari,

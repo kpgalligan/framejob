@@ -1138,7 +1138,7 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   known — a frame count or a duration that moves still fails the row —
   and what the row gives up is a change of the encoder's rate, which this
   640 × 360 fixture could not see for the line phase B changed (G-33
-  (h)). The same pass wrote the dump's `tooltip` into spec §7.9a and ran
+  (h)). The same pass wrote the dump's `tooltip` into spec §7.9c and ran
   the two readers of the dump not run since the key was added, each on an
   instance of its own in a scratch home: `v2_snapshot.py` 29 pass, 0
   fail, one named host skip (O2), and `screens.py --only 12-export-sheet`

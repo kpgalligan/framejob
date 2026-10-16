@@ -94,7 +94,7 @@ Nothing had been published, so nothing migrates. (orig opening, What exists)
 - What exists: the tree before the road map, including the TCP listener, the menu switch, `AgentServerEnabled`'s second meaning and the proofs' ports.
 - Decisions: MC-1..MC-6 as MC0 wrote them, with MC1's `Agent`-folder amendment. §11 is the fuller text for MC-4 and MC-6.
 - Phases: MC0–MC5 as planned, including MC1's four questions and each phase's planned proof and mutants.
-- Record ▸ MC0: the §11 file, the index rows and §7.9a's interim paragraph.
+- Record ▸ MC0: the §11 file, the index rows and §7.9c's interim paragraph.
 - Record ▸ MC1: q1 (the snapshot, B1–B12), q2 (the launch, L1–L7), q3 (the client, D1 and T1–T3), q4 (the socket, S1–S10), S11 and the §11 amendment, and the side effects.
 - Record ▸ MC2: `ReelCore.swift`'s toll, the core and app changes, the deviations (a separate FFI pair, release without join, the interim port rule, the non-socket rule) and the checks and mutants.
 - Record ▸ MC3: the versions file, the crate, the snapshot, the build phases, `dist_check.py` D15–D24, the deviations (the lock, the stranded session, the 5 s wait, the scratch launch's extras) and the LaunchServices cleanup of road map 14's own copies.
