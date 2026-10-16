@@ -32,7 +32,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
 | [`05.4-actions.md`](05.4-actions.md) | 137 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
 | [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
-| [`05.6-persistence.md`](05.6-persistence.md) | 169 | The package on disk: Consolidate, bookmarks, reversed assets, caches and their markers, transcripts. |
+| [`05.6-persistence.md`](05.6-persistence.md) | 185 | The package on disk: Consolidate, bookmarks, reversed assets, caches and their markers, transcripts. |
 | **§6 — Edit operations: exact semantics** | | |
 | [`06a-edit-operations-shared-rules.md`](06a-edit-operations-shared-rules.md) | 84 | The rules every op shares: caller ticks snapped to the frame grid, an omitted argument against `null`, how to read a "refuses", the one way a patch is read, and the `scope` envelope key (the view project, the eight ops that are an error with a scope, the checks on the merged parent). |
 | [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 402 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, paste and paste attributes; nest and unnest; the patch ops; the transition ops. |
@@ -42,18 +42,18 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 132 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 140 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 460 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
-| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 52 | The spec's Swift file map (app/CLAUDE.md is the live one). |
+| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 53 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5-compositor.md`](07.5-compositor.md) | 414 | The Metal compositor's step 0 (per composition), passes, mattes, and transitions, and the scopes' tap (the shown set, the kernels, the counting rule). |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 46 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 201 | `MediaImporter.probe`, the formats import accepts, the WebM/Matroska rewrap, its copy's progress window, the copy's original, and the opt-in ffmpeg step's original and checked VP9 copy. |
 | [`07.8-export.md`](07.8-export.md) | 353 | Export: writers, formats, loudness, the queue. |
-| [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 587 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, the app-state tools, lenient decoding, the graphics loop, the dev tools, the transport. |
+| [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 604 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, the app-state tools, lenient decoding, the graphics loop, the dev tools, the transport. |
 | [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 156 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 99 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 179 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 182 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 8617 in 23 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 8841 in 23 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

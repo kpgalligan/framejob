@@ -8,7 +8,11 @@ The road map that made these is closed (2026-10-15): its condensed record is
 drift, AS-2 corrects it). SY-1…SY-5 were recorded in AS-1, before its code, from the owner's three
 answers of 2026-10-15 (quoted verbatim in the road map): placement frame-snapped; the clip with
 video stays and the audio moves; drift reported first, correction straight after. SY-6…SY-10 were
-recorded in AS-2 before its code; SY-8 was amended by the owner's choice after AS-2's STOP.
+recorded in AS-2 before its code; SY-8 was amended by the owner's choice after AS-2's STOP. SY-11…SY-16 were
+recorded in round 2's AS-3 (`designs/audio-sync-2.md`) before its code, from the owner's "Go ahead" to
+all five points of 2026-10-15 and the owner's choice of the head trim (SY-16). SY-17…SY-19 were
+recorded in AS-3's second fix pass, before its code, from the owner's "Ask, then apply" of
+2026-10-15, which resolved SY-14's calibration stop.
 
 **Stands, and nothing here re-litigates it:** the overlap rule and `move_clip` (foundations,
 spec §6); D2-1 (a composite that measures nothing makes no op and says why); #42's one-delta
@@ -26,7 +30,9 @@ never silence; the menu and the tool call the same `read` + `plan`).
   menu. A selection already in sync is no op: the tool answers `moved: false` and "already in
   sync", the menu beeps. A tool with no `scope` argument; it reads the open container's plan
   (`editedProject`), as `normalize_clip` does. AS-2 corrects drift; AS-1 only measures it
-  (SY-5).
+  (SY-5). **Amended by SY-11 (AS-3):** the match measures each file's cached sync FEATURES
+  (`cache/sync/<media id>.bin`, SY-11) as well as its waveform; the waveform's onsets still carry
+  drift (SY-5/SY-7) until AS-4. Nothing else here changes.
 
 - **SY-2 — The anchor.** A caller may name `anchor`, which must be one of `clips` (refused by
   name otherwise). Without one: among the clips that have pictures — a video segment of positive
@@ -51,7 +57,10 @@ never silence; the menu and the tool call the same `read` + `plan`).
   printed r and q are recorded in the road map and here. AS-1's fixtures were not
   misclassified: the delayed, filtered, noisy recorder against its camera read r 0.49, q 3.06
   (S1, Debug and Release, 2026-10-15), the same recorder drifting +200 ppm r 0.31, q 1.82 (S10,
-  Release), and an unrelated recording r 0.14, q 1.10 (S3).
+  Release), and an unrelated recording r 0.14, q 1.10 (S3). **Superseded for the coarse match by SY-12 and
+  SY-13 (AS-3):** the onset envelope, its 1,000-bucket overlap, its ±50-bucket runner-up, the
+  peak ratio and the 200-bucket file minimum are gone. Its r ≥ 0.25 stays as SY-7's per-window
+  floor (`minimumCorrelation`), and the onsets stay as drift's input.
 
 - **SY-4 — Placement on the frame grid, and what is refused before the core sees it.** `lag` is
   the anchor's bucket minus the mover's bucket of the same sound; the mover's `delta` is
@@ -67,7 +76,10 @@ never silence; the menu and the tool call the same `read` + `plan`).
   clip on its own track ("would overlap clip M on its track") — because `move_clip` clamps the
   earliest clip at 0 and turns an overlap within the overlap rule into a cross dissolve rather
   than refusing, neither of which is a sync. The core's own refusals stay the backstop. Moving or
-  trimming a neighbour to make room is not done.
+  trimming a neighbour to make room is not done. **Amended by SY-16 (AS-3):** "a mover that would have to start
+  before 0" is no longer refused; its head is trimmed (SY-16), and the meeting and neighbour
+  checks are made on the trimmed span. The "no sound" sentence for a silent file is now "has no
+  sound to line up by." (SY-12). Every other refusal here stands.
 
 - **SY-5 — Drift is measured and reported by the tool only.** Over the overlap of the anchor and
   the placed mover (in anchor-source buckets), when it is at least 6,000 buckets (60 s): the
@@ -154,4 +166,207 @@ never silence; the menu and the tool call the same `read` + `plan`).
   own-track neighbour check are made on the FINAL span `[S + δ, S + δ + d')`, the neighbour check
   whenever δ ≠ 0 or d' ≠ d. The op order keeps every intermediate span inside the old or the
   final one: when d' > d, `move_clip` then `set_speed`; otherwise `set_speed` then `move_clip`;
-  each only when it changes something. The list is one undo step, "Synchronize Audio".
+  each only when it changes something. The list is one undo step, "Synchronize Audio". **Amended by SY-16 (AS-3):** a mover
+  whose final start would be before 0 is trimmed instead, and its ops are `set_speed` (when
+  corrected), `trim_start`, `move_clip`, in that order; with no trim this order stands.
+
+- **SY-11 — The sync-features cache (`cache/sync/`).** Each media file with audio gets
+  `cache/sync/<media id>.bin`: f32 little-endian MFCC frames, 26 coefficients each, one frame per
+  128 samples at 8,000 Hz (16 ms of source, 9,600 ticks; about 6.5 KB a second, 23 MB an hour),
+  frame-major. The recipe is BBC R&D's `audio-offset-finder` (github.com/bbc/audio-offset-finder:
+  8 kHz, a hop of 128, 26 coefficients, the correlation of standardised MFCCs), as the round's
+  `mfccsync.py` wrote it: mono 8 kHz float, a 512-point frame holding a Hann(256) window centred
+  in it, the power spectrum through 40 triangular HTK-mel bands from 0 to 4 kHz, `log(P·FB +
+  1e-10)`, a DCT-II (unnormalised) to c0…c25. Frame f starts at sample 128·f; a file of n
+  samples holds `(n − 512)/128 + 1` frames (0 under 512). Its marker `<id>.complete.json` is
+  `{"source": CacheStamp, "version": 1}`, `PeaksStamp`'s shape; the version is bumped on ANY
+  change to a recipe constant. The pass reads the first audio track (the one `peaks` reads) with
+  speech's output settings at 8 kHz, keeps nothing unless the reader ends `.completed`, and writes
+  the `.bin` and then the marker inside one `CacheLedger.publish`. It runs in `generateCaches`
+  after `peaks` and before `speech` (which stays last), clears at its head when stale or when the
+  media has no audio, and posts NO `.mediaCacheDidChange`: nothing memoises features. A
+  `.bin` is read only under a current-version marker, its size a positive multiple of 26·4 bytes,
+  every value finite; anything else is "still being analysed", never silence. **Its one retry:**
+  `retryPeaks` runs the pass once, with that attempt's fresh stamp, straight after an attempt whose
+  `peaks` answers true — so a file unreadable on the first pass and readable on a retry gets its
+  features in the same session. Nothing else retries it. **The edge:** a file with sound but
+  under 512 samples (64 ms) holds no whole frame, so the pass publishes nothing for it and it
+  reads "still being analysed" for good rather than "too short to match" (AS-3's review, finding
+  6; recorded, not handled). **Amended by SY-17 (AS-3's second fix pass):** the same retry also
+  runs `speech` once, straight after the features, with the same stamp, so a file whose speech
+  pass failed with its waveform gets its VAD probabilities in the same session too.
+
+- **SY-12 — The feature match and its confidence (supersedes SY-3 for the coarse match).** The
+  two stretches compared (SY-13) are taken onto the timeline grid (SY-6's resampling, applied to
+  each frame vector) and standardised per coefficient over the stretch (mean 0, sd 1; a
+  coefficient with sd under 1e-6 is 0, so a silent stretch is all zeros). The correlation is the
+  SUM over the 26 coefficients of each coefficient's full cross-correlation, `c(L) = Σ_k Σ_m
+  x_k[m + L]·y_k[m]` (L the anchor frame minus the mover frame), by one zero-padded `vDSP_fft_zrip`
+  per coefficient and ONE inverse transform of the summed cross-spectrum. The confidence of a lag
+  is its z-score, `(c(L) − mean)/sd` with the mean and sd taken over EVERY lag (every overlap of at
+  least one frame), as `mfccsync.py` does; z is 0 when sd is 0. A lag may be a candidate only when
+  its overlap is at least 125 frames (2 s), or the shorter stretch when that is shorter. The
+  summed correlation, not BBC's norm across coefficients, is the one the owner's files told apart:
+  on the owner's trimmed windows the norm put the best lag at 110.1 s (z 2.7), the sum at
+  118.68 s (z 4.3), the owner's own ground truth being about 118.7 s (round 2's request, its
+  table). BBC's README reads its z-score as "> 10 trustworthy, < 5 check"; landmark
+  fingerprinting then cross-correlation (Bryan, Smaragdis & Mysore, "Clustering and
+  synchronizing multi-camera video via landmark cross-correlation", ICASSP 2012; and `audalign`)
+  was tried by the round's `landmark.py` and found nothing usable on the owner's files. A file
+  under 125 frames is "too short to match: its file holds under 2 s of sound."; a file whose
+  every coefficient is constant is "has no sound to line up by.", named on that clip alone (SY-4's
+  rule).
+
+- **SY-13 — The played windows first (reverses SY-3's whole files).** Each clip's PLAYED window is
+  the frames `[⌊(start − zero)/9600⌋, ⌈(end − zero)/9600⌉)` of its file on its timeline grid,
+  clamped to the file. When both hold at least 125 frames they are searched first; only when that
+  search chooses nothing (SY-14) and either window is a strict part of its file are the whole files
+  searched. AS-1 searched the whole files because a user's trim could cut the shared sound out.
+  **The reversal's reason is the owner's case:** the owner's recorder (165 s) and camera (55 s)
+  share a second, unrelated stretch — the recorder's first ~13 s against the camera's last ~13 s,
+  at −41.92 s — and that stretch wins any whole-file search (z 6.3 against the true 118.64 s's
+  3.7, `mfccsync.py`), while the owner's trims hold only the real utterance. Where the user put
+  the clips is evidence of what they mean to line up.
+
+- **SY-14 — Candidates, the choice and the refusal.** A search answers its CANDIDATES: the local
+  maxima of c among the lags that may be candidates (a lag above its left neighbour and at least
+  its right, a neighbour that may not be a candidate counting as no rival — so at an overlap of
+  exactly 125 frames the last scorable lag of a slope rising into the unscorable edge is a
+  candidate though it is a flank; recorded from AS-3's review, finding 5), highest first, each more than 60 frames
+  (0.96 s) from every one already kept, at most 4, each refined parabolically; and its NEAR
+  PLACEMENT: the highest local maximum of c (both neighbours scorable and strictly lower) within
+  188 frames (3.008 s) of the lag at which the mover already sits, `(zeroN − zeroA)/9600`, refined
+  — nil when there is none, so the flank of a peak outside the radius is never chosen. **The
+  choice:** the best candidate when its z ≥ 6 and it stands at least 1.5 above the second (or
+  there is no second), chosen "by confidence"; otherwise the near placement when its z ≥ 4,
+  chosen "by placement"; otherwise nothing. **The refusal**, when no search chooses: "no matching
+  sound found between clip A and clip N: in the played windows, moving clip N by +0.77 s
+  (confidence 4.31) or −12.40 s (3.90); in the whole files, …. A match needs confidence ≥ 6 and
+  1.5 above the next candidate, or ≥ 4 within 3 s of where clip N sits now." — each search that
+  ran, with its candidates as the frame-snapped move each would make, and the rule printed from
+  the constants; with no candidate in any search, "…: too little room to compare their sound."
+  **The answer:** each `sync_audio` row drops `correlation`; `confidence` is the chosen lag's z;
+  it adds `search` ("played" | "whole"), `chosen_by` ("confidence" | "placement"), `candidates`
+  (`[{offset, delta, confidence}]`: the chosen search's candidates, plus the near placement when
+  that was chosen and is not among them) and `trimmed` (SY-16). **Calibration rule:** the
+  constants (6, 1.5, 4, 188 frames) are initial; when the proof's fixtures (S1, S3, S9, S10,
+  S19, S20, S21, and from AS-3's review S22 and the probe's P13, unrelated sound placed where it
+  overlaps) are misclassified they change, and every value tried is recorded here and in the
+  road map; when no set classifies them all, the phase stops and reports the printed z's.
+  **AS-3 stopped here (2026-10-15).** S22 (CAMERA and UNRELATED both at 0) is synced by
+  placement at z 4.59 and P13's unrelated pairs at 4.14 and 4.39 by placement and at 6.83 by
+  confidence, while the owner's true match is z 4.19 with a competitor at 4.15: no `plausibleZ`
+  separates them, and neither does z taken over the scored lags, z of `c(L)/√overlap(L)` (the
+  owner 3.57, S22 3.46; unrelated sound at the owner's window lengths reaches ≥ 3.5 in 5–32% of
+  placements), a margin guard (the owner's margin is 0.07) or the mean per-coefficient
+  correlation (the owner 0.057, unrelated windows up to 0.13). The numbers are in road map
+  "audio-sync-2"'s AS-3 record; the choice rule waits on the designer and owner.
+  **Resolved by SY-17..SY-19 (the owner's choice of 2026-10-15):** "chosen by confidence" is now
+  the CONFIDENT tier and its z is 10, not 6 (BBC's own "> 10 trustworthy"); "chosen by
+  placement" is now the WEAK tier (SY-18), which is never applied without asking (SY-19); and a
+  search between two stretches that both hold speech correlates their speech frames only (SY-17).
+  The refusal's rule sentence now reads "A match applies on its own at confidence ≥ 10 and 1.5
+  above the next candidate; one ≥ 4 within 3 s of where clip N sits now is offered as a weak
+  match." The 1.5, the 4 and the 188 frames are unchanged.
+
+- **SY-15 — The fixtures and the owner's rows.** Beside AS-1's, a committed SYNTHETIC pair with
+  the owner's traits, made by the proof from a seed (16 kHz, `camera2-v1.mov`,
+  `recorder2-v2.wav`): a 60 s camera with a 5 s speech-like utterance at 31.2 s and a 13 s
+  competing stretch at its end, and a 165 s recorder of heavy low-frequency rumble holding the
+  competing stretch at 0 s and the utterance 118.70 s later than the camera does. S19 places them
+  as the owner did (trimmed to the utterance, the camera at 2 s) and must land the recorder
+  exactly on the snapped true offset by the played search. **Amended in AS-3's fix pass:** the
+  offset was 118.71 s (`recorder2-v1.wav`), whose true landing (35.7 frames) sat 6.7 ms from a
+  snap boundary, inside the coarse match's measured error of about 8 ms (the numpy reference of
+  `mfccsync.py` erred the same way), so S19 missed by a frame. At 118.70 s the true landing is
+  1.2 s, a whole frame, half a frame (16.7 ms) from either boundary; the exact-landing claim is
+  kept, not loosened. **Amended by SY-18 and SY-19 (AS-3's second fix pass):** S20 and S21 are
+  weak matches: a first call answers `moved: false` naming the recorder (or the camera) in
+  `weak`, and a second with `accept_weak: true` must meet the landing below. S22, S23 (the owner's
+  recorder time-reversed, placed where it overlaps the camera — a null that does run the
+  speech-only search, both windows holding at least 125 speech frames) and P13 must never apply
+  without `accept_weak` and never be confident; S24 puts the Weak match sheet up and cancels it.
+  **The owner's own files**
+  (`tools/proof/media/owner-sync/IMG_0018.MOV`, `record.aifc`; gitignored, never committed or
+  copied out) are rows S20 (the camera the anchor) and S21 (the recorder the anchor), placed as the
+  owner placed them; each needs recorder − camera within one 30 fps frame of 118.68 s. A row
+  whose files are absent is a scored FAIL, never a skip: the owner's case is the reason for the
+  round, and a proof run without it has not shown the round works.
+
+- **SY-16 — The head trim (amends SY-4 and SY-10; the owner's choice of 2026-10-15).** Asked what
+  Synchronize Audio should do when syncing would push the audio clip before the start of the
+  timeline, the owner chose: "**Trim the audio's head** — the audio clip stays at 0:00 and drops
+  its first 0.77 s, so what remains plays in sync. The video doesn't move. Only trims the moving
+  clip, and only by the amount that would fall before 0." So with S the mover's start, I its in
+  point, δ the final snapped delta, s' its final speed and d' its SY-10 duration: when `S + δ <
+  0`, the excess `e = −(S + δ)` (on the frame grid) is trimmed off its head. Its span becomes
+  `[0, d' − e)` and its in point `I + e·s'` (`trim_start`'s own arithmetic at s'), so source tick
+  μ still plays at `S + δ + (μ − I)/s'`, SY-6's line. The ops are `set_speed` (only when
+  corrected), `trim_start {clip, to: S + e}`, `move_clip {delta: δ}`, in that order, one undo
+  step; `trimmed` is e (0 with no trim). The anchor never moves or trims. Refused by name before
+  any op: `d' − e` under one frame ("would have to lose X s of its head to start at 0, leaving
+  under a frame of it."); the trimmed span not meeting the anchor's (SY-4's sentence); a neighbour
+  on the mover's track meeting the trimmed span or, when it is corrected and grows, `[S, S + d')`
+  (SY-4's sentence). With `S + δ ≥ 0` nothing is trimmed and SY-10 stands.
+
+- **SY-17 — Speech-only matching (AS-3's second fix pass; the owner's choice of 2026-10-15).** A
+  search whose two stretches each hold at least 125 SPEECH frames (2 s) correlates their speech
+  frames only: frame f of a file is speech when the cached Silero VAD probability of the chunk
+  holding its centre, `cache/speech/<id>.bin` at `⌊(f·9600 + 19200)/19200⌋` (the frame's centre is
+  256 samples at 8 kHz, 19,200 ticks, after its start; one chunk is 19,200 ticks), is at least
+  0.5 (Silero's default, and `detect_silence`'s default `voice_confidence`); a mask is resampled
+  onto the timeline grid as the frames are (frame k is source frame `round(k·speed)`). Each
+  stretch is then standardised per coefficient over its own speech frames, and every other frame
+  is 0, so only frames speech in BOTH stretches correlate; everything after the standardisation
+  (SY-12's sum, z over every lag, SY-14's candidates and near placement) is unchanged. Otherwise,
+  or when the model cannot be used this process (`SileroVAD.isAvailable` false), the search is on
+  every frame, as SY-12 says. Each `sync_audio` row says which, `matched_on` ("speech" |
+  "sound"). With the model available, a clip whose speech cache is not yet written is "still
+  being analysed", as one with no features is. **Why the VAD and not an energy gate:** the app
+  already caches Silero per media for `detect_silence` (road map 4), so a mask costs no new
+  pass, and an energy gate would mark the owner's recorder rumble as sound. **The measurement**
+  (a numpy reproduction of `search` over the S20 session's own `cache/sync/` and
+  `cache/speech/`): the owner's true match is z 4.18 at 118.672 s unmasked (the app's own
+  number), **7.92 at 118.688 s with both stretches masked** (next candidate 4.43), 5.50 with the
+  recorder's mask only, 6.95 with the camera's only, and 4.12 when a pair is kept where EITHER is
+  speech (it then loses to 113.856 s). The owner's recorder reversed, against 47 camera windows,
+  reached at most z 6.04 masked. The owner's played windows hold 244 speech frames (the camera)
+  and 248 (the recorder); REC2 holds no speech chunk, so S19 matches on sound, and the burst
+  fixtures hold 0–1, so S1–S18, S22 and P13 match on sound.
+
+- **SY-18 — The two tiers (resolves SY-14's stop).** A search's choice (SY-14's shape) is
+  CONFIDENT when its best candidate's z is at least 10 and 1.5 above the second (or there is no
+  second) — `chosen_by` "confidence" — and WEAK when it is not but the near placement's z is at
+  least 4 within 188 frames — `chosen_by` "placement"; otherwise nothing, and the refusal names
+  the candidates (SY-14). The search order (SY-13) is unchanged: a played search that chooses
+  either tier ends the search. A confident match applies as before. **A weak match is never
+  applied silently** — the owner's reason: "Unrelated clips are never moved silently." AS-3's
+  stop showed noise near a placement reaching z 4.6 and the owner's true unmasked match 4.2, so
+  the near placement alone cannot tell them apart and a person must. A run's WEAK MOVES are its
+  movers chosen by placement whose plan changes something (a non-zero delta, a trim, or a
+  corrected drift); a weak mover already in place is not asked about. One tier decision serves
+  both callers (`AudioSync.weakMoves`), so the menu and the tool cannot disagree.
+
+- **SY-19 — The Weak match sheet and `accept_weak` (the owner's choice of 2026-10-15).** Asked
+  "When Synchronize Audio finds only a weak match, what should it do?", the owner chose **"Ask,
+  then apply"**: "Strong matches apply as now. A weak match near where you placed the clip shows
+  'Weak match: move the recorder 0.77 s (trim 0.77 s)? Apply / Cancel'. Over MCP the tool
+  returns the candidate and applies only with an explicit accept_weak flag. Also add
+  speech-only matching (it lifted your match from z 4.3 to 5.9). Unrelated clips are never
+  moved silently." So: **the menu**, when a plan has weak moves, puts up one alert sheet on the
+  editor's window — "Weak match: move “record.aifc” 0.77 s earlier (trimming 0.77 s off its
+  head)?", its detail naming the anchor, each confidence, the 10 a match needs to apply on its
+  own and the 3 s radius — with Apply (the default) and Cancel (Escape). Cancel changes nothing
+  and makes no undo step. Apply commits the plan's ops as one grouped undo step ("Synchronize
+  Audio") only when the project and the open scope are the ones the sheet was asked about;
+  otherwise it beeps and puts "the project changed while the weak match was being asked about,
+  so nothing moved. Choose Synchronize Audio again." at the inspector's foot. With no window, or
+  a sheet already up, it beeps. **`sync_audio`** takes a new optional boolean `accept_weak`
+  (default false). Every success answer carries `weak`, the clip ids of its weak moves; with weak
+  moves and `accept_weak` not true it answers `{ok: true, moved: false, anchor, synced, weak,
+  note, project}` — no op, no undo step, not an error — the note naming each move and saying to
+  call again with `accept_weak: true`. With `accept_weak: true` it applies, as the sheet's Apply
+  does. **An agent passes `accept_weak: true` only after the person has agreed to that weak
+  match, naming the move** (the orchestrator's ruling): the catalog's description and the weak
+  answer's note both say so, and there is no per-argument ask-first machinery in the assistant's
+  lane (AI-7 names tools, not arguments); the edit is one undo step.

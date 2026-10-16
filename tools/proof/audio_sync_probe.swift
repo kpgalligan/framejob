@@ -1,6 +1,7 @@
-// Road map "audio-sync", AS-1 and AS-2 (spec §11 SY-1..SY-10) — Synchronize Audio's
-// arithmetic, measured through the app's own `AudioSyncMatch` and
-// `AudioSync` with no document, no window and no disk.
+// Road maps "audio-sync" (AS-1, AS-2) and "audio-sync-2" (AS-3) — spec §11
+// SY-1..SY-19 — Synchronize Audio's arithmetic, measured through the app's own
+// `SyncFeatures`, `AudioSyncMatch` and `AudioSync` with no document, no window and
+// no disk.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a`, by
@@ -10,29 +11,34 @@
 //
 // Every array is made here from a seeded LCG, so a run is the same run. No
 // expected number is read back from the code under test: each is written as
-// the arithmetic the spec states (delta = snap(zeroA − zeroN + lag·6000)).
+// the arithmetic the spec states (delta = snap(zeroA − zeroN + lag·9600)).
+// Features are frame-major, 26 floats a frame, one frame per 9,600 ticks;
+// onsets (drift's input) one bucket per 6,000. Where drift is measured the
+// planted lag is a multiple of 48,000 ticks, whole on both grids.
 //
-//   P1  delta arithmetic: five placements of a mover whose sound is the
-//       anchor's shifted by a known number of buckets, each delta, start and
+//   P1  delta arithmetic: five placements of a mover whose features are the
+//       anchor's shifted by a known number of frames, each delta, start and
 //       lag against its hand-worked value at 30 fps.
 //   P2  the anchor rule (SY-2): pictures first, then earliest start, then
 //       rearmost track, then lowest id; a named anchor wins; a named stranger
 //       is nil.
-//   P3  the FFT correlation equals a brute-force sum on short arrays, and a
-//       known lag is recovered from a peaks envelope 9 dB quieter.
-//   P4  the thresholds (SY-3) at their boundaries; unrelated arrays are not
-//       confident; two equal 300-bucket arrays have no runner-up and plan to
-//       "too little room"; a runner-up ≤ 0 is ratio +∞ and confident.
+//   P3  `crossCorrelation` equals a brute-force sum on short arrays (drift's
+//       FFT, kept); and end to end, `SyncFeatures.frames` of 30 s of 8 kHz
+//       bursts and of the same 313 frames later, 9 dB down with noise, searched:
+//       lag −313 ±0.5, chosen by confidence.
+//   P4  unrelated features plan to the refusal naming the played windows'
+//       candidates and the rule from its constants; two 100-frame files (no
+//       search can run) to "too little room to compare their sound."
 //   P5  drift (SY-7) on smooth arrays stretched by known ratios, within
 //       ±5 ppm, including 100 ppm at exactly `driftMinimumOverlapBuckets`;
 //       one bucket under it is not measured; a mover that sounds only in its
 //       first 3,000 of 15,000 buckets is not measured (the span rule); a
 //       6,000-bucket overlap where only the two end windows can match is not
 //       measured, naming 2 windows (the count rule, checked first).
-//   P6  the refusals (SY-4): before 0, windows that never meet, two clips on
-//       one track, a neighbour on the mover's track; a neighbour that only
-//       abuts the new window is not refused; a silent anchor is named once,
-//       and not against the movers, and a silent mover is named alone.
+//   P6  the refusals (SY-4): windows that never meet, two clips on one
+//       track, a neighbour on the mover's track; a neighbour that only abuts
+//       the new window is not refused; a silent anchor is named once, and not
+//       against the movers, and a silent mover is named alone.
 //   P7  correction (SY-6, SY-10): a +1,000 ppm mover (it lengthens) and a
 //       −1,000 ppm one (it shortens): the set_speed rate within 5 ppm of s/k,
 //       keep_pitch false, delta the hand-worked snap(zeroA + 6000·c − S + I·k)
@@ -42,9 +48,51 @@
 //   P8  SY-8's boundaries (4.99 vs 5.0 ms, a drift just over, exactly at and
 //       just under 3× its uncertainty, a new speed
 //       0.0019 vs 0.0021 from ×1), a 20 ppm drift left with its note; a
-//       reading at speed 1/k with the drifted onsets makes no op, one at
-//       ×0.9999 is set to within 5 ppm of 1/k; `rateProblem` at ×2, ×1.002,
-//       ×1.0021, ×0.998, ×0.9979.
+//       reading at speed 1/k with the drifted features and onsets makes no
+//       op, one at ×0.9999 is set to within 5 ppm of 1/k; `rateProblem` at
+//       ×2, ×1.002, ×1.0021, ×0.998, ×0.9979.
+//   P9  `SyncFeatures` (SY-11): `frameCount` at its edges, the frames of a
+//       signal delayed by 5·128 samples (fed in odd pieces) are its frames
+//       shifted by 5 (max |Δ| < 1e-3), digital silence `isSilent` and a noise
+//       floor not, `frameTicks` 9,600.
+//   P10 `summedCorrelation` equals a brute-force sum on short arrays; a lag
+//       planted at a partial overlap, the mover's gain and coefficient levels
+//       changed and noise added, is recovered within ±0.25 frame and chosen
+//       by confidence; the candidates lie more than 60 frames apart.
+//   P11 `choose` at its boundaries, written from the constants (z confidentZ
+//       against 0.01 under, margin confidentMargin against 0.01 under, a near
+//       peak at plausibleZ against 0.01 under, confident beats nearer); the near
+//       placement within 188 frames and not at 189; a strong peak with only
+//       its flank inside the radius and a margin under 1.5 gives no near
+//       placement and no choice (the flank's z ≥ 4 is the control); `find`:
+//       the played windows before the whole files, the whole files when the
+//       played windows choose nothing and a window is a part of its file or
+//       is under 125 frames, never when both are whole files, and the refusal
+//       naming each search's first candidate as its move.
+//   P12 the head trim (SY-16) against hand-worked numbers: a ×1 mover at
+//       −0.5 s is trimmed by 0.5 s (ops, start 0, trimmed, duration); a
+//       +1,000 ppm mover needing 5 s gets set_speed, trim_start, move_clip;
+//       exactly one frame left is planned, under one refused; a trimmed span
+//       that no longer meets the anchor is refused; a neighbour meeting the
+//       trimmed span is refused, the same one frame clear is not.
+//   P13 unrelated sound placed where it overlaps (both at 0, placement lag
+//       0): four pairs of 30 s bursts from different seeds and one pair of
+//       white-noise frames, each refused "no matching sound found" or planned
+//       with every row chosen by placement and `weakMoves` non-empty — never
+//       by confidence (SY-18); each near placement's z printed.
+//   P14 speech-only matching (SY-17): `speechMask` on a hand-worked chunk
+//       list (the frame's centre chunk, ≥ 0.5) and on none; `frameCentreTicks`
+//       19,200; `resampledMask` the identity at ×1 and as long as
+//       `resampledFrames` at ×1.001; the masked `standardised` of 200 frames
+//       with 120 speech frames (mean 0, sd 1 over them, the others 0); a
+//       planted pair whose speech segment (300 frames, lag +200) loses to an
+//       unmarked longer one (400 frames, lag −300) on sound and wins on
+//       speech; 124 speech frames in the mover is on sound, 125 on speech.
+//   P15 the weak tier's words (SY-18, SY-19): `weakMoves` of a confident
+//       mover, a weak one that moves and trims, a weak one already in place;
+//       `weakQuestion`'s message and one-mover detail and `weakNote`, each
+//       exactly; two weak movers joined with "; "; a weak mover listed only
+//       for its drift correction worded as the speed it plays at.
 import Foundation
 
 var rows: [[String: Any]] = []
@@ -62,41 +110,57 @@ struct LCG {
     mutating func signed() -> Float { Float(next() * 2 - 1) }
 }
 
+let width = SyncFeatures.coefficients
+
 func randomArray(_ count: Int, seed: UInt64) -> [Float] {
     var lcg = LCG(state: seed)
     return (0..<count).map { _ in lcg.signed() }
 }
 
-/// `mover[m] = anchor[m + shift]` where that exists, fresh noise elsewhere:
-/// the mover's sound at bucket m is the anchor's at m + shift, so lag = shift.
-func shifted(_ anchor: [Float], by shift: Int, count: Int, seed: UInt64) -> [Float] {
+/// `count` frames of seeded noise, frame-major.
+func randomFrames(_ count: Int, seed: UInt64) -> [Float] { randomArray(count * width, seed: seed) }
+
+/// `mover[m] = anchor[m + shift]` frame by frame where that exists, fresh
+/// noise elsewhere: the mover's sound at frame m is the anchor's at m + shift,
+/// so lag = shift.
+func shiftedFrames(_ anchor: [Float], by shift: Int, count: Int, seed: UInt64) -> [Float] {
     var lcg = LCG(state: seed)
-    return (0..<count).map { m in
+    let frames = anchor.count / width
+    var out: [Float] = []
+    out.reserveCapacity(count * width)
+    for m in 0..<count {
         let a = m + shift
-        return a >= 0 && a < anchor.count ? anchor[a] : lcg.signed()
+        for k in 0..<width {
+            out.append(a >= 0 && a < frames ? anchor[a * width + k] : lcg.signed())
+        }
     }
+    return out
 }
 
 let fps = Fps(num: 30, den: 1)
 let bucket: Ticks = 6000
+let step: Ticks = SyncFeatures.frameTicks
 
 /// A reading whose in point is `(start − zero)·speed`, so that its zero is
 /// `start − in/speed` as `AudioSync.read` writes it.
 func reading(
     _ clip: UInt32, track: Int, start: Ticks, end: Ticks, zero: Ticks, video: Bool = false,
-    onsets: [Float] = [], neighbours: [AudioSync.Neighbour] = [], speed: Double = 1
+    onsets: [Float] = [], features: [Float] = [], speech: [Bool]? = nil,
+    neighbours: [AudioSync.Neighbour] = [], speed: Double = 1
 ) -> AudioSync.Reading {
     AudioSync.Reading(
         clip: clip, media: clip + 100, trackIndex: track, start: start, end: end, zero: zero,
-        hasVideo: video, onsets: onsets, neighbours: neighbours, speed: speed,
-        sourceIn: Ticks((Double(start - zero) * speed).rounded()))
+        hasVideo: video, onsets: onsets, features: features, speech: speech,
+        neighbours: neighbours,
+        speed: speed, sourceIn: Ticks((Double(start - zero) * speed).rounded()))
 }
 
-/// A smooth signal: Gaussian bumps (σ 2 buckets) at seeded moments.
+/// A smooth signal: Gaussian bumps (σ `sigma` buckets) at seeded moments.
 struct Bumps {
     var at: [Double] = []
     var amp: [Double] = []
-    init(seed: UInt64, length: Double) {
+    var sigma = 2.0
+    init(seed: UInt64, length: Double, sigma: Double = 2) {
         var lcg = LCG(state: seed)
         var t = 0.0
         while t < length {
@@ -104,23 +168,41 @@ struct Bumps {
             at.append(t)
             amp.append(0.2 + lcg.next())
         }
+        self.sigma = sigma
     }
     /// Samples `f(m·k + c)` for m in 0..<count.
     func sample(count: Int, k: Double, c: Double) -> [Float] {
         var out = [Double](repeating: 0, count: count)
+        let reach = sigma == 2 ? 12 : Int(6 * sigma / k) + 1
         for (t, a) in zip(at, amp) {
             let centre = (t - c) / k
-            let low = max(0, Int(centre - 12))
-            let high = min(count - 1, Int(centre + 12))
+            let low = max(0, Int(centre) - reach)
+            let high = min(count - 1, Int(centre) + reach)
             guard low <= high else { continue }
             for m in low...high {
                 let d = Double(m) * k + c - t
-                out[m] += a * exp(-d * d / 8)
+                out[m] += a * exp(-d * d / (2 * sigma * sigma))
             }
         }
         let mean = out.reduce(0, +) / Double(max(count, 1))
         return out.map { Float($0 - mean) }
     }
+}
+
+/// Smooth features: coefficient q is its own `Bumps` (σ 6 buckets, seed
+/// `seed + q`) read at bucket time `f·1.6·k + c` for frame f — the same clock
+/// as onsets sampled at `m·k + c`, so a drifted file is drifted in both.
+func featureBumps(seed: UInt64, length: Double, count: Int, k: Double, c: Double) -> [Float] {
+    let perFrame = Double(step) / Double(bucket)
+    let columns = (0..<width).map {
+        Bumps(seed: seed + UInt64($0), length: length, sigma: 6)
+            .sample(count: count, k: perFrame * k, c: c)
+    }
+    var out = [Float](repeating: 0, count: count * width)
+    for f in 0..<count {
+        for q in 0..<width { out[f * width + q] = columns[q][f] }
+    }
+    return out
 }
 
 func describe(_ plan: AudioSync.Plan) -> String {
@@ -130,7 +212,8 @@ func describe(_ plan: AudioSync.Plan) -> String {
     case .planned(let anchor, let synced, let ops):
         let parts = synced.map {
             "clip \($0.clip) lag \($0.lag) delta \($0.delta) start \($0.start) "
-                + "r \(String(format: "%.3f", $0.correlation))"
+                + "z \(String(format: "%.2f", $0.confidence)) \($0.search.rawValue)/"
+                + "\($0.chosenBy.rawValue) on \($0.matchedOn.rawValue) trimmed \($0.trimmed)"
         }
         return "planned: anchor \(anchor), \(parts.joined(separator: "; ")), \(ops.count) op(s)"
     }
@@ -146,27 +229,27 @@ func refusal(_ plan: AudioSync.Plan) -> String? {
 // MARK: - P1 delta arithmetic
 
 do {
-    let anchor = randomArray(3000, seed: 11)
-    // (zeroA, startA, zeroN, startN, shift k, expected delta) — each worked
-    // by hand: zeroA − zeroN + k·6000, rounded to the nearest 20 000.
+    let anchor = randomFrames(3000, seed: 11)
+    // (zeroA, startA, zeroN, startN, shift k frames, expected delta) — each
+    // worked by hand: zeroA − zeroN + k·9600, rounded to the nearest 20 000.
     let table: [(Ticks, Ticks, Ticks, Ticks, Int, Ticks)] = [
-        (600_000, 600_000, 0, 0, 300, 2_400_000),  // 600 000 + 1 800 000, on a frame
-        (600_000, 600_000, 0, 0, 301, 2_400_000),  // 2 406 000 = frame 120.3 → 120
-        (6_000_000, 6_000_000, 0, 0, -250, 4_500_000),  // 6 000 000 − 1 500 000
-        (0, 0, 600_000, 1_200_000, 400, 1_800_000),  // a trimmed mover: −600 000 + 2 400 000
-        (0, 0, 0, 0, 33, 200_000),  // 198 000 = frame 9.9 → 10
+        (600_000, 600_000, 0, 0, 250, 3_000_000),  // 600 000 + 2 400 000, on a frame
+        (600_000, 600_000, 0, 0, 251, 3_000_000),  // 3 009 600 = frame 150.48 → 150
+        (6_000_000, 6_000_000, 0, 0, -250, 3_600_000),  // 6 000 000 − 2 400 000
+        (0, 0, 600_000, 1_200_000, 400, 3_240_000),  // a trimmed mover: −600 000 + 3 840 000
+        (0, 0, 0, 0, 33, 320_000),  // 316 800 = frame 15.84 → 16
     ]
     var good = true
     var notes: [String] = []
     for (index, entry) in table.enumerated() {
         let (zeroA, startA, zeroN, startN, shift, expected) = entry
-        let mover = shifted(anchor, by: shift, count: 3000, seed: 100 + UInt64(index))
+        let mover = shiftedFrames(anchor, by: shift, count: 3000, seed: 100 + UInt64(index))
         let input = AudioSync.Input(
             readings: [
-                reading(1, track: 0, start: startA, end: startA + 3000 * bucket, zero: zeroA,
-                        video: true, onsets: anchor),
-                reading(2, track: 1, start: startN, end: startN + 2500 * bucket, zero: zeroN,
-                        onsets: mover),
+                reading(1, track: 0, start: startA, end: startA + 3000 * step, zero: zeroA,
+                        video: true, features: anchor),
+                reading(2, track: 1, start: startN, end: startN + 2500 * step, zero: zeroN,
+                        features: mover),
             ], problems: [], anchor: nil, fps: fps)
         let plan = AudioSync.plan(input)
         guard case .planned(let anchorClip, let synced, let ops) = plan, let one = synced.first
@@ -175,13 +258,15 @@ do {
             notes.append("case \(index): \(describe(plan))")
             continue
         }
-        let lagOK = abs(one.lag - Ticks(shift) * bucket) <= 600
+        let lagOK = abs(one.lag - Ticks(shift) * step) <= 960
         let ok = anchorClip == 1 && one.clip == 2 && one.delta == expected
             && one.start == startN + expected && lagOK && ops.count == (expected != 0 ? 1 : 0)
+            && one.trimmed == 0
         if !ok { good = false }
         notes.append(
             "case \(index): k \(shift) delta \(one.delta) (want \(expected)) start \(one.start) "
-                + "lag \(one.lag) (want \(Ticks(shift) * bucket) ±600)")
+                + "lag \(one.lag) (want \(Ticks(shift) * step) ±960) z "
+                + "\(String(format: "%.1f", one.confidence)) \(one.search.rawValue)")
     }
     row("P1", good, notes.joined(separator: "; "))
 }
@@ -211,7 +296,30 @@ do {
             + "\($0.2.map(String.init) ?? "nil"))" }.joined(separator: "; "))
 }
 
-// MARK: - P3 correlation against brute force, and a known lag
+// MARK: - P3 correlation against brute force, and a known lag through the extractor
+
+/// `seconds` of 8 kHz bursts — noise or a tone, 30–400 ms, gaps of 50–600
+/// ms — over a floor near −66 dBFS (the proof's `source_samples`, smaller).
+func bursts(seconds: Int, seed: UInt64) -> [Float] {
+    var lcg = LCG(state: seed)
+    let rate = SyncFeatures.sampleRate
+    let total = rate * seconds
+    var out = (0..<total).map { _ in Float(lcg.signed()) * 0.0005 }
+    var n = Int((0.05 + lcg.next() * 0.55) * Double(rate))
+    while n < total {
+        let length = Int((0.03 + lcg.next() * 0.37) * Double(rate))
+        let level = 0.1 + lcg.next() * 0.7
+        let tone = lcg.next() < 0.5
+        let freq = 200 + lcg.next() * 1800
+        for i in 0..<min(length, total - n) {
+            let env = level * min(1, Double(i) / 32) * (1 - 0.6 * Double(i) / Double(length))
+            let value = tone ? sin(2 * Double.pi * freq * Double(i) / Double(rate)) : lcg.next() * 2 - 1
+            out[n + i] += Float(env * value)
+        }
+        n += length + Int((0.05 + lcg.next() * 0.55) * Double(rate))
+    }
+    return out
+}
 
 do {
     let x = randomArray(400, seed: 21)
@@ -230,84 +338,77 @@ do {
     }
     let bruteOK = fast.count == 649 && worst <= 1e-4 * max(scale, 1)
 
-    // A peaks envelope: a floor, and bursts that rise at seeded moments; the
-    // mover is the same envelope 313 buckets later and 9 dB down.
-    var lcg = LCG(state: 31)
-    var peaks = [Float](repeating: 0.002, count: 6000)
-    var index = 0
-    while index < peaks.count {
-        index += 5 + Int(lcg.next() * 60)
-        let length = 3 + Int(lcg.next() * 25)
-        let level = Float(0.05 + lcg.next() * 0.9)
-        for k in index..<min(index + length, peaks.count) {
-            peaks[k] = level * Float(1 - 0.5 * Double(k - index) / Double(length))
-        }
-        index += length
+    // The mover is the same sound 313 frames (40 064 samples) later, 9 dB
+    // down, with noise at −60 dBFS: its frame m is the anchor's m − 313.
+    let source = bursts(seconds: 30, seed: 31)
+    var lcg = LCG(state: 32)
+    let delay = 313 * SyncFeatures.hop
+    let later = (0..<(source.count - 20_000)).map { n -> Float in
+        let a = n - delay
+        return (a >= 0 ? source[a] * 0.3548 : 0) + Float(lcg.signed()) * 0.001
     }
-    let quieter = (0..<5800).map { m -> Float in
-        let a = m - 313
-        return a >= 0 ? peaks[a] * 0.3548 : 0.002 * 0.3548
-    }
-    let match = AudioSyncMatch.match(
-        anchor: AudioSyncMatch.onsets(peaks), mover: AudioSyncMatch.onsets(quieter))
-    // The mover's sound at m is the anchor's at m − 313: lag −313.
-    let lagOK = match.map { abs($0.lag - -313) <= 0.5 && $0.correlation >= 0.9 && $0.isConfident }
-        ?? false
+    let anchorFrames = SyncFeatures.frames(source)
+    let moverFrames = SyncFeatures.frames(later)
+    let result = AudioSyncMatch.search(
+        anchor: anchorFrames, mover: moverFrames, anchorSpeech: nil, moverSpeech: nil,
+        offset: 0, placementLag: 10_000)
+    let chosen = result.flatMap { AudioSync.choose($0) }
+    let lagOK = chosen.map { abs($0.0.lag - -313) <= 0.5 && $0.1 == .confidence } ?? false
     row(
         "P3", bruteOK && lagOK,
-        "FFT vs brute force over 649 lags: worst |Δ| \(String(format: "%.2e", worst)) of scale "
-            + "\(String(format: "%.1f", scale)) (≤ 1e-4 of it); peaks lag "
-            + "\(match.map { String(format: "%.3f", $0.lag) } ?? "nil") (want −313 ±0.5), r "
-            + "\(match.map { String(format: "%.3f", $0.correlation) } ?? "nil"), confident "
-            + "\(match?.isConfident ?? false)")
+        "crossCorrelation vs brute force over 649 lags: worst |Δ| "
+            + "\(String(format: "%.2e", worst)) of scale \(String(format: "%.1f", scale)) "
+            + "(≤ 1e-4 of it); through SyncFeatures (\(anchorFrames.count / width) and "
+            + "\(moverFrames.count / width) frames): lag "
+            + "\(chosen.map { String(format: "%.3f", $0.0.lag) } ?? "nil") (want −313 ±0.5), z "
+            + "\(chosen.map { String(format: "%.2f", $0.0.z) } ?? "nil"), chosen by "
+            + "\(chosen.map { $0.1.rawValue } ?? "nothing"); candidates "
+            + "\(result.map { $0.candidates.map { String(format: "%.1f@%.2f", $0.lag, $0.z) } } ?? [])")
 }
 
-// MARK: - P4 thresholds
+// MARK: - P4 the refusals a search makes
 
 do {
-    typealias M = AudioSyncMatch.Match
-    let boundary: [(String, M, Bool)] = [
-        ("r 0.25, runner-up 0.125", M(lag: 0, correlation: 0.25, runnerUp: 0.125), true),
-        ("r 0.2499, runner-up 0.125", M(lag: 0, correlation: 0.2499, runnerUp: 0.125), false),
-        ("ratio exactly 1.5", M(lag: 0, correlation: 0.375, runnerUp: 0.25), true),
-        ("ratio under 1.5", M(lag: 0, correlation: 0.375, runnerUp: 0.2501), false),
-        ("runner-up −0.1", M(lag: 0, correlation: 0.9, runnerUp: -0.1), true),
-        ("no runner-up", M(lag: 0, correlation: 0.9, runnerUp: nil), false),
-    ]
     var good = true
     var notes: [String] = []
-    for (name, match, want) in boundary {
-        if match.isConfident != want { good = false }
-        notes.append("\(name): ratio \(match.ratio) confident \(match.isConfident) (want \(want))")
-    }
-    let infinite = M(lag: 0, correlation: 0.9, runnerUp: -0.1).ratio == .infinity
-    if !infinite { good = false }
-
-    let unrelated = AudioSyncMatch.match(
-        anchor: randomArray(3000, seed: 41), mover: randomArray(3000, seed: 42))
-    let unrelatedOK = unrelated.map { !$0.isConfident } ?? false
-    if !unrelatedOK { good = false }
-    notes.append(
-        "unrelated: r \(unrelated.map { String(format: "%.3f", $0.correlation) } ?? "nil") ratio "
-            + "\(unrelated.map { String(format: "%.2f", $0.ratio) } ?? "nil") confident "
-            + "\(unrelated?.isConfident ?? true)")
-
-    let equal = randomArray(300, seed: 43)
-    let same = AudioSyncMatch.match(anchor: equal, mover: equal)
-    let sameOK = same.map { $0.runnerUp == nil && !$0.isConfident } ?? false
+    // The mover sits 5,000 frames from the anchor, beyond every lag the two
+    // can be compared at, so no peak is near its placement: only the
+    // confident rule can choose, and white noise never reaches it. (Near a
+    // placement, white noise CAN reach plausibleZ: z is taken over every lag,
+    // and the short-overlap lags at the ends lower the sd; see P11.)
+    let anchor = randomFrames(1500, seed: 41)
+    let unrelated = randomFrames(1500, seed: 42)
     let plan = AudioSync.plan(
         AudioSync.Input(
             readings: [
-                reading(1, track: 0, start: 0, end: 300 * bucket, zero: 0, video: true,
-                        onsets: equal),
-                reading(2, track: 1, start: 0, end: 300 * bucket, zero: 0, onsets: equal),
+                reading(1, track: 0, start: 0, end: 1500 * step, zero: 0, video: true,
+                        features: anchor),
+                reading(2, track: 1, start: 5000 * step, end: 6500 * step, zero: 5000 * step,
+                        features: unrelated),
             ], problems: [], anchor: nil, fps: fps))
-    let roomOK = refusal(plan)?.contains("clip 2: too little room to compare its sound with "
-        + "clip 1's") ?? false
-    if !sameOK || !roomOK { good = false }
-    notes.append(
-        "equal 300: runner-up \(same.map { $0.runnerUp.map { String($0) } ?? "nil" } ?? "no match") "
-            + "confident \(same?.isConfident ?? true); \(describe(plan))")
+    let said = refusal(plan) ?? ""
+    let rule = " A match applies on its own at confidence ≥ 10 and 1.5 above the next "
+        + "candidate; one ≥ 4 within 3 s of where clip 2 sits now is offered as a weak match."
+    let unrelatedOK = said.hasPrefix(
+        "no matching sound found between clip 1 and clip 2: in the played windows, moving clip 2 "
+            + "by ") && said.hasSuffix(rule) && said.contains("(confidence ")
+        && !said.contains("in the whole files")
+    if !unrelatedOK { good = false }
+    notes.append("unrelated 1,500 frames: \(describe(plan))")
+
+    let short = AudioSync.plan(
+        AudioSync.Input(
+            readings: [
+                reading(1, track: 0, start: 0, end: 100 * step, zero: 0, video: true,
+                        features: randomFrames(100, seed: 43)),
+                reading(2, track: 1, start: 0, end: 100 * step, zero: 0,
+                        features: randomFrames(100, seed: 44)),
+            ], problems: [], anchor: nil, fps: fps))
+    if refusal(short) != "no matching sound found between clip 1 and clip 2: too little room to "
+        + "compare their sound." {
+        good = false
+    }
+    notes.append("two 100-frame files: \(describe(short))")
     row("P4", good, notes.joined(separator: "; "))
 }
 
@@ -383,7 +484,7 @@ do {
 // MARK: - P6 refusals
 
 do {
-    let anchor = randomArray(3000, seed: 61)
+    let anchor = randomFrames(3000, seed: 61)
     var good = true
     var notes: [String] = []
     func expect(_ name: String, _ plan: AudioSync.Plan, refusedWith words: String?) {
@@ -392,31 +493,20 @@ do {
         if !ok { good = false }
         notes.append("\(name): \(describe(plan))")
     }
-    let late = shifted(anchor, by: 300, count: 3000, seed: 62)
-    let early = shifted(anchor, by: -300, count: 3000, seed: 63)
-    let far = shifted(anchor, by: 2000, count: 3000, seed: 64)
+    let late = shiftedFrames(anchor, by: 300, count: 3000, seed: 62)
+    let far = shiftedFrames(anchor, by: 2000, count: 3000, seed: 64)
 
-    // Before 0: lag −300 from an anchor at 0 puts the mover at −1 800 000.
-    expect(
-        "before 0",
-        AudioSync.plan(
-            AudioSync.Input(
-                readings: [
-                    reading(1, track: 0, start: 0, end: 18_000_000, zero: 0, video: true,
-                            onsets: anchor),
-                    reading(2, track: 1, start: 0, end: 18_000_000, zero: 0, onsets: early),
-                ], problems: [], anchor: nil, fps: fps)),
-        refusedWith: "clip 2: would have to start 3.00 s before the timeline begins.")
-    // Never meeting: the anchor plays its first 2 s, the mover its first 1 s,
-    // which lands at 20 s.
+    // Never meeting: the anchor plays its first 2 s (125 frames), the mover
+    // its first 1 s (under 125, so the whole files are searched), which lands
+    // at 19.2 s.
     expect(
         "windows never meet",
         AudioSync.plan(
             AudioSync.Input(
                 readings: [
                     reading(1, track: 0, start: 0, end: 1_200_000, zero: 0, video: true,
-                            onsets: anchor),
-                    reading(2, track: 1, start: 0, end: 600_000, zero: 0, onsets: far),
+                            features: anchor),
+                    reading(2, track: 1, start: 0, end: 600_000, zero: 0, features: far),
                 ], problems: [], anchor: nil, fps: fps)),
         refusedWith: "clip 2: once lined up it would not play at any moment clip 1 plays.")
     // Same track.
@@ -426,46 +516,47 @@ do {
             AudioSync.Input(
                 readings: [
                     reading(1, track: 0, start: 600_000, end: 18_600_000, zero: 600_000,
-                            video: true, onsets: anchor),
+                            video: true, features: anchor),
                     reading(2, track: 0, start: 20_000_000, end: 38_000_000, zero: 20_000_000,
-                            onsets: late),
+                            features: late),
                 ], problems: [], anchor: nil, fps: fps)),
         refusedWith: "clip 1 and clip 2 are on one track")
-    // A neighbour: the mover lands on [2 400 000, 20 400 000).
+    // A neighbour: lag 300 frames (2 880 000) puts the mover on
+    // [3 480 000, 21 480 000).
     func withNeighbour(_ start: Ticks, _ end: Ticks) -> AudioSync.Plan {
         AudioSync.plan(
             AudioSync.Input(
                 readings: [
                     reading(1, track: 0, start: 600_000, end: 18_600_000, zero: 600_000,
-                            video: true, onsets: anchor),
-                    reading(2, track: 1, start: 0, end: 18_000_000, zero: 0, onsets: late,
+                            video: true, features: anchor),
+                    reading(2, track: 1, start: 0, end: 18_000_000, zero: 0, features: late,
                             neighbours: [AudioSync.Neighbour(clip: 99, start: start, end: end)]),
                 ], problems: [], anchor: nil, fps: fps))
     }
     expect("neighbour overlapped", withNeighbour(20_000_000, 21_000_000),
            refusedWith: "clip 2: would overlap clip 99 on its track.")
-    expect("neighbour abutting after", withNeighbour(20_400_000, 21_000_000), refusedWith: nil)
-    expect("neighbour abutting before", withNeighbour(1_000_000, 2_400_000),
+    expect("neighbour abutting after", withNeighbour(21_480_000, 22_000_000), refusedWith: nil)
+    expect("neighbour abutting before", withNeighbour(1_000_000, 3_480_000),
            refusedWith: nil)
     // Silence is the silent clip's own problem, named on it alone.
-    let quiet = [Float](repeating: 0, count: 3000)
+    let quiet = [Float](repeating: 0, count: 3000 * width)
     func silence(anchor first: [Float], mover second: [Float]) -> AudioSync.Plan {
         AudioSync.plan(
             AudioSync.Input(
                 readings: [
                     reading(1, track: 0, start: 600_000, end: 18_600_000, zero: 600_000,
-                            video: true, onsets: first),
-                    reading(2, track: 1, start: 0, end: 18_000_000, zero: 0, onsets: second),
-                    reading(3, track: 2, start: 0, end: 18_000_000, zero: 0, onsets: late),
+                            video: true, features: first),
+                    reading(2, track: 1, start: 0, end: 18_000_000, zero: 0, features: second),
+                    reading(3, track: 2, start: 0, end: 18_000_000, zero: 0, features: late),
                 ], problems: [], anchor: nil, fps: fps))
     }
     let silentAnchor = silence(anchor: quiet, mover: late)
-    if refusal(silentAnchor) != "clip 1: has no sound that rises anywhere to line up by." {
+    if refusal(silentAnchor) != "clip 1: has no sound to line up by." {
         good = false
     }
     notes.append("silent anchor: \(describe(silentAnchor))")
     let silentMover = silence(anchor: anchor, mover: quiet)
-    if refusal(silentMover) != "clip 2: has no sound that rises anywhere to line up by." {
+    if refusal(silentMover) != "clip 2: has no sound to line up by." {
         good = false
     }
     notes.append("silent mover: \(describe(silentMover))")
@@ -490,15 +581,23 @@ do {
     // 3 000 000 (5 s) and starts at S = 3 000 000 (zero 0), d = 117 s.
     let signal = Bumps(seed: 71, length: 8_100)
     let anchorOnsets = signal.sample(count: 8_000, k: 1, c: 0)
+    let anchorFeatures = featureBumps(seed: 171, length: 8_100, count: 5_000, k: 1, c: 0)
     let zeroA: Ticks = 90_000_000
     let c = -12_000.0
     let frame: Ticks = 20_000
     let anchor = reading(
         1, track: 0, start: zeroA, end: zeroA + 48_000_000, zero: zeroA, video: true,
-        onsets: anchorOnsets)
+        onsets: anchorOnsets, features: anchorFeatures)
     func moverFile(_ k: Double) -> [Float] {
         var file = signal.sample(count: 20_000, k: k, c: c)
         for m in 0..<12_000 { file[m] = 0 }
+        return file
+    }
+    /// The mover's features: silent for its first 7,500 frames (12,000
+    /// buckets), then the anchor's on the same drifted clock.
+    func moverFeatures(_ k: Double) -> [Float] {
+        var file = featureBumps(seed: 171, length: 8_100, count: 12_500, k: k, c: c)
+        for index in 0..<(7_500 * width) { file[index] = 0 }
         return file
     }
     var good = true
@@ -518,10 +617,16 @@ do {
     for (name, k, want, centreLine, order) in cases {
         let moverOnsets = moverFile(k)
         let mover = reading(
-            2, track: 1, start: 3_000_000, end: 120_000_000, zero: 0, onsets: moverOnsets)
-        let coarse = AudioSyncMatch.match(anchor: anchorOnsets, mover: moverOnsets)
+            2, track: 1, start: 3_000_000, end: 120_000_000, zero: 0, onsets: moverOnsets,
+            features: moverFeatures(k))
+        var coarse: AudioSync.Found?
+        if case .found(let found) = AudioSync.find(
+            anchor: anchor, anchorFrames: anchor.features, anchorSpeech: nil, mover: mover,
+            moverFrames: mover.features, moverSpeech: nil, fps: fps) {
+            coarse = found
+        }
         let coarseDelta = coarse.map {
-            ReelTime.snapToFrame(zeroA + Ticks(($0.lag * 6000).rounded()), fps: fps)
+            ReelTime.snapToFrame(zeroA + Ticks(($0.lag * Double(step)).rounded()), fps: fps)
         }
         let plan = AudioSync.plan(
             AudioSync.Input(readings: [anchor, mover], problems: [], anchor: nil, fps: fps))
@@ -543,16 +648,17 @@ do {
             "\(name): rate \(String(format: "%.7f", rate)) (want 1/k "
                 + "\(String(format: "%.7f", 1 / k)) ±5 ppm), keep_pitch \(keep.map(String.init) ?? "nil"), "
                 + "delta \(one.delta) (want \(want)), duration \(one.duration); ops \(opList(ops)) "
-                + "(want \(order)); control: centre-line delta \(centreLine), AS-1 delta "
-                + "\(coarseDelta.map(String.init) ?? "nil") (r "
-                + "\(coarse.map { String(format: "%.3f", $0.correlation) } ?? "nil"), q "
-                + "\(coarse.map { String(format: "%.2f", $0.ratio) } ?? "nil")), drift \(one.drift)")
+                + "(want \(order)); control: centre-line delta \(centreLine), coarse delta "
+                + "\(coarseDelta.map(String.init) ?? "nil") (z "
+                + "\(coarse.map { String(format: "%.2f", $0.confidence) } ?? "nil"), "
+                + "\(coarse.map { $0.search.rawValue } ?? "nil")), drift \(one.drift)")
     }
     // The neighbour: k 1.001 at S 21 000 000 (zero 18 000 000, I 3 000 000)
     // puts delta at snap(3 000) = 0; d 117 000 000 grows to about
     // 117 120 000, so a neighbour from the old end 138 000 000 is overlapped
     // and one 10 frames later (138 200 000) is not.
     let moverOnsets = moverFile(1.001)
+    let movedFeatures = moverFeatures(1.001)
     func withNeighbour(_ at: Ticks) -> AudioSync.Plan {
         AudioSync.plan(
             AudioSync.Input(
@@ -560,7 +666,7 @@ do {
                     anchor,
                     reading(
                         2, track: 1, start: 21_000_000, end: 138_000_000, zero: 18_000_000,
-                        onsets: moverOnsets,
+                        onsets: moverOnsets, features: movedFeatures,
                         neighbours: [AudioSync.Neighbour(clip: 99, start: at, end: 150_000_000)]),
                 ], problems: [], anchor: nil, fps: fps))
     }
@@ -636,9 +742,11 @@ do {
     let anchorOnsets = signal.sample(count: 16_000, k: 1, c: 0)
     let k = 1.001
     let drifted = signal.sample(count: 20_000, k: k, c: -4000)
+    let driftedFeatures = featureBumps(seed: 181, length: 16_500, count: 12_500, k: k, c: -4000)
     let anchor = reading(
         1, track: 0, start: 36_000_000, end: 132_000_000, zero: 36_000_000, video: true,
-        onsets: anchorOnsets)
+        onsets: anchorOnsets,
+        features: featureBumps(seed: 181, length: 16_500, count: 10_000, k: 1, c: 0))
     func resync(_ speed: Double) -> AudioSync.Plan {
         AudioSync.plan(
             AudioSync.Input(
@@ -646,7 +754,8 @@ do {
                     anchor,
                     reading(
                         2, track: 1, start: 15_000_000, end: 15_000_000 + 117_120_000,
-                        zero: 12_000_000, onsets: drifted, speed: speed),
+                        zero: 12_000_000, onsets: drifted, features: driftedFeatures,
+                        speed: speed),
                 ], problems: [], anchor: nil, fps: fps))
     }
     let settled = resync(1 / k)
@@ -679,6 +788,664 @@ do {
         good = false
     }
     row("P8", good, notes.joined(separator: "; "))
+}
+
+// MARK: - P9 the extractor
+
+do {
+    var good = true
+    var notes: [String] = []
+    let counts: [(Int, Int)] = [(511, 0), (512, 1), (639, 1), (640, 2), (8000, 59)]
+    for (samples, want) in counts {
+        let got = SyncFeatures.frameCount(samples: samples)
+        if got != want { good = false }
+        notes.append("frameCount(\(samples)) \(got) (want \(want))")
+    }
+    let signal = bursts(seconds: 4, seed: 91)
+    let plain = SyncFeatures.frames(signal)
+    if plain.count != SyncFeatures.frameCount(samples: signal.count) * width { good = false }
+    // Delayed by 5 hops and fed in pieces of 1,000 samples.
+    let delayed = [Float](repeating: 0, count: 5 * SyncFeatures.hop) + signal
+    let extractor = SyncFeatures.Extractor()
+    var at = 0
+    while at < delayed.count {
+        let piece = Array(delayed[at..<min(at + 1000, delayed.count)])
+        piece.withUnsafeBufferPointer { extractor.feed($0) }
+        at += 1000
+    }
+    let shiftedOut = extractor.finish()
+    var worst: Float = 0
+    let frames = plain.count / width
+    if shiftedOut.count != (frames + 5) * width { good = false }
+    for f in 0..<min(frames, shiftedOut.count / width - 5) {
+        for k in 0..<width {
+            worst = max(worst, abs(shiftedOut[(f + 5) * width + k] - plain[f * width + k]))
+        }
+    }
+    if !(worst < 1e-3) { good = false }
+    notes.append(
+        "\(frames) frames; delayed 5·128 samples, fed in 1,000s: \(shiftedOut.count / width) "
+            + "frames, max |Δ| against frame f + 5 \(String(format: "%.2e", worst)) (< 1e-3)")
+    let silence = SyncFeatures.frames([Float](repeating: 0, count: 16_000))
+    var lcg = LCG(state: 92)
+    let floor = SyncFeatures.frames((0..<16_000).map { _ in lcg.signed() * 0.0005 })
+    let silentOK = AudioSyncMatch.isSilent(silence) && !AudioSyncMatch.isSilent(floor)
+        && !AudioSyncMatch.isSilent(plain)
+    if !silentOK { good = false }
+    if SyncFeatures.frameTicks != 9600 { good = false }
+    notes.append(
+        "silence isSilent \(AudioSyncMatch.isSilent(silence)), a −66 dBFS floor "
+            + "\(AudioSyncMatch.isSilent(floor)), the bursts \(AudioSyncMatch.isSilent(plain)); "
+            + "frameTicks \(SyncFeatures.frameTicks)")
+    row("P9", good, notes.joined(separator: "; "))
+}
+
+// MARK: - P10 the summed correlation
+
+do {
+    var good = true
+    var notes: [String] = []
+    // Brute force: Σ_k Σ_m x_k[m+L]·y_k[m], on 40 and 25 frames.
+    let x = randomFrames(40, seed: 101)
+    let y = randomFrames(25, seed: 102)
+    let fast = AudioSyncMatch.summedCorrelation(x, y)
+    var worst = 0.0
+    var scale = 0.0
+    for index in 0..<(40 + 25 - 1) {
+        let lag = index - 24
+        var sum = 0.0
+        for m in 0..<25 where m + lag >= 0 && m + lag < 40 {
+            for k in 0..<width { sum += Double(x[(m + lag) * width + k]) * Double(y[m * width + k]) }
+        }
+        worst = max(worst, abs(sum - fast[index]))
+        scale = max(scale, abs(sum))
+    }
+    if !(fast.count == 64 && worst <= 1e-4 * max(scale, 1)) { good = false }
+    notes.append(
+        "vs brute force over 64 lags: worst |Δ| \(String(format: "%.2e", worst)) of scale "
+            + "\(String(format: "%.1f", scale))")
+
+    // A lag planted at a PARTIAL overlap (500 of the mover's 1,000 frames):
+    // anchor frame m + 1500 is the mover's m. Each coefficient sits at its
+    // own level, as MFCCs do, and the mover's is moved (a gain change moves
+    // c0 most) and scaled, with noise; unstandardised, the levels would put
+    // the peak where the overlap is longest.
+    var lcg = LCG(state: 103)
+    var anchor = randomFrames(2000, seed: 104)
+    for f in 0..<2000 { for k in 0..<width { anchor[f * width + k] += Float(30 - k) } }
+    var mover = [Float](repeating: 0, count: 1000 * width)
+    for m in 0..<1000 {
+        for k in 0..<width {
+            let base = m + 1500 < 2000
+                ? anchor[(m + 1500) * width + k] - Float(30 - k) : lcg.signed()
+            let level: Float = k == 0 ? 52 : Float(35 - k)
+            mover[m * width + k] = 0.5 * base + level + lcg.signed() * 0.2
+        }
+    }
+    let result = AudioSyncMatch.search(
+        anchor: anchor, mover: mover, anchorSpeech: nil, moverSpeech: nil,
+        offset: 0, placementLag: -5000)
+    let chosen = result.flatMap { AudioSync.choose($0) }
+    let lagOK = chosen.map { abs($0.0.lag - 1500) <= 0.25 && $0.1 == .confidence } ?? false
+    let lags = result?.candidates.map { $0.lag } ?? []
+    var apart = !lags.isEmpty
+    for i in lags.indices { for j in lags.indices where j > i && abs(lags[i] - lags[j]) <= 60 {
+        apart = false
+    } }
+    if !lagOK || !apart { good = false }
+    notes.append(
+        "planted 1500 at a 500-frame overlap: chosen "
+            + "\(chosen.map { String(format: "%.3f", $0.0.lag) } ?? "nil") (want 1500 ±0.25) z "
+            + "\(chosen.map { String(format: "%.2f", $0.0.z) } ?? "nil") by "
+            + "\(chosen.map { $0.1.rawValue } ?? "nothing"); candidates "
+            + "\(result.map { $0.candidates.map { String(format: "%.1f@%.2f", $0.lag, $0.z) } } ?? []) "
+            + "(each > 60 apart: \(apart))")
+    row("P10", good, notes.joined(separator: "; "))
+}
+
+// MARK: - P11 the choice and the search order
+
+do {
+    typealias C = AudioSyncMatch.Candidate
+    typealias R = AudioSyncMatch.SearchResult
+    var good = true
+    var notes: [String] = []
+    func chooses(_ name: String, _ result: R, _ want: (C, AudioSync.ChosenBy)?) {
+        let got = AudioSync.choose(result)
+        let ok = got?.0 == want?.0 && got?.1 == want?.1
+        if !ok { good = false }
+        notes.append(
+            "\(name): \(got.map { "\($0.1.rawValue) z \($0.0.z)" } ?? "nil")"
+                + (ok ? "" : " (want \(want.map { "\($0.1.rawValue) z \($0.0.z)" } ?? "nil"))"))
+    }
+    let zc = AudioSyncMatch.confidentZ
+    let margin = AudioSyncMatch.confidentMargin
+    let zp = AudioSyncMatch.plausibleZ
+    let six = C(lag: 10, z: zc)
+    let near = C(lag: -3, z: zp)
+    let exactly = C(lag: 200, z: zc - margin)
+    let short = C(lag: 200, z: zc - margin + 0.01)
+    chooses("z confidentZ, margin exactly confidentMargin",
+            R(candidates: [six, exactly], nearPlacement: nil), (six, .confidence))
+    chooses("z confidentZ − 0.01, margin far over",
+            R(candidates: [C(lag: 10, z: zc - 0.01), C(lag: 200, z: 1.0)], nearPlacement: nil), nil)
+    chooses("z confidentZ, margin 0.01 short", R(candidates: [six, short], nearPlacement: nil), nil)
+    chooses("margin 0.01 short, near z plausibleZ",
+            R(candidates: [six, short], nearPlacement: near), (near, .placement))
+    chooses("margin 0.01 short, near z plausibleZ − 0.01",
+            R(candidates: [six, short], nearPlacement: C(lag: -3, z: zp - 0.01)), nil)
+    chooses("one candidate z confidentZ", R(candidates: [six], nearPlacement: nil),
+            (six, .confidence))
+    let strong = C(lag: 400, z: zc + 2)
+    chooses("confident beats nearer", R(candidates: [strong, C(lag: 0, z: zp + 1)],
+                                        nearPlacement: C(lag: 0, z: zp + 1)), (strong, .confidence))
+
+    // The radius: a planted lag of 100 is the near placement 188 frames from
+    // where the mover sits, and not 189 frames away.
+    let base = randomFrames(1000, seed: 111)
+    let planted = shiftedFrames(base, by: 100, count: 800, seed: 112)
+    let inside = AudioSyncMatch.search(
+        anchor: base, mover: planted, anchorSpeech: nil, moverSpeech: nil,
+        offset: 0, placementLag: -88)
+    let outside = AudioSyncMatch.search(
+        anchor: base, mover: planted, anchorSpeech: nil, moverSpeech: nil,
+        offset: 0, placementLag: -89)
+    let insideOK = inside?.nearPlacement.map { abs($0.lag - 100) <= 0.5 } ?? false
+    let outsideOK = outside.map { result in
+        result.nearPlacement.map { abs($0.lag - 100) > 1 && $0.z < AudioSyncMatch.plausibleZ } ?? true
+    } ?? false
+    if !insideOK || !outsideOK { good = false }
+    notes.append(
+        "planted 100, placement −88 (188 away): near "
+            + "\(inside?.nearPlacement.map { String(format: "%.2f@%.2f", $0.lag, $0.z) } ?? "nil"); "
+            + "placement −89: near "
+            + "\(outside?.nearPlacement.map { String(format: "%.2f@%.2f", $0.lag, $0.z) } ?? "nil")")
+
+    // A flank: the anchor holds one broad event twice (frames 7,000 and
+    // 13,000 of 20,000), the mover once (frame 750 of 1,500), so the two
+    // peaks (lags 6,250 and 12,250) tie and the margin fails. The radius
+    // around 6,250 − 196 covers only the rising flank up to 8 frames short of
+    // the peak: there is no local maximum in it, so no near placement.
+    func event(_ count: Int, at centres: [Double], sigma: Double, seed: UInt64) -> [Float] {
+        var lcg = LCG(state: seed)
+        let signs = (0..<width).map { _ in lcg.next() < 0.5 ? -1.0 : 1.0 }
+        var out = [Float](repeating: 0, count: count * width)
+        for f in 0..<count {
+            let g = centres.reduce(0.0) { $0 + exp(-(Double(f) - $1) * (Double(f) - $1)
+                / (2 * sigma * sigma)) }
+            for k in 0..<width { out[f * width + k] = Float(g * signs[k]) }
+        }
+        return out
+    }
+    let wide = event(20_000, at: [7_000, 13_000], sigma: 106, seed: 113)
+    let once = event(1_500, at: [750], sigma: 106, seed: 113)
+    let flank = AudioSyncMatch.search(
+        anchor: wide, mover: once, anchorSpeech: nil, moverSpeech: nil,
+        offset: 0, placementLag: 6_250 - 196)
+    // The control: the flank lag 8 frames short of the peak reaches z ≥ 4,
+    // so a rule taking the highest lag in the radius would have chosen it.
+    let c = AudioSyncMatch.summedCorrelation(
+        AudioSyncMatch.standardised(wide), AudioSyncMatch.standardised(once))
+    let mean = c.reduce(0, +) / Double(c.count)
+    let sd = (c.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(c.count)).squareRoot()
+    let flankZ = (c[6_250 - 8 + 1_499] - mean) / sd
+    let flankOK = flank.map { $0.nearPlacement == nil && AudioSync.choose($0) == nil } ?? false
+        && flankZ >= AudioSyncMatch.plausibleZ
+    if !flankOK { good = false }
+    notes.append(
+        "flank only: candidates "
+            + "\(flank.map { $0.candidates.map { String(format: "%.1f@%.2f", $0.lag, $0.z) } } ?? []), "
+            + "near \(flank?.nearPlacement.map { String(format: "%.1f", $0.lag) } ?? "nil"), choice "
+            + "\(flank.flatMap { AudioSync.choose($0) }.map { $0.1.rawValue } ?? "nil"); control: "
+            + "the flank's z \(String(format: "%.2f", flankZ)) (≥ 4)")
+
+    // `find`. The anchor's file holds an utterance U at frames [2000, 2300)
+    // and a longer competing stretch C at [4000, 4800); the mover's file holds
+    // C at [0, 800) and U at [6000, 6300). U's lag is −4000, C's +4000, and
+    // C wins any whole-file search.
+    let anchorFile = randomFrames(5000, seed: 114)
+    var moverFile = randomFrames(8000, seed: 115)
+    for f in 0..<800 { for k in 0..<width { moverFile[f * width + k] = anchorFile[(4000 + f) * width + k] } }
+    for f in 0..<300 { for k in 0..<width {
+        moverFile[(6000 + f) * width + k] = anchorFile[(2000 + f) * width + k]
+    } }
+    func found(
+        _ name: String, anchorWindow: Range<Int>, moverWindow: Range<Int>, moverZeroFrames: Int,
+        anchorFeatures: [Float] = anchorFile, moverFeatures: [Float] = moverFile
+    ) -> AudioSync.FindAnswer {
+        let a = reading(
+            1, track: 0, start: Ticks(anchorWindow.lowerBound) * step,
+            end: Ticks(anchorWindow.upperBound) * step, zero: 0, video: true,
+            features: anchorFeatures)
+        let zero = Ticks(moverZeroFrames) * step
+        let m = reading(
+            2, track: 1, start: zero + Ticks(moverWindow.lowerBound) * step,
+            end: zero + Ticks(moverWindow.upperBound) * step, zero: zero, features: moverFeatures)
+        let answer = AudioSync.find(
+            anchor: a, anchorFrames: anchorFeatures, anchorSpeech: nil, mover: m,
+            moverFrames: moverFeatures, moverSpeech: nil, fps: fps)
+        switch answer {
+        case .found(let f):
+            notes.append(
+                "\(name): \(f.search.rawValue) by \(f.chosenBy.rawValue), lag "
+                    + "\(String(format: "%.2f", f.lag)) z \(String(format: "%.2f", f.confidence)), "
+                    + "\(f.candidates.count) candidate(s)")
+        case .refused(let problem):
+            notes.append("\(name): refused \(problem.description)")
+        }
+        return answer
+    }
+    func isFound(_ answer: AudioSync.FindAnswer, _ search: AudioSync.Search, lag: Double) -> Bool {
+        if case .found(let f) = answer { return f.search == search && abs(f.lag - lag) <= 0.5 }
+        return false
+    }
+    // Played first: both windows hold U, both are parts of their files.
+    let first = found("played first", anchorWindow: 1800..<2500, moverWindow: 5900..<6400,
+                      moverZeroFrames: -4200)
+    if !isFound(first, .played, lag: -4000) { good = false }
+    // The played windows hold nothing in common, and are parts of their
+    // files: the whole files are searched and C is found. The mover sits at
+    // lag 4,000, well away from every lag the played search can see.
+    let fallback = found("played chose nothing", anchorWindow: 0..<700, moverWindow: 2000..<2500,
+                         moverZeroFrames: 4000)
+    if !isFound(fallback, .whole, lag: 4000) { good = false }
+    // Under 125 frames, the played windows are not searched.
+    let tiny = found("played windows of 100 frames", anchorWindow: 2000..<2100,
+                     moverWindow: 6000..<6100, moverZeroFrames: -4000)
+    if !isFound(tiny, .whole, lag: 4000) { good = false }
+    // Two unrelated files played whole: the played windows ran, the whole
+    // files did not, and the refusal names the played search's best candidate
+    // as its move. The mover sits 5,000 frames away, beyond every lag (P4).
+    let lone = randomFrames(1000, seed: 116)
+    let stranger = randomFrames(1000, seed: 117)
+    let whole = found("both whole files, unrelated", anchorWindow: 0..<1000,
+                      moverWindow: 0..<1000, moverZeroFrames: 5000, anchorFeatures: lone,
+                      moverFeatures: stranger)
+    let direct = AudioSyncMatch.search(
+        anchor: lone, mover: stranger, anchorSpeech: nil, moverSpeech: nil,
+        offset: 0, placementLag: 5000)
+    let firstMove = direct?.candidates.first.map { candidate -> String in
+        let delta = ReelTime.snapToFrame(
+            -5000 * step + Ticks((candidate.lag * Double(step)).rounded()), fps: fps)
+        return String(format: "%+.2f", Double(delta) / 600_000).replacingOccurrences(of: "-", with: "−")
+            + " s (confidence " + String(format: "%.2f", candidate.z) + ")"
+    }
+    if case .refused(let problem) = whole, let firstMove {
+        if !(problem.reason.hasPrefix("no matching sound found between clip 1 and clip 2: in the "
+                + "played windows, moving clip 2 by " + firstMove)
+            && !problem.reason.contains("in the whole files")) {
+            good = false
+        }
+    } else {
+        good = false
+    }
+    notes.append("the played search's first candidate as a move: \(firstMove ?? "nil")")
+    // The same two files played in part: both searches ran and are named.
+    let both = found("both in part, unrelated", anchorWindow: 0..<500, moverWindow: 0..<500,
+                     moverZeroFrames: 5000, anchorFeatures: lone, moverFeatures: stranger)
+    if case .refused(let problem) = both, problem.reason.contains("in the played windows, moving")
+        && problem.reason.contains("; in the whole files, moving") {
+    } else {
+        good = false
+    }
+    row("P11", good, notes.joined(separator: "; "))
+}
+
+// MARK: - P12 the head trim
+
+do {
+    var good = true
+    var notes: [String] = []
+    let frame: Ticks = 20_000
+    let anchorFile = randomFrames(3000, seed: 121)
+    // The mover's frame m is the anchor's m − 50: lag −50 frames (−480 000).
+    let moverFile = shiftedFrames(anchorFile, by: -50, count: 3000, seed: 122)
+    let anchorAt0 = reading(1, track: 0, start: 0, end: 3000 * step, zero: 0, video: true,
+                            features: anchorFile)
+    /// A ×1 mover at S with in point I and duration d: zeroN = S − I, so
+    /// δ = 0 − (S − I) − 480 000 and S + δ = I − 480 000.
+    func trimmed(_ name: String, anchor: AudioSync.Reading = anchorAt0, start: Ticks, sourceIn: Ticks,
+                 duration: Ticks, neighbours: [AudioSync.Neighbour] = []) -> AudioSync.Plan {
+        let plan = AudioSync.plan(
+            AudioSync.Input(
+                readings: [
+                    anchor,
+                    reading(2, track: 1, start: start, end: start + duration,
+                            zero: start - sourceIn, features: moverFile, neighbours: neighbours),
+                ], problems: [], anchor: nil, fps: fps))
+        notes.append("\(name): \(describe(plan))"
+            + (planOps(plan).map { ", ops \(opList($0))" } ?? ""))
+        return plan
+    }
+    func planOps(_ plan: AudioSync.Plan) -> [ReelOp]? {
+        if case .planned(_, _, let ops) = plan { return ops }
+        return nil
+    }
+    func expectTrim(_ plan: AudioSync.Plan, delta: Ticks, to: Ticks, excess: Ticks,
+                    duration: Ticks) -> Bool {
+        guard case .planned(let anchorClip, let synced, let ops) = plan, let one = synced.first
+        else { return false }
+        return anchorClip == 1 && one.delta == delta && one.start == 0 && one.trimmed == excess
+            && one.duration == duration && ops.map { $0.name } == ["trim_start", "move_clip"]
+            && ops[0].args["to"] as? Ticks == to && ops[0].args["clip"] as? UInt32 == 2
+            && ops[1].args["delta"] as? Ticks == delta
+    }
+    // ×1 at −0.5 s: S 600 000, I 180 000 (zeroN 420 000), d 14 400 000.
+    // δ = −420 000 − 480 000 = −900 000 (frame −45); S + δ = −300 000, so
+    // e = 300 000: trim_start to S + e = 900 000, then move_clip −900 000;
+    // the span [0, 14 100 000) and in I + e = 480 000 (the core's trim).
+    let half = trimmed("×1 at −0.5 s", start: 600_000, sourceIn: 180_000, duration: 14_400_000)
+    if !expectTrim(half, delta: -900_000, to: 900_000, excess: 300_000, duration: 14_100_000) {
+        good = false
+    }
+    notes.append("want in 480 000 after trim_start (I + e)")
+    // Exactly one frame left: d 320 000 − e 300 000 = 20 000.
+    let oneFrame = trimmed("one frame left", start: 600_000, sourceIn: 180_000, duration: 320_000)
+    if !expectTrim(oneFrame, delta: -900_000, to: 900_000, excess: 300_000, duration: frame) {
+        good = false
+    }
+    let under = trimmed("under a frame left", start: 600_000, sourceIn: 180_000, duration: 319_999)
+    if refusal(under) != "clip 2: would have to lose 0.50 s of its head to start at 0, leaving "
+        + "under a frame of it." {
+        good = false
+    }
+    // The anchor plays only from 20 s: the trimmed span [0, 14 100 000)
+    // never meets it.
+    let late = reading(1, track: 0, start: 20_000_000, end: 3000 * step, zero: 0, video: true,
+                       features: anchorFile)
+    let apart = trimmed("trimmed span misses the anchor", anchor: late, start: 600_000,
+                        sourceIn: 180_000, duration: 14_400_000)
+    if refusal(apart) != "clip 2: once lined up it would not play at any moment clip 1 plays." {
+        good = false
+    }
+    // S 3 000 000, I 180 000 (zeroN 2 820 000), d 1 500 000: δ = −3 300 000,
+    // e 300 000, the trimmed span [0, 1 200 000), clear of the mover's old
+    // span [3 000 000, 4 500 000).
+    let hit = trimmed("neighbour meeting the trimmed span", start: 3_000_000, sourceIn: 180_000,
+                      duration: 1_500_000,
+                      neighbours: [AudioSync.Neighbour(clip: 99, start: 1_180_000, end: 2_000_000)])
+    if refusal(hit) != "clip 2: would overlap clip 99 on its track." { good = false }
+    let clear = trimmed("the same neighbour one frame clear", start: 3_000_000, sourceIn: 180_000,
+                        duration: 1_500_000,
+                        neighbours: [AudioSync.Neighbour(clip: 99, start: 1_200_000, end: 2_000_000)])
+    if !expectTrim(clear, delta: -3_300_000, to: 3_300_000, excess: 300_000, duration: 1_200_000) {
+        good = false
+    }
+
+    // +1,000 ppm needing a trim: P7's mover (S 3 000 000, I 3 000 000, zero
+    // 0, d 117 s) against P7's anchor moved 24 000 000 earlier (zeroA
+    // 66 000 000, a multiple of 48 000). δ = snap(66 000 000 − 72 000 000 −
+    // 3 000 000 + 3 000 000·1.001) = snap(−5 997 000) = −6 000 000; S + δ =
+    // −3 000 000, so e = 3 000 000: set_speed (≈ 1/k), trim_start to
+    // 6 000 000, move_clip −6 000 000; in after I + e·s' ≈ 3 000 000 +
+    // 3 000 000/1.001 = 5 997 003 (the core's trim at s').
+    let k = 1.001
+    let signal = Bumps(seed: 71, length: 8_100)
+    var moverOnsets = signal.sample(count: 20_000, k: k, c: -12_000)
+    for m in 0..<12_000 { moverOnsets[m] = 0 }
+    var moverFeatures = featureBumps(seed: 171, length: 8_100, count: 12_500, k: k, c: -12_000)
+    for index in 0..<(7_500 * width) { moverFeatures[index] = 0 }
+    let zeroA: Ticks = 66_000_000
+    let drifted = AudioSync.plan(
+        AudioSync.Input(
+            readings: [
+                reading(1, track: 0, start: zeroA, end: zeroA + 48_000_000, zero: zeroA,
+                        video: true, onsets: signal.sample(count: 8_000, k: 1, c: 0),
+                        features: featureBumps(seed: 171, length: 8_100, count: 5_000, k: 1, c: 0)),
+                reading(2, track: 1, start: 3_000_000, end: 120_000_000, zero: 0,
+                        onsets: moverOnsets, features: moverFeatures),
+            ], problems: [], anchor: nil, fps: fps))
+    if case .planned(_, let synced, let ops) = drifted, let one = synced.first,
+       ops.map({ $0.name }) == ["set_speed", "trim_start", "move_clip"],
+       let rate = ops[0].args["rate"] as? Double, abs(rate * k - 1) <= 5e-6,
+       ops[1].args["to"] as? Ticks == 6_000_000, ops[2].args["delta"] as? Ticks == -6_000_000,
+       one.start == 0, one.trimmed == 3_000_000 {
+        notes.append(
+            "+1000 ppm with a trim: \(opList(ops)); duration \(one.duration); want in "
+                + "\(String(format: "%.0f", 3_000_000 + 3_000_000 * rate)) after trim_start")
+    } else {
+        good = false
+        notes.append("+1000 ppm with a trim: \(describe(drifted))"
+            + (planOps(drifted).map { ", ops \(opList($0))" } ?? ""))
+    }
+    row("P12", good, notes.joined(separator: "; "))
+}
+
+// MARK: - P13 unrelated sound placed where it overlaps
+
+do {
+    // The case P4 and P11 keep out of reach (AS-3's review, finding 3): two
+    // clips that are not the same take, placed so they overlap — both at 0,
+    // placement lag 0, the user's natural first try — must never apply
+    // without asking (SY-18). Each pair is `SyncFeatures.frames` of two
+    // seeds' 30 s of bursts (CAMERA and UNRELATED's recipe), and one pair is
+    // white-noise frames; every one must be refused "no matching sound
+    // found", or planned with every row chosen by placement and `weakMoves`
+    // non-empty — never by confidence. The near placement's z is printed
+    // beside each, for SY-14's calibration.
+    var good = true
+    var notes: [String] = []
+    func unrelatedAtPlacement(_ name: String, _ anchor: [Float], _ mover: [Float]) {
+        let count = (anchor.count / width, mover.count / width)
+        let plan = AudioSync.plan(
+            AudioSync.Input(
+                readings: [
+                    reading(1, track: 0, start: 0, end: Ticks(count.0) * step, zero: 0,
+                            video: true, features: anchor),
+                    reading(2, track: 1, start: 0, end: Ticks(count.1) * step, zero: 0,
+                            features: mover),
+                ], problems: [], anchor: nil, fps: fps))
+        let near = AudioSyncMatch.search(
+            anchor: anchor, mover: mover, anchorSpeech: nil, moverSpeech: nil,
+            offset: 0, placementLag: 0
+        ).flatMap { $0.nearPlacement }
+        let refused = refusal(plan)?.hasPrefix("no matching sound found between clip 1 and clip 2")
+            ?? false
+        var weak = false
+        if case .planned(_, let synced, _) = plan {
+            weak = !synced.isEmpty && synced.allSatisfy { $0.chosenBy == .placement }
+                && !AudioSync.weakMoves(synced).isEmpty
+        }
+        if !refused && !weak { good = false }
+        notes.append(
+            "\(name) (\(count.0) and \(count.1) frames, both at 0): near placement "
+                + (near.map { String(format: "lag %.2f z %.2f", $0.lag, $0.z) } ?? "nil")
+                + " → \(refused ? "refused" : weak ? "weak, asked: " + describe(plan) : "NOT refused or weak: " + describe(plan))")
+    }
+    for (index, seeds) in [(131, 132), (133, 134), (135, 136), (137, 138)].enumerated() {
+        unrelatedAtPlacement(
+            "bursts pair \(index + 1)",
+            SyncFeatures.frames(bursts(seconds: 30, seed: UInt64(seeds.0))),
+            SyncFeatures.frames(bursts(seconds: 30, seed: UInt64(seeds.1))))
+    }
+    unrelatedAtPlacement(
+        "white noise", randomFrames(1500, seed: 139), randomFrames(1500, seed: 140))
+    row("P13", good, notes.joined(separator: "; "))
+}
+
+// MARK: - P14 speech-only matching
+
+do {
+    var good = true
+    var notes: [String] = []
+    let (T, F) = (true, false)
+    // Frame f's centre is f·9,600 + 19,200 ticks; a chunk is 19,200: frames
+    // 0 and 1 read chunk 1 (0.5, speech), 2 and 3 chunk 2 (0.49, not), 4 and
+    // 5 chunk 3 (0.9), 6 and 7 past the end, the last chunk (0.9).
+    let mask = AudioSyncMatch.speechMask([0.1, 0.5, 0.49, 0.9], frames: 8)
+    let empty = AudioSyncMatch.speechMask([], frames: 5)
+    let centre = AudioSyncMatch.frameCentreTicks
+    if mask != [T, T, F, F, T, T, T, T] || empty != [Bool](repeating: false, count: 5)
+        || centre != 19_200 {
+        good = false
+    }
+    notes.append(
+        "speechMask([0.1, 0.5, 0.49, 0.9], frames: 8) \(mask.map { $0 ? "T" : "F" }.joined()) "
+            + "(want TTFFTTTT); of none \(empty.map { $0 ? "T" : "F" }.joined()) (want FFFFF); "
+            + "frameCentreTicks \(centre) (want 19200)")
+
+    var lcg = LCG(state: 141)
+    let long = (0..<1000).map { _ in lcg.next() < 0.4 }
+    let identity = AudioSyncMatch.resampledMask(long, speed: 1) == long
+    let stretched = AudioSyncMatch.resampledMask(long, speed: 1.001).count
+    let framesAt = AudioSyncMatch.resampledFrames(randomFrames(1000, seed: 142), speed: 1.001)
+        .count / width
+    if !identity || stretched != framesAt { good = false }
+    notes.append(
+        "resampledMask ×1 the identity \(identity); ×1.001 \(stretched) frames (resampledFrames "
+            + "\(framesAt))")
+
+    // 200 frames, 120 of them speech; the others sit 5 higher, so a mean
+    // over every frame is not the speech frames' mean.
+    let speech200 = (0..<200).map { ($0 * 7) % 10 < 6 }
+    var stretch = randomFrames(200, seed: 143)
+    for f in 0..<200 { for k in 0..<width {
+        stretch[f * width + k] = stretch[f * width + k] * Float(1 + k % 3) + Float(k)
+            + (speech200[f] ? 0 : 5)
+    } }
+    let masked = AudioSyncMatch.standardised(stretch, speech: speech200)
+    var worstMean = 0.0
+    var worstSD = 0.0
+    var strayFrames = 0
+    let spoken = (0..<200).filter { speech200[$0] }
+    for k in 0..<width {
+        let values = spoken.map { Double(masked[$0 * width + k]) }
+        let mean = values.reduce(0, +) / Double(values.count)
+        let sd = (values.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(values.count))
+            .squareRoot()
+        worstMean = max(worstMean, abs(mean))
+        worstSD = max(worstSD, abs(sd - 1))
+    }
+    for f in 0..<200 where !speech200[f] {
+        if (0..<width).contains(where: { masked[f * width + $0] != 0 }) { strayFrames += 1 }
+    }
+    if spoken.count != 120 || worstMean >= 1e-4 || worstSD >= 1e-3 || strayFrames != 0 {
+        good = false
+    }
+    notes.append(
+        "masked standardised over \(spoken.count) of 200: worst |mean| "
+            + "\(String(format: "%.2e", worstMean)) (< 1e-4), worst |sd − 1| "
+            + "\(String(format: "%.2e", worstSD)) (< 1e-3), non-speech frames not 0: "
+            + "\(strayFrames)")
+
+    // Planted: the mover's [100, 400) is the anchor's [300, 600) (lag +200),
+    // marked speech in both; its [1000, 1400) is the anchor's [700, 1100)
+    // (lag −300), longer and unmarked. On sound the longer wins; on speech
+    // only the marked one can.
+    let anchor = randomFrames(2000, seed: 144)
+    var mover = randomFrames(2000, seed: 145)
+    for f in 0..<300 { for k in 0..<width { mover[(100 + f) * width + k] = anchor[(300 + f) * width + k] } }
+    for f in 0..<400 { for k in 0..<width { mover[(1000 + f) * width + k] = anchor[(700 + f) * width + k] } }
+    let anchorSpeech = (0..<2000).map { (300..<600).contains($0) }
+    func moverSpeech(_ count: Int) -> [Bool] { (0..<2000).map { (100..<(100 + count)).contains($0) } }
+    func best(_ result: AudioSyncMatch.SearchResult?) -> String {
+        guard let result, let first = result.candidates.first else { return "nil" }
+        return String(format: "%.2f z %.2f on ", first.lag, first.z) + result.matchedOn.rawValue
+    }
+    let sound = AudioSyncMatch.search(
+        anchor: anchor, mover: mover, anchorSpeech: nil, moverSpeech: nil, offset: 0,
+        placementLag: 5000)
+    let onSpeech = AudioSyncMatch.search(
+        anchor: anchor, mover: mover, anchorSpeech: anchorSpeech, moverSpeech: moverSpeech(300),
+        offset: 0, placementLag: 5000)
+    let soundOK = sound.map {
+        $0.matchedOn == .sound && abs(($0.candidates.first?.lag ?? 0) - -300) <= 0.5
+    } ?? false
+    let speechOK = onSpeech.map {
+        $0.matchedOn == .speech && abs(($0.candidates.first?.lag ?? 0) - 200) <= 0.5
+    } ?? false
+    if !soundOK || !speechOK { good = false }
+    notes.append(
+        "planted +200 (speech) and −300 (longer, unmarked): unmasked best \(best(sound)) (want "
+            + "−300 on sound); masked best \(best(onSpeech)) (want +200 ±0.5 on speech)")
+    // The floor: 124 speech frames in the mover is on sound, 125 on speech.
+    let under = AudioSyncMatch.search(
+        anchor: anchor, mover: mover, anchorSpeech: anchorSpeech, moverSpeech: moverSpeech(124),
+        offset: 0, placementLag: 5000)?.matchedOn
+    let at = AudioSyncMatch.search(
+        anchor: anchor, mover: mover, anchorSpeech: anchorSpeech, moverSpeech: moverSpeech(125),
+        offset: 0, placementLag: 5000)?.matchedOn
+    if under != .sound || at != .speech { good = false }
+    notes.append(
+        "mover speech 124 frames → \(under?.rawValue ?? "nil") (want sound), 125 → "
+            + "\(at?.rawValue ?? "nil") (want speech)")
+    row("P14", good, notes.joined(separator: "; "))
+}
+
+// MARK: - P15 the weak tier's words
+
+do {
+    var good = true
+    var notes: [String] = []
+    func synced(
+        _ clip: UInt32, _ rule: AudioSync.ChosenBy, delta: Ticks, trimmed: Ticks, z: Double,
+        correction: AudioSync.Correction = .leave(note: nil)
+    ) -> AudioSync.Synced {
+        AudioSync.Synced(
+            clip: clip, media: clip + 100, lag: 0, delta: delta, start: 0, confidence: z,
+            search: .played, chosenBy: rule, matchedOn: .speech, candidates: [],
+            drift: .notMeasured("not measured"), speed: 1, duration: 600_000,
+            correction: correction, trimmed: trimmed)
+    }
+    let confident = synced(2, .confidence, delta: -460_000, trimmed: 460_000, z: 12)
+    let weak = synced(2, .placement, delta: -460_000, trimmed: 460_000, z: 7.92)
+    let still = synced(2, .placement, delta: 0, trimmed: 0, z: 5)
+    let moves = (AudioSync.weakMoves([confident]), AudioSync.weakMoves([weak]),
+                 AudioSync.weakMoves([still]))
+    if !(moves.0.isEmpty && moves.1 == [weak] && moves.2.isEmpty) { good = false }
+    notes.append(
+        "weakMoves: confident \(moves.0.count) (want 0), weak moving and trimming "
+            + "\(moves.1.count) (want 1), weak in place \(moves.2.count) (want 0)")
+
+    let names: [UInt32: String] = [1: "IMG_0018.MOV", 2: "record.aifc", 3: "lapel.wav"]
+    let asked = AudioSync.weakQuestion([weak], anchor: 1, names: names)
+    let message = "Weak match: move “record.aifc” 0.77 s earlier (trimming 0.77 s off its head)?"
+    let detail = "Its sound matches “IMG_0018.MOV” with confidence 7.92: under the 10 a match "
+        + "needs to apply on its own, and the best match within 3 s of where it sits now. Cancel "
+        + "leaves everything as it is."
+    let note = AudioSync.weakNote([weak])
+    let wantNote = "Weak match, nothing moved: clip 2 would move by −0.77 s (trimming 0.77 s off "
+        + "its head), confidence 7.92 — under the 10 a match needs to apply on its own, and the "
+        + "best match within 3 s of where it sits now. Call sync_audio again with accept_weak: "
+        + "true to apply it, once the person has agreed to that move."
+    if asked.message != message || asked.detail != detail || note != wantNote { good = false }
+    notes.append(
+        "message \(asked.message == message ? "exact" : "WRONG: " + asked.message); detail "
+            + "\(asked.detail == detail ? "exact" : "WRONG: " + asked.detail); note "
+            + "\(note == wantNote ? "exact" : "WRONG: " + note)")
+
+    let other = synced(3, .placement, delta: 300_000, trimmed: 0, z: 5.1)
+    let two = AudioSync.weakQuestion([weak, other], anchor: 1, names: names)
+    let twoMessage = "Weak match: move “record.aifc” 0.77 s earlier (trimming 0.77 s off its "
+        + "head); move “lapel.wav” 0.50 s later?"
+    let twoNote = AudioSync.weakNote([weak, other])
+    let joined = two.message == twoMessage
+        && two.detail.hasPrefix("Their sound matches “IMG_0018.MOV” with confidence 7.92, 5.10: ")
+        && twoNote.contains("off its head), confidence 7.92; clip 3 would move by +0.50 s, "
+            + "confidence 5.10 — ")
+    if !joined { good = false }
+    notes.append("two weak movers: \(two.message) | \(two.detail) | \(twoNote)")
+
+    // A weak mover listed only because its drift correction applies: no
+    // delta, no trim, worded as the speed Apply sets (AS-3's second review).
+    let drifted = synced(3, .placement, delta: 0, trimmed: 0, z: 5.1,
+                         correction: .apply(speed: 1.0004))
+    let driftMoves = AudioSync.weakMoves([drifted])
+    let driftMessage = AudioSync.weakQuestion([drifted], anchor: 1, names: names).message
+    let driftNote = AudioSync.weakNote([drifted])
+    let wantDriftMessage = "Weak match: play “lapel.wav” at ×1.0004, correcting its drift?"
+    let wantDriftNote = "Weak match, nothing moved: clip 3 would play at ×1.0004, correcting its "
+        + "drift, confidence 5.10 — under the 10 a match needs to apply on its own, and the best "
+        + "match within 3 s of where it sits now. Call sync_audio again with accept_weak: true "
+        + "to apply it, once the person has agreed to that move."
+    if !(driftMoves == [drifted] && driftMessage == wantDriftMessage && driftNote == wantDriftNote) {
+        good = false
+    }
+    notes.append(
+        "speed-only weak mover: listed \(driftMoves.count) (want 1); message "
+            + "\(driftMessage == wantDriftMessage ? "exact" : "WRONG: " + driftMessage); note "
+            + "\(driftNote == wantDriftNote ? "exact" : "WRONG: " + driftNote)")
+    row("P15", good, notes.joined(separator: "; "))
 }
 
 let data = (try? JSONSerialization.data(withJSONObject: ["rows": rows], options: [.sortedKeys]))

@@ -3,7 +3,8 @@ import AppKit
 /// The Clip menu's sound commands: Normalize (road map 2 phase 5c), moved
 /// here whole out of `EditorViewController.swift` with its validator arm, as
 /// that body's own comment asked a second sound command to do, and
-/// Synchronize Audio (road map "audio-sync", AS-1; spec §11 SY-1..SY-5).
+/// Synchronize Audio (road map "audio-sync", AS-1; spec §11 SY-1..SY-5), with
+/// its Weak match sheet (road map "audio-sync-2", AS-3; SY-18, SY-19).
 extension EditorViewController {
 
     /// Clip ▸ Normalize (road map 2 phase 5c) — the menu half of the Audio
@@ -57,7 +58,10 @@ extension EditorViewController {
     /// CI-10); a selection already in sync is no ops and beeps. A drift the
     /// plan corrects is applied here too, as the same `set_speed` in the same
     /// undo step (SY-6); the menu shows no drift figure — the inspector's
-    /// speed is what changed.
+    /// speed is what changed. A plan with WEAK moves (SY-18,
+    /// `AudioSync.weakMoves`, the tool's own test) is asked about first in
+    /// the Weak match sheet (SY-19); with no window or a sheet already up it
+    /// beeps.
     @objc func synchronizeAudio(_ sender: Any?) {
         guard let document = document else { return }
         let snapshot = document.editedProject.snapshot
@@ -75,12 +79,61 @@ extension EditorViewController {
             NotificationCenter.default.post(
                 name: .projectDocumentDidRefuse, object: document,
                 userInfo: ["refusal": ReelRefusal(op: "sync_audio", reason: reason)])
-        case .planned(_, _, let ops):
+        case .planned(let anchor, let synced, let ops):
             guard !ops.isEmpty else {
                 NSSound.beep()
                 return
             }
-            document.applyEdit("Synchronize Audio", ops)
+            let weak = AudioSync.weakMoves(synced)
+            guard !weak.isEmpty else {
+                document.applyEdit("Synchronize Audio", ops)
+                return
+            }
+            guard let window = view.window, window.attachedSheet == nil else {
+                NSSound.beep()
+                return
+            }
+            askToApplyWeakMatch(weak, anchor: anchor, ops: ops, document: document, on: window)
+        }
+    }
+
+    /// The Weak match sheet (SY-19): Apply (the default) commits `ops` as one
+    /// grouped step — a sheet's completion is not an AppKit event
+    /// (app/CLAUDE.md's undo pitfall) — but only on the project handle and
+    /// scope it was asked about; anything else beeps and says so at the
+    /// inspector's foot. Cancel (Escape) changes nothing.
+    private func askToApplyWeakMatch(
+        _ weak: [AudioSync.Synced], anchor: UInt32, ops: [ReelOp],
+        document: ProjectDocument, on window: NSWindow
+    ) {
+        let snapshot = document.editedProject.snapshot
+        var names: [UInt32: String] = [:]
+        for id in [anchor] + weak.map(\.clip) {
+            if let clip = snapshot.clip(id) { names[id] = snapshot.name(of: clip) }
+        }
+        let text = AudioSync.weakQuestion(weak, anchor: anchor, names: names)
+        let asked = document.project
+        let scope = document.scope
+        let alert = NSAlert()
+        alert.messageText = text.message
+        alert.informativeText = text.detail
+        alert.addButton(withTitle: "Apply")
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { [weak document] response in
+            guard response == .alertFirstButtonReturn, let document else { return }
+            guard document.project === asked, document.scope == scope else {
+                NSSound.beep()
+                NotificationCenter.default.post(
+                    name: .projectDocumentDidRefuse, object: document,
+                    userInfo: [
+                        "refusal": ReelRefusal(
+                            op: "sync_audio",
+                            reason: "the project changed while the weak match was being asked "
+                                + "about, so nothing moved. Choose Synchronize Audio again.")
+                    ])
+                return
+            }
+            document.performGroupedEdit("Synchronize Audio", ops)
         }
     }
 

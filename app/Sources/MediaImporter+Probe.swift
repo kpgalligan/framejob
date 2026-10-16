@@ -1,3 +1,4 @@
+import CoreMedia
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
@@ -344,5 +345,34 @@ extension MediaImporter {
         dictionary[withoutAskingKey] = true
         defer { dictionary[withoutAskingKey] = prior }
         return try body()
+    }
+
+    /// Carries one probe's outcome across the semaphore in `waitForProbe`.
+    /// Unchecked because the join is the synchronisation: the detached task
+    /// writes it, signals, and never touches it again; the waiter reads it
+    /// only after the wait returns.
+    final class ProbeBox: @unchecked Sendable {
+        var outcome: Result<MediaDescriptor, any Error>?
+    }
+
+    /// Whether the codec carries alpha. The format description's own flag
+    /// first (ProRes 4444 and animation-with-alpha set it); the codec type is
+    /// the fallback for files whose writer omitted the extension.
+    static func hasAlphaChannel(_ descriptions: [CMFormatDescription]) -> Bool {
+        for description in descriptions {
+            if let flag = CMFormatDescriptionGetExtension(
+                description, extensionKey: kCMFormatDescriptionExtension_ContainsAlphaChannel)
+                as? Bool, flag {
+                return true
+            }
+            switch CMFormatDescriptionGetMediaSubType(description) {
+            // 'ap4h' ProRes 4444, 'ap4x' ProRes 4444 XQ, 'rle ' animation.
+            case 0x6170_3468, 0x6170_3478, 0x726C_6520:
+                return true
+            default:
+                continue
+            }
+        }
+        return false
     }
 }

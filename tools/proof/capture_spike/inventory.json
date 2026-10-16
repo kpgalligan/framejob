@@ -416,11 +416,12 @@
    "note": "an edit"
   },
   "synchronizeAudio:": {
-   "verdict": "none",
+   "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController+Audio.swift `func synchronizeAudio(`"
+    "app/Sources/EditorViewController+Audio.swift `func synchronizeAudio(`",
+    "app/Sources/EditorViewController+Audio.swift:122"
    ],
-   "note": "an edit"
+   "note": "a weak match asks Apply / Cancel in an alert sheet (SY-19); otherwise an edit"
   },
   "showSpeedSheet:": {
    "verdict": "sheet",
@@ -941,6 +942,15 @@
      "gate": "app/Sources/ExportSheetController.swift `if queue {` — Export…, not Add to Queue, and the save panel answered OK"
     }
    ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+Audio.swift:122": {
+   "token": "beginSheetModal",
+   "func": "askToApplyWeakMatch",
+   "reached_from": [
+    "synchronizeAudio:"
+   ],
+   "reached_after": [],
    "other_caller": ""
   },
   "app/Sources/EditorViewController+Export.swift:108": {

@@ -44,14 +44,6 @@ enum MediaImporter {
         return try await probeAsset(url)
     }
 
-    /// Carries one probe's outcome across the semaphore in `waitForProbe`.
-    /// Unchecked because the join is the synchronisation: the detached task
-    /// writes it, signals, and never touches it again; the waiter reads it
-    /// only after the wait returns.
-    private final class ProbeBox: @unchecked Sendable {
-        var outcome: Result<MediaDescriptor, any Error>?
-    }
-
     /// One AVFoundation probe, waited for from whatever thread called —
     /// `probeBlocking`'s original body, now shared with the
     /// completion-handler face and used twice per assisted import (once on
@@ -137,27 +129,6 @@ enum MediaImporter {
         return rationalFrameRate(nominal)
     }
 
-    /// Whether the codec carries alpha. The format description's own flag
-    /// first (ProRes 4444 and animation-with-alpha set it); the codec type is
-    /// the fallback for files whose writer omitted the extension.
-    private static func hasAlphaChannel(_ descriptions: [CMFormatDescription]) -> Bool {
-        for description in descriptions {
-            if let flag = CMFormatDescriptionGetExtension(
-                description, extensionKey: kCMFormatDescriptionExtension_ContainsAlphaChannel)
-                as? Bool, flag {
-                return true
-            }
-            switch CMFormatDescriptionGetMediaSubType(description) {
-            // 'ap4h' ProRes 4444, 'ap4x' ProRes 4444 XQ, 'rle ' animation.
-            case 0x6170_3468, 0x6170_3478, 0x726C_6520:
-                return true
-            default:
-                continue
-            }
-        }
-        return false
-    }
-
     // MARK: - Cache generation
 
     /// Kicks off both caches in the background and returns immediately —
@@ -234,6 +205,7 @@ enum MediaImporter {
                     for: media, url: url, stamp: stamp, into: cacheDir, pass: pass, input: input)
                 let published = await peaks(
                     for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
+                await syncFeatures(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
                 await speech(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
                 if !published, pass.isCurrent() {
                     await retryPeaks(for: media, url: url, into: cacheDir, pass: pass)
@@ -281,7 +253,8 @@ enum MediaImporter {
 
     /// The in-session retry of a waveform pass that published nothing: after
     /// each delay (a cancellation ends the wait), while the pass is current,
-    /// with a fresh stamp, until one attempt publishes or finds it current.
+    /// with a fresh stamp, until one attempt publishes or finds it current —
+    /// and then runs `syncFeatures` and `speech` once with that stamp (SY-11, SY-17).
     private static func retryPeaks(
         for media: MediaSnapshot, url: URL, into cacheDir: URL, pass: CachePass
     ) async {
@@ -290,6 +263,9 @@ enum MediaImporter {
             guard pass.isCurrent() else { return }
             let stamp = CacheStamp.stamp(for: media, url: url)
             if await peaks(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass) {
+                // SY-11, SY-17: features and speech lost with the waveform land with it.
+                await syncFeatures(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
+                await speech(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
                 return
             }
         }
@@ -550,6 +526,33 @@ enum MediaImporter {
         else { return false }
         return writePeaks(for: media, asset: asset, track: track, expectedRanges: expected,
                           stamp: stamp, into: cacheDir, pass: pass)
+    }
+
+    // MARK: - Sync features
+
+    /// Writes `cache/sync/<id>.bin` — Synchronize Audio's MFCC frames (spec
+    /// §11 SY-11; `MediaImporter+SyncFeatures.swift` is the reader and the
+    /// marker), run after `peaks` and before `speech`, and once more by
+    /// `retryPeaks` after an attempt that lands the waveform. `speech`'s
+    /// posture with no posts and no model: no audio clears what is on disk
+    /// (while current); a current marker skips; a stale one is cleared first.
+    static func syncFeatures(
+        for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL,
+        pass: CachePass? = nil
+    ) async {
+        guard media.hasAudio, media.duration > 0 else {
+            if pass?.isCurrent() ?? true { clearSyncFeatures(for: media.id, in: cacheDir) }
+            return
+        }
+        guard !syncFeaturesAreCurrent(for: media, stamp: stamp, in: cacheDir) else { return }
+        guard pass?.isCurrent() ?? true else { return }
+        clearSyncFeatures(for: media.id, in: cacheDir)
+        let asset = AVURLAsset(url: url)
+        guard let track = (try? await asset.loadTracks(withMediaType: .audio))?.first else {
+            return
+        }
+        writeSyncFeatures(for: media, asset: asset, track: track, stamp: stamp, into: cacheDir,
+                          pass: pass)
     }
 
     // MARK: - Speech

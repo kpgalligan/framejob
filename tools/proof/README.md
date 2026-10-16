@@ -20119,6 +20119,121 @@ mix's lag −2.20 / −2.53 ms (Δ −0.33), the ×1 control +24.09 / −2.39 ms
 18/18 killed, no failed control. S18's absolute bound reads the export against SOURCE, and the
 export's audio offset differs by path (#298).
 
+## Road map audio-sync-2 — AS-3, the feature match, played windows first, candidates, the head trim, speech-only matching and the weak tier (`audio_sync_proof.py` S1–S24, P1–P15 and thirty-two mutants; `audio_sync_probe.swift`; spec §11 SY-11..SY-19)
+
+The same script as AS-1 and AS-2 above; AS-3 retargeted the probe onto the cached sync features
+(`cache/sync/`, 26 MFCCs per 16 ms), changed S8 and every S row's match keys, and added three
+S rows and four P rows; its first fix pass added S22 and P13, its second S23, S24, P14 and P15.
+
+**Media.** OWNERLIKE, made by the script from seeds into `work/audio-sync/fixtures/`
+(`camera2-v1.mov`, `recorder2-v2.wav`; the names carry their version): a 60 s camera with a 5 s
+speech-like utterance at 31.2 s and a 13 s competing stretch of bursts at [47 s, 60 s), and a
+165 s recorder of low-frequency rumble (about −14 dBFS RMS) holding the competing stretch at 0 s
+and the utterance 118.70 s later than the camera does (118.71 s in `-v1`), both through RECORDER's −9 dB, low-pass and
+noise — the owner's traits: a short shared utterance, heavy rumble, and a second shared stretch
+that wins any whole-file search. The OWNER's own files (`tools/proof/media/owner-sync/IMG_0018.MOV`
+and `record.aifc`) are gitignored, never committed and never copied outside `tools/proof/`; rows
+S20 and S21 are a scored FAIL without them. `Session.media` now also waits 60 s for
+`cache/sync/<id>.complete.json`.
+
+**Rows changed.** S8 (SY-16): camera and recorder both at 0 sync by the head trim — the recorder
+stays at 0 with `in` and `trimmed` 94 frames (1,880,000, the snapped 3.1333125 s), the camera
+unmoved, one undo restoring start 0 and in 0. S1, S2, S10 print `confidence` (z), `search`,
+`chosen_by`, `candidates` and `trimmed` where they printed `correlation`. P1, P6, P7, P8 carry
+features shifted by the planted lag in frames (drift's lags multiples of 48,000 ticks); P3 now
+runs `SyncFeatures.frames` end to end on 8 kHz bursts and a delayed, 9 dB quieter copy; P4 is the
+refusal naming the played windows' candidates and the rule, and "too little room"; P6's before-0
+case moved to P12.
+
+**Rows added.** S19 the OWNERLIKE pair placed as the owner placed his (camera at 2 s from 29.72 s
+for 25.52 s; recorder at 0 from 147.63 s for 17.34 s): the recorder on exactly
+snap(cam.start − cam.in + rec.in − 118.70 s) — 1.2 s, a whole frame, so the snap's boundaries
+lie half a frame either side of the truth (SY-15 as amended) — found in the played windows. S20 the owner's files
+in the owner's placement, default anchor: the recorder stays at 0 with its in advanced by about
+0.77 s, recorder − camera within 1/30 s of 118.68 s, one undo restoring both. S21 the same with the
+recorder the anchor: the camera moves by about +0.77 s, no trim. P9 the extractor (`frameCount`,
+a 5-hop delay is a 5-frame shift, silence). P10 `summedCorrelation` against brute force and a lag
+planted at a partial overlap under per-coefficient levels. P11 `choose` at its boundaries, the
+near placement's radius and the flank case, and `find`'s order. P12 the head trim against
+hand-worked numbers. Fix pass 1 (the review's findings 1 and 3): S22 CAMERA and UNRELATED both
+at 0, refused "no matching sound found" (it prints how they synced when they do); P13 four pairs
+of 30 s bursts and one of white-noise frames, each placed both at 0, each refused, each near
+placement's z printed. P13 is its own row so that P11's mutants still kill on P11 alone.
+
+**Mutants** (the eighteen kept; `ratio-dropped` retargeted to the margin, P11, and
+`before-zero-dropped` to the trim, P12): `trim-floor-dropped` (P12); `confident-z`,
+`plausible-floor-dropped`, `radius-dropped`, `played-first-dropped`, `window-offset-dropped`
+(P11); `standardise-dropped` (P10).
+
+**Debug runs** (2026-10-15): P1–P12 12/12 (P4 and P11's unrelated cases place the mover beyond
+every searchable lag: white-noise features near a placement reached z 5.28 and 4.39, see the
+road map's record). S1–S18, S20, S21 20/20; S19 FAIL — the recorder landed on frame 35, not 36:
+the played search measured recorder − camera 118.7181 s for the true 118.71 s (z 15.17), and
+the snap boundary sits 6.7 ms from the true value. A numpy run of `mfccsync.py`'s recipe on the
+same windows measured 118.7191 s (z 15.15), so the 8 ms is the coarse match's own precision
+(parabolic refinement on 16 ms frames), not the Swift port's.
+
+**Recorded runs** (Release, after the gate's `make app`; no `Frame Job: ` line):
+`audio_sync_proof.py <dir>/agent.sock` 32/33 — S19 FAIL as on Debug (recorder on frame 35, not 36;
+recorder − camera 118.7188 s, z 15.20); S3 refused with its best candidate at z 5.97; S8 trimmed
+1,880,000; S20 the recorder at 0 with in +460,000 (0.767 s), T 118.6667 s, unsnapped 118.6703 s,
+z 4.17 by placement; S21 the camera +0.767 s, z 4.14 by placement; S10 197.374 ppm corrected to
+×0.99980263, frame 206; S18 Δ −0.33 ms, the control Δ −26.49 ms. `--mutants` 25/25 killed, no
+failed control. `recording_probe.py --only catalog` 31/31; `cache_pass_probe.py` 13/13.
+
+**Fix pass 1** (Release, the same build, 2026-10-15; no `Frame Job: ` line): 33/35. S19 ok on
+`recorder2-v2.wav` (frame 36; recorder − camera 118.6945 s, z 15.20). S22 FAIL — the unrelated
+pair synced by placement at z 4.57 (trimmed 1,000,000); P13 FAIL — bursts pairs 2 and 3 and the
+white noise synced (z 4.14 by placement, 6.83 by confidence, 4.39 by placement). These two FAILs
+are SY-14's calibration stop, recorded in road map "audio-sync-2"'s AS-3 record with every z;
+they stay failing until the choice rule is redesigned.
+
+**Fix pass 2** (the owner's "Ask, then apply", SY-17..SY-19). `Session.media` also waits for
+`cache/speech/<id>.complete.json`, and each of its three waits is 120 s (in one Debug run the
+owner's recorder's features landed just over 60 s after its import). Since fix pass 3 it prints
+each marker's seconds after `import_media` (`  media <key> (<file>): import …, peaks …, sync …,
+speech … after import_media`); on Release the owner's camera is ready in about 3.2 s and its
+recorder in 0.6 s. Retargeted: S3 and S22 pass when the
+call is refused "no matching sound found" or answers `moved: false` with the mover in `weak`,
+nothing chosen by confidence, the project unchanged and no step (each prints which and the z);
+S15's properties are `{clips, anchor, accept_weak, project}`, `accept_weak` a boolean; S20 and
+S21 first call without `accept_weak` (`moved` false, `weak` the mover, `chosen_by` "placement",
+`matched_on` "speech", unchanged, no step), then with `accept_weak: true` against every earlier
+assertion. Added: S23, the masked null — the owner's camera as in S20 against the owner's
+recorder reversed by ffmpeg's `areverse` (written to `work/audio-sync/` only), placed at 0 from
+8.0 s for 17.34 s — S3's test, with a control: both played windows must hold ≥ 125 frames the
+cached VAD calls speech (rebuilt from `cache/speech/<id>.bin` by SY-17's centre-chunk rule), so
+the search ran on speech; S24, the Weak match sheet — S20's placement, `perform_menu_item ["Clip",
+"Synchronize Audio"]` answers a sheet, `snapshot_ui {window: "sheet"}`'s texts hold "Weak
+match…", "Apply" and "Cancel", `cancel_sheet` presses Cancel, nothing changed. S23 and S24 are a
+scored FAIL without the owner's files. P11's boundaries are written from `confidentZ`,
+`confidentMargin` and `plausibleZ`; P13 passes each pair refused or weak (every row by placement,
+`weakMoves` non-empty), never confident; P14 the speech masks, `frameCentreTicks`, the masked
+standardisation, a planted pair that loses on sound and wins on speech, and the 125-frame floor;
+P15 `weakMoves`, `weakQuestion` and `weakNote`, exactly. **Mutants** added (seven):
+`speech-mask-dropped`, `speech-floor-dropped`, `speech-threshold`, `speech-chunk-offset`,
+`masked-standardise-all` (P14); `weak-applied`, `weak-unchanged-listed` (P15);
+`standardise-dropped` re-anchored to the unmasked branch (P10).
+
+**Fix pass 2's Debug run** (2026-10-15; no `Frame Job: ` line): S1–S24 24/24, P1–P15 15/15.
+S20 and S21 weak on speech at z 7.99, then accepted, T 118.7000 s; S22 weak on sound at 4.62;
+S23 weak on speech at 5.53 (speech frames 244 and 186); S3 refused (best 6.09); P13 refused,
+weak, refused, refused, weak. The classes are in road map "audio-sync-2"'s AS-3 record.
+
+**Fix pass 2's recorded runs** (Release, 2026-10-15, after `make gate` passed — names,
+typecheck at its four warnings, test, app; fmt and lint skipped, no Rust changed; own instance,
+no `Frame Job: ` line): `audio_sync_proof.py <dir>/agent.sock` 39/39 (S1–S24, P1–P15). Release's
+z's: S1 44.32, S2 44.33, S8 44.29, S10 confident on sound (197.374 ppm corrected to ×0.99980263,
+frame 206), S19 15.26 (frame 36, recorder − camera 118.6938 s); S20 weak on speech at 7.93 (next
+4.31), then accepted, T 118.7000 s, unsnapped 118.6848 s, trimmed 480,000; S21 weak on speech at
+7.91, then accepted, the camera +0.800 s, T 118.7000 s; S3 refused (best 6.06, then 4.70, 4.59,
+4.56); S22 weak on sound at 4.63 (candidates 6.07, 4.64, 4.63, 4.52); S23 weak on speech at 5.54
+(speech frames 244 and 186); S24's sheet at confidence 7.99; P13 as on Debug. Every fixture in the
+class the amendment named. `--mutants` 32/32 killed, no failed control;
+`op_argument_proof.py` 160/160 (`sync_audio`'s gate names `accept_weak`); `phase9_proof.py`
+231/231; `recording_probe.py --only catalog` 31/31; `cache_pass_probe.py` 13/13;
+`v2_menu.py --only H` 5/5; `capture_spike/inventory.py --check` 5/5.
+
 ## Issue #298 — the export's audio offsets, measured (`export_offset_proof.py` Z0–Z3, R1–R2, E1–E23, L1–L9; `export_offset_probe.swift`, `export_offset_writer.swift`; no product code, no decision)
 
 ```

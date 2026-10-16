@@ -114,15 +114,20 @@ extension AudioSync {
     /// One mover's ops, each only when it changes something, ordered so
     /// that every span in between lies inside the old one or the final one
     /// (SY-10): a mover that grows moves first, one that shrinks or keeps
-    /// its length changes speed first.
+    /// its length changes speed first. A mover trimmed at its head (SY-16,
+    /// `trimTo` the `trim_start` target S + e) changes speed first, so the
+    /// trim advances its in point at the new speed, then trims, then moves.
     static func ops(
         clip: UInt32, delta: Ticks, from old: Double, to new: Double?, duration: Ticks,
-        newDuration: Ticks
+        newDuration: Ticks, trimTo: Ticks? = nil
     ) -> [ReelOp] {
         let move: ReelOp? = delta != 0 ? ReelOp.moveClip(clips: [clip], delta: delta) : nil
         var speed: ReelOp?
         if let new = new, new != old {
             speed = ReelOp.setSpeed(clip: clip, rate: new, keepPitch: false)
+        }
+        if let trimTo {
+            return [speed, ReelOp.trimStart(clip: clip, to: trimTo), move].compactMap { $0 }
         }
         if newDuration > duration {
             return [move, speed].compactMap { $0 }

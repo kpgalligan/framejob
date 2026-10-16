@@ -6,7 +6,7 @@ import Foundation
 /// composite tools road map 2's phases 3 and 5 added, and `sync_audio`, the
 /// third (road map "audio-sync", AS-1) — none of the three is an op, and all
 /// read the same cached waveform `SilenceDetector`, `AudioNormalize` and
-/// `AudioSync` share.
+/// `AudioSync` share (`AudioSync` also its sync features, AS-3).
 ///
 /// A pure move out of `AgentCatalog+Clips.swift`, road map 4's toll 2, landed
 /// first and alone. `AgentCatalog+Files.swift`'s header is the model: the two
@@ -20,6 +20,14 @@ extension AgentServer {
 
     /// The audio rows of `catalogJSON()`'s array, in their order.
     func audioTools(ticks: String, clipsProperty: [String: Any]) -> [[String: Any]] {
+        // sync_audio's speech floor and placement radius, in seconds, from
+        // the constants, as `AudioSync.rule(_:)` prints the radius.
+        func seconds(_ frames: Int) -> Double {
+            Double(Ticks(frames) * SyncFeatures.frameTicks) / Double(ReelTime.perSecond)
+        }
+        let speechFloor = String(format: "%g", seconds(AudioSyncMatch.minimumSpeechFrames))
+        let radius = String(format: "%.0f", seconds(AudioSyncMatch.placementRadiusFrames))
+        let shortest = String(format: "%g", seconds(AudioSyncMatch.minimumStretchFrames))
         return [
             tool(
                 "detect_silence",
@@ -133,14 +141,37 @@ extension AgentServer {
                     + "One clip, the anchor, stays where it is; every other clip moves along "
                     + "its own track by a whole number of frames so its sound plays at the "
                     + "same moment as the anchor's. The match is made on each file's cached "
-                    + "waveform (where the sound RISES, so gain, microphone and room do not "
-                    + "matter) by cross-correlation; a match must reach correlation 0.25 and "
-                    + "stand 1.5× above the next best lag more than 0.5 s away. All or "
+                    + "sound features (26 MFCCs per 16 ms, standardised, so gain, microphone "
+                    + "and room do not matter) by cross-correlation summed over the "
+                    + "coefficients; a lag's confidence is its z-score against every lag. When "
+                    + "both stretches hold at least \(speechFloor) s of speech by the cached "
+                    + "Silero VAD "
+                    + "(probability ≥ \(String(format: "%g", AudioSyncMatch.speechProbability))), "
+                    + "only their speech frames are compared (matched_on \"speech\", else "
+                    + "\"sound\"). The clips' PLAYED windows (their trims) are searched first, "
+                    + "and the whole files only when that chooses nothing and a clip is "
+                    + "trimmed. A search's match is CONFIDENT when its best candidate's "
+                    + "confidence is at least \(String(format: "%g", AudioSyncMatch.confidentZ)) "
+                    + "and \(String(format: "%g", AudioSyncMatch.confidentMargin)) above the "
+                    + "next, and applies; else it is WEAK when the best peak within "
+                    + "\(radius) s of "
+                    + "where the clip already sits has confidence at least "
+                    + "\(String(format: "%g", AudioSyncMatch.plausibleZ)), and a weak match "
+                    + "that would move anything is NOT applied unless accept_weak is true: the "
+                    + "answer is moved: false, weak naming those clips, each row's move, and a "
+                    + "note. Pass accept_weak: true only after the person has agreed to that "
+                    + "weak match, naming the move — a weak match can be unrelated sound. "
+                    + "Otherwise the call is refused, "
+                    + "naming each search's candidates as the move each would make and its "
+                    + "confidence, so a caller can move the clip near one and call again. A "
+                    + "clip that would start before 0 is trimmed at its head instead, by just "
+                    + "that much, and starts at 0 (the anchor never moves or trims). All or "
                     + "nothing, one undo step: when any clip cannot be matched — no sound, "
-                    + "still being analysed, playing more than 0.2% away from ×1, at a "
-                    + "rate other than its speed, or reversed, two clips on one track, no clear match, a move that would "
-                    + "start before 0, never play beside the anchor or overlap another clip "
-                    + "on its track — nothing moves and every reason is named. Over at least "
+                    + "still being analysed, under \(shortest) s, playing more than 0.2% away from ×1, "
+                    + "at a rate other than its speed, or reversed, two clips on one track, no "
+                    + "match chosen, a trim that would leave under a frame, never playing "
+                    + "beside the anchor or overlapping another clip on its track — nothing "
+                    + "moves and every reason is named. Over at least "
                     + "60 s of overlap the clock drift between the two is measured as a line "
                     + "through many windows and CORRECTED with set_speed (keep_pitch false, "
                     + "a resample) so the clip's sound stays under the anchor's along the "
@@ -149,10 +180,15 @@ extension AgentServer {
                     + "it is left and "
                     + "drift_note says why. The answer reports each moved clip's offset "
                     + "(anchor source minus clip source, in ticks), delta, new start, "
-                    + "correlation and confidence (the peak ratio), speed (after the "
-                    + "command), drift_ppm, drift_ms, drift_error_ms, drift_corrected and "
-                    + "residual_ms (the error left when corrected, the drift itself when "
-                    + "not). A second call answers moved: false and \"already in sync\".",
+                    + "confidence (the chosen lag's z-score), search (\"played\" or "
+                    + "\"whole\"), chosen_by (\"confidence\" or \"placement\", the weak tier), "
+                    + "matched_on (\"speech\" or \"sound\"), candidates "
+                    + "([{offset, delta, confidence}]), trimmed (the ticks cut off its head, "
+                    + "0 when none), speed (after the command), drift_ppm, drift_ms, "
+                    + "drift_error_ms, drift_corrected and residual_ms (the error left when "
+                    + "corrected, the drift itself when not); every answer also carries weak "
+                    + "(the clip ids of its weak moves, [] when none). A second call answers "
+                    + "moved: false and \"already in sync\".",
                 [
                     "clips": [
                         "type": "array", "items": ["type": "integer"], "minItems": 2,
@@ -165,6 +201,13 @@ extension AgentServer {
                             + "among the clips with pictures (all of them when none has), "
                             + "the earliest start, then the rearmost track, then the lowest "
                             + "id.",
+                    ],
+                    "accept_weak": [
+                        "type": "boolean",
+                        "description": "Apply a weak match — the Weak match sheet's Apply. "
+                            + "Default false: a weak match answers moved: false, weak naming "
+                            + "its clips, and the move each would make, and nothing changes. "
+                            + "Pass true only after the person has agreed to that move.",
                     ],
                 ], required: ["clips"]),
         ]

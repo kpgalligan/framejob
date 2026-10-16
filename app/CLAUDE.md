@@ -321,7 +321,9 @@ detail there.
   a save of the package is in flight (`ProjectDocument+CacheSaves.swift`
   announces every save, which stops counting 120 s after it began), and a save
   waits for one being written; a failed waveform pass is retried in the
-  session after 2 s and 10 s. The cache order is thumbnails → peaks → speech.
+  session after 2 s and 10 s, and a retry that publishes also runs the sync
+  features and speech passes once. The cache order is thumbnails → peaks →
+  sync features (`cache/sync/`, `MediaImporter+SyncFeatures.swift`) → speech.
   `thumbnails` holds a
   video track's last frame past its end, from the track's last SAMPLE's time.
   `FFmpegRewrap+Plan.swift` (a pure move, issue batch B80) holds the plan,
@@ -1793,17 +1795,24 @@ free.
 - `AudioNormalize.swift` — Normalize Clip as a value type: peaks in, ops out,
   measured PRE-FADER from the plan segment, REPLACING `volume` so a second
   press is a no-op, always to BASE props.
-- `AudioSync.swift` (+`Correction`) · `AudioSyncMatch.swift` ·
-  `AudioSyncDrift.swift` — Synchronize Audio (spec §11 SY-1..SY-10),
-  `AudioNormalize`'s shape: `read` takes the plan segments and the peaks
-  caches once, `plan` is pure and answers frame-snapped `move_clip` ops,
-  with a `set_speed {keep_pitch: false}` (a resample) per mover whose drift
-  passes SY-8's significance test, all one undo step, or one refusal naming
-  every reason. It refuses what the core would quietly change — a start
-  before 0 (the core clamps) and an overlap on the mover's own track, judged
-  on the FINAL span after the speed change (the core adds a dissolve).
-  `AudioSyncMatch` is the pure signal arithmetic: onset envelopes, the
-  per-lag normalised FFT correlation and SY-3's confidence;
+- `AudioSync.swift` (+`Correction`, +`Search`, +`Weak`) · `AudioSyncMatch.swift`
+  · `AudioSyncDrift.swift` · `SyncFeatures.swift` — Synchronize Audio (spec §11
+  SY-1..SY-19), `AudioNormalize`'s shape: `read` takes the plan segments, the
+  peaks, the sync features (standardised MFCC frames, `SyncFeatures`) and the
+  speech caches once. `+Search` matches the PLAYED windows first, then the
+  whole files, on speech frames only when both hold enough (SY-17), and sorts
+  a match into confident (applied) or weak (near the placement; never applied
+  silently — the menu asks in a Weak match sheet, `sync_audio` needs
+  `accept_weak`, `+Weak` words both, SY-18/SY-19). A mover that would start
+  before 0 is trimmed at its head instead (SY-16). `plan` is pure and
+  answers frame-snapped `move_clip` ops, with a `set_speed {keep_pitch:
+  false}` (a resample) per mover whose drift passes SY-8's significance
+  test, all one undo step, or one refusal naming every reason. It handles
+  what the core would quietly change — the core clamps a start before 0
+  (hence the head trim), and adds a dissolve on an overlap with a clip on the
+  mover's own track, which is refused, judged on the FINAL span.
+  `AudioSyncMatch` is the pure signal arithmetic: the summed feature
+  correlation, its z-score confidence and the speech masks;
   `AudioSyncDrift` fits the drift as a line through many windows (SY-7);
   `+Correction` decides whether to correct it, the ±0.2% band and the op
   order. `EditorViewController+Audio` holds the Clip menu's sound

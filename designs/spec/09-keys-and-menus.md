@@ -103,7 +103,10 @@ map "audio-sync" AS-1 and AS-2, §11 SY-1..SY-10: the selected clips that play
 sound lined up by their sound, one anchor kept, each mover's clock drift
 corrected by a speed change in the same undo step; it shows no drift figure,
 the inspector's speed is what changes; enabled with two or more such clips;
-no key equivalent; its mirror is `sync_audio`), Add Action, Speed…,
+no key equivalent; its mirror is `sync_audio`; since road map
+"audio-sync-2" AS-3, §11 SY-18 and SY-19, a WEAK match — one found only near
+where the clip sits — is asked about first in the Weak match alert sheet,
+Apply (Return) or Cancel (Escape), and Cancel changes nothing), Add Action, Speed…,
 Close Gap, Remove
 Silences…, Transition ▸, Motion ▸ (In ▸ / Out ▸ / During ▸, each the kinds
 and None; no key equivalent), Look ▸ (the eight looks, a separator, then the

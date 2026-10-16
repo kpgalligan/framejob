@@ -670,6 +670,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `inventory.json`'s site.
 - `CompositionBuilder.swift`: the orientation helpers (`orientationCodes`, `trackOrientations`,
   `orientationCode`) to `CompositionBuilder+Orientation.swift`.
+- `MediaImporter.swift`: audio-sync-2's AS-3 paid a toll before the `syncFeatures` pass landed:
+  `ProbeBox` (with its doc) and `hasAlphaChannel` (with its doc), the two members of the file that
+  do not await, went verbatim to `MediaImporter+Probe.swift` (which gained `import CoreMedia`),
+  each losing only `private` — a pure move, typechecked alone (0 errors, the 4 baseline warnings)
+  before any other edit. `wc -l app/Sources/MediaImporter.swift`: 596 before, 567 after;
+  `MediaImporter+Probe.swift` 348 → 378. The next seam: a pass's await-free body out to its `+`
+  file, `writeSpeech`'s precedent (what is left here awaits).
 - `Playback.swift`: `seekFinished()` and `report(_:)` to `Playback+Scope.swift`, with `reported`
   and `refreshWanted` widened from `private` for that file alone (B30's shape). `player` stays
   private.

@@ -125,13 +125,20 @@ extension AgentServer {
     /// .synchronizeAudio`). All or nothing (SY-1): a refusal names every
     /// reason and moves nothing; a plan with no op (already in sync)
     /// answers `moved: false` and makes no undo step; otherwise each
-    /// mover's `move_clip` and, when its drift is corrected, its `set_speed`
-    /// (SY-6, SY-10), all one step. Each mover's row carries its match, its
-    /// measured drift (SY-7), the speed it plays at after the command and
-    /// whether the drift was corrected, with the residual left (SY-8).
+    /// mover's `move_clip`, when its drift is corrected its `set_speed`
+    /// (SY-6, SY-10), and when it would start before 0 its `trim_start`
+    /// (SY-16), all one step. Each mover's row carries its match (its z, the
+    /// search and rule that chose it, the candidates, SY-14), its measured
+    /// drift (SY-7), the speed it plays at after the command and whether the
+    /// drift was corrected, with the residual left (SY-8), and the head it
+    /// lost. A plan with WEAK moves (SY-18, `AudioSync.weakMoves`, the
+    /// menu's own test) answers `moved: false` with `weak` and a note and
+    /// changes nothing, unless `accept_weak` is true — the Weak match sheet's
+    /// Apply (SY-19).
     func syncAudio(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
+        let acceptWeak = try boolArg(a, "accept_weak") ?? false
         var anchor: UInt32?
         if try intArg(a, "anchor") != nil {
             let named = try idArg(a, "anchor")
@@ -151,14 +158,24 @@ extension AgentServer {
             let reasons = problems.map { $0.description }.joined(separator: " ")
             throw ToolError(message: "Synchronize Audio was refused: \(reasons)")
         case .planned(let anchorClip, let synced, let ops):
+            let weak = AudioSync.weakMoves(synced)
             var fields: [String: Any] = [
                 "anchor": Int(anchorClip),
                 "synced": synced.map(Self.syncedRow),
+                "weak": weak.map { Int($0.clip) },
             ]
             guard !ops.isEmpty else {
                 fields["ok"] = true
                 fields["moved"] = false
                 fields["note"] = "already in sync"
+                fields["project"] = summary(document)
+                return try jsonResult(fields)
+            }
+            guard weak.isEmpty || acceptWeak else {
+                // Not a refusal and never an error: the person decides (SY-19).
+                fields["ok"] = true
+                fields["moved"] = false
+                fields["note"] = AudioSync.weakNote(weak)
                 fields["project"] = summary(document)
                 return try jsonResult(fields)
             }
@@ -175,8 +192,14 @@ extension AgentServer {
             "offset": row.lag,
             "delta": row.delta,
             "start": row.start,
-            "correlation": row.correlation,
-            "confidence": row.ratio.isFinite ? row.ratio : NSNull(),
+            "confidence": row.confidence,
+            "search": row.search.rawValue,
+            "chosen_by": row.chosenBy.rawValue,
+            "matched_on": row.matchedOn.rawValue,
+            "candidates": row.candidates.map {
+                ["offset": $0.offset, "delta": $0.delta, "confidence": $0.confidence] as [String: Any]
+            },
+            "trimmed": row.trimmed,
         ]
         result["speed"] = row.speed
         switch row.drift {

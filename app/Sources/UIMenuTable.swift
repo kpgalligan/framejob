@@ -71,7 +71,7 @@ extension UIMenu {
         "nestClips:": .plain,
         "unnestClips:": .plain,
         "normalizeClips:": .plain,
-        "synchronizeAudio:": .plain,
+        "synchronizeAudio:": .sheet,
         "showSpeedSheet:": .sheet,
         "removeSilences:": .sheet,
         "setTransitionKind:": .sheet,

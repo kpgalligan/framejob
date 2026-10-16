@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Road map "audio-sync", AS-1 and AS-2 (spec §11 SY-1..SY-10) — Clip ▸
-Synchronize Audio and `sync_audio`, over MCP against a running instance, then
-the probe's rows over `app/Sources`.
+"""Road maps "audio-sync" (AS-1, AS-2) and "audio-sync-2" (AS-3) — spec §11
+SY-1..SY-19 — Clip ▸ Synchronize Audio and `sync_audio`, over MCP against a
+running instance, then the probe's rows over `app/Sources`.
 
     python3 tools/proof/audio_sync_proof.py <dir>/agent.sock [--only S1,P3,...]
     python3 tools/proof/audio_sync_proof.py [<dir>/agent.sock] --mutants
@@ -10,7 +10,9 @@ The instance is the caller's (`proof_app.py launch`; Debug while iterating,
 `RC_PROOF_APP=release` for the recorded run). Every package and fixture is
 under `tools/proof/work/audio-sync/`; every project is closed (`close_project`,
 discard). The only menu item performed is Clip ▸ Synchronize Audio, which
-persists nothing. S18 decodes two `audio_wav` exports with `ffmpeg`.
+persists nothing. S18 decodes two `audio_wav` exports with `ffmpeg`; S23 has
+ffmpeg's `areverse` write the owner's recorder reversed into
+`tools/proof/work/audio-sync/`.
 
 Fixtures (Python `wave`, 16 kHz mono, seeded): SOURCE, 150 s of irregular
 noise and tone bursts over a quiet floor; RECORDER, SOURCE delayed by
@@ -21,7 +23,22 @@ another seed; DRIFT, SOURCE resampled by k = 1 + 200e-6 (linear
 interpolation; recorder bucket m holds source (m·160 − d)·k) and processed as
 RECORDER, so the fixture's drift is (1 − 1/k)·1e6 ppm; CAMERA, ffmpeg's mux of
 SOURCE (`pcm_s16le`) under `color` video (libx264, 30 fps) into a `.mov`.
-Every media's `cache/peaks/<id>.bin` is waited for (60 s) before it is used.
+
+OWNERLIKE (AS-3, SY-15; the owner's traits, made from seeds): UTTER, 5 s of
+speech-like syllables (120–280 ms, gaps 40–200 ms, f0 gliding within
+110–190 Hz, 20 harmonics weighted by three formant bumps); COMPETE, 13 s of
+SOURCE-style bursts; CAMERA2 (`camera2-v1.mov`), 60 s of a −66 dBFS floor with
+UTTER at 31.2 s and COMPETE at [47 s, 60 s), muxed as CAMERA is; RECORDER2
+(`recorder2-v2.wav`), 165 s of low-frequency rumble (31, 47, 63 and 82 Hz and
+low-passed noise, about −14 dBFS RMS) under COMPETE at 0 s and UTTER at
+31.2 + 118.70 s (a whole number of samples), both through RECORDER's −9 dB,
+low-pass and noise. Recorder − camera is 118.70 s for UTTER and −47 s for
+COMPETE. The OWNER's files are `tools/proof/media/owner-sync/IMG_0018.MOV` and
+`record.aifc` (gitignored, never copied out of `tools/proof/`).
+
+Every media's `cache/peaks/<id>.bin`, `cache/sync/<id>.complete.json` and
+`cache/speech/<id>.complete.json` are each waited for (120 s) before it is used, and
+each marker's seconds after `import_media` are printed (the time to ready).
 
 Rows (30 fps; "unchanged" is `get_project`'s project, key-sorted, equal
 before and after, and the last undo step not "Synchronize Audio"):
@@ -32,7 +49,9 @@ before and after, and the last undo step not "Synchronize Audio"):
        "Synchronize Audio" and puts the recorder back at 0.
   S2   camera at 0, recorder at 20 s, `anchor` the recorder: the camera lands
        on exactly frame 694 (unsnapped 23.1333125 s), the recorder unmoved.
-  S3   camera and UNRELATED: refused "no matching sound found", unchanged.
+  S3   camera and UNRELATED: refused "no matching sound found", or answered
+       `moved: false` with UNRELATED in `weak` (SY-18) — no row chosen by
+       confidence either way — unchanged; it prints which, and the z.
   S4   a still (freeze_frame) and the recorder: refused "plays no sound",
        unchanged.
   S5   the recorder's audio disabled: refused "plays no sound", unchanged.
@@ -40,8 +59,10 @@ before and after, and the last undo step not "Synchronize Audio"):
        refused "plays reversed"; each unchanged.
   S7   camera and recorder on one track: refused "are on one track",
        unchanged.
-  S8   camera at 0, recorder at 0: refused "before the timeline begins",
-       unchanged.
+  S8   camera at 0, recorder at 0 (SY-16): the recorder is trimmed instead —
+       start 0, `in` 94 frames (1,880,000, the snapped 3.1333125 s),
+       `trimmed` the same, the camera unmoved; one `undo` restores start 0 and
+       in 0.
   S9   camera trimmed to [10 s, 20 s), recorder front-trimmed to start at
        100 s: refused "would not play at any moment", unchanged.
   S10  camera at 10 s and DRIFT: corrected (`drift_corrected` true), the
@@ -54,7 +75,7 @@ before and after, and the last undo step not "Synchronize Audio"):
   S14  `set_selection` [camera, recorder] then `perform_menu_item ["Clip",
        "Synchronize Audio"]`: the recorder lands where S1's did.
   S15  the catalog row: no `scope`; `clips` (minItems 2, required), `anchor`,
-       `project`.
+       `accept_weak` (boolean), `project`.
   S16  the recorder's track holds a 2 s text clip ending 1 s after where S1's
        recorder lands, the recorder placed after it: refused "would overlap
        clip M on its track", unchanged, no transition anywhere.
@@ -67,16 +88,50 @@ before and after, and the last undo step not "Synchronize Audio"):
        ±40 ms with parabolic refinement: |Δlag| ≤ 3 ms and each |lag| ≤ 20 ms.
        Control: `set_speed` rate 1 on the recorder, exported again: |Δlag| ≥
        20 ms.
-  P1–P8  `audio_sync_probe.swift`, built by `swift_build.build` over
-       `app/Sources` (a failed build is a scored FAIL of all eight); each
+  S19  CAMERA2 placed at 0, trimmed to in 29.72 s for 25.52 s and moved to
+       2 s; RECORDER2 at 0 trimmed to in 147.63 s for 17.34 s and moved to 0,
+       on track 1; default anchor: the recorder lands on exactly
+       snap(cam.start − cam.in + rec.in − 118.70 s) (from read-back values;
+       1.2 s, a whole frame, so the snap's boundaries lie half a frame either
+       side of the truth — SY-15 as amended), `search` "played", the camera
+       unmoved.
+  S20  the OWNER's files placed as the owner placed them (camera at 0 from
+       29.72 s for 25.52 s; recorder at 0 from 147.63 s for 17.34 s on track
+       1), default anchor: first without `accept_weak`, `moved` false, `weak`
+       [the recorder], its row `chosen_by` "placement" and `matched_on`
+       "speech", unchanged and no step (SY-18, SY-19); then with
+       `accept_weak: true`: synced, the camera unmoved, the recorder at start 0
+       with its `in` advanced by e ≈ 0.77 s (`trimmed` e); T = (rec.in −
+       rec.start) − (cam.in − cam.start) within 1/30 s of 118.68 s; one `undo`
+       restores both clips. The unsnapped −offset/600000 is printed.
+  S21  the same with `anchor` the recorder (weak first, `weak` [the camera],
+       then accepted): the camera moves by about +0.77 s,
+       `trimmed` 0, and the same bound on T.
+       S20 and S21 are a scored FAIL when either OWNER file is absent.
+       Every S row that syncs prints its candidates (search, offset, z).
+  S22  camera and UNRELATED both at 0 (placement lag 0, so the near-placement
+       rule can reach them): S3's test — refused, or weak and not applied.
+  S23  the masked null (SY-17): the OWNER's camera placed as in S20, the
+       owner's recorder time-reversed placed at 0 from 8.0 s for 17.34 s on
+       track 1: S3's test. Control: both played windows hold ≥ 125 frames the
+       cached VAD calls speech (`cache/speech/<id>.bin`, SY-17's centre-chunk
+       rule rebuilt here), so the search ran on speech; both counts printed.
+  S24  the Weak match sheet (SY-19): S20's placement, `set_selection` both,
+       `perform_menu_item ["Clip", "Synchronize Audio"]` answers a sheet;
+       `snapshot_ui {window: "sheet"}`'s layout texts hold "Weak match…",
+       "Apply" and "Cancel"; `cancel_sheet` answers `cancel_button`, "Cancel"
+       and no sheet; unchanged, no step.
+       S23 and S24 are a scored FAIL when either OWNER file is absent.
+  P1–P15 `audio_sync_probe.swift`, built by `swift_build.build` over
+       `app/Sources` (a failed build is a scored FAIL of all fifteen); each
        row's sentence is the probe's.
 
-`--mutants`: the eighteen below, probe-only. Each copies `app/Sources` under
+`--mutants`: the thirty-two below, probe-only. Each copies `app/Sources` under
 `work/audio-sync/mutants/<name>/`, applies its edit (its `before` asserted to
 occur exactly once), rebuilds the probe (900 s wall) and runs it (240 s wall);
 killed when a named row fails; a copy that does not build or answer is a failed
 control, never a kill. Exit 0 when every scored row passed (with
-`--mutants`, when all eighteen were killed); 1 otherwise.
+`--mutants`, when all thirty-two were killed); 1 otherwise.
 """
 
 import argparse
@@ -110,8 +165,13 @@ SEC = 600_000
 FRAME = SEC // 30
 BUILD_WALL = 900
 RUN_WALL = 240
-S_ROWS = [f"S{n}" for n in range(1, 19)]
-P_ROWS = [f"P{n}" for n in range(1, 9)]
+S_ROWS = [f"S{n}" for n in range(1, 25)]
+OWNER = ROOT / "tools/proof/media/owner-sync"
+OWNER_FILES = {"owner_camera": OWNER / "IMG_0018.MOV", "owner_recorder": OWNER / "record.aifc"}
+UTTER_AT = 31.2                      # s, in CAMERA2
+UTTER_GAP = 118.70                   # s, recorder − camera for UTTER (1,899,200 samples)
+OWNER_GAP = 118.68                   # s, the owner's recorder − camera (round 2's request)
+P_ROWS = [f"P{n}" for n in range(1, 16)]
 ENVELOPE = RATE // 1000              # samples per 1 ms envelope bucket
 
 # name: (the rows it must fail, file, before, after)
@@ -121,10 +181,11 @@ MUTANTS = {
     "anchor-inverted": (["P2"], "AudioSync.swift",
                         "if a.start != b.start { return a.start < b.start }",
                         "if a.start != b.start { return a.start > b.start }"),
-    "ratio-dropped": (["P4"], "AudioSyncMatch.swift",
-                      "\n                && ratio >= AudioSyncMatch.minimumPeakRatio", ""),
-    "before-zero-dropped": (["P6"], "AudioSync.swift",
-                            "guard start >= 0 else {", "guard start >= 0 || true else {"),
+    "ratio-dropped": (["P11"], "AudioSync+Search.swift",
+                      "\n            || best.z - result.candidates[1].z >= AudioSyncMatch.confidentMargin",
+                      "\n            || true"),
+    "before-zero-dropped": (["P12"], "AudioSync.swift",
+                            "let excess = max(0, -(mover.start + delta))", "let excess: Ticks = 0"),
     "overlap-dropped": (["P6"], "AudioSync.swift",
                         "guard overlapStart < overlapEnd else {",
                         "guard overlapStart < overlapEnd || true else {"),
@@ -157,6 +218,61 @@ MUTANTS = {
                       "if delta != 0 || newDuration != duration,", "if delta != 0,"),
     "pivot-dropped": (["P7"], "AudioSync.swift",
                       "delta = correctedDelta(", "_ = correctedDelta("),
+    # AS-3 (SY-12..SY-16)
+    "trim-floor-dropped": (["P12"], "AudioSync.swift",
+                           "guard newDuration - excess >= input.fps.frameDuration else {",
+                           "guard newDuration - excess >= input.fps.frameDuration || true else {"),
+    "confident-z": (["P11"], "AudioSync+Search.swift",
+                    "best.z >= AudioSyncMatch.confidentZ", "best.z >= 0"),
+    "plausible-floor-dropped": (["P11"], "AudioSync+Search.swift",
+                                "near.z >= AudioSyncMatch.plausibleZ", "near.z >= -Double.infinity"),
+    "radius-dropped": (["P11"], "AudioSyncMatch.swift",
+                       "guard abs(lag - placementLag) <= Double(placementRadiusFrames) else { continue }",
+                       "guard abs(lag - placementLag) >= 0 else { continue }"),
+    "played-first-dropped": (["P11"], "AudioSync+Search.swift",
+                             "        if playable {\n", "        if playable && false {\n"),
+    "window-offset-dropped": (["P11"], "AudioSync+Search.swift",
+                              "offset: anchorWindow.lowerBound - moverWindow.lowerBound,",
+                              "offset: 0,"),
+    "standardise-dropped": (["P10"], "AudioSyncMatch.swift",
+                            "            : (standardised(anchor), standardised(mover))",
+                            "            : (anchor, mover)"),
+    # AS-3's second fix pass (SY-17..SY-19)
+    "speech-mask-dropped": (["P14"], "AudioSyncMatch.swift",
+                            "let onSpeech = spoken(anchorSpeech) && spoken(moverSpeech)",
+                            "let onSpeech = false"),
+    "speech-floor-dropped": (["P14"], "AudioSyncMatch.swift",
+                             "static let minimumSpeechFrames = 125",
+                             "static let minimumSpeechFrames = 0"),
+    "speech-threshold": (["P14"], "AudioSyncMatch.swift",
+                         "return probabilities[index] >= speechProbability",
+                         "return probabilities[index] > speechProbability"),
+    "speech-chunk-offset": (["P14"], "AudioSyncMatch.swift",
+                            "Int((Ticks(f) * SyncFeatures.frameTicks + frameCentreTicks) / chunk)",
+                            "Int((Ticks(f) * SyncFeatures.frameTicks) / chunk)"),
+    "masked-standardise-all": (
+        ["P14"], "AudioSyncMatch.swift",
+        "            for f in counted { sum += Double(frames[f * width + k]) }\n"
+        "            let mean = sum / Double(counted.count)\n"
+        "            var squares = 0.0\n"
+        "            for f in counted {\n"
+        "                let d = Double(frames[f * width + k]) - mean\n"
+        "                squares += d * d\n"
+        "            }\n"
+        "            let sd = (squares / Double(counted.count)).squareRoot()",
+        "            for f in 0..<count { sum += Double(frames[f * width + k]) }\n"
+        "            let mean = sum / Double(count)\n"
+        "            var squares = 0.0\n"
+        "            for f in 0..<count {\n"
+        "                let d = Double(frames[f * width + k]) - mean\n"
+        "                squares += d * d\n"
+        "            }\n"
+        "            let sd = (squares / Double(count)).squareRoot()"),
+    "weak-applied": (["P15"], "AudioSync+Weak.swift",
+                     "guard row.chosenBy == .placement else { return false }",
+                     "guard row.chosenBy == .placement && false else { return false }"),
+    "weak-unchanged-listed": (["P15"], "AudioSync+Weak.swift",
+                              "return row.delta != 0 || row.trimmed > 0", "return true"),
 }
 
 results = {}
@@ -170,11 +286,11 @@ def score(row, ok, detail):
 # ---- fixtures ------------------------------------------------------------------
 
 
-def source_samples(seed):
-    """150 s of bursts — noise or a tone, 30–400 ms, gaps of 50–600 ms — over a
-    floor at about −66 dBFS."""
+def source_samples(seed, seconds=SECONDS):
+    """`seconds` (150) of bursts — noise or a tone, 30–400 ms, gaps of 50–600
+    ms — over a floor at about −66 dBFS."""
     rng = random.Random(seed)
-    total = RATE * SECONDS
+    total = RATE * seconds
     out = array.array("d", (rng.gauss(0, 0.0005) for _ in range(total)))
     n = int(rng.uniform(0.05, 0.6) * RATE)
     while n < total:
@@ -214,6 +330,53 @@ def recorded(samples, seed, delay=DELAY, k=1.0):
     return out
 
 
+def utterance(seed, seconds=5.0):
+    """Speech-like syllables: 120–280 ms each, gaps of 40–200 ms, f0 gliding
+    between two values in 110–190 Hz, 20 harmonics weighted by three formant
+    bumps, a raised-cosine envelope; peak about 0.5."""
+    rng = random.Random(seed)
+    total = int(seconds * RATE)
+    out = array.array("d", bytes(8 * total))
+    n = int(rng.uniform(0.04, 0.2) * RATE)
+    while n < total:
+        length = min(int(rng.uniform(0.12, 0.28) * RATE), total - n)
+        f_start, f_end = rng.uniform(110, 190), rng.uniform(110, 190)
+        formants = [(rng.uniform(300, 900), 120), (rng.uniform(900, 2500), 200),
+                    (rng.uniform(2500, 3500), 300)]
+        phases = [0.0] * 20
+        for i in range(length):
+            f0 = f_start + (f_end - f_start) * i / length
+            env = 0.5 - 0.5 * math.cos(2 * math.pi * i / length)
+            value = 0.0
+            for h in range(20):
+                phases[h] += 2 * math.pi * (h + 1) * f0 / RATE
+                weight = sum(math.exp(-(((h + 1) * f0 - f) / bw) ** 2) for f, bw in formants)
+                value += weight * math.sin(phases[h])
+            out[n + i] = 0.12 * env * value
+        n += length + int(rng.uniform(0.04, 0.2) * RATE)
+    return out
+
+
+def rumble(seed, seconds):
+    """Low-frequency rumble: sines at 31, 47, 63 and 82 Hz and one-pole
+    low-passed noise, scaled to about −14 dBFS RMS."""
+    rng = random.Random(seed)
+    total = int(seconds * RATE)
+    phases = [rng.uniform(0, 2 * math.pi) for _ in range(4)]
+    freqs = (31, 47, 63, 82)
+    out = array.array("d", bytes(8 * total))
+    held = 0.0
+    for n in range(total):
+        held += 0.02 * (rng.gauss(0, 1) - held)
+        out[n] = sum(math.sin(2 * math.pi * f * n / RATE + p) for f, p in zip(freqs, phases)) \
+            + 4 * held
+    rms = math.sqrt(sum(v * v for v in out) / total)
+    scale = 10 ** (-14 / 20) / rms
+    for n in range(total):
+        out[n] *= scale
+    return out
+
+
 def write_wav(path, samples):
     data = array.array("h", (max(-32767, min(32767, int(round(s * 32767)))) for s in samples))
     with wave.open(str(path), "wb") as w:
@@ -236,11 +399,47 @@ def fixtures():
     write_wav(names["recorder"], recorded(source, 2))
     write_wav(names["unrelated"], recorded(source_samples(3), 4))
     write_wav(names["drift"], recorded(source, 5, k=DRIFT_K))
+    mux(names["source"], names["camera"], SECONDS)
+    return names
+
+
+def mux(wav, mov, seconds):
+    """`wav` (`pcm_s16le`) under `color` video (libx264, 30 fps) into `mov`."""
     subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
-         f"color=c=gray:s=320x180:r=30:d={SECONDS}", "-i", str(names["source"]),
+         f"color=c=gray:s=320x180:r=30:d={seconds}", "-i", str(wav),
          "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "pcm_s16le", "-shortest",
-         str(names["camera"])], check=True, timeout=300)
+         str(mov)], check=True, timeout=300)
+
+
+def fixtures2():
+    """CAMERA2 and RECORDER2, written once per tree (the names carry their
+    version)."""
+    FIXTURES.mkdir(parents=True, exist_ok=True)
+    names = {"camera2": FIXTURES / "camera2-v1.mov", "recorder2": FIXTURES / "recorder2-v2.wav"}
+    if all(p.exists() for p in names.values()):
+        return names
+    utter = utterance(21)
+    compete = source_samples(22, seconds=13)
+    rng = random.Random(23)
+    camera = array.array("d", (rng.gauss(0, 0.0005) for _ in range(60 * RATE)))
+    at = int(round(UTTER_AT * RATE))
+    for i, v in enumerate(utter):
+        camera[at + i] += v
+    for i, v in enumerate(compete[:13 * RATE]):
+        camera[47 * RATE + i] += v
+    wav = FIXTURES / "camera2-v1.wav"
+    write_wav(wav, camera)
+    mux(wav, names["camera2"], 60)
+    heard = array.array("d", bytes(8 * 165 * RATE))
+    for i, v in enumerate(compete[:13 * RATE]):
+        heard[i] += v
+    later = at + int(round(UTTER_GAP * RATE))
+    for i, v in enumerate(utter):
+        heard[later + i] += v
+    recorder = recorded(heard, 24, delay=0)
+    noise = rumble(25, 165)
+    write_wav(names["recorder2"], [r + q for r, q in zip(recorder, noise)])
     return names
 
 
@@ -274,6 +473,24 @@ class Session:
     def start(self, clip):
         return self.clip(clip)["start"]
 
+    def in_point(self, clip):
+        return self.clip(clip)["source"]["in"]
+
+    def place_trimmed(self, key, track_index, at, source_in, length):
+        """A clip at 0, `trim_start` to `source_in`, `trim_end` to that start
+        plus `length`, then `move_clip` to `at`: the owner's order."""
+        clip = self.place(key, 0, track_index)
+        for name, to in (("trim_start", source_in), ("trim_end", None)):
+            try:
+                self.op(name, clip=clip, to=to if to is not None else self.start(clip) + length)
+            except ToolError as error:  # the file already ends there: an identity
+                if "made no change" not in str(error):
+                    raise
+        start = self.start(clip)
+        if at != start:
+            self.op("move_clip", clips=[clip], delta=at - start)
+        return clip
+
     def tracks(self):
         return [t["id"] for t in self.project()["tracks"]]
 
@@ -285,14 +502,29 @@ class Session:
     def media(self, key):
         if key in self.imported:
             return self.imported[key]
+        began = time.monotonic()
         media = self.op("import_media", path=str(self.files[key]))["media"]
-        peaks = Path(self.path) / "cache" / "peaks" / f"{media}.bin"
-        for _ in range(1200):
-            if peaks.exists():
-                self.imported[key] = media
-                return media
-            time.sleep(0.05)
-        raise RuntimeError(f"{peaks} was never written")
+        cache = Path(self.path) / "cache"
+        # Each marker's seconds after import_media was called: the time to
+        # ready a person meets before Synchronize Audio can match the file.
+        landed = [f"import {time.monotonic() - began:.1f} s"]
+        for label, wanted in (("peaks", cache / "peaks" / f"{media}.bin"),
+                              ("sync", cache / "sync" / f"{media}.complete.json"),
+                              ("speech", cache / "speech" / f"{media}.complete.json")):
+            # 120 s: in one Debug run the owner's 165 s recorder's features
+            # landed just over 60 s after its import; the times printed
+            # below are the measurement.
+            for _ in range(2400):
+                if wanted.exists():
+                    break
+                time.sleep(0.05)
+            else:
+                raise RuntimeError(f"{wanted} was never written")
+            landed.append(f"{label} {time.monotonic() - began:.1f} s")
+        print(f"  media {key} ({Path(self.files[key]).name}): " + ", ".join(landed)
+              + " after import_media", flush=True)
+        self.imported[key] = media
+        return media
 
     def place(self, key, at, track_index):
         media = self.media(key)
@@ -340,6 +572,79 @@ def refused(session, label, words, **kwargs):
 
 def recorder_row(answer, clip):
     return next((r for r in answer.get("synced", []) if r["clip"] == clip), {})
+
+
+def match_text(row):
+    """A synced row's match: its z, how it was found, its candidates."""
+    candidates = ", ".join(f"{c.get('offset', 0) / SEC:+.3f} s z {c.get('confidence', 0):.2f}"
+                           for c in row.get("candidates", []))
+    return (f"z {row.get('confidence')}, {row.get('search')}/{row.get('chosen_by')} on "
+            f"{row.get('matched_on')}, candidates [{candidates}], trimmed {row.get('trimmed')}")
+
+
+def not_applied(session, label, mover, **kwargs):
+    """(ok, detail): sync_audio, called without `accept_weak`, either refused
+    "no matching sound found" or answered `moved: false` with `mover` in
+    `weak` (SY-18) — no row chosen by confidence either way — the project
+    unchanged and no Synchronize Audio step. A call that moved anything is
+    undone after it is described."""
+    before = session.text()
+    try:
+        answer, message = session.sync(**kwargs), None
+    except ToolError as error:
+        answer, message = None, str(error)
+    after = session.text()
+    if answer is not None and answer.get("moved") is True:
+        undone = session.op("undo")["undone"]
+        row = recorder_row(answer, mover)
+        return False, (f"{label}: MOVED without accept_weak — {match_text(row)}; undo "
+                       f"{undone!r}, restored {session.text() == before}")
+    step = session.last_step()
+    if answer is None:
+        how = "refused"
+        ok = ("Synchronize Audio was refused" in message and "no matching sound found" in message)
+        said = " ".join(message.split())[:500]
+    else:
+        rows = answer.get("synced", [])
+        how = "weak, not applied"
+        ok = (answer.get("ok") is True and answer.get("moved") is False
+              and mover in answer.get("weak", [])
+              and not any(r.get("chosen_by") == "confidence" for r in rows))
+        said = (f"weak {answer.get('weak')}, {match_text(recorder_row(answer, mover))}; note "
+                f"{answer.get('note')!r}")
+    ok = ok and before == after and step != "Synchronize Audio"
+    return ok, f"{label}: {how} — {said}; unchanged {before == after}; last step {step!r}"
+
+
+def speech_frames(session, media, clip):
+    """How many of `clip`'s played-window feature frames the cached Silero VAD
+    calls speech (SY-17's mask, rebuilt here from `cache/speech/<id>.bin`):
+    frame f's centre chunk is (f·9600 + 19200) // 19200, speech at ≥ 0.5."""
+    cache = Path(session.path) / "cache"
+    probabilities = array.array("f", (cache / "speech" / f"{media}.bin").read_bytes())
+    frames = (cache / "sync" / f"{media}.bin").stat().st_size // (26 * 4)
+    c = session.clip(clip)
+    low = min(max(0, math.floor(c["source"]["in"] / 9600)), frames)
+    high = min(max(low, math.ceil((c["source"]["in"] + c["duration"]) / 9600)), frames)
+    count = 0
+    for f in range(low, high):
+        chunk = min((f * 9600 + 19200) // 19200, len(probabilities) - 1)
+        count += probabilities[chunk] >= 0.5
+    return count
+
+
+def reversed_owner_recorder():
+    """The owner's recorder time-reversed (S23), by ffmpeg's `areverse`, into
+    `tools/proof/work/audio-sync/` (gitignored) and nowhere else."""
+    out = WORK / "owner-recorder-reversed.wav"
+    if not out.exists():
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(OWNER_FILES["owner_recorder"]),
+                        "-af", "areverse", str(out)], check=True, timeout=300)
+    return out
+
+
+def snap(ticks):
+    return math.floor(ticks / FRAME + 0.5) * FRAME
 
 
 # ---- the exported mix (S18) ----------------------------------------------------
@@ -442,8 +747,8 @@ def mcp_rows(sock, wanted, files):
                       and drift_ms is not None and abs(drift_ms) < 5,
                       f"recorder at {landed} (want {206 * FRAME}, frame 206), camera at "
                       f"{a.start(cam)}, offset {row.get('offset')} (unsnapped "
-                      f"{-DELAY / RATE * SEC:.1f}), r {row.get('correlation')}, confidence "
-                      f"{row.get('confidence')}; drift {row.get('drift_ppm')} ppm, {drift_ms} ms "
+                      f"{-DELAY / RATE * SEC:.1f}), {match_text(row)}; drift "
+                      f"{row.get('drift_ppm')} ppm, {drift_ms} ms "
                       f"(want |·| < 5), ±{row.get('drift_error_ms')} ms, corrected "
                       f"{row.get('drift_corrected')}, speed {row.get('speed')}, note "
                       f"{row.get('drift_note')!r}; undo {undone!r} → {back}")
@@ -492,8 +797,8 @@ def mcp_rows(sock, wanted, files):
                       f"{row.get('drift_note')!r}; speed {speed} (want 1/k {1 / DRIFT_K:.7f}; "
                       f"|s·k − 1|·150 000 = {spread} ms, want ≤ 2), keep_pitch {keep}, recorder "
                       f"at {landed} (want {206 * FRAME}, frame 206), duration "
-                      f"{clip.get('duration')}, r {row.get('correlation')}, confidence "
-                      f"{row.get('confidence')}; undo {undone!r} → speed {back.get('speed')}, "
+                      f"{clip.get('duration')}, {match_text(row)}; undo {undone!r} → speed "
+                      f"{back.get('speed')}, "
                       f"start {back.get('start')}")
             if "S17" in want:
                 again = h.sync(clips=[cam, drift])
@@ -535,9 +840,8 @@ def mcp_rows(sock, wanted, files):
                 score("S2", answer.get("anchor") == rec and b.start(cam) == 694 * FRAME
                       and b.start(rec) == 20 * SEC,
                       f"camera at {b.start(cam)} (want {694 * FRAME}, frame 694), recorder at "
-                      f"{b.start(rec)}, anchor {answer.get('anchor')}, r "
-                      f"{recorder_row(answer, cam).get('correlation')}, confidence "
-                      f"{recorder_row(answer, cam).get('confidence')}")
+                      f"{b.start(rec)}, anchor {answer.get('anchor')}, "
+                      f"{match_text(recorder_row(answer, cam))}")
         finally:
             b.close()
 
@@ -546,8 +850,18 @@ def mcp_rows(sock, wanted, files):
         try:
             cam = c.place("camera", 10 * SEC, 0)
             other = c.place("unrelated", 0, 1)
-            ok, detail = refused(c, "unrelated", "no matching sound found", clips=[cam, other])
+            ok, detail = not_applied(c, "unrelated", other, clips=[cam, other])
             score("S3", ok, detail)
+        finally:
+            c.close()
+
+    if "S22" in want:
+        c = Session(mcp, "sync-v", files)
+        try:
+            cam = c.place("camera", 0, 0)
+            other = c.place("unrelated", 0, 1)
+            ok, detail = not_applied(c, "unrelated, both at 0", other, clips=[cam, other])
+            score("S22", ok, detail)
         finally:
             c.close()
 
@@ -597,9 +911,18 @@ def mcp_rows(sock, wanted, files):
         try:
             cam = f.place("camera", 0, 0)
             rec = f.place("recorder", 0, 1)
-            ok, detail = refused(f, "before 0", f"clip {rec}: would have to start",
-                                 clips=[cam, rec])
-            score("S8", ok and "before the timeline begins" in detail, detail)
+            answer = f.sync(clips=[cam, rec])
+            row = recorder_row(answer, rec)
+            landed, source_in = f.start(rec), f.in_point(rec)
+            undone = f.op("undo")["undone"]
+            back, back_in = f.start(rec), f.in_point(rec)
+            want_in = 94 * FRAME
+            score("S8", answer.get("moved") is True and landed == 0 and source_in == want_in
+                  and row.get("trimmed") == want_in and f.start(cam) == 0
+                  and undone == "Synchronize Audio" and back == 0 and back_in == 0,
+                  f"recorder at {landed} (want 0), in {source_in} (want {want_in}, frame 94; "
+                  f"unsnapped {DELAY / RATE * SEC:.1f}), {match_text(row)} (want {want_in}), "
+                  f"camera at {f.start(cam)}; undo {undone!r} → start {back}, in {back_in}")
         finally:
             f.close()
 
@@ -631,12 +954,14 @@ def mcp_rows(sock, wanted, files):
         tool = mcp.schemas().get("sync_audio", {})
         schema = tool.get("inputSchema", {})
         props = schema.get("properties", {})
-        ok = (set(props) == {"clips", "anchor", "project"} and "scope" not in props
+        ok = (set(props) == {"clips", "anchor", "accept_weak", "project"} and "scope" not in props
               and schema.get("required") == ["clips"] and props["clips"].get("minItems") == 2
               and props["anchor"].get("type") == "integer"
+              and props["accept_weak"].get("type") == "boolean"
               and "Synchronize Audio" in tool.get("description", ""))
         score("S15", ok, f"properties {sorted(props)}, required {schema.get('required')}, clips "
-              f"minItems {props.get('clips', {}).get('minItems')}")
+              f"minItems {props.get('clips', {}).get('minItems')}, accept_weak "
+              f"{props.get('accept_weak', {}).get('type')}")
 
     if "S16" in want:
         j = Session(mcp, "sync-j", files)
@@ -653,6 +978,150 @@ def mcp_rows(sock, wanted, files):
             score("S16", ok and not transitions, f"{detail}; transitions {transitions}")
         finally:
             j.close()
+
+    if "S19" in want:
+        k = Session(mcp, "sync-k", files)
+        try:
+            cam = k.place_trimmed("camera2", 0, 2 * SEC, round(29.72 * SEC), round(25.52 * SEC))
+            rec = k.place_trimmed("recorder2", 1, 0, round(147.63 * SEC), round(17.34 * SEC))
+            cam_start, cam_in, rec_in = k.start(cam), k.in_point(cam), k.in_point(rec)
+            exact = cam_start - cam_in + rec_in - round(UTTER_GAP * SEC)
+            want_start = snap(exact)
+            answer = k.sync(clips=[cam, rec])
+            row = recorder_row(answer, rec)
+            landed = k.start(rec)
+            score("S19", landed == want_start and row.get("search") == "played"
+                  and k.start(cam) == cam_start and answer.get("anchor") == cam,
+                  f"camera at {cam_start} in {cam_in}, recorder in {rec_in}: recorder at {landed} "
+                  f"(want {want_start}, frame {want_start // FRAME}; unsnapped {exact}), "
+                  f"recorder − camera {-(row.get('offset') or 0) / SEC:.4f} s (true {UTTER_GAP}); "
+                  f"{match_text(row)}; camera at {k.start(cam)}")
+        finally:
+            k.close()
+
+    for name, named_anchor in (("S20", "camera"), ("S21", "recorder")):
+        if name not in want:
+            continue
+        missing = [str(p) for p in OWNER_FILES.values() if not p.exists()]
+        if missing:
+            score(name, False, f"the owner's files are absent: {', '.join(missing)}")
+            continue
+        o = Session(mcp, f"sync-{name.lower()}", files)
+        try:
+            cam = o.place_trimmed("owner_camera", 0, 0, round(29.72 * SEC), round(25.52 * SEC))
+            rec = o.place_trimmed("owner_recorder", 1, 0, round(147.63 * SEC),
+                                  round(17.34 * SEC))
+            before = {c: (o.start(c), o.in_point(c), o.clip(c)["duration"]) for c in (cam, rec)}
+            anchor = cam if named_anchor == "camera" else rec
+            moved = rec if anchor == cam else cam
+            # First without accept_weak (SY-19): a weak match on speech,
+            # answered moved: false, nothing changed and no step.
+            text = o.text()
+            asked = o.sync(clips=[cam, rec], anchor=anchor)
+            asked_row = recorder_row(asked, moved)
+            asked_step = o.last_step()
+            weak_ok = (asked.get("moved") is False and asked.get("weak") == [moved]
+                       and asked_row.get("chosen_by") == "placement"
+                       and asked_row.get("matched_on") == "speech"
+                       and o.text() == text and asked_step != "Synchronize Audio")
+            weak_said = (f"without accept_weak: moved {asked.get('moved')}, weak "
+                         f"{asked.get('weak')}, {match_text(asked_row)}, unchanged "
+                         f"{o.text() == text}, last step {asked_step!r}")
+            answer = o.sync(clips=[cam, rec], anchor=anchor, accept_weak=True)
+            row = recorder_row(answer, moved)
+            after = {c: (o.start(c), o.in_point(c)) for c in (cam, rec)}
+            gap = ((after[rec][1] - after[rec][0]) - (after[cam][1] - after[cam][0])) / SEC
+            undone = o.op("undo")["undone"]
+            restored = {c: (o.start(c), o.in_point(c), o.clip(c)["duration"]) for c in (cam, rec)}
+            unsnapped = -(row.get("offset") or 0) / SEC if anchor == cam \
+                else (row.get("offset") or 0) / SEC
+            if anchor == cam:
+                shape = (after[cam][:2] == before[cam][:2] and after[rec][0] == 0
+                         and row.get("trimmed", 0) > 0
+                         and after[rec][1] == before[rec][1] + row.get("trimmed", 0))
+                what = (f"recorder start {after[rec][0]}, in {before[rec][1]} → {after[rec][1]} "
+                        f"(e {row.get('trimmed', 0) / SEC:.3f} s), camera unmoved "
+                        f"{after[cam] == before[cam][:2]}")
+            else:
+                shift = after[cam][0] - before[cam][0]
+                shape = (after[rec] == before[rec][:2] and row.get("trimmed") == 0
+                         and 0.5 * SEC <= shift <= 1.0 * SEC and after[cam][1] == before[cam][1])
+                what = (f"camera moved {shift / SEC:+.3f} s (want about +0.77), trimmed "
+                        f"{row.get('trimmed')}, recorder unmoved {after[rec] == before[rec][:2]}")
+            score(name, weak_ok and answer.get("moved") is True and shape
+                  and abs(gap - OWNER_GAP) <= 1 / 30 and undone == "Synchronize Audio"
+                  and restored == before,
+                  f"anchor the {named_anchor}: {weak_said}; with accept_weak: {what}; "
+                  f"T = recorder − camera {gap:.4f} s (want "
+                  f"{OWNER_GAP} ± 1/30); unsnapped −offset/600000 {unsnapped:.4f} s; "
+                  f"{match_text(row)}; undo {undone!r} restores both {restored == before}")
+        finally:
+            o.close()
+
+
+    if "S23" in want:
+        missing = [str(p) for p in OWNER_FILES.values() if not p.exists()]
+        if missing:
+            score("S23", False, f"the owner's files are absent: {', '.join(missing)}")
+        else:
+            o = Session(mcp, "sync-s23", {**files, "owner_reversed": reversed_owner_recorder()})
+            try:
+                cam = o.place_trimmed("owner_camera", 0, 0, round(29.72 * SEC),
+                                      round(25.52 * SEC))
+                rev = o.place_trimmed("owner_reversed", 1, 0, round(8.0 * SEC),
+                                      round(17.34 * SEC))
+                # The control: both played windows hold enough speech that
+                # the search ran on speech, not sound (02c's objection 2).
+                counts = (speech_frames(o, o.media("owner_camera"), cam),
+                          speech_frames(o, o.media("owner_reversed"), rev))
+                ok, detail = not_applied(o, "the owner's recorder reversed", rev,
+                                         clips=[cam, rev])
+                score("S23", ok and min(counts) >= 125,
+                      f"speech frames in the played windows: camera {counts[0]}, reversed "
+                      f"recorder {counts[1]} (each ≥ 125); {detail}")
+            finally:
+                o.close()
+
+    if "S24" in want:
+        missing = [str(p) for p in OWNER_FILES.values() if not p.exists()]
+        if missing:
+            score("S24", False, f"the owner's files are absent: {', '.join(missing)}")
+        else:
+            o = Session(mcp, "sync-s24", files)
+            try:
+                cam = o.place_trimmed("owner_camera", 0, 0, round(29.72 * SEC),
+                                      round(25.52 * SEC))
+                rec = o.place_trimmed("owner_recorder", 1, 0, round(147.63 * SEC),
+                                      round(17.34 * SEC))
+                o.op("set_selection", clips=[cam, rec])
+                before = o.text()
+                menu = o.op("perform_menu_item", path=["Clip", "Synchronize Audio"])
+                up = menu.get("sheet") is not None
+                picture = WORK / f"s24-sheet-{os.getpid()}.png"
+                texts = []
+                try:
+                    shot = o.op("snapshot_ui", window="sheet", path=str(picture))
+                    with open(shot.get("layout_path") or "") as handle:
+                        texts = [v.get("text") for v in json.load(handle)["views"]
+                                 if not v.get("hidden") and v.get("text")]
+                except (ToolError, OSError, ValueError, KeyError) as error:
+                    texts = [f"(no layout: {error})"]
+                message = next((t for t in texts if "Weak match" in t), None)
+                cancelled = o.op("cancel_sheet")
+                down = (cancelled.get("how") == "cancel_button"
+                        and cancelled.get("button") == "Cancel"
+                        and "sheet" in cancelled and cancelled["sheet"] is None)
+                after = o.text()
+                step = o.last_step()
+                score("S24", up and message is not None and "Apply" in texts
+                      and "Cancel" in texts and down and before == after
+                      and step != "Synchronize Audio",
+                      f"menu → sheet {menu.get('sheet')!r}; texts {texts[:6]}; cancel_sheet "
+                      f"{cancelled.get('how')} {cancelled.get('button')!r} → sheet "
+                      f"{cancelled.get('sheet')!r}; unchanged {before == after}; last step "
+                      f"{step!r}")
+            finally:
+                o.close()
 
 
 # ---- the probe -----------------------------------------------------------------
@@ -737,7 +1206,7 @@ def main():
         if not args.socket:
             print("the S rows need the running instance's socket path")
             return 2
-        files = fixtures()
+        files = {**fixtures(), **fixtures2(), **OWNER_FILES}
         try:
             mcp_rows(args.socket, s_wanted, files)
         except Exception as error:  # an instrument failure is a scored FAIL of the rest
