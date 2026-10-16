@@ -48,12 +48,14 @@ enum AudioSyncMatch {
     static let candidateCount = 4
     /// The z a best candidate needs to be chosen on its own — the CONFIDENT
     /// tier, which applies without asking (SY-18; BBC's `audio-offset-finder`
-    /// reads "> 10 trustworthy").
+    /// reads "> 10 trustworthy"), and applied only when GCC-PHAT confirms it
+    /// (SY-29).
     static let confidentZ = 10.0
     /// How far, in z, it must stand above the second candidate.
     static let confidentMargin = 1.5
     /// The z the peak near the mover's placement needs to be chosen — the
-    /// WEAK tier, which is asked about, never applied silently (SY-18).
+    /// WEAK tier, which is asked about, never applied silently (SY-18), and
+    /// offered only when GCC-PHAT confirms it (SY-29).
     static let plausibleZ = 4.0
     /// 3.008 s: how near the mover's current placement that peak must lie.
     static let placementRadiusFrames = 188

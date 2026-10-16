@@ -19,8 +19,12 @@ import Foundation
 /// **Why only near the line** (SY-20): PHAT whitens every bin, so any shared
 /// stretch can own its global peak; the round's analysis found whole-file
 /// PHAT fooled by a burst. The peak is taken within `reachSamples` of the
-/// line and is used only when it is CLEAR; otherwise the caller keeps the
-/// coarse value. The refinement never changes a match's confidence or tier.
+/// line and is used only when it is CLEAR. **It is also the waveform gate**
+/// (SY-29): `plan` keeps a match of either tier only when its refinement is
+/// clear, and refuses it when the peak is not clear or the refinement cannot
+/// run — features that match where the waveforms do not are two takes of
+/// similar words, not one recording (SY-28). It never changes a match's
+/// confidence.
 enum AudioSyncPHAT {
 
     // MARK: - The numbers (SY-20)
@@ -31,11 +35,14 @@ enum AudioSyncPHAT {
     /// ±3 feature frames (48 ms): how far from the line the peak may lie.
     static let reachSamples = 384
     /// The z a peak needs to be clear: 8 at first, 15 by SY-20's calibration
-    /// rule (the owner's recorder reversed, a null, read 10.24).
+    /// rule (the owner's recorder reversed, a null, read 10.24); kept by SY-29,
+    /// ×1.45 the highest null at a chosen lag and ×1.83 under the lowest true
+    /// match.
     static let clearZ = 15.0
     /// 30 s: the most samples one refinement correlates.
     static let maximumRegionSamples = 240_000
-    /// 2 s: a region under this is not refined.
+    /// 2 s: a region under this is not refined (SY-29: `plan` falls back to
+    /// the files' overlap first).
     static let minimumRegionSamples = 16_000
     /// The shared setup's size (SY-22): 524,288 ≥ 2·`maximumRegionSamples` − 1.
     static let planLog2n = 19

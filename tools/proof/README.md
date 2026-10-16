@@ -20492,3 +20492,47 @@ s empty edit ends, so the padding is what writes that edit, and without it no cl
 (X8 −0.576), and M9 survived. 7/7 killed, with the same numbers for M1–M6 after the fix pass. The
 core's by hand, each reverted: M7 the band never `TimeDomain` — `pitch_band.rs` fails 2 of 4; M8
 `place` comparing keep pitch (`Off` against not) — fails 1 of 4; both killed.
+
+## Audio sync round 3 — the waveform gate and the owner's fixtures retargeted (`audio_sync_proof.py` S1–S30, P1–P18, P20 and forty-three mutants; `audio_sync_probe.swift`; spec §11 SY-28..SY-30)
+
+```
+python3 tools/proof/audio_sync_proof.py <dir>/agent.sock [--only S20,P20,...]  # Debug; the recorded run is RC_PROOF_APP=release
+python3 tools/proof/audio_sync_proof.py --mutants                              # the 43 mutants, probe-only (run it in the background)
+```
+
+The same script. The owner's first pair (`tools/proof/media/owner-sync/`) is two takes of similar
+words (SY-28), so its rows are now nulls the waveform gate refuses (SY-29): **S20** (the owner's
+trims, the camera the anchor) is refused naming "waveforms do not line up", again with
+`accept_weak: true`, and then by the menu item — the window polled every 0.25 s until it has no
+sheet, no sheet's texts ever holding "Weak match", the inspector's foot "Refused: no matching
+sound found…"; **S21** the same by tool with the recorder the anchor; **S30** both at 0
+untrimmed (the features' confident tier) refused the same. **S3** is refused by the search, **S22**
+and **S23** by the gate. The owner's second pair (`tools/proof/media/owner-sync-2/`, `IMG_0019.MOV`
+and the same `record.aifc`) is one recording: **S27** and **S28** (both at 0 untrimmed, each
+anchor) are confident, `refined` "phat", recorder − camera within 1/30 s of 148.27 s; **S29**
+(IMG_0019 from 2 s for 3 s at frame 188, the recorder from 150 s for 3 s at 5 s) is weak first and
+applied with `accept_weak`, the recorder moving 0.9–1.1 s; **S24**'s Weak match sheet is on S29's
+placement. A row whose owner files are absent is a scored FAIL. The probe's **P4** suffix carries
+the rule sentence's waveform clause; **P13** gives each reading its own samples and needs the
+refusal (never weak); **P20** is the gate through `plan` (a weak and a confident pair with
+coherent, unrelated and all-zero samples and none at all; a whole-file match whose played spans
+meet for 1 s; two 188-frame files at the outermost scored lag — the outward rounding of the
+spec review's objection 1). Mutants added (four, P20): `phat-gate-dropped`,
+`phat-gate-weak-only`, `files-region-dropped`, and `unconfirmed-dropped` (the orchestrator's
+fail-closed ruling).
+
+**Debug runs** (2026-10-16, own instance, no `Frame Job: ` line): `--only P4,P11,P13,P15,P16,P17,P18,P20`
+8/8; `--only S1,S3,S8,S10,S19,S20,S21,S22,S23,S24,S27,S28,S29,S30` 14/14 — S20 refused at z 7.99
+masked, GCC-PHAT 9.00 (S21 8.12); S30 at z 17.63, GCC-PHAT 8.34; S22 4.60 / 4.74; S23 5.53 / 10.24;
+S27 z 46.39, PHAT 98.65, T 148.2667 s (unsnapped 148.2658); S28 PHAT 84.59, the camera +148.2667 s;
+S29 weak 8.52 on speech, PHAT 90.49, the recorder +1.0000 s, T 148.2667 s.
+
+**Recorded runs** (Release, 2026-10-16, after `make gate` passed; own instance, no `Frame Job: `
+line): 49/49 (S1–S30, P1–P18, P20). S20/S21 refused at z 7.93 / 7.92, GCC-PHAT 8.01 / 8.72, the
+menu's foot "Refused: no matching sound found…" with no Weak match sheet; S30 z 17.45, GCC-PHAT
+8.45; S22 4.64 / 4.69; S23 5.53 / 10.51 (camera 244, reversed recorder 186 speech frames); S27/S28
+z 46.40 / 46.41, PHAT 95.29 / 90.50, T 148.2667 s (unsnapped 148.2658); S29 weak 8.52 on speech,
+PHAT 81.09, the recorder +1.0000 s; S1's offset 32.5 ticks from the truth (PHAT 433.7); S10 199.917
+ppm on phat. `--mutants` 43/43 killed, no failed control. GCC-PHAT on the owner's files differs
+between runs (S20 9.00 on Debug, 8.01 on Release; S23 10.24 and 10.51; the feature z moved too, 7.99
+and 7.93, so the decoded inputs differed — compare #305), every reading under 15.

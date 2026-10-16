@@ -32,6 +32,7 @@ extension AgentServer {
         let rate = Double(SyncFeatures.sampleRate)
         let reach = String(format: "%g", Double(AudioSyncPHAT.reachSamples) / rate * 1000)
         let region = String(format: "%g", Double(AudioSyncPHAT.maximumRegionSamples) / rate)
+        let least = String(format: "%g", Double(AudioSyncPHAT.minimumRegionSamples) / rate)
         let band = String(format: "%g–%g Hz", AudioSyncPHAT.lowHertz, AudioSyncPHAT.highHertz)
         let driftOverlap = String(format: "%g", seconds(AudioSyncMatch.driftMinimumOverlapFrames))
         let driftWindow = String(format: "%g", seconds(AudioSyncMatch.driftWindowFrames))
@@ -160,7 +161,8 @@ extension AgentServer {
                     + "trimmed. A search's match is CONFIDENT when its best candidate's "
                     + "confidence is at least \(String(format: "%g", AudioSyncMatch.confidentZ)) "
                     + "and \(String(format: "%g", AudioSyncMatch.confidentMargin)) above the "
-                    + "next, and applies; else it is WEAK when the best peak within "
+                    + "next, and applies (once the waveforms confirm it, below); else it is "
+                    + "WEAK when the best peak within "
                     + "\(radius) s of "
                     + "where the clip already sits has confidence at least "
                     + "\(String(format: "%g", AudioSyncMatch.plausibleZ)), and a weak match "
@@ -176,7 +178,8 @@ extension AgentServer {
                     + "nothing, one undo step: when any clip cannot be matched — no sound, "
                     + "still being analysed, under \(shortest) s, playing more than 0.2% away from ×1, "
                     + "at a rate other than its speed, or reversed, two clips on one track, no "
-                    + "match chosen, a trim that would leave under a frame, never playing "
+                    + "match chosen, waveforms that do not line up at it, a trim that would "
+                    + "leave under a frame, never playing "
                     + "beside the anchor or overlapping another clip on its track — nothing "
                     + "moves and every reason is named. Over at least "
                     + "\(driftOverlap) s of overlap the clock drift between the two is measured "
@@ -189,11 +192,14 @@ extension AgentServer {
                     + "it is left and "
                     + "drift_note says why. Each match's offset is then refined below a frame "
                     + "by GCC-PHAT on the files' cached 8 kHz samples, over the \(band) "
-                    + "speech band and at most \(region) s of the overlap, within ±\(reach) ms "
-                    + "of the match; without a clear peak there (confidence ≥ "
-                    + "\(String(format: "%g", AudioSyncPHAT.clearZ))) the coarse offset is "
-                    + "kept. The refinement never changes the confidence or the tier, and the "
-                    + "move stays a whole number of frames. The answer reports each moved "
+                    + "speech band and at most \(region) s of the overlap (the files' overlap "
+                    + "at the match when the played overlap is under \(least) s), within "
+                    + "±\(reach) ms of the match. EITHER tier needs a clear peak there "
+                    + "(confidence ≥ \(String(format: "%g", AudioSyncPHAT.clearZ))): a match "
+                    + "whose waveforms do not line up, or that shares too little sound to "
+                    + "check, is refused as not one recording — features alone can match two "
+                    + "takes of similar words. The refinement never changes the confidence, "
+                    + "and the move stays a whole number of frames. The answer reports each moved "
                     + "clip's offset (anchor source minus clip source at the overlap's centre, "
                     + "refined, in ticks), coarse_offset (the match before the refinement), "
                     + "refined (\"phat\" or \"coarse\"), refine_confidence (the PHAT peak's "

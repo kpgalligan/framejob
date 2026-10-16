@@ -1,4 +1,4 @@
-# Audio sync: lining clips up by their sound (road maps "audio-sync" and "audio-sync-2")
+# Audio sync: lining clips up by their sound (road maps "audio-sync" and "audio-sync-2", and round 3)
 
 - **Status:** Built and closed 2026-10-15. Each phase was one litecode pipeline with its own review, worked in `~/devel/framejob-audio-sync` on branch `audio-sync`:
   - AS-1, Clip ▸ Synchronize Audio and `sync_audio`: the onset match, the anchor rule, frame-snapped placement, drift measured and reported (SY-1..SY-5) (`d92e1d3`)
@@ -6,8 +6,9 @@
 - **Round 2 status:** Built and closed 2026-10-16, worked in `~/devel/framejob-sync2` on branch `sync-2`, one litecode pipeline per phase:
   - AS-3, the MFCC feature match, the played windows first, candidates and the refusal naming them, the head trim, speech-only matching, the confident and weak tiers and the Weak match sheet (SY-11..SY-19) (`a794639`)
   - AS-4, the GCC-PHAT refinement, drift on the features with a robust line, the plan off the main thread under the Synchronizing Audio sheet, #300's re-test, and the round's close (SY-20..SY-22) (the commit that moved round 2's record to `archive/`)
+- **Round 3 status:** Built 2026-10-16, worked in `~/devel/framejob-sync3`, one litecode pipeline ("sync-tighten") with no road map of its own; this record is its record: the owner's first pair found to be two takes (SY-28), the waveform gate on both tiers with the files' overlap under 2 s and the fail-closed ruling (SY-29), speech-only matching kept and the owner's rows retargeted onto a second pair that is one recording (SY-30). #303 closed.
 - **Original:** `archive/audio-sync.md` is round 1's full record and `archive/audio-sync-2.md` round 2's. Neither has section numbers, so each is cited by section title: "orig AS-2 record" is the first's "AS-2 — the record" section, "orig-2 AS-4 record" the second's "AS-4 — the record".
-- **Spec decisions:** SY-1..SY-22 in spec §11 (`designs/spec/11-decisions/audio-sync.md`). They stay binding, and where the originals word them differently, §11's text wins:
+- **Spec decisions:** SY-1..SY-22 and SY-28..SY-30 in spec §11 (`designs/spec/11-decisions/audio-sync.md`). They stay binding, and where the originals word them differently, §11's text wins:
   - SY-1: a composite, not an op. One anchor stays, every other clip moves (and, since SY-6, may change speed), all or nothing, one undo step, "already in sync" when no op is needed; no `scope`.
   - SY-2: the anchor is the named clip, else among clips with pictures (all of them when none has) the earliest start, then the rearmost track, then the lowest id.
   - SY-3: the match. Onset envelopes of the whole peaks files, a normalised FFT cross-correlation and parabolic refinement; it needs r ≥ 0.25 and a peak ratio ≥ 1.5 over the runner-up outside ±0.5 s. Files under 2 s are refused.
@@ -32,6 +33,10 @@
   - SY-21: drift on the features (supersedes SY-5/SY-7's onsets): 1,250-frame windows searched ±62 frames against a mover slice ±62 wider, kept at z ≥ 6, a Theil–Sen + MAD inlier filter (k 3, fixed), SY-7's count and span rules, an OLS line; then each window refined by PHAT and refitted (`drift_on` "phat"); c in samples.
   - SY-22: ≤ 1.5 s of CPU for a one-hour pair on Release; one shared FFT setup per plan; `plan` off the main thread under the Synchronizing Audio sheet and in `sync_audio`, applied only to the project and scope `read` took; the dev hold `-RCDevSyncHold`.
   - Amended in round 2: SY-1 by SY-11, SY-20 and SY-21; SY-3 by SY-12, SY-13 and SY-21; SY-4 and SY-10 by SY-16; SY-5, SY-6 and SY-7 by SY-21; SY-11 by SY-17 and SY-20; SY-14 by SY-17..SY-19; SY-15 by SY-18 and SY-19; SY-8 and SY-9 re-checked in AS-4, unchanged.
+  - SY-28: the record corrected — both projects share one `record.aifc` (165.0 s); IMG_0019 is one recording with it (148.2658 s), IMG_0018 the earlier take, so 118.68 s was never a true offset; the only shared sound is −41.92 s (PHAT 25.98); round 2's owner numbers (7.92, 4.2, 9.00/9.01, #303) were a false pair.
+  - SY-29: the waveform gate — either tier stands only on a clear refinement; not clear refuses (`incoherent`); with samples and no refinement refuses too (`unconfirmed`, the orchestrator's fail-closed ruling); no samples at all keeps the features' tier; the region falls back to the files' overlap, rounded outward, under 2 s; `clearZ` 15 kept.
+  - SY-30: speech-only matching kept; the fixtures retargeted (S20/S21/S30 refused nulls, S27/S28/S29 owner-sync-2, S24 on S29's placement, P13 refused, P20).
+  - Corrected or amended in round 3: SY-12, SY-13, SY-14, SY-15, SY-17 by SY-28; SY-14, SY-18 and SY-20 by SY-29; SY-15 by SY-30.
 
 ## Context
 
@@ -59,6 +64,7 @@ Round 2 began when the owner tried it on a real project and it refused: a phone 
 - **Two tiers, and a weak match is asked about.** No constant or statistic tried separated the owner's true match (z 4.2) from unrelated sound placed where it overlaps (up to 4.6); speech-only matching lifted the owner's to 7.9, and the owner chose that a person decides below the confident 10. (orig-2 AS-3 record, the stop and its resolution; SY-17..SY-19)
 - **PHAT refines, never finds.** It whitens every bin, so any shared burst can own its global peak (whole-file PHAT in the round's `pcm.py` was fooled); it is searched only within 48 ms of the coarse match, used only when clear, and never changes the tier. `clearZ` moved 8 → 15 when the owner's recorder reversed (a null) read 10.24. (orig-2 AS-4 record; SY-20)
 - **Drift on the features, with a wider slice and a robust line.** Equal-length slices pulled each window toward the coarse lag (P7 986.6 ppm for 999); widening the mover's slice by the search radius fixed it. Windows partly in noise passed the z floor and bent the least-squares line (211.43 ppm for 199.96; the phase stopped); Theil–Sen + MAD inliers read 201.06, and k is fixed at 3. (orig-2 AS-4 record, the stop; SY-21)
+- **Round 3: the waveform gate.** The owner's first pair was two takes of similar words: the features matched them (7.99 masked at the owner's trims, 17.63 confident both at 0) and PHAT refused to (9.00, 8.34), which round 2 read as PHAT failing (#303). Over 127 null placements every PHAT at the chosen lag read ≤ 10.36 and every true match ≥ 27.5, so a clear peak (`clearZ` 15, unchanged) is required of both tiers; PHAT alone is not enough (a random lag reached 19.18), so the gate is joint — the features find, the waveforms confirm. A played overlap under 2 s refines over the files' overlap, rounded outward so no scorable lag falls under 2 s; with samples and still no refinement the match is refused (fail closed). (SY-28, SY-29)
 - **The plan off the main thread.** S10's call took 7.43 s on Debug on the main thread; with one shared FFT setup a one-hour pair costs 0.793 s of CPU on Release, and the menu runs it under a sheet, applying the answer only to the project it read. (SY-22)
 
 ## What it built — where it lives now
@@ -81,6 +87,7 @@ Round 2 began when the owner tried it on a real project and it refused: a phone 
   - `AudioSyncSheetController.swift` and `EditorViewController+Audio.swift`: the Synchronizing Audio sheet, the stale test, the Weak match sheet. `AgentServer+Audio.swift`: `sync_audio` off main, `accept_weak`, the answer's keys.
   - Proofs: `audio_sync_proof.py` S1–S26 (S19 the synthetic owner-like pair, S20/S21/S23/S24 the owner's files, S25/S26 a held instance), `audio_sync_probe.swift` P1–P19 (P19 behind `--cost`), thirty-nine mutants.
   - Person checks: SE-10 (updated), SE-11 (the Weak match sheet), SE-12 (the Synchronizing Audio sheet).
+- Round 3 (the waveform gate): `AudioSync.swift`'s `plan` (the files' overlap fallback, `filesOverlap`, the gate), `AudioSync+Search.swift`'s `incoherent` and `unconfirmed` and the rule sentence's clause, the catalog's `sync_audio` description; proofs `audio_sync_proof.py` S1–S30 (S3/S20–S23/S30 refused, S27–S29 owner-sync-2, S24 on S29's placement) and `audio_sync_probe.swift` P13 with samples and P20, forty-three mutants; person checks SE-10 (step 8) and SE-11 (step 1).
 
 **Headline numbers** (Release, 2026-10-15).
 
@@ -106,15 +113,27 @@ Round 2 began when the owner tried it on a real project and it refused: a phone 
 | P18 (#300): ±1,000 ppm over 160 s | confident, rate within 5 ppm of 1/k | z 41.23 / 41.36, 0.1 ppm / 0.0 ppm | `audio_sync_proof.py --only P18` |
 | P19: a one-hour pair, loads + `plan`, -O whole module | ≤ 1.5 s of CPU | 0.793 s (`plan` 0.731) | `audio_sync_proof.py --cost` |
 
+**Round 3's headline numbers** (Release, 2026-10-16, the recorded run, 49/49: S1–S30, P1–P18, P20).
+
+| Measure | Bound | Measured | Command |
+|---|---|---|---|
+| S20/S21: the owner's first pair at the owner's trims (two takes) | refused naming the waveforms, with `accept_weak` too; the menu puts up no Weak match sheet | weak on features at z 7.93 / 7.92, GCC-PHAT 8.01 / 8.72, refused; the menu's foot "Refused: no matching sound found…" | `RC_PROOF_APP=release audio_sync_proof.py <sock>` |
+| S30: the same pair both at 0 untrimmed | refused | confident on features at z 17.45, GCC-PHAT 8.45, refused | same |
+| S22 / S23: the nulls the features chose | refused by the gate | z 4.64 / 5.53, GCC-PHAT 4.69 / 10.51 | same |
+| S27/S28: owner-sync-2 both at 0 (one recording) | confident, `refined` "phat", T within 1/30 s of 148.27 s | z 46.40 / 46.41, PHAT 95.29 / 90.50, T 148.2667 s (unsnapped 148.2658 s) | same |
+| S29: the weak positive (3 s windows, 1 s off) | weak, then moved 0.9–1.1 s, T within 1/30 s | z 8.52 on speech, PHAT 81.09; +1.0000 s, T 148.2667 s | same |
+| P20: the gate through `plan` | as the probe says | weak clear 375.12; unrelated 3.50 / 3.46 refused as written; all-zero samples refused `unconfirmed`; the files' overlap 176,000 samples for a played 7,936 (clear 410.38); the outermost lag 62.999, region 16,128 for a played 15,872 (clear 113.10) | same |
+| Mutants | every one killed | 43/43 killed (the four new ones on P20), no failed control | `audio_sync_proof.py --mutants` |
+
 ## Known limits
 
 - **Frame-snapped placement.** After correction, one constant offset of up to half a frame remains (SY-4, the owner's answer 1).
 - **The export's audio offsets (#298) — fixed in its phase 2** (spec §11 SY-23..SY-27): a non-48 kHz source is read from a 48 kHz copy, varispeed and the noise reducer are led by their fixed delays, and keep pitch near ×1 plays `time_domain`. On Release (2026-10-16) the 16 kHz recorder exports at +0.04 ms (×1) and +0.09 ms (×0.99999 varispeed), where #298 reported +25.71 and −2.81; S18's corrected mix reads 0.70 ms early in the take and 0.85 ms late; every pinned path in `export_offset_proof.py` is within 1.0 ms. An MP3 source is +13.084 ms (its decoder delay, #306). The preview plays the same composition but its output is not measured (SE-13).
 - **Keep pitch at a near-×1 rate (#299).** Synchronize Audio never uses it. Since #298's phase 2, keep pitch at 0.98–1.02 plays `time_domain` (×0.99999: +0.010 ms, spread 0.138); outside the band `.spectral` still smears (×0.9: +3.170 ms, spread 7.458), and #299 stays open for it.
 - **A large drift can defeat the coarse match (#300)** — fixed in round 2: on the features ±1,000 ppm over 160 s matches confidently (P18), and #300 is closed.
-- **Real footage: the owner's one pair, otherwise synthetic.** The owner's camera and recorder are rows S20, S21, S23 and S24 (gitignored, never committed); every other fixture is generated. Their offset has no 1 ms ground truth, and PHAT cannot refine it (#303). Real footage at large is SE-10's.
-- **The owner's files keep the coarse offset (#303)**; the refinement reads only the overlap's centre 30 s (#302); features-only drift loses about 20 ppm when a 120 s take's last third is unrelated sound (#304); a file under 64 ms reads "still being analysed" for good (#301).
-- **A weak match needs a person** (SY-18, SY-19): the owner's own case is weak, so it is asked about every time.
+- **Real footage: the owner's two pairs, otherwise synthetic.** The owner's first pair (two takes, SY-28) is rows S20, S21, S23 and S30, all refused; the second (one recording) is S24, S27, S28 and S29 (gitignored, never committed); every other fixture is generated. Neither has a 1 ms ground truth. Real footage at large is SE-10's.
+- **Two takes of the same words are refused, not matched** (SY-29): the gate needs the waveforms themselves to line up, so a re-take cannot be synced to the other take's recorder; the refinement reads only the overlap's centre 30 s (#302); features-only drift loses about 20 ppm when a 120 s take's last third is unrelated sound (#304); a file under 64 ms reads "still being analysed" for good (#301).
+- **A weak match needs a person** (SY-18, SY-19): one recording trimmed to a few seconds, placed near its truth, is weak (S29), so it is asked about every time — and since SY-29 only when the waveforms confirm it.
 - **The anchor is never corrected, and neighbours are never moved or trimmed** (SY-4, SY-10).
 
 ## Open items
@@ -131,6 +150,8 @@ Round 2: #300 closed at AS-4 (P18). Filed at AS-4's close, each `ai-drafted` and
 - #302: the PHAT refinement reads only the overlap's centre 30 s.
 - #303: the owner's files are not refined (PHAT z 8–9 under `clearZ` 15).
 - #304: features-only drift loses about 20 ppm when the last third of a 120 s take is unrelated sound.
+
+Round 3: #303 closed — PHAT's 8–9 on the owner's first pair was correct, the pair being two takes (SY-28), and the gate now acts on it (SY-29). Nothing filed.
 
 #298 and #299 stayed open; neither was round 2's. #298's phase 2 closed #298 (SY-23..SY-27) and filed #306 (an MP3 source's decoder delay); #299 stays open for keep pitch outside 0.98–1.02.
 

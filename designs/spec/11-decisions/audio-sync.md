@@ -18,7 +18,10 @@ AS-4 before its code, from point 4 of the owner's "Go ahead"; SY-21's slice and 
 SY-22 were recorded after AS-4's stop, from the orchestrator's ruling of 2026-10-16. SY-23…SY-27
 were recorded in #298's phase 2 before its code: the export's audio offsets phase 1 measured and
 located (`tools/proof/export_offset_proof.py`), removed at their causes; their numbers are the
-designer's scratch measurement of 2026-10-16, SY-22's precedent.
+designer's scratch measurement of 2026-10-16, SY-22's precedent. SY-28…SY-30 were recorded in
+round 3 (the waveform gate) before its code; their numbers are the designer's scratch measurement
+of 2026-10-16, SY-22's precedent, and SY-29's fail-closed clause is the orchestrator's ruling of
+2026-10-16 on the round's spec review.
 
 **Stands, and nothing here re-litigates it:** the overlap rule and `move_clip` (foundations,
 spec §6); D2-1 (a composite that measures nothing makes no op and says why); #42's one-delta
@@ -248,7 +251,8 @@ never silence; the menu and the tool call the same `read` + `plan`).
   was tried by the round's `landmark.py` and found nothing usable on the owner's files. A file
   under 125 frames is "too short to match: its file holds under 2 s of sound."; a file whose
   every coefficient is constant is "has no sound to line up by.", named on that clip alone (SY-4's
-  rule).
+  rule). **Corrected by SY-28:** "the owner's own ground truth" of about 118.7 s was never a true
+  offset — the owner's two files are two takes of similar words, not one recording.
 
 - **SY-13 — The played windows first (reverses SY-3's whole files).** Each clip's PLAYED window is
   the frames `[⌊(start − zero)/9600⌋, ⌈(end − zero)/9600⌉)` of its file on its timeline grid,
@@ -259,7 +263,9 @@ never silence; the menu and the tool call the same `read` + `plan`).
   share a second, unrelated stretch — the recorder's first ~13 s against the camera's last ~13 s,
   at −41.92 s — and that stretch wins any whole-file search (z 6.3 against the true 118.64 s's
   3.7, `mfccsync.py`), while the owner's trims hold only the real utterance. Where the user put
-  the clips is evidence of what they mean to line up.
+  the clips is evidence of what they mean to line up. **Corrected by SY-28:** −41.92 s is the
+  only sound the owner's files SHARE and 118.64 s is not a true offset; the rule stands on its
+  own reason, that the trims are the evidence.
 
 - **SY-14 — Candidates, the choice and the refusal.** A search answers its CANDIDATES: the local
   maxima of c among the lags that may be candidates (a lag above its left neighbour and at least
@@ -300,7 +306,10 @@ never silence; the menu and the tool call the same `read` + `plan`).
   search between two stretches that both hold speech correlates their speech frames only (SY-17).
   The refusal's rule sentence now reads "A match applies on its own at confidence ≥ 10 and 1.5
   above the next candidate; one ≥ 4 within 3 s of where clip N sits now is offered as a weak
-  match." The 1.5, the 4 and the 188 frames are unchanged.
+  match." The 1.5, the 4 and the 188 frames are unchanged. **Corrected by SY-28, amended by
+  SY-29:** "the owner's true match" here was a false pair; a choice of either tier now stands only
+  on SY-29's clear GCC-PHAT peak, and the rule sentence gains "Either counts only when the two
+  waveforms line up there (a clear GCC-PHAT peak of at least 15 within 48 ms)."
 
 - **SY-15 — The fixtures and the owner's rows.** Beside AS-1's, a committed SYNTHETIC pair with
   the owner's traits, made by the proof from a seed (16 kHz, `camera2-v1.mov`,
@@ -324,7 +333,9 @@ never silence; the menu and the tool call the same `read` + `plan`).
   copied out) are rows S20 (the camera the anchor) and S21 (the recorder the anchor), placed as the
   owner placed them; each needs recorder − camera within one 30 fps frame of 118.68 s. A row
   whose files are absent is a scored FAIL, never a skip: the owner's case is the reason for the
-  round, and a proof run without it has not shown the round works.
+  round, and a proof run without it has not shown the round works. **Corrected by SY-28, amended
+  by SY-30:** the owner's files are two takes, so S20 and S21 are refused nulls with no 118.68 s
+  bound; the one-recording rows are owner-sync-2's (S27–S29).
 
 - **SY-16 — The head trim (amends SY-4 and SY-10; the owner's choice of 2026-10-15).** Asked what
   Synchronize Audio should do when syncing would push the audio clip before the start of the
@@ -365,7 +376,8 @@ never silence; the menu and the tool call the same `read` + `plan`).
   speech (it then loses to 113.856 s). The owner's recorder reversed, against 47 camera windows,
   reached at most z 6.04 masked. The owner's played windows hold 244 speech frames (the camera)
   and 248 (the recorder); REC2 holds no speech chunk, so S19 matches on sound, and the burst
-  fixtures hold 0–1, so S1–S18, S22 and P13 match on sound.
+  fixtures hold 0–1, so S1–S18, S22 and P13 match on sound. **Corrected by SY-28:** the 7.92
+  "true match" is a false pair (two takes); SY-30 keeps speech-only matching on other evidence.
 
 - **SY-18 — The two tiers (resolves SY-14's stop).** A search's choice (SY-14's shape) is
   CONFIDENT when its best candidate's z is at least 10 and 1.5 above the second (or there is no
@@ -378,7 +390,9 @@ never silence; the menu and the tool call the same `read` + `plan`).
   the near placement alone cannot tell them apart and a person must. A run's WEAK MOVES are its
   movers chosen by placement whose plan changes something (a non-zero delta, a trim, or a
   corrected drift); a weak mover already in place is not asked about. One tier decision serves
-  both callers (`AudioSync.weakMoves`), so the menu and the tool cannot disagree.
+  both callers (`AudioSync.weakMoves`), so the menu and the tool cannot disagree. **Amended by
+  SY-29, corrected by SY-28:** either tier stands only on a clear GCC-PHAT peak; "the owner's true
+  unmasked match 4.2" was a false pair.
 
 - **SY-19 — The Weak match sheet and `accept_weak` (the owner's choice of 2026-10-15).** Asked
   "When Synchronize Audio finds only a weak match, what should it do?", the owner chose **"Ask,
@@ -440,6 +454,10 @@ never silence; the menu and the tool call the same `read` + `plan`).
   tried and classifies every fixture (positives S1 433.8, S2 433.5, S8 433.9, S10 423.3, S19 131.5 and 187.9 (two runs),
   P16's planted delay 162.5, P17 514.1 and 516.0; negatives S22 4.03, S23 10.24, P16's unrelated
   pips 4.71). The owner's files read 9.00 (S20) and 9.01 (S21), so they keep the coarse offset.
+  **Amended by SY-29, corrected by SY-28:** the refinement is now the gate — not clear, or with
+  samples not run, refuses — its region falls back to the files' overlap under 2 s, and "the tier
+  is untouched" no longer holds; S20's 9.00 and S21's 9.01 were PHAT reading a false pair
+  correctly.
 
 - **SY-21 — Drift on the features, each window refined by PHAT (supersedes SY-5's and SY-7's
   onsets; amends SY-6's units).** Drift's inputs are the readings' timeline-grid features and
@@ -575,3 +593,84 @@ never silence; the menu and the tool call the same `read` + `plan`).
   same composition (the copy and the leads apply); its output latency and its behaviour at a
   44.1 kHz output device are unmeasured (phase 1's L7: a 48 kHz composition read at 44,100 Hz is
   +3.402 ms at frame 206), so the manual check SE-13 is run at both device rates.
+
+- **SY-28 — The record corrected: the owner's first pair is two takes, not one recording (round
+  3; the designer's scratch measurement of 2026-10-16, SY-22's precedent).** Both projects' recorders
+  are one file, `record.aifc` (165.0 s; `tools/proof/media/owner-sync/` and `owner-sync-2/` hold
+  the same 23,764,480 bytes). `IMG_0019.MOV` (owner-sync-2) is one recording with it: today's
+  `plan`, both at 0 untrimmed, is confident at recorder − camera 148.2658 s (z 46.39 masked, 29.62
+  unmasked), PHAT 98.65, clear. `IMG_0018.MOV` (owner-sync, 55.27 s) is the EARLIER take of
+  similar words, so 118.68 s was never a true offset: the only sound the two share is the
+  recorder's first 13 s ≈ the camera's last 13 s, at −41.92 s (the recorder's [0, 17.34 s) at 0
+  against the camera's trims is confident on sound at z 11.39, PHAT 27.5 clear; over the files'
+  overlap there PHAT reads 25.98, clear). So SY-17's 7.92, SY-18's "the owner's true unmasked
+  match 4.2", SY-20's 9.00 and 9.01 and #303 were a false pair, which PHAT read correctly as not
+  one recording. The measurement (the probe built by `swift_build.py` over `app/Sources` at
+  e8add54, -Onone, each file decoded by copies of `writeSyncFeatures`' and `writeSpeech`'s reader
+  loops, then the app's own `AudioSync.plan`, `AudioSyncMatch.search` and `AudioSyncPHAT.refine`;
+  "PHAT" the refinement along the coarse lag over the played overlap, "files" over the files'
+  overlap at that lag, centred, capped 30 s; 30 fps):
+
+  | Case (placement) | today's `plan` | z masked / unmasked | PHAT z |
+  |---|---|---|---|
+  | owner-sync, the owner's trims (cam 0 from 29.72 s for 25.52; rec 0 from 147.63 for 17.34), anchor cam / rec | weak, played, speech | 7.99 / 4.19 | 9.00 / 9.11 (not clear) |
+  | same, whole-file search | — | 17.63 confident / best −41.92 s at 6.30 | 8.34; −41.92 s: files 25.98 clear |
+  | owner-sync both at 0 untrimmed | confident 17.63, applied silently | 17.63 / none (−41.92 at 6.30) | 8.34 |
+  | owner-sync-2 both at 0 untrimmed (anchor cam; anchor rec) | confident, rec − cam 148.2658 s | 46.39 / 29.62 | 98.65 clear (98.74) |
+  | S23 (rec reversed, from 8.0 s for 17.34) | weak 5.54; whole masked confident 12.42 | 5.54 / none | 10.235 (10.52; files 5.61) |
+  | S22 / S3 | weak 4.64 / refused (best 6.05) | — | 4.83 / — |
+  | S1, S8 / S19 | confident 44.31 / 15.23 | same | 434.3 / 180.5 |
+  | owner-sync rec [0, 17.34) at 0 vs cam trims (the real −41.92 s overlap) | confident 11.39 on sound | 11.39 | 27.5 clear |
+  | owner-sync-2 short windows (16 placements; cam 2.5–4 s, rec 3–5 s, 1 s from truth) | 9 weak, 2 confident, 5 confident via whole | weak 7.86–9.94; 10.11/10.77 masked vs 8.41/9.03 unmasked | 65.3–100.8 clear; the 5: played < 2 s, files 98.38 clear |
+
+  The owner-sync rows are retargeted as nulls (SY-30); `archive/` is untouched.
+
+- **SY-29 — The waveform gate (amends SY-18 and SY-20).** A chosen match of EITHER tier stands
+  only when the plan's refinement (SY-20) is CLEAR. When it ran and is not clear the command is
+  refused, all or nothing (SY-1): "no matching sound found between clip A and clip N: moving clip
+  N by −0.80 s matches their sound (confidence 7.99), but their waveforms do not line up there
+  (GCC-PHAT confidence 9.00; a match needs a clear peak of at least 15 within 48 ms), so they are
+  not one recording." — the move the coarse snapped delta, both confidences to two places, the 15
+  `clearZ` and the 48 ms `reachSamples` printed from the constants (`AudioSync.incoherent`). **The
+  region** is SY-20's played overlap; when that is under 16,000 samples (2 s) it is the files'
+  overlap at the coarse lag instead, the anchor timeline frames `[lo, hi)` ×128 with
+  `lo = max(0, ⌊lag⌋)` and `hi = max(lo, min(anchor frames, mover frames + ⌈lag⌉))`, centred and capped at 30 s — rounded OUTWARD
+  (the round's spec review, objection 1; a slice reads 0 past a file's end), so every lag a search
+  can score (an overlap of at least 125 frames) holds at least 16,000 samples. **Fail closed (the
+  orchestrator's ruling of 2026-10-16):** when the readings carry samples and the refinement cannot
+  run (a region under 2 s, an all-zero slice, any other nil) the match is not applied or offered
+  either: refused with "…: moving clip N by −0.80 s matches their sound (confidence 7.99), but
+  they share too little sound there to confirm it is one recording (GCC-PHAT needs 2 s of both
+  waveforms)." (`AudioSync.unconfirmed`). Only a pair whose readings carry no samples at all (the
+  probe's feature-only rows) keeps the features' tier unrefined. SY-14's rule sentence gains
+  "Either counts only when the two waveforms line up there (a clear GCC-PHAT peak of at least 15
+  within 48 ms)." A played-window choice refused here does NOT fall back to the whole files
+  (SY-13: the trims are the evidence). `find`, `choose`, `weakMoves`, the sheets, `accept_weak`,
+  the tool's keys, every op, the FFI and the format are unchanged; `refined` "coarse" now means
+  that no refinement ran. **Why `clearZ` stays 15:** sweeps over owner-sync (74 recorder windows
+  every 2 s; 50 of the reversed recorder every 3 s; the camera at the owner's trims) and the
+  table's rows give 127 null placements, of which today's `plan` offers 15 weak and applies 14
+  confidently (2 with no PHAT run, a played overlap under 2 s; their files' overlaps read 8.25 and
+  5.61); every null's PHAT at its chosen lag is ≤ 10.36, every true match's ≥ 27.5 — 15 is ×1.45
+  the highest null and ×1.83 under the lowest true match. **Why joint, not PHAT alone:** at random
+  lags (≥ 10 s of overlap) PHAT reads on owner-sync a median of 3.75 and a maximum of 19.18 over 200
+  lags, 2 of them ≥ 15 (15.49, 19.18); owner-sync-2 off the truth at most 12.34; the reversed
+  recorder 11.51; CAMERA against UNRELATED 6.25. PHAT confirms; it never finds (SY-20).
+  **Calibration rule:** a fixture misclassified stops the round, which reports every z; no
+  constant moves.
+
+- **SY-30 — Speech-only matching kept; the fixtures retargeted.** SY-17 stays: masking lifted two
+  true short-window pairs of owner-sync-2 into the confident tier (8.41 → 10.11 and 9.03 → 10.77
+  unmasked → masked), and every null it lifted is refused by SY-29. The rows: S20 (owner-sync at
+  the owner's trims, the camera the anchor) and S21 (the recorder the anchor) refused naming the
+  waveforms, again with `accept_weak: true`; S20's menu item puts up no Weak match sheet and leaves
+  "Refused: no matching sound found…" at the inspector's foot; S30 (owner-sync both at 0
+  untrimmed, today's confident 17.63) refused the same; S3 refused, S22 and S23 refused by the
+  gate (S23 keeping its speech-frames control); S27 and S28 (owner-sync-2 both at 0 untrimmed, each
+  anchor) confident, `refined` "phat", recorder − camera within one 30 fps frame of 148.27 s; S29,
+  the weak positive (IMG_0019 on track 0 from 2 s for 3 s at frame 188, 6.2667 s; `record.aifc` on
+  track 1 from 150 s for 3 s at 5 s; measured weak 8.52 masked, PHAT 90.49, speech 162 and 166
+  frames): weak first, then applied with `accept_weak`, the recorder moving 0.9–1.1 s, the same
+  bound; S24 the Weak match sheet on S29's placement; the probe's P13 (each pair with its own
+  samples) refused, never weak; P20 the gate through `plan`. A row whose files are absent is a
+  scored FAIL (SY-15's rule, for both owner folders).

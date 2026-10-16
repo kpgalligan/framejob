@@ -1,5 +1,6 @@
-// Road maps "audio-sync" (AS-1, AS-2) and "audio-sync-2" (AS-3, AS-4) — spec §11
-// SY-1..SY-21 — Synchronize Audio's arithmetic, measured through the app's own
+// Road maps "audio-sync" (AS-1, AS-2) and "audio-sync-2" (AS-3, AS-4) and its
+// round 3 — spec §11 SY-1..SY-22, SY-28..SY-30 — Synchronize Audio's
+// arithmetic, measured through the app's own
 // `SyncFeatures`, `AudioSyncMatch`, `AudioSyncPHAT` and `AudioSync` with no
 // document, no window and no disk.
 //
@@ -16,7 +17,9 @@
 // samples (the refinement's input, SY-20) 8 kHz int16, 75 ticks each. The
 // smooth `featureBumps` keep AS-2's 6,000-tick bucket as their clock, so a
 // planted lag is a multiple of 48,000 ticks, whole on both grids. A reading
-// with no samples is never refined, and its drift is the features' line.
+// with no samples is never refined, and its drift is the features' line; a
+// pair with no samples at all keeps the features' tier (SY-29), so the rows
+// built on features alone still read the search.
 //
 //   P1  delta arithmetic: five placements of a mover whose features are the
 //       anchor's shifted by a known number of frames, each delta, start and
@@ -28,8 +31,9 @@
 //       same 313 frames later, 9 dB down with noise, searched: lag −313 ±0.5,
 //       chosen by confidence.
 //   P4  unrelated features plan to the refusal naming the played windows'
-//       candidates and the rule from its constants; two 100-frame files (no
-//       search can run) to "too little room to compare their sound."
+//       candidates and the rule from its constants, the waveform clause
+//       (SY-29) included; two 100-frame files (no search can run) to "too
+//       little room to compare their sound."
 //   P5  drift (SY-21) on smooth features stretched by known ratios, within
 //       ±5 ppm, including 100 ppm at exactly `driftMinimumOverlapFrames` and
 //       200 ppm with the mover's frames 4,000–7,000 seeded noise (whole
@@ -82,10 +86,11 @@
 //       that no longer meets the anchor is refused; a neighbour meeting the
 //       trimmed span is refused, the same one frame clear is not.
 //   P13 unrelated sound placed where it overlaps (both at 0, placement lag
-//       0): four pairs of 30 s bursts from different seeds and one pair of
-//       white-noise frames, each refused "no matching sound found" or planned
-//       with every row chosen by placement and `weakMoves` non-empty — never
-//       by confidence (SY-18); each near placement's z printed.
+//       0): four pairs of 30 s bursts from different seeds, each reading
+//       carrying its bursts as int16 samples, and one pair of white-noise
+//       frames with seeded noise samples, each refused "no matching sound
+//       found" — never planned, not even weak (SY-18, SY-29); each near
+//       placement's z printed, and whether the search or the gate refused.
 //   P14 speech-only matching (SY-17): `speechMask` on a hand-worked chunk
 //       list (the frame's centre chunk, ≥ 0.5) and on none; `frameCentreTicks`
 //       19,200; `resampledMask` the identity at ×1 and as long as
@@ -126,6 +131,28 @@
 //   P18 #300: 160 s of pips against a mover at ±1,000 ppm (features from its
 //       own PCM): confident, drift measured on PHAT, the set_speed rate
 //       within 5 ppm of 1/k; the plan's wall seconds printed.
+//   P20 the waveform gate (SY-29) through `plan`: 30 s seeded feature
+//       frames with a planted lag of 300 frames, the mover 60 frames from
+//       it, and pips PCM planted 300·128 + 37.4 samples late. (a) the lag at
+//       weight 0.03 (control: its near peak 4 ≤ z < 10, chosen by
+//       placement) with the coherent samples: weak, the refinement clear,
+//       `weakMoves` non-empty; (b) the same features, unrelated pips:
+//       refused, the reason exactly `incoherent` of the plan's own numbers
+//       (`find`, the snapped delta, the region, `refine`, written out
+//       here); (c) the lag at full weight (control: chosen by confidence),
+//       unrelated pips: refused the same way; (d) (a)'s features and no
+//       samples at all: weak, the refinement nil; (g) (a) with the mover's
+//       samples all 0: refused, exactly `unconfirmed` (the fail-closed
+//       ruling); (e) the anchor playing [0, 9 s) and the mover [0, 6 s) of
+//       a file 500 frames on, 5,000 frames from its placement: the whole
+//       files choose by confidence, the played spans meet for 1 s once
+//       moved (control: the played region under 2 s), and the refinement
+//       runs over the files' overlap and is clear; with unrelated pips,
+//       refused as written; (f) two 188-frame files sharing the outermost
+//       scored lag (63, a 125-frame overlap), the mover's zero the first in
+//       0, 200, … ticks whose snapped played overlap is under 2 s: the
+//       refinement runs over the outward-rounded files' overlap (≥ 16,000
+//       samples) and is clear (control: the lag 63 ±0.5).
 import Foundation
 
 var rows: [[String: Any]] = []
@@ -528,7 +555,9 @@ do {
             ], problems: [], anchor: nil, fps: fps))
     let said = refusal(plan) ?? ""
     let rule = " A match applies on its own at confidence ≥ 10 and 1.5 above the next "
-        + "candidate; one ≥ 4 within 3 s of where clip 2 sits now is offered as a weak match."
+        + "candidate; one ≥ 4 within 3 s of where clip 2 sits now is offered as a weak match. "
+        + "Either counts only when the two waveforms line up there (a clear GCC-PHAT peak of "
+        + "at least 15 within 48 ms)."
     let unrelatedOK = said.hasPrefix(
         "no matching sound found between clip 1 and clip 2: in the played windows, moving clip 2 "
             + "by ") && said.hasSuffix(rule) && said.contains("(confidence ")
@@ -1390,49 +1419,59 @@ do {
     // The case P4 and P11 keep out of reach (AS-3's review, finding 3): two
     // clips that are not the same take, placed so they overlap — both at 0,
     // placement lag 0, the user's natural first try — must never apply
-    // without asking (SY-18). Each pair is `SyncFeatures.frames` of two
-    // seeds' 30 s of bursts (CAMERA and UNRELATED's recipe), and one pair is
-    // white-noise frames; every one must be refused "no matching sound
-    // found", or planned with every row chosen by placement and `weakMoves`
-    // non-empty — never by confidence. The near placement's z is printed
-    // beside each, for SY-14's calibration.
+    // without asking (SY-18), and since SY-29 not even be offered: each
+    // reading carries its own samples, which never line up, so the waveform
+    // gate refuses whatever the features chose. Each pair is
+    // `SyncFeatures.frames` of two seeds' 30 s of bursts (CAMERA and
+    // UNRELATED's recipe) with those bursts as its int16 samples, and one
+    // pair is white-noise frames with seeded noise samples; every one must be
+    // refused "no matching sound found" — never planned. The near
+    // placement's z is printed beside each, for SY-14's calibration, and
+    // which refusal it was (the search's, or the gate's naming GCC-PHAT).
     var good = true
     var notes: [String] = []
-    func unrelatedAtPlacement(_ name: String, _ anchor: [Float], _ mover: [Float]) {
+    func unrelatedAtPlacement(
+        _ name: String, _ anchor: [Float], _ mover: [Float], _ samples: ([Int16], [Int16])
+    ) {
         let count = (anchor.count / width, mover.count / width)
         let plan = AudioSync.plan(
             AudioSync.Input(
                 readings: [
                     reading(1, track: 0, start: 0, end: Ticks(count.0) * step, zero: 0,
-                            video: true, features: anchor),
+                            video: true, samples: samples.0, features: anchor),
                     reading(2, track: 1, start: 0, end: Ticks(count.1) * step, zero: 0,
-                            features: mover),
+                            samples: samples.1, features: mover),
                 ], problems: [], anchor: nil, fps: fps))
         let near = AudioSyncMatch.search(
             anchor: anchor, mover: mover, anchorSpeech: nil, moverSpeech: nil,
             offset: 0, placementLag: 0
         ).flatMap { $0.nearPlacement }
-        let refused = refusal(plan)?.hasPrefix("no matching sound found between clip 1 and clip 2")
-            ?? false
-        var weak = false
-        if case .planned(_, let synced, _) = plan {
-            weak = !synced.isEmpty && synced.allSatisfy { $0.chosenBy == .placement }
-                && !AudioSync.weakMoves(synced).isEmpty
-        }
-        if !refused && !weak { good = false }
+        let said = refusal(plan) ?? ""
+        let refused = said.hasPrefix("no matching sound found between clip 1 and clip 2")
+        if !refused { good = false }
+        let how = said.contains("GCC-PHAT confidence") ? "refused by the waveform gate"
+            : "refused by the search"
         notes.append(
             "\(name) (\(count.0) and \(count.1) frames, both at 0): near placement "
                 + (near.map { String(format: "lag %.2f z %.2f", $0.lag, $0.z) } ?? "nil")
-                + " → \(refused ? "refused" : weak ? "weak, asked: " + describe(plan) : "NOT refused or weak: " + describe(plan))")
+                + " → \(refused ? how + (how.hasSuffix("gate") ? " (" + String(said.suffix(170)) + ")" : "") : "NOT refused: " + describe(plan))")
+    }
+    /// The cache's int16 of `values` (`round(clamp(x, −1, 1)·32767)`).
+    func int16(_ values: [Float]) -> [Int16] {
+        values.map { Int16((min(1, max(-1, Double($0))) * 32767).rounded()) }
     }
     for (index, seeds) in [(131, 132), (133, 134), (135, 136), (137, 138)].enumerated() {
+        let anchorSound = bursts(seconds: 30, seed: UInt64(seeds.0))
+        let moverSound = bursts(seconds: 30, seed: UInt64(seeds.1))
         unrelatedAtPlacement(
             "bursts pair \(index + 1)",
-            SyncFeatures.frames(bursts(seconds: 30, seed: UInt64(seeds.0))),
-            SyncFeatures.frames(bursts(seconds: 30, seed: UInt64(seeds.1))))
+            SyncFeatures.frames(anchorSound), SyncFeatures.frames(moverSound),
+            (int16(anchorSound), int16(moverSound)))
     }
     unrelatedAtPlacement(
-        "white noise", randomFrames(1500, seed: 139), randomFrames(1500, seed: 140))
+        "white noise", randomFrames(1500, seed: 139), randomFrames(1500, seed: 140),
+        (int16(randomArray(1500 * SyncFeatures.hop, seed: 141).map { $0 * 0.3 }),
+         int16(randomArray(1500 * SyncFeatures.hop, seed: 142).map { $0 * 0.3 })))
     row("P13", good, notes.joined(separator: "; "))
 }
 
@@ -1975,6 +2014,282 @@ do {
                 + "±5 ppm); plan \(String(format: "%.2f", wall)) s")
     }
     row("P18", good, notes.joined(separator: "; "))
+}
+
+// MARK: - P20 the waveform gate (SY-29)
+
+/// `count` frames whose frame m is `weight`·anchor[m + lag] (where that
+/// exists, fresh noise elsewhere) plus seeded noise: the lag is planted, and
+/// `weight` sets how strongly it matches.
+func plantedFrames(_ anchor: [Float], lag: Int, count: Int, weight: Float, seed: UInt64)
+    -> [Float] {
+    let shifted = shiftedFrames(anchor, by: lag, count: count, seed: seed)
+    let noise = randomFrames(count, seed: seed + 1)
+    return zip(shifted, noise).map { weight * $0 + $1 }
+}
+
+/// What `plan` should answer for a chosen match the gate refuses, written
+/// from the spec: `find`'s choice, the coarse delta snap(zeroA − zeroN +
+/// lag·9600), the played overlap it gives in anchor frames (the files'
+/// overlap at the lag, rounded outward, when that is under 2 s), its region
+/// (the centre 30 s), `refine` along the coarse lag, then `incoherent` or
+/// `unconfirmed`; and the region's size. nil when `find` chose nothing.
+func gateAnswer(_ anchor: AudioSync.Reading, _ mover: AudioSync.Reading)
+    -> (reason: String, region: Int, played: Int, found: AudioSync.Found)? {
+    guard case .found(let found) = AudioSync.find(
+        anchor: anchor, anchorFrames: anchor.features, anchorSpeech: nil, mover: mover,
+        moverFrames: mover.features, moverSpeech: nil, fps: fps)
+    else { return nil }
+    let hop = SyncFeatures.hop
+    let lagTicks = Ticks((found.lag * Double(step)).rounded())
+    let coarse = ReelTime.snapToFrame(anchor.zero - mover.zero + lagTicks, fps: fps)
+    func frame(_ ticks: Ticks) -> Int { Int((Double(ticks) / Double(step)).rounded(.down)) }
+    let lower = max(0, frame(max(anchor.start, mover.start + coarse) - anchor.zero))
+    let upper = max(lower, frame(min(anchor.end, mover.end + coarse) - anchor.zero))
+    func centred(_ low: Int, _ high: Int) -> Range<Int> {
+        let cap = AudioSyncPHAT.maximumRegionSamples
+        guard high - low > cap else { return low..<high }
+        let start = (low + high) / 2 - cap / 2
+        return start..<(start + cap)
+    }
+    var region = centred(lower * hop, upper * hop)
+    let played = region.count
+    if region.count < AudioSyncPHAT.minimumRegionSamples {
+        let lo = max(0, Int(found.lag.rounded(.down)))
+        let hi = max(lo, min(anchor.features.count / width,
+                             mover.features.count / width + Int(found.lag.rounded(.up))))
+        region = centred(lo * hop, hi * hop)
+    }
+    let refinement = AudioSyncPHAT.refine(
+        anchor: anchor.samples, anchorSpeed: 1, mover: mover.samples, moverSpeed: 1,
+        line: AudioSyncPHAT.Line(intercept: found.lag * Double(hop), rate: 0), region: region)
+    let reason = refinement.map {
+        AudioSync.incoherent(
+            anchor: anchor.clip, mover: mover.clip, delta: coarse, confidence: found.confidence,
+            refinement: $0)
+    } ?? AudioSync.unconfirmed(
+        anchor: anchor.clip, mover: mover.clip, delta: coarse, confidence: found.confidence)
+    return (reason, region.count, played, found)
+}
+
+/// `reading` with `samples` in place of its own.
+func withSamples(_ r: AudioSync.Reading, _ samples: [Int16]) -> AudioSync.Reading {
+    AudioSync.Reading(
+        clip: r.clip, media: r.media, trackIndex: r.trackIndex, start: r.start, end: r.end,
+        zero: r.zero, hasVideo: r.hasVideo, samples: samples, features: r.features,
+        speech: r.speech, neighbours: r.neighbours, speed: r.speed, sourceIn: r.sourceIn)
+}
+
+do {
+    var good = true
+    var notes: [String] = []
+    var instrument = false
+    let head = "no matching sound found between clip 1 and clip 2: moving clip 2 by "
+    func plan(_ readings: [AudioSync.Reading]) -> AudioSync.Plan {
+        AudioSync.plan(AudioSync.Input(readings: readings, problems: [], anchor: nil, fps: fps))
+    }
+    /// The refused case: the plan's reason equals `gateAnswer`'s, starts
+    /// with `head` and names `words`.
+    func gated(_ name: String, _ readings: [AudioSync.Reading], _ words: String) {
+        let answer = plan(readings)
+        let said = refusal(answer) ?? ""
+        let want = gateAnswer(readings[0], readings[1])
+        let ok = said == want?.reason && said.hasPrefix(head) && said.contains(words)
+        if !ok { good = false }
+        // The sentence after `head`, from "matches", is the part that varies.
+        let tail = said.range(of: "matches their sound").map { String(said[$0.lowerBound...]) }
+        notes.append(
+            ok ? "\(name): refused as written, …\((tail ?? said).prefix(118))…"
+                : "\(name): \(describe(answer)) (want: \(want?.reason ?? "nil"))")
+    }
+
+    // (a)–(d), (g): 30 s each. The anchor's frame a is the mover's a − 300
+    // (4.8 s); the mover sits 60 frames (0.96 s) from the truth, so the
+    // planted peak is the near placement. Its features carry the lag at
+    // weight 0.03, under the confident tier; the coherent samples are pips
+    // with the anchor 300·128 + 37.4 samples late.
+    let frames = 1875
+    let lag = 300
+    let anchorFeatures = randomFrames(frames, seed: 201)
+    let weakFeatures = plantedFrames(
+        anchorFeatures, lag: lag, count: frames, weight: 0.03, seed: 202)
+    let strongFeatures = shiftedFrames(anchorFeatures, by: lag, count: frames, seed: 204)
+    let count = frames * SyncFeatures.hop
+    let delay = Double(lag * SyncFeatures.hop) + 37.4
+    let pips = Pips(seed: 205, samples: Double(count) + delay + 1000)
+    let anchorPCM = pcm(pips.sample(count: count, c: -delay), noise: 0.003, seed: 206)
+    let moverPCM = pcm(pips.sample(count: count), gain: 0.5, noise: 0.003, seed: 207)
+    let unrelatedPCM = pcm(Pips(seed: 208, samples: Double(count) + 1000).sample(count: count),
+                           gain: 0.5, noise: 0.003, seed: 209)
+    let zero = Ticks(lag + 60) * step
+    let anchorReading = reading(
+        1, track: 0, start: 0, end: Ticks(frames) * step, zero: 0, video: true,
+        samples: anchorPCM, features: anchorFeatures)
+    func mover(_ features: [Float], _ samples: [Int16]) -> AudioSync.Reading {
+        reading(2, track: 1, start: zero, end: zero + Ticks(frames) * step, zero: zero,
+                samples: samples, features: features)
+    }
+    let near = AudioSyncMatch.search(
+        anchor: anchorFeatures, mover: weakFeatures, anchorSpeech: nil, moverSpeech: nil,
+        offset: 0, placementLag: Double(lag + 60))
+    let nearZ = near?.nearPlacement?.z ?? 0
+    let nearLag = near?.nearPlacement?.lag ?? .nan
+    let notConfident = near.map { AudioSync.choose($0)?.1 == .placement } ?? false
+    let weakControl = nearZ >= AudioSyncMatch.plausibleZ && nearZ < AudioSyncMatch.confidentZ
+        && abs(nearLag - Double(lag)) <= 0.5 && notConfident
+    if !weakControl { instrument = true }
+    notes.append(
+        "control: weak features' near peak lag \(String(format: "%.2f", nearLag)) z "
+            + "\(String(format: "%.2f", nearZ)) (\(lag) ±0.5, 4 ≤ z < 10, by placement): "
+            + "\(weakControl)")
+
+    // (a) weak features, coherent samples: offered, the refinement clear.
+    let a = plan([anchorReading, mover(weakFeatures, moverPCM)])
+    if case .planned(_, let synced, _) = a, let one = synced.first {
+        let ok = one.chosenBy == .placement && one.refinement?.clear == true
+            && !AudioSync.weakMoves(synced).isEmpty
+        if !ok { good = false }
+        notes.append("(a) weak, coherent: \(one.chosenBy.rawValue), delta \(one.delta), "
+            + "\(describe(one.refinement)), asked \(!AudioSync.weakMoves(synced).isEmpty)")
+    } else {
+        good = false
+        notes.append("(a) weak, coherent: \(describe(a)) (want weak and clear)")
+    }
+    // (b) the same features, unrelated samples: the gate refuses.
+    gated("(b) weak, unrelated samples", [anchorReading, mover(weakFeatures, unrelatedPCM)],
+          "but their waveforms do not line up there (GCC-PHAT confidence ")
+    // (c) confident features, unrelated samples: the gate refuses the
+    // confident tier too.
+    let strongResult = AudioSyncMatch.search(
+        anchor: anchorFeatures, mover: strongFeatures, anchorSpeech: nil, moverSpeech: nil,
+        offset: 0, placementLag: Double(lag + 60))
+    let strongControl = strongResult.flatMap { AudioSync.choose($0) }?.1 == .confidence
+    if !strongControl { instrument = true }
+    notes.append(
+        "control: strong features by confidence (z "
+            + "\(String(format: "%.2f", strongResult?.candidates.first?.z ?? 0))): \(strongControl)")
+    gated("(c) confident, unrelated samples", [anchorReading, mover(strongFeatures, unrelatedPCM)],
+          "but their waveforms do not line up there (GCC-PHAT confidence ")
+    // (d) the weak features with no samples at all: the features' tier stands.
+    let d = plan([withSamples(anchorReading, []), mover(weakFeatures, [])])
+    if case .planned(_, let synced, _) = d, let one = synced.first {
+        let ok = one.chosenBy == .placement && one.refinement == nil
+            && !AudioSync.weakMoves(synced).isEmpty
+        if !ok { good = false }
+        notes.append("(d) weak, no samples: \(one.chosenBy.rawValue), refinement "
+            + "\(describe(one.refinement)), asked \(!AudioSync.weakMoves(synced).isEmpty)")
+    } else {
+        good = false
+        notes.append("(d) weak, no samples: \(describe(d)) (want weak, unrefined)")
+    }
+    // (g) the fail-closed ruling: samples, but the mover's all 0 — the
+    // refinement cannot run, so the match is refused, not offered.
+    gated("(g) weak, the mover's samples all 0",
+          [anchorReading, mover(weakFeatures, [Int16](repeating: 0, count: count))],
+          "but they share too little sound there to confirm it is one recording")
+
+    // (e) a confident whole-file match whose played spans meet for 1 s once
+    // moved: the anchor plays [0, 9 s) of its file, the mover [0, 6 s) of a
+    // file whose frame m is the anchor's m + 500, sitting 5,000 frames away
+    // so no peak is near its placement. The played windows share 62 frames
+    // at the true lag, under a candidate's 125, so the whole files choose;
+    // the refinement runs over the files' overlap.
+    let eLag = 500
+    let eAnchorFeatures = randomFrames(frames, seed: 211)
+    let eMoverFeatures = shiftedFrames(eAnchorFeatures, by: eLag, count: frames, seed: 212)
+    let eDelay = Double(eLag * SyncFeatures.hop) + 21.3
+    let ePips = Pips(seed: 213, samples: Double(count) + eDelay + 1000)
+    let eAnchorPCM = pcm(ePips.sample(count: count, c: -eDelay), noise: 0.003, seed: 214)
+    let eMoverPCM = pcm(ePips.sample(count: count), gain: 0.5, noise: 0.003, seed: 215)
+    let eZero = Ticks(5000) * step
+    let eAnchor = reading(
+        1, track: 0, start: 0, end: 9 * ReelTime.perSecond, zero: 0, video: true,
+        samples: eAnchorPCM, features: eAnchorFeatures)
+    let eMover = reading(
+        2, track: 1, start: eZero, end: eZero + 6 * ReelTime.perSecond, zero: eZero,
+        samples: eMoverPCM, features: eMoverFeatures)
+    let eWant = gateAnswer(eAnchor, eMover)
+    let eControl = eWant.map {
+        $0.played < AudioSyncPHAT.minimumRegionSamples && $0.found.search == .whole
+            && $0.found.chosenBy == .confidence
+    } ?? false
+    if !eControl { instrument = true }
+    let e = plan([eAnchor, eMover])
+    if case .planned(_, let synced, _) = e, let one = synced.first, let w = eWant {
+        let ok = one.search == .whole && one.chosenBy == .confidence
+            && one.refinement?.clear == true && w.region >= AudioSyncPHAT.minimumRegionSamples
+        if !ok { good = false }
+        notes.append(
+            "(e) played spans meeting for 1 s: \(one.search.rawValue)/"
+                + "\(one.chosenBy.rawValue) z \(String(format: "%.2f", one.confidence)), "
+                + "\(describe(one.refinement)), region \(w.region) samples; control: played "
+                + "\(w.played) < \(AudioSyncPHAT.minimumRegionSamples): \(eControl)")
+    } else {
+        good = false
+        notes.append("(e) whole files, played spans meeting for 1 s: \(describe(e)) (want "
+            + "planned, clear; control \(eControl))")
+    }
+    gated("(e) with unrelated samples",
+          [eAnchor, withSamples(eMover, unrelatedPCM)],
+          "but their waveforms do not line up there (GCC-PHAT confidence ")
+
+    // (f) the outward rounding (02's objection 1): two whole 188-frame
+    // files, the mover's frames [0, 125) the anchor's [63, 188) — the
+    // outermost lag a search scores — and its zero chosen so the snapped
+    // played overlap is under 2 s: the refinement runs over the files'
+    // overlap (≥ 125 frames, ≥ 16,000 samples) and is clear.
+    let fFrames = 188
+    let fLag = 63
+    let fAnchorFeatures = randomFrames(fFrames, seed: 221)
+    let fMoverFeatures = shiftedFrames(fAnchorFeatures, by: fLag, count: fFrames, seed: 222)
+    let fCount = fFrames * SyncFeatures.hop
+    let fPips = Pips(seed: 223, samples: Double(fCount) + Double(fLag * SyncFeatures.hop) + 1000)
+    let fAnchorPCM = pcm(fPips.sample(count: fCount, c: -Double(fLag * SyncFeatures.hop)),
+                         noise: 0.003, seed: 224)
+    let fMoverPCM = pcm(fPips.sample(count: fCount), gain: 0.5, noise: 0.003, seed: 225)
+    let fAnchor = reading(
+        1, track: 0, start: 0, end: Ticks(fFrames) * step, zero: 0, video: true,
+        samples: fAnchorPCM, features: fAnchorFeatures)
+    var fChosen: (zero: Ticks, want: (reason: String, region: Int, played: Int, found: AudioSync.Found))?
+    for z in stride(from: Ticks(0), to: 20_000, by: 200) {
+        let candidate = reading(
+            2, track: 1, start: z, end: z + Ticks(fFrames) * step, zero: z,
+            samples: fMoverPCM, features: fMoverFeatures)
+        if let w = gateAnswer(fAnchor, candidate), w.played < AudioSyncPHAT.minimumRegionSamples {
+            fChosen = (z, w)
+            break
+        }
+    }
+    if let chosen = fChosen {
+        let (fZero, w) = (chosen.zero, chosen.want)
+        let fMover = reading(
+            2, track: 1, start: fZero, end: fZero + Ticks(fFrames) * step, zero: fZero,
+            samples: fMoverPCM, features: fMoverFeatures)
+        let f = plan([fAnchor, fMover])
+        let outermost = abs(w.found.lag - Double(fLag)) <= 0.5
+        if !outermost { instrument = true }
+        var ok = w.region >= AudioSyncPHAT.minimumRegionSamples
+        var refined = "nil"
+        if case .planned(_, let synced, _) = f, let one = synced.first {
+            ok = ok && one.refinement?.clear == true
+            refined = describe(one.refinement)
+        } else {
+            ok = false
+        }
+        if !ok { good = false }
+        var answered = "refused"
+        if case .planned(_, let synced, _) = f, let one = synced.first {
+            answered = "\(one.chosenBy.rawValue) z \(String(format: "%.2f", one.confidence))"
+        }
+        notes.append(
+            "(f) 188-frame files, the mover at \(fZero) ticks: \(answered), \(refined), "
+                + "played \(w.played), region \(w.region) samples; control: lag "
+                + "\(String(format: "%.3f", w.found.lag)) (want \(fLag) ±0.5): \(outermost)")
+    } else {
+        instrument = true
+        notes.append("(f) no mover zero in [0, 20,000) ticks left a played overlap under 2 s")
+    }
+    row("P20", good, notes.joined(separator: "; "), instrument: instrument)
 }
 
 emit()

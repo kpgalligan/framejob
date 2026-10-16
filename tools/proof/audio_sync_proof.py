@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Road maps "audio-sync" (AS-1, AS-2) and "audio-sync-2" (AS-3, AS-4) — spec
-§11 SY-1..SY-22 — Clip ▸ Synchronize Audio and `sync_audio`, over MCP against a
+"""Road maps "audio-sync" (AS-1, AS-2) and "audio-sync-2" (AS-3, AS-4) and its
+round 3 — spec §11 SY-1..SY-22, SY-28..SY-30 — Clip ▸ Synchronize Audio and
+`sync_audio`, over MCP against a
 running instance, then the probe's rows over `app/Sources`.
 
     python3 tools/proof/audio_sync_proof.py <dir>/agent.sock [--only S1,P3,...]
@@ -35,7 +36,10 @@ low-passed noise, about −14 dBFS RMS) under COMPETE at 0 s and UTTER at
 31.2 + 118.70 s (a whole number of samples), both through RECORDER's −9 dB,
 low-pass and noise. Recorder − camera is 118.70 s for UTTER and −47 s for
 COMPETE. The OWNER's files are `tools/proof/media/owner-sync/IMG_0018.MOV` and
-`record.aifc` (gitignored, never copied out of `tools/proof/`).
+`record.aifc`, two takes of similar words with no shared stretch but the
+recorder's first 13 s (SY-28); OWNER2's, `tools/proof/media/owner-sync-2/`
+`IMG_0019.MOV` and the same `record.aifc`, one recording, recorder − camera
+148.27 s (SY-28). Both gitignored, never copied out of `tools/proof/`.
 
 Every media's `cache/peaks/<id>.bin`, `cache/sync/<id>.complete.json` and
 `cache/speech/<id>.complete.json` are each waited for (120 s) before it is used, and
@@ -53,9 +57,8 @@ before and after, and the last undo step not "Synchronize Audio"):
        both offsets.
   S2   camera at 0, recorder at 20 s, `anchor` the recorder: the camera lands
        on exactly frame 694 (unsnapped 23.1333125 s), the recorder unmoved.
-  S3   camera and UNRELATED: refused "no matching sound found", or answered
-       `moved: false` with UNRELATED in `weak` (SY-18) — no row chosen by
-       confidence either way — unchanged; it prints which, and the z.
+  S3   camera and UNRELATED: refused "no matching sound found", unchanged,
+       no step.
   S4   a still (freeze_frame) and the recorder: refused "plays no sound",
        unchanged.
   S5   the recorder's audio disabled: refused "plays no sound", unchanged.
@@ -106,36 +109,35 @@ before and after, and the last undo step not "Synchronize Audio"):
        −118.70 s).
   S20  the OWNER's files placed as the owner placed them (camera at 0 from
        29.72 s for 25.52 s; recorder at 0 from 147.63 s for 17.34 s on track
-       1), default anchor: first without `accept_weak`, `moved` false, `weak`
-       [the recorder], its row `chosen_by` "placement" and `matched_on`
-       "speech", unchanged and no step (SY-18, SY-19); then with
-       `accept_weak: true`: synced, the camera unmoved, the recorder at start 0
-       with its `in` advanced by e ≈ 0.77 s (`trimmed` e); T = (rec.in −
-       rec.start) − (cam.in − cam.start) within 1/30 s of 118.68 s; one `undo`
-       restores both clips. The unsnapped −offset/600000 is printed.
-  S21  the same with `anchor` the recorder (weak first, `weak` [the camera],
-       then accepted): the camera moves by about +0.77 s,
-       `trimmed` 0, and the same bound on T.
-       S20 and S21 are a scored FAIL when either OWNER file is absent.
+       1), default anchor — two takes (SY-28), so the features' weak match is
+       refused by the waveform gate (SY-29): refused "no matching sound found"
+       and "waveforms do not line up"; again with `accept_weak: true`, refused
+       the same; then `set_selection` both and `perform_menu_item ["Clip",
+       "Synchronize Audio"]`, the window polled every 0.25 s (≤ 600 s) until
+       it has no sheet, no sheet's texts ever holding "Weak match", and the
+       editor's texts holding "Refused: no matching sound found…"; each
+       unchanged, no step.
+  S21  the same by tool (not the menu) with `anchor` the recorder.
+       S20, S21 and S30 are a scored FAIL when either OWNER file is absent.
        Every S row that syncs prints its candidates (search, offset, z).
   S22  camera and UNRELATED both at 0 (placement lag 0, so the near-placement
-       rule can reach them): S3's test — refused, or weak and not applied.
+       rule can reach them): refused "no matching sound found" and "waveforms
+       do not line up" (the features' weak match, gated), unchanged.
   S23  the masked null (SY-17): the OWNER's camera placed as in S20, the
        owner's recorder time-reversed placed at 0 from 8.0 s for 17.34 s on
-       track 1: S3's test. Control: both played windows hold ≥ 125 frames the
-       cached VAD calls speech (`cache/speech/<id>.bin`, SY-17's centre-chunk
-       rule rebuilt here), so the search ran on speech; both counts printed.
-  S24  the Weak match sheet (SY-19): S20's placement, `set_selection` both,
+       track 1: S22's test. Control: both played windows hold ≥ 125 frames
+       the cached VAD calls speech (`cache/speech/<id>.bin`, SY-17's
+       centre-chunk rule rebuilt here), so the search ran on speech; both
+       counts printed.
+  S24  the Weak match sheet (SY-19): S29's placement, `set_selection` both,
        `perform_menu_item ["Clip", "Synchronize Audio"]` answers a sheet;
        `snapshot_ui {window: "sheet"}`'s layout texts hold "Weak match…",
        "Apply" and "Cancel"; `cancel_sheet` answers `cancel_button`, "Cancel"
        and no sheet; unchanged, no step. The Synchronizing Audio sheet comes
        first (SY-22): `snapshot_ui` is polled every 0.25 s (≤ 600 s) until the
        sheet's texts no longer hold "Synchronizing Audio".
-       S23 and S24 are a scored FAIL when either OWNER file is absent.
-       S20 and S21 print `refined`, `refine_confidence` and both offsets, and
-       pass with `refined` either "phat" or "coarse" (SY-20's fallback); S22
-       and S23 also need `refined` "coarse" on the mover's row.
+       S23 is a scored FAIL when either OWNER file is absent; S24, S27, S28
+       and S29 when either OWNER2 file is.
        S14 polls `perform_menu_item` with no path every 0.1 s (≤ 600 s) until
        the window has no sheet, and prints the wait.
   S25  (its own instance, launched with `-RCDevSyncHold 3`, stopped by its
@@ -150,19 +152,35 @@ before and after, and the last undo step not "Synchronize Audio"):
        answers "Cancel" and no sheet; 4 s later nothing changed and no new
        step. Control: the menu item again, waited out, lands the recorder on
        frame 206.
-  P1–P18 `audio_sync_probe.swift`, built by `swift_build.build` over
-       `app/Sources` (a failed build is a scored FAIL of all eighteen); each
+  S27  OWNER2 both at 0, untrimmed, default anchor (one recording, SY-28):
+       `moved` true, `weak` [], `chosen_by` "confidence", `refined` "phat",
+       the camera unmoved, the recorder at start 0 with its `in` advanced by
+       `trimmed`; T = (rec.in − rec.start) − (cam.in − cam.start) within 1/30
+       s of 148.27 s; the unsnapped offset printed; one `undo` restores both.
+  S28  the same with `anchor` the recorder: the camera moves by T (within
+       1/30 s of 148.27 s), `trimmed` 0, the recorder unmoved.
+  S29  the weak positive (SY-30): IMG_0019 on track 0 from 2 s for 3 s at
+       frame 188 (6.2667 s), `record.aifc` on track 1 from 150 s for 3 s at 5
+       s: first without `accept_weak`, `moved` false, `weak` [the recorder],
+       its row `chosen_by` "placement", unchanged and no step; then with
+       `accept_weak: true`: the recorder moves by 0.9–1.1 s, `trimmed` 0, the
+       camera unmoved, T within 1/30 s of 148.27 s; one `undo` restores both.
+  S30  the OWNER's files both at 0, untrimmed (the features' confident tier
+       today): refused "no matching sound found" and "waveforms do not line
+       up", unchanged.
+  P1–P18, P20 `audio_sync_probe.swift`, built by `swift_build.build` over
+       `app/Sources` (a failed build is a scored FAIL of all nineteen); each
        row's sentence is the probe's.
   P19  (`--cost` only) the probe built -O whole-module and run with `cost
        work/audio-sync/cost`: SY-22's ≤ 1.5 s of CPU for a one-hour pair; the
        folder is removed after.
 
-`--mutants`: the thirty-nine below, probe-only. Each copies `app/Sources` under
+`--mutants`: the forty-three below, probe-only. Each copies `app/Sources` under
 `work/audio-sync/mutants/<name>/`, applies its edit (its `before` asserted to
 occur exactly once), rebuilds the probe (900 s wall) and runs it (240 s wall);
 killed when a named row fails; a copy that does not build or answer is a failed
 control, never a kill. Exit 0 when every scored row passed (with
-`--mutants`, when all thirty-nine were killed); 1 otherwise.
+`--mutants`, when all forty-three were killed); 1 otherwise.
 """
 
 import argparse
@@ -201,13 +219,16 @@ RUN_WALL = 240
 SHEET_WAIT = 600                     # s: a sheet's poll bound, mcp.py's call timeout
 COST = WORK / "cost"                 # P19's one-hour fixture, removed when it ends
 HOLD = 3                             # s: S25's and S26's -RCDevSyncHold
-S_ROWS = [f"S{n}" for n in range(1, 27)]
+S_ROWS = [f"S{n}" for n in range(1, 31)]
 OWNER = ROOT / "tools/proof/media/owner-sync"
 OWNER_FILES = {"owner_camera": OWNER / "IMG_0018.MOV", "owner_recorder": OWNER / "record.aifc"}
+OWNER2 = ROOT / "tools/proof/media/owner-sync-2"
+OWNER2_FILES = {"owner2_camera": OWNER2 / "IMG_0019.MOV",
+                "owner2_recorder": OWNER2 / "record.aifc"}
 UTTER_AT = 31.2                      # s, in CAMERA2
 UTTER_GAP = 118.70                   # s, recorder − camera for UTTER (1,899,200 samples)
-OWNER_GAP = 118.68                   # s, the owner's recorder − camera (round 2's request)
-P_ROWS = [f"P{n}" for n in range(1, 19)]
+OWNER2_GAP = 148.27                  # s, recorder − camera of owner-sync-2 (SY-28, one recording)
+P_ROWS = [f"P{n}" for n in range(1, 19)] + ["P20"]  # P19 is --cost only
 ENVELOPE = RATE // 1000              # samples per 1 ms envelope bucket
 
 # name: (the rows it must fail, file, before, after)
@@ -333,6 +354,20 @@ MUTANTS = {
     "drift-inliers-dropped": (["P5"], "AudioSyncDrift.swift",
                               "return r.map { abs($0) <= threshold }",
                               "return r.map { _ in true }"),
+    # round 3 (SY-29, the waveform gate, and the fail-closed ruling)
+    "phat-gate-dropped": (["P20"], "AudioSync.swift",
+                          "if let refinement, !refinement.clear {",
+                          "if let refinement, !refinement.clear, false {"),
+    "phat-gate-weak-only": (["P20"], "AudioSync.swift",
+                            "if let refinement, !refinement.clear {",
+                            "if let refinement, !refinement.clear, found.chosenBy == .placement {"),
+    "files-region-dropped": (["P20"], "AudioSync.swift",
+                             "played.count >= AudioSyncPHAT.minimumRegionSamples",
+                             "played.count >= 0"),
+    "unconfirmed-dropped": (["P20"], "AudioSync.swift",
+                            "if refinement == nil, !(anchor.samples.isEmpty && mover.samples.isEmpty) {",
+                            "if refinement == nil, !(anchor.samples.isEmpty && mover.samples.isEmpty), "
+                            "false {"),
 }
 
 results = {}
@@ -618,14 +653,17 @@ class Session:
 
 
 def refused(session, label, words, **kwargs):
-    """(ok, detail): sync_audio refused naming `words`, the project unchanged
-    and no Synchronize Audio step on the stack."""
+    """(ok, detail): sync_audio refused naming `words` (one phrase, or a list
+    of phrases each of which it names), the project unchanged and no
+    Synchronize Audio step on the stack."""
     before = session.text()
     message = session.error("sync_audio", **kwargs)
     after = session.text()
     step = session.last_step()
+    phrases = [words] if isinstance(words, str) else list(words)
     ok = (message is not None and "Synchronize Audio was refused" in message
-          and words in message and before == after and step != "Synchronize Audio")
+          and all(w in message for w in phrases) and before == after
+          and step != "Synchronize Audio")
     flat = " ".join(str(message).split())
     return ok, (f"{label}: {flat[:400]}; unchanged {before == after}; last step {step!r}")
 
@@ -645,41 +683,50 @@ def match_text(row):
             f"{row.get('offset')}, coarse_offset {row.get('coarse_offset')}")
 
 
-def not_applied(session, label, mover, refined=None, **kwargs):
-    """(ok, detail): sync_audio, called without `accept_weak`, either refused
-    "no matching sound found" or answered `moved: false` with `mover` in
-    `weak` (SY-18) — no row chosen by confidence either way, and with
-    `refined` the mover's row (when there is one) refined so (S22's and S23's
-    "coarse", SY-20's negatives) — the
-    project unchanged and no Synchronize Audio step. A call that moved
-    anything is undone after it is described."""
+def menu_refused(session, clips, foot):
+    """(ok, detail): `set_selection` `clips`, `perform_menu_item ["Clip",
+    "Synchronize Audio"]`, then the window polled every 0.25 s (≤ SHEET_WAIT)
+    until it has no sheet: no sheet's texts ever hold "Weak match" (one that
+    does is cancelled and fails the row), the editor's texts hold a line
+    starting `foot`, the project unchanged and no Synchronize Audio step."""
+    session.op("set_selection", clips=clips)
     before = session.text()
-    try:
-        answer, message = session.sync(**kwargs), None
-    except ToolError as error:
-        answer, message = None, str(error)
+    menu = session.op("perform_menu_item", path=["Clip", "Synchronize Audio"])
+    began = time.monotonic()
+    seen, weak, gone = [], False, None
+    while time.monotonic() - began < SHEET_WAIT:
+        listing = session.op("perform_menu_item")
+        if ((listing.get("window") or {}).get("sheet")) is None:
+            gone = time.monotonic() - began
+            break
+        texts = sheet_texts(session) or []
+        seen += [t for t in texts if t not in seen]
+        if any("Weak match" in t for t in texts):
+            weak = True
+            session.op("cancel_sheet")
+            break
+        time.sleep(0.25)
+    # The foot first: `last_step`'s undo and redo would clear it.
+    said = next((t for t in editor_texts(session) if t.startswith(foot)), None)
     after = session.text()
-    if answer is not None and answer.get("moved") is True:
-        undone = session.op("undo")["undone"]
-        row = recorder_row(answer, mover)
-        return False, (f"{label}: MOVED without accept_weak — {match_text(row)}; undo "
-                       f"{undone!r}, restored {session.text() == before}")
     step = session.last_step()
-    if answer is None:
-        how = "refused"
-        ok = ("Synchronize Audio was refused" in message and "no matching sound found" in message)
-        said = " ".join(message.split())[:500]
-    else:
-        rows = answer.get("synced", [])
-        how = "weak, not applied"
-        ok = (answer.get("ok") is True and answer.get("moved") is False
-              and mover in answer.get("weak", [])
-              and not any(r.get("chosen_by") == "confidence" for r in rows)
-              and (refined is None or recorder_row(answer, mover).get("refined") == refined))
-        said = (f"weak {answer.get('weak')}, {match_text(recorder_row(answer, mover))}; note "
-                f"{answer.get('note')!r}")
-    ok = ok and before == after and step != "Synchronize Audio"
-    return ok, f"{label}: {how} — {said}; unchanged {before == after}; last step {step!r}"
+    ok = (not weak and gone is not None and said is not None and before == after
+          and step != "Synchronize Audio")
+    flat = " ".join(str(said).split())
+    return ok, (f"the menu item: sheet {menu.get('sheet')!r}, gone after "
+                f"{gone if gone is None else round(gone, 2)} s, a Weak match sheet seen {weak} "
+                f"(sheet texts {seen[:4]}); foot {flat[:300]!r}; unchanged {before == after}; "
+                f"last step {step!r}")
+
+
+def place_weak_positive(session):
+    """S24's and S29's placement of owner-sync-2: IMG_0019 on track 0 from 2 s
+    for 3 s at frame 188 (6.2667 s); record.aifc on track 1 from 150 s for 3
+    s at 5 s — the recorder about 1 s earlier than the truth, a weak match the
+    waveforms confirm (SY-30)."""
+    cam = session.place_trimmed("owner2_camera", 0, 188 * FRAME, 2 * SEC, 3 * SEC)
+    rec = session.place_trimmed("owner2_recorder", 1, 5 * SEC, 150 * SEC, 3 * SEC)
+    return cam, rec
 
 
 def speech_frames(session, media, clip):
@@ -965,7 +1012,7 @@ def mcp_rows(sock, wanted, files):
         try:
             cam = c.place("camera", 10 * SEC, 0)
             other = c.place("unrelated", 0, 1)
-            ok, detail = not_applied(c, "unrelated", other, clips=[cam, other])
+            ok, detail = refused(c, "unrelated", "no matching sound found", clips=[cam, other])
             score("S3", ok, detail)
         finally:
             c.close()
@@ -975,8 +1022,9 @@ def mcp_rows(sock, wanted, files):
         try:
             cam = c.place("camera", 0, 0)
             other = c.place("unrelated", 0, 1)
-            ok, detail = not_applied(c, "unrelated, both at 0", other, refined="coarse",
-                                     clips=[cam, other])
+            ok, detail = refused(c, "unrelated, both at 0",
+                                 ["no matching sound found", "waveforms do not line up"],
+                                 clips=[cam, other])
             score("S22", ok, detail)
         finally:
             c.close()
@@ -1132,23 +1180,39 @@ def mcp_rows(sock, wanted, files):
             cam = o.place_trimmed("owner_camera", 0, 0, round(29.72 * SEC), round(25.52 * SEC))
             rec = o.place_trimmed("owner_recorder", 1, 0, round(147.63 * SEC),
                                   round(17.34 * SEC))
+            anchor = cam if named_anchor == "camera" else rec
+            # Two takes of similar words (SY-28): the features' weak match
+            # is refused by the waveform gate (SY-29), and accept_weak does
+            # not change that.
+            words = ["no matching sound found", "waveforms do not line up"]
+            ok1, said1 = refused(o, f"anchor the {named_anchor}", words, clips=[cam, rec],
+                                 anchor=anchor)
+            ok2, said2 = refused(o, "with accept_weak", words, clips=[cam, rec], anchor=anchor,
+                                 accept_weak=True)
+            ok, detail = ok1 and ok2, f"{said1}; {said2}"
+            if name == "S20":
+                ok3, said3 = menu_refused(o, [cam, rec], "Refused: no matching sound found")
+                ok, detail = ok and ok3, f"{detail}; {said3}"
+            score(name, ok, detail)
+        finally:
+            o.close()
+
+    for name, named_anchor in (("S27", "camera"), ("S28", "recorder")):
+        if name not in want:
+            continue
+        missing = [str(p) for p in OWNER2_FILES.values() if not p.exists()]
+        if missing:
+            score(name, False, f"the owner's files are absent: {', '.join(missing)}")
+            continue
+        o = Session(mcp, f"sync-{name.lower()}", files)
+        try:
+            # owner-sync-2, one recording (SY-28): both at 0, untrimmed.
+            cam = o.place("owner2_camera", 0, 0)
+            rec = o.place("owner2_recorder", 0, 1)
             before = {c: (o.start(c), o.in_point(c), o.clip(c)["duration"]) for c in (cam, rec)}
             anchor = cam if named_anchor == "camera" else rec
             moved = rec if anchor == cam else cam
-            # First without accept_weak (SY-19): a weak match on speech,
-            # answered moved: false, nothing changed and no step.
-            text = o.text()
-            asked = o.sync(clips=[cam, rec], anchor=anchor)
-            asked_row = recorder_row(asked, moved)
-            asked_step = o.last_step()
-            weak_ok = (asked.get("moved") is False and asked.get("weak") == [moved]
-                       and asked_row.get("chosen_by") == "placement"
-                       and asked_row.get("matched_on") == "speech"
-                       and o.text() == text and asked_step != "Synchronize Audio")
-            weak_said = (f"without accept_weak: moved {asked.get('moved')}, weak "
-                         f"{asked.get('weak')}, {match_text(asked_row)}, unchanged "
-                         f"{o.text() == text}, last step {asked_step!r}")
-            answer = o.sync(clips=[cam, rec], anchor=anchor, accept_weak=True)
+            answer = o.sync(clips=[cam, rec], anchor=anchor)
             row = recorder_row(answer, moved)
             after = {c: (o.start(c), o.in_point(c)) for c in (cam, rec)}
             gap = ((after[rec][1] - after[rec][0]) - (after[cam][1] - after[cam][0])) / SEC
@@ -1157,28 +1221,89 @@ def mcp_rows(sock, wanted, files):
             unsnapped = -(row.get("offset") or 0) / SEC if anchor == cam \
                 else (row.get("offset") or 0) / SEC
             if anchor == cam:
-                shape = (after[cam][:2] == before[cam][:2] and after[rec][0] == 0
+                shape = (after[cam] == before[cam][:2] and after[rec][0] == 0
                          and row.get("trimmed", 0) > 0
                          and after[rec][1] == before[rec][1] + row.get("trimmed", 0))
                 what = (f"recorder start {after[rec][0]}, in {before[rec][1]} → {after[rec][1]} "
-                        f"(e {row.get('trimmed', 0) / SEC:.3f} s), camera unmoved "
+                        f"(trimmed {row.get('trimmed', 0) / SEC:.3f} s), camera unmoved "
                         f"{after[cam] == before[cam][:2]}")
             else:
-                shift = after[cam][0] - before[cam][0]
+                shift = (after[cam][0] - before[cam][0]) / SEC
                 shape = (after[rec] == before[rec][:2] and row.get("trimmed") == 0
-                         and 0.5 * SEC <= shift <= 1.0 * SEC and after[cam][1] == before[cam][1])
-                what = (f"camera moved {shift / SEC:+.3f} s (want about +0.77), trimmed "
+                         and abs(shift - OWNER2_GAP) <= 1 / 30
+                         and after[cam][1] == before[cam][1])
+                what = (f"camera moved {shift:+.4f} s (want {OWNER2_GAP} ± 1/30), trimmed "
                         f"{row.get('trimmed')}, recorder unmoved {after[rec] == before[rec][:2]}")
-            score(name, weak_ok and answer.get("moved") is True and shape
-                  and abs(gap - OWNER_GAP) <= 1 / 30 and undone == "Synchronize Audio"
-                  and restored == before,
-                  f"anchor the {named_anchor}: {weak_said}; with accept_weak: {what}; "
-                  f"T = recorder − camera {gap:.4f} s (want "
-                  f"{OWNER_GAP} ± 1/30); unsnapped −offset/600000 {unsnapped:.4f} s; "
+            score(name, answer.get("moved") is True and answer.get("weak") == []
+                  and row.get("chosen_by") == "confidence" and row.get("refined") == "phat"
+                  and shape and abs(gap - OWNER2_GAP) <= 1 / 30
+                  and undone == "Synchronize Audio" and restored == before,
+                  f"owner-sync-2 both at 0, anchor the {named_anchor}: moved "
+                  f"{answer.get('moved')}, weak {answer.get('weak')}; {what}; T = recorder − "
+                  f"camera {gap:.4f} s (want {OWNER2_GAP} ± 1/30); unsnapped {unsnapped:.4f} s; "
                   f"{match_text(row)}; undo {undone!r} restores both {restored == before}")
         finally:
             o.close()
 
+    if "S29" in want:
+        missing = [str(p) for p in OWNER2_FILES.values() if not p.exists()]
+        if missing:
+            score("S29", False, f"the owner's files are absent: {', '.join(missing)}")
+        else:
+            o = Session(mcp, "sync-s29", files)
+            try:
+                cam, rec = place_weak_positive(o)
+                before = {c: (o.start(c), o.in_point(c), o.clip(c)["duration"])
+                          for c in (cam, rec)}
+                # First without accept_weak (SY-19): weak, the waveforms
+                # confirming it, answered moved: false, nothing changed.
+                text = o.text()
+                asked = o.sync(clips=[cam, rec])
+                asked_row = recorder_row(asked, rec)
+                asked_step = o.last_step()
+                weak_ok = (asked.get("moved") is False and asked.get("weak") == [rec]
+                           and asked_row.get("chosen_by") == "placement"
+                           and o.text() == text and asked_step != "Synchronize Audio")
+                weak_said = (f"without accept_weak: moved {asked.get('moved')}, weak "
+                             f"{asked.get('weak')}, {match_text(asked_row)}, unchanged "
+                             f"{o.text() == text}, last step {asked_step!r}")
+                answer = o.sync(clips=[cam, rec], accept_weak=True)
+                row = recorder_row(answer, rec)
+                after = {c: (o.start(c), o.in_point(c)) for c in (cam, rec)}
+                shift = (after[rec][0] - before[rec][0]) / SEC
+                gap = ((after[rec][1] - after[rec][0]) - (after[cam][1] - after[cam][0])) / SEC
+                undone = o.op("undo")["undone"]
+                restored = {c: (o.start(c), o.in_point(c), o.clip(c)["duration"])
+                            for c in (cam, rec)}
+                score("S29", weak_ok and answer.get("moved") is True
+                      and after[cam] == before[cam][:2] and 0.9 <= shift <= 1.1
+                      and row.get("trimmed") == 0 and abs(gap - OWNER2_GAP) <= 1 / 30
+                      and undone == "Synchronize Audio" and restored == before,
+                      f"{weak_said}; with accept_weak: recorder moved {shift:+.4f} s (want "
+                      f"0.9–1.1), trimmed {row.get('trimmed')}, camera unmoved "
+                      f"{after[cam] == before[cam][:2]}; T = recorder − camera {gap:.4f} s (want "
+                      f"{OWNER2_GAP} ± 1/30); {match_text(row)}; undo {undone!r} restores both "
+                      f"{restored == before}")
+            finally:
+                o.close()
+
+    if "S30" in want:
+        missing = [str(p) for p in OWNER_FILES.values() if not p.exists()]
+        if missing:
+            score("S30", False, f"the owner's files are absent: {', '.join(missing)}")
+        else:
+            o = Session(mcp, "sync-s30", files)
+            try:
+                # owner-sync both at 0, untrimmed: the features' confident
+                # tier, refused by the gate (SY-29).
+                cam = o.place("owner_camera", 0, 0)
+                rec = o.place("owner_recorder", 0, 1)
+                ok, detail = refused(o, "owner-sync both at 0",
+                                     ["no matching sound found", "waveforms do not line up"],
+                                     clips=[cam, rec])
+                score("S30", ok, detail)
+            finally:
+                o.close()
 
     if "S23" in want:
         missing = [str(p) for p in OWNER_FILES.values() if not p.exists()]
@@ -1195,8 +1320,9 @@ def mcp_rows(sock, wanted, files):
                 # the search ran on speech, not sound (02c's objection 2).
                 counts = (speech_frames(o, o.media("owner_camera"), cam),
                           speech_frames(o, o.media("owner_reversed"), rev))
-                ok, detail = not_applied(o, "the owner's recorder reversed", rev,
-                                         refined="coarse", clips=[cam, rev])
+                ok, detail = refused(o, "the owner's recorder reversed",
+                                     ["no matching sound found", "waveforms do not line up"],
+                                     clips=[cam, rev])
                 score("S23", ok and min(counts) >= 125,
                       f"speech frames in the played windows: camera {counts[0]}, reversed "
                       f"recorder {counts[1]} (each ≥ 125); {detail}")
@@ -1204,16 +1330,13 @@ def mcp_rows(sock, wanted, files):
                 o.close()
 
     if "S24" in want:
-        missing = [str(p) for p in OWNER_FILES.values() if not p.exists()]
+        missing = [str(p) for p in OWNER2_FILES.values() if not p.exists()]
         if missing:
             score("S24", False, f"the owner's files are absent: {', '.join(missing)}")
         else:
             o = Session(mcp, "sync-s24", files)
             try:
-                cam = o.place_trimmed("owner_camera", 0, 0, round(29.72 * SEC),
-                                      round(25.52 * SEC))
-                rec = o.place_trimmed("owner_recorder", 1, 0, round(147.63 * SEC),
-                                      round(17.34 * SEC))
+                cam, rec = place_weak_positive(o)
                 o.op("set_selection", clips=[cam, rec])
                 before = o.text()
                 menu = o.op("perform_menu_item", path=["Clip", "Synchronize Audio"])
@@ -1462,7 +1585,7 @@ def main():
         if not args.socket:
             print("the S rows need the running instance's socket path")
             return 2
-        files = {**fixtures(), **fixtures2(), **OWNER_FILES}
+        files = {**fixtures(), **fixtures2(), **OWNER_FILES, **OWNER2_FILES}
         try:
             mcp_rows(args.socket, [row for row in s_wanted if row not in ("S25", "S26")], files)
             held = [row for row in s_wanted if row in ("S25", "S26")]

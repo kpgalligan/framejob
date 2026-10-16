@@ -1819,7 +1819,12 @@ free.
   whole files, on speech frames only when both hold enough (SY-17), and sorts
   a match into confident (applied) or weak (near the placement; never applied
   silently — the menu asks in a Weak match sheet, `sync_audio` needs
-  `accept_weak`, `+Weak` words both, SY-18/SY-19). A mover that would start
+  `accept_weak`, `+Weak` words both, SY-18/SY-19). Either tier stands only
+  when the GCC-PHAT refinement confirms one recording (SY-29, the waveform
+  gate): a refinement that is not clear refuses (`incoherent`), and one that
+  cannot run on real samples refuses too (`unconfirmed`, fail closed) —
+  MFCC similarity cannot tell the same words spoken twice from one take
+  (SY-28, the owner's IMG_0018 pair). A mover that would start
   before 0 is trimmed at its head instead (SY-16). `plan` is pure and
   answers frame-snapped `move_clip` ops, with a `set_speed {keep_pitch:
   false}` (a resample) per mover whose drift passes SY-8's significance

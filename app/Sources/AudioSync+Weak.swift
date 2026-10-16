@@ -10,7 +10,9 @@ import Foundation
 /// may apply without asking. A weak match is never applied silently — the
 /// owner's "Unrelated clips are never moved silently" — because AS-3's
 /// calibration showed noise near a placement reaching the z of the owner's
-/// own true match (SY-14's stop).
+/// first pair (SY-14's stop), a pair SY-28 found to be two takes, not one
+/// recording. A weak match is offered at all only when GCC-PHAT confirms it
+/// (SY-29).
 extension AudioSync {
 
     /// The movers of `synced` chosen by placement (the weak tier) whose plan

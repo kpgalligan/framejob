@@ -8,7 +8,10 @@ import Foundation
 ///
 /// Pure, as `AudioSync.plan` is: two readings' features on their timeline
 /// grids in, a lag or a refusal out. The arithmetic of one search is
-/// `AudioSyncMatch.search`'s.
+/// `AudioSyncMatch.search`'s. A tier chosen here is only a candidate: `plan`
+/// keeps it only when GCC-PHAT on the samples finds a clear peak at it (the
+/// waveform gate, SY-29), and words the refusal when it does not
+/// (`incoherent`, `unconfirmed`).
 ///
 /// **The played windows first** (SY-13, reversing AS-1's whole files): what
 /// the user trimmed each clip to is evidence of what they mean to line up,
@@ -166,8 +169,9 @@ extension AudioSync {
 
     /// "no matching sound found between clip A and clip N: in the played
     /// windows, moving clip N by +0.77 s (confidence 4.31) or −12.40 s (3.90);
-    /// in the whole files, …. A match applies on its own at …" — every search that ran with
-    /// its candidates, and the rule printed from its constants; "…: too
+    /// in the whole files, …. A match applies on its own at …. Either counts
+    /// only when the two waveforms line up there (…)." — every search that ran
+    /// with its candidates, and the rule printed from its constants; "…: too
     /// little room to compare their sound." when no search had a candidate.
     static func refusal(anchor: UInt32, mover: UInt32, ran: [(Search, [CandidateMove])])
         -> String {
@@ -197,6 +201,54 @@ extension AudioSync {
             + String(format: "%g", AudioSyncMatch.confidentMargin)
             + " above the next candidate; one ≥ " + String(format: "%g", AudioSyncMatch.plausibleZ)
             + " within " + String(format: "%.0f", radius) + " s of where clip \(mover) sits now "
-            + "is offered as a weak match."
+            + "is offered as a weak match. Either counts only when the two waveforms line up "
+            + "there (a clear GCC-PHAT peak " + clearPeak + ")."
+    }
+
+    // MARK: - The waveform gate (SY-29)
+
+    /// "no matching sound found between clip A and clip N: moving clip N by
+    /// −0.80 s matches their sound (confidence 7.99), but their waveforms do
+    /// not line up there (GCC-PHAT confidence 9.00; a match needs a clear peak
+    /// of at least 15 within 48 ms), so they are not one recording." — a
+    /// chosen match of either tier whose refinement ran and was not clear.
+    static func incoherent(
+        anchor: UInt32, mover: UInt32, delta: Ticks, confidence: Double,
+        refinement: AudioSyncPHAT.Refinement
+    ) -> String {
+        "no matching sound found between clip \(anchor) and clip \(mover): moving clip "
+            + "\(mover) by " + signedSeconds(delta) + " matches their sound (confidence "
+            + String(format: "%.2f", confidence) + "), but their waveforms do not line up there "
+            + "(GCC-PHAT confidence " + String(format: "%.2f", refinement.z) + "; a match needs "
+            + "a clear peak " + clearPeak + "), so they are not one recording."
+    }
+
+    /// "no matching sound found between clip A and clip N: moving clip N by
+    /// −0.80 s matches their sound (confidence 7.99), but they share too
+    /// little sound there to confirm it is one recording (GCC-PHAT needs 2 s
+    /// of both waveforms)." — a chosen match whose readings carry samples but
+    /// whose refinement could not run (the orchestrator's fail-closed ruling,
+    /// SY-29).
+    static func unconfirmed(anchor: UInt32, mover: UInt32, delta: Ticks, confidence: Double)
+        -> String {
+        let least = Double(AudioSyncPHAT.minimumRegionSamples) / Double(SyncFeatures.sampleRate)
+        return "no matching sound found between clip \(anchor) and clip \(mover): moving clip "
+            + "\(mover) by " + signedSeconds(delta) + " matches their sound (confidence "
+            + String(format: "%.2f", confidence) + "), but they share too little sound there to "
+            + "confirm it is one recording (GCC-PHAT needs " + String(format: "%g", least)
+            + " s of both waveforms)."
+    }
+
+    /// "of at least 15 within 48 ms", from `clearZ` and `reachSamples`.
+    private static var clearPeak: String {
+        let reach = Double(AudioSyncPHAT.reachSamples) * 1000 / Double(SyncFeatures.sampleRate)
+        return "of at least " + String(format: "%g", AudioSyncPHAT.clearZ)
+            + " within " + String(format: "%g", reach) + " ms"
+    }
+
+    /// "−0.80 s": `refusal`'s signed seconds.
+    private static func signedSeconds(_ delta: Ticks) -> String {
+        String(format: "%+.2f", Double(delta) / Double(ReelTime.perSecond))
+            .replacingOccurrences(of: "-", with: "−") + " s"
     }
 }

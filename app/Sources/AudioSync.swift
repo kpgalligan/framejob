@@ -28,11 +28,16 @@ import Foundation
 /// `delta = zeroA − zeroN + lag·9600`, snapped to the frame grid (SY-4),
 /// because the model stores no sub-frame time.
 ///
-/// **Drift and the refinement** (SY-6, SY-20, SY-21). Over the overlap the
-/// coarse delta gives, the lag is fitted as a line, `lag(a) = c + ρ·a` (a an
+/// **Drift and the refinement** (SY-6, SY-20, SY-21, SY-29). Over the overlap
+/// the coarse delta gives, the lag is fitted as a line, `lag(a) = c + ρ·a` (a an
 /// anchor timeline sample, 75 ticks each, c in samples); not measured, the
-/// line is the coarse lag. PHAT along it over the overlap's centre 30 s
-/// shifts c by a clear peak's sub-sample shift, else c stands. Corrected
+/// line is the coarse lag. PHAT along it over the overlap's centre 30 s —
+/// the files' overlap at the lag when that played overlap is under 2 s —
+/// shifts c by a clear peak's sub-sample shift. **The waveform gate**
+/// (SY-29): a match of either tier stands only on that clear peak; a peak
+/// that is not clear refuses the command (`incoherent`), and so does a
+/// refinement that cannot run (`unconfirmed`) unless neither reading carries
+/// samples at all, when the features' tier stands. Corrected
 /// (SY-8), the mover's speed becomes `s' = s·(1 − ρ)` and, since `set_speed`
 /// keeps its start S and in point I, source tick μ plays at `S + δ + (μ −
 /// I)/s'` — on the anchor's line everywhere when `δ = snapToFrame(round(zeroA
@@ -388,14 +393,44 @@ enum AudioSync {
                 moverSpeech: moverSpeech, anchorSamples: anchor.samples,
                 moverSamples: mover.samples, anchorSpeed: anchor.speed, moverSpeed: mover.speed,
                 lag: found.lag, overlap: window, fft: fft)
-            // SY-20: PHAT along the line over the overlap's centre 30 s.
+            // SY-20: PHAT along the line over the overlap's centre 30 s; under
+            // 2 s played, over the files' overlap at the lag instead (SY-29).
             var line = AudioSyncPHAT.Line(intercept: found.lag * hop, rate: 0)
             if case .measured(let fit) = drift {
                 line = AudioSyncPHAT.Line(intercept: fit.intercept, rate: fit.rate)
             }
+            let played = region(window)
+            let width = SyncFeatures.coefficients
+            let reach = played.count >= AudioSyncPHAT.minimumRegionSamples
+                ? played
+                : region(
+                    filesOverlap(
+                        lag: found.lag, anchorFrames: anchorFrames.count / width,
+                        moverFrames: moverFrames.count / width))
             let refinement = AudioSyncPHAT.refine(
                 anchor: anchor.samples, anchorSpeed: anchor.speed, mover: mover.samples,
-                moverSpeed: mover.speed, line: line, region: region(window), fft: fft)
+                moverSpeed: mover.speed, line: line, region: reach, fft: fft)
+            // SY-29, the waveform gate: either tier stands only on a clear
+            // peak; a refinement that could not run refuses too, unless
+            // neither reading carries samples at all.
+            if let refinement, !refinement.clear {
+                problems.append(
+                    Problem(
+                        clip: nil,
+                        reason: incoherent(
+                            anchor: anchor.clip, mover: mover.clip, delta: coarse,
+                            confidence: found.confidence, refinement: refinement)))
+                continue
+            }
+            if refinement == nil, !(anchor.samples.isEmpty && mover.samples.isEmpty) {
+                problems.append(
+                    Problem(
+                        clip: nil,
+                        reason: unconfirmed(
+                            anchor: anchor.clip, mover: mover.clip, delta: coarse,
+                            confidence: found.confidence)))
+                continue
+            }
             var refinedTicks = lagTicks
             var delta = coarse
             if let refinement, refinement.clear {
@@ -500,5 +535,17 @@ enum AudioSync {
         guard high - low > cap else { return low..<high }
         let start = (low + high) / 2 - cap / 2
         return start..<(start + cap)
+    }
+
+    /// SY-29's fallback region: the anchor timeline frames where the two
+    /// files (`anchorFrames` and `moverFrames` frames on their timeline
+    /// grids) overlap at `lag`, rounded outward — `[max(0, ⌊lag⌋), min(anchorFrames,
+    /// moverFrames + ⌈lag⌉))` — so every lag a search can score holds at
+    /// least `minimumOverlapFrames` (a sample read past a file's end is 0).
+    private static func filesOverlap(lag: Double, anchorFrames: Int, moverFrames: Int)
+        -> Range<Int> {
+        let lo = max(0, Int(lag.rounded(.down)))
+        let hi = max(lo, min(anchorFrames, moverFrames + Int(lag.rounded(.up))))
+        return lo..<hi
     }
 }
