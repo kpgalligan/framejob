@@ -386,7 +386,8 @@ of 2026-10-16, SY-22's precedent, and SY-29's fail-closed clause is the orchestr
   build. `rate != 48000` converts every other rate, 96 kHz included. A reversed clip already reads
   a 48 kHz intermediate (`ReverseRenderer+Audio.swift`), so its branch stays first. Video never
   reads the copy. Pre-making the copy in the import's cache pass and pruning the folder are not
-  done.
+  done. **Amended by SY-36 (#306):** an MP3 whose LAME/Xing encoder delay Core Audio leaves in is
+  copied at any rate, 48 kHz included, its read starting past that delay (`version` 2).
 
 - **SY-24 — The varispeed lead.** A time-scaled segment on a plan audio track whose pitch is `off`
   reads its source 575 ticks (46 samples at 48 kHz) earlier. Measured (the designer's scratch,
@@ -417,7 +418,9 @@ of 2026-10-16, SY-22's precedent, and SY-29's fail-closed clause is the orchestr
   |median| ≤ 1.0 ms and spread ≤ 0.5 ms for ×1, varispeed, in-band keep pitch, LPCM and AAC
   sources, gain, pan, noise reduction and range exports; |median| ≤ 5.0 ms for keep pitch outside
   the band; the video presets' flashes on exactly their timeline frames with every |click − flash|
-  ≤ 1.0 ms. MP3's decoder delay is a filed residue, measured and not pinned. The preview plays the
+  ≤ 1.0 ms. MP3's decoder delay is a filed residue, measured and not pinned. **Amended by SY-36
+  (#306):** an MP3 is read past its own encoder delay and pinned like every other source (E30,
+  E33, X10, X11, X13, X15); one with no tag keeps the delay (X14). The preview plays the
   same composition (the copy and the leads apply); its output latency and its behaviour at a
   44.1 kHz output device are unmeasured (phase 1's L7: a 48 kHz composition read at 44,100 Hz is
   +3.402 ms at frame 206), so the manual check SE-13 is run at both device rates.

@@ -324,9 +324,10 @@ detail there.
   session after 2 s and 10 s, and a retry that publishes also runs the sync
   features and speech passes once. The cache order is thumbnails → peaks →
   sync features (`cache/sync/<id>.bin` and the 8 kHz `<id>.pcm`,
-  `MediaImporter+SyncFeatures.swift`, version 3: decoded at the file's own
+  `MediaImporter+SyncFeatures.swift`, version 4: decoded at the file's own
   rate and brought to 8 kHz by `SyncResampler`, so two passes write the same
-  bytes, SY-34; a file under one frame publishes an empty `.bin`, SY-31) →
+  bytes, SY-34; a file under one frame publishes an empty `.bin`, SY-31; an
+  MP3 read past its tag's encoder delay, SY-38) →
   speech.
   `thumbnails` holds a
   video track's last frame past its end, from the track's last SAMPLE's time.
@@ -1102,13 +1103,19 @@ the key map behind it.
   timeline of only graphics, text, shapes or images has no plan track and
   plays over the builder's placeholder (road map 10 §10.8,
   `media_less_playback_probe.py`).
-- `AudioRateCopy.swift` — a non-48 kHz audio source is read from a
-  file-keyed 24-bit 48 kHz CAF copy in `NSTemporaryDirectory()/FrameJob/
+- `AudioRateCopy.swift` — a non-48 kHz audio source, or an MP3 whose
+  LAME/Xing encoder delay Core Audio leaves in (read past it, SY-36), is read
+  from a file-keyed 24-bit 48 kHz CAF copy in `NSTemporaryDirectory()/FrameJob/
   AudioRate48/` (spec §11 SY-23: AVFoundation's rate conversion after an
   empty edit drifts with placement, #298); the copy's sample 0 is the
   source track's time 0 (a leading empty edit is skipped and zero-padded),
   made blocking on the first build that needs it; reversed-only media are
   not copied.
+- `MP3Gapless.swift` — the LAME/Xing tag reader (pure) and `leadingTrim`, the
+  encoder delay the 48 kHz copy and the sync reader skip when Core Audio
+  reports no packet table (SY-36, SY-38); the other readers (peaks, speech,
+  the transcription extract, reverse) keep it, SY-38's measured residue
+  (#309 at 24 kHz).
 - `CompositionBuilder.swift` (+`InstructionRanges`, +`AudioTracks`,
   +`AudioPlacement`: where an audio segment is inserted, with the varispeed
   source lead (575 ticks, SY-24) and the noise-reduction track lead (6,400
@@ -1812,7 +1819,7 @@ free.
 - `AudioSync.swift` (+`Correction`, +`Region`, +`Search`, +`Weak`) ·
   `AudioSyncMatch.swift` · `AudioSyncDrift.swift` · `AudioSyncPHAT.swift` ·
   `SyncFeatures.swift` · `SyncResampler.swift` ·
-  `AudioSyncSheetController.swift` — Synchronize Audio (spec §11 SY-1..SY-34,
+  `AudioSyncSheetController.swift` — Synchronize Audio (spec §11 SY-1..SY-38,
   ADR `audio-sync`), `AudioNormalize`'s shape: `read` takes the plan
   segments, the sync features (standardised MFCC frames, `SyncFeatures`), the
   8 kHz samples and the speech caches once; `plan` is pure and runs OFF the

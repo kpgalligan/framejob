@@ -20,8 +20,9 @@ extension MediaImporter {
     /// Bumped on ANY change to a `SyncFeatures` constant or to what the pass
     /// writes: an old `.bin` then reads as not written yet, never as another
     /// recipe's frames. 2: the `.pcm` beside the `.bin` (SY-20). 3: decoded at
-    /// the file's own rate and resampled by `SyncResampler` (SY-34).
-    static let syncFeaturesVersion = 3
+    /// the file's own rate and resampled by `SyncResampler` (SY-34). 4: an MP3
+    /// read past its tag's encoder delay (SY-38).
+    static let syncFeaturesVersion = 4
 
     struct SyncFeaturesStamp: Codable, Equatable {
         let source: CacheStamp
@@ -128,10 +129,12 @@ extension MediaImporter {
         return removed
     }
 
-    /// Reads `track` as mono float at its own rate (speech's output settings
-    /// without a rate), the rate the first buffer says, brought to
-    /// `SyncFeatures.sampleRate` by a `SyncResampler` (SY-34: AVFoundation's
-    /// own conversion wrote different bytes on every pass), then through a
+    /// Reads `track` from `MP3Gapless.leadingTrim` (an MP3's encoder delay
+    /// Core Audio left in, SY-38; zero for every other file) as mono float at
+    /// its own rate (speech's output settings without a rate), the rate the
+    /// first buffer says, brought to `SyncFeatures.sampleRate` by a
+    /// `SyncResampler` (SY-34: AVFoundation's own conversion wrote different
+    /// bytes on every pass), then through a
     /// `SyncFeatures.Extractor`, keeping the same samples as int16
     /// (`round(clamp(x, −1, 1)·32767)`), and publishes the frames and the
     /// samples only when the reader ended `.completed` — a decode that gave
@@ -147,6 +150,10 @@ extension MediaImporter {
         into cacheDir: URL, pass: CachePass?
     ) {
         guard let reader = try? AVAssetReader(asset: asset) else { return }
+        let trim = MP3Gapless.leadingTrim(of: asset.url, track: track)
+        if trim > .zero {
+            reader.timeRange = CMTimeRange(start: trim, duration: .positiveInfinity)
+        }
         let output = AVAssetReaderTrackOutput(
             track: track,
             outputSettings: [

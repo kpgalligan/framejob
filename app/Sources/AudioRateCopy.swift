@@ -1,13 +1,17 @@
 import AVFoundation
 
-/// A non-48 kHz source's audio, read from a 48 kHz copy (spec §11 SY-23).
+/// A non-48 kHz source's audio, read from a 48 kHz copy (spec §11 SY-23),
+/// and an MP3's at any rate when Core Audio leaves its encoder delay in
+/// (SY-36).
 ///
 /// **Why:** an empty edit before a non-48 kHz segment on its composition
 /// track is rate-converted wrongly, so the segment's sound lands off its
 /// timeline place by an amount that grows with where it is placed (16 kHz
 /// +39 ms at 10 s, lost past ±60 ms at 60 s; 44.1 kHz −12.7 ms at 10 s).
 /// A 48 kHz source behind the same empty edit is exact, so the build reads
-/// such a source's audio from a 48 kHz LPCM copy of it instead.
+/// such a source's audio from a 48 kHz LPCM copy of it instead. An MP3 whose
+/// LAME/Xing encoder delay no packet table removes (`MP3Gapless.leadingTrim`)
+/// is copied at 48 kHz too, its read starting past that delay.
 ///
 /// The copy is keyed by the FILE (its path, size and modification second,
 /// and `version`), lives in `NSTemporaryDirectory()/FrameJob/AudioRate48/` —
@@ -19,22 +23,26 @@ import AVFoundation
 /// **The copy's sample 0 is the source track's time 0**: the read starts
 /// where a leading empty edit ends, a gap before or between the reader's
 /// buffers is written as zeros, and a buffer that starts before 0 or overlaps
-/// the one before abandons the copy. A failed or
+/// the one before abandons the copy. With a trim, the copy's sample 0 is the
+/// source's sample at the trim instead. A failed or
 /// abandoned copy answers nil and the build reads the source as before, with
 /// one log line.
 enum AudioRateCopy {
     static let sampleRate = 48_000
     /// Part of every copy's key: bumping it orphans every copy written before.
-    static let version = 1
+    static let version = 2
 
     /// Zero-filled blocks for a gap, at most this many frames each.
     private static let silenceBlockFrames = 48_000
 
     private static let lock = NSLock()
 
-    /// Every rate but 48 kHz converts, 96 kHz included.
-    static func needsCopy(_ signature: CompositionBuilder.AudioFormatSignature) -> Bool {
-        signature.sampleRate != Double(sampleRate)
+    /// Every rate but 48 kHz converts, 96 kHz included, and so does an MP3
+    /// with a trim at any rate (SY-36).
+    static func needsCopy(_ signature: CompositionBuilder.AudioFormatSignature, trim: CMTime)
+        -> Bool
+    {
+        signature.sampleRate != Double(sampleRate) || trim > .zero
     }
 
     static func directory() -> URL {
@@ -62,9 +70,10 @@ enum AudioRateCopy {
         return directory().appendingPathComponent(name).appendingPathExtension("caf")
     }
 
-    /// The 48 kHz copy of `source`'s audio `track`: the one on disk, else
-    /// written now (blocking). Nil when it cannot be made.
-    static func copy(of source: URL, track: AVAssetTrack) -> URL? {
+    /// The 48 kHz copy of `source`'s audio `track`, read from `trim`: the one
+    /// on disk, else written now (blocking). Nil when it cannot be made. The
+    /// key is the file's, since the trim is a function of the file.
+    static func copy(of source: URL, track: AVAssetTrack, trim: CMTime) -> URL? {
         guard let destination = destination(for: source) else {
             log(source, "the source cannot be read")
             return nil
@@ -84,7 +93,7 @@ enum AudioRateCopy {
             .appendingPathExtension("partial-\(getpid())")
             .appendingPathExtension("caf")
         try? FileManager.default.removeItem(at: partial)
-        if let failure = write(track: track, source: source, to: partial) {
+        if let failure = write(track: track, source: source, trim: trim, to: partial) {
             try? FileManager.default.removeItem(at: partial)
             log(source, failure)
             return nil
@@ -116,9 +125,11 @@ enum AudioRateCopy {
         ]
     }
 
-    /// Reads `track` as the copy's format and writes it to `url` under the
-    /// copy-timing rule. Nil on success, else why not.
-    private static func write(track: AVAssetTrack, source: URL, to url: URL) -> String? {
+    /// Reads `track` as the copy's format from `trim` and writes it to `url`
+    /// under the copy-timing rule. Nil on success, else why not.
+    private static func write(track: AVAssetTrack, source: URL, trim: CMTime, to url: URL)
+        -> String?
+    {
         let channels = Int(
             min(max(CompositionBuilder.audioFormatSignature(of: track)?.channels ?? 2, 1), 2))
         let settings = settings(channels: channels)
@@ -138,6 +149,11 @@ enum AudioRateCopy {
         if head > .zero {
             reader.timeRange = CMTimeRange(start: head, duration: .positiveInfinity)
         }
+        // An MP3's encoder delay Core Audio left in (SY-36): the read starts
+        // past it.
+        if trim > .zero {
+            reader.timeRange = CMTimeRange(start: trim, duration: .positiveInfinity)
+        }
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: settings)
         output.alwaysCopiesSampleData = false
         guard reader.canAdd(output) else { return "the reader refused the track" }
@@ -153,7 +169,10 @@ enum AudioRateCopy {
             reader.cancelReading()
             return writer.error?.localizedDescription ?? "the writer did not start"
         }
-        writer.startSession(atSourceTime: .zero)
+        // With a trim, frame 0 is the first buffer's first frame and the
+        // session starts at its time; else both are zero.
+        var origin: Int64? = trim > .zero ? nil : 0
+        if origin != nil { writer.startSession(atSourceTime: .zero) }
 
         var failure: String?
         var end: Int64 = 0
@@ -167,7 +186,12 @@ enum AudioRateCopy {
                 failure = "a buffer has no time"
                 break
             }
-            let start = stamp.value
+            if origin == nil {
+                origin = stamp.value
+                writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(buffer))
+            }
+            let zero = origin ?? 0
+            let start = stamp.value - zero
             if start < 0 || end - start > 1 {
                 failure = "a buffer starts at frame \(start), before frame \(end)"
                 break
@@ -178,7 +202,7 @@ enum AudioRateCopy {
                     let count = Int(min(Int64(silenceBlockFrames), start - at))
                     guard let zeros = silence(
                         frames: count,
-                        at: CMTime(value: at, timescale: CMTimeScale(sampleRate)),
+                        at: CMTime(value: zero + at, timescale: CMTimeScale(sampleRate)),
                         like: buffer)
                     else {
                         failure = "the gap's silence could not be made"
@@ -281,9 +305,10 @@ enum AudioRateCopy {
 }
 
 extension CompositionBuilder {
-    /// `urls` with every audio-track media whose audio is not 48 kHz pointed
-    /// at its 48 kHz copy (spec §11 SY-23); a media whose copy fails keeps
-    /// its own file. Video never reads these, and neither does a reversed
+    /// `urls` with every audio-track media whose audio is not 48 kHz, or is
+    /// an MP3 with an encoder delay to trim (SY-36, computed once per media),
+    /// pointed at its 48 kHz copy (spec §11 SY-23); a media whose copy fails
+    /// keeps its own file. Video never reads these, and neither does a reversed
     /// clip (`resolveSource`'s reversed branch), so a media only reversed
     /// clips play is not copied.
     static func audioURLs(
@@ -302,8 +327,9 @@ extension CompositionBuilder {
                     let track = assetTrack(
                         at: url, key: segment.media, mediaType: .audio, assets: &assets),
                     let signature = audioFormatSignature(of: track),
-                    AudioRateCopy.needsCopy(signature),
-                    let copy = AudioRateCopy.copy(of: url, track: track)
+                    case let trim = MP3Gapless.leadingTrim(of: url, track: track),
+                    AudioRateCopy.needsCopy(signature, trim: trim),
+                    let copy = AudioRateCopy.copy(of: url, track: track, trim: trim)
                 else { continue }
                 result[segment.media] = copy
             }

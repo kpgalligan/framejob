@@ -4,14 +4,18 @@ timeline, measured against sample-exact click fixtures. Phase 1 measured the
 offsets and the stage (file, AVFoundation decode/SRC, composition insert,
 mix, time-pitch, writer) where each enters; phase 2 removed them at their
 causes (spec §11 SY-23..SY-27) and this is now the standing pin: every E, R
-and X row is scored against SY-27's tolerance.
+and X row is scored against SY-27's tolerance. Clean-up batch 3 (SY-35..SY-38)
+added the late head's separating fixture (#307), an MP3 read past its own
+LAME/Xing encoder delay (#306) and keep pitch outside the band on a real
+recording (#299).
 
-    python3 tools/proof/export_offset_proof.py [<dir>/agent.sock] [--only ID,ID,...] [--mutants]
+    python3 tools/proof/export_offset_proof.py [<dir>/agent.sock] [--only ID,ID,...]
+    python3 tools/proof/export_offset_proof.py --mutants [--mutant NAME,NAME,...]
 
-Z0, Z2, L1–L9 and X1–X8 need no app; every other row needs the running instance's
+Z0, Z2, L1–L12 and X1–X15 need no app; every other row needs the running instance's
 socket (`proof_app.py launch`; `--app release` for the recorded run) and the
 script exits 2 when one is asked for without it. Rows print
-`<ID> ok|FAIL — <detail>`, then the E and L tables, then `scores: n/m`; exit
+`<ID> ok|measured|FAIL — <detail>`, then the E and L tables, then `scores: n/m`; exit
 0 iff every requested row passed. Everything is under
 `tools/proof/work/export-offset/` (fixtures in `fixtures/`, names carrying
 `-v1`, made once). Every project is closed with `discard: true`; no menu item
@@ -27,10 +31,21 @@ v(n) = 0.25·(1 + cos(π(n − c)/h)) for |n − c| < h, h = rate/2000 samples.
   clicks44                the same at 44.1 kHz
   clicks44-aac / -mp3     clicks44 through ffmpeg: `-c:a aac -b:a 192k` (.m4a),
                           `-c:a libmp3lame -b:a 192k` (.mp3)
+  clicks48-mp3            clicks48 through `-c:a libmp3lame -b:a 192k`
+  clicks44s-mp3           clicks44 through `-ac 2 -c:a libmp3lame -b:a 192k`
+                          (stereo: Core Audio accepts ffmpeg's tag, a packet table)
+  clicks44-mp3-noxing     clicks44-mp3's recipe with `-write_xing 0` (no tag)
+  clicks24-mp3            clicks44 through `-ar 24000 -c:a libmp3lame -b:a 64k`
+                          (MPEG-2)
+  clicks44-mp3-itunsmpb   noxing's frames behind an ID3v2.3 tag of one COMM
+                          `iTunSMPB` frame (576 priming, 792 remainder, 441,000
+                          valid; `write_itunsmpb`, Python)
   clicks44-late           an 11 s grey 320×180 H.264 movie from 0 with clicks44
                           as pcm_s16le from 0.5 s (`-itsoffset 0.5`): its audio
                           track starts 0.5 s in (SOURCE_OFFSET), Z0 checks
                           ffprobe's start_time 0.500 ± 0.001
+  clicks16-late5          the same recipe over clicks16 from 5 s (`-itsoffset 5`,
+                          a 16 s movie; #307, SY-35)
   clicks48-lead37         clicks48 with every click 37 samples later (Z1)
   cam-pcm48 / cam-aac48   `export_offset_writer.swift`: AVFoundation's H.264
                           movie, white on the click frames, 48 kHz mono LPCM
@@ -61,8 +76,13 @@ Rows:
       clicks within 0.05 ms of the written times (0.5 ms for cam-aac48 and
       clicks44-aac); the writer's movies flash on exactly CLICK_FRAMES (pts
       F/30 ± 1 ms); cam-ff16 is flat grey and checked for sound only;
-      clicks44-late's audio start_time is 0.500 ± 0.001 s (else the fixture
-      is a failure); clicks44-mp3 is read by E30 alone
+      clicks44-late's and clicks16-late5's audio start_time is 0.500 / 5.000
+      ± 0.001 s (else the fixture is a failure); every MP3 but noxing and
+      itunsmpb is read by ffmpeg (0.5 ms); `afinfo` prints no `valid frames`
+      line for clicks44-mp3, clicks48-mp3, clicks24-mp3 and noxing, and
+      `audio 441000 valid frames + 576 priming + 792 remainder = 442368` for
+      clicks44s-mp3 and itunsmpb — a miss names the fixture: "not the class
+      the rows assume"
   Z1  E4's project with clicks48-lead37: its median − E4's = 37/48 000 s
       ± 0.05 ms
   Z2  `locate` on synthetic 48 kHz trains with clicks at +0.0, +0.3, +0.7
@@ -76,17 +96,33 @@ Rows:
       r ≥ 0.8 and |lag| ≤ 1.0 ms
   R2  the same at `set_speed {rate: 0.99999, keep_pitch: false}` (#298:
       −2.81 ms), the same pin
-  E1–E31  one project each (`E_ROWS`), exported and located; ok when the
+  R3–R7  the same clip at ×0.99999 keep (R3, #299's in-band case), ×0.9 and
+      ×1.1 keep (R4, R5), ×0.9 and ×1.1 off (R6, R7, the controls), each by
+      `stretched_lag` against the recorder's own envelope stretched by the
+      speed on its media windows [12 s, 22 s) and [128 s, 138 s); R6 and R7
+      pinned (both |lag| ≤ 1.0 ms, r ≥ 0.8). R3, R4 and R5 (reach ±200 ms)
+      are MEASURED rows (#299 open, SY-37): printed `measured` when both
+      windows are found (r ≥ 0.5, inside the reach), never pinned to a lag;
+      their detail names SY-37's class (a defect when a window has r < 0.8,
+      |lag| > 5.0 ms or a lag at the edge)
+  E1–E34  one project each (`E_ROWS`), exported and located; ok when the
       export completed, ≥ 10 of 12 clicks were found (E23: all 10 of its
-      in-range clicks) and SY-27's pin holds; E30 (MP3, the decoder delay's
-      residue) is ok when measured, its detail labelled residue. The detail
+      in-range clicks) and SY-27's pin holds (E30, E33: the MP3s, read past
+      their encoder delay, SY-36; E32 the late head, SY-35). E34 (×1.1 keep
+      pitch) is a MEASURED row: ≥ 10 found, its median printed, not pinned. The detail
       prints the median and spread of found − expected, the count, the
       least r and the pin
-  L1–L9  `export_offset_probe.swift`'s stage reads (its header lists them),
+  L1–L11  `export_offset_probe.swift`'s stage reads (its header lists them),
       each located; ok when every read completed and found ≥ 10 of 12. A
-      probe that does not build or answer FAILS every L and X row asked
-  X1–X8  the probe's in-process `audio_wav` exports (its header lists them),
-      each located and pinned: ≥ 10 found, |median| ≤ 1.0 ms, spread ≤ 0.5 ms
+      probe that does not build or answer FAILS every L and X row asked.
+      L10 is also the trim's gate: every `trimmed` read within 0.1 ms of
+      ffmpeg's read of the same file, the tabled MP3s' native reads within
+      0.1 ms of 0, noxing's 576/44.1 ms late ± 0.1
+  L12  `MP3Gapless`'s tag reader and trim, checked inside the probe (no read)
+  X1–X15  the probe's in-process exports and the sync cache (its header lists
+      them), each located and pinned: ≥ 10 found, |median| ≤ 1.0 ms, spread
+      ≤ 0.5 ms; X14 (no tag) instead 12 found and |X14 − X2 − 576/44.1| ≤
+      0.1 ms
 Under the L table, per fixture and speed, the first stage of
 asset48 → comp → mix → export whose median moves by more than 0.1 ms from
 the stage before it, and native against asset48 (the decoder's SRC).
@@ -97,8 +133,8 @@ asserted to occur exactly once), rebuilds the probe (900 s wall) and runs its
 X group (240 s wall); killed when every named row fails. `before` — the
 unmutated tree — runs exactly once first and must pass every X row; a copy
 that does not build or answer is a failed control, never a kill. M7 and M8
-are the core's (`core/tests/pitch_band.rs`), run by hand. Exit 0 when every
-mutant was killed.
+are the core's (`core/tests/pitch_band.rs`), run by hand. `--mutant` runs
+`before` and only the named mutants. Exit 0 when every mutant was killed.
 """
 
 import argparse
@@ -145,20 +181,38 @@ TARGET_MS = 1.0
 TARGET_SPREAD_MS = 0.5
 KEEP_TARGET_MS = 5.0
 NR_DELAY_MS = 512 / 48_000 * 1000
-SOURCE_OFFSET = {"clicks44-late": 0.5}  # s: where the fixture's audio track starts
+SOURCE_OFFSET = {"clicks44-late": 0.5, "clicks16-late5": 5.0}  # s: where its audio track starts
 FIXTURE_FILES = {
     "clicks16": "clicks16-v1.wav", "clicks48": "clicks48-v1.wav",
     "clicks48-lead37": "clicks48-lead37-v1.wav", "clicks44": "clicks44-v1.wav",
     "clicks44-aac": "clicks44-aac-v1.m4a", "clicks44-mp3": "clicks44-mp3-v1.mp3",
     "clicks44-late": "clicks44-late-v1.mov", "cam-pcm48": "cam-pcm48-v1.mov",
     "cam-aac48": "cam-aac48-v1.mov", "cam-ff16": "cam-ff16-v1.mov",
+    "clicks48-mp3": "clicks48-mp3-v1.mp3", "clicks16-late5": "clicks16-late5-v1.mov",
+    "clicks44s-mp3": "clicks44s-mp3-v1.mp3", "clicks44-mp3-noxing": "clicks44-mp3-noxing-v1.mp3",
+    "clicks44-mp3-itunsmpb": "clicks44-mp3-itunsmpb-v1.mp3", "clicks24-mp3": "clicks24-mp3-v1.mp3",
 }
+# The fixtures whose tag Core Audio ignores (no packet table: trimmed by
+# `MP3Gapless`) and those it reads as a packet table (left alone).
+UNTABLED_MP3 = ["clicks44-mp3", "clicks48-mp3", "clicks24-mp3", "clicks44-mp3-noxing"]
+TABLED_MP3 = ["clicks44s-mp3", "clicks44-mp3-itunsmpb"]
+TABLE_LINE = "audio 441000 valid frames + 576 priming + 792 remainder = 442368"
+NOXING_LATE_MS = 576 / 44.1  # the encoder delay no tag names, left in
 FLASH_SHARE = (320 * 180) / (640 * 360)  # the movie's share of the canvas
 
 Z_ROWS = ["Z0", "Z1", "Z2", "Z3"]
-R_ROWS = ["R1", "R2"]
-L_ROWS = [f"L{n}" for n in range(1, 10)]
-X_ROWS = [f"X{n}" for n in range(1, 9)]
+R_ROWS = [f"R{n}" for n in range(1, 8)]
+# row: (speed, keep_pitch, reach ms, pinned) — R1 ×1, R2 #298's varispeed, R3–R7 #299 (SY-37).
+R_EDITS = {
+    "R1": (None, None, 40, True), "R2": (0.99999, False, 40, True),
+    "R3": (0.99999, True, 200, False), "R4": (0.9, True, 200, False),
+    "R5": (1.1, True, 200, False), "R6": (0.9, False, 40, True), "R7": (1.1, False, 40, True),
+}
+R_WINDOWS = [(12_000, 22_000), (128_000, 138_000)]  # ms of the recorder (media), R3–R7
+DEFECT_MS = 5.0  # SY-37: outside the band, a window past this is a defect
+L_ROWS = [f"L{n}" for n in range(1, 13)]
+X_ROWS = [f"X{n}" for n in range(1, 16)]
+NO_READ_ROWS = {"L12"}  # checked inside the probe; no manifest read
 
 # row: (fixture, start ticks, edit, preset). An edit: None (×1),
 # ("speed", rate, keep_pitch), ("loudness", lufs), ("pan", value), ("nr", value),
@@ -195,10 +249,16 @@ E_ROWS = {
     "E29": ("clicks48", F206, ("speed", 0.9, True), "audio_wav"),
     "E30": ("clicks44-mp3", F206, None, "audio_wav"),
     "E31": ("clicks44-late", F206, None, "audio_wav"),
+    "E32": ("clicks16-late5", F206, None, "audio_wav"),
+    "E33": ("clicks48-mp3", F206, None, "audio_wav"),
+    "E34": ("clicks48", F206, ("speed", 1.1, True), "audio_wav"),
 }
 E_IDS = list(E_ROWS)
 KEEP_ROWS = {"E9", "E11", "E12", "E29"}
-RESIDUE_ROWS = {"E30"}
+# #299 (SY-37, ruling 3): keep pitch's time-pitch algorithms move real sound,
+# so these rows run every pass and print their readings, scored on the
+# instrument only (the export decoded, the clicks or windows found).
+MEASURED_ROWS = {"R3", "R4", "R5", "E34"}
 VIDEO_ROWS = {"E16", "E17", "E18", "E19"}
 EXTENSIONS = {"audio_wav": "wav", "prores_422": "mov", "h264": "mp4"}
 ALL_ROWS = Z_ROWS + R_ROWS + E_IDS + L_ROWS + X_ROWS
@@ -223,6 +283,20 @@ MUTANTS = {
                         "let in0 = sourceIn - lead", "let in0 = max(0, sourceIn - lead)"),
     "M9-no-gap-padding": (["X8"], "AudioRateCopy.swift",
                           "if start - end > 1 {", "if false && start - end > 1 {"),
+    "M10-no-head-range": (["X9"], "AudioRateCopy.swift",
+                          "if head > .zero {", "if false && head > .zero {"),
+    "M11-no-mp3-copy": (["X11"], "AudioRateCopy.swift",
+                        "signature.sampleRate != Double(sampleRate) || trim > .zero",
+                        "signature.sampleRate != Double(sampleRate)"),
+    "M12-no-copy-trim": (["X10", "X11", "X15"], "AudioRateCopy.swift",
+                         "if trim > .zero {", "if false && trim > .zero {"),
+    "M13-no-sync-trim": (["X12"], "MediaImporter+SyncFeatures.swift",
+                         "if trim > .zero {", "if false && trim > .zero {"),
+    "M14-delay-field": (["X10", "X11"], "MP3Gapless.swift",
+                        "let delay = Int(packed >> 12)", "let delay = Int(packed & 0xFFF)"),
+    "M15-no-table-guard": (["X13"], "MP3Gapless.swift",
+                           "guard hasPacketTable(url) == false else { return .zero }",
+                           "guard hasPacketTable(url) != nil else { return .zero }"),
 }
 
 results = {}
@@ -231,8 +305,11 @@ l_table = []
 
 
 def score(row, ok, detail):
+    """A MEASURED_ROWS row prints `measured` when its instrument held (it
+    counts toward the score; its reading is never pinned)."""
     results[row] = (bool(ok), detail)
-    print(f"{row} {'ok' if ok else 'FAIL'} — {detail}", flush=True)
+    word = ("measured" if row in MEASURED_ROWS else "ok") if ok else "FAIL"
+    print(f"{row} {word} — {detail}", flush=True)
 
 
 class FixtureError(RuntimeError):
@@ -323,12 +400,18 @@ def make_fixtures():
             path.unlink(missing_ok=True)
             raise
     made["cam-ff16"] = path
-    for name, codec in [("clicks44-aac", ["-c:a", "aac", "-b:a", "192k"]),
-                        ("clicks44-mp3", ["-c:a", "libmp3lame", "-b:a", "192k"])]:
+    lame = ["-c:a", "libmp3lame", "-b:a", "192k"]
+    for name, base, codec in [("clicks44-aac", "clicks44", ["-c:a", "aac", "-b:a", "192k"]),
+                              ("clicks44-mp3", "clicks44", lame),
+                              ("clicks48-mp3", "clicks48", lame),
+                              ("clicks44s-mp3", "clicks44", ["-ac", "2", *lame]),
+                              ("clicks44-mp3-noxing", "clicks44", [*lame, "-write_xing", "0"]),
+                              ("clicks24-mp3", "clicks44",
+                               ["-ar", "24000", "-c:a", "libmp3lame", "-b:a", "64k"])]:
         path = fixture_path(name)
         if not path.exists():
             try:
-                run(["ffmpeg", "-v", "error", "-y", "-i", made["clicks44"], *codec, path])
+                run(["ffmpeg", "-v", "error", "-y", "-i", made[base], *codec, path])
             except FixtureError:
                 path.unlink(missing_ok=True)
                 raise
@@ -344,7 +427,49 @@ def make_fixtures():
             path.unlink(missing_ok=True)
             raise
     made["clicks44-late"] = path
+    path = fixture_path("clicks16-late5")
+    if not path.exists():
+        try:
+            run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                 "color=c=gray:s=320x180:r=30:d=16", "-itsoffset", "5", "-i",
+                 made["clicks16"], "-map", "0:v", "-map", "1:a", "-c:v", "libx264",
+                 "-pix_fmt", "yuv420p", "-c:a", "pcm_s16le", path])
+        except FixtureError:
+            path.unlink(missing_ok=True)
+            raise
+    made["clicks16-late5"] = path
+    path = fixture_path("clicks44-mp3-itunsmpb")
+    if not path.exists():
+        write_itunsmpb(made["clicks44-mp3-noxing"], path)
+    made["clicks44-mp3-itunsmpb"] = path
     return made
+
+
+def write_itunsmpb(noxing: Path, path: Path) -> None:
+    """`noxing`'s frames behind an ID3v2.3 tag of one COMM frame, `eng`,
+    `iTunSMPB`: 576 priming, 792 remainder, 441 000 valid frames."""
+    data = noxing.read_bytes()
+    audio = data
+    if data[:3] == b"ID3":
+        size = 0
+        for byte in data[6:10]:
+            size = size << 7 | (byte & 0x7F)
+        audio = data[10 + size + (10 if data[5] & 0x10 else 0):]
+    text = " 00000000 00000240 00000318 000000000006BAA8" + " 00000000" * 8
+    body = b"\x00" + b"eng" + b"iTunSMPB\x00" + text.encode("ascii")
+    frame = b"COMM" + len(body).to_bytes(4, "big") + b"\x00\x00" + body
+    n = len(frame)
+    synchsafe = bytes([(n >> 21) & 0x7F, (n >> 14) & 0x7F, (n >> 7) & 0x7F, n & 0x7F])
+    partial = path.with_name(path.name + ".partial")
+    partial.write_bytes(b"ID3\x03\x00\x00" + synchsafe + frame + audio)
+    partial.rename(path)
+
+
+def afinfo_table(path):
+    """The `valid frames` lines `afinfo` prints for the file (its packet
+    table), stripped; none when Core Audio has none."""
+    ran = run(["afinfo", path], 60)
+    return [line.strip() for line in ran["stdout"].splitlines() if "valid frames" in line]
 
 
 def audio_start_time(path):
@@ -677,11 +802,11 @@ def pinned(s):
 
 def e_target(row, r):
     """SY-27's pin for one E row: (ok, sentence)."""
-    if row in RESIDUE_ROWS:
-        return r["found"] >= 10, ("residue, not pinned (the MP3 decoder's delay): "
-                                  + ("measured" if r["found"] >= 10 else "not measured"))
     if r["median_ms"] is None:
         return False, "pin missed (nothing found)"
+    if row in MEASURED_ROWS:
+        return True, (f"measured, not pinned (#299 open; SY-37's {KEEP_TARGET_MS} ms would read "
+                      + ("within" if abs(r["median_ms"]) <= KEEP_TARGET_MS else "OVER") + ")")
     if row in KEEP_ROWS:
         met = abs(r["median_ms"]) <= KEEP_TARGET_MS
         return met, "pin " + ("met" if met else "missed") + f" (|median| ≤ {KEEP_TARGET_MS} ms)"
@@ -732,12 +857,15 @@ def z0():
     files = fixtures()
     notes, ok = [], True
     for name in ["clicks16", "clicks48", "clicks48-lead37", "clicks44", "clicks44-aac",
-                 "cam-pcm48", "cam-aac48", "cam-ff16"]:
+                 "clicks44-mp3", "clicks48-mp3", "clicks44s-mp3", "clicks24-mp3", "cam-pcm48",
+                 "cam-aac48", "cam-ff16"]:
         samples, rate = read_any(files[name])
         lead = LEAD / 48_000 if name == "clicks48-lead37" else 0
         expected = [c + lead for c in CLICKS]
         s = summary(locate(samples, rate, expected), expected)
-        tolerance = 0.5 if name in ("cam-aac48", "clicks44-aac") else 0.05
+        lossy = ("cam-aac48", "clicks44-aac", "clicks44-mp3", "clicks48-mp3", "clicks44s-mp3",
+                 "clicks24-mp3")
+        tolerance = 0.5 if name in lossy else 0.05
         worst = max((abs(d) for d in s["diffs"]), default=None)
         good = s["found"] == 12 and worst is not None and worst <= tolerance
         ok &= good
@@ -751,10 +879,20 @@ def z0():
             ok &= good
             notes.append(f"{name} flashes on {frames == CLICK_FRAMES and 'CLICK_FRAMES' or frames}"
                          f" (pts off its frame ≤ {fmt(off, 4)} ms)")
-    start = audio_start_time(files["clicks44-late"])
-    good = abs(start - SOURCE_OFFSET["clicks44-late"]) <= 0.001
-    ok &= good
-    notes.append(f"clicks44-late audio start_time {start:.6f} s (want 0.500 ± 0.001)")
+    for name in ["clicks44-late", "clicks16-late5"]:
+        start = audio_start_time(files[name])
+        good = abs(start - SOURCE_OFFSET[name]) <= 0.001
+        ok &= good
+        notes.append(f"{name} audio start_time {start:.6f} s (want "
+                     f"{SOURCE_OFFSET[name]:.3f} ± 0.001)")
+    # The class each MP3 row assumes: Core Audio's packet table, or none.
+    for name in UNTABLED_MP3 + TABLED_MP3:
+        lines = afinfo_table(files[name])
+        want = [TABLE_LINE] if name in TABLED_MP3 else []
+        good = lines == want
+        ok &= good
+        notes.append(f"{name} afinfo {lines or 'no valid frames line'}"
+                     + ("" if good else " — FAIL: not the class the rows assume"))
     score("Z0", ok, "; ".join(notes))
 
 
@@ -814,27 +952,101 @@ def z3(mcp):
 # ---- R rows --------------------------------------------------------------------
 
 
+def stretched_lag(mix, media, clip_start_ms: float, in_ms: float, speed: float, lo_ms: int,
+                  hi_ms: int, reach: int = 40) -> tuple[float, float]:
+    """(lag ms, peak r): the mix's 1 ms envelope over the timeline span media
+    window [lo_ms, hi_ms) plays at, against the media's envelope linearly
+    interpolated at (t + 0.5 − L − clip_start_ms)·speed + in_ms − 0.5, by
+    mean-removed normalised correlation at each whole ms L in ±reach, refined
+    parabolically (`window_lag`'s shape). A lag of exactly ±reach is on the
+    edge (no refinement)."""
+    a = round(clip_start_ms + (lo_ms - in_ms) / speed)
+    b = round(clip_start_ms + (hi_ms - in_ms) / speed)
+    xs = mix[a:b]
+    mx = sum(xs) / len(xs)
+    xc = [x - mx for x in xs]
+    ex = math.sqrt(sum(x * x for x in xc))
+    last = len(media) - 1
+
+    def at(u):
+        if u <= 0:
+            return media[0]
+        if u >= last:
+            return media[last]
+        i = int(u)
+        f = u - i
+        return media[i] * (1 - f) + media[i + 1] * f
+
+    scores = []
+    for lag in range(-reach, reach + 1):
+        ys = [at((t + 0.5 - lag - clip_start_ms) * speed + in_ms - 0.5) for t in range(a, b)]
+        my = sum(ys) / len(ys)
+        yc = [y - my for y in ys]
+        ey = math.sqrt(sum(y * y for y in yc))
+        scores.append(sum(p * q for p, q in zip(xc, yc)) / (ex * ey) if ex and ey else 0)
+    best = max(range(len(scores)), key=lambda i: scores[i])
+    offset = 0.0
+    if 0 < best < len(scores) - 1:
+        left, centre, right = scores[best - 1], scores[best], scores[best + 1]
+        bend = left - 2 * centre + right
+        if bend < 0:
+            offset = max(-0.5, min(0.5, 0.5 * (left - right) / bend))
+    return best - reach + offset, scores[best]
+
+
 def r_rows(mcp, wanted):
     files = sync_fixtures()
     source = envelope(wav_samples(Path(files["source"])))
+    media = envelope(wav_samples(Path(files["recorder"])))
     session = Session(mcp, "offset-r")
     issue = {"R1": "+25.71", "R2": "−2.81"}
     try:
         clip = session.place(files["recorder"], F206)
         for row in R_ROWS:
-            if row == "R2":
-                session.op("set_speed", clip=clip, rate=0.99999, keep_pitch=False)
             if row not in wanted:
                 continue
+            speed, keep, reach, pin = R_EDITS[row]
+            if speed is not None:
+                session.op("set_speed", clip=clip, rate=speed, keep_pitch=keep)
             out = EXPORTS / f"{row}.wav"
             EXPORTS.mkdir(parents=True, exist_ok=True)
             out.unlink(missing_ok=True)
             session.op("export", preset="audio_wav", path=str(out))
-            lag, r = window_lag(envelope(wav_samples(out)), source, 12_000, 22_000)
-            score(row, r >= 0.8 and abs(lag) <= TARGET_MS,
-                  f"{'×1' if row == 'R1' else '×0.99999 keep_pitch false'}: "
-                  f"S18 lag {lag:+.2f} ms (r {r:.3f}) on [12 s, 22 s) (want |lag| ≤ "
-                  f"{TARGET_MS} ms, r ≥ 0.8); #298 reported {issue[row]} ms")
+            mix = envelope(wav_samples(out))
+            if row in ("R1", "R2"):
+                lag, r = window_lag(mix, source, 12_000, 22_000)
+                score(row, r >= 0.8 and abs(lag) <= TARGET_MS,
+                      f"{'×1' if row == 'R1' else '×0.99999 keep_pitch false'}: "
+                      f"S18 lag {lag:+.2f} ms (r {r:.3f}) on [12 s, 22 s) (want |lag| ≤ "
+                      f"{TARGET_MS} ms, r ≥ 0.8); #298 reported {issue[row]} ms")
+                continue
+            placed = session.clip(clip)
+            start_ms = placed["start"] / SEC * 1000
+            in_ms = placed["source"].get("in", 0) / SEC * 1000
+            rate = placed.get("speed", 1) or 1
+            lags = [stretched_lag(mix, media, start_ms, in_ms, rate, lo, hi, reach)
+                    for lo, hi in R_WINDOWS]
+            edge = [abs(lag) >= reach for lag, _ in lags]
+            text = "; ".join(
+                f"[{lo // 1000} s, {hi // 1000} s) lag {lag:+.3f} ms (r {r:.3f})"
+                + (" at the edge" if on_edge else "")
+                for (lo, hi), (lag, r), on_edge in zip(R_WINDOWS, lags, edge))
+            label = f"×{rate} keep_pitch {str(keep).lower()}, reach ±{reach} ms"
+            if pin:
+                ok = all(r >= 0.8 and abs(lag) <= TARGET_MS for lag, r in lags) and not any(edge)
+                score(row, ok, f"{label}: {text} (want both |lag| ≤ {TARGET_MS} ms, r ≥ 0.8)")
+            else:
+                # Measured (ruling 3): the instrument holds when each window
+                # is found — a finite lag inside the reach at r ≥ 0.5.
+                found = all(math.isfinite(lag) and math.isfinite(r) and r >= 0.5 and not on_edge
+                            for (lag, r), on_edge in zip(lags, edge))
+                defect = any(r < 0.8 or abs(lag) > DEFECT_MS or on_edge
+                             for (lag, r), on_edge in zip(lags, edge))
+                score(row, found,
+                      f"{label}: {text}; not pinned (#299 open); SY-37's class: "
+                      + ("DEFECT (r < 0.8, |lag| > 5.0 ms or at the edge)" if defect
+                         else "within SY-27's 5.0 ms (every window r ≥ 0.8, inside the reach)")
+                      + ("" if found else "; a window not found (r < 0.5 or at the edge)"))
     finally:
         session.close()
 
@@ -925,9 +1137,10 @@ def probe_scores(manifest, rows, wanted, table=None):
         mine = [(e, s) for e, s in measured if e["row"] == row]
         short = [f"{e['fixture']} {e['stage']} {e['variant']}" for e, s in mine
                  if s is None or s["found"] < 10]
-        ok = probe_row["ok"] and bool(mine) and not short
+        ok = probe_row["ok"] and (bool(mine) or row in NO_READ_ROWS) and not short
         if row in X_ROWS:
-            pins = [pinned(s) for _, s in mine]
+            x2 = next((s for e, s in measured if e["row"] == "X2"), None)
+            pins = [noxing_pin(s, x2) if row == "X14" else pinned(s) for _, s in mine]
             ok = ok and all(met for met, _ in pins)
             medians = "; ".join(
                 f"{e['fixture']} {e['variant']} {describe(s)}, {pin[1]}"
@@ -936,9 +1149,59 @@ def probe_scores(manifest, rows, wanted, table=None):
             medians = ", ".join(
                 f"{e['fixture']} {e['stage']} {e['variant']} {fmt(s['median_ms'])}"
                 for e, s in mine if s is not None)
+        if row == "L10":
+            met, sentence = l10_gate(mine)
+            ok = ok and met
+            medians += f"; gate {sentence}"
         out[row] = (ok, f"probe: {probe_row['detail']}; under 10 found: {short or 'none'}; "
                         f"medians (ms): {medians}")
     return out, measured
+
+
+def noxing_pin(s, x2):
+    """X14: an MP3 with no tag is left untrimmed — all 12 found and
+    |X14 − X2 − 576/44.1| ≤ 0.1 ms."""
+    if s is None or s["median_ms"] is None or x2 is None or x2["median_ms"] is None:
+        return False, "untrimmed check missed (nothing found, or no X2)"
+    delta = s["median_ms"] - x2["median_ms"]
+    met = s["found"] == 12 and abs(delta - NOXING_LATE_MS) <= 0.1
+    return met, (f"untrimmed {'met' if met else 'missed'} (X14 − X2 {delta:+.3f} ms, want "
+                 f"{NOXING_LATE_MS:.3f} ± 0.1 with 12 found)")
+
+
+_ffmpeg_medians = {}
+
+
+def ffmpeg_median(name):
+    """The fixture's clicks by ffmpeg (`read_any`), median of found − written."""
+    if name not in _ffmpeg_medians:
+        samples, rate = read_any(fixtures()[name])
+        _ffmpeg_medians[name] = summary(locate(samples, rate, CLICKS), CLICKS)["median_ms"]
+    return _ffmpeg_medians[name]
+
+
+def l10_gate(mine):
+    """Step 2's gate over L10's reads: (ok, sentence). Every `trimmed` read ≥ 10
+    found within 0.1 ms of the same file's ffmpeg median; the tabled MP3s'
+    native reads within 0.1 ms; noxing's native read 576/44.1 ms late ± 0.1."""
+    notes, ok = [], True
+    for e, s in mine:
+        name = e["fixture"]
+        if e["stage"] == "trimmed":
+            want = ffmpeg_median(name)
+            label = f"ffmpeg {fmt(want)}"
+        elif e["stage"] == "native" and name in TABLED_MP3:
+            want, label = 0.0, "0"
+        elif e["stage"] == "native" and name == "clicks44-mp3-noxing":
+            want, label = NOXING_LATE_MS, f"{NOXING_LATE_MS:.3f}"
+        else:
+            continue
+        good = (s is not None and s["median_ms"] is not None and s["found"] >= 10
+                and want is not None and abs(s["median_ms"] - want) <= 0.1)
+        ok &= good
+        got = fmt(s["median_ms"]) if s is not None else "—"
+        notes.append(f"{name} {e['stage']} {got} vs {label} {'ok' if good else 'MISSED'}")
+    return ok, "; ".join(notes)
 
 
 def l_rows(wanted):
@@ -1053,7 +1316,8 @@ def mutant_x(sources, here):
     return scored, None
 
 
-def mutants():
+def mutants(only=None):
+    """`only`: the mutant names to run after `before` (None: all of them)."""
     try:
         fixtures()
     except FixtureError as error:
@@ -1071,7 +1335,8 @@ def mutants():
         print("mutants: CONTROL FAILED — the unmutated tree fails X rows")
         return 1
     killed = []
-    for name, (named, file, old, new) in MUTANTS.items():
+    chosen = {name: MUTANTS[name] for name in (only or MUTANTS)}
+    for name, (named, file, old, new) in chosen.items():
         here = WORK / "mutants" / name
         if here.exists():
             shutil.rmtree(here)
@@ -1096,9 +1361,9 @@ def mutants():
               f"{failed}; other rows failing {others}", flush=True)
         for row in named:
             print(f"    {row}: {rows[row][1][:400]}")
-    print(f"mutants: {len(killed)}/{len(MUTANTS)} killed (M7, M8: core/tests/pitch_band.rs, "
+    print(f"mutants: {len(killed)}/{len(chosen)} killed (M7, M8: core/tests/pitch_band.rs, "
           "by hand)")
-    return 0 if len(killed) == len(MUTANTS) else 1
+    return 0 if len(killed) == len(chosen) else 1
 
 
 def main():
@@ -1106,10 +1371,19 @@ def main():
     parser.add_argument("socket", nargs="?")
     parser.add_argument("--only", help="comma-separated row ids")
     parser.add_argument("--mutants", action="store_true")
+    parser.add_argument("--mutant", help="with --mutants: comma-separated mutant names")
     args = parser.parse_args()
+    if args.mutant and not args.mutants:
+        print("--mutant needs --mutants")
+        return 2
     if args.mutants:
+        only = args.mutant.split(",") if args.mutant else None
+        unknown = [name for name in only or [] if name not in MUTANTS]
+        if unknown:
+            print("unknown mutant " + ", ".join(unknown))
+            return 2
         WORK.mkdir(parents=True, exist_ok=True)
-        return mutants()
+        return mutants(only)
     wanted = args.only.split(",") if args.only else list(ALL_ROWS)
     unknown = [row for row in wanted if row not in ALL_ROWS]
     if unknown:
@@ -1168,7 +1442,9 @@ def main():
 
     print_tables()
     passed = sum(1 for row in wanted if results.get(row, (False,))[0])
-    print(f"scores: {passed}/{len(wanted)}")
+    measured = sum(1 for row in wanted if row in MEASURED_ROWS and results.get(row, (False,))[0])
+    print(f"scores: {passed}/{len(wanted)}" + (f" ({measured} of them measured, not pinned)"
+                                                if measured else ""))
     return 0 if passed == len(wanted) else 1
 
 

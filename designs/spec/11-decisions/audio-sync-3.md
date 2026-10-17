@@ -1,4 +1,4 @@
-# Spec §11 — decisions: Audio sync, the clean-up (#301, #302, #304, #305)
+# Spec §11 — decisions: Audio sync, the clean-up (#301, #302, #304, #305) and the export's audio residue (#307, #306, #299)
 
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
@@ -11,7 +11,10 @@ recorded in the clean-up batch of Synchronize Audio's residue (#301, #302, #304,
 from the owner's "Do the small followups" of 2026-10-16, each before its code; their numbers are
 the implementer's printed runs of 2026-10-16, named where they are quoted. Round 3's verdicts
 (SY-28) and the waveform gate (SY-29) stand unchanged: nothing here lets a match stand without a
-clear GCC-PHAT peak.
+clear GCC-PHAT peak. SY-35…SY-38 were recorded in clean-up batch 3, the
+export's audio residue (#307, #306, #299), each before its code; their numbers are the
+implementer's printed runs of 2026-10-17 (`export_offset_proof.py`, `audio_sync_proof.py`) and,
+where they say so, the designer's scratch runs of the same day, SY-22's precedent.
 
 - **SY-31 — A file too short for one frame publishes an empty cache (#301; amends SY-11's edge
   and its "positive" sizes).** A completed read that holds no whole frame (sound under 512
@@ -132,3 +135,121 @@ clear GCC-PHAT peak.
   **The risk it accepts:** a resampler of Frame Job's own to keep — pure arithmetic, no
   AVFoundation — and a pass about 1.2× as long; and the matching moves by the resampler's
   slightly different band edge (3,600 Hz against AVFoundation's), which the S and P rows re-read.
+
+- **SY-35 — The late head's read range is pinned by a fixture that separates (#307; SY-23's head
+  range unchanged).** X8's `clicks44-late` (its audio 0.5 s into the movie) read +0.023 ms with the
+  copy's head range and −0.576 ms without it — inside SY-27's 1.0 ms, so no row failed when the
+  range was taken out. `clicks16-late5` is the same recipe over clicks16 with the audio 5 s in
+  (`-itsoffset 5`, a 16 s grey movie; Z0 reads its start_time 5.000000 s). X9 (F206, ×1, the
+  in-process `audio_wav`) reads +0.000 ms, spread 0.000, 12/12 with `if head > .zero {` and
+  +19.500 ms, spread 0.000, 12/12 without it; M10-no-head-range is killed (named X9, X9 failed, no
+  other row failing). E32 is the same project exported by the app. The fixture separates by
+  19.5 ms, so SY-27's pins stand and no 0.25 ms pin is added.
+
+- **SY-36 — An MP3 is read past its own LAME/Xing encoder delay when Core Audio leaves it in
+  (#306; amends SY-23's "every rate but 48 kHz" and SY-27's MP3 residue).** **The cause** (the
+  designer's scratch runs of 2026-10-17): an MP3's first frames are the encoder's priming. Core
+  Audio always removes its decoder's own 529 samples, and the encoder's delay only when it reports
+  a packet table — from an iTunSMPB comment, or from a LAME/Xing tag whose CRC passes LAME's rule
+  (CRC-16, 0xA001, over the frame's bytes before the CRC field). ffmpeg's muxer computes that CRC
+  over the frame's first 190 bytes with the field zeroed, which agrees only when the field sits at
+  byte 190 (MPEG-1 stereo), so Core Audio ignores ffmpeg's tag on a mono or MPEG-2 file and every
+  AVFoundation reader — the export's, the copy's, the sync pass's, `AVAudioFile` — places the
+  sound the tag's encoder delay late: 576 frames, +13.061 ms at 44.1 kHz, +12.000 at 48 kHz,
+  +24.000 at 24 kHz. ffprobe's start_time is 1,105 samples (576 + 529), so what Apple leaves is
+  exactly the tag's delay. Rewriting the fixtures' CRC by LAME's rule makes them read +0.000;
+  ffmpeg's stereo file is accepted (and reads +13.061 with its CRC broken); `lame` 4.0's mono
+  file stays accepted even with its CRC broken, so Core Audio's exact rule is not reproducible and
+  Frame Job asks Core Audio instead of re-deriving it. A delay that is not 576 is applied as
+  written, by Core Audio (a tag edited to 1,000 with a good CRC reads −9.615 ms, priming 1,000) and
+  by ffmpeg alike, so Frame Job applies it as written too. **The rule** (`MP3Gapless.swift`):
+  `leadingTrim` answers the tag's encoder delay, `CMTime(delay, rate)`, only for a track whose
+  format is MPEG Layer III, whose file's first frame (after any ID3v2 tag) holds a Xing/Info header
+  with a LAME extension (encoder "LAME", "Lavf" or "Lavc"; the CRC not checked) of the track's
+  rate and a delay above 0, and for which `kAudioFilePropertyPacketTableInfo` does not answer —
+  a packet table is never second-guessed. Every other file is read as before: no tag (ffmpeg's
+  `-write_xing 0`) is today's +13.061 ms, Apple having nothing to apply; a container's MP3 track
+  never parses, so it keeps the head range. The reads are bounded — 10 bytes, then at most 2,048
+  at the first frame — and nothing is sized from the ID3 header. **Where:** the 48 kHz copy
+  (`AudioRateCopy`, `version` 2, so every v1 copy is re-made once) is now made for an MP3 with a
+  trim at ANY rate, 48 kHz included, its reader starting at the trim and its frame 0 the first
+  buffer's first frame; the sync pass reads from the same trim (SY-38). Preview reads the same
+  copy (`Playback.swift`'s build → `CompositionBuilder.build` → `audioURLs`), so SE-13's row is
+  unchanged. **The tail:** the copy ends `delay` frames before AVFoundation's duration, which the
+  media record keeps; that remainder plays silence, because `insertTimeRange` does not clamp
+  (`CompositionBuilder.swift`). **The cost:** per build, per MP3 media, at most 2,058 bytes read
+  and one `AudioFileOpenURL`; a non-MP3 stops at the format signature. **The limit:** an iTunSMPB
+  whose priming counts Apple's 529 (1,105) is applied by Core Audio as written and reads 12 ms
+  early (the designer's scratch run: −11.995 ms); it is a packet table, so it is not
+  second-guessed. Trimming the end padding and the import's duration are not done. **The
+  measurement here** (the implementer's run, `--only Z0,L10,L12`, no app): `afinfo` prints no
+  packet table for clicks44-mp3, clicks48-mp3, clicks24-mp3 (MPEG-2, 24 kHz, 64 kb/s) or
+  clicks44-mp3-noxing, and `audio 441000 valid frames + 576 priming + 792 remainder = 442368` for
+  clicks44s-mp3 (ffmpeg stereo) and clicks44-mp3-itunsmpb (noxing behind a hand-written iTunSMPB);
+  L10 reads clicks44-mp3 +13.084 (asset48) / +13.061 (native) / +13.061 (`AVAudioFile`),
+  clicks48-mp3 +12.000 / +12.000 / +12.000, and from the trim (576 frames each) clicks44-mp3
+  +0.000, clicks48-mp3 −0.000, clicks24-mp3 −0.000, each within 0.1 ms of ffmpeg's read of the
+  same file; natively clicks44s-mp3 +0.000, itunsmpb +0.000, noxing +13.061 and clicks24-mp3
+  +24.000. L12 answered all 41 of its cases as expected: the four tags (576/792 at 44.1 kHz,
+  576/960 at 48, 576/768 at 24, 576/792 stereo), nil for every other fixture, the trim 576 frames
+  for the three untabled MP3s and zero for every other fixture, the tabled two included, and nil
+  for every prefix under 177 bytes of the first frame, a foreign encoder, a smeared header, a
+  200-byte file, an ID3 size past the file, a size byte ≥ 0x80, an empty and a 3-byte file and
+  4,096 bytes of noise. **The rows:** X10, X11 and X15 (clicks44-mp3, clicks48-mp3, clicks24-mp3
+  through the copy), X13 (the tabled two, untouched), X14 (noxing left 576/44.1 ms late, against
+  X2), E30 and E33 (the app's exports), all but X14 on SY-27's 1.0 ms pin; M11 (no MP3 copy at
+  48 kHz), M12 (no trim in the copy), M14 (padding read as the delay) and M15 (a packet table
+  second-guessed). **The recorded run** (Release, 2026-10-17, after `make gate`): E30 +0.023, E33
+  −0.000, X10 +0.023, X11 −0.000, X13 +0.023 / +0.023, X14 +13.084 (X14 − X2 +13.061) and X15
+  −0.000 ms, each spread 0.000, E32 +0.000; `--mutants` 13/13 killed.
+
+- **SY-37 — Keep pitch, measured on a real recording: a defect, left open for the owner (#299).**
+  **The rule, fixed before R4 and R5 ran:** `stretched_lag` (the export against the media's 1 ms
+  envelope stretched by the speed) on the recorder's media windows [12 s, 22 s) and
+  [128 s, 138 s), reach ±200 ms; a **defect** when at ×0.9 or ×1.1 keep pitch any window has
+  r < 0.8, |lag| > 5.0 ms, or a lag on the ±200 ms edge; otherwise an accepted limit within
+  SY-27's 5.0 ms. R3 (×0.99999 keep, the in-band `time_domain`) was to be pinned at 1.0 ms with
+  the controls R6 and R7 (×0.9 and ×1.1 with keep pitch off). **The readings** (the implementer's
+  Debug run of 2026-10-17; lag on [12 s, 22 s) / [128 s, 138 s)): R3 −8.899 (r 0.950) / −0.129 ms
+  (r 0.952); R4 (×0.9) +12.213 (r 0.960) / +94.193 ms (r 0.935); R5 (×1.1) +6.080 (r 0.966) /
+  +43.118 ms (r 0.936); the controls R6 +0.019 / −0.000 and R7 +0.013 / −0.005 ms (r ≥ 0.982).
+  R3's own export swept in 10 s media windows reads −0.185 to −8.899 ms (mostly early), where
+  R6's reads within ±0.027 ms in every window. **The class: DEFECT** — AVFoundation's time-pitch
+  algorithms move real sound against its timeline, `time_domain` inside the band included,
+  which the click fixtures (E10 +0.010 ms, X6) do not show. Fixing it means choosing how Keep
+  pitch is rendered, a product behaviour change and the owner's call (the orchestrator's
+  ruling 3), so it is not fixed here and #299 stays open. **So R3, R4, R5 and E34 (clicks48
+  ×1.1 keep) are measured rows:** they run on every pass and print `measured` with their
+  readings, scored on the instrument only (both windows found at r ≥ 0.5 inside the ±200 ms
+  reach; for E34 ≥ 10 clicks found) and never pinned to a lag; R6 and R7 stay pinned at 1.0 ms,
+  r ≥ 0.8. SY-26's band and SY-27's 5.0 ms for the KEEP rows on clicks are unchanged.
+
+- **SY-38 — The MP3's other readers (#306).** **The sync pass** reads from the same
+  `MP3Gapless.leadingTrim` as the copy, its reader's time range starting there, and its marker's
+  version is 4: every media's sync cache reads "still being analysed" once and is re-made on the
+  next pass (SY-34's no-migration posture); a file with no trim decodes the same bytes as at
+  version 3. Measured before the change (X12, the product's `writeSyncFeatures` → `loadSyncSamples`,
+  the implementer's run of 2026-10-17): clicks44-mp3 +13.061 ms and clicks48-mp3 +12.000 ms, the
+  WAV controls +0.000 — the export's delay, so the export and the sync cache would have disagreed
+  with the file by the same amount and with each other not at all; after it X12 is pinned with
+  them, and M13 (no trim in the sync pass) is killed by it.
+  **The residue readers, by a rule fixed before they were read:** peaks (10 ms buckets: the
+  waveform, Normalize's window peak, level-mode silence spans snapped to the 33 ms frame grid),
+  speech (32 ms VAD chunks: voice-mode spans and SY-17's mask on 64 ms feature frames), the
+  transcription extract (word timings) and the reverse renderer's decode (L1's asset48) are each
+  an **accepted residue** when both MP3s read |median − their WAV control's| ≤ 16.7 ms (half a
+  30 fps frame), and a reader over it is filed. L11 (the implementer's run of 2026-10-17, the
+  unfixed decode): peaks +13.061 / +12.000 (controls +0.000 / +0.000), speech +13.039 / +11.958
+  (−0.023 / −0.042), the extract +13.039 / +11.958 (−0.023 / −0.042), the reverse decode +13.084 /
+  +12.000 (+0.023 / +0.000); the largest |MP3 − control| is 13.062 ms, so all four are accepted
+  residues. **An MPEG-2 MP3 is over it, and filed (#309):** L11 extended to clicks24-mp3 (the
+  orchestrator's ruling 3; its control clicks44, the WAV it was made from) reads peaks +24.000,
+  speech +23.958, the extract +23.958 and the reverse decode +24.000 ms — |MP3 − control| 24.000,
+  23.981, 23.981 and 23.977 ms, the tag's 576 frames at 24 kHz — so all four readers are over
+  16.7 ms for such a file, and one issue names them. The recorded run (Release, 2026-10-17) reads
+  the same; X12 ±0.000 ms for all five reads, and `audio_sync_proof.py`'s S32 (an MP3 recorder) syncs
+  on frame 206, 32.5 ticks from the truth, its export +0.047 / +0.041 ms. **Why they do not take the trim:** in each it is a placement change,
+  not one line — peaks place by presentation time and certify their coverage against the track's
+  range (`MediaPeakBuckets.swift`); VAD sizes its chunks from the media's duration; the extract's
+  range is the clip's source range; and `ReverseRenderer.swift` places by presentation time and
+  is over the file cap. Loudness is not a timing reader.

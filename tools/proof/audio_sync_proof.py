@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Road maps "audio-sync" (AS-1, AS-2) and "audio-sync-2" (AS-3, AS-4), its
-round 3 and the clean-up — spec §11 SY-1..SY-22, SY-28..SY-34 — Clip ▸
+round 3 and the clean-up — spec §11 SY-1..SY-22, SY-28..SY-34, SY-36, SY-38 — Clip ▸
 Synchronize Audio and `sync_audio`, over MCP against a
 running instance, then the probe's rows over `app/Sources`.
 
@@ -42,7 +42,9 @@ recorder's first 13 s (SY-28); OWNER2's, `tools/proof/media/owner-sync-2/`
 `IMG_0019.MOV` and the same `record.aifc`, one recording, recorder − camera
 148.27 s (SY-28). Both gitignored, never copied out of `tools/proof/`. SHORT
 (`short-v1.wav`, SY-31), 40 ms of a 1 kHz tone at −6 dBFS: sound under one
-feature frame.
+feature frame. RECORDER_MP3 (`recorder-mp3-v1.mp3`, SY-36, SY-38), RECORDER
+through ffmpeg `-ar 48000 -ac 1 -c:a libmp3lame -b:a 192k`: an MP3 whose
+LAME tag Core Audio ignores.
 
 Every media's `cache/peaks/<id>.bin`, `cache/sync/<id>.complete.json` and
 `cache/speech/<id>.complete.json` are each waited for (120 s) before it is used, and
@@ -175,6 +177,16 @@ before and after, and the last undo step not "Synchronize Audio"):
        within the 120 s wait (its seconds printed); refused "clip N: is too
        short to match: its file holds under 2 s of sound.", never naming
        "still being analysed", unchanged, no step.
+  S32  RECORDER_MP3 for the recorder (SY-36, SY-38). Control first:
+       `afinfo` prints no `valid frames` line for it (no packet table, so the
+       row exercises the trim), and by `wav_samples` against RECORDER,
+       `window_lag(…, offset_ms=0)` on [12 s, 22 s) and [118 s, 128 s) both
+       read |lag| ≤ 0.25 ms; a miss is an instrument FAIL naming the control.
+       Then S1's placement and call: `moved` true, `anchor` the camera, the
+       recorder on exactly frame 206, `refined` "phat", |offset − truth| ≤
+       600 ticks; then the camera's audio off, `export` `audio_wav`, and
+       S18's `window_lag` against SOURCE at 10 s on [12 s, 22 s) and
+       [128 s, 138 s): both |lag| ≤ 1.0 ms.
   P1–P18, P20, P21, P23, P24 `audio_sync_probe.swift`, built by
        `swift_build.build` over `app/Sources` (a failed build is a scored FAIL
        of all twenty-two); each row's sentence is the probe's. P21 is SY-32's
@@ -237,7 +249,7 @@ SHEET_WAIT = 600                     # s: a sheet's poll bound, mcp.py's call ti
 COST = WORK / "cost"                 # P19's one-hour fixture, removed when it ends
 DETERMINISM = WORK / "determinism"   # P25's ffmpeg fixtures, removed when it ends
 HOLD = 3                             # s: S25's and S26's -RCDevSyncHold
-S_ROWS = [f"S{n}" for n in range(1, 32)]
+S_ROWS = [f"S{n}" for n in range(1, 33)]
 OWNER = ROOT / "tools/proof/media/owner-sync"
 OWNER_FILES = {"owner_camera": OWNER / "IMG_0018.MOV", "owner_recorder": OWNER / "record.aifc"}
 OWNER2 = ROOT / "tools/proof/media/owner-sync-2"
@@ -248,6 +260,7 @@ UTTER_GAP = 118.70                   # s, recorder − camera for UTTER (1,899,2
 OWNER2_GAP = 148.27                  # s, recorder − camera of owner-sync-2 (SY-28, one recording)
 P_ROWS = [f"P{n}" for n in range(1, 19)] + ["P20", "P21", "P23", "P24"]  # P19 is --cost only
 ENVELOPE = RATE // 1000              # samples per 1 ms envelope bucket
+TARGET_LAG_MS = 1.0                  # SY-27's pin, S32's exported windows
 
 # name: (the rows it must fail, file, before, after)
 MUTANTS = {
@@ -538,6 +551,20 @@ def short_fixture():
         write_wav(path, [amplitude * math.sin(2 * math.pi * 1000 * n / RATE)
                          for n in range(RATE * 40 // 1000)])
     return {"short": path}
+
+
+def mp3_fixture():
+    """RECORDER_MP3 (SY-36, SY-38): RECORDER through ffmpeg's libmp3lame at
+    48 kHz mono, 192 kb/s. Written once per tree."""
+    FIXTURES.mkdir(parents=True, exist_ok=True)
+    path = FIXTURES / "recorder-mp3-v1.mp3"
+    if not path.exists():
+        partial = FIXTURES / "recorder-mp3-v1.partial.mp3"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(fixtures()["recorder"]),
+                        "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k",
+                        str(partial)], check=True, timeout=300)
+        partial.rename(path)
+    return {"recorder_mp3": path}
 
 
 def mux(wav, mov, seconds):
@@ -907,6 +934,57 @@ def exported_drift(session, cam, recorder, files):
                 f"{q1:.3f}) on [148 s, 158 s), Δ {change:.2f} ms (want |Δ| ≤ 3, early |lag| ≤ "
                 f"1.0, late |lag| ≤ 3); control at rate 1: {e2:.2f} ms (r {r2:.3f}), {l2:.2f} ms (r {q2:.3f}), "
                 f"Δ {control:.2f} ms (want |Δ| ≥ 20)")
+
+
+def s32(mcp, files):
+    """S32: an MP3 recorder synced and exported (SY-36, SY-38)."""
+    mp3 = files["recorder_mp3"]
+    table = subprocess.run(["afinfo", str(mp3)], capture_output=True, text=True, timeout=60)
+    tabled = [line.strip() for line in table.stdout.splitlines() if "valid frames" in line]
+    truth_env = envelope(wav_samples(Path(files["recorder"])))
+    decoded = envelope(wav_samples(Path(mp3)))
+    controls = [window_lag(decoded, truth_env, lo, hi, offset_ms=0)
+                for lo, hi in ((12_000, 22_000), (118_000, 128_000))]
+    control = ", ".join(f"{lag:+.3f} ms (r {r:.3f})" for lag, r in controls)
+    if table.returncode != 0 or tabled:
+        score("S32", False, f"instrument FAIL: the control `afinfo` (exit {table.returncode}) "
+              f"printed {tabled or 'nothing usable'}; the row needs an MP3 with no packet table")
+        return
+    if not all(abs(lag) <= 0.25 for lag, _ in controls):
+        score("S32", False, f"instrument FAIL: the control, ffmpeg's decode of the MP3 against "
+              f"RECORDER, reads {control} (want both |lag| ≤ 0.25 ms)")
+        return
+    source = envelope(wav_samples(Path(files["source"])))
+    m = Session(mcp, "sync-s32", {**files, "recorder": mp3})
+    try:
+        cam = m.place("camera", 10 * SEC, 0)
+        rec = m.place("recorder", 0, 1)
+        answer = m.sync(clips=[cam, rec])
+        row = recorder_row(answer, rec)
+        landed = m.start(rec)
+        truth = -DELAY / RATE * SEC
+        offset = row.get("offset")
+        synced = (answer.get("moved") is True and answer.get("anchor") == cam
+                  and landed == 206 * FRAME and m.start(cam) == 10 * SEC
+                  and row.get("refined") == "phat" and offset is not None
+                  and abs(offset - truth) <= 600)
+        m.op("set_enabled", clip=cam, audio=False)
+        out = WORK / f"s32-{os.getpid()}.wav"
+        out.unlink(missing_ok=True)
+        m.op("export", preset="audio_wav", path=str(out))
+        mix = envelope(wav_samples(out))
+        lags = [window_lag(mix, source, lo, hi) for lo, hi in ((12_000, 22_000),
+                                                               (128_000, 138_000))]
+        placed = all(abs(lag) <= TARGET_LAG_MS and r >= 0.8 for lag, r in lags)
+        score("S32", synced and placed,
+              f"control: no packet table; ffmpeg's decode against RECORDER {control}; "
+              f"recorder at {landed} (want {206 * FRAME}, frame 206), camera at {m.start(cam)}, "
+              f"offset {offset} (want {truth:.1f} ±600; |Δ| {abs((offset or 0) - truth):.1f}), "
+              f"{match_text(row)}; the export's lag "
+              + ", ".join(f"{lag:+.3f} ms (r {r:.3f})" for lag, r in lags)
+              + f" on [12 s, 22 s), [128 s, 138 s) (want |lag| ≤ {TARGET_LAG_MS} ms, r ≥ 0.8)")
+    finally:
+        m.close()
 
 
 # ---- the MCP rows --------------------------------------------------------------
@@ -1365,6 +1443,9 @@ def mcp_rows(sock, wanted, files):
         finally:
             c.close()
 
+    if "S32" in want:
+        s32(mcp, files)
+
     if "S23" in want:
         missing = [str(p) for p in OWNER_FILES.values() if not p.exists()]
         if missing:
@@ -1713,7 +1794,8 @@ def main():
         if not args.socket:
             print("the S rows need the running instance's socket path")
             return 2
-        files = {**fixtures(), **fixtures2(), **short_fixture(), **OWNER_FILES, **OWNER2_FILES}
+        files = {**fixtures(), **fixtures2(), **short_fixture(), **mp3_fixture(), **OWNER_FILES,
+                 **OWNER2_FILES}
         try:
             mcp_rows(args.socket, [row for row in s_wanted if row not in ("S25", "S26")], files)
             held = [row for row in s_wanted if row in ("S25", "S26")]

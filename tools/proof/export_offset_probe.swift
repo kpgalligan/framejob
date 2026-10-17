@@ -1,6 +1,7 @@
 // Issue #298 — where an exported sample lands, stage by stage. The
-// in-process instrument behind `export_offset_proof.py`'s L1–L9 (phase 1)
-// and X1–X8 (phase 2's pins).
+// in-process instrument behind `export_offset_proof.py`'s L1–L9 (phase 1),
+// X1–X8 (phase 2's pins) and clean-up batch 3's L10–L12 and X9–X15 (#307,
+// #306: spec §11 SY-35, SY-36, SY-38).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a`, through
@@ -9,19 +10,19 @@
 //
 //     export_offset_probe <out-dir> <fixtures-dir> [all|L|X]
 //
-// The third argument picks the row group (default `all`): `L` runs L1–L9,
-// `X` runs X1–X8 (what `--mutants` runs).
+// The third argument picks the row group (default `all`): `L` runs L1–L12,
+// `X` runs X1–X15 (what `--mutants` runs).
 //
 // It decodes each fixture's sound at each stage of the export path and writes
 // what it read; it locates nothing — the proof locates every click in what is
 // written here, with the same `locate` it runs on the exported files. Each
 // read is `<out-dir>/<fixture>-<stage>-<variant>.f32` (mono float32 LE, a
 // stereo read averaged, placed by its first buffer's presentation time), but
-// the export stage's, which is the WAV `Exporter` wrote
+// the export and extract stages', which are WAVs
 // (`<fixture>-export-<variant>.wav`), read by the proof's `read_wav`. Every
 // read is a row of `<out-dir>/manifest.json`: `{"row", "fixture", "stage",
 // "variant", "rate", "path", "start_ticks", "speed", "first_pts_s", "ok",
-// "error"}`. One line out: `ANSWER {"rows": [{"id", "ok", "detail"}]}`, a row
+// "error"}` and a stage's extras. One line out: `ANSWER {"rows": [{"id", "ok", "detail"}]}`, a row
 // ok when every read in it completed.
 //
 // Projects: an untitled `ProjectDocument`'s project, 640×360 at 30 fps, one
@@ -47,6 +48,16 @@
 //            output's default algorithm, as `ExportWriter.addAudioOutput`
 //            reads it                                         (L4, L6, L8, L9)
 //   export   the in-process `audio_wav` export                       (L5, L8)
+//   avaudiofile  the file through `AVAudioFile`, float at its rate, from
+//            frame 0; extras `priming_frames`, `remainder_frames`,
+//            `valid_frames` (its packet table, else null)              (L10)
+//   trimmed  native, the reader's range from `MP3Gapless.leadingTrim` when
+//            not zero, placed from it; extra `trim_frames`              (L10)
+//   peaks    `writePeaks`' output settings verbatim, channels averaged (L11)
+//   speech   `writeSpeech`'s, 16 kHz mono                              (L11)
+//   extract  the product's `Transcriber.extractAudio`, a 16 kHz WAV    (L11)
+//   sync     the product's `writeSyncFeatures` into a cache of its own,
+//            then `loadSyncSamples` at 8 kHz from 0                    (X12)
 //
 //   L1–L5  each fixture (all five) at frame 206 (F206 = 206·20 000 ticks), ×1
 //   L6     L4 at ×1 with each input's algorithm set to nil (the reader
@@ -57,6 +68,16 @@
 //   L8     L3, L4, L5 at ×0.99999 and ×0.5, keep_pitch false and true
 //          (clicks16, clicks48)
 //   L9     L4 with the clip at 0, F206 and 10 s (clicks16, clicks48, cam-ff16)
+//   L10    asset48, native and avaudiofile of clicks44-mp3 and clicks48-mp3;
+//          trimmed of those and clicks24-mp3; native of clicks44s-mp3,
+//          clicks44-mp3-itunsmpb, clicks44-mp3-noxing and clicks24-mp3
+//   L11    peaks, speech and extract of the three MP3s (clicks44-mp3,
+//          clicks48-mp3, clicks24-mp3) and their WAV controls clicks44,
+//          clicks48; asset48 of clicks44 and clicks24-mp3 (the reverse
+//          decode's)
+//   L12    `MP3Gapless` checked in-process: each fixture's tag and trim,
+//          then synthetic and damaged tags (files under `<out-dir>/l12/`);
+//          a mismatch is a row error naming the case
 //
 //   X1–X8  the in-process `audio_wav` export (the export stage), pinned by the
 //          proof (spec §11 SY-27): X1 clicks16 F206 ×1; X2 clicks44 F206 ×1;
@@ -64,8 +85,14 @@
 //          0.5 (`set_audio`); X5 clicks48 at 0 noise reduction 0.5; X6
 //          clicks16 F206 ×0.99999 keep true; X7 clicks48 F206 ×1; X8
 //          clicks44-late F206 ×1 (its audio, 0.5 s into the movie)
+//   X9–X15 the same at F206 ×1: X9 clicks16-late5 (its audio 5 s in, SY-35);
+//          X10 clicks44-mp3; X11 clicks48-mp3; X12 the sync cache (stage
+//          `sync`) of both MP3s, clicks44, clicks48 and clicks44s-mp3; X13
+//          clicks44s-mp3 and clicks44-mp3-itunsmpb (packet tables); X14
+//          clicks44-mp3-noxing (no tag); X15 clicks24-mp3 (MPEG-2)
 import AVFoundation
 import AppKit
+import AudioToolbox
 
 NSApplication.shared.setActivationPolicy(.prohibited)
 
@@ -85,6 +112,10 @@ let fixtureFiles: [String: String] = [
     "cam-pcm48": "cam-pcm48-v1.mov", "cam-aac48": "cam-aac48-v1.mov",
     "cam-ff16": "cam-ff16-v1.mov",
     "clicks44": "clicks44-v1.wav", "clicks44-late": "clicks44-late-v1.mov",
+    "clicks44-mp3": "clicks44-mp3-v1.mp3", "clicks48-mp3": "clicks48-mp3-v1.mp3",
+    "clicks16-late5": "clicks16-late5-v1.mov",
+    "clicks44s-mp3": "clicks44s-mp3-v1.mp3", "clicks44-mp3-noxing": "clicks44-mp3-noxing-v1.mp3",
+    "clicks44-mp3-itunsmpb": "clicks44-mp3-itunsmpb-v1.mp3", "clicks24-mp3": "clicks24-mp3-v1.mp3",
 ]
 let allFixtures = ["clicks16", "clicks48", "cam-pcm48", "cam-aac48", "cam-ff16"]
 let wavFixtures = ["clicks16", "clicks48"]
@@ -104,8 +135,11 @@ func writeAnswer() {
     let manifestData = (try? JSONSerialization.data(
         withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])) ?? Data("[]".utf8)
     try? manifestData.write(to: outDir.appendingPathComponent("manifest.json"))
-    let lRows = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9"]
-    let xRows = ["X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8"]
+    let lRows = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11", "L12"]
+    let xRows = [
+        "X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8", "X9", "X10", "X11", "X12", "X13", "X14",
+        "X15",
+    ]
     let ids = group == "L" ? lRows : group == "X" ? xRows : lRows + xRows
     let rows = ids.map { id -> [String: Any] in
         let reads = rowReads[id] ?? 0
@@ -134,10 +168,12 @@ func floatSettings(rate: Int, channels: Int) -> [String: Any] {
 }
 
 /// Every sample `output` yields, its channels averaged, placed on the
-/// output's own clock: the first buffer's presentation time, in samples, is
-/// leading silence (or, when negative, samples dropped). (samples, that time).
+/// output's own clock: the first buffer's presentation time less `origin`, in
+/// samples, is leading silence (or, when negative, samples dropped).
+/// (samples, that presentation time).
 func drain(
-    _ reader: AVAssetReader, _ output: AVAssetReaderOutput, channels: Int, rate: Int
+    _ reader: AVAssetReader, _ output: AVAssetReaderOutput, channels: Int, rate: Int,
+    origin: Double = 0
 ) throws -> ([Float], Double) {
     guard reader.canAdd(output) else { throw ProbeError("the reader refused the output") }
     reader.add(output)
@@ -175,7 +211,7 @@ func drain(
             + "\(String(describing: reader.error))")
     }
     let pts = first.map { CMTimeGetSeconds($0) } ?? 0
-    let shift = Int((pts * Double(rate)).rounded())
+    let shift = Int(((pts - origin) * Double(rate)).rounded())
     if shift > 0 {
         samples = [Float](repeating: 0, count: shift) + samples
     } else if shift < 0 {
@@ -208,18 +244,20 @@ func nativeRate(_ track: AVAssetTrack) throws -> Int {
     return Int(asbd.pointee.mSampleRate.rounded())
 }
 
-/// One read, recorded in the manifest whether it completed or not.
+/// One read, recorded in the manifest whether it completed or not; `extra`
+/// is merged into its entry.
 func record(
     _ row: String, _ fixture: String, _ stage: String, _ variant: String, rate: Int,
-    start: Ticks, speed: Double, _ body: (URL) throws -> Double
+    start: Ticks, speed: Double, extra: [String: Any] = [:], _ body: (URL) throws -> Double
 ) {
-    let ext = stage == "export" ? "wav" : "f32"
+    let ext = stage == "export" || stage == "extract" ? "wav" : "f32"
     let url = outDir.appendingPathComponent("\(fixture)-\(stage)-\(variant).\(ext)")
     try? FileManager.default.removeItem(at: url)
     var entry: [String: Any] = [
         "row": row, "fixture": fixture, "stage": stage, "variant": variant, "rate": rate,
         "path": url.path, "start_ticks": Int(start), "speed": speed,
     ]
+    entry.merge(extra) { _, new in new }
     rowReads[row, default: 0] += 1
     do {
         entry["first_pts_s"] = try body(url)
@@ -467,6 +505,292 @@ func readExport(
     }
 }
 
+// MARK: - An MP3's other readers (L10, L11, X12)
+
+/// The file's packet table (`kAudioFilePropertyPacketTableInfo`): its
+/// priming, remainder and valid frames, or nil when it has none.
+func packetTable(_ url: URL) -> (priming: Int64, remainder: Int64, valid: Int64)? {
+    var file: AudioFileID?
+    guard AudioFileOpenURL(url as CFURL, .readPermission, 0, &file) == noErr, let file else {
+        return nil
+    }
+    defer { AudioFileClose(file) }
+    var info = AudioFilePacketTableInfo()
+    var size = UInt32(MemoryLayout<AudioFilePacketTableInfo>.size)
+    guard AudioFileGetProperty(file, kAudioFilePropertyPacketTableInfo, &size, &info) == noErr
+    else { return nil }
+    return (Int64(info.mPrimingFrames), Int64(info.mRemainderFrames), info.mNumberValidFrames)
+}
+
+/// The file through `AVAudioFile` (float, the file's own rate), its channels
+/// averaged, from frame 0: no presentation time to place it by.
+func readGapless(_ row: String, _ fixture: String) {
+    let url = fixtureURL(fixture)
+    var extra: [String: Any] = [
+        "priming_frames": NSNull(), "remainder_frames": NSNull(), "valid_frames": NSNull(),
+    ]
+    if let table = packetTable(url) {
+        extra = [
+            "priming_frames": Int(table.priming), "remainder_frames": Int(table.remainder),
+            "valid_frames": Int(table.valid),
+        ]
+    }
+    let rate = (try? AVAudioFile(forReading: url)).map {
+        Int($0.processingFormat.sampleRate.rounded())
+    } ?? 0
+    record(row, fixture, "avaudiofile", "x1", rate: rate, start: 0, speed: 1, extra: extra) {
+        out in
+        let file = try AVAudioFile(
+            forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
+        let format = file.processingFormat
+        let channels = Int(format.channelCount)
+        guard channels > 0 else { throw ProbeError("the file has no channels") }
+        var samples: [Float] = []
+        while file.framePosition < file.length {
+            let count = AVAudioFrameCount(min(48_000, file.length - file.framePosition))
+            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: count) else {
+                throw ProbeError("the buffer could not be made")
+            }
+            try file.read(into: buffer, frameCount: count)
+            let frames = Int(buffer.frameLength)
+            guard frames > 0, let data = buffer.floatChannelData else { break }
+            for n in 0..<frames {
+                var sum: Float = 0
+                for c in 0..<channels { sum += data[c][n] }
+                samples.append(sum / Float(channels))
+            }
+        }
+        try writeF32(samples, out)
+        return 0
+    }
+}
+
+/// The track's own rate and channel count.
+func nativeFormat(_ fixture: String) -> (rate: Int, channels: Int) {
+    guard let (_, track) = try? audioTrack(fixture),
+          let description = (track.formatDescriptions as? [CMAudioFormatDescription])?.first,
+          let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(description)
+    else { return (48_000, 1) }
+    return (Int(asbd.pointee.mSampleRate.rounded()), max(1, Int(asbd.pointee.mChannelsPerFrame)))
+}
+
+/// `writePeaks`' decode: its output settings verbatim (no rate, no channel
+/// count), the track's channels averaged, placed by its first buffer.
+func readPeaksDecode(_ row: String, _ fixture: String) {
+    let (rate, channels) = nativeFormat(fixture)
+    record(row, fixture, "peaks", "x1", rate: rate, start: 0, speed: 1) { url in
+        let (asset, track) = try audioTrack(fixture)
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVLinearPCMBitDepthKey: 32,
+                AVLinearPCMIsFloatKey: true,
+                AVLinearPCMIsBigEndianKey: false,
+                AVLinearPCMIsNonInterleaved: false,
+            ])
+        output.alwaysCopiesSampleData = false
+        let (samples, pts) = try drain(reader, output, channels: channels, rate: rate)
+        try writeF32(samples, url)
+        return pts
+    }
+}
+
+/// `writeSpeech`'s decode: its output settings verbatim, 16 kHz mono.
+func readSpeechDecode(_ row: String, _ fixture: String) {
+    let rate = SileroVAD.sampleRate
+    record(row, fixture, "speech", "x1", rate: rate, start: 0, speed: 1) { url in
+        let (asset, track) = try audioTrack(fixture)
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVSampleRateKey: Double(SileroVAD.sampleRate),
+                AVNumberOfChannelsKey: 1,
+                AVLinearPCMBitDepthKey: 32,
+                AVLinearPCMIsFloatKey: true,
+                AVLinearPCMIsBigEndianKey: false,
+                AVLinearPCMIsNonInterleaved: false,
+            ])
+        output.alwaysCopiesSampleData = false
+        let (samples, pts) = try drain(reader, output, channels: 1, rate: rate)
+        try writeF32(samples, url)
+        return pts
+    }
+}
+
+/// The transcription extract: the product's `Transcriber.extractAudio` over
+/// the whole asset, a 16 kHz mono WAV.
+func readExtract(_ row: String, _ fixture: String) {
+    record(row, fixture, "extract", "x1", rate: 16_000, start: 0, speed: 1) { url in
+        _ = try Transcriber.extractAudio(
+            url: fixtureURL(fixture), name: fixture, range: Transcriber.wholeAsset, to: url,
+            cancel: Transcriber.CancelToken())
+        return 0
+    }
+}
+
+/// The sync cache: the product's `writeSyncFeatures` into a cache of its
+/// own, then its `.pcm` by `loadSyncSamples` at 8 kHz from 0.
+func readSync(_ row: String, _ fixture: String) {
+    record(row, fixture, "sync", "x1+\(row)", rate: SyncFeatures.sampleRate, start: 0,
+           speed: 1) { out in
+        let url = fixtureURL(fixture)
+        let media = MediaSnapshot(
+            id: 1, path: url.path, kind: .audio, duration: try descriptor(url).duration,
+            hasVideo: false, hasAudio: true)
+        guard let stamp = MediaImporter.CacheStamp.stamp(for: media, url: url) else {
+            throw ProbeError("no cache stamp")
+        }
+        let folder = outDir.appendingPathComponent("sync-\(fixture)", isDirectory: true)
+        try? FileManager.default.removeItem(at: folder)
+        let cache = folder.appendingPathComponent("cache", isDirectory: true)
+        try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+        let asset = AVURLAsset(url: url)
+        guard let track = CompositionBuilder.firstTrack(of: asset, mediaType: .audio) else {
+            throw ProbeError("\(fixture) has no audio track")
+        }
+        MediaImporter.writeSyncFeatures(
+            for: media, asset: asset, track: track, stamp: stamp, into: cache, pass: nil)
+        guard let samples = MediaImporter.loadSyncSamples(for: media.id, in: cache) else {
+            throw ProbeError("loadSyncSamples answered nil (no cache was published)")
+        }
+        try writeF32(samples.map { Float($0) / 32767 }, out)
+        return 0
+    }
+}
+
+let mp3Fixtures = ["clicks44-mp3", "clicks48-mp3"]
+let residueFixtures = mp3Fixtures + ["clicks44", "clicks48"]
+
+// MARK: - The MP3's encoder delay (L10's trimmed reads, L12)
+
+/// The track at its own rate, read from `MP3Gapless.leadingTrim` when that is
+/// not zero (the copy's and the sync reader's start), placed from the trim:
+/// the first frame read is index 0.
+func readTrimmed(_ row: String, _ fixture: String) {
+    let url = fixtureURL(fixture)
+    var rate = 48_000
+    var trim = CMTime.zero
+    if let (asset, track) = try? audioTrack(fixture) {
+        if let native = try? nativeRate(track) { rate = native }
+        trim = withExtendedLifetime(asset) { MP3Gapless.leadingTrim(of: url, track: track) }
+    }
+    record(row, fixture, "trimmed", "x1", rate: rate, start: 0, speed: 1,
+           extra: ["trim_frames": Int(trim.value)]) { out in
+        let (asset, track) = try audioTrack(fixture)
+        let reader = try AVAssetReader(asset: asset)
+        if trim > .zero {
+            reader.timeRange = CMTimeRange(start: trim, duration: .positiveInfinity)
+        }
+        let output = AVAssetReaderTrackOutput(
+            track: track, outputSettings: floatSettings(rate: rate, channels: 1))
+        let (samples, pts) = try drain(
+            reader, output, channels: 1, rate: rate, origin: CMTimeGetSeconds(trim))
+        try writeF32(samples, out)
+        return pts
+    }
+}
+
+/// `MP3Gapless` against what each file is: (a) `tag(at:)` per fixture, (b)
+/// `leadingTrim` per fixture, (c) synthetic and damaged tags. Each mismatch is
+/// a row error naming the case, the answer and the expectation.
+func checkTags(_ row: String) {
+    func check(_ name: String, _ answer: String, _ want: String) {
+        rowReads[row, default: 0] += 1
+        if answer != want {
+            rowErrors[row, default: []].append("\(name): answered \(answer), want \(want)")
+        }
+    }
+    func show(_ tag: MP3Gapless.Tag?) -> String {
+        tag.map { "Tag(\($0.encoderDelay), \($0.padding), \($0.sampleRate))" } ?? "nil"
+    }
+    let tags: [String: MP3Gapless.Tag] = [
+        "clicks44-mp3": .init(encoderDelay: 576, padding: 792, sampleRate: 44_100),
+        "clicks48-mp3": .init(encoderDelay: 576, padding: 960, sampleRate: 48_000),
+        "clicks24-mp3": .init(encoderDelay: 576, padding: 768, sampleRate: 24_000),
+        "clicks44s-mp3": .init(encoderDelay: 576, padding: 792, sampleRate: 44_100),
+    ]
+    let trims: [String: CMTime] = [
+        "clicks44-mp3": CMTime(value: 576, timescale: 44_100),
+        "clicks48-mp3": CMTime(value: 576, timescale: 48_000),
+        "clicks24-mp3": CMTime(value: 576, timescale: 24_000),
+    ]
+    for fixture in fixtureFiles.keys.sorted() {
+        let url = fixtureURL(fixture)
+        check("(a) tag(at:) \(fixture)", show(MP3Gapless.tag(at: url)), show(tags[fixture]))
+        let asset = AVURLAsset(url: url)
+        guard let track = CompositionBuilder.firstTrack(of: asset, mediaType: .audio) else {
+            check("(b) \(fixture)'s audio track", "none", "a track")
+            continue
+        }
+        let trim = withExtendedLifetime(asset) { MP3Gapless.leadingTrim(of: url, track: track) }
+        let want = trims[fixture] ?? .zero
+        check("(b) leadingTrim \(fixture)", "\(trim.value)/\(trim.timescale)",
+              "\(want.value)/\(want.timescale)")
+    }
+
+    // (c) synthetic cases, from clicks44-mp3's bytes.
+    guard let file = try? Data(contentsOf: fixtureURL("clicks44-mp3")) else {
+        check("(c) clicks44-mp3's bytes", "unreadable", "read")
+        return
+    }
+    let bytes = [UInt8](file)
+    let offset = MP3Gapless.firstFrameOffset(head: Data(bytes.prefix(10)))
+    check("(c) firstFrameOffset clicks44-mp3", "\(offset.map(String.init) ?? "nil")", "44")
+    let frame = Array(bytes.dropFirst(44))
+    let tag = tags["clicks44-mp3"]
+    var wrong: [Int] = []
+    for length in 0...2_048 where show(MP3Gapless.tag(frame: Data(frame.prefix(length))))
+        != (length < 177 ? "nil" : show(tag))
+    {
+        wrong.append(length)
+    }
+    check("(c) prefixes 0…2048 (nil below 177, the tag from 177)",
+          wrong.isEmpty ? "as wanted" : "wrong at lengths \(wrong.prefix(8))", "as wanted")
+    var xing = frame
+    xing.replaceSubrange(21..<25, with: Array("Xing".utf8))
+    check("(c) Info→Xing", show(MP3Gapless.tag(frame: Data(xing))), show(tag))
+    var stranger = frame
+    stranger.replaceSubrange(141..<145, with: Array("XXXX".utf8))
+    check("(c) encoder XXXX", show(MP3Gapless.tag(frame: Data(stranger))), "nil")
+    var smeared = frame
+    for i in 21..<177 { smeared[i] = 0xA5 }
+    check("(c) bytes 21..<177 = 0xA5", show(MP3Gapless.tag(frame: Data(smeared))), "nil")
+
+    let folder = outDir.appendingPathComponent("l12", isDirectory: true)
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    var lcg: UInt32 = 0
+    var noise: [UInt8] = []
+    for _ in 0..<4_096 {
+        noise.append(UInt8(truncatingIfNeeded: lcg >> 24))
+        lcg = lcg &* 1_664_525 &+ 1_013_904_223
+    }
+    let id3 = Array("ID3".utf8)
+    let files: [(String, [UInt8], String)] = [
+        ("first-200", Array(bytes.prefix(200)), "nil"),
+        ("first-221", Array(bytes.prefix(221)), show(tag)),
+        ("id3-size-7f7f7f7f", id3 + [4, 0, 0, 0x7F, 0x7F, 0x7F, 0x7F], "nil"),
+        ("id3-size-byte-80", id3 + [4, 0, 0, 0, 0, 0, 0x80], "nil"),
+        ("empty", [], "nil"),
+        ("id3-3-bytes", id3, "nil"),
+        ("lcg-4096", noise, "nil"),
+    ]
+    for (name, content, want) in files {
+        let url = folder.appendingPathComponent("\(name).mp3")
+        guard (try? Data(content).write(to: url)) != nil else {
+            check("(c) file \(name)", "not written", "written")
+            continue
+        }
+        check("(c) file \(name)", show(MP3Gapless.tag(at: url)), want)
+    }
+    check("(c) firstFrameOffset of size 0x7F7F7F7F",
+          "\(MP3Gapless.firstFrameOffset(head: Data(id3 + [4, 0, 0, 0x7F, 0x7F, 0x7F, 0x7F])).map(String.init) ?? "nil")",
+          "\(10 + 0x0FFF_FFFF)")
+}
+
 // MARK: - The rows
 
 func lRows() {
@@ -499,6 +823,25 @@ func lRows() {
             readMix("L9", fixture, at: at, tag: "+at-\(name)")
         }
     }
+    for fixture in mp3Fixtures {
+        readTrack("L10", fixture, stage: "asset48")
+        readTrack("L10", fixture, stage: "native")
+        readGapless("L10", fixture)
+    }
+    for fixture in mp3Fixtures + ["clicks24-mp3"] { readTrimmed("L10", fixture) }
+    for fixture in ["clicks44s-mp3", "clicks44-mp3-itunsmpb", "clicks44-mp3-noxing", "clicks24-mp3"] {
+        readTrack("L10", fixture, stage: "native")
+    }
+    for fixture in residueFixtures + ["clicks24-mp3"] {
+        readPeaksDecode("L11", fixture)
+        readSpeechDecode("L11", fixture)
+        readExtract("L11", fixture)
+    }
+    // The reverse renderer's decode is L1's asset48; L1 has no clicks44 or
+    // clicks24-mp3 (whose control is clicks44, the WAV it was made from).
+    readTrack("L11", "clicks44", stage: "asset48")
+    readTrack("L11", "clicks24-mp3", stage: "asset48")
+    checkTags("L12")
 }
 
 func xRows() {
@@ -511,6 +854,14 @@ func xRows() {
     readExport("X6", "clicks16", rate: 0.99999, keep: true, tag: "+X6")
     readExport("X7", "clicks48", tag: "+X7")
     readExport("X8", "clicks44-late", tag: "+X8")
+    readExport("X9", "clicks16-late5", tag: "+X9")
+    readExport("X10", "clicks44-mp3", tag: "+X10")
+    readExport("X11", "clicks48-mp3", tag: "+X11")
+    for fixture in residueFixtures + ["clicks44s-mp3"] { readSync("X12", fixture) }
+    readExport("X13", "clicks44s-mp3", tag: "+X13")
+    readExport("X13", "clicks44-mp3-itunsmpb", tag: "+X13")
+    readExport("X14", "clicks44-mp3-noxing", tag: "+X14")
+    readExport("X15", "clicks24-mp3", tag: "+X15")
 }
 
 if group != "X" { lRows() }

@@ -20589,3 +20589,73 @@ runs differed (S20 9.00 against 8.01) — SY-34's determinism. `--cost` P19 0.95
 0.066, plan 0.891). `--determinism` P25 ok: P and N identical on D1–D4, T differing on all four
 (478, 116, 121 and 35 samples), P/T 1.259 (D1) and 1.189 (D2). `--mutants` 47/47 killed, no failed
 control.
+
+## Clean-up batch 3 — #307, #306, #299 (`export_offset_proof.py` Z0, R3–R7, E32–E34, L10–L12, X9–X15 and M10–M15; `export_offset_probe.swift`; `audio_sync_proof.py` S32; spec §11 SY-35..SY-38)
+
+```
+python3 tools/proof/export_offset_proof.py [<dir>/agent.sock] [--only Z0,L10,L12,X9,...]   # Debug; the recorded run is RC_PROOF_APP=release
+python3 tools/proof/export_offset_proof.py --mutants [--mutant M11-no-mp3-copy,...]       # probe-only; --mutant runs `before` and the named ones
+python3 tools/proof/audio_sync_proof.py <dir>/agent.sock --only S1,S32
+```
+
+**#307 (SY-35).** `clicks16-late5` (.mov) is clicks44-late's recipe over clicks16 with its audio
+5 s in (`-itsoffset 5`, a 16 s grey movie; Z0 checks ffprobe's start_time 5.000 ± 0.001). X9
+(the probe's export, F206 ×1) and E32 (the app's) are pinned; **M10** takes the copy's head range
+out (`if head > .zero {`): X9 reads +19.500 ms, killed. X8's clicks44-late moved only to
+−0.576 ms without it, inside the pin, which is why it never separated.
+
+**#306 (SY-36, SY-38).** `MP3Gapless` reads the first frame's LAME/Xing tag and trims its encoder
+delay only when Core Audio reports no packet table; the 48 kHz copy (`AudioRateCopy` version 2)
+and the sync pass (cache version 4) both read from it. **Fixtures** (made once, `-v1`):
+`clicks48-mp3` (clicks48, libmp3lame 192k); `clicks44s-mp3` (stereo — Core Audio accepts ffmpeg's
+tag there, a packet table); `clicks44-mp3-noxing` (`-write_xing 0`, no tag); `clicks24-mp3`
+(`-ar 24000 -b:a 64k`, MPEG-2); `clicks44-mp3-itunsmpb` (noxing's frames behind a hand-written
+ID3v2.3 COMM `iTunSMPB`, by `write_itunsmpb`). Z0 reads the ffmpeg-decodable MP3s within 0.5 ms
+and checks each MP3's class by `afinfo`: no `valid frames` line for clicks44-mp3, clicks48-mp3,
+clicks24-mp3 and noxing, `audio 441000 valid frames + 576 priming + 792 remainder = 442368` for
+clicks44s-mp3 and itunsmpb. **Rows:** L10 (asset48/native/`AVAudioFile` reads, the `trimmed`
+stage, and the gate: every trimmed read within 0.1 ms of ffmpeg's, the tabled MP3s' native reads
+within 0.1 ms of 0, noxing's 576/44.1 ms late); L11 (the residue readers: `writePeaks`' and
+`writeSpeech`'s decodes, the product's `Transcriber.extractAudio`, the reverse decode's asset48,
+for clicks44-mp3, clicks48-mp3 and clicks24-mp3 against clicks44 and clicks48); L12 (`MP3Gapless`
+in-process: each fixture's tag and trim, every prefix 0…2048 of the first frame, damaged headers,
+an ID3 size past the file, empty, 3-byte and noise files); X10, X11, X15 (the three trimmed MP3s
+through the copy), X12 (the product's `writeSyncFeatures` → `loadSyncSamples` for the MP3s,
+clicks44s-mp3 and the WAV controls), X13 (the tabled two, untouched), X14 (noxing, untrimmed:
+|X14 − X2 − 576/44.1| ≤ 0.1 ms), E30 and E33 (the app's exports), all but X14 pinned at 1.0 ms.
+`audio_sync_proof.py`'s **S32** syncs `recorder-mp3-v1.mp3` (RECORDER through libmp3lame at
+48 kHz mono; control: no packet table, and ffmpeg's decode within 0.25 ms of RECORDER) against
+CAMERA as S1 does, then exports the mix: both windows within 1.0 ms. **Mutants:** M11 (no copy
+for a 48 kHz MP3) X11; M12 (no trim in the copy) X10, X11, X15; M13 (no trim in the sync pass)
+X12; M14 (the padding read as the delay) X10, X11; M15 (a packet table second-guessed) X13 — only
+clicks44s-mp3 shows it, since itunsmpb's frames carry no Xing tag.
+
+**#299 (SY-37).** `stretched_lag` measures an export against the media's own 1 ms envelope
+stretched by the clip's speed. R3–R7 put the 16 kHz RECORDER at F206 at ×0.99999 keep (R3), ×0.9
+and ×1.1 keep (R4, R5), and ×0.9 and ×1.1 off (R6, R7, the pinned controls). Keep pitch moves
+real sound against its timeline, inside the band too, so by the orchestrator's ruling 3 **R3,
+R4, R5 and E34 (clicks48 ×1.1 keep) are measured rows**: they print `measured` with their
+readings when the instrument holds (both windows found at r ≥ 0.5 inside ±200 ms; E34 ≥ 10 clicks)
+and are never pinned to a lag. #299 stays open for the owner's choice of how keep pitch is rendered.
+
+**Debug runs** (2026-10-17, own instance, no `Frame Job: ` line): `--only Z0,L10,L12` 3/3 — the
+trimmed reads +0.000 / −0.000 / −0.000 ms (576 frames each), the tabled MP3s +0.000, noxing
++13.061, clicks24-mp3 native +24.000; `--only X1,X2,X8,X9,X10,X11,X12,X13,X14,X15` 10/10;
+`--mutants --mutant M10-no-head-range` 1/1 and `--mutant M11…M15` 5/5 (M11 X11 +12.000; M12 X10
++13.084, X11 +12.000, X15 +24.000; M13 X12 +13.061 / +12.000; M14 X10 −4.875, X11 −8.000; M15
+X13's clicks44s-mp3 −13.039); `audio_sync_proof.py --only S1,S32` 2/2. R3 on Debug read −8.899 ms
+on [12 s, 22 s); a 10 s-window sweep of its export read −0.185 to −8.899 ms where R6's stayed
+within ±0.027 ms.
+
+**Recorded runs** (Release, 2026-10-17, after `make gate` passed and its `make app`; own instance,
+no `Frame Job: ` line, no `DEFAULTS MOVED`). `export_offset_proof.py` whole: 72/72, 4 of them
+measured, exit 0 — E30 +0.023, E31 +0.023, E32 +0.000, E33 −0.000 ms; X9 +0.000, X10 +0.023, X11
+−0.000, X12 ±0.000 for all five reads, X13 +0.023 / +0.023, X14 +13.084 (X14 − X2 +13.061), X15
+−0.000, each spread 0.000; L10's gate and L12's 41 cases as on Debug; L11's clicks24-mp3 peaks
++24.000, speech +23.958, extract +23.958, reverse decode +24.000 ms (filed #309); R6 +0.019 /
+−0.000 and R7 +0.013 / −0.005 ms; **measured:** R3 −8.898 (r 0.950) / −0.129 ms (r 0.952), R4
++12.213 / +94.193, R5 +6.080 / +43.118 (each SY-37's DEFECT), E34 +1.058 ms, spread 4.589; every
+pre-SY-35 row as in #298 phase 2's table. `--mutants`: 13/13 killed, `before` failing no X row.
+`audio_sync_proof.py` whole: 54/54, exit 0 — S32 the recorder on frame 206, offset 32.5 ticks from
+the truth (as S1), the export's lag +0.047 / +0.041 ms; S18 0.70 / 0.85 ms, Δ 0.15 ms, control
+Δ −26.61 ms; S1 PHAT 452.58.
