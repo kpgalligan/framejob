@@ -70,6 +70,32 @@ nothing of Concat is opened, at design time or build time.
   - **When:** the code and the app-pass T1 land in T4-1.
   - Risk accepted: until T4-1 lands, the shipped kernel misses the bound on that fixture (one
     phase).
+  - **#296 (clean-up 4, 2026-10-17): kept (worst fixture).** Does the central 64 × 64
+    threadgroup path still pay after the same-bin add? `python3 tools/proof/scopes_proof.py
+    --central-ab` times the ×1 vectorscope of `base` (`c7c0dbf`'s shader, the central path),
+    `tree` (the kernel a drop would ship: every bin global with the same-bin add, no threadgroup
+    array) and `twin` (`base` with `bool central = false`, T3's twin, a record only) on the six
+    4K fixtures, 60 rounds each, round r in `[base, tree, twin]` rotated by r mod 3, each a T1
+    `gpuMedian`. The rule, declared before the run, with m a fixture's median and S the larger of
+    base's and tree's IQR: STOP when any S > 10 % of the smaller median; KEEP (pays) when
+    near-grey's m_tree − m_base > S and no fixture's m_base − m_tree > S; else KEEP (worst
+    fixture) when the worst m_tree > the worst m_base + S_W (GR-10 bounds the worst fixture);
+    else DROP. Apple M2 Max, AC power.
+    - The CONTROL (the tree's shader identical to base): near-grey base 0.2897 ms, tree 0.2891
+      (S 0.0026); `worst: base 0.4070 (gradient) tree 0.4071 (gradient) S_W 0.0043`; `CONTROL
+      PASS`. Load 23.92 37.44 81.25 before, 146.81 69.08 90.25 after.
+    - The run (the drop candidate in the tree): near-grey base 0.2877 ms (IQR 0.0008), tree
+      0.5306 (IQR 0.0004), twin 0.5326; paired tree − base +0.2429 ms. The worst loss is flat:
+      base 0.3220, tree 0.2565, paired −0.0654 (S 0.0011), so KEEP (pays) fails (ramp −0.0648,
+      noise −0.0631 and flat-red −0.0303 too; on flat, ramp and noise most of the loss is the
+      central counts themselves, base − twin, the 16 KB zero and merge the rest, twin − tree:
+      flat 0.0496 and 0.0159 ms). `worst: base 0.4038 (gradient) tree 0.5306 (near-grey) S_W
+      0.0049`: dropping would raise the worst fixture GR-10 bounds, so `VERDICT: KEEP (worst
+      fixture)` (the twin under the same rule: KEEP (worst fixture), 0.5326 on near-grey). Load
+      77.41 62.70 86.72 before, 56.99 58.99 84.83 after.
+    - The path stays, and T3 and its mutant `vectorscope-global` with it. T3 now scores
+      near-grey by name: the slowest forced-global fixture, its old pick, let a loaded gradient
+      sample (base/twin about 0.9 at rest, above) fail it at 1.139 in this batch's Release run.
 - **GR-27 — An Offset wheel is not wanted: #266 closed.** Choice 4a. Its master is Color's
   Brightness, Temperature and Tint already shift every level, and a fourth disc squeezes the row
   past the master field at the 280 pt pane.

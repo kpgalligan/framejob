@@ -84,10 +84,9 @@ Mutants, each run once on the final instrument and each answering MUTANT PASS (a
 ## Open items
 
 Filed at T4-1, each `ai-drafted` and `low-priority`, still open:
-- #296: whether the vectorscope's central 64 × 64 threadgroup path still pays for itself after the same-bin add.
 - #297: `designs/spec/07.9a-agent-tools.md` past the ~500-line split threshold.
 
-Closed: #265 as built (T4-1, GR-26, GR-31); #267 as built (T4-2, GR-32); #268 as built (T4-4, GR-35); #270's hover readout and ⇧ axis lock as built (T4-2, GR-32) and its histogram behind the plot as not wanted (GR-30); #271 as built (T4-3, GR-34). Not wanted: #266 (GR-27), #269 (GR-28), #273 (GR-29).
+Closed: #296 by measurement in clean-up 4 (GR-26: the central 64 × 64 threadgroup path kept, since dropping it raised the worst 4K fixture, near-grey 0.5306 ms against the path's worst, gradient 0.4038; T3 stays, now scored on near-grey by name); #265 as built (T4-1, GR-26, GR-31); #267 as built (T4-2, GR-32); #268 as built (T4-4, GR-35); #270's hover readout and ⇧ axis lock as built (T4-2, GR-32) and its histogram behind the plot as not wanted (GR-30); #271 as built (T4-3, GR-34). Not wanted: #266 (GR-27), #269 (GR-28), #273 (GR-29).
 
 Not filed, each decided at the close:
 - Hue vs Luma: choice 5a said "not now"; it follows on the strip's row with no new design, if asked.

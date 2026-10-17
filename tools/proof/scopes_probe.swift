@@ -19,7 +19,9 @@
 // row id), `data` (S1's bins, which the proof scores against its own BT.709
 // arithmetic) and `records` (T1's GPU times, which the proof scores against
 // GR-10's bound; T2's banded and forced-global parade times and T3's tree and
-// forced-global vectorscope times, which it scores as ratios).
+// forced-global vectorscope times, which it scores as ratios). With
+// `central_ab` (`--central-ab`, #296) it runs only that A/B and answers
+// `records["AB"]`.
 import AppKit
 import CoreVideo
 import Metal
@@ -65,6 +67,84 @@ else {
         check("\(name) the four kernels compile from \(shaderPath)", false,
               "device \(device != nil), library \(library != nil) \(compileError)")
     }
+    finish()
+}
+
+// MARK: - #296's A/B: the central threadgroup path against the kernel without it
+
+/// `scopes_proof.py --central-ab` (spec §11 GR-26, #296): three shaders'
+/// ×1 vectorscope passes on each of the six 4K fixtures, one buffer at a
+/// time — `base` (the last tree with the central path), `twin` (`base` with
+/// its `bool central = ` line forced to `false`) and `tree` (the tree's
+/// shader) — over `rounds` rounds, round r timing them in `[base, tree,
+/// twin]` rotated left by r % 3, one `gpuMedian` each, so load falls on all
+/// three alike. The proof computes every statistic and the verdict.
+func centralAB(_ ab: [String: Any]) -> [String: Any] {
+    func read(_ key: String) -> String? {
+        (ab[key] as? String).flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }
+    }
+    func loads() -> [Double] {
+        var three = [Double](repeating: 0, count: 3)
+        let got = getloadavg(&three, 3)
+        return got == 3 ? three : []
+    }
+    let rounds = ab["rounds"] as? Int ?? 0
+    guard let baseText = read("base_shader"), let twinText = read("forced_shader"),
+        let treeText = try? String(contentsOfFile: shaderPath, encoding: .utf8), rounds > 0
+    else { return ["error": "a shader could not be read, or rounds \(rounds) is not positive"] }
+    var arms: [(String, WaveformAnalyzer)] = []
+    for (name, text) in [("base", baseText), ("tree", treeText), ("twin", twinText)] {
+        do {
+            let library = try device.makeLibrary(source: text, options: nil)
+            guard let made = WaveformAnalyzer(device: device, library: library) else {
+                return ["error": "the \(name) WaveformAnalyzer is nil"]
+            }
+            arms.append((name, made))
+        } catch {
+            return ["error": "the \(name) shader does not compile: \(error)"]
+        }
+    }
+    var cache: CVMetalTextureCache?
+    CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cache)
+    guard let cache, let queue = device.makeCommandQueue() else {
+        return ["error": "no texture cache or command queue"]
+    }
+    let pass: Set<ScopePass> = [ScopePass(.vectorscope)]
+    let (width, height) = (3840, 2160)
+    var byFixture: [String: Any] = [:]
+    for (name, fill) in fixtures(width, height) {
+        guard let frame = pixelBuffer(width, height, fill) else {
+            return ["error": "no 4K buffer for \(name)"]
+        }
+        var wrapper: CVMetalTexture?
+        CVMetalTextureCacheCreateTextureFromImage(
+            kCFAllocatorDefault, cache, frame, nil, .rgba16Float, width, height, 0, &wrapper)
+        guard let wrapper, let made = CVMetalTextureGetTexture(wrapper) else {
+            return ["error": "no texture over the \(name) buffer"]
+        }
+        let before = loads()
+        var times: [String: [Double]] = ["base": [], "tree": [], "twin": []]
+        for round in 0..<rounds {
+            let shift = round % arms.count
+            for (arm, through) in arms[shift...] + arms[..<shift] {
+                guard let median = gpuMedian(through, pass, made, queue) else {
+                    return ["error": "no GPU time for \(arm) on \(name), round \(round)"]
+                }
+                times[arm, default: []].append(median)
+            }
+        }
+        var entry: [String: Any] = times
+        entry["load_before"] = before
+        entry["load_after"] = loads()
+        byFixture[name] = entry
+        withExtendedLifetime(wrapper) {}
+    }
+    return ["gpu": device.name, "rounds": rounds, "identical": baseText == treeText,
+            "fixtures": byFixture]
+}
+
+if let ab = request["central_ab"] as? [String: Any] {
+    records["AB"] = centralAB(ab)
     finish()
 }
 
@@ -852,9 +932,9 @@ records["T2"] = forcedGlobal(
 // T3 (grading-4 T4-1): the vectorscope's one `bool central = ` line forced
 // to `false`, so every pixel goes to the global bins. GR-26's same-bin add
 // rescues the flat fixtures T1 used to catch that on, so the proof holds the
-// tree's ×1 time, on the fixture where the forced-global vectorscope is
-// slowest, to a fraction of the global one: the central threadgroup path is
-// the one running.
+// tree's ×1 time on near-grey, the fixture the central path is for (by name
+// since #296), to a fraction of the global one: the central threadgroup path
+// is the one running. Every fixture is timed and recorded.
 records["T3"] = forcedGlobal(
     prefix: "bool central = ", forced: "            bool central = false;",
     pass: ScopePass(.vectorscope), mine: "tree")

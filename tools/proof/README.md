@@ -18712,9 +18712,11 @@ through one tap and each shown in its slot, kept across hide and show and a
 pick away and back, no `UserDefaults` key, ×1 in a new controller. T1 adds the
 vectorscope at ×2 and ×4 to its scored scopes. T3 is T2's shape for the
 vectorscope: the tree's ×1 pass against its one `bool central = ` line forced
-to `false`, scored on the fixture where the forced-global vectorscope is
-slowest, the tree's time ≤ 0.85 × the global one's (the same-bin add rescues
-the flat fixtures T1 caught the global vectorscope on). H4 the harness's `topzoom=2|4` light and dark, each
+to `false`, scored on near-grey by name (the fixture the central path is for;
+since #296, whose A/B put gradient's ratio about 0.9 and 16 % behind
+near-grey's global time, so one loaded gradient sample could take the old
+slowest-fixture pick), the tree's time ≤ 0.85 × the global one's (the same-bin
+add rescues the flat fixtures T1 caught the global vectorscope on). H4 the harness's `topzoom=2|4` light and dark, each
 byte-identical twice and unlike ×1, and the `seeing cells …` rect 4 pt in from
 the square's bottom-right corner.
 
@@ -18722,6 +18724,7 @@ the square's bottom-right corner.
 python3 tools/proof/scopes_proof.py                  # Debug unless RC_PROOF_APP=release
 python3 tools/proof/scopes_proof.py --only S1,M1     # run and score only these rows
 python3 tools/proof/scopes_proof.py --mutant NAME    # one of the sixteen below
+python3 tools/proof/scopes_proof.py --central-ab     # #296's A/B; no app [--rounds N] [--base REV]
 ```
 
 It launches its own instance on a scratch socket in a scratch home
@@ -18734,6 +18737,22 @@ copy's `app/Sources` and shader, skips H1–H4 (the harness builds the tree's
 own sources), and reports MUTANT PASS only when every named row failed and no
 other scored row did, but a row the mutant tolerates (`TOLERATED`), which the
 MUTANT line names when it failed.
+
+`--central-ab` (clean-up 4, #296, spec §11 GR-26's #296 entry) launches no app
+and takes neither `--mutant` nor `--only`: it builds the probe and times the ×1
+vectorscope of three shaders on the six 4K fixtures, through T1's `gpuMedian`
+and IOSurface wrap — `base` (`git show c7c0dbf:…/Waveform.metal`, the central
+path; `--base REV`), `twin` (`base` with its one `bool central = ` line forced
+to `false`, T3's twin, a record only) and `tree` (the tree's shader) — over 60
+rounds (`--rounds`), each round in `[base, tree, twin]` rotated by its index
+mod 3, so load falls on all three alike. Per fixture it prints each arm's
+median, IQR and range, the paired `tree − base`, the load averages and the
+`worst:` line, then one line, declared before the run: `STOP — spread too
+wide` (exit 2) when a fixture's S (the larger of base's and tree's IQR) passes
+10 % of the smaller median; with tree and base the same text, the CONTROL,
+`CONTROL PASS` or `CONTROL FAILURE` (exit 2); else `VERDICT: KEEP (pays)`,
+`VERDICT: KEEP (worst fixture)` or `VERDICT: DROP` (the module docstring has
+the rule). #296's run kept the path (worst fixture).
 
 | Mutant | Edit | Must fail |
 |---|---|---|
@@ -18750,7 +18769,7 @@ MUTANT line names when it failed.
 | `parade-global` | every parade group adds globally (`bool banded = false;`) | T2; T1 tolerated (the forced-global parade measured 1.15 ms at 4K on flat in G2-5, 1.019–1.042 in G2-1, at or over T1's 1.1 ms) |
 | `zoom-in-drawing-only` | the kernel bins every zoom at ×1 | S11 S12 S13; S6 tolerated (its zoomed half is the same off-plot count) |
 | `off-plot-clamped` | a pixel off the plot is clamped to the edge, as at ×1 | S6 S12 S13; T1 tolerated (1.67 ms at ×4 on the gradient in the brief's bench) |
-| `same-bin-add-dropped` | the same-bin add's branch is never taken | T1; T3 tolerated (the flat red, about 7.2 ms in the tree and its forced-global twin alike, becomes T3's slowest fixture) |
+| `same-bin-add-dropped` | the same-bin add's branch is never taken | T1 (nothing tolerated since #296: T3 scores near-grey by name and held at ratio 0.576 in the copy, run of 2026-10-17; the old slowest-fixture pick had made the flat red, about 7.2 ms in tree and twin alike, its fixture) |
 | `zoom-persisted` | a slot's zoom is written to `UserDefaults` | S14 |
 | `render-ignores-zoom` | `writeScopes` always gets zoom 1 | S13 |
 

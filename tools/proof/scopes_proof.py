@@ -8,6 +8,7 @@ vectorscope's same-bin add, its zoom ×1/×2/×4 counted at the zoom, and
 
     python3 tools/proof/scopes_proof.py [--app PATH] [--only S1,M1,...]
     python3 tools/proof/scopes_proof.py --mutant NAME
+    python3 tools/proof/scopes_proof.py --central-ab [--rounds N] [--base REV]
 
 Launches the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
 on a scratch socket of its own, and stops only that process. **The instance
@@ -83,9 +84,12 @@ kernels compiled from the tree's `Waveform.metal`):
   such line, or more than one, is a FAILURE, never a skip.
 - **T3**: T2's shape for the vectorscope: the tree's ×1 pass against the same
   shader with its one `bool central = ` line forced to `false`, on the six 4K
-  fixtures. Scored: on the fixture where the forced-global vectorscope is
-  slowest, the tree's time ≤ 0.85 × the global one's (GR-26's same-bin add
-  rescues the flat fixtures T1 used to catch a global vectorscope on).
+  fixtures. Scored on near-grey by name, the fixture the central path is
+  for: the tree's time ≤ 0.85 × the global one's (GR-26's same-bin add
+  rescues the flat fixtures T1 used to catch a global vectorscope on). Not
+  the slowest forced-global fixture: gradient sits 16 % behind near-grey
+  there at a ratio about 0.9 (#296's A/B), so one loaded sample of it
+  failed T3 whatever the path did. The other five are recorded.
 
 **MCP rows** (project S):
 - **M1**: `render_frame` with all four booleans: four sentences in
@@ -158,11 +162,32 @@ The mutants of the ×1 counting tolerate S12, which holds every ×1 count to
 the T4-0 tree's shader. `TOLERATED` gives each tolerated row's reason.
 Exit 0 when every scored row passed (a mutant: caught); 1 when one failed
 (a mutant: survived); 2 when the control could not be performed.
+
+`--central-ab` (#296, spec §11 GR-26; neither `--mutant` nor `--only`, no app,
+no MCP) builds the probe and times the ×1 vectorscope of three shaders on the
+six 4K fixtures, each through T1's `gpuMedian` over T1's IOSurface wrap:
+`base` (`git show REV:…/Waveform.metal`, `CENTRAL_BASE` the last tree with the
+central path), `twin` (`base` with its one `bool central = ` line forced to
+`false`, T3's twin; not exactly one such line is an instrument failure) and
+`tree` (the tree's shader, the kernel a drop ships). Each of `--rounds`
+(`CENTRAL_ROUNDS`) rounds times the three in `[base, tree, twin]` rotated left
+by the round's index mod 3, so load falls on each alike. Per fixture and arm:
+median m and spread s (the IQR of the rounds), min and max, and the paired
+`tree − base`; S = max(s_base, s_tree). `tree` against `base` decides, the
+twin's numbers and verdict are a record. One line, last: `STOP — spread too
+wide` when any S > `CENTRAL_PRECISION` × the smaller median (exit 2); when tree
+and base are the same text, the CONTROL — `CONTROL PASS` iff every |m_tree −
+m_base| ≤ S, else `CONTROL FAILURE` (exit 2); else `VERDICT: KEEP (pays)` iff
+near-grey's m_tree − m_base > S and no fixture's m_base − m_tree > S, else
+`VERDICT: KEEP (worst fixture)` iff the worst m_tree > the worst m_base + S_W
+(the two worst fixtures' S), else `VERDICT: DROP` (exit 0). The load averages
+before and after, each fixture's, the GPU and `pmset`'s lines are printed.
 """
 
 import argparse
 import atexit
 import json
+import os
 import re
 import struct
 import subprocess
@@ -211,6 +236,13 @@ SCOPES = ["View", "Scopes"]
 ZOOMS = [1, 2, 4]
 # The T4-0 tree, whose ×1 counts S12 holds the tree's to.
 BASELINE = "31f3aa1"
+# `--central-ab` (#296): the last tree with the vectorscope's central path,
+# the rounds, and the precision every fixture's spread must reach.
+CENTRAL_BASE = "c7c0dbf"
+CENTRAL_ROUNDS = 60
+CENTRAL_PRECISION = 0.10
+CENTRAL_ANCHOR = "bool central = "
+CENTRAL_FORCED = "            bool central = false;"
 VECTOR = "    float2 c = float2((rgb.b - luma) / 1.8556, (rgb.r - luma) / 1.5748);\n"
 # name: ([(file, anchor, replacement), …], the rows that must fail)
 MUTANTS = {
@@ -288,10 +320,10 @@ TOLERATED = {
     # Clamped to the edge, the ×4 gradient piles every off-plot pixel on
     # the rim's global bins: 1.67 ms in the brief's bench.
     "off-plot-clamped": ["T1"],
-    # Without the same-bin add the flat red is about 7.2 ms in the tree and
-    # in its forced-global twin alike (its bin is not central in either), so
-    # T3's slowest fixture becomes it, at a ratio near 1.
-    "same-bin-add-dropped": ["T3"],
+    # same-bin-add-dropped tolerates nothing since #296: T3 scores near-grey
+    # by name (its bins are central), and the run of 2026-10-17 read it at
+    # ratio 0.576 in the copy; the old slowest-fixture pick had made the flat
+    # red (about 7.2 ms in tree and twin alike) T3's fixture.
     # S14's vectorscope ×1 over ×4 is two passes of one kind through the
     # same tap: the first pass alone leaves the bottom slot without a trace.
     "tap-first-kind-only": ["S14"],
@@ -698,15 +730,17 @@ def score_t3(body):
         note(f"T3 4K {name}: tree {pair.get('tree')}, global {pair.get('global')} ms")
     tree = [pair.get("tree") for pair in pairs.values()]
     global_ = [pair.get("global") for pair in pairs.values()]
-    whole = (len(pairs) == 6 and not figures.get("anchor") and not figures.get("error")
+    whole = (len(pairs) == 6 and "near-grey" in pairs and not figures.get("anchor")
+             and not figures.get("error")
              and all(isinstance(v, (int, float)) for v in tree + global_))
-    # The fixture where the forced-global vectorscope is slowest, the one the
-    # central threadgroup counts are for.
-    at = max(pairs, key=lambda name: pairs[name].get("global")) if whole else None
+    # Near-grey by name, the fixture the central threadgroup counts are for
+    # (#296: the slowest forced-global fixture let a loaded gradient sample,
+    # ratio about 0.9 at rest, take the score).
+    at = "near-grey" if whole else None
     worst_t = pairs[at].get("tree") if whole else None
     worst_g = pairs[at].get("global") if whole else None
     ratio = worst_t / worst_g if whole and worst_g else None
-    check(f"T3 on the fixture where the forced-global vectorscope is slowest, the tree's 4K time "
+    check(f"T3 on near-grey, the tree's 4K time "
           f"is ≤ {T3_RATIO_MAX} × the global one's (the central threadgroup path is the one "
           f"running): {at}, tree {worst_t}, global {worst_g}, "
           f"ratio {None if ratio is None else round(ratio, 3)}",
@@ -723,6 +757,137 @@ def baseline_shader(folder):
     path = folder / "baseline-Waveform.metal"
     path.write_text(ran["stdout"])
     return path
+
+
+def percentile(values, q):
+    """The `q` quantile of `values`, by linear interpolation between ranks."""
+    ordered = sorted(values)
+    at = (len(ordered) - 1) * q
+    low = int(at)
+    high = min(low + 1, len(ordered) - 1)
+    return ordered[low] + (ordered[high] - ordered[low]) * (at - low)
+
+
+def summary(values):
+    """(median, IQR, min, max) of `values`."""
+    return (percentile(values, 0.5), percentile(values, 0.75) - percentile(values, 0.25),
+            min(values), max(values))
+
+
+def loads(values):
+    return " ".join(f"{v:.2f}" for v in values or [])
+
+
+def central_ab(rounds, base):
+    """#296's A/B: the ×1 vectorscope of `base`'s shader (the central path),
+    its `central = false` twin and the tree's, interleaved per round on the
+    six 4K fixtures; one verdict line, last. Exit 0, or 2 when the
+    measurement could not decide or could not be made."""
+    print(f"grading-4 #296 — the vectorscope's central path A/B ({rounds} rounds, base {base})",
+          flush=True)
+    print(f"  load before: {loads(os.getloadavg())}", flush=True)
+    for line in power():
+        print(f"  power: {line}", flush=True)
+    folder = WORK / "probe"
+    folder.mkdir(parents=True, exist_ok=True)
+    shown = bounded.run(["git", "-C", str(ROOT), "show", f"{base}:{SHADER}"], 60)
+    if shown["rc"] != 0 or not shown["stdout"]:
+        print(f"instrument failure: git show {base}:{SHADER} — {shown['stderr'].strip()[-300:]}")
+        return 2
+    base_text = shown["stdout"]
+    lines = base_text.split("\n")
+    matches = [i for i, line in enumerate(lines) if line.strip().startswith(CENTRAL_ANCHOR)]
+    if len(matches) != 1:
+        print(f"instrument failure: {len(matches)} lines of {base}'s shader start "
+              f"`{CENTRAL_ANCHOR}`")
+        return 2
+    lines[matches[0]] = CENTRAL_FORCED
+    base_path, twin_path = folder / "base-Waveform.metal", folder / "twin-Waveform.metal"
+    base_path.write_text(base_text)
+    twin_path.write_text("\n".join(lines))
+    entry = folder / "main.swift"
+    entry.write_text(PROBE.read_text())
+    try:
+        built = swift_build.build(sources=swift_build.app_sources(ROOT / "app/Sources") + [entry],
+                                  output=folder / "scopes_probe",
+                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=1200)
+    except swift_build.SwiftBuildFailed as error:
+        print(f"instrument failure: the probe does not build — {error} {error.diagnostics[:6]}")
+        return 2
+    request, answer = folder / "request.json", folder / "answer.json"
+    request.write_text(json.dumps({
+        "shader": str(ROOT / SHADER),
+        "central_ab": {"base_shader": str(base_path), "forced_shader": str(twin_path),
+                       "rounds": rounds}}))
+    ran = bounded.run([str(built.binary), str(request), str(answer)], 540,
+                      env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
+    print(f"  load after: {loads(os.getloadavg())}", flush=True)
+    try:
+        ab = (json.loads(answer.read_text()).get("records") or {}).get("AB") or {}
+    except (OSError, ValueError):
+        ab = {}
+    fixtures = ab.get("fixtures") or {}
+    if ab.get("error") or len(fixtures) != 6 or "near-grey" not in fixtures or any(
+            len(fixtures[f].get(arm) or []) != rounds for f in fixtures
+            for arm in ("base", "tree", "twin")):
+        print(f"instrument failure: the probe answered {ab.get('error') or sorted(fixtures)} "
+              f"(rc {ran['rc']}, expired {ran['expired']}) "
+              f"{(ran['stdout'] + ran['stderr']).strip()[-400:]}")
+        return 2
+    identical = bool(ab.get("identical"))
+    print(f"  GPU: {ab.get('gpu')}; rounds {ab.get('rounds')}; tree "
+          f"{'IDENTICAL to' if identical else 'differs from'} base (the "
+          f"{'CONTROL' if identical else 'measurement'})", flush=True)
+    stats, spread = {}, {}
+    for name, entry_ in fixtures.items():
+        stats[name] = {arm: summary(entry_[arm]) for arm in ("base", "tree", "twin")}
+        paired = summary([t - b for t, b in zip(entry_["tree"], entry_["base"])])
+        spread[name] = max(stats[name]["base"][1], stats[name]["tree"][1])
+        print(f"  {name}: " + "; ".join(
+            f"{arm} {s[0]:.4f} ms, IQR {s[1]:.4f}, [{s[2]:.4f}..{s[3]:.4f}]"
+            for arm, s in stats[name].items()), flush=True)
+        print(f"    tree − base paired: median {paired[0]:+.4f} ms, IQR {paired[1]:.4f}; S "
+              f"{spread[name]:.4f}; load {loads(entry_.get('load_before'))} → "
+              f"{loads(entry_.get('load_after'))}", flush=True)
+    m = {arm: {f: stats[f][arm][0] for f in stats} for arm in ("base", "tree", "twin")}
+    worst_base = max(m["base"], key=m["base"].get)
+    worst_tree = max(m["tree"], key=m["tree"].get)
+    spread_w = max(spread[worst_base], spread[worst_tree])
+    print(f"  worst: base {m['base'][worst_base]:.4f} ({worst_base}) tree "
+          f"{m['tree'][worst_tree]:.4f} ({worst_tree}) S_W {spread_w:.4f}", flush=True)
+
+    def verdict(other, s, s_w):
+        """The pre-declared rule with `other` in the drop candidate's place,
+        `s` each fixture's decision spread and `s_w` the worst fixtures'."""
+        grey = "near-grey"
+        if m[other][grey] - m["base"][grey] > s[grey] and all(
+                m["base"][f] - m[other][f] <= s[f] for f in stats):
+            return "KEEP (pays)"
+        if max(m[other].values()) > m["base"][worst_base] + s_w:
+            return "KEEP (worst fixture)"
+        return "DROP"
+
+    # The twin's verdict, under the same rule with its own spreads, as a record.
+    twin_spread = {f: max(stats[f]["base"][1], stats[f]["twin"][1]) for f in stats}
+    twin_worst = max(m["twin"], key=m["twin"].get)
+    twin_w = max(twin_spread[worst_base], twin_spread[twin_worst])
+    print(f"  rec   twin under the same rule: {verdict('twin', twin_spread, twin_w)} (worst "
+          f"twin {m['twin'][twin_worst]:.4f} ({twin_worst}), S_W {twin_w:.4f})", flush=True)
+    wide = [f for f in stats if spread[f] > CENTRAL_PRECISION * min(m["base"][f], m["tree"][f])]
+    if wide:
+        print(f"STOP — spread too wide: {', '.join(f'{f} S {spread[f]:.4f}' for f in wide)} "
+              f"exceed {CENTRAL_PRECISION:.0%} of the smaller median")
+        return 2
+    if identical:
+        apart = [f for f in stats if abs(m["tree"][f] - m["base"][f]) > spread[f]]
+        if apart:
+            print(f"CONTROL FAILURE: identical shaders differ by more than S on "
+                  f"{', '.join(apart)}")
+            return 2
+        print("CONTROL PASS: identical shaders within S on every fixture")
+        return 0
+    print(f"VERDICT: {verdict('tree', spread, spread_w)}")
+    return 0
 
 
 def run_probe(sources, package):
@@ -976,7 +1141,22 @@ def main():
     parser.add_argument("--app", default=None)
     parser.add_argument("--only", help="comma-separated rows to run and score")
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
+    parser.add_argument("--central-ab", action="store_true",
+                        help="#296's A/B of the vectorscope's central path; launches no app")
+    parser.add_argument("--rounds", type=int, default=CENTRAL_ROUNDS)
+    parser.add_argument("--base", default=CENTRAL_BASE)
     args = parser.parse_args()
+    if args.central_ab:
+        if args.mutant or args.only:
+            print("--central-ab takes neither --mutant nor --only")
+            return 2
+        if args.rounds < 1:
+            print("--rounds must be positive")
+            return 2
+        remove_work()
+        atexit.register(remove_work)
+        HOME.mkdir(parents=True)
+        return central_ab(args.rounds, args.base)
     if args.only:
         selected = {name.strip() for name in args.only.split(",") if name.strip()}
         unknown = selected - set(ROWS)
