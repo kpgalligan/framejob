@@ -5,7 +5,8 @@ import Foundation
 /// The await-free half of the sync-features cache (road map "audio-sync-2",
 /// AS-3 and AS-4; spec §11 SY-11, SY-20, spec §5.6): `cache/sync/<id>.bin`, the
 /// MFCC frames `SyncFeatures` makes of a file's sound, `cache/sync/<id>.pcm`, the
-/// 8 kHz samples it made them of (the refinement's, SY-20), and their marker
+/// 8 kHz samples it made them of (the refinement's, SY-20; brought to 8 kHz by
+/// `SyncResampler` from the file's own rate since SY-34), and their marker
 /// `cache/sync/<id>.complete.json`. `MediaImporter.syncFeatures` owns the
 /// async boundary (loading the track); everything here runs on
 /// `copyNextSampleBuffer` and does not await, `MediaImporter+Speech.swift`'s
@@ -18,8 +19,9 @@ extension MediaImporter {
 
     /// Bumped on ANY change to a `SyncFeatures` constant or to what the pass
     /// writes: an old `.bin` then reads as not written yet, never as another
-    /// recipe's frames. 2: the `.pcm` beside the `.bin` (SY-20).
-    static let syncFeaturesVersion = 2
+    /// recipe's frames. 2: the `.pcm` beside the `.bin` (SY-20). 3: decoded at
+    /// the file's own rate and resampled by `SyncResampler` (SY-34).
+    static let syncFeaturesVersion = 3
 
     struct SyncFeaturesStamp: Codable, Equatable {
         let source: CacheStamp
@@ -60,8 +62,8 @@ extension MediaImporter {
     }
 
     /// Whether the features for `media` are current: a stamp, a marker equal
-    /// to `SyncFeaturesStamp(stamp)`, a `.bin` that loads and a `.pcm` of a
-    /// positive even size. A nil stamp never says yes.
+    /// to `SyncFeaturesStamp(stamp)`, a `.bin` that loads and a `.pcm` of an
+    /// even size, 0 included (SY-31). A nil stamp never says yes.
     static func syncFeaturesAreCurrent(
         for media: MediaSnapshot, stamp: CacheStamp?, in cacheDir: URL
     ) -> Bool {
@@ -70,7 +72,7 @@ extension MediaImporter {
                 == SyncFeaturesStamp(stamp)
         else { return false }
         guard loadSyncFeatures(for: media.id, in: cacheDir) != nil else { return false }
-        return syncSamplesSize(for: media.id, in: cacheDir).map { $0 > 0 && $0 % 2 == 0 } ?? false
+        return syncSamplesSize(for: media.id, in: cacheDir).map { $0 % 2 == 0 } ?? false
     }
 
     /// The `.pcm`'s size in bytes, nil when it is not there.
@@ -81,14 +83,15 @@ extension MediaImporter {
 
     /// The cached frames, frame-major, or nil until a complete pass is
     /// certified: no marker or another version's, a `.bin` whose size is not
-    /// a positive multiple of a frame's bytes, or a value that is not finite.
-    /// Never silence.
+    /// a multiple of a frame's bytes, or a value that is not finite. Never
+    /// silence; a zero-byte `.bin` is a file under one frame, no frames
+    /// (SY-31).
     static func loadSyncFeatures(for media: UInt32, in cacheDir: URL) -> [Float]? {
         guard readSyncFeaturesStamp(at: syncFeaturesMarkerURL(for: media, in: cacheDir)) != nil
         else { return nil }
         let frameBytes = SyncFeatures.coefficients * MemoryLayout<Float>.size
         guard let data = try? Data(contentsOf: syncFeaturesURL(for: media, in: cacheDir)),
-            data.count > 0, data.count % frameBytes == 0
+            data.count % frameBytes == 0
         else { return nil }
         let values = data.withUnsafeBytes { raw in Array(raw.bindMemory(to: Float.self)) }
         guard values.allSatisfy({ $0.isFinite }) else { return nil }
@@ -97,12 +100,12 @@ extension MediaImporter {
 
     /// The cached samples (SY-20), or nil until a complete pass is
     /// certified: no marker or another version's, or a `.pcm` whose size is
-    /// not a positive even number of bytes. Never silence.
+    /// not an even number of bytes, 0 included (SY-31). Never silence.
     static func loadSyncSamples(for media: UInt32, in cacheDir: URL) -> [Int16]? {
         guard readSyncFeaturesStamp(at: syncFeaturesMarkerURL(for: media, in: cacheDir)) != nil
         else { return nil }
         guard let data = try? Data(contentsOf: syncSamplesURL(for: media, in: cacheDir)),
-            data.count > 0, data.count % 2 == 0
+            data.count % 2 == 0
         else { return nil }
         return data.withUnsafeBytes { raw in
             raw.bindMemory(to: Int16.self).map { Int16(littleEndian: $0) }
@@ -125,16 +128,20 @@ extension MediaImporter {
         return removed
     }
 
-    /// Reads `track` as mono float at `SyncFeatures.sampleRate` (speech's
-    /// output settings at that rate) through a `SyncFeatures.Extractor`,
-    /// keeping the same samples as int16 (`round(clamp(x, −1, 1)·32767)`),
-    /// and publishes the frames and the samples only when the reader ended
-    /// `.completed` — a decode that gave up part way is not a shorter file.
-    /// The directory, the `.bin`, the `.pcm` and then the marker run inside
-    /// one `CacheLedger.publish`, and a write that fails takes both files
-    /// with it. A
-    /// `canAdd`/`startReading` failure, no stamp, or no whole frame publishes
-    /// nothing; the media then reads as still being analysed.
+    /// Reads `track` as mono float at its own rate (speech's output settings
+    /// without a rate), the rate the first buffer says, brought to
+    /// `SyncFeatures.sampleRate` by a `SyncResampler` (SY-34: AVFoundation's
+    /// own conversion wrote different bytes on every pass), then through a
+    /// `SyncFeatures.Extractor`, keeping the same samples as int16
+    /// (`round(clamp(x, −1, 1)·32767)`), and publishes the frames and the
+    /// samples only when the reader ended `.completed` — a decode that gave
+    /// up part way is not a shorter file. The directory, the `.bin`, the
+    /// `.pcm` and then the marker run inside one `CacheLedger.publish`, and
+    /// a write that fails takes both files with it. A `canAdd`/`startReading`
+    /// failure, a first buffer with no rate, or no stamp publishes nothing;
+    /// the media then reads as still being analysed. A completed read with
+    /// no whole frame publishes an empty `.bin` (SY-31), which reads as too
+    /// short to match.
     static func writeSyncFeatures(
         for media: MediaSnapshot, asset: AVURLAsset, track: AVAssetTrack, stamp: CacheStamp?,
         into cacheDir: URL, pass: CachePass?
@@ -144,7 +151,6 @@ extension MediaImporter {
             track: track,
             outputSettings: [
                 AVFormatIDKey: kAudioFormatLinearPCM,
-                AVSampleRateKey: Double(SyncFeatures.sampleRate),
                 AVNumberOfChannelsKey: 1,
                 AVLinearPCMBitDepthKey: 32,
                 AVLinearPCMIsFloatKey: true,
@@ -158,6 +164,14 @@ extension MediaImporter {
 
         let extractor = SyncFeatures.Extractor()
         var pcm: [Int16] = []
+        var resampler: SyncResampler?
+        var rateless = false
+        func take(_ samples: [Float]) {
+            samples.withUnsafeBufferPointer { extractor.feed($0) }
+            for x in samples {
+                pcm.append(x.isFinite ? Int16((min(1, max(-1, x)) * 32767).rounded()) : 0)
+            }
+        }
         while let sample = output.copyNextSampleBuffer() {
             guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
             let byteCount = CMBlockBufferGetDataLength(block)
@@ -169,16 +183,24 @@ extension MediaImporter {
                     block, atOffset: 0, dataLength: byteCount, destination: base)
             }
             guard copied == noErr else { continue }
-            samples.withUnsafeBufferPointer { extractor.feed($0) }
-            for x in samples {
-                pcm.append(x.isFinite ? Int16((min(1, max(-1, x)) * 32767).rounded()) : 0)
+            if resampler == nil {
+                let rate = CMSampleBufferGetFormatDescription(sample)
+                    .flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0) }?
+                    .pointee.mSampleRate ?? 0
+                guard rate > 0, rate.isFinite else {
+                    rateless = true
+                    break
+                }
+                resampler = SyncResampler(inputRate: rate)
             }
+            if let resampler { take(samples.withUnsafeBufferPointer { resampler.feed($0) }) }
         }
         // Before the cancel, which would make every status `.cancelled`.
         let status = reader.status
         reader.cancelReading()
+        if let resampler { take(resampler.finish()) }
         let frames = extractor.finish()
-        guard status == .completed, let stamp, !frames.isEmpty else { return }
+        guard status == .completed, !rateless, let stamp else { return }
 
         let file = syncFeaturesURL(for: media.id, in: cacheDir)
         let samplesFile = syncSamplesURL(for: media.id, in: cacheDir)

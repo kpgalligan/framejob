@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Road maps "audio-sync" (AS-1, AS-2) and "audio-sync-2" (AS-3, AS-4) and its
-round 3 — spec §11 SY-1..SY-22, SY-28..SY-30 — Clip ▸ Synchronize Audio and
-`sync_audio`, over MCP against a
+"""Road maps "audio-sync" (AS-1, AS-2) and "audio-sync-2" (AS-3, AS-4), its
+round 3 and the clean-up — spec §11 SY-1..SY-22, SY-28..SY-34 — Clip ▸
+Synchronize Audio and `sync_audio`, over MCP against a
 running instance, then the probe's rows over `app/Sources`.
 
     python3 tools/proof/audio_sync_proof.py <dir>/agent.sock [--only S1,P3,...]
     python3 tools/proof/audio_sync_proof.py [<dir>/agent.sock] --mutants
     python3 tools/proof/audio_sync_proof.py --cost    # P19 alone: SY-22's budget
+    python3 tools/proof/audio_sync_proof.py --determinism   # P25 alone: SY-34's two passes
 
 The instance is the caller's (`proof_app.py launch`; Debug while iterating,
 `RC_PROOF_APP=release` for the recorded run). Every package and fixture is
@@ -39,7 +40,9 @@ COMPETE. The OWNER's files are `tools/proof/media/owner-sync/IMG_0018.MOV` and
 `record.aifc`, two takes of similar words with no shared stretch but the
 recorder's first 13 s (SY-28); OWNER2's, `tools/proof/media/owner-sync-2/`
 `IMG_0019.MOV` and the same `record.aifc`, one recording, recorder − camera
-148.27 s (SY-28). Both gitignored, never copied out of `tools/proof/`.
+148.27 s (SY-28). Both gitignored, never copied out of `tools/proof/`. SHORT
+(`short-v1.wav`, SY-31), 40 ms of a 1 kHz tone at −6 dBFS: sound under one
+feature frame.
 
 Every media's `cache/peaks/<id>.bin`, `cache/sync/<id>.complete.json` and
 `cache/speech/<id>.complete.json` are each waited for (120 s) before it is used, and
@@ -168,19 +171,33 @@ before and after, and the last undo step not "Synchronize Audio"):
   S30  the OWNER's files both at 0, untrimmed (the features' confident tier
        today): refused "no matching sound found" and "waveforms do not line
        up", unchanged.
-  P1–P18, P20 `audio_sync_probe.swift`, built by `swift_build.build` over
-       `app/Sources` (a failed build is a scored FAIL of all nineteen); each
-       row's sentence is the probe's.
+  S31  SHORT at 0 on track 1, CAMERA at 10 s (SY-31): its sync marker lands
+       within the 120 s wait (its seconds printed); refused "clip N: is too
+       short to match: its file holds under 2 s of sound.", never naming
+       "still being analysed", unchanged, no step.
+  P1–P18, P20, P21, P23, P24 `audio_sync_probe.swift`, built by
+       `swift_build.build` over `app/Sources` (a failed build is a scored FAIL
+       of all twenty-two); each row's sentence is the probe's. P21 is SY-32's
+       region chosen by the features, P23 SY-31's file under one frame, P24
+       SY-34's resampler.
   P19  (`--cost` only) the probe built -O whole-module and run with `cost
        work/audio-sync/cost`: SY-22's ≤ 1.5 s of CPU for a one-hour pair; the
        folder is removed after.
+  P25  (`--determinism` only) the probe built as P19's is, run with
+       `determinism work/audio-sync/determinism` over four ffmpeg files (D1 one
+       hour mono AAC at 48 kHz, D2 ten minutes stereo AAC at 44.1 kHz, D3 and
+       D4 ten minutes mono WAV at 48 and 16 kHz): today's reader (T, the
+       probe's own), the product's pass (P) and the native-rate decode (N),
+       each twice, compared byte for byte; SY-34's score — P and N identical
+       on all four, P's wall ≤ 1.5× T's on D1 and D2. The folder is removed
+       after.
 
-`--mutants`: the forty-three below, probe-only. Each copies `app/Sources` under
+`--mutants`: the forty-seven below, probe-only. Each copies `app/Sources` under
 `work/audio-sync/mutants/<name>/`, applies its edit (its `before` asserted to
-occur exactly once), rebuilds the probe (900 s wall) and runs it (240 s wall);
+occur exactly once), rebuilds the probe (900 s wall) and runs it (600 s wall);
 killed when a named row fails; a copy that does not build or answer is a failed
 control, never a kill. Exit 0 when every scored row passed (with
-`--mutants`, when all forty-three were killed); 1 otherwise.
+`--mutants`, when all forty-seven were killed); 1 otherwise.
 """
 
 import argparse
@@ -215,11 +232,12 @@ DRIFT_PPM = (1 - 1 / DRIFT_K) * 1e6  # the fixture's drift, in the proof's sign
 SEC = 600_000
 FRAME = SEC // 30
 BUILD_WALL = 900
-RUN_WALL = 240
+RUN_WALL = 600                       # s: the probe answers in about 135 s unloaded (P21–P23 added)
 SHEET_WAIT = 600                     # s: a sheet's poll bound, mcp.py's call timeout
 COST = WORK / "cost"                 # P19's one-hour fixture, removed when it ends
+DETERMINISM = WORK / "determinism"   # P25's ffmpeg fixtures, removed when it ends
 HOLD = 3                             # s: S25's and S26's -RCDevSyncHold
-S_ROWS = [f"S{n}" for n in range(1, 31)]
+S_ROWS = [f"S{n}" for n in range(1, 32)]
 OWNER = ROOT / "tools/proof/media/owner-sync"
 OWNER_FILES = {"owner_camera": OWNER / "IMG_0018.MOV", "owner_recorder": OWNER / "record.aifc"}
 OWNER2 = ROOT / "tools/proof/media/owner-sync-2"
@@ -228,7 +246,7 @@ OWNER2_FILES = {"owner2_camera": OWNER2 / "IMG_0019.MOV",
 UTTER_AT = 31.2                      # s, in CAMERA2
 UTTER_GAP = 118.70                   # s, recorder − camera for UTTER (1,899,200 samples)
 OWNER2_GAP = 148.27                  # s, recorder − camera of owner-sync-2 (SY-28, one recording)
-P_ROWS = [f"P{n}" for n in range(1, 19)] + ["P20"]  # P19 is --cost only
+P_ROWS = [f"P{n}" for n in range(1, 19)] + ["P20", "P21", "P23", "P24"]  # P19 is --cost only
 ENVELOPE = RATE // 1000              # samples per 1 ms envelope bucket
 
 # name: (the rows it must fail, file, before, after)
@@ -368,6 +386,18 @@ MUTANTS = {
                             "if refinement == nil, !(anchor.samples.isEmpty && mover.samples.isEmpty) {",
                             "if refinement == nil, !(anchor.samples.isEmpty && mover.samples.isEmpty), "
                             "false {"),
+    # the clean-up (SY-31, SY-32, SY-34)
+    "short-file-unpublished": (["P23"], "MediaImporter+SyncFeatures.swift",
+                               "guard status == .completed, !rateless, let stamp else { return }",
+                               "guard status == .completed, !rateless, let stamp, !frames.isEmpty "
+                               "else { return }"),
+    "empty-bin-refused": (["P23"], "MediaImporter+SyncFeatures.swift",
+                          "            data.count % frameBytes == 0\n",
+                          "            data.count > 0, data.count % frameBytes == 0\n"),
+    "phat-region-centred": (["P21"], "AudioSync+Region.swift",
+                            "if value > bestSum ||", "if value > bestSum && false ||"),
+    "resampler-offset": (["P24"], "SyncResampler.swift",
+                         "let numerator = n * rate\n", "let numerator = n * rate + rate / 2\n"),
 }
 
 results = {}
@@ -496,6 +526,18 @@ def fixtures():
     write_wav(names["drift"], recorded(source, 5, k=DRIFT_K))
     mux(names["source"], names["camera"], SECONDS)
     return names
+
+
+def short_fixture():
+    """SHORT (SY-31): 40 ms of a 1 kHz tone at −6 dBFS, 16 kHz mono — sound,
+    but under one 512-sample feature frame at 8 kHz. Written once per tree."""
+    FIXTURES.mkdir(parents=True, exist_ok=True)
+    path = FIXTURES / "short-v1.wav"
+    if not path.exists():
+        amplitude = 10 ** (-6 / 20)
+        write_wav(path, [amplitude * math.sin(2 * math.pi * 1000 * n / RATE)
+                         for n in range(RATE * 40 // 1000)])
+    return {"short": path}
 
 
 def mux(wav, mov, seconds):
@@ -1305,6 +1347,24 @@ def mcp_rows(sock, wanted, files):
             finally:
                 o.close()
 
+    if "S31" in want:
+        c = Session(mcp, "sync-s31", files)
+        try:
+            # SY-31: a file under one feature frame publishes an empty cache
+            # (its marker waited for in `media`), so it reads too short to
+            # match, never still being analysed.
+            cam = c.place("camera", 10 * SEC, 0)
+            short = c.place("short", 0, 1)
+            ok, detail = refused(c, "a 40 ms file",
+                                 f"clip {short}: is too short to match: its file holds under 2 s "
+                                 "of sound.", clips=[cam, short])
+            said = c.error("sync_audio", clips=[cam, short]) or ""
+            analysing = "still being analysed" in said
+            score("S31", ok and not analysing,
+                  f"{detail}; 'still being analysed' named {analysing} (want False)")
+        finally:
+            c.close()
+
     if "S23" in want:
         missing = [str(p) for p in OWNER_FILES.values() if not p.exists()]
         if missing:
@@ -1530,6 +1590,70 @@ def cost():
     return 0 if results["P19"][0] else 1
 
 
+def determinism_fixtures():
+    """P25's files (SY-34), by ffmpeg's lavfi: seeded white noise at 0.02 under
+    880 Hz tone bursts (0.25 s of every 1.7 s, at 0.3). D1 one hour mono AAC
+    at 48 kHz, 128 kb/s; D2 ten minutes stereo AAC at 44.1 kHz; D3 ten
+    minutes mono 48 kHz WAV; D4 ten minutes mono 16 kHz WAV."""
+    if DETERMINISM.exists():
+        shutil.rmtree(DETERMINISM)
+    DETERMINISM.mkdir(parents=True)
+    for name, seconds, rate, channels, codec in [
+            ("D1.m4a", 3600, 48_000, 1, ["-c:a", "aac", "-b:a", "128k"]),
+            ("D2.m4a", 600, 44_100, 2, ["-c:a", "aac", "-b:a", "128k"]),
+            ("D3.wav", 600, 48_000, 1, ["-c:a", "pcm_s16le"]),
+            ("D4.wav", 600, 16_000, 1, ["-c:a", "pcm_s16le"])]:
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y",
+             "-f", "lavfi", "-i", f"anoisesrc=d={seconds}:c=white:r={rate}:a=0.02:seed=305",
+             "-f", "lavfi", "-i", f"sine=f=880:r={rate}:d={seconds}",
+             "-filter_complex",
+             "[1]volume='0.3*lt(mod(t,1.7),0.25)':eval=frame[t];[0][t]amix=inputs=2:normalize=0",
+             "-ac", str(channels), *codec, str(DETERMINISM / name)],
+            check=True, timeout=900)
+
+
+def determinism():
+    """P25 alone (SY-34): #305's two-pass bytes and the arms' walls, the probe
+    built as `cost()` builds P19's (-O, whole module) and run with
+    `determinism <DETERMINISM>`; no socket."""
+    here = WORK / "determinism-probe"
+    if here.exists():
+        shutil.rmtree(here)
+    here.mkdir(parents=True)
+    entry = here / "main.swift"
+    shutil.copyfile(PROBE, entry)
+    binary = here / "audio-sync-determinism"
+    try:
+        swift_build.build(sources=swift_build.app_sources() + [entry], output=binary,
+                          optimize=True, wmo=True, timeout=BUILD_WALL)
+    except swift_build.SwiftBuildFailed as error:
+        score("P25", False, "the probe did not build: " + "; ".join(error.diagnostics[:6]))
+        return 1
+    try:
+        made = time.monotonic()
+        determinism_fixtures()
+        print(f"  P25's fixtures made in {time.monotonic() - made:.1f} s", flush=True)
+        try:
+            ran = subprocess.run([str(binary), "determinism", str(DETERMINISM)],
+                                 capture_output=True, text=True, timeout=3600)
+        except subprocess.TimeoutExpired:
+            score("P25", False, "no answer within 3600 s")
+            return 1
+    finally:
+        shutil.rmtree(DETERMINISM, ignore_errors=True)
+    for line in ran.stderr.splitlines():
+        if line.startswith("P25: "):
+            print("  " + line, flush=True)
+    try:
+        answered = {r["id"]: (r["pass"], r["detail"]) for r in json.loads(ran.stdout)["rows"]}
+    except (ValueError, KeyError):
+        score("P25", False, f"no answer (exit {ran.returncode}): {ran.stderr[-300:]}")
+        return 1
+    score("P25", *answered.get("P25", (False, "the probe did not answer it")))
+    return 0 if results["P25"][0] else 1
+
+
 def mutants():
     killed = []
     for name, (named, file, before, after) in MUTANTS.items():
@@ -1569,12 +1693,16 @@ def main():
     parser.add_argument("--mutants", action="store_true")
     parser.add_argument("--cost", action="store_true",
                         help="P19 alone: SY-22's budget on the -O whole-module probe")
+    parser.add_argument("--determinism", action="store_true",
+                        help="P25 alone: #305's two cache passes on the -O whole-module probe")
     args = parser.parse_args()
     WORK.mkdir(parents=True, exist_ok=True)
     if args.mutants:
         return mutants()
     if args.cost:
         return cost()
+    if args.determinism:
+        return determinism()
     wanted = args.only.split(",") if args.only else S_ROWS + P_ROWS
     unknown = [row for row in wanted if row not in S_ROWS + P_ROWS]
     if unknown:
@@ -1585,7 +1713,7 @@ def main():
         if not args.socket:
             print("the S rows need the running instance's socket path")
             return 2
-        files = {**fixtures(), **fixtures2(), **OWNER_FILES, **OWNER2_FILES}
+        files = {**fixtures(), **fixtures2(), **short_fixture(), **OWNER_FILES, **OWNER2_FILES}
         try:
             mcp_rows(args.socket, [row for row in s_wanted if row not in ("S25", "S26")], files)
             held = [row for row in s_wanted if row in ("S25", "S26")]

@@ -1,14 +1,16 @@
-// Road maps "audio-sync" (AS-1, AS-2) and "audio-sync-2" (AS-3, AS-4) and its
-// round 3 — spec §11 SY-1..SY-22, SY-28..SY-30 — Synchronize Audio's
-// arithmetic, measured through the app's own
-// `SyncFeatures`, `AudioSyncMatch`, `AudioSyncPHAT` and `AudioSync` with no
-// document, no window and no disk.
+// Road maps "audio-sync" (AS-1, AS-2) and "audio-sync-2" (AS-3, AS-4), its
+// round 3 and the clean-up — spec §11 SY-1..SY-22, SY-28..SY-34 — Synchronize
+// Audio's arithmetic, measured through the app's own
+// `SyncFeatures`, `AudioSyncMatch`, `AudioSyncPHAT`, `SyncResampler` and
+// `AudioSync` with no document and no window; only P19, P23 and P25 touch
+// the disk, each in a folder of its own that it removes.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a`, by
 // `swift_build.build` (`audio_sync_proof.py` builds and runs it). One process,
-// no arguments; the answer is one JSON object on stdout, `{"rows": [...]}`,
-// each row `{"id", "pass", "detail", "instrument"}`.
+// no arguments (or `cost <dir>` for P19 alone, `determinism <dir>` for P25
+// alone); the answer is one JSON object on stdout, `{"rows": [...]}`, each
+// row `{"id", "pass", "detail", "instrument"}`.
 //
 // Every array is made here from a seeded LCG, so a run is the same run. No
 // expected number is read back from the code under test: each is written as
@@ -123,7 +125,7 @@
 //       features-only line skipped a gap window).
 //   P19 (only with the arguments `cost <dir>`, and then alone; the proof's
 //       `--cost`, built -O whole-module): SY-22's budget. One hour of pips
-//       and a mover at +100 ppm, their `.bin`, `.pcm` and v2 marker written
+//       and a mover at +100 ppm, their `.bin`, `.pcm` and current marker written
 //       under <dir>/cache/sync/; the thread CPU and wall of loading both
 //       files and of `AudioSync.plan`, the total ≤ 1.5 s of CPU (control:
 //       confident, drift on PHAT over 64 windows, the refinement clear);
@@ -153,6 +155,37 @@
 //       0, 200, … ticks whose snapped played overlap is under 2 s: the
 //       refinement runs over the outward-rounded files' overlap (≥ 16,000
 //       samples) and is clear (control: the lag 63 ±0.5).
+//   P21 the region chosen by the features (SY-32) through `plan`: a 54 s
+//       pips pair (seed 401), the anchor 1.204 s later (P17's construction),
+//       the mover's [12 s, 42 s) replaced by seeded noise (LCG 402) and its
+//       features those of the edited samples. (a) the noise at 0.1 and (b) at
+//       −60 dBFS (room tone): confident, the refinement clear, |offset −
+//       truth| ≤ 75 ticks, the region printed (control, an instrument
+//       failure otherwise: PHAT over the old centred 30 s of the same overlap
+//       is not clear); (c) (a) with the anchor's samples unrelated pips (seed
+//       403): refused, exactly `incoherent` of the plan's own numbers.
+//   P23 a file under one frame (SY-31): 40 ms of a 1 kHz tone at −6 dBFS, 16
+//       kHz, written by `AVAudioFile` under the temporary directory's
+//       `framejob-sync-probe-<pid>/` (removed after) and passed through the
+//       product's `writeSyncFeatures`: the marker present, no frames,
+//       samples whose `frameCount` is 0, current; control: 1 s of the same
+//       tone gives `frameCount(samples:)` frames.
+//   P24 `SyncResampler` (SY-34): an impulse at 48,000, 44,100, 16,000 and
+//       44,099.5 Hz (not whole, its phase rounded)
+//       lands (the response's first moment) within ±0.05 output sample of
+//       8000·t; ⌈N·8000/rate⌉ outputs; the whole input against pieces of 1,
+//       777 and 4,096 samples byte-identical; at 8,000 Hz the identity.
+//   P25 (only with the arguments `determinism <dir>`, and then alone; the
+//       proof's `--determinism`, built -O whole-module): #305's measurement.
+//       Each of <dir>'s D1–D4 read by three arms, each twice, interleaved —
+//       T, the pass as it stood before SY-34 (the reader converting to 8 kHz,
+//       kept here for good), P the product's `writeSyncFeatures`, N the
+//       native-rate decode — and each pair compared byte for byte (the
+//       samples that differ, their clusters, the largest |Δ|); scored as
+//       SY-34 rules: P and N identical on all four and P's wall ≤ 1.5× T's on
+//       D1 and D2 (fastest of two each); with the cache below version 3, P
+//       on D3 and D4 only.
+import AVFoundation
 import Foundation
 
 var rows: [[String: Any]] = []
@@ -408,6 +441,256 @@ func runCost(_ dir: URL) {
 
 if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "cost" {
     runCost(URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true))
+    emit()
+}
+
+// MARK: - P25 the cache pass's determinism (only with the arguments `determinism <dir>`)
+
+/// One reader pass over `url`'s first audio track with `settings` as its
+/// output, every buffer's floats handed to `body` with the rate the buffer
+/// says; whether the reader ended `.completed`, and its wall seconds.
+func readAudio(
+    _ url: URL, settings: [String: Any], _ body: (UnsafeBufferPointer<Float>, Double) -> Void
+) -> (completed: Bool, wall: Double) {
+    let began = Date()
+    let asset = AVURLAsset(url: url)
+    guard let track = asset.tracks(withMediaType: .audio).first,
+          let reader = try? AVAssetReader(asset: asset)
+    else { return (false, 0) }
+    let output = AVAssetReaderTrackOutput(track: track, outputSettings: settings)
+    output.alwaysCopiesSampleData = false
+    guard reader.canAdd(output) else { return (false, 0) }
+    reader.add(output)
+    guard reader.startReading() else { return (false, 0) }
+    while let sample = output.copyNextSampleBuffer() {
+        guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
+        let byteCount = CMBlockBufferGetDataLength(block)
+        guard byteCount >= 4 else { continue }
+        var rate = 0.0
+        if let format = CMSampleBufferGetFormatDescription(sample),
+           let basic = CMAudioFormatDescriptionGetStreamBasicDescription(format) {
+            rate = basic.pointee.mSampleRate
+        }
+        var samples = [Float](repeating: 0, count: byteCount / 4)
+        let copied = samples.withUnsafeMutableBytes { raw -> OSStatus in
+            guard let base = raw.baseAddress else { return -1 }
+            return CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: byteCount,
+                                              destination: base)
+        }
+        guard copied == noErr else { continue }
+        samples.withUnsafeBufferPointer { body($0, rate) }
+    }
+    let status = reader.status
+    reader.cancelReading()
+    return (status == .completed, Date().timeIntervalSince(began))
+}
+
+/// The pass's output settings (`writeSyncFeatures`' before SY-34), with
+/// `AVSampleRateKey` only when `rate` is given.
+func syncSettings(rate: Double?) -> [String: Any] {
+    var settings: [String: Any] = [
+        AVFormatIDKey: kAudioFormatLinearPCM, AVNumberOfChannelsKey: 1,
+        AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true,
+        AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false,
+    ]
+    if let rate { settings[AVSampleRateKey] = rate }
+    return settings
+}
+
+/// How two files differ, as arrays of `T`: the elements that differ, the
+/// clusters they fall in (a new one more than 1,000 elements after the
+/// last), and the largest |Δ|; "identical" when the bytes are.
+func compare<T: BinaryFloatingPoint>(_ a: URL, _ b: URL, as type: T.Type) -> (Bool, String) {
+    compareValues(a, b, stride: MemoryLayout<T>.size) { raw, index in
+        Double(raw.load(fromByteOffset: index * MemoryLayout<T>.size, as: T.self))
+    }
+}
+
+func compareInt16(_ a: URL, _ b: URL) -> (Bool, String) {
+    compareValues(a, b, stride: 2) { raw, index in
+        Double(Int16(littleEndian: raw.load(fromByteOffset: index * 2, as: Int16.self)))
+    }
+}
+
+func compareValues(
+    _ a: URL, _ b: URL, stride: Int, value: (UnsafeRawBufferPointer, Int) -> Double
+) -> (Bool, String) {
+    guard let x = try? Data(contentsOf: a, options: .alwaysMapped),
+          let y = try? Data(contentsOf: b, options: .alwaysMapped)
+    else { return (false, "a file is missing") }
+    if x == y { return (true, "identical (\(x.count) bytes)") }
+    var difference = Difference()
+    x.withUnsafeBytes { xr in
+        y.withUnsafeBytes { yr in
+            for index in 0..<(min(x.count, y.count) / stride) {
+                difference.note(index, value(xr, index), value(yr, index))
+            }
+        }
+    }
+    return (false, "\(x.count) and \(y.count) bytes, " + difference.said)
+}
+
+/// How two float streams differ: `differ` elements, in `clusters` (a new
+/// one more than 1,000 elements after the last), the largest |Δ|.
+struct Difference {
+    var differing = 0
+    var clusters = 0
+    var first: [Int] = []
+    var largest = 0.0
+    private var last: Int?
+
+    mutating func note(_ index: Int, _ u: Double, _ v: Double) {
+        guard u != v else { return }
+        differing += 1
+        if last.map({ index - $0 > 1000 }) ?? true {
+            clusters += 1
+            if first.count < 3 { first.append(index) }
+        }
+        last = index
+        largest = max(largest, abs(u - v))
+    }
+
+    var said: String {
+        "\(differing) elements differ in \(clusters) clusters (first at \(first)), largest |Δ| "
+            + String(format: "%g", largest)
+    }
+}
+
+/// #305's measurement (SY-34): each file in `dir` (`D1.m4a`, `D2.m4a`,
+/// `D3.wav`, `D4.wav`) through three arms, each twice, the arms interleaved
+/// (T, P, N, then again) so a drifting host load falls on them alike: T,
+/// today's arm kept here for good (8 kHz from the reader into a
+/// `SyncFeatures.Extractor`, the same int16 rounding, written as the pass
+/// writes); P the product's `writeSyncFeatures`; N the native-rate decode,
+/// its first pass held in memory and the second compared as it comes. Each
+/// pair is compared byte for byte; the walls are each arm's whole pass.
+func runDeterminism(_ dir: URL) {
+    let manager = FileManager.default
+    let scratch = dir.appendingPathComponent("passes", isDirectory: true)
+    try? manager.removeItem(at: scratch)
+    try? manager.createDirectory(at: scratch, withIntermediateDirectories: true)
+    defer { try? manager.removeItem(at: scratch) }
+    let shipped = MediaImporter.syncFeaturesVersion >= 3
+    var good = true
+    var instrument = false
+    var notes: [String] = []
+    var walls: [String: (t: Double, p: Double)] = [:]
+    func seconds(_ values: [Double]) -> String {
+        values.map { String(format: "%.2f", $0) }.joined(separator: ", ")
+    }
+    let files = [("D1", "D1.m4a"), ("D2", "D2.m4a"), ("D3", "D3.wav"), ("D4", "D4.wav")]
+    for (name, file) in files {
+        let url = dir.appendingPathComponent(file)
+        let media = MediaSnapshot(id: 1, path: url.path, kind: .audio, hasVideo: false,
+                                  hasAudio: true)
+        guard manager.fileExists(atPath: url.path),
+              let stamp = MediaImporter.CacheStamp.stamp(for: media, url: url)
+        else {
+            instrument = true
+            notes.append("\(name): \(file) is missing")
+            continue
+        }
+        var tWalls: [Double] = []
+        var pWalls: [Double] = []
+        var nWalls: [Double] = []
+        var rates: Set<Double> = []
+        var native: [Float] = []
+        var nDifference = Difference()
+        var nCounts: [Int] = []
+        var caches: [URL] = []
+        for pass in 1...2 {
+            // T: today's arm.
+            let tBegan = Date()
+            let extractor = SyncFeatures.Extractor()
+            var pcm: [Int16] = []
+            let read = readAudio(url, settings: syncSettings(rate: Double(SyncFeatures.sampleRate))) {
+                samples, _ in
+                extractor.feed(samples)
+                for x in samples {
+                    pcm.append(x.isFinite ? Int16((min(1, max(-1, x)) * 32767).rounded()) : 0)
+                }
+            }
+            let frames = extractor.finish()
+            if !read.completed { instrument = true }
+            let tCache = scratch.appendingPathComponent("\(name)-T\(pass)", isDirectory: true)
+            try? manager.createDirectory(at: tCache, withIntermediateDirectories: true)
+            try? frames.withUnsafeBufferPointer { Data(buffer: $0) }
+                .write(to: tCache.appendingPathComponent("T.bin"), options: .atomic)
+            try? pcm.map { $0.littleEndian }.withUnsafeBufferPointer { Data(buffer: $0) }
+                .write(to: tCache.appendingPathComponent("T.pcm"), options: .atomic)
+            tWalls.append(Date().timeIntervalSince(tBegan))
+            // P: the product's pass, into its own cache.
+            let pBegan = Date()
+            let asset = AVURLAsset(url: url)
+            let cache = scratch.appendingPathComponent("\(name)-P\(pass)", isDirectory: true)
+            if let track = asset.tracks(withMediaType: .audio).first {
+                MediaImporter.writeSyncFeatures(
+                    for: media, asset: asset, track: track, stamp: stamp, into: cache, pass: nil)
+            } else {
+                instrument = true
+            }
+            pWalls.append(Date().timeIntervalSince(pBegan))
+            caches.append(cache)
+            // N: the native-rate decode.
+            var index = 0
+            let nRead = readAudio(url, settings: syncSettings(rate: nil)) { samples, rate in
+                rates.insert(rate)
+                if pass == 1 {
+                    native.append(contentsOf: samples)
+                } else {
+                    for x in samples {
+                        let u = index < native.count ? Double(native[index]) : .nan
+                        nDifference.note(index, u, Double(x))
+                        index += 1
+                    }
+                }
+            }
+            if !nRead.completed { instrument = true }
+            nWalls.append(nRead.wall)
+            nCounts.append(pass == 1 ? native.count : index)
+        }
+        native = []
+        let nSame = nDifference.differing == 0 && nCounts[0] == nCounts[1]
+        let t = (compareInt16(scratch.appendingPathComponent("\(name)-T1/T.pcm"),
+                              scratch.appendingPathComponent("\(name)-T2/T.pcm")),
+                 compare(scratch.appendingPathComponent("\(name)-T1/T.bin"),
+                         scratch.appendingPathComponent("\(name)-T2/T.bin"), as: Float.self))
+        let p = (compareInt16(MediaImporter.syncSamplesURL(for: 1, in: caches[0]),
+                              MediaImporter.syncSamplesURL(for: 1, in: caches[1])),
+                 compare(MediaImporter.syncFeaturesURL(for: 1, in: caches[0]),
+                         MediaImporter.syncFeaturesURL(for: 1, in: caches[1]), as: Float.self))
+        for pass in 1...2 {
+            try? manager.removeItem(at: scratch.appendingPathComponent("\(name)-T\(pass)"))
+            try? manager.removeItem(at: caches[pass - 1])
+        }
+        walls[name] = (tWalls.min() ?? 0, pWalls.min() ?? 0)
+        // Scored as SY-34 rules: shipped, P identical on every file and the
+        // native decode too; not shipped, P on the PCM sources D3 and D4.
+        let scored = shipped || name == "D3" || name == "D4"
+        if scored && !(p.0.0 && p.1.0) { good = false }
+        if shipped && !nSame { good = false }
+        notes.append(
+            "\(name) (\(file)): T walls \(seconds(tWalls)) s, .pcm \(t.0.1), .bin \(t.1.1); "
+                + "P walls \(seconds(pWalls)) s, .pcm \(p.0.1), .bin \(p.1.1); N walls "
+                + "\(seconds(nWalls)) s at \(rates.sorted().map { String(format: "%g", $0) }) Hz, "
+                + "\(nCounts) samples, "
+                + (nSame ? "identical" : nDifference.said))
+    }
+    for name in ["D1", "D2"] {
+        guard let w = walls[name] else { continue }
+        let ratio = w.t > 0 ? w.p / w.t : .infinity
+        if shipped && !(ratio <= 1.5) { good = false }
+        notes.append("\(name) P/T wall \(String(format: "%.3f", ratio)) (fastest of two each; "
+            + "want ≤ 1.5 when shipped)")
+    }
+    notes.append("the path shipped (cache version \(MediaImporter.syncFeaturesVersion)): \(shipped)")
+    // The whole of it on stderr too: the row's detail is cut at 1,500.
+    for note in notes { FileHandle.standardError.write(Data(("P25: " + note + "\n").utf8)) }
+    row("P25", good, notes.joined(separator: "; "), instrument: instrument)
+}
+
+if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "determinism" {
+    runDeterminism(URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true))
     emit()
 }
 
@@ -1451,10 +1734,14 @@ do {
         if !refused { good = false }
         let how = said.contains("GCC-PHAT confidence") ? "refused by the waveform gate"
             : "refused by the search"
+        // The gate's clause, whole words: from its first "(GCC-PHAT
+        // confidence" to the end (#308), the whole reason when it is absent.
+        let gate = said.range(of: "(GCC-PHAT confidence").map { String(said[$0.lowerBound...]) }
+            ?? said
         notes.append(
             "\(name) (\(count.0) and \(count.1) frames, both at 0): near placement "
                 + (near.map { String(format: "lag %.2f z %.2f", $0.lag, $0.z) } ?? "nil")
-                + " → \(refused ? how + (how.hasSuffix("gate") ? " (" + String(said.suffix(170)) + ")" : "") : "NOT refused: " + describe(plan))")
+                + " → \(refused ? how + (how.hasSuffix("gate") ? " " + gate : "") : "NOT refused: " + describe(plan))")
     }
     /// The cache's int16 of `values` (`round(clamp(x, −1, 1)·32767)`).
     func int16(_ values: [Float]) -> [Int16] {
@@ -2032,10 +2319,20 @@ func plantedFrames(_ anchor: [Float], lag: Int, count: Int, weight: Float, seed:
 /// from the spec: `find`'s choice, the coarse delta snap(zeroA − zeroN +
 /// lag·9600), the played overlap it gives in anchor frames (the files'
 /// overlap at the lag, rounded outward, when that is under 2 s), its region
-/// (the centre 30 s), `refine` along the coarse lag, then `incoherent` or
+/// (the centre 30 s; with `byEvidence`, SY-32's `refinementRegion` of the
+/// same overlap), `refine` along the coarse lag, then `incoherent` or
 /// `unconfirmed`; and the region's size. nil when `find` chose nothing.
-func gateAnswer(_ anchor: AudioSync.Reading, _ mover: AudioSync.Reading)
+func gateAnswer(_ anchor: AudioSync.Reading, _ mover: AudioSync.Reading, byEvidence: Bool = false)
     -> (reason: String, region: Int, played: Int, found: AudioSync.Found)? {
+    gateRegions(anchor, mover, byEvidence: byEvidence).map {
+        ($0.reason, $0.region.count, $0.played, $0.found)
+    }
+}
+
+/// `gateAnswer` with the region itself and the old centred one beside it.
+func gateRegions(_ anchor: AudioSync.Reading, _ mover: AudioSync.Reading, byEvidence: Bool)
+    -> (reason: String, region: Range<Int>, centred: Range<Int>, played: Int,
+        found: AudioSync.Found, refinement: AudioSyncPHAT.Refinement?)? {
     guard case .found(let found) = AudioSync.find(
         anchor: anchor, anchorFrames: anchor.features, anchorSpeech: nil, mover: mover,
         moverFrames: mover.features, moverSpeech: nil, fps: fps)
@@ -2052,24 +2349,33 @@ func gateAnswer(_ anchor: AudioSync.Reading, _ mover: AudioSync.Reading)
         let start = (low + high) / 2 - cap / 2
         return start..<(start + cap)
     }
-    var region = centred(lower * hop, upper * hop)
+    let line = AudioSyncPHAT.Line(intercept: found.lag * Double(hop), rate: 0)
+    func chosen(_ lo: Int, _ hi: Int) -> Range<Int> {
+        guard byEvidence else { return centred(lo * hop, hi * hop) }
+        return AudioSync.refinementRegion(
+            overlap: lo..<hi, anchorFrames: anchor.features, moverFrames: mover.features,
+            anchorSpeech: nil, moverSpeech: nil, matchedOn: found.matchedOn, line: line)
+    }
+    var region = chosen(lower, upper)
+    var old = centred(lower * hop, upper * hop)
     let played = region.count
     if region.count < AudioSyncPHAT.minimumRegionSamples {
         let lo = max(0, Int(found.lag.rounded(.down)))
         let hi = max(lo, min(anchor.features.count / width,
                              mover.features.count / width + Int(found.lag.rounded(.up))))
-        region = centred(lo * hop, hi * hop)
+        region = chosen(lo, hi)
+        old = centred(lo * hop, hi * hop)
     }
     let refinement = AudioSyncPHAT.refine(
         anchor: anchor.samples, anchorSpeed: 1, mover: mover.samples, moverSpeed: 1,
-        line: AudioSyncPHAT.Line(intercept: found.lag * Double(hop), rate: 0), region: region)
+        line: line, region: region)
     let reason = refinement.map {
         AudioSync.incoherent(
             anchor: anchor.clip, mover: mover.clip, delta: coarse, confidence: found.confidence,
             refinement: $0)
     } ?? AudioSync.unconfirmed(
         anchor: anchor.clip, mover: mover.clip, delta: coarse, confidence: found.confidence)
-    return (reason, region.count, played, found)
+    return (reason, region, old, played, found, refinement)
 }
 
 /// `reading` with `samples` in place of its own.
@@ -2292,5 +2598,239 @@ do {
     row("P20", good, notes.joined(separator: "; "), instrument: instrument)
 }
 
-emit()
+// MARK: - P21 the region chosen by the features (SY-32)
 
+do {
+    var good = true
+    var notes: [String] = []
+    var instrument = false
+    // P17's construction over 54 s: the anchor holds the pips 9,632 samples
+    // (1.204 s) after the mover. The mover's [12 s, 42 s) is replaced, so
+    // the overlap's centre 30 s is the gap and the shared sound lies only
+    // either side of it; its features are `SyncFeatures.frames` of the
+    // edited samples. Under 60 s of overlap, so no drift: the line is the
+    // coarse lag.
+    let seconds = 54
+    let delay = 9632.0
+    let pips = Pips(seed: 401, samples: Double(seconds * 8000) + delay + 1000)
+    let anchorPCM = pcm(pips.sample(count: seconds * 8000 + 9632, c: -delay), noise: 0.003,
+                        seed: 411)
+    let moverPCM = pcm(pips.sample(count: seconds * 8000), gain: 0.5, noise: 0.003, seed: 412)
+    let truth = Ticks(delay) * AudioSyncPHAT.sampleTicks
+    func gapped(_ level: Double) -> [Int16] {
+        var out = moverPCM
+        var noise = LCG(state: 402)
+        for n in (12 * 8000)..<(42 * 8000) {
+            out[n] = Int16((Double(noise.signed()) * level * 32767).rounded())
+        }
+        return out
+    }
+    func span(_ r: Range<Int>) -> String {
+        String(format: "[%.3f s, %.3f s)", Double(r.lowerBound) / 8000, Double(r.upperBound) / 8000)
+    }
+    let anchor = pipsReading(1, track: 0, start: 0, samples: anchorPCM, video: true)
+    for (name, level) in [("(a) noise at 0.1", 0.1), ("(b) room tone at −60 dBFS", 0.001)] {
+        let mover = pipsReading(2, track: 1, start: 0, samples: gapped(level))
+        let plan = AudioSync.plan(
+            AudioSync.Input(readings: [anchor, mover], problems: [], anchor: nil, fps: fps))
+        let written = gateRegions(anchor, mover, byEvidence: true)
+        // The control: PHAT over the old centred 30 s of the same overlap.
+        let old = written.flatMap { w in
+            AudioSyncPHAT.refine(
+                anchor: anchorPCM, anchorSpeed: 1, mover: mover.samples, moverSpeed: 1,
+                line: AudioSyncPHAT.Line(intercept: w.found.lag * Double(SyncFeatures.hop), rate: 0),
+                region: w.centred)
+        }
+        let control = old.map { !$0.clear } ?? false
+        if !control { instrument = true }
+        let region = written.map { span($0.region) } ?? "nil"
+        let centred = written.map { span($0.centred) } ?? "nil"
+        if case .planned(_, let synced, _) = plan, let one = synced.first {
+            let ok = one.chosenBy == .confidence && one.refinement?.clear == true
+                && abs(one.lag - truth) <= 75
+            if !ok { good = false }
+            notes.append(
+                "\(name): offset \(one.lag) (want \(truth) ±75), \(one.chosenBy.rawValue) z "
+                    + "\(String(format: "%.2f", one.confidence)), \(describe(one.refinement)), "
+                    + "region \(region) of the anchor timeline; control: the centred "
+                    + "\(centred) \(describe(old)) (want not clear: \(control))")
+        } else {
+            good = false
+            notes.append("\(name): \(describe(plan)) (want planned, clear); region \(region); "
+                + "control: the centred \(centred) \(describe(old)) (\(control))")
+        }
+    }
+    // (c) (a)'s features with the anchor's samples unrelated pips: the gate
+    // refuses, exactly as the plan's own numbers write it.
+    let unrelated = pcm(Pips(seed: 403, samples: Double(seconds * 8000) + delay + 1000)
+        .sample(count: seconds * 8000 + 9632), noise: 0.003, seed: 413)
+    let cAnchor = withSamples(anchor, unrelated)
+    let cMover = pipsReading(2, track: 1, start: 0, samples: gapped(0.1))
+    let said = refusal(
+        AudioSync.plan(
+            AudioSync.Input(readings: [cAnchor, cMover], problems: [], anchor: nil, fps: fps)))
+        ?? ""
+    let want = gateRegions(cAnchor, cMover, byEvidence: true)
+    let cOK = !said.isEmpty && said == want?.reason
+        && said.contains("but their waveforms do not line up there (GCC-PHAT confidence ")
+    if !cOK { good = false }
+    notes.append(
+        "(c) unrelated anchor samples: \(cOK ? "refused as written" : "NOT as written"), "
+            + "region \(want.map { span($0.region) } ?? "nil"), "
+            + (said.range(of: "(GCC-PHAT").map { String(said[$0.lowerBound...]) } ?? said)
+            + (cOK ? "" : " (want: \(want?.reason ?? "nil"))"))
+    row("P21", good, notes.joined(separator: "; "), instrument: instrument)
+}
+
+// MARK: - P24 the sync pass's resampler (SY-34)
+
+do {
+    var good = true
+    var notes: [String] = []
+    /// `samples` through a resampler at `rate`, in pieces of `piece` (the
+    /// whole at once when nil), and its `finish`.
+    func resampled(_ samples: [Float], rate: Double, piece: Int? = nil) -> [Float] {
+        let resampler = SyncResampler(inputRate: rate)
+        var out: [Float] = []
+        let size = piece ?? max(samples.count, 1)
+        var start = 0
+        while start < samples.count {
+            let end = min(samples.count, start + size)
+            out += samples[start..<end].withUnsafeBufferPointer { resampler.feed($0) }
+            start = end
+        }
+        return out + resampler.finish()
+    }
+    func same(_ a: [Float], _ b: [Float]) -> Bool {
+        a.count == b.count && zip(a, b).allSatisfy { $0.bitPattern == $1.bitPattern }
+    }
+    // 44,099.5 Hz: a rate that is not whole, its phase rounded (SY-34).
+    for rate in [48_000.0, 44_100.0, 16_000.0, 44_099.5] {
+        let count = Int(rate) * 2
+        // An impulse at input j: it lands at output 8000·j/rate, read as
+        // the response's first moment over ±20 output samples.
+        var placed: [String] = []
+        for fraction in [0.3137, 0.7311] {
+            let j = Int(rate * 2 * fraction)
+            var impulse = [Float](repeating: 0, count: count)
+            impulse[j] = 1
+            let y = resampled(impulse, rate: rate)
+            let want = 8000 * Double(j) / rate
+            let lo = max(0, Int(want) - 20)
+            let hi = min(y.count - 1, Int(want) + 21)
+            var sum = 0.0
+            var moment = 0.0
+            for n in lo...hi {
+                sum += Double(y[n])
+                moment += Double(n) * Double(y[n])
+            }
+            let at = sum != 0 ? moment / sum : .nan
+            let ok = abs(at - want) <= 0.05
+            if !ok { good = false }
+            placed.append("input \(j) at \(String(format: "%.4f", at)) (want "
+                + "\(String(format: "%.4f", want)) ±0.05)")
+        }
+        // The count, and whole against pieces of 1, 777 and 4,096 samples.
+        let noise = randomArray(count + 123, seed: 241).map { $0 * 0.5 }
+        let whole = resampled(noise, rate: rate)
+        let wantCount = Int((Double(noise.count) * 8000 / rate).rounded(.up))
+        let pieces = [1, 777, 4096].map { same(whole, resampled(noise, rate: rate, piece: $0)) }
+        let ok = whole.count == wantCount && pieces.allSatisfy { $0 }
+        if !ok { good = false }
+        notes.append(
+            "\(String(format: "%g", rate)) Hz: \(placed.joined(separator: ", ")); "
+                + "\(noise.count) samples give \(whole.count) (want ⌈N·8000/rate⌉ \(wantCount)); "
+                + "pieces of 1, 777, 4096 identical to the whole: \(pieces)")
+    }
+    let noise = randomArray(8000 * 3 + 5, seed: 242)
+    let identity = resampled(noise, rate: 8000)
+    let identical = same(identity, noise) && same(resampled(noise, rate: 8000, piece: 777), noise)
+    if !identical { good = false }
+    notes.append("8000 Hz: the identity, whole and in pieces of 777: \(identical)")
+    row("P24", good, notes.joined(separator: "; "))
+}
+
+// MARK: - P23 a file under one frame (SY-31)
+
+do {
+    var good = true
+    var notes: [String] = []
+    var instrument = false
+    let manager = FileManager.default
+    let dir = manager.temporaryDirectory.appendingPathComponent(
+        "framejob-sync-probe-\(getpid())", isDirectory: true)
+    try? manager.removeItem(at: dir)
+    defer { try? manager.removeItem(at: dir) }
+    try? manager.createDirectory(at: dir, withIntermediateDirectories: true)
+    typealias Cached = (marker: Bool, features: [Float]?, samples: [Int16]?, current: Bool)
+    /// A 1 kHz tone at −6 dBFS, 16 kHz mono 16-bit, `count` samples, written
+    /// by `AVAudioFile` and passed through the product's `writeSyncFeatures`
+    /// into `<dir>/<name>/cache`: what the cache then holds.
+    func cached(_ name: String, count: Int, id: UInt32) -> Cached? {
+        let url = dir.appendingPathComponent("\(name).wav")
+        let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 16_000.0,
+            AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false,
+        ]
+        do {
+            guard let format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1),
+                  let buffer = AVAudioPCMBuffer(
+                    pcmFormat: format, frameCapacity: AVAudioFrameCount(count)),
+                  let channel = buffer.floatChannelData?[0]
+            else { return nil }
+            buffer.frameLength = AVAudioFrameCount(count)
+            let amplitude = pow(10, -6.0 / 20)
+            for n in 0..<count {
+                channel[n] = Float(amplitude * sin(2 * Double.pi * 1000 * Double(n) / 16_000))
+            }
+            guard let file = try? AVAudioFile(forWriting: url, settings: settings),
+                  (try? file.write(from: buffer)) != nil
+            else { return nil }
+        }
+        let asset = AVURLAsset(url: url)
+        guard let track = asset.tracks(withMediaType: .audio).first else { return nil }
+        let media = MediaSnapshot(
+            id: id, path: url.path, kind: .audio,
+            duration: Ticks(count) * ReelTime.perSecond / 16_000, hasVideo: false, hasAudio: true)
+        guard let stamp = MediaImporter.CacheStamp.stamp(for: media, url: url) else { return nil }
+        let cache = dir.appendingPathComponent(name, isDirectory: true)
+            .appendingPathComponent("cache", isDirectory: true)
+        MediaImporter.writeSyncFeatures(
+            for: media, asset: asset, track: track, stamp: stamp, into: cache, pass: nil)
+        return (
+            MediaImporter.readSyncFeaturesStamp(
+                at: MediaImporter.syncFeaturesMarkerURL(for: id, in: cache)) != nil,
+            MediaImporter.loadSyncFeatures(for: id, in: cache),
+            MediaImporter.loadSyncSamples(for: id, in: cache),
+            MediaImporter.syncFeaturesAreCurrent(for: media, stamp: stamp, in: cache))
+    }
+    func said(_ c: Cached?) -> String {
+        guard let c else { return "the fixture could not be written or read" }
+        let frames = c.features.map { "\($0.count / width)" } ?? "nil"
+        let samples = c.samples.map {
+            "\($0.count) (frameCount \(SyncFeatures.frameCount(samples: $0.count)))"
+        } ?? "nil"
+        return "marker \(c.marker), frames \(frames), samples \(samples), current \(c.current)"
+    }
+    let short = cached("short", count: 640, id: 1)
+    var shortOK = false
+    if let c = short, let samples = c.samples {
+        shortOK = c.marker && c.features == [] && SyncFeatures.frameCount(samples: samples.count) == 0
+            && c.current
+    }
+    if !shortOK { good = false }
+    notes.append("40 ms of a 1 kHz tone at −6 dBFS: \(said(short)) (want marker, 0 frames, "
+        + "samples of frameCount 0, current)")
+    let long = cached("long", count: 16_000, id: 2)
+    var control = false
+    if let c = long, let features = c.features, let samples = c.samples {
+        let frames = SyncFeatures.frameCount(samples: samples.count)
+        control = c.marker && frames > 0 && features.count / width == frames && c.current
+    }
+    if !control { instrument = true }
+    notes.append("control, 1 s of the same tone: \(said(long)) (want frameCount(samples) frames: "
+        + "\(control))")
+    row("P23", good, notes.joined(separator: "; "), instrument: instrument)
+}
+
+emit()

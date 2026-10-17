@@ -324,7 +324,10 @@ detail there.
   session after 2 s and 10 s, and a retry that publishes also runs the sync
   features and speech passes once. The cache order is thumbnails → peaks →
   sync features (`cache/sync/<id>.bin` and the 8 kHz `<id>.pcm`,
-  `MediaImporter+SyncFeatures.swift`) → speech.
+  `MediaImporter+SyncFeatures.swift`, version 3: decoded at the file's own
+  rate and brought to 8 kHz by `SyncResampler`, so two passes write the same
+  bytes, SY-34; a file under one frame publishes an empty `.bin`, SY-31) →
+  speech.
   `thumbnails` holds a
   video track's last frame past its end, from the track's last SAMPLE's time.
   `FFmpegRewrap+Plan.swift` (a pure move, issue batch B80) holds the plan,
@@ -1806,9 +1809,10 @@ free.
 - `AudioNormalize.swift` — Normalize Clip as a value type: peaks in, ops out,
   measured PRE-FADER from the plan segment, REPLACING `volume` so a second
   press is a no-op, always to BASE props.
-- `AudioSync.swift` (+`Correction`, +`Search`, +`Weak`) · `AudioSyncMatch.swift`
-  · `AudioSyncDrift.swift` · `AudioSyncPHAT.swift` · `SyncFeatures.swift` ·
-  `AudioSyncSheetController.swift` — Synchronize Audio (spec §11 SY-1..SY-22,
+- `AudioSync.swift` (+`Correction`, +`Region`, +`Search`, +`Weak`) ·
+  `AudioSyncMatch.swift` · `AudioSyncDrift.swift` · `AudioSyncPHAT.swift` ·
+  `SyncFeatures.swift` · `SyncResampler.swift` ·
+  `AudioSyncSheetController.swift` — Synchronize Audio (spec §11 SY-1..SY-34,
   ADR `audio-sync`), `AudioNormalize`'s shape: `read` takes the plan
   segments, the sync features (standardised MFCC frames, `SyncFeatures`), the
   8 kHz samples and the speech caches once; `plan` is pure and runs OFF the
@@ -1835,7 +1839,8 @@ free.
   `AudioSyncMatch` is the pure signal arithmetic: the summed feature
   correlation, its z-score confidence and the speech masks;
   `AudioSyncPHAT` refines a match by GCC-PHAT on the speech band within
-  ±48 ms (SY-20; the coarse offset stands when no clear peak); `AudioSyncDrift`
+  ±48 ms (SY-20), over the one 30 s region `+Region` picks where the features
+  agree best at the lag (SY-32); `AudioSyncDrift`
   fits the drift as a robust line (Theil–Sen, MAD inliers) through feature
   windows, then PHAT per window (SY-21);
   `+Correction` decides whether to correct it, the ±0.2% band and the op

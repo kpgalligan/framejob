@@ -52,7 +52,10 @@ of 2026-10-16, SY-22's precedent, and SY-29's fail-closed clause is the orchestr
   current-version marker, its size a positive even number of bytes, and the features are current
   only when it is; clearing removes the marker, then both files. A version-1 marker is another
   version, so its media reads "still being analysed" until the next cache pass rewrites both — no
-  migration.
+  migration. **Amended by SY-31 (#301):** a completed read with no whole frame publishes a
+  zero-byte `.bin` beside its `.pcm`, read as no frames, so the edge above reads "too short to
+  match"; sizes of 0 are read. **Amended by SY-34 (#305):** the pass decodes at the file's own
+  rate and `SyncResampler` brings it to 8 kHz, so two passes write the same bytes; version 3.
 
 - **SY-12 — The feature match and its confidence (supersedes SY-3 for the coarse match).** The
   two stretches compared (SY-13) are taken onto the timeline grid (SY-6's resampling, applied to
@@ -279,7 +282,8 @@ of 2026-10-16, SY-22's precedent, and SY-29's fail-closed clause is the orchestr
   **Amended by SY-29, corrected by SY-28:** the refinement is now the gate — not clear, or with
   samples not run, refuses — its region falls back to the files' overlap under 2 s, and "the tier
   is untouched" no longer holds; S20's 9.00 and S21's 9.01 were PHAT reading a false pair
-  correctly.
+  correctly. **Amended by SY-32 (#302):** an overlap over 30 s gives the 30 s whose features
+  agree most along the line, not its centre.
 
 - **SY-21 — Drift on the features, each window refined by PHAT (supersedes SY-5's and SY-7's
   onsets; amends SY-6's units).** Drift's inputs are the readings' timeline-grid features and
@@ -324,7 +328,9 @@ of 2026-10-16, SY-22's precedent, and SY-29's fail-closed clause is the orchestr
   rule:** S10's 2 ms, S17's 2 ms, P5's ±5 ppm and S18's 3 ms stand; on a miss only the window floor
   `driftWindowZ` (6) may move, every value tried recorded here; a miss that no value fixes stops
   the phase. The inlier scale k (`driftInlierScale`) is FIXED at 3 and the floor at 1 sample: a
-  miss is a stop, never a new k (the measured passing band, 2–6, is recorded above).
+  miss is a stop, never a new k (the measured passing band, 2–6, is recorded above). **Measured
+  by SY-33 (#304):** a z²-weighted stage-1 line and a span fallback were tried on a late unrelated
+  stretch and neither corrected it; stage 1 is unchanged.
 
 - **SY-22 — The call's cost and its background run (AS-4, the orchestrator's ruling of
   2026-10-16).** **The budget:** a whole sync of a one-hour pair — the cached features and samples
@@ -479,7 +485,8 @@ of 2026-10-16, SY-22's precedent, and SY-29's fail-closed clause is the orchestr
   lags, 2 of them ≥ 15 (15.49, 19.18); owner-sync-2 off the truth at most 12.34; the reversed
   recorder 11.51; CAMERA against UNRELATED 6.25. PHAT confirms; it never finds (SY-20).
   **Calibration rule:** a fixture misclassified stops the round, which reports every z; no
-  constant moves.
+  constant moves. **Amended by SY-32 (#302):** over 30 s, the region (played or the files') is
+  the 30 s whose features agree most along the line; still one region and one refinement.
 
 - **SY-30 — Speech-only matching kept; the fixtures retargeted.** SY-17 stays: masking lifted two
   true short-window pairs of owner-sync-2 into the confident tier (8.41 → 10.11 and 9.03 → 10.77

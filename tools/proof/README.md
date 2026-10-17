@@ -20536,3 +20536,56 @@ PHAT 81.09, the recorder +1.0000 s; S1's offset 32.5 ticks from the truth (PHAT 
 ppm on phat. `--mutants` 43/43 killed, no failed control. GCC-PHAT on the owner's files differs
 between runs (S20 9.00 on Debug, 8.01 on Release; S23 10.24 and 10.51; the feature z moved too, 7.99
 and 7.93, so the decoded inputs differed — compare #305), every reading under 15.
+
+## Audio sync, the clean-up — #301, #302, #304, #305, #308 (`audio_sync_proof.py` S31, P21, P23, P24, `--determinism` (P25) and forty-seven mutants; `audio_sync_probe.swift`; spec §11 SY-31..SY-34)
+
+```
+python3 tools/proof/audio_sync_proof.py <dir>/agent.sock [--only S31,P21,...]  # Debug; the recorded run is RC_PROOF_APP=release
+python3 tools/proof/audio_sync_proof.py --determinism                          # P25 alone: SY-34's two cache passes (-O wmo probe, ffmpeg fixtures)
+python3 tools/proof/audio_sync_proof.py --mutants                              # the 47 mutants, probe-only (run it in the background)
+```
+
+The same script. **S31** (SY-31) imports SHORT (`short-v1.wav`, 40 ms of a 1 kHz tone at −6 dBFS)
+at 0 beside CAMERA at 10 s: its sync marker lands, and `sync_audio` is refused "is too short to
+match: its file holds under 2 s of sound.", never "still being analysed". The probe's **P13** quotes
+the gate's clause from its first "(GCC-PHAT confidence" in whole words (#308). **P21** (SY-32) is a
+54 s pips pair whose mover's centre 30 s is replaced by noise (at 0.1, and at −60 dBFS): the plan
+refines over the 30 s where the features agree and is clear (control: PHAT over the old centred
+30 s is not), and with unrelated anchor samples it is refused exactly as the plan's numbers write
+it. **P23** (SY-31) writes a 40 ms tone with `AVAudioFile` and passes it through the product's
+`writeSyncFeatures`: marker, no frames, current (control: 1 s gives its frames). **P24** (SY-34) is
+`SyncResampler`: impulses at 48,000, 44,100, 16,000 and 44,099.5 Hz (not whole, its phase
+rounded to 1/1,024 sample) land within ±0.05 output sample, the whole against pieces of 1, 777 and 4,096 samples byte-identical, 8,000 Hz the identity. **P25**
+(`--determinism` only, its probe built -O whole-module as P19's) makes four ffmpeg files under
+`work/audio-sync/determinism/` (removed after) — D1 one hour mono AAC at 48 kHz, D2 ten minutes
+stereo AAC at 44.1 kHz, D3 and D4 ten minutes mono WAV at 48 and 16 kHz — and reads each twice by
+three interleaved arms: T the pass as it stood (the reader converting to 8 kHz; the probe's own,
+kept for good), P the product's `writeSyncFeatures`, N the native-rate decode; scored on P and N
+identical on all four and P's wall ≤ 1.5× T's on D1 and D2. The probe's run wall is now 600 s (it
+answers in about 135 s unloaded; a loaded host took two candidate runs past the old 240). Mutants
+added (four): `short-file-unpublished` and `empty-bin-refused` (P23), `phat-region-centred` (P21),
+`resampler-offset` (P24). #304's attempt (SY-33) stopped: neither candidate passed its six cases,
+so no drift mutant and no P22.
+
+**Debug runs** (2026-10-16, own instance, no `Frame Job: ` line): `--only
+P5,P7,P8,P12,P13,P17,P18,P20,P21,P23,P24` 11/11 — P21 (a) offset 722,404 ticks for 722,400, PHAT
+73.09 over [1.200 s, 31.200 s) where the centred [13.2 s, 43.2 s) reads 3.75, (b) 276.46 for 3.74,
+(c) refused at 3.75; P23 320 samples, 0 frames, current (1 s: 8,000 samples, 59 frames); `--only
+S1,S10,S19,S20,S21,S22,S23,S27,S28,S29,S30,S31` 12/12 — S31's sync marker 0.1 s after
+`import_media`; S20/S21 refused at z 7.77, GCC-PHAT 9.47 / 9.51; S30 17.11, GCC-PHAT 8.30; S22
+4.59 / 5.18; S23 5.27 / 9.72; S27/S28 PHAT 107.35 / 107.47, T 148.2667 s (unsnapped 148.2658); S29
+weak 8.49 on speech, PHAT 70.45; S1 PHAT 452.58, 32.5 ticks from the truth; S10 199.922 ppm on phat.
+`--determinism` (before the product change, P being T): T and P differed on every file, N identical;
+after it, P and N identical on D1–D4, P/T 1.213 (D1) and 1.157 (D2).
+
+**Recorded runs** (Release, 2026-10-16, after `make gate` passed; own instance, no `Frame Job: `
+line): 53/53 (S1–S31, P1–P18, P20, P21, P23, P24). S31 refused "too short to match", its sync marker
+0.1 s after `import_media`; S20/S21 refused at z 7.77, GCC-PHAT 9.47 / 9.51; S30 17.11, GCC-PHAT
+8.30; S22 4.59 / 5.18; S23 5.27 / 9.72 (camera 244, reversed recorder 186 speech frames); S27/S28
+PHAT 107.35 / 107.47, T 148.2667 s (unsnapped 148.2658); S29 weak 8.49 on speech, PHAT 70.45, the
+recorder +1.0000 s; S1 PHAT 452.58, 32.5 ticks from the truth; S10 199.922 ppm on phat; S18 0.70 ms
+early in the take. Every owner reading equals the Debug run's, where round 3's Release and Debug
+runs differed (S20 9.00 against 8.01) — SY-34's determinism. `--cost` P19 0.957 s of CPU (load
+0.066, plan 0.891). `--determinism` P25 ok: P and N identical on D1–D4, T differing on all four
+(478, 116, 121 and 35 samples), P/T 1.259 (D1) and 1.189 (D2). `--mutants` 47/47 killed, no failed
+control.
