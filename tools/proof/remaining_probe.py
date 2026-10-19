@@ -1215,7 +1215,7 @@ SITES = [
     ("CaptionExporter.swift", "@objc private func formatChanged", "CaptionExporter.renamed("),
     ("CaptionExporter.swift", "func exportCaptionsCommand()", "document.displayStem"),
     ("EditorViewController+SaveFrame.swift", "func saveFrameCommand()", "document.displayStem"),
-    ("ExportSheetController.swift", "private func suggestedName(", ".displayStem"),
+    ("ExportSheetCommit.swift", "private func suggestedName(", ".displayStem"),
     ("AgentServer+Captions.swift", "func exportCaptions(", "captionDestinationURL("),
 ]
 
@@ -1226,7 +1226,7 @@ BARE_ALLOWED = {
     "CaptionExporter.swift": 1,
     "ProjectDocument+DisplayStem.swift": 1,
     "EditorViewController+SaveFrame.swift": 0,
-    "ExportSheetController.swift": 0,
+    "ExportSheetCommit.swift": 0,
     "AgentServer+Captions.swift": 0,
 }
 

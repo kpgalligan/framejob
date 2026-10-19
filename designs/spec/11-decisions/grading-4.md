@@ -143,6 +143,8 @@ nothing of Concat is opened, at design time or build time.
   - **Not:** no format, op, FFI or tool-count change.
   - Risk accepted: a pixel whose `255·zoom·c` lies within 1e-3 of 127.5 or −128.5 may fall
     either side of the edge between the GPU and a CPU count; S6 allows that band, nothing else.
+  **Amended by HD-8** (hdr H-0): in an HLG project the six targets and their rim ticks are BT.2020's
+  75 % bars; an SDR project's zoom, bins and ticks are unchanged.
 - **GR-32 — Hue curves: `video.curves.hue_hue` (Hue vs Hue) and `.hue_sat` (Hue vs Sat) on a
   periodic Fritsch–Carlson spline, applied after the channel curves at step 4c.2 through the
   strip's second row behind `hueCurvesEnabled`; the Hue and Sat cells, the hover readout and the
@@ -241,6 +243,8 @@ nothing of Concat is opened, at design time or build time.
   **Amended by GR-34** (grading-4 T4-3): "any other count change switches at the end (T4-3
   changes that)" and the risk's last clause are replaced: inside an action two non-identity hue
   curves of different counts blend their values, `(1−t)·a(h) + t·b(h)`, in their units.
+  **Amended by HD-2** (hdr H-0): in an HLG project the hue shift and the Sat gain keep BT.2020 luma
+  instead of Rec. 709's; an SDR project's curves are unchanged.
 - **GR-33 — Color's Hue turns HSV hue by GR-32's exact shift: + is red → yellow → green, Rec. 709
   luma kept.** Recorded in T4-2b before its code, from the owner's answer of 2026-10-15 to
   T4-2's H16 ("Fix with the new exact shift (Recommended)"); it amends GR-2 and GR-32.
@@ -274,6 +278,8 @@ nothing of Concat is opened, at design time or build time.
     `gradeHueShift`'s body or to the hue curves.
   - Risk accepted: the shift costs more than the matrix per tap on a blurred layer (13 taps); not
     measured.
+  **Amended by HD-2** (hdr H-0): in an HLG project Color's Hue keeps BT.2020 luma instead of Rec.
+  709's; an SDR project's Hue is unchanged.
 - **GR-34 — Inside an action, a curve channel whose two ends are non-identity curves of
   different point counts renders `(1−t)·a(x) + t·b(x)`, the two curves' VALUES blended; the core
   publishes the pair and t, Swift's strip blends the two splines; a count change inside an action

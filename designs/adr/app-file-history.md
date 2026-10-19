@@ -676,7 +676,29 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   each losing only `private` — a pure move, typechecked alone (0 errors, the 4 baseline warnings)
   before any other edit. `wc -l app/Sources/MediaImporter.swift`: 596 before, 567 after;
   `MediaImporter+Probe.swift` 348 → 378. The next seam: a pass's await-free body out to its `+`
-  file, `writeSpeech`'s precedent (what is left here awaits).
+  file, `writeSpeech`'s precedent (what is left here awaits). The HDR road map's H-0 paid that
+  seam before H-1's peak read: inside `thumbnails`, the image branch's body and the closing
+  publication (the marker under `CacheLedger.shared.publish` and the last post, with its
+  comment as the doc) went to `MediaImporter+Thumbnails.swift` (`import AVFoundation`) as
+  `writeImageThumbnail` and `publishThumbnails`, each called from where its lines stood, so
+  `defer { reader.finish() }` still runs after the publication; `thumbnails` keeps its own
+  `written` and every `await`, and `cache_pass_probe.py`'s six anchors still occur once here.
+  A pure move gated alone; nothing widened (every member the moved lines reach was already
+  internal). `wc -l app/Sources/MediaImporter.swift`: 599 before, 573 after;
+  `MediaImporter+Thumbnails.swift` is 57. The next seam: the frames loop's per-result write
+  (the `switch result` body) out to `+Thumbnails`.
+- `ExportSheetController.swift`: the HDR road map's H-0 paid a toll before H-3's export range:
+  `// MARK: - Commit` through `panelMessage`'s closing brace (lines 514–623 at `24672e2`, and
+  the blank line before) moved verbatim into `extension ExportSheetController` in
+  `ExportSheetCommit.swift` (`import AppKit`, `import UniformTypeIdentifiers`): `cancelClicked`,
+  `exportClicked`, `queueClicked`, `commit(queue:)`, `recipeOptions`, `suggestedName` and
+  `panelMessage`. The three `@objc private func` became `@objc func`, because `loadView`'s
+  `#selector`s must reach them from the other file; nothing else widened. The type's doc names
+  the fourth extension, and `inventory.json`'s `commit` site and `remaining_probe.py`'s 1e
+  re-pinned to the new file. A pure move gated alone. `wc -l
+  app/Sources/ExportSheetController.swift`: 639 before, 528 after; `ExportSheetCommit.swift` is
+  120. The next seam: `// MARK: - Controls` and the `NSTextFieldDelegate` extension out whole to
+  `ExportSheetControls.swift`.
 - `Playback.swift`: `seekFinished()` and `report(_:)` to `Playback+Scope.swift`, with `reported`
   and `refreshWanted` widened from `private` for that file alone (B30's shape). `player` stays
   private.

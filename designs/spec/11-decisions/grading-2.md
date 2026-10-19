@@ -85,6 +85,10 @@ Concat is opened, at design time or build time.
   **Amended by GR-31** (grading-4 T4-1): the vectorscope zooms ×1, ×2 and ×4, per slot, binned
   `128 + round(255·zoom·c)`, clamped at ×1 as above and not counted off the plot at ×2 and ×4;
   the targets become rim ticks off the plot; `render_frame` gains `vectorscope_zoom`.
+  **Amended by HD-8** (hdr H-0): in an HLG project the waveform and the parade read HLG signal %
+  with a cd/m² scale, a reference-white line at 75 % and clip marks at 100 % (1,000 cd/m²), the
+  vectorscope uses BT.2020's matrix and targets, and the scope JSON names its scale; every SDR
+  project's traces and this entry's bound are unchanged.
 - **GR-11 — Wheels: `video.wheels {lift, gamma, gain}`, each a Cartesian colour push `{x, y}`
   and a `master`, applied at step 4c.1 after tone and before the look, in the layer stage and the
   adjustment pass; format 16.** Recorded in G2-2 before its code, from the owner's "All as
@@ -419,3 +423,5 @@ Concat is opened, at design time or build time.
   an `r16Float` map pass the adjustment pass reads at `texture(0)` (`blurred`, the block's
   reserved float); the coverage is never blurred; Show Selection and `render_frame {selection}`
   draw the blurred q × coverage; neutral now also needs blur 0; format 21.
+  **Amended by HD-2** (hdr H-0): in an HLG project the qualifier's luma uses BT.2020's weights
+  (0.2627, 0.6780, 0.0593) instead of Rec. 709's; an SDR project's selection is unchanged.

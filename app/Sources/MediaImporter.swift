@@ -350,20 +350,9 @@ enum MediaImporter {
         var written: Set<Int> = []
 
         if media.kind == .image {
-            if let image = decodeImage(url, maxPixelSize: Int(thumbnailHeight * 4)),
-                pass?.isCurrent() ?? true,
-                writeJPEG(image, to: directory.appendingPathComponent("0.jpg")) {
-                written.insert(0)
-            }
-            if let stamp {
-                CacheLedger.shared.publish(in: cacheDir, for: pass) {
-                    if stripHolds(written, in: directory) { writeStamp(stamp, to: marker) }
-                }
-            }
-            // Posted whether or not the picture decoded: the old tile is
-            // gone either way, and a memo still holding it would draw a
-            // picture the package no longer has.
-            postCacheChange(media: media.id, kind: thumbsKind, replaced: replaced)
+            writeImageThumbnail(
+                for: media, url: url, stamp: stamp, into: cacheDir, pass: pass,
+                directory: directory, marker: marker, replaced: replaced)
             return
         }
 
@@ -437,24 +426,9 @@ enum MediaImporter {
                 replaced = false
             }
         }
-        // AFTER the loop and never inside it: a hole left by a frame that
-        // would not decode is still a finished pass — complete is not a
-        // count. But only when the pass wrote at least one frame and every
-        // frame it wrote is still there (`stripHolds` argues both halves: a
-        // pass that wrote nothing is a failed reader to retry, and a frame
-        // that is gone is a titled document's save having swapped the
-        // package under the pass); otherwise NO marker, and the next open
-        // rebuilds, exactly as before the marker existed. And only for a
-        // stamp that exists; nothing certifies a strip made from a file that
-        // could not be measured. The listing and the marker run inside one
-        // publication, which no announced save overlaps.
-        if let stamp, reader.certifies {
-            CacheLedger.shared.publish(in: cacheDir, for: pass) {
-                guard stripHolds(written, in: directory) else { return }
-                writeThumbsStamp(stamp, input: reader.input, fullRange: reader.fullRange, to: marker)
-            }
-        }
-        postCacheChange(media: media.id, kind: thumbsKind, replaced: replaced)
+        publishThumbnails(
+            written, reader: reader, for: media, stamp: stamp, into: cacheDir, pass: pass,
+            directory: directory, marker: marker, replaced: replaced)
     }
 
     /// The presentation time of `track`'s last frame on the track's own

@@ -97,6 +97,10 @@ Frame Job's own numbers, and nothing of Concat is opened, at design time or buil
   **Amended by GR-33** (grading-4 T4-2b): the Color section's Hue row now turns HSV hue by GR-32's
   exact shift (+ is red → yellow → green, Rec. 709 luma kept), and `hueRotate` is gone; "a local
   colour transform like `hueRotate`" above reads as "like Color's hue turn".
+  **Amended by HD-2** (hdr H-0): in an HLG project tone's luma weights are BT.2020's (0.2627,
+  0.6780, 0.0593) and its local linear light is HLG's scene light (HLG's inverse OETF and OETF)
+  instead of the sRGB transfer, so exposure +1 still doubles the scene light; every SDR project
+  keeps this entry's constants.
 - **GR-3 — Precision: grading runs on PR-1's float pipeline; blending stays encoded (§7.5).**
   Every stage between layers is `rgba16Float` and every video source decodes deep (PR-1, PR-2),
   so a stacked grade keeps its levels by construction (GR0's P1: −1 EV then +1 EV through

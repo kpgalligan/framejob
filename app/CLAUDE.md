@@ -270,7 +270,8 @@ detail there.
   `.projectGraphicsDidChange` observer.
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`, +`Color`: the
   Apple Log and Apple Log 2 labels read at probe, spec §11 GR-16;
-  +`ThumbnailSource`: the converted strip, below) ·
+  +`ThumbnailSource`: the converted strip, below; +`Thumbnails`: the
+  await-free halves of `thumbnails`, the image branch and the publish) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
   `FFmpegRewrap.swift` (+`Plan`) · `AppSupport.swift` · `DecoderSupport.swift` ·
   `ContainerRewrap.swift` (+`Writer`) · `RewrapProgress.swift` ·
@@ -1868,7 +1869,8 @@ free.
 **Dialogs and windows.**
 - `Sheets.swift` (the `makeSheetView` builders every sheet uses) ·
   `ExportSheetController.swift` (+`Options`, +`Resolve`, +`Presets`,
-  `ExportPresetsStore.swift`) · `ExportProgressSheetController.swift` ·
+  `ExportPresetsStore.swift`, `ExportSheetCommit.swift`: Export… and Add
+  to Queue, the save panel and the job) · `ExportProgressSheetController.swift` ·
   `ReverseProgressSheetController.swift` ·
   `SpeedSheetController.swift` · `RelinkSheetController.swift` ·
   `GraphicFileSheetController.swift`. A sheet

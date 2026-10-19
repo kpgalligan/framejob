@@ -210,6 +210,8 @@ NOT_SHOWN = {
                           "(DevAssistantLaunch.swift); no screen launches with it",
     "RCDevAssistantReport": "the report path beside RCDevAssistantSend; no screen launches "
                             "with it",
+    "RCDevSyncHold": "a dev launch default that holds Synchronize Audio's background analysis "
+                     "so a proof can act during it; no screen launches with it",
     "FrameJobScreenRecordingAsked": "whether the panel has put up the Screen Recording prompt "
                                    "once; read only by a press of Record, which no screen makes",
     "RC_AGENT_SOCKET": "an environment variable, the agent server's socket path; each launch "

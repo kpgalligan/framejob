@@ -938,8 +938,8 @@
    "reached_after": [
     {
      "selector": "exportProject:",
-     "via": "app/Sources/ExportSheetController.swift `editor.beginExport(settings: settings, to: url, options: options)`",
-     "gate": "app/Sources/ExportSheetController.swift `if queue {` — Export…, not Add to Queue, and the save panel answered OK"
+     "via": "app/Sources/ExportSheetCommit.swift `editor.beginExport(settings: settings, to: url, options: options)`",
+     "gate": "app/Sources/ExportSheetCommit.swift `if queue {` — Export…, not Add to Queue, and the save panel answered OK"
     }
    ],
    "other_caller": ""
@@ -1126,15 +1126,15 @@
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/ExportSheetController.swift:582": {
+  "app/Sources/ExportSheetCommit.swift:78": {
    "token": "beginSheetModal",
    "func": "commit",
    "reached_from": [],
    "reached_after": [
     {
      "selector": "exportProject:",
-     "via": "app/Sources/ExportSheetController.swift `commit(queue: false)`",
-     "gate": "app/Sources/ExportSheetController.swift `guard let editor = editor, let settings = resolved,` — the card resolves (the sheet's Export… or Add to Queue button)"
+     "via": "app/Sources/ExportSheetCommit.swift `commit(queue: false)`",
+     "gate": "app/Sources/ExportSheetCommit.swift `guard let editor = editor, let settings = resolved,` — the card resolves (the sheet's Export… or Add to Queue button)"
     }
    ],
    "other_caller": ""

@@ -156,6 +156,9 @@ it amends PR-4 and PR-9.
   more than 8 bits is read through export's reader too, so it is deep in `render_frame` and
   Save Frame… (PNG, HEIC), however many other video tracks the composition holds. The
   generator's 8-bit image of such a file (B102's `composition-gap`) no longer reaches a frame.
+  **Amended by HD-2** (hdr H-0): an HLG project's `render_frame` and Save Frame… frames are 16-bit
+  (PNG) or 10-bit (HEIC) whatever their sources; JPEG, GIF and APNG carry the 8-bit SDR version
+  (HD-5).
 - **PR-5 — What stays 8-bit, and the frozen references (choice 6).**
   - These stay 8-bit:
     - graphics (G-7's BGRA8);
@@ -404,6 +407,9 @@ it amends PR-4 and PR-9.
     `precision_proof.py` S11 (the JPEG and `ramp8.png`'s APNG), each decoded raw equal to its
     control (`frame_label_proof.py same-pixels`, max |Δ| 0).
   - Amends PR-4 and PR-9.
+  **Amended by HD-2** (hdr H-0): an HLG project's frames are labelled BT.2100 HLG (a PNG's `cICP`
+  9/18/0/1), not `frameSpace`; the SDR version's frames (JPEG, APNG) and every SDR project keep
+  `frameSpace`.
 - **PR-12 — A frame showing a deep VP9 track is read deep, through export's reader (owner,
   2026-10-14, #294: "fix it").**
   - `render_frame` and File ▸ Save Frame… as PNG or HEIC, of a frame whose recipe at the frame

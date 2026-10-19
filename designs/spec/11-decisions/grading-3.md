@@ -226,6 +226,12 @@ opened, at design time or build time.
         follows neither field either (the player was not measured).
   **Amended by NM-4** (rename R0): `~/Movies/Reelcut Recordings/` is now
   `~/Movies/Frame Job Recordings/` (the folder `hdr_proof.py` R0 reads).
+  **Amended by HD-2** (hdr H-0): in an HLG project step 0 gains HLG arms chosen by the canvas's
+  output as well as the buffer's labels (SDR → HLG by HD-3's lift, HLG over BT.2020 the identity, PQ
+  → HLG at 1,000 cd/m², log → HLG); in an SDR project every arm is this entry's.
+  **Amended by HD-6** (hdr H-0): T3-1's PQ white is the media's own peak ÷ 203, held at 1 or above,
+  instead of a fixed 1000/203; an unknown peak means 1,000 cd/m², so every unlabelled file renders
+  byte-identical (H-1).
 - **GR-16 — Camera log is a setting on the media, `media.color {log, gamut, lut, detected}`,
   converted at step 0 before the chroma key and Color's four.** Choices 3a, 4a, 5a and 6
   (owner, 2026-10-11).
@@ -373,6 +379,12 @@ opened, at design time or build time.
     - **Accepted limits**: thumbnails on the timeline and in the Media tab show the log picture;
       Sony's and Panasonic's own metadata is not read; a full-range-flagged log file is read as
       video range — Amended by GR-22. — Amended by GR-21: thumbnails are drawn through step 0.
+  **Amended by HD-6** (hdr H-0): the media's colour record gains the PQ peak read at import (from
+  the format description, else the first sample's HEVC SEI; MaxCLL first), which `set_media_color`
+  overrides and refuses by name on media that is not PQ; its key is H-1's spec's.
+  **Amended by HD-10** (hdr H-0): the `log` vocabulary gains Canon Log 2 and Canon Log 3 with Cinema
+  Gamut, each built under this entry's recipe from Canon's published document (format 24); "Sony's
+  and Panasonic's own metadata is not read" still stands.
 - **GR-17 — Tier 3's working arrangement: each phase gated in the `grading-3` worktree and
   merged into main alone, main's format numbers, no verdict phase; synthetic fixtures now.**
   Choice 10 and the footage answer (owner, 2026-10-11). GR-14's arrangement again: the worktree
@@ -428,6 +440,14 @@ opened, at design time or build time.
   - Why not now: it touches every clamp in the compositor and every graphic's brightness, its
     main check is a person's at an XDR display, and a screen-recording editor's HDR deliverables
     are rare. The export half is measured cheap, so nothing blocks it later.
+  **Amended by HD-2** (hdr H-0): its design is built in H-2: `canvas.output` `"sdr"` or `"hlg"`,
+  HLG-encoded BT.2020 working values, and every composition of an HLG project converting in
+  BT.2020/HLG.
+  **Amended by HD-3** (hdr H-0): SDR white stays at 203 cd/m², and the SDR → HLG mapping's mid-tones
+  are fixed by measurement: Core Graphics' `kCGColorSpaceCoreMedia709` → `itur_2100_HLG` (SDR 0.50 →
+  HLG 0.5059, measured in H-0).
+  **Amended by HD-5** (hdr H-0): PQ becomes an export range (`export {range: "pq"}`), not a
+  `canvas.output` value, and every 8-bit row carries HD-4's SDR version, not only GIF and APNG.
 - **GR-20 — A wide-gamut working space for SDR projects is not wanted: closed.** Choice 9a
   (owner, 2026-10-11). SDR deliverables are Rec. 709, every tier-2 stage is defined on encoded
   Rec. 709 values, and a wider space pays off only with linear-light grading, which nobody has
@@ -467,6 +487,8 @@ opened, at design time or build time.
     owner 2026-10-09).
   - Amended by GR-23: the converted marker of an S-Log3 or V-Log media from a full-range source
     also carries `fullRange: true`, and the head check reads that range for those media alone.
+  **Amended by HD-6** (hdr H-0): a PQ media's strip is drawn through step 0 at its own peak, as a
+  Camera Log's is at its curve; how the converted marker names the peak is H-1's spec's.
 - **GR-22 — A log file's code domain follows its media's range flag** (#283; amends GR-16).
   - The range is the media's forward video track's `kCMFormatDescriptionExtension_FullRangeVideo`.
     It is read when the composition is built and carried per instruction, per track, as
