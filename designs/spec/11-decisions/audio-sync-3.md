@@ -326,3 +326,21 @@ run and its readings after, from the implementer's printed runs of 2026-10-19.
   timeDomain, autimepitch adoptable at 5.0 ms`. No method is adoptable at 1.0 ms. Phase 2
   chooses between them (a per-rate lead for either; `autimepitch` as an offline-rendered copy)
   from these numbers.
+
+- **SY-41 — Keep pitch outside SY-39's band stays on Apple's time-pitch; Frame Job builds no
+  time-stretch of its own for now (#299, the owner's choice).** Phase 2 tested whether either
+  method SY-40 found adoptable at 5.0 ms carries a lead that generalises, by a rule fixed before
+  the run: 17 rates (×0.1…×12, off-grid ×0.73, ×1.27, ×1.83 among them) on three fixtures (the
+  RECORDER, a seeded synthetic MUSIC fixture, the owner's real voice read in place), SY-40's
+  `stretched_lag` over its 15 windows. AUTimePitch less its own reported latency held within
+  5.0 ms on the RECORDER at ×0.5–×2 but read 4.4–11.3 ms off on the owner's voice at ×0.5–×1.27
+  (a smoothed envelope, r ≥ 0.86) and 6–85 ms off or unreadable at ×0.1–×0.25 and ×4–×12;
+  `timeDomain` with a per-rate lead fitted on the RECORDER held within 5.0 ms at ×0.9–×1.83 on
+  all three fixtures (smoothed) but not outside that range, and is a table fitted to one
+  recording. (MUSIC read unrendered at r 0.797, under the rule's 0.8, an instrument gap: a next
+  attempt needs a reader of tonal material whose unrendered control requires r ≥ 0.8.) Nothing
+  was adopted. Offered (1) Frame Job's own offline time-stretch, (2) the fitted `timeDomain`
+  table over a limited range, or (3) leaving it, the owner chose (3) on 2026-10-19: keep pitch
+  outside ×0.999–×1.001 plays as before (`time_domain` within ×0.98–×1.02, `spectral`
+  elsewhere), SY-37's DEFECT stands as an accepted, recorded limit, and #299 stays open. The
+  design-stage scratch instruments live only in a gitignored work folder and are not kept.
