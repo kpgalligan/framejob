@@ -1,4 +1,4 @@
-# Spec §11 — decisions: Audio sync, the clean-up (#301, #302, #304, #305) and the export's audio residue (#307, #306, #299)
+# Spec §11 — decisions: Audio sync, the clean-up (#301, #302, #304, #305), the export's audio residue (#307, #306, #299) and keep pitch (#299)
 
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
@@ -15,6 +15,9 @@ clear GCC-PHAT peak. SY-35…SY-38 were recorded in clean-up batch 3, the
 export's audio residue (#307, #306, #299), each before its code; their numbers are the
 implementer's printed runs of 2026-10-17 (`export_offset_proof.py`, `audio_sync_proof.py`) and,
 where they say so, the designer's scratch runs of the same day, SY-22's precedent.
+SY-39 and SY-40 were recorded for #299 from the owner's "Push. For 299, go with your
+recommendation." of 2026-10-19: SY-39 before its code, SY-40's rule before the survey's first
+run and its readings after, from the implementer's printed runs of 2026-10-19.
 
 - **SY-31 — A file too short for one frame publishes an empty cache (#301; amends SY-11's edge
   and its "positive" sizes).** A completed read that holds no whole frame (sound under 512
@@ -253,3 +256,73 @@ where they say so, the designer's scratch runs of the same day, SY-22's preceden
   range (`MediaPeakBuckets.swift`); VAD sizes its chunks from the media's duration; the extract's
   range is the clip's source range; and `ReverseRenderer.swift` places by presentation time and
   is over the file cap. Loudness is not a timing reader.
+
+- **SY-39 — Keep pitch within ±0.1% of ×1 plays varispeed (#299; amends SY-26's near-unity
+  part).** A clip with Keep pitch on at 0.999 ≤ speed ≤ 1.001 (speed ≠ 1, both ends inclusive)
+  plays `off` — varispeed, no time-pitch — exactly as a clip with Keep pitch off. The pitch it
+  moves is bounded by 1200·log2(1.001) = +1.730 cents and 1200·log2(0.999) = −1.732 cents, under
+  1.74 cents either way, which nobody hears; in exchange its sound stays on its timeline, where
+  SY-37 read `time_domain` at ×0.99999 move real speech by up to −8.899 ms. SY-26's band is now
+  0.98 ≤ speed ≤ 1.02 outside this one: there keep pitch still plays `time_domain`, and outside
+  0.98–1.02 `spectral` (SY-37's defect for real speed changes stays open, measured by SY-40). ×1
+  is unchanged: unscaled, it plays `spectral` and is inert (SY-24). The plan's three pitch names
+  are unchanged — only which name a speed gets moves — so a near-unity keep clip shares plan
+  audio tracks with keep-off clips and gets SY-24's varispeed lead, and preview and export, which
+  share the plan, agree. The band is tested with the inclusive range of its two constants
+  (`PITCH_VARISPEED_MIN`, `PITCH_VARISPEED_MAX` in `evaluate.rs`), never as |speed − 1| ≤ 0.001,
+  which in binary floating point excludes 0.999. No persisted field moves: no format bump. **The
+  pins:** R3 (the recorder at ×0.99999 keep) is pinned at SY-27's 1.0 ms with r ≥ 0.8;
+  `core/tests/pitch_band.rs` holds the band's edges (0.999, 1.001 `off`; 0.99899, 1.00101
+  `time_domain`) and a near-unity keep clip sharing a track with a keep-off one; mutants M16 (the
+  band's branch removed), M17 (`PITCH_VARISPEED_MAX` 1.0009) and M18 (`PITCH_VARISPEED_MIN`
+  0.9989) each fail it. E35 (clicks16 ×0.99 keep, the app's one remaining `time_domain` export) is
+  a measured row beside R4, R5 and E34.
+
+- **SY-40 — Every pitch-keeping method macOS offers, measured at real speed changes before one is
+  chosen (#299).** **The rule, fixed before the survey's first run:** `keep_pitch_survey.py`
+  reads the RECORDER fixture (`audio_sync_proof`'s, 16 kHz) at frame 206, in 0, at the rates
+  ×0.5, ×0.9, ×0.99, ×1.01, ×1.1, ×1.5 and ×2, by four methods and one control:
+  `spectral` and `timeDomain` (`AVAudioTimePitchAlgorithm`, set on the export's audio mix as
+  the product's mix read takes it, `export_offset_probe.swift`'s T1), `timepitch`
+  (`AVAudioUnitTimePitch`, AVAudioEngine's offline manual rendering of `AudioRateCopy`'s 48 kHz
+  copy into a CAF of the copy's format, inserted unscaled into a composition, T2) and
+  `autimepitch` (the older AUTimePitch, `kAudioUnitSubType_TimePitch`, the same render, T2);
+  the CONTROL is keep pitch off, the product's varispeed with SY-24's lead (T1). A unit that
+  does not instantiate is `unavailable` and leaves the comparison, not the run. Each read is
+  measured by `stretched_lag` (reach ±200 ms) on 15 media windows: the sweep [12 s, 22 s),
+  [22 s, 32 s) … [142 s, 152 s) and [128 s, 138 s) (R4/R5's late window). Each (method, rate)
+  is classed over all 15 windows, the first that applies: **lost** — any r < 0.8 or a lag on
+  the ±200 ms edge; **on time** — every |lag| ≤ 1.0 ms; **constant** — max − min ≤ 1.0 ms (a
+  lead of the median leaves every window within 1.0 ms); **bounded** — max − min ≤ 10.0 ms
+  (within SY-27's 5.0 ms after a lead); **drifts** — otherwise. A method is **adoptable at
+  1.0 ms** when every rate is `on time` or `constant`, and **at 5.0 ms** when every rate is at
+  worst `bounded`. The control must be `on time` at every rate, else the run is a failed
+  instrument. Adopting a method is phase 2, designed from these numbers; this decision changes
+  no behaviour.
+  **The readings** (the implementer's run of 2026-10-19 on the final instrument, `python3
+  tools/proof/keep_pitch_survey.py`, exit 0, 290 s; a first run's ×2 reads were dropped by the
+  survey's own key, JSON writing 2.0 as 2, and it exited 1 as a failed instrument). Per rate:
+  lag on [12 s, 22 s) / [128 s, 138 s), max − min over the 15 windows, the class; ms.
+  **Control (`off`):** within ±0.077 ms in every window at every rate (max − min 0.032–0.116,
+  least r 0.956): `on time` at every rate, so the run held. **`spectral`:** ×0.5 +0.709 /
+  −0.776, 3.255 bounded; ×0.9 +12.213 / +94.193, 92.654 drifts; ×0.99 +13.064 / +99.405, 96.681
+  drifts; ×1.01 +4.289 / +30.382, 29.558 drifts; ×1.1 +6.080 / +43.118, 40.975 drifts; ×1.5
+  −0.070 / −0.656, 2.064 bounded; ×2 +0.709 / −0.610, 3.455 bounded — not adoptable.
+  **`timeDomain`:** ×0.5 −41.648 / −41.604, 1.641; ×0.9 −12.177 / −13.015, 3.137; ×0.99 −5.929 /
+  −8.791, 3.382; ×1.01 −5.286 / −2.630, 4.368; ×1.1 −1.956 / −2.886, 4.822; ×1.5 +2.972 /
+  +3.913, 3.292; ×2 +8.104 / +7.341, 1.915 — `bounded` at every rate: **adoptable at 5.0 ms**,
+  its per-rate medians −41.620 … +7.505 ms (spread 49.125), so its lead is per rate.
+  **`timepitch`** (`AVAudioUnitTimePitch`, latency 0, render 0.25–0.90 s, the CAF 11.0–44.1 MB):
+  ×0.5 −2.144 / −1.722, 5.560 bounded; ×0.9 −8.326 / −64.463, 62.252 drifts; ×0.99 −4.562 /
+  −32.156, 30.474 drifts; ×1.01 +4.416 / +31.070, 29.807 drifts; ×1.1 +5.944 / +43.725, 41.163
+  drifts; ×1.5 +0.432 / +0.281, 1.824 bounded; ×2 +0.258 / +0.774, 1.916 bounded — not
+  adoptable (the same drift as `spectral`, sign flipped below ×1). **`autimepitch`** (the older
+  AUTimePitch; it instantiates; latency 0.041–0.079 s, render 2.69–5.38 s, the same CAF sizes):
+  ×0.5 +77.929 / +77.933, 2.439 bounded; ×0.9 +62.560 / +62.241, 0.951 constant; ×0.99
+  +60.041 / +59.969, 0.127 constant; ×1.01 +45.355 / +45.412, 0.474 constant; ×1.1 +45.941 /
+  +45.244, 2.451 bounded; ×1.5 +43.954 / +43.287, 0.851 constant; ×2 +43.114 / +42.516, 1.276
+  bounded (least r 0.894) — **adoptable at 5.0 ms**, its per-rate medians +42.895 … +77.484 ms
+  (spread 34.589), near its reported latency at each rate. The run's last line: `VERDICT:
+  timeDomain, autimepitch adoptable at 5.0 ms`. No method is adoptable at 1.0 ms. Phase 2
+  chooses between them (a per-rate lead for either; `autimepitch` as an offline-rendered copy)
+  from these numbers.

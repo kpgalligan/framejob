@@ -7,7 +7,9 @@ causes (spec §11 SY-23..SY-27) and this is now the standing pin: every E, R
 and X row is scored against SY-27's tolerance. Clean-up batch 3 (SY-35..SY-38)
 added the late head's separating fixture (#307), an MP3 read past its own
 LAME/Xing encoder delay (#306) and keep pitch outside the band on a real
-recording (#299).
+recording (#299). #299 phase 1 (SY-39) plays keep pitch within ±0.1% of ×1
+as varispeed, so R3 is pinned, and adds E35 (the app's one remaining
+`time_domain` export, measured).
 
     python3 tools/proof/export_offset_proof.py [<dir>/agent.sock] [--only ID,ID,...]
     python3 tools/proof/export_offset_proof.py --mutants [--mutant NAME,NAME,...]
@@ -66,8 +68,9 @@ time c: `start + (c + SOURCE_OFFSET − in)/speed` from `get_project`'s clip; in
 an `in_out` export, minus the in point.
 
 SY-27's pin (`pinned`): |median| ≤ 1.0 ms and spread ≤ 0.5 ms with ≥ 10 of
-12 found, for ×1, varispeed, in-band keep pitch, LPCM/AAC, gain, pan, noise
-reduction and range rows; |median| ≤ 5.0 ms for keep pitch outside the band
+12 found, for ×1, varispeed (×0.99999 keep included, SY-39), LPCM/AAC,
+gain, pan, noise reduction and range rows (E35, keep pitch in 0.98–1.02 at
+`time_domain`, is measured); |median| ≤ 5.0 ms for keep pitch outside the band
 (KEEP_ROWS: E9, E11, E12, E29); the video presets' flashes on exactly their
 timeline frames with every |click − flash| ≤ 1.0 ms.
 
@@ -99,17 +102,19 @@ Rows:
   R3–R7  the same clip at ×0.99999 keep (R3, #299's in-band case), ×0.9 and
       ×1.1 keep (R4, R5), ×0.9 and ×1.1 off (R6, R7, the controls), each by
       `stretched_lag` against the recorder's own envelope stretched by the
-      speed on its media windows [12 s, 22 s) and [128 s, 138 s); R6 and R7
-      pinned (both |lag| ≤ 1.0 ms, r ≥ 0.8). R3, R4 and R5 (reach ±200 ms)
-      are MEASURED rows (#299 open, SY-37): printed `measured` when both
-      windows are found (r ≥ 0.5, inside the reach), never pinned to a lag;
-      their detail names SY-37's class (a defect when a window has r < 0.8,
-      |lag| > 5.0 ms or a lag at the edge)
-  E1–E34  one project each (`E_ROWS`), exported and located; ok when the
+      speed on its media windows [12 s, 22 s) and [128 s, 138 s); R3 (now
+      varispeed, SY-39; reach ±40 ms), R6 and R7 pinned (both |lag| ≤
+      1.0 ms, r ≥ 0.8). R4 and R5 (reach ±200 ms) are MEASURED rows (#299,
+      SY-37, SY-40): printed `measured` when both windows are found (r ≥ 0.5,
+      inside the reach), never pinned to a lag; their detail names SY-37's
+      class (a defect when a window has r < 0.8, |lag| > 5.0 ms or a lag at
+      the edge)
+  E1–E35  one project each (`E_ROWS`), exported and located; ok when the
       export completed, ≥ 10 of 12 clicks were found (E23: all 10 of its
       in-range clicks) and SY-27's pin holds (E30, E33: the MP3s, read past
       their encoder delay, SY-36; E32 the late head, SY-35). E34 (×1.1 keep
-      pitch) is a MEASURED row: ≥ 10 found, its median printed, not pinned. The detail
+      pitch) and E35 (×0.99 keep pitch, `time_domain`, SY-39) are MEASURED
+      rows: ≥ 10 found, their median printed, not pinned. The detail
       prints the median and spread of found − expected, the count, the
       least r and the pin
   L1–L11  `export_offset_probe.swift`'s stage reads (its header lists them),
@@ -132,8 +137,8 @@ under `work/export-offset/mutants/<name>/`, applies its edit (its `before`
 asserted to occur exactly once), rebuilds the probe (900 s wall) and runs its
 X group (240 s wall); killed when every named row fails. `before` — the
 unmutated tree — runs exactly once first and must pass every X row; a copy
-that does not build or answer is a failed control, never a kill. M7 and M8
-are the core's (`core/tests/pitch_band.rs`), run by hand. `--mutant` runs
+that does not build or answer is a failed control, never a kill. M7, M8 and
+M16–M18 are the core's (`core/tests/pitch_band.rs`), run by hand. `--mutant` runs
 `before` and only the named mutants. Exit 0 when every mutant was killed.
 """
 
@@ -202,10 +207,11 @@ FLASH_SHARE = (320 * 180) / (640 * 360)  # the movie's share of the canvas
 
 Z_ROWS = ["Z0", "Z1", "Z2", "Z3"]
 R_ROWS = [f"R{n}" for n in range(1, 8)]
-# row: (speed, keep_pitch, reach ms, pinned) — R1 ×1, R2 #298's varispeed, R3–R7 #299 (SY-37).
+# row: (speed, keep_pitch, reach ms, pinned) — R1 ×1, R2 #298's varispeed, R3–R7 #299 (SY-37;
+# R3 pinned since SY-39).
 R_EDITS = {
     "R1": (None, None, 40, True), "R2": (0.99999, False, 40, True),
-    "R3": (0.99999, True, 200, False), "R4": (0.9, True, 200, False),
+    "R3": (0.99999, True, 40, True), "R4": (0.9, True, 200, False),
     "R5": (1.1, True, 200, False), "R6": (0.9, False, 40, True), "R7": (1.1, False, 40, True),
 }
 R_WINDOWS = [(12_000, 22_000), (128_000, 138_000)]  # ms of the recorder (media), R3–R7
@@ -252,13 +258,14 @@ E_ROWS = {
     "E32": ("clicks16-late5", F206, None, "audio_wav"),
     "E33": ("clicks48-mp3", F206, None, "audio_wav"),
     "E34": ("clicks48", F206, ("speed", 1.1, True), "audio_wav"),
+    "E35": ("clicks16", F206, ("speed", 0.99, True), "audio_wav"),
 }
 E_IDS = list(E_ROWS)
 KEEP_ROWS = {"E9", "E11", "E12", "E29"}
 # #299 (SY-37, ruling 3): keep pitch's time-pitch algorithms move real sound,
 # so these rows run every pass and print their readings, scored on the
 # instrument only (the export decoded, the clicks or windows found).
-MEASURED_ROWS = {"R3", "R4", "R5", "E34"}
+MEASURED_ROWS = {"R4", "R5", "E34", "E35"}
 VIDEO_ROWS = {"E16", "E17", "E18", "E19"}
 EXTENSIONS = {"audio_wav": "wav", "prores_422": "mov", "h264": "mp4"}
 ALL_ROWS = Z_ROWS + R_ROWS + E_IDS + L_ROWS + X_ROWS
@@ -1361,8 +1368,8 @@ def mutants(only=None):
               f"{failed}; other rows failing {others}", flush=True)
         for row in named:
             print(f"    {row}: {rows[row][1][:400]}")
-    print(f"mutants: {len(killed)}/{len(chosen)} killed (M7, M8: core/tests/pitch_band.rs, "
-          "by hand)")
+    print(f"mutants: {len(killed)}/{len(chosen)} killed (M7, M8, M16–M18: "
+          "core/tests/pitch_band.rs, by hand)")
     return 0 if len(killed) == len(chosen) else 1
 
 

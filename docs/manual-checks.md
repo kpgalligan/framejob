@@ -339,6 +339,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** is every clip in sync in the preview at 48 kHz and at 44.1 kHz?
 - **Source:** #298 phase 2, spec §11 SY-23..SY-27 (the export is pinned by `export_offset_proof.py`; the preview's output latency and a 44.1 kHz device are not measured).
 
+**SE-14 — Keep pitch sounds clean**
+- **Do:** on a clip of speech set ×0.9995, ×0.9 and ×1.5 with Keep pitch on, play each and export each.
+- **Expect:** ×0.9995 sounds the same as ×1; ×0.9 and ×1.5 keep the voice's pitch with no warble, phasing or echo.
+- **Answer:** does Keep pitch sound clean?
+- **Source:** #299, spec §11 SY-39, SY-40.
+
 ## Captions
 
 **CAP-1 — Text reveals and legibility**

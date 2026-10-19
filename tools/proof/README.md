@@ -20678,3 +20678,59 @@ pre-SY-35 row as in #298 phase 2's table. `--mutants`: 13/13 killed, `before` fa
 `audio_sync_proof.py` whole: 54/54, exit 0 — S32 the recorder on frame 206, offset 32.5 ticks from
 the truth (as S1), the export's lag +0.047 / +0.041 ms; S18 0.70 / 0.85 ms, Δ 0.15 ms, control
 Δ −26.61 ms; S1 PHAT 452.58.
+
+## #299 phase 1 — keep pitch near ×1 plays varispeed; the time-pitch survey (`export_offset_proof.py` R3, E35; `keep_pitch_survey.py`; `export_offset_probe.swift` T1–T2; `core/tests/pitch_band.rs`; spec §11 SY-39, SY-40)
+
+```sh
+cd core && cargo test --release --test pitch_band
+python3 tools/proof/export_offset_proof.py <dir>/agent.sock --only R3,R6,R7,E10,E35,X6
+python3 tools/proof/keep_pitch_survey.py      # no app; ~5 min
+```
+
+**The band (SY-39).** Keep pitch at 0.999 ≤ speed ≤ 1.001 (≠ 1) plays `off`, varispeed, under
+1.74 cents of pitch; ×1 keep stays `spectral` (inert), and the rest of 0.98–1.02 `time_domain`.
+`pitch_band.rs` holds the edges (0.999, 0.99999, 1.00001, 1.001 `off`; 0.99899, 1.00101
+`time_domain`) and a ×0.99999 keep clip sharing one plan audio track with a ×0.9 keep-off clip.
+**R3** (the recorder at ×0.99999 keep) is now pinned like R6 and R7: both windows |lag| ≤ 1.0 ms,
+r ≥ 0.8, reach ±40 ms. **E35** (clicks16 ×0.99 keep, the app's one remaining `time_domain` export)
+is a measured row beside R4, R5 and E34: ≥ 10 clicks found, its median printed. X6 (×0.99999 keep
+in the probe) now exercises the varispeed path. **Mutants** (the core's, by hand, each reverted):
+M16 (`Pitch::of`'s band clause removed) fails `keep_pitch_within_a_tenth_of_a_percent_plays_off`
+and `a_near_unity_keep_clip_shares_a_track_with_a_keep_off_clip`; M17 (`PITCH_VARISPEED_MAX`
+1.0009) fails the first; M18 (`PITCH_VARISPEED_MIN` 0.9989) fails
+`keep_pitch_just_outside_the_varispeed_band_plays_time_domain` — 3/3 killed (2026-10-19).
+
+**The survey (SY-40).** `keep_pitch_survey.py` builds the probe (`build_probe`) and runs its group
+`T` over `audio_sync_proof`'s fixtures dir (the RECORDER through the probe's own `recorderFile`,
+not a `fixtureFiles` key, so L12 is untouched): T1 the export's mix with keep pitch and the
+algorithm overridden to `spectral` and `timeDomain`, and the varispeed CONTROL; T2 the recorder's
+48 kHz copy rendered offline through `AVAudioUnitTimePitch` and the older AUTimePitch into a CAF,
+read from a composition at frame 206 — at ×0.5, ×0.9, ×0.99, ×1.01, ×1.1, ×1.5 and ×2. Each read
+is measured by `stretched_lag` (±200 ms) on 15 media windows (10 s from 12 s to 152 s, and
+[128 s, 138 s)) in a process pool and classed by SY-40's rule, fixed before the run: `lost`, `on
+time`, `constant` (max − min ≤ 1.0 ms), `bounded` (≤ 10.0 ms), `drifts`; a method adoptable at
+1.0 ms when every rate is on time or constant, at 5.0 ms when every rate is at worst bounded; the
+control must be on time at every rate. Writes `work/keep-pitch/survey.json`.
+
+**The survey's run** (2026-10-19, the final instrument, exit 0, 290 s; an earlier run dropped its
+×2 reads to a key bug — JSON writes 2.0 as 2 — and exited 1 as a failed instrument): the control
+within ±0.077 ms everywhere, on time at every rate. `spectral` drifts at ×0.9 (+12.213 / +94.193
+ms early / late, max − min 92.654), ×0.99, ×1.01 and ×1.1, bounded at ×0.5, ×1.5, ×2;
+`AVAudioUnitTimePitch` (latency 0, render 0.25–0.90 s) drifts at the same four (×0.9 −8.326 /
+−64.463); `timeDomain` bounded at every rate (max − min 1.641–4.822, medians −41.620 … +7.505 ms);
+AUTimePitch (latency 0.041–0.079 s, render 2.69–5.38 s) constant or bounded at every rate (max −
+min 0.127–2.451, medians +42.895 … +77.484 ms). Last line: `VERDICT: timeDomain, autimepitch
+adoptable at 5.0 ms`. The full table is SY-40's.
+
+**Debug run** (2026-10-19, own instance, no `Frame Job: ` line): `--only R3,R6,R7,E10,E35,X6`
+6/6 (1 measured) — R3 +0.013 / −0.001 ms (r 0.991), R6 +0.019 / −0.000, R7 +0.013 / −0.005, E10
+−0.001 (spread 0.001), E35 −0.298 (spread 1.536, 12/12), X6 −0.001 ms.
+
+**Recorded runs** (Release, 2026-10-19, after `make gate` passed in 480 s and its `make app`; own
+instance, no `Frame Job: ` line, no `DEFAULTS MOVED`). `export_offset_proof.py` whole: 73/73, 4
+of them measured, exit 0 — R3 +0.013 / −0.001 ms (r 0.991), pinned; R6 +0.019 / −0.000, R7
++0.013 / −0.005; **measured:** R4 +12.213 / +94.193, R5 +6.080 / +43.118 (SY-37's DEFECT), E34
++1.058 ms (spread 4.589), E35 −0.298 ms (spread 1.536). `--mutants`: 13/13 killed, `before`
+failing no X row (M1 now also fails X6, the ×0.99999 keep clip being on the varispeed path).
+`audio_sync_proof.py` whole: 54/54, exit 0 (S18 0.70 / 0.85 ms, control Δ −26.61 ms).
+`speed_limits_probe.py`: 24 rows, none failed.

@@ -536,9 +536,10 @@ governs a module now.
   and the layer list are built from. `assign` leaves a clip's audio out above
   `AUDIO_SPEED_MAX`, and `place` gives every plan audio track ONE `pitch`
   (#190, #211), a `Pitch` (off, spectral, time_domain): keep pitch within
-  ×0.98–×1.02 plays `time_domain`, which stays on time where `.spectral`
-  drifts (SY-26, #299). `Segment`, `CompTrack` and `Assignment`'s tracks are
-  `pub(crate)` for `plan.rs` alone.
+  ×0.999–×1.001 (but not ×1) plays `off`, varispeed, whose pitch change is
+  under 1.74 cents (SY-39), and elsewhere within ×0.98–×1.02 `time_domain`
+  (SY-26; SY-40 for real speed changes). `Segment`, `CompTrack` and
+  `Assignment`'s tracks are `pub(crate)` for `plan.rs` alone.
 - `plan.rs` — `composition_plan()` (spec §7.2): the plan's JSON from
   `assign()`, the instruction tiling, and the decoder-budget warning
   (`MAX_CONCURRENT_VIDEO_TRACKS`). Deterministic to the byte. A pure move

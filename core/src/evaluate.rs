@@ -77,10 +77,12 @@ pub(crate) fn number(value: f64) -> Value {
 
 // ---- the time-pitch algorithm -------------------------------------------
 
-/// The time-pitch algorithm a plan audio segment plays at (spec §11 SY-26):
-/// keep pitch at a near-unity speed is `time_domain`, whose drift within a
-/// clip is bounded where `spectral`'s grows; keep pitch elsewhere is
-/// `spectral`, and keep pitch off is `off` (varispeed).
+/// The time-pitch algorithm a plan audio segment plays at (spec §11 SY-26,
+/// SY-39): keep pitch within ±0.1% of ×1 (not ×1 itself) is `off`
+/// (varispeed, under 1.74 cents of pitch), keep pitch at a near-unity speed
+/// outside that is `time_domain`, whose drift within a clip is bounded where
+/// `spectral`'s grows; keep pitch elsewhere is `spectral`, and keep pitch off
+/// is `off` (varispeed).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Pitch {
     Spectral,
@@ -92,9 +94,15 @@ pub(crate) enum Pitch {
 pub(crate) const PITCH_TIME_DOMAIN_MIN: f64 = 0.98;
 pub(crate) const PITCH_TIME_DOMAIN_MAX: f64 = 1.02;
 
+/// The band, inclusive, in which keep pitch plays `off` (spec §11 SY-39); ×1 excluded.
+pub(crate) const PITCH_VARISPEED_MIN: f64 = 0.999;
+pub(crate) const PITCH_VARISPEED_MAX: f64 = 1.001;
+
 impl Pitch {
     pub(crate) fn of(keep_pitch: bool, speed: f64) -> Pitch {
-        if !keep_pitch {
+        let varispeed =
+            speed != 1.0 && (PITCH_VARISPEED_MIN..=PITCH_VARISPEED_MAX).contains(&speed);
+        if !keep_pitch || varispeed {
             Pitch::Off
         } else if speed != 1.0 && (PITCH_TIME_DOMAIN_MIN..=PITCH_TIME_DOMAIN_MAX).contains(&speed) {
             Pitch::TimeDomain

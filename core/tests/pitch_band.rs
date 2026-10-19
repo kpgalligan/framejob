@@ -1,6 +1,8 @@
 //! Keep pitch at a near-unity speed plays `time_domain` (spec §11 SY-26):
 //! the band 0.98 ≤ speed ≤ 1.02 (≠ 1), the names the plan writes either
-//! side of it, and one pitch NAME per plan audio track.
+//! side of it, and one pitch NAME per plan audio track. Within ±0.1% of ×1
+//! (0.999 ≤ speed ≤ 1.001, ≠ 1) keep pitch plays `off`, varispeed (spec §11
+//! SY-39), and shares a plan audio track with keep-off clips.
 
 use serde_json::{json, Value};
 
@@ -96,4 +98,36 @@ fn a_track_holds_one_pitch_name() {
         names,
         vec![(3, "spectral".to_string()), (4, "time_domain".to_string())]
     );
+}
+
+#[test]
+fn keep_pitch_within_a_tenth_of_a_percent_plays_off() {
+    for speed in [0.999, 0.99999, 1.00001, 1.001] {
+        assert_eq!(pitch_of(speed, true), "off", "×{speed} keep");
+    }
+}
+
+#[test]
+fn keep_pitch_just_outside_the_varispeed_band_plays_time_domain() {
+    for speed in [0.99899, 1.00101] {
+        assert_eq!(pitch_of(speed, true), "time_domain", "×{speed} keep");
+    }
+}
+
+#[test]
+fn a_near_unity_keep_clip_shares_a_track_with_a_keep_off_clip() {
+    // A ×0.9 keep-off clip abutting a ×0.99999 keep clip: both play `off`
+    // (SY-39), so they share one plan audio track.
+    let plan = Handle::from_value(&project(vec![
+        media_clip(3, 0, 10 * SEC, 0.9, false),
+        media_clip(4, 10 * SEC, 10 * SEC, 0.99999, true),
+    ]))
+    .plan();
+    let tracks = array(&plan, "/audio_tracks");
+    assert_eq!(tracks.len(), 1, "both `off`, one track: {plan}");
+    let segments = array(&tracks[0], "/segments");
+    assert_eq!(segments.len(), 2, "{plan}");
+    for segment in segments {
+        assert_eq!(segment["pitch"].as_str(), Some("off"), "{segment}");
+    }
 }

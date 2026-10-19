@@ -1,17 +1,20 @@
 // Issue #298 — where an exported sample lands, stage by stage. The
 // in-process instrument behind `export_offset_proof.py`'s L1–L9 (phase 1),
 // X1–X8 (phase 2's pins) and clean-up batch 3's L10–L12 and X9–X15 (#307,
-// #306: spec §11 SY-35, SY-36, SY-38).
+// #306: spec §11 SY-35, SY-36, SY-38); and #299's time-pitch survey, T1–T2
+// (spec §11 SY-40), behind `keep_pitch_survey.py`.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a`, through
 // `swift_build.build` (the proof's `build_probe`, `playback_audio_proof.py`'s
 // pattern), with `Blank.mp4` beside the binary:
 //
-//     export_offset_probe <out-dir> <fixtures-dir> [all|L|X]
+//     export_offset_probe <out-dir> <fixtures-dir> [all|L|X|T]
 //
 // The third argument picks the row group (default `all`): `L` runs L1–L12,
-// `X` runs X1–X15 (what `--mutants` runs).
+// `X` runs X1–X15 (what `--mutants` runs), `all` both; `T` runs only T1–T2,
+// whose fixtures dir is `audio_sync_proof`'s (the RECORDER, `recorderFile`,
+// which is no `fixtureFiles` key: L12 walks those).
 //
 // It decodes each fixture's sound at each stage of the export path and writes
 // what it read; it locates nothing — the proof locates every click in what is
@@ -90,6 +93,26 @@
 //          `sync`) of both MP3s, clicks44, clicks48 and clicks44s-mp3; X13
 //          clicks44s-mp3 and clicks44-mp3-itunsmpb (packet tables); X14
 //          clicks44-mp3-noxing (no tag); X15 clicks24-mp3 (MPEG-2)
+//
+//   T1–T2  #299's survey (SY-40): the RECORDER at F206, in 0, at each rate r
+//          of `surveyRates`, 48 kHz mono reads with `start_ticks` F206 and
+//          `speed` r.
+//   T1     stage `mix` (`readMix`): `x<r>-keep+alg-spectral` and
+//          `x<r>-keep+alg-timeDomain` (the override), and the CONTROL
+//          `x<r>-off` (keep pitch off, no override: the product's varispeed
+//          with SY-24's lead)
+//   T2     stage `render`: `AudioRateCopy.copy(of:track:trim: .zero)` rendered
+//          offline (AVAudioEngine manual rendering, `.offline`) through
+//          `AVAudioUnitTimePitch` at rate r, default overlap (`x<r>+timepitch`),
+//          and through the older AUTimePitch (`kAudioUnitSubType_TimePitch`,
+//          `kTimePitchParam_Rate`; `x<r>+autimepitch`), written uncompensated
+//          to a CAF of the copy's format (24-bit LPCM, 48 kHz, the source's
+//          channels), then read from a bare `AVMutableComposition` holding
+//          that CAF unscaled at F206 (`AVAssetReaderAudioMixOutput`, 48 kHz, no
+//          mix). Extras `latency_s` (the unit's `auAudioUnit.latency`),
+//          `render_s` (the render's wall time) and `copy_bytes` (the CAF's
+//          size). A unit that does not instantiate is a failed read whose
+//          error starts `unavailable:`.
 import AVFoundation
 import AppKit
 import AudioToolbox
@@ -98,9 +121,9 @@ NSApplication.shared.setActivationPolicy(.prohibited)
 
 let arguments = CommandLine.arguments
 let group = arguments.count == 4 ? arguments[3] : "all"
-guard arguments.count == 3 || arguments.count == 4, ["all", "L", "X"].contains(group) else {
+guard arguments.count == 3 || arguments.count == 4, ["all", "L", "X", "T"].contains(group) else {
     FileHandle.standardError.write(
-        Data("usage: export_offset_probe <out-dir> <fixtures-dir> [all|L|X]\n".utf8))
+        Data("usage: export_offset_probe <out-dir> <fixtures-dir> [all|L|X|T]\n".utf8))
     exit(2)
 }
 let outDir = URL(fileURLWithPath: arguments[1], isDirectory: true)
@@ -117,6 +140,9 @@ let fixtureFiles: [String: String] = [
     "clicks44s-mp3": "clicks44s-mp3-v1.mp3", "clicks44-mp3-noxing": "clicks44-mp3-noxing-v1.mp3",
     "clicks44-mp3-itunsmpb": "clicks44-mp3-itunsmpb-v1.mp3", "clicks24-mp3": "clicks24-mp3-v1.mp3",
 ]
+/// The RECORDER of `audio_sync_proof` (group T only; not a `fixtureFiles` key).
+let recorderFile = "recorder-v1.wav"
+let surveyRates = [0.5, 0.9, 0.99, 1.01, 1.1, 1.5, 2.0]
 let allFixtures = ["clicks16", "clicks48", "cam-pcm48", "cam-aac48", "cam-ff16"]
 let wavFixtures = ["clicks16", "clicks48"]
 let second: Ticks = 600_000
@@ -130,6 +156,8 @@ struct ProbeError: Error, CustomStringConvertible {
 var manifest: [[String: Any]] = []
 var rowReads: [String: Int] = [:]
 var rowErrors: [String: [String]] = [:]
+/// Extras a read's body learns as it runs, merged into its entry by `record`.
+var lateExtras: [String: Any] = [:]
 
 func writeAnswer() {
     let manifestData = (try? JSONSerialization.data(
@@ -140,7 +168,8 @@ func writeAnswer() {
         "X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8", "X9", "X10", "X11", "X12", "X13", "X14",
         "X15",
     ]
-    let ids = group == "L" ? lRows : group == "X" ? xRows : lRows + xRows
+    let ids = group == "L" ? lRows : group == "X" ? xRows : group == "T" ? ["T1", "T2"]
+        : lRows + xRows
     let rows = ids.map { id -> [String: Any] in
         let reads = rowReads[id] ?? 0
         let errors = rowErrors[id] ?? []
@@ -226,7 +255,8 @@ func writeF32(_ samples: [Float], _ url: URL) throws {
 }
 
 func fixtureURL(_ fixture: String) -> URL {
-    fixturesDir.appendingPathComponent(fixtureFiles[fixture]!)
+    if fixture == "recorder" { return fixturesDir.appendingPathComponent(recorderFile) }
+    return fixturesDir.appendingPathComponent(fixtureFiles[fixture]!)
 }
 
 func audioTrack(_ fixture: String) throws -> (AVURLAsset, AVAssetTrack) {
@@ -259,8 +289,11 @@ func record(
     ]
     entry.merge(extra) { _, new in new }
     rowReads[row, default: 0] += 1
+    lateExtras = [:]
+    defer { lateExtras = [:] }
     do {
         entry["first_pts_s"] = try body(url)
+        entry.merge(lateExtras) { _, new in new }
         entry["ok"] = true
         entry["error"] = NSNull()
     } catch {
@@ -864,7 +897,144 @@ func xRows() {
     readExport("X15", "clicks24-mp3", tag: "+X15")
 }
 
-if group != "X" { lRows() }
-if group != "L" { xRows() }
+// MARK: - #299's time-pitch survey (T1, T2; spec §11 SY-40)
+
+/// A time-pitch unit for T2: `AVAudioUnitTimePitch`, or the older AUTimePitch
+/// through `AVAudioUnitTimeEffect`, at `rate`. A component the system does not
+/// have throws `unavailable:`.
+func timePitchUnit(_ name: String, rate: Double) throws -> AVAudioUnit {
+    if name == "timepitch" {
+        let unit = AVAudioUnitTimePitch()
+        unit.rate = Float(rate)
+        return unit
+    }
+    var description = AudioComponentDescription(
+        componentType: kAudioUnitType_FormatConverter,
+        componentSubType: kAudioUnitSubType_TimePitch,
+        componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0,
+        componentFlagsMask: 0)
+    guard AudioComponentFindNext(nil, &description) != nil else {
+        throw ProbeError("unavailable: no AUTimePitch component (kAudioUnitSubType_TimePitch)")
+    }
+    let unit = AVAudioUnitTimeEffect(audioComponentDescription: description)
+    let status = AudioUnitSetParameter(
+        unit.audioUnit, AudioUnitParameterID(kTimePitchParam_Rate), kAudioUnitScope_Global, 0,
+        AudioUnitParameterValue(rate), 0)
+    guard status == noErr else {
+        throw ProbeError("AUTimePitch's rate would not set (OSStatus \(status))")
+    }
+    return unit
+}
+
+/// `copy` through `unit` by AVAudioEngine's offline manual rendering, written
+/// uncompensated (from the render's sample 0) to `caf` in the copy's format;
+/// length the copy's over `rate`. Sets `latency_s` and `render_s`.
+func renderTimePitch(_ copy: URL, unit: AVAudioUnit, rate: Double, to caf: URL) throws {
+    let input = try AVAudioFile(forReading: copy)
+    let format = input.processingFormat
+    let engine = AVAudioEngine()
+    let player = AVAudioPlayerNode()
+    engine.attach(player)
+    engine.attach(unit)
+    engine.connect(player, to: unit, format: format)
+    engine.connect(unit, to: engine.mainMixerNode, format: format)
+    try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: 4096)
+    try engine.start()
+    defer {
+        player.stop()
+        engine.stop()
+    }
+    player.scheduleFile(input, at: nil)
+    player.play()
+    lateExtras["latency_s"] = unit.auAudioUnit.latency
+    let settings: [String: Any] = [
+        AVFormatIDKey: Int(kAudioFormatLinearPCM), AVSampleRateKey: AudioRateCopy.sampleRate,
+        AVNumberOfChannelsKey: Int(format.channelCount), AVLinearPCMBitDepthKey: 24,
+        AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false,
+        AVLinearPCMIsNonInterleaved: false,
+    ]
+    guard let buffer = AVAudioPCMBuffer(
+        pcmFormat: engine.manualRenderingFormat,
+        frameCapacity: engine.manualRenderingMaximumFrameCount)
+    else { throw ProbeError("the render buffer could not be made") }
+    let total = AVAudioFramePosition((Double(input.length) / rate).rounded())
+    let began = Date()
+    do {
+        let output = try AVAudioFile(
+            forWriting: caf, settings: settings, commonFormat: .pcmFormatFloat32,
+            interleaved: false)
+        var stalls = 0
+        while engine.manualRenderingSampleTime < total {
+            let frames = AVAudioFrameCount(
+                min(AVAudioFramePosition(buffer.frameCapacity),
+                    total - engine.manualRenderingSampleTime))
+            switch try engine.renderOffline(frames, to: buffer) {
+            case .success:
+                try output.write(from: buffer)
+                stalls = 0
+            case .insufficientDataFromInputNode, .cannotDoInCurrentContext:
+                stalls += 1
+                if stalls > 1_000 { throw ProbeError("the render stalled") }
+            case .error:
+                throw ProbeError("the render failed")
+            @unknown default:
+                throw ProbeError("the render answered an unknown status")
+            }
+        }
+    }
+    lateExtras["render_s"] = Date().timeIntervalSince(began)
+}
+
+/// T2's read: the recorder's 48 kHz copy rendered through `unitName` at
+/// `rate`, the CAF read from a bare composition at F206, 48 kHz, no mix.
+func readRender(_ row: String, rate: Double, unitName: String) {
+    record(row, "recorder", "render", "x\(rate)+\(unitName)", rate: 48_000, start: f206,
+           speed: rate) { url in
+        let source = fixtureURL("recorder")
+        let (_, track) = try audioTrack("recorder")
+        guard let copy = AudioRateCopy.copy(of: source, track: track, trim: .zero) else {
+            throw ProbeError("the 48 kHz copy could not be made")
+        }
+        let unit = try timePitchUnit(unitName, rate: rate)
+        let caf = url.deletingPathExtension().appendingPathExtension("caf")
+        try? FileManager.default.removeItem(at: caf)
+        try renderTimePitch(copy, unit: unit, rate: rate, to: caf)
+        let size = try FileManager.default.attributesOfItem(atPath: caf.path)[.size]
+        lateExtras["copy_bytes"] = (size as? NSNumber)?.intValue ?? NSNull()
+        let rendered = AVURLAsset(url: caf)
+        guard let renderedTrack = rendered.tracks(withMediaType: .audio).first else {
+            throw ProbeError("the rendered CAF has no audio track")
+        }
+        let composition = AVMutableComposition()
+        guard let target = composition.addMutableTrack(
+            withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+        else { throw ProbeError("the composition refused a track") }
+        try target.insertTimeRange(
+            CMTimeRange(start: .zero, duration: renderedTrack.timeRange.duration),
+            of: renderedTrack, at: CMTime(value: CMTimeValue(f206), timescale: 600_000))
+        let reader = try AVAssetReader(asset: composition)
+        let output = AVAssetReaderAudioMixOutput(
+            audioTracks: composition.tracks(withMediaType: .audio),
+            audioSettings: floatSettings(rate: 48_000, channels: 2))
+        output.audioMix = nil
+        let (samples, pts) = try drain(reader, output, channels: 2, rate: 48_000)
+        try writeF32(samples, url)
+        return pts
+    }
+}
+
+func tRows() {
+    for rate in surveyRates {
+        readMix("T1", "recorder", rate: rate, keep: true, override: (.spectral, "spectral"))
+        readMix("T1", "recorder", rate: rate, keep: true, override: (.timeDomain, "timeDomain"))
+        readMix("T1", "recorder", rate: rate, keep: false)
+        readRender("T2", rate: rate, unitName: "timepitch")
+        readRender("T2", rate: rate, unitName: "autimepitch")
+    }
+}
+
+if group == "all" || group == "L" { lRows() }
+if group == "all" || group == "X" { xRows() }
+if group == "T" { tRows() }
 writeAnswer()
 exit(0)
