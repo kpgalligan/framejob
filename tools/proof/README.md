@@ -20793,7 +20793,7 @@ RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --mutant <name> --control 
 The five mutants and their rows: `peak-ignored` (the PQ arm's white from `pqShoulderWhite(peak:
 nil)`) H7p, H7o; `mastering-over-cll` (`hdr10.rs` takes the mastering maximum first) H7d, H7i;
 `sei-unparsed` (the SEI route reads nothing) H7d, H7p; `unknown-not-1000` (no peak means 4,000)
-H7i, P5; `peak-below-knee` (the white not held at 1) H7o, P5. Its record: `designs/hdr.md`'s H-1
+H7i, P5; `peak-below-knee` (the white not held at 1) H7o, P5. Its record: `archive/hdr.md`'s H-1
 section.
 
 ## Road map hdr — H-2, the HLG working space (`hdr_proof.py` HS, HH, HP, HT, HL, HW, HK, HM, HF, HX, TH, P6 and twelve mutants; `hdr_probe.swift` P6; spec §11 HD-2, HD-3, HD-13)
@@ -20845,7 +20845,7 @@ edited, each re-run: `hdr_proof.py`'s `no-composition-color` and `convert-everyw
 `curves_proof.py`'s `hue-from-graded`, `hue-shift-reversed`, `hue-before-channel-curves`,
 `color-hue-guarded` (the `HUE_GAIN`, `STEP_HUE`, `COLOR_SHIFT` anchors), `tone_proof.py`'s `exposure-encoded`,
 `wheels_proof.py`'s `push-not-luma-neutral`, `log_proof.py`'s `labels-over-setting`. Its record:
-`designs/hdr.md`'s H-2 section.
+`archive/hdr.md`'s H-2 section.
 
 ## Road map hdr — H-3, the deliverables (`hdr_proof.py` DT, DP, DV, DI, DE, DR, DS, DM, DX, HX and HF rewritten, TO, P7 and seven mutants; `hdr_probe.swift` P7; spec §11 HD-4, HD-5, HD-7, HD-14)
 
@@ -20888,7 +20888,7 @@ DE, HX; `sdr-version-preview-only` (`Exporter` publishes `options`, not
 `.delivering(settings)`) DE; `jpeg-not-sdr-version` (`forFrame` returns its options) DE, HF;
 `preview-keeps-hlg` (`previewComposition` ignores `sdrVersion`) P7. Re-pinned in H-3:
 `no-composition-color` to `OutputTransform.compositionColour`'s SDR arm (H2, H3, H1m). Its
-record: `designs/hdr.md`'s H-3 section.
+record: `archive/hdr.md`'s H-3 section.
 
 ## Road map hdr — H-4, HDR scopes (`hdr_proof.py` SI, SW, SV, SS, SD, SP, P8 and nine mutants; `hdr_probe.swift` P8; `scopes_proof.py` S15 and T1's HLG variants; spec §11 HD-8, HD-15)
 
@@ -20936,7 +20936,7 @@ Rec. 709's weights) SW; `ref-line-at-100` (`referenceWhitePercent` 100) SS, P8;
 passes `.sdr`) SW, SV, SS; `sdr-json-names-scale` (the SDR `jsonKeys` writes `"signal":
 "sdr"`) SI, P8; `vectorscope-view-709-targets` (`VectorscopeView` draws `targets(for: .sdr)`
 and `skinLineDegrees(for: .sdr)`) P8; `parade-graticule-sdr` (`ParadeView`'s graticule call
-drops `signal:`) P8. Its record: `designs/hdr.md`'s H-4 section.
+drops `signal:`) P8. Its record: `archive/hdr.md`'s H-4 section.
 
 ## Road map hdr — H-6, linear light (`hdr_proof.py` LT, LH, LG, LA, LS, LM, LD, LB, LF, LR, LE, LO, LU, TL, P9 and ten mutants; `hdr_probe.swift` P9; spec §11 GR-18, HD-9, HD-16)
 
@@ -20975,7 +20975,7 @@ The ten mutants and their rows: `linear-before-grade` (the decode moved before 4
 (`uniforms(for:)` answers a linear canvas as an encoded one) LT, LH; `background-not-decoded`
 LB; `shadow-colour-not-decoded` LD; `fade-colour-not-decoded` LF; `matte-reads-linear` LM;
 `qualifier-map-reads-linear` LA (its blurred case); `selection-grey-not-decoded` LS. Its
-record: `designs/hdr.md`'s H-6 section.
+record: `archive/hdr.md`'s H-6 section.
 
 ## Road map hdr — H-5, Canon Log 2 and Canon Log 3 (`log_proof.py` LP5, LP6, L19–L22, L2, L8 and L9 extended, and seven mutants; `log_probe.swift` LP2, LP4–LP6; spec §11 HD-17)
 
@@ -21015,4 +21015,4 @@ discrimination is the mutants'. The seven mutants and their rows: `clog2-breakpo
 rule) LP5, L19 and LP6, L20; `canon-scale-dropped` (`kCanonReflection` 1.0) LP5, LP6, L19, L20,
 L21; `cinema-as-2020` (`InputPrimaries(.cinemaGamut)` answers BT.2020) LP2, L19, L20;
 `canon-not-log-in-hlg` (`inputToHLG`'s log test back to kinds 5–7) L21. Its record:
-`designs/hdr.md`'s H-5 section.
+`archive/hdr.md`'s H-5 section.

@@ -3,13 +3,13 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map that makes these is in progress: `designs/hdr.md` holds each phase's record (H-0 the
-road map, these decisions and the two pure moves; H-1 #281, the PQ peak; H-2 #277's HLG working
-space; H-3 #277's deliverables; H-4 #277's HDR scopes; H-5 #278's curves; H-6 #276, linear light;
-H-7 the close). HD-1…HD-11 were recorded in H-0, before any HDR code, from the owner's answers of
-2026-10-19 to the HDR brief's twelve choices, every one the recommended answer: four were asked
-as questions and the other eight were stated to the owner as taken (`designs/hdr.md`, "The
-owner's choices"; the brief is `~/.claude/litecode/framejob/hdr-brief/I-hdr.md` and the answers
+The road map that made these is closed: its condensed record is `designs/adr/hdr.md`, and the
+original, `archive/hdr.md`, holds each phase's record (H-0 the road map, these decisions and the
+two pure moves; H-1 #281, the PQ peak; H-2 #277's HLG working space; H-3 #277's deliverables; H-4
+#277's HDR scopes; H-5 #278's curves; H-6 #276, linear light; H-7 the close). HD-1…HD-11 were
+recorded in H-0, before any HDR code, from the owner's answers of 2026-10-19 to the HDR brief's
+twelve choices, every one the recommended answer: four were asked as questions and the other
+eight were stated to the owner as taken (`archive/hdr.md`, "The owner's choices"; the brief is `~/.claude/litecode/framejob/hdr-brief/I-hdr.md` and the answers
 `answers.md` beside it, outside the repo). H-1…H-6 each record their numbers as a new entry (HD-12
 on) or as Amended-by lines before their code.
 
@@ -143,7 +143,7 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
   - **Where it is used:** every 8-bit row, GIF, APNG and JPEG (HD-5), and Show SDR Version
     (HD-7) — one path, chosen by the recipe options of the key drawn, so the preview,
     `render_frame` and the export share it.
-  - **The knee:** H-3 fixes it against the brief's rows (copied into `designs/hdr.md`, "The SDR
+  - **The knee:** H-3 fixes it against the brief's rows (copied into `archive/hdr.md`, "The SDR
     version, computed"), after reading BT.2408's own HDR → SDR constants, and records it here
     by an Amended-by line before its code. The brief computed those rows on the inverse of the
     BT.1886 route (`hdr_math.py` §1), not of HD-3's measured lift, so H-3 recomputes them on

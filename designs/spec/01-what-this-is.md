@@ -14,9 +14,10 @@ per-clip controls (§11 GR-1: tier 1 of grading — tone, adjustment clips,
 looks, LUT import, an ungraded switch and one luma waveform — is in, kept by
 the owner's verdict of 2026-10-10, and tier 2's scopes, colour wheels,
 curves and qualifiers beside it, GR-10…GR-13; tier 3's HDR→SDR conversion
-and camera log are in, GR-15, GR-16; linear-light blending and the HDR
-timeline are deferred, GR-18 #276, GR-19 #277; a wide-gamut working
-space for SDR projects is not wanted, GR-20; tier 4's vectorscope zoom,
+and camera log are in, GR-15, GR-16; the HDR road map's HLG timeline, its
+HLG, HDR10 and SDR-version deliverables, HDR scopes, the PQ peak, Canon Log
+2 and 3 and opt-in linear-light blending are in, HD-1…HD-17; a wide-gamut
+working space for SDR projects is not wanted, GR-20; tier 4's vectorscope zoom,
 hue curves, the blend between curves of different point counts and the
 qualifier's cleanup blur are in, GR-24, GR-31…GR-35, while an Offset
 wheel, a qualifier on picture clips, 1,024-level scopes and a histogram

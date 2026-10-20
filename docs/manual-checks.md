@@ -627,7 +627,7 @@ These rows are run on a Release build (`make app`), with real camera footage of 
 
 ## HDR
 
-These rows are run on a Release build (`make app`), with real HDR footage of your own, in a project you can spare or a copy of one. Each row is added by the HDR road map's phase that creates it (`designs/hdr.md`, "Person checks").
+These rows are run on a Release build (`make app`), with real HDR footage of your own, in a project you can spare or a copy of one. Each row was added by the HDR road map's phase that created it, as `designs/adr/hdr.md` records.
 
 **HDR-1 — An HLG project on an XDR display and on an SDR display**
 - **Do:** 1. In a new project, put an iPhone HLG clip (default Camera settings), a white text title over it, and a short Frame Job screen recording (File ▸ New Recording…) after it. 2. In the Document tab read the Colour row, then set Dynamic Range to HDR (HLG); read the Colour row again; undo and redo the switch once. 3. Look at all three on the built-in XDR display, paused and playing, beside the interface's own white (a Finder window). 4. Drag the window to an SDR display (or turn the XDR display's HDR off in System Settings ▸ Displays) and look again. 5. Export `hevc_10bit` and `prores_422` and open each in QuickTime Player on both displays. 6. Try Save Frame… as PNG, HEIC and JPEG. 7. (hdr H-3) Turn View ▸ Show SDR Version on, on both displays, paused and playing; turn it off again.

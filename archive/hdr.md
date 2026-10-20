@@ -1672,3 +1672,53 @@ merge and `make gate` passed after it.
 
 **Residue:** #278 stays open for detection from the makers' metadata. #310 (LG1, G1, S1)
 as before, not run here. The owner's person check is GRD-19. Next: H-7.
+
+## H-7 — the close
+
+**What landed** (2026-10-20, in the worktree on `hdr`, from `6b88c38`). `designs/adr/hdr.md`.
+This road map `git mv`'d to `archive/hdr.md`, with its `archive/INDEX.md` row. Every
+`designs/hdr.md` citation outside `archive/` now points at the ADR or here: §11 `hdr.md`'s first
+paragraph in the closed form, its line naming "The owner's choices" and HD-4's "copied into"
+line; `designs/adr/grading-3.md`'s B96 line; `docs/manual-checks.md`'s HDR section intro, now in
+the past tense; and `tools/proof/README.md`'s six record lines (H-1, H-2, H-3, H-4, H-6, H-5).
+`designs/adr/grading-3.md` gained "built by" notes on GR-18 and GR-19 and on its #276, #277,
+#278 and #281 lines. Spec §1's non-goals sentence now names the HDR road map's work in place of
+"deferred, GR-18 #276, GR-19 #277", and the `11-decisions/README.md` row drops "in progress".
+The spec indexes' Lines cells follow. Every HDR person check (HDR-1, HDR-2, HDR-3, HDR-4, HDR-6,
+LIN-1, GRD-16's and GRD-17's HLG steps, GRD-19) was read against the code — the Colour row's
+words (`CanvasOutput.swift`), the undo names Dynamic Range, Blending and PQ Peak, Use File's, the
+"SDR Version" tag, `HDR_ROWS` and the popup's HDR (HLG) · HDR10 (PQ) · SDR version, the scope
+captions (`ScopeSignal.swift`), the C-Log rows, the LUT warning — and each agreed, so no row
+changed. No product, core, Swift, shader or proof-script file changed.
+
+**Verification** (2026-10-20, `pmset -g ps`: "Now drawing from 'AC Power'"):
+- `python3 tools/proof/spec_index_proof.py`: exit 0, 177/177.
+- `python3 tools/proof/name_residue.py`: exit 0, no output.
+- `git grep -n "designs/hdr\.md" -- . ':!archive'`: prints nothing.
+- `git status --porcelain`: `RM designs/hdr.md -> archive/hdr.md` (the rename staged, this
+  section unstaged on top of it).
+- `make gate`: PASS in 84 s (names 1 s, test 83 s; typecheck, fmt, lint and app skipped as
+  byte-identical to their last pass); the test log has 136 `test result: ok` lines and no
+  FAILED, and `spec_index_proof.py` 177/177 among its steps. This line was written after the gate
+  passed (`archive/` is outside every gate step's inputs, `gate.py`'s `EXCLUDED`).
+- No mutants: the phase adds no product decision.
+
+**The issues.** Filed, each `ai-drafted` and `low-priority`: **#316**, the PQ peak not read from a
+WebM/Matroska Colour element (`container_header.rs`'s `video_settings` reads 0x55B1, 0x55B9,
+0x55BA and 0x55BB only, skipping MaxCLL 0x55BC and MasteringMetadata 0x55D0) or from AV1's HDR
+metadata OBUs ("Not established: Other containers", REASONED from the code); **#317**, ProRes 4444
+with alpha from an HLG project unmeasured (DT and DP read its tags and side data, no row its
+alpha; "Not established"). Reviewed against the tree and the tracker (read-only): #281, #277 and
+#276 are closed as completed (built); #313 and #314 closed (instrument, fixed in H-2 and H-3);
+#278, #310, #311, #312, #315 and #274 are open and hold what they hold. Not filed, each decided:
+the XDR panel and an SDR external display (HDR-1's steps 3–4); the HLG project's 4K cost
+(measured: TH, TO, TL); VideoToolbox's HEVC Main 10 HLG/PQ encode speed (the SDR `hevc_10bit`
+encoder with tags and two blobs; no decision waits on it); BT.2408's constants (read in H-3,
+HD-14 (a)); other editors (general knowledge); Dolby Vision in iPhone sources (REASONED not;
+HDR-2 watches for a badge); "Found while reading" 1–4 (settled in H-1, H-1, H-2, H-2). #274 was
+not measured: no owner HDR or log clip reached the road map (HD-1).
+
+**Owed.** A comment on #278 saying the road map closed into `designs/adr/hdr.md`, with the
+original at `archive/hdr.md`, since its H-0 comment names `designs/hdr.md` (the orchestrator's).
+The root `CLAUDE.md`'s ADR list names `hdr` (the orchestrator applies it). The owner's person
+checks: HDR-1, HDR-2, HDR-3, HDR-4, HDR-6, LIN-1, GRD-16's and GRD-17's HLG steps, GRD-19.

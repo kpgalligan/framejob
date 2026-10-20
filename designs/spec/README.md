@@ -17,7 +17,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 
 | File | Lines | Read it for |
 |---|---|---|
-| [`01-what-this-is.md`](01-what-this-is.md) | 42 | The product in one page, its opening flow, and its non-goals. |
+| [`01-what-this-is.md`](01-what-this-is.md) | 43 | The product in one page, its opening flow, and its non-goals. |
 | [`02-six-ideas.md`](02-six-ideas.md) | 26 | The six a screencast editor ideas the model copies, and why it stays simple. |
 | [`03-window-layout.md`](03-window-layout.md) | 62 | The window's regions, as the design handoff specifies them. |
 | **§4 — The regions in detail** | | |
