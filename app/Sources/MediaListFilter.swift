@@ -160,6 +160,8 @@ extension MediaListFilter {
                 apply(next)
             },
             enabled: { true }, onEdit: {})
+        // The offscreen harness finds this popup by the tooltip's opening words
+        // (`tools/proof/harness/main.swift`'s `mediaFilter`): reword both.
         sort.toolTip =
             "Import Order is the order the files were added — what this list shows "
             + "unless another row is chosen."

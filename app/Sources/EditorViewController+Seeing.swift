@@ -1,18 +1,20 @@
 import AppKit
 
 /// Seeing the grade (grading GR3, grading-2 G2-1 and G2-4, spec §11 GR-4,
-/// GR-5, GR-10 and GR-13): View ▸ Show Ungraded, View ▸ Show Selection and
-/// View ▸ Scopes, checkmark toggles in the preview group.
+/// GR-5, GR-10 and GR-13): View ▸ Show Ungraded, View ▸ Show Selection,
+/// View ▸ Show SDR Version (hdr H-3, spec §11 HD-7, HD-14 (g)) and View ▸
+/// Scopes, checkmark toggles in the preview group.
 ///
-/// **All three are view state, per window, and none persists**: no
-/// `UserDefaults` key, so a new window starts with both off (and the scopes'
+/// **All four are view state, per window, and none persists**: no
+/// `UserDefaults` key, so a new window starts with each off (and the scopes'
 /// slots at Waveform over Vectorscope) and a proof can drive them through
 /// `perform_menu_item` without moving the defaults. No MCP tool mirrors them
 /// or the slot picks (§7.9's Preview Quality exemption); `render_frame
-/// {ungraded, selection, waveform, parade, vectorscope, histogram}` is the
-/// capability.
+/// {ungraded, selection, sdr_version, waveform, parade, vectorscope,
+/// histogram}` is the capability.
 ///
-/// **Show Ungraded and Show Selection are options on the document's KEY** (`RecipeSource`,
+/// **Show Ungraded, Show Selection and Show SDR Version are options on the
+/// document's KEY** (`RecipeSource`,
 /// spec §7.3), so it reaches exactly what composes through that key: the
 /// editor's preview and the Preview Window, one player. An export, Save
 /// Frame…, the eyedropper and `render_frame` mint keys of their own
@@ -45,6 +47,10 @@ extension EditorViewController {
         seeingTags?.arrangedSubviews.compactMap { $0 as? SelectionTagView }.first
     }
 
+    var sdrVersionTag: SDRVersionTagView? {
+        seeingTags?.arrangedSubviews.compactMap { $0 as? SDRVersionTagView }.first
+    }
+
     /// The panel at the pane's right edge, the canvas's trailing edge pinned
     /// to its leading one, and the tags in the void's top-left corner. Called
     /// once, from `installCanvas`. A slot the panel reveals or re-picks asks
@@ -52,7 +58,8 @@ extension EditorViewController {
     func installSeeing(beside canvas: PreviewCanvasView) {
         let panel = ScopesPanelView()
         panel.onNeedsFrame = { [weak self] in self?.refreshSeeing() }
-        let tag = SeeingTagStack(views: [UngradedTagView(), SelectionTagView()])
+        let tag = SeeingTagStack(
+            views: [UngradedTagView(), SelectionTagView(), SDRVersionTagView()])
         tag.orientation = .horizontal
         tag.spacing = 4
         tag.detachesHiddenViews = true
@@ -99,6 +106,20 @@ extension EditorViewController {
         showSelection(options, for: document)
     }
 
+    /// View ▸ Show SDR Version (no shortcut, spec §11 HD-7, HD-14 (g)): this
+    /// window's preview drawn as the project's SDR version — `dynamicRange`
+    /// `.sdr` on the document's key, the composition recoloured BT.709 with
+    /// no rebuild (`Playback.recompose`). In an SDR project no pixel changes
+    /// and the tag still shows.
+    @objc func toggleShowSDRVersion(_ sender: Any?) {
+        guard let document = document else { return }
+        var options = RecipeSource.shared.options(for: document.recipeKey)
+        options.dynamicRange = options.dynamicRange == .sdr ? nil : .sdr
+        RecipeSource.shared.setOptions(options, for: document.recipeKey)
+        sdrVersionTag?.isHidden = options.dynamicRange != .sdr
+        playback.recompose()
+    }
+
     /// Called from `refreshCanvas`: while Show Selection is on, a selection
     /// change rebinds it to the first selected adjustment clip, or turns it
     /// off when none is selected. Nothing while it is off.
@@ -143,16 +164,22 @@ extension EditorViewController {
     // MARK: - Validation
 
     /// The half of `validateUserInterfaceItem` this file owns; nil means "not
-    /// one of mine". Show Ungraded and Scopes are always enabled, like Preview
-    /// Window: both are about the preview, not the timeline; Show Selection
-    /// is disabled while off with no adjustment clip selected. The checkmark
-    /// is the state.
+    /// one of mine". Show Ungraded, Show SDR Version and Scopes are always
+    /// enabled, like Preview Window: each is about the preview, not the
+    /// timeline; Show Selection is disabled while off with no adjustment clip
+    /// selected. The checkmark is the state.
     func validateSeeingAction(
         _ action: Selector, item: any NSValidatedUserInterfaceItem
     ) -> Bool? {
         switch action {
         case #selector(toggleShowUngraded(_:)):
             let on = document.map { RecipeSource.shared.options(for: $0.recipeKey).ungraded }
+            (item as? NSMenuItem)?.state = on == true ? .on : .off
+            return true
+        case #selector(toggleShowSDRVersion(_:)):
+            let on = document.map {
+                RecipeSource.shared.options(for: $0.recipeKey).dynamicRange == .sdr
+            }
             (item as? NSMenuItem)?.state = on == true ? .on : .off
             return true
         case #selector(toggleShowSelection(_:)):
@@ -170,9 +197,9 @@ extension EditorViewController {
     }
 }
 
-/// The preview's tag stack (spec §11 GR-4, GR-13): "Ungraded" then
-/// "Selection", hidden tags detached. Like the tags, it takes no clicks, so
-/// a gesture in the void beneath it is the canvas's.
+/// The preview's tag stack (spec §11 GR-4, GR-13, HD-14 (g)): "Ungraded",
+/// "Selection", then "SDR Version", hidden tags detached. Like the tags, it
+/// takes no clicks, so a gesture in the void beneath it is the canvas's.
 final class SeeingTagStack: NSStackView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

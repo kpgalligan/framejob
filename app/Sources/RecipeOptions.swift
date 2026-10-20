@@ -35,9 +35,35 @@ struct RecipeOptions: Equatable {
     /// Pick from Canvas (GR-13): this adjustment clip and every layer in
     /// front of it left out — the picture the clip reads.
     var behind: UInt32? = nil
+    /// The picture an HLG project is drawn as (spec §11 HD-14): `.sdr` is its
+    /// SDR version (View ▸ Show SDR Version on a document's key, `render_frame
+    /// {sdr_version}`, an export's SDR version, a JPEG frame), `.pq` an HDR10
+    /// export. The core puts it on the recipe's canvas only in an HLG project.
+    var dynamicRange: DynamicRange? = nil
 
     /// Every option off: the recipe as it has always been.
     static let none = RecipeOptions()
+
+    /// These options as an export draws them (spec §11 HD-14 (b)): the
+    /// settings' `pq` or `sdr` becomes the key's `dynamicRange`, so the file
+    /// is written through the output pass the preview draws; `hlg` and an SDR
+    /// project's settings (no `color`) leave the options as they are.
+    func delivering(_ settings: ExportSettings) -> RecipeOptions {
+        guard let range = settings.dynamicRange, range != .hlg else { return self }
+        var options = self
+        options.dynamicRange = range
+        return options
+    }
+
+    /// These options as a still frame of `format` draws them (spec §11 HD-14
+    /// (e)): a JPEG of an HLG project is its SDR version; anything else is
+    /// unchanged.
+    func forFrame(_ format: FrameWriter.Format, output: CanvasOutput) -> RecipeOptions {
+        guard format == .jpeg, output == .hlg else { return self }
+        var options = self
+        options.dynamicRange = .sdr
+        return options
+    }
 
     /// The core's `opts_json`, or nil for "ask the un-optioned export" — the
     /// argument `rc_project_frame_recipe` itself passes, the core documenting
@@ -48,6 +74,7 @@ struct RecipeOptions: Equatable {
         var json = "{\"burn_in_timecode\":\(burnInTimecode),\"ungraded\":\(ungraded)"
         if let selection { json += ",\"selection\":\(selection)" }
         if let behind { json += ",\"behind\":\(behind)" }
+        if let dynamicRange { json += ",\"dynamic_range\":\"\(dynamicRange.rawValue)\"" }
         return json + "}"
     }
 }

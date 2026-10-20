@@ -383,6 +383,7 @@ extension ExportSheetController {
         // ignores override keys it does not know — so `start` and `duration`
         // spelled at the top level exported the whole project instead of the
         // in/out range, silently.
+        if let picture = dynamicRangeOverride() { overrides["dynamic_range"] = picture }
         if rangePopup.indexOfSelectedItem == 1, let range = range {
             overrides["range"] = [
                 "start": range.start,
@@ -436,6 +437,7 @@ extension ExportSheetController {
         // format-dependent controls, offering to write a timecode into a file
         // with no picture to write it into.
         burnInCheckbox.isEnabled = applies.burnIn
+        syncDynamicRange(applies)
 
         guard let settings = resolved else {
             summaryLabel.stringValue = resolveError ?? "These settings are not available."

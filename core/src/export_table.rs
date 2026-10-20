@@ -558,6 +558,9 @@ impl Preset {
                 None => Value::Null,
             },
         );
+        if crate::dynamic_range::HDR_ROWS.contains(&self.id) {
+            out.insert("hdr".to_string(), Value::from(true));
+        }
         Value::Object(out)
     }
 }

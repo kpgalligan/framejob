@@ -1073,7 +1073,10 @@ the key map behind it.
 **Playback and rendering.**
 - `Playback.swift` (+`Meter`, +`PreviewQuality`, +`Step`, +`Scope`) — one
   `AVPlayer` over the plan's composition; the transport, JKL, the rate KVO; `+Meter` is the level meter, moved out under
-  the size rule. **Only a seek someone ASKED for reports a time**:
+  the size rule; `+Scope` also holds `seekFinished()` and `report(_:)`
+  (hdr H-3's pure move). `recompose()` re-colours the player's copy of the
+  composition without a rebuild (`previewComposition(…, sdrVersion:)`, the
+  way Preview Quality does): View ▸ Show SDR Version, spec §11 HD-14. **Only a seek someone ASKED for reports a time**:
   `seek(to:)` is that door, and Playback's own RESTORES — the rebuild's item
   swap and re-seek, the paused refresh's round trip — go through `startSeek`
   silently and report once, only if they come to rest off the last reported
@@ -1125,7 +1128,9 @@ the key map behind it.
   reports no packet table (SY-36, SY-38); the other readers (peaks, speech,
   the transcription extract, reverse) keep it, SY-38's measured residue
   (#309 at 24 kHz).
-- `CompositionBuilder.swift` (+`InstructionRanges`, +`AudioTracks`,
+- `CompositionBuilder.swift` (`build` takes the composition's colour from its
+  key's options: BT.709 for the SDR version, BT.2020/PQ for HDR10, spec §11
+  HD-14; +`InstructionRanges`, +`AudioTracks`,
   +`AudioPlacement`: where an audio segment is inserted, with the varispeed
   source lead (575 ticks, SY-24) and the noise-reduction track lead (6,400
   ticks, SY-25); `build` substitutes `AudioRateCopy`'s URLs for the audio
@@ -1225,7 +1230,7 @@ the key map behind it.
   are two passes; one pass in flight per key and one pending slot the newest
   frame replaces) · `ScopesPanelView.swift` (View ▸ Scopes' panel: two slots
   with pickers, the shrink-to-fit layout and its 360 pt floor,
-  `zoom(_:slot:)`, `UngradedTagView`, `SelectionTagView`) ·
+  `zoom(_:slot:)`, `UngradedTagView`, `SelectionTagView`, `SDRVersionTagView`) ·
   `ScopeSlotView.swift` (a slot: the picker, the caption, the body and its
   readouts, and the vectorscope's zoom, kept across a pick away and back) ·
   `WaveformTraceView.swift` · `ParadeView.swift` · `VectorscopeView.swift`
@@ -1236,8 +1241,10 @@ the key map behind it.
   front-most free non-matte track or a new front "Adjustment" track, one undo
   step, and its validator arm) ·
   `EditorViewController+Seeing.swift` (View ▸ Show Ungraded, View ▸ Show
-  Selection and View ▸ Scopes, the tag stack, `installSeeing`, their validator
-  arm; spec §11 GR-4, GR-5, GR-10, GR-13) — the grade's seeing tools. Show
+  Selection, View ▸ Show SDR Version and View ▸ Scopes, the tag stack,
+  `installSeeing`, their validator arm; spec §11 GR-4, GR-5, GR-10, GR-13,
+  HD-14) — the grade's seeing tools. Show SDR Version writes no UserDefaults
+  (not a persisting item) and changes no pixel in an SDR project. Show
   Ungraded sets `RecipeOptions.ungraded` on the
   document's own key only, so an export or `render_frame`, which mint their
   own keys, never see it. `armCanvasMode` pins the modal overlays to the
@@ -1261,6 +1268,12 @@ the key map behind it.
   `uniforms(…, output:)`, and every number Frame Job chose — a log curve's
   code domain by its media's range flag, GR-22; the SDR→HLG lift's CPU
   twins `liftSDR`, `unliftSDR`, `unliftedPick` and `coreMedia709Toe`) ·
+  `OutputTransform.swift` (`DynamicRange`, mirroring the core's: an HLG
+  project's picture, `hlg`, `pq` or `sdr`; the SDR version's knee and the
+  output pass's uniforms, answered only when the key asks for `sdr` or `pq`,
+  spec §11 HD-4, HD-5, HD-14) · `Compositor+Output.swift` (the output pass:
+  one quad after the last layer reading the destination, so an HLG master and
+  every SDR frame are the bytes they were) ·
   `LayerLift.swift` (an HLG project's lift of every layer Frame Job draws,
   once at upload by step 0's `.sdr` arm; an LRU of
   `LayerRenderers.cacheLimit + graphicCacheLimit` entries keyed by the
@@ -1887,7 +1900,10 @@ free.
 - `Sheets.swift` (the `makeSheetView` builders every sheet uses) ·
   `ExportSheetController.swift` (+`Options`, +`Resolve`, +`Presets`,
   `ExportPresetsStore.swift`, `ExportSheetCommit.swift`: Export… and Add
-  to Queue, the save panel and the job) · `ExportProgressSheetController.swift` ·
+  to Queue, the save panel and the job; `ExportSheetDynamicRange.swift`: the
+  Dynamic Range row, only in an HLG project, HDR (HLG) · HDR10 (PQ) · SDR
+  version on the rows that carry HDR and a disabled "SDR version" on every
+  other, never part of `ExportChoice`, spec §11 HD-14) · `ExportProgressSheetController.swift` ·
   `ReverseProgressSheetController.swift` ·
   `SpeedSheetController.swift` · `RelinkSheetController.swift` ·
   `GraphicFileSheetController.swift`. A sheet

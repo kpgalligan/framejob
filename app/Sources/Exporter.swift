@@ -243,7 +243,7 @@ final class Exporter {
         // The options belong to the KEY, not to the handle, which is what
         // makes this enough: `finish` unregisters the key and takes them with
         // it, and nothing else in the process can be reading it.
-        RecipeSource.shared.setOptions(options, for: key)
+        RecipeSource.shared.setOptions(options.delivering(settings), for: key)
         if let graphics = graphics { GraphicRegistry.shared.pin(graphics, for: key) }
 
         measureShare = Exporter.measuresLoudness(settings)

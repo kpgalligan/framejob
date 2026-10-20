@@ -514,9 +514,13 @@ enum Harness {
                 Notification(name: NSControl.textDidChangeNotification, object: field))
         }
         if let order = order {
+            // The pane holds more than the find band's popup (grading-3's
+            // Camera Log section has one too), so the sort is the popup
+            // carrying `MediaListFilter.controls`'s own tooltip.
             let popups = descendants(OptionPopupControl.self, in: pane)
+                .filter { $0.toolTip?.hasPrefix("Import Order is the order") == true }
             guard popups.count == 1 else {
-                warn("mediaFilter: expected one OptionPopupControl, found \(popups.count)")
+                warn("mediaFilter: expected one sort OptionPopupControl, found \(popups.count)")
                 return
             }
             let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")

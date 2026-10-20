@@ -313,7 +313,8 @@ char *rc_project_frame_recipe(const RcProject *p, int64_t t);
 
 /* The same recipe, with the caller's OPTIONS. `opts_json` is
  * {"burn_in_timecode": bool, "ungraded": bool, "selection": clip id,
- * "behind": clip id} (any key may be absent) —
+ * "behind": clip id, "dynamic_range": "hlg" | "pq" | "sdr"} (any key may be
+ * absent) —
  * or NULL, which is the defaults and is exactly what rc_project_frame_recipe
  * asks for, the two being one implementation.
  *
@@ -329,6 +330,11 @@ char *rc_project_frame_recipe(const RcProject *p, int64_t t);
  * and the background is black. `behind` leaves out that layer and the same
  * layers in front of it (none found: the recipe unchanged) — the picture the
  * clip reads. A clip id is a whole number; anything else is OFF.
+ *
+ * `dynamic_range` (spec 11 HD-14) is the picture an HLG project is drawn as:
+ * `sdr` (its SDR version) or `pq` (HDR10) adds `"dynamic_range"` to the
+ * recipe's canvas after `output`, which the compositor's output pass reads;
+ * `hlg`, and every SDR project, add nothing.
  *
  * `burn_in_timecode` APPENDS a text layer (so, last: topmost) showing the
  * project timecode at `t`, spelled by the document's own timecode_frames, in
@@ -432,14 +438,16 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * (`video_bitrate`, `audio_bitrate`) and the two loudness figures
  * (`loudness_lufs`, the integrated target an export is normalised to,
  * -70..0; `peak_dbtp`, the true-peak ceiling the gain is capped against,
- * -20..0). Absent and explicit null both mean "use the preset", an
- * unknown key is ignored so a newer UI still gets an export, and a value
- * out of range or of the wrong type is an error naming the key and the
- * value. One pairing rule, and it is the table's only one: a `peak_dbtp`
- * with no `loudness_lufs` is an error, because normalisation is gain-only
- * and a ceiling with nothing to cap would be accepted, echoed and
- * silently inert. Neither loudness key appears in the resolved settings
- * unless it was asked for.
+ * -20..0) and `dynamic_range` ("hlg", "pq" or "sdr", spec 11 HD-14: an
+ * HLG project's 10-bit rows default to hlg, its other video rows write sdr
+ * and refuse hlg and pq, and an SDR project refuses hlg and pq). Absent
+ * and explicit null both mean "use the preset", an unknown key is ignored
+ * so a newer UI still gets an export, and a value out of range or of the
+ * wrong type is an error naming the key and the value. One pairing rule,
+ * and it is the table's only one: a `peak_dbtp` with no `loudness_lufs` is
+ * an error, because normalisation is gain-only and a ceiling with nothing
+ * to cap would be accepted, echoed and silently inert. Neither loudness
+ * key appears in the resolved settings unless it was asked for.
  *
  * Note what is NOT in that list: there is no `size` key. A size is two
  * numbers here. `rc_export_sizes`' row ids ("1080p", "document") are the
@@ -476,7 +484,11 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * none of which has anywhere to put a fourth channel; it is the same kind
  * of fact as `audio`, which says what the CONTAINER can hold and not
  * whether this timeline has any sound in it. A transparent canvas exported
- * through any other row is composited onto black. */
+ * through any other row is composited onto black.
+ *
+ * In an HLG project every video row's settings carry `color`, the picture it
+ * writes: "hlg", "pq" or "sdr" (spec 11 HD-14); an SDR project's and an
+ * audio row's never do. */
 char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json,
                          char **err_out);
 

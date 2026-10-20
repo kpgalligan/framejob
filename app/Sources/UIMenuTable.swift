@@ -112,6 +112,7 @@ extension UIMenu {
         "togglePreviewWindow:": .window,
         "toggleShowUngraded:": .plain,
         "toggleShowSelection:": .plain,
+        "toggleShowSDRVersion:": .plain,
         "toggleScopes:": .plain,
         "performMiniaturize:": .framework,
         "performZoom:": .framework,

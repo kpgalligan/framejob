@@ -195,10 +195,12 @@ extension EditorViewController {
         let graphics = GraphicRegistry.shared.snapshot(for: document.recipeKey)
         EditorViewController.frameGrabQueue.async { [weak self] in
             let result: Result<URL, Error>
-            // `render_frame`'s expression, so the two stay one frame's bytes.
+            // `render_frame`'s expression, so the two stay one frame's bytes: a
+            // JPEG of an HLG project is its SDR version (spec §11 HD-14 (e)).
+            let options = RecipeOptions.none.forFrame(format, output: project.snapshot.canvas.output)
             if let image = Exporter.renderFrame(
-                project: project, urls: urls, at: time, maxWidth: nil, graphics: graphics,
-                keepsDepth: format.carriesDepth)
+                project: project, urls: urls, at: time, maxWidth: nil, options: options,
+                graphics: graphics, keepsDepth: format.carriesDepth)
             {
                 result = Result { try FrameWriter.writeFrame(image, as: format, to: url) }
             } else {

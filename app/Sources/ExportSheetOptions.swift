@@ -194,6 +194,10 @@ extension ExportSheetController {
         /// `hasVideo` (the three audio-only rows are exactly where a
         /// delivery target matters most).
         var loudness: Bool { preset != nil && !frameSequence }
+
+        /// The Dynamic Range popup is live only on a row that carries an HLG
+        /// project's HDR picture (spec §11 HD-14 (h)).
+        var dynamicRange: Bool { preset?.carriesHDR ?? false }
     }
 
     /// GIF and APNG. Spelled once, and taken from the container rather than

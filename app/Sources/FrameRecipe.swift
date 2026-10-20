@@ -10,15 +10,19 @@ struct RecipeCanvas: Codable, Equatable {
     let background: RGBA
     /// The project's dynamic range (spec §11 HD-2); `.sdr` when absent.
     let output: CanvasOutput
+    /// The output pass's arm (spec §11 HD-14 (b)): `.sdr` or `.pq` on an HLG
+    /// canvas whose key asked for it, nil otherwise (`OutputTransform`).
+    let dynamicRange: DynamicRange?
 
     init(
         width: Int = 1920, height: Int = 1080, background: RGBA = [0, 0, 0, 1],
-        output: CanvasOutput = .sdr
+        output: CanvasOutput = .sdr, dynamicRange: DynamicRange? = nil
     ) {
         self.width = width
         self.height = height
         self.background = background
         self.output = output
+        self.dynamicRange = dynamicRange
     }
 
     init(from decoder: Decoder) throws {
@@ -27,6 +31,7 @@ struct RecipeCanvas: Codable, Equatable {
         height = c.lenient(.height, 1080)
         background = c.lenient(.background, [0, 0, 0, 1])
         output = c.lenient(.output, .sdr)
+        dynamicRange = c.lenient(.dynamicRange)
     }
 
     var size: CGSize { CGSize(width: width, height: height) }

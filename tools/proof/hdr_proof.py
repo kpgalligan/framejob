@@ -9,7 +9,7 @@ of GR-15's unmeasured claims; the product was not edited for them.
     python3 tools/proof/hdr_proof.py capture DIR [--only H1,H7i,Z1]   # the CONTROL tree: H1's
                                                     # and H7i's references, H2–H6 shown
     python3 tools/proof/hdr_proof.py compare DIR [--only H1,...]
-    python3 tools/proof/hdr_proof.py --measure      # TI and TH: step 0's 4K cost (Release figures)
+    python3 tools/proof/hdr_proof.py --measure      # TI, TH and TO: 4K costs (Release figures)
     python3 tools/proof/hdr_proof.py --mutant NAME [--control DIR]
 
 curves_proof.py's shape. Launches the app `proof_app` picks (Debug unless
@@ -20,8 +20,11 @@ export of a run is under `tools/proof/work/hdr/run/`, removed at the start and
 at exit. The fixtures are made once under `tools/proof/work/hdr/media/` and
 kept; `capture` copies H1's into `DIR/media/`, and every later run reads H1's
 from there, so the control and the tree draw the same bytes (a VideoToolbox
-encode is not repeatable). No menu item is performed and no default written:
-`--measure` passes `-FrameJobCompositorTiming YES` as a launch argument. Every
+encode is not repeatable). No default is written: `--measure` passes
+`-FrameJobCompositorTiming YES` as a launch argument, and the only menu items
+performed (hdr H-3's DM and DX) are View ▸ Show SDR Version and File ▸ Export…,
+neither of which persists anything (the sheet is read and cancelled, never
+committed). Every
 call is bounded (`CALL_BOUND`), every ffmpeg and ffprobe too. Every project is
 closed (`close_project`, discard). This script NEVER records the screen.
 
@@ -146,8 +149,8 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   lines each; the averages, their difference, each export's wall time
   (`time.monotonic()` around the `export` call, recorded, not scored) and the
   host state are printed.
-- **P1–P5**: `hdr_probe.swift` over `app/Sources` (a probe that will not build
-  is a scored FAIL of all five). P5 (hdr H-1): `pqShoulderWhite` (1000/203
+- **P1–P7**: `hdr_probe.swift` over `app/Sources` (a probe that will not build
+  is a scored FAIL of all seven). P5 (hdr H-1): `pqShoulderWhite` (1000/203
   bit-exact with no peak, 1 at 100 and 203, peak/203 above), `MediaColor`'s
   stored and `input` shapes and its two dictionaries, `setMediaColor` sending
   null for an empty dictionary, and a converted marker omitting a nil `peak`.
@@ -178,9 +181,50 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   matte (two shapes nested on the matte track) over bt709: left the lifted
   ramp, right 0.5·lift + 0.5·0.5059 ±2/1023; HF the PNG 16-bit with `cICP`
   9/18/0/1 and an `iCCP` named ITUR_2100_HLG, the HEIC 10-bit as BT.2100 HLG
-  (`sips`), JPEG refused by its sentence; HX `hevc_10bit` and `prores_422`
-  tagged bt2020nc/arib-std-b67/bt2020 with no Dolby Vision configuration or
-  RPU, `h264` and `gif` refused by the sentence, `audio_wav` written.
+  (`sips`), a JPEG written as the SDR version and not labelled HLG (hdr H-3;
+  H-2 refused it); HX `hevc_10bit` and `prores_422` tagged
+  bt2020nc/arib-std-b67/bt2020 with no Dolby Vision configuration or RPU,
+  `h264` written as the SDR version, tagged bt709 ×3 (hdr H-3; H-2 refused
+  it), `gif` and `audio_wav` written.
+- **DT…DX** (hdr H-3, #277, spec §11 HD-4, HD-5, HD-7, HD-14 — the
+  deliverables): 16-bit PNGs read as value/65535 against HD-14 (a)'s
+  `sdr_version` (scene light, display light at γ 1.2, × 1000/203, BT.2020 →
+  BT.709, GR-15's gamut lift and shoulder at knee 0.9 to 1000/203, Core Media
+  709's encode with its toe) and (d)'s `pq_version`; every bounded row prints
+  its largest miss. DT every video row of an HLG project (the hlg ramp) at its
+  default and each accepted `dynamic_range`: bt709 ×3 for the SDR version,
+  bt2020nc/arib-std-b67/bt2020 for hlg, bt2020nc/smpte2084/bt2020 for pq, the
+  result's `dynamic_range` naming it, no DOVI record or RPU on any HEVC file,
+  gif and apng written; DP prores_422, prores_4444 and hevc_10bit at pq: each
+  file's side data (P3-D65, min 50/10000, max 10000000/10000, MaxCLL 1000,
+  MaxFALL 0) and prores_422's decoded grey row = the PQ oracle ±2/1023; DV
+  `render_frame {sdr_version}` of the ramp = the oracle ±1/255 every 64th
+  column, a white title 248.4/255, a 0.42 title 107.1/255 and HLG 0.50
+  125.7/255, each ±1, the PNG labelled as an SDR project's frame; DI the bt709
+  ramp in an HLG project, sdr_version = its SDR render ±1/255 at or below SDR
+  0.9477, the shoulder oracle above; DE `h264` (default) frame 15 = the
+  sdr_version render ±2/255 (decoded 8-bit, at 50 Mbit/s: the encoder's own
+  rate put the grey row's chroma 2.7/255 off) and `prores_422 {sdr}` ±1/255, and
+  a JPEG `render_frame` = the sdr_version PNG ±1/255, labelled as it; DR four
+  refusals by sentence; DS an SDR project's `sdr_version` PNG and JPEG
+  byte-identical to without and its `{dynamic_range: "sdr"}` h264 settings
+  equal; DM View ▸ Show SDR Version (it writes no default, so it is performed
+  here) shows the "SDR Version" tag, leaves an un-optioned `render_frame`
+  byte-identical, and hides the tag when performed again; DX on instances of
+  its own (scratch homes, `screens.py`'s PINS and `FrameJobExportChoice` as
+  `<string>{"preset_id":…}</string>` launch arguments, as hevc_alpha_proof's
+  E3): File ▸ Export… in an HLG project shows "Dynamic Range:" with the popup
+  on HDR (HLG) (pinned hevc_10bit) and SDR version (pinned h264); an SDR
+  project's sheet has no such row; `cancel_sheet` closes each. The layout dump
+  carries no enabled state, so DX reads the popup's title only.
+- **TO** (`--measure`): TH's 4K fixture placed twice as an HLG project,
+  `prores_422` at hlg and at sdr, each on its own instance: the frame times
+  printed against C0's 0.21 ms (REASONED); scored only on the two files' tags.
+- **P7**: `hdr_probe.swift`'s `OutputTransform.compositionColour` table,
+  `Playback.previewComposition` recolouring a hand-built HLG composition by
+  `sdrVersion` (an SDR one never, the same object at Full), `OutputUniforms`
+  16 bytes, `sdrKnee` 0.9, `uniforms(for:)`, the two HDR10 blobs, and
+  `RecipeOptions.json` / `delivering` / `forFrame`.
 - **TH** (`--measure`): TI's 4K BT.709 twin on two tracks (the upper at scale
   0.5) and a title, 8 s, `prores_422`, as an SDR and as an HLG project, each on
   its own instance: 0 and 240 input passes per 120 frames (scored), the frame
@@ -195,10 +239,10 @@ NEW` shows the pixels equal). The mutant `relabel-in-renderframe` (H1)
 applies the label inside `Exporter.renderFrame` instead, which moves the
 eyedropper's picks; it runs against a capture made after PR-11.
 
-H1a, the H7 family and the H-2 rows run in a plain run, `compare` and `--only`;
-never under `capture`'s default selection, `--measure` or a mutant's default
-selection; hdr H-1's five and H-2's twelve mutants run with `--only <their
-rows>,Z1`. `capture --only`
+H1a, the H7 family, the H-2 rows and the H-3 rows run in a plain run, `compare`
+and `--only`; never under `capture`'s default selection, `--measure` or a
+mutant's default selection; hdr H-1's five, H-2's twelve and H-3's seven
+mutants run with `--only <their rows>,Z1`. `capture --only`
 captures just the rows named, keeping an earlier capture's H1 record.
 `capture DIR` records H1's references (`DIR/h1-*.png`, `DIR/media/`,
 `DIR/capture.json` with the picks and the reverse's digest) and runs H2–H6 and
@@ -306,8 +350,9 @@ H1_SUFFIX = {"still8": ".png", "webm": ".webm"}
 PICK_POINTS = {(W, H): [[256.5, 32.5], [512.5, 96.5], [900.5, 100.5]],
                (SW, SH): [[320.5, 180.5], [100.5, 60.5], [540.5, 300.5]]}
 ROWS = ["H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "H7", "H7d", "H7i",
-        "H7p", "H7o", "H7r", "HS", "HH", "HP", "HT", "HL", "HW", "HK", "HM", "HF", "HX", "R0",
-        "TI", "TH", "P1", "P2", "P3", "P4", "P5", "P6", "Z1"]
+        "H7p", "H7o", "H7r", "HS", "HH", "HP", "HT", "HL", "HW", "HK", "HM", "HF", "HX", "DT",
+        "DP", "DV", "DI", "DE", "DR", "DS", "DM", "DX", "R0", "TI", "TH", "TO", "P1", "P2", "P3",
+        "P4", "P5", "P6", "P7", "Z1"]
 # H7's family (hdr H-1, #281, spec §11 HD-6, HD-12): PQ ramps whose HDR10 static
 # metadata sits in the HEVC stream's SEI (the x265 CLI, muxed by ffmpeg's stream copy;
 # ffmpeg 9.0.2's libx265 wrapper no longer writes the mastering display with these
@@ -349,6 +394,26 @@ SLOG3_BREAK = 171.2102946929
 # Core Graphics draws Core Media 709's γ curve with a slope limit of 16: its decode is
 # max(s/16, s^γ) (measured in H-2, `hdr_probe.swift` P6), and so is the lift's.
 CM709_TOE = 16.0
+# hdr H-3 (#277, spec §11 HD-4, HD-5, HD-7, HD-14): the deliverables' rows and numbers.
+# The SDR version's knee and white (HD-14 (a)), and the SDR grey at the knee, below which
+# the version is the round trip; the video rows, the three that carry HDR, the tags each
+# picture is written with, HD-5's HDR10 side data as ffprobe names it, and the menu item.
+H3_ROWS = {"DT", "DP", "DV", "DI", "DE", "DR", "DS", "DM", "DX"}
+SDR_KNEE = 0.9
+SDR_WHITE = PQ_WHITE / PQ_REFERENCE
+SDR_KNEE_GREY = 0.9477
+VIDEO_ROWS = ["h264", "hevc", "hevc_10bit", "hevc_alpha", "prores_422", "prores_4444", "gif",
+              "apng"]
+HDR_ROWS = ["hevc_10bit", "prores_422", "prores_4444"]
+PICTURE_TAGS = {"sdr": "bt709/bt709/bt709", "hlg": "bt2020nc/arib-std-b67/bt2020",
+                "pq": "bt2020nc/smpte2084/bt2020"}
+HDR10_SIDE = {"red_x": "34000/50000", "red_y": "16000/50000", "green_x": "13250/50000",
+              "green_y": "34500/50000", "blue_x": "7500/50000", "blue_y": "3000/50000",
+              "white_point_x": "15635/50000", "white_point_y": "16450/50000",
+              "min_luminance": "50/10000", "max_luminance": "10000000/10000",
+              "max_content": "1000", "max_average": "0"}
+SDR_VERSION_MENU = ["View", "Show SDR Version"]
+DE_H264_BITRATE = 50_000_000
 
 
 BASE_COMMIT = "716720c"
@@ -361,9 +426,15 @@ SHADER = "app/Resources/Shaders/Compositor.metal"
 HDR10_RS = "core/src/hdr10.rs"
 SOURCES_SWIFT = "app/Sources/Compositor+Sources.swift"
 RENDERER_SWIFT = "app/Sources/MetalRenderer.swift"
+OUTPUT_SWIFT = "app/Sources/OutputTransform.swift"
+RANGE_RS = "core/src/dynamic_range.rs"
+EXPORT_RS = "core/src/export.rs"
+EXPORTER_SWIFT = "app/Sources/Exporter.swift"
+OPTIONS_SWIFT = "app/Sources/RecipeOptions.swift"
+PREVIEW_SWIFT = "app/Sources/Playback+PreviewQuality.swift"
 WRITER_SWIFT = "app/Sources/FrameWriter.swift"
 SETTINGS_SWIFT = "app/Sources/ExporterWriter+Settings.swift"
-P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6"}
+P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7"}
 RECORDS = {"R0"}
 # name: ([(file, anchor, replacement), …], the rows that must fail).
 MUTANTS = {
@@ -379,14 +450,10 @@ MUTANTS = {
                          ["H3", "H4", "P3"]),
     "lift-dropped": ([(SHADER, "    return y <= 0.0 ? float3(0.0) : y + (l - y) * (y / (y - low));\n",
                        "    return max(l, 0.0);\n")], ["H4", "P3"]),
-    # Re-pinned in hdr H-2: an HLG project's colour comes first on each line.
-    "no-composition-color": ([
-        (BUILDER, "                : converts ? AVVideoColorPrimaries_ITU_R_709_2 : nil,\n",
-         "                : nil,\n"),
-        (BUILDER, "                : converts ? AVVideoTransferFunction_ITU_R_709_2 : nil,\n",
-         "                : nil,\n"),
-        (BUILDER, "                : converts ? AVVideoYCbCrMatrix_ITU_R_709_2 : nil,\n",
-         "                : nil,\n")], ["H2", "H3", "H1m"]),
+    # Re-pinned in hdr H-3: an SDR project's colour is `OutputTransform.compositionColour`'s
+    # first arm, a converting composition's BT.709 dropped.
+    "no-composition-color": ([(OUTPUT_SWIFT, "            return converts\n",
+                               "            return false\n")], ["H2", "H3", "H1m"]),
     "select-by-primaries": ([(INPUT_SWIFT, "        guard logTransfer == nil else { return nil }\n",
                               "        if let wide = wide(primaries) { return wide }\n")],
                             ["H1", "P1"]),
@@ -498,6 +565,57 @@ MUTANTS = {
                            "CGColorSpace.sRGB) else { return image }\n"
                            "        return image.copy(colorSpace: srgb) ?? image\n",
                            "        return image\n")], ["P6"]),
+    # hdr H-3 (#277, spec §11 HD-14): one per decision, each run with `--only <its
+    # rows>,Z1` and `--control` the capture made on the tree before the phase's code.
+    # The export override never read: every row at its default.
+    "range-ignored": ([(EXPORT_RS,
+                        "        let picture = self.deliverable(preset, dynamic_range(overrides)?)?;\n",
+                        "        let picture = self.deliverable(preset, None)?;\n"
+                        "        let _ = dynamic_range;\n")], ["DP", "DR"]),
+    # The output pass's SDR arm on GR-15's HLG constants (γ 0.96, gain 1.07, knee 0.39,
+    # white 1.07, BT.1886's encode) instead of the inverse of the lift.
+    "sdr-via-gr15": ([(SHADER,
+                       "        float3 l = inputShoulder(inputLift(kBT2020ToBT709 * (display * "
+                       "kHlgPeakOverSDRWhite)),\n"
+                       "                                 u.knee, kHlgPeakOverSDRWhite);\n"
+                       "        l = max(l, 0.0);\n"
+                       "        rgb = min(l * kCoreMedia709Toe, pow(l, 1.0 / kCoreMedia709Gamma));\n",
+                       "        float3 light = ys > 1e-6 ? 1.07 * scene * pow(ys, 0.96 - 1.0) : "
+                       "float3(0.0);\n"
+                       "        float3 l = inputShoulder(inputLift(kBT2020ToBT709 * light), 0.39, "
+                       "1.07);\n"
+                       "        rgb = pow(max(l, 0.0), 1.0 / 2.4);\n")], ["DV", "DI"]),
+    # HDR10's two keys dropped: VideoToolbox's Auto metadata, and none on ProRes.
+    "pq-auto-metadata": ([(SETTINGS_SWIFT,
+                           "        [\n"
+                           "            kVTCompressionPropertyKey_MasteringDisplayColorVolume as "
+                           "String:\n"
+                           "                OutputTransform.masteringDisplay,\n"
+                           "            kVTCompressionPropertyKey_ContentLightLevelInfo as String:\n"
+                           "                OutputTransform.contentLightLevel,\n"
+                           "        ]\n",
+                           "        [:]\n")], ["DP"]),
+    # An 8-bit row of an HLG project written as HLG, not its SDR version.
+    "8bit-row-hlg": ([(RANGE_RS, "            None => Ok(Some(DynamicRange::Sdr)),\n",
+                       "            None => Ok(Some(DynamicRange::Hlg)),\n")],
+                     ["DT", "DE", "HX"]),
+    # The export draws the asked options, not its settings' picture: the SDR version only
+    # ever in the preview.
+    "sdr-version-preview-only": ([(EXPORTER_SWIFT,
+                                   "        RecipeSource.shared.setOptions(options.delivering("
+                                   "settings), for: key)\n",
+                                   "        RecipeSource.shared.setOptions(options, for: key)\n")],
+                                 ["DE"]),
+    # A JPEG of an HLG project drawn as HLG (and so refused by FrameWriter's guard).
+    "jpeg-not-sdr-version": ([(OPTIONS_SWIFT,
+                               "        guard format == .jpeg, output == .hlg else { return self }\n",
+                               "        guard format == .jpeg, output == .hlg, format != .jpeg else "
+                               "{ return self }\n")], ["DE", "HF"]),
+    # The preview's composition kept HLG whatever Show SDR Version says.
+    "preview-keeps-hlg": ([(PREVIEW_SWIFT,
+                            "                hlg: true, converts: true, range: sdrVersion ? .sdr : "
+                            ".hlg)\n",
+                            "                hlg: true, converts: true, range: .hlg)\n")], ["P7"]),
     # The chroma key's distance on the working (lifted) colour.
     "key-not-unlifted": ([(SHADER,
                            "        float d = distance(u.hlgOutput > 0.5 ? saturate(hlgUnliftSDR("
@@ -2748,15 +2866,17 @@ def png_chunks(path):
 
 def run_hf(client, state):
     """HF: an HLG project's frames — a 16-bit PNG with cICP 9/18/0/1 and an iCCP named
-    ITUR_2100_HLG, a 10-bit HEIC labelled ITUR_2100_HLG, and JPEG refused."""
+    ITUR_2100_HLG, a 10-bit HEIC labelled ITUR_2100_HLG, and a JPEG written as the SDR
+    version (hdr H-3, spec §11 HD-14 (e)), not labelled HLG."""
     misses, figures = [], []
     doc = hlg_doc(client, "hf", [fixture("bt709")])
     png = doc.render("hf") if doc.ok else None
     heic = WORK / "hf.heic"
     made = doc.call("render_frame", t=T, path=str(heic), format="heic") if doc.ok \
         else {"ok": False}
-    jpeg = doc.call("render_frame", t=T, path=str(WORK / "hf.jpg"), format="jpeg") if doc.ok \
-        else {"ok": True}
+    jpeg_path = WORK / "hf.jpg"
+    jpeg = doc.call("render_frame", t=T, path=str(jpeg_path), format="jpeg") if doc.ok \
+        else {"ok": False}
     state["hf_closed"] = doc.close()
     if png is None:
         misses.append(f"no PNG: {doc.why}")
@@ -2777,19 +2897,22 @@ def run_hf(client, state):
         # sips names a profile by its description: ITUR_2100_HLG's is "Rec. ITU-R BT.2100 HLG".
         if "bitsPerSample: 10" not in read["stdout"] or "BT.2100 HLG" not in read["stdout"]:
             misses.append("the HEIC")
-    sentence = "JPEG cannot carry an HLG project's picture; save the frame as PNG or HEIC"
-    figures.append(f"JPEG: {jpeg.get('error', 'written')}")
-    if jpeg["ok"] or sentence not in jpeg.get("error", ""):
-        misses.append("JPEG was not refused by its sentence")
+    if not jpeg["ok"] or not jpeg_path.exists():
+        misses.append(f"no JPEG: {jpeg.get('error')}")
+    else:
+        label = sips_profile(jpeg_path)
+        figures.append(f"JPEG: written, profile {label!r}")
+        if "HLG" in label or "2100" in label:
+            misses.append("the JPEG is labelled HLG")
     check("HF an HLG project's render_frame: a 16-bit PNG with cICP 9/18/0/1 and an iCCP named "
           "ITUR_2100_HLG; a HEIC at 10 bits labelled ITUR_2100_HLG (sips: \"Rec. ITU-R BT.2100 "
-          "HLG\"); JPEG refused by its sentence",
+          "HLG\"); a JPEG written as the SDR version, not labelled HLG",
           not misses, f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
 
 
 def run_hx(client, state):
-    """HX: an HLG project's 10-bit exports tagged HLG with no Dolby Vision; h264 and gif
-    refused by the sentence; audio_wav written."""
+    """HX: an HLG project's 10-bit exports tagged HLG with no Dolby Vision; h264 its SDR
+    version (bt709, hdr H-3); gif and audio_wav written."""
     misses, figures = [], []
     doc = hlg_doc(client, "hx", [fixture("bt709"), fixture("webm")])
     outs = {}
@@ -2800,39 +2923,616 @@ def run_hx(client, state):
         files = sorted(WORK.glob(f"hx-{preset}.*"))
         outs[preset] = (got, files[0] if files else None)
     state["hx_closed"] = doc.close()
-    for preset in ("hevc_10bit", "prores_422"):
+    for preset, want in (("hevc_10bit", PICTURE_TAGS["hlg"]), ("prores_422", PICTURE_TAGS["hlg"]),
+                         ("h264", PICTURE_TAGS["sdr"])):
         got, path = outs[preset]
         probe = stream(path) if path else {}
         figures.append(f"{preset}: {tags(probe) if path else got.get('error')}")
-        if not path or tags(probe) != "bt2020nc/arib-std-b67/bt2020":
+        if not path or tags(probe) != want:
             misses.append(f"{preset}'s tags")
     got, path = outs["hevc_10bit"]
     if path:
-        streams = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
-                               "-show_entries", "stream_side_data_list", str(path)], 60)["stdout"]
-        frames = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
-                              "-read_intervals", "%+#10", "-show_frames", "-show_entries",
-                              "frame=side_data_list", str(path)], 120)["stdout"]
-        dovi = "DOVI configuration record" in streams
-        rpu = "Dolby Vision RPU" in frames
-        figures.append(f"hevc_10bit: DOVI configuration record {dovi}, Dolby Vision RPU {rpu}")
-        if dovi or rpu:
+        record, rpu = dovi(path)
+        figures.append(f"hevc_10bit: DOVI configuration record {record}, Dolby Vision RPU {rpu}")
+        if record or rpu:
             misses.append("Dolby Vision in the HEVC")
-    for preset in ("h264", "gif"):
+    for preset in ("gif", "audio_wav"):
         got, path = outs[preset]
-        sentence = (f"{preset} cannot carry an HLG project's picture; export it as hevc_10bit, "
-                    f"prores_422 or prores_4444")
-        figures.append(f"{preset}: {got.get('error', 'written')}")
-        if got["ok"] or sentence not in got.get("error", "") or path is not None:
-            misses.append(f"{preset} was not refused by the sentence")
-    got, path = outs["audio_wav"]
-    figures.append(f"audio_wav: {path.name if path else got.get('error')}")
-    if not got["ok"] or path is None:
-        misses.append("audio_wav was not written")
+        figures.append(f"{preset}: {path.name if path else got.get('error')}")
+        if not got["ok"] or path is None:
+            misses.append(f"{preset} was not written")
     check("HX an HLG project's hevc_10bit and prores_422 exports tagged bt2020nc/arib-std-b67/"
-          "bt2020, the HEVC with no DOVI configuration record and no Dolby Vision RPU; h264 and "
-          "gif refused by the sentence; audio_wav written", not misses,
+          "bt2020, the HEVC with no DOVI configuration record and no Dolby Vision RPU; h264 "
+          "written as the SDR version, tagged bt709 ×3; gif and audio_wav written", not misses,
           f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+# ---- hdr H-3 (#277, spec §11 HD-4, HD-5, HD-7, HD-14): the deliverables ----------
+
+def sdr_version(hlg_rgb):
+    """HD-14 (a)/(b)'s SDR version of one HLG R'G'B' (the output pass, `framejob_output_
+    fragment`): scene light, display light (γ 1.2 on BT.2020 luminance), × 1000/203,
+    BT.2020 → BT.709, GR-15's gamut lift, the shoulder at the knee reaching 1 at 1000/203,
+    Core Media 709's encode with its toe."""
+    scene = [hlg_inverse(unit(c)) for c in hlg_rgb]
+    ys = sum(w * c for w, c in zip(LUMA2020, scene))
+    display = [c * ys ** (HLG_NOMINAL_GAMMA - 1) for c in scene] if ys > 0 else [0.0] * 3
+    lin = mat_vec(to709("bt2020"), [c * SDR_WHITE for c in display])
+    low = min(lin)
+    if low < 0:
+        y = sum(w * c for w, c in zip(LUMA709, lin))
+        lin = [0.0] * 3 if y <= 0 else [y + (c - y) * y / (y - low) for c in lin]
+    top = max(lin)
+    if top > SDR_KNEE:
+        if top >= SDR_WHITE:
+            s = 1.0
+        else:
+            t, tw = (top - SDR_KNEE) / (1 - SDR_KNEE), (SDR_WHITE - SDR_KNEE) / (1 - SDR_KNEE)
+            s = SDR_KNEE + (1 - SDR_KNEE) * t * (1 + t / (tw * tw)) / (1 + t)
+        lin = [c * s / top for c in lin]
+    return [unit(min(max(c, 0.0) * CM709_TOE, max(c, 0.0) ** (1 / CM709_GAMMA))) for c in lin]
+
+
+def pq_version(hlg_rgb):
+    """HD-14 (d)'s PQ of one HLG R'G'B': display light at 1,000 cd/m² on ST 2084's scale."""
+    scene = [hlg_inverse(unit(c)) for c in hlg_rgb]
+    ys = sum(w * c for w, c in zip(LUMA2020, scene))
+    display = [c * ys ** (HLG_NOMINAL_GAMMA - 1) for c in scene] if ys > 0 else [0.0] * 3
+    return [unit(pq_signal(c * PQ_WHITE)) for c in display]
+
+
+def render_opts(doc, tag, t=T, **options):
+    """`render_frame` at `t` with `options` (`format`, `sdr_version`, …); (path, reply)."""
+    suffix = {"jpeg": ".jpg", "heic": ".heic"}.get(options.get("format"), ".png")
+    out = WORK / f"{tag}{suffix}"
+    out.unlink(missing_ok=True)
+    got = doc.call("render_frame", t=t, path=str(out), **options) if doc.ok \
+        else {"ok": False, "error": doc.why}
+    if not (got["ok"] and out.exists()):
+        print(f"       render {tag}: {got.get('error', 'no file')}", flush=True)
+        return None, got
+    return out, got
+
+
+def export_as(doc, tag, preset, **extra):
+    """One `export` of `doc` as `preset` at its document size: (file or None, reply)."""
+    base_path = WORK / tag
+
+    def written():  # the export's file, never a package a document of that name made
+        return sorted(f for f in WORK.glob(f"{tag}.*") if f.is_file())
+    for stale in written():
+        stale.unlink()
+    got = doc.call("export", preset=preset, path=str(base_path), size="document", **extra) \
+        if doc.ok else {"ok": False, "error": doc.why}
+    files = written()
+    return (files[0] if got["ok"] and files else None), got
+
+
+def dovi(path):
+    """(a DOVI configuration record in the stream, Dolby Vision RPU on its first 10
+    frames) as ffprobe reads `path`."""
+    streams = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                           "-show_entries", "stream_side_data_list", str(path)], 60)["stdout"]
+    frames = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                          "-read_intervals", "%+#10", "-show_frames", "-show_entries",
+                          "frame=side_data_list", str(path)], 120)["stdout"]
+    return "DOVI configuration record" in streams, "Dolby Vision RPU" in frames
+
+
+def side_all(path):
+    """Every `key=value` of `path`'s HDR10 side data: the stream's (the sample
+    description's `mdcv` and `clli`), else its first frame's."""
+    found = {}
+    for entries in ("stream", "frame"):
+        argv = ["ffprobe", "-v", "error", "-select_streams", "v:0"]
+        argv += (["-show_entries", "stream_side_data_list"] if entries == "stream" else
+                 ["-read_intervals", "%+#1", "-show_frames", "-show_entries",
+                  "frame=side_data_list"])
+        for line in bounded.run(argv + [str(path)], 60)["stdout"].splitlines():
+            key, _, value = line.strip().partition("=")
+            if key in HDR10_SIDE and key not in found:
+                found[key] = value
+        if all(k in found for k in HDR10_SIDE):
+            break
+    return found
+
+
+def sips_profile(path):
+    ran = bounded.run(["sips", "-g", "profile", str(path)], 60)["stdout"]
+    return " ".join(ran.split("profile:", 1)[1].split()) if "profile:" in ran else ""
+
+
+def png_label(path):
+    """(cICP list, iCCP name) of a PNG."""
+    chunks = dict((k, v) for k, v in reversed(png_chunks(path)))
+    return list(chunks.get("cICP", b"")), \
+        chunks.get("iCCP", b"").split(b"\0")[0].decode("latin-1")
+
+
+def ramp_sdr_misses(frame, source, oracle, tag, bound, misses, step=64, matrix="bt2020nc"):
+    """The grey row every `step`th column against `oracle(R'G'B')` within `bound`; the
+    largest miss in levels of 255."""
+    worst = 0.0
+    for x in range(0, W, step):
+        want = oracle(source.rgb(x, GREY_ROW, matrix))
+        got = frame.px(x, GREY_ROW)
+        gap = max(abs(a - b) for a, b in zip(got, want))
+        worst = max(worst, gap)
+        if gap > bound and len(misses) < 12:
+            misses.append(f"{tag} x={x} got {[round(v, 5) for v in got]} want "
+                          f"{[round(v, 5) for v in want]} ({gap * 255:.2f}/255)")
+    return worst * 255
+
+
+def code_column(source, code):
+    """The first grey-row column whose luma code is `code`, or None."""
+    return next((x for x in range(W) if source.codes(x, GREY_ROW)[0] == code), None)
+
+
+def run_dt(client, state):
+    """DT: every video row of an HLG project at its default and each accepted
+    dynamic_range, tagged as the picture it writes; no Dolby Vision in any HEVC file."""
+    misses, figures = [], []
+    doc = hlg_doc(client, "dt", [fixture("hlg")])
+    for preset in VIDEO_ROWS:
+        ranges = [None, "hlg", "pq", "sdr"] if preset in HDR_ROWS else [None, "sdr"]
+        for asked in ranges:
+            tag = f"dt-{preset}-{asked or 'default'}"
+            extra = {"dynamic_range": asked} if asked else {}
+            path, got = export_as(doc, tag, preset, **extra)
+            picture = asked or ("hlg" if preset in HDR_ROWS else "sdr")
+            said = reply(got).get("dynamic_range")
+            if path is None:
+                misses.append(f"{tag}: {got.get('error', 'no file')}")
+                continue
+            if said != picture:
+                misses.append(f"{tag}: the result's dynamic_range {said!r}, not {picture!r}")
+            if preset in ("gif", "apng"):
+                figures.append(f"{tag}: written ({path.stat().st_size} bytes)")
+                continue
+            read = tags(stream(path))
+            line = f"{tag}: {read}"
+            if read != PICTURE_TAGS[picture]:
+                misses.append(f"{tag}: {read}, not {PICTURE_TAGS[picture]}")
+            if preset.startswith("hevc"):
+                record, rpu = dovi(path)
+                line += f", DOVI record {record}, RPU {rpu}"
+                if record or rpu:
+                    misses.append(f"{tag}: Dolby Vision")
+            figures.append(line)
+    state["dt_closed"] = doc.close()
+    check("DT every video row of an HLG project (the hlg ramp, 1 s) at its default and each "
+          "accepted dynamic_range: bt709 ×3 for the SDR version, bt2020nc/arib-std-b67/bt2020 "
+          "for hlg, bt2020nc/smpte2084/bt2020 for pq, the result naming it; no DOVI record or "
+          "RPU in any HEVC file; gif and apng written", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def run_dp(client, state):
+    """DP: the three 10-bit rows at pq carry HD-5's mastering display and content light
+    level; prores_422's decoded grey row = the PQ oracle ±2/1023."""
+    misses, figures = [], []
+    path = fixture("hlg")
+    source = yuv_frames(path, W, H) if path else None
+    doc = hlg_doc(client, "dp", [path])
+    outs = {preset: export_as(doc, f"dp-{preset}", preset, dynamic_range="pq")
+            for preset in HDR_ROWS}
+    state["dp_closed"] = doc.close()
+    for preset, (out, got) in outs.items():
+        if out is None:
+            misses.append(f"{preset}: {got.get('error', 'no file')}")
+            continue
+        found = side_all(out)
+        figures.append(f"{preset}: {tags(stream(out))}; side data {found}")
+        wrong = {k: found.get(k) for k, v in HDR10_SIDE.items() if found.get(k) != v}
+        if wrong:
+            misses.append(f"{preset}: {wrong}")
+    out = outs["prores_422"][0]
+    frames = yuv_frames(out, W, H, 16) if out else None
+    if frames is None or source is None:
+        misses.append("prores_422's frames or the fixture did not decode")
+    else:
+        worst = 0.0
+        for x in range(0, W, 8):
+            want = pq_version(source[0].rgb(x, GREY_ROW, "bt2020nc"))
+            got = frames[15].rgb(x, GREY_ROW, "bt2020nc")
+            gap = max(abs(a - b) for a, b in zip(got, want))
+            worst = max(worst, gap)
+            if gap > 2 * LEVEL and len(misses) < 12:
+                misses.append(f"prores_422 x={x} {[round(v, 5) for v in got]} want "
+                              f"{[round(v, 5) for v in want]}")
+        figures.append(f"prores_422's grey row against the PQ oracle: largest miss "
+                       f"{levels(worst):.3f}/1023")
+    check("DP prores_422, prores_4444 and hevc_10bit at pq: each file's side data P3-D65 "
+          "(red 34000/50000 …, white 16450/50000), min_luminance=50/10000 max_luminance="
+          "10000000/10000, max_content=1000 max_average=0; prores_422's decoded grey row = the "
+          "PQ oracle ±2/1023", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def run_dv(client, state):
+    """DV: render_frame {sdr_version} of the hlg ramp = the HD-14 (a) oracle; a white title
+    248.4/255, a 0.42 title 107.1/255, HLG 0.50 125.7/255, each ±1; the PNG labelled BT.709
+    as an SDR project's frame is."""
+    misses, figures = [], []
+    path = fixture("hlg")
+    source = yuv_frames(path, W, H) if path else None
+    doc = hlg_doc(client, "dv", [path])
+    png, _ = render_opts(doc, "dv", sdr_version=True)
+    state["dv_closed"] = doc.close()
+    frame = Frame(png, W, H) if png else None
+    if frame is None or not frame.ok or source is None:
+        misses.append(f"the ramp: {doc.why or 'no render or decode'}")
+    else:
+        worst = ramp_sdr_misses(frame, source[0], sdr_version, "ramp", 1 / 255, misses)
+        figures.append(f"the ramp against the oracle every 64th column: largest miss "
+                       f"{worst:.3f}/255")
+        x = code_column(source[0], 502)
+        if x is None:
+            misses.append("no column at HLG code 502 (0.50)")
+        else:
+            got = frame.px(x, GREY_ROW)[1] * 255
+            figures.append(f"HLG 0.50 (x={x}): {got:.2f}/255 (want 125.7 ±1)")
+            if abs(got - 125.7) > 1:
+                misses.append("HLG 0.50")
+        cicp, name = png_label(png)
+        sdr = Doc(client, "dv-sdr", W, H)
+        sdr.place(fixture("bt709")) if sdr.ok else None
+        sdr_png, _ = render_opts(sdr, "dv-sdr")
+        state["dv_sdr_closed"] = sdr.close()
+        sdr_label = png_label(sdr_png) if sdr_png else None
+        figures.append(f"the PNG: cICP {cicp}, iCCP {name!r}; an SDR project's: {sdr_label}")
+        if (cicp, name) != sdr_label or "2100" in name or cicp[:2] == [9, 18]:
+            misses.append("the PNG's label")
+    for title, color, want in (("white title", [1, 1, 1, 1], 248.4),
+                               ("0.42 title", [0.42, 0.42, 0.42, 1], 107.1)):
+        tag = "dv-" + title.replace(" ", "-").replace(".", "")
+        d = Doc(client, tag, SW, SH)
+        if d.ok:
+            d.place_tool("add_text_clip", track=d.track(), at=0, duration=2 * SEC,
+                         text={"content": "H", "size": 220, "color": color})
+            d.call("set_canvas", output="hlg")
+        out, _ = render_opts(d, tag, sdr_version=True)
+        state[f"{tag}_closed"] = d.close()
+        f = Frame(out, SW, SH) if out else None
+        if f is None or not f.ok:
+            misses.append(f"{title}: {d.why or 'no render'}")
+            continue
+        got = brightest(f, SW, SH) * 255
+        figures.append(f"{title}: {got:.2f}/255 (want {want} ±1)")
+        if abs(got - want) > 1:
+            misses.append(title)
+    check("DV render_frame {sdr_version} of the hlg ramp = HD-14 (a)'s oracle ±1/255 every "
+          "64th column; a white title 248.4/255, a 0.42 title 107.1/255 and HLG 0.50 125.7/255, "
+          "each ±1; the PNG labelled as an SDR project's frame (BT.709), not HLG", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def run_di(client, state):
+    """DI: the bt709 ramp in an HLG project drawn as its SDR version = the same ramp's SDR
+    project render ±1/255 wherever SDR ≤ the knee's grey, and the shoulder oracle above."""
+    misses, figures = [], []
+    path = fixture("bt709")
+    source = yuv_frames(path, W, H) if path else None
+    sdr = Doc(client, "di-sdr", W, H)
+    sdr.place(path) if sdr.ok and path else None
+    plain, _ = render_opts(sdr, "di-sdr")
+    state["di_sdr_closed"] = sdr.close()
+    doc = hlg_doc(client, "di", [path])
+    version, _ = render_opts(doc, "di", sdr_version=True)
+    state["di_closed"] = doc.close()
+    a = Frame(plain, W, H) if plain else None
+    b = Frame(version, W, H) if version else None
+    if a is None or b is None or not (a.ok and b.ok) or source is None:
+        misses.append("a render or the fixture did not decode")
+    else:
+        below = above = 0.0
+        counted = [0, 0]
+        for x in range(0, W, 8):
+            s = a.px(x, GREY_ROW)
+            got = b.px(x, GREY_ROW)
+            if max(s) <= SDR_KNEE_GREY:
+                want, counted[0] = s, counted[0] + 1
+            else:
+                want, counted[1] = sdr_version(lift(source[0].rgb(x, GREY_ROW, "bt709"))), \
+                    counted[1] + 1
+            gap = max(abs(p - q) for p, q in zip(got, want))
+            if max(s) <= SDR_KNEE_GREY:
+                below = max(below, gap)
+            else:
+                above = max(above, gap)
+            if gap > 1 / 255 and len(misses) < 12:
+                misses.append(f"x={x} SDR {[round(v, 5) for v in s]} version "
+                              f"{[round(v, 5) for v in got]} want {[round(v, 5) for v in want]}")
+        figures.append(f"{counted[0]} columns at or below SDR {SDR_KNEE_GREY}: largest miss "
+                       f"{below * 255:.3f}/255; {counted[1]} above, against the shoulder "
+                       f"oracle: {above * 255:.3f}/255")
+        if not all(counted):
+            misses.append(f"columns below/above the knee {counted}")
+    check("DI the bt709 ramp in an HLG project, sdr_version = its SDR project's render ±1/255 "
+          "wherever SDR ≤ 0.9477, and the shoulder oracle above (every 8th column)", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def run_de(client, state):
+    """DE: an h264 export (default) and a prores_422 {sdr} export of the hlg ramp, frame
+    15, = render_frame {sdr_version} at 0.5 s (±2/255 decoded 8-bit, ±1/255 ProRes); a JPEG
+    render_frame = the sdr_version PNG ±1/255, labelled as it."""
+    misses, figures = [], []
+    doc = hlg_doc(client, "de", [fixture("hlg")])
+    png, _ = render_opts(doc, "de", sdr_version=True)
+    jpeg, _ = render_opts(doc, "de-jpeg", format="jpeg")
+    # The h264 export at the default dynamic range but a high rate (DE_H264_BITRATE): at the
+    # encoder's own rate its chroma on the grey row reads 2.7/255 off at worst (measured on
+    # the first run), which is compression, not the picture this row asks about.
+    files = {"h264": export_as(doc, "de-h264", "h264", video_bitrate=DE_H264_BITRATE),
+             "prores_422": export_as(doc, "de-prores", "prores_422", dynamic_range="sdr")}
+    state["de_closed"] = doc.close()
+    frame = Frame(png, W, H) if png else None
+    if frame is None or not frame.ok:
+        check("DE exports = the SDR version", False, f"no sdr_version render: {doc.why}")
+        return
+    for preset, bound in (("h264", 2 / 255), ("prores_422", 1 / 255)):
+        out, got = files[preset]
+        frames = yuv_frames(out, W, H, 16) if out else None
+        if frames is None:
+            misses.append(f"{preset}: {got.get('error', 'no frames')}")
+            continue
+        worst = 0.0
+        for x in range(0, W, 8):
+            e = frames[15].rgb(x, GREY_ROW, "bt709")
+            r = frame.px(x, GREY_ROW)
+            gap = max(abs(p - q) for p, q in zip(e, r))
+            worst = max(worst, gap)
+            if gap > bound and len(misses) < 12:
+                misses.append(f"{preset} x={x} export {[round(v, 4) for v in e]} render "
+                              f"{[round(v, 4) for v in r]}")
+        figures.append(f"{preset} ({tags(stream(out))}) frame 15 against the render: largest "
+                       f"miss {worst * 255:.3f}/255 (bound {bound * 255:.0f})")
+    j = Frame(jpeg, W, H) if jpeg else None
+    if j is None or not j.ok:
+        misses.append("no JPEG")
+    else:
+        worst = max(max(abs(p - q) for p, q in zip(j.px(x, GREY_ROW), frame.px(x, GREY_ROW)))
+                    for x in range(0, W, 8))
+        label, want = sips_profile(jpeg), sips_profile(png)
+        figures.append(f"JPEG against the PNG: largest miss {worst * 255:.3f}/255; profile "
+                       f"{label!r} (the PNG's {want!r})")
+        if worst > 1 / 255:
+            misses.append("the JPEG's pixels")
+        if label != want or "HLG" in label:
+            misses.append("the JPEG's label")
+    check("DE h264 (default) frame 15 = render_frame {sdr_version} at 0.5 s ±2/255 and "
+          "prores_422 {sdr} frame 15 ±1/255 on the grey row every 8th column; a JPEG "
+          "render_frame (no sdr_version) = the sdr_version PNG ±1/255, labelled as it",
+          not misses, f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def run_dr(client, state):
+    """DR: the three refusals and the reader's, each by its sentence."""
+    misses, figures = [], []
+    hlg = hlg_doc(client, "dr-hlg", [fixture("hlg")])
+    sdr = Doc(client, "dr-sdr", W, H)
+    sdr.place(fixture("bt709")) if sdr.ok else None
+    cases = [
+        (hlg, "h264", "hlg", "h264 is 8-bit and writes the SDR version; export dynamic_range "
+         "\"hlg\" as hevc_10bit, prores_422 or prores_4444"),
+        (hlg, "gif", "pq", "gif is 8-bit and writes the SDR version; export dynamic_range "
+         "\"pq\" as hevc_10bit, prores_422 or prores_4444"),
+        (sdr, "hevc_10bit", "pq", "dynamic_range \"pq\" needs an HLG project; set_canvas "
+         "output \"hlg\" first"),
+        (hlg, "hevc_10bit", "bogus", "export dynamic_range must be \"hlg\", \"pq\" or "
+         "\"sdr\", not \"bogus\""),
+    ]
+    for doc, preset, asked, sentence in cases:
+        tag = f"dr-{preset}-{asked}"
+        out, got = export_as(doc, tag, preset, dynamic_range=asked)
+        figures.append(f"{preset} {{{asked}}}: {got.get('error', 'WRITTEN')}")
+        if got["ok"] or out is not None or sentence not in got.get("error", ""):
+            misses.append(f"{preset} {{{asked}}}")
+    state["dr_hlg_closed"], state["dr_sdr_closed"] = hlg.close(), sdr.close()
+    check("DR refused by sentence: h264 {hlg} and gif {pq} in an HLG project; hevc_10bit {pq} "
+          "in an SDR project; {dynamic_range: \"bogus\"}", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def run_ds(client, state):
+    """DS: an SDR project's render_frame {sdr_version: true} PNG and JPEG byte-identical to
+    without; its {dynamic_range: "sdr"} h264 export's settings equal to without."""
+    misses, figures = [], []
+    doc = Doc(client, "ds", W, H)
+    doc.place(fixture("bt709")) if doc.ok else None
+    pairs = {}
+    for fmt in ("png", "jpeg"):
+        a, _ = render_opts(doc, f"ds-{fmt}-plain", format=fmt)
+        b, _ = render_opts(doc, f"ds-{fmt}-sdr", format=fmt, sdr_version=True)
+        pairs[fmt] = (a, b)
+    plain_out, plain = export_as(doc, "ds-h264-plain", "h264")
+    sdr_out, sdr = export_as(doc, "ds-h264-sdr", "h264", dynamic_range="sdr")
+    state["ds_closed"] = doc.close()
+    for fmt, (a, b) in pairs.items():
+        same = a is not None and b is not None and a.read_bytes() == b.read_bytes()
+        figures.append(f"{fmt}: {digest(a) if a else None} / {digest(b) if b else None}")
+        if not same:
+            misses.append(fmt)
+    keep = lambda got: {k: v for k, v in reply(got).items() if k not in ("path", "bytes")}
+    figures.append(f"h264 settings {keep(plain)} / {keep(sdr)}")
+    if plain_out is None or sdr_out is None or keep(plain) != keep(sdr) or not keep(plain):
+        misses.append("the h264 settings")
+    check("DS an SDR project's render_frame {sdr_version: true} PNG and JPEG byte-identical to "
+          "without; its {dynamic_range: \"sdr\"} h264 export's settings equal to without",
+          not misses, f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def editor_views(doc, tag):
+    out = WORK / "snapshots" / f"{tag}.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    got = reply(doc.call("snapshot_ui", window="editor", view="preview", path=str(out),
+                         fill_preview=False))
+    try:
+        return json.loads(Path(got.get("layout_path", "")).read_text()).get("views", [])
+    except (OSError, ValueError):
+        return []
+
+
+def sdr_tag_shown(views):
+    tag = next((v for v in views if v.get("id") == "preview.sdrVersion"), None)
+    return tag is not None and not tag.get("hidden", True) and tag.get("text") == "SDR Version"
+
+
+def run_dm(client, state):
+    """DM: View ▸ Show SDR Version on an HLG project shows its tag, leaves an un-optioned
+    render_frame byte-identical, and performed again hides the tag."""
+    misses, figures = [], []
+    doc = hlg_doc(client, "dm", [fixture("hlg")])
+    before, _ = render_opts(doc, "dm-before")
+    on = doc.call("perform_menu_item", path=SDR_VERSION_MENU) if doc.ok else {"ok": False}
+    shown = sdr_tag_shown(editor_views(doc, "dm-on"))
+    during, _ = render_opts(doc, "dm-during")
+    off = doc.call("perform_menu_item", path=SDR_VERSION_MENU) if doc.ok else {"ok": False}
+    hidden = not sdr_tag_shown(editor_views(doc, "dm-off"))
+    state["dm_closed"] = doc.close()
+    same = before is not None and during is not None and before.read_bytes() == during.read_bytes()
+    figures.append(f"menu on {on.get('error', 'ok')}, off {off.get('error', 'ok')}; tag shown "
+                   f"{shown}, hidden after {hidden}; render {digest(before) if before else None}"
+                   f" / {digest(during) if during else None}")
+    if not (on["ok"] and off["ok"] and shown and hidden and same):
+        misses.append("as above")
+    check("DM View ▸ Show SDR Version on an HLG project: the editor's \"SDR Version\" tag shows, "
+          "an un-optioned render_frame is byte-identical before and while it is on, and "
+          "performing it again hides the tag", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def sheet_texts(client, doc, tag):
+    """File ▸ Export… on `doc`, the sheet's visible texts and the title of the popup after
+    "Dynamic Range:", then `cancel_sheet`. (texts, title, problem or None)."""
+    menu = attempt(client, "perform_menu_item",
+                   {"project": str(doc.path), "path": ["File", "Export…"]})
+    if not menu["ok"]:
+        return [], None, f"File ▸ Export…: {menu.get('error')}"
+    try:
+        out = WORK / "snapshots" / f"{tag}.png"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        got = reply(attempt(client, "snapshot_ui",
+                            {"window": "sheet", "project": str(doc.path), "path": str(out)}))
+        views = json.loads(Path(got.get("layout_path", "")).read_text()).get("views", [])
+    except (OSError, ValueError) as error:
+        return [], None, f"snapshot_ui: {error}"
+    finally:
+        cancelled = attempt(client, "cancel_sheet", {"project": str(doc.path)})
+    visible = [v for v in views if not v.get("hidden") and v.get("text")]
+    at = next((v["i"] for v in visible if v["text"] == "Dynamic Range:"), None)
+    title = next((v["text"] for v in visible
+                  if at is not None and v.get("class") == "NSPopUpButton" and v["i"] > at), None)
+    return [v["text"] for v in visible], title, \
+        None if cancelled["ok"] else f"cancel_sheet: {cancelled.get('error')}"
+
+
+def run_dx(binary):
+    """DX: the export sheet on instances of its own, each pinned with `screens.py`'s PINS
+    and the export choice: an HLG project's Dynamic Range row reads HDR (HLG) on
+    hevc_10bit and SDR version on h264; an SDR project's sheet has no such row."""
+    from screens import PINS
+    misses, figures = [], []
+    for preset, want in (("hevc_10bit", "HDR (HLG)"), ("h264", "SDR version")):
+        folder = WORK / f"dx-{preset}"
+        home = folder / "home"
+        home.mkdir(parents=True)
+        choice = json.dumps({"preset_id": preset}, separators=(",", ":"))
+        arguments = []
+        for key, value in PINS:
+            arguments += [f"-{key}", f"<string>{choice}</string>"
+                          if key == "FrameJobExportChoice" else value]
+        log = folder / "instance.log"
+        launched = mcp.launch(str(binary), arguments,
+                              env=bounded.child_env({"CFFIXED_USER_HOME": str(home)}),
+                              log_path=str(log), timeout=CALL_BOUND)
+        try:
+            if launched.client is None:
+                misses.append(f"{preset}: the instance did not listen")
+                continue
+            client = launched.client
+            doc = hlg_doc(client, f"dx-{preset}-hlg", [fixture("hlg")])
+            texts, title, problem = sheet_texts(client, doc, f"dx-{preset}-hlg")
+            closed = doc.close()
+            figures.append(f"{preset} pinned, HLG project: \"Dynamic Range:\" "
+                           f"{'Dynamic Range:' in texts}, the popup {title!r}")
+            if "Dynamic Range:" not in texts or title != want or problem or not closed:
+                misses.append(f"{preset} HLG: {title!r} {problem or ''} closed {closed}")
+            if preset == "hevc_10bit":
+                sdr = Doc(client, f"dx-{preset}-sdr", W, H)
+                sdr.place(fixture("bt709")) if sdr.ok else None
+                texts, _, problem = sheet_texts(client, sdr, f"dx-{preset}-sdr")
+                closed = sdr.close()
+                format_shown = "HEVC 10-bit (MP4)" in texts
+                figures.append(f"{preset} pinned, SDR project: \"Dynamic Range:\" "
+                               f"{'Dynamic Range:' in texts}; the format shown {format_shown}")
+                if "Dynamic Range:" in texts or not texts or problem or not closed:
+                    misses.append(f"{preset} SDR: {problem or ''} closed {closed}")
+        finally:
+            launched.stop()
+            mcp.remove_scratch(launched.socket_path)
+        found = complaints(log)
+        if found:
+            misses.append(f"{preset}: complaints {found[:2]}")
+    check("DX the export sheet (own instances, PINS and FrameJobExportChoice pinned): in an HLG "
+          "project \"Dynamic Range:\" with the popup on HDR (HLG) when pinned to hevc_10bit and "
+          "on SDR version when pinned to h264; no \"Dynamic Range:\" in an SDR project",
+          not misses, f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def run_to(binary):
+    """TO (`--measure`): TH's 4K fixture placed twice (8 s) as an HLG project, exported
+    prores_422 at hlg and at sdr, each on an instance of its own: the frame times printed
+    against C0's 0.21 ms (REASONED); scored only on both files' tags."""
+    figures, misses = [], []
+    path = fixture("bt709_4k")
+    averages_by = {}
+    for asked in ("hlg", "sdr"):
+        if path is None:
+            misses.append(f"bt709_4k refused: {REFUSED.get('bt709_4k')}")
+            break
+        log = WORK / f"to-{asked}-instance.log"
+        before = host_state()
+        launched = mcp.launch(str(binary), ["-FrameJobCompositorTiming", "YES"],
+                              env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
+                              log_path=str(log), timeout=CALL_BOUND)
+        lines, out = [], None
+        try:
+            if launched.client is None:
+                misses.append(f"{asked}: the instance did not listen")
+                continue
+            doc = Doc(launched.client, f"to-{asked}-project", 3840, 2160)
+            doc.place(path, 0)
+            doc.place(path, 4 * SEC)
+            doc.call("set_canvas", output="hlg")
+            start = log.stat().st_size if log.exists() else 0
+            out, _ = export_as(doc, f"to-{asked}", "prores_422", dynamic_range=asked)
+            time.sleep(1)
+            with open(log, errors="replace") as handle:
+                handle.seek(start)
+                lines = TIMING.findall(handle.read())
+            doc.close()
+        finally:
+            launched.stop()
+            mcp.remove_scratch(launched.socket_path)
+        averages = [float(a) for a, _, _ in lines]
+        averages_by[asked] = averages
+        read = tags(stream(out)) if out else None
+        figures.append(f"{asked}: {read}; {len(lines)} timing lines, average ms {averages}, "
+                       f"worst {[float(w) for _, w, _ in lines]}; host before {before}, after "
+                       f"{host_state()}")
+        if read != PICTURE_TAGS[asked]:
+            misses.append(f"{asked}: {read}")
+    if all(averages_by.get(k) for k in ("hlg", "sdr")):
+        mean = {k: sum(v) / len(v) for k, v in averages_by.items()}
+        figures.append(f"mean average hlg {mean['hlg']:.3f} ms, sdr {mean['sdr']:.3f} ms: the "
+                       f"output pass {mean['sdr'] - mean['hlg']:+.3f} ms per 4K frame (C0's copy "
+                       f"0.21 ms, REASONED; recorded, not scored)")
+    check("TO the 4K HLG project's prores_422 at hlg and at sdr: tagged bt2020nc/arib-std-b67/"
+          "bt2020 and bt709 ×3; the output pass's frame time recorded", not misses,
+          f"{misses or 'as wanted'}\n       " + "\n       ".join(figures))
 
 
 def run_th(binary):
@@ -3136,11 +3836,11 @@ def main():
             print(f"unknown rows: {sorted(unknown)}")
             return 2
     elif args.measure:
-        selected = {"TI", "TH", "Z1"}
+        selected = {"TI", "TH", "TO", "Z1"}
     else:
-        selected -= {"TI", "TH"}
+        selected -= {"TI", "TH", "TO"}
         if args.mutant:
-            selected -= {"H1a"} | H7_ROWS | H2_ROWS
+            selected -= {"H1a"} | H7_ROWS | H2_ROWS | H3_ROWS
     if args.mode == "capture":
         if not args.only:
             selected = {"H1", "H2", "H3", "H4", "H5", "H6", "R0", "Z1"}
@@ -3176,7 +3876,8 @@ def main():
     closed = True
     log = WORK / "instance.log"
     needs_instance = bool(selected & ({"H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5",
-                                       "H6", "R0"} | H7_ROWS | H2_ROWS))
+                                       "H6", "R0"} | H7_ROWS | H2_ROWS
+                                      | (H3_ROWS - {"DX"})))
     if needs_instance:
         launched = mcp.launch(str(binary), [],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
@@ -3232,7 +3933,11 @@ def main():
                 for row, run in (("HS", run_hs), ("HH", run_hh), ("HP", run_hp),
                                  ("HT", run_ht), ("HL", run_hl), ("HW", run_hw),
                                  ("HK", run_hk), ("HM", run_hm), ("HF", run_hf),
-                                 ("HX", run_hx)):
+                                 ("HX", run_hx),
+                                 # hdr H-3 (#277): the deliverables.
+                                 ("DT", run_dt), ("DP", run_dp), ("DV", run_dv),
+                                 ("DI", run_di), ("DE", run_de), ("DR", run_dr),
+                                 ("DS", run_ds), ("DM", run_dm)):
                     if row in selected:
                         run(client, state)
             except Exception as error:  # a row that could not run is a failure
@@ -3247,6 +3952,10 @@ def main():
         run_ti(binary)
     if "TH" in selected:
         run_th(binary)
+    if "TO" in selected:
+        run_to(binary)
+    if "DX" in selected:
+        run_dx(binary)
     if selected & P_ROWS:
         run_math_probe(sources)
     found = complaints(log) if needs_instance else []

@@ -75,7 +75,8 @@ pub unsafe extern "C" fn rc_project_frame_recipe(p: *const Project, t: i64) -> *
 
 /// [`rc_project_frame_recipe`] with the caller's recipe options (spec §7.3;
 /// [`RecipeOptions`]). `opts_json` is `{"burn_in_timecode": bool,
-/// "ungraded": bool, "selection": clip id, "behind": clip id}` (any key may be absent) or NULL
+/// "ungraded": bool, "selection": clip id, "behind": clip id, "dynamic_range": "hlg" | "pq" |
+/// "sdr"}` (any key may be absent) or NULL
 /// for the defaults, and NULL is exactly what
 /// [`rc_project_frame_recipe`] asks for — the two exports are one
 /// implementation, so a plain call to either produces the same bytes.

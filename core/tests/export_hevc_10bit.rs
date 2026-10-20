@@ -94,7 +94,8 @@ fn the_row_is_written_out_whole() {
             "video": true,
             "size": null,
             "fps": null,
-            "avf_preset": "AVAssetExportPresetHEVCHighestQuality"
+            "avf_preset": "AVAssetExportPresetHEVCHighestQuality",
+            "hdr": true
         })
     );
 }

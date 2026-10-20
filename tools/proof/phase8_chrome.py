@@ -2437,17 +2437,19 @@ def main():
     bits = menu.get("modifierBits", {})
     check("the View menu exists and is not empty", len(view) > 3, f"{len(view)} rows")
     # The preview group is the rows after the LAST separator: grading GR3 and
-    # grading-2 G2-1 appended Show Ungraded and Scopes to it, and G2-4 Show
-    # Selection after Show Ungraded, so its tail is no longer Preview Window.
+    # grading-2 G2-1 appended Show Ungraded and Scopes to it, G2-4 Show
+    # Selection after Show Ungraded, and hdr H-3 Show SDR Version after Show
+    # Selection, so its tail is no longer Preview Window.
     last_separator = max((i for i, r in enumerate(view) if r["separator"]), default=-1)
     group = view[last_separator + 1:] if last_separator >= 0 else []
     check("its LAST group, after a separator, is the Preview Quality submenu and Preview "
-          "Window, then Show Ungraded, Show Selection and Scopes — a group of their own, "
-          "because all five are about the PREVIEW rather than about the editor's own panes",
-          len(group) == 5
+          "Window, then Show Ungraded, Show Selection, Show SDR Version and Scopes — a group "
+          "of their own, because all six are about the PREVIEW rather than about the editor's "
+          "own panes",
+          len(group) == 6
           and group[0].get("submenu", {}).get("title") == "Preview Quality"
           and [r["title"] for r in group[1:]]
-          == ["Preview Window", "Show Ungraded", "Show Selection", "Scopes"],
+          == ["Preview Window", "Show Ungraded", "Show Selection", "Show SDR Version", "Scopes"],
           " | ".join(r["title"] or "(separator)" for r in view[last_separator:]))
 
     quality_rows = group[0].get("submenu", {}).get("items", []) if group else []
@@ -3243,14 +3245,14 @@ def main():
     if compositor is None:
         check("the compositor probe answered", False, compositor_error or "")
         compositor = {}
-    check("`LayerUniforms` is 512 bytes and `ShadowUniforms` 48 — the layout contract's own "
-          "arithmetic (128 floats since grading-2 G2-2's wheels group, 32 x 16; and 12 "
+    check("`LayerUniforms` is 528 bytes and `ShadowUniforms` 48 — the layout contract's own "
+          "arithmetic (132 floats since hdr H-2's HLG group, 33 x 16; and 12 "
           "floats, 3 x 16), read from "
           "`MemoryLayout` rather than counted by eye. Nothing checks the METAL half of that "
           "contract but reading it, and the twelve renders below, which come back as "
           "garbage the moment the two lists disagree",
-          compositor.get("layerUniformsSize") == 512
-          and compositor.get("layerUniformsStride") == 512
+          compositor.get("layerUniformsSize") == 528
+          and compositor.get("layerUniformsStride") == 528
           and compositor.get("shadowUniformsSize") == 48
           and compositor.get("shadowUniformsStride") == 48,
           f"layer {compositor.get('layerUniformsSize')}/"

@@ -7,10 +7,11 @@
 //! an identity; an unknown value is invalid input naming serde's list; the
 //! recipe's canvas and the plan carry `"output": "hlg"` only in an HLG
 //! project; in an HLG project the three 10-bit rows gain `"color": "hlg"`,
-//! every other video row is refused in its own sentence and an audio row is
-//! unchanged, while an SDR project's settings are the text they were;
-//! `set_canvas` inside a scope is still refused; and a nest's scoped view of
-//! an HLG project composes in HLG.
+//! every other video row `"color": "sdr"` (H-3's SDR version, spec §11
+//! HD-14, where H-2 refused it) and an audio row is unchanged, while an SDR
+//! project's settings are the text they were; `set_canvas` inside a scope
+//! is still refused; and a nest's scoped view of an HLG project composes in
+//! HLG.
 
 mod common;
 
@@ -130,14 +131,10 @@ fn each_export_row_in_both_outputs() {
             want["color"] = json!("hlg");
             assert_eq!(answer, Ok(want), "{id}");
         } else {
-            assert_eq!(
-                answer,
-                Err(format!(
-                    "{id} cannot carry an HLG project's picture; export it as hevc_10bit, \
-                     prores_422 or prores_4444"
-                )),
-                "{id}"
-            );
+            // H-3 (spec §11 HD-14): the SDR version, where H-2 refused.
+            let mut want = plain.clone();
+            want["color"] = json!("sdr");
+            assert_eq!(answer, Ok(want), "{id}");
         }
     }
 }

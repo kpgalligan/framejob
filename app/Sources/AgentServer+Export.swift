@@ -104,6 +104,12 @@ extension AgentServer {
                 overrides["width"] = size.width
                 overrides["height"] = size.height
             }
+            // The sheet's Dynamic Range popup (spec §11 HD-14 (c)), forwarded
+            // unread: the core's reader and resolver own its three words, its
+            // per-row defaults and both refusals, each in its own sentence.
+            if let range = a["dynamic_range"] {
+                overrides["dynamic_range"] = range
+            }
             let settings: ExportSettings
             do {
                 settings = try ReelExport.settings(
@@ -190,6 +196,11 @@ extension AgentServer {
             // `tools/proof/phase7_proof.py` is where one does.
             "burn_in_timecode": options.burnInTimecode,
         ]
+        // The picture an HLG project's file was written as (`hlg`, `pq` or
+        // `sdr`); absent for every SDR project and audio row.
+        if let color = settings.color {
+            result["dynamic_range"] = color
+        }
         if let measured = Self.loudnessResult(exporter.loudnessReport) {
             result["loudness"] = measured
         }

@@ -30,7 +30,8 @@ final class RecipeSource {
     /// that. An absent entry is `RecipeOptions.none`, so a key nobody set
     /// options on answers exactly what it answered before this dictionary
     /// existed. A document's key asks only for `ungraded`, while View ▸ Show
-    /// Ungraded is on (spec §11 GR-4); `Exporter` mints keys of its own for an
+    /// Ungraded is on (spec §11 GR-4), and `dynamicRange` `.sdr`, while View ▸
+    /// Show SDR Version is (HD-14 (g)); `Exporter` mints keys of its own for an
     /// export and for an offline frame, which is why the switch never reaches
     /// them — never copy a document key's options onto one.
     private var options: [Int: RecipeOptions] = [:]

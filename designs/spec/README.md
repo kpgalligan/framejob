@@ -22,7 +22,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`03-window-layout.md`](03-window-layout.md) | 62 | The window's regions, as the design handoff specifies them. |
 | **§4 — The regions in detail** | | |
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 25 | The toolbar. |
-| [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 152 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping, Show Ungraded and the scopes panel (its two slots, their sizes and the four scopes drawn). |
+| [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 159 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping, Show Ungraded and the scopes panel (its two slots, their sizes and the four scopes drawn). |
 | [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 519 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear; every video, audio, text and shape section. |
 | [`04.3b-inspector-media-document-assistant.md`](04.3b-inspector-media-document-assistant.md) | 220 | The inspector's Media tab (find band, rows, drags, Consolidate, import, generate and export captions), Document tab and Assistant tab. |
 | [`04.4-timeline.md`](04.4-timeline.md) | 213 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
@@ -41,20 +41,20 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 140 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 164 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
-| [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 469 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
+| [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 484 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 55 | The spec's Swift file map (app/CLAUDE.md is the live one). |
-| [`07.5-compositor.md`](07.5-compositor.md) | 448 | The Metal compositor's step 0 (per composition), passes, mattes, and transitions, and the scopes' tap (the shown set, the kernels, the counting rule). |
+| [`07.5-compositor.md`](07.5-compositor.md) | 464 | The Metal compositor's step 0 (per composition), passes, mattes, and transitions, and the scopes' tap (the shown set, the kernels, the counting rule). |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 46 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 207 | `MediaImporter.probe`, the formats import accepts, the WebM/Matroska rewrap, its copy's progress window, the copy's original, and the opt-in ffmpeg step's original and checked VP9 copy. |
-| [`07.8-export.md`](07.8-export.md) | 401 | Export: writers, formats, loudness, the queue. |
-| [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 372 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, the app-state tools, lenient decoding. |
+| [`07.8-export.md`](07.8-export.md) | 432 | Export: writers, formats, loudness, the queue. |
+| [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 379 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, the app-state tools, lenient decoding. |
 | [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 157 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
 | [`07.9c-agent-graphics-dev-tools-transport.md`](07.9c-agent-graphics-dev-tools-transport.md) | 255 | The graphics loop's tools (write, read, render, import, delete, rename and restore a module), an action's graphic props and the graphics menus, the dev tools (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `assistant_send` / `assistant_answer` and their launch defaults), and the transport (the Unix socket, `framejob-mcp`, Copy MCP Command). |
-| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 100 | The spec's Rust module map (core/CLAUDE.md is the live one). |
+| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 101 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 185 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 188 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 10016 in 26 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 10108 in 26 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

@@ -38,6 +38,7 @@
 
 use serde_json::Value;
 
+use crate::dynamic_range::DynamicRange;
 use crate::time::{Fps, Ticks};
 
 // ---- the shared front door -----------------------------------------------
@@ -184,6 +185,23 @@ pub(crate) fn boolean(overrides: Option<&Value>, key: &str, default: bool) -> Re
                 describe(value)
             )
         }),
+    }
+}
+
+/// The `dynamic_range` override (spec §11 HD-14 (c)): `hlg`, `pq` or `sdr`,
+/// `None` when absent or null. Which of them a row may write is the
+/// resolver's question (`Project::deliverable`); this answers only whether
+/// the value is one of the three words.
+pub(crate) fn dynamic_range(overrides: Option<&Value>) -> Result<Option<DynamicRange>, String> {
+    let Some(value) = field(overrides, "dynamic_range") else {
+        return Ok(None);
+    };
+    match value.as_str().and_then(DynamicRange::parse) {
+        Some(range) => Ok(Some(range)),
+        None => Err(format!(
+            "export dynamic_range must be \"hlg\", \"pq\" or \"sdr\", not {}",
+            describe(value)
+        )),
     }
 }
 

@@ -262,3 +262,30 @@ final class SelectionTagView: NSTextField {
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
+
+/// The "SDR Version" tag (spec §11 HD-7, HD-14 (g)): Show SDR Version's,
+/// third in the preview's top-left void, shown only while the switch is on —
+/// in an SDR project too, where the picture does not change. It takes no
+/// clicks.
+final class SDRVersionTagView: NSTextField {
+    init() {
+        super.init(frame: .zero)
+        stringValue = "SDR Version"
+        isEditable = false
+        isSelectable = false
+        isBezeled = false
+        isBordered = false
+        drawsBackground = true
+        backgroundColor = DS.chromeBackground
+        textColor = DS.textMuted
+        font = DS.mono(10)
+        isHidden = true
+        setAccessibilityIdentifier("preview.sdrVersion")
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) {
+        fatalError("SDRVersionTagView does not support NSCoder")
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}

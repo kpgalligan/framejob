@@ -27,13 +27,28 @@ extension Playback {
     /// guard returns the builder's own object with no new one made at all, so a
     /// preview at the default setting is byte for byte the preview this file
     /// built before the setting existed.
+    ///
+    /// An HLG plan's copy is also labelled as Show SDR Version asks (spec §11
+    /// HD-14 (g)): BT.709 for the SDR version, BT.2020/HLG otherwise; an SDR
+    /// plan's colour is never touched.
     static func previewComposition(
-        _ built: BuiltComposition, quality: PreviewQuality
+        _ built: BuiltComposition, quality: PreviewQuality, sdrVersion: Bool = false
     ) -> AVVideoComposition {
         var configuration = built.videoConfiguration
         let wanted = quality.renderSize(for: configuration.renderSize)
-        guard wanted != configuration.renderSize else { return built.videoComposition }
+        var changed = wanted != configuration.renderSize
         configuration.renderSize = wanted
+        if built.output == .hlg {
+            let colour = OutputTransform.compositionColour(
+                hlg: true, converts: true, range: sdrVersion ? .sdr : .hlg)
+            changed = changed || colour.primaries != configuration.colorPrimaries
+                || colour.transfer != configuration.colorTransferFunction
+                || colour.matrix != configuration.colorYCbCrMatrix
+            configuration.colorPrimaries = colour.primaries
+            configuration.colorTransferFunction = colour.transfer
+            configuration.colorYCbCrMatrix = colour.matrix
+        }
+        guard changed else { return built.videoComposition }
         return AVVideoComposition(configuration: configuration)
     }
 }

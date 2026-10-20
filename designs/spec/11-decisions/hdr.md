@@ -146,6 +146,10 @@ design time or build time.
     BT.1886 route (`hdr_math.py` §1), not of HD-3's measured lift, so H-3 recomputes them on
     HD-3's before fixing the knee.
   - GR-15's mapping is not touched: it stays the conversion of HDR sources in SDR projects.
+  **Amended by HD-14** (hdr H-3): the knee is 0.9 on the largest linear BT.709 channel over
+  reference white, with GR-15's extended-Reinhard shoulder to W = 1000/203; recomputed on HD-3's
+  lift, the white title reads 248.4/255 (not 249.6) and HLG 0.50 reads 125.7 (not 143.1, which
+  was BT.1886's).
 - **HD-5 — The deliverables: HLG, HDR10 (PQ) or SDR on the 10-bit rows, the SDR version on every
   other row; Dolby Vision off; the HDR10 metadata fixed.** Choices 4a, 5a and 6a (owner,
   2026-10-19: "HLG + HDR10, DV off (Recommended)").
@@ -172,6 +176,9 @@ design time or build time.
     later option" without saying where), and every 8-bit row carries the SDR version, not only
     GIF and APNG ("GIF and APNG stay SDR"). PR-3 stands: `hevc` stays Main and carries the SDR
     version.
+  **Amended by HD-14** (hdr H-3): the argument is spelled `dynamic_range`, not `range` (which the
+  export tool already takes for `"project"` or `"in_out"`); the settings' `color` and presets'
+  `"hdr"` carry it.
 - **HD-6 — #281: a PQ media's own peak sets step 0's PQ white; 1,000 cd/m² when unknown.**
   Choice 7a (taken as recommended, stated to the owner before the questions; the owner's
   2026-10-14 comment on #281 asked for it as a feature).
@@ -208,6 +215,9 @@ design time or build time.
   - **Why:** on an XDR display it is the only way to see the SDR deliverable before exporting
     it; on an SDR display the player's own tone mapping is Apple's, not the export's.
   - What it does in an SDR project, and its key, H-3 records here before its code.
+  **Amended by HD-14** (hdr H-3): its key is the recipe option `dynamic_range: "sdr"`; it writes no
+  `UserDefaults` and has no shortcut; in an SDR project it changes no pixel and its tag still
+  shows.
 - **HD-8 — The scopes of an HLG project read HLG, with a cd/m² scale.** Choice 9 (taken as
   recommended, stated to the owner before the questions).
   - The waveform and the parade read HLG signal % with a cd/m² scale (computed for the brief:
@@ -382,3 +392,84 @@ design time or build time.
     (fixing it needs `LayerRenderers.swift`, an output-keyed image cache, a not-lifted flag
     through `LayerSource` and PQ tone mapping for stills), #311; (h)'s HDR-source key across a
     switch, #312.
+  **Amended by HD-14** (hdr H-3): (i)'s JPEG and (j)'s non-10-bit video rows now write HD-4's
+  SDR version instead of being refused; the JPEG sentence stays only as `FrameWriter`'s guard.
+- **HD-14 — H-3's settlements: the knee at 0.9, one output pass chosen by the key's
+  `dynamic_range`, the argument's spelling and its refusals, PQ at 1,000 cd/m² with HD-5's
+  metadata, the frames, Show SDR Version's key and the sheet's row.** H-3's spec, recorded before
+  its code; it settles what HD-4, HD-5 and HD-7 left to H-3. No format change.
+  - **(a) The knee is 0.9**, choice 3a's shape, on the largest linear BT.709 channel over
+    reference white (1 = 203 cd/m²), with W = 1000/203 and GR-15's extended-Reinhard shoulder
+    after its gamut lift. Recomputed on HD-3's lift by `python3 -I
+    tools/proof/work/h3/sdr_version_math.py` (scratch, gitignored; 2026-10-20, AC Power). The lift
+    reads 0.10 → 0.13582, 0.42 → 0.43872, 1.00 → 0.74988. At knee 0.9 the levels of 255 are, with
+    GR-15's beside them: SDR 0.42 title 107.1 (GR-15 87.4); SDR 0.75 grey 191.2 (127.7); SDR-white
+    title **248.4** (154.2); iPhone HLG 0.50 **125.7** (97.1; the brief's 143.1 was BT.1886's);
+    HLG 0.85 253.9 (189.4); HLG 0.90 254.4 (209.3); HLG 1.00 255.0. The white title by knee
+    0.39/0.5/0.6/0.7/0.75/0.8/0.85/0.9/0.95 reads 212.7/220.7/227.8/234.8/238.3/241.7/245.1/
+    248.4/251.7, and 249.6 needs knee 0.9170. The round trip is within 0.5 of a 10-bit level up to
+    SDR 0.9531; the knee's SDR grey is 0.9477 (241.7/255). The SDR version at HLG
+    0.10/0.25/0.40/0.50/0.60/0.70/0.75/0.80/0.90/1.00 is
+    0.06875/0.21101/0.37509/0.49288/0.64091/0.85788/0.97430/0.99102/0.99762/1.00000 (the proof's
+    oracle). **BT.2408's own HDR → SDR constants**, read for H-3 (Report ITU-R BT.2408-9, 2026,
+    fetched from itu.int on 2026-10-20): the report gives no down-mapping curve or knee of its
+    own; §5.2 prefers display-light down-mapping and points to Report BT.2446's three example
+    methods, and says a live production's down-mapper follows "a complementary tone-curve to any
+    SDR to HDR converters over the lower and middle signal ranges, with compressed highlights
+    filling the upper SDR signal range" (a "hybrid-linear" down-mapper) — the shape of this
+    choice; §7.1.3 records SDR content at 75 % HLG attenuated on the SDR output "to as little as
+    86 % (a 14 % loss)", and round-trip losses "as low as 5 %" where a down-mapper uses the
+    super-white range to EBU R.103's ~105 %. Frame Job's SDR deliverable has no super-white, and
+    its round trip holds to SDR 0.9531, a loss of about 5 % below SDR white. The knee is unchanged
+    by the reading.
+  - **(b) One output pass** (`framejob_output_fragment`), for the preview, `render_frame` and
+    export, chosen by the recipe key's `dynamic_range` option and drawn only in an HLG project
+    whose key asks `sdr` or `pq`: HLG → scene light (the inverse OETF) → display light, scene ·
+    Ys^0.2 on BT.2020 luma (1 = 1,000 cd/m²); the SDR version × W → BT.2020 to BT.709 → GR-15's
+    gamut lift → the shoulder at the knee → Core Media 709's encode with HD-13 (a)'s toe, `min(16
+    · l, l^(256/502))`; PQ × 0.1 → ST 2084's inverse EOTF (1 = 10,000 cd/m²). Premultiplied in
+    and out. A composition's colour follows its key: BT.709 for `sdr`, BT.2020/PQ/BT.2020 for
+    `pq`, BT.2020/HLG for `hlg`.
+  - **(c) `dynamic_range`, not `range`**: `range` is already the export tool's `"project" |
+    "in_out"` and the core's `{start, duration}` override, so HD-5's argument is spelled
+    `dynamic_range` (`"hlg"`, `"pq"` or `"sdr"`; anything else refused: `export dynamic_range
+    must be "hlg", "pq" or "sdr", not …`). Per row: an HLG project's 10-bit rows default to
+    `hlg`; its other video rows write `sdr`, refusing `hlg` and `pq` by `{id} is 8-bit and writes
+    the SDR version; export dynamic_range "{x}" as hevc_10bit, prores_422 or prores_4444`; an SDR
+    project refuses `hlg` and `pq` by `dynamic_range "{x}" needs an HLG project; set_canvas
+    output "hlg" first` and takes `sdr` as nothing; an audio row reads and ignores it. The
+    resolved settings carry `color` (`hlg`, `pq` or `sdr`) only in an HLG project, so an SDR
+    project's and an audio row's settings are the text they were. `rc_export_presets` gains
+    `"hdr": true` on the three 10-bit rows alone.
+  - **(d) PQ:** HLG display light at 1,000 cd/m² → ST 2084, so nothing exceeds 1,000 cd/m².
+    HD-5's metadata is written as two blobs: the mastering display (ST 2086 in SEI 137's order:
+    P3's G, B, R, D65, max 1,000 and min 0.005 cd/m² in 0.0001) `33c2 86c4 1d4c 0bb8 84d0 3e80
+    3d13 4042 0098 9680 0000 0032`, and the content light level (MaxCLL 1,000, MaxFALL 0) `03e8
+    0000`; HEVC beside its existing keys with NO HDR-metadata insertion-mode key, ProRes as a
+    compression dictionary of the two keys alone.
+  - **(e) Frames:** `render_frame {sdr_version}`, and a JPEG from `render_frame` or Save Frame…
+    in an HLG project, draw the SDR version through the reader: a 16-bit PNG, a 10-bit HEIC or a
+    JPEG, labelled `frameSpace` (BT.709, PR-11). HD-13 (i)'s JPEG refusal stays only as
+    `FrameWriter`'s guard.
+  - **(f) Measured for H-3's spec** (M-H3a, 2026-10-20): H-0's spike binary
+    (`tools/proof/work/h0/spike/spike`, key `f4c98006cae6b461`) ran `write-hdr
+    tools/proof/work/h3/m1/w_<k>.mov <k>`, read with ffprobe 9.0.2. `pq-explicit` (HEVC Main 10,
+    explicit keys, no insertion-mode key): `bt2020nc/smpte2084/bt2020`, mastering
+    `min_luminance=50/10000 max_luminance=6000000/10000`, CLL 600/200, and no DOVI configuration
+    record or RPU. `pq` (Auto): 5/10000, 10000000/10000, 1000/400, no DOVI. `hlg` (no key): DOVI
+    profile 8 level 1 compatibility 4 with RPU. `prores-pq-explicit`: ProRes 422 HQ with our
+    values. So PQ HEVC sets no insertion-mode key, and HLG HEVC keeps `None`. MaxFALL 0 was
+    unmeasured there; `hdr_proof.py`'s DP is its first measurement.
+  - **(g) Show SDR Version** (HD-7): it sets `dynamic_range = .sdr` on the document's recipe key;
+    the canvas tag "SDR Version" shows; the preview's composition is recoloured BT.709 by
+    re-assigning the item's composition, with no rebuild. It has no shortcut, writes no
+    `UserDefaults` (so it is not a persisting menu item, and proofs may perform it), is always
+    enabled, and never reaches Save Frame…, `render_frame`, an export or the eyedropper. In an SDR
+    project it changes no pixel and its tag still shows, and `render_frame {sdr_version: true}` is
+    byte-identical to without.
+  - **(h) The sheet:** a "Dynamic Range:" row under Format, only in an HLG project. On a 10-bit
+    row (`hdr`) it offers "HDR (HLG)", "HDR10 (PQ)" and "SDR version", default HDR (HLG); on any
+    other row it is disabled, showing "SDR version", and sends no override. The choice is not
+    remembered by the export choice or user presets.
+  - **(i) Amends** HD-4 (the knee and its recomputed rows), HD-5 (the spelling), HD-7 ((g)) and
+    HD-13 ((i), (j): JPEG and the non-10-bit rows now the SDR version).

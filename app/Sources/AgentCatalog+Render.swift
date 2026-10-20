@@ -123,7 +123,8 @@ extension AgentServer {
                     + "sentence before the last names the graphic, its frame and the "
                     + "diagnostic; a failed graphic draws its error card in the picture. In an "
                     + "HLG project (set_canvas output) the frame is a 16-bit PNG or a 10-bit "
-                    + "HEIC labelled BT.2100 HLG, and JPEG is refused.",
+                    + "HEIC labelled BT.2100 HLG; a JPEG, and any frame asked with "
+                    + "sdr_version, is the project's SDR version, labelled BT.709.",
                 [
                     "t": [
                         "type": "integer",
@@ -150,6 +151,17 @@ extension AgentServer {
                             + "video.color (Light and Color) neutral, everything else kept: "
                             + "View ▸ Show Ungraded's picture. The view switch itself never "
                             + "reaches this tool or an export. Default false.",
+                    ],
+                    // View ▸ Show SDR Version's mirror (spec §11 HD-7, HD-14).
+                    "sdr_version": [
+                        "type": "boolean",
+                        "description": "Draw an HDR (HLG) project's SDR version — what h264, "
+                            + "hevc, hevc_alpha, gif, apng, JPEG frames and dynamic_range "
+                            + "\"sdr\" write: the inverse of the lift, white titles near white, "
+                            + "highlights above reference white rolled off. View ▸ Show SDR "
+                            + "Version's picture; the switch itself never reaches this tool or "
+                            + "an export. An SDR project's frame is its own SDR version, "
+                            + "byte-identical. Default false.",
                     ],
                     "selection": [
                         "type": "integer",
@@ -232,8 +244,10 @@ extension AgentServer {
                     + "stops the export with no file left, naming the graphic and the frame. "
                     + "graphic_warnings [{name, frame, message}]: each distinct warning a "
                     + "graphic gave while the file was drawn, absent when none. In an HLG "
-                    + "project (set_canvas output) hevc_10bit, prores_422 and prores_4444 are "
-                    + "written tagged HLG, and every other video preset is refused.",
+                    + "project (set_canvas output) hevc_10bit, prores_422 and prores_4444 "
+                    + "write HLG unless dynamic_range says pq or sdr, every other video preset "
+                    + "writes the project's SDR version, and the result's dynamic_range names "
+                    + "the picture written.",
                 [
                     "preset": exportPresetProperty,
                     "path": [
@@ -285,6 +299,17 @@ extension AgentServer {
                             + "for and the result's capped_by_peak says so.",
                     ],
                     "burn_in_timecode": burnInProperty,
+                    // The sheet's Dynamic Range popup (spec §11 HD-5, HD-14).
+                    "dynamic_range": [
+                        "type": "string", "enum": ["hlg", "pq", "sdr"],
+                        "description": "An HDR (HLG) project's picture on hevc_10bit, "
+                            + "prores_422 and prores_4444 — the sheet's Dynamic Range popup: "
+                            + "hlg (the default; BT.2100 HLG, no Dolby Vision), pq (HDR10: "
+                            + "BT.2100 PQ at 1,000 cd/m², mastering display P3-D65 0.005–1,000 "
+                            + "cd/m², MaxCLL 1,000, MaxFALL 0) or sdr (the SDR version). Every "
+                            + "other video preset writes the SDR version; hlg and pq are refused "
+                            + "there and in an SDR project, where sdr changes nothing.",
+                    ],
                 ], required: ["preset", "path"]),
         ]
     }

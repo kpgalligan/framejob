@@ -2561,6 +2561,52 @@ fragment float4 framejob_input_fragment(ShadowVaryings in [[stage_in]],
     return float4(rgb, a);
 }
 
+// MARK: - The output pass (spec §11 HD-14 (b))
+
+// `OutputUniforms` (`OutputTransform.swift`), sixteen bytes: `mode` 1 draws
+// the SDR version, 2 PQ; `knee` is the SDR version's knee.
+struct OutputUniforms {
+    float mode;
+    float knee;
+    float reserved0;
+    float reserved1;
+};
+
+// ST 2084's inverse EOTF (BT.2100's PQ): light, 1 at 10,000 cd/m², clamped to
+// 0…1, → signal.
+static float3 pqInverseEOTF(float3 light) {
+    float3 y = pow(clamp(light, 0.0, 1.0), kPqM1);
+    return pow((kPqC1 + kPqC2 * y) / (1.0 + kPqC3 * y), kPqM2);
+}
+
+// An HLG project's finished frame as the key asked (spec §11 HD-4, HD-14):
+// un-premultiplied (alpha 0 reads 0), scene light by HLG's inverse OETF,
+// display light by BT.2100's OOTF (γ 1.2 on BT.2020 luminance, 1 = 1,000
+// cd/m²). The SDR version: over reference white (× 1000/203), BT.2020 to
+// BT.709, GR-15's gamut lift and shoulder at `knee` reaching 1 at 1000/203,
+// then Core Media 709's encode with Core Graphics' toe — the inverse of HD-3's
+// lift below the knee. PQ: display light at 1,000 cd/m² on ST 2084's scale.
+// Premultiplied back by the destination's own alpha.
+fragment float4 framejob_output_fragment(ShadowVaryings in [[stage_in]],
+                                        float4 dst [[color(0)]],
+                                        constant OutputUniforms &u [[buffer(0)]]) {
+    float a = saturate(dst.a);
+    float3 signal = a > 0.0 ? dst.rgb / a : float3(0.0);
+    float3 scene = hlgInverseOETF(saturate(signal));
+    float ys = dot(scene, kLuma2020);
+    float3 display = ys > 0.0 ? scene * pow(ys, kHlgNominalGamma - 1.0) : float3(0.0);
+    float3 rgb;
+    if (u.mode > 1.5) {
+        rgb = pqInverseEOTF(display * 0.1);
+    } else {
+        float3 l = inputShoulder(inputLift(kBT2020ToBT709 * (display * kHlgPeakOverSDRWhite)),
+                                 u.knee, kHlgPeakOverSDRWhite);
+        l = max(l, 0.0);
+        rgb = min(l * kCoreMedia709Toe, pow(l, 1.0 / kCoreMedia709Gamma));
+    }
+    return float4(rgb * a, a);
+}
+
 // MARK: - The look bake (spec §11 GR-7)
 
 // One look's lattice: the identity lattice — texel (r, g, b) holds its own

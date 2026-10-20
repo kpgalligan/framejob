@@ -145,10 +145,13 @@ and every ⌘-item whose action lives on the editor would stop resolving while
 the preview was focused; its window sets `isExcludedFromWindowsMenu` for the
 export queue's reason and autosaves its frame, which the queue's deliberately
 does not, so it stays on the display it was put on), then Show Ungraded ⌃⌘U,
-Show Selection (no shortcut) and Scopes ⌃⌘W (grading GR3 and grading-2 G2-1
-and G2-4, §11 GR-4, GR-5, GR-10, GR-13: three checkmark toggles about the
-preview, view state that nothing persists; Show Selection is disabled while
-off with no adjustment clip selected)), Window (Minimize,
+Show Selection (no shortcut), Show SDR Version (no shortcut) and Scopes ⌃⌘W
+(grading GR3 and grading-2 G2-1 and G2-4, §11 GR-4, GR-5, GR-10, GR-13; hdr
+H-3, §11 HD-7, HD-14 (g): four checkmark toggles about the preview, view state
+that nothing persists — none writes a default; Show Selection is disabled
+while off with no adjustment clip selected, Show SDR Version is always
+enabled and shows an HLG project's SDR version with an "SDR Version" tag)),
+Window (Minimize,
 Zoom, Export Queue — road map 2's phase 7e, the export sheet's Add to Queue
 button's other end, with no key equivalent because §9's "proposed, not yet
 bound" table claims no row for it and every bare letter belongs to the

@@ -123,6 +123,13 @@ governs a module now.
   (what a LUT's removal or a paste leaves: the reading), `media_input` (the
   recipe layer's and the plan segment's `input`, with the effective `peak`)
   and `media_converted_by`.
+- `dynamic_range.rs` — an HLG project's deliverables (spec §11 HD-5,
+  HD-14): `DynamicRange` (`hlg`, `pq`, `sdr`), spelled `dynamic_range` both
+  as an export override and as a recipe option; `deliverable` answers `None`
+  for an audio row and for every row of an SDR project, else the picture:
+  the three 10-bit rows carry `hlg` (the default), `pq` or `sdr`, every
+  other video row writes the SDR version, and `hlg`/`pq` are refused in an
+  SDR project and on a row that is not 10-bit, each in its own sentence.
 - `hdr10.rs` · `ffi_hdr10.rs` — an HDR10 file's peak (spec §11 HD-6,
   HD-12): the mastering-display and content-light blobs of a sample
   description, else the first sample's prefix SEI (payloads 137, 144,
@@ -674,8 +681,8 @@ governs a module now.
 - `export.rs` · `export_overrides.rs` · `export_size.rs` · `export_table.rs`
   — settings resolution (`Project::export_settings`, the one thing that reads
   a canvas, a duration, a rate and an override against a preset row; in an
-  HLG project only `HLG_ROWS` carry the picture, each other video row
-  refused by its own sentence, spec §11 HD-13); how an
+  HLG project a video row's settings name the picture it writes as `color`,
+  `hlg`, `pq` or `sdr`, from `dynamic_range.rs`); how an
   override is READ and REFUSED, naming the key and the value (`peak_dbtp`
   without `loudness_lufs` is an `Err`, because a ceiling with nothing to cap
   would be a key accepted and silently inert); the sizes the sheet offers and

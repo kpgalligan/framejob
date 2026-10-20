@@ -88,6 +88,11 @@ extension AgentServer {
     /// vectorscope counted at that zoom. Anything else is refused by name,
     /// and so is the zoom without `vectorscope: true`, both before the render.
     ///
+    /// **`sdr_version` is View ▸ Show SDR Version's mirror** (spec §11 HD-7,
+    /// HD-14): an HLG project's SDR version, a recipe option like `ungraded`;
+    /// a JPEG of an HLG project is drawn so too, and an SDR project's frame is
+    /// unchanged by it.
+    ///
     /// **`selection` is View ▸ Show Selection's mirror** (spec §11 GR-13): an
     /// adjustment clip's id, a recipe option like `ungraded` — the clip's
     /// qualifier drawn as grey, every layer in front of it left out, black
@@ -135,9 +140,9 @@ extension AgentServer {
             }
             maxWidth = requested
         }
-        let options = RecipeOptions(
-            burnInTimecode: try boolArg(a, "burn_in_timecode") ?? false,
-            ungraded: try boolArg(a, "ungraded") ?? false, selection: selection)
+        let burnIn = try boolArg(a, "burn_in_timecode") ?? false
+        let ungraded = try boolArg(a, "ungraded") ?? false
+        let sdrVersion = try boolArg(a, "sdr_version") ?? false
         var scopes: [ScopeKind] = []
         for kind in ScopeKind.allCases where try boolArg(a, kind.rawValue) ?? false {
             scopes.append(kind)
@@ -147,6 +152,14 @@ extension AgentServer {
         // millisecond rather than after a decode: `exportProject` orders its
         // own two the same way.
         let (url, format) = try frameDestination(a, at: time)
+        // View ▸ Show SDR Version's mirror, and a JPEG of an HLG project, draw
+        // its SDR version (spec §11 HD-14 (e), (g)); an SDR project's frame is
+        // its own SDR version, the recipe unchanged.
+        let output = project.snapshot.canvas.output
+        let options = RecipeOptions(
+            burnInTimecode: burnIn, ungraded: ungraded, selection: selection,
+            dynamicRange: sdrVersion ? .sdr : nil
+        ).forFrame(format, output: output)
         // Off the main thread by construction — `Exporter.renderFrame` opens
         // asset tracks and decodes, and says so. A PNG or HEIC keeps depth, so
         // `Exporter` reads a frame showing a deep still or a deep VP9 track
@@ -181,6 +194,9 @@ extension AgentServer {
         if let selection {
             text += ", drawn as clip \(selection)'s qualifier selection (white fully graded, "
                 + "black untouched)"
+        }
+        if output == .hlg, options.dynamicRange == .sdr {
+            text += ", as the project's SDR version"
         }
         text += "."
         // Said where the caller can see it rather than only in the schema: a

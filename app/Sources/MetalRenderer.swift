@@ -25,11 +25,12 @@ final class MetalRenderer {
     /// combination itself. Built with `blending: false`, which is the whole
     /// correctness argument — see `pipelineDescriptor`.
     ///
-    /// Ten pipelines from eight fragment functions: plain, plain + gather,
+    /// Eleven pipelines from nine fragment functions: plain, plain + gather,
     /// blend, blend + gather, the shadow, the matte resolve, the dissolve mix,
     /// the adjustment pass (`Compositor+Adjustment.swift`, spec §11 GR-6), the
-    /// selection map (`Compositor+Selection.swift`, spec §11 GR-35) and the
-    /// input pass (`Compositor+Input.swift`, spec §11 GR-15).
+    /// selection map (`Compositor+Selection.swift`, spec §11 GR-35), the
+    /// input pass (`Compositor+Input.swift`, spec §11 GR-15) and the output
+    /// pass (`Compositor+Output.swift`, spec §11 HD-14).
     private let blendPipeline: MTLRenderPipelineState
     private let blendGatherPipeline: MTLRenderPipelineState
     /// The full-canvas quad that draws one blurred mask as a shadow (§7.5).
@@ -43,6 +44,8 @@ final class MetalRenderer {
     let adjustPipeline: MTLRenderPipelineState
     /// The blurred qualifier's map pass (spec §11 GR-35, `Compositor+Selection.swift`).
     let qualifierMapPipeline: MTLRenderPipelineState
+    /// The output pass (spec §11 HD-14 (b), `Compositor+Output.swift`).
+    let outputPipeline: MTLRenderPipelineState
     let looks: LookTextures
     /// Step 0's pass, its targets and this frame's conversions (spec §11 GR-15).
     let inputs: InputStage
@@ -156,6 +159,7 @@ final class MetalRenderer {
             let adjustPipeline = MetalRenderer.adjustPipeline(device: device, library: library),
             let qualifierMapPipeline = MetalRenderer.qualifierMapPipeline(
                 device: device, library: library),
+            let outputPipeline = MetalRenderer.outputPipeline(device: device, library: library),
             let looks = LookTextures(device: device, library: library),
             let inputs = InputStage(device: device, library: library),
             let lift = LayerLift(device: device, library: library)
@@ -201,6 +205,7 @@ final class MetalRenderer {
         self.dissolvePipeline = dissolvePipeline
         self.adjustPipeline = adjustPipeline
         self.qualifierMapPipeline = qualifierMapPipeline
+        self.outputPipeline = outputPipeline
         self.looks = looks
         self.inputs = inputs
         self.lift = lift
@@ -345,6 +350,9 @@ final class MetalRenderer {
         try encodeLayers(
             canvasLayers, depth: 0, among: layers, coverage: coverage, canvas: canvas,
             pass: &pass, request: request, instruction: instruction, live: &live)
+        // The output pass, last (spec §11 HD-14 (b)): only for an HLG canvas
+        // asked for its SDR version or PQ.
+        try encodeOutput(canvas, pass: &pass)
         pass.suspend()
         buffer.commit()
         // The pixel buffer is handed to AVFoundation the moment this returns,

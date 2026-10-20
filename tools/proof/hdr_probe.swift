@@ -1,7 +1,7 @@
 // Built by tools/proof/hdr_proof.py as `main.swift` over every other file in
-// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P6
+// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P7
 // (grading-3 T3-1, spec §11 GR-15 as amended; P5 hdr H-1, spec §11 HD-12; P6
-// hdr H-2, spec §11 HD-3, HD-13).
+// hdr H-2, spec §11 HD-3, HD-13; P7 hdr H-3, spec §11 HD-14).
 //
 // Step 0's maths through the app's own types: `InputConversion`'s selector
 // through BOTH readers (the labels as strings, and a `CMVideoFormatDescription`
@@ -539,6 +539,144 @@ do {
         (misses.isEmpty ? [] : misses).joined(separator: "; ")
             + "; worst against CG \(worstCG * 1023) levels, round trip \(worstRound * 1023) levels; "
             + pickDetail)
+}
+
+
+// MARK: - P7 the output pass's values (hdr H-3, spec §11 HD-14)
+
+do {
+    var misses: [String] = []
+    func name(_ c: VideoColour) -> String {
+        "\(c.primaries ?? "nil")/\(c.transfer ?? "nil")/\(c.matrix ?? "nil")"
+    }
+    // (a) compositionColour's table: an SDR project's as it was, an HLG one's by the range.
+    let bt709 = VideoColour(
+        primaries: AVVideoColorPrimaries_ITU_R_709_2, transfer: AVVideoTransferFunction_ITU_R_709_2,
+        matrix: AVVideoYCbCrMatrix_ITU_R_709_2)
+    let hlgColour = VideoColour(
+        primaries: AVVideoColorPrimaries_ITU_R_2020, transfer: AVVideoTransferFunction_ITU_R_2100_HLG,
+        matrix: AVVideoYCbCrMatrix_ITU_R_2020)
+    let pqColour = VideoColour(
+        primaries: AVVideoColorPrimaries_ITU_R_2020,
+        transfer: AVVideoTransferFunction_SMPTE_ST_2084_PQ, matrix: AVVideoYCbCrMatrix_ITU_R_2020)
+    let none = VideoColour(primaries: nil, transfer: nil, matrix: nil)
+    let table: [(Bool, Bool, DynamicRange?, VideoColour)] = [
+        (false, false, nil, none), (false, true, nil, bt709), (false, false, .sdr, none),
+        (false, true, .pq, bt709), (false, true, .sdr, bt709), (true, true, nil, hlgColour),
+        (true, true, .hlg, hlgColour), (true, true, .pq, pqColour), (true, true, .sdr, bt709),
+    ]
+    for (hlg, converts, range, want) in table {
+        let got = OutputTransform.compositionColour(hlg: hlg, converts: converts, range: range)
+        if got != want {
+            misses.append("compositionColour(hlg \(hlg), converts \(converts), "
+                + "\(range?.rawValue ?? "nil")) = \(name(got)), not \(name(want))")
+        }
+    }
+    // (b) previewComposition on hand-built compositions: an HLG one recoloured by the switch,
+    // an SDR one never, and at Full with nothing to change the builder's own object.
+    func built(_ colour: VideoColour, output: CanvasOutput) -> BuiltComposition {
+        let configuration = AVVideoComposition.Configuration(
+            colorPrimaries: colour.primaries, colorTransferFunction: colour.transfer,
+            colorYCbCrMatrix: colour.matrix, customVideoCompositorClass: nil,
+            frameDuration: CMTime(value: 1, timescale: 30), instructions: [], renderScale: 1,
+            renderSize: CGSize(width: 64, height: 32))
+        return BuiltComposition(
+            composition: AVMutableComposition(),
+            videoComposition: AVVideoComposition(configuration: configuration),
+            videoConfiguration: configuration, audioMix: AVMutableAudioMix(), planJSON: "{}",
+            meters: [], output: output)
+    }
+    func colourOf(_ c: AVVideoComposition) -> VideoColour {
+        VideoColour(
+            primaries: c.colorPrimaries, transfer: c.colorTransferFunction,
+            matrix: c.colorYCbCrMatrix)
+    }
+    let hlgBuilt = built(hlgColour, output: .hlg)
+    let sdrOn = Playback.previewComposition(hlgBuilt, quality: .full, sdrVersion: true)
+    let sdrOff = Playback.previewComposition(hlgBuilt, quality: .full, sdrVersion: false)
+    if colourOf(sdrOn) != bt709 { misses.append("HLG, sdrVersion true: \(name(colourOf(sdrOn)))") }
+    if sdrOn === hlgBuilt.videoComposition { misses.append("HLG, sdrVersion true: the same object") }
+    if sdrOff !== hlgBuilt.videoComposition {
+        misses.append("HLG, sdrVersion false at Full: not the builder's own object")
+    }
+    let halfOn = Playback.previewComposition(hlgBuilt, quality: .half, sdrVersion: true)
+    if colourOf(halfOn) != bt709 || halfOn.renderSize != CGSize(width: 32, height: 16) {
+        misses.append("HLG, sdrVersion true at Half: \(name(colourOf(halfOn))) \(halfOn.renderSize)")
+    }
+    let sdrBuilt = built(bt709, output: .sdr)
+    for on in [false, true] {
+        let got = Playback.previewComposition(sdrBuilt, quality: .full, sdrVersion: on)
+        if got !== sdrBuilt.videoComposition {
+            misses.append("SDR, sdrVersion \(on) at Full: not the builder's own object")
+        }
+    }
+    let sdrHalf = Playback.previewComposition(sdrBuilt, quality: .half, sdrVersion: true)
+    if colourOf(sdrHalf) != bt709 { misses.append("SDR at Half: \(name(colourOf(sdrHalf)))") }
+    // (c) the block, the knee, the uniforms' choice and the two blobs.
+    if MemoryLayout<OutputUniforms>.stride != 16 {
+        misses.append("OutputUniforms is \(MemoryLayout<OutputUniforms>.stride) bytes")
+    }
+    if OutputTransform.sdrKnee != 0.9 { misses.append("sdrKnee \(OutputTransform.sdrKnee)") }
+    let canvases: [(RecipeCanvas, Float?)] = [
+        (RecipeCanvas(), nil), (RecipeCanvas(dynamicRange: .sdr), nil),
+        (RecipeCanvas(output: .hlg), nil), (RecipeCanvas(output: .hlg, dynamicRange: .hlg), nil),
+        (RecipeCanvas(output: .hlg, dynamicRange: .sdr), 1),
+        (RecipeCanvas(output: .hlg, dynamicRange: .pq), 2),
+    ]
+    for (canvas, mode) in canvases {
+        let got = OutputTransform.uniforms(for: canvas)
+        if got?.mode != mode || (got != nil && got?.knee != 0.9) {
+            misses.append("uniforms(\(canvas.output), \(canvas.dynamicRange?.rawValue ?? "nil")) = "
+                + "\(String(describing: got?.mode))")
+        }
+    }
+    let hex = { (d: Data) in d.map { String(format: "%02x", $0) }.joined() }
+    if hex(OutputTransform.masteringDisplay) != "33c286c41d4c0bb884d03e803d134042009896800000" + "0032" {
+        misses.append("masteringDisplay \(hex(OutputTransform.masteringDisplay))")
+    }
+    if hex(OutputTransform.contentLightLevel) != "03e80000" {
+        misses.append("contentLightLevel \(hex(OutputTransform.contentLightLevel))")
+    }
+    // (d) RecipeOptions: the json, delivering and forFrame.
+    if RecipeOptions.none.json != nil { misses.append("none.json \(RecipeOptions.none.json ?? "")") }
+    let sdrJSON = RecipeOptions(dynamicRange: .sdr).json
+    if sdrJSON != "{\"burn_in_timecode\":false,\"ungraded\":false,\"dynamic_range\":\"sdr\"}" {
+        misses.append("json \(sdrJSON ?? "nil")")
+    }
+    func settings(_ color: String?) -> ExportSettings? {
+        let colorKey = color.map { ",\"color\":\"\($0)\"" } ?? ""
+        let text = "{\"preset\":\"h264\",\"container\":\"mp4\",\"codec\":\"h264\",\"width\":64,"
+            + "\"height\":32,\"fps\":[30,1],\"range\":{\"start\":0,\"duration\":600000}\(colorKey)}"
+        return try? ReelJSON.decoder().decode(ExportSettings.self, from: Data(text.utf8))
+    }
+    let burnt = RecipeOptions(burnInTimecode: true)
+    for (color, want) in [(nil, nil), ("hlg", nil), ("pq", DynamicRange.pq), ("sdr", .sdr)]
+        as [(String?, DynamicRange?)]
+    {
+        guard let resolved = settings(color) else {
+            misses.append("settings \(color ?? "nil") did not decode")
+            continue
+        }
+        let got = burnt.delivering(resolved)
+        if got.dynamicRange != want || !got.burnInTimecode {
+            misses.append("delivering(\(color ?? "nil")) = \(got.dynamicRange?.rawValue ?? "nil")")
+        }
+    }
+    for format in FrameWriter.Format.allCases {
+        for output in CanvasOutput.allCases {
+            let got = burnt.forFrame(format, output: output)
+            let want: DynamicRange? = format == .jpeg && output == .hlg ? .sdr : nil
+            if got.dynamicRange != want || !got.burnInTimecode {
+                misses.append("forFrame(\(format), \(output)) = \(got.dynamicRange?.rawValue ?? "nil")")
+            }
+        }
+    }
+    check(
+        "P7 compositionColour's table, previewComposition recolouring an HLG composition by "
+            + "sdrVersion (an SDR one never; the same object at Full with nothing to change), "
+            + "OutputUniforms 16 bytes, sdrKnee 0.9, uniforms(for:) only for HLG + sdr/pq, the two "
+            + "HDR10 blobs, RecipeOptions.json / delivering / forFrame",
+        misses.isEmpty, misses.isEmpty ? "as wanted" : misses.joined(separator: "; "))
 }
 
 finish()

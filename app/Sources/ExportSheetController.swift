@@ -45,7 +45,8 @@ import UniformTypeIdentifiers
 /// the Size rows and the actions they send. FOUR extensions carry the rest, each cut out when the
 /// card passed app/CLAUDE.md's ~600-line cap — the first two when it stood at 1114, the third when
 /// phase 7's own additions put it back over, the fourth (`ExportSheetCommit.swift`, the two commits
-/// that end in a save panel) before the HDR road map's export range (hdr H-0).
+/// that end in a save panel) before the HDR road map's export range (hdr H-0); a fifth,
+/// `ExportSheetDynamicRange.swift`, is an HLG project's Dynamic Range row (hdr H-3).
 /// `ExportSheetOptions.swift` is what a control MEANS before any of them has
 /// been read, `ExportSheetResolve.swift` is the round trip that turns a
 /// selection into the core's answer and the answer back into the readout, and
@@ -168,6 +169,10 @@ final class ExportSheetController: NSViewController {
     let loudnessPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let loudnessField = NSTextField(string: "")
     let rangePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    /// An HLG project's Dynamic Range row and its choice for this sheet
+    /// (`ExportSheetDynamicRange.swift`, spec §11 HD-14 (h)).
+    let dynamicRangePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    var dynamicRangeChoice: DynamicRange = .hlg
     let summaryLabel = NSTextField(wrappingLabelWithString: "")
     let footnote = sheetFootnote("")
     var exportButton: NSButton!
@@ -310,6 +315,7 @@ final class ExportSheetController: NSViewController {
         presetPopup.widthAnchor.constraint(equalToConstant: 216).isActive = true
         buildPresetMenuButton()
         rebuildPresetPopup(selecting: nil)
+        configureDynamicRange()
 
         // THE ORDER BELOW IS LOAD-BEARING and `apply(_:)` is where it is
         // written down. The remembered choice has to reach the format popup
@@ -329,7 +335,7 @@ final class ExportSheetController: NSViewController {
         summaryLabel.textColor = DS.textMuted
         summaryLabel.preferredMaxLayoutWidth = Self.cardWidth - sheetInset * 2
 
-        let grid = NSGridView(views: [
+        var rows: [[NSView]] = [
             // The Preset row is FIRST because it is the row that sets every
             // other one: reading down the card is then "this is the shape of
             // export I want" followed by what that shape means.
@@ -349,7 +355,12 @@ final class ExportSheetController: NSViewController {
             // No label: the checkbox carries its own, the way
             // `SpeedSheetController`'s "Preserve pitch" does.
             [NSGridCell.emptyContentView, burnInCheckbox],
-        ])
+        ]
+        // Under Format, in an HLG project only (spec §11 HD-14 (h)).
+        if isHLGProject {
+            rows.insert([fieldLabel("Dynamic Range:"), dynamicRangePopup], at: 2)
+        }
+        let grid = NSGridView(views: rows)
         grid.rowSpacing = 10
         grid.columnSpacing = 12
         grid.column(at: 0).xPlacement = .trailing

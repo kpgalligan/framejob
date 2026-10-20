@@ -16,13 +16,16 @@ struct ExportPreset: Decodable, Equatable, Identifiable {
     let width: Int?
     let height: Int?
     let audioOnly: Bool
+    /// Whether the row carries an HLG project's HDR picture (`"hdr"`, spec §11
+    /// HD-14 (c)): the three 10-bit rows, which offer the Dynamic Range popup.
+    let carriesHDR: Bool
 
     /// The core spells the size as one `size: [w, h] | null` and audio-only
     /// as `video: false` (`export.rs`), so the size and the audio flag are
     /// read from those rather than from `width` / `height` / `audio_only`,
     /// which it never emits.
     private enum CodingKeys: String, CodingKey {
-        case id, name, container, codec, size, video
+        case id, name, container, codec, size, video, hdr
     }
 
     init(from decoder: Decoder) throws {
@@ -35,6 +38,7 @@ struct ExportPreset: Decodable, Equatable, Identifiable {
         width = size?.count == 2 ? size?[0] : nil
         height = size?.count == 2 ? size?[1] : nil
         audioOnly = !c.lenient(.video, true)
+        carriesHDR = c.lenient(.hdr, false)
     }
 }
 
@@ -94,10 +98,15 @@ struct ExportSettings: Decodable, Equatable {
     /// separate, orthogonal fact, and what this answers is whether the file
     /// would keep it.
     let alpha: Bool
-    /// The colour the file is tagged with: `"hlg"` for an HLG project's
-    /// 10-bit row (spec §11 HD-13 (j), `export.rs`), nil — today's tags — for
-    /// every SDR project, whose settings carry no key.
+    /// The picture the file is written as and tagged with (spec §11 HD-14
+    /// (c), `export.rs`): in an HLG project `"hlg"` (a 10-bit row's default),
+    /// `"pq"` (HDR10) or `"sdr"` (the SDR version, every other video row's);
+    /// nil — today's tags — for every SDR project and every audio row, whose
+    /// settings carry no key.
     let color: String?
+
+    /// `color` as the picture it names; nil when the settings carry none.
+    var dynamicRange: DynamicRange? { color.flatMap(DynamicRange.init(rawValue:)) }
 
     /// Spelled out rather than synthesized because two keys do not follow
     /// from the property names: the core nests the resolved range under

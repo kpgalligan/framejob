@@ -1125,3 +1125,178 @@ an HDR clip in an SDR project may need re-picking after the switch), filed from 
 (LG1, and now look_proof's G1 and S1, older than this phase); #313 (`hue-shift-reversed`'s row
 list missing B2, older than this phase) fixed here, B2 added and the mutant passing. The owner's
 person check is HDR-1, with the HLG steps added to GRD-16 and GRD-17.
+
+## H-3 — #277, the deliverables (HD-4, HD-5, HD-7, HD-14)
+
+**What landed** (2026-10-20, in the worktree on `hdr`, from `742ae32`). Spec §11 **HD-14**, written
+before the code (`11-decisions/hdr.md`: (a) the knee at 0.9, recomputed on HD-3's lift by
+`tools/proof/work/h3/sdr_version_math.py` — the white title 248.4/255, HLG 0.50 125.7/255 —
+with BT.2408's own reading beside it; (b) the one output pass and the composition's colour;
+(c) `dynamic_range`, not `range`, its per-row defaults and two refusals; (d) PQ and HD-5's two
+blobs; (e) frames; (f) M-H3a, the spike's HEVC PQ with no insertion-mode key; (g) Show SDR
+Version; (h) the sheet's row; (i) the amendments), its README row, "amended by HD-14" on HD-4,
+HD-5, HD-7 and HD-13 with their Amended-by lines, and the Lines cells. **BT.2408 read:** Report
+ITU-R BT.2408-9 (2026), fetched from itu.int, gives no HDR → SDR curve or knee of its own (§5.2
+points to Report BT.2446's three methods; §7.1.3 records SDR content at 75 % HLG attenuated "to
+as little as 86 %" on a live SDR output, and round-trip losses "as low as 5 %" with a
+super-white range); the knee is unchanged by it, and no issue was needed. No format change, no
+FFI export, no new tool (92), no op change. Then:
+
+- **The toll, gated alone first** (`04-toll.patch` in the handoff): `Playback.swift`'s named seam —
+  `seekFinished()` and `report(_:)` with their docs (and the blank line before) moved verbatim to
+  the end of `Playback+Scope.swift`, each losing only `private`; `reported` and `refreshWanted`
+  widened from `private`; `player` stays private; the type's doc and `+Scope`'s name the pair.
+  `wc -l app/Sources/Playback.swift`: 588 → 564; `Playback+Scope.swift` 35 → 60. The verbatim
+  `diff` of the moved block and of the kept lines both exit 0; `make typecheck` 0 errors and the
+  4 baseline warnings; `make gate` **PASS in 203 s** (names 1 s, typecheck 5 s, fmt and lint
+  skipped, test 104 s, app 93 s). Recorded in `designs/adr/app-file-history.md` with the next seam
+  (`setPreviewQuality` and `recompose()` to `+PreviewQuality` behind an internal read of the
+  player's item).
+- **Core:** `dynamic_range.rs` (new, 95: `DynamicRange`, `HDR_ROWS`, `Project::deliverable`);
+  `lib.rs`; `export.rs` (the reader called right after `object(overrides)?`, `deliverable`, the
+  settings' `color` = the picture, H-2's `HLG_ROWS` and refusal gone; 268 → 259);
+  `export_overrides.rs` (`dynamic_range`, its sentence); `export_table.rs` (`"hdr": true` on
+  `HDR_ROWS`, 581 → 584); `recipe_options.rs` (`dynamic_range`, read by `parse`); `recipe.rs`
+  (the canvas's `dynamic_range` after `output`, only for HLG + `sdr`/`pq`); `ffi_query.rs` and the
+  header (doc comments only: the opts and the overrides paragraph name `dynamic_range`, the
+  resolved `color` a sentence). Tests: `core/tests/dynamic_range.rs` (new, 7),
+  `canvas_output.rs`'s row test (the non-10-bit rows now `"color": "sdr"`),
+  `export_hevc_10bit.rs`'s row (`"hdr": true`).
+- **Swift and Metal:** `OutputTransform.swift` (new, 105: `DynamicRange`, `VideoColour`,
+  `OutputUniforms`, `sdrKnee`, `compositionColour`, `uniforms(for:)`, the two blobs);
+  `Compositor+Output.swift` (new, 42: `outputPipeline`, `encodeOutput`); the shader's
+  `OutputUniforms`, `pqInverseEOTF` and `framejob_output_fragment` after the input fragment;
+  `MetalRenderer` (the pipeline, one call after `encodeLayers`; 356 → 364); `RecipeOptions`
+  (`dynamicRange`, `json`, `delivering`, `forFrame`); `RecipeCanvas.dynamicRange`;
+  `ExportPreset.carriesHDR`, `ExportSettings.dynamicRange`; `CompositionBuilder` (its `let hlg`
+  and `let converts` lines kept verbatim, the colour through `compositionColour` with the key's
+  option, `BuiltComposition.output`; 579 → 581); `Exporter.swift`'s one line replaced in place
+  (595); `videoSettings` (PQ's tags, the two keys beside HEVC's with no insertion-mode key, a
+  ProRes compression dictionary of the two; 444 → 469); Save Frame…'s options through
+  `forFrame`; `Playback.recompose()` (579), `setPreviewQuality` calling it, `finishRebuild`
+  passing `sdrVersion`, `previewComposition(…, sdrVersion:)`; View ▸ Show SDR Version
+  (`toggleShowSDRVersion`, no shortcut, no default written, always enabled), `SDRVersionTagView`
+  third in the tag stack, `UIMenuTable`'s row and `inventory.json`'s entry (verdict `none`, "view
+  state, not persisted"); the sheet's "Dynamic Range:" row under Format in an HLG project only
+  (`ExportSheetDynamicRange.swift`, new, 55; `ExportSheetController.swift` 528 → 537,
+  `ExportSheetResolve.swift` 578 → 580 wiring only, `Applies.dynamicRange`); MCP:
+  `render_frame {sdr_version}` (built after `frameDestination` through `forFrame`, the text's ",
+  as the project's SDR version"), `export {dynamic_range}` forwarded unread and the result's
+  `dynamic_range`, the catalog's two properties and sentences.
+- **Proof:** `hdr_proof.py`'s DT, DP, DV, DI, DE, DR, DS, DM, DX and TO, HX and HF rewritten,
+  seven mutants, `no-composition-color` re-pinned to `compositionColour`, the docstring;
+  `hdr_probe.swift`'s P7; `phase8_chrome.py`'s View group (six rows, Show SDR Version after Show
+  Selection); `tools/proof/README.md`'s "Road map hdr — H-3".
+- **Documents:** spec §4.2, §7.1, §7.3, §7.4, §7.5, §7.8, §7.9a, §7.10, §9 and the Lines;
+  `docs/manual-checks.md`'s HDR-1 (step 7, Show SDR Version; JPEG saves the SDR version), **HDR-2**
+  and **HDR-3**; the README's HDR bullet and its `render_frame` and `export` rows.
+
+**Found while building, and settled in the instrument:**
+- DE's `h264` at the encoder's own rate read the grey row's decoded chroma 2.720/255 off the
+  render at worst (x 528–536, R and B apart by about 0.015 on a neutral row: H.264's chroma
+  compression of the 1024 × 128 ramp), against the spec's ±2/255; the row now exports `h264` at
+  the default dynamic range and 50 Mbit/s (`DE_H264_BITRATE`), where it read 1.034/255. The bound
+  is unchanged.
+- The layout dump carries no enabled state, so DX reads the Dynamic Range popup's title ("HDR
+  (HLG)" / "SDR version"); its disabled state on a non-10-bit row is HDR-2's to see.
+- `export_as`'s glob first matched a document package and an instance log of the same name (TO's
+  first two `--measure` runs stopped on them); it now takes files only and TO's names differ.
+
+**Verification**, 2026-10-20 (`pmset -g ps`: "Now drawing from 'AC Power'"; other sessions'
+load on the host, loadavg about 10–15), own instances on scratch sockets and homes, each stopped
+by its pid; no `Frame Job: ` line in any run and no `DEFAULTS MOVED`:
+- **Controls**, on the toll's Release build before the first product edit (a `ditto` copy,
+  `tools/proof/work/h3/ctl-app/`, gitignored; `precision_proof.py`'s on the tree's own build,
+  which needs a product of a tree): `hdr_proof.py capture tools/proof/work/h3/ctl --only
+  H1,H7i,Z1` exit 0; `precision_proof.py capture …/precision-ctl` 7/7; `tone_`, `wheels_`,
+  `curves_`, `qualifier_`, `look_`, `log_proof.py capture …-ctl` exit 0 (6, 6, 18, 8, 4 frames;
+  log's control FAILED none); `screens.py --only 12-export-sheet --out …/screens-ctl` 6/6.
+- In the loop: `cargo test --release` `dynamic_range` 7, `canvas_output` 7, `export` 38,
+  `export_hevc_10bit` 4, `recipe` 15, `scope` 38, all passing; `make lint` clean; `make
+  typecheck` 0 errors and exactly the 4 baseline warnings; `swift_build.py typecheck
+  hdr_probe.swift` exit 0; `inventory.py --check` 5/5; `v2_menu.py --only H` 5/5;
+  `spec_index_proof.py` 177/177; `make app-debug` BUILD SUCCEEDED; on Debug `hdr_proof.py
+  --only DT,…,DX,HX,HF,P1–P7,Z1` first 18/19 (DE, above), then `--only DE,Z1` 2/2.
+- `make gate`: **PASS in 250 s** (names 1 s, typecheck 5 s, fmt 2 s, lint 1 s, test 138 s, app
+  103 s). After the Release runs, the instrument fixes (`export_as`, TO's names), this record,
+  the proof README and the manual checks, `make gate` passed again in 67 s (names 1 s and test
+  66 s re-ran; typecheck, fmt, lint and app skipped as unchanged). The review's fix pass (comment
+  re-wraps, the export sheet's split `rows.insert`, phase8_chrome's size check and the harness's
+  `mediaFilter`): `make typecheck` 0 errors and the 4 baseline warnings; `make gate` **PASS in
+  210 s** (names 1 s, typecheck 5 s, fmt 2 s, lint 1 s, test 108 s, app 92 s), then
+  `phase8_chrome.py` on its Release build 150/150; this record's lines on that pass came after it.
+- **Release** (the gate's `make app`): `hdr_proof.py --control tools/proof/work/h3/ctl` whole on
+  the final instrument: **42/42**, R0 recorded. DT: every row and range tagged as its picture
+  (h264, hevc, hevc_alpha and every `sdr` bt709 ×3; the 10-bit rows' default and `hlg`
+  bt2020nc/arib-std-b67/bt2020; `pq` bt2020nc/smpte2084/bt2020), no DOVI record or RPU on any of
+  the eight HEVC files, gif and apng written. DP: all three PQ files' side data exactly
+  `red_x=34000/50000 … white_point_y=16450/50000 min_luminance=50/10000
+  max_luminance=10000000/10000`, `max_content=1000 max_average=0` (MaxFALL 0's first
+  measurement), prores_422's grey row 1.283/1023 from the PQ oracle at worst. DV: the ramp
+  0.108/255 from the oracle at worst; HLG 0.50 125.63/255; the white title 248.28/255; the 0.42
+  title 106.89/255; the PNG's label `kCGColorSpaceCoreMedia709`, as an SDR project's, no cICP.
+  DI: 122 columns at or below SDR 0.9477 0.374/255 from the SDR render at worst, 6 above 0.244/255
+  from the shoulder oracle. DE: h264 frame 15 1.034/255 (at 50 Mbit/s), prores_422 {sdr} 0.289/255,
+  the JPEG 0.498/255 from the sdr_version PNG, both profiles "HDTV". DR: the four sentences. DS: PNG
+  `9c1e7efe2da2592b` and JPEG `6697a302554930b8` each equal with and without `sdr_version`; the
+  h264 settings equal. DM: the tag shown and hidden again, the render `ad786e55f69451fd` both
+  times. DX: "HDR (HLG)" pinned to hevc_10bit, "SDR version" pinned to h264, no row in an SDR
+  project. HF: the PNG 16-bit cICP [9, 18, 0, 1]; the HEIC 10-bit "Rec. ITU-R BT.2100 HLG"; the
+  JPEG written, "HDTV". HX: both 10-bit files HLG with no Dolby Vision, h264 bt709 ×3, gif and
+  audio_wav written. P1–P7 ok. `compare tools/proof/work/h3/ctl --only H1,Z1`: **2/2**, every one of
+  H1's 12 SDR scenes byte-identical at 0 and 0.5 s with equal picks (the reverse's intermediate
+  digest differs, f651dfe600c6b1a2 against f3be809e5b36946f, printed and unscored, as in H-1 and
+  H-2).
+- **`--measure`** (4/4): TI (HLG 120 passes, mean 1.945 ms; BT.709 0, mean 1.400 ms); TH (SDR 0
+  passes, mean 2.200 ms; HLG 240, mean 3.000 ms); **TO**: the 4K HLG project's prores_422 at hlg
+  bt2020nc/arib-std-b67/bt2020, averages 2.09 and 1.76 ms (mean 1.925), and at sdr bt709 ×3,
+  averages 2.05 and 1.72 ms (mean 1.885): the output pass's cost did not show against two
+  runs' noise (−0.040 ms; C0's copy 0.21 ms was the REASONED figure), host loadavg 10–11.
+- `precision_proof.py compare …/precision-ctl` **11/11** (K1–K6 byte-identical, E1, E2, S3,
+  S11); `tone_proof.py` 19/19, `wheels_proof.py` 23/23, `curves_proof.py` 59/59,
+  `qualifier_proof.py` 40/40, each `compare` with its N0 byte-identical; `look_proof.py compare`
+  **28/30 — G1 and S1 FAILED** as before (#310); `log_proof.py compare` 23/23;
+  `log_thumbs_proof.py --only T1,T2,T6,T7,T8,TP,Z1` 7/7; `lut_proof.py` **27/28 — LG1 FAILED** as
+  before (#310); `frame_label_proof.py` 16/16; `hevc_alpha_proof.py` 43/43; `seeing_proof.py`
+  19/19; `op_argument_proof.py` 160/160 and `phase9_proof.py` 233/233 (on an instance launched by
+  `proof_app.py launch`); `recording_probe.py --only catalog` 31/31.
+- `phase8_chrome.py`: **147/150** — the View group's new row passes ("Preview Quality | Preview
+  Window | Show Ungraded | Show Selection | Show SDR Version | Scopes"); three checks FAILED, and
+  a detached worktree of `742ae32` (before any H-3 edit, its own core built) failed the same three
+  (147/150): `LayerUniforms` 528 bytes against the check's 512 (H-2's growth), and the Media pane's
+  `mediaFilter` finding two `OptionPopupControl`s, which blanks the sort-popup check. Filed as
+  #314. The review's fix pass mended all three on the instrument side: the size check expects
+  528/528 (132 floats since H-2's HLG group, 33 x 16), and the harness's `mediaFilter` picks the
+  sort popup by `MediaListFilter.controls`' own tooltip, since the second popup is grading-3's
+  Camera Log section (GR-16), not H-1's. On the fix pass's Release build: **150/150**.
+- `screens.py --only 12-export-sheet --compare`: the first compare read 0/2, "size differs
+  ((960, 1308) vs (480, 654))" — the host's main display had moved from 1x to 2x since the
+  control (H-0 saw the same); the control captured again on the copy of the toll's build at 2x
+  (6/6) and the Release run compared against it: **2/2 byte-identical**, the SDR card unchanged.
+- **Mutants** (Release copies, each `--only <its rows>,Z1` against `tools/proof/work/h3/ctl`), all
+  eight **MUTANT PASS** with no other row failing: `range-ignored` (DP, DR), `sdr-via-gr15` (DV,
+  DI), `pq-auto-metadata` (DP), `8bit-row-hlg` (DT, DE, HX), `sdr-version-preview-only` (DE),
+  `jpeg-not-sdr-version` (DE, HF), `preview-keeps-hlg` (P7), and the re-pinned
+  `no-composition-color` (H2, H3, H1m). They ran before TO's log rename, which no mutant row
+  reaches.
+
+**Owed.** The `CLAUDE.md` edits (applied by the orchestrator):
+- `app/CLAUDE.md`: `OutputTransform.swift` (an HLG project's output values: `DynamicRange`,
+  `VideoColour`, `OutputUniforms`, the knee, `compositionColour` — the colour every composition is
+  labelled with — and HD-5's two HDR10 blobs); `Compositor+Output.swift` (the output pass,
+  `framejob_output_fragment`, after the last layer when the recipe canvas's `dynamic_range` asks);
+  `ExportSheetDynamicRange.swift` (an HLG project's Dynamic Range row); `Playback+Scope.swift`'s
+  role gaining `seekFinished` and `report` (the H-3 toll); `EditorViewController+Seeing.swift`'s
+  gaining View ▸ Show SDR Version; `ScopesPanelView.swift`'s gaining `SDRVersionTagView`;
+  `CompositionBuilder.swift`'s gaining the colour through `compositionColour` and
+  `BuiltComposition.output`; `Playback.swift`'s gaining `recompose()`.
+- `core/CLAUDE.md`'s module map: a row for `dynamic_range.rs` (`DynamicRange`, `HDR_ROWS`,
+  `Project::deliverable`, the two refusals), and `export.rs`'s HLG arm (`HLG_ROWS`) replaced by
+  the resolver's call.
+
+Both map edits were applied by the orchestrator at merge, with the second review's nit: a comment
+at `MediaListFilter.swift`'s sort tooltip naming the harness that matches its opening words;
+`make gate` PASS (202 s) after them.
+
+**Residue:** #310 (LG1, G1, S1) as before; #314 (phase8_chrome's stale checks, older than this
+phase) fixed in this phase, to close with its commit. The owner's person checks are HDR-1's new step, HDR-2 and HDR-3.

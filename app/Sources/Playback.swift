@@ -334,12 +334,26 @@ final class Playback {
         guard quality != previewQuality else { return }
         previewQuality = quality
         quality.store()
+        recompose()
+    }
+
+    /// The item's composition re-assigned as Preview Quality and View ▸ Show
+    /// SDR Version (spec §11 HD-14 (g), the key's `dynamicRange`) now ask —
+    /// no rebuild — then one forced frame. With no item there is nothing to
+    /// re-assign, and `finishRebuild` applies both to the item it installs.
+    func recompose() {
         guard let item = player.currentItem, let built = built else { return }
-        item.videoComposition = Self.previewComposition(built, quality: quality)
+        item.videoComposition = Self.previewComposition(
+            built, quality: previewQuality, sdrVersion: showsSDRVersion)
         // A paused preview would otherwise keep the frame it has until the
         // next seek: the item's composition changed, but nothing asked it for
         // a picture. The same trick a property-only edit uses.
         refreshPausedFrame()
+    }
+
+    /// Whether this document's key asks for the SDR version (Show SDR Version).
+    private var showsSDRVersion: Bool {
+        RecipeSource.shared.options(for: recipeKey).dynamicRange == .sdr
     }
 
     /// A second `AVPlayerLayer` on this document's player, for the preview
@@ -437,7 +451,8 @@ final class Playback {
             // Through `previewComposition`, or a structural rebuild would put
             // the preview silently back to Full: the item is new, and the
             // quality lives on this object rather than in the plan.
-            item.videoComposition = Self.previewComposition(composition, quality: previewQuality)
+            item.videoComposition = Self.previewComposition(
+                composition, quality: previewQuality, sdrVersion: showsSDRVersion)
             item.audioMix = composition.audioMix
             // Decoding above the canvas size is wasted work — the compositor
             // renders at the canvas size no matter what the source is (§7.6).

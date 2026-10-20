@@ -28,6 +28,7 @@ mod container_timing;
 mod container_vorbis;
 mod container_vorbis_setup;
 pub mod cube;
+pub mod dynamic_range;
 pub mod edit;
 pub mod edit_action;
 mod edit_action_graphic;

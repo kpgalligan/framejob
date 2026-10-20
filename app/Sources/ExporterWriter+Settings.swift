@@ -252,15 +252,23 @@ extension ExportWriter {
                 AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
             ],
         ]
-        // An HLG project's 10-bit row (spec §11 HD-13 (j), the core's `color`):
-        // its pixels are HLG over BT.2020, and so are its tags.
+        // An HLG project's 10-bit row (spec §11 HD-13 (j), HD-14 (c), the
+        // core's `color`): its pixels are HLG or PQ over BT.2020, and so are
+        // its tags; its SDR version (`sdr`) keeps the BT.709 tags above.
         let hlg = settings.color == "hlg"
-        if hlg {
+        let pq = settings.color == "pq"
+        if hlg || pq {
             output[AVVideoColorPropertiesKey] = [
                 AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_2020,
-                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_2100_HLG,
+                AVVideoTransferFunctionKey: pq
+                    ? AVVideoTransferFunction_SMPTE_ST_2084_PQ : AVVideoTransferFunction_ITU_R_2100_HLG,
                 AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_2020,
             ]
+        }
+        // HDR10's fixed metadata (spec §11 HD-5, HD-14 (d)): ProRes takes the
+        // two keys as a compression dictionary of their own (measured, M7).
+        if pq, codec == .proRes422 || codec == .proRes4444 {
+            output[AVVideoCompressionPropertiesKey] = hdr10Metadata
         }
         guard codec != .proRes422, codec != .proRes4444 else { return output }
 
@@ -300,8 +308,25 @@ extension ExportWriter {
             compression[kVTCompressionPropertyKey_HDRMetadataInsertionMode as String] =
                 kVTHDRMetadataInsertionMode_None
         }
+        // HDR10's metadata beside the other keys, with NO insertion-mode key:
+        // explicit values are written exactly and no Dolby Vision is added
+        // (spec §11 HD-14 (f), measured).
+        if pq, codec == .hevc {
+            compression.merge(hdr10Metadata) { _, metadata in metadata }
+        }
         output[AVVideoCompressionPropertiesKey] = compression
         return output
+    }
+
+    /// HDR10's mastering display and content light level as VideoToolbox's
+    /// two compression keys (`OutputTransform`'s blobs, spec §11 HD-14 (d)).
+    static var hdr10Metadata: [String: Any] {
+        [
+            kVTCompressionPropertyKey_MasteringDisplayColorVolume as String:
+                OutputTransform.masteringDisplay,
+            kVTCompressionPropertyKey_ContentLightLevelInfo as String:
+                OutputTransform.contentLightLevel,
+        ]
     }
 
     /// What the video pump makes of each 64RGBAHalf frame before the encoder

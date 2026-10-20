@@ -20834,3 +20834,46 @@ edited, each re-run: `hdr_proof.py`'s `no-composition-color` and `convert-everyw
 `color-hue-guarded` (the `HUE_GAIN`, `STEP_HUE`, `COLOR_SHIFT` anchors), `tone_proof.py`'s `exposure-encoded`,
 `wheels_proof.py`'s `push-not-luma-neutral`, `log_proof.py`'s `labels-over-setting`. Its record:
 `designs/hdr.md`'s H-2 section.
+
+## Road map hdr — H-3, the deliverables (`hdr_proof.py` DT, DP, DV, DI, DE, DR, DS, DM, DX, HX and HF rewritten, TO, P7 and seven mutants; `hdr_probe.swift` P7; spec §11 HD-4, HD-5, HD-7, HD-14)
+
+H-3 (#277) gives an HLG project its deliverables: `export {dynamic_range}` (`hlg`, `pq`, `sdr`)
+on the three 10-bit rows, the SDR version on every other video row and on JPEG frames, PQ with
+HD-5's fixed HDR10 metadata, and View ▸ Show SDR Version with its mirror `render_frame
+{sdr_version}`. The rows hold 16-bit PNGs (value/65535) to the header's two oracles,
+`sdr_version` (HD-14 (a): knee 0.9 on the largest linear BT.709 channel over reference white,
+GR-15's shoulder to 1000/203, Core Media 709's encode with its toe) and `pq_version` (display
+light at 1,000 cd/m² on ST 2084's scale); every bounded row prints its largest miss.
+
+- **DE** exports `h264` at the default dynamic range but at 50 Mbit/s (`DE_H264_BITRATE`): at
+  the encoder's own rate the grey row's decoded chroma read 2.7/255 off the render at worst (the
+  first Debug run), which is H.264's compression of a 1024×128 ramp, not the picture the row
+  asks about; at 50 Mbit/s the same comparison read 1.034/255 (the second Debug run).
+- **DM** performs View ▸ Show SDR Version, which writes no default (it is not a persisting menu
+  item), and reads the "SDR Version" tag (`preview.sdrVersion`) from `snapshot_ui`'s editor
+  dump.
+- **DX** launches its own instances, each in a scratch home with `screens.py`'s `PINS` as launch
+  arguments and `FrameJobExportChoice` as `<string>{"preset_id":…}</string>` (hevc_alpha_proof's
+  E3 way), performs File ▸ Export…, reads the sheet's layout dump and cancels it; the dump has no
+  enabled state, so it reads the Dynamic Range popup's title.
+- **TO** (`--measure`) exports TH's 4K fixture, placed twice, as an HLG project at `hlg` and
+  at `sdr`, each on an instance of its own; the frame times are recorded against C0's 0.21 ms
+  (REASONED) and only the two files' tags are scored.
+
+```sh
+python3 tools/proof/hdr_proof.py capture tools/proof/work/h3/ctl --only H1,H7i,Z1   # the toll's build, before H-3's code
+make app-debug && python3 tools/proof/hdr_proof.py --only DT,DP,DV,DI,DE,DR,DS,DM,DX,HX,HF,P1,P2,P3,P4,P5,P6,P7,Z1
+make app && RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --control tools/proof/work/h3/ctl
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py compare tools/proof/work/h3/ctl --only H1,Z1
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --mutant <name> --control tools/proof/work/h3/ctl --only <its rows>,Z1
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --measure                        # TI, TH and TO
+```
+
+The seven mutants and their rows: `range-ignored` (the override never read) DP, DR;
+`sdr-via-gr15` (the output pass's SDR arm on GR-15's HLG constants) DV, DI; `pq-auto-metadata`
+(the two HDR10 keys dropped) DP; `8bit-row-hlg` (`deliverable` answers `hlg` for 8-bit rows) DT,
+DE, HX; `sdr-version-preview-only` (`Exporter` publishes `options`, not
+`.delivering(settings)`) DE; `jpeg-not-sdr-version` (`forFrame` returns its options) DE, HF;
+`preview-keeps-hlg` (`previewComposition` ignores `sdrVersion`) P7. Re-pinned in H-3:
+`no-composition-color` to `OutputTransform.compositionColour`'s SDR arm (H2, H3, H1m). Its
+record: `designs/hdr.md`'s H-3 section.

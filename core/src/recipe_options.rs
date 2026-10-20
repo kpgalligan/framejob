@@ -10,6 +10,8 @@
 
 use serde_json::Value;
 
+use crate::dynamic_range::DynamicRange;
+
 // ---- what a caller asked for -------------------------------------------
 
 /// What a recipe was asked for BESIDES the instant (spec §7.3, §7.9's
@@ -53,6 +55,11 @@ pub struct RecipeOptions {
     /// canvas layer in front of it are left out, so the frame is the picture
     /// that clip reads (`recipe_selection.rs`).
     pub behind: Option<u32>,
+    /// The picture an HLG project is drawn as (spec §11 HD-14 (b)): `sdr`
+    /// (Show SDR Version, `render_frame {sdr_version}`, an export's SDR
+    /// version) or `pq` (an HDR10 export) puts the output pass's arm on the
+    /// recipe's canvas; `hlg`, absent and every SDR project draw no pass.
+    pub dynamic_range: Option<DynamicRange>,
 }
 
 impl RecipeOptions {
@@ -86,6 +93,10 @@ impl RecipeOptions {
                 .unwrap_or(false),
             selection: clip_id(value, "selection"),
             behind: clip_id(value, "behind"),
+            dynamic_range: value
+                .get("dynamic_range")
+                .and_then(Value::as_str)
+                .and_then(DynamicRange::parse),
         }
     }
 }

@@ -28,6 +28,9 @@ struct BuiltComposition {
     /// asked for the build and already holds this object, so the sinks' life
     /// is exactly the composition's and no lock is involved at all.
     let meters: [LevelMeterTrack]
+    /// The plan's dynamic range: what `Playback.previewComposition` recolours
+    /// for Show SDR Version (spec §11 HD-14 (g)).
+    let output: CanvasOutput
 }
 
 /// Plan JSON → `AVMutableComposition` + an `AVVideoComposition` built from an
@@ -151,16 +154,15 @@ enum CompositionBuilder {
         // segment `input`), is converting — `ConvertingCompositor`, its
         // frames BT.709 — and every other is built exactly as before. Every
         // composition of an HLG project converts, its frames BT.2020/HLG
-        // (spec §11 HD-2).
+        // (spec §11 HD-2), labelled by the key's picture (HD-14 (b)).
         let hlg = plan.output == .hlg
         let converts = hlg || convertsSources(videoTracks) || plan.convertsMedia
+        let colour = OutputTransform.compositionColour(
+            hlg: hlg, converts: converts,
+            range: RecipeSource.shared.options(for: recipeKey).dynamicRange)
         let videoConfiguration = AVVideoComposition.Configuration(
-            colorPrimaries: hlg ? AVVideoColorPrimaries_ITU_R_2020
-                : converts ? AVVideoColorPrimaries_ITU_R_709_2 : nil,
-            colorTransferFunction: hlg ? AVVideoTransferFunction_ITU_R_2100_HLG
-                : converts ? AVVideoTransferFunction_ITU_R_709_2 : nil,
-            colorYCbCrMatrix: hlg ? AVVideoYCbCrMatrix_ITU_R_2020
-                : converts ? AVVideoYCbCrMatrix_ITU_R_709_2 : nil,
+            colorPrimaries: colour.primaries, colorTransferFunction: colour.transfer,
+            colorYCbCrMatrix: colour.matrix,
             customVideoCompositorClass: converts ? ConvertingCompositor.self : Compositor.self,
             frameDuration: frameDuration(plan.fps),
             instructions: instructions, renderScale: 1,
@@ -174,7 +176,7 @@ enum CompositionBuilder {
             composition: composition,
             videoComposition: AVVideoComposition(configuration: videoConfiguration),
             videoConfiguration: videoConfiguration, audioMix: audioMix, planJSON: planJSON,
-            meters: meters)
+            meters: meters, output: plan.output)
     }
 
     // MARK: - The media-less timeline

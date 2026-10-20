@@ -50,6 +50,7 @@
 use serde_json::{Map, Value};
 
 use crate::actions::Evaluated;
+use crate::dynamic_range::DynamicRange;
 use crate::edit_adjustment::is_adjustment;
 use crate::evaluate::{json, number, Assignment};
 use crate::model::{BlendMode, ColorAdjust, Curves, Nest, Project, Source, VideoProps, Wheels};
@@ -219,6 +220,11 @@ impl Project {
         // project's recipe is the text it was.
         if !self.canvas.output.is_sdr() {
             canvas.insert("output".to_string(), Value::from("hlg"));
+            // The output pass's arm (spec §11 HD-14 (b)), only for an HLG
+            // canvas asked for its SDR version or PQ.
+            if let Some(range @ (DynamicRange::Sdr | DynamicRange::Pq)) = opts.dynamic_range {
+                canvas.insert("dynamic_range".to_string(), Value::from(range.as_str()));
+            }
         }
 
         let mut out = Map::new();
