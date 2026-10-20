@@ -5,7 +5,7 @@ import simd
 /// The primaries a converted source is read in: the gamut step 0's matrix
 /// takes to BT.709 (spec §11 GR-15), and the camera gamuts of GR-16.
 enum InputPrimaries: Equatable {
-    case bt709, bt2020, p3D65, sGamut3Cine, sGamut3, vGamut, appleWideGamut
+    case bt709, bt2020, p3D65, sGamut3Cine, sGamut3, vGamut, appleWideGamut, cinemaGamut
 
     /// A media's camera gamut (spec §11 GR-16).
     init(_ gamut: CameraGamut) {
@@ -15,6 +15,7 @@ enum InputPrimaries: Equatable {
         case .sGamut3: self = .sGamut3
         case .vGamut: self = .vGamut
         case .appleWideGamut: self = .appleWideGamut
+        case .cinemaGamut: self = .cinemaGamut
         }
     }
 }
@@ -412,19 +413,26 @@ enum InputConversions {
 
     /// A curve's code domain as the pass's `codeScale` and `codeOffset`. A
     /// full-range file decodes to s = code/1023, so Sony's and Panasonic's
-    /// signal is s itself there (spec §11 GR-22); Apple's is (1, 0) in both.
+    /// signal is s itself there (spec §11 GR-22); Apple's is (1, 0) in both,
+    /// and so is Canon's: its clips are recorded full range and its ProRes
+    /// reads out full range (spec §11 HD-17 (e)).
     static func codeDomain(_ curve: LogCurve, fullRange: Bool) -> (scale: Float, offset: Float) {
         switch curve {
         case .appleLog, .appleLog2: return (1, 0)
         case .slog3, .vlog: return fullRange ? (1, 0) : (videoCodeScale, videoCodeOffset)
+        case .canonLog2: return (1, 0)
+        case .canonLog3: return (1, 0)
         }
     }
 
     /// Published chromaticities (x, y) of red, green and blue: ITU-R BT.709,
     /// ITU-R BT.2020, and P3 D65 (SMPTE EG 432-1); the camera gamuts from
     /// their makers' documents (GR-16's append): Sony's S-Gamut3.Cine and
-    /// S-Gamut3, Panasonic's V-Gamut, Apple's Apple Wide Gamut. Every white
-    /// is D65.
+    /// S-Gamut3, Panasonic's V-Gamut, Apple's Apple Wide Gamut; Canon's Cinema
+    /// Gamut from the ACES project's Canon CSCs
+    /// (`canon/CSC.Canon.CLog2_CGamut_to_ACES.ctl` in
+    /// aces-aswf/aces-input-and-colorspaces, Apache-2.0; spec §11 HD-17 (a)),
+    /// whose numbers only are cited. Every white is D65.
     private static func chromaticities(_ primaries: InputPrimaries) -> [SIMD2<Double>] {
         switch primaries {
         case .bt709: return [[0.640, 0.330], [0.300, 0.600], [0.150, 0.060]]
@@ -434,6 +442,7 @@ enum InputConversions {
         case .sGamut3: return [[0.730, 0.280], [0.140, 0.855], [0.100, -0.050]]
         case .vGamut: return [[0.730, 0.280], [0.165, 0.840], [0.100, -0.030]]
         case .appleWideGamut: return [[0.725, 0.301], [0.221, 0.814], [0.068, -0.076]]
+        case .cinemaGamut: return [[0.740, 0.270], [0.170, 1.140], [0.080, -0.100]]
         }
     }
 

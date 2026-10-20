@@ -20976,3 +20976,43 @@ The ten mutants and their rows: `linear-before-grade` (the decode moved before 4
 LB; `shadow-colour-not-decoded` LD; `fade-colour-not-decoded` LF; `matte-reads-linear` LM;
 `qualifier-map-reads-linear` LA (its blurred case); `selection-grey-not-decoded` LS. Its
 record: `designs/hdr.md`'s H-6 section.
+
+## Road map hdr — H-5, Canon Log 2 and Canon Log 3 (`log_proof.py` LP5, LP6, L19–L22, L2, L8 and L9 extended, and seven mutants; `log_probe.swift` LP2, LP4–LP6; spec §11 HD-17)
+
+H-5 (#278) adds `canon_log2` and `canon_log3`, each with `cinema_gamut` (the default) or
+`bt2020`: step 0's kinds 10 and 11, Canon's code domain (1, 0) in both ranges and its reflection
+0.9 × scene linear. The rules are `log_proof.py`'s header.
+
+- **LP5 / LP6** (probe rows, no instance): each pairing in SDR and HLG output (an item's
+  `"output": "hlg"` passes `output: .hlg` to `InputStage.encode`); the ramp and seeded triples
+  ±2e-3; the makers' codes within each code's own 10-bit step (code ± 0.5, half-rounded),
+  never under ±0.005. The Python encode must reproduce table [4] (`TABLE4`), else the row fails
+  as an instrument failure.
+- **L19 / L20**: `clog2.mov` / `clog3.mov` (untagged, Canon's y stored as 64 + 876·y; patches
+  145/413/557 and 174/365/558) and their cards (`clog2_card.mov`, `clog3_card.mov`, tagged with
+  the matrix alone, `green_m`'s way) under `{log}` and `{log, gamut: bt2020}`; the cards' centres
+  parting by ≥ 8 levels is the CONTROL that the matrix moved.
+- **L21**: the two ramps with `{log}` in an HLG project, hdr_proof's HL method.
+- **L22** (L9's modes): the existing curves with their Camera Log, and slog3 in an HLG project,
+  byte-equal to the control's — the refactored log dispatch (`inputIsLog`, `logInverse`).
+- **L9** gains `clog2` and `clog3` with no setting; **L2** checks both import with no colour;
+  **L8** the two Canon refusals.
+
+```sh
+RC_PROOF_APP=release python3 tools/proof/log_proof.py capture tools/proof/work/h5/log-ctl   # before H-5's code (LP1–LP6 fail on the probe build)
+RC_PROOF_APP=release python3 tools/proof/log_thumbs_proof.py capture tools/proof/work/h5/thumbs-ctl
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py capture tools/proof/work/h5/hdr-ctl --only H1,H7i,SI,Z1
+make app-debug && python3 tools/proof/log_proof.py --only LP1,LP2,LP3,LP4,LP5,LP6,L2,L8,L19,L20,L21,Z1
+make app && RC_PROOF_APP=release python3 tools/proof/log_proof.py compare tools/proof/work/h5/log-ctl
+RC_PROOF_APP=release python3 tools/proof/log_proof.py --mutant <name> --control tools/proof/work/h5/log-ctl --only <its rows>,Z1
+```
+
+The control's probe cannot build (`log_probe.swift` names `InputPrimaries.cinemaGamut` and
+`InputUniforms.canonLog2`/`canonLog3`), so LP1–LP6 are scored failures there and LP5's and LP6's
+discrimination is the mutants'. The seven mutants and their rows: `clog2-breakpoint`
+(`kCanonLog2Break` 0.15) LP5, L19; `clog3-breakpoint` (`kCanonLog3BreakHigh` 0.2) LP6, L20;
+`clog2-video-domain` and `clog3-video-domain` (the curve's domain by the range flag, S-Log3's
+rule) LP5, L19 and LP6, L20; `canon-scale-dropped` (`kCanonReflection` 1.0) LP5, LP6, L19, L20,
+L21; `cinema-as-2020` (`InputPrimaries(.cinemaGamut)` answers BT.2020) LP2, L19, L20;
+`canon-not-log-in-hlg` (`inputToHLG`'s log test back to kinds 5–7) L21. Its record:
+`designs/hdr.md`'s H-5 section.

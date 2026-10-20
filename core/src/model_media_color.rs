@@ -4,7 +4,9 @@
 //! `media_color.rs`; how step 0 converts with it is the app's
 //! (`InputConversions.swift`). Format 22 adds a PQ file's HDR10 peak
 //! (spec §11 HD-12): [`PqColor`] on `media.color.pq`, read at import
-//! (`hdr10.rs`) with the person's override beside it.
+//! (`hdr10.rs`) with the person's override beside it. Format 25 adds Canon
+//! Log 2 and Canon Log 3 (`canon_log2`, `canon_log3`) and their Cinema Gamut
+//! (`cinema_gamut`), spec §11 HD-17.
 //!
 //! `LogCurve` and `CameraGamut` are closed vocabularies spelled as their
 //! makers' documents name them. Their declaration order is NOT a shader
@@ -16,7 +18,8 @@ use serde::{Deserialize, Serialize};
 
 /// A maker's published log curve. Apple Log 2 is Apple Log's curve with
 /// Apple Wide Gamut (the Apple Log 2 white paper, GR-16's append), named
-/// apart because a file's label names it apart.
+/// apart because a file's label names it apart. Canon Log 2 and Canon Log 3
+/// are Canon's (its *Canon Log Gamma Curves* white paper, HD-17).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LogCurve {
@@ -24,9 +27,12 @@ pub enum LogCurve {
     Slog3,
     Vlog,
     AppleLog2,
+    CanonLog2,
+    CanonLog3,
 }
 
-/// The camera gamut a log curve's signal is in, each with D65 white.
+/// The camera gamut a log curve's signal is in, each with D65 white. Cinema
+/// Gamut's chromaticities are the ACES project's Canon CSC's (HD-17 (a)).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CameraGamut {
@@ -35,18 +41,23 @@ pub enum CameraGamut {
     SGamut3,
     VGamut,
     AppleWideGamut,
+    CinemaGamut,
 }
 
 impl LogCurve {
     /// The gamuts the curve pairs with, its default first: Apple Log with
     /// BT.2020, Apple Log 2 with Apple Wide Gamut, S-Log3 with S-Gamut3.Cine
-    /// or S-Gamut3, V-Log with V-Gamut (GR-16).
+    /// or S-Gamut3, V-Log with V-Gamut (GR-16); Canon Log 2 and Canon Log 3
+    /// each with Cinema Gamut or BT.2020 (HD-17).
     pub const fn gamuts(self) -> &'static [CameraGamut] {
         match self {
             LogCurve::AppleLog => &[CameraGamut::Bt2020],
             LogCurve::AppleLog2 => &[CameraGamut::AppleWideGamut],
             LogCurve::Slog3 => &[CameraGamut::SGamut3Cine, CameraGamut::SGamut3],
             LogCurve::Vlog => &[CameraGamut::VGamut],
+            LogCurve::CanonLog2 | LogCurve::CanonLog3 => {
+                &[CameraGamut::CinemaGamut, CameraGamut::Bt2020]
+            }
         }
     }
 }

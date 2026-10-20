@@ -2376,6 +2376,8 @@ constant int kInputVlog    = 7;
 constant int kInputLUT     = 8;
 // 9 is SDR into an HLG project (`InputUniforms.sdr`, HD-3's lift), which only
 // `inputToHLG`'s SDR ending reads, with the other SDR arms.
+constant int kInputCanonLog2 = 10;
+constant int kInputCanonLog3 = 11;
 
 // (BT.2100's HLG constants and the luminance weights are declared above the
 // grade, `MARK: - HLG`.)
@@ -2416,6 +2418,25 @@ constant float kVlogC = 0.241514;
 constant float kVlogD = 0.598206;
 constant float kVlogSlope = 5.6;
 constant float kVlogOffset = 0.125;
+// Canon Log 2 (Canon's *Canon Log Gamma Curves* white paper, November 1st,
+// 2018, Appendix [2]; spec §11 HD-17 (c)): x = ±(10^(±(y − C)/A) − 1)/B on
+// either side of the break y = C.
+constant float kCanonLog2A = 0.24136077;
+constant float kCanonLog2B = 87.099375;
+constant float kCanonLog2C = 0.092864125;
+constant float kCanonLog2Break = 0.092864125;
+// Canon Log 3 (the same paper, Appendix [3]): a log piece below the low
+// break, a straight piece between the breaks, a log piece above the high one.
+constant float kCanonLog3A = 0.36726845;
+constant float kCanonLog3B = 14.98325;
+constant float kCanonLog3LowC = 0.12783901;
+constant float kCanonLog3HighC = 0.12240537;
+constant float kCanonLog3Slope = 1.9754798;
+constant float kCanonLog3LinearC = 0.12512219;
+constant float kCanonLog3BreakLow = 0.097465473;
+constant float kCanonLog3BreakHigh = 0.15277891;
+// Canon's reflection is its scene linear × 0.9 (HD-17 (d)).
+constant float kCanonReflection = 0.9;
 
 // The PQ EOTF (ST 2084): signal clamped to 0…1 → light, 1.0 at 10,000 cd/m².
 static float3 pqEOTF(float3 signal) {
@@ -2454,6 +2475,46 @@ static float3 vlogInverse(float3 v) {
     float3 high = exp10((v - kVlogD) / kVlogC) - kVlogB;
     float3 low = (v - kVlogOffset) / kVlogSlope;
     return select(high, low, v < kVlogCut2);
+}
+
+// Canon Log 2 to scene reflection (Canon's): y the normalized signal.
+static float3 canonLog2Inverse(float3 y) {
+    float3 high = (exp10((y - kCanonLog2C) / kCanonLog2A) - 1.0) / kCanonLog2B;
+    float3 low = -(exp10((kCanonLog2C - y) / kCanonLog2A) - 1.0) / kCanonLog2B;
+    return kCanonReflection * select(high, low, y < kCanonLog2Break);
+}
+
+// Canon Log 3 to scene reflection (Canon's): y the normalized signal.
+static float3 canonLog3Inverse(float3 y) {
+    float3 low = -(exp10((kCanonLog3LowC - y) / kCanonLog3A) - 1.0) / kCanonLog3B;
+    float3 middle = (y - kCanonLog3LinearC) / kCanonLog3Slope;
+    float3 high = (exp10((y - kCanonLog3HighC) / kCanonLog3A) - 1.0) / kCanonLog3B;
+    float3 x = select(select(high, middle, y <= kCanonLog3BreakHigh), low,
+                      y < kCanonLog3BreakLow);
+    return kCanonReflection * x;
+}
+
+// Whether `kind` is a built-in camera log curve: 5–7, 10 and 11.
+static bool inputIsLog(int kind) {
+    return (kind >= kInputAppleLog && kind <= kInputVlog) || kind == kInputCanonLog2
+        || kind == kInputCanonLog3;
+}
+
+// A built-in curve's inverse to scene reflection, by kind.
+static float3 logInverse(int kind, float3 y) {
+    if (kind == kInputAppleLog) {
+        return appleLogInverse(y);
+    }
+    if (kind == kInputSlog3) {
+        return slog3Inverse(y);
+    }
+    if (kind == kInputCanonLog2) {
+        return canonLog2Inverse(y);
+    }
+    if (kind == kInputCanonLog3) {
+        return canonLog3Inverse(y);
+    }
+    return vlogInverse(y);
 }
 
 // The uniform block's source → BT.709 matrix, row-major, applied to `c`.
@@ -2530,10 +2591,9 @@ static float3 inputToHLG(float3 signal, int kind, constant InputUniforms &u,
         float3 display = max(inputMatrix(u, min(pqEOTF(s) * u.nitsScale, 1.0)), 0.0);
         return hlgOETF(hlgInverseOOTF(display, u.ootfGamma));
     }
-    if (kind >= kInputAppleLog && kind <= kInputVlog) {
+    if (inputIsLog(kind)) {
         float3 y = signal * u.codeScale + u.codeOffset;
-        float3 r = kind == kInputAppleLog ? appleLogInverse(y)
-                 : (kind == kInputSlog3 ? slog3Inverse(y) : vlogInverse(y));
+        float3 r = logInverse(kind, y);
         return hlgOETF(max(inputMatrix(u, r * u.exposure), 0.0));
     }
     float3 encoded = signal;
@@ -2576,13 +2636,12 @@ fragment float4 framejob_input_fragment(ShadowVaryings in [[stage_in]],
         // the layer stage's clamp bounds it (spec §11 PR-1).
         float3 linear = inputMatrix(u, pow(max(signal, 0.0), u.decodePower));
         rgb = pow(max(linear, 0.0), u.encodePower);
-    } else if (kind >= kInputAppleLog && kind <= kInputVlog) {
+    } else if (inputIsLog(kind)) {
         // Camera log (GR-16): the signal into the maker's code domain, the
         // maker's inverse to scene reflection, the exposure, the camera
         // gamut's matrix, the lift, the shoulder, the encode.
         float3 y = signal * u.codeScale + u.codeOffset;
-        float3 r = kind == kInputAppleLog ? appleLogInverse(y)
-                 : (kind == kInputSlog3 ? slog3Inverse(y) : vlogInverse(y));
+        float3 r = logInverse(kind, y);
         float3 l = inputShoulder(inputLift(inputMatrix(u, r * u.exposure)), u.knee, u.white);
         rgb = pow(max(l, 0.0), u.encodePower);
     } else if (kind == kInputLUT) {

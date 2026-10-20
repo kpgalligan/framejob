@@ -25,10 +25,10 @@ the layer's `preferredDynamicRange` explicitly; failing that, a `CAMetalLayer` p
 would amend the foundations' decision and is the owner's call, not an agent's.
 **The Concat rule** (`designs/adr/effects-survey.md`, "Licensing") stands for every phase: the
 conversions come from ITU-R BT.2100, BT.2408, BT.2390, BT.2020 and BT.709, SMPTE ST 2084 and
-ST 2086, CTA-861.3, ITU-T H.265's SEI syntax and each camera maker's own published log document;
-matrices are derived from published primaries and D65; Apple's conversions are MEASURED as
-targets, never copied; every fixture is written by a script. Nothing of Concat is opened, at
-design time or build time.
+ST 2086, CTA-861.3, ITU-T H.265's SEI syntax and each camera maker's own published log document
+(Cinema Gamut's chromaticities: the ACES project's Canon CSC, HD-17); matrices are derived from
+published primaries and D65; Apple's conversions are MEASURED as targets, never copied; every
+fixture is written by a script. Nothing of Concat is opened, at design time or build time.
 
 - **HD-1 — The HDR road map builds everything the brief offered, in this order: #281, then
   #277 in three phases, then #278's curves, then #276 last.** Choice 1a (owner, 2026-10-19:
@@ -264,6 +264,10 @@ design time or build time.
     clip as log. So #278 stays open after H-5.
   - **Amends GR-16:** its `log` vocabulary and gamut pairs gain Canon Log 2 and Canon Log 3 with
     Cinema Gamut (their spellings are H-5's spec's).
+  **Amended by HD-17** (hdr H-5): the sources are Canon's curve paper (*Canon Log Gamma Curves*,
+  Canon U.S.A., November 1st, 2018) plus the ACES project's Canon CSC for Cinema Gamut's
+  chromaticities, and each curve also pairs with BT.2020: Canon Log 2 and Canon Log 3, each with
+  Cinema Gamut (the default) or BT.2020.
 - **HD-11 — The HDR road map's working arrangement: each phase merged into main alone, main's
   numbers, no verdict phase.** Choice 12 (taken as recommended, stated to the owner before the
   questions). GR-14, GR-17 and GR-25 again.
@@ -608,3 +612,58 @@ design time or build time.
     still the first phase to drop. So H-6 takes format 24 and H-5 25 (HD-9, HD-10, HD-11).
   - **Amends** HD-1 and HD-9 (the order; their text and titles otherwise unchanged) and HD-14
     (b) (the output pass is also drawn for a linear project).
+- **HD-17 — H-5's settlements: Canon Log 2 and Canon Log 3, each with Cinema Gamut or BT.2020,
+  from Canon's curve paper and the ACES project's Canon CSC.** H-5's spec, recorded before its
+  code; it settles what HD-10 left to the spec. Format 25 (HD-11).
+  - **(a) Sources.**
+    - The curves: Canon U.S.A., *Canon Log Gamma Curves* white paper, November 1st, 2018 (10
+      pages; sha256 `cc77333058e4c37d53ee8b3809a04d05e36d0d2e69e759a3ca8c88eea2a7341e`):
+      Appendix [2] (Canon Log 2, revised), [3] (Canon Log 3), table [4], FAQ Q6 and Q7. Its only
+      terms are "© 2018 Canon USA, Inc. All rights reserved."; FAQ Q4 says the formulas were
+      supplied to application vendors. It is read in place, never copied.
+    - Cinema Gamut: the ACES project's Canon CSCs, `canon/CSC.Canon.CLog2_CGamut_to_ACES.ctl`
+      and `canon/CSC.Canon.CLog3_CGamut_to_ACES.ctl`, in
+      github.com/aces-aswf/aces-input-and-colorspaces (SPDX Apache-2.0, "Copyright Contributors
+      to the ACES Project"), re-read 2026-10-20. Its chromaticities: R 0.7400 0.2700, G 0.1700
+      1.1400, B 0.0800 −0.1000, white 0.3127 0.3290 (D65).
+    - No ACES code is copied: the matrices are derived by `InputConversions.rgbToXYZ`. The CSCs'
+      curves and their 0.9 agree with the paper (a cross-check only).
+    - The owner chose this on 2026-10-20: "Use ACES, both gamuts (Recommended)".
+  - **(b) Vocabulary.**
+    - `log`: `canon_log2`, `canon_log3`. `gamut`: `cinema_gamut`. Each curve pairs with
+      `cinema_gamut` (first, the default) or `bt2020`.
+    - The Camera Log popup's rows, after V-Log: "C-Log2 / Cinema Gamut", "C-Log2 / BT.2020",
+      "C-Log3 / Cinema Gamut", "C-Log3 / BT.2020".
+    - Why "C-Log" (the owner's words, "Canon C-Log2/3"): "Canon Log 3 / Cinema Gamut" is 26
+      characters, about 172 pt in IBM Plex Mono 11, wider than the 168 pt popup
+      (`popupWidth + 52`). The catalog and the spec's prose say Canon Log 2 and 3.
+  - **(c) Curves.** x is Canon's scene linear; y the normalized signal.
+    - Canon Log 2: for y ≥ 0.092864125, x = (10^((y − 0.092864125)/0.24136077) − 1)/87.099375;
+      below it, x = −(10^((0.092864125 − y)/0.24136077) − 1)/87.099375.
+    - Canon Log 3: for y < 0.097465473, x = −(10^((0.12783901 − y)/0.36726845) − 1)/14.98325;
+      for y ≤ 0.15277891, x = (y − 0.12512219)/1.9754798; otherwise x = (10^((y −
+      0.12240537)/0.36726845) − 1)/14.98325.
+  - **(d) Scale.** Reflection R = 0.9·x ("reflection = Scene Linear × 0.9"). 18 % grey (x =
+    0.2) therefore keeps GR-16's anchor (0.42) and HD-13 (e)'s (HLG 0.380).
+  - **(e) Code domain.** y = s, (1, 0), in both ranges: Q6 says clips are recorded full range,
+    and Q7 that ProRes's RGB readout is full range. This is Apple Log's rule under GR-22, not
+    S-Log3's.
+    - `readsRange` stays false, so there is no GR-23 `fullRange` marker.
+    - Accepted limit: a video-range-flagged non-ProRes file storing full-range codes reads too
+      contrasty (GRD-19).
+  - **(f) Step 0.** Kinds 10 and 11.
+    - SDR: GR-16's transform (exposure, the gamut's matrix to BT.709, lift, shoulder, encode).
+    - HLG: HD-13 (e) (×0.26741, the matrix to BT.2020 — the identity for `bt2020` — the OETF,
+      no shoulder).
+    - Thumbnails follow (GR-21). No detection; #278 stays open.
+  - **(g) Test points.** The formulas reproduce table [4]'s 10-bit full-range codes:
+    - Canon Log 2, 0/20/100/800/1600/6400 %: 95/407/575/797/871/1020;
+    - Canon Log 3, 0/20/100/800/1600 %: 128/351/577/908/1020.
+    - Video-range ProRes stores 64 + 876·y: 145/413/557 (Canon Log 2) and 174/365/558 (Canon
+      Log 3) at 0/18/90 % reflection.
+    - A stored code's tolerance is its own 10-bit step: the reflections decoded from code − 0.5
+      and code + 0.5, each signal rounded to half, never tighter than ±0.005 reflection. Reason:
+      Canon Log 2's slope is low near 90 %; code 557's half, 0.562988, sits against the true
+      0.562304 and decodes to R 0.90596.
+  - **(h) Format 25.** No migration. No op, tool (92), FFI export or `InputUniforms` field.
+  - **(i) Amends** HD-10 (its sources and pairings) and GR-16 (its vocabulary).

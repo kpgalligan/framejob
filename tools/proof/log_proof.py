@@ -46,7 +46,7 @@ here from the published chromaticities and D65), GR-15's lift, the shoulder
 
 Rows (projects are the fixture alone on a canvas its size, 30 fps):
 - **LP1–LP4**: `log_probe.swift` over `app/Sources` (a probe that will not
-  build is a scored FAIL of all four).
+  build is a scored FAIL of all four, and of LP5 and LP6).
 - **L1**: each fixture with its Camera Log set (`set_media_color`): the grey
   row every 8th column and every column of the first 32 (each curve's toe and
   break), the three patches, and the card (the chromatic fixture, which a
@@ -173,8 +173,50 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   `slog3_fr_vp9e.mp4` alone as `format: "jpeg"` — byte-equal to DIR's.
   `capture` copies their media into `DIR/media/`, each extension kept, and
   every later L18 reads them from there.
+- **LP5 / LP6** (hdr H-5, spec §11 HD-17; probe rows): Canon Log 2 / Canon
+  Log 3, each pairing (`cinema_gamut`, `bt2020`) in SDR and HLG output (the
+  item's `"output": "hlg"` passes `output: .hlg` to `InputStage.encode`): a
+  1,024-step ramp across the breaks and 512 seeded triples = the oracle ±2e-3
+  (SDR `log_convert`; HLG the shader's `hlgOETF(max(M→2020·R·0.26741, 0))`,
+  `log_hlg_convert`), LP3's premultiplied checks, and the makers' codes
+  (`PATCHES`, the input `hdr.half(signal(code))`) decoding to 0 / 0.18 / 0.90
+  within each code's own 10-bit step: the larger of LP3's ±0.005 display
+  bound and the oracle's distance at the reflections decoded from code ± 0.5,
+  each signal half-rounded (Canon Log 2's 90 % code 557 decodes to 0.90596).
+  The Python encode must reproduce table [4]'s codes (`TABLE4`), else the row
+  fails as an instrument failure.
+- **L19 / L20** (H-5): `clog2.mov` / `clog3.mov` and their cards
+  (`clog2_card.mov`, `clog3_card.mov`) at 0.5 s with `{log}` (stored
+  `cinema_gamut`, read back by `get_project`) and with `{log, gamut: bt2020}`:
+  L1's points = the oracle ±1 at 8 bits under each; the two grey rows equal
+  ±1; the card = its oracle ±1 at L1's three card points under each; the two
+  cards part by ≥ 8 levels at the centre (the CONTROL that the matrix moved;
+  computed R 0 against 54).
+- **L21** (H-5): `clog2.mov` and `clog3.mov` with `{log}` in an HLG project
+  (`set_canvas {output: "hlg"}`): the grey row every 64th column = the HLG
+  oracle inside the ±1-code envelope ±1/1023 (hdr_proof's HL method), the
+  18 % patch at 0.380 ±1/1023.
+- **L22** (H-5; L9's modes: `capture DIR`, `compare DIR`, mutants):
+  `slog3`, `vlog`, `applelog`, `applelog2` and `green`, each with its
+  SETTINGS Camera Log, and `slog3` in an HLG project, at 0.5 s byte-equal to
+  `DIR/l22-*.png` — step 0's refactored log dispatch leaves every existing
+  curve as it was.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
+
+H-5's fixtures (ProRes 422 HQ 1024×128, as GR-16's): `clog2.mov` and
+`clog3.mov`, untagged, the ramp and patches stored as Apple's P is (Y =
+round(64 + 876·y), y Canon's signal of x = R/0.9; patches 145/413/557 and
+174/365/558, HD-17 (g)); `clog2_card.mov` and `clog3_card.mov`, GREEN_LIGHT
+encoded per channel by the curve, Y/Cb/Cr through bt2020nc, tagged with the
+matrix alone (`green_m`'s way). H-5's mutants (each run `--only` its rows and
+Z1): `clog2-breakpoint` (LP5, L19: `kCanonLog2Break` 0.15),
+`clog3-breakpoint` (LP6, L20: `kCanonLog3BreakHigh` 0.2),
+`clog2-video-domain` / `clog3-video-domain` (LP5, L19 / LP6, L20: the
+curve's code domain by the range flag, S-Log3's rule), `canon-scale-dropped`
+(LP5, LP6, L19, L20, L21: `kCanonReflection` 1.0), `cinema-as-2020` (LP2,
+L19, L20: `InputPrimaries(.cinemaGamut)` answers BT.2020) and
+`canon-not-log-in-hlg` (L21: `inputToHLG`'s log test back to kinds 5–7).
 
 B95's fixtures (1024×128, 1 s, HEVC Main 10 4:2:0, libx265 lossless, `.mov`
 `hvc1`): the curve's ramp and patches stored as the code 1023·y (Apple's P as
@@ -354,37 +396,67 @@ VIDEO_SCALE, VIDEO_OFFSET = 876 / 1023, 64 / 1023
 APPLE = dict(r0=-0.05641088, rt=0.01, c=47.28711236, b=0.00964052, g=0.08550479, d=0.69336945)
 SLOG3_BREAK = 171.2102946929
 VLOG = dict(cut1=0.01, cut2=0.181, b=0.00873, c=0.241514, d=0.598206)
+# hdr H-5 (spec §11 HD-17 (c), (d)): Canon's *Canon Log Gamma Curves* white
+# paper (November 1st, 2018), Appendix [2] and [3]; x is Canon's scene linear,
+# the reflection R = 0.9·x.
+CANON2 = dict(a=0.24136077, b=87.099375, c=0.092864125)
+CANON3 = dict(a=0.36726845, b=14.98325, low_c=0.12783901, high_c=0.12240537,
+              slope=1.9754798, linear_c=0.12512219, break_low=0.097465473,
+              break_high=0.15277891)
+CANON_REFLECTION = 0.9
+CANON = ("canon_log2", "canon_log3")
+# Table [4]'s 10-bit full-range codes at scene linear x (HD-17 (g)); the
+# Python encode must reproduce each exactly (else LP5/LP6 fail as an
+# instrument failure).
+TABLE4 = {"canon_log2": ((0, 95), (0.2, 407), (1, 575), (8, 797), (16, 871), (64, 1020)),
+          "canon_log3": ((0, 128), (0.2, 351), (1, 577), (8, 908), (16, 1020))}
+# HD-13 (e): an HLG project's camera log, reflection × 0.38²/3/0.18.
+LOG_HLG_EXPOSURE = 0.38 * 0.38 / 3 / 0.18
 # Published chromaticities (x, y) of R, G, B; every white D65.
 PRIMARIES = {"bt709": ((0.640, 0.330), (0.300, 0.600), (0.150, 0.060)),
              "bt2020": ((0.708, 0.292), (0.170, 0.797), (0.131, 0.046)),
              "s_gamut3_cine": ((0.766, 0.275), (0.225, 0.800), (0.089, -0.087)),
              "s_gamut3": ((0.730, 0.280), (0.140, 0.855), (0.100, -0.050)),
              "v_gamut": ((0.730, 0.280), (0.165, 0.840), (0.100, -0.030)),
-             "apple_wide_gamut": ((0.725, 0.301), (0.221, 0.814), (0.068, -0.076))}
+             "apple_wide_gamut": ((0.725, 0.301), (0.221, 0.814), (0.068, -0.076)),
+             # The ACES project's Canon CSC (spec §11 HD-17 (a)).
+             "cinema_gamut": ((0.740, 0.270), (0.170, 1.140), (0.080, -0.100))}
 D65 = (0.3127, 0.3290)
 LUMA709 = (0.2126, 0.7152, 0.0722)
 GAMUTS = {"apple_log": ["bt2020"], "apple_log2": ["apple_wide_gamut"],
-          "slog3": ["s_gamut3_cine", "s_gamut3"], "vlog": ["v_gamut"]}
+          "slog3": ["s_gamut3_cine", "s_gamut3"], "vlog": ["v_gamut"],
+          "canon_log2": ["cinema_gamut", "bt2020"], "canon_log3": ["cinema_gamut", "bt2020"]}
 CODE = {"apple_log": (1.0, 0.0), "apple_log2": (1.0, 0.0),
-        "slog3": (VIDEO_SCALE, VIDEO_OFFSET), "vlog": (VIDEO_SCALE, VIDEO_OFFSET)}
-# The makers' 0 / 18 / 90 % codes, as STORED (Apple's P in video range).
+        "slog3": (VIDEO_SCALE, VIDEO_OFFSET), "vlog": (VIDEO_SCALE, VIDEO_OFFSET),
+        "canon_log2": (1.0, 0.0), "canon_log3": (1.0, 0.0)}
+# The makers' 0 / 18 / 90 % codes, as STORED (Apple's P and Canon's y in
+# video range).
 PATCHES = {"slog3": (95, 420, 598), "vlog": (128, 433, 602),
-           "apple_log": (196, 492, 661), "apple_log2": (196, 492, 661)}
+           "apple_log": (196, 492, 661), "apple_log2": (196, 492, 661),
+           "canon_log2": (145, 413, 557), "canon_log3": (174, 365, 558)}
 REFLECTANCE = (0.0, 0.18, 0.90)
 GREEN_LIGHT = (0.15, 0.35, 0.12)
 # name: (curve, the file's tags (primaries, transfer, matrix) or None, writer mode)
 FIXTURES = {"slog3": ("slog3", ("bt2020", "bt709", "bt2020nc"), None),
             "vlog": ("vlog", None, None),
             "applelog": ("apple_log", ("bt709", "bt709", "bt709"), "log"),
-            "applelog2": ("apple_log2", ("bt709", "bt709", "bt709"), "log2")}
+            "applelog2": ("apple_log2", ("bt709", "bt709", "bt709"), "log2"),
+            "clog2": ("canon_log2", None, None),
+            "clog3": ("canon_log3", None, None)}
 SETTINGS = {"slog3": {"log": "slog3", "gamut": "s_gamut3_cine"}, "vlog": {"log": "vlog"},
             "applelog": {"log": "apple_log"}, "applelog2": {"log": "apple_log2"},
             "green": {"log": "slog3", "gamut": "s_gamut3_cine"},
             "green_m": {"log": "slog3", "gamut": "s_gamut3_cine"}}
-L9_FIXTURES = ["slog3", "vlog", "applelog", "applelog2", "green"]
-ROWS = ["LP1", "LP2", "LP3", "LP4", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10",
-        "L11", "L12", "L13", "L14", "L15", "L16", "L17", "L18", "Z1"]
-LP_ROWS = {"LP1", "LP2", "LP3", "LP4"}
+L9_FIXTURES = ["slog3", "vlog", "applelog", "applelog2", "green", "clog2", "clog3"]
+# hdr H-5 (spec §11 HD-17): each Canon curve's ramp and card fixtures (the
+# card tagged with its matrix alone, `green_m`'s way), its two settings, and
+# L22's existing curves rendered with their Camera Log.
+CANON_FIXTURES = {"canon_log2": ("clog2", "clog2_card"), "canon_log3": ("clog3", "clog3_card")}
+L22_FIXTURES = ["slog3", "vlog", "applelog", "applelog2", "green"]
+ROWS = ["LP1", "LP2", "LP3", "LP4", "LP5", "LP6", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8",
+        "L9", "L10", "L11", "L12", "L13", "L14", "L15", "L16", "L17", "L18", "L19", "L20", "L21",
+        "L22", "Z1"]
+LP_ROWS = {"LP1", "LP2", "LP3", "LP4", "LP5", "LP6"}
 # The rows a probe answers with no instance (B101 adds L15, B103 L16).
 PROBE_ROWS = LP_ROWS | {"L15", "L16"}
 # B95 (spec §11 GR-22): HEVC Main 10 4:2:0 fixtures (libx265, lossless) flagged
@@ -580,6 +652,26 @@ MUTANTS = {
                          "{ return true }\n")], ["L18"]),
     "vp9-jpeg-deep": ([(RENDER_SWIFT, "            graphics: graphics, keepsDepth: format.carriesDepth)\n",
                         "            graphics: graphics, keepsDepth: true)\n")], ["L18"]),
+    # hdr H-5 (spec §11 HD-17): each Canon curve's breakpoint and code domain,
+    # the 0.9 scale, Cinema Gamut's primaries, and the HLG arm's log test.
+    "clog2-breakpoint": ([(SHADER, "constant float kCanonLog2Break = 0.092864125;\n",
+                           "constant float kCanonLog2Break = 0.15;\n")], ["LP5", "L19"]),
+    "clog3-breakpoint": ([(SHADER, "constant float kCanonLog3BreakHigh = 0.15277891;\n",
+                           "constant float kCanonLog3BreakHigh = 0.2;\n")], ["LP6", "L20"]),
+    "clog2-video-domain": ([(INPUT_SWIFT, "        case .canonLog2: return (1, 0)\n",
+                             "        case .canonLog2: return fullRange ? (1, 0) : "
+                             "(videoCodeScale, videoCodeOffset)\n")], ["LP5", "L19"]),
+    "clog3-video-domain": ([(INPUT_SWIFT, "        case .canonLog3: return (1, 0)\n",
+                             "        case .canonLog3: return fullRange ? (1, 0) : "
+                             "(videoCodeScale, videoCodeOffset)\n")], ["LP6", "L20"]),
+    "canon-scale-dropped": ([(SHADER, "constant float kCanonReflection = 0.9;\n",
+                              "constant float kCanonReflection = 1.0;\n")],
+                            ["LP5", "LP6", "L19", "L20", "L21"]),
+    "cinema-as-2020": ([(INPUT_SWIFT, "        case .cinemaGamut: self = .cinemaGamut\n",
+                         "        case .cinemaGamut: self = .bt2020\n")], ["LP2", "L19", "L20"]),
+    "canon-not-log-in-hlg": ([(SHADER, "    if (inputIsLog(kind)) {\n",
+                               "    if (kind >= kInputAppleLog && kind <= kInputVlog) {\n")],
+                             ["L21"]),
 }
 # B96 (#280): the reverse's intermediate variants, each one edit to the plain
 # `.hevcMain10` path of ReverseRenderer.swift (`reverse-variants`). The rate
@@ -660,8 +752,49 @@ def to709(name):
     return mat_mul(mat_inv(npm("bt709")), npm(name))
 
 
+def to2020(name):
+    """Linear `name` RGB → linear BT.2020 RGB (hdr H-5: this script's own
+    primaries, Cinema Gamut among them)."""
+    return mat_mul(mat_inv(npm("bt2020")), npm(name))
+
+
+def canon_encode(curve, x):
+    """Canon's encode (HD-17 (c), the inverse of Appendix [2]/[3]'s decode):
+    scene linear x → the normalized signal y."""
+    if curve == "canon_log2":
+        k = CANON2
+        if x >= 0:
+            return k["a"] * math.log10(k["b"] * x + 1) + k["c"]
+        return k["c"] - k["a"] * math.log10(1 - k["b"] * x)
+    k = CANON3
+    linear = k["slope"] * x + k["linear_c"]
+    if linear < k["break_low"]:
+        return k["low_c"] - k["a"] * math.log10(1 - k["b"] * x)
+    if linear <= k["break_high"]:
+        return linear
+    return k["a"] * math.log10(k["b"] * x + 1) + k["high_c"]
+
+
+def canon_decode(curve, y):
+    """Canon's decode (HD-17 (c)): signal y → scene linear x."""
+    if curve == "canon_log2":
+        k = CANON2
+        if y >= k["c"]:
+            return (10 ** ((y - k["c"]) / k["a"]) - 1) / k["b"]
+        return -(10 ** ((k["c"] - y) / k["a"]) - 1) / k["b"]
+    k = CANON3
+    if y < k["break_low"]:
+        return -(10 ** ((k["low_c"] - y) / k["a"]) - 1) / k["b"]
+    if y <= k["break_high"]:
+        return (y - k["linear_c"]) / k["slope"]
+    return (10 ** ((y - k["high_c"]) / k["a"]) - 1) / k["b"]
+
+
 def encode_curve(curve, r):
-    """The maker's encode: scene reflection → its signal (y = CV/1023, or Apple's P)."""
+    """The maker's encode: scene reflection → its signal (y = CV/1023, or Apple's P;
+    Canon's x = r/0.9, HD-17 (d))."""
+    if curve in CANON:
+        return canon_encode(curve, r / CANON_REFLECTION)
     if curve in ("apple_log", "apple_log2"):
         a = APPLE
         if r >= a["rt"]:
@@ -676,7 +809,9 @@ def encode_curve(curve, r):
 
 
 def decode_curve(curve, y):
-    """The maker's inverse: signal → scene reflection."""
+    """The maker's inverse: signal → scene reflection (Canon's r = 0.9·x)."""
+    if curve in CANON:
+        return CANON_REFLECTION * canon_decode(curve, y)
     if curve in ("apple_log", "apple_log2"):
         a = APPLE
         pt = a["c"] * (a["rt"] - a["r0"]) ** 2
@@ -722,10 +857,24 @@ def log_convert(curve, gamut, rgb):
     return display(curve, gamut, [decode_curve(curve, c * scale + offset) for c in rgb])
 
 
+def hlg_light(gamut, light):
+    """HD-13 (e)'s ending on scene reflection: × 0.26741, the matrix to
+    BT.2020, the HLG OETF of the channel floored at 0 — the shader's
+    `hlgOETF(max(M·R·exposure, 0))`, unclamped (step 0's own output)."""
+    return [hdr.hlg_oetf(max(c, 0.0))
+            for c in mat_vec(to2020(gamut), [c * LOG_HLG_EXPOSURE for c in light])]
+
+
+def log_hlg_convert(curve, gamut, rgb):
+    """Step 0's camera log in an HLG project on one straight decoded signal s."""
+    scale, offset = CODE[curve]
+    return hlg_light(gamut, [decode_curve(curve, c * scale + offset) for c in rgb])
+
+
 def stored_code(curve, r):
     """The fixture's 10-bit Y for scene reflection `r` (GR-16's code domains)."""
     y = encode_curve(curve, r)
-    if curve in ("apple_log", "apple_log2"):
+    if curve in ("apple_log", "apple_log2", *CANON):
         return min(1023, max(0, round(64 + 876 * y)))
     return min(1023, max(0, round(1023 * y)))
 
@@ -782,18 +931,22 @@ def raw_ramp(curve):
     return struct.pack(f"<{len(luma) + 2 * len(chroma)}H", *luma, *chroma, *chroma)
 
 
-def green_codes():
+def green_codes(curve="slog3"):
     """The card's (Y, Cb, Cr): S-Log3's CV per channel of GREEN_LIGHT, as the
-    decoded signal s = (CV − 64)/876, through the bt2020nc matrix."""
-    s = [(1023 * encode_curve("slog3", c) - 64) / 876 for c in GREEN_LIGHT]
+    decoded signal s = (CV − 64)/876, through the bt2020nc matrix. A Canon
+    curve's card (hdr H-5) stores its y as Apple's P is stored, so s = y."""
+    if curve in CANON:
+        s = [encode_curve(curve, c) for c in GREEN_LIGHT]
+    else:
+        s = [(1023 * encode_curve(curve, c) - 64) / 876 for c in GREEN_LIGHT]
     kr, kb = hdr.KR_KB["bt2020nc"]
     yy = kr * s[0] + (1 - kr - kb) * s[1] + kb * s[2]
     pb, pr = (s[2] - yy) / (2 * (1 - kb)), (s[0] - yy) / (2 * (1 - kr))
     return round(64 + 876 * yy), round(512 + 896 * pb), round(512 + 896 * pr)
 
 
-def raw_green():
-    y, cb, cr = green_codes()
+def raw_green(curve="slog3"):
+    y, cb, cr = green_codes(curve)
     n, c = W * H, W // 2 * H
     return struct.pack(f"<{n + 2 * c}H", *([y] * n), *([cb] * c), *([cr] * c))
 
@@ -912,6 +1065,12 @@ def fixture(name):
         # The same card tagged with its matrix alone (GRD-18: how a real
         # camera file may arrive), primaries and transfer left unknown.
         return checked(name, encode("green_m", raw_green(), (None, None, "bt2020nc")),
+                       {"pix_fmt": "yuv422p10le", "color_primaries": "unknown",
+                        "color_transfer": "unknown", "color_space": "bt2020nc"})
+    if name in ("clog2_card", "clog3_card"):
+        # hdr H-5: the Canon card, tagged with its matrix alone (green_m's way).
+        curve = "canon_log2" if name == "clog2_card" else "canon_log3"
+        return checked(name, encode(name, raw_green(curve), (None, None, "bt2020nc")),
                        {"pix_fmt": "yuv422p10le", "color_primaries": "unknown",
                         "color_transfer": "unknown", "color_space": "bt2020nc"})
     if name == VP9_8BIT:
@@ -1234,7 +1393,7 @@ def run_l1(client):
 def run_l2(client):
     want = {"applelog": {"log": "apple_log", "gamut": "bt2020", "detected": True},
             "applelog2": {"log": "apple_log2", "gamut": "apple_wide_gamut", "detected": True},
-            "slog3": None}
+            "slog3": None, "clog2": None, "clog3": None}
     doc = Doc(client, "l2")
     got = {}
     for name in want:
@@ -1243,7 +1402,8 @@ def run_l2(client):
         got[name] = doc.row(media).get("color") if media is not None else "not imported"
     doc.close()
     check("L2 applelog.mov imports with color {apple_log, bt2020, detected}, applelog2.mov with "
-          "{apple_log2, apple_wide_gamut, detected}, slog3.mov with none",
+          "{apple_log2, apple_wide_gamut, detected}, slog3.mov with none; clog2.mov and clog3.mov "
+          "import with no color",
           got == want, f"got {got}")
 
 
@@ -1498,6 +1658,11 @@ def run_l8(client):
          "slog3 takes gamut s_gamut3_cine or s_gamut3, not v_gamut"),
         (video, {"log": "apple_log", "gamut": "apple_wide_gamut"},
          "apple_log takes gamut bt2020, not apple_wide_gamut"),
+        # hdr H-5 (spec §11 HD-17 (b)).
+        (video, {"log": "canon_log2", "gamut": "s_gamut3"},
+         "canon_log2 takes gamut cinema_gamut or bt2020, not s_gamut3"),
+        (video, {"log": "canon_log3", "gamut": "v_gamut"},
+         "canon_log3 takes gamut cinema_gamut or bt2020, not v_gamut"),
         (video, {"lut": 99999}, "color.lut 99999 is not a media of this project"),
         (video, {"lut": other}, f"color.lut {other} is a video media, not a lut"),
         (video, {"log": "slog3", "detected": True}, "color.detected is written by import, not set"),
@@ -2285,6 +2450,166 @@ def run_l18(client, mode, control, state):
           f"byte-identical to {control.name}'s", not misses, f"{misses}")
 
 
+# ---- L19–L22 (hdr H-5, spec §11 HD-17) -----------------------------------------
+
+def canon_settings(curve):
+    """A Canon curve's two settings: `{log}` (stored with `cinema_gamut`, the
+    default) and `{log, gamut: bt2020}`, each with the gamut it converts from."""
+    return (("cinema", {"log": curve}, "cinema_gamut"),
+            ("bt2020", {"log": curve, "gamut": "bt2020"}, "bt2020"))
+
+
+CARD_POINTS = ((W // 2, H // 2), (100, 20), (900, 110))
+
+
+def run_canon(client, row, curve):
+    """L19 (Canon Log 2) / L20 (Canon Log 3): the ramp and the card under each
+    setting at 0.5 s against the oracle ±1 at 8 bits; the stored gamut read
+    back; the grey row the same under both; the cards parted by the matrix."""
+    ramp_name, card_name = CANON_FIXTURES[curve]
+    ramp_path, card_path = fixture(ramp_name), fixture(card_name)
+    ramp_yuv = source_yuv(ramp_path) if ramp_path else None
+    card_yuv = source_yuv(card_path) if card_path else None
+    misses, worst, stored, grey, centre = [], {}, {}, {}, {}
+    for tag, color, gamut in canon_settings(curve):
+        def read_back(doc, clip, tag=tag):
+            media = next(iter(doc._media.values()), None)
+            stored[tag] = doc.row(media).get("color")
+        got, why = scene(client, ramp_name, f"{row.lower()}-{ramp_name}-{tag}", color, read_back)
+        if got is None or ramp_yuv is None or why:
+            misses.append(f"{ramp_name} {tag}: {why or REFUSED.get(ramp_name) or 'no decode'}")
+        else:
+            points = samples(got) + [(x, GREY_ROW, got.px8(x, GREY_ROW))
+                                     for x in range(32) if x % 8]
+            gaps = [(x, y, v, oracle_at(curve, gamut, ramp_yuv, x, y)) for x, y, v in points]
+            worst[f"{ramp_name} {tag}"] = max(spread(v, o) for _, _, v, o in gaps)
+            bad = [(x, y, v, o) for x, y, v, o in gaps if spread(v, o) > 1]
+            if bad:
+                misses.append(f"{ramp_name} {tag}: {len(bad)} samples off, e.g. {bad[:3]}")
+            grey[tag] = {(x, y): v for x, y, v in points if y == GREY_ROW}
+            print(f"       {ramp_name} {tag}: oracle patches "
+                  f"{[o for x, y, v, o in gaps if y == PATCH_ROW]}, render "
+                  f"{[v for x, y, v, o in gaps if y == PATCH_ROW]}", flush=True)
+        card_got, why = scene(client, card_name, f"{row.lower()}-{card_name}-{tag}", color)
+        if card_got is None or card_yuv is None or why:
+            misses.append(f"{card_name} {tag}: {why or REFUSED.get(card_name) or 'no decode'}")
+            continue
+        gaps = [(x, y, card_got.px8(x, y), oracle_at(curve, gamut, card_yuv, x, y))
+                for x, y in CARD_POINTS]
+        worst[f"{card_name} {tag}"] = max(spread(v, o) for _, _, v, o in gaps)
+        bad = [(x, y, v, o) for x, y, v, o in gaps if spread(v, o) > 1]
+        if bad:
+            misses.append(f"{card_name} {tag}: {len(bad)} points off, e.g. {bad[:3]}")
+        centre[tag] = card_got.px8(*CARD_POINTS[0])
+        print(f"       {card_name} {tag}: centre render {centre[tag]}, oracle {gaps[0][3]}",
+              flush=True)
+    want = {"cinema": {"log": curve, "gamut": "cinema_gamut"},
+            "bt2020": {"log": curve, "gamut": "bt2020"}}
+    if stored != want:
+        misses.append(f"stored {stored}, want {want}")
+    grey_gap = None
+    if len(grey) == 2:
+        grey_gap = max(spread(grey["cinema"][k], grey["bt2020"][k]) for k in grey["cinema"])
+        if grey_gap > 1:
+            misses.append(f"the grey rows part by {grey_gap} levels")
+    apart = spread(centre["cinema"], centre["bt2020"]) if len(centre) == 2 else None
+    if apart is None or apart < 8:
+        misses.append(f"the cards' centres part by {apart} levels, not ≥ 8 (the matrix's CONTROL)")
+    label = "Canon Log 2" if curve == "canon_log2" else "Canon Log 3"
+    check(f"{row} {ramp_name}.mov and {card_name}.mov ({label}) at 0.5 s with {{log: {curve}}} "
+          f"(stored cinema_gamut, read back) and with {{log, gamut: bt2020}}: L1's points = the "
+          f"oracle ±1 at 8 bits under each, the two grey rows equal ±1, the card = its oracle ±1 "
+          f"at L1's three card points under each, and the two cards part by ≥ 8 levels at the "
+          f"centre (the CONTROL that the matrix moved)",
+          not misses, f"worst {worst}; grey rows apart {grey_gap}; cards apart {apart}; {misses}")
+
+
+def run_l21(client, state):
+    """L21: clog2 and clog3 with {log} in an HLG project — HL's method."""
+    misses, figures = [], []
+    for curve in CANON:
+        name = CANON_FIXTURES[curve][0]
+        path = fixture(name)
+        source = source_yuv(path) if path else None
+        doc = Doc(client, f"l21-{name}")
+        clip = doc.place(path) if doc.ok and path else None
+        media = doc._media.get(path)
+        set_to = doc.color(media, {"log": curve}) if clip is not None \
+            else {"ok": False, "error": doc.why or REFUSED.get(name)}
+        output = doc.call("set_canvas", output="hlg") if set_to["ok"] else {"ok": False}
+        hlg = output["ok"] and (doc.project().get("canvas") or {}).get("output") == "hlg"
+        got = frame(doc.render(f"l21-{name}")) if hlg else None
+        state[f"l21_{name}_closed"] = doc.close()
+        if got is None or source is None:
+            misses.append(f"{name}: set_media_color {set_to.get('error')}; set_canvas "
+                          f"{output.get('error')}; no render or decode")
+            continue
+
+        def want(rgb, curve=curve):
+            return [hdr.unit(c) for c in log_hlg_convert(curve, "cinema_gamut", rgb)]
+        worst = hdr.grey_row_misses(got, source, "bt2020nc", want, name, misses)
+        patch = got.px(PATCH_X[1], PATCH_ROW)[1]
+        figures.append(f"{name}: worst |Δ| {worst:.3f} levels; the 18 % patch (code "
+                       f"{source.codes(PATCH_X[1], PATCH_ROW)[0]}) renders {patch:.4f}")
+        if abs(patch - 0.380) > hdr.LEVEL:
+            misses.append(f"{name}: the 18 % patch at {patch:.4f}, not 0.380")
+    check("L21 clog2.mov and clog3.mov with {log} in an HLG project: the grey row (every 64th "
+          "column) = the HLG oracle (×0.26741, the matrix to BT.2020, the OETF, clipped at 1) "
+          "inside the ±1-code envelope ±1/1023, the 18 % patch at 0.380 ±1/1023",
+          not misses, f"{misses or 'all within'}\n       " + "\n       ".join(figures))
+
+
+# L22's renders: (tag, fixture, HLG project?).
+L22_CASES = (tuple((f"l22-{n}", n, False) for n in L22_FIXTURES)
+             + (("l22-slog3-hlg", "slog3", True),))
+
+
+def run_l22(client, mode, control, state):
+    """L22 (L9's modes): the existing curves with their Camera Log, and slog3
+    in an HLG project, byte-equal to DIR's — step 0's refactored dispatch
+    leaves them as they were."""
+    misses, captured = [], 0
+    for tag, name, hlg in L22_CASES:
+        path = l9_media(name, None if mode == "capture" else control)
+        if path is None:
+            misses.append(f"{tag}: {REFUSED.get(name)}")
+            continue
+        if mode == "capture":
+            (control / "media").mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, control / "media" / path.name)
+        doc = Doc(client, tag)
+        clip = doc.place(path) if doc.ok else None
+        media = doc._media.get(path)
+        set_to = doc.color(media, SETTINGS[name]) if clip is not None \
+            else {"ok": False, "error": doc.why}
+        if set_to["ok"] and hlg:
+            output = doc.call("set_canvas", output="hlg")
+            if not output["ok"]:
+                set_to = {"ok": False, "error": f"set_canvas: {output.get('error')}"}
+        png = doc.render(tag) if set_to["ok"] else None
+        state[f"{tag}_closed"] = doc.close()
+        if png is None:
+            misses.append(f"{tag}: {set_to.get('error') or 'no render'}")
+            continue
+        want = control / f"{tag}.png"
+        if mode == "capture":
+            shutil.copy2(png, want)
+            captured += 1
+        elif not want.exists():
+            misses.append(f"{tag}: no control PNG")
+        elif png.read_bytes() != want.read_bytes():
+            a, b = hdr.Frame(png, W, H), hdr.Frame(want, W, H)
+            differ = sum(1 for x, y in zip(a.values, b.values) if x != y)
+            misses.append(f"{tag}: PNG bytes differ ({differ} 16-bit samples differ)")
+    if mode == "capture":
+        print(f"  L22 references captured for {captured} of {len(L22_CASES)} frames "
+              f"{misses or ''}", flush=True)
+        state["capture_ok"] = state.get("capture_ok", True) and not misses
+        return
+    check(f"L22 (hdr H-5) {', '.join(L22_FIXTURES)} with their Camera Log, and slog3 in an HLG "
+          f"project, render byte-identical to {control.name}'s at 0.5 s", not misses, f"{misses}")
+
+
 # ---- L9 -------------------------------------------------------------------------
 
 def run_l9(client, mode, control, state):
@@ -2349,9 +2674,10 @@ def probe_request(shader):
     pairings = []
     for curve, gamuts in GAMUTS.items():
         swift = {"apple_log": "apple_log", "apple_log2": "apple_log2", "slog3": "slog3",
-                 "vlog": "vlog"}[curve]
+                 "vlog": "vlog", "canon_log2": "canon_log2", "canon_log3": "canon_log3"}[curve]
         name = {"bt2020": "bt2020", "apple_wide_gamut": "appleWideGamut",
-                "s_gamut3_cine": "sGamut3Cine", "s_gamut3": "sGamut3", "v_gamut": "vGamut"}
+                "s_gamut3_cine": "sGamut3Cine", "s_gamut3": "sGamut3", "v_gamut": "vGamut",
+                "cinema_gamut": "cinemaGamut"}
         for gamut in gamuts:
             pairings.append([{"log": curve, "gamut": gamut}, f"log({swift},{name[gamut]})"])
         pairings.append([{"log": curve}, f"log({swift},{name[gamuts[0]]})"])
@@ -2386,6 +2712,7 @@ def probe_request(shader):
             bounds.append(max(abs(hi - want[1]), abs(want[1] - lo), 1e-4))
         p3.append({"label": f"{curve} makers' codes", "log": curve, "gamut": gamut,
                    "inputs": codes, "outputs": outs, "bounds": bounds})
+    p5, p6 = (canon_items(curve, steps, triples) for curve in CANON)
     grid = [[(i + 0.37) / 9.4, (j + 0.11) / 9.2, (k + 0.73) / 9.6]
             for i in range(9) for j in range(9) for k in range(9)]
     grid = [[hdr.half(c) for c in rgb] for rgb in grid]
@@ -2393,14 +2720,71 @@ def probe_request(shader):
                "outputs": [trilinear(17, rgb) for rgb in grid], "premultiplied": True})
     return {"shader": str(shader), "pairings": pairings, "cube": str(fixture("lut17")),
             "matrices": {g: to709(g) for g in PRIMARIES if g != "bt709"}, "p3": p3,
+            "p5": p5, "p6": p6,
             "constants": {"logMidGrey": MID_GREY, "logExposure": EXPOSURE,
                           "logWhite": LOG_WHITE, "shoulderKnee": KNEE,
                           "displayGamma": DISPLAY_GAMMA, "videoCodeScale": VIDEO_SCALE,
                           "videoCodeOffset": VIDEO_OFFSET, "kindAppleLog": 5, "kindSlog3": 6,
-                          "kindVlog": 7, "kindLUT": 8}}
+                          "kindVlog": 7, "kindLUT": 8, "kindCanonLog2": 10,
+                          "kindCanonLog3": 11}}
+
+
+def canon_items(curve, steps, triples):
+    """LP5's (Canon Log 2) or LP6's (Canon Log 3) pass items, for each
+    pairing under SDR and HLG output (hdr H-5, spec §11 HD-17): the ramp and
+    the seeded triples against the oracle ±2e-3 (with LP3's premultiplied
+    checks), and the makers' codes, each bounded by the larger of LP3's
+    ±0.005 display bound and the code's own 10-bit step — the reflections
+    decoded from code ± 0.5, each signal half-rounded (HD-17 (g))."""
+    items = []
+    for gamut in GAMUTS[curve]:
+        for output in ("sdr", "hlg"):
+            if output == "sdr":
+                def oracle(light, gamut=gamut):
+                    return display(curve, gamut, light)
+                convert = log_convert
+            else:
+                def oracle(light, gamut=gamut):
+                    return hlg_light(gamut, light)
+                convert = log_hlg_convert
+            inputs = [[hdr.half(c) for c in rgb] for rgb in [[g, g, g] for g in steps] + triples]
+            items.append({"label": f"{curve}/{gamut} {output}", "log": curve, "gamut": gamut,
+                          "output": output, "inputs": inputs,
+                          "outputs": [convert(curve, gamut, rgb) for rgb in inputs],
+                          "premultiplied": True})
+            codes, outs, bounds = [], [], []
+            for code, r in zip(PATCHES[curve], REFLECTANCE):
+                s = hdr.half(signal(code))
+                codes.append([s, s, s])
+                want = oracle([r] * 3)
+                display_bound = max(abs(oracle([r + d] * 3)[1] - want[1]) for d in (-0.005, 0.005))
+                step = max(abs(oracle([decode_curve(curve, hdr.half(signal(code + d)))] * 3)[1]
+                               - want[1]) for d in (-0.5, 0.5))
+                outs.append(want)
+                bounds.append(max(display_bound, step, 1e-4))
+            items.append({"label": f"{curve}/{gamut} {output} makers' codes", "log": curve,
+                          "gamut": gamut, "output": output, "inputs": codes, "outputs": outs,
+                          "bounds": bounds})
+    return items
+
+
+def table4_misses():
+    """The Python encode against table [4]'s 10-bit full-range codes:
+    {curve: [(x, code, encoded)]} of every mismatch."""
+    return {curve: [(x, code, round(1023 * encode_curve(curve, CANON_REFLECTION * x)))
+                    for x, code in TABLE4[curve]
+                    if round(1023 * encode_curve(curve, CANON_REFLECTION * x)) != code]
+            for curve in CANON}
 
 
 def run_probe(sources):
+    table = table4_misses()
+    for row, curve in (("LP5", "canon_log2"), ("LP6", "canon_log3")):
+        if row in selected:
+            check(f"{row} the instrument's encode reproduces table [4]'s codes "
+                  f"{[code for _, code in TABLE4[curve]]}", not table[curve],
+                  f"instrument failure: (x, table, encoded) {table[curve]}" if table[curve]
+                  else "reproduced")
     binary, why = build_probe(sources)
     if binary is None:
         for name in sorted(LP_ROWS & selected):
@@ -2966,7 +3350,7 @@ def main():
     if args.mode == "capture":
         control.mkdir(parents=True, exist_ok=True)
     if args.mode is None and not args.mutant:
-        selected -= {"L9", "L18"}
+        selected -= {"L9", "L18", "L22"}
     remove_work()
     atexit.register(remove_work)
     HOME.mkdir(parents=True)
@@ -3011,15 +3395,21 @@ def main():
                     run_l9(client, args.mode, control, state)
                 if "L18" in selected and (args.mode in ("capture", "compare") or args.mutant):
                     run_l18(client, args.mode, control, state)
+                if "L22" in selected and (args.mode in ("capture", "compare") or args.mutant):
+                    run_l22(client, args.mode, control, state)
                 if "L17" in selected:
                     run_l17(client, state)
                 for name, run in (("L1", run_l1), ("L2", run_l2), ("L3", run_l3),
                                   ("L4", run_l4), ("L5", run_l5), ("L6", run_l6),
                                   ("L7", run_l7), ("L8", run_l8), ("L10", run_l10),
                                   ("L11", run_l11), ("L12", run_l12), ("L13", run_l13),
-                                  ("L14", run_l14)):
+                                  ("L14", run_l14),
+                                  ("L19", lambda c: run_canon(c, "L19", "canon_log2")),
+                                  ("L20", lambda c: run_canon(c, "L20", "canon_log3"))):
                     if name in selected:
                         run(client)
+                if "L21" in selected:
+                    run_l21(client, state)
             except Exception as error:  # a row that could not run is a failure
                 import traceback
                 traceback.print_exc()
@@ -3044,7 +3434,7 @@ def main():
     if args.mode == "capture":
         (control / "capture.json").write_text(json.dumps({"tree": str(ROOT), "config": config},
                                                          indent=1))
-        shown = [n for n in ROWS if n in rows and n not in ("L9", "L18", "Z1")]
+        shown = [n for n in ROWS if n in rows and n not in ("L9", "L18", "L22", "Z1")]
         failing = [n for n in shown if not rows[n]]
         print(f"captured into {args.folder}; on the control FAILED: {failing} (passed, so not "
               f"discriminating: {[n for n in shown if rows[n]]})")

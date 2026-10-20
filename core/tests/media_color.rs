@@ -129,6 +129,16 @@ fn every_refusal_is_its_own_sentence() {
         ),
         (
             VIDEO,
+            json!({"log": "canon_log2", "gamut": "s_gamut3"}),
+            "canon_log2 takes gamut cinema_gamut or bt2020, not s_gamut3".to_string(),
+        ),
+        (
+            VIDEO,
+            json!({"log": "canon_log3", "gamut": "v_gamut"}),
+            "canon_log3 takes gamut cinema_gamut or bt2020, not v_gamut".to_string(),
+        ),
+        (
+            VIDEO,
             json!({"lut": 99}),
             "color.lut 99 is not a media of this project".to_string(),
         ),
@@ -189,6 +199,12 @@ fn every_pairing_is_stored_and_an_absent_gamut_is_the_curves_first() {
         ("slog3", Some("s_gamut3"), "s_gamut3"),
         ("vlog", None, "v_gamut"),
         ("vlog", Some("v_gamut"), "v_gamut"),
+        ("canon_log2", None, "cinema_gamut"),
+        ("canon_log2", Some("cinema_gamut"), "cinema_gamut"),
+        ("canon_log2", Some("bt2020"), "bt2020"),
+        ("canon_log3", None, "cinema_gamut"),
+        ("canon_log3", Some("cinema_gamut"), "cinema_gamut"),
+        ("canon_log3", Some("bt2020"), "bt2020"),
     ];
     for (log, gamut, stored) in pairs {
         let mut color = json!({"log": log});

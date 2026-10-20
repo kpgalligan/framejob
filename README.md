@@ -350,8 +350,10 @@ schema, §6 the op table, §7 the architecture.
   clip ungraded until it is relinked.
 - **Camera log**. The Media tab's **Camera Log** section sets how a video
   file's log footage becomes Rec. 709: None, Apple Log, Apple Log 2,
-  S-Log3 / S-Gamut3.Cine, S-Log3 / S-Gamut3, V-Log / V-Gamut — each
-  from its maker's published curve and gamut, 18 % grey at Frame Job's 42 % —
+  S-Log3 / S-Gamut3.Cine, S-Log3 / S-Gamut3, V-Log / V-Gamut, and Canon's
+  C-Log2 and C-Log3, each with Cinema Gamut or BT.2020 — each from its
+  maker's published curve and gamut (Cinema Gamut's from the ACES
+  project's Canon transform), 18 % grey at Frame Job's 42 % —
   or **Use LUT…** with your own `.cube`. It is the FILE's setting: every
   clip of it follows, it applies before the chroma key and every grade, and
   Show Ungraded keeps it. Apple Log is detected on import ("from the file");
@@ -464,8 +466,8 @@ schema, §6 the op table, §7 the architecture.
   same in the preview, every export, every rendered frame and the timeline's
   filmstrip. So is camera
   log footage: an iPhone Apple Log or Apple Log 2 file is recognised by its
-  label on import and looks like normal video at once, and S-Log3 and V-Log
-  are set by hand in the Media tab's **Camera Log** section.
+  label on import and looks like normal video at once, and S-Log3, V-Log,
+  C-Log2 and C-Log3 are set by hand in the Media tab's **Camera Log** section.
   The size the sheet and the `export` tool report is the size the file has: a
   document with an odd width or height exports one pixel smaller on that edge
   on the formats that need even dimensions (H.264, HEVC, HEVC with alpha,

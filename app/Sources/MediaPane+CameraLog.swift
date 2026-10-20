@@ -13,6 +13,8 @@ enum CameraLogChoice: Equatable {
     static let curves: [CameraLogChoice] = [
         .curve(.appleLog, .bt2020), .curve(.appleLog2, .appleWideGamut),
         .curve(.slog3, .sGamut3Cine), .curve(.slog3, .sGamut3), .curve(.vlog, .vGamut),
+        .curve(.canonLog2, .cinemaGamut), .curve(.canonLog2, .bt2020),
+        .curve(.canonLog3, .cinemaGamut), .curve(.canonLog3, .bt2020),
     ]
 
     /// A media's setting as a row: its curve and gamut (the curve's first

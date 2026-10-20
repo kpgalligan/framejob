@@ -38,7 +38,8 @@ the project has a video file. Its "Log" row holds a pop-up reading "None",
 dimmed because no row of the list is selected (it acts on the selected video
 file), and under it a line reads "Select a video in the list". Selecting
 speech.mov enables the pop-up — None, Apple Log, Apple Log 2, S-Log3 /
-S-Gamut3.Cine, S-Log3 / S-Gamut3, V-Log / V-Gamut, Use LUT… — and the line
+S-Gamut3.Cine, S-Log3 / S-Gamut3, V-Log / V-Gamut, C-Log2 / Cinema Gamut,
+C-Log2 / BT.2020, C-Log3 / Cinema Gamut, C-Log3 / BT.2020, Use LUT… — and the line
 then names the file's setting, "None" here. The rest of the panel is empty.
 
 The two bands and the footer are drawn edge to edge across the panel while

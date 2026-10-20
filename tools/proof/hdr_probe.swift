@@ -52,6 +52,7 @@ func describe(_ conversion: InputConversion?) -> String {
         case .sGamut3: return "sGamut3"
         case .vGamut: return "vGamut"
         case .appleWideGamut: return "appleWideGamut"
+        case .cinemaGamut: return "cinemaGamut"
         }
     }
     switch conversion {

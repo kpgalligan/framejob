@@ -46,8 +46,8 @@ final class ConvertingCompositor: Compositor {
 /// contract: scalars only, a multiple of 16 bytes (28 floats, 112 bytes).
 struct InputUniforms {
     /// 1 HLG, 2 PQ, 3 wide-gamut SDR, 4 sRGB, 5 Apple Log (and Apple Log 2),
-    /// 6 S-Log3, 7 V-Log, 8 a LUT, 9 SDR into an HLG project (`kInputHLG`…
-    /// in the shader).
+    /// 6 S-Log3, 7 V-Log, 8 a LUT, 9 SDR into an HLG project, 10 Canon Log 2,
+    /// 11 Canon Log 3 (`kInputHLG`… in the shader).
     var kind: Float = 0
     var premultiplied: Float = 0
     var systemGamma: Float = 0
@@ -93,6 +93,7 @@ struct InputUniforms {
     static let hlg: Float = 1, pq: Float = 2, sdrWide: Float = 3, srgb: Float = 4
     static let appleLog: Float = 5, slog3: Float = 6, vlog: Float = 7, lut: Float = 8
     static let sdr: Float = 9
+    static let canonLog2: Float = 10, canonLog3: Float = 11
 
     /// A curve's kind: Apple Log 2 is Apple Log's curve (its gamut differs).
     static func kind(of curve: LogCurve) -> Float {
@@ -100,6 +101,8 @@ struct InputUniforms {
         case .appleLog, .appleLog2: return appleLog
         case .slog3: return slog3
         case .vlog: return vlog
+        case .canonLog2: return canonLog2
+        case .canonLog3: return canonLog3
         }
     }
 

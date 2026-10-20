@@ -46,7 +46,10 @@ Rows:
 - **TH**: the same four: `hlg` and `pq` hold a converted marker whose
   `transfer` is "hlg" / "pq" and whose `0.jpg` = the render ±4 on the grey
   row; `b2020_709` and `p3_709` a flat marker and ±5. Fails when
-  `DIR/h0.json` is missing or did not hold.
+  `DIR/h0.json` is missing or did not hold, except under `compare DIR`:
+  H0 is #282's untouched-tree control and holds only on a tree before #282
+  (its held copy is `tools/proof/work/i282/ctl/h0.json`), so there TH scores
+  its own figures and prints DIR's H0 state as a note.
 - **T0** (CONTROL, capture): on the untouched tree, T1's comparison fails at
   the 90 % patch by ≥ 20 levels for every T1 case.
 - **T1**: `applelog.mov` and `applelog2.mov` (detected at import),
@@ -423,16 +426,25 @@ def run_h0(client, control, state):
           "; ".join(notes) + (f"; misses {misses}" if misses else ""))
 
 
-def run_th(client, control, state):
+def run_th(client, control, state, gated=True):
     """TH: HLG and PQ drawn through step 0 (a `transfer` marker, ±4); the SDR
-    wide-gamut pair still plain (a flat marker, ±5)."""
+    wide-gamut pair still plain (a flat marker, ±5). Ungated (`compare DIR`),
+    a DIR whose H0 did not hold is a note, not a miss: H0 holds only on a
+    tree before #282."""
     misses, notes = [], []
     try:
         h0 = json.loads((control / "h0.json").read_text())
     except (OSError, ValueError):
         h0 = None
     if not (isinstance(h0, dict) and h0.get("held") is True):
-        misses.append(f"{control.name}/h0.json is missing or did not hold")
+        if gated:
+            misses.append(f"{control.name}/h0.json is missing or did not hold")
+        else:
+            held = h0.get("held") if isinstance(h0, dict) else None
+            state_h0 = "missing" if h0 is None else f"held {held}"
+            notes.append(f"note: {control.name}/h0.json {state_h0} (H0 is #282's untouched-tree "
+                         "control, held only before #282; its held copy is "
+                         "tools/proof/work/i282/ctl/h0.json), TH scored on its own figures")
     for name in list(HDR_DRAWN) + HDR_PLAIN:
         drawn = name in HDR_DRAWN
         want = transferred(HDR_DRAWN[name]) if drawn else flat
@@ -1171,7 +1183,7 @@ def main():
                 if "H0" in selected and capture:
                     run_h0(client, control, state)
                 if "TH" in selected and not capture:
-                    run_th(client, control, state)
+                    run_th(client, control, state, gated=args.mode != "compare")
                 if "T0" in selected and capture:
                     run_t1(client, control_tree=True)
                 if "T1" in selected and not capture:

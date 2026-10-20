@@ -276,11 +276,15 @@ marks at 100 %. The vectorscope uses BT.2020's matrix and targets. What it takes
 
 ### Log curves (H-5, HD-10; the brief's §5)
 
-The Media tab's Camera Log popup gains "Canon Log 2 / Cinema Gamut" and "Canon Log 3 / Cinema
-Gamut", each converted at step 0 as S-Log3 is today; in an HLG project the same curves feed the
-log → HLG arm, where they matter most. Each is GR-16's recipe: Canon's published document read for
-its terms first, its curve and gamut constants, its code domain, a matrix derived from its
-primaries (never copied), an L1-style fixture row and an LP3 maths row. Sony's site refused this
+The Media tab's Camera Log popup gains four rows after V-Log (HD-17 (b)): "C-Log2 / Cinema
+Gamut", "C-Log2 / BT.2020", "C-Log3 / Cinema Gamut" and "C-Log3 / BT.2020" — Canon Log 2 and Canon
+Log 3, each with Cinema Gamut (the default) or BT.2020 — each converted at step 0 as S-Log3 is
+today; in an HLG project the same curves feed the log → HLG arm, where they matter most. Each is
+GR-16's recipe: the curves from Canon's *Canon Log Gamma Curves* white paper (November 1st, 2018),
+read for its terms first; Cinema Gamut's chromaticities from the ACES project's Canon CSC
+(Apache-2.0; Canon's own Cinema Gamut paper only plots the triangle), the owner's choice of
+2026-10-20; the code domain (1, 0) in both ranges (HD-17 (e)); a matrix derived from the
+primaries (never copied); L1-style fixture rows and LP3-style maths rows. Sony's site refused this
 host with 403 at T3-2, so the owner downloads each document, as he did for Sony's and
 Panasonic's. `LogCurve`'s new values are format 25 (24 at H-0; H-6 ran first and took 24, HD-16
 (j)), since an older Frame Job cannot read them.
@@ -438,7 +442,7 @@ complete, the phase's proof recorded whole on Release, mutants about one per new
 | H-2 | **#277, the HLG working space**: `canvas.output`, `set_canvas {output}`, the Document tab's Colour row and popup; every composition of an HLG project converting in BT.2020/HLG; step 0's HLG arms; drawn layers and the background lifted; the grade's BT.2020 constants; `render_frame`/Save Frame… 16-bit labelled BT.2100 HLG; the 10-bit rows tagged HLG with Dolby Vision off and every other row refused in an HLG project until H-3; format 23 | Every SDR project byte-identical; HS, HH, HP, HT, HL, HW, HF, HX (below) | HDR-1; the heavy-4K HLG frame time |
 | H-3 | **#277, the deliverables**: `range` (HLG/PQ/SDR) resolved in the core; the SDR version for the 8-bit rows, GIF, APNG and JPEG, lifting H-2's refusals; PQ by one output conversion with HD-5's metadata; the Dynamic Range popup; View ▸ Show SDR Version and `render_frame {sdr_version}` | ffprobe tags per row; no Dolby Vision; the mastering-display and content-light values as chosen; the SDR export = Show SDR Version's frame ±1; every SDR project's encoder input unchanged | HDR-2, HDR-3; HD-4's knee, HD-7's SDR-project behaviour |
 | H-4 | **#277, HDR scopes**: HLG % with a cd/m² scale and a 75 % line; the BT.2020 vectorscope and targets; the scope JSON names its scale | HLG fixtures' traces against oracles; every SDR trace identical; GR-10's 1.1 ms at 4K | HDR-6 |
-| H-5 | **#278**: Canon Log 2 and Canon Log 3 with Cinema Gamut, each per GR-16; format 25 (runs after H-6, HD-16 (j)) | Each curve on its ramp within a level; maths rows; a mutant per breakpoint and domain | GRD-19 (real clips per camera); Canon's document from the owner |
+| H-5 | **#278**: Canon Log 2 and Canon Log 3, each with Cinema Gamut or BT.2020 (HD-17), each per GR-16; the curves from Canon's paper, Cinema Gamut from the ACES Canon CSC; format 25 (runs after H-6, HD-16 (j)) | Each curve on its ramp within a level; maths rows; a mutant per breakpoint and domain | GRD-19 (real clips per camera); Canon's document from the owner |
 | H-6 | **#276**: `canvas.blending` (`encoded`/`linear`), opt-in; HLG projects decode by HLG's transfer; format 24 (runs before H-5, HD-16 (j)) | GR-18's table as `render_frame` rows; off byte-identical; the output pass's 4K time | LIN-1 |
 | H-7 | The close: ADR `designs/adr/hdr.md`, the archive, `archive/INDEX.md`, the manual-check rows; #281, #277, #276 closed as built; #278 left open for detection; #274 measured if a real clip is at hand | — | — |
 
@@ -506,10 +510,12 @@ complete, the phase's proof recorded whole on Release, mutants about one per new
 
 ### H-5 — log curves (HD-10)
 
-- **Lands:** Canon Log 2 and Canon Log 3 with Cinema Gamut, format 25, from Canon's document.
-  **H-6 runs before H-5** (HD-16 (j)): H-5 waits on Canon's document, which the owner has not
-  yet supplied.
-- **Proof rows:** per curve, an L1 row and an LP3 row.
+- **Lands:** Canon Log 2 and Canon Log 3, each with Cinema Gamut or BT.2020 (HD-17's four
+  pairings), format 25; the curves from Canon's *Canon Log Gamma Curves* white paper, Cinema
+  Gamut's chromaticities from the ACES project's Canon CSC. **H-6 runs before H-5** (HD-16 (j)):
+  H-5 waited on Canon's document.
+- **Proof rows:** per curve, an L1-style row (L19, L20) and an LP3-style row (LP5, LP6); the
+  HLG arm (L21); the existing curves byte-identical (L22).
 - **Mutants:** per curve, its breakpoint and its code domain (two each).
 - **Person check:** GRD-19 (real clips from each camera).
 
@@ -660,7 +666,8 @@ and build time. The brief consulted nothing of Concat, and neither did this road
 sources instead: ITU-R BT.2100 (HLG and PQ), BT.2408 (SDR ↔ HDR and reference white), BT.2390
 (the EETF), BT.2020 and BT.709 (primaries and luma), SMPTE ST 2084, ST 2086 and CTA-861.3 (HDR10's
 metadata), ITU-T H.265's SEI syntax (payloads 137 and 144), Canon's published Canon Log
-documents, and Apple's conversions measured as targets, never copied. Every fixture is written by
+documents, Cinema Gamut's chromaticities from the ACES project's Canon CSC (Apache-2.0, HD-17; no
+ACES code copied), and Apple's conversions measured as targets, never copied. Every fixture is written by
 a script.
 
 ## H-0 — the road map, HD-1…HD-11 and the two moves
@@ -1553,3 +1560,115 @@ orchestrator at merge with the CLAUDE.md map edits above; `make gate` passed aft
 **Residue:** #310 (LG1,
 G1, S1) as before. The owner's person check is LIN-1. Next: H-5 when Canon's document arrives,
 then H-7.
+
+## H-5 — #278, Canon Log 2 and Canon Log 3 (HD-10, HD-17; format 25)
+
+**What landed** (2026-10-20, in the worktree on `hdr`, from `60aa387`). The designer's first spec
+stopped: Canon's own Cinema Gamut paper only plots the triangle. The owner chose on 2026-10-20
+"Use ACES, both gamuts (Recommended)": the curves from Canon's *Canon Log Gamma Curves* white
+paper (Canon U.S.A., November 1st, 2018; read in place in the main tree, never copied), Cinema
+Gamut's chromaticities from the ACES project's Canon CSC (Apache-2.0; no ACES code copied, the
+matrices derived by `InputConversions.rgbToXYZ`), and each curve paired with Cinema Gamut or
+BT.2020. Spec §11 **HD-17**, written before the code ((a) the sources, (b) the vocabulary and the
+popup's "C-Log" rows, (c) the curves, (d) the 0.9 scale, (e) the code domain (1, 0) in both
+ranges and its accepted limit, (f) step 0's kinds 10 and 11 in SDR and HLG, (g) table [4]'s test
+points and a code's own 10-bit step as its tolerance, (h) format 25, (i) what it amends), its
+README row, HD-10's and GR-16's "Amended by HD-17" lines, GR-16's "(format 24)" corrected to 25,
+the Concat-rule sources sentence and the Lines cells. No FFI export, no new op or tool (92), no
+`InputUniforms` field (112 bytes). No file was near the cap (`InputConversions.swift` 473 → 482,
+`MediaColor.swift` 153 → 161, `AgentCatalog+Files.swift` 403 → 404, `format.rs` 531 → 540), so
+no toll.
+
+- **Core:** `model_media_color.rs` (`LogCurve::CanonLog2`, `CanonLog3`; `CameraGamut::
+  CinemaGamut`; `gamuts()` `[CinemaGamut, Bt2020]` for both); `format.rs` and the header (25).
+  Tests: `schema_v25.rs` (new, 4) and `media_color.rs` (six Canon pairings, two refusals).
+- **Metal:** kinds `kInputCanonLog2` 10 and `kInputCanonLog3` 11; Canon's constants one per line
+  beside V-Log's, `kCanonReflection` 0.9; `canonLog2Inverse`, `canonLog3Inverse`, `inputIsLog`
+  and `logInverse`; both log tests (`inputToHLG` and the SDR arm) now `inputIsLog(kind)` and both
+  three-way ternaries `logInverse(kind, y)`. Every existing constant line and `inputToHLG`'s
+  `hlgOETF(max(inputMatrix(u, r * u.exposure), 0.0))` line unchanged.
+- **Swift:** `MediaColor.swift` (`canonLog2`, `canonLog3` displayed "C-Log2", "C-Log3";
+  `cinemaGamut` "Cinema Gamut"); `InputConversions.swift` (`InputPrimaries.cinemaGamut`, its
+  chromaticities row citing the ACES CSC, two new `codeDomain` lines `return (1, 0)`);
+  `Compositor+Input.swift` (`InputUniforms.canonLog2` 10, `canonLog3` 11, `kind(of:)`);
+  `MediaPane+CameraLog.swift` (four popup rows after V-Log); `AgentCatalog+Files.swift`
+  (`set_media_color`'s sentence).
+- **Proofs:** `log_proof.py` LP5, LP6, L19–L22, L2, L8 and L9 extended, seven mutants;
+  `log_probe.swift` (LP2's Cinema Gamut, the pass loop run for `p3`, `p5`, `p6`, an item's
+  `output`, LP4's kinds 10 and 11); `hdr_probe.swift`'s `name(_:)` arm; `tools/proof/README.md`'s
+  H-5 section.
+- **Documents:** spec §4.3b, §5.2 (format 25), §6c, §7.5, §7.10, the Lines cells; this file's
+  "Log curves", H-5 phase, Phases row and Concat rule; README's two Camera Log bullets;
+  `docs/manual-checks.md` GRD-19; the screen catalog's Media tab prose.
+
+**Rules written before the rows they judge** (the spec's Approach 2): LP5/LP6's ramp and seeded
+triples ±2e-3 against `log_convert` (SDR) and the shader's `hlgOETF(max(M→2020·R·0.26741, 0))`
+(HLG); the makers' codes within the larger of LP3's ±0.005 display bound and the code's own 10-bit
+step (code ± 0.5, each signal half-rounded), because Canon Log 2's 90 % code 557 decodes to R
+0.90596; the Python encode must reproduce table [4] or the row fails as an instrument failure;
+L19/L20 ±1 at 8 bits, the grey rows equal ±1, the cards' centres parting by ≥ 8 levels (the
+CONTROL that the matrix moved, computed R 0 against 54); L21 HL's ±1-code envelope ±1/1023 and the
+18 % patch at 0.380 ±1/1023; L22 byte-equal.
+
+**Verification**, 2026-10-20 (`pmset -g ps`: "Now drawing from 'AC Power'"), own instances on
+scratch sockets and homes, each stopped by its pid; no `Frame Job: ` line in any run and no
+`DEFAULTS MOVED`:
+- **Controls**, on the untouched tree's Release build (`make app`) before any product edit, each
+  `RC_PROOF_APP=release`: `log_proof.py capture tools/proof/work/h5/log-ctl` exit 0 — L9 7 of 7,
+  L18 4 of 4 and L22 6 of 6 references captured; on the control FAILED LP1–LP6, L8, L19, L20, L21.
+  LP1–LP6 failed because the edited `log_probe.swift` does not build over the untouched
+  `app/Sources` (its diagnostics name `InputPrimaries.cinemaGamut`, `CameraGamut.cinemaGamut` —
+  LP2's new list entry — and `InputUniforms.canonLog2`/`canonLog3`, the spec's new names only), so
+  LP5's and LP6's discrimination is the mutants'; LP1–LP4 are regression rows. L8, L19–L21 failed
+  on `unknown variant canon_log2/canon_log3`. L2 passed on the control (not discriminating: the
+  untouched tree imports the Canon fixtures with no colour too). `log_thumbs_proof.py capture
+  tools/proof/work/h5/thumbs-ctl` exit 1: H0 and T0 FAILED, as they must on any tree after #282
+  (they are #282's untouched-tree controls), T4's and T5's references captured. `hdr_proof.py
+  capture tools/proof/work/h5/hdr-ctl --only H1,H7i,SI,Z1` exit 0.
+- In the loop: `cargo test --release` `media_color` 16, `schema_v25` 4, `schema_v24` 5,
+  `schema_v19` 5, all passing; `make lint` clean; `make typecheck` 0 errors and exactly the 4
+  baseline warnings; `swift_build.py typecheck` of `log_probe.swift` and `hdr_probe.swift` exit 0;
+  `spec_index_proof.py` 177/177; every mutant anchor of `log_proof.py`, `hdr_proof.py` and
+  `log_thumbs_proof.py` found once; `make app-debug` BUILD SUCCEEDED; on Debug `log_proof.py
+  --only LP1,LP2,LP3,LP4,LP5,LP6,L2,L8,L19,L20,L21,Z1` **12/12**.
+- `make gate`: **PASS in 345 s** (names 1 s, typecheck 14 s, fmt 5 s, lint 2 s, test 205 s, app
+  116 s).
+- `log_proof.py compare tools/proof/work/h5/log-ctl` on Release: **29/29**. L9 (7 fixtures, the
+  Canon ramps among them), L18 and L22 (slog3, vlog, applelog, applelog2, green with their Camera
+  Log, and slog3 in an HLG project) byte-identical to the control. LP5 worst |Δ| 0.0009752512, LP6
+  0.0010080338 (LP3 0.000910759); table [4] reproduced (95/407/575/797/871/1020 and
+  128/351/577/908/1020). L19: worst 1 on each ramp and card; patches render [0, 107, 200] (oracle
+  the same) under both gamuts; the card's centre [0, 157, 49] under Cinema Gamut and [54, 145, 82]
+  (oracle [54, 145, 83]) under BT.2020, apart 54; grey rows apart 0. L20: patches [7, 107, 200]
+  under both; centres [0, 158, 50] and [54, 146, 83], apart 54; grey rows apart 0. L21: worst
+  0.695 (Canon Log 2) and 0.622 (Canon Log 3) levels on the grey row; the 18 % patch (codes 413 and
+  365) renders 0.3801 in both.
+- **Mutants** (Release copies, each `--only <its rows>,Z1 --control tools/proof/work/h5/log-ctl`),
+  all seven **MUTANT PASS** with no other row failing: `clog2-breakpoint` (LP5, L19),
+  `clog3-breakpoint` (LP6, L20), `clog2-video-domain` (LP5, L19), `clog3-video-domain` (LP6, L20),
+  `canon-scale-dropped` (LP5, LP6, L19, L20, L21), `cinema-as-2020` (LP2, L19, L20),
+  `canon-not-log-in-hlg` (L21).
+- `hdr_proof.py --control tools/proof/work/h5/hdr-ctl` whole on Release: **63/63**.
+  `hdr_proof.py compare tools/proof/work/h5/hdr-ctl --only H1,SI,Z1`: **3/3** — H1's 12 SDR scenes
+  byte-identical with equal picks (the reverse's intermediate digest differs, 29cc0c3ac0d133b6
+  against e00e3b2470eba08b, printed and unscored as before), SI 50 of 50 JSON files equal.
+- `log_thumbs_proof.py compare tools/proof/work/h5/thumbs-ctl` on Release: first **11/12**. TH
+  FAILED only on its control file: `thumbs-ctl/h0.json` did not hold, because H0 is #282's
+  untouched-tree control and cannot hold on a tree past #282. The review's fix: under `compare DIR`
+  TH scores its own figures and prints DIR's H0 state as a note naming #282's held control
+  (`tools/proof/work/i282/ctl/h0.json`); a plain run and a mutant keep the gate. Re-run: **12/12**.
+  TH: HLG and PQ `transfer` markers, worst 1 level each (bound 4); `b2020_709` and `p3_709` flat,
+  worst 1 each (bound 5). T1–T9, TP and Z1 passed (T4 byte-equal to the control, T1 worst 1, 1, 1,
+  1 and 2).
+- `op_argument_proof.py` **160/160** and `phase9_proof.py` **235/235** on an instance of their own
+  (`proof_app.py launch --app release`); `recording_probe.py --only catalog` **31/31**.
+- After this record, `make gate` passed again in 2 s (names re-ran; every other step's inputs
+  unchanged).
+
+**Owed.** The `CLAUDE.md` edit (applied by the orchestrator): `core/CLAUDE.md`'s
+`model_media_color.rs` entry says format 25 adds `canon_log2`, `canon_log3` and `cinema_gamut`.
+The second review passed; the `core/CLAUDE.md` edit above was applied by the orchestrator at
+merge and `make gate` passed after it.
+
+**Residue:** #278 stays open for detection from the makers' metadata. #310 (LG1, G1, S1)
+as before, not run here. The owner's person check is GRD-19. Next: H-7.

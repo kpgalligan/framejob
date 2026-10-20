@@ -117,7 +117,9 @@ governs a module now.
   default first) and `MediaColor` (`log`, `gamut`, `lut`, `detected`, and
   since format 22 `pq`, a `PqColor` — import's `file` reading, its
   `PeakSource`, the override `peak`, `PEAK_MIN`..`PEAK_MAX` — each written
-  only when set), re-exported by `model.rs` for `Media.color`.
+  only when set; format 25 adds `canon_log2`, `canon_log3` and the gamut
+  `cinema_gamut`, each Canon curve pairing with Cinema Gamut (its default)
+  or BT.2020, spec §11 HD-17), re-exported by `model.rs` for `Media.color`.
   `media_color.rs` — its rules: `set_media_color` (a strict reader,
   `detected` and `pq` refused, its `peak` the override, "needs log or lut"
   judged on what the caller asked for, spec §11 HD-12),

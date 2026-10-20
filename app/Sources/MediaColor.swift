@@ -3,9 +3,11 @@ import Foundation
 // MARK: - Camera log (spec §11 GR-16)
 
 /// A maker's published log curve, as `media.color.log` spells it. Apple
-/// Log 2 is Apple Log's curve with Apple Wide Gamut (GR-16's append).
+/// Log 2 is Apple Log's curve with Apple Wide Gamut (GR-16's append); Canon
+/// Log 2 and 3 pair with Cinema Gamut or BT.2020 (spec §11 HD-17).
 enum LogCurve: String, Codable, CaseIterable {
     case appleLog = "apple_log", slog3, vlog, appleLog2 = "apple_log2"
+    case canonLog2 = "canon_log2", canonLog3 = "canon_log3"
 
     /// The gamuts the curve pairs with, its default first — the core's
     /// `LogCurve::gamuts`, which refuses any other.
@@ -15,6 +17,7 @@ enum LogCurve: String, Codable, CaseIterable {
         case .appleLog2: return [.appleWideGamut]
         case .slog3: return [.sGamut3Cine, .sGamut3]
         case .vlog: return [.vGamut]
+        case .canonLog2, .canonLog3: return [.cinemaGamut, .bt2020]
         }
     }
 
@@ -24,6 +27,9 @@ enum LogCurve: String, Codable, CaseIterable {
         case .appleLog2: return "Apple Log 2"
         case .slog3: return "S-Log3"
         case .vlog: return "V-Log"
+        // "C-Log": "Canon Log 3 / Cinema Gamut" is wider than the popup (HD-17 (b)).
+        case .canonLog2: return "C-Log2"
+        case .canonLog3: return "C-Log3"
         }
     }
 }
@@ -33,6 +39,7 @@ enum LogCurve: String, Codable, CaseIterable {
 enum CameraGamut: String, Codable, CaseIterable {
     case bt2020, sGamut3Cine = "s_gamut3_cine", sGamut3 = "s_gamut3", vGamut = "v_gamut"
     case appleWideGamut = "apple_wide_gamut"
+    case cinemaGamut = "cinema_gamut"
 
     var displayName: String {
         switch self {
@@ -41,6 +48,7 @@ enum CameraGamut: String, Codable, CaseIterable {
         case .sGamut3: return "S-Gamut3"
         case .vGamut: return "V-Gamut"
         case .appleWideGamut: return "Apple Wide Gamut"
+        case .cinemaGamut: return "Cinema Gamut"
         }
     }
 }

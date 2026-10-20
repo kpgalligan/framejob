@@ -295,8 +295,17 @@ use crate::model::{Canvas, Project};
 /// `encoded`, so there is no migration step. The bump is so an older build
 /// refuses a linear file instead of opening it encoded and dropping its
 /// blending on save.
-/// Every number from 25 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 24;
+///
+/// Version 25 is Canon Log 2 and Canon Log 3 (spec §11 HD-17):
+/// [`crate::model_media_color::LogCurve`] gains `canon_log2` and
+/// `canon_log3`, and [`crate::model_media_color::CameraGamut`] gains
+/// `cinema_gamut`, each Canon curve pairing with `cinema_gamut` (the default)
+/// or `bt2020` on `media.color`. No key moves, so every other project writes
+/// exactly the text it did, and there is no migration step. The bump is so an
+/// older build refuses a Canon file instead of failing on its unknown
+/// `log` value.
+/// Every number from 26 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 25;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

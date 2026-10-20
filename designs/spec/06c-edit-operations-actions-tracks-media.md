@@ -114,7 +114,8 @@ The rules every op shares are §6a; the clip ops are §6b.
   it and clear both`); `with_clips` clears those conversions as well.
 - **`set_media_color {media, color}`** — A video media's Camera Log (§11 GR-16): `color` is
   `{log, gamut?}` — `apple_log` (gamut `bt2020`), `apple_log2` (`apple_wide_gamut`), `slog3`
-  (`s_gamut3_cine` or `s_gamut3`), `vlog` (`v_gamut`), an absent `gamut` stored as the curve's
+  (`s_gamut3_cine` or `s_gamut3`), `vlog` (`v_gamut`), `canon_log2` or `canon_log3` (Canon Log
+  2 and 3, §11 HD-17: `cinema_gamut` or `bt2020`), an absent `gamut` stored as the curve's
   first — or `{lut}`, a `lut` media converting the file instead; `null` clears it (an identity
   with none). Every clip of the media, its stills and its reverse are converted at step 0
   (§7.5), before the chroma key and every grade. What is stored has no `detected`. `Err` for an
@@ -123,7 +124,8 @@ The rules every op shares are §6a; the clip ops are §6b.
   word outside the vocabulary (serde's `unknown variant`); refused, each in its own sentence:
   `media 2 is an audio file; Camera Log is a setting on a video file` (`an image`, `a LUT`
   likewise), `color needs log or lut; null clears it`, `color takes log or lut, not both`,
-  `color.gamut goes with log`, `slog3 takes gamut s_gamut3_cine or s_gamut3, not v_gamut`,
+  `color.gamut goes with log`, `slog3 takes gamut s_gamut3_cine or s_gamut3, not v_gamut`
+  (`canon_log2 takes gamut cinema_gamut or bt2020, not s_gamut3` likewise),
   `color.lut 9 is not a media of this project`, `color.lut 5 is a video media, not a lut`,
   `color.detected is written by import, not set`. A PQ file's **`peak`** (§11 HD-12, a whole
   number of cd/m²) overrides the peak import read into `pq`, beside `log` or `lut` or alone:

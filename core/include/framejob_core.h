@@ -172,9 +172,14 @@ extern "C" {
  * Version 24 is the canvas's blending (spec §11 GR-18, HD-9, HD-16):
  * `canvas.blending`, `encoded` or `linear`, after `output`, written only when
  * `linear`, so every other project writes the text it did; the reader's
- * default is `encoded`, so there is no migration step. 25 and above, 1014
- * included, are newer. */
-#define RC_FORMAT_VERSION 24
+ * default is `encoded`, so there is no migration step.
+ *
+ * Version 25 is Canon Log 2 and Canon Log 3 (spec §11 HD-17): `media.color`'s
+ * `log` gains `canon_log2` and `canon_log3`, and its `gamut` `cinema_gamut`,
+ * each Canon curve pairing with `cinema_gamut` (the default) or `bt2020`; no
+ * key moves, so every other project writes the text it did, and there is no
+ * migration step. 26 and above, 1014 included, are newer. */
+#define RC_FORMAT_VERSION 25
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

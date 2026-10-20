@@ -393,8 +393,13 @@ opened, at design time or build time.
   and replaces the Camera Log and the override together, `null` keeping import's `{file, from}`;
   three new refusals; removing a converting LUT, or a paste without it, keeps `pq`.
   **Amended by HD-10** (hdr H-0): the `log` vocabulary gains Canon Log 2 and Canon Log 3 with Cinema
-  Gamut, each built under this entry's recipe from Canon's published document (format 24); "Sony's
+  Gamut, each built under this entry's recipe from Canon's published document (format 25); "Sony's
   and Panasonic's own metadata is not read" still stands.
+  **Amended by HD-17** (hdr H-5): `log` gains `canon_log2` and `canon_log3`, and `gamut` gains
+  `cinema_gamut`; each Canon curve pairs with `cinema_gamut` (first, the default) or `bt2020`. The
+  curves are from Canon's *Canon Log Gamma Curves* white paper (November 1st, 2018), Cinema
+  Gamut's chromaticities from the ACES project's Canon CSC, the matrices derived; Canon's code
+  domain is (1, 0) in both ranges (Apple Log's rule under GR-22).
 - **GR-17 — Tier 3's working arrangement: each phase gated in the `grading-3` worktree and
   merged into main alone, main's format numbers, no verdict phase; synthetic fixtures now.**
   Choice 10 and the footage answer (owner, 2026-10-11). GR-14's arrangement again: the worktree

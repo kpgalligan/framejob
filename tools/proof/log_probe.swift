@@ -1,6 +1,7 @@
 // Built by tools/proof/log_proof.py as `main.swift` over every other file in
 // `app/Sources` (`swift_build.py`). See that script's header, rows LP1–LP4
-// (grading-3 T3-2, spec §11 GR-16).
+// (grading-3 T3-2, spec §11 GR-16) and LP5–LP6 (hdr H-5, spec §11 HD-17:
+// Canon Log 2 and 3, in SDR and HLG output).
 //
 // Step 0's camera-log maths through the app's own types: the selector over
 // a media's `color` (`InputConversion.choose(input:)`), the decoding of a
@@ -48,6 +49,7 @@ func name(_ p: InputPrimaries) -> String {
     case .sGamut3: return "sGamut3"
     case .vGamut: return "vGamut"
     case .appleWideGamut: return "appleWideGamut"
+    case .cinemaGamut: return "cinemaGamut"
     }
 }
 
@@ -130,6 +132,7 @@ do {
     let gamuts: [(String, CameraGamut)] = [
         ("bt2020", .bt2020), ("s_gamut3_cine", .sGamut3Cine), ("s_gamut3", .sGamut3),
         ("v_gamut", .vGamut), ("apple_wide_gamut", .appleWideGamut),
+        ("cinema_gamut", .cinemaGamut),
     ]
     var worst = 0.0
     var detail: [String] = []
@@ -149,15 +152,16 @@ do {
     }
     check(
         "LP2 toBT709(from: InputPrimaries(gamut)) equals the oracle's derivation ±1e-4 for "
-            + "BT.2020, S-Gamut3.Cine, S-Gamut3, V-Gamut and Apple Wide Gamut",
+            + "BT.2020, S-Gamut3.Cine, S-Gamut3, V-Gamut, Apple Wide Gamut and Cinema Gamut",
         worst <= 1e-4, "worst |Δ| \(worst); \(detail.joined(separator: "; "))")
 }
 
-// MARK: - LP3 the pass
+// MARK: - LP3, LP5, LP6 the pass
 
 func runPass(
     _ stage: InputStage, device: MTLDevice, queue: MTLCommandQueue,
-    conversion: InputConversion, premultiplied: Bool, texels: [SIMD4<Float>], lut: MTLTexture?
+    conversion: InputConversion, premultiplied: Bool, texels: [SIMD4<Float>], lut: MTLTexture?,
+    output: CanvasOutput = .sdr
 ) -> [SIMD4<Float>]? {
     let width = texels.count
     let descriptor = MTLTextureDescriptor.texture2DDescriptor(
@@ -180,7 +184,7 @@ func runPass(
     guard let target = stage.target(width: width, height: 1),
         stage.encode(
             conversion, premultiplied: premultiplied, from: source, into: target, buffer: buffer,
-            lut: lut),
+            lut: lut, output: output),
         let blit = buffer.makeBlitCommandEncoder()
     else { return nil }
     blit.copy(from: target, to: readback)
@@ -204,36 +208,24 @@ func conversion(_ item: [String: Any]) -> InputConversion? {
     return .log(curve, InputPrimaries(gamut))
 }
 
-do {
-    let shaderPath = request["shader"] as? String ?? ""
-    guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue(),
-        let text = try? String(contentsOfFile: shaderPath, encoding: .utf8)
-    else {
-        check("LP3 the pass runs", false, "no Metal device or no shader at \(shaderPath)")
-        finish()
-    }
-    let library: MTLLibrary
-    do {
-        library = try device.makeLibrary(source: text, options: nil)
-    } catch {
-        check("LP3 the pass runs", false, "the shader did not compile: \(error)")
-        finish()
-    }
-    guard let stage = InputStage(device: device, library: library) else {
-        check("LP3 the pass runs", false, "InputStage(device:library:) answered nil")
-        finish()
-    }
-    let lutTexture = (request["cube"] as? String).flatMap {
-        LutTextures(device: device).texture(at: URL(fileURLWithPath: $0))
-    }
+/// The pass over one request list (`p3`, `p5` or `p6`): each item's straight
+/// texels against its outputs (its `bounds`, else ±2e-3), in its `output`
+/// (`"hlg"` an HLG project's arm, else SDR), and for a `premultiplied` item
+/// α 0 and α 0.5 against the straight result. The misses and the worst gap
+/// of the unbounded items.
+func passMisses(
+    _ items: [[String: Any]], stage: InputStage, device: MTLDevice, queue: MTLCommandQueue,
+    lutTexture: MTLTexture?
+) -> (misses: [String], worst: Float) {
     var misses: [String] = []
     var worst: Float = 0
-    for item in request["p3"] as? [[String: Any]] ?? [] {
+    for item in items {
         let label = item["label"] as? String ?? "?"
         guard let conversion = conversion(item) else {
             misses.append("\(label): no conversion")
             continue
         }
+        let output: CanvasOutput = (item["output"] as? String) == "hlg" ? .hlg : .sdr
         let isLUT: Bool
         if case .lut = conversion { isLUT = true } else { isLUT = false }
         if isLUT && lutTexture == nil {
@@ -247,7 +239,8 @@ do {
         let bounds = item["bounds"] as? [Double]
         guard let straight = runPass(
             stage, device: device, queue: queue, conversion: conversion, premultiplied: false,
-            texels: inputs, lut: isLUT ? lutTexture : nil), straight.count == outputs.count
+            texels: inputs, lut: isLUT ? lutTexture : nil, output: output),
+            straight.count == outputs.count
         else {
             misses.append("\(label): the pass did not run")
             continue
@@ -271,9 +264,11 @@ do {
         let zero = sample.map { _ in SIMD4<Float>(0, 0, 0, 0) }
         let halfAlpha = sample.map { SIMD4<Float>($0.x * 0.5, $0.y * 0.5, $0.z * 0.5, 0.5) }
         if let z = runPass(stage, device: device, queue: queue, conversion: conversion,
-                           premultiplied: true, texels: zero, lut: isLUT ? lutTexture : nil),
+                           premultiplied: true, texels: zero, lut: isLUT ? lutTexture : nil,
+                           output: output),
             let h = runPass(stage, device: device, queue: queue, conversion: conversion,
-                            premultiplied: true, texels: halfAlpha, lut: isLUT ? lutTexture : nil)
+                            premultiplied: true, texels: halfAlpha, lut: isLUT ? lutTexture : nil,
+                            output: output)
         {
             let zeroOK = z.allSatisfy {
                 $0.x.isFinite && $0.y.isFinite && $0.z.isFinite && $0.w == 0
@@ -290,14 +285,61 @@ do {
             misses.append("\(label): the premultiplied passes did not run")
         }
     }
-    check(
-        "LP3 the pass on rgba16Float: each curve at its maker's 0/18/90 % codes decodes to 0, "
-            + "0.18 and 0.90 (±0.005 of reflectance), a 1,024-step ramp across its break and 512 "
-            + "seeded triples equal the oracle ±2e-3, premultiplied α 0 stays 0 and α 0.5 is the "
-            + "straight result × 0.5; kind 8 with a channel-distinct 17³ cube over a 9×9×9 grid "
-            + "equals Python's trilinear ±2e-3",
-        misses.isEmpty && !(request["p3"] as? [Any] ?? []).isEmpty,
-        "worst |Δ| \(worst); \(misses.prefix(12).joined(separator: "; "))")
+    return (misses, worst)
+}
+
+/// The rows the pass answers: LP3 (GR-16's curves and the LUT), LP5 and LP6
+/// (Canon Log 2 and 3, hdr H-5), each over its request list.
+let passRows: [(key: String, title: String)] = [
+    ("p3",
+     "LP3 the pass on rgba16Float: each curve at its maker's 0/18/90 % codes decodes to 0, "
+        + "0.18 and 0.90 (±0.005 of reflectance), a 1,024-step ramp across its break and 512 "
+        + "seeded triples equal the oracle ±2e-3, premultiplied α 0 stays 0 and α 0.5 is the "
+        + "straight result × 0.5; kind 8 with a channel-distinct 17³ cube over a 9×9×9 grid "
+        + "equals Python's trilinear ±2e-3"),
+    ("p5",
+     "LP5 the pass on rgba16Float for Canon Log 2 with Cinema Gamut and with BT.2020, in SDR "
+        + "and HLG output: a 1,024-step ramp across its break and 512 seeded triples equal the "
+        + "oracle ±2e-3, the makers' 0/18/90 % codes decode to 0, 0.18 and 0.90 within the "
+        + "code's own 10-bit step (code ± 0.5, half-rounded), never under ±0.005, premultiplied "
+        + "α 0 stays 0 and α 0.5 is the straight result × 0.5"),
+    ("p6",
+     "LP6 the pass on rgba16Float for Canon Log 3 with Cinema Gamut and with BT.2020, in SDR "
+        + "and HLG output: a 1,024-step ramp across its breaks and 512 seeded triples equal the "
+        + "oracle ±2e-3, the makers' 0/18/90 % codes decode to 0, 0.18 and 0.90 within the "
+        + "code's own 10-bit step (code ± 0.5, half-rounded), never under ±0.005, premultiplied "
+        + "α 0 stays 0 and α 0.5 is the straight result × 0.5"),
+]
+
+do {
+    let shaderPath = request["shader"] as? String ?? ""
+    func failAll(_ why: String) -> Never {
+        for row in passRows { check(row.title, false, why) }
+        finish()
+    }
+    guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue(),
+        let text = try? String(contentsOfFile: shaderPath, encoding: .utf8)
+    else { failAll("no Metal device or no shader at \(shaderPath)") }
+    let library: MTLLibrary
+    do {
+        library = try device.makeLibrary(source: text, options: nil)
+    } catch {
+        failAll("the shader did not compile: \(error)")
+    }
+    guard let stage = InputStage(device: device, library: library) else {
+        failAll("InputStage(device:library:) answered nil")
+    }
+    let lutTexture = (request["cube"] as? String).flatMap {
+        LutTextures(device: device).texture(at: URL(fileURLWithPath: $0))
+    }
+    for row in passRows {
+        let items = request[row.key] as? [[String: Any]] ?? []
+        let (misses, worst) = passMisses(
+            items, stage: stage, device: device, queue: queue, lutTexture: lutTexture)
+        check(
+            row.title, misses.isEmpty && !items.isEmpty,
+            "worst |Δ| \(worst); \(misses.prefix(12).joined(separator: "; "))")
+    }
 }
 
 // MARK: - LP4 the constants
@@ -316,6 +358,8 @@ do {
         "kindSlog3": InputUniforms.slog3,
         "kindVlog": InputUniforms.vlog,
         "kindLUT": InputUniforms.lut,
+        "kindCanonLog2": InputUniforms.canonLog2,
+        "kindCanonLog3": InputUniforms.canonLog3,
     ]
     let wrong = mine.filter { key, value in
         guard let w = want[key] else { return true }
@@ -325,7 +369,7 @@ do {
     check(
         "LP4 InputConversions' log constants are GR-16's (mid-grey 0.42, exposure 0.42^2.4/0.18, "
             + "white 64·0.42^2.4, knee 0.39, the video code scale and offset), the kinds are 5–8, "
-            + "and InputUniforms is 112 bytes (hdr H-2's HLG group)",
+            + "10 and 11, and InputUniforms is 112 bytes (hdr H-2's HLG group)",
         wrong.isEmpty && want.count == mine.count && stride == 112,
         "wrong \(wrong); stride \(stride)")
 }
