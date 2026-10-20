@@ -21,10 +21,13 @@ background.
 The Document tab is selected at the top of the inspector, and nothing is selected
 in the timeline ("No selection"). Four open sections: DOCUMENT, a read-out —
 Resolution "960 × 540", Frame rate "30 fps", Duration "00:00:05:07", Tracks "5",
-Background "Black"; CANVAS — a Preset pop-up set to "Custom", Width "960 px",
-Height "540 px", and an unchecked "Resize clips proportionally"; FRAME RATE — Rate
-"30" in a pop-up and Duration "00:00:05:07"; and APPEARANCE — a black Background
-colour well and Timecode set to "Frames", the last row in view.
+Background "Black", Colour "SDR — Rec. 709" (the project's dynamic range, spec §11
+HD-13; "HDR — Rec. 2100 HLG" in an HLG project); CANVAS — a Preset pop-up set to
+"Custom", Width "960 px", Height "540 px", an unchecked "Resize clips
+proportionally", and a Dynamic Range pop-up set to "SDR" (its other item "HDR
+(HLG)"); FRAME RATE — Rate
+"30" in a pop-up and Duration "00:00:05:07"; and APPEARANCE, whose header is the last
+row in view with the top of its black Background colour well below it.
 
 In the light capture the inspector is white with black labels and values; the
 Document tab is a light-grey cell with a blue underline beside the white Clip,

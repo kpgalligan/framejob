@@ -8,7 +8,9 @@ import simd
 /// amended after T3-1's H1 stop). It answers AVFoundation's two colour
 /// properties true, so every source frame arrives native and honestly
 /// labelled on every path, and runs step 0 (`encodeInputs`); its composition
-/// is BT.709, so a frame it composes is labelled for what it holds. Every
+/// is BT.709 — BT.2020/HLG in an HLG project, every one of whose compositions
+/// it builds (spec §11 HD-2) — so a frame it composes is labelled for what it
+/// holds. Every
 /// other composition keeps `Compositor`, which answers both false, so an
 /// SDR-only project keeps today's pixels and labels by construction. No
 /// stored property and no initializer: AVFoundation instantiates the class.
@@ -41,10 +43,11 @@ final class ConvertingCompositor: Compositor {
 
 /// The input pass's uniform block, mirrored FIELD FOR FIELD by
 /// `InputUniforms` in `Compositor.metal` under `LayerUniforms`' layout
-/// contract: scalars only, a multiple of 16 bytes (24 floats, 96 bytes).
+/// contract: scalars only, a multiple of 16 bytes (28 floats, 112 bytes).
 struct InputUniforms {
     /// 1 HLG, 2 PQ, 3 wide-gamut SDR, 4 sRGB, 5 Apple Log (and Apple Log 2),
-    /// 6 S-Log3, 7 V-Log, 8 a LUT (`kInputHLG`… in the shader).
+    /// 6 S-Log3, 7 V-Log, 8 a LUT, 9 SDR into an HLG project (`kInputHLG`…
+    /// in the shader).
     var kind: Float = 0
     var premultiplied: Float = 0
     var systemGamma: Float = 0
@@ -68,12 +71,28 @@ struct InputUniforms {
     var m00: Float = 1, m01: Float = 0, m02: Float = 0
     var m10: Float = 0, m11: Float = 1, m12: Float = 0
     var m20: Float = 0, m21: Float = 0, m22: Float = 1
-    var reserved3: Float = 0
-    var reserved4: Float = 0
-    var reserved5: Float = 0
+    /// 1 in an HLG project (spec §11 HD-2): the shader's HLG ending, every
+    /// arm written as HLG-encoded BT.2020 (the matrix is then source →
+    /// BT.2020). 0 in an SDR project, whose arms are exactly as before.
+    var output: Float = 0
+    /// The lift's SDR white over HLG's nominal peak, 203/1000 (HD-3).
+    var liftScale: Float = 0
+    /// BT.2100's nominal system gamma, the lift's inverse OOTF (1.2).
+    var ootfGamma: Float = 0
+    /// BT.2390's EETF for a PQ media above 1,000 cd/m² (HD-13 (c)): the PQ
+    /// signal of its peak (0 = no EETF), the target's signal over it, and
+    /// the knee KS = 1.5·maxLum − 0.5.
+    var eetfSourcePQ: Float = 0
+    var eetfMaxLum: Float = 0
+    var eetfKnee: Float = 0
+    /// The lift's decode toe (HD-13 (a)): Core Media 709's γ curve is drawn
+    /// by Core Graphics with ColorSync's slope limit, `max(s/16, s^γ)`, so an
+    /// SDR arm's decode in an HLG project is too (1/16; 0 elsewhere).
+    var decodeToe: Float = 0
 
     static let hlg: Float = 1, pq: Float = 2, sdrWide: Float = 3, srgb: Float = 4
     static let appleLog: Float = 5, slog3: Float = 6, vlog: Float = 7, lut: Float = 8
+    static let sdr: Float = 9
 
     /// A curve's kind: Apple Log 2 is Apple Log's curve (its gamut differs).
     static func kind(of curve: LogCurve) -> Float {
@@ -208,11 +227,11 @@ final class InputStage {
     /// (spec §11 GR-16), sampled at `texture(1)`; `fullRange` is the source
     /// media's range flag, which a log curve's code domain follows (GR-22);
     /// `peak` a PQ media's effective peak, where the PQ arm's shoulder ends
-    /// (spec §11 HD-12).
+    /// (spec §11 HD-12); `output` the project's dynamic range (HD-2).
     func encode(
         _ conversion: InputConversion, premultiplied: Bool, from source: MTLTexture,
         into target: MTLTexture, buffer: MTLCommandBuffer, lut: MTLTexture? = nil,
-        fullRange: Bool = false, peak: UInt32? = nil
+        fullRange: Bool = false, peak: UInt32? = nil, output: CanvasOutput = .sdr
     ) -> Bool {
         let descriptor = MTLRenderPassDescriptor()
         descriptor.colorAttachments[0].texture = target
@@ -224,7 +243,7 @@ final class InputStage {
         encoder.label = "Frame Job input"
         encoder.setRenderPipelineState(pipeline)
         var u = conversion.uniforms(
-            premultiplied: premultiplied, fullRange: fullRange, peak: peak)
+            premultiplied: premultiplied, fullRange: fullRange, peak: peak, output: output)
         encoder.setFragmentBytes(&u, length: MemoryLayout<InputUniforms>.stride, index: 0)
         encoder.setFragmentTexture(source, index: 0)
         encoder.setFragmentTexture(lut ?? noLUT, index: 1)
@@ -250,18 +269,19 @@ extension MetalRenderer {
     /// a LUT is found through the URLs its document published, and one that
     /// cannot be drawn leaves the source unconverted. A track's range flag
     /// comes from the instruction (`fullRangeTracks`, GR-22), and a PQ
-    /// media's peak from the same `input` (spec §11 HD-12).
+    /// media's peak from the same `input` (spec §11 HD-12). In an HLG project
+    /// (`output`, spec §11 HD-2) the choice is `choose(input:buffer:output:)`'s.
     func encodeInputs(
         layers: [RecipeLayer], request: AVAsynchronousVideoCompositionRequest,
-        buffer: MTLCommandBuffer, live: inout [CVMetalTexture]
+        buffer: MTLCommandBuffer, live: inout [CVMetalTexture], output: CanvasOutput
     ) throws {
         var seen = Set<Int>()
         for layer in layers {
             guard case .track(let id) = layer.source, seen.insert(id).inserted,
                 let frame = request.sourceFrame(byTrackID: CMPersistentTrackID(id))
             else { continue }
-            let conversion = layer.input.flatMap(InputConversion.choose(input:))
-                ?? InputConversion.choose(for: frame)
+            let conversion = InputConversion.choose(
+                input: layer.input, buffer: frame, output: output)
             guard let conversion else { continue }
             var lut: MTLTexture?
             if case .lut(let media) = conversion {
@@ -279,7 +299,7 @@ extension MetalRenderer {
                 inputs.encode(
                     conversion, premultiplied: Self.declaresPremultipliedAlpha(frame),
                     from: source, into: target, buffer: buffer, lut: lut, fullRange: fullRange,
-                    peak: layer.input?.peak)
+                    peak: layer.input?.peak, output: output)
             else { throw InputError.noTarget }
             inputs.record(target, trackID: id)
         }

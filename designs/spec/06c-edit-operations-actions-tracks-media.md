@@ -82,10 +82,13 @@ The rules every op shares are §6a; the clip ops are §6b.
   color?}` · `remove_marker {marker}`** — Markers snap to frames; two markers may not share a time.
   Default color `red`.
 - **`set_canvas {width?, height?, fps?, background?, rescale_clips?, fit_new_clips?,
-  timecode_frames?}`** — `rescale_clips` multiplies every clip's `x`, `y`, `scale` by the size
+  timecode_frames?, output?}`** — `rescale_clips` multiplies every clip's `x`, `y`, `scale` by the size
   ratio. Changing fps normalizes top-level and every stored nest's clip starts, source-bounded
   durations, action spans, present base motion/text timing and a graphic's `in` and `length`, plus
   top-level markers (§11, D7-3, G-18·b). Size-only and same-fps edits leave legacy timing alone.
+  `output` (`sdr` or `hlg`, format 23, §11 HD-2, HD-13) sets the project's dynamic range and
+  changes no clip or grade; the output the canvas has is an identity, and another value is
+  invalid input naming serde's list (`unknown variant \`pq\`, expected \`sdr\` or \`hlg\``).
 - **`add_media {descriptor}` → returns the id · `relink_media {media, path, bookmark?, probe?}` ·
   `remove_media {media, with_clips=false}`** — The descriptor is the `media[]` element minus `id`;
   the host probes the file. `relink_media`'s `probe` is the new file's descriptor minus `path` and

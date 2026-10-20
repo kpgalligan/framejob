@@ -47,7 +47,7 @@
 //! [`Kind::Text`], [`Kind::Texts`], [`Kind::Ids`] and [`Kind::Ranges`] are
 //! `Ticks`, `f64`, `bool`, `String`, `Vec<String>` (`set_action_end`'s
 //! `off` paths), `Vec<u32>` and the silence cut's `Vec<[Ticks; 2]>`, and
-//! the twelve named types map like this:
+//! the thirteen named types map like this:
 //!
 //! - [`Kind::Id`] — `u32`: an id naming a clip, track, action, marker or
 //!   media, and the canvas's two pixel dimensions, which are the same whole
@@ -58,8 +58,8 @@
 //!   two. Named rather than "a list of numbers" because their LENGTH is
 //!   part of what serde refuses.
 //! - [`Kind::Transition`], [`Kind::Alignment`], [`Kind::Curve`],
-//!   [`Kind::Fit`] and [`Kind::Matte`] — `TransitionKind`,
-//!   `TransitionAlign`, `Curve`, `ZoomFit`, `TrackMatte`: closed
+//!   [`Kind::Fit`], [`Kind::Matte`] and [`Kind::Output`] — `TransitionKind`,
+//!   `TransitionAlign`, `Curve`, `ZoomFit`, `TrackMatte`, `CanvasOutput`: closed
 //!   vocabularies, each carrying its members in [`Kind::values`] rather
 //!   than flattened to a string, because an agent
 //!   picking a legal value out of a schema is a reason this table exists.
@@ -148,6 +148,7 @@ pub enum Kind {
     Region,
     Groups,
     Matte,
+    Output,
 }
 
 impl Kind {
@@ -182,6 +183,7 @@ impl Kind {
             Fit => &["fit", "fill"],
             Groups => &["video", "audio", "text", "shape", "graphic"],
             Matte => &["none", "alpha", "alpha_inverted", "luma", "luma_inverted"],
+            Output => &["sdr", "hlg"],
             Ticks | Id | Index | Ids | Ranges | Number | Boolean | Text | Texts | Object
             | Color | FrameRate | Region => &[],
         }
@@ -318,7 +320,7 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
          within(opt("height", Id), CANVAS_MIN, CANVAS_MAX),
          opt("fps", FrameRate), opt("background", Color),
          opt("rescale_clips", Boolean), opt("fit_new_clips", Boolean),
-         opt("timecode_frames", Boolean)]),
+         opt("timecode_frames", Boolean), opt("output", Output)]),
     op("add_media", &[req("descriptor", Object)]),
     op("relink_media",
        &[req("media", Id), req("path", Text), opt("bookmark", Text), opt("probe", Object)]),

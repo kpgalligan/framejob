@@ -198,7 +198,7 @@ extension EditorViewController {
             let frame = Exporter.renderFrame(
                 project: project, urls: urls, at: time, maxWidth: nil, graphics: graphics)
             let picked = frame.flatMap {
-                CanvasEyedropperSession.color(at: target, in: $0, canvas: snapshot)
+                CanvasEyedropperSession.keyColor(at: target, in: $0, canvas: snapshot)
             }
             DispatchQueue.main.async { self?.chromaKeySampled(picked, session: session) }
         }
@@ -228,6 +228,20 @@ extension EditorViewController {
         binding.applyGrouped(
             "Chroma Key",
             binding.ops(video: VideoPatch(chroma: .some(session.chroma(picked: color)))))
+    }
+}
+
+extension CanvasEyedropperSession {
+    /// The chroma key the eyedropper stores for a pick at `point`: the
+    /// frame's colour there, read at its code values (`FrameWriter.pickable`)
+    /// — and in an HLG project un-lifted to the Rec. 709 colour it is
+    /// (`InputConversions.unliftedPick`), so the stored key is a Rec. 709
+    /// colour in both outputs and keys through the shader's inverse lift
+    /// (spec §11 HD-13 (h)).
+    static func keyColor(at point: CGPoint, in frame: CGImage, canvas: CanvasSnapshot) -> RGBA? {
+        let picked = color(at: point, in: FrameWriter.pickable(frame), canvas: canvas)
+        guard canvas.output == .hlg else { return picked }
+        return picked.map(InputConversions.unliftedPick)
     }
 }
 

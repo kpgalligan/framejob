@@ -215,7 +215,7 @@ struct ColorQualifierPatch: Codable, Equatable {
 // MARK: - The shader's block
 
 /// The adjustment pass's `buffer(1)` (`Compositor.metal`'s
-/// `QualifierUniforms`, field for field: sixteen scalar floats, 64 bytes).
+/// `QualifierUniforms`, field for field: twenty scalar floats, 80 bytes).
 struct QualifierUniforms {
     var hueEnabled: Float = 0
     var hueCenter: Float = 0
@@ -235,6 +235,12 @@ struct QualifierUniforms {
     /// 1 when the pass reads q from the blurred map at `texture(0)` instead
     /// of computing it (spec §11 GR-35); set only by `drawAdjustment`.
     var blurred: Float = 0
+    /// 1 in an HLG project: Y′ by BT.2020's weights (spec §11 HD-13 (g));
+    /// set only by `drawAdjustment`, from the canvas.
+    var hlgOutput: Float = 0
+    var reserved0: Float = 0
+    var reserved1: Float = 0
+    var reserved2: Float = 0
 
     /// `q`'s block, `enabled` 1 exactly when the qualifier is not neutral,
     /// so an unqualified pass skips the reading and weighs as it did.

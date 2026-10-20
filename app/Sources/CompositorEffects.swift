@@ -376,7 +376,10 @@ extension MetalRenderer {
                 for: layer, canvas: canvas, destination: destination, partner: partner)
         else { return nil }
         let texture: MTLTexture
-        switch source(for: layer, request: request, instruction: instruction, live: &live) {
+        switch source(
+            for: layer, request: request, instruction: instruction, live: &live,
+            output: canvas.output)
+        {
         case .textured(let resolved, let size, let premultiplied, let orientation):
             texture = resolved
             uniforms.sourceWidth = Float(size.width)

@@ -196,13 +196,13 @@ hue_curves` in the copy's own `core/` (row CT). MUTANT PASS when every named row
   identity-not-aligned     no identity alignment in an action: A2 A3 CT
   hue-wrap-dropped         a hue curve flat outside its first and last x: H4 P12
   hue-from-graded          the gain sampled at the turned hue: H13
-  hue-shift-reversed       the turn's degrees negated: H15 H1 H4 H13 H17
+  hue-shift-reversed       the turn's degrees negated: H15 H1 H4 H13 H17 B2
   luma-not-kept            the turn as HSV(h + degrees, S, V): H12 H1 H4 H13 H16
   gamut-limit-dropped      k fixed at 1: H15 H12 H1 H4 H13 H16
   chroma-guard-dropped     no chroma guard on the hue curves: H3
   hue-before-channel-curves  the hue curves before the channel curves: H14
   row-0-at-centre          row 0 sampled at y 0.5: K1 C1 M1 O1
-(A turn edit fails every row whose oracle turns a colour — H1, H4, H13 — and
+(A turn edit fails every row whose oracle turns a colour — H1, H4, H13, B2 — and
 row 0 at y 0.5 every tone row, O1 too: each is named, as it fails by
 construction.)
   shift-lock-ignored       the drag's ⇧ ignored: P14
@@ -307,15 +307,15 @@ STEP_HUE = ("        // (4c.2) The hue curves (spec §11 GR-32): once per pixel,
             "        // channel curves and before the look, through the strip's second row.\n"
             "        // Behind `hueCurvesEnabled`, so a layer without them never enters it.\n"
             "        if (u.hueCurvesEnabled > 0.5) {\n"
-            "            rgb = gradeHueCurves(rgb, curves, samp);\n"
+            "            rgb = gradeHueCurves(rgb, curves, samp, gradeWeights(u.hlgOutput));\n"
             "        }\n\n")
 HUE_GAIN = ("    if (abs(curve.g - 1.0) > 1e-6) {\n"
-            "        out = mix(float3(dot(out, float3(0.2126, 0.7152, 0.0722))), out, curve.g);\n"
+            "        out = mix(float3(dot(out, w)), out, curve.g);\n"
             "    }\n")
 HUE_RETURN = "    return y + max(k, 0.0) * d;\n"
 COLOR_DEGREES = "        float degrees = u.hue * (180.0 / M_PI_F);\n"
 COLOR_WRAP = "        float turn = degrees - 360.0 * floor(degrees / 360.0);\n"
-COLOR_SHIFT = "        rgb = gradeHueShift(rgb, hsvHue(rgb, mx, chroma), turn);\n"
+COLOR_SHIFT = "        rgb = gradeHueShift(rgb, hsvHue(rgb, mx, chroma), turn, w);\n"
 # name: ([(file, anchor, replacement), …], the rows that must fail)
 MUTANTS = {
     "catmull-rom": ([
@@ -382,13 +382,13 @@ MUTANTS = {
         "    float gain = strip.sample(samp, float2((oh / 360.0) * ((n - 1.0) / n) + 0.5 / n,"
         " 0.75)).g;\n"
         "    if (abs(gain - 1.0) > 1e-6) {\n"
-        "        out = mix(float3(dot(out, float3(0.2126, 0.7152, 0.0722))), out, gain);\n"
+        "        out = mix(float3(dot(out, w)), out, gain);\n"
         "    }\n")], ["H13"]),
     "hue-shift-reversed": ([(
         SHADER,
-        "        out = gradeHueShift(out, h, 360.0 * curve.r);\n",
-        "        out = gradeHueShift(out, h, -360.0 * curve.r);\n")],
-        ["H15", "H1", "H4", "H13", "H17"]),
+        "        out = gradeHueShift(out, h, 360.0 * curve.r, w);\n",
+        "        out = gradeHueShift(out, h, -360.0 * curve.r, w);\n")],
+        ["H15", "H1", "H4", "H13", "H17", "B2"]),
     "luma-not-kept": ([(
         SHADER, HUE_RETURN,
         "    float s = mx > 0.0 ? (mx - mn) / mx : 0.0;\n"
@@ -423,7 +423,7 @@ MUTANTS = {
                             ["H18"]),
     "color-hue-guarded": ([(
         SHADER, COLOR_SHIFT,
-        "        rgb = mix(rgb, gradeHueShift(rgb, hsvHue(rgb, mx, chroma), turn),\n"
+        "        rgb = mix(rgb, gradeHueShift(rgb, hsvHue(rgb, mx, chroma), turn, w),\n"
         "                  smoothstep(0.02, 0.06, chroma));\n")], ["H19"]),
     # T4-3 (spec §11 GR-34): one per decision.
     "blend-t-inverted": ([(

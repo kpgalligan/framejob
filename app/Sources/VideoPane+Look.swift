@@ -35,6 +35,15 @@ extension VideoPane {
         }
     }
 
+    /// Some selected clip's look is a LUT and the project is HDR (HLG), where
+    /// a `.cube` LUT still reads its values as Rec. 709 (spec §11 HD-2, HD-13
+    /// (k)). `ClipPane`'s structure signature reads it, since it adds or
+    /// removes the warning row.
+    var lutInHLG: Bool {
+        binding.snapshot.canvas.output == .hlg
+            && binding.videoClips.contains { binding.video($0).look?.kind == .lut }
+    }
+
     func lookSection(_ gallery: LookGallery) -> InspectorSection {
         let binding = self.binding
         func ids() -> [UInt32] { binding.videoClips.map(\.id) }
@@ -59,6 +68,14 @@ extension VideoPane {
             let warning = InspectorRowLabel(
                 "This clip's file is converted by Camera Log; a camera LUT here converts it "
                     + "twice.")
+            warning.lineBreakMode = .byWordWrapping
+            warning.maximumNumberOfLines = 0
+            rows.append(inspectorRow(nil, [warning]))
+        }
+        if lutInHLG {
+            // A warning only, as GR-16's: a LUT keeps its 0…1 meaning.
+            let warning = InspectorRowLabel(
+                "This project is HDR (HLG): a .cube LUT reads its values as Rec. 709.")
             warning.lineBreakMode = .byWordWrapping
             warning.maximumNumberOfLines = 0
             rows.append(inspectorRow(nil, [warning]))

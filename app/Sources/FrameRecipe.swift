@@ -8,11 +8,17 @@ struct RecipeCanvas: Codable, Equatable {
     let width: Int
     let height: Int
     let background: RGBA
+    /// The project's dynamic range (spec §11 HD-2); `.sdr` when absent.
+    let output: CanvasOutput
 
-    init(width: Int = 1920, height: Int = 1080, background: RGBA = [0, 0, 0, 1]) {
+    init(
+        width: Int = 1920, height: Int = 1080, background: RGBA = [0, 0, 0, 1],
+        output: CanvasOutput = .sdr
+    ) {
         self.width = width
         self.height = height
         self.background = background
+        self.output = output
     }
 
     init(from decoder: Decoder) throws {
@@ -20,6 +26,7 @@ struct RecipeCanvas: Codable, Equatable {
         width = c.lenient(.width, 1920)
         height = c.lenient(.height, 1080)
         background = c.lenient(.background, [0, 0, 0, 1])
+        output = c.lenient(.output, .sdr)
     }
 
     var size: CGSize { CGSize(width: width, height: height) }

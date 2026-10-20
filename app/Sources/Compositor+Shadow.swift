@@ -147,6 +147,12 @@ extension MetalRenderer {
         u.colorR = component(0)
         u.colorG = component(1)
         u.colorB = component(2)
+        // An HLG project's shadow colour is lifted, as every SDR colour Frame
+        // Job draws is (spec §11 HD-13 (f)).
+        if canvas.output == .hlg {
+            let lifted = InputConversions.liftSDR(SIMD3<Float>(u.colorR, u.colorG, u.colorB))
+            (u.colorR, u.colorG, u.colorB) = (lifted.x, lifted.y, lifted.z)
+        }
         u.opacity = opacity
 
         encoder.setRenderPipelineState(shadowPipeline)

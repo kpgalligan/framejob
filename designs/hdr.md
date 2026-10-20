@@ -924,3 +924,204 @@ scratch sockets and homes, each stopped by its pid; no `Frame Job: ` line in any
 **Residue:** #310 (LG1, found here and older than this phase). The owner's person check is
 HDR-4. Nothing else is open: the road map's question 2 (an HDR10 file mastered off 1,000 cd/m²)
 is HDR-4's file.
+
+## H-2 — #277, the HLG working space (HD-2, HD-3, HD-13)
+
+**What landed** (2026-10-19, in the worktree on `hdr`, from `9ccefec`). Spec §11 **HD-13**, written
+before the code (`11-decisions/hdr.md`: (a) the lift's arithmetic, (b) the SDR arms' decodes, (c)
+PQ through BT.2390's EETF above 1,000 cd/m², (d) HLG over P3 or BT.709, (e) camera log at
+×0.26741, (f) every drawn layer lifted at upload, (g) the grade's BT.2020 weights and tone's HLG
+transfer, (h) the key and a luma matte through the inverse lift, the qualifier not, (i) frames,
+(j) exports, (k) the words, (l) the two limits), its README row and the Lines cells. No toll: no
+file passed its cap (`CompositionBuilder.swift` 573 → 579, `Exporter.swift` 595 with its one line
+replaced in place, `ProjectSnapshot.swift` wiring only, `LayerRenderers.swift`, `Playback.swift`,
+`ExporterWriter.swift`, `CanvasSessions.swift` and the frozen files untouched). Then:
+
+- **Core:** `model.rs` `CanvasOutput` (`Sdr` default, `Hlg`, `is_sdr`) and `Canvas.output`, written
+  last and only when `hlg`; `edit_canvas.rs` `set_canvas`'s `output` (the same output an identity
+  through `finish`); `edit.rs` `Op::SetCanvas.output`, its dispatch and doc row; `op_table.rs`
+  `Kind::Output` (`["sdr", "hlg"]`, "thirteen named types") and `opt("output", Output)` last in
+  `set_canvas`'s row; `op_schema.rs` the vocabulary arm; `scope.rs` `scoped_view` copying the
+  parent's output (and its doc row); `recipe.rs` the canvas's `"output": "hlg"`, `plan.rs` the
+  plan's, each only when hlg; `export.rs` `HLG_ROWS` (the three 10-bit rows gain `"color": "hlg"`,
+  every other video row refused by its sentence, audio rows unchanged); format **23** in
+  `format.rs` and the header. Tests: `core/tests/canvas_output.rs` (new, 7), `schema_v23.rs`
+  (new, 5); `op_table.rs`, `op_schemas.rs` and `op_nullability.rs` take `Kind::Output` in their
+  exhaustive matches, `op_schemas.rs`'s count of kinds 19 → 20 and `op_nullability.rs`'s optional
+  inventory 68 → 69 (63 → 64 not plain).
+- **Swift and Metal:** `CanvasOutput.swift` (new, 32); the three decodes (`CanvasSnapshot.output`,
+  `RecipeCanvas.output`, `CompositionPlan.output`); `ReelOps.setCanvas(…, output:)` and
+  `setCanvasRaw(…, output:)`; `AgentServer+Tracks.setCanvas` reading `output` by `stringArg`
+  and counting it in "nothing to change"; the catalog's `output` description and one HLG sentence
+  each on `render_frame` and `export`. Step 0: `InputConversion.sdr`,
+  `choose(input:buffer:output:)`, `uniforms(…, output:)` and its `hlgUniforms`,
+  `InputConversions`' `hlgNominalGamma`, `hlgLogGrey`, `logHLGExposure`, `coreMedia709Toe`,
+  `toBT2020(from:)`, `hlgOETF`, `hlgInverseOETF`, `pqSignal(nits:)`, `liftSDR`, `unliftSDR`,
+  `unliftedPick`; `InputUniforms` 24 → 28 floats (`output`, `liftScale`, `ootfGamma` in the three
+  reserved, then `eetfSourcePQ`, `eetfMaxLum`, `eetfKnee`, `decodeToe`); `CompositionBuilder`
+  converting with BT.2020/HLG colour when `plan.output == .hlg`; the shader's `inputToHLG`,
+  `hlgInverseOOTF`, `pqEETF`, and above the grade the moved HLG constants, `kLuma2020`/`kLuma709`
+  and `hlgInverseOETF`, with `hlgOETF`, `kBT2020ToBT709` (derived) and `hlgUnliftSDR`. Layers and
+  grade: `LayerLift.swift` (new, 104); `MetalRenderer` holding it, passing `canvas.output` to
+  `encodeInputs` and clearing to the lifted background; `source(for:…, output:)`;
+  `prepare` passing the output; `LayerUniforms`' HLG group (`hlgOutput`, `liftedWhite`, two
+  reserved: 128 → 132 floats); `QualifierUniforms`' (16 → 20); `MatteUniforms.hlgOutput`;
+  `gradeWeights`, `lookHueChroma`/`gradeHueShift`/`gradeHueCurves` taking their weights, tone's HLG
+  pair, the key's and the matte resolve's un-lift, Fade Through White's lifted white, a shadow's
+  colour lifted. Frames and export: `FrameWriter.hlgSpace`, `isHLG`, `labelled` keeping an HLG
+  label, `pickable`, `WriteError.hlgJPEG`; `DeepStillFrame.read` labelling by the composition's
+  transfer; `DeepVideoFrame.reads(…, keepsDepth:)`; the one `Exporter.swift` line;
+  `ExportSettings.color`; `videoSettings` tagging HLG and turning Dolby Vision off. Picks:
+  `CanvasEyedropperSession.keyColor` (in `EditorViewController+Eyedropper.swift`), `QualifierPick`
+  reading `FrameWriter.pickable`. UI: `DocumentPane`'s Colour row (the "whole pipeline is sRGB"
+  comment replaced) and Dynamic Range popup; `VideoPane+Look.lutInHLG` and its warning row, read
+  by `ClipPane`'s signature.
+- **Proof:** `hdr_proof.py`'s HS, HH, HP, HT, HL, HW, HK, HM, HF, HX, TH, P6 (in
+  `hdr_probe.swift`), twelve mutants, the `hlg_p3`, `green_709` and `grey8` fixtures, and its
+  `no-composition-color` and `convert-everywhere` re-pinned; the layout asserts of
+  `tone_probe.swift`, `look_probe.swift`, `wheels_probe.swift`, `curves_probe.swift` (512 → 528),
+  `qualifier_probe.swift` (64 → 80, sixteen → twenty), `log_probe.swift` and `hdr_probe.swift`
+  (InputUniforms 96 → 112), and `log_probe.swift`'s `describe` gaining `.sdr`; the re-pinned
+  anchors of `curves_proof.py` (four mutants), `tone_proof.py`, `wheels_proof.py` and
+  `log_proof.py`; `tools/proof/README.md`'s "Road map hdr — H-2".
+- **Documents:** spec §4.3b, §5.2 (its title's format 21 → 23), §6c, §7.2, §7.3, §7.4, §7.5, §7.8
+  and the Lines; `designs/screens/11-document-inspector.md`; `docs/manual-checks.md`'s **HDR-1**
+  and an HLG step on GRD-16 and GRD-17; the README's HDR (HLG) bullet and `render_frame` row.
+
+**Found while building, and settled:**
+- **Core Graphics draws Core Media 709's γ curve with a toe.** P6, built to the spec's arithmetic
+  (the pure γ 502/256), failed by 21 levels at grey 11/1023 (CPU 0.0220 against Core Graphics'
+  0.0425). A scratch drawing of every 10-bit grey into `linearITUR_2020` read Core Graphics'
+  decode exactly: `max(s/16, s^γ)` (1/1023 → 6.109e-5, which is 1/1023/16; grey 57 the last
+  linear one, 58 on the curve). HD-3 makes the lift Core Graphics' drawing, so the lift takes the
+  toe (HD-13 (a) and (b) record it): the CPU lift then equals Core Graphics within 0.25 levels at
+  all 1,024 greys and its inverse returns every grey within 0.0002 levels (P6). HD-3's eight anchor
+  greys are all above the toe, which is why the pure γ reproduced them.
+- **`InputUniforms`' new group is four, not five:** the spec's three renamed fields and five new
+  ones make 29 floats (116 bytes, not a multiple of 16); its last reserved became `decodeToe`, so
+  the block is the 28 floats, 112 bytes it named.
+- **An SDR project's `render_frame` of a drawn layer is not its drawn value:** through
+  `AVAssetImageGenerator` a 128/255 texture reads 0.49999 and white 0.99615, where an HLG
+  project's frame is the reader's — so HT holds a layer to the value it is drawn with (128/255),
+  and prints the SDR figures unscored.
+- **A decoder's reading of a code is many levels at black through the lift's toe:** `srgb.mov`
+  (HEVC Main 10) renders column 0 at 0.0182 against a nominal 0 (18.65 levels; the sRGB EOTF's
+  linear toe) and `hlg_hevc` 1.41 levels from its own signal, where the ProRes fixtures stay under
+  half a level. Each fixture row is held to the oracle's ±1-code envelope widened by 1/1023 (H4's
+  `envelope` at 16 bits), and HP's EETF row to the columns where the clip and the EETF part by
+  more than 3 levels (near the 4,000 cd/m² peak both reach 1.0 again).
+- **ImageIO writes `cICP` 9/18/0/1 from the half-float HLG image directly** (`iCCP`
+  `kCGColorSpaceITUR_2100_HLG`), so the spec's conditional redraw into a 16-bit integer context
+  was not needed; the HEIC reads back 10-bit, `sips` naming its profile "Rec. ITU-R BT.2100 HLG".
+- Instruments: an empty timeline renders no frame (HT's background scene holds a clear 16 × 16
+  shape); a track holds no two clips at once (HM nests its two shapes and removes the emptied
+  track); `prores_ks`'s `-color_*` flags left `green_709` untagged (re-tagged by stream copy);
+  the layout asserts of seven probes (`tone_`, `look_`, `wheels_`, `curves_`, `qualifier_`,
+  `log_`, `hdr_probe.swift`) follow the grown blocks, and `log_probe.swift`'s exhaustive
+  `describe` gained `.sdr`.
+- **`LayerLift`'s key, the source texture's identity, cannot serve a stale lift** (the review's
+  open question: an animated graphic, a changing text). Every texture it is given is new and
+  written once: `lifting` (`Compositor+Sources.swift`:25) is called only on `renderers.image`,
+  `text`, `shape` and `graphic` (:63, :67, :70, :75), each of which comes through `cached`
+  (`LayerRenderers.swift`:92), whose miss makes a texture by `upload` — `device.makeTexture` then
+  one `replace` (`LayerRenderers.swift`:531–532; the graphic's `LayerRenderersGraphic.swift`:203,
+  :206), the only `makeTexture` and `replace` calls in `LayerRenderers*.swift`. Nothing there
+  draws into a texture it has already returned; a new text hash or a graphic's new frame (its key
+  is the frame's SVG, `LayerRenderersGraphic.swift`:72) is a new texture, so a new entry. Each
+  entry holds its source strongly (`LayerLift.swift`:90), so an identity is not reused while its
+  lift is held, and a hit also checks `===` (:61). No row added; the key is unchanged.
+
+**Verification**, 2026-10-19 (`pmset -g ps`: "Now drawing from 'AC Power'"; other sessions'
+load on the host, loadavg about 7), own instances on scratch sockets and homes, each stopped by
+its pid; no `Frame Job: ` line in any run (Z1) and no `DEFAULTS MOVED`:
+- **Controls**, on the untouched tree's Release build before the first product edit
+  (`RC_PROOF_APP=release`), each exit 0: `hdr_proof.py capture tools/proof/work/h2/ctl --only
+  H1,H7i,Z1` (H1's 12 scenes and picks captured, H7i ok); `precision_proof.py capture
+  …/precision-ctl` 7/7; `tone_`, `wheels_`, `curves_`, `qualifier_`, `look_proof.py capture
+  …-ctl` (6, 6, 18, 8 and 4 frames); `log_proof.py capture …/log-ctl`. A `ditto` copy of that
+  build is kept outside the products folder (`tools/proof/work/h2/ctl-app/`, gitignored).
+- In the loop: the core tests above and `scope`, `export`, `schema_v22`, `op_table`,
+  `op_schemas`, `op_nullability`; `make lint` clean; `make typecheck` 0 errors and the 4 baseline
+  warnings; each changed probe through `swift_build.py typecheck`; `make app-debug` BUILD
+  SUCCEEDED; on Debug `hdr_proof.py --only HS,HH,HP,HT,HL,HW,HK,HM,HF,HX,P1,P2,P3,P4,P5,P6,Z1`
+  first 7/17 (instrument faults above, and P6's toe), then 17/17; `spec_index_proof.py` 177/177.
+- `make gate`: **PASS in 257 s** (names 1 s, typecheck 5 s, fmt 2 s, lint 1 s, test 148 s, app
+  100 s). After the Release runs, the record and the instrument fixes (`op_argument_proof.py`,
+  the proof README), `make gate` passed again in 74 s (names 1 s and test 72 s re-ran;
+  typecheck, fmt, lint and app skipped as unchanged).
+- **Release** (the gate's `make app`): `hdr_proof.py --control tools/proof/work/h2/ctl` whole:
+  **32/32**, R0 recorded. HS: bt709 and untagged worst 0.479 levels from the lift (x = 512:
+  0.50536 against 0.50583), srgb 18.654 at column 0 (inside the envelope). HH: hlg 0.413, hlg_hevc
+  1.412 levels from their own signal; hlg_p3 grey 0.413, chroma 0 of 16 columns outside, 15 moved
+  > 4 levels by the matrix (CONTROL). HP: worst 1.009 levels for both; pq_hdr10 on the EETF at the
+  10 columns 776–848 where it parts from the clip by 28.3 … 3.76 levels. HT: white title 0.74951;
+  grey title, grey still and grey shape each 0.50732 against the recording at 128/255 0.50718 and
+  the lift 0.50741; background 0.50585. HL: worst 0.392 levels; 18 % grey 0.3801. HW: 0 of 16
+  chroma columns outside BT.2020 luma (15 separating the weights by > 2 levels, CONTROL); exposure
+  +1 worst 0.662 levels. HK: key [0.0, 0.99951, 0.00012]; SDR keyed left 0.50001 (CONTROL); HLG
+  left 0.50585, right 0.50536 against 0.50584. HM: worst left 0.219, right 0.347 levels. HF: depth
+  16, `cICP` [9, 18, 0, 1], `iCCP` 'kCGColorSpaceITUR_2100_HLG'; HEIC bitsPerSample 10, "Rec.
+  ITU-R BT.2100 HLG"; JPEG refused by its sentence. HX: both files bt2020nc/arib-std-b67/bt2020,
+  no DOVI record, no RPU; h264 and gif refused by the sentence; audio_wav written. P6: the CPU
+  lift 0.250 levels from Core Graphics at worst, the round trip 0.0002 levels, the pick
+  [0.6196, 0.4, 0.2118] for [0.62, 0.40, 0.21], the HLG key [0.7611, 0.3468, 0.1548] against
+  `unliftedPick` [0.7621, 0.3467, 0.1523]. `compare tools/proof/work/h2/ctl --only H1,Z1`: **2/2**,
+  every one of H1's 12 SDR scenes byte-identical to the control at 0 and 0.5 s with equal picks
+  (the reverse's intermediate digest differs, 962ccd7b115483ae against d7dd0befa51aa9c8, printed
+  and unscored, as in H-1).
+- **TH and TI** (`--measure`, 3/3): TH's SDR project 0 input passes per 120 frames (two lines),
+  averages 2.63 and 2.51 ms (mean 2.570), worst 6.39 and 8.06 ms; the HLG project 240 passes,
+  averages 3.61 and 3.2 ms (**mean 3.405 ms**), worst 12.98 and 6.79 ms — under PR-1's 8 ms
+  average budget, +0.835 ms over the same project in SDR for its two 4K sources' passes and the
+  lifted title; exports' wall 1.02 and 1.06 s. TI as before (HLG 120 passes, mean 1.975 ms;
+  BT.709 0, mean 1.395 ms).
+- `precision_proof.py compare …/precision-ctl` **11/11** (K1–K6 byte-identical, E1, E2, S3, S11);
+  `tone_proof.py` 19/19, `wheels_proof.py` 23/23, `curves_proof.py` 59/59, `qualifier_proof.py`
+  40/40, each `compare` with its N0 byte-identical; `look_proof.py compare` **28/30 — G1 and S1
+  FAILED**, and both fail the same way on the pre-H-2 copy (`--app …/ctl-app --only G1,S1,Z1`:
+  1/3): G1 is LG1's twin for the built-in tiles, added to #310; S1's expected refusal predates the
+  Color sub-tab's wheels and curves sections (noted on #310). `log_proof.py compare …/log-ctl`
+  **23/23**; `log_thumbs_proof.py --only T1,T2,T6,T7,T8,TP,Z1` 7/7; `lut_proof.py` **27/28 — LG1
+  FAILED**, #310 as in H-1; `matte_proof.py` 46/46; `frame_label_proof.py` 16/16;
+  `hevc_alpha_proof.py` 43/43; `op_argument_proof.py` 160/160 (after its candidates learned to try
+  every member of a closed vocabulary: `set_canvas.output`'s first member, `sdr`, is what an SDR
+  canvas already says, so the first run read it as unread, 158/160); `phase9_proof.py` 233/233;
+  `recording_probe.py --only catalog` 31/31; `screens.py --only 11-document-inspector` 6/6, 0 new
+  problems (the Colour row and the Dynamic Range popup in both looks).
+- **Mutants** (Release copies, each `--only <its rows>,Z1` against `tools/proof/work/h2/ctl`), all
+  twelve **MUTANT PASS** with no other row failing: `sdr-not-lifted` (HS: bt709 213.94 levels
+  from the lift; HT), `title-not-lifted` (HT: the white title 1.00000, the grey 0.50196),
+  `background-not-lifted` (HT), `709-weights-in-hlg` (HW), `srgb-tone-in-hlg` (HW),
+  `pq-no-eetf` (HP), `frame-labelled-709` (HF), `log-to-sdr-in-hlg` (HL), `dv-left-on` (HX),
+  `pick-tone-mapped` (P6), `key-not-unlifted` (HK), `matte-not-unlifted` (HM). The re-pinned
+  ones: `hdr_proof.py`'s `no-composition-color` (H2, H3, H1m) and `convert-everywhere` (H1, H1m),
+  `curves_proof.py`'s `hue-from-graded` (H13), `hue-before-channel-curves` (H14) and
+  `color-hue-guarded` (H19), `tone_proof.py`'s `exposure-encoded` (E1, E2),
+  `wheels_proof.py`'s `push-not-luma-neutral` (C1) and `log_proof.py`'s `labels-over-setting`
+  (L1, `--control …/log-ctl --only L1,Z1`): MUTANT PASS. `curves_proof.py`'s
+  `hue-shift-reversed` first answered MUTANT FAILURE: its five rows all FAILED (caught), and B2
+  failed beside them — B2 (T4-3's hue-curve blend, whose oracle is the same hue shift) postdates
+  the mutant's row list, and the same mutant on a detached worktree of `9ccefec` (before any H-2
+  edit) failed the same way, the same B2 columns (52/58), filed as #313. B2 is now in its row
+  list (`curves_proof.py`'s `MUTANTS` and docstring), and on Release (2026-10-20) it answered
+  MUTANT PASS: H15 H1 H4 H13 H17 B2 all FAILED, survived none, other rows failed none, B2 at
+  52/58 columns.
+
+**Owed.** The `CLAUDE.md` edits (applied by the orchestrator):
+- `app/CLAUDE.md`: `LayerLift.swift` (an HLG project's lift of every layer Frame Job draws, once
+  at upload by step 0's `.sdr` arm, an LRU of `LayerRenderers.cacheLimit + graphicCacheLimit`
+  entries keyed by the source texture); `CanvasOutput.swift` (the project's dynamic range, `sdr`
+  or `hlg`, on the canvas snapshot, the recipe's canvas and the plan); step 0's role in
+  `Compositor+Input.swift` and `InputConversions.swift` gaining the HLG arms
+  (`choose(input:buffer:output:)`, `uniforms(…, output:)`, `InputUniforms`' HLG fields) and the
+  lift's CPU twins (`liftSDR`, `unliftSDR`, `unliftedPick`, `coreMedia709Toe`); `FrameWriter`'s
+  role gaining `hlgSpace`, `pickable` and the HLG JPEG refusal; `DocumentPane`'s gaining the
+  Colour row and the Dynamic Range popup.
+- `core/CLAUDE.md`'s module map: `model.rs` gaining `CanvasOutput` (`Canvas.output`, written only
+  when `hlg`), `op_table.rs` gaining `Kind::Output`, and `export.rs`'s HLG arm (`HLG_ROWS`).
+
+**Residue:** #311 (an HLG or PQ still is drawn as SDR in an HLG project) and #312 (a key set on
+an HDR clip in an SDR project may need re-picking after the switch), filed from HD-13 (l); #310
+(LG1, and now look_proof's G1 and S1, older than this phase); #313 (`hue-shift-reversed`'s row
+list missing B2, older than this phase) fixed here, B2 added and the mutant passing. The owner's
+person check is HDR-1, with the HLG steps added to GRD-16 and GRD-17.

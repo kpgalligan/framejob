@@ -513,12 +513,11 @@ MUTANTS = {
     "plan-input-dropped": ([("core/src/plan.rs",
                              "                segment.insert(\"input\".to_string(), input);\n",
                              "")], ["L1"]),
-    "labels-over-setting": ([(STAGE_SWIFT,
-                              "            let conversion = layer.input.flatMap(InputConversion"
-                              ".choose(input:))\n                ?? InputConversion.choose(for: "
-                              "frame)\n",
-                              "            let conversion = InputConversion.choose(for: frame)\n"
-                              "                ?? layer.input.flatMap(InputConversion.choose("
+    # hdr H-2 (spec §11 HD-13): the choice moved into `choose(input:buffer:output:)`.
+    "labels-over-setting": ([(INPUT_SWIFT,
+                              "        let chosen = input.flatMap(choose(input:)) ?? choose(for: "
+                              "buffer)\n",
+                              "        let chosen = choose(for: buffer) ?? input.flatMap(choose("
                               "input:))\n")], ["L1"]),
     # hdr H-1 (spec §11 HD-12): the clear keeps a PQ file's peak, so the anchor is
     # the line that clears the Camera Log through `without_camera_log`.

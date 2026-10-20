@@ -73,8 +73,8 @@ tracks, lift masters 0.2 and −0.2, saved for the probe).
   P1 a puck drag over two clips (masters 0.2 / −0.2) is ONE live gesture ended
   "Lift" whose every update sends one `set_video` naming both with a patch of
   exactly `{wheels: {lift: {x, y}}}`; P2 `apply(wheels:)` sets `wheelsEnabled` 1
-  for gain master −0.5 alone and 0 for neutral; P3 `LayerUniforms` is 512 bytes
-  with `liftX` at 464 and `wheelsEnabled` at 500; P4 `keyedCount` for `{video:
+  for gain master −0.5 alone and 0 for neutral; P3 `LayerUniforms` is 528 bytes
+  (512 until hdr H-2's HLG group) with `liftX` at 464 and `wheelsEnabled` at 500; P4 `keyedCount` for `{video:
   {wheels: …, x: 3}}` is 1 on Color and 1 on Picture; P5 an ⌥ drag moves the
   puck a tenth of a plain one, and a press on the strip's knob grabs it with no
   write, so a double-click there is the reset alone; and, on a fresh document
@@ -183,7 +183,7 @@ MUTANTS = {
         "    v = pow(max(v, 0.0), exp2(gamma * kGamma));\n")], ["Y1", "C1"]),
     "push-not-luma-neutral": ([(
         SHADER,
-        "    return master + kWheelPush * length(float2(x, y)) * lookHueChroma(h);\n",
+        "    return master + kWheelPush * length(float2(x, y)) * lookHueChroma(h, kLuma709);\n",
         "    return master + kWheelPush * length(float2(x, y))\n"
         "        * saturate(abs(fmod(h / 60.0 + float3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0);\n")],
         ["C1"]),

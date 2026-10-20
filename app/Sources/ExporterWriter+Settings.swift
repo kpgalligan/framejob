@@ -252,6 +252,16 @@ extension ExportWriter {
                 AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
             ],
         ]
+        // An HLG project's 10-bit row (spec §11 HD-13 (j), the core's `color`):
+        // its pixels are HLG over BT.2020, and so are its tags.
+        let hlg = settings.color == "hlg"
+        if hlg {
+            output[AVVideoColorPropertiesKey] = [
+                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_2020,
+                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_2100_HLG,
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_2020,
+            ]
+        }
         guard codec != .proRes422, codec != .proRes4444 else { return output }
 
         var compression: [String: Any] = [
@@ -282,6 +292,13 @@ extension ExportWriter {
         if codec == .hevcWithAlpha {
             compression[kVTCompressionPropertyKey_AlphaChannelMode as String] =
                 kVTAlphaChannelMode_StraightAlpha
+        }
+        // Dolby Vision off (spec §11 HD-5, choice 5a): without the key
+        // VideoToolbox adds a profile 8.4 configuration and RPU frames to an
+        // HLG HEVC Main 10 file by itself (the brief's M7).
+        if hlg, codec == .hevc {
+            compression[kVTCompressionPropertyKey_HDRMetadataInsertionMode as String] =
+                kVTHDRMetadataInsertionMode_None
         }
         output[AVVideoCompressionPropertiesKey] = compression
         return output

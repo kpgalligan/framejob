@@ -947,7 +947,10 @@ the key map behind it.
   `GraphicSchema` (with `orderedKeys`), a pure move out of it ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
   ops are document-level; its transparency note names one or two alpha
-  export formats and counts three or more, spec §11 G-33) · `OptionControls.swift` (the descriptor-driven
+  export formats and counts three or more, spec §11 G-33; the Colour row
+  and its Dynamic Range popup, SDR or HLG, spec §11 HD-2) ·
+  `CanvasOutput.swift` (the project's dynamic range, `sdr` or `hlg`, on the
+  canvas snapshot, the recipe's canvas and the plan) · `OptionControls.swift` (the descriptor-driven
   row controls) · `OptionControls+Choices.swift` (the typed, value-carrying
   `OptionPopupControl` init over the index one). `VideoPane+Motion.swift` owns the local wrapping
   `MotionInactiveNote` for selected zero-duration edges; it refreshes with
@@ -1252,9 +1255,16 @@ the key map behind it.
   `InputStage`, `InputUniforms`, and `ConvertingCompositor`, the class a
   composition holding an HLG, PQ or wide-gamut source, or a media with
   Camera Log, is built with, spec §11 GR-15, GR-16; a layer's `input`
-  chooses before the frame's labels) · `InputConversions.swift` (the
-  selector, `choose(input:)` for Camera Log, and every number Frame Job
-  chose — a log curve's code domain by its media's range flag, GR-22) ·
+  chooses before the frame's labels; in an HLG project the HLG arms,
+  `InputUniforms`' HLG fields, spec §11 HD-2, HD-3, HD-13) ·
+  `InputConversions.swift` (the selector, `choose(input:buffer:output:)`,
+  `uniforms(…, output:)`, and every number Frame Job chose — a log curve's
+  code domain by its media's range flag, GR-22; the SDR→HLG lift's CPU
+  twins `liftSDR`, `unliftSDR`, `unliftedPick` and `coreMedia709Toe`) ·
+  `LayerLift.swift` (an HLG project's lift of every layer Frame Job draws,
+  once at upload by step 0's `.sdr` arm; an LRU of
+  `LayerRenderers.cacheLimit + graphicCacheLimit` entries keyed by the
+  source texture, which `LayerRenderers` never redraws) ·
   `Compositor+Uniforms.swift` ·
   `Compositor+Shadow.swift` · `Compositor+Matte.swift` · `MattePlan.swift` ·
   `Compositor+Dissolve.swift` · `Compositor+Adjustment.swift` ·
@@ -1490,8 +1500,10 @@ the key map behind it.
 - `FrameWriter.swift` — a `CGImage` and a format in, a URL out, no panel:
   Save Frame and `render_frame` both call `writeFrame`, so their PNGs are
   byte-identical by construction; `writeFrame` labels a rendered frame BT.709
-  (`frameSpace`, §11 PR-11; `labelled` does the same for an APNG's frames),
-  and `write` is for snapshots, sheets and tiles. PNG keeps a NIL properties
+  (`frameSpace`, §11 PR-11; `labelled` does the same for an APNG's frames;
+  an HLG project's frame is `hlgSpace`, BT.2100 HLG, and JPEG is refused for
+  it, HD-13), `pickable` relabels an HLG frame so a pick reads its raw
+  values, and `write` is for snapshots, sheets and tiles. PNG keeps a NIL properties
   dictionary (anything added changes the file); JPEG flattens onto BLACK at
   0.9; HEIC is `UTType.heic`, never `public.heif`.
 

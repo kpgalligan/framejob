@@ -121,7 +121,9 @@ extension AgentServer {
                     + "path or format says otherwise, so a call that names neither is exactly "
                     + "the call it always was. When a graphic in the frame warned or failed, a "
                     + "sentence before the last names the graphic, its frame and the "
-                    + "diagnostic; a failed graphic draws its error card in the picture.",
+                    + "diagnostic; a failed graphic draws its error card in the picture. In an "
+                    + "HLG project (set_canvas output) the frame is a 16-bit PNG or a 10-bit "
+                    + "HEIC labelled BT.2100 HLG, and JPEG is refused.",
                 [
                     "t": [
                         "type": "integer",
@@ -229,7 +231,9 @@ extension AgentServer {
                     + "refuses the export before it starts; a graphic that fails during it "
                     + "stops the export with no file left, naming the graphic and the frame. "
                     + "graphic_warnings [{name, frame, message}]: each distinct warning a "
-                    + "graphic gave while the file was drawn, absent when none.",
+                    + "graphic gave while the file was drawn, absent when none. In an HLG "
+                    + "project (set_canvas output) hevc_10bit, prores_422 and prores_4444 are "
+                    + "written tagged HLG, and every other video preset is refused.",
                 [
                     "preset": exportPresetProperty,
                     "path": [

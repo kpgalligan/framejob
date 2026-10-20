@@ -38,8 +38,14 @@ use crate::export_overrides::{
     boolean, fps as fps_override, loudness, object, positive_u32, range as range_override,
 };
 use crate::export_table::fps_json;
-use crate::model::Project;
+use crate::model::{CanvasOutput, Project};
 use crate::time;
+
+/// The rows that carry an HLG project's picture in H-2 (spec §11 HD-5,
+/// HD-13 (j)): the three 10-bit ones, tagged HLG. Every other video row of an
+/// HLG project is refused until the SDR version lands (H-3), so no file
+/// carries HLG pixels labelled BT.709.
+const HLG_ROWS: [&str; 3] = ["hevc_10bit", "prores_422", "prores_4444"];
 
 /// Re-exported at its old path. Five modules outside this one
 /// (`edit.rs`, `edit_props.rs`, `edit_action.rs`, `edit_paste.rs`,
@@ -105,6 +111,14 @@ impl Project {
         overrides: Option<&Value>,
     ) -> Result<Value, String> {
         let preset = preset(preset_id)?;
+        let hlg = self.canvas.output == CanvasOutput::Hlg;
+        if hlg && preset.video && !HLG_ROWS.contains(&preset.id) {
+            return Err(format!(
+                "{} cannot carry an HLG project's picture; export it as hevc_10bit, \
+                 prores_422 or prores_4444",
+                preset.id
+            ));
+        }
 
         let overrides = object(overrides)?;
 
@@ -243,6 +257,12 @@ impl Project {
         // exists.
         out.insert("alpha".to_string(), Value::from(preset.alpha));
         out.insert("optimize_for_network".to_string(), Value::from(optimize));
+        // An HLG project's 10-bit row is written tagged HLG (spec §11 HD-13
+        // (j)); only then, so every SDR project's settings are the text they
+        // were and an audio row is unchanged.
+        if hlg && preset.video {
+            out.insert("color".to_string(), Value::from("hlg"));
+        }
         Ok(Value::Object(out))
     }
 }

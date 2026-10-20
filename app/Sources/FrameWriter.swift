@@ -216,6 +216,9 @@ enum FrameWriter {
         case flattenFailed(URL)
         /// `CGImageDestinationFinalize` answered false.
         case encodingFailed(Format, URL)
+        /// A JPEG asked of an HLG project's frame (spec §11 HD-13 (i)): eight
+        /// bits labelled BT.709 cannot carry it until H-3's SDR version.
+        case hlgJPEG
 
         var errorDescription: String? {
             switch self {
@@ -230,6 +233,8 @@ enum FrameWriter {
                 return "Could not flatten the frame onto black for \(url.path)."
             case .encodingFailed(let format, let url):
                 return "\(format.displayName) encoding failed for \(url.path)."
+            case .hlgJPEG:
+                return "JPEG cannot carry an HLG project's picture; save the frame as PNG or HEIC"
             }
         }
     }
@@ -399,19 +404,41 @@ extension FrameWriter {
             ?? CGColorSpace(name: CGColorSpace.itur_709)!
     }()
 
+    /// An HLG project's frame label (spec §11 HD-2, HD-13 (i)): BT.2100 HLG,
+    /// which `DeepStillFrame.read` gives every frame of an HLG composition.
+    static let hlgSpace: CGColorSpace = CGColorSpace(name: CGColorSpace.itur_2100_HLG)!
+
+    /// Whether `image` is an HLG project's frame, labelled `hlgSpace`.
+    static func isHLG(_ image: CGImage) -> Bool {
+        image.colorSpace?.name == CGColorSpace.itur_2100_HLG
+    }
+
     /// `image` labelled `frameSpace`, its pixels untouched; `image` itself
-    /// when the copy cannot be made.
+    /// when the copy cannot be made — and an HLG project's frame, already
+    /// labelled `hlgSpace`, unchanged.
     static func labelled(_ image: CGImage) -> CGImage {
-        image.copy(colorSpace: frameSpace) ?? image
+        if isHLG(image) { return image }
+        return image.copy(colorSpace: frameSpace) ?? image
+    }
+
+    /// The frame a pick reads (the chroma eyedropper, Pick from Canvas): an
+    /// HLG project's frame relabelled sRGB, so its code values pass through
+    /// the pick's sRGB readback unconverted (spec §11 HD-13 (h)) rather than
+    /// tone-mapped; any other frame unchanged.
+    static func pickable(_ image: CGImage) -> CGImage {
+        guard isHLG(image), let srgb = CGColorSpace(name: CGColorSpace.sRGB) else { return image }
+        return image.copy(colorSpace: srgb) ?? image
     }
 
     /// `write(labelled(image), as: format, to: url)`: the one writer of
     /// `render_frame` and File ▸ Save Frame… (PR-11). `write` itself stays
     /// unlabelled for `snapshot_ui`, `render_graphic`'s sheets and the look
-    /// gallery's tiles.
+    /// gallery's tiles. An HLG project's frame as JPEG is refused (spec §11
+    /// HD-13 (i)).
     @discardableResult
     static func writeFrame(_ image: CGImage, as format: Format, to url: URL) throws -> URL {
-        try write(labelled(image), as: format, to: url)
+        if format == .jpeg, isHLG(image) { throw WriteError.hlgJPEG }
+        return try write(labelled(image), as: format, to: url)
     }
 }
 

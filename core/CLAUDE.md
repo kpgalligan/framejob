@@ -14,7 +14,9 @@ governs a module now.
 - `lib.rs` — module declarations and re-exports only. No implementation code.
 - `model.rs` — the spec §5.2 SHAPE: the project, its tracks, clips, sources,
   actions, markers and nests, with the serde defaults that say what an absent
-  key means. The struct field names ARE the JSON keys. Nothing else lives here.
+  key means. The struct field names ARE the JSON keys. Nothing else lives here
+  but `CanvasOutput` (`Canvas.output`, `sdr` or `hlg`, written only when
+  `hlg`, format 23, spec §11 HD-2).
 - `model_props.rs` — the schema's VOCABULARY: the per-clip property types
   (`VideoProps`, `AudioProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`,
   `Filter`, `Reflection`, `BlendMode`, `Compressor`, `Duck`) and their
@@ -212,7 +214,8 @@ governs a module now.
   nests. The semantics table is the reason this file is over the size cap
   and stays exempt (below).
 - `op_table.rs` — the op table as DATA (road map 7's D3): one `OpRow` per
-  op and one `Argument` per argument — its name, its `Kind`, whether the
+  op and one `Argument` per argument — its name, its `Kind` (`Kind::Output`
+  for `set_canvas`'s dynamic range), whether the
   decoder requires it and, for the few that have one, its `Bound` — and
   `OP_NAMES` as a projection of it, re-exported by
   `edit.rs` so no caller moved. A published interface, where the `Op` enum
@@ -670,7 +673,9 @@ governs a module now.
   (spec §11 GR-9).
 - `export.rs` · `export_overrides.rs` · `export_size.rs` · `export_table.rs`
   — settings resolution (`Project::export_settings`, the one thing that reads
-  a canvas, a duration, a rate and an override against a preset row); how an
+  a canvas, a duration, a rate and an override against a preset row; in an
+  HLG project only `HLG_ROWS` carry the picture, each other video row
+  refused by its own sentence, spec §11 HD-13); how an
   override is READ and REFUSED, naming the key and the value (`peak_dbtp`
   without `loudness_lufs` is an `Err`, because a ceiling with nothing to cap
   would be a key accepted and silently inert); the sizes the sheet offers and

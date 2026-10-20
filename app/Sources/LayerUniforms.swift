@@ -73,9 +73,9 @@ struct LayerUniforms {
     // `CompositorEffects.swift` fills every one of these and is where each
     // field's meaning, units and range are argued; the declarations live here
     // because the layout contract above governs the whole struct and a reader
-    // checking it against `Compositor.metal` has to see all 128 fields in one
-    // list (104 to here, the tone group's twelve and the wheels' twelve at
-    // the end).
+    // checking it against `Compositor.metal` has to see all 132 fields in one
+    // list (104 to here, the tone group's twelve, the wheels' twelve and the
+    // HLG group's four at the end).
     //
     // The M3 block's 28 begin with the four floats that used to be
     // `reserved0…3`; the obscure block's 36 restored a padding tail of three,
@@ -231,6 +231,16 @@ struct LayerUniforms {
     var wheelsEnabled: Float = 0
     var curvesEnabled: Float = 0
     var hueCurvesEnabled: Float = 0
+    // HLG (spec §11 HD-2, HD-13): `hlgOutput` is 1 in an HLG project — the
+    // grade's BT.2020 weights and HLG transfer, the chroma key read through
+    // the inverse lift — and `liftedWhite` Fade Through White's white there
+    // (HD-3's lift of SDR white); both 0 in an SDR project, so its draws are
+    // what they were (`Compositor+Uniforms.swift`, `Compositor+Adjustment
+    // .swift`). 128 + 4 = 132 floats = 528 bytes, 33 × 16.
+    var hlgOutput: Float = 0
+    var liftedWhite: Float = 0
+    var hlgReserved0: Float = 0
+    var hlgReserved1: Float = 0
 }
 
 /// The shadow pass's uniform block, mirroring `ShadowUniforms` in

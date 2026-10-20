@@ -97,6 +97,7 @@ extension MetalRenderer {
                 for: layer, canvas: canvas, destination: destination, ignoringOpacity: selection)
         else { return }
         var q = QualifierUniforms(layer.qualifier, selection: selection)
+        q.hlgOutput = canvas.output == .hlg ? 1 : 0
         u.chromaEnabled = 0
         if look == nil { u.lookEnabled = 0 }
         let curves = looks.curves.texture(for: layer.curves)

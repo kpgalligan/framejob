@@ -25,10 +25,17 @@ enum InputPrimaries: Equatable {
 /// the identity — for every other source, which is then sampled exactly as
 /// before T3-1 (no pass, its own texture). A media's Camera Log (GR-16)
 /// chooses before the labels: a maker's log curve and its camera gamut, or a
-/// `lut` media's table.
+/// `lut` media's table. In an HLG project (spec §11 HD-2, HD-13) every arm
+/// writes HLG-encoded BT.2020 instead, a BT.709 or untagged source takes
+/// `.sdr` (HD-3's lift) and an HLG BT.2020 source is the identity.
 enum InputConversion: Equatable {
     case hlg(InputPrimaries), pq(InputPrimaries), sdrWide(InputPrimaries), srgb(InputPrimaries)
     case log(LogCurve, InputPrimaries), lut(UInt32)
+    /// A BT.709 or untagged source lifted into an HLG project by HD-3's lift
+    /// (`InputConversions.liftSDR` is its CPU twin); chosen only in an HLG
+    /// project, and the conversion every layer Frame Job draws is lifted by
+    /// at upload (`LayerLift`).
+    case sdr
 
     /// Whether a source answering this makes its composition a converting
     /// one (`ConvertingCompositor`, GR-15 as amended). False only for
@@ -65,6 +72,23 @@ enum InputConversion: Equatable {
             return .log(log, InputPrimaries(gamut))
         }
         return input.lut.map { .lut($0) }
+    }
+
+    /// Step 0's choice for one frame in a project of `output` (spec §11 HD-2):
+    /// the media's Camera Log, else the frame's labels — exactly today's
+    /// choice in an SDR project. In an HLG project an HLG BT.2020 source is
+    /// already the working space (nil) and a source no arm converts — BT.709
+    /// or untagged — is lifted (`.sdr`).
+    static func choose(
+        input: MediaColor?, buffer: CVPixelBuffer, output: CanvasOutput
+    ) -> InputConversion? {
+        let chosen = input.flatMap(choose(input:)) ?? choose(for: buffer)
+        guard output == .hlg else { return chosen }
+        switch chosen {
+        case .hlg(.bt2020): return nil
+        case nil: return .sdr
+        default: return chosen
+        }
     }
 
     /// The selector over a decoded frame's own attachments — the labels
@@ -130,10 +154,17 @@ enum InputConversion: Equatable {
     /// The pass's uniform block for this conversion; `premultiplied` is the
     /// buffer's own label (spec §11 G-35 (b)), `fullRange` its media's range
     /// flag (spec §11 GR-22, `RecipeInstruction.fullRangeTracks`), `peak` a PQ
-    /// media's effective peak, its layer's `input.peak` (spec §11 HD-12).
-    func uniforms(premultiplied: Bool, fullRange: Bool = false, peak: UInt32? = nil)
-        -> InputUniforms
-    {
+    /// media's effective peak, its layer's `input.peak` (spec §11 HD-12),
+    /// `output` the project's dynamic range: an HLG project's arms are
+    /// `hlgUniforms` (`.sdr` is one in either output, since it is only ever
+    /// chosen in an HLG project).
+    func uniforms(
+        premultiplied: Bool, fullRange: Bool = false, peak: UInt32? = nil,
+        output: CanvasOutput = .sdr
+    ) -> InputUniforms {
+        guard output == .sdr else {
+            return hlgUniforms(premultiplied: premultiplied, fullRange: fullRange, peak: peak)
+        }
         let primaries: InputPrimaries
         var uniforms = InputUniforms()
         switch self {
@@ -167,6 +198,8 @@ enum InputConversion: Equatable {
             uniforms.kind = InputUniforms.lut
             uniforms.white = 1
             primaries = .bt709
+        case .sdr:
+            return hlgUniforms(premultiplied: premultiplied, fullRange: fullRange, peak: peak)
         }
         uniforms.premultiplied = premultiplied ? 1 : 0
         uniforms.systemGamma = InputConversions.hlgSystemGamma
@@ -178,6 +211,67 @@ enum InputConversion: Equatable {
         }
         uniforms.decodePower = InputConversions.displayGamma
         uniforms.setMatrix(InputConversions.toBT709(from: primaries))
+        return uniforms
+    }
+
+    /// The pass's uniform block in an HLG project (spec §11 HD-13 (a)–(e)):
+    /// every arm's decode, its primaries' matrix to BT.2020, then HLG's own
+    /// ending — the SDR arms (`.sdr`, `.srgb`, `.sdrWide`, `.lut`) by the
+    /// lift, PQ through display light at 1,000 cd/m² (BT.2390's EETF above
+    /// it), HLG and camera log in scene light.
+    private func hlgUniforms(premultiplied: Bool, fullRange: Bool, peak: UInt32?)
+        -> InputUniforms
+    {
+        var uniforms = InputUniforms()
+        let primaries: InputPrimaries
+        let cm709 = InputConversions.coreMedia709Gamma
+        switch self {
+        case .sdr:
+            uniforms.kind = InputUniforms.sdr
+            uniforms.decodePower = cm709
+            uniforms.decodeToe = InputConversions.coreMedia709Toe
+            primaries = .bt709
+        case .srgb(let p):
+            uniforms.kind = InputUniforms.srgb
+            primaries = p
+        case .sdrWide(let p):
+            uniforms.kind = InputUniforms.sdrWide
+            uniforms.decodePower = cm709
+            uniforms.decodeToe = InputConversions.coreMedia709Toe
+            primaries = p
+        case .lut:
+            uniforms.kind = InputUniforms.lut
+            uniforms.decodePower = cm709
+            uniforms.decodeToe = InputConversions.coreMedia709Toe
+            primaries = .bt709
+        case .hlg(let p):
+            uniforms.kind = InputUniforms.hlg
+            primaries = p
+        case .pq(let p):
+            uniforms.kind = InputUniforms.pq
+            let nits = Float(peak ?? 0)
+            if nits > InputConversions.pqWhite {
+                let source = InputConversions.pqSignal(nits: nits)
+                let maxLum = InputConversions.pqSignal(nits: InputConversions.pqWhite) / source
+                uniforms.eetfSourcePQ = source
+                uniforms.eetfMaxLum = maxLum
+                uniforms.eetfKnee = 1.5 * maxLum - 0.5
+            }
+            primaries = p
+        case .log(let curve, let p):
+            uniforms.kind = InputUniforms.kind(of: curve)
+            uniforms.exposure = InputConversions.logHLGExposure
+            let domain = InputConversions.codeDomain(curve, fullRange: fullRange)
+            uniforms.codeScale = domain.scale
+            uniforms.codeOffset = domain.offset
+            primaries = p
+        }
+        uniforms.premultiplied = premultiplied ? 1 : 0
+        uniforms.output = 1
+        uniforms.liftScale = InputConversions.pqReferenceWhite / InputConversions.pqWhite
+        uniforms.ootfGamma = InputConversions.hlgNominalGamma
+        uniforms.nitsScale = 10_000 / InputConversions.pqWhite
+        uniforms.setMatrix(InputConversions.toBT2020(from: primaries))
         return uniforms
     }
 }
@@ -224,6 +318,92 @@ enum InputConversions {
     static let logMidGrey: Float = 0.42
     static let logExposure: Float = pow(logMidGrey, displayGamma) / 0.18
     static let logWhite: Float = 64 * pow(logMidGrey, displayGamma)
+    /// An HLG project's camera log (spec §11 HD-13 (e)): scene reflection is
+    /// scaled so 18 % grey lands at HLG 0.38 (BT.2408's 38 %), then taken to
+    /// BT.2020 and through the OETF with no shoulder: 0.38²/3/0.18 (≈ 0.26741).
+    static let hlgLogGrey: Float = 0.38
+    static let logHLGExposure: Float = hlgLogGrey * hlgLogGrey / 3 / 0.18
+    /// BT.2100's nominal HLG system gamma at 1,000 cd/m², the lift's inverse
+    /// OOTF (spec §11 HD-13 (a)).
+    static let hlgNominalGamma: Float = 1.2
+    /// The slope limit Core Graphics draws Core Media 709's γ curve with,
+    /// measured in H-2 (`hdr_probe.swift` P6): its decode is `max(s/16, s^γ)`,
+    /// linear below grey 0.0559, so the lift's is too (spec §11 HD-13 (a)).
+    static let coreMedia709Toe: Float = 1.0 / 16.0
+
+    // MARK: The lift's CPU twins (spec §11 HD-3, HD-13 (a), (h))
+
+    /// BT.2100's HLG OETF constants a, b = 1 − 4a, c = 0.5 − a·ln(4a), and
+    /// BT.2020's luminance weights — the shader's own, for the twins below.
+    private static let hlgA: Float = 0.17883277, hlgB: Float = 0.28466892
+    private static let hlgC: Float = 0.55991073
+    private static let luma2020 = SIMD3<Float>(0.2627, 0.6780, 0.0593)
+
+    /// The HLG OETF: scene light (floored at 0) → signal.
+    static func hlgOETF(_ light: Float) -> Float {
+        let e = max(light, 0)
+        return e <= 1.0 / 12.0 ? (3 * e).squareRoot() : hlgA * log(12 * e - hlgB) + hlgC
+    }
+
+    /// The HLG inverse OETF: signal (floored at 0) → scene light.
+    static func hlgInverseOETF(_ signal: Float) -> Float {
+        let v = max(signal, 0)
+        return v <= 0.5 ? v * v / 3 : (exp((v - hlgC) / hlgA) + hlgB) / 12
+    }
+
+    /// SMPTE ST 2084's inverse EOTF: cd/m² → PQ signal (BT.2390's EETF, HD-13 (c)).
+    static func pqSignal(nits: Float) -> Float {
+        let m1: Float = 2610.0 / 16384.0, m2: Float = 2523.0 / 4096.0 * 128
+        let c1: Float = 3424.0 / 4096.0, c2: Float = 2413.0 / 4096.0 * 32
+        let c3: Float = 2392.0 / 4096.0 * 32
+        let y = pow(max(nits, 0) / 10_000, m1)
+        return pow((c1 + c2 * y) / (1 + c3 * y), m2)
+    }
+
+    /// HD-3's lift of an encoded SDR Rec. 709 colour into HLG BT.2020 —
+    /// step 0's `.sdr` arm on the CPU, for the canvas background, a shadow's
+    /// colour and Fade Through White's white: Core Media 709's γ decode with
+    /// its toe, the matrix to BT.2020, ×203/1000, BT.2100's inverse OOTF
+    /// (γ 1.2) and the OETF.
+    static func liftSDR(_ rgb: SIMD3<Float>) -> SIMD3<Float> {
+        func decode(_ s: Float) -> Float {
+            max(max(s, 0) * coreMedia709Toe, pow(max(s, 0), coreMedia709Gamma))
+        }
+        let linear = SIMD3<Float>(decode(rgb.x), decode(rgb.y), decode(rgb.z))
+        let display = simd_max(toBT2020(from: .bt709) * linear, .zero)
+            * (pqReferenceWhite / pqWhite)
+        let yd = simd_dot(display, luma2020)
+        let scene = yd > 0
+            ? display * pow(yd, (1 - hlgNominalGamma) / hlgNominalGamma) : .zero
+        return SIMD3<Float>(hlgOETF(scene.x), hlgOETF(scene.y), hlgOETF(scene.z))
+    }
+
+    /// `liftSDR`'s exact inverse, unclamped (spec §11 HD-13 (h)): the inverse
+    /// OETF, the OOTF (γ 1.2 on BT.2020 luminance), ×1000/203, BT.2020 →
+    /// BT.709 and Core Media 709's γ encode with its toe. The shader's
+    /// `hlgUnliftSDR` is its twin; the chroma key and a luma matte read
+    /// through it.
+    static func unliftSDR(_ hlg: SIMD3<Float>) -> SIMD3<Float> {
+        let scene = SIMD3<Float>(
+            hlgInverseOETF(hlg.x), hlgInverseOETF(hlg.y), hlgInverseOETF(hlg.z))
+        let ys = simd_dot(scene, luma2020)
+        let display = ys > 0 ? scene * pow(ys, hlgNominalGamma - 1) : .zero
+        let linear = toBT709(from: .bt2020) * (display * (pqWhite / pqReferenceWhite))
+        func encode(_ l: Float) -> Float {
+            min(max(l, 0) / coreMedia709Toe, pow(max(l, 0), 1 / coreMedia709Gamma))
+        }
+        return SIMD3<Float>(encode(linear.x), encode(linear.y), encode(linear.z))
+    }
+
+    /// The eyedropper's stored key in an HLG project (spec §11 HD-13 (h)): a
+    /// picked HLG colour un-lifted to the Rec. 709 colour it is, each channel
+    /// clamped to [0, 1], its alpha kept.
+    static func unliftedPick(_ color: RGBA) -> RGBA {
+        guard color.count >= 3 else { return color }
+        let rgb = unliftSDR(SIMD3<Float>(Float(color[0]), Float(color[1]), Float(color[2])))
+        return [rgb.x, rgb.y, rgb.z].map { Double(min(max($0, 0), 1)) } + color.dropFirst(3)
+    }
+
     /// Sony's and Panasonic's curves read the STORED 10-bit code over 1023,
     /// and a video-range file decodes to s = (code − 64)/876: their signal is
     /// s·876/1023 + 64/1023. Apple's is the normalized signal itself (GR-16's
@@ -270,6 +450,16 @@ enum InputConversions {
         let scale = unscaled.inverse * white
         return simd_double3x3(
             columns: (columns[0] * scale.x, columns[1] * scale.y, columns[2] * scale.z))
+    }
+
+    /// Linear `primaries` RGB → linear BT.2020 RGB (spec §11 HD-13), derived
+    /// like `toBT709`; exactly the identity for BT.2020.
+    static func toBT2020(from primaries: InputPrimaries) -> simd_float3x3 {
+        guard primaries != .bt2020 else { return matrix_identity_float3x3 }
+        let m = rgbToXYZ(.bt2020).inverse * rgbToXYZ(primaries)
+        return simd_float3x3(rows: (0..<3).map { r in
+            SIMD3<Float>((0..<3).map { c in Float(m[c][r]) })
+        })
     }
 
     /// Linear `primaries` RGB → linear BT.709 RGB, derived (never copied)

@@ -24,14 +24,18 @@ import CoreMedia
 /// file's asset and reads its first video track synchronously.
 enum DeepVideoFrame {
 
-    /// PR-9's still (`DeepStillFrame.shows`) or PR-12's track (`shows`),
-    /// asked in that order.
+    /// Every frame of an HLG project (spec §11 HD-13 (i): 16-bit, labelled
+    /// BT.2100 HLG, whatever the caller's format); otherwise, when the
+    /// caller's format `keepsDepth`, PR-9's still (`DeepStillFrame.shows`) or
+    /// PR-12's track (`shows`), asked in that order.
     static func reads(
         _ project: ReelProject, _ built: BuiltComposition, urls: [UInt32: URL], at t: Ticks,
-        options: RecipeOptions
+        options: RecipeOptions, keepsDepth: Bool
     ) -> Bool {
-        DeepStillFrame.shows(project, urls: urls, at: t, options: options)
-            || shows(project, built, at: t, options: options)
+        project.plan?.output == .hlg
+            || (keepsDepth
+                && (DeepStillFrame.shows(project, urls: urls, at: t, options: options)
+                    || shows(project, built, at: t, options: options)))
     }
 
     /// True when the recipe at `max(0, t)` (with `options`) has a `track`

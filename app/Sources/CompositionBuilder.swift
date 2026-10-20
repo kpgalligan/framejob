@@ -149,12 +149,18 @@ enum CompositionBuilder {
         // Per composition (spec §11 GR-15 as amended): one holding an HLG, PQ
         // or wide-gamut source, or a media with Camera Log (GR-16, the plan's
         // segment `input`), is converting — `ConvertingCompositor`, its
-        // frames BT.709 — and every other is built exactly as before.
-        let converts = convertsSources(videoTracks) || plan.convertsMedia
+        // frames BT.709 — and every other is built exactly as before. Every
+        // composition of an HLG project converts, its frames BT.2020/HLG
+        // (spec §11 HD-2).
+        let hlg = plan.output == .hlg
+        let converts = hlg || convertsSources(videoTracks) || plan.convertsMedia
         let videoConfiguration = AVVideoComposition.Configuration(
-            colorPrimaries: converts ? AVVideoColorPrimaries_ITU_R_709_2 : nil,
-            colorTransferFunction: converts ? AVVideoTransferFunction_ITU_R_709_2 : nil,
-            colorYCbCrMatrix: converts ? AVVideoYCbCrMatrix_ITU_R_709_2 : nil,
+            colorPrimaries: hlg ? AVVideoColorPrimaries_ITU_R_2020
+                : converts ? AVVideoColorPrimaries_ITU_R_709_2 : nil,
+            colorTransferFunction: hlg ? AVVideoTransferFunction_ITU_R_2100_HLG
+                : converts ? AVVideoTransferFunction_ITU_R_709_2 : nil,
+            colorYCbCrMatrix: hlg ? AVVideoYCbCrMatrix_ITU_R_2020
+                : converts ? AVVideoYCbCrMatrix_ITU_R_709_2 : nil,
             customVideoCompositorClass: converts ? ConvertingCompositor.self : Compositor.self,
             frameDuration: frameDuration(plan.fps),
             instructions: instructions, renderScale: 1,

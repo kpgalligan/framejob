@@ -1168,26 +1168,31 @@ extension ReelOp {
     }
 
     /// `rescaleClips` multiplies every clip's `x`, `y` and `scale` by the
-    /// size ratio; changing `fps` re-snaps every clip start and duration.
+    /// size ratio; changing `fps` re-snaps every clip start and duration;
+    /// `output` sets the dynamic range (spec §11 HD-2).
     static func setCanvas(
         width: Int? = nil, height: Int? = nil, fps: Fps? = nil, background: RGBA? = nil,
-        rescaleClips: Bool? = nil, fitNewClips: Bool? = nil, timecodeFrames: Bool? = nil
+        rescaleClips: Bool? = nil, fitNewClips: Bool? = nil, timecodeFrames: Bool? = nil,
+        output: CanvasOutput? = nil
     ) -> ReelOp {
         setCanvasRaw(
             width: width, height: height, fps: fps, background: background.map { $0 as Any },
             rescaleClips: rescaleClips, fitNewClips: fitNewClips,
-            timecodeFrames: timecodeFrames)
+            timecodeFrames: timecodeFrames, output: output?.rawValue)
     }
 
     /// The same op with the `background` the CALLER wrote, forwarded unread
     /// — the agent door's factory (deepening D1·4). Only the colour differs
     /// from the typed factory above, which is why that one delegates here
-    /// rather than keeping a second copy of the seven arguments; the `map` is
+    /// rather than keeping a second copy of the eight arguments; the `map` is
     /// what keeps an absent background absent, since an `Optional<RGBA>.none`
-    /// widened straight to `Any?` is a non-nil `Any` wrapping a nil.
+    /// widened straight to `Any?` is a non-nil `Any` wrapping a nil. `output`
+    /// is the caller's string, forwarded unread, so the core names a value it
+    /// does not know.
     static func setCanvasRaw(
         width: Int? = nil, height: Int? = nil, fps: Fps? = nil, background: Any? = nil,
-        rescaleClips: Bool? = nil, fitNewClips: Bool? = nil, timecodeFrames: Bool? = nil
+        rescaleClips: Bool? = nil, fitNewClips: Bool? = nil, timecodeFrames: Bool? = nil,
+        output: String? = nil
     ) -> ReelOp {
         var a = OpArgs()
         a.put("width", width)
@@ -1197,6 +1202,7 @@ extension ReelOp {
         a.put("rescale_clips", rescaleClips)
         a.put("fit_new_clips", fitNewClips)
         a.put("timecode_frames", timecodeFrames)
+        a.put("output", output)
         return ReelOp(name: "set_canvas", args: a.values)
     }
 

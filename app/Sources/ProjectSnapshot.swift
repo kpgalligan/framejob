@@ -401,11 +401,13 @@ struct CanvasSnapshot: Codable, Equatable {
     let fitNewClips: Bool
     /// Timecode shows `HH:MM:SS:FF` when true, `HH:MM:SS.mmm` when false.
     let timecodeFrames: Bool
+    /// The dynamic range (format 23, `CanvasOutput.swift`); `.sdr` when absent.
+    let output: CanvasOutput
 
     init(
         width: Int = 1920, height: Int = 1080, fps: Fps = .thirty,
         background: RGBA = [0, 0, 0, 1], fitNewClips: Bool = true,
-        timecodeFrames: Bool = true
+        timecodeFrames: Bool = true, output: CanvasOutput = .sdr
     ) {
         self.width = width
         self.height = height
@@ -413,6 +415,7 @@ struct CanvasSnapshot: Codable, Equatable {
         self.background = background
         self.fitNewClips = fitNewClips
         self.timecodeFrames = timecodeFrames
+        self.output = output
     }
 
     init(from decoder: Decoder) throws {
@@ -423,6 +426,7 @@ struct CanvasSnapshot: Codable, Equatable {
         background = c.lenient(.background, [0, 0, 0, 1])
         fitNewClips = c.lenient(.fitNewClips, true)
         timecodeFrames = c.lenient(.timecodeFrames, true)
+        output = c.lenient(.output, .sdr)
     }
 
     var size: CGSize { CGSize(width: width, height: height) }

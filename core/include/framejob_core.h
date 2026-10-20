@@ -162,9 +162,14 @@ extern "C" {
  * is), `peak` the person's override (1–10000) — each written only when set,
  * `{}` for a PQ file whose import read nothing, and `pq` only on a PQ file's
  * media, so a project with none writes the text it did; the reader's default
- * is none, so there is no migration step. 23 and above, 1014 included, are
+ * is none, so there is no migration step.
+ *
+ * Version 23 is the project's dynamic range (spec §11 HD-2, HD-13):
+ * `canvas.output`, `sdr` or `hlg`, after `timecode_frames`, written only when
+ * `hlg`, so an SDR project writes the text it did; the reader's default is
+ * `sdr`, so there is no migration step. 24 and above, 1014 included, are
  * newer. */
-#define RC_FORMAT_VERSION 22
+#define RC_FORMAT_VERSION 23
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

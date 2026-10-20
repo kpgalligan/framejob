@@ -60,6 +60,7 @@ func describe(_ conversion: InputConversion?) -> String {
     case .srgb(let p): return "srgb(\(name(p)))"
     case .log(let curve, let p): return "log(\(curve.rawValue),\(name(p)))"
     case .lut(let id): return "lut(\(id))"
+    case .sdr: return "sdr"
     }
 }
 
@@ -324,8 +325,8 @@ do {
     check(
         "LP4 InputConversions' log constants are GR-16's (mid-grey 0.42, exposure 0.42^2.4/0.18, "
             + "white 64·0.42^2.4, knee 0.39, the video code scale and offset), the kinds are 5–8, "
-            + "and InputUniforms stays 96 bytes",
-        wrong.isEmpty && want.count == mine.count && stride == 96,
+            + "and InputUniforms is 112 bytes (hdr H-2's HLG group)",
+        wrong.isEmpty && want.count == mine.count && stride == 112,
         "wrong \(wrong); stride \(stride)")
 }
 

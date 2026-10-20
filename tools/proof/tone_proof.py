@@ -68,8 +68,8 @@ for the probe), S (CARD, saved twice for N2).
   P: P1 Light's Temperature field over two clips with exposures +1 and −1
   sends one `set_video` naming both whose patch is exactly
   `{color: {temperature: 0.5}}`; P2 `apply(tone:)` sets `toneEnabled` 1 for
-  exposure −1 alone and 0 for neutral; P3 `LayerUniforms` is 512 bytes (464
-  until grading-2 G2-2's wheels group) with
+  exposure −1 alone and 0 for neutral; P3 `LayerUniforms` is 528 bytes (512
+  until hdr H-2's HLG group, 464 until grading-2 G2-2's wheels group) with
   `exposure` at 416; P4 `keyedCount` for `{video: {color: {exposure: 1}, x: 3}}`
   is 1 on Color and 1 on Picture.
 - **Z1** (CONTROL): the projects close and the log holds no `Frame Job: ` line.
@@ -146,10 +146,12 @@ STEP_4B = "        // (4b) The obscured regions. COLOUR ONLY"
 MUTANTS = {
     "exposure-encoded": ([(
         SHADER,
-        "    float3 lin = gradeDecode(rgb) * exp2(u.exposure) * gains;\n"
-        "    rgb = gradeEncode(lin);\n",
-        "    float3 lin = gradeDecode(rgb) * gains;\n"
-        "    rgb = clamp(gradeEncode(lin) * exp2(u.exposure), 0.0, 1.0);\n")], ["E1", "E2"]),
+        "    float3 lin = (hlg ? hlgInverseOETF(saturate(rgb)) : gradeDecode(rgb))\n"
+        "        * exp2(u.exposure) * gains;\n"
+        "    rgb = hlg ? hlgOETF(saturate(lin)) : gradeEncode(lin);\n",
+        "    float3 lin = (hlg ? hlgInverseOETF(saturate(rgb)) : gradeDecode(rgb)) * gains;\n"
+        "    rgb = clamp((hlg ? hlgOETF(saturate(lin)) : gradeEncode(lin)) * exp2(u.exposure), "
+        "0.0, 1.0);\n")], ["E1", "E2"]),
     "tone-before-obscure": ([
         (SHADER, STEP_4C, ""),
         (SHADER, STEP_4B, STEP_4C + STEP_4B)], ["O1"]),

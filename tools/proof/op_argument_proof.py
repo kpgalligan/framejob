@@ -766,9 +766,12 @@ def main():
         `value_for`'s; the rest exist because an argument whose value is what
         the project ALREADY says changes nothing when it is read and nothing
         when it is not — a boolean already set, `[30, 1]` on a 30 fps
-        project, black on a black canvas — and that is a fact about the
-        value, not about the handler."""
+        project, black on a black canvas, `sdr` on an SDR canvas (hdr H-2's
+        `set_canvas.output`: a closed vocabulary tries every member) — and
+        that is a fact about the value, not about the handler."""
         first = value_for(argument, fragment, ids, 600000)
+        if fragment.get("enum") and not isinstance(first, list):
+            return [m for m in fragment["enum"] if m is not None]
         if isinstance(first, bool):
             return [first, not first]
         if first == [0, 0, 0, 1]:

@@ -215,6 +215,11 @@ impl Project {
             "background".to_string(),
             Value::Array(background.iter().map(|c| number(*c)).collect()),
         );
+        // The dynamic range (spec §11 HD-2), only when HLG, so an SDR
+        // project's recipe is the text it was.
+        if !self.canvas.output.is_sdr() {
+            canvas.insert("output".to_string(), Value::from("hlg"));
+        }
 
         let mut out = Map::new();
         out.insert("t".to_string(), Value::from(t));

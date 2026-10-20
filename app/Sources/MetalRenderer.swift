@@ -46,6 +46,8 @@ final class MetalRenderer {
     let looks: LookTextures
     /// Step 0's pass, its targets and this frame's conversions (spec §11 GR-15).
     let inputs: InputStage
+    /// An HLG project's lift of every layer Frame Job draws (spec §11 HD-13 (f)).
+    private let lift: LayerLift
     let sampler: MTLSamplerState
     let textureCache: CVMetalTextureCache
     /// Bound where the shader ignores the texture (the slate): an unbound draw is undefined.
@@ -155,7 +157,8 @@ final class MetalRenderer {
             let qualifierMapPipeline = MetalRenderer.qualifierMapPipeline(
                 device: device, library: library),
             let looks = LookTextures(device: device, library: library),
-            let inputs = InputStage(device: device, library: library)
+            let inputs = InputStage(device: device, library: library),
+            let lift = LayerLift(device: device, library: library)
         else { return nil }
 
         let samplerDescriptor = MTLSamplerDescriptor()
@@ -200,6 +203,7 @@ final class MetalRenderer {
         self.qualifierMapPipeline = qualifierMapPipeline
         self.looks = looks
         self.inputs = inputs
+        self.lift = lift
         self.sampler = sampler
         self.textureCache = cache
         self.placeholder = placeholder
@@ -261,6 +265,21 @@ final class MetalRenderer {
         }
     }
 
+    /// `texture`, a layer Frame Job drew, lifted into an HLG project's working
+    /// space (`LayerLift`); nil when it could not be.
+    func lifted(_ texture: MTLTexture) -> MTLTexture? {
+        lift.lifted(texture, queue: commandQueue)
+    }
+
+    /// The canvas background as the frame is cleared to it: HD-3's lift of it
+    /// in an HLG project (spec §11 HD-13 (f)), as it stands in an SDR one.
+    private func background(_ canvas: RecipeCanvas) -> RGBA {
+        let c = canvas.background
+        guard canvas.output == .hlg, c.count >= 3 else { return c }
+        let lifted = InputConversions.liftSDR(SIMD3<Float>(Float(c[0]), Float(c[1]), Float(c[2])))
+        return [Double(lifted.x), Double(lifted.y), Double(lifted.z)] + c.dropFirst(3)
+    }
+
     /// Drops the `CVMetalTexture`s wrapping the previous render context's pixel buffers.
     func flushPixelBufferTextures() {
         CVMetalTextureCacheFlush(textureCache, 0)
@@ -295,7 +314,9 @@ final class MetalRenderer {
         inputs.beginFrame()
         defer { inputs.endFrame() }
         if converts, let recipe = recipe {
-            try encodeInputs(layers: recipe.layers, request: request, buffer: buffer, live: &live)
+            try encodeInputs(
+                layers: recipe.layers, request: request, buffer: buffer, live: &live,
+                output: canvas.output)
         }
         // Every matte, before the destination pass opens (spec §11 MT-6).
         var coverage = MatteCoverage(placeholder: placeholder)
@@ -316,7 +337,7 @@ final class MetalRenderer {
         // or a routed dissolve has to interrupt it, so the pass is a value
         // that can be suspended and resumed rather than one long-lived one.
         var pass = DestinationPass(
-            buffer: buffer, target: target, clear: clearColor(canvas.background),
+            buffer: buffer, target: target, clear: clearColor(background(canvas)),
             pipeline: pipeline, sampler: sampler)
         // Opened eagerly: a recipe with no layers still has to CLEAR the
         // destination, a recycled pixel buffer holding an old frame.

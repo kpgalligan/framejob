@@ -1,6 +1,7 @@
 // Built by tools/proof/hdr_proof.py as `main.swift` over every other file in
-// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P5
-// (grading-3 T3-1, spec §11 GR-15 as amended; P5 hdr H-1, spec §11 HD-12).
+// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P6
+// (grading-3 T3-1, spec §11 GR-15 as amended; P5 hdr H-1, spec §11 HD-12; P6
+// hdr H-2, spec §11 HD-3, HD-13).
 //
 // Step 0's maths through the app's own types: `InputConversion`'s selector
 // through BOTH readers (the labels as strings, and a `CMVideoFormatDescription`
@@ -57,6 +58,7 @@ func describe(_ conversion: InputConversion?) -> String {
     case .srgb(let p): return "srgb(\(name(p)))"
     case .log(let curve, let p): return "log(\(curve.rawValue),\(name(p)))"
     case .lut(let id): return "lut(\(id))"
+    case .sdr: return "sdr"
     }
 }
 
@@ -289,9 +291,9 @@ do {
     }
     let stride = MemoryLayout<InputUniforms>.stride
     check(
-        "P4 InputConversions' constants are GR-15's (502/256 included) and InputUniforms is 96 "
-            + "bytes",
-        wrong.isEmpty && want.count == mine.count && stride == 96,
+        "P4 InputConversions' constants are GR-15's (502/256 included) and InputUniforms is 112 "
+            + "bytes (hdr H-2's HLG group)",
+        wrong.isEmpty && want.count == mine.count && stride == 112,
         "wrong \(wrong); stride \(stride)")
 }
 
@@ -395,6 +397,148 @@ do {
             + "opDictionary sends peak and descriptorDictionary pq; setMediaColor sends null "
             + "for an empty dictionary; a marker omits a nil peak",
         misses.isEmpty, misses.joined(separator: "; "))
+}
+
+// MARK: - P6 the lift, its inverse, the HLG selector and the pick (hdr H-2, spec §11 HD-13)
+
+do {
+    var misses: [String] = []
+    // (a) liftSDR against Core Graphics drawing each Core Media 709 grey into a 16-bit-float
+    // `itur_2100_HLG` bitmap (HD-3's measurement, at every 10-bit grey).
+    let cm709 = CVImageBufferCreateColorSpaceFromAttachments([
+        kCVImageBufferColorPrimariesKey: kCVImageBufferColorPrimaries_ITU_R_709_2,
+        kCVImageBufferTransferFunctionKey: kCVImageBufferTransferFunction_ITU_R_709_2,
+        kCVImageBufferYCbCrMatrixKey: kCVImageBufferYCbCrMatrix_ITU_R_709_2,
+    ] as CFDictionary)?.takeRetainedValue()
+    let hlg = CGColorSpace(name: CGColorSpace.itur_2100_HLG)
+    let info = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.floatComponents.rawValue
+        | CGBitmapInfo.byteOrder16Little.rawValue
+    var worstCG: Float = .infinity, worstRound: Float = .infinity
+    if let cm709, let hlg,
+        let ctx = CGContext(
+            data: nil, width: 1024, height: 1, bitsPerComponent: 16, bytesPerRow: 1024 * 8,
+            space: hlg, bitmapInfo: info)
+    {
+        for i in 0..<1024 {
+            let v = CGFloat(i) / 1023
+            ctx.setFillColor(CGColor(colorSpace: cm709, components: [v, v, v, 1])!)
+            ctx.fill(CGRect(x: i, y: 0, width: 1, height: 1))
+        }
+        let drawn = ctx.data!.assumingMemoryBound(to: Float16.self)
+        worstCG = 0
+        worstRound = 0
+        var at: (Int, Float, Float) = (0, 0, 0)
+        for i in 0..<1024 {
+            let g = Float(i) / 1023
+            let lifted = InputConversions.liftSDR(SIMD3<Float>(repeating: g))
+            let cg = Float(drawn[i * 4])
+            if abs(lifted.x - cg) > worstCG { worstCG = abs(lifted.x - cg); at = (i, lifted.x, cg) }
+            let back = InputConversions.unliftSDR(lifted)
+            worstRound = max(worstRound, abs(back.x - g), abs(back.y - g), abs(back.z - g))
+        }
+        if worstCG > 1.0 / 1023 {
+            misses.append("liftSDR against CG worst \(worstCG * 1023) levels at grey \(at.0): "
+                + "\(at.1) against \(at.2)")
+        }
+        if worstRound > 1.0 / 1023 {
+            misses.append("unliftSDR(liftSDR(x)) worst \(worstRound * 1023) levels")
+        }
+    } else {
+        misses.append("the Core Media 709 space or the HLG bitmap could not be made")
+    }
+    // (c) choose(input:buffer:output:)'s table.
+    func buffer(_ transfer: CFString?, _ primaries: CFString?, log: CFString? = nil) -> CVPixelBuffer? {
+        var made: CVPixelBuffer?
+        CVPixelBufferCreate(nil, 16, 16, kCVPixelFormatType_64RGBAHalf, nil, &made)
+        guard let made else { return nil }
+        if let transfer {
+            CVBufferSetAttachment(made, kCVImageBufferTransferFunctionKey, transfer, .shouldPropagate)
+        }
+        if let primaries {
+            CVBufferSetAttachment(made, kCVImageBufferColorPrimariesKey, primaries, .shouldPropagate)
+        }
+        if let log {
+            CVBufferSetAttachment(made, kCVImageBufferLogTransferFunctionKey, log, .shouldPropagate)
+        }
+        return made
+    }
+    let hlgT = kCVImageBufferTransferFunction_ITU_R_2100_HLG
+    let pqT = kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ
+    let t709 = kCVImageBufferTransferFunction_ITU_R_709_2
+    let srgbT = kCVImageBufferTransferFunction_sRGB
+    let p2020 = kCVImageBufferColorPrimaries_ITU_R_2020
+    let p709 = kCVImageBufferColorPrimaries_ITU_R_709_2
+    let p3 = kCVImageBufferColorPrimaries_P3_D65
+    let slog3 = MediaColor(log: .slog3, gamut: .sGamut3)
+    let lut = try? JSONDecoder().decode(MediaColor.self, from: Data(#"{"lut":7}"#.utf8))
+    // (name, input, buffer, the SDR answer, the HLG answer)
+    let table: [(String, MediaColor?, CVPixelBuffer?, String, String)] = [
+        ("HLG 2020", nil, buffer(hlgT, p2020), "hlg(bt2020)", "nil"),
+        ("HLG P3", nil, buffer(hlgT, p3), "hlg(p3D65)", "hlg(p3D65)"),
+        ("HLG 709", nil, buffer(hlgT, p709), "hlg(bt709)", "hlg(bt709)"),
+        ("PQ 2020", nil, buffer(pqT, p2020), "pq(bt2020)", "pq(bt2020)"),
+        ("709 709", nil, buffer(t709, p709), "nil", "sdr"),
+        ("untagged", nil, buffer(nil, nil), "nil", "sdr"),
+        ("sRGB 709", nil, buffer(srgbT, p709), "srgb(bt709)", "srgb(bt709)"),
+        ("709 2020", nil, buffer(t709, p2020), "sdrWide(bt2020)", "sdrWide(bt2020)"),
+        ("Apple Log label", nil,
+         buffer(nil, p2020, log: kCVImageBufferLogTransferFunction_AppleLog), "nil", "sdr"),
+        ("S-Log3 on 709", slog3, buffer(t709, p709), "log(slog3,sGamut3)", "log(slog3,sGamut3)"),
+        ("a LUT on HLG", lut, buffer(hlgT, p2020), "lut(7)", "lut(7)"),
+    ]
+    for (name, input, frame, sdr, hdr) in table {
+        guard let frame else { misses.append("\(name): no buffer"); continue }
+        let old = describe(input.flatMap(InputConversion.choose(input:))
+            ?? InputConversion.choose(for: frame))
+        let gotSDR = describe(InputConversion.choose(input: input, buffer: frame, output: .sdr))
+        let gotHLG = describe(InputConversion.choose(input: input, buffer: frame, output: .hlg))
+        if gotSDR != sdr || old != sdr || gotHLG != hdr {
+            misses.append("\(name): sdr \(gotSDR) (today's \(old), want \(sdr)), hlg \(gotHLG) "
+                + "(want \(hdr))")
+        }
+    }
+    // (d) the pick: a 16-bit HLG frame of a known colour, read at its code values, and the
+    // eyedropper's stored key un-lifted in an HLG project.
+    let known: [CGFloat] = [0.62, 0.40, 0.21]
+    var pickDetail = "no frame"
+    if let hlg,
+        let ctx = CGContext(
+            data: nil, width: 4, height: 4, bitsPerComponent: 16, bytesPerRow: 4 * 8,
+            space: hlg, bitmapInfo: info)
+    {
+        ctx.setFillColor(CGColor(colorSpace: hlg, components: known + [1])!)
+        ctx.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        if let frame = ctx.makeImage() {
+            let point = CGPoint(x: 1.5, y: 1.5)
+            let sdrCanvas = CanvasSnapshot(width: 4, height: 4)
+            let hlgCanvas = CanvasSnapshot(width: 4, height: 4, output: .hlg)
+            let picked = CanvasEyedropperSession.color(
+                at: point, in: FrameWriter.pickable(frame), canvas: sdrCanvas)
+            let keySDR = CanvasEyedropperSession.keyColor(at: point, in: frame, canvas: sdrCanvas)
+            let keyHLG = CanvasEyedropperSession.keyColor(at: point, in: frame, canvas: hlgCanvas)
+            let want = InputConversions.unliftedPick(known.map(Double.init) + [1])
+            pickDetail = "picked \(String(describing: picked)), key sdr \(String(describing: keySDR)), "
+                + "key hlg \(String(describing: keyHLG)), unliftedPick \(want)"
+            let pickOK = picked.map { p in (0..<3).allSatisfy { abs(p[$0] - Double(known[$0])) <= 1.0 / 255 } } ?? false
+            let keyOK = keyHLG.map { k in (0..<3).allSatisfy { abs(k[$0] - want[$0]) <= 2.0 / 255 } } ?? false
+            if !pickOK || keySDR != picked || !keyOK || FrameWriter.isHLG(frame) == false {
+                misses.append("the pick: \(pickDetail)")
+            }
+        } else {
+            misses.append("the HLG frame could not be made")
+        }
+    } else {
+        misses.append("the HLG bitmap could not be made")
+    }
+    check(
+        "P6 liftSDR = Core Graphics drawing Core Media 709 into itur_2100_HLG at 1,024 greys ±1/1023, "
+            + "unliftSDR(liftSDR(x)) = x ±1/1023, choose(…, output:)'s table (SDR today's, HLG: "
+            + "HLG BT.2020 nil, no arm → sdr), and an HLG frame's pick at its code values ±1/255, "
+            + "the HLG eyedropper's key = unliftedPick ±2/255",
+        misses.isEmpty,
+        (misses.isEmpty ? [] : misses).joined(separator: "; ")
+            + "; worst against CG \(worstCG * 1023) levels, round trip \(worstRound * 1023) levels; "
+            + pickDetail)
 }
 
 finish()

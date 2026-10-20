@@ -20783,3 +20783,54 @@ nil)`) H7p, H7o; `mastering-over-cll` (`hdr10.rs` takes the mastering maximum fi
 `sei-unparsed` (the SEI route reads nothing) H7d, H7p; `unknown-not-1000` (no peak means 4,000)
 H7i, P5; `peak-below-knee` (the white not held at 1) H7o, P5. Its record: `designs/hdr.md`'s H-1
 section.
+
+## Road map hdr — H-2, the HLG working space (`hdr_proof.py` HS, HH, HP, HT, HL, HW, HK, HM, HF, HX, TH, P6 and twelve mutants; `hdr_probe.swift` P6; spec §11 HD-2, HD-3, HD-13)
+
+H-2 (#277) composes an HLG project (`canvas.output: "hlg"`, set only by `set_canvas {output}` —
+the Document tab's popup is never pressed, and "Resize clips proportionally" beside it persists a
+default) in HLG-encoded BT.2020. Every row reads `render_frame`'s 16-bit PNG as value/65535 and
+holds it to the proof's own maths (the header's HD-13 oracles: `lift`, `unlift`, `pq_hlg` with
+`eetf`, `hlg_matrix`, `log_hlg`), sampled at every 64th column. A fixture's row compares inside
+the oracle's **±1-code envelope widened by one 10-bit level** (`env16`, H4's way): the
+decoder's reading of a code is the uncertainty, and next to black one code is many levels of the
+lift's toe (srgb.mov's column 0: 18.65 levels from the nominal oracle, measured). Two fixtures
+are new, each made once under `tools/proof/work/hdr/media/`: `hlg_p3.mov` (the ramp re-tagged
+smpte432/arib-std-b67/bt2020nc) and `green_709.mov` (the left half BT.709 code-value green, Y 690
+Cb 167 Cr 105, the right half 50 % grey, `prores_ks` HQ re-tagged bt709 by stream copy — the
+encoder's own `-color_*` flags did not stick), plus `grey8.png` (0x808080, 640×360).
+
+- **HT** reads a layer's SDR grey as the value it is drawn with (128/255): an SDR project's
+  render comes through `AVAssetImageGenerator`, which reads 128/255 as 0.49999 and white as
+  0.99615 (printed, unscored), where an HLG project's frame is the reader's, the compositor's own.
+- **HM** draws its two shapes on two tracks and `nest`s them (a track holds no two clips at
+  once), removes the emptied track and makes the nest's track the luma matte.
+- **HF** reads the HEIC through `sips` (bitsPerSample, and the profile by its description, "Rec.
+  ITU-R BT.2100 HLG").
+- **P6** (`hdr_probe.swift`) draws every 10-bit Core Media 709 grey into a 16-bit-float
+  `itur_2100_HLG` bitmap: Core Graphics' decode of that space is `max(s/16, s^γ)`, measured in
+  H-2, and the lift takes the toe (spec §11 HD-13 (a)).
+- **TH** (`--measure`, with TI) exports TI's 4K BT.709 twin on two tracks (the upper at scale
+  0.5) and a title, 8 s, `prores_422`, once as an SDR and once as an HLG project, each on an
+  instance of its own; scored on the input passes only (0 and 240 per 120 frames).
+
+```sh
+python3 tools/proof/hdr_proof.py capture tools/proof/work/h2/ctl --only H1,H7i,Z1   # the tree before H-2's code
+make app-debug && python3 tools/proof/hdr_proof.py --only HS,HH,HP,HT,HL,HW,HK,HM,HF,HX,P1,P2,P3,P4,P5,P6,Z1
+make app && RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --control tools/proof/work/h2/ctl
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py compare tools/proof/work/h2/ctl --only H1,Z1
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --mutant <name> --control tools/proof/work/h2/ctl --only <its rows>,Z1
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --measure                        # TI and TH
+```
+
+The twelve mutants and their rows: `sdr-not-lifted` (no `.sdr` fallback) HS, HT;
+`title-not-lifted` (text bypasses `LayerLift`) HT; `background-not-lifted` HT;
+`709-weights-in-hlg` HW; `srgb-tone-in-hlg` HW; `pq-no-eetf` HP; `frame-labelled-709`
+(`labelled` always `frameSpace`) HF; `log-to-sdr-in-hlg` (log takes the SDR arms' ending) HL;
+`dv-left-on` (the insertion-mode key dropped) HX; `pick-tone-mapped` (`pickable` returns its
+image) P6; `key-not-unlifted` (the key's distance on the working colour) HK;
+`matte-not-unlifted` (the HLG resolve takes today's luma) HM. Re-pinned in H-2 to the lines it
+edited, each re-run: `hdr_proof.py`'s `no-composition-color` and `convert-everywhere`,
+`curves_proof.py`'s `hue-from-graded`, `hue-shift-reversed`, `hue-before-channel-curves`,
+`color-hue-guarded` (the `HUE_GAIN`, `STEP_HUE`, `COLOR_SHIFT` anchors), `tone_proof.py`'s `exposure-encoded`,
+`wheels_proof.py`'s `push-not-luma-neutral`, `log_proof.py`'s `labels-over-setting`. Its record:
+`designs/hdr.md`'s H-2 section.

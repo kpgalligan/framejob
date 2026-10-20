@@ -94,6 +94,8 @@ final class ClipPane: InspectorPaneView {
             videoPane.allLooked ? "look" : "-",
             // A LUT look over a Camera Log file adds Look's warning row (GR-16).
             videoPane.lutOverCameraLog ? "twice" : "-",
+            // A LUT look in an HLG project adds Look's other warning row (HD-13).
+            videoPane.lutInHLG ? "hlg-lut" : "-",
             // The LUTs are the Look gallery's Imported tiles (GR-8 [b]).
             LookGallery.luts(in: binding.snapshot).map { "\($0.id)=\(LookGallery.lutName($0))" }
                 .joined(separator: ","),

@@ -9,7 +9,7 @@ of GR-15's unmeasured claims; the product was not edited for them.
     python3 tools/proof/hdr_proof.py capture DIR [--only H1,H7i,Z1]   # the CONTROL tree: H1's
                                                     # and H7i's references, H2–H6 shown
     python3 tools/proof/hdr_proof.py compare DIR [--only H1,...]
-    python3 tools/proof/hdr_proof.py --measure      # TI: step 0's 4K cost (Release figures)
+    python3 tools/proof/hdr_proof.py --measure      # TI and TH: step 0's 4K cost (Release figures)
     python3 tools/proof/hdr_proof.py --mutant NAME [--control DIR]
 
 curves_proof.py's shape. Launches the app `proof_app` picks (Debug unless
@@ -151,6 +151,40 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   bit-exact with no peak, 1 at 100 and 203, peak/203 above), `MediaColor`'s
   stored and `input` shapes and its two dictionaries, `setMediaColor` sending
   null for an empty dictionary, and a converted marker omitting a nil `peak`.
+  P6 (hdr H-2): `liftSDR` against Core Graphics drawing each 10-bit Core Media
+  709 grey into a 16-bit-float `itur_2100_HLG` bitmap ±1/1023 and
+  `unliftSDR(liftSDR(x)) = x` ±1/1023; `choose(input:buffer:output:)`'s table
+  (SDR today's, HLG: HLG BT.2020 nil and no arm `.sdr`); a 16-bit HLG frame's
+  pick at its code values ±1/255 and the HLG eyedropper's key = `unliftedPick`
+  ±2/255.
+- **HS…HX** (hdr H-2, #277, spec §11 HD-2, HD-3, HD-13 — the HLG working
+  space): each project set to HLG by `set_canvas {output}`; every row reads the
+  16-bit PNG as value/65535 against this script's HD-13 oracles (`lift`,
+  `unlift`, `pq_hlg`, `eetf`, `hlg_matrix`, `log_hlg`) every 64th column,
+  inside the oracle's ±1-code envelope widened by 1/1023 (`env16`) unless a
+  row says otherwise. HS the bt709, untagged and srgb ramps → the lift (the
+  sRGB-EOTF twin for srgb); HH hlg and hlg_hevc = their own signal, `hlg_p3`
+  (smpte432/arib-std-b67) = the matrix in scene light on both rows; HP
+  pq_plain → PQ→HLG at 1,000 cd/m², pq_hdr10 (4,000) through BT.2390's EETF and
+  on it wherever it parts from the clip by > 3 levels (every 8th column, ≥ 4);
+  HT (640×360) a white title = 0.7500, a 50 % grey title, 8-bit grey PNG and
+  grey shape (each drawn 128/255) = the bt709 recording at 128/255 and its
+  lift, a [0.5, 0.5, 0.5, 1] background = 0.5059, each ±1/1023; HL bt709 as
+  S-Log3 → the log oracle, 18 % grey at 0.380; HW saturation −1 on the chroma
+  row → BT.2020 luma of the lifted colour, exposure +1 on the grey row →
+  OETF(min(2·invOETF(v), 1)); HK `green_709` over a 50 % background keyed in
+  SDR at the green its render reads, then switched: the left the lifted
+  background 0.5059, the right the lift of the SDR grey ±1/1023; HM a luma
+  matte (two shapes nested on the matte track) over bt709: left the lifted
+  ramp, right 0.5·lift + 0.5·0.5059 ±2/1023; HF the PNG 16-bit with `cICP`
+  9/18/0/1 and an `iCCP` named ITUR_2100_HLG, the HEIC 10-bit as BT.2100 HLG
+  (`sips`), JPEG refused by its sentence; HX `hevc_10bit` and `prores_422`
+  tagged bt2020nc/arib-std-b67/bt2020 with no Dolby Vision configuration or
+  RPU, `h264` and `gif` refused by the sentence, `audio_wav` written.
+- **TH** (`--measure`): TI's 4K BT.709 twin on two tracks (the upper at scale
+  0.5) and a title, 8 s, `prores_422`, as an SDR and as an HLG project, each on
+  its own instance: 0 and 240 input passes per 120 frames (scored), the frame
+  times printed against PR-1's 8 ms.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
@@ -161,9 +195,10 @@ NEW` shows the pixels equal). The mutant `relabel-in-renderframe` (H1)
 applies the label inside `Exporter.renderFrame` instead, which moves the
 eyedropper's picks; it runs against a capture made after PR-11.
 
-H1a and the H7 family run in a plain run, `compare` and `--only`; never under
-`capture`'s default selection, `--measure` or a mutant's default selection;
-hdr H-1's five mutants run with `--only <their rows>,Z1`. `capture --only`
+H1a, the H7 family and the H-2 rows run in a plain run, `compare` and `--only`;
+never under `capture`'s default selection, `--measure` or a mutant's default
+selection; hdr H-1's five and H-2's twelve mutants run with `--only <their
+rows>,Z1`. `capture --only`
 captures just the rows named, keeping an earlier capture's H1 record.
 `capture DIR` records H1's references (`DIR/h1-*.png`, `DIR/media/`,
 `DIR/capture.json` with the picks and the reverse's digest) and runs H2–H6 and
@@ -231,7 +266,9 @@ RETAGS = {"bt709": ("bt709", "bt709", "bt709"),
           "hlg": ("bt2020", "arib-std-b67", "bt2020nc"),
           "pq": ("bt2020", "smpte2084", "bt2020nc"),
           "b2020_709": ("bt2020", "bt709", "bt2020nc"),
-          "p3_709": ("smpte432", "bt709", "bt709")}
+          "p3_709": ("smpte432", "bt709", "bt709"),
+          # hdr H-2's HH: HLG over P3 D65 (spec §11 HD-13 (d)).
+          "hlg_p3": ("smpte432", "arib-std-b67", "bt2020nc")}
 HEVC10 = {"hlg_hevc": ("bt2020", "arib-std-b67", "bt2020nc"),
           "srgb": ("bt709", "iec61966-2-1", "bt709"),
           "b2020_2020": ("bt2020", "bt2020-10", "bt2020nc"),
@@ -269,7 +306,8 @@ H1_SUFFIX = {"still8": ".png", "webm": ".webm"}
 PICK_POINTS = {(W, H): [[256.5, 32.5], [512.5, 96.5], [900.5, 100.5]],
                (SW, SH): [[320.5, 180.5], [100.5, 60.5], [540.5, 300.5]]}
 ROWS = ["H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "H7", "H7d", "H7i",
-        "H7p", "H7o", "H7r", "R0", "TI", "P1", "P2", "P3", "P4", "P5", "Z1"]
+        "H7p", "H7o", "H7r", "HS", "HH", "HP", "HT", "HL", "HW", "HK", "HM", "HF", "HX", "R0",
+        "TI", "TH", "P1", "P2", "P3", "P4", "P5", "P6", "Z1"]
 # H7's family (hdr H-1, #281, spec §11 HD-6, HD-12): PQ ramps whose HDR10 static
 # metadata sits in the HEVC stream's SEI (the x265 CLI, muxed by ffmpeg's stream copy;
 # ffmpeg 9.0.2's libx265 wrapper no longer writes the mastering display with these
@@ -299,6 +337,18 @@ PEAK_FIXTURES = {600: "pq_hdr10_600", 1000: "pq_hdr10_cll", 2000: "pq_hdr10_disp
                  4000: "pq_hdr10"}
 AT_070 = {600: 255.0, 1000: 246.9, 2000: 243.5, 4000: 242.8}
 H7_ROWS = {"H7", "H7d", "H7i", "H7p", "H7o", "H7r"}
+# hdr H-2 (#277, spec §11 HD-2, HD-3, HD-13): the HLG working space's rows, and the
+# numbers its oracles use (HD-13 (a)–(e)); every row reads 16-bit PNGs as value/65535,
+# and a 10-bit level is the tolerance unless the row names another.
+H2_ROWS = {"HS", "HH", "HP", "HT", "HL", "HW", "HK", "HM", "HF", "HX"}
+LEVEL = 1 / 1023
+HLG_NOMINAL_GAMMA = 1.2
+LIFT_SCALE = PQ_REFERENCE / PQ_WHITE
+LOG_HLG_EXPOSURE = 0.38 * 0.38 / 3 / 0.18
+SLOG3_BREAK = 171.2102946929
+# Core Graphics draws Core Media 709's γ curve with a slope limit of 16: its decode is
+# max(s/16, s^γ) (measured in H-2, `hdr_probe.swift` P6), and so is the lift's.
+CM709_TOE = 16.0
 
 
 BASE_COMMIT = "716720c"
@@ -309,7 +359,11 @@ COMPOSITOR = "app/Sources/Compositor.swift"
 BUILDER = "app/Sources/CompositionBuilder.swift"
 SHADER = "app/Resources/Shaders/Compositor.metal"
 HDR10_RS = "core/src/hdr10.rs"
-P_ROWS = {"P1", "P2", "P3", "P4", "P5"}
+SOURCES_SWIFT = "app/Sources/Compositor+Sources.swift"
+RENDERER_SWIFT = "app/Sources/MetalRenderer.swift"
+WRITER_SWIFT = "app/Sources/FrameWriter.swift"
+SETTINGS_SWIFT = "app/Sources/ExporterWriter+Settings.swift"
+P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6"}
 RECORDS = {"R0"}
 # name: ([(file, anchor, replacement), …], the rows that must fail).
 MUTANTS = {
@@ -325,18 +379,19 @@ MUTANTS = {
                          ["H3", "H4", "P3"]),
     "lift-dropped": ([(SHADER, "    return y <= 0.0 ? float3(0.0) : y + (l - y) * (y / (y - low));\n",
                        "    return max(l, 0.0);\n")], ["H4", "P3"]),
+    # Re-pinned in hdr H-2: an HLG project's colour comes first on each line.
     "no-composition-color": ([
-        (BUILDER, "            colorPrimaries: converts ? AVVideoColorPrimaries_ITU_R_709_2 : nil,\n",
-         "            colorPrimaries: nil,\n"),
-        (BUILDER, "            colorTransferFunction: converts ? AVVideoTransferFunction_ITU_R_709_2 : "
-         "nil,\n", "            colorTransferFunction: nil,\n"),
-        (BUILDER, "            colorYCbCrMatrix: converts ? AVVideoYCbCrMatrix_ITU_R_709_2 : nil,\n",
-         "            colorYCbCrMatrix: nil,\n")], ["H2", "H3", "H1m"]),
+        (BUILDER, "                : converts ? AVVideoColorPrimaries_ITU_R_709_2 : nil,\n",
+         "                : nil,\n"),
+        (BUILDER, "                : converts ? AVVideoTransferFunction_ITU_R_709_2 : nil,\n",
+         "                : nil,\n"),
+        (BUILDER, "                : converts ? AVVideoYCbCrMatrix_ITU_R_709_2 : nil,\n",
+         "                : nil,\n")], ["H2", "H3", "H1m"]),
     "select-by-primaries": ([(INPUT_SWIFT, "        guard logTransfer == nil else { return nil }\n",
                               "        if let wide = wide(primaries) { return wide }\n")],
                             ["H1", "P1"]),
-    "convert-everywhere": ([(BUILDER, "        let converts = convertsSources(videoTracks) || "
-                                      "plan.convertsMedia\n",
+    "convert-everywhere": ([(BUILDER, "        let converts = hlg || convertsSources(videoTracks) "
+                                      "|| plan.convertsMedia\n",
                              "        let converts = true\n")], ["H1", "H1m"]),
     "conform-everywhere": ([
         (COMPOSITOR, "    var canConformColorOfSourceFrames: Bool { false }\n",
@@ -386,6 +441,74 @@ MUTANTS = {
     "peak-below-knee": ([(INPUT_SWIFT,
                           "        return max(nits, pqReferenceWhite) / pqReferenceWhite\n",
                           "        return nits / pqReferenceWhite\n")], ["H7o", "P5"]),
+    # hdr H-2 (#277, spec §11 HD-13): one per decision, each run with `--only <its
+    # rows>,Z1` and `--control` the capture made on the tree before the phase's code.
+    # The SDR arm: a BT.709 or untagged source left unlifted in an HLG project.
+    "sdr-not-lifted": ([(INPUT_SWIFT, "        case nil: return .sdr\n",
+                         "        case nil: return nil\n")], ["HS", "HT"]),
+    # Layers: text sampled as drawn, not lifted.
+    "title-not-lifted": ([(SOURCES_SWIFT,
+                           "            guard let rendered = renderers.text(props, hash: hash, "
+                           "reveal: reveal)\n            else { return .absent }\n"
+                           "            return lifting(rendered.texture, rendered.size)\n",
+                           "            guard let rendered = renderers.text(props, hash: hash, "
+                           "reveal: reveal)\n            else { return .absent }\n"
+                           "            return .textured(\n                rendered.texture, "
+                           "rendered.size, premultiplied: true, orientation: 0)\n")], ["HT"]),
+    # The background cleared to its SDR colour.
+    "background-not-lifted": ([(RENDERER_SWIFT,
+                                "            buffer: buffer, target: target, clear: "
+                                "clearColor(background(canvas)),\n",
+                                "            buffer: buffer, target: target, clear: "
+                                "clearColor(canvas.background),\n")], ["HT"]),
+    # The grade's weights: Rec. 709's in an HLG project too.
+    "709-weights-in-hlg": ([(SHADER,
+                             "    return hlgOutput > 0.5 ? kLuma2020 : float3(0.2126, 0.7152, "
+                             "0.0722);\n",
+                             "    return float3(0.2126, 0.7152, 0.0722);\n")], ["HW"]),
+    # Tone's transfer: the sRGB pair in an HLG project too.
+    "srgb-tone-in-hlg": ([(SHADER,
+                           "    float3 lin = (hlg ? hlgInverseOETF(saturate(rgb)) : "
+                           "gradeDecode(rgb))\n        * exp2(u.exposure) * gains;\n"
+                           "    rgb = hlg ? hlgOETF(saturate(lin)) : gradeEncode(lin);\n",
+                           "    float3 lin = gradeDecode(rgb) * exp2(u.exposure) * gains;\n"
+                           "    rgb = gradeEncode(lin);\n")], ["HW"]),
+    # PQ above 1,000 cd/m² clipped, not through BT.2390's EETF.
+    "pq-no-eetf": ([(SHADER,
+                     "        float3 s = u.eetfSourcePQ > 0.0 ? pqEETF(signal, u) : signal;\n",
+                     "        float3 s = signal;\n")], ["HP"]),
+    # Frames: an HLG frame relabelled BT.709 at the write.
+    "frame-labelled-709": ([(WRITER_SWIFT, "        if isHLG(image) { return image }\n", "")],
+                           ["HF"]),
+    # Camera log: the SDR arms' ending (the lift) in place of scene light's.
+    "log-to-sdr-in-hlg": ([(SHADER,
+                            "        return hlgOETF(max(inputMatrix(u, r * u.exposure), "
+                            "0.0));\n",
+                            "        return hlgOETF(hlgInverseOOTF(\n            max(inputMatrix("
+                            "u, r * u.exposure), 0.0) * u.liftScale, u.ootfGamma));\n")],
+                          ["HL"]),
+    # Dolby Vision: the insertion-mode key dropped.
+    "dv-left-on": ([(SETTINGS_SWIFT,
+                     "            compression[kVTCompressionPropertyKey_HDRMetadataInsertionMode "
+                     "as String] =\n                kVTHDRMetadataInsertionMode_None\n", "")],
+                   ["HX"]),
+    # The pick: an HLG frame read through ColorSync's tone mapping.
+    "pick-tone-mapped": ([(WRITER_SWIFT,
+                           "        guard isHLG(image), let srgb = CGColorSpace(name: "
+                           "CGColorSpace.sRGB) else { return image }\n"
+                           "        return image.copy(colorSpace: srgb) ?? image\n",
+                           "        return image\n")], ["P6"]),
+    # The chroma key's distance on the working (lifted) colour.
+    "key-not-unlifted": ([(SHADER,
+                           "        float d = distance(u.hlgOutput > 0.5 ? saturate(hlgUnliftSDR("
+                           "rgb)) : rgb, key);\n",
+                           "        float d = distance(rgb, key);\n")], ["HK"]),
+    # The matte resolve's luma on the lifted composite.
+    "matte-not-unlifted": ([(SHADER,
+                             "    if (u.hlgOutput > 0.5) {\n        // An HLG project (spec §11 "
+                             "HD-13 (h)): Rec. 709 luma of the un-lifted,\n",
+                             "    if (false) {\n        // An HLG project (spec §11 "
+                             "HD-13 (h)): Rec. 709 luma of the un-lifted,\n")], ["HM"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -743,6 +866,10 @@ def fixture(name):
         return pq_described(name)
     if name in ("hlg4k", "bt709_4k"):
         return four_k(name)
+    if name == "green_709":
+        return green_709()
+    if name == "grey8":
+        return grey_png()
     if name in MEDIA_REC:
         return MEDIA_REC[name]
     raise ValueError(name)
@@ -1011,6 +1138,17 @@ class Doc:
         new = [c["id"] for c in self.project().get("clips") or [] if c["id"] not in before]
         if not got["ok"] or len(new) != 1:
             self.ok, self.why = False, f"add_clip {Path(path).name}: {got.get('error')}"
+            return None
+        return new[0]
+
+    def place_tool(self, tool, **arguments):
+        """One clip made by `tool` (`add_text_clip`, `add_shape_clip`, `add_clip`); its
+        id, or None and the Doc failed."""
+        before = {c["id"] for c in self.project().get("clips") or []}
+        got = self.call(tool, **arguments)
+        new = [c["id"] for c in self.project().get("clips") or [] if c["id"] not in before]
+        if not got["ok"] or len(new) != 1:
+            self.ok, self.why = False, f"{tool}: {got.get('error')}"
             return None
         return new[0]
 
@@ -2021,6 +2159,753 @@ def run_r0(state):
     return {"path": made, "arm": chosen, "primaries": primaries, "matrix": matrix}
 
 
+# ---- hdr H-2 (#277, spec §11 HD-2, HD-3, HD-13): the HLG working space ----------
+
+def to2020(name):
+    """Linear `name` RGB → linear BT.2020 RGB (derived here, as `to709`)."""
+    return mat_mul(mat_inv(npm("bt2020")), npm(name))
+
+
+def hlg_oetf(light):
+    e = max(light, 0.0)
+    return math.sqrt(3 * e) if e <= 1 / 12 else HLG_A * math.log(12 * e - HLG_B) + HLG_C
+
+
+def inverse_ootf(display):
+    """BT.2100's inverse OOTF at γ 1.2 on BT.2020 luminance (HD-13 (a))."""
+    yd = sum(w * c for w, c in zip(LUMA2020, display))
+    if yd <= 0:
+        return [0.0, 0.0, 0.0]
+    return [c * yd ** ((1 - HLG_NOMINAL_GAMMA) / HLG_NOMINAL_GAMMA) for c in display]
+
+
+def srgb_eotf(c):
+    c = max(c, 0.0)
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def lift(rgb, primaries="bt709", decode="cm709"):
+    """HD-3's lift as HD-13 (a) computes it: Core Media 709's γ decode with its toe
+    (or the sRGB EOTF), the matrix to BT.2020, × 203/1000, the inverse OOTF, the HLG
+    OETF."""
+    linear = [srgb_eotf(c) if decode == "srgb" else max(max(c, 0.0) / CM709_TOE,
+                                                          max(c, 0.0) ** CM709_GAMMA)
+              for c in rgb]
+    display = [max(c, 0.0) * LIFT_SCALE for c in mat_vec(to2020(primaries), linear)]
+    return [unit(hlg_oetf(c)) for c in inverse_ootf(display)]
+
+
+def unlift(hlg):
+    """The lift's inverse (HD-13 (h)), unclamped above 1."""
+    scene = [hlg_inverse(c) for c in hlg]
+    ys = sum(w * c for w, c in zip(LUMA2020, scene))
+    display = [c * ys ** (HLG_NOMINAL_GAMMA - 1) for c in scene] if ys > 0 else [0.0] * 3
+    linear = mat_vec(to709("bt2020"), [c / LIFT_SCALE for c in display])
+    return [min(max(c, 0.0) * CM709_TOE, max(c, 0.0) ** (1 / CM709_GAMMA)) for c in linear]
+
+
+def pq_signal(nits):
+    y = (max(nits, 0.0) / 10000) ** PQ_M1
+    return ((PQ_C1 + PQ_C2 * y) / (1 + PQ_C3 * y)) ** PQ_M2
+
+
+def eetf(signal, peak):
+    """BT.2390's EETF (HD-13 (c)): Lb 0, the target 1,000 cd/m², KS = 1.5·maxLum − 0.5,
+    on the signal over the source's peak (held at 1)."""
+    source = pq_signal(peak)
+    max_lum = pq_signal(PQ_WHITE) / source
+    ks = 1.5 * max_lum - 0.5
+    e1 = min(min(max(signal, 0.0), 1.0) / source, 1.0)
+    if e1 < ks:
+        e2 = e1
+    else:
+        t = (e1 - ks) / (1 - ks)
+        e2 = ((2 * t ** 3 - 3 * t ** 2 + 1) * ks + (t ** 3 - 2 * t ** 2 + t) * (1 - ks)
+              + (-2 * t ** 3 + 3 * t ** 2) * max_lum)
+    return min(e2, 1.0) * source
+
+
+def pq_hlg(rgb, peak=None):
+    """PQ → HLG at 1,000 cd/m² (HD-13 (c)), through the EETF when `peak` exceeds it."""
+    signal = [eetf(c, peak) for c in rgb] if peak and peak > PQ_WHITE else list(rgb)
+    display = [min(pq_eotf(c) * 10000 / PQ_WHITE, 1.0) for c in signal]
+    return [unit(hlg_oetf(c)) for c in inverse_ootf([max(c, 0.0) for c in display])]
+
+
+def hlg_matrix(rgb, primaries):
+    """HLG over `primaries` → BT.2020 in scene light (HD-13 (d))."""
+    scene = mat_vec(to2020(primaries), [hlg_inverse(c) for c in rgb])
+    return [unit(hlg_oetf(max(c, 0.0))) for c in scene]
+
+
+def slog3_reflection(y):
+    """Sony's S-Log3 to scene reflection, y = code/1023 (the shader's constants)."""
+    code = y * 1023
+    if code >= SLOG3_BREAK:
+        return 10 ** ((code - 420.0) / 261.5) * 0.19 - 0.01
+    return (code - 95.0) * 0.01125 / (SLOG3_BREAK - 95.0)
+
+
+def log_hlg(signal):
+    """A video-range S-Log3 grey → HLG (HD-13 (e)): the code domain, the curve, the
+    exposure 0.26741, the OETF, no shoulder."""
+    y = signal * 876 / 1023 + 64 / 1023
+    return unit(hlg_oetf(slog3_reflection(y) * LOG_HLG_EXPOSURE))
+
+
+def levels(value):
+    return value * 1023
+
+
+def unit(value):
+    """The layer stage's clamp (spec §11 PR-1): every oracle's output is in [0, 1]."""
+    return min(max(value, 0.0), 1.0)
+
+
+def env16(fn, codes, matrix):
+    """The oracle `fn` of the R'G'B' at a fixture's Y', Cb and Cr codes each moved by
+    −1, 0, +1, as H4's envelope, widened by one 10-bit level: (low, high) triples."""
+    luma, cb, cr = codes
+    outs = [fn(rgb_of(luma + a, cb + b, cr + c, matrix))
+            for a in (-1, 0, 1) for b in (-1, 0, 1) for c in (-1, 0, 1)]
+    return ([min(o[i] for o in outs) - LEVEL for i in range(3)],
+            [max(o[i] for o in outs) + LEVEL for i in range(3)])
+
+
+def hlg_doc(client, name, paths=(), width=W, height=H, background=None):
+    """A project of `paths` one after another (1 s each), its canvas set to HLG
+    (`set_canvas {output}` — the Dynamic Range popup is never pressed: the canvas
+    checkbox beside it persists a default). The Doc, open."""
+    doc = Doc(client, name, width, height)
+    if background is not None and doc.ok:
+        doc.call("set_canvas", background=background)
+    for i, path in enumerate(paths):
+        if path is None:
+            doc.ok, doc.why = False, f"{name}: a fixture was refused ({REFUSED})"
+        elif doc.ok:
+            doc.place(path, at=i * SEC)
+    if doc.ok:
+        got = doc.call("set_canvas", output="hlg")
+        if not got["ok"] or (doc.project().get("canvas") or {}).get("output") != "hlg":
+            doc.ok, doc.why = False, f"{name}: set_canvas output: {got.get('error')}"
+    return doc
+
+
+def frame_of(doc, tag, width=W, height=H, t=T):
+    png = doc.render(tag, t) if doc.ok else None
+    frame = Frame(png, width, height) if png else None
+    return frame if frame is not None and frame.ok else None
+
+
+def grey_row_misses(frame, source, matrix, want, tag, misses, step=64):
+    """The grey row every `step`th column inside the envelope of `want(R'G'B')` at the
+    fixture's codes ±1 (`env16`), widened by one 10-bit level — the decoder's reading of
+    a code is the uncertainty, as H4's and H5's envelopes hold. The worst |Δ| against the
+    nominal oracle in 10-bit levels."""
+    worst = 0.0
+    for x in range(0, W, step):
+        rgb = source.rgb(x, GREY_ROW, matrix)
+        oracle = want(rgb)
+        bounds = env16(want, source.codes(x, GREY_ROW), matrix)
+        got = frame.px(x, GREY_ROW)
+        gap = max(abs(a - b) for a, b in zip(got, oracle))
+        worst = max(worst, gap)
+        if not inside(got, bounds) and len(misses) < 12:
+            misses.append(f"{tag} x={x} render {[round(v, 5) for v in got]} oracle "
+                          f"{[round(v, 5) for v in oracle]} ({levels(gap):.2f} levels) envelope "
+                          f"{[[round(v, 5) for v in b] for b in bounds]}")
+    return levels(worst)
+
+
+def run_hs(client, state):
+    """HS: the BT.709, untagged and sRGB ramps in an HLG project → the lift."""
+    misses, figures = [], []
+    for name, decode in (("bt709", "cm709"), ("untagged", "cm709"), ("srgb", "srgb")):
+        path = fixture(name)
+        source = yuv_frames(path, W, H) if path else None
+        doc = hlg_doc(client, f"hs-{name}", [path])
+        frame = frame_of(doc, f"hs-{name}")
+        state[f"hs_{name}_closed"] = doc.close()
+        if frame is None or source is None:
+            misses.append(f"{name}: {doc.why or 'no render or decode'}")
+            continue
+        worst = grey_row_misses(frame, source[0], "bt709",
+                                lambda rgb, d=decode: lift(rgb, "bt709", d), name, misses)
+        figures.append(f"{name}: worst |Δ| {worst:.3f} levels; at x=512 "
+                       f"{round(frame.px(512, GREY_ROW)[1], 5)} (lift "
+                       f"{round(lift(source[0].rgb(512, GREY_ROW, 'bt709'), 'bt709', decode)[1], 5)})")
+    check("HS the bt709, untagged and srgb ramps in an HLG project: the grey row (every 64th "
+          "column) = HD-3's lift (the sRGB-EOTF twin for srgb) inside the ±1-code envelope "
+          "±1/1023", not misses,
+          f"{misses or 'all within'}\n       " + "\n       ".join(figures))
+
+
+def run_hh(client, state):
+    """HH: HLG over BT.2020 unchanged; HLG over P3 matrixed in scene light."""
+    misses, figures = [], []
+    for name in ("hlg", "hlg_hevc"):
+        path = fixture(name)
+        source = yuv_frames(path, W, H) if path else None
+        doc = hlg_doc(client, f"hh-{name}", [path])
+        frame = frame_of(doc, f"hh-{name}")
+        state[f"hh_{name}_closed"] = doc.close()
+        if frame is None or source is None:
+            misses.append(f"{name}: {doc.why or 'no render or decode'}")
+            continue
+        worst = grey_row_misses(frame, source[0], "bt2020nc", lambda rgb: rgb, name, misses)
+        figures.append(f"{name}: grey row against its own signal worst {worst:.3f} levels")
+    path = fixture("hlg_p3")
+    source = yuv_frames(path, W, H) if path else None
+    doc = hlg_doc(client, "hh-hlg_p3", [path])
+    frame = frame_of(doc, "hh-hlg_p3")
+    state["hh_hlg_p3_closed"] = doc.close()
+    if frame is None or source is None:
+        misses.append(f"hlg_p3: {doc.why or 'no render or decode'} {REFUSED.get('hlg_p3', '')}")
+    else:
+        worst = grey_row_misses(frame, source[0], "bt2020nc",
+                                lambda rgb: hlg_matrix(rgb, "p3d65"), "hlg_p3", misses)
+        outside, moved = [], 0
+        for x in range(0, W, 64):
+            codes = source[0].codes(x, CHROMA_ROW)
+            bounds = env16(lambda rgb: hlg_matrix(rgb, "p3d65"), codes, "bt2020nc")
+            got = frame.px(x, CHROMA_ROW)
+            signal = source[0].rgb(x, CHROMA_ROW, "bt2020nc")
+            moved += max(abs(a - b) for a, b in zip(hlg_matrix(signal, "p3d65"), signal)) > 4 * LEVEL
+            if not inside(got, bounds):
+                outside.append((x, [round(v, 4) for v in got],
+                                [[round(v, 4) for v in b] for b in bounds]))
+        if outside:
+            misses.append(f"hlg_p3 chroma row outside the oracle's envelope: {outside[:3]}")
+        if moved < 4:
+            misses.append(f"CONTROL: the matrix moved only {moved} chroma columns by > 4 levels")
+        figures.append(f"hlg_p3: grey worst {worst:.3f} levels; chroma {len(outside)} of "
+                       f"{W // 64} columns outside, {moved} moved by > 4 levels (CONTROL)")
+    check("HH hlg and hlg_hevc in an HLG project equal their source signal (the grey row, "
+          "every 64th column, inside the ±1-code envelope ±1/1023); hlg_p3 (smpte432/"
+          "arib-std-b67) = the matrix in scene light (the grey and chroma rows inside the same "
+          "envelope)",
+          not misses, f"{misses or 'all within'}\n       " + "\n       ".join(figures))
+
+
+def run_hp(client, state):
+    """HP: PQ → HLG at 1,000 cd/m², and pq_hdr10 (4,000) through BT.2390's EETF."""
+    misses, figures = [], []
+    for name, peak in (("pq_plain", None), ("pq_hdr10", 4000)):
+        path = fixture(name)
+        source = yuv_frames(path, W, H) if path else None
+        doc = hlg_doc(client, f"hp-{name}", [path])
+        frame = frame_of(doc, f"hp-{name}")
+        state[f"hp_{name}_closed"] = doc.close()
+        if frame is None or source is None:
+            misses.append(f"{name}: {doc.why or 'no render or decode'}")
+            continue
+        worst = grey_row_misses(frame, source[0], "bt2020nc",
+                                lambda rgb, p=peak: pq_hlg(rgb, p), name, misses)
+        figures.append(f"{name}: worst |Δ| {worst:.3f} levels against PQ→HLG"
+                       f"{' through the EETF at 4,000' if peak else ' at 1,000'}")
+        if peak:
+            # Every 8th column above 1,000 cd/m² where the two oracles part by more than
+            # 3 levels: the render inside the EETF oracle's envelope there, so outside the
+            # no-EETF one's (at least four such columns, a CONTROL on the fixture).
+            parted = []
+            for x in range(0, W, 8):
+                rgb = source[0].rgb(x, GREY_ROW, "bt2020nc")
+                apart = abs(pq_hlg(rgb, peak)[1] - pq_hlg(rgb)[1])
+                if pq_eotf(rgb[1]) * 10000 <= PQ_WHITE or apart <= 3 * LEVEL:
+                    continue
+                bounds = env16(lambda c: pq_hlg(c, peak), source[0].codes(x, GREY_ROW),
+                               "bt2020nc")
+                got = frame.px(x, GREY_ROW)
+                parted.append((x, round(levels(apart), 2), inside(got, bounds)))
+            if len(parted) < 4 or not all(ok for _, _, ok in parted):
+                misses.append(f"pq_hdr10 where the EETF parts from the clip: {parted}")
+            figures.append(f"pq_hdr10 above 1,000 cd/m², every 8th column where the oracles part "
+                           f"by > 3 levels: (x, levels apart, inside the EETF envelope) {parted}")
+    check("HP pq_plain = PQ→HLG at 1,000 cd/m² and pq_hdr10 (4,000) = it through BT.2390's EETF "
+          "(the grey row, every 64th column, inside the ±1-code envelope ±1/1023), and pq_hdr10 "
+          "on the EETF where it parts from the no-EETF oracle by > 3 levels above 1,000 cd/m² "
+          "(every 8th column, ≥ 4 columns)", not misses,
+          f"{misses or 'all within'}\n       " + "\n       ".join(figures))
+
+
+def grey_png():
+    """HT's 8-bit grey still (128/255), 640×360, made once."""
+    return checked("grey8", ffmpeg_make(MEDIA / "grey8.png", [
+        "-f", "lavfi", "-i", f"color=c=0x808080:size={SW}x{SH}:rate=1:duration=1",
+        "-frames:v", "1", "-pix_fmt", "rgb24"]), {"pix_fmt": "rgb24"})
+
+
+def layer_scene(client, name, add, background=None):
+    """A 640×360 project with one layer `add(doc, track)` puts on its track, rendered
+    SDR then HLG: (SDR Frame, HLG Frame) or (None, why)."""
+    doc = Doc(client, name, SW, SH)
+    if background is not None and doc.ok:
+        doc.call("set_canvas", background=background)
+    made = add(doc, doc.track()) if doc.ok and add else True
+    sdr = frame_of(doc, f"{name}-sdr", SW, SH) if made else None
+    got = doc.call("set_canvas", output="hlg") if doc.ok else {"ok": False}
+    hlg = frame_of(doc, f"{name}-hlg", SW, SH) if got["ok"] else None
+    closed = doc.close()
+    if sdr is None or hlg is None or not closed:
+        return None, f"{name}: {doc.why or 'no render'} (made {made}, closed {closed})"
+    return (sdr, hlg), None
+
+
+def brightest(frame, width, height):
+    """The largest green value of the frame (every 2nd pixel): a title's full-coverage
+    interior over black."""
+    return max(frame.px(x, y)[1] for y in range(0, height, 2) for x in range(0, width, 2))
+
+
+def run_ht(client, state):
+    """HT: a white title → 0.7500; a grey title, an 8-bit grey PNG still and a grey shape
+    each equal the bt709 recording at the same SDR grey; a 50 % background → 0.5059.
+
+    The same SDR grey is the layer's own 8-bit value, 128/255 (Core Graphics draws 0.5
+    as 128, and the PNG holds 0x80). An SDR project's render of these layers is printed,
+    not used: it comes through `AVAssetImageGenerator`, which reads 128/255 as 0.49999
+    (measured in H-2), where an HLG project's frame is the reader's, the compositor's own
+    values (HD-13 (i))."""
+    misses, figures = [], []
+    ramp_path = fixture("bt709")
+    ramp_source = yuv_frames(ramp_path, W, H) if ramp_path else None
+    doc = hlg_doc(client, "ht-ramp", [ramp_path])
+    ramp = frame_of(doc, "ht-ramp")
+    state["ht_ramp_closed"] = doc.close()
+    if ramp is None or ramp_source is None:
+        check("HT drawn layers lifted", False, f"the ramp: {doc.why}")
+        return
+
+    def text(color):
+        return lambda d, track: d.place_tool(
+            "add_text_clip", track=track, at=0, duration=2 * SEC,
+            text={"content": "H", "size": 220, "color": color})
+
+    def shape(fill, width, height):
+        return lambda d, track: d.place_tool(
+            "add_shape_clip", track=track, at=0, duration=2 * SEC,
+            shape={"kind": "rectangle", "stroke": None, "width": width, "height": height,
+                   "fill": fill})
+    still = grey_png()
+    grey = 128 / 255
+    scenes = {
+        "white title": (text([1, 1, 1, 1]), "max", None),
+        "grey title": (text([0.5, 0.5, 0.5, 1]), "max", None),
+        "grey still": ((lambda d, track: d.place(still)) if still else None, "centre", None),
+        "grey shape": (shape([0.5, 0.5, 0.5, 1], 400, 200), "centre", None),
+        # A clear 16 × 16 shape in the corner: an empty timeline draws no frame.
+        "background": (shape([0, 0, 0, 0], 16, 16), "centre", [0.5, 0.5, 0.5, 1]),
+    }
+    for name, (add, read, background) in scenes.items():
+        if add is None:
+            misses.append(f"{name}: fixture refused {REFUSED.get('grey8')}")
+            continue
+        pair, why = layer_scene(client, "ht-" + name.replace(" ", "-"), add, background)
+        state[f"ht_{name.replace(' ', '_')}_closed"] = why is None or "closed False" not in why
+        if pair is None:
+            misses.append(why)
+            continue
+        sdr, hlg = pair
+        if read == "max":
+            v_sdr, v_hlg = brightest(sdr, SW, SH), brightest(hlg, SW, SH)
+        else:
+            v_sdr, v_hlg = sdr.px(SW // 2, SH // 2)[1], hlg.px(SW // 2, SH // 2)[1]
+        if name == "white title":
+            ok = abs(v_hlg - 0.75) <= LEVEL
+            figures.append(f"{name}: HLG {v_hlg:.5f} (want 0.7500 ±1/1023; SDR {v_sdr:.5f})")
+        elif name == "background":
+            got = hlg.px(SW // 2, SH // 2)
+            ok = all(abs(v - 0.5059) <= LEVEL for v in got)
+            figures.append(f"{name} [0.5, 0.5, 0.5, 1]: HLG {[round(v, 5) for v in got]} (want "
+                           f"0.5059; the lift {lift([0.5] * 3)[1]:.5f}; SDR {v_sdr:.5f})")
+        else:
+            at = render_at(ramp, ramp_source[0], grey, "bt709")
+            want = lift([grey] * 3)[1]
+            ok = abs(v_hlg - at) <= LEVEL and abs(v_hlg - want) <= LEVEL
+            figures.append(f"{name}: HLG {v_hlg:.5f}; the bt709 recording at 128/255 {at:.5f}; "
+                           f"the lift {want:.5f} (SDR, unscored: {v_sdr:.5f})")
+        if not ok:
+            misses.append(name)
+    check("HT in an HLG project a white text title = 0.7500 ±1/1023; a 50 % grey title, an "
+          "8-bit grey PNG still and a 50 % grey shape (each 128/255 drawn) = the bt709 recording "
+          "at 128/255 and the lift of it ±1/1023; a [0.5, 0.5, 0.5, 1] background = 0.5059 "
+          "±1/1023", not misses, f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def run_hl(client, state):
+    """HL: bt709 as S-Log3 in an HLG project → the log oracle; 18 % grey at 0.380."""
+    misses, figures = [], []
+    path = fixture("bt709")
+    source = yuv_frames(path, W, H) if path else None
+    doc = hlg_doc(client, "hl", [path])
+    media = getattr(doc, "_media", {}).get(path)
+    got = doc.call("set_media_color", media=media, color={"log": "slog3"}) if doc.ok \
+        else {"ok": False, "error": doc.why}
+    frame = frame_of(doc, "hl") if got["ok"] else None
+    state["hl_closed"] = doc.close()
+    if frame is None or source is None:
+        misses.append(f"{doc.why or got.get('error') or 'no render or decode'}")
+    else:
+        worst = grey_row_misses(frame, source[0], "bt709", lambda rgb: [log_hlg(c) for c in rgb],
+                                "slog3", misses)
+        grey = (420 - 64) / 876
+        at = render_at(frame, source[0], grey, "bt709")
+        figures.append(f"worst |Δ| {worst:.3f} levels; 18 % grey (signal {grey:.4f}) renders "
+                       f"{at:.4f} (oracle {log_hlg(grey):.4f})")
+        if abs(at - 0.380) > LEVEL:
+            misses.append(f"18 % grey at {at:.4f}, not 0.380")
+    check("HL bt709 with set_media_color {log: slog3} in an HLG project: the grey row (every "
+          "64th column) = the log oracle (×0.26741, the OETF, clipped at 1) inside the ±1-code "
+          "envelope ±1/1023, 18 % grey at 0.380 ±1/1023",
+          not misses, f"{misses or 'all within'}\n       " + "\n       ".join(figures))
+
+
+def run_hw(client, state):
+    """HW: saturation −1 → BT.2020 luma of the lifted colour; exposure +1 → HLG's
+    scene light doubled."""
+    misses, figures = [], []
+    path = fixture("bt709")
+    source = yuv_frames(path, W, H) if path else None
+    doc = hlg_doc(client, "hw", [path])
+    clip = (doc.project().get("clips") or [{}])[0].get("id") if doc.ok else None
+    a = doc.call("set_video", clips=[clip], patch={"color": {"saturation": -1}}) if clip \
+        else {"ok": False}
+    grey = frame_of(doc, "hw-saturation") if a["ok"] else None
+    b = doc.call("set_video", clips=[clip], patch={"color": {"saturation": 0, "exposure": 1}}) \
+        if a["ok"] else {"ok": False}
+    exposed = frame_of(doc, "hw-exposure") if b["ok"] else None
+    state["hw_closed"] = doc.close()
+    if grey is None or exposed is None or source is None:
+        misses.append(f"{doc.why or a.get('error') or b.get('error') or 'no render or decode'}")
+    else:
+        def luma2020(rgb):
+            y = sum(w * c for w, c in zip(LUMA2020, lift(rgb)))
+            return [y] * 3
+        outside, separated = [], 0
+        for x in range(0, W, 64):
+            codes = source[0].codes(x, CHROMA_ROW)
+            bounds = env16(luma2020, codes, "bt709")
+            got = grey.px(x, CHROMA_ROW)
+            rgb = source[0].rgb(x, CHROMA_ROW, "bt709")
+            y709 = sum(w * c for w, c in zip(LUMA709, lift(rgb)))
+            separated += abs(y709 - luma2020(rgb)[0]) > 2 * LEVEL
+            if not inside(got, bounds):
+                outside.append((x, [round(v, 4) for v in got],
+                                [[round(v, 4) for v in b] for b in bounds]))
+        if outside:
+            misses.append(f"saturation −1: {len(outside)} chroma columns outside the BT.2020 "
+                          f"luma envelope {outside[:3]}")
+        if separated < 4:
+            misses.append(f"CONTROL: BT.709 and BT.2020 luma part by > 2 levels at only "
+                          f"{separated} columns")
+        worst = grey_row_misses(
+            exposed, source[0], "bt709",
+            lambda rgb: [hlg_oetf(min(2 * hlg_inverse(c), 1.0)) for c in lift(rgb)],
+            "exposure +1", misses)
+        figures.append(f"saturation −1: {len(outside)} of {W // 64} chroma columns outside, "
+                       f"{separated} separating the weights by > 2 levels (CONTROL); exposure +1: "
+                       f"worst |Δ| {worst:.3f} levels")
+    check("HW in an HLG project: saturation −1 on the chroma row = BT.2020 luma of the lifted "
+          "colour, exposure +1 on the grey row = OETF(min(2·invOETF(v), 1)), each inside the "
+          "±1-code envelope ±1/1023", not misses,
+          f"{misses or 'all within'}\n       " + "\n       ".join(figures))
+
+
+GREEN_Y, GREEN_CB, GREEN_CR = 690, 167, 105  # BT.709 R'G'B' (0, 1, 0), 10-bit video range
+
+
+def green_709():
+    """HK's fixture: the left half code-value green, the right half 50 % grey, 1024×128,
+    1 s, 10-bit ProRes 422 HQ, then tagged BT.709 by stream copy as `retag` tags (the
+    encoder's own `-color_*` flags did not stick, measured), made once."""
+    vf = (f"color=c=black:size={W}x{H}:rate=30:duration=1,format=yuv422p10le,"
+          f"geq=lum='if(lt(X,W/2),{GREEN_Y},502)':cb='if(lt(X,W/2),{GREEN_CB},512)':"
+          f"cr='if(lt(X,W/2),{GREEN_CR},512)'")
+    plain = ffmpeg_make(MEDIA / "green_plain.mov", [
+        "-f", "lavfi", "-i", vf, "-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt",
+        "yuv422p10le"])
+    if plain is None:
+        REFUSED["green_709"] = "ffmpeg did not make green_plain.mov"
+        return None
+    return checked("green_709", ffmpeg_make(MEDIA / "green_709.mov", [
+        "-i", str(plain), "-c", "copy", "-bsf:v",
+        "prores_metadata=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+        "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
+        "-movflags", "+write_colr"], 120),
+        {"codec_name": "prores", "color_primaries": "bt709", "color_transfer": "bt709",
+         "color_space": "bt709"})
+
+
+def run_hk(client, state):
+    """HK: a chroma key picked in SDR keeps keying after the switch to HLG."""
+    misses, figures = [], []
+    path = green_709()
+    doc = Doc(client, "hk", W, H)
+    if doc.ok:
+        doc.call("set_canvas", background=[0.5, 0.5, 0.5, 1])
+    clip = doc.place(path) if doc.ok and path else None
+    left, right = (W // 4, H // 2), (3 * W // 4, H // 2)
+    plain = frame_of(doc, "hk-plain") if clip else None
+    key = [round(v, 5) for v in plain.px(*left)] if plain else None
+    keyed = doc.call("set_video", clips=[clip], patch={"chroma": {
+        "key": key, "tolerance": 0.1, "softness": 0.0, "spill": 0.0}}) if key else {"ok": False}
+    sdr = frame_of(doc, "hk-sdr") if keyed["ok"] else None
+    switched = doc.call("set_canvas", output="hlg") if sdr else {"ok": False}
+    hlg = frame_of(doc, "hk-hlg") if switched["ok"] else None
+    state["hk_closed"] = doc.close()
+    if hlg is None or sdr is None:
+        misses.append(f"{doc.why or keyed.get('error') or switched.get('error') or 'no render'}"
+                      f" {REFUSED.get('green_709', '')}")
+    else:
+        grey = sdr.px(*right)
+        want_right = lift(grey)
+        got_left, got_right = hlg.px(*left), hlg.px(*right)
+        figures.append(f"key {key}; SDR keyed: left {[round(v, 5) for v in sdr.px(*left)]} "
+                       f"(CONTROL, the background 0.5), right {[round(v, 5) for v in grey]}; HLG: "
+                       f"left {[round(v, 5) for v in got_left]} (want 0.5059), right "
+                       f"{[round(v, 5) for v in got_right]} (want {[round(v, 5) for v in want_right]})")
+        if not close_to(sdr.px(*left), [0.5] * 3, LEVEL):
+            misses.append("CONTROL: the SDR key did not open the left half")
+        if not close_to(got_left, [0.5059] * 3, LEVEL):
+            misses.append("the HLG left half is not the lifted background")
+        if not close_to(got_right, want_right, LEVEL):
+            misses.append("the HLG right half is not the lift of the SDR grey")
+    check("HK green_709 over a [0.5, 0.5, 0.5, 1] background, keyed (tolerance 0.1) at the green "
+          "the SDR render reads: after set_canvas {output: hlg} the left half reads the lifted "
+          "background 0.5059 and the right half the lift of the SDR render's grey, ±1/1023",
+          not misses, f"{misses or 'all as wanted'}\n       " + "\n       ".join(figures))
+
+
+def run_hm(client, state):
+    """HM: a luma matte of a white and a 50 % grey shape over bt709 in an HLG project.
+
+    A track holds no two clips at once, so the two shapes are drawn on two tracks and
+    nested (`nest`), the emptied track removed (`remove_empty_tracks`), and the nest's
+    track made the luma matte directly in front of the ramp's."""
+    misses, figures = [], []
+    path = fixture("bt709")
+    source = yuv_frames(path, W, H) if path else None
+    doc = Doc(client, "hm", W, H)
+    if doc.ok:
+        doc.call("set_canvas", background=[0.5, 0.5, 0.5, 1])
+    clip = doc.place(path) if doc.ok and path else None
+    shapes = []
+    for x0, fill in ((0, [1, 1, 1, 1]), (W // 2, [0.5, 0.5, 0.5, 1])):
+        added = doc.call("add_track") if clip else {"ok": False}
+        tracks = doc.project().get("tracks") or [] if added["ok"] else []
+        made = doc.place_tool("add_shape_clip", track=tracks[-1]["id"], at=0, duration=2 * SEC,
+                              shape={"kind": "rectangle", "stroke": None, "width": W // 2,
+                                     "height": H, "fill": fill}) if tracks else None
+        moved = doc.call("set_video", clips=[made], patch={"x": x0 + W // 4 - W // 2, "y": 0}) \
+            if made else {"ok": False}
+        shapes.append(made if moved["ok"] else None)
+    nested = doc.call("nest", clips=shapes) if all(shapes) else {"ok": False}
+    pruned = doc.call("remove_empty_tracks") if nested["ok"] else {"ok": False}
+    tracks = doc.project().get("tracks") or [] if pruned["ok"] else []
+    front = tracks[-1]["id"] if len(tracks) == 2 else None
+    matted = doc.call("set_track", track=front, matte="luma") if front else {"ok": False}
+    switched = doc.call("set_canvas", output="hlg") if matted["ok"] else {"ok": False}
+    frame = frame_of(doc, "hm") if switched["ok"] else None
+    state["hm_closed"] = doc.close()
+    if frame is None or source is None:
+        misses.append(f"{doc.why or nested.get('error') or pruned.get('error') or matted.get('error') or switched.get('error') or 'not built'}"
+                      f" (tracks {len(tracks)})")
+    else:
+        bg = lift([0.5] * 3)
+        worst = {"left": 0.0, "right": 0.0}
+        for x in range(0, W, 64):
+            if abs(x - W // 2) < 8:
+                continue
+            ramp = lift(source[0].rgb(x, GREY_ROW, "bt709"))
+            side = "left" if x < W // 2 else "right"
+            want = ramp if side == "left" else [0.5 * r + 0.5 * b for r, b in zip(ramp, bg)]
+            got = frame.px(x, GREY_ROW)
+            gap = max(abs(a - b) for a, b in zip(got, want))
+            worst[side] = max(worst[side], levels(gap))
+            if gap > 2 * LEVEL and len(misses) < 12:
+                misses.append(f"{side} x={x} render {[round(v, 5) for v in got]} want "
+                              f"{[round(v, 5) for v in want]}")
+        figures.append(f"worst |Δ| left (coverage 1) {worst['left']:.3f}, right (coverage 0.5) "
+                       f"{worst['right']:.3f} levels")
+    check("HM a luma matte track holding a white shape (left) and a 50 % grey shape (right) "
+          "over bt709 in an HLG project: the left = the lifted ramp (coverage 1), the right = "
+          "0.5·lift(ramp) + 0.5·0.5059, ±2/1023 (the grey row, every 64th column)", not misses,
+          f"{misses or 'all within'}\n       " + "\n       ".join(figures))
+
+
+def png_chunks(path):
+    """`path`'s PNG chunks as [(type, data)], or [] when it is not a PNG."""
+    data = Path(path).read_bytes()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        return []
+    chunks, at = [], 8
+    while at + 8 <= len(data):
+        size = struct.unpack(">I", data[at:at + 4])[0]
+        chunks.append((data[at + 4:at + 8].decode("latin-1"), data[at + 8:at + 8 + size]))
+        at += 12 + size
+    return chunks
+
+
+def run_hf(client, state):
+    """HF: an HLG project's frames — a 16-bit PNG with cICP 9/18/0/1 and an iCCP named
+    ITUR_2100_HLG, a 10-bit HEIC labelled ITUR_2100_HLG, and JPEG refused."""
+    misses, figures = [], []
+    doc = hlg_doc(client, "hf", [fixture("bt709")])
+    png = doc.render("hf") if doc.ok else None
+    heic = WORK / "hf.heic"
+    made = doc.call("render_frame", t=T, path=str(heic), format="heic") if doc.ok \
+        else {"ok": False}
+    jpeg = doc.call("render_frame", t=T, path=str(WORK / "hf.jpg"), format="jpeg") if doc.ok \
+        else {"ok": True}
+    state["hf_closed"] = doc.close()
+    if png is None:
+        misses.append(f"no PNG: {doc.why}")
+    else:
+        chunks = dict((k, v) for k, v in reversed(png_chunks(png)))
+        depth = chunks.get("IHDR", b"\0" * 9)[8]
+        cicp = list(chunks.get("cICP", b""))
+        name = chunks.get("iCCP", b"").split(b"\0")[0].decode("latin-1")
+        figures.append(f"PNG: depth {depth}, cICP {cicp}, iCCP {name!r}, chunks "
+                       f"{[k for k, _ in png_chunks(png)]}")
+        if depth != 16 or cicp != [9, 18, 0, 1] or "ITUR_2100_HLG" not in name:
+            misses.append("the PNG")
+    if not made["ok"] or not heic.exists():
+        misses.append(f"no HEIC: {made.get('error')}")
+    else:
+        read = bounded.run(["sips", "-g", "bitsPerSample", "-g", "profile", str(heic)], 60)
+        figures.append(f"HEIC (sips): {' '.join(read['stdout'].split()[1:])}")
+        # sips names a profile by its description: ITUR_2100_HLG's is "Rec. ITU-R BT.2100 HLG".
+        if "bitsPerSample: 10" not in read["stdout"] or "BT.2100 HLG" not in read["stdout"]:
+            misses.append("the HEIC")
+    sentence = "JPEG cannot carry an HLG project's picture; save the frame as PNG or HEIC"
+    figures.append(f"JPEG: {jpeg.get('error', 'written')}")
+    if jpeg["ok"] or sentence not in jpeg.get("error", ""):
+        misses.append("JPEG was not refused by its sentence")
+    check("HF an HLG project's render_frame: a 16-bit PNG with cICP 9/18/0/1 and an iCCP named "
+          "ITUR_2100_HLG; a HEIC at 10 bits labelled ITUR_2100_HLG (sips: \"Rec. ITU-R BT.2100 "
+          "HLG\"); JPEG refused by its sentence",
+          not misses, f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def run_hx(client, state):
+    """HX: an HLG project's 10-bit exports tagged HLG with no Dolby Vision; h264 and gif
+    refused by the sentence; audio_wav written."""
+    misses, figures = [], []
+    doc = hlg_doc(client, "hx", [fixture("bt709"), fixture("webm")])
+    outs = {}
+    for preset in ("hevc_10bit", "prores_422", "h264", "gif", "audio_wav"):
+        base = WORK / f"hx-{preset}"
+        got = doc.call("export", preset=preset, path=str(base), size="document") if doc.ok \
+            else {"ok": False, "error": doc.why}
+        files = sorted(WORK.glob(f"hx-{preset}.*"))
+        outs[preset] = (got, files[0] if files else None)
+    state["hx_closed"] = doc.close()
+    for preset in ("hevc_10bit", "prores_422"):
+        got, path = outs[preset]
+        probe = stream(path) if path else {}
+        figures.append(f"{preset}: {tags(probe) if path else got.get('error')}")
+        if not path or tags(probe) != "bt2020nc/arib-std-b67/bt2020":
+            misses.append(f"{preset}'s tags")
+    got, path = outs["hevc_10bit"]
+    if path:
+        streams = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                               "-show_entries", "stream_side_data_list", str(path)], 60)["stdout"]
+        frames = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                              "-read_intervals", "%+#10", "-show_frames", "-show_entries",
+                              "frame=side_data_list", str(path)], 120)["stdout"]
+        dovi = "DOVI configuration record" in streams
+        rpu = "Dolby Vision RPU" in frames
+        figures.append(f"hevc_10bit: DOVI configuration record {dovi}, Dolby Vision RPU {rpu}")
+        if dovi or rpu:
+            misses.append("Dolby Vision in the HEVC")
+    for preset in ("h264", "gif"):
+        got, path = outs[preset]
+        sentence = (f"{preset} cannot carry an HLG project's picture; export it as hevc_10bit, "
+                    f"prores_422 or prores_4444")
+        figures.append(f"{preset}: {got.get('error', 'written')}")
+        if got["ok"] or sentence not in got.get("error", "") or path is not None:
+            misses.append(f"{preset} was not refused by the sentence")
+    got, path = outs["audio_wav"]
+    figures.append(f"audio_wav: {path.name if path else got.get('error')}")
+    if not got["ok"] or path is None:
+        misses.append("audio_wav was not written")
+    check("HX an HLG project's hevc_10bit and prores_422 exports tagged bt2020nc/arib-std-b67/"
+          "bt2020, the HEVC with no DOVI configuration record and no Dolby Vision RPU; h264 and "
+          "gif refused by the sentence; audio_wav written", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def run_th(binary):
+    """TH (`--measure`): TI's 4K BT.709 twin on two tracks (the upper at scale 0.5) and a
+    title, 8 s, exported prores_422 as an SDR project and as an HLG project, each on its
+    own instance: 240 input passes per 120 frames in HLG and 0 in SDR (scored), the
+    averages against PR-1's 8 ms (recorded)."""
+    figures, misses = [], []
+    path = fixture("bt709_4k")
+    for output, want in (("sdr", 0), ("hlg", 240)):
+        if path is None:
+            misses.append(f"bt709_4k refused: {REFUSED.get('bt709_4k')}")
+            break
+        log = WORK / f"th-{output}.log"
+        before = host_state()
+        wall = None
+        launched = mcp.launch(str(binary), ["-FrameJobCompositorTiming", "YES"],
+                              env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
+                              log_path=str(log), timeout=CALL_BOUND)
+        lines, out = [], None
+        try:
+            if launched.client is None:
+                misses.append(f"{output}: the instance did not listen")
+                continue
+            doc = Doc(launched.client, f"th-{output}", 3840, 2160)
+            doc.place(path, 0)
+            doc.place(path, 4 * SEC)
+            added = doc.call("add_track")
+            tracks = doc.project().get("tracks") or [] if added["ok"] else []
+            upper = tracks[-1]["id"] if len(tracks) == 2 else None
+            for at in (0, 4 * SEC):
+                made = doc.place_tool("add_clip", track=upper, media=doc._media.get(path),
+                                      at=at) if upper else None
+                if made:
+                    doc.call("set_video", clips=[made], patch={"scale": 0.5})
+            doc.call("add_track")
+            tracks = doc.project().get("tracks") or []
+            doc.place_tool("add_text_clip", track=tracks[-1]["id"], at=0, duration=8 * SEC,
+                           text={"content": "Frame Job", "size": 160})
+            if output == "hlg":
+                doc.call("set_canvas", output="hlg")
+            start = log.stat().st_size if log.exists() else 0
+            started = time.monotonic()
+            out = doc.export(f"th-{output}") if doc.ok else None
+            wall = time.monotonic() - started
+            time.sleep(1)
+            with open(log, errors="replace") as handle:
+                handle.seek(start)
+                lines = TIMING.findall(handle.read())
+            doc.close()
+        finally:
+            launched.stop()
+            mcp.remove_scratch(launched.socket_path)
+        found = [l for l in open(log, errors="replace") if "Frame Job: " in l]
+        passes = [None if p == "" else int(p) for _, _, p in lines]
+        averages = [float(a) for a, _, _ in lines]
+        worst = [float(w) for _, w, _ in lines]
+        figures.append(f"{output}: {len(lines)} lines, passes {passes}, average ms {averages}, "
+                       f"worst {worst}; export wall s "
+                       f"{'%.2f' % wall if wall is not None and out else None} (recorded, not "
+                       f"scored); host before {before}; after {host_state()}")
+        if averages:
+            figures.append(f"{output} mean average {sum(averages) / len(averages):.3f} ms "
+                           f"(PR-1's 7.38–7.585 ms; the budget 8 ms)")
+        if out is None or len(lines) < 2 or any(p != want for p in passes) or found:
+            misses.append(f"{output}: export {'ok' if out else 'missing'}, lines {len(lines)}, "
+                          f"passes {passes}, complaints {found[:2]}")
+    check("TH the 4K BT.709 twin on two tracks (the upper at scale 0.5) and a title: 240 input "
+          "passes per 120 frames as an HLG project, 0 as an SDR one (≥ 2 lines each); the frame "
+          "times recorded against PR-1's 8 ms", not misses,
+          f"{misses or 'as wanted'}\n       " + "\n       ".join(figures))
+
+
 # ---- TI -------------------------------------------------------------------------
 
 def host_state():
@@ -2251,11 +3136,11 @@ def main():
             print(f"unknown rows: {sorted(unknown)}")
             return 2
     elif args.measure:
-        selected = {"TI", "Z1"}
+        selected = {"TI", "TH", "Z1"}
     else:
-        selected.discard("TI")
+        selected -= {"TI", "TH"}
         if args.mutant:
-            selected -= {"H1a"} | H7_ROWS
+            selected -= {"H1a"} | H7_ROWS | H2_ROWS
     if args.mode == "capture":
         if not args.only:
             selected = {"H1", "H2", "H3", "H4", "H5", "H6", "R0", "Z1"}
@@ -2291,7 +3176,7 @@ def main():
     closed = True
     log = WORK / "instance.log"
     needs_instance = bool(selected & ({"H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5",
-                                       "H6", "R0"} | H7_ROWS))
+                                       "H6", "R0"} | H7_ROWS | H2_ROWS))
     if needs_instance:
         launched = mcp.launch(str(binary), [],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
@@ -2343,6 +3228,13 @@ def main():
                     run_h6(client, sources, state)
                 if selected & H7_ROWS:
                     run_h7(client, args.mode, control, sources, state)
+                # hdr H-2 (#277): the HLG working space.
+                for row, run in (("HS", run_hs), ("HH", run_hh), ("HP", run_hp),
+                                 ("HT", run_ht), ("HL", run_hl), ("HW", run_hw),
+                                 ("HK", run_hk), ("HM", run_hm), ("HF", run_hf),
+                                 ("HX", run_hx)):
+                    if row in selected:
+                        run(client, state)
             except Exception as error:  # a row that could not run is a failure
                 import traceback
                 traceback.print_exc()
@@ -2353,6 +3245,8 @@ def main():
             mcp.remove_scratch(launched.socket_path)
     if "TI" in selected:
         run_ti(binary)
+    if "TH" in selected:
+        run_th(binary)
     if selected & P_ROWS:
         run_math_probe(sources)
     found = complaints(log) if needs_instance else []

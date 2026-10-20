@@ -192,9 +192,9 @@ do {
     let swift = Mirror(reflecting: block).children.compactMap(\.label)
     let neutral = QualifierUniforms(.none, selection: false)
     check(
-        "K7 QualifierUniforms is 64 bytes (stride) and its sixteen fields are the shader's "
+        "K7 QualifierUniforms is 80 bytes (stride) and its twenty fields are the shader's "
             + "struct's, in order; enabled is 1 for a range and 0 for none",
-        MemoryLayout<QualifierUniforms>.stride == 64 && swift == fields && fields.count == 16
+        MemoryLayout<QualifierUniforms>.stride == 80 && swift == fields && fields.count == 20
             && block.enabled == 1 && block.selection == 1 && block.hueEnabled == 1
             && block.hueCenter == 120 && neutral.enabled == 0,
         "stride \(MemoryLayout<QualifierUniforms>.stride); swift \(swift); shader \(fields)")

@@ -370,6 +370,14 @@ struct LayerUniforms {
     float wheelsEnabled;        // 1 when any of the nine is not 0
     float curvesEnabled;        // 1 when any tone curve is not the identity
     float hueCurvesEnabled;     // 1 when a hue curve is not the identity
+    // ── HLG (spec §11 HD-2, HD-13): `hlgOutput` is 1 in an HLG project —
+    // the grade's BT.2020 weights and HLG transfer, the key's inverse lift —
+    // and `liftedWhite` Fade Through White's white there (HD-3's lift of 1).
+    // Both 0 in an SDR project. 128 + 4 = 132 floats = 528 bytes, 33 × 16.
+    float hlgOutput;
+    float liftedWhite;
+    float hlgReserved0;
+    float hlgReserved1;
 };
 
 /// A fragment's `[[position]]` in CANVAS pixels — the frame the nest clip
@@ -518,13 +526,71 @@ static inline float roundedBoxDistance(float2 p, float2 halfSize, float radius) 
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
 }
 
+// MARK: - HLG (spec §11 HD-2, HD-13)
+
+// The transfer pair and the inverse lift an HLG project's grade, chroma key
+// and matte resolve read, declared above them; step 0's HLG arms use them too.
+// ITU-R BT.2100, the HLG OETF's constants: a, b = 1 − 4a, c = 0.5 − a·ln(4a).
+constant float kHlgA = 0.17883277;
+constant float kHlgB = 0.28466892;
+constant float kHlgC = 0.55991073;
+// Luminance weights: BT.2020's (HLG's Ys, BT.2100, and an HLG project's
+// grade, HD-13 (g)) and BT.709's (the lift).
+constant float3 kLuma2020 = float3(0.2627, 0.6780, 0.0593);
+constant float3 kLuma709 = float3(0.2126, 0.7152, 0.0722);
+// Linear BT.2020 → linear BT.709, derived from the published primaries and
+// D65 (`InputConversions.toBT709(from: .bt2020)`'s numbers), column-major.
+constant float3x3 kBT2020ToBT709 = float3x3(
+    float3(1.6604910021, -0.1245504745, -0.0181507634),
+    float3(-0.5876411388, 1.1328998971, -0.1005788980),
+    float3(-0.0728498633, -0.0083494226, 1.1187296614));
+// The inverse lift's four numbers (`InputConversions`): BT.2100's nominal
+// system gamma, HLG's nominal peak over SDR white (1000/203, BT.2408), Core
+// Media 709's γ (`curv` 502/256) and the slope limit Core Graphics draws it
+// with (16: its decode is max(s/16, s^γ), measured in H-2).
+constant float kHlgNominalGamma = 1.2;
+constant float kHlgPeakOverSDRWhite = 1000.0 / 203.0;
+constant float kCoreMedia709Gamma = 502.0 / 256.0;
+constant float kCoreMedia709Toe = 16.0;
+
+// The HLG inverse OETF (BT.2100): signal → scene light, 0…1 at nominal peak.
+// Floored at 0, never capped: a signal above 1 keeps rising.
+static float3 hlgInverseOETF(float3 signal) {
+    float3 v = max(signal, 0.0);
+    float3 low = v * v / 3.0;
+    float3 high = (exp((v - kHlgC) / kHlgA) + kHlgB) / 12.0;
+    return select(high, low, v <= 0.5);
+}
+
+// The HLG OETF (BT.2100): scene light, floored at 0, → signal; 1 at 1.
+static float3 hlgOETF(float3 light) {
+    float3 e = max(light, 0.0);
+    float3 low = sqrt(3.0 * e);
+    float3 high = kHlgA * log(max(12.0 * e - kHlgB, 1e-6)) + kHlgC;
+    return select(high, low, e <= 1.0 / 12.0);
+}
+
+// HD-3's lift undone (spec §11 HD-13 (h)), `InputConversions.unliftSDR`'s
+// twin: the inverse OETF, the OOTF (γ 1.2 on BT.2020 luminance), × 1000/203,
+// BT.2020 → BT.709 and Core Media 709's γ encode with its toe — the Rec. 709
+// colour a lifted SDR value came from, unclamped above 1.
+static inline float3 hlgUnliftSDR(float3 hlg) {
+    float3 scene = hlgInverseOETF(hlg);
+    float ys = dot(scene, kLuma2020);
+    float3 display = ys > 0.0 ? scene * pow(ys, kHlgNominalGamma - 1.0) : float3(0.0);
+    float3 linear = kBT2020ToBT709 * (display * kHlgPeakOverSDRWhite);
+    float3 l = max(linear, 0.0);
+    return min(l * kCoreMedia709Toe, pow(l, 1.0 / kCoreMedia709Gamma));
+}
+
 // MARK: - Hue (spec §11 GR-13, GR-32, GR-33)
 
 // The fully saturated hue `degrees` (the textbook HSV ramp) less its own
-// Rec. 709 luma: a push towards that hue that moves no brightness.
-static inline float3 lookHueChroma(float degrees) {
+// luma by `w` (Rec. 709's; BT.2020's in an HLG project's grade, spec §11
+// HD-13 (g)): a push towards that hue that moves no brightness.
+static inline float3 lookHueChroma(float degrees, float3 w) {
     float3 full = saturate(abs(fmod(degrees / 60.0 + float3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0);
-    return full - dot(full, float3(0.2126, 0.7152, 0.0722));
+    return full - dot(full, w);
 }
 
 // The HSV hue of an encoded, saturated colour in degrees, [0, 360), 0 when
@@ -554,12 +620,13 @@ static inline float hsvHue(float3 c, float mx, float chroma) {
 // max(1, max rgb)], gives up chroma (toward the same-luma grey, which keeps
 // the hue) only where the turned colour at that luma would leave the range.
 // Color's Hue (step 3) calls it too, its degrees wrapped into [0, 360) and
-// with no chroma guard (spec §11 GR-33).
-static inline float3 gradeHueShift(float3 rgb, float hue, float degrees) {
-    float y = dot(rgb, float3(0.2126, 0.7152, 0.0722));
+// with no chroma guard (spec §11 GR-33). `w` the luma weights it keeps
+// (BT.2020's in an HLG project, spec §11 HD-13 (g)).
+static inline float3 gradeHueShift(float3 rgb, float hue, float degrees, float3 w) {
+    float y = dot(rgb, w);
     float mx = max(rgb.r, max(rgb.g, rgb.b));
     float mn = min(rgb.r, min(rgb.g, rgb.b));
-    float3 d = (mx - mn) * lookHueChroma(fmod(hue + degrees + 360.0, 360.0));
+    float3 d = (mx - mn) * lookHueChroma(fmod(hue + degrees + 360.0, 360.0), w);
     float lo = min(0.0, mn);
     float hi = max(1.0, mx);
     float k = 1.0;
@@ -590,6 +657,12 @@ struct LayerSample {
     float alpha;
 };
 
+/// The grade's luma weights for a block's `hlgOutput` flag: Rec. 709's, and
+/// BT.2020's in an HLG project (spec §11 HD-13 (g)).
+static inline float3 gradeWeights(float hlgOutput) {
+    return hlgOutput > 0.5 ? kLuma2020 : float3(0.2126, 0.7152, 0.0722);
+}
+
 /// The chroma key and the colour adjust, on straight colour. Split from the
 /// sample below so the missing-media slate goes through exactly the same
 /// grade it always has — it is generated colour, not sampled, but a brightness
@@ -597,21 +670,26 @@ struct LayerSample {
 /// asked for.
 static inline LayerSample gradeSample(float3 rgb, float alpha,
                                       constant LayerUniforms &u) {
+    // The luma weights: Rec. 709's, BT.2020's in an HLG project (spec §11
+    // HD-13 (g)).
+    float3 w = gradeWeights(u.hlgOutput);
     // Chroma key (M3): distance from the key colour opens a soft hole, then
-    // the spill control pulls the remaining fringe toward its own luma.
+    // the spill control pulls the remaining fringe toward its own luma. In
+    // an HLG project the distance reads the inverse lift of the working
+    // colour against the stored Rec. 709 key (spec §11 HD-13 (h)).
     if (u.chromaEnabled > 0.5) {
         float3 key = float3(u.chromaKeyR, u.chromaKeyG, u.chromaKeyB);
-        float d = distance(rgb, key);
+        float d = distance(u.hlgOutput > 0.5 ? saturate(hlgUnliftSDR(rgb)) : rgb, key);
         float keyed = smoothstep(u.chromaTolerance,
                                  u.chromaTolerance + max(u.chromaSoftness, 1e-4), d);
         alpha *= keyed;
-        float keyLuma = dot(rgb, float3(0.2126, 0.7152, 0.0722));
+        float keyLuma = dot(rgb, w);
         rgb = mix(rgb, float3(keyLuma), u.chromaSpill * (1.0 - keyed));
     }
 
     rgb += u.brightness;
     rgb = (rgb - 0.5) * (1.0 + u.contrast) + 0.5;
-    float luma = dot(rgb, float3(0.2126, 0.7152, 0.0722));
+    float luma = dot(rgb, w);
     rgb = mix(float3(luma), rgb, 1.0 + u.saturation);
     if (abs(u.hue) > 1e-4) {
         // Color's Hue (spec §11 GR-33): GR-32's exact HSV-hue shift, + red →
@@ -624,7 +702,7 @@ static inline LayerSample gradeSample(float3 rgb, float alpha,
         float turn = degrees - 360.0 * floor(degrees / 360.0);
         float mx = max(rgb.r, max(rgb.g, rgb.b));
         float chroma = mx - min(rgb.r, min(rgb.g, rgb.b));
-        rgb = gradeHueShift(rgb, hsvHue(rgb, mx, chroma), turn);
+        rgb = gradeHueShift(rgb, hsvHue(rgb, mx, chroma), turn, w);
     }
 
     LayerSample out;
@@ -986,16 +1064,23 @@ static inline float3 gradeEncode(float3 c) {
 // stretch held at black and at white; vibrance saturation ×(1 ± 1) where a
 // colour has little; fade 1 black to 10 % and white to 95 %. Neutral (all
 // zero) is the identity, but an untoned layer never comes here at all.
+//
+// In an HLG project (spec §11 HD-13 (g)) the local linear light is HLG's
+// scene light — its inverse OETF and OETF, on [0, 1] — so exposure +1 still
+// doubles the scene light, and the luma weights are BT.2020's.
 static inline float3 gradeTone(float3 rgb, constant LayerUniforms &u) {
+    bool hlg = u.hlgOutput > 0.5;
+    float3 w = gradeWeights(u.hlgOutput);
     float3 gains = exp2(float3(0.3 * u.temperature, -0.3 * u.tint, -0.3 * u.temperature));
-    float3 lin = gradeDecode(rgb) * exp2(u.exposure) * gains;
-    rgb = gradeEncode(lin);
-    float luma = dot(rgb, float3(0.2126, 0.7152, 0.0722));
+    float3 lin = (hlg ? hlgInverseOETF(saturate(rgb)) : gradeDecode(rgb))
+        * exp2(u.exposure) * gains;
+    rgb = hlg ? hlgOETF(saturate(lin)) : gradeEncode(lin);
+    float luma = dot(rgb, w);
     rgb += 0.25 * u.highlights * smoothstep(0.5, 1.0, luma)
          + 0.25 * u.shadows * (1.0 - smoothstep(0.0, 0.5, luma));
     rgb += 0.15 * u.whites * rgb + 0.15 * u.blacks * (1.0 - rgb);
     float spread = max(rgb.r, max(rgb.g, rgb.b)) - min(rgb.r, min(rgb.g, rgb.b));
-    luma = dot(rgb, float3(0.2126, 0.7152, 0.0722));
+    luma = dot(rgb, w);
     rgb = mix(float3(luma), rgb, 1.0 + u.vibrance * (1.0 - saturate(spread)));
     rgb = mix(rgb, rgb * 0.85 + 0.1, u.fade);
     return rgb;
@@ -1030,7 +1115,7 @@ constant float kGamma = 1.0;
 static inline float3 wheelOffset(float x, float y, float master) {
     float h = atan2(y, x) * (180.0 / M_PI_F);
     h = h < 0.0 ? h + 360.0 : h;
-    return master + kWheelPush * length(float2(x, y)) * lookHueChroma(h);
+    return master + kWheelPush * length(float2(x, y)) * lookHueChroma(h, kLuma709);
 }
 
 // Step 4c.1, on encoded straight colour: lift (pivots at white), then gain
@@ -1069,8 +1154,10 @@ static inline float3 gradeCurves(float3 rgb, texture2d<float> strip, sampler sam
 // turn applies only when it is not ~0, then the gain about Rec. 709 luma
 // (Color's Saturation) only when it is not ~1, and the result is weighted by
 // GR-13's chroma guard, so a grey or near-grey, whose hue is noise, is never
-// tinted.
-static inline float3 gradeHueCurves(float3 rgb, texture2d<float> strip, sampler samp) {
+// tinted. `w` the luma weights (BT.2020's in an HLG project, spec §11 HD-13
+// (g)).
+static inline float3 gradeHueCurves(float3 rgb, texture2d<float> strip, sampler samp,
+                                    float3 w) {
     float3 c = saturate(rgb);
     float mx = max(c.r, max(c.g, c.b));
     float chroma = mx - min(c.r, min(c.g, c.b));
@@ -1079,10 +1166,10 @@ static inline float3 gradeHueCurves(float3 rgb, texture2d<float> strip, sampler 
     float4 curve = strip.sample(samp, float2((h / 360.0) * ((n - 1.0) / n) + 0.5 / n, 0.75));
     float3 out = rgb;
     if (abs(curve.r) > 1e-6) {
-        out = gradeHueShift(out, h, 360.0 * curve.r);
+        out = gradeHueShift(out, h, 360.0 * curve.r, w);
     }
     if (abs(curve.g - 1.0) > 1e-6) {
-        out = mix(float3(dot(out, float3(0.2126, 0.7152, 0.0722))), out, curve.g);
+        out = mix(float3(dot(out, w)), out, curve.g);
     }
     return mix(rgb, out, smoothstep(0.02, 0.06, chroma));
 }
@@ -1092,8 +1179,8 @@ static inline float3 gradeHueCurves(float3 rgb, texture2d<float> strip, sampler 
 // a fifth of the amount. Frame Job's own strength, tuned at GR7.
 static inline float3 lookSplitTone(float3 rgb, constant LookBakeUniforms &b) {
     float y = saturate(dot(rgb, float3(0.2126, 0.7152, 0.0722)));
-    return rgb + 0.2 * (b.shadowAmount * (1.0 - y) * (1.0 - y) * lookHueChroma(b.shadowHue)
-                        + b.highlightAmount * y * y * lookHueChroma(b.highlightHue));
+    return rgb + 0.2 * (b.shadowAmount * (1.0 - y) * (1.0 - y) * lookHueChroma(b.shadowHue, kLuma709)
+                        + b.highlightAmount * y * y * lookHueChroma(b.highlightHue, kLuma709));
 }
 
 // Step 4d: the look's lattice (`LookTextures`, baked by `framejob_look_bake`
@@ -1492,7 +1579,7 @@ static inline float4 layerColorPremultiplied(Varyings in,
         // channel curves and before the look, through the strip's second row.
         // Behind `hueCurvesEnabled`, so a layer without them never enters it.
         if (u.hueCurvesEnabled > 0.5) {
-            rgb = gradeHueCurves(rgb, curves, samp);
+            rgb = gradeHueCurves(rgb, curves, samp, gradeWeights(u.hlgOutput));
         }
 
         // (4d) The look (spec §11 GR-7): once per pixel, right after tone and
@@ -1642,7 +1729,9 @@ static inline float4 layerColorPremultiplied(Varyings in,
     } else if (kind == kTransitionFadeBlack || kind == kTransitionFadeWhite) {
         // First half: the outgoing clip fades to the colour. Second half:
         // the incoming clip fades up from it.
-        float3 fade = kind == kTransitionFadeWhite ? float3(1.0) : float3(0.0);
+        // An HLG project's white is the lifted SDR white (spec §11 HD-13 (f)).
+        float3 fade = kind == kTransitionFadeWhite
+            ? (u.hlgOutput > 0.5 ? float3(u.liftedWhite) : float3(1.0)) : float3(0.0);
         if (incoming) {
             rgb = mix(fade, rgb, clamp((p - 0.5) * 2.0, 0.0, 1.0));
             alpha *= p >= 0.5 ? 1.0 : 0.0;
@@ -1912,7 +2001,7 @@ fragment float4 framejob_shadow_fragment(ShadowVaryings in [[stage_in]],
 // under `LayerUniforms`' layout contract.
 struct MatteUniforms {
     float mode;
-    float reserved0;
+    float hlgOutput;  // 1 in an HLG project (spec §11 HD-13 (h))
     float reserved1;
     float reserved2;
 };
@@ -1930,6 +2019,15 @@ fragment float4 framejob_matte_resolve_fragment(ShadowVaryings in [[stage_in]],
     float4 m = mask.read(uint2(in.position.xy));
     int mode = int(u.mode + 0.5);
     float luma = dot(m.rgb, float3(0.2126, 0.7152, 0.0722));
+    if (u.hlgOutput > 0.5) {
+        // An HLG project (spec §11 HD-13 (h)): Rec. 709 luma of the un-lifted,
+        // saturated straight colour, premultiplied again; a white title
+        // covers 1, as in an SDR project.
+        luma = m.a > 0.0
+            ? dot(saturate(hlgUnliftSDR(saturate(m.rgb / m.a))) * m.a,
+                  float3(0.2126, 0.7152, 0.0722))
+            : 0.0;
+    }
     float v = 1.0;
     if (mode == kMatteAlpha) {
         v = m.a;
@@ -2032,6 +2130,11 @@ struct QualifierUniforms {
     float selection;
     float enabled;
     float blurred;
+    // 1 in an HLG project: Y′ by BT.2020's weights (spec §11 HD-13 (g)).
+    float hlgOutput;
+    float reserved0;
+    float reserved1;
+    float reserved2;
 };
 
 // 1 at or inside `edge`, falling to 0 across `softness` OUTSIDE it by
@@ -2074,7 +2177,7 @@ static inline float qualifierWeight(float3 c, constant QualifierUniforms &q) {
         w *= qualifierLevel(s, q.satLow, q.satHigh, q.satSoftness);
     }
     if (q.lumaEnabled > 0.5) {
-        float y = saturate(dot(c, float3(0.2126, 0.7152, 0.0722)));
+        float y = saturate(dot(c, gradeWeights(q.hlgOutput)));
         w *= qualifierLevel(y, q.lumaLow, q.lumaHigh, q.lumaSoftness);
     }
     return q.invert > 0.5 ? 1.0 - w : w;
@@ -2146,7 +2249,7 @@ fragment float4 framejob_adjust_fragment(ShadowVaryings in [[stage_in]],
         c = gradeCurves(c, curves, samp);
     }
     if (u.hueCurvesEnabled > 0.5) {
-        c = gradeHueCurves(c, curves, samp);
+        c = gradeHueCurves(c, curves, samp, gradeWeights(u.hlgOutput));
     }
     if (u.lookEnabled > 0.5) {
         c = gradeLook(c, look, samp, u);
@@ -2176,7 +2279,8 @@ fragment float4 framejob_adjust_fragment(ShadowVaryings in [[stage_in]],
 //
 // The block is mirrored FIELD FOR FIELD by `InputUniforms` in
 // `Compositor+Input.swift`, under `LayerUniforms`' layout contract (scalars
-// only, a multiple of 16 bytes: 24 floats, 96 bytes). The matrix is row-major.
+// only, a multiple of 16 bytes: 28 floats, 112 bytes). The matrix is row-major:
+// source → BT.709, or source → BT.2020 in an HLG project.
 struct InputUniforms {
     float kind;
     float premultiplied;
@@ -2199,9 +2303,13 @@ struct InputUniforms {
     float m20;
     float m21;
     float m22;
-    float reserved3;
-    float reserved4;
-    float reserved5;
+    float output;        // 1 in an HLG project (spec §11 HD-2): the HLG ending
+    float liftScale;     // 203/1000, the lift's SDR white over HLG's peak
+    float ootfGamma;     // 1.2, BT.2100's nominal system gamma
+    float eetfSourcePQ;  // BT.2390's EETF: the peak's PQ signal; 0 = none
+    float eetfMaxLum;    // the 1,000 cd/m² target's signal over it
+    float eetfKnee;      // KS = 1.5·maxLum − 0.5
+    float decodeToe;     // 1/16: Core Media 709's γ curve's toe, max(s/16, s^γ)
 };
 
 // `InputUniforms.kind`, mirrored by `InputUniforms.hlg`… in Swift.
@@ -2213,11 +2321,11 @@ constant int kInputAppleLog = 5;
 constant int kInputSlog3   = 6;
 constant int kInputVlog    = 7;
 constant int kInputLUT     = 8;
+// 9 is SDR into an HLG project (`InputUniforms.sdr`, HD-3's lift), which only
+// `inputToHLG`'s SDR ending reads, with the other SDR arms.
 
-// ITU-R BT.2100, the HLG OETF's constants: a, b = 1 − 4a, c = 0.5 − a·ln(4a).
-constant float kHlgA = 0.17883277;
-constant float kHlgB = 0.28466892;
-constant float kHlgC = 0.55991073;
+// (BT.2100's HLG constants and the luminance weights are declared above the
+// grade, `MARK: - HLG`.)
 // SMPTE ST 2084 (BT.2100's PQ): m1 = 2610/16384, m2 = 2523/4096 × 128,
 // c1 = 3424/4096, c2 = 2413/4096 × 32, c3 = 2392/4096 × 32.
 constant float kPqM1 = 0.1593017578125;
@@ -2230,9 +2338,6 @@ constant float kSrgbBreak = 0.04045;
 constant float kSrgbSlope = 12.92;
 constant float kSrgbOffset = 0.055;
 constant float kSrgbGamma = 2.4;
-// Luminance weights: BT.2020's (HLG's Ys, BT.2100) and BT.709's (the lift).
-constant float3 kLuma2020 = float3(0.2627, 0.6780, 0.0593);
-constant float3 kLuma709 = float3(0.2126, 0.7152, 0.0722);
 // Apple Log (Apple's Apple Log 2 White Paper, September 2025, whose curve is
 // Apple Log's): R0, Rt, c, β, γ, δ of P = γ·log2(R + β) + δ above Rt and
 // c·(R − R0)² below it.
@@ -2258,15 +2363,6 @@ constant float kVlogC = 0.241514;
 constant float kVlogD = 0.598206;
 constant float kVlogSlope = 5.6;
 constant float kVlogOffset = 0.125;
-
-// The HLG inverse OETF (BT.2100): signal → scene light, 0…1 at nominal peak.
-// Floored at 0, never capped: a signal above 1 keeps rising.
-static float3 hlgInverseOETF(float3 signal) {
-    float3 v = max(signal, 0.0);
-    float3 low = v * v / 3.0;
-    float3 high = (exp((v - kHlgC) / kHlgA) + kHlgB) / 12.0;
-    return select(high, low, v <= 0.5);
-}
 
 // The PQ EOTF (ST 2084): signal clamped to 0…1 → light, 1.0 at 10,000 cd/m².
 static float3 pqEOTF(float3 signal) {
@@ -2344,6 +2440,62 @@ static float3 inputShoulder(float3 l, float knee, float white) {
     return l * (s / m);
 }
 
+// BT.2100's inverse OOTF at system gamma `gamma` on BT.2020 luminance:
+// display light (1 at the nominal peak) → scene light, E = Fd·Yd^((1−γ)/γ).
+static float3 hlgInverseOOTF(float3 display, float gamma) {
+    float yd = dot(display, kLuma2020);
+    return yd > 0.0 ? display * pow(yd, (1.0 - gamma) / gamma) : float3(0.0);
+}
+
+// BT.2390's EETF on a PQ signal (spec §11 HD-13 (c)): Lb 0, the target
+// 1,000 cd/m², `KS = 1.5·maxLum − 0.5` and its Hermite spline, on the signal
+// over the source's peak (held at 1), back on the PQ scale.
+static float3 pqEETF(float3 signal, constant InputUniforms &u) {
+    float3 e1 = min(clamp(signal, 0.0, 1.0) / u.eetfSourcePQ, 1.0);
+    float ks = u.eetfKnee;
+    float3 t = (e1 - ks) / (1.0 - ks);
+    float3 t2 = t * t;
+    float3 t3 = t2 * t;
+    float3 spline = (2.0 * t3 - 3.0 * t2 + 1.0) * ks + (t3 - 2.0 * t2 + t) * (1.0 - ks)
+                  + (-2.0 * t3 + 3.0 * t2) * u.eetfMaxLum;
+    return min(select(spline, e1, e1 < ks), 1.0) * u.eetfSourcePQ;
+}
+
+// Step 0 in an HLG project (spec §11 HD-2, HD-13 (a)–(e)), every arm into
+// HLG-encoded BT.2020 by the block's matrix: HLG over P3 or BT.709 in scene
+// light; PQ as display light at 1,000 cd/m² (the EETF above it); camera log
+// in scene light at `exposure` with no shoulder; every SDR arm — BT.709 and
+// untagged (`kInputSDR`), sRGB, wide-gamut SDR and a LUT's Rec. 709 output —
+// by HD-3's lift: its decode, the matrix, × `liftScale`, the inverse OOTF.
+static float3 inputToHLG(float3 signal, int kind, constant InputUniforms &u,
+                         texture3d<float> lut) {
+    if (kind == kInputHLG) {
+        return hlgOETF(max(inputMatrix(u, hlgInverseOETF(signal)), 0.0));
+    }
+    if (kind == kInputPQ) {
+        float3 s = u.eetfSourcePQ > 0.0 ? pqEETF(signal, u) : signal;
+        float3 display = max(inputMatrix(u, min(pqEOTF(s) * u.nitsScale, 1.0)), 0.0);
+        return hlgOETF(hlgInverseOOTF(display, u.ootfGamma));
+    }
+    if (kind >= kInputAppleLog && kind <= kInputVlog) {
+        float3 y = signal * u.codeScale + u.codeOffset;
+        float3 r = kind == kInputAppleLog ? appleLogInverse(y)
+                 : (kind == kInputSlog3 ? slog3Inverse(y) : vlogInverse(y));
+        return hlgOETF(max(inputMatrix(u, r * u.exposure), 0.0));
+    }
+    float3 encoded = signal;
+    if (kind == kInputLUT) {
+        constexpr sampler lutSampler(coord::normalized, filter::linear,
+                                     address::clamp_to_edge);
+        float n = float(lut.get_width());
+        encoded = lut.sample(lutSampler, saturate(signal) * ((n - 1.0) / n) + 0.5 / n).rgb;
+    }
+    float3 linear = kind == kInputSRGB ? srgbEOTF(encoded)
+        : max(max(encoded, 0.0) * u.decodeToe, pow(max(encoded, 0.0), u.decodePower));
+    float3 display = max(inputMatrix(u, linear), 0.0) * u.liftScale;
+    return hlgOETF(hlgInverseOOTF(display, u.ootfGamma));
+}
+
 // One texel of step 0, on STRAIGHT colour: a premultiplied source (its
 // buffer labelled so) is divided by its alpha first, with the layer stage's
 // own floor, and multiplied back after; alpha passes through. The target is
@@ -2357,7 +2509,10 @@ fragment float4 framejob_input_fragment(ShadowVaryings in [[stage_in]],
     float3 signal = u.premultiplied > 0.5 ? texel.rgb / max(a, 1e-4) : texel.rgb;
     int kind = int(u.kind + 0.5);
     float3 rgb;
-    if (kind == kInputSRGB) {
+    if (u.output > 0.5) {
+        // An HLG project's arms (spec §11 HD-2); an SDR project never comes here.
+        rgb = inputToHLG(signal, kind, u, lut);
+    } else if (kind == kInputSRGB) {
         // The sRGB arm (GR-15 as amended): the EOTF, the source's primaries
         // to BT.709 in linear light, then the encode (`encodePower`, the
         // inverse of the gamma ColorSync reads a converted frame through).

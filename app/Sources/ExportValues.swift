@@ -94,6 +94,10 @@ struct ExportSettings: Decodable, Equatable {
     /// separate, orthogonal fact, and what this answers is whether the file
     /// would keep it.
     let alpha: Bool
+    /// The colour the file is tagged with: `"hlg"` for an HLG project's
+    /// 10-bit row (spec §11 HD-13 (j), `export.rs`), nil — today's tags — for
+    /// every SDR project, whose settings carry no key.
+    let color: String?
 
     /// Spelled out rather than synthesized because two keys do not follow
     /// from the property names: the core nests the resolved range under
@@ -124,7 +128,7 @@ struct ExportSettings: Decodable, Equatable {
         case preset, container, codec, width, height, fps, range
         case avPreset = "avfPreset"
         case fileType, optimizeForNetwork, videoBitrate, audioBitrate
-        case loudnessLufs, peakDbtp, alpha
+        case loudnessLufs, peakDbtp, alpha, color
     }
 
     private enum RangeKeys: String, CodingKey {
@@ -158,6 +162,7 @@ struct ExportSettings: Decodable, Equatable {
         // `ExportWriter.checkAlphaSurvivesTheSize`, so false promises less
         // than the file holds where true would promise more.
         alpha = c.lenient(.alpha, false)
+        color = c.lenient(.color)
     }
 
     var renderSize: CGSize { CGSize(width: width, height: height) }

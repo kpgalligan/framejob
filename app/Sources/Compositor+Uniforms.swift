@@ -82,6 +82,12 @@ extension MetalRenderer {
         u.apply(spotlight: layer.spotlight)
         u.apply(clipRect: layer.clipRect)
         u.apply(obscure: layer.obscure)
+        // An HLG project's grade, key and Fade Through White (spec §11 HD-2,
+        // HD-13); 0 in an SDR project, so its block is what it was.
+        if canvas.output == .hlg {
+            u.hlgOutput = 1
+            u.liftedWhite = InputConversions.liftSDR(SIMD3<Float>(1, 1, 1)).x
+        }
         if let transition = layer.transition {
             u.transitionKind = TransitionCode.code(transition.kind)
             u.transitionProgress = Float(min(max(transition.progress, 0), 1))

@@ -149,7 +149,12 @@ fn schema_of_kind(kind: Kind) -> Value {
         // A closed vocabulary's members, from the core's own list — the
         // `enum` an agent picks a legal value out of without guessing, and
         // the one part of a schema the catalog could never derive.
-        Kind::Transition | Kind::Alignment | Kind::Curve | Kind::Fit | Kind::Matte => {
+        Kind::Transition
+        | Kind::Alignment
+        | Kind::Curve
+        | Kind::Fit
+        | Kind::Matte
+        | Kind::Output => {
             json!({"type": "string", "enum": kind.values()})
         }
         Kind::Groups => json!({

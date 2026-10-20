@@ -53,10 +53,9 @@ final class DocumentPane: InspectorPaneView {
     /// (handoff README, Part 2 §5). The tab used to open on a size popup,
     /// which answers "what can I set" before "what am I looking at".
     ///
-    /// The design lists a sixth row, Colour. `CanvasSnapshot` (spec §5.2)
-    /// carries no colour space — a canvas is a size, a rate, a background and
-    /// a timecode format, and the whole pipeline is sRGB — so the row is left
-    /// out rather than filled with a value the model does not hold.
+    /// The sixth row, Colour, is the design's: the project's dynamic range,
+    /// `canvas.output` (spec §11 HD-2, HD-13 (k)), "SDR — Rec. 709" or "HDR —
+    /// Rec. 2100 HLG", set by the Canvas section's Dynamic Range popup.
     private func summarySection() -> InspectorSection {
         let binding = self.binding
         return InspectorSection(
@@ -75,6 +74,7 @@ final class DocumentPane: InspectorPaneView {
                 summaryRow("Background") {
                     DocumentPane.colorName(binding.documentCanvas.background)
                 },
+                summaryRow("Colour") { binding.documentCanvas.output.colourName },
             ])
     }
 
@@ -83,7 +83,7 @@ final class DocumentPane: InspectorPaneView {
     /// takes no override, so the row is assembled here.
     ///
     /// The value is an `inspectorReadout` — an `OptionControl` — because none
-    /// of these five is in `structureSignature`: adding a track or moving the
+    /// of these six is in `structureSignature`: adding a track or moving the
     /// last clip changes what the row says without rebuilding the pane, and a
     /// plain label would go stale where a control is refreshed.
     private func summaryRow(_ label: String, _ read: @escaping () -> String) -> NSView {
@@ -222,6 +222,13 @@ final class DocumentPane: InspectorPaneView {
                             enabled: { true },
                             onEdit: { binding.edited() })
                     ]),
+                // The project's dynamic range (spec §11 HD-2): one
+                // `set_canvas {output}` step, undoable; switching keeps every
+                // grade's numbers.
+                inspectorPopupRow(
+                    "Dynamic Range", binding, name: "Dynamic Range", items: ["SDR", "HDR (HLG)"],
+                    read: { binding.documentCanvas.output == .hlg ? 1 : 0 },
+                    ops: { [.setCanvas(output: $0 == 1 ? .hlg : .sdr)] }, resets: false),
             ])
     }
 

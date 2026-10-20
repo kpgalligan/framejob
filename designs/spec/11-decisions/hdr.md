@@ -316,3 +316,69 @@ design time or build time.
   - **Amends** GR-15 (the white, and B96's route: its four files held HDR10 metadata only in the
     HEVC SEI, which AVFoundation does not read, M5), GR-16 (the colour record, the op's key and
     its refusals) and GR-21 (the marker's `peak`).
+- **HD-13 — H-2's settlements: the lift's arithmetic, step 0's HLG arms, every drawn layer lifted
+  at upload, the grade's BT.2020 constants, what reads through the inverse lift, the frames and
+  the exports.** H-2's spec, recorded before its code; it settles what HD-2 and HD-3 left to the
+  spec. Format 23.
+  - **(a) The lift.** Core Media 709's γ 502/256 decode → linear BT.709 → BT.2020 → ×203/1000 →
+    BT.2100's inverse OOTF (γ 1.2 on BT.2020 luminance: `E = Fd·Yd^((1−γ)/γ)`) → the HLG OETF.
+    Computed 2026-10-19 by `tools/proof/work/h2/lift_math.py` (scratch, gitignored; run with
+    `python3 -I`): it reproduces HD-3's CoreMedia709 row within 0.125 of a 10-bit level at all
+    eight greys (0.10 → 0.13582 against 0.1359; 0.50 → 0.50583 against 0.5059; 1.00 → 0.74988
+    against 0.7500), and its sRGB-EOTF twin reproduces HD-3's sRGB row within 0.127 (0.50 →
+    0.46888 against 0.4690). **The toe, measured in H-2** (`hdr_probe.swift` P6, and a
+    scratch drawing into `linearITUR_2020`): Core Graphics draws Core Media 709's γ curve
+    with a slope limit — its decode is `max(s/16, s^γ)`, linear below grey 0.0559 (at 1/1023
+    it gives 6.109e-5, 1/1023/16, where s^γ is 1.25e-6) — so the pure γ reproduced HD-3's
+    eight greys but missed Core Graphics by up to 21 levels below 0.0559 (grey 11/1023: HLG
+    0.0220 against 0.0425). HD-3 makes the lift Core Graphics' drawing, so the lift's decode
+    takes the toe (`InputConversions.coreMedia709Toe`, 1/16; `InputUniforms.decodeToe`) and
+    its inverse the matching `min(16·l, l^(1/γ))`; with it the CPU lift equals Core
+    Graphics at all 1,024 greys within 0.25 of a level (P6).
+  - **(b) The SDR arms' decodes.** Core Media 709's γ with (a)'s toe for BT.709, untagged and
+    wide-gamut SDR sources and for a LUT's output; the sRGB EOTF for the sRGB transfer. Each is
+    matrixed from its own primaries.
+  - **(c) PQ.** Display light in cd/m². When the effective peak (HD-12) exceeds 1,000, BT.2390's
+    EETF applies (Lb 0, target 1,000, `KS = 1.5·maxLum − 0.5`, its Hermite spline); then ÷ 1000
+    clipped at 1, the matrix to BT.2020, the inverse OOTF and the OETF. Computed: peak 4,000,
+    PQ 0.75 → 808.48 cd/m² → HLG 0.9675.
+  - **(d) HLG over P3 or BT.709.** Inverse OETF → the matrix → floored at 0 → the OETF.
+  - **(e) Camera log.** Reflection × 0.26741, so 18 % grey lands at HLG 0.3800 (BT.2408's 38 %);
+    then the gamut matrix to BT.2020, floored at 0, and the OETF. No shoulder: reflection above
+    3.74 clips at signal 1.
+  - **(f) Every drawn layer is lifted at upload by step 0's own SDR arm**: text, captions, the
+    burn-in, shapes, stills and graphics. CPU twins lift the background, a shadow's colour and
+    Fade Through White's white. The missing-media slate is not lifted.
+  - **(g) The grade's BT.2020 weights** apply in Color's saturation and hue (`lookHueChroma`,
+    `gradeHueShift`), Hue vs Sat, tone, the chroma key's spill and the qualifier; tone's transfer
+    becomes HLG's inverse OETF and OETF. Unchanged: the look bake (a lattice is its definition's,
+    at Rec. 709 constants), the point filters and the scopes. The waveform's weights move to H-4
+    with the rest of `Waveform.metal` (HD-8): this amends HD-2's list by phasing only.
+  - **(h) What reads through the inverse lift.** The chroma key's distance and a luma matte's
+    coverage read `unliftSDR` of the working value, saturated, against the stored Rec. 709
+    numbers, so for every SDR source and drawn layer a key and a matte cut exactly what they cut
+    in an SDR project: a white title as a luma matte covers 1, not 0.75, and a green screen keyed
+    at [0, 1, 0] still keys after the switch. The eyedropper reads the HLG frame's code values
+    (`FrameWriter.pickable`) and stores `unliftedPick` of them, so the stored key stays a Rec. 709
+    colour in both outputs. The qualifier is not un-lifted: it keeps HD-2's working-space reading
+    with BT.2020 weights, and Pick from Canvas stores the HLG value it reads. The un-lift was
+    considered and declined: HD-2 names the qualifier's BT.2020 weights, and the un-lift
+    saturates everything above SDR white at 1, so a luma or saturation range could never
+    separate the highlights an HLG grade exists for; its ranges are re-picked after a switch,
+    which the catalog says. Limit: an HDR source's key in an HLG project reads through the
+    un-lift, not GR-15's Apple-anchored HDR→SDR arm (HD-4: HLG 0.50 → 143.1 against 97.1), so a
+    key set on an HDR clip in an SDR project may need re-picking after the switch.
+  - **(i) Frames.** Every HLG frame is read through the reader and labelled `itur_2100_HLG`; JPEG
+    is refused: "JPEG cannot carry an HLG project's picture; save the frame as PNG or HEIC".
+  - **(j) Exports.** The three 10-bit rows (`hevc_10bit`, `prores_422`, `prores_4444`) are
+    tagged HLG (BT.2020 primaries, the HLG transfer, the BT.2020 matrix), HEVC with
+    `kVTHDRMetadataInsertionMode_None`. Every other video row is refused: "{id} cannot carry an
+    HLG project's picture; export it as hevc_10bit, prores_422 or prores_4444". Audio rows are
+    unchanged.
+  - **(k) The words.** The Document tab's Colour row reads "SDR — Rec. 709" or "HDR — Rec. 2100
+    HLG"; the Canvas section's Dynamic Range popup offers "SDR" and "HDR (HLG)"; the Look
+    section warns "This project is HDR (HLG): a .cube LUT reads its values as Rec. 709."
+  - **(l) Known limits, each filed as an issue:** a still image labelled HLG or PQ is drawn as SDR
+    (fixing it needs `LayerRenderers.swift`, an output-keyed image cache, a not-lifted flag
+    through `LayerSource` and PQ tone mapping for stills), #311; (h)'s HDR-source key across a
+    switch, #312.

@@ -53,9 +53,9 @@ do {
     let flag = MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.lookEnabled) ?? -1
     check(
         "L3 apply(look:) writes amount 0.8 and flag 1 for a look at 0.8, flag 0 for none and for "
-            + "amount 0; lookAmount and lookEnabled at 456 and 460 of 512 bytes",
+            + "amount 0; lookAmount and lookEnabled at 456 and 460 of 528 bytes",
         looked.lookAmount == 0.8 && looked.lookEnabled == 1 && none.lookEnabled == 0
-            && none.lookAmount == 0 && zero.lookEnabled == 0 && stride == 512 && amount == 456
+            && none.lookAmount == 0 && zero.lookEnabled == 0 && stride == 528 && amount == 456
             && flag == 460,
         "looked \(looked.lookAmount)/\(looked.lookEnabled); none \(none.lookEnabled); zero "
             + "\(zero.lookEnabled); stride \(stride), amount at \(amount), flag at \(flag)")

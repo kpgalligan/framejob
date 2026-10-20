@@ -22,7 +22,7 @@
 //! | Key | Value | Why |
 //! |---|---|---|
 //! | `canvas.width` / `height` | the NEST's frozen pair | a nest is composited at the size it was made at ([`Nest`]), so that is the canvas its contents are placed against — `add_background`'s plate and `add_zoom_action`'s solve both read it |
-//! | `canvas.fps`, `background`, `fit_new_clips`, `timecode_frames` | the PARENT's | a [`Nest`] has none of them. The rate matters: every time argument snaps to the document's frame grid, and there is only one grid |
+//! | `canvas.fps`, `background`, `fit_new_clips`, `timecode_frames`, `output` | the PARENT's | a [`Nest`] has none of them. The rate matters: every time argument snaps to the document's frame grid, and there is only one grid; the output, because a nest composes in its document's dynamic range (spec §11 HD-2) |
 //! | `tracks` / `clips` | the nest's | the whole point |
 //! | `media` | the parent's | a nest references the parent's `media[]` in the parent's one id space (spec §5.2); a view with none would fail `validate` on the first clip that shows a file |
 //! | `nests` | the parent's, with the scoped one EMPTIED | see below — this is neither "the parent's" nor "the parent's minus the scope" |
@@ -320,6 +320,7 @@ impl Project {
                 background: self.canvas.background,
                 fit_new_clips: self.canvas.fit_new_clips,
                 timecode_frames: self.canvas.timecode_frames,
+                output: self.canvas.output,
             },
             media: self.media.clone(),
             tracks: nest.tracks.clone(),

@@ -69,9 +69,9 @@ do {
     let offset = MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.exposure) ?? -1
     let flag = MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.toneEnabled) ?? -1
     check(
-        "P3 LayerUniforms is 512 bytes (128 floats, 32 × 16, since grading-2 G2-2's wheels) "
+        "P3 LayerUniforms is 528 bytes (132 floats, 33 × 16, since hdr H-2's HLG group) "
             + "with exposure at 416",
-        stride == 512 && offset == 416 && flag == 452,
+        stride == 528 && offset == 416 && flag == 452,
         "stride \(stride), exposure at \(offset), toneEnabled at \(flag)")
 }
 

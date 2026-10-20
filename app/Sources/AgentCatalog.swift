@@ -549,6 +549,11 @@ extension AgentServer {
                     "fit_new_clips": "Give a new clip Fit scale when its source is bigger "
                         + "than the canvas.",
                     "timecode_frames": "Show times as HH:MM:SS:FF rather than HH:MM:SS.mmm.",
+                    "output": "The project's dynamic range: \"sdr\" (Rec. 709, the default) or "
+                        + "\"hlg\" (HDR, Rec. 2100 HLG). Switching keeps every grade's settings, "
+                        + "and a chroma key keeps keying the colour it was picked on; a "
+                        + "qualifier's ranges read the HLG signal, so re-pick them after "
+                        + "switching. UI: Document tab ▸ Canvas ▸ Dynamic Range.",
                 ]),
         ]
         // The file rows — Media, Captions, Rendering and export — are

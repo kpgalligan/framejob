@@ -122,7 +122,9 @@ extension EditorViewController {
 /// What a pick samples (GR-13): the frame at `at` rendered with
 /// `RecipeOptions(behind: clip)` — the adjustment clip and every canvas
 /// layer in front of it left out — read at `point` (canvas pixels) as the
-/// eyedropper reads a pixel.
+/// eyedropper reads a pixel. An HLG project's frame is read at its code
+/// values (`FrameWriter.pickable`) and not un-lifted: the qualifier works on
+/// the HLG signal (spec §11 HD-13 (h)).
 enum QualifierPick {
     static func sample(
         project: ReelProject, urls: [UInt32: URL], at time: Ticks, clip: UInt32,
@@ -132,7 +134,9 @@ enum QualifierPick {
         let frame = Exporter.renderFrame(
             project: project, urls: urls, at: time, maxWidth: nil, options: options,
             graphics: graphics)
-        return frame.flatMap { CanvasEyedropperSession.color(at: point, in: $0, canvas: canvas) }
+        return frame.flatMap {
+            CanvasEyedropperSession.color(at: point, in: FrameWriter.pickable($0), canvas: canvas)
+        }
     }
 }
 

@@ -100,6 +100,29 @@ pub struct Canvas {
     pub fit_new_clips: bool,
     /// Display timecode as `HH:MM:SS:FF` rather than `HH:MM:SS.mmm`.
     pub timecode_frames: bool,
+    /// The project's dynamic range (format version 23, spec §11 HD-2,
+    /// HD-13): `sdr` composes in Rec. 709, `hlg` in HLG-encoded BT.2020.
+    /// Written only when `hlg`, so an SDR project and every older file
+    /// round-trip byte for byte.
+    #[serde(skip_serializing_if = "CanvasOutput::is_sdr")]
+    pub output: CanvasOutput,
+}
+
+/// A canvas's dynamic range (spec §11 HD-2): `Sdr`, the default, or `Hlg`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CanvasOutput {
+    #[default]
+    Sdr,
+    Hlg,
+}
+
+impl CanvasOutput {
+    /// Whether this is an SDR canvas: the `skip_serializing_if` on
+    /// `Canvas.output`, so an SDR project writes no key.
+    pub fn is_sdr(&self) -> bool {
+        *self == CanvasOutput::Sdr
+    }
 }
 
 impl Default for Canvas {
@@ -111,6 +134,7 @@ impl Default for Canvas {
             background: [0.0, 0.0, 0.0, 1.0],
             fit_new_clips: true,
             timecode_frames: true,
+            output: CanvasOutput::Sdr,
         }
     }
 }

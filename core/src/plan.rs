@@ -110,6 +110,12 @@ impl Project {
                 Value::from(self.canvas.height),
             ]),
         );
+        // The dynamic range (spec §11 HD-2): every composition of an HLG
+        // project converts in BT.2020/HLG. Only when HLG, so an SDR project's
+        // plan is the text it was.
+        if !self.canvas.output.is_sdr() {
+            out.insert("output".to_string(), Value::from("hlg"));
+        }
         out.insert("video_tracks".to_string(), Value::Array(video_tracks));
         out.insert("audio_tracks".to_string(), Value::Array(audio_tracks));
         out.insert(

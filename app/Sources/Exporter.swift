@@ -560,7 +560,7 @@ final class Exporter {
         } catch {
             return RenderedFrame(image: nil, graphics: GraphicRegistry.shared.reports(for: key))
         }
-        if keepsDepth, DeepVideoFrame.reads(project, built, urls: urls, at: t, options: options) {
+        if DeepVideoFrame.reads(project, built, urls: urls, at: t, options: options, keepsDepth: keepsDepth) {
             return RenderedFrame(
                 image: DeepStillFrame.read(built, at: t, maxWidth: maxWidth),
                 graphics: GraphicRegistry.shared.reports(for: key))

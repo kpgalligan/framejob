@@ -280,8 +280,15 @@ use crate::model::{Canvas, Project};
 /// there is no migration step: a PQ media from an older file has no `pq` and
 /// renders at 1,000 cd/m² until imported again. The bump is so an older build
 /// refuses the file instead of dropping the peak on save.
-/// Every number from 23 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 22;
+///
+/// Version 23 is the project's dynamic range (spec §11 HD-2, HD-13):
+/// [`crate::model::CanvasOutput`] on `canvas.output`, `sdr` or `hlg`, after
+/// `timecode_frames`, written only when `hlg`, so an SDR project writes
+/// exactly the text it did, and the reader's default is `sdr`, so there is
+/// no migration step. The bump is so an older build refuses an HLG file
+/// instead of opening it as SDR and dropping its output on save.
+/// Every number from 24 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 23;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

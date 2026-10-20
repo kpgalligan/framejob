@@ -21,7 +21,9 @@ import Metal
 struct MatteUniforms {
     /// A `TrackMatte.shaderCode`.
     var mode: Float = 0
-    var reserved0: Float = 0
+    /// 1 in an HLG project: a luma matte reads the un-lifted colour (spec
+    /// §11 HD-13 (h)); 0 in an SDR project.
+    var hlgOutput: Float = 0
     var reserved1: Float = 0
     var reserved2: Float = 0
 }
@@ -251,7 +253,8 @@ extension MetalRenderer {
             pass.suspend()
             composites[step.group] = (composite, group.mode)
             for cut in step.resolve {
-                try resolve(cut, composites, into: &coverage, buffer)
+                try resolve(
+                    cut, composites, into: &coverage, buffer, hlg: canvas.output == .hlg)
             }
             // A composite no later resolve reads goes back to the pool, so the
             // next step may draw into it; Metal orders that clear after the
@@ -267,10 +270,11 @@ extension MetalRenderer {
 
     /// One cut set's coverage, resolved once per frame: a pass cleared to 1
     /// with each matte's mode multiplied in. An empty set is the placeholder
-    /// and encodes nothing.
+    /// and encodes nothing. `hlg`: an HLG project's luma reads the un-lifted
+    /// colour (spec §11 HD-13 (h)).
     private func resolve(
         _ cut: [Int], _ composites: [Int: (texture: MTLTexture, mode: TrackMatte)],
-        into coverage: inout MatteCoverage, _ buffer: MTLCommandBuffer
+        into coverage: inout MatteCoverage, _ buffer: MTLCommandBuffer, hlg: Bool
     ) throws {
         guard !cut.isEmpty, coverage.byCut[cut] == nil else { return }
         // Every matte in the set is drawn already, checked before the pass
@@ -295,6 +299,7 @@ extension MetalRenderer {
         for matte in mattes {
             var u = MatteUniforms()
             u.mode = matte.mode.shaderCode
+            u.hlgOutput = hlg ? 1 : 0
             encoder.setFragmentBytes(&u, length: MemoryLayout<MatteUniforms>.stride, index: 0)
             encoder.setFragmentTexture(matte.texture, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)

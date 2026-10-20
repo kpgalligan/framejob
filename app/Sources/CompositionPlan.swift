@@ -107,6 +107,9 @@ struct CompositionPlan: Codable, Equatable {
     let instructions: [PlanInstruction]
     /// Advisory, e.g. more than 8 video tracks required by one instruction.
     let warnings: [String]
+    /// The project's dynamic range (spec §11 HD-2): every composition of an
+    /// HLG project converts in BT.2020/HLG (`CompositionBuilder`).
+    let output: CanvasOutput
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -118,6 +121,7 @@ struct CompositionPlan: Codable, Equatable {
         audioTracks = c.lenient(.audioTracks, [])
         instructions = c.lenient(.instructions, [])
         warnings = c.lenient(.warnings, [])
+        output = c.lenient(.output, .sdr)
     }
 
     /// Whether any video segment's media converts at step 0 (spec §11

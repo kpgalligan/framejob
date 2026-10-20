@@ -80,8 +80,8 @@ black).
   the probe's own kernels: L1 the 2³ placeholder and a neutral 33³ bake through
   `gradeLook` return all 16,777,216 8-bit colours as themselves; L2 the
   neutral bake's texels equal their coordinates; L3 `apply(look:)` (amount and
-  flag) and `lookAmount` / `lookEnabled` at offsets 456 / 460 of 512 (464 until
-  grading-2 G2-2's wheels group); L4
+  flag) and `lookAmount` / `lookEnabled` at offsets 456 / 460 of 528 (512 until
+  hdr H-2's HLG group, 464 until grading-2 G2-2's wheels group); L4
   (RECORD, unscored) the eight bakes' milliseconds; L5 `teal_orange`'s
   lattice (its definition read off the core's recipe) answers B > R at grey
   0.2 and R > B at grey 0.8.
