@@ -1232,14 +1232,16 @@ extension ReelOp {
         return ReelOp(name: "remove_media", args: a.values)
     }
 
-    /// A video media's Camera Log (spec §11 GR-16): `color` as
-    /// `MediaColor.opDictionary` (never `detected`, which import writes), or
-    /// nil to clear it with an explicit null.
+    /// A video media's Camera Log (spec §11 GR-16) and a PQ file's peak
+    /// override (HD-12): `color` as `MediaColor.opDictionary` (never
+    /// `detected` or the file's reading, which import writes), or an explicit
+    /// null — for nil, and for a colour with nothing to send, which clears
+    /// both and keeps the reading.
     static func setMediaColor(media: UInt32, color: MediaColor?) -> ReelOp {
         var a = OpArgs()
         a.put("media", media)
-        if let color = color {
-            a.put("color", color.opDictionary)
+        if let sent = color?.opDictionary, !sent.isEmpty {
+            a.put("color", sent)
         } else {
             a.putNull("color")
         }

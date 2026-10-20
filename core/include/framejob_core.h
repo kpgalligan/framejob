@@ -154,9 +154,17 @@ extern "C" {
  * Version 21 is the qualifier's cleanup blur (spec §11 GR-35):
  * `video.qualifier` gains `blur`, 0…1, written only when above 0, so a
  * project with no blurred qualifier writes the text it did; the reader's
- * default is 0, so there is no migration step. 22 and above, 1014
- * included, are newer. */
-#define RC_FORMAT_VERSION 21
+ * default is 0, so there is no migration step.
+ *
+ * Version 22 is a PQ file's HDR10 peak (spec §11 HD-12): `media.color.pq
+ * {file, from, peak}`, after `detected` — `file` the peak import read in
+ * whole cd/m², `from` `max_cll` or `mastering_display` (exactly when `file`
+ * is), `peak` the person's override (1–10000) — each written only when set,
+ * `{}` for a PQ file whose import read nothing, and `pq` only on a PQ file's
+ * media, so a project with none writes the text it did; the reader's default
+ * is none, so there is no migration step. 23 and above, 1014 included, are
+ * newer. */
+#define RC_FORMAT_VERSION 22
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips
@@ -661,6 +669,25 @@ bool rc_cube_copy_rgb(const RcCube *cube, float *out, size_t count);
 
 /* Releases a LUT. NULL-tolerant. */
 void rc_cube_free(RcCube *cube);
+
+/* ----------------------------------------------------------------- hdr10 */
+
+/* A PQ file's HDR10 peak (spec §11 HD-12), read by the core from the bytes
+ * the import probe hands it: `mastering` (the format description's
+ * MasteringDisplayColorVolume, 24 bytes of SMPTE ST 2086, the maximum a
+ * big-endian u32 at bytes 16-19 in 0.0001 cd/m²) and `content_light` (its
+ * ContentLightLevelInfo, 4 bytes of CTA-861.3, MaxCLL a big-endian u16 at
+ * bytes 0-1), read when either is given; else `sample`, the first video
+ * sample, whose NAL units are prefixed by `nal_length_size` bytes (1, 2 or 4;
+ * anything else reads nothing): its prefix SEI before the first VCL unit,
+ * payloads 137 and 144. MaxCLL when non-zero, else the mastering maximum
+ * rounded to whole cd/m²; above 10000 clamped, 0 none.
+ * JSON {"file":N,"from":"max_cll"|"mastering_display"} or {} (nothing
+ * read); a NULL pointer or 0 length is absent; NULL only on a caught panic.
+ * Freed with rc_string_free. */
+char *rc_hdr10_peak(const uint8_t *mastering, size_t mastering_len, const uint8_t *content_light,
+                    size_t content_light_len, const uint8_t *sample, size_t sample_len,
+                    uint32_t nal_length_size);
 
 /* ----------------------------------------------------------------- agent */
 

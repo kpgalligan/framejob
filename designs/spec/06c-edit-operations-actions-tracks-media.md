@@ -100,8 +100,8 @@ The rules every op shares are §6a; the clip ops are §6b.
   true to remove it and clear their looks`); `with_clips` then clears those looks, on the timeline
   and in every nest, and keeps the clips; an action's end naming it is left, inert. The
   descriptor may carry `color` (format 19, §11 GR-16), the Camera Log import detected (`{log:
-  "apple_log", gamut: "bt2020", detected: true}`), held to `set_media_color`'s rules as an
-  error; a relink's probe may NOT carry it (`unknown key "color" in a relink probe`), and a relink
+  "apple_log", gamut: "bt2020", detected: true}`) or a PQ file's peak (`{pq: {file: 4000, from:
+  "max_cll"}}`, format 22, §11 HD-12), held to `set_media_color`'s rules as an error; a relink's probe may NOT carry it (`unknown key "color" in a relink probe`), and a relink
   keeps the stored one. A LUT that is a media's Camera Log refuses `remove_media` too (`media 7
   is the Camera Log of media 3; pass with_clips: true to remove it and clear it`, or, with looks,
   `media 7 is the look of clip 5 and the Camera Log of media 3; pass with_clips: true to remove
@@ -119,8 +119,16 @@ The rules every op shares are §6a; the clip ops are §6b.
   likewise), `color needs log or lut; null clears it`, `color takes log or lut, not both`,
   `color.gamut goes with log`, `slog3 takes gamut s_gamut3_cine or s_gamut3, not v_gamut`,
   `color.lut 9 is not a media of this project`, `color.lut 5 is a video media, not a lut`,
-  `color.detected is written by import, not set`. A `scope` is an `Err` (`set_media_color has
-  no meaning inside nest 4`): a nest shares the document's media.
+  `color.detected is written by import, not set`. A PQ file's **`peak`** (§11 HD-12, a whole
+  number of cd/m²) overrides the peak import read into `pq`, beside `log` or `lut` or alone:
+  `color` replaces the Camera Log and the override together, import's `pq.file` and `pq.from`
+  survive every op, and `null` clears both, keeping the reading (an identity with neither).
+  Refused besides: `color.pq is read from the file at import, not set`, `media 3 is not a PQ
+  file; only a PQ file takes a peak`, `color.peak must be 1–10000 cd/m², not 0`; an asked
+  `color` with none of `log`, `lut` and `peak` keeps `color needs log or lut; null clears it`;
+  a `peak` that is not a whole number is an `Err` (`color.peak must be a whole number of
+  cd/m², not a string`). A `scope` is an `Err` (`set_media_color has no meaning inside nest
+  4`): a nest shares the document's media.
 
 **This table is the SEMANTICS half of the op table, and it has a second
 half.** What an op MEANS is written here and in `core/src/edit.rs`'s module

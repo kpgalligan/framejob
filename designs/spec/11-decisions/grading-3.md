@@ -232,6 +232,12 @@ opened, at design time or build time.
   **Amended by HD-6** (hdr H-0): T3-1's PQ white is the media's own peak ÷ 203, held at 1 or above,
   instead of a fixed 1000/203; an unknown peak means 1,000 cd/m², so every unlabelled file renders
   byte-identical (H-1).
+  **Amended by HD-12** (hdr H-1): the white is W = max(peak, 203)/203 with the peak the `input`'s
+  `peak` (the media's override, else its reading), 1000/203 when none. B96's measurement above was
+  taken on files whose HDR10 metadata sat only in the HEVC stream's SEI (x265 through ffmpeg),
+  which AVFoundation does not read (M5), so "Apple's own reading … the same for all four" saw no
+  field; on two Apple-written files whose sample description carries 600 and 1,000 cd/m², Apple's
+  conversion was byte-identical again (digest `d34d90b3f676a425`, M5), so B96's conclusion stands.
 - **GR-16 — Camera log is a setting on the media, `media.color {log, gamut, lut, detected}`,
   converted at step 0 before the chroma key and Color's four.** Choices 3a, 4a, 5a and 6
   (owner, 2026-10-11).
@@ -382,6 +388,10 @@ opened, at design time or build time.
   **Amended by HD-6** (hdr H-0): the media's colour record gains the PQ peak read at import (from
   the format description, else the first sample's HEVC SEI; MaxCLL first), which `set_media_color`
   overrides and refuses by name on media that is not PQ; its key is H-1's spec's.
+  **Amended by HD-12** (hdr H-1): `media.color` gains `pq {file?, from?, peak?}` after `detected`
+  (format 22), which a colour may hold with neither `log` nor `lut`; `set_media_color` takes `peak`
+  and replaces the Camera Log and the override together, `null` keeping import's `{file, from}`;
+  three new refusals; removing a converting LUT, or a paste without it, keeps `pq`.
   **Amended by HD-10** (hdr H-0): the `log` vocabulary gains Canon Log 2 and Canon Log 3 with Cinema
   Gamut, each built under this entry's recipe from Canon's published document (format 24); "Sony's
   and Panasonic's own metadata is not read" still stands.
@@ -489,6 +499,9 @@ opened, at design time or build time.
     also carries `fullRange: true`, and the head check reads that range for those media alone.
   **Amended by HD-6** (hdr H-0): a PQ media's strip is drawn through step 0 at its own peak, as a
   Camera Log's is at its curve; how the converted marker names the peak is H-1's spec's.
+  **Amended by HD-12** (hdr H-1): a PQ media with an effective peak takes the Camera Log path (its
+  `color` counts as converting), and its converted marker carries `peak`; a PQ media with no
+  reading and no override keeps the `transfer: "pq"` marker it had.
 - **GR-22 — A log file's code domain follows its media's range flag** (#283; amends GR-16).
   - The range is the media's forward video track's `kCMFormatDescriptionExtension_FullRangeVideo`.
     It is read when the composition is built and carried per instruction, per track, as

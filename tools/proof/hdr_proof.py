@@ -5,8 +5,9 @@ Written before any product edit, so the control is captured on the untouched
 tree. T3-3 (the close) added H1a, H7 and TI's export wall time, measuring two
 of GR-15's unmeasured claims; the product was not edited for them.
 
-    python3 tools/proof/hdr_proof.py [--app PATH] [--only H1a,H2,H7,...]
-    python3 tools/proof/hdr_proof.py capture DIR    # the CONTROL tree: H1's references, H2–H6 shown failing
+    python3 tools/proof/hdr_proof.py [--app PATH] [--only H1a,H2,H7,...] [--control DIR]
+    python3 tools/proof/hdr_proof.py capture DIR [--only H1,H7i,Z1]   # the CONTROL tree: H1's
+                                                    # and H7i's references, H2–H6 shown
     python3 tools/proof/hdr_proof.py compare DIR [--only H1,...]
     python3 tools/proof/hdr_proof.py --measure      # TI: step 0's 4K cost (Release figures)
     python3 tools/proof/hdr_proof.py --mutant NAME [--control DIR]
@@ -46,13 +47,19 @@ relabelled Apple Log by `applelog_writer.swift` (ffprobe
 ProRes twins of the ramp, HLG and BT.709.
 For H1a: `hevc_alpha.mov`, 640×360 1 s `testsrc2` with an alpha ramp through
 `hevc_videotoolbox` from `bgra`, BT.709-tagged by `setparams` (the `-color_*`
-flags alone do not stick from `bgra`). For H7: `pq_plain.mov` and
-`pq_hdr10.mov`, the ramp through `libx265` lossless 4:2:0 10-bit with the PQ
-tags, the second with x265's `master-display` and `max-cll` (HDR10 static
-metadata naming a 4,000 cd/m² peak, not the conversion's 1,000); issue batch
-B96 (#281) added `pq_hdr10_600.mov` (a 600 cd/m² display, MaxCLL 600) and
-`pq_hdr10_cll.mov` (the 4,000 cd/m² display, MaxCLL 1,000), which separates
-the two fields.
+flags alone do not stick from `bgra`). For H7's family (rewritten in hdr H-1,
+#281): the ramp as raw 4:2:0 10-bit planes through the **x265 CLI**
+(`--lossless`, the PQ tags in its VUI; ffmpeg 9.0.2's libx265 wrapper no
+longer writes the mastering display with these values), muxed by ffmpeg's
+stream copy as `hvc1` — `pq_plain.mov` with no metadata, and with SEI 137
+(`--master-display G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)
+L(<max>,50)`) and SEI 144 (`--max-cll`): `pq_hdr10` (40000000; 4000,400),
+`pq_hdr10_600` (6000000; 600,200), `pq_hdr10_cll` (40000000; 1000,400) and
+`pq_hdr10_display` (20000000; no CLL) — and through `hdr10_writer.swift`
+(AVAssetWriter's explicit `MasteringDisplayColorVolume` and
+`ContentLightLevelInfo`, every sample copied): `pq_desc_600` (over pq_plain:
+6000000; 600,200) and `pq_both` (over pq_hdr10, its SEI still 4,000: 600). No
+x265 on the host refuses each by name.
 The oracle: the codes ffmpeg reads back from a fixture, through the matrix
 its tags name (limited range), then this script's own formula with GR-15's
 numbers (`convert`), the matrices derived here from the published
@@ -92,21 +99,38 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   background: the eyedropper's pick at (256, 96) at 0.5 s equals the
   `prores_422` export's pixel there (frame 15) ±2; keyed with the probe's key
   (`set_video` chroma, tolerance 0.05), the export shows magenta there ±8.
-- **H7** (T3-3; GR-15's "HDR10 static metadata on a converted frame"; B96
-  for #281): CONTROL first, ffprobe's first frame of each of `pq_hdr10`,
-  `pq_hdr10_600` and `pq_hdr10_cll` names "Mastering display metadata" and
-  "Content light level metadata" with its own peaks (`max_luminance=
-  40000000/10000` and `max_content=4000`; 6000000/10000 and 600;
-  40000000/10000 and 1000; the conversion assumes 1,000) and `pq_plain`'s
-  none of them; then each of the four alone at 0.5 s: the grey row (every
-  8th column) = the PQ oracle ±1 at 8 bits (H3's loop), and every render's
-  PNG bytes equal pq_plain's (lossless twins; if not, the worst |Δ| is
-  printed and held to ±1). Because no metadata peak is the conversion's own,
-  equal renders show the shoulder ignores it rather than follows it.
+- **H7** (CONTROL; rewritten in hdr H-1 for #281, spec §11 HD-12): ffprobe's
+  first-frame side data names each SEI fixture's own values (`max_luminance=
+  <max>/10000`, `max_content=<MaxCLL>`; x265 writes MaxCLL 0 for
+  pq_hdr10_display, measured), none on `pq_plain`; its stream side data names
+  each writer fixture's description values, and pq_both's first frame still
+  pq_hdr10's 4,000; and `hdr10_writer` read both extensions back.
+- **H7d**: `get_project`'s `media[0].color.pq` after import: `{}` on
+  pq_plain, `{file 4000, from max_cll}`, `{600, max_cll}`, `{1000, max_cll}`,
+  `{2000, mastering_display}`, `{600, max_cll}` on pq_desc_600 and on pq_both
+  (the description over the SEI); `{}` on the ProRes `pq` retag; no `pq` on
+  `hlg` or `bt709`.
+- **H7i**: pq_plain's and pq_hdr10_cll's renders at 0.5 s byte-equal DIR's
+  pq_plain PNG (`capture DIR --only H7i,Z1` on the tree before the phase's
+  code writes `DIR/h7-pq_plain.png` and copies both files into `DIR/media/`,
+  which the run reads), and the grey row (every 8th column) = the oracle at
+  1,000 ±1.
+- **H7p**: pq_hdr10_600's, pq_hdr10_display's, pq_hdr10's and pq_desc_600's
+  grey rows = the oracle at the file's peak (600, 2000, 4000, 600) ±1; at PQ
+  0.70 (`render_at`) the 600/1000/2000/4000 files within ±1 of
+  255.0/246.9/243.5/242.8 (the road map's computed table); pq_desc_600's PNG
+  bytes = pq_hdr10_600's.
+- **H7o** on pq_hdr10: `set_media_color {peak: 1000}` renders pq_plain's
+  bytes and stores `{4000, max_cll, peak 1000}`; `undo` brings the 4,000
+  render back; `{peak: 100}` renders `{peak: 203}`'s bytes (the white held at
+  1); `null` keeps `{4000, max_cll}` and the 4,000 render.
+- **H7r**: refused, each in its own sentence: a peak on `hlg` and on `bt709`
+  ("media N is not a PQ file; only a PQ file takes a peak"), 0 and 10001
+  ("color.peak must be 1–10000 cd/m², not N"), `{pq: {file: 1}}` ("color.pq
+  is read from the file at import, not set").
   Printed, unscored: Apple's reading of each file (`hdr_pick_probe.swift`'s
   `plain` request, as H1w's oracle) at the grey row every 64th column, and
-  each HDR10 file's worst |Δ| against `pq_plain`'s — whether Apple's own
-  reading follows the metadata, and which field.
+  each one's worst |Δ| against `pq_plain`'s.
 - **R0** (GR-15's owed check; NEVER records the screen, never searches the
   disk): ffprobe reads the labels of the newest-by-name `Screen Recording
   *.mov` in `~/Movies/Frame Job Recordings/` (that folder only, read-only,
@@ -122,8 +146,11 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   lines each; the averages, their difference, each export's wall time
   (`time.monotonic()` around the `export` call, recorded, not scored) and the
   host state are printed.
-- **P1–P4**: `hdr_probe.swift` over `app/Sources` (a probe that will not build
-  is a scored FAIL of all four).
+- **P1–P5**: `hdr_probe.swift` over `app/Sources` (a probe that will not build
+  is a scored FAIL of all five). P5 (hdr H-1): `pqShoulderWhite` (1000/203
+  bit-exact with no peak, 1 at 100 and 203, peak/203 above), `MediaColor`'s
+  stored and `input` shapes and its two dictionaries, `setMediaColor` sending
+  null for an empty dictionary, and a converted marker omitting a nil `peak`.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
@@ -134,8 +161,10 @@ NEW` shows the pixels equal). The mutant `relabel-in-renderframe` (H1)
 applies the label inside `Exporter.renderFrame` instead, which moves the
 eyedropper's picks; it runs against a capture made after PR-11.
 
-H1a and H7 run in a plain run, `compare` and `--only`; never under
-`capture`, `--measure` or a mutant's default selection.
+H1a and the H7 family run in a plain run, `compare` and `--only`; never under
+`capture`'s default selection, `--measure` or a mutant's default selection;
+hdr H-1's five mutants run with `--only <their rows>,Z1`. `capture --only`
+captures just the rows named, keeping an earlier capture's H1 record.
 `capture DIR` records H1's references (`DIR/h1-*.png`, `DIR/media/`,
 `DIR/capture.json` with the picks and the reverse's digest) and runs H2–H6 and
 R0, which must FAIL on the control (each discriminates). `--mutant NAME`
@@ -182,6 +211,7 @@ CONTROL = "tools/proof/work/t3-1/ctl"
 PICK_PROBE = ROOT / "tools/proof/hdr_pick_probe.swift"
 MATH_PROBE = ROOT / "tools/proof/hdr_probe.swift"
 WRITER = ROOT / "tools/proof/applelog_writer.swift"
+HDR10_WRITER = ROOT / "tools/proof/hdr10_writer.swift"
 RECORDINGS = Path.home() / "Movies" / "Frame Job Recordings"
 CALL_BOUND = 300
 BUILD_BOUND = 1500
@@ -238,33 +268,37 @@ H1_FIXTURES = [("bt709", W, H), ("untagged", W, H), ("h264_709", SW, SH),
 H1_SUFFIX = {"still8": ".png", "webm": ".webm"}
 PICK_POINTS = {(W, H): [[256.5, 32.5], [512.5, 96.5], [900.5, 100.5]],
                (SW, SH): [[320.5, 180.5], [100.5, 60.5], [540.5, 300.5]]}
-ROWS = ["H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "H7", "R0", "TI", "P1",
-        "P2", "P3", "P4", "Z1"]
-# H7's fixtures: libx265 lossless with the PQ tags; pq_hdr10 adds HDR10 static metadata
-# naming a 4,000 cd/m² peak, not the 1,000 the conversion assumes (GR-15's PQ 1000/203),
-# so equal renders mean the metadata is ignored, not followed. Issue batch B96 (#281)
-# added two: pq_hdr10_600 (a 600 cd/m² mastering display and MaxCLL 600, both below
-# the conversion's white) and pq_hdr10_cll (the 4,000 cd/m² display with MaxCLL 1,000),
-# which separates the two fields in Apple's reading.
-PQ_X265 = "lossless=1:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc"
-HDR10_DISPLAY = ":master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)"
-# name: (the mastering display's maximum luminance in x265's 0.0001 cd/m², MaxCLL).
-HDR10_FIXTURES = {"pq_hdr10": (40000000, 4000), "pq_hdr10_600": (6000000, 600),
-                  "pq_hdr10_cll": (40000000, 1000)}
-H7_FIXTURES = ["pq_plain"] + list(HDR10_FIXTURES)
-SIDE_DATA = ("Mastering display metadata", "Content light level metadata")
-
-
-def hdr10_params(name):
-    """x265's HDR10 static metadata for `name` (an HDR10_FIXTURES key)."""
-    luminance, cll = HDR10_FIXTURES[name]
-    return f"{HDR10_DISPLAY}L({luminance},50):max-cll={cll},400"
-
-
-def hdr10_peak(name):
-    """What ffprobe prints for `name`'s peaks (a stale fixture fails the CONTROL)."""
-    luminance, cll = HDR10_FIXTURES[name]
-    return (f"max_luminance={luminance}/10000", f"max_content={cll}")
+ROWS = ["H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "H7", "H7d", "H7i",
+        "H7p", "H7o", "H7r", "R0", "TI", "P1", "P2", "P3", "P4", "P5", "Z1"]
+# H7's family (hdr H-1, #281, spec §11 HD-6, HD-12): PQ ramps whose HDR10 static
+# metadata sits in the HEVC stream's SEI (the x265 CLI, muxed by ffmpeg's stream copy;
+# ffmpeg 9.0.2's libx265 wrapper no longer writes the mastering display with these
+# values) or in the sample description (hdr10_writer.swift, AVAssetWriter's explicit keys).
+X265_DISPLAY = "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)"
+# name: (the mastering display's maximum in x265's 0.0001 cd/m² or None, (MaxCLL, MaxFALL)
+# or None), each written by x265 as SEI 137 and 144.
+SEI_FIXTURES = {"pq_plain": (None, None), "pq_hdr10": (40000000, (4000, 400)),
+                "pq_hdr10_600": (6000000, (600, 200)), "pq_hdr10_cll": (40000000, (1000, 400)),
+                "pq_hdr10_display": (20000000, None)}
+# name: (the SEI fixture whose samples it copies, the maximum, MaxCLL, MaxFALL) in the
+# sample description; pq_both keeps pq_hdr10's SEI (4,000) under a 600 description.
+DESC_FIXTURES = {"pq_desc_600": ("pq_plain", 6000000, 600, 200),
+                 "pq_both": ("pq_hdr10", 6000000, 600, 200)}
+H7_FIXTURES = list(SEI_FIXTURES) + list(DESC_FIXTURES)
+# H7d: what import stores as `media.color.pq` (HD-12: the description first, else the
+# SEI; MaxCLL when non-zero, else the mastering maximum rounded to whole cd/m²).
+H7_READS = {"pq_plain": {}, "pq_hdr10": {"file": 4000, "from": "max_cll"},
+            "pq_hdr10_600": {"file": 600, "from": "max_cll"},
+            "pq_hdr10_cll": {"file": 1000, "from": "max_cll"},
+            "pq_hdr10_display": {"file": 2000, "from": "mastering_display"},
+            "pq_desc_600": {"file": 600, "from": "max_cll"},
+            "pq_both": {"file": 600, "from": "max_cll"}}
+# H7p: each peak's fixture, and the computed level at PQ 0.70 (620.9 cd/m²; the road
+# map's table, hdr_math.py §4, re-run in H-0).
+PEAK_FIXTURES = {600: "pq_hdr10_600", 1000: "pq_hdr10_cll", 2000: "pq_hdr10_display",
+                 4000: "pq_hdr10"}
+AT_070 = {600: 255.0, 1000: 246.9, 2000: 243.5, 4000: 242.8}
+H7_ROWS = {"H7", "H7d", "H7i", "H7p", "H7o", "H7r"}
 
 
 BASE_COMMIT = "716720c"
@@ -274,7 +308,8 @@ STAGE_SWIFT = "app/Sources/Compositor+Input.swift"
 COMPOSITOR = "app/Sources/Compositor.swift"
 BUILDER = "app/Sources/CompositionBuilder.swift"
 SHADER = "app/Resources/Shaders/Compositor.metal"
-P_ROWS = {"P1", "P2", "P3", "P4"}
+HDR10_RS = "core/src/hdr10.rs"
+P_ROWS = {"P1", "P2", "P3", "P4", "P5"}
 RECORDS = {"R0"}
 # name: ([(file, anchor, replacement), …], the rows that must fail).
 MUTANTS = {
@@ -328,6 +363,29 @@ MUTANTS = {
                                  "        return RenderedFrame(image: image.map(FrameWriter.labelled), "
                                  "graphics: GraphicRegistry.shared.reports(for: key))\n")],
                                ["H1"]),
+    # hdr H-1 (#281, spec §11 HD-12): each run with `--only <its rows>,Z1` and `--control`
+    # the capture of H7i made on the tree before the phase's code.
+    "peak-ignored": ([(INPUT_SWIFT,
+                       "            uniforms.white = InputConversions.pqShoulderWhite(peak: peak)\n",
+                       "            uniforms.white = InputConversions.pqShoulderWhite(peak: nil)\n")],
+                     ["H7p", "H7o"]),
+    "mastering-over-cll": ([(HDR10_RS,
+                             "    content_light\n"
+                             "        .map(|cll| found(cll, PeakSource::MaxCll))\n"
+                             "        .or_else(|| mastering.map(|max| found(max, "
+                             "PeakSource::MasteringDisplay)))\n",
+                             "    mastering\n"
+                             "        .map(|max| found(max, PeakSource::MasteringDisplay))\n"
+                             "        .or_else(|| content_light.map(|cll| found(cll, "
+                             "PeakSource::MaxCll)))\n")], ["H7d", "H7i"]),
+    "sei-unparsed": ([(HDR10_RS, "    let (mastering, light) = sei_payloads(sample, nal_length_size);\n",
+                       "    let (mastering, light) = (None, None);\n")], ["H7d", "H7p"]),
+    "unknown-not-1000": ([(INPUT_SWIFT, "        let nits = peak.map { Float($0) } ?? pqWhite\n",
+                           "        let nits = peak.map { Float($0) } ?? 4000\n")],
+                         ["H7i", "P5"]),
+    "peak-below-knee": ([(INPUT_SWIFT,
+                          "        return max(nits, pqReferenceWhite) / pqReferenceWhite\n",
+                          "        return nits / pqReferenceWhite\n")], ["H7o", "P5"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -411,11 +469,12 @@ def shoulder(m, white):
     return KNEE + (1 - KNEE) * t * (1 + t / (tw * tw)) / (1 + t)
 
 
-def convert(kind, primaries, rgb):
+def convert(kind, primaries, rgb, peak=PQ_WHITE):
     """GR-15's step 0 on one straight R'G'B' signal: (the encoded output, the
     linear BT.709 colour before the lift). `kind` is hlg, pq, sdr (wide-gamut
     SDR) or srgb (the sRGB arm: IEC 61966-2-1's EOTF, the matrix, the inverse
-    of Core Media's 709 gamma)."""
+    of Core Media's 709 gamma). `peak` is a PQ file's peak in cd/m² (spec §11
+    HD-12: the shoulder's white max(peak, 203)/203; 1,000 when unknown)."""
     m = to709(primaries)
     if kind == "srgb":
         light = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
@@ -432,7 +491,7 @@ def convert(kind, primaries, rgb):
         white = HLG_WHITE
     else:
         light = [pq_eotf(c) * 10000 / PQ_REFERENCE for c in rgb]
-        white = PQ_WHITE / PQ_REFERENCE
+        white = max(peak, PQ_REFERENCE) / PQ_REFERENCE
     linear = mat_vec(m, light)
     out = list(linear)
     low = min(out)
@@ -678,8 +737,10 @@ def fixture(name):
                               "0.75", "-pix_fmt", "bgra", "-tag:v", "hvc1", "-b:v", "8M"],
                        {"codec_name": "hevc", "color_transfer": "bt709",
                         "color_primaries": "bt709"})
-    if name in H7_FIXTURES:
+    if name in SEI_FIXTURES:
         return pq_x265(name)
+    if name in DESC_FIXTURES:
+        return pq_described(name)
     if name in ("hlg4k", "bt709_4k"):
         return four_k(name)
     if name in MEDIA_REC:
@@ -687,22 +748,87 @@ def fixture(name):
     raise ValueError(name)
 
 
-def pq_x265(name):
-    """H7's fixtures: the ramp through libx265 lossless, 4:2:0 10-bit, PQ-tagged;
-    each HDR10_FIXTURES name with its x265 HDR10 static metadata."""
+def pq_raw():
+    """The ramp as raw 4:2:0 10-bit planes, x265's input (made once, kept)."""
     source = base()
     if source is None:
-        REFUSED[name] = REFUSED.get("base")
         return None
-    params = PQ_X265 + (hdr10_params(name) if name in HDR10_FIXTURES else "")
-    made = ffmpeg_make(MEDIA / f"{name}.mov", [
-        "-i", str(source), "-vf", "format=yuv420p10le,setparams=color_primaries=bt2020:"
-        "color_trc=smpte2084:colorspace=bt2020nc", "-c:v", "libx265", "-preset", "fast",
-        "-tag:v", "hvc1", "-color_primaries", "bt2020", "-color_trc", "smpte2084",
-        "-colorspace", "bt2020nc", "-x265-params", params], 300)
-    return checked(name, made, {"codec_name": "hevc", "pix_fmt": "yuv420p10le",
-                                "color_primaries": "bt2020", "color_transfer": "smpte2084",
-                                "color_space": "bt2020nc"})
+    return ffmpeg_make(MEDIA / "ramp420p10.yuv", [
+        "-i", str(source), "-vf", "format=yuv420p10le", "-f", "rawvideo",
+        "-pix_fmt", "yuv420p10le"], 120)
+
+
+def pq_x265(name):
+    """H7's SEI fixtures (hdr H-1): the ramp through the x265 CLI, lossless, 4:2:0
+    10-bit, PQ-tagged in its VUI, with SEI_FIXTURES' HDR10 static metadata as SEI 137
+    and 144, then muxed by ffmpeg's stream copy (`hvc1`, 30 frames at k/30 s). Refused
+    by name when x265 is not installed."""
+    out = MEDIA / f"{name}.mov"
+    if not out.exists():
+        x265 = shutil.which("x265")
+        if x265 is None:
+            REFUSED[name] = f"{name} refused: the x265 CLI is not installed (`which x265`)"
+            return None
+        raw = pq_raw()
+        if raw is None:
+            REFUSED[name] = REFUSED.get("base") or "ramp420p10.yuv was not made"
+            return None
+        maximum, cll = SEI_FIXTURES[name]
+        hevc = MEDIA / f"{name}.hevc"
+        argv = [x265, "--input", str(raw), "--input-res", f"{W}x{H}", "--fps", "30",
+                "--input-csp", "i420", "--input-depth", "10", "--output-depth", "10",
+                "--lossless", "--colorprim", "bt2020", "--transfer", "smpte2084",
+                "--colormatrix", "bt2020nc", "--log-level", "error"]
+        if maximum is not None:
+            argv += ["--master-display", f"{X265_DISPLAY}L({maximum},50)"]
+        if cll is not None:
+            argv += ["--max-cll", f"{cll[0]},{cll[1]}"]
+        made = bounded.run(argv + ["-o", str(hevc)], 300)
+        if made["rc"] != 0 or not hevc.exists():
+            REFUSED[name] = f"x265 {name}: rc {made['rc']} {made['stderr'][-300:]}"
+            hevc.unlink(missing_ok=True)
+            return None
+        # `-framerate` and `make_zero`: the stream's frames at k/30 from 0 with no edit
+        # list (`-r 30` alone started them at -0.08 s under an edit list, which put
+        # hdr10_writer's copies off the 1/30 grid).
+        muxed = ffmpeg_make(out, ["-framerate", "30", "-i", str(hevc), "-c", "copy", "-tag:v",
+                                  "hvc1", "-avoid_negative_ts", "make_zero"], 120)
+        hevc.unlink(missing_ok=True)
+        if muxed is None:
+            REFUSED[name] = f"ffmpeg did not mux {name}.mov"
+            return None
+    return checked(name, out, {"codec_name": "hevc", "pix_fmt": "yuv420p10le",
+                               "color_primaries": "bt2020", "color_transfer": "smpte2084",
+                               "color_space": "bt2020nc"})
+
+
+def pq_described(name):
+    """H7's sample-description fixtures (hdr H-1): an SEI fixture's samples copied by
+    hdr10_writer.swift under a description carrying DESC_FIXTURES' two extensions.
+    The writer's own line is kept in WRITTEN; it exits 0 only when both read back."""
+    out = MEDIA / f"{name}.mov"
+    over, maximum, cll, fall = DESC_FIXTURES[name]
+    if not out.exists():
+        source = pq_x265(over)
+        if source is None:
+            REFUSED[name] = REFUSED.get(over)
+            return None
+        writer = BASE / "hdr10-writer" / "hdr10_writer"
+        try:
+            swift_build.build(sources=[HDR10_WRITER], output=writer, timeout=BUILD_BOUND)
+        except swift_build.SwiftBuildFailed as failure:
+            REFUSED[name] = f"hdr10_writer did not build: {str(failure)[:300]}"
+            return None
+        made = bounded.run([str(writer), str(source), str(out), str(maximum), str(cll),
+                            str(fall)], 120)
+        WRITTEN[name] = (made["rc"], (made["stdout"] + made["stderr"]).strip()[-300:])
+        print(f"       hdr10_writer {name}: {WRITTEN[name][1]}", flush=True)
+        if made["rc"] != 0 or not out.exists():
+            REFUSED[name] = f"hdr10_writer exited {made['rc']} for {name}"
+            out.unlink(missing_ok=True)
+            return None
+    return checked(name, out, {"codec_name": "hevc", "pix_fmt": "yuv420p10le",
+                               "color_transfer": "smpte2084"})
 
 
 def four_k(name):
@@ -1492,89 +1618,308 @@ def run_h1a(client, sources, state):
 
 # ---- H7 -------------------------------------------------------------------------
 
-def side_data(path, peak=()):
-    """The side data ffprobe names on `path`'s first video frame, then the
-    `peak` lines (`hdr10_peak`) it prints."""
-    ran = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-read_intervals",
-                       "%+#1", "-show_frames", "-show_entries", "frame=side_data_list",
-                       str(path)], 60)
-    lines = {line.strip() for line in ran["stdout"].splitlines()}
-    return [name for name in SIDE_DATA if name in ran["stdout"]] + \
-        [line for line in peak if line in lines]
+def side(path, entries):
+    """What ffprobe reads as `path`'s HDR10 side data — `frame=side_data_list` on its
+    first video frame (the HEVC stream's SEI) or `stream_side_data_list` (the sample
+    description's `mdcv` and `clli`): {"mastering": max_luminance, "cll": max_content},
+    None for each it does not name."""
+    argv = ["ffprobe", "-v", "error", "-select_streams", "v:0"]
+    if entries == "frame":
+        argv += ["-read_intervals", "%+#1", "-show_frames", "-show_entries",
+                 "frame=side_data_list"]
+    else:
+        argv += ["-show_entries", "stream_side_data_list"]
+    ran = bounded.run(argv + [str(path)], 60)
+    found = {"mastering": None, "cll": None}
+    for line in ran["stdout"].splitlines():
+        key, _, value = line.strip().partition("=")
+        if key == "max_luminance":
+            found["mastering"] = value
+        elif key == "max_content":
+            found["cll"] = value
+    return found
 
 
-def run_h7(client, sources, state):
-    """H7 (T3-3; B96 for #281): PQ with and without HDR10 static metadata
-    converts the same; Apple's own reading of each file printed beside it."""
-    name = "H7 PQ with and without HDR10 static metadata (4,000 cd/m² display and MaxCLL; 600 " \
-           "and 600; 4,000 and MaxCLL 1,000): ffprobe names the side data and each fixture's " \
-           "own peaks, and none on pq_plain (CONTROL); each of the four grey rows (every 8th " \
-           "column) = the PQ oracle ±1, and the four renders' PNG bytes equal"
-    paths = {n: fixture(n) for n in H7_FIXTURES}
-    if any(path is None for path in paths.values()):
-        check(name, False, f"refused {REFUSED}")
-        return
-    found = {n: side_data(paths[n], hdr10_peak(n) if n in HDR10_FIXTURES else ())
-             for n in H7_FIXTURES}
-    control = not found["pq_plain"] and all(
-        found[n] == list(SIDE_DATA + hdr10_peak(n)) for n in HDR10_FIXTURES)
-    misses = [] if control else [f"CONTROL: side data {found}"]
-    figures, frames = [f"side data {found}"], {}
-    for fixture_name in H7_FIXTURES:
-        frame, source = fixture_scene(client, fixture_name)
-        if frame is None:
-            misses.append(f"{fixture_name}: {source}")
+def side_want(maximum, cll):
+    """`side`'s answer for a maximum and a (MaxCLL, MaxFALL) pair. Measured in hdr H-1:
+    given `--master-display` alone, x265 still writes SEI 144, as 0,0 (MaxCLL unknown)."""
+    return {"mastering": f"{maximum}/10000" if maximum is not None else None,
+            "cll": str(cll[0]) if cll is not None else ("0" if maximum is not None else None)}
+
+
+def h7_control(paths):
+    """H7's CONTROL readings: {name: (got, want)} — each SEI fixture's first frame
+    against its own values; each writer fixture's stream side data against the
+    description it was given, and pq_both's first frame still pq_hdr10's SEI."""
+    readings = {}
+    for n, path in paths.items():
+        if path is None:
             continue
-        frames[fixture_name] = frame
-        worst = 0
-        for x in range(0, W, 8):
-            rgb = source.rgb(x, GREY_ROW, "bt2020nc")
-            want = [code8(c) for c in convert("pq", "bt2020", rgb)[0]]
-            got = frame.px8(x, GREY_ROW)
-            worst = max(worst, max(abs(a - b) for a, b in zip(got, want)))
-            if not close_to(got, want, 1) and len(misses) < 12:
-                misses.append(f"{fixture_name} x={x} render {got} oracle {want}")
-        mid = W // 2
-        figures.append(f"{fixture_name}: worst |Δ| against the oracle {worst} levels; x={mid} "
-                       f"render {frame.px8(mid, GREY_ROW)} oracle "
-                       f"{[code8(c) for c in convert('pq', 'bt2020', source.rgb(mid, GREY_ROW, 'bt2020nc'))[0]]}")
-    if len(frames) == len(H7_FIXTURES):
-        a = frames["pq_plain"]
-        for other in HDR10_FIXTURES:
-            b = frames[other]
-            if Path(a.path).read_bytes() == Path(b.path).read_bytes():
-                figures.append(f"pq_plain's and {other}'s render PNG bytes equal")
-                continue
-            worst = max((abs(round(x / 257) - round(y / 257)) for x, y in zip(a.values, b.values)),
-                        default=0)
-            figures.append(f"pq_plain's and {other}'s render PNG bytes differ; worst |Δ| {worst} "
-                           "levels")
-            if worst > 1:
-                misses.append(f"{other}'s render differs from pq_plain's by {worst} levels")
-    # Unscored (B96, #281): Apple's reading of each file's own labels and side
-    # data — `hdr_pick_probe.swift`'s `plain` request (H1w's oracle), an
-    # AVAssetImageGenerator frame with no composition — at the grey row, every
-    # 64th column, and each one's worst |Δ| against pq_plain's.
+        if n in SEI_FIXTURES:
+            readings[n] = (side(path, "frame"), side_want(*SEI_FIXTURES[n]))
+        else:
+            over, maximum, cll, fall = DESC_FIXTURES[n]
+            readings[n] = (side(path, "stream"), side_want(maximum, (cll, fall)))
+            if SEI_FIXTURES[over] != (None, None):
+                readings[f"{n} frame"] = (side(path, "frame"), side_want(*SEI_FIXTURES[over]))
+    return readings
+
+
+def h7_media(name, control):
+    """H7i's fixture: DIR's copy when DIR holds one (the capture made it), else MEDIA's."""
+    if control is not None:
+        copy = control / "media" / f"{name}.mov"
+        if copy.exists():
+            return copy
+    return fixture(name)
+
+
+def peak_scene(client, name, path):
+    """`path` alone at 1024×128: what import stored as `color` and the render at T —
+    {color, frame, source, png} or {why}; the doc is closed."""
+    doc = Doc(client, f"p-{name}", W, H)
+    doc.place(path) if doc.ok else None
+    rows = doc.project().get("media") or [] if doc.ok else []
+    color = rows[0].get("color") if rows else None
+    png = doc.render(f"p-{name}") if doc.ok else None
+    closed = doc.close()
+    source = yuv_frames(path, W, H)
+    frame = Frame(png, W, H) if png else None
+    if frame is None or not frame.ok or source is None or not closed:
+        return {"why": f"{name}: {doc.why or 'no render, no decode or not closed'}",
+                "color": color, "closed": closed}
+    return {"color": color, "frame": frame, "source": source[0], "png": png, "closed": closed}
+
+
+def grey_misses(scene, peak, tag, misses):
+    """H3's loop at `peak`: the grey row's every 8th column against the oracle ±1;
+    the worst |Δ| in levels."""
+    worst = 0
+    for x in range(0, W, 8):
+        rgb = scene["source"].rgb(x, GREY_ROW, "bt2020nc")
+        want = [code8(c) for c in convert("pq", "bt2020", rgb, peak)[0]]
+        got = scene["frame"].px8(x, GREY_ROW)
+        worst = max(worst, max(abs(a - b) for a, b in zip(got, want)))
+        if not close_to(got, want, 1) and len(misses) < 12:
+            misses.append(f"{tag} x={x} render {got} oracle at {peak} {want}")
+    return worst
+
+
+def same_png(a, b):
+    return a is not None and b is not None and Path(a).read_bytes() == Path(b).read_bytes()
+
+
+def run_h7(client, mode, control, sources, state):
+    """hdr H-1 (#281, spec §11 HD-12): H7 the fixtures' own metadata (CONTROL), H7d
+    what import reads, H7i the unknown and 1,000 cd/m² files unchanged, H7p the peak
+    placing the shoulder, H7o the override, H7r the three new refusals."""
+    paths = {n: fixture(n) for n in H7_FIXTURES}
+    for n in ("pq_plain", "pq_hdr10_cll"):
+        paths[n] = h7_media(n, None if mode == "capture" else control) or paths[n]
+    if mode == "capture":
+        (control / "media").mkdir(parents=True, exist_ok=True)
+        for n in ("pq_plain", "pq_hdr10_cll"):
+            if paths[n] is not None:
+                shutil.copy2(paths[n], control / "media" / f"{n}.mov")
+    refused = {n: REFUSED.get(n) for n, p in paths.items() if p is None}
+    state["h7_fixture"] = not refused
+    # H7, a CONTROL: each SEI fixture's first frame names its own values, pq_plain
+    # none, and the writer read both extensions back.
+    readings = h7_control(paths)
+    found = {n: got for n, (got, _) in readings.items()}
+    wrong = {n: pair for n, pair in readings.items() if pair[0] != pair[1]}
+    unwritten = {n: WRITTEN.get(n) for n in DESC_FIXTURES
+                 if n in WRITTEN and WRITTEN[n][0] != 0}
+    check("H7 CONTROL: ffprobe reads each SEI fixture's own HDR10 values on its first frame "
+          "(none on pq_plain; MaxCLL 0 on pq_hdr10_display) and each writer fixture's in its "
+          "stream side data, pq_both's first frame still 4,000; hdr10_writer read both "
+          "description extensions back", not refused and not wrong and not unwritten,
+          f"refused {refused or 'none'}; side data {found}; wrong {wrong or 'none'}; writer "
+          f"{ {n: w[1] for n, w in WRITTEN.items()} or 'not run this time (fixtures kept)'}")
+    if refused:
+        for row in sorted(H7_ROWS - {"H7"}):
+            check(f"{row} the fixtures were made", False, f"refused {refused}")
+        return
+    scenes = {n: peak_scene(client, n, paths[n]) for n in H7_FIXTURES}
+    state["h7_closed"] = all(s.get("closed") for s in scenes.values())
+    # H7d: what import stored.
+    misses = []
+    for n in H7_FIXTURES:
+        got = (scenes[n].get("color") or {}).get("pq")
+        if got != H7_READS[n]:
+            misses.append(f"{n}: color {scenes[n].get('color')}, want pq {H7_READS[n]}")
+    others = {}
+    for n, want in (("pq", True), ("hlg", False), ("bt709", False)):
+        doc = Doc(client, f"pd-{n}", W, H)
+        doc.place(fixture(n)) if doc.ok else None
+        rows = doc.project().get("media") or [] if doc.ok else []
+        others[n] = rows[0].get("color") if rows else "not imported"
+        state[f"h7_{n}_closed"] = doc.close()
+        if want and (others[n] or {}).get("pq") != {}:
+            misses.append(f"the ProRes pq retag: color {others[n]}, want pq {{}}")
+        if not want and isinstance(others[n], dict) and "pq" in others[n]:
+            misses.append(f"{n}: color {others[n]}, want no pq")
+        if others[n] == "not imported":
+            misses.append(f"{n} was not imported")
+    check("H7d import stores color.pq: {} on pq_plain, {4000, max_cll}, {600, max_cll}, "
+          "{1000, max_cll}, {2000, mastering_display}, {600, max_cll} on pq_desc_600 and on "
+          "pq_both (the description over the SEI's 4,000); {} on the ProRes pq retag; none on "
+          "hlg or bt709", not misses,
+          f"{misses or 'all as read'}; read {[(n, (scenes[n].get('color') or {}).get('pq')) for n in H7_FIXTURES]}; "
+          f"others {others}")
+    # H7i: the unknown file and the 1,000 cd/m² file render as before.
+    misses, figures = [], []
+    want_png = control / "h7-pq_plain.png"
+    for n in ("pq_plain", "pq_hdr10_cll"):
+        scene = scenes[n]
+        if "frame" not in scene:
+            misses.append(scene["why"])
+            continue
+        worst = grey_misses(scene, 1000, n, misses)
+        figures.append(f"{n}: worst |Δ| against the oracle at 1,000 {worst} levels")
+        if mode == "capture":
+            if n == "pq_plain":
+                shutil.copy2(scene["png"], want_png)
+        elif not want_png.exists():
+            misses.append(f"{n}: no control PNG {want_png}")
+        elif not same_png(scene["png"], want_png):
+            misses.append(f"{n}: its render's PNG bytes differ from the control's pq_plain")
+    check(f"H7i pq_plain and pq_hdr10_cll (MaxCLL 1,000) at 0.5 s: the render's PNG bytes equal "
+          f"{control.name}'s pq_plain, and the grey row (every 8th column) = the oracle at 1,000 "
+          f"±1", not misses, f"{misses or 'all equal'}; " + "; ".join(figures))
+    # H7p: the peak places the shoulder.
+    misses, figures = [], []
+    for n, peak in [(PEAK_FIXTURES[p], p) for p in (600, 2000, 4000)] + [("pq_desc_600", 600)]:
+        scene = scenes[n]
+        if "frame" not in scene:
+            misses.append(scene["why"])
+            continue
+        worst = grey_misses(scene, peak, n, misses)
+        figures.append(f"{n}: worst |Δ| against the oracle at {peak} {worst} levels")
+    for peak, n in PEAK_FIXTURES.items():
+        scene = scenes[n]
+        if "frame" not in scene:
+            continue
+        level = render_at(scene["frame"], scene["source"], 0.70, "bt2020nc") * 255
+        figures.append(f"{n} at PQ 0.70: {level:.2f} (computed {AT_070[peak]})")
+        if abs(level - AT_070[peak]) > 1:
+            misses.append(f"{n} at PQ 0.70: {level:.2f}, computed {AT_070[peak]}")
+    if not same_png(scenes["pq_desc_600"].get("png"), scenes["pq_hdr10_600"].get("png")):
+        misses.append("pq_desc_600's render PNG bytes differ from pq_hdr10_600's")
+    check("H7p the shoulder at the file's peak: pq_hdr10_600, pq_hdr10_display, pq_hdr10 and "
+          "pq_desc_600's grey rows (every 8th column) = the oracle at 600/2000/4000/600 ±1; at "
+          "PQ 0.70 the 600/1000/2000/4000 files within ±1 of 255.0/246.9/243.5/242.8; "
+          "pq_desc_600's PNG bytes = pq_hdr10_600's", not misses,
+          f"{misses or 'all within'}\n       " + "\n       ".join(figures))
+    run_h7o(client, paths, scenes, state)
+    run_h7r(client, paths, state)
+    apple_reading(sources, paths, state)
+
+
+def apple_reading(sources, paths, state):
+    """Unscored (B96's, kept for #281): Apple's own reading of each fixture —
+    `hdr_pick_probe.swift`'s `plain` request (H1w's oracle), an AVAssetImageGenerator
+    frame with no composition — at the grey row every 64th column, and each one's worst
+    |Δ| against pq_plain's: whether Apple's reading follows either route's metadata."""
     points = [[x + 0.5, GREY_ROW + 0.5] for x in range(0, W, 64)]
     apple = run_picks(sources, [{"tag": n, "plain": str(paths[n]), "tick": T, "clips": [],
                                  "points": points} for n in H7_FIXTURES])
     read = {}
     for n in H7_FIXTURES:
-        row = apple.get(n) or {}
-        got = row.get("picked")
+        got = (apple.get(n) or {}).get("picked")
         read[n] = [[code8(c) for c in one] if one else None for one in got] if got else None
-        figures.append(f"Apple's reading of {n} (x = 0, 64, …, 960; unscored): "
-                       f"{read[n] if read[n] is not None else row.get('error') or apple.get('error')}")
-    for n in HDR10_FIXTURES:
+    lines = [f"{n}: {read[n] if read[n] is not None else (apple.get(n) or {}).get('error') or apple.get('error') or 'not read'}"
+             for n in H7_FIXTURES]
+    for n in H7_FIXTURES[1:]:
         a, b = read.get("pq_plain"), read.get(n)
         if a is None or b is None or any(p is None or q is None for p, q in zip(a, b)):
-            figures.append(f"Apple's reading, {n} against pq_plain: not read")
+            lines.append(f"{n} against pq_plain: not read")
             continue
         worst = max(max(abs(x - y) for x, y in zip(p, q)) for p, q in zip(a, b))
-        figures.append(f"Apple's reading, {n} against pq_plain: worst |Δ| {worst} levels")
-    state["h7_side_data"] = found
+        lines.append(f"{n} against pq_plain: worst |Δ| {worst} levels")
     state["h7_apple"] = read
-    check(name, not misses, f"{misses or 'all within'}\n       " + "\n       ".join(figures))
+    print("  unscored: Apple's reading (x = 0, 64, …, 960)\n       " + "\n       ".join(lines),
+          flush=True)
+
+
+def run_h7o(client, paths, scenes, state):
+    """H7o: the override on pq_hdr10, its undo, the knee, and null."""
+    misses = []
+    plain = scenes["pq_plain"].get("png")
+    doc = Doc(client, "h7o", W, H)
+    doc.place(paths["pq_hdr10"]) if doc.ok else None
+    media = getattr(doc, "_media", {}).get(paths["pq_hdr10"])
+
+    def pq():
+        row = next((m for m in doc.project().get("media") or [] if m.get("id") == media), {})
+        return (row.get("color") or {}).get("pq")
+
+    def peak(color, tag):
+        got = doc.call("set_media_color", media=media, color=color)
+        if not got["ok"]:
+            misses.append(f"set {color}: {got.get('error')}")
+            return None
+        return doc.render(f"h7o-{tag}")
+
+    at4000 = doc.render("h7o-4000") if doc.ok else None
+    at1000 = peak({"peak": 1000}, "1000")
+    stored = pq()
+    if not same_png(at1000, plain):
+        misses.append("{peak: 1000}'s render differs from pq_plain's")
+    if stored != {"file": 4000, "from": "max_cll", "peak": 1000}:
+        misses.append(f"{{peak: 1000}} stored pq {stored}")
+    # Undone only after an applied set, so a refused one never undoes the clip.
+    undone = doc.call("undo") if at1000 is not None else {"ok": False, "error": "nothing set"}
+    after_undo = doc.render("h7o-undone") if undone["ok"] else None
+    if not (undone["ok"] and same_png(after_undo, at4000) and not same_png(at4000, plain)):
+        misses.append(f"undo: {undone.get('error')}; the 4,000 render back "
+                      f"{same_png(after_undo, at4000)}; it differs from pq_plain's "
+                      f"{not same_png(at4000, plain)}")
+    at100 = peak({"peak": 100}, "100")
+    at203 = peak({"peak": 203}, "203")
+    if not same_png(at100, at203):
+        misses.append("{peak: 100}'s render differs from {peak: 203}'s (the white held at 1)")
+    cleared = doc.call("set_media_color", media=media, color=None)
+    after_null = pq()
+    at_null = doc.render("h7o-null")
+    if not (cleared["ok"] and after_null == {"file": 4000, "from": "max_cll"}
+            and same_png(at_null, at4000)):
+        misses.append(f"null: {cleared.get('error')}; pq {after_null}; the 4,000 render "
+                      f"{same_png(at_null, at4000)}")
+    state["h7o_closed"] = doc.close()
+    check("H7o the override on pq_hdr10: {peak: 1000} renders pq_plain's bytes and stores "
+          "{4000, max_cll, peak 1000}; undo brings the 4,000 render back; {peak: 100} renders "
+          "{peak: 203}'s bytes; null keeps {4000, max_cll} and the 4,000 render", not misses,
+          f"{misses or 'all as asked'}")
+
+
+def run_h7r(client, paths, state):
+    """H7r: the three new sentences, each a refusal."""
+    misses = []
+    doc = Doc(client, "h7r", W, H)
+    ids = {}
+    for index, (n, path) in enumerate((("hlg", fixture("hlg")), ("bt709", fixture("bt709")),
+                                       ("pq_hdr10", paths["pq_hdr10"]))):
+        doc.place(path, at=index * SEC) if doc.ok and path is not None else None
+        ids[n] = getattr(doc, "_media", {}).get(path)
+    cases = [(ids["hlg"], {"peak": 1000},
+              f"media {ids['hlg']} is not a PQ file; only a PQ file takes a peak"),
+             (ids["bt709"], {"peak": 1000},
+              f"media {ids['bt709']} is not a PQ file; only a PQ file takes a peak"),
+             (ids["pq_hdr10"], {"peak": 0}, "color.peak must be 1–10000 cd/m², not 0"),
+             (ids["pq_hdr10"], {"peak": 10001}, "color.peak must be 1–10000 cd/m², not 10001"),
+             (ids["pq_hdr10"], {"pq": {"file": 1}},
+              "color.pq is read from the file at import, not set")]
+    for media, color, sentence in cases:
+        got = doc.call("set_media_color", media=media, color=color)
+        want = f"was refused at set_media_color: {sentence}"
+        if got["ok"] or want not in got.get("error", ""):
+            misses.append(f"{color} on {media}: {got.get('error') if not got['ok'] else 'applied'}"
+                          f" (want …{want}…)")
+    state["h7r_closed"] = doc.close()
+    check("H7r refused, each in its own sentence: a peak on hlg and on bt709 (not a PQ file), "
+          "0 and 10001 (outside 1–10000), and {pq: {file: 1}} (read at import)", not misses,
+          f"{misses or 'all refused'}")
 
 
 def run_srgb_rows(client, control, sources, state):
@@ -1861,8 +2206,18 @@ def build_mutant(name):
     copy = Path(made)
     for path, anchor, replacement in edits:
         target = copy / path
-        if not target.resolve().is_relative_to(WORK):
-            return None, f"{path} in the copy is the tree's own file"
+        if target.is_symlink() or not target.resolve().is_relative_to(WORK):
+            # A core file is a symlink into the tree: the copy gets its own core
+            # (log_proof.py's way; hdr H-1's `hdr10.rs` mutants).
+            if path.startswith("core/"):
+                core = copy / "core"
+                if core.is_symlink():
+                    core.unlink()
+                    shutil.copytree(ROOT / "core", core, symlinks=True,
+                                    ignore=shutil.ignore_patterns("target"))
+                target = copy / path
+            if not target.resolve().is_relative_to(WORK):
+                return None, f"{path} in the copy is the tree's own file"
         text = target.read_text()
         if text.count(anchor) != 1:
             return None, f"the anchor occurs {text.count(anchor)} times in {path}: {anchor!r}"
@@ -1900,9 +2255,10 @@ def main():
     else:
         selected.discard("TI")
         if args.mutant:
-            selected -= {"H1a", "H7"}
+            selected -= {"H1a"} | H7_ROWS
     if args.mode == "capture":
-        selected = {"H1", "H2", "H3", "H4", "H5", "H6", "R0", "Z1"}
+        if not args.only:
+            selected = {"H1", "H2", "H3", "H4", "H5", "H6", "R0", "Z1"}
         control.mkdir(parents=True, exist_ok=True)
     if args.mode is None and not args.mutant:
         selected -= {"H1"}
@@ -1934,8 +2290,8 @@ def main():
     state = {}
     closed = True
     log = WORK / "instance.log"
-    needs_instance = bool(selected & {"H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5",
-                                      "H6", "H7", "R0"})
+    needs_instance = bool(selected & ({"H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5",
+                                       "H6", "R0"} | H7_ROWS))
     if needs_instance:
         launched = mcp.launch(str(binary), [],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
@@ -1985,8 +2341,8 @@ def main():
                     run_h5(client, scenes, extra_h5)
                 if "H6" in selected:
                     run_h6(client, sources, state)
-                if "H7" in selected:
-                    run_h7(client, sources, state)
+                if selected & H7_ROWS:
+                    run_h7(client, args.mode, control, sources, state)
             except Exception as error:  # a row that could not run is a failure
                 import traceback
                 traceback.print_exc()
@@ -2009,14 +2365,20 @@ def main():
     if needs_instance:
         print(f"  {log.name} tail:\n    " + "\n    ".join(tail(log)), flush=True)
     if args.mode == "capture":
-        record = dict(state.get("h1_record") or {}, r0=state.get("r0"),
-                      tree=str(ROOT), config=config)
+        try:  # a capture of other rows (`--only`) keeps an earlier one's H1 record
+            kept = json.loads((control / "capture.json").read_text())
+        except (OSError, ValueError):
+            kept = {}
+        record = dict(kept, **(state.get("h1_record") or {}), tree=str(ROOT), config=config)
+        if "R0" in selected:
+            record["r0"] = state.get("r0")
         (control / "capture.json").write_text(json.dumps(record, indent=1))
         shown = [n for n in ("H2", "H3", "H4", "H5", "H6") if n in rows]
         failing = [n for n in shown if not rows[n]]
         print(f"captured into {args.folder}; on the control H2–H6 FAILED: {failing} "
               f"(passed, so not discriminating: {[n for n in shown if rows[n]]})")
-        return 0 if rows.get("Z1") and state.get("capture_ok") else 1
+        captured = state.get("capture_ok") or "H1" not in selected
+        return 0 if rows.get("Z1") and captured and rows.get("H7i", True) else 1
     scored = [name for name in ROWS if name in rows and name not in RECORDS]
     passed = sum(1 for name in scored if rows.get(name))
     print(f"{passed}/{len(scored)}")
@@ -2038,6 +2400,7 @@ def main():
 
 
 MEDIA_REC = {}
+WRITTEN = {}
 
 if __name__ == "__main__":
     sys.exit(main())

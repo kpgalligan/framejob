@@ -132,9 +132,13 @@ final class MediaPane: InspectorPaneView {
         arrange()
         let files = InspectorSection(id: "media.files", title: "Media", rows: content)
         // Camera Log (spec §11 GR-16) acts on a video file, so it is there
-        // once the project has one (`MediaPane+CameraLog.swift`).
-        let video = binding.documentSnapshot.media.contains { $0.kind == .video }
-        return video ? [files, cameraLogSection()] : [files]
+        // once the project has one (`MediaPane+CameraLog.swift`); HDR10 (spec
+        // §11 HD-12) on a PQ file, once the project has one
+        // (`MediaPane+HDR10.swift`).
+        let media = binding.documentSnapshot.media
+        let video = media.contains { $0.kind == .video }
+        let pq = media.contains { $0.color?.pq != nil }
+        return (video ? [files, cameraLogSection()] : [files]) + (pq ? [hdr10Section()] : [])
     }
 
     /// Add Media…, its ⇧⌘I hint, and the item count at the trailing edge.

@@ -109,12 +109,23 @@ governs a module now.
   `with_clips`; paste carries it by path.
 - `model_media_color.rs` — camera log's vocabulary (format version 19,
   spec §11 GR-16): `LogCurve`, `CameraGamut` (`LogCurve::gamuts`, its
-  default first) and `MediaColor` (`log`, `gamut`, `lut`, `detected`, each
-  written only when set), re-exported by `model.rs` for `Media.color`.
+  default first) and `MediaColor` (`log`, `gamut`, `lut`, `detected`, and
+  since format 22 `pq`, a `PqColor` — import's `file` reading, its
+  `PeakSource`, the override `peak`, `PEAK_MIN`..`PEAK_MAX` — each written
+  only when set), re-exported by `model.rs` for `Media.color`.
   `media_color.rs` — its rules: `set_media_color` (a strict reader,
-  `detected` refused), `check_media_color` (each refusal its own sentence;
-  `add_media` and `validate` call it too), `media_input` (the recipe
-  layer's and the plan segment's `input`) and `media_converted_by`.
+  `detected` and `pq` refused, its `peak` the override, "needs log or lut"
+  judged on what the caller asked for, spec §11 HD-12),
+  `check_media_color` (each refusal its own sentence; `add_media` and
+  `validate` call it too; a `pq`-only colour stands), `without_camera_log`
+  (what a LUT's removal or a paste leaves: the reading), `media_input` (the
+  recipe layer's and the plan segment's `input`, with the effective `peak`)
+  and `media_converted_by`.
+- `hdr10.rs` · `ffi_hdr10.rs` — an HDR10 file's peak (spec §11 HD-6,
+  HD-12): the mastering-display and content-light blobs of a sample
+  description, else the first sample's prefix SEI (payloads 137, 144,
+  emulation-prevention bytes removed); MaxCLL first, rounded in u64,
+  clamped to 10,000; `rc_hdr10_peak` its export. Pure, bounded reads.
 - `model_matte.rs` — the matte vocabulary (format version 14, spec §11 MT-1):
   `TrackMatte` (`none`, `alpha`, `alpha_inverted`, `luma`, `luma_inverted`)
   and `is_none`, re-exported through `model_props.rs`; the FIELD

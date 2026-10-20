@@ -1,9 +1,10 @@
 import AVFoundation
 
 /// Where a filmstrip's pictures come from (spec §11 GR-21): the plain asset,
-/// or — for a media whose Camera Log converts, or whose video track is
-/// labelled HLG or PQ — a one-clip composition around it, through
-/// `CompositionBuilder` and step 0, so the strip is the preview's picture.
+/// or — for a media whose Camera Log converts, a PQ file with a peak (spec
+/// §11 HD-12), or a video track labelled HLG or PQ — a one-clip composition
+/// around it, through `CompositionBuilder` and step 0, so the strip is the
+/// preview's picture.
 /// The strip's marker says which: the flat `CacheStamp` for a plain strip,
 /// exactly as before, and a `ConvertedThumbsStamp` for a converted one, which
 /// records `fullRange` for an S-Log3 or V-Log media from a full-range source
@@ -20,17 +21,17 @@ enum HDRTransfer: String, Codable, Equatable {
 }
 
 /// What a strip is drawn through: a media's converting Camera Log (and its
-/// LUT's file), or an HDR track's transfer.
+/// LUT's file) or a PQ file's peak, or an HDR track's transfer.
 struct ThumbnailInput: Equatable {
-    /// The media's converting Camera Log; nil for an HDR input.
+    /// The media's converting Camera Log or PQ peak; nil for an HDR input.
     let color: MediaColor?
     /// `urls[color.lut]` when `color.lut` is set; nil when it does not resolve.
     let lutURL: URL?
     /// Non-nil only when `color` is nil.
     let transfer: HDRTransfer?
 
-    /// Camera Log: nil unless the media is a video with a picture whose
-    /// `color` step 0 converts (`InputConversion.choose(input:)`).
+    /// Camera Log or a PQ peak: nil unless the media is a video with a
+    /// picture whose `color` step 0 converts (`convertingColor(of:)`).
     init?(media: MediaSnapshot, urls: [UInt32: URL]) {
         guard let color = Self.convertingColor(of: media) else { return nil }
         self.color = color
@@ -68,11 +69,14 @@ struct ThumbnailInput: Equatable {
         }
     }
 
-    /// The media's `color` when step 0 converts it, else nil — without URLs,
-    /// so the document's observer and the cache ledger key on it.
+    /// The media's `color` when step 0 converts by it — a Camera Log
+    /// (`InputConversion.choose(input:)`), or a PQ file's effective peak
+    /// (spec §11 HD-12), so a change of either redraws the strip — else nil;
+    /// without URLs, so the document's observer and the cache ledger key on
+    /// it. A PQ file with no peak keeps the HDR transfer's strip.
     static func convertingColor(of media: MediaSnapshot) -> MediaColor? {
         guard media.kind == .video, media.hasVideo, let color = media.color,
-            InputConversion.choose(input: color) != nil
+            InputConversion.choose(input: color) != nil || color.pq?.effectivePeak != nil
         else { return nil }
         return color
     }
@@ -82,10 +86,11 @@ struct ThumbnailInput: Equatable {
 /// `CacheStamp`, and what converted it — the curve and gamut, or the LUT
 /// named by its resolved path, size and modification second (so another
 /// file of the same size and second is not taken for it), or the HDR
-/// transfer; and `fullRange` true for a `readsRange` input from a source
-/// flagged full range (spec §11 GR-23). Nil fields are omitted on disk, so
-/// every other marker is the shape it was before, and a marker written
-/// before GR-23 decodes with no `fullRange`.
+/// transfer; `fullRange` true for a `readsRange` input from a source
+/// flagged full range (spec §11 GR-23); and `peak`, a PQ file's effective
+/// peak (spec §11 HD-12). Nil fields are omitted on disk, so every other
+/// marker is the shape it was before, and a marker written before GR-23 or
+/// HD-12 decodes with no `fullRange` or `peak`.
 struct ConvertedThumbsStamp: Codable, Equatable {
     let source: MediaImporter.CacheStamp
     let log: LogCurve?
@@ -95,6 +100,7 @@ struct ConvertedThumbsStamp: Codable, Equatable {
     let lutModified: Int64?
     let transfer: HDRTransfer?
     let fullRange: Bool?
+    let peak: UInt32?
 
     init(_ source: MediaImporter.CacheStamp, input: ThumbnailInput, fullRange: Bool) {
         self.source = source
@@ -108,6 +114,7 @@ struct ConvertedThumbsStamp: Codable, Equatable {
         lutModified = file?.modified
         transfer = input.transfer
         self.fullRange = fullRange && input.readsRange ? true : nil
+        peak = input.color?.pq?.effectivePeak
     }
 
     /// The file's byte size and modification second, rounded as
@@ -124,7 +131,7 @@ struct ConvertedThumbsStamp: Codable, Equatable {
     /// nothing of a Camera Log.
     func holdsHDR(of stamp: MediaImporter.CacheStamp) -> Bool {
         source == stamp && transfer != nil && log == nil && gamut == nil && lutPath == nil
-            && lutSize == nil && lutModified == nil
+            && lutSize == nil && lutModified == nil && peak == nil
     }
 }
 
@@ -280,6 +287,7 @@ extension MediaImporter {
         descriptor.color = input.color.map {
             MediaColor(log: $0.log, gamut: $0.gamut, lut: lutID, detected: false)
         }
+        descriptor.color?.pq = input.color?.pq
         guard let withMedia = (try? project.applying(.addMedia(descriptor: descriptor))).project,
             let id = withMedia.snapshot.media.last?.id,
             let track = withMedia.snapshot.tracks.first?.id,

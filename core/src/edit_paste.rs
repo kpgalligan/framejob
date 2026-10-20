@@ -327,7 +327,7 @@ pub(crate) fn absorb_media(
                         color.lut = Some(*local);
                     }
                 }
-                None => row.color = None,
+                None => row.color = row.color.and_then(|color| color.without_camera_log()),
             }
         }
     }

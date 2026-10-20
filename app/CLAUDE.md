@@ -17,11 +17,12 @@ detail there.
 - `ReelCore.swift` — the **only** home for `rc_*` calls: `ReelProject`
   (handle + lazily decoded `ProjectSnapshot`; `json`, `snapshot` and
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
-  them), timecode, snapping, export presets/sizes/settings, `SpeedLimits`
+  them), timecode, snapping (export presets/sizes/settings are
+  `ExportValues.swift`'s, a pure move, HDR H-1), `SpeedLimits`
   / `ReelSpeed.limits` (the core's speed range and audio ceiling — no Swift
   file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25) and
   `ReelContainer` (`rc_container_*`, a WebM/Matroska file's index,
-  #216-R); the typed patches are `TypedPatches.swift`'s (`VideoPatch`,
+  #216-R) and `ReelHDR10` (`rc_hdr10_peak`, spec §11 HD-6); the typed patches are `TypedPatches.swift`'s (`VideoPatch`,
   `AudioPatch`, `ClipPatch`, the `ActionPatch` extension; a pure move, B73),
   `TextPatch` (with `case`, `words` and `word_style`) is `TextPatch.swift`'s,
   moved out so it could grow, and `ShapePatch` `ShapePatch.swift`'s (a pure
@@ -269,7 +270,8 @@ detail there.
   call it, or any of the three bodies, from a `.graphicsDidChange` or
   `.projectGraphicsDidChange` observer.
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`, +`Color`: the
-  Apple Log and Apple Log 2 labels read at probe, spec §11 GR-16;
+  Apple Log and Apple Log 2 labels read at probe, spec §11 GR-16, and
+  `detectedPQ`, a PQ file's HDR10 peak through `ReelHDR10`, HD-6;
   +`ThumbnailSource`: the converted strip, below; +`Thumbnails`: the
   await-free halves of `thumbnails`, the image branch and the publish) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
@@ -1053,9 +1055,12 @@ the key map behind it.
   the clips whose look it is and the media whose Camera Log it is) ·
   `MediaReveal.swift` · `MediaPane+CameraLog.swift` (the Camera Log
   section, spec §11 GR-16: `CameraLogChoice` and the popup over the row
-  selected in the list, one undo step "Camera Log") · `MediaColor.swift`
-  (`LogCurve`, `CameraGamut`, `MediaColor`, whose own decoder reads an
-  absent `detected` as false) · `EditorViewController+CameraLog.swift`
+  selected in the list, one undo step "Camera Log") ·
+  `MediaPane+HDR10.swift` (the HDR10 section on a PQ file: the Peak field
+  and its quick picks, Use File's, the readout; one undo step "PQ Peak",
+  spec §11 HD-12) · `MediaColor.swift` (`LogCurve`, `CameraGamut`,
+  `PeakSource`, `PQColor`, `MediaColor`, whose own decoder reads an absent
+  `detected` as false) · `EditorViewController+CameraLog.swift`
   (Use LUT…: Import LUT…'s panel, then `add_media` and `set_media_color`
   as one grouped step) — the Media tab. The find band never rebuilds the
   pane. A filter that hides the selected row clears `selectedMedia`

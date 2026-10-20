@@ -98,7 +98,7 @@ enum MediaImporter {
             fps = await frameRate(of: track)
             let descriptions = (try? await track.load(.formatDescriptions)) ?? []
             hasAlpha = hasAlphaChannel(descriptions)
-            color = detectedColor(descriptions)
+            color = detectedColor(descriptions) ?? detectedPQ(descriptions, track: track, asset: asset)
             // One frame through the decoder: `isPlayable` says yes to files
             // nothing here decodes (spec §11 #216).
             guard DecoderSupport.decodesFirstFrame(of: track, in: asset) else {

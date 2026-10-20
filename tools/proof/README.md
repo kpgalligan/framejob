@@ -19258,6 +19258,9 @@ gate's `make app`; Debug the same): 2/2. The four renders are byte-equal, each w
 against the oracle. Apple's four readings are equal (worst |Δ| 0), [0, 2, 10, 25, 44, 68, 98,
 134, 180, 221, 244, 254, 255, 255, 255, 255] at x = 0, 64, …, 960. No `Frame Job: ` line.
 
+**The HDR road map's H-1 (#281) rewrote H7** as the family H7, H7d, H7i, H7p, H7o and H7r, with
+new fixtures from the x265 CLI and `hdr10_writer.swift`, and P5: see "Road map hdr — H-1" below.
+
 ## Road map grading-3 — T3-2, camera log at step 0 (`log_proof.py` LP1–LP4, L1–L9, Z1 and ten mutants; `log_probe.swift`; `applelog_writer.swift`'s `log2`; spec §11 GR-16)
 
 `log_proof.py` is hdr_proof.py's shape (`capture DIR` | `compare DIR [--only …]` | `--mutant
@@ -20734,3 +20737,49 @@ of them measured, exit 0 — R3 +0.013 / −0.001 ms (r 0.991), pinned; R6 +0.01
 failing no X row (M1 now also fails X6, the ×0.99999 keep clip being on the varispeed path).
 `audio_sync_proof.py` whole: 54/54, exit 0 (S18 0.70 / 0.85 ms, control Δ −26.61 ms).
 `speed_limits_probe.py`: 24 rows, none failed.
+
+## Road map hdr — H-1, the PQ peak (`hdr_proof.py` H7, H7d, H7i, H7p, H7o, H7r, P5 and five mutants; `hdr10_writer.swift`; `log_thumbs_proof.py` TP; spec §11 HD-12)
+
+H-1 (#281) makes step 0's PQ shoulder end at the file's own HDR10 peak, so H7 is now a family of
+rows over two kinds of fixture, each made once under `tools/proof/work/hdr/media/` and kept:
+
+- **SEI fixtures, by the x265 CLI** (ffmpeg 9.0.2's libx265 wrapper no longer writes the
+  mastering display with these values): the ramp as raw 4:2:0 10-bit planes
+  (`ramp420p10.yuv`) through `x265 --input-res 1024x128 --fps 30 --input-csp i420
+  --input-depth 10 --output-depth 10 --lossless --colorprim bt2020 --transfer smpte2084
+  --colormatrix bt2020nc [--master-display "G(13250,34500)B(7500,3000)R(34000,16000)
+  WP(15635,16450)L(<max>,50)"] [--max-cll "<cll>,<fall>"]`, muxed by `ffmpeg -framerate 30 -i
+  x.hevc -c copy -tag:v hvc1 -avoid_negative_ts make_zero` (frames at k/30 from 0, no edit
+  list; `-r 30` alone started them at −0.08 s under one): `pq_plain`, `pq_hdr10` (40000000;
+  4000,400), `pq_hdr10_600` (6000000; 600,200), `pq_hdr10_cll` (40000000; 1000,400),
+  `pq_hdr10_display` (20000000 and no `--max-cll`, for which x265 still writes SEI 144 as 0,0,
+  measured). No x265 refuses each by name.
+- **Description fixtures, by `hdr10_writer.swift`** (applelog_writer's method:
+  every sample copied with its attachments, so only the IDR frame is a sync sample — without
+  them every frame was marked sync and a zero-tolerance generator could not read 0.5 s — the
+  verbatim keys removed, `MasteringDisplayColorVolume` and `ContentLightLevelInfo` set; exit 0
+  only when both read back): `pq_desc_600` (over pq_plain: 6000000; 600,200) and `pq_both`
+  (over pq_hdr10, its SEI still 4,000: 600).
+
+The rows are in `hdr_proof.py`'s header. **H7i**'s control is a capture of the tree before the
+phase's code (`capture DIR --only H7i,Z1`): `DIR/h7-pq_plain.png` and `DIR/media/pq_plain.mov`
+and `pq_hdr10_cll.mov`, which the run renders. A plain run that also scores H1m, H1s and H1w
+needs H1's media in the same DIR, so the phase's control folder holds a `capture --only H1,…`
+too; `capture --only` keeps an earlier capture's H1 record. **P5** is `hdr_probe.swift`'s.
+**TP** (`log_thumbs_proof.py`) holds a PQ file's strip to its peak: `pq_hdr10`'s converted
+marker carries `peak: 4000`, then `1000` after `{peak: 1000}`, each `0.jpg` = its render ±4, and
+`pq_plain`'s keeps `transfer: "pq"`.
+
+```sh
+python3 tools/proof/hdr_proof.py capture tools/proof/work/h1/ctl --only H1,H7i,Z1   # the tree before H-1's code
+make app-debug && python3 tools/proof/hdr_proof.py --control tools/proof/work/h1/ctl --only H7,H7d,H7i,H7p,H7o,H7r,P5,Z1
+python3 tools/proof/log_thumbs_proof.py --only TP,Z1
+make app && RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --control tools/proof/work/h1/ctl
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --mutant <name> --control tools/proof/work/h1/ctl --only <its rows>,Z1
+```
+
+The five mutants and their rows: `peak-ignored` (the PQ arm's white from `pqShoulderWhite(peak:
+nil)`) H7p, H7o; `mastering-over-cll` (`hdr10.rs` takes the mastering maximum first) H7d, H7i;
+`sei-unparsed` (the SEI route reads nothing) H7d, H7p; `unknown-not-1000` (no peak means 4,000)
+H7i, P5; `peak-below-knee` (the white not held at 1) H7o, P5. Its record: `designs/hdr.md`'s H-1
+section.

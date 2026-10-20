@@ -643,6 +643,33 @@ enum ReelCube {
     }
 }
 
+// MARK: - HDR10
+
+/// A PQ file's HDR10 peak read by the core (`rc_hdr10_peak`, spec §11 HD-12):
+/// the format description's two extensions when either is present, else the
+/// first sample's prefix SEI, its NAL units prefixed by `nalLength` bytes.
+enum ReelHDR10 {
+    /// What the core read; an empty `PQColor` when it read nothing (the core
+    /// answers NULL only on a caught panic, read as nothing too).
+    static func peak(mastering: Data?, contentLight: Data?, sample: Data?, nalLength: Int)
+        -> PQColor
+    {
+        func withBytes<R>(_ data: Data?, _ body: (UnsafePointer<UInt8>?, Int) -> R) -> R {
+            guard let data, !data.isEmpty else { return body(nil, 0) }
+            return data.withUnsafeBytes { body($0.bindMemory(to: UInt8.self).baseAddress, $0.count) }
+        }
+        let length = UInt32(clamping: max(0, nalLength))
+        let text: String? = withBytes(mastering) { m, mCount in
+            withBytes(contentLight) { l, lCount in
+                withBytes(sample) { s, sCount in
+                    takeString(rc_hdr10_peak(m, mCount, l, lCount, s, sCount, length))
+                }
+            }
+        }
+        return text.flatMap { ReelJSON.decode(PQColor.self, from: $0) } ?? PQColor()
+    }
+}
+
 // MARK: - Graphics
 
 /// One `{level, message, line, column, frame}` out of the graphics engine's

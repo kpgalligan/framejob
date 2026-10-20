@@ -129,8 +129,11 @@ enum InputConversion: Equatable {
 
     /// The pass's uniform block for this conversion; `premultiplied` is the
     /// buffer's own label (spec §11 G-35 (b)), `fullRange` its media's range
-    /// flag (spec §11 GR-22, `RecipeInstruction.fullRangeTracks`).
-    func uniforms(premultiplied: Bool, fullRange: Bool = false) -> InputUniforms {
+    /// flag (spec §11 GR-22, `RecipeInstruction.fullRangeTracks`), `peak` a PQ
+    /// media's effective peak, its layer's `input.peak` (spec §11 HD-12).
+    func uniforms(premultiplied: Bool, fullRange: Bool = false, peak: UInt32? = nil)
+        -> InputUniforms
+    {
         let primaries: InputPrimaries
         var uniforms = InputUniforms()
         switch self {
@@ -140,7 +143,7 @@ enum InputConversion: Equatable {
             primaries = p
         case .pq(let p):
             uniforms.kind = InputUniforms.pq
-            uniforms.white = InputConversions.pqWhite / InputConversions.pqReferenceWhite
+            uniforms.white = InputConversions.pqShoulderWhite(peak: peak)
             primaries = p
         case .sdrWide(let p):
             uniforms.kind = InputUniforms.sdrWide
@@ -192,8 +195,18 @@ enum InputConversions {
     /// The linear value the shoulder maps to 1: HLG's at full signal (the gain).
     static let hlgWhite: Float = 1.07
     /// PQ's reference white (BT.2408, 203 cd/m², drawn as 1.0) and the
-    /// brightness its shoulder reaches 1 at (1,000 cd/m²).
+    /// brightness its shoulder reaches 1 at when the file names no peak
+    /// (1,000 cd/m²).
     static let pqReferenceWhite: Float = 203, pqWhite: Float = 1000
+
+    /// The PQ arm's white (spec §11 HD-12): the media's peak over the
+    /// reference white, held at 1 or above so the shoulder never starts above
+    /// its own end; 1000/203 when the media names no peak — the same float
+    /// division as before, so an unlabelled file's frame is byte-identical.
+    static func pqShoulderWhite(peak: UInt32?) -> Float {
+        let nits = peak.map { Float($0) } ?? pqWhite
+        return max(nits, pqReferenceWhite) / pqReferenceWhite
+    }
     /// BT.1886's display gamma: the encode is its inverse, `L^(1/2.4)`, and
     /// a wide-gamut SDR source's decode is `signal^2.4`.
     static let displayGamma: Float = 2.4

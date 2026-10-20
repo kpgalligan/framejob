@@ -2,7 +2,9 @@
 //! a video media carries in `media.color`, re-exported by `model.rs`. What
 //! the setting may hold, and every sentence refusing what it may not, is
 //! `media_color.rs`; how step 0 converts with it is the app's
-//! (`InputConversions.swift`).
+//! (`InputConversions.swift`). Format 22 adds a PQ file's HDR10 peak
+//! (spec §11 HD-12): [`PqColor`] on `media.color.pq`, read at import
+//! (`hdr10.rs`) with the person's override beside it.
 //!
 //! `LogCurve` and `CameraGamut` are closed vocabularies spelled as their
 //! makers' documents name them. Their declaration order is NOT a shader
@@ -49,12 +51,51 @@ impl LogCurve {
     }
 }
 
+/// The smallest and largest PQ peak a media may hold, in cd/m² (spec §11
+/// HD-12): PQ's own range, SMPTE ST 2084 reaching 10,000. The one home of
+/// both; the reader clamps to them and the rules refuse outside them.
+pub const PEAK_MIN: u32 = 1;
+pub const PEAK_MAX: u32 = 10_000;
+
+/// Which HDR10 field gave a PQ file's peak: CTA-861.3's MaxCLL, or SMPTE
+/// ST 2086's mastering-display maximum when there is no MaxCLL (HD-6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PeakSource {
+    MaxCll,
+    MasteringDisplay,
+}
+
+/// A PQ file's HDR10 peak (spec §11 HD-12): `file`, what import read, in
+/// whole cd/m², with `from` naming its field (present exactly when `file`
+/// is); `peak`, the person's override. Each key is written only when set, so
+/// a PQ file whose import read nothing stores `{}` — which still says the
+/// media IS a PQ file, the one a peak may be set on.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PqColor {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from: Option<PeakSource>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peak: Option<u32>,
+}
+
+impl PqColor {
+    /// The peak step 0 uses: the override, else the file's; `None` means
+    /// the app's 1,000 cd/m².
+    pub fn effective(&self) -> Option<u32> {
+        self.peak.or(self.file)
+    }
+}
+
 /// A video media's camera-log setting: a built-in curve and its gamut, or a
 /// `lut` media used as the input conversion instead; `detected` is true
-/// when import read it from the file's label. Each key is written only when
-/// set (`detected` only when true), and `media.color` itself only when the
-/// media has one, so a project with none writes the text it did before
-/// version 19.
+/// when import read it from the file's label; `pq` a PQ file's peak (format
+/// 22). Each key is written only when set (`detected` only when true), and
+/// `media.color` itself only when the media has one, so a project with none
+/// writes the text it did before version 19.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MediaColor {
@@ -66,6 +107,20 @@ pub struct MediaColor {
     pub lut: Option<u32>,
     #[serde(skip_serializing_if = "is_false")]
     pub detected: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pq: Option<PqColor>,
+}
+
+impl MediaColor {
+    /// The setting with its Camera Log taken away and its PQ peak kept:
+    /// `Some({pq})` for a PQ file, else `None` — what removing a converting
+    /// LUT, or a paste that leaves its LUT behind, leaves on the media.
+    pub fn without_camera_log(self) -> Option<MediaColor> {
+        self.pq.map(|pq| MediaColor {
+            pq: Some(pq),
+            ..MediaColor::default()
+        })
+    }
 }
 
 fn is_false(value: &bool) -> bool {

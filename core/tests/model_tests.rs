@@ -45,6 +45,7 @@ use framejob_core::ffi_graphic::{
     rc_graphic_library_add_font, rc_graphic_library_families, rc_graphic_library_free,
     rc_graphic_library_new, rc_graphic_rasterize, rc_graphic_svg,
 };
+use framejob_core::ffi_hdr10::rc_hdr10_peak;
 use framejob_core::ffi_query::{
     rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_op_schemas,
     rc_project_clip_state, rc_project_composition_plan, rc_project_duration,
@@ -2331,6 +2332,11 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     cover("rc_cube_copy_rgb");
     unsafe { rc_cube_free(ptr::null_mut()) };
     cover("rc_cube_free");
+
+    // rc_hdr10_peak — every NULL is an absent input, so nothing is read: `{}`.
+    let read = unsafe { rc_hdr10_peak(ptr::null(), 24, ptr::null(), 4, ptr::null(), 100, 4) };
+    assert_eq!(take_string(read).as_deref(), Some("{}"));
+    cover("rc_hdr10_peak");
 
     swept.sort();
     swept.dedup();

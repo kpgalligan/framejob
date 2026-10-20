@@ -308,17 +308,18 @@ extension AgentServer {
     }
 
     /// A descriptor's `color` (spec §11 GR-16): `{log?, gamut?, lut?,
-    /// detected?}`, or nil when absent or null. Each wrong shape and word is
-    /// refused by name; what the setting may HOLD is the core's to refuse
+    /// detected?, pq?}`, or nil when absent or null. Each wrong shape and word
+    /// is refused by name; what the setting may HOLD is the core's to refuse
     /// (`add_media` holds it to `set_media_color`'s rules).
     private func mediaColor(_ raw: Any?) throws -> MediaColor? {
         guard let raw = raw, !(raw is NSNull) else { return nil }
         guard let object = raw as? [String: Any] else {
             throw ToolError(
                 message: "descriptor.color must be a JSON object {log, gamut?} or {lut} — the "
-                    + "file's Camera Log, as set_media_color takes it, plus detected.")
+                    + "file's Camera Log, as set_media_color takes it, plus detected — and "
+                    + "pq, a PQ file's peak as get_project shows it.")
         }
-        let allowed: Set<String> = ["log", "gamut", "lut", "detected"]
+        let allowed: Set<String> = ["log", "gamut", "lut", "detected", "pq"]
         if let first = object.keys.filter({ !allowed.contains($0) }).sorted().first {
             throw ToolError(
                 message: "Unknown color key \"\(first)\" — allowed keys are "
@@ -346,7 +347,49 @@ extension AgentServer {
         if object["lut"] != nil, !(object["lut"] is NSNull) {
             color.lut = try idArg(object, "lut")
         }
+        color.pq = try mediaPQ(object["pq"])
         return color
+    }
+
+    /// A descriptor's `color.pq` (spec §11 HD-12): `{file?, from?, peak?}`,
+    /// a PQ file's HDR10 peak as `media[]` stores it, or nil when absent or
+    /// null. Each wrong shape and word is refused by name; the range and the
+    /// pairing of `from` with `file` are the core's to refuse.
+    private func mediaPQ(_ raw: Any?) throws -> PQColor? {
+        guard let raw = raw, !(raw is NSNull) else { return nil }
+        guard let object = raw as? [String: Any] else {
+            throw ToolError(
+                message: "descriptor.color.pq must be a JSON object {file?, from?, peak?} — a "
+                    + "PQ file's HDR10 peak as get_project shows it.")
+        }
+        let allowed: Set<String> = ["file", "from", "peak"]
+        if let first = object.keys.filter({ !allowed.contains($0) }).sorted().first {
+            throw ToolError(
+                message: "Unknown color.pq key \"\(first)\" — allowed keys are "
+                    + allowed.sorted().joined(separator: ", ") + ".")
+        }
+        var pq = PQColor(file: try peakArg(object, "file"), peak: try peakArg(object, "peak"))
+        if let name = try stringArg(object, "from") {
+            guard let from = PeakSource(rawValue: name) else {
+                throw ToolError(
+                    message: "descriptor.color.pq.from must be one of "
+                        + PeakSource.allCases.map(\.rawValue).joined(separator: ", ")
+                        + " (got \"\(name)\").")
+            }
+            pq.from = from
+        }
+        return pq
+    }
+
+    /// One of `color.pq`'s peaks, a whole number of cd/m² that fits the field.
+    private func peakArg(_ object: [String: Any], _ key: String) throws -> UInt32? {
+        guard let value = try intArg(object, key) else { return nil }
+        guard let peak = UInt32(exactly: value) else {
+            throw ToolError(
+                message: "descriptor.color.pq.\(key) must be a whole number of cd/m² "
+                    + "(got \(value)).")
+        }
+        return peak
     }
 
     /// A descriptor's `original` (spec §11 #228-O): `{path, bookmark?}`, or
@@ -455,22 +498,27 @@ extension AgentServer {
     }
 
     /// `set_media_color` — the Media tab's Camera Log popup
-    /// (`MediaPane+CameraLog.swift`, spec §11 GR-16): a video file's log
-    /// curve and gamut, or a `lut` media as its input conversion, or `null`
-    /// to clear it, one undo step "Camera Log". `color` goes to the core
-    /// unread (`setMediaColorRaw`), which names what it refuses; the media id
-    /// is the core's to look up too, so an unknown one is its sentence. An
-    /// absent `color` names the call, not a rule.
+    /// (`MediaPane+CameraLog.swift`, spec §11 GR-16) and its HDR10 section's
+    /// Peak field and Use File's (`MediaPane+HDR10.swift`, HD-12): a video
+    /// file's log curve and gamut, or a `lut` media as its input conversion,
+    /// and a PQ file's `peak` override, or `null` to clear them, one undo step
+    /// "Camera Log" — "PQ Peak" when `color` is an object whose only key is
+    /// `peak`, as the Peak field's is. `color` goes to the core unread
+    /// (`setMediaColorRaw`), which names what it refuses; the media id is the
+    /// core's to look up too, so an unknown one is its sentence. An absent
+    /// `color` names the call, not a rule.
     func setMediaColor(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let media = try idArg(a, "media")
         guard let color = a["color"] else {
             throw ToolError(
-                message: "Missing required argument: color ({log, gamut?}, {lut} or null)")
+                message: "Missing required argument: color ({log, gamut?}, {lut}, {peak} or "
+                    + "null)")
         }
+        let peakOnly = (color as? [String: Any]).map { Set($0.keys) == ["peak"] } == true
         return try editResult(
-            document, "Camera Log", [.setMediaColorRaw(media: media, color: color)],
-            ["media": Int(media)])
+            document, peakOnly ? "PQ Peak" : "Camera Log",
+            [.setMediaColorRaw(media: media, color: color)], ["media": Int(media)])
     }
 }
 

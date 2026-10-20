@@ -269,8 +269,19 @@ use crate::model::{Canvas, Project};
 /// project with no blurred qualifier writes exactly the text it did, and the
 /// reader's default is 0, so there is no migration step. The bump is so an
 /// older build refuses the file instead of dropping the blur on save.
-/// Every number from 22 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 21;
+///
+/// Version 22 is a PQ file's HDR10 peak (spec §11 HD-12):
+/// [`crate::model_media_color::PqColor`] on `media.color.pq`, after
+/// `detected` — `file` (the peak import read, whole cd/m²), `from`
+/// (`max_cll` or `mastering_display`, exactly when `file` is) and `peak` (the
+/// person's override), each written only when set, `{}` for a PQ file whose
+/// import read nothing — written only on a PQ file's media, so a project with
+/// none writes exactly the text it did, and the reader's default is none, so
+/// there is no migration step: a PQ media from an older file has no `pq` and
+/// renders at 1,000 cd/m² until imported again. The bump is so an older build
+/// refuses the file instead of dropping the peak on save.
+/// Every number from 23 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 22;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

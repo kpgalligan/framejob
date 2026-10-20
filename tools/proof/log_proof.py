@@ -520,8 +520,11 @@ MUTANTS = {
                               "            let conversion = InputConversion.choose(for: frame)\n"
                               "                ?? layer.input.flatMap(InputConversion.choose("
                               "input:))\n")], ["L1"]),
-    "remove-lut-keeps-conversion": ([("core/src/lut.rs", "                row.color = None;\n",
-                                      "")], ["L8"]),
+    # hdr H-1 (spec §11 HD-12): the clear keeps a PQ file's peak, so the anchor is
+    # the line that clears the Camera Log through `without_camera_log`.
+    "remove-lut-keeps-conversion": ([("core/src/lut.rs",
+                                      "                row.color = row.color.and_then(|color| "
+                                      "color.without_camera_log());\n", "")], ["L8"]),
     "log2-as-log": ([(COLOR_SWIFT,
                       "                return MediaColor(log: .appleLog2, gamut: .appleWideGamut, "
                       "detected: true)\n",

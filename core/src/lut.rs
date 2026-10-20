@@ -253,7 +253,7 @@ impl Project {
         }
         for row in next.media.iter_mut() {
             if converted.contains(&row.id) {
-                row.color = None;
+                row.color = row.color.and_then(|color| color.without_camera_log());
             }
         }
         next.media.retain(|m| m.id != media);

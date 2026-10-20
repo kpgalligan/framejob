@@ -68,16 +68,22 @@ extension MediaPane {
             read: { CameraLogChoice(selected()?.color) },
             write: { [weak self] choice in
                 guard let media = selected(), choice != CameraLogChoice(media.color) else { return }
+                // Every write keeps a PQ file's peak override (spec §11 HD-12):
+                // `color` replaces the Camera Log and the override together.
+                let pq = media.color?.pq
                 switch choice {
                 case .none:
-                    binding.apply("Camera Log", [.setMediaColor(media: media.id, color: nil)])
+                    binding.apply(
+                        "Camera Log", [.setMediaColor(media: media.id, color: MediaColor(pq: pq))])
                 case .curve(let log, let gamut):
                     binding.apply(
                         "Camera Log",
-                        [.setMediaColor(media: media.id, color: MediaColor(log: log, gamut: gamut))])
+                        [.setMediaColor(
+                            media: media.id, color: MediaColor(log: log, gamut: gamut, pq: pq))])
                 case .lut(let lut):
                     binding.apply(
-                        "Camera Log", [.setMediaColor(media: media.id, color: MediaColor(lut: lut))])
+                        "Camera Log",
+                        [.setMediaColor(media: media.id, color: MediaColor(lut: lut, pq: pq))])
                 case .useLUT:
                     self?.inspector?.onCommand?(
                         #selector(EditorViewController.useCameraLogLUT(_:)))

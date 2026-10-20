@@ -1,6 +1,6 @@
 // Built by tools/proof/hdr_proof.py as `main.swift` over every other file in
-// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P4
-// (grading-3 T3-1, spec §11 GR-15 as amended).
+// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P5
+// (grading-3 T3-1, spec §11 GR-15 as amended; P5 hdr H-1, spec §11 HD-12).
 //
 // Step 0's maths through the app's own types: `InputConversion`'s selector
 // through BOTH readers (the labels as strings, and a `CMVideoFormatDescription`
@@ -293,6 +293,108 @@ do {
             + "bytes",
         wrong.isEmpty && want.count == mine.count && stride == 96,
         "wrong \(wrong); stride \(stride)")
+}
+
+// MARK: - P5 the PQ peak (hdr H-1, spec §11 HD-12)
+
+do {
+    var misses: [String] = []
+    let reference = InputConversions.pqReferenceWhite
+    let whites: [(UInt32?, Float)] = [
+        (nil, InputConversions.pqWhite / reference), (100, 1), (203, 1), (1000, 1000 / reference),
+        (4000, Float(4000) / reference),
+    ]
+    for (peak, want) in whites {
+        let got = InputConversions.pqShoulderWhite(peak: peak)
+        if got.bitPattern != want.bitPattern {
+            misses.append("pqShoulderWhite(\(peak.map(String.init) ?? "nil")) = \(got), want \(want)")
+        }
+    }
+    let unknown = InputConversion.pq(.bt2020).uniforms(premultiplied: false).white
+    if unknown.bitPattern != (InputConversions.pqWhite / reference).bitPattern {
+        misses.append("the PQ arm's white with no peak is \(unknown), not 1000/203")
+    }
+    let at4000 = InputConversion.pq(.bt2020).uniforms(premultiplied: false, peak: 4000).white
+    if at4000.bitPattern != (Float(4000) / reference).bitPattern {
+        misses.append("the PQ arm's white at 4,000 is \(at4000)")
+    }
+    func decoded(_ text: String) -> MediaColor? {
+        try? JSONDecoder().decode(MediaColor.self, from: Data(text.utf8))
+    }
+    let stored = decoded(
+        #"{"log":"slog3","gamut":"s_gamut3","pq":{"file":4000,"from":"max_cll","peak":1000}}"#)
+    if stored?.pq != PQColor(file: 4000, from: .maxCLL, peak: 1000) || stored?.peak != nil
+        || stored?.pq?.effectivePeak != 1000 || stored?.log != .slog3
+    {
+        misses.append("the stored shape decoded as \(String(describing: stored))")
+    }
+    let reading = decoded(#"{"pq":{"file":2000,"from":"mastering_display"}}"#)
+    if reading?.pq != PQColor(file: 2000, from: .masteringDisplay) || reading?.pq?.effectivePeak != 2000 {
+        misses.append("a reading decoded as \(String(describing: reading))")
+    }
+    let empty = decoded(#"{"pq":{}}"#)
+    if empty?.pq != PQColor() || empty?.pq?.effectivePeak != nil {
+        misses.append("{pq: {}} decoded as \(String(describing: empty))")
+    }
+    let input = decoded(#"{"peak":4000}"#)
+    if input?.peak != 4000 || input?.pq != nil || input?.log != nil || input?.lut != nil {
+        misses.append("the input shape decoded as \(String(describing: input))")
+    }
+    let color = MediaColor(
+        log: .slog3, gamut: .sGamut3, pq: PQColor(file: 4000, from: .maxCLL, peak: 1000))
+    let op = color.opDictionary
+    if op.count != 3 || op["log"] as? String != "slog3" || op["gamut"] as? String != "s_gamut3"
+        || op["peak"] as? UInt32 != 1000
+    {
+        misses.append("opDictionary \(op)")
+    }
+    let descriptor = color.descriptorDictionary
+    let pq = descriptor["pq"] as? [String: Any] ?? [:]
+    if descriptor["peak"] != nil || pq.count != 3 || pq["file"] as? UInt32 != 4000
+        || pq["from"] as? String != "max_cll" || pq["peak"] as? UInt32 != 1000
+    {
+        misses.append("descriptorDictionary \(descriptor)")
+    }
+    let readingOnly = MediaColor(pq: PQColor(file: 4000, from: .maxCLL))
+    for (tag, asked) in [("a reading alone", readingOnly), ("an empty color", MediaColor())] {
+        let sent = ReelOp.setMediaColor(media: 3, color: asked).args["color"]
+        if !(sent is NSNull) {
+            misses.append("setMediaColor with \(tag) sent \(String(describing: sent)), not null")
+        }
+    }
+    let overridden = ReelOp.setMediaColor(
+        media: 3, color: MediaColor(pq: PQColor(file: 4000, from: .maxCLL, peak: 600)))
+        .args["color"] as? [String: Any] ?? [:]
+    if overridden.count != 1 || overridden["peak"] as? UInt32 != 600 {
+        misses.append("setMediaColor with an override sent \(overridden)")
+    }
+    let source = MediaImporter.CacheStamp(
+        size: 1, modified: 2, duration: 3, width: 4, height: 5, hasVideo: true, hasAudio: false,
+        thumbnailHeight: 6, maxThumbnails: 7, peakBucketsPerSecond: 8)
+    /// The marker's top-level keys and values, as written to disk.
+    func marker(_ color: MediaColor) -> [String: Any] {
+        let media = MediaSnapshot(id: 1, path: "/p.mov", color: color)
+        guard let thumbs = ThumbnailInput(media: media, urls: [:]),
+            let data = try? JSONEncoder().encode(
+                ConvertedThumbsStamp(source, input: thumbs, fullRange: false)),
+            let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        else { return [:] }
+        return object
+    }
+    let logMarker = marker(MediaColor(log: .slog3, gamut: .sGamut3))
+    let peakMarker = marker(MediaColor(pq: PQColor(file: 4000, from: .maxCLL)))
+    if logMarker["peak"] != nil || logMarker["log"] as? String != "slog3" {
+        misses.append("a Camera Log marker with no peak: \(logMarker)")
+    }
+    if peakMarker["peak"] as? Int != 4000 || peakMarker["log"] != nil {
+        misses.append("a PQ reading's marker: \(peakMarker)")
+    }
+    check(
+        "P5 pqShoulderWhite is 1000/203 bit-exact with no peak, 1 at 100 and 203, peak/203 at "
+            + "1,000 and 4,000; MediaColor decodes the stored pq and the input's peak; "
+            + "opDictionary sends peak and descriptorDictionary pq; setMediaColor sends null "
+            + "for an empty dictionary; a marker omits a nil peak",
+        misses.isEmpty, misses.joined(separator: "; "))
 }
 
 finish()

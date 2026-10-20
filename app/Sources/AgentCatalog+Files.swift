@@ -192,7 +192,8 @@ extension AgentServer {
                     + "bookmark, kind, duration, width, height, fps [num, den], has_video, "
                     + "has_audio, has_alpha, original {path, bookmark?} — the file a .mov copy "
                     + "or conversion was made from — and color, a video file's Camera Log, as "
-                    + "set_media_color takes it plus detected). Probing files is the host's "
+                    + "set_media_color takes it plus detected, and a PQ file's pq {file?, "
+                    + "from?, peak?} as get_project shows it). Probing files is the host's "
                     + "job, so unless you are replaying a project's own JSON, call import_media "
                     + "and let it probe.",
                 ["descriptor": "The media entry to add; only path is required."]),
@@ -232,10 +233,18 @@ extension AgentServer {
                     + "media id} to convert with an imported .cube (import_media it first); or "
                     + "null for none, which shows the log picture. An Apple Log or Apple Log 2 "
                     + "file is set at import (get_project's media[].color shows detected: "
-                    + "true). Refused on an audio, image or LUT media.",
+                    + "true). Refused on an audio, image or LUT media. A PQ (HDR10) file also "
+                    + "takes peak, a whole number of cd/m² 1–10000 — the Media tab's HDR10 "
+                    + "Peak field: where its highlights roll off to white. Import reads the "
+                    + "file's own peak into media[].color.pq {file, from} (MaxCLL, else the "
+                    + "mastering display's maximum; {} when the file names none, which means "
+                    + "1,000), and peak overrides it. color replaces the Camera Log and the "
+                    + "peak together, so send both to keep both; null clears both and keeps "
+                    + "the file's reading. A peak on a file that is not PQ is refused.",
                 [
                     "media": "The video media's id.",
-                    "color": "{log, gamut?}, {lut} or null to clear.",
+                    "color": "{log, gamut?}, {lut} or {peak}, log or lut beside peak, or null to "
+                        + "clear.",
                 ]),
         ]
         // transcribe and export_captions are `AgentCatalog+Captions.swift`'s

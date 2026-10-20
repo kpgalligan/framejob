@@ -255,3 +255,64 @@ design time or build time.
     `docs/manual-checks.md` rows, read from a path he gives and never copied into the repo.
   - Agents never edit a `CLAUDE.md`: each phase's record lists the edits it owes, and the
     orchestrator applies them.
+- **HD-12 — #281's key and shape: `media.color.pq {file?, from?, peak?}`, read by two routes,
+  overridden by `set_media_color {color: {peak}}`, published as the `input`'s `peak`.** H-1's
+  spec, recorded before its code; it settles what HD-6 left to the spec. Format 22.
+  - **The key.** `media.color` gains `pq`, after `detected`: `{file, from, peak}`, each written
+    only when set, an empty reading written as `{}`. `file` is the peak import read, in whole
+    cd/m²; `from` names which field gave it, `max_cll` or `mastering_display`, and is present
+    exactly when `file` is; `peak` is the person's override. Import writes `pq` on every video
+    media whose track is labelled PQ (`InputConversion.choose(for:)` answers `.pq`), `{}` when
+    neither route reads a peak, and on no other media; so a media has `pq` exactly when it is a
+    PQ file. The effective peak is `peak`, else `file`, else 1,000 cd/m².
+  - **The routes, in order.** (1) The track's format description: the
+    `MasteringDisplayColorVolume` extension (24 bytes, SMPTE ST 2086 in the order H.265's SEI
+    137 carries it; the maximum luminance a big-endian u32 at bytes 16–19 in 0.0001 cd/m²) and
+    the `ContentLightLevelInfo` extension (4 bytes, CTA-861.3; MaxCLL a big-endian u16 at bytes
+    0–1). (2) When the description carries neither: the first video sample with data, read
+    unconverted, for an `hvc1` or `hev1` track only: its length-prefixed NAL units (the length
+    size 1, 2 or 4 from the description's `hvcC`; anything else reads nothing), the prefix SEI
+    NAL units (type 39) before the first VCL unit (type below 32), emulation-prevention bytes
+    removed, the `ff`-extended payload type and size, payloads 137 (24 bytes or more) and 144
+    (4 or more), the first of each kept. Within the route that answered, MaxCLL when present
+    and non-zero, else the mastering maximum. The two routes are never mixed. Measured for
+    H-1's spec: an x265 CLI file muxed by ffmpeg carries both payloads in sample 0 and nothing
+    in its description, and AVFoundation's first buffer of such a track is empty (no data), so
+    the read skips to the first buffer with data.
+  - **The arithmetic.** The mastering maximum rounds to the nearest cd/m² in 64 bits,
+    `(v + 5000) / 10000`, so a corrupt `0xFFFFFFFF` cannot wrap; then a value above 10,000 is
+    clamped to 10,000 and 0 reads as no peak. MaxCLL is read as it stands, 0 meaning absent
+    (CTA-861.3), above 10,000 clamped. The reader is the core's pure `hdr10.rs`, bounds-checked
+    so no input panics, reached through one export, `rc_hdr10_peak` (the road map's "no FFI
+    export" is corrected: this is H-1's one).
+  - **The op.** `set_media_color {media, color}` takes one new key, `peak`, a whole number of
+    cd/m². `color` replaces the Camera Log (`log`, `gamut`, `lut`) AND the override together;
+    import's `file` and `from` survive every op; `null` clears both, keeping `{pq: {file,
+    from}}` (no `color` at all on a media without `pq`). Refused, each in its own sentence:
+    `color.pq is read from the file at import, not set`; `media {id} is not a PQ file; only a
+    PQ file takes a peak`; `color.peak must be 1–10000 cd/m², not {n}`; and an asked `color`
+    with none of `log`, `lut` and `peak` (`{}`) keeps today's `color needs log or lut; null
+    clears it`. A stored colour (`add_media`'s descriptor, a file) may hold `pq` with neither
+    `log` nor `lut`; `pq` is on video only (today's kind sentence), `file` and `peak` within
+    1–10,000, and `color.pq.from goes with color.pq.file`. Removing a LUT that converts a media,
+    and a paste whose LUT does not come along, clear its Camera Log and keep its `pq`.
+  - **What draws.** The recipe layer's and the plan segment's `input` gains `peak`, the
+    effective peak, whenever the media has a reading or an override: `{peak}` alone, or beside
+    `{log, gamut}` or `{lut}`; a `{}` reading publishes nothing new, so an unlabelled PQ file's
+    plan and recipe are the text they were. Step 0's PQ arm takes W = max(peak, 203) / 203,
+    1000/203 when `input` names no peak — the same float arithmetic as before, so a 1,000 cd/m²
+    file renders byte-identical too.
+  - **Thumbnails** (GR-21): a PQ media with an effective peak is drawn through the one-clip
+    composition as a Camera Log is, its converted marker carrying `peak`; a PQ media with none
+    keeps today's marker (`transfer: "pq"`), so its strip is not redrawn.
+  - **The Media tab** shows an **HDR10** section (not the road map's popup): a Peak field in
+    cd/m² (1–10,000, quick values 1,000, 2,000, 4,000 and 10,000), a Use File's button that
+    clears the override, and a line naming where the peak came from; one undo step "PQ Peak".
+    Every Camera Log write keeps the media's override.
+  - **Not re-read.** A relink keeps the media's `color`, its reading included (GR-16's rule); a
+    project from before format 22 has no `pq` on its PQ media and renders at 1,000 cd/m² until
+    the file is imported again. No migration: the owner said on 2026-10-09 that Frame Job is in
+    no real use yet.
+  - **Amends** GR-15 (the white, and B96's route: its four files held HDR10 metadata only in the
+    HEVC SEI, which AVFoundation does not read, M5), GR-16 (the colour record, the op's key and
+    its refusals) and GR-21 (the marker's `peak`).

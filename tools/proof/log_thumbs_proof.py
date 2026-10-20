@@ -91,6 +91,12 @@ Rows:
   lands again, `0.jpg`'s (inode, mtime_ns) moved, and = the render ±4;
   saved, closed, bt709's marker deleted again, reopened: once bt709's flat
   marker lands, both VP9 strips stay unchanged for 5 s (T8's method).
+- **TP** (hdr H-1, #281, spec §11 HD-12): hdr_proof's `pq_hdr10` (x265's SEI,
+  MaxCLL 4,000) alone: a converted marker carrying `peak: 4000` and nothing
+  of a Camera Log or a transfer, `0.jpg` = the render ±4 on the grey row;
+  after `set_media_color {peak: 1000}`: the marker's `peak` 1000 and = the
+  1,000 render ±4; `pq_plain` (no metadata) alone: the `transfer: "pq"`
+  marker as before, ±4.
 - **TT** (`--measure`, recorded and not scored): a 60 s 1920×1080 10-bit
   HEVC (libx265, `ultrafast`, default GOP) file imported: seconds from the
   import call to the flat marker; then S-Log3 set: seconds from
@@ -101,8 +107,8 @@ Rows:
   the copy's `app/Sources`.
 
 `capture DIR` runs H0, T0, T4 and T5's capture (`--only` scores and writes
-only the rows named). `compare DIR` runs TH, T1–T9 and Z1. A plain run is TH,
-T1, T2, T3, T6, T7, T8, T9 and Z1 (`--only` adds T4 or T5, read against
+only the rows named). `compare DIR` runs TH, T1–T9, TP and Z1. A plain run is TH,
+T1, T2, T3, T6, T7, T8, T9, TP and Z1 (`--only` adds T4 or T5, read against
 `--control`). `--mutant NAME` builds a COPY of the tree
 (`tree_copy.make_copy`), applies its edits (each anchor asserted to occur
 exactly once), builds it by the copy's own `make app-debug` (`make app` under
@@ -162,8 +168,8 @@ T1_CASES = [("applelog", "applelog", None, ("apple_log", "bt2020")),
             ("slog3", "slog3", SLOG3, ("slog3", "s_gamut3_cine")),
             ("vlog", "vlog", {"log": "vlog"}, ("vlog", "v_gamut")),
             ("slog3-lut", "slog3", "lut", None)]
-ROWS = ["H0", "TH", "T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "TT", "S2",
-        "Z1"]
+ROWS = ["H0", "TH", "T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "TP", "TT",
+        "S2", "Z1"]
 RECORDS = {"TT"}
 SOURCE_SWIFT = "app/Sources/MediaImporter+ThumbnailSource.swift"
 WATCH_SWIFT = "app/Sources/ProjectDocument+ConvertedThumbnails.swift"
@@ -765,6 +771,48 @@ def run_t7(client, state):
           + (f"; misses {misses}" if misses else ""))
 
 
+def peaked(peak):
+    """A `ConvertedThumbsStamp` of a PQ media drawn at its peak (hdr H-1, spec §11
+    HD-12): `peak` and nothing of a Camera Log or a transfer."""
+    def holds(marker):
+        return ("source" in marker and marker.get("peak") == peak
+                and not {"log", "gamut", "lutPath", "lutSize", "lutModified", "transfer"}
+                & set(marker))
+    return holds
+
+
+def run_tp(client, state):
+    """TP (hdr H-1, #281): a PQ file's strip follows its peak."""
+    misses, notes = [], []
+    path, plain = hdr.fixture("pq_hdr10"), hdr.fixture("pq_plain")
+    doc = Doc(client, "tp")
+    clip = doc.place(path) if doc.ok and path else None
+    media = doc._media.get(path)
+    if clip is None:
+        misses.append(f"setup: {doc.why or refused().get('pq_hdr10')}")
+    else:
+        step(doc, media, "pq_hdr10", peaked(4000), "tp-4000", misses, notes, grey_only=True)
+        if doc.color(media, {"peak": 1000}):
+            step(doc, media, "{peak: 1000}", peaked(1000), "tp-1000", misses, notes,
+                 grey_only=True)
+        if not doc.ok:
+            misses.append(doc.why)
+    state["tp closed"] = doc.close()
+    other = Doc(client, "tp-plain")
+    clip = other.place(plain) if other.ok and plain else None
+    media = other._media.get(plain)
+    if clip is None:
+        misses.append(f"setup: {other.why or refused().get('pq_plain')}")
+    else:
+        step(other, media, "pq_plain", transferred("pq"), "tp-plain", misses, notes,
+             grey_only=True)
+    state["tp-plain closed"] = other.close()
+    check("TP a PQ file's strip at its peak: pq_hdr10's marker carries peak 4000 and 0.jpg = "
+          "its render ±4; after {peak: 1000} the marker's 1000 and = the 1,000 render ±4; "
+          "pq_plain's marker unchanged (transfer pq)", not misses, "; ".join(notes)
+          + (f"; misses {misses}" if misses else ""))
+
+
 def strip_state(doc, media):
     """(inode, mtime_ns) of `0.jpg` and the bytes of `complete.json`, or None."""
     jpg, marker = doc.strip(media) / "0.jpg", doc.strip(media) / "complete.json"
@@ -1068,13 +1116,13 @@ def main():
     elif capture:
         selected = {"H0", "T0", "T4", "T5", "Z1"}
     elif args.mode == "compare":
-        selected = {"TH", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "Z1"}
+        selected = {"TH", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "TP", "Z1"}
     elif args.measure:
         selected = {"TT", "Z1"}
     elif args.mutant:
         selected = set(named) | ({"Z1"} if "S2" not in named else set())
     else:
-        selected = {"TH", "T1", "T2", "T3", "T6", "T7", "T8", "T9", "Z1"}
+        selected = {"TH", "T1", "T2", "T3", "T6", "T7", "T8", "T9", "TP", "Z1"}
     if "H0" in selected and not capture:
         print("H0 runs in capture only")
         return 2
@@ -1144,6 +1192,8 @@ def main():
                     run_t8(client, state)
                 if "T9" in selected:
                     run_t9(client, state)
+                if "TP" in selected:
+                    run_tp(client, state)
                 if "TT" in selected:
                     run_tt(client, state)
             except Exception as error:  # a row that could not run is a failure

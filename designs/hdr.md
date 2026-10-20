@@ -351,7 +351,8 @@ nothing: the preview layer takes the HLG frame by itself (M8).
   values), 25 (H-6, `canvas.blending`), each main's next when its code is written and renumbered
   before its merge if main moved first. H-3 and H-4 change no persisted state.
 - **Ops:** `set_canvas` gains `output` (H-2) and `blending` (H-6); `set_media_color` gains the
-  peak override (H-1). No new op, no new tool (the product tool count stays 92), no FFI export.
+  peak override (H-1). No new op, no new tool (the product tool count stays 92). One FFI export,
+  H-1's `rc_hdr10_peak` (the SEI reader's door; corrected in H-1, which this line had as none).
 - **New module:** the HEVC SEI reader (H-1).
 
 ### Documents (each phase's own)
@@ -780,3 +781,146 @@ The root `CLAUDE.md` needs nothing until the road map closes. **Residue:** none.
 P2, which failed on the untouched tree (`RCDevSyncHold`, added in `87fb100`, neither pinned nor
 in `NOT_SHOWN`), is fixed in this phase by its `NOT_SHOWN` row. H-1 (#281) is next, from main
 after this phase's merge.
+
+## H-1 — #281, the PQ peak (HD-6, HD-12)
+
+**What landed** (2026-10-19, in the worktree on `hdr`, from `82184d4`). Spec §11 **HD-12**, written
+before the code (`11-decisions/hdr.md`: the key `media.color.pq {file?, from?, peak?}`, both
+routes, the 64-bit rounding and the clamp, the op's `peak` and its three new sentences, `null`
+keeping the reading, the `input`'s `peak`, the marker's `peak`, the Media tab's HDR10 section in
+place of this road map's popup, no re-read on relink or for a pre-22 file), its README row, the
+Lines cells, and "Amended by HD-12" lines on GR-15 (B96's route named: SEI only, unread by
+AVFoundation, M5's digest `d34d90b3f676a425`), GR-16 and GR-21 with their index suffixes. Then:
+
+- **The toll, gated alone first:** `ReelCore.swift` lines 411–583 at `82184d4` (`ExportPreset`,
+  `ExportSettings`, `ExportSize` and their docs; no `rc_*` call) out whole to `ExportValues.swift`
+  under `import AppKit` and a three-line doc — 989 → 815, the new file 178, nothing widened; the
+  verbatim `diff` of the block and of the kept lines both exit 0; `make typecheck` 0 errors and the
+  4 baseline warnings; `make gate` PASS in 246 s. Recorded in `designs/adr/app-file-history.md`
+  with the next seam (the graphics value types and `SpeedLimits` to a values file). `ReelCore.swift`
+  is 842 after `ReelHDR10`.
+- **Core:** `hdr10.rs` (new, 214 lines), the pure reader — the description route when either
+  blob is given, else the first sample's prefix SEI (NAL length 1, 2 or 4; before the first VCL
+  unit; emulation prevention removed; `ff`-extended type and size; 137 ≥ 24 bytes and 144 ≥ 4,
+  the first of each), MaxCLL when non-zero, else the mastering maximum rounded in u64, clamped to
+  10,000, 0 none (MaxCLL clamped too: a u16 reaches 65,535); `ffi_hdr10.rs` (new), the one export
+  `rc_hdr10_peak`, in the header's new `hdr10` block; `model_media_color.rs` `PEAK_MIN`/`PEAK_MAX`,
+  `PeakSource`, `PqColor` (`effective()`), `MediaColor.pq`, `without_camera_log`;
+  `media_color.rs` the op's `peak` (an `Err` when not a whole number), the reading kept by every
+  op, the refusals in the order `detected`, `pq`, the peak's range, not PQ, the media's kind,
+  none of `log`/`lut`/`peak`, then `check_media_color` (which now takes a `pq`-only colour and
+  holds `pq` to its range and `from` with `file`), `media_input` publishing `peak`; `lut.rs`'s
+  `remove_lut` and `edit_paste.rs` keep `pq`; format **22** in `format.rs` and the header;
+  `edit.rs`'s row. Tests: `core/tests/hdr10.rs` (12, on x265's 47 bytes, M5's blobs, every
+  prefix, the routes, MaxCLL 0, the rounding and the `0xFFFFFFFF` clamp, NAL sizes 1/2/3/4/0/8,
+  VCL first, a suffix SEI, `ff` values, first-wins, NULLs), `media_peak.rs` (10), `schema_v22.rs`
+  (5); `rc_hdr10_peak` in `model_tests.rs`'s null sweep; `schema_v21.rs`'s literal "the current
+  version is 21" became the `>= 21` const assert `schema_v20.rs` uses (the bump broke it).
+- **Swift:** `MediaColor.swift` (`PeakSource`, `PQColor`, `MediaColor.pq` and `.peak`, the two
+  dictionaries); `ReelCore.swift`'s `// MARK: - HDR10` `ReelHDR10`; `MediaImporter+Color.swift`'s
+  `detectedPQ` (synchronous: the description's two extensions, else an `hvc1`/`hev1` track's NAL
+  length and first sample with data, `outputSettings: nil`, then `cancelReading()`) and the one
+  changed line in `MediaImporter.swift` (573, unchanged count); `InputConversions.pqShoulderWhite`
+  and `uniforms(…, peak:)`; `InputStage.encode(…, peak:)`, `encodeInputs` passing
+  `layer.input?.peak` (its two `let conversion` lines unchanged); thumbnails (`convertingColor`
+  counts a peak, `oneClip` carries `pq`, `ConvertedThumbsStamp.peak`, `holdsHDR` requires none);
+  `MediaPane+HDR10.swift` (new, 96) registered by `MediaPane.swift`; the Camera Log writes keep
+  `pq`; `ReelOps.setMediaColor` sends `null` for an empty dictionary; `AgentServer+Media.swift`
+  reads a descriptor's `color.pq` and names the step "PQ Peak" for a peak-only `color`;
+  `AgentCatalog+Files.swift`'s prose for `set_media_color` and `add_media` (no argument changed,
+  so `op_argument_proof.py` and `phase9_proof.py` were not run).
+- **Proof:** `hdr_proof.py`'s H7 rewritten as H7 (CONTROL), H7d, H7i, H7p, H7o, H7r, with P5 in
+  `hdr_probe.swift`, five mutants, `capture --only`, and the fixtures by the x265 CLI and the new
+  `hdr10_writer.swift`; `log_thumbs_proof.py`'s TP; `log_proof.py`'s `remove-lut-keeps-conversion`
+  re-pinned to `lut.rs`'s new line; `tools/proof/README.md`'s "Road map hdr — H-1" section.
+- **Documents:** spec §4.3b, §5.2, §5.6, §6c, §7.1, §7.2, §7.3, §7.4, §7.5, §7.7, §7.10 and the
+  Lines; `designs/adr/grading-3.md`'s Known-limits line ("Found while reading" 2) and its #281
+  row; `docs/manual-checks.md`'s new **HDR** section with **HDR-4**; the README's Camera log
+  bullet and its `set_media_color` row; this road map's "no FFI export" (§ "Core") corrected.
+
+**Found while building, and settled in the instrument:**
+- `ffmpeg -r 30 -i x.hevc -c copy` started the stream at −0.08 s under an edit list
+  (`pq_plain` 0.933 s); `-framerate 30 … -avoid_negative_ts make_zero` puts the 30 frames at k/30
+  from 0. Measured with ffprobe's packet times.
+- The writer's first fixtures marked every frame a sync sample (the reader's attachments were not
+  copied), so `AVAssetImageGenerator` at zero tolerance answered nil at 0.5 s; copying each
+  sample's attachments leaves only the IDR frame sync (ffprobe's `K__` on packet 0 alone), and
+  Apple's reading of both writer files then reads.
+- With `--master-display` alone x265 still writes SEI 144, as 0,0 (ffprobe: `max_content=0` on
+  `pq_hdr10_display`), so that fixture tests "MaxCLL when non-zero" for real.
+- ffprobe reports a writer fixture's `mdcv`/`clli` as its first frame's side data too when the
+  frames carry no SEI (`pq_desc_600`), so H7's CONTROL reads the writer fixtures from the stream
+  side data and `pq_both`'s first frame for its kept SEI.
+
+**Verification**, 2026-10-19 (`pmset -g ps`: "Now drawing from 'AC Power'"), own instances on
+scratch sockets and homes, each stopped by its pid; no `Frame Job: ` line in any run (Z1) and no
+`DEFAULTS MOVED`:
+- **Controls**, on the product as the toll's gate left it (its Release build; for the second and
+  third, a `ditto` copy of it outside the products folder, because the phase's first core edit
+  made the tree's own bundle stale to `proof_app`): `capture tools/proof/work/h1/ctl --only
+  H1,H7i,Z1` exit 0 (H1's 12 scenes captured, H7i ok); after the mux fix `capture … --only
+  H7i,Z1` exit 0, H7i ok (pq_plain and pq_hdr10_cll worst 1 level against the oracle at 1,000);
+  `--control tools/proof/work/h1/ctl --only H7,H7d,H7i,H7p,H7o,H7r,Z1`: 3/7 — H7, H7i and Z1 ok,
+  **H7d, H7p, H7o and H7r FAILED** (no `pq` stored; pq_desc_600 9 levels off the oracle at 600;
+  the override and the sentences refused as `unknown key "peak" in color`); `log_thumbs_proof.py
+  --only TP,Z1`: 1/2, **TP FAILED** (pq_hdr10's marker `{"transfer": "pq"}`, the override refused).
+  Each new row discriminates; H7i is the unchanged-picture row and passes there by design.
+- In the loop: the core tests above, `make lint` clean, `make typecheck` 0 errors and the 4
+  warnings, `swift_build.py typecheck hdr_probe.swift` exit 0, `make app-debug` BUILD SUCCEEDED;
+  on Debug `--only H7,H7d,H7i,H7p,H7o,H7r,P5,Z1` found two instrument bugs (H7r placed its three
+  clips at 0, so the third import never ran; P5 read `peakBucketsPerSecond` as a `peak` key),
+  both fixed, then `--only H7r,P1,P2,P3,P4,P5,Z1` 7/7; `log_thumbs_proof.py --only TP,Z1` 2/2;
+  `spec_index_proof.py` 177/177.
+- `make gate`: **PASS in 243 s** (names 1 s, typecheck 5 s, fmt 2 s, lint 1 s, test 138 s, app
+  96 s). After the Release runs, `hdr_proof.py`'s core-copy fix, the proof README and this record,
+  `make gate` passed again in 66 s (names 1 s and test 64 s re-ran; typecheck, fmt, lint and app
+  skipped as unchanged); this sentence is the only edit after it.
+- **Release** (the gate's `make app`): `hdr_proof.py --control tools/proof/work/h1/ctl` whole:
+  **21/21**, R0 recorded. H7d read exactly `{}`, `{4000, max_cll}`, `{600, max_cll}`, `{1000,
+  max_cll}`, `{2000, mastering_display}`, `{600, max_cll}` (pq_desc_600), `{600, max_cll}`
+  (pq_both, the description over the SEI's 4,000), the ProRes `pq` retag `{}`, no `pq` on hlg or
+  bt709. H7i: both renders byte-equal the control's pq_plain PNG, worst 1 level against the
+  oracle at 1,000. H7p: worst 1 level against the oracle at 600, 2000, 4000 and 600; at PQ 0.70
+  255.00, 246.96, 243.57, 242.72 against the computed 255.0, 246.9, 243.5, 242.8; pq_desc_600's
+  PNG bytes = pq_hdr10_600's. H7o and H7r as their rows say; P1–P5 ok. Unscored: Apple's reading
+  of all seven files is the same at every 64th column (worst |Δ| 0 against pq_plain), the B96
+  values, so Apple's conversion follows neither route's metadata — the same as M5 found.
+  `compare tools/proof/work/h1/ctl --only H1,Z1`: 2/2, every one of H1's 12 SDR scenes
+  byte-identical to the control at 0 and 0.5 s with equal picks (the reverse's intermediate
+  digest differs from the control's, f761e4934e0c2243 against 9664f5afa03f769b, a printed and
+  unscored figure; its renders are among the byte-identical ones).
+- `log_proof.py` whole: **21/21** (L8's sentences unchanged, the conversion LUT's removal and
+  paste). `log_thumbs_proof.py --only T1,T2,T6,T7,T8,TP,Z1`: **7/7**; TP's markers `{"peak":
+  4000}`, then `{"peak": 1000}`, and pq_plain's `{"transfer": "pq"}`, each `0.jpg` 1 level from its
+  render at worst. `recording_probe.py --only catalog`: 31/31 (the catalog's prose).
+- `lut_proof.py` whole: **27/28 — LG1 FAILED** ("lut-4: set ok, render ok, bytes differ",
+  lut-5 the same: the Look gallery's LUT tiles are not byte-identical to `render_frame`). Run
+  alone on Release it failed again (1/2), and on the copy of the toll's build — the product
+  before any H-1 code — it failed the same way (1/2), so it predates this phase; filed as #310.
+  Every other row passed, the rows on `remove_lut` and paste among them.
+- **Mutants** (Release copies, each `--only <its rows>,Z1` against `tools/proof/work/h1/ctl`),
+  all **MUTANT PASS**, no other row failing: `peak-ignored` (H7p, H7o), `mastering-over-cll` (H7d
+  read `mastering_display` on every two-field file; H7i pq_hdr10_cll 2 levels under the oracle at
+  1,000 from x 648), `sei-unparsed` (H7d read `{}`; H7p at 1,000), `unknown-not-1000` (H7i, P5),
+  `peak-below-knee` (H7o, P5). `mastering-over-cll` and `sei-unparsed` first answered "the control
+  could not be performed": `hdr_proof.py`'s copy symlinked `core/`, so it now gives a core edit its
+  own copy of `core/` as `log_proof.py` does, and both ran again. `log_proof.py --mutant
+  remove-lut-keeps-conversion` on the re-pinned anchor: MUTANT PASS (L8: `media 7: color.lut 6 is
+  not a media of this project`); L9, L18 and Z1 failed beside it only because that mutant's default
+  `--control`, `tools/proof/work/t3-2/ctl`, does not exist in this worktree ("… is missing from
+  the control"), as they would on any build.
+
+**Owed.** The `CLAUDE.md` edits (applied by the orchestrator):
+- `core/CLAUDE.md`'s module map: a row for `hdr10.rs` · `ffi_hdr10.rs` (a PQ file's HDR10 peak
+  read from bytes, pure; the one `rc_hdr10_peak` export), and the `model_media_color.rs` /
+  `media_color.rs` entry gaining `PEAK_MIN`/`PEAK_MAX` (their one home), `PeakSource`, `PqColor`,
+  `MediaColor.pq` and `without_camera_log`, and the op's `peak`, the reading kept by every op and
+  `media_input`'s `peak`.
+- `app/CLAUDE.md`: `ExportValues.swift` (the export values out of `ReelCore.swift`, a pure move,
+  hdr H-1); `ReelCore.swift`'s list gaining `ReelHDR10`; the Media tab's row gaining
+  `MediaPane+HDR10.swift` (the HDR10 section, one undo step "PQ Peak") and `MediaColor.swift`'s
+  `PeakSource` and `PQColor`; `MediaImporter+Color.swift`'s role gaining `detectedPQ`.
+
+**Residue:** #310 (LG1, found here and older than this phase). The owner's person check is
+HDR-4. Nothing else is open: the road map's question 2 (an HDR10 file mastered off 1,000 cd/m²)
+is HDR-4's file.

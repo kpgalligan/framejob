@@ -36,10 +36,12 @@ extension EditorViewController {
                     NSSound.beep()
                     return
                 }
+                // The media's PQ peak override is kept (spec §11 HD-12).
+                let pq = document.project.snapshot.media(media)?.color?.pq
                 document.performGroupedEdit(
                     "Camera Log",
                     [.addMedia(descriptor: descriptor),
-                     .setMediaColor(media: media, color: MediaColor(lut: lut))])
+                     .setMediaColor(media: media, color: MediaColor(lut: lut, pq: pq))])
             } catch {
                 document.present(error)
             }
