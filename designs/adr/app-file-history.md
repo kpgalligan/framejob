@@ -706,9 +706,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   app/Sources/ExportSheetController.swift`: 639 before, 528 after; `ExportSheetCommit.swift` is
   120. The next seam: `// MARK: - Controls` and the `NSTextFieldDelegate` extension out whole to
   `ExportSheetControls.swift`.
-- `Playback.swift`: `seekFinished()` and `report(_:)` to `Playback+Scope.swift`, with `reported`
-  and `refreshWanted` widened from `private` for that file alone (B30's shape). `player` stays
-  private.
+- `Playback.swift`: the HDR road map's H-3 paid its named seam before Show SDR Version's
+  `recompose()`: `seekFinished()` and `report(_:)` with their docs (and the blank line before)
+  moved verbatim to the end of `Playback+Scope.swift`, each losing only `private`; `reported` and
+  `refreshWanted` widened from `private` for that file alone (B30's shape); `player` stays
+  private. The type's doc and `+Scope`'s name the moved pair. A pure move gated alone. `wc -l
+  app/Sources/Playback.swift`: 588 before, 564 after; `Playback+Scope.swift` 35 → 60. The next
+  seam: the two composition re-assignments (`setPreviewQuality`, `recompose()`) out to
+  `Playback+PreviewQuality.swift` behind an internal read of the player's current item, so
+  `player` itself stays private.
 - `AppDelegate+Menus.swift`: a submenu builder out (the precedent is
   `AppDelegate+GraphicMenu.swift`). The grading road map's GR1 moved the Clip menu's submenu
   builders (`backgroundMenu`, `transitionMenu`, `motionMenu`, `motionSlotMenu`, `labelMenu`,

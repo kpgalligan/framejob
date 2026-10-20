@@ -22,7 +22,7 @@ import AppKit
 /// from the DSP tap rather than observed from a second one.
 /// The meter's read and its two switches live in `Playback+Meter.swift`.
 /// `previewComposition` lives in `Playback+PreviewQuality.swift`, `stepFrames` and the main
-/// hop `onMain` in `+Step`, `seekAfterRebuild` in `+Scope`.
+/// hop `onMain` in `+Step`, `seekAfterRebuild`, `seekFinished` and `report` in `+Scope`.
 ///
 /// Road map 2's phase 8 hung two more things off the player, and both are here
 /// because both are about the PLAYER rather than about the document: View ▸
@@ -116,7 +116,7 @@ final class Playback {
     var isSeeking = false
     var pendingSeek: Ticks?
     /// A paused refresh asked for mid-seek: run when the seek lands, not dropped.
-    private var refreshWanted = false
+    var refreshWanted = false
     /// True from a restore's first line until its last seek lands.
     var restoring = false
     /// True from `startRebuild`'s dispatch until that generation lands or is discarded.
@@ -124,7 +124,7 @@ final class Playback {
     /// True from `seekAfterRebuild` until the rebuild it waits for lands, fails or is discarded.
     var holding = false
     /// The last tick `onTimeChanged` carried.
-    private var reported: Ticks?
+    var reported: Ticks?
     /// Bumped by every `player.seek`; a completion for an older serial is
     /// ignored, so one the item swap cancelled cannot end a newer seek.
     var seekSerial = 0
@@ -541,30 +541,6 @@ final class Playback {
                 self.seekFinished()
             }
         }
-    }
-
-    /// One seek has landed: take the newest position that arrived while it
-    /// was in flight, if any, dropping the rest; else end it — a restore or an
-    /// asked seek alike — heard once only if it rests off the tick last
-    /// reported (the observer may have carried it already); then any paused
-    /// refresh waiting.
-    private func seekFinished() {
-        isSeeking = false
-        if let next = pendingSeek {
-            pendingSeek = nil
-            startSeek(to: next)
-            return
-        }
-        restoring = false
-        let rest = currentTime
-        if rest != reported { report(rest) }
-        if refreshWanted { refreshPausedFrame() }
-    }
-
-    /// The ONE caller of `onTimeChanged`.
-    private func report(_ t: Ticks) {
-        reported = t
-        onTimeChanged?(t)
     }
 
     // MARK: - Observers
