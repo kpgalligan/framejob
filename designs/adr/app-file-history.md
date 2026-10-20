@@ -573,7 +573,14 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   (`PropsDictionaries.swift`) before adding `ReelAgentSocket`; the merge into main kept
   `OpDictionaries.swift`, whose code is identical (only its
   `import` and the doc comment's file name differ). It stays the only file that calls
-  `rc_*`.
+  `rc_*`. The HDR road map's H-1 paid a toll before `ReelHDR10` (#281) landed: lines 411–583 at
+  `82184d4` — `ExportPreset`, `ExportSettings`, `ExportSize` and their docs, none naming an `rc_*`
+  symbol but in a doc comment — went whole to `ExportValues.swift` under `import AppKit` and a
+  three-line doc, a pure move gated alone; nothing widened (no member was `private` to the file).
+  `wc -l app/Sources/ReelCore.swift`: 989 before, 815 after; `ExportValues.swift` is 178. The next
+  seam: the graphics engine's value types (`GraphicDiagnostic`, `GraphicFailure`,
+  `GraphicRaster`, under `// MARK: - Graphics`) and `SpeedLimits` out to a values file, each
+  naming no `rc_*` symbol; `takeDiagnostics` stays, since it frees through `takeString`.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,
