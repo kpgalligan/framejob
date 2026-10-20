@@ -68,12 +68,19 @@ kernels compiled from the tree's `Waveform.metal`):
   slot's pass and asks for one frame; vectorscope ×1 over ×4 is two passes,
   each slot showing its own zoom's trace; kept across hide and show and a pick
   away and back; no defaults key; a new controller ×1.
+- **S15** (hdr H-4, spec §11 HD-15): with `signal: .hlg`, the six BT.2020
+  75 % cards each land in ONE vectorscope bin, this script's BT.2020 bin
+  (`Cb = (B′ − Y′)/1.8814`, `Cr = (R′ − Y′)/1.4746`), the HLG JSON's targets
+  agree; nine colour cards' waveform and histogram Y′ levels are
+  round(255·dot(rgb, BT.2020)); the parade's counts are the same at either
+  signal. CONTROL: at least 4 cards whose Rec. 709 and BT.2020 levels part.
 - **T1**: each scope's GPU time at 1080p and 4K on the six fixtures, through
   an IOSurface 64RGBAHalf wrap as the tap's, median of 10 after 2 warm-ups.
   Scored: the worst 4K figure of each of parade, histogram and the
-  vectorscope at ×1, ×2 and ×4 ≤ 1.1 ms (GR-10, GR-26, GR-31). The waveform
-  and the waveform + vectorscope pair are recorded, with `pmset -g`'s power
-  lines.
+  vectorscope at ×1, ×2 and ×4 ≤ 1.1 ms (GR-10, GR-26, GR-31), and (hdr H-4)
+  the HLG signal's vectorscope at ×1, ×2 and ×4 and histogram. The waveform,
+  the waveform + vectorscope pair and the HLG waveform are recorded, with
+  `pmset -g`'s power lines.
 - **T2**: the tree's parade against the same shader with its one
   `bool banded = ` line forced to `false` (every group adding globally),
   timed back to back on the five 4K fixtures as T1 times them. Scored: on the
@@ -227,9 +234,9 @@ RATIO_MAX = 0.75
 T3_RATIO_MAX = 0.85
 KINDS = ["waveform", "parade", "vectorscope", "histogram"]
 ROWS = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "S13", "S14",
-        "T1", "T2", "T3", "M1", "M2", "M3", "M4", "H1", "H2", "H3", "H4", "Z1"]
-S_ROWS = {"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "S14", "T1",
-          "T2", "T3"}
+        "S15", "T1", "T2", "T3", "M1", "M2", "M3", "M4", "H1", "H2", "H3", "H4", "Z1"]
+S_ROWS = {"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "S14", "S15",
+          "T1", "T2", "T3"}
 M_ROWS = {"M1", "M2", "M3", "M4", "S13"}
 H_ROWS = {"H1", "H2", "H3", "H4"}
 SCOPES = ["View", "Scopes"]
@@ -272,9 +279,11 @@ MUTANTS = {
         "        UserDefaults.standard.set(kind.rawValue, forKey: \"RCScopePick\\(slot)\")\n")],
         ["S9"]),
     "tap-first-kind-only": ([(
-        "app/Sources/WaveformTap.swift", "analyzer.encode(passes, frame: texture, into: buffer)",
+        # Re-pinned in hdr H-4: the tap's encode takes the frame's signal.
+        "app/Sources/WaveformTap.swift",
+        "analyzer.encode(passes, frame: texture, into: buffer, signal: signal)",
         "analyzer.encode(Set(ScopePass.ordered(passes).prefix(1)), "
-        "frame: texture, into: buffer)")], ["S7", "S8"]),
+        "frame: texture, into: buffer, signal: signal)")], ["S7", "S8"]),
     "slots-not-shrunk": ([(
         "app/Sources/ScopesPanelView.swift",
         "        let factor = total > 0 ? min(1, room / total) : 0\n",
@@ -300,9 +309,10 @@ MUTANTS = {
         "        UserDefaults.standard.set(zoom, forKey: \"RCScopeZoom\\(slot)\")\n")],
         ["S14"]),
     "render-ignores-zoom": ([(
+        # Re-pinned in hdr H-4: `writeScopes` takes the frame's signal.
         "app/Sources/AgentServer+Render.swift",
-        "scopes, vectorscopeZoom: vectorscopeZoom, of: image, beside: url)",
-        "scopes, vectorscopeZoom: 1, of: image, beside: url)")], ["S13"]),
+        "scopes, vectorscopeZoom: vectorscopeZoom, signal: signal, of: image, beside: url)",
+        "scopes, vectorscopeZoom: 1, signal: signal, of: image, beside: url)")], ["S13"]),
 }
 # A row a mutant may fail BECAUSE of it, besides the rows it must fail, each
 # with its reason.
@@ -383,6 +393,20 @@ def chroma(r, g, b):
 
 def bin_of(c):
     return min(255, max(0, 128 + half_away(255 * c)))
+
+
+# hdr H-4 (spec §11 HD-15 (e)): BT.2020's, for an HLG signal.
+LUMA2020 = (0.2627, 0.6780, 0.0593)
+LUMA709 = (0.2126, 0.7152, 0.0722)
+
+
+def chroma2020(r, g, b):
+    y = LUMA2020[0] * r + LUMA2020[1] * g + LUMA2020[2] * b
+    return (b - y) / 1.8814, (r - y) / 1.4746
+
+
+def luma_level(rgb, weights):
+    return min(255, max(0, half_away(255 * sum(w * c for w, c in zip(weights, rgb)))))
 
 
 def bins_of(r, g, b):
@@ -673,13 +697,56 @@ def score_s1(body):
           f"misses {misses[:6]}; skin line {angle}")
 
 
-T1_SCORED = ("parade", "vectorscope", "vectorscope-x2", "vectorscope-x4", "histogram")
+# S15's cards (`scopes_probe.swift`), each value exact in half float.
+S15_CARDS = {"R": (0.75, 0, 0), "G": (0, 0.75, 0), "B": (0, 0, 0.75), "Cy": (0, 0.75, 0.75),
+             "Mg": (0.75, 0, 0.75), "Yl": (0.75, 0.75, 0), "warm": (0.875, 0.25, 0.125),
+             "leaf": (0.125, 0.625, 0.375), "sky": (0.375, 0.5, 0.875)}
+S15_BARS = ("R", "G", "B", "Cy", "Mg", "Yl")
+
+
+def score_s15(body):
+    """S15 (hdr H-4): with signal .hlg the six 75 % cards land in this script's BT.2020 bin,
+    the JSON's targets agree, every card's waveform and histogram Y′ is round(255·Y′₂₀₂₀),
+    and the parade is the same at either signal. CONTROL: cards whose Rec. 709 and BT.2020
+    Y′ levels part."""
+    s15 = (body.get("data") or {}).get("S15") or {}
+    cards, levels, targets = s15.get("cards") or {}, s15.get("levels") or {}, \
+        s15.get("targets") or {}
+    misses, parted = [], 0
+    for name in S15_BARS:
+        want = [bin_of(c) for c in chroma2020(*S15_CARDS[name])]
+        got = cards.get(name) or []
+        if len(got) != 1 or got[0][:2] != want or got[0][2] != 256:
+            misses.append(f"{name}: card {got[:3]} ≠ {want}")
+        if targets.get(name) != want:
+            misses.append(f"{name}: target {targets.get(name)} ≠ {want}")
+    for name, rgb in S15_CARDS.items():
+        want = luma_level(rgb, LUMA2020)
+        parted += want != luma_level(rgb, LUMA709)
+        got = levels.get(name) or {}
+        for kind in ("waveform", "histogram"):
+            if got.get(kind) != [want]:
+                misses.append(f"{name}: {kind} Y′ {got.get(kind)} ≠ [{want}]")
+    if parted < 4:
+        misses.append(f"CONTROL: only {parted} cards' Rec. 709 and BT.2020 Y′ levels part")
+    if s15.get("parade_same") is not True:
+        misses.append(f"the parade differs across the signals ({s15.get('parade_same')})")
+    check("S15 an HLG signal: the six 75 % cards each land in ONE vectorscope bin, this script's "
+          "BT.2020 bin, the JSON's targets agree; nine cards' waveform and histogram Y′ levels "
+          "are round(255·Y′) on BT.2020's weights; the parade is the same at either signal",
+          bool(cards) and not misses,
+          f"misses {misses[:6]}; {parted} of {len(S15_CARDS)} cards part Rec. 709 from BT.2020 "
+          f"(CONTROL); skin line {s15.get('skin_line_degrees')} (recorded)")
+
+
+T1_SCORED = ("parade", "vectorscope", "vectorscope-x2", "vectorscope-x4", "histogram",
+             "vectorscope-hlg", "vectorscope-hlg-x2", "vectorscope-hlg-x4", "histogram-hlg")
 
 
 def score_t1(body):
     figures = (body.get("records") or {}).get("T1") or {}
     worst = {}
-    for scope in T1_SCORED + ("waveform", "waveform+vectorscope"):
+    for scope in T1_SCORED + ("waveform", "waveform+vectorscope", "waveform-hlg"):
         values = (figures.get("4K") or {}).get(scope) or {}
         whole = len(values) == 6
         worst[scope] = ((max(values.values()), max(values, key=values.get)) if whole else None)
@@ -692,9 +759,11 @@ def score_t1(body):
     check(f"T1 the worst 4K GPU time over GR-26's six fixtures of each scope, the vectorscope at "
           f"each zoom, is ≤ {BOUND_MS} ms (GR-10, GR-26, GR-31): parade {worst.get('parade')}, "
           f"vectorscope ×1 {worst.get('vectorscope')}, ×2 {worst.get('vectorscope-x2')}, ×4 "
-          f"{worst.get('vectorscope-x4')}, histogram {worst.get('histogram')} (recorded: "
-          f"waveform {worst.get('waveform')}, waveform + vectorscope "
-          f"{worst.get('waveform+vectorscope')})",
+          f"{worst.get('vectorscope-x4')}, histogram {worst.get('histogram')}; in HLG "
+          f"vectorscope ×1 {worst.get('vectorscope-hlg')}, ×2 {worst.get('vectorscope-hlg-x2')}, "
+          f"×4 {worst.get('vectorscope-hlg-x4')}, histogram {worst.get('histogram-hlg')} "
+          f"(recorded: waveform {worst.get('waveform')}, waveform + vectorscope "
+          f"{worst.get('waveform+vectorscope')}, HLG waveform {worst.get('waveform-hlg')})",
           all(w is not None and w[0] <= BOUND_MS for w in scored))
 
 
@@ -921,6 +990,8 @@ def run_probe(sources, package):
     answered = body.get("rows") or []
     if "S1" in selected:
         score_s1(body)
+    if "S15" in selected:
+        score_s15(body)
     if "T1" in selected:
         score_t1(body)
     if "T2" in selected:
@@ -928,7 +999,7 @@ def run_probe(sources, package):
     if "T3" in selected:
         score_t3(body)
     for name in scored:
-        if name in ("S1", "T1", "T2", "T3"):
+        if name in ("S1", "S15", "T1", "T2", "T3"):
             continue
         mine = [r for r in answered if r["name"].split()[0] == name]
         if not mine:

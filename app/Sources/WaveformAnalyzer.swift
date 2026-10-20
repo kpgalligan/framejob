@@ -22,6 +22,9 @@ struct WaveformTrace: Equatable {
     /// The analysed frame's size in pixels.
     let width: Int
     let height: Int
+    /// What the frame holds (spec §11 HD-15): an HLG trace's Y′ is on BT.2020's
+    /// weights and its JSON names its scale.
+    var signal: ScopeSignal = .sdr
 
     /// Pixels at level 255, over every column.
     var clippedHigh: Int { clipped(level: Self.levels - 1) }
@@ -59,17 +62,18 @@ struct WaveformTrace: Equatable {
     }
 
     /// What `render_frame {waveform}` writes: the counts as 256 arrays, one
-    /// per column bin, each indexed by level, and every figure the panel shows.
+    /// per column bin, each indexed by level, and every figure the panel shows;
+    /// an HLG trace adds `signal` and `scale` (HD-15 (h)).
     func json() -> [String: Any] {
         let byColumn = (0..<Self.columns).map { column in
             counts[(column * Self.levels)..<((column + 1) * Self.levels)].map { Int($0) }
         }
-        return [
+        return signal.adding(to: [
             "columns": Self.columns, "levels": Self.levels, "width": width, "height": height,
             "counts": byColumn, "clipped_high": clippedHigh, "clipped_low": clippedLow,
             "marks_high": marks(high: true), "marks_low": marks(high: false),
             "highlights": highlightsPercent, "shadows": shadowsPercent,
-        ]
+        ], scaled: true)
     }
 
     private func clipped(level: Int) -> Int {
@@ -155,10 +159,12 @@ final class WaveformAnalyzer {
     /// Encodes each of `passes` over `frame` into `buffer`, in
     /// `ScopePass.ordered` order, and answers each pass's counts buffer,
     /// readable once `buffer` has completed. A vectorscope pass takes its
-    /// zoom at `buffer(1)`.
-    func encode(_ passes: Set<ScopePass>, frame: MTLTexture, into buffer: MTLCommandBuffer)
-        -> [ScopePass: MTLBuffer]?
-    {
+    /// zoom at `buffer(1)` and `signal` at `buffer(2)`; the waveform and the
+    /// histogram take `signal` at `buffer(1)` (spec §11 HD-15 (e)).
+    func encode(
+        _ passes: Set<ScopePass>, frame: MTLTexture, into buffer: MTLCommandBuffer,
+        signal: ScopeSignal = .sdr
+    ) -> [ScopePass: MTLBuffer]? {
         guard let encoder = buffer.makeComputeCommandEncoder() else { return nil }
         var made: [ScopePass: MTLBuffer] = [:]
         for pass in ScopePass.ordered(passes) {
@@ -174,9 +180,16 @@ final class WaveformAnalyzer {
             encoder.setComputePipelineState(pipeline)
             encoder.setTexture(frame, index: 0)
             encoder.setBuffer(counts, offset: 0, index: 0)
-            if kind == .vectorscope {
+            var uniform = signal.uniform
+            switch kind {
+            case .vectorscope:
                 var zoom = UInt32(pass.zoom)
                 encoder.setBytes(&zoom, length: MemoryLayout<UInt32>.stride, index: 1)
+                encoder.setBytes(&uniform, length: MemoryLayout<UInt32>.stride, index: 2)
+            case .waveform, .histogram:
+                encoder.setBytes(&uniform, length: MemoryLayout<UInt32>.stride, index: 1)
+            case .parade:
+                break
             }
             // The parade's threadgroups are 8 px wide, so each spans at
             // most the two column bins its kernel counts per band.
@@ -206,23 +219,29 @@ final class WaveformAnalyzer {
 
     /// The trace a completed `pass` left in `counts`, for a `width` ×
     /// `height` frame; a vectorscope's carries its zoom and what it left off
-    /// the plot.
-    func trace(_ pass: ScopePass, of counts: MTLBuffer, width: Int, height: Int) -> ScopeTrace {
+    /// the plot, and every trace the `signal` it was encoded with.
+    func trace(
+        _ pass: ScopePass, of counts: MTLBuffer, width: Int, height: Int,
+        signal: ScopeSignal = .sdr
+    ) -> ScopeTrace {
         let count = Self.countsCount(pass.kind)
         let bound = counts.contents().bindMemory(to: UInt32.self, capacity: count)
         let values = Array(UnsafeBufferPointer(start: bound, count: count))
         switch pass.kind {
         case .waveform:
-            return .waveform(WaveformTrace(counts: values, width: width, height: height))
+            return .waveform(WaveformTrace(
+                counts: values, width: width, height: height, signal: signal))
         case .parade:
-            return .parade(ParadeTrace(counts: values, width: width, height: height))
+            return .parade(ParadeTrace(
+                counts: values, width: width, height: height, signal: signal))
         case .vectorscope:
             let counted = values.reduce(0) { $0 + Int($1) }
             return .vectorscope(VectorscopeTrace(
                 counts: values, width: width, height: height, zoom: pass.zoom,
-                offPlot: max(0, width * height - counted)))
+                offPlot: max(0, width * height - counted), signal: signal))
         case .histogram:
-            return .histogram(HistogramTrace(counts: values, width: width, height: height))
+            return .histogram(HistogramTrace(
+                counts: values, width: width, height: height, signal: signal))
         }
     }
 
@@ -236,9 +255,11 @@ final class WaveformAnalyzer {
     }
 
     /// `passes`' traces of `texture`, waiting for the GPU.
-    func analyze(texture: MTLTexture, passes: Set<ScopePass>) -> [ScopePass: ScopeTrace]? {
+    func analyze(texture: MTLTexture, passes: Set<ScopePass>, signal: ScopeSignal = .sdr)
+        -> [ScopePass: ScopeTrace]?
+    {
         guard let buffer = queue.makeCommandBuffer(),
-            let counts = encode(passes, frame: texture, into: buffer)
+            let counts = encode(passes, frame: texture, into: buffer, signal: signal)
         else { return nil }
         buffer.commit()
         buffer.waitUntilCompleted()
@@ -246,7 +267,8 @@ final class WaveformAnalyzer {
         var traces: [ScopePass: ScopeTrace] = [:]
         for pass in ScopePass.ordered(passes) {
             guard let buffer = counts[pass] else { continue }
-            traces[pass] = trace(pass, of: buffer, width: texture.width, height: texture.height)
+            traces[pass] = trace(
+                pass, of: buffer, width: texture.width, height: texture.height, signal: signal)
         }
         return traces
     }
@@ -270,8 +292,10 @@ final class WaveformAnalyzer {
 
     /// `passes`' traces of a rendered image: drawn into an RGBA half-float
     /// bitmap in the image's OWN colour space (no conversion, so the encoded
-    /// values are the image's), uploaded, then the kernels.
-    func analyze(image: CGImage, passes: Set<ScopePass>) -> [ScopePass: ScopeTrace]? {
+    /// values are the image's), uploaded, then the kernels at `signal`.
+    func analyze(image: CGImage, passes: Set<ScopePass>, signal: ScopeSignal = .sdr)
+        -> [ScopePass: ScopeTrace]?
+    {
         let width = image.width
         let height = image.height
         let own = image.colorSpace.flatMap { $0.model == .rgb ? $0 : nil }
@@ -294,7 +318,7 @@ final class WaveformAnalyzer {
         texture.replace(
             region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: data,
             bytesPerRow: context.bytesPerRow)
-        return analyze(texture: texture, passes: passes)
+        return analyze(texture: texture, passes: passes, signal: signal)
     }
 
     /// The waveform trace of a rendered image.

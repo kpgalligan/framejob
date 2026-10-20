@@ -230,6 +230,10 @@ design time or build time.
     HDR editor's user reads.
   - **Amends** GR-10 (its scales, weights and targets in an HLG project) and GR-31 (the
     zoom's targets and rim ticks are BT.2020's in an HLG project).
+  **Amended by HD-15** (hdr H-4): the weights are not uniforms but a 0/1 `signal` choosing
+  between two constant sets; the scopes read the SDR version while Show SDR Version is on and
+  in `render_frame {sdr_version}` and an HLG project's JPEG frame; Show Ungraded keeps the HLG
+  reading; the scale's labels, line, JSON and sentences as HD-15 lists them.
 - **HD-9 — #276 is built last, as GR-18 wrote it; in an HLG project its decode is HLG's scene
   light.** Choice 11 (taken as recommended, stated to the owner before the questions).
   - `canvas.blending`, `"encoded"` or `"linear"`, written only when `linear`; `set_canvas
@@ -473,3 +477,62 @@ design time or build time.
     remembered by the export choice or user presets.
   - **(i) Amends** HD-4 (the knee and its recomputed rows), HD-5 (the spelling), HD-7 ((g)) and
     HD-13 ((i), (j): JPEG and the non-10-bit rows now the SDR version).
+- **HD-15 — H-4's settlements: the scopes read the picture shown, the SDR version's as an SDR
+  project's, the HLG master's on BT.2020's weights, matrix and targets with a cd/m² scale.**
+  H-4's spec, recorded before its code; it settles what HD-8 left to H-4. No tool, argument, op
+  or format change.
+  - **(a) The scopes read the picture shown**, as GR-5 rules: the tap reads the frame the
+    compositor finished, and `render_frame` the frame it wrote. In an HLG project that picture is
+    the HLG signal, so the scopes read HLG.
+  - **(b) Show SDR Version, `render_frame {sdr_version}` and an HLG project's JPEG frame** read
+    the SDR version's Rec. 709 signal exactly as an SDR project's scopes do: Rec. 709's weights
+    and matrix, the 0/50/100 labels, the "Rec. 709 · encoded" caption, and JSON with no `signal`
+    or `scale` key. **Why:** the scopes measure the deliverable on screen, the HLG master is one
+    toggle away, and the tap reads the one frame the compositor finished; reading the HLG master
+    under the SDR picture would need a second composite the tap does not have.
+  - **(c) Show Ungraded** in an HLG project reads the ungraded HLG picture on the HLG scale; with
+    both switches on, the scopes read the ungraded SDR version.
+  - **(d) The signal comes from the recipe canvas** the frame was drawn with (`ScopeSignal(canvas:)`,
+    HLG iff the canvas is HLG and its `dynamic_range` is not `sdr`), so the panel follows the
+    frame, not the window's switches. PQ never reaches a scope: an export has no tap, and
+    `render_frame` has no `pq`.
+  - **(e) The kernels take a 0/1 `signal` uniform** (the waveform and histogram at `buffer(1)`,
+    the vectorscope at `buffer(2)` beside its zoom at `buffer(1)`; the parade, whose channels
+    carry no weights, none) that chooses between two compile-time constant sets: Rec. 709's
+    (today's expressions, unchanged in text) and BT.2020's (`0.2627, 0.6780, 0.0593`, Cb =
+    (B′ − Y′)/1.8814, Cr = (R′ − Y′)/1.4746). The weights themselves are not uniforms, so the
+    SDR arm stays T4-0's arithmetic (scopes_proof S12). This amends HD-8's "as uniforms".
+  - **(f) The scale.** The waveform's and parade's gutter labels at 0/25/50/75/100 % read 0, 10,
+    51, 203 and 1000 (cd/m², `ScopeSignal.hlgNits` rounded: a grey at BT.2100's 1,000 cd/m²,
+    1000·E^1.2 with E the HLG inverse OETF), right-aligned 2 pt from the well (4 pt in SDR) so
+    "1000" fits the 24 pt gutter; the 75 % line, reference white, is dashed (3 pt on, 3 pt off,
+    white α 0.45) in place of its solid line. The clip marks and readouts are unchanged: level
+    255 is 100 %, 1,000 cd/m². The slot's caption reads "HLG · cd/m²" over a waveform or parade
+    and "Rec. 2100 HLG" over a vectorscope or histogram, following the last trace shown. The
+    histogram draws no scale.
+  - **(g) The vectorscope** in an HLG project uses BT.2020's matrix and BT.2111's 75 % bars, (0.75,
+    0, 0) and so on, through it, and the skin line of the ColorChecker patch (194, 150, 130)/255
+    lifted by HD-3's lift (`InputConversions.liftSDR`), then BT.2020's matrix. Computed by
+    `python3 -I tools/proof/work/h4/h4_math.py` (scratch, gitignored; 2026-10-20, through
+    `hdr_proof.py`'s own `lift`): R Cb −0.10472 Cr 0.37500, bins (101, 224) at ×1 (Rec. 709's
+    (106, 224)); Mg 0.27028, 0.34484, (197, 216) ((202, 215)); B 0.37500, −0.03016, (224, 120)
+    ((224, 119)); Cy 0.10472, −0.37500, (155, 32) ((150, 32)); G −0.27028, −0.34484, (59, 40)
+    ((54, 41)); Yl −0.37500, 0.03016, (32, 136) ((32, 137)). At ×2 only R's Cb 75, B's Cr 113,
+    Cy's Cb 181 and Yl's Cr 143 stay on the plot, so every target is a rim tick there, as at
+    ×4. The skin line is 139.9164° (the lifted patch 0.63832, 0.57381, 0.50898); Rec. 709's
+    stays 123.2783°.
+  - **(h) The JSON and the sentences.** An HLG project's waveform, parade and histogram JSON add
+    `"signal": "hlg"` and `"scale": {"unit": "cd/m²", "ticks": [{percent, level, nits}…],
+    "reference_white_percent": 75, "clip_percent": 100}`, the ticks 0/0/0.0, 25/64/9.6,
+    50/128/50.7, 75/191/203.2 and 100/255/1000.0 (level round(255·p/100), halves away from zero;
+    nits `hlgNits` to 0.1); the vectorscope's adds `"signal": "hlg"`, `"matrix": "Rec. 2020"` and
+    (g)'s targets and skin line. The sentences: "Waveform (HLG signal; reference white at 75 %,
+    203 cd/m², and 100 % at 1,000 cd/m²): …", "Parade (HLG signal): …", "Vectorscope (Rec. 2020
+    Cb and Cr of the HLG values): …" (and "Vectorscope at ×Z (Rec. 2020 …)"), "Histogram (HLG
+    signal): … (by Y′, BT.2020 weights); …". An SDR project's, the SDR version's and a JPEG
+    frame's JSON and sentences are byte-identical to before H-4.
+  - **(i) Nothing new to call or persist:** no tool, argument, op, format or `UserDefaults` key;
+    `render_frame`'s description gains one sentence. GR-10's counting rule, the latest-wins tap,
+    the 256 levels and bins and GR-31's zoom rule are unchanged.
+  - **(j) Amends** HD-8 ((e): a signal, not weights, as the uniform; (b), (c), (f), (h)), GR-10
+    and GR-31 (as HD-8 does).

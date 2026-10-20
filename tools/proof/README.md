@@ -18710,7 +18710,14 @@ the panel's zoom in an `EditorViewController`: per slot, re-attaching its pass
 with one ask for a frame, two vectorscope passes at ×1 and ×4 delivered
 through one tap and each shown in its slot, kept across hide and show and a
 pick away and back, no `UserDefaults` key, ×1 in a new controller. T1 adds the
-vectorscope at ×2 and ×4 to its scored scopes. T3 is T2's shape for the
+vectorscope at ×2 and ×4 to its scored scopes. **hdr H-4** (spec §11 HD-15) adds S15:
+with `signal: .hlg` the six 75 % cards each in ONE bin, this script's BT.2020 bin
+(`Cb = (B′ − Y′)/1.8814`, `Cr = (R′ − Y′)/1.4746`), the HLG JSON's targets the same, nine
+colour cards' waveform and histogram Y′ at round(255·dot(rgb, BT.2020)) (CONTROL: at least
+4 cards whose Rec. 709 and BT.2020 levels part), and the parade's counts the same at either
+signal; and T1's HLG variants (`gpuMedian` takes the signal): `vectorscope-hlg` at ×1, ×2
+and ×4 and `histogram-hlg` scored with the SDR ones (≤ 1.1 ms at 4K over the six fixtures),
+`waveform-hlg` recorded. T3 is T2's shape for the
 vectorscope: the tree's ×1 pass against its one `bool central = ` line forced
 to `false`, scored on near-grey by name (the fixture the central path is for;
 since #296, whose A/B put gradient's ratio about 0.9 and 16 % behind
@@ -18772,6 +18779,11 @@ the rule). #296's run kept the path (worst fixture).
 | `same-bin-add-dropped` | the same-bin add's branch is never taken | T1 (nothing tolerated since #296: T3 scores near-grey by name and held at ratio 0.576 in the copy, run of 2026-10-17; the old slowest-fixture pick had made the flat red, about 7.2 ms in tree and twin alike, its fixture) |
 | `zoom-persisted` | a slot's zoom is written to `UserDefaults` | S14 |
 | `render-ignores-zoom` | `writeScopes` always gets zoom 1 | S13 |
+
+hdr H-4 re-pinned two anchors to their new text, the edits unchanged: `tap-first-kind-only`
+on `analyzer.encode(passes, frame: texture, into: buffer, signal: signal)` and
+`render-ignores-zoom` on `scopes, vectorscopeZoom: vectorscopeZoom, signal: signal, of:
+image, beside: url)`.
 
 S12 holds every ×1 count to the T4-0 tree's shader, so the mutants of the ×1
 counting (`cb-cr-swapped`, `bt601`, `bins-edged`, `histogram-luma-601`,
@@ -20877,3 +20889,51 @@ DE, HX; `sdr-version-preview-only` (`Exporter` publishes `options`, not
 `preview-keeps-hlg` (`previewComposition` ignores `sdrVersion`) P7. Re-pinned in H-3:
 `no-composition-color` to `OutputTransform.compositionColour`'s SDR arm (H2, H3, H1m). Its
 record: `designs/hdr.md`'s H-3 section.
+
+## Road map hdr — H-4, HDR scopes (`hdr_proof.py` SI, SW, SV, SS, SD, SP, P8 and nine mutants; `hdr_probe.swift` P8; `scopes_proof.py` S15 and T1's HLG variants; spec §11 HD-8, HD-15)
+
+H-4 (#277) makes an HLG project's scopes read the HLG signal: a 0/1 `signal` uniform in
+`Waveform.metal` choosing BT.2020's weights and matrix (`ScopeSignal`, from the recipe canvas
+the frame was drawn with, and in `render_frame` from the project and `dynamic_range`), the
+waveform's and parade's cd/m² labels and dashed 75 % reference-white line, the vectorscope's
+BT.2111 targets and lifted skin line, the captions, and the JSON's `signal`, `scale` and
+`matrix`. The SDR version's scopes (Show SDR Version, `render_frame {sdr_version}`, a JPEG)
+are an SDR project's.
+
+- **SI** holds every SDR project's scope JSON and text to a capture made on the tree before
+  H-4's code: `capture DIR --only H1,H7i,SI,Z1` writes `DIR/si/si-<scene>-<all|x4>.<kind>.json`
+  and `.txt` (the text with the run folder spelled `<work>`); every other mode compares.
+- **SW** reads the hlg and bt709 ramps' waveform, parade and histogram. The render's row 64,
+  where the chroma half begins, is off every oracle level of its column (the decoder's chroma
+  upsampling mixes the halves; SW prints the rows off the oracle, row 64 alone in H-4's runs),
+  so the oracle holds each column's levels holding more than 8 px (`SEAM_PIXELS`: a column bin
+  is 4 px wide), each pixel's envelope its codes ±1 as H-2's rows take it (the lift's toe
+  spreads a code over several levels near black), and every level is held to the PNG's own
+  pixels ±1, which also says `analyze(image:)` reads an HLG-labelled image's values as written.
+- **SV** makes `hlg_bars.mov` (kept in `tools/proof/work/hdr/media/`): geq's X on a 4:2:2
+  chroma plane is that plane's own, half the luma's, so the chroma bars switch at 80 px.
+- **SP** performs View ▸ Scopes, View ▸ Show SDR Version and View ▸ Show Ungraded, none of
+  which writes a default, each turned off again, and reads the captions
+  (`scopes.top.caption`, `scopes.bottom.caption`) and readouts from `snapshot_ui`'s editor
+  dump, polling up to 20 s for each state.
+- **P8** caches the three views in a borderless offscreen window and reads the bitmap at the
+  rep's own scale; a pixel is lit when brighter than the well's fill by more than 0.05.
+
+```sh
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py capture tools/proof/work/h4/ctl --only H1,H7i,SI,Z1   # before H-4's code
+make app-debug && python3 tools/proof/hdr_proof.py --control tools/proof/work/h4/ctl --only SI,SW,SV,SS,SD,SP,P8,Z1
+make app && RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --control tools/proof/work/h4/ctl
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py compare tools/proof/work/h4/ctl --only H1,SI,Z1
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --mutant <name> --control tools/proof/work/h4/ctl --only <its rows>,Z1
+RC_PROOF_APP=release python3 tools/proof/scopes_proof.py --only S1,S12,S15,T1,Z1
+```
+
+The nine mutants and their rows: `scope-709-in-hlg` (the shader's HLG waveform and
+vectorscope on Rec. 709's constants) SW, SV; `histogram-709-in-hlg` (the histogram's HLG Y′ on
+Rec. 709's weights) SW; `ref-line-at-100` (`referenceWhitePercent` 100) SS, P8;
+`sdr-version-read-as-hlg` (`init(output:dynamicRange:)` ignores `dynamicRange`) SD, SP;
+`tap-signal-dropped` (the compositor offers `.sdr`) SP; `render-scopes-sdr` (`renderFrame`
+passes `.sdr`) SW, SV, SS; `sdr-json-names-scale` (the SDR `jsonKeys` writes `"signal":
+"sdr"`) SI, P8; `vectorscope-view-709-targets` (`VectorscopeView` draws `targets(for: .sdr)`
+and `skinLineDegrees(for: .sdr)`) P8; `parade-graticule-sdr` (`ParadeView`'s graticule call
+drops `signal:`) P8. Its record: `designs/hdr.md`'s H-4 section.

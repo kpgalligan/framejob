@@ -28,6 +28,11 @@ import Metal
 /// without waiting for it. The destination is read-only here; holding it
 /// keeps its pool from recycling it until the pass is done.
 ///
+/// **Each frame carries its signal** (spec §11 HD-15 (d)): what the recipe
+/// canvas it was drawn with holds, HLG or SDR, so a frame of Show SDR
+/// Version is read as SDR and the HLG frame after it as HLG; a pending
+/// frame keeps its own.
+///
 /// **The main hop is a documented seam** (app/CLAUDE.md's hygiene list): the
 /// passes complete on Metal's completion thread and the traces reach the
 /// panel through one `DispatchQueue.main.async`, dropped there unless the
@@ -44,6 +49,8 @@ final class WaveformTaps {
         let onTraces: ([ScopePass: ScopeTrace]) -> Void
         var inFlight = false
         var pending: CVPixelBuffer?
+        /// The pending frame's signal.
+        var pendingSignal: ScopeSignal = .sdr
     }
 
     private let analyzer: WaveformAnalyzer?
@@ -114,8 +121,9 @@ final class WaveformTaps {
         taps.removeValue(forKey: key)
     }
 
-    /// A finished frame for `key`, from the compositor's render queue.
-    func offer(_ frame: CVPixelBuffer, key: Int) {
+    /// A finished frame for `key`, from the compositor's render queue, and
+    /// what it holds.
+    func offer(_ frame: CVPixelBuffer, key: Int, signal: ScopeSignal = .sdr) {
         lock.lock()
         guard analyzer != nil, var tap = taps[key] else {
             lock.unlock()
@@ -123,6 +131,7 @@ final class WaveformTaps {
         }
         if tap.inFlight {
             tap.pending = frame
+            tap.pendingSignal = signal
             taps[key] = tap
             lock.unlock()
             return
@@ -130,16 +139,19 @@ final class WaveformTaps {
         tap.inFlight = true
         taps[key] = tap
         lock.unlock()
-        start(frame, key: key, token: tap.token, passes: tap.passes)
+        start(frame, key: key, token: tap.token, passes: tap.passes, signal: signal)
     }
 
-    private func start(_ frame: CVPixelBuffer, key: Int, token: Int, passes: Set<ScopePass>) {
+    private func start(
+        _ frame: CVPixelBuffer, key: Int, token: Int, passes: Set<ScopePass>,
+        signal: ScopeSignal
+    ) {
         let width = CVPixelBufferGetWidth(frame)
         let height = CVPixelBufferGetHeight(frame)
         guard let analyzer, let wrapper = wrap(frame),
             let texture = CVMetalTextureGetTexture(wrapper),
             let buffer = queue?.makeCommandBuffer(),
-            let counts = analyzer.encode(passes, frame: texture, into: buffer)
+            let counts = analyzer.encode(passes, frame: texture, into: buffer, signal: signal)
         else {
             finished(key: key, token: token, traces: nil)
             return
@@ -152,7 +164,8 @@ final class WaveformTaps {
                 var read: [ScopePass: ScopeTrace] = [:]
                 for pass in ScopePass.ordered(passes) {
                     guard let buffer = counts[pass] else { continue }
-                    read[pass] = analyzer.trace(pass, of: buffer, width: width, height: height)
+                    read[pass] = analyzer.trace(
+                        pass, of: buffer, width: width, height: height, signal: signal)
                 }
                 traces = read
             }
@@ -170,11 +183,14 @@ final class WaveformTaps {
             return
         }
         let next = tap.pending
+        let nextSignal = tap.pendingSignal
         tap.pending = nil
         tap.inFlight = next != nil
         taps[key] = tap
         lock.unlock()
-        if let next { start(next, key: key, token: token, passes: tap.passes) }
+        if let next {
+            start(next, key: key, token: token, passes: tap.passes, signal: nextSignal)
+        }
         guard let traces else { return }
         DispatchQueue.main.async { [weak self] in self?.deliver(traces, key: key, token: token) }
     }

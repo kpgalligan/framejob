@@ -234,7 +234,9 @@ class Compositor: NSObject, AVVideoCompositing {
                 recipe: recipe, into: destination, request: request, instruction: instruction,
                 converts: canConformColorOfSourceFrames)
             request.finish(withComposedVideoFrame: destination)
-            WaveformTaps.shared.offer(destination, key: instruction?.recipeKey ?? 0)
+            WaveformTaps.shared.offer(
+                destination, key: instruction?.recipeKey ?? 0,
+                signal: ScopeSignal(canvas: recipe?.canvas))
         } catch {
             // A frame that will not compose is dropped: the player shows the last one.
             request.finish(with: error)

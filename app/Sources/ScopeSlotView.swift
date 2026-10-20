@@ -1,7 +1,9 @@
 import AppKit
 
 /// One slot of the scopes panel: a header with the picker at its left and
-/// the faint "Rec. 709 · encoded" caption at its right, the picked scope's
+/// the faint caption at its right — "Rec. 709 · encoded", or in an HLG
+/// project "HLG · cd/m²" or "Rec. 2100 HLG" (spec §11 HD-15 (f)), following
+/// the signal of the last trace shown — the picked scope's
 /// body, and — for the waveform and the histogram — the two clipping
 /// readouts. Its height is its kind's chrome plus `bodyHeight`, which the
 /// panel's layout rule sets. It also holds the vectorscope's zoom (spec §11
@@ -68,6 +70,9 @@ final class ScopeSlotView: NSView {
     var onZoom: ((Int) -> Void)?
     /// The pass this slot shows: its kind and, for the vectorscope, its zoom.
     var pass: ScopePass { ScopePass(kind, zoom: zoom) }
+    /// The last trace's signal, kept across a pick and a frameless show; it
+    /// sets the caption and a new body's scale.
+    private(set) var signal: ScopeSignal = .sdr
     private(set) var body: NSView = WaveformTraceView()
 
     private lazy var picker = OptionPopupControl(
@@ -100,6 +105,10 @@ final class ScopeSlotView: NSView {
 
     /// `trace` drawn in the body (nil, or another kind's, is "no frame yet").
     func show(_ trace: ScopeTrace?) {
+        if let trace {
+            signal = trace.signal
+            captionLabel.stringValue = signal.caption(for: kind)
+        }
         var readouts: (String, String)?
         switch (trace, body) {
         case (.waveform(let t)?, let view as WaveformTraceView):
@@ -172,10 +181,17 @@ final class ScopeSlotView: NSView {
         NSLayoutConstraint.deactivate(bodyConstraints)
         body.removeFromSuperview()
         switch kind {
-        case .waveform: body = WaveformTraceView()
-        case .parade: body = ParadeView()
+        case .waveform:
+            let waveform = WaveformTraceView()
+            waveform.signal = signal
+            body = waveform
+        case .parade:
+            let parade = ParadeView()
+            parade.signal = signal
+            body = parade
         case .vectorscope:
             let vectorscope = VectorscopeView()
+            vectorscope.signal = signal
             vectorscope.zoom = zoom
             vectorscope.onZoom = { [weak self] zoom in self?.onZoom?(zoom) }
             vectorscope.cells.setAccessibilityIdentifier("scopes.\(name).zoom")
@@ -204,6 +220,7 @@ final class ScopeSlotView: NSView {
         NSLayoutConstraint.activate(bodyConstraints)
         highlights.isHidden = !Self.hasReadouts(kind)
         shadows.isHidden = !Self.hasReadouts(kind)
+        captionLabel.stringValue = signal.caption(for: kind)
         show(nil)
         picker.refresh()
         applyHeights()

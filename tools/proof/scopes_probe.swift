@@ -17,7 +17,9 @@
 // against) and `package`, a project the proof saved over MCP. One JSON object
 // out: `rows` (S2–S14, each a name, ok and detail, the name starting with its
 // row id), `data` (S1's bins, which the proof scores against its own BT.709
-// arithmetic) and `records` (T1's GPU times, which the proof scores against
+// arithmetic, and hdr H-4's S15, an HLG signal's cards, levels and parade,
+// against its BT.2020 arithmetic) and `records` (T1's GPU times, SDR and HLG
+// variants, which the proof scores against
 // GR-10's bound; T2's banded and forced-global parade times and T3's tree and
 // forced-global vectorscope times, which it scores as ratios). With
 // `central_ab` (`--central-ab`, #296) it runs only that A/B and answers
@@ -320,6 +322,50 @@ do {
     data["S1"] = [
         "cards": bins, "targets": json["targets"] ?? [:],
         "skin_line_degrees": VectorscopeTrace.skinLineDegrees,
+    ]
+}
+
+// MARK: - S15 an HLG signal's cards (scored by the proof; hdr H-4, spec §11 HD-15)
+
+do {
+    let cards: [(String, (Float, Float, Float))] = [
+        ("R", (0.75, 0, 0)), ("G", (0, 0.75, 0)), ("B", (0, 0, 0.75)),
+        ("Cy", (0, 0.75, 0.75)), ("Mg", (0.75, 0, 0.75)), ("Yl", (0.75, 0.75, 0)),
+        ("warm", (0.875, 0.25, 0.125)), ("leaf", (0.125, 0.625, 0.375)),
+        ("sky", (0.375, 0.5, 0.875)),
+    ]
+    var bins: [String: Any] = [:]
+    var levels: [String: Any] = [:]
+    var paradeSame = true
+    let all: Set<ScopePass> = Set(ScopeKind.allCases.map { ScopePass($0) })
+    for (name, rgb) in cards {
+        let made = texture(16, 16) { _, _ in rgb }
+        let hlg = made.flatMap { analyzer.analyze(texture: $0, passes: all, signal: .hlg) }
+        let sdr = made.flatMap { analyzer.analyze(texture: $0, passes: all) }
+        let byKind = hlg.map(WaveformAnalyzer.byKind)
+        bins[name] = occupied(vectorscope(byKind))
+        let wave = waveform(byKind).map { trace in
+            (0..<WaveformTrace.levels).filter { level in
+                (0..<WaveformTrace.columns).contains {
+                    trace.counts[$0 * WaveformTrace.levels + level] > 0
+                }
+            }
+        } ?? []
+        let luma = histogram(byKind).map { trace in
+            trace.plane(3).enumerated().filter { $0.element > 0 }.map(\.offset)
+        } ?? []
+        levels[name] = ["waveform": wave, "histogram": luma]
+        let tree = parade(byKind)?.counts
+        let plain = parade(sdr.map(WaveformAnalyzer.byKind))?.counts
+        paradeSame = paradeSame && tree != nil && tree == plain
+    }
+    let json = VectorscopeTrace(
+        counts: [UInt32](repeating: 0, count: 65536), width: 1, height: 1, signal: .hlg
+    ).json()
+    data["S15"] = [
+        "cards": bins, "levels": levels, "parade_same": paradeSame,
+        "targets": json["targets"] ?? [:],
+        "skin_line_degrees": VectorscopeTrace.skinLineDegrees(for: .hlg),
     ]
 }
 
@@ -814,12 +860,12 @@ do {
 /// time doubles.
 func gpuMedian(
     _ analyzer: WaveformAnalyzer, _ passes: Set<ScopePass>, _ frame: MTLTexture,
-    _ queue: MTLCommandQueue
+    _ queue: MTLCommandQueue, signal: ScopeSignal = .sdr
 ) -> Double? {
     var burst: [MTLCommandBuffer] = []
     for _ in 0..<16 {
         guard let buffer = queue.makeCommandBuffer(),
-            analyzer.encode(passes, frame: frame, into: buffer) != nil
+            analyzer.encode(passes, frame: frame, into: buffer, signal: signal) != nil
         else { continue }
         buffer.commit()
         burst.append(buffer)
@@ -828,7 +874,7 @@ func gpuMedian(
     var times: [Double] = []
     for _ in 0..<12 {
         guard let buffer = queue.makeCommandBuffer(),
-            analyzer.encode(passes, frame: frame, into: buffer) != nil
+            analyzer.encode(passes, frame: frame, into: buffer, signal: signal) != nil
         else { continue }
         buffer.commit()
         buffer.waitUntilCompleted()
@@ -841,12 +887,18 @@ func gpuMedian(
 do {
     var cache: CVMetalTextureCache?
     CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cache)
-    let variants: [(String, Set<ScopePass>)] = [
-        ("parade", [ScopePass(.parade)]), ("vectorscope", [ScopePass(.vectorscope)]),
-        ("vectorscope-x2", [ScopePass(.vectorscope, zoom: 2)]),
-        ("vectorscope-x4", [ScopePass(.vectorscope, zoom: 4)]),
-        ("histogram", [ScopePass(.histogram)]), ("waveform", [ScopePass(.waveform)]),
-        ("waveform+vectorscope", [ScopePass(.waveform), ScopePass(.vectorscope)]),
+    // hdr H-4 (spec §11 HD-15): the HLG signal's variants beside the SDR ones.
+    let variants: [(String, Set<ScopePass>, ScopeSignal)] = [
+        ("parade", [ScopePass(.parade)], .sdr), ("vectorscope", [ScopePass(.vectorscope)], .sdr),
+        ("vectorscope-x2", [ScopePass(.vectorscope, zoom: 2)], .sdr),
+        ("vectorscope-x4", [ScopePass(.vectorscope, zoom: 4)], .sdr),
+        ("histogram", [ScopePass(.histogram)], .sdr), ("waveform", [ScopePass(.waveform)], .sdr),
+        ("waveform+vectorscope", [ScopePass(.waveform), ScopePass(.vectorscope)], .sdr),
+        ("waveform-hlg", [ScopePass(.waveform)], .hlg),
+        ("vectorscope-hlg", [ScopePass(.vectorscope)], .hlg),
+        ("vectorscope-hlg-x2", [ScopePass(.vectorscope, zoom: 2)], .hlg),
+        ("vectorscope-hlg-x4", [ScopePass(.vectorscope, zoom: 4)], .hlg),
+        ("histogram-hlg", [ScopePass(.histogram)], .hlg),
     ]
     var figures: [String: Any] = ["gpu": device.name]
     if let cache, let queue = device.makeCommandQueue() {
@@ -859,8 +911,8 @@ do {
                     kCFAllocatorDefault, cache, frame, nil, .rgba16Float, width, height, 0,
                     &wrapper)
                 guard let wrapper, let made = CVMetalTextureGetTexture(wrapper) else { continue }
-                for (variant, passes) in variants {
-                    if let median = gpuMedian(analyzer, passes, made, queue) {
+                for (variant, passes, signal) in variants {
+                    if let median = gpuMedian(analyzer, passes, made, queue, signal: signal) {
                         bySize[variant, default: [:]][name] = median
                     }
                 }

@@ -1,7 +1,9 @@
 // Built by tools/proof/hdr_proof.py as `main.swift` over every other file in
-// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P7
+// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P8
 // (grading-3 T3-1, spec §11 GR-15 as amended; P5 hdr H-1, spec §11 HD-12; P6
-// hdr H-2, spec §11 HD-3, HD-13; P7 hdr H-3, spec §11 HD-14).
+// hdr H-2, spec §11 HD-3, HD-13; P7 hdr H-3, spec §11 HD-14; P8 hdr H-4, spec
+// §11 HD-15: `ScopeSignal`, the traces' JSON, and the waveform's, parade's
+// and vectorscope's drawing cached to bitmaps).
 //
 // Step 0's maths through the app's own types: `InputConversion`'s selector
 // through BOTH readers (the labels as strings, and a `CMVideoFormatDescription`
@@ -16,6 +18,7 @@
 // One JSON object out: `rows`, each a name, ok and detail, the name starting
 // with its P-number.
 import AVFoundation
+import AppKit
 import CoreMedia
 import Metal
 import simd
@@ -677,6 +680,331 @@ do {
             + "OutputUniforms 16 bytes, sdrKnee 0.9, uniforms(for:) only for HLG + sdr/pq, the two "
             + "HDR10 blobs, RecipeOptions.json / delivering / forFrame",
         misses.isEmpty, misses.isEmpty ? "as wanted" : misses.joined(separator: "; "))
+}
+
+// MARK: - P8 the scopes' signal (hdr H-4, spec §11 HD-15)
+
+/// `view` drawn by `cacheDisplay` inside a borderless offscreen window (the
+/// panel's own paint path), or nil.
+func cached(_ view: NSView) -> NSBitmapImageRep? {
+    let window = NSWindow(
+        contentRect: view.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+    let holder = NSView(frame: NSRect(origin: .zero, size: view.frame.size))
+    window.contentView = holder
+    view.frame.origin = .zero
+    holder.addSubview(view)
+    view.layoutSubtreeIfNeeded()
+    guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
+    view.cacheDisplay(in: view.bounds, to: rep)
+    return rep
+}
+
+/// A cached view's pixels addressed in the view's points (origin bottom-left):
+/// points map to pixels by the rep's `pixelsWide / bounds.width`.
+struct Pixels {
+    let rep: NSBitmapImageRep
+    let bounds: NSRect
+    var scale: CGFloat { CGFloat(rep.pixelsWide) / bounds.width }
+    /// The brightest channel of pixel (`px`, `py`), `py` from the top, 0…1.
+    func at(_ px: Int, _ py: Int) -> Double {
+        guard px >= 0, py >= 0, px < rep.pixelsWide, py < rep.pixelsHigh,
+            let color = rep.colorAt(x: px, y: py)?.usingColorSpace(.sRGB)
+        else { return 0 }
+        return Double(max(color.redComponent, color.greenComponent, color.blueComponent))
+    }
+    /// The pixel holding point (`x`, `y`).
+    func pixel(_ x: CGFloat, _ y: CGFloat) -> (Int, Int) {
+        (Int((x * scale).rounded(.down)), Int(((bounds.height - y) * scale).rounded(.down)))
+    }
+    func value(_ x: CGFloat, _ y: CGFloat) -> Double {
+        let (px, py) = pixel(x, y)
+        return at(px, py)
+    }
+    /// Whether any pixel within ±`slack` px of point (`x`, `y`) is brighter
+    /// than `fill` by more than 0.05.
+    func lit(_ x: CGFloat, _ y: CGFloat, above fill: Double, slack: Int = 1) -> Bool {
+        let (px, py) = pixel(x, y)
+        for dx in -slack...slack {
+            for dy in -slack...slack where at(px + dx, py + dy) > fill + 0.05 {
+                return true
+            }
+        }
+        return false
+    }
+    /// The pixel rows (from the top) of `well` whose run across the well is
+    /// dashed: lit between 30 and 70 % of it, with at least 8 lit-to-unlit
+    /// changes. A solid line is lit across, an empty row nowhere.
+    func dashedRows(_ well: NSRect, above fill: Double) -> [Int] {
+        let first = Int(((bounds.height - well.maxY) * scale).rounded(.down))
+        let last = Int(((bounds.height - well.minY) * scale).rounded(.up)) - 1
+        let left = Int((well.minX * scale).rounded(.up)) + 1
+        let right = Int((well.maxX * scale).rounded(.down)) - 2
+        guard right > left else { return [] }
+        return (max(first, 0)...max(first, last)).filter { py in
+            var lit = 0
+            var changes = 0
+            var was = false
+            for px in left...right {
+                let now = at(px, py) > fill + 0.05
+                if now { lit += 1 }
+                if was && !now { changes += 1 }
+                was = now
+            }
+            let share = Double(lit) / Double(right - left + 1)
+            return share >= 0.3 && share <= 0.7 && changes >= 8
+        }
+    }
+    /// The pixel rows (from the top) of a 1 pt line at `row` points.
+    func rows(ofLineAt row: CGFloat) -> [Int] {
+        let top = Int(((bounds.height - row - 1) * scale).rounded(.down))
+        let bottom = Int(((bounds.height - row) * scale).rounded(.down))
+        return Array(top..<max(top + 1, bottom))
+    }
+}
+
+do {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.prohibited)
+    var misses: [String] = []
+    var notes: [String] = []
+    // ScopeSignal's table.
+    let table: [(CanvasOutput, DynamicRange?, ScopeSignal)] = [
+        (.sdr, nil, .sdr), (.sdr, .sdr, .sdr), (.sdr, .pq, .sdr), (.sdr, .hlg, .sdr),
+        (.hlg, nil, .hlg), (.hlg, .hlg, .hlg), (.hlg, .pq, .hlg), (.hlg, .sdr, .sdr),
+    ]
+    for (output, range, want) in table {
+        let got = ScopeSignal(output: output, dynamicRange: range)
+        let canvas = ScopeSignal(canvas: RecipeCanvas(output: output, dynamicRange: range))
+        if got != want || canvas != want {
+            misses.append("(\(output), \(range?.rawValue ?? "nil")) → \(got), canvas \(canvas)")
+        }
+    }
+    if ScopeSignal(canvas: nil) != .sdr { misses.append("canvas nil is not sdr") }
+    if ScopeSignal.sdr.uniform != 0 || ScopeSignal.hlg.uniform != 1 {
+        misses.append("uniforms \(ScopeSignal.sdr.uniform), \(ScopeSignal.hlg.uniform)")
+    }
+    if ScopeSignal.sdr.matrixName != "Rec. 709" || ScopeSignal.hlg.matrixName != "Rec. 2020" {
+        misses.append("matrix names")
+    }
+    // The ticks, labels and captions.
+    let sdrLabels = ScopeSignal.sdr.graticule.map { "\($0.percent):\($0.label ?? "-")" }
+    let hlgLabels = ScopeSignal.hlg.graticule.map { "\($0.percent):\($0.label ?? "-")" }
+    if sdrLabels != ["0:0", "25:-", "50:50", "75:-", "100:100"] {
+        misses.append("SDR labels \(sdrLabels)")
+    }
+    if hlgLabels != ["0:0", "25:10", "50:51", "75:203", "100:1000"] {
+        misses.append("HLG labels \(hlgLabels)")
+    }
+    if ScopeSignal.sdr.referenceWhitePercent != nil || ScopeSignal.hlg.referenceWhitePercent != 75 {
+        misses.append("reference white \(String(describing: ScopeSignal.hlg.referenceWhitePercent))")
+    }
+    let wantTicks: [[Double]] = [[0, 0, 0], [25, 64, 9.6], [50, 128, 50.7], [75, 191, 203.2],
+                                 [100, 255, 1000]]
+    let scale = ScopeSignal.hlg.scaleJSON ?? [:]
+    let ticks = (scale["ticks"] as? [[String: Any]] ?? []).map { tick -> [Double] in
+        ["percent", "level", "nits"].map { (tick[$0] as? NSNumber)?.doubleValue ?? -1 }
+    }
+    if ticks != wantTicks || scale["unit"] as? String != "cd/m²"
+        || scale["reference_white_percent"] as? Int != 75 || scale["clip_percent"] as? Int != 100
+        || ScopeSignal.sdr.scaleJSON != nil
+    {
+        misses.append("scale \(scale)")
+    }
+    for kind in ScopeKind.allCases {
+        let hlg = kind == .waveform || kind == .parade ? "HLG · cd/m²" : "Rec. 2100 HLG"
+        if ScopeSignal.sdr.caption(for: kind) != "Rec. 709 · encoded"
+            || ScopeSignal.hlg.caption(for: kind) != hlg
+        {
+            misses.append("caption \(kind)")
+        }
+    }
+    // The targets.
+    let sdrTargets = VectorscopeTrace.targets(for: .sdr)
+    if sdrTargets.count != 6 || zip(sdrTargets, VectorscopeTrace.targets).contains(where: {
+        $0.name != $1.name || $0.cb.bitPattern != $1.cb.bitPattern
+            || $0.cr.bitPattern != $1.cr.bitPattern
+    }) {
+        misses.append("targets(for: .sdr) ≠ targets")
+    }
+    if VectorscopeTrace.skinLineDegrees(for: .sdr).bitPattern
+        != VectorscopeTrace.skinLineDegrees.bitPattern
+    {
+        misses.append("skinLineDegrees(for: .sdr) ≠ skinLineDegrees")
+    }
+    let bars: [String: (Double, Double, Double)] = [
+        "R": (0.75, 0, 0), "Mg": (0.75, 0, 0.75), "B": (0, 0, 0.75), "Cy": (0, 0.75, 0.75),
+        "G": (0, 0.75, 0), "Yl": (0.75, 0.75, 0),
+    ]
+    for target in VectorscopeTrace.targets(for: .hlg) {
+        guard let (r, g, b) = bars[target.name] else {
+            misses.append("target \(target.name)")
+            continue
+        }
+        let y = 0.2627 * r + 0.6780 * g + 0.0593 * b
+        if abs(target.cb - (b - y) / 1.8814) > 1e-12 || abs(target.cr - (r - y) / 1.4746) > 1e-12 {
+            misses.append("HLG target \(target.name) \(target.cb), \(target.cr)")
+        }
+    }
+    // The JSON: no `signal` or `scale` in SDR; both in HLG.
+    let zeros = [UInt32](repeating: 0, count: 65536)
+    func traces(_ signal: ScopeSignal) -> [ScopeTrace] {
+        [
+            .waveform(WaveformTrace(counts: zeros, width: 1, height: 1, signal: signal)),
+            .parade(ParadeTrace(
+                counts: [UInt32](repeating: 0, count: 3 * 65536), width: 1, height: 1,
+                signal: signal)),
+            .vectorscope(VectorscopeTrace(counts: zeros, width: 1, height: 1, signal: signal)),
+            .histogram(HistogramTrace(
+                counts: [UInt32](repeating: 0, count: 1024), width: 1, height: 1, signal: signal)),
+        ]
+    }
+    for trace in traces(.sdr) {
+        let json = trace.json()
+        if json["signal"] != nil || json["scale"] != nil { misses.append("SDR \(trace.kind) keys") }
+    }
+    for trace in traces(.hlg) {
+        let json = trace.json()
+        let scaled = trace.kind != .vectorscope
+        if json["signal"] as? String != "hlg" || (json["scale"] != nil) != scaled
+            || (trace.kind == .vectorscope && json["matrix"] as? String != "Rec. 2020")
+        {
+            misses.append("HLG \(trace.kind) keys \(json.keys.sorted())")
+        }
+    }
+    // The waveform's and the parade's dashed reference-white row.
+    func wellFill(_ pixels: Pixels, _ well: NSRect) -> Double {
+        pixels.value(well.midX, well.minY + well.height * 0.125)
+    }
+    func dashCheck(_ name: String, _ pixels: Pixels, _ wells: [NSRect], _ signal: ScopeSignal) {
+        for (index, well) in wells.enumerated() {
+            let fill = wellFill(pixels, well)
+            let dashed = pixels.dashedRows(well, above: fill)
+            let y = well.minY + well.height * 0.75
+            let want = Set(pixels.rows(ofLineAt: min(y, well.maxY - 1)))
+            notes.append("\(name) \(signal) well \(index): dashed rows \(dashed), 75 % at \(want.sorted())")
+            if signal == .hlg ? (dashed.isEmpty || !Set(dashed).isSubset(of: want)
+                || !want.isSubset(of: Set(dashed))) : !dashed.isEmpty
+            {
+                misses.append("\(name) \(signal) well \(index): dashed rows \(dashed), want \(signal == .hlg ? want.sorted() : [])")
+            }
+        }
+    }
+    for signal in [ScopeSignal.hlg, .sdr] {
+        let waveform = WaveformTraceView(frame: NSRect(x: 0, y: 0, width: 248, height: 200))
+        waveform.trace = WaveformTrace(counts: zeros, width: 1, height: 1, signal: signal)
+        if let rep = cached(waveform) {
+            let pixels = Pixels(rep: rep, bounds: waveform.bounds)
+            let well = NSRect(
+                x: WaveformTraceView.gutter, y: 0, width: 248 - WaveformTraceView.gutter,
+                height: 200)
+            dashCheck("waveform", pixels, [well], signal)
+        } else {
+            misses.append("the waveform view did not cache")
+        }
+        let parade = ParadeView(frame: NSRect(x: 0, y: 0, width: 600, height: 200))
+        parade.trace = ParadeTrace(
+            counts: [UInt32](repeating: 0, count: 3 * 65536), width: 1, height: 1, signal: signal)
+        if let rep = cached(parade) {
+            dashCheck("parade", Pixels(rep: rep, bounds: parade.bounds), parade.wells(), signal)
+        } else {
+            misses.append("the parade view did not cache")
+        }
+    }
+    // The vectorscope's boxes and skin line, at ×1 and ×2.
+    var parted = 0
+    for zoom in [1, 2] {
+        var bitmaps: [ScopeSignal: Pixels] = [:]
+        var views: [ScopeSignal: VectorscopeView] = [:]
+        for signal in [ScopeSignal.hlg, .sdr] {
+            let view = VectorscopeView()
+            view.frame = NSRect(x: 0, y: 0, width: 512, height: 512)
+            view.zoom = zoom
+            view.trace = VectorscopeTrace(
+                counts: zeros, width: 1, height: 1, zoom: zoom, signal: signal)
+            guard let rep = cached(view) else {
+                misses.append("the vectorscope view did not cache at ×\(zoom)")
+                continue
+            }
+            bitmaps[signal] = Pixels(rep: rep, bounds: view.bounds)
+            views[signal] = view
+        }
+        guard let hlgPixels = bitmaps[.hlg], let sdrPixels = bitmaps[.sdr],
+            let hlgView = views[.hlg], let sdrView = views[.sdr]
+        else { continue }
+        let fill = hlgPixels.value(3, 3)
+        func corners(_ at: NSPoint) -> [NSPoint] {
+            let half = VectorscopeView.targetBox / 2
+            return [(-1, -1), (-1, 1), (1, -1), (1, 1)].map {
+                NSPoint(x: at.x + CGFloat($0.0) * half, y: at.y + CGFloat($0.1) * half)
+            }
+        }
+        for (signal, pixels, view) in [(ScopeSignal.hlg, hlgPixels, hlgView),
+                                       (.sdr, sdrPixels, sdrView)] {
+            var boxes = 0
+            for target in VectorscopeTrace.targets(for: signal) {
+                guard let bins = VectorscopeTrace.targetBins(
+                    cb: target.cb, cr: target.cr, zoom: zoom)
+                else { continue }
+                boxes += 1
+                let at = view.point(cb: bins.cb, cr: bins.cr)
+                let dark = corners(at).filter { !pixels.lit($0.x, $0.y, above: fill) }
+                if !dark.isEmpty {
+                    misses.append("×\(zoom) \(signal) \(target.name): corners unlit \(dark)")
+                }
+            }
+            let angle = VectorscopeTrace.skinLineDegrees(for: signal) * .pi / 180
+            let centre = view.point(cb: VectorscopeTrace.centre, cr: VectorscopeTrace.centre)
+            let reach = 0.9 * view.bounds.width / 2
+            let ray = NSPoint(
+                x: centre.x + reach * CGFloat(cos(angle)), y: centre.y + reach * CGFloat(sin(angle)))
+            if !pixels.lit(ray.x, ray.y, above: fill) {
+                misses.append("×\(zoom) \(signal): the skin line is unlit at 0.9 of the reach")
+            }
+            notes.append("×\(zoom) \(signal): \(boxes) boxes on the plot")
+        }
+        guard zoom == 1 else { continue }
+        let hlgTargets = VectorscopeTrace.targets(for: .hlg)
+        let sdrTargets = VectorscopeTrace.targets(for: .sdr)
+        for (h, s) in zip(hlgTargets, sdrTargets) {
+            guard let hb = VectorscopeTrace.targetBins(cb: h.cb, cr: h.cr, zoom: 1),
+                let sb = VectorscopeTrace.targetBins(cb: s.cb, cr: s.cr, zoom: 1)
+            else { continue }
+            let hp = hlgView.point(cb: hb.cb, cr: hb.cr)
+            let sp = sdrView.point(cb: sb.cb, cr: sb.cr)
+            guard hypot(hp.x - sp.x, hp.y - sp.y) >= 4 else { continue }
+            parted += 1
+            let boxed = corners(hp).filter { sdrPixels.lit($0.x, $0.y, above: fill, slack: 0) }
+            if !boxed.isEmpty {
+                misses.append("CONTROL \(h.name): the SDR bitmap has a lit corner of the HLG box \(boxed)")
+            }
+        }
+        // The two skin rays.
+        func ray(_ signal: ScopeSignal) -> NSPoint {
+            let angle = VectorscopeTrace.skinLineDegrees(for: signal) * .pi / 180
+            let centre = hlgView.point(cb: VectorscopeTrace.centre, cr: VectorscopeTrace.centre)
+            let reach = 0.9 * hlgView.bounds.width / 2
+            return NSPoint(
+                x: centre.x + reach * CGFloat(cos(angle)), y: centre.y + reach * CGFloat(sin(angle)))
+        }
+        let (a, b) = (ray(.hlg), ray(.sdr))
+        let apart = hypot(a.x - b.x, a.y - b.y) * hlgPixels.scale
+        notes.append("the skin rays part by \(String(format: "%.1f", apart)) px at 0.9 of the reach")
+        if apart >= 3, sdrPixels.lit(a.x, a.y, above: fill, slack: 0) {
+            misses.append("CONTROL: the SDR bitmap is lit on the HLG skin ray")
+        }
+    }
+    if parted < 4 {
+        misses.append("CONTROL: only \(parted) targets' HLG and SDR boxes part by ≥ 4 pt at ×1")
+    }
+    check(
+        "P8 ScopeSignal's table, ticks, labels and captions; targets(for: .sdr) bit-equal to "
+            + "targets, targets(for: .hlg) BT.2020's; SDR JSON with no signal/scale, HLG with "
+            + "both; the waveform's and each parade well's dashed row at 75 % in HLG only; the "
+            + "vectorscope's boxes and skin line at ×1 and ×2 for its trace's signal (CONTROL: "
+            + "\(parted) targets part HLG from SDR by ≥ 4 pt)",
+        misses.isEmpty,
+        (misses.isEmpty ? "as wanted" : misses.joined(separator: "; ")) + " | "
+            + notes.joined(separator: "; "))
 }
 
 finish()

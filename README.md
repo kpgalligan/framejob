@@ -283,8 +283,10 @@ schema, §6 the op table, §7 the architecture.
   parade, a Rec. 709 vectorscope with its colour-bar targets and skin line
   (its 1× 2× 4× cells zoom in on a near-grey picture, counted at the zoom),
   or an RGB-and-luma histogram; it opens as Waveform over Vectorscope and
-  shrinks both to fit a short window. Neither is remembered: a window opens
-  with both off.
+  shrinks both to fit a short window. In an HDR (HLG) project the scopes read
+  the HLG signal, with a cd/m² scale (0, 10, 51, 203, 1000) and a dashed line
+  at reference white, and a Rec. 2020 vectorscope. Neither is remembered: a
+  window opens with both off.
 - **Colour wheels**. The Color tab's **Wheels** section has three wheels —
   **Lift** (the shadows), **Gamma** (the middle) and **Gain** (the
   highlights) — each a hue disc whose puck pushes that range toward a colour
@@ -373,7 +375,10 @@ schema, §6 the op table, §7 the architecture.
   what H.264, HEVC, HEVC with alpha, GIF, APNG and JPEG write: the HDR master
   brought back to Rec. 709 so a white title stays white and only the
   highlights above reference white are rolled off. **View ▸ Show SDR Version**
-  shows it in the preview, with a tag in the corner.
+  shows it in the preview, with a tag in the corner. View ▸ Scopes reads the
+  HLG master in cd/m² — titles on the dashed 75 % reference-white line,
+  highlights above it — on BT.2020's luma and vectorscope, and the SDR version
+  as an SDR project's while Show SDR Version is on.
 - **Output.** **File ▸ Save Frame…** (⌥⌘E) writes the frame under the
   playhead as a PNG, JPEG or HEIC still — the same writer `render_frame`
   uses, so a still saved from the menu and one an agent asked for are the

@@ -22,6 +22,15 @@ final class ParadeView: NSView {
             marks = channels.map { channel in
                 channel.map { ($0.marks(high: true), $0.marks(high: false)) } ?? ([], [])
             }
+            if let trace { signal = trace.signal }
+            needsDisplay = true
+        }
+    }
+    /// The scale drawn (spec §11 HD-15 (f)): the last trace's signal, kept
+    /// while there is none.
+    var signal: ScopeSignal = .sdr {
+        didSet {
+            guard signal != oldValue else { return }
             needsDisplay = true
         }
     }
@@ -43,7 +52,7 @@ final class ParadeView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         for (index, well) in wells().enumerated() {
             ScopeWell.fill(well, image: images[index])
-            ScopeWell.graticule(well, labelsIn: index == 0 ? bounds : nil)
+            ScopeWell.graticule(well, labelsIn: index == 0 ? bounds : nil, signal: signal)
             ScopeWell.marks(high: marks[index].high, low: marks[index].low, in: well)
         }
     }

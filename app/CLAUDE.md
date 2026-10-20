@@ -1220,19 +1220,27 @@ the key map behind it.
   `ProjectSnapshot.swift`; the canvas hit-tests through `CanvasLayerBox`.
 - `WaveformAnalyzer.swift` (the four scopes' GPU passes over
   `Resources/Shaders/Waveform.metal`: waveform, parade, vectorscope, histogram;
-  `WaveformTrace`; pass-keyed, the kind-keyed forms ×1 wrappers) ·
+  `WaveformTrace`; pass-keyed, the kind-keyed forms ×1 wrappers; each pass
+  takes the frame's `ScopeSignal`, the kernels' 0/1 `signal` uniform) ·
+  `ScopeSignal.swift` (`sdr` or `hlg`: what a scope's frame holds, from the
+  recipe canvas it was drawn with — an HLG project's SDR version is `sdr`;
+  it picks the kernels' constants, the JSON's keys, the panel's scale,
+  captions and targets, and adds nothing to an SDR trace, spec §11 HD-8,
+  HD-15) ·
   `ScopeTraces.swift` (`ScopeKind`, `ScopePass` — a kind and, for the
   vectorscope, its zoom, spec §11 GR-31 — `ParadeTrace`, `VectorscopeTrace`
   with its zoom and off-plot count, `HistogramTrace`, `ScopeTrace`, their
-  JSON; spec §11 GR-10) · `WaveformTap.swift` (`WaveformTaps`:
-  `Compositor.serve` offers each composed frame by recipe key; one command
+  JSON, each with its `signal`; spec §11 GR-10) · `WaveformTap.swift` (`WaveformTaps`:
+  `Compositor.serve` offers each composed frame by recipe key, with its
+  signal; one command
   buffer per frame for the shown passes, not kinds, so two vectorscope zooms
   are two passes; one pass in flight per key and one pending slot the newest
   frame replaces) · `ScopesPanelView.swift` (View ▸ Scopes' panel: two slots
   with pickers, the shrink-to-fit layout and its 360 pt floor,
   `zoom(_:slot:)`, `UngradedTagView`, `SelectionTagView`, `SDRVersionTagView`) ·
-  `ScopeSlotView.swift` (a slot: the picker, the caption, the body and its
-  readouts, and the vectorscope's zoom, kept across a pick away and back) ·
+  `ScopeSlotView.swift` (a slot: the picker, the caption — it follows the
+  trace's signal — the body and its readouts, and the vectorscope's zoom,
+  kept across a pick away and back) ·
   `WaveformTraceView.swift` · `ParadeView.swift` · `VectorscopeView.swift`
   (its rim ticks, and `VectorscopeZoomCells`, the "1× 2× 4×" cells) ·
   `HistogramView.swift` (the slot bodies) ·

@@ -6,7 +6,9 @@ import AppKit
 /// lines at 0/25/50/75/100 % labelled 0, 50 and 100 in a gutter to the left,
 /// and the red clip marks on the well's top edge (high) and bottom edge
 /// (low). The parade (`ParadeView`) draws each of its three wells the same
-/// way through `ScopeWell`.
+/// way through `ScopeWell`. An HLG trace's scale (spec §11 HD-15 (f)) labels
+/// every line in cd/m² (0, 10, 51, 203, 1000) and dashes the 75 % line,
+/// reference white.
 final class WaveformTraceView: NSView {
     static let gutter: CGFloat = 24
     static let markHeight: CGFloat = 3
@@ -18,6 +20,14 @@ final class WaveformTraceView: NSView {
         didSet {
             guard trace != oldValue else { return }
             image = trace.flatMap(Self.density)
+            if let trace { signal = trace.signal }
+            needsDisplay = true
+        }
+    }
+    /// The scale drawn: the last trace's signal, kept while there is none.
+    var signal: ScopeSignal = .sdr {
+        didSet {
+            guard signal != oldValue else { return }
             needsDisplay = true
         }
     }
@@ -28,7 +38,7 @@ final class WaveformTraceView: NSView {
             x: Self.gutter, y: 0, width: max(0, bounds.width - Self.gutter),
             height: bounds.height)
         ScopeWell.fill(well, image: image)
-        ScopeWell.graticule(well, labelsIn: bounds)
+        ScopeWell.graticule(well, labelsIn: bounds, signal: signal)
         guard let trace else { return }
         ScopeWell.marks(trace, in: well)
     }
@@ -55,21 +65,36 @@ enum ScopeWell {
         }
     }
 
-    /// Lines at 0/25/50/75/100 % across `well`; with `labelsIn`, 0, 50 and
-    /// 100 drawn in the gutter left of the well (in `labelsIn`'s height).
-    static func graticule(_ well: NSRect, labelsIn bounds: NSRect?) {
-        let labels = [0: "0", 50: "50", 100: "100"]
-        for percent in stride(from: 0, through: 100, by: 25) {
+    /// The reference-white line's dash, on and off (HD-15 (f)), and its ink.
+    static let dash: CGFloat = 3
+    static let referenceInk = NSColor(white: 1, alpha: 0.45)
+
+    /// Lines at 0/25/50/75/100 % across `well`; with `labelsIn`, `signal`'s
+    /// labels (0, 50 and 100 in SDR; every line's cd/m² in HLG) drawn
+    /// right-aligned in the gutter left of the well (in `labelsIn`'s height).
+    /// `signal`'s reference-white line is dashed in place of its solid line.
+    static func graticule(_ well: NSRect, labelsIn bounds: NSRect?, signal: ScopeSignal = .sdr) {
+        for (percent, label) in signal.graticule {
             let y = well.minY + well.height * CGFloat(percent) / 100
-            NSColor(white: 1, alpha: 0.18).setFill()
-            NSRect(x: well.minX, y: min(y, well.maxY - 1), width: well.width, height: 1).fill()
-            guard let bounds, let label = labels[percent] else { continue }
+            let row = min(y, well.maxY - 1)
+            if percent == signal.referenceWhitePercent {
+                referenceInk.setFill()
+                var x = well.minX
+                while x < well.maxX {
+                    NSRect(x: x, y: row, width: min(dash, well.maxX - x), height: 1).fill()
+                    x += 2 * dash
+                }
+            } else {
+                NSColor(white: 1, alpha: 0.18).setFill()
+                NSRect(x: well.minX, y: row, width: well.width, height: 1).fill()
+            }
+            guard let bounds, let label else { continue }
             let text = NSAttributedString(
                 string: label,
                 attributes: [.font: DS.mono(9), .foregroundColor: DS.textFaint])
             let size = text.size()
             let top = min(max(y - size.height / 2, 0), bounds.height - size.height)
-            text.draw(at: NSPoint(x: well.minX - 4 - size.width, y: top))
+            text.draw(at: NSPoint(x: well.minX - signal.labelGap - size.width, y: top))
         }
     }
 

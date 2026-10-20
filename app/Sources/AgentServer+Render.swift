@@ -209,8 +209,11 @@ extension AgentServer {
             text += " " + Self.graphicSentence(report)
         }
         if !scopes.isEmpty {
+            // The scopes read the frame drawn (spec §11 HD-15 (a), (b)): an HLG
+            // project's own picture as HLG, its SDR version (and a JPEG) as SDR.
+            let signal = ScopeSignal(output: output, dynamicRange: options.dynamicRange)
             text += " " + (try Self.writeScopes(
-                scopes, vectorscopeZoom: vectorscopeZoom, of: image, beside: url))
+                scopes, vectorscopeZoom: vectorscopeZoom, signal: signal, of: image, beside: url))
         }
         text += " Written to \(url.path)."
         return try callResult(

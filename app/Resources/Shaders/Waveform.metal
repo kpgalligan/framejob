@@ -20,6 +20,12 @@
 //  threadgroup merges its counts once, and a threadgroup kernel guards its
 //  pixel read rather than returning before its barriers.
 //
+//  **The signal** (spec §11 HD-15 (e)): the waveform, the vectorscope and the
+//  histogram take a 0/1 `signal` uniform. 0 is Rec. 709's constants, the
+//  expressions T4-0 counted, unchanged in text; 1, an HLG project's frame, is
+//  BT.2020's weights and matrix. The weights are constants chosen by it,
+//  never uniforms, so the SDR arm's arithmetic is the one S12 holds.
+//
 
 #include <metal_stdlib>
 using namespace metal;
@@ -27,20 +33,29 @@ using namespace metal;
 // Rec. 709 luma weights, on the ENCODED (sRGB) values: Y′, what the person
 // sees, not linear luminance.
 constant float3 kLumaWeights = float3(0.2126, 0.7152, 0.0722);
+// BT.2020's, for an HLG project's signal (HD-15 (e)).
+constant float3 kLuma2020Weights = float3(0.2627, 0.6780, 0.0593);
 
 // One pixel into its (column bin, level) cell. The column bin is the pixel's
 // x scaled to 256; the level is Y′ of the saturated colour rounded to 0…255,
 // so level 255 is exactly "an 8-bit file writes 255" (Y′ ≥ 254.5/255) and
-// level 0 is Y′ < 0.5/255. `counts` is `column * 256 + level`.
+// level 0 is Y′ < 0.5/255. `counts` is `column * 256 + level`; `signal` 1
+// takes BT.2020's weights.
 kernel void framejob_waveform_bin(texture2d<half, access::read> frame [[texture(0)]],
                                  device atomic_uint *counts [[buffer(0)]],
+                                 constant uint &signal [[buffer(1)]],
                                  uint2 gid [[thread_position_in_grid]]) {
     uint width = frame.get_width();
     if (gid.x >= width || gid.y >= frame.get_height()) {
         return;
     }
     float3 rgb = saturate(float3(frame.read(gid).rgb));
-    uint level = min(255u, uint(dot(rgb, kLumaWeights) * 255.0 + 0.5));
+    uint level;
+    if (signal == 1u) {
+        level = min(255u, uint(dot(rgb, kLuma2020Weights) * 255.0 + 0.5));
+    } else {
+        level = min(255u, uint(dot(rgb, kLumaWeights) * 255.0 + 0.5));
+    }
     uint column = gid.x * 256u / width;
     atomic_fetch_add_explicit(&counts[column * 256u + level], 1u, memory_order_relaxed);
 }
@@ -133,18 +148,32 @@ static inline int2 chromaBins(float3 rgb, uint zoom) {
     return int2(128) + int2(round(255.0 * float(zoom) * c));
 }
 
+// `chromaBins` for an HLG project's signal (HD-15 (e)): BT.2020's Cb =
+// (B′ − Y′)/1.8814 and Cr = (R′ − Y′)/1.4746, Y′ on BT.2020's weights, binned
+// by the same rule.
+static inline int2 chromaBins2020(float3 rgb, uint zoom) {
+    float y = dot(rgb, kLuma2020Weights);
+    float2 d = float2((rgb.b - y) / 1.8814, (rgb.r - y) / 1.4746);
+    if (zoom == 1u) {
+        return clamp(int2(128) + int2(round(255.0 * d)), int2(0), int2(255));
+    }
+    return int2(128) + int2(round(255.0 * float(zoom) * d));
+}
+
 // A lane with no global bin to add: off the frame, off the plot, or counted
 // in the centre.
 constant uint kNoBin = 0xFFFFFFFFu;
 
 // The vectorscope: `counts` is `crBin * 256 + cbBin`, `zoom` 1, 2 or 4
-// (GR-31; a pixel off the plot at ×2 and ×4 is not counted). The central
+// (GR-31; a pixel off the plot at ×2 and ×4 is not counted), `signal` 1
+// BT.2020's matrix (`chromaBins2020`). The central
 // 64 × 64 bins (96..<160 on both axes) are counted per threadgroup and
 // merged once per group, non-zero only; every other bin globally, once per
 // SIMD group when all of its lanes share the bin (GR-26), else per pixel.
 kernel void framejob_vectorscope_bin(texture2d<half, access::read> frame [[texture(0)]],
                                     device atomic_uint *counts [[buffer(0)]],
                                     constant uint &zoom [[buffer(1)]],
+                                    constant uint &signal [[buffer(2)]],
                                     uint2 gid [[thread_position_in_grid]],
                                     uint index [[thread_index_in_threadgroup]],
                                     uint2 group [[threads_per_threadgroup]]) {
@@ -156,7 +185,8 @@ kernel void framejob_vectorscope_bin(texture2d<half, access::read> frame [[textu
     threadgroup_barrier(mem_flags::mem_threadgroup);
     uint bin = kNoBin;
     if (gid.x < frame.get_width() && gid.y < frame.get_height()) {
-        int2 raw = chromaBins(saturate(float3(frame.read(gid).rgb)), zoom);
+        int2 raw = signal == 1u ? chromaBins2020(saturate(float3(frame.read(gid).rgb)), zoom)
+                                : chromaBins(saturate(float3(frame.read(gid).rgb)), zoom);
         if (all(raw >= int2(0)) && all(raw <= int2(255))) {
             uint2 bins = uint2(raw);
             bool central = all(bins >= 96u) && all(bins < 160u);
@@ -191,9 +221,11 @@ kernel void framejob_vectorscope_bin(texture2d<half, access::read> frame [[textu
 }
 
 // The histogram: `counts` is `plane * 256 + level`, plane 0 R′, 1 G′, 2 B′,
-// 3 Y′, counted per threadgroup and merged once per group, non-zero only.
+// 3 Y′, counted per threadgroup and merged once per group, non-zero only;
+// `signal` 1 takes Y′ on BT.2020's weights.
 kernel void framejob_histogram_bin(texture2d<half, access::read> frame [[texture(0)]],
                                   device atomic_uint *counts [[buffer(0)]],
+                                  constant uint &signal [[buffer(1)]],
                                   uint2 gid [[thread_position_in_grid]],
                                   uint index [[thread_index_in_threadgroup]],
                                   uint2 group [[threads_per_threadgroup]]) {
@@ -207,6 +239,9 @@ kernel void framejob_histogram_bin(texture2d<half, access::read> frame [[texture
         float3 rgb = saturate(float3(frame.read(gid).rgb));
         uint4 levels = uint4(scopeLevel(rgb.r), scopeLevel(rgb.g), scopeLevel(rgb.b),
                              scopeLevel(dot(rgb, kLumaWeights)));
+        if (signal == 1u) {
+            levels.w = scopeLevel(dot(rgb, kLuma2020Weights));
+        }
         for (uint plane = 0u; plane < 4u; plane++) {
             atomic_fetch_add_explicit(&local[plane * 256u + levels[plane]], 1u,
                                       memory_order_relaxed);

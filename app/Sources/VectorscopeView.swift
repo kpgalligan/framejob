@@ -8,7 +8,8 @@ import AppKit
 /// the centre to the edge; and the zoom's three cells "1× 2× 4×" in the
 /// bottom-right corner (`VectorscopeZoomCells`). No circles. The counts are
 /// binned at the zoom by the kernel, so the drawing never scales them. The
-/// slot keeps it square and centres it.
+/// slot keeps it square and centres it. An HLG trace's targets, rim ticks and
+/// skin line are BT.2020's (spec §11 HD-15 (g)).
 final class VectorscopeView: NSView {
     static let targetBox: CGFloat = 7
     static let crossArm: CGFloat = 6
@@ -22,6 +23,15 @@ final class VectorscopeView: NSView {
         didSet {
             guard trace != oldValue else { return }
             image = trace.flatMap(Self.density)
+            if let trace { signal = trace.signal }
+            needsDisplay = true
+        }
+    }
+    /// The matrix the targets and skin line are drawn on: the last trace's
+    /// signal, kept while there is none (`.sdr` before any).
+    var signal: ScopeSignal = .sdr {
+        didSet {
+            guard signal != oldValue else { return }
             needsDisplay = true
         }
     }
@@ -75,7 +85,7 @@ final class VectorscopeView: NSView {
         cross.line(to: NSPoint(x: centre.x, y: centre.y + Self.crossArm))
         cross.stroke()
         // The skin line, centre to edge, at its angle from +Cb.
-        let angle = VectorscopeTrace.skinLineDegrees * .pi / 180
+        let angle = VectorscopeTrace.skinLineDegrees(for: signal) * .pi / 180
         let reach = bounds.width / 2
         let skin = NSBezierPath()
         skin.lineWidth = 1
@@ -84,7 +94,7 @@ final class VectorscopeView: NSView {
             to: NSPoint(
                 x: centre.x + reach * CGFloat(cos(angle)), y: centre.y + reach * CGFloat(sin(angle))))
         skin.stroke()
-        for target in VectorscopeTrace.targets {
+        for target in VectorscopeTrace.targets(for: signal) {
             let text = NSAttributedString(
                 string: target.name,
                 attributes: [.font: DS.mono(9), .foregroundColor: Self.label])

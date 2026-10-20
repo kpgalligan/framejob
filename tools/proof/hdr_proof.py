@@ -149,8 +149,8 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   lines each; the averages, their difference, each export's wall time
   (`time.monotonic()` around the `export` call, recorded, not scored) and the
   host state are printed.
-- **P1–P7**: `hdr_probe.swift` over `app/Sources` (a probe that will not build
-  is a scored FAIL of all seven). P5 (hdr H-1): `pqShoulderWhite` (1000/203
+- **P1–P8**: `hdr_probe.swift` over `app/Sources` (a probe that will not build
+  is a scored FAIL of all eight). P5 (hdr H-1): `pqShoulderWhite` (1000/203
   bit-exact with no peak, 1 at 100 and 203, peak/203 above), `MediaColor`'s
   stored and `input` shapes and its two dictionaries, `setMediaColor` sending
   null for an empty dictionary, and a converted marker omitting a nil `peak`.
@@ -229,6 +229,41 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   0.5) and a title, 8 s, `prores_422`, as an SDR and as an HLG project, each on
   its own instance: 0 and 240 input passes per 120 frames (scored), the frame
   times printed against PR-1's 8 ms.
+- **SI…SP** (hdr H-4, #277, spec §11 HD-8, HD-15 — the scopes): SI every H1 SDR
+  scene at 0.5 s, `render_frame` with the four scopes and with `{vectorscope,
+  vectorscope_zoom: 4}`: each JSON byte-identical to DIR's `si/` and the text (WORK's
+  path spelled `<work>`) equal (`capture` writes them; a plain run, `compare` and
+  `--only` compare); SW HLG projects of the hlg ramp (identity) and the bt709 ramp (the
+  lift): every waveform column's levels holding more than 8 px within ±1 of round(255·
+  Y′₂₀₂₀) of the oracle's saturated R′G′B′ at the pixel's codes ±1 (both ways), every
+  level within ±1 of the PNG's own pixels (the render's row 64, where the chroma half
+  begins, is off the oracle and printed), the parade's channels the same, the histogram's
+  planes the waveform's and the parade's column sums exactly, CONTROL ≥ 50 chroma-row
+  columns where Rec. 709 and BT.2020 levels part by > 2; SV the `hlg_bars` fixture
+  (960×128 ProRes 422 HQ, BT.2111's six 75 % bars as BT.2020-NCL limited-range codes
+  computed here, 160 px each, re-tagged HLG as `hlg` is): the six fullest non-centre bins
+  each ±1 of one bar's BT.2020 bin, the JSON's targets this script's bins, null at ×2 off
+  the plot, the skin line the lifted patch through BT.2020 ±0.05°, CONTROL ≥ 4 bars whose
+  Rec. 709 and BT.2020 bins part by ≥ 2; SS the HLG JSON's `signal`, `scale` (the nits
+  recomputed here) and `matrix`, and the four sentences and the ×2 one; SD
+  `{sdr_version, waveform, vectorscope}` with no `signal` or `scale`, matrix Rec. 709, the
+  waveform ±1 of Rec. 709 levels of its PNG, a JPEG's scopes with no `signal`,
+  `{ungraded, waveform}` with exposure +1 on the clip `signal` "hlg" at SW's hlg oracle;
+  SP View ▸ Scopes on the hlg ramp, paused, through `snapshot_ui`: the captions "HLG ·
+  cd/m²" over "Rec. 2100 HLG" and the top readouts within 0.2 of `render_frame`'s; View ▸
+  Show SDR Version turns both captions "Rec. 709 · encoded" at `{sdr_version}`'s readouts
+  (CONTROL: > 1 point from the HLG ones); off again the HLG captions, kept under View ▸
+  Show Ungraded; an SDR project's "Rec. 709 · encoded". The View items performed —
+  Scopes, Show SDR Version, Show Ungraded — persist nothing.
+- **P8** (hdr H-4): `hdr_probe.swift`'s `ScopeSignal` (its init table, ticks, labels,
+  captions, uniforms), `targets(for: .sdr)` bit-equal to `targets`, `targets(for: .hlg)`
+  BT.2020's, the traces' SDR JSON with no `signal`/`scale` and HLG JSON with both; and
+  `WaveformTraceView` (248×200), `ParadeView` (600×200) and `VectorscopeView` (512×512 at
+  ×1 and ×2) cached to bitmaps in a borderless offscreen window, an HLG trace beside the
+  same with `signal: .sdr`: a dashed well row at 75 % in HLG only (every parade well), the
+  target boxes' corners and the skin line lit for the trace's signal, CONTROL ≥ 4 targets
+  whose HLG and SDR boxes part by ≥ 4 pt with no SDR box where the HLG one is, and the SDR
+  bitmap unlit on the HLG skin ray.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
@@ -239,10 +274,11 @@ NEW` shows the pixels equal). The mutant `relabel-in-renderframe` (H1)
 applies the label inside `Exporter.renderFrame` instead, which moves the
 eyedropper's picks; it runs against a capture made after PR-11.
 
-H1a, the H7 family, the H-2 rows and the H-3 rows run in a plain run, `compare`
-and `--only`; never under `capture`'s default selection, `--measure` or a
-mutant's default selection; hdr H-1's five, H-2's twelve and H-3's seven
-mutants run with `--only <their rows>,Z1`. `capture --only`
+H1a, the H7 family, the H-2 rows, the H-3 rows and the H-4 rows run in a plain run,
+`compare` and `--only`; never under `capture`'s default selection, `--measure` or a
+mutant's default selection; hdr H-1's five, H-2's twelve, H-3's seven and H-4's nine
+mutants run with `--only <their rows>,Z1` (SI also runs under `capture --only`, writing
+DIR's references). `capture --only`
 captures just the rows named, keeping an earlier capture's H1 record.
 `capture DIR` records H1's references (`DIR/h1-*.png`, `DIR/media/`,
 `DIR/capture.json` with the picks and the reverse's digest) and runs H2–H6 and
@@ -351,8 +387,8 @@ PICK_POINTS = {(W, H): [[256.5, 32.5], [512.5, 96.5], [900.5, 100.5]],
                (SW, SH): [[320.5, 180.5], [100.5, 60.5], [540.5, 300.5]]}
 ROWS = ["H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "H7", "H7d", "H7i",
         "H7p", "H7o", "H7r", "HS", "HH", "HP", "HT", "HL", "HW", "HK", "HM", "HF", "HX", "DT",
-        "DP", "DV", "DI", "DE", "DR", "DS", "DM", "DX", "R0", "TI", "TH", "TO", "P1", "P2", "P3",
-        "P4", "P5", "P6", "P7", "Z1"]
+        "DP", "DV", "DI", "DE", "DR", "DS", "DM", "DX", "SI", "SW", "SV", "SS", "SD", "SP", "R0",
+        "TI", "TH", "TO", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "Z1"]
 # H7's family (hdr H-1, #281, spec §11 HD-6, HD-12): PQ ramps whose HDR10 static
 # metadata sits in the HEVC stream's SEI (the x265 CLI, muxed by ffmpeg's stream copy;
 # ffmpeg 9.0.2's libx265 wrapper no longer writes the mastering display with these
@@ -414,6 +450,20 @@ HDR10_SIDE = {"red_x": "34000/50000", "red_y": "16000/50000", "green_x": "13250/
               "max_content": "1000", "max_average": "0"}
 SDR_VERSION_MENU = ["View", "Show SDR Version"]
 DE_H264_BITRATE = 50_000_000
+# hdr H-4 (#277, spec §11 HD-8, HD-15): the scopes' rows. SI holds every SDR project's scope
+# JSON and sentences to DIR's; the rest read an HLG project's.
+H4_ROWS = {"SI", "SW", "SV", "SS", "SD", "SP"}
+SCOPE_KINDS = ["waveform", "parade", "vectorscope", "histogram"]
+SCOPES_ALL = {kind: True for kind in SCOPE_KINDS}
+SCOPES_MENU = ["View", "Scopes"]
+UNGRADED_MENU = ["View", "Show Ungraded"]
+# SV's fixture: BT.2111's six 75 % bars as BT.2020 HLG values, 160 px each, tagged HLG.
+HLG_BARS = [("R", (0.75, 0.0, 0.0)), ("Mg", (0.75, 0.0, 0.75)), ("B", (0.0, 0.0, 0.75)),
+            ("Cy", (0.0, 0.75, 0.75)), ("G", (0.0, 0.75, 0.0)), ("Yl", (0.75, 0.75, 0.0))]
+BARS_W, BARS_H, BAR_W = 960, 128, 160
+SKIN_PATCH = (194 / 255, 150 / 255, 130 / 255)
+PANEL_WAIT = 20
+SDR_CAPTION = "Rec. 709 · encoded"
 
 
 BASE_COMMIT = "716720c"
@@ -434,7 +484,10 @@ OPTIONS_SWIFT = "app/Sources/RecipeOptions.swift"
 PREVIEW_SWIFT = "app/Sources/Playback+PreviewQuality.swift"
 WRITER_SWIFT = "app/Sources/FrameWriter.swift"
 SETTINGS_SWIFT = "app/Sources/ExporterWriter+Settings.swift"
-P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7"}
+SCOPE_SHADER = "app/Resources/Shaders/Waveform.metal"
+SIGNAL_SWIFT = "app/Sources/ScopeSignal.swift"
+VECTORSCOPE_SWIFT = "app/Sources/VectorscopeView.swift"
+P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"}
 RECORDS = {"R0"}
 # name: ([(file, anchor, replacement), …], the rows that must fail).
 MUTANTS = {
@@ -627,6 +680,50 @@ MUTANTS = {
                              "HD-13 (h)): Rec. 709 luma of the un-lifted,\n",
                              "    if (false) {\n        // An HLG project (spec §11 "
                              "HD-13 (h)): Rec. 709 luma of the un-lifted,\n")], ["HM"]),
+    # hdr H-4 (#277, spec §11 HD-8, HD-15): one per decision, each run with `--only <its
+    # rows>,Z1` and `--control` the capture made on the tree before the phase's code.
+    # The shader's HLG waveform and vectorscope on Rec. 709's constants.
+    "scope-709-in-hlg": ([
+        (SCOPE_SHADER, "        level = min(255u, uint(dot(rgb, kLuma2020Weights) * 255.0 + 0.5));\n",
+         "        level = min(255u, uint(dot(rgb, kLumaWeights) * 255.0 + 0.5));\n"),
+        (SCOPE_SHADER, "        int2 raw = signal == 1u ? chromaBins2020(",
+         "        int2 raw = signal == 1u ? chromaBins(")], ["SW", "SV"]),
+    # The histogram's HLG Y′ on Rec. 709's weights.
+    "histogram-709-in-hlg": ([(SCOPE_SHADER,
+                               "            levels.w = scopeLevel(dot(rgb, kLuma2020Weights));\n",
+                               "            levels.w = scopeLevel(dot(rgb, kLumaWeights));\n")],
+                             ["SW"]),
+    # Reference white at 100 %, not 75 %: the JSON's and the dashed line's.
+    "ref-line-at-100": ([(SIGNAL_SWIFT, "        case .hlg: return 75\n",
+                          "        case .hlg: return 100\n")], ["SS", "P8"]),
+    # The SDR version's frames read as HLG.
+    "sdr-version-read-as-hlg": ([(SIGNAL_SWIFT,
+                                  "        self = output == .hlg && dynamicRange != .sdr ? .hlg : "
+                                  ".sdr\n",
+                                  "        self = output == .hlg ? .hlg : .sdr\n")],
+                                ["SD", "SP"]),
+    # The panel's frames offered as SDR whatever their canvas.
+    "tap-signal-dropped": ([(COMPOSITOR, "                signal: ScopeSignal(canvas: recipe?.canvas))\n",
+                             "                signal: .sdr)\n")], ["SP"]),
+    # render_frame's scopes read as SDR in an HLG project.
+    "render-scopes-sdr": ([("app/Sources/AgentServer+Render.swift",
+                            "            let signal = ScopeSignal(output: output, dynamicRange: "
+                            "options.dynamicRange)\n",
+                            "            let signal = ScopeSignal.sdr\n")], ["SW", "SV", "SS"]),
+    # An SDR trace's JSON naming its signal.
+    "sdr-json-names-scale": ([(SIGNAL_SWIFT, "        case .sdr: return [:]\n",
+                               "        case .sdr: return [\"signal\": rawValue]\n")],
+                             ["SI", "P8"]),
+    # The vectorscope view drawing Rec. 709's targets and skin line in HLG.
+    "vectorscope-view-709-targets": ([
+        (VECTORSCOPE_SWIFT, "VectorscopeTrace.skinLineDegrees(for: signal) * .pi / 180",
+         "VectorscopeTrace.skinLineDegrees(for: .sdr) * .pi / 180"),
+        (VECTORSCOPE_SWIFT, "for target in VectorscopeTrace.targets(for: signal) {",
+         "for target in VectorscopeTrace.targets(for: .sdr) {")], ["P8"]),
+    # The parade's wells drawing SDR's graticule in HLG.
+    "parade-graticule-sdr": ([("app/Sources/ParadeView.swift",
+                               "labelsIn: index == 0 ? bounds : nil, signal: signal)",
+                               "labelsIn: index == 0 ? bounds : nil)")], ["P8"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -988,6 +1085,8 @@ def fixture(name):
         return green_709()
     if name == "grey8":
         return grey_png()
+    if name == "hlg_bars":
+        return hlg_bars()
     if name in MEDIA_REC:
         return MEDIA_REC[name]
     raise ValueError(name)
@@ -3759,6 +3858,583 @@ def math_request(shader):
                           "displayGamma": DISPLAY_GAMMA, "coreMedia709Gamma": CM709_GAMMA}}
 
 
+# ---- hdr H-4 (#277, spec §11 HD-8, HD-15): the scopes -----------------------------
+
+def half_away(v):
+    """round() as Metal and Swift's `.rounded()` do: halves away from zero."""
+    return int(v + 0.5) if v >= 0 else -int(-v + 0.5)
+
+
+def level8(v):
+    """GR-5's level of a saturated value: round(255·v), 0…255."""
+    return min(255, max(0, half_away(255 * v)))
+
+
+def sat(rgb):
+    return [min(max(c, 0.0), 1.0) for c in rgb]
+
+
+def luma(rgb, weights=LUMA2020):
+    return sum(w * c for w, c in zip(weights, rgb))
+
+
+def chroma_of(rgb, matrix="bt2020nc"):
+    """Cb, Cr of an R'G'B' on `matrix`'s weights (the scopes' formula)."""
+    if matrix == "bt2020nc":
+        y = luma(rgb, LUMA2020)
+        return (rgb[2] - y) / 1.8814, (rgb[0] - y) / 1.4746
+    y = luma(rgb, LUMA709)
+    return (rgb[2] - y) / 1.8556, (rgb[0] - y) / 1.5748
+
+
+def chroma_bins(rgb, matrix="bt2020nc", zoom=1):
+    """The vectorscope's bins (cb, cr) at `zoom` (GR-31), None off the plot."""
+    raw = [128 + half_away(255 * zoom * c) for c in chroma_of(rgb, matrix)]
+    if zoom == 1:
+        return tuple(min(255, max(0, v)) for v in raw)
+    return tuple(raw) if all(0 <= v <= 255 for v in raw) else None
+
+
+def bar_codes(rgb):
+    """BT.2020-NCL limited-range 10-bit codes (Y, Cb, Cr) of an R'G'B'."""
+    y = luma(rgb, LUMA2020)
+    return (half_away(64 + 876 * y), half_away(512 + 896 * (rgb[2] - y) / 1.8814),
+            half_away(512 + 896 * (rgb[0] - y) / 1.4746))
+
+
+def hlg_bars():
+    """SV's fixture: 960×128, 1 s, ProRes 422 HQ, the six bars' BT.2020 codes, re-tagged
+    HLG by stream copy as `hlg` is."""
+    out = MEDIA / "hlg_bars.mov"
+    if not out.exists():
+        codes = [bar_codes(rgb) for _, rgb in HLG_BARS]
+
+        def expr(i):  # geq's X is the plane's own: 4:2:2 chroma is half as wide
+            width = BAR_W if i == 0 else BAR_W // 2
+            e = str(codes[-1][i])
+            for k in range(len(codes) - 2, -1, -1):
+                e = f"if(lt(X,{(k + 1) * width}),{codes[k][i]},{e})"
+            return e
+        lavfi = (f"color=c=black:size={BARS_W}x{BARS_H}:rate=30:duration=1,format=yuv422p10le,"
+                 f"geq=lum='{expr(0)}':cb='{expr(1)}':cr='{expr(2)}'")
+        raw = ffmpeg_make(MEDIA / "hlg_bars_raw.mov", [
+            "-f", "lavfi", "-i", lavfi, "-c:v", "prores_ks", "-profile:v", "3",
+            "-pix_fmt", "yuv422p10le"])
+        if raw is None:
+            REFUSED["hlg_bars"] = "hlg_bars_raw.mov was not made"
+            return None
+        primaries, transfer, matrix = RETAGS["hlg"]
+        ffmpeg_make(out, ["-i", str(raw), "-c", "copy", "-bsf:v",
+                          f"prores_metadata=color_primaries={primaries}:color_trc={transfer}:"
+                          f"colorspace={matrix}", "-color_primaries", primaries, "-color_trc",
+                          transfer, "-colorspace", matrix, "-movflags", "+write_colr"], 120)
+    return checked("hlg_bars", out if out.exists() else None, {
+        "codec_name": "prores", "width": BARS_W, "height": BARS_H, "color_primaries": "bt2020",
+        "color_transfer": "arib-std-b67", "color_space": "bt2020nc"})
+
+
+# A waveform column bin of the 1024 px ramp is 4 px wide, so a level holding at most 8 of its
+# pixels lies on at most two rows. The render's row 64, where the chroma half begins, is off
+# every oracle level of its column (the decoder's chroma upsampling mixes the halves there;
+# SW prints the rows, row 64 alone in H-4's runs): SW and SD hold the oracle to the levels
+# holding more than 8 px, and every level to the PNG's own pixels.
+SEAM_PIXELS = 8
+
+
+def wave_columns(counts, more_than=0):
+    """A waveform JSON's (or a parade channel's) 256 columns as sets of the levels holding
+    more than `more_than` pixels."""
+    return [{level for level, n in enumerate(column) if n > more_than} for column in counts or []]
+
+
+def apart(a, b):
+    """The largest distance from a level in `a` to the nearest in `b` (both ways)."""
+    if not a and not b:
+        return 0
+    if not a or not b:
+        return 999
+    return max(max(min(abs(x - y) for y in b) for x in a),
+               max(min(abs(x - y) for y in a) for x in b))
+
+
+def oracle_columns(source, matrix, oracle, plane):
+    """Per waveform column bin (4 px of the 1024 px ramp), each grey- and chroma-row
+    pixel's oracle envelope (lo, hi): the least and the greatest level of `plane(rgb)` of
+    the saturated oracle R'G'B' at its Y', Cb and Cr codes each moved by −1, 0, +1 (H-2's
+    envelope: the lift's toe spreads a code over several levels near black)."""
+    cols = []
+    for c in range(256):
+        ranges = []
+        for x in range(c * W // 256, (c + 1) * W // 256):
+            for row in (GREY_ROW, CHROMA_ROW):
+                luma_code, cb, cr = source.codes(x, row)
+                outs = [level8(plane(sat(oracle(rgb_of(luma_code + a, cb + b, cr + d, matrix)))))
+                        for a in (-1, 0, 1) for b in (-1, 0, 1) for d in (-1, 0, 1)]
+                ranges.append((min(outs), max(outs)))
+        cols.append(ranges)
+    return cols
+
+
+def fits(levels, ranges):
+    """Both ways within ±1: every level inside some pixel's envelope widened by 1, and every
+    pixel's widened envelope holding some level."""
+    def inside(level, lo, hi):
+        return lo - 1 <= level <= hi + 1
+    return all(any(inside(v, lo, hi) for lo, hi in ranges) for v in levels) and all(
+        any(inside(v, lo, hi) for v in levels) for lo, hi in ranges)
+
+
+def png_columns(frame, width, height, plane):
+    """Per waveform column bin, `plane(rgb)`'s levels over every pixel of the PNG."""
+    cols = [set() for _ in range(256)]
+    for y in range(height):
+        for x in range(width):
+            cols[x * 256 // width].add(level8(plane(frame.px(x, y))))
+    return cols
+
+
+def run_sw(client, state):
+    """SW: HLG projects of the hlg ramp (identity) and the bt709 ramp (the lift): the
+    waveform's columns on BT.2020 luma, the parade's channels, at the oracle ±1 and at the
+    PNG's own pixels ±1; the histogram's planes the column sums exactly."""
+    misses, figures = [], []
+    for name, matrix, oracle in (("hlg", "bt2020nc", lambda rgb: rgb),
+                                 ("bt709", "bt709", lift)):
+        path = fixture(name)
+        source = yuv_frames(path, W, H) if path else None
+        doc = hlg_doc(client, f"sw-{name}", [path])
+        png, files, text = scope_render(doc, f"sw-{name}", waveform=True, parade=True,
+                                        histogram=True)
+        state[f"sw_{name}_closed"] = doc.close()
+        wave, par, hist = (scope_json(files, k) for k in ("waveform", "parade", "histogram"))
+        frame = Frame(png, W, H) if png else None
+        if source is None or None in (wave, par, hist) or frame is None or not frame.ok:
+            misses.append(f"{name}: {doc.why or text[-200:]}")
+            continue
+        src = source[0]
+        got = wave_columns(wave.get("counts"), SEAM_PIXELS)
+        every = wave_columns(wave.get("counts"))
+        want = oracle_columns(src, matrix, oracle, luma)
+        seen = png_columns(frame, W, H, luma)
+        off = [c for c in range(256) if len(got) != 256 or not fits(got[c], want[c])]
+        drawn = max(apart(every[c], seen[c]) for c in range(256)) if len(every) == 256 else 999
+        seam = sum(len(every[c] - got[c]) for c in range(len(every)))
+        # The rows whose PNG level is no oracle level of its column ±1: the seam's.
+        seam_rows = sorted({y for y in range(H) for x in range(0, W, 4)
+                            if not any(lo - 1 <= level8(luma(frame.px(x, y))) <= hi + 1
+                                       for lo, hi in want[x * 256 // W])})
+        if len(got) != 256 or off:
+            misses.append(f"{name} waveform: {len(off)} columns off the oracle ±1, e.g. "
+                          f"{[(c, sorted(got[c]), sorted(want[c])) for c in off[:2]]}")
+        if drawn > 1:
+            misses.append(f"{name} waveform: off the PNG's own pixels by {drawn} levels")
+        if not set(seam_rows) <= {GREY_ROW * 2 - 1, GREY_ROW * 2}:
+            misses.append(f"{name}: PNG rows off the oracle beyond the seam: {seam_rows}")
+        channels = (par.get("counts") or {})
+        p_off, p_eg = 0, []
+        for i, key in enumerate(("red", "green", "blue")):
+            pick = (lambda k: lambda rgb: rgb[k])(i)
+            have = wave_columns(channels.get(key), SEAM_PIXELS)
+            ref = oracle_columns(src, matrix, oracle, pick)
+            bad = [c for c in range(256) if len(have) != 256 or not fits(have[c], ref[c])]
+            p_off += len(bad)
+            p_eg += [(key, c, sorted(have[c]), sorted(ref[c])) for c in bad[:2]]
+        if p_off:
+            misses.append(f"{name} parade: {p_off} channel columns off the oracle ±1, e.g. "
+                          f"{p_eg[:3]}")
+        sums = [sum(column[level] for column in wave.get("counts") or []) for level in range(256)]
+        if hist.get("luma") != sums:
+            misses.append(f"{name} histogram: luma ≠ the waveform's column sums")
+        for key in ("red", "green", "blue"):
+            col_sums = [sum(column[level] for column in channels.get(key) or [])
+                        for level in range(256)]
+            if hist.get(key) != col_sums:
+                misses.append(f"{name} histogram: {key} ≠ the parade's column sums")
+        parted = sum(1 for c in range(256)
+                     if abs(level8(luma(sat(oracle(src.rgb(c * 4, CHROMA_ROW, matrix))), LUMA709))
+                            - level8(luma(sat(oracle(src.rgb(c * 4, CHROMA_ROW, matrix))))))
+                     > 2)
+        if parted < 50:
+            misses.append(f"CONTROL {name}: only {parted} chroma-row columns part Rec. 709 from "
+                          f"BT.2020 by > 2 levels")
+        figures.append(f"{name}: waveform {len(off)} columns off the oracle, {seam} seam levels "
+                       f"(≤ {SEAM_PIXELS} px) left to the PNG (its rows off the oracle: "
+                       f"{seam_rows}), worst against the PNG {drawn}; "
+                       f"parade {p_off} off; {parted} chroma-row columns part Rec. 709 from "
+                       f"BT.2020 by > 2 levels (CONTROL)")
+    check("SW HLG projects of the hlg ramp (identity) and the bt709 ramp (the lift): every "
+          "waveform column's occupied levels (holding > 8 px; the grey/chroma seam's left to "
+          "the PNG) within ±1 of round(255·Y′₂₀₂₀) of the oracle at its codes ±1, and every "
+          "level within ±1 of "
+          "the PNG's own pixels; the parade's channels within ±1 of theirs; the "
+          "histogram's planes the waveform's and the parade's column sums exactly",
+          not misses, f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def vector_counts(js):
+    """A vectorscope JSON's occupied bins: {(cb, cr): count}."""
+    return {(cb, cr): n for cr, row in enumerate(js.get("counts") or [])
+            for cb, n in enumerate(row) if n}
+
+
+def skin_hlg():
+    cb, cr = chroma_of(lift(list(SKIN_PATCH)))
+    return math.degrees(math.atan2(cr, cb))
+
+
+def run_sv(client, state):
+    """SV: the hlg_bars fixture in an HLG project: the vectorscope's six fullest bins at
+    this script's BT.2020 bins of the bars' codes ±1; its targets BT.2111's 75 % bars
+    exactly, null at ×2 off the plot; the skin line the lifted patch's."""
+    misses, figures = [], []
+    path = fixture("hlg_bars")
+    source = yuv_frames(path, BARS_W, BARS_H) if path else None
+    doc = hlg_doc(client, "sv", [path], BARS_W, BARS_H)
+    png, files, text = scope_render(doc, "sv", vectorscope=True)
+    _, zoomed, ztext = scope_render(doc, "sv-x2", vectorscope=True, vectorscope_zoom=2)
+    state["sv_closed"] = doc.close()
+    js, js2 = scope_json(files, "vectorscope"), scope_json(zoomed, "vectorscope")
+    if source is None or js is None or js2 is None:
+        check("SV the hlg_bars vectorscope", False,
+              f"{doc.why or REFUSED.get('hlg_bars') or text[-200:] or ztext[-200:]}")
+        return
+    bars = {}
+    parted = 0
+    for k, (name, nominal) in enumerate(HLG_BARS):
+        rgb = sat(rgb_of(*source[0].codes(k * BAR_W + BAR_W // 2, BARS_H // 2), "bt2020nc"))
+        bars[name] = chroma_bins(rgb)
+        b709 = chroma_bins(rgb, "bt709")
+        parted += max(abs(a - b) for a, b in zip(bars[name], b709)) >= 2
+    counts = vector_counts(js)
+    fullest = sorted((n, bins) for bins, n in counts.items() if bins != (128, 128))[::-1][:6]
+    free = dict(bars)
+    for n, bins in fullest:
+        match = next((name for name, at in free.items()
+                      if max(abs(a - b) for a, b in zip(at, bins)) <= 1), None)
+        if match is None:
+            misses.append(f"bin {bins} ({n} px) is no bar's ±1 (bars {free})")
+        else:
+            free.pop(match)
+    figures.append(f"fullest {[(b, n) for n, b in fullest]}; the bars' BT.2020 bins {bars}")
+    for name, nominal in HLG_BARS:
+        want = list(chroma_bins(list(nominal)))
+        if (js.get("targets") or {}).get(name) != want:
+            misses.append(f"target {name} {(js.get('targets') or {}).get(name)} ≠ {want}")
+        at2 = chroma_bins(list(nominal), zoom=2)
+        got2 = (js2.get("targets") or {}).get(name)
+        if got2 != (list(at2) if at2 else None):
+            misses.append(f"×2 target {name} {got2} ≠ {at2}")
+    angle, want_angle = js.get("skin_line_degrees"), skin_hlg()
+    if not isinstance(angle, (int, float)) or abs(angle - want_angle) > 0.05:
+        misses.append(f"skin line {angle} ≠ {want_angle:.4f}")
+    if parted < 4:
+        misses.append(f"CONTROL: only {parted} bars part Rec. 709 from BT.2020 by ≥ 2 bins")
+    figures.append(f"skin line {angle} (want {want_angle:.4f}); {parted} bars part Rec. 709 "
+                   f"from BT.2020 by ≥ 2 bins (CONTROL)")
+    check("SV hlg_bars (BT.2111's 75 % bars as BT.2020 HLG codes) in an HLG project: the six "
+          "fullest non-centre vectorscope bins each within ±1 of one bar's BT.2020 bin; the "
+          "JSON's targets this script's bins, null at ×2 where off the plot; the skin line the "
+          "lifted patch through BT.2020 ±0.05°", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+SS_SENTENCES = {
+    "waveform": r"Waveform \(HLG signal; reference white at 75 %, 203 cd/m², and 100 % at "
+                r"1,000 cd/m²\): highlights clipped in \d+\.\d % of pixels, shadows in \d+\.\d "
+                r"%; its 256 × 256 counts are in \S+\.waveform\.json\.",
+    "parade": r"Parade \(HLG signal\): red clips high in \d+\.\d % of pixels and low in "
+              r"\d+\.\d %, green in \d+\.\d % and \d+\.\d %, blue in \d+\.\d % and \d+\.\d %; "
+              r"its 3 × 256 × 256 counts are in \S+\.parade\.json\.",
+    "vectorscope": r"Vectorscope \(Rec\. 2020 Cb and Cr of the HLG values\): \d+\.\d % of "
+                   r"pixels are neutral; its 256 × 256 counts are in \S+\.vectorscope\.json\.",
+    "histogram": r"Histogram \(HLG signal\): highlights clipped in \d+\.\d % of pixels, "
+                 r"shadows in \d+\.\d % \(by Y′, BT\.2020 weights\); its R′, G′, B′ and Y′ "
+                 r"counts per 256 levels are in \S+\.histogram\.json\.",
+    "zoomed": r"Vectorscope at ×2 \(Rec\. 2020 Cb and Cr of the HLG values\): \d+\.\d % of "
+              r"pixels are neutral and \d+\.\d % lie off the plot; its 256 × 256 counts are "
+              r"in \S+\.vectorscope\.json\.",
+}
+
+
+def want_scale():
+    """HD-15 (h)'s scale, recomputed here."""
+    return {"unit": "cd/m²", "reference_white_percent": 75, "clip_percent": 100,
+            "ticks": [{"percent": p, "level": half_away(255 * p / 100),
+                       "nits": round(1000 * hlg_inverse(p / 100) ** 1.2, 1)}
+                      for p in (0, 25, 50, 75, 100)]}
+
+
+def same_scale(got, want):
+    if not isinstance(got, dict) or set(got) != set(want):
+        return False
+    ticks = got.get("ticks") or []
+    return all(got[k] == want[k] for k in want if k != "ticks") and len(ticks) == 5 and all(
+        set(a) == set(b) and all(abs(a[k] - b[k]) < 1e-9 for k in b)
+        for a, b in zip(ticks, want["ticks"]))
+
+
+def run_ss(client, state):
+    """SS: an HLG project's scope JSON names its signal and scale, the vectorscope its
+    matrix; the four sentences (and the zoomed one) read as HD-15 (h) writes them."""
+    misses = []
+    doc = hlg_doc(client, "ss", [fixture("hlg")])
+    _, files, text = scope_render(doc, "ss", **SCOPES_ALL)
+    _, zoomed, ztext = scope_render(doc, "ss-x2", vectorscope=True, vectorscope_zoom=2)
+    state["ss_closed"] = doc.close()
+    scale = want_scale()
+    for kind in SCOPE_KINDS:
+        js = scope_json(files, kind)
+        if js is None:
+            misses.append(f"{kind}: no JSON ({text[-200:]})")
+            continue
+        if js.get("signal") != "hlg":
+            misses.append(f"{kind} signal {js.get('signal')!r}")
+        if kind == "vectorscope":
+            if js.get("matrix") != "Rec. 2020" or "scale" in js:
+                misses.append(f"vectorscope matrix {js.get('matrix')!r}, scale {'scale' in js}")
+        elif not same_scale(js.get("scale"), scale):
+            misses.append(f"{kind} scale {js.get('scale')}")
+        if not re.search(SS_SENTENCES[kind], text):
+            misses.append(f"the {kind} sentence: {text[:600]!r}")
+    js2 = scope_json(zoomed, "vectorscope") or {}
+    if js2.get("signal") != "hlg" or js2.get("matrix") != "Rec. 2020" \
+            or not re.search(SS_SENTENCES["zoomed"], ztext):
+        misses.append(f"the zoomed vectorscope: {js2.get('signal')}, {js2.get('matrix')}, "
+                      f"{ztext[:400]!r}")
+    check("SS an HLG project's waveform, parade and histogram JSON carry signal \"hlg\" and "
+          "HD-15's scale (ticks 0/25/50/75/100 % at levels 0/64/128/191/255 and their cd/m², "
+          "recomputed here; reference white 75, clip 100); the vectorscope's signal \"hlg\" "
+          "and matrix \"Rec. 2020\"; the four sentences and the ×2 one as HD-15 (h) writes "
+          "them", not misses, f"failed {misses or 'none'}; scale wanted {scale}")
+
+
+def run_sd(client, state):
+    """SD: the SDR version's scopes (`sdr_version`, a JPEG) are an SDR project's; Show
+    Ungraded's (`ungraded`) stay HLG."""
+    misses, figures = [], []
+    path = fixture("hlg")
+    source = yuv_frames(path, W, H) if path else None
+    doc = hlg_doc(client, "sd", [path])
+    png, files, text = scope_render(doc, "sd-sdr", sdr_version=True, waveform=True,
+                                    vectorscope=True)
+    _, jfiles, jtext = scope_render(doc, "sd-jpeg", format="jpeg", waveform=True,
+                                    vectorscope=True)
+    clip = (doc.project().get("clips") or [{}])[0].get("id") if doc.ok else None
+    exposed = doc.call("set_video", clips=[clip], patch={"color": {"exposure": 1}}) if clip \
+        else {"ok": False}
+    _, ufiles, utext = scope_render(doc, "sd-ungraded", ungraded=True, waveform=True) \
+        if exposed["ok"] else (None, {}, exposed.get("error"))
+    _, efiles, _ = scope_render(doc, "sd-exposed", waveform=True) if exposed["ok"] \
+        else (None, {}, None)
+    state["sd_closed"] = doc.close()
+    wave, vec = scope_json(files, "waveform"), scope_json(files, "vectorscope")
+    frame = Frame(png, W, H) if png else None
+    if wave is None or vec is None or frame is None or not frame.ok:
+        misses.append(f"sdr_version: {doc.why or text[-200:]}")
+    else:
+        if {"signal", "scale"} & (set(wave) | set(vec)) or vec.get("matrix") != "Rec. 709":
+            misses.append(f"sdr_version keys {sorted(set(wave) | set(vec))}, matrix "
+                          f"{vec.get('matrix')!r}")
+        seen = png_columns(frame, W, H, lambda rgb: luma(rgb, LUMA709))
+        got = wave_columns(wave.get("counts"))
+        worst = max(apart(got[c], seen[c]) for c in range(256)) if len(got) == 256 else 999
+        figures.append(f"sdr_version's waveform against Rec. 709 levels of its PNG: worst "
+                       f"{worst} levels")
+        if worst > 1:
+            misses.append(f"sdr_version's waveform off the PNG's Rec. 709 levels by {worst}")
+        if "Waveform: highlights" not in text or "(Rec. 709 Cb and Cr of the encoded values)" \
+                not in text:
+            misses.append(f"sdr_version's sentences {text[:300]!r}")
+    jw, jv = scope_json(jfiles, "waveform"), scope_json(jfiles, "vectorscope")
+    if jw is None or jv is None or "signal" in jw or "signal" in jv:
+        misses.append(f"the JPEG's scopes: {None if jw is None else sorted(jw)} {jtext[-200:]}")
+    uw, ew = scope_json(ufiles, "waveform"), scope_json(efiles, "waveform")
+    if uw is None or source is None:
+        misses.append(f"ungraded: {utext}")
+    else:
+        got = wave_columns(uw.get("counts"), SEAM_PIXELS)
+        want = oracle_columns(source[0], "bt2020nc", lambda rgb: rgb, luma)
+        off = [c for c in range(256) if len(got) != 256 or not fits(got[c], want[c])]
+        moved = ew is not None and ew.get("counts") != uw.get("counts")
+        figures.append(f"ungraded: signal {uw.get('signal')!r}, {len(off)} columns off SW's hlg "
+                       f"oracle; the exposed render's waveform differs {moved}")
+        if uw.get("signal") != "hlg" or off or not moved:
+            misses.append(f"ungraded: signal {uw.get('signal')!r}, {len(off)} columns off, the "
+                          f"exposure moved the graded waveform {moved}")
+    check("SD in an HLG project: {sdr_version, waveform, vectorscope} carries no signal or "
+          "scale, the matrix \"Rec. 709\", the waveform within ±1 of Rec. 709 levels of its PNG; "
+          "a JPEG frame's scopes no signal; {ungraded, waveform} with exposure +1 on the clip "
+          "signal \"hlg\" at SW's hlg oracle ±1", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def panel_state(views):
+    """The scopes panel as `snapshot_ui` dumps it: the two captions and the top readouts."""
+    def text(identifier):
+        v = next((v for v in views if v.get("id") == identifier), None)
+        return None if v is None or v.get("hidden") else v.get("text")
+    found = []
+    for identifier in ("scopes.top.highlights", "scopes.top.shadows"):
+        m = re.search(r"clipped (\d+\.\d) %", text(identifier) or "")
+        found.append(float(m.group(1)) if m else None)
+    return text("scopes.top.caption"), text("scopes.bottom.caption"), tuple(found)
+
+
+def wait_panel(doc, tag, top, bottom, readouts=None):
+    """Polls the panel until its captions are `top`/`bottom` and (when given) its top
+    readouts within 0.2 of `readouts`, for `PANEL_WAIT` s: the last state seen and whether
+    it matched."""
+    deadline = time.monotonic() + PANEL_WAIT
+    n, state = 0, (None, None, (None, None))
+    while time.monotonic() < deadline:
+        state = panel_state(editor_views(doc, f"{tag}-{n}"))
+        n += 1
+        shown = state[2]
+        near = readouts is None or (None not in shown and None not in readouts and all(
+            abs(a - b) <= 0.2 for a, b in zip(shown, readouts)))
+        if state[0] == top and state[1] == bottom and near and None not in shown:
+            return state, True
+        time.sleep(0.5)
+    return state, False
+
+
+def run_sp(client, state):
+    """SP: View ▸ Scopes on an HLG project, paused: the HLG captions and the top readouts
+    at render_frame's; Show SDR Version turns both to Rec. 709 at the SDR version's
+    readouts; off again the HLG captions return and Show Ungraded keeps them; an SDR
+    project's captions Rec. 709. Only the non-persisting View items are performed."""
+    misses, figures = [], []
+    hlg_cap = ("HLG · cd/m²", "Rec. 2100 HLG")
+    doc = hlg_doc(client, "sp", [fixture("hlg")])
+    _, files, _ = scope_render(doc, "sp-hlg", waveform=True)
+    _, sfiles, _ = scope_render(doc, "sp-sdr", sdr_version=True, waveform=True)
+    hw, sw = scope_json(files, "waveform") or {}, scope_json(sfiles, "waveform") or {}
+    hlg_r = (hw.get("highlights"), hw.get("shadows"))
+    sdr_r = (sw.get("highlights"), sw.get("shadows"))
+    steps = []
+
+    def menu(path):
+        got = doc.call("perform_menu_item", path=path) if doc.ok else {"ok": False}
+        steps.append(f"{' ▸ '.join(path)} {got.get('error', 'ok')}")
+        return got["ok"]
+    if menu(SCOPES_MENU):
+        seen, ok = wait_panel(doc, "sp-hlg", *hlg_cap, hlg_r)
+        figures.append(f"HLG: {seen} against render_frame's {hlg_r}")
+        if not ok:
+            misses.append(f"HLG panel {seen}")
+        if menu(SDR_VERSION_MENU):
+            seen, ok = wait_panel(doc, "sp-sdr", SDR_CAPTION, SDR_CAPTION, sdr_r)
+            figures.append(f"Show SDR Version: {seen} against {sdr_r}")
+            if not ok:
+                misses.append(f"Show SDR Version panel {seen}")
+            parted = None not in hlg_r + sdr_r and max(
+                abs(hlg_r[0] - sdr_r[0]), abs(hlg_r[1] - sdr_r[1])) > 1
+            if not parted:
+                misses.append(f"CONTROL: the HLG {hlg_r} and SDR {sdr_r} readouts part by ≤ 1")
+            if menu(SDR_VERSION_MENU):
+                seen, ok = wait_panel(doc, "sp-back", *hlg_cap, hlg_r)
+                figures.append(f"off again: {seen}")
+                if not ok:
+                    misses.append(f"off again {seen}")
+                if menu(UNGRADED_MENU):
+                    seen, ok = wait_panel(doc, "sp-ungraded", *hlg_cap)
+                    figures.append(f"Show Ungraded: {seen}")
+                    if not ok:
+                        misses.append(f"Show Ungraded {seen}")
+                    menu(UNGRADED_MENU)
+        menu(SCOPES_MENU)
+    state["sp_closed"] = doc.close()
+    sdr = Doc(client, "sp-sdr-project", W, H)
+    sdr.place(fixture("bt709")) if sdr.ok else None
+    got = sdr.call("perform_menu_item", path=SCOPES_MENU) if sdr.ok else {"ok": False}
+    steps.append(f"SDR project View ▸ Scopes {got.get('error', 'ok')}")
+    seen, ok = wait_panel(sdr, "sp-sdrproject", SDR_CAPTION, SDR_CAPTION) if got["ok"] \
+        else (None, False)
+    figures.append(f"an SDR project: {seen}")
+    if not ok:
+        misses.append(f"the SDR project's panel {seen}")
+    sdr.call("perform_menu_item", path=SCOPES_MENU) if got["ok"] else None
+    state["sp_sdr_closed"] = sdr.close()
+    if any(not s.endswith(" ok") for s in steps):
+        misses.append(f"menu steps {steps}")
+    check("SP View ▸ Scopes on an HLG project, paused: captions \"HLG · cd/m²\" over "
+          "\"Rec. 2100 HLG\", the top readouts within 0.2 of render_frame's; with Show SDR "
+          "Version both \"Rec. 709 · encoded\" at {sdr_version}'s readouts (CONTROL: they part "
+          "from the HLG ones by > 1); off again the HLG captions, kept under Show Ungraded; an "
+          "SDR project's \"Rec. 709 · encoded\"", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def scope_render(doc, tag, t=T, **options):
+    """`render_frame` with `options` (scope booleans among them): (png, {kind: json path},
+    the text with WORK's path spelled `<work>`), png None when no frame was written."""
+    png, got = render_opts(doc, tag, t=t, **options)
+    text = str(got.get("reply", "")) if got.get("ok") else str(got.get("error"))
+    files = {kind: Path(f"{png}.{kind}.json") for kind in SCOPE_KINDS
+             if png is not None and options.get(kind)}
+    return png, files, text.replace(str(WORK), "<work>")
+
+
+def scope_json(files, kind):
+    try:
+        return json.loads(files[kind].read_text())
+    except (KeyError, OSError, ValueError):
+        return None
+
+
+def run_si(client, mode, control, state):
+    """SI: every H1 SDR scene at 0.5 s, `render_frame` with the four scopes and with
+    `{vectorscope, vectorscope_zoom: 4}`: each JSON byte-identical to DIR's, and the text
+    (WORK's path spelled `<work>`) equal. `capture` writes DIR's."""
+    folder = control / "si"
+    if mode == "capture":
+        folder.mkdir(parents=True, exist_ok=True)
+    misses, compared, written = [], 0, 0
+    for name, width, height in H1_FIXTURES:
+        path = h1_media(name, None if mode == "capture" else control)
+        doc = Doc(client, f"si-{name}", width, height)
+        if path is None:
+            doc.ok, doc.why = False, f"{name}: {REFUSED.get(name)}"
+        elif doc.ok:
+            doc.place(path)
+        for variant, options in (("all", SCOPES_ALL),
+                                 ("x4", {"vectorscope": True, "vectorscope_zoom": 4})):
+            tag = f"si-{name}-{variant}"
+            png, files, text = scope_render(doc, tag, **options)
+            if png is None or not all(f.exists() for f in files.values()):
+                misses.append(f"{tag}: {doc.why or text[-200:]}")
+                continue
+            if mode == "capture":
+                for kind, f in files.items():
+                    shutil.copy2(f, folder / f"{tag}.{kind}.json")
+                    written += 1
+                (folder / f"{tag}.txt").write_text(text)
+                continue
+            for kind, f in files.items():
+                want = folder / f"{tag}.{kind}.json"
+                if not want.exists():
+                    misses.append(f"{tag}.{kind}: no control JSON")
+                elif f.read_bytes() != want.read_bytes():
+                    misses.append(f"{tag}.{kind}: JSON differs ({len(f.read_bytes())} vs "
+                                  f"{len(want.read_bytes())} bytes)")
+                else:
+                    compared += 1
+            said = folder / f"{tag}.txt"
+            if not said.exists() or said.read_text() != text:
+                misses.append(f"{tag}: the text differs: {text[-300:]!r}")
+        state[f"si_{name}_closed"] = doc.close()
+    want_files = len(H1_FIXTURES) * (len(SCOPE_KINDS) + 1)
+    if mode == "capture":
+        state["si_captured"] = not misses and written == want_files
+        print(f"  SI references captured: {written} JSON files of {want_files}"
+              f"{'; NOT ' + str(misses) if misses else ''}", flush=True)
+        return
+    check(f"SI {len(H1_FIXTURES)} SDR scenes at 0.5 s: render_frame's four scopes' JSON and "
+          f"{{vectorscope, vectorscope_zoom: 4}}'s byte-identical to {control.name}'s, and "
+          f"its text the same", not misses and compared == want_files,
+          f"{compared} of {want_files} JSON files equal; failed {misses[:8] or 'none'}")
+
+
 # ---- the run --------------------------------------------------------------------
 
 def tail(log, count=4):
@@ -3840,7 +4516,7 @@ def main():
     else:
         selected -= {"TI", "TH", "TO"}
         if args.mutant:
-            selected -= {"H1a"} | H7_ROWS | H2_ROWS | H3_ROWS
+            selected -= {"H1a"} | H7_ROWS | H2_ROWS | H3_ROWS | H4_ROWS
     if args.mode == "capture":
         if not args.only:
             selected = {"H1", "H2", "H3", "H4", "H5", "H6", "R0", "Z1"}
@@ -3877,7 +4553,7 @@ def main():
     log = WORK / "instance.log"
     needs_instance = bool(selected & ({"H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5",
                                        "H6", "R0"} | H7_ROWS | H2_ROWS
-                                      | (H3_ROWS - {"DX"})))
+                                      | (H3_ROWS - {"DX"}) | H4_ROWS))
     if needs_instance:
         launched = mcp.launch(str(binary), [],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
@@ -3940,6 +4616,13 @@ def main():
                                  ("DS", run_ds), ("DM", run_dm)):
                     if row in selected:
                         run(client, state)
+                # hdr H-4 (#277): the scopes.
+                if "SI" in selected:
+                    run_si(client, args.mode, control, state)
+                for row, run in (("SW", run_sw), ("SV", run_sv), ("SS", run_ss),
+                                 ("SD", run_sd), ("SP", run_sp)):
+                    if row in selected:
+                        run(client, state)
             except Exception as error:  # a row that could not run is a failure
                 import traceback
                 traceback.print_exc()
@@ -3980,7 +4663,8 @@ def main():
         failing = [n for n in shown if not rows[n]]
         print(f"captured into {args.folder}; on the control H2–H6 FAILED: {failing} "
               f"(passed, so not discriminating: {[n for n in shown if rows[n]]})")
-        captured = state.get("capture_ok") or "H1" not in selected
+        captured = (state.get("capture_ok") or "H1" not in selected) \
+            and state.get("si_captured", "SI" not in selected)
         return 0 if rows.get("Z1") and captured and rows.get("H7i", True) else 1
     scored = [name for name in ROWS if name in rows and name not in RECORDS]
     passed = sum(1 for name in scored if rows.get(name))

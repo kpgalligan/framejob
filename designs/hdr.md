@@ -1300,3 +1300,118 @@ at `MediaListFilter.swift`'s sort tooltip naming the harness that matches its op
 
 **Residue:** #310 (LG1, G1, S1) as before; #314 (phase8_chrome's stale checks, older than this
 phase) fixed in this phase, to close with its commit. The owner's person checks are HDR-1's new step, HDR-2 and HDR-3.
+
+## H-4 — #277, HDR scopes (HD-8, HD-15)
+
+**What landed** (2026-10-20, in the worktree on `hdr`, from `a08d072`). Spec §11 **HD-15**, written
+before the code (`11-decisions/hdr.md`: (a) the scopes read the picture shown; (b) Show SDR
+Version, `render_frame {sdr_version}` and an HLG project's JPEG read the SDR version as an SDR
+project's — Rec. 709, the 0/50/100 labels, "Rec. 709 · encoded", JSON with no `signal` key —
+because the scopes measure the deliverable on screen, the HLG master is one toggle away and the
+tap reads the one frame the compositor finished; (c) Show Ungraded keeps the HLG reading; (d) the
+signal from the recipe canvas; (e) a 0/1 `signal` uniform choosing two constant sets, not the
+weights as uniforms, so the SDR arm is T4-0's arithmetic — amending HD-8's "as uniforms"; (f) the
+scale; (g) the BT.2020 targets and the lifted skin line, printed by `python3 -I
+tools/proof/work/h4/h4_math.py` (scratch, gitignored) through `hdr_proof.py`'s own `lift`; (h)
+the JSON and sentences; (i) nothing new to call or persist), its README row, "amended by HD-15"
+on HD-8 with its Amended-by line, and the Lines cells. No format change, no FFI export, no new
+tool (92), argument or op. H-4 inherits H-3's Show SDR Version (its recipe key's
+`dynamic_range: "sdr"` is what the canvas carries to the tap) and the preview's tag stack
+(unchanged: the scopes add no tag). No file was near the cap, so no toll.
+
+- **Metal:** `Waveform.metal`'s waveform and histogram take `signal` at `buffer(1)`, the
+  vectorscope at `buffer(2)` beside its zoom; `kLuma2020Weights` and `chromaBins2020` beside the
+  Rec. 709 set, whose text is unchanged (every `scopes_proof` and `seeing_proof` anchor still
+  occurs once in the shader).
+- **Swift:** `ScopeSignal.swift` (new, 137 lines: the init table, `uniform`, `matrixName`,
+  `caption(for:)`, `graticule`, `referenceWhitePercent`, `labelGap`, `hlgNits`, `jsonKeys`,
+  `scaleJSON`); `WaveformAnalyzer` (`encode`/`trace`/`analyze` take `signal`, default `.sdr`);
+  `ScopeTraces` (each trace's `signal`, last and defaulted, so every memberwise call compiles
+  unchanged; `chroma(…, signal:)`, `targets(for:)`, `skinLineDegrees(for:)`; the JSON);
+  `WaveformTap` (`offer(_:key:signal:)`, the pending frame's own signal); `Compositor.serve`'s one
+  offer line passes `ScopeSignal(canvas: recipe?.canvas)`; `ScopeWell.graticule(…, signal:)`
+  draws the cd/m² labels and the dashed 75 % line; `ParadeView` and `VectorscopeView` keep the
+  last trace's signal; `ScopeSlotView`'s caption follows it; `writeScopes(…, signal:…)` and the
+  four HLG sentences; `renderFrame` computes the signal from the project and
+  `options.dynamicRange`; one sentence in `render_frame`'s description.
+- **Proofs:** `hdr_proof.py` SI, SW, SV, SS, SD, SP and P8 (`hdr_probe.swift`), the `hlg_bars`
+  fixture and nine mutants; `scopes_proof.py` S15 and T1's HLG variants; two `scopes_proof`
+  anchors re-pinned (`tap-first-kind-only`, `render-ignores-zoom`: the edits unchanged).
+- **Documents:** spec §4.2 (the HLG captions, labels and dashed line), §7.5 (the tap's per-frame
+  signal; "(the waveform's move at H-4)" replaced), §7.9a (the HLG JSON keys and sentences), the
+  spec index's Lines cells; README's HDR (HLG) and scopes bullets; `tools/proof/README.md`'s H-4
+  section and the scopes section's S15 and T1; `docs/manual-checks.md` HDR-6, and GRD-17's step
+  now reads "near 38 % on the waveform's HLG scale".
+
+**Rules written before the rows they judge** (the spec's step 7, carried into the rows): SW's
+oracle is the source codes through the identity (hlg) or the lift (bt709), each pixel's envelope
+its codes ±1 as H-2's rows take it, both ways ±1; SV's six fullest bins ±1 of a bar's BT.2020 bin
+of the decoded codes, the targets exact; SS the scale recomputed here; SP's readouts within 0.2.
+Two rules were set on the first Debug run's evidence and say so in the script: SW's oracle holds
+each column's levels holding more than 8 px (`SEAM_PIXELS`), because the render's row 64, where
+the ramp's chroma half begins, is off every oracle level of its column (the decoder's chroma
+upsampling mixes the halves; SW prints the rows, and every run printed `[64]` alone), every level
+still held to the PNG's own pixels ±1; and SW's envelope, because the bt709 ramp's first column
+read level 2 beside the nominal oracle's 0/4/6 (the lift's toe spreads one code over several
+levels near black). SV's first fixture was wrong, not the product: geq's X on a 4:2:2 chroma
+plane is that plane's own, so the chroma bars now switch every 80 px. `analyze(image:)` was left
+drawing into the image's own space: SW read the HLG-labelled frames' waveforms at 0 (hlg) and 1
+(bt709) levels from the PNGs' own pixels, inside the spec's one level.
+
+**Measured** (Release, 2026-10-20, AC Power, Apple M2 Max). The control: `capture
+tools/proof/work/h4/ctl --only H1,H7i,SI,Z1` on the untouched tree's Release build (exit 0; SI
+"50 JSON files of 50"), its app kept by `ditto` in `tools/proof/work/h4/ctl-app/`, and `screens.py
+--only 04b-preview-scopes --out tools/proof/work/h4/screens-ctl` on the same build (6/6, run with
+`RC_PROOF_APP=release` so the compare's build matches).
+- `make gate`: **PASS** (206 s; names, typecheck — its four baseline warnings — test and app ran;
+  fmt and lint skipped, no Rust changed).
+- `hdr_proof.py --control tools/proof/work/h4/ctl` whole: **49/49**. SI: 50 of 50 JSON files
+  byte-identical, the text the same. SW: hlg 0 waveform columns off the oracle, 145 seam levels
+  left to the PNG (rows off the oracle `[64]`), worst 0 against the PNG, parade 0 off, 212
+  chroma-row columns part Rec. 709 from BT.2020 by > 2 levels (CONTROL); bt709 0, 121, `[64]`,
+  worst 1, parade 0, 101 (CONTROL). SV: the six fullest bins (101, 224) 20480 px, (224, 120),
+  (197, 216), (155, 32), (59, 40), (32, 136) 20352 px each, the bars' BT.2020 bins exactly; the
+  skin line 139.916428844002 (wanted 139.9164); 4 bars part Rec. 709 from BT.2020 by ≥ 2 bins
+  (CONTROL). SS: the scale as wanted, the vectorscope "Rec. 2020", the five sentences. SD: the
+  SDR version's waveform at most 1 level from its PNG's Rec. 709 levels; the JPEG's scopes with
+  no `signal`; ungraded `signal` "hlg", 0 columns off, the exposed render's waveform different.
+  SP: HLG captions with readouts (0.1, 0.1) against `render_frame`'s (0.146484375,
+  0.146484375); Show SDR Version both "Rec. 709 · encoded", (4.3, 1.1) against (4.296875,
+  1.123046875) (CONTROL: highlights 4.296875 against the HLG 0.146484375, more than 1 point
+  apart); off again and under Show Ungraded the HLG
+  captions; an SDR project's "Rec. 709 · encoded". P8: dashed rows [98, 99] at 75 % in the
+  waveform's and every parade well's HLG bitmap, none in SDR; six boxes on the plot at ×1 in
+  each, none at ×2 (every target a rim tick there, HD-15 (g)); the skin rays 133.3 px apart at
+  0.9 of the reach; 4 targets part HLG from SDR by ≥ 4 pt (CONTROL). H-2's and H-3's rows all
+  passed in the same run (HS…HX, DT…DX).
+- `hdr_proof.py compare tools/proof/work/h4/ctl --only H1,SI,Z1`: **3/3** — H1's 12 SDR scenes
+  byte-identical at 0 and 0.5 s with equal picks (the reverse's intermediate digest differs,
+  2f713bfc59c23c7c against 0c5a3cc65738520e, printed and unscored as in H-1…H-3), SI 50 of 50.
+- **Mutants** (Release copies, each `--only <its rows>,Z1 --control tools/proof/work/h4/ctl`),
+  all nine **MUTANT PASS** with no other row failing: `scope-709-in-hlg` (SW, SV),
+  `histogram-709-in-hlg` (SW), `ref-line-at-100` (SS, P8), `sdr-version-read-as-hlg` (SD, SP),
+  `tap-signal-dropped` (SP), `render-scopes-sdr` (SW, SV, SS), `sdr-json-names-scale` (SI, P8),
+  `vectorscope-view-709-targets` (P8), `parade-graticule-sdr` (P8).
+- `scopes_proof.py` whole: **27/27** — S12 holds every ×1 SDR count to `31f3aa1`'s shader; S15
+  9 of 9 cards part Rec. 709 from BT.2020 (CONTROL); T1's worst 4K: parade 0.629 ms, vectorscope
+  ×1/×2/×4 0.407/0.362/0.336, histogram 0.667; in HLG vectorscope 0.401/0.326/0.324, histogram
+  0.559 (recorded: waveform 0.451, waveform + vectorscope 0.815, HLG waveform 0.452). The
+  re-pinned mutants: `tap-first-kind-only` MUTANT PASS (S7, S8; S14 tolerated, failed),
+  `render-ignores-zoom` MUTANT PASS (S13).
+- `seeing_proof.py` **19/19**; `screens.py --only 04b-preview-scopes --compare
+  tools/proof/work/h4/screens-ctl` **4/4 byte-identical**; `recording_probe.py --only catalog`
+  **31/31**. No run's log held a `Frame Job: ` line and none printed `DEFAULTS MOVED`.
+  `phase8_chrome.py`, `op_argument_proof.py` and `phase9_proof.py` were not run: the SDR chrome
+  is byte-identical and no tool's arguments changed.
+
+**Owed.** The `CLAUDE.md` edits (applied by the orchestrator): `app/CLAUDE.md` gains a
+`ScopeSignal.swift` entry (what a scope's frame holds: the init from the canvas, the kernels'
+uniform, the captions, the scale and the JSON keys); `WaveformAnalyzer.swift` and
+`ScopeTraces.swift` gain `signal`; `WaveformTap.swift` gains the per-frame signal;
+`ScopeSlotView.swift`'s caption follows the signal.
+
+The review passed with three nits; the CLAUDE.md map edits above were applied by the orchestrator
+at merge. **Residue:** #315 (the review's nits 1 and 2: no row reads Show Ungraded and Show SDR
+Version on together, HD-15 (c); `ScopeSlotView.show(_:)` takes its caption from any kind's trace);
+#310 (LG1, G1, S1) as before, not run here. The owner's person check is HDR-6 (the scopes on real
+HDR footage).

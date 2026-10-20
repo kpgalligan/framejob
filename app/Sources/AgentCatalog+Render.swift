@@ -124,7 +124,12 @@ extension AgentServer {
                     + "diagnostic; a failed graphic draws its error card in the picture. In an "
                     + "HLG project (set_canvas output) the frame is a 16-bit PNG or a 10-bit "
                     + "HEIC labelled BT.2100 HLG; a JPEG, and any frame asked with "
-                    + "sdr_version, is the project's SDR version, labelled BT.709.",
+                    + "sdr_version, is the project's SDR version, labelled BT.709. Its scopes "
+                    + "read the picture it draws: in an HLG project the HLG signal, each JSON "
+                    + "adding signal \"hlg\" and, for the waveform, parade and histogram, scale "
+                    + "(the HLG % ticks in cd/m², reference white at 75 %), the luma and "
+                    + "vectorscope taking Rec. 2020's weights and targets; the SDR version's "
+                    + "scopes are an SDR project's.",
                 [
                     "t": [
                         "type": "integer",
