@@ -287,8 +287,16 @@ use crate::model::{Canvas, Project};
 /// exactly the text it did, and the reader's default is `sdr`, so there is
 /// no migration step. The bump is so an older build refuses an HLG file
 /// instead of opening it as SDR and dropping its output on save.
-/// Every number from 24 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 23;
+///
+/// Version 24 is the canvas's blending (spec §11 GR-18, HD-9, HD-16):
+/// [`crate::model::CanvasBlending`] on `canvas.blending`, `encoded` or
+/// `linear`, after `output`, written only when `linear`, so every other
+/// project writes exactly the text it did, and the reader's default is
+/// `encoded`, so there is no migration step. The bump is so an older build
+/// refuses a linear file instead of opening it encoded and dropping its
+/// blending on save.
+/// Every number from 25 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 24;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

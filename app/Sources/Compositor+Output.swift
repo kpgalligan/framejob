@@ -6,8 +6,12 @@ import Metal
 /// SDR version (HD-4: HLG → display light → × 1000/203 → BT.2020 to BT.709 →
 /// GR-15's gamut lift → the shoulder at `OutputTransform.sdrKnee` → Core
 /// Media 709's encode with its toe) or PQ (display light at 1,000 cd/m² →
-/// ST 2084). Drawn only when `OutputTransform.uniforms(for:)` answers a block,
-/// so an HLG master and every SDR project's frame are the bytes they were.
+/// ST 2084). On a linear canvas (spec §11 HD-16 (f)) it is also the one
+/// encode of the linear destination: the sRGB encode in an SDR project, the
+/// HLG OETF for an HLG master, and the SDR version or PQ from the linear
+/// scene light. Drawn only when `OutputTransform.uniforms(for:)` answers a
+/// block, so an encoded HLG master and every encoded SDR project's frame are
+/// the bytes they were.
 ///
 /// The shadow pass's vertex stage and the adjustment pass's shape: **blending
 /// OFF** (`pipelineDescriptor`'s doc, the B6 lesson), the fragment returning

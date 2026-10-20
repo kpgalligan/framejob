@@ -277,12 +277,15 @@ final class MetalRenderer {
     }
 
     /// The canvas background as the frame is cleared to it: HD-3's lift of it
-    /// in an HLG project (spec §11 HD-13 (f)), as it stands in an SDR one.
+    /// in an HLG project (spec §11 HD-13 (f)), as it stands in an SDR one;
+    /// then, on a linear canvas, decoded (`RecipeCanvas.blended`, HD-16 (d)).
     private func background(_ canvas: RecipeCanvas) -> RGBA {
         let c = canvas.background
-        guard canvas.output == .hlg, c.count >= 3 else { return c }
-        let lifted = InputConversions.liftSDR(SIMD3<Float>(Float(c[0]), Float(c[1]), Float(c[2])))
-        return [Double(lifted.x), Double(lifted.y), Double(lifted.z)] + c.dropFirst(3)
+        guard canvas.output == .hlg || canvas.blending == .linear, c.count >= 3 else { return c }
+        var rgb = SIMD3<Float>(Float(c[0]), Float(c[1]), Float(c[2]))
+        if canvas.output == .hlg { rgb = InputConversions.liftSDR(rgb) }
+        rgb = canvas.blended(rgb)
+        return [Double(rgb.x), Double(rgb.y), Double(rgb.z)] + c.dropFirst(3)
     }
 
     /// Drops the `CVMetalTexture`s wrapping the previous render context's pixel buffers.
@@ -350,8 +353,8 @@ final class MetalRenderer {
         try encodeLayers(
             canvasLayers, depth: 0, among: layers, coverage: coverage, canvas: canvas,
             pass: &pass, request: request, instruction: instruction, live: &live)
-        // The output pass, last (spec §11 HD-14 (b)): only for an HLG canvas
-        // asked for its SDR version or PQ.
+        // The output pass, last (spec §11 HD-14 (b), HD-16 (f)): for an HLG
+        // canvas asked for its SDR version or PQ, and for every linear canvas.
         try encodeOutput(canvas, pass: &pass)
         pass.suspend()
         buffer.commit()

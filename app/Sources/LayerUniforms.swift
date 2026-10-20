@@ -236,10 +236,12 @@ struct LayerUniforms {
     // the inverse lift — and `liftedWhite` Fade Through White's white there
     // (HD-3's lift of SDR white); both 0 in an SDR project, so its draws are
     // what they were (`Compositor+Uniforms.swift`, `Compositor+Adjustment
-    // .swift`). 128 + 4 = 132 floats = 528 bytes, 33 × 16.
+    // .swift`). `linearLight` (spec §11 HD-16 (c)) is 1 when the canvas
+    // blends in linear light: the layer decoded after its grade; 0 in every
+    // other project. 128 + 4 = 132 floats = 528 bytes, 33 × 16.
     var hlgOutput: Float = 0
     var liftedWhite: Float = 0
-    var hlgReserved0: Float = 0
+    var linearLight: Float = 0
     var hlgReserved1: Float = 0
 }
 

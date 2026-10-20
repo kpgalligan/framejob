@@ -48,6 +48,9 @@ design time or build time.
     blend, opacity and dissolve is untouched by H-1…H-5.
   - Risk accepted: every proof is synthetic; how an HDR picture looks on a panel is the person
     checks' (the HDR rows, each added by the phase that creates it).
+  **Amended by HD-16** (hdr H-6): H-6 runs before H-5. H-5 waits on Canon's own log document,
+  which the owner has not yet supplied, and H-6 needs nothing H-5 adds; H-6 is still the first
+  phase to drop.
 - **HD-2 — An HLG project works in HLG-encoded BT.2020 values: GR-19's design, built in H-2.**
   Choice 1a (owner, 2026-10-19).
   - **The setting:** `canvas.output` is `"sdr"` or `"hlg"`, absent = SDR, written only when
@@ -237,12 +240,16 @@ design time or build time.
 - **HD-9 — #276 is built last, as GR-18 wrote it; in an HLG project its decode is HLG's scene
   light.** Choice 11 (taken as recommended, stated to the owner before the questions).
   - `canvas.blending`, `"encoded"` or `"linear"`, written only when `linear`; `set_canvas
-    {blending}`; off and byte-identical for every project; format 25 (HD-11).
+    {blending}`; off and byte-identical for every project; format 24 (HD-11; 25 at H-0,
+    renumbered by HD-16 when H-6 ran before H-5).
   - "Linear" means the project's own transfer decoded: the sRGB EOTF in an SDR project, HLG's
     inverse OETF (scene light) in an HLG project. Its encode lives in H-3's output pass.
   - GR-18's text is unchanged and takes no Amended-by line: H-6 builds it as written, and the
     transfer it follows is HD-2's.
   - It is the first phase to drop if the road map is shortened.
+  **Amended by HD-16** (hdr H-6): H-6 runs before H-5. H-5 waits on Canon's own log document,
+  which the owner has not yet supplied, and H-6 needs nothing H-5 adds; H-6 is still the first
+  phase to drop.
 - **HD-10 — #278: the new curves are Canon Log 2 and Canon Log 3, with Cinema Gamut.** Choice
   10 (owner, 2026-10-19: "Sony S-Log3, Panasonic V-Log, Canon C-Log2/3"). S-Log3 and V-Log
   exist since GR-16, so the new curves are Canon's.
@@ -250,7 +257,8 @@ design time or build time.
     (the owner downloads it, kept outside the repo), the curve's and gamut's constants, its code
     domain, a matrix derived from the primaries (never copied), and an L1-style fixture row and
     an LP3-style maths row. No maker LUT enters the repo.
-  - New `log` values are **format 24** (HD-11): an older Frame Job cannot read them.
+  - New `log` values are **format 25** (HD-11; 24 at H-0, renumbered by HD-16 when H-6 ran
+    first): an older Frame Job cannot read them.
   - **Detection** of S-Log3 and V-Log from the maker's metadata waits for real files (one per
     camera, read and never copied into the repo): a parser built blind could convert a normal
     clip as log. So #278 stays open after H-5.
@@ -263,7 +271,8 @@ design time or build time.
     gated (`make gate`) and merged into main alone, the next started from main.
   - Format numbers are main's next when a phase's code is written: 22 for H-1, 23 for H-2, 24
     for H-5, 25 for H-6 at H-0, each renumbered before its merge if main moved first. HD IDs
-    likewise.
+    likewise. H-6 ran before H-5 (HD-16), so it took 24 when its code was written, and H-5 takes
+    25.
   - No verdict phase: each phase is kept when its proofs pass.
   - Synthetic fixtures now; the owner's real HDR, HDR10 and log clips become
     `docs/manual-checks.md` rows, read from a path he gives and never copied into the repo.
@@ -477,6 +486,8 @@ design time or build time.
     remembered by the export choice or user presets.
   - **(i) Amends** HD-4 (the knee and its recomputed rows), HD-5 (the spelling), HD-7 ((g)) and
     HD-13 ((i), (j): JPEG and the non-10-bit rows now the SDR version).
+  **Amended by HD-16** (hdr H-6): the output pass is also drawn for every project whose
+  `canvas.blending` is `linear`, encoding its linear destination (HD-16 (f)).
 - **HD-15 — H-4's settlements: the scopes read the picture shown, the SDR version's as an SDR
   project's, the HLG master's on BT.2020's weights, matrix and targets with a cd/m² scale.**
   H-4's spec, recorded before its code; it settles what HD-8 left to H-4. No tool, argument, op
@@ -536,3 +547,64 @@ design time or build time.
     the 256 levels and bins and GR-31's zoom rule are unchanged.
   - **(j) Amends** HD-8 ((e): a signal, not weights, as the uniform; (b), (c), (f), (h)), GR-10
     and GR-31 (as HD-8 does).
+- **HD-16 — H-6's settlements: `canvas.blending`, the decode once per layer after the grade, a
+  linear destination encoded once by the output pass, and every reading that keeps its meaning
+  kept encoded.** H-6's spec, recorded before its code; it settles what HD-9 and GR-18 left to
+  the spec. Format 24 (HD-11).
+  - **(a) The key, the op and nests.** `canvas.blending`, `"encoded"` (the default, GR-3) or
+    `"linear"`, after `output`, written only when `linear`; `set_canvas {blending}` sets it,
+    one undoable step, and an unknown value is refused naming both. Setting the value the canvas
+    already has is an identity through `finish`. The recipe canvas carries `"blending":
+    "linear"` last (after `output` and `dynamic_range`), for any output, only when linear;
+    `get_project` shows it only when linear; the plan is unchanged. A nest shares its document's
+    blending: it is flattened into the document's recipe, and `scoped_view` copies the key. No
+    new tool or op (92 product tools), no FFI export.
+  - **(b) What "linear" means:** the project's own transfer as scene light, with no OOTF — the
+    IEC 61966-2-1 pair (`gradeDecode`/`gradeEncode`, GR-18's `linear.py`) in an SDR project,
+    HLG's inverse OETF and OETF (BT.2100) in an HLG project.
+  - **(c) Where the decode runs:** once per layer, in `layerColorPremultiplied`, right after the
+    `if (effects) { … }` block (steps 1–6, with 7a and 9a, which touch alpha only) and before
+    7b: `if (u.linearLight > 0.5) rgb = blendDecode(rgb, u.hlgOutput);`. The route is GR0's
+    uniform flag (`LayerUniforms.linearLight`, H-2's reserved float renamed), and it does not
+    join the effects sum. The gather filters stay encoded (GR-18: blur and sharpen move only if
+    the decode moves before the gather). Coverage, the transition weight, opacity, the
+    reflection's fade, premultiplication, fixed-function source-over and all eight blend modes
+    act on linear values; their formulas are unchanged, and `overlay`'s 0.5 test reads the
+    linear backdrop.
+  - **(d) Linear too:** the background is cleared to the decode of HD-13's lifted colour
+    (`RecipeCanvas.blended`); Fade Through Black and White's colour goes through `blendDecode`;
+    a shadow's colour through `blended` after its lift; matte composites, and a routed
+    dissolve's halves and their mix, are linear, because the same stage draws them, so a routed
+    dissolve equals the unrouted one.
+  - **(e) Read encoded, so a value keeps its meaning:**
+    - the adjustment pass encodes the un-premultiplied destination before its qualifier and
+      grade, then decodes the graded colour before its strength mix. The mix `mix(dst, g, w)`
+      stays in linear light, as every other opacity does under (c): where `w` is 0 or 1 the
+      result equals the encoded one, and in a qualifier's soft band or blur it is the linear mix
+      of the same two colours;
+    - the qualifier-map pass (GR-35's blur) encodes the same way;
+    - Show Selection writes `blendDecode(q · coverage)`, so the frame shows the grey it showed
+      before;
+    - a luma matte reads the encoded straight colour (then HD-13 (h)'s un-lift in an HLG
+      project), premultiplied, so it cuts what it cut before; alpha mattes are unchanged;
+    - the chroma key (step 3) is unchanged, since it runs before the decode;
+    - the scopes, picks and the eyedropper read the output pass's encoded frame (GR-18).
+  - **(f) The output pass** (HD-14 (b)) is drawn for every linear project. `OutputUniforms`'
+    two reserved floats become `linearLight` and `hlgOutput`. An SDR project draws `mode` 0
+    and `gradeEncode`; an HLG master `mode` 0 and the HLG OETF; HLG with `sdr` or `pq` (modes 1
+    and 2) starts from the linear destination as its scene light in place of
+    `hlgInverseOETF(signal)`. The pass stays premultiplied in and out. An encoded project's
+    `uniforms(for:)` is exactly what it was, so its frame draws the passes it drew.
+  - **(g) The Document tab:** the Canvas section gains a "Blending" popup after Dynamic Range,
+    "Encoded" and "Linear light". Each change is one `set_canvas {blending}` step named
+    "Blending"; there is no summary row.
+  - **(h) Unchanged:** thumbnails and the Media tab (a media thumbnail is one clip, not the
+    project's blend), the look bake, Show Ungraded and GR-3's default.
+  - **(i) The costs** are GR-18's figures (+0.000–0.001 ms at 4K for the decode and encode,
+    one output pass of about a copy, C0's 0.21 ms); H-6's TL measures them.
+  - **(j) The order.** H-6 runs before H-5, amending HD-1's and HD-9's "#276 last": H-5 waits
+    on Canon's own log document, which the owner has not supplied, and H-6 needs nothing H-5
+    adds (HD-1's own "why this order" puts H-6's dependencies on H-2 and H-3 only). H-6 is
+    still the first phase to drop. So H-6 takes format 24 and H-5 25 (HD-9, HD-10, HD-11).
+  - **Amends** HD-1 and HD-9 (the order; their text and titles otherwise unchanged) and HD-14
+    (b) (the output pass is also drawn for a linear project).

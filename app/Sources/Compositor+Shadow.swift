@@ -153,6 +153,12 @@ extension MetalRenderer {
             let lifted = InputConversions.liftSDR(SIMD3<Float>(u.colorR, u.colorG, u.colorB))
             (u.colorR, u.colorG, u.colorB) = (lifted.x, lifted.y, lifted.z)
         }
+        // A linear canvas's shadow colour is decoded after its lift (spec §11
+        // HD-16 (d)); `blended` is the identity for every encoded project.
+        if canvas.blending == .linear {
+            let decoded = canvas.blended(SIMD3<Float>(u.colorR, u.colorG, u.colorB))
+            (u.colorR, u.colorG, u.colorB) = (decoded.x, decoded.y, decoded.z)
+        }
         u.opacity = opacity
 
         encoder.setRenderPipelineState(shadowPipeline)

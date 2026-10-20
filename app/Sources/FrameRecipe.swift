@@ -13,16 +13,20 @@ struct RecipeCanvas: Codable, Equatable {
     /// The output pass's arm (spec §11 HD-14 (b)): `.sdr` or `.pq` on an HLG
     /// canvas whose key asked for it, nil otherwise (`OutputTransform`).
     let dynamicRange: DynamicRange?
+    /// How the layers blend (spec §11 HD-16); `.encoded` when absent.
+    let blending: CanvasBlending
 
     init(
         width: Int = 1920, height: Int = 1080, background: RGBA = [0, 0, 0, 1],
-        output: CanvasOutput = .sdr, dynamicRange: DynamicRange? = nil
+        output: CanvasOutput = .sdr, dynamicRange: DynamicRange? = nil,
+        blending: CanvasBlending = .encoded
     ) {
         self.width = width
         self.height = height
         self.background = background
         self.output = output
         self.dynamicRange = dynamicRange
+        self.blending = blending
     }
 
     init(from decoder: Decoder) throws {
@@ -32,6 +36,7 @@ struct RecipeCanvas: Codable, Equatable {
         background = c.lenient(.background, [0, 0, 0, 1])
         output = c.lenient(.output, .sdr)
         dynamicRange = c.lenient(.dynamicRange)
+        blending = c.lenient(.blending, .encoded)
     }
 
     var size: CGSize { CGSize(width: width, height: height) }

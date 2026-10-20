@@ -24,7 +24,9 @@ struct MatteUniforms {
     /// 1 in an HLG project: a luma matte reads the un-lifted colour (spec
     /// §11 HD-13 (h)); 0 in an SDR project.
     var hlgOutput: Float = 0
-    var reserved1: Float = 0
+    /// 1 when the canvas blends in linear light: a luma matte reads the
+    /// encoded colour of its linear composite (spec §11 HD-16 (e)).
+    var linearLight: Float = 0
     var reserved2: Float = 0
 }
 
@@ -254,7 +256,8 @@ extension MetalRenderer {
             composites[step.group] = (composite, group.mode)
             for cut in step.resolve {
                 try resolve(
-                    cut, composites, into: &coverage, buffer, hlg: canvas.output == .hlg)
+                    cut, composites, into: &coverage, buffer, hlg: canvas.output == .hlg,
+                    linear: canvas.blending == .linear)
             }
             // A composite no later resolve reads goes back to the pool, so the
             // next step may draw into it; Metal orders that clear after the
@@ -271,10 +274,12 @@ extension MetalRenderer {
     /// One cut set's coverage, resolved once per frame: a pass cleared to 1
     /// with each matte's mode multiplied in. An empty set is the placeholder
     /// and encodes nothing. `hlg`: an HLG project's luma reads the un-lifted
-    /// colour (spec §11 HD-13 (h)).
+    /// colour (spec §11 HD-13 (h)); `linear`: a linear canvas's luma reads
+    /// the encoded colour (HD-16 (e)).
     private func resolve(
         _ cut: [Int], _ composites: [Int: (texture: MTLTexture, mode: TrackMatte)],
-        into coverage: inout MatteCoverage, _ buffer: MTLCommandBuffer, hlg: Bool
+        into coverage: inout MatteCoverage, _ buffer: MTLCommandBuffer, hlg: Bool,
+        linear: Bool
     ) throws {
         guard !cut.isEmpty, coverage.byCut[cut] == nil else { return }
         // Every matte in the set is drawn already, checked before the pass
@@ -300,6 +305,7 @@ extension MetalRenderer {
             var u = MatteUniforms()
             u.mode = matte.mode.shaderCode
             u.hlgOutput = hlg ? 1 : 0
+            u.linearLight = linear ? 1 : 0
             encoder.setFragmentBytes(&u, length: MemoryLayout<MatteUniforms>.stride, index: 0)
             encoder.setFragmentTexture(matte.texture, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)

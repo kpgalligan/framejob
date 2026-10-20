@@ -403,11 +403,14 @@ struct CanvasSnapshot: Codable, Equatable {
     let timecodeFrames: Bool
     /// The dynamic range (format 23, `CanvasOutput.swift`); `.sdr` when absent.
     let output: CanvasOutput
+    /// The blending (format 24, `CanvasOutput.swift`); `.encoded` when absent.
+    let blending: CanvasBlending
 
     init(
         width: Int = 1920, height: Int = 1080, fps: Fps = .thirty,
         background: RGBA = [0, 0, 0, 1], fitNewClips: Bool = true,
-        timecodeFrames: Bool = true, output: CanvasOutput = .sdr
+        timecodeFrames: Bool = true, output: CanvasOutput = .sdr,
+        blending: CanvasBlending = .encoded
     ) {
         self.width = width
         self.height = height
@@ -416,6 +419,7 @@ struct CanvasSnapshot: Codable, Equatable {
         self.fitNewClips = fitNewClips
         self.timecodeFrames = timecodeFrames
         self.output = output
+        self.blending = blending
     }
 
     init(from decoder: Decoder) throws {
@@ -427,6 +431,7 @@ struct CanvasSnapshot: Codable, Equatable {
         fitNewClips = c.lenient(.fitNewClips, true)
         timecodeFrames = c.lenient(.timecodeFrames, true)
         output = c.lenient(.output, .sdr)
+        blending = c.lenient(.blending, .encoded)
     }
 
     var size: CGSize { CGSize(width: width, height: height) }

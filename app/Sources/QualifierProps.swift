@@ -238,7 +238,10 @@ struct QualifierUniforms {
     /// 1 in an HLG project: Y′ by BT.2020's weights (spec §11 HD-13 (g));
     /// set only by `drawAdjustment`, from the canvas.
     var hlgOutput: Float = 0
-    var reserved0: Float = 0
+    /// 1 when the canvas blends in linear light: the selection map encodes
+    /// the destination before reading it (spec §11 HD-16 (e)); set only by
+    /// `drawAdjustment`, from the canvas.
+    var linearLight: Float = 0
     var reserved1: Float = 0
     var reserved2: Float = 0
 

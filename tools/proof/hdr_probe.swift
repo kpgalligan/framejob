@@ -1,9 +1,10 @@
 // Built by tools/proof/hdr_proof.py as `main.swift` over every other file in
-// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P8
+// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P9
 // (grading-3 T3-1, spec §11 GR-15 as amended; P5 hdr H-1, spec §11 HD-12; P6
 // hdr H-2, spec §11 HD-3, HD-13; P7 hdr H-3, spec §11 HD-14; P8 hdr H-4, spec
 // §11 HD-15: `ScopeSignal`, the traces' JSON, and the waveform's, parade's
-// and vectorscope's drawing cached to bitmaps).
+// and vectorscope's drawing cached to bitmaps; P9 hdr H-6, spec §11 HD-16:
+// `RecipeCanvas.blended`, `uniforms(for:)` and the four blocks' sizes).
 //
 // Step 0's maths through the app's own types: `InputConversion`'s selector
 // through BOTH readers (the labels as strings, and a `CMVideoFormatDescription`
@@ -1005,6 +1006,94 @@ do {
         misses.isEmpty,
         (misses.isEmpty ? "as wanted" : misses.joined(separator: "; ")) + " | "
             + notes.joined(separator: "; "))
+}
+
+// MARK: - P9 linear light's values (hdr H-6, spec §11 HD-16)
+
+do {
+    var misses: [String] = []
+    // (a) `blended` against IEC 61966-2-1's EOTF and BT.2100's HLG inverse OETF,
+    // written out here in Double, per channel, clamped to 0…1.
+    func iec(_ c: Double) -> Double {
+        let v = min(max(c, 0), 1)
+        return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
+    }
+    func hlgInverse(_ c: Double) -> Double {
+        let a = 0.17883277, b = 1 - 4 * 0.17883277
+        let cc = 0.5 - a * log(4 * a)
+        let v = min(max(c, 0), 1)
+        return v <= 0.5 ? v * v / 3 : (exp((v - cc) / a) + b) / 12
+    }
+    let inputs: [Double] = [-0.1, 0, 0.02, 0.04045, 0.05, 0.25, 0.5, 0.5059, 0.75, 1, 1.2]
+    var worst = 0.0
+    for output in CanvasOutput.allCases {
+        let encoded = RecipeCanvas(output: output)
+        let linear = RecipeCanvas(output: output, blending: .linear)
+        for x in inputs {
+            let rgb = SIMD3<Float>(Float(x), Float(x) * 0.5, 1 - Float(x))
+            if encoded.blended(rgb) != rgb {
+                misses.append("encoded \(output) blended(\(x)) is not the identity")
+            }
+            let got = linear.blended(rgb)
+            for (g, c) in [(got.x, rgb.x), (got.y, rgb.y), (got.z, rgb.z)] {
+                let want = output == .hlg ? hlgInverse(Double(c)) : iec(Double(c))
+                worst = max(worst, abs(Double(g) - want))
+                if abs(Double(g) - want) > 2e-6 {
+                    misses.append("\(output) blended(\(c)) = \(g), want \(want)")
+                }
+            }
+        }
+    }
+    // (b) `uniforms(for:)` over output × blending × range: (mode, linearLight,
+    // hlgOutput), nil where no pass is drawn; an encoded canvas's answer is H-3's.
+    let ranges: [DynamicRange?] = [nil, .hlg, .sdr, .pq]
+    for output in CanvasOutput.allCases {
+        for blending in CanvasBlending.allCases {
+            for range in ranges {
+                let canvas = RecipeCanvas(output: output, dynamicRange: range, blending: blending)
+                let got = OutputTransform.uniforms(for: canvas)
+                let hdrMode: Float? = output == .hlg ? (range == .sdr ? 1 : range == .pq ? 2 : nil) : nil
+                let want: (Float, Float, Float)? = blending == .encoded
+                    ? hdrMode.map { ($0, 0, 0) }
+                    : (hdrMode ?? 0, 1, output == .hlg ? 1 : 0)
+                let said = got.map { "(\($0.mode), \($0.linearLight), \($0.hlgOutput), knee \($0.knee))" }
+                    ?? "nil"
+                let match: Bool
+                if let w = want, let g = got {
+                    match = g.mode == w.0 && g.linearLight == w.1 && g.hlgOutput == w.2
+                        && g.knee == OutputTransform.sdrKnee
+                } else {
+                    match = want == nil && got == nil
+                }
+                if !match {
+                    misses.append("uniforms(\(output), \(blending), \(range?.rawValue ?? "nil")) = \(said)")
+                }
+            }
+        }
+    }
+    // (c) the Blending popup's items (HD-16 (g)).
+    let names = CanvasBlending.allCases.map(\.menuName)
+    if names != ["Encoded", "Linear light"] { misses.append("the popup's items \(names)") }
+    // (d) the four blocks' sizes: the renamed floats added nothing.
+    let sizes = [
+        ("LayerUniforms", MemoryLayout<LayerUniforms>.stride, 528),
+        ("QualifierUniforms", MemoryLayout<QualifierUniforms>.stride, 80),
+        ("MatteUniforms", MemoryLayout<MatteUniforms>.stride, 16),
+        ("OutputUniforms", MemoryLayout<OutputUniforms>.stride, 16),
+    ]
+    for (name, got, want) in sizes where got != want {
+        misses.append("\(name) is \(got) bytes, not \(want)")
+    }
+    check(
+        "P9 RecipeCanvas.blended: the identity when encoded, IEC 61966-2-1's EOTF (SDR) and "
+            + "HLG's inverse OETF (HLG) when linear, ±2e-6; uniforms(for:) over output × "
+            + "blending × range (encoded H-3's, linear mode 0/1/2 with linearLight 1 and "
+            + "hlgOutput the canvas's); the popup's items Encoded and Linear light; "
+            + "LayerUniforms 528, QualifierUniforms 80, MatteUniforms "
+            + "16 and OutputUniforms 16 bytes",
+        misses.isEmpty,
+        (misses.isEmpty ? "as wanted" : misses.prefix(12).joined(separator: "; "))
+            + " | worst blended |Δ| \(worst)")
 }
 
 finish()

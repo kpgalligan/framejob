@@ -31,7 +31,8 @@ fn sample(kind: Kind) -> Value {
         | Kind::Curve
         | Kind::Fit
         | Kind::Matte
-        | Kind::Output => {
+        | Kind::Output
+        | Kind::Blending => {
             json!(kind.values()[0])
         }
     }
@@ -86,11 +87,11 @@ fn every_optional_field_has_its_real_null_contract() {
             }
         }
     }
-    assert_eq!(seen.len(), 69, "optional inventory changed");
+    assert_eq!(seen.len(), 70, "optional inventory changed");
     for field in PLAIN {
         assert!(seen.contains(&field), "missing plain bool {field:?}");
     }
-    assert_eq!(seen.iter().filter(|x| !PLAIN.contains(x)).count(), 64);
+    assert_eq!(seen.iter().filter(|x| !PLAIN.contains(x)).count(), 65);
 }
 
 #[test]

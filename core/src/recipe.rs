@@ -226,6 +226,12 @@ impl Project {
                 canvas.insert("dynamic_range".to_string(), Value::from(range.as_str()));
             }
         }
+        // Linear-light blending (spec §11 HD-16 (a)), last and only when
+        // linear, for any output, so every other project's recipe is the
+        // text it was.
+        if !self.canvas.blending.is_encoded() {
+            canvas.insert("blending".to_string(), Value::from("linear"));
+        }
 
         let mut out = Map::new();
         out.insert("t".to_string(), Value::from(t));

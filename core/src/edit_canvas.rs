@@ -18,7 +18,7 @@
 //!    coarser grid can land two markers on one tick, which markers may
 //!    never share.
 
-use crate::model::{CanvasOutput, Color, Project};
+use crate::model::{CanvasBlending, CanvasOutput, Color, Project};
 use crate::outcome::Outcome;
 use crate::props_check::{color_ok, SCALE_MAX, SCALE_MIN};
 use crate::time::{self, Fps, Ticks};
@@ -167,13 +167,17 @@ impl Project {
     /// has is an identity, like every other unchanged field, through
     /// `finish`.
     ///
+    /// `blending` sets how layers blend (spec §11 GR-18, HD-16): `encoded`
+    /// or `linear` light. It changes no clip and no grade, and the blending
+    /// the canvas already has is an identity through `finish`, as `output`.
+    ///
     /// The rate change is deliberately NOT re-checked against the overlap
     /// rule: re-snapping moves each edge by less than one frame, so an
     /// overlap can grow by at most a frame, and refusing a document-wide
     /// rate change over a one-frame drift would be worse than the drift.
     #[allow(clippy::too_many_arguments)]
     // The argument list IS the op's argument list (spec §6); a struct would
-    // hold exactly the same eight optional fields and one more name.
+    // hold exactly the same nine optional fields and one more name.
     pub fn set_canvas(
         &self,
         width: Option<u32>,
@@ -184,6 +188,7 @@ impl Project {
         fit_new_clips: Option<bool>,
         timecode_frames: Option<bool>,
         output: Option<CanvasOutput>,
+        blending: Option<CanvasBlending>,
     ) -> Result<Outcome, String> {
         let width = match width {
             None => self.canvas.width,
@@ -228,6 +233,9 @@ impl Project {
         }
         if let Some(output) = output {
             next.canvas.output = output;
+        }
+        if let Some(blending) = blending {
+            next.canvas.blending = blending;
         }
 
         let resized = width != self.canvas.width || height != self.canvas.height;

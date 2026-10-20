@@ -51,6 +51,10 @@ use crate::time::{Fps, Ticks};
 /// own.
 pub use crate::model_props::*;
 
+/// The canvas's blending (format version 24, spec §11 HD-16), a file of its
+/// own so this one stays clear of the cap.
+pub use crate::model_canvas::CanvasBlending;
+
 /// Camera log's vocabulary (format version 19, spec §11 GR-16), a file of
 /// its own for the reason `model_props.rs` is.
 pub use crate::model_media_color::{CameraGamut, LogCurve, MediaColor};
@@ -106,6 +110,11 @@ pub struct Canvas {
     /// round-trip byte for byte.
     #[serde(skip_serializing_if = "CanvasOutput::is_sdr")]
     pub output: CanvasOutput,
+    /// How layers blend (format version 24, spec §11 HD-16): `encoded`, or
+    /// `linear` light. Written only when `linear`, so every other project
+    /// round-trips byte for byte.
+    #[serde(skip_serializing_if = "CanvasBlending::is_encoded")]
+    pub blending: CanvasBlending,
 }
 
 /// A canvas's dynamic range (spec §11 HD-2): `Sdr`, the default, or `Hlg`.
@@ -135,6 +144,7 @@ impl Default for Canvas {
             fit_new_clips: true,
             timecode_frames: true,
             output: CanvasOutput::Sdr,
+            blending: CanvasBlending::Encoded,
         }
     }
 }

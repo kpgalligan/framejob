@@ -29,12 +29,15 @@ struct VideoColour: Equatable {
 }
 
 /// The output pass's uniform block (`framejob_output_fragment`'s
-/// `OutputUniforms`, sixteen bytes): `mode` 1 draws the SDR version, 2 PQ.
+/// `OutputUniforms`, sixteen bytes): `mode` 1 draws the SDR version, 2 PQ;
+/// `linearLight` 1 when the destination holds linear light (spec §11 HD-16
+/// (f)), with `hlgOutput` 1 when that light is HLG's scene light — mode 0
+/// then encodes it by the project's own transfer.
 struct OutputUniforms {
     var mode: Float
     var knee: Float
-    var reserved0: Float = 0
-    var reserved1: Float = 0
+    var linearLight: Float = 0
+    var hlgOutput: Float = 0
 }
 
 /// The one final pass an HLG project's picture takes on its way out (spec
@@ -79,9 +82,23 @@ enum OutputTransform {
         }
     }
 
-    /// The pass's block for `canvas`, or nil when no pass is drawn: only an
-    /// HLG canvas whose key asked for the SDR version or PQ.
+    /// The pass's block for `canvas`, or nil when no pass is drawn: an HLG
+    /// canvas whose key asked for the SDR version or PQ, and every linear
+    /// canvas (spec §11 HD-16 (f)) — mode 0 an SDR project's or an HLG
+    /// master's encode, modes 1 and 2 from the linear scene light. An
+    /// encoded canvas's answer is what it was before HD-16.
     static func uniforms(for canvas: RecipeCanvas) -> OutputUniforms? {
+        guard canvas.blending == .linear else { return encodedUniforms(for: canvas) }
+        let hlg: Float = canvas.output == .hlg ? 1 : 0
+        var u = encodedUniforms(for: canvas) ?? OutputUniforms(mode: 0, knee: sdrKnee)
+        u.linearLight = 1
+        u.hlgOutput = hlg
+        return u
+    }
+
+    /// An encoded canvas's block: only an HLG canvas whose key asked for the
+    /// SDR version or PQ.
+    private static func encodedUniforms(for canvas: RecipeCanvas) -> OutputUniforms? {
         guard canvas.output == .hlg else { return nil }
         switch canvas.dynamicRange {
         case .sdr: return OutputUniforms(mode: 1, knee: sdrKnee)

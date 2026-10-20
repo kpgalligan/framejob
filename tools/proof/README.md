@@ -20937,3 +20937,42 @@ passes `.sdr`) SW, SV, SS; `sdr-json-names-scale` (the SDR `jsonKeys` writes `"s
 "sdr"`) SI, P8; `vectorscope-view-709-targets` (`VectorscopeView` draws `targets(for: .sdr)`
 and `skinLineDegrees(for: .sdr)`) P8; `parade-graticule-sdr` (`ParadeView`'s graticule call
 drops `signal:`) P8. Its record: `designs/hdr.md`'s H-4 section.
+
+## Road map hdr — H-6, linear light (`hdr_proof.py` LT, LH, LG, LA, LS, LM, LD, LB, LF, LR, LE, LO, LU, TL, P9 and ten mutants; `hdr_probe.swift` P9; spec §11 GR-18, HD-9, HD-16)
+
+H-6 (#276) adds `canvas.blending` (`encoded`, `linear`): on a linear canvas every layer is
+decoded to the project's own transfer as scene light after its grade (the sRGB EOTF in SDR,
+HLG's inverse OETF in HLG), blended there, and encoded once by the output pass; the adjustment
+pass, its qualifier map, Show Selection's grey and a luma matte read encoded. Each L row sets
+`blending: "linear"` with `set_canvas` (the Blending popup is never pressed: nothing persists)
+and renders beside the encoded CONTROL. The rules are the script's header: formula rows over
+the inputs drawn alone in the same run (±2/255 SDR, ±2/1023 HLG), the CONTROL held to the
+encoded formula and parting from the linear figure by more than the bound; equality rows ±1/255
+or ±1/1023.
+
+- **LT / LH** draw the inputs by opacity (the shape at 1 for the top, at 0 for the bottom), the
+  multiply's top at `normal` then `multiply`, and the dissolve's ends at 1 s and 3.5 s; p is
+  read from the CONTROL's channel that differs most between the ends.
+- **LA** reads the grey row of the bt709 ramp, D with the adjustment clip's track hidden and G
+  with no qualifier; **LS** is scored by the same pass.
+- **LU** cannot read the popup's title: `snapshot_ui`'s layout dump carries none for an
+  `OptionPopupControl`, so it reads the popup in the "Blending" row as its drawn pixels in the
+  inspector capture (it must redraw between encoded and linear; the Dynamic Range popup must
+  not), and P9 pins the items' names.
+- **TL** (`--measure`) is TH's 4K SDR project on two instances.
+
+```sh
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py capture tools/proof/work/h6/ctl --only H1,H7i,SI,Z1   # before H-6's code
+make app-debug && python3 tools/proof/hdr_proof.py --only LT,LH,LG,LA,LS,LM,LD,LB,LF,LR,LE,LO,LU,P9,Z1
+make app && RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --control tools/proof/work/h6/ctl
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --measure
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --mutant <name> --control tools/proof/work/h6/ctl --only <its rows>,Z1
+```
+
+The ten mutants and their rows: `linear-before-grade` (the decode moved before 4c) LG;
+`adjustment-unwrapped` (the adjustment pass grades the linear destination) LA;
+`hlg-decoded-as-srgb` (`blendDecode` takes the sRGB EOTF in HLG) LH; `no-output-encode`
+(`uniforms(for:)` answers a linear canvas as an encoded one) LT, LH; `background-not-decoded`
+LB; `shadow-colour-not-decoded` LD; `fade-colour-not-decoded` LF; `matte-reads-linear` LM;
+`qualifier-map-reads-linear` LA (its blurred case); `selection-grey-not-decoded` LS. Its
+record: `designs/hdr.md`'s H-6 section.

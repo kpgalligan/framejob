@@ -211,7 +211,8 @@ extension AgentServer {
     ///
     /// `output` — the Canvas section's Dynamic Range popup (spec §11 HD-2,
     /// HD-13) — is read as a string and forwarded unread, so the core names
-    /// an unknown value with its own list.
+    /// an unknown value with its own list; so is `blending`, the Canvas
+    /// section's Blending popup (HD-16).
     func setCanvas(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let width = try intArg(a, "width")
@@ -228,8 +229,9 @@ extension AgentServer {
         let fitNew = try boolArg(a, "fit_new_clips")
         let timecodeFrames = try boolArg(a, "timecode_frames")
         let output = try stringArg(a, "output")
+        let blending = try stringArg(a, "blending")
         guard width != nil || height != nil || fps != nil || background != nil || rescale != nil
-            || fitNew != nil || timecodeFrames != nil || output != nil
+            || fitNew != nil || timecodeFrames != nil || output != nil || blending != nil
         else {
             throw ToolError(message: "set_canvas: nothing to change.")
         }
@@ -239,7 +241,7 @@ extension AgentServer {
                 .setCanvasRaw(
                     width: width, height: height, fps: fps, background: background,
                     rescaleClips: rescale, fitNewClips: fitNew, timecodeFrames: timecodeFrames,
-                    output: output)
+                    output: output, blending: blending)
             ])
     }
 

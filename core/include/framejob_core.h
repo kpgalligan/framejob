@@ -167,9 +167,14 @@ extern "C" {
  * Version 23 is the project's dynamic range (spec §11 HD-2, HD-13):
  * `canvas.output`, `sdr` or `hlg`, after `timecode_frames`, written only when
  * `hlg`, so an SDR project writes the text it did; the reader's default is
- * `sdr`, so there is no migration step. 24 and above, 1014 included, are
- * newer. */
-#define RC_FORMAT_VERSION 23
+ * `sdr`, so there is no migration step.
+ *
+ * Version 24 is the canvas's blending (spec §11 GR-18, HD-9, HD-16):
+ * `canvas.blending`, `encoded` or `linear`, after `output`, written only when
+ * `linear`, so every other project writes the text it did; the reader's
+ * default is `encoded`, so there is no migration step. 25 and above, 1014
+ * included, are newer. */
+#define RC_FORMAT_VERSION 24
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

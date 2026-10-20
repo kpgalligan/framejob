@@ -282,7 +282,8 @@ log → HLG arm, where they matter most. Each is GR-16's recipe: Canon's publish
 its terms first, its curve and gamut constants, its code domain, a matrix derived from its
 primaries (never copied), an L1-style fixture row and an LP3 maths row. Sony's site refused this
 host with 403 at T3-2, so the owner downloads each document, as he did for Sony's and
-Panasonic's. `LogCurve`'s new values are format 24, since an older Frame Job cannot read them.
+Panasonic's. `LogCurve`'s new values are format 25 (24 at H-0; H-6 ran first and took 24, HD-16
+(j)), since an older Frame Job cannot read them.
 **Detection** from the maker's metadata is not built: AVFoundation does not expose Sony's or
 Panasonic's labels (GR-16); from general knowledge only, Sony's XAVC files carry an XML
 "NonRealTimeMeta" block naming the gamma ("s-log3-cine") inside the MP4, and Panasonic's location
@@ -297,7 +298,8 @@ mirror `set_canvas {blending}`. With it on (GR-18's figures, the tier-3 brief's 
 50 % white over black reads 188 instead of 128; a red → green dissolve loses its dark dip
 (luminance 0.464 instead of 0.199); glows and blurred edges get brighter. In an HLG project
 "linear" means HLG's scene light (the inverse OETF), not the sRGB EOTF, so the decode/encode pair
-takes the working transfer from the canvas. What it takes: `canvas.blending` (format 25, written
+takes the working transfer from the canvas. What it takes: `canvas.blending` (format 24, 25 at
+H-0, renumbered when H-6 ran before H-5 (HD-16 (j)); written
 only when `linear`), `set_canvas`'s argument and the recipe canvas; `Compositor.metal` — the
 decode after the grade and before step 7, the destination kept linear, an encode in H-3's output
 pass (which grows an arm), and the adjustment pass and qualifier wrapped (encode before reading
@@ -347,9 +349,10 @@ nothing: the preview layer takes the HLG frame by itself (M8).
 
 ### Core
 
-- **Formats** (HD-11): 22 (H-1, the media's peak), 23 (H-2, `canvas.output`), 24 (H-5, new `log`
-  values), 25 (H-6, `canvas.blending`), each main's next when its code is written and renumbered
-  before its merge if main moved first. H-3 and H-4 change no persisted state.
+- **Formats** (HD-11): 22 (H-1, the media's peak), 23 (H-2, `canvas.output`), 24 (H-6,
+  `canvas.blending`), 25 (H-5, new `log` values), each main's next when its code is written and
+  renumbered before its merge if main moved first. At H-0 these read 24 for H-5 and 25 for H-6;
+  H-6 runs before H-5 (HD-16 (j)), so it took 24. H-3 and H-4 change no persisted state.
 - **Ops:** `set_canvas` gains `output` (H-2) and `blending` (H-6); `set_media_color` gains the
   peak override (H-1). No new op, no new tool (the product tool count stays 92). One FFI export,
   H-1's `rc_hdr10_peak` (the SEI reader's door; corrected in H-1, which this line had as none).
@@ -435,8 +438,8 @@ complete, the phase's proof recorded whole on Release, mutants about one per new
 | H-2 | **#277, the HLG working space**: `canvas.output`, `set_canvas {output}`, the Document tab's Colour row and popup; every composition of an HLG project converting in BT.2020/HLG; step 0's HLG arms; drawn layers and the background lifted; the grade's BT.2020 constants; `render_frame`/Save Frame… 16-bit labelled BT.2100 HLG; the 10-bit rows tagged HLG with Dolby Vision off and every other row refused in an HLG project until H-3; format 23 | Every SDR project byte-identical; HS, HH, HP, HT, HL, HW, HF, HX (below) | HDR-1; the heavy-4K HLG frame time |
 | H-3 | **#277, the deliverables**: `range` (HLG/PQ/SDR) resolved in the core; the SDR version for the 8-bit rows, GIF, APNG and JPEG, lifting H-2's refusals; PQ by one output conversion with HD-5's metadata; the Dynamic Range popup; View ▸ Show SDR Version and `render_frame {sdr_version}` | ffprobe tags per row; no Dolby Vision; the mastering-display and content-light values as chosen; the SDR export = Show SDR Version's frame ±1; every SDR project's encoder input unchanged | HDR-2, HDR-3; HD-4's knee, HD-7's SDR-project behaviour |
 | H-4 | **#277, HDR scopes**: HLG % with a cd/m² scale and a 75 % line; the BT.2020 vectorscope and targets; the scope JSON names its scale | HLG fixtures' traces against oracles; every SDR trace identical; GR-10's 1.1 ms at 4K | HDR-6 |
-| H-5 | **#278**: Canon Log 2 and Canon Log 3 with Cinema Gamut, each per GR-16; format 24 | Each curve on its ramp within a level; maths rows; a mutant per breakpoint and domain | GRD-19 (real clips per camera); Canon's document from the owner |
-| H-6 | **#276**: `canvas.blending` (`encoded`/`linear`), opt-in; HLG projects decode by HLG's transfer; format 25 | GR-18's table as `render_frame` rows; off byte-identical; the output pass's 4K time | LIN-1 |
+| H-5 | **#278**: Canon Log 2 and Canon Log 3 with Cinema Gamut, each per GR-16; format 25 (runs after H-6, HD-16 (j)) | Each curve on its ramp within a level; maths rows; a mutant per breakpoint and domain | GRD-19 (real clips per camera); Canon's document from the owner |
+| H-6 | **#276**: `canvas.blending` (`encoded`/`linear`), opt-in; HLG projects decode by HLG's transfer; format 24 (runs before H-5, HD-16 (j)) | GR-18's table as `render_frame` rows; off byte-identical; the output pass's 4K time | LIN-1 |
 | H-7 | The close: ADR `designs/adr/hdr.md`, the archive, `archive/INDEX.md`, the manual-check rows; #281, #277, #276 closed as built; #278 left open for detection; #274 measured if a real clip is at hand | — | — |
 
 ### H-1 — #281, the PQ peak (HD-6)
@@ -503,7 +506,9 @@ complete, the phase's proof recorded whole on Release, mutants about one per new
 
 ### H-5 — log curves (HD-10)
 
-- **Lands:** Canon Log 2 and Canon Log 3 with Cinema Gamut, format 24, from Canon's document.
+- **Lands:** Canon Log 2 and Canon Log 3 with Cinema Gamut, format 25, from Canon's document.
+  **H-6 runs before H-5** (HD-16 (j)): H-5 waits on Canon's document, which the owner has not
+  yet supplied.
 - **Proof rows:** per curve, an L1 row and an LP3 row.
 - **Mutants:** per curve, its breakpoint and its code domain (two each).
 - **Person check:** GRD-19 (real clips from each camera).
@@ -1415,3 +1420,136 @@ at merge. **Residue:** #315 (the review's nits 1 and 2: no row reads Show Ungrad
 Version on together, HD-15 (c); `ScopeSlotView.show(_:)` takes its caption from any kind's trace);
 #310 (LG1, G1, S1) as before, not run here. The owner's person check is HDR-6 (the scopes on real
 HDR footage).
+
+## H-6 — #276, linear light (HD-9, HD-16; format 24)
+
+**What landed** (2026-10-20, in the worktree on `hdr`, from `7c053a6`). **H-6 runs before H-5**:
+H-5 waits on Canon's own log document, which the owner has not supplied, and H-6 needs nothing H-5
+adds, so under HD-11 H-6 took **format 24** and H-5 will take 25. Spec §11 **HD-16**, written
+before the code (`11-decisions/hdr.md`: (a) the key, `set_canvas {blending}`, the recipe canvas
+and nests sharing it; (b) linear as the project's own transfer as scene light, no OOTF; (c) the
+decode once per layer after the effects block, before 7b, behind GR0's flag, the gather filters
+encoded; (d) the background, fade colour and shadow colour decoded, matte composites and the
+routed dissolve linear; (e) what reads encoded — the adjustment pass and its strength mix in
+linear light, the qualifier map, Show Selection's grey, a luma matte, the key, the scopes and
+picks; (f) the output pass drawn for every linear project; (g) the Blending popup; (h) what is
+unchanged; (i) the costs; (j) the order), its README row, HD-1's and HD-9's "Amended by HD-16"
+lines (H-6 before H-5) and HD-14's (the output pass also drawn for a linear project, HD-16 (f)),
+the format numbers in HD-9, HD-10 and HD-11, and the Lines cells. No FFI export, no new tool (92)
+or op; `set_canvas` gains `blending`. No file was near the cap (largest after: `model.rs` 574 →
+584, `AgentCatalog.swift` 572 → 576, `DocumentPane.swift` 515 → 522), so no toll.
+
+- **Core:** `model_canvas.rs` (new, 32: `CanvasBlending`, `is_encoded`), re-exported by
+  `model.rs`, whose `Canvas.blending` sits after `output`, written only when `linear`;
+  `edit.rs` (`Op::SetCanvas.blending`, its dispatch, the doc row's sentence); `edit_canvas.rs`
+  (`set_canvas`'s ninth optional field); `op_table.rs` (`Kind::Blending`, fourteen named types,
+  `opt("blending", Blending)`); `op_schema.rs`; `recipe.rs` (the canvas's `"blending":
+  "linear"` last); `scope.rs` (`scoped_view` copies it); `format.rs` and the header (24). Tests:
+  `canvas_blending.rs` (new, 8) and `schema_v24.rs` (new, 5); `op_table.rs`, `op_schemas.rs`
+  (21 kinds) and `op_nullability.rs` (70 optionals) updated.
+- **Metal:** `blendDecode`/`blendEncode` beside `gradeDecode`/`gradeEncode`; the layer stage's
+  step (7) decode after the effects block; the fade colour; `LayerUniforms.hlgReserved0`,
+  `QualifierUniforms.reserved0`, `MatteUniforms.reserved1` and `OutputUniforms`' two reserved
+  floats renamed (`linearLight`, and `hlgOutput` in `OutputUniforms`), no size changed; the
+  adjust fragment's encode before and decode after, its selection grey decoded; the qualifier
+  map's encode; the matte resolve's encode of a linear composite; the output fragment's mode-0
+  encode and modes 1/2 from the linear scene light; the "blends in the ENCODED sRGB space,
+  deliberately" comment now names HD-16's opt-in.
+- **Swift:** `CanvasOutput.swift` (`CanvasBlending` with `menuName`, `RecipeCanvas.blended`);
+  `RecipeCanvas.blending` and `CanvasSnapshot.blending` (lenient, `.encoded`; the snapshot file
+  over the cap takes wiring only); `Compositor+Uniforms` (`u.linearLight`); `Compositor+Adjustment`
+  (`q.linearLight`); `Compositor+Matte` (`resolve(…, linear:)`); `Compositor+Shadow` (the colour
+  through `blended` after its lift); `MetalRenderer.background` (through `blended`);
+  `OutputTransform.uniforms(for:)` (an encoded canvas's answer is H-3's, `encodedUniforms`; a
+  linear canvas always draws a pass); `ReelOps.setCanvas`/`setCanvasRaw`; the MCP handler reads
+  `blending` as a string, forwarded unread; `AgentCatalog`'s description ("UI: Document tab ▸
+  Canvas ▸ Blending."); `DocumentPane`'s Blending popup row after Dynamic Range.
+- **Proofs:** `hdr_proof.py` LT, LH, LG, LA, LS, LM, LD, LB, LF, LR, LE, LO, LU, TL and P9
+  (`hdr_probe.swift`), and ten mutants; `tools/proof/README.md`'s H-6 section.
+- **Documents:** spec §4.3b, §5.2 (format 24), §6c, §7.3, §7.4, §7.5 (the linear-light entry),
+  §7.10 (`model_canvas.rs`), the Lines cells; this file's format numbers and order; README's
+  Linear light bullet; `docs/manual-checks.md` LIN-1; the screen catalog's Document inspector.
+
+**Rules written before the rows they judge** (the spec's step 5): SDR rows are formula over
+measured bytes (each input drawn alone in the same run) ±2/255; HLG rows ±2/1023 on 16-bit PNGs;
+equality rows ±1/255 or ±1/1023; a formula row's encoded CONTROL is held to the encoded formula and
+must part from the linear figure by more than the bound (≥ 2 levels for SDR multiply); an equality
+row's CONTROL is the encoded render it is compared to. **One deviation from the spec's rows:**
+LU's "snapshot_ui reads Encoded, then Linear light" cannot be read — the layout dump carries no
+title for an `OptionPopupControl` (it draws its own text) — so LU reads the "Blending" row's popup
+as its drawn pixels in the inspector capture, which must differ between encoded and linear while
+the Dynamic Range popup's do not (CONTROL), and P9 pins the items' names, "Encoded" and "Linear
+light".
+
+**Verification**, 2026-10-20 (`pmset -g ps`: "Now drawing from 'AC Power'"; loadavg about 5–11),
+own instances on scratch sockets and homes, each stopped by its pid; no `Frame Job: ` line in any
+run and no `DEFAULTS MOVED`:
+- **Controls**, on the untouched tree's Release build before the first product edit (a `ditto`
+  copy kept in `tools/proof/work/h6/ctl-app/`, gitignored; the runs `RC_PROOF_APP=release`, each
+  exit 0): `hdr_proof.py capture tools/proof/work/h6/ctl --only H1,H7i,SI,Z1`; `precision_proof.py
+  capture …/precision-ctl` 7/7; `tone_`, `wheels_`, `curves_`, `qualifier_`, `look_`,
+  `log_proof.py capture …-ctl` (6, 6, 18, 8, 4 frames; log's control FAILED none);
+  `screens.py --only 11-document-inspector --out …/screens-ctl` 6/6.
+- In the loop: `cargo test --release` `canvas_blending` 8, `schema_v24` 5, `canvas_output` 7,
+  `op_table` 10, `op_schemas` 8, `op_nullability` 2, `recipe` 15, `scope` 38, all passing;
+  `make lint` clean; `make typecheck` 0 errors and exactly the 4 baseline warnings; `swift_build.py
+  typecheck hdr_probe.swift` exit 0; `spec_index_proof.py` 177/177; `make app-debug` BUILD
+  SUCCEEDED; on Debug `hdr_proof.py --only LT,…,LU,P9,Z1` first 12/15 (LT and LH: `set_video
+  {opacity: 1}` on a new shape is the identity's refusal, so the inputs at 1 were never drawn —
+  `l_patch` now takes "made no change" as applied; LU: the popup's title is not in the dump, as
+  above), then 15/15.
+- `make gate`: **PASS in 247 s** (names 1 s, typecheck 5 s, fmt 2 s, lint 1 s, test 142 s, app
+  96 s).
+- `hdr_proof.py --control tools/proof/work/h6/ctl` whole on Release: **63/63** — every H-1…H-4
+  row (H1m, H1a, H1s, H1w, H2–H7r, HS–HX, DT–DX, SI–SP) and every H-6 row. LT (SDR, /255):
+  white at 0.5 linear 187.3 (oracle 186.8), CONTROL 127.5 (127.0), parted 59.28 levels; at 0.25
+  136.5 (136.4), CONTROL 63.8; at 1/3 155.4 (155.6), CONTROL 84.7; multiply 60.8 (60.4), CONTROL
+  63.8 (63.7), parted 3.33; the dissolve at p 0.4983 linear (187.2, 187.3, 0.0), CONTROL (127.4,
+  127.5, 0.0), linear luminance 0.199 encoded against 0.463 linear (GR-18's 0.199 and 0.464).
+  LH (HLG, /1023): white at 0.5 620.4 (620.9), CONTROL 383.4; multiply 152.1 (152.1), CONTROL
+  263.2; the dissolve at p 0.4992 parted 117.61 levels. LG: worst |linear − encoded| 0.125/255
+  (SDR) and 0.500/1023 (HLG), the grade moving 254 of 256 pixels each (CONTROL). LA: unblurred 469
+  pixels at w 0 or 1 (worst 0.249/255) and 43 in the band (worst 0.169/255); blurred 466 and 46
+  (0.374, 0.169). LS worst 0.374/255 over 50 levels 0…255. LM m 0.5000, linear 187.3 (186.8),
+  CONTROL 127.5. LD the grey shadow 127.5 both; black at 0.5 over white 187.3 (186.8). LB SDR
+  encoded 127.5, linear 126.5 (inside ±1/255: the 16-bit PNG reads 32767 and 32511; a 0.25 and a
+  1.0 background read identical on Debug, so the 0.5 grey sits on a rounding boundary of the SDR
+  frame path), HLG 517.5 both. LF 766.7/1023 both. LR the routed dissolve = the unrouted, linear
+  and encoded, to the printed tenth. LE SDR export 187.5 against the render 187.3, HLG 620.1
+  against 620.4. LO and LU as wanted ("Canvas" undone). P9 worst `blended` |Δ| 9.2e-8.
+- `hdr_proof.py --measure` on Release: **5/5**. TL (TH's 4K SDR project, `prores_422`): encoded
+  2.330 ms and linear 2.500 ms mean average per frame (PR-1's budget 8 ms): linear costs +0.170
+  ms, beside GR-18's decode/encode and C0's 0.21 ms copy (REASONED). TI, TH and TO as before
+  (TH sdr 2.310, hlg 3.270 ms).
+- `precision_proof.py compare …/precision-ctl` **11/11** (K1–K6 byte-identical, E1, E2);
+  `tone_` 19/19, `wheels_` 23/23, `curves_` 59/59, `qualifier_` 40/40, `log_` 23/23 compares,
+  each N0 (or L9) byte-identical to its control; `look_proof.py compare` 28/30, failing G1 and S1
+  only (#310, as before), its N0 byte-identical; `matte_proof.py` 46/46; `adjustment_proof.py`
+  36/36; `hevc_alpha_proof.py` 43/43; `phase6_proof.py` 168/168, `op_argument_proof.py` 160/160
+  and `phase9_proof.py` 234/234, each on an instance of its own from `proof_app.py launch --app
+  release`; `recording_probe.py --only catalog` 31/31; `screens.py --only 11-document-inspector
+  --out tools/proof/work/h6/screens-release` 6/6 (its inspector dumps hold the Blending row);
+  `phase8_chrome.py` 150/150.
+- `hdr_proof.py compare tools/proof/work/h6/ctl --only H1,SI,Z1` on Release: **3/3** — H1's 12
+  SDR scenes byte-identical at 0 and 0.5 s with equal picks (the reverse's intermediate digest
+  differs, 775c01fbad7af266 against 6f5be3c956bca5cc, printed and unscored as in H-1…H-4), SI 50 of
+  50 JSON files equal.
+- **Mutants** (Release copies, each `--only <its rows>,Z1 --control tools/proof/work/h6/ctl`), all
+  ten **MUTANT PASS** with no other row failing: `linear-before-grade` (LG),
+  `adjustment-unwrapped` (LA), `hlg-decoded-as-srgb` (LH), `no-output-encode` (LT, LH),
+  `background-not-decoded` (LB), `shadow-colour-not-decoded` (LD), `fade-colour-not-decoded`
+  (LF), `matte-reads-linear` (LM), `qualifier-map-reads-linear` (LA's blurred case),
+  `selection-grey-not-decoded` (LS).
+- After this record, `make gate` passed again in 1 s (names re-ran; every other step's inputs
+  unchanged).
+
+**Owed.** The `CLAUDE.md` edits (applied by the orchestrator): `core/CLAUDE.md` gains a
+`model_canvas.rs` row (`CanvasBlending`, the canvas's blending, format 24) and `Kind::Blending`
+among `op_table.rs`'s closed vocabularies; `app/CLAUDE.md`: `CanvasOutput.swift` gains
+`CanvasBlending` and `RecipeCanvas.blended`, `DocumentPane.swift`'s Canvas section gains the
+Blending row, and the output pass (`Compositor+Output.swift`, `OutputTransform.swift`) is drawn
+for every linear project as well as an HLG project's SDR version and PQ. The review passed with one nit, `MetalRenderer.swift`'s output-pass comment, fixed by the
+orchestrator at merge with the CLAUDE.md map edits above; `make gate` passed after them.
+**Residue:** #310 (LG1,
+G1, S1) as before. The owner's person check is LIN-1. Next: H-5 when Canon's document arrives,
+then H-7.

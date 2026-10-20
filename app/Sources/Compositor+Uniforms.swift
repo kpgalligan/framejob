@@ -88,6 +88,11 @@ extension MetalRenderer {
             u.hlgOutput = 1
             u.liftedWhite = InputConversions.liftSDR(SIMD3<Float>(1, 1, 1)).x
         }
+        // Linear-light blending (spec §11 HD-16 (c)): 0 for every encoded
+        // project, so its block is what it was.
+        if canvas.blending == .linear {
+            u.linearLight = 1
+        }
         if let transition = layer.transition {
             u.transitionKind = TransitionCode.code(transition.kind)
             u.transitionProgress = Float(min(max(transition.progress, 0), 1))

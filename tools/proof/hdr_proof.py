@@ -9,7 +9,7 @@ of GR-15's unmeasured claims; the product was not edited for them.
     python3 tools/proof/hdr_proof.py capture DIR [--only H1,H7i,Z1]   # the CONTROL tree: H1's
                                                     # and H7i's references, H2–H6 shown
     python3 tools/proof/hdr_proof.py compare DIR [--only H1,...]
-    python3 tools/proof/hdr_proof.py --measure      # TI, TH and TO: 4K costs (Release figures)
+    python3 tools/proof/hdr_proof.py --measure      # TI, TH, TO and TL: 4K costs (Release figures)
     python3 tools/proof/hdr_proof.py --mutant NAME [--control DIR]
 
 curves_proof.py's shape. Launches the app `proof_app` picks (Debug unless
@@ -264,6 +264,46 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   target boxes' corners and the skin line lit for the trace's signal, CONTROL ≥ 4 targets
   whose HLG and SDR boxes part by ≥ 4 pt with no SDR box where the HLG one is, and the SDR
   bitmap unlit on the HLG skin ray.
+- **LT…LU** (hdr H-6, #276, spec §11 GR-18, HD-9, HD-16 — linear light): each project
+  set `blending: "linear"` by `set_canvas` (the Blending popup is never pressed) and
+  rendered beside its encoded CONTROL. The rules, fixed before the rows: SDR rows are
+  "formula over measured bytes" (matte_proof's rule: the oracle is computed from each
+  input drawn alone in the same run) ±2/255; HLG rows read 16-bit PNGs, ±2/1023; equality
+  rows ±1/255 or ±1/1023. In a FORMULA row the CONTROL is held to the encoded formula and
+  must part from the linear figure by more than the bound (≥ 2 levels for SDR multiply),
+  GR-18's integers printed beside; in an EQUALITY row the CONTROL is the encoded render the
+  linear one is compared to. LT (SDR, 640×360 at the centre): white over black at
+  opacity 0.5, 0.25 and 1/3 (inputs: the shape at opacity 1 and 0), multiply of a 128/255
+  shape over a 128/255 background (inputs: the shape normal at 1, then at 0), and a red →
+  green dissolve (20 frames from the cut at 2 s, `align: after`, linear) at its midpoint,
+  frame 70, p read from the CONTROL and the luminances printed; LH the same five in an
+  HLG project (the inputs lifted); LG the bt709 (SDR) and hlg (HLG) ramps at brightness
+  0.25 and exposure +1, linear = encoded on both rows every 8th column (CONTROL: the grade
+  moves ≥ 32 of them); LA an adjustment clip (brightness 0.25, luma qualifier 0.4–1.0,
+  softness 0.1) over the opaque bt709 ramp, unblurred and at blur 0.25, with D (the clip's
+  track hidden) and G (no qualifier) drawn in the same run: per grey-row pixel (every 2nd
+  column) w = (E − D)/(G − D) from the CONTROL E; at w 0 or 1 (E within 1/255 of D or G)
+  linear = E ±1/255, in the band (G − D ≥ 32/255) linear = encode(mix(decode D, decode G,
+  w)) ±2/255, both counts non-zero; LS `render_frame {selection}` of LA's clip, linear =
+  encoded ±1/255; LM a white card over black cut by a luma matte of a 128/255 grey card, m
+  the card's Rec. 709 luma drawn alone; LD a 128/255 shadow (opacity 1, blur 0, 120 px to
+  the right of a 100 px shape) over black, linear = encoded, and a black shadow at 0.5 over
+  white on the linear formula; LB a [0.5, 0.5, 0.5, 1] background, SDR and HLG, linear =
+  encoded; LF Fade Through White in HLG at frame 70, linear = encoded (CONTROL 0.75); LR
+  the dissolve routed (its green half a nest, MT-8) = LT's unrouted one, linear and
+  encoded, ±1/255; LE `prores_422` of the 50 % scene in SDR and HLG, frame 15 = the
+  render ±2; LO linear then encoded: `get_project` and the PNG bytes equal the project's
+  before, and the same value twice answers "made no change"; LU one undo step ("Canvas"),
+  `gamma` refused naming both, and the Document tab's "Blending" row's popup redrawn
+  between encoded and linear while the Dynamic Range popup is not (the layout dump carries
+  no popup title, so the popup is read as its drawn pixels; its items' names are P9's).
+- **TL** (`--measure`): TH's 4K SDR project, `prores_422`, encoded and linear, each on its
+  own instance: the linear mean frame time under PR-1's 8 ms (scored); its difference from
+  the encoded one printed beside C0's 0.21 ms (REASONED).
+- **P9** (hdr H-6): `hdr_probe.swift`'s `RecipeCanvas.blended` against IEC 61966-2-1's
+  EOTF and HLG's inverse OETF, `uniforms(for:)` over output × blending × range, the
+  Blending popup's items, and `LayerUniforms` 528, `QualifierUniforms` 80, `MatteUniforms`
+  16 and `OutputUniforms` 16 bytes.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
@@ -274,10 +314,10 @@ NEW` shows the pixels equal). The mutant `relabel-in-renderframe` (H1)
 applies the label inside `Exporter.renderFrame` instead, which moves the
 eyedropper's picks; it runs against a capture made after PR-11.
 
-H1a, the H7 family, the H-2 rows, the H-3 rows and the H-4 rows run in a plain run,
-`compare` and `--only`; never under `capture`'s default selection, `--measure` or a
-mutant's default selection; hdr H-1's five, H-2's twelve, H-3's seven and H-4's nine
-mutants run with `--only <their rows>,Z1` (SI also runs under `capture --only`, writing
+H1a, the H7 family, the H-2 rows, the H-3 rows, the H-4 rows and the H-6 rows run in a
+plain run, `compare` and `--only`; never under `capture`'s default selection, `--measure`
+or a mutant's default selection; hdr H-1's five, H-2's twelve, H-3's seven, H-4's nine and
+H-6's ten mutants run with `--only <their rows>,Z1` (SI also runs under `capture --only`, writing
 DIR's references). `capture --only`
 captures just the rows named, keeping an earlier capture's H1 record.
 `capture DIR` records H1's references (`DIR/h1-*.png`, `DIR/media/`,
@@ -387,8 +427,9 @@ PICK_POINTS = {(W, H): [[256.5, 32.5], [512.5, 96.5], [900.5, 100.5]],
                (SW, SH): [[320.5, 180.5], [100.5, 60.5], [540.5, 300.5]]}
 ROWS = ["H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "H7", "H7d", "H7i",
         "H7p", "H7o", "H7r", "HS", "HH", "HP", "HT", "HL", "HW", "HK", "HM", "HF", "HX", "DT",
-        "DP", "DV", "DI", "DE", "DR", "DS", "DM", "DX", "SI", "SW", "SV", "SS", "SD", "SP", "R0",
-        "TI", "TH", "TO", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "Z1"]
+        "DP", "DV", "DI", "DE", "DR", "DS", "DM", "DX", "SI", "SW", "SV", "SS", "SD", "SP", "LT",
+        "LH", "LG", "LA", "LS", "LM", "LD", "LB", "LF", "LR", "LE", "LO", "LU", "R0", "TI", "TH",
+        "TO", "TL", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "Z1"]
 # H7's family (hdr H-1, #281, spec §11 HD-6, HD-12): PQ ramps whose HDR10 static
 # metadata sits in the HEVC stream's SEI (the x265 CLI, muxed by ffmpeg's stream copy;
 # ffmpeg 9.0.2's libx265 wrapper no longer writes the mastering display with these
@@ -464,6 +505,14 @@ BARS_W, BARS_H, BAR_W = 960, 128, 160
 SKIN_PATCH = (194 / 255, 150 / 255, 130 / 255)
 PANEL_WAIT = 20
 SDR_CAPTION = "Rec. 709 · encoded"
+# hdr H-6 (#276, spec §11 GR-18, HD-9, HD-16): linear light's rows. Each L row's project is
+# set `blending: "linear"` by `set_canvas` and rendered beside its encoded CONTROL; a
+# transition is 20 frames from the cut at 2 s (`align: after`, linear), so frame 70 is its
+# midpoint.
+L_ROWS = {"LT", "LH", "LG", "LA", "LS", "LM", "LD", "LB", "LF", "LR", "LE", "LO", "LU"}
+LIN_D = 2 * SEC // 3
+L_SCENES = {}
+LIN_T = 2 * SEC + LIN_D // 2
 
 
 BASE_COMMIT = "716720c"
@@ -487,7 +536,7 @@ SETTINGS_SWIFT = "app/Sources/ExporterWriter+Settings.swift"
 SCOPE_SHADER = "app/Resources/Shaders/Waveform.metal"
 SIGNAL_SWIFT = "app/Sources/ScopeSignal.swift"
 VECTORSCOPE_SWIFT = "app/Sources/VectorscopeView.swift"
-P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"}
+P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"}
 RECORDS = {"R0"}
 # name: ([(file, anchor, replacement), …], the rows that must fail).
 MUTANTS = {
@@ -724,6 +773,53 @@ MUTANTS = {
     "parade-graticule-sdr": ([("app/Sources/ParadeView.swift",
                                "labelsIn: index == 0 ? bounds : nil, signal: signal)",
                                "labelsIn: index == 0 ? bounds : nil)")], ["P8"]),
+    # hdr H-6 (#276, spec §11 HD-16): linear light, one mutant per new branch.
+    # The decode moved before 4c, so tone, the wheels, curves and look grade linear values.
+    "linear-before-grade": ([
+        (SHADER, "        // (4c) Tone (spec §11 GR-2): once per pixel, after the regions' own\n",
+         "        if (u.linearLight > 0.5) {\n            rgb = blendDecode(rgb, u.hlgOutput);\n"
+         "        }\n        // (4c) Tone (spec §11 GR-2): once per pixel, after the regions' own\n"),
+        (SHADER, "    if (u.linearLight > 0.5) {\n        rgb = blendDecode(rgb, u.hlgOutput);\n"
+         "    }\n", "")], ["LG"]),
+    # The adjustment pass grading the linear destination as it stands.
+    "adjustment-unwrapped": ([
+        (SHADER, "    if (linear) {\n        c = blendEncode(c, u.hlgOutput);\n    }\n", ""),
+        (SHADER, "    if (linear) {\n        c = blendDecode(c, u.hlgOutput);\n    }\n", "")],
+        ["LA"]),
+    # An HLG project decoded by the sRGB EOTF.
+    "hlg-decoded-as-srgb": ([(SHADER,
+                              "    return hlg > 0.5 ? hlgInverseOETF(saturate(c)) : "
+                              "gradeDecode(c);\n",
+                              "    return gradeDecode(c);\n")], ["LH"]),
+    # A linear canvas drawing no output pass: its linear light shown as it stands.
+    "no-output-encode": ([(OUTPUT_SWIFT,
+                           "        guard canvas.blending == .linear else { return "
+                           "encodedUniforms(for: canvas) }\n",
+                           "        guard canvas.blending == .encoded && false else { return "
+                           "encodedUniforms(for: canvas) }\n")], ["LT", "LH"]),
+    # The background cleared to its encoded value on a linear canvas.
+    "background-not-decoded": ([(RENDERER_SWIFT, "        rgb = canvas.blended(rgb)\n", "")],
+                               ["LB"]),
+    # The shadow's colour left encoded on a linear canvas.
+    "shadow-colour-not-decoded": ([("app/Sources/Compositor+Shadow.swift",
+                                    "            let decoded = canvas.blended(",
+                                    "            let decoded = RecipeCanvas().blended(")],
+                                  ["LD"]),
+    # Fade Through White's white left encoded on a linear canvas.
+    "fade-colour-not-decoded": ([(SHADER, "            fade = blendDecode(fade, u.hlgOutput);\n",
+                                  "")], ["LF"]),
+    # A luma matte reading its linear composite's luma.
+    "matte-reads-linear": ([(SHADER,
+                             "        m.rgb = m.a > 0.0 ? blendEncode(saturate(m.rgb / m.a), "
+                             "u.hlgOutput) * m.a : float3(0.0);\n", "")], ["LM"]),
+    # The qualifier's blurred map reading the linear destination.
+    "qualifier-map-reads-linear": ([(SHADER, "        c = blendEncode(c, q.hlgOutput);\n", "")],
+                                   ["LA"]),
+    # Show Selection's grey written encoded, so the output pass brightens it.
+    "selection-grey-not-decoded": ([(SHADER,
+                                     "        return float4(linear ? blendDecode(grey, "
+                                     "u.hlgOutput) : grey, 1.0);\n",
+                                     "        return float4(grey, 1.0);\n")], ["LS"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -4437,6 +4533,727 @@ def run_si(client, mode, control, state):
 
 # ---- the run --------------------------------------------------------------------
 
+# ---- hdr H-6 (#276, spec §11 GR-18, HD-9, HD-16): linear light -------------------
+
+def srgb_oetf(c):
+    """IEC 61966-2-1's encode on [0, 1] (the shader's `gradeEncode`)."""
+    c = min(max(c, 0.0), 1.0)
+    return c * 12.92 if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055
+
+
+def blend_pair(hlg):
+    """(decode, encode): the project's own transfer as scene light, no OOTF (HD-16 (b)) —
+    the sRGB pair in an SDR project, HLG's inverse OETF and OETF in an HLG one."""
+    if hlg:
+        return (lambda c: hlg_inverse(min(max(c, 0.0), 1.0)),
+                lambda c: unit(hlg_oetf(min(max(c, 0.0), 1.0))))
+    return (lambda c: srgb_eotf(min(max(c, 0.0), 1.0)), srgb_oetf)
+
+
+def set_blending(doc, value):
+    """`set_canvas {blending}` (the Blending popup is never pressed); whether the canvas
+    reads it back (absent is encoded)."""
+    got = doc.call("set_canvas", blending=value) if doc.ok else {"ok": False}
+    read = (doc.project().get("canvas") or {}).get("blending", "encoded")
+    if not got["ok"] or read != value:
+        doc.ok, doc.why = False, f"set_canvas blending {value}: {got.get('error')} (read {read})"
+    return doc.ok
+
+
+def l_doc(client, name, output, background=(0, 0, 0, 1), width=SW, height=SH):
+    """A project for an L row: its canvas, background and dynamic range set."""
+    doc = Doc(client, name, width, height)
+    if doc.ok:
+        doc.call("set_canvas", background=list(background))
+    if doc.ok and output == "hlg":
+        got = doc.call("set_canvas", output="hlg")
+        if not got["ok"]:
+            doc.ok, doc.why = False, f"{name}: set_canvas output: {got.get('error')}"
+    return doc
+
+
+def l_shape(doc, track, fill, at=0, duration=4 * SEC, width=SW, height=SH):
+    """An unstroked rectangle (full canvas by default) on `track`; its id or None."""
+    if not doc.ok or track is None:
+        return None
+    return doc.place_tool("add_shape_clip", track=track, at=at, duration=duration,
+                          shape={"kind": "rectangle", "stroke": None, "width": width,
+                                 "height": height, "fill": list(fill)})
+
+
+def l_track(doc):
+    """A new track in front; its id or None."""
+    if not doc.ok or not doc.call("add_track")["ok"]:
+        return None
+    return (doc.project().get("tracks") or [{}])[-1].get("id")
+
+
+def l_frame(doc, tag, t=T, width=SW, height=SH):
+    return frame_of(doc, tag, width, height, t) if doc.ok else None
+
+
+def l_patch(doc, clip, patch):
+    """`set_video` on `clip`; whether it applied or was the identity (the value it had)."""
+    if not (doc.ok and clip):
+        return False
+    got = doc.call("set_video", clips=[clip], patch=patch)
+    return got["ok"] or "made no change" in str(got.get("error"))
+
+
+def fmt(values, scale):
+    return "(" + ", ".join(f"{v * scale:.1f}" for v in values) + ")"
+
+
+def l_transition(doc, clip, kind="cross_dissolve"):
+    """A 20-frame `kind` from the cut at 2 s into `clip`, its curve linear, so frame 70
+    (`LIN_T`) is its midpoint, p = 0.5."""
+    if clip is None:
+        return False
+    made = doc.call("add_transition", clip=clip, kind=kind, duration=LIN_D, align="after")
+    return made["ok"] and doc.call("set_transition_style", clip=clip, curve="linear")["ok"]
+
+
+def formula_scenes(client, output, state):
+    """LT's or LH's five scenes in `output`: each its inputs drawn alone (encoded), the
+    encoded CONTROL and the linear render at the centre; [(name, inputs, E, L, encoded
+    oracle, linear oracle, note)] or [(name, None, why…)]."""
+    hlg = output == "hlg"
+    dec, enc = blend_pair(hlg)
+    tag = "lh" if hlg else "lt"
+    out = []
+    for alpha, gr18 in ((0.5, "GR-18, SDR: 128 encoded, 188 linear"),
+                        (0.25, "SDR computed: 64 and 137"),
+                        (1 / 3, "GR-18's blur tap at a third, SDR: 85 and 156")):
+        name = f"white {alpha:.3f} over black"
+        doc = l_doc(client, f"{tag}-w{int(alpha * 100)}", output)
+        clip = l_shape(doc, doc.track() if doc.ok else None, (1, 1, 1, 1))
+        frames = {}
+        for key, value in (("top", 1), ("bottom", 0), ("ctl", alpha)):
+            if l_patch(doc, clip, {"opacity": value}):
+                frames[key] = l_frame(doc, f"{doc.path.stem}-{key}")
+        if set_blending(doc, "linear"):
+            frames["lin"] = l_frame(doc, f"{doc.path.stem}-lin")
+        state[f"{doc.path.stem}_closed"] = doc.close()
+        if len(frames) < 4 or None in frames.values():
+            out.append((name, None, doc.why or f"frames {sorted(frames)}"))
+            continue
+        top, bot = frames["top"].px(SW // 2, SH // 2), frames["bottom"].px(SW // 2, SH // 2)
+        out.append((name, {"top": top, "bottom": bot}, frames["ctl"].px(SW // 2, SH // 2),
+                    frames["lin"].px(SW // 2, SH // 2),
+                    [alpha * a + (1 - alpha) * b for a, b in zip(top, bot)],
+                    [enc(alpha * dec(a) + (1 - alpha) * dec(b)) for a, b in zip(top, bot)],
+                    gr18))
+    # Multiply 128 × 128: the background and the shape both 128/255.
+    grey = [128 / 255] * 3 + [1]
+    doc = l_doc(client, f"{tag}-multiply", output, background=grey)
+    clip = l_shape(doc, doc.track() if doc.ok else None, grey)
+    frames = {}
+    if l_patch(doc, clip, {"opacity": 1}):
+        frames["top"] = l_frame(doc, f"{tag}-multiply-top")
+    if l_patch(doc, clip, {"opacity": 0}):
+        frames["bottom"] = l_frame(doc, f"{tag}-multiply-bottom")
+    if l_patch(doc, clip, {"opacity": 1, "blend": "multiply"}):
+        frames["ctl"] = l_frame(doc, f"{tag}-multiply-ctl")
+    if set_blending(doc, "linear"):
+        frames["lin"] = l_frame(doc, f"{tag}-multiply-lin")
+    state[f"{tag}_multiply_closed"] = doc.close()
+    if len(frames) < 4 or None in frames.values():
+        out.append(("multiply", None, doc.why or f"frames {sorted(frames)}"))
+    else:
+        top, bot = frames["top"].px(SW // 2, SH // 2), frames["bottom"].px(SW // 2, SH // 2)
+        out.append(("multiply 128 × 128", {"top": top, "bottom": bot},
+                    frames["ctl"].px(SW // 2, SH // 2), frames["lin"].px(SW // 2, SH // 2),
+                    [a * b for a, b in zip(top, bot)],
+                    [enc(dec(a) * dec(b)) for a, b in zip(top, bot)],
+                    "GR-18, SDR: 64 and 61"))
+    out.append(dissolve_scene(client, output, state))
+    return out
+
+
+def dissolve_scene(client, output, state, routed=False):
+    """A red → green dissolve (20 frames from the cut at 2 s, linear) at its midpoint,
+    LIN_T; `routed`, the green half a nest (MT-8's route). (name, inputs, E, L, encoded
+    oracle, linear oracle, note) with p from the encoded CONTROL, or (name, None, why)."""
+    hlg = output == "hlg"
+    dec, enc = blend_pair(hlg)
+    tag = ("lh" if hlg else "lt") + ("-routed" if routed else "") + "-dissolve"
+    doc = l_doc(client, tag, output)
+    track = doc.track() if doc.ok else None
+    red = l_shape(doc, track, (1, 0, 0, 1), at=0, duration=2 * SEC)
+    green = l_shape(doc, track, (0, 1, 0, 1), at=2 * SEC, duration=2 * SEC)
+    if routed and green is not None:
+        nested = doc.call("nest", clips=[green])
+        green = next((c["id"] for c in doc.project().get("clips") or []
+                      if (c.get("source") or {}).get("kind") == "nest"), None) \
+            if nested["ok"] else None
+    built = red is not None and l_transition(doc, green)
+    frames = {}
+    if built:
+        frames = {"red": l_frame(doc, f"{tag}-red", t=SEC),
+                  "green": l_frame(doc, f"{tag}-green", t=3 * SEC + SEC // 2),
+                  "ctl": l_frame(doc, f"{tag}-ctl", t=LIN_T)}
+        if set_blending(doc, "linear"):
+            frames["lin"] = l_frame(doc, f"{tag}-lin", t=LIN_T)
+    state[f"{tag.replace('-', '_')}_closed"] = doc.close()
+    name = "red → green dissolve" + (" (routed)" if routed else "")
+    if len(frames) < 4 or None in frames.values():
+        return (name, None, doc.why or f"built {built}, frames {sorted(frames)}")
+    r, g = frames["red"].px(SW // 2, SH // 2), frames["green"].px(SW // 2, SH // 2)
+    e, l = frames["ctl"].px(SW // 2, SH // 2), frames["lin"].px(SW // 2, SH // 2)
+    c = max(range(3), key=lambda i: abs(g[i] - r[i]))
+    p = (e[c] - r[c]) / (g[c] - r[c]) if abs(g[c] - r[c]) > 0.1 else -1
+    if not 0.4 <= p <= 0.6:
+        return (name, None, f"p {p:.4f} from the CONTROL is not near the midpoint")
+    lum = LUMA2020 if hlg else LUMA709
+    y_e = sum(w * dec(v) for w, v in zip(lum, e))
+    y_l = sum(w * dec(v) for w, v in zip(lum, l))
+    return (name, {"red": r, "green": g, "p": p}, e, l,
+            [(1 - p) * a + p * b for a, b in zip(r, g)],
+            [enc((1 - p) * dec(a) + p * dec(b)) for a, b in zip(r, g)],
+            f"p {p:.4f}; linear luminance of the encoded CONTROL {y_e:.3f}, of the linear "
+            f"render {y_l:.3f} (GR-18 in SDR: 0.199 and 0.464)")
+
+
+def score_formulas(row, scenes, hlg):
+    """LT/LH's rule, written before the rows: the linear render = the linear formula over
+    the measured inputs and the encoded CONTROL = the encoded formula, each within the
+    bound (2/255 SDR, 2/1023 HLG), and the CONTROL parts from the linear figure by more
+    than the bound (multiply in SDR: by ≥ 2 levels)."""
+    bound, scale = (2 * LEVEL, 1023) if hlg else (2 / 255, 255)
+    misses, lines = [], []
+    for scene in scenes:
+        name = scene[0]
+        if scene[1] is None:
+            misses.append(f"{name}: {scene[2]}")
+            continue
+        _, inputs, e, l, enc_o, lin_o, note = scene
+        lin_ok = close_to(l, lin_o, bound + 1e-9)
+        ctl_ok = close_to(e, enc_o, bound + 1e-9)
+        parted = max(abs(a - b) for a, b in zip(e, lin_o))
+        need = 2 / 255 - 1e-9 if name.startswith("multiply") and not hlg else bound + 1e-9
+        part_ok = parted >= need if name.startswith("multiply") and not hlg else parted > need
+        lines.append(f"{name}: linear {fmt(l, scale)} oracle {fmt(lin_o, scale)}; CONTROL "
+                     f"encoded {fmt(e, scale)} oracle {fmt(enc_o, scale)}, parted "
+                     f"{parted * scale:.2f} levels; {note}")
+        if not (lin_ok and ctl_ok and part_ok):
+            misses.append(f"{name} (linear {lin_ok}, CONTROL {ctl_ok}, parted {part_ok})")
+    return misses, lines
+
+
+def run_lt(client, state, output="sdr"):
+    """LT (SDR) / LH (HLG): GR-18's table as render_frame rows (score_formulas' rule)."""
+    hlg = output == "hlg"
+    row = "LH" if hlg else "LT"
+    scenes = formula_scenes(client, output, state)
+    L_SCENES[row] = scenes
+    misses, lines = score_formulas(row, scenes, hlg)
+    unit_name = "1023" if hlg else "255"
+    check(f"{row} linear light in an {'HLG' if hlg else 'SDR'} project: white at 50 %, 25 % and "
+          f"1/3 over black, multiply 128 × 128 and a red → green dissolve's midpoint = "
+          f"encode(the inputs' linear mix) ±2/{unit_name}, the inputs drawn alone in the same "
+          f"run; each encoded CONTROL = the encoded mix ±2/{unit_name} and parts from the "
+          f"linear figure by more than that", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(lines))
+
+
+def run_lh(client, state):
+    run_lt(client, state, "hlg")
+
+
+def run_lg(client, state):
+    """LG: the bt709 ramp (SDR) and the hlg ramp (HLG) graded brightness 0.25, exposure
+    +1: the linear render = the encoded one (the grade runs before the decode)."""
+    misses, lines = [], []
+    for output, name, bound, scale in (("sdr", "bt709", 1 / 255, 255),
+                                       ("hlg", "hlg", LEVEL, 1023)):
+        path = fixture(name)
+        doc = Doc(client, f"lg-{output}", W, H)
+        clip = doc.place(path) if doc.ok and path else None
+        if output == "hlg" and doc.ok:
+            doc.call("set_canvas", output="hlg")
+        plain = l_frame(doc, f"lg-{output}-plain", width=W, height=H)
+        graded = l_patch(doc, clip, {"color": {"brightness": 0.25, "exposure": 1}})
+        e = l_frame(doc, f"lg-{output}-encoded", width=W, height=H) if graded else None
+        l = l_frame(doc, f"lg-{output}-linear", width=W, height=H) \
+            if e is not None and set_blending(doc, "linear") else None
+        state[f"lg_{output}_closed"] = doc.close()
+        if None in (plain, e, l):
+            misses.append(f"{output}: {doc.why or 'no render'}")
+            continue
+        worst, moved = 0.0, 0
+        for y in (GREY_ROW, CHROMA_ROW):
+            for x in range(0, W, 8):
+                gap = max(abs(a - b) for a, b in zip(l.px(x, y), e.px(x, y)))
+                worst = max(worst, gap)
+                moved += max(abs(a - b) for a, b in zip(e.px(x, y), plain.px(x, y))) > 4 / 255
+        lines.append(f"{output}: worst |linear − encoded| {worst * scale:.3f}/{scale} over "
+                     f"{2 * W // 8} pixels; CONTROL the grade moved {moved} of them by > 4/255")
+        if worst > bound + 1e-9 or moved < 32:
+            misses.append(f"{output} (worst {worst * scale:.3f}, moved {moved})")
+    check("LG the bt709 ramp (SDR, ±1/255) and the hlg ramp (HLG, ±1/1023) at brightness 0.25 "
+          "and exposure +1: the linear render = the encoded render on the grey and chroma rows "
+          "every 8th column (CONTROL: the grade moves ≥ 32 of them by > 4/255)", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(lines))
+
+
+def run_la(client, state):
+    """LA and LS: an adjustment clip (brightness 0.25, luma qualifier 0.4–1.0, softness
+    0.1) over the opaque bt709 ramp, unblurred and with the qualifier's blur 0.25.
+
+    The rule, before the rows: D the ramp alone and G the clip with no qualifier, drawn
+    in the same run; per pixel of the grey row (every 2nd column) w = (E − D)/(G − D)
+    from the encoded CONTROL E. Where E is D or G (±1/255, w = 0 or 1) the linear render
+    = E ±1/255; where 0 < w < 1 and G − D ≥ 32/255, the linear render = encode(mix(
+    decode D, decode G, w)) ±2/255. Both counts printed and non-zero in each case; the
+    blurred case must have band pixels. LS: render_frame {selection} linear = encoded
+    ±1/255."""
+    misses, lines = [], []
+    path = fixture("bt709")
+    doc = Doc(client, "la", W, H)
+    ramp = doc.place(path) if doc.ok and path else None
+    track = l_track(doc) if ramp else None
+    adj = doc.place_tool("add_adjustment_clip", track=track, at=0, duration=SEC) \
+        if track else None
+    frames = {}
+    if adj and doc.call("set_track", track=track, hidden=True)["ok"]:
+        frames["D"] = l_frame(doc, "la-d", width=W, height=H)
+        doc.call("set_track", track=track, hidden=False)
+    if l_patch(doc, adj, {"color": {"brightness": 0.25}}):
+        frames["G"] = l_frame(doc, "la-g", width=W, height=H)
+    luma = {"luma": {"low": 0.4, "high": 1.0, "softness": 0.1}}
+    if l_patch(doc, adj, {"qualifier": luma}):
+        frames["E"] = l_frame(doc, "la-e", width=W, height=H)
+        frames["Se"] = doc.ok and l_frame_opts(doc, "la-sel-e", selection=adj)
+    if l_patch(doc, adj, {"qualifier": {"blur": 0.25}}):
+        frames["Eb"] = l_frame(doc, "la-eb", width=W, height=H)
+    if adj and set_blending(doc, "linear"):
+        frames["Lb"] = l_frame(doc, "la-lb", width=W, height=H)
+        if l_patch(doc, adj, {"qualifier": {"blur": 0}}):
+            frames["L"] = l_frame(doc, "la-l", width=W, height=H)
+            frames["Sl"] = l_frame_opts(doc, "la-sel-l", selection=adj)
+    state["la_closed"] = doc.close()
+    state["la_fixture"] = bool(path and ramp and adj)
+    want = ("D", "G", "E", "Eb", "Lb", "L")
+    if any(frames.get(k) is None for k in want):
+        check("LA the adjustment pass and its qualifier wrapped", False,
+              f"{doc.why or 'not built'}; frames {[k for k in want if frames.get(k)]}")
+    else:
+        d_, g_ = frames["D"], frames["G"]
+        for case, e_, l_ in (("unblurred", frames["E"], frames["L"]),
+                             ("blurred", frames["Eb"], frames["Lb"])):
+            ends = band = 0
+            worst_end = worst_band = 0.0
+            for x in range(0, W, 2):
+                d, g = d_.px(x, GREY_ROW), g_.px(x, GREY_ROW)
+                e, l = e_.px(x, GREY_ROW), l_.px(x, GREY_ROW)
+                if abs(e[1] - d[1]) <= 1 / 255 or abs(e[1] - g[1]) <= 1 / 255:
+                    ends += 1
+                    gap = max(abs(a - b) for a, b in zip(l, e))
+                    worst_end = max(worst_end, gap)
+                    if gap > 1 / 255 + 1e-9 and len(misses) < 12:
+                        misses.append(f"{case} x={x} w∈{{0,1}}: linear {fmt(l, 255)} encoded "
+                                      f"{fmt(e, 255)}")
+                elif g[1] - d[1] >= 32 / 255:
+                    band += 1
+                    w = (e[1] - d[1]) / (g[1] - d[1])
+                    oracle = [srgb_oetf((1 - w) * srgb_eotf(a) + w * srgb_eotf(b))
+                              for a, b in zip(d, g)]
+                    gap = max(abs(a - b) for a, b in zip(l, oracle))
+                    worst_band = max(worst_band, gap)
+                    if gap > 2 / 255 + 1e-9 and len(misses) < 12:
+                        misses.append(f"{case} x={x} w {w:.3f}: linear {fmt(l, 255)} oracle "
+                                      f"{fmt(oracle, 255)}")
+            lines.append(f"{case}: {ends} pixels at w 0 or 1 (worst {worst_end * 255:.3f}/255), "
+                         f"{band} in the band (worst {worst_band * 255:.3f}/255)")
+            if ends == 0 or band == 0:
+                misses.append(f"{case}: {ends} end pixels, {band} band pixels")
+        check("LA an adjustment clip (brightness 0.25, luma qualifier 0.4–1.0) over the opaque "
+              "bt709 ramp, unblurred and blurred 0.25: where w is 0 or 1 the linear render = the "
+              "encoded ±1/255; in the band (G − D ≥ 32/255) = encode(mix(decode D, decode G, w)) "
+              "±2/255, w from the encoded CONTROL; both counts non-zero", not misses,
+              f"failed {misses or 'none'}\n       " + "\n       ".join(lines))
+    se, sl = frames.get("Se"), frames.get("Sl")
+    if not se or not sl:
+        check("LS render_frame {selection} linear = encoded", False, "no selection render")
+        return
+    worst, levels_seen = 0.0, set()
+    for x in range(0, W, 2):
+        a, b = se.px(x, GREY_ROW), sl.px(x, GREY_ROW)
+        worst = max(worst, max(abs(p - q) for p, q in zip(a, b)))
+        levels_seen.add(round(a[1] * 255))
+    graded = min(levels_seen) <= 1 and max(levels_seen) >= 254 and len(levels_seen) > 8
+    check("LS render_frame {selection} of LA's clip: the linear frame = the encoded one ±1/255 "
+          "on the grey row every 2nd column (CONTROL: the selection runs 0 → 255 through > 8 "
+          "levels)", worst <= 1 / 255 + 1e-9 and graded,
+          f"worst {worst * 255:.3f}/255; {len(levels_seen)} levels, {min(levels_seen)}…"
+          f"{max(levels_seen)}")
+
+
+def l_frame_opts(doc, tag, width=W, height=H, t=T, **options):
+    png, _ = render_opts(doc, tag, t=t, **options)
+    frame = Frame(png, width, height) if png else None
+    return frame if frame is not None and frame.ok else None
+
+
+def run_lm(client, state):
+    """LM: a white card over black cut by a luma matte of a 128/255 grey card; m from the
+    matte's bytes drawn alone (its Rec. 709 luma), the oracle m·W + (1 − m)·B linear."""
+    doc = l_doc(client, "lm", "sdr")
+    t1 = doc.track() if doc.ok else None
+    white = l_shape(doc, t1, (1, 1, 1, 1))
+    t2 = l_track(doc) if white else None
+    card = l_shape(doc, t2, [128 / 255] * 3 + [1])
+    frames = {}
+    if card and doc.call("set_track", track=t2, hidden=True)["ok"]:
+        frames["W"] = l_frame(doc, "lm-white")
+        if l_patch(doc, white, {"opacity": 0}):
+            frames["B"] = l_frame(doc, "lm-black")
+        l_patch(doc, white, {"opacity": 1})
+        doc.call("set_track", track=t2, hidden=False)
+    if card and doc.call("set_track", track=t1, hidden=True)["ok"]:
+        frames["card"] = l_frame(doc, "lm-card")
+        doc.call("set_track", track=t1, hidden=False)
+    if card and doc.call("set_track", track=t2, matte="luma")["ok"]:
+        frames["ctl"] = l_frame(doc, "lm-ctl")
+        if set_blending(doc, "linear"):
+            frames["lin"] = l_frame(doc, "lm-lin")
+    state["lm_closed"] = doc.close()
+    if len(frames) < 5 or None in frames.values():
+        check("LM a luma matte on a linear canvas", False,
+              f"{doc.why or 'not built'}; frames {sorted(k for k, v in frames.items() if v)}")
+        return
+    c = (SW // 2, SH // 2)
+    w_, b_, card_ = frames["W"].px(*c), frames["B"].px(*c), frames["card"].px(*c)
+    m = sum(k * v for k, v in zip(LUMA709, card_))
+    e, l = frames["ctl"].px(*c), frames["lin"].px(*c)
+    enc_o = [m * a + (1 - m) * b for a, b in zip(w_, b_)]
+    lin_o = [srgb_oetf(m * srgb_eotf(a) + (1 - m) * srgb_eotf(b)) for a, b in zip(w_, b_)]
+    parted = max(abs(a - b) for a, b in zip(e, lin_o))
+    ok = (close_to(l, lin_o, 2 / 255 + 1e-9) and close_to(e, enc_o, 2 / 255 + 1e-9)
+          and parted > 2 / 255)
+    check("LM a white card over black cut by a luma matte of a 128/255 grey card: the linear "
+          "render = encode(m·decode W + (1 − m)·decode B) ±2/255, m the card's Rec. 709 luma "
+          "drawn alone; the encoded CONTROL = m·W + (1 − m)·B ±2/255, parted by more", ok,
+          f"m {m:.4f}; linear {fmt(l, 255)} oracle {fmt(lin_o, 255)}; CONTROL {fmt(e, 255)} "
+          f"oracle {fmt(enc_o, 255)}, parted {parted * 255:.2f} levels")
+
+
+def run_ld(client, state):
+    """LD: a shadow's colour decoded on a linear canvas — a 128/255 shadow at opacity 1,
+    blur 0, over black, linear = encoded ±1/255; a black shadow at 0.5 over white, on the
+    linear formula ±2/255 (the CONTROL on the encoded one and parted by more)."""
+    misses, lines = [], []
+    at = (SW // 2 + 120, SH // 2)
+
+    def shadowed(name, background, colour, opacities):
+        doc = l_doc(client, name, "sdr", background=background)
+        clip = l_shape(doc, doc.track() if doc.ok else None, (1, 0, 0, 1), width=100,
+                       height=100)
+        got = {}
+        for key, opacity in opacities:
+            if l_patch(doc, clip, {"shadow": {"color": colour, "opacity": opacity, "blur": 0,
+                                              "angle": 0, "distance": 120}}):
+                got[key] = l_frame(doc, f"{name}-{key}")
+        if set_blending(doc, "linear"):
+            got["lin"] = l_frame(doc, f"{name}-lin")
+        state[f"{name.replace('-', '_')}_closed"] = doc.close()
+        return got, doc.why
+
+    grey, why = shadowed("ld-grey", (0, 0, 0, 1), [128 / 255] * 3 + [1], [("ctl", 1)])
+    if None in grey.values() or len(grey) < 2:
+        misses.append(f"grey: {why or 'no render'}")
+    else:
+        e, l = grey["ctl"].px(*at), grey["lin"].px(*at)
+        lines.append(f"128/255 at 1 over black: encoded {fmt(e, 255)} (CONTROL 128 ±1), linear "
+                     f"{fmt(l, 255)}")
+        if not close_to(l, e, 1 / 255 + 1e-9) or not close_to(e, [128 / 255] * 3, 1 / 255):
+            misses.append("grey")
+    black, why = shadowed("ld-black", (1, 1, 1, 1), [0, 0, 0, 1], [("top", 1), ("ctl", 0.5)])
+    if None in black.values() or len(black) < 3:
+        misses.append(f"black: {why or 'no render'}")
+    else:
+        top, bg = black["top"].px(*at), black["ctl"].px(20, 20)
+        e, l = black["ctl"].px(*at), black["lin"].px(*at)
+        enc_o = [0.5 * a + 0.5 * b for a, b in zip(top, bg)]
+        lin_o = [srgb_oetf(0.5 * srgb_eotf(a) + 0.5 * srgb_eotf(b)) for a, b in zip(top, bg)]
+        parted = max(abs(a - b) for a, b in zip(e, lin_o))
+        lines.append(f"black at 0.5 over white: linear {fmt(l, 255)} oracle {fmt(lin_o, 255)}; "
+                     f"CONTROL {fmt(e, 255)} oracle {fmt(enc_o, 255)}, parted "
+                     f"{parted * 255:.2f} levels (the shadow at 1 {fmt(top, 255)}, the "
+                     f"background {fmt(bg, 255)})")
+        if not (close_to(l, lin_o, 2 / 255 + 1e-9) and close_to(e, enc_o, 2 / 255 + 1e-9)
+                and parted > 2 / 255):
+            misses.append("black at 0.5")
+    check("LD a 128/255 shadow (opacity 1, blur 0) over black: linear = encoded ±1/255; a "
+          "black shadow at 0.5 over white = encode(0.5·decode C + 0.5·decode BG) ±2/255, the "
+          "encoded CONTROL on the encoded mix and parted by more", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(lines))
+
+
+def run_lb(client, state):
+    """LB: a [0.5, 0.5, 0.5, 1] background (a clear 16 × 16 shape so the timeline draws),
+    linear = encoded, SDR ±1/255 and HLG ±1/1023."""
+    misses, lines = [], []
+    for output, bound, scale in (("sdr", 1 / 255, 255), ("hlg", LEVEL, 1023)):
+        doc = l_doc(client, f"lb-{output}", output, background=(0.5, 0.5, 0.5, 1))
+        l_shape(doc, doc.track() if doc.ok else None, (0, 0, 0, 0), width=16, height=16)
+        e = l_frame(doc, f"lb-{output}-encoded")
+        l = l_frame(doc, f"lb-{output}-linear") if e and set_blending(doc, "linear") else None
+        state[f"lb_{output}_closed"] = doc.close()
+        if e is None or l is None:
+            misses.append(f"{output}: {doc.why or 'no render'}")
+            continue
+        a, b = e.px(SW // 2, SH // 2), l.px(SW // 2, SH // 2)
+        lines.append(f"{output}: encoded {fmt(a, scale)}, linear {fmt(b, scale)} (/{scale})")
+        if not close_to(a, b, bound + 1e-9):
+            misses.append(output)
+    check("LB a [0.5, 0.5, 0.5, 1] background: linear = encoded, SDR ±1/255 and HLG ±1/1023",
+          not misses, f"failed {misses or 'none'}\n       " + "\n       ".join(lines))
+
+
+def run_lf(client, state):
+    """LF: Fade Through White in an HLG project at its full fade (LIN_T): linear = encoded
+    ±1/1023, the CONTROL the lifted white 0.75 ±2/1023."""
+    doc = l_doc(client, "lf", "hlg")
+    track = doc.track() if doc.ok else None
+    a = l_shape(doc, track, (1, 0, 0, 1), at=0, duration=2 * SEC)
+    b = l_shape(doc, track, (0, 0, 1, 1), at=2 * SEC, duration=2 * SEC)
+    built = a is not None and l_transition(doc, b, kind="fade_white")
+    e = l_frame(doc, "lf-encoded", t=LIN_T) if built else None
+    l = l_frame(doc, "lf-linear", t=LIN_T) if e and set_blending(doc, "linear") else None
+    state["lf_closed"] = doc.close()
+    if e is None or l is None:
+        check("LF Fade Through White in HLG", False, doc.why or f"built {built}")
+        return
+    x, y = e.px(SW // 2, SH // 2), l.px(SW // 2, SH // 2)
+    check("LF Fade Through White in an HLG project at full fade: linear = encoded ±1/1023 "
+          "(CONTROL: the encoded frame is the lifted white 0.75 ±2/1023)",
+          close_to(x, y, LEVEL + 1e-9) and close_to(x, [0.75] * 3, 2 * LEVEL),
+          f"encoded {fmt(x, 1023)}, linear {fmt(y, 1023)} (/1023)")
+
+
+def run_lr(client, state):
+    """LR: a routed dissolve (the green half a nest, MT-8) at its midpoint = LT's
+    unrouted dissolve, encoded and linear, ±1/255."""
+    plain = next((s for s in L_SCENES.get("LT") or [] if s[0] == "red → green dissolve"),
+                 None) or dissolve_scene(client, "sdr", state)
+    routed = dissolve_scene(client, "sdr", state, routed=True)
+    if plain[1] is None or routed[1] is None:
+        check("LR a routed dissolve = the unrouted one", False,
+              f"plain {plain[2] if plain[1] is None else 'ok'}; routed "
+              f"{routed[2] if routed[1] is None else 'ok'}")
+        return
+    ok = close_to(routed[3], plain[3], 1 / 255 + 1e-9) and close_to(routed[2], plain[2],
+                                                                     1 / 255 + 1e-9)
+    check("LR a routed dissolve (the incoming half a nest) at its midpoint, linear = LT's "
+          "unrouted linear dissolve ±1/255 (and encoded = encoded)", ok,
+          f"routed linear {fmt(routed[3], 255)}, unrouted {fmt(plain[3], 255)}; routed encoded "
+          f"{fmt(routed[2], 255)}, unrouted {fmt(plain[2], 255)}; {routed[6]}")
+
+
+def run_le(client, state):
+    """LE: prores_422 of LT's and LH's 50 % scene with blending linear: frame 15 decoded at
+    the centre = render_frame at 0.5 s ±2/255 (SDR) and ±2/1023 (HLG)."""
+    misses, lines = [], []
+    for output, matrix, bound, scale in (("sdr", "bt709", 2 / 255, 255),
+                                         ("hlg", "bt2020nc", 2 * LEVEL, 1023)):
+        doc = l_doc(client, f"le-{output}", output)
+        clip = l_shape(doc, doc.track() if doc.ok else None, (1, 1, 1, 1))
+        l_patch(doc, clip, {"opacity": 0.5})
+        frame = l_frame(doc, f"le-{output}") if set_blending(doc, "linear") else None
+        out, got = export_as(doc, f"le-{output}-export", "prores_422")
+        state[f"le_{output}_closed"] = doc.close()
+        frames = yuv_frames(out, SW, SH, 16) if out else None
+        if frame is None or frames is None:
+            misses.append(f"{output}: {doc.why or got.get('error') or 'no frames'}")
+            continue
+        x = frames[15].rgb(SW // 2, SH // 2, matrix)
+        y = frame.px(SW // 2, SH // 2)
+        lines.append(f"{output} ({tags(stream(out))}): export {fmt(x, scale)}, render "
+                     f"{fmt(y, scale)} (/{scale})")
+        if not close_to(x, y, bound):
+            misses.append(output)
+    check("LE prores_422 of the white-at-50 % scene with blending linear: frame 15 = "
+          "render_frame at 0.5 s, SDR ±2/255 and HLG ±2/1023", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(lines))
+
+
+def run_lo(client, state):
+    """LO: set linear then encoded — get_project and the render's bytes equal a project
+    never set; `encoded` on an encoded project (and `linear` on a linear one) is the
+    identity's answer."""
+    misses = []
+    doc = l_doc(client, "lo", "sdr")
+    clip = l_shape(doc, doc.track() if doc.ok else None, (1, 1, 1, 1))
+    l_patch(doc, clip, {"opacity": 0.5})
+    before, png0 = doc.project(), doc.render("lo-before")
+    same = doc.call("set_canvas", blending="encoded")
+    if same["ok"] or "made no change" not in str(same.get("error")):
+        misses.append(f"encoded on encoded: {same}")
+    on = set_blending(doc, "linear")
+    again = doc.call("set_canvas", blending="linear") if on else {"ok": True}
+    if again["ok"] or "made no change" not in str(again.get("error")):
+        misses.append(f"linear on linear: {again}")
+    back = on and set_blending(doc, "encoded")
+    after, png1 = doc.project(), doc.render("lo-after")
+    state["lo_closed"] = doc.close()
+    if not back or png0 is None or png1 is None:
+        misses.append(f"not built: {doc.why}")
+    else:
+        if after != before:
+            misses.append(f"get_project differs: canvas {after.get('canvas')} against "
+                          f"{before.get('canvas')}")
+        if Path(png0).read_bytes() != Path(png1).read_bytes():
+            misses.append(f"render bytes differ ({digest(png0)} against {digest(png1)})")
+    check("LO set_canvas blending linear then encoded: get_project and the render's bytes equal "
+          "the project before; encoded on an encoded project and linear on a linear one each "
+          "answer \"made no change\"", not misses, f"failed {misses or 'none'}")
+
+
+def inspector_popups(doc, tag):
+    """`snapshot_ui` of the inspector's Document tab: {label: the pixels of the popup in
+    that label's row}, for "Dynamic Range" and "Blending" (the layout dump carries no
+    popup title, so the title is read as the control's drawn pixels), or {}."""
+    doc.call("set_selection", clips=[])
+    doc.call("select_inspector_tab", tab="document")
+    out = WORK / "snapshots" / f"{tag}.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    got = reply(doc.call("snapshot_ui", window="editor", view="inspector", path=str(out)))
+    try:
+        dump = json.loads(Path(got.get("layout_path", "")).read_text())
+    except (OSError, ValueError):
+        return {}
+    views, scale = dump.get("views", []), dump.get("scale", 2)
+    width, height = (round(v * scale) for v in dump.get("size", [0, 0]))
+    picture = Frame(out, width, height) if out.exists() and width else None
+    found = {}
+    for label in ("Dynamic Range", "Blending"):
+        row = next((v.get("parent") for v in views if v.get("text") == label
+                    and v.get("class") == "InspectorRowLabel" and not v.get("hidden")), None)
+        popup = next((v for v in views if row is not None and v.get("parent") == row
+                      and v.get("class") == "OptionPopupControl" and not v.get("hidden")), None)
+        if popup is None or picture is None or not picture.ok:
+            continue
+        x0, y0, w, h = (round(c * scale) for c in popup["frame"])
+        found[label] = [tuple(picture.px(x, y)) for y in range(y0, y0 + h)
+                        for x in range(x0, x0 + w)]
+    return found
+
+
+def run_lu(client, state):
+    """LU: one undo step; canvas.blending read back; an unknown value refused naming both;
+    the Document tab's Canvas section has a "Blending" row with a popup, which redraws when
+    blending is set to linear over MCP while the Dynamic Range popup beside it does not
+    (its items' names, "Encoded" and "Linear light", are P9's)."""
+    misses = []
+    doc = l_doc(client, "lu", "sdr")
+    l_shape(doc, doc.track() if doc.ok else None, (1, 1, 1, 1))
+    shown_before = inspector_popups(doc, "lu-encoded") if doc.ok else {}
+    on = set_blending(doc, "linear")
+    shown_after = inspector_popups(doc, "lu-linear") if on else {}
+    undone = doc.call("undo") if on else {"ok": False}
+    read_undone = (doc.project().get("canvas") or {}).get("blending")
+    redone = doc.call("redo") if undone["ok"] else {"ok": False}
+    read_redone = (doc.project().get("canvas") or {}).get("blending")
+    bad = doc.call("set_canvas", blending="gamma") if doc.ok else {"ok": True}
+    state["lu_closed"] = doc.close()
+    if not on:
+        misses.append(f"set linear: {doc.why}")
+    if not undone["ok"] or read_undone is not None:
+        misses.append(f"undo: {undone.get('error') or reply(undone).get('undone')}, canvas "
+                      f"blending after {read_undone!r}")
+    if not redone["ok"] or read_redone != "linear":
+        misses.append(f"redo: {redone.get('error')}, blending {read_redone!r}")
+    if bad["ok"] or "unknown variant `gamma`, expected `encoded` or `linear`" not in str(
+            bad.get("error")):
+        misses.append(f"gamma: {bad}")
+    rows_found = sorted(set(shown_before) & set(shown_after))
+    if rows_found != ["Blending", "Dynamic Range"]:
+        misses.append(f"the rows found {sorted(shown_before)} then {sorted(shown_after)}")
+    else:
+        if shown_before["Blending"] == shown_after["Blending"]:
+            misses.append("the Blending popup did not redraw")
+        if shown_before["Dynamic Range"] != shown_after["Dynamic Range"]:
+            misses.append("CONTROL: the Dynamic Range popup redrew too")
+    check("LU set_canvas {blending: linear} is one undo step (undo leaves no canvas.blending, "
+          "redo reads linear); \"gamma\" is refused naming encoded and linear; the Document "
+          "tab's \"Blending\" row holds a popup that redraws when blending is set over MCP "
+          "(CONTROL: the Dynamic Range popup does not)", not misses,
+          f"failed {misses or 'none'}; undone {reply(undone).get('undone')!r}")
+
+
+def run_tl(binary):
+    """TL (`--measure`): TH's 4K SDR project (the BT.709 twin on two tracks, the upper at
+    scale 0.5, and a title, 8 s), prores_422, encoded and linear, each on its own instance:
+    the linear mean average under PR-1's 8 ms (scored), and its difference from the
+    encoded one beside C0's 0.21 ms (REASONED, printed)."""
+    figures, misses = [], []
+    path = fixture("bt709_4k")
+    means = {}
+    for blend in ("encoded", "linear"):
+        if path is None:
+            misses.append(f"bt709_4k refused: {REFUSED.get('bt709_4k')}")
+            break
+        log = WORK / f"tl-{blend}.log"
+        before = host_state()
+        launched = mcp.launch(str(binary), ["-FrameJobCompositorTiming", "YES"],
+                              env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
+                              log_path=str(log), timeout=CALL_BOUND)
+        lines, out = [], None
+        try:
+            if launched.client is None:
+                misses.append(f"{blend}: the instance did not listen")
+                continue
+            doc = Doc(launched.client, f"tl-{blend}", 3840, 2160)
+            doc.place(path, 0)
+            doc.place(path, 4 * SEC)
+            upper = l_track(doc)
+            for at in (0, 4 * SEC):
+                made = doc.place_tool("add_clip", track=upper, media=doc._media.get(path),
+                                      at=at) if upper else None
+                if made:
+                    doc.call("set_video", clips=[made], patch={"scale": 0.5})
+            title = l_track(doc)
+            doc.place_tool("add_text_clip", track=title, at=0, duration=8 * SEC,
+                           text={"content": "Frame Job", "size": 160})
+            if blend == "linear":
+                set_blending(doc, "linear")
+            start = log.stat().st_size if log.exists() else 0
+            out = doc.export(f"tl-{blend}") if doc.ok else None
+            time.sleep(1)
+            with open(log, errors="replace") as handle:
+                handle.seek(start)
+                lines = TIMING.findall(handle.read())
+            doc.close()
+        finally:
+            launched.stop()
+            mcp.remove_scratch(launched.socket_path)
+        found = [l for l in open(log, errors="replace") if "Frame Job: " in l]
+        averages = [float(a) for a, _, _ in lines]
+        figures.append(f"{blend}: {len(lines)} lines, average ms {averages}, worst "
+                       f"{[float(w) for _, w, _ in lines]}; host before {before}; after "
+                       f"{host_state()}")
+        if out is None or len(lines) < 2 or found:
+            misses.append(f"{blend}: export {'ok' if out else 'missing'}, lines {len(lines)}, "
+                          f"complaints {found[:2]}")
+        elif averages:
+            means[blend] = sum(averages) / len(averages)
+    if "linear" in means:
+        figures.append(f"mean average linear {means['linear']:.3f} ms (PR-1's budget 8 ms)")
+        if means["linear"] >= 8:
+            misses.append(f"linear mean {means['linear']:.3f} ms")
+    else:
+        misses.append("no linear figure")
+    if len(means) == 2:
+        figures.append(f"encoded {means['encoded']:.3f} ms: linear costs "
+                       f"{means['linear'] - means['encoded']:+.3f} ms per 4K frame (GR-18's "
+                       f"decode/encode +0.000–0.001 ms plus the output pass, C0's copy 0.21 ms, "
+                       f"REASONED; printed, not scored)")
+    check("TL TH's 4K SDR project exported prores_422 with blending linear: the compositor's "
+          "mean frame time under PR-1's 8 ms; the difference from encoded printed", not misses,
+          f"{misses or 'as wanted'}\n       " + "\n       ".join(figures))
+
+
 def tail(log, count=4):
     try:
         lines = [line.rstrip() for line in open(log, errors="replace")]
@@ -4512,11 +5329,11 @@ def main():
             print(f"unknown rows: {sorted(unknown)}")
             return 2
     elif args.measure:
-        selected = {"TI", "TH", "TO", "Z1"}
+        selected = {"TI", "TH", "TO", "TL", "Z1"}
     else:
-        selected -= {"TI", "TH", "TO"}
+        selected -= {"TI", "TH", "TO", "TL"}
         if args.mutant:
-            selected -= {"H1a"} | H7_ROWS | H2_ROWS | H3_ROWS | H4_ROWS
+            selected -= {"H1a"} | H7_ROWS | H2_ROWS | H3_ROWS | H4_ROWS | L_ROWS
     if args.mode == "capture":
         if not args.only:
             selected = {"H1", "H2", "H3", "H4", "H5", "H6", "R0", "Z1"}
@@ -4553,7 +5370,7 @@ def main():
     log = WORK / "instance.log"
     needs_instance = bool(selected & ({"H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5",
                                        "H6", "R0"} | H7_ROWS | H2_ROWS
-                                      | (H3_ROWS - {"DX"}) | H4_ROWS))
+                                      | (H3_ROWS - {"DX"}) | H4_ROWS | L_ROWS))
     if needs_instance:
         launched = mcp.launch(str(binary), [],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
@@ -4623,6 +5440,14 @@ def main():
                                  ("SD", run_sd), ("SP", run_sp)):
                     if row in selected:
                         run(client, state)
+                # hdr H-6 (#276): linear light. LA scores LA and LS together.
+                for rows_, run in (({"LT"}, run_lt), ({"LH"}, run_lh), ({"LG"}, run_lg),
+                                   ({"LA", "LS"}, run_la), ({"LM"}, run_lm),
+                                   ({"LD"}, run_ld), ({"LB"}, run_lb), ({"LF"}, run_lf),
+                                   ({"LR"}, run_lr), ({"LE"}, run_le), ({"LO"}, run_lo),
+                                   ({"LU"}, run_lu)):
+                    if rows_ & selected:
+                        run(client, state)
             except Exception as error:  # a row that could not run is a failure
                 import traceback
                 traceback.print_exc()
@@ -4637,6 +5462,8 @@ def main():
         run_th(binary)
     if "TO" in selected:
         run_to(binary)
+    if "TL" in selected:
+        run_tl(binary)
     if "DX" in selected:
         run_dx(binary)
     if selected & P_ROWS:

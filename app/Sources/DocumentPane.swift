@@ -229,6 +229,13 @@ final class DocumentPane: InspectorPaneView {
                     "Dynamic Range", binding, name: "Dynamic Range", items: ["SDR", "HDR (HLG)"],
                     read: { binding.documentCanvas.output == .hlg ? 1 : 0 },
                     ops: { [.setCanvas(output: $0 == 1 ? .hlg : .sdr)] }, resets: false),
+                // How layers blend (spec §11 GR-18, HD-16 (g)): one
+                // `set_canvas {blending}` step, undoable.
+                inspectorPopupRow(
+                    "Blending", binding, name: "Blending",
+                    items: CanvasBlending.allCases.map(\.menuName),
+                    read: { binding.documentCanvas.blending == .linear ? 1 : 0 },
+                    ops: { [.setCanvas(blending: $0 == 1 ? .linear : .encoded)] }, resets: false),
             ])
     }
 

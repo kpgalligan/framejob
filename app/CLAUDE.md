@@ -948,9 +948,12 @@ the key map behind it.
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
   ops are document-level; its transparency note names one or two alpha
   export formats and counts three or more, spec §11 G-33; the Colour row
-  and its Dynamic Range popup, SDR or HLG, spec §11 HD-2) ·
+  and its Dynamic Range popup, SDR or HLG, spec §11 HD-2; the Blending row,
+  Encoded or Linear light, spec §11 HD-16) ·
   `CanvasOutput.swift` (the project's dynamic range, `sdr` or `hlg`, on the
-  canvas snapshot, the recipe's canvas and the plan) · `OptionControls.swift` (the descriptor-driven
+  canvas snapshot, the recipe's canvas and the plan; `CanvasBlending`, and
+  `RecipeCanvas.blended`, which decodes a colour Frame Job draws — the
+  background, a shadow — on a linear canvas) · `OptionControls.swift` (the descriptor-driven
   row controls) · `OptionControls+Choices.swift` (the typed, value-carrying
   `OptionPopupControl` init over the index one). `VideoPane+Motion.swift` owns the local wrapping
   `MotionInactiveNote` for selected zero-duration edges; it refreshes with
@@ -1280,8 +1283,9 @@ the key map behind it.
   project's picture, `hlg`, `pq` or `sdr`; the SDR version's knee and the
   output pass's uniforms, answered only when the key asks for `sdr` or `pq`,
   spec §11 HD-4, HD-5, HD-14) · `Compositor+Output.swift` (the output pass:
-  one quad after the last layer reading the destination, so an HLG master and
-  every SDR frame are the bytes they were) ·
+  one quad after the last layer reading the destination, drawn for an HLG
+  project's SDR version or PQ and for every linear-light project, so an HLG
+  master and every encoded SDR frame are the bytes they were) ·
   `LayerLift.swift` (an HLG project's lift of every layer Frame Job draws,
   once at upload by step 0's `.sdr` arm; an LRU of
   `LayerRenderers.cacheLimit + graphicCacheLimit` entries keyed by the

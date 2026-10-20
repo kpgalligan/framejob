@@ -373,10 +373,12 @@ struct LayerUniforms {
     // ── HLG (spec §11 HD-2, HD-13): `hlgOutput` is 1 in an HLG project —
     // the grade's BT.2020 weights and HLG transfer, the key's inverse lift —
     // and `liftedWhite` Fade Through White's white there (HD-3's lift of 1).
-    // Both 0 in an SDR project. 128 + 4 = 132 floats = 528 bytes, 33 × 16.
+    // Both 0 in an SDR project. `linearLight` (spec §11 HD-16 (c)) is 1 when
+    // the canvas blends in linear light, 0 otherwise. 128 + 4 = 132 floats =
+    // 528 bytes, 33 × 16.
     float hlgOutput;
     float liftedWhite;
-    float hlgReserved0;
+    float linearLight;
     float hlgReserved1;
 };
 
@@ -1054,6 +1056,17 @@ static inline float3 gradeEncode(float3 c) {
     return select(1.055 * pow(c, float3(1.0 / 2.4)) - 0.055, c * 12.92, c <= 0.0031308);
 }
 
+// Linear-light blending's pair (spec §11 GR-18, HD-16 (b)): the project's own
+// transfer as scene light, no OOTF — the IEC 61966-2-1 pair above in an SDR
+// project, HLG's inverse OETF and OETF (BT.2100) when `hlg` is 1. On [0, 1].
+static inline float3 blendDecode(float3 c, float hlg) {
+    return hlg > 0.5 ? hlgInverseOETF(saturate(c)) : gradeDecode(c);
+}
+
+static inline float3 blendEncode(float3 c, float hlg) {
+    return hlg > 0.5 ? hlgOETF(saturate(c)) : gradeEncode(c);
+}
+
 // Tone, on straight colour: exposure and white balance in LOCAL linear light
 // — decoded, multiplied and re-encoded here, a colour transform like Color's
 // hue turn, not the whole-pipeline linear light §7.5 and PR-5 defer — and the
@@ -1267,19 +1280,22 @@ static inline float3 gradeLook(float3 rgb, texture3d<float> look, sampler samp,
 // The visible consequence, said out loud because from here it reads as a bug:
 // the inspector shows the MODEL's value while an overlap draws `normal`.
 //
-// **This compositor blends in the ENCODED sRGB space, deliberately.** Nothing
-// in the pipeline uses an `_srgb` pixel format — the attachment is
-// `.rgba16Float` holding encoded values clamped to [0, 1] (spec §11 PR-1) —
-// so every stage above works on encoded values, and step 11 works on the same
-// ones, kept at 16-bit float rather than rounded to 8 bits between layers.
-// "Multiply of 50 % grey over 50 % grey is 25 %" is a statement about ENCODED
-// values and is false in linear light, where the answer is about 24 %
-// (61/255). A reader who knows colour will want to put a
-// linearise/encode pair around the blend; that would change every blended
-// pixel, break the proof's measured 64 / 192 / 255, and make the compositor
-// disagree with itself, since the grade, the filters and the transitions have
-// all worked in encoded space since M1. If linear light is ever wanted it is
-// a decision for the WHOLE pipeline, not for this one stage.
+// **This compositor blends in the ENCODED sRGB space by default,
+// deliberately** (spec §11 GR-3). Nothing in the pipeline uses an `_srgb`
+// pixel format — the attachment is `.rgba16Float` holding encoded values
+// clamped to [0, 1] (spec §11 PR-1) — so every stage above works on encoded
+// values, and step 11 works on the same ones, kept at 16-bit float rather
+// than rounded to 8 bits between layers. "Multiply of 50 % grey over 50 %
+// grey is 25 %" is a statement about ENCODED values and is false in linear
+// light, where the answer is about 24 % (61/255). A linearise/encode pair
+// around this one stage would change every blended pixel, break the proof's
+// measured 64 / 192 / 255, and make the compositor disagree with itself, so
+// linear light is a decision for the WHOLE pipeline, and it is one: HD-16's
+// opt-in `canvas.blending: "linear"` decodes each layer once after its grade
+// (step 7 below), keeps the destination linear through every weight and
+// blend, reads the adjustment pass, its qualifier and luma mattes encoded,
+// and encodes once in the output pass. Off, every branch it adds is
+// untaken.
 //
 // **Why the neighbourhood filters do not run in slot order.** Blur, sharpen
 // and pixelate reach for neighbouring pixels, and in a single pass a second
@@ -1647,6 +1663,16 @@ static inline float4 layerColorPremultiplied(Varyings in,
         }
     }
 
+    // (7) Linear light (spec §11 GR-18, HD-16 (c)): on a linear canvas the
+    // graded colour is decoded here, once, after every colour stage above
+    // and before every weight below — coverage, the transition, opacity, the
+    // reflection's fade and the blend all act on linear values, and the
+    // output pass encodes the frame once. GR0's route: a uniform flag, 0 on
+    // every encoded canvas, outside the effects sum.
+    if (u.linearLight > 0.5) {
+        rgb = blendDecode(rgb, u.hlgOutput);
+    }
+
     // (7b) Coverage. The corner radius and the clip rectangle above are both
     // pure alpha, so nothing else can tell where among the colour stages they
     // ran.
@@ -1732,6 +1758,10 @@ static inline float4 layerColorPremultiplied(Varyings in,
         // An HLG project's white is the lifted SDR white (spec §11 HD-13 (f)).
         float3 fade = kind == kTransitionFadeWhite
             ? (u.hlgOutput > 0.5 ? float3(u.liftedWhite) : float3(1.0)) : float3(0.0);
+        // A linear canvas fades through the colour's linear light (HD-16 (d)).
+        if (u.linearLight > 0.5) {
+            fade = blendDecode(fade, u.hlgOutput);
+        }
         if (incoming) {
             rgb = mix(fade, rgb, clamp((p - 0.5) * 2.0, 0.0, 1.0));
             alpha *= p >= 0.5 ? 1.0 : 0.0;
@@ -2002,7 +2032,7 @@ fragment float4 framejob_shadow_fragment(ShadowVaryings in [[stage_in]],
 struct MatteUniforms {
     float mode;
     float hlgOutput;  // 1 in an HLG project (spec §11 HD-13 (h))
-    float reserved1;
+    float linearLight;  // 1 on a linear canvas (spec §11 HD-16 (e))
     float reserved2;
 };
 
@@ -2018,6 +2048,12 @@ fragment float4 framejob_matte_resolve_fragment(ShadowVaryings in [[stage_in]],
                                                texture2d<float> mask [[texture(0)]]) {
     float4 m = mask.read(uint2(in.position.xy));
     int mode = int(u.mode + 0.5);
+    // A linear canvas's composite holds linear light (spec §11 HD-16 (e)):
+    // its straight colour is encoded first, premultiplied again, so a luma
+    // matte cuts what it cut before.
+    if (u.linearLight > 0.5) {
+        m.rgb = m.a > 0.0 ? blendEncode(saturate(m.rgb / m.a), u.hlgOutput) * m.a : float3(0.0);
+    }
     float luma = dot(m.rgb, float3(0.2126, 0.7152, 0.0722));
     if (u.hlgOutput > 0.5) {
         // An HLG project (spec §11 HD-13 (h)): Rec. 709 luma of the un-lifted,
@@ -2132,7 +2168,9 @@ struct QualifierUniforms {
     float blurred;
     // 1 in an HLG project: Y′ by BT.2020's weights (spec §11 HD-13 (g)).
     float hlgOutput;
-    float reserved0;
+    // 1 on a linear canvas: the map encodes the destination before reading
+    // it (spec §11 HD-16 (e)).
+    float linearLight;
     float reserved1;
     float reserved2;
 };
@@ -2196,6 +2234,9 @@ fragment float4 framejob_qualifier_map_fragment(ShadowVaryings in [[stage_in]],
     float4 dst = destination.read(uint2(in.position.xy));
     float a = saturate(dst.a);
     float3 c = saturate(dst.rgb / max(a, 1e-4));
+    if (q.linearLight > 0.5) {
+        c = blendEncode(c, q.hlgOutput);
+    }
     return float4(qualifierWeight(c, q), 0.0, 0.0, 1.0);
 }
 
@@ -2215,7 +2256,11 @@ fragment float4 framejob_qualifier_map_fragment(ShadowVaryings in [[stage_in]],
 // blurred map at `texture(0)` the selection pass made from that same
 // destination (spec §11 GR-35). With `q.selection` set the pass writes
 // `q` × coverage as opaque grey instead (Show Selection); the coverage is
-// never blurred.
+// never blurred. On a linear canvas (spec §11 HD-16 (e)) the destination is
+// encoded before the qualifier and the grade read it and the graded colour
+// decoded before the strength mix, which stays in linear light like every
+// other opacity; Show Selection's grey is decoded, so the frame shows the
+// grey it showed before.
 fragment float4 framejob_adjust_fragment(ShadowVaryings in [[stage_in]],
                                         constant LayerUniforms &u [[buffer(0)]],
                                         constant QualifierUniforms &q [[buffer(1)]],
@@ -2227,6 +2272,10 @@ fragment float4 framejob_adjust_fragment(ShadowVaryings in [[stage_in]],
                                         sampler samp [[sampler(0)]]) {
     float a = saturate(dst.a);
     float3 c = saturate(dst.rgb / max(a, 1e-4));
+    bool linear = u.linearLight > 0.5;
+    if (linear) {
+        c = blendEncode(c, u.hlgOutput);
+    }
     float2 local = canvasPixels(in.position.xy, float2(u.canvasPerDestX, u.canvasPerDestY))
         / max(float2(u.canvasWidth, u.canvasHeight), float2(1.0));
     float coverage = matte.sample(samp, local).r;
@@ -2236,7 +2285,8 @@ fragment float4 framejob_adjust_fragment(ShadowVaryings in [[stage_in]],
             : qualifierWeight(c, q);
     }
     if (q.selection > 0.5) {
-        return float4(float3(saturate(selected * coverage)), 1.0);
+        float3 grey = float3(saturate(selected * coverage));
+        return float4(linear ? blendDecode(grey, u.hlgOutput) : grey, 1.0);
     }
     c = gradeSample(c, 1.0, u).rgb;
     if (u.toneEnabled > 0.5) {
@@ -2259,6 +2309,9 @@ fragment float4 framejob_adjust_fragment(ShadowVaryings in [[stage_in]],
         c = pointFilter(int(slot.x + 0.5), clamp(slot.y, 0.0, 1.0), c, local);
     }
     c = saturate(c);
+    if (linear) {
+        c = blendDecode(c, u.hlgOutput);
+    }
     float4 g = float4(c * a, a);
     float w = saturate(u.opacity * coverage * selected);
     return mix(dst, g, w);
@@ -2564,12 +2617,14 @@ fragment float4 framejob_input_fragment(ShadowVaryings in [[stage_in]],
 // MARK: - The output pass (spec §11 HD-14 (b))
 
 // `OutputUniforms` (`OutputTransform.swift`), sixteen bytes: `mode` 1 draws
-// the SDR version, 2 PQ; `knee` is the SDR version's knee.
+// the SDR version, 2 PQ; `knee` is the SDR version's knee; `linearLight` 1
+// when the destination holds linear light (spec §11 HD-16 (f)), `hlgOutput`
+// 1 when that light is HLG's scene light.
 struct OutputUniforms {
     float mode;
     float knee;
-    float reserved0;
-    float reserved1;
+    float linearLight;
+    float hlgOutput;
 };
 
 // ST 2084's inverse EOTF (BT.2100's PQ): light, 1 at 10,000 cd/m², clamped to
@@ -2587,12 +2642,20 @@ static float3 pqInverseEOTF(float3 light) {
 // then Core Media 709's encode with Core Graphics' toe — the inverse of HD-3's
 // lift below the knee. PQ: display light at 1,000 cd/m² on ST 2084's scale.
 // Premultiplied back by the destination's own alpha.
+//
+// A linear canvas (spec §11 HD-16 (f)) holds linear light: `mode` 0 encodes
+// it by the project's own transfer (the sRGB encode, or HLG's OETF for an
+// HLG master), and modes 1 and 2 take it as the scene light directly.
 fragment float4 framejob_output_fragment(ShadowVaryings in [[stage_in]],
                                         float4 dst [[color(0)]],
                                         constant OutputUniforms &u [[buffer(0)]]) {
     float a = saturate(dst.a);
     float3 signal = a > 0.0 ? dst.rgb / a : float3(0.0);
-    float3 scene = hlgInverseOETF(saturate(signal));
+    bool linear = u.linearLight > 0.5;
+    if (linear && u.mode < 0.5) {
+        return float4(blendEncode(signal, u.hlgOutput) * a, a);
+    }
+    float3 scene = linear ? saturate(signal) : hlgInverseOETF(saturate(signal));
     float ys = dot(scene, kLuma2020);
     float3 display = ys > 0.0 ? scene * pow(ys, kHlgNominalGamma - 1.0) : float3(0.0);
     float3 rgb;

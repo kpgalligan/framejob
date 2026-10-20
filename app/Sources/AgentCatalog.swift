@@ -554,6 +554,10 @@ extension AgentServer {
                         + "and a chroma key keeps keying the colour it was picked on; a "
                         + "qualifier's ranges read the HLG signal, so re-pick them after "
                         + "switching. UI: Document tab ▸ Canvas ▸ Dynamic Range.",
+                    "blending": "How layers blend: \"encoded\" (the default) or \"linear\" "
+                        + "light, where a dissolve keeps its brightness and soft edges and glows "
+                        + "come out brighter; grades, keys and qualifiers read what they did. "
+                        + "UI: Document tab ▸ Canvas ▸ Blending.",
                 ]),
         ]
         // The file rows — Media, Captions, Rendering and export — are

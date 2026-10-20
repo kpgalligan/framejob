@@ -17,6 +17,9 @@ governs a module now.
   key means. The struct field names ARE the JSON keys. Nothing else lives here
   but `CanvasOutput` (`Canvas.output`, `sdr` or `hlg`, written only when
   `hlg`, format 23, spec §11 HD-2).
+- `model_canvas.rs` — `CanvasBlending` (`Canvas.blending`, `encoded` or
+  `linear`, written only when `linear`, format 24, spec §11 GR-18, HD-16),
+  re-exported by `model.rs`; the recipe canvas carries it only when linear.
 - `model_props.rs` — the schema's VOCABULARY: the per-clip property types
   (`VideoProps`, `AudioProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`,
   `Filter`, `Reflection`, `BlendMode`, `Compressor`, `Duck`) and their
@@ -222,7 +225,8 @@ governs a module now.
   and stays exempt (below).
 - `op_table.rs` — the op table as DATA (road map 7's D3): one `OpRow` per
   op and one `Argument` per argument — its name, its `Kind` (`Kind::Output`
-  for `set_canvas`'s dynamic range), whether the
+  for `set_canvas`'s dynamic range, `Kind::Blending` for its blending),
+  whether the
   decoder requires it and, for the few that have one, its `Bound` — and
   `OP_NAMES` as a projection of it, re-exported by
   `edit.rs` so no caller moved. A published interface, where the `Op` enum

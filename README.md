@@ -379,6 +379,14 @@ schema, §6 the op table, §7 the architecture.
   HLG master in cd/m² — titles on the dashed 75 % reference-white line,
   highlights above it — on BT.2020's luma and vectorscope, and the SDR version
   as an SDR project's while Show SDR Version is on.
+- **Linear light.** The Document tab's **Blending** popup (Encoded · Linear
+  light) blends a project's layers in linear light instead of on their
+  encoded values: a dissolve between two saturated clips keeps its
+  brightness instead of dipping dark at the midpoint, a title fading over
+  video and a blurred edge come out brighter, and a glow adds light as light
+  does. Grades, keys, qualifiers and the scopes read what they did, and in
+  an HDR (HLG) project "linear" is HLG's scene light. It is off for every
+  project until you turn it on.
 - **Output.** **File ▸ Save Frame…** (⌥⌘E) writes the frame under the
   playhead as a PNG, JPEG or HEIC still — the same writer `render_frame`
   uses, so a still saved from the menu and one an agent asked for are the
