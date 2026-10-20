@@ -19,3 +19,5 @@ xcuserdata/
 /.secrets/
 # Python bytecode, rewritten by every run (one was committed by mistake in road map 13 P1).
 __pycache__/
+# Camera makers' published documents (spec §11 GR-16, HD-10): read in place, never redistributed.
+/designs/white-paper-canon-log-gamma-curves.pdf
