@@ -533,24 +533,6 @@ extension ReelOp {
 
 // MARK: - Speed limits
 
-/// Every number about a clip's speed, as the core publishes it through
-/// `rc_speed_limits` (spec §11 #190): the range `set_speed` clamps to and the
-/// reader enforces, and the speed above which the plan leaves a clip's audio
-/// out, in both pitch modes. No Swift file types one of these numbers; each
-/// reads them here.
-struct SpeedLimits: Decodable, Equatable {
-    let min: Double
-    let max: Double
-    let audioMax: Double
-
-    enum CodingKeys: String, CodingKey {
-        case min, max
-        case audioMax = "audio_max"
-    }
-
-    var range: ClosedRange<Double> { min...max }
-}
-
 enum ReelSpeed {
     /// Read once from the core. An answer that does not decode is a broken
     /// build, not a state the app can carry on in, so it stops here. A plain
@@ -671,30 +653,6 @@ enum ReelHDR10 {
 }
 
 // MARK: - Graphics
-
-/// One `{level, message, line, column, frame}` out of the graphics engine's
-/// `diag_out` (road map 10 §5e).
-struct GraphicDiagnostic: Decodable, Equatable {
-    let level: String
-    let message: String
-    let line: Int?
-    let column: Int?
-    let frame: Int?
-}
-
-/// A graphic that did not compile, draw or rasterize: the engine's one error.
-struct GraphicFailure: Error {
-    let diagnostics: [GraphicDiagnostic]
-}
-
-/// One drawn frame: premultiplied BGRA rows `stride` bytes apart.
-struct GraphicRaster {
-    let width: Int
-    let height: Int
-    let stride: Int
-    let bgra: [UInt8]
-    let warnings: [GraphicDiagnostic]
-}
 
 /// Decodes and frees a `diag_out`. An unreadable one is one error saying so.
 private func takeDiagnostics(_ raw: UnsafeMutablePointer<CChar>?) -> [GraphicDiagnostic] {
