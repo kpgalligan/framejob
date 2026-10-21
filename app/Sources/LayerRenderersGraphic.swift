@@ -91,6 +91,7 @@ extension LayerRenderers {
                 refused = Self.diagnostics(of: error)
                 return nil
             }
+            GraphicPrefetch.shared.keep(recipeKey, textureKey: key, raster: raster)
             guard var uploaded = self.upload(raster) else { return nil }
             uploaded.warnings = raster.warnings
             return uploaded

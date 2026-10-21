@@ -480,9 +480,16 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 **GR-9 — A heavy graphics project plays**
 - **Setup:** Low Power Mode off — `pmset -g | grep powermode` reads 0 before and after the run (if it does not, skip this check and note it). View ▸ Preview Quality ▸ Full. Activity Monitor open on Frame Job's memory.
 - **Do:** Open a COPY of a parive-like project — many graphic clips drawing images and text, such as `~/temp/testmotiongraphics/parive-promo.framejob` — and play one of its `section` scenes (in parive-promo, clip 8, from 41.87 s) for ten seconds or more.
-- **Expect:** the play runs on and stays in sync. Until #127's later phases a `section` scene still stutters (the bench composes about 28 % of its frames at Full), so a stutter goes to #127, not a new issue. Frame Job's memory rises while it plays and stays raised after it: G-36 (e) bounds only the rasters held ahead (1 GiB; 373 MB at peak on parive-promo), not the workers' rasters in flight or the freed memory the system keeps for the app. Measured on parive-promo's section scene on a 12-core Mac: from 366 MB to a peak of about 2.1 GB while playing, about 1.2 GB after it. A rise well past that, or one that keeps growing over a longer play, is the failure.
+- **Expect:** the play runs on and stays in sync. Until #127's later phases a `section` scene still stutters (the bench composes about 28 % of its frames at Full), so a stutter goes to #127, not a new issue. Frame Job's memory rises while it plays and stays raised after it: G-37 holds the rasters held ahead and the graphic frames the window keeps to one budget, a quarter of the Mac's physical memory (less under memory pressure), and the kept frames stay held after the play, up to that quarter, until the window closes. Outside the budget are the workers' rasters in flight and the freed memory the system keeps for the app. A rise well past a quarter of physical memory above the start, or one that keeps growing over a longer play, is the failure.
 - **Answer:** stutter, yes or no, and the memory figure before, at its highest while playing, and after.
-- **Source:** #127 G6 phase 2 (spec §11 G-36); `tools/proof/playback_prefetch_proof.py --bench` measures the share of frames composed, not how the play looks.
+- **Source:** #127 G6 phases 2 and 3 (spec §11 G-36, G-37); `tools/proof/playback_prefetch_proof.py --bench` measures the share of frames composed, not how the play looks.
+
+**GR-10 — A replay plays from memory, and the memory is given back**
+- **Setup:** as GR-9's.
+- **Do:** Open a COPY of `~/temp/testmotiongraphics/parive-promo.framejob` and play its `section` scene (clip 8, from 41.87 s) for 10 s, then play the same 10 s again, then close the window.
+- **Expect:** the replay stutters visibly less than the first play. Frame Job's memory stays raised after the plays, at most a quarter of physical memory above the start, and falls when the window closes.
+- **Answer:** smoother, yes or no; the memory figure before, after both plays, and after the close.
+- **Source:** #127 G6 phase 3 (spec §11 G-37); `tools/proof/graphic_memory_proof.py --bench` measures the share of frames composed on each play, not how the replay looks.
 
 ## Mattes
 

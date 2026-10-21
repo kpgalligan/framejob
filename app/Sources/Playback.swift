@@ -137,6 +137,7 @@ final class Playback {
 
     init(recipeKey: Int) {
         self.recipeKey = recipeKey
+        GraphicPrefetch.shared.beginKeeping(recipeKey)
         playerLayer = AVPlayerLayer(player: player)
         playerLayer.videoGravity = .resizeAspect
         // The player must not resume at the end of an item: the playhead
@@ -161,7 +162,7 @@ final class Playback {
                 // stopped, including when AVFoundation stops it itself at the
                 // end of an item or on a stall.
                 if rate == 0 { self.stopMetering() } else { self.startMetering() }
-                self.syncPrefetch(from: self.currentTime)
+                self.syncPrefetch(from: self.currentTime, seeking: self.isSeeking)
                 self.onRateChanged?(rate)
             }
         }
@@ -181,7 +182,7 @@ final class Playback {
         // resurrect — an object that is already deinitialising.
         meterTimer?.invalidate()
         LevelMeter.shared.publish(.silent, from: ObjectIdentifier(self))
-        GraphicPrefetch.shared.stop(recipeKey)
+        GraphicPrefetch.shared.endKeeping(recipeKey)
     }
 
     /// Stops everything and drops the item. `ProjectDocument` calls this when
@@ -197,6 +198,7 @@ final class Playback {
         holding = false
         stopMetering()
         GraphicPrefetch.shared.stop(recipeKey)
+        GraphicPrefetch.shared.dropKept(recipeKey)
         player.pause()
         player.replaceCurrentItem(with: nil)
         built = nil
@@ -254,7 +256,11 @@ final class Playback {
                 isSeeking = false
                 startSeek(to: lastKnownTime)
             }
-            if player.rate == 0 { refreshPausedFrame() } else { syncPrefetch(from: currentTime) }
+            if player.rate == 0 {
+                refreshPausedFrame()
+            } else {
+                syncPrefetch(from: currentTime, seeking: isSeeking)
+            }
             return
         }
         guard let plan = project.plan else { return }

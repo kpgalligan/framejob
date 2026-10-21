@@ -300,7 +300,9 @@ envelope key, plus the app-state tools — `open_project`, `new_project`,
 `restore_graphic`. A Debug or Release build also has the dev tools
 (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`;
 "Seeing the chrome" below; `play_preview`, which plays a window's preview
-for a while and answers the frames composed (#127, spec §11 G-36); and
+for a while and answers the frames composed (#127, spec §11 G-36);
+`graphic_memory`, which answers the graphic rasters' memory budget, what is
+held and kept, and simulates memory pressure (G-37); and
 `assistant_send` / `assistant_answer`, which
 drive a window's assistant turn against a stand-in server, with the dev-only
 launch default `-RCDevAssistantSend <text> -RCDevAssistantReport <path>` for

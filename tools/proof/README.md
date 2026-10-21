@@ -7146,7 +7146,7 @@ python3 tools/proof/v2_snapshot.py <dir>/agent.sock [--log PATH] [--only T,N,O,C
 
 `dev_tools.py` names the dev tools once (`DEV_TOOLS`, in catalog order: the
 four of road map 11, then road map 12 A1's `assistant_send` and
-`assistant_answer`, then #127's `play_preview`) and reads the startup marker's count
+`assistant_answer`, then #127's `play_preview` and `graphic_memory`) and reads the startup marker's count
 (`dev_marker_count`). The scripts that assert an exact tool set subtract
 `DEV_TOOLS` first.
 
@@ -10552,9 +10552,13 @@ launches two owned instances one after the other, each on a scratch socket
 (OFF with `-FrameJobGraphicPrefetchOff YES`, ON without), logs under
 `work/playback-prefetch/`, every child under `graphics_spike/bounded.py`;
 it imports `graphics_prefetch_proof.py`'s launch, `fixture()` and log
-readers. Fixtures, saved under `work/`: H is that proof's F; L a 30 fps
-project with one 5 s shape clip. Every play is preceded by `set_playhead`,
-and a timing ratio is scored only in the CONTROL rows.
+readers. Every instance, the bench's included, also gets
+`-FrameJobGraphicKeepOff YES` (spec §11 G-37 (e)), so no row is served from
+a document's kept frames and each keeps its phase 2 meaning;
+`graphic_memory_proof.py` (below) measures the kept frames. Fixtures, saved
+under `work/`: H is that proof's F; L a 30 fps project with one 5 s shape
+clip. Every play is preceded by `set_playhead`, and a timing ratio is scored
+only in the CONTROL rows.
 
 - **P0** CONTROL, each instance: L from 0 for 3 s composes ≥ 0.9. **P1**
   OFF: H plays, and OFF's log has no `graphic prefetch:` line. **P2** ON: H
@@ -10577,13 +10581,20 @@ and a timing ratio is scored only in the CONTROL rows.
   twice on Release, because this play seldom has an old request served
   between the seek and AVFoundation's cancel; the stranded floor was seen
   once, in an `unguarded` run of a build without the arming (0 hits, 86
-  skipped). **Z1** no `Frame Job: ` in
-  any log.
+  skipped). **P11** (G6 phase 3), ON's last play, a loop lap:
+  `set_selection` on H's first `heavy` clip, then `perform_menu_item
+  ["Clip", "Motion", "Preview"]` (the in/out range set to the clip, Loop
+  on, playing from its start), 6 s, then `play_preview {seconds: 0.5}` to
+  pause: at least two `playback from 0` lines since, the last with hits >
+  0. `no-range-guard` (`reach`'s `ticks < session.endTicks` out) is not a
+  mutant: it passed P11 twice on Release (the lap 169 and 156 hits) —
+  presumably because the old position's requests are served below the
+  loop's end, where the arming alone holds them off (not measured). **Z1** no `Frame Job: ` in any log.
 - `--mutant NAME`, each anchor exactly once in its file, driven through
   every row: `worker-frame-plus-one` → P2, `unguarded` → P8,
   `no-stop-on-pause` → P2, `no-graphic-gate` → P4, `no-follow` → P6,
-  `seek-reads-player` → P9. Exit 0 caught, 1 survived, 2 a CONTROL row
-  (P0, P7) failed.
+  `seek-reads-player` → P9, `no-arming` → P11. Exit 0 caught, 1 survived,
+  2 a CONTROL row (P0, P7) failed.
 - `--bench PACKAGE --from T --seconds S` plays a COPY under
   `work/playback-prefetch-bench/`, one owned instance per cell — OFF and ON,
   each at Full and Quarter (`-FrameJobPreviewQuality 0` / `2`, argument
@@ -10604,6 +10615,82 @@ Run on 2026-10-21 over `858146a` plus the phase, every instance my own, on a
 | `graphics_prefetch_proof.py` and its two mutants (Release) | 7/7; both caught |
 | fix pass 1, `playback_prefetch_proof.py` (Debug, then Release) | 11/11, exit 0, each; Release P8 39 common ticks of 39 OFF (3 plays) and 100 ON (3 plays), P10 91 hits, 0 skipped |
 | fix pass 1, `--mutant` `unguarded` (on the first try's build), `seek-reads-player`, `no-follow` (Release) | each caught, exit 0: P8 (38 of 39 differ); P9 (no line from 1800000); P6 (0 skipped) |
+| G6 phase 3, keep off, `playback_prefetch_proof.py` (Debug, then Release) | 12/12, exit 0, each; Release P2 232 hits; P8 45 common ticks equal; P11 the lap 150 hits |
+| G6 phase 3, `--mutant` `worker-frame-plus-one`, `unguarded`, `no-follow`, `seek-reads-player`, `no-arming` (Release) | each caught, exit 0: P2 (24 mismatched); P8 (45 of 46 differ); P6 (0 skipped); P9 (no line from 1800000); P11 (the laps 0 hits) |
+| G6 phase 3, `--mutant no-range-guard` (Release, twice) | survived both (P11's lap 169, then 156 hits); not kept as a mutant |
+| G6 phase 3, `graphics_prefetch_proof.py` and its two mutants (Release) | 7/7 (S2 301 hits, S6 OFF 16.01 s, ON 3.79 s); both caught |
+
+## Issue #127 — one memory budget and kept frames (`graphic_memory_proof.py`)
+
+G6 phase 3 (spec §11 G-37): every session's held rasters and the graphic
+frames a document keeps share one budget, a quarter of physical memory
+(an eighth under warning pressure, 0 under critical), and a playing
+document's key keeps each raster it drew under its texture key, so a replay,
+a loop or a paused scrub over a span already drawn is served from memory.
+The instrument is the dev tool `graphic_memory` (spec §7.9c), beside
+`play_preview`. The proof launches three owned instances one after the
+other, each on a scratch socket, logs under `work/graphic-memory/`: SERIAL
+(`-FrameJobGraphicPrefetchOff YES -FrameJobGraphicKeepOff YES`), KEEP (no
+switches) and KEEP-SERIAL (`-FrameJobGraphicPrefetchOff YES`), switches in
+the argument domain only. It imports `playback_prefetch_proof.py`'s
+launch, plays and digest merge and `graphics_prefetch_proof.py`'s fixture
+and log readers. Fixtures H and L, made on SERIAL, are that proof's. A
+timing figure is scored only in a CONTROL row.
+
+- **M0** CONTROL: L from 0 for 3 s composes ≥ 0.9 on SERIAL and KEEP.
+  **M1** KEEP's first answer: `physical_bytes` is `sysctl -n hw.memsize`,
+  `budget_bytes` that over 4, 8 or 0 by the answer's own `pressure`,
+  `held_bytes` 0. **M2** H from 0 for 3 s, its line awaited: frames kept,
+  bytes kept, nothing held. **M3** the same play again: its line has
+  `kept` > 0 and `kept_hits` rose. **M4** KEEP-SERIAL, two plays: the
+  second's `kept_hits` rose (no session: the kept frames answer `take`
+  alone); both ratios MEASURED. **M5** H's digests (the union of plays from
+  0, 1 and 2 frames), KEEP after M3 against SERIAL: ≥ 10 common ticks,
+  every one equal. **M6** paused, `set_playhead` at frames 3..8, 0.3 s
+  apart: `kept_hits` rose. **M7** simulated `warning` answers physical / 8
+  with the kept bytes inside it; `critical` budget 0 and nothing kept; H
+  under critical: its line has 0 frames with graphics and nothing is kept
+  after; `normal` physical / 4. **M8** H for 2 s, then `close_project`:
+  within 5 s nothing is kept. **M9** SERIAL after its plays: nothing kept,
+  no kept hit. **M10** M2's `held_peak_entries` above `4 × workers +
+  workers × 4` (H's four graphic layers a frame: the most a `4 × workers`
+  slot limit can hold, since a claim reserves nothing and every worker can
+  claim just under it and then insert its frame) and at most 1,024. **M11** every answer read: `kept_bytes ≤ max(0, budget_bytes
+  − held_bytes)`, `held_bytes ≥ 0`. **Z1** no `Frame Job: ` in any log.
+- `--mutant NAME`, built in this proof's own `work/`, each anchor exactly
+  once in its file: `kept-any-texture` → M5, `no-compositor-keep` → M4,
+  `no-pressure-trim` → M7, `budget-ignored` → M7, `slot-limit` → M10,
+  `kept-outlives-window` (both `dropKept` calls out, `deinit` back to
+  `stop`) → M8, `keep-switch-ignored` → M9. Exit 0 caught, 1 survived, 2
+  the CONTROL (M0) failed.
+- `--bench PACKAGE --from T --seconds S` plays a COPY under
+  `work/graphic-memory-bench/` at Full, one owned instance per cell —
+  KEEP-OFF (`-FrameJobGraphicKeepOff YES`) and KEEP — from T for S seconds
+  twice, printing per play the powermode line, the load average, the
+  answer, the playback line, `graphic_memory` and the RSS; scored only on
+  every play answering.
+
+Run on 2026-10-21 over `1e7f64c` plus the phase, every instance my own, on a
+12-CPU host with 96 GiB (budget 25 769 803 776 bytes), `powermode 0`:
+
+| Command | Answer |
+|---|---|
+| `graphic_memory_proof.py` (Debug) | 13/13, exit 0 (M8 failed on the first try, see below) |
+| `RC_PROOF_APP=release graphic_memory_proof.py` | 13/13, exit 0; M2 242 hits, 301 frames kept (2 496 614 400 bytes), held peak 171 entries (1 418 342 400 bytes); M3 kept 245, `kept_hits` 0 → 248, composed 92 of 92 (6.05 ms mean) against M2's 89 of 91 (13.08 ms); M4 MEASURED KEEP-SERIAL 0.259 then 0.33, `kept_hits` 0 → 28; M5 45 common ticks equal; M6 `kept_hits` 984 → 1000; M7 under critical 0 frames with graphics, 41 missed; M8 296 kept → 0 after the close |
+| `--mutant` × 7 (Release) | each caught, exit 0: `kept-any-texture` M5 (48 of 48 common digests differ); `no-compositor-keep` M4 (nothing kept on KEEP-SERIAL); `no-pressure-trim` M7 (301 kept under critical); `budget-ignored` M7 (120 frames with graphics under critical); `slot-limit` M10 (74 entries, at most 88 under such a limit); `kept-outlives-window` M8 (272 kept after the close); `keep-switch-ignored` M9 (170 kept on SERIAL) |
+| `--bench parive-promo.framejob --from 25120000 --seconds 10` (Release, Full) | KEEP-OFF composed 0.453 then 0.402; KEEP 0.392 then 0.668 (the replay: 281 kept, 72 hits); RSS after KEEP-OFF's plays 894 304 and 920 032 KiB, KEEP's 4 451 040 and 7 690 592 KiB (6 386 688 000 bytes kept, 770 frames); load average 130.43–182.37 (other sessions' builds on the host) |
+
+Its first Debug run failed M8: `close_project` closed the window, but the
+kept frames stayed for 40 s and more, until another window opened. The
+editor, and so `Playback.invalidate` and `deinit`, is freed only later (a
+window controller still retained, the hazard `ProjectDocument.close()`
+already names for the recipe key), so the document's close now drops the
+key's kept frames too (`ProjectDocument+Graphics.swift`'s
+`stopGraphicStore`), and `kept-outlives-window` takes both calls out. Its
+first `slot-limit` run survived (M10's bound was `4 × workers`, and a
+claim reserves no slot, so that limit held 74 entries); M10's bound is now
+what such a limit can hold, and the mutant is caught.
+
 
 ## Issue batch B38 — the assistant Stop residue: ST's hour fixture, K1 last with its `key-echo` control, `transcribe`'s first-statement read (`assistant_session_proof.py` ST, K1, `--mutant key-echo`; #179 items 1, 2 and 4)
 

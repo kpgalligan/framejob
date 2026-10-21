@@ -388,7 +388,7 @@ def row_a0(app, ctx):
     at = names.index(DEV_TOOLS[0]) if DEV_TOOLS[0] in names else len(names)
     block = names[at:at + len(DEV_TOOLS) + 1]
     ctx["catalog"] = names
-    ok = not complaints and marker == len(DEV_TOOLS) == 7 and block == DEV_TOOLS + ["import_media"]
+    ok = not complaints and marker == len(DEV_TOOLS) == 8 and block == DEV_TOOLS + ["import_media"]
     return ok, (f"`Frame Job: ` lines {complaints[:2]}; marker {marker} of {len(DEV_TOOLS)}; "
                 f"dev block {block}")
 

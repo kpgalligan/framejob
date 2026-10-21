@@ -95,7 +95,8 @@ extension ProjectDocument {
             userInfo: [GraphicStore.namesKey: names, GraphicStore.libraryKey: library])
     }
 
-    /// Stops the store and drops its compiled set, from `close()`, then
+    /// Stops the store and drops its compiled set and the window's kept
+    /// graphic frames (spec §11 G-37 (c)), from `close()`, then
     /// removes the untitled graphics root and the untitled cache root (spec
     /// §11 G-19 (d)). `close()`, in the over-cap base file, reaches the
     /// cache removal through this call.
@@ -107,6 +108,7 @@ extension ProjectDocument {
         NotificationCenter.default.removeObserver(
             self, name: .projectDocumentDidChange, object: self)
         GraphicRegistry.shared.remove(recipeKey)
+        GraphicPrefetch.shared.dropKept(recipeKey)
         graphicStore?.stop()
         graphicStore?.removeScratchRoot()
         graphicStore = nil

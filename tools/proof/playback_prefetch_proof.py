@@ -11,7 +11,11 @@ key. Two owned instances, one after the other, each on a scratch socket,
 launched and stopped by PID, logs under `tools/proof/work/playback-prefetch/`:
 OFF with `-FrameJobGraphicPrefetchOff YES`, ON without. Nothing else is ever
 killed. Every child runs under `graphics_spike/bounded.py`; the launch,
-`fixture()` and the log reading are `graphics_prefetch_proof.py`'s.
+`fixture()` and the log reading are `graphics_prefetch_proof.py`'s. Every
+instance, the bench's included, also gets `-FrameJobGraphicKeepOff YES` (spec
+§11 G-37 (e)), so no row and no bench cell is served from a document's kept
+frames and each keeps phase 2's meaning; `graphic_memory_proof.py` measures
+the kept frames.
 
 Fixtures, made over MCP on the OFF instance and saved under `work/`: H is
 `graphics_prefetch_proof.fixture()`'s F (30 fps, two `heavy` clips, `static`
@@ -45,6 +49,16 @@ P10 ON: H from 1200000 for 2 s with seek_to 0, a seek BEHIND the play; within
     served between the seek and AVFoundation's cancel (the stranded floor
     was seen once, in an `unguarded` run of a build without the arming: 0
     hits, 86 skipped);
+P11 ON, its last play: a loop lap. `set_selection` on H's first `heavy` clip,
+    then `perform_menu_item ["Clip", "Motion", "Preview"]` (the in/out range
+    set to the clip, Loop on, playing from its start), 6 s, then
+    `play_preview {seconds: 0.5}` to pause; at least two `playback from 0`
+    lines since, the last (the lap after the loop's return) with hits > 0.
+    `no-range-guard` (`reach`'s `ticks < session.endTicks` taken out) is
+    not a mutant here: it passed P11 twice on Release (the lap 169 and 156
+    hits) — presumably because the old position's requests are served
+    below the loop's end, inside the range, where the arming alone holds
+    them off (not measured);
 Z1  `grep "Frame Job: "` over every log prints nothing.
 
     python3 tools/proof/playback_prefetch_proof.py [--app PATH]
@@ -57,7 +71,8 @@ must fail its row: `worker-frame-plus-one` → P2, `unguarded` (that plus the
 texture-key guard) → P8, `no-stop-on-pause` (`syncPrefetch`'s `stop`) → P2,
 `no-graphic-gate` (`drawsGraphics` not consulted) → P4, `no-follow` (`reach`'s
 floor raise) → P6, `seek-reads-player` (`startSeek` starts from `currentTime`)
-→ P9. Exit 0 = caught, 1 = survived, 2 = the control (P0, P7) could not be
+→ P9, `no-arming` (`reach` arms a seek's session at its first request) →
+P11. Exit 0 = caught, 1 = survived, 2 = the control (P0, P7) could not be
 performed.
 
 `--bench PACKAGE` launches one owned instance per cell — OFF and ON, each at
@@ -94,7 +109,7 @@ WORK = ROOT / "tools/proof/work/playback-prefetch"
 BENCH_WORK = ROOT / "tools/proof/work/playback-prefetch-bench"
 APP = proof_app.binary()
 SECOND = 600_000
-ROWS = ["P0", "P1", "P2", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "Z1"]
+ROWS = ["P0", "P1", "P2", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "Z1"]
 CONTROLS = ("P0", "P7")
 PLAY = re.compile(gp.LINE.pattern + r", playback from (\d+), (\d+) skipped")
 PLAY_FIELDS = gp.FIELDS + ("start", "skipped")
@@ -114,6 +129,8 @@ MUTANTS = {
     "no-follow": ([(PREFETCH, "session.floor = index", "_ = index")], "P6"),
     "seek-reads-player": (
         [(PLAYBACK, "syncPrefetch(from: clamped,", "syncPrefetch(from: currentTime,")], "P9"),
+    "no-arming": (
+        [(PREFETCH, "            guard index < Self.armFrames else { return }\n", "")], "P11"),
 }
 FRAME = SECOND // 30
 
@@ -127,15 +144,19 @@ def check(row, good, detail=""):
 
 class Instance(gp.Instance):
     """`graphics_prefetch_proof.Instance` with launch arguments of its own
-    (the bench's Preview Quality), in the argument domain only."""
+    (the bench's Preview Quality), in the argument domain only, and
+    `-FrameJobGraphicKeepOff YES` unless `keep_off` is False (only
+    `graphic_memory_proof.py` passes False)."""
 
-    def __init__(self, app, log, off, extra=()):
+    def __init__(self, app, log, off, extra=(), keep_off=True):
         super().__init__(app, log, off)
         self.extra = list(extra)
+        self.keep_off = keep_off
 
     def start(self, timeout=gp.CALL_BOUND):
         offset = self.log.stat().st_size if self.log.exists() else 0
-        extra = (["-FrameJobGraphicPrefetchOff", "YES"] if self.off else []) + self.extra
+        extra = (["-FrameJobGraphicPrefetchOff", "YES"] if self.off else []) \
+            + (["-FrameJobGraphicKeepOff", "YES"] if self.keep_off else []) + self.extra
         with open(self.log, "a") as out:
             self.child = subprocess.Popen(
                 [str(self.app), "-ApplePersistenceIgnoreState", "YES"] + extra,
@@ -237,6 +258,38 @@ def digests_agree(off, on):
             f"{len(b)} ON (from {plays[1]}); " + ("; ".join(reasons) or "every common digest equal"))
 
 
+def first_clip(client, package, name):
+    """The id of the first clip `get_project` lists drawing graphic `name`,
+    or None."""
+    for clip in gp.project_of(client, package).get("clips", []):
+        if isinstance(clip, dict) and (clip.get("graphic") or {}).get("name") == name:
+            return clip.get("id")
+    return None
+
+
+def loop_lap(client, package, log):
+    """P11's play: the first `heavy` clip selected, Clip ▸ Motion ▸ Preview,
+    6 s, then a 0.5 s `play_preview` to pause. (every `playback from 0` line
+    since, detail)."""
+    offset = gp.log_size(log)
+    clip = first_clip(client, package, "heavy")
+    chose = gp.attempt(client, "set_selection", {"project": str(package), "clips": [clip]})
+    menu = gp.attempt(client, "perform_menu_item",
+                      {"project": str(package), "path": ["Clip", "Motion", "Preview"]})
+    time.sleep(6)
+    paused = gp.attempt(client, "play_preview", {"project": str(package), "seconds": 0.5})
+    deadline = time.monotonic() + 10
+    while True:
+        laps = [line for line in playback_lines(log, offset) if line["start"] == 0]
+        if len(laps) >= 2 or time.monotonic() >= deadline:
+            break
+        time.sleep(0.25)
+    steps = [f"clip {clip}", f"selection {chose['ok'] or chose.get('error')}",
+             f"menu {menu['ok'] or menu.get('error')}",
+             f"pause {brief(paused['reply']) if paused['ok'] else paused.get('error')}"]
+    return laps, "; ".join(steps)
+
+
 def light_project(client, package):
     """L: a new 30 fps project holding one 5 s shape clip, saved."""
     return gp.graphic_project(client, package, [], [], tail=True)
@@ -321,6 +374,10 @@ def run_all(app):
         plays["on-L-digests"] = play(client, light, 0, 3, digests=True)
         plays["on-H-digests"] = [play(client, heavy, start, 3, digests=True)
                                  for start in (0, FRAME, 2 * FRAME)]
+
+        laps, detail = loop_lap(client, heavy, on_log)
+        check("P11", len(laps) >= 2 and laps[-1]["hits"] > 0,
+              f"{detail}; `playback from 0` lines {laps}")
     finally:
         on.stop()
 

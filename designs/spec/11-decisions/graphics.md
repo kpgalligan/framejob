@@ -615,6 +615,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `FrameJobGraphicPrefetchOff`.
   **Amended by G-36**: (a)'s "or the preview" no longer holds — a playing
   preview has its own session on the document's key.
+  **Amended by G-37**: (d)'s slot count and 1 GiB are gone — every
+  session's held rasters share one process-wide budget, a quarter of
+  physical memory, under a ceiling of 1,024 entries per session.
 - **G-27 — Deleting a graphic is refused while a clip draws it; the deleted
   text is kept, and that kept text is what marks the name as deleted**
   (issue #103, 2026-10-04, issue batch B84).
@@ -1922,3 +1925,50 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   rasters in flight. `cancelAllPendingVideoCompositionRequests` can wait
   up to one raster on a `take`, no longer than the serial path's own
   raster.
+  **Amended by G-37**: (e)'s `4 × workers` slots and 1 GiB are replaced by
+  G-37 (a)'s one budget; a document also keeps the frames it drew (G-37
+  (c)).
+- **G-37 — Graphic rasters share one memory budget, a quarter of the Mac's
+  physical memory; a document keeps the graphic frames it drew** (#127, G6
+  phase 3, 2026-10-21; amends G-26 (d) and G-36 (e)).
+  (a) **Budget.** `ProcessInfo.physicalMemory / 4` for the whole process
+  (4 GB on 16 GB, 8 GB on 32 GB). It covers every session's held rasters
+  (export and playback) plus the kept frames. A worker waits while the
+  held rasters of all sessions reach it. The kept frames give way, least
+  recently used first. The `4 × workers` slot count is gone: bytes decide
+  how far ahead workers go, under a bookkeeping ceiling of 1,024 entries
+  per session that also bounds entries holding no bytes (a deferred or
+  kept-texture skip), so a static graphic cannot run the workers to the
+  range's end. The kept frames never exceed the room the held rasters
+  leave: every change to either trims them to `max(0, budget − held)`.
+  Outside the budget, as G-36 (e) measured: rasters in flight and the
+  allocator's retained blocks. **The owner's choice** (2026-10-21): limits
+  relative to the Mac; 16 GB is the floor.
+  (b) **Pressure.** A `DispatchSourceMemoryPressure` sets the budget:
+  warning halves it (physical / 8) and trims the kept frames to fit;
+  critical sets it to 0, empties the kept frames, and lets no worker
+  claim, so preview and export draw serially; normal restores it. Held
+  rasters are still served.
+  (c) **Kept frames.** Only a `Playback`'s key keeps frames (registered in
+  its `init`); exports, `render_frame` and thumbnails never keep, so G-26's
+  export is unchanged. Kept under its texture key: each raster the
+  compositor used (a worker's or its own), and each finished raster a
+  worker made for that key when it leaves its slot (taken, passed by
+  `reach`, dropped by `remove` or `stop`). On a pool miss `take` answers
+  from the kept frames before any slot, with no session needed (a paused
+  scrub). A worker whose texture key is kept rasterizes nothing
+  (`deferred`, G-36 (g)'s `missed` rule). `invalidate` drops the key's kept
+  frames, and so does the document's `close` (`stopGraphicStore`), which a
+  window controller still retained cannot delay as it delays the editor's
+  deinit (measured: an idle app kept a closed window's frames for 40 s, until
+  another window opened); `deinit` unregisters it.
+  (d) **Purity.** A raster is a function of its texture key: the SVG text,
+  the size and the library version, which is a content hash
+  (`GraphicStore.swift`). So a kept raster is the serial path's (G-26 (c),
+  G-5). Its warnings ride with it (G-8).
+  (e) **Switches.** `FrameJobGraphicKeepOff` (YES) keeps nothing. It is a
+  measurement switch, not a setting, and is independent of
+  `FrameJobGraphicPrefetchOff`.
+  (f) **Risk accepted.** Up to a quarter of memory stays held after a
+  play, until the window closes, pressure arrives, or newer frames push it
+  out. #127's next phase adds drawing ahead while paused as a setting.

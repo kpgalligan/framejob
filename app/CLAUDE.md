@@ -1214,8 +1214,9 @@ the key map behind it.
   `range.start + i × frameDuration` on the export's key, reading only
   `RecipeSource.recipe(for:at:)` and `GraphicRegistry.resolve` (the pin,
   G-13), and fill `Slot`s — exactly `LayerRenderers.graphic`'s inputs —
-  with a texture key and a raster; at most `4 × workers` slots and 1 GiB
-  held. `LayerRenderersGraphic` asks `take` on a pool MISS and uses the
+  with a texture key and a raster; held within the process's one budget
+  (a quarter of physical memory, spec §11 G-37, `GraphicPrefetch+Memory.swift`)
+  and at most `entryCeiling` (1,024) entries a session. `LayerRenderersGraphic` asks `take` on a pool MISS and uses the
   raster only when the worker's texture key equals its own, else rasterizes
   as before; a pool hit `discard`s the slot. The compositor still runs
   `svg`, records every report and draws every card (G-8), so the file is
@@ -1231,6 +1232,15 @@ the key map behind it.
   session frees what falls below the floor, and its same-texture shortcut's
   (`deferred`) entries count as misses, not mismatches. A wait `stop` ends
   counts as nothing.
+- `GraphicPrefetch+Memory.swift` — the graphic rasters' one memory budget and
+  the frames a document keeps (spec §11 G-37, #127): a quarter of physical
+  memory covers every session's held rasters and the kept frames, which give
+  way least recently used first and are trimmed to `max(0, budget − held)`
+  on every change; memory pressure halves the budget (warning) or sets it to
+  0 (critical). Only a `Playback`'s key keeps, under the texture key, so a
+  kept raster is the serial path's; a pool miss checks the kept frames
+  first. A document's close drops its kept frames (`stopGraphicStore`);
+  `deinit` unregisters. `FrameJobGraphicKeepOff` (YES) keeps nothing.
 - `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
   leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
   `RecipeClipRect`, `RecipeLayerMatte`, `RecipeLayerDissolve`,
@@ -2429,13 +2439,19 @@ free.
   inline. Its tables hold
   `snapshot_ui` (V2a), `perform_menu_item` and `cancel_sheet` (V2b),
   `select_inspector_tab` (V3), `assistant_send` and `assistant_answer`
-  (road map 12 A1), and `play_preview` (#127, G-36); a dev tool is counted apart from the product tools (`tools/proof/dev_tools.py`).
+  (road map 12 A1), `play_preview` (#127, G-36) and `graphic_memory` (G-37); a dev tool is counted apart from the product tools (`tools/proof/dev_tools.py`).
 - `AgentServer+PlayPreview.swift` — `play_preview` (dev only, wholly under
   the flag; spec §11 G-36, §7.9c): plays a window's preview forward through
   the transport's own `setRate` and `seek(to:)` (an optional `seek_to` half
   way) on the SERVER thread, and answers the frames expected against those
   composed per key, compose milliseconds and, when asked, each frame's
   digest. `tools/proof/playback_prefetch_proof.py` drives it.
+- `AgentServer+GraphicMemory.swift` — `graphic_memory {pressure?}` (dev
+  only, wholly under the flag, off main; spec §11 G-37): the graphic
+  rasters' budget, held and kept bytes and their peaks, from
+  `GraphicPrefetch.memoryReport`; `pressure` simulates a memory-pressure
+  level until the tool sets `normal`. `tools/proof/graphic_memory_proof.py`
+  drives it.
 - `PlaybackTrial.swift` — `PlaybackTrials`, `play_preview`'s record (dev
   only): `Compositor.serve` reports each finished frame's time, compose
   time and, while a trial asks, a SHA-256 of the destination's pixels.

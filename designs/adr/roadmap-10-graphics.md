@@ -148,8 +148,13 @@ pool miss whose texture key matches its own, and still runs `svg`, records
 every report and draws every card, so the file is the serial path's.
 Since G6 phase 2 (2026-10-21, spec §11 G-36) a preview playing forward does
 the same on the document's own key, its workers following the frame the
-compositor last asked for (below, "G6 phase 2 — playback prefetch"). The
-decoded-image cache and in-place raster are still not built.
+compositor last asked for (below, "G6 phase 2 — playback prefetch").
+Since G6 phase 3 (2026-10-21, spec §11 G-37) every session's held rasters
+share one budget, a quarter of physical memory, with the graphic frames a
+playing document keeps, so a replay, loop or paused scrub over a span
+already drawn is served from memory (below, "G6 phase 3 — one memory
+budget and kept frames"). The decoded-image cache and in-place raster are
+still not built.
 
 **The FFI is ten `rc_graphic_*` exports, and a library is a builder that
 FREEZES** at its first compile, rasterize or `families` call
@@ -1313,12 +1318,102 @@ Owed: GR-9 in `docs/manual-checks.md` (a heavy project plays; memory).
 Filed: #326, `export`'s missing MCP progress notifications (agent
 transport, not graphics speed).
 
+## G6 phase 3 — one memory budget and kept frames (#127, spec §11 G-37)
+
+2026-10-21, on `1e7f64c`. G-26 (d)'s and G-36 (e)'s fixed bounds (1 GiB
+and `4 × workers` slots a session) are gone. Every session's held rasters,
+export and playback, and the graphic frames a document keeps share one
+process-wide budget, `ProcessInfo.physicalMemory / 4` (the owner's choice:
+limits relative to the Mac, 16 GB the floor), which a
+`DispatchSourceMemoryPressure` halves at warning and sets to 0 at critical
+(no worker claims; preview and export draw serially). A worker waits while
+the held rasters of all sessions reach it, or while its session holds
+1,024 entries, bytes or none (the bookkeeping ceiling that keeps a static
+graphic from running the workers to the range's end). A `Playback`'s key
+KEEPS each raster the compositor used and each finished raster a worker
+made for it when it leaves its slot, under its texture key, least
+recently used out first and never past the room the held rasters leave
+(`GraphicPrefetch+Memory.swift`'s `KeptFrames`); `take` answers from them
+on a pool miss before any slot, with no session needed, and a worker skips
+a texture key already kept. A raster is a function of its texture key, so
+a kept raster is the serial path's. `FrameJobGraphicKeepOff` keeps
+nothing. The instrument is the dev tool `graphic_memory` (spec §7.9c).
+Residue folded in: the rate KVO and a property-only edit while playing
+pass `seeking: isSeeking` to `syncPrefetch`.
+
+**One deviation from the brief.** The brief dropped a window's kept frames
+in `Playback.invalidate`, which the editor's `deinit` calls. On the first
+Debug run M8 failed: after `close_project` the frames stayed for 40 s and
+more, until another window opened, because the editor is freed only later
+(the retained window controller `ProjectDocument.close()` already names
+for the recipe key). The document's close now drops them too
+(`ProjectDocument+Graphics.swift`'s `stopGraphicStore`, beside
+`GraphicRegistry.remove`); G-37 (c) says so.
+
+**Bench** (Release, `graphic_memory_proof.py --bench` over a copy of
+parive-promo, clip 8's `section` scene from tick 25 120 000 for 10 s,
+played twice per cell; Full; 12 cores, 96 GiB, `powermode 0`; the load
+average was 130–182 throughout, from other sessions' builds on the host,
+so the ratios are low against phase 2's and are compared only within this
+run):
+
+| Cell, play | Load before | Composed | compose_ms mean / p95 | Playback line | `graphic_memory` after | RSS after |
+|---|---|---|---|---|---|---|
+| KEEP-OFF, 1 | 130.43 | 136 of 300 (0.453) | 57.27 / 522.82 | 250 hits, 15 missed, 28 skipped, 0 kept | held peak 812 851 200 B in 98 entries; nothing kept | 894 304 KiB |
+| KEEP-OFF, 2 | 140.41 | 121 of 301 (0.402) | 76.24 / 569.68 | 214 hits, 9 missed, 30 skipped, 0 kept | held peak 754 790 400 B in 91 | 920 032 KiB |
+| KEEP, 1 | 175.44 | 116 of 296 (0.392) | 79.02 / 605.88 | 198 hits, 11 missed, 23 skipped, 0 kept | held peak 862 617 600 B in 104; 3 176 755 200 B kept in 383 frames | 4 451 040 KiB |
+| KEEP, 2 | 182.37 | 201 of 301 (0.668) | 32.05 / 69.01 | 72 hits, 1 missed, 10 skipped, 281 kept | held peak 2 513 203 200 B in 303; 6 386 688 000 B kept in 770 frames, 291 kept hits | 7 690 592 KiB |
+
+So the replay with kept frames composed 0.668 of its frames against the
+first play's 0.392 (KEEP-OFF's replay: 0.402), with its p95 compose time
+down from 606 to 69 ms; the kept frames held 6.4 GB after two plays, a
+quarter of the budget, and the process's RSS stood at 7.3 GiB, against
+0.9 GiB with keeping off. Memory figures are only these printed ones.
+
+**Rows** (`graphic_memory_proof.py`, Release, three owned instances: SERIAL,
+KEEP, KEEP-SERIAL): 13/13 — M0 CONTROL L composed 1.0 on both; M1 the
+budget a quarter of `hw.memsize`; M2 242 hits, 301 frames kept, nothing
+held after; M3 kept 245, `kept_hits` 0 → 248, 92 of 92 composed; M4
+KEEP-SERIAL `kept_hits` 0 → 28 (MEASURED 0.259 then 0.33); M5 45 common
+ticks equal; M6 a paused scrub, `kept_hits` 984 → 1000; M7 warning
+physical / 8, critical 0 with nothing kept and 0 frames with graphics, then
+normal physical / 4; M8 296 kept → 0 after the close; M9; M10 held peak
+171 entries; M11 over 15 answers; Z1. The same on Debug, 13/13.
+**Mutants**, each built in a tree copy and driven through every row, all
+seven caught: `kept-any-texture` (M5: 48 of 48 common digests differ),
+`no-compositor-keep` (M4: nothing kept), `no-pressure-trim` (M7: 301 kept
+under critical), `budget-ignored` (M7: 120 frames with graphics under
+critical), `slot-limit` (M10: 74 entries), `kept-outlives-window` (M8: 272
+kept after the close), `keep-switch-ignored` (M9: 170 kept on SERIAL).
+`slot-limit` survived M10's first bound, `4 × workers`: a claim reserves
+no slot, so a `4 × workers` limit held 74 entries; M10's bound is now what
+such a limit can hold, `4 × workers + workers × 4` (H's four layers a
+frame), and the real build's 171 clears it.
+
+**Phase 2's proofs keep their meaning**: `playback_prefetch_proof.py`
+launches every instance with `-FrameJobGraphicKeepOff YES`, and gains P11,
+a loop lap (Clip ▸ Motion ▸ Preview on H's first `heavy` clip, 6 s): Release
+12/12 (the lap 150 hits), Debug 12/12; `worker-frame-plus-one`,
+`unguarded`, `no-follow`, `seek-reads-player` caught again, and
+`no-arming` (P11: the laps 0 hits) is a new mutant. `no-range-guard`
+(`reach`'s `ticks < session.endTicks` out) survived P11 twice (the lap 169
+and 156 hits), so it is residue like P10's, not a mutant.
+`graphics_prefetch_proof.py` 7/7 (S2 301 hits; S6 OFF 16.01 s, ON 3.79 s)
+with both mutants caught: the export without slots is the serial path's
+file. `op_argument_proof.py` 162/162 (31 product and 8 dev tools);
+`assistant_session_proof.py` 13/13 (A0's marker 8); `make gate` exit 0.
+
+Owed: GR-10 in `docs/manual-checks.md` (a replay plays from memory, and the
+memory is given back). Next in #127: drawing ahead while paused, a
+setting.
+
 ## Open items
 
-- G6's rest — in-place raster (`graphic/src/raster.rs`) and a
+- G6's rest — drawing ahead while paused (a setting, as Final Cut's
+  Background render), in-place raster (`graphic/src/raster.rs`) and a
   decoded-image cache past resvg's per-render decode — tracked in #127.
-  The export's parallel rasterization landed (G-26), and playback's
-  (G-36).
+  The export's parallel rasterization landed (G-26), playback's (G-36),
+  and one memory budget with kept frames (G-37).
 - The person's watched checks: the playback-check projects with no video
   underneath, memory at 4K, and the error card in the live preview —
   tracked in #56.

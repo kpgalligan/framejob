@@ -1,6 +1,6 @@
 // app/Sources/GraphicPrefetch.swift — an export's graphics, and a playing
 // preview's, rasterized AHEAD of the compositor, on worker threads (spec §11
-// G-26 and G-36, issue #127).
+// G-26, G-36 and G-37, issue #127).
 //
 // **The compositor stays the one writer.** A worker runs a frame's graphic
 // modules and rasterizes their SVG into a slot; the compositor still runs
@@ -35,10 +35,20 @@
 // AVFoundation cancels the old position's requests, and those still served
 // in between must not move the new session's floor. An export session never reads `floor`,
 // `skipped` or `deferred`, and its log line is unchanged; a following one's
-// appends `, playback from <start>, <skipped> skipped`.
+// appends `, playback from <start>, <skipped> skipped, <kept> kept`.
 //
-// **One `NSCondition`** guards `sessions` and every session and entry field,
-// broadcast on every change (`CacheLedger`'s precedent). A worker never
+// **Bounds (G-37).** Bytes decide how far ahead workers go: a worker waits
+// while the held rasters of ALL sessions reach the one process-wide budget
+// (a quarter of physical memory, less under memory pressure), or while its
+// session holds `entryCeiling` entries, bytes or none. A playing document's
+// key KEEPS the frames it drew (`GraphicPrefetch+Memory.swift`): a finished
+// raster leaving its slot goes into the kept frames, `take` answers from them
+// before any slot, and a worker skips a texture key already kept. The kept
+// frames fill only the room the held rasters leave.
+//
+// **One `NSCondition`** guards `sessions`, the kept frames, every total and
+// every session and entry field, broadcast on every change (`CacheLedger`'s
+// precedent). A worker never
 // waits while it holds an unfinished entry, so the compositor's `take`, the
 // one wait on its queue, always ends: on `done` or on `stop`. Each worker is
 // a Foundation `Thread` with a stack above the engine's own 1 MiB; its
@@ -52,13 +62,11 @@ final class GraphicPrefetch: @unchecked Sendable {
     static let shared = GraphicPrefetch()
     /// YES draws every graphic on the compositor's queue alone.
     static let offDefaultsKey = "FrameJobGraphicPrefetchOff"
-    /// The rasters held ahead, at most.
-    static let maxHeldBytes = 1 << 30
     /// Above `graphic::STACK_BYTES` (1 MiB).
     static let workerStackBytes = 8 << 20
     static var workerCount: Int { max(1, ProcessInfo.processInfo.activeProcessorCount - 1) }
-    /// The slots held ahead, at most.
-    static var slotLimit: Int { 4 * workerCount }
+    /// The entries one session holds at most, bytes or none (G-37 (a)).
+    static let entryCeiling = 1024
 
     /// One graphic layer's inputs — exactly what `LayerRenderers.graphic` is
     /// called with. Member order is load-bearing (`graphics_proof.py`'s
@@ -119,6 +127,8 @@ final class GraphicPrefetch: @unchecked Sendable {
         var mismatched = 0
         var missed = 0
         var unused = 0
+        /// Requests the kept frames answered while this session ran.
+        var kept = 0
         /// Texture key → the SMALLEST frame index whose entry rasterizes it,
         /// least recently touched first; the compositor pool's capacity.
         var recent: [(key: String, index: Int)] = []
@@ -152,10 +162,27 @@ final class GraphicPrefetch: @unchecked Sendable {
         }
     }
 
-    private let condition = NSCondition()
+    let condition = NSCondition()
     private var sessions: [Int: Session] = [:]
+    /// The kept frames and the keys that keep (G-37 (c)).
+    var kept = KeptFrames()
+    var keeping: Set<Int> = []
+    /// The system's memory-pressure level, and the dev tool's simulated one.
+    var pressure = MemoryPressure.normal
+    var simulatedPressure: MemoryPressure?
+    /// Every session's held rasters: bytes, entries holding bytes, and their
+    /// peaks since the last report that reset them.
+    var heldTotal = 0
+    var heldEntries = 0
+    var heldPeakBytes = 0
+    var heldPeakEntries = 0
+    /// Requests the kept frames answered.
+    var keptHits = 0
+    var pressureSource: DispatchSourceMemoryPressure?
 
-    private init() {}
+    private init() {
+        watchMemoryPressure()
+    }
 
     // MARK: - Main
 
@@ -193,8 +220,8 @@ final class GraphicPrefetch: @unchecked Sendable {
         }
     }
 
-    /// Ends `key`'s session: its entries unused, its workers told. Any
-    /// thread; idempotent; never waits.
+    /// Ends `key`'s session: its entries unused (a keeping key's finished
+    /// rasters kept), its workers told. Any thread; idempotent; never waits.
     func stop(_ key: Int) {
         condition.lock()
         guard let session = sessions.removeValue(forKey: key) else {
@@ -203,9 +230,8 @@ final class GraphicPrefetch: @unchecked Sendable {
         }
         session.stopped = true
         session.unused += session.slots.count
-        for entry in session.slots.values { entry.bytes = 0 }
+        for entry in session.slots.values { release(entry, from: session) }
         session.slots.removeAll()
-        session.heldBytes = 0
         condition.broadcast()
         let line = session.liveWorkers == 0 ? logLine(session) : nil
         condition.unlock()
@@ -249,13 +275,26 @@ final class GraphicPrefetch: @unchecked Sendable {
     }
 
     /// The worker's raster for `slot` when its texture key is `textureKey`,
-    /// else nil. Every entry of an earlier frame goes as unused. Waits for
-    /// the entry's worker, or for `stop` — a wait `stop` ends counts as
-    /// nothing. In a following session an entry the worker left to the pool
-    /// counts `missed`: playback may have dropped the frame that filled it.
+    /// else nil. A keeping key's kept raster for `textureKey` answers first,
+    /// session or none, and takes the slot out. Every entry of an earlier
+    /// frame goes as unused. Waits for the entry's worker, or for `stop` — a
+    /// wait `stop` ends counts as nothing. In a following session an entry
+    /// the worker left to the pool counts `missed`: playback may have
+    /// dropped the frame that filled it.
     func take(_ key: Int, slot: Slot, textureKey: String) -> Result<GraphicRaster, any Error>? {
         condition.lock()
         defer { condition.unlock() }
+        if keeping.contains(key), let raster = kept.raster(key, textureKey) {
+            if let session = sessions[key] {
+                if let entry = session.slots[slot] {
+                    remove(slot, entry, from: session)
+                    condition.broadcast()
+                }
+                session.kept += 1
+            }
+            keptHits += 1
+            return .success(raster)
+        }
         guard let session = sessions[key] else { return nil }
         guard let entry = session.slots[slot] else {
             session.missed += 1
@@ -300,9 +339,20 @@ final class GraphicPrefetch: @unchecked Sendable {
         release(entry, from: session)
     }
 
+    /// An entry's bytes out of the totals, once; a keeping key's finished
+    /// raster then kept, room permitting. Under `condition`.
     private func release(_ entry: Entry, from session: Session) {
+        guard entry.bytes > 0 else { return }
         session.heldBytes -= entry.bytes
+        heldTotal -= entry.bytes
+        heldEntries -= 1
         entry.bytes = 0
+        guard keeping.contains(session.key), entry.done,
+            case .success(let raster)? = entry.raster, let textureKey = entry.textureKey,
+            raster.bgra.count <= budgetBytes - heldTotal
+        else { return }
+        kept.insert(session.key, textureKey, raster)
+        kept.trim(toFit: budgetBytes - heldTotal)
     }
 
     // MARK: - Workers
@@ -353,13 +403,15 @@ final class GraphicPrefetch: @unchecked Sendable {
         if let line = line { NSLog("%@", line) }
     }
 
-    /// The next frame index, once there is room; nil once stopped or
-    /// exhausted. A following session's never at or before `floor`.
+    /// The next frame index, once the held rasters of every session are
+    /// under the budget and this session under `entryCeiling` entries; nil
+    /// once stopped or exhausted. A following session's never at or before
+    /// `floor`.
     private func claim(_ session: Session) -> Int? {
         condition.lock()
         defer { condition.unlock() }
         while !session.stopped, !session.exhausted,
-            session.slots.count >= Self.slotLimit || session.heldBytes >= Self.maxHeldBytes
+            heldTotal >= budgetBytes || session.slots.count >= Self.entryCeiling
         {
             condition.wait()
         }
@@ -373,8 +425,9 @@ final class GraphicPrefetch: @unchecked Sendable {
         return index
     }
 
-    /// Every absent slot of frame `index` inserted under ONE hold; nil once
-    /// stopped.
+    /// Every absent slot of frame `index` inserted under ONE hold, the totals
+    /// and peaks raised and the kept frames trimmed to the room left; nil
+    /// once stopped.
     private func insert(
         _ wanted: [(slot: Slot, module: GraphicModule)], index: Int, into session: Session
     ) -> [Job]? {
@@ -387,14 +440,20 @@ final class GraphicPrefetch: @unchecked Sendable {
             let entry = Entry(index: index, bytes: slot.width * slot.height * 4)
             session.slots[slot] = entry
             session.heldBytes += entry.bytes
+            heldTotal += entry.bytes
+            heldEntries += 1
             jobs.append(Job(slot: slot, entry: entry, module: module))
         }
+        heldPeakBytes = max(heldPeakBytes, heldTotal)
+        heldPeakEntries = max(heldPeakEntries, heldEntries)
+        kept.trim(toFit: budgetBytes - heldTotal)
         if !jobs.isEmpty { condition.broadcast() }
         return jobs
     }
 
     /// Each job's SVG, key and raster, outside the lock; `stopped` checked
-    /// between jobs, and the rest marked done.
+    /// between jobs, and the rest marked done. A texture key an earlier
+    /// frame's entry rasterizes, or the key keeps, is left to the compositor.
     private func draw(
         _ jobs: [Job], session: Session, resolved: (set: GraphicSet, budgetMs: Int)
     ) {
@@ -420,7 +479,8 @@ final class GraphicPrefetch: @unchecked Sendable {
                 libraryVersion: resolved.set.libraryVersion)
             condition.lock()
             job.entry.textureKey = key
-            if let earlier = session.recentIndex(key), earlier < job.entry.index {
+            let keptAlready = keeping.contains(session.key) && kept.contains(session.key, key)
+            if keptAlready || session.recentIndex(key).map({ $0 < job.entry.index }) == true {
                 session.touch(key)
                 job.entry.done = true
                 job.entry.deferred = true
@@ -457,6 +517,7 @@ final class GraphicPrefetch: @unchecked Sendable {
             + "\(session.mismatched) mismatched, \(session.missed) missed, "
             + "\(session.unused) unused"
         guard session.follows else { return line }
-        return line + ", playback from \(session.startTicks), \(session.skipped) skipped"
+        return line + ", playback from \(session.startTicks), \(session.skipped) skipped, "
+            + "\(session.kept) kept"
     }
 }
