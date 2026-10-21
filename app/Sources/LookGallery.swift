@@ -21,7 +21,8 @@ import AppKit
 /// running generation. A generation applies the trial ops (the nine, then one
 /// per LUT) on main and renders them off main, one tile after another, through
 /// `Exporter.renderFrame` — `render_frame`'s renderer, so a thumbnail is the
-/// bytes that tool writes —
+/// pixels that tool writes (its file carries PR-11's label; a tile's dump is
+/// unlabelled, spec §11 PR-11) —
 /// with `RecipeOptions.none` (thumbnails ignore Show Ungraded, as an export
 /// does). A superseded generation skips its remaining tiles, and its results
 /// never land.

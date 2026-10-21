@@ -100,10 +100,14 @@ first as LG0 (no LUT) for the probe and worked on as LG-work:
   refused as a submenu naming the eight and None. Then `swap-33` (A) and
   `invert` (B) are imported.
 - **LG1**: the first manifest naming the clip at 0.5 s whose `tiles` are none,
-  the eight, `lut-A`, `lut-B`: each LUT PNG is BYTE-identical to `set_video
-  {look: {kind: lut, media}}` (the amount 0.5 kept) then `render_frame {t,
-  max_width: 256}`, undone after; the two differ from each other and from
-  None's.
+  the eight, `lut-A`, `lut-B`: `set_video {look: {kind: lut, media}}` (the
+  amount 0.5 kept) then `render_frame {t, max_width: 256}`, undone after, holds
+  each LUT PNG's pixels exactly and carries PR-11's label (`look_proof`'s
+  `tile_matches`: the same IHDR and inflated IDAT, `iCCP` `LABEL_NAME`, no
+  other chunk compared, because spec §11 PR-11 labels `render_frame`'s file
+  and leaves the gallery's dump unlabelled; clean-up batch 1, #310:
+  BYTE-identical until then); the two PNGs differ, byte for byte, from each
+  other and from None's.
 - Then `{lut, A, 0.8}` is set (a fixture step).
 - **LG2**: "Imported" is below every built-in tile name; "swap-33" and
   "invert" are tile names on one row in that order, below "Imported"; "Import
@@ -168,7 +172,7 @@ import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 from hevc_alpha_proof import own_core  # noqa: E402
 from look_proof import (KINDS, SAMPLES, TILE_NAMES, manifests, pins, settled,  # noqa: E402
-                        under, visible_texts, wait_manifest, write_chart)
+                        tile_matches, under, visible_texts, wait_manifest, write_chart)
 from tone_proof import Frame, decode, same_pixels  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/lut"
@@ -976,16 +980,18 @@ def run_lg(client, chart, state):
             mine = out.read_bytes() if rendered["ok"] and out.exists() else None
             if got["ok"]:
                 doc.call("undo")
-            if not got["ok"] or mine is None or mine != dumped.get(name):
+            matches, clause = tile_matches(dumped.get(name), mine)
+            if not got["ok"] or mine is None or not matches:
                 misses.append(f"{name}: set {got.get('error', 'ok')[:60]}, render "
-                              f"{rendered.get('error', 'ok')[:60]}, bytes "
-                              f"{'equal' if mine == dumped.get(name) else 'differ'}")
+                              f"{rendered.get('error', 'ok')[:60]}, "
+                              f"{clause or 'tile matches'}")
     blobs = list(dumped.values())
     distinct = len(blobs) == 3 and None not in blobs and len(set(blobs)) == 3
     back = doc.look_of(clip)
     check("LG1 the first manifest naming the clip at 0.5 s with tiles none, the eight, lut-A, "
-          "lut-B: each LUT PNG is BYTE-identical to set_video {look: {kind: lut, media}} then "
-          "render_frame {t, max_width: 256}; the two differ from each other and from None's",
+          "lut-B: each LUT tile's pixels are render_frame {t, max_width: 256}'s exactly and "
+          "render_frame's file carries PR-11's label (after set_video {look: {kind: lut, "
+          "media}}); the two differ from each other and from None's",
           found is not None and not misses and distinct
           and back == {"kind": "warm", "amount": 0.5},
           f"generation {found.get('generation') if found else None}; tiles of the last "

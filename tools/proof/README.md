@@ -18369,7 +18369,7 @@ failed and no other scored row did.
 
 **Its record**: `archive/grading.md`'s GR4a and GR4b sections.
 
-## Road map grading — GR5a and GR5b, looks end to end over MCP and in the chrome (`look_proof.py` N0, R1, K1, D1, P1, A0, M1, U2, U1, J1, A1, O1, X1, L1–L5 (GR5a); G1, G2, S1, S2, LM1–LM3, G3, B1–B4 (GR5b); Z1; fourteen mutants; `look_probe.swift`; `core/tests/look.rs`, `core/tests/ungraded.rs`; spec §11 GR-7; the `grading` branch)
+## Road map grading — GR5a and GR5b, looks end to end over MCP and in the chrome (`look_proof.py` N0, R1, K1, D1, P1, A0, M1, U2, U1, J1, A1, O1, X1, L1–L5 (GR5a); G1, G2, S1, S2, LM1–LM3, G3, B1–B4 (GR5b); Z1; sixteen mutants; `look_probe.swift`; `core/tests/look.rs`, `core/tests/ungraded.rs`; spec §11 GR-7; the `grading` branch)
 
 **What it answers.** That `set_video {patch: {look: {kind, amount}}}` reaches
 the compositor's step 4d through the recipe's `look` — the core's definition,
@@ -18404,13 +18404,15 @@ MG (MOVIE `{warm, 0.5}` and a grey card IM on one track, a text clip TX, an
 adjustment clip AJ). The instance is launched with argument-domain pins —
 `video.look` open, `video.light` and `video.color` closed — and
 `-RCDevLookGalleryDump`, so each completed thumbnail generation lands in the
-work folder as nine PNGs and a manifest. G1 holds each tile's PNG BYTE-identical
-to the click's own `set_video` followed by `render_frame {t, max_width: 256}`,
-and the nine distinct; G2 that nothing renders while nothing changes, and that
-the thumbnail time follows the playhead inside the clip and falls back to its
-start outside; S1 that `select_inspector_tab {section: video.look}` shows the
+work folder as nine PNGs and a manifest. G1 holds each tile's pixels exactly
+those of the click's own `set_video` followed by `render_frame {t, max_width:
+256}` (`tile_matches`: the same IHDR and inflated IDAT), that file carrying
+spec §11 PR-11's label, and the nine PNGs distinct; G2 that nothing renders
+while nothing changes, and that the thumbnail time follows the playhead inside
+the clip and falls back to its start outside; S1 that `select_inspector_tab {section: video.look}` shows the
 nine names in reading order inside the captured inspector with no layout
-problem, and refuses an unknown section naming the held ones; S2 that the
+problem, and refuses an unknown section naming the held ones (Light, Color,
+Wheels, Curves and Look since grading-2's GR-11 and GR-12); S2 that the
 Amount row appears only when every selected clip has a look; LM1–LM3 Clip ▸
 Look ▸ over MCP (`perform_menu_item`): a kind keeps each clip's amount, None
 removes, undo "Look", disabled for a text clip and enabled for an adjustment
@@ -18426,7 +18428,7 @@ python3 tools/proof/look_proof.py --only D1,M1                      # run and sc
 RC_PROOF_APP=release python3 tools/proof/look_proof.py capture DIR  # the neutral control, on the untouched tree
 RC_PROOF_APP=release python3 tools/proof/look_proof.py compare DIR  # every row, and N0 (scored on Release only)
 python3 tools/proof/look_proof.py --only G1,G2,G3,S1,S2,LM1,LM2,LM3,B1,B2,B3,B4  # GR5b's rows
-python3 tools/proof/look_proof.py --mutant NAME                     # one of the fourteen below
+python3 tools/proof/look_proof.py --mutant NAME                     # one of the sixteen below
 cd core && cargo test --release --test look --test ungraded
 ```
 
@@ -18458,12 +18460,33 @@ CT).
 | `amount-row-always` | the Amount row for any selection | S2 |
 | `thumbnail-not-click` | the thumbnail's trial op adds amount 1 | G1 |
 | `adjustment-not-a-target` | an adjustment clip is no look target | LM3 B2 |
+| `frame-unlabelled` | `render_frame` writes through `FrameWriter.write`, unlabelled | G1 |
+| `wheels-section-dropped` | the Color sub-tab has no Wheels section | S1 B4 |
 
 GR5a's seven are not re-run for GR5b: none of their anchors moved.
 
 GR6a moved one anchor: `kindless-look-kept` now names `evaluate_clip`'s guard
 as it calls `lut.rs`'s `evaluates_as_look`. K1 expects the eight and `lut`
 (GR-8), and `look_probe.swift`'s B1/B2 and L4 walk `LookKind.builtIns`.
+
+Clean-up batch 1 (#310): G1 and S1 had failed since before the HDR road map,
+and both were stale instruments. G1 compared a tile's file with
+`render_frame`'s byte for byte, but spec §11 PR-11 (B102, `bf1f711`) labels
+`render_frame`'s file (`FrameWriter.writeFrame`, an `iCCP` named
+`kCGColorSpaceCoreMedia709`) and leaves the gallery's dump unlabelled, so the
+two files differ in their colour chunk alone. G1 now compares the IHDR and the
+inflated IDAT and requires the label on `render_frame`'s file
+(`tile_matches`, beside `png_parts`; distinctness stays byte for byte). S1's
+expected refusal named three sections; it now names the five that
+`ClipPane.makeSections()` has shown since GR-11 (`b2fd1f9`) and GR-12
+(`75ebf34`). The control on the untouched tree's Release build failed G1
+("bytes differ" for every tile it printed) and S1 (the refusal named video.light,
+video.color, video.wheels, video.curves, video.look). After the change,
+`RC_PROOF_APP=release look_proof.py compare` scored 30/30 and exited 0.
+`frame-unlabelled` (G1's label clause, failed on "frame label None") and
+`wheels-section-dropped` are new. Both, and the three on G1 that were re-run
+because its comparator changed (`kind-drops-amount`, `gallery-ignores-playhead`,
+`thumbnail-not-click`), printed MUTANT PASS.
 
 **Its record**: `archive/grading.md`'s GR5a and GR5b sections.
 
@@ -18501,8 +18524,9 @@ instruction's key after it was built.
 
 GR6b adds project LG (the CHART with `{warm, 0.5}`, saved first as LG0 for the
 probe) on an instance launched with `look_proof.pins(closed=False,
-dump=WORK/dump)`: LG1 each Imported tile's dumped thumbnail is BYTE-identical to
-`set_video {look: {kind: lut, media}}` then `render_frame {t, max_width: 256}`;
+dump=WORK/dump)`: LG1 each Imported tile's dumped thumbnail has exactly the pixels
+of `set_video {look: {kind: lut, media}}` then `render_frame {t, max_width: 256}`,
+and that file carries spec §11 PR-11's label (`look_proof.tile_matches`);
 LG2 the Look section's layout before the import (Import LUT…, no Imported) and
 after it (Imported under the nine, swap-33 and invert on one row, Import LUT…
 under them, no layout problem); LM4 Clip ▸ Look ▸'s titles before and after,
@@ -18550,6 +18574,15 @@ did; a core mutant also runs `cargo test --release --no-fail-fast --test cube
 | `import-two-steps` | Import LUT is two grouped edits | P7 |
 | `import-new-id-always` | Import LUT predicts `next_id` even for a listed file | P7 |
 | `summary-says-lut` | a LUT look's summary is "LUT" | P4 P6 |
+
+Clean-up batch 1 (#310): LG1 is look_proof G1's twin. It failed for the same
+reason: PR-11's label on `render_frame`'s file, not on the gallery's dump. It
+is now scored by `look_proof.tile_matches`: the same IHDR and inflated IDAT,
+and the label on `render_frame`'s file. The control on the untouched tree's
+Release build failed LG1 with "bytes differ" for both LUT tiles. After the
+change, `RC_PROOF_APP=release lut_proof.py` scored 28/28 and exited 0.
+`luts-reversed` and `lut-tile-amount-one` were re-run because LG1's comparator
+changed, and both printed MUTANT PASS.
 
 **Its record**: `archive/grading.md`'s GR6a and GR6b sections.
 

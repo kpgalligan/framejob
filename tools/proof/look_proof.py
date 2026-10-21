@@ -94,14 +94,20 @@ adjustment clip) over 0–4 s on a third; saved as MG (and, after the rows, with
 IM at `{cool, 0.5}`, as MG-cool) for the probe and G3. MOVIE selected, the
 playhead at 0.5 s, `select_inspector_tab {clip, color}`:
 - **G1**: the first manifest naming [MOVIE] at t 0.5 s (≤ 30 s): per tile, the
-  click's `set_video` then `render_frame {t, max_width: 256}` is BYTE-identical
-  to its PNG (`undo` after each applied one); the nine pairwise differ.
+  click's `set_video` then `render_frame {t, max_width: 256}` holds its PNG's
+  pixels exactly (`tile_matches`: the same IHDR and inflated IDAT) and carries
+  PR-11's label, `iCCP` `LABEL_NAME` (`undo` after each applied one); no other
+  chunk is compared, because spec §11 PR-11 labels `render_frame`'s file and
+  leaves the gallery's dump unlabelled (clean-up batch 1, #310: BYTE-identical
+  until then); the nine PNGs pairwise differ, byte for byte.
 - **G2**: no new generation in 1.5 s unchanged; `set_playhead 1.0 s` → a
   generation at 1.0 s; the playhead at the clip's end → one at its start (0).
 - **S1**: `section: video.look`, once not pending: the inspector's layout dump
   holds the nine names in reading order (3 rows by y, 3 by x), each inside the
   captured inspector, and no layout problem on a gallery view; `section:
-  video.nothing` is refused naming the held ids.
+  video.nothing` is refused naming the held ids — video.light, video.color,
+  video.wheels, video.curves, video.look (GR-11's Wheels and GR-12's Curves
+  since grading-2; clean-up batch 1, #310).
 - **S2**: MOVIE alone shows "Amount" and a field "50%"; MOVIE + IM no
   "Amount"; CONTROL: IM alone none.
 - **LM1**: MOVIE + IM, Clip ▸ Look ▸ Vivid: `{vivid, 0.5}`, `{vivid, 1}`;
@@ -143,6 +149,8 @@ row did:
   renders-while-closed      the gallery is open whenever in a window: G3
   amount-row-always         the Amount row for any selection: S2
   thumbnail-not-click       the trial op adds amount 1: G1
+  frame-unlabelled          render_frame writes through the unlabelled write: G1
+  wheels-section-dropped    the Color sub-tab has no Wheels section: S1 B4
   adjustment-not-a-target   an adjustment clip takes no look: LM3 B2
 Exit 0 when every scored row passed (a mutant: caught); 1 when one failed
 (a mutant: survived); 2 when the control could not be performed.
@@ -167,6 +175,7 @@ import mcp  # noqa: E402
 import proof_app  # noqa: E402
 import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
+from frame_label_proof import LABEL_NAME  # noqa: E402  — PR-11's iCCP name, one home
 from hevc_alpha_proof import own_core  # noqa: E402
 from tone_proof import Frame, decode, same_pixels, write_png  # noqa: E402
 
@@ -284,6 +293,14 @@ MUTANTS = {
         "inputs.project.applying(Self.op(tile, clips: inputs.ids))",
         "inputs.project.applying(.setVideo(clips: inputs.ids, patch: VideoPatch(look: "
         ".some(tile.map { LookPatch(kind: $0, amount: 1) }))))")], ["G1"]),
+    "frame-unlabelled": ([(
+        "app/Sources/AgentServer+Render.swift",
+        "            try FrameWriter.writeFrame(image, as: format, to: url)\n",
+        "            try FrameWriter.write(image, as: format, to: url)\n")], ["G1"]),
+    "wheels-section-dropped": ([(
+        "app/Sources/ClipPane.swift",
+        "videoPane.lightSection(), videoPane.colorSection(), videoPane.wheelsSection(),",
+        "videoPane.lightSection(), videoPane.colorSection(),")], ["S1", "B4"]),
     "adjustment-not-a-target": ([(
         GALLERY,
         "(InspectorTab.hasSourcePixels($0, in: snapshot) || InspectorTab.isAdjustment($0))",
@@ -351,6 +368,55 @@ def spread(a, b):
 
 def close_to(got, want, tolerance=1.0):
     return all(abs(a - b) <= tolerance for a, b in zip(got, want))
+
+
+def png_parts(data):
+    """A PNG's IHDR, its pixels (every IDAT payload in order, joined and
+    inflated: the filtered scanlines) and its iCCP profile's name (None when it
+    has none); None when `data` is None or no PNG, has no IHDR or IDAT, or its
+    IDAT does not inflate."""
+    if data is None or not data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return None
+    at, ihdr, idat, label = 8, None, [], None
+    while at + 8 <= len(data):
+        length, kind = struct.unpack(">I4s", data[at:at + 8])
+        body = data[at + 8:at + 8 + length]
+        if kind == b"IHDR":
+            ihdr = body
+        elif kind == b"IDAT":
+            idat.append(body)
+        elif kind == b"iCCP":
+            label = body.split(b"\0", 1)[0].decode("latin-1")
+        elif kind == b"IEND":
+            break
+        at += 12 + length
+    if ihdr is None or not idat:
+        return None
+    try:
+        pixels = zlib.decompress(b"".join(idat))
+    except zlib.error:
+        return None
+    return {"ihdr": ihdr, "pixels": pixels, "label": label}
+
+
+def tile_matches(tile, frame):
+    """G1's and lut_proof LG1's rule (spec §11 PR-11: pixels unchanged, the
+    label at the write; the gallery's dump stays unlabelled): the same IHDR and
+    the same inflated IDAT, and `render_frame`'s file carries PR-11's label.
+    No other chunk is compared. (True, "") or (False, the first failing
+    clause)."""
+    a, b = png_parts(tile), png_parts(frame)
+    if a is None:
+        return False, "tile not a PNG"
+    if b is None:
+        return False, "frame not a PNG"
+    if a["ihdr"] != b["ihdr"]:
+        return False, "IHDR differs"
+    if a["pixels"] != b["pixels"]:
+        return False, "pixels differ"
+    if b["label"] != LABEL_NAME:
+        return False, f"frame label {b['label']}"
+    return True, ""
 
 
 # ---- the documents ------------------------------------------------------------
@@ -879,14 +945,16 @@ def run_mg_rows(doc, clips, state):
             mine = out.read_bytes() if rendered["ok"] and out.exists() else None
             if got["ok"]:
                 doc.call("undo")
-            if not (got["ok"] or same) or mine is None or mine != dumped[name]:
+            matches, clause = tile_matches(dumped[name], mine)
+            if not (got["ok"] or same) or mine is None or not matches:
                 misses.append(f"{name}: set {got.get('error', 'ok')[:60]}, render "
-                              f"{rendered.get('error', 'ok')[:60]}, bytes "
-                              f"{'equal' if mine == dumped[name] else 'differ'}")
+                              f"{rendered.get('error', 'ok')[:60]}, "
+                              f"{clause or 'tile matches'}")
     blobs = [b for b in dumped.values() if b is not None]
     distinct = len(blobs) == 9 and len(set(blobs)) == 9
-    check("G1 the first generation naming [MOVIE] at 0.5 s: each tile's PNG is BYTE-identical "
-          "to the click's set_video then render_frame {t, max_width: 256}; the nine differ",
+    check("G1 the first generation naming [MOVIE] at 0.5 s: each tile's pixels are render_frame "
+          "{t, max_width: 256}'s exactly and render_frame's file carries PR-11's label (after "
+          "the click's set_video); the nine differ",
           tabs.get("sub_tab") == "color" and found is not None and not misses and distinct,
           f"tab {tabs.get('sub_tab')}; generation "
           f"{found.get('generation') if found else None}; misses {misses[:3]}; distinct "
@@ -933,7 +1001,7 @@ def run_mg_rows(doc, clips, state):
                 if under(views, p.get("view"), {"LookGalleryView", "LookTileButton"})]
     refused = doc.call("select_inspector_tab", section="video.nothing")
     want = ("The shown pane has no section video.nothing; its sections are video.light, "
-            "video.color, video.look.")
+            "video.color, video.wheels, video.curves, video.look.")
     check("S1 section video.look: the nine names in reading order (3 rows by y, 3 by x), each "
           "inside the captured inspector, no layout problem on the gallery; video.nothing is "
           "refused naming the held ids",
