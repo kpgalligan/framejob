@@ -221,19 +221,26 @@ class Compositor: NSObject, AVVideoCompositing {
             return
         }
         let instruction = request.videoCompositionInstruction as? RecipeInstruction
+        let key = instruction?.recipeKey ?? 0
+        let ticks = CompositionBuilder.ticks(request.compositionTime)
+        // A playing preview's prefetch follows the frame asked for (G-36 (d)).
+        GraphicPrefetch.shared.reach(key, ticks: ticks)
         // The key is the whole ask: `RecipeSource.recipe(for:at:)` reads the
         // project AND that key's `RecipeOptions` under one hold, so a burn-in
         // an export asked for arrives here without this file, the
         // instruction or `CompositionBuilder` carrying a flag of its own
         // (spec §7.3). Do not read the two halves separately.
-        let recipe = RecipeSource.shared.recipe(
-            for: instruction?.recipeKey ?? 0,
-            at: CompositionBuilder.ticks(request.compositionTime))
+        let recipe = RecipeSource.shared.recipe(for: key, at: ticks)
         do {
             try renderer.render(
                 recipe: recipe, into: destination, request: request, instruction: instruction,
                 converts: canConformColorOfSourceFrames)
             request.finish(withComposedVideoFrame: destination)
+            #if FRAMEJOB_DEV_TOOLS
+            PlaybackTrials.shared.served(
+                key, ticks: ticks, seconds: CFAbsoluteTimeGetCurrent() - started,
+                buffer: destination)
+            #endif
             WaveformTaps.shared.offer(
                 destination, key: instruction?.recipeKey ?? 0,
                 signal: ScopeSignal(canvas: recipe?.canvas))

@@ -613,6 +613,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   keeps G-8's reports and G-5's purity where they were.
   **Amended by NM-6** (rename R0): `ReelcutGraphicPrefetchOff` is now
   `FrameJobGraphicPrefetchOff`.
+  **Amended by G-36**: (a)'s "or the preview" no longer holds — a playing
+  preview has its own session on the document's key.
 - **G-27 — Deleting a graphic is refused while a clip draws it; the deleted
   text is kept, and that kept text is what marks the name as deleted**
   (issue #103, 2026-10-04, issue batch B84).
@@ -1851,3 +1853,72 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   QuickTime Player and Final Cut is a person's check (`docs/manual-checks.md`
   SE-9). G-33 (h)'s sentence that Frame Job is a reader that ignores the
   declared mode, and its I1 figures, describe the build before this entry.
+- **G-36 — Playback rasterizes upcoming graphic frames ahead on worker
+  threads too; the compositor stays the one consumer and the texture key
+  decides** (issue #127, G6 phase 2, 2026-10-21; amends G-26 (a)).
+  (a) **Where.** On the document's own key, while the transport's rate is
+  above 0, the project draws a graphic clip (on the timeline or in any
+  nest), the switch is off and an item is built
+  (`Playback+Prefetch.swift`'s `syncPrefetch(from:)`). Never while paused,
+  in reverse, for `render_frame`, or on an export's key.
+  (b) **The grid.** A session starts at its start time — the seek's
+  target when a seek starts it, else the playhead — snapped down onto the
+  composition's frame grid from 0, at the built composition's
+  `frameDuration`. It ends at the in/out range's end while playback loops
+  inside that range, else at the composition's end.
+  (c) **Restart.** Play, a seek (at its target, a loop's return included),
+  an item swap and a property-only edit while playing each stop the
+  session and start a fresh one. Pause, a rate of 0 or below and
+  `invalidate` stop it.
+  (d) **Follow.** Every compositor request reports its time
+  (`GraphicPrefetch.reach`). A worker never claims a frame at or before the
+  last one the compositor reached; the frames it passes over are counted
+  `skipped`. A held raster of a frame before the reached one is dropped as
+  unused, freeing its room. A request outside the session's range is not
+  followed, and a seek's session (a loop's return included) follows
+  nothing until a request lands in its first four frames: a seek installs
+  the new session before AVFoundation cancels the old position's requests,
+  and those served in between must not move the new one's floor.
+  (e) **Bounds.** G-26 (d)'s, per session: `activeProcessorCount − 1`
+  workers, `4 × workers` slots and 1 GiB of rasters. An export running
+  alongside has its own session. **The owner's choice** (2026-10-21): first
+  the same limits as an export's, with no setting; then, shown the
+  measurement below, no fixed limit at all — memory limits are relative to
+  the Mac (one budget of 25 % of physical memory, given back under memory
+  pressure; 16 GB is the floor, 32 GB the usual machine), and drawing ahead
+  while paused is a setting, as in Final Cut. #127's next phase replaces
+  this paragraph's 1 GiB and slot count, and G-26 (d)'s, with that budget.
+  Until it lands the bounds below stand. **What the bound holds, and
+  what it does not:** the 1 GiB and the slots bound only the finished
+  rasters HELD ahead for the compositor. Outside them are each worker's
+  raster in flight (its output and the images it decodes, one per worker
+  at a time) and the freed large blocks the system allocator keeps
+  resident after them, which stay counted in the process's memory after
+  the play until the system needs them. Measured on parive-promo's
+  `section` scene (Release, 12 cores, 11 workers, 2026-10-21, fix pass 1's
+  instrumented copy): the held rasters peaked at 373 MB in 53 slots, under
+  the bound (the slot limit binds first; a frame's layers go in together,
+  so the count can pass `4 × workers` by a frame's worth); live large
+  allocations were 855 MB in mid-play, the allocator's kept free blocks
+  602 MB then and 939 MB after; the process's footprint rose from 366 MB
+  to a peak of 2.07 GB while playing (the serial path, the switch on:
+  116 MB to 392 MB) and stood at 1.24 GB after the play (serial: 499 MB).
+  (f) **The switch.** `FrameJobGraphicPrefetchOff` turns both off.
+  (g) **Purity.** G-26 (c) holds unchanged, so every preview frame is the
+  serial path's bytes (G-5). A wait that `stop` ends counts as neither a
+  hit nor a mismatch. In a following session, a slot the worker left to
+  the compositor's pool (the same-texture shortcut) that reaches `take`
+  counts `missed`, because playback may have dropped the earlier frame
+  whose raster the pool was to hold. The session's log line is an
+  export's with `, playback from <start>, <skipped> skipped` appended.
+  (h) **Preview Quality.** It does not shrink a graphic's raster (G-7), so
+  Quarter gains little: measured on parive-promo's `section` scene (clip 8
+  from tick 25 120 000, 10 s, Release, 12 cores, 2026-10-21), the share of
+  frames composed was 0.115 at Full and 0.112 at Quarter with the switch
+  on, and 0.279 at Full and 0.325 at Quarter with the prefetch
+  (`designs/adr/roadmap-10-graphics.md`, "G6 phase 2").
+  (i) **Risk accepted.** While playing, a graphic's JavaScript runs twice
+  per frame, and up to all cores but one are busy. A restart wastes the
+  rasters in flight. `cancelAllPendingVideoCompositionRequests` can wait
+  up to one raster on a `take`, no longer than the serial path's own
+  raster.

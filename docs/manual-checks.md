@@ -442,7 +442,7 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 
 **GR-2 — Memory at 4K, and a slower machine**
 - **Do:** 1. Play `Playback-4K` with Activity Monitor open on Frame Job's memory. 2. If one is available, play it on a slower Mac, or a heavier graphic.
-- **Expect / Answer:** memory stays steady (note the figure); no stutter. A stutter reopens graphics performance work.
+- **Expect / Answer:** memory stays steady (note the figure); no stutter. A stutter goes on #127 with the project and the machine: playback rasterizes graphics ahead (spec §11 G-36), so a stutter is graphics performance work again.
 - **Source:** #56.
 
 **GR-3 — The error card**
@@ -474,8 +474,15 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Setup:** Low Power Mode off — `pmset -g | grep powermode` reads 0 before and after the run (if it does not, skip this check and note it). View ▸ Preview Quality ▸ Full.
 - **Do:** Play `Playback-4K-animated` through both actions (title-card's colours, then kinetic-type's stagger and accent).
 - **Expect:** no stutter through the two action spans.
-- **Answer:** stutter, yes or no. #127 (graphics performance) stays deferred either way.
+- **Answer:** stutter, yes or no. A stutter goes on #127: playback rasterizes graphics ahead (spec §11 G-36), so a stutter is graphics performance work again.
 - **Source:** #239 (issue batch B87 phase 3, spec §11 G-34 (g)); the project is built by `graphics_playback_samples.py`.
+
+**GR-9 — A heavy graphics project plays**
+- **Setup:** Low Power Mode off — `pmset -g | grep powermode` reads 0 before and after the run (if it does not, skip this check and note it). View ▸ Preview Quality ▸ Full. Activity Monitor open on Frame Job's memory.
+- **Do:** Open a COPY of a parive-like project — many graphic clips drawing images and text, such as `~/temp/testmotiongraphics/parive-promo.framejob` — and play one of its `section` scenes (in parive-promo, clip 8, from 41.87 s) for ten seconds or more.
+- **Expect:** the play runs on and stays in sync. Until #127's later phases a `section` scene still stutters (the bench composes about 28 % of its frames at Full), so a stutter goes to #127, not a new issue. Frame Job's memory rises while it plays and stays raised after it: G-36 (e) bounds only the rasters held ahead (1 GiB; 373 MB at peak on parive-promo), not the workers' rasters in flight or the freed memory the system keeps for the app. Measured on parive-promo's section scene on a 12-core Mac: from 366 MB to a peak of about 2.1 GB while playing, about 1.2 GB after it. A rise well past that, or one that keeps growing over a longer play, is the failure.
+- **Answer:** stutter, yes or no, and the memory figure before, at its highest while playing, and after.
+- **Source:** #127 G6 phase 2 (spec §11 G-36); `tools/proof/playback_prefetch_proof.py --bench` measures the share of frames composed, not how the play looks.
 
 ## Mattes
 

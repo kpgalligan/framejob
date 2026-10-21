@@ -299,7 +299,9 @@ envelope key, plus the app-state tools — `open_project`, `new_project`,
 `import_graphic_asset`, `delete_graphic`, `rename_graphic` and
 `restore_graphic`. A Debug or Release build also has the dev tools
 (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`;
-"Seeing the chrome" below; and `assistant_send` / `assistant_answer`, which
+"Seeing the chrome" below; `play_preview`, which plays a window's preview
+for a while and answers the frames composed (#127, spec §11 G-36); and
+`assistant_send` / `assistant_answer`, which
 drive a window's assistant turn against a stand-in server, with the dev-only
 launch default `-RCDevAssistantSend <text> -RCDevAssistantReport <path>` for
 a turn in a launch without the server; and `-RCDevSyncHold <s>`, which holds

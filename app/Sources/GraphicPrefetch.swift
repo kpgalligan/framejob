@@ -1,5 +1,6 @@
-// app/Sources/GraphicPrefetch.swift — an export's graphics rasterized
-// AHEAD of the compositor, on worker threads (spec §11 G-26, issue #127).
+// app/Sources/GraphicPrefetch.swift — an export's graphics, and a playing
+// preview's, rasterized AHEAD of the compositor, on worker threads (spec §11
+// G-26 and G-36, issue #127).
 //
 // **The compositor stays the one writer.** A worker runs a frame's graphic
 // modules and rasterizes their SVG into a slot; the compositor still runs
@@ -9,17 +10,32 @@
 // worker can be wrong, late or absent and the file is still the serial
 // path's, byte for byte.
 //
-// **Where it runs.** Only an `ExportWriter` export with a pinned set and a
-// graphic in range (`Exporter.startGraphicPrefetch`); never GIF/APNG, a
-// one-frame render or the preview. `FrameJobGraphicPrefetchOff` (YES) is the
-// measurement switch back to the serial path.
+// **Where it runs.** An `ExportWriter` export with a pinned set and a
+// graphic in range (`Exporter.startGraphicPrefetch`), and a preview playing
+// forward over a project that draws a graphic, on the document's own key
+// (`Playback+Prefetch.swift`, G-36); never GIF/APNG, a one-frame render or a
+// paused or reversing preview. `FrameJobGraphicPrefetchOff` (YES) is the
+// measurement switch back to the serial path for both.
 //
 // **The grid.** A worker walks `range.start + i × frameDuration` on the
 // export's own key: the core snaps the start onto the export's own grid
 // from 0, at the export's rate after any override, so those are the
-// instants the writer asks the compositor for. A worker reads only through
+// instants the writer asks the compositor for. A playback session's grid
+// starts at the seek target or the playhead, snapped down onto the
+// composition's own grid from 0. A worker reads only through
 // `RecipeSource.recipe(for:at:)` and `GraphicRegistry.resolve` — the
-// export's PINNED set (G-13) — and never records a report.
+// export's PINNED set (G-13), or the document's — and never records a report.
+//
+// **Following.** A playback session `follows`: the compositor reports every
+// request's time (`reach`), a worker never claims a frame at or before the
+// last one reached (the frames passed over are `skipped`), and a held entry
+// of an earlier frame goes as unused. A request outside the session's range
+// is not followed, and a seek's session follows nothing until a request
+// lands in its first `armFrames` frames: a seek installs the session before
+// AVFoundation cancels the old position's requests, and those still served
+// in between must not move the new session's floor. An export session never reads `floor`,
+// `skipped` or `deferred`, and its log line is unchanged; a following one's
+// appends `, playback from <start>, <skipped> skipped`.
 //
 // **One `NSCondition`** guards `sessions` and every session and entry field,
 // broadcast on every change (`CacheLedger`'s precedent). A worker never
@@ -61,6 +77,9 @@ final class GraphicPrefetch: @unchecked Sendable {
         let index: Int
         var bytes: Int
         var done = false
+        /// Set by the worker's same-texture shortcut: the raster is left to
+        /// the compositor's pool, from an earlier frame's entry.
+        var deferred = false
         var textureKey: String?
         var raster: Result<GraphicRaster, any Error>?
 
@@ -78,6 +97,16 @@ final class GraphicPrefetch: @unchecked Sendable {
         let frameDuration: CMTime
         let endTicks: Ticks
         let workerCount: Int
+        /// A playback session: `reach` raises `floor`, `claim` skips past it.
+        let follows: Bool
+        let startTicks: Ticks
+        let frameTicks: Ticks
+        /// False for a seek's session until a request lands in its first
+        /// `armFrames` frames; `reach` follows nothing before.
+        var armed: Bool
+        /// The last frame index the compositor reached; -1 before any.
+        var floor = -1
+        var skipped = 0
         var next = 0
         var exhausted = false
         var stopped = false
@@ -94,12 +123,19 @@ final class GraphicPrefetch: @unchecked Sendable {
         /// least recently touched first; the compositor pool's capacity.
         var recent: [(key: String, index: Int)] = []
 
-        init(key: Int, range: CMTimeRange, frameDuration: CMTime, workerCount: Int) {
+        init(
+            key: Int, range: CMTimeRange, frameDuration: CMTime, workerCount: Int, follows: Bool,
+            seeking: Bool
+        ) {
             self.key = key
             self.start = range.start
             self.frameDuration = frameDuration
             self.endTicks = CompositionBuilder.ticks(range.end)
             self.workerCount = workerCount
+            self.follows = follows
+            self.armed = !seeking
+            self.startTicks = CompositionBuilder.ticks(range.start)
+            self.frameTicks = max(1, CompositionBuilder.ticks(frameDuration))
         }
 
         func recentIndex(_ key: String) -> Int? {
@@ -123,10 +159,14 @@ final class GraphicPrefetch: @unchecked Sendable {
 
     // MARK: - Main
 
-    /// Starts `key`'s workers over `range` at `frameDuration`. A no-op when
-    /// the switch is on, a session for `key` exists, or either is not
-    /// positive.
-    func start(key: Int, range: CMTimeRange, frameDuration: CMTime) {
+    /// Starts `key`'s workers over `range` at `frameDuration`; `follows` for
+    /// a playing preview's session (G-36), `seeking` when a seek to
+    /// `range.start` starts it. A no-op when the switch is on, a session for
+    /// `key` exists, or either is not positive.
+    func start(
+        key: Int, range: CMTimeRange, frameDuration: CMTime, follows: Bool = false,
+        seeking: Bool = false
+    ) {
         guard !UserDefaults.standard.bool(forKey: Self.offDefaultsKey),
             range.isValid, range.start.isNumeric, range.duration.isNumeric,
             frameDuration.isNumeric,
@@ -139,7 +179,8 @@ final class GraphicPrefetch: @unchecked Sendable {
             return
         }
         let session = Session(
-            key: key, range: range, frameDuration: frameDuration, workerCount: count)
+            key: key, range: range, frameDuration: frameDuration, workerCount: count,
+            follows: follows, seeking: seeking)
         session.liveWorkers = count
         sessions[key] = session
         condition.unlock()
@@ -173,9 +214,45 @@ final class GraphicPrefetch: @unchecked Sendable {
 
     // MARK: - The compositor's queue
 
+    /// A seek's session follows from the first request in this many of its
+    /// first frames: the seek's own frame, or one just after it.
+    static let armFrames = 4
+
+    /// The compositor reached `ticks` on `key`. In a following session a
+    /// request inside its range whose frame index is above `floor` raises
+    /// it, and every entry of a frame BELOW it goes as unused — the floor
+    /// frame's own entry is the one `take` is about to ask for. A seek's
+    /// session (a loop's return included) follows nothing until a request
+    /// lands in its first `armFrames` frames: until then a request may be
+    /// the old position's, served before AVFoundation cancelled it. Any
+    /// thread; a no-op unless `key`'s session follows.
+    func reach(_ key: Int, ticks: Ticks) {
+        condition.lock()
+        defer { condition.unlock() }
+        guard let session = sessions[key], session.follows,
+            ticks >= session.startTicks, ticks < session.endTicks
+        else { return }
+        let index = Int(clamping: (ticks - session.startTicks) / session.frameTicks)
+        if !session.armed {
+            guard index < Self.armFrames else { return }
+            session.armed = true
+        }
+        guard index > session.floor else { return }
+        session.floor = index
+        let passed = session.slots.filter { $0.value.index < index }
+        for (slot, entry) in passed {
+            session.slots[slot] = nil
+            release(entry, from: session)
+        }
+        session.unused += passed.count
+        condition.broadcast()
+    }
+
     /// The worker's raster for `slot` when its texture key is `textureKey`,
     /// else nil. Every entry of an earlier frame goes as unused. Waits for
-    /// the entry's worker, or for `stop`.
+    /// the entry's worker, or for `stop` — a wait `stop` ends counts as
+    /// nothing. In a following session an entry the worker left to the pool
+    /// counts `missed`: playback may have dropped the frame that filled it.
     func take(_ key: Int, slot: Slot, textureKey: String) -> Result<GraphicRaster, any Error>? {
         condition.lock()
         defer { condition.unlock() }
@@ -187,6 +264,11 @@ final class GraphicPrefetch: @unchecked Sendable {
         remove(slot, entry, from: session)
         condition.broadcast()
         while !entry.done, !session.stopped { condition.wait() }
+        guard entry.done else { return nil }
+        if session.follows, entry.deferred, textureKey == entry.textureKey {
+            session.missed += 1
+            return nil
+        }
         if entry.done, let raster = entry.raster, entry.textureKey == textureKey {
             session.hits += 1
             return raster
@@ -272,7 +354,7 @@ final class GraphicPrefetch: @unchecked Sendable {
     }
 
     /// The next frame index, once there is room; nil once stopped or
-    /// exhausted.
+    /// exhausted. A following session's never at or before `floor`.
     private func claim(_ session: Session) -> Int? {
         condition.lock()
         defer { condition.unlock() }
@@ -282,6 +364,10 @@ final class GraphicPrefetch: @unchecked Sendable {
             condition.wait()
         }
         guard !session.stopped, !session.exhausted else { return nil }
+        if session.follows, session.next <= session.floor {
+            session.skipped += session.floor + 1 - session.next
+            session.next = session.floor + 1
+        }
         let index = session.next
         session.next += 1
         return index
@@ -337,6 +423,7 @@ final class GraphicPrefetch: @unchecked Sendable {
             if let earlier = session.recentIndex(key), earlier < job.entry.index {
                 session.touch(key)
                 job.entry.done = true
+                job.entry.deferred = true
                 release(job.entry, from: session)
                 condition.broadcast()
                 condition.unlock()
@@ -364,9 +451,12 @@ final class GraphicPrefetch: @unchecked Sendable {
     private func logLine(_ session: Session) -> String? {
         guard !session.logged else { return nil }
         session.logged = true
-        return "[framejob] graphic prefetch: key \(session.key), \(session.workerCount) workers, "
+        let line =
+            "[framejob] graphic prefetch: key \(session.key), \(session.workerCount) workers, "
             + "\(session.framesWithGraphics) frames with graphics, \(session.hits) hits, "
             + "\(session.mismatched) mismatched, \(session.missed) missed, "
             + "\(session.unused) unused"
+        guard session.follows else { return line }
+        return line + ", playback from \(session.startTicks), \(session.skipped) skipped"
     }
 }

@@ -11,12 +11,13 @@ apart.
 splices its rows in immediately before `import_media`, the first file tool:
 `snapshot_ui` (road map 11's V2a), then `perform_menu_item` and `cancel_sheet`
 (V2b), then `select_inspector_tab` (V3), then `assistant_send` and
-`assistant_answer` (road map 12 A1)."""
+`assistant_answer` (road map 12 A1), then `play_preview` (issue #127, spec §11
+G-36)."""
 
 import re
 
 DEV_TOOLS = ["snapshot_ui", "perform_menu_item", "cancel_sheet", "select_inspector_tab",
-             "assistant_send", "assistant_answer"]
+             "assistant_send", "assistant_answer", "play_preview"]
 
 MARKER = re.compile(r"Frame Job agent server: framejob-dev-tools-compiled-in, (\d+) dev tools")
 

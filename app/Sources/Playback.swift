@@ -22,7 +22,8 @@ import AppKit
 /// from the DSP tap rather than observed from a second one.
 /// The meter's read and its two switches live in `Playback+Meter.swift`.
 /// `previewComposition` lives in `Playback+PreviewQuality.swift`, `stepFrames` and the main
-/// hop `onMain` in `+Step`, `seekAfterRebuild`, `seekFinished` and `report` in `+Scope`.
+/// hop `onMain` in `+Step`, `seekAfterRebuild`, `seekFinished` and `report` in `+Scope`,
+/// the playing preview's graphics prefetch, `syncPrefetch(from:)`, in `+Prefetch` (G-36).
 ///
 /// Road map 2's phase 8 hung two more things off the player, and both are here
 /// because both are about the PLAYER rather than about the document: View ▸
@@ -79,7 +80,7 @@ final class Playback {
     private let player = AVPlayer()
     /// This document's `RecipeSource` slot. Travels onto every instruction so
     /// the compositor reads this document's recipes and no other's.
-    private let recipeKey: Int
+    let recipeKey: Int
 
     /// The documented rebuild seam: building a composition opens asset tracks,
     /// which touches the disk and must never block a gesture.
@@ -87,6 +88,8 @@ final class Playback {
         label: "com.kgalligan.framejob.rebuild", qos: .userInitiated)
 
     private(set) var built: BuiltComposition?
+    /// Whether the last project `update` was handed draws a graphic clip (G-36).
+    private(set) var drawsGraphics = false
     /// The plan the CURRENT item was built from; nil before the first build.
     private(set) var builtPlanJSON: String?
     /// The sample-level audio settings the CURRENT item's taps were built
@@ -158,6 +161,7 @@ final class Playback {
                 // stopped, including when AVFoundation stops it itself at the
                 // end of an item or on a stall.
                 if rate == 0 { self.stopMetering() } else { self.startMetering() }
+                self.syncPrefetch(from: self.currentTime)
                 self.onRateChanged?(rate)
             }
         }
@@ -177,6 +181,7 @@ final class Playback {
         // resurrect — an object that is already deinitialising.
         meterTimer?.invalidate()
         LevelMeter.shared.publish(.silent, from: ObjectIdentifier(self))
+        GraphicPrefetch.shared.stop(recipeKey)
     }
 
     /// Stops everything and drops the item. `ProjectDocument` calls this when
@@ -191,6 +196,7 @@ final class Playback {
         rebuilding = false
         holding = false
         stopMetering()
+        GraphicPrefetch.shared.stop(recipeKey)
         player.pause()
         player.replaceCurrentItem(with: nil)
         built = nil
@@ -234,6 +240,7 @@ final class Playback {
         RecipeSource.shared.setMediaURLs(urls, for: recipeKey)  // LUT looks read these (GR-8)
         let audioDSP = AudioDSPParameters(snapshot: project.snapshot)
         AudioDSPSource.shared.publish(audioDSP, for: recipeKey)
+        drawsGraphics = Self.drawsGraphics(project.snapshot)
         let planJSON = project.planJSON
         if planJSON == builtPlanJSON, audioDSP == builtAudioDSP {
             // Any rebuild still queued was for a plan this edit just undid.
@@ -247,7 +254,7 @@ final class Playback {
                 isSeeking = false
                 startSeek(to: lastKnownTime)
             }
-            if player.rate == 0 { refreshPausedFrame() }
+            if player.rate == 0 { refreshPausedFrame() } else { syncPrefetch(from: currentTime) }
             return
         }
         guard let plan = project.plan else { return }
@@ -536,6 +543,7 @@ final class Playback {
     func startSeek(to t: Ticks) {
         let clamped = max(0, t)
         lastKnownTime = clamped
+        syncPrefetch(from: clamped, seeking: true)
         guard player.currentItem != nil else {
             report(clamped)
             return

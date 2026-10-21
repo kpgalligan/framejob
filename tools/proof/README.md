@@ -7146,7 +7146,7 @@ python3 tools/proof/v2_snapshot.py <dir>/agent.sock [--log PATH] [--only T,N,O,C
 
 `dev_tools.py` names the dev tools once (`DEV_TOOLS`, in catalog order: the
 four of road map 11, then road map 12 A1's `assistant_send` and
-`assistant_answer`) and reads the startup marker's count
+`assistant_answer`, then #127's `play_preview`) and reads the startup marker's count
 (`dev_marker_count`). The scripts that assert an exact tool set subtract
 `DEV_TOOLS` first.
 
@@ -10539,6 +10539,71 @@ whose load average from other work ran 47–270:
 | `export_cancel_proof.py --port 4935 --only gate` | G1, G2, Z1 ok, exit 0 |
 | `--bench parive-promo.reelcut` (h264) | OFF 360.1 s, ON 47.34 s; 3 596 hits, 0 mismatched, 0 missed; masked DIFFERENT, as two OFF h264 exports also are |
 | `--bench … --preset prores_422` | OFF 445.75 s, ON 43.31 s; 3 596 hits; masked equal |
+
+## Issue #127 — playback prefetch (`playback_prefetch_proof.py`)
+
+A preview playing forward over a project that draws a graphic runs G-26's
+workers on the document's own key (`Playback+Prefetch.swift`, spec §11
+G-36), following the frame the compositor last asked for
+(`GraphicPrefetch.reach`). The instrument is the dev tool `play_preview`
+(spec §7.9c): it plays for `seconds` and answers the share of frames
+composed, `compose_ms` and, with `digests`, each frame's SHA-256. The proof
+launches two owned instances one after the other, each on a scratch socket
+(OFF with `-FrameJobGraphicPrefetchOff YES`, ON without), logs under
+`work/playback-prefetch/`, every child under `graphics_spike/bounded.py`;
+it imports `graphics_prefetch_proof.py`'s launch, `fixture()` and log
+readers. Fixtures, saved under `work/`: H is that proof's F; L a 30 fps
+project with one 5 s shape clip. Every play is preceded by `set_playhead`,
+and a timing ratio is scored only in the CONTROL rows.
+
+- **P0** CONTROL, each instance: L from 0 for 3 s composes ≥ 0.9. **P1**
+  OFF: H plays, and OFF's log has no `graphic prefetch:` line. **P2** ON: H
+  from 0 for 3 s; within 10 s a line ending `playback from 0, N skipped`,
+  hits > 0, mismatched 0. **P3** MEASURED: OFF and ON `composed_ratio` and
+  `compose_ms` for H. **P4** ON: L's play, before any H play, leaves no line
+  within 10 s. **P5** H from 600000 for 2 s: a line `playback from 600000`.
+  **P6** H at rate 4 for 1 s: skipped > 0. **P7** CONTROL: L with
+  `digests`, OFF against ON: ≥ 10 common ticks, every one equal. **P8** P7
+  for H, each side's digests the union of three plays (from 0, 1 and 2
+  frames: the serial path composes about one H frame in four, a loaded
+  host fewer on either side, and which ones varies), a tick two plays of
+  one side share agreeing, too few common ticks reported apart from a
+  digest that differs. **P9** H for 2 s with
+  `seek_to` 1800000: a line `playback from 1800000`. **P10** H from
+  1200000 for 2 s with `seek_to` 0, a seek behind the play: a line
+  `playback from 0` with hits > 0 (the old position's requests still in
+  flight do not move the new session's floor). P10 has no mutant: with
+  `reach`'s range guard and the seek session's arming taken out it passed
+  twice on Release, because this play seldom has an old request served
+  between the seek and AVFoundation's cancel; the stranded floor was seen
+  once, in an `unguarded` run of a build without the arming (0 hits, 86
+  skipped). **Z1** no `Frame Job: ` in
+  any log.
+- `--mutant NAME`, each anchor exactly once in its file, driven through
+  every row: `worker-frame-plus-one` → P2, `unguarded` → P8,
+  `no-stop-on-pause` → P2, `no-graphic-gate` → P4, `no-follow` → P6,
+  `seek-reads-player` → P9. Exit 0 caught, 1 survived, 2 a CONTROL row
+  (P0, P7) failed.
+- `--bench PACKAGE --from T --seconds S` plays a COPY under
+  `work/playback-prefetch-bench/`, one owned instance per cell — OFF and ON,
+  each at Full and Quarter (`-FrameJobPreviewQuality 0` / `2`, argument
+  domain only) — printing `pmset -g`'s powermode line and the load average
+  before each play, the RSS after it, the answer and ON's line; scored only
+  on every play answering.
+
+Run on 2026-10-21 over `858146a` plus the phase, every instance my own, on a
+12-CPU host, `powermode 0`:
+
+| Command | Answer |
+|---|---|
+| `playback_prefetch_proof.py` (Debug) | 10/10, exit 0 |
+| `RC_PROOF_APP=release playback_prefetch_proof.py` | 10/10, exit 0; P2 232 hits, 0 mismatched, 0 missed; P3 H OFF 0.264 (122.71 ms mean), ON 0.978 (13.24 ms mean, 36.55 ms p95); P6 30 skipped; P8 22 common ticks equal |
+| `--mutant` × 6 (Release) | each caught, exit 0: P2 (39 mismatched); P8 (20 of 21 differ); P2 (no line); P4 (a line for L); P6 (0 skipped); P9 (no line from 1800000) |
+| `--bench parive-promo.framejob --from 25120000 --seconds 10`, before the prefetch code | composed OFF Full 0.126, Quarter 0.122; ON the same (0.126, 0.122); load 15.84–9.07; RSS 414 320–422 960 KiB |
+| the same, after | OFF Full 0.115, Quarter 0.112; ON Full 0.279, Quarter 0.325 (136 and 151 hits, 0 mismatched); load 9.51–19.17; RSS ON 1 748 944 and 1 721 328 KiB, OFF 413 600 and 415 968 KiB |
+| `graphics_prefetch_proof.py` and its two mutants (Release) | 7/7; both caught |
+| fix pass 1, `playback_prefetch_proof.py` (Debug, then Release) | 11/11, exit 0, each; Release P8 39 common ticks of 39 OFF (3 plays) and 100 ON (3 plays), P10 91 hits, 0 skipped |
+| fix pass 1, `--mutant` `unguarded` (on the first try's build), `seek-reads-player`, `no-follow` (Release) | each caught, exit 0: P8 (38 of 39 differ); P9 (no line from 1800000); P6 (0 skipped) |
 
 ## Issue batch B38 — the assistant Stop residue: ST's hour fixture, K1 last with its `key-echo` control, `transcribe`'s first-statement read (`assistant_session_proof.py` ST, K1, `--mutant key-echo`; #179 items 1, 2 and 4)
 

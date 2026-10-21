@@ -1077,7 +1077,7 @@ the key map behind it.
   the Camera Log section reads.
 
 **Playback and rendering.**
-- `Playback.swift` (+`Meter`, +`PreviewQuality`, +`Step`, +`Scope`) — one
+- `Playback.swift` (+`Meter`, +`PreviewQuality`, +`Step`, +`Scope`, +`Prefetch`) — one
   `AVPlayer` over the plan's composition; the transport, JKL, the rate KVO; `+Meter` is the level meter, moved out under
   the size rule; `+Scope` also holds `seekFinished()` and `report(_:)`
   (hdr H-3's pure move). `recompose()` re-colours the player's copy of the
@@ -1101,7 +1101,12 @@ the key map behind it.
   the last report — a late callback for a superseded seek or a swapped-out
   item is dropped (#204, #209; `playhead_echo_probe.py` twice·1, pause·1) —
   and every seek's landing reports its rest once when it differs. `+Step`
-  also holds the main hop `onMain`. An echoed restore
+  also holds the main hop `onMain`. `+Prefetch` is the playing preview's
+  graphics prefetch (spec §11 G-36, #127): `syncPrefetch(from:seeking:)`,
+  called from the rate KVO, `startSeek` (with the seek's TARGET, never
+  `currentTime`, which still reads the player there) and `update`'s
+  same-plan arm while playing, and stopped in `invalidate` and `deinit`;
+  `recipeKey` is internal for it. An echoed restore
   moved the playhead (0 and back on every rebuild), and the timeline reveals
   every moved playhead, so a clip drag yanked the view
   (`playhead_echo_probe.py`). **A paused refresh is a one-tick round trip**
@@ -1218,7 +1223,14 @@ the key map behind it.
   waits holding an unfinished entry, so `take`'s wait always ends.
   `FrameJobGraphicPrefetchOff` (YES) is the measurement switch; each session
   logs one `[framejob] graphic prefetch: …` line once it is stopped and its
-  last worker has exited.
+  last worker has exited. A PLAYING preview runs a FOLLOWING session on the
+  document's own key (spec §11 G-36, `Playback+Prefetch.swift`): the
+  compositor `reach`es each frame it asks for, and the workers skip past it;
+  `reach` ignores ticks outside the session's range, a seek's session follows
+  nothing until a request lands in its first `armFrames`, a following
+  session frees what falls below the floor, and its same-texture shortcut's
+  (`deferred`) entries count as misses, not mismatches. A wait `stop` ends
+  counts as nothing.
 - `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
   leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
   `RecipeClipRect`, `RecipeLayerMatte`, `RecipeLayerDissolve`,
@@ -2416,8 +2428,17 @@ free.
   marker, because an `-O` binary stores a literal of 15 bytes or fewer
   inline. Its tables hold
   `snapshot_ui` (V2a), `perform_menu_item` and `cancel_sheet` (V2b),
-  `select_inspector_tab` (V3), and `assistant_send` and `assistant_answer`
-  (road map 12 A1); a dev tool is counted apart from the product tools (`tools/proof/dev_tools.py`).
+  `select_inspector_tab` (V3), `assistant_send` and `assistant_answer`
+  (road map 12 A1), and `play_preview` (#127, G-36); a dev tool is counted apart from the product tools (`tools/proof/dev_tools.py`).
+- `AgentServer+PlayPreview.swift` — `play_preview` (dev only, wholly under
+  the flag; spec §11 G-36, §7.9c): plays a window's preview forward through
+  the transport's own `setRate` and `seek(to:)` (an optional `seek_to` half
+  way) on the SERVER thread, and answers the frames expected against those
+  composed per key, compose milliseconds and, when asked, each frame's
+  digest. `tools/proof/playback_prefetch_proof.py` drives it.
+- `PlaybackTrial.swift` — `PlaybackTrials`, `play_preview`'s record (dev
+  only): `Compositor.serve` reports each finished frame's time, compose
+  time and, while a trial asks, a SHA-256 of the destination's pixels.
 - `AgentServer+MenuItem.swift` — `perform_menu_item` and `cancel_sheet`
   (road map 11's V2b, dev only, wholly under the flag). It runs a main-menu
   item by path in a NAMED project window's own responder chain, never
@@ -2730,7 +2751,7 @@ queue (`AssistantSpendMonth.queue`, Settings' ledger fold, answered by a
 main hop), the waveform tap's main hop (`WaveformTaps.finished` →
 `DispatchQueue.main.async`, from Metal's completion thread), and — not a
 queue but a seam all the same — the graphic
-prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-26). The recorder adds
+prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-26, G-36). The recorder adds
 NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in

@@ -146,7 +146,10 @@ its graphics ahead on worker threads (`GraphicPrefetch.swift`); the
 compositor stays serial and the one writer, uses a worker's raster only on a
 pool miss whose texture key matches its own, and still runs `svg`, records
 every report and draws every card, so the file is the serial path's.
-Playback prefetch and in-place raster are still not built.
+Since G6 phase 2 (2026-10-21, spec §11 G-36) a preview playing forward does
+the same on the document's own key, its workers following the frame the
+compositor last asked for (below, "G6 phase 2 — playback prefetch"). The
+decoded-image cache and in-place raster are still not built.
 
 **The FFI is ten `rc_graphic_*` exports, and a library is a builder that
 FREEZES** at its first compile, rasterize or `families` call
@@ -1208,11 +1211,114 @@ as issues: a per-prop `animate: false` opt-out for module authors
 (#248), an asset prop in an action (#249) and an OKLab
 blend beside the channel blend (#250).
 
+## G6 phase 2 — playback prefetch (#127, spec §11 G-36)
+
+2026-10-21, on `858146a`. A preview playing forward over a project that
+draws a graphic now runs G-26's workers on the document's own key
+(`Playback+Prefetch.swift`'s `syncPrefetch(from:)`, called from the rate
+KVO, `startSeek` with its target, and a property-only edit while playing;
+stopped in `invalidate` and `deinit`). The session FOLLOWS the compositor:
+`Compositor.serve` reports each request's time (`GraphicPrefetch.reach`),
+a worker never claims a frame at or before the last one reached (counted
+`skipped`), and held entries of earlier frames go as unused. A slot the
+worker left to the pool (the same-texture shortcut, now marked `deferred`)
+that reaches `take` in a following session counts `missed`, and a wait
+that `stop` ends counts as nothing. The export's session is unchanged but
+for that last rule. The owner chose G-26's limits for playback too, with
+no setting.
+
+**The instrument came first**: the dev tool `play_preview`
+(`AgentServer+PlayPreview.swift`, `PlaybackTrial.swift`, spec §7.9c)
+plays the preview for a while and answers the share of the frames it
+passed that the compositor composed, and how long each took.
+
+**Baseline**, before any prefetch code (Release, `playback_prefetch_proof.py
+--bench` over a copy of parive-promo, clip 8's `section` scene from tick
+25 120 000 for 10 s; 12 cores, `powermode 0` in every cell; ON equals OFF
+here because nothing yet read the switch for playback):
+
+| Cell | Load average before | Composed | compose_ms mean / p95 / worst | RSS after |
+|---|---|---|---|---|
+| OFF Full | 15.84 | 35 of 277 (0.126) | 266.94 / 589.54 / 613.63 | 414 320 KiB |
+| OFF Quarter | 13.24 | 36 of 296 (0.122) | 271.96 / 590.25 / 612.54 | 420 736 KiB |
+| ON Full | 11.58 | 35 of 277 (0.126) | 266.63 / 595.72 / 603.97 | 422 960 KiB |
+| ON Quarter | 9.07 | 36 of 295 (0.122) | 270.24 / 604.07 / 611.07 | 422 528 KiB |
+
+The rule written before the run — stop if OFF at Full composed ≥ 0.95 —
+did not hold, so the phase went on.
+
+**After**, the same bench on the built phase (Release, `powermode 0`):
+
+| Cell | Load average before | Composed | compose_ms mean / p95 / worst | RSS after | Playback line |
+|---|---|---|---|---|---|
+| OFF Full | 9.51 | 34 of 295 (0.115) | 279.40 / 636.99 / 652.37 | 413 600 KiB | — |
+| OFF Quarter | 13.12 | 33 of 294 (0.112) | 286.28 / 606.54 / 634.23 | 415 968 KiB | — |
+| ON Full | 13.29 | 83 of 298 (0.279) | 115.65 / 564.70 / 836.55 | 1 748 944 KiB | 260 frames, 136 hits, 0 mismatched, 12 missed, 390 unused, 29 skipped |
+| ON Quarter | 19.17 | 94 of 289 (0.325) | 95.78 / 640.38 / 765.00 | 1 721 328 KiB | 247 frames, 151 hits, 0 mismatched, 12 missed, 349 unused, 35 skipped |
+
+So the prefetch composes about 2.4 times the frames on parive's heaviest
+scene and still does not keep up there: 28% of its 30 fps frames at
+Full, 33% at Quarter. The process's RSS just after the play stood about
+1.27 GiB above OFF's. Fix pass 1 measured what that is, on a Release copy
+instrumented to log the held bytes and `phys_footprint` (same scene, 10 s,
+Full, load 24.51 at the start): the held rasters peaked at 373 MB in 53
+slots, well under the 1 GiB bound (the 44-slot limit binds first; a
+frame's layers go in together, so the count passes it by a frame's
+worth). The rest is outside the bound: `vmmap` in mid-play read 855 MB of
+live large allocations (the held rasters, eleven workers' rasters in
+flight with the images they decode, the compositor's taken rasters) and
+602 MB of freed large blocks the allocator keeps resident (939 MB after
+the play), and IOSurface 130 MB against OFF's 68 MB. The footprint rose
+from 366 MB to a peak of 2.07 GB while playing and stood at 1.24 GB after
+(OFF: 116 MB to 392 MB, 499 MB after). G-36 (e) and GR-9 now say that the
+1 GiB bounds only the held rasters.
+Quarter gains little, because a graphic draws at its own size (G-7). On
+the proof's lighter fixture H the same change takes the share from 0.264
+to 0.978. The decoded-image cache and the in-place raster (#127's phases 3
+and 4) are what is left on the time per frame.
+
+**Rows** (`playback_prefetch_proof.py`, Release, two owned instances):
+10/10 — P0 CONTROL L composed 1.0 on both; P1; P2 232 hits, 0 mismatched,
+0 missed; P3 H OFF 24 of 91 (0.264, 122.71 ms mean) against ON 89 of 91
+(0.978, 13.24 ms mean, 36.55 ms p95); P4; P5; P6 30 skipped at rate 4;
+P7 98 common ticks equal; P8 22 common ticks equal; P9; Z1. The same on
+Debug, 10/10. **Mutants**, each built in a tree copy and driven through
+every row, all six caught: `worker-frame-plus-one` (P2: 39 mismatched),
+`unguarded` (P8: 20 of 21 common digests differ), `no-stop-on-pause` (P2:
+no line), `no-graphic-gate` (P4: a line for L), `no-follow` (P6: 0
+skipped), `seek-reads-player` (P9: no line from 1 800 000). G-26 still
+holds: `graphics_prefetch_proof.py` 7/7 (S2 301 hits, 0 mismatched; S6
+OFF 15.63 s, ON 2.41 s) with both of its mutants caught;
+`op_argument_proof.py` 161/161 (31 product and 7 dev tools);
+`assistant_session_proof.py` 13/13; `make gate` exit 0.
+
+**Fix pass 1** (the review's should-fix): a seek installs its session
+before AVFoundation cancels the old position's requests, and one of those
+served in between raised the new session's floor — past a loop's end, so
+the whole lap drew serially, or ahead of a backward seek's target.
+`reach` now ignores a request outside the session's range, and a seek's
+session (`syncPrefetch(from:seeking:)`) follows nothing until a request
+lands in its first four frames (`armFrames`). A first try, ignoring
+requests AVFoundation issued before the session began, was not enough: an
+`unguarded` run of that build showed a backward seek's session with 0
+hits and 86 skipped. New row P10 (H from 1 200 000, `seek_to` 0: hits >
+0); P8 now merges three plays a side (39 common ticks on Release, against
+22). Release 11/11; Debug 11/11; `unguarded` caught on the first try's
+build (P8: 38 of 39 common digests differ), `seek-reads-player` (P9) and
+`no-follow` (P6) on the final one. P10 has no mutant: with the guard and the
+arming taken out it passed twice, because this play seldom serves an old
+request in that window. `make gate` exit 0.
+
+Owed: GR-9 in `docs/manual-checks.md` (a heavy project plays; memory).
+Filed: #326, `export`'s missing MCP progress notifications (agent
+transport, not graphics speed).
+
 ## Open items
 
-- G6's rest — playback prefetch, in-place raster (`graphic/src/raster.rs`)
-  and a decoded-image cache past resvg's per-render decode — tracked in
-  #127. The export's parallel rasterization landed (G-26).
+- G6's rest — in-place raster (`graphic/src/raster.rs`) and a
+  decoded-image cache past resvg's per-render decode — tracked in #127.
+  The export's parallel rasterization landed (G-26), and playback's
+  (G-36).
 - The person's watched checks: the playback-check projects with no video
   underneath, memory at 4K, and the error card in the live preview —
   tracked in #56.
