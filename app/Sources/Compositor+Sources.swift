@@ -17,7 +17,9 @@ extension MetalRenderer {
     /// The layer's texture. In an HLG project (`output`, spec §11 HD-13 (f))
     /// a layer Frame Job drew — a still, text, a shape or a graphic — is its
     /// lift (`lifted`); a video track's frame was converted at step 0, and the
-    /// missing-media slate is not lifted.
+    /// missing-media slate is not lifted. An HLG or PQ still is run through its
+    /// own arm in either output (spec §11 HD-19 (a)), and an HLG BT.2020 one in
+    /// an HLG project is already the working space, sampled as drawn.
     func source(
         for layer: RecipeLayer, request: AVAsynchronousVideoCompositionRequest,
         instruction: RecipeInstruction?, live: inout [CVMetalTexture], output: CanvasOutput
@@ -60,7 +62,15 @@ extension MetalRenderer {
             guard let url = instruction?.mediaURLs[media],
                 let rendered = renderers.image(url: url, media: media)
             else { return .slate(layer.sourceSizeCG ?? CGSize(width: 640, height: 360)) }
-            return lifting(rendered.texture, rendered.size)
+            guard let conversion = rendered.conversion else {
+                return lifting(rendered.texture, rendered.size)
+            }
+            if output == .hlg, conversion == .hlg(.bt2020) {
+                return .textured(rendered.texture, rendered.size, premultiplied: true, orientation: 0)
+            }
+            guard let converted = lifted(rendered.texture, conversion: conversion, output: output)
+            else { return .absent }
+            return .textured(converted, rendered.size, premultiplied: true, orientation: 0)
         case .text(let hash, let props, let reveal):
             guard let rendered = renderers.text(props, hash: hash, reveal: reveal)
             else { return .absent }
@@ -76,6 +86,29 @@ extension MetalRenderer {
         case .missing:
             return .slate(layer.sourceSizeCG ?? CGSize(width: 640, height: 360))
         case .adjustment: return .absent  // graded by `drawAdjustment`, never sampled
+        }
+    }
+
+    /// How the chroma key reads this layer in an HLG project (spec §11 HD-19
+    /// (c)): a track by its frame's SDR-project step-0 choice and its media's
+    /// peak, a still by its own arm (its cached texture's, peak unknown), every
+    /// other layer — text, shapes, graphics, the slate — by HD-13 (h)'s un-lift.
+    func keyReading(
+        for layer: RecipeLayer, request: AVAsynchronousVideoCompositionRequest,
+        instruction: RecipeInstruction?
+    ) -> KeyReading {
+        switch layer.source {
+        case .track(let id):
+            guard let frame = request.sourceFrame(byTrackID: CMPersistentTrackID(id)) else {
+                return .unlift
+            }
+            let chosen = InputConversion.choose(input: layer.input, buffer: frame, output: .sdr)
+            return KeyReading.of(chosen, peak: layer.input?.peak)
+        case .image(let media):
+            guard let url = instruction?.mediaURLs[media] else { return .unlift }
+            return KeyReading.of(renderers.image(url: url, media: media)?.conversion, peak: nil)
+        default:
+            return .unlift
         }
     }
 

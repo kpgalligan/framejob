@@ -189,6 +189,11 @@ enum ContainerRewrapWriter {
             extensions.merge(hdr10Blobs(v)) { _, blob in blob }
             extensions.merge(pqLabels(v)) { _, label in label }
         }
+        // Spec §11 HD-19 (b): an HLG copy (transfer 18) carries the HLG label,
+        // which AVFoundation does not infer from the codec's own colour (H7h).
+        if v.transfer == hlgTransfer {
+            extensions.merge(hlgLabels(v)) { _, label in label }
+        }
         var format: CMFormatDescription?
         let status = CMVideoFormatDescriptionCreate(
             allocator: nil, codecType: ContainerRewrap.fourCharCode(v.fourcc ?? ""),
@@ -200,8 +205,10 @@ enum ContainerRewrapWriter {
         return format
     }
 
-    /// ISO/IEC 23091-2's transfer code for SMPTE ST 2084 (PQ).
+    /// ISO/IEC 23091-2's transfer codes for SMPTE ST 2084 (PQ) and ARIB
+    /// STD-B67 (HLG).
     private static let pqTransfer = 16
+    private static let hlgTransfer = 18
 
     /// The Colour element's `mdcv` and `clli` blobs, each only when the file
     /// has it (spec §11 HD-18 (a)).
@@ -220,9 +227,21 @@ enum ContainerRewrapWriter {
     /// The PQ label, and the primaries and matrix Core Video names for the
     /// Colour's codes (spec §11 HD-18 (b)).
     private static func pqLabels(_ v: ContainerDescription.Video) -> [String: Any] {
+        labels(v, transfer: kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ as String)
+    }
+
+    /// The HLG label, with `pqLabels`' primaries and matrix (spec §11 HD-19 (b)).
+    private static func hlgLabels(_ v: ContainerDescription.Video) -> [String: Any] {
+        labels(v, transfer: kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG as String)
+    }
+
+    /// `transfer` as the description's transfer function, and the primaries
+    /// and matrix Core Video names for the Colour's codes when it names them.
+    private static func labels(
+        _ v: ContainerDescription.Video, transfer: String
+    ) -> [String: Any] {
         var labels: [String: Any] = [
-            kCMFormatDescriptionExtension_TransferFunction as String:
-                kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ as String
+            kCMFormatDescriptionExtension_TransferFunction as String: transfer
         ]
         if let code = v.primaries,
             let name = CVColorPrimariesGetStringForIntegerCodePoint(Int32(clamping: code))

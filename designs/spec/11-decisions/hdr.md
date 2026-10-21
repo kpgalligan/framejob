@@ -414,6 +414,10 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
     switch, #312.
   **Amended by HD-14** (hdr H-3): (i)'s JPEG and (j)'s non-10-bit video rows now write HD-4's
   SDR version instead of being refused; the JPEG sentence stays only as `FrameWriter`'s guard.
+  **Amended by HD-19** (clean-up batch 2, phase 2): (f) an HLG- or PQ-labelled still is
+  lifted by its own step-0 arm, not the SDR one (closing (l)'s first limit, #311); (h) the key
+  on a layer whose source is HLG or PQ reads through GR-15's HDR→SDR arm, and the eyedropper
+  stores the pick through it (closing (l)'s second limit, #312).
 - **HD-14 — H-3's settlements: the knee at 0.9, one output pass chosen by the key's
   `dynamic_range`, the argument's spelling and its refusals, PQ at 1,000 cd/m² with HD-5's
   metadata, the frames, Show SDR Version's key and the sheet's row.** H-3's spec, recorded before
@@ -721,3 +725,76 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
     export. A failure is filed with its figures and fixed in a later phase.
   - **(f) Amends** HD-12 (its routes: a Matroska Colour's fields carried into the copy's
     description, and AV1's metadata OBUs as the stream route for an `av01` track).
+  **Amended by HD-19** (clean-up batch 2, phase 2): (b) a copy whose Colour's transfer is 18
+  is labelled HLG as a transfer-16 copy is labelled PQ, when H7h finds it misread without.
+- **HD-19 — Clean-up batch 2, phase 2's settlements: an HLG or PQ still by its own label, an
+  HLG WebM/Matroska copy labelled HLG, and the chroma key on an HDR source read as the SDR colour
+  an SDR project shows.** Recorded before the phase's code (#311, #321, #312). No op, tool,
+  argument, recipe, catalog or format change (format stays 25).
+  - **(a) An HDR still, #311.** A still whose decoded image's colour space is HLG-based
+    (`CGColorSpaceIsHLGBased`) takes step 0's `.hlg(p)` arm, and one that is PQ-based
+    (`CGColorSpaceIsPQBased`) `.pq(p)`: p is `.p3D65` for `displayP3_HLG` and `displayP3_PQ`,
+    `.bt709` for `itur_709_HLG` and `itur_709_PQ`, and `.bt2020` for every other such space.
+    - It is decoded with its longest side bounded by `maxPixelSize` and its EXIF orientation
+      applied, as `MediaCacheFiles.decodeImage` decodes every still today, on whichever ImageIO
+      route keeps its space, its depth and its codes (measured first, M1 below).
+    - **M1, measured 2026-10-21** (`tools/proof/work/cleanup2/m1/`, scratch, gitignored:
+      `m1.swift` built over `app/Sources` by `swift_build.py`, run by `python3 -I m1.py` over
+      `hdr_proof.py`'s stills). Four routes: `decodeImage` (ImageIO's thumbnail with the
+      transform, bounded at 8192), the same with `kCGImageSourceDecodeRequest:
+      kCGImageSourceDecodeToHDR`, and `CGImageSourceCreateImageAtIndex` with and without it.
+      Every route answered the same space and depth for every file: the 16-bit HLG PNG
+      (`render_frame` of an HLG project, cICP 9/18/0/1) `kCGColorSpaceITUR_2100_HLG` at 16 bits;
+      the 16-bit PQ PNG (ffmpeg, cICP 9/16/0/1) `kCGColorSpaceITUR_2100_PQ`, 16; the 16-bit
+      BT.709 HLG PNG (cICP 1/18/0/1) `kCGColorSpaceITUR_709_HLG`, 16; the 10-bit HLG HEIC
+      (`render_frame {format: heic}`) and a 10-bit HLG AVIF (ffmpeg's libsvtav1)
+      `kCGColorSpaceITUR_2100_HLG` at 10 bits; the 16-bit sRGB PNG and `still8.png`
+      `kCGColorSpaceSRGB` at 16 and 8 bits. Each image drawn into a 16-bit-float bitmap of its
+      own space kept the file's codes (ffmpeg `rgb48le`) within 0.01 of a 10-bit level (HLG
+      PNG), 0.17 (PQ and BT.709 HLG PNGs) and 0.06 (sRGB), and the HEIC and AVIF, against the
+      HLG PNG they were encoded from, within 1.01 and 5.99 (their encodes' own loss, the same
+      on every route). Only the thumbnail routes bound and orient: a 9000×600 HLG PNG came back
+      8192×546 from both and 9000×600 from `CreateImageAtIndex`, and the HLG HEIC rewritten
+      with `kCGImagePropertyOrientation` 6 came back 128×1024 from both against 1024×128. So
+      the route is today's `decodeImage`, unchanged, and nothing in it is redone by hand. A
+      lossless JPEG XL of the HLG PNG (`cjxl -d 0`) read the same on every route:
+      `kCGColorSpaceITUR_2100_HLG` at 16 bits, its codes within 0.008 of a level.
+    - It is drawn in its own space, its codes unconverted, into a 16-bit-float premultiplied
+      RGBA bitmap and uploaded `rgba16Float`.
+    - `LayerLift` runs that arm on it, the peak unknown (1,000 cd/m², HD-6): in an HLG project
+      the HLG arms of HD-13 (c), (d) — an `.hlg(.bt2020)` still is sampled as drawn, as
+      `choose(input:buffer:output:)` answers nil for its video twin — and in an SDR project
+      GR-15's arm, so an HDR still is no longer drawn as SDR there either.
+    - The image cache's key is unchanged: the texture holds the file's codes in both outputs.
+    - Every other still takes today's path byte for byte, and so does an HDR still that this
+      route cannot read or draw.
+    - Amends HD-13 (f) (a still is lifted by its own arm, not the SDR one) and closes (l)'s first
+      limit.
+  - **(b) An HLG WebM/Matroska copy, #321.** A copy whose Colour element's transfer is 18
+    (ARIB STD-B67) is labelled HLG in its format description: `TransferFunction` ITU-R 2100
+    HLG, with `ColorPrimaries` and `YCbCrMatrix` exactly as HD-18 (b)'s PQ label takes them. No
+    HDR10 blobs. No other copy's description changes. Taken only if `hdr_proof.py` H7h finds an
+    unlabelled HLG copy misread on the control; otherwise this records that AVFoundation reads
+    the copy as HLG without the label and no writer changes. **H7h on the control** (the
+    phase's untouched Release build, 2026-10-21): the copy was misread, its grey row as far
+    as 158.27 10-bit levels from GR-15's HLG arm in an SDR project and 213.67 from the
+    identity in an HLG project, so the label is written. Amends HD-18 (b).
+  - **(c) The chroma key on an HDR source, #312**, the owner's choice of 2026-10-20 ("Key means
+    SDR colour (Recommended)", the designer's option (b)). In an HLG project, the key's distance
+    reads the working colour, saturated, against the stored key, through:
+    - for a layer whose source's SDR-project step-0 choice (`choose(input:buffer:output: .sdr)`;
+      a still's by (a)) is `.hlg`: GR-15's HLG arm over BT.2020, applied to the working colour;
+    - for one whose choice is `.pq`: the working colour back to display light (the inverse
+      OETF, BT.2100's OOTF γ 1.2, × 1000/203), then GR-15's PQ arm (BT.2020 → BT.709, the gamut
+      lift, the shoulder from 0.39 to max(peak, 203)/203);
+    - for every other layer — Camera Log and LUT media, SDR sources, drawn layers — HD-13 (h)'s
+      un-lift, unchanged.
+    - So a key picked in an SDR project keys the same colour after a switch to HLG. The reading
+      is exact for an HLG BT.2020 source and for a PQ source up to 1,000 cd/m². It is close for
+      HLG over P3 or BT.709 (their working colour was matrixed in scene light) and for PQ above
+      1,000 cd/m² (BT.2390's EETF is not undone).
+    - The eyedropper in an HLG project stores the picked HLG colour through the keyed clips'
+      reading: their common one when they all agree, else the un-lift.
+    - The spill, a luma matte and the qualifier are unchanged.
+    - Amends HD-13 (h) and closes (l)'s second limit.
+  - **(d) Amends** HD-13 ((f), (h), (l)) and HD-18 (b).

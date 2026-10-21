@@ -194,11 +194,19 @@ extension EditorViewController {
         let project = (try? document.editedProject.applying([session.suppression])).project
             ?? document.editedProject
         let graphics = GraphicRegistry.shared.snapshot(for: document.recipeKey)
+        // The keyed clips' media, read here; their reading (spec §11 HD-19 (c)) is chosen
+        // on the queue, since a video's is a lookup in its file.
+        let edited = document.editedProject.snapshot
+        let keyed = session.clips.compactMap { edited.clip($0).flatMap(edited.media(for:)) }
         EditorViewController.eyedropperQueue.async { [weak self] in
+            let reading = snapshot.output == .hlg
+                ? KeyReading.common(keyed.map { KeyReading.of(media: $0, url: urls[$0.id]) })
+                : .unlift
             let frame = Exporter.renderFrame(
                 project: project, urls: urls, at: time, maxWidth: nil, graphics: graphics)
             let picked = frame.flatMap {
-                CanvasEyedropperSession.keyColor(at: target, in: $0, canvas: snapshot)
+                CanvasEyedropperSession.keyColor(
+                    at: target, in: $0, canvas: snapshot, reading: reading)
             }
             DispatchQueue.main.async { self?.chromaKeySampled(picked, session: session) }
         }
@@ -234,14 +242,18 @@ extension EditorViewController {
 extension CanvasEyedropperSession {
     /// The chroma key the eyedropper stores for a pick at `point`: the
     /// frame's colour there, read at its code values (`FrameWriter.pickable`)
-    /// — and in an HLG project un-lifted to the Rec. 709 colour it is
-    /// (`InputConversions.unliftedPick`), so the stored key is a Rec. 709
-    /// colour in both outputs and keys through the shader's inverse lift
-    /// (spec §11 HD-13 (h)).
-    static func keyColor(at point: CGPoint, in frame: CGImage, canvas: CanvasSnapshot) -> RGBA? {
+    /// — and in an HLG project read through the keyed clips' `reading`, so the
+    /// stored key is the SDR colour an SDR project shows and keys through the
+    /// shader's same reading in both outputs: the un-lift to the Rec. 709
+    /// colour it is (spec §11 HD-13 (h)) by default, GR-15's HDR→SDR arm for
+    /// an HLG or PQ source (HD-19 (c)).
+    static func keyColor(
+        at point: CGPoint, in frame: CGImage, canvas: CanvasSnapshot,
+        reading: KeyReading = .unlift
+    ) -> RGBA? {
         let picked = color(at: point, in: FrameWriter.pickable(frame), canvas: canvas)
         guard canvas.output == .hlg else { return picked }
-        return picked.map(InputConversions.unliftedPick)
+        return picked.map(reading.pick)
     }
 }
 

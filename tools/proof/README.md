@@ -21089,3 +21089,51 @@ cd/m²) P10; `av1-route-skipped` (`detectedPQ`'s `av01` route never taken) P10;
 `output-premultiply-dropped` (`framejob_output_fragment` returns `rgb`, not `rgb * a`) DA, by
 its pq arm; `straighten-skipped-half` (`ExportStraightAlpha.straighten(half:…)` returns at its
 guard) DA. Its record: `designs/adr/hdr.md`'s "Clean-up batch 2".
+
+## HDR clean-up batch 2, phase 2 — HDR stills by their own label, the HLG WebM label, the key on an HDR clip (`hdr_proof.py` HI, HKh, H7h, P12, P13, thirteen mutants and `key-not-unlifted` re-pinned; `hdr_probe.swift` P12, P13; spec §11 HD-19)
+
+The phase (#311, #321, #312) draws an HLG- or PQ-labelled still in its own colour space and runs
+its own step-0 arm on it in both outputs (`StillColor`, `LayerLift` taking a conversion and an
+output), labels an HLG WebM/Matroska copy HLG, and makes an HLG project's chroma key on an HLG
+or PQ source compare the colour an SDR project shows (`KeyReading`, the shader's `keyReadSDR`,
+the eyedropper's pick). The rules are `hdr_proof.py`'s header, fixed before the phase's control
+ran.
+
+- **The control** is this phase's own: `capture tools/proof/work/cleanup2/ctl-p2` on the
+  untouched tree's Release build, and HI, HKh and H7h run on that same build, their figures kept
+  beside it in `rows-control.log`. Every mutant of the phase runs with `--control` naming it.
+- **The stills** (`hdr_stills`) are made once under `tools/proof/work/hdr/media/`: the HLG PNG
+  and HEIC need an instance (an HLG project's `render_frame`), so HI and P13 (and P12, which
+  reads the HLG PNG) launch one; the rest are ffmpeg's. M1, the measurement HD-19 (a) records,
+  ran over them (`tools/proof/work/cleanup2/m1/`, scratch: `m1.swift` built over `app/Sources`,
+  driven by `m1.py`, which imports this script for its fixtures).
+- **HKh** fixes each fixture's tolerance from its oracle before rendering: the largest of 0.1,
+  0.05, 0.02 and 0.01 that the right reading's distance from the key is within half of and
+  every substituted reading's at least 1.5 times; it prints each distance, and none qualifying
+  is a rotted instrument, not a pass.
+- **H7h** reuses H7w's VP9 route and `webm_rewrite` with no HDR10 children; H7w's own five
+  fixtures are untouched (`HLG_WEBM` sits beside `WEBM_FIXTURES`).
+- **P12** and **P13** run only when named (the request's `rows`); P13 writes the
+  Orientation-6 HEIC itself and reads `LayerLift`'s private targets back by a blit.
+
+```sh
+make app && RC_PROOF_APP=release python3 tools/proof/hdr_proof.py capture tools/proof/work/cleanup2/ctl-p2 --only H1,H7i,SI,Z1   # the untouched tree
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --only HI,HKh,H7h,Z1   # the same build: the control's figures
+make app-debug && python3 tools/proof/hdr_proof.py --only HI,HKh,H7h,HK,HT,H7w,P6,P9,P12,P13,Z1
+make app && RC_PROOF_APP=release python3 tools/proof/hdr_proof.py compare tools/proof/work/cleanup2/ctl-p2
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --mutant <name> --control tools/proof/work/cleanup2/ctl-p2 --only <its rows>,Z1
+```
+
+The thirteen mutants and their rows (one more than the spec's twelve: the BT.709 HLG and PQ
+spaces' own primaries are a branch of their own): `still-hdr-unread` (`StillColor.conversion(of:)`
+answers nil) HI, P13; `still-drawn-srgb` (`hdrBitmap` in sRGB) HI; `still-pq-as-hlg` HI, P13;
+`hdr709-as-2020` (`itur_709_HLG`/`itur_709_PQ` read as BT.2020) P13;
+`still-sdr-project-unconverted` (an SDR project's HDR still takes `lifting`) HI;
+`lift-pool-ignores-output` (`LayerLift` hits on source and conversion alone) P13;
+`key-reading-dropped` (the shader always un-lifts) HKh; `key-pq-as-hlg` (a PQ reading takes the
+HLG arm) HKh; `key-pq-white-fixed` (the PQ reading's white 1000/203) HKh;
+`key-track-reading-hlg-terms` (`keyReading(for:…)` chooses with `output: .hlg`) HKh;
+`pick-reading-ignored` (the eyedropper stores the un-lift) P12; `reading-ignores-log`
+(`of(media:url:)` skips the Camera Log) P12; `webm-hlg-unlabelled` (the HLG label not written)
+H7h. `key-not-unlifted` is re-pinned to the new distance's two lines and still aims at HK. Its
+record: `designs/adr/hdr.md`'s "Clean-up batch 2".

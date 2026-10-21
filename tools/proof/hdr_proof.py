@@ -334,6 +334,42 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   `{sdr_version}`'s counts (CONTROL: the exposed `{sdr_version}`'s differ); **SP** turns Show
   SDR Version on under Show Ungraded: both captions "Rec. 709 · encoded" at `{sdr_version,
   ungraded}`'s readouts, then both off and the HLG captions back (HD-15 (c)).
+- **HI, HKh, H7h, P12, P13** (clean-up batch 2, phase 2, #311, #312, #321, spec §11 HD-19;
+  the rules fixed before the phase's control ran, `tools/proof/work/cleanup2/ctl-p2`). The
+  stills (`hdr_stills`, M1's fixtures, made once): `still_hlg.png` and `still_hlg.heic`, an
+  HLG project's `render_frame` of the hlg ramp at 0.5 s (16-bit PNG cICP 9/18/0/1; 10-bit
+  HEIC, sips "BT.2100 HLG"); by ffmpeg, the pq and hlg ramps' first frames as full-range
+  16-bit RGB PNGs tagged by `setparams` — `still_pq.png` (cICP 9/16/0/1) and
+  `still_hlg709.png` (BT.709 primaries, cICP 1/18/0/1) — a flat 0x808080 HLG PNG 9000×600
+  (`still_hlg_wide.png`), a 10-bit HLG AVIF of the hlg ramp (libsvtav1) and a 16-bit sRGB
+  gradient PNG (an `sRGB` chunk, no cICP). HI: the grey row every 64th column of the still's
+  own codes (its PNG decoded `rgb48le`): in an HLG project the HLG PNG = its codes ±1/1023,
+  the PQ PNG = `pq_hlg(codes)` ±1/1023, the HLG HEIC = the HLG PNG's render ±4/1023; in an
+  SDR project the HLG PNG = `convert(hlg, bt2020, codes)` ±1/255 and the PQ PNG =
+  `convert(pq, bt2020, codes)` ±1/255. HKh: `green_hlg` and `green_pq` (green_709's route,
+  the left half R′G′B′ (0.30, 0.62, 0.28) and (0.30, 0.70, 0.28) as BT.2020 NCL codes, the
+  right half grey 0.5, tagged HLG and PQ; `green_pq` given `set_media_color {peak: 600}`),
+  each over a [0.5, 0.5, 0.5, 1] background keyed in SDR at its render's left pixel
+  (softness 0, spill 0) at the tolerance `hkh_oracle` fixes: the largest of 0.1, 0.05, 0.02,
+  0.01 at which the oracle's distance from the key is ≤ ½ it for the right reading
+  (`key_read_sdr`) and ≥ 1.5 × it for every reading a mutant substitutes (green_hlg: the
+  un-lift, the HLG-output terms; green_pq: the un-lift, PQ read as HLG, white 1000/203),
+  each distance printed and no qualifying tolerance a failure; CONTROL the SDR render's left
+  0.5 ±1/255; after `set_canvas {output: hlg}` the left the lifted background 0.5059 and the
+  right the clip's working grey (0.5; `pq_hlg(0.5)`) ±1/1023. H7h: `hlg_webm` (H7w's VP9
+  route, arib-std-b67/bt2020/bt2020nc, no HDR10 children) in an SDR project, the grey row
+  every 64th column inside `env16` of `convert(hlg, bt2020, ·)`, and in an HLG project of the
+  identity. P12: `KeyReading.hlg.sdr` = `InputStage`'s `.hlg(.bt2020)` at `.sdr` over 33
+  greys and the six primaries and secondaries at 0.6, ±1/1023; `KeyReading.pq(peak: 600)
+  .sdr(h)` = the `.pq(.bt2020)` pass at 600 in SDR, h its HLG output, PQ signals to 0.75,
+  ±1/1023; the uniforms; `keyColor` per reading = `reading.pick` (an SDR canvas the pick);
+  `of(media:url:)` over hlg (`.hlg`), pq at 600 (`.pq(600)`), bt709, hlg as Apple Log and with
+  a LUT (`.unlift`), the HLG PNG (`.hlg`) and still8.png (`.unlift`); `common`. P13:
+  `StillColor.read` and `conversion(at:)` over the stills (hlg(bt2020), pq(bt2020),
+  hlg(bt709); the sRGB PNG and still8.png nil), the wide one's longest side 8192, an
+  Orientation-6 copy of the HEIC (written by the probe) rotated; a `LayerLift` of one
+  texture through `.pq(.bt2020)` at `.sdr` then `.hlg`: two textures, each `InputStage`'s
+  pass ±1/1023.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
@@ -345,9 +381,10 @@ applies the label inside `Exporter.renderFrame` instead, which moves the
 eyedropper's picks; it runs against a capture made after PR-11.
 
 H1a, the H7 family, the H-2 rows, the H-3 rows, the H-4 rows, the H-6 rows and clean-up
-batch 2's H7w and DA run in a plain run, `compare` and `--only`; never under `capture`'s
-default selection, `--measure` or a mutant's default selection; hdr H-1's five, H-2's
-twelve, H-3's seven, H-4's nine, H-6's ten and clean-up batch 2's eleven mutants run with
+batch 2's H7w and DA, and its phase 2's HI, HKh and H7h, run in a plain run, `compare` and
+`--only`; never under `capture`'s default selection, `--measure` or a mutant's default
+selection; hdr H-1's five, H-2's twelve, H-3's seven, H-4's nine, H-6's ten, clean-up batch
+2's eleven and its phase 2's thirteen mutants run with
 `--only <their rows>,Z1` (SI also runs under `capture --only`, writing
 DIR's references). `capture --only`
 captures just the rows named, keeping an earlier capture's H1 record.
@@ -457,11 +494,12 @@ H1_SUFFIX = {"still8": ".png", "webm": ".webm"}
 PICK_POINTS = {(W, H): [[256.5, 32.5], [512.5, 96.5], [900.5, 100.5]],
                (SW, SH): [[320.5, 180.5], [100.5, 60.5], [540.5, 300.5]]}
 ROWS = ["H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "H7", "H7d", "H7i",
-        "H7p", "H7o", "H7r", "H7w", "HS", "HH", "HP", "HT", "HL", "HW", "HK", "HM", "HF", "HX", "DT",
+        "H7p", "H7o", "H7r", "H7w", "H7h", "HS", "HH", "HP", "HT", "HI", "HL", "HW", "HK", "HKh",
+        "HM", "HF", "HX", "DT",
         "DP", "DV", "DI", "DE", "DR", "DS", "DM", "DX", "DA", "SI", "SW", "SV", "SS", "SD", "SP", "LT",
         "LH", "LG", "LA", "LS", "LM", "LD", "LB", "LF", "LR", "LE", "LO", "LU", "R0", "TI", "TH",
         "TO", "TL", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10",
-        "P11", "Z1"]
+        "P11", "P12", "P13", "Z1"]
 # H7's family (hdr H-1, #281, spec §11 HD-6, HD-12): PQ ramps whose HDR10 static
 # metadata sits in the HEVC stream's SEI (the x265 CLI, muxed by ffmpeg's stream copy;
 # ffmpeg 9.0.2's libx265 wrapper no longer writes the mastering display with these
@@ -554,7 +592,8 @@ DA_ALPHA_BOUND = 1 / 255
 DA_COLOUR_BOUND = 2 / 1023
 # H7w's WebMs: name → (their tags, MaxCLL, MaxFALL, the mastering maximum), each None when
 # the Colour element lacks it; WEBM_READS what import stores as color.pq.
-WEBM_TAGS = {"pq": ("smpte2084", "bt2020", "bt2020nc"), "sdr": ("bt709", "bt709", "bt709")}
+WEBM_TAGS = {"pq": ("smpte2084", "bt2020", "bt2020nc"), "sdr": ("bt709", "bt709", "bt709"),
+             "hlg": ("arib-std-b67", "bt2020", "bt2020nc")}
 WEBM_FIXTURES = {"pq_webm_cll": ("pq", 600, 200, 4000.0),
                  "pq_webm_display": ("pq", None, None, 2000.0),
                  "pq_webm_plain": ("pq", None, None, None),
@@ -574,6 +613,31 @@ AV1_FIXTURES = {"av1_pq_cll": (4000, (600, 200)), "av1_pq_display": (2000, None)
 AV1_READS = {"av1_pq_cll": {"file": 600, "from": "max_cll"},
              "av1_pq_display": {"file": 2000, "from": "mastering_display"},
              "av1_pq_plain": {}}
+# Clean-up batch 2, phase 2 (#311, #312, #321, spec §11 HD-19): an HLG or PQ still by its own
+# label (HI), the key on an HDR clip read as the SDR colour an SDR project shows (HKh) and an
+# HLG WebM copy (H7h). STILL_FILES: HI's and P13's stills under MEDIA (M1's fixtures).
+C3_ROWS = {"HI", "HKh", "H7h"}
+STILL_FILES = {"still_hlg_png": "still_hlg.png", "still_hlg_heic": "still_hlg.heic",
+               "still_pq_png": "still_pq.png", "still_hlg709_png": "still_hlg709.png",
+               "still_hlg_wide": "still_hlg_wide.png", "still_hlg_avif": "still_hlg.avif",
+               "still16_srgb": "still16_srgb.png"}
+# Each ffmpeg still: (its source, the setparams tags, its cICP; None for the AVIF, and
+# "sRGB" for the sRGB PNG, which ffmpeg labels with an sRGB chunk rather than a cICP).
+STILL_FFMPEG = {"still_pq_png": ("pq", ("bt2020", "smpte2084"), [9, 16, 0, 1]),
+                "still_hlg709_png": ("hlg", ("bt709", "arib-std-b67"), [1, 18, 0, 1]),
+                "still_hlg_wide": ("wide", ("bt2020", "arib-std-b67"), [9, 18, 0, 1]),
+                "still_hlg_avif": ("hlg", ("bt2020", "arib-std-b67"), None),
+                "still16_srgb": ("gradient", ("bt709", "iec61966-2-1"), "sRGB")}
+WIDE_STILL = (9000, 600)
+# HKh's fixtures: name → (the left half's BT.2020 R'G'B', (trc, primaries, matrix), the
+# media's peak or None); the right half grey 0.5. KEY_TOLERANCES: HKh's candidates, largest
+# first (the row's rule).
+GREEN_HDR = {"green_hlg": ((0.30, 0.62, 0.28), ("arib-std-b67", "bt2020", "bt2020nc"), None),
+             "green_pq": ((0.30, 0.70, 0.28), ("smpte2084", "bt2020", "bt2020nc"), 600)}
+KEY_TOLERANCES = (0.1, 0.05, 0.02, 0.01)
+HI_STILL_BOUND = 4 / 1023
+# H7h's WebM: H7w's route, HLG-tagged, no HDR10 children.
+HLG_WEBM = {"hlg_webm": ("hlg", None, None, None)}
 LIN_D = 2 * SEC // 3
 L_SCENES = {}
 LIN_T = 2 * SEC + LIN_D // 2
@@ -603,7 +667,12 @@ VECTORSCOPE_SWIFT = "app/Sources/VectorscopeView.swift"
 CONTAINER_HEADER_RS = "core/src/container_header.rs"
 REWRAP_WRITER_SWIFT = "app/Sources/ContainerRewrapWriter.swift"
 IMPORTER_COLOR_SWIFT = "app/Sources/MediaImporter+Color.swift"
-P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11"}
+STILL_SWIFT = "app/Sources/StillColor.swift"
+LAYER_RENDERERS_SWIFT = "app/Sources/LayerRenderers.swift"
+LIFT_SWIFT = "app/Sources/LayerLift.swift"
+EYEDROPPER_SWIFT = "app/Sources/EditorViewController+Eyedropper.swift"
+KEY_SWIFT = "app/Sources/ChromaKeyHDR.swift"
+P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"}
 RECORDS = {"R0"}
 # name: ([(file, anchor, replacement), …], the rows that must fail).
 MUTANTS = {
@@ -786,9 +855,11 @@ MUTANTS = {
                             ".hlg)\n",
                             "                hlg: true, converts: true, range: .hlg)\n")], ["P7"]),
     # The chroma key's distance on the working (lifted) colour.
+    # Re-pinned in clean-up batch 2, phase 2 (spec §11 HD-19 (c)) to the distance's two lines.
     "key-not-unlifted": ([(SHADER,
-                           "        float d = distance(u.hlgOutput > 0.5 ? saturate(hlgUnliftSDR("
-                           "rgb)) : rgb, key);\n",
+                           "        float d = distance(u.hlgOutput > 0.5 ? saturate(u.keyReading "
+                           "!= 0.0\n            ? keyReadSDR(rgb, u.keyReading) : hlgUnliftSDR(rgb)) "
+                           ": rgb, key);\n",
                            "        float d = distance(rgb, key);\n")], ["HK"]),
     # The matte resolve's luma on the lifted composite.
     "matte-not-unlifted": ([(SHADER,
@@ -942,6 +1013,69 @@ MUTANTS = {
                                   "else { return }\n",
                                   "        guard width > 0, height > 0, bytesPerRow >= width * 8, "
                                   "false else { return }\n")], ["DA"]),
+    # Clean-up batch 2, phase 2 (#311, #312, #321, spec §11 HD-19): one per decision, each run
+    # with `--only <its rows>,Z1` and `--control` the phase's capture
+    # (tools/proof/work/cleanup2/ctl-p2). Thirteen, one more than the spec's twelve: the
+    # BT.709 HLG/PQ spaces' own primaries are a branch of their own (objection 3), so
+    # `hdr709-as-2020` is its mutant.
+    # An HDR still's space never read: every still drawn as SDR.
+    "still-hdr-unread": ([(STILL_SWIFT, "        guard hlg || CGColorSpaceIsPQBased(space) else "
+                           "{ return nil }\n",
+                           "        guard hlg || CGColorSpaceIsPQBased(space), false else "
+                           "{ return nil }\n")], ["HI", "P13"]),
+    # The HDR still drawn into sRGB, so Core Graphics converts its codes before the arm.
+    "still-drawn-srgb": ([(LAYER_RENDERERS_SWIFT, "            space: own,\n",
+                           "            space: CGColorSpace(name: CGColorSpace.sRGB)!,\n")],
+                         ["HI"]),
+    # A PQ still read as HLG.
+    "still-pq-as-hlg": ([(STILL_SWIFT, "        return hlg ? .hlg(p) : .pq(p)\n",
+                          "        return .hlg(p)\n")], ["HI", "P13"]),
+    # A BT.709 HLG or PQ space's primaries read as BT.2020.
+    "hdr709-as-2020": ([(STILL_SWIFT, "            return .bt709\n", "            return .bt2020\n")],
+                       ["P13"]),
+    # An SDR project's HDR still takes `lifting`, so it is drawn unconverted.
+    "still-sdr-project-unconverted": ([(SOURCES_SWIFT,
+                                        "            guard let conversion = rendered.conversion "
+                                        "else {\n",
+                                        "            guard let conversion = rendered.conversion, "
+                                        "output == .hlg else {\n")], ["HI"]),
+    # The lift's pool hits on its source and conversion alone, whatever the output.
+    "lift-pool-ignores-output": ([(LIFT_SWIFT,
+                                   "        if let hit = entries[key], hit.source === texture, "
+                                   "hit.conversion == conversion,\n            hit.output == "
+                                   "output\n",
+                                   "        if let hit = entries[key], hit.source === texture, "
+                                   "hit.conversion == conversion\n")], ["P13"]),
+    # The shader always un-lifts (the reading written, never read).
+    "key-reading-dropped": ([(SHADER, "            ? keyReadSDR(rgb, u.keyReading) : "
+                              "hlgUnliftSDR(rgb)) : rgb, key);\n",
+                              "            ? hlgUnliftSDR(rgb) : hlgUnliftSDR(rgb)) : rgb, key);\n")],
+                            ["HKh"]),
+    # A PQ reading takes the HLG arm.
+    "key-pq-as-hlg": ([(SHADER, "    if (reading > 0.0) {\n", "    if (reading != 0.0) {\n")],
+                      ["HKh"]),
+    # The PQ reading's white fixed at 1000/203, the media's peak ignored.
+    "key-pq-white-fixed": ([(SHADER, "        white = -reading;\n",
+                             "        white = kHlgPeakOverSDRWhite;\n")], ["HKh"]),
+    # A track's reading chosen with the HLG project's terms (an HLG BT.2020 frame: nil).
+    "key-track-reading-hlg-terms": ([(SOURCES_SWIFT,
+                                      "            let chosen = InputConversion.choose(input: "
+                                      "layer.input, buffer: frame, output: .sdr)\n",
+                                      "            let chosen = InputConversion.choose(input: "
+                                      "layer.input, buffer: frame, output: .hlg)\n")], ["HKh"]),
+    # The eyedropper stores the un-lift whatever the clips' reading.
+    "pick-reading-ignored": ([(EYEDROPPER_SWIFT, "        return picked.map(reading.pick)\n",
+                               "        return picked.map(KeyReading.unlift.pick)\n")], ["P12"]),
+    # A media's Camera Log not consulted, so a log-converted HLG file reads as HLG.
+    "reading-ignores-log": ([(KEY_SWIFT,
+                              "            if let color = media.color, InputConversion.choose("
+                              "input: color) != nil {\n",
+                              "            if let color = media.color, InputConversion.choose("
+                              "input: color) != nil, false {\n")], ["P12"]),
+    # An HLG WebM copy left unlabelled (HD-19 (b)).
+    "webm-hlg-unlabelled": ([(REWRAP_WRITER_SWIFT,
+                              "            extensions.merge(hlgLabels(v)) { _, label in label }\n",
+                              "")], ["H7h"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -4006,6 +4140,15 @@ def run_math_probe(sources):
     shader = Path(sources).parent / "Resources/Shaders/Compositor.metal"
     asked = math_request(shader)
     asked["av1"] = av1_request() if "P10" in selected else []
+    # Clean-up batch 2, phase 2: P12's and P13's files (the stills made on the instance).
+    asked["rows"] = sorted(P_ROWS & selected)
+    if selected & {"P12", "P13"}:
+        stills = dict(hdr_stills(None), still8=fixture("still8"))
+        asked["keyMedia"] = {n: str(f) for n, f in
+                             [(n, fixture(n)) for n in ("hlg", "pq", "bt709")]
+                             + [(n, stills[n]) for n in ("still_hlg_png", "still8")] if f}
+        asked["stills"] = {n: str(f) for n, f in stills.items() if f}
+        asked["o6"] = str(WORK / "still_hlg_o6.heic")
     request.write_text(json.dumps(asked))
     ran = bounded.run([str(binary), str(request), str(answer)], 600,
                       env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
@@ -5543,7 +5686,7 @@ def webm_fixture(name):
     """H7w's fixture: the ramp as VP9 Profile 2 `-lossless 1` (ffmpeg's libvpx-vp9, its
     WebM's Colour from the tags), rewritten with WEBM_FIXTURES' HDR10 children; kept only
     when ffprobe reads its tags and, in its stream side data, exactly those values."""
-    tagset, max_cll, max_fall, luminance_max = WEBM_FIXTURES[name]
+    tagset, max_cll, max_fall, luminance_max = {**WEBM_FIXTURES, **HLG_WEBM}[name]
     trc, primaries, space = WEBM_TAGS[tagset]
     out = MEDIA / f"{name}.webm"
     if not out.exists():
@@ -5814,6 +5957,356 @@ def run_da(client, state):
           f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
 
 
+# ---- clean-up batch 2, phase 2 (#311, #312, #321, spec §11 HD-19) ------------------
+
+def png_depth(path):
+    """A PNG's bit depth (IHDR byte 8), 0 when it is not one."""
+    chunks = dict(png_chunks(path)) if path and Path(path).exists() else {}
+    return chunks.get("IHDR", b"\0" * 9)[8]
+
+
+def still_ffmpeg(name):
+    """An ffmpeg still of STILL_FFMPEG: the hlg or pq ramp's first frame (BT.2020 limited
+    range to full-range 16-bit RGB), a flat 0x808080 at WIDE_STILL, or a black-to-white
+    gradient, tagged by `setparams`; the AVIF through libsvtav1 at 10 bits."""
+    source, (primaries, trc), _ = STILL_FFMPEG[name]
+    out = MEDIA / STILL_FILES[name]
+    params = f"setparams=color_primaries={primaries}:color_trc={trc}"
+    if name == "still_hlg_avif":
+        ramp = fixture("hlg")
+        if ramp is None:
+            return None
+        return ffmpeg_make(out, [
+            "-i", str(ramp), "-frames:v", "1", "-vf",
+            f"format=yuv420p10le,{params}:colorspace=bt2020nc:range=tv", "-c:v", "libsvtav1",
+            "-color_primaries", primaries, "-color_trc", trc, "-colorspace", "bt2020nc"], 300)
+    if source in ("hlg", "pq"):
+        ramp = fixture(source)
+        if ramp is None:
+            return None
+        head = ["-i", str(ramp), "-frames:v", "1", "-vf",
+                "scale=in_range=tv:out_range=pc:in_color_matrix=bt2020,format=rgb48be,"
+                f"{params}:colorspace=gbr"]
+    elif source == "wide":
+        head = ["-f", "lavfi", "-i", f"color=c=0x808080:size={WIDE_STILL[0]}x{WIDE_STILL[1]}:"
+                "rate=1:duration=1", "-frames:v", "1", "-vf",
+                f"format=rgb48be,{params}:colorspace=gbr"]
+    else:
+        head = ["-f", "lavfi", "-i", f"gradients=s={W}x{H}:c0=black:c1=white:x0=0:y0=0:"
+                f"x1={W - 1}:y1=0:nb_colors=2", "-frames:v", "1", "-vf",
+                f"format=rgb48be,{params}:colorspace=gbr"]
+    return ffmpeg_make(out, head, 300)
+
+
+def hdr_stills(client=None):
+    """HI's and P13's stills (M1's fixtures), made once under MEDIA and kept: name → path,
+    None with REFUSED[name] saying why. `still_hlg_png` and `still_hlg_heic` are an HLG
+    project's `render_frame` of the hlg ramp at T (a 16-bit PNG, cICP 9/18/0/1, and a 10-bit
+    HEIC labelled BT.2100 HLG), made only with `client`; the rest are ffmpeg's, each kept
+    only when its PNG's cICP and depth (the AVIF: ffprobe's tags) read as made."""
+    png = MEDIA / STILL_FILES["still_hlg_png"]
+    heic = MEDIA / STILL_FILES["still_hlg_heic"]
+    if client is not None and not (png.exists() and heic.exists()):
+        doc = hlg_doc(client, "still-source", [fixture("hlg")])
+        for path, extra in ((png, {}), (heic, {"format": "heic"})):
+            if doc.ok and not path.exists():
+                got = doc.call("render_frame", t=T, path=str(path), **extra)
+                if not got["ok"]:
+                    REFUSED[path.name] = f"render_frame {path.name}: {got.get('error')}"
+        if not doc.close():
+            REFUSED["still-source"] = "the still-source project did not close"
+    out = {}
+    for name in STILL_FILES:
+        path = MEDIA / STILL_FILES[name]
+        if name in STILL_FFMPEG:
+            path = still_ffmpeg(name)
+        if path is None or not path.exists():
+            REFUSED[name] = REFUSED.get(name) or REFUSED.get(STILL_FILES[name]) \
+                or f"{STILL_FILES[name]} was not made"
+            out[name] = None
+            continue
+        if name == "still_hlg_heic":
+            read = bounded.run(["sips", "-g", "bitsPerSample", "-g", "profile", str(path)], 60)
+            ok = "bitsPerSample: 10" in read["stdout"] and "BT.2100 HLG" in read["stdout"]
+            why = f"sips read {' '.join(read['stdout'].split()[1:])}"
+        elif name == "still_hlg_avif":
+            probe = stream(path)
+            ok = (probe.get("codec_name"), probe.get("color_transfer"),
+                  probe.get("color_primaries")) == ("av1", "arib-std-b67", "bt2020")
+            why = f"ffprobe read {tags(probe)}"
+        elif name == "still16_srgb":
+            kinds = [k for k, _ in png_chunks(path)]
+            ok = "sRGB" in kinds and "cICP" not in kinds and png_depth(path) == 16
+            why = f"chunks {kinds} depth {png_depth(path)}, want an sRGB chunk, no cICP, 16"
+        else:
+            cicp = STILL_FFMPEG[name][2] if name in STILL_FFMPEG else [9, 18, 0, 1]
+            ok = png_label(path)[0] == cicp and png_depth(path) == 16
+            why = f"cICP {png_label(path)[0]} depth {png_depth(path)}, want {cicp} and 16"
+        if not ok:
+            REFUSED[name] = f"{path.name} refused: {why}"
+            path.unlink(missing_ok=True)
+            path = None
+        out[name] = path
+    return out
+
+
+def still_scene(client, name, path, output):
+    """`path` alone on a W×H canvas in a project of `output`: its render at T, or None."""
+    doc = Doc(client, f"hi-{name}-{output}", W, H)
+    clip = doc.place(path) if doc.ok and path else None
+    if clip and output == "hlg":
+        got = doc.call("set_canvas", output="hlg")
+        doc.ok = doc.ok and got["ok"]
+    frame = frame_of(doc, f"hi-{name}-{output}") if clip and doc.ok else None
+    closed = doc.close()
+    return frame, closed, doc.why
+
+
+def run_hi(client, state):
+    """HI (#311, spec §11 HD-19 (a)): an HLG or PQ still enters step 0 by its own label in
+    both outputs. The rules, fixed before the control ran: the grey row every 64th column of
+    the still's own codes (its PNG decoded at 16 bits); in an HLG project the HLG PNG = its
+    codes ±1/1023, the PQ PNG = pq_hlg(codes) ±1/1023, the HLG HEIC = the HLG PNG's render
+    ±4/1023; in an SDR project the HLG PNG = convert(hlg, bt2020, codes) ±1/255 and the PQ PNG
+    = convert(pq, bt2020, codes) ±1/255."""
+    stills = hdr_stills(client)
+    names = ("still_hlg_png", "still_pq_png", "still_hlg_heic")
+    refused = {n: REFUSED.get(n) for n in names if stills.get(n) is None}
+    state["hi_fixture"] = not refused
+    if refused:
+        check("HI the stills were made", False, f"refused {refused}")
+        return
+    codes = {n: Frame(stills[n], W, H) for n in ("still_hlg_png", "still_pq_png")}
+    frames, closed = {}, True
+    for n in names:
+        for output in ("hlg", "sdr") if n != "still_hlg_heic" else ("hlg",):
+            frame, ok, why = still_scene(client, n, stills[n], output)
+            closed = closed and ok
+            frames[(n, output)] = frame
+            if frame is None:
+                frames[(n, output, "why")] = why
+    state["hi_closed"] = closed
+    misses, figures = [], []
+    oracles = {
+        ("still_hlg_png", "hlg"): (codes["still_hlg_png"], lambda c: c, LEVEL),
+        ("still_pq_png", "hlg"): (codes["still_pq_png"], pq_hlg, LEVEL),
+        ("still_hlg_heic", "hlg"): (None, None, HI_STILL_BOUND),
+        ("still_hlg_png", "sdr"): (codes["still_hlg_png"],
+                                   lambda c: convert("hlg", "bt2020", c)[0], 1 / 255),
+        ("still_pq_png", "sdr"): (codes["still_pq_png"],
+                                  lambda c: convert("pq", "bt2020", c)[0], 1 / 255),
+    }
+    for key, (source, oracle, bound) in oracles.items():
+        frame = frames.get(key)
+        if frame is None:
+            misses.append(f"{key}: no render ({frames.get(key + ('why',))})")
+            continue
+        worst, bad = 0.0, []
+        for x in range(0, W, 64):
+            got = frame.px(x, GREY_ROW)
+            if oracle is None:
+                reference = frames.get(("still_hlg_png", "hlg"))
+                want = reference.px(x, GREY_ROW) if reference else [math.nan] * 3
+            else:
+                want = [unit(v) for v in oracle(source.px(x, GREY_ROW))]
+            gap = max(abs(a - b) for a, b in zip(got, want))
+            worst = max(worst, gap)
+            if not gap <= bound and len(bad) < 3:
+                bad.append(f"x={x} render {[round(v, 5) for v in got]} want "
+                           f"{[round(v, 5) for v in want]}")
+        figures.append(f"{key[0]} in {key[1]}: worst |Δ| {levels(worst):.2f} of 1023 "
+                       f"({worst * 255:.2f} of 255), bound {bound * 1023:.2f} of 1023"
+                       + (f"; {bad}" if bad else ""))
+        if bad:
+            misses.append(f"{key[0]} in {key[1]}")
+    check("HI an HLG project: the HLG PNG still's grey row (every 64th column) = its own codes "
+          "±1/1023, the PQ PNG's = pq_hlg(codes) ±1/1023, the HLG HEIC's = the HLG PNG's render "
+          "±4/1023; an SDR project: the HLG PNG = convert(hlg, bt2020, codes) ±1/255, the PQ PNG "
+          "= convert(pq, bt2020, codes) ±1/255", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def bt2020_codes(rgb):
+    """BT.2020 NCL R'G'B' → 10-bit limited-range (Y', Cb, Cr) codes, rounded."""
+    kr, kb = KR_KB["bt2020nc"]
+    r, g, b = rgb
+    y = kr * r + (1 - kr - kb) * g + kb * b
+    return (round(64 + 876 * y), round(512 + 896 * (b - y) / (2 * (1 - kb))),
+            round(512 + 896 * (r - y) / (2 * (1 - kr))))
+
+
+def green_hdr(name):
+    """HKh's fixture: green_709's route (10-bit ProRes 422 HQ, 1024×128, 1 s), the left half
+    GREEN_HDR's colour as BT.2020 NCL codes, the right half grey 0.5, tagged HLG or PQ by
+    stream copy; made once."""
+    rgb, (trc, primaries, space), _ = GREEN_HDR[name]
+    y, cb, cr = bt2020_codes(rgb)
+    vf = (f"color=c=black:size={W}x{H}:rate=30:duration=1,format=yuv422p10le,"
+          f"geq=lum='if(lt(X,W/2),{y},502)':cb='if(lt(X,W/2),{cb},512)':"
+          f"cr='if(lt(X,W/2),{cr},512)'")
+    plain = ffmpeg_make(MEDIA / f"{name}_plain.mov", [
+        "-f", "lavfi", "-i", vf, "-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt",
+        "yuv422p10le"])
+    if plain is None:
+        REFUSED[name] = f"ffmpeg did not make {name}_plain.mov"
+        return None
+    return checked(name, ffmpeg_make(MEDIA / f"{name}.mov", [
+        "-i", str(plain), "-c", "copy", "-bsf:v",
+        f"prores_metadata=color_primaries={primaries}:color_trc={trc}:colorspace={space}",
+        "-color_primaries", primaries, "-color_trc", trc, "-colorspace", space,
+        "-movflags", "+write_colr"], 120),
+        {"codec_name": "prores", "color_primaries": primaries, "color_transfer": trc,
+         "color_space": space})
+
+
+def key_read_sdr(kind, hlg, peak=None):
+    """HD-19 (c)'s reading of a working HLG colour, saturated: GR-15's HLG arm over BT.2020;
+    or, for PQ, display light (the inverse OETF, BT.2100's OOTF γ 1.2, × 1000/203) through
+    GR-15's PQ arm at `peak` — written as that arm on the PQ signal of the display light at
+    1,000 cd/m², so `convert`'s own matrix, gamut lift and shoulder are the twin's."""
+    if kind == "hlg":
+        return [unit(c) for c in convert("hlg", "bt2020", hlg)[0]]
+    scene = [hlg_inverse(c) for c in hlg]
+    ys = sum(w * c for w, c in zip(LUMA2020, scene))
+    display = [c * ys ** (HLG_NOMINAL_GAMMA - 1) for c in scene] if ys > 0 else [0.0] * 3
+    signal = [pq_signal(d * PQ_WHITE) for d in display]
+    return [unit(c) for c in convert("pq", "bt2020", signal, peak or PQ_WHITE)[0]]
+
+
+def hkh_oracle(name, source):
+    """HKh's oracle at the fixture's decoded left codes: the key (GR-15's SDR arm), the
+    working HLG colour, and the distance from the key of the right reading and of each
+    reading a mutant aimed at the fixture substitutes; the tolerance KEY_TOLERANCES' rule
+    picks (the largest with the right reading ≤ ½ it and every other ≥ 1.5 × it), or None."""
+    _, _, peak = GREEN_HDR[name]
+    rgb = source.rgb(W // 4, H // 2, "bt2020nc")
+    unlifted = None
+    if name == "green_hlg":
+        key = [unit(c) for c in convert("hlg", "bt2020", rgb)[0]]
+        working = [unit(c) for c in rgb]
+        right = key_read_sdr("hlg", working)
+        unlifted = [unit(c) for c in unlift(working)]
+        others = {"un-lift": unlifted, ".hlg-output terms (choose → nil → un-lift)": unlifted}
+    else:
+        key = [unit(c) for c in convert("pq", "bt2020", rgb, peak)[0]]
+        working = pq_hlg(rgb, peak)
+        right = key_read_sdr("pq", working, peak)
+        others = {"un-lift": [unit(c) for c in unlift(working)],
+                  "PQ read as HLG": key_read_sdr("hlg", working),
+                  "white 1000/203": key_read_sdr("pq", working, PQ_WHITE)}
+    d_right = math.dist(right, key)
+    d_others = {k: math.dist(v, key) for k, v in others.items()}
+    tolerance = next((t for t in KEY_TOLERANCES if d_right <= t / 2
+                      and all(d >= 1.5 * t for d in d_others.values())), None)
+    return {"key": key, "working": working, "right": d_right, "others": d_others,
+            "tolerance": tolerance}
+
+
+def run_hkh(client, state):
+    """HKh (#312, spec §11 HD-19 (c)): a key picked in an SDR project on an HDR clip keys the
+    same colour after the switch to HLG. Per fixture (green_hlg; green_pq at peak 600): an SDR
+    project over a [0.5, 0.5, 0.5, 1] background, keyed at the SDR render's left pixel (the
+    tolerance `hkh_oracle` fixes, softness 0, spill 0); CONTROL the SDR render's left = 0.5
+    ±1/255; after `set_canvas {output: hlg}` the left = the lifted background 0.5059 ±1/1023
+    and the right = the clip's working grey (HLG 0.5; pq_hlg(0.5)) ±1/1023."""
+    misses, figures, closed = [], [], True
+    paths = {n: green_hdr(n) for n in GREEN_HDR}
+    refused = {n: REFUSED.get(n) for n, p in paths.items() if p is None}
+    state["hkh_fixture"] = not refused
+    if refused:
+        check("HKh the fixtures were made", False, f"refused {refused}")
+        return
+    left, right = (W // 4, H // 2), (3 * W // 4, H // 2)
+    for name, path in paths.items():
+        source = yuv_frames(path, W, H)
+        if source is None:
+            misses.append(f"{name}: no decode")
+            continue
+        oracle = hkh_oracle(name, source[0])
+        figures.append(f"{name}: oracle key {[round(v, 4) for v in oracle['key']]}, distance of "
+                       f"the right reading {oracle['right']:.4f}, of the others "
+                       f"{ {k: round(v, 4) for k, v in oracle['others'].items()} }; tolerance "
+                       f"{oracle['tolerance']}")
+        if oracle["tolerance"] is None:
+            misses.append(f"{name}: no tolerance qualifies (a rotted instrument)")
+            continue
+        doc = Doc(client, f"hkh-{name}", W, H)
+        if doc.ok:
+            doc.call("set_canvas", background=[0.5, 0.5, 0.5, 1])
+        clip = doc.place(path) if doc.ok else None
+        peak = GREEN_HDR[name][2]
+        if clip and peak is not None:
+            media = getattr(doc, "_media", {}).get(path)
+            got = doc.call("set_media_color", media=media, color={"peak": peak})
+            if not got["ok"]:
+                doc.ok, doc.why = False, f"set_media_color: {got.get('error')}"
+        plain = frame_of(doc, f"hkh-{name}-plain") if clip and doc.ok else None
+        key = [round(v, 5) for v in plain.px(*left)] if plain else None
+        keyed = doc.call("set_video", clips=[clip], patch={"chroma": {
+            "key": key, "tolerance": oracle["tolerance"], "softness": 0.0, "spill": 0.0}}) \
+            if key else {"ok": False}
+        sdr = frame_of(doc, f"hkh-{name}-sdr") if keyed["ok"] else None
+        switched = doc.call("set_canvas", output="hlg") if sdr else {"ok": False}
+        hlg = frame_of(doc, f"hkh-{name}-hlg") if switched["ok"] else None
+        closed = doc.close() and closed
+        if sdr is None or hlg is None:
+            misses.append(f"{name}: {doc.why or keyed.get('error') or switched.get('error')}")
+            continue
+        grey = [0.5] * 3 if name == "green_hlg" else pq_hlg([0.5] * 3)
+        got_left, got_right = hlg.px(*left), hlg.px(*right)
+        figures.append(f"{name}: key {key} (the oracle's at {math.dist(key, oracle['key']):.4f});"
+                       f" SDR keyed left {[round(v, 5) for v in sdr.px(*left)]} (CONTROL 0.5); "
+                       f"HLG left {[round(v, 5) for v in got_left]} (want 0.5059), right "
+                       f"{[round(v, 5) for v in got_right]} (want {[round(v, 5) for v in grey]})")
+        if not close_to(sdr.px(*left), [0.5] * 3, 1 / 255):
+            misses.append(f"CONTROL {name}: the SDR key did not open the left half")
+        if not close_to(got_left, [0.5059] * 3, LEVEL):
+            misses.append(f"{name}: the HLG left half is not the lifted background")
+        if not close_to(got_right, grey, LEVEL):
+            misses.append(f"{name}: the HLG right half is not the clip's working grey")
+    state["hkh_closed"] = closed
+    check("HKh green_hlg and green_pq (peak 600) over a [0.5, 0.5, 0.5, 1] background, keyed in "
+          "SDR at the green its render reads (the tolerance each fixture's oracle fixes): after "
+          "set_canvas {output: hlg} the left half reads the lifted background 0.5059 and the "
+          "right half the clip's working grey, ±1/1023 (CONTROL: the SDR key opens the left "
+          "half)", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def run_h7h(client, state):
+    """H7h (#321, spec §11 HD-19 (b)): an HLG VP9 WebM's copy reads as HLG — in an SDR project
+    its grey row (every 64th column) inside env16 of convert(hlg, bt2020, ·), in an HLG project
+    inside env16 of the identity."""
+    path = webm_fixture("hlg_webm")
+    state["h7h_fixture"] = path is not None
+    if path is None:
+        check("H7h the HLG WebM was made", False, f"refused {REFUSED.get('hlg_webm')}")
+        return
+    misses, figures = [], []
+    sdr = webm_scene(client, "hlg_webm", path)
+    doc = hlg_doc(client, "h7h-hlg", [path])
+    hlg = frame_of(doc, "h7h-hlg")
+    hlg_closed = doc.close()
+    state["h7h_closed"] = bool(sdr.get("closed")) and hlg_closed
+    source = yuv_frames(path, W, H)
+    if "frame" not in sdr or hlg is None or source is None:
+        misses.append(sdr.get("why") or doc.why or "no render or decode")
+    else:
+        worst_sdr = grey_row_misses(sdr["frame"], source[0], "bt2020nc",
+                                    lambda rgb: [unit(c) for c in
+                                                 convert("hlg", "bt2020", rgb)[0]],
+                                    "SDR", misses)
+        worst_hlg = grey_row_misses(hlg, source[0], "bt2020nc",
+                                    lambda rgb: [unit(c) for c in rgb], "HLG", misses)
+        figures.append(f"the copy's colour fields {colour_fields(sdr['copy'])}; media color "
+                       f"{sdr.get('color')}; worst |Δ| SDR {worst_sdr:.2f}, HLG {worst_hlg:.2f} "
+                       f"levels of 1023")
+    check("H7h an HLG VP9 WebM (arib-std-b67/bt2020/bt2020nc, no HDR10 children): in an SDR "
+          "project the grey row (every 64th column) inside env16 of convert(hlg, bt2020, ·), in "
+          "an HLG project inside env16 of the identity", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
 def tail(log, count=4):
     try:
         lines = [line.rstrip() for line in open(log, errors="replace")]
@@ -5893,7 +6386,8 @@ def main():
     else:
         selected -= {"TI", "TH", "TO", "TL"}
         if args.mutant:
-            selected -= {"H1a"} | H7_ROWS | H2_ROWS | H3_ROWS | H4_ROWS | L_ROWS | C2_ROWS
+            selected -= ({"H1a"} | H7_ROWS | H2_ROWS | H3_ROWS | H4_ROWS | L_ROWS | C2_ROWS
+                         | C3_ROWS)
     if args.mode == "capture":
         if not args.only:
             selected = {"H1", "H2", "H3", "H4", "H5", "H6", "R0", "Z1"}
@@ -5930,7 +6424,8 @@ def main():
     log = WORK / "instance.log"
     needs_instance = bool(selected & ({"H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5",
                                        "H6", "R0"} | H7_ROWS | H2_ROWS
-                                      | (H3_ROWS - {"DX"}) | H4_ROWS | L_ROWS | C2_ROWS))
+                                      | (H3_ROWS - {"DX"}) | H4_ROWS | L_ROWS | C2_ROWS
+                                      | C3_ROWS | {"P12", "P13"}))
     if needs_instance:
         launched = mcp.launch(str(binary), [],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
@@ -5984,10 +6479,18 @@ def main():
                     run_h7(client, args.mode, control, sources, state)
                 if "H7w" in selected:
                     run_h7w(client, state)
+                # Clean-up batch 2, phase 2 (#321, #311, #312): the HLG WebM, HDR stills and
+                # the key on an HDR clip; P13's stills made here (the probe has no instance).
+                if "H7h" in selected:
+                    run_h7h(client, state)
+                if selected & {"P12", "P13"}:
+                    stills = hdr_stills(client)
+                    state["p13_fixture"] = all(stills.values())
                 # hdr H-2 (#277): the HLG working space.
                 for row, run in (("HS", run_hs), ("HH", run_hh), ("HP", run_hp),
-                                 ("HT", run_ht), ("HL", run_hl), ("HW", run_hw),
-                                 ("HK", run_hk), ("HM", run_hm), ("HF", run_hf),
+                                 ("HT", run_ht), ("HI", run_hi), ("HL", run_hl),
+                                 ("HW", run_hw), ("HK", run_hk), ("HKh", run_hkh),
+                                 ("HM", run_hm), ("HF", run_hf),
                                  ("HX", run_hx),
                                  # hdr H-3 (#277): the deliverables.
                                  ("DT", run_dt), ("DP", run_dp), ("DV", run_dv),

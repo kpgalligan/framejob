@@ -397,6 +397,12 @@ extension MetalRenderer {
             // an error. Nothing to draw.
             return nil
         }
+        // The chroma key's reading in an HLG project (spec §11 HD-19 (c)), asked
+        // only of a keyed layer: 0 (HD-13 (h)'s un-lift) in every other block.
+        if canvas.output == .hlg, layer.chroma != nil {
+            uniforms.keyReading =
+                keyReading(for: layer, request: request, instruction: instruction).uniform
+        }
         // The look's lattice (GR-7, GR-8): a LUT's file is found through the
         // URLs its document last published, never the instruction's alone. A
         // look that cannot be drawn — a LUT missing or refused — draws the

@@ -10,7 +10,9 @@ import UniformTypeIdentifiers
 /// a still whose decoded image is deeper than 8 bits a component is drawn
 /// into a 16-bit-float premultiplied RGBA bitmap and uploaded `rgba16Float`
 /// (`deepBitmap`, spec §11 PR-6), which the layer stage samples as it does
-/// `bgra8Unorm` (PR-2).
+/// `bgra8Unorm` (PR-2); and a still labelled HLG or PQ is drawn the same way
+/// in its OWN space (`hdrBitmap`, spec §11 HD-19 (a)), its `Rendered` carrying
+/// the step-0 arm `source(for:…)` runs on it.
 ///
 /// Premultiplied is not a detail: `Compositor.metal` blends source-over with
 /// `(one, one_minus_source_alpha)` and un-premultiplies these textures before
@@ -71,6 +73,9 @@ final class LayerRenderers {
         let texture: MTLTexture
         let size: CGSize
         var warnings: [GraphicDiagnostic] = []
+        /// An HLG or PQ still's step-0 arm (spec §11 HD-19 (a), `StillColor`);
+        /// nil for every other texture.
+        var conversion: InputConversion? = nil
     }
 
     init(device: MTLDevice) {
@@ -171,9 +176,18 @@ final class LayerRenderers {
 
     /// The texture for an `image` recipe layer, decoded with ImageIO and
     /// cached by path. Bounded by `maxTextureSide`: a 60-megapixel HEIC is
-    /// scaled down once here rather than on every frame.
+    /// scaled down once here rather than on every frame. An HLG or PQ still
+    /// (`StillColor.read`) is drawn by `renderHDRImage`; when either answers
+    /// nil — every SDR still, after a header read — today's lines run, so an
+    /// HDR still is never drawn worse than before (spec §11 HD-19 (a)). The
+    /// key is unchanged: the texture is the file's codes in both outputs.
     func image(url: URL, media: UInt32) -> Rendered? {
         cached("image:\(media):" + url.path) {
+            if let hdr = StillColor.read(url, maxPixelSize: LayerRenderers.maxTextureSide),
+                let rendered = self.renderHDRImage(hdr.image, conversion: hdr.conversion)
+            {
+                return rendered
+            }
             guard let image = MediaImporter.decodeImage(
                 url, maxPixelSize: LayerRenderers.maxTextureSide)
             else { return nil }
@@ -471,6 +485,22 @@ final class LayerRenderers {
         return upload(context, size: size)
     }
 
+    /// An HLG or PQ still (spec §11 HD-19 (a)) drawn in its own colour space,
+    /// so Core Graphics converts nothing and the bitmap holds the file's codes,
+    /// into `hdrBitmap` and uploaded `rgba16Float`, carrying its arm.
+    private func renderHDRImage(_ image: CGImage, conversion: InputConversion) -> Rendered? {
+        let size = CGSize(width: image.width, height: image.height)
+        guard size.width >= 1, size.height >= 1, let space = image.colorSpace,
+            let context = LayerRenderers.hdrBitmap(size, space: space)
+        else { return nil }
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(origin: .zero, size: size))
+        guard var rendered = upload(context, size: size, pixelFormat: .rgba16Float)
+        else { return nil }
+        rendered.conversion = conversion
+        return rendered
+    }
+
     // MARK: - Bitmaps and textures
 
     /// A premultiplied BGRA bitmap context — the pixel layout this renderer
@@ -512,13 +542,28 @@ final class LayerRenderers {
                 | CGBitmapInfo.byteOrder16Little.rawValue)
     }
 
+    /// A 16-bit-float premultiplied RGBA bitmap context in an HDR still's own
+    /// space (spec §11 HD-19 (a)); `deepBitmap`'s layout and size guard.
+    private static func hdrBitmap(_ size: CGSize, space own: CGColorSpace) -> CGContext? {
+        let width = Int(size.width.rounded())
+        let height = Int(size.height.rounded())
+        guard width > 0, height > 0, width <= maxTextureSide, height <= maxTextureSide
+        else { return nil }
+        return CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 16, bytesPerRow: 0,
+            space: own,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                | CGBitmapInfo.floatComponents.rawValue
+                | CGBitmapInfo.byteOrder16Little.rawValue)
+    }
+
     /// Uploads a bitmap context to a texture. Row 0 of the context's memory
     /// is the TOP row of the drawing, which is also texture row 0 — the same
     /// top-left origin the crop window and the recipe's y-down canvas use, so
     /// nothing is flipped anywhere in this pipeline.
     ///
     /// Internal for `bitmap`'s reason: `renderText` ends here too.
-    /// `pixelFormat` is `.rgba16Float` for a `deepBitmap` only.
+    /// `pixelFormat` is `.rgba16Float` for a `deepBitmap` or an `hdrBitmap` only.
     func upload(
         _ context: CGContext, size: CGSize, pixelFormat: MTLPixelFormat = .bgra8Unorm
     ) -> Rendered? {

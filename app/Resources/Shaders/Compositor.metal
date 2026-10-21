@@ -374,12 +374,14 @@ struct LayerUniforms {
     // the grade's BT.2020 weights and HLG transfer, the key's inverse lift —
     // and `liftedWhite` Fade Through White's white there (HD-3's lift of 1).
     // Both 0 in an SDR project. `linearLight` (spec §11 HD-16 (c)) is 1 when
-    // the canvas blends in linear light, 0 otherwise. 128 + 4 = 132 floats =
-    // 528 bytes, 33 × 16.
+    // the canvas blends in linear light, 0 otherwise. `keyReading` (spec §11
+    // HD-19 (c)) is how an HLG project's key reads a keyed HLG or PQ source:
+    // 1 GR-15's HLG arm, ≤ −1 its PQ arm at white −keyReading, 0 the un-lift.
+    // 128 + 4 = 132 floats = 528 bytes, 33 × 16.
     float hlgOutput;
     float liftedWhite;
     float linearLight;
-    float hlgReserved1;
+    float keyReading;
 };
 
 /// A fragment's `[[position]]` in CANVAS pixels — the frame the nest clip
@@ -585,6 +587,71 @@ static inline float3 hlgUnliftSDR(float3 hlg) {
     return min(l * kCoreMedia709Toe, pow(l, 1.0 / kCoreMedia709Gamma));
 }
 
+// Step 0's gamut lift and shoulder (GR-15), declared here, above the key that
+// reads through them (`keyReadSDR`); step 0's arms and the output pass use
+// them too.
+// The gamut lift: a colour with a negative channel (outside Rec. 709) moves
+// toward its BT.709 luminance until its lowest channel is 0 — black when its
+// luminance is not positive. Every channel's distance from the luminance is
+// scaled alike, so its hue in linear opponent space is kept.
+static float3 inputLift(float3 l) {
+    float low = min(l.r, min(l.g, l.b));
+    if (low >= 0.0) {
+        return l;
+    }
+    float y = dot(l, kLuma709);
+    return y <= 0.0 ? float3(0.0) : y + (l - y) * (y / (y - low));
+}
+
+// The shoulder, on the largest channel m: unchanged up to the knee, then an
+// extended Reinhard roll-off reaching 1 at `white` (and 1 above it), every
+// channel scaled by the same S(m)/m so the colour's hue is kept.
+static float3 inputShoulder(float3 l, float knee, float white) {
+    float m = max(l.r, max(l.g, l.b));
+    if (m <= knee) {
+        return l;
+    }
+    float s = 1.0;
+    if (m < white) {
+        float t = (m - knee) / (1.0 - knee);
+        float tw = (white - knee) / (1.0 - knee);
+        s = knee + (1.0 - knee) * t * (1.0 + t / (tw * tw)) / (1.0 + t);
+    }
+    return l * (s / m);
+}
+
+// GR-15's HDR→SDR numbers the key's reading uses (spec §11 HD-19 (c)), twins
+// of `InputConversions`' `hlgSystemGamma`, `hlgGain`, `shoulderKnee`,
+// `hlgWhite` and `displayGamma` (step 0 has them in its uniform block).
+constant float kKeyHlgSystemGamma = 0.96;
+constant float kKeyHlgGain = 1.07;
+constant float kKeyShoulderKnee = 0.39;
+constant float kKeyHlgWhite = 1.07;
+constant float kKeyDisplayGamma = 2.4;
+
+// The SDR colour an SDR project shows for an HLG project's working colour
+// (spec §11 HD-19 (c), `KeyReading.sdr`'s twin), unclamped: `reading` 1 is
+// GR-15's HLG arm over BT.2020 (its OOTF shape with Frame Job's system gamma
+// and gain); ≤ −1 the PQ source's display light (the inverse OETF, BT.2100's
+// OOTF γ 1.2, × 1000/203) through GR-15's PQ arm, its shoulder reaching 1 at
+// −reading. Then BT.2020 → BT.709, the gamut lift, the shoulder and the encode.
+static inline float3 keyReadSDR(float3 hlg, float reading) {
+    float3 e = hlgInverseOETF(hlg);
+    float ys = dot(e, kLuma2020);
+    float3 light;
+    float white;
+    if (reading > 0.0) {
+        light = ys > 1e-6 ? kKeyHlgGain * e * pow(ys, kKeyHlgSystemGamma - 1.0) : float3(0.0);
+        white = kKeyHlgWhite;
+    } else {
+        float3 display = ys > 0.0 ? e * pow(ys, kHlgNominalGamma - 1.0) : float3(0.0);
+        light = display * kHlgPeakOverSDRWhite;
+        white = -reading;
+    }
+    float3 l = inputShoulder(inputLift(kBT2020ToBT709 * light), kKeyShoulderKnee, white);
+    return pow(max(l, 0.0), 1.0 / kKeyDisplayGamma);
+}
+
 // MARK: - Hue (spec §11 GR-13, GR-32, GR-33)
 
 // The fully saturated hue `degrees` (the textbook HSV ramp) less its own
@@ -677,11 +744,14 @@ static inline LayerSample gradeSample(float3 rgb, float alpha,
     float3 w = gradeWeights(u.hlgOutput);
     // Chroma key (M3): distance from the key colour opens a soft hole, then
     // the spill control pulls the remaining fringe toward its own luma. In
-    // an HLG project the distance reads the inverse lift of the working
-    // colour against the stored Rec. 709 key (spec §11 HD-13 (h)).
+    // an HLG project the distance reads the working colour as an SDR project
+    // shows it against the stored key: GR-15's HDR→SDR arm for an HLG or PQ
+    // source (`keyReading`, spec §11 HD-19 (c)), the inverse lift for every
+    // other layer (HD-13 (h)).
     if (u.chromaEnabled > 0.5) {
         float3 key = float3(u.chromaKeyR, u.chromaKeyG, u.chromaKeyB);
-        float d = distance(u.hlgOutput > 0.5 ? saturate(hlgUnliftSDR(rgb)) : rgb, key);
+        float d = distance(u.hlgOutput > 0.5 ? saturate(u.keyReading != 0.0
+            ? keyReadSDR(rgb, u.keyReading) : hlgUnliftSDR(rgb)) : rgb, key);
         float keyed = smoothstep(u.chromaTolerance,
                                  u.chromaTolerance + max(u.chromaSoftness, 1e-4), d);
         alpha *= keyed;
@@ -2379,8 +2449,9 @@ constant int kInputLUT     = 8;
 constant int kInputCanonLog2 = 10;
 constant int kInputCanonLog3 = 11;
 
-// (BT.2100's HLG constants and the luminance weights are declared above the
-// grade, `MARK: - HLG`.)
+// (BT.2100's HLG constants, the luminance weights, the gamut lift
+// `inputLift` and the shoulder `inputShoulder` are declared above the grade,
+// `MARK: - HLG`.)
 // SMPTE ST 2084 (BT.2100's PQ): m1 = 2610/16384, m2 = 2523/4096 × 128,
 // c1 = 3424/4096, c2 = 2413/4096 × 32, c3 = 2392/4096 × 32.
 constant float kPqM1 = 0.1593017578125;
@@ -2522,36 +2593,6 @@ static float3 inputMatrix(constant InputUniforms &u, float3 c) {
     return float3(dot(float3(u.m00, u.m01, u.m02), c),
                   dot(float3(u.m10, u.m11, u.m12), c),
                   dot(float3(u.m20, u.m21, u.m22), c));
-}
-
-// The gamut lift: a colour with a negative channel (outside Rec. 709) moves
-// toward its BT.709 luminance until its lowest channel is 0 — black when its
-// luminance is not positive. Every channel's distance from the luminance is
-// scaled alike, so its hue in linear opponent space is kept.
-static float3 inputLift(float3 l) {
-    float low = min(l.r, min(l.g, l.b));
-    if (low >= 0.0) {
-        return l;
-    }
-    float y = dot(l, kLuma709);
-    return y <= 0.0 ? float3(0.0) : y + (l - y) * (y / (y - low));
-}
-
-// The shoulder, on the largest channel m: unchanged up to the knee, then an
-// extended Reinhard roll-off reaching 1 at `white` (and 1 above it), every
-// channel scaled by the same S(m)/m so the colour's hue is kept.
-static float3 inputShoulder(float3 l, float knee, float white) {
-    float m = max(l.r, max(l.g, l.b));
-    if (m <= knee) {
-        return l;
-    }
-    float s = 1.0;
-    if (m < white) {
-        float t = (m - knee) / (1.0 - knee);
-        float tw = (white - knee) / (1.0 - knee);
-        s = knee + (1.0 - knee) * t * (1.0 + t / (tw * tw)) / (1.0 + t);
-    }
-    return l * (s / m);
 }
 
 // BT.2100's inverse OOTF at system gamma `gamma` on BT.2020 luminance:

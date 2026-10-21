@@ -1290,9 +1290,16 @@ the key map behind it.
   project's SDR version or PQ and for every linear-light project, so an HLG
   master and every encoded SDR frame are the bytes they were) ·
   `LayerLift.swift` (an HLG project's lift of every layer Frame Job draws,
-  once at upload by step 0's `.sdr` arm; an LRU of
+  once at upload by step 0's `.sdr` arm, and an HLG or PQ still run through
+  its own step-0 arm in either output, spec §11 HD-19; an LRU of
   `LayerRenderers.cacheLimit + graphicCacheLimit` entries keyed by the
-  source texture, which `LayerRenderers` never redraws) ·
+  source texture, hit only when source, conversion and output all match) ·
+  `StillColor.swift` (a still's step-0 arm from its colour space: HLG or PQ
+  over BT.2020, P3 or BT.709, else none — SDR stills draw as before) ·
+  `ChromaKeyHDR.swift` (`KeyReading`: how an HLG project's chroma key reads
+  a keyed layer — GR-15's HLG or PQ arm for an HDR source, so a key means
+  the colour an SDR project shows; HD-13 (h)'s un-lift for every other
+  layer; the shader's `keyReading` uniform and the eyedropper's pick) ·
   `Compositor+Uniforms.swift` ·
   `Compositor+Shadow.swift` · `Compositor+Matte.swift` · `MattePlan.swift` ·
   `Compositor+Dissolve.swift` · `Compositor+Adjustment.swift` ·

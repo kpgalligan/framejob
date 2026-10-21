@@ -1,12 +1,14 @@
 // Built by tools/proof/hdr_proof.py as `main.swift` over every other file in
-// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P11
+// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P13
 // (grading-3 T3-1, spec §11 GR-15 as amended; P5 hdr H-1, spec §11 HD-12; P6
 // hdr H-2, spec §11 HD-3, HD-13; P7 hdr H-3, spec §11 HD-14; P8 hdr H-4, spec
 // §11 HD-15: `ScopeSignal`, the traces' JSON, and the waveform's, parade's
 // and vectorscope's drawing cached to bitmaps; P9 hdr H-6, spec §11 HD-16:
 // `RecipeCanvas.blended`, `uniforms(for:)` and the four blocks' sizes; P10
 // and P11 clean-up batch 2, spec §11 HD-18: an AV1 file's peak through
-// `MediaImporter.detectedPQ`, and a scope slot reading only its own kind).
+// `MediaImporter.detectedPQ`, and a scope slot reading only its own kind;
+// P12 and P13 its phase 2, spec §11 HD-19: `KeyReading` against step 0's own
+// arms, and `StillColor` over the HDR stills with `LayerLift`'s pool).
 //
 // Step 0's maths through the app's own types: `InputConversion`'s selector
 // through BOTH readers (the labels as strings, and a `CMVideoFormatDescription`
@@ -1195,6 +1197,279 @@ do {
         "P11 ScopeSlotView (waveform) shown an HLG waveform, then an SDR vectorscope trace: the "
             + "caption stays \"HLG · cd/m²\" and the body is cleared",
         misses.isEmpty, misses.isEmpty ? "as wanted" : misses.joined(separator: "; "))
+}
+
+// MARK: - P12 the key's reading (clean-up batch 2, phase 2, spec §11 HD-19 (c), #312)
+
+/// A one-row `rgba16Float` texture of `texels`, shared, for a pass to read.
+func halfTexture(_ device: MTLDevice, _ texels: [SIMD4<Float>]) -> MTLTexture? {
+    let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+        pixelFormat: .rgba16Float, width: texels.count, height: 1, mipmapped: false)
+    descriptor.usage = [.shaderRead]
+    descriptor.storageMode = .shared
+    guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
+    var halves = texels.flatMap { [Float16($0.x), Float16($0.y), Float16($0.z), Float16($0.w)] }
+    texture.replace(
+        region: MTLRegionMake2D(0, 0, texels.count, 1), mipmapLevel: 0, withBytes: &halves,
+        bytesPerRow: texels.count * 8)
+    return texture
+}
+
+/// `texture` (any storage) copied into a shared one and read back as floats.
+func readBack(_ texture: MTLTexture, _ device: MTLDevice, _ queue: MTLCommandQueue)
+    -> [SIMD4<Float>]?
+{
+    let width = texture.width
+    let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+        pixelFormat: .rgba16Float, width: width, height: 1, mipmapped: false)
+    descriptor.storageMode = .shared
+    guard let shared = device.makeTexture(descriptor: descriptor),
+        let buffer = queue.makeCommandBuffer(), let blit = buffer.makeBlitCommandEncoder()
+    else { return nil }
+    blit.copy(from: texture, sourceSlice: 0, sourceLevel: 0,
+              sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0), sourceSize: MTLSize(width: width, height: 1, depth: 1),
+              to: shared, destinationSlice: 0, destinationLevel: 0,
+              destinationOrigin: MTLOrigin(x: 0, y: 0, z: 0))
+    blit.endEncoding()
+    buffer.commit()
+    buffer.waitUntilCompleted()
+    var back = [Float16](repeating: 0, count: width * 4)
+    shared.getBytes(
+        &back, bytesPerRow: width * 8, from: MTLRegionMake2D(0, 0, width, 1), mipmapLevel: 0)
+    return (0..<width).map {
+        SIMD4<Float>(Float(back[4 * $0]), Float(back[4 * $0 + 1]), Float(back[4 * $0 + 2]),
+                     Float(back[4 * $0 + 3]))
+    }
+}
+
+/// `InputStage`'s pass of `conversion` for a project of `output` over `texels`
+/// (straight), at `peak`, read back.
+func stagePass(
+    _ stage: InputStage, _ device: MTLDevice, _ queue: MTLCommandQueue,
+    _ conversion: InputConversion, peak: UInt32?, output: CanvasOutput,
+    _ texels: [SIMD4<Float>]
+) -> [SIMD4<Float>]? {
+    guard let source = halfTexture(device, texels), let buffer = queue.makeCommandBuffer()
+    else { return nil }
+    stage.beginFrame()
+    defer { stage.endFrame() }
+    guard let target = stage.target(width: texels.count, height: 1),
+        stage.encode(
+            conversion, premultiplied: false, from: source, into: target, buffer: buffer,
+            peak: peak, output: output)
+    else { return nil }
+    buffer.commit()
+    buffer.waitUntilCompleted()
+    return readBack(target, device, queue)
+}
+
+/// The tree's shader compiled, and an `InputStage` over it (P3's way).
+func compiledStage() -> (MTLDevice, MTLCommandQueue, MTLLibrary, InputStage)? {
+    guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue(),
+        let text = try? String(contentsOfFile: request["shader"] as? String ?? "", encoding: .utf8),
+        let library = try? device.makeLibrary(source: text, options: nil),
+        let stage = InputStage(device: device, library: library)
+    else { return nil }
+    return (device, queue, library, stage)
+}
+
+func worstGap(_ a: [SIMD3<Float>], _ b: [SIMD3<Float>]) -> Float {
+    zip(a, b).map { x, y in max(abs(x.x - y.x), abs(x.y - y.y), abs(x.z - y.z)) }.max() ?? .infinity
+}
+
+if Set(request["rows"] as? [String] ?? []).contains("P12") {
+    var misses: [String] = []
+    var figures: [String] = []
+    if let (device, queue, _, stage) = compiledStage() {
+        // (a) the HLG reading = step 0's HLG BT.2020 arm in an SDR project, over 33 greys and
+        // the six primaries and secondaries at 0.6.
+        let greys = (0...32).map { SIMD3<Float>(repeating: Float($0) / 32) }
+        let hues = [SIMD3<Float>(0.6, 0, 0), [0, 0.6, 0], [0, 0, 0.6], [0.6, 0.6, 0], [0, 0.6, 0.6],
+                    [0.6, 0, 0.6]]
+        let inputs = greys + hues
+        let texels = inputs.map { SIMD4<Float>($0, 1) }
+        if let pass = stagePass(stage, device, queue, .hlg(.bt2020), peak: nil, output: .sdr, texels) {
+            let half = inputs.map { SIMD3<Float>(Float(Float16($0.x)), Float(Float16($0.y)), Float(Float16($0.z))) }
+            let worst = worstGap(half.map(KeyReading.hlg.sdr), pass.map { SIMD3($0.x, $0.y, $0.z) })
+            figures.append("hlg: worst |Δ| \(worst * 1023) levels")
+            if !(worst <= 1.0 / 1023) { misses.append("KeyReading.hlg.sdr against the HLG arm: \(worst * 1023) levels") }
+        } else {
+            misses.append("the HLG pass did not run")
+        }
+        // (b) the PQ reading at peak 600: of the PQ arm's HLG output h, = the PQ arm's SDR output.
+        let signals = (0...30).map { SIMD3<Float>(repeating: Float($0) * 0.025) }
+            + [SIMD3<Float>(0.30, 0.70, 0.28), [0.55, 0.40, 0.30], [0.20, 0.35, 0.60], [0.70, 0.10, 0.10]]
+        let pqTexels = signals.map { SIMD4<Float>($0, 1) }
+        if let h = stagePass(stage, device, queue, .pq(.bt2020), peak: 600, output: .hlg, pqTexels),
+            let sdr = stagePass(stage, device, queue, .pq(.bt2020), peak: 600, output: .sdr, pqTexels)
+        {
+            let read = h.map { KeyReading.pq(peak: 600).sdr(SIMD3($0.x, $0.y, $0.z)) }
+            let worst = worstGap(read, sdr.map { SIMD3($0.x, $0.y, $0.z) })
+            figures.append("pq at 600: worst |Δ| \(worst * 1023) levels")
+            if !(worst <= 1.0 / 1023) { misses.append("KeyReading.pq(600).sdr of the HLG arm against the SDR arm: \(worst * 1023) levels") }
+        } else {
+            misses.append("the PQ passes did not run")
+        }
+    } else {
+        misses.append("no Metal device, shader or InputStage")
+    }
+    // (c) the uniforms, and keyColor per reading = reading.pick (an SDR canvas: the pick).
+    let uniforms: [(KeyReading, Float)] = [(.unlift, 0), (.hlg, 1), (.pq(peak: 600), -600 / 203),
+                                           (.pq(peak: nil), -1000 / 203), (.pq(peak: 100), -1)]
+    for (reading, want) in uniforms where reading.uniform != want {
+        misses.append("\(reading).uniform \(reading.uniform), want \(want)")
+    }
+    let hlgSpace = CGColorSpace(name: CGColorSpace.itur_2100_HLG)
+    let info = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.floatComponents.rawValue
+        | CGBitmapInfo.byteOrder16Little.rawValue
+    if let hlgSpace,
+        let ctx = CGContext(data: nil, width: 4, height: 4, bitsPerComponent: 16, bytesPerRow: 32,
+                            space: hlgSpace, bitmapInfo: info)
+    {
+        ctx.setFillColor(CGColor(colorSpace: hlgSpace, components: [0.30, 0.62, 0.28, 1])!)
+        ctx.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        if let frame = ctx.makeImage() {
+            let point = CGPoint(x: 1.5, y: 1.5)
+            let sdrCanvas = CanvasSnapshot(width: 4, height: 4)
+            let hlgCanvas = CanvasSnapshot(width: 4, height: 4, output: .hlg)
+            let picked = CanvasEyedropperSession.color(at: point, in: FrameWriter.pickable(frame), canvas: sdrCanvas)
+            for reading in [KeyReading.unlift, .hlg, .pq(peak: 600)] {
+                let hlgKey = CanvasEyedropperSession.keyColor(at: point, in: frame, canvas: hlgCanvas, reading: reading)
+                let sdrKey = CanvasEyedropperSession.keyColor(at: point, in: frame, canvas: sdrCanvas, reading: reading)
+                if picked == nil || hlgKey != picked.map(reading.pick) || sdrKey != picked {
+                    misses.append("keyColor at \(reading): hlg \(String(describing: hlgKey)) want "
+                        + "\(String(describing: picked.map(reading.pick))); sdr \(String(describing: sdrKey))")
+                }
+            }
+            figures.append("picked \(String(describing: picked)), hlg pick \(String(describing: picked.map(KeyReading.hlg.pick)))")
+        } else {
+            misses.append("the HLG frame could not be made")
+        }
+    } else {
+        misses.append("the HLG bitmap could not be made")
+    }
+    // (d) of(media:url:) over the H fixtures, and common.
+    let paths = request["keyMedia"] as? [String: String] ?? [:]
+    func url(_ name: String) -> URL? { paths[name].map { URL(fileURLWithPath: $0) } }
+    let pq600 = MediaColor(pq: PQColor(file: nil, from: nil, peak: 600))
+    let lut = MediaColor(lut: 7)
+    let table: [(String, String, MediaKind, MediaColor?, KeyReading)] = [
+        ("hlg", "hlg", .video, nil, .hlg),
+        ("pq peak 600", "pq", .video, pq600, .pq(peak: 600)),
+        ("bt709", "bt709", .video, nil, .unlift),
+        ("hlg as Apple Log", "hlg", .video, MediaColor(log: .appleLog), .unlift),
+        ("hlg with a LUT", "hlg", .video, lut, .unlift),
+        ("the HLG PNG", "still_hlg_png", .image, nil, .hlg),
+        ("still8.png", "still8", .image, nil, .unlift),
+    ]
+    for (label, name, kind, color, want) in table {
+        guard let u = url(name) else {
+            misses.append("\(label): no fixture \(name)")
+            continue
+        }
+        let media = MediaSnapshot(id: 1, path: u.path, kind: kind, color: color)
+        let got = KeyReading.of(media: media, url: u)
+        if got != want { misses.append("of(media:) \(label): \(got), want \(want)") }
+    }
+    if KeyReading.common([.hlg, .hlg]) != .hlg || KeyReading.common([.hlg, .pq(peak: 600)]) != .unlift
+        || KeyReading.common([]) != .unlift || KeyReading.common([.pq(peak: 600)]) != .pq(peak: 600)
+    {
+        misses.append("common: agree/mixed/none")
+    }
+    check(
+        "P12 KeyReading.hlg.sdr = InputStage's HLG BT.2020 arm in an SDR project (33 greys, six "
+            + "hues at 0.6) ±1/1023; KeyReading.pq(600).sdr of the PQ arm's HLG output = its SDR "
+            + "output (PQ signals to 0.75) ±1/1023; the uniforms; keyColor per reading = "
+            + "reading.pick (SDR canvas: the pick); of(media:url:) over hlg, pq at 600, bt709, "
+            + "hlg as Apple Log and with a LUT, the HLG PNG and still8.png; common",
+        misses.isEmpty,
+        (misses.isEmpty ? "as wanted" : misses.joined(separator: "; ")) + " | "
+            + figures.joined(separator: "; "))
+}
+
+// MARK: - P13 a still's arm and its lift (clean-up batch 2, phase 2, spec §11 HD-19 (a), #311)
+
+if Set(request["rows"] as? [String] ?? []).contains("P13") {
+    var misses: [String] = []
+    var figures: [String] = []
+    let stills = request["stills"] as? [String: String] ?? [:]
+    // The Orientation-6 copy of the HLG HEIC, its image copied with the property (codes kept).
+    let o6Path = request["o6"] as? String ?? ""
+    var o6: String?
+    if let heic = stills["still_hlg_heic"],
+        let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: heic) as CFURL, nil),
+        let type = CGImageSourceGetType(source),
+        let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: o6Path) as CFURL, type, 1, nil)
+    {
+        CGImageDestinationAddImageFromSource(dest, source, 0, [kCGImagePropertyOrientation: 6] as CFDictionary)
+        if CGImageDestinationFinalize(dest) { o6 = o6Path }
+    }
+    let want: [(String, String?, String)] = [
+        ("still_hlg_png", stills["still_hlg_png"], "hlg(bt2020)"),
+        ("still_hlg_heic", stills["still_hlg_heic"], "hlg(bt2020)"),
+        ("still_pq_png", stills["still_pq_png"], "pq(bt2020)"),
+        ("still_hlg709_png", stills["still_hlg709_png"], "hlg(bt709)"),
+        ("still_hlg_wide", stills["still_hlg_wide"], "hlg(bt2020)"),
+        ("still_hlg_avif", stills["still_hlg_avif"], "hlg(bt2020)"),
+        ("still_hlg_heic_o6", o6, "hlg(bt2020)"),
+        ("still16_srgb", stills["still16_srgb"], "nil"),
+        ("still8", stills["still8"], "nil"),
+    ]
+    var sizes: [String: (Int, Int)] = [:]
+    for (name, path, arm) in want {
+        guard let path else {
+            misses.append("\(name): no file")
+            continue
+        }
+        let url = URL(fileURLWithPath: path)
+        let read = StillColor.read(url, maxPixelSize: LayerRenderers.maxTextureSide)
+        let at = describe(StillColor.conversion(at: url))
+        let got = describe(read?.conversion)
+        if let image = read?.image { sizes[name] = (image.width, image.height) }
+        figures.append("\(name): \(got)\(read.map { " \($0.image.width)×\($0.image.height)" } ?? "")")
+        if got != arm || at != arm { misses.append("\(name): read \(got), at \(at), want \(arm)") }
+    }
+    if let wide = sizes["still_hlg_wide"], max(wide.0, wide.1) != LayerRenderers.maxTextureSide {
+        misses.append("the 9000×600 still read at \(wide), longest side not 8192")
+    }
+    if let plain = sizes["still_hlg_heic"], let turned = sizes["still_hlg_heic_o6"],
+        plain.0 == plain.1 || turned != (plain.1, plain.0)
+    {
+        misses.append("the Orientation-6 HEIC read \(turned) against \(plain): not rotated")
+    }
+    // The lift: one texture through `.pq(.bt2020)` at .sdr, then at .hlg — two textures,
+    // each InputStage's pass.
+    if let (device, queue, library, stage) = compiledStage(), let lift = LayerLift(device: device, library: library) {
+        let texels = (0...30).map { SIMD4<Float>(SIMD3(repeating: Float($0) * 0.025), 1) }
+            + [SIMD4<Float>(0.30, 0.70, 0.28, 1), [0.55, 0.40, 0.30, 1]]
+        if let source = halfTexture(device, texels),
+            let sdr = lift.lifted(source, conversion: .pq(.bt2020), output: .sdr, queue: queue),
+            let hlg = lift.lifted(source, conversion: .pq(.bt2020), output: .hlg, queue: queue),
+            let gotSDR = readBack(sdr, device, queue), let gotHLG = readBack(hlg, device, queue),
+            let wantSDR = stagePass(stage, device, queue, .pq(.bt2020), peak: nil, output: .sdr, texels),
+            let wantHLG = stagePass(stage, device, queue, .pq(.bt2020), peak: nil, output: .hlg, texels)
+        {
+            let three = { (v: [SIMD4<Float>]) in v.map { SIMD3($0.x, $0.y, $0.z) } }
+            let a = worstGap(three(gotSDR), three(wantSDR)), b = worstGap(three(gotHLG), three(wantHLG))
+            figures.append("lift at sdr worst \(a * 1023), at hlg \(b * 1023) levels; distinct \(sdr !== hlg)")
+            if sdr === hlg || !(a <= 1.0 / 1023) || !(b <= 1.0 / 1023) {
+                misses.append("the lift: sdr \(a * 1023), hlg \(b * 1023) levels, distinct \(sdr !== hlg)")
+            }
+        } else {
+            misses.append("the lift or the passes did not run")
+        }
+    } else {
+        misses.append("no Metal device, shader, InputStage or LayerLift")
+    }
+    check(
+        "P13 StillColor.read and conversion(at:): the HLG PNG, HEIC, AVIF and 9000×600 PNG "
+            + "hlg(bt2020), the PQ PNG pq(bt2020), the BT.709 HLG PNG hlg(bt709), the sRGB 16-bit "
+            + "PNG and still8.png nil; the wide still's longest side 8192; the Orientation-6 HEIC "
+            + "rotated; a LayerLift of one texture through pq(bt2020) at .sdr then .hlg gives two "
+            + "textures, each InputStage's pass ±1/1023",
+        misses.isEmpty,
+        (misses.isEmpty ? "as wanted" : misses.joined(separator: "; ")) + " | "
+            + figures.joined(separator: "; "))
 }
 
 finish()

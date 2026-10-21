@@ -338,7 +338,7 @@ enum InputConversions {
     /// BT.2020's luminance weights — the shader's own, for the twins below.
     private static let hlgA: Float = 0.17883277, hlgB: Float = 0.28466892
     private static let hlgC: Float = 0.55991073
-    private static let luma2020 = SIMD3<Float>(0.2627, 0.6780, 0.0593)
+    static let luma2020 = SIMD3<Float>(0.2627, 0.6780, 0.0593)
 
     /// The HLG OETF: scene light (floored at 0) → signal.
     static func hlgOETF(_ light: Float) -> Float {

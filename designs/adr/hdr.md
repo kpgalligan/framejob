@@ -79,9 +79,10 @@ Mutants, each run once on the final instrument and each answering MUTANT PASS: H
 
 - **Synthetic fixtures only.** No owner HDR or log clip reached the road map; real footage is HDR-1…HDR-6, LIN-1 and GRD-16, GRD-17, GRD-19's.
 - **HD-2's named risk:** if HDR-1 finds the XDR panel shows the HLG preview tone-mapped rather than in EDR, the first fallback is setting the preview layer's `preferredDynamicRange` explicitly, then a `CAMetalLayer` preview, which would amend the `AVPlayerLayer` decision and is the owner's call.
-- **An HLG or PQ still is drawn as SDR in an HLG project** (#311), and **a key set on an HDR clip in an SDR project may need re-picking after the switch** (#312) (HD-13 (l)).
+- **An HDR still is read only by an HLG- or PQ-based colour space** (HD-19 (a)): an iPhone HDR photo's gain map is not read, so it is drawn as SDR (#322); an HDR still's Media-tab thumbnail and filmstrip are ImageIO's, not its step-0 arm's (#323); and a PQ still's peak is unknown, 1,000 cd/m², whatever its `mDCV`/`cLLI` say (#325).
+- **The key's SDR reading is close, not exact, in two cases** (HD-19 (c)): HLG over P3 or BT.709 (its working colour was matrixed in scene light) and PQ above 1,000 cd/m² (BT.2390's EETF is not undone). A Camera Log clip's key keeps the un-lift, so it may need re-picking after the switch (#324).
 - **Apple's own conversion ignores the peak:** M5's digest `d34d90b3f676a425` for the 600 and 1,000 cd/m² files, and H-1's unscored reading of all seven files (worst |Δ| 0 against `pq_plain`).
-- **AV1's peak is measured without a decode:** P10 reads libsvtav1 files through `MediaImporter.detectedPQ` on an M2 Max, which refuses AV1 imports; an AV1 file's import, render and Media-tab section on an M3 or later Mac is HDR-4's step 7. An HLG WebM's copy is probably unlabelled, as a PQ copy is without HD-18 (b)'s label (#321; not measured).
+- **AV1's peak is measured without a decode:** P10 reads libsvtav1 files through `MediaImporter.detectedPQ` on an M2 Max, which refuses AV1 imports; an AV1 file's import, render and Media-tab section on an M3 or later Mac is HDR-4's step 7.
 - **A video-range-flagged non-ProRes Canon file storing full-range codes reads too contrasty** (HD-17 (e); GRD-19).
 - **No log detection** from the makers' metadata (#278).
 - **No re-read of the peak on relink, or for a file imported before format 22** (HD-12).
@@ -94,12 +95,11 @@ Mutants, each run once on the final instrument and each answering MUTANT PASS: H
 
 Still open:
 - #278: S-Log3/V-Log detection from the makers' metadata (Canon Log 2 and 3 built by H-5, HD-17).
-- #311: HDR stills drawn as SDR in an HLG project (HD-13 (l)).
-- #312: a key on an HDR clip across the switch to HLG (HD-13 (l)).
-- #321 (clean-up batch 2): an HLG WebM/Matroska copy probably not labelled HLG.
+- #322, #323, #325 (clean-up batch 2, phase 2): an iPhone HDR photo's gain map, an HDR still's thumbnails, and a PQ still's peak (HD-19 (a)).
+- #324 (clean-up batch 2, phase 2): a key on a Camera Log clip across the switch to HLG (HD-19 (c)).
 - #274: the odd-size reverse's ProRes 422 cost on camera footage — not measured: no owner HDR or log clip reached the road map (HD-1).
 
-Closed: #281 (H-1, HD-6, HD-12), #277 (H-2…H-4, HD-2…HD-5, HD-7, HD-8, HD-13…HD-15) and #276 (H-6, HD-9, HD-16) as built; #313 and #314, instrument defects older than the road map, fixed in H-2 and H-3; #310 (clean-up batch 1, the instruments held to the spec) and #315, #316, #317 (clean-up batch 2, HD-18; #317 measured, no defect).
+Closed: #281 (H-1, HD-6, HD-12), #277 (H-2…H-4, HD-2…HD-5, HD-7, HD-8, HD-13…HD-15) and #276 (H-6, HD-9, HD-16) as built; #313 and #314, instrument defects older than the road map, fixed in H-2 and H-3; #310 (clean-up batch 1, the instruments held to the spec) and #315, #316, #317 (clean-up batch 2, HD-18; #317 measured, no defect), and #311, #312, #321 (clean-up batch 2, phase 2, HD-19).
 
 Not filed, each decided at the close:
 - How the XDR panel and an SDR external display show an HLG preview: HDR-1's steps 3–4.
@@ -154,3 +154,44 @@ re-run).
 - H-6: HD-16, the order change, the landed list, LU's deviation, LT–LU and TL, the ten mutants.
 - H-5: HD-17, the owner's ACES choice, the curves, LP5/LP6 and L19–L22, the seven mutants, `log_thumbs_proof`'s TH.
 - H-7: the close, the issues filed and not filed.
+
+Clean-up batch 2, phase 2 (#311, #321, #312; spec §11 HD-19, recorded before the code, its (a)
+and (b) amended with M1's and the control's figures as they came): an HLG- or PQ-labelled still is
+drawn in its own colour space at 16-bit float (`LayerRenderers.renderHDRImage`, `StillColor`) and
+run through its own step-0 arm in both outputs, `LayerLift` now taking a conversion and an output;
+an HLG WebM/Matroska copy (Colour transfer 18) is labelled HLG (`ContainerRewrapWriter`'s
+`hlgLabels`); and an HLG project's chroma key on an HLG or PQ source reads the colour an SDR
+project shows (`KeyReading` in `ChromaKeyHDR.swift`, the shader's `keyReadSDR` behind
+`LayerUniforms.keyReading`, the reserved float renamed), the eyedropper storing the pick through
+the keyed clips' common reading. The owner chose the key's meaning on 2026-10-20 ("Key means SDR
+colour (Recommended)"). M1 found today's still decode, `decodeImage`, keeps an HLG or PQ PNG's,
+HEIC's, AVIF's and JPEG XL's space, depth and codes and is the only route that bounds and orients
+(HD-19 (a) holds its figures), so the decode is unchanged. The phase's control was captured on the
+untouched tree's Release build (`hdr_proof.py capture tools/proof/work/cleanup2/ctl-p2 --only
+H1,H7i,SI,Z1`), and HI, HKh and H7h, written before any product code, all failed there: HI's HLG
+and PQ PNGs as far as 209.80 and 256.25 10-bit levels from their oracles in an HLG project and
+140.72 and 190.44 in an SDR one (drawn as SDR); HKh's keyed left halves read [0.3003, 0.6201,
+0.2808] (green_hlg) and [0.1862, 0.9380, 0.1636] (green_pq) for the lifted background 0.5059, so
+the key no longer keyed after the switch; H7h's copy read 158.27 and 213.67 levels off, so the
+HLG label is written. HKh's rule fixed each fixture's tolerance from its oracle: 0.1 for
+green_hlg (the un-lift 0.2267 away) and 0.02 for green_pq (white 1000/203 0.0374 away). On the
+phase's Release build `hdr_proof.py compare tools/proof/work/cleanup2/ctl-p2` scored 73/73 (H1's
+12 SDR scenes byte-identical with equal picks, SI's 50 JSON files byte-identical; HI's worst
+|Δ| 0.00, 0.50 and 1.00 levels in an HLG project and 0.38 and 0.34 in an SDR one; HKh's left
+halves 0.50585 and green_pq's right 0.61474 against 0.61518; H7h's worst 1.94 and 1.41 levels;
+P12's twins 0.451 and 0.412 levels from `InputStage`; P13's lift 0.0 levels at both outputs, the
+9000×600 still read 8192×546 and the Orientation-6 HEIC 128×1024), `precision_proof.py --only
+S1,S2,S4,S6,S7` 6/6 against a HEAD-built control (`ctl-p2/precision`, captured `--only Sc,Sd`
+from a tree copy with the phase's app files restored to HEAD: S4's ramp16.png within max |Δ| 1,
+mean 0.476, of it), `container_rewrap_probe.py` 61/61 and `container_import_proof.py` 16/16.
+The thirteen mutants (the spec's twelve and `hdr709-as-2020`, since BT.709 HLG/PQ spaces' own
+primaries are a branch of their own) and `key-not-unlifted`, re-pinned to the new distance's two
+lines, each printed MUTANT PASS with `--control tools/proof/work/cleanup2/ctl-p2`; each key
+mutant failed the fixture it aimed at (`key-pq-white-fixed` and `key-pq-as-hlg` green_pq,
+`key-track-reading-hlg-terms` green_hlg, `key-reading-dropped` both). The gate passed first in
+266 s, and again in 1 s after this record (names re-run). The review passed with two nits, applied
+at merge: `KeyReading.pick` on `.unlift` now calls `InputConversions.unliftedPick` (the same
+arithmetic, so P6 and P12 read one function), and a comment on a still whose HDR bitmap Core
+Graphics refuses; `make gate` passed in 211 s and P6, P12, HK, HKh, Z1 5/5 on Release after them.
+Residue filed: #322 (gain-map HDR photos), #323 (an HDR still's thumbnails), #324 (a Camera Log
+clip's key across the switch), #325 (a PQ still's HDR10 peak).
