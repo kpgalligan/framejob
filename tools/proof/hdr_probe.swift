@@ -1,10 +1,12 @@
 // Built by tools/proof/hdr_proof.py as `main.swift` over every other file in
-// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P9
+// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P11
 // (grading-3 T3-1, spec §11 GR-15 as amended; P5 hdr H-1, spec §11 HD-12; P6
 // hdr H-2, spec §11 HD-3, HD-13; P7 hdr H-3, spec §11 HD-14; P8 hdr H-4, spec
 // §11 HD-15: `ScopeSignal`, the traces' JSON, and the waveform's, parade's
 // and vectorscope's drawing cached to bitmaps; P9 hdr H-6, spec §11 HD-16:
-// `RecipeCanvas.blended`, `uniforms(for:)` and the four blocks' sizes).
+// `RecipeCanvas.blended`, `uniforms(for:)` and the four blocks' sizes; P10
+// and P11 clean-up batch 2, spec §11 HD-18: an AV1 file's peak through
+// `MediaImporter.detectedPQ`, and a scope slot reading only its own kind).
 //
 // Step 0's maths through the app's own types: `InputConversion`'s selector
 // through BOTH readers (the labels as strings, and a `CMVideoFormatDescription`
@@ -1095,6 +1097,104 @@ do {
         misses.isEmpty,
         (misses.isEmpty ? "as wanted" : misses.prefix(12).joined(separator: "; "))
             + " | worst blended |Δ| \(worst)")
+}
+
+
+// MARK: - P10 the AV1 peak (clean-up batch 2, spec §11 HD-18 (c))
+
+do {
+    var misses: [String] = []
+    var figures: [String] = []
+    let items = request["av1"] as? [[String: Any]] ?? []
+    if items.isEmpty {
+        misses.append("the request names no AV1 fixture")
+    }
+    for item in items {
+        let name = item["name"] as? String ?? "?"
+        guard let path = item["path"] as? String else {
+            misses.append("\(name): \(item["why"] as? String ?? "no file")")
+            continue
+        }
+        let want = item["want"] as? [String: Any] ?? [:]
+        let asset = AVURLAsset(url: URL(fileURLWithPath: path))
+        guard let track = CompositionBuilder.firstTrack(of: asset, mediaType: .video),
+            let descriptions = CompositionBuilder.keyed(track, "formatDescriptions")
+                as? [CMFormatDescription], !descriptions.isEmpty
+        else {
+            misses.append("\(name): no video track or no format description")
+            continue
+        }
+        let readsPQ = descriptions.contains {
+            if case .pq = InputConversion.choose(for: $0) { return true }
+            return false
+        }
+        let carries = descriptions.contains {
+            CMFormatDescriptionGetExtension(
+                $0, extensionKey: kCMFormatDescriptionExtension_MasteringDisplayColorVolume) != nil
+                || CMFormatDescriptionGetExtension(
+                    $0, extensionKey: kCMFormatDescriptionExtension_ContentLightLevelInfo) != nil
+        }
+        let subtype = descriptions.map { CMFormatDescriptionGetMediaSubType($0) }
+        let read = MediaImporter.detectedPQ(descriptions, track: track, asset: asset)?.pq?
+            .dictionary
+        let same = read.map { NSDictionary(dictionary: $0).isEqual(to: want) } ?? false
+        figures.append(
+            "\(name): av01 \(subtype.contains(kCMVideoCodecType_AV1)), reads PQ \(readsPQ), "
+                + "description extensions \(carries), read \(read.map { "\($0)" } ?? "nil")")
+        if !readsPQ {
+            misses.append("CONTROL \(name): its description does not read as PQ")
+        }
+        if carries {
+            misses.append("CONTROL \(name): its description carries an HDR10 extension")
+        }
+        if !same {
+            misses.append("\(name): read \(read.map { "\($0)" } ?? "nil"), want \(want)")
+        }
+    }
+    check(
+        "P10 MediaImporter.detectedPQ on libsvtav1 PQ MP4s whose HDR10 metadata is in the "
+            + "stream: av1_pq_cll {600, max_cll}, av1_pq_display {2000, mastering_display}, "
+            + "av1_pq_plain {} (CONTROL: each description reads as PQ and carries neither "
+            + "extension)",
+        misses.isEmpty,
+        (misses.isEmpty ? "as wanted" : misses.joined(separator: "; ")) + " | "
+            + figures.joined(separator: "; "))
+}
+
+// MARK: - P11 a scope slot reads only its own kind's trace (clean-up batch 2, #315)
+
+do {
+    var misses: [String] = []
+    func views(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(views) }
+    let slot = ScopeSlotView(name: "top")
+    func caption() -> String? {
+        (views(slot).first { $0.accessibilityIdentifier() == "scopes.top.caption" }
+            as? NSTextField)?.stringValue
+    }
+    let wave = views(slot).compactMap { $0 as? WaveformTraceView }.first
+    var counts = [UInt32](repeating: 0, count: 65536)
+    counts[128] = 4
+    let hlg = WaveformTrace(counts: counts, width: 1, height: 1, signal: .hlg)
+    slot.show(.waveform(hlg))
+    let first = (caption(), wave?.trace != nil)
+    let sdr = VectorscopeTrace(
+        counts: [UInt32](repeating: 0, count: 65536), width: 1, height: 1, signal: .sdr)
+    slot.show(.vectorscope(sdr))
+    let second = (caption(), wave?.trace != nil)
+    if slot.kind != .waveform || wave == nil {
+        misses.append("the slot is not a waveform slot with a waveform body")
+    }
+    if first != ("HLG · cd/m²", true) {
+        misses.append("after the HLG waveform: caption \(first.0 ?? "nil"), drawn \(first.1)")
+    }
+    if second != ("HLG · cd/m²", false) {
+        misses.append(
+            "after an SDR vectorscope trace: caption \(second.0 ?? "nil"), drawn \(second.1)")
+    }
+    check(
+        "P11 ScopeSlotView (waveform) shown an HLG waveform, then an SDR vectorscope trace: the "
+            + "caption stays \"HLG · cd/m²\" and the body is cleared",
+        misses.isEmpty, misses.isEmpty ? "as wanted" : misses.joined(separator: "; "))
 }
 
 finish()

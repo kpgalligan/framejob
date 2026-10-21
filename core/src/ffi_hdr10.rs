@@ -1,8 +1,8 @@
-//! C FFI: a PQ file's HDR10 peak (spec §11 HD-12) — one export over
-//! `hdr10.rs`'s pure reader, a thin shim through `ffi_util.rs`'s helpers.
-//! The import probe hands it the bytes AVFoundation gives it (the format
-//! description's two extensions, else the first sample) and stores the
-//! answer on the media.
+//! C FFI: a PQ file's HDR10 peak (spec §11 HD-12, HD-18) — two exports over
+//! `hdr10.rs`'s pure reader, thin shims through `ffi_util.rs`'s helpers.
+//! The import probe hands them the bytes AVFoundation gives it (the format
+//! description's two extensions, else the first sample; for AV1 the `av1C`
+//! record and the first sample) and stores the answer on the media.
 
 use std::ffi::c_char;
 use std::ptr;
@@ -57,6 +57,39 @@ pub unsafe extern "C" fn rc_hdr10_peak(
         fallible_op(
             ptr::null_mut(),
             "reading an HDR10 peak",
+            ptr::null_mut(),
+            body,
+            out_string,
+        )
+    }
+}
+
+/// The peak `hdr10::av1_peak` reads from an AV1 track whose description
+/// carries neither extension (spec §11 HD-18 (c)): `config` the `av1C`
+/// record, `sample` the first video sample with data; JSON as
+/// `rc_hdr10_peak`'s. A NULL pointer or a 0 length is absent. NULL only on a
+/// caught panic. Freed with `rc_string_free`.
+///
+/// # Safety
+/// Each pointer must be NULL or point to its length's readable bytes, valid
+/// for the call.
+#[no_mangle]
+pub unsafe extern "C" fn rc_hdr10_av1_peak(
+    config: *const u8,
+    config_len: usize,
+    sample: *const u8,
+    sample_len: usize,
+) -> *mut c_char {
+    let body = || {
+        let config = unsafe { optional(config, config_len) };
+        let sample = unsafe { optional(sample, sample_len) };
+        let read = hdr10::av1_peak(config, sample);
+        serde_json::to_string(&read).map_err(|e| e.to_string())
+    };
+    unsafe {
+        fallible_op(
+            ptr::null_mut(),
+            "reading an AV1 HDR10 peak",
             ptr::null_mut(),
             body,
             out_string,

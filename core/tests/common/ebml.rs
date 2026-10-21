@@ -127,6 +127,10 @@ pub struct Track {
     pub height: u64,
     /// (matrix, range, transfer, primaries) as a Colour element.
     pub colour: Option<(u64, u64, u64, u64)>,
+    /// Further Colour children, written after those four (MaxCLL,
+    /// MasteringMetadata, …); a Colour element is written when `colour` is
+    /// set or this is not empty.
+    pub colour_extra: Vec<Vec<u8>>,
     pub rate: f64,
     pub channels: u64,
 }
@@ -179,16 +183,18 @@ impl Track {
         }
         if self.kind == 1 {
             let mut v = vec![uint(0xB0, self.width), uint(0xBA, self.height)];
-            if let Some((m, r, t, p)) = self.colour {
-                v.push(master(
-                    0x55B0,
-                    &[
+            if self.colour.is_some() || !self.colour_extra.is_empty() {
+                let mut colour = Vec::new();
+                if let Some((m, r, t, p)) = self.colour {
+                    colour.extend([
                         uint(0x55B1, m),
                         uint(0x55B9, r),
                         uint(0x55BA, t),
                         uint(0x55BB, p),
-                    ],
-                ));
+                    ]);
+                }
+                colour.extend(self.colour_extra.iter().cloned());
+                v.push(master(0x55B0, &colour));
             }
             c.push(master(0xE0, &v));
         }

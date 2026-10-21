@@ -15,7 +15,7 @@ use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::os::unix::fs::FileExt;
 
-use crate::container_codec::Colour;
+use crate::container_codec::{Colour, Mastering};
 
 const EBML: u32 = 0x1A45_DFA3;
 const DOC_TYPE: u32 = 0x4282;
@@ -261,6 +261,9 @@ fn video_settings(e: &mut Entry, body: &[u8]) -> Result<(), String> {
                         0x55B9 => e.colour.range = v,
                         0x55BA => e.colour.transfer = v,
                         0x55BB => e.colour.primaries = v,
+                        0x55BC => e.colour.max_cll = Some(uint(b)),
+                        0x55BD => e.colour.max_fall = Some(uint(b)),
+                        0x55D0 => e.colour.mastering = mastering(b),
                         _ => {}
                     }
                 }
@@ -269,6 +272,30 @@ fn video_settings(e: &mut Entry, body: &[u8]) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// A MasteringMetadata element's floats (RFC 9559; spec §11 HD-18 (a)), an
+/// absent child 0; `None` when its children cannot be read, so a damaged one
+/// is ignored, never a refusal.
+fn mastering(body: &[u8]) -> Option<Mastering> {
+    let mut m = Mastering::default();
+    for (id, b) in children(body, "MasteringMetadata").ok()? {
+        let v = float(b);
+        match id {
+            0x55D1 => m.red.0 = v,
+            0x55D2 => m.red.1 = v,
+            0x55D3 => m.green.0 = v,
+            0x55D4 => m.green.1 = v,
+            0x55D5 => m.blue.0 = v,
+            0x55D6 => m.blue.1 = v,
+            0x55D7 => m.white.0 = v,
+            0x55D8 => m.white.1 = v,
+            0x55D9 => m.luminance_max = v,
+            0x55DA => m.luminance_min = v,
+            _ => {}
+        }
+    }
+    Some(m)
 }
 
 /// What `open` read before the first Cluster.

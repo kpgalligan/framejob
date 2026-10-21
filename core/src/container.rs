@@ -63,6 +63,7 @@ struct Video {
     height: u64,
     atom: Option<(&'static str, Vec<u8>)>,
     vp9_profile: Option<u8>,
+    colour: codec::Colour,
     frames: Vec<Frame>,
     ns: Vec<i64>,
     raw: Timing,
@@ -147,6 +148,10 @@ impl Container {
                 "vp9_profile": v.vp9_profile, "nominal_fps": v.nominal_fps,
                 "timescale": v.timing.timescale, "grid": v.timing.grid,
                 "samples": vc.0, "bytes": vc.1,
+                "mdcv_hex": v.colour.mastering.map(|m| codec::hex(&codec::mdcv(&m))),
+                "clli_hex": hdr10_light(&v.colour),
+                "transfer": v.colour.transfer, "primaries": v.colour.primaries,
+                "matrix": v.colour.matrix,
             })
         });
         let audio = a.map_or(Value::Null, |a| {
@@ -265,12 +270,20 @@ fn video(src: &Source, e: &Entry, frames: Vec<Frame>, scale: u64) -> Result<Vide
         height: e.height,
         atom,
         vp9_profile,
+        colour: e.colour,
         nominal_fps: timing::nominal_fps(&ns, e.default_duration),
         frames,
         ns,
         timing: raw.clone(),
         raw,
     })
+}
+
+/// The Colour element's `clli` blob in hex, when it names MaxCLL or MaxFALL
+/// (spec §11 HD-18 (a)).
+fn hdr10_light(colour: &codec::Colour) -> Option<String> {
+    (colour.max_cll.is_some() || colour.max_fall.is_some())
+        .then(|| codec::hex(&codec::clli(colour.max_cll, colour.max_fall)))
 }
 
 fn audio(src: &Source, e: &Entry, frames: Vec<Frame>) -> Audio {

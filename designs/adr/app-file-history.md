@@ -581,6 +581,14 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   seam: the graphics engine's value types (`GraphicDiagnostic`, `GraphicFailure`,
   `GraphicRaster`, under `// MARK: - Graphics`) and `SpeedLimits` out to a values file, each
   naming no `rc_*` symbol; `takeDiagnostics` stays, since it frees through `takeString`.
+  Clean-up batch 2 paid that seam before `ReelHDR10.av1Peak` (#316, spec §11 HD-18) landed:
+  `SpeedLimits` and `GraphicDiagnostic`, `GraphicFailure` and `GraphicRaster` with their docs
+  went whole to `CoreValues.swift` under `import Foundation` and a three-line doc, a pure move
+  gated alone (`04-toll.patch`); `takeDiagnostics`, `ReelSpeed` and the `// MARK:` lines
+  stayed, and nothing widened. `wc -l app/Sources/ReelCore.swift`: 842 before, 800 after;
+  `CoreValues.swift` is 47. The next seam: `ReelCoreError` and the `Fps.ffiPair` extension
+  (lines 41–78 less the three private string helpers) out to `CoreValues.swift`, neither
+  calling an `rc_*` symbol.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,

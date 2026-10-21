@@ -28,12 +28,14 @@ extension MediaImporter {
         return nil
     }
 
-    /// A PQ video track's HDR10 peak (spec §11 HD-12), read when `probeAsset`
-    /// runs: `{pq}` for a track whose description `InputConversion` reads as
-    /// PQ — the core's reading of the description's mastering-display and
-    /// content-light extensions, else, for an `hvc1` or `hev1` track only, of
-    /// the first sample's SEI (`firstSample`) — `{pq: {}}` when neither
-    /// reads; nil for any track that is not PQ. Synchronous (spec §11 W-8).
+    /// A PQ video track's HDR10 peak (spec §11 HD-12, HD-18), read when
+    /// `probeAsset` runs: `{pq}` for a track whose description
+    /// `InputConversion` reads as PQ — the core's reading of the
+    /// description's mastering-display and content-light extensions, else,
+    /// for an `av01` track, of its `av1C` record's and first sample's
+    /// metadata OBUs, and for an `hvc1` or `hev1` track of the first sample's
+    /// SEI (`firstSample`) — `{pq: {}}` when none reads; nil for any track
+    /// that is not PQ. Synchronous (spec §11 W-8).
     static func detectedPQ(
         _ descriptions: [CMFormatDescription], track: AVAssetTrack, asset: AVAsset
     ) -> MediaColor? {
@@ -46,6 +48,17 @@ extension MediaImporter {
         }
         let mastering = data(kCMFormatDescriptionExtension_MasteringDisplayColorVolume)
         let contentLight = data(kCMFormatDescriptionExtension_ContentLightLevelInfo)
+        if mastering == nil, contentLight == nil,
+            CMFormatDescriptionGetMediaSubType(description) == kCMVideoCodecType_AV1
+        {
+            let atoms = CMFormatDescriptionGetExtension(
+                description,
+                extensionKey: kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms)
+                as? [String: Any]
+            let read = ReelHDR10.av1Peak(
+                config: atoms?["av1C"] as? Data, sample: firstSample(of: track, in: asset))
+            return MediaColor(pq: read)
+        }
         var sample: Data?
         var nalLength = 0
         if mastering == nil, contentLight == nil, let length = hevcNALLength(description) {

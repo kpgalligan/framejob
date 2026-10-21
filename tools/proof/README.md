@@ -21049,3 +21049,43 @@ rule) LP5, L19 and LP6, L20; `canon-scale-dropped` (`kCanonReflection` 1.0) LP5,
 L21; `cinema-as-2020` (`InputPrimaries(.cinemaGamut)` answers BT.2020) LP2, L19, L20;
 `canon-not-log-in-hlg` (`inputToHLG`'s log test back to kinds 5–7) L21. Its record:
 `archive/hdr.md`'s H-5 section.
+
+## HDR clean-up batch 2, phase 1 — the PQ peak from WebM/Matroska and AV1, the scopes' two nits, ProRes 4444 with alpha (`hdr_proof.py` H7w, DA, P10, P11, SD and SP extended, and eleven mutants; `hdr_probe.swift` P10, P11; `core/tests/hdr10_containers.rs`; spec §11 HD-18)
+
+The phase (#316, #315, #317) reads a WebM/Matroska Colour element's MaxCLL, MaxFALL and
+MasteringMetadata into a PQ copy's description as HD-12's two blobs, labels that copy PQ, reads
+an AV1 stream's HDR_CLL and HDR_MDCV metadata OBUs (`rc_hdr10_av1_peak`), and makes a scope slot
+read only its own kind's trace. The rules are `hdr_proof.py`'s header.
+
+- **H7w**: five VP9 Profile 2 lossless WebMs of the ramp, rewritten by `webm_rewrite` (Python,
+  from RFC 8794 and RFC 9559) and each kept only when ffprobe's stream side data reads its own
+  values; ffmpeg 9.0.2 wrote the transfer and primaries into the WebM only with the tags on
+  the input as well (measured, as with libsvtav1). The three PQ files read their peaks through
+  the copy's description; the SDR pair's copies must be indistinguishable.
+- **DA** (#317) was added and run on the control's Release build before any product code; its
+  rules are in the header and in spec §11 HD-18 (e). It prints each arm's verdict, so a DA
+  mutant is judged only by arms that passed on the control.
+- **P10** reads libsvtav1 MP4s through `MediaImporter.detectedPQ` without a decode (an M1/M2
+  refuses AV1 imports); a fixture is kept only when its HDR10 metadata is in the first frame's
+  side data and not in the stream's, so the stream route is the one read. **P11** is an
+  offscreen `ScopeSlotView`.
+- **SD** and **SP** gain HD-15 (c)'s both-switches case (#315).
+
+```sh
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py capture tools/proof/work/cleanup2/ctl --only H1,H7i,SI,Z1   # the toll's build, before the phase's code
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --only DA,Z1   # the same build: DA's rules on the control
+make app-debug && python3 tools/proof/hdr_proof.py --only H7w,P10,P11,SD,SP,DA,Z1
+make app && RC_PROOF_APP=release python3 tools/proof/hdr_proof.py compare tools/proof/work/cleanup2/ctl
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --mutant <name> --control tools/proof/work/cleanup2/ctl --only <its rows>,Z1
+```
+
+The eleven mutants and their rows: `mkv-maxcll-unread` (0x55BC not read) H7w;
+`mkv-mastering-unread` (0x55D0 not read) H7w; `mkv-blobs-not-written` (the copy's description
+without the blobs) H7w; `webm-pq-unlabelled` (without the PQ label) H7w; `mkv-blobs-ungated`
+(the blobs written into every copy, an SDR one too) H7w; `av1-mastering-over-cll` (AV1's
+mastering maximum chosen over MaxCLL) P10; `av1-luminance-as-st2086` (24.8 read as 0.0001
+cd/m²) P10; `av1-route-skipped` (`detectedPQ`'s `av01` route never taken) P10;
+`slot-any-trace` (`ScopeSlotView.show` taking its caption from any trace) P11;
+`output-premultiply-dropped` (`framejob_output_fragment` returns `rgb`, not `rgb * a`) DA, by
+its pq arm; `straighten-skipped-half` (`ExportStraightAlpha.straighten(half:…)` returns at its
+guard) DA. Its record: `designs/adr/hdr.md`'s "Clean-up batch 2".

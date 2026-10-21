@@ -343,6 +343,9 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
   - **Amends** GR-15 (the white, and B96's route: its four files held HDR10 metadata only in the
     HEVC SEI, which AVFoundation does not read, M5), GR-16 (the colour record, the op's key and
     its refusals) and GR-21 (the marker's `peak`).
+  **Amended by HD-18** (clean-up batch 2): a WebM/Matroska PQ copy's description carries its
+  Colour element's MaxCLL, MaxFALL and MasteringMetadata as route 1's two blobs, and an `av01`
+  track's stream route is its `av1C` config OBUs, then its first sample's, HDR_CLL and HDR_MDCV.
 - **HD-13 — H-2's settlements: the lift's arithmetic, step 0's HLG arms, every drawn layer lifted
   at upload, the grade's BT.2020 constants, what reads through the inverse lift, the frames and
   the exports.** H-2's spec, recorded before its code; it settles what HD-2 and HD-3 left to the
@@ -667,3 +670,54 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
       0.562304 and decodes to R 0.90596.
   - **(h) Format 25.** No migration. No op, tool (92), FFI export or `InputUniforms` field.
   - **(i) Amends** HD-10 (its sources and pairings) and GR-16 (its vocabulary).
+- **HD-18 — Clean-up batch 2's settlements: the PQ peak read from a WebM/Matroska Colour
+  element and from an AV1 stream's metadata OBUs, the scopes with both switches on, and ProRes
+  4444 with alpha from an HLG project measured.** Recorded before the batch's code (#316, #315,
+  #317); it settles what HD-12 left to other containers. No op, tool, argument, recipe, catalog
+  or format change (format stays 25).
+  - **(a) Matroska's HDR10 fields** (RFC 9559's Colour element): MaxCLL 0x55BC and MaxFALL
+    0x55BD (unsigned integers, cd/m²) and MasteringMetadata 0x55D0, whose children are floats —
+    PrimaryRChromaticityX/Y 0x55D1/0x55D2, G 0x55D3/0x55D4, B 0x55D5/0x55D6, the white point
+    0x55D7/0x55D8, LuminanceMax 0x55D9 and LuminanceMin 0x55DA (cd/m²). The core reads them with
+    the Colour element and `rc_container_describe` reports them (the video's `mdcv_hex`,
+    `clli_hex`, and the Colour's `transfer`, `primaries` and `matrix` codes, each null when
+    absent). The copy's format description carries them as HD-12's two blobs **only when the
+    Colour's transfer is 16** (PQ), so an SDR or untagged copy gains nothing, and HD-12's route 1
+    reads them unchanged:
+    - `MasteringDisplayColorVolume`, 24 bytes, written when 0x55D0 is present: the primaries in
+      ST 2086's and SEI 137's order G, B, R, then the white point, each x and y a big-endian u16
+      of round(c·50000) clamped to 0…50000; then the maximum and minimum luminance, each a
+      big-endian u32 of round(L·10000) clamped to the u32's range (NaN or negative → 0). An
+      absent child is 0.
+    - `ContentLightLevelInfo`, 4 bytes, written when MaxCLL or MaxFALL is present: MaxCLL then
+      MaxFALL, each a big-endian u16 clamped to 65535, an absent one 0.
+  - **(b) The PQ label.** A copy whose Colour's transfer is 16 is labelled PQ in its format
+    description: `TransferFunction` SMPTE ST 2084, and `ColorPrimaries` and `YCbCrMatrix` from
+    `CVColorPrimariesGetStringForIntegerCodePoint` and `CVYCbCrMatrixGetStringForIntegerCodePoint`
+    when the Colour names them and Core Video maps the code. No other copy's description changes.
+  - **(c) AV1.** The description's two extensions first (HD-12's route 1); else the stream (AV1
+    §5.3, §5.8; AV1-ISOBMFF §2.3): the `av1C`'s configOBUs (bytes 4 on, when byte 0 is 0x81, the
+    marker and version 1; else none), then the first sample with data. Every OBU is walked: the
+    type is the header's bits 6–3, an extension byte is skipped, `obu_size` is a leb128 of at
+    most 8 bytes when `obu_has_size_field` is set, else the OBU is the rest of the bytes. An
+    OBU_METADATA (type 5) is read by its leb128 `metadata_type`: 1 HDR_CLL (`max_cll` a
+    big-endian u16, 4 bytes or more) and 2 HDR_MDCV (`luminance_max` a big-endian u32 at payload
+    bytes 16–19 in 24.8 fixed point, 24 bytes or more), the first of each kept, the config's
+    before the sample's. The maximum is whole cd/m² as (v + 128) / 256 in 64 bits, clamped to
+    10,000, 0 no reading; MaxCLL as it stands, 0 absent, clamped to 10,000. MaxCLL first, else
+    the mastering maximum, as HD-12. The core's pure `hdr10.rs` reads it through one export,
+    `rc_hdr10_av1_peak`; the import probe calls it for an `av01` track.
+  - **(d) The scopes, #315.** With Show Ungraded and Show SDR Version both on, the scopes read
+    the ungraded SDR version (HD-15 (c)): no new branch, since the recipe's `ungraded` and
+    `dynamic_range` are independent and `ScopeSignal` reads the second. A scope slot takes its
+    caption and signal only from a trace of its own kind; another kind's trace is "no frame
+    yet".
+  - **(e) ProRes 4444 with alpha, #317,** is measured by a row before any fix (`hdr_proof.py`
+    DA): an HLG project with a transparent background, a translucent shape and its opaque twin,
+    exported `prores_4444` at its default, `hlg`, `sdr` and `pq`. Rules, fixed before the row
+    runs: at the shape's centre, alpha within ±1/255 and the straight colour within ±2/1023;
+    `hlg` and the default against `render_frame`, `sdr` against `render_frame {sdr_version:
+    true}`, `pq`'s alpha against `render_frame`'s and its colour against the opaque twin's `pq`
+    export. A failure is filed with its figures and fixed in a later phase.
+  - **(f) Amends** HD-12 (its routes: a Matroska Colour's fields carried into the copy's
+    description, and AV1's metadata OBUs as the stream route for an `av01` track).

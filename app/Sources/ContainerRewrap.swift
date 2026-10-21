@@ -260,6 +260,13 @@ struct ContainerDescription: Decodable {
         let grid: Bool
         let samples: Int
         let bytes: UInt64
+        /// The Colour element's HDR10 fields as HD-12's two blobs, and its
+        /// codes (spec §11 HD-18 (a)); nil when the file has none.
+        let mdcvHex: String?
+        let clliHex: String?
+        let transfer: Int?
+        let primaries: Int?
+        let matrix: Int?
     }
 
     struct Audio: Decodable {

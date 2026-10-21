@@ -650,6 +650,23 @@ enum ReelHDR10 {
         }
         return text.flatMap { ReelJSON.decode(PQColor.self, from: $0) } ?? PQColor()
     }
+
+    /// An AV1 track's peak (spec §11 HD-18 (c)), for a description carrying
+    /// neither extension: the metadata OBUs of its `av1C` record (`config`),
+    /// then of its first sample with data; an empty `PQColor` when nothing
+    /// reads.
+    static func av1Peak(config: Data?, sample: Data?) -> PQColor {
+        func withBytes<R>(_ data: Data?, _ body: (UnsafePointer<UInt8>?, Int) -> R) -> R {
+            guard let data, !data.isEmpty else { return body(nil, 0) }
+            return data.withUnsafeBytes { body($0.bindMemory(to: UInt8.self).baseAddress, $0.count) }
+        }
+        let text: String? = withBytes(config) { c, cCount in
+            withBytes(sample) { s, sCount in
+                takeString(rc_hdr10_av1_peak(c, cCount, s, sCount))
+            }
+        }
+        return text.flatMap { ReelJSON.decode(PQColor.self, from: $0) } ?? PQColor()
+    }
 }
 
 // MARK: - Graphics

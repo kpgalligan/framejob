@@ -105,7 +105,7 @@ final class ScopeSlotView: NSView {
 
     /// `trace` drawn in the body (nil, or another kind's, is "no frame yet").
     func show(_ trace: ScopeTrace?) {
-        if let trace {
+        if let trace, trace.kind == kind {
             signal = trace.signal
             captionLabel.stringValue = signal.caption(for: kind)
         }

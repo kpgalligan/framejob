@@ -25,13 +25,81 @@
 
 use crate::container_vorbis::Vorbis;
 
-/// The Colour element's four values the `vpcC` record carries.
+/// The Colour element's four values the `vpcC` record carries, and its
+/// HDR10 fields (spec §11 HD-18 (a), RFC 9559): MaxCLL, MaxFALL and the
+/// MasteringMetadata, which a PQ copy's description carries as `mdcv` and
+/// `clli`.
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct Colour {
     pub matrix: Option<u8>,
     pub range: Option<u8>,
     pub transfer: Option<u8>,
     pub primaries: Option<u8>,
+    pub max_cll: Option<u64>,
+    pub max_fall: Option<u64>,
+    pub mastering: Option<Mastering>,
+}
+
+/// A MasteringMetadata element's floats: each primary's and the white
+/// point's CIE 1931 x and y, and the luminance range in cd/m². An absent
+/// child is 0.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Mastering {
+    pub red: (f64, f64),
+    pub green: (f64, f64),
+    pub blue: (f64, f64),
+    pub white: (f64, f64),
+    pub luminance_max: f64,
+    pub luminance_min: f64,
+}
+
+/// ST 2086's chromaticity unit (0.00002) and luminance unit (0.0001 cd/m²).
+const CHROMATICITY_UNITS: f64 = 50_000.0;
+const LUMINANCE_UNITS: f64 = 10_000.0;
+
+/// `value × units` rounded to nearest and clamped to `0…max`; NaN or a
+/// negative value is 0.
+fn fixed(value: f64, units: f64, max: u64) -> u64 {
+    if value.is_nan() || value <= 0.0 {
+        return 0;
+    }
+    let scaled = (value * units).round();
+    if scaled >= max as f64 {
+        max
+    } else {
+        scaled as u64
+    }
+}
+
+/// The `MasteringDisplayColorVolume` blob (spec §11 HD-12, HD-18 (a)): the
+/// primaries in ST 2086's and H.265 SEI 137's order — green, blue, red —
+/// then the white point, each x and y a big-endian u16 in 0.00002 units
+/// clamped to 50000; then the maximum and minimum luminance, each a
+/// big-endian u32 in 0.0001 cd/m².
+pub(crate) fn mdcv(m: &Mastering) -> [u8; 24] {
+    let mut out = [0u8; 24];
+    let points = [m.green, m.blue, m.red, m.white];
+    for (i, (x, y)) in points.iter().enumerate() {
+        for (j, c) in [x, y].iter().enumerate() {
+            let v = fixed(**c, CHROMATICITY_UNITS, 50_000) as u16;
+            out[i * 4 + j * 2..i * 4 + j * 2 + 2].copy_from_slice(&v.to_be_bytes());
+        }
+    }
+    let max = fixed(m.luminance_max, LUMINANCE_UNITS, u64::from(u32::MAX)) as u32;
+    let min = fixed(m.luminance_min, LUMINANCE_UNITS, u64::from(u32::MAX)) as u32;
+    out[16..20].copy_from_slice(&max.to_be_bytes());
+    out[20..24].copy_from_slice(&min.to_be_bytes());
+    out
+}
+
+/// The `ContentLightLevelInfo` blob (CTA-861.3): MaxCLL then MaxFALL, each
+/// a big-endian u16 clamped to 65535, an absent one 0.
+pub(crate) fn clli(max_cll: Option<u64>, max_fall: Option<u64>) -> [u8; 4] {
+    let level = |v: Option<u64>| v.unwrap_or(0).min(u64::from(u16::MAX)) as u16;
+    let mut out = [0u8; 4];
+    out[0..2].copy_from_slice(&level(max_cll).to_be_bytes());
+    out[2..4].copy_from_slice(&level(max_fall).to_be_bytes());
+    out
 }
 
 /// A video codec's four-character code, or `None` when it is not copied.

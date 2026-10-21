@@ -139,7 +139,10 @@ governs a module now.
   HD-12): the mastering-display and content-light blobs of a sample
   description, else the first sample's prefix SEI (payloads 137, 144,
   emulation-prevention bytes removed); MaxCLL first, rounded in u64,
-  clamped to 10,000; `rc_hdr10_peak` its export. Pure, bounded reads.
+  clamped to 10,000; `rc_hdr10_peak` its export. `av1_peak` the same for
+  AV1 (HD-18): the HDR_CLL and HDR_MDCV metadata OBUs of the `av1C`'s
+  config OBUs, else the first sample, luminance in 24.8 fixed point;
+  `rc_hdr10_av1_peak` its export. Pure, bounded reads.
 - `model_matte.rs` — the matte vocabulary (format version 14, spec §11 MT-1):
   `TrackMatte` (`none`, `alpha`, `alpha_inverted`, `luma`, `luma_inverted`)
   and `is_none`, re-exported through `model_props.rs`; the FIELD
@@ -749,7 +752,11 @@ governs a module now.
   `container_vorbis_setup.rs` the setup header's walk (codebooks, floors,
   residues, mappings, modes); `container.rs` the first video and
   audio track and `describe`/`retime`/`sample_count`/`sample`;
-  `ffi_container.rs` the six `rc_container_*` exports. The only payload read
+  `ffi_container.rs` the six `rc_container_*` exports. The Colour
+  element's MaxCLL, MaxFALL and MasteringMetadata are read too (HD-18):
+  `container_codec.rs` writes them as the `mdcv`/`clli` blobs and
+  `describe` publishes `mdcv_hex`, `clli_hex`, `transfer`, `primaries` and
+  `matrix`; the app writes the blobs and the PQ label only for transfer 16. The only payload read
   is the first VP9 keyframe's header, each Opus packet's TOC and each Vorbis
   packet's first byte.
 - `ffi_graphic.rs` — the ten `rc_graphic_*` exports (road map 10 §5e)

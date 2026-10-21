@@ -179,9 +179,16 @@ enum ContainerRewrapWriter {
     ) throws -> CMFormatDescription {
         var atoms: [String: Any] = [:]
         if let atom = v.atom, let hex = v.atomHex { atoms[atom] = data(hex: hex) }
-        let extensions: [String: Any] = [
+        var extensions: [String: Any] = [
             kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms as String: atoms
         ]
+        // Spec §11 HD-18 (a), (b): a PQ copy (the Colour's transfer 16) carries
+        // its HDR10 fields as HD-12's two blobs, and the PQ label; no other
+        // copy's description changes.
+        if v.transfer == pqTransfer {
+            extensions.merge(hdr10Blobs(v)) { _, blob in blob }
+            extensions.merge(pqLabels(v)) { _, label in label }
+        }
         var format: CMFormatDescription?
         let status = CMVideoFormatDescriptionCreate(
             allocator: nil, codecType: ContainerRewrap.fourCharCode(v.fourcc ?? ""),
@@ -191,6 +198,45 @@ enum ContainerRewrapWriter {
             throw failed("its video could not be described (\(status))")
         }
         return format
+    }
+
+    /// ISO/IEC 23091-2's transfer code for SMPTE ST 2084 (PQ).
+    private static let pqTransfer = 16
+
+    /// The Colour element's `mdcv` and `clli` blobs, each only when the file
+    /// has it (spec §11 HD-18 (a)).
+    private static func hdr10Blobs(_ v: ContainerDescription.Video) -> [String: Any] {
+        var blobs: [String: Any] = [:]
+        if let hex = v.mdcvHex {
+            blobs[kCMFormatDescriptionExtension_MasteringDisplayColorVolume as String] =
+                data(hex: hex)
+        }
+        if let hex = v.clliHex {
+            blobs[kCMFormatDescriptionExtension_ContentLightLevelInfo as String] = data(hex: hex)
+        }
+        return blobs
+    }
+
+    /// The PQ label, and the primaries and matrix Core Video names for the
+    /// Colour's codes (spec §11 HD-18 (b)).
+    private static func pqLabels(_ v: ContainerDescription.Video) -> [String: Any] {
+        var labels: [String: Any] = [
+            kCMFormatDescriptionExtension_TransferFunction as String:
+                kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ as String
+        ]
+        if let code = v.primaries,
+            let name = CVColorPrimariesGetStringForIntegerCodePoint(Int32(clamping: code))
+        {
+            labels[kCMFormatDescriptionExtension_ColorPrimaries as String] =
+                name.takeUnretainedValue() as String
+        }
+        if let code = v.matrix,
+            let name = CVYCbCrMatrixGetStringForIntegerCodePoint(Int32(clamping: code))
+        {
+            labels[kCMFormatDescriptionExtension_YCbCrMatrix as String] =
+                name.takeUnretainedValue() as String
+        }
+        return labels
     }
 
     private static func audioFormat(

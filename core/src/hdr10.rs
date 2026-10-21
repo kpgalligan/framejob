@@ -18,6 +18,18 @@
 //!   (ITU-T H.265 §7.3.5), payloads 137 (`mastering_display_colour_volume`,
 //!   the same 24 bytes) and 144 (`content_light_level_info`, the same 4).
 //!
+//! - **The AV1 stream** (spec §11 HD-18 (c); AV1 §5.3, §5.8, §6.7;
+//!   AV1-ISOBMFF §2.3): the `av1C` record's configOBUs (bytes 4 on, when its
+//!   first byte is 0x81, the marker and version 1), then the first sample's
+//!   OBUs — each OBU's type in its header's bits 6–3, an extension byte
+//!   skipped, its leb128 `obu_size` when it has one, else the rest of the
+//!   bytes — and in each OBU_METADATA (type 5) its leb128 `metadata_type`:
+//!   HDR_CLL (1; `max_cll` then `max_fall`, CTA-861.3's 4 bytes) and
+//!   HDR_MDCV (2; ST 2086's 24 bytes, but `luminance_max` in 24.8 fixed
+//!   point), the first of each kept, the config's first. Reached through
+//!   `rc_hdr10_av1_peak` for an `av01` track whose description carries
+//!   neither extension.
+//!
 //! The description is read when the caller has either extension; only when
 //! it has neither is the stream read, and the two are never mixed. Within
 //! the route read, the peak is MaxCLL when present and non-zero, else the
@@ -41,6 +53,20 @@ const PREFIX_SEI: u8 = 39;
 const FIRST_NON_VCL: u8 = 32;
 /// The mastering luminance's unit: 0.0001 cd/m².
 const LUMINANCE_UNITS: u64 = 10_000;
+/// AV1's OBU_METADATA type and its two HDR10 metadata types (AV1 §6.2.2,
+/// §6.7.1).
+const OBU_METADATA: u8 = 5;
+const METADATA_HDR_CLL: u64 = 1;
+const METADATA_HDR_MDCV: u64 = 2;
+/// An `av1C` record's first byte, its marker bit and version 1, and the
+/// length of its fixed header, after which its configOBUs lie
+/// (AV1-ISOBMFF §2.3.3).
+const AV1C_MARKER_VERSION: u8 = 0x81;
+const AV1C_HEADER: usize = 4;
+/// AV1's mastering luminance: 24.8 fixed point, so 1/256 cd/m².
+const AV1_LUMINANCE_UNITS: u64 = 256;
+/// The longest leb128 AV1 allows (§4.10.5).
+const LEB128_MAX_BYTES: usize = 8;
 
 /// The peak of a PQ file: the description's two extensions (`mastering`,
 /// `content_light`; `None` for one the file lacks) when either is given,
@@ -64,6 +90,22 @@ pub fn peak(
     };
     let (mastering, light) = sei_payloads(sample, nal_length_size);
     choose(mastering, light)
+}
+
+/// The peak of an AV1 PQ file whose description carries neither extension
+/// (spec §11 HD-18 (c)): the metadata OBUs of its `av1C` record (`config`)
+/// and then of its first sample with data (`sample`), the first HDR_CLL and
+/// the first HDR_MDCV kept; MaxCLL when present and non-zero, else the
+/// mastering maximum. `peak` is always `None`.
+pub fn av1_peak(config: Option<&[u8]>, sample: Option<&[u8]>) -> PqColor {
+    let mut readings = Readings::default();
+    let config_obus = config
+        .filter(|record| record.first() == Some(&AV1C_MARKER_VERSION))
+        .and_then(|record| record.get(AV1C_HEADER..));
+    for obus in [config_obus, sample].into_iter().flatten() {
+        readings.read_obus(obus);
+    }
+    choose(readings.mastering.flatten(), readings.light.flatten())
 }
 
 /// MaxCLL when there is one, else the mastering maximum, else nothing.
@@ -92,6 +134,20 @@ fn mastering_max(bytes: &[u8]) -> Option<u32> {
     }
     let units = u64::from(u32::from_be_bytes(field));
     let nits = (units + LUMINANCE_UNITS / 2) / LUMINANCE_UNITS;
+    let nits = u32::try_from(nits.min(u64::from(PEAK_MAX))).ok()?;
+    (nits > 0).then_some(nits)
+}
+
+/// AV1's HDR_MDCV maximum luminance (24.8 fixed point at bytes 16–19) in
+/// whole cd/m², rounded to nearest in 64 bits and clamped to [`PEAK_MAX`];
+/// `None` for a short payload or a maximum that rounds to 0.
+fn av1_mastering_max(bytes: &[u8]) -> Option<u32> {
+    let field: [u8; 4] = bytes.get(16..20)?.try_into().ok()?;
+    if bytes.len() < MASTERING_BYTES {
+        return None;
+    }
+    let units = u64::from(u32::from_be_bytes(field));
+    let nits = (units + AV1_LUMINANCE_UNITS / 2) / AV1_LUMINANCE_UNITS;
     let nits = u32::try_from(nits.min(u64::from(PEAK_MAX))).ok()?;
     (nits > 0).then_some(nits)
 }
@@ -171,6 +227,71 @@ impl Readings {
             }
         }
     }
+}
+
+impl Readings {
+    /// Every OBU of `bytes` (AV1 §5.3.1): an OBU_METADATA's HDR_CLL and
+    /// HDR_MDCV read, every other OBU passed over; a size past the end, or a
+    /// header or size cut short, ends the walk.
+    fn read_obus(&mut self, mut bytes: &[u8]) {
+        while let Some((&header, rest)) = bytes.split_first() {
+            let kind = (header >> 3) & 0x0f;
+            let has_extension = header & 0x04 != 0;
+            let has_size = header & 0x02 != 0;
+            let Some(rest) = rest.get(usize::from(has_extension)..) else {
+                return;
+            };
+            let (payload, next) = if has_size {
+                let Some((size, used)) = leb128(rest) else {
+                    return;
+                };
+                let end = usize::try_from(size)
+                    .ok()
+                    .and_then(|size| used.checked_add(size));
+                let Some(end) = end.filter(|end| *end <= rest.len()) else {
+                    return;
+                };
+                (&rest[used..end], &rest[end..])
+            } else {
+                (rest, &rest[rest.len()..])
+            };
+            if kind == OBU_METADATA {
+                self.read_metadata(payload);
+            }
+            bytes = next;
+        }
+    }
+
+    /// One OBU_METADATA's payload (AV1 §5.8.1): its leb128 `metadata_type`,
+    /// then an HDR_CLL or HDR_MDCV body long enough to read.
+    fn read_metadata(&mut self, payload: &[u8]) {
+        let Some((kind, used)) = leb128(payload) else {
+            return;
+        };
+        let body = &payload[used..];
+        match kind {
+            METADATA_HDR_CLL if body.len() >= CONTENT_LIGHT_BYTES => {
+                self.light.get_or_insert(max_cll(body));
+            }
+            METADATA_HDR_MDCV if body.len() >= MASTERING_BYTES => {
+                self.mastering.get_or_insert(av1_mastering_max(body));
+            }
+            _ => {}
+        }
+    }
+}
+
+/// An unsigned leb128 (AV1 §4.10.5): its value and its length in bytes;
+/// `None` when it is cut short or longer than 8 bytes.
+fn leb128(bytes: &[u8]) -> Option<(u64, usize)> {
+    let mut value = 0u64;
+    for (i, byte) in bytes.iter().take(LEB128_MAX_BYTES).enumerate() {
+        value |= u64::from(byte & 0x7f) << (7 * i);
+        if byte & 0x80 == 0 {
+            return Some((value, i + 1));
+        }
+    }
+    None
 }
 
 /// Whether a message starts at `at`: bytes remain and they are not only the

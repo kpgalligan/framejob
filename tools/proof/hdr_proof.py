@@ -304,6 +304,36 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   EOTF and HLG's inverse OETF, `uniforms(for:)` over output × blending × range, the
   Blending popup's items, and `LayerUniforms` 528, `QualifierUniforms` 80, `MatteUniforms`
   16 and `OutputUniforms` 16 bytes.
+- **H7w, DA, P10, P11** (clean-up batch 2, #316, #315, #317, spec §11 HD-18). H7w: the
+  ramp as VP9 Profile 2 `-lossless 1` WebMs (libvpx-vp9, the tags on the input and output),
+  rewritten by `webm_rewrite` (the video Colour's HDR10 children replaced, SeekHead, Void and
+  Cues dropped, every size recomputed, the Clusters verbatim) and kept only when ffprobe's
+  stream side data reads exactly their values: `pq_webm_cll` (MaxCLL 600, MaxFALL 200, a
+  BT.2020 MasteringMetadata to 4,000 cd/m²) → `color.pq {600, max_cll}`, `pq_webm_display`
+  (the mastering display to 2,000 alone) → `{2000, mastering_display}`, `pq_webm_plain` →
+  `{}` (CONTROL: each copy reads as PQ, `pq` present); their grey rows (every 8th column) =
+  the oracle at 600 and 2,000 ±1 (H7p's `grey_misses`); `sdr_webm_cll` (bt709 ×3 with
+  MaxCLL 600 and the mastering element) against `sdr_webm_plain`: no `color`, the copies'
+  `ffprobe -show_streams` colour fields and side data equal (no mastering or CLL), their
+  `render_frame` PNGs byte-identical. The copies' own side data is printed. DA (the rules
+  fixed before it ran, on the control's Release build): an HLG project with a [0, 0, 0, 0]
+  background and one 512×64 shape (fill (0.8, 0.4, 0.2), opacity 0.5), `prores_4444` at the
+  default, `hlg`, `sdr` and `pq`, frame 15 decoded `yuva444p16le` (bt2020nc, bt709 for sdr)
+  and the PNGs `rgba64le`: at the centre alpha ±1/255 and the straight colour ±2/1023 against
+  `render_frame` (default, hlg), `render_frame {sdr_version}` (sdr), and for pq the alpha
+  against `render_frame`'s and the colour against the shape's opaque twin's `pq` export;
+  each arm's verdict printed. P10: libsvtav1 10-bit PQ MP4s (BT.2020/PQ in the sequence
+  header and `colr`, `mastering-display`/`content-light` as metadata OBUs), kept only when
+  ffprobe reads the values in the first frame's side data and none in the stream's, through
+  `MediaImporter.detectedPQ` in `hdr_probe.swift` (no decode: an M1/M2 refuses AV1 imports):
+  `av1_pq_cll` (4,000, CLL 600) {600, max_cll}, `av1_pq_display` (2,000) {2000,
+  mastering_display}, `av1_pq_plain` {} (CONTROL: each description reads as PQ and carries
+  neither extension). P11: a waveform `ScopeSlotView` shown an HLG waveform trace, then an
+  SDR vectorscope trace: its caption stays "HLG · cd/m²" and its body is cleared. **SD** also
+  renders `{sdr_version, ungraded, waveform}` after the exposure: no `signal`, the pre-exposure
+  `{sdr_version}`'s counts (CONTROL: the exposed `{sdr_version}`'s differ); **SP** turns Show
+  SDR Version on under Show Ungraded: both captions "Rec. 709 · encoded" at `{sdr_version,
+  ungraded}`'s readouts, then both off and the HLG captions back (HD-15 (c)).
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
@@ -314,10 +344,11 @@ NEW` shows the pixels equal). The mutant `relabel-in-renderframe` (H1)
 applies the label inside `Exporter.renderFrame` instead, which moves the
 eyedropper's picks; it runs against a capture made after PR-11.
 
-H1a, the H7 family, the H-2 rows, the H-3 rows, the H-4 rows and the H-6 rows run in a
-plain run, `compare` and `--only`; never under `capture`'s default selection, `--measure`
-or a mutant's default selection; hdr H-1's five, H-2's twelve, H-3's seven, H-4's nine and
-H-6's ten mutants run with `--only <their rows>,Z1` (SI also runs under `capture --only`, writing
+H1a, the H7 family, the H-2 rows, the H-3 rows, the H-4 rows, the H-6 rows and clean-up
+batch 2's H7w and DA run in a plain run, `compare` and `--only`; never under `capture`'s
+default selection, `--measure` or a mutant's default selection; hdr H-1's five, H-2's
+twelve, H-3's seven, H-4's nine, H-6's ten and clean-up batch 2's eleven mutants run with
+`--only <their rows>,Z1` (SI also runs under `capture --only`, writing
 DIR's references). `capture --only`
 captures just the rows named, keeping an earlier capture's H1 record.
 `capture DIR` records H1's references (`DIR/h1-*.png`, `DIR/media/`,
@@ -426,10 +457,11 @@ H1_SUFFIX = {"still8": ".png", "webm": ".webm"}
 PICK_POINTS = {(W, H): [[256.5, 32.5], [512.5, 96.5], [900.5, 100.5]],
                (SW, SH): [[320.5, 180.5], [100.5, 60.5], [540.5, 300.5]]}
 ROWS = ["H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "H7", "H7d", "H7i",
-        "H7p", "H7o", "H7r", "HS", "HH", "HP", "HT", "HL", "HW", "HK", "HM", "HF", "HX", "DT",
-        "DP", "DV", "DI", "DE", "DR", "DS", "DM", "DX", "SI", "SW", "SV", "SS", "SD", "SP", "LT",
+        "H7p", "H7o", "H7r", "H7w", "HS", "HH", "HP", "HT", "HL", "HW", "HK", "HM", "HF", "HX", "DT",
+        "DP", "DV", "DI", "DE", "DR", "DS", "DM", "DX", "DA", "SI", "SW", "SV", "SS", "SD", "SP", "LT",
         "LH", "LG", "LA", "LS", "LM", "LD", "LB", "LF", "LR", "LE", "LO", "LU", "R0", "TI", "TH",
-        "TO", "TL", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "Z1"]
+        "TO", "TL", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10",
+        "P11", "Z1"]
 # H7's family (hdr H-1, #281, spec §11 HD-6, HD-12): PQ ramps whose HDR10 static
 # metadata sits in the HEVC stream's SEI (the x265 CLI, muxed by ffmpeg's stream copy;
 # ffmpeg 9.0.2's libx265 wrapper no longer writes the mastering display with these
@@ -510,6 +542,38 @@ SDR_CAPTION = "Rec. 709 · encoded"
 # transition is 20 frames from the cut at 2 s (`align: after`, linear), so frame 70 is its
 # midpoint.
 L_ROWS = {"LT", "LH", "LG", "LA", "LS", "LM", "LD", "LB", "LF", "LR", "LE", "LO", "LU"}
+# Clean-up batch 2 (#316, #317, spec §11 HD-18): the WebM PQ peak (H7w) and ProRes 4444
+# with alpha from an HLG project (DA). DA's shape: its fill and opacity, and each arm's
+# `dynamic_range` (None the default), its decode matrix and its reference.
+C2_ROWS = {"H7w", "DA"}
+DA_FILL = (0.8, 0.4, 0.2, 1)
+DA_OPACITY = 0.5
+DA_ARMS = [("default", None, "bt2020nc"), ("hlg", "hlg", "bt2020nc"), ("sdr", "sdr", "bt709"),
+           ("pq", "pq", "bt2020nc")]
+DA_ALPHA_BOUND = 1 / 255
+DA_COLOUR_BOUND = 2 / 1023
+# H7w's WebMs: name → (their tags, MaxCLL, MaxFALL, the mastering maximum), each None when
+# the Colour element lacks it; WEBM_READS what import stores as color.pq.
+WEBM_TAGS = {"pq": ("smpte2084", "bt2020", "bt2020nc"), "sdr": ("bt709", "bt709", "bt709")}
+WEBM_FIXTURES = {"pq_webm_cll": ("pq", 600, 200, 4000.0),
+                 "pq_webm_display": ("pq", None, None, 2000.0),
+                 "pq_webm_plain": ("pq", None, None, None),
+                 "sdr_webm_cll": ("sdr", 600, 200, 4000.0),
+                 "sdr_webm_plain": ("sdr", None, None, None)}
+WEBM_READS = {"pq_webm_cll": {"file": 600, "from": "max_cll"},
+              "pq_webm_display": {"file": 2000, "from": "mastering_display"},
+              "pq_webm_plain": {}}
+# BT.2020's primaries and D65 as MasteringMetadata's float children (R, G, B, white).
+MASTERING_FLOATS = [(0x55D1, 0.708), (0x55D2, 0.292), (0x55D3, 0.170), (0x55D4, 0.797),
+                    (0x55D5, 0.131), (0x55D6, 0.046), (0x55D7, 0.3127), (0x55D8, 0.3290)]
+# P10's AV1 MP4s: name → (the mastering maximum, (MaxCLL, MaxFALL)), libsvtav1's
+# `mastering-display` and `content-light` (metadata OBUs); AV1_READS what detectedPQ reads.
+AV1_DISPLAY = "G(0.17,0.797)B(0.131,0.046)R(0.708,0.292)WP(0.3127,0.329)"
+AV1_FIXTURES = {"av1_pq_cll": (4000, (600, 200)), "av1_pq_display": (2000, None),
+                "av1_pq_plain": (None, None)}
+AV1_READS = {"av1_pq_cll": {"file": 600, "from": "max_cll"},
+             "av1_pq_display": {"file": 2000, "from": "mastering_display"},
+             "av1_pq_plain": {}}
 LIN_D = 2 * SEC // 3
 L_SCENES = {}
 LIN_T = 2 * SEC + LIN_D // 2
@@ -536,7 +600,10 @@ SETTINGS_SWIFT = "app/Sources/ExporterWriter+Settings.swift"
 SCOPE_SHADER = "app/Resources/Shaders/Waveform.metal"
 SIGNAL_SWIFT = "app/Sources/ScopeSignal.swift"
 VECTORSCOPE_SWIFT = "app/Sources/VectorscopeView.swift"
-P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"}
+CONTAINER_HEADER_RS = "core/src/container_header.rs"
+REWRAP_WRITER_SWIFT = "app/Sources/ContainerRewrapWriter.swift"
+IMPORTER_COLOR_SWIFT = "app/Sources/MediaImporter+Color.swift"
+P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11"}
 RECORDS = {"R0"}
 # name: ([(file, anchor, replacement), …], the rows that must fail).
 MUTANTS = {
@@ -820,6 +887,61 @@ MUTANTS = {
                                      "        return float4(linear ? blendDecode(grey, "
                                      "u.hlgOutput) : grey, 1.0);\n",
                                      "        return float4(grey, 1.0);\n")], ["LS"]),
+    # Clean-up batch 2 (#316, #315, #317, spec §11 HD-18): one per decision, each run with
+    # `--only <its rows>,Z1` and `--control` the batch's capture (tools/proof/work/cleanup2/ctl).
+    # The Colour element's MaxCLL never read: pq_webm_cll falls to its mastering 4,000.
+    "mkv-maxcll-unread": ([(CONTAINER_HEADER_RS,
+                            "                        0x55BC => e.colour.max_cll = Some(uint(b)),\n",
+                            "")], ["H7w"]),
+    # Its MasteringMetadata never read: pq_webm_display reads nothing.
+    "mkv-mastering-unread": ([(CONTAINER_HEADER_RS,
+                               "                        0x55D0 => e.colour.mastering = "
+                               "mastering(b),\n", "")], ["H7w"]),
+    # The copy's description without the two blobs.
+    "mkv-blobs-not-written": ([(REWRAP_WRITER_SWIFT,
+                                "            extensions.merge(hdr10Blobs(v)) { _, blob in blob }\n",
+                                "")], ["H7w"]),
+    # The copy's description without the PQ label (HD-18 (b)).
+    "webm-pq-unlabelled": ([(REWRAP_WRITER_SWIFT,
+                             "            extensions.merge(pqLabels(v)) { _, label in label }\n",
+                             "")], ["H7w"]),
+    # The blobs written into every copy, an SDR one too (the transfer-16 gate dropped).
+    "mkv-blobs-ungated": ([(REWRAP_WRITER_SWIFT,
+                            "        if v.transfer == pqTransfer {\n"
+                            "            extensions.merge(hdr10Blobs(v)) { _, blob in blob }\n",
+                            "        extensions.merge(hdr10Blobs(v)) { _, blob in blob }\n"
+                            "        if v.transfer == pqTransfer {\n")], ["H7w"]),
+    # AV1's mastering maximum chosen over its MaxCLL.
+    "av1-mastering-over-cll": ([(HDR10_RS,
+                                 "    choose(readings.mastering.flatten(), "
+                                 "readings.light.flatten())\n",
+                                 "    choose(readings.light.flatten(), "
+                                 "readings.mastering.flatten())\n")], ["P10"]),
+    # AV1's 24.8 luminance read in ST 2086's 0.0001 cd/m².
+    "av1-luminance-as-st2086": ([(HDR10_RS,
+                                  "    let nits = (units + AV1_LUMINANCE_UNITS / 2) / "
+                                  "AV1_LUMINANCE_UNITS;\n",
+                                  "    let nits = (units + LUMINANCE_UNITS / 2) / "
+                                  "LUMINANCE_UNITS;\n")], ["P10"]),
+    # The import probe's `av01` route never taken.
+    "av1-route-skipped": ([(IMPORTER_COLOR_SWIFT,
+                            "            CMFormatDescriptionGetMediaSubType(description) == "
+                            "kCMVideoCodecType_AV1\n",
+                            "            CMFormatDescriptionGetMediaSubType(description) == "
+                            "kCMVideoCodecType_AV1, false\n")], ["P10"]),
+    # A slot's caption taken from any trace (#315).
+    "slot-any-trace": ([("app/Sources/ScopeSlotView.swift",
+                         "        if let trace, trace.kind == kind {\n",
+                         "        if let trace {\n")], ["P11"]),
+    # The output pass leaves its result un-premultiplied (killed by DA's pq arm).
+    "output-premultiply-dropped": ([(SHADER, "    return float4(rgb * a, a);\n",
+                                     "    return float4(rgb, a);\n")], ["DA"]),
+    # The deep export's straightening skipped (#242, #254's half-float path).
+    "straighten-skipped-half": ([("app/Sources/ExportStraightAlphaHalf.swift",
+                                  "        guard width > 0, height > 0, bytesPerRow >= width * 8 "
+                                  "else { return }\n",
+                                  "        guard width > 0, height > 0, bytesPerRow >= width * 8, "
+                                  "false else { return }\n")], ["DA"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -1536,8 +1658,14 @@ def build_probe(source, sources, name):
         return None, f"the shader did not build: {step['stderr'][-400:]}"
     try:
         defines = reference_build.tree_defines(Path(sources).parents[1], ["FRAMEJOB_DEV_TOOLS"])
+        # The tree's own core when it has one built (clean-up batch 2): a mutant copy with
+        # its own `core/` (a core file's mutant) links the core it built, so a probe row
+        # sees the mutant; the tree and a symlinked core link the same file as before, and
+        # the base tree (no `core/`) the tree's.
+        own = Path(sources).parents[1] / "core/target/release/libframejob_core.a"
         built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
-                                  output=folder / name, defines=defines, timeout=BUILD_BOUND)
+                                  output=folder / name, defines=defines, timeout=BUILD_BOUND,
+                                  library=own if own.exists() else None)
     except swift_build.SwiftBuildFailed as error:
         return None, f"{error} {error.diagnostics[:6]}"
     return built.binary, None
@@ -3876,7 +4004,9 @@ def run_math_probe(sources):
     request, answer = WORK / "math.json", WORK / "math-answer.json"
     answer.unlink(missing_ok=True)
     shader = Path(sources).parent / "Resources/Shaders/Compositor.metal"
-    request.write_text(json.dumps(math_request(shader)))
+    asked = math_request(shader)
+    asked["av1"] = av1_request() if "P10" in selected else []
+    request.write_text(json.dumps(asked))
     ran = bounded.run([str(binary), str(request), str(answer)], 600,
                       env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
     try:
@@ -4306,7 +4436,8 @@ def run_ss(client, state):
 
 def run_sd(client, state):
     """SD: the SDR version's scopes (`sdr_version`, a JPEG) are an SDR project's; Show
-    Ungraded's (`ungraded`) stay HLG."""
+    Ungraded's (`ungraded`) stay HLG; with both (clean-up batch 2, #315, HD-15 (c)) the
+    ungraded SDR version's."""
     misses, figures = [], []
     path = fixture("hlg")
     source = yuv_frames(path, W, H) if path else None
@@ -4322,6 +4453,11 @@ def run_sd(client, state):
         if exposed["ok"] else (None, {}, exposed.get("error"))
     _, efiles, _ = scope_render(doc, "sd-exposed", waveform=True) if exposed["ok"] \
         else (None, {}, None)
+    _, bfiles, btext = scope_render(doc, "sd-both", sdr_version=True, ungraded=True,
+                                    waveform=True) if exposed["ok"] \
+        else (None, {}, exposed.get("error"))
+    _, xfiles, _ = scope_render(doc, "sd-sdr-exposed", sdr_version=True, waveform=True) \
+        if exposed["ok"] else (None, {}, None)
     state["sd_closed"] = doc.close()
     wave, vec = scope_json(files, "waveform"), scope_json(files, "vectorscope")
     frame = Frame(png, W, H) if png else None
@@ -4357,10 +4493,24 @@ def run_sd(client, state):
         if uw.get("signal") != "hlg" or off or not moved:
             misses.append(f"ungraded: signal {uw.get('signal')!r}, {len(off)} columns off, the "
                           f"exposure moved the graded waveform {moved}")
+    bw, xw = scope_json(bfiles, "waveform"), scope_json(xfiles, "waveform")
+    if bw is None or xw is None or wave is None:
+        misses.append(f"both switches: {btext}")
+    else:
+        same = bw.get("counts") == wave.get("counts")
+        moved = xw.get("counts") != wave.get("counts")
+        figures.append(f"both switches: keys {sorted(bw)}, the waveform equals the "
+                       f"pre-exposure sdr_version's {same}; CONTROL the exposed sdr_version's "
+                       f"differs {moved}")
+        if {"signal", "scale"} & set(bw) or not same or not moved:
+            misses.append(f"both switches: keys {sorted(bw)}, equal to the pre-exposure SDR "
+                          f"version {same}, CONTROL the exposure moved the SDR version {moved}")
     check("SD in an HLG project: {sdr_version, waveform, vectorscope} carries no signal or "
           "scale, the matrix \"Rec. 709\", the waveform within ±1 of Rec. 709 levels of its PNG; "
           "a JPEG frame's scopes no signal; {ungraded, waveform} with exposure +1 on the clip "
-          "signal \"hlg\" at SW's hlg oracle ±1", not misses,
+          "signal \"hlg\" at SW's hlg oracle ±1; {sdr_version, ungraded, waveform} after it no "
+          "signal and the pre-exposure {sdr_version}'s counts (CONTROL: the exposed "
+          "{sdr_version}'s differ)", not misses,
           f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
 
 
@@ -4404,9 +4554,12 @@ def run_sp(client, state):
     doc = hlg_doc(client, "sp", [fixture("hlg")])
     _, files, _ = scope_render(doc, "sp-hlg", waveform=True)
     _, sfiles, _ = scope_render(doc, "sp-sdr", sdr_version=True, waveform=True)
+    _, bfiles, _ = scope_render(doc, "sp-both", sdr_version=True, ungraded=True, waveform=True)
     hw, sw = scope_json(files, "waveform") or {}, scope_json(sfiles, "waveform") or {}
+    bw = scope_json(bfiles, "waveform") or {}
     hlg_r = (hw.get("highlights"), hw.get("shadows"))
     sdr_r = (sw.get("highlights"), sw.get("shadows"))
+    both_r = (bw.get("highlights"), bw.get("shadows"))
     steps = []
 
     def menu(path):
@@ -4437,7 +4590,19 @@ def run_sp(client, state):
                     figures.append(f"Show Ungraded: {seen}")
                     if not ok:
                         misses.append(f"Show Ungraded {seen}")
+                    # Clean-up batch 2 (#315, HD-15 (c)): both switches on.
+                    if menu(SDR_VERSION_MENU):
+                        seen, ok = wait_panel(doc, "sp-both", SDR_CAPTION, SDR_CAPTION, both_r)
+                        figures.append(f"Show Ungraded and Show SDR Version: {seen} against "
+                                       f"{{sdr_version, ungraded}}'s {both_r}")
+                        if not ok:
+                            misses.append(f"both switches' panel {seen}")
+                        menu(SDR_VERSION_MENU)
                     menu(UNGRADED_MENU)
+                    seen, ok = wait_panel(doc, "sp-off", *hlg_cap, hlg_r)
+                    figures.append(f"both off: {seen}")
+                    if not ok:
+                        misses.append(f"both off {seen}")
         menu(SCOPES_MENU)
     state["sp_closed"] = doc.close()
     sdr = Doc(client, "sp-sdr-project", W, H)
@@ -4456,8 +4621,10 @@ def run_sp(client, state):
     check("SP View ▸ Scopes on an HLG project, paused: captions \"HLG · cd/m²\" over "
           "\"Rec. 2100 HLG\", the top readouts within 0.2 of render_frame's; with Show SDR "
           "Version both \"Rec. 709 · encoded\" at {sdr_version}'s readouts (CONTROL: they part "
-          "from the HLG ones by > 1); off again the HLG captions, kept under Show Ungraded; an "
-          "SDR project's \"Rec. 709 · encoded\"", not misses,
+          "from the HLG ones by > 1); off again the HLG captions, kept under Show Ungraded; with "
+          "Show Ungraded and Show SDR Version both on both \"Rec. 709 · encoded\" at "
+          "{sdr_version, ungraded}'s readouts, the HLG captions again with both off; an SDR "
+          "project's \"Rec. 709 · encoded\"", not misses,
           f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
 
 
@@ -5254,6 +5421,399 @@ def run_tl(binary):
           f"{misses or 'as wanted'}\n       " + "\n       ".join(figures))
 
 
+# ---- clean-up batch 2 (#316, #315, #317, spec §11 HD-18) ---------------------------
+
+# ---- H7w and P10's fixtures (clean-up batch 2, #316, spec §11 HD-18 (a)–(c)) ------
+
+def ebml_id(data, at):
+    """An EBML element ID at `at`, its length marker kept: (id, the next offset)."""
+    n = 9 - data[at].bit_length()
+    if not 1 <= n <= 4 or at + n > len(data):
+        raise ValueError(f"an element ID at {at} cannot be read")
+    return int.from_bytes(data[at:at + n], "big"), at + n
+
+
+def ebml_size(data, at):
+    """An EBML size at `at`: (size, or None when unknown, the next offset)."""
+    n = 9 - data[at].bit_length()
+    if not 1 <= n <= 8 or at + n > len(data):
+        raise ValueError(f"a size at {at} cannot be read")
+    value = int.from_bytes(data[at:at + n], "big") & ((1 << (7 * n)) - 1)
+    return (None if value == (1 << (7 * n)) - 1 else value), at + n
+
+
+def ebml_children(data):
+    """A master element's body as [(id, body)]; every child must have a size."""
+    out, at = [], 0
+    while at < len(data):
+        eid, at = ebml_id(data, at)
+        size, at = ebml_size(data, at)
+        if size is None or at + size > len(data):
+            raise ValueError(f"element {eid:X} has no size or runs past its parent")
+        out.append((eid, data[at:at + size]))
+        at += size
+    return out
+
+
+def ebml_element(eid, body):
+    """`body` under `eid` with the shortest size that holds it (RFC 8794 §4)."""
+    n = 1
+    while len(body) >= (1 << (7 * n)) - 1:
+        n += 1
+    return (eid.to_bytes((eid.bit_length() + 7) // 8, "big")
+            + (len(body) | (1 << (7 * n))).to_bytes(n, "big") + body)
+
+
+def ebml_uint(eid, value):
+    return ebml_element(eid, value.to_bytes(max(1, (value.bit_length() + 7) // 8), "big"))
+
+
+def ebml_float(eid, value):
+    return ebml_element(eid, struct.pack(">d", value))
+
+
+def webm_colour_extra(max_cll, max_fall, luminance_max):
+    """The Colour children RFC 9559 names for HDR10: MaxCLL 0x55BC, MaxFALL 0x55BD and
+    MasteringMetadata 0x55D0 (BT.2020's primaries and D65, `luminance_max` to 0.005)."""
+    extra = []
+    if max_cll is not None:
+        extra.append(ebml_uint(0x55BC, max_cll))
+    if max_fall is not None:
+        extra.append(ebml_uint(0x55BD, max_fall))
+    if luminance_max is not None:
+        floats = MASTERING_FLOATS + [(0x55D9, luminance_max), (0x55DA, 0.005)]
+        extra.append(ebml_element(0x55D0, b"".join(ebml_float(i, v) for i, v in floats)))
+    return extra
+
+
+def webm_rewrite(source, out, extra):
+    """ffmpeg's WebM with its video Colour element's HDR10 children replaced by
+    `extra`: the EBML header kept, the Segment's SeekHead, Void and Cues dropped (their
+    offsets would be stale), Tracks rebuilt with every size recomputed, Info, Tags and
+    the Clusters verbatim."""
+    data = Path(source).read_bytes()
+    _, at = ebml_id(data, 0)
+    size, at = ebml_size(data, at)
+    head_end = at + size
+    segment, at = ebml_id(data, head_end)
+    if segment != 0x18538067:
+        raise ValueError("no Segment after the EBML header")
+    size, at = ebml_size(data, at)
+    body = data[at:at + size] if size is not None else data[at:]
+
+    def colour(b):
+        kept = [ebml_element(i, c) for i, c in ebml_children(b)
+                if i not in (0x55BC, 0x55BD, 0x55D0)]
+        return b"".join(kept + extra)
+
+    def video(b):
+        parts, seen = [], False
+        for i, c in ebml_children(b):
+            if i == 0x55B0:
+                c, seen = colour(c), True
+            parts.append(ebml_element(i, c))
+        if not seen and extra:
+            parts.append(ebml_element(0x55B0, b"".join(extra)))
+        return b"".join(parts)
+
+    def entry(b):
+        return b"".join(ebml_element(i, video(c) if i == 0xE0 else c)
+                        for i, c in ebml_children(b))
+
+    kept = []
+    for eid, b in ebml_children(body):
+        if eid in (0x114D9B74, 0xEC, 0x1C53BB6B):
+            continue
+        if eid == 0x1654AE6B:
+            b = b"".join(ebml_element(i, entry(c) if i == 0xAE else c)
+                         for i, c in ebml_children(b))
+        kept.append(ebml_element(eid, b))
+    Path(out).write_bytes(data[:head_end] + ebml_element(segment, b"".join(kept)))
+
+
+def fraction(value):
+    """ffprobe's `a/b` (or a number) as a float; None stays None."""
+    if value is None:
+        return None
+    a, _, b = str(value).partition("/")
+    return float(a) / float(b or 1)
+
+
+def webm_fixture(name):
+    """H7w's fixture: the ramp as VP9 Profile 2 `-lossless 1` (ffmpeg's libvpx-vp9, its
+    WebM's Colour from the tags), rewritten with WEBM_FIXTURES' HDR10 children; kept only
+    when ffprobe reads its tags and, in its stream side data, exactly those values."""
+    tagset, max_cll, max_fall, luminance_max = WEBM_FIXTURES[name]
+    trc, primaries, space = WEBM_TAGS[tagset]
+    out = MEDIA / f"{name}.webm"
+    if not out.exists():
+        raw = pq_raw()
+        if raw is None:
+            REFUSED[name] = REFUSED.get("base") or "ramp420p10.yuv was not made"
+            return None
+        # The tags on the input too: on the output alone ffmpeg 9.0.2 wrote the matrix
+        # but not the transfer or primaries (measured), as with libsvtav1.
+        tags = ["-color_range", "tv", "-color_trc", trc, "-color_primaries", primaries,
+                "-colorspace", space]
+        plain = ffmpeg_make(MEDIA / f"vp9_{tagset}.webm", [
+            "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "-s", f"{W}x{H}", "-framerate", "30",
+            *tags, "-i", str(raw), "-c:v", "libvpx-vp9", "-lossless", "1", "-profile:v", "2",
+            "-pix_fmt", "yuv420p10le", *tags, "-write_crc32", "0"], 300)
+        if plain is None:
+            REFUSED[name] = f"ffmpeg did not make vp9_{tagset}.webm"
+            return None
+        try:
+            webm_rewrite(plain, out, webm_colour_extra(max_cll, max_fall, luminance_max))
+        except (ValueError, IndexError, OSError) as error:
+            REFUSED[name] = f"{name}: the rewrite failed ({error})"
+            out.unlink(missing_ok=True)
+            return None
+    kept = checked(name, out, {"codec_name": "vp9", "pix_fmt": "yuv420p10le",
+                               "color_transfer": trc, "color_primaries": primaries,
+                               "color_space": space})
+    if kept is None:
+        return None
+    read = side(kept, "stream")
+    got = (fraction(read["mastering"]), fraction(read["cll"]))
+    want = (luminance_max, max_cll)
+    if got != want:
+        REFUSED[name] = f"{name}: ffprobe reads mastering, MaxCLL {got}, not {want}"
+        kept.unlink(missing_ok=True)
+        return None
+    return kept
+
+
+def av1_fixture(name):
+    """P10's fixture: the ramp through libsvtav1, 10-bit, PQ-tagged in its sequence header
+    and its MP4's `colr`, with AV1_FIXTURES' HDR10 metadata as metadata OBUs; kept only
+    when ffprobe reads its tags, the values in its first frame's side data and no
+    mastering or CLL in its stream side data (so the description carries neither)."""
+    display, light = AV1_FIXTURES[name]
+    out = MEDIA / f"{name}.mp4"
+    if not out.exists():
+        raw = pq_raw()
+        if raw is None:
+            REFUSED[name] = REFUSED.get("base") or "ramp420p10.yuv was not made"
+            return None
+        params = ["color-primaries=bt2020", "transfer-characteristics=smpte2084",
+                  "matrix-coefficients=bt2020-ncl"]
+        if display is not None:
+            params.append(f"mastering-display={AV1_DISPLAY}L({display},0.005)")
+        if light is not None:
+            params.append(f"content-light={light[0]},{light[1]}")
+        tags = ["-color_range", "tv", "-color_trc", "smpte2084", "-color_primaries", "bt2020",
+                "-colorspace", "bt2020nc"]
+        made = ffmpeg_make(out, [
+            "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "-s", f"{W}x{H}", "-framerate", "30",
+            *tags, "-i", str(raw), "-c:v", "libsvtav1", "-pix_fmt", "yuv420p10le",
+            "-preset", "8", "-svtav1-params", ":".join(params), *tags,
+            "-movflags", "+write_colr"], 300)
+        if made is None:
+            REFUSED[name] = f"ffmpeg did not make {name}.mp4"
+            return None
+    kept = checked(name, out, {"codec_name": "av1", "pix_fmt": "yuv420p10le",
+                               "color_transfer": "smpte2084", "color_primaries": "bt2020",
+                               "color_space": "bt2020nc"})
+    if kept is None:
+        return None
+    frame, stream_ = side(kept, "frame"), side(kept, "stream")
+    got = (fraction(frame["mastering"]), fraction(frame["cll"]))
+    want = (display, light[0] if light else None)
+    if got != want or stream_ != {"mastering": None, "cll": None}:
+        REFUSED[name] = (f"{name}: ffprobe reads mastering, MaxCLL {got} in the first frame "
+                         f"(want {want}) and {stream_} in the stream")
+        kept.unlink(missing_ok=True)
+        return None
+    return kept
+
+
+def av1_request():
+    """P10's part of the probe's request: each AV1 fixture's path and what it must read."""
+    items = []
+    for name in AV1_FIXTURES:
+        path = av1_fixture(name)
+        item = {"name": name, "want": AV1_READS[name]}
+        if path is None:
+            item["why"] = REFUSED.get(name) or f"{name} was not made"
+        else:
+            item["path"] = str(path)
+        items.append(item)
+    return items
+
+
+def webm_scene(client, name, path):
+    """`path` alone at 1024×128: the media's `color` and `path` (the copy), and the
+    render at T — peak_scene's shape plus `copy`; the doc is closed."""
+    doc = Doc(client, f"w-{name}", W, H)
+    doc.place(path) if doc.ok else None
+    rows = doc.project().get("media") or [] if doc.ok else []
+    color = rows[0].get("color") if rows else None
+    copy = rows[0].get("path") if rows else None
+    png = doc.render(f"w-{name}") if doc.ok else None
+    closed = doc.close()
+    source = yuv_frames(path, W, H)
+    frame = Frame(png, W, H) if png else None
+    if frame is None or not frame.ok or source is None or not closed or not copy:
+        return {"why": f"{name}: {doc.why or 'no render, no copy, no decode or not closed'}",
+                "color": color, "closed": closed}
+    return {"color": color, "frame": frame, "source": source[0], "png": png, "closed": closed,
+            "copy": Path(copy)}
+
+
+def colour_fields(path):
+    """ffprobe's colour fields of `path`'s video stream, as text."""
+    return bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                        "stream=color_range,color_space,color_transfer,color_primaries,"
+                        "chroma_location", "-of", "compact", str(path)], 60)["stdout"].strip()
+
+
+def run_h7w(client, state):
+    """H7w (#316, spec §11 HD-18 (a), (b)): a VP9 WebM's Colour element gives import its
+    PQ peak through the copy's description; an SDR WebM's HDR10 fields change nothing."""
+    paths = {n: webm_fixture(n) for n in WEBM_FIXTURES}
+    refused = {n: REFUSED.get(n) for n, p in paths.items() if p is None}
+    state["h7w_fixture"] = not refused
+    if refused:
+        check("H7w the WebM fixtures were made", False, f"refused {refused}")
+        return
+    scenes = {n: webm_scene(client, n, p) for n, p in paths.items()}
+    state["h7w_closed"] = all(s.get("closed") for s in scenes.values())
+    misses, figures = [], []
+    for n, want in WEBM_READS.items():
+        color = scenes[n].get("color")
+        if not isinstance(color, dict) or "pq" not in color:
+            misses.append(f"CONTROL {n}: color {color}, so its copy does not read as PQ")
+        elif color["pq"] != want:
+            misses.append(f"{n}: color.pq {color['pq']}, want {want}")
+        copy = scenes[n].get("copy")
+        figures.append(f"{n}: color {color}; the copy's side data "
+                       f"{side(copy, 'stream') if copy else scenes[n].get('why')}")
+    for n, peak in (("pq_webm_cll", 600), ("pq_webm_display", 2000)):
+        if "frame" not in scenes[n]:
+            misses.append(scenes[n]["why"])
+            continue
+        worst = grey_misses(scenes[n], peak, n, misses)
+        figures.append(f"{n}: worst |Δ| against the oracle at {peak} {worst} levels")
+    sdr = [scenes["sdr_webm_cll"], scenes["sdr_webm_plain"]]
+    for n in ("sdr_webm_cll", "sdr_webm_plain"):
+        if scenes[n].get("color") is not None:
+            misses.append(f"{n}: color {scenes[n]['color']}, want none")
+    if any("copy" not in s for s in sdr):
+        misses.extend(s["why"] for s in sdr if "copy" not in s)
+    else:
+        fields = [colour_fields(s["copy"]) for s in sdr]
+        sides = [side(s["copy"], "stream") for s in sdr]
+        figures.append(f"the SDR copies' colour fields {fields}, side data {sides}")
+        if fields[0] != fields[1] or not fields[0]:
+            misses.append(f"the SDR copies' colour fields differ: {fields}")
+        if sides != [{"mastering": None, "cll": None}] * 2:
+            misses.append(f"an SDR copy carries HDR10 side data: {sides}")
+        if not same_png(sdr[0]["png"], sdr[1]["png"]):
+            misses.append("the SDR copies' render_frame PNGs differ")
+    check("H7w VP9 WebMs' Colour element: pq_webm_cll (MaxCLL 600, MaxFALL 200, mastering "
+          "4,000) {600, max_cll}, pq_webm_display (mastering 2,000) {2000, mastering_display}, "
+          "pq_webm_plain {} (CONTROL: each copy reads as PQ), their grey rows (every 8th "
+          "column) = the oracle at 600/2000 ±1; sdr_webm_cll against sdr_webm_plain: no color, "
+          "the copies' colour fields and side data equal (none), their renders byte-identical",
+          not misses, f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def export_rgba(path, width, height, matrix, index=T // FRAME):
+    """Frame `index` of an export decoded `yuva444p16le`: a function (x, y) → (straight
+    R'G'B' through `matrix`, limited range, alpha), or None when it could not be read."""
+    n = width * height
+    size = 4 * n * 2
+    raw = decode(path, "yuva444p16le", frames=index + 1)
+    if not raw or len(raw) < size * (index + 1):
+        return None
+    values = struct.unpack(f"<{4 * n}H", raw[size * index:size * (index + 1)])
+
+    def at(x, y):
+        i = y * width + x
+        luma, cb, cr, alpha = (values[k * n + i] for k in range(4))
+        return rgb_of(luma / 64, cb / 64, cr / 64, matrix), alpha / 65535
+    return at
+
+
+def png_rgba(path, width, height):
+    """A PNG decoded `rgba64le`: a function (x, y) → (straight R'G'B', alpha), or None."""
+    raw = decode(path, "rgba64le") if path else None
+    if not raw or len(raw) < width * height * 8:
+        return None
+    values = struct.unpack(f"<{width * height * 4}H", raw[:width * height * 8])
+
+    def at(x, y):
+        i = (y * width + x) * 4
+        return [v / 65535 for v in values[i:i + 3]], values[i + 3] / 65535
+    return at
+
+
+def run_da(client, state):
+    """DA (#317, spec §11 HD-18 (e)): ProRes 4444 with alpha from an HLG project with a
+    transparent background, a translucent shape (fill (0.8, 0.4, 0.2), opacity 0.5) and its
+    opaque twin, at the default, `hlg`, `sdr` and `pq`. The rules, fixed before the row
+    ran: at the shape's centre the alpha within ±1/255 and the straight colour within
+    ±2/1023; hlg and the default against `render_frame`, sdr against `render_frame
+    {sdr_version: true}`, pq's alpha against render_frame's and its colour against the
+    opaque twin's pq export. Each arm's verdict is printed, so a mutant is judged only by
+    arms that passed on the control."""
+    misses, figures = [], []
+    x, y = W // 2, H // 2
+    doc = hlg_doc(client, "da", background=[0, 0, 0, 0])
+    clip = l_shape(doc, doc.track() if doc.ok else None, DA_FILL, width=W // 2,
+                   height=H // 2) if doc.ok else None
+    translucent = l_patch(doc, clip, {"opacity": DA_OPACITY})
+    if not translucent:
+        misses.append(f"the scene: shape {clip}, opacity set {translucent}, {doc.why}")
+    hlg_png, _ = render_opts(doc, "da-frame-hlg") if translucent else (None, None)
+    sdr_png, _ = render_opts(doc, "da-frame-sdr", sdr_version=True) if translucent else (None, None)
+    exports = {}
+    for arm, asked, matrix in DA_ARMS:
+        extra = {"dynamic_range": asked} if asked else {}
+        path, got = export_as(doc, f"da-{arm}", "prores_4444", **extra) if translucent \
+            else (None, {"error": doc.why})
+        exports[arm] = (export_rgba(path, W, H, matrix) if path else None,
+                        got.get("error") if path is None else None)
+    opaque = l_patch(doc, clip, {"opacity": 1})
+    twin_path, twin_got = export_as(doc, "da-pq-opaque", "prores_4444", dynamic_range="pq") \
+        if opaque else (None, {"error": doc.why})
+    twin = export_rgba(twin_path, W, H, "bt2020nc") if twin_path else None
+    state["da_closed"] = doc.close()
+    hlg_ref, sdr_ref = png_rgba(hlg_png, W, H), png_rgba(sdr_png, W, H)
+    if hlg_ref is None or sdr_ref is None:
+        misses.append(f"render_frame: {doc.why or 'a PNG was not written'}")
+    if twin is None:
+        misses.append(f"the opaque pq twin: {twin_got.get('error', 'not decoded')}")
+    verdicts = {}
+    for arm, _, _ in DA_ARMS:
+        read, why = exports[arm]
+        reference = sdr_ref if arm == "sdr" else hlg_ref
+        if read is None or reference is None or (arm == "pq" and twin is None):
+            verdicts[arm] = False
+            misses.append(f"{arm}: {why or ('not decoded' if read is None else 'no reference')}")
+            continue
+        colour, alpha = read(x, y)
+        want_colour, want_alpha = reference(x, y)
+        if arm == "pq":
+            want_colour = twin(x, y)[0]
+        d_alpha = abs(alpha - want_alpha)
+        d_colour = max(abs(a - b) for a, b in zip(colour, want_colour))
+        verdicts[arm] = d_alpha <= DA_ALPHA_BOUND and d_colour <= DA_COLOUR_BOUND
+        figures.append(f"{arm}: alpha {alpha:.5f} against {want_alpha:.5f} (|Δ| "
+                       f"{d_alpha * 255:.3f}/255), straight colour "
+                       f"{fmt(colour, 1023)} against {fmt(want_colour, 1023)} (/1023; worst "
+                       f"|Δ| {d_colour * 1023:.3f}/1023): {'ok' if verdicts[arm] else 'FAILED'}")
+        if not verdicts[arm]:
+            misses.append(f"{arm}: alpha |Δ| {d_alpha * 255:.3f}/255, colour |Δ| "
+                          f"{d_colour * 1023:.3f}/1023")
+    state["da_arms"] = verdicts
+    check("DA prores_4444 from an HLG project, a 0.5-opacity shape on a transparent canvas, at "
+          "the default, hlg, sdr and pq: at the centre alpha ±1/255 and straight colour "
+          "±2/1023 against render_frame (default, hlg), render_frame {sdr_version} (sdr), and "
+          "render_frame's alpha with the opaque twin's pq export's colour (pq)", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
 def tail(log, count=4):
     try:
         lines = [line.rstrip() for line in open(log, errors="replace")]
@@ -5333,7 +5893,7 @@ def main():
     else:
         selected -= {"TI", "TH", "TO", "TL"}
         if args.mutant:
-            selected -= {"H1a"} | H7_ROWS | H2_ROWS | H3_ROWS | H4_ROWS | L_ROWS
+            selected -= {"H1a"} | H7_ROWS | H2_ROWS | H3_ROWS | H4_ROWS | L_ROWS | C2_ROWS
     if args.mode == "capture":
         if not args.only:
             selected = {"H1", "H2", "H3", "H4", "H5", "H6", "R0", "Z1"}
@@ -5370,7 +5930,7 @@ def main():
     log = WORK / "instance.log"
     needs_instance = bool(selected & ({"H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5",
                                        "H6", "R0"} | H7_ROWS | H2_ROWS
-                                      | (H3_ROWS - {"DX"}) | H4_ROWS | L_ROWS))
+                                      | (H3_ROWS - {"DX"}) | H4_ROWS | L_ROWS | C2_ROWS))
     if needs_instance:
         launched = mcp.launch(str(binary), [],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
@@ -5422,6 +5982,8 @@ def main():
                     run_h6(client, sources, state)
                 if selected & H7_ROWS:
                     run_h7(client, args.mode, control, sources, state)
+                if "H7w" in selected:
+                    run_h7w(client, state)
                 # hdr H-2 (#277): the HLG working space.
                 for row, run in (("HS", run_hs), ("HH", run_hh), ("HP", run_hp),
                                  ("HT", run_ht), ("HL", run_hl), ("HW", run_hw),
@@ -5430,7 +5992,9 @@ def main():
                                  # hdr H-3 (#277): the deliverables.
                                  ("DT", run_dt), ("DP", run_dp), ("DV", run_dv),
                                  ("DI", run_di), ("DE", run_de), ("DR", run_dr),
-                                 ("DS", run_ds), ("DM", run_dm)):
+                                 ("DS", run_ds), ("DM", run_dm),
+                                 # Clean-up batch 2 (#317): ProRes 4444 with alpha.
+                                 ("DA", run_da)):
                     if row in selected:
                         run(client, state)
                 # hdr H-4 (#277): the scopes.

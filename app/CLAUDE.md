@@ -18,11 +18,12 @@ detail there.
   (handle + lazily decoded `ProjectSnapshot`; `json`, `snapshot` and
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
   them), timecode, snapping (export presets/sizes/settings are
-  `ExportValues.swift`'s, a pure move, HDR H-1), `SpeedLimits`
-  / `ReelSpeed.limits` (the core's speed range and audio ceiling — no Swift
-  file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25) and
+  `ExportValues.swift`'s, a pure move, HDR H-1), `ReelSpeed.limits` (the
+  core's speed range and audio ceiling, typed as `SpeedLimits` in
+  `CoreValues.swift` — no Swift file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25) and
   `ReelContainer` (`rc_container_*`, a WebM/Matroska file's index,
-  #216-R) and `ReelHDR10` (`rc_hdr10_peak`, spec §11 HD-6); the typed patches are `TypedPatches.swift`'s (`VideoPatch`,
+  #216-R) and `ReelHDR10` (`rc_hdr10_peak`, spec §11 HD-6; `av1Peak`,
+  `rc_hdr10_av1_peak`, HD-18); the typed patches are `TypedPatches.swift`'s (`VideoPatch`,
   `AudioPatch`, `ClipPatch`, the `ActionPatch` extension; a pure move, B73),
   `TextPatch` (with `case`, `words` and `word_style`) is `TextPatch.swift`'s,
   moved out so it could grow, and `ShapePatch` `ShapePatch.swift`'s (a pure
@@ -51,8 +52,10 @@ detail there.
   `addAsset`, `rasterize`, `families()`; frozen by its first compile,
   rasterize or `families()`) and
   `GraphicModule` (`compile`, `describeJSON`, `svg`; it holds its library
-  strongly), with `GraphicDiagnostic`, `GraphicFailure` (what a `diag_out`
-  failure throws; `err_out` stays `ReelCoreError`) and `GraphicRaster`.
+  strongly); their values `GraphicDiagnostic`, `GraphicFailure` (what a
+  `diag_out` failure throws; `err_out` stays `ReelCoreError`) and
+  `GraphicRaster` are `CoreValues.swift`'s, with `SpeedLimits` (a pure move,
+  clean-up batch 2).
   `MediaDescriptor`, `MediaOriginal`, `mediaURL(for:)`, `originalURL(for:)`,
   `revealURL(for:)` (the original, else the copy), `isTrashed` and
   `bookmarkString(for:)` are `MediaDescriptor.swift`'s: a `media[]` element

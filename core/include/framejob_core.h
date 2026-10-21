@@ -602,7 +602,8 @@ void rc_graphic_free(RcGraphic *g);
  *    "video":null|{"codec_id","fourcc":"vp09"|"av01"|"avc1"|"hvc1"|"vp08"|null,
  *      "encoded":bool,"width","height","atom":"vpcC"|"av1C"|"avcC"|"hvcC"|null,
  *      "atom_hex","vp9_profile":int|null,"nominal_fps":f64|null,"timescale",
- *      "grid":bool,"samples","bytes"},
+ *      "grid":bool,"samples","bytes","mdcv_hex":null|48 hex,"clli_hex":null|8 hex,
+ *      "transfer":int|null,"primaries":int|null,"matrix":int|null},
  *    "audio":null|{"codec_id","fourcc":"opus"|"vorb"|"aac "|null,"encoded":bool,
  *      "sample_rate","channels","cookie_hex","frames_per_packet":0|1024,
  *      "timescale","samples","bytes"}}
@@ -614,8 +615,14 @@ void rc_graphic_free(RcGraphic *g);
  * that answered true, else the raw timescale (1e9 / TimestampScale when
  * exact, else 1000000). For Vorbis (`"vorb"`, spec §11 #228-V),
  * `sample_rate` and `channels` are the identification header's, and its
- * `fourcc` is null when the headers cannot be read. A sample's times are in
- * its track's `timescale`; samples come in decode order. */
+ * `fourcc` is null when the headers cannot be read. `transfer`, `primaries`
+ * and `matrix` are the Colour element's codes; `mdcv_hex` is its
+ * MasteringMetadata as the 24-byte MasteringDisplayColorVolume (G, B, R and
+ * the white point as u16 in 0.00002, then the maximum and minimum luminance
+ * as u32 in 0.0001 cd/m², big-endian), `clli_hex` its MaxCLL and MaxFALL as
+ * the 4-byte ContentLightLevelInfo, each null when the file has none (spec
+ * §11 HD-18 (a)). A sample's times are in its track's `timescale`; samples
+ * come in decode order. */
 #define RC_CONTAINER_VIDEO 0
 #define RC_CONTAINER_AUDIO 1
 
@@ -715,6 +722,19 @@ void rc_cube_free(RcCube *cube);
 char *rc_hdr10_peak(const uint8_t *mastering, size_t mastering_len, const uint8_t *content_light,
                     size_t content_light_len, const uint8_t *sample, size_t sample_len,
                     uint32_t nal_length_size);
+
+/* An AV1 PQ file's HDR10 peak (spec §11 HD-18 (c)), for an `av01` track
+ * whose format description carries neither extension: the metadata OBUs of
+ * `config` (the `av1C` record; its configOBUs from byte 4, read only when
+ * byte 0 is 0x81) and then of `sample` (the first video sample with data),
+ * HDR_CLL (MaxCLL a big-endian u16) and HDR_MDCV (the maximum a big-endian
+ * u32 at bytes 16-19 in 24.8 fixed point), the first of each kept, the
+ * config's first. MaxCLL when non-zero, else the mastering maximum rounded
+ * to whole cd/m²; above 10000 clamped, 0 none. JSON as rc_hdr10_peak's; a
+ * NULL pointer or 0 length is absent; NULL only on a caught panic. Freed
+ * with rc_string_free. */
+char *rc_hdr10_av1_peak(const uint8_t *config, size_t config_len, const uint8_t *sample,
+                        size_t sample_len);
 
 /* ----------------------------------------------------------------- agent */
 

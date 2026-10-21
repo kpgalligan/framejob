@@ -81,7 +81,7 @@ Mutants, each run once on the final instrument and each answering MUTANT PASS: H
 - **HD-2's named risk:** if HDR-1 finds the XDR panel shows the HLG preview tone-mapped rather than in EDR, the first fallback is setting the preview layer's `preferredDynamicRange` explicitly, then a `CAMetalLayer` preview, which would amend the `AVPlayerLayer` decision and is the owner's call.
 - **An HLG or PQ still is drawn as SDR in an HLG project** (#311), and **a key set on an HDR clip in an SDR project may need re-picking after the switch** (#312) (HD-13 (l)).
 - **Apple's own conversion ignores the peak:** M5's digest `d34d90b3f676a425` for the 600 and 1,000 cd/m² files, and H-1's unscored reading of all seven files (worst |Δ| 0 against `pq_plain`).
-- **The peak is read only from a MOV/MP4 description or HEVC SEI:** not from a WebM/Matroska Colour element or an AV1 stream (#316).
+- **AV1's peak is measured without a decode:** P10 reads libsvtav1 files through `MediaImporter.detectedPQ` on an M2 Max, which refuses AV1 imports; an AV1 file's import, render and Media-tab section on an M3 or later Mac is HDR-4's step 7. An HLG WebM's copy is probably unlabelled, as a PQ copy is without HD-18 (b)'s label (#321; not measured).
 - **A video-range-flagged non-ProRes Canon file storing full-range codes reads too contrasty** (HD-17 (e); GRD-19).
 - **No log detection** from the makers' metadata (#278).
 - **No re-read of the peak on relink, or for a file imported before format 22** (HD-12).
@@ -94,15 +94,12 @@ Mutants, each run once on the final instrument and each answering MUTANT PASS: H
 
 Still open:
 - #278: S-Log3/V-Log detection from the makers' metadata (Canon Log 2 and 3 built by H-5, HD-17).
-- #310: LG1, G1, S1 — older than the road map (found in H-1 and H-2).
 - #311: HDR stills drawn as SDR in an HLG project (HD-13 (l)).
 - #312: a key on an HDR clip across the switch to HLG (HD-13 (l)).
-- #315: no row reads Show Ungraded and Show SDR Version on together; `ScopeSlotView.show(_:)` takes its caption from any kind's trace (H-4's review).
+- #321 (clean-up batch 2): an HLG WebM/Matroska copy probably not labelled HLG.
 - #274: the odd-size reverse's ProRes 422 cost on camera footage — not measured: no owner HDR or log clip reached the road map (HD-1).
-- #316 (filed at the close): the PQ peak from a WebM/Matroska Colour element or an AV1 stream.
-- #317 (filed at the close): ProRes 4444 with alpha from an HLG project, unmeasured.
 
-Closed: #281 (H-1, HD-6, HD-12), #277 (H-2…H-4, HD-2…HD-5, HD-7, HD-8, HD-13…HD-15) and #276 (H-6, HD-9, HD-16) as built; #313 and #314, instrument defects older than the road map, fixed in H-2 and H-3.
+Closed: #281 (H-1, HD-6, HD-12), #277 (H-2…H-4, HD-2…HD-5, HD-7, HD-8, HD-13…HD-15) and #276 (H-6, HD-9, HD-16) as built; #313 and #314, instrument defects older than the road map, fixed in H-2 and H-3; #310 (clean-up batch 1, the instruments held to the spec) and #315, #316, #317 (clean-up batch 2, HD-18; #317 measured, no defect).
 
 Not filed, each decided at the close:
 - How the XDR panel and an SDR external display show an HLG preview: HDR-1's steps 3–4.
@@ -112,6 +109,31 @@ Not filed, each decided at the close:
 - Other editors' exact behaviour: general knowledge.
 - Dolby Vision in iPhone sources: REASONED not to change what the compositor receives; HDR-2 watches for a badge.
 - "Found while reading" 1–4: settled in H-1, H-1, H-2 and H-2.
+
+Clean-up batch 2, phase 1 (#316, #315, #317; spec §11 HD-18, recorded before the code): a
+WebM/Matroska Colour element's MaxCLL, MaxFALL and MasteringMetadata are read by
+`container_header.rs`, reported by `rc_container_describe` (`mdcv_hex`, `clli_hex`,
+`transfer`, `primaries`, `matrix`) and written into a copy's description as HD-12's two blobs,
+with the PQ label, only when the Colour's transfer is 16; an `av01` track's peak is read from its
+`av1C` config OBUs, then its first sample's, HDR_CLL and HDR_MDCV (`hdr10.rs`'s `av1_peak`,
+`rc_hdr10_av1_peak`); a scope slot takes its caption only from its own kind's trace. The toll
+moved `SpeedLimits` and the graphics value types to `CoreValues.swift` (`designs/adr/app-file-history.md`).
+The control was captured on the toll's Release build (`hdr_proof.py capture
+tools/proof/work/cleanup2/ctl --only H1,H7i,SI,Z1`, H-4's precedent), and DA, written before any
+product code, passed there: each arm's alpha 0.50013 against `render_frame`'s 0.50001, the
+straight colour's worst |Δ| 0.160/1023 (default, hlg), 0.282/1023 (sdr) and 0.000/1023 (pq
+against the opaque twin), so #317 found no defect. On the phase's Release build `hdr_proof.py
+compare` scored 68/68 (H1's 12 SDR scenes byte-identical with equal picks; H7w: the copies'
+side data read 40000000/10000 and 600, 20000000/10000, and none, so the blobs survived the
+passthrough write and step 5's atom fallback was not taken; the PQ grey rows' worst |Δ| 1 level
+at 600 and 2,000; DA as on the control), `container_rewrap_probe.py` 61/61,
+`container_import_proof.py` 16/16, `scopes_proof.py` 27/27 and `seeing_proof.py` 19/19. The
+eleven mutants each printed MUTANT PASS; `av1-mastering-over-cll` and `av1-luminance-as-st2086`
+first survived because `hdr_probe.swift` linked the tree's core, not the mutant copy's, and
+passed once `build_probe` linked a copy's own built core. `webm-pq-unlabelled` was killed by
+H7w's CONTROL (no copy read as PQ without the label), so HD-18 (b)'s label write stays. The gate
+passed first in 243 s (the toll) and 299 s, and again in 70 s after `build_probe`'s change (names and test
+re-run).
 
 ## Where to look in the original
 
