@@ -100,6 +100,25 @@ Rows:
   after `set_media_color {peak: 1000}`: the marker's `peak` 1000 and = the
   1,000 render ±4; `pq_plain` (no metadata) alone: the `transfer: "pq"`
   marker as before, ±4.
+- **TS0** (CONTROL, capture only; #323, spec §11 HD-21): hdr_proof's `still_hlg.png`,
+  `still_pq.png` and `still_pq_cll.png` (`hdr_stills`, `pq_meta_stills`, made once under its
+  `work/hdr/media/`), each alone, on the untouched tree: a flat marker, and `0.jpg` leaves
+  `render_frame` at tick 0 by > 4 somewhere on the grey row (every 8th column). Written to
+  `DIR/ts0.json` with `held` and every worst |Δ|, a record like H0's that TS does not read.
+- **TS** (#323, spec §11 HD-21; reads no control file): (a) `still_hlg.png` alone: the
+  `transfer: "hlg"` marker; (b) `still_pq.png`: `transfer: "pq"`; (c) `still_pq_cll.png`:
+  `peak: 4000`, then after `set_media_color {peak: 1000}` `peak: 1000`. Each `0.jpg` = a fresh
+  render ±4 on the grey row and 640×80. (d) (a)'s project saved and closed, its
+  `complete.json` rewritten as the marker's `source` (the flat stamp an older build wrote),
+  reopened: the `transfer` marker lands again, `0.jpg`'s (inode, mtime_ns) moved, ±4. (e) T8's
+  method, `bt709.mov` imported as the trigger: saved, closed, the trigger's marker deleted,
+  reopened: once its flat marker lands, the still's `0.jpg` and `complete.json` stay unchanged
+  for 5 s.
+- **TU** (#323; only with `--only`, against `--control tools/proof/work/i323/ctl` or the
+  capture DIR): `still8.png` and `still16_srgb.png` (copied into `DIR/media/` by capture), each
+  alone: every `.jpg` and `complete.json` byte-equal to `DIR/tu/<name>/` and the marker flat.
+  In capture, two packages of each must hold byte-equal strips (the CONTROL). A run whose
+  control lacks one of those files exits 2 before anything is built or launched.
 - **TT** (`--measure`, recorded and not scored): a 60 s 1920×1080 10-bit
   HEVC (libx265, `ultrafast`, default GOP) file imported: seconds from the
   import call to the flat marker; then S-Log3 set: seconds from
@@ -110,13 +129,16 @@ Rows:
   the copy's `app/Sources`.
 
 `capture DIR` runs H0, T0, T4 and T5's capture (`--only` scores and writes
-only the rows named). `compare DIR` runs TH, T1–T9, TP and Z1. A plain run is TH,
-T1, T2, T3, T6, T7, T8, T9, TP and Z1 (`--only` adds T4 or T5, read against
-`--control`). `--mutant NAME` builds a COPY of the tree
+only the rows named, TS0 and TU's capture among them: #323's control is
+`capture tools/proof/work/i323/ctl --only TS0,TU,Z1`). `compare DIR` runs TH,
+T1–T9, TP, TS and Z1. A plain run is TH, T1, T2, T3, T6, T7, T8, T9, TP, TS and
+Z1 (`--only` adds T4, T5 or TU, read against `--control`; TU needs
+`--control tools/proof/work/i323/ctl`). `--mutant NAME` builds a COPY of the tree
 (`tree_copy.make_copy`), applies its edits (each anchor asserted to occur
 exactly once), builds it by the copy's own `make app-debug` (`make app` under
 `RC_PROOF_APP=release`) and runs the rows it names (TH, T4 and T5 against
-`--control`, default tools/proof/work/i282/ctl); `no-supersede` builds no app
+`--control`, default tools/proof/work/i282/ctl; #323's six `still-*` mutants
+always with `--control tools/proof/work/i323/ctl`, which TU reads); `no-supersede` builds no app
 and runs `cache_pass_probe.py`'s S2 over the copy. MUTANT PASS when every
 named row FAILED. Exit 0 when every scored row passed (a mutant: caught); 1
 when one failed (a mutant: survived); 2 when the control could not be
@@ -171,10 +193,20 @@ T1_CASES = [("applelog", "applelog", None, ("apple_log", "bt2020")),
             ("slog3", "slog3", SLOG3, ("slog3", "s_gamut3_cine")),
             ("vlog", "vlog", {"log": "vlog"}, ("vlog", "v_gamut")),
             ("slog3-lut", "slog3", "lut", None)]
-ROWS = ["H0", "TH", "T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "TP", "TT",
-        "S2", "Z1"]
+ROWS = ["H0", "TH", "T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "TP", "TS0",
+        "TS", "TU", "TT", "S2", "Z1"]
 RECORDS = {"TT"}
+# Clean-up 3 batch B, phase 2 (#323, spec §11 HD-21): an HDR still's one tile through step 0.
+# TS_STILLS: TS0's and TS's row names → hdr_proof's still names (made once under its MEDIA);
+# TS_SIZE the tile's size (`thumbnailHeight` × 4 on the longest side of a 1024×128 still);
+# TU_STILLS: TU's SDR stills → their file names in DIR/media/.
+TS_STILLS = {"still_hlg": "still_hlg_png", "still_pq": "still_pq_png",
+             "still_pq_cll": "still_pq_cll"}
+TS_SIZE = "640×80"
+TU_STILLS = {"still8": "still8.png", "still16_srgb": "still16_srgb.png"}
 SOURCE_SWIFT = "app/Sources/MediaImporter+ThumbnailSource.swift"
+IMPORTER_SWIFT = "app/Sources/MediaImporter.swift"
+THUMBS_SWIFT = "app/Sources/MediaImporter+Thumbnails.swift"
 WATCH_SWIFT = "app/Sources/ProjectDocument+ConvertedThumbnails.swift"
 LEDGER_SWIFT = "app/Sources/MediaCacheLedger.swift"
 # name: ([(file, anchor, replacement), …], the rows that must fail).
@@ -224,6 +256,31 @@ MUTANTS = {
                            "== true\n",
                            "        let fullRange = track.map { _ in false } == true\n")],
                          ["T9"]),
+    # Clean-up 3 batch B, phase 2 (#323, spec §11 HD-21): an HDR still's tile.
+    "still-plain": ([(IMPORTER_SWIFT,
+                      "        let input = media.kind == .image ? input ?? ThumbnailInput(still: "
+                      "url) : input\n",
+                      "        let input = input\n")], ["TS"]),
+    "still-peak-ignored": ([(SOURCE_SWIFT,
+                             "            return color.pq?.effectivePeak != nil ? color : nil  "
+                             "// HD-21\n",
+                             "            return nil\n")], ["TS"]),
+    "still-sdr-converted": ([(SOURCE_SWIFT,
+                              "        default: return nil  // an SDR still keeps today's tile\n",
+                              "        default: transfer = .hlg\n")], ["TU"]),
+    "still-head-blind": ([(IMPORTER_SWIFT,
+                           "        if let stamp, thumbsAreCurrent(stamp, input: input, url: url, "
+                           "at: marker) { return }\n",
+                           "        if let stamp, thumbsAreCurrent(stamp, input: media.kind == "
+                           ".image ? nil : input, url: url, at: marker) { return }\n")], ["TS"]),
+    "still-flat-marker": ([(THUMBS_SWIFT,
+                            "                    writeThumbsStamp(stamp, input: input, "
+                            "fullRange: false, to: marker)\n",
+                            "                    writeStamp(stamp, to: marker)\n")], ["TS"]),
+    "still-unbounded": ([(SOURCE_SWIFT,
+                          "        generator.maximumSize = CGSize(width: thumbnailHeight * 4, "
+                          "height: thumbnailHeight * 4)\n",
+                          "")], ["TS"]),
 }
 rows = {}
 selected = set()
@@ -1016,6 +1073,225 @@ def run_t9(client, state):
     check(T9_TITLE, not misses, "; ".join(notes) + (f"; misses {misses}" if misses else ""))
 
 
+# ---- TS0, TS, TU (#323) ---------------------------------------------------------
+
+STILLS = {}
+TS_TITLE = ("TS an HLG or PQ still's one tile drawn through step 0: still_hlg's transfer marker, "
+            "still_pq's, still_pq_cll's peak 4000 then 1000, each 0.jpg = its render ±4 on the "
+            f"grey row and {TS_SIZE}; an older build's flat marker drawn again; an unchanged "
+            f"reopen holds the tile for {T8_HOLD} s")
+
+
+def stills(client):
+    """hdr_proof's stills (HI's, P13's and HIp's), made once under its MEDIA and kept, its
+    scratch projects under this script's WORK: name → path or None (hdr.REFUSED says why)."""
+    if not STILLS:
+        hdr.WORK = WORK
+        made = hdr.hdr_stills(client)
+        made.update(hdr.pq_meta_stills(made))
+        STILLS.update(made)
+    return STILLS
+
+
+def ts_paths(client):
+    """TS_STILLS' row names → paths; (None, why) when one was refused."""
+    made = stills(client)
+    paths = {name: made.get(source) for name, source in TS_STILLS.items()}
+    absent = {name: refused().get(TS_STILLS[name]) for name, p in paths.items() if p is None}
+    return (None, f"refused {absent}") if absent else (paths, None)
+
+
+def run_ts0(client, control, state):
+    """TS0 (capture): each HDR still's flat tile on the untouched tree leaves its render."""
+    paths, why = ts_paths(client)
+    misses, notes, worsts = [], [], {}
+    if paths is None:
+        misses.append(why)
+    for name, path in (paths or {}).items():
+        doc = Doc(client, f"ts0-{name}")
+        clip = doc.place(path) if doc.ok else None
+        media = doc._media.get(path)
+        marker, why = wait_marker(doc, media, flat) if clip is not None else (None, doc.why)
+        render = doc.render(f"ts0-{name}") if marker else None
+        worst, _, size = compare(doc, media, render, grey_only=True) if marker \
+            else (None, None, why)
+        where = profile(doc, media, render, TOLERANCE) if worst is not None else ""
+        state[f"ts0-{name} closed"] = doc.close()
+        worsts[name] = worst
+        notes.append(f"{name} worst |Δ| {worst} ({size}{where})")
+        if worst is None:
+            misses.append(f"{name}: {size}")
+        elif worst <= TOLERANCE:
+            misses.append(f"{name}: worst {worst} ≤ {TOLERANCE}, the flat tile already matches")
+    held = not misses
+    (control / "ts0.json").write_text(json.dumps(
+        {"held": held, "worst": worsts, "config": proof_app.config()}, indent=1, sort_keys=True))
+    check(f"TS0 CONTROL: on the untouched tree each HDR still lands a flat marker and its 0.jpg "
+          f"leaves render_frame at tick 0 by > {TOLERANCE} on the grey row", held,
+          "; ".join(notes) + (f"; misses {misses}" if misses else ""))
+
+
+def ts_step(doc, media, label, want, tag, misses, notes):
+    """`step` on the grey row, with 0.jpg held to TS_SIZE: the marker, or None."""
+    marker, why = wait_marker(doc, media, want)
+    if marker is None:
+        misses.append(f"{label}: {why}")
+        return None
+    worst, _, size = compare(doc, media, doc.render(tag), grey_only=True)
+    notes.append(f"{label} {shape(marker)[:60]} worst {worst} ({size})")
+    if worst is None or worst > TOLERANCE or size != TS_SIZE:
+        misses.append(f"{label}: worst {worst} ({size}, want {TS_SIZE})")
+    return marker
+
+
+def ts_reopen(client, doc, misses):
+    opened = attempt(client, "open_project", {"path": str(doc.path)})
+    if not opened["ok"]:
+        misses.append(f"open_project: {opened.get('error')}")
+    return opened["ok"]
+
+
+def ts_hlg(client, path, trigger_path, misses, notes, state):
+    """(a) still_hlg alone; (d) its marker rewritten flat, drawn again at the reopen; (e)
+    T8's method with bt709.mov as the trigger."""
+    doc = Doc(client, "ts-hlg")
+    clip = doc.place(path) if doc.ok else None
+    media = doc._media.get(path)
+    before = None
+    if clip is None:
+        misses.append(f"(a) setup: {doc.why}")
+    elif ts_step(doc, media, "(a) still_hlg", transferred("hlg"), "ts-hlg", misses, notes):
+        if doc.call("save_project")["ok"]:
+            before = strip_state(doc, media)
+        else:
+            misses.append("(a) save_project refused")
+    state["ts-hlg closed"] = doc.close()
+    if before is None:
+        misses.append("(d), (e) not reached: no saved still_hlg tile")
+        return
+    # (d): the flat stamp a build before HD-21 wrote.
+    marker_path = doc.strip(media) / "complete.json"
+    marker_path.write_text(json.dumps(json.loads(marker_path.read_text())["source"]))
+    if not ts_reopen(client, doc, misses):
+        return
+    held = None
+    if ts_step(doc, media, "(d) the flat marker drawn again", transferred("hlg"), "ts-hlg-d",
+               misses, notes):
+        now = strip_state(doc, media)
+        moved = now is not None and now[:2] != before[:2]
+        notes.append(f"(d) 0.jpg rewritten {moved}")
+        if not moved:
+            misses.append("(d) 0.jpg was not rewritten")
+    trigger = doc.media_id(trigger_path)
+    landed, why = wait_marker(doc, trigger, flat) if trigger is not None else (None, doc.why)
+    if landed is None:
+        misses.append(f"(e) bt709: {why}")
+    elif not doc.call("save_project")["ok"]:
+        misses.append("(e) save_project refused")
+    else:
+        held = strip_state(doc, media)
+    state["ts-hlg reopened closed"] = doc.close()
+    if held is None:
+        return
+    # (e): an unchanged reopen holds the tile.
+    (doc.strip(trigger) / "complete.json").unlink(missing_ok=True)
+    if not ts_reopen(client, doc, misses):
+        return
+    landed, why = wait_marker(doc, trigger, flat)
+    if landed is None:
+        misses.append(f"(e) bt709 after the reopen: {why}")
+    else:
+        end, moved = time.monotonic() + T8_HOLD, None
+        while moved is None and time.monotonic() < end:
+            now = strip_state(doc, media)
+            if now != held:
+                moved = "gone" if now is None else (
+                    "0.jpg rewritten" if now[:2] != held[:2] else "complete.json changed")
+            time.sleep(0.1)
+        notes.append(f"(e) bt709's flat marker back; still_hlg's tile over {T8_HOLD} s: "
+                     f"{moved or 'unchanged'}")
+        if moved:
+            misses.append(f"(e) still_hlg: {moved}")
+    state["ts-hlg held closed"] = doc.close()
+
+
+def run_ts(client, state):
+    """TS (#323, spec §11 HD-21): reads no control file."""
+    misses, notes = [], []
+    paths, why = ts_paths(client)
+    trigger = hdr.fixture("bt709")
+    if paths is None or trigger is None:
+        check(TS_TITLE, False, why or f"refused {refused().get('bt709')}")
+        return
+    ts_hlg(client, paths["still_hlg"], trigger, misses, notes, state)
+    for name, want in (("still_pq", transferred("pq")), ("still_pq_cll", peaked(4000))):
+        doc = Doc(client, f"ts-{name}")
+        clip = doc.place(paths[name]) if doc.ok else None
+        media = doc._media.get(paths[name])
+        if clip is None:
+            misses.append(f"{name} setup: {doc.why}")
+        elif ts_step(doc, media, f"({'b' if name == 'still_pq' else 'c'}) {name}", want,
+                     f"ts-{name}", misses, notes) and name == "still_pq_cll":
+            if doc.color(media, {"peak": 1000}):
+                ts_step(doc, media, "(c) {peak: 1000}", peaked(1000), "ts-cll-1000", misses,
+                        notes)
+            else:
+                misses.append(f"(c) {doc.why}")
+        state[f"ts-{name} closed"] = doc.close()
+    check(TS_TITLE, not misses, "; ".join(notes) + (f"; misses {misses}" if misses else ""))
+
+
+def tu_control(control):
+    """TU's control files: the first missing one, or None."""
+    for name, file in TU_STILLS.items():
+        for path in (control / "media" / file, control / "tu" / name):
+            if not path.exists():
+                return path
+    return None
+
+
+def run_tu(client, control, capture, state):
+    """TU (#323): every SDR still's tile and marker byte-identical to DIR's."""
+    misses, notes = [], []
+    made = stills(client) if capture else {}
+    for name, file in TU_STILLS.items():
+        copy, folder = control / "media" / file, control / "tu" / name
+        if capture:
+            source = hdr.fixture("still8") if name == "still8" else made.get(name)
+            if source is None:
+                misses.append(f"{name}: refused {refused().get(name)}")
+                continue
+            copy.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, copy)
+            first, why = strip_bytes(client, f"tu-{name}-a", copy, state)
+            second, why2 = strip_bytes(client, f"tu-{name}-b", copy, state)
+            same = first is not None and first == second
+            notes.append(f"{name} {sorted(first or {})} two packages byte-equal {same}")
+            if same:
+                folder.mkdir(parents=True, exist_ok=True)
+                for part, data in first.items():
+                    (folder / part).write_bytes(data)
+            else:
+                misses.append(f"{name}: {why or why2 or 'the two strips differ'}")
+            continue
+        want = {p.name: p.read_bytes() for p in sorted(folder.glob("*"))} \
+            if folder.is_dir() else {}
+        got, why = strip_bytes(client, f"tu-{name}", copy, state)
+        differ = sorted(set(want) ^ set(got or {})) + sorted(
+            n for n in set(want) & set(got or {}) if want[n] != got[n])
+        notes.append(f"{name} captured {sorted(want)}; got {sorted(got or {})}; differ {differ}")
+        if not want or got is None or differ:
+            misses.append(f"{name}: {why or differ or 'nothing captured'}")
+    if capture:
+        state["tu control"] = not misses
+        print(f"  {'ok  ' if not misses else 'FAIL'} TU CONTROL: two packages of each SDR still "
+              f"hold byte-equal strips ({'; '.join(notes)}"
+              f"{'; misses ' + str(misses) if misses else ''})", flush=True)
+        return
+    check(f"TU every SDR still's .jpg and complete.json byte-equal to {control.name}'s, the "
+          "marker flat", not misses, "; ".join(notes) + (f"; misses {misses}" if misses else ""))
+
+
 # ---- TT -------------------------------------------------------------------------
 
 def tt_fixture():
@@ -1128,16 +1404,22 @@ def main():
     elif capture:
         selected = {"H0", "T0", "T4", "T5", "Z1"}
     elif args.mode == "compare":
-        selected = {"TH", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "TP", "Z1"}
+        selected = {"TH", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "TP", "TS", "Z1"}
     elif args.measure:
         selected = {"TT", "Z1"}
     elif args.mutant:
         selected = set(named) | ({"Z1"} if "S2" not in named else set())
     else:
-        selected = {"TH", "T1", "T2", "T3", "T6", "T7", "T8", "T9", "TP", "Z1"}
-    if "H0" in selected and not capture:
-        print("H0 runs in capture only")
-        return 2
+        selected = {"TH", "T1", "T2", "T3", "T6", "T7", "T8", "T9", "TP", "TS", "Z1"}
+    for name in ("H0", "TS0"):
+        if name in selected and not capture:
+            print(f"{name} runs in capture only")
+            return 2
+    if "TU" in selected and not capture:
+        missing = tu_control(control)
+        if missing is not None:
+            print(f"TU: the control could not be performed — {missing} is missing")
+            return 2
     if capture:
         control.mkdir(parents=True, exist_ok=True)
     remove_work()
@@ -1206,6 +1488,12 @@ def main():
                     run_t9(client, state)
                 if "TP" in selected:
                     run_tp(client, state)
+                if "TS0" in selected and capture:
+                    run_ts0(client, control, state)
+                if "TS" in selected and not capture:
+                    run_ts(client, state)
+                if "TU" in selected:
+                    run_tu(client, control, capture, state)
                 if "TT" in selected:
                     run_tt(client, state)
             except Exception as error:  # a row that could not run is a failure
@@ -1226,12 +1514,14 @@ def main():
     if capture:
         (control / "capture.json").write_text(json.dumps({"tree": str(ROOT), "config": config},
                                                          indent=1))
-        good = (all(rows.get(name) for name in ("H0", "T0", "Z1") if name in selected)
+        good = (all(rows.get(name) for name in ("H0", "T0", "TS0", "Z1") if name in selected)
                 and ("T4" not in selected or state.get("t4 control"))
-                and ("T5" not in selected or state.get("t5 captured")))
+                and ("T5" not in selected or state.get("t5 captured"))
+                and ("TU" not in selected or state.get("tu control")))
         print(f"captured into {args.folder} ({', '.join(sorted(selected))}): H0 "
               f"{rows.get('H0')}, T0 {rows.get('T0')}, T4 control {state.get('t4 control')}, "
-              f"T5 {state.get('t5 captured')}, Z1 {rows.get('Z1')}")
+              f"T5 {state.get('t5 captured')}, TS0 {rows.get('TS0')}, TU control "
+              f"{state.get('tu control')}, Z1 {rows.get('Z1')}")
         return 0 if good else 1
     scored = [name for name in ROWS if name in rows and name not in RECORDS]
     passed = sum(1 for name in scored if rows.get(name))

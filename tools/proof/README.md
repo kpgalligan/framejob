@@ -21818,3 +21818,60 @@ nil) HIp; `key-log-as-unlift` (`KeyReading.of`'s `.log` arm `.unlift`) L23;
 | `log_proof.py --mutant key-log-as-unlift --only L23,Z1` | caught: HLG left (0.530, 0.711, 0.412), not keyed |
 | `log_proof.py --mutant key-log-exposure-dropped --only L23,Z1` | caught: HLG left (0.530, 0.711, 0.412) |
 | `log_proof.py --mutant key-log-white-hlg --only L23,Z1` | caught: HLG left (0.530, 0.711, 0.412) |
+
+## Clean-up round 3, batch B, phase 2 — #323, an HDR still's filmstrip tile and Media-tab thumbnail through step 0 (`log_thumbs_proof.py` TS0, TS, TU and six mutants; spec §11 HD-21)
+
+The phase draws the one tile of a still labelled HLG or PQ (`ThumbnailInput(still:)`, a header
+read through `StillColor.conversion(at:)`), or of a PQ still with a peak (`convertingColor`'s
+image arm), from GR-21's one-clip composition (`MediaImporter.stillReader`): read at 0 with zero
+tolerance, its longest side at most 640, the SDR project's picture. Its marker is GR-21's
+converted stamp (`transfer`, or `peak`), the label is resolved before the head check so a flat
+marker from an older build is drawn again, and the Media-tab row of an HLG or PQ still waits for
+its tile instead of ImageIO's own decode. The rules are the script's header, fixed before the
+phase's code and the control capture.
+
+- **Fixtures:** hdr_proof's `still_hlg.png`, `still_pq.png` and `still_pq_cll.png` (`hdr_stills`
+  with an instance, `pq_meta_stills`), made once under `tools/proof/work/hdr/media/` and kept;
+  the script sets `hdr.WORK` to its own `run/` first, so `still_hlg.png`'s source project is
+  scratch. TU's SDR stills are `still8.png` (`hdr.fixture("still8")`) and `still16_srgb.png`,
+  copied by capture into the control's `media/`.
+- **The control folder** is `tools/proof/work/i323/ctl` (scratch, gitignored): `ts0.json` (TS0's
+  record, which TS does not read), `media/` and `tu/<name>/` (TU's byte references). A TU run
+  whose control lacks any of them prints `the control could not be performed — <path> is
+  missing` and exits 2 before anything is built or launched, so a mutant without
+  `--control tools/proof/work/i323/ctl` is never a false catch.
+- **TS0** (CONTROL, capture only, the untouched tree): each HDR still's flat tile leaves its
+  render by more than 4 levels somewhere on the grey row.
+- **TS** (in the plain run and `compare`): the three stills' markers (`transfer` "hlg", "pq",
+  `peak` 4000 then 1000) and each `0.jpg` = a fresh render ±4 on the grey row at 640×80; (d) a
+  marker rewritten as its own `source` (the flat stamp an older build wrote) is drawn again at
+  the reopen; (e) T8's method with `bt709.mov` as the trigger holds the still's tile for 5 s.
+- **TU** (`--only` and `--control` only): `still8.png`'s and `still16_srgb.png`'s every `.jpg`
+  and `complete.json` byte-equal to the control's, the marker flat.
+
+```sh
+make app && RC_PROOF_APP=release python3 tools/proof/log_thumbs_proof.py capture tools/proof/work/i323/ctl --only TS0,TU,Z1   # untouched tree only
+make app-debug && python3 tools/proof/log_thumbs_proof.py --only TS,TH,TP,T7,T8,Z1
+RC_PROOF_APP=release python3 tools/proof/log_thumbs_proof.py
+RC_PROOF_APP=release python3 tools/proof/log_thumbs_proof.py --only TU,Z1 --control tools/proof/work/i323/ctl
+python3 tools/proof/log_thumbs_proof.py --mutant <name> --control tools/proof/work/i323/ctl   # --control is mandatory
+```
+
+The six mutants and their rows: `still-plain` (the resolving line keeps only the caller's
+`input`) TS; `still-peak-ignored` (`convertingColor`'s image arm answers nil) TS;
+`still-sdr-converted` (`init?(still:)`'s nil arm becomes transfer `.hlg`) TU; `still-head-blind`
+(the head check passes nil for a still) TS; `still-flat-marker` (the certified still's marker
+written flat) TS; `still-unbounded` (`stillReader`'s `maximumSize` line removed) TS.
+
+| Run (2026-10-22, the worktree) | Result |
+|---|---|
+| `capture tools/proof/work/i323/ctl --only TS0,TU,Z1` (Release, the untouched app) | TS0, the TU CONTROL and Z1 held. TS0's flat tiles left the render by 40 (`still_hlg`), 73 (`still_pq`) and 72 (`still_pq_cll`) levels at worst on the grey row; two packages of each SDR still held byte-equal strips |
+| `--only TS,TH,TP,T7,T8,Z1` (Debug) | TS, TP, T7, T8 and Z1 passed; TH's figures passed (hlg and pq worst 1, the SDR pair 1) and it failed only on its gate, the worktree having no `tools/proof/work/i282/ctl/h0.json` (gitignored); the held copy was copied in from the main checkout before the Release run |
+| `RC_PROOF_APP=release python3 tools/proof/log_thumbs_proof.py` | 11/11. TS: each tile 640×80 and worst \|Δ\| 1 against its render (`transfer` "hlg", "pq", `peak` 4000, 1000); (d) the flat marker drawn again, `0.jpg` rewritten, worst 1; (e) the tile unchanged for 5 s |
+| `RC_PROOF_APP=release … --only TU,Z1 --control tools/proof/work/i323/ctl` | 2/2: `still8.png`'s and `still16_srgb.png`'s `0.jpg` and `complete.json` byte-equal to the control's |
+| `--mutant still-plain` | caught: `still_hlg` and `still_pq` land flat markers |
+| `--mutant still-peak-ignored` | caught: `still_pq_cll` lands `transfer: "pq"`, not `peak` |
+| `--mutant still-sdr-converted` | caught: both SDR stills land `transfer: "hlg"` |
+| `--mutant still-head-blind` | caught: (d)'s flat marker is never drawn again |
+| `--mutant still-flat-marker` | caught: every HDR still lands a flat marker |
+| `--mutant still-unbounded` | caught: every tile 1024×128 |

@@ -507,6 +507,9 @@ opened, at design time or build time.
   **Amended by HD-12** (hdr H-1): a PQ media with an effective peak takes the Camera Log path (its
   `color` counts as converting), and its converted marker carries `peak`; a PQ media with no
   reading and no override keeps the `transfer: "pq"` marker it had.
+  **Amended by HD-21** (clean-up 3 batch B, phase 2): an HLG- or PQ-labelled still, or a PQ still
+  with a peak, joins the converted strips, and its flat marker from an older build is drawn
+  again.
 - **GR-22 — A log file's code domain follows its media's range flag** (#283; amends GR-16).
   - The range is the media's forward video track's `kCMFormatDescriptionExtension_FullRangeVideo`.
     It is read when the composition is built and carried per instruction, per track, as

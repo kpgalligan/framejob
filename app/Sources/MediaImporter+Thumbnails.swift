@@ -1,27 +1,34 @@
 import AVFoundation
 
 /// The await-free halves of the thumbnail pass — `writeImageThumbnail` (a still's one tile, its
-/// marker and its post) and `publishThumbnails` (a movie's marker and last post, after
+/// marker and its post; an HLG or PQ still's tile drawn by `MediaImporter.thumbnails` through
+/// `stillReader`, spec §11 HD-21) and `publishThumbnails` (a movie's marker and last post, after
 /// `thumbnails(for:url:stamp:into:pass:input:)` has drawn its frames). An `extension
 /// MediaImporter` in a file of its own for the same reason `MediaImporter+Speech.swift` is:
 /// `async`/`await` is confined to `MediaImporter.swift`, and these pieces of the pass do not need
 /// it (hdr H-0, a pure move).
 extension MediaImporter {
 
+    /// With no `input`, today's tile and flat marker exactly. With one, `drawn` (the one-clip
+    /// composition's picture) and the converted marker; a `drawn` that failed writes today's
+    /// tile and no marker, so the next open draws it again (spec §11 HD-21).
     static func writeImageThumbnail(
         for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL,
-        pass: CachePass?, directory: URL, marker: URL, replaced: Bool
+        pass: CachePass?, directory: URL, marker: URL, replaced: Bool,
+        input: ThumbnailInput?, drawn: CGImage?
     ) {
         // The indices `writeJPEG` succeeded on: what the marker vouches for.
         var written: Set<Int> = []
-        if let image = decodeImage(url, maxPixelSize: Int(thumbnailHeight * 4)),
+        if let image = drawn ?? decodeImage(url, maxPixelSize: Int(thumbnailHeight * 4)),
             pass?.isCurrent() ?? true,
             writeJPEG(image, to: directory.appendingPathComponent("0.jpg")) {
             written.insert(0)
         }
-        if let stamp {
+        if let stamp, input == nil || drawn != nil {
             CacheLedger.shared.publish(in: cacheDir, for: pass) {
-                if stripHolds(written, in: directory) { writeStamp(stamp, to: marker) }
+                if stripHolds(written, in: directory) {
+                    writeThumbsStamp(stamp, input: input, fullRange: false, to: marker)
+                }
             }
         }
         // Posted whether or not the picture decoded: the old tile is

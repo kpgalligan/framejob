@@ -330,6 +330,8 @@ enum MediaImporter {
         pass: CachePass? = nil, input: ThumbnailInput? = nil
     ) async {
         guard media.hasVideo else { return }
+        // A still's label, resolved before the head check (spec §11 HD-21).
+        let input = media.kind == .image ? input ?? ThumbnailInput(still: url) : input
         let directory = thumbsDirectory(for: media.id, in: cacheDir)
         let marker = thumbsMarkerURL(for: media.id, in: cacheDir)
         // The head check. A nil stamp (the file cannot be stat'ed) never
@@ -350,9 +352,17 @@ enum MediaImporter {
         var written: Set<Int> = []
 
         if media.kind == .image {
+            // An HLG or PQ still's tile through step 0 (spec §11 HD-21).
+            let reader = input.flatMap { stillReader(for: media, url: url, input: $0) }
+            var drawn: CGImage?
+            if let reader {
+                drawn = try? await reader.generator.image(at: .zero).image
+                reader.finish()
+            }
             writeImageThumbnail(
                 for: media, url: url, stamp: stamp, into: cacheDir, pass: pass,
-                directory: directory, marker: marker, replaced: replaced)
+                directory: directory, marker: marker, replaced: replaced, input: input,
+                drawn: drawn)
             return
         }
 

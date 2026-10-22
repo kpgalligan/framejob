@@ -132,7 +132,10 @@ final class MediaRowView: NSView, NSDraggingSource {
             thumbnail = image
             return
         }
-        guard entry.kind == .image, let url = mediaURL(for: entry) else { return }
+        // An HLG or PQ still waits for its tile, never ImageIO's tone map (spec §11 HD-21).
+        guard entry.kind == .image, let url = mediaURL(for: entry),
+            StillColor.conversion(at: url) == nil
+        else { return }
         thumbnail = MediaImporter.decodeImage(url, maxPixelSize: 256)
     }
 

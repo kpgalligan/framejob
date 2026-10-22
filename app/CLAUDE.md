@@ -316,8 +316,11 @@ detail there.
   await-free: `ThumbnailInput`, `ThumbnailReader`, `ConvertedThumbsStamp`),
   its marker the converted stamp (the source stamp plus the curve and gamut,
   or the LUT's path, size and second, or the HDR transfer, and `fullRange`
-  for a full-range S-Log3 or V-Log source (GR-23)), every other
-  strip's the flat `CacheStamp`; the ledger starts a new generation for a
+  for a full-range S-Log3 or V-Log source (GR-23)); an HLG- or PQ-labelled
+  still, or a PQ still with a peak, draws its one tile the same way
+  (`stillReader`, spec §11 HD-21, its marker the transfer or the peak, its
+  label read before the head check). Every other
+  strip's marker is the flat `CacheStamp`; the ledger starts a new generation for a
   changed Camera Log input as for another file (spec §11 GR-21). Peaks alone
   wrap the unchanged source stamp in `PeaksStamp` version 2 (SY-42) and require a
   complete selected-track decode, valid PCM coverage and a usable
@@ -1074,7 +1077,8 @@ the key map behind it.
   `insertTab`'s body, the override and `placeholderRect`'s height, each
   exactly once.
 - `MediaPane.swift` · `MediaRowView.swift` (a row and the drag it starts,
-  with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop) ·
+  with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop; an HDR
+  still's row shows nothing until its step-0 tile lands, HD-21) ·
   `MediaPaneCommands.swift` · `MediaListFilter.swift` (the find band as a
   VALUE; not persisted) · `MediaUsage.swift` (the ONE spelling of "is this
   media used", over the timeline's clips AND every nest's, a LUT counted by

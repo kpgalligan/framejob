@@ -364,7 +364,9 @@ schema, §6 the op table, §7 the architecture.
   file (MaxCLL, else the mastering display's maximum), 1,000 cd/m² when it
   names none — and the Media tab's **HDR10** section shows where the peak
   came from and lets you set your own. A PQ still image (PNG, HEIF or AVIF)
-  works the same way, its peak read from the image's own HDR10 metadata.
+  works the same way, its peak read from the image's own HDR10 metadata. An
+  HLG or PQ still's filmstrip and Media-tab thumbnail show the picture an SDR
+  project shows.
 - **HDR (HLG)**. The Document tab's **Dynamic Range** popup makes a project
   HDR: every frame is composed in Rec. 2100 HLG, so an iPhone HDR clip keeps
   its highlights above white while titles, shapes, stills, graphics, captions

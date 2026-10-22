@@ -802,6 +802,8 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
   - **(d) Amends** HD-13 ((f), (h), (l)) and HD-18 (b).
   **Amended by HD-20** (clean-up 3 batch B): (a) a PQ still's peak is read at import and drawn;
   (c) the key on a built-in Camera Log reads through GR-16's SDR arm, not the un-lift.
+  **Amended by HD-21** (clean-up 3 batch B, phase 2): (a) an HLG or PQ still's thumbnail is drawn
+  through step 0.
 - **HD-20 — Clean-up 3 batch B, phase 1's settlements: the key on Camera Log media read as its
   SDR colour across HLG, and a PQ still's HDR10 peak read at import.** Recorded before the
   phase's code (#324, #325). Format 26.
@@ -844,3 +846,29 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
       `.pq(peak)`. The Media tab's HDR10 section acts on the still.
     - **Persistence:** format 26. An older file is not re-read (HD-12's rule).
     - Amends HD-12 (where import writes `pq`) and HD-19 (a) (a still's peak).
+- **HD-21 — Clean-up 3 batch B, phase 2's settlement: an HLG or PQ still's thumbnail drawn
+  through step 0 (#323).** Recorded before the phase's code. No op, tool, argument, recipe,
+  catalog or format change (format stays 26).
+  - **Which stills:** a still whose first image's space is HLG- or PQ-based
+    (`StillColor.conversion(at:)`, HD-19 (a)), or an image media whose `color.pq` has an
+    effective peak (HD-20 (b)). Every other still keeps today's tile (ImageIO's decode, longest
+    side 640, JPEG 0.7) and its flat marker, byte for byte.
+  - **How it is drawn:** GR-21's one-clip project around the media — its pixel size, its rate,
+    the still at 0, and its `pq` only when it has a peak — built as `render_frame` builds a
+    frame and read by the generator at 0 with zero tolerance, its longest side at most 640
+    (`thumbnailHeight` × 4, today's still bound).
+  - **Which picture:** the SDR project's picture (GR-15's arm at the still's peak), in an HLG
+    project too, as a video's converted strip is.
+  - **The marker:** GR-21's converted stamp. A labelled still with no peak writes `transfer`
+    "hlg" or "pq"; a PQ still with a peak writes `peak` (HD-12's shape).
+  - **The head check:** a still's label is resolved first (a header read, no decode), so a flat
+    marker from a build before HD-21 is drawn again. This differs from GR-21's accepted limit
+    for video.
+  - **Peak changes:** a set, clear, undo or redo of a PQ still's peak starts a pass (GR-21's
+    ledger rule, through `convertingColor`).
+  - **Failure:** a failed build or read writes today's tile and no marker, so the next open
+    retries.
+  - **The Media-tab row:** an HLG or PQ still shows no picture until its tile lands. It never
+    shows ImageIO's own tone map.
+  - **Measured by** `log_thumbs_proof.py` TS0, TS and TU.
+  - **Amends** GR-21 and HD-19 (a).

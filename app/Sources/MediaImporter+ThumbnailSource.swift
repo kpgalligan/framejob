@@ -4,7 +4,8 @@ import AVFoundation
 /// or — for a media whose Camera Log converts, a PQ file with a peak (spec
 /// §11 HD-12), or a video track labelled HLG or PQ — a one-clip composition
 /// around it, through `CompositionBuilder` and step 0, so the strip is the
-/// preview's picture.
+/// preview's picture. A still labelled HLG or PQ, or a PQ still with a peak,
+/// draws its one tile the same way (`stillReader`, spec §11 HD-21).
 /// The strip's marker says which: the flat `CacheStamp` for a plain strip,
 /// exactly as before, and a `ConvertedThumbsStamp` for a converted one, which
 /// records `fullRange` for an S-Log3 or V-Log media from a full-range source
@@ -31,7 +32,8 @@ struct ThumbnailInput: Equatable {
     let transfer: HDRTransfer?
 
     /// Camera Log or a PQ peak: nil unless the media is a video with a
-    /// picture whose `color` step 0 converts (`convertingColor(of:)`).
+    /// picture whose `color` step 0 converts, or a PQ still with a peak
+    /// (`convertingColor(of:)`).
     init?(media: MediaSnapshot, urls: [UInt32: URL]) {
         guard let color = Self.convertingColor(of: media) else { return nil }
         self.color = color
@@ -59,6 +61,19 @@ struct ThumbnailInput: Equatable {
         transfer = found
     }
 
+    /// HLG or PQ by the still's own label (spec §11 HD-21):
+    /// `StillColor.conversion(at:)`, a header read with no decode, answers
+    /// `.hlg` or `.pq`; nil for every other still, which keeps today's tile.
+    init?(still url: URL) {
+        switch StillColor.conversion(at: url) {
+        case .hlg?: transfer = .hlg
+        case .pq?: transfer = .pq
+        default: return nil  // an SDR still keeps today's tile
+        }
+        color = nil
+        lutURL = nil
+    }
+
     /// Whether the strip's picture follows the source's range: S-Log3 and
     /// V-Log, whose code domain does (`InputConversions.codeDomain`); not
     /// Apple Log, a LUT or an HDR transfer.
@@ -73,8 +88,13 @@ struct ThumbnailInput: Equatable {
     /// (`InputConversion.choose(input:)`), or a PQ file's effective peak
     /// (spec §11 HD-12), so a change of either redraws the strip — else nil;
     /// without URLs, so the document's observer and the cache ledger key on
-    /// it. A PQ file with no peak keeps the HDR transfer's strip.
+    /// it. A PQ file with no peak keeps the HDR transfer's strip. A still
+    /// answers only for a PQ peak (spec §11 HD-21), so a set, clear, undo or
+    /// redo of it starts a pass.
     static func convertingColor(of media: MediaSnapshot) -> MediaColor? {
+        if media.kind == .image, media.hasVideo, let color = media.color {
+            return color.pq?.effectivePeak != nil ? color : nil  // HD-21
+        }
         guard media.kind == .video, media.hasVideo, let color = media.color,
             InputConversion.choose(input: color) != nil || color.pq?.effectivePeak != nil
         else { return nil }
@@ -194,6 +214,32 @@ extension MediaImporter {
         configure(generator, for: media, transform: false)
         return ThumbnailReader(
             generator: generator, input: effective, certifies: true, fullRange: fullRange,
+            recipeKey: key)
+    }
+
+    /// A still's one tile through step 0 (spec §11 HD-21): GR-21's one-clip
+    /// project around it (its pixel size, its rate, the still at 0, its `pq`
+    /// only with a peak), built as `Exporter.renderFrameReported` builds a
+    /// frame and read at 0 with zero tolerance, its longest side at most
+    /// `thumbnailHeight` × 4, today's still bound. Nil when the build fails,
+    /// its key then unregistered; the caller's `finish()` unregisters it
+    /// otherwise.
+    static func stillReader(
+        for media: MediaSnapshot, url: URL, input: ThumbnailInput
+    ) -> ThumbnailReader? {
+        let key = RecipeSource.shared.register()
+        guard let built = oneClip(media, url: url, input: input, key: key) else {
+            RecipeSource.shared.unregister(key)
+            return nil
+        }
+        let generator = AVAssetImageGenerator(asset: built.composition)
+        generator.videoComposition = built.videoComposition
+        generator.appliesPreferredTrackTransform = false
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        generator.maximumSize = CGSize(width: thumbnailHeight * 4, height: thumbnailHeight * 4)
+        return ThumbnailReader(
+            generator: generator, input: input, certifies: true, fullRange: false,
             recipeKey: key)
     }
 
