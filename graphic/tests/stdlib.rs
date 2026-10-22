@@ -188,3 +188,57 @@ fn interpolate_colors_answers_the_shared_colour_fixture() {
         );
     }
 }
+
+const OKLAB: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/oklab.json");
+
+/// Every blend in `tests/oklab.json` (spec §11 G-40) is what
+/// `interpolateColors(t, [0, 1], [from, to])` answers: the reference the
+/// core's `oklab_mix` (`core/tests/graphic_actions.rs`) answers too.
+#[test]
+fn interpolate_colors_answers_the_shared_oklab_fixture() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(OKLAB).expect("tests/oklab.json"))
+            .expect("the OKLab fixture is JSON");
+    let blends = fixture["blends"].as_array().expect("blends");
+    assert!(!blends.is_empty());
+    let sent: Vec<serde_json::Value> = blends
+        .iter()
+        .map(|case| serde_json::json!([case[0], case[1], case[2]]))
+        .collect();
+    let source = format!(
+        "const SENT = {};\n\
+         export function render(frame, props, ctx) {{\n\
+           const answers = SENT.map(([from, to, t]) => interpolateColors(t, [0, 1], [from, to]));\n\
+           return svg(ctx, `<desc>${{escapeXml(JSON.stringify(answers))}}</desc>`);\n\
+         }}\n",
+        serde_json::Value::from(sent)
+    );
+    let module = compile(&source);
+    let (svg, warnings) = call(&module, 0).unwrap_or_else(|d| panic!("{}", d.message));
+    assert!(warnings.is_empty(), "{warnings:?}");
+    let body = &svg[svg.find("<desc>").expect("a desc") + 6..svg.find("</desc>").expect("its end")];
+    let unescaped = body
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&amp;", "&");
+    let answers: Vec<String> = serde_json::from_str(&unescaped).expect("the answers");
+    assert_eq!(answers.len(), blends.len());
+    // The stdlib keeps an alpha on every answer when either end has one;
+    // G-12 writes none at 255, so an opaque answer drops its `ff`.
+    let written: Vec<String> = answers
+        .iter()
+        .map(|a| match a.strip_suffix("ff") {
+            Some(opaque) if a.len() == 9 => opaque.to_string(),
+            _ => a.clone(),
+        })
+        .collect();
+    for (case, answer) in blends.iter().zip(&written) {
+        assert_eq!(
+            answer,
+            case[3].as_str().unwrap(),
+            "{case} (all: {written:?})"
+        );
+    }
+}

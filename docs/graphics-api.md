@@ -401,8 +401,9 @@ A graphic clip's props can be the target of an action, as a clip's position or o
 `add_action {clip, at, duration}` makes the span, and `set_action_end {clip, action, patch:
 {graphic: {props: {…}}}}` names the values the props end at. Each value is checked against your
 schema as `set_graphic` checks it, `min` and `max` included, using the module as it is now. Across
-the action a `number` and a `color` ramp along its curve; a `string`, `boolean` and `enum` change to
-the end's value when the action ends; an `asset` cannot be animated. A prop the clip holds no value
+the action a `number` and a `color` ramp along its curve, a `color` in OKLab, giving the same middle
+`interpolateColors` gives; a `string`, `boolean` and `enum` change to the end's value when the
+action ends; an `asset` cannot be animated. A prop the clip holds no value
 for starts from the schema's `default` as it is when an action first names it, and that value is
 written into the clip, so a later change to the default does not move the animation. `render` gets
 that frame's values every frame, and your own animation from `frame` still runs on top. A `null`
@@ -432,8 +433,9 @@ export function render(frame, props, ctx) {
 }
 ```
 
-A colour blends channel by channel with straight alpha: `#ff0000` to `#0000ff` is `#800080`
-halfway, and `#ffffff` to `#00000000` is `#80808080`, grey and half transparent. While a prop
+A colour blends in OKLab with straight alpha, exactly as `interpolateColors` blends it: `#ff0000`
+to `#0000ff` is `#8c53a2` halfway, not the muddy `#800080` of a channel-by-channel blend, and
+`#ffffff` to `#00000000` is `#63636380`, grey and half transparent. While a prop
 moves, every frame is drawn anew, so a graphic that had settled costs a full draw per frame for the
 length of the action.
 

@@ -1615,7 +1615,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   is 255) each interpolate STRAIGHT, not premultiplied: `#00000000` to
   `#ffffff` is `#80808080` halfway. Each channel is rounded to the nearest
   byte and the result written as G-12 writes a colour (`#rrggbb` when the
-  alpha is 255). Not OKLab.
+  alpha is 255). Not OKLab. (Amended by G-40: a colour prop blends in
+  OKLab, as `interpolateColors` does, with straight alpha; `#00000000` to
+  `#ffffff` is `#63636380` halfway; the rounding and written form stand.)
   (g) **Playback (answer 7).** Nothing is built. Every frame of an
   animated prop is drawn at the recorded per-frame cost, so a graphic that
   had settled misses its texture for the action's span. A
@@ -2107,3 +2109,37 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `Pixmap::decode_png`) or one of a JPEG (zune-jpeg), one encode, and one
   decode of the copy, before the frame's own decode of the copy. Each copy
   holds about w × h × 4 bytes.
+
+- **G-40 — An action on a graphic `color` prop blends in OKLab, as
+  stdlib's `interpolateColors` does, with straight alpha; no setting, no
+  per-action or per-end key** (#250, graphics gaps phase 1, 2026-10-22;
+  the owner's answer, 2026-10-22: "OKLab always"; amends G-34 (f)).
+  (a) **The blend.** Every action on a graphic prop whose end's `kinds`
+  names it `color` (G-34 (c)) moves it from its start toward its end in
+  OKLab: stdlib's `interpolateColors`' conversion, mix and rounding
+  (`graphic/src/stdlib.js`'s `__toLinear`, `__toOklab`, `__fromOklab`,
+  `__fromLinear`), ported operation for operation into the core's
+  `model_color.rs` as `oklab_mix`, so both round the same byte. Each end's
+  red, green and blue are decoded from sRGB to linear, taken to OKLab,
+  mixed component by component by the eased progress, taken back and
+  rounded to the nearest byte. Alpha is carried straight in unit form,
+  `a0 + (a1 − a0) × u`, rounded to the nearest byte: never premultiplied.
+  `#000000` to `#ffffff` is `#636363` halfway (L 0.5, linear 0.125, sRGB
+  99.09) and `#00000000` to `#ffffff` is `#63636380`. There is no setting
+  and no per-action or per-end key. This supersedes G-34 (f)'s "channel by
+  channel … Not OKLab"; its rounding to the nearest byte and its written
+  form (G-12: `#rrggbb` when the alpha is 255) stand.
+  (b) **Older projects.** A project whose ends already ramp a colour
+  re-renders with the new middle. No persisted shape changes, so
+  `RC_FORMAT_VERSION` is not bumped, and there is no migration (no real
+  use yet, the owner, 2026-10-09). An end without `kinds` (version 12 or
+  older) still switches its colours at the end (G-34 (k)).
+  (c) **One fixture.** `graphic/tests/oklab.json` holds the blends both
+  implementations answer — `core/tests/graphic_actions.rs` through the FFI
+  and `graphic/tests/stdlib.rs` through `interpolateColors` — as
+  `colours.json` holds G-12's grammar. A change to one is a change to the
+  other; the JavaScript is the reference.
+  (d) **Not changed.** The model's own colours (`[r, g, b, a]` in video,
+  text and shape groups) still blend element by element in actions
+  (§5.4); a graphic prop's other kinds keep G-34's rules; `split` stays
+  invisible to within one byte per channel (G-34 (i)).

@@ -1225,8 +1225,8 @@ Owed: the person's checks CT-8 (a keyed graphic row's look, both
 appearances) and GR-8 (a 4K animated prop plays without stutter, G-34 (g))
 in `docs/manual-checks.md`. Left out by G-34's accepted limits and filed
 as issues: a per-prop `animate: false` opt-out for module authors
-(#248), an asset prop in an action (#249) and an OKLab
-blend beside the channel blend (#250).
+(#248) and an asset prop in an action (#249). The OKLab blend (#250) is
+built: "Graphics gaps" below, spec §11 G-40.
 
 ## G6 phase 2 — playback prefetch (#127, spec §11 G-36)
 
@@ -1715,6 +1715,42 @@ its probe, `image_cache_bench.py`'s `dump_scene` (and `covering_clip`'s
 `image_cache_bench.py --frames 4 --rounds 1` still passes (every frame
 identical across the arms). #127's phases are all done; it can close.
 
+## Graphics gaps (#248, #249, #250)
+
+Three of G-34's accepted limits, one phase each.
+
+**Phase 1 — an animated colour prop blends in OKLab (#250, spec §11
+G-40)**, 2026-10-22, on `d2a3b82`. The owner's answer: "OKLab always" — no
+setting, no per-action or per-end key. Every action on a graphic `color`
+prop now blends as stdlib's `interpolateColors` does: `core/src/model_color.rs`
+gains `oklab_mix`, the stdlib's `__toLinear`, `__toOklab`, `__fromOklab`
+and `__fromLinear` ported operation for operation (alpha straight, mixed
+as a unit value), and `actions_graphic.rs`'s `lerp_prop` colour arm is one
+line calling it. One fixture, `graphic/tests/oklab.json` (ten blends; the
+first two and `#aabbcc` → itself worked by hand, the rest written from
+what `interpolateColors` answered), is answered by
+`graphic/tests/stdlib.rs`'s `interpolate_colors_answers_the_shared_oklab_fixture`
+and `core/tests/graphic_actions.rs`'s `a_colour_answers_the_shared_oklab_fixture`,
+exact string equality on every case; `a_colour_ramps_channel_by_channel_with_straight_alpha`
+became `a_colour_ramps_in_oklab_with_straight_alpha` (`#00000000` →
+`#ffffff` is `#63636380` halfway, red → blue `#8c53a2`).
+`a_split_through_an_animated_prop_is_invisible` passes unchanged. No
+format bump and no migration: older projects re-render with the new
+middle. The catalog's `set_action_end` prose, `docs/graphics-api.md` and
+§5.4 say OKLab. `graphic_prop_action_proof.py`'s B1, C1 and E1 read the
+red → blue middle from the fixture (`BLEND`).
+
+Verified: `make gate` PASS; the proof against Release, 17/17, exit 0
+(B1's (150,60) (140, 83, 162), E1's decoded (138, 82, 160)); its new
+mutant `channel-blend` (the arm as a per-channel straight lerp) `MUTANT
+PASS`, B1, C1 and E1 failed. The core mutants, applied by hand to the tree
+and reverted: the arm as a channel lerp failed both colour tests; `oklab_mix`
+without the sRGB decode failed the fixture test (and the split test);
+`to`'s alpha taken instead of mixed failed both on `#63636380`.
+
+Not changed: the model's own `[r, g, b, a]` colours (text, shadow,
+background, shape groups) keep §5.4's element-by-element blend.
+
 ## Open items
 
 - G6 (#127) has no phase left. The export's parallel rasterization landed
@@ -1734,8 +1770,7 @@ identical across the arms). #127's phases are all done; it can close.
 - The not-built list: mattes or video input — #240. (HEVC with alpha and
   keyframed props were on it and are built: spec §11 G-33, G-34.)
 - G-34's accepted limits, as candidates: the per-prop opt-out
-  (#248), asset props in an action (#249), an OKLab blend
-  (#250).
+  (#248) and asset props in an action (#249).
 - Replacing QuickJS with JavaScriptCore — GitHub issue #39.
 
 ## Where to look in the original

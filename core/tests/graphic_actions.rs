@@ -1,7 +1,7 @@
 //! Black-box tests for what an action does to a graphic clip's props over
-//! time (format version 13, spec §11 G-34 (b), (e), (f), (h), (i)), through
-//! the C FFI as `ReelCore.swift` drives it: a number ramps and arrives
-//! fractional, a colour ramps channel by channel with straight alpha, a
+//! time (format version 13, spec §11 G-34 (b), (e), (h), (i), and G-40),
+//! through the C FFI as `ReelCore.swift` drives it: a number ramps and
+//! arrives fractional, a colour ramps in OKLab with straight alpha, a
 //! string, a boolean and an enum switch at the action's END, the layer's
 //! hash moves only while a prop does, `split` is invisible, and an action
 //! inside a nest animates its graphic as any other. The door — what
@@ -9,7 +9,9 @@
 //! file holds is `schema_v13.rs`'s.
 //!
 //! Every oracle is worked by hand from the fixture: a linear action at 1 s
-//! for 1 s, so 1.5 s is u = 0.5 and 2 s − 1 frame is u = 29/30.
+//! for 1 s, so 1.5 s is u = 0.5 and 2 s − 1 frame is u = 29/30. A colour's
+//! middle is also `graphic/tests/oklab.json`'s, the blends stdlib's
+//! `interpolateColors` answers (G-40).
 
 mod common;
 #[path = "common/graphic_actions.rs"]
@@ -22,6 +24,10 @@ use fixture::{
     clip, end, hash_at, project, project_with, props_at, source_at, with_action, with_action_on,
     FRAME, SEC,
 };
+
+/// The blends both colour implementations answer (spec §11 G-40), read by
+/// path as `colour.rs` reads `colours.json`.
+const OKLAB: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../graphic/tests/oklab.json");
 
 /// The bytes of a `#rrggbb[aa]` colour, alpha 255 when absent.
 fn channels(colour: &Value) -> [i64; 4] {
@@ -50,17 +56,20 @@ fn a_number_ramps_and_arrives_fractional_never_rounded() {
 }
 
 #[test]
-fn a_colour_ramps_channel_by_channel_with_straight_alpha() {
+fn a_colour_ramps_in_oklab_with_straight_alpha() {
     let (with, action) = with_action();
     let clear = with.apply(&end(
         action,
         json!({"graphic": {"props": {"accent": "#ffffff"}}}),
     ));
-    // Every channel 0 → 255, alpha included: 127.5 rounds to 128 (0x80).
-    // Premultiplied, the colour would stay white and only the alpha move.
+    // Black to white in OKLab is L 0 → 1, a and b 0: halfway L is 0.5, so
+    // linear light 0.5³ = 0.125, sRGB 1.055 × 0.125^(1/2.4) − 0.055 =
+    // 0.3886, × 255 = 99.09, rounding to 99 (0x63). Alpha straight, 0 → 255:
+    // 127.5 rounds to 128 (0x80). Premultiplied, the colour would stay
+    // white and only the alpha move; channel by channel it would be 0x80.
     assert_eq!(
         props_at(&clear, SEC + SEC / 2)["accent"],
-        json!("#80808080")
+        json!("#63636380")
     );
 
     let (red, action) = with_action_on(&project_with("accent", json!("#ff0000")));
@@ -68,8 +77,29 @@ fn a_colour_ramps_channel_by_channel_with_straight_alpha() {
         action,
         json!({"graphic": {"props": {"accent": "#0000ff"}}}),
     ));
-    // Opaque both ends, so written `#rrggbb` (G-12).
-    assert_eq!(props_at(&blue, SEC + SEC / 2)["accent"], json!("#800080"));
+    // Opaque both ends, so written `#rrggbb` (G-12); the middle is
+    // `oklab.json`'s red → blue at 0.5, never the channel blend `#800080`.
+    assert_eq!(props_at(&blue, SEC + SEC / 2)["accent"], json!("#8c53a2"));
+}
+
+/// The shared fixture `graphic/tests/oklab.json` (G-40): each blend driven
+/// through the FFI as a linear action at 1 s for 1 s from the clip's `from`
+/// to an end of `to`, read at 1 s + t, answers the fixture's colour, the
+/// one stdlib's `interpolateColors` answers (`graphic/tests/stdlib.rs`).
+#[test]
+fn a_colour_answers_the_shared_oklab_fixture() {
+    let text = std::fs::read_to_string(OKLAB).expect("graphic/tests/oklab.json");
+    let fixture: Value = serde_json::from_str(&text).expect("the OKLab fixture is JSON");
+    let blends = fixture["blends"].as_array().expect("blends");
+    assert!(!blends.is_empty());
+    for case in blends {
+        let (from, to) = (case[0].clone(), case[1].clone());
+        let t = case[2].as_f64().expect("t");
+        let (with, action) = with_action_on(&project_with("accent", from));
+        let blended = with.apply(&end(action, json!({"graphic": {"props": {"accent": to}}})));
+        let at = SEC + (t * SEC as f64) as i64;
+        assert_eq!(props_at(&blended, at)["accent"], case[3], "{case}");
+    }
 }
 
 #[test]

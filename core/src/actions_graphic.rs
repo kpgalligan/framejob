@@ -14,10 +14,12 @@
 //!   and never snapped to a `step` (G-34 (e)) — so two whole ends 64 and
 //!   129 give 96.5 halfway, and a module that wants a whole number rounds;
 //! - **a colour**, known by `end.graphic.kinds.<key> == "color"` and never
-//!   by the value's shape, channel by channel through `model_color.rs`'s
-//!   `color_channels` / `color_hex`, STRAIGHT alpha, each channel rounded to
-//!   the nearest byte (G-34 (f)) — the element-by-element blend every colour
-//!   action already gets from `actions.rs`'s `lerp_at` over `[r, g, b, a]`;
+//!   by the value's shape, in OKLab through `model_color.rs`'s
+//!   `color_channels`, `oklab_mix` and `color_hex` — stdlib's
+//!   `interpolateColors`' blend, byte for byte, with STRAIGHT alpha, each
+//!   channel rounded to the nearest byte (G-40, amending G-34 (f)). The
+//!   model's own `[r, g, b, a]` colours keep `actions.rs`'s
+//!   element-by-element `lerp_at`;
 //! - **anything else** — a string, a boolean, an enum, two values of
 //!   different JSON kinds, a colour it cannot read — holds its start and
 //!   takes the end's value at the action's END.
@@ -30,7 +32,7 @@ use serde_json::{Map, Number, Value};
 
 use crate::actions::{ease, ordered_actions, spans};
 use crate::model::{Clip, GraphicProps};
-use crate::model_color::{color_channels, color_hex};
+use crate::model_color::{color_channels, color_hex, oklab_mix};
 use crate::time::Ticks;
 
 /// The clip's `graphic` with its `props` evaluated at `clip_t`, its other
@@ -123,16 +125,7 @@ fn lerp_prop(from: &Value, to: &Value, colour: bool, u: f64) -> Value {
         },
         (Value::String(a), Value::String(b)) if colour => {
             match (color_channels(a), color_channels(b)) {
-                (Some(a), Some(b)) => {
-                    let mut out = [0u8; 4];
-                    for (slot, (x, y)) in out.iter_mut().zip(a.iter().zip(b.iter())) {
-                        let (x, y) = (f64::from(*x), f64::from(*y));
-                        // Straight, not premultiplied: each channel on its
-                        // own, alpha included (G-34 (f)).
-                        *slot = (x + (y - x) * u).round().clamp(0.0, 255.0) as u8;
-                    }
-                    Value::String(color_hex(out))
-                }
+                (Some(a), Some(b)) => Value::String(color_hex(oklab_mix(a, b, u))),
                 _ => from.clone(),
             }
         }

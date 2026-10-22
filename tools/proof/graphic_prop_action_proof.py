@@ -7,6 +7,7 @@ the clip's module, and the evaluated props reach `render_frame`, a
     python3 tools/proof/graphic_prop_action_proof.py [--app PATH]
     python3 tools/proof/graphic_prop_action_proof.py --mutant recipe-stored-props
     python3 tools/proof/graphic_prop_action_proof.py --mutant handler-no-schema
+    python3 tools/proof/graphic_prop_action_proof.py --mutant channel-blend
 
 Launches the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
 on scratch sockets of its own, one instance at a
@@ -36,19 +37,22 @@ Instance 1 (the prefetch on, the default), project P:
   number / color / string, and the clip's props hold the three defaults
   (each start written into the clip).
 - **B1**: at mid the edge is at x = 96.5 — (80,60) background where the
-  still frame had red, (150,60) the blend #800080, (96,60) the half-covered
-  column; the frame one tick of 20000 later differs (CONTROL).
+  still frame had red, (150,60) the OKLab blend `BLEND` (spec §11 G-40:
+  `graphic/tests/oklab.json`'s #ff0000 → #0000ff at 0.5, read at import, the
+  answer stdlib's `interpolateColors` gives; never the channel blend
+  #800080), (96,60) the half-covered column; the frame one tick of 20000
+  later differs (CONTROL).
 - **S1**: the string switches at the END: (150,200) is background at
   880000 and blue at 900000.
 - **U1**: `undo` answers "Action End" and restores the project and the mid
   frame's bytes; `redo` brings the animated frame's bytes back.
 - **C1**: the mid and end frames are byte-equal to a STILL control clip
-  (project Q) holding the evaluated values {x: 96.5, fill: #800080, mode:
+  (project Q) holding the evaluated values {x: 96.5, fill: `BLEND`, mode:
   A} and, by `set_graphic`, the end values.
 - **E0** (CONTROL): Q.mov's decoded frames 10 and 30 are byte-equal: the
   encoder is stable for identical input frames.
 - **E1**: P-on.mov's frame 30 is byte-equal to Q.mov's frame 30, and
-  differs from its own frame 10 (CONTROL); (150,60) is near the blend and
+  differs from its own frame 10 (CONTROL); (150,60) is near `BLEND` and
   (80,60) near background, ±6. The byte comparison rests on ProRes 422
   being INTRA-frame: a frame's bytes depend only on its own picture, which
   E0 shows for this encoder. A PNG is never compared with a ProRes frame
@@ -84,6 +88,8 @@ F2 are skipped):
   recipe-stored-props  the recipe publishes the STORED props, not the
                        evaluated ones: C1 must FAIL.
   handler-no-schema    the handler sends no schema: A1 must FAIL.
+  channel-blend        the colour arm blends channel by channel, straight
+                       (G-34 (f) before G-40): B1 must FAIL.
 Rule R: exit 0 means the named row FAILED in the copy — caught; 1 that it
 passed — survived; 2 that the control could not be performed (the copy did
 not build or launch, or the row was not reached). A plain run exits 0 iff
@@ -121,6 +127,12 @@ ROWS = ["H0", "T0", "F0", "A1", "B1", "S1", "U1", "C1", "E0", "E1", "R1", "R2", 
         "F1", "F2", "Z1"]
 MUTANT_ROWS = [name for name in ROWS if name not in ("F1", "F2")]
 PREFIX = "set_action_end: "
+# The OKLab middle of #ff0000 → #0000ff (spec §11 G-40), from the fixture both
+# the core and stdlib's interpolateColors answer.
+BLEND = next(case[3] for case in
+             json.loads((ROOT / "graphic/tests/oklab.json").read_text())["blends"]
+             if case[:3] == ["#ff0000", "#0000ff", 0.5])
+BLEND_RGB = tuple(int(BLEND[i:i + 2], 16) for i in (1, 3, 5))
 # name: (file, anchor, replacement, the row that must fail)
 MUTANTS = {
     "recipe-stored-props": (
@@ -131,6 +143,11 @@ MUTANTS = {
         "app/Sources/AgentServer+Actions.swift",
         "off: off, schema: schema)",
         "off: off, schema: nil)", "A1"),
+    "channel-blend": (
+        "core/src/actions_graphic.rs",
+        "                (Some(a), Some(b)) => Value::String(color_hex(oklab_mix(a, b, u))),",
+        "                (Some(a), Some(b)) => Value::String(color_hex(std::array::from_fn(|i| "
+        "(f64::from(a[i]) + (f64::from(b[i]) - f64::from(a[i])) * u).round() as u8))),", "B1"),
 }
 rows = {}
 
@@ -363,12 +380,12 @@ def run_p(client, log, state):
     background = pixel(mid, 5, 5)
     left, centre, column = pixel(mid, 80, 60), pixel(mid, 150, 60), pixel(mid, 96, 60)
     was_left = pixel(base_mid, 80, 60)
-    check("B1 at mid the edge is at x = 96.5 and the fill is the blend #800080; the frame "
-          "20000 ticks later differs (CONTROL)",
+    check(f"B1 at mid the edge is at x = 96.5 and the fill is the OKLab blend {BLEND}; the "
+          "frame 20000 ticks later differs (CONTROL)",
           mid is not None and mid1 is not None and mid != base_mid and mid != mid1
           and near(left, background, 2) and near(was_left, (255, 0, 0), 2)
-          and near(centre, (128, 0, 128), 2)
-          and not near(column, background, 2) and not near(column, (128, 0, 128), 2),
+          and near(centre, BLEND_RGB, 2)
+          and not near(column, background, 2) and not near(column, BLEND_RGB, 2),
           f"background {background}; (80,60) {left} (still {was_left}); (150,60) {centre}; "
           f"(96,60) {column}; mid≠still {mid != base_mid}; mid≠next {mid != mid1}")
 
@@ -415,7 +432,7 @@ def run_p(client, log, state):
     q_track = (project_of(client, q).get("tracks") or [{}])[0].get("id")
     still = place(client, q, "add_graphic_clip",
                   {"name": "ramp", "track": q_track, "at": 0, "duration": 1_200_000,
-                   "props": {"x": 96.5, "fill": "#800080", "mode": "A"}})
+                   "props": {"x": 96.5, "fill": BLEND, "mode": "A"}})
     c_mid = frame(client, q, "c-mid", MID)
     patched = attempt(client, "set_graphic", {"project": str(q), "clips": [still],
                                               "patch": {"props": {"x": 129, "fill": "#0000ff",
@@ -449,10 +466,10 @@ def run_p(client, log, state):
         if state["p_on"] else (b"", b"")
     centre_m, left_m = movie_pixel(p30, 150, 60), movie_pixel(p30, 80, 60)
     check("E1 P-on.mov's frame 30 is byte-equal to the still control's (ProRes 422 is "
-          "intra-frame), differs from its frame 10 (CONTROL); (150,60) near #800080 and "
+          f"intra-frame), differs from its frame 10 (CONTROL); (150,60) near {BLEND} and "
           "(80,60) near background, ±6",
           len(p30) == size and p30 == q30 and p30 != p10
-          and near(centre_m, (128, 0, 128)) and near(left_m, background),
+          and near(centre_m, BLEND_RGB) and near(left_m, background),
           f"P-on.mov {state['p_on']} {state['p_on_error']}; frame 30 = Q's {p30 == q30}; "
           f"≠ its frame 10 {p30 != p10}; (150,60) {centre_m}; (80,60) {left_m}")
 

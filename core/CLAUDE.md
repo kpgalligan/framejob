@@ -161,7 +161,10 @@ governs a module now.
   (`ffi.rs`) exports it for the Inspector's colour defaults (spec §11 G-25
   (c)), and `model_graphic.rs`'s `check_schema` refuses a `color` default
   it refuses (G-25 (a)). `color_channels` and `color_hex` (which
-  `normalise_color` writes through) are `actions_graphic.rs`'s blend's.
+  `normalise_color` writes through) and `oklab_mix` are
+  `actions_graphic.rs`'s blend's: `oklab_mix` is the stdlib's
+  `interpolateColors` ported operation for operation (spec §11 G-40), and
+  both suites read `graphic/tests/oklab.json`.
 - `model_query.rs` — reading a project: `Project::new`, id allocation, the
   `clip`/`track`/`media`/`marker`/`nest` lookups, `clips_on`, `duration`,
   `validate` with its nesting walk, and `source_size`. The three
@@ -551,8 +554,8 @@ governs a module now.
   version 13, spec §11 G-34): finished actions' `end.graphic.props` laid
   over the clip's map by `insert`, the spanning one interpolated — a number
   in floating point, never rounded; a `color` (by `end.graphic.kinds`,
-  never by shape) four channels straight through `model_color.rs`'s
-  `color_channels` / `color_hex`; anything else, a malformed end, or a prop
+  never by shape) in OKLab with straight alpha through `model_color.rs`'s
+  `oklab_mix` (G-40); anything else, a malformed end, or a prop
   with no start, held and switched at the end. Total. `names_prop` is
   `set_graphic`'s and `paste_attributes`' question.
 - `transition.rs` — overlap detection, THE overlap rule (spec §11), eased

@@ -17173,7 +17173,7 @@ into ordinary layers drawn by the same loop, a nested text layer keeps its
 `.text` source and reveal, and a nest has no code of its own here. The probe
 is an unoptimised build, so its medians are an upper reading of the app's.
 
-## Issue batch B87 phase 2 — an action animates a graphic's props over MCP (`graphic_prop_action_proof.py` H0, T0, F0, A1, B1, S1, U1, C1, E0, E1, R1–R3, N1, F1, F2, Z1 and two mutants; #239, spec §11 G-34)
+## Issue batch B87 phase 2 — an action animates a graphic's props over MCP (`graphic_prop_action_proof.py` H0, T0, F0, A1, B1, S1, U1, C1, E0, E1, R1–R3, N1, F1, F2, Z1 and three mutants; #239, #250, spec §11 G-34, G-40)
 
 **What it proves.** `set_action_end`'s handler (`AgentServer+Actions.swift`)
 fills `schema` from the CURRENT revision of the module the action's clip is
@@ -17187,6 +17187,7 @@ linear.
     python3 tools/proof/graphic_prop_action_proof.py
     python3 tools/proof/graphic_prop_action_proof.py --mutant recipe-stored-props
     python3 tools/proof/graphic_prop_action_proof.py --mutant handler-no-schema
+    python3 tools/proof/graphic_prop_action_proof.py --mutant channel-blend
 
 Two instances, one after the other, each launched by the script under the
 scratch home `tools/proof/work/graphic-prop-action/home` and stopped by its
@@ -17206,7 +17207,9 @@ default curve is already linear, so `set_action`'s "made no change" is
 accepted and the curve read back). A1 the end lands with `props` and the
 op's `kinds`, and the clip's props hold the three defaults. B1 at the mid
 tick the edge is at x = 96.5 — (80,60) background where the still frame is
-red, (150,60) #800080, (96,60) the half-covered column — and the frame 20000
+red, (150,60) the OKLab middle `#8c53a2` (G-40; `BLEND`, read at import
+from `graphic/tests/oklab.json`'s `#ff0000` → `#0000ff` at 0.5, the answer
+stdlib's `interpolateColors` gives), (96,60) the half-covered column — and the frame 20000
 ticks later differs (CONTROL). S1 the string switches at the END tick. U1
 undo answers "Action End" and restores the project and the mid frame's
 bytes; redo restores the animated bytes. C1 the mid and end frames are
@@ -17236,6 +17239,7 @@ and F2 skipped):
 |---|---|---|---|
 | `recipe-stored-props` | `core/src/recipe_graphic.rs` `\|evaluated\| evaluated.props.clone(),` → `\|_\| graphic.props.clone(),` (the copy's `core/` its own, `hevc_alpha_proof.own_core`) | C1 | `MUTANT PASS`, built in 94 s, 11/15: B1, S1, C1, E1 failed (mid and end frames not the control's) |
 | `handler-no-schema` | `app/Sources/AgentServer+Actions.swift` `off: off, schema: schema)` → `off: off, schema: nil)` | A1 | `MUTANT PASS`, built in 88 s, 6/15: A1 failed on "graphic.props.fill needs its module's schema to animate, and none came with the op", and every row after it that needs the end |
+| `channel-blend` (graphics gaps phase 1, #250) | `core/src/actions_graphic.rs` `(Some(a), Some(b)) => Value::String(color_hex(oklab_mix(a, b, u))),` → the same arm with a per-channel straight lerp, `std::array::from_fn(\|i\| (f64::from(a[i]) + (f64::from(b[i]) - f64::from(a[i])) * u).round() as u8)` (G-34 (f) before G-40; the copy's `core/` its own) | B1 | `MUTANT PASS` (2026-10-22, Release, powermode 0), built in 138 s, 12/15: B1 read (150,60) (128, 0, 128), so C1 and E1 failed with it |
 
 **Its record** (2026-10-07, the B87 phase 2 tree, `powermode 0`): plain run
 17/17, exit 0, no `DEFAULTS MOVED`. B1 read background (0, 0, 0), (80,60)
@@ -17245,6 +17249,16 @@ and F2 skipped):
 unused`; P-on.mov and P-off.mov 306963 bytes each, equal after masking.
 The two instances' rows take a few seconds; each mutant adds one tree-copy
 build (about 90 s here).
+
+**Graphics gaps phase 1** (#250, spec §11 G-40, 2026-10-22, Release,
+`powermode 0`): a colour prop now blends in OKLab, so B1, C1 and E1 expect
+`BLEND` (`#8c53a2`) instead of `#800080`. Plain run 17/17, exit 0, no
+`DEFAULTS MOVED`. B1 read background (0, 0, 0), (80,60) (0, 0, 0) against
+the still frame's (255, 0, 0), (150,60) (140, 83, 162), (96,60) (70, 42,
+81); E1's decoded (150,60) (138, 82, 160); F2's line `key 9, 11 workers, 60
+frames with graphics, 31 hits, 0 mismatched, 0 missed, 29 unused`; P-on.mov
+and P-off.mov 307843 bytes each, equal after masking. `--mutant
+channel-blend` exit 0 (`MUTANT PASS`, B1 caught).
 
 **Limits.** No row is timed. The 4K playback of an animated prop is spec §11
 G-34's watched row for phase 3 (GR-8). One module, one action, one curve; the
