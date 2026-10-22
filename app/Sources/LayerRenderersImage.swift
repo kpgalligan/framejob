@@ -17,12 +17,21 @@ extension LayerRenderers {
     /// scaled down once here rather than on every frame. An HLG or PQ still
     /// (`StillColor.read`) is drawn by `renderHDRImage`; when either answers
     /// nil — every SDR still, after a header read — today's lines run, so an
-    /// HDR still is never drawn worse than before (spec §11 HD-19 (a)). The
-    /// key is unchanged: the texture is the file's codes in both outputs.
-    func image(url: URL, media: UInt32) -> Rendered? {
-        cached("image:\(media):" + url.path) {
+    /// HDR still is never drawn worse than before (spec §11 HD-19 (a)). In an
+    /// HLG project (`output`) a still with a gain map is drawn from its HDR
+    /// rendition by `renderGainMapImage` first (HD-22 (b)); every other still
+    /// draws the same texture in both outputs, an HLG project's under its own
+    /// key (`hlg:`, HD-22 (f)), and the SDR key is unchanged.
+    func image(url: URL, media: UInt32, output: CanvasOutput) -> Rendered? {
+        cached("image:" + (output == .hlg ? "hlg:" : "") + "\(media):" + url.path) {
             if let hdr = StillColor.read(url, maxPixelSize: LayerRenderers.maxTextureSide),
                 let rendered = self.renderHDRImage(hdr.image, conversion: hdr.conversion)
+            {
+                return rendered
+            }
+            if output == .hlg,
+                let hdr = StillGainMap.decodeHDR(url, maxPixelSize: LayerRenderers.maxTextureSide),
+                let rendered = self.renderGainMapImage(hdr)
             {
                 return rendered
             }
@@ -68,6 +77,26 @@ extension LayerRenderers {
         guard var rendered = upload(context, size: size, pixelFormat: .rgba16Float)
         else { return nil }
         rendered.conversion = conversion
+        return rendered
+    }
+
+    /// A gain-map still's HDR rendition (spec §11 HD-22 (b)) drawn into
+    /// `StillGainMap.linearBitmap` with no tone mapping (an EDR target headroom
+    /// of 0), so the full gain lands above 1.0; encoded to PQ in place, uploaded
+    /// `rgba16Float` and carrying step 0's `.pq(.bt2020)` arm and its own peak.
+    private func renderGainMapImage(_ image: CGImage) -> Rendered? {
+        let size = CGSize(width: image.width, height: image.height)
+        guard size.width >= 1, size.height >= 1,
+            let context = StillGainMap.linearBitmap(size)
+        else { return nil }
+        _ = context.setEDRTargetHeadroom(0)
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(origin: .zero, size: size))
+        let peak = StillGainMap.encodePQ(context)
+        guard var rendered = upload(context, size: size, pixelFormat: .rgba16Float)
+        else { return nil }
+        rendered.conversion = .pq(.bt2020)
+        rendered.peak = peak
         return rendered
     }
 

@@ -12,8 +12,9 @@ import CoreText
 /// which dispatches to the three reveal routines (`LayerRenderersReveal`) and
 /// the word caption (`LayerRenderersWords`) — and everything that merely
 /// rasterizes a box the model already describes stays in
-/// `LayerRenderers.swift`, which keeps the texture cache,
-/// the three entry points, shapes, images and the bitmap/texture pair.
+/// `LayerRenderers.swift`, which keeps the texture cache, the text and shape
+/// entry points, shapes and the bitmap/texture pair (stills went out to
+/// `LayerRenderersImage.swift`).
 /// The file is an extension and not a second type for that reason: there is
 /// one cache and one lock, and a text texture is looked up beside a shape's.
 ///

@@ -20,7 +20,9 @@ extension MetalRenderer {
     /// missing-media slate is not lifted. An HLG or PQ still is run through its
     /// own arm in either output (spec §11 HD-19 (a)), a PQ one at its
     /// `input.peak` (HD-20 (b)), and an HLG BT.2020 one in an HLG project is
-    /// already the working space, sampled as drawn.
+    /// already the working space, sampled as drawn. In an HLG project a
+    /// gain-map still is its HDR rendition through `.pq(.bt2020)` at the
+    /// rendition's own peak (HD-22 (b)).
     func source(
         for layer: RecipeLayer, request: AVAsynchronousVideoCompositionRequest,
         instruction: RecipeInstruction?, live: inout [CVMetalTexture], output: CanvasOutput
@@ -61,7 +63,7 @@ extension MetalRenderer {
                 orientation: orientation)
         case .image(let media):
             guard let url = instruction?.mediaURLs[media],
-                let rendered = renderers.image(url: url, media: media)
+                let rendered = renderers.image(url: url, media: media, output: output)
             else { return .slate(layer.sourceSizeCG ?? CGSize(width: 640, height: 360)) }
             guard let conversion = rendered.conversion else {
                 return lifting(rendered.texture, rendered.size)
@@ -69,8 +71,9 @@ extension MetalRenderer {
             if output == .hlg, conversion == .hlg(.bt2020) {
                 return .textured(rendered.texture, rendered.size, premultiplied: true, orientation: 0)
             }
+            let peak = layer.input?.peak ?? rendered.peak
             guard let converted = lifted(
-                rendered.texture, conversion: conversion, output: output, peak: layer.input?.peak)
+                rendered.texture, conversion: conversion, output: output, peak: peak)
             else { return .absent }
             return .textured(converted, rendered.size, premultiplied: true, orientation: 0)
         case .text(let hash, let props, let reveal):
@@ -95,7 +98,8 @@ extension MetalRenderer {
     /// (c)): a track by its frame's SDR-project step-0 choice and its media's
     /// peak (a built-in Camera Log `.log`, HD-20 (a)), a still by its own arm
     /// (its cached texture's) and its `input.peak` (HD-20 (b)), every other
-    /// layer — text, shapes, graphics, the slate — by HD-13 (h)'s un-lift.
+    /// layer — text, shapes, graphics, the slate — by HD-13 (h)'s un-lift. A
+    /// gain-map still reads the un-lift too, as its SDR label does (HD-22 (g)).
     func keyReading(
         for layer: RecipeLayer, request: AVAsynchronousVideoCompositionRequest,
         instruction: RecipeInstruction?
@@ -109,8 +113,9 @@ extension MetalRenderer {
             return KeyReading.of(chosen, peak: layer.input?.peak)
         case .image(let media):
             guard let url = instruction?.mediaURLs[media] else { return .unlift }
-            return KeyReading.of(
-                renderers.image(url: url, media: media)?.conversion, peak: layer.input?.peak)
+            let rendered = renderers.image(url: url, media: media, output: .hlg)
+            guard rendered?.peak == nil else { return .unlift }
+            return KeyReading.of(rendered?.conversion, peak: layer.input?.peak)
         default:
             return .unlift
         }

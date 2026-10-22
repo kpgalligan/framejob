@@ -391,6 +391,36 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   through `.pq(.bt2020)` at `.sdr` with peak nil, then 4000: two textures, the second the
   pass at 4000 ±1/1023, and 4000 asked again the same texture. log_proof.py's L23 is
   #324's MCP row.
+- **HG0, HG, HGu, HGk, P15** (clean-up 3 batch B, phase 3, #322, spec §11 HD-22; the rules
+  fixed before the phase's control ran, `tools/proof/work/i322/ctl`). The fixture
+  (`gainmap_still`): `gainmap_writer.swift`, built through `swift_build.build`, writes eight
+  equal vertical bands of extended-linear grey, L = 0.05, 0.18, 0.5, 1, 2, 4, 6, 8 left to
+  right (each band named by its L; centres x = 64 + 128i, y = 64), as a HEIC with an ISO
+  gain map over ImageIO's own SDR base (Display P3, 8 bits) — `still_gainmap.heic` (1024×128)
+  and `still_gainmap_wide.heic` (9000×600), kept under `work/hdr/media/`, a refused one its
+  row's FAIL by name. It proves the route on Apple's own encoder; Apple's pre-ISO gain map, a
+  real photo's headroom and look, and JPEG or AVIF gain maps are `docs/manual-checks.md`
+  HDR-7's. HG0 (capture only): copies the gain-map still, still8.png, still16_srgb.png and
+  still_hlg.heic into DIR/media/ and saves into DIR/hg0/ the gain-map still's SDR-project
+  render and the three others' HLG-project renders; CONTROL each band's HLG-project code =
+  lift(its SDR-project code) ±2/1023 (HD-3's lift of a drawn layer, Core Media 709's γ with
+  its toe) and none above lift(white) + 2/1023. P15 (the probe; HG or HGk adds it, run before
+  HG): `hasGainMap` true for both fixtures and an Orientation-6 copy, false for still8,
+  still16_srgb, still_hlg.heic and still_pq.png; `encodePQ` over linear {0, 1, 4, 8} (one
+  pixel at α 0.5) = pqSignal(v·203) ±1/1023, α kept, peak 1624; one `LayerRenderers`: the
+  fixture at `.sdr` conversion nil and peak nil, at `.hlg` `.pq(.bt2020)`, a peak above 1,000
+  and another texture, still8 at `.hlg` peak nil, still_hlg.heic at `.hlg` `.hlg(.bt2020)`;
+  `decodeHDR` of the wide fixture 8192 on its longest side and of the O6 copy 128×1024, each
+  with its L = 8 band above 2.0; the answer's `gainmap` (the eight bands in linear BT.2020, the
+  rendition's peak). HG: in an HLG project each band = pq_hlg(pq_signal(203·rgb), peak)
+  ±2/1023, the L = 2, 4, 6, 8 bands ≥ 40/1023 above L = 1, the bands increasing in L, L = 1
+  within ±6/1023 of pq_hlg(pq_signal(203)), and the worst gap from the lifted base printed
+  (HD-22 (c)). HGu (`--only` with `--control`): the gain-map still's SDR render and the three
+  others' HLG renders, from DIR/media/, byte-equal to DIR/hg0/'s; a missing control file
+  returns 2 before anything runs. HGk: over a [0.5, 0.5, 0.5, 1] background in HLG, keyed at
+  unlift(the L = 0.5 band's working colour) at `hkh_oracle`'s rule (the right reading the
+  un-lift, the other the PQ reading), that band shows 0.5059 ±1/1023 and the L = 0.18 and
+  L = 1 bands keep their codes ±1/1023.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
@@ -402,11 +432,12 @@ applies the label inside `Exporter.renderFrame` instead, which moves the
 eyedropper's picks; it runs against a capture made after PR-11.
 
 H1a, the H7 family, the H-2 rows, the H-3 rows, the H-4 rows, the H-6 rows and clean-up
-batch 2's H7w and DA, its phase 2's HI, HKh and H7h, and clean-up 3 batch B's HIp, run in
-a plain run, `compare` and `--only`; never under `capture`'s default selection, `--measure`
-or a mutant's default selection; hdr H-1's five, H-2's twelve, H-3's seven, H-4's nine,
-H-6's ten, clean-up batch 2's eleven, its phase 2's thirteen and clean-up 3 batch B's four
-mutants run with
+batch 2's H7w and DA, its phase 2's HI, HKh and H7h, and clean-up 3 batch B's HIp and its
+phase 3's HG and HGk, run in a plain run, `compare` and `--only`; never under `capture`'s
+default selection, `--measure` or a mutant's default selection (HG0 runs only under
+`capture --only`, HGu only under `--only`); hdr H-1's five, H-2's twelve, H-3's seven, H-4's
+nine, H-6's ten, clean-up batch 2's eleven, its phase 2's thirteen, clean-up 3 batch B's four
+and its phase 3's six mutants (and `still-peak-dropped`, re-anchored there) run with
 `--only <their rows>,Z1` (SI also runs under `capture --only`, writing
 DIR's references). `capture --only`
 captures just the rows named, keeping an earlier capture's H1 record.
@@ -458,6 +489,7 @@ PICK_PROBE = ROOT / "tools/proof/hdr_pick_probe.swift"
 MATH_PROBE = ROOT / "tools/proof/hdr_probe.swift"
 WRITER = ROOT / "tools/proof/applelog_writer.swift"
 HDR10_WRITER = ROOT / "tools/proof/hdr10_writer.swift"
+GAINMAP_WRITER = ROOT / "tools/proof/gainmap_writer.swift"
 RECORDINGS = Path.home() / "Movies" / "Frame Job Recordings"
 CALL_BOUND = 300
 BUILD_BOUND = 1500
@@ -517,12 +549,13 @@ H1_SUFFIX = {"still8": ".png", "webm": ".webm"}
 PICK_POINTS = {(W, H): [[256.5, 32.5], [512.5, 96.5], [900.5, 100.5]],
                (SW, SH): [[320.5, 180.5], [100.5, 60.5], [540.5, 300.5]]}
 ROWS = ["H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "H7", "H7d", "H7i",
-        "H7p", "H7o", "H7r", "H7w", "H7h", "HS", "HH", "HP", "HT", "HI", "HIp", "HL", "HW", "HK", "HKh",
+        "H7p", "H7o", "H7r", "H7w", "H7h", "HS", "HH", "HP", "HT", "HI", "HIp", "HG0", "HG", "HGu",
+        "HGk", "HL", "HW", "HK", "HKh",
         "HM", "HF", "HX", "DT",
         "DP", "DV", "DI", "DE", "DR", "DS", "DM", "DX", "DA", "SI", "SW", "SV", "SS", "SD", "SP", "LT",
         "LH", "LG", "LA", "LS", "LM", "LD", "LB", "LF", "LR", "LE", "LO", "LU", "R0", "TI", "TH",
         "TO", "TL", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10",
-        "P11", "P12", "P13", "P14", "Z1"]
+        "P11", "P12", "P13", "P14", "P15", "Z1"]
 # H7's family (hdr H-1, #281, spec §11 HD-6, HD-12): PQ ramps whose HDR10 static
 # metadata sits in the HEVC stream's SEI (the x265 CLI, muxed by ffmpeg's stream copy;
 # ffmpeg 9.0.2's libx265 wrapper no longer writes the mastering display with these
@@ -663,6 +696,20 @@ HI_STILL_BOUND = 4 / 1023
 # PQ_META_STILLS: name → (the chunk inserted into still_pq.png after IHDR, its data, the
 # cd/m² ffprobe must read from it).
 B3_ROWS = {"HIp"}
+# Clean-up 3 batch B, phase 3 (#322, spec §11 HD-22): a gain-map still drawn as HDR in an HLG
+# project. GAINMAP_FILES: the writer's two fixtures under MEDIA (name → (file, width, height));
+# GAINMAP_L: the bands' authored extended-linear greys, left to right, each band named by its
+# L; HG0_FILES: the stills HG0 copies into DIR/media/ and HGu reads from there.
+B4_ROWS = {"HG0", "HG", "HGu", "HGk"}
+GAINMAP_FILES = {"fixture": ("still_gainmap.heic", W, H),
+                 "wide": ("still_gainmap_wide.heic", 9000, 600)}
+GAINMAP_L = (0.05, 0.18, 0.5, 1, 2, 4, 6, 8)
+GAINMAP_Y = 64
+HG0_FILES = {"gainmap": "still_gainmap.heic", "still8": "still8.png",
+             "still16_srgb": "still16_srgb.png", "still_hlg_heic": "still_hlg.heic"}
+# What HG0 saves into DIR/hg0/ and HGu compares byte for byte: (still, output).
+HG0_RENDERS = (("gainmap", "sdr"), ("still8", "hlg"), ("still16_srgb", "hlg"),
+               ("still_hlg_heic", "hlg"))
 PQ_META_STILLS = {
     "still_pq_cll": (b"cLLI", struct.pack(">II", 40_000_000, 4_000_000), 4000),
     "still_pq_mdcv": (b"mDCV", struct.pack(">8HII", 35400, 14600, 8500, 39850, 6550, 2300,
@@ -703,8 +750,12 @@ LAYER_RENDERERS_SWIFT = "app/Sources/LayerRenderersImage.swift"
 LIFT_SWIFT = "app/Sources/LayerLift.swift"
 EYEDROPPER_SWIFT = "app/Sources/EditorViewController+Eyedropper.swift"
 KEY_SWIFT = "app/Sources/ChromaKeyHDR.swift"
+GAINMAP_SWIFT = "app/Sources/StillGainMap.swift"
 # The lift pool's hit test (clean-up 3 batch B: the output and the peak), the anchor of
 # `lift-pool-ignores-output` and `lift-pool-ignores-peak`.
+# The `.image` arm's peak line (clean-up 3 batch B, phase 3): the anchor of `still-peak-dropped`
+# and `gainmap-peak-dropped`.
+GAINMAP_PEAK_LINE = "            let peak = layer.input?.peak ?? rendered.peak\n"
 LIFT_HIT = ("        if let hit = entries[key], hit.source === texture, hit.conversion == "
             "conversion,\n            hit.output == output, hit.peak == peak\n")
 P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13",
@@ -1115,16 +1166,46 @@ MUTANTS = {
     # Clean-up 3 batch B, phase 1 (#325, spec §11 HD-20 (b)): one per decision, each run with
     # `--only <its rows>,Z1`.
     # A PQ still's layer drawn at the unknown peak, its `input.peak` not passed to the lift.
-    "still-peak-dropped": ([(SOURCES_SWIFT,
-                             "                rendered.texture, conversion: conversion, output: "
-                             "output, peak: layer.input?.peak)\n",
-                             "                rendered.texture, conversion: conversion, output: "
-                             "output, peak: nil)\n")], ["HIp"]),
+    # (Re-anchored by clean-up 3 batch B, phase 3, whose `let peak` line names the peak the
+    # lift is given.)
+    "still-peak-dropped": ([(SOURCES_SWIFT, GAINMAP_PEAK_LINE,
+                             "            let peak = nil as UInt32?\n")], ["HIp"]),
     # The lift's pool hits whatever the peak, so a peak asked after another is not drawn.
     "lift-pool-ignores-peak": ([(LIFT_SWIFT, LIFT_HIT,
                                  "        if let hit = entries[key], hit.source === texture, "
                                  "hit.conversion == conversion,\n            hit.output == "
                                  "output\n")], ["P14"]),
+    # Clean-up 3 batch B, phase 3 (#322, spec §11 HD-22): one per decision, each run with
+    # `--only <its rows>,Z1` (HGu's with `--control`, the capture made before the phase's code).
+    # No still has a gain map, so the fixture is drawn as its SDR base in HLG too.
+    "gainmap-unread": ([(GAINMAP_SWIFT,
+                         "        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) "
+                         "else { return false }\n",
+                         "        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil), "
+                         "false else { return false }\n")], ["HG", "P15"]),
+    # The rendition's linear light encoded with 1.0 at 100 cd/m², not BT.2408's 203.
+    "gainmap-white-100": ([(GAINMAP_SWIFT,
+                            "                        let nits = min(v * InputConversions."
+                            "pqReferenceWhite, 10_000)\n",
+                            "                        let nits = min(v * 100, 10_000)\n")],
+                          ["HG", "P15"]),
+    # The rendition's own peak not passed to the lift, so the EETF never runs (the L = 6 band,
+    # 1218 cd/m², clips at 1,000).
+    "gainmap-peak-dropped": ([(SOURCES_SWIFT, GAINMAP_PEAK_LINE,
+                               "            let peak = layer.input?.peak\n")], ["HG"]),
+    # The HDR decode in an SDR project too.
+    "gainmap-sdr-project": ([(LAYER_RENDERERS_SWIFT, "            if output == .hlg,\n",
+                              "            if true,\n")], ["HGu", "P15"]),
+    # One cache key for both outputs, so the first output's texture serves the second.
+    "gainmap-cache-shared": ([(LAYER_RENDERERS_SWIFT,
+                               "        cached(\"image:\" + (output == .hlg ? \"hlg:\" : \"\") + "
+                               "\"\\(media):\" + url.path) {\n",
+                               "        cached(\"image:\\(media):\" + url.path) {\n")], ["P15"]),
+    # The key on a gain-map still read through its `.pq` arm, not the un-lift.
+    "gainmap-key-pq": ([(SOURCES_SWIFT,
+                         "            guard rendered?.peak == nil else { return .unlift }\n",
+                         "            guard rendered?.peak == nil || true else { return .unlift "
+                         "}\n")], ["HGk"]),
     # A PNG's cLLI read as whole cd/m², not 0.0001 cd/m².
     "png-cll-whole-nits": ([("core/src/hdr10_still.rs",
                              "                    .get_or_insert(be_u32(data, 0).and_then("
@@ -6529,6 +6610,301 @@ def run_h7h(client, state):
           f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
 
 
+# ---- clean-up 3 batch B, phase 3 (#322, spec §11 HD-22): a gain-map still ------------
+
+def gainmap_still():
+    """HG's, HGk's, HG0's and P15's fixtures, `gainmap_writer.swift` built through
+    `swift_build.build` and run once each, kept under MEDIA: `still_gainmap.heic` (W×H) and
+    `still_gainmap_wide.heic` (9000×600). name → path, None with REFUSED[name] saying why;
+    the writer exits 0 only when its file reads back with a gain map over a base no HDR
+    label claims."""
+    out = {}
+    writer = BASE / "gainmap-writer" / "gainmap_writer"
+    for name, (file, width, height) in GAINMAP_FILES.items():
+        path = MEDIA / file
+        if not path.exists():
+            try:
+                swift_build.build(sources=[GAINMAP_WRITER], output=writer, timeout=BUILD_BOUND)
+            except swift_build.SwiftBuildFailed as failure:
+                REFUSED[f"gainmap_{name}"] = f"gainmap_writer did not build: {str(failure)[:300]}"
+                out[name] = None
+                continue
+            made = bounded.run([str(writer), str(path), str(width), str(height)], 120)
+            print(f"       gainmap_writer {file}: {(made['stdout'] + made['stderr']).strip()[-200:]}",
+                  flush=True)
+            if made["rc"] != 0 or not path.exists():
+                REFUSED[f"gainmap_{name}"] = f"gainmap_writer {file} exited {made['rc']}"
+                path.unlink(missing_ok=True)
+                out[name] = None
+                continue
+        out[name] = path
+    return out
+
+
+def gainmap_x(i, width=W):
+    """The centre of the band authored at GAINMAP_L[i] (x = 64 + 128i at W)."""
+    return int((i + 0.5) * width / len(GAINMAP_L))
+
+
+def gainmap_band(frame, l):
+    """The render's pixel at the centre of the band authored at L = `l`."""
+    return frame.px(gainmap_x(GAINMAP_L.index(l)), GAINMAP_Y)
+
+
+def hg0_paths(control):
+    """HG0's files as HGu reads them: (the copies under DIR/media/, the renders under
+    DIR/hg0/), each name → path."""
+    media = {n: control / "media" / f for n, f in HG0_FILES.items()}
+    renders = {(n, o): control / "hg0" / f"{n}-{o}.png" for n, o in HG0_RENDERS}
+    return media, renders
+
+
+def run_hg0(client, mode, control, state):
+    """HG0 (capture only, #322): the untouched tree's gain-map still. Copies the gain-map still,
+    still8.png, still16_srgb.png and still_hlg.heic into DIR/media/ and saves into DIR/hg0/
+    the gain-map still's SDR-project render and the three others' HLG-project renders, each
+    drawn from DIR/media/. CONTROL (drawn as its SDR base, lifted by HD-3), at each band
+    centre: the gain-map still's HLG-project code = lift(c, bt709, d) ±2/1023, c the same
+    band's code in its SDR-project render, d HD-3's own decode of a drawn layer (Core Media
+    709's γ with its toe, HD-13 (f); the sRGB EOTF's figure printed beside it); and no band's
+    HLG code above lift([1, 1, 1]) + 2/1023."""
+    if mode != "capture":
+        return
+    made = gainmap_still()
+    stills = hdr_stills(client)
+    sources = {"gainmap": made.get("fixture"), "still8": fixture("still8"),
+               "still16_srgb": stills.get("still16_srgb"),
+               "still_hlg_heic": stills.get("still_hlg_heic")}
+    refused = {n: REFUSED.get(n) or REFUSED.get("gainmap_fixture") for n, p in sources.items()
+               if p is None}
+    state["hg0_fixture"] = not refused
+    if refused:
+        check("HG0 the stills were made", False, f"refused {refused}")
+        return
+    media, renders = hg0_paths(control)
+    (control / "media").mkdir(parents=True, exist_ok=True)
+    (control / "hg0").mkdir(parents=True, exist_ok=True)
+    for n, path in sources.items():
+        shutil.copy2(path, media[n])
+    misses, figures, closed = [], [], True
+    frames = {}
+    for n, output in HG0_RENDERS + (("gainmap", "hlg"),):
+        frame, ok, why = still_scene(client, f"hg0-{n}", media[n], output)
+        closed = closed and ok
+        frames[(n, output)] = frame
+        if frame is None:
+            misses.append(f"{n} in {output}: no render ({why})")
+        elif (n, output) in renders:
+            shutil.copy2(frame.path, renders[(n, output)])
+    state["hg0_closed"] = closed
+    sdr, hlg = frames.get(("gainmap", "sdr")), frames.get(("gainmap", "hlg"))
+    if sdr is not None and hlg is not None:
+        ceiling = max(lift([1.0, 1.0, 1.0])) + 2 * LEVEL
+        worst, worst_srgb = 0.0, 0.0
+        for l in GAINMAP_L:
+            c, got = gainmap_band(sdr, l), gainmap_band(hlg, l)
+            want = lift(c, "bt709", "cm709")
+            gap = max(abs(a - b) for a, b in zip(got, want))
+            worst = max(worst, gap)
+            worst_srgb = max(worst_srgb, max(abs(a - b) for a, b in
+                                             zip(got, lift(c, "bt709", "srgb"))))
+            figures.append(f"L = {l}: SDR {[round(v * 255, 2) for v in c]} of 255, HLG "
+                           f"{[round(v, 5) for v in got]}, lift {[round(v, 5) for v in want]}")
+            if not gap <= 2 * LEVEL:
+                misses.append(f"CONTROL L = {l}: HLG {[round(v, 5) for v in got]} against the "
+                              f"lift {[round(v, 5) for v in want]} ({levels(gap):.2f} levels)")
+            if max(got) > ceiling:
+                misses.append(f"CONTROL L = {l}: HLG {max(got):.5f} above lift(white) + 2/1023")
+        figures.append(f"worst |Δ| from the lift {levels(worst):.2f} levels (the sRGB EOTF's "
+                       f"{levels(worst_srgb):.2f})")
+    check("HG0 CONTROL (the untouched tree): the gain-map still drawn as its SDR base and lifted "
+          "by HD-3 — each band's HLG-project code = lift(its SDR-project code) ±2/1023 and none "
+          "above lift(white) + 2/1023; DIR/media/ and DIR/hg0/ written", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def run_hgu(client, control, state):
+    """HGu (#322, `--only` with `--control`): what the phase must leave alone. The gain-map
+    still's SDR-project render and the HLG-project renders of still8.png, still16_srgb.png
+    and still_hlg.heic, each drawn from DIR/media/, byte-equal to DIR/hg0/'s."""
+    media, renders = hg0_paths(control)
+    misses, closed, equal = [], True, 0
+    for (n, output), want in renders.items():
+        frame, ok, why = still_scene(client, f"hgu-{n}", media[n], output)
+        closed = closed and ok
+        if frame is None:
+            misses.append(f"{n} in {output}: no render ({why})")
+        elif not same_png(frame.path, want):
+            misses.append(f"{n} in {output}: differs from {want.name} ({digest(frame.path)} "
+                          f"against {digest(want)})")
+        else:
+            equal += 1
+    state["hgu_closed"] = closed
+    check(f"HGu the gain-map still's SDR-project render and still8, still16_srgb and "
+          f"still_hlg.heic's HLG-project renders byte-equal to {control.name}'s (HD-22 (d), "
+          f"(f))", not misses and equal == len(renders),
+          f"{equal} of {len(renders)} equal; failed {misses or 'none'}")
+
+
+def run_p15(sources, state):
+    """P15 (#322, spec §11 HD-22): the probe over `sources` asked for P15 alone, before HG
+    reads its answer: `hasGainMap`, `encodePQ`, one `LayerRenderers` in both outputs and
+    `decodeHDR` bounded and oriented. Its `gainmap` answer (the fixture's eight bands in
+    linear BT.2020, authored-L order, and the rendition's peak) goes to `state["gainmap"]`."""
+    made = gainmap_still()
+    stills = dict(hdr_stills(None), still8=fixture("still8"))
+    files = {**{f"gainmap_{n}": p for n, p in made.items()},
+             **{n: stills.get(n) for n in ("still8", "still16_srgb", "still_hlg_heic",
+                                           "still_pq_png")}}
+    refused = {n: REFUSED.get(n) for n, p in files.items() if p is None}
+    state["p15_fixture"] = not refused
+    if refused:
+        check("P15 the stills were made", False, f"refused {refused}")
+        return
+    binary, why = build_probe(MATH_PROBE, sources, "hdr_probe")
+    if binary is None:
+        check("P15 the probe builds over app/Sources", False, why)
+        return
+    request, answer = WORK / "p15.json", WORK / "p15-answer.json"
+    answer.unlink(missing_ok=True)
+    asked = {"rows": ["P15"], "gainmap": {n: str(p) for n, p in files.items()},
+             "gainmapO6": str(WORK / "still_gainmap_o6.heic"),
+             "gainmapL": list(GAINMAP_L), "gainmapY": GAINMAP_Y,
+             "shader": str(Path(sources).parent / "Resources/Shaders/Compositor.metal")}
+    request.write_text(json.dumps(asked))
+    ran = bounded.run([str(binary), str(request), str(answer)], 600,
+                      env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
+    try:
+        answered = json.loads(answer.read_text())
+    except (OSError, ValueError):
+        answered = {}
+    state["gainmap"] = answered.get("gainmap")
+    mine = [r for r in answered.get("rows") or [] if r["name"].split()[0] == "P15"]
+    if not mine:
+        check("P15 the probe answered", False, (ran["stdout"] + ran["stderr"]).strip()[-400:])
+    for row in mine:
+        check(row["name"], row["ok"], row.get("detail", ""))
+
+
+def run_hg(client, state):
+    """HG (#322, spec §11 HD-22 (b), (c)): the fixture alone in a W×H SDR project, rendered,
+    then `set_canvas {output: hlg}` and rendered again. In HLG each band centre =
+    pq_hlg([pq_signal(203·r), pq_signal(203·g), pq_signal(203·b)], peak) ±2/1023, [r, g, b]
+    and peak from P15's answer; the L = 2, 4, 6 and 8 bands each above the L = 1 band by
+    ≥ 40/1023 and the eight bands increasing in L; the L = 1 band within ±6/1023 of
+    pq_hlg([pq_signal(203)] × 3, peak). The worst gap from the lifted base (HG0's lift of the
+    same band's SDR-project code) is printed for HD-22 (c)."""
+    path = gainmap_still().get("fixture")
+    answer = state.get("gainmap") or {}
+    bands, peak = answer.get("bands"), answer.get("peak")
+    state["hg_fixture"] = path is not None
+    if path is None:
+        check("HG the fixture was made", False, f"refused {REFUSED.get('gainmap_fixture')}")
+        return
+    misses, figures = [], []
+    if not (isinstance(bands, list) and len(bands) == len(GAINMAP_L) and peak):
+        misses.append(f"no P15 answer to read the bands and the peak from ({answer})")
+    doc = Doc(client, "hg", W, H)
+    clip = doc.place(path) if doc.ok else None
+    sdr = frame_of(doc, "hg-sdr") if clip else None
+    switched = doc.call("set_canvas", output="hlg") if sdr else {"ok": False}
+    hlg = frame_of(doc, "hg-hlg") if switched["ok"] else None
+    state["hg_closed"] = doc.close()
+    if sdr is None or hlg is None:
+        misses.append(f"no render: {doc.why or switched.get('error')}")
+    if not misses:
+        got = {l: gainmap_band(hlg, l) for l in GAINMAP_L}
+        worst, base_gaps = 0.0, []
+        for i, l in enumerate(GAINMAP_L):
+            want = pq_hlg([pq_signal(PQ_REFERENCE * c) for c in bands[i]], peak)
+            gap = max(abs(a - b) for a, b in zip(got[l], want))
+            worst = max(worst, gap)
+            based = lift(gainmap_band(sdr, l), "bt709", "cm709")
+            base_gaps.append((l, sum(got[l]) / 3 - sum(based) / 3))
+            figures.append(f"L = {l}: linear {[round(c, 4) for c in bands[i]]}, HLG "
+                           f"{[round(v, 5) for v in got[l]]}, want {[round(v, 5) for v in want]} "
+                           f"({levels(gap):.2f} levels); the lifted base {round(based[1], 5)}")
+            if not gap <= 2 * LEVEL:
+                misses.append(f"L = {l}: {levels(gap):.2f} levels from the oracle")
+        for l in (2, 4, 6, 8):
+            if not min(a - b for a, b in zip(got[l], got[1])) >= 40 * LEVEL:
+                misses.append(f"L = {l} is not above the L = 1 band by 40/1023")
+        means = [sum(got[l]) / 3 for l in GAINMAP_L]
+        if not all(b > a for a, b in zip(means, means[1:])):
+            misses.append(f"the bands are not increasing in L: {[round(m, 5) for m in means]}")
+        white = pq_hlg([pq_signal(PQ_REFERENCE)] * 3, peak)
+        if not close_to(got[1], white, 6 * LEVEL):
+            misses.append(f"L = 1 {[round(v, 5) for v in got[1]]} is not BT.2408's white "
+                          f"{[round(v, 5) for v in white]} ±6/1023")
+        far = max(base_gaps, key=lambda g: abs(g[1]))
+        figures.append(f"peak {peak}; worst |Δ| from the oracle {levels(worst):.2f} levels; the "
+                       f"rendition against the lifted base (HD-22 (c)), per band in levels "
+                       f"{[(l, round(levels(g), 1)) for l, g in base_gaps]}, the worst "
+                       f"{levels(far[1]):+.1f} at L = {far[0]}")
+    check("HG a gain-map still in an HLG project (#322): each band = pq_hlg(pq_signal(203·rgb), "
+          "peak) ±2/1023 from P15's bands and peak; L = 2, 4, 6, 8 each ≥ 40/1023 above L = 1, "
+          "the bands increasing in L, L = 1 within ±6/1023 of BT.2408's white", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def run_hgk(client, state):
+    """HGk (#322, spec §11 HD-22 (g)): the chroma key on a gain-map still in an HLG project reads
+    HD-13 (h)'s un-lift. Over a [0.5, 0.5, 0.5, 1] background, the L = 0.5 band's working colour
+    read; the key = unlift(working) clamped, at the tolerance `hkh_oracle`'s rule picks (the
+    right reading the un-lift, the other key_read_sdr(pq, working, None)), softness 0, spill
+    0. Keyed, the L = 0.5 band = the lifted background 0.5059 ±1/1023 and the L = 0.18 and
+    L = 1 bands their unkeyed codes ±1/1023."""
+    path = gainmap_still().get("fixture")
+    state["hgk_fixture"] = path is not None
+    if path is None:
+        check("HGk the fixture was made", False, f"refused {REFUSED.get('gainmap_fixture')}")
+        return
+    misses, figures = [], []
+    doc = Doc(client, "hgk", W, H)
+    if doc.ok:
+        doc.call("set_canvas", background=[0.5, 0.5, 0.5, 1])
+    clip = doc.place(path) if doc.ok else None
+    switched = doc.call("set_canvas", output="hlg") if clip else {"ok": False}
+    plain = frame_of(doc, "hgk-plain") if switched["ok"] else None
+    tolerance, keyed = None, None
+    if plain is not None:
+        working = gainmap_band(plain, 0.5)
+        key = [unit(c) for c in unlift(working)]
+        right = 0.0  # the key IS the un-lift of the working colour, so its own distance is 0
+        other = math.dist(key_read_sdr("pq", working, None), key)
+        tolerance = next((t for t in KEY_TOLERANCES if right <= t / 2 and other >= 1.5 * t),
+                         None)
+        figures.append(f"working {[round(v, 5) for v in working]}, key "
+                       f"{[round(v, 5) for v in key]}, the PQ reading's distance {other:.4f}; "
+                       f"tolerance {tolerance}")
+        if tolerance is None:
+            misses.append("no tolerance qualifies (a rotted instrument)")
+        else:
+            got = doc.call("set_video", clips=[clip], patch={"chroma": {
+                "key": [round(v, 5) for v in key], "tolerance": tolerance, "softness": 0.0,
+                "spill": 0.0}})
+            keyed = frame_of(doc, "hgk-keyed") if got["ok"] else None
+            if keyed is None:
+                misses.append(f"set_video chroma: {got.get('error') or 'no render'}")
+    state["hgk_closed"] = doc.close()
+    if plain is None:
+        misses.append(f"no render: {doc.why or switched.get('error')}")
+    if keyed is not None:
+        opened = gainmap_band(keyed, 0.5)
+        figures.append(f"keyed: L = 0.5 {[round(v, 5) for v in opened]} (want 0.5059), L = 0.18 "
+                       f"{[round(v, 5) for v in gainmap_band(keyed, 0.18)]}, L = 1 "
+                       f"{[round(v, 5) for v in gainmap_band(keyed, 1)]}")
+        if not close_to(opened, [0.5059] * 3, LEVEL):
+            misses.append("the L = 0.5 band is not the lifted background")
+        for l in (0.18, 1):
+            if not close_to(gainmap_band(keyed, l), gainmap_band(plain, l), LEVEL):
+                misses.append(f"the L = {l} band moved")
+    check("HGk the chroma key on a gain-map still in an HLG project reads the un-lift: keyed at "
+          "unlift(the L = 0.5 band's working colour), that band shows the lifted background "
+          "0.5059 ±1/1023 and the L = 0.18 and L = 1 bands keep their codes ±1/1023", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
 def tail(log, count=4):
     try:
         lines = [line.rstrip() for line in open(log, errors="replace")]
@@ -6609,13 +6985,27 @@ def main():
         selected -= {"TI", "TH", "TO", "TL"}
         if args.mutant:
             selected -= ({"H1a"} | H7_ROWS | H2_ROWS | H3_ROWS | H4_ROWS | L_ROWS | C2_ROWS
-                         | C3_ROWS | B3_ROWS)
+                         | C3_ROWS | B3_ROWS | B4_ROWS)
     if args.mode == "capture":
         if not args.only:
             selected = {"H1", "H2", "H3", "H4", "H5", "H6", "R0", "Z1"}
         control.mkdir(parents=True, exist_ok=True)
     if args.mode is None and not args.mutant:
         selected -= {"H1"}
+    # Clean-up 3 batch B, phase 3 (#322): HG0 only captures, HGu only when `--only` names it,
+    # and HG or HGk adds P15, whose answer HG reads.
+    if args.mode != "capture":
+        selected -= {"HG0"}
+    if not args.only:
+        selected -= {"HGu"}
+    if selected & {"HG", "HGk"}:
+        selected.add("P15")
+    if "HGu" in selected:
+        wanted = [p for paths in hg0_paths(control) for p in paths.values()]
+        missing = next((p for p in wanted if not p.is_file()), None)
+        if missing is not None:
+            print(f"the control could not be performed — {missing} is missing")
+            return 2
     remove_work()
     atexit.register(remove_work)
     HOME.mkdir(parents=True)
@@ -6647,7 +7037,7 @@ def main():
     needs_instance = bool(selected & ({"H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5",
                                        "H6", "R0"} | H7_ROWS | H2_ROWS
                                       | (H3_ROWS - {"DX"}) | H4_ROWS | L_ROWS | C2_ROWS
-                                      | C3_ROWS | B3_ROWS | {"P12", "P13"}))
+                                      | C3_ROWS | B3_ROWS | B4_ROWS | {"P12", "P13", "P15"}))
     if needs_instance:
         launched = mcp.launch(str(binary), [],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
@@ -6708,9 +7098,19 @@ def main():
                 if selected & {"P12", "P13"}:
                     stills = hdr_stills(client)
                     state["p13_fixture"] = all(stills.values())
+                # Clean-up 3 batch B, phase 3 (#322): P15 first (its stills made on the
+                # instance), since HG reads its answer; HG0 and HGu in run_si's shape.
+                if "P15" in selected:
+                    hdr_stills(client)
+                    run_p15(sources, state)
+                if "HG0" in selected:
+                    run_hg0(client, args.mode, control, state)
+                if "HGu" in selected:
+                    run_hgu(client, control, state)
                 # hdr H-2 (#277): the HLG working space.
                 for row, run in (("HS", run_hs), ("HH", run_hh), ("HP", run_hp),
                                  ("HT", run_ht), ("HI", run_hi), ("HIp", run_hip),
+                                 ("HG", run_hg), ("HGk", run_hgk),
                                  ("HL", run_hl),
                                  ("HW", run_hw), ("HK", run_hk), ("HKh", run_hkh),
                                  ("HM", run_hm), ("HF", run_hf),
@@ -6782,7 +7182,8 @@ def main():
               f"(passed, so not discriminating: {[n for n in shown if rows[n]]})")
         captured = (state.get("capture_ok") or "H1" not in selected) \
             and state.get("si_captured", "SI" not in selected)
-        return 0 if rows.get("Z1") and captured and rows.get("H7i", True) else 1
+        return 0 if rows.get("Z1") and captured and rows.get("H7i", True) \
+            and rows.get("HG0", True) else 1
     scored = [name for name in ROWS if name in rows and name not in RECORDS]
     passed = sum(1 for name in scored if rows.get(name))
     print(f"{passed}/{len(scored)}")

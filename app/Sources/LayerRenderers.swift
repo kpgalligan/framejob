@@ -79,6 +79,9 @@ final class LayerRenderers {
         /// An HLG or PQ still's step-0 arm (spec §11 HD-19 (a), `StillColor`);
         /// nil for every other texture.
         var conversion: InputConversion? = nil
+        /// A gain-map still's HDR rendition peak in cd/m² (spec §11 HD-22): its brightest decoded
+        /// channel × 203, rounded up, clamped to 1…10,000; nil for every other texture.
+        var peak: UInt32? = nil
     }
 
     init(device: MTLDevice) {

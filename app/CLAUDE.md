@@ -1357,6 +1357,10 @@ the key map behind it.
   source texture, hit only when source, conversion and output all match) ·
   `StillColor.swift` (a still's step-0 arm from its colour space: HLG or PQ
   over BT.2020, P3 or BT.709, else none — SDR stills draw as before) ·
+  `StillGainMap.swift` (a still with an ISO or Apple HDR gain map, HD-22,
+  #322: in an HLG project only, ImageIO's HDR decode encoded to PQ and run
+  through `.pq(.bt2020)` at the rendition's own peak; the base everywhere
+  else, thumbnails included) ·
   `ChromaKeyHDR.swift` (`KeyReading`: how an HLG project's chroma key reads
   a keyed layer — GR-15's HLG or PQ arm for an HDR source, so a key means
   the colour an SDR project shows; `.log` for a built-in Camera Log clip
@@ -1455,10 +1459,13 @@ the key map behind it.
   (`framejob_dissolve_fragment`), which scales a zoom's halves about their
   anchors there. `drawLayer` is the one per-layer draw both use.
 - `LayerRenderers.swift` · `LayerRenderersText.swift` · `LayerRenderersReveal.swift`
-  · `LayerRenderersWords.swift` · `LayerRenderersBackdrop.swift` — text,
+  · `LayerRenderersWords.swift` · `LayerRenderersBackdrop.swift` ·
+  `LayerRenderersImage.swift` — text,
   shape and still descriptions to textures (premultiplied `bgra8Unorm`; a
   still deeper than 8 bits a component is drawn at 16-bit float and
-  uploaded `rgba16Float`, spec §11 PR-6),
+  uploaded `rgba16Float`, spec §11 PR-6; `LayerRenderersImage` is the still
+  arm — the plain, deep and HDR decodes, and a gain-map still's rendition in
+  an HLG project, HD-22, whose texture answers its own `peak`),
   keyed by the recipe's `hash` (`RecipeSourceRef.cacheHash` is the WHOLE key;
   nothing here may append to it — a graphic's key is its SVG text instead,
   `LayerRenderersGraphic.swift`, in its own six-entry pool). Text draws what the recipe computed; the

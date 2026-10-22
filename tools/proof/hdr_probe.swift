@@ -1,5 +1,5 @@
 // Built by tools/proof/hdr_proof.py as `main.swift` over every other file in
-// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P14
+// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P15
 // (grading-3 T3-1, spec §11 GR-15 as amended; P5 hdr H-1, spec §11 HD-12; P6
 // hdr H-2, spec §11 HD-3, HD-13; P7 hdr H-3, spec §11 HD-14; P8 hdr H-4, spec
 // §11 HD-15: `ScopeSignal`, the traces' JSON, and the waveform's, parade's
@@ -10,7 +10,9 @@
 // P12 and P13 its phase 2, spec §11 HD-19: `KeyReading` against step 0's own
 // arms, and `StillColor` over the HDR stills with `LayerLift`'s pool; P14
 // clean-up 3 batch B, spec §11 HD-20: `KeyReading.log` against step 0's
-// camera-log arm, and `LayerLift`'s pool keyed on a PQ still's peak).
+// camera-log arm, and `LayerLift`'s pool keyed on a PQ still's peak; P15 its
+// phase 3, spec §11 HD-22: `StillGainMap` and a gain-map still's HDR rendition
+// through `LayerRenderers`, answering the fixture's bands and peak for HG).
 //
 // Step 0's maths through the app's own types: `InputConversion`'s selector
 // through BOTH readers (the labels as strings, and a `CMVideoFormatDescription`
@@ -23,7 +25,7 @@
 //   hdr_probe <request.json> <answer.json>
 //
 // One JSON object out: `rows`, each a name, ok and detail, the name starting
-// with its P-number.
+// with its P-number; P15 adds `gainmap`.
 import AVFoundation
 import AppKit
 import CoreMedia
@@ -36,12 +38,14 @@ let request = (try? JSONSerialization.jsonObject(
 let out = URL(fileURLWithPath: CommandLine.arguments[2])
 
 var rows: [[String: Any]] = []
+/// Answers beside `rows` (P15's `gainmap`).
+var answerExtras: [String: Any] = [:]
 func check(_ name: String, _ ok: Bool, _ detail: String = "") {
     rows.append(["name": name, "ok": ok, "detail": String(detail.prefix(1500))])
 }
 
 func finish() -> Never {
-    let answer: [String: Any] = ["rows": rows]
+    let answer: [String: Any] = answerExtras.merging(["rows": rows]) { _, rows in rows }
     if let data = try? JSONSerialization.data(withJSONObject: answer, options: [.prettyPrinted]) {
         try? data.write(to: out)
     }
@@ -1557,6 +1561,157 @@ if Set(request["rows"] as? [String] ?? []).contains("P14") {
             + "95…740 and the GREEN_LIGHT card, inside BT.2020) ±1/1023; a LayerLift of one "
             + "texture through pq(bt2020) at .sdr, peak nil then 4000, gives two textures, the "
             + "second InputStage's pass at 4000 ±1/1023, and 4000 again the same texture",
+        misses.isEmpty,
+        (misses.isEmpty ? "as wanted" : misses.joined(separator: "; ")) + " | "
+            + figures.joined(separator: "; "))
+}
+
+// MARK: - P15 a gain-map still's HDR rendition (clean-up 3 batch B, phase 3, spec §11 HD-22, #322)
+
+if Set(request["rows"] as? [String] ?? []).contains("P15") {
+    var misses: [String] = []
+    var figures: [String] = []
+    let files = request["gainmap"] as? [String: String] ?? [:]
+    let authored = request["gainmapL"] as? [Double] ?? []
+    let bandY = request["gainmapY"] as? Int ?? 64
+    func file(_ name: String) -> URL? { files[name].map { URL(fileURLWithPath: $0) } }
+    /// Each band's centre of `image` drawn into `StillGainMap.linearBitmap` with no tone
+    /// mapping, un-premultiplied: across at row `y`, or down the middle column (`down`).
+    func bands(_ image: CGImage, y: Int, down: Bool = false) -> [SIMD3<Float>]? {
+        let size = CGSize(width: image.width, height: image.height)
+        guard !authored.isEmpty, let context = StillGainMap.linearBitmap(size),
+            let data = context.data
+        else { return nil }
+        _ = context.setEDRTargetHeadroom(0)
+        context.draw(image, in: CGRect(origin: .zero, size: size))
+        let count = Float(authored.count)
+        return (0..<authored.count).map { i in
+            let along = (Float(i) + 0.5) / count
+            let (x, row) = down
+                ? (image.width / 2, Int(along * Float(image.height)))
+                : (Int(along * Float(image.width)), y)
+            let texel = (data + row * context.bytesPerRow + x * 8).assumingMemoryBound(to: Float16.self)
+            let a = Float(texel[3]) > 0 ? Float(texel[3]) : 1
+            return SIMD3(Float(texel[0]) / a, Float(texel[1]) / a, Float(texel[2]) / a)
+        }
+    }
+    // The Orientation-6 copy of the fixture, its gain map kept.
+    var o6: URL?
+    if let fixture = file("gainmap_fixture"), let o6Path = request["gainmapO6"] as? String,
+        let source = CGImageSourceCreateWithURL(fixture as CFURL, nil),
+        let type = CGImageSourceGetType(source),
+        let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: o6Path) as CFURL, type, 1, nil)
+    {
+        CGImageDestinationAddImageFromSource(
+            dest, source, 0,
+            [kCGImagePropertyOrientation: 6, kCGImageDestinationPreserveGainMap: true] as CFDictionary)
+        if CGImageDestinationFinalize(dest) { o6 = URL(fileURLWithPath: o6Path) }
+    }
+    // (a) hasGainMap.
+    let gained: [(String, URL?, Bool)] = [
+        ("still_gainmap.heic", file("gainmap_fixture"), true),
+        ("still_gainmap_wide.heic", file("gainmap_wide"), true), ("the O6 copy", o6, true),
+        ("still8", file("still8"), false), ("still16_srgb", file("still16_srgb"), false),
+        ("still_hlg.heic", file("still_hlg_heic"), false), ("still_pq.png", file("still_pq_png"), false),
+    ]
+    for (name, url, want) in gained {
+        guard let url else {
+            misses.append("(a) \(name): no file")
+            continue
+        }
+        let got = StillGainMap.hasGainMap(at: url)
+        if got != want { misses.append("(a) hasGainMap(\(name)) \(got), want \(want)") }
+    }
+    // (b) encodePQ over linear {0, 1, 4, 8}, the second at α 0.5 (premultiplied).
+    if let context = StillGainMap.linearBitmap(CGSize(width: 4, height: 1)), let data = context.data {
+        let linear: [Float] = [0, 1, 4, 8], alphas: [Float] = [1, 0.5, 1, 1]
+        let texels = data.assumingMemoryBound(to: Float16.self)
+        for i in 0..<4 {
+            for c in 0..<3 { texels[i * 4 + c] = Float16(linear[i] * alphas[i]) }
+            texels[i * 4 + 3] = Float16(alphas[i])
+        }
+        let peak = StillGainMap.encodePQ(context)
+        var worst: Float = 0
+        var kept = true
+        for i in 0..<4 {
+            let alpha = Float(texels[i * 4 + 3])
+            if alpha != alphas[i] { kept = false }
+            let want = InputConversions.pqSignal(nits: linear[i] * 203)
+            for c in 0..<3 { worst = max(worst, abs(Float(texels[i * 4 + c]) / alpha - want)) }
+        }
+        figures.append("(b) encodePQ worst \(worst * 1023) levels, peak \(peak)")
+        if !(worst <= 1.0 / 1023) || !kept || peak != 1624 {
+            misses.append("(b) encodePQ \(worst * 1023) levels, α kept \(kept), peak \(peak), want 1624")
+        }
+    } else {
+        misses.append("(b) no linearBitmap")
+    }
+    // (c) one LayerRenderers in both outputs.
+    var renditionPeak: UInt32?
+    if let device = MTLCreateSystemDefaultDevice(), let fixture = file("gainmap_fixture") {
+        let renderers = LayerRenderers(device: device)
+        let sdr = renderers.image(url: fixture, media: 1, output: .sdr)
+        let hlg = renderers.image(url: fixture, media: 1, output: .hlg)
+        renditionPeak = hlg?.peak
+        figures.append("(c) the fixture at .sdr \(describe(sdr?.conversion)) peak "
+            + "\(sdr?.peak.map(String.init) ?? "nil"), at .hlg \(describe(hlg?.conversion)) peak "
+            + "\(hlg?.peak.map(String.init) ?? "nil")")
+        if sdr == nil || sdr?.conversion != nil || sdr?.peak != nil {
+            misses.append("(c) the fixture at .sdr: \(describe(sdr?.conversion)), peak \(String(describing: sdr?.peak))")
+        }
+        if hlg?.conversion != .pq(.bt2020) || !((hlg?.peak ?? 0) > 1000) || hlg?.texture === sdr?.texture {
+            misses.append("(c) the fixture at .hlg: \(describe(hlg?.conversion)), peak "
+                + "\(String(describing: hlg?.peak)), its own texture \(hlg?.texture !== sdr?.texture)")
+        }
+        if let still8 = file("still8") {
+            let got = renderers.image(url: still8, media: 2, output: .hlg)
+            if got == nil || got?.peak != nil { misses.append("(c) still8 at .hlg: peak \(String(describing: got?.peak))") }
+        } else {
+            misses.append("(c) no still8")
+        }
+        if let heic = file("still_hlg_heic") {
+            let got = renderers.image(url: heic, media: 3, output: .hlg)
+            if got?.conversion != .hlg(.bt2020) { misses.append("(c) still_hlg.heic at .hlg: \(describe(got?.conversion))") }
+        } else {
+            misses.append("(c) no still_hlg.heic")
+        }
+    } else {
+        misses.append("(c) no Metal device or fixture")
+    }
+    // (d) decodeHDR bounded and oriented, the L = 8 band still bright.
+    for (name, url, down) in [("the wide fixture", file("gainmap_wide"), false), ("the O6 copy", o6, true)] {
+        guard let url, let image = StillGainMap.decodeHDR(url, maxPixelSize: LayerRenderers.maxTextureSide),
+            let read = bands(image, y: image.height / 2, down: down), let top = read.last
+        else {
+            misses.append("(d) \(name): no HDR decode")
+            continue
+        }
+        figures.append("(d) \(name) \(image.width)×\(image.height), L = 8 band \(top.x)")
+        let sized = down ? (image.width == 128 && image.height == 1024)
+            : max(image.width, image.height) == LayerRenderers.maxTextureSide
+        if !sized || !(min(top.x, top.y, top.z) > 2.0) {
+            misses.append("(d) \(name) \(image.width)×\(image.height), L = 8 band \(top)")
+        }
+    }
+    // (e) the fixture's bands and the rendition's peak, for HG.
+    if let fixture = file("gainmap_fixture"),
+        let image = StillGainMap.decodeHDR(fixture, maxPixelSize: LayerRenderers.maxTextureSide),
+        let read = bands(image, y: bandY), let peak = renditionPeak
+    {
+        answerExtras["gainmap"] = ["bands": read.map { [Double($0.x), Double($0.y), Double($0.z)] },
+                                   "peak": Int(peak)]
+        figures.append("(e) bands \(read.map { ($0.x * 1000).rounded() / 1000 }), peak \(peak)")
+    } else {
+        misses.append("(e) no bands or peak to answer")
+    }
+    check(
+        "P15 hasGainMap true for both gain-map fixtures and their O6 copy, false for still8, "
+            + "still16_srgb, still_hlg.heic and still_pq.png; encodePQ over linear {0, 1, 4, 8} "
+            + "(one at α 0.5) = pqSignal(v·203) ±1/1023, α kept, peak 1624; one LayerRenderers: "
+            + "the fixture at .sdr nil and no peak, at .hlg pq(bt2020), a peak above 1,000 and its "
+            + "own texture, still8 at .hlg no peak, still_hlg.heic at .hlg hlg(bt2020); decodeHDR "
+            + "of the wide fixture 8192 on its longest side and of the O6 copy 128×1024, each L = 8 "
+            + "band above 2.0",
         misses.isEmpty,
         (misses.isEmpty ? "as wanted" : misses.joined(separator: "; ")) + " | "
             + figures.joined(separator: "; "))

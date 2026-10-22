@@ -21875,3 +21875,71 @@ written flat) TS; `still-unbounded` (`stillReader`'s `maximumSize` line removed)
 | `--mutant still-head-blind` | caught: (d)'s flat marker is never drawn again |
 | `--mutant still-flat-marker` | caught: every HDR still lands a flat marker |
 | `--mutant still-unbounded` | caught: every tile 1024×128 |
+
+## Clean-up round 3, batch B, phase 3 — #322, an iPhone HDR photo (a gain map) drawn as HDR in an HLG project (`hdr_proof.py` HG0, HG, HGu, HGk, P15 and six mutants; `gainmap_writer.swift`; `hdr_probe.swift` P15; spec §11 HD-22)
+
+The phase draws a still whose first image carries an ISO 21496-1 or Apple HDR gain map, and
+that no HDR label claims, from ImageIO's HDR decode in an HLG project only
+(`StillGainMap.decodeHDR`, today's `decodeImage` plus `kCGImageSourceDecodeToHDR`): drawn into
+16-bit-float extended-linear BT.2020 with no tone mapping, encoded to PQ on the CPU
+(`encodePQ`, 1.0 at 203 cd/m²), uploaded `rgba16Float` and run through step 0's `.pq(.bt2020)`
+arm at the rendition's own peak (`Rendered.peak`). An HLG project's still textures sit under
+their own cache key; the SDR project, the thumbnails and every other still are unchanged. The
+rules are the script's header, fixed before the phase's code and the control capture.
+
+- **The fixture** (`gainmap_still`): `gainmap_writer.swift`, built through
+  `swift_build.build`, draws eight equal vertical bands of extended-linear grey, L = 0.05,
+  0.18, 0.5, 1, 2, 4, 6, 8 left to right (each band is named by its L; centres x = 64 + 128i,
+  y = 64 at 1024×128), into a 16-bit-float `extendedLinearSRGB` image with content headroom 8
+  and writes it with `kCGImageDestinationEncodeToISOGainmap` — M2's writer (HD-22 (a); at the
+  default headroom the gain is lost). ImageIO writes its own tone-mapped SDR base (Display P3,
+  8 bits, codes 43 … 255) and an ISO gain map; the writer exits 0 only when its file answers a
+  gain-map lookup over a base no HDR label claims. `still_gainmap.heic` (1024×128) and
+  `still_gainmap_wide.heic` (9000×600) are made once under `tools/proof/work/hdr/media/` and
+  kept. **What it proves and does not:** the route on Apple's own ISO encoder — the decode, the
+  bound and the orientation, the PQ encode and the peak, the key's reading. Apple's pre-ISO
+  gain map (iOS 17 and older), a real photo's headroom and look, and JPEG or AVIF gain maps are
+  `docs/manual-checks.md` HDR-7's.
+- **The control folder** is `tools/proof/work/i322/ctl` (scratch, gitignored): `media/` (the
+  four stills HG0 copies) and `hg0/` (the four renders HGu compares). An HGu run whose control
+  lacks any of them prints `the control could not be performed — <path> is missing` and exits 2
+  before anything is built or launched, so a mutant without `--control` is never a false catch.
+- **HG0** (capture only, the untouched tree): CONTROL each band's HLG-project code = HD-3's
+  lift of its SDR-project code ±2/1023 and none above lift(white) + 2/1023. The lift is Core
+  Media 709's γ with its toe, the `.sdr` arm every drawn layer takes (HD-13 (f)); the spec's
+  draft chose the sRGB EOTF by the base's transfer, which the row prints beside it (38.57
+  levels off on the control).
+- **P15** runs before HG on the instance (its stills made there) and answers the fixture's
+  bands in linear BT.2020 and the rendition's peak, which HG's oracle reads; selecting HG or
+  HGk adds it.
+- **HG**, **HGk** run in a plain run, `compare` and `--only`; **HGu** only under `--only`, with
+  `--control`.
+
+```sh
+make app && RC_PROOF_APP=release python3 tools/proof/hdr_proof.py capture tools/proof/work/i322/ctl --only HG0,Z1   # untouched tree only
+make app-debug && python3 tools/proof/hdr_proof.py --only HG,HGk,P15,HI,HIp,P13,Z1
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --only HG,HGk,P15,HI,HKh,HIp,P13,P14,Z1
+RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --only HGu,Z1 --control tools/proof/work/i322/ctl
+python3 tools/proof/hdr_proof.py --mutant <name> --only <its rows>,Z1 --control tools/proof/work/i322/ctl
+```
+
+The six mutants and their rows: `gainmap-unread` (`hasGainMap` answers false) HG, P15;
+`gainmap-white-100` (`encodePQ` at 100 cd/m², not 203) HG, P15; `gainmap-peak-dropped` (the
+`.image` arm's peak is the layer's alone) HG; `gainmap-sdr-project` (the HDR decode in an SDR
+project too) HGu, P15; `gainmap-cache-shared` (one key for both outputs) P15; `gainmap-key-pq`
+(the key reads the rendition's `.pq` arm) HGk. `still-peak-dropped` (HIp) is re-anchored to the
+same `let peak` line.
+
+| Run (2026-10-22, the worktree) | Result |
+|---|---|
+| `capture tools/proof/work/i322/ctl --only HG0,Z1` (Release, the untouched app after the toll) | HG0's CONTROL and Z1 held: each band's HLG code within 1.30/1023 of the lift of its SDR code (the sRGB EOTF's lift 38.57 off), none above lift(white); SDR codes 42.8, 83.7, 129.5, 165.4, 201.2, 236.1, 254.0, 254.0 of 255 |
+| `--only HG,HGk,P15,HI,HIp,P13,Z1` (Debug) | 7/7 |
+| `RC_PROOF_APP=release … --only HG,HGk,P15,HI,HKh,HIp,P13,P14,Z1` | 9/9. P15: `encodePQ` worst 0.15/1023, peak 1624; the fixture's rendition `pq(bt2020)` at peak 1621; the wide decode 8192×546 and the O6 copy 128×1024, each L = 8 band 7.98; bands 0.049, 0.181, 0.499, 1.000, 1.996, 4.004, 5.992, 7.984. HG: worst 0.58/1023 from the oracle; the rendition above the lifted base by 48.3 (L = 0.05) … 256.6 (L = 8) levels. HGk: the PQ reading's distance 0.0644, tolerance 0.02, the L = 0.5 band keyed to 0.50585 |
+| `RC_PROOF_APP=release … --only HGu,Z1 --control tools/proof/work/i322/ctl` | 2/2: four renders byte-equal to the control's |
+| `--mutant gainmap-unread --only HG,P15,Z1` | caught: `hasGainMap` false on all three gain-map files; no bands for HG |
+| `--mutant gainmap-white-100 --only HG,P15,Z1` | caught: `encodePQ` 78.96/1023 off; HG's bands 35.5–138.5/1023 off |
+| `--mutant gainmap-peak-dropped --only HG,Z1` | caught, by the bands' order only: L = 6 and L = 8 both 0.99951. The L = 6 band sat 1.85/1023 from the oracle, inside its ±2/1023, so the per-band check alone would not have caught it |
+| `--mutant gainmap-sdr-project --only HGu,P15,Z1 --control …` | caught: the fixture at `.sdr` `pq(bt2020)` peak 1621; the SDR render differs from the control's |
+| `--mutant gainmap-cache-shared --only P15,Z1` | caught: the fixture at `.hlg` the SDR texture, conversion nil |
+| `--mutant gainmap-key-pq --only HGk,Z1` | caught: the L = 0.5 band not keyed |
+| `--mutant still-peak-dropped --only HIp,Z1` (re-anchored) | caught: the cLLI still off in HLG, SDR and at 600 |

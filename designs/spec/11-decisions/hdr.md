@@ -420,6 +420,8 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
   lifted by its own step-0 arm, not the SDR one (closing (l)'s first limit, #311); (h) the key
   on a layer whose source is HLG or PQ reads through GR-15's HDR→SDR arm, and the eyedropper
   stores the pick through it (closing (l)'s second limit, #312).
+  **Amended by HD-22** (clean-up 3 batch B, phase 3): (f) in an HLG project a gain-map still is
+  drawn from its HDR rendition through the `.pq(.bt2020)` arm, not lifted by the SDR one.
 - **HD-14 — H-3's settlements: the knee at 0.9, one output pass chosen by the key's
   `dynamic_range`, the argument's spelling and its refusals, PQ at 1,000 cd/m² with HD-5's
   metadata, the frames, Show SDR Version's key and the sheet's row.** H-3's spec, recorded before
@@ -804,6 +806,9 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
   (c) the key on a built-in Camera Log reads through GR-16's SDR arm, not the un-lift.
   **Amended by HD-21** (clean-up 3 batch B, phase 2): (a) an HLG or PQ still's thumbnail is drawn
   through step 0.
+  **Amended by HD-22** (clean-up 3 batch B, phase 3): (a) in an HLG project a gain-map still is
+  decoded to HDR (`kCGImageSourceDecodeToHDR` on today's route) under an image-cache key of its
+  own.
 - **HD-20 — Clean-up 3 batch B, phase 1's settlements: the key on Camera Log media read as its
   SDR colour across HLG, and a PQ still's HDR10 peak read at import.** Recorded before the
   phase's code (#324, #325). Format 26.
@@ -872,3 +877,80 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
     shows ImageIO's own tone map.
   - **Measured by** `log_thumbs_proof.py` TS0, TS and TU.
   - **Amends** GR-21 and HD-19 (a).
+- **HD-22 — Clean-up 3 batch B, phase 3's settlement: a gain-map still drawn as HDR in an HLG
+  project (#322).** Recorded before the phase's code. No op, tool, argument, recipe, catalog,
+  schema, `media.color` or format change (format stays 26).
+  - **(a) Which stills.** A still whose base `StillColor` does not claim (its first image's space
+    is neither HLG- nor PQ-based, HD-19 (a)) and whose first image carries an ISO 21496-1 or
+    Apple HDR gain map: `CGImageSourceCopyAuxiliaryDataInfoAtIndex` answers for
+    `kCGImageAuxiliaryDataTypeISOGainMap` or `kCGImageAuxiliaryDataTypeHDRGainMap`
+    (`StillGainMap.hasGainMap`).
+    - **M2, measured 2026-10-22** (`tools/proof/work/cleanup3/m2/`, scratch, gitignored:
+      `m2.swift` built by `swift_build.py`, run by `python3 -I m2.py`). The fixture is eight
+      equal vertical bands of extended-linear grey, L = 0.05, 0.18, 0.5, 1, 2, 4, 6, 8, drawn
+      into a 16-bit-float `extendedLinearSRGB` image.
+    - **The writer.** W1, `CGImageDestinationAddImage` with `kCGImageDestinationEncodeRequest:
+      kCGImageDestinationEncodeToISOGainmap` (quality 0.99), needs the source image's content
+      headroom set (`CGImageCreateCopyWithContentHeadroom`, 8). At the default headroom (0)
+      the file carried an ISO gain map but every band from L = 1 up read back 1.0. At 8 it
+      answered the ISO lookup and not Apple's. Its base is `kCGColorSpaceDisplayP3` at 8 bits
+      (headroom 1.0, the sRGB transfer), ImageIO's own tone map of the bands: codes 43, 84,
+      130, 166, 202, 237, 255, 255 (linear 0.024, 0.089, 0.223, 0.381, 0.591, 0.847, 1, 1).
+      W2 (Core Image's HEIF writer with `.hdrImage`) also wrote an ISO gain map, over a base
+      clipped at L = 1 (codes 63, 118, 188, then 255). W1 is the fixture's writer.
+    - **The routes.** R1, `decodeImage`'s thumbnail options plus `kCGImageSourceDecodeRequest:
+      kCGImageSourceDecodeToHDR`, answered a PQ-based 10-bit image (content headroom 8.0).
+      Drawn into 16-bit-float extended-linear BT.2020 with `setEDRTargetHeadroom(0)`, the
+      bands read 0.049, 0.181, 0.499, 1.000, 1.996, 4.004, 5.992, 7.984. A fresh context's
+      headroom is already 0, and both read the same. The 1024×128 file decoded in 18–27 ms,
+      the 9000×600 one came back 8192×546 in 251 ms, and an Orientation-6 copy
+      (`CGImageDestinationAddImageFromSource`, `kCGImageDestinationPreserveGainMap`) came back
+      128×1024 with the same bands. R2, `CGImageSourceCreateImageAtIndex` with DecodeToHDR,
+      read the same bands but neither bounded (9000×600) nor oriented (1024×128). R3, Core
+      Image's `.expandToHDR`, read 0.049 … 8.000, oriented but not bounded. R1 over
+      `still8.png`, `still16_srgb.png`, `still_hlg.heic` and `still_pq.png` answered today's
+      space, depth and bytes, and none has a gain map. So **R1 is the route**: today's
+      `decodeImage` with one more option, nothing bounded or oriented by hand (HD-19 (a)). No
+      owner photo was in `tools/proof/media/`.
+  - **(b) In an HLG project.** R1's decode (`StillGainMap.decodeHDR`) is drawn into 16-bit-float
+    premultiplied `extendedLinearITUR_2020`, where 1.0 is the base's white at 203 cd/m² (BT.2408,
+    HD-3's SDR white), with `setEDRTargetHeadroom(0)`, so the full gain is applied and nothing is
+    tone-mapped. It is encoded on the CPU to SMPTE ST 2084 PQ (each channel floored at 0, ×203,
+    at most 10,000 cd/m²; `StillGainMap.encodePQ`) and uploaded `rgba16Float`. Then step 0's
+    `.pq(.bt2020)` arm runs at the rendition's peak: its brightest decoded channel × 203,
+    rounded up, clamped to 1…10,000 (`Rendered.peak`; a stored `input.peak` would win, and none
+    is written, (e)). BT.2390's EETF applies above 1,000 (HD-13 (c)). No highlight the file holds
+    is clipped before the EETF.
+  - **(c) Parts with no gain** are the base's own linear light (its own EOTF), not HD-3's lift of
+    its codes, so un-gained mids may sit darker than the same still's lift. The owner chose this
+    on 2026-10-22 ("draw as the gain map defines it, measure and record the difference").
+    `hdr_proof.py` HG measures how this differs from the lifted base and prints the figure.
+    **Measured** (HG, Release, 2026-10-22, the synthetic fixture): the rendition sits above the
+    lifted base at every band, by 48.3 10-bit levels at L = 0.05, 122.0 at L = 0.5, 148.7 at
+    L = 1 and 256.6 at L = 8, because this fixture's base is ImageIO's own tone map of the
+    bands, darker than their light. A real photo's base and gain differ; HDR-7 looks at one.
+  - **(d) In an SDR project, and in every thumbnail and Media-tab row:** the base, as today, byte
+    for byte. HD-21 does not apply, because `StillColor` does not claim the still.
+  - **(e) Not stored.** No `media.color` is written and there is no Media-tab HDR10 section.
+    `set_media_color {peak}` still refuses a gain-map still ("…is not a PQ file; only a PQ file
+    takes a peak").
+  - **(f) The image cache.** An HLG project's still textures sit under their own key
+    (`image:hlg:<media>:<path>`), and that texture is unchanged for every other still. The SDR key
+    is unchanged.
+  - **(g) The chroma key** in an HLG project reads HD-13 (h)'s un-lift on a gain-map still. The
+    eyedropper's `KeyReading.of(media:url:)` reads the same, by the SDR label, so a pick in HLG
+    keys. A key picked in an SDR project on the base is close, not exact.
+  - **(h) Show SDR Version and the SDR deliverables** of an HLG project show the rendition through
+    HD-14's output pass (the project's own HDR→SDR conversion), not the photo's SDR base. The
+    owner chose this on 2026-10-22 ("HDR toned down").
+  - **(i) What the proof does not cover:** Apple's pre-ISO gain map, a real photo's headroom and
+    look, and JPEG or AVIF gain maps. These are `docs/manual-checks.md` HDR-7's.
+  - **(j) Amends** HD-13 (f) and HD-19 (a).
+  - **(k) The proof's record** (2026-10-22). HG0's control decodes the base with HD-3's lift
+    (Core Media 709's γ and toe, HD-13 (f)), not by the base's own transfer: on the untouched
+    tree every unclaimed still is drawn through the `.sdr` arm, so the control held to 1.30/1023
+    with that decode and would have been 38.57/1023 off with sRGB. The rule changed before the
+    control ran, and the row prints both figures. The `gainmap-peak-dropped` mutant is caught
+    only by HG's bands-increasing test (L = 6 and L = 8 both render 0.99951); the L = 6 band
+    sat 1.85/1023 from its oracle, inside ±2/1023, so the per-band check alone would miss it
+    (#330).
