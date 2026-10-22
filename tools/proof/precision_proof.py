@@ -425,7 +425,7 @@ PROBE_DIR = BASE / "encoder-probe"
 BUILD_BOUND = 1500
 SETTINGS = "app/Sources/ExporterWriter+Settings.swift"
 TABLE = "core/src/export_table.rs"
-RENDERERS = "app/Sources/LayerRenderers.swift"
+RENDERERS = "app/Sources/LayerRenderersImage.swift"
 # The stills (precision-2 P2-1): the brief's make_media.sh ramp, every column
 # X at X/(W−1) of full scale in all three channels.
 G16 = "format=gbrp16le,geq=r='X*65535/(W-1)':g='X*65535/(W-1)':b='X*65535/(W-1)'"

@@ -789,6 +789,18 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   app/Sources/ReverseRenderer.swift`: 737 before, 557 after; `ReverseRenderer+Read.swift` is
   183. The next seam: `// MARK: - Settings` (`dimensions`, `videoSettings`, `sliceDuration`) out
   to `ReverseRenderer+Settings.swift`.
+- `LayerRenderers.swift`: clean-up round 3's batch B phase 3 paid its toll before #322's
+  gain-map still (spec §11 HD-22). `image(url:media:)` with its doc (lines 177–196 at `b7846d9`),
+  `renderImage` and `renderHDRImage` (466–502) and `deepBitmap` and `hdrBitmap` (528–558) moved
+  byte for byte into `extension LayerRenderers` in `LayerRenderersImage.swift` with `import
+  AppKit` and `import Metal`, a pure move gated alone; all five live in that one file, so
+  nothing widened (`cached`, `bitmap`, `upload` and `maxTextureSide` were already internal and
+  stay with the type). Only the header doc's "What stays here…" sentence changed, to name the
+  new file. `hdr_proof.py`'s `still-drawn-srgb` anchor and `precision_proof.py`'s three
+  `RENDERERS` anchors moved to the new file, where each occurs once and none in the old. `wc -l
+  app/Sources/LayerRenderers.swift`: 582 before, 494 after; `LayerRenderersImage.swift` is 105.
+  The next seam: the shape group (`renderShape`, `draw`, `cgGradient`, `paint`, `drawLine`,
+  `fillHead`) out whole to `LayerRenderersShape.swift`.
 - `Controls.swift`: held to the sync rule with Rasterize's copy (`app/CLAUDE.md` "Shared chrome");
   7 of its lines are the SH-2 fork of `drawBar` (#101).
 - `ReelOps.swift` is exempt (a table, one row per op). `TimelineView.swift`,

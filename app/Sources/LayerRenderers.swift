@@ -32,9 +32,12 @@ import UniformTypeIdentifiers
 ///
 /// **Text lives in `LayerRenderersText.swift`** — measuring, laying out and
 /// the three reveals — which is the size payment road map 2's phase 6 made
-/// before it added gradients. What stays here is the cache, the three entry
-/// points, shapes, images and the bitmap/texture pair; the file's own doc
-/// argues the seam and names the three members that widened for it.
+/// before it added gradients; its own doc argues the seam and names the
+/// three members that widened for it. **Stills live in
+/// `LayerRenderersImage.swift`** — the image entry point, its two draws and
+/// the deep and HDR bitmaps, a pure move that widened nothing. What stays
+/// here is the cache, the text and shape entry points, shapes and the
+/// bitmap/texture pair.
 ///
 /// The cache key is the RECIPE's hash and never anything this file assembles,
 /// and phase 6 is the second feature to depend on that. `recipe.rs`'s
@@ -172,27 +175,6 @@ final class LayerRenderers {
     /// every hit-test and handle would be off by the stroke.
     func shape(_ props: ShapeProps, hash: String) -> Rendered? {
         cached("shape:" + hash) { self.renderShape(props) }
-    }
-
-    /// The texture for an `image` recipe layer, decoded with ImageIO and
-    /// cached by path. Bounded by `maxTextureSide`: a 60-megapixel HEIC is
-    /// scaled down once here rather than on every frame. An HLG or PQ still
-    /// (`StillColor.read`) is drawn by `renderHDRImage`; when either answers
-    /// nil — every SDR still, after a header read — today's lines run, so an
-    /// HDR still is never drawn worse than before (spec §11 HD-19 (a)). The
-    /// key is unchanged: the texture is the file's codes in both outputs.
-    func image(url: URL, media: UInt32) -> Rendered? {
-        cached("image:\(media):" + url.path) {
-            if let hdr = StillColor.read(url, maxPixelSize: LayerRenderers.maxTextureSide),
-                let rendered = self.renderHDRImage(hdr.image, conversion: hdr.conversion)
-            {
-                return rendered
-            }
-            guard let image = MediaImporter.decodeImage(
-                url, maxPixelSize: LayerRenderers.maxTextureSide)
-            else { return nil }
-            return self.renderImage(image)
-        }
     }
 
     // MARK: - Measured layers
@@ -463,44 +445,6 @@ final class LayerRenderers {
         context.fillPath()
     }
 
-    /// A still drawn at its own size. A decoded image deeper than 8 bits a
-    /// component (a 16-bit PNG or TIFF, a 10-bit HEIC) is drawn into `deepBitmap` and
-    /// uploaded `rgba16Float`, so its levels reach the 16-bit-float compositor
-    /// (spec §11 PR-6); every other still takes the 8-bit path byte for byte.
-    private func renderImage(_ image: CGImage) -> Rendered? {
-        let size = CGSize(width: image.width, height: image.height)
-        let deep = image.bitsPerComponent > 8
-        if deep {
-            guard size.width >= 1, size.height >= 1,
-                let context = LayerRenderers.deepBitmap(size)
-            else { return nil }
-            context.interpolationQuality = .high
-            context.draw(image, in: CGRect(origin: .zero, size: size))
-            return upload(context, size: size, pixelFormat: .rgba16Float)
-        }
-        guard size.width >= 1, size.height >= 1, let context = LayerRenderers.bitmap(size)
-        else { return nil }
-        context.interpolationQuality = .high
-        context.draw(image, in: CGRect(origin: .zero, size: size))
-        return upload(context, size: size)
-    }
-
-    /// An HLG or PQ still (spec §11 HD-19 (a)) drawn in its own colour space,
-    /// so Core Graphics converts nothing and the bitmap holds the file's codes,
-    /// into `hdrBitmap` and uploaded `rgba16Float`, carrying its arm.
-    private func renderHDRImage(_ image: CGImage, conversion: InputConversion) -> Rendered? {
-        let size = CGSize(width: image.width, height: image.height)
-        guard size.width >= 1, size.height >= 1, let space = image.colorSpace,
-            let context = LayerRenderers.hdrBitmap(size, space: space)
-        else { return nil }
-        context.interpolationQuality = .high
-        context.draw(image, in: CGRect(origin: .zero, size: size))
-        guard var rendered = upload(context, size: size, pixelFormat: .rgba16Float)
-        else { return nil }
-        rendered.conversion = conversion
-        return rendered
-    }
-
     // MARK: - Bitmaps and textures
 
     /// A premultiplied BGRA bitmap context — the pixel layout this renderer
@@ -523,38 +467,6 @@ final class LayerRenderers {
                 | CGBitmapInfo.byteOrder32Little.rawValue)
         context?.setAllowsAntialiasing(true)
         return context
-    }
-
-    /// A 16-bit-float premultiplied RGBA bitmap context in sRGB, for a still
-    /// deeper than 8 bits a component only (spec §11 PR-6); its bytes are
-    /// `rgba16Float`'s. The same size guard as `bitmap(_:)`.
-    private static func deepBitmap(_ size: CGSize) -> CGContext? {
-        let width = Int(size.width.rounded())
-        let height = Int(size.height.rounded())
-        guard width > 0, height > 0, width <= maxTextureSide, height <= maxTextureSide,
-            let deepSpace = CGColorSpace(name: CGColorSpace.sRGB)
-        else { return nil }
-        return CGContext(
-            data: nil, width: width, height: height, bitsPerComponent: 16, bytesPerRow: 0,
-            space: deepSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-                | CGBitmapInfo.floatComponents.rawValue
-                | CGBitmapInfo.byteOrder16Little.rawValue)
-    }
-
-    /// A 16-bit-float premultiplied RGBA bitmap context in an HDR still's own
-    /// space (spec §11 HD-19 (a)); `deepBitmap`'s layout and size guard.
-    private static func hdrBitmap(_ size: CGSize, space own: CGColorSpace) -> CGContext? {
-        let width = Int(size.width.rounded())
-        let height = Int(size.height.rounded())
-        guard width > 0, height > 0, width <= maxTextureSide, height <= maxTextureSide
-        else { return nil }
-        return CGContext(
-            data: nil, width: width, height: height, bitsPerComponent: 16, bytesPerRow: 0,
-            space: own,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-                | CGBitmapInfo.floatComponents.rawValue
-                | CGBitmapInfo.byteOrder16Little.rawValue)
     }
 
     /// Uploads a bitmap context to a texture. Row 0 of the context's memory
