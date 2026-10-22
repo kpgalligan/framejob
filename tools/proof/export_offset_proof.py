@@ -9,12 +9,14 @@ added the late head's separating fixture (#307), an MP3 read past its own
 LAME/Xing encoder delay (#306) and keep pitch outside the band on a real
 recording (#299). #299 phase 1 (SY-39) plays keep pitch within ±0.1% of ×1
 as varispeed, so R3 is pinned, and adds E35 (the app's one remaining
-`time_domain` export, measured).
+`time_domain` export, measured). Clean-up round 3 (#309, SY-42) added X16 and
+X17: the speech reader, the transcription extract, the reverse and the peaks
+of an MP3 read past the encoder delay Core Audio leaves in.
 
     python3 tools/proof/export_offset_proof.py [<dir>/agent.sock] [--only ID,ID,...]
     python3 tools/proof/export_offset_proof.py --mutants [--mutant NAME,NAME,...]
 
-Z0, Z2, L1–L12 and X1–X15 need no app; every other row needs the running instance's
+Z0, Z2, L1–L12 and X1–X17 need no app; every other row needs the running instance's
 socket (`proof_app.py launch`; `--app release` for the recorded run) and the
 script exits 2 when one is asked for without it. Rows print
 `<ID> ok|measured|FAIL — <detail>`, then the E and L tables, then `scores: n/m`; exit
@@ -122,12 +124,29 @@ Rows:
       probe that does not build or answer FAILS every L and X row asked.
       L10 is also the trim's gate: every `trimmed` read within 0.1 ms of
       ffmpeg's read of the same file, the tabled MP3s' native reads within
-      0.1 ms of 0, noxing's 576/44.1 ms late ± 0.1
+      0.1 ms of 0, noxing's 576/44.1 ms late ± 0.1. L11 is SY-38's record of
+      the readers' UNTRIMMED decodes (its stages read the track as the
+      product did before SY-42); X16 and X17 are the product's readers now
   L12  `MP3Gapless`'s tag reader and trim, checked inside the probe (no read)
   X1–X15  the probe's in-process exports and the sync cache (its header lists
       them), each located and pinned: ≥ 10 found, |median| ≤ 1.0 ms, spread
       ≤ 0.5 ms; X14 (no tag) instead 12 found and |X14 − X2 − 576/44.1| ≤
       0.1 ms
+  X16  (SY-42) the product's speech reader (`MediaImporter.speechReader`,
+      placed from its range start), extract (`Transcriber.extractAudio`,
+      `wholeAsset`) and reverse (`ReverseRenderer`, its audio turned back into
+      source order) of clicks24-mp3, clicks44-mp3, clicks48-mp3, clicks44 and
+      clicks48, every read pinned as X1–X15
+  X17  (SY-42) the product's `writePeaks` (the published `.bin`, one float per
+      10 ms) of clicks44, clicks48, clicks44-mp3, clicks24-mp3 and
+      clicks48-mp3; a read that does not publish fails. Every click is centred
+      on a bucket boundary (CLICKS are multiples of 0.1 s), so the row scores
+      whole buckets (`x17_pin`): for a click at t, k = round(t·100), b the
+      bucket of largest value over k ± 6 (found when it is ≥ 0.1), e = b − k;
+      per fixture ≥ 10 found and every e in {−1, 0}. Each MP3's detail prints
+      its PCM twin's e values beside its own (clicks44 for clicks44-mp3 and
+      clicks24-mp3, clicks48 for clicks48-mp3). The untrimmed lag (12 ms at
+      48 kHz, 13.06 at 44.1, 24 at 24) puts every click at e ≥ +1
 Under the L table, per fixture and speed, the first stage of
 asset48 → comp → mix → export whose median moves by more than 0.1 ms from
 the stage before it, and native against asset48 (the decoder's SRC).
@@ -137,8 +156,9 @@ under `work/export-offset/mutants/<name>/`, applies its edit (its `before`
 asserted to occur exactly once), rebuilds the probe (900 s wall) and runs its
 X group (240 s wall); killed when every named row fails. `before` — the
 unmutated tree — runs exactly once first and must pass every X row; a copy
-that does not build or answer is a failed control, never a kill. M7, M8 and
-M16–M18 are the core's (`core/tests/pitch_band.rs`), run by hand. `--mutant` runs
+that does not build or answer is a failed control, never a kill. M19 is
+killed only when X17 fails on each of clicks44-mp3, clicks48-mp3 and
+clicks24-mp3 (`MUTANT_FIXTURES`). M7, M8 and M16–M18 are the core's (`core/tests/pitch_band.rs`), run by hand. `--mutant` runs
 `before` and only the named mutants. Exit 0 when every mutant was killed.
 """
 
@@ -217,7 +237,7 @@ R_EDITS = {
 R_WINDOWS = [(12_000, 22_000), (128_000, 138_000)]  # ms of the recorder (media), R3–R7
 DEFECT_MS = 5.0  # SY-37: outside the band, a window past this is a defect
 L_ROWS = [f"L{n}" for n in range(1, 13)]
-X_ROWS = [f"X{n}" for n in range(1, 16)]
+X_ROWS = [f"X{n}" for n in range(1, 18)]
 NO_READ_ROWS = {"L12"}  # checked inside the probe; no manifest read
 
 # row: (fixture, start ticks, edit, preset). An edit: None (×1),
@@ -304,7 +324,33 @@ MUTANTS = {
     "M15-no-table-guard": (["X13"], "MP3Gapless.swift",
                            "guard hasPacketTable(url) == false else { return .zero }",
                            "guard hasPacketTable(url) != nil else { return .zero }"),
+    # Clean-up round 3 (#309, spec §11 SY-42): each of the four readers' trim.
+    "M19-no-peaks-lead": (["X17"], "MediaImporter+Peaks.swift",
+                          "let lead = MP3Gapless.leadingTrim(of: asset.url, track: track)",
+                          "let lead = CMTime.zero"),
+    "M20-no-speech-trim": (["X16"], "MediaImporter+Speech.swift",
+                           "if trim > .zero {", "if false && trim > .zero {"),
+    "M21-no-extract-trim": (["X16"], "Transcriber+Extract.swift",
+                            "let trim = MP3Gapless.leadingTrim(of: url, track: track)",
+                            "let trim = CMTime.zero"),
+    "M22-no-reverse-lead": (["X16"], "ReverseRenderer.swift",
+                            "let lead = audioTrack.map { MP3Gapless.leadingTrim(of: job.source, "
+                            "track: $0) } ?? .zero",
+                            "let lead = CMTime.zero"),
+    "M23-no-reverse-silence": (["X16"], "ReverseRenderer.swift",
+                               "if lead > .zero, audioInput != nil, let format = Self.audioFormat {",
+                               "if false, lead > .zero, audioInput != nil, "
+                               "let format = Self.audioFormat {"),
+    "M24-no-peaks-ranges": (["X17"], "MediaImporter+Peaks.swift",
+                            "expectedRanges: peaksRanges(expectedRanges, less: lead),",
+                            "expectedRanges: expectedRanges,"),
 }
+# A mutant that must fail its row on EACH of these fixtures (row, fixtures).
+MUTANT_FIXTURES = {"M19-no-peaks-lead": ("X17", ["clicks44-mp3", "clicks48-mp3", "clicks24-mp3"])}
+# X17's twins: each MP3 against the PCM file it was made from.
+X17_TWIN = {"clicks44-mp3": "clicks44", "clicks24-mp3": "clicks44", "clicks48-mp3": "clicks48"}
+X17_REACH = 6  # buckets either side of round(t·100)
+X17_FLOOR = 0.1  # a bucket under this is no click (the clicks peak at 0.5)
 
 results = {}
 e_table = []
@@ -1104,10 +1150,60 @@ def run_probe(binary, group="all", runs=PROBE_RUNS):
     return None, None, f"no answer (exit {ran['rc']}): {ran['stderr'].strip()[-400:]}"
 
 
+def measure_buckets(entry):
+    """X17: the bucket error e = b − round(t·100) of each click in a peaks
+    `.bin` (`X17_REACH`, `X17_FLOOR`), as a summary with `buckets`."""
+    values = read_f32(Path(entry["path"]), entry["rate"])
+    errors = []
+    for t in CLICKS:
+        k = round(t * 100)
+        lo, hi = max(0, k - X17_REACH), min(len(values), k + X17_REACH + 1)
+        if hi <= lo:
+            continue
+        b = max(range(lo, hi), key=lambda i: values[i])
+        if values[b] >= X17_FLOOR:
+            errors.append(b - k)
+    return {"found": len(errors), "of": len(CLICKS), "median_ms": None, "spread_ms": None,
+            "min_r": None, "diffs": [], "buckets": errors}
+
+
+def bucket_counts(s):
+    """`e:count` over a measured X17 read, e ascending."""
+    if s is None:
+        return "not measured"
+    counts = {}
+    for e in s["buckets"]:
+        counts[e] = counts.get(e, 0) + 1
+    return ", ".join(f"{e:+d}×{n}" for e, n in sorted(counts.items())) or "none found"
+
+
+def x17_pin(entry, s, measured):
+    """X17's pin for one fixture's `.bin`: ≥ 10 found and every e in {−1, 0};
+    (ok, sentence), an MP3's sentence carrying its twin's e values."""
+    twin = X17_TWIN.get(entry["fixture"])
+    beside = ""
+    if twin:
+        other = next((t for e, t in measured if e["row"] == "X17" and e["fixture"] == twin), None)
+        beside = f"; twin {twin} e {bucket_counts(other)}"
+    if s is None:
+        return False, "pin missed (not measured)" + beside
+    met = s["found"] >= 10 and all(e in (-1, 0) for e in s["buckets"])
+    return met, (f"e {bucket_counts(s)} ({s['found']}/{s['of']} found), pin "
+                 + ("met" if met else "missed") + " (≥ 10 found, every e in {−1, 0})" + beside)
+
+
+def x17_missed(measured):
+    """The fixtures whose X17 pin missed, from one probe run's reads."""
+    return {e["fixture"] for e, s in measured
+            if e["row"] == "X17" and not x17_pin(e, s, measured)[0]}
+
+
 def measure_read(entry):
     """The located summary of one manifest read, or None."""
     if not entry.get("ok"):
         return None
+    if entry["stage"] == "peaksbin":
+        return measure_buckets(entry)
     path = Path(entry["path"])
     if path.suffix == ".wav":
         samples, rate = read_wav(path)
@@ -1149,10 +1245,12 @@ def probe_scores(manifest, rows, wanted, table=None):
         ok = probe_row["ok"] and (bool(mine) or row in NO_READ_ROWS) and not short
         if row in X_ROWS:
             x2 = next((s for e, s in measured if e["row"] == "X2"), None)
-            pins = [noxing_pin(s, x2) if row == "X14" else pinned(s) for _, s in mine]
+            pins = [noxing_pin(s, x2) if row == "X14" else x17_pin(e, s, measured)
+                    if row == "X17" else pinned(s) for e, s in mine]
             ok = ok and all(met for met, _ in pins)
             medians = "; ".join(
-                f"{e['fixture']} {e['variant']} {describe(s)}, {pin[1]}"
+                (f"{e['fixture']} {e['variant']} {pin[1]}" if row == "X17" else
+                 f"{e['fixture']} {e['stage']} {e['variant']} {describe(s)}, {pin[1]}")
                 for (e, s), pin in zip(mine, pins) if s is not None)
         else:
             medians = ", ".join(
@@ -1304,7 +1402,8 @@ def print_tables():
                 continue
             print(f"| {entry['row']} | {entry['fixture']} | {entry['stage']} | "
                   f"{entry['variant']} | {entry['rate']} | {s['found']}/{s['of']} | "
-                  f"{fmt(s['median_ms'])} | {fmt(s['spread_ms'])} | {s['min_r']:.3f} | "
+                  f"{fmt(s['median_ms'])} | {fmt(s['spread_ms'])} | "
+                  f"{'—' if s['min_r'] is None else format(s['min_r'], '.3f')} | "
                   f"{'—' if pts is None else f'{pts:.6f}'} |")
 
 
@@ -1312,17 +1411,18 @@ def print_tables():
 
 
 def mutant_x(sources, here):
-    """{X row: (ok, detail)} from the probe built over `sources` and run on
-    its X group, or (None, why) when it does not build or answer."""
+    """({X row: (ok, detail)}, None, the measured reads) from the probe built
+    over `sources` and run on its X group, or (None, why, None) when it does
+    not build or answer."""
     clear_rate_copies()
     binary, why = build_probe(sources, here / "probe")
     if binary is None:
-        return None, why
+        return None, why, None
     rows, manifest, why = run_probe(binary, "X", here / "runs")
     if rows is None:
-        return None, why
-    scored, _ = probe_scores(manifest, rows, X_ROWS)
-    return scored, None
+        return None, why, None
+    scored, measured = probe_scores(manifest, rows, X_ROWS)
+    return scored, None, measured
 
 
 def mutants(only=None):
@@ -1332,7 +1432,7 @@ def mutants(only=None):
     except FixtureError as error:
         print(f"mutants: CONTROL FAILED — the fixtures could not be made: {error}")
         return 1
-    before, why = mutant_x(None, WORK / "mutants" / "before")
+    before, why, _ = mutant_x(None, WORK / "mutants" / "before")
     if before is None:
         print(f"before: CONTROL FAILED — {why[:300]}")
         return 1
@@ -1357,13 +1457,20 @@ def mutants(only=None):
             print(f"mutant {name}: CONTROL FAILED — `{old}` found {text.count(old)} times")
             continue
         path.write_text(text.replace(old, new))
-        rows, why = mutant_x(sources, here)
+        rows, why, measured = mutant_x(sources, here)
         if rows is None:
             print(f"mutant {name}: CONTROL FAILED — {why[:300]}")
             continue
         failed = [row for row in named if not rows[row][0]]
         others = [row for row in X_ROWS if row not in named and not rows[row][0]]
         caught = len(failed) == len(named)
+        if name in MUTANT_FIXTURES:
+            row, wanted = MUTANT_FIXTURES[name]
+            missed = x17_missed(measured) if row == "X17" else set()
+            spared = [fixture for fixture in wanted if fixture not in missed]
+            caught = caught and not spared
+            print(f"mutant {name}: {row} failed on {sorted(missed) or 'none'}; must fail on "
+                  f"each of {wanted}" + (f" — passed on {spared}" if spared else ""), flush=True)
         if caught:
             killed.append(name)
         print(f"mutant {name}: {'killed' if caught else 'SURVIVED'} — named {named} failed "

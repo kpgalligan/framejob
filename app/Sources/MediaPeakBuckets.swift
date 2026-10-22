@@ -12,14 +12,22 @@ extension MediaImporter {
     /// always writes the same bytes (issue #285). Coverage follows decoded
     /// presentation timestamps, in seconds, independently of that storage
     /// bound, so a shorter record cannot certify an unread track tail.
+    ///
+    /// `lead` is the MP3 encoder delay Core Audio left in
+    /// (`MP3Gapless.leadingTrim`, spec §11 SY-42): every buffer is placed, and
+    /// its coverage counted, at its PTS − lead, so the recording's first frame
+    /// is bucket 0's and the priming before it falls under the `bucket >= 0`
+    /// rule. Zero for every other file, whose buffers are placed at their PTS.
     struct PeakBuckets {
         private var buckets: [Float]
         private var coverage: [(start: Double, end: Double,
                                 startUnit: Double, endUnit: Double)] = []
         private(set) var acceptedFrames = 0
         private(set) var failed = false
+        private let lead: CMTime
 
-        init(duration: Ticks) {
+        init(duration: Ticks, lead: CMTime = .zero) {
+            self.lead = lead
             let count = max(1, Int((Double(duration) / Double(ReelTime.perSecond)
                 * Double(MediaImporter.peakBucketsPerSecond)).rounded(.up)))
             buckets = [Float](repeating: 0, count: count)
@@ -57,7 +65,8 @@ extension MediaImporter {
                 CMSampleBufferGetTotalSampleSize(sample) == expectedBytes,
                 expectedBytes > 0
             else { failed = true; return false }
-            let time = CMSampleBufferGetPresentationTimeStamp(sample)
+            let stamp = CMSampleBufferGetPresentationTimeStamp(sample)
+            let time = lead == .zero ? stamp : CMTimeSubtract(stamp, lead)
             guard time.isNumeric, time.timescale > 0 else { failed = true; return false }
             let start = CMTimeGetSeconds(time)
             let end = start + Double(frames) / asbd.mSampleRate

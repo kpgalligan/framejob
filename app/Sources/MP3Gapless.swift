@@ -2,7 +2,7 @@ import AVFoundation
 import AudioToolbox
 
 /// An MP3's own encoder delay, where Core Audio leaves it in (spec §11 SY-36,
-/// SY-38).
+/// SY-38, SY-42).
 ///
 /// **Why:** an MP3's first `encoderDelay` frames are the encoder's priming,
 /// not the recording. Core Audio removes its decoder's own delay always, and
@@ -15,8 +15,15 @@ import AudioToolbox
 ///
 /// `leadingTrim` answers that delay, read from the file's own LAME/Xing tag
 /// and applied as written, only when Core Audio has no packet table: a packet
-/// table is never second-guessed. The 48 kHz copy (`AudioRateCopy`) and the
-/// sync reader (`MediaImporter.writeSyncFeatures`) start their reads there.
+/// table is never second-guessed. Every reader of the file's sound starts
+/// there: the 48 kHz copy (`AudioRateCopy`), the sync reader
+/// (`MediaImporter.writeSyncFeatures`), the speech reader
+/// (`MediaImporter.speechReader`), the transcription extract
+/// (`Transcriber.extractAudio`, whose session starts there too) and the
+/// reverse (`ReverseRenderer`, each slice read that far on behind a lead of
+/// silence); the peaks decode from zero and place every buffer at PTS − trim
+/// (`PeakBuckets`' `lead`, `MediaImporter.peaksRanges`), so the priming falls
+/// before bucket 0.
 ///
 /// The tag reader is pure (`firstFrameOffset`, `tag(frame:)`); `tag(at:)`
 /// reads at most 10 + `frameReadLimit` bytes, and nothing is sized from the

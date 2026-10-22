@@ -99,8 +99,8 @@ final class EditorViewController: NSViewController {
     let playerHost = NSView()
     let safeGuides = SafeGuidesView(frame: .zero)
 
-    private let mainSplit = NSSplitView()
-    private let upperSplit = NSSplitView()
+    private let mainSplit = PaneSplitView()
+    private let upperSplit = PaneSplitView()
 
     // MARK: - Toolbar
     //
@@ -967,13 +967,9 @@ extension EditorViewController: NSSplitViewDelegate {
 
     func splitViewDidResizeSubviews(_ notification: Notification) {
         guard !isAdjustingPanes, didRestorePanes else { return }
-        let defaults = UserDefaults.standard
-        if !inspectorContainer.isHidden, inspectorContainer.bounds.width > 1 {
-            defaults.set(Double(inspectorContainer.bounds.width), forKey: Self.inspectorWidthKey)
-        }
-        if timelineContainer.bounds.height > 1 {
-            defaults.set(Double(timelineContainer.bounds.height), forKey: Self.timelineHeightKey)
-        }
+        Self.savePaneSize(
+            after: notification, main: mainSplit, upper: upperSplit,
+            timeline: timelineContainer, inspector: inspectorContainer, to: .standard)
         layoutCanvas()
     }
 }

@@ -5,7 +5,9 @@ import Foundation
 /// The await-free reader and publisher for the peaks pass. Asset properties
 /// are loaded by `MediaImporter.peaks`, which owns the async boundary.
 extension MediaImporter {
-    static let peaksVersion = 1
+    /// 2 since spec §11 SY-42: an MP3 whose encoder delay Core Audio leaves in
+    /// is read past it, so every peaks file made before is made again once.
+    static let peaksVersion = 2
 
     struct PeaksStamp: Codable, Equatable {
         let source: CacheStamp
@@ -64,6 +66,21 @@ extension MediaImporter {
         return merged
     }
 
+    /// Each range shifted by −lead and intersected with [0, +∞); empty ones
+    /// dropped. `expectedPeaksRanges` stays in the track's own timeline; this
+    /// is where the peaks of a delayed MP3 (`PeakBuckets`' `lead`) must reach.
+    static func peaksRanges(_ ranges: [CMTimeRange], less lead: CMTime) -> [CMTimeRange] {
+        guard lead != .zero else { return ranges }
+        let after = CMTimeRange(start: .zero, duration: .positiveInfinity)
+        return ranges.compactMap { range in
+            let shifted = CMTimeRangeGetIntersection(
+                CMTimeRange(start: CMTimeSubtract(range.start, lead), duration: range.duration),
+                otherRange: after)
+            guard shifted.isValid, !shifted.isEmpty else { return nil }
+            return shifted
+        }
+    }
+
     @discardableResult
     static func writePeaks(
         for media: MediaSnapshot, asset: AVURLAsset, track: AVAssetTrack,
@@ -71,6 +88,9 @@ extension MediaImporter {
         pass: CachePass? = nil
     ) -> Bool {
         guard let reader = try? AVAssetReader(asset: asset) else { return false }
+        // The MP3 encoder delay Core Audio left in (spec §11 SY-42): decoded
+        // from 0 and placed at PTS − lead, so the priming falls before bucket 0.
+        let lead = MP3Gapless.leadingTrim(of: asset.url, track: track)
         let output = AVAssetReaderTrackOutput(
             track: track,
             outputSettings: [
@@ -85,7 +105,7 @@ extension MediaImporter {
         reader.add(output)
         guard reader.startReading() else { return false }
 
-        var peaks = PeakBuckets(duration: media.duration)
+        var peaks = PeakBuckets(duration: media.duration, lead: lead)
         while let sample = output.copyNextSampleBuffer() {
             if !peaks.add(sample) { break }
         }
@@ -93,7 +113,8 @@ extension MediaImporter {
         // Cancelling first would erase that distinction.
         let status = reader.status
         reader.cancelReading()
-        return finishPeaks(peaks, status: status, expectedRanges: expectedRanges,
+        return finishPeaks(peaks, status: status,
+                           expectedRanges: peaksRanges(expectedRanges, less: lead),
                            for: media, stamp: stamp, into: cacheDir, pass: pass)
     }
 

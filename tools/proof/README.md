@@ -21649,3 +21649,112 @@ RC_PROOF_APP=release python3 tools/proof/export_status_proof.py --mutant <name>
 | `agent_socket_proof.py` | 16/16 in 40 s (K14 retired; K15 in flight, N exited in 0.08 s) |
 | `op_argument_proof.py`, `phase5_proof.py`, `phase9_proof.py` | 164/164; 90/90; 235/235 (phase 9 on an instance of its own: run after the other two on one instance, sections 8–10 failed on leftover state) |
 | `recording_probe.py --only catalog`; `export_cancel_proof.py --only gate` | 31/31; 3/3 (G1 through the helper, G2 synchronous) |
+
+## Clean-up round 3, batch A — #327, pane sizes saved from a divider drag only (`pane_size_probe.py` B0, R0, W1, H1, D1, D2, O1 and three mutants; `pane_size_probe.swift`)
+
+The timeline height (`FrameJobTimelineHeight`) and the inspector width (`FrameJobInspectorWidth`)
+were saved on every `splitViewDidResizeSubviews`, so a window resize stored whatever the panes
+were squeezed to and the next window opened with it. Both split views are now `PaneSplitView`
+(`EditorViewController+Panes.swift`), whose `isDraggingDivider` is true only inside its
+`mouseDown(with:)` — AppKit's divider drag runs its tracking loop there until the mouse is up —
+and `EditorViewController.savePaneSize` saves only for a notification whose object is dragging.
+**The notification's `NSSplitViewDividerIndex` is not the test:** NSSplitView.h says that since
+macOS 12 it is posted "during resize and layout events as well", and W1's RECORD reads it on
+macOS 26: 8 of 8 resize notifications of a window resize carried it.
+
+- **`pane_size_probe.py [--sources DIR] [--mutant NAME] [--only IDS]`** builds
+  `pane_size_probe.swift` as `main.swift` over `app/Sources` (`swift_build.build`, the binary
+  named `pane_size_probe`), runs it once under `tools/proof/work/pane-size/` (a 120 s wall) and
+  prints `<ID> pass|fail — <detail>` and `scores: N/M`. The probe's `UserDefaults.standard` is its
+  own domain, `pane_size_probe`: it removes the two size keys first, and the driver removes the
+  domain (`proof_defaults.remove_domain`) after the probe exits. The fixture is the harness's: an
+  untitled `ProjectDocument` in `EditorViewController(document:)` in a 1280×800 titled resizable
+  window never ordered on screen, one layout pass before `viewDidAppear` (a window on screen is
+  laid out before it appears; without it the restore ran into 0 × 0 split views and collapsed
+  both panes, measured), then runloop turns. **Rows:** R0 no key after the restore; W1 none after
+  `setContentSize` 1440×900 and 1100×700 (RECORD: the user-info keys seen); H1 none after ⌥⌘I
+  twice; D1 a drag of the main divider 60 pt up — a leftMouseDown at the divider's centre handed
+  to `mouseDown(with:)`, a leftMouseDragged and a leftMouseUp posted behind it, which AppKit's
+  tracking loop takes from the queue: the height key is the timeline's new height ± 0.5 pt, no
+  width key, the flag false after; D2 the same on the upper divider 40 pt left: the width key is
+  the inspector's width ± 0.5, D1's height kept (after W1 the inspector sits at 211 pt, under its
+  280 pt minimum, and the drag's clamp lands it at 279, so D1 and D2 ask for a change of size, not
+  for exactly 60 and 40 pt); O1 (the driver) `proof_defaults.snapshot` of `com.kgalligan.FrameJob`
+  and `com.kgalligan.FrameJob.debug` before and after: no key moved. **Mutants** (on a copy of
+  `--sources`; exit 1 caught, 0 survived, 2 not performed): `save-any-resize` (the drag guard
+  dropped) W1; `flag-never-set` (`mouseDown` leaves the flag false) D1, D2; `panes-swapped`
+  (main's drag saves the width) D1. R0 passes under `save-any-resize`, measured: the restore's
+  resizes fall inside `isAdjustingPanes` or before `didRestorePanes`, the guard that was already
+  there. ⌥⌘I posted no resize notification in this fixture, so H1 under it fails only on what W1
+  had written; neither is named. A real drag and a real window resize are `docs/manual-checks.md`'s
+  TL-15.
+
+```sh
+python3 tools/proof/pane_size_probe.py
+python3 tools/proof/pane_size_probe.py --mutant save-any-resize   # flag-never-set, panes-swapped
+```
+
+| Run (2026-10-22, the worktree's sources) | Result |
+|---|---|
+| `pane_size_probe.py` | 7/7 — R0 timeline 300 pt, inspector 304 pt, no key; W1 no key, 8 notifications (4 main, 4 upper), 8 with `NSSplitViewDividerIndex`; H1 no key; D1 timeline 260 → 320 pt, height key 320.00; D2 inspector 211 → 279 pt, width key 279.00, height 320.00; O1 19 and 3 keys, none moved |
+| `--mutant save-any-resize` | W1 FAIL (height 260.00, width 261.00); caught, exit 1 |
+| `--mutant flag-never-set` | D1, D2 FAIL (both keys absent); caught, exit 1 |
+| `--mutant panes-swapped` | D1 FAIL (no height key, width 211.00); caught, exit 1 |
+
+## Clean-up round 3, batch A — #309, every reader of an MP3 past its encoder delay (`export_offset_proof.py` X16, X17 and M19–M24; `export_offset_probe.swift`; `peaks_proof.py`, `remaining_proof.py` and `peaks_probe.swift` on peaks version 2; spec §11 SY-42)
+
+SY-38 left four readers placing an MP3's sound `encoderDelay` frames late wherever
+`MP3Gapless.leadingTrim` is past zero (L11: +13.061 ms at 44.1 kHz, +12.000 at 48, +24.000 at
+24 kHz). Each now takes the trim (SY-42): the peaks decode from 0 and `PeakBuckets(duration:lead:)`
+places every buffer, and its coverage, at PTS − trim, the publish asking for
+`peaksRanges(expected, less: trim)`; `MediaImporter.speechReader` starts its reader at the trim;
+`Transcriber.extractAudio` reads and starts its session at `range.start` + trim; and
+`ReverseRenderer` reads each slice that far on behind the trim's frames of silence. Versions:
+peaks 2, speech 2 (`SpeechStamp.version`), `ReverseCache.rendererVersion` 5.
+
+- **X16** (the X group, no app): the product's speech reader drained and placed from its range
+  start (stage `speech`, variant `x1+X16`), the product's extract of `wholeAsset` (`extract`) and
+  the product's reverse (`reverse`: a `Job` at the file's import duration — precise timing, as
+  `MediaImporter.descriptor` reads it — and 30 fps into `<out>/reverse-<fixture>/`, its audio
+  read at 48 kHz mono and its first `audioFrames(in: duration)` frames, zero-padded, reversed back
+  into source order), for clicks24-mp3, clicks44-mp3, clicks48-mp3, clicks44 and clicks48, every
+  read under SY-27's pin. **Why the import duration:** the probe's `descriptor` opens a plain
+  `AVURLAsset`, which ESTIMATES an MP3's duration, and the estimate moved between two runs of the
+  same tree (clicks24-mp3: 10.056 s, the decode's 241,344 frames, or 10.077 s); a reverse whose
+  total is not the sound's end places every click by the difference (−21.375 ms on the 10.077 s
+  run, measured).
+- **X17**: the product's `writePeaks` into a cache of its own (stage `peaksbin`, expected ranges
+  from `expectedPeaksRanges(trackRange:segments:)`, a read that does not publish fails), the
+  published `.bin` as f32 at rate 100, for clicks44, clicks48, clicks44-mp3, clicks24-mp3 and
+  clicks48-mp3. The clicks sit on 10 ms bucket boundaries (CLICKS are multiples of 0.1 s;
+  `write_clicks_wav` centres each at `rate·F/30`), so `x17_pin` scores whole buckets: for a click
+  at t, k = round(t·100), b the loudest bucket within k ± 6 (found when ≥ 0.1), e = b − k; per
+  fixture ≥ 10 found and every e in {−1, 0}; each MP3's detail prints its PCM twin's e values
+  (clicks44 for clicks44-mp3 and clicks24-mp3, clicks48 for clicks48-mp3).
+- **Mutants** (`--mutants`, the X group): M19 the peaks' lead `.zero` (X17, and killed only when
+  X17 misses on each of clicks44-mp3, clicks48-mp3 and clicks24-mp3: `MUTANT_FIXTURES`); M20 the
+  speech reader's trim off; M21 the extract's; M22 the reverse's lead `.zero`; M23 the reverse's
+  leading silence skipped (all X16); M24 `peaksRanges` not applied (X17: not published).
+- **L11** stays SY-38's record of the untrimmed decodes; it is not the product's reader now.
+- **Peaks version 2:** `peaks_proof.py` (lines 134–135, 150) and `remaining_proof.py` (273, 544)
+  pin the marker's `version` at 2, and `peaks_probe.swift`'s "future" marker is
+  `MediaImporter.peaksVersion + 1` rather than a literal 2 (which is the current version now).
+  `peaks_proof.py` imports fixtures `peaks_probe.py` authors, so on a fresh tree run the probe
+  first.
+
+```sh
+python3 tools/proof/export_offset_proof.py --only Z0,L10,L11,L12,X12,X15,X16,X17
+python3 tools/proof/export_offset_proof.py --mutants --mutant M19-no-peaks-lead,M20-no-speech-trim,M21-no-extract-trim,M22-no-reverse-lead,M23-no-reverse-silence,M24-no-peaks-ranges
+python3 tools/proof/peaks_probe.py && python3 tools/proof/peaks_proof.py <dir>/agent.sock
+python3 tools/proof/remaining_proof.py <dir>/agent.sock
+RC_PROOF_APP=release python3 tools/proof/precision_proof.py --only V0,V1,V2,V3,V4,V5,V6
+```
+
+| Run (2026-10-22) | Result |
+|---|---|
+| `--only Z0,L10,L11,L12,X12,X15,X16,X17` | 8/8. X16, 12/12 found on every read, spread 0.000: speech −0.042 / −0.085 / −0.042 ms (clicks24-mp3 / clicks44-mp3 / clicks48-mp3; controls clicks44 −0.023, clicks48 −0.042), extract −0.042 / −0.023 / −0.042 (−0.023 / −0.042), reverse +0.667 / +0.377 / −0.000 (+0.377 / +0.000). X17 e = 0 on 12 of 12 for all five. L11 unchanged (peaks +13.061 / +12.000 / +24.000 untrimmed) |
+| `--mutants --mutant M19…M24` | 6/6 killed, `before` failing no X row. M19 X17 e +1×12 (clicks44-mp3, clicks48-mp3), +2×12 (clicks24-mp3), on all three; M20 speech +23.958 / +13.039 / +11.958; M21 extract +23.958 / +13.039 / +11.958; M22 reverse +24.667 / +13.438 / +12.000; M23 reverse +24.667 / +13.439 / +12.000; M24 the three MP3s "writePeaks did not publish" |
+| `peaks_probe.py` | 95/95 |
+| `peaks_proof.py` (Release, own instance) | 21/21, the marker at version 2 |
+| `remaining_proof.py` (Release, the same instance) | 80/80; the instance's log holds no `Frame Job: ` line |
+| `precision_proof.py --only V0…V6` (Release) | 8/8 with Z1; V4's digest names renderer version 5 |

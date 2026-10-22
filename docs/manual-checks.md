@@ -185,6 +185,11 @@ the same way.
 - **Expect:** the dashed outlines sit on the hidden areas and turn with the clip; the cursors change over the grips; a drag has no jump or lag; each Esc puts the drag back with no step (Edit ▸ Undo names the step before it); each drag is one "Move Region" or "Resize Region" step; with an action selected the region animates to where it was dragged; the outlines stay drawn under the band.
 - **Source:** #85.
 
+**TL-15 — Pane sizes remembered from a drag only**
+- **Do:** 1. Drag the divider above the timeline to make the timeline clearly taller, and the divider beside the inspector to make it wider. 2. Open a new window (File ▸ New). 3. In that window, make the window itself much smaller and then larger again, and press ⌥⌘I twice. 4. Open a third window.
+- **Expect:** the second window opens with the timeline height and inspector width from step 1; the third opens with those same sizes, not the ones the window resize in step 3 left behind.
+- **Source:** #327.
+
 ## Clip tab and action lane
 
 Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Action, ⌥⌘K).

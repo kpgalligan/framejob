@@ -117,7 +117,14 @@ extension Transcriber {
         } catch {
             throw TranscribeError.failed(error.localizedDescription)
         }
-        reader.timeRange = range
+        // The MP3 encoder delay Core Audio leaves in (spec §11 SY-42): the read
+        // and the session both start that far into the decode, so frame 0 of
+        // the extract is the recording's `range.start`. Zero for every other
+        // file, whose read is `range` as it always was.
+        let trim = MP3Gapless.leadingTrim(of: url, track: track)
+        let read = trim == .zero
+            ? range : CMTimeRange(start: CMTimeAdd(range.start, trim), duration: range.duration)
+        reader.timeRange = read
 
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: extractSettings)
         guard reader.canAdd(output) else { throw TranscribeError.unreadable(name) }
@@ -138,7 +145,7 @@ extension Transcriber {
         // The session begins where the window does, so the first sample lands
         // at zero of the extract — which is what makes `project(_:in:)` a
         // single division with no `in` term in it.
-        writer.startSession(atSourceTime: range.start)
+        writer.startSession(atSourceTime: read.start)
 
         var frames = 0
         while let sample = output.copyNextSampleBuffer() {

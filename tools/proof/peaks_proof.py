@@ -131,8 +131,8 @@ def main():
     # shared loader before a new pass is requested. The marker's own source
     # object proves that no thumbnail/transcript stamp was changed.
     wrapper = json.loads(loud.marker(loud_media).read_text())
-    check("peaks marker uses version 1 and unchanged source object",
-          wrapper.get("version") == 1 and isinstance(wrapper.get("source"), dict))
+    check("peaks marker uses version 2 and unchanged source object",
+          wrapper.get("version") == 2 and isinstance(wrapper.get("source"), dict))
     loud.marker(loud_media).write_text(json.dumps(wrapper["source"]))
     loud.peaks(loud_media).write_bytes(b"\0" * loud.peaks(loud_media).stat().st_size)
     legacy_level = loud.op("detect_silence", mode="level", clips=[loud_clip])
@@ -147,7 +147,7 @@ def main():
     trigger_media = loud.op("import_media", path=str(FIXTURES / "silent48.wav"))["media"]
     check("normal cache pass trigger imported a second media",
           trigger_media != loud_media)
-    rebuilt = wait_for(lambda: (json.loads(loud.marker(loud_media).read_text()).get("version") == 1)
+    rebuilt = wait_for(lambda: (json.loads(loud.marker(loud_media).read_text()).get("version") == 2)
                        if loud.marker(loud_media).exists() else False)
     check("legacy cache migrates on next normal pass", rebuilt is not None)
     if rebuilt is not None:

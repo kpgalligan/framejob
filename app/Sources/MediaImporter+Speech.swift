@@ -11,6 +11,10 @@ import Foundation
 /// `MediaImporter.swift`, and this is the piece of the pass that does not
 /// need it.
 extension MediaImporter {
+    /// `SpeechStamp.version`. 2 since spec §11 SY-42: an MP3 whose encoder
+    /// delay Core Audio leaves in is read past it, so every speech cache made
+    /// before is made again once.
+    static let speechVersion = 2
 
     /// Whether the speech cache for `media` is already current: a stamp,
     /// a marker equal to `SpeechStamp(stamp)`, and the `.bin` actually there.
@@ -44,19 +48,7 @@ extension MediaImporter {
         into cacheDir: URL, pass: CachePass? = nil
     ) {
         guard let vad = SileroVAD.bundled() else { return }
-        guard let reader = try? AVAssetReader(asset: asset) else { return }
-        let output = AVAssetReaderTrackOutput(
-            track: track,
-            outputSettings: [
-                AVFormatIDKey: kAudioFormatLinearPCM,
-                AVSampleRateKey: Double(SileroVAD.sampleRate),
-                AVNumberOfChannelsKey: 1,
-                AVLinearPCMBitDepthKey: 32,
-                AVLinearPCMIsFloatKey: true,
-                AVLinearPCMIsBigEndianKey: false,
-                AVLinearPCMIsNonInterleaved: false,
-            ])
-        output.alwaysCopiesSampleData = false
+        guard let (reader, output) = speechReader(asset: asset, track: track) else { return }
         guard reader.canAdd(output) else { return }
         reader.add(output)
         guard reader.startReading() else { return }
@@ -128,5 +120,33 @@ extension MediaImporter {
             }
             postCacheChange(media: media.id, kind: speechKind)
         }
+    }
+
+    /// `writeSpeech`'s reader and output, neither added nor started. The
+    /// reader starts at `MP3Gapless.leadingTrim` when it is past zero — the
+    /// MP3 encoder delay Core Audio leaves in (spec §11 SY-42) — so chunk 0
+    /// is the recording's first 32 ms; for every other file it reads the
+    /// whole track, as it always has.
+    static func speechReader(asset: AVURLAsset, track: AVAssetTrack)
+        -> (reader: AVAssetReader, output: AVAssetReaderTrackOutput)?
+    {
+        guard let reader = try? AVAssetReader(asset: asset) else { return nil }
+        let trim = MP3Gapless.leadingTrim(of: asset.url, track: track)
+        if trim > .zero {
+            reader.timeRange = CMTimeRange(start: trim, duration: .positiveInfinity)
+        }
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVSampleRateKey: Double(SileroVAD.sampleRate),
+                AVNumberOfChannelsKey: 1,
+                AVLinearPCMBitDepthKey: 32,
+                AVLinearPCMIsFloatKey: true,
+                AVLinearPCMIsBigEndianKey: false,
+                AVLinearPCMIsNonInterleaved: false,
+            ])
+        output.alwaysCopiesSampleData = false
+        return (reader, output)
     }
 }

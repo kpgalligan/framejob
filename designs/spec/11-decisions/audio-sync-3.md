@@ -344,3 +344,42 @@ run and its readings after, from the implementer's printed runs of 2026-10-19.
   outside ×0.999–×1.001 plays as before (`time_domain` within ×0.98–×1.02, `spectral`
   elsewhere), SY-37's DEFECT stands as an accepted, recorded limit, and #299 stays open. The
   design-stage scratch instruments live only in a gitignored work folder and are not kept.
+
+- **SY-42 — Every reader of an MP3 reads past the encoder delay Core Audio leaves in (#309;
+  amends SY-38's residue).** Recorded in clean-up round 3 (batch A, 2026-10-22) before its code,
+  from the owner's "queue the other bugs … fix them in batches" of that day; its numbers are the
+  implementer's printed run of 2026-10-22 (`export_offset_proof.py --only …,X16,X17`). SY-38 left
+  peaks, speech, the transcription extract and the reverse reading an MP3's sound `encoderDelay`
+  frames late wherever `MP3Gapless.leadingTrim` is past zero — 13.061 ms at 44.1 kHz and 12.000
+  ms at 48 kHz (MPEG-1, accepted under 16.7 ms), 24 ms at 24 kHz (MPEG-2, over it). Each now
+  takes the same trim, as a placement and not only a read range: **peaks**
+  (`MediaImporter.writePeaks`) decode from 0 and `PeakBuckets` places every buffer, and counts
+  its coverage, at PTS − trim, so the priming falls before bucket 0 under the existing `bucket >=
+  0` rule; the coverage the publish asks for is `peaksRanges(expected, less: trim)`, the track's
+  ranges shifted by −trim and cut at 0. **Speech** (`MediaImporter.speechReader`, `writeSpeech`'s
+  reader) starts its reader at the trim; the probabilities stay placed by index from 0, so chunk
+  0 is the recording's first 32 ms. **The transcription extract** (`Transcriber.extractAudio`)
+  reads `range` shifted by the trim and starts its writer's session there, so the extract's frame
+  0 is the recording's `range.start` for a clip's window and the cloud upload alike. **The
+  reverse** (`ReverseRenderer`) reads each slice at `[start + trim, cursor + trim)` and opens the
+  reversed file with the trim's frames of silence (the recording's last stretch lies past the
+  decode's end); `leadingTrim` answers only for a bare MPEG stream, so no picture is ever
+  shifted. A file with no trim — every non-MP3, an MP3 with a packet table or no tag — reads
+  byte-identically to before in all four. **Versions:** the peaks marker's `version` is 2, the
+  speech marker carries `version` 2 (a marker without it fails to decode), and
+  `ReverseCache.rendererVersion` is 5: every peaks, speech and reverse cache is made again once,
+  SY-34's no-migration posture; the MPEG-1 residues SY-38 accepted go with the MPEG-2 one. **A
+  cloud transcript already cached for an MP3 is not re-fetched:** re-fetching spends, and its
+  words stay where that upload placed them until the owner asks for a new transcript. **The
+  pins:** X16 reads the product's speech reader, extract and reverse of clicks24-mp3,
+  clicks44-mp3, clicks48-mp3 and the WAVs clicks44 and clicks48, each pinned by SY-27 (≥ 10 of 12
+  found, |median| ≤ 1.0 ms, spread ≤ 0.5 ms); every read found 12 of 12 — speech −0.042 / −0.085
+  / −0.042 ms (controls −0.023 / −0.042), the extract −0.042 / −0.023 / −0.042 (−0.023 / −0.042),
+  the reverse +0.667 / +0.377 / −0.000 (+0.377 / +0.000), spread 0.000 throughout. X17 reads the
+  published peaks `.bin` of the same five by whole buckets (the clicks sit on 10 ms bucket
+  boundaries, so a millisecond median would flip a bucket on a one-sample decode shift): for a
+  click at t, e = b − round(t·100), b the loudest bucket within ±6, pinned per fixture to ≥ 10
+  found and every e in {−1, 0}; all five read e = 0 on 12 of 12, where the untrimmed lag puts
+  every click at e ≥ +1. Mutants M19–M24 (each reader's trim removed, the reverse's silence
+  skipped, the shifted coverage not asked for) must each fail their row, M19 on each of the three
+  MP3s. L11 stays SY-38's record of the untrimmed decodes.

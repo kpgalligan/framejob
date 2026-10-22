@@ -265,11 +265,14 @@ final class ReverseRenderer {
                 writer.error?.localizedDescription ?? "the file could not be opened for writing")
         }
         writer.startSession(atSourceTime: .zero)
+        // The MP3 encoder delay Core Audio leaves in (spec §11 SY-42); zero
+        // for every other file.
+        let lead = audioTrack.map { MP3Gapless.leadingTrim(of: job.source, track: $0) } ?? .zero
 
         do {
             try walkBackwards(
                 asset: asset, videoTrack: videoTrack, audioTrack: audioTrack, total: total,
-                dimensions: dimensions,
+                lead: lead, dimensions: dimensions,
                 pixelFormat: videoInput == nil
                     ? kCVPixelFormatType_32BGRA
                     : (intermediate?.pixelFormat(fullRange: fullRange)
@@ -339,9 +342,15 @@ final class ReverseRenderer {
     /// against it. It is filled with silence instead, which is also exactly
     /// what the source plays there and what the composition would have made of
     /// the forward file.
+    ///
+    /// **The MP3's lead** (spec §11 SY-42). `lead` is the encoder delay Core
+    /// Audio leaves in (`MP3Gapless.leadingTrim`), so the recording's time `t`
+    /// decodes at `t + lead`: each slice reads that far on, and the reversed
+    /// file opens with `lead` of silence — the recording's last `lead` lies past
+    /// the decode's end. A bare MPEG stream has no picture, so no frame moves.
     private func walkBackwards(
         asset: AVURLAsset, videoTrack: AVAssetTrack?, audioTrack: AVAssetTrack?, total: CMTime,
-        dimensions: CMVideoDimensions?, pixelFormat: OSType, writer: AVAssetWriter,
+        lead: CMTime, dimensions: CMVideoDimensions?, pixelFormat: OSType, writer: AVAssetWriter,
         videoInput: AVAssetWriterInput?, adaptor: AVAssetWriterInputPixelBufferAdaptor?,
         audioInput: AVAssetWriterInput?, cancel: CancelToken?, progress: ((Double) -> Void)?
     ) throws {
@@ -416,6 +425,11 @@ final class ReverseRenderer {
 
         var videoDone = videoInput == nil
         var audioDone = audioInput == nil
+        if lead > .zero, audioInput != nil, let format = Self.audioFormat {
+            sounds.append(
+                contentsOf: Self.audioBlocks(
+                    [], format: format, from: &written, covering: Self.audioFrames(in: lead)))
+        }
         while cursor > .zero {
             if cancel?.isCancelled == true { throw ReverseError.cancelled }
             let start = CMTimeMaximum(.zero, cursor - slice)
@@ -424,8 +438,11 @@ final class ReverseRenderer {
             // place to trust arithmetic, and the cost of being sure is a
             // comparison.
             guard start < cursor else { break }
+            let range = lead == .zero
+                ? CMTimeRange(start: start, end: cursor)
+                : CMTimeRange(start: start + lead, end: cursor + lead)
             let read = try Self.read(
-                asset: asset, range: CMTimeRange(start: start, end: cursor), limit: total,
+                asset: asset, range: range, limit: total,
                 videoTrack: videoTrack, audioTrack: audioTrack, pixelFormat: pixelFormat,
                 cancel: cancel)
 

@@ -173,7 +173,7 @@ if let fullStamp {
         } else if label == "future", let markerBytes,
                   var object = (try? JSONSerialization.jsonObject(with: markerBytes))
                     as? [String: Any] {
-            object["version"] = 2
+            object["version"] = MediaImporter.peaksVersion + 1
             let future = try? JSONSerialization.data(withJSONObject: object)
             try? future?.write(to: markerFile)
             let sourceSize = ((object["source"] as? [String: Any])?["size"]

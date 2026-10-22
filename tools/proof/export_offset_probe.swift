@@ -1,8 +1,9 @@
 // Issue #298 — where an exported sample lands, stage by stage. The
 // in-process instrument behind `export_offset_proof.py`'s L1–L9 (phase 1),
 // X1–X8 (phase 2's pins) and clean-up batch 3's L10–L12 and X9–X15 (#307,
-// #306: spec §11 SY-35, SY-36, SY-38); and #299's time-pitch survey, T1–T2
-// (spec §11 SY-40), behind `keep_pitch_survey.py`.
+// #306: spec §11 SY-35, SY-36, SY-38); clean-up round 3's X16–X17 (#309: spec
+// §11 SY-42); and #299's time-pitch survey, T1–T2 (spec §11 SY-40), behind
+// `keep_pitch_survey.py`.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a`, through
@@ -12,7 +13,7 @@
 //     export_offset_probe <out-dir> <fixtures-dir> [all|L|X|T]
 //
 // The third argument picks the row group (default `all`): `L` runs L1–L12,
-// `X` runs X1–X15 (what `--mutants` runs), `all` both; `T` runs only T1–T2,
+// `X` runs X1–X17 (what `--mutants` runs), `all` both; `T` runs only T1–T2,
 // whose fixtures dir is `audio_sync_proof`'s (the RECORDER, `recorderFile`,
 // which is no `fixtureFiles` key: L12 walks those).
 //
@@ -61,6 +62,20 @@
 //   extract  the product's `Transcriber.extractAudio`, a 16 kHz WAV    (L11)
 //   sync     the product's `writeSyncFeatures` into a cache of its own,
 //            then `loadSyncSamples` at 8 kHz from 0                    (X12)
+//   speech (variant `x1+X16`)  the product's `MediaImporter.speechReader`
+//            drained, placed from its reader's range start           (X16)
+//   extract (variant `x1+X16`)  the product's `Transcriber.extractAudio` of
+//            `wholeAsset`, as L11's                                   (X16)
+//   reverse  the product's `ReverseRenderer` on a `Job` of the file's
+//            import duration (`importDuration`, precise timing) at 30 fps,
+//            into `<out-dir>/reverse-<fixture>/`;
+//            the reversed file's audio read at 48 kHz mono, its first
+//            `ReverseRenderer.audioFrames(in: duration)` frames (zero-padded)
+//            reversed back into source order                         (X16)
+//   peaksbin the product's `writePeaks` into a cache of its own (expected
+//            ranges from `expectedPeaksRanges(trackRange:segments:)`), the
+//            published `.bin` as written: one float per 10 ms, rate 100; a
+//            read that does not publish fails                         (X17)
 //
 //   L1–L5  each fixture (all five) at frame 206 (F206 = 206·20 000 ticks), ×1
 //   L6     L4 at ×1 with each input's algorithm set to nil (the reader
@@ -93,6 +108,11 @@
 //          `sync`) of both MP3s, clicks44, clicks48 and clicks44s-mp3; X13
 //          clicks44s-mp3 and clicks44-mp3-itunsmpb (packet tables); X14
 //          clicks44-mp3-noxing (no tag); X15 clicks24-mp3 (MPEG-2)
+//   X16    SY-42's readers: `speech`, `extract` and `reverse` of
+//          clicks24-mp3, clicks44-mp3, clicks48-mp3 and the WAVs clicks44,
+//          clicks48, each pinned like X1–X15
+//   X17    `peaksbin` of clicks44, clicks48, clicks44-mp3, clicks24-mp3 and
+//          clicks48-mp3, scored by whole buckets (the proof's `x17_pin`)
 //
 //   T1–T2  #299's survey (SY-40): the RECORDER at F206, in 0, at each rate r
 //          of `surveyRates`, 48 kHz mono reads with `start_ticks` F206 and
@@ -166,7 +186,7 @@ func writeAnswer() {
     let lRows = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11", "L12"]
     let xRows = [
         "X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8", "X9", "X10", "X11", "X12", "X13", "X14",
-        "X15",
+        "X15", "X16", "X17",
     ]
     let ids = group == "L" ? lRows : group == "X" ? xRows : group == "T" ? ["T1", "T2"]
         : lRows + xRows
@@ -695,6 +715,118 @@ func readSync(_ row: String, _ fixture: String) {
     }
 }
 
+// MARK: - SY-42's readers (X16, X17)
+
+/// The duration the app's import records (`MediaImporter.descriptor`'s
+/// precise-timing asset). `descriptor`'s plain asset estimates an MP3's
+/// duration, and the estimate moved between runs (clicks24-mp3: 10.056 s or
+/// 10.077 s, measured) — a reverse whose total is not the sound's end places
+/// every frame by the difference.
+func importDuration(_ url: URL) throws -> Ticks {
+    let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
+    let duration = CompositionBuilder.ticks(asset.duration)
+    guard duration > 0 else { throw ProbeError("\(url.lastPathComponent) has no duration") }
+    return duration
+}
+
+/// The product's speech reader (`MediaImporter.speechReader`) drained, 16 kHz
+/// mono, placed from its reader's range start (the trim for a delayed MP3).
+func readProductSpeech(_ row: String, _ fixture: String) {
+    record(row, fixture, "speech", "x1+\(row)", rate: SileroVAD.sampleRate, start: 0,
+           speed: 1) { url in
+        let (asset, track) = try audioTrack(fixture)
+        guard let (reader, output) = MediaImporter.speechReader(asset: asset, track: track) else {
+            throw ProbeError("speechReader answered nil")
+        }
+        let origin = CMTimeGetSeconds(reader.timeRange.start)
+        lateExtras["origin_s"] = origin
+        let (samples, pts) = try drain(
+            reader, output, channels: 1, rate: SileroVAD.sampleRate, origin: origin)
+        try writeF32(samples, url)
+        return pts
+    }
+}
+
+/// The product's extract of the whole asset (`Transcriber.extractAudio`).
+func readProductExtract(_ row: String, _ fixture: String) {
+    record(row, fixture, "extract", "x1+\(row)", rate: 16_000, start: 0, speed: 1) { url in
+        _ = try Transcriber.extractAudio(
+            url: fixtureURL(fixture), name: fixture, range: Transcriber.wholeAsset, to: url,
+            cancel: Transcriber.CancelToken())
+        return 0
+    }
+}
+
+/// The product's reverse (`ReverseRenderer`) of the file, its audio read at
+/// 48 kHz mono and turned back into source order: the first
+/// `audioFrames(in: duration)` frames, zero-padded, reversed.
+func readReverse(_ row: String, _ fixture: String) {
+    record(row, fixture, "reverse", "x1+\(row)", rate: 48_000, start: 0, speed: 1) { url in
+        let source = fixtureURL(fixture)
+        let duration = try importDuration(source)
+        let folder = outDir.appendingPathComponent("reverse-\(fixture)", isDirectory: true)
+        try? FileManager.default.removeItem(at: folder)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let job = ReverseRenderer.Job(
+            media: 1, name: fixture, source: source,
+            destination: folder.appendingPathComponent("reversed.mov"),
+            duration: duration, fps: Fps(num: 30, den: 1), hasAudio: true)
+        let reversed: URL
+        switch ReverseRenderer(job: job).run() {
+        case .success(let made): reversed = made
+        case .failure(let error): throw ProbeError("the reverse failed: \(error)")
+        }
+        let asset = AVURLAsset(url: reversed)
+        guard let track = asset.tracks(withMediaType: .audio).first else {
+            throw ProbeError("the reversed file has no audio track")
+        }
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(
+            track: track, outputSettings: floatSettings(rate: 48_000, channels: 1))
+        var (samples, _) = try drain(reader, output, channels: 1, rate: 48_000)
+        let count = Int(ReverseRenderer.audioFrames(in: CompositionBuilder.time(duration)))
+        lateExtras["reversed_frames"] = samples.count
+        if samples.count < count {
+            samples += [Float](repeating: 0, count: count - samples.count)
+        }
+        try writeF32(Array(samples.prefix(count).reversed()), url)
+        return 0
+    }
+}
+
+/// The product's `writePeaks` into a cache of its own; the published `.bin`
+/// as written (rate 100, one float per bucket). A read that does not publish
+/// fails.
+func readPeaksBin(_ row: String, _ fixture: String) {
+    record(row, fixture, "peaksbin", "x1+\(row)", rate: MediaImporter.peakBucketsPerSecond,
+           start: 0, speed: 1) { out in
+        let url = fixtureURL(fixture)
+        let media = MediaSnapshot(
+            id: 1, path: url.path, kind: .audio, duration: try importDuration(url),
+            hasVideo: false, hasAudio: true)
+        guard let stamp = MediaImporter.CacheStamp.stamp(for: media, url: url) else {
+            throw ProbeError("no cache stamp")
+        }
+        let folder = outDir.appendingPathComponent("peaks-\(fixture)", isDirectory: true)
+        try? FileManager.default.removeItem(at: folder)
+        let cache = folder.appendingPathComponent("cache", isDirectory: true)
+        try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+        let (asset, track) = try audioTrack(fixture)
+        guard let expected = MediaImporter.expectedPeaksRanges(
+            trackRange: track.timeRange, segments: track.segments)
+        else { throw ProbeError("expectedPeaksRanges answered nil") }
+        guard MediaImporter.writePeaks(
+            for: media, asset: asset, track: track, expectedRanges: expected, stamp: stamp,
+            into: cache)
+        else { throw ProbeError("writePeaks did not publish") }
+        guard let peaks = MediaImporter.loadPeaks(for: media.id, in: cache) else {
+            throw ProbeError("loadPeaks answered nil after a publish")
+        }
+        try writeF32(peaks, out)
+        return 0
+    }
+}
+
 let mp3Fixtures = ["clicks44-mp3", "clicks48-mp3"]
 let residueFixtures = mp3Fixtures + ["clicks44", "clicks48"]
 
@@ -895,6 +1027,14 @@ func xRows() {
     readExport("X13", "clicks44-mp3-itunsmpb", tag: "+X13")
     readExport("X14", "clicks44-mp3-noxing", tag: "+X14")
     readExport("X15", "clicks24-mp3", tag: "+X15")
+    for fixture in ["clicks24-mp3", "clicks44-mp3", "clicks48-mp3", "clicks44", "clicks48"] {
+        readProductSpeech("X16", fixture)
+        readProductExtract("X16", fixture)
+        readReverse("X16", fixture)
+    }
+    for fixture in ["clicks44", "clicks48", "clicks44-mp3", "clicks24-mp3", "clicks48-mp3"] {
+        readPeaksBin("X17", fixture)
+    }
 }
 
 // MARK: - #299's time-pitch survey (T1, T2; spec §11 SY-40)

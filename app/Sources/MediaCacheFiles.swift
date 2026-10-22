@@ -238,18 +238,22 @@ extension MediaImporter {
     }
 
     /// The stamp `cache/speech/<id>.complete.json` carries — a `CacheStamp`
-    /// plus the model and chunk size that made the file, so a build that
-    /// changes either rebuilds every speech cache without touching the
-    /// thumbs or peaks markers, which share `source`'s underlying stamp.
+    /// plus the model and chunk size that made the file and the reader's
+    /// `MediaImporter.speechVersion`, so a build that changes any of them
+    /// rebuilds every speech cache without touching the thumbs or peaks
+    /// markers, which share `source`'s underlying stamp. A marker written
+    /// before `version` existed fails to decode, so its cache is rebuilt.
     struct SpeechStamp: Codable, Equatable {
         let source: CacheStamp
         let speechModel: String
         let speechChunkSamples: Int
+        let version: Int
 
         init(_ source: CacheStamp) {
             self.source = source
             self.speechModel = SileroVAD.modelName
             self.speechChunkSamples = SileroVAD.chunkSamples
+            self.version = MediaImporter.speechVersion
         }
     }
 

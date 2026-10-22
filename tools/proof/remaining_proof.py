@@ -270,7 +270,7 @@ def read_json(path):
 
 def peaks_source(path):
     marker = read_json(path)
-    if not isinstance(marker, dict) or marker.get("version") != 1:
+    if not isinstance(marker, dict) or marker.get("version") != 2:
         return None
     return marker.get("source")
 
@@ -541,7 +541,7 @@ def part_1a(mcp, s):
         check(marker.get("duration") == imported["duration"],
               f"the {label} marker's `duration` is the record's ({marker.get('duration')})")
     check(peaks_source(session.peaks_marker(av)) == read_json(session.thumbs_marker(av)),
-          "peaks version 1 wraps the unchanged thumbnail source stamp")
+          "peaks version 2 wraps the unchanged thumbnail source stamp")
     s.marker_bytes = read_bytes(session.thumbs_marker(av))
     s.peaks_marker_bytes = read_bytes(session.peaks_marker(av))
     s.baseline = session.stats(av)

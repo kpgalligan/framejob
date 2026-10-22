@@ -316,7 +316,7 @@ detail there.
   for a full-range S-Log3 or V-Log source (GR-23)), every other
   strip's the flat `CacheStamp`; the ledger starts a new generation for a
   changed Camera Log input as for another file (spec §11 GR-21). Peaks alone
-  wrap the unchanged source stamp in `PeaksStamp` version 1 and require a
+  wrap the unchanged source stamp in `PeaksStamp` version 2 (SY-42) and require a
   complete selected-track decode, valid PCM coverage and a usable
   record-sized Float32 payload; legacy or malformed peaks are unavailable until rebuilt.
   A stale cache is deleted
@@ -467,7 +467,13 @@ detail there.
   `cache/reversed/<id>-<digest>.mov`, written HEVC Main 10, or ProRes 422 at
   an odd size, carrying the source's colour labels (spec §11 PR-7), rendered
   on demand behind `ReverseProgressSheetController.swift`'s sheet,
-  substituted per CLIP by `CompositionBuilder`.
+  substituted per CLIP by `CompositionBuilder`. An MP3's slices are read
+  `MP3Gapless.leadingTrim` on, behind that much silence (spec §11 SY-42,
+  `rendererVersion` 5).
+- `ReverseRenderer+Read.swift` — reading one slice (`Frame`, `Slice`, `read`,
+  `copyBuffer`, `copyRows`), moved whole out of `ReverseRenderer.swift`
+  (clean-up round 3's toll; its next seam, `// MARK: - Settings`, is named in
+  app-file-history.md).
 - `ReverseRenderer+Audio.swift` — the reverse's audio: its LPCM settings,
   slice bytes, reversed blocks and sample buffers, moved whole out of
   `ReverseRenderer.swift` (issue batch B98).
@@ -501,6 +507,12 @@ the key map behind it.
 **The editor.**
 - `EditorViewController+Graphics` refreshes the paused frame on
   `.projectGraphicsDidChange` for its own document.
+- `EditorViewController+Panes.swift` — `PaneSplitView`, whose
+  `isDraggingDivider` is true only inside `mouseDown(with:)` (AppKit's divider
+  drag), and `savePaneSize`: the timeline height and inspector width are saved
+  only from a person's drag of their divider, never a window resize, a
+  restore or Hide Inspector (#327; since macOS 12 every resize notification
+  carries `NSSplitViewDividerIndex`, so that key cannot tell them apart).
 - `EditorViewController+Timeline` / `+Canvas` / `+Inspector` / `+Toolbar` —
   installing the three panes and the toolbar (transport · timecode — view ·
   Export, nothing else). `+Timeline` holds the delete family, including ⌫
@@ -1140,10 +1152,9 @@ the key map behind it.
   made blocking on the first build that needs it; reversed-only media are
   not copied.
 - `MP3Gapless.swift` — the LAME/Xing tag reader (pure) and `leadingTrim`, the
-  encoder delay the 48 kHz copy and the sync reader skip when Core Audio
-  reports no packet table (SY-36, SY-38); the other readers (peaks, speech,
-  the transcription extract, reverse) keep it, SY-38's measured residue
-  (#309 at 24 kHz).
+  encoder delay Core Audio leaves in when it reports no packet table: the
+  48 kHz copy and the sync reader skip it (SY-36, SY-38), and so do the
+  peaks, speech, the transcription extract and the reverse (SY-42, #309).
 - `CompositionBuilder.swift` (`build` takes the composition's colour from its
   key's options: BT.709 for the SDR version, BT.2020/PQ for HDR10, spec §11
   HD-14; +`InstructionRanges`, +`AudioTracks`,

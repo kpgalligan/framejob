@@ -50,8 +50,9 @@ enum ReverseCache {
     /// rendered again rather than played. 2: the 10-bit intermediate with
     /// the source's colour labels (spec §11 PR-7). 3: an odd-size reverse of
     /// full-range media read as full-range frames (spec §11 PR-10). 4: a VP9
-    /// media's range read from its `vpcC` (spec §11 GR-23).
-    static let rendererVersion = 4
+    /// media's range read from its `vpcC` (spec §11 GR-23). 5: an MP3 read
+    /// past the encoder delay Core Audio leaves in (spec §11 SY-42).
+    static let rendererVersion = 5
 
     static func directory(in cache: URL) -> URL {
         cache.appendingPathComponent(directoryName, isDirectory: true)
