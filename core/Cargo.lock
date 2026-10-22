@@ -267,12 +267,15 @@ dependencies = [
 name = "graphic"
 version = "0.1.0"
 dependencies = [
+ "imagesize",
+ "png",
  "resvg",
  "rquickjs",
  "serde_json",
  "sha2",
  "simplecss",
  "svgtypes",
+ "zune-jpeg",
 ]
 
 [[package]]

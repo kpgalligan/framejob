@@ -39,7 +39,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`06c-edit-operations-actions-tracks-media.md`](06c-edit-operations-actions-tracks-media.md) | 154 | The action ops (the zoom action, end patches and `off`); the track, marker, canvas and media ops; and the op table's two halves (the arguments half is `core/src/op_table.rs`). |
 | **§7 — Architecture: Rust decides, AVFoundation and Metal do** | | |
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
-| [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 146 | The `rc_*` exports and their contracts. |
+| [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 147 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 164 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 487 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 56 | The spec's Swift file map (app/CLAUDE.md is the live one). |
@@ -49,12 +49,12 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.8-export.md`](07.8-export.md) | 432 | Export: writers, formats, loudness, the queue. |
 | [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 392 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, the app-state tools, lenient decoding. |
 | [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 157 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
-| [`07.9c-agent-graphics-dev-tools-transport.md`](07.9c-agent-graphics-dev-tools-transport.md) | 297 | The graphics loop's tools (write, read, render, import, delete, rename and restore a module), an action's graphic props and the graphics menus, the dev tools (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `assistant_send` / `assistant_answer` and their launch defaults, `play_preview`, `graphic_memory`), and the transport (the Unix socket, `framejob-mcp`, Copy MCP Command). |
-| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 102 | The spec's Rust module map (core/CLAUDE.md is the live one). |
+| [`07.9c-agent-graphics-dev-tools-transport.md`](07.9c-agent-graphics-dev-tools-transport.md) | 300 | The graphics loop's tools (write, read, render, import, delete, rename and restore a module), an action's graphic props and the graphics menus, the dev tools (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `assistant_send` / `assistant_answer` and their launch defaults, `play_preview`, `graphic_memory`), and the transport (the Unix socket, `framejob-mcp`, Copy MCP Command). |
+| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 103 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 188 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 10640 in 26 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 10703 in 26 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

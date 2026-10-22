@@ -23,7 +23,9 @@ detail there.
   `CoreValues.swift` — no Swift file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25) and
   `ReelContainer` (`rc_container_*`, a WebM/Matroska file's index,
   #216-R) and `ReelHDR10` (`rc_hdr10_peak`, spec §11 HD-6; `av1Peak`,
-  `rc_hdr10_av1_peak`, HD-18); the typed patches are `TypedPatches.swift`'s (`VideoPatch`,
+  `rc_hdr10_av1_peak`, HD-18), and `GraphicLibrary.imageCache(limit:)`
+  (`rc_graphic_image_cache`, G-39); `ReelCoreError` and `Fps.ffiPair` are
+  `CoreValues.swift`'s (G6 phase 5's toll T2, a pure move); the typed patches are `TypedPatches.swift`'s (`VideoPatch`,
   `AudioPatch`, `ClipPatch`, the `ActionPatch` extension; a pure move, B73),
   `TextPatch` (with `case`, `words` and `word_style`) is `TextPatch.swift`'s,
   moved out so it could grow, and `ShapePatch` `ShapePatch.swift`'s (a pure
@@ -55,7 +57,7 @@ detail there.
   strongly); their values `GraphicDiagnostic`, `GraphicFailure` (what a
   `diag_out` failure throws; `err_out` stays `ReelCoreError`) and
   `GraphicRaster` are `CoreValues.swift`'s, with `SpeedLimits` (a pure move,
-  clean-up batch 2).
+  clean-up batch 2), `ReelCoreError` and `Fps.ffiPair` (G6 phase 5's toll).
   `MediaDescriptor`, `MediaOriginal`, `mediaURL(for:)`, `originalURL(for:)`,
   `revealURL(for:)` (the original, else the copy), `isTrashed` and
   `bookmarkString(for:)` are `MediaDescriptor.swift`'s: a `media[]` element
@@ -1252,7 +1254,9 @@ the key map behind it.
   kept raster is the serial path's; a pool miss checks the kept frames
   first. A document's close stops its session and drops its kept frames
   (`stopGraphicStore`); `deinit` unregisters. `FrameJobGraphicKeepOff` (YES)
-  keeps nothing. A background pass's frames are MARKED drawn ahead
+  keeps nothing. The decoded-image cache's limit (G-39) is `budgetBytes / 16`
+  at the level in force, set at launch and in `setPressure`;
+  `FrameJobGraphicImageCacheOff` sets it to 0. A background pass's frames are MARKED drawn ahead
   (`beginAhead`, `followAhead`, `endAhead`, `roomAhead`): the trim takes
   unmarked frames first, a mark clears as a play reaches its frame, and a
   marked frame pushed out unreached is counted (`ahead_evicted`). A pass
@@ -2479,7 +2483,8 @@ free.
 - `AgentServer+GraphicMemory.swift` — `graphic_memory {pressure?}` (dev
   only, wholly under the flag, off main; spec §11 G-37): the graphic
   rasters' budget, held and kept bytes and their peaks, a pass's
-  `ahead_bytes`, `ahead_evicted` and `pass_activity` (G-38), from
+  `ahead_bytes`, `ahead_evicted` and `pass_activity` (G-38), and
+  `image_cache_bytes` and `image_cache_limit` (G-39), from
   `GraphicPrefetch.memoryReport`; `pressure` simulates a memory-pressure
   level until the tool sets `normal`. `tools/proof/graphic_memory_proof.py`
   drives it.

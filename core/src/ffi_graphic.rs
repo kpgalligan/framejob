@@ -1,6 +1,7 @@
-//! C FFI: the motion-graphics engine (road map 10 §5e) — ten `rc_graphic_*`
-//! exports delegating to the `graphic` crate (the builder's `new` and
-//! `add_asset` live in `ffi_graphic_pending.rs`, re-exported here). **The
+//! C FFI: the motion-graphics engine (road map 10 §5e) — eleven
+//! `rc_graphic_*` exports delegating to the `graphic` crate (the builder's
+//! `new` and `add_asset` live in `ffi_graphic_pending.rs`, re-exported
+//! here), the eleventh the engine's decoded-image cache (spec §11 G-39). **The
 //! only module of the core that names that crate** (G-2): the core still
 //! does no pixel work and reaches no file; it hands the app's bytes to the
 //! engine and the engine's answer back.
@@ -330,4 +331,24 @@ pub unsafe extern "C" fn rc_graphic_rasterize(
 #[no_mangle]
 pub unsafe extern "C" fn rc_graphic_free(g: *mut RcGraphic) {
     unsafe { free_boxed(g, "freeing a graphic") }
+}
+
+/// The engine's decoded-image cache (spec §11 G-39): sets its limit in
+/// bytes, trims it least recently used first, and answers the bytes it
+/// holds after; 0 empties it. Never fails; a caught panic answers 0.
+///
+/// # Safety
+/// Takes no pointers.
+#[no_mangle]
+pub unsafe extern "C" fn rc_graphic_image_cache(limit_bytes: usize) -> usize {
+    let body = || Ok(graphic::set_image_cache_limit(limit_bytes));
+    unsafe {
+        fallible_op(
+            ptr::null_mut(),
+            "setting the image cache",
+            0,
+            body,
+            |held| held,
+        )
+    }
 }

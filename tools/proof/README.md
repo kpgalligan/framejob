@@ -10840,6 +10840,69 @@ and exited 3 after its CAUGHT line: an editor's split view wrote the key
 (`EditorViewController.splitViewDidResizeSubviews`), on a resize this proof
 did not ask for; no other run moved it.
 
+## Issue #127 — the decoded-image cache (`image_cache_bench.py`, `image_cache_proof.py`)
+
+G6 phase 5 (spec §11 G-39): a graphic's PNG and JPEG assets are drawn from
+stored, unfiltered RGBA8 PNG copies that decode to the original's pixmap,
+in one process-wide cache in the engine (`graphic/src/images.rs`) keyed by
+the SHA-256 of the asset's bytes, its limit `budget_bytes / 16` at the
+level in force (`GraphicPrefetch+Memory.swift`), 0 under
+`-FrameJobGraphicImageCacheOff YES`. Its unit rows are
+`graphic/tests/image_cache.rs`'s I1–I6.
+
+- **`image_cache_bench.py PACKAGE [--from T] [--frames 40] [--rounds 5]`**:
+  copies PACKAGE under `work/image-cache-bench/` (the original is never
+  opened), launches one owned instance of `proof_app`'s default app (the
+  SVG text does not depend on the build), opens the copy, finds the graphic
+  clip covering T on the frontmost track and dumps `--frames` evenly spaced
+  frames of it through `render_graphic {format: "svg"}` with the clip's
+  props and size into `dump/svg/`, with `frames.json` and the copy's
+  `graphics/assets` and `graphics/fonts`; stops the instance by PID; prints
+  the powermode line and the load average; then runs `cd graphic && cargo
+  test --release --test image_bench -- --ignored --nocapture` with
+  `GRAPHIC_IMAGE_BENCH` and `GRAPHIC_IMAGE_BENCH_ROUNDS`. The test
+  alternates ORIG (limit 0) and CACHED (1 GiB after one untimed warm
+  frame), each round drawing every SVG once, and prints each round's
+  total, the medians, `saving = 1 − CACHED/ORIG`, ORIG's `spread = (max −
+  min)/median` and `decode share` (each PNG href's median
+  `Pixmap::decode_png` time summed over the frames, over ORIG's median); it
+  asserts every frame's bytes equal across the arms. The spike's second arm
+  was STORED, the library with each PNG swapped for a copy the test built.
+- **`image_cache_proof.py`**: OFF (`-FrameJobGraphicImageCacheOff YES`) and
+  ON, owned instances one after the other on scratch sockets, through
+  `playback_prefetch_proof.Instance`, logs under `work/image-cache/`. C0
+  (CONTROL) the fixture: a 30 fps project, one graphic clip drawing a
+  generated 640 × 360 alpha-ramp `ramp.png` and `steel.jpg` under a
+  frame-dependent transform and opacity, made on OFF, saved, closed, and
+  copied once per instance. C1 six `render_frame`s byte-equal OFF against
+  ON; C2 ON's `image_cache_bytes` > 0 and `image_cache_limit` ==
+  `budget_bytes // 16`, OFF's both 0; C3 ON under `critical` 0 and 0 and
+  its frame OFF's, `warning` physical // 8 // 16, `normal` physical // 4 //
+  16; C4 `ramp.png` replaced by a second ramp on both: ON's frame OFF's,
+  and not ON's before; Z1 no `Frame Job: ` line.
+- `--mutant NAME`, each anchor exactly once in its file. The graphic
+  mutants run `cargo test --release --test image_cache` in a copy of
+  `graphic/` under `work/image-cache/mutant/` (a sibling `app` symlink, the
+  target dir `work/image-cache-target/`, kept between runs) and must fail
+  their row with its assertion's text: `name-key` → I2, `premultiplied-copy`
+  → I1 (bytes), `unchecked` → I1 (pixels), `no-trim` → I3, `over-limit` →
+  I4 (bytes), `no-skip-marker` → I4 (builds). The app mutant
+  `pressure-ignored` is built by `tree_copy` and must fail C3. Exit 0
+  caught, 1 survived, 2 the control was not performed.
+
+Run on 2026-10-22 over `2d003d1` plus the phase, every instance my own, on
+a 12-CPU host with 96 GiB, `powermode 0`, shared with other sessions:
+
+| Command | Answer |
+|---|---|
+| `image_cache_bench.py parive-promo.framejob --from 25120000` (the spike, STORED) | clip 8 (`section`), frames 0…529, 40 of 1920 × 1080, 5 rounds; load 6.10 before, 6.16 after; ORIG median 11 595.0 ms, STORED 11 097.4 ms; saving 0.0429, spread 0.0330, decode share 0.0753 (872.7 ms); every frame identical. The stop rule (saving ≥ 0.03 and > spread) said build |
+| the same, after (CACHED) | load 12.30 before, 5.73 after; ORIG median 11 202.9 ms, CACHED 10 689.6 ms; saving 0.0458, spread 0.0333, decode share 0.0730 (818.0 ms); 14 972 870 bytes cached; every frame identical |
+| `cargo test --release --test image_cache` | I1–I6 pass |
+| `image_cache_proof.py` (Debug; Release) | 6/6 each; C2 ON 922 430 bytes, limit 1 610 612 736; C3 critical 0 and 0, warning 805 306 368, normal 1 610 612 736 |
+| `--mutant` (Release) | caught, exit 0: `name-key` I2, `premultiplied-copy` I1 (`the cache holds`), `unchecked` I1 (`a cached draw differs`), `no-trim` I3, `over-limit` I4 (`a copy over the limit was kept`), `no-skip-marker` I4 (`the copy was rebuilt`), `pressure-ignored` C3 (critical answered a 1 610 612 736 limit) |
+| `RC_PROOF_APP=release graphic_memory_proof.py` | 13/13; `--mutant no-pressure-trim` caught (M7) |
+| `RC_PROOF_APP=release screens.py --only 02-settings` | 6/6, 0 new problems (P2: `FrameJobGraphicImageCacheOff` in NOT_SHOWN) |
+
 
 ## Issue batch B38 — the assistant Stop residue: ST's hour fixture, K1 last with its `key-echo` control, `transcribe`'s first-statement read (`assistant_session_proof.py` ST, K1, `--mutant key-echo`; #179 items 1, 2 and 4)
 

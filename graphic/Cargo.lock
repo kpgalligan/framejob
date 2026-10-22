@@ -243,6 +243,7 @@ name = "graphic"
 version = "0.1.0"
 dependencies = [
  "flate2",
+ "imagesize",
  "png",
  "resvg",
  "rquickjs",
@@ -250,6 +251,7 @@ dependencies = [
  "sha2",
  "simplecss",
  "svgtypes",
+ "zune-jpeg",
 ]
 
 [[package]]

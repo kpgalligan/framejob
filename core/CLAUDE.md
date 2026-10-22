@@ -759,7 +759,9 @@ governs a module now.
   `matrix`; the app writes the blobs and the PQ label only for transfer 16. The only payload read
   is the first VP9 keyframe's header, each Opus packet's TOC and each Vorbis
   packet's first byte.
-- `ffi_graphic.rs` — the ten `rc_graphic_*` exports (road map 10 §5e)
+- `ffi_graphic.rs` — the eleven `rc_graphic_*` exports (road map 10 §5e; the
+  eleventh `rc_graphic_image_cache`, G-39: set the decoded-image cache's
+  limit, answer its bytes; two re-exported from `ffi_graphic_pending.rs`)
   and the ONLY module of `core/src/` that names the `graphic` crate (spec
   §11 G-2; `core/tests/graphic_ffi.rs` reads `core/src/` to hold it). An
   `RcGraphicLibrary` is a BUILDER that the first compile or rasterize
@@ -773,13 +775,17 @@ governs a module now.
   which a `font-family` must match (CoreText names 13 of 2500 host fonts
   differently) — and freezes it. `rc_graphic_describe` answers `{meta,
   schema, revision, warnings}`, `warnings` being `Module::warnings()`
-  through `Diagnostic::to_json` (spec §11 G-24 (a)). At 399 of 400: the
-  next export pays a toll,
-  and nothing crate-free is left in it (`diag_json`/`diag_error` name
-  `Diagnostic`). `ffi_util.rs` holds the two crate-free helpers it gave up:
+  through `Diagnostic::to_json` (spec §11 G-24 (a)). G6 phase 5's toll T1
+  moved the crate-free builder half to `ffi_graphic_pending.rs`
+  (core-file-history); what is left names the crate (`diag_json`/
+  `diag_error` name `Diagnostic`). `ffi_util.rs` holds the two crate-free helpers it gave up:
   `read_bytes` (a pointer and a length into an owned `Vec`, `bytes is NULL`
   refused) and `free_boxed` (drops a handle `boxed` made, under
   `fallible_op` with no channel; NULL a no-op).
+- `ffi_graphic_pending.rs` — the library builder's crate-free half (G6
+  phase 5's toll T1): `FROZEN`, `Pending`, `lock`, `rc_graphic_library_new`
+  and `rc_graphic_library_add_asset`, `pub(crate)` for `ffi_graphic.rs`;
+  it names no `graphic` item (G-2).
 
 ## Rules
 

@@ -41,9 +41,9 @@ use framejob_core::ffi_container::{
 use framejob_core::ffi_cube::{rc_cube_copy_rgb, rc_cube_free, rc_cube_parse, rc_cube_size};
 use framejob_core::ffi_edit::rc_project_apply;
 use framejob_core::ffi_graphic::{
-    rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_library_add_asset,
-    rc_graphic_library_add_font, rc_graphic_library_families, rc_graphic_library_free,
-    rc_graphic_library_new, rc_graphic_rasterize, rc_graphic_svg,
+    rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_image_cache,
+    rc_graphic_library_add_asset, rc_graphic_library_add_font, rc_graphic_library_families,
+    rc_graphic_library_free, rc_graphic_library_new, rc_graphic_rasterize, rc_graphic_svg,
 };
 use framejob_core::ffi_hdr10::{rc_hdr10_av1_peak, rc_hdr10_peak};
 use framejob_core::ffi_query::{
@@ -2300,6 +2300,10 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     unsafe { rc_graphic_library_free(ptr::null_mut()) };
     unsafe { rc_graphic_library_free(lib) };
     cover("rc_graphic_library_free");
+
+    // No pointers: a limit of 0 (the engine's default) empties the cache.
+    assert_eq!(unsafe { rc_graphic_image_cache(0) }, 0);
+    cover("rc_graphic_image_cache");
 
     let mut err: *mut c_char = ptr::null_mut();
     assert!(unsafe { rc_container_open(ptr::null(), &mut err) }.is_null());

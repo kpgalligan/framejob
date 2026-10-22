@@ -588,6 +588,10 @@ bool rc_graphic_rasterize(const RcGraphicLibrary *lib, const char *svg, uint32_t
 /* Releases a graphic. NULL-tolerant. */
 void rc_graphic_free(RcGraphic *g);
 
+/* The engine's decoded-image cache (spec §11 G-39): sets its limit, trims it least recently
+ * used first, and answers the bytes it holds after; 0 empties it. Never fails. */
+size_t rc_graphic_image_cache(size_t limit_bytes);
+
 /* ------------------------------------------------------------- container */
 
 /* A WebM or Matroska file being imported, read as an INDEX (spec §11

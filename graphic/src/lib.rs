@@ -13,6 +13,7 @@
 mod diagnostic;
 mod exception;
 mod host;
+mod images;
 mod library;
 mod measure;
 mod module;
@@ -22,6 +23,7 @@ mod runtime;
 mod sandbox;
 
 pub use diagnostic::{Diagnostic, Level};
+pub use images::{image_cache_builds, image_cache_bytes, set_image_cache_limit};
 pub use library::{Face, Library};
 pub use measure::{measure_text, FontStyle, TextFont, TextMetrics};
 pub use module::Module;

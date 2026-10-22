@@ -14,6 +14,7 @@ use resvg::usvg::fontdb;
 use sha2::{Digest, Sha256};
 
 use crate::diagnostic::Diagnostic;
+use crate::images::{cached_kind, Asset};
 use crate::measure::{FontStyle, TextMetrics};
 
 /// `(family, size bits, weight, style, letter-spacing bits, preserve, text)`.
@@ -25,7 +26,7 @@ const MEMO_CAP: usize = 4096;
 /// The engine's fonts and assets. Immutable once built; `Send + Sync`.
 pub struct Library {
     db: Arc<fontdb::Database>,
-    assets: BTreeMap<String, Arc<Vec<u8>>>,
+    assets: BTreeMap<String, Asset>,
     families: Vec<String>,
     version: String,
     warnings: Vec<Diagnostic>,
@@ -88,7 +89,11 @@ impl Library {
             db: Arc::new(db),
             assets: assets
                 .into_iter()
-                .map(|(name, data)| (name, Arc::new(data)))
+                .map(|(name, data)| {
+                    let digest = Sha256::digest(&data).into();
+                    let data = Arc::new(data);
+                    (name, Asset { data, digest })
+                })
                 .collect(),
             families,
             version,
@@ -123,7 +128,7 @@ impl Library {
     }
 
     pub fn asset(&self, name: &str) -> Option<&[u8]> {
-        self.assets.get(name).map(|data| data.as_slice())
+        self.assets.get(name).map(|asset| asset.data.as_slice())
     }
 
     /// SHA-256 of the font and asset bytes, 64 lowercase hex characters.
@@ -165,8 +170,8 @@ impl Library {
         });
         let resolve_string: usvg::ImageHrefStringResolverFn<'a> =
             Box::new(move |href, opts| match self.assets.get(href) {
-                Some(data) => {
-                    let kind = image_kind(data, opts);
+                Some(asset) => {
+                    let kind = image_kind(asset, opts);
                     if kind.is_none() {
                         lock(probe).bad_assets.push(href.to_string());
                     }
@@ -234,14 +239,16 @@ fn select_font(font: &usvg::Font, db: &fontdb::Database) -> Option<fontdb::ID> {
     })
 }
 
-/// An asset's kind by its magic; anything that is not PNG, JPEG, GIF or
-/// WebP is tried as an SVG (gzipped or not), with no lock held.
-fn image_kind(data: &Arc<Vec<u8>>, opts: &usvg::Options) -> Option<usvg::ImageKind> {
+/// An asset's kind by its magic; a PNG or JPEG is the cache's stored copy
+/// when it has one (G-39), and anything that is not PNG, JPEG, GIF or WebP
+/// is tried as an SVG (gzipped or not), with no lock held.
+fn image_kind(asset: &Asset, opts: &usvg::Options) -> Option<usvg::ImageKind> {
+    let data = &asset.data;
     let bytes = data.as_slice();
     if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
-        Some(usvg::ImageKind::PNG(data.clone()))
+        cached_kind(asset).or_else(|| Some(usvg::ImageKind::PNG(data.clone())))
     } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
-        Some(usvg::ImageKind::JPEG(data.clone()))
+        cached_kind(asset).or_else(|| Some(usvg::ImageKind::JPEG(data.clone())))
     } else if bytes.starts_with(&[0x47, 0x49, 0x46, 0x38]) {
         Some(usvg::ImageKind::GIF(data.clone()))
     } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {

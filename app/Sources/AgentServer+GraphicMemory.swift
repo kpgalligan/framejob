@@ -43,6 +43,8 @@ extension AgentServer {
             "ahead_bytes": report.aheadBytes,
             "ahead_evicted": report.aheadEvicted,
             "pass_activity": report.passActivity,
+            "image_cache_bytes": report.imageCacheBytes,
+            "image_cache_limit": report.imageCacheLimit,
         ])
     }
 
@@ -62,7 +64,10 @@ extension AgentServer {
                 + "background pass drew ahead and the compositor has not yet passed, spec G-38), "
                 + "ahead_evicted (those a trim pushed out while still ahead, since the last "
                 + "answer; each answer resets it) and pass_activity (whether a running background "
-                + "pass holds Frame Job's App Nap opt-out). Needs no project. pressure first "
+                + "pass holds Frame Job's App Nap opt-out), image_cache_bytes and "
+                + "image_cache_limit (the engine's decoded-image cache of PNG and JPEG assets, "
+                + "spec G-39: the bytes its copies hold, and its limit, a sixteenth of "
+                + "budget_bytes, 0 when its switch is on). Needs no project. pressure first "
                 + "sets a simulated memory-pressure level, which holds against the system's own "
                 + "until pressure normal clears it. Refused, changing nothing: any other "
                 + "pressure value.",

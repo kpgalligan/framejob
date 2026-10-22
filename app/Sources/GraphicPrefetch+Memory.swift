@@ -17,6 +17,10 @@
 // content hash), so a kept raster is the serial path's (G-26 (c)).
 // `FrameJobGraphicKeepOff` (YES) keeps nothing.
 //
+// **The engine's image cache** (G-39) is sized from the same budget: a
+// sixteenth of it at the level in force, set at launch and on every pressure
+// change; `FrameJobGraphicImageCacheOff` (YES) sets it to 0.
+//
 // Everything here is guarded by `GraphicPrefetch.condition`; `KeptFrames`
 // never locks.
 
@@ -193,6 +197,9 @@ struct GraphicMemoryReport: Equatable {
     /// its App Nap opt-out (G-38 (d), (c)).
     let aheadBytes, aheadEvicted: Int
     let passActivity: Bool
+    /// The engine's decoded-image cache: the bytes it holds and its limit
+    /// (G-39 (c)).
+    let imageCacheBytes, imageCacheLimit: Int
 }
 
 extension GraphicPrefetch {
@@ -200,10 +207,24 @@ extension GraphicPrefetch {
     /// `offDefaultsKey`).
     static let keepOffDefaultsKey = "FrameJobGraphicKeepOff"
     static let physicalBytes = ProcessInfo.processInfo.physicalMemory
+    /// YES: the engine's decoded-image cache holds nothing (G-39 (d)), a
+    /// measurement switch.
+    static let imageCacheOffDefaultsKey = "FrameJobGraphicImageCacheOff"
 
     /// The budget at the level in force: the simulated one when set, else the
     /// system's. Under `condition`.
     var budgetBytes: Int { (simulatedPressure ?? pressure).budget(physical: Self.physicalBytes) }
+
+    /// The engine's image cache's limit: a sixteenth of the budget at the
+    /// level in force, 0 under the switch (G-39 (c), (d)). Under `condition`.
+    var imageCacheLimit: Int {
+        UserDefaults.standard.bool(forKey: Self.imageCacheOffDefaultsKey) ? 0 : budgetBytes / 16
+    }
+
+    /// The engine's image cache set to `imageCacheLimit`. Under `condition`.
+    func applyImageCacheLimit() {
+        GraphicLibrary.imageCache(limit: imageCacheLimit)
+    }
 
     /// `key` keeps the frames it draws from now on. Any thread; a no-op under
     /// the switch.
@@ -306,7 +327,8 @@ extension GraphicPrefetch {
 
     /// The memory-pressure level: the system's, or with `simulated` the dev
     /// tool's, which holds until it sets `.normal` (that clears it). The kept
-    /// frames trimmed to the new budget, and every waiting worker told.
+    /// frames trimmed to the new budget, every waiting worker told, and the
+    /// engine's image cache set to its new limit (G-39 (c)).
     func setPressure(_ level: MemoryPressure, simulated: Bool = false) {
         condition.lock()
         if simulated {
@@ -316,6 +338,7 @@ extension GraphicPrefetch {
         }
         kept.trim(toFit: budgetBytes - heldTotal)
         condition.broadcast()
+        applyImageCacheLimit()
         condition.unlock()
     }
 
@@ -330,7 +353,9 @@ extension GraphicPrefetch {
             heldPeakBytes: heldPeakBytes, heldPeakEntries: heldPeakEntries,
             keptBytes: kept.bytes, keptFrames: kept.count, keptHits: keptHits,
             aheadBytes: kept.aheadBytes, aheadEvicted: kept.aheadEvicted,
-            passActivity: passActivity != nil)
+            passActivity: passActivity != nil,
+            imageCacheBytes: GraphicLibrary.imageCache(limit: imageCacheLimit),
+            imageCacheLimit: imageCacheLimit)
         if resettingPeaks {
             heldPeakBytes = heldTotal
             heldPeakEntries = heldEntries
@@ -340,7 +365,8 @@ extension GraphicPrefetch {
     }
 
     /// One `DispatchSourceMemoryPressure` over normal, warning and critical,
-    /// on a utility queue, for the process's life.
+    /// on a utility queue, for the process's life; then the engine's image
+    /// cache gets its first limit (G-39 (c)).
     func watchMemoryPressure() {
         let source = DispatchSource.makeMemoryPressureSource(
             eventMask: [.normal, .warning, .critical], queue: .global(qos: .utility))
@@ -355,5 +381,8 @@ extension GraphicPrefetch {
         pressureSource = source
         condition.unlock()
         source.activate()
+        condition.lock()
+        applyImageCacheLimit()
+        condition.unlock()
     }
 }

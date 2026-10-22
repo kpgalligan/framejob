@@ -34,7 +34,7 @@ pub(crate) fn lock(lib: &RcGraphicLibrary) -> MutexGuard<'_, Option<Pending>> {
 ///
 /// # Safety
 /// Takes no pointers; the handle is owned by the caller and freed with
-/// [`rc_graphic_library_free`].
+/// [`rc_graphic_library_free`](crate::ffi_graphic::rc_graphic_library_free).
 #[no_mangle]
 pub unsafe extern "C" fn rc_graphic_library_new() -> *mut RcGraphicLibrary {
     boxed(RcGraphicLibrary {

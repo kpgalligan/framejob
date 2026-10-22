@@ -588,7 +588,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   stayed, and nothing widened. `wc -l app/Sources/ReelCore.swift`: 842 before, 800 after;
   `CoreValues.swift` is 47. The next seam: `ReelCoreError` and the `Fps.ffiPair` extension
   (lines 41–78 less the three private string helpers) out to `CoreValues.swift`, neither
-  calling an `rc_*` symbol.
+  calling an `rc_*` symbol. #127 G6 phase 5 paid that seam (toll T2) before
+  `GraphicLibrary.imageCache(limit:)` (spec §11 G-39) landed: `ReelCoreError` (lines 41–45) and
+  `extension Fps { var ffiPair }` (lines 67–76) with their docs went whole to the head of
+  `CoreValues.swift`, whose doc gained a clause, and the header gained its payment sentence; a
+  pure move gated alone, nothing widened (neither was `private`), the three private string
+  helpers stayed. `wc -l app/Sources/ReelCore.swift`: 817 before, 803 after; `CoreValues.swift`
+  is 65. The next seam: the parsing halves of `ReelProject.snapCandidates(excluding:)` (the
+  JSON-to-`Set<Ticks>` absorb) and `clipState(_:at:)` (the JSON object read) as static helpers
+  in a values file, the `rc_*` calls staying here.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,

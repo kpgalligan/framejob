@@ -224,6 +224,8 @@ NOT_SHOWN = {
                                  "compositor's queue alone; no screen shows it",
     "FrameJobGraphicKeepOff": "a measurement switch that keeps no graphic frame (spec §11 "
                              "G-37 (e)); no screen shows it",
+    "FrameJobGraphicImageCacheOff": "a measurement switch that sets the engine's decoded-image "
+                                   "cache's limit to 0 (spec §11 G-39 (d)); no screen shows it",
     "RCDevLookGalleryDump": "a dev launch default naming a folder the Look gallery writes "
                             "its thumbnails to (look_proof.py's G rows); no screen launches "
                             "with it",

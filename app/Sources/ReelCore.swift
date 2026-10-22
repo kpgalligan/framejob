@@ -700,6 +700,13 @@ final class GraphicLibrary {
         if !ok { throw ReelCoreError(message: takeErrorMessage(err, fallback: "No asset added.")) }
     }
 
+    /// The engine's decoded-image cache, one per process (spec §11 G-39): its
+    /// limit set to `limit` bytes and trimmed least recently used first; the
+    /// bytes it holds after. 0 empties it.
+    @discardableResult static func imageCache(limit: Int) -> Int {
+        rc_graphic_image_cache(max(0, limit))
+    }
+
     /// The engine's own family names, sorted — the exact strings a
     /// `font-family` must match. FREEZES the library, as a compile would.
     func families() -> [String] {

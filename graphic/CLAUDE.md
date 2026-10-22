@@ -12,8 +12,18 @@ The crate's record is road map 10 §10.4.
   only. No implementation code.
 - `diagnostic.rs` — `Level`, `Diagnostic` (`{level, message, line, column,
   frame}`, §5b) and its JSON, keys in that order.
+- `images.rs` — the decoded-image cache (spec §11 G-39, #127): `Asset
+  {data, digest}`, a process-wide `Mutex` map from an asset's own SHA-256
+  to `Ready`/`Building`/`Refused`/`Skipped {len}`, `set_image_cache_limit`,
+  `image_cache_bytes`, the doc-hidden `image_cache_builds`, `cached_kind`,
+  and the builder of a stored-deflate RGBA8 PNG copy, used only when it
+  decodes to exactly the original's pixmap and `imagesize` reads the same
+  size. No lock is held across a decode, an encode or a usvg call; a
+  build writes only while its digest is still `Building`; the default limit
+  is 0, so a binary that sets none takes the original route.
 - `library.rs` — `Library`: the font set (`fontdb`, from bytes, never
-  `load_system_fonts`, G-6) and the asset map, their content `version`
+  `load_system_fonts`, G-6) and the asset map (each asset keeps its own
+  SHA-256; a PNG or JPEG kind is asked of the cache first), their content `version`
   (SHA-256 with length prefixes), the `measure_text` memo, and the
   crate-private `options()` builder whose resolvers record into a `Probe`
   what resvg never reports. The generic families map to bundled faces
@@ -134,5 +144,11 @@ The crate's record is road map 10 §10.4.
   built by `rquickjs-sys`. `loader` exists for `set_loader`; the resolver
   and loader installed refuse every specifier, and none of rquickjs's own
   loaders (which reach the file system) is used.
-- Dev: `flate2`, to gzip an `.svgz` asset in a test; `png` 0.18 (already in
-  the lock through tiny-skia), for the pins' PNG dump.
+- `png` 0.18 (tiny-skia 0.12's own decoder, already in the lock): decode as
+  `Pixmap::decode_png` does and write the stored copy (G-39); still the
+  pins' PNG dump.
+- `zune-jpeg` 0.5 (resvg 0.48.1's own JPEG decoder): decode as resvg does,
+  so a JPEG's copy is checked against resvg's own pixels.
+- `imagesize` 0.15 (usvg's own size reader): check a copy's size reads the
+  same as its original's.
+- Dev: `flate2`, to gzip an `.svgz` asset in a test.

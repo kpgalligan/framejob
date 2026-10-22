@@ -1977,6 +1977,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   **Amended by G-38**: the kept frames are also filled while paused;
   frames a pass drew ahead give way last; a pool hit touches its kept
   frame.
+  **Amended by G-39**: the engine's decoded-image cache is sized from this
+  budget, `budgetBytes / 16` at the level in force, beside it.
 - **G-38 — Graphic frames are drawn ahead while paused once the person has
   left Frame Job alone: Settings ▸ Playback ▸ Background render, on after
   5 s by default, as Final Cut's** (#127, G6 phase 4, 2026-10-21; amends
@@ -2045,3 +2047,63 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   is held. A pass covers only what
   lies after the playhead. The mouse-and-keyboard path is a person's check
   (GR-11).
+- **G-39 — A graphic's PNG and JPEG assets are kept as stored PNG copies
+  that decode to the same pixmap, in one process-wide cache keyed by
+  content and sized from G-37's budget** (#127, G6 phase 5, 2026-10-22;
+  amends G-37).
+  (a) **The copy.** On the first frame that draws a PNG or JPEG asset, the
+  engine (`graphic/src/images.rs`) decodes it once and writes its straight
+  RGBA8 as an RGBA PNG at 8 bits, stored (`DeflateCompression::NoCompression`)
+  and unfiltered (`Filter::NoFilter`). A PNG is decoded by png 0.18 with
+  `normalize_to_color8`, Rgb, Grayscale and GrayscaleAlpha expanded to RGBA
+  exactly as tiny-skia 0.12's `Pixmap::decode_png` expands them; a JPEG by
+  resvg 0.48.1's own `decode_jpeg` (zune-jpeg, RGBA out). Any other colour
+  type, or a JPEG that does not answer RGBA, is refused and keeps the
+  original route. The copy is used only if `Pixmap::decode_png` of it
+  equals `Pixmap::decode_png` of the PNG (width, height and data), or the
+  JPEG's RGBA, and `imagesize::blob_size` of the original is the copy's
+  size, which usvg reads at parse. resvg is unchanged and decodes the
+  copy. GIF, WebP and SVG assets never reach the cache.
+  (b) **Key.** The SHA-256 of the asset's own bytes. A replaced asset, a
+  rebuilt library or a renamed one can never draw a stale copy, and
+  identical bytes share one copy across libraries.
+  (c) **Limit.** `budgetBytes / 16` at the level in force: physical/64 at
+  normal (256 MB on 16 GB, 512 MB on 32 GB), physical/128 at warning, 0 at
+  critical, which empties the cache. It is set at launch and on every
+  pressure change, simulated ones included (`rc_graphic_image_cache`). It
+  sits beside G-37's raster budget, as the rasters in flight do; this
+  follows the owner's standing rule (2026-10-21) that limits are relative
+  to the Mac and share or are sized from G-37's budget. The engine's
+  default is 0, so a process that never sets it caches nothing. Three
+  test binaries set a positive limit: the cache's own
+  (`graphic/tests/image_cache.rs`, serialised); the ignored bench
+  (`graphic/tests/image_bench.rs`); and `core/tests/graphic_ffi.rs`, whose
+  one cache test sets 64 MiB and then 0 while the binary's other tests run
+  in parallel threads, none of which draws an image asset, so nothing else
+  there reaches the cache. Every other test binary caches nothing. Copies are trimmed least recently used
+  first. `graphic_memory` answers `image_cache_bytes` and
+  `image_cache_limit`.
+  (d) **Switch.** `FrameJobGraphicImageCacheOff` (YES) sets the limit to 0.
+  It is a measurement switch, not a setting.
+  (e) **Purity.** The copy is used only when it decodes to the original's
+  pixmap, so every frame is the serial path's (G-5, G-26 (c)), and
+  `graphic/tests/pins.json` is unchanged.
+  (f) **No rebuild loop.** A copy that does not fit, alone or after an
+  eviction, is remembered by its size and drawn by the original route
+  until there is room for it without evicting; an asset never costs more
+  per frame with the cache on than off, after its first frame. The
+  remembered refusals and sizes are capped at 1,024 entries, and reaching
+  the cap clears them. No lock is held across a decode, an encode or a
+  usvg call.
+  (g) **Measured** (`tools/proof/image_cache_bench.py`, 2026-10-22, the
+  owner's parive promo's `section` clip at 25120000, 40 frames of
+  1920 × 1080, 5 alternating rounds, load average 6.10, powermode 0): the
+  original assets' median 11,595.0 ms, the stored copies' 11,097.4 ms, a
+  saving of 0.0429 against a spread of 0.0330, and PNG decodes 0.0753 of
+  the original's time. The stop rule, written before the run (build only
+  if the saving is at least 0.03 and above the spread), said build.
+  (h) **Risk accepted.** The first frame that draws an asset pays for the
+  copy and its check: two decodes of a PNG original (png, then
+  `Pixmap::decode_png`) or one of a JPEG (zune-jpeg), one encode, and one
+  decode of the copy, before the frame's own decode of the copy. Each copy
+  holds about w × h × 4 bytes.

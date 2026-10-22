@@ -159,10 +159,13 @@ Playback ▸ Background render, on after 5 s, as Final Cut's), the window
 whose transport last moved draws its graphic frames ahead of the paused
 playhead into those kept frames, marked so they give way last; any
 activity stops it, and it never runs beside a play (below, "G6 phase 4 —
-background render"). The decoded-image cache and in-place raster are
-still not built.
+background render"). Since G6 phase 5 (2026-10-22, spec §11 G-39) a
+PNG or JPEG asset is drawn from a stored PNG copy that decodes to the same
+pixmap, kept in one process-wide cache sized from that budget (below, "G6
+phase 5 — decoded-image cache"). In-place raster is still not built.
 
-**The FFI is ten `rc_graphic_*` exports, and a library is a builder that
+**The FFI is ten `rc_graphic_*` exports (eleven since G6 phase 5's
+`rc_graphic_image_cache`), and a library is a builder that
 FREEZES** at its first compile, rasterize or `families` call
 (orig §5e, §10.4 G1d):
 - `diag_out` is always a JSON array of `{level, message, line, column,
@@ -1559,13 +1562,103 @@ is the earlier code's.
 Owed: GR-11 in `docs/manual-checks.md` (now with a hidden wait) and CH-6's
 scrolling step.
 
+## G6 phase 5 — decoded-image cache (#127, spec §11 G-39)
+
+2026-10-22, on `2d003d1`. resvg decodes each `<image>` asset's PNG or JPEG
+on every frame. Measured first: `tools/proof/image_cache_bench.py` copies a
+package under `work/image-cache-bench/`, dumps 40 evenly spaced frames of
+the graphic clip covering `--from` as SVG through `render_graphic {format:
+"svg"}` on its own instance, and runs `graphic/tests/image_bench.rs`
+(ignored) over them: the original assets (ORIG) alternating with a second
+arm, 5 rounds, every frame's bytes compared across the arms. The stop rule,
+written before the run: build only if the saving is at least 0.03 and above
+ORIG's spread.
+
+The spike (STORED: the same library with each PNG asset swapped for a
+stored-deflate RGBA8 PNG copy the test built; the package has no JPEG), on
+the owner's parive promo's `section` clip at 25120000 (clip 8, frames
+0…529, 1920 × 1080), `powermode 0`, load average 6.10 before and 6.16
+after: ORIG median 11,595.0 ms, STORED 11,097.4 ms; saving 0.0429, spread
+0.0330, PNG decodes 0.0753 of ORIG (872.7 ms); every frame identical. The
+rule said build.
+
+Built, in this order. Spec §11 G-39 first. The tolls, one pure move gated
+alone (`make gate` exit 0): T1, `ffi_graphic.rs`'s crate-free builder half
+to the new `ffi_graphic_pending.rs` (399 → 333; its widenings in
+`core-file-history.md`), and T2, `ReelCoreError` and `Fps.ffiPair` to
+`CoreValues.swift` (`ReelCore.swift` 817 → 803). Then the crate's
+`images.rs`: one `Mutex` over a map from the SHA-256 of an asset's bytes to
+`Ready` (the copy and its use stamp), `Building`, `Refused` or `Skipped
+{len}`, under a limit (default 0: nothing cached) and a byte total. The
+first frame that draws a PNG or JPEG builds its copy with no lock held
+(png 0.18's decode expanded as tiny-skia's, or resvg's own zune-jpeg
+decode; written stored and unfiltered), used only if `Pixmap::decode_png`
+of it is the original's pixmap and `imagesize` reads the same size; a copy
+over the limit, and every copy a trim evicts, is remembered as `Skipped`
+by its length and takes the original route until it fits without
+evicting, so nothing is rebuilt per frame. `library.rs` keeps each asset
+with its digest and asks the cache before answering a PNG or JPEG kind.
+`rc_graphic_image_cache` sets the limit and answers the bytes held;
+`GraphicLibrary.imageCache(limit:)` wraps it; `GraphicPrefetch+Memory.swift`
+sets `budgetBytes / 16` at launch and in `setPressure` (after the
+broadcast, so `graphic_memory_proof.py`'s `no-pressure-trim` anchor holds),
+0 under `FrameJobGraphicImageCacheOff`; `graphic_memory` answers
+`image_cache_bytes` and `image_cache_limit`. `graphic/tests/pins.json` is
+unchanged. Outside the spec's file list: `core/tests/model_tests.rs`'s NULL
+sweep covers the new export (the sweep reads the header's list), and
+`tools/proof/screens.py`'s NOT_SHOWN names the new switch.
+
+The after run (CACHED: the ORIG library at a limit of 1 GiB after one
+untimed warm frame), same clip, `powermode 0`, load average 12.30 before
+and 5.73 after: ORIG median 11,202.9 ms, CACHED 10,689.6 ms; saving 0.0458,
+spread 0.0333, PNG decodes 0.0730 of ORIG (818.0 ms); 14,972,870 bytes
+cached (one asset's copy, `feature-map.png`'s); every frame identical.
+
+Rows: `graphic/tests/image_cache.rs` I1–I6 pass; `image_cache_proof.py`
+6/6 on Debug and on Release (C2 ON 922,430 bytes under a 1,610,612,736
+limit on 96 GiB; C3 critical 0 and 0, warning 805,306,368, normal
+1,610,612,736). Mutants, each caught (exit 0) before fix pass 1 changed
+the miss path (below):
+`name-key` I2, `premultiplied-copy` I1 (bytes), `unchecked` I1 (pixels),
+`no-trim` I3, `over-limit` I4 (bytes), `no-skip-marker` I4 (builds),
+`pressure-ignored` C3 (Release). `graphic_memory_proof.py` 13/13 on
+Release, and its `no-pressure-trim` caught (M7). `screens.py --only
+02-settings` 6/6 on Release. `make gate` exit 0 after the tolls and at the
+end. No person check is created.
+
+**Fix pass 1** (its review's should-fix and three nits). (1) A build that
+re-locked wrote its result without asking whether the digest was still its
+own: a limit of 0 and back while it ran (critical, then normal) let a
+second worker mark and build the same digest, and both added their length
+to `bytes`, or the over-limit arm overwrote the other's `Ready` with
+`Skipped`, so `bytes` counted copies nobody held. `cached_kind` now writes
+only while the entry is still `Building`, and otherwise returns its copy
+and leaves the map alone; the `limit == 0` removal sits behind the same
+check. (2) `ffi_graphic_pending.rs`'s moved doc link to
+`rc_graphic_library_free` names `crate::ffi_graphic::` (`cargo doc`
+reports no broken link). (3) G-39 (h) states the first frame's exact cost:
+two decodes of a PNG original (png, then `Pixmap::decode_png`) or one of a
+JPEG, one encode and one decode of the copy. (4) G-39 (c) says what is
+true rather than serialising a test: `core/tests/graphic_ffi.rs` sets a
+64 MiB limit and then 0 while its other tests run, and none of them draws
+an image asset. The Lines cells moved with (3) and (4) (`graphics.md`
+2109, `11-decisions/` 10703). Runs: `image_cache.rs`, `images.rs`,
+`library.rs`, `pins.rs` and `graphic_ffi.rs` pass; `spec_index_proof.py`
+177/177; `make lint` exit 0; `make gate` exit 0 (152 s);
+`image_cache_proof.py` 6/6 on Release. Not re-run, each with its reason:
+the seven mutants (no anchor line was touched, and the new check passes
+straight through on the single-threaded path the I-rows drive),
+`graphic_memory_proof.py` and its mutant (no Swift changed), and the
+bench (one map lookup under a lock already held; its single-threaded
+figures do not depend on interleaved builds). No row drives two builds of
+one digest across a limit of 0; the race has no instrument.
+
 ## Open items
 
-- G6's rest — in-place raster (`graphic/src/raster.rs`) and a
-  decoded-image cache past resvg's per-render decode — tracked in #127.
+- G6's rest — in-place raster (`graphic/src/raster.rs`) — tracked in #127.
   The export's parallel rasterization landed (G-26), playback's (G-36),
-  one memory budget with kept frames (G-37), and drawing ahead while
-  paused, Background render (G-38).
+  one memory budget with kept frames (G-37), drawing ahead while paused,
+  Background render (G-38), and the decoded-image cache (G-39).
 - The person's watched checks: the playback-check projects with no video
   underneath, memory at 4K, and the error card in the live preview —
   tracked in #56.

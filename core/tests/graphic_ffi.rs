@@ -1,4 +1,4 @@
-//! The ten `rc_graphic_*` exports (road map 10 §5e), black box through the
+//! The eleven `rc_graphic_*` exports (road map 10 §5e), black box through the
 //! FFI: a library built from the app's bundled faces, the `lower-third`
 //! fixture compiled and drawn, and every answer read back off the C side.
 //!
@@ -19,9 +19,10 @@ use sha2::{Digest, Sha256};
 
 use common::{cstring, take_string};
 use framejob_core::ffi_graphic::{
-    rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_library_add_asset,
-    rc_graphic_library_add_font, rc_graphic_library_families, rc_graphic_library_free,
-    rc_graphic_library_new, rc_graphic_rasterize, rc_graphic_svg, RcGraphic, RcGraphicLibrary,
+    rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_image_cache,
+    rc_graphic_library_add_asset, rc_graphic_library_add_font, rc_graphic_library_families,
+    rc_graphic_library_free, rc_graphic_library_new, rc_graphic_rasterize, rc_graphic_svg,
+    RcGraphic, RcGraphicLibrary,
 };
 
 const FONTS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../app/Resources/Fonts");
@@ -416,6 +417,30 @@ fn a_graphic_draws_from_a_second_thread_identically() {
         .expect("the thread did not panic");
     assert_eq!(there.as_deref(), Some(here.as_str()));
     unsafe { rc_graphic_free(g) };
+    unsafe { rc_graphic_library_free(lib) };
+}
+
+#[test]
+fn the_image_cache_holds_a_drawn_copy_and_a_limit_of_zero_empties_it() {
+    let red = fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../graphic/tests/assets/red.png"
+    ))
+    .expect("the committed red.png");
+    let lib = unsafe { rc_graphic_library_new() };
+    assert_eq!(add_asset(lib, "red.png", &red), None);
+    let limit = 64 << 20;
+    unsafe { rc_graphic_image_cache(limit) };
+    draw(
+        lib,
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1920\" height=\"1080\">\
+         <image href=\"red.png\" width=\"64\" height=\"64\"/></svg>",
+    );
+    assert!(
+        unsafe { rc_graphic_image_cache(limit) } > 0,
+        "red.png's copy is held"
+    );
+    assert_eq!(unsafe { rc_graphic_image_cache(0) }, 0);
     unsafe { rc_graphic_library_free(lib) };
 }
 

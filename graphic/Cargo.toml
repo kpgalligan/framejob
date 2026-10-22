@@ -21,11 +21,18 @@ simplecss = "0.2"
 # for `set_loader` alone — the resolver and loader installed refuse every
 # specifier; none of rquickjs's own loaders is used.
 rquickjs = { version = "0.14.0", features = ["loader"] }
+# The decoded-image cache (spec §11 G-39, `src/images.rs`), each already in
+# the lock through resvg, tiny-skia or usvg: `png`, tiny-skia 0.12's own
+# decoder, decodes a PNG asset as `Pixmap::decode_png` does and writes the
+# stored copy (and the pins' PNG dump on a mismatch); `zune-jpeg`, resvg
+# 0.48.1's own decoder, decodes a JPEG asset as resvg does; `imagesize`,
+# usvg's own, checks the copy has the size usvg reads off the original.
+png = "0.18"
+zune-jpeg = "0.5"
+imagesize = "0.15"
 
 [dev-dependencies]
 flate2 = "1"
-# The pins' PNG dump on a mismatch (already in the lock through tiny-skia).
-png = "0.18"
 
 [profile.release]
 # No LTO (designs/adr/rust-build-settings.md).

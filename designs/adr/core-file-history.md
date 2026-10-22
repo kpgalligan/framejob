@@ -247,8 +247,20 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   module, `recipe_selection.rs` (83: `LayerFacts`, `select_layers`), and `recipe.rs` took the
   facts' collection, the one call, the black background and the adjustment source's `qualifier`
   (486 → 513). The named seam (the content hash out to `recipe_hash.rs`) is unchanged.
-- `ffi_graphic.rs`: at the new-module cap with nothing crate-free left to move (`diag_json` and
-  `diag_error` name `Diagnostic`; road map 10 §10.7).
+- `ffi_graphic.rs`: at the new-module cap (399 of 400) before #127 G6 phase 5's
+  `rc_graphic_image_cache` (spec §11 G-39), it paid toll T1 first, a pure move gated alone: the
+  builder's crate-free half — `FROZEN`, `Pending`, `lock`, `rc_graphic_library_new` and
+  `rc_graphic_library_add_asset` — went whole to the new `ffi_graphic_pending.rs`, which names no
+  `graphic` item, so `only_ffi_graphic_names_the_graphic_crate` (G-2) passes unchanged. T1's
+  widenings: `RcGraphicLibrary`'s two fields (`pending`, `built`), `FROZEN`, `Pending` and its
+  fields `fonts` and `assets`, and `lock` became `pub(crate)`, because `frozen` and
+  `rc_graphic_library_add_font` stay behind and reach them; nothing else changed visibility.
+  `ffi_graphic.rs` imports `lock`, `Pending` and `FROZEN` back and `pub use`s the two exports, so
+  every test's `framejob_core::ffi_graphic::` path is unchanged. `wc -l core/src/ffi_graphic.rs`:
+  399 before, 333 after; `ffi_graphic_pending.rs` is 83. The next seam: `rc_graphic_library_free`
+  and `rc_graphic_free`, which name only the two handles and `free_boxed`, out to
+  `ffi_graphic_pending.rs`; `diag_json` and `diag_error` stay, since they name `Diagnostic` (road
+  map 10 §10.7).
 - `core/tests/add_transition_edges.rs`: at the new-file cap; gives something up before it takes
   anything on.
 
