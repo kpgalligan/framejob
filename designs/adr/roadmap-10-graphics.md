@@ -1224,9 +1224,9 @@ layer half and G-32 (h) stand.
 Owed: the person's checks CT-8 (a keyed graphic row's look, both
 appearances) and GR-8 (a 4K animated prop plays without stutter, G-34 (g))
 in `docs/manual-checks.md`. Left out by G-34's accepted limits and filed
-as issues: a per-prop `animate: false` opt-out for module authors
-(#248) and an asset prop in an action (#249). The OKLab blend (#250) is
-built: "Graphics gaps" below, spec §11 G-40.
+as an issue: an asset prop in an action (#249). The OKLab blend (#250) and
+the per-prop `animate: false` opt-out (#248) are built: "Graphics gaps"
+below, spec §11 G-40 and G-41.
 
 ## G6 phase 2 — playback prefetch (#127, spec §11 G-36)
 
@@ -1751,6 +1751,41 @@ without the sRGB decode failed the fixture test (and the split test);
 Not changed: the model's own `[r, g, b, a]` colours (text, shadow,
 background, shape groups) keep §5.4's element-by-element blend.
 
+**Phase 2 — a module marks a prop `animate: false` (#248, spec §11
+G-41)**, 2026-10-22, on `fa328f2`. Any schema entry may carry an optional
+boolean `animate`; absent or `true` animates. The engine's and the core's
+`check_entry` refuse a non-boolean in one copied sentence, `schema.<key>.animate
+<value> is not a boolean`, after the default's. `edit_action_graphic.rs`'s
+`read_graphic_end` refuses a non-null value for a prop marked `false` —
+`graphic.props.<key> is marked animate: false by its module; an action does
+not animate it — set it with set_graphic` — after a prop the schema lacks
+and before the asset check, so an asset marked so gets this sentence
+(phase 3 deletes the asset check). A `null` still removes, and a stored end
+is not re-checked: one that named the prop before the mark keeps ramping
+it. App side: `GraphicSchemaEntry` gains `animate` and `animatable`
+(`animate && type != "asset"`), the one test `InspectorBinding.ops(graphic:…)`'s
+split and the end's stale rows use; `GraphicSchemaRows.actionStaleKeys`
+(built on `staleKeys`) adds a declared non-animatable key the end names,
+and `actionStaleRow(declared:)` says "The module does not let <key> be
+animated — remove it from action N" for it. The ⊘ mark needed no
+`InspectorMarks.swift` change (CI-7: a row whose writes reach no
+`set_action_end`). No format bump; no op-table, gate or parity change — the
+app's schema is the registry's raw dictionary, so `animate` reaches the core
+untouched; the catalog's change is prose. `docs/graphics-api.md` and its
+`.d.ts` document the key, and the Agenda example's `items` carries it, so
+`reference.rs` compiles it.
+
+Verified: `make gate` PASS; against Release, `graphics_inspector_proof.py`
+94/94 (K19a–K19c new) and `graphic_prop_action_proof.py` 18/18 (R4 new),
+each exit 0 with Z1 held and no `DEFAULTS MOVED`. Inspector mutants, each
+`MUTANT PASS`: `animate-ignored` (K19a–c), `end-animate-stale-dropped`
+(K19c), `asset-to-end` re-anchored onto `animatable` (K8, K17),
+`end-stale-dropped` now K12 and K19c, and `stale` still K12 and the five I5
+rows. The core and engine mutants, applied by hand and reverted: without
+the refusal, and with it after the asset check, the door test failed; the
+core's `check_entry` without the `animate` check failed `add_errs…` and the
+door test; the engine's failed `every_compile_sentence`.
+
 ## Open items
 
 - G6 (#127) has no phase left. The export's parallel rasterization landed
@@ -1769,8 +1804,7 @@ background, shape groups) keep §5.4's element-by-element blend.
   Tracked in #72.
 - The not-built list: mattes or video input — #240. (HEVC with alpha and
   keyframed props were on it and are built: spec §11 G-33, G-34.)
-- G-34's accepted limits, as candidates: the per-prop opt-out
-  (#248) and asset props in an action (#249).
+- G-34's accepted limits, as a candidate: asset props in an action (#249).
 - Replacing QuickJS with JavaScriptCore — GitHub issue #39.
 
 ## Where to look in the original

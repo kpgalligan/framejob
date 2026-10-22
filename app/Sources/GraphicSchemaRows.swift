@@ -12,7 +12,8 @@
 // row writes `set_graphic` to the clip; with one selected, a row reads the
 // action's END state (`InspectorBinding.graphicProps`) and writes it — one
 // `set_action_end` naming `graphic.props.<key>` with the module's schema —
-// through `InspectorBinding.ops(graphic:…)`, an asset still the clip's.
+// through `InspectorBinding.ops(graphic:…)`, an asset and a prop its module
+// marks `animate: false` (G-41) still the clip's.
 //
 // **A value equal to the schema's default is written as `null`** to the
 // clip (spec §11 G-15): the key leaves the stored props and the module
@@ -119,6 +120,16 @@ enum GraphicSchemaRows {
     static func staleKeys(stored: [String: GraphicPropValue], schema: GraphicSchema?) -> [String] {
         let declared = Set(schema?.keys ?? [])
         return stored.keys.filter { !declared.contains($0) }.sorted()
+    }
+
+    /// The keys the selected action's END names that no row writes into it,
+    /// sorted: each `schema` does not declare and each whose entry is not
+    /// `animatable` (G-41 (c)); every key with no compiled schema. The
+    /// undeclared keys are `staleKeys`' own.
+    static func actionStaleKeys(end: [String: GraphicPropValue], schema: GraphicSchema?) -> [String] {
+        let held = Set((schema?.entries ?? []).filter { !$0.animatable }.map(\.key))
+        let declaredHeld = end.keys.filter { held.contains($0) }
+        return (staleKeys(stored: end, schema: schema) + declaredHeld).sorted()
     }
 
     /// A number row's decimals: with a `step`, 2 below 1 and else 0; with
@@ -322,10 +333,11 @@ enum GraphicSchemaRows {
     }
 
     /// A key the selected action's END names that the schema no longer
-    /// declares (G-34 (l), O2): its row beside the clip's own, marked as the
-    /// end's, with ⌫ taking it out of the end — `clearOps`, no schema.
+    /// declares (G-34 (l), O2), or `declared` but not `animatable` (G-41 (c)):
+    /// its row beside the clip's own, marked as the end's, with ⌫ taking it
+    /// out of the end — `clearOps`, no schema.
     static func actionStaleRow(
-        key: String, value: GraphicPropValue, _ binding: InspectorBinding
+        key: String, value: GraphicPropValue, declared: Bool, _ binding: InspectorBinding
     ) -> NSView {
         let (label, readout) = staleLabels(key: key, value: value)
         let ops = binding.clearOps(["graphic.props." + key])
@@ -334,7 +346,9 @@ enum GraphicSchemaRows {
             action: { [weak binding] in binding?.apply("Remove from Action", ops) },
             enabled: { true }, onEdit: {})
         let number = binding.selectedActionNumber.map { String($0) } ?? ""
-        remove.toolTip = "The module no longer declares \(key) — remove it from action \(number)"
+        remove.toolTip = declared
+            ? "The module does not let \(key) be animated — remove it from action \(number)"
+            : "The module no longer declares \(key) — remove it from action \(number)"
         return inspectorRow(nil, [label, readout, remove], binding: binding, writes: ops)
     }
 

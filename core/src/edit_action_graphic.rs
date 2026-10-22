@@ -24,6 +24,12 @@
 //! lacks starts from the schema's CURRENT default, appended in the same
 //! edit (G-34 (d)). Maps change only by `insert` and `shift_remove`
 //! (`model_graphic.rs`'s rule).
+//!
+//! A prop whose schema entry says `animate: false` is refused by name, as
+//! an asset is (G-41): its module draws it whole, a count or a layout mode a
+//! ramp would break. Like every check here it reads only a named, non-null
+//! prop, so an end that named the prop before its module said so keeps
+//! animating it as stored, and a `null` removes it.
 
 use serde_json::{Map, Value};
 
@@ -57,7 +63,8 @@ pub(crate) struct GraphicEnd {
 /// `Err` in the dotted path's own sentence for a body or `props` that is not
 /// an object, a layer key, an unknown key, and for each non-null prop, in
 /// this order: a clip that is not a graphic, no schema, a prop the schema
-/// lacks, an asset, and whatever `check_typed` refuses.
+/// lacks, a prop marked `animate: false` (G-41), an asset, and whatever
+/// `check_typed` refuses.
 pub(crate) fn read_graphic_end(
     clip: &Clip,
     body: &Value,
@@ -129,6 +136,12 @@ pub(crate) fn read_graphic_end(
         let entry = schema
             .get(key)
             .ok_or_else(|| unknown_key(&format!("graphic.props.{key}"), END_PATCH))?;
+        if entry.get("animate") == Some(&Value::Bool(false)) {
+            return Err(format!(
+                "graphic.props.{key} is marked animate: false by its module; an action does not \
+                 animate it — set it with set_graphic"
+            ));
+        }
         let kind = entry.get("type").and_then(Value::as_str).unwrap_or("");
         if kind == "asset" {
             return Err(format!(

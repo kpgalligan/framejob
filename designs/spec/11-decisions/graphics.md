@@ -1568,7 +1568,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   start and take the end's value at the action's END, as every
   non-numeric property does (§5.4). An `asset` is an error naming the prop
   (`graphic.props.<key> is an asset; an action does not animate an image —
-  set it with set_graphic`).
+  set it with set_graphic`). (Amended by G-41: a prop whose schema entry
+  says `animate: false`, of any type, is refused too, in its own sentence,
+  checked before the asset's.)
   (c) **How the kind is known, and the check.** From the `schema` the op
   carries. The app fills it from the module's CURRENT revision and never
   takes it from a caller (G-4; a `.filledByTheApp` row). A non-null prop
@@ -1700,7 +1702,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   no per-prop opt-out: a module's own animation composes by being handed
   that frame's value. A prop that a later revision renames or drops stays
   in the end, and the engine passes it through with a warning. `kinds`
-  goes stale only if a module changes a prop's type.
+  goes stale only if a module changes a prop's type. (Amended by G-41: a
+  module may mark a prop `animate: false`, and an action then refuses it;
+  a module's own animation still composes by being handed the frame's
+  value.)
 - **G-35 — A video frame is composited as premultiplied only when its
   buffer says so, and every other frame, an unlabelled one included, as
   straight; the two alpha movie rows are written STRAIGHT — each frame
@@ -2143,3 +2148,37 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   text and shape groups) still blend element by element in actions
   (§5.4); a graphic prop's other kinds keep G-34's rules; `split` stays
   invisible to within one byte per channel (G-34 (i)).
+
+- **G-41 — A module marks a prop `animate: false` and no action animates
+  it: `set_action_end` refuses a value for it by name, and the Graphic tab
+  marks its row ⊘ and writes the clip; amends G-34 (b), (l) and its
+  accepted limits** (#248, graphics gaps phase 2, 2026-10-22).
+  (a) **The key.** Any schema entry may carry an optional boolean
+  `animate`; absent or `true` animates, `false` does not, whatever the
+  entry's type (an `asset` included). A present non-boolean is refused
+  when the module compiles (the engine's `check_schema`) and when an op
+  carries the schema (the core's), in one sentence, copied and not
+  shared (G-2): `schema.<key>.animate <value> is not a boolean`, e.g.
+  `schema.a.animate 1 is not a boolean`, checked after the default. An
+  older build ignores the key, so the module still loads there.
+  (b) **The refusal.** `set_action_end` refuses a non-null value for such
+  a prop in its own sentence: `graphic.props.<key> is marked animate:
+  false by its module; an action does not animate it — set it with
+  set_graphic`. It is checked after a prop the schema lacks (G-34 (c))
+  and before an asset (G-34 (b)), so an asset marked `animate: false`
+  gets this sentence. A `null` still removes, unchecked (G-34 (j)); only
+  the props a patch names are checked. The use: a count, a layout mode, a
+  data series — e.g. `new Array(props.count)`, which a fractional ramp
+  breaks (G-34 (e)).
+  (c) **Stored ends are not re-checked** (G-34 (c)). An end that named the
+  prop before its module said `animate: false` still animates it as
+  stored, and an edit naming another prop of that end is not refused. The
+  Graphic tab lists the key as the end's own stale row (G-34 (l)'s O2
+  row: ◆, the end's value, ⌫ through the shared clear, its tooltip "The
+  module does not let <key> be animated — remove it from action N"), and
+  `set_action_end` with `null` for it removes it over MCP.
+  (d) **The Graphic tab.** With an action selected, such a prop's row is
+  ⊘ and writes `set_graphic`, as an asset's does (G-34 (l)); Properties'
+  Reset writes its default to the base. With no action selected it is a
+  row like any other. No format bump: the schema lives in the module, not
+  the project.

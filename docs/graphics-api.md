@@ -67,7 +67,10 @@ such as `const u = ctx.height / 1080`) so the graphic draws at any size.
 At most 64 keys. A key is letters, digits and `_`, starts with a letter or
 `_`, and is at most 32 characters. Every entry needs a `type` and a
 `default` of that type; `label` (else the key) and `help` (a tooltip) are
-optional.
+optional. Any entry may say `animate: false` (a boolean; absent is `true`):
+an action never animates that prop, and the inspector writes it to the clip
+even while an action is selected — for a count, a layout mode or a data
+series a ramp would break.
 
 | `type` | value | options |
 |---|---|---|
@@ -403,14 +406,16 @@ A graphic clip's props can be the target of an action, as a clip's position or o
 schema as `set_graphic` checks it, `min` and `max` included, using the module as it is now. Across
 the action a `number` and a `color` ramp along its curve, a `color` in OKLab, giving the same middle
 `interpolateColors` gives; a `string`, `boolean` and `enum` change to the end's value when the
-action ends; an `asset` cannot be animated. A prop the clip holds no value
+action ends; an `asset`, and a prop whose entry says `animate: false`, cannot be animated
+(`set_action_end` refuses a value for it). A prop the clip holds no value
 for starts from the schema's `default` as it is when an action first names it, and that value is
 written into the clip, so a later change to the default does not move the animation. `render` gets
 that frame's values every frame, and your own animation from `frame` still runs on top. A `null`
 for a prop in `set_action_end`'s patch stops animating it.
 
 **An animated number arrives with decimals**: 64 to 129 is 96.5 halfway, never rounded and never
-snapped to `step`. A module that needs a whole number rounds it itself. One that does not —
+snapped to `step`. A module that needs a whole number rounds it itself, or marks the prop
+`animate: false` so no action ramps it. One that does neither —
 `new Array(props.count)` is the usual case — throws on a fraction, so those frames draw the error
 card, and an export stops there.
 
@@ -490,7 +495,7 @@ export function render(frame, props, ctx) {
 ```js
 export const meta = { name: "Agenda" };
 export const schema = {
-  items: { type: "string", default: "Intro\nDemo\nQuestions", multiline: true },
+  items: { type: "string", default: "Intro\nDemo\nQuestions", multiline: true, animate: false },
   accent: { type: "color", default: "#ffcc00" },
 };
 

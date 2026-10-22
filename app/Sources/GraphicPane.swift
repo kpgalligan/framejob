@@ -113,7 +113,8 @@ final class GraphicPane: InspectorPaneView {
 
     /// The schema's entries whole (a default, bounds or options a row is
     /// built from), the stale keys (the clip's, then the selected action's
-    /// end's), each asset popup's names, the
+    /// end's, `actionStaleKeys`, a declared key no action may animate
+    /// included, G-41), each asset popup's names, the
     /// diagnostics' messages and the folder's warnings. Stored values, the
     /// revision and the playhead are NOT here: they are read fresh by
     /// `refresh()`.
@@ -137,7 +138,7 @@ final class GraphicPane: InspectorPaneView {
         return [
             super.structureSignature, shared?.name ?? "mixed", keys.joined(separator: ","),
             stale.joined(separator: ","), assetSignature(parsed?.schema),
-            GraphicSchemaRows.staleKeys(stored: endProps(), schema: parsed?.schema)
+            GraphicSchemaRows.actionStaleKeys(end: endProps(), schema: parsed?.schema)
                 .joined(separator: ","),
         ].joined(separator: "|") + "|" + messages.joined(separator: "|")
     }
@@ -156,10 +157,12 @@ final class GraphicPane: InspectorPaneView {
 
     /// One row per schema key in the module's order, then the stale keys,
     /// sorted, then — with an action selected — the end's own stale keys
-    /// (G-34 (l), O2). With no compiled schema every stored key is stale.
+    /// (G-34 (l), O2), a declared key whose entry is not `animatable` among
+    /// them (G-41 (c)). With no compiled schema every stored key is stale.
     /// Reset nulls every stored key; with an action selected it writes each
-    /// declared default through the rows' own split, into the END, an
-    /// asset's onto the clip (O7). Its `differs` folds from the rows.
+    /// declared default through the rows' own split, into the END, a
+    /// non-`animatable` one's (an asset's, or an `animate: false` one's,
+    /// G-41 (d)) onto the clip (O7). Its `differs` folds from the rows.
     func propertiesSection() -> InspectorSection {
         let binding = self.binding
         let shared = self.shared()
@@ -177,8 +180,11 @@ final class GraphicPane: InspectorPaneView {
                     key: key, value: stored[key] ?? .null, binding, clips: clips))
         }
         let ends = endProps()
-        for key in GraphicSchemaRows.staleKeys(stored: ends, schema: parsed?.schema) {
-            rows.append(GraphicSchemaRows.actionStaleRow(key: key, value: ends[key] ?? .null, binding))
+        let declared = Set(parsed?.schema.keys ?? [])
+        for key in GraphicSchemaRows.actionStaleKeys(end: ends, schema: parsed?.schema) {
+            rows.append(
+                GraphicSchemaRows.actionStaleRow(
+                    key: key, value: ends[key] ?? .null, declared: declared.contains(key), binding))
         }
         let note: String?
         if parsed == nil {

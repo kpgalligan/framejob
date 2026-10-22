@@ -962,6 +962,83 @@ check("K8 action selected: Logo is ⊘ (.notAnimatable); its popup's write(1) is
       "mark \(k8mark.map { "\($0)" } ?? "none"), " + describe(k8))
 base(["logo": NSNull()])
 
+// K19 a prop its module marks `animate: false` is the clip's (G-41).
+let offsetAnchor = "offset: { type: \"number\", default: 0,"
+let offsetAnchors = sixSource.components(separatedBy: offsetAnchor).count - 1
+let heldSource = sixSource.replacingOccurrences(
+    of: offsetAnchor, with: "offset: { type: \"number\", default: 0, animate: false,")
+resetEnd()
+binding.invalidate()
+let k19before = graphic.structureSignature
+rewrite("six", heldSource)
+binding.invalidate()
+let k19after = graphic.structureSignature
+let k19entry = graphic.schema(graphic.shared())?.schema.entries.first { $0.key == "offset" }
+check("K19a six with offset marked animate: false: the parsed entry's animate and animatable are "
+        + "false, and structureSignature changes",
+      offsetAnchors == 1 && k19entry?.animate == false && k19entry?.animatable == false
+        && k19before != k19after,
+      "anchor \(offsetAnchors)×, entry \(k19entry.map { "\($0)" } ?? "none")")
+
+// K19b its row is ⊘ and writes the clip; Size still writes the end (CONTROL).
+properties = section("graphic.properties")
+let k19offset = row(properties, "Offset")
+let k19offsetMark = k19offset?.gutter.mark
+let k19b = recording { fieldWrite(k19offset)?(5) }
+let k19bEnd = end()?.props["offset"], k19bBase = props()["offset"]
+properties = section("graphic.properties")
+let k19size = row(properties, "Size")
+let k19sizeMark = k19size?.gutter.mark
+let k19control = recording { fieldWrite(k19size)?(150) }
+check("K19b action selected, end empty, offset animate: false: Offset is ⊘ (.notAnimatable); its "
+        + "write(5) is exactly one set_graphic {props: {offset: 5}}, and the end holds no offset; "
+        + "CONTROL: Size is not ⊘ and its write(150) is one set_action_end",
+      k19offsetMark == .notAnimatable && onlyOp(k19b, "set_graphic") != nil
+        && propsPatch(k19b.first)?.count == 1 && propsPatch(k19b.first)?["offset"] as? Double == 5
+        && k19bEnd == nil && k19bBase == .number(5)
+        && k19sizeMark != nil && k19sizeMark != .notAnimatable
+        && endProps(onlyOp(k19control, "set_action_end"))?["size"] as? Double == 150,
+      "offset \(k19offsetMark.map { "\($0)" } ?? "none"), " + describe(k19b) + " | end offset "
+        + "\(String(describing: k19bEnd)), base \(String(describing: k19bBase)) | size "
+        + "\(k19sizeMark.map { "\($0)" } ?? "none"), " + describe(k19control))
+base(["offset": NSNull()])
+resetEnd()
+
+// K19c an end that named offset before the mark lists it as the end's own stale row.
+let k19tip = "The module does not let offset be animated — remove it from action 1"
+func heldRows() -> [InspectorRowView] {
+    (properties.map { walk($0).compactMap { $0 as? InspectorRowView } } ?? []).filter { row in
+        row.arrangedSubviews.contains { ($0 as? InspectorRowLabel)?.stringValue == "offset" }
+            && walk(row).compactMap { $0 as? OptionButtonControl }.first?.toolTip == k19tip
+    }
+}
+rewrite("six", sixSource)
+key(["offset": 3])
+rewrite("six", heldSource)
+properties = section("graphic.properties")
+let k19heldRow = heldRows().first
+let k19heldMark = k19heldRow?.gutter.mark
+let k19c = recording {
+    _ = click(k19heldRow.flatMap { walk($0).compactMap { $0 as? OptionButtonControl }.first })
+}
+let k19cOp = onlyOp(k19c, "set_action_end")
+let k19cAfter = end()?.props["offset"]
+rewrite("six", sixSource)
+key(["offset": 3])
+properties = section("graphic.properties")
+let k19controlRows = heldRows().count
+check("K19c key({offset: 3}) under six, then offset marked animate: false: a row labelled "
+        + "\"offset\" whose ⌫ reads \"\(k19tip)\", ◆ (.keyed); its ⌫ is one set_action_end "
+        + "{graphic: {props: {offset: null}}} with no schema, and after it the end has no offset; "
+        + "CONTROL: under six as written, keyed again, no such row",
+      k19heldRow != nil && k19heldMark == .keyed && endProps(k19cOp)?.count == 1
+        && endProps(k19cOp)?["offset"] is NSNull && k19cOp?.args["schema"] == nil
+        && k19cAfter == nil && k19controlRows == 0,
+      "row \(k19heldMark.map { "\($0)" } ?? "none"), " + describe(k19c) + " | end offset "
+        + "\(String(describing: k19cAfter)), control rows \(k19controlRows)")
+resetEnd()
+rewrite("six", sixSource)
+
 // K9 "Set end value to default".
 fresh(["size": 150])
 properties = section("graphic.properties")

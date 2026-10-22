@@ -303,3 +303,71 @@ fn a_paste_keeps_an_animated_start_in_its_slot() {
     assert!(props.get("boxed").is_none(), "{props}");
     assert_eq!(props_at(&pasted, SEC + SEC / 2)["size"], json!(96.5));
 }
+
+/// A prop whose schema entry says `animate: false` is refused by name, in
+/// its own sentence and before an asset's (spec §11 G-41 (b)); a stored end
+/// that named it before the mark is not re-checked and still ramps, and a
+/// `null` removes it (G-41 (c)); `animate: true` animates, and any other
+/// value is the schema's own error (G-41 (a)).
+#[test]
+fn a_prop_its_module_marks_animate_false_is_refused_by_name() {
+    let (with, action) = with_action();
+    let props = |props: Value| json!({"graphic": {"props": props}});
+    let mut held = schema();
+    held["size"]["animate"] = json!(false);
+    assert_eq!(
+        with.errors(&end_with(action, props(json!({"size": 100})), held.clone())),
+        "graphic.props.size is marked animate: false by its module; an action does not animate \
+         it — set it with set_graphic"
+    );
+    // An asset marked so gets this sentence, not the asset's.
+    let mut logo = held.clone();
+    logo["logo"]["animate"] = json!(false);
+    assert_eq!(
+        with.errors(&end_with(action, props(json!({"logo": "x.png"})), logo)),
+        "graphic.props.logo is marked animate: false by its module; an action does not animate \
+         it — set it with set_graphic"
+    );
+    // CONTROL: another prop under the same schema lands.
+    let other = with.apply(&end_with(action, props(json!({"extra": 9})), held.clone()));
+    assert_eq!(
+        end_of(&other, 11),
+        json!({"graphic": {"props": {"extra": 9}, "kinds": {"extra": "number"}}})
+    );
+    // An end stored before the mark is untouched by an edit to another prop
+    // and still ramps; a `null` removes it, unchecked.
+    let stored = with.apply(&end(action, props(json!({"size": 150}))));
+    let edited = stored.apply(&end_with(action, props(json!({"extra": 9})), held.clone()));
+    assert_eq!(
+        end_of(&edited, 11),
+        json!({"graphic": {"props": {"size": 150, "extra": 9},
+                           "kinds": {"size": "number", "extra": "number"}}})
+    );
+    let mid = props_at(&edited, SEC + SEC / 2)["size"]
+        .as_f64()
+        .expect("a number");
+    assert!(mid > 64.0 && mid < 150.0, "size halfway is {mid}");
+    let removed = edited.apply(&end_with(
+        action,
+        props(json!({"size": null})),
+        held.clone(),
+    ));
+    assert_eq!(
+        end_of(&removed, 11),
+        json!({"graphic": {"props": {"extra": 9}, "kinds": {"extra": "number"}}})
+    );
+    // `animate: true` animates.
+    let mut open = schema();
+    open["size"]["animate"] = json!(true);
+    let landed = with.apply(&end_with(action, props(json!({"size": 100})), open));
+    assert_eq!(
+        end_of(&landed, 11),
+        json!({"graphic": {"props": {"size": 100}, "kinds": {"size": "number"}}})
+    );
+    // Any other value is refused when the op carries the schema.
+    held["size"]["animate"] = json!("no");
+    assert_eq!(
+        with.errors(&end_with(action, props(json!({"extra": 9})), held)),
+        "schema.size.animate \"no\" is not a boolean"
+    );
+}

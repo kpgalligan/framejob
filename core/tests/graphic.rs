@@ -172,6 +172,12 @@ fn add_errs_on_a_bad_name_a_bad_side_a_bad_schema_and_too_many_props() {
         "schema.title has no default"
     );
     assert_eq!(
+        project.errors(&add(
+            json!({"schema": {"title": {"type": "string", "default": "x", "animate": "no"}}})
+        )),
+        "schema.title.animate \"no\" is not a boolean"
+    );
+    assert_eq!(
         project.errors(&add(json!({"props": many(65, 0)}))),
         "props has 65 keys; the most is 64"
     );

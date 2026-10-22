@@ -161,13 +161,14 @@ extension InspectorBinding {
     /// (`patchProps`), so a base write is what it always was; a clip with an
     /// action selected gets one `set_action_end` naming `graphic.props.<key>`
     /// with the module's `schema`, each value as it is — a `null` in an end
-    /// REMOVES (G-34 (j)). An asset is the base's (an end refuses one, G-34
-    /// (b)), sent there by CI-3's mechanism.
+    /// REMOVES (G-34 (j)). A prop that is not `animatable` — an asset, or
+    /// one its module marks `animate: false` (G-41) — is the base's (an end
+    /// refuses either, G-34 (b), G-41 (b)), sent there by CI-3's mechanism.
     func ops(
         graphic values: [String: GraphicPropValue], entries: [GraphicSchemaEntry],
         clips: [ClipSnapshot], schema: [String: Any]?
     ) -> [ReelOp] {
-        let assets = Set(entries.filter { $0.type == "asset" }.map(\.key))
+        let held = Set(entries.filter { !$0.animatable }.map(\.key))
         return split(
             clips, values, values.isEmpty,
             base: {
@@ -176,8 +177,8 @@ extension InspectorBinding {
             action: { ActionPatch(graphic: ActionGraphicPatch(props: $0)) },
             schema: schema,
             structural: { values, _ in
-                let base = values.filter { assets.contains($0.key) }
-                let animated = values.filter { !assets.contains($0.key) }
+                let base = values.filter { held.contains($0.key) }
+                let animated = values.filter { !held.contains($0.key) }
                 return (base.isEmpty ? nil : base, animated.isEmpty ? nil : animated)
             })
     }

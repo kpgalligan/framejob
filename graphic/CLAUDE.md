@@ -64,7 +64,8 @@ The crate's record is road map 10 §10.4.
   parser).
 - `props.rs` — `check_schema` (compile, strict; it takes a colour reader,
   which `Module::compile` builds from `Engine::parse_colours` over the
-  schema's colour defaults, G-25 (a)), `overlay` (render,
+  schema's colour defaults, G-25 (a); a non-boolean `animate` on an entry
+  is refused, G-41), `overlay` (render,
   lenient; every surprise a warning) and the schema's limits `MAX_PROPS`,
   `MAX_OPTIONS`, `MAX_STRING` and `TYPES`, which the core restates as
   `GRAPHIC_<X>` (`core/tests/graphic_ffi.rs` pins each pair;

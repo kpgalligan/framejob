@@ -942,9 +942,10 @@ the key map behind it.
   through `layerMemo`, emptied on a new project handle; Properties, Size and
   Timeline; with no action selected every write is `set_graphic`; with one selected a Properties
   write — Reset's included (O7) — is one `set_action_end` naming `graphic.props.<key>` with the
-  module's current schema, except an asset's, which stays `set_graphic`; Size, Timeline and Source
+  module's current schema, except a non-`animatable` prop's — an asset's or an `animate: false`
+  one's (G-41) — which stays `set_graphic`; Size, Timeline and Source
   still write `set_graphic` (Width, Height and Follow Clip ⊘); the structure signature also carries
-  the selected action's end's stale keys (`endProps()`)) ·
+  the selected action's end's stale keys (`endProps()` through `actionStaleKeys`)) ·
   `GraphicPane+Source.swift` (Source: name, file, revision, Open / Reveal /
   Duplicate as New Graphic… — `store.write`, `rescan()` inside the button's
   event, one `set_graphic {name}` step — and `report(for:)`, the compile's
@@ -961,12 +962,15 @@ the key map behind it.
   sorted with ⌫ writing `null`, CSS ↔ `RGBA`, and the null rule: a value
   equal to the default is written as `null`, a colour compared by parsed
   channels); rows read `binding.graphicProps`; `patchProps` (the base null rule over a
-  map) and `actionStaleRow` (an end key the module no longer declares, ⌫ through `clearOps`);
+  map), `actionStaleKeys` (an end's keys the module no longer declares, or declares
+  non-`animatable`, built on `staleKeys`) and `actionStaleRow` (one such key, its tooltip by
+  `declared:`, ⌫ through `clearOps`);
   `decimals(for:)` (a step decides, else a fractional default, min
   or max) and `assetNames(for:files:clips:)`; a one-line string field's own
   height is re-pinned to `DS.controlHeight`, and its width is ≤ 170 required, == 170 at 249,
   compression 248, so it gives way only to "at end" (O1), as is `DocumentPane`'s marker
-  name field. `GraphicSchema.swift` holds `GraphicSchemaEntry` and
+  name field. `GraphicSchema.swift` holds `GraphicSchemaEntry` (with `animate`, default true,
+  and `animatable`: `animate` and not an asset, G-41) and
   `GraphicSchema` (with `orderedKeys`), a pure move out of it ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
   ops are document-level; its transparency note names one or two alpha

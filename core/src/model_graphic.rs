@@ -170,6 +170,9 @@ fn check_entry(key: &str, entry: &Value) -> Result<(), String> {
     if !fits {
         return Err(format!("schema.{key}.default {default} is not a {kind}"));
     }
+    if let Some(animate) = entry.get("animate").filter(|a| !a.is_boolean()) {
+        return Err(format!("schema.{key}.animate {animate} is not a boolean"));
+    }
     Ok(())
 }
 

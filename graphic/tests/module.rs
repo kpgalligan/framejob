@@ -205,6 +205,10 @@ fn every_compile_sentence() {
             schema("{ a: { type: \"enum\", default: \"a\", options: [\"a\", 2] } }"),
             "schema.a.options must be 1–32 strings",
         ),
+        (
+            schema("{ a: { type: \"number\", default: 0, animate: 1 } }"),
+            "schema.a.animate 1 is not a boolean",
+        ),
     ];
     for (source, expected) in cases {
         let d = refusal(&source);
@@ -234,7 +238,9 @@ fn every_compile_sentence() {
         "limits",
         &schema(&format!(
             "{{ {name}: {{ type: \"string\", default: \"x\".repeat(4096) }}, \
-             b: {{ type: \"asset\", default: null }}, c: {{ type: \"color\", default: \"red\" }} }}"
+             b: {{ type: \"asset\", default: null }}, c: {{ type: \"color\", default: \"red\" }}, \
+             d: {{ type: \"number\", default: 0, animate: false }}, \
+             e: {{ type: \"asset\", default: null, animate: true }} }}"
         )),
     )
     .unwrap();

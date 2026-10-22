@@ -72,7 +72,8 @@ governs a module now.
   `model.rs`. And the `pub(crate)` checks every writer shares: `check_name`
   (G-3's `^[a-z0-9][a-z0-9-]{0,62}$`, its clause `NAME_RULE` shared with
   `validate`), `check_side`, `check_schema` (the engine's sentences, COPIED —
-  no module of the model may name the crate, G-2), `check_props` (by dotted
+  no module of the model may name the crate, G-2; a non-boolean `animate`
+  on an entry is refused, G-41), `check_props` (by dotted
   path against the schema the op carries, shape only without one; a `null`
   is a removal and is never checked), `check_typed` (one value against its
   entry, answered normalised; `edit_action_graphic.rs` calls it under
@@ -475,8 +476,8 @@ governs a module now.
 - `edit_action_graphic.rs` — `set_action_end`'s graphic arm (G-34):
   `read_graphic_end` checks the patch's `graphic.props` (never the stored
   end's) against the op's `schema` through `check_typed` under
-  `graphic.props.<key>`, discards a `kinds`, refuses an asset, an
-  undeclared prop, a layer key and a missing schema by name, and answers
+  `graphic.props.<key>`, discards a `kinds`, refuses an asset, a prop its
+  module marks `animate: false` (G-41), an undeclared prop, a layer key and a missing schema by name, and answers
   each prop's kind and the default for each the clip lacks
   (`schema_default`); `write_graphic_end` stores `props` and `kinds` by
   `insert` / `shift_remove`.

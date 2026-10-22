@@ -17377,7 +17377,7 @@ fail, 0 new layout problems.
 
 **Limits.** No row is timed. The inspector predicts no refusal (an end the core
 refuses beeps and shows its sentence, as on every tab). G-34's accepted limits
-stand (no per-prop opt-out, no asset ends, no OKLab).
+stand (no asset ends; the opt-out since G-41, OKLab since G-40).
 
 ## Issue batch B87 phase 4 — a long checkbox label gives way to "at end" (`graphics_inspector_proof.py` K18c and two more mutants; #239, spec §11 G-34 (l))
 
@@ -21957,3 +21957,74 @@ same `let peak` line.
 | `--mutant gainmap-cache-shared --only P15,Z1` | caught: the fixture at `.hlg` the SDR texture, conversion nil |
 | `--mutant gainmap-key-pq --only HGk,Z1` | caught: the L = 0.5 band not keyed |
 | `--mutant still-peak-dropped --only HIp,Z1` (re-anchored) | caught: the cLLI still off in HLG, SDR and at 600 |
+
+## Graphics gaps phase 2 — a module marks a prop `animate: false` (`graphics_inspector_proof.py` K19a–K19c and two more mutants; `graphic_prop_action_proof.py` R4; #248, spec §11 G-41)
+
+**What it proves.** A schema entry may say `animate: false`. The core refuses
+a value for that prop in `set_action_end` by name (`graphic.props.<key> is
+marked animate: false by its module; an action does not animate it — set it
+with set_graphic`), after an unknown key and before an asset; a `null` still
+removes it, and a stored end is not re-checked. The Graphic tab marks the
+row ⊘ and writes the clip while an action is selected, as it does for an
+asset, through `GraphicSchemaEntry.animatable` (`animate && type !=
+"asset"`), the one test the split (`InspectorBinding.ops(graphic:…)`) and the
+end's stale rows (`GraphicSchemaRows.actionStaleKeys`, built on `staleKeys`)
+use. A non-boolean `animate` is refused by the engine and the core in one
+sentence (`schema.<key>.animate <value> is not a boolean`); those and the
+door's order are `core/tests/graphic_action_door.rs`'s
+`a_prop_its_module_marks_animate_false_is_refused_by_name`,
+`core/tests/graphic.rs`'s `add_errs…` and `graphic/tests/module.rs`'s
+`every_compile_sentence`.
+
+**The probe's rows** (after K8, before K9; six's `offset` marked `animate:
+false` through the anchor `offset: { type: "number", default: 0,`, asserted
+to occur once; six and the end restored before K9):
+- **K19a** the parsed entry for `offset` has `animate` and `animatable`
+  false, and `structureSignature` differs from the one read before the
+  rewrite.
+- **K19b** the action selected, its end empty: Offset is ⊘
+  (`.notAnimatable`), its field's write(5) is exactly one `set_graphic
+  {props: {offset: 5}}` and the end holds no offset; CONTROL: Size is not ⊘
+  and its write(150) is one `set_action_end`.
+- **K19c** an end keyed `{offset: 3}` under six as written, then the mark:
+  Properties holds a row labelled `offset`, ◆, whose ⌫ tooltip is "The
+  module does not let offset be animated — remove it from action 1"; its
+  click is one `set_action_end {graphic: {props: {offset: null}}}` with no
+  schema, after which the end has no offset; CONTROL: six as written and the
+  end keyed again, no such row. K19c reads neither `keyedCount` nor
+  `marks.keyed`, so `count-zero`'s rows are unchanged.
+
+**`graphic_prop_action_proof.py` R4** (after R3, before N1): ramp v4 is v2
+with `h` marked `animate: false`; `{h: 20}` is refused exactly the sentence
+above (the app filled the schema from the module, `animate` included) and
+nothing changes; the end still holds R2's `h` 40; `{x: 50}` lands
+(CONTROL); `{h: null}` lands and removes `h` from the end's props and kinds.
+
+| Mutant | Anchor | Must fail |
+|---|---|---|
+| `asset-to-end` (re-anchored) | `GraphicSchema.swift` `var animatable: Bool { animate && type != "asset" }` → `var animatable: Bool { animate }` | K8 K17 |
+| `animate-ignored` | the same anchor → `var animatable: Bool { type != "asset" }` | K19a K19b K19c |
+| `end-animate-stale-dropped` | `GraphicSchemaRows.swift` `let declaredHeld = end.keys.filter { held.contains($0) }` → `… { held.contains($0) && false }` | K19c |
+| `end-stale-dropped` (rows widened) | `GraphicPane.swift` `binding.selectedAction?.end.graphic?.props ?? [:]` → `[:]` | K12 K19c (K12 alone before this phase; the past-run row above stays as history) |
+
+The core and engine mutants, applied by hand to the tree, the named test run
+and reverted: M1 `read_graphic_end` without the animate refusal — the door
+test failed; M2 the animate check after the asset's — the door test's `logo`
+case failed (the asset's sentence came back); M3 the core's `check_entry`
+without the `animate` check — `add_errs…` and the door test failed; M4 the
+engine's without it — `every_compile_sentence` failed.
+
+| Run (2026-10-22, the worktree, Release, `powermode 0`) | Result |
+|---|---|
+| `make gate` | PASS (names, typecheck, fmt, lint, test, app) |
+| `RC_PROOF_APP=release python3 tools/proof/graphics_inspector_proof.py` | 94/94, exit 0, Z1 held, no `DEFAULTS MOVED` |
+| `--mutant asset-to-end` | `MUTANT PASS`: K8 K17 |
+| `--mutant animate-ignored` | `MUTANT PASS`: K19a K19b K19c |
+| `--mutant end-animate-stale-dropped` | `MUTANT PASS`: K19c |
+| `--mutant end-stale-dropped` | `MUTANT PASS`: K12 K19c |
+| `--mutant stale` | `MUTANT PASS`: the five I5 rows and K12 (K19c held: its key is declared, so it does not come from `staleKeys`) |
+| `RC_PROOF_APP=release python3 tools/proof/graphic_prop_action_proof.py` | 18/18, exit 0, no `DEFAULTS MOVED`; R4's end after it `{"props": {"fill": "#0000ff", "x": 50}, "kinds": {"fill": "color", "x": "number"}}` |
+
+**Limits.** An end stored before its module said `animate: false` keeps
+animating the prop until it is removed (G-41 (c)); the inspector lists it as
+the end's stale row and does not remove it on its own.

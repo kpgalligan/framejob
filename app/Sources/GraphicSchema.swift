@@ -8,6 +8,11 @@ import Foundation
 struct GraphicSchemaEntry: Equatable {
     let key: String, type: String, `default`: GraphicPropValue, label: String, help: String?
     let min: Double?, max: Double?, step: Double?, multiline: Bool, options: [String]
+    /// The module's `animate` (spec §11 G-41); absent is true.
+    var animate: Bool = true
+    /// Whether an action's end may name this prop: the one test the
+    /// inspector's split and the end's stale rows use.
+    var animatable: Bool { animate && type != "asset" }
 }
 
 /// A module's schema, in the module's own key order.
@@ -43,7 +48,8 @@ struct GraphicSchema: Equatable {
                 label: entry["label"] as? String ?? key, help: entry["help"] as? String,
                 min: number("min"), max: number("max"), step: number("step"),
                 multiline: (entry["multiline"] as? NSNumber)?.boolValue ?? false,
-                options: entry["options"] as? [String] ?? [])
+                options: entry["options"] as? [String] ?? [],
+                animate: (entry["animate"] as? NSNumber)?.boolValue ?? true)
         }
     }
 

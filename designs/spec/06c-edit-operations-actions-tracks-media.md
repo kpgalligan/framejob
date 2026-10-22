@@ -51,7 +51,9 @@ The rules every op shares are §6a; the clip ops are §6b.
   <value>}}`, each non-null prop checked as `set_graphic` checks it against `schema` — the module's
   CURRENT revision, which the app fills and never takes from a caller (G-4) — and refused under
   `graphic.props.<key>`; no schema (`graphic.props.<key> needs its module's schema to animate, and
-  none came with the op`), a prop the schema lacks (an unknown key) and an `asset`
+  none came with the op`), a prop the schema lacks (an unknown key), a prop whose schema entry says
+  `animate: false` (§11 G-41; `graphic.props.<key> is marked animate: false by its module; an
+  action does not animate it — set it with set_graphic`, checked before the asset's) and an `asset`
   (`graphic.props.<key> is an asset; an action does not animate an image — set it with
   set_graphic`) are each an **error**, and so are `name`, `width`, `height`, `in` and `length`
   (`graphic.<key> is not an animation target; an action animates graphic.props`). Each named prop's

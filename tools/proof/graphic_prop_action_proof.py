@@ -21,7 +21,7 @@ The module, `ramp`, draws one rectangle from its props: `x` (number,
 default 64, 0–1000), `fill` (color, default #ff0000) and `mode` (string,
 default "A"; "B" makes the rectangle 300 tall instead of 100). Its v2 lowers
 `x`'s max to 100 and adds `h` (number, default 10, 0–50); its v3 does not
-compile. The canvas is 640×360 at 30 fps; the graphic clip runs 0–2 s and
+compile; its v4 is v2 with `h` marked `animate: false` (spec §11 G-41). The canvas is 640×360 at 30 fps; the graphic clip runs 0–2 s and
 its action 0.5–1.5 s, linear. Ticks: mid 600000 (frame 30), 620000, end−1
 880000, end 900000. Background is the frame's own pixel (5,5).
 
@@ -65,6 +65,13 @@ Instance 1 (the prefetch on, the default), project P:
 - **R3**: after a v3 that does not compile, a value is refused ("needs its
   module's schema to animate, and none came with the op") and `{mode: null}`
   still removes `mode` from the end's props and kinds.
+- **R4** (graphics gaps phase 2, #248, spec §11 G-41): after ramp v4 is
+  written, `{h: 20}` is refused exactly "graphic.props.h is marked animate:
+  false by its module; an action does not animate it — set it with
+  set_graphic" and nothing changes — the app filled the schema, `animate`
+  included; the end still holds `h` 40 from R2 (a stored end is not
+  re-checked); `{x: 50}` lands (CONTROL); `{h: null}` lands and removes `h`
+  from the end's props and kinds.
 - **N1**: v2 written again, the graphic clip nested; with `scope` = the
   nest's id, `{x: 30}` on the nested clip's action lands and the nest's
   clip shows `props.x` 30 and `kinds.x` "number".
@@ -123,8 +130,8 @@ CALL_BOUND = 300
 BUILD_BOUND = 1500
 WIDTH, HEIGHT = 640, 360
 MID, NEXT, END_LESS_ONE, END = 600_000, 620_000, 880_000, 900_000
-ROWS = ["H0", "T0", "F0", "A1", "B1", "S1", "U1", "C1", "E0", "E1", "R1", "R2", "R3", "N1",
-        "F1", "F2", "Z1"]
+ROWS = ["H0", "T0", "F0", "A1", "B1", "S1", "U1", "C1", "E0", "E1", "R1", "R2", "R3", "R4",
+        "N1", "F1", "F2", "Z1"]
 MUTANT_ROWS = [name for name in ROWS if name not in ("F1", "F2")]
 PREFIX = "set_action_end: "
 # The OKLab middle of #ff0000 → #0000ff (spec §11 G-40), from the fixture both
@@ -159,11 +166,14 @@ def check(name, good, detail=""):
 
 
 def module(version):
-    """`ramp` v1, v2 (x's max 100, a new `h`) or v3 (does not compile)."""
+    """`ramp` v1, v2 (x's max 100, a new `h`), v3 (does not compile) or v4 (v2 with `h`
+    marked `animate: false`)."""
     if version == 3:
         return "export const meta = { name: \"Ramp\", durationInFrames: 60 \n"
     x_max = 1000 if version == 1 else 100
-    extra = "" if version == 1 else "  h: { type: \"number\", default: 10, min: 0, max: 50 },\n"
+    held = ", animate: false" if version == 4 else ""
+    extra = ("" if version == 1
+             else f"  h: {{ type: \"number\", default: 10, min: 0, max: 50{held} }},\n")
     return ("export const meta = { name: \"Ramp\", durationInFrames: 60 };\n"
             "export const schema = {\n"
             f"  x: {{ type: \"number\", default: 64, min: 0, max: {x_max} }},\n"
@@ -356,7 +366,7 @@ def run_p(client, log, state):
           f"{g}; action {action}; curve {curved.get('error', 'ok')}, linear {linear}; frame "
           f"{None if base_mid is None else len(base_mid)}")
     if not fixture:
-        for name in ("A1", "B1", "S1", "U1", "C1", "E0", "E1", "R1", "R2", "R3", "N1"):
+        for name in ("A1", "B1", "S1", "U1", "C1", "E0", "E1", "R1", "R2", "R3", "R4", "N1"):
             check(f"{name} not run: the fixture could not be built", False)
         closed = attempt(client, "close_project", {"project": str(p), "discard": True})
         return closed["ok"]
@@ -521,6 +531,29 @@ def run_p(client, log, state):
           and "mode" not in (end.get("kinds") or {"mode": 0}),
           f"v3 ok {v3}; x {value.get('error', 'APPLIED')!r}, unchanged {unchanged}; null "
           f"{removed.get('error', 'ok')}; end {canon(end)}")
+
+    # R4 — a prop its module marks `animate: false` (G-41)
+    v4, v4_error = wrote(client, p, 4)
+    was = project_of(client, p)
+    held = set_end(client, p, g, action, {"h": 20})
+    unchanged = canon(project_of(client, p)) == canon(was)
+    kept = (end_graphic(project_of(client, p), g, action).get("props") or {}).get("h")
+    other = set_end(client, p, g, action, {"x": 50})
+    other_end = end_graphic(project_of(client, p), g, action)
+    gone = set_end(client, p, g, action, {"h": None})
+    end = end_graphic(project_of(client, p), g, action)
+    check("R4 after ramp v4 marks h animate: false: h 20 is refused in G-41's sentence and "
+          "nothing changes; the end still holds h 40; x 50 lands (CONTROL); a null removes h "
+          "from props and kinds",
+          v4 is True
+          and said(held, "graphic.props.h is marked animate: false by its module; an action "
+                         "does not animate it — set it with set_graphic") and unchanged
+          and kept == 40 and other["ok"] and (other_end.get("props") or {}).get("x") == 50
+          and gone["ok"] and "h" not in (end.get("props") or {"h": 0})
+          and "h" not in (end.get("kinds") or {"h": 0}),
+          f"v4 {v4} {v4_error}; h {held.get('error', 'APPLIED')!r}, unchanged {unchanged}; "
+          f"kept h {kept}; x {other.get('error', 'ok')}; null {gone.get('error', 'ok')}; end "
+          f"{canon(end)}")
 
     # N1 — a clip inside a nest, addressed by scope
     v2_again, _ = wrote(client, p, 2)

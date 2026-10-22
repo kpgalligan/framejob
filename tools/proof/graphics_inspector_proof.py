@@ -129,6 +129,18 @@ K1–K18 (issue batch B87 phase 3, #239, spec §11 G-34 (l); after I21, before I
     has no ink between the checkbox and the tag and none over the tag beyond
     the tag's own (its title cut at its edge) while the checkbox's frame has
     some (CONTROL: not keyed, no tag and the checkbox exactly its own width).
+K19a–K19c (graphics gaps phase 2, #248, spec §11 G-41; after K8, before K9) six's
+    `offset` marked `animate: false` (the anchor `offset: { type: "number", default:
+    0,` asserted to occur once): K19a the parsed entry's `animate` and `animatable`
+    are false and `structureSignature` changes; K19b the action selected, its end
+    empty: Offset is ⊘ and its write(5) is exactly one `set_graphic {props: {offset:
+    5}}`, the end holding no offset (CONTROL: Size is not ⊘ and writes one
+    `set_action_end`); K19c an end keyed `{offset: 3}` under six as written, then the
+    mark: a row labelled `offset`, ◆, whose ⌫ reads "The module does not let offset be
+    animated — remove it from action 1" and is one `set_action_end {graphic: {props:
+    {offset: null}}}` with no schema, after which the end has no offset (CONTROL: six
+    as written and the end keyed again, no such row). Six and the end are restored
+    before K9.
 I15 (B8, last) a second `six` clip; the two hold logo "a.png" and "b.png" and
     both are selected: the Logo popup is `["None", "red.png", "a.png",
     "b.png"]`, and the signature holds "red.png,a.png,b.png".
@@ -183,9 +195,11 @@ Issue batch B87 phase 3 adds K12 to `stale` and sixteen more (a bare K id in
   paths-flat         an end's `graphic` group is one path — K3a K10 K11 K13;
   string-continuous  the string row is not discrete — K6a K6b;
   title-fixed-width  the Title field's 170 is required — K6b;
-  asset-to-end       an asset goes to the end — K8 K17;
+  asset-to-end       an asset goes to the end — K8 K17 (since graphics gaps phase 2,
+                     `GraphicSchemaEntry.animatable` is `animate` alone);
   schema-dropped     the typed `setActionEnd` drops `schema` — K2 K5 K9 K17;
-  end-stale-dropped  `endProps()` answers nothing — K12;
+  end-stale-dropped  `endProps()` answers nothing — K12 K19c (K19c since graphics gaps
+                     phase 2: the end's stale rows are read from it);
   layer-keys-unnamed `set_graphic`'s width/height/length name no path — K14;
   band-label-graphic-dropped  the band's label omits graphic keys — K15a;
   zoom-graphic-nil   the zoom test asks for no `graphic` at all — K15b;
@@ -199,6 +213,10 @@ Issue batch B87 phase 4 adds two more:
   checkbox-fixed-width  a row with no popup gives no checkbox the 749 — K18c (O8);
   checkbox-title-unclipped  the narrowing checkbox is not clipped to its
                      bounds, so its title draws on under the tag — K18c.
+Graphics gaps phase 2 (#248, spec §11 G-41) adds two more:
+  animate-ignored    `animatable` ignores `animate` (`type != "asset"`) — K19a K19b K19c;
+  end-animate-stale-dropped  `actionStaleKeys` drops its declared non-animatable
+                     keys — K19c.
 """
 
 import argparse
@@ -350,15 +368,20 @@ MUTANTS = {
         "GraphicSchemaRows.swift",
         "            width.priority = NSLayoutConstraint.Priority(249)\n", "", ["K6b"]),
     "asset-to-end": (
-        "InspectorBinding+Writes.swift",
-        "let assets = Set(entries.filter { $0.type == \"asset\" }.map(\\.key))",
-        "let assets = Set<String>()", ["K8", "K17"]),
+        "GraphicSchema.swift", "var animatable: Bool { animate && type != \"asset\" }",
+        "var animatable: Bool { animate }", ["K8", "K17"]),
+    "animate-ignored": (
+        "GraphicSchema.swift", "var animatable: Bool { animate && type != \"asset\" }",
+        "var animatable: Bool { type != \"asset\" }", ["K19a", "K19b", "K19c"]),
+    "end-animate-stale-dropped": (
+        "GraphicSchemaRows.swift", "let declaredHeld = end.keys.filter { held.contains($0) }",
+        "let declaredHeld = end.keys.filter { held.contains($0) && false }", ["K19c"]),
     "schema-dropped": (
         "ReelOps.swift", "off: off.sorted(), schema: schema)", "off: off.sorted())",
         ["K2", "K5", "K9", "K17"]),
     "end-stale-dropped": (
         "GraphicPane.swift", "binding.selectedAction?.end.graphic?.props ?? [:]", "[:]",
-        ["K12"]),
+        ["K12", "K19c"]),
     "layer-keys-unnamed": (
         "InspectorMarks.swift", "paths.append(\"graphic.\" + key)", "_ = key", ["K14"]),
     "band-label-graphic-dropped": (
@@ -396,7 +419,8 @@ def expected_names(expected, names):
     return out
 
 K_IDS = ["K1", "K2", "K3a", "K3b", "K4", "K5", "K6a", "K6b", "K7", "K8", "K9", "K10", "K11",
-         "K12", "K13", "K14", "K15a", "K15b", "K16", "K17", "K18a", "K18b", "K18c"]
+         "K12", "K13", "K14", "K15a", "K15b", "K16", "K17", "K18a", "K18b", "K18c", "K19a",
+         "K19b", "K19c"]
 
 RESULTS = []
 
@@ -559,7 +583,7 @@ def probe_checks(sources, out, package):
     probe_rows = json.loads(answer.read_text())["rows"]
     ids = [f"I{n}" for n in range(1, 22)] + K_IDS
     missing = [i for i in ids if not any(r["name"].startswith(i + " ") for r in probe_rows)]
-    check("the probe answers every row (I1–I21 and K1–K18 present)", not missing,
+    check("the probe answers every row (I1–I21 and K1–K19c present)", not missing,
           f"{len(probe_rows)} rows, missing {missing}")
     for row in probe_rows:
         check(row["name"], row["ok"], row["detail"])

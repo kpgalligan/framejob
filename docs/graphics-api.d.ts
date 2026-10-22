@@ -47,6 +47,8 @@ interface SchemaCommon {
   label?: string;
   /** A tooltip. */
   help?: string;
+  /** false: an action never animates this prop — set_action_end refuses it, and the inspector writes the clip. Default true. */
+  animate?: boolean;
 }
 
 /** One prop: a `type` and a `default` of that type. */
