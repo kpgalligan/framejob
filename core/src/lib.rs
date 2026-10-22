@@ -71,6 +71,7 @@ pub mod format;
 pub mod frame_grid;
 mod grade_check;
 pub mod hdr10;
+pub mod hdr10_still;
 mod lut;
 pub mod mcp_versions;
 mod media_color;

@@ -97,10 +97,13 @@ extension MediaImporter {
         // `enabled.video` means something on its clips. It still gets NO
         // composition track — the recipe names an image layer `image`, not
         // `track` (§7.2), and the plan never lists it.
-        return MediaDescriptor(
+        var descriptor = MediaDescriptor(
             path: url.path, bookmark: bookmarkString(for: url), kind: .image, duration: 0,
             width: width, height: height, fps: .thirty, hasVideo: true, hasAudio: false,
             hasAlpha: hasAlpha)
+        // A PQ still's peak, as a PQ video's (spec §11 HD-20 (b)).
+        descriptor.color = detectedStillPQ(url)
+        return descriptor
     }
 
     // MARK: - Rates

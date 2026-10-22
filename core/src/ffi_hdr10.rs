@@ -1,8 +1,9 @@
-//! C FFI: a PQ file's HDR10 peak (spec §11 HD-12, HD-18) — two exports over
-//! `hdr10.rs`'s pure reader, thin shims through `ffi_util.rs`'s helpers.
-//! The import probe hands them the bytes AVFoundation gives it (the format
-//! description's two extensions, else the first sample; for AV1 the `av1C`
-//! record and the first sample) and stores the answer on the media.
+//! C FFI: a PQ file's HDR10 peak (spec §11 HD-12, HD-18, HD-20) — three
+//! exports over `hdr10.rs`'s and `hdr10_still.rs`'s pure readers, thin shims
+//! through `ffi_util.rs`'s helpers. The import probe hands them the bytes
+//! AVFoundation gives it (the format description's two extensions, else the
+//! first sample; for AV1 the `av1C` record and the first sample), or a PQ
+//! still's whole file, and stores the answer on the media.
 
 use std::ffi::c_char;
 use std::ptr;
@@ -10,6 +11,7 @@ use std::slice;
 
 use crate::ffi_util::{fallible_op, out_string};
 use crate::hdr10;
+use crate::hdr10_still;
 
 /// `len` bytes at `bytes`, or `None` for a NULL pointer or a 0 length (an
 /// absent extension or sample).
@@ -90,6 +92,33 @@ pub unsafe extern "C" fn rc_hdr10_av1_peak(
         fallible_op(
             ptr::null_mut(),
             "reading an AV1 HDR10 peak",
+            ptr::null_mut(),
+            body,
+            out_string,
+        )
+    }
+}
+
+/// The peak `hdr10_still::still_peak` reads from a PQ still's whole file
+/// (spec §11 HD-20 (b)): a PNG's `cLLI`/`mDCV`, an ISOBMFF file's primary
+/// item's `clli`/`mdcv`; JSON as `rc_hdr10_peak`'s, `{}` for a NULL pointer
+/// or a 0 length. NULL only on a caught panic. Freed with `rc_string_free`.
+///
+/// # Safety
+/// `file` must be NULL or point to `file_len` readable bytes, valid for the
+/// call.
+#[no_mangle]
+pub unsafe extern "C" fn rc_hdr10_still_peak(file: *const u8, file_len: usize) -> *mut c_char {
+    let body = || {
+        let read = unsafe { optional(file, file_len) }
+            .map(hdr10_still::still_peak)
+            .unwrap_or_default();
+        serde_json::to_string(&read).map_err(|e| e.to_string())
+    };
+    unsafe {
+        fallible_op(
+            ptr::null_mut(),
+            "reading a still's HDR10 peak",
             ptr::null_mut(),
             body,
             out_string,

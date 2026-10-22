@@ -1,7 +1,8 @@
 //! Black-box tests for a PQ file's peak on its media (spec §11 HD-12): the
 //! `set_media_color` op's `peak`, `media.color.pq` through `add_media`, a
 //! file, a LUT's removal and a paste, and the `peak` the recipe and the plan
-//! publish in `input` — all through the C FFI, as `ReelCore.swift` drives it.
+//! publish in `input`; and a PQ still's (HD-20 (b)) — all through the C FFI,
+//! as `ReelCore.swift` drives it.
 //!
 //! The oracle for every sentence is the sentence itself, written out here.
 
@@ -359,4 +360,103 @@ fn input_publishes_the_effective_peak_and_an_empty_reading_publishes_nothing() {
     let set_plain = plain.apply(&set(PLAIN, json!({"peak": 2000})));
     assert_eq!(input(&set_plain), json!({"peak": 2000}));
     assert_eq!(set_plain.apply(&set(PLAIN, Value::Null)).plan_text(), text);
+}
+
+// ---- a PQ still (spec §11 HD-20 (b)) ----------------------------------------------
+
+/// A PQ still whose import read MaxCLL 4,000, an SDR still, and a clip of
+/// the first.
+const PQ_STILL: u32 = 8;
+const SDR_STILL: u32 = 9;
+const STILL_CLIP: u32 = 10;
+const KIND: &str = "is an image; Camera Log is a setting on a video file";
+
+fn image(id: u32, color: Value) -> Value {
+    let mut row = json!({"id": id, "path": format!("/fixtures/s{id}.png"), "kind": "image",
+        "width": 1024, "height": 128});
+    if !color.is_null() {
+        row["color"] = color;
+    }
+    row
+}
+
+fn still_project() -> Value {
+    let mut file = project();
+    file["version"] = json!(26);
+    let media = file["media"].as_array_mut().expect("media");
+    media.push(image(
+        PQ_STILL,
+        json!({"pq": {"file": 4000, "from": "max_cll"}}),
+    ));
+    media.push(image(SDR_STILL, Value::Null));
+    file["tracks"]
+        .as_array_mut()
+        .expect("tracks")
+        .push(json!({"id": 11, "name": "Track 2"}));
+    file["clips"].as_array_mut().expect("clips").push(json!({
+        "id": STILL_CLIP, "track": 11, "start": 0, "duration": 600_000,
+        "source": {"kind": "image", "media": PQ_STILL}}));
+    file
+}
+
+fn still_input(h: &Handle) -> Value {
+    array(&h.recipe(300_000), "/layers")
+        .iter()
+        .find(|l| l["clip"] == json!(STILL_CLIP))
+        .map(|l| l["input"].clone())
+        .expect("the still's layer")
+}
+
+#[test]
+fn an_image_takes_a_reading_by_add_media_a_file_and_a_peak() {
+    let color = json!({"pq": {"file": 4000, "from": "max_cll"}});
+    let mut descriptor = json!({"path": "/fixtures/new.png", "kind": "image",
+        "width": 1024, "height": 128, "color": color.clone()});
+    let added = handle().apply(&json!({"op": "add_media", "descriptor": descriptor.clone()}));
+    assert_eq!(color_of(&added, 20), color);
+    descriptor["color"] = json!({"pq": {}});
+    let empty = handle().apply(&json!({"op": "add_media", "descriptor": descriptor}));
+    assert_eq!(color_of(&empty, 20), json!({"pq": {}}));
+    let h = Handle::from_value(&still_project());
+    assert_eq!(color_of(&h, PQ_STILL), color);
+    assert_eq!(still_input(&h), json!({"peak": 4000}));
+    let set_to = h.apply(&set(PQ_STILL, json!({"peak": 600})));
+    assert_eq!(
+        color_of(&set_to, PQ_STILL),
+        json!({"pq": {"file": 4000, "from": "max_cll", "peak": 600}})
+    );
+    assert_eq!(still_input(&set_to), json!({"peak": 600}));
+}
+
+#[test]
+fn a_pq_image_keeps_its_reading_after_null() {
+    let h = Handle::from_value(&still_project()).apply(&set(PQ_STILL, json!({"peak": 600})));
+    let cleared = h.apply(&set(PQ_STILL, Value::Null));
+    assert_eq!(
+        color_of(&cleared, PQ_STILL),
+        json!({"pq": {"file": 4000, "from": "max_cll"}})
+    );
+    assert_eq!(still_input(&cleared), json!({"peak": 4000}));
+}
+
+#[test]
+fn an_image_refuses_camera_log_and_a_peak_without_a_reading() {
+    let h = Handle::from_value(&still_project());
+    let cases = [
+        (
+            PQ_STILL,
+            json!({"log": "slog3"}),
+            format!("media {PQ_STILL} {KIND}"),
+        ),
+        (PQ_STILL, json!({}), format!("media {PQ_STILL} {KIND}")),
+        (SDR_STILL, json!({}), format!("media {SDR_STILL} {KIND}")),
+        (
+            SDR_STILL,
+            json!({"peak": 600}),
+            format!("media {SDR_STILL} is not a PQ file; only a PQ file takes a peak"),
+        ),
+    ];
+    for (media, color, sentence) in cases {
+        h.refuses_with(&set(media, color), &sentence);
+    }
 }

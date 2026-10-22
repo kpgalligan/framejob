@@ -235,16 +235,18 @@ extension AgentServer {
                     + "media id} to convert with an imported .cube (import_media it first); or "
                     + "null for none, which shows the log picture. An Apple Log or Apple Log 2 "
                     + "file is set at import (get_project's media[].color shows detected: "
-                    + "true). Refused on an audio, image or LUT media. A PQ (HDR10) file also "
-                    + "takes peak, a whole number of cd/m² 1–10000 — the Media tab's HDR10 "
-                    + "Peak field: where its highlights roll off to white. Import reads the "
-                    + "file's own peak into media[].color.pq {file, from} (MaxCLL, else the "
-                    + "mastering display's maximum; {} when the file names none, which means "
-                    + "1,000), and peak overrides it. color replaces the Camera Log and the "
-                    + "peak together, so send both to keep both; null clears both and keeps "
-                    + "the file's reading. A peak on a file that is not PQ is refused.",
+                    + "true). Camera Log is refused on an audio, image or LUT media. A PQ "
+                    + "(HDR10) file — a video, or a PQ still image — also takes peak, a whole "
+                    + "number of cd/m² 1–10000 — the Media tab's HDR10 Peak field: where its "
+                    + "highlights roll off to white. Import reads the file's own peak into "
+                    + "media[].color.pq {file, from} (MaxCLL, else the mastering display's "
+                    + "maximum; {} when the file names none, which means 1,000), and peak "
+                    + "overrides it. color replaces the Camera Log and the peak together, so "
+                    + "send both to keep both; null clears both and keeps the file's reading. "
+                    + "A PQ still takes {peak} alone. A peak on a file that is not PQ is "
+                    + "refused.",
                 [
-                    "media": "The video media's id.",
+                    "media": "The video media's id, or a PQ still's for peak alone.",
                     "color": "{log, gamut?}, {lut} or {peak}, log or lut beside peak, or null to "
                         + "clear.",
                 ]),

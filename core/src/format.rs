@@ -304,8 +304,18 @@ use crate::model::{Canvas, Project};
 /// exactly the text it did, and there is no migration step. The bump is so an
 /// older build refuses a Canon file instead of failing on its unknown
 /// `log` value.
-/// Every number from 26 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 25;
+///
+/// Version 26 is a PQ still's HDR10 peak (spec §11 HD-20 (b)): an image
+/// media whose decoded space is PQ-based carries `media.color.pq` as a PQ
+/// video's media does (version 22), read from its PNG `cLLI`/`mDCV` or its
+/// HEIF/AVIF `clli`/`mdcv`, and takes `peak`; a colour of `pq` alone is valid
+/// on an image. No key moves, so every other project writes exactly the text
+/// it did, and the reader's default is none, so there is no migration step: a
+/// PQ still from an older file has no `pq` and renders at 1,000 cd/m² until
+/// imported again. The bump is so an older build refuses the file instead of
+/// refusing an image's `pq`.
+/// Every number from 27 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 26;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

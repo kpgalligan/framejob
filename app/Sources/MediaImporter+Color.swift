@@ -70,6 +70,18 @@ extension MediaImporter {
         return MediaColor(pq: read)
     }
 
+    /// A PQ still's HDR10 peak (spec §11 HD-20 (b)), read when `probeImage`
+    /// runs: `{pq}` for a still whose decoded space is PQ-based
+    /// (`StillColor.conversion(at:)` answers `.pq`) — the core's reading of
+    /// the file's bytes, a PNG's `cLLI`/`mDCV` or a HEIF or AVIF primary
+    /// item's `clli`/`mdcv` — `{pq: {}}` when none reads; nil for any other
+    /// still. ImageIO's properties are not read. Synchronous (spec §11 W-8).
+    static func detectedStillPQ(_ url: URL) -> MediaColor? {
+        guard case .pq = StillColor.conversion(at: url) else { return nil }
+        let file = try? Data(contentsOf: url, options: .alwaysMapped)
+        return MediaColor(pq: ReelHDR10.stillPeak(file: file))
+    }
+
     /// An HEVC description's NAL length size (its `hvcC`'s), nil for any
     /// other codec or an unreadable record.
     private static func hevcNALLength(_ description: CMFormatDescription) -> Int? {

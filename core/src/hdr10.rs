@@ -109,7 +109,7 @@ pub fn av1_peak(config: Option<&[u8]>, sample: Option<&[u8]>) -> PqColor {
 }
 
 /// MaxCLL when there is one, else the mastering maximum, else nothing.
-fn choose(mastering: Option<u32>, content_light: Option<u32>) -> PqColor {
+pub(crate) fn choose(mastering: Option<u32>, content_light: Option<u32>) -> PqColor {
     content_light
         .map(|cll| found(cll, PeakSource::MaxCll))
         .or_else(|| mastering.map(|max| found(max, PeakSource::MasteringDisplay)))
@@ -127,13 +127,18 @@ fn found(nits: u32, from: PeakSource) -> PqColor {
 /// ST 2086's maximum luminance in whole cd/m², rounded to nearest and
 /// clamped to [`PEAK_MAX`]; `None` for a short payload or a maximum that
 /// rounds to 0.
-fn mastering_max(bytes: &[u8]) -> Option<u32> {
+pub(crate) fn mastering_max(bytes: &[u8]) -> Option<u32> {
     let field: [u8; 4] = bytes.get(16..20)?.try_into().ok()?;
     if bytes.len() < MASTERING_BYTES {
         return None;
     }
-    let units = u64::from(u32::from_be_bytes(field));
-    let nits = (units + LUMINANCE_UNITS / 2) / LUMINANCE_UNITS;
+    ten_thousandths(u32::from_be_bytes(field))
+}
+
+/// A luminance in 0.0001 cd/m² as whole cd/m², rounded to nearest in 64
+/// bits and clamped to [`PEAK_MAX`]; `None` when it rounds to 0.
+pub(crate) fn ten_thousandths(units: u32) -> Option<u32> {
+    let nits = (u64::from(units) + LUMINANCE_UNITS / 2) / LUMINANCE_UNITS;
     let nits = u32::try_from(nits.min(u64::from(PEAK_MAX))).ok()?;
     (nits > 0).then_some(nits)
 }
@@ -154,7 +159,7 @@ fn av1_mastering_max(bytes: &[u8]) -> Option<u32> {
 
 /// CTA-861.3's MaxCLL; `None` for a short payload or 0 (unknown, by the
 /// standard).
-fn max_cll(bytes: &[u8]) -> Option<u32> {
+pub(crate) fn max_cll(bytes: &[u8]) -> Option<u32> {
     let field: [u8; 2] = bytes.get(0..2)?.try_into().ok()?;
     if bytes.len() < CONTENT_LIGHT_BYTES {
         return None;

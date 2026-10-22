@@ -14,19 +14,23 @@
 //!   reading (`pq.file`, `pq.from`) survives every op, and `null` clears
 //!   both, keeping the reading.
 //! - **The rules** ([`Project::check_media_color`]), each its own sentence:
-//!   the media is a video file; the setting has `log` or `lut`, not both, or
+//!   the media is a video file, or an image whose colour is a PQ still's
+//!   `pq` alone (spec §11 HD-20 (b)); the setting has `log` or `lut`, not both, or
 //!   is a PQ file's `pq` alone; `gamut` goes with `log` and is one its curve
 //!   takes; `lut` names a `lut` media of the project; `pq`'s peaks are within
 //!   [`PEAK_MIN`]–[`PEAK_MAX`] and `from` goes with `file`. The op answers
 //!   them as refusals; `add_media` (whose descriptor may carry a detected
 //!   `color`) and `validate` (a file) as errors, as they answer every other
-//!   field. The op's own: a `peak` only on a PQ file and in range, and an
-//!   asked `color` with none of `log`, `lut` and `peak` refused.
+//!   field. The op's own: a `peak` only on a PQ file and in range, an image
+//!   taking only a `peak` alone, and an asked `color` with none of `log`,
+//!   `lut` and `peak` refused.
 //! - **What draws** ([`Project::media_input`]): the recipe layer of a media
 //!   or still source and the plan's video segment publish the setting as
 //!   `input` — `{log, gamut}` or `{lut}`, and `peak` (the effective PQ peak)
-//!   beside either or alone — and the app converts at step 0. A `lut` that
-//!   names no `lut` media publishes nothing of it.
+//!   beside either or alone — and the app converts at step 0. The recipe
+//!   layer of an image source publishes a PQ still's `{peak}` alone (spec
+//!   §11 HD-20 (b)), and `null` for `{pq: {}}`. A `lut` that names no `lut`
+//!   media publishes nothing of it.
 //! - **Removing a LUT** that converts a media (`lut.rs`'s `remove_lut`) is
 //!   refused naming those media ([`Project::media_converted_by`]), or with
 //!   `with_clips` clears the conversions with the looks.
@@ -69,9 +73,10 @@ fn spelled<T: serde::Serialize>(value: T) -> String {
 /// The sentence for a setting with nothing to convert by.
 const NEEDS_LOG_OR_LUT: &str = "color needs log or lut; null clears it";
 
-/// A colour is a setting on a video file only.
-fn check_kind(media: &Media) -> Result<(), String> {
-    if media.kind == MediaKind::Video {
+/// A colour is a setting on a video file; on an image only when `image_ok`
+/// (a PQ still's peak alone, spec §11 HD-20 (b)), and every other kind never.
+fn check_kind(media: &Media, image_ok: bool) -> Result<(), String> {
+    if media.kind == MediaKind::Video || (media.kind == MediaKind::Image && image_ok) {
         return Ok(());
     }
     Err(format!(
@@ -173,7 +178,8 @@ impl Project {
     /// The setting an asked `color` stores on `media` beside its `reading`,
     /// or (`Err`) the refusal in the rule's own sentence, in this order: `detected`,
     /// `pq`, a `peak` outside [`PEAK_MIN`]–[`PEAK_MAX`] or on media that is
-    /// not a PQ file, the media's kind, and none of `log`, `lut` and `peak`.
+    /// not a PQ file, the media's kind (an image passes only with a `peak`
+    /// alone, spec §11 HD-20 (b)), and none of `log`, `lut` and `peak`.
     fn asked_color(
         &self,
         media: u32,
@@ -204,7 +210,11 @@ impl Project {
             ));
         }
         if let Some(row) = self.media(media) {
-            check_kind(row)?;
+            let image_ok = peak.is_some()
+                && given.log.is_none()
+                && given.lut.is_none()
+                && given.gamut.is_none();
+            check_kind(row, image_ok)?;
         }
         if given.log.is_none() && given.lut.is_none() && peak.is_none() {
             return Err(NEEDS_LOG_OR_LUT.to_string());
@@ -218,7 +228,8 @@ impl Project {
     }
 
     /// A media's `color` against this project; `Ok` for a media without one.
-    /// Each sentence is the rule's own, in this order: the media's kind, a
+    /// Each sentence is the rule's own, in this order: the media's kind (an
+    /// image passes only with an import's `pq` alone, spec §11 HD-20 (b)), a
     /// setting with neither or both of `log` and `lut` (neither is a PQ
     /// file's `pq` alone, which passes), a `gamut` without a `log`, a pairing
     /// the curve does not take, a `lut` that is not a `lut` media of the
@@ -227,7 +238,12 @@ impl Project {
         let Some(color) = media.color else {
             return Ok(());
         };
-        check_kind(media)?;
+        let image_ok = color.pq.is_some()
+            && !color.detected
+            && color.log.is_none()
+            && color.lut.is_none()
+            && color.gamut.is_none();
+        check_kind(media, image_ok)?;
         match (color.log, color.lut) {
             (None, None) if color.pq.is_none() || color.detected => {
                 return Err(NEEDS_LOG_OR_LUT.to_string())

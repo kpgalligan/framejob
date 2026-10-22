@@ -369,7 +369,28 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   hlg(bt709); the sRGB PNG and still8.png nil), the wide one's longest side 8192, an
   Orientation-6 copy of the HEIC (written by the probe) rotated; a `LayerLift` of one
   texture through `.pq(.bt2020)` at `.sdr` then `.hlg`: two textures, each `InputStage`'s
-  pass ±1/1023.
+  pass ±1/1023. P12's `of(media:url:)` row "hlg as Apple Log" answers `.log` since
+  clean-up 3 batch B (HD-20 (a)).
+- **HIp, P14** (clean-up 3 batch B, phase 1, #325, #324, spec §11 HD-20; the rules fixed
+  before the phase's code). HIp's stills (`pq_meta_stills`): `still_pq.png` with a cLLI
+  (MaxCLL 40,000,000, MaxFALL 4,000,000, in 0.0001 cd/m²) or an mDCV (BT.2020's primaries,
+  D65, maximum 20,000,000, minimum 50) inserted after IHDR, its CRC `zlib.crc32` —
+  `still_pq_cll.png` and `still_pq_mdcv.png` — each kept only when ffprobe's frame side data
+  reads 4000 (resp. 2000) cd/m². HIp: `get_project`'s colours {pq: {file: 4000, from:
+  max_cll}}, {pq: {file: 2000, from: mastering_display}}, `still_pq.png` {pq: {}} and none
+  on `still16_srgb.png` and `still_hlg.png`; the cLLI still's grey row (every 64th column of
+  its own codes) = `pq_hlg(codes, 4000)` ±1/1023 in an HLG project and `convert(pq, bt2020,
+  codes, 4000)` ±1/255 in an SDR one (CONTROL: the SDR oracles at 4000 and 1000 part by more
+  than 2/255 at some sampled column); after `set_media_color {peak: 600}` the SDR render =
+  `convert(…, 600)` ±1/255; `{log: slog3}` on the PQ still and `{peak: 600}` on the sRGB
+  still refused by their sentences. P14: `KeyReading.log.uniform` 2, `of(.log(.slog3,
+  .sGamut3Cine))` `.log` and `of(.lut(7))` `.unlift`; `KeyReading.log.sdr(h)` = the
+  `.log(.slog3, .sGamut3Cine)` pass at `.sdr` ±1/1023, h its pass at `.hlg`, over 33
+  video-range S-Log3 greys (codes 95…740) and the GREEN_LIGHT card, after asserting the
+  card is inside BT.2020 (M(S-Gamut3.Cine → 2020)·r ≥ 0); a `LayerLift` of one texture
+  through `.pq(.bt2020)` at `.sdr` with peak nil, then 4000: two textures, the second the
+  pass at 4000 ±1/1023, and 4000 asked again the same texture. log_proof.py's L23 is
+  #324's MCP row.
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
@@ -381,10 +402,11 @@ applies the label inside `Exporter.renderFrame` instead, which moves the
 eyedropper's picks; it runs against a capture made after PR-11.
 
 H1a, the H7 family, the H-2 rows, the H-3 rows, the H-4 rows, the H-6 rows and clean-up
-batch 2's H7w and DA, and its phase 2's HI, HKh and H7h, run in a plain run, `compare` and
-`--only`; never under `capture`'s default selection, `--measure` or a mutant's default
-selection; hdr H-1's five, H-2's twelve, H-3's seven, H-4's nine, H-6's ten, clean-up batch
-2's eleven and its phase 2's thirteen mutants run with
+batch 2's H7w and DA, its phase 2's HI, HKh and H7h, and clean-up 3 batch B's HIp, run in
+a plain run, `compare` and `--only`; never under `capture`'s default selection, `--measure`
+or a mutant's default selection; hdr H-1's five, H-2's twelve, H-3's seven, H-4's nine,
+H-6's ten, clean-up batch 2's eleven, its phase 2's thirteen and clean-up 3 batch B's four
+mutants run with
 `--only <their rows>,Z1` (SI also runs under `capture --only`, writing
 DIR's references). `capture --only`
 captures just the rows named, keeping an earlier capture's H1 record.
@@ -413,6 +435,7 @@ import struct
 import subprocess
 import sys
 import time
+import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -494,12 +517,12 @@ H1_SUFFIX = {"still8": ".png", "webm": ".webm"}
 PICK_POINTS = {(W, H): [[256.5, 32.5], [512.5, 96.5], [900.5, 100.5]],
                (SW, SH): [[320.5, 180.5], [100.5, 60.5], [540.5, 300.5]]}
 ROWS = ["H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "H7", "H7d", "H7i",
-        "H7p", "H7o", "H7r", "H7w", "H7h", "HS", "HH", "HP", "HT", "HI", "HL", "HW", "HK", "HKh",
+        "H7p", "H7o", "H7r", "H7w", "H7h", "HS", "HH", "HP", "HT", "HI", "HIp", "HL", "HW", "HK", "HKh",
         "HM", "HF", "HX", "DT",
         "DP", "DV", "DI", "DE", "DR", "DS", "DM", "DX", "DA", "SI", "SW", "SV", "SS", "SD", "SP", "LT",
         "LH", "LG", "LA", "LS", "LM", "LD", "LB", "LF", "LR", "LE", "LO", "LU", "R0", "TI", "TH",
         "TO", "TL", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10",
-        "P11", "P12", "P13", "Z1"]
+        "P11", "P12", "P13", "P14", "Z1"]
 # H7's family (hdr H-1, #281, spec §11 HD-6, HD-12): PQ ramps whose HDR10 static
 # metadata sits in the HEVC stream's SEI (the x265 CLI, muxed by ffmpeg's stream copy;
 # ffmpeg 9.0.2's libx265 wrapper no longer writes the mastering display with these
@@ -636,6 +659,14 @@ GREEN_HDR = {"green_hlg": ((0.30, 0.62, 0.28), ("arib-std-b67", "bt2020", "bt202
              "green_pq": ((0.30, 0.70, 0.28), ("smpte2084", "bt2020", "bt2020nc"), 600)}
 KEY_TOLERANCES = (0.1, 0.05, 0.02, 0.01)
 HI_STILL_BOUND = 4 / 1023
+# Clean-up 3 batch B, phase 1 (#325, spec §11 HD-20 (b)): a PQ still's HDR10 peak (HIp).
+# PQ_META_STILLS: name → (the chunk inserted into still_pq.png after IHDR, its data, the
+# cd/m² ffprobe must read from it).
+B3_ROWS = {"HIp"}
+PQ_META_STILLS = {
+    "still_pq_cll": (b"cLLI", struct.pack(">II", 40_000_000, 4_000_000), 4000),
+    "still_pq_mdcv": (b"mDCV", struct.pack(">8HII", 35400, 14600, 8500, 39850, 6550, 2300,
+                                           15635, 16450, 20_000_000, 50), 2000)}
 # H7h's WebM: H7w's route, HLG-tagged, no HDR10 children.
 HLG_WEBM = {"hlg_webm": ("hlg", None, None, None)}
 LIN_D = 2 * SEC // 3
@@ -672,7 +703,12 @@ LAYER_RENDERERS_SWIFT = "app/Sources/LayerRenderers.swift"
 LIFT_SWIFT = "app/Sources/LayerLift.swift"
 EYEDROPPER_SWIFT = "app/Sources/EditorViewController+Eyedropper.swift"
 KEY_SWIFT = "app/Sources/ChromaKeyHDR.swift"
-P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"}
+# The lift pool's hit test (clean-up 3 batch B: the output and the peak), the anchor of
+# `lift-pool-ignores-output` and `lift-pool-ignores-peak`.
+LIFT_HIT = ("        if let hit = entries[key], hit.source === texture, hit.conversion == "
+            "conversion,\n            hit.output == output, hit.peak == peak\n")
+P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13",
+          "P14"}
 RECORDS = {"R0"}
 # name: ([(file, anchor, replacement), …], the rows that must fail).
 MUTANTS = {
@@ -1039,13 +1075,12 @@ MUTANTS = {
                                         "else {\n",
                                         "            guard let conversion = rendered.conversion, "
                                         "output == .hlg else {\n")], ["HI"]),
-    # The lift's pool hits on its source and conversion alone, whatever the output.
-    "lift-pool-ignores-output": ([(LIFT_SWIFT,
+    # The lift's pool hits on its source, conversion and peak alone, whatever the output
+    # (re-anchored by clean-up 3 batch B, which added the peak to the hit).
+    "lift-pool-ignores-output": ([(LIFT_SWIFT, LIFT_HIT,
                                    "        if let hit = entries[key], hit.source === texture, "
-                                   "hit.conversion == conversion,\n            hit.output == "
-                                   "output\n",
-                                   "        if let hit = entries[key], hit.source === texture, "
-                                   "hit.conversion == conversion\n")], ["P13"]),
+                                   "hit.conversion == conversion,\n            hit.peak == "
+                                   "peak\n")], ["P13"]),
     # The shader always un-lifts (the reading written, never read).
     "key-reading-dropped": ([(SHADER, "            ? keyReadSDR(rgb, u.keyReading) : "
                               "hlgUnliftSDR(rgb)) : rgb, key);\n",
@@ -1066,16 +1101,42 @@ MUTANTS = {
     # The eyedropper stores the un-lift whatever the clips' reading.
     "pick-reading-ignored": ([(EYEDROPPER_SWIFT, "        return picked.map(reading.pick)\n",
                                "        return picked.map(KeyReading.unlift.pick)\n")], ["P12"]),
-    # A media's Camera Log not consulted, so a log-converted HLG file reads as HLG.
+    # A media's Camera Log not consulted, so a log-converted HLG file reads as HLG
+    # (re-anchored by clean-up 3 batch B, whose reading of a log media is `.log`).
     "reading-ignores-log": ([(KEY_SWIFT,
-                              "            if let color = media.color, InputConversion.choose("
-                              "input: color) != nil {\n",
-                              "            if let color = media.color, InputConversion.choose("
-                              "input: color) != nil, false {\n")], ["P12"]),
+                              "            if let color = media.color, let chosen = "
+                              "InputConversion.choose(input: color) {\n",
+                              "            if let color = media.color, let chosen = "
+                              "InputConversion.choose(input: color), false {\n")], ["P12"]),
     # An HLG WebM copy left unlabelled (HD-19 (b)).
     "webm-hlg-unlabelled": ([(REWRAP_WRITER_SWIFT,
                               "            extensions.merge(hlgLabels(v)) { _, label in label }\n",
                               "")], ["H7h"]),
+    # Clean-up 3 batch B, phase 1 (#325, spec §11 HD-20 (b)): one per decision, each run with
+    # `--only <its rows>,Z1`.
+    # A PQ still's layer drawn at the unknown peak, its `input.peak` not passed to the lift.
+    "still-peak-dropped": ([(SOURCES_SWIFT,
+                             "                rendered.texture, conversion: conversion, output: "
+                             "output, peak: layer.input?.peak)\n",
+                             "                rendered.texture, conversion: conversion, output: "
+                             "output, peak: nil)\n")], ["HIp"]),
+    # The lift's pool hits whatever the peak, so a peak asked after another is not drawn.
+    "lift-pool-ignores-peak": ([(LIFT_SWIFT, LIFT_HIT,
+                                 "        if let hit = entries[key], hit.source === texture, "
+                                 "hit.conversion == conversion,\n            hit.output == "
+                                 "output\n")], ["P14"]),
+    # A PNG's cLLI read as whole cd/m², not 0.0001 cd/m².
+    "png-cll-whole-nits": ([("core/src/hdr10_still.rs",
+                             "                    .get_or_insert(be_u32(data, 0).and_then("
+                             "ten_thousandths));\n",
+                             "                    .get_or_insert(be_u32(data, 0).filter(|n| *n > "
+                             "0));\n")], ["HIp"]),
+    # A PQ still imported with no `pq`.
+    "still-pq-not-imported": ([(IMPORTER_COLOR_SWIFT,
+                                "        guard case .pq = StillColor.conversion(at: url) else "
+                                "{ return nil }\n",
+                                "        guard case .pq = StillColor.conversion(at: url), false "
+                                "else { return nil }\n")], ["HIp"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -6129,6 +6190,164 @@ def run_hi(client, state):
           f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
 
 
+# ---- clean-up 3 batch B, phase 1 (#325, spec §11 HD-20 (b)) -------------------------
+
+def png_with_chunk(source, out, kind, data):
+    """`source` (a PNG) rewritten to `out` with one chunk of `kind` and `data` straight after
+    IHDR, its CRC `zlib.crc32` of the type and data."""
+    raw = Path(source).read_bytes()
+    end = 8 + 12 + struct.unpack(">I", raw[8:12])[0]
+    chunk = (struct.pack(">I", len(data)) + kind + data
+             + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
+    out.write_bytes(raw[:end] + chunk + raw[end:])
+    return out
+
+
+def side_data_peak(path):
+    """ffprobe's reading of a still's HDR10 side data: (MaxCLL, the mastering maximum),
+    each in cd/m² or None."""
+    ran = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_frames",
+                       "-read_intervals", "%+#1", "-show_entries", "frame=side_data_list",
+                       "-of", "json", str(path)], 60)
+    try:
+        sides = json.loads(ran["stdout"])["frames"][0].get("side_data_list") or []
+    except (ValueError, KeyError, IndexError):
+        return None, None
+    cll = next((d.get("max_content") for d in sides
+                if d.get("side_data_type") == "Content light level metadata"), None)
+    top = next((d.get("max_luminance") for d in sides
+                if d.get("side_data_type") == "Mastering display metadata"), None)
+    if isinstance(top, str) and "/" in top:
+        n, d = top.split("/")
+        top = int(n) / int(d)
+    return cll, top
+
+
+def pq_meta_stills(stills):
+    """HIp's two stills: `still_pq.png` with a cLLI (MaxCLL 40,000,000, MaxFALL 4,000,000 in
+    0.0001 cd/m²) or an mDCV (BT.2020's primaries, D65, maximum 20,000,000, minimum 50)
+    inserted after IHDR, each kept only when ffprobe's frame side data reads 4000 (resp.
+    2000) cd/m². name → path or None, with REFUSED[name] saying why."""
+    out = {}
+    source = stills.get("still_pq_png")
+    for name, (kind, data, want) in PQ_META_STILLS.items():
+        path = MEDIA / f"{name}.png"
+        if source is None:
+            REFUSED[name] = "still_pq.png was refused"
+            out[name] = None
+            continue
+        png_with_chunk(source, path, kind, data)
+        cll, top = side_data_peak(path)
+        got = cll if kind == b"cLLI" else top
+        if got is None or abs(float(got) - want) > 0.5:
+            REFUSED[name] = f"{path.name} refused: ffprobe read MaxCLL {cll}, maximum {top}"
+            path.unlink(missing_ok=True)
+            out[name] = None
+            continue
+        out[name] = path
+    return out
+
+
+def run_hip(client, state):
+    """HIp (#325, spec §11 HD-20 (b)): a PQ still's HDR10 peak read at import, drawn and
+    overridden. The rules, fixed before the run: get_project's colours ({pq: {file: 4000,
+    from: max_cll}}, {pq: {file: 2000, from: mastering_display}}, still_pq.png {pq: {}}, and
+    none on still16_srgb.png and still_hlg.png); the cLLI still's grey row (every 64th column
+    of its own codes) = pq_hlg(codes, 4000) ±1/1023 in an HLG project and convert(pq,
+    bt2020, codes, 4000) ±1/255 in an SDR one (CONTROL: the SDR oracles at 4000 and 1000
+    part by more than 2/255 at some sampled column); after {peak: 600} the SDR render =
+    convert(…, 600) ±1/255; {log: slog3} on the PQ still and {peak: 600} on the sRGB still
+    refused by their sentences."""
+    stills = hdr_stills(client)
+    metas = pq_meta_stills(stills)
+    names = {**{n: stills.get(n) for n in ("still_pq_png", "still16_srgb", "still_hlg_png")},
+             **metas}
+    refused = {n: REFUSED.get(n) for n, p in names.items() if p is None}
+    state["hip_fixture"] = not refused
+    if refused:
+        check("HIp the stills were made", False, f"refused {refused}")
+        return
+    misses, figures, closed = [], [], True
+    # The colours import wrote, all five in one project.
+    doc = Doc(client, "hip-colours", W, H)
+    media = {}
+    for n, path in names.items():
+        got = doc.call("import_media", path=str(path)) if doc.ok else {"ok": False}
+        media[n] = reply(got).get("media")
+    rows_ = {m.get("id"): m for m in doc.project().get("media") or []}
+    colours = {n: rows_.get(i, {}).get("color") for n, i in media.items()}
+    want = {"still_pq_cll": {"pq": {"file": 4000, "from": "max_cll"}},
+            "still_pq_mdcv": {"pq": {"file": 2000, "from": "mastering_display"}},
+            "still_pq_png": {"pq": {}}, "still16_srgb": None, "still_hlg_png": None}
+    figures.append(f"colours {colours}")
+    if colours != want:
+        misses.append(f"get_project's colours {colours}, want {want}")
+    # Step 4's refusals, by their sentences.
+    sentences = (("still_pq_cll", {"log": "slog3"},
+                  f"media {media.get('still_pq_cll')} is an image; Camera Log is a setting on "
+                  "a video file"),
+                 ("still16_srgb", {"peak": 600},
+                  f"media {media.get('still16_srgb')} is not a PQ file; only a PQ file takes a "
+                  "peak"))
+    for n, color, sentence in sentences:
+        got = doc.call("set_media_color", media=media.get(n), color=color)
+        if got["ok"] or sentence not in got.get("error", ""):
+            misses.append(f"{n} {color}: {got.get('error') or 'accepted'}, want {sentence!r}")
+    closed = doc.close() and closed
+    # The cLLI still drawn at its peak in both outputs, then overridden to 600 in SDR.
+    codes = Frame(names["still_pq_cll"], W, H)
+    renders = {}
+    for output in ("hlg", "sdr"):
+        frame, ok, why = still_scene(client, f"pq-cll-{output}", names["still_pq_cll"], output)
+        closed = closed and ok
+        renders[output] = frame
+        if frame is None:
+            misses.append(f"the cLLI still in {output}: no render ({why})")
+    doc = Doc(client, "hip-peak", W, H)
+    clip = doc.place(names["still_pq_cll"]) if doc.ok else None
+    set_to = doc.call("set_media_color", media=doc._media.get(names["still_pq_cll"]),
+                      color={"peak": 600}) if clip else {"ok": False}
+    renders["600"] = frame_of(doc, "hip-peak-600") if set_to["ok"] else None
+    closed = doc.close() and closed
+    if renders["600"] is None:
+        misses.append(f"the 600 cd/m² override: {set_to.get('error') or doc.why or 'no render'}")
+    oracles = {"hlg": (lambda c: pq_hlg(c, 4000), LEVEL),
+               "sdr": (lambda c: convert("pq", "bt2020", c, 4000)[0], 1 / 255),
+               "600": (lambda c: convert("pq", "bt2020", c, 600)[0], 1 / 255)}
+    for key, (oracle, bound) in oracles.items():
+        frame = renders.get(key)
+        if frame is None:
+            continue
+        worst, bad = 0.0, []
+        for x in range(0, W, 64):
+            got = frame.px(x, GREY_ROW)
+            want_ = [unit(v) for v in oracle(codes.px(x, GREY_ROW))]
+            gap = max(abs(a - b) for a, b in zip(got, want_))
+            worst = max(worst, gap)
+            if not gap <= bound and len(bad) < 3:
+                bad.append(f"x={x} render {[round(v, 5) for v in got]} want "
+                           f"{[round(v, 5) for v in want_]}")
+        figures.append(f"{key}: worst |Δ| {levels(worst):.2f} of 1023 ({worst * 255:.2f} of "
+                       f"255), bound {bound * 1023:.2f} of 1023" + (f"; {bad}" if bad else ""))
+        if bad:
+            misses.append(f"the cLLI still at {key}")
+    apart = max(max(abs(a - b) for a, b in zip(
+        convert("pq", "bt2020", codes.px(x, GREY_ROW), 4000)[0],
+        convert("pq", "bt2020", codes.px(x, GREY_ROW), PQ_WHITE)[0])) for x in range(0, W, 64))
+    figures.append(f"CONTROL: the SDR oracles at 4000 and 1000 part by {apart * 255:.2f} of 255")
+    if not apart > 2 / 255:
+        misses.append("CONTROL: the SDR oracles at 4000 and 1000 part by 2/255 or less")
+    state["hip_closed"] = closed
+    check("HIp a PQ still's HDR10 peak (#325): get_project reads still_pq_cll.png {pq: {file: "
+          "4000, from: max_cll}}, still_pq_mdcv.png {pq: {file: 2000, from: mastering_display}}, "
+          "still_pq.png {pq: {}} and no colour on the sRGB and HLG stills; the cLLI still's grey "
+          "row = pq_hlg(codes, 4000) ±1/1023 in HLG and convert(pq, bt2020, codes, 4000) ±1/255 "
+          "in SDR, and after {peak: 600} convert(…, 600) ±1/255 (CONTROL: the 4000 and 1000 "
+          "oracles part by > 2/255); {log: slog3} on the PQ still and {peak} on the sRGB still "
+          "refused by their sentences", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
 def bt2020_codes(rgb):
     """BT.2020 NCL R'G'B' → 10-bit limited-range (Y', Cb, Cr) codes, rounded."""
     kr, kb = KR_KB["bt2020nc"]
@@ -6390,7 +6609,7 @@ def main():
         selected -= {"TI", "TH", "TO", "TL"}
         if args.mutant:
             selected -= ({"H1a"} | H7_ROWS | H2_ROWS | H3_ROWS | H4_ROWS | L_ROWS | C2_ROWS
-                         | C3_ROWS)
+                         | C3_ROWS | B3_ROWS)
     if args.mode == "capture":
         if not args.only:
             selected = {"H1", "H2", "H3", "H4", "H5", "H6", "R0", "Z1"}
@@ -6428,7 +6647,7 @@ def main():
     needs_instance = bool(selected & ({"H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5",
                                        "H6", "R0"} | H7_ROWS | H2_ROWS
                                       | (H3_ROWS - {"DX"}) | H4_ROWS | L_ROWS | C2_ROWS
-                                      | C3_ROWS | {"P12", "P13"}))
+                                      | C3_ROWS | B3_ROWS | {"P12", "P13"}))
     if needs_instance:
         launched = mcp.launch(str(binary), [],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
@@ -6491,7 +6710,8 @@ def main():
                     state["p13_fixture"] = all(stills.values())
                 # hdr H-2 (#277): the HLG working space.
                 for row, run in (("HS", run_hs), ("HH", run_hh), ("HP", run_hp),
-                                 ("HT", run_ht), ("HI", run_hi), ("HL", run_hl),
+                                 ("HT", run_ht), ("HI", run_hi), ("HIp", run_hip),
+                                 ("HL", run_hl),
                                  ("HW", run_hw), ("HK", run_hk), ("HKh", run_hkh),
                                  ("HM", run_hm), ("HF", run_hf),
                                  ("HX", run_hx),

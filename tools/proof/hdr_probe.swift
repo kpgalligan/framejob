@@ -1,5 +1,5 @@
 // Built by tools/proof/hdr_proof.py as `main.swift` over every other file in
-// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P13
+// `app/Sources` (`swift_build.py`). See that script's header, rows P1–P14
 // (grading-3 T3-1, spec §11 GR-15 as amended; P5 hdr H-1, spec §11 HD-12; P6
 // hdr H-2, spec §11 HD-3, HD-13; P7 hdr H-3, spec §11 HD-14; P8 hdr H-4, spec
 // §11 HD-15: `ScopeSignal`, the traces' JSON, and the waveform's, parade's
@@ -8,7 +8,9 @@
 // and P11 clean-up batch 2, spec §11 HD-18: an AV1 file's peak through
 // `MediaImporter.detectedPQ`, and a scope slot reading only its own kind;
 // P12 and P13 its phase 2, spec §11 HD-19: `KeyReading` against step 0's own
-// arms, and `StillColor` over the HDR stills with `LayerLift`'s pool).
+// arms, and `StillColor` over the HDR stills with `LayerLift`'s pool; P14
+// clean-up 3 batch B, spec §11 HD-20: `KeyReading.log` against step 0's
+// camera-log arm, and `LayerLift`'s pool keyed on a PQ still's peak).
 //
 // Step 0's maths through the app's own types: `InputConversion`'s selector
 // through BOTH readers (the labels as strings, and a `CMVideoFormatDescription`
@@ -1357,7 +1359,7 @@ if Set(request["rows"] as? [String] ?? []).contains("P12") {
         ("hlg", "hlg", .video, nil, .hlg),
         ("pq peak 600", "pq", .video, pq600, .pq(peak: 600)),
         ("bt709", "bt709", .video, nil, .unlift),
-        ("hlg as Apple Log", "hlg", .video, MediaColor(log: .appleLog), .unlift),
+        ("hlg as Apple Log", "hlg", .video, MediaColor(log: .appleLog), .log),
         ("hlg with a LUT", "hlg", .video, lut, .unlift),
         ("the HLG PNG", "still_hlg_png", .image, nil, .hlg),
         ("still8.png", "still8", .image, nil, .unlift),
@@ -1467,6 +1469,94 @@ if Set(request["rows"] as? [String] ?? []).contains("P13") {
             + "PNG and still8.png nil; the wide still's longest side 8192; the Orientation-6 HEIC "
             + "rotated; a LayerLift of one texture through pq(bt2020) at .sdr then .hlg gives two "
             + "textures, each InputStage's pass ±1/1023",
+        misses.isEmpty,
+        (misses.isEmpty ? "as wanted" : misses.joined(separator: "; ")) + " | "
+            + figures.joined(separator: "; "))
+}
+
+// MARK: - P14 the key's camera-log reading and the lift's peak (clean-up 3 batch B, spec §11 HD-20)
+
+if Set(request["rows"] as? [String] ?? []).contains("P14") {
+    var misses: [String] = []
+    var figures: [String] = []
+    // (a) the reading's uniform and its choice.
+    if KeyReading.log.uniform != 2 { misses.append("KeyReading.log.uniform \(KeyReading.log.uniform), want 2") }
+    let logged = KeyReading.of(.log(.slog3, .sGamut3Cine), peak: nil)
+    let lutted = KeyReading.of(.lut(7), peak: nil)
+    if logged != .log { misses.append("of(.log(.slog3, .sGamut3Cine)) \(logged), want .log") }
+    if lutted != .unlift { misses.append("of(.lut(7)) \(lutted), want .unlift") }
+    // S-Log3's encode (Sony's formula): reflection → its signal y = CV/1023.
+    func slog3(_ r: Float) -> Float {
+        r >= 0.01125
+            ? (420 + 261.5 * log10((r + 0.01) / 0.19)) / 1023
+            : (r * (171.2102946929 - 95) / 0.01125 + 95) / 1023
+    }
+    // A video-range code's decoded signal s = (code − 64)/876.
+    func signal(_ code: Float) -> Float { (code - 64) / 876 }
+    let card = SIMD3<Float>(0.15, 0.35, 0.12)
+    let card2020 = InputConversions.toBT2020(from: .sGamut3Cine) * card
+    figures.append("card in BT.2020 \(card2020)")
+    if min(card2020.x, card2020.y, card2020.z) < 0 {
+        misses.append("the card leaves BT.2020 (\(card2020)): the HLG arm would floor it")
+    }
+    // (b) the reading of the HLG arm's output = the SDR arm's output, over 33 greys (codes
+    // 95…740) and the card.
+    if let (device, queue, library, stage) = compiledStage() {
+        let greys = (0...32).map { i -> SIMD3<Float> in
+            SIMD3(repeating: signal((95 + Float(i) * (740 - 95) / 32).rounded()))
+        }
+        let cardSignal = SIMD3<Float>(
+            signal(1023 * slog3(card.x)), signal(1023 * slog3(card.y)), signal(1023 * slog3(card.z)))
+        let texels = (greys + [cardSignal]).map { SIMD4<Float>($0, 1) }
+        let conversion = InputConversion.log(.slog3, .sGamut3Cine)
+        if min(card2020.x, card2020.y, card2020.z) >= 0,
+            let h = stagePass(stage, device, queue, conversion, peak: nil, output: .hlg, texels),
+            let sdr = stagePass(stage, device, queue, conversion, peak: nil, output: .sdr, texels)
+        {
+            let read = h.map { KeyReading.log.sdr(SIMD3($0.x, $0.y, $0.z)) }
+            let worst = worstGap(read, sdr.map { SIMD3($0.x, $0.y, $0.z) })
+            figures.append("log: worst |Δ| \(worst * 1023) levels")
+            if !(worst <= 1.0 / 1023) {
+                misses.append("KeyReading.log.sdr of the log arm's HLG output against its SDR output: \(worst * 1023) levels")
+            }
+        } else {
+            misses.append("the camera-log passes did not run")
+        }
+        // (c) the lift's pool: one texture through `.pq(.bt2020)` at .sdr, peak nil then 4000,
+        // gives two textures, the second InputStage's pass at 4000; asked again at 4000 the
+        // same texture.
+        if let lift = LayerLift(device: device, library: library) {
+            let pq = (0...30).map { SIMD4<Float>(SIMD3(repeating: Float($0) * 0.025), 1) }
+                + [SIMD4<Float>(0.30, 0.70, 0.28, 1), [0.55, 0.40, 0.30, 1]]
+            if let source = halfTexture(device, pq),
+                let unknown = lift.lifted(source, conversion: .pq(.bt2020), output: .sdr, queue: queue),
+                let named = lift.lifted(source, conversion: .pq(.bt2020), output: .sdr, peak: 4000, queue: queue),
+                let again = lift.lifted(source, conversion: .pq(.bt2020), output: .sdr, peak: 4000, queue: queue),
+                let got = readBack(named, device, queue),
+                let want = stagePass(stage, device, queue, .pq(.bt2020), peak: 4000, output: .sdr, pq)
+            {
+                let gap = worstGap(got.map { SIMD3($0.x, $0.y, $0.z) }, want.map { SIMD3($0.x, $0.y, $0.z) })
+                figures.append("lift at 4000 worst \(gap * 1023) levels; distinct \(unknown !== named); "
+                    + "again the same \(again === named)")
+                if unknown === named || again !== named || !(gap <= 1.0 / 1023) {
+                    misses.append("the lift's peak: distinct \(unknown !== named), again the same "
+                        + "\(again === named), at 4000 \(gap * 1023) levels")
+                }
+            } else {
+                misses.append("the lift or the pass did not run")
+            }
+        } else {
+            misses.append("no LayerLift")
+        }
+    } else {
+        misses.append("no Metal device, shader or InputStage")
+    }
+    check(
+        "P14 KeyReading.log.uniform 2, of(.log) .log and of(.lut) .unlift; KeyReading.log.sdr of "
+            + "the S-Log3 / S-Gamut3.Cine arm's HLG output = its SDR output (33 greys at codes "
+            + "95…740 and the GREEN_LIGHT card, inside BT.2020) ±1/1023; a LayerLift of one "
+            + "texture through pq(bt2020) at .sdr, peak nil then 4000, gives two textures, the "
+            + "second InputStage's pass at 4000 ±1/1023, and 4000 again the same texture",
         misses.isEmpty,
         (misses.isEmpty ? "as wanted" : misses.joined(separator: "; ")) + " | "
             + figures.joined(separator: "; "))

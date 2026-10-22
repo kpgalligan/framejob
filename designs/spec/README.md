@@ -24,11 +24,11 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 25 | The toolbar. |
 | [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 171 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping, Show Ungraded and the scopes panel (its two slots, their sizes and the four scopes drawn). |
 | [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 519 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear; every video, audio, text and shape section. |
-| [`04.3b-inspector-media-document-assistant.md`](04.3b-inspector-media-document-assistant.md) | 224 | The inspector's Media tab (find band, rows, drags, Consolidate, import, generate and export captions), Document tab and Assistant tab. |
+| [`04.3b-inspector-media-document-assistant.md`](04.3b-inspector-media-document-assistant.md) | 225 | The inspector's Media tab (find band, rows, drags, Consolidate, import, generate and export captions), Document tab and Assistant tab. |
 | [`04.4-timeline.md`](04.4-timeline.md) | 213 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
-| [`05.2-project-schema.md`](05.2-project-schema.md) | 539 | The project JSON schema: every persisted field (format version 19). |
+| [`05.2-project-schema.md`](05.2-project-schema.md) | 542 | The project JSON schema: every persisted field (format version 19). |
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
 | [`05.4-actions.md`](05.4-actions.md) | 137 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
 | [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
@@ -36,25 +36,25 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | **§6 — Edit operations: exact semantics** | | |
 | [`06a-edit-operations-shared-rules.md`](06a-edit-operations-shared-rules.md) | 84 | The rules every op shares: caller ticks snapped to the frame grid, an omitted argument against `null`, how to read a "refuses", the one way a patch is read, and the `scope` envelope key (the view project, the eight ops that are an error with a scope, the checks on the merged parent). |
 | [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 402 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, paste and paste attributes; nest and unnest; the patch ops; the transition ops. |
-| [`06c-edit-operations-actions-tracks-media.md`](06c-edit-operations-actions-tracks-media.md) | 154 | The action ops (the zoom action, end patches and `off`); the track, marker, canvas and media ops; and the op table's two halves (the arguments half is `core/src/op_table.rs`). |
+| [`06c-edit-operations-actions-tracks-media.md`](06c-edit-operations-actions-tracks-media.md) | 157 | The action ops (the zoom action, end patches and `off`); the track, marker, canvas and media ops; and the op table's two halves (the arguments half is `core/src/op_table.rs`). |
 | **§7 — Architecture: Rust decides, AVFoundation and Metal do** | | |
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
-| [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 147 | The `rc_*` exports and their contracts. |
+| [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 151 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 164 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
-| [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 487 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
+| [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 488 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 56 | The spec's Swift file map (app/CLAUDE.md is the live one). |
-| [`07.5-compositor.md`](07.5-compositor.md) | 511 | The Metal compositor's step 0 (per composition), passes, mattes, and transitions, and the scopes' tap (the shown set, the kernels, the counting rule). |
+| [`07.5-compositor.md`](07.5-compositor.md) | 515 | The Metal compositor's step 0 (per composition), passes, mattes, and transitions, and the scopes' tap (the shown set, the kernels, the counting rule). |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 46 | What playback does after every edit: rebuild or refresh. |
-| [`07.7-import.md`](07.7-import.md) | 219 | `MediaImporter.probe`, the formats import accepts, the WebM/Matroska rewrap and its PQ copy's HDR10 fields, its copy's progress window, the copy's original, and the opt-in ffmpeg step's original and checked VP9 copy. |
+| [`07.7-import.md`](07.7-import.md) | 223 | `MediaImporter.probe`, the formats import accepts, the WebM/Matroska rewrap and its PQ copy's HDR10 fields, its copy's progress window, the copy's original, and the opt-in ffmpeg step's original and checked VP9 copy. |
 | [`07.8-export.md`](07.8-export.md) | 432 | Export: writers, formats, loudness, the queue. |
 | [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 409 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, the app-state tools, lenient decoding. |
 | [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 159 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
 | [`07.9c-agent-graphics-dev-tools-transport.md`](07.9c-agent-graphics-dev-tools-transport.md) | 300 | The graphics loop's tools (write, read, render, import, delete, rename and restore a module), an action's graphic props and the graphics menus, the dev tools (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `assistant_send` / `assistant_answer` and their launch defaults, `play_preview`, `graphic_memory`), and the transport (the Unix socket, `framejob-mcp`, Copy MCP Command). |
-| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 103 | The spec's Rust module map (core/CLAUDE.md is the live one). |
+| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 104 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 188 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 10785 in 26 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 10832 in 26 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

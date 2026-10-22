@@ -133,7 +133,10 @@ The rules every op shares are §6a; the clip ops are §6b.
   survive every op, and `null` clears both, keeping the reading (an identity with neither).
   Refused besides: `color.pq is read from the file at import, not set`, `media 3 is not a PQ
   file; only a PQ file takes a peak`, `color.peak must be 1–10000 cd/m², not 0`; an asked
-  `color` with none of `log`, `lut` and `peak` keeps `color needs log or lut; null clears it`;
+  `color` with none of `log`, `lut` and `peak` keeps `color needs log or lut; null clears it`.
+  A PQ still (§11 HD-20 (b): an image media import gave `pq`) takes `peak` alone; any other
+  `color` on an image, `{}` included, keeps the kind sentence `media 5 is an image; Camera
+  Log is a setting on a video file` (a `peak` on a non-PQ image keeps its own sentence);
   a `peak` that is not a whole number is an `Err` (`color.peak must be a whole number of
   cd/m², not a string`). A `scope` is an `Err` (`set_media_color has no meaning inside nest
   4`): a nest shares the document's media.

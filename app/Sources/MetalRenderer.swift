@@ -272,11 +272,13 @@ final class MetalRenderer {
 
     /// `texture`, a layer Frame Job drew, lifted into an HLG project's working
     /// space (`LayerLift`) — or an HLG or PQ still run through its own arm for
-    /// a project of `output` (spec §11 HD-19 (a)); nil when it could not be.
+    /// a project of `output` (spec §11 HD-19 (a)), a PQ still's at its `peak`
+    /// (HD-20 (b)); nil when it could not be.
     func lifted(
-        _ texture: MTLTexture, conversion: InputConversion = .sdr, output: CanvasOutput = .hlg
+        _ texture: MTLTexture, conversion: InputConversion = .sdr, output: CanvasOutput = .hlg,
+        peak: UInt32? = nil
     ) -> MTLTexture? {
-        lift.lifted(texture, conversion: conversion, output: output, queue: commandQueue)
+        lift.lifted(texture, conversion: conversion, output: output, peak: peak, queue: commandQueue)
     }
 
     /// The canvas background as the frame is cleared to it: HD-3's lift of it

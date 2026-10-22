@@ -45,7 +45,7 @@ use framejob_core::ffi_graphic::{
     rc_graphic_library_add_asset, rc_graphic_library_add_font, rc_graphic_library_families,
     rc_graphic_library_free, rc_graphic_library_new, rc_graphic_rasterize, rc_graphic_svg,
 };
-use framejob_core::ffi_hdr10::{rc_hdr10_av1_peak, rc_hdr10_peak};
+use framejob_core::ffi_hdr10::{rc_hdr10_av1_peak, rc_hdr10_peak, rc_hdr10_still_peak};
 use framejob_core::ffi_query::{
     rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_op_schemas,
     rc_project_clip_state, rc_project_composition_plan, rc_project_duration,
@@ -2345,6 +2345,10 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     let read = unsafe { rc_hdr10_av1_peak(ptr::null(), 40, ptr::null(), 100) };
     assert_eq!(take_string(read).as_deref(), Some("{}"));
     cover("rc_hdr10_av1_peak");
+    // rc_hdr10_still_peak — a NULL file reads nothing: `{}`.
+    let read = unsafe { rc_hdr10_still_peak(ptr::null(), 64) };
+    assert_eq!(take_string(read).as_deref(), Some("{}"));
+    cover("rc_hdr10_still_peak");
 
     swept.sort();
     swept.dedup();

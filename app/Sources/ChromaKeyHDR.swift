@@ -13,22 +13,31 @@ import simd
 ///   inverse OETF, BT.2100's OOTF γ 1.2, × 1000/203), then GR-15's PQ arm's
 ///   matrix, gamut lift and shoulder to max(peak, 203)/203. Exact up to 1,000
 ///   cd/m²; close above, where BT.2390's EETF is not undone.
-/// - `.unlift` — every other layer (Camera Log and LUT media, SDR sources,
-///   drawn layers): HD-13 (h)'s inverse lift, unchanged.
+/// - `.log` — the layer's media has a built-in Camera Log (spec §11 HD-20
+///   (a), #324): the working colour back to scene light (the inverse OETF,
+///   HD-13 (e)'s BT.2020 reflection × `logHLGExposure`), × `logExposure /
+///   logHLGExposure`, then GR-16's SDR arm's matrix, gamut lift and shoulder
+///   to `logWhite`. Exact where the HLG arm floored no channel and did not
+///   clip (reflection ≤ 3.74).
+/// - `.unlift` — every other layer (LUT media, SDR sources, drawn layers):
+///   HD-13 (h)'s inverse lift, unchanged, exact for a LUT media's output,
+///   which HD-3 lifted.
 ///
 /// The shader's `keyReadSDR` and `hlgUnliftSDR` read it from
 /// `LayerUniforms.keyReading` (`uniform`); `sdr` is their CPU twin, and the
 /// HLG eyedropper stores `pick` of the clicked colour.
 enum KeyReading: Equatable {
-    case unlift, hlg, pq(peak: UInt32?)
+    case unlift, hlg, pq(peak: UInt32?), log
 
-    /// `LayerUniforms.keyReading`: 0 the un-lift, 1 the HLG arm, and for PQ
-    /// minus the shoulder's white, max(peak, 203)/203 with 1,000 cd/m² when
-    /// none is named — never above −1, so the shader tells the three apart.
+    /// `LayerUniforms.keyReading`: 0 the un-lift, 1 the HLG arm, 2 the
+    /// camera-log arm, and for PQ minus the shoulder's white, max(peak,
+    /// 203)/203 with 1,000 cd/m² when none is named — never above −1, so the
+    /// shader tells the four apart.
     var uniform: Float {
         switch self {
         case .unlift: return 0
         case .hlg: return 1
+        case .log: return 2
         case .pq(let peak): return -InputConversions.pqShoulderWhite(peak: peak)
         }
     }
@@ -55,6 +64,9 @@ enum KeyReading: Equatable {
                 ? scene * pow(ys, InputConversions.hlgNominalGamma - 1) : .zero
             light = display * (InputConversions.pqWhite / InputConversions.pqReferenceWhite)
             white = InputConversions.pqShoulderWhite(peak: peak)
+        case .log:
+            light = scene * (InputConversions.logExposure / InputConversions.logHLGExposure)
+            white = InputConversions.logWhite
         }
         let linear = Self.shoulder(
             Self.gamutLift(InputConversions.toBT709(from: .bt2020) * light), white: white)
@@ -77,21 +89,24 @@ enum KeyReading: Equatable {
 
     /// The reading of a source whose SDR-project step-0 choice is
     /// `conversion` — a frame's `choose(input:buffer:output: .sdr)` or a
-    /// still's `StillColor` arm — with its media's effective PQ peak.
+    /// still's `StillColor` arm — with its media's effective PQ peak: a
+    /// built-in Camera Log `.log`, a LUT (and no conversion) `.unlift`.
     static func of(_ conversion: InputConversion?, peak: UInt32?) -> KeyReading {
         switch conversion {
         case .hlg: return .hlg
         case .pq: return .pq(peak: peak)
+        case .log: return .log
         default: return .unlift
         }
     }
 
     /// The reading of a media, for the eyedropper, which has no frame: a
-    /// still by its colour space; a video `.unlift` when its Camera Log
-    /// converts it (GR-16 chooses before the labels), else by its track's
-    /// labels (`ThumbnailInput(track:)`, await-free) with its effective PQ
-    /// peak; every other media, or none at `url`, `.unlift`. Off the main
-    /// thread: the track lookup reads the file.
+    /// still by its colour space with its effective PQ peak (spec §11 HD-20
+    /// (b)); a video by its Camera Log when one converts it (GR-16 chooses
+    /// before the labels: a built-in curve `.log`, a LUT `.unlift`), else by
+    /// its track's labels (`ThumbnailInput(track:)`, await-free) with its
+    /// effective PQ peak; every other media, or none at `url`, `.unlift`. Off
+    /// the main thread: the track lookup reads the file.
     static func of(media: MediaSnapshot, url: URL?) -> KeyReading {
         guard let url else { return .unlift }
         switch media.kind {
@@ -100,10 +115,10 @@ enum KeyReading: Equatable {
             // still's HDR bitmap at draw time, the layer falls back to the SDR
             // path and the shader reads `.unlift` against this pick: rare, and
             // a re-pick fixes it.
-            return of(StillColor.conversion(at: url), peak: nil)
+            return of(StillColor.conversion(at: url), peak: media.color?.pq?.effectivePeak)
         case .video:
-            if let color = media.color, InputConversion.choose(input: color) != nil {
-                return .unlift
+            if let color = media.color, let chosen = InputConversion.choose(input: color) {
+                return of(chosen, peak: nil)
             }
             let track = CompositionBuilder.firstTrack(of: AVURLAsset(url: url), mediaType: .video)
             switch track.flatMap(ThumbnailInput.init(track:))?.transfer {

@@ -238,10 +238,11 @@ struct LayerUniforms {
     // what they were (`Compositor+Uniforms.swift`, `Compositor+Adjustment
     // .swift`). `linearLight` (spec §11 HD-16 (c)) is 1 when the canvas
     // blends in linear light: the layer decoded after its grade; 0 in every
-    // other project. `keyReading` (spec §11 HD-19 (c)) is how an HLG project's
-    // chroma key reads a keyed layer whose source is HLG or PQ: 1 through
-    // GR-15's HLG arm, minus the PQ shoulder's white through its PQ arm, 0 the
-    // un-lift (`KeyReading.uniform`); 0 in every other block. 128 + 4 = 132
+    // other project. `keyReading` (spec §11 HD-19 (c), HD-20 (a)) is how an
+    // HLG project's chroma key reads a keyed layer whose source is HLG, PQ or
+    // camera log: 1 through GR-15's HLG arm, 2 through GR-16's camera-log arm,
+    // minus the PQ shoulder's white through its PQ arm, 0 the un-lift
+    // (`KeyReading.uniform`); 0 in every other block. 128 + 4 = 132
     // floats = 528 bytes, 33 × 16.
     var hlgOutput: Float = 0
     var liftedWhite: Float = 0

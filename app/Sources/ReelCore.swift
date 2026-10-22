@@ -602,15 +602,17 @@ enum ReelCube {
 /// the format description's two extensions when either is present, else the
 /// first sample's prefix SEI, its NAL units prefixed by `nalLength` bytes.
 enum ReelHDR10 {
+    /// `data`'s bytes and count for the call, or NULL and 0 when absent or empty.
+    private static func withBytes<R>(_ data: Data?, _ body: (UnsafePointer<UInt8>?, Int) -> R) -> R {
+        guard let data, !data.isEmpty else { return body(nil, 0) }
+        return data.withUnsafeBytes { body($0.bindMemory(to: UInt8.self).baseAddress, $0.count) }
+    }
+
     /// What the core read; an empty `PQColor` when it read nothing (the core
     /// answers NULL only on a caught panic, read as nothing too).
     static func peak(mastering: Data?, contentLight: Data?, sample: Data?, nalLength: Int)
         -> PQColor
     {
-        func withBytes<R>(_ data: Data?, _ body: (UnsafePointer<UInt8>?, Int) -> R) -> R {
-            guard let data, !data.isEmpty else { return body(nil, 0) }
-            return data.withUnsafeBytes { body($0.bindMemory(to: UInt8.self).baseAddress, $0.count) }
-        }
         let length = UInt32(clamping: max(0, nalLength))
         let text: String? = withBytes(mastering) { m, mCount in
             withBytes(contentLight) { l, lCount in
@@ -627,14 +629,20 @@ enum ReelHDR10 {
     /// then of its first sample with data; an empty `PQColor` when nothing
     /// reads.
     static func av1Peak(config: Data?, sample: Data?) -> PQColor {
-        func withBytes<R>(_ data: Data?, _ body: (UnsafePointer<UInt8>?, Int) -> R) -> R {
-            guard let data, !data.isEmpty else { return body(nil, 0) }
-            return data.withUnsafeBytes { body($0.bindMemory(to: UInt8.self).baseAddress, $0.count) }
-        }
         let text: String? = withBytes(config) { c, cCount in
             withBytes(sample) { s, sCount in
                 takeString(rc_hdr10_av1_peak(c, cCount, s, sCount))
             }
+        }
+        return text.flatMap { ReelJSON.decode(PQColor.self, from: $0) } ?? PQColor()
+    }
+
+    /// A PQ still's peak (`rc_hdr10_still_peak`, spec §11 HD-20 (b)) from its
+    /// whole file: a PNG's `cLLI`/`mDCV`, a HEIF or AVIF primary item's
+    /// `clli`/`mdcv`; an empty `PQColor` when nothing reads.
+    static func stillPeak(file: Data?) -> PQColor {
+        let text: String? = withBytes(file) { f, fCount in
+            takeString(rc_hdr10_still_peak(f, fCount))
         }
         return text.flatMap { ReelJSON.decode(PQColor.self, from: $0) } ?? PQColor()
     }

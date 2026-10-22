@@ -21758,3 +21758,63 @@ RC_PROOF_APP=release python3 tools/proof/precision_proof.py --only V0,V1,V2,V3,V
 | `peaks_proof.py` (Release, own instance) | 21/21, the marker at version 2 |
 | `remaining_proof.py` (Release, the same instance) | 80/80; the instance's log holds no `Frame Job: ` line |
 | `precision_proof.py --only V0…V6` (Release) | 8/8 with Z1; V4's digest names renderer version 5 |
+
+## Clean-up round 3, batch B, phase 1 — #324, the key on Camera Log media across HLG, and #325, a PQ still's HDR10 peak (`hdr_proof.py` HIp, P14 and four mutants; `log_proof.py` L23 and three mutants; `hdr_probe.swift` P12's table, P14; `core/tests/hdr10_still.rs`, `schema_v26.rs`, `media_peak.rs`; spec §11 HD-20)
+
+The phase makes an HLG project's chroma key on a layer whose media has a built-in Camera Log
+compare the colour an SDR project shows (`KeyReading.log`, uniform 2, the shader's
+`keyReadSDR` log branch, the eyedropper through `of(media:url:)`), and reads a PQ still's HDR10
+peak at import (`rc_hdr10_still_peak` over the file's bytes, `MediaImporter.detectedStillPQ`),
+publishes it as the still's `input.peak` and draws it through `LayerLift`'s `.pq` arm at that
+peak, the pool keyed on it (format 26). The rules are the two scripts' headers, fixed before the
+phase's code.
+
+- **HIp's stills** (`pq_meta_stills`) are `still_pq.png` with one chunk inserted after IHDR, its
+  CRC `zlib.crc32`: `still_pq_cll.png` (cLLI, MaxCLL 40,000,000 and MaxFALL 4,000,000 in 0.0001
+  cd/m²) and `still_pq_mdcv.png` (mDCV, BT.2020's primaries, D65, maximum 20,000,000, minimum
+  50), each kept only when ffprobe's frame side data reads 4000 (resp. 2000) cd/m² (ffmpeg
+  9.0.2's PNG decoder reads both chunks). They are rewritten on every run from `still_pq.png`,
+  which `hdr_stills` makes once; HIp needs an instance for the HLG PNG it reads the colour of.
+- **HIp** reads every colour from one project's `get_project`, refuses `{log: slog3}` on the
+  PQ still and `{peak: 600}` on the sRGB still by their sentences, then renders the cLLI still
+  alone in HLG and SDR (`still_scene`) and once more after `{peak: 600}`. Its CONTROL is the
+  oracle's own: at the sampled columns the SDR oracle at 4000 and at 1000 part by more than
+  2/255, so a still drawn at the unknown peak cannot pass.
+- **L23** asserts its card first: its largest SDR light above the shoulder's knee (so
+  `key-log-white-hlg` moves the reading) and its BT.2020 reflection unclipped in HLG (so the
+  reading is exact); either failing is the row's failure, not a skip. Its tolerance is HKh's
+  rule over `KEY_TOLERANCES`, the substituted readings the un-lift, the reading without the
+  exposure ratio and the reading with white 1.07.
+- **P14** asserts the card is inside BT.2020 before comparing `KeyReading.log.sdr` with the
+  SDR pass; P12's "hlg as Apple Log" row answers `.log` now.
+- **Re-anchored:** `lift-pool-ignores-output` (P13) and the new `lift-pool-ignores-peak` (P14)
+  share `LIFT_HIT`, the hit test that gained `hit.peak == peak`; `reading-ignores-log` (P12)
+  names the line that now binds `chosen`. Their meanings are unchanged.
+
+```sh
+cd core && cargo test --release --test hdr10_still && cargo test --release --test media_peak && cargo test --release --test schema_v26
+make app-debug && python3 tools/proof/hdr_proof.py --only HI,HKh,HIp,P12,P13,P14,Z1 && python3 tools/proof/log_proof.py --only L3,L21,L23,Z1
+make app && RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --only HI,HKh,HIp,P12,P13,P14,Z1
+RC_PROOF_APP=release python3 tools/proof/log_proof.py --only L3,L21,L23,Z1
+python3 tools/proof/hdr_proof.py --mutant <name> --only <its rows>,Z1
+python3 tools/proof/log_proof.py --mutant <name> --only L23,Z1
+```
+
+The seven mutants and their rows: `still-peak-dropped` (the `.image` arm lifts at no peak) HIp;
+`lift-pool-ignores-peak` (the pool hits whatever the peak) P14; `png-cll-whole-nits` (a PNG's
+cLLI read without `ten_thousandths`) HIp; `still-pq-not-imported` (`detectedStillPQ` answers
+nil) HIp; `key-log-as-unlift` (`KeyReading.of`'s `.log` arm `.unlift`) L23;
+`key-log-exposure-dropped` (the shader's log light = e) L23; `key-log-white-hlg` (its white
+`kKeyHlgWhite`) L23.
+
+| Run (2026-10-22, the worktree) | Result |
+|---|---|
+| `hdr_proof.py --only HI,HKh,HIp,P12,P13,P14,Z1` (Debug, then Release) | 7/7 both. HIp: colours as wanted; the cLLI still's worst \|Δ\| 0.50/1023 in HLG (bound 1), 0.57/1023 in SDR and 0.43/1023 at 600 (bound 4.01, 1/255); CONTROL the 4000 and 1000 oracles part by 7.05/255. P14: the card in BT.2020 (0.176, 0.409, 0.105); `KeyReading.log.sdr` worst 0.76/1023; the lift at 4000 worst 0.0, distinct, asked again the same |
+| `log_proof.py --only L3,L21,L23,Z1` (Debug, then Release) | 4/4 both. L23: card SDR light (0.063, 0.610, 0.103), above 0.39; BT.2020 reflection max 0.817, unclipped; distances right 0.0000, un-lift 0.1245, no ratio 0.2738, white 1.07 0.0313: tolerance 0.02; HLG left 0.50585, right 0.38013 (want 0.38016) |
+| `hdr_proof.py --mutant still-peak-dropped --only HIp,Z1` | caught: the cLLI still 28.21/1023 off in HLG, 28.18 in SDR, 30.55 at 600 |
+| `hdr_proof.py --mutant lift-pool-ignores-peak --only P14,Z1` | caught: not distinct, the 4000 lift 28.97/1023 off |
+| `hdr_proof.py --mutant png-cll-whole-nits --only HIp,Z1` | caught: still_pq_cll reads {file: 10000}; 21.24/1023 off in HLG |
+| `hdr_proof.py --mutant still-pq-not-imported --only HIp,Z1` | caught: no `color` on any PQ still; 28.21/1023 off in HLG |
+| `log_proof.py --mutant key-log-as-unlift --only L23,Z1` | caught: HLG left (0.530, 0.711, 0.412), not keyed |
+| `log_proof.py --mutant key-log-exposure-dropped --only L23,Z1` | caught: HLG left (0.530, 0.711, 0.412) |
+| `log_proof.py --mutant key-log-white-hlg --only L23,Z1` | caught: HLG left (0.530, 0.711, 0.412) |

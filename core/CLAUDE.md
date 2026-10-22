@@ -142,7 +142,12 @@ governs a module now.
   clamped to 10,000; `rc_hdr10_peak` its export. `av1_peak` the same for
   AV1 (HD-18): the HDR_CLL and HDR_MDCV metadata OBUs of the `av1C`'s
   config OBUs, else the first sample, luminance in 24.8 fixed point;
-  `rc_hdr10_av1_peak` its export. Pure, bounded reads.
+  `rc_hdr10_av1_peak` its export. Pure, bounded reads. `rc_hdr10_still_peak`
+  (HD-20) is the third export, over `hdr10_still.rs`.
+- `hdr10_still.rs` — a PQ still's HDR10 peak (spec §11 HD-20, #325): a PNG's
+  `cLLI`/`mDCV` chunks before the first IDAT, else a HEIF/AVIF primary item's
+  `clli`/`mdcv` properties (its first `ipma`); MaxCLL first, the same rounding
+  and clamp as `hdr10.rs`. Pure, every index checked against the buffer.
 - `model_matte.rs` — the matte vocabulary (format version 14, spec §11 MT-1):
   `TrackMatte` (`none`, `alpha`, `alpha_inverted`, `luma`, `luma_inverted`)
   and `is_none`, re-exported through `model_props.rs`; the FIELD

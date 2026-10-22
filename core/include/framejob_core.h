@@ -178,8 +178,14 @@ extern "C" {
  * `log` gains `canon_log2` and `canon_log3`, and its `gamut` `cinema_gamut`,
  * each Canon curve pairing with `cinema_gamut` (the default) or `bt2020`; no
  * key moves, so every other project writes the text it did, and there is no
- * migration step. 26 and above, 1014 included, are newer. */
-#define RC_FORMAT_VERSION 25
+ * migration step.
+ *
+ * Version 26 is a PQ still's HDR10 peak (spec §11 HD-20 (b)): an image media
+ * whose decoded space is PQ-based carries `media.color.pq` as a PQ video's
+ * does, read from its PNG cLLI/mDCV or HEIF/AVIF clli/mdcv, and takes `peak`;
+ * no key moves, so every other project writes the text it did, and there is
+ * no migration step. 27 and above, 1014 included, are newer. */
+#define RC_FORMAT_VERSION 26
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips
@@ -739,6 +745,18 @@ char *rc_hdr10_peak(const uint8_t *mastering, size_t mastering_len, const uint8_
  * with rc_string_free. */
 char *rc_hdr10_av1_peak(const uint8_t *config, size_t config_len, const uint8_t *sample,
                         size_t sample_len);
+
+/* A PQ still's HDR10 peak (spec §11 HD-20 (b)), read from the whole file:
+ * a PNG's first cLLI (MaxCLL a big-endian u32 in 0.0001 cd/m²) and first
+ * mDCV (the maximum a big-endian u32 at bytes 16-19 in 0.0001 cd/m²), each
+ * before the first IDAT; an ISOBMFF file's (HEIF, AVIF: `ftyp` at bytes 4-8)
+ * primary item's first clli (MaxCLL a big-endian u16) and first mdcv (as
+ * mDCV), found through meta's pitm and iprp's ipco and ipma. MaxCLL when
+ * non-zero, else the mastering maximum, each rounded to whole cd/m²; above
+ * 10000 clamped, 0 none; any other file reads {}. JSON as rc_hdr10_peak's;
+ * a NULL pointer or 0 length reads {}; NULL only on a caught panic. Freed
+ * with rc_string_free. */
+char *rc_hdr10_still_peak(const uint8_t *file, size_t file_len);
 
 /* ----------------------------------------------------------------- agent */
 

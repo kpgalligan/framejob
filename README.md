@@ -363,7 +363,8 @@ schema, §6 the op table, §7 the architecture.
   off to white at the peak its own metadata names — read on import from the
   file (MaxCLL, else the mastering display's maximum), 1,000 cd/m² when it
   names none — and the Media tab's **HDR10** section shows where the peak
-  came from and lets you set your own.
+  came from and lets you set your own. A PQ still image (PNG, HEIF or AVIF)
+  works the same way, its peak read from the image's own HDR10 metadata.
 - **HDR (HLG)**. The Document tab's **Dynamic Range** popup makes a project
   HDR: every frame is composed in Rec. 2100 HLG, so an iPhone HDR clip keeps
   its highlights above white while titles, shapes, stills, graphics, captions

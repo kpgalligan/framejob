@@ -13,10 +13,12 @@ import AppKit
 extension MediaPane {
     func hdr10Section() -> InspectorSection {
         let binding = self.binding
-        /// The selected row when it is a PQ video file.
+        /// The selected row when it is a PQ file: a video or a still (spec §11
+        /// HD-20 (b)).
         func selected() -> MediaSnapshot? {
             guard let id = binding.document?.selectedMedia,
-                let media = binding.documentSnapshot.media(id), media.kind == .video,
+                let media = binding.documentSnapshot.media(id),
+                media.kind == .video || media.kind == .image,
                 media.color?.pq != nil
             else { return nil }
             return media
@@ -55,7 +57,7 @@ extension MediaPane {
             onEdit: { binding.edited() })
         useFile.toolTip = "Go back to the peak the file's HDR10 metadata names"
         let readout = inspectorReadout(width: InspectorMetrics.popupWidth + 52) {
-            guard let pq = selected()?.color?.pq else { return "Select a PQ video in the list" }
+            guard let pq = selected()?.color?.pq else { return "Select a PQ file in the list" }
             return MediaPane.hdr10Line(pq)
         }
         return InspectorSection(

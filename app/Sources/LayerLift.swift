@@ -11,8 +11,9 @@ import Metal
 /// 0's own reason: a 25-tap blur would repeat the lift 25 times. An HLG or PQ
 /// still (spec §11 HD-19 (a)) is run through its OWN arm instead, in an HLG
 /// project and in an SDR one (GR-15's HDR→SDR), so the pass takes the
-/// conversion and the output, and an entry is a hit only when its source, its
-/// conversion and its output are all three the asked ones.
+/// conversion, the output and a PQ still's peak (spec §11 HD-20 (b)), and an
+/// entry is a hit only when its source, its conversion, its output and its
+/// peak are all four the asked ones.
 ///
 /// The cache is a least-recently-used pool of `LayerRenderers.cacheLimit +
 /// LayerRenderers.graphicCacheLimit` entries — the two pools' sizes, so every
@@ -20,8 +21,8 @@ import Metal
 /// texture's identity. Each entry holds its source strongly, so an identity
 /// is never reused for another texture while its lift is held; a source
 /// `LayerRenderers` re-renders is a new texture and a new entry, and the old
-/// one ages out; one asked again in another conversion or output is made
-/// again and replaces its entry. An SDR project reaches this class only for an
+/// one ages out; one asked again in another conversion, output or peak is
+/// made again and replaces its entry. An SDR project reaches this class only for an
 /// HDR still. One instance per `MetalRenderer`, called from its render queue.
 final class LayerLift {
     static let limit = LayerRenderers.cacheLimit + LayerRenderers.graphicCacheLimit
@@ -30,6 +31,7 @@ final class LayerLift {
         let source: MTLTexture
         let conversion: InputConversion
         let output: CanvasOutput
+        let peak: UInt32?
         let lifted: MTLTexture
     }
 
@@ -63,15 +65,16 @@ final class LayerLift {
     /// `texture` run through `conversion`'s arm for a project of `output` —
     /// by default HD-3's lift into HLG — from the pool or made now on a
     /// command buffer of its own on `queue`, waited for before it is returned;
-    /// nil only when Metal cannot make the target or the pass. The peak is
-    /// unknown (1,000 cd/m², HD-6): a still names none.
+    /// nil only when Metal cannot make the target or the pass. `peak` is a PQ
+    /// still's effective peak, its layer's `input.peak` (spec §11 HD-20 (b));
+    /// nil is unknown (1,000 cd/m², HD-6).
     func lifted(
         _ texture: MTLTexture, conversion: InputConversion = .sdr, output: CanvasOutput = .hlg,
-        queue: MTLCommandQueue
+        peak: UInt32? = nil, queue: MTLCommandQueue
     ) -> MTLTexture? {
         let key = ObjectIdentifier(texture)
         if let hit = entries[key], hit.source === texture, hit.conversion == conversion,
-            hit.output == output
+            hit.output == output, hit.peak == peak
         {
             touch(key)
             return hit.lifted
@@ -92,7 +95,7 @@ final class LayerLift {
         guard let encoder = buffer.makeRenderCommandEncoder(descriptor: pass) else { return nil }
         encoder.label = "Frame Job layer lift"
         encoder.setRenderPipelineState(pipeline)
-        var u = conversion.uniforms(premultiplied: true, output: output)
+        var u = conversion.uniforms(premultiplied: true, peak: peak, output: output)
         encoder.setFragmentBytes(&u, length: MemoryLayout<InputUniforms>.stride, index: 0)
         encoder.setFragmentTexture(texture, index: 0)
         encoder.setFragmentTexture(noLUT, index: 1)
@@ -101,7 +104,8 @@ final class LayerLift {
         buffer.commit()
         buffer.waitUntilCompleted()
         guard buffer.status == .completed else { return nil }
-        entries[key] = Entry(source: texture, conversion: conversion, output: output, lifted: target)
+        entries[key] = Entry(
+            source: texture, conversion: conversion, output: output, peak: peak, lifted: target)
         touch(key)
         while order.count > Self.limit, let oldest = order.first {
             order.removeFirst()

@@ -18,8 +18,9 @@ extension MetalRenderer {
     /// a layer Frame Job drew — a still, text, a shape or a graphic — is its
     /// lift (`lifted`); a video track's frame was converted at step 0, and the
     /// missing-media slate is not lifted. An HLG or PQ still is run through its
-    /// own arm in either output (spec §11 HD-19 (a)), and an HLG BT.2020 one in
-    /// an HLG project is already the working space, sampled as drawn.
+    /// own arm in either output (spec §11 HD-19 (a)), a PQ one at its
+    /// `input.peak` (HD-20 (b)), and an HLG BT.2020 one in an HLG project is
+    /// already the working space, sampled as drawn.
     func source(
         for layer: RecipeLayer, request: AVAsynchronousVideoCompositionRequest,
         instruction: RecipeInstruction?, live: inout [CVMetalTexture], output: CanvasOutput
@@ -68,7 +69,8 @@ extension MetalRenderer {
             if output == .hlg, conversion == .hlg(.bt2020) {
                 return .textured(rendered.texture, rendered.size, premultiplied: true, orientation: 0)
             }
-            guard let converted = lifted(rendered.texture, conversion: conversion, output: output)
+            guard let converted = lifted(
+                rendered.texture, conversion: conversion, output: output, peak: layer.input?.peak)
             else { return .absent }
             return .textured(converted, rendered.size, premultiplied: true, orientation: 0)
         case .text(let hash, let props, let reveal):
@@ -91,8 +93,9 @@ extension MetalRenderer {
 
     /// How the chroma key reads this layer in an HLG project (spec §11 HD-19
     /// (c)): a track by its frame's SDR-project step-0 choice and its media's
-    /// peak, a still by its own arm (its cached texture's, peak unknown), every
-    /// other layer — text, shapes, graphics, the slate — by HD-13 (h)'s un-lift.
+    /// peak (a built-in Camera Log `.log`, HD-20 (a)), a still by its own arm
+    /// (its cached texture's) and its `input.peak` (HD-20 (b)), every other
+    /// layer — text, shapes, graphics, the slate — by HD-13 (h)'s un-lift.
     func keyReading(
         for layer: RecipeLayer, request: AVAsynchronousVideoCompositionRequest,
         instruction: RecipeInstruction?
@@ -106,7 +109,8 @@ extension MetalRenderer {
             return KeyReading.of(chosen, peak: layer.input?.peak)
         case .image(let media):
             guard let url = instruction?.mediaURLs[media] else { return .unlift }
-            return KeyReading.of(renderers.image(url: url, media: media)?.conversion, peak: nil)
+            return KeyReading.of(
+                renderers.image(url: url, media: media)?.conversion, peak: layer.input?.peak)
         default:
             return .unlift
         }

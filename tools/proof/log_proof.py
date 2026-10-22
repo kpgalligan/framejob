@@ -201,6 +201,21 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   SETTINGS Camera Log, and `slog3` in an HLG project, at 0.5 s byte-equal to
   `DIR/l22-*.png` — step 0's refactored log dispatch leaves every existing
   curve as it was.
+- **L23** (clean-up 3 batch B, #324, spec §11 HD-20 (a)): `green_half.mov` — the
+  left half the S-Log3 codes of a bright card at 2 × GREEN_LIGHT (0.30, 0.70, 0.24), the
+  right half S-Log3's 18 % grey (Y 420, chroma 512), tagged as `green.mov` — with {log:
+  slog3, gamut: s_gamut3_cine}. First asserted (a failure is the row's): the card's largest
+  SDR light, M(S-Gamut3.Cine → 709)·card·0.42^2.4/0.18, is above the shoulder's knee 0.39,
+  and its BT.2020 reflection is unclipped in HLG (× 0.26741 ≤ 1, ≈ 3.74). In an SDR project
+  over [0.5, 0.5, 0.5, 1], keyed at the SDR render's left pixel (softness 0, spill 0) at the
+  tolerance HKh's rule over hdr_proof's KEY_TOLERANCES fixes, comparing the right reading
+  (`key_log_sdr`, `KeyReading.log.sdr`'s twin) with the others: the un-lift, the reading
+  without the exposure ratio, and the reading with white 1.07. CONTROL: the SDR left half
+  reads 0.5 ±1/255. After `set_canvas {output: hlg}`: the left reads the lifted background
+  0.5059 and the right `log_hlg_convert` of its grey (0.380), each ±1/1023. Its three
+  mutants (each run `--only L23,Z1`): `key-log-as-unlift` (`KeyReading.of`'s `.log` arm
+  `.unlift`), `key-log-exposure-dropped` (the shader's log light = e) and
+  `key-log-white-hlg` (its white `kKeyHlgWhite`).
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds no
   `Frame Job: ` line.
 
@@ -436,6 +451,10 @@ PATCHES = {"slog3": (95, 420, 598), "vlog": (128, 433, 602),
            "canon_log2": (145, 413, 557), "canon_log3": (174, 365, 558)}
 REFLECTANCE = (0.0, 0.18, 0.90)
 GREEN_LIGHT = (0.15, 0.35, 0.12)
+# Clean-up 3 batch B (#324, spec §11 HD-20 (a)): L23's card is GREEN_LIGHT × 2, above the
+# shoulder's knee in SDR and unclipped in HLG; its right half S-Log3's 18 % grey code.
+L23_SCALE = 2.0
+L23_GREY = 420
 # name: (curve, the file's tags (primaries, transfer, matrix) or None, writer mode)
 FIXTURES = {"slog3": ("slog3", ("bt2020", "bt709", "bt2020nc"), None),
             "vlog": ("vlog", None, None),
@@ -446,7 +465,8 @@ FIXTURES = {"slog3": ("slog3", ("bt2020", "bt709", "bt2020nc"), None),
 SETTINGS = {"slog3": {"log": "slog3", "gamut": "s_gamut3_cine"}, "vlog": {"log": "vlog"},
             "applelog": {"log": "apple_log"}, "applelog2": {"log": "apple_log2"},
             "green": {"log": "slog3", "gamut": "s_gamut3_cine"},
-            "green_m": {"log": "slog3", "gamut": "s_gamut3_cine"}}
+            "green_m": {"log": "slog3", "gamut": "s_gamut3_cine"},
+            "green_half": {"log": "slog3", "gamut": "s_gamut3_cine"}}
 L9_FIXTURES = ["slog3", "vlog", "applelog", "applelog2", "green", "clog2", "clog3"]
 # hdr H-5 (spec §11 HD-17): each Canon curve's ramp and card fixtures (the
 # card tagged with its matrix alone, `green_m`'s way), its two settings, and
@@ -455,7 +475,7 @@ CANON_FIXTURES = {"canon_log2": ("clog2", "clog2_card"), "canon_log3": ("clog3",
 L22_FIXTURES = ["slog3", "vlog", "applelog", "applelog2", "green"]
 ROWS = ["LP1", "LP2", "LP3", "LP4", "LP5", "LP6", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8",
         "L9", "L10", "L11", "L12", "L13", "L14", "L15", "L16", "L17", "L18", "L19", "L20", "L21",
-        "L22", "Z1"]
+        "L22", "L23", "Z1"]
 LP_ROWS = {"LP1", "LP2", "LP3", "LP4", "LP5", "LP6"}
 # The rows a probe answers with no instance (B101 adds L15, B103 L16).
 PROBE_ROWS = LP_ROWS | {"L15", "L16"}
@@ -518,6 +538,7 @@ RANGE_CHECKED = {}
 INPUT_SWIFT = "app/Sources/InputConversions.swift"
 STAGE_SWIFT = "app/Sources/Compositor+Input.swift"
 SOURCES_SWIFT = "app/Sources/Compositor+Sources.swift"
+KEY_SWIFT = "app/Sources/ChromaKeyHDR.swift"
 COLOR_SWIFT = "app/Sources/MediaImporter+Color.swift"
 SHADER = "app/Resources/Shaders/Compositor.metal"
 BUILDER_SWIFT = "app/Sources/CompositionBuilder.swift"
@@ -672,6 +693,17 @@ MUTANTS = {
     "canon-not-log-in-hlg": ([(SHADER, "    if (inputIsLog(kind)) {\n",
                                "    if (kind >= kInputAppleLog && kind <= kInputVlog) {\n")],
                              ["L21"]),
+    # Clean-up 3 batch B (#324, spec §11 HD-20 (a)): each run with `--only L23,Z1`.
+    # A camera-log layer's key reads through the un-lift.
+    "key-log-as-unlift": ([(KEY_SWIFT, "        case .log: return .log\n",
+                            "        case .log: return .unlift\n")], ["L23"]),
+    # The camera-log reading's exposure ratio dropped: scene light read as SDR light.
+    "key-log-exposure-dropped": ([(SHADER, "            light = e * (3.0 * m / (kKeyHlgLogGrey "
+                                   "* kKeyHlgLogGrey));\n",
+                                   "            light = e;\n")], ["L23"]),
+    # The camera-log reading's shoulder white HLG's 1.07, not logWhite.
+    "key-log-white-hlg": ([(SHADER, "            white = 64.0 * m;\n",
+                            "            white = kKeyHlgWhite;\n")], ["L23"]),
 }
 # B96 (#280): the reverse's intermediate variants, each one edit to the plain
 # `.hevcMain10` path of ReverseRenderer.swift (`reverse-variants`). The rate
@@ -931,14 +963,16 @@ def raw_ramp(curve):
     return struct.pack(f"<{len(luma) + 2 * len(chroma)}H", *luma, *chroma, *chroma)
 
 
-def green_codes(curve="slog3"):
-    """The card's (Y, Cb, Cr): S-Log3's CV per channel of GREEN_LIGHT, as the
-    decoded signal s = (CV − 64)/876, through the bt2020nc matrix. A Canon
-    curve's card (hdr H-5) stores its y as Apple's P is stored, so s = y."""
+def green_codes(curve="slog3", scale=1.0):
+    """The card's (Y, Cb, Cr): S-Log3's CV per channel of GREEN_LIGHT (× `scale`;
+    L23's card is twice it), as the decoded signal s = (CV − 64)/876, through the
+    bt2020nc matrix. A Canon curve's card (hdr H-5) stores its y as Apple's P is
+    stored, so s = y."""
+    light = [c * scale for c in GREEN_LIGHT]
     if curve in CANON:
-        s = [encode_curve(curve, c) for c in GREEN_LIGHT]
+        s = [encode_curve(curve, c) for c in light]
     else:
-        s = [(1023 * encode_curve(curve, c) - 64) / 876 for c in GREEN_LIGHT]
+        s = [(1023 * encode_curve(curve, c) - 64) / 876 for c in light]
     kr, kb = hdr.KR_KB["bt2020nc"]
     yy = kr * s[0] + (1 - kr - kb) * s[1] + kb * s[2]
     pb, pr = (s[2] - yy) / (2 * (1 - kb)), (s[0] - yy) / (2 * (1 - kr))
@@ -949,6 +983,16 @@ def raw_green(curve="slog3"):
     y, cb, cr = green_codes(curve)
     n, c = W * H, W // 2 * H
     return struct.pack(f"<{n + 2 * c}H", *([y] * n), *([cb] * c), *([cr] * c))
+
+
+def raw_green_half():
+    """L23's frame: the left half the S-Log3 card at 2 × GREEN_LIGHT, the right half S-Log3's
+    18 % grey (Y 420, chroma 512)."""
+    y, cb, cr = green_codes(scale=L23_SCALE)
+    luma = ([y] * (W // 2) + [L23_GREY] * (W // 2)) * H
+    blue = ([cb] * (W // 4) + [512] * (W // 4)) * H
+    red = ([cr] * (W // 4) + [512] * (W // 4)) * H
+    return struct.pack(f"<{len(luma) + len(blue) + len(red)}H", *luma, *blue, *red)
 
 
 def encode(name, raw, tagset):
@@ -1059,6 +1103,12 @@ def fixture(name):
                                     "color_transfer": transfer, "color_space": matrix})
     if name == "green":
         return checked(name, encode("green", raw_green(), ("bt2020", "bt709", "bt2020nc")),
+                       {"pix_fmt": "yuv422p10le", "color_primaries": "bt2020",
+                        "color_transfer": "bt709", "color_space": "bt2020nc"})
+    if name == "green_half":
+        # Clean-up 3 batch B (#324): L23's card beside S-Log3's grey, tagged as green.mov.
+        return checked(name, encode("green_half", raw_green_half(),
+                                    ("bt2020", "bt709", "bt2020nc")),
                        {"pix_fmt": "yuv422p10le", "color_primaries": "bt2020",
                         "color_transfer": "bt709", "color_space": "bt2020nc"})
     if name == "green_m":
@@ -2559,6 +2609,119 @@ def run_l21(client, state):
           not misses, f"{misses or 'all within'}\n       " + "\n       ".join(figures))
 
 
+# ---- L23 (clean-up 3 batch B, #324, spec §11 HD-20 (a)) ---------------------------
+
+def key_log_sdr(hlg, ratio=EXPOSURE / LOG_HLG_EXPOSURE, white=LOG_WHITE):
+    """`KeyReading.log.sdr`'s twin, saturated: a working HLG colour back to scene light (the
+    inverse OETF), × `ratio` (0.42^2.4·3/0.38²), BT.2020 → BT.709, GR-15's gamut lift, the
+    shoulder (knee 0.39) to `white` and the encode L^(1/2.4)."""
+    scene = [hdr.hlg_inverse(c) for c in hlg]
+    out = mat_vec(to709("bt2020"), [c * ratio for c in scene])
+    low = min(out)
+    if low < 0:
+        y = sum(w * c for w, c in zip(LUMA709, out))
+        out = [0.0] * 3 if y <= 0 else [y + (c - y) * y / (y - low) for c in out]
+    top = max(out)
+    if top > KNEE:
+        out = [c * shoulder(top, white) / top for c in out]
+    return [hdr.unit(max(c, 0.0) ** (1 / DISPLAY_GAMMA)) for c in out]
+
+
+def l23_oracle(yuv):
+    """L23's oracle at the fixture's decoded left codes (rounded to half): the card's SDR
+    light and HLG reflection (the two assertions), the key (GR-16's SDR arm), the working
+    HLG colour (HD-13 (e)), the distance from the key of the right reading and of each a
+    mutant substitutes, and the tolerance hdr_proof's KEY_TOLERANCES rule picks (HKh's: the
+    largest with the right reading ≤ ½ it and every other ≥ 1.5 × it), or None."""
+    s = [hdr.half(c) for c in hdr.rgb_of(*yuv.codes(W // 4, H // 2), "bt2020nc")]
+    scale, offset = CODE["slog3"]
+    reflection = [decode_curve("slog3", c * scale + offset) for c in s]
+    light = mat_vec(to709("s_gamut3_cine"), [c * EXPOSURE for c in reflection])
+    hlg_reflection = mat_vec(to2020("s_gamut3_cine"), reflection)
+    key = [hdr.unit(c) for c in log_convert("slog3", "s_gamut3_cine", s)]
+    working = [hdr.unit(c) for c in log_hlg_convert("slog3", "s_gamut3_cine", s)]
+    right = key_log_sdr(working)
+    others = {"un-lift": [hdr.unit(c) for c in hdr.unlift(working)],
+              "no exposure ratio": key_log_sdr(working, ratio=1.0),
+              "white 1.07": key_log_sdr(working, white=hdr.HLG_WHITE)}
+    d_right = math.dist(right, key)
+    d_others = {k: math.dist(v, key) for k, v in others.items()}
+    tolerance = next((t for t in hdr.KEY_TOLERANCES if d_right <= t / 2
+                      and all(d >= 1.5 * t for d in d_others.values())), None)
+    return {"light": light, "hlg_reflection": hlg_reflection, "key": key, "working": working,
+            "right": d_right, "others": d_others, "tolerance": tolerance}
+
+
+def run_l23(client, state):
+    """L23 (#324, spec §11 HD-20 (a)): a key picked in an SDR project on a built-in Camera
+    Log keys the same colour after the switch to HLG. `green_half.mov` with {log: slog3,
+    gamut: s_gamut3_cine} over a [0.5, 0.5, 0.5, 1] background, keyed at the SDR render's
+    left pixel (the tolerance `l23_oracle` fixes, softness 0, spill 0), after asserting the
+    card is above the shoulder's knee (its largest SDR light > 0.39) and unclipped in HLG
+    (its BT.2020 reflection ≤ 1/0.26741 ≈ 3.74); CONTROL the SDR render's left = 0.5
+    ±1/255; after set_canvas {output: hlg} the left = the lifted background 0.5059 and the
+    right = log_hlg_convert of its grey (0.380) ±1/1023."""
+    misses, figures = [], []
+    path = fixture("green_half")
+    yuv = source_yuv(path) if path else None
+    if yuv is None:
+        check("L23 the fixture was made", False, REFUSED.get("green_half") or "no decode")
+        return
+    oracle = l23_oracle(yuv)
+    figures.append(f"card SDR light {[round(c, 4) for c in oracle['light']]}, BT.2020 "
+                   f"reflection {[round(c, 4) for c in oracle['hlg_reflection']]}; oracle key "
+                   f"{[round(c, 4) for c in oracle['key']]}, distance of the right reading "
+                   f"{oracle['right']:.4f}, of the others "
+                   f"{ {k: round(v, 4) for k, v in oracle['others'].items()} }; tolerance "
+                   f"{oracle['tolerance']}")
+    if not max(oracle["light"]) > KNEE:
+        misses.append(f"the card's SDR light {max(oracle['light']):.4f} is not above the knee")
+    if not max(oracle["hlg_reflection"]) * LOG_HLG_EXPOSURE <= 1:
+        misses.append(f"the card's reflection {max(oracle['hlg_reflection']):.4f} clips in HLG")
+    if oracle["tolerance"] is None:
+        misses.append("no tolerance qualifies (a rotted instrument)")
+    if misses:
+        check("L23 the card and its tolerance", False, f"{misses}\n       " + figures[0])
+        return
+    left, right = (W // 4, H // 2), (3 * W // 4, H // 2)
+    doc = Doc(client, "l23")
+    if doc.ok:
+        doc.call("set_canvas", background=[0.5, 0.5, 0.5, 1])
+    clip = doc.place(path) if doc.ok else None
+    set_to = doc.color(doc._media.get(path), SETTINGS["green_half"]) if clip \
+        else {"ok": False, "error": doc.why}
+    plain = frame(doc.render("l23-plain")) if set_to["ok"] else None
+    key = [round(v, 5) for v in plain.px(*left)] if plain else None
+    keyed = doc.call("set_video", clips=[clip], patch={"chroma": {
+        "key": key, "tolerance": oracle["tolerance"], "softness": 0.0, "spill": 0.0}}) \
+        if key else {"ok": False}
+    sdr = frame(doc.render("l23-sdr")) if keyed["ok"] else None
+    switched = doc.call("set_canvas", output="hlg") if sdr else {"ok": False}
+    hlg = frame(doc.render("l23-hlg")) if switched["ok"] else None
+    state["l23_closed"] = doc.close()
+    if sdr is None or hlg is None:
+        misses.append(f"{set_to.get('error') or keyed.get('error') or switched.get('error')}")
+    else:
+        s = [hdr.half(c) for c in hdr.rgb_of(*yuv.codes(*right), "bt2020nc")]
+        grey = [hdr.unit(c) for c in log_hlg_convert("slog3", "s_gamut3_cine", s)]
+        got_left, got_right = hlg.px(*left), hlg.px(*right)
+        figures.append(f"key {key} (the oracle's at {math.dist(key, oracle['key']):.4f}); SDR "
+                       f"keyed left {[round(v, 5) for v in sdr.px(*left)]} (CONTROL 0.5); HLG "
+                       f"left {[round(v, 5) for v in got_left]} (want 0.5059), right "
+                       f"{[round(v, 5) for v in got_right]} (want {[round(v, 5) for v in grey]})")
+        if not close_to(sdr.px(*left), [0.5] * 3, 1 / 255):
+            misses.append("CONTROL: the SDR key did not open the left half")
+        if not close_to(got_left, [0.5059] * 3, hdr.LEVEL):
+            misses.append("the HLG left half is not the lifted background")
+        if not close_to(got_right, grey, hdr.LEVEL):
+            misses.append("the HLG right half is not the clip's working grey")
+    check("L23 green_half.mov (S-Log3 / S-Gamut3.Cine, its card 2 × GREEN_LIGHT above the knee "
+          "and unclipped in HLG) over a [0.5, 0.5, 0.5, 1] background, keyed in SDR at the "
+          "colour its render reads (the tolerance the oracle fixes): after set_canvas {output: "
+          "hlg} the left half reads the lifted background 0.5059 and the right half the clip's "
+          "working grey 0.380, ±1/1023 (CONTROL: the SDR key opens the left half)", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
 # L22's renders: (tag, fixture, HLG project?).
 L22_CASES = (tuple((f"l22-{n}", n, False) for n in L22_FIXTURES)
              + (("l22-slog3-hlg", "slog3", True),))
@@ -3410,6 +3573,8 @@ def main():
                         run(client)
                 if "L21" in selected:
                     run_l21(client, state)
+                if "L23" in selected:
+                    run_l23(client, state)
             except Exception as error:  # a row that could not run is a failure
                 import traceback
                 traceback.print_exc()

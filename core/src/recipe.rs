@@ -341,9 +341,12 @@ impl Project {
 
         // Step 0's conversion is the MEDIA's (spec §11 GR-16): every clip of a
         // file, a still of it and its reverse alike, and the ungraded branch
-        // above does not touch it.
+        // above does not touch it. An image publishes a PQ still's peak
+        // (HD-20 (b)), the only colour an image takes.
         let input = match instance.clip.source {
-            Source::Media { media, .. } | Source::Still { media, .. } => self.media_input(media),
+            Source::Media { media, .. } | Source::Still { media, .. } | Source::Image { media } => {
+                self.media_input(media)
+            }
             _ => Value::Null,
         };
 

@@ -23,7 +23,7 @@ detail there.
   `CoreValues.swift` — no Swift file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25) and
   `ReelContainer` (`rc_container_*`, a WebM/Matroska file's index,
   #216-R) and `ReelHDR10` (`rc_hdr10_peak`, spec §11 HD-6; `av1Peak`,
-  `rc_hdr10_av1_peak`, HD-18), and `GraphicLibrary.imageCache(limit:)`
+  `rc_hdr10_av1_peak`, HD-18; `stillPeak`, `rc_hdr10_still_peak`, HD-20), and `GraphicLibrary.imageCache(limit:)`
   (`rc_graphic_image_cache`, G-39); `ReelCoreError` and `Fps.ffiPair` are
   `CoreValues.swift`'s (G6 phase 5's toll T2, a pure move); the typed patches are `TypedPatches.swift`'s (`VideoPatch`,
   `AudioPatch`, `ClipPatch`, the `ActionPatch` extension; a pure move, B73),
@@ -57,7 +57,9 @@ detail there.
   strongly); their values `GraphicDiagnostic`, `GraphicFailure` (what a
   `diag_out` failure throws; `err_out` stays `ReelCoreError`) and
   `GraphicRaster` are `CoreValues.swift`'s, with `SpeedLimits` (a pure move,
-  clean-up batch 2), `ReelCoreError` and `Fps.ffiPair` (G6 phase 5's toll).
+  clean-up batch 2), `ReelCoreError` and `Fps.ffiPair` (G6 phase 5's toll), and
+  `CoreJSON` (`value`, `snapTicks`: `clipState`'s and `snapCandidates`' JSON
+  halves, clean-up round 3's toll).
   `MediaDescriptor`, `MediaOriginal`, `mediaURL(for:)`, `originalURL(for:)`,
   `revealURL(for:)` (the original, else the copy), `isTrashed` and
   `bookmarkString(for:)` are `MediaDescriptor.swift`'s: a `media[]` element
@@ -276,7 +278,8 @@ detail there.
   `.projectGraphicsDidChange` observer.
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`, +`Color`: the
   Apple Log and Apple Log 2 labels read at probe, spec §11 GR-16, and
-  `detectedPQ`, a PQ file's HDR10 peak through `ReelHDR10`, HD-6;
+  `detectedPQ`, a PQ file's HDR10 peak through `ReelHDR10`, HD-6, and
+  `detectedStillPQ`, a PQ still's through `ReelHDR10.stillPeak`, HD-20;
   +`ThumbnailSource`: the converted strip, below; +`Thumbnails`: the
   await-free halves of `thumbnails`, the image branch and the publish) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
@@ -1352,8 +1355,9 @@ the key map behind it.
   over BT.2020, P3 or BT.709, else none — SDR stills draw as before) ·
   `ChromaKeyHDR.swift` (`KeyReading`: how an HLG project's chroma key reads
   a keyed layer — GR-15's HLG or PQ arm for an HDR source, so a key means
-  the colour an SDR project shows; HD-13 (h)'s un-lift for every other
-  layer; the shader's `keyReading` uniform and the eyedropper's pick) ·
+  the colour an SDR project shows; `.log` for a built-in Camera Log clip
+  (HD-20, #324: the HLG log arm undone, then GR-16's SDR log arm); HD-13 (h)'s
+  un-lift for every other layer; the shader's `keyReading` uniform and the eyedropper's pick) ·
   `Compositor+Uniforms.swift` ·
   `Compositor+Shadow.swift` · `Compositor+Matte.swift` · `MattePlan.swift` ·
   `Compositor+Dissolve.swift` · `Compositor+Adjustment.swift` ·

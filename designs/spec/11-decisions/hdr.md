@@ -346,6 +346,8 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
   **Amended by HD-18** (clean-up batch 2): a WebM/Matroska PQ copy's description carries its
   Colour element's MaxCLL, MaxFALL and MasteringMetadata as route 1's two blobs, and an `av01`
   track's stream route is its `av1C` config OBUs, then its first sample's, HDR_CLL and HDR_MDCV.
+  **Amended by HD-20** (clean-up 3 batch B): import also writes `pq` on a still whose decoded
+  space is PQ-based, read from its PNG `cLLI`/`mDCV` or its HEIF/AVIF `clli`/`mdcv`.
 - **HD-13 — H-2's settlements: the lift's arithmetic, step 0's HLG arms, every drawn layer lifted
   at upload, the grade's BT.2020 constants, what reads through the inverse lift, the frames and
   the exports.** H-2's spec, recorded before its code; it settles what HD-2 and HD-3 left to the
@@ -798,3 +800,47 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
     - The spill, a luma matte and the qualifier are unchanged.
     - Amends HD-13 (h) and closes (l)'s second limit.
   - **(d) Amends** HD-13 ((f), (h), (l)) and HD-18 (b).
+  **Amended by HD-20** (clean-up 3 batch B): (a) a PQ still's peak is read at import and drawn;
+  (c) the key on a built-in Camera Log reads through GR-16's SDR arm, not the un-lift.
+- **HD-20 — Clean-up 3 batch B, phase 1's settlements: the key on Camera Log media read as its
+  SDR colour across HLG, and a PQ still's HDR10 peak read at import.** Recorded before the
+  phase's code (#324, #325). Format 26.
+  - **(a) The key on a built-in Camera Log, #324.** In an HLG project, the chroma key on a layer
+    whose media's `choose(input:)` is `.log` reads the working colour back through the HLG
+    inverse OETF to scene light (BT.2020 reflection × `logHLGExposure`, HD-13 (e)), then
+    multiplies it by `logExposure / logHLGExposure` (0.42^2.4·3/0.38² ≈ 2.5903) and applies
+    BT.2020 → BT.709, GR-15's gamut lift, the shoulder (knee 0.39, white `logWhite` =
+    64·0.42^2.4 ≈ 7.98) and the encode L^(1/2.4): GR-16's SDR arm, with M(p→709) =
+    M(2020→709)·M(p→2020).
+    - The reading is exact where the HLG arm floored no channel and did not clip (reflection ≤
+      3.74).
+    - A LUT media keeps HD-13 (h)'s un-lift, which is already exact because its output is
+      lifted by HD-3.
+    - The eyedropper stores the pick through the same reading (`KeyReading.of(media:url:)`).
+    - Amends HD-19 (c)'s "every other layer".
+  - **(b) A PQ still's peak, #325.** A still whose decoded space is PQ-based (HD-19 (a)) is a PQ
+    file. Import writes `media.color.pq` from `rc_hdr10_still_peak` over the file's bytes;
+    ImageIO's properties are not read.
+    - **PNG:** the first `cLLI` (8 bytes or more; MaxCLL a big-endian u32 in 0.0001 cd/m², read
+      through `ten_thousandths`) and the first `mDCV` (24 bytes or more; its maximum at bytes
+      16–19 in 0.0001 cd/m², through `mastering_max`), each counted only before the first
+      `IDAT`. CRCs are not checked.
+    - **ISOBMFF** (`ftyp` at bytes 4–8): the first top-level `meta` (a FullBox) gives `pitm` (the
+      item id a u16 when its version is 0, else a u32) and `iprp`. Inside `iprp`, `ipco` holds
+      the properties (1-based) and `ipma` (a FullBox) the associations: an entry's item id is a
+      u16 when the version is 0, else a u32; `association_count` is a u8; each association is a
+      u16 when flags & 1, else a u8, its index the low 15 or low 7 bits. Among the primary
+      item's associated properties, the first `clli` (4 bytes or more, `max_cll`) and the first
+      `mdcv` (24 bytes or more, `mastering_max`) are read. A box size of 1 means a 64-bit size,
+      0 that the box runs to its parent's end, and an overrun ends the walk. The `av1C` OBUs are
+      not read.
+    - **The choice:** MaxCLL when present and non-zero, else the mastering maximum
+      (`hdr10::choose`), else `{}`. Any other file reads `{}`. No input panics.
+    - **The op:** `set_media_color {peak}` takes a PQ still. Camera Log stays on video only, its
+      sentence unchanged. A stored colour of `pq` alone is valid on an image media.
+    - **What draws:** the still's recipe layer publishes `input.peak`. `LayerLift` runs the
+      `.pq` arm at that peak — BT.2390's EETF above 1,000 in HLG, the shoulder at
+      max(peak, 203)/203 in SDR — and its pool hits only on the same peak. The key reads
+      `.pq(peak)`. The Media tab's HDR10 section acts on the still.
+    - **Persistence:** format 26. An older file is not re-read (HD-12's rule).
+    - Amends HD-12 (where import writes `pq`) and HD-19 (a) (a still's peak).

@@ -375,8 +375,9 @@ struct LayerUniforms {
     // and `liftedWhite` Fade Through White's white there (HD-3's lift of 1).
     // Both 0 in an SDR project. `linearLight` (spec §11 HD-16 (c)) is 1 when
     // the canvas blends in linear light, 0 otherwise. `keyReading` (spec §11
-    // HD-19 (c)) is how an HLG project's key reads a keyed HLG or PQ source:
-    // 1 GR-15's HLG arm, ≤ −1 its PQ arm at white −keyReading, 0 the un-lift.
+    // HD-19 (c), HD-20 (a)) is how an HLG project's key reads a keyed HLG, PQ
+    // or camera-log source: 1 GR-15's HLG arm, 2 GR-16's camera-log arm, ≤ −1
+    // the PQ arm at white −keyReading, 0 the un-lift.
     // 128 + 4 = 132 floats = 528 bytes, 33 × 16.
     float hlgOutput;
     float liftedWhite;
@@ -622,27 +623,40 @@ static float3 inputShoulder(float3 l, float knee, float white) {
 
 // GR-15's HDR→SDR numbers the key's reading uses (spec §11 HD-19 (c)), twins
 // of `InputConversions`' `hlgSystemGamma`, `hlgGain`, `shoulderKnee`,
-// `hlgWhite` and `displayGamma` (step 0 has them in its uniform block).
+// `hlgWhite` and `displayGamma` (step 0 has them in its uniform block); and
+// the camera-log reading's (HD-20 (a)), twins of `logMidGrey` and
+// `hlgLogGrey`.
 constant float kKeyHlgSystemGamma = 0.96;
 constant float kKeyHlgGain = 1.07;
 constant float kKeyShoulderKnee = 0.39;
 constant float kKeyHlgWhite = 1.07;
 constant float kKeyDisplayGamma = 2.4;
+constant float kKeyLogMidGrey = 0.42;
+constant float kKeyHlgLogGrey = 0.38;
 
 // The SDR colour an SDR project shows for an HLG project's working colour
 // (spec §11 HD-19 (c), `KeyReading.sdr`'s twin), unclamped: `reading` 1 is
 // GR-15's HLG arm over BT.2020 (its OOTF shape with Frame Job's system gamma
-// and gain); ≤ −1 the PQ source's display light (the inverse OETF, BT.2100's
-// OOTF γ 1.2, × 1000/203) through GR-15's PQ arm, its shoulder reaching 1 at
-// −reading. Then BT.2020 → BT.709, the gamut lift, the shoulder and the encode.
+// and gain); 2 a camera-log source's scene light (HD-13 (e)'s reflection ×
+// 0.38²/3/0.18) × the SDR arm's exposure over it, 3·0.42^2.4/0.38², through
+// GR-16's arm, its shoulder reaching 1 at 64·0.42^2.4 (spec §11 HD-20 (a));
+// ≤ −1 the PQ source's display light (the inverse OETF, BT.2100's OOTF γ 1.2,
+// × 1000/203) through GR-15's PQ arm, its shoulder reaching 1 at −reading.
+// Then BT.2020 → BT.709, the gamut lift, the shoulder and the encode.
 static inline float3 keyReadSDR(float3 hlg, float reading) {
     float3 e = hlgInverseOETF(hlg);
     float ys = dot(e, kLuma2020);
     float3 light;
     float white;
     if (reading > 0.0) {
-        light = ys > 1e-6 ? kKeyHlgGain * e * pow(ys, kKeyHlgSystemGamma - 1.0) : float3(0.0);
-        white = kKeyHlgWhite;
+        if (reading > 1.5) {
+            float m = pow(kKeyLogMidGrey, kKeyDisplayGamma);
+            light = e * (3.0 * m / (kKeyHlgLogGrey * kKeyHlgLogGrey));
+            white = 64.0 * m;
+        } else {
+            light = ys > 1e-6 ? kKeyHlgGain * e * pow(ys, kKeyHlgSystemGamma - 1.0) : float3(0.0);
+            white = kKeyHlgWhite;
+        }
     } else {
         float3 display = ys > 0.0 ? e * pow(ys, kHlgNominalGamma - 1.0) : float3(0.0);
         light = display * kHlgPeakOverSDRWhite;
@@ -746,8 +760,8 @@ static inline LayerSample gradeSample(float3 rgb, float alpha,
     // the spill control pulls the remaining fringe toward its own luma. In
     // an HLG project the distance reads the working colour as an SDR project
     // shows it against the stored key: GR-15's HDR→SDR arm for an HLG or PQ
-    // source (`keyReading`, spec §11 HD-19 (c)), the inverse lift for every
-    // other layer (HD-13 (h)).
+    // source and GR-16's for a camera-log one (`keyReading`, spec §11 HD-19
+    // (c), HD-20 (a)), the inverse lift for every other layer (HD-13 (h)).
     if (u.chromaEnabled > 0.5) {
         float3 key = float3(u.chromaKeyR, u.chromaKeyG, u.chromaKeyB);
         float d = distance(u.hlgOutput > 0.5 ? saturate(u.keyReading != 0.0
