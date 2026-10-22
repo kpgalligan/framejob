@@ -454,6 +454,7 @@ REVERSE_DISTINCT = 800
 REVERSE_PROBE = ROOT / "tools/proof/reverse_probe.swift"
 REVERSE_DIR = BASE / "reverse-probe"
 REVERSER = "app/Sources/ReverseRenderer.swift"
+REVERSE_READ = "app/Sources/ReverseRenderer+Read.swift"
 REVERSE_CACHE = "app/Sources/ReverseCache.swift"
 DEEP = "app/Sources/DeepStillFrame.swift"
 RAMP_ODD = ("color=c=black:size=1919x1079:rate=30:duration=1,format=yuv422p10le,"
@@ -522,7 +523,7 @@ MUTANTS = {
          "            let deepSpace = CGColorSpace(name: CGColorSpace.linearSRGB)\n")]},
     # precision-2 P2-2 (spec §11 PR-7): the reverse.
     "reverse-bgra": {"mode": "rows", "rows": ["V0"], "also": ["V1", "V2"], "anchors": [
-        (REVERSER, "                    kCVPixelBufferPixelFormatTypeKey as String: Int(pixelFormat),\n",
+        (REVERSE_READ, "                    kCVPixelBufferPixelFormatTypeKey as String: Int(pixelFormat),\n",
          "                    kCVPixelBufferPixelFormatTypeKey as String: "
          "Int(kCVPixelFormatType_32BGRA),\n")]},
     "reverse-main": {"mode": "rows", "rows": ["V0"], "anchors": [
@@ -538,11 +539,11 @@ MUTANTS = {
          "            ],\n"
          "            AVVideoCompressionPropertiesKey: compression,\n")]},
     "reverse-planar-drop": {"mode": "rows", "rows": ["V0"], "anchors": [
-        (REVERSER, "        guard width > 0, height > 0 else { return nil }\n",
+        (REVERSE_READ, "        guard width > 0, height > 0 else { return nil }\n",
          "        guard width > 0, height > 0, CVPixelBufferGetPlaneCount(source) <= 1 else "
          "{ return nil }\n")]},
     "reverse-no-attachments": {"mode": "rows", "rows": ["V2"], "also": ["V3"], "anchors": [
-        (REVERSER, "        CVBufferPropagateAttachments(source, target)\n", "")]},
+        (REVERSE_READ, "        CVBufferPropagateAttachments(source, target)\n", "")]},
     "reverse-unversioned": {"mode": "rows", "rows": ["V4"], "anchors": [
         (REVERSE_CACHE, '        for byte in "\\(source.path)|\\(size)|\\(Int64(modified.rounded()))'
          '|v\\(rendererVersion)".utf8 {\n',

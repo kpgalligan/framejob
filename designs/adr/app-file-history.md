@@ -771,7 +771,16 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `copyBuffer`, `copyRows`; lines 447–626 after the move) out whole to
   `ReverseRenderer+Read.swift`, widening their `private`, with `precision_proof.py`'s reverse
   mutants whose anchors live there (`reverse-bgra`, `reverse-planar-drop`,
-  `reverse-no-attachments`) re-anchored to the new file.
+  `reverse-no-attachments`) re-anchored to the new file. Clean-up round 3's batch A paid it
+  before #309's encoder-delay shift: lines 463–641 at `904d28a` (`// MARK: - Reading one slice`
+  through `copyRows`' closing brace) moved byte for byte into `extension ReverseRenderer` in
+  `ReverseRenderer+Read.swift` with `import AVFoundation`, a pure move gated alone; `Frame`,
+  `Slice`, `read`, `copyBuffer` and `copyRows` lost `private` and nothing else changed, and
+  `precision_proof.py`'s `reverse-bgra`, `reverse-planar-drop` and `reverse-no-attachments`
+  anchors moved to `REVERSE_READ`, the new file, where each occurs once. `wc -l
+  app/Sources/ReverseRenderer.swift`: 737 before, 557 after; `ReverseRenderer+Read.swift` is
+  183. The next seam: `// MARK: - Settings` (`dimensions`, `videoSettings`, `sliceDuration`) out
+  to `ReverseRenderer+Settings.swift`.
 - `Controls.swift`: held to the sync rule with Rasterize's copy (`app/CLAUDE.md` "Shared chrome");
   7 of its lines are the SH-2 fork of `drawBar` (#101).
 - `ReelOps.swift` is exempt (a table, one row per op). `TimelineView.swift`,
