@@ -1749,7 +1749,9 @@ without the sRGB decode failed the fixture test (and the split test);
 `to`'s alpha taken instead of mixed failed both on `#63636380`.
 
 Not changed: the model's own `[r, g, b, a]` colours (text, shadow,
-background, shape groups) keep §5.4's element-by-element blend.
+background, shape groups) keep §5.4's element-by-element blend (the text and
+shadow colours, and the chroma key, changed by Phase 4, G-43; background and
+shape colours are not action targets).
 
 **Phase 2 — a module marks a prop `animate: false` (#248, spec §11
 G-41)**, 2026-10-22, on `fa328f2`. Any schema entry may carry an optional
@@ -1824,6 +1826,49 @@ core and engine mutants, applied by hand and reverted: `overlay` without
 the `""` arm failed `an_empty_asset_is_handed_as_null`; `schema_default`'s
 asset arm back to `None` failed the door test; the asset refusal restored
 failed the door test and `an_asset_switches_at_the_end`.
+
+**Phase 4 — every action colour in OKLab (spec §11 G-43)**, 2026-10-22, on
+`4da64a5`. The model's nine colour keys in an action's state now blend as a
+graphic `color` prop does: `video.shadow.color`, `text.color`,
+`text.outline.color`, `text.backdrop.color`, the word style's
+`active_color`, `spoken_color`, `upcoming_color` and `active_pill.color`
+(`[r, g, b, a]`, sRGB-encoded 0–1), and `video.chroma.key` (`[r, g, b]`).
+`core/src/model_color.rs` moved to a unit path: `oklab_mix_unit` and
+`oklab_mix_rgb` run G-40's operations in floating point on inputs clamped
+to [0, 1] (alpha straight, clamped), and `oklab_mix` is that path with
+bytes/255 in and ×255 rounded out, so `core/tests/graphic_actions.rs`
+passes byte for byte unchanged. A new `core/src/actions_color.rs`
+(`COLOR_POINTERS`, `CHROMA_KEY_POINTER`, `blend_colors`) is called once in
+`evaluate_clip`'s spanning branch after the `lerp`, from the two ends: a
+key is blended only strictly inside 0…1, only when its two ends differ (an
+untouched colour keeps the lerp's exact copy, so a split saves no drift),
+and only when both read as arrays of its arity; anything else keeps §5.4's
+hold-then-switch. `actions.rs` is 582 lines. Known by key, never by shape:
+`the_colour_keys_are_every_colour_in_the_state` censuses every array of 3
+or 4 numbers under a fully populated clip's `video` and `text` and finds
+exactly the nine. `graphic/tests/oklab.json` gains its third reader,
+`core/tests/action_colours.rs` (nine tests: each key's red → blue middle
+`#8c53a2`, the fixture through `text.color` and `video.chroma.key`, the
+recipe's text colour, the first tick exact, an untouched colour exact
+mid-action and after a split, a non-colour end held, an out-of-range end
+blended from its clamp, a split's exact join and its interior within
+1e-6). No format bump; older projects re-render with the new middle. The
+catalog's `set_action_end` prose, §5.4 and §7.10 say so. `shape` and
+`canvas.background` are not action targets and have no blend.
+
+Verified: `make gate` PASS; against Release, `graphic_prop_action_proof.py`
+20/20, exit 0, Z1 held (no `Frame Job: ` line), its rows unchanged (B1's
+and E1's red → blue middle is the byte path's, unchanged).
+Mutants, applied by hand to the tree and reverted, each failing a named
+test: the `blend_colors` call removed (four `action_colours` tests);
+`to_linear` returning its input (the fixture tests in both suites and
+both split tests); the chroma key skipped (`every_colour_key_ramps_in_oklab`,
+the fixture test); the `0 < u < 1` guard removed
+(`an_action_s_first_tick_is_the_stored_start`, the split test); alpha
+taken from `to` (the fixture tests in both suites); the rgb input clamp
+removed and the alpha input clamp removed (`an_out_of_range_end_blends_from_its_clamp`);
+the arity check removed (`a_colour_that_does_not_read_holds`, a four-number
+chroma key end); the ends-differ check removed (`an_untouched_colour_stays_exact`).
 
 ## Open items
 

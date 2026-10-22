@@ -30,7 +30,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
 | [`05.2-project-schema.md`](05.2-project-schema.md) | 542 | The project JSON schema: every persisted field (format version 19). |
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
-| [`05.4-actions.md`](05.4-actions.md) | 140 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
+| [`05.4-actions.md`](05.4-actions.md) | 144 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
 | [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
 | [`05.6-persistence.md`](05.6-persistence.md) | 211 | The package on disk: Consolidate, bookmarks, reversed assets, caches and their markers, transcripts. |
 | **§6 — Edit operations: exact semantics** | | |
@@ -50,11 +50,11 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 409 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, the app-state tools, lenient decoding. |
 | [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 159 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
 | [`07.9c-agent-graphics-dev-tools-transport.md`](07.9c-agent-graphics-dev-tools-transport.md) | 300 | The graphics loop's tools (write, read, render, import, delete, rename and restore a module), an action's graphic props and the graphics menus, the dev tools (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `assistant_send` / `assistant_answer` and their launch defaults, `play_preview`, `graphic_memory`), and the transport (the Unix socket, `framejob-mcp`, Copy MCP Command). |
-| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 104 | The spec's Rust module map (core/CLAUDE.md is the live one). |
+| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 105 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 188 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 11067 in 26 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 11113 in 26 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

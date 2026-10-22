@@ -1619,6 +1619,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   for those frames (G-8), which stops an export.
   (f) **Colours blend channel by channel (answer 6)**, as every colour
   action already does (the model's `[r, g, b, a]`, element by element).
+  (Amended by G-43: the model's colours blend in OKLab too, so no colour
+  action blends channel by channel.)
   The red, green, blue and alpha of the two `#rrggbb[aa]` strings (no alpha
   is 255) each interpolate STRAIGHT, not premultiplied: `#00000000` to
   `#ffffff` is `#80808080` halfway. Each channel is rounded to the nearest
@@ -2157,6 +2159,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   text and shape groups) still blend element by element in actions
   (§5.4); a graphic prop's other kinds keep G-34's rules; `split` stays
   invisible to within one byte per channel (G-34 (i)).
+  (Amended by G-43: the model's nine colour keys in `video` and `text`
+  blend in OKLab with straight alpha, through the same arithmetic in
+  floating point; `shape` is not an action target.)
 
 - **G-41 — A module marks a prop `animate: false` and no action animates
   it: `set_action_end` refuses a value for it by name, and the Graphic tab
@@ -2224,3 +2229,43 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   (e) **No format bump.** No persisted shape changes; `""` was already a
   stored string. An older build draws an asset end but hands `""` to the
   module as `""`; there is no real use yet (owner, 2026-10-09).
+
+- **G-43 — Every colour an action animates blends in OKLab, with
+  straight alpha, by key; amends G-40 (d), G-34 (f)** (graphics gaps
+  phase 4, 2026-10-22).
+  (a) **The keys.** Nine keys of an action's state are colours, known by
+  key and never by the value's shape: `video.shadow.color`, `text.color`,
+  `text.outline.color`, `text.backdrop.color`,
+  `text.word_style.active_color`, `.spoken_color`, `.upcoming_color`,
+  `text.word_style.active_pill.color` (each `[r, g, b, a]`, sRGB-encoded
+  0–1) and `video.chroma.key` (`[r, g, b]`, no alpha). Inside the spanning
+  action each one whose start and end differ moves from its start toward
+  its end in OKLab: the inputs clamped to [0, 1], then G-40's operations
+  (sRGB → linear → OKLab, a mix by the eased progress, and back) in
+  floating point, never rounded to a byte. Alpha is `a0 + (a1 − a0) × u`,
+  straight, never premultiplied, clamped to [0, 1]; the chroma key is rgb
+  only. A key whose start and end are the same numbers (compared parsed, so
+  a stored `1.0` and an end's `1` are equal) is not blended, so it stays
+  exactly as stored (the round trip would drift it by ~1e-7). A value that
+  does not read as a colour of its key's arity (a `null`, a missing
+  group, a wrong length, a non-number) keeps §5.4's rule: it holds and
+  switches at the end. The ends are the stored values: an action's first
+  tick is its start and its end is its end, exactly. Red to blue halfway
+  is `#8c53a2` (×255 rounded), never `[0.5, 0, 0.5]`.
+  (b) **One implementation.** `model_color.rs`'s unit path
+  (`oklab_mix_unit`, `oklab_mix_rgb`) is the blend; G-40's `oklab_mix`
+  is that path with each byte read as byte/255 and each unit rounded to
+  the nearest byte, so its output does not change by a byte.
+  `graphic/tests/oklab.json` is answered by three readers:
+  `graphic/tests/stdlib.rs`, `core/tests/graphic_actions.rs` (bytes), and
+  `core/tests/action_colours.rs`, which takes each case's bytes/255 in and
+  compares the result ×255 rounded to the fixture.
+  (c) **Older projects** re-render with the new middle. No persisted
+  shape changes, so `RC_FORMAT_VERSION` is not bumped and there is no
+  migration.
+  (d) **Not changed.** The `shape` group and `canvas.background` are not
+  action targets (§5.4's three groups), so they have no blend; a colour
+  plate is a shape. At a `split` the join is exact (`clip_state` either
+  side of the cut is equal); inside the head and the tail a sample
+  matches the unsplit clip within the matrices' round-trip error (1e-6
+  per channel), not exactly.

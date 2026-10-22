@@ -25,12 +25,15 @@
 //!
 //! A graphic clip's props are the fourth target (format version 13, spec
 //! §11 G-34) and are NOT this file's `merge` / `lerp`: `actions_graphic.rs`
-//! evaluates them by the props' kinds, into [`Evaluated::graphic`].
+//! evaluates them by the props' kinds, into [`Evaluated::graphic`]. The
+//! model's colours, known by key, are blended in OKLab after the `lerp` by
+//! `actions_color.rs` (spec §11 G-43).
 
 use serde::Serialize;
 use serde_json::{Map, Number, Value};
 
 use crate::actions_clamp::{clamp_audio, clamp_video};
+use crate::actions_color::blend_colors;
 use crate::actions_curves::{
     align_identity_curves, blended_curves_json, curve_blends, curves_json, CurveBlend,
 };
@@ -132,9 +135,11 @@ fn merge_at(base: &Value, patch: &Value, depth: u32) -> Value {
 
 /// Interpolates `from` toward `to` by eased progress `u`.
 ///
-/// Numbers interpolate; arrays (colors, `key`, `from`/`to` points, the
-/// filter and obscure lists) interpolate element by element when the
-/// lengths match; objects interpolate key by key. **Booleans, strings,
+/// Numbers interpolate; arrays (`from`/`to` points, the filter and obscure
+/// lists) interpolate element by element when the lengths match; objects
+/// interpolate key by key. Colours lerp element by element here too, and
+/// `actions_color.rs`'s `blend_colors` then overwrites them with the OKLab
+/// blend of the two ends (spec §11 G-43). **Booleans, strings,
 /// enums, `null`s and any pair of mismatched types switch at the END** —
 /// they hold the `from` value until `u` reaches 1 — which is the §5.4 rule
 /// and the only sane reading of "interpolate `left` to `center`".
@@ -439,7 +444,10 @@ impl Project {
             let elapsed = clip_t.saturating_sub(action.start) as f64;
             let progress = elapsed / action.duration as f64;
             let eased = ease(action.curve, progress);
-            state = lerp(&state, &target, eased);
+            let mut lerped = lerp(&state, &target, eased);
+            // The colours in OKLab from the two ends (spec §11 G-43).
+            blend_colors(&state, &target, eased, &mut lerped);
+            state = lerped;
             spanning = Some((target, eased));
         }
 

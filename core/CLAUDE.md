@@ -164,8 +164,11 @@ governs a module now.
   it refuses (G-25 (a)). `color_channels` and `color_hex` (which
   `normalise_color` writes through) and `oklab_mix` are
   `actions_graphic.rs`'s blend's: `oklab_mix` is the stdlib's
-  `interpolateColors` ported operation for operation (spec §11 G-40), and
-  both suites read `graphic/tests/oklab.json`.
+  `interpolateColors` ported operation for operation (spec §11 G-40), now
+  bytes/255 through `oklab_mix_unit` and ×255 rounded out; `oklab_mix_unit`
+  and `oklab_mix_rgb` (0–1 floats, clamped, never rounded) are
+  `actions_color.rs`'s (G-43). Three suites read `graphic/tests/oklab.json`:
+  the stdlib's, `graphic_actions.rs` and `action_colours.rs`.
 - `model_query.rs` — reading a project: `Project::new`, id allocation, the
   `clip`/`track`/`media`/`marker`/`nest` lookups, `clips_on`, `duration`,
   `validate` with its nesting walk, and `source_size`. The three
@@ -552,6 +555,13 @@ governs a module now.
   centres are more than 180° apart, so the centre animates the short
   way round (350 → 10 through 0); `clamp_qualifier` brings it back
   into [0, 360).
+- `actions_color.rs` — `blend_colors` (spec §11 G-43): after the spanning
+  action's `lerp`, each of the model's colours — `COLOR_POINTERS`' eight
+  `[r, g, b, a]` in `video` and `text` and `CHROMA_KEY_POINTER`'s `[r, g,
+  b]`, by path, never by shape — is overwritten by the OKLab blend of the
+  action's two ends (`oklab_mix_unit` / `oklab_mix_rgb`), only strictly
+  inside the action and only where the ends differ, so an untouched colour
+  stays exact; an end of the wrong arity keeps §5.4's hold-then-switch.
 - `actions_graphic.rs` — a graphic clip's props at a clip time (format
   version 13, spec §11 G-34): finished actions' `end.graphic.props` laid
   over the clip's map by `insert`, the spanning one interpolated — a number

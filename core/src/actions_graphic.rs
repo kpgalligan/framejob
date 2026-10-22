@@ -18,8 +18,8 @@
 //!   `color_channels`, `oklab_mix` and `color_hex` — stdlib's
 //!   `interpolateColors`' blend, byte for byte, with STRAIGHT alpha, each
 //!   channel rounded to the nearest byte (G-40, amending G-34 (f)). The
-//!   model's own `[r, g, b, a]` colours keep `actions.rs`'s
-//!   element-by-element `lerp_at`;
+//!   model's own `[r, g, b, a]` colours blend through `actions_color.rs`
+//!   with the same arithmetic, in floating point (G-43);
 //! - **anything else** — a string, a boolean, an enum, an asset (G-42), two values of
 //!   different JSON kinds, a colour it cannot read — holds its start and
 //!   takes the end's value at the action's END.

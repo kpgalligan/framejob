@@ -15,11 +15,15 @@
 //!
 //! **[`oklab_mix`] is G-40's blend, and `graphic/src/stdlib.js`'s
 //! `interpolateColors` is its second implementation**: both answer
-//! `graphic/tests/oklab.json` (`core/tests/graphic_actions.rs` and
-//! `graphic/tests/stdlib.rs`), so a change here is a change there; the
+//! `graphic/tests/oklab.json`, so a change here is a change there; the
 //! JavaScript is the reference. It is the stdlib's `__toLinear`,
 //! `__toOklab`, `__fromOklab` and `__fromLinear` operation for operation,
-//! so both round the same byte.
+//! so both round the same byte. It is [`oklab_mix_unit`] plus rounding:
+//! the unit path, in floating point, is the one blend, and
+//! `actions_color.rs` blends the model's own colours through it (G-43).
+//! The fixture has three readers: `graphic/tests/stdlib.rs`,
+//! `core/tests/graphic_actions.rs` (bytes) and `core/tests/action_colours.rs`
+//! (the unit path, bytes/255 in and ×255 rounded out).
 
 /// A CSS colour as `#rrggbb`, or `#rrggbbaa` when it is not opaque,
 /// lowercase (G-12). Takes the four hex forms in any case, `rgb()` /
@@ -60,22 +64,38 @@ pub(crate) fn color_hex(channels: [u8; 4]) -> String {
 }
 
 /// `from` toward `to` by `t` in OKLab, as stdlib.js's interpolateColors:
-/// bytes in, bytes out (G-40). Red, green and blue go sRGB → linear →
-/// OKLab, mix, and back, rounded to the nearest byte; alpha is mixed
-/// straight as a unit value, as the stdlib carries it.
+/// bytes in, bytes out (G-40). [`oklab_mix_unit`] with each byte read as
+/// byte/255 and each unit rounded to the nearest byte, which is the byte
+/// G-40's own rounding gave: for a unit in [0, 1], rounding it ×255 and
+/// clamping the byte is clamping it and rounding it ×255.
 pub(crate) fn oklab_mix(from: [u8; 4], to: [u8; 4], t: f64) -> [u8; 4] {
-    let a = to_oklab(from);
-    let b = to_oklab(to);
-    let mixed: [f64; 3] = std::array::from_fn(|k| a[k] + (b[k] - a[k]) * t);
-    let [r, g, bl] = from_oklab(mixed);
-    let (a0, a1) = (f64::from(from[3]) / 255.0, f64::from(to[3]) / 255.0);
-    let alpha = ((a0 + (a1 - a0) * t) * 255.0).round().clamp(0.0, 255.0) as u8;
-    [r, g, bl, alpha]
+    let unit = |c: [u8; 4]| c.map(|v| f64::from(v) / 255.0);
+    oklab_mix_unit(unit(from), unit(to), t).map(|v| (v * 255.0).round() as u8)
 }
 
-/// stdlib.js's `__toLinear`: one sRGB byte to linear light.
-fn to_linear(c: u8) -> f64 {
-    let v = f64::from(c) / 255.0;
+/// `from` toward `to` by `t` in OKLab, sRGB-encoded units in and out
+/// (G-43): red, green and blue through [`oklab_mix_rgb`]; alpha mixed
+/// straight, never premultiplied, `a0 + (a1 − a0) × t` on the two inputs
+/// clamped to [0, 1], the result clamped to [0, 1].
+pub(crate) fn oklab_mix_unit(from: [f64; 4], to: [f64; 4], t: f64) -> [f64; 4] {
+    let [r, g, b] = oklab_mix_rgb([from[0], from[1], from[2]], [to[0], to[1], to[2]], t);
+    let (a0, a1) = (from[3].clamp(0.0, 1.0), to[3].clamp(0.0, 1.0));
+    [r, g, b, (a0 + (a1 - a0) * t).clamp(0.0, 1.0)]
+}
+
+/// Three sRGB-encoded units toward three more by `t` in OKLab (G-40's
+/// operations in floating point, G-43): each input clamped to [0, 1], then
+/// sRGB → linear → OKLab, mixed component by component, and back, each
+/// result clamped to [0, 1] and never rounded.
+pub(crate) fn oklab_mix_rgb(from: [f64; 3], to: [f64; 3], t: f64) -> [f64; 3] {
+    let a = to_oklab(from.map(|v| v.clamp(0.0, 1.0)));
+    let b = to_oklab(to.map(|v| v.clamp(0.0, 1.0)));
+    let mixed: [f64; 3] = std::array::from_fn(|k| a[k] + (b[k] - a[k]) * t);
+    from_oklab(mixed)
+}
+
+/// stdlib.js's `__toLinear`: one sRGB unit to linear light.
+fn to_linear(v: f64) -> f64 {
     if v <= 0.04045 {
         v / 12.92
     } else {
@@ -83,19 +103,20 @@ fn to_linear(c: u8) -> f64 {
     }
 }
 
-/// stdlib.js's `__fromLinear`: linear light to the nearest sRGB byte.
-fn from_linear(v: f64) -> u8 {
+/// stdlib.js's `__fromLinear`: linear light to an sRGB unit, clamped to
+/// [0, 1] (the stdlib rounds it ×255 then; [`oklab_mix`] does).
+fn from_linear(v: f64) -> f64 {
     let s = if v <= 0.0031308 {
         12.92 * v
     } else {
         1.055 * v.powf(1.0 / 2.4) - 0.055
     };
-    (s * 255.0).round().clamp(0.0, 255.0) as u8
+    s.clamp(0.0, 1.0)
 }
 
 /// stdlib.js's `__toOklab`, its literals in its order; alpha is not here.
-fn to_oklab(rgba: [u8; 4]) -> [f64; 3] {
-    let (lr, lg, lb) = (to_linear(rgba[0]), to_linear(rgba[1]), to_linear(rgba[2]));
+fn to_oklab(rgb: [f64; 3]) -> [f64; 3] {
+    let (lr, lg, lb) = (to_linear(rgb[0]), to_linear(rgb[1]), to_linear(rgb[2]));
     let l = (0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb).cbrt();
     let m = (0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb).cbrt();
     let s = (0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb).cbrt();
@@ -107,7 +128,7 @@ fn to_oklab(rgba: [u8; 4]) -> [f64; 3] {
 }
 
 /// stdlib.js's `__fromOklab`: `powf(3.0)`, as `Math.pow(_, 3)`.
-fn from_oklab([lightness, a, b]: [f64; 3]) -> [u8; 3] {
+fn from_oklab([lightness, a, b]: [f64; 3]) -> [f64; 3] {
     let l = (lightness + 0.3963377774 * a + 0.2158037573 * b).powf(3.0);
     let m = (lightness - 0.1055613458 * a - 0.0638541728 * b).powf(3.0);
     let s = (lightness - 0.0894841775 * a - 1.291485548 * b).powf(3.0);
