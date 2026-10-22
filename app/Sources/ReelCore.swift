@@ -22,7 +22,9 @@ import AppKit
 /// `ShapePatch` is in `ShapePatch.swift` (as `TextPatch` is in
 /// `TextPatch.swift`), the payment it owed at 1280 before `ReelColor`. The
 /// other typed patches are in `TypedPatches.swift`, the payment it owed at
-/// 1211 before `ReelContainer`.
+/// 1211 before `ReelContainer`. `ReelCoreError` and `Fps.ffiPair` are in
+/// `CoreValues.swift`, the payment it owed at 817 before the engine's image
+/// cache, for the same reason.
 /// Only `ReelOp.coreNames()` and `ReelOp.coreSchemas()` stayed behind — the
 /// op table read BACK, its names and its arguments — because they read
 /// `rc_op_names()` and `rc_op_schemas()` and the rule above admits no second
@@ -37,12 +39,6 @@ import AppKit
 ///    returns goes through `takeString` / `takeErrorMessage`, which free it.
 ///  - `rc_project_apply` returning NULL means three things — see
 ///    `applying(_:)`. Getting that wrong is a phantom undo step.
-
-/// Error thrown by the Rust core, carrying the message from `err_out`.
-struct ReelCoreError: LocalizedError {
-    let message: String
-    var errorDescription: String? { message }
-}
 
 /// Consumes a Rust-allocated error string and returns its contents.
 private func takeErrorMessage(_ err: UnsafeMutablePointer<CChar>?, fallback: String) -> String {
@@ -65,16 +61,6 @@ private func takeString(_ s: UnsafeMutablePointer<CChar>?) -> String? {
 /// this cannot fail.
 private func jsonArray<T: FixedWidthInteger>(_ values: [T]) -> String {
     "[" + values.map { String($0) } .joined(separator: ",") + "]"
-}
-
-extension Fps {
-    /// The rate as the two `uint32_t` arguments every `rc_*` time function
-    /// takes; nil for a degenerate or out-of-range rate — impossible in a
-    /// document the core wrote, possible in a hand-written JSON.
-    var ffiPair: (num: UInt32, den: UInt32)? {
-        guard num > 0, den > 0, num <= Int(UInt32.max), den <= Int(UInt32.max) else { return nil }
-        return (UInt32(num), UInt32(den))
-    }
 }
 
 // MARK: - The project handle

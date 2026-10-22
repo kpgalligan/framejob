@@ -2,7 +2,25 @@ import Foundation
 
 /// The values the core's speed limits and graphics engine decode into — `SpeedLimits`,
 /// `GraphicDiagnostic`, `GraphicFailure` and `GraphicRaster` — moved out of `ReelCore.swift`
-/// (a pure move, clean-up batch 2) because they name no `rc_*` symbol but in a doc comment.
+/// (a pure move, clean-up batch 2) because they name no `rc_*` symbol but in a doc comment;
+/// and, for the same reason, the core's error `ReelCoreError` and `Fps.ffiPair` (a pure
+/// move, #127 G6 phase 5's toll).
+
+/// Error thrown by the Rust core, carrying the message from `err_out`.
+struct ReelCoreError: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
+extension Fps {
+    /// The rate as the two `uint32_t` arguments every `rc_*` time function
+    /// takes; nil for a degenerate or out-of-range rate — impossible in a
+    /// document the core wrote, possible in a hand-written JSON.
+    var ffiPair: (num: UInt32, den: UInt32)? {
+        guard num > 0, den > 0, num <= Int(UInt32.max), den <= Int(UInt32.max) else { return nil }
+        return (UInt32(num), UInt32(den))
+    }
+}
 
 /// Every number about a clip's speed, as the core publishes it through
 /// `rc_speed_limits` (spec §11 #190): the range `set_speed` clamps to and the

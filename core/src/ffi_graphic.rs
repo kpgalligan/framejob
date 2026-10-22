@@ -1,8 +1,9 @@
 //! C FFI: the motion-graphics engine (road map 10 §5e) — ten `rc_graphic_*`
-//! exports delegating to the `graphic` crate. **The only module of the core
-//! that names that crate** (G-2): the core still does no pixel work and
-//! reaches no file; it hands the app's bytes to the engine and the engine's
-//! answer back.
+//! exports delegating to the `graphic` crate (the builder's `new` and
+//! `add_asset` live in `ffi_graphic_pending.rs`, re-exported here). **The
+//! only module of the core that names that crate** (G-2): the core still
+//! does no pixel work and reaches no file; it hands the app's bytes to the
+//! engine and the engine's answer back.
 //!
 //! Two handles. An `RcGraphicLibrary` is a BUILDER of `graphic::Library`,
 //! which is immutable because its `version` hashes every byte in it: fonts
@@ -24,44 +25,29 @@ use std::collections::BTreeMap;
 use std::ffi::c_char;
 use std::ptr;
 use std::slice;
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use graphic::{Diagnostic, Library, Module};
 use serde_json::Value;
 
+use crate::ffi_graphic_pending::{lock, Pending, FROZEN};
+pub use crate::ffi_graphic_pending::{rc_graphic_library_add_asset, rc_graphic_library_new};
 use crate::ffi_util::{
     boxed, fallible_op, fallible_op_wrapped, free_boxed, out_string, read_bytes, read_cstr,
     read_opt_cstr, set_message,
 };
 
-/// The refusal of an add after the first use.
-const FROZEN: &str =
-    "the library is frozen: a graphic was compiled or a frame drawn against it; build a new one";
-
 /// A font and asset set being assembled, then the one `Library` it froze
 /// into. `Sync`: the adds lock `pending`, and the freeze takes it whole.
 pub struct RcGraphicLibrary {
-    pending: Mutex<Option<Pending>>,
-    built: OnceLock<Arc<Library>>,
-}
-
-/// What has been added and not yet frozen.
-#[derive(Default)]
-struct Pending {
-    fonts: Vec<Vec<u8>>,
-    assets: BTreeMap<String, Vec<u8>>,
+    pub(crate) pending: Mutex<Option<Pending>>,
+    pub(crate) built: OnceLock<Arc<Library>>,
 }
 
 /// A compiled graphic module; `Send + Sync`, each drawing thread keeping its
 /// own engine (`graphic`'s `runtime.rs`).
 pub struct RcGraphic {
     module: Module,
-}
-
-fn lock(lib: &RcGraphicLibrary) -> MutexGuard<'_, Option<Pending>> {
-    lib.pending
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// The library, frozen on first call: the pending fonts and assets are taken
@@ -84,19 +70,6 @@ fn diag_json(list: &[Diagnostic]) -> String {
 /// One error Diagnostic's array, for an argument this file could not read.
 fn diag_error(message: String) -> String {
     diag_json(&[Diagnostic::error(message)])
-}
-
-/// A new, empty library builder. Never NULL.
-///
-/// # Safety
-/// Takes no pointers; the handle is owned by the caller and freed with
-/// [`rc_graphic_library_free`].
-#[no_mangle]
-pub unsafe extern "C" fn rc_graphic_library_new() -> *mut RcGraphicLibrary {
-    boxed(RcGraphicLibrary {
-        pending: Mutex::new(Some(Pending::default())),
-        built: OnceLock::new(),
-    })
 }
 
 /// Adds one font file's bytes (`.ttf`/`.otf`/`.ttc`). False with a message
@@ -137,45 +110,6 @@ pub unsafe extern "C" fn rc_graphic_library_add_font(
         }
     };
     unsafe { fallible_op(err_out, "adding a font", false, body, |()| true) }
-}
-
-/// Adds one asset under `name`, the string a graphic's `<image href>`
-/// names. False with a message through `err_out` for a NULL argument, an
-/// empty name, a name already in the library, or a frozen library.
-///
-/// # Safety
-/// `lib` must be NULL or a live handle from [`rc_graphic_library_new`];
-/// `name` must be NULL or a valid NUL-terminated C string; `bytes` must be
-/// NULL or point to `len` readable bytes; `err_out` must be NULL or a valid
-/// pointer to writable `*mut c_char`, freed with `rc_string_free`.
-#[no_mangle]
-pub unsafe extern "C" fn rc_graphic_library_add_asset(
-    lib: *mut RcGraphicLibrary,
-    name: *const c_char,
-    bytes: *const u8,
-    len: usize,
-    err_out: *mut *mut c_char,
-) -> bool {
-    let body = || {
-        if lib.is_null() {
-            return Err("library is NULL".to_string());
-        }
-        let name = unsafe { read_cstr(name, "name") }?;
-        if name.is_empty() {
-            return Err("name is empty".to_string());
-        }
-        let data = unsafe { read_bytes(bytes, len) }?;
-        let mut guard = lock(unsafe { &*lib });
-        let Some(pending) = guard.as_mut() else {
-            return Err(FROZEN.to_string());
-        };
-        if pending.assets.contains_key(&name) {
-            return Err(format!("asset \"{name}\" is already in the library"));
-        }
-        pending.assets.insert(name, data);
-        Ok(())
-    };
-    unsafe { fallible_op(err_out, "adding an asset", false, body, |()| true) }
 }
 
 /// The frozen library's families as a JSON array of strings, sorted and

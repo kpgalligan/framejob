@@ -64,6 +64,7 @@ pub mod ffi_container;
 pub mod ffi_cube;
 pub mod ffi_edit;
 pub mod ffi_graphic;
+pub mod ffi_graphic_pending;
 pub mod ffi_hdr10;
 pub mod ffi_query;
 pub mod format;
