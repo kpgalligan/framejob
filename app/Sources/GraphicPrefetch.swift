@@ -68,18 +68,6 @@ final class GraphicPrefetch: @unchecked Sendable {
     /// The entries one session holds at most, bytes or none (G-37 (a)).
     static let entryCeiling = 1024
 
-    /// One graphic layer's inputs — exactly what `LayerRenderers.graphic` is
-    /// called with. Member order is load-bearing (`graphics_proof.py`'s
-    /// `frame-plus-one` anchor in `LayerRenderersGraphic.swift`).
-    struct Slot: Hashable {
-        let name: String
-        let frame: Int
-        let width: Int
-        let height: Int
-        let propsJSON: String
-        let ctxJSON: String
-    }
-
     /// One slot's raster as a worker made it. Guarded by `condition`.
     private final class Entry {
         let index: Int

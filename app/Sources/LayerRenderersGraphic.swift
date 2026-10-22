@@ -212,3 +212,17 @@ extension LayerRenderers {
             texture: texture, size: CGSize(width: raster.width, height: raster.height))
     }
 }
+
+extension GraphicPrefetch {
+    /// One graphic layer's inputs — exactly what `LayerRenderers.graphic` is
+    /// called with. Member order is load-bearing (`graphics_proof.py`'s
+    /// `frame-plus-one` anchor in `LayerRenderersGraphic.swift`).
+    struct Slot: Hashable {
+        let name: String
+        let frame: Int
+        let width: Int
+        let height: Int
+        let propsJSON: String
+        let ctxJSON: String
+    }
+}
