@@ -2,10 +2,11 @@ import Foundation
 
 // MARK: - Catalog: rendering and export
 
-/// The catalog's RENDERING rows: `render_frame`, the verification hook, and
-/// `export`, the movie — two of the eleven `fileTools` publishes, and the
-/// ones grading-2's G2-1 goes on to change (`render_frame`'s scope
-/// booleans, spec §11 GR-10).
+/// The catalog's RENDERING rows: `render_frame`, the verification hook,
+/// `export`, the movie, and since spec §11 #326 `export_status` and
+/// `cancel_export`, which follow and stop the job `export` queued — four of
+/// the thirteen `fileTools` publishes. The first two are the ones grading-2's
+/// G2-1 went on to change (`render_frame`'s scope booleans, spec §11 GR-10).
 ///
 /// A pure move out of `AgentCatalog+Files.swift`, which stood at 579 lines
 /// against app/CLAUDE.md's ~600 cap with no seam named: grading-2's G2-0,
@@ -24,8 +25,9 @@ import Foundation
 /// internal extension of `AgentServer`.
 extension AgentServer {
 
-    /// `render_frame` and `export`, in that order: the rows `fileTools`
-    /// splices in after the Captions group and before Recording.
+    /// `render_frame`, `export`, `export_status` and `cancel_export`, in that
+    /// order: the rows `fileTools` splices in after the Captions group and
+    /// before Recording.
     func renderTools(ticks: String) -> [[String: Any]] {
         // `render_frame`'s three image containers, read off `FrameWriter`'s
         // own enum rather than restated, and hoisted for the type checker's
@@ -227,32 +229,31 @@ extension AgentServer {
                 ]),
             tool(
                 "export",
-                "Writes the timeline to a file and waits for it to finish — ⌘E, the export "
-                    + "sheet's six controls (format, size, frame rate, quality, loudness, "
-                    + "range) in the sheet's own vocabulary, all but the frame rate — this "
-                    + "exports at the "
-                    + "document's rate, or on gif and apng at the format's own rate (12.5 and "
-                    + "25 fps). The preset is the ENCODING only and the size a separate "
-                    + "choice defaulting to the document's own, or on gif and apng to the "
-                    + "format's cap; the core resolves both into concrete settings "
-                    + "(container, codec, size, rate, range) and hands them to the same "
-                    + "exporter the sheet uses, so an agent export and a menu export cannot "
-                    + "disagree. An existing file at the path is replaced, and the "
-                    + "container's extension is added when the path has none. The result "
-                    + "reports the settings that were used, the file's size, and — for every "
-                    + "format that carries sound, normalised or not — what that sound "
-                    + "MEASURED on the way through, under loudness: integrated_lufs, "
-                    + "true_peak_dbtp and the gain_db that was applied. Those are read off "
-                    + "the mix that was written, so they are what the file holds rather than "
-                    + "what was asked for. A graphic clip whose module does not compile "
-                    + "refuses the export before it starts; a graphic that fails during it "
-                    + "stops the export with no file left, naming the graphic and the frame. "
-                    + "graphic_warnings [{name, frame, message}]: each distinct warning a "
-                    + "graphic gave while the file was drawn, absent when none. In an HLG "
+                "Starts writing the timeline to a file and answers AT ONCE with "
+                    + "{export_id, path, status} — ⌘E, the export sheet's six controls (format, "
+                    + "size, frame rate, quality, loudness, range) in the sheet's own "
+                    + "vocabulary, all but the frame rate — this exports at the document's "
+                    + "rate, or on gif and apng at the format's own rate (12.5 and 25 fps). The "
+                    + "export is a job in the Export Queue, run one at a time behind any other "
+                    + "export already there; status is queued or running. Follow it with "
+                    + "export_status, which never waits — call it again after a pause until "
+                    + "status is done, failed or cancelled — and stop it with cancel_export. "
+                    + "The export_id lasts until Frame Job quits. Every refusal comes back "
+                    + "from this call, before anything is queued: a bad argument, a missing "
+                    + "folder, and a graphic clip whose module does not compile; a failure "
+                    + "while writing comes back from export_status, failed with its reason "
+                    + "(a graphic that fails during the export stops it with no file left, "
+                    + "naming the graphic and the frame). The preset is the ENCODING only and "
+                    + "the size a separate choice defaulting to the document's own, or on gif "
+                    + "and apng to the format's cap; the core resolves both into concrete "
+                    + "settings (container, codec, size, rate, range) and hands them to the "
+                    + "same exporter the sheet uses, so an agent export and a menu export "
+                    + "cannot disagree. An existing file at the path is replaced, and the "
+                    + "container's extension is added when the path has none. In an HLG "
                     + "project (set_canvas output) hevc_10bit, prores_422 and prores_4444 "
-                    + "write HLG unless dynamic_range says pq or sdr, every other video preset "
-                    + "writes the project's SDR version, and the result's dynamic_range names "
-                    + "the picture written.",
+                    + "write HLG unless dynamic_range says pq or sdr, and every other video "
+                    + "preset writes the project's SDR version. What the finished file holds "
+                    + "is export_status's done answer.",
                 [
                     "preset": exportPresetProperty,
                     "path": [
@@ -316,6 +317,47 @@ extension AgentServer {
                             + "there and in an SDR project, where sdr changes nothing.",
                     ],
                 ], required: ["preset", "path"]),
+            // Window ▸ Export Queue's row for the job (spec §11 #326).
+            tool(
+                "export_status",
+                "How an export this launch started is going — Window ▸ Export Queue's row "
+                    + "for it, read now: it never waits, so call it again after a pause. "
+                    + "Always export_id, status (queued, running, done, failed or "
+                    + "cancelled), path and elapsed (seconds since export was called, or to "
+                    + "the finish once it has finished). running adds progress (0 to 1) and "
+                    + "phase while the exporter names one (the loudness measurement). done "
+                    + "adds what the file holds: ok, bytes, the settings that were used "
+                    + "(preset, container, codec, width, height, fps [num, den], start, "
+                    + "duration), burn_in_timecode, dynamic_range in an HLG project (the "
+                    + "picture written), loudness for every format that carries sound, "
+                    + "normalised or not — summary, integrated_lufs, true_peak_dbtp, "
+                    + "sample_peak_dbfs, gain_db, ceiling_dbtp, capped_by_peak and target_lufs "
+                    + "when one was asked, read off the mix that was written — and "
+                    + "graphic_warnings [{name, frame, message}], each distinct warning a "
+                    + "graphic gave while the file was drawn, absent when none. failed and "
+                    + "cancelled add reason, the queue row's sentence. Only ids export "
+                    + "returned are known, until Frame Job quits.",
+                [
+                    "export_id": [
+                        "type": "integer", "minimum": 1,
+                        "description": "The export_id export answered.",
+                    ]
+                ], required: ["export_id"]),
+            // The Export Queue row's Cancel (spec §11 #326).
+            tool(
+                "cancel_export",
+                "Stops an export this launch started — the Export Queue row's Cancel. A "
+                    + "queued one is cancelled before it starts; a running one stops and "
+                    + "its half-written file is removed, though the answer may still read "
+                    + "running until the writer has stopped (export_status then reads "
+                    + "cancelled). A finished one is left alone. Answers as export_status "
+                    + "does.",
+                [
+                    "export_id": [
+                        "type": "integer", "minimum": 1,
+                        "description": "The export_id export answered.",
+                    ]
+                ], required: ["export_id"]),
         ]
     }
 }

@@ -247,7 +247,7 @@ def render(mcp, tick):
 
 
 def export(mcp, project, preset, path):
-    reply = mcp.call("export", project=project, preset=preset, path=path)
+    reply = mcp.export(project=project, preset=preset, path=path)
     if not isinstance(reply, dict) or not reply.get("ok"):
         raise RuntimeError(f"export {preset} answered {reply}")
     return reply["path"]

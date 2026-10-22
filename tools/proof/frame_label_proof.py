@@ -195,7 +195,10 @@ def check(name, good, detail=""):
 
 def attempt(client, tool, arguments):
     try:
-        return {"ok": True, "reply": client.call_with(tool, arguments)}
+        # `export` answers an id since #326; the helper follows it to the file.
+        answer = (client.export_with(arguments) if tool == "export"
+                  else client.call_with(tool, arguments))
+        return {"ok": True, "reply": answer}
     except mcp.ToolError as error:
         return {"ok": False, "error": str(error)}
     except Exception as error:  # a socket timeout is the expiry

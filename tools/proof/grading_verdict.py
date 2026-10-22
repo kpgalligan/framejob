@@ -488,7 +488,10 @@ def load():
 def attempt(client, tool, arguments):
     """One MCP call; a refusal is an answer, and so is an expiry."""
     try:
-        return {"ok": True, "reply": client.call_with(tool, arguments)}
+        # `export` answers an id since #326; the helper follows it to the file.
+        answer = (client.export_with(arguments) if tool == "export"
+                  else client.call_with(tool, arguments))
+        return {"ok": True, "reply": answer}
     except mcp.ToolError as error:
         return {"ok": False, "error": str(error)}
     except Exception as error:  # a socket timeout is the expiry
@@ -511,6 +514,7 @@ class Doc:
         self.client, self.path = client, Doc.folder / f"{Doc.made:02d}-{name}{ext}"
         self.width, self.height = width, height
         self.ok, self.why = True, None
+        self.exported = None  # the last export's answer (`export`)
         self.media = {}
         self.note("new_project", attempt(client, "new_project", {"path": str(self.path)}))
         sized = self.call("set_canvas", width=width, height=height, fps=[30, 1],
@@ -589,7 +593,10 @@ class Doc:
         out = Path(out)
         if out.exists():
             out.unlink()
+        # Through `attempt`, so `client.export_with`: the done answer on a
+        # #326 build, the blocking answer on an older one (MAIN_BINARY).
         got = self.call("export", preset=preset, path=str(out), size="document", **extra)
+        self.exported = got.get("reply") if got["ok"] else None
         if not (got["ok"] and out.exists()):
             print(f"       export {out.name}: {got.get('error', 'no file')}", flush=True)
             return None
@@ -681,7 +688,15 @@ def timed_export(binary: Path, kind: str, seconds: int, label: str) -> dict:
         figures["load_before"] = load()
         started = time.monotonic()
         movie = doc.export("h264", out)
-        figures["export_s"] = round(time.monotonic() - started, 2)
+        reply = doc.exported
+        # A #326 build answers at once and the helper polls, so its time is the
+        # app's own `elapsed`, from the call to the finish with no poll
+        # interval in it; an older build blocks to the file, so the wall clock
+        # around the call is the same measurement there.
+        if isinstance(reply, dict) and "export_id" in reply:
+            figures["export_s"] = round(reply["elapsed"], 2)
+        else:
+            figures["export_s"] = round(time.monotonic() - started, 2)
         figures["load_after"] = load()
         figures["exported"] = movie is not None
         with open(log, errors="replace") as handle:

@@ -2003,8 +2003,9 @@ free.
   controller has NO AppKit in it so a probe can drive it; one job at a time on
   the MAIN thread with a fresh `Exporter` each (two concurrent ones deadlock);
   `mediaURLs()` AND the document's compiled graphics (`Job.graphics`)
-  captured at ENQUEUE. No MCP mirror: `export` called N times is
-  the capability.
+  captured at ENQUEUE. The agent's `export` enqueues here too (spec §11
+  #326): its job shows in the window with its progress and Cancel, and
+  `export_status` / `cancel_export` read and cancel it by the job's id.
 - `SettingsInfoButton.swift` — Settings' ⓘ: an image-only `NSButton` whose
   `NSPopover` shows a pane's explanation on hover (0.35 s) or press (SH-5),
   its `infoState` (closed/hover/held) deciding a press and its
@@ -2166,7 +2167,7 @@ free.
   (+`RecordingArguments`, +`RecordingResult`, +`RecordingChrome` —
   `RecordingToolChrome`, the tool's status item, flipped by the recorder's
   `pauseDidChangeNotification` and frozen at its
-  `finishingDidBeginNotification`) — the handlers, one file per group. `+Export` is `export`, a pure move out of `+Render` (issue batch B97). `+Scopes` is `render_frame`'s scope writers (`writeScopes`: waveform, parade, vectorscope, histogram; grading-2 G2-0, G2-1). `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
+  `finishingDidBeginNotification`) — the handlers, one file per group. `+Export` is `export`, a pure move out of `+Render` (issue batch B97); since #326 it refuses up front, enqueues on `ExportQueueController` and answers `{export_id, path, status}`. `+ExportStatus` holds `AgentExports` (the launch's in-memory records of the ids `export` returned, kept past the row's Remove) and the `export_status` and `cancel_export` handlers; `+ExportResult` builds a `done` answer from the queue's job. `+Scopes` is `render_frame`'s scope writers (`writeScopes`: waveform, parade, vectorscope, histogram; grading-2 G2-0, G2-1). `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
   reader, the three cloud-only arguments refused by name under `apple`, the
   vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
   the network, and the result keys; `+Captions` dispatches on `engine` and is otherwise the code it was.
@@ -2226,11 +2227,11 @@ free.
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
   **Every one of the sixty-one op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the thirty-one APP-STATE tools, which have no op behind them
+  callers are the thirty-three APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
   `AgentCatalog+Audio.swift`'s three composites and
   `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
-  left, the five other file tools (`AgentCatalog+Files.swift`'s `import_media`, `consolidate_media` and `record_screen`, and `AgentCatalog+Render.swift`'s `render_frame` and `export`, spliced back where they left), and
+  left, the five other file tools (`AgentCatalog+Files.swift`'s `import_media`, `consolidate_media` and `record_screen`, and `AgentCatalog+Render.swift`'s `render_frame`, `export`, `export_status` and `cancel_export`, spliced back where they left), and
   `AgentCatalog+Graphics.swift`'s nine, after its two `opTool` rows.
   `set_text`'s clause for `case`, `words` and `word_style` is
   `AgentServer.textWordsClause` in `AgentCatalog+Captions.swift` (a pure move
@@ -2260,7 +2261,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all ninety-one
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all ninety-four
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

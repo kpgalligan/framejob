@@ -163,7 +163,7 @@ def pcm(path):
 
 def export(mcp, project, where, label):
     target = os.path.join(where, f"{label}.mp4")
-    result = mcp.call("export", project=project, preset="h264", path=target, size=[640, 360])
+    result = mcp.export(project=project, preset="h264", path=target, size=[640, 360])
     return result["path"]
 
 

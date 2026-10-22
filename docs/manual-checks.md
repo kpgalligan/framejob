@@ -287,9 +287,9 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Source:** #51.
 
 **SE-5 — Export remembers, queues, and plays**
-- **Do:** 1. Export with a non-default format, size, quality and loudness; quit and relaunch; open Export… again. 2. Save a user preset, change settings, pick the preset. 3. Start two exports; Window ▸ Export Queue. 4. Save Frame… (⌥⌘E) at a paused frame. 5. Open an exported movie in QuickTime Player.
-- **Expect:** the sheet reopens on the last choices and the preset restores them; the queue is listed once, with per-row progress and Cancel; the saved frame matches the preview; the movie plays in QuickTime with sound.
-- **Source:** #51; spec §10 step 10.
+- **Do:** 1. Export with a non-default format, size, quality and loudness; quit and relaunch; open Export… again. 2. Save a user preset, change settings, pick the preset. 3. Start two exports; Window ▸ Export Queue. 4. Save Frame… (⌥⌘E) at a paused frame. 5. Open an exported movie in QuickTime Player. 6. Ask the Assistant to export the project, allow it, and open Window ▸ Export Queue; press its row's Cancel.
+- **Expect:** the sheet reopens on the last choices and the preset restores them; the queue is listed once, with per-row progress and Cancel; the saved frame matches the preview; the movie plays in QuickTime with sound; the Assistant's export is a row in the queue with its progress, and Cancel stops it.
+- **Source:** #51; spec §10 step 10; #326.
 
 **SE-6 — A ×120 preview is watchable**
 - **Do:** 1. Put an hour-long recording on the timeline. 2. In the Clip tab's Speed section, type 120 into Rate, or Fit to 30 s. 3. Play it from the start to the end.

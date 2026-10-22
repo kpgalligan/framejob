@@ -125,17 +125,18 @@ WORK = os.path.join(ROOT, "tools", "proof", "work", "op-argument-probe")
 MEDIA = os.path.join(ROOT, "tools", "proof", "media", "AV.mov")
 
 # This script owns the EXACT tool count (`tools/proof/README.md`'s handover
-# rule): 61 ops plus the thirty-one app-state tools (G3b added the two graphic ops'
+# rule): 61 ops plus the thirty-three app-state tools (G3b added the two graphic ops'
 # tools, G4a the three app-state graphics tools, G4b three more, B44 close_project,
 # B84 delete_graphic, rename_graphic and restore_graphic; grading GR4a's op tool
 # add_adjustment_clip is the sixtieth op, grading-3 T3-2's set_media_color the
-# sixty-first; audio-sync AS-1's app-state sync_audio the ninety-second). D3 adds no tool and renames
+# sixty-first; audio-sync AS-1's app-state sync_audio the ninety-second; #326's export_status
+# and cancel_export the ninety-third and ninety-fourth). D3 adds no tool and renames
 # none, so it is road map 3's 75 plus phase 9's set_scope and… no: it is the
 # number the catalog has had since road map 5's E1, taken exactly here for the
 # first time. Every older script keeps its floor. It counts PRODUCT tools:
 # road map 11's dev tools (`dev_tools.py`) are in a Release catalog and not a
 # Distribution one, so section 1 counts them apart.
-PRODUCT_TOOLS = 92
+PRODUCT_TOOLS = 94
 OPS = 61
 PARITY = "Frame Job: "
 

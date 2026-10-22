@@ -137,6 +137,8 @@ in §6).
   (an opt-in ffmpeg conversion included), `save_project`/`new_project` and the main-thread tools
   run to their end; Clear, closing the window and a dead helper still let a running call finish,
   its result dropped, as before; cloud `transcribe` is withheld (AI-7) and not linked.
+  **Amended by #326**: `export` answers at once, so Stop no longer reaches it; a queued export
+  stops by `cancel_export` or the Export Queue's Cancel.
 - **AI-17 — The transcript is one selectable text, and the composer is multi-line with K-2's
   Return** (issue batch B18, #153, #154). The transcript is one non-editable text view: the
   entries in order, one "\n" between them, so a selection and a plain-text copy cross entries;

@@ -161,8 +161,8 @@ class Side:
 
     def export(self):
         path = str(self.folder / "fixture.mov")
-        reply = self.call("export", project=self.project, preset="prores_422", range="in_out",
-                          path=path)
+        reply = self.client.export(project=self.project, preset="prores_422",
+                                   range="in_out", path=path)
         if not (isinstance(reply, dict) and reply.get("ok")):
             raise RuntimeError(f"{self.name}: export answered {reply}")
         return reply["path"]

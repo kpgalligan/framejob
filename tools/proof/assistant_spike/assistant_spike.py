@@ -647,7 +647,7 @@ def exports(client, folder, project_path):
                     duration=1_200_000)
         fresh = os.path.join(folder, "e1.mp4")
         started = time.monotonic()
-        result = client.call("export", project=project_path, preset="h264", path=fresh)
+        result = client.export(project=project_path, preset="h264", path=fresh)
         out["e1_seconds"] = round(time.monotonic() - started, 1)
         out["e1_result"] = result if isinstance(result, dict) else str(result)[:400]
         head = open(fresh, "rb").read(12) if os.path.exists(fresh) else b""
@@ -660,7 +660,7 @@ def exports(client, folder, project_path):
         with open(existing, "wb") as f:
             f.write(b"A0-SENTINEL\n")
         try:
-            result = client.call("export", project=project_path, preset="h264", path=existing)
+            result = client.export(project=project_path, preset="h264", path=existing)
             out["e2_error"] = False
         except mcp.ToolError as error:
             result = str(error)

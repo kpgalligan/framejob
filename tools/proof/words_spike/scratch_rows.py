@@ -353,7 +353,7 @@ def q6_picture(work, binary, say):
                 # The tool CORRECTS the extension to the preset's own
                 # container, so the path it ANSWERS with is the file — never
                 # the one that was asked for.
-                told = client.call("export", project=path, preset=preset, path=asked)
+                told = client.export(project=path, preset=preset, path=asked)
                 movie = (told.get("path") if isinstance(told, dict) else None) or asked
                 if not os.path.exists(movie):
                     guess = re.search(r"(/\S+\.(?:mp4|mov|m4v|gif|png))", str(told))

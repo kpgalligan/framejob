@@ -14,7 +14,16 @@ tools only, no dependencies) — `MCP("<dir>/agent.sock")` is enough to
 `call_with(tool, {…})` when an ARGUMENT is itself spelled `name`
 (`add_track`, `set_track`, `add_marker`, `set_marker`, `nest`), since
 `call`'s own first parameter is the tool's name; given a port number it
-raises a `TypeError` naming MC4. It is also the launcher the proofs share
+raises a `TypeError` naming MC4. `export(**args)` and `export_with({…})` are
+`export` as the proofs knew it before spec §11 #326 made it answer an id at
+once: a refusal raises, and the answer is the finished file's, followed
+through `wait_export(export_id)` (it polls `export_status` every 0.2 s; a
+`failed` or `cancelled` job raises `ToolError("export: <reason>")`, and past
+its bound, by default the client's own `timeout` (600 s unless the
+script set its own, the bound the blocking call had), it calls `cancel_export` and raises); an answer
+with no `export_id`, an older build's blocking one, is returned as it is.
+Every proof that expects the file on return goes through them. It is also
+the launcher the proofs share
 (road map 14's MC4): `scratch_socket()` makes a `0700` folder under `$TMPDIR`
 and answers `<folder>/agent.sock` (refusing a path over 103 bytes),
 `launch(binary, …)` starts an instance there in its own session with
@@ -21571,3 +21580,72 @@ HLG arm) HKh; `key-pq-white-fixed` (the PQ reading's white 1000/203) HKh;
 (`of(media:url:)` skips the Camera Log) P12; `webm-hlg-unlabelled` (the HLG label not written)
 H7h. `key-not-unlifted` is re-pinned to the new distance's two lines and still aims at HK. Its
 record: `designs/adr/hdr.md`'s "Clean-up batch 2".
+
+## Issue #326 — `export` through the Export Queue, answered at once; `export_status` and `cancel_export` (`export_status_proof.py` A1–A8, Z1 and five mutants; `mcp.py`'s export helper; spec §11 #326)
+
+An agent's `export` keeps its synchronous refusals (the graphics gate
+included), enqueues a job in `ExportQueueController.shared` and answers
+`{export_id, path, status}`; `export_status` follows the job and
+`cancel_export` stops it (`AgentServer+ExportStatus.swift`). Every proof that
+expected the file on return now goes through `MCP.export` /
+`MCP.export_with` (the top of this README), at its own funnel line where it
+has one (`attempt`, `self.op`), so its return shape is unchanged.
+`grading_verdict.py`'s `timed_export` takes `export_s` from the done
+answer's `elapsed` on a build that answers an id (app-side, from the call to
+the finish, with no poll interval in it) and keeps the wall clock on an older
+build, which blocks to the file.
+
+- **`export_status_proof.py`** — its own instance (`mcp.launch` on
+  `proof_app`'s app, or `--app PATH`), work in `tools/proof/work/export-status/`.
+  A1 a 2 s text clip over `AV.mov`: `export h264` answers exactly
+  `{export_id, path, status}`; A2 `wait_export` reaches `done` with every
+  pre-#326 key and `loudness`, `bytes` the file's size; A3 a 240 s text
+  clip's export answers within 5 s with `running`, and `export_status` reads
+  `running` with 0 ≤ progress ≤ 1; A4 a second export behind it reads
+  `queued`; A5 `cancel_export` of the queued one answers `cancelled`, of the
+  running one reaches `cancelled` within 10 s, and neither file exists; A6 an
+  unknown id and a missing `export_id` refused by name for both tools; A7 a
+  missing folder and a graphic that does not compile (export_cancel_proof
+  G2's fixture) refused synchronously, the next id A4's plus one; A8
+  `cancel_export` of a done export answers `done`, the file intact; Z1 no
+  `Frame Job: ` in the log. Mutants (`tree_copy` copy and build, exit 1
+  caught, 0 survived, 2 when the control could not be performed):
+  `waiting-as-running` (A4), `no-cancel` (A5), `no-graphics-gate` (A7),
+  `no-observer` (A2), `loudness-dropped` (A2).
+- **`assistant_session_proof.py`** — E reads the `export_id` from the
+  stand-in's `tool_result` and waits for the file before reading its head.
+  SX is now "an allowed export answers at once": the 240 s text clip on B,
+  allowed with no `stop_after`; the turn finishes with the export's
+  `tool_result` not an error, holding an integer `export_id` and `status`
+  `queued` or `running`; then `cancel_export` and `wait_export` raising
+  "export: Cancelled…"; no file 1 s later. The `no-export-stop` mutant is
+  gone with the line it removed (AI-16 as amended by #326).
+- **`assistant_tab_proof.py`** — L4 waits for its export the same way.
+- **`agent_socket_proof.py`** — K14 is retired: its subject, an export
+  holding the lane's lock in flight at a quit, no longer exists. K15 is the
+  in-flight-call row, with `K15_READ_BOUND`; `waits-for-call` names K15
+  alone.
+- **Counts** — `op_argument_proof.py` `PRODUCT_TOOLS = 94`;
+  `recording_probe.py`, `phase9_proof.py` and `recording_proof.py` list the
+  two new app-state tools, and `recording_probe.py` 7b reads the last
+  fourteen names.
+
+```sh
+make app-debug && python3 tools/proof/export_status_proof.py
+make app && RC_PROOF_APP=release python3 tools/proof/export_status_proof.py
+RC_PROOF_APP=release python3 tools/proof/export_status_proof.py --mutant <name>
+```
+
+| Run (Release, 2026-10-22) | Result |
+|---|---|
+| `export_status_proof.py` | 9/9 in 4 s — A1 answered in 0.00 s `running`; A2 done, 177110 bytes, `elapsed` 0.761; A3 answered in 0.01 s; A5 the queued one "Cancelled before it started." |
+| `--mutant waiting-as-running` | A4 FAIL (`status: running`); caught, exit 1 |
+| `--mutant no-cancel` | A5 FAIL (the queued one still `queued`, the running one `running`, a3 on disk); caught, exit 1 |
+| `--mutant no-graphics-gate` | A7 FAIL (the broken graphic's export answered `export_id` 4); caught, exit 1 |
+| `--mutant no-observer` | A2 FAIL ("export: 1 still running after 120 s"); A5, A8 fail too; caught, exit 1 |
+| `--mutant loudness-dropped` | A2 FAIL (`loudness` absent); caught, exit 1 |
+| `assistant_session_proof.py` | 13/13 — E `export_id 1 done`, `ftyp`; SX `status 'running'`, "export: Cancelled.", no file |
+| `assistant_tab_proof.py` | 26/26 |
+| `agent_socket_proof.py` | 16/16 in 40 s (K14 retired; K15 in flight, N exited in 0.08 s) |
+| `op_argument_proof.py`, `phase5_proof.py`, `phase9_proof.py` | 164/164; 90/90; 235/235 (phase 9 on an instance of its own: run after the other two on one instance, sections 8–10 failed on leftover state) |
+| `recording_probe.py --only catalog`; `export_cancel_proof.py --only gate` | 31/31; 3/3 (G1 through the helper, G2 synchronous) |

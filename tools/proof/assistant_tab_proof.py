@@ -116,7 +116,8 @@ the tab's own controls (`assistant_send` / `assistant_answer` with `pane`):
       Stop, and no layout problem inside the tab; then no file, the row
       hidden, `Declined: …`
   L4  Allow through the pane over a sentinel E: `export REPLACES E`, a movie
-      written, `Allowed: …`
+      written (its `export_id` followed by `MCP.wait_export`, #326),
+      `Allowed: …`
   L5  Stop through the pane while asking: no file, `Declined (stop): …`
   L6  `pane: true` with the Media tab showing is refused by name, and the
       stand-in hears nothing
@@ -644,6 +645,14 @@ def row_l4(app, fake, ctx):
     ok, answer = answer_pane(app, ctx, "allow")
     if not ok:
         return False, f"allow (pane) refused: {answer}"
+    # `export` answers an id at once since #326; the file is followed to its end.
+    sent_posts = asp.posts(fake.log())
+    result = asp.tool_result_block(sent_posts[1].get("body") or {}, "toolu_l4") \
+        if len(sent_posts) > 1 else None
+    export_id = asp.queued_id(result)
+    if export_id is None:
+        return False, f"allow: {asp.brief(answer)}; POST 2 tool_result {result} holds no export_id"
+    app.mcp.wait_export(export_id)
     with open(path, "rb") as handle:
         head = handle.read(12)
     after = Dump(app, ctx["A"], "l4-after")

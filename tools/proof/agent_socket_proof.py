@@ -59,20 +59,10 @@ K13 (spec §11 MC-7) Settings' MCP section, on K, with no clipboard
     Command"; their frame tops are strictly ordered heading < blurb.1 <
     helper < copy < `settings.assistant.info`; none of those ids has a layout
     problem. The press itself is `settings_layout_probe.py`'s L10.
-K14 (#224) a quit with an agent call in flight, by the same pid-targeted
-    quit event as K6 and K7 (`NSRunningApplication.terminate`: an Apple
-    event, no activation, no window). M: `new_project`, one 1920×1080
-    rectangle lasting 600 s, `save_project`; CONTROL C1: `get_project`'s
-    `unsaved_changes` is false, so no save sheet can appear (when it is not,
-    the row FAILs and M is stopped by SIGTERM, never by a quit event). Over a
-    raw AF_UNIX socket, one HTTP/1.1 `POST /mcp` (`Connection: close`) of
-    `tools/call export {preset: "h264"}`; 2 s later, CONTROL C2: `select`
-    shows nothing to read, so the call is still in flight. Then the quit
-    event: M exits within 20 s, its socket file is gone, and the raw
-    connection reads 0 bytes and closes by EOF or a reset (not a 10 s
-    timeout) — a clean failure, never a half answer.
 K15 (spec §11 #231, issue batch B81) a quit with an `open_project` READ in
-    flight, by K14's quit event. N is launched with
+    flight, by the same pid-targeted quit event as K6 and K7
+    (`NSRunningApplication.terminate`: an Apple event, no activation, no
+    window). N is launched with
     `CFFIXED_USER_HOME=<work>/k15-home`, a fresh folder with no `Library`,
     so its copy lands in a scratch `Rewrapped/` and never in the owner's.
     CONTROL C0: once N has bound, `<k15-home>/Library/Application Support`
@@ -80,7 +70,7 @@ K15 (spec §11 #231, issue batch B81) a quit with an `open_project` READ in
     made). The fixture is `agent_open_proof.make_fixture`'s `big.webm`
     (`--k15-megabytes`, default 512) under `<work>/k15/`. A quit sender is
     armed BEFORE the call: one bounded `osascript -l JavaScript` that polls
-    for a trigger file every 10 ms and then sends K14's `terminate`, so the
+    for a trigger file every 10 ms and then sends that `terminate`, so the
     quit costs no osascript start-up once the copy is seen. Then a raw `POST`
     of `open_project {big.webm}`; the scratch `Rewrapped/` is polled every
     10 ms, and on its `.partial.mov`: CONTROL C2, the connection has nothing
@@ -108,10 +98,10 @@ against that build: `no-connect-first` (K4 must FAIL), `no-mode-check` (K8),
 `listening at` line), `agent-asks` (K12's import half: `AgentServer+Media`'s
 probe passes `mayAsk: true`), `open-asks` (K12's open half: `openProject`
 calls `makeDocument` outside `withoutAsking`) and `fixed-path` (K13:
-`mcpHelperURL` is `/Applications/Frame Job.app/…`) and `waits-for-call` (K14
-AND K15: `applicationWillTerminate` joins a `get_project` served on a
+`mcpHelperURL` is `/Applications/Frame Job.app/…`) and `waits-for-call` (K15:
+`applicationWillTerminate` joins a `get_project` served on a
 background thread before it unbinds, so main waits on the lane lock the
-in-flight export or open holds, while that call's completion waits for main;
+in-flight open holds, while that call's completion waits for main;
 K6 and K7 fail too, as expected. It is `async` plus a semaphore, never
 `DispatchQueue.global().sync`: GCD runs a `sync` block inline on the calling
 thread, so `serve` would see the main thread and skip the lock) and
@@ -202,11 +192,11 @@ MUTANTS = {
                    "        Bundle.main.bundleURL.appendingPathComponent(\"Contents/Helpers/framejob-mcp\")\n",
                    "        URL(fileURLWithPath: \"/Applications/Frame Job.app/Contents/Helpers/framejob-mcp\")\n"),
     # A join: main waits while a real background thread waits on the lane
-    # lock, which the in-flight export holds; the export's completion is
-    # delivered on main (Exporter.swift), so the quit cannot complete. Not
+    # lock, which the in-flight open holds; the open hops back to main for
+    # its document, so the quit cannot complete. Not
     # `DispatchQueue.global().sync`: GCD runs that block inline on main, and
     # `serve` skips the lock on main (AgentLane.swift).
-    "waits-for-call": (("K14", "K15"), None, "AppDelegate.swift",
+    "waits-for-call": (("K15",), None, "AppDelegate.swift",
                        "        AgentServer.shared.unbindSocket()\n",
                        "        let held = DispatchSemaphore(value: 0)\n"
                        "        DispatchQueue.global().async { _ = AgentLane.shared.serve("
@@ -219,7 +209,7 @@ MUTANTS = {
                       "ProjectDocumentController.install()\n", ""),
 }
 ORDER = ["P1", "K0", "K1", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K11", "K12", "K13",
-         "K14", "K15", "Z1", "Z2"]
+         "K15", "Z1", "Z2"]
 # The rows that need the app and K0: every K row after K0.
 APP_ROWS = [name for name in ORDER if name.startswith("K") and name != "K0"]
 rows = {}
@@ -561,80 +551,8 @@ def row_k13(app):
           f"{text['settings.mcp.copy']!r}; tops {tops} ordered {ordered}; problems {problems[:3]}")
 
 
-K14_SECONDS = 600
-K14_SEC = 600_000
-K14_READ_BOUND = 10
-
-
-def row_k14(app):
-    """A quit event with an `export` in flight over a raw socket."""
-    folder = scratch_folder()
-    sock = os.path.join(folder, "agent.sock")
-    m = Instance("m", app, sock)
-    up = m.start()
-    raw = None
-    try:
-        if not up or m.socket_line != f"listening at {sock}":
-            check("K14", False, f"M did not bind: {m.socket_line!r}")
-            return
-        project = call(sock, "new_project", {"path": os.path.join(folder, "k14.framejob")})["saved"]
-        tracks = call(sock, "get_project", {"project": project})["project"].get("tracks", [])
-        if not tracks:
-            call(sock, "add_track", {"project": project})
-            tracks = call(sock, "get_project", {"project": project})["project"]["tracks"]
-        call(sock, "add_shape_clip", {
-            "project": project, "track": tracks[0]["id"], "at": 0,
-            "duration": K14_SECONDS * K14_SEC,
-            "shape": {"kind": "rectangle", "width": 1920, "height": 1080, "stroke": None,
-                      "fill": [192 / 255.0, 192 / 255.0, 192 / 255.0, 1.0]}})
-        call(sock, "save_project", {"project": project})
-        unsaved = call(sock, "get_project", {"project": project}).get("unsaved_changes")
-        if unsaved is not False:
-            check("K14", False, f"CONTROL C1: unsaved_changes {unsaved!r} after save_project "
-                                f"(M is stopped by SIGTERM, not a quit event)")
-            return
-        body = json.dumps({"jsonrpc": "2.0", "id": 14, "method": "tools/call", "params": {
-            "name": "export", "arguments": {"project": project, "preset": "h264",
-                                            "path": os.path.join(folder, "k14.mov")}}}).encode()
-        raw = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        raw.settimeout(10)
-        raw.connect(sock)
-        raw.sendall(b"POST /mcp HTTP/1.1\r\nHost: localhost\r\n"
-                    b"Content-Type: application/json\r\n"
-                    b"Accept: application/json, text/event-stream\r\n"
-                    b"Connection: close\r\n"
-                    + f"Content-Length: {len(body)}\r\n\r\n".encode() + body)
-        time.sleep(2)
-        readable, _, _ = select.select([raw], [], [], 0)
-        if readable:
-            check("K14", False, "CONTROL C2: the export's connection had bytes to read 2 s "
-                                "after it was sent — the call was not in flight at the quit")
-            return
-        exited, seconds, said = m.quit_event()
-        received, close = 0, "timeout"
-        raw.settimeout(K14_READ_BOUND)
-        try:
-            while True:
-                chunk = raw.recv(65536)
-                if not chunk:
-                    close = "EOF"
-                    break
-                received += len(chunk)
-        except ConnectionResetError:
-            close = "reset"
-        except socket.timeout:
-            close = "timeout"
-        gone = ident(sock) is None
-        check("K14", exited and gone and received == 0 and close in ("EOF", "reset"),
-              f"C1 saved; C2 in flight; M exited {exited} in {seconds} s ({said}); socket file "
-              f"gone {gone}; {received} bytes received; closed by {close}")
-    finally:
-        if raw is not None:
-            raw.close()
-        m.stop()
-
-
 K15_MEGABYTES = 512
+K15_READ_BOUND = 10
 K15_ARM_BOUND = 30
 K15_PARTIAL_BOUND = 120
 K15_SENDER_BOUND = 300
@@ -646,7 +564,8 @@ K15_MOVIE = re.compile(r"^big-[0-9a-f]{16}\.mov$")
 def k15_sender(instance, armed, trigger):
     """The quit sender, armed before the call: one bounded `osascript` that
     writes `armed`, polls for `trigger` every 10 ms and then sends
-    `instance` K14's quit event. A `bounded.Background`."""
+    `instance` the pid-targeted quit event, `NSRunningApplication.terminate`.
+    A `bounded.Background`."""
     script = ("ObjC.import('AppKit');"
               f"var app = $.NSRunningApplication.runningApplicationWithProcessIdentifier("
               f"{instance.child.pid});"
@@ -742,7 +661,7 @@ def row_k15(app, megabytes):
             exited = False
         seconds = round(time.monotonic() - started, 2)
         received, close = 0, "timeout"
-        raw.settimeout(K14_READ_BOUND)
+        raw.settimeout(K15_READ_BOUND)
         try:
             while True:
                 chunk = raw.recv(65536)
@@ -789,7 +708,8 @@ def row_k15(app, megabytes):
                  and bool(K15_MOVIE.match(os.path.basename(path))))
         # A WebM opens as an untitled project with unsaved changes, and a
         # quit's document review would put a save sheet up and never exit:
-        # the project is closed first, so no sheet can appear (K14's C1).
+        # the project is closed first, so no sheet can appear — the same
+        # control as an unsaved-changes check before a quit event.
         closed = call(sock2, "close_project", {"project": fixture, "discard": True})
         n2_exited, n2_seconds, n2_said = n2.quit_event()
         check("K15", "project" in opened and len(media) == 1 and named and os.path.exists(path)
@@ -952,12 +872,6 @@ def run_rows(app, megabytes=K15_MEGABYTES):
         row_k13(app)
     except Exception as error:  # noqa: BLE001
         check("K13", False, f"the row broke: {type(error).__name__}: {error}")
-
-    # K14 — a quit with an agent call in flight (#224).
-    try:
-        row_k14(app)
-    except Exception as error:  # noqa: BLE001
-        check("K14", False, f"the row broke: {type(error).__name__}: {error}")
 
     # K15 — a quit with an open_project read in flight (#231).
     try:

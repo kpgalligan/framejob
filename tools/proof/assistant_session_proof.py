@@ -20,16 +20,19 @@ dummy key, `RC_ASSISTANT_BASE_URL` at the stand-in):
       name, changing nothing
   D   Deny: an export is asked about, declined, writes nothing, and the model
       sees "The person declined: …"
-  E   Allow: the export REPLACES a sentinel with a movie
+  E   Allow: the export REPLACES a sentinel with a movie — the tool_result
+      answers an `export_id` at once (#326), followed to the file by
+      `MCP.wait_export` before the head is read
   S   Stop while asking: no file, the question declined by "stop"
   X   the helper killed while asking: a new send is taken within 10 s and
       its marker lands; no file; the app lives
-  SX  (issue batch B15, #149; AI-16) Stop reaches a running export: on B, a
-      text clip of SX_SECONDS (an un-stopped h264 export of it takes over
-      10 s), the export asked about and allowed with `stop_after: 2`:
-      finished, `stopped_ms` ≥ 2000 and `waited_ms` − `stopped_ms` ≤ 5000,
-      the export's `tool_result` an error "The export was cancelled.", no
-      file 1 s later, no stand-in failure
+  SX  (#326, AI-16 as amended) an allowed export answers at once: on B, a
+      text clip of SX_SECONDS (its h264 export takes over 10 s), the export
+      asked about and allowed: finished, the export's `tool_result` not an
+      error, JSON holding an integer `export_id` and `status` queued or
+      running; then `cancel_export` of that id, and `MCP.wait_export`
+      raising a `ToolError` that starts "export: Cancelled"; no file 1 s
+      later, no stand-in failure
   ST  Stop reaches a running on-device transcribe: on C, a new project,
       `long.wav` placed — ST_COPIES (6) copies of
       `speech_engine_proof.make_fixtures()`'s ten-minute WAV, about 3600 s,
@@ -54,20 +57,19 @@ Launch C, K2: AI-13 — the override set and no `-RCSecretFolder`: the session
 
     python3 tools/proof/assistant_session_proof.py
     python3 tools/proof/assistant_session_proof.py --mutant no-prepare          # W: FAILS
-    python3 tools/proof/assistant_session_proof.py --mutant no-export-stop      # SX: FAILS
     python3 tools/proof/assistant_session_proof.py --mutant no-transcribe-stop  # ST: FAILS
     python3 tools/proof/assistant_session_proof.py --mutant key-echo            # K1: FAILS
 
 A mutant copies the tree with `tree_copy.make_copy` into
 `work/assistant_session/mutant/tree`, deletes its one line (`MUTANTS`: the
-`AgentLane.prepareAtLaunch()` line in main.swift; the export's `onCancel`
-line; the transcribe's `onCancel` line), builds it there (`tree_copy.build_app`), and runs its
-row against that app — W's report must be `ok: false`, naming AI-3; SX and
-ST run in a launch A of the mutant app. `no-transcribe-stop` must fail ST
+`AgentLane.prepareAtLaunch()` line in main.swift; the transcribe's
+`onCancel` line), builds it there (`tree_copy.build_app`), and runs its
+row against that app — W's report must be `ok: false`, naming AI-3; ST
+runs in a launch A of the mutant app. `no-transcribe-stop` must fail ST
 with `waited_ms − stopped_ms … > 5000` (LATE) among its problems, or the run
 exits 2: the fixture ran out within the bound on this host. `key-echo` is a
-stand-in control with no build: launch A of the built app, where SX's and
-ST's first replies carry a text block holding `proof-key`, which reaches the
+stand-in control with no build: launch A of the built app, where ST's
+first reply carries a text block holding `proof-key`, which reaches the
 dev tools' `text`; W and K2 do not run, and K1 must FAIL. Exit 1 depends only
 on the named row FAILing (caught); 0 when it passes (survived). A mutant that
 did not build could not perform the control (exit 2), and so (rule R, issue
@@ -107,7 +109,7 @@ import bounded  # noqa: E402
 import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 from dev_tools import DEV_TOOLS, dev_marker_count  # noqa: E402
-from mcp import MCP, remove_scratch, scratch_socket, wait_listening  # noqa: E402
+from mcp import MCP, ToolError, remove_scratch, scratch_socket, wait_listening  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "assistant_session")
 FAKE = os.path.join(HERE, "anthropic_fake.py")
@@ -120,7 +122,7 @@ PROOF_MODEL = "claude-proof-model"
 CORE_TOOLS = ["get_project", "render_frame", "undo", "redo"]
 SEARCH_TOOL = "tool_search_tool_bm25"
 WALL_PORT, WALL_MCP, WALL_TURN, WALL_REPORT, WALL_BUILD = 60, 300, 60, 150, 900
-SX_SECONDS, WALL_SX, WALL_ST, STOP_AFTER, WALL_STOPPED = 240, 180, 300, 2, 5000
+SX_SECONDS, WALL_ST, STOP_AFTER, WALL_STOPPED = 240, 300, 2, 5000
 ST_COPIES = 6  # long.wav: six copies of ten.wav, about 3600 s
 LATE = "waited_ms − stopped_ms"
 ECHO = "key-echo control: " + KEY
@@ -128,8 +130,6 @@ ECHO = "key-echo control: " + KEY
 # that must FAIL, a text that row's detail must hold or None)
 MUTANTS: dict[str, tuple[str | None, str | None, str, str | None]] = {
     "no-prepare": ("main.swift", PREPARE, "W", None),
-    "no-export-stop": ("AgentServer+Export.swift",
-                       "stop?.onCancel { [weak exporter] in exporter?.cancel() }", "SX", None),
     "no-transcribe-stop": ("AgentServer+Captions.swift",
                            "stop?.onCancel { token.cancel() }", "ST", LATE),
     "key-echo": (None, None, "K1", None),
@@ -538,15 +538,20 @@ def row_e(app, fake, ctx):
                           timeout=WALL_TURN)
     if not ok:
         return False, f"allow refused: {answer}"
-    with open(path, "rb") as handle:
-        head = handle.read(12)
     sent_posts = posts(fake.log())
     result = tool_result_block(sent_posts[1].get("body") or {}, "toolu_e") \
         if len(sent_posts) > 1 else None
+    # `export` answers an id at once since #326; the file is followed to its end.
+    export_id = queued_id(result)
+    if export_id is None:
+        return False, f"allow: {brief(answer)}; POST 2 tool_result {result} holds no export_id"
+    app.mcp.wait_export(export_id)
+    with open(path, "rb") as handle:
+        head = handle.read(12)
     good = (answer["state"] == "finished" and head[4:8] == b"ftyp"
             and result is not None and result[0] is False)
-    return good, (f"allow: {brief(answer)}; bytes 4–8 {head[4:8]!r}; POST 2 tool_result "
-                  f"{result and (result[0], result[1][:60])}")
+    return good, (f"allow: {brief(answer)}; export_id {export_id} done; bytes 4–8 "
+                  f"{head[4:8]!r}; POST 2 tool_result {result and (result[0], result[1][:60])}")
 
 
 def row_s(app, fake, ctx):
@@ -624,36 +629,68 @@ def stopped_turn(answer, tool, sentence):
     return problems
 
 
+def queued_id(result):
+    """The integer `export_id` in a successful export's tool_result text, or
+    None."""
+    if result is None or result[0]:
+        return None
+    try:
+        answer = json.loads(result[1])
+    except ValueError:
+        return None
+    export_id = answer.get("export_id") if isinstance(answer, dict) else None
+    return export_id if isinstance(export_id, int) and not isinstance(export_id, bool) else None
+
+
 def row_sx(app, fake, ctx):
     b = ctx.get("B") or app.must(
         "new_project", path=os.path.join(ctx["folder"], "B.framejob"))["saved"]
     app.must("add_text_clip", project=b, track=1, at=0, duration=SX_SECONDS * 600000)
     path = os.path.join(ctx["folder"], "SX.mp4")
-    fake.scenario([use("toolu_sx", "export", {"preset": "h264", "path": path},
-                       said=ctx.get("echo")),
-                   say("SX: stopped.")])
+    fake.scenario([use("toolu_sx", "export", {"preset": "h264", "path": path}),
+                   say("SX: queued.")])
     ok, sent = app.call("assistant_send", project=b, text="Export the long project (SX).",
                         timeout=WALL_TURN)
     if not ok or sent.get("state") != "asking":
         return False, f"send: {sent if not ok else brief(sent)}; wanted asking"
-    ok, answer = app.call("assistant_answer", project=b, answer="allow", stop_after=STOP_AFTER,
-                          timeout=WALL_SX)
+    ok, answer = app.call("assistant_answer", project=b, answer="allow", timeout=WALL_TURN)
     if not ok:
-        return False, f"allow with stop_after refused: {answer}"
+        return False, f"allow refused: {answer}"
+    problems = []
+    if answer.get("state") != "finished":
+        problems.append(f"state {answer.get('state')}")
+    sent_posts = posts(fake.log())
+    result = tool_result_block(sent_posts[1].get("body") or {}, "toolu_sx") \
+        if len(sent_posts) > 1 else None
+    export_id = queued_id(result)
+    status = None
+    if export_id is None:
+        problems.append(f"tool_result {result} holds no integer export_id")
+    else:
+        status = json.loads(result[1]).get("status")
+        if status not in ("queued", "running"):
+            problems.append(f"status {status!r}, not queued or running")
+    cancelled = None
+    if export_id is not None:
+        app.mcp.call("cancel_export", export_id=export_id)
+        try:
+            app.mcp.wait_export(export_id, seconds=60)
+            problems.append("wait_export answered done after cancel_export")
+        except ToolError as error:
+            cancelled = str(error)
+            if not cancelled.startswith("export: Cancelled"):
+                problems.append(f"wait_export raised {cancelled!r}")
     time.sleep(1.0)  # an export that ran on would still be writing, or have written
     exists = os.path.exists(path)
-    log = fake.log()
-    problems = stopped_turn(answer, "export", "The export was cancelled.")
     if exists:
         problems.append(f"{path} exists")
+    log = fake.log()
     if log.get("failures"):
         problems.append(f"failures {log['failures']}")
-    return not problems, (f"a {SX_SECONDS} s text clip (control: un-stopped, its h264 export "
-                          f"takes over 10 s); {brief(answer)}, stopped_ms "
-                          f"{answer.get('stopped_ms')}; export results "
-                          f"{[(r.get('is_error'), r.get('summary')) for r in tool_results(answer, 'export')]}"
-                          f"; file 1 s later {exists}"
-                          + ("" if not problems else " — " + "; ".join(problems)))
+    return not problems, (f"a {SX_SECONDS} s text clip; {brief(answer)}; tool_result "
+                          f"{result and (result[0], result[1][:80])}; export_id {export_id} "
+                          f"status {status!r}; after cancel_export {cancelled!r}; file 1 s "
+                          f"later {exists}" + ("" if not problems else " — " + "; ".join(problems)))
 
 
 def long_fixture(ten):
@@ -899,9 +936,8 @@ def main():
                 mutant_app = App("A", app, ["-RCSecretFolder", secrets], fake.base)
                 try:
                     mutant_app.connect()
-                    function = row_sx if named == "SX" else row_st
                     guarded(named, lambda: (lambda ok, d: (ok, f"({args.mutant}) " + d))
-                            (*function(mutant_app, fake, mutant_ctx)))
+                            (*row_st(mutant_app, fake, mutant_ctx)))
                 finally:
                     mutant_app.stop()
         else:

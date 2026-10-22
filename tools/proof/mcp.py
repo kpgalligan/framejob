@@ -193,6 +193,50 @@ class MCP:
         except json.JSONDecodeError:
             return text
 
+    # ---- export, through the Export Queue (spec §11 #326) ----------------------
+
+    def wait_export(self, export_id, seconds=None, interval=0.2):
+        """Poll `export_status` until the job `export` queued is over: `done`
+        answers the status (every key `export` answered before #326), and
+        `failed` or `cancelled` raises `ToolError("export: <reason>")`, so a
+        caller sees the failure the blocking `export` used to raise. Past
+        `seconds` the job is cancelled and a `ToolError` names its status.
+        `seconds` defaults to this client's own `timeout` (600 unless the
+        script built it with its own), the bound the blocking `export` call
+        was held to before #326, so a script with a longer bound keeps it."""
+        if seconds is None:
+            seconds = self.timeout
+        deadline = time.monotonic() + seconds
+        while True:
+            status = self.call("export_status", export_id=export_id)
+            word = status.get("status")
+            if word == "done":
+                return status
+            if word in ("failed", "cancelled"):
+                raise ToolError(f"export: {status.get('reason', '')}")
+            if time.monotonic() >= deadline:
+                try:
+                    self.call("cancel_export", export_id=export_id)
+                except ToolError:
+                    pass
+                raise ToolError(f"export: {export_id} still {word} after {seconds} s")
+            time.sleep(interval)
+
+    def export_with(self, arguments, seconds=None):
+        """`export` as the proofs knew it: a refusal raises, and the answer is
+        the finished file's. An answer with no `export_id` is a pre-#326
+        build's, whose `export` blocked to the file, and is returned as is
+        with no `export_status` call; otherwise the job is followed through
+        `wait_export` (`seconds` None is the client's own `timeout`)."""
+        answer = self.call_with("export", arguments)
+        if not isinstance(answer, dict) or "export_id" not in answer:
+            return answer
+        return self.wait_export(answer["export_id"], seconds=seconds)
+
+    def export(self, **arguments):
+        """`export_with` with keyword arguments."""
+        return self.export_with(arguments)
+
 
 class ToolError(RuntimeError):
     pass

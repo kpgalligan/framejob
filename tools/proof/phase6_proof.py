@@ -500,6 +500,8 @@ class Session:
                 background=[c / 255.0 for c in background] + [1.0])
 
     def op(self, name, **kwargs):
+        if name == "export":  # an id since #326; the helper follows it to the file
+            return self.mcp.export(project=self.path, **kwargs)
         return self.mcp.call(name, project=self.path, **kwargs)
 
     def op_with(self, name, arguments):

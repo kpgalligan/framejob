@@ -193,7 +193,7 @@ final class AgentServer {
     /// and `prepareCatalog()` checks the two sets match on every launch.
     ///
     /// One entry per row of the op table (spec §6, and the module doc of
-    /// `core/src/edit.rs`) plus the thirty-one tools that are not ops: the
+    /// `core/src/edit.rs`) plus the thirty-three tools that are not ops: the
     /// project-level ones spec §7.9 names, the five view-state and history
     /// mirrors beside them (`set_range`, `set_selection`, `set_scope`,
     /// `undo`, `redo`), the composites later phases added —
@@ -312,6 +312,8 @@ final class AgentServer {
         // Rendering and export (AgentServer+Render.swift, AgentServer+Export.swift)
         "render_frame": { $0.renderFrame },
         "export": { $0.exportProject },
+        "export_status": { $0.exportStatus },
+        "cancel_export": { $0.cancelExport },
     ]
     // The dev tools' handlers join here (AgentServer+DevTools.swift).
     private static let handlers = withDevHandlers(productHandlers)

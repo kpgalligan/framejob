@@ -189,8 +189,9 @@ final class AssistantSession {
 
     /// Stop: the helper aborts its request, a pending question is declined,
     /// and every call not yet run answers "Cancelled by the user.". Only
-    /// while busy or asking. A running `export` or on-device `transcribe` is
-    /// cancelled through its token; any other running call finishes (AI-16).
+    /// while busy or asking. A running on-device `transcribe` is cancelled
+    /// through its token; any other running call finishes (AI-16). `export`
+    /// answers at once, so Stop never reaches it (#326).
     func cancel() {
         guard phase == .busy || phase == .asking else { return }
         cancelRequested = true

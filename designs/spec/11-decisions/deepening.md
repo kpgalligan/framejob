@@ -1288,3 +1288,42 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `Frame Job: …`; a project is a `.framejob` package (NM-3), so A14's mutant
   now reads "Timed out saving a4.framejob."; the measured runs above are
   quoted as they printed.
+- **#326 — An agent's `export` is a job in the Export Queue and answers at
+  once; `export_status` follows it and `cancel_export` stops it.** (Amends
+  AI-16.) Every refusal `export` had stays synchronous — the arguments, the
+  core's settings, the folder — and so does the graphics gate
+  (`Exporter.graphicsRefusal`, its "The export was not started: …"), run in
+  the handler before anything is queued, so a call that could only fail
+  enqueues nothing. Then the handler pauses the editor's playback and
+  enqueues in `ExportQueueController.shared` exactly as Add to Queue does
+  (the queue captures the media URLs, the reverse resolution and the
+  graphics itself), and answers `{export_id, path, status}`, nothing else.
+  The status words are the queue's states in the agent's spelling:
+  `queued` (waiting), `running`, `done` (completed), `failed`,
+  `cancelled`. `export_status {export_id}` never waits: it answers
+  `export_id`, `status`, `path` and `elapsed` (seconds, three decimals,
+  from the `export` handler's entry to now, or to the finish); `running`
+  adds `progress` and the exporter's `phase` when it has one; `done` adds
+  every key `export` answered before this (the settings used, `bytes` read
+  at the finish, `burn_in_timecode`, `dynamic_range`, `loudness`,
+  `graphic_warnings`); `failed` and `cancelled` add `reason`, the queue
+  row's sentence. `cancel_export {export_id}` is the row's Cancel
+  (`ExportQueueController.cancel`) for a queued or running job, answered as
+  `export_status` answers then, and leaves a finished one alone. **The
+  records live in memory for the launch** (`AgentExports`,
+  `AgentServer+ExportStatus.swift`), for ids `export` returned only — a
+  person's own queued job is not reachable — and are copied from the queue
+  inside its own change notification, synchronously on main, so a record
+  outlives the row's Remove and Clear Finished; a record holds no project
+  handle or graphic set. The Export Queue window is not opened for an agent
+  export. The queue runs one job at a time, so an agent export waits
+  behind a person's (`queued`), and the queue's quit question now covers an
+  agent's export as it does a person's. Stop no longer reaches an export
+  (AI-16 as amended): the call has already answered; a queued or running
+  export stops by `cancel_export` or the Export Queue's Cancel. **Risk
+  accepted:** an agent that never asks never learns the outcome, and the
+  assistant cannot sleep between polls, so it asks again when its turn
+  allows. `tools/proof/export_status_proof.py` (A1–A8, Z1) is the proof;
+  every proof that expected the file on return follows the job through
+  `MCP.export_with` in `tools/proof/mcp.py`, which returns an older build's
+  blocking answer as it is.

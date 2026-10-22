@@ -108,6 +108,8 @@ class Session:
         self.op("set_canvas", width=640, height=360)
 
     def op(self, name, **kwargs):
+        if name == "export":  # an id since #326; the helper follows it to the file
+            return self.mcp.export(project=self.path, **kwargs)
         return self.mcp.call(name, project=self.path, **kwargs)
 
     def project(self):

@@ -411,7 +411,9 @@ schema, §6 the op table, §7 the architecture.
   a 1080p document exports 4K at the right rate when you apply it to a 4K
   one. And **Window ▸ Export Queue** lines exports up and runs them one at a
   time: a queued job holds the timeline as it was when you confirmed it, so
-  you can keep editing, undo, or close the document while it writes.
+  you can keep editing, undo, or close the document while it writes. An
+  agent's export is a job there too: `export` answers with an id at once,
+  and `export_status` follows it to the file.
 - **Inside a nest.** Double-click a nest clip, or **Clip ▸ Open Nest** (⌘↓),
   and the timeline, the canvas and the inspector all show what is inside it;
   ⌘↑ comes back out, and a breadcrumb at the left of the ruler says where you

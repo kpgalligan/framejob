@@ -68,7 +68,8 @@ enum AssistantPrompt {
          ["add_graphic_clip", "set_graphic", "write_graphic", "get_graphic",
           "graphic_reference", "render_graphic", "import_graphic_font",
           "import_graphic_asset", "delete_graphic", "rename_graphic", "restore_graphic"]),
-        ("export a movie", ["export"]),
+        ("export a movie, see how it is going, or stop it",
+         ["export", "export_status", "cancel_export"]),
     ]
 
     /// The system prompt, fixed for the session (AI-15).

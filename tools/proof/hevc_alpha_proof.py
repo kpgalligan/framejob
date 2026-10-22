@@ -638,7 +638,10 @@ def faint_reading(raster):
 def attempt(client, name, arguments):
     """One MCP call; a refusal is an answer, and so is an expiry."""
     try:
-        return {"ok": True, "reply": client.call_with(name, arguments)}
+        # `export` answers an id since #326; the helper follows it to the file.
+        answer = (client.export_with(arguments) if name == "export"
+                  else client.call_with(name, arguments))
+        return {"ok": True, "reply": answer}
     except mcp.ToolError as error:
         return {"ok": False, "error": str(error)}
     except Exception as error:  # a socket timeout is the expiry

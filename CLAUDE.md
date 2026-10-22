@@ -228,7 +228,7 @@ else is what bloats files:
   (`AgentServer+Parity.swift`). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all ninety-two product tools (and the dev tools, road
+  stranger by name, for all ninety-four product tools (and the dev tools, road
   map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
@@ -294,7 +294,8 @@ envelope key, plus the app-state tools — `open_project`, `new_project`,
 `save_project`, `close_project`, `get_project`, `import_media`,
 `import_captions`, `export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
 `normalize_clip`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
-`undo`, `redo`, `render_frame`, `export`, `record_screen`, `write_graphic`,
+`undo`, `redo`, `render_frame`, `export`, `export_status`, `cancel_export`,
+`record_screen`, `write_graphic`,
 `get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`,
 `import_graphic_asset`, `delete_graphic`, `rename_graphic` and
 `restore_graphic`. A Debug or Release build also has the dev tools
@@ -311,7 +312,9 @@ Synchronize Audio's background analysis so a proof can act during it), which
 Distribution does not. `rc_op_names`
 and the catalog are the authority for the counts; the parity check compares
 them at startup. `render_frame` writes a PNG and returns its path; `export`
-waits for the file.
+puts the job on the Export Queue and answers an `export_id` at once, and
+`export_status` answers it until `done` (`mcp.py`'s `export_with` waits; spec
+§11 #326).
 
 A proof picks its app through `tools/proof/proof_app.py`: `RC_PROOF_APP` is
 `debug` (the default), `release` or a `.app` path. `mcp.launch`, `mcp.MCP` and

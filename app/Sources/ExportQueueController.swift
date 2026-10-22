@@ -7,8 +7,9 @@ import Foundation
 /// **There is no AppKit in this file, and that is the design rather than
 /// tidiness.** A queue window can be checked by neither of this project's two
 /// instruments: the offscreen harness renders an `EditorViewController` into a
-/// window and nothing else, and MCP drives the app through tools — of which
-/// this feature has none and must have none (below). What a proof CAN do is
+/// window and nothing else, and MCP drives the app through tools — and the
+/// agent's `export` enqueues here, so a tool reaches this list but never the
+/// window (below, spec §11 #326). What a proof CAN do is
 /// compile a probe out of the whole of `app/Sources`
 /// (`tools/proof/phase6_chrome.py`'s `build_probe`), make one of these,
 /// enqueue two jobs, spin the main run loop until `isIdle` and read `jobs`
@@ -21,13 +22,13 @@ import Foundation
 /// level meter is the closest sibling, where the MODEL publishes a number
 /// precisely so that a proof need not photograph a window.
 ///
-/// **No MCP mirror is owed.** The rule is that every user-visible EDIT gets
-/// one (spec §7.9); a queue edits no project, it writes files, and an agent can
-/// already call `export` N times in sequence — which is exactly what this
-/// does. `export` IS the mirror. Adding a tool so that a proof could exist
-/// would be the proof deciding the product's API, which
-/// `tools/proof/README.md` settled for the level meter and this phase
-/// inherits.
+/// **The agent's `export` is a job here (spec §11 #326).** It keeps its
+/// refusals synchronous, then enqueues exactly as Add to Queue does and
+/// answers the job's id at once; `export_status` follows the job and
+/// `cancel_export` calls `cancel` (`AgentServer+ExportStatus.swift`). The
+/// queue's own API is unchanged by it: the mirror reads `job(_:)` and
+/// observes `didChangeNotification` like the window does, and no tool
+/// exists for a person's own queued job.
 ///
 /// **One job at a time, on the MAIN thread, a fresh `Exporter` for each.**
 /// `Exporter.export`'s own doc says main-thread-only and one export at a time,
@@ -184,6 +185,10 @@ final class ExportQueueController {
         /// What the graphics warned while a COMPLETED job's file was drawn
         /// (G-24 (c)): the row's count and its tooltip's list.
         var graphicWarnings: [ExportGraphicWarning] = []
+        /// What a COMPLETED job's sound measured, read off its exporter at the
+        /// finish — the figures the row's message summarises, kept whole for
+        /// `export_status`'s `loudness` (spec §11 #326). nil otherwise.
+        var loudness: ExportLoudness? = nil
 
         /// What the row calls this job. The file name and not the path: the
         /// row is narrow, and the full path is the tooltip's job.
@@ -380,7 +385,8 @@ final class ExportQueueController {
         // Read BEFORE the exporter is dropped: `Exporter.finish` publishes the
         // measurement and then calls this, so the report is there now and only
         // now.
-        let measured = exporter?.loudnessReport.map { " \($0.summary)." } ?? ""
+        let report = exporter?.loudnessReport
+        let measured = report.map { " \($0.summary)." } ?? ""
         let warnings = exporter?.graphicWarnings ?? []
         exporter = nil
         // The pin goes with the exporter, and from `pinnedProject` rather than
@@ -399,6 +405,7 @@ final class ExportQueueController {
                 jobs[index].state = .completed
                 jobs[index].progress = 1
                 jobs[index].graphicWarnings = warnings
+                jobs[index].loudness = report
                 // The count BEFORE the loudness figures: the row truncates
                 // its tail (`ExportQueueRowView`).
                 jobs[index].message = "Exported “\(url.lastPathComponent)”."

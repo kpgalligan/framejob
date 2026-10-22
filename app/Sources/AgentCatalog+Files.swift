@@ -2,24 +2,25 @@ import Foundation
 
 // MARK: - Catalog: files
 
-/// The catalog's FILE half: the eleven tools whose every row is about a path
+/// The catalog's FILE half: the thirteen tools whose every row is about a path
 /// on disk — the six of Media (a file probed into the list, a caption file
 /// read onto a track, the package consolidated, and the three raw media ops),
 /// the two of Captions (a transcript made, a caption file written), the two
-/// of Rendering and export (a frame, and the movie) and, since road map 3,
-/// the one of Recording (a movie the app wrote itself). Three of the eleven
+/// of Rendering and export (a frame, the movie, and the two that follow and
+/// stop the movie's job) and, since road map 3, the one of Recording (a
+/// movie the app wrote itself). Three of the thirteen
 /// are ops (`add_media`, `relink_media`, `remove_media`), so they are built
 /// with `opTool` — their arguments PRINTED from the core's published table
-/// (road map 7's D3) — and get a `scope` as every op does; the other eight
+/// (road map 7's D3) — and get a `scope` as every op does; the other ten
 /// are app-state tools of spec §7.9 with no op behind them and nothing to
 /// read from that table, so they declare their schemas whole through `tool`.
 /// `record_screen` is among those, declaring NO `scope` by construction,
 /// since `tool` injects one for the core's op names only and the parity
-/// check's fourth part reads those. Five of the eleven are built elsewhere
+/// check's fourth part reads those. Seven of the thirteen are built elsewhere
 /// and spliced back in at the points they left, so the order is unchanged:
 /// `import_captions`, `transcribe` and `export_captions` in
-/// `AgentCatalog+Captions.swift`, and `render_frame` and `export` in
-/// `AgentCatalog+Render.swift`.
+/// `AgentCatalog+Captions.swift`, and `render_frame`, `export`,
+/// `export_status` and `cancel_export` in `AgentCatalog+Render.swift`.
 ///
 /// A pure move out of `AgentCatalog.swift`, which stood at 807 lines against
 /// app/CLAUDE.md's ~600 cap — road map 2's phase 9 had put it back over the

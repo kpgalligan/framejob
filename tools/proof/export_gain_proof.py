@@ -168,8 +168,7 @@ def run_exports(mcp):
                     if preset in VIDEO:
                         args["size"] = [640, 360]
                     target = os.path.join(OUT, f"{name}-{label}-{preset}")
-                    result = mcp.call("export", project=path, preset=preset, path=target,
-                                      **args)
+                    result = mcp.export(project=path, preset=preset, path=target, **args)
                     pcm = os.path.join(OUT, f"{label}-{preset}.pcm")
                     data = decode(result["path"], pcm)
                     got.setdefault(preset, {})[label] = (pcm, data, result.get("loudness"))

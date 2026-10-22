@@ -356,8 +356,8 @@ def run(mcp, where, fixtures, mutant):
             answer = mcp.call("import_media", project=p3, path=fixtures["p3.mkv"])
             place(mcp, p3, answer["media"])
             target = os.path.join(where, "p3-export.mp4")
-            movie = mcp.call("export", project=p3, preset="h264", path=target,
-                             size=[640, 360])["path"]
+            movie = mcp.export(project=p3, preset="h264", path=target,
+                               size=[640, 360])["path"]
             seconds, rms = duration(movie), audio_rms(movie)
             row("M4", answer["has_audio"] and seconds is not None
                 and abs(seconds - 2.0) <= 0.05 and rms > 0.01,
@@ -391,8 +391,8 @@ def run(mcp, where, fixtures, mutant):
                                        os.path.basename(answer["path"]))))
             place(mcp, p10, answer["media"])
             target = os.path.join(where, "p10-export.mp4")
-            movie = mcp.call("export", project=p10, preset="h264", path=target,
-                             size=[640, 360])["path"]
+            movie = mcp.export(project=p10, preset="h264", path=target,
+                               size=[640, 360])["path"]
             seconds, rms = duration(movie), audio_rms(movie)
             row("M7", named and answer["has_audio"] and seconds is not None
                 and abs(seconds - 2.0) <= 0.05 and rms > 0.01,

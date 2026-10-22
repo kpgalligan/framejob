@@ -13,18 +13,25 @@ extension AgentServer {
     /// that go to the same `Exporter.export` the sheet uses: there is exactly
     /// one writer, so an agent export and a menu export cannot disagree.
     ///
-    /// Blocks until the file is written, so the model can render, export and
-    /// verify in sequence without polling.
+    /// Answers AT ONCE (spec §11 #326): every refusal is made here, before
+    /// anything is queued — the arguments, the core's settings, the folder
+    /// and the graphics gate — and the export is then a job in the Export
+    /// Queue, exactly as the sheet's Add to Queue makes one, answered as
+    /// `{export_id, path, status}`. `export_status` follows the job and
+    /// `cancel_export` stops it (`AgentServer+ExportStatus.swift`); a failure
+    /// while writing comes back from there. The queue window is not shown.
     ///
     /// One argument is NOT a setting and never reaches the core:
     /// `burn_in_timecode` is a recipe option (`RecipeOptions`), read below
     /// beside the overrides it deliberately does not join.
     ///
-    /// The result carries the sound the file actually holds — its integrated
-    /// loudness and true peak, measured on the way through — for every format
-    /// that has any, whether `loudness_lufs` was asked for or not.
+    /// The finished job's answer carries the sound the file actually holds —
+    /// its integrated loudness and true peak, measured on the way through —
+    /// for every format that has any, whether `loudness_lufs` was asked for
+    /// or not.
     func exportProject(_ a: [String: Any]) throws -> String {
-        let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
+        // The clock `export_status`'s `elapsed` runs on, read before any check.
+        let started = ProcessInfo.processInfo.systemUptime
         let presetID = try requiredString(a, "preset")
         let path = try requiredString(a, "path")
         let wholeProject = (try stringArg(a, "range") ?? "project").lowercased()
@@ -132,82 +139,29 @@ extension AgentServer {
             throw ToolError(message: "There is no folder at \(folder.path) to write into.")
         }
 
-        // Held on this stack for the whole call, which is what keeps the
-        // export alive: nothing else references it, and its `deinit` tears the
-        // progress timer and its recipe slot down.
-        let exporter = Exporter()
-        let semaphore = DispatchSemaphore(value: 0)
-        let box = AgentBox<Result<URL, any Error>>()
-        onMain {
+        // The graphics gate, here rather than only in the writer: a module
+        // that does not compile refuses the CALL, so nothing is queued that
+        // could only fail (`Exporter.graphicsRefusal`, the writer's own gate).
+        if let refusal = Exporter.graphicsRefusal(
+            project: project, settings: settings, graphics: graphics)
+        {
+            throw ToolError(message: refusal.localizedDescription)
+        }
+        let (id, status) = onMain { () -> (UInt64, String) in
             // The editor pauses before its own export so the player is not
             // decoding the same media; the agent's does the same.
             self.editor(document)?.playback.pause()
-            exporter.export(
+            let id = ExportQueueController.shared.enqueue(
                 project: project, urls: urls, settings: settings, to: url, options: options,
-                graphics: graphics, progress: { _ in }
-            ) { result in
-                box.value = result
-                semaphore.signal()
+                graphics: graphics)
+            AgentExports.shared.track(
+                id, settings: settings, burnInTimecode: options.burnInTimecode, started: started)
+            let word = ExportQueueController.shared.job(id).map {
+                Self.exportStatusWord($0.state)
             }
-            stop?.onCancel { [weak exporter] in exporter?.cancel() }
+            return (id, word ?? "queued")
         }
-        guard semaphore.wait(timeout: .now() + 3600) == .success else {
-            // Cancel on main AND let main hold the last reference: `Exporter`
-            // installs a run-loop timer that its `deinit` invalidates, and a
-            // timer has to be invalidated on the thread it was scheduled on.
-            // (On the normal path `finish` has already torn the timer down
-            // before it calls back, so the release here is a no-op.)
-            DispatchQueue.main.async { exporter.cancel() }
-            throw ToolError(message: "The export did not finish within an hour.")
-        }
-        guard let outcome = box.value else {
-            throw ToolError(message: "The export ended without a result.")
-        }
-        let written: URL
-        do {
-            written = try outcome.get()
-        } catch {
-            throw ToolError(message: error.localizedDescription)
-        }
-        let size = (try? FileManager.default.attributesOfItem(atPath: written.path)[.size])
-            .flatMap { ($0 as? NSNumber)?.intValue } ?? 0
-        var result: [String: Any] = [
-            "ok": true,
-            "path": written.path,
-            "bytes": size,
-            "preset": settings.preset,
-            "container": settings.container,
-            "codec": settings.codec,
-            "width": settings.width,
-            "height": settings.height,
-            "fps": [settings.fps.num, settings.fps.den],
-            "start": settings.start,
-            "duration": settings.duration,
-            // Not one of the resolved settings — the core never saw it — but
-            // it is a fact about the file that was written, and every other
-            // key here is one too.
-            //
-            // What it establishes is exactly one link and not the chain: this
-            // is `options.burnInTimecode`, the local decoded a few lines up,
-            // so a caller reading it back knows the argument was READ rather
-            // than dropped in argument reading — the failure `boolArg`'s
-            // refusal covers from the other side. It does NOT say the writer
-            // used it; only a pixel can say that, and
-            // `tools/proof/phase7_proof.py` is where one does.
-            "burn_in_timecode": options.burnInTimecode,
-        ]
-        // The picture an HLG project's file was written as (`hlg`, `pq` or
-        // `sdr`); absent for every SDR project and audio row.
-        if let color = settings.color {
-            result["dynamic_range"] = color
-        }
-        if let measured = Self.loudnessResult(exporter.loudnessReport) {
-            result["loudness"] = measured
-        }
-        if let warned = Self.graphicWarningsResult(exporter.graphicWarnings) {
-            result["graphic_warnings"] = warned
-        }
-        return try jsonResult(result)
+        return try jsonResult(["export_id": id, "path": url.path, "status": status])
     }
 
     /// The `size` argument of `export`, in the Size popup's vocabulary: a row
