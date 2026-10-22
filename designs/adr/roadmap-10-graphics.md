@@ -162,7 +162,10 @@ activity stops it, and it never runs beside a play (below, "G6 phase 4 —
 background render"). Since G6 phase 5 (2026-10-22, spec §11 G-39) a
 PNG or JPEG asset is drawn from a stored PNG copy that decodes to the same
 pixmap, kept in one process-wide cache sized from that budget (below, "G6
-phase 5 — decoded-image cache"). In-place raster is still not built.
+phase 5 — decoded-image cache"). In-place raster was measured in G6
+phase 6 (2026-10-22) and not built: what a frame pays outside resvg's own
+render is 0.3% of a `section` frame (below, "G6 phase 6 — in-place
+raster").
 
 **The FFI is ten `rc_graphic_*` exports (eleven since G6 phase 5's
 `rc_graphic_image_cache`), and a library is a builder that
@@ -1653,12 +1656,72 @@ bench (one map lookup under a lock already held; its single-threaded
 figures do not depend on interleaved builds). No row drives two builds of
 one digest across a limit of 0; the race has no instrument.
 
+## G6 phase 6 — in-place raster (#127)
+
+2026-10-22, on `f06c9bb`. Measured first, and stopped by its rule before
+any product code. The question: how much of a graphic frame's raster time
+sits outside resvg's own render — the pixmap's allocation and first touch,
+the RGBA→BGRA copy, the Swift buffer's zero-fill and the copy into the
+texture (no un-premultiply: `rasterize` hands on tiny-skia's premultiplied
+bytes as they are). `tools/proof/raster_bench.py` dumps the clip's frames
+as `image_cache_bench.py` does (its `dump_scene`, which that bench now
+shares), then runs `graphic/tests/image_bench.rs`'s ignored
+`section_scene_raster_overhead` over them with the image cache on (1 GiB,
+one warm frame), 5 rounds, single-threaded: ROW (every SVG through
+`rasterize` at stride `w×4`), PADDED (at `w×4 + 64`, every frame's rows
+compared with ROW's), ALLOC (`Pixmap::new` and a touch of every page),
+SWIZZLE (raster.rs's row loop from a held pixmap) and CLEARSWAP (the clear
+and in-place R↔B swap an in-place route would still pay), each arm as many
+times as there are frames. The probe `tools/proof/raster_upload_probe.swift`
+times, at the dump's size, the zeroed buffer `GraphicLibrary.rasterize`
+allocates (Z), the app's own `LayerRenderers.upload` (U) and
+`makeTexture` alone (M). Per frame: `net = max(0, alloc + swz − cs)`, `copy
+= max(0, U − M)`, `F = row + Z + U`, `share = (net + Z + copy)/F`, `rust =
+net/F`, `swift = (Z + copy)/F`, `spread` ROW's `(max − min)/median`. The
+stop rule, written before the run: STOP if `share < 0.03` or `share ≤
+spread`; else BUILD if `rust ≥ 0.03` and `> spread`; else SWIFT (the
+texture path, a phase 6b) if `swift ≥ 0.03` and `> spread`; else STOP.
+
+The run that decided: the owner's parive promo's `section` clip at
+25120000 (clip 8, frames 0…529, 40 of 1920 × 1080), on a 12-CPU host
+shared with other sessions, `powermode 0`, load average 68.05 24.51 15.42
+before and 23.87 25.57 17.34 after. Medians over 5 rounds of 40 frames:
+ROW 11,134.0 ms, PADDED 11,267.1 ms, ALLOC 2.7 ms, SWIZZLE 7.0 ms,
+CLEARSWAP 29.0 ms; ROW's spread 0.2987, PADDED's 0.2659; every frame's ROW
+bytes equal PADDED's rows. The probe (40 iterations): Z 0.048 ms, U
+0.845 ms, M 0.022 ms. (A Z that small for an 8.3 MB buffer suggests its
+pages are zeroed lazily, so the first write into a fresh one is counted in
+neither Z nor ROW; under 0.03 the verdict holds either way.) Per frame: row 278.349 ms, alloc 0.067, swz 0.176,
+cs 0.725, net 0 (the clear and swap cost more than the allocation and
+copy they would replace), copy 0.823, F 279.242, outside 0.871; share
+0.0031, rust 0, swift 0.0031. **Verdict: STOP** (share under 0.03).
+
+For the record only, `--module bg` at the same `--from` (clip 4, frames
+0…3775, 1920 × 1080; bg is cheap and full-frame, and the overhead depends
+only on the size): load 20.66 24.82 17.17 before, 15.35 23.23 16.82 after;
+ROW 1,407.5 ms, PADDED 1,401.7 ms, ALLOC 2.1, SWIZZLE 6.7, CLEARSWAP
+28.7; spreads 0.0714 and 0.0695; Z 0.043, U 0.796, M 0.020; per frame row
+35.188, net 0, copy 0.776, F 36.027, outside 0.819; share 0.0227, rust
+0, swift 0.0227. Its own verdict was STOP too, so nothing is filed.
+
+Nothing under `graphic/src/`, `core/` or `app/Sources/` changed; spec §11
+gains no decision, and G-7's row copy stands. What landed is the
+instrument: `section_scene_raster_overhead` beside the phase 5 bench (the
+scene's loading factored into one `load_scene`), `raster_bench.py` with
+its probe, `image_cache_bench.py`'s `dump_scene` (and `covering_clip`'s
+`module`; its cargo line now runs only its own test). `raster_bench.py
+--mutant` carries the in-place route's three anchors (`no-clear`,
+`no-swap`, `padded-in-place`) and answers 2 while the route is unbuilt.
+`image_cache_bench.py --frames 4 --rounds 1` still passes (every frame
+identical across the arms). #127's phases are all done; it can close.
+
 ## Open items
 
-- G6's rest — in-place raster (`graphic/src/raster.rs`) — tracked in #127.
-  The export's parallel rasterization landed (G-26), playback's (G-36),
-  one memory budget with kept frames (G-37), drawing ahead while paused,
-  Background render (G-38), and the decoded-image cache (G-39).
+- G6 (#127) has no phase left. The export's parallel rasterization landed
+  (G-26), playback's (G-36), one memory budget with kept frames (G-37),
+  drawing ahead while paused, Background render (G-38), and the
+  decoded-image cache (G-39); in-place raster was measured and stopped
+  (G6 phase 6), so #127 can close.
 - The person's watched checks: the playback-check projects with no video
   underneath, memory at 4K, and the error card in the live preview —
   tracked in #56.

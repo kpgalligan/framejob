@@ -10904,6 +10904,60 @@ a 12-CPU host with 96 GiB, `powermode 0`, shared with other sessions:
 | `RC_PROOF_APP=release screens.py --only 02-settings` | 6/6, 0 new problems (P2: `FrameJobGraphicImageCacheOff` in NOT_SHOWN) |
 
 
+## Issue #127 — in-place raster (`raster_bench.py`, `raster_upload_probe.swift`)
+
+G6 phase 6: how much of a graphic frame's raster time sits outside resvg's
+own render, and whether drawing in place into the caller's buffer would pay
+(it would not; the stop rule said STOP and nothing in the product changed).
+
+- **`raster_bench.py PACKAGE [--from T] [--module NAME] [--frames 40]
+  [--rounds 5] [--iterations 40]`**: dumps the graphic clip covering T on
+  the frontmost track (with `--module`, that module's clip there) through
+  `image_cache_bench.dump_scene` — the package copied under
+  `work/raster-bench/` and only the copy opened, one owned instance stopped
+  by PID, its log checked for `Frame Job: ` — then builds
+  `raster_upload_probe.swift` through `swift_build.build(optimize=True)`
+  into `work/raster-upload-probe/` (a failed build is a FAIL), prints the
+  powermode line and the load average, runs `cd graphic && cargo test
+  --release --test image_bench -- --ignored --nocapture --exact
+  section_scene_raster_overhead` and the probe at the dump's size, prints
+  both whole, the per-frame figures, the load average again and one
+  `verdict:` line. The test, single-threaded, with the image cache on (1 GiB
+  after one warm frame), times per round ROW (`rasterize` at stride `w×4`),
+  PADDED (at `w×4 + 64`, asserting each frame's rows equal ROW's), ALLOC
+  (`Pixmap::new` and a touch of every page), SWIZZLE (raster.rs's row loop
+  from a held pixmap) and CLEARSWAP (a clear and an in-place R↔B swap), and
+  ends with `RESULT {json}` (medians of per-round totals, and ROW's and
+  PADDED's `(max − min)/median`). The probe times, per iteration in an
+  `autoreleasepool`, the zeroed `[UInt8]` `GraphicLibrary.rasterize`
+  allocates (Z), `LayerRenderers.upload` of it (U) and `makeTexture` with
+  upload's descriptor (M), and prints their medians as JSON. Per frame:
+  `net = max(0, alloc + swz − cs)`, `copy = max(0, U − M)`, `F = row + Z +
+  U`, `share = (net + Z + copy)/F`, `rust = net/F`, `swift = (Z + copy)/F`,
+  `spread` = ROW's, `inplace saving = 1 − ROW/PADDED`. The verdict: STOP if
+  `share < 0.03` or `≤ spread`; else BUILD if `rust ≥ 0.03` and `> spread`;
+  else SWIFT if `swift ≥ 0.03` and `> spread`; else STOP. Exit 0 iff the
+  dump, the build, the bench and the probe all succeeded; the verdict does
+  not set it.
+- `--mutant no-clear|no-swap|padded-in-place`: a copy of `graphic/` under
+  `work/raster-bench/mutant/` (a sibling `app` symlink, the target dir
+  `work/raster-bench-target/`), each anchor in `src/raster.rs` exactly once,
+  `cargo test --release --test pixels`. The anchors are the in-place
+  route's, which was not built, so each answers 2 (the control was not
+  performed).
+
+Run on 2026-10-22 over `f06c9bb` plus the instrument, on the owner's parive
+promo (a copy), every instance my own, on a 12-CPU host with 96 GiB,
+`powermode 0`, shared with other sessions:
+
+| Command | Answer |
+|---|---|
+| `raster_bench.py parive-promo.framejob --from 25120000` (the run that decided) | clip 8 (`section`), frames 0…529, 40 of 1920 × 1080, 5 rounds; load 68.05 24.51 15.42 before, 23.87 25.57 17.34 after; ROW 11 134.0 ms, PADDED 11 267.1 ms, ALLOC 2.7 ms, SWIZZLE 7.0 ms, CLEARSWAP 29.0 ms; spreads 0.2987 (ROW) and 0.2659 (PADDED); every frame's ROW bytes equal PADDED's rows; probe Z 0.048 ms, U 0.845 ms, M 0.022 ms. Per frame: row 278.349 ms, net 0, copy 0.823, F 279.242, outside 0.871; share 0.0031, rust 0, swift 0.0031; inplace saving 0.0118 (both arms the copy route). **verdict: STOP**; exit 0 |
+| the same, `--module bg` (for the record) | clip 4 (`bg`), frames 0…3775, 1920 × 1080; load 20.66 24.82 17.17 before, 15.35 23.23 16.82 after; ROW 1 407.5 ms, PADDED 1 401.7 ms, ALLOC 2.1, SWIZZLE 6.7, CLEARSWAP 28.7; spreads 0.0714 and 0.0695; probe Z 0.043, U 0.796, M 0.020. Per frame: row 35.188, net 0, copy 0.776, F 36.027, outside 0.819; share 0.0227, rust 0, swift 0.0227; inplace saving −0.0041. verdict: STOP; exit 0 |
+| `image_cache_bench.py parive-promo.framejob --frames 4 --rounds 1` (after `dump_scene` and `--exact`) | runs only `section_scene_orig_against_cached` (1 passed, 1 filtered out); every frame identical across the arms; exit 0 |
+| `raster_bench.py --mutant no-clear` | exit 2: the anchor occurs 0 times (the route is unbuilt) |
+| `grep "Frame Job: "` over the dump instances' logs | nothing |
+
 ## Issue batch B38 — the assistant Stop residue: ST's hour fixture, K1 last with its `key-echo` control, `transcribe`'s first-statement read (`assistant_session_proof.py` ST, K1, `--mutant key-echo`; #179 items 1, 2 and 4)
 
 - **#179 item 4** (`AgentServer+Captions.swift`): `transcribe(_:)` reads

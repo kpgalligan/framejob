@@ -456,6 +456,12 @@ The size rule is in the root `CLAUDE.md`; which files are over it is `wc -l`, ne
 What follows is only the SEAM each over-cap or at-edge file's record named, so the phase that has
 to pay a toll starts from it. A file not listed has no named seam yet.
 
+- `GraphicPrefetch.swift`: at 600 since #127 G6 phase 4 (spec §11 G-38), which moved `Slot`
+  unchanged to the foot of `LayerRenderersGraphic.swift` (a pure move committed alone, 9cedb2d).
+  The next seam: the background-pass branches (`start(background:)`'s arm, `stopBackground`,
+  the pass's end line) out whole to a `GraphicPrefetch+Background.swift` extension, with what
+  they read made internal, a pure move gated alone before anything else lands in the file.
+
 - `ProjectSnapshot.swift`: a property group's snapshot types out, whole. The precedents are
   `TextProps.swift`, `ProjectSnapshot+Graphic.swift`, `MediaSnapshot.swift` (issue batch
   B78, a pure move gated alone before `original` landed) and `ActionSnapshot.swift` (issue batch

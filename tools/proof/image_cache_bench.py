@@ -20,9 +20,10 @@ are written to `svg/NNNN.svg` with `frames.json {width, height, files}`,
 beside the copy's `graphics/assets` and `graphics/fonts`. Then `pmset -g`'s
 powermode line and `sysctl -n vm.loadavg` are printed, and
 `cd graphic && cargo test --release --test image_bench -- --ignored
---nocapture` runs with `GRAPHIC_IMAGE_BENCH=<that folder>` and
+--nocapture section_scene_orig_against_cached --exact` runs with `GRAPHIC_IMAGE_BENCH=<that folder>` and
 `GRAPHIC_IMAGE_BENCH_ROUNDS`; its output is printed whole. Every child runs
-under `graphics_spike/bounded.py`.
+under `graphics_spike/bounded.py`. `dump_scene` is the copy, launch,
+dump and stop; `raster_bench.py` (G6 phase 6) dumps through it too.
 
 Exit 0 iff the dump completed and the bench passed (its assertion: every
 frame's bytes equal across the arms).
@@ -47,12 +48,14 @@ TICKS = 600_000
 BENCH_BOUND = 3600
 
 
-def covering_clip(project, at):
+def covering_clip(project, at, module=None):
     """The graphic clip covering `at` on the frontmost track (the tracks'
-    last in order), or None."""
+    last in order), or None; with `module`, only a clip whose graphic's
+    name is `module`."""
     order = {track["id"]: index for index, track in enumerate(project.get("tracks", []))}
     found = [clip for clip in project.get("clips", [])
-             if clip.get("graphic") and clip["start"] <= at < clip["start"] + clip["duration"]]
+             if clip.get("graphic") and clip["start"] <= at < clip["start"] + clip["duration"]
+             and (module is None or clip["graphic"].get("name") == module)]
     found.sort(key=lambda clip: order.get(clip["track"], -1))
     return found[-1] if found else None
 
@@ -85,6 +88,44 @@ def dump(client, package, clip, fps, count, out):
     return True, f"{graphic['name']} clip {clip['id']}: frames {frames[0]}…{frames[-1]}"
 
 
+def dump_scene(source, at, frames, work, module=None):
+    """`source` copied under `work` (emptied first; the original is never
+    opened), one owned instance opening the copy, `frames` frames of the
+    graphic clip covering `at` (with `module`, of that module) dumped into
+    `work/dump` with the copy's assets and fonts, the instance stopped by
+    PID and its log checked. (ok, the dump folder, detail)."""
+    out = work / "dump"
+    if not (source / "project.json").is_file():
+        return False, out, f"{source} is not a package"
+    tree_copy.remove_tree(work)
+    work.mkdir(parents=True)
+    package = work / source.name
+    shutil.copytree(source, package, symlinks=True)
+    out.mkdir()
+    instance = gp.Instance(proof_app.binary(), work / "instance.log", off=False)
+    try:
+        client = instance.start()
+        if client is None or not gp.opened(client, package):
+            return False, out, "the instance did not open the copy"
+        project = gp.project_of(client, package)
+        clip = covering_clip(project, at, module)
+        if clip is None:
+            named = f" of {module}" if module else ""
+            return False, out, f"no graphic clip{named} covers {at}"
+        ok, detail = dump(client, package, clip, project["canvas"]["fps"], frames, out)
+    finally:
+        instance.stop()
+    if not ok:
+        return False, out, f"the dump failed: {detail}"
+    complaints = gp.complaints()
+    if complaints:
+        return False, out, f"the log complains: {complaints}"
+    for folder in ("assets", "fonts"):
+        if (package / "graphics" / folder).is_dir():
+            shutil.copytree(package / "graphics" / folder, out / folder)
+    return True, out, detail
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("package", type=Path)
@@ -94,45 +135,18 @@ def main():
     args = parser.parse_args()
     source = args.package.expanduser().resolve()
     print(f"#127 G6 phase 5 — the image-cache bench of {source.name} at {args.at}", flush=True)
-    if not (source / "project.json").is_file():
-        print(f"bench FAIL — {source} is not a package")
-        return 1
-    tree_copy.remove_tree(WORK)
-    WORK.mkdir(parents=True)
-    package = WORK / source.name
-    shutil.copytree(source, package, symlinks=True)
-    out = WORK / "dump"
-    out.mkdir()
-    instance = gp.Instance(proof_app.binary(), WORK / "instance.log", off=False)
-    try:
-        client = instance.start()
-        if client is None or not gp.opened(client, package):
-            print("bench FAIL — the instance did not open the copy")
-            return 1
-        project = gp.project_of(client, package)
-        clip = covering_clip(project, args.at)
-        if clip is None:
-            print(f"bench FAIL — no graphic clip covers {args.at}")
-            return 1
-        ok, detail = dump(client, package, clip, project["canvas"]["fps"], args.frames, out)
-    finally:
-        instance.stop()
-    print(f"  dump {'ok' if ok else 'FAIL'} — {detail}", flush=True)
+    ok, out, detail = dump_scene(source, args.at, args.frames, WORK)
     if not ok:
+        print(f"bench FAIL — {detail}")
         return 1
-    complaints = gp.complaints()
-    if complaints:
-        print(f"bench FAIL — the log complains: {complaints}")
-        return 1
-    for folder in ("assets", "fonts"):
-        if (package / "graphics" / folder).is_dir():
-            shutil.copytree(package / "graphics" / folder, out / folder)
+    print(f"  dump ok — {detail}", flush=True)
     power = bounded.run(["pmset", "-g"], 30)["stdout"]
     print("  " + next((line.strip() for line in power.splitlines() if "powermode" in line),
                       "powermode: not reported"), flush=True)
     print(f"  load average {gp.loadavg()}", flush=True)
     got = bounded.run(
-        ["cargo", "test", "--release", "--test", "image_bench", "--", "--ignored", "--nocapture"],
+        ["cargo", "test", "--release", "--test", "image_bench", "--", "--ignored", "--nocapture",
+         "section_scene_orig_against_cached", "--exact"],
         BENCH_BOUND, cwd=str(ROOT / "graphic"),
         env=bounded.child_env({"GRAPHIC_IMAGE_BENCH": str(out),
                                "GRAPHIC_IMAGE_BENCH_ROUNDS": str(args.rounds)}))
