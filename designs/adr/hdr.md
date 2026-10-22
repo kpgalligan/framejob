@@ -79,8 +79,8 @@ Mutants, each run once on the final instrument and each answering MUTANT PASS: H
 
 - **Synthetic fixtures only.** No owner HDR or log clip reached the road map; real footage is HDR-1…HDR-6, LIN-1 and GRD-16, GRD-17, GRD-19's.
 - **HD-2's named risk:** if HDR-1 finds the XDR panel shows the HLG preview tone-mapped rather than in EDR, the first fallback is setting the preview layer's `preferredDynamicRange` explicitly, then a `CAMetalLayer` preview, which would amend the `AVPlayerLayer` decision and is the owner's call.
-- **An HDR still is read only by an HLG- or PQ-based colour space** (HD-19 (a)): an iPhone HDR photo's gain map is not read, so it is drawn as SDR (#322); an HDR still's Media-tab thumbnail and filmstrip are ImageIO's, not its step-0 arm's (#323); and a PQ still's peak is unknown, 1,000 cd/m², whatever its `mDCV`/`cLLI` say (#325).
-- **The key's SDR reading is close, not exact, in two cases** (HD-19 (c)): HLG over P3 or BT.709 (its working colour was matrixed in scene light) and PQ above 1,000 cd/m² (BT.2390's EETF is not undone). A Camera Log clip's key keeps the un-lift, so it may need re-picking after the switch (#324).
+- **An HDR still is read by an HLG- or PQ-based colour space** (HD-19 (a)), **or by an ISO or Apple HDR gain map, in an HLG project only** (HD-22): a gain-map photo's un-gained parts are the base's own light, not HD-3's lift of its codes, and its SDR version is the rendition toned down, not the photo's own base (owner's choices). Only a synthetic gain map was measured; a real iPhone photo, Apple's pre-ISO map and JPEG or AVIF gain maps are HDR-7's. A key picked on a gain-map still in an SDR project is close, not exact, after the switch to HLG (HD-22 (g)).
+- **The key's SDR reading is close, not exact, in two cases** (HD-19 (c)): HLG over P3 or BT.709 (its working colour was matrixed in scene light) and PQ above 1,000 cd/m² (BT.2390's EETF is not undone). A Camera Log clip's key reads its SDR colour since HD-20 (#324).
 - **Apple's own conversion ignores the peak:** M5's digest `d34d90b3f676a425` for the 600 and 1,000 cd/m² files, and H-1's unscored reading of all seven files (worst |Δ| 0 against `pq_plain`).
 - **AV1's peak is measured without a decode:** P10 reads libsvtav1 files through `MediaImporter.detectedPQ` on an M2 Max, which refuses AV1 imports; an AV1 file's import, render and Media-tab section on an M3 or later Mac is HDR-4's step 7.
 - **A video-range-flagged non-ProRes Canon file storing full-range codes reads too contrasty** (HD-17 (e); GRD-19).
@@ -95,11 +95,10 @@ Mutants, each run once on the final instrument and each answering MUTANT PASS: H
 
 Still open:
 - #278: S-Log3/V-Log detection from the makers' metadata (Canon Log 2 and 3 built by H-5, HD-17).
-- #322, #323, #325 (clean-up batch 2, phase 2): an iPhone HDR photo's gain map, an HDR still's thumbnails, and a PQ still's peak (HD-19 (a)).
-- #324 (clean-up batch 2, phase 2): a key on a Camera Log clip across the switch to HLG (HD-19 (c)).
+- #330 (clean-up 3, batch B phase 3): `hdr_proof` HG's gain-map peak mutant is caught only by the bands' order (HD-22 (k)).
 - #274: the odd-size reverse's ProRes 422 cost on camera footage — not measured: no owner HDR or log clip reached the road map (HD-1).
 
-Closed: #281 (H-1, HD-6, HD-12), #277 (H-2…H-4, HD-2…HD-5, HD-7, HD-8, HD-13…HD-15) and #276 (H-6, HD-9, HD-16) as built; #313 and #314, instrument defects older than the road map, fixed in H-2 and H-3; #310 (clean-up batch 1, the instruments held to the spec) and #315, #316, #317 (clean-up batch 2, HD-18; #317 measured, no defect), and #311, #312, #321 (clean-up batch 2, phase 2, HD-19).
+Closed: #281 (H-1, HD-6, HD-12), #277 (H-2…H-4, HD-2…HD-5, HD-7, HD-8, HD-13…HD-15) and #276 (H-6, HD-9, HD-16) as built; #313 and #314, instrument defects older than the road map, fixed in H-2 and H-3; #310 (clean-up batch 1, the instruments held to the spec) and #315, #316, #317 (clean-up batch 2, HD-18; #317 measured, no defect), and #311, #312, #321 (clean-up batch 2, phase 2, HD-19); #324 and #325 (clean-up 3 batch B phase 1, HD-20: a Camera Log clip's key, a PQ still's HDR10 peak, format 26), #323 (phase 2, HD-21: an HDR still's thumbnails through step 0) and #322 (phase 3, HD-22: a gain-map still drawn as HDR in an HLG project).
 
 Not filed, each decided at the close:
 - How the XDR panel and an SDR external display show an HLG preview: HDR-1's steps 3–4.
