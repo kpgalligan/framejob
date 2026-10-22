@@ -24,7 +24,9 @@ import AppKit
 /// other typed patches are in `TypedPatches.swift`, the payment it owed at
 /// 1211 before `ReelContainer`. `ReelCoreError` and `Fps.ffiPair` are in
 /// `CoreValues.swift`, the payment it owed at 817 before the engine's image
-/// cache, for the same reason.
+/// cache, for the same reason. The JSON-reading halves of `clipState(_:at:)`
+/// and `snapCandidates(excluding:)` are `CoreJSON` there, the payment it owed
+/// at 810 before `ReelHDR10.stillPeak(file:)`; their `rc_*` calls stayed.
 /// Only `ReelOp.coreNames()` and `ReelOp.coreSchemas()` stayed behind — the
 /// op table read BACK, its names and its arguments — because they read
 /// `rc_op_names()` and `rc_op_schemas()` and the rule above admits no second
@@ -243,11 +245,7 @@ final class ReelProject {
     /// the shape is the union of the property groups a clip happens to have,
     /// and the inspector reads individual keys. nil for an unknown clip id.
     func clipState(_ clip: UInt32, at t: Ticks) -> [String: Any]? {
-        guard let json = takeString(rc_project_clip_state(ptr, clip, t)),
-              let data = json.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data)
-        else { return nil }
-        return object as? [String: Any]
+        CoreJSON.value(takeString(rc_project_clip_state(ptr, clip, t))) as? [String: Any]
     }
 
     /// Sorted, de-duplicated snap targets for a timeline drag: clip edges,
@@ -261,21 +259,8 @@ final class ReelProject {
         } else {
             raw = rc_project_snap_candidates(ptr, jsonArray(clips))
         }
-        guard let json = takeString(raw), let data = json.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data)
-        else { return [] }
-        var out = Set<Ticks>()
-        func absorb(_ value: Any) {
-            if let numbers = value as? [NSNumber] {
-                for number in numbers { out.insert(number.int64Value) }
-            }
-        }
-        if let grouped = object as? [String: Any] {
-            for value in grouped.values { absorb(value) }
-        } else {
-            absorb(object)
-        }
-        return out.sorted()
+        guard let o = CoreJSON.value(takeString(raw)) else { return [] }
+        return CoreJSON.snapTicks(o)
     }
 
     /// Applies one op and returns what the core answered — `ReelEdit`, next

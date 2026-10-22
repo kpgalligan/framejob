@@ -4,12 +4,41 @@ import Foundation
 /// `GraphicDiagnostic`, `GraphicFailure` and `GraphicRaster` — moved out of `ReelCore.swift`
 /// (a pure move, clean-up batch 2) because they name no `rc_*` symbol but in a doc comment;
 /// and, for the same reason, the core's error `ReelCoreError` and `Fps.ffiPair` (a pure
-/// move, #127 G6 phase 5's toll).
+/// move, #127 G6 phase 5's toll); and the JSON-reading halves of `ReelProject.clipState(_:at:)`
+/// and `snapCandidates(excluding:)` as `CoreJSON` (a pure move, clean-up 3 batch B's toll).
 
 /// Error thrown by the Rust core, carrying the message from `err_out`.
 struct ReelCoreError: LocalizedError {
     let message: String
     var errorDescription: String? { message }
+}
+
+/// The parsing halves of two `ReelProject` reads whose `rc_*` calls stay in `ReelCore.swift`.
+enum CoreJSON {
+    /// `json`'s UTF-8 through `JSONSerialization`; nil for a nil or unreadable string.
+    static func value(_ json: String?) -> Any? {
+        guard let json = json, let data = json.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data)
+        else { return nil }
+        return object
+    }
+
+    /// The core's snap candidates — grouped by kind as an object of arrays, or one array —
+    /// merged, de-duplicated and sorted.
+    static func snapTicks(_ answer: Any) -> [Ticks] {
+        var out = Set<Ticks>()
+        func absorb(_ value: Any) {
+            if let numbers = value as? [NSNumber] {
+                for number in numbers { out.insert(number.int64Value) }
+            }
+        }
+        if let grouped = answer as? [String: Any] {
+            for value in grouped.values { absorb(value) }
+        } else {
+            absorb(answer)
+        }
+        return out.sorted()
+    }
 }
 
 extension Fps {

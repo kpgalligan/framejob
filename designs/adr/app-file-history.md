@@ -602,7 +602,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   helpers stayed. `wc -l app/Sources/ReelCore.swift`: 817 before, 803 after; `CoreValues.swift`
   is 65. The next seam: the parsing halves of `ReelProject.snapCandidates(excluding:)` (the
   JSON-to-`Set<Ticks>` absorb) and `clipState(_:at:)` (the JSON object read) as static helpers
-  in a values file, the `rc_*` calls staying here.
+  in a values file, the `rc_*` calls staying here. Clean-up 3 batch B paid that seam (toll T1)
+  before `ReelHDR10.stillPeak(file:)` (#325, spec §11 HD-20) landed: `enum CoreJSON` in
+  `CoreValues.swift` took `value(_:)` (the JSON object read, nil for a nil or unreadable string)
+  and `snapTicks(_:)` (the object-of-arrays or one-array absorb, merged, de-duplicated and
+  sorted); `clipState` and `snapCandidates` call them, their `rc_*` calls and `jsonArray`
+  staying, and the header gained its payment sentence. A pure move gated alone, nothing widened.
+  `wc -l app/Sources/ReelCore.swift`: 810 before, 795 after; `CoreValues.swift` is 94. The next
+  seam: the private `jsonArray` above `ReelProject` (it names no `rc_*` symbol) to `CoreJSON`,
+  widened to internal.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,
