@@ -13,7 +13,8 @@ import Foundation
 /// sets a SIMULATED memory-pressure level first (`setPressure(_:simulated:)`),
 /// which holds against the system's real events until the tool sets
 /// `normal`; that clears the simulation and applies the last real level.
-/// Every answer resets the held peaks to the current totals.
+/// Every answer resets the held peaks to the current totals, and the count of
+/// marked frames a trim pushed out (`ahead_evicted`, G-38) to 0.
 extension AgentServer {
 
     func graphicMemory(_ a: [String: Any]) throws -> String {
@@ -39,6 +40,9 @@ extension AgentServer {
             "kept_bytes": report.keptBytes,
             "kept_frames": report.keptFrames,
             "kept_hits": report.keptHits,
+            "ahead_bytes": report.aheadBytes,
+            "ahead_evicted": report.aheadEvicted,
+            "pass_activity": report.passActivity,
         ])
     }
 
@@ -54,7 +58,11 @@ extension AgentServer {
                 + "ahead now), held_peak_bytes and held_peak_entries (the highest totals since "
                 + "the last answer; each answer resets them to the current ones), kept_bytes and "
                 + "kept_frames (the graphic frames the documents keep) and kept_hits (requests "
-                + "the kept frames answered since launch). Needs no project. pressure first "
+                + "the kept frames answered since launch), ahead_bytes (the kept frames a "
+                + "background pass drew ahead and the compositor has not yet passed, spec G-38), "
+                + "ahead_evicted (those a trim pushed out while still ahead, since the last "
+                + "answer; each answer resets it) and pass_activity (whether a running background "
+                + "pass holds Frame Job's App Nap opt-out). Needs no project. pressure first "
                 + "sets a simulated memory-pressure level, which holds against the system's own "
                 + "until pressure normal clears it. Refused, changing nothing: any other "
                 + "pressure value.",

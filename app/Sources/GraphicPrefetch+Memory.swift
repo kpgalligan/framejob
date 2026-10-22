@@ -6,7 +6,8 @@
 // waits while the held rasters of all sessions reach it (`claim`); the kept
 // frames give way, least recently used first, and never exceed the room the
 // held rasters leave: every change to either trims them to
-// `max(0, budget − held)`. Memory pressure halves the budget (warning) or
+// `max(0, budget − held)`. Frames a background pass drew ahead (G-38) are
+// marked and give way last. Memory pressure halves the budget (warning) or
 // sets it to 0 (critical: nothing is kept and no worker claims).
 //
 // **Kept frames.** Only a `Playback`'s key keeps (`beginKeeping` in its
@@ -52,6 +53,13 @@ struct KeptFrames {
     }
 
     private var frames: [Name: Frame] = [:]
+    /// Marked frame → the highest background frame index it serves (G-38).
+    private var ahead: [Name: Int] = [:]
+    /// Σ bytes of the marked frames.
+    private(set) var aheadBytes = 0
+    /// Marked frames `trim` pushed out while still marked, since the last
+    /// report that reset it (`graphic_memory`'s `ahead_evicted`, G-38 (d)).
+    var aheadEvicted = 0
     /// Every touch in order, oldest first from `head`; an element whose stamp
     /// is no longer its frame's is stale and skipped.
     private var order: [(name: Name, stamp: Int)] = []
@@ -87,26 +95,72 @@ struct KeptFrames {
         bytes += raster.bgra.count
     }
 
-    /// The least recently used out until `bytes <= max(0, room)`.
+    /// Out until `bytes <= max(0, room)`: unmarked frames least recently used
+    /// first, marked ones only after no unmarked frame is left (G-38 (d)).
     mutating func trim(toFit room: Int) {
         let limit = max(0, room)
+        var index = head
+        while bytes > limit, index < order.count {
+            let (name, stamp) = order[index]
+            index += 1
+            guard let one = frames[name], one.stamp == stamp, ahead[name] == nil else { continue }
+            trimOut(name)
+        }
         while bytes > limit, head < order.count {
             let (name, stamp) = order[head]
             head += 1
             guard let frame = frames[name], frame.stamp == stamp else { continue }
-            frames[name] = nil
-            bytes -= frame.raster.bgra.count
+            trimOut(name)
         }
         compact()
+    }
+
+    /// `trim`'s eviction: a marked frame counted in `aheadEvicted`.
+    private mutating func trimOut(_ name: Name) {
+        if ahead[name] != nil { aheadEvicted += 1 }
+        evict(name)
     }
 
     /// Every frame of `key` out.
     mutating func drop(_ key: Int) {
         let gone = frames.keys.filter { $0.key == key }
-        for name in gone {
-            if let frame = frames.removeValue(forKey: name) { bytes -= frame.raster.bgra.count }
-        }
+        for name in gone { evict(name) }
         compact()
+    }
+
+    /// Marks `key`'s kept frame for `textureKey` as drawn ahead, serving
+    /// background frame `index`; the higher index stays. A kept frame only.
+    mutating func markAhead(_ key: Int, _ textureKey: String, index: Int) {
+        let name = Name(key: key, textureKey: textureKey)
+        guard let frame = frames[name] else { return }
+        if let old = ahead[name] {
+            ahead[name] = max(old, index)
+        } else {
+            ahead[name] = index
+            aheadBytes += frame.raster.bgra.count
+        }
+    }
+
+    /// The marks whose index is below `index` out: the compositor passed them.
+    mutating func clearAhead(below index: Int) {
+        let passed = ahead.filter { $0.value < index }.map(\.key)
+        for name in passed {
+            ahead[name] = nil
+            if let frame = frames[name] { aheadBytes -= frame.raster.bgra.count }
+        }
+    }
+
+    /// Every mark out.
+    mutating func clearAhead() {
+        ahead.removeAll()
+        aheadBytes = 0
+    }
+
+    /// `name`'s frame out, and its mark with it.
+    private mutating func evict(_ name: Name) {
+        guard let frame = frames.removeValue(forKey: name) else { return }
+        bytes -= frame.raster.bgra.count
+        if ahead.removeValue(forKey: name) != nil { aheadBytes -= frame.raster.bgra.count }
     }
 
     private mutating func touch(_ name: Name) {
@@ -134,6 +188,11 @@ struct GraphicMemoryReport: Equatable {
     let physicalBytes, budgetBytes: Int
     let pressure: MemoryPressure
     let heldBytes, heldPeakBytes, heldPeakEntries, keptBytes, keptFrames, keptHits: Int
+    /// The marked frames' bytes now, the marked frames a trim pushed out
+    /// since the last report that reset the peaks, and whether a pass holds
+    /// its App Nap opt-out (G-38 (d), (c)).
+    let aheadBytes, aheadEvicted: Int
+    let passActivity: Bool
 }
 
 extension GraphicPrefetch {
@@ -155,6 +214,14 @@ extension GraphicPrefetch {
         condition.unlock()
     }
 
+    /// Whether `key` keeps the frames it draws: a background pass's own
+    /// condition (G-38 (e)). Any thread.
+    func keeps(_ key: Int) -> Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        return keeping.contains(key)
+    }
+
     /// `key`'s kept frames out; it still keeps.
     func dropKept(_ key: Int) {
         condition.lock()
@@ -169,6 +236,61 @@ extension GraphicPrefetch {
         kept.drop(key)
         keeping.remove(key)
         condition.unlock()
+    }
+
+    /// A background pass from `key` at `startTicks` begins: every mark out,
+    /// it is the origin (G-38 (d)), and Frame Job opts out of App Nap for
+    /// the pass's life, so it keeps drawing while hidden or covered (G-38
+    /// (c)); `endPassActivity` ends it. Under `condition`.
+    func beginAhead(_ key: Int, startTicks: Ticks) {
+        kept.clearAhead()
+        aheadOrigin = (key, startTicks)
+        endPassActivity()
+        passActivity = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiatedAllowingIdleSystemSleep,
+            reason: "Frame Job background render (spec §11 G-38)")
+    }
+
+    /// The pass ended (done, full or stopped): its App Nap opt-out ends.
+    /// Under `condition`.
+    func endPassActivity() {
+        if let activity = passActivity { ProcessInfo.processInfo.endActivity(activity) }
+        passActivity = nil
+    }
+
+    /// A play from `key` at `startTicks` begins: the marks stay only when it
+    /// starts where the last pass did, on its key. Under `condition`.
+    func followAhead(_ key: Int, startTicks: Ticks) {
+        if let origin = aheadOrigin, origin.key == key, origin.startTicks == startTicks { return }
+        kept.clearAhead()
+        aheadOrigin = nil
+    }
+
+    /// The play on the last pass's key stopped: every mark out. Under
+    /// `condition`.
+    func endAhead(_ key: Int) {
+        guard aheadOrigin?.key == key else { return }
+        kept.clearAhead()
+        aheadOrigin = nil
+    }
+
+    /// Whether a background pass can take `slots` without its marked frames
+    /// giving way: they, every held raster and `slots` within the budget. A
+    /// pass ends `full` when not (G-38 (c)). Under `condition`.
+    func roomAhead(for slots: [Slot]) -> Bool {
+        kept.aheadBytes + heldTotal + slots.reduce(0) { $0 + $1.width * $1.height * 4 }
+            <= budgetBytes
+    }
+
+    /// A background session's one line (G-38 (c)); B is the marked bytes.
+    /// Under `condition`.
+    func backgroundLine(
+        key: Int, workers: Int, start: Ticks, frames: Int, counts: (drawn: Int, kept: Int),
+        end: String
+    ) -> String {
+        "[framejob] graphic background: key \(key), \(workers) workers, from \(start), "
+            + "\(frames) frames with graphics, \(counts.drawn) drawn, \(counts.kept) already "
+            + "kept, \(kept.aheadBytes) bytes kept, \(end)"
     }
 
     /// The compositor used `raster` for `textureKey` on `key`: kept when `key`
@@ -206,10 +328,13 @@ extension GraphicPrefetch {
             physicalBytes: Int(clamping: Self.physicalBytes), budgetBytes: budgetBytes,
             pressure: simulatedPressure ?? pressure, heldBytes: heldTotal,
             heldPeakBytes: heldPeakBytes, heldPeakEntries: heldPeakEntries,
-            keptBytes: kept.bytes, keptFrames: kept.count, keptHits: keptHits)
+            keptBytes: kept.bytes, keptFrames: kept.count, keptHits: keptHits,
+            aheadBytes: kept.aheadBytes, aheadEvicted: kept.aheadEvicted,
+            passActivity: passActivity != nil)
         if resettingPeaks {
             heldPeakBytes = heldTotal
             heldPeakEntries = heldEntries
+            kept.aheadEvicted = 0
         }
         return report
     }

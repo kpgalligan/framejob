@@ -153,7 +153,13 @@ Since G6 phase 3 (2026-10-21, spec §11 G-37) every session's held rasters
 share one budget, a quarter of physical memory, with the graphic frames a
 playing document keeps, so a replay, loop or paused scrub over a span
 already drawn is served from memory (below, "G6 phase 3 — one memory
-budget and kept frames"). The decoded-image cache and in-place raster are
+budget and kept frames"). Since G6 phase 4 (2026-10-21, spec §11 G-38),
+once the person has left Frame Job alone for a few seconds (Settings ▸
+Playback ▸ Background render, on after 5 s, as Final Cut's), the window
+whose transport last moved draws its graphic frames ahead of the paused
+playhead into those kept frames, marked so they give way last; any
+activity stops it, and it never runs beside a play (below, "G6 phase 4 —
+background render"). The decoded-image cache and in-place raster are
 still not built.
 
 **The FFI is ten `rc_graphic_*` exports, and a library is a builder that
@@ -1407,13 +1413,159 @@ Owed: GR-10 in `docs/manual-checks.md` (a replay plays from memory, and the
 memory is given back). Next in #127: drawing ahead while paused, a
 setting.
 
+## G6 phase 4 — background render (#127, spec §11 G-38)
+
+2026-10-21, on `adf9807`. Settings gets a fourth pane, Playback
+(`PlaybackSettingsPane.swift`): "Background render", on, and "Start after
+[5] seconds" (1–60), a person's setting with no tool, stored in
+`FrameJobBackgroundRender` and `FrameJobBackgroundRenderDelay`. The idle
+clock (`BackgroundRender.swift`) is one run-loop `Timer` restarted by every
+key, modifier, button, drag, scroll and trackpad gesture event the app
+receives (an `NSEvent` local monitor), every `.projectDocumentDidChange` and
+every `syncPrefetch` (play, pause, rate change, seek), each restart stopping
+the running pass. At the delay the document whose transport last moved —
+paused, built, drawing a graphic, still open (its graphics registered) —
+asks `GraphicPrefetch` for a background session over G-36 (b)'s grid from
+the playhead (`Playback+Prefetch.swift`'s `startBackgroundRender`); seeking,
+restoring, rebuilding, holding or a refused start (a window plays, a pass
+runs, the key does not keep) runs the clock again. A pass's workers run at
+utility QoS; each finished raster goes straight into the kept frames,
+marked as drawn ahead (`KeptFrames.markAhead`), and a texture key already
+kept is touched and marked, not drawn. It ends `done` at its range's end,
+`full` when its marked frames, every held raster and the next frame's bytes
+would pass the budget, `stopped` on activity, close (`stopGraphicStore`
+now stops the key's session before dropping its frames) or `invalidate`;
+its line is written at once on a stop. The kept frames give way unmarked
+first, least recently used first, marked last. A play from the pass's own
+key and grid start keeps the marks: its workers wait while the held rasters
+and the marked frames reach the budget — in `claim`, and again in `insert`
+with the frame's own bytes, because concurrent claims reserve nothing and
+eleven workers at once pushed the nearest marked frames out (a 4K LONG,
+Debug: kept share 0.576 before, 1.0 after) — and `reach` unmarks the frames
+it passes; that play's stop, a play from anywhere else and a new pass clear
+every mark. Phase 3's review: a pool hit touches its kept frame
+(`discard(_:slot:textureKey:)`), and `heldEntries` counts only entries
+holding bytes.
+
+**Deviations, all in the instrument but the second.** (1) B3 sets the
+playhead to 1 frame again, not to 0: frame 0's rasters are emptied before B1
+and still in the compositor's pool, so a seek to 0 keeps none and the pass
+drew frame 0's two `heavy` layers. (2) The `insert` wait above, and `full`
+counting the next frame's bytes, beside `claim`'s check: without them a
+pass's own inserts, and a play's concurrent claims, evicted marked frames.
+(3) B13 plays LONG through Clip ▸ Motion ▸ Preview, not a second client's
+`play_preview`: the agent lane serialises every call (AI-2), so the second
+client held the first's `set_playhead` to the play's end; and B13 reads
+"before LONG's playback line" as before the pausing call, since a following
+session's line is written by its last worker, which a loaded host held
+seconds past the pause. (4) B7 runs after B12 and B13 and saves LONG: run
+first, B12's pass was stopped 15 s after B7's edit, the autosave in place's
+delay (its edited-state change is activity), with no other line to explain
+it. (5) LONG's canvas is 2560 × 1440 (the spec left it
+open): at 1080p B12's 1,553 frames of deferred entries reached the
+1,024-entry ceiling before unguarded workers passed the pass's end, at 4K
+the rasters were too slow to outrun the play; both let `ahead-unguarded`
+survive. (6) A mid-pass control and B12's are performed again once, and
+BG's instances run with `-NSAppSleepDisabled YES`. (7) `screens.py` pins
+the two new keys and lists phase 3's `FrameJobGraphicKeepOff` as not shown
+(its P2 failed on all three).
+
+**Bench** (Release, `background_render_proof.py --bench` over a copy of
+parive-promo, clip 8's `section` scene from tick 25 120 000 for 10 s, Full;
+12 cores, 96 GiB, `powermode 0`):
+
+| Cell | Load before the play | Pass | Composed | compose_ms mean / p95 | Playback line | RSS after |
+|---|---|---|---|---|---|---|
+| BG-OFF | 31.84 | none | 88 of 301 (0.292) | 104.59 / 640.19 | 136 hits, 8 missed, 58 skipped, 0 kept | 3 667 520 KiB |
+| BG | 87.11 | `full`: 3 103 drawn, 330 already kept, 25 762 406 400 bytes kept | 301 of 301 (1.0) | 5.82 / 9.48 | 0 hits, 537 kept | 26 158 368 KiB |
+
+So after an idle wait the first play composed every frame, against 0.292
+with Background render off, at the cost of a quarter of memory held (the
+budget, 25.8 GB of kept frames) and the RSS that comes with it. An earlier
+bench on the code before the `insert` wait read 0.442 off and 0.857 on (load
+31.02 and 113.39).
+
+**Rows** (`background_render_proof.py`, Release, the final instrument): 14/14
+— B1, B2 (300 drawn), B3 (0 drawn, 476 already kept), B4 (kept 245), B11
+(48 common ticks equal), B9 (`full`, 0 drawn), B5, B6, B12 (873 frames
+`full`; the 22.7 s play's kept share 1.0), B13, B7, B10, B8, Z1.
+**Mutants** (Release): eight caught — `no-idle-delay` B1, `ignores-setting`
+B8, `activity-stops-own-only` B5, `background-past-budget` B9,
+`close-keeps-drawing` B10, `draws-kept-again` B3, `ahead-evicted-first` B12
+(share 0.861), `background-beside-play` B13. `ahead-unguarded` is NOT
+caught: it survived at 1080p (0.994) and 4K (0.958), and at 2560 × 1440 its
+control failed twice (passes stopped by activity the proof did not make).
+`graphic_memory_proof.py` 13/13 with its six re-run mutants caught,
+`playback_prefetch_proof.py` 12/12 with four, `graphics_prefetch_proof.py`
+7/7 with both; `settings_layout_probe.py` 13/13 (L12) with `order-swapped`,
+`mcp-last` and `delay-unclamped` caught; `cloud_captions_probe.py --only
+chrome,settings_verify` 117/117 (the window re-pinned at 460 × 863);
+`assistant_tab_proof.py` 26/26; `screens.py --only 02-settings` 6/6; `make
+gate` exit 0.
+
+**Fix pass 1** (its review's two should-fixes, three nits, and the owner's
+App Nap answer). (1) `ahead-unguarded` is caught: `KeptFrames` counts the
+marked frames a trim pushes out while still marked (`aheadEvicted`), and
+`graphic_memory` answers it as `ahead_evicted` beside `ahead_bytes` and
+`pass_activity`, reset by each answer. B12 reads it before and after its
+play and wants 0. The share alone could not see an unguarded play: a
+`full` pass leaves under one frame of room, so the play's first
+reservations trim marked frames out at once, about one per worker, and the
+rest of the damage waits on the workers passing the pass's end, which the
+host's speed decides; the count sees the first trim on any host (the
+mutant's run: share 0.981, which passed 0.9, and 19 evicted). The
+reviewer's other bound (`held_peak_bytes` plus the pass's bytes within the
+budget plus what the compositor passed) was not used: a guarded play's
+workers also reach eleven frames held once the compositor has passed
+eleven, so by the time a reply can be read the slack swallows the
+difference. (2) Settings' panes sit in a scroll view capped at the screen's
+visible height less the title bar (`fitScreen`, from `init` and `show()`),
+so the 863-point window fits a 1440 × 900 display and scrolls there; on a
+taller screen nothing changes (row 18 still 460 × 863), and
+`settings_layout_probe.py`'s L13 drives both, with the mutant
+`screen-uncapped`. (3) `idle()` runs the clock again while any transport
+that has moved plays, forward or in reverse, with graphics or without
+(`BackgroundRender.transports`, weak); `background-beside-play` now removes
+this check and `start(background:)`'s refusal both. (4) A pass's layer
+deferred to an earlier frame's unfinished entry of the same texture raises
+that entry's mark index (`Entry.sharedUpTo`) and counts as already kept
+when it is kept (`Entry.sharers`). (5) `startBackgroundRender` answers
+`.notNeeded`, not `.busy`, under `FrameJobGraphicPrefetchOff` or a key that
+does not keep, so neither switch re-arms the clock. (6) The owner
+(2026-10-21), "Keep going (Recommended)": a pass holds a `ProcessInfo`
+activity (`userInitiatedAllowingIdleSystemSleep`) from `beginAhead` to its
+end (`stop`, or its last worker's exit unstopped), recorded in G-38 (c);
+B14 reads `pass_activity` false after B2's `done`, true during B5's pass,
+false after B10's close, and the mutant `nap-outlives-stop` fails it.
+`GraphicPrefetch.Slot` moved to `LayerRenderersGraphic.swift` (a pure move)
+to hold `GraphicPrefetch.swift` at 600.
+
+Fix pass 1's runs (Release): `background_render_proof.py` 15/15 (B12: 873
+frames `full`, 850 drawn; the 22.7 s play kept 686 of 686, share 1.0,
+`ahead_evicted` 0); mutants caught: `ahead-unguarded` B12 (19 evicted,
+share 0.981), `ahead-evicted-first` B12 (179 evicted, share 0.872),
+`background-beside-play` B13, `nap-outlives-stop` B14, `draws-kept-again`
+B3; `graphic_memory_proof.py` 13/13, `playback_prefetch_proof.py` 12/12,
+`graphics_prefetch_proof.py` 7/7, `assistant_tab_proof.py` 26/26,
+`screens.py --only 02-settings` 6/6 (0 new problems),
+`agent_socket_proof.py` 17/17; `settings_layout_probe.py` 14/14 with
+`screen-uncapped`, `order-swapped`, `mcp-last` and `delay-unclamped`
+caught; `cloud_captions_probe.py --only chrome,settings_verify` 117/117
+(460 × 863); `make gate` exit 0. The bench answered both plays, but its BG
+pass was `stopped` after 20 frames by activity it did not make (load 55
+before), so its 0.306 (against 0.402 off) measures no pass; the table above
+is the earlier code's.
+
+Owed: GR-11 in `docs/manual-checks.md` (now with a hidden wait) and CH-6's
+scrolling step.
+
 ## Open items
 
-- G6's rest — drawing ahead while paused (a setting, as Final Cut's
-  Background render), in-place raster (`graphic/src/raster.rs`) and a
+- G6's rest — in-place raster (`graphic/src/raster.rs`) and a
   decoded-image cache past resvg's per-render decode — tracked in #127.
   The export's parallel rasterization landed (G-26), playback's (G-36),
-  and one memory budget with kept frames (G-37).
+  one memory budget with kept frames (G-37), and drawing ahead while
+  paused, Background render (G-38).
 - The person's watched checks: the playback-check projects with no video
   underneath, memory at 4K, and the error card in the live preview —
   tracked in #56.

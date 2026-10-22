@@ -2031,8 +2031,12 @@ button and the missing-helper sentence. The constructor, exactly as
         mcpHelper: URL(fileURLWithPath: "/nonexistent/Frame Job.app/Contents/Helpers/framejob-mcp"))
 ```
 
-The window is 460 × 780 points now (`cloud_captions_probe.py`'s row 18
-measures it; issue batch B74).
+The window is 460 × 863 points now (`cloud_captions_probe.py`'s row 18
+measures it; issue batch B74's 780, then G6 phase 4's Playback pane, spec §11
+G-38) on a screen with room for it: since that phase's fix pass 1 the panes
+sit in a scroll view capped at the screen's visible height less the title
+bar, so on a shorter screen the window is shorter and scrolls
+(`settings_layout_probe.py`'s L13).
 
 Road map 8's W4b took a fifth render target, in `settings`' shape:
 
@@ -10499,7 +10503,9 @@ the one writer and uses a worker's raster only on a pool miss whose texture
 key matches its own. The proof launches two owned instances one after the
 other, each on a scratch socket (OFF with `-FrameJobGraphicPrefetchOff YES`, ON without),
 logs under `work/graphics-prefetch/`, every child under
-`graphics_spike/bounded.py`. Its fixture, made over MCP and saved: a 30 fps
+`graphics_spike/bounded.py`. Every instance also gets `-FrameJobBackgroundRender NO`
+(G6 phase 4, spec §11 G-38 (e)), so no paused document draws in the background
+beside a row. Its fixture, made over MCP and saved: a 30 fps
 canvas; `heavy` (moving gradient, `feGaussianBlur`, an `<image>` of the
 imported `red.png`, bundled-font text) on two overlapping clips with
 different props; `static`; `stepped` (`Math.floor(frame / 2)`); each 4 s,
@@ -10555,7 +10561,10 @@ it imports `graphics_prefetch_proof.py`'s launch, `fixture()` and log
 readers. Every instance, the bench's included, also gets
 `-FrameJobGraphicKeepOff YES` (spec §11 G-37 (e)), so no row is served from
 a document's kept frames and each keeps its phase 2 meaning;
-`graphic_memory_proof.py` (below) measures the kept frames. Fixtures, saved
+`graphic_memory_proof.py` (below) measures the kept frames. Every instance
+also gets `-FrameJobBackgroundRender NO` unless it is made with
+`background=True` (only `background_render_proof.py` passes it; spec §11
+G-38 (e)). Fixtures, saved
 under `work/`: H is that proof's F; L a 30 fps project with one 5 s shape
 clip. Every play is preceded by `set_playhead`, and a timing ratio is scored
 only in the CONTROL rows.
@@ -10632,7 +10641,9 @@ The instrument is the dev tool `graphic_memory` (spec §7.9c), beside
 other, each on a scratch socket, logs under `work/graphic-memory/`: SERIAL
 (`-FrameJobGraphicPrefetchOff YES -FrameJobGraphicKeepOff YES`), KEEP (no
 switches) and KEEP-SERIAL (`-FrameJobGraphicPrefetchOff YES`), switches in
-the argument domain only. It imports `playback_prefetch_proof.py`'s
+the argument domain only; since G6 phase 4 every instance, the bench's
+included, also runs with `-FrameJobBackgroundRender NO` (`pp.Instance`'s
+default, spec §11 G-38 (e)). It imports `playback_prefetch_proof.py`'s
 launch, plays and digest merge and `graphics_prefetch_proof.py`'s fixture
 and log readers. Fixtures H and L, made on SERIAL, are that proof's. A
 timing figure is scored only in a CONTROL row.
@@ -10690,6 +10701,144 @@ key's kept frames too (`ProjectDocument+Graphics.swift`'s
 first `slot-limit` run survived (M10's bound was `4 × workers`, and a
 claim reserves no slot, so that limit held 74 entries); M10's bound is now
 what such a limit can hold, and the mutant is caught.
+
+## Issue #127 — background render (`background_render_proof.py`)
+
+G6 phase 4 (spec §11 G-38): once Frame Job has been left alone for the
+delay set in Settings ▸ Playback ▸ Background render (on, 5 s by default),
+the document whose transport last moved draws its graphic frames ahead of
+the paused playhead into its kept frames, marked as drawn ahead
+(`BackgroundRender.swift`, `GraphicPrefetch.swift`'s background sessions,
+`GraphicPrefetch+Memory.swift`'s ahead marks). Any key, click, scroll or
+gesture event the app receives, any edit and any transport move stops it;
+it never runs beside a play; a play from the pass's own start keeps the
+marked frames until the compositor reaches them. Its lines read
+`[framejob] graphic background: key K, from T, started` and, once at the
+end, `… W workers, from T, F frames with graphics, D drawn, A already kept,
+B bytes kept, done|full|stopped`. The proof launches three owned instances
+one after the other (SERIAL: prefetch, keeping and background off; BG-OFF:
+keeping, `-FrameJobBackgroundRender NO`; BG: keeping, Background render on),
+the last two with `-FrameJobBackgroundRenderDelay 1` and
+`-NSAppSleepDisabled YES` (App Nap throttles a hidden app's utility-QoS
+threads; a precaution, not measured with and without), switches in the
+argument domain only, logs under `work/background-render/`. It imports
+`playback_prefetch_proof.py` (`pp`), `graphics_prefetch_proof.py` (`gp`)
+and `graphic_memory_proof.py` (`gm`). Fixtures, made on SERIAL: H is `gp`'s
+F, H2 a copy; LONG one `heavy` clip on a 2560 × 1440 canvas, lengthened to
+the greater of 60 s and 1.5 × physical / 8 of its frames. Before each
+mid-pass row the kept frames are emptied (`graphic_memory {pressure:
+"critical"}`, then `"normal"`). The CONTROLS: a mid-pass row's (B5, B6, B7,
+B10) is a `started` line and no end line yet at the interruption; B12's an
+end line reading `full`; B13's H's `set_playhead` answering while LONG plays.
+A mid-pass row's and B12's are performed again once when they fail, since
+activity the proof does not make (a scroll over one of its windows, a key
+pressed while an instance is frontmost, an autosave) stops a pass too; a
+run whose control still fails exits 2.
+
+- **B1** `set_playhead` H to 1 frame: no `graphic background:` line by 0.5
+  s. **B2** a `started … from 20000` by 4 s, then `done` with drawn > 0, and
+  `kept_frames` rose. **B3** `set_playhead` H to 1 frame again: the next end
+  line has 0 drawn, already kept > 0 (to 1 frame, not to 0 as the spec first
+  had it: frame 0's rasters are emptied before B1 and the compositor's pool
+  still holds them, so a seek to 0 keeps none and the pass draws frame 0's
+  two `heavy` layers — measured, 2 drawn). **B4** H from 0 for 3 s: its
+  playback line's kept > 10 and `kept_hits` rose; composed_ratio MEASURED.
+  **B11** H2's `done` pass from 0, then its digests (plays from 0, 1 and 2
+  frames) against SERIAL's: ≥ 10 common ticks, every one equal. **B9** H2
+  under `critical`: an end line `full` with 0 drawn within 5 s. **B5**
+  mid-pass on LONG, `set_playhead` on H: LONG reads `stopped` within 5 s.
+  **B6** mid-pass, `set_playhead` LONG to frame 10: `stopped`, then a new
+  `started … from 200000`. **B12** under `warning`: LONG's pass from 1
+  frame to `full` (bound 300 s, D drawn), then `graphic_memory` read (it
+  resets `ahead_evicted`), then LONG plays 0.8 × D / 30 s: its playback
+  line's kept > 30 and ≥ 0.9 × (kept + hits + missed + mismatched), and
+  `graphic_memory` then answers `ahead_evicted` 0 — no frame the pass drew
+  ahead was trimmed out before the compositor reached it (fix pass 1: a
+  `full` pass leaves under one frame of room, so an unguarded play's first
+  reservations trim marked frames out at once, about one per worker, which
+  the share alone cannot see; the rest of the damage waits on the workers
+  passing the pass's end, which the host's speed decides). **B13** LONG plays through Clip ▸ Motion ▸ Preview
+  (`set_selection`, `perform_menu_item`: the agent lane serialises every
+  call, AI-2, so a second client's `play_preview` would have held the first
+  client's call to its end); 0.5 s in, H's playhead to 1 frame; 8 s in,
+  `play_preview {seconds: 0.5}` pauses LONG: no `started` line before that
+  pause (a following session's line is written by its last worker, which a
+  loaded host holds seconds past the pause), and LONG's `started` within 4 s.
+  **B7** mid-pass, `set_video` opacity on LONG's clip: `stopped` within 5 s;
+  after B12 and B13, and LONG saved after it, because an edit's autosave in
+  place clears the edited state about 15 s later, which is activity (B12's
+  pass, run after B7 once, was stopped 15 s after the edit, with no other
+  line to explain it). **B10** H and H2 closed, LONG mid-pass, LONG
+  closed: `stopped` within 5 s, `kept_frames` 0 at 5 s and 8 s. **B8**
+  BG-OFF: no line within 4 s, `kept_frames` ≤ 8; H from 0 for 3 s,
+  composed_ratio MEASURED. **B14** `graphic_memory`'s `pass_activity` (the
+  App Nap opt-out a pass holds, G-38 (c)) reads false after B2's `done`,
+  true during B5's pass and false 5 s after B10's close. **Z1** no
+  `Frame Job: ` in any log.
+- `--mutant NAME`, built in this proof's `work/`, each anchor exactly once
+  in its file: `no-idle-delay` → B1, `ignores-setting` → B8,
+  `activity-stops-own-only` → B5, `background-past-budget` → B9,
+  `close-keeps-drawing` → B10, `draws-kept-again` → B3, `ahead-unguarded`
+  (the following session's ahead waits in `claim` and `insert`) → B12,
+  `ahead-evicted-first` → B12, `background-beside-play` (the refusal in
+  `start(background:)` and `idle()`'s check that no transport plays, both:
+  either alone keeps B13's pass from starting) → B13, `nap-outlives-stop`
+  (`stop`'s end of the App Nap opt-out removed) → B14. Exit 0 caught, 1
+  survived, 2 the row's control failed.
+- `--bench PACKAGE --from T --seconds S`: BG-OFF and BG at Full, each over a
+  COPY under `work/background-render-bench/`, `set_playhead` T; BG awaits its
+  pass's end line (300 s), BG-OFF waits 5 s; then one play of S s, printing
+  the powermode line, the load average, the answer, the playback line,
+  `graphic_memory` and the RSS. Scored only on every play answering.
+- The three prefetch proofs now launch every instance with
+  `-FrameJobBackgroundRender NO` (`pp.Instance(…, background=False)` by
+  default).
+
+Run on 2026-10-21 over `adf9807` plus the phase, every instance my own, on a
+12-CPU host with 96 GiB, `powermode 0`, whose load average from other
+sessions ran 6–239:
+
+| Command | Answer |
+|---|---|
+| `make typecheck` | 0 errors, the 4 baseline warnings, tsc clean |
+| `settings_layout_probe.py` | 13/13 (L12 new); `--mutant order-swapped`, `mcp-last`, `delay-unclamped` each exit 1, caught (L1, L1, L12) |
+| `background_render_proof.py` (Debug, with LONG at 3840 × 2160) | 14/14, exit 0; B12 388 frames `full`, kept share 1.0 |
+| `RC_PROOF_APP=release background_render_proof.py` (final instrument) | 14/14, exit 0; B2 300 drawn, 174 already kept; B3 0 drawn, 476 already kept; B4 kept 245; B11 48 common ticks equal; B12 873 frames `full` (852 drawn, 12 872 908 800 bytes), the 22.7 s play composed 682 of 682, kept 687 of 687 (share 1.0); B13 LONG's `started` 5 260 000 after the pause; B10 nothing kept at 5 s and 8 s; MEASURED B4 composed 1.0 (6.06 ms mean), B8 BG-OFF 1.0 (12.98 ms) |
+| `--mutant` (Release) | caught, exit 0: `no-idle-delay` B1 (a line by 0.5 s), `ignores-setting` B8 (2 lines, 245 kept), `activity-stops-own-only` B5 (no end line), `background-past-budget` B9 (no end line under critical), `close-keeps-drawing` B10 (LONG `done`, 11 frames kept after the close), `draws-kept-again` B3 (361 drawn), `ahead-evicted-first` B12 (share 0.861, 48 missed), `background-beside-play` B13 (H's `started` during LONG's play) |
+| `--mutant ahead-unguarded` (Release) | NOT caught: at 1920 × 1080 it survived (share 0.994; the pass's 1,553 frames of deferred entries reach the 1,024-entry ceiling first), at 3840 × 2160 it survived (0.958; the 4K rasters too slow to outrun the 10 s play), and at 2560 × 1440 its control failed twice (both passes `stopped` by activity the proof did not make), exit 2. Open |
+| `--bench parive-promo.framejob --from 25120000 --seconds 10` (Release, Full) | BG-OFF composed 88 of 301 (0.292; 104.59 ms mean, 640.19 p95; load 31.84 before); BG after a `full` pass (3 103 drawn, 330 already kept, 25 762 406 400 bytes) composed 301 of 301 (1.0; 5.82 ms mean, 9.48 p95; 537 kept, 0 hits; load 87.11 before); RSS after 3 667 520 and 26 158 368 KiB |
+| `graphic_memory_proof.py` (Debug; Release) | 13/13 each; its six re-run mutants (`budget-ignored`, `slot-limit`, `kept-outlives-window`, `no-compositor-keep`, `kept-any-texture`, `no-pressure-trim`) each caught on Release |
+| `playback_prefetch_proof.py` (Release) | 12/12; `no-stop-on-pause`, `no-graphic-gate`, `worker-frame-plus-one`, `unguarded` each caught |
+| `graphics_prefetch_proof.py` (Release) | 7/7 (S2 301 hits, S6 OFF 16.29 s, ON 3.25 s); `worker-frame-plus-one`, `unguarded` caught |
+| `cloud_captions_probe.py --only chrome,settings_verify` | 116/117 before the re-pin (measured 920 × 1726 at scale 2); 117/117 after |
+| `assistant_tab_proof.py` (Release) | 26/26 |
+| `screens.py --only 02-settings` (Release) | 5/6 first: P2 found `FrameJobBackgroundRender`, `FrameJobBackgroundRenderDelay` and phase 3's `FrameJobGraphicKeepOff` neither pinned nor in NOT_SHOWN; with the two pinned and the third not shown, 6/6 |
+
+Fix pass 1, run on 2026-10-21 over the same tree plus the fix (B12's
+`ahead_evicted`, B14, the Settings scroll view and L13, `idle()`'s playing
+check, the deferred mark, the switches' `.notNeeded`, the App Nap opt-out):
+
+| Command | Answer |
+|---|---|
+| `make typecheck` | 0 errors, the 4 baseline warnings, tsc clean |
+| `settings_layout_probe.py` | 14/14 (L13 new: 864 pt uncapped; capped at 1440 × 875 the window is 875 tall and the 864 pt document scrolls in an 843 pt clip); `--mutant screen-uncapped`, `order-swapped`, `mcp-last`, `delay-unclamped` each exit 1, caught |
+| `background_render_proof.py` (Debug) | 14/15, exit 2: B12's control failed twice (both passes `stopped` by activity the proof did not make, load 35–54); B14 passed |
+| `RC_PROOF_APP=release background_render_proof.py` | 15/15, exit 0; B12 873 frames `full` (850 drawn), the 22.7 s play kept 686 of 686 (share 1.0), `ahead_evicted` 0; B14 false, true, false |
+| `--mutant` (Release) | caught, exit 0: `ahead-unguarded` B12 (`ahead_evicted` 19; share 0.981, which the share alone passes), `ahead-evicted-first` B12 (179 evicted, share 0.872), `background-beside-play` B13 (H's `started` during LONG's play), `nap-outlives-stop` B14 (true 5 s after B10's close), `draws-kept-again` B3 (367 drawn) |
+| `--bench parive-promo.framejob --from 25120000 --seconds 10` (Release, Full) | both plays answered; BG-OFF 121 of 301 (0.402, load 52.54); BG's pass `stopped` after 20 frames by activity the bench did not make, then 92 of 301 (0.306, load 55.47): no pass measured |
+| `graphic_memory_proof.py` (Debug; Release) | 13/13 each |
+| `playback_prefetch_proof.py` (Release) | 12/12 |
+| `graphics_prefetch_proof.py` (Release) | 7/7 |
+| `cloud_captions_probe.py --only chrome,settings_verify` | 117/117 (row 18 measured 460 × 863 at scale 1) |
+| `assistant_tab_proof.py` (Release) | 26/26 |
+| `screens.py --only 02-settings` (Release) | 6/6, 0 new problems |
+| `agent_socket_proof.py` (Release; K13 reads Settings' layout) | 17/17 |
+
+One `--mutant draws-kept-again` run printed `DEFAULTS MOVED in
+com.kgalligan.FrameJob: FrameJobTimelineHeight (other Frame Job pids: none)`
+and exited 3 after its CAUGHT line: an editor's split view wrote the key
+(`EditorViewController.splitViewDidResizeSubviews`), on a resize this proof
+did not ask for; no other run moved it.
 
 
 ## Issue batch B38 — the assistant Stop residue: ST's hour fixture, K1 last with its `key-echo` control, `transcribe`'s first-statement read (`assistant_session_proof.py` ST, K1, `--mutant key-echo`; #179 items 1, 2 and 4)
@@ -12873,6 +13022,22 @@ again.
   L1 and L3–L8 (`order-swapped`, `bare-label`, `grey-info`,
   `paragraph-back`, `exit-keeps-pending`, `click-closes-hover`,
   `guard-off`), exit 1 when caught (rule R).
+- #127 G6 phase 4 (spec §11 G-38) put Settings' Playback pane last: L1
+  wants four panes, `playbackPane` last (`order-swapped` and `mcp-last`
+  follow the new pane list), and **L12** reads the pane — its header
+  [heading "Playback", ⓘ] and its row [the "Background render" box, on;
+  "Start after"; the field, "5"; the stepper, 1–60; "seconds"]; unticking
+  writes false and disables the field and stepper; committing "0" leaves the
+  suite unchanged and shows "5"; "12" writes 12 and moves the stepper;
+  stepping up writes 13. Its mutant `delay-unclamped` (the pane's range
+  check removed) must fail L12. Its fix pass 1 put the panes in a scroll
+  view capped at the screen's visible height less the title bar
+  (`fitScreen`), and **L13** drives it: over a 3000 pt visible frame the
+  scroll view is exactly the document's height; over 1440 × 875 (a
+  1440 × 900 display less its menu bar) the window lies inside it
+  vertically, the document is taller than the clip, and the Playback pane
+  is still `content`'s last, inside the document. Its mutant
+  `screen-uncapped` (`fitScreen`'s cap removed) must fail L13.
 - `assistant_tab_probe.swift`'s P7 now reads the panes' order;
   `cloud_captions_probe.py`'s row 18 reads `headingOpensPane`, the new
   placeholder, and the window's height re-measured at 529 points.

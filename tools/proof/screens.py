@@ -190,6 +190,8 @@ PINS = [(key, _plist(value)) for key, value in [
     ("FrameJobAssistantAutoCompact", True),
     ("FrameJobAssistantAutoCompactTokens", 300000),
     ("FrameJobAssistantClearToolResults", False),
+    ("FrameJobBackgroundRender", True),
+    ("FrameJobBackgroundRenderDelay", 5),
     ("AppleShowScrollBars", "Always"),
 ]] + [(f"FrameJobInspectorSection.{sid}", _plist(collapsed))
       for sid, collapsed in sorted(SECTIONS.items())]
@@ -220,6 +222,8 @@ NOT_SHOWN = {
                       "exits before any window; no screen launches with it",
     "FrameJobGraphicPrefetchOff": "a measurement switch that draws every graphic on the "
                                  "compositor's queue alone; no screen shows it",
+    "FrameJobGraphicKeepOff": "a measurement switch that keeps no graphic frame (spec §11 "
+                             "G-37 (e)); no screen shows it",
     "RCDevLookGalleryDump": "a dev launch default naming a folder the Look gallery writes "
                             "its thumbnails to (look_proof.py's G rows); no screen launches "
                             "with it",

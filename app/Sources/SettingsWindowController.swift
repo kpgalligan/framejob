@@ -16,13 +16,14 @@ import AppKit
 /// the Window menu opens it, so AppKit's own row is the only way back to a
 /// window the person has buried.
 ///
-/// **Three panes, "MCP", "Assistant" then "Transcription"** (issue batch
-/// B74's `MCPSettingsPane`, spec §11 MC-7; road map 12 A2's
-/// `AssistantSettingsPane`; then `transcriptionPane`), each a vertical stack
+/// **Four panes, "MCP", "Assistant", "Transcription" then "Playback"** (issue
+/// batch B74's `MCPSettingsPane`, spec §11 MC-7; road map 12 A2's
+/// `AssistantSettingsPane`; `transcriptionPane`; then G-38's
+/// `PlaybackSettingsPane`), each a vertical stack
 /// and each one of `content`'s arranged subviews, 24 pt apart through
 /// `content.spacing`. §5d's one pane was taken as a HEADING inside a window
-/// titled Settings rather than as a tab bar with one tab. The Assistant and
-/// Transcription panes open with `settingsSectionHeader` — a heading and a
+/// titled Settings rather than as a tab bar with one tab. The Assistant,
+/// Transcription and Playback panes open with `settingsSectionHeader` — a heading and a
 /// `SettingsInfoButton` whose popover holds its explanation (spec §11 SH-5);
 /// the MCP pane opens with its bare heading and shows its blurb, because
 /// MC-7 asked for the text above its button. There is still a Transcription
@@ -33,6 +34,12 @@ import AppKit
 /// never opens selected. **A later section is one more pane**: a vertical
 /// stack, put in `buildContent`'s pane list where it belongs; the gap comes
 /// from `content.spacing`, so nothing else moves.
+///
+/// **The panes scroll when the screen is short.** `content` sits in `scroll`,
+/// as tall as the panes but capped at the screen's visible height less the
+/// title bar (`fitScreen`): four panes are taller than a 1440 × 900 display
+/// leaves, and the window must never outgrow its screen. On a taller screen
+/// nothing scrolls and the window is exactly the panes' height.
 ///
 /// **The key is never shown, never logged, and never in `UserDefaults`.**
 /// `sync()` writes a FIXED-LENGTH mask into the field's PLACEHOLDER when a
@@ -102,12 +109,17 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         infoText: SettingsWindowController.explanation())
     /// The window's one stack: its arranged subviews are the panes, in order.
     let content = NSStackView()
+    /// `content`'s scroll view, capped at the screen's height (`fitScreen`).
+    let scroll = NSScrollView()
+    private var heightCap: NSLayoutConstraint?
     /// Settings' MCP pane, `content`'s first (MC-7).
     let mcpPane: MCPSettingsPane
     /// Settings' Assistant pane, after the MCP pane.
     let assistantPane: AssistantSettingsPane
     /// The Transcription pane, after the Assistant pane.
     let transcriptionPane = NSStackView()
+    /// Settings' Playback pane, last (G-38).
+    let playbackPane: PlaybackSettingsPane
 
     private(set) var saveButton: NSButton!
     private(set) var removeButton: NSButton!
@@ -130,6 +142,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         assistantPane = AssistantSettingsPane(
             store: assistantStore, defaults: defaults, environment: environment,
             spendFolder: spendFolder)
+        playbackPane = PlaybackSettingsPane(defaults: defaults)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: Self.windowWidth, height: 340),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -138,6 +151,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         window.center()
         super.init(window: window)
         window.contentView = buildContent()
+        fitScreen(window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame)
         window.initialFirstResponder = assistantPane.keyField
         applyBackground()
         sync()
@@ -210,24 +224,62 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         content.orientation = .vertical
         content.alignment = .leading
         content.spacing = 24
-        for pane in [mcpPane, assistantPane, transcriptionPane] {
+        for pane in [mcpPane, assistantPane, transcriptionPane, playbackPane] {
             content.addArrangedSubview(pane)
         }
         content.translatesAutoresizingMaskIntoConstraints = false
 
+        let document = SettingsDocumentView()
+        document.translatesAutoresizingMaskIntoConstraints = false
+        document.addSubview(content)
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.documentView = document
+
         let root = NSView(
             frame: NSRect(x: 0, y: 0, width: Self.windowWidth, height: 340))
         root.wantsLayer = true
-        root.addSubview(content)
+        root.addSubview(scroll)
+        let clip = scroll.contentView
+        // As tall as the panes, below the labels' compression resistance so
+        // a short screen's cap shortens the scroll view, never a pane.
+        let fit = scroll.heightAnchor.constraint(equalTo: document.heightAnchor)
+        fit.priority = .defaultHigh - 1
+        let cap = scroll.heightAnchor.constraint(lessThanOrEqualToConstant: 10_000)
+        heightCap = cap
         NSLayoutConstraint.activate([
             root.widthAnchor.constraint(equalToConstant: Self.windowWidth),
-            content.topAnchor.constraint(equalTo: root.topAnchor, constant: Self.inset),
-            content.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Self.inset),
+            scroll.topAnchor.constraint(equalTo: root.topAnchor),
+            scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            document.topAnchor.constraint(equalTo: clip.topAnchor),
+            document.leadingAnchor.constraint(equalTo: clip.leadingAnchor),
+            document.trailingAnchor.constraint(equalTo: clip.trailingAnchor),
+            content.topAnchor.constraint(equalTo: document.topAnchor, constant: Self.inset),
+            content.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: Self.inset),
             content.trailingAnchor.constraint(
-                equalTo: root.trailingAnchor, constant: -Self.inset),
-            content.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -Self.inset),
+                equalTo: document.trailingAnchor, constant: -Self.inset),
+            content.bottomAnchor.constraint(equalTo: document.bottomAnchor, constant: -Self.inset),
+            fit, cap,
         ])
         return root
+    }
+
+    /// Caps `scroll` at `visible`'s height less the title bar, so the window
+    /// never outgrows its screen and taller panes scroll, then moves the
+    /// window up or down into `visible` when it sticks out. A window that
+    /// fits stays where it is. Main only; `init` and `show()` call it.
+    func fitScreen(_ visible: NSRect?) {
+        guard let window, let visible, let cap = heightCap else { return }
+        let titleBar = NSWindow.frameRect(forContentRect: .zero, styleMask: window.styleMask).height
+        cap.constant = max(200, visible.height - titleBar)
+        window.layoutIfNeeded()
+        var frame = window.frame
+        frame.origin.y = min(max(frame.minY, visible.minY), visible.maxY - frame.height)
+        if frame != window.frame { window.setFrame(frame, display: false) }
     }
 
     private func row(_ views: [NSView]) -> NSStackView {
@@ -251,6 +303,8 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         mcpPane.sync()
         assistantPane.sync()
         assistantPane.refreshSpend()
+        playbackPane.sync()
+        fitScreen(window?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
     }
@@ -387,6 +441,12 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
 }
 
 // MARK: - The menu command
+
+/// `SettingsWindowController.scroll`'s document: flipped, so the panes start
+/// at the top.
+private final class SettingsDocumentView: NSView {
+    override var isFlipped: Bool { true }
+}
 
 /// The command half, at the foot of the file that owns the feature —
 /// `CaptionImporter.swift`'s precedent, and what keeps `AppDelegate.swift`

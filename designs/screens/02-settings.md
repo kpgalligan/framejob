@@ -13,17 +13,20 @@
              {"capture": "window", "visible_text": "Compact when context reaches"},
              {"capture": "window",
               "visible_text": "Frame Job's own estimate at LiteLLM prices, from its spend ledger. The Anthropic Console shows what your account was billed."},
+             {"capture": "window", "visible_text": "Background render"},
              {"capture": "window", "no_visible_text": "API key:"}]
 }
 ```
 
-Settings (Frame Job ▸ Settings…) has three sections, one under the other: MCP,
-Assistant and Transcription. The first is where a person finds how to connect
+Settings (Frame Job ▸ Settings…) has four sections, one under the other: MCP,
+Assistant, Transcription and Playback. The first is where a person finds how to connect
 an MCP client such as Claude Code to Frame Job (spec §11 MC-7); the second is
 where they give Frame Job an Anthropic API key, choose the model for the
 Assistant tab, and set how a long conversation is kept in bounds; the third is
 where they give it an AssemblyAI API key, so that the Generate Captions sheet
-can transcribe in the cloud instead of on this Mac.
+can transcribe in the cloud instead of on this Mac; the fourth is where they
+say whether Frame Job draws a window's graphics ahead while it is left alone
+(spec §11 G-38).
 
 The "MCP" section opens with its bold heading alone, with no ⓘ. Under it, two
 short paragraphs in 13 pt black (white in dark), visible rather than in a
@@ -41,7 +44,7 @@ the line reads "framejob-mcp is missing from this copy of Frame Job." Nothing in
 the section is selected when the window opens; the Anthropic key field has the
 focus.
 
-The Assistant and Transcription sections each open with their bold heading
+The Assistant, Transcription and Playback sections each open with their bold heading
 and, just after it, a small mid-grey ⓘ icon about the height of the heading's capitals, darkening while the pointer
 is on it. Resting on an ⓘ for about a third of a second opens a standard macOS
 popover under it — the rounded bubble with an arrow (spec §11 SH-5) — holding
@@ -92,12 +95,30 @@ pressed; captions made on this Mac never leave it; the published price and the
 date it was read; and that the key is kept in a file only the person can read
 and is never shown again once saved.
 
+Under the "Playback" heading, after the same wider gap, one row: a ticked
+checkbox "Background render", then "Start after", a short right-aligned field
+reading "5", a small up-and-down stepper, and the word "seconds" in grey. The
+field and the stepper can be used only while the box is ticked, and a change
+applies at once, with no Save. Its ⓘ says that while Frame Job is left alone
+for that long it draws the graphics after the playhead in the window last used,
+so they play smoothly from the start; that it stops as soon as the person does
+anything in Frame Job, starts again after the same wait, and keeps the
+processor busy while it runs; and that the frames are held in memory, at most a
+quarter of this Mac's and less when memory is short, until the window closes or
+newer frames replace them.
+
 No long grey paragraph is left in the window; the MCP section's blurb is its
 only paragraph, and it is black.
 
+The window is as tall as its four sections on a screen with room for them. On a
+shorter one, such as a 1440 × 900 display, it stops at the screen's visible
+height and the sections scroll inside it, so the Playback row is reached by
+scrolling. The expectation that "Background render" is visible assumes a
+capture on a screen tall enough that nothing scrolls.
+
 In the light capture the ground is white and the headings, the MCP blurb and
-path, labels, status lines and the month's line black; the ⓘ icons, the spend note and the word
-"tokens" are mid-grey, the key, model and threshold fields white boxes with grey
+path, labels, status lines and the month's line black; the ⓘ icons, the spend note and the words
+"tokens" and "seconds" are mid-grey, the key, model, threshold and delay fields white boxes with grey
 borders, the Region pop-up a light-grey pill, "Account Page" a white square
 button with a thin black outline and no shadow, the two Saves flat blue blocks,
 and the dimmed Remove and Verify grey-outlined with grey titles.

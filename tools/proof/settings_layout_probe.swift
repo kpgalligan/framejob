@@ -4,6 +4,7 @@
 // paragraph left in the window, and the ⓘ's hover and click policy. Issue
 // batch B74 (spec §11 MC-7) put the MCP pane first and added L9–L11: its
 // order and text, Copy MCP Command's press, and its missing-helper state.
+// #127 G6 phase 4 (spec §11 G-38) put the Playback pane last and added L12.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a`. One process,
@@ -21,7 +22,7 @@
 // LITERAL, never the app's own constant, so a changed constant is a changed
 // answer. Rows:
 //   L1 `content`'s arranged subviews are exactly [mcpPane, assistantPane,
-//      transcriptionPane], and `content.spacing` is 24.
+//      transcriptionPane, playbackPane], and `content.spacing` is 24.
 //   L2 the Assistant and Transcription panes open with a stack of
 //      [headingLabel, infoButton], the headings reading "Assistant" and
 //      "Transcription"; the MCP pane opens with its bare headingLabel reading
@@ -53,6 +54,19 @@
 //   L11 with "/nonexistent/framejob-mcp": the button is disabled, the status
 //      is the missing sentence, and a direct `copyClicked(nil)` leaves the
 //      private pasteboard's `changeCount` where it was.
+//   L12 the Playback pane opens with [settingsSectionHeader("Playback", ⓘ)]
+//      and its row; the box reads "Background render" and is on, the field
+//      reads "5", the stepper runs 1–60. Unticking writes false and disables
+//      the field and the stepper; committing "0" leaves the suite unchanged
+//      and shows "5"; committing "12" writes 12 and sets the stepper to 12;
+//      stepping up writes 13.
+//   L13 the window fits its screen (G-38, fix pass 1): a fresh controller's
+//      `fitScreen` over a 3000 pt visible frame leaves `scroll` exactly the
+//      document's height (nothing scrolls); over a 1440 × 875 one (a
+//      1440 × 900 display less its menu bar) the window's frame lies inside
+//      it vertically, the document is taller than the clip (the panes
+//      scroll), and the Playback pane is still `content`'s last, inside the
+//      document.
 import AppKit
 
 let app = NSApplication.shared
@@ -119,14 +133,16 @@ let allFields = fields(in: root)
 
 do {
     let arranged = controller.content.arrangedSubviews
-    let ordered = arranged.count == 3 && arranged[0] === controller.mcpPane
+    let ordered = arranged.count == 4 && arranged[0] === controller.mcpPane
         && arranged[1] === assistant && arranged[2] === controller.transcriptionPane
+        && arranged[3] === controller.playbackPane
     let spacing = controller.content.spacing
     row("L1", ordered && spacing == 24,
         "arranged \(arranged.map { String(describing: type(of: $0)) }), "
             + "mcp first \(arranged.first === controller.mcpPane), "
             + "assistant second \(arranged.count > 1 && arranged[1] === assistant), "
-            + "transcription last \(arranged.last === controller.transcriptionPane), spacing \(spacing)")
+            + "transcription third \(arranged.count > 2 && arranged[2] === controller.transcriptionPane), "
+            + "playback last \(arranged.last === controller.playbackPane), spacing \(spacing)")
 }
 
 // MARK: - L2 the headers
@@ -377,6 +393,101 @@ do {
     let after = pasteboard.changeCount
     row("L11", disabled && status == "framejob-mcp is missing from this copy of Frame Job." && before == after,
         "disabled \(disabled); status \"\(status)\"; probe changeCount \(before) → \(after)")
+}
+
+// MARK: - L12 the Playback pane (G-38)
+
+do {
+    let pane = controller.playbackPane
+    var notes: [String] = []
+    let views = pane.arrangedSubviews
+    var headed = false
+    if views.count == 2, let header = views[0] as? NSStackView {
+        let parts = header.arrangedSubviews
+        headed = parts.count == 2 && parts[0] === pane.headingLabel && parts[1] === pane.infoButton
+            && pane.headingLabel.stringValue == "Playback"
+    }
+    let rowViews = (views.count == 2 ? (views[1] as? NSStackView)?.arrangedSubviews : nil) ?? []
+    let rowOK = rowViews.count == 5 && rowViews[0] === pane.backgroundBox
+        && rowViews[2] === pane.delayField && rowViews[3] === pane.delayStepper
+        && rowViews[4] === pane.secondsLabel
+        && (rowViews[1] as? NSTextField)?.stringValue == "Start after"
+        && pane.secondsLabel.stringValue == "seconds"
+    let initial = pane.backgroundBox.title == "Background render" && pane.backgroundBox.state == .on
+        && pane.delayField.stringValue == "5" && pane.delayField.isEnabled
+        && pane.delayStepper.minValue == 1 && pane.delayStepper.maxValue == 60
+        && pane.delayStepper.isEnabled
+    notes.append("header \(headed); row \(rowOK) (\(rowViews.count) views); box "
+        + "\"\(pane.backgroundBox.title)\" \(pane.backgroundBox.state == .on ? "on" : "off"), field "
+        + "\"\(pane.delayField.stringValue)\", stepper \(pane.delayStepper.minValue)–"
+        + "\(pane.delayStepper.maxValue); initial \(initial)")
+
+    pane.backgroundBox.state = .off
+    pane.backgroundToggled(nil)
+    let unticked = suite.object(forKey: "FrameJobBackgroundRender") as? Bool == false
+        && !pane.delayField.isEnabled && !pane.delayStepper.isEnabled
+    notes.append("untick: stored \(suite.object(forKey: "FrameJobBackgroundRender") ?? "nil"), field "
+        + "enabled \(pane.delayField.isEnabled), stepper enabled \(pane.delayStepper.isEnabled)")
+
+    let before = suite.dictionaryRepresentation().filter { $0.key.hasPrefix("FrameJobBackgroundRender") }
+        .mapValues { "\($0)" }
+    pane.delayField.stringValue = "0"
+    pane.delayChanged(nil)
+    let after = suite.dictionaryRepresentation().filter { $0.key.hasPrefix("FrameJobBackgroundRender") }
+        .mapValues { "\($0)" }
+    let refused = before == after && pane.delayField.stringValue == "5"
+    notes.append("\"0\": suite \(before) → \(after), field \"\(pane.delayField.stringValue)\"")
+
+    pane.delayField.stringValue = "12"
+    pane.delayChanged(nil)
+    let twelve = suite.object(forKey: "FrameJobBackgroundRenderDelay") as? Int == 12
+        && pane.delayStepper.integerValue == 12
+    notes.append("\"12\": stored \(suite.object(forKey: "FrameJobBackgroundRenderDelay") ?? "nil"), "
+        + "stepper \(pane.delayStepper.integerValue)")
+
+    pane.delayStepper.integerValue += Int(pane.delayStepper.increment)
+    pane.delayStepped(nil)
+    let thirteen = suite.object(forKey: "FrameJobBackgroundRenderDelay") as? Int == 13
+        && pane.delayField.stringValue == "13"
+    notes.append("step up: stored \(suite.object(forKey: "FrameJobBackgroundRenderDelay") ?? "nil"), "
+        + "field \"\(pane.delayField.stringValue)\"")
+    row("L12", headed && rowOK && initial && unticked && refused && twelve && thirteen,
+        notes.joined(separator: "; "))
+}
+
+// MARK: - L13 the window fits its screen (G-38, fix pass 1)
+
+do {
+    let fitted = SettingsWindowController(
+        store: { MemoryStore() }, assistantStore: { MemoryStore() }, defaults: suite,
+        environment: [:], spendFolder: { absentSpend })
+    var good = false
+    var detail = "no window or no document view"
+    if let window = fitted.window, let document = fitted.scroll.documentView {
+        fitted.fitScreen(NSRect(x: 0, y: 0, width: 1728, height: 3000))
+        window.contentView?.layoutSubtreeIfNeeded()
+        let full = document.frame.height
+        let tallScroll = fitted.scroll.frame.height
+        let tallWidth = document.frame.width
+        let uncapped = full > 0 && abs(tallScroll - full) < 0.5
+        let short = NSRect(x: 0, y: 0, width: 1440, height: 875)
+        fitted.fitScreen(short)
+        window.contentView?.layoutSubtreeIfNeeded()
+        let frame = window.frame
+        let inside = frame.minY >= short.minY - 0.5 && frame.maxY <= short.maxY + 0.5
+        let clipHeight = fitted.scroll.contentView.bounds.height
+        let scrolls = document.frame.height > clipHeight + 0.5
+        let last = fitted.content.arrangedSubviews.last === fitted.playbackPane
+            && fitted.playbackPane.isDescendant(of: document)
+        good = uncapped && inside && scrolls && last
+        detail = "3000 pt screen: document \(full), scroll \(tallScroll) (equal \(uncapped)), "
+            + "document width \(tallWidth) then \(document.frame.width), scroller style "
+            + "\(fitted.scroll.scrollerStyle == .legacy ? "legacy" : "overlay"); "
+            + "1440 × 875 screen: window \(frame) inside \(inside), document "
+            + "\(document.frame.height) over clip \(clipHeight) (scrolls \(scrolls)); playback "
+            + "last in the document \(last)"
+    }
+    row("L13", good, detail)
 }
 
 UserDefaults().removePersistentDomain(forName: suiteName)

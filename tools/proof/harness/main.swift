@@ -434,6 +434,12 @@ enum Harness {
             "FrameJobAssistantAutoCompact": true,
             "FrameJobAssistantAutoCompactTokens": 300_000,
             "FrameJobAssistantClearToolResults": false,
+            // Settings' Playback pane (`BackgroundRenderSettings`' two keys,
+            // spec §11 G-38), literals for the same reason: written by ordinary
+            // use whenever a person changes them, and drawn by the `settings`
+            // mode. These are the defaults.
+            "FrameJobBackgroundRender": true,
+            "FrameJobBackgroundRenderDelay": 5,
             // AppKit picks legacy (16 pt, always visible) or overlay scrollers
             // by whether a MOUSE is attached, and the inspector pane is 16 pt
             // narrower under the legacy kind, which moves its header's right

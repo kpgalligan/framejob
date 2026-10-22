@@ -502,7 +502,11 @@ schema, §6 the op table, §7 the architecture.
   follows, and Undo renames it back. A person renames, deletes and restores
   from File ▸ Rename Graphic…, Delete Graphic… and Restore Graphic Version…
   (which puts back the newest kept version); each is a small sheet that
-  shows Frame Job's reason when it refuses.
+  shows Frame Job's reason when it refuses. While Frame Job is left alone
+  for a few seconds (5 by default; Settings ▸ Playback ▸ Background render),
+  the window last used draws its graphics ahead of the paused playhead into
+  memory, so the play that follows runs smoothly from the start; anything
+  the person does stops it at once.
 - **MCP agent** (below): one tool per edit op, plus open/new/save/read,
   import, playhead, frame render and export.
 
@@ -590,7 +594,7 @@ Makefile              Build orchestration
 | `AssistantView.swift` · `AssistantTranscriptView.swift` · `AssistantComposer.swift` · `AssistantTranscript.swift` · `AssistantContextMeter.swift` · `AssistantSettingsPane.swift` · `EditorViewController+Assistant.swift` | the Assistant tab's views, which hold no conversation; the multi-line message field, with its own undo; the transcript the window keeps; the context meter; Settings' Assistant pane (key, model and chat settings); and the glue between the tab and the window's session |
 | `RecordingSetup.swift` · `ScreenRecorder.swift` (with `+Finishing` and `+Content`) · `RecordingLanding.swift` · `ProjectDocument+Recording.swift` · `RecorderPanelController.swift` (with `+Rows` and `+Recording`) · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` | screen recording (road map 3): the values, the session over ScreenCaptureKit and a second `AVCaptureSession` for the microphone, the landing as ordinary media, the floating non-activating panel with its countdown and meter, the menu-bar status item, and the `record_screen` tool |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
-| `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` (+`Cloud` `Commit` `Download` `Style` `Looks`) · `SettingsWindowController.swift` · `MCPSettingsPane.swift` | the remaining dialogs, and Frame Job ▸ Settings… (with its MCP section) |
+| `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` (+`Cloud` `Commit` `Download` `Style` `Looks`) · `SettingsWindowController.swift` · `MCPSettingsPane.swift` · `PlaybackSettingsPane.swift` | the remaining dialogs, and Frame Job ▸ Settings… (with its MCP and Playback sections) |
 | `Theme.swift` · `Controls.swift` · `OptionControls.swift` · `Sheets.swift` · `EditorChrome.swift` · `FileDropView.swift` | shared chrome, copied from Rasterize |
 
 ## Building

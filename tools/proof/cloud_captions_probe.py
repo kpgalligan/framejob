@@ -7615,22 +7615,27 @@ def section_chrome(binary, sources):
               one[0] == two[0] and one[0] != b"", "the two renders differ")
     check("18: light and dark differ — both appearances really were rendered",
           taken[("light", 1)][0] != taken[("dark", 1)][0], "the two appearances are equal")
-    # 780, not 340, since road map 12 A2 (610), road map 13 P4 (677), issue
-    # batch B48 (805, measured), B49 (793, measured), B71 (529, measured) and
-    # B74 (780, measured): Settings' Assistant pane sits above the
+    # 863, not 340, since road map 12 A2 (610), road map 13 P4 (677), issue
+    # batch B48 (805, measured), B49 (793, measured), B71 (529, measured),
+    # B74 (780, measured) and G-38 (863, measured): Settings' Assistant pane sits above the
     # Transcription pane in the same stack, with its chat settings (AI-20)
     # under the model, the month's spend line and its note under its buttons,
     # and the window grows to fit it; spec §11 SH-4's square StickerButton
     # took 6 pt off each of its 2 button rows, B71 moved both long paragraphs
     # into the headings' ⓘ popovers (SH-5), and B74 put the MCP pane first
     # (MC-7: its blurb, the harness's fixed absent helper path, the button and
-    # the missing-helper status line).
+    # the missing-helper status line), and G-38 put the Playback pane under
+    # Transcription (its heading and one row: Background render and its delay).
+    # Since G-38's fix pass 1 the panes sit in a scroll view capped at the
+    # screen's visible height less the title bar, so on a screen shorter than
+    # this the window is shorter and scrolls (settings_layout_probe's L13);
+    # 863 is the uncapped height, measured again after the change.
     size = png_size(taken[("light", 1)][0])
     scale = (size[0] / 460.0) if size else 0
-    check(f"18: the PNG is the window's content — 460 × 780 points at the display's backing "
+    check(f"18: the PNG is the window's content — 460 × 863 points at the display's backing "
           f"scale (measured {size!r}, scale {scale:g})",
-          size is not None and size[0] % 460 == 0 and size[1] % 780 == 0
-          and size[0] // 460 == size[1] // 780 and size[0] // 460 >= 1,
+          size is not None and size[0] % 460 == 0 and size[1] % 863 == 0
+          and size[0] // 460 == size[1] // 863 and size[0] // 460 >= 1,
           f"got {size!r}")
 
 

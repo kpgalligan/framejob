@@ -1928,6 +1928,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   **Amended by G-37**: (e)'s `4 × workers` slots and 1 GiB are replaced by
   G-37 (a)'s one budget; a document also keeps the frames it drew (G-37
   (c)).
+  **Amended by G-38**: (a)'s never-while-paused has one exception, G-38's
+  background session; a play ends it.
 - **G-37 — Graphic rasters share one memory budget, a quarter of the Mac's
   physical memory; a document keeps the graphic frames it drew** (#127, G6
   phase 3, 2026-10-21; amends G-26 (d) and G-36 (e)).
@@ -1972,3 +1974,74 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   (f) **Risk accepted.** Up to a quarter of memory stays held after a
   play, until the window closes, pressure arrives, or newer frames push it
   out. #127's next phase adds drawing ahead while paused as a setting.
+  **Amended by G-38**: the kept frames are also filled while paused;
+  frames a pass drew ahead give way last; a pool hit touches its kept
+  frame.
+- **G-38 — Graphic frames are drawn ahead while paused once the person has
+  left Frame Job alone: Settings ▸ Playback ▸ Background render, on after
+  5 s by default, as Final Cut's** (#127, G6 phase 4, 2026-10-21; amends
+  G-36 (a) and G-37 (c)).
+  (a) **The setting.** Settings' fourth pane, "Playback", holds a
+  "Background render" checkbox (on) and "Start after [N] seconds" (1–60,
+  default 5), stored in `FrameJobBackgroundRender` and
+  `FrameJobBackgroundRenderDelay`. It is a person's setting like AI-11 and
+  R6-12: no tool reads or writes it, and it has no MCP mirror. A proof sets
+  it in the argument domain and writes nothing. The owner (2026-10-21):
+  "should be configurable (same as Final cut)"; "On, after 5 s
+  (Recommended)". With four panes Settings is taller than a 1440 × 900
+  display leaves, so its panes sit in a scroll view capped at the screen's
+  visible height less the title bar; on a taller screen nothing scrolls.
+  (b) **Idle.** These events restart the clock: any key, modifier, mouse
+  button, drag, scroll or trackpad gesture event the app receives (pointer
+  motion alone and events in other apps do not count); every edit of any
+  document (`.projectDocumentDidChange`, live ticks included); every play,
+  pause, rate change and seek of any transport (`syncPrefetch`). Each
+  restart stops the running background session at once. An agent's call
+  counts only when it edits or moves a transport.
+  (c) **What is drawn.** At the delay, the document whose transport last
+  moved starts a background session if all of these hold: it is paused, it
+  is built, it draws a graphic, it is still open, and no window plays —
+  forward or in reverse, with graphics or without. If it is seeking,
+  restoring or rebuilding, or any window plays, the clock runs again. The grid and range are G-36 (b)'s, from the playhead.
+  Workers are `activeProcessorCount − 1` threads at utility QoS. One
+  background session runs at a time, and a play's session ends it. Each
+  finished raster goes straight into the kept frames, marked as drawn
+  ahead. A texture key already kept is touched, marked, and not drawn; one
+  an earlier frame of the pass is still drawing is not drawn either, and
+  that frame's mark serves the later frame too. While a pass runs, Frame
+  Job opts out of App Nap: a `ProcessInfo` activity
+  (`userInitiatedAllowingIdleSystemSleep`, so idle system sleep is still
+  allowed) begun with the pass and ended when it ends, so it keeps drawing
+  while Frame Job is hidden or behind other windows. The owner
+  (2026-10-21): "Keep going (Recommended)". The session ends `done` when
+  its range is done. It ends `full` when its
+  marked frames plus every session's held rasters reach the budget; older
+  unmarked kept frames give way first. It ends `stopped` on activity, close
+  or `invalidate`. Its log lines read `[framejob] graphic background: key
+  K, from T, started` and, once at the end, `[framejob] graphic
+  background: key K, W workers, from T, F frames with graphics, D drawn, A
+  already kept, B bytes kept, done|full|stopped`, B being the marked
+  frames' bytes.
+  (d) **The play that follows.** Marked frames give way last. A play from
+  the pass's own grid start does not push them out: its workers wait while
+  the held rasters plus the marked frames reach the budget. A frame stops
+  being marked once the compositor passes it. Every mark clears when that
+  play stops, when a play starts anywhere else, or when a new pass starts.
+  `graphic_memory` answers the marked bytes, the marked frames a trim
+  pushed out since its last answer (`ahead_evicted`, 0 while the rule
+  holds) and whether a pass holds the App Nap opt-out.
+  (e) **Switches.** Only a keeping key draws in the background, so
+  `FrameJobGraphicKeepOff` and `FrameJobGraphicPrefetchOff` turn it off
+  too; under either, or with the setting off, the clock waits for the next
+  activity instead of running again. The measurement proofs launch with
+  `-FrameJobBackgroundRender NO` unless they measure it.
+  (f) **Purity.** A kept raster is the serial path's (G-37 (d)), so
+  drawing ahead changes when a frame is ready, never its pixels.
+  (g) **Phase 3's review.** A pool hit touches its kept frame, so a graphic
+  held on screen is not the first one evicted. `heldEntries` counts only
+  entries that hold bytes.
+  (h) **Risk accepted.** While idle, up to all cores but one are busy at
+  utility QoS, even while Frame Job is hidden, and memory up to the budget
+  is held. A pass covers only what
+  lies after the playhead. The mouse-and-keyboard path is a person's check
+  (GR-11).

@@ -11,7 +11,9 @@ Three owned instances, one after the other, each on a scratch socket, launched
 and stopped by PID, logs under `tools/proof/work/graphic-memory/`: SERIAL
 (`-FrameJobGraphicPrefetchOff YES -FrameJobGraphicKeepOff YES`), KEEP (no
 switches) and KEEP-SERIAL (`-FrameJobGraphicPrefetchOff YES`), switches in the
-argument domain only. Nothing else is ever killed. Every child runs under
+argument domain only; every instance, the bench's included, runs with
+Background render off (`-FrameJobBackgroundRender NO`, `pp.Instance`'s
+default, spec §11 G-38 (e)), so no row counts frames a paused pass drew. Nothing else is ever killed. Every child runs under
 `graphics_spike/bounded.py`; the launch, the plays and the log reading are
 `playback_prefetch_proof.py`'s (`pp`) and `graphics_prefetch_proof.py`'s
 (`gp`).

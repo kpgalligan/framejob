@@ -8,7 +8,9 @@ graphic rasters must come from the workers. Two owned instances, one after
 the other, each on a scratch socket, launched and stopped by PID, logs under
 `tools/proof/work/graphics-prefetch/`: OFF with `-FrameJobGraphicPrefetchOff
 YES`, ON without. Nothing else is ever killed. Every child runs under
-`graphics_spike/bounded.py`.
+`graphics_spike/bounded.py`. Every instance also gets
+`-FrameJobBackgroundRender NO` (spec §11 G-38 (e)), so no paused document
+draws in the background beside what a row measures.
 
 The fixture F, made over MCP on the OFF instance and saved: a 30 fps canvas
 (checked through `get_project`); `heavy` (a moving gradient, a
@@ -165,7 +167,8 @@ def check(row, good, detail=""):
 
 class Instance:
     """One owned app, by PID; `off` launches it with the prefetch's switch
-    on. Each launch reads only the part of the log it appended."""
+    on, and every launch with Background render off (G-38 (e)). Each launch
+    reads only the part of the log it appended."""
 
     def __init__(self, app, log, off):
         self.app, self.log, self.off = app, log, off
@@ -175,7 +178,8 @@ class Instance:
 
     def start(self, timeout=CALL_BOUND):
         offset = self.log.stat().st_size if self.log.exists() else 0
-        extra = ["-FrameJobGraphicPrefetchOff", "YES"] if self.off else []
+        extra = (["-FrameJobGraphicPrefetchOff", "YES"] if self.off else []) \
+            + ["-FrameJobBackgroundRender", "NO"]
         with open(self.log, "a") as out:
             self.child = subprocess.Popen(
                 [str(self.app), "-ApplePersistenceIgnoreState", "YES"] + extra,

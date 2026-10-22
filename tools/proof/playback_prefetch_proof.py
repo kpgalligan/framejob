@@ -15,7 +15,10 @@ killed. Every child runs under `graphics_spike/bounded.py`; the launch,
 instance, the bench's included, also gets `-FrameJobGraphicKeepOff YES` (spec
 §11 G-37 (e)), so no row and no bench cell is served from a document's kept
 frames and each keeps phase 2's meaning; `graphic_memory_proof.py` measures
-the kept frames.
+the kept frames. Every instance also gets `-FrameJobBackgroundRender NO`
+(spec §11 G-38 (e)) unless it is made with `background=True` (only
+`background_render_proof.py` passes it), so no paused document draws in the
+background beside a row.
 
 Fixtures, made over MCP on the OFF instance and saved under `work/`: H is
 `graphics_prefetch_proof.fixture()`'s F (30 fps, two `heavy` clips, `static`
@@ -145,18 +148,21 @@ def check(row, good, detail=""):
 class Instance(gp.Instance):
     """`graphics_prefetch_proof.Instance` with launch arguments of its own
     (the bench's Preview Quality), in the argument domain only, and
-    `-FrameJobGraphicKeepOff YES` unless `keep_off` is False (only
-    `graphic_memory_proof.py` passes False)."""
+    `-FrameJobGraphicKeepOff YES` unless `keep_off` is False
+    (`graphic_memory_proof.py` and `background_render_proof.py` pass False),
+    and `-FrameJobBackgroundRender NO` unless `background` is True."""
 
-    def __init__(self, app, log, off, extra=(), keep_off=True):
+    def __init__(self, app, log, off, extra=(), keep_off=True, background=False):
         super().__init__(app, log, off)
         self.extra = list(extra)
         self.keep_off = keep_off
+        self.background = background
 
     def start(self, timeout=gp.CALL_BOUND):
         offset = self.log.stat().st_size if self.log.exists() else 0
         extra = (["-FrameJobGraphicPrefetchOff", "YES"] if self.off else []) \
-            + (["-FrameJobGraphicKeepOff", "YES"] if self.keep_off else []) + self.extra
+            + (["-FrameJobGraphicKeepOff", "YES"] if self.keep_off else []) \
+            + ([] if self.background else ["-FrameJobBackgroundRender", "NO"]) + self.extra
         with open(self.log, "a") as out:
             self.child = subprocess.Popen(
                 [str(self.app), "-ApplePersistenceIgnoreState", "YES"] + extra,

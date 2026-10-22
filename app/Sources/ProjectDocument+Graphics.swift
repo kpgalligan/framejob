@@ -108,6 +108,7 @@ extension ProjectDocument {
         NotificationCenter.default.removeObserver(
             self, name: .projectDocumentDidChange, object: self)
         GraphicRegistry.shared.remove(recipeKey)
+        GraphicPrefetch.shared.stop(recipeKey)
         GraphicPrefetch.shared.dropKept(recipeKey)
         graphicStore?.stop()
         graphicStore?.removeScratchRoot()

@@ -1106,7 +1106,10 @@ the key map behind it.
   called from the rate KVO, `startSeek` (with the seek's TARGET, never
   `currentTime`, which still reads the player there) and `update`'s
   same-plan arm while playing, and stopped in `invalidate` and `deinit`;
-  `recipeKey` is internal for it. An echoed restore
+  `recipeKey` is internal for it. `syncPrefetch` first notes activity for
+  Background render, and `startBackgroundRender` (G-38) starts a paused pass
+  on the composition's grid (`prefetchGrid`), answering why not
+  (`.busy` re-arms the clock, `.notNeeded` waits for the next activity). An echoed restore
   moved the playhead (0 and back on every rebuild), and the timeline reveals
   every moved playhead, so a clip drag yanked the view
   (`playhead_echo_probe.py`). **A paused refresh is a one-tick round trip**
@@ -1231,7 +1234,15 @@ the key map behind it.
   nothing until a request lands in its first `armFrames`, a following
   session frees what falls below the floor, and its same-texture shortcut's
   (`deferred`) entries count as misses, not mismatches. A wait `stop` ends
-  counts as nothing.
+  counts as nothing. A BACKGROUND session (spec §11 G-38, `start(background:)`
+  → Bool, `stopBackground`) is a paused pass from the playhead at utility QoS
+  straight into the kept frames; it is refused beside any following session,
+  and a following session's start ends it. `aheadOrigin` is the last pass's
+  key and start: a play from it waits in `claim` and `insert` rather than
+  push out the frames drawn ahead. A pass's end line (`done`, `full`,
+  `stopped`) is written at its stop. `Slot` lives at the foot of
+  `LayerRenderersGraphic.swift` (a pure move under the cap); at 600 lines
+  the file's next cut is the background branches.
 - `GraphicPrefetch+Memory.swift` — the graphic rasters' one memory budget and
   the frames a document keeps (spec §11 G-37, #127): a quarter of physical
   memory covers every session's held rasters and the kept frames, which give
@@ -1239,8 +1250,14 @@ the key map behind it.
   on every change; memory pressure halves the budget (warning) or sets it to
   0 (critical). Only a `Playback`'s key keeps, under the texture key, so a
   kept raster is the serial path's; a pool miss checks the kept frames
-  first. A document's close drops its kept frames (`stopGraphicStore`);
-  `deinit` unregisters. `FrameJobGraphicKeepOff` (YES) keeps nothing.
+  first. A document's close stops its session and drops its kept frames
+  (`stopGraphicStore`); `deinit` unregisters. `FrameJobGraphicKeepOff` (YES)
+  keeps nothing. A background pass's frames are MARKED drawn ahead
+  (`beginAhead`, `followAhead`, `endAhead`, `roomAhead`): the trim takes
+  unmarked frames first, a mark clears as a play reaches its frame, and a
+  marked frame pushed out unreached is counted (`ahead_evicted`). A pass
+  holds a `ProcessInfo` activity, so App Nap does not slow it, until it ends
+  (`passActivity`, `endPassActivity`; the owner's choice, G-38).
 - `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
   leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
   `RecipeClipRect`, `RecipeLayerMatte`, `RecipeLayerDissolve`,
@@ -1999,15 +2016,28 @@ free.
   enables the button exactly while the helper is executable, and says
   `missingStatus` when it is not; a press writes the line and says
   `copiedStatus` until the next `sync()`. Not an edit, so no MCP mirror.
+- `BackgroundRender.swift` — Background render (spec §11 G-38, #127): its
+  settings (`BackgroundRenderSettings`, `FrameJobBackgroundRender` and
+  `FrameJobBackgroundRenderDelay`, on and 5 s by default, 1–60) and the idle
+  clock on main. Any key, click, drag, scroll or gesture, any edit and any
+  transport move restarts it and stops the running pass; when it fires, the
+  document whose transport moved last starts a pass, never while any
+  transport (`transports`) plays.
+- `PlaybackSettingsPane.swift` — Settings' Playback pane (G-38): the
+  Background render checkbox and "Start after N seconds". No tool reads or
+  writes it (AI-11, R6-12, MC-7).
 - `SettingsWindowController.swift` — Frame Job ▸ Settings… ⌘,, the app's one
   window for something PERSISTED beyond view state, with
   `extension AppDelegate { showSettings }` at its foot
   (`CaptionImporter.swift`'s command-at-the-foot precedent, which is why
   `AppDelegate.swift` is untouched). `ExportQueueWindowController`'s mould.
   `+Verify` holds the Verify bookkeeping (pure move, #58).
-  Three panes as `content`'s arranged subviews, MCP (`mcpPane`,
-  `MCPSettingsPane`, spec §11 MC-7), Assistant (`AssistantSettingsPane`)
-  then Transcription (`transcriptionPane`), 24 pt apart; the Assistant and
+  Four panes as `content`'s arranged subviews, MCP (`mcpPane`,
+  `MCPSettingsPane`, spec §11 MC-7), Assistant (`AssistantSettingsPane`),
+  Transcription (`transcriptionPane`) then Playback (`PlaybackSettingsPane`,
+  spec §11 G-38), 24 pt apart, inside a scroll view `fitScreen` caps at the
+  screen's visible height less the title bar (called from `init` and
+  `show()`; a tall screen shows it all, a 1440 × 900 one scrolls); the Assistant and
   Transcription panes open with `settingsSectionHeader` (a heading and a
   `SettingsInfoButton` holding its explanation, spec §11 SH-5), the MCP
   pane with its bare heading. Two defaulted parameters build the MCP pane,
@@ -2448,7 +2478,8 @@ free.
   digest. `tools/proof/playback_prefetch_proof.py` drives it.
 - `AgentServer+GraphicMemory.swift` — `graphic_memory {pressure?}` (dev
   only, wholly under the flag, off main; spec §11 G-37): the graphic
-  rasters' budget, held and kept bytes and their peaks, from
+  rasters' budget, held and kept bytes and their peaks, a pass's
+  `ahead_bytes`, `ahead_evicted` and `pass_activity` (G-38), from
   `GraphicPrefetch.memoryReport`; `pressure` simulates a memory-pressure
   level until the tool sets `normal`. `tools/proof/graphic_memory_proof.py`
   drives it.
@@ -2706,7 +2737,8 @@ Media tab's search and sort, the Assistant tab (view state; the dev tool
 `select_inspector_tab` shows it in a Release build, and the assistant's own
 calls already are tool calls) and Settings' Assistant pane (the key, the model
 and the chat settings are the person's, spec §11 AI-8, AI-11, AI-20) and
-Settings' MCP pane (copies a line, edits nothing, MC-7) get no
+Settings' MCP pane (copies a line, edits nothing, MC-7) and Settings'
+Playback pane (Background render, the person's setting, spec §11 G-38) get no
 mirror, because they edit no project and `set_selection` / `export` already are the capability.
 Opening System Settings at a grant's pane (the recorder panel) is no edit
 and gets no mirror; `record_screen` refuses by name instead (spec §11

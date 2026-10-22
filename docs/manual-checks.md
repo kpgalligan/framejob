@@ -258,10 +258,10 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Source:** issue batch B71 (spec §11 SH-5).
 
 **CH-6 — Settings' MCP section**
-- **Do:** 1. On a 13" display, open Frame Job ▸ Settings… in the light appearance and read the MCP section's blurb. 2. Press Copy MCP Command. 3. Repeat in the dark appearance.
-- **Expect:** the window fits on screen; the blurb is large and high-contrast; the button is below the blurb; nothing is selected or highlighted when Settings opens (the Assistant key field has focus); the status line appears after a press.
+- **Do:** 1. On a 13" display, open Frame Job ▸ Settings… in the light appearance and read the MCP section's blurb. 2. Press Copy MCP Command. 3. Scroll down to the Playback section's Background render row, if Settings scrolls. 4. Repeat in the dark appearance.
+- **Expect:** the window fits on screen, top and bottom (on a display shorter than its four panes, such as 1440 × 900, the panes scroll and the Background render row is reached by scrolling); the blurb is large and high-contrast; the button is below the blurb; nothing is selected or highlighted when Settings opens (the Assistant key field has focus); the status line appears after a press.
 - **Answer:** did the window fit, read clearly, open with nothing selected, and show the status line after the press, in both appearances?
-- **Source:** issue batch B74 (#222; `settings_layout_probe.py` L9, L10; spec §11 MC-7).
+- **Source:** issue batch B74 (#222; `settings_layout_probe.py` L9, L10; spec §11 MC-7); the scrolling, #127 G6 phase 4's fix pass 1 (`settings_layout_probe.py` L13; spec §11 G-38 (a)).
 
 ## Sound and export
 
@@ -478,18 +478,25 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Source:** #239 (issue batch B87 phase 3, spec §11 G-34 (g)); the project is built by `graphics_playback_samples.py`.
 
 **GR-9 — A heavy graphics project plays**
-- **Setup:** Low Power Mode off — `pmset -g | grep powermode` reads 0 before and after the run (if it does not, skip this check and note it). View ▸ Preview Quality ▸ Full. Activity Monitor open on Frame Job's memory.
+- **Setup:** Low Power Mode off — `pmset -g | grep powermode` reads 0 before and after the run (if it does not, skip this check and note it). View ▸ Preview Quality ▸ Full. Activity Monitor open on Frame Job's memory. Background render off in Settings ▸ Playback (spec §11 G-38), so no frame is drawn ahead while the window waits; tick it again after GR-10.
 - **Do:** Open a COPY of a parive-like project — many graphic clips drawing images and text, such as `~/temp/testmotiongraphics/parive-promo.framejob` — and play one of its `section` scenes (in parive-promo, clip 8, from 41.87 s) for ten seconds or more.
 - **Expect:** the play runs on and stays in sync. Until #127's later phases a `section` scene still stutters (the bench composes about 28 % of its frames at Full), so a stutter goes to #127, not a new issue. Frame Job's memory rises while it plays and stays raised after it: G-37 holds the rasters held ahead and the graphic frames the window keeps to one budget, a quarter of the Mac's physical memory (less under memory pressure), and the kept frames stay held after the play, up to that quarter, until the window closes. Outside the budget are the workers' rasters in flight and the freed memory the system keeps for the app. A rise well past a quarter of physical memory above the start, or one that keeps growing over a longer play, is the failure.
 - **Answer:** stutter, yes or no, and the memory figure before, at its highest while playing, and after.
 - **Source:** #127 G6 phases 2 and 3 (spec §11 G-36, G-37); `tools/proof/playback_prefetch_proof.py --bench` measures the share of frames composed, not how the play looks.
 
 **GR-10 — A replay plays from memory, and the memory is given back**
-- **Setup:** as GR-9's.
+- **Setup:** as GR-9's, Background render still off in Settings ▸ Playback; tick it on again when this check is done.
 - **Do:** Open a COPY of `~/temp/testmotiongraphics/parive-promo.framejob` and play its `section` scene (clip 8, from 41.87 s) for 10 s, then play the same 10 s again, then close the window.
 - **Expect:** the replay stutters visibly less than the first play. Frame Job's memory stays raised after the plays, at most a quarter of physical memory above the start, and falls when the window closes.
 - **Answer:** smoother, yes or no; the memory figure before, after both plays, and after the close.
 - **Source:** #127 G6 phase 3 (spec §11 G-37); `tools/proof/graphic_memory_proof.py --bench` measures the share of frames composed on each play, not how the replay looks.
+
+**GR-11 — Background render draws while Frame Job is left alone, and stops when you touch it**
+- **Setup:** GR-9's, with Background render on at 5 s in Settings ▸ Playback, and Activity Monitor showing Frame Job's CPU and memory.
+- **Do:** Open a COPY of `~/temp/testmotiongraphics/parive-promo.framejob`, park the playhead at 41.87 s, and leave Frame Job alone for 20 s. Press Shift once, wait 20 s, then play 10 s. Park at 41.87 s again, press ⌘H to hide Frame Job and wait 20 s with it hidden. Then show it, untick Background render and leave Frame Job alone for 20 s.
+- **Expect:** CPU stays low for about 5 s after you stop, then rises, and falls at the Shift. Hidden, the CPU rises about 5 s after the ⌘H and stays up (a pass opts out of App Nap). Memory stays within a quarter of physical memory above the start. The play is visibly smoother than GR-9's first play. With the box unticked, the CPU stays low while Frame Job is idle.
+- **Answer:** CPU low, then up, then down at the Shift, yes or no; smoother than GR-9's first play, yes or no; CPU up while hidden, yes or no; idle CPU low with the box off, yes or no; the memory figure before and at its highest.
+- **Source:** #127 G6 phase 4 (spec §11 G-38); `tools/proof/background_render_proof.py` measures this by tool, not the keyboard path or the look.
 
 ## Mattes
 

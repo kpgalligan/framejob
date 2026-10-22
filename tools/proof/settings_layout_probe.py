@@ -5,7 +5,10 @@ heading's ⓘ holding its pane's explanation (spec §11 SH-5) at 13 pt in the
 label colour, no long paragraph left in the window, and the ⓘ's hover and
 click policy — measured through the app's own sources. Issue batch B74
 (spec §11 MC-7) put the MCP pane first and added L9–L11: its order and
-visible text, Copy MCP Command's press, and its missing-helper state.
+visible text, Copy MCP Command's press, and its missing-helper state. #127
+G6 phase 4 (spec §11 G-38) put the Playback pane last and added L12, and
+its fix pass 1 put the panes in a scroll view capped at the screen and
+added L13.
 
     python3 tools/proof/settings_layout_probe.py [--sources DIR] [--mutant NAME] [--only IDS]
 
@@ -25,7 +28,8 @@ Prints `<ID> pass|fail — <detail>` per row, then `scores: N/M`.
 Rows:
   B0   the probe builds.
   L1   `content.arrangedSubviews` is exactly [mcpPane, assistantPane,
-       transcriptionPane], in that order, and `content.spacing` is 24.
+       transcriptionPane, playbackPane], in that order, and
+       `content.spacing` is 24.
   L2   the Assistant and Transcription panes' first arranged subview is a
        stack of [headingLabel, infoButton], the headings reading "Assistant"
        and "Transcription"; the MCP pane's first is its bare headingLabel
@@ -67,6 +71,18 @@ Rows:
        reads "framejob-mcp is missing from this copy of Frame Job.", and a
        direct `copyClicked(nil)` leaves the private pasteboard's
        `changeCount` unchanged.
+  L12  the Playback pane opens with [settingsSectionHeader("Playback", ⓘ)]
+       and its row [box, "Start after", field, stepper, "seconds"]; the box
+       reads "Background render" and is on, the field reads "5", the stepper
+       runs 1–60. Unticking writes false and disables the field and the
+       stepper; committing "0" leaves the suite unchanged and shows "5";
+       committing "12" writes 12 and sets the stepper to 12; stepping up
+       writes 13.
+  L13  a fresh controller's `fitScreen` over a 3000 pt visible frame leaves
+       `scroll` exactly the document's height; over 1440 × 875 (a
+       1440 × 900 display less its menu bar) the window lies inside it
+       vertically, the document is taller than the clip, and the Playback
+       pane is still `content`'s last, inside the document.
 
 Mutants (`--mutant`), each a literal found exactly once in the written code:
   order-swapped       the panes added Transcription before Assistant: must
@@ -83,6 +99,10 @@ Mutants (`--mutant`), each a literal found exactly once in the written code:
   copy-unwired        Copy MCP Command's action nil: must fail L10.
   always-enabled      `sync()` enables the button whether or not the helper
                       is executable: must fail L11.
+  delay-unclamped     the Playback pane's range check on the delay field
+                      removed: must fail L12.
+  screen-uncapped     `fitScreen` no longer caps the scroll view: must fail
+                      L13.
 
 Exit (rule R): a plain run exits 0 iff every row passed and 1 when a row
 failed; a build failure is B0's FAIL there. A `--mutant` run exits 1 when
@@ -101,19 +121,20 @@ import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/settings-layout"
-ROWS = ["B0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+ROWS = ["B0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11", "L12",
+        "L13"]
 WALL = 120
 
 # name: (the rows it must fail, [(file, before, after), ...])
 MUTANTS = {
     "order-swapped": (["L1"], [
         ("SettingsWindowController.swift",
-         "for pane in [mcpPane, assistantPane, transcriptionPane] {",
-         "for pane in [mcpPane, transcriptionPane, assistantPane] {")]),
+         "for pane in [mcpPane, assistantPane, transcriptionPane, playbackPane] {",
+         "for pane in [mcpPane, transcriptionPane, assistantPane, playbackPane] {")]),
     "mcp-last": (["L1"], [
         ("SettingsWindowController.swift",
-         "for pane in [mcpPane, assistantPane, transcriptionPane] {",
-         "for pane in [assistantPane, transcriptionPane, mcpPane] {")]),
+         "for pane in [mcpPane, assistantPane, transcriptionPane, playbackPane] {",
+         "for pane in [assistantPane, transcriptionPane, playbackPane, mcpPane] {")]),
     "bare-label": (["L3"], [
         ("SettingsWindowController.swift",
          'static let keyLabel = "AssemblyAI API key:"',
@@ -151,6 +172,14 @@ MUTANTS = {
         ("MCPSettingsPane.swift",
          "let present = FileManager.default.isExecutableFile(atPath: helperURL.path)",
          "let present = true")]),
+    "delay-unclamped": (["L12"], [
+        ("PlaybackSettingsPane.swift",
+         "BackgroundRenderSettings.delayRange.contains(seconds)",
+         "true")]),
+    "screen-uncapped": (["L13"], [
+        ("SettingsWindowController.swift",
+         "        cap.constant = max(200, visible.height - titleBar)\n",
+         "")]),
 }
 
 

@@ -96,7 +96,7 @@ extension LayerRenderers {
             uploaded.warnings = raster.warnings
             return uploaded
         }
-        if !made { GraphicPrefetch.shared.discard(recipeKey, slot: slot) }
+        if !made { GraphicPrefetch.shared.discard(recipeKey, slot: slot, textureKey: key) }
         if let refused = refused {
             return failed(name, frame: frame, refused, size: size, recipeKey: recipeKey)
         }

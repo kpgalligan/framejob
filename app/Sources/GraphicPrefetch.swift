@@ -78,6 +78,8 @@ final class GraphicPrefetch: @unchecked Sendable {
         var deferred = false
         var textureKey: String?
         var raster: Result<GraphicRaster, any Error>?
+        /// A pass's later layers deferred to this entry, and their top index.
+        var sharers = 0, sharedUpTo = 0
 
         init(index: Int, bytes: Int) {
             self.index = index
@@ -95,6 +97,9 @@ final class GraphicPrefetch: @unchecked Sendable {
         let workerCount: Int
         /// A playback session: `reach` raises `floor`, `claim` skips past it.
         let follows: Bool
+        /// A paused document's pass into its kept frames (G-38).
+        let background: Bool
+        var drawn = 0, alreadyKept = 0, end = "done"
         let startTicks: Ticks
         let frameTicks: Ticks
         /// False for a seek's session until a request lands in its first
@@ -123,9 +128,10 @@ final class GraphicPrefetch: @unchecked Sendable {
 
         init(
             key: Int, range: CMTimeRange, frameDuration: CMTime, workerCount: Int, follows: Bool,
-            seeking: Bool
+            seeking: Bool, background: Bool
         ) {
             self.key = key
+            self.background = background
             self.start = range.start
             self.frameDuration = frameDuration
             self.endTicks = CompositionBuilder.ticks(range.end)
@@ -155,6 +161,9 @@ final class GraphicPrefetch: @unchecked Sendable {
     /// The kept frames and the keys that keep (G-37 (c)).
     var kept = KeptFrames()
     var keeping: Set<Int> = []
+    /// The last pass's key and grid start, and its App Nap opt-out (G-38).
+    var aheadOrigin: (key: Int, startTicks: Ticks)?
+    var passActivity: NSObjectProtocol?
     /// The system's memory-pressure level, and the dev tool's simulated one.
     var pressure = MemoryPressure.normal
     var simulatedPressure: MemoryPressure?
@@ -174,54 +183,80 @@ final class GraphicPrefetch: @unchecked Sendable {
 
     // MARK: - Main
 
-    /// Starts `key`'s workers over `range` at `frameDuration`; `follows` for
-    /// a playing preview's session (G-36), `seeking` when a seek to
-    /// `range.start` starts it. A no-op when the switch is on, a session for
-    /// `key` exists, or either is not positive.
+    /// Starts `key`'s workers over `range` at `frameDuration`: `follows` a
+    /// play (G-36), `seeking` from a seek, `background` a paused pass (G-38;
+    /// both main only). False, installing nothing, when the switch is on, `key`
+    /// has a session, either is not positive, or (a pass) `key` does not keep
+    /// or any session is a pass or follows.
+    @discardableResult
     func start(
         key: Int, range: CMTimeRange, frameDuration: CMTime, follows: Bool = false,
-        seeking: Bool = false
-    ) {
+        seeking: Bool = false, background: Bool = false
+    ) -> Bool {
         guard !UserDefaults.standard.bool(forKey: Self.offDefaultsKey),
             range.isValid, range.start.isNumeric, range.duration.isNumeric,
             frameDuration.isNumeric,
             CMTimeCompare(range.duration, .zero) > 0, CMTimeCompare(frameDuration, .zero) > 0
-        else { return }
+        else { return false }
+        if follows { stopBackground() }
         let count = Self.workerCount
+        let startTicks = CompositionBuilder.ticks(range.start)
         condition.lock()
-        guard sessions[key] == nil else {
+        let refused =
+            background
+            && (!keeping.contains(key) || sessions.values.contains { $0.background }
+                || sessions.values.contains { $0.follows })
+        guard sessions[key] == nil, !refused else {
             condition.unlock()
-            return
+            return false
         }
+        if background { beginAhead(key, startTicks: startTicks) }
+        if follows { followAhead(key, startTicks: startTicks) }
         let session = Session(
             key: key, range: range, frameDuration: frameDuration, workerCount: count,
-            follows: follows, seeking: seeking)
+            follows: follows, seeking: seeking, background: background)
         session.liveWorkers = count
         sessions[key] = session
+        condition.broadcast()
         condition.unlock()
+        if background {
+            NSLog("[framejob] graphic background: key %ld, from %lld, started", key, startTicks)
+        }
         for _ in 0..<count {
             let thread = Thread { [self] in self.work(session) }
             thread.stackSize = Self.workerStackBytes
-            thread.qualityOfService = .userInitiated
+            thread.qualityOfService = background ? .utility : .userInitiated
             thread.name = "framejob.graphic-prefetch"
             thread.start()
         }
+        return true
+    }
+
+    /// `stop(key)` for every background session, no other. Main only.
+    func stopBackground() {
+        condition.lock()
+        let keys = sessions.values.filter(\.background).map(\.key)
+        condition.unlock()
+        for key in keys { stop(key) }
     }
 
     /// Ends `key`'s session: its entries unused (a keeping key's finished
     /// rasters kept), its workers told. Any thread; idempotent; never waits.
+    /// A pass logs at once: nothing it draws after the stop is kept.
     func stop(_ key: Int) {
         condition.lock()
         guard let session = sessions.removeValue(forKey: key) else {
             condition.unlock()
             return
         }
-        session.stopped = true
+        (session.stopped, session.end) = (true, session.exhausted ? session.end : "stopped")
+        if session.follows { endAhead(key) }
+        if session.background { endPassActivity() }
         session.unused += session.slots.count
         for entry in session.slots.values { release(entry, from: session) }
         session.slots.removeAll()
         condition.broadcast()
-        let line = session.liveWorkers == 0 ? logLine(session) : nil
+        let line = session.liveWorkers == 0 || session.background ? logLine(session) : nil
         condition.unlock()
         if let line = line { NSLog("%@", line) }
     }
@@ -253,6 +288,7 @@ final class GraphicPrefetch: @unchecked Sendable {
         }
         guard index > session.floor else { return }
         session.floor = index
+        if aheadOrigin?.key == key { kept.clearAhead(below: index) }
         let passed = session.slots.filter { $0.value.index < index }
         for (slot, entry) in passed {
             session.slots[slot] = nil
@@ -304,10 +340,12 @@ final class GraphicPrefetch: @unchecked Sendable {
         return nil
     }
 
-    /// `take`'s removal for a slot the pool answered: never waits.
-    func discard(_ key: Int, slot: Slot) {
+    /// `take`'s removal for a slot the pool answered: never waits. A keeping
+    /// key's kept frame for `textureKey` is touched first, session or none.
+    func discard(_ key: Int, slot: Slot, textureKey: String) {
         condition.lock()
         defer { condition.unlock() }
+        if keeping.contains(key) { _ = kept.raster(key, textureKey) }
         guard let session = sessions[key], let entry = session.slots[slot] else { return }
         remove(slot, entry, from: session)
         session.unused += 1
@@ -328,9 +366,10 @@ final class GraphicPrefetch: @unchecked Sendable {
     }
 
     /// An entry's bytes out of the totals, once; a keeping key's finished
-    /// raster then kept, room permitting. Under `condition`.
-    private func release(_ entry: Entry, from session: Session) {
-        guard entry.bytes > 0 else { return }
+    /// raster then kept, room permitting (true when it is). Under `condition`.
+    @discardableResult
+    private func release(_ entry: Entry, from session: Session) -> Bool {
+        guard entry.bytes > 0 else { return false }
         session.heldBytes -= entry.bytes
         heldTotal -= entry.bytes
         heldEntries -= 1
@@ -338,9 +377,10 @@ final class GraphicPrefetch: @unchecked Sendable {
         guard keeping.contains(session.key), entry.done,
             case .success(let raster)? = entry.raster, let textureKey = entry.textureKey,
             raster.bgra.count <= budgetBytes - heldTotal
-        else { return }
+        else { return false }
         kept.insert(session.key, textureKey, raster)
         kept.trim(toFit: budgetBytes - heldTotal)
+        return kept.contains(session.key, textureKey)
     }
 
     // MARK: - Workers
@@ -385,7 +425,10 @@ final class GraphicPrefetch: @unchecked Sendable {
         }
         condition.lock()
         session.liveWorkers -= 1
-        let line = session.liveWorkers == 0 && session.stopped ? logLine(session) : nil
+        let ends = session.liveWorkers == 0 && (session.stopped || session.background)
+        if ends, sessions[session.key] === session { sessions[session.key] = nil }
+        if ends, session.background, !session.stopped { endPassActivity() }
+        let line = ends ? logLine(session) : nil
         condition.broadcast()
         condition.unlock()
         if let line = line { NSLog("%@", line) }
@@ -394,13 +437,22 @@ final class GraphicPrefetch: @unchecked Sendable {
     /// The next frame index, once the held rasters of every session are
     /// under the budget and this session under `entryCeiling` entries; nil
     /// once stopped or exhausted. A following session's never at or before
-    /// `floor`.
+    /// `floor`, and from the last pass's key it also waits while the held
+    /// and marked bytes reach the budget; a pass ends `full` there (G-38).
     private func claim(_ session: Session) -> Int? {
         condition.lock()
         defer { condition.unlock() }
-        while !session.stopped, !session.exhausted,
-            heldTotal >= budgetBytes || session.slots.count >= Self.entryCeiling
-        {
+        while !session.stopped, !session.exhausted {
+            if session.background, kept.aheadBytes + heldTotal >= budgetBytes {
+                (session.exhausted, session.end) = (true, "full")
+                condition.broadcast()
+                break
+            }
+            let waits =
+                heldTotal >= budgetBytes || session.slots.count >= Self.entryCeiling
+                || session.follows && aheadOrigin?.key == session.key
+                    && heldTotal + kept.aheadBytes >= budgetBytes
+            guard waits else { break }
             condition.wait()
         }
         guard !session.stopped, !session.exhausted else { return nil }
@@ -415,13 +467,21 @@ final class GraphicPrefetch: @unchecked Sendable {
 
     /// Every absent slot of frame `index` inserted under ONE hold, the totals
     /// and peaks raised and the kept frames trimmed to the room left; nil
-    /// once stopped.
+    /// once stopped. A play from the last pass's key first waits for room
+    /// beside the marked frames; a pass without room ends `full` (G-38).
     private func insert(
         _ wanted: [(slot: Slot, module: GraphicModule)], index: Int, into session: Session
     ) -> [Job]? {
         condition.lock()
         defer { condition.unlock() }
+        let slots = wanted.map(\.slot)
+        while session.follows, aheadOrigin?.key == session.key, !session.stopped,
+            !roomAhead(for: slots) { condition.wait() }
         guard !session.stopped else { return nil }
+        if session.background, !roomAhead(for: slots) {
+            (session.exhausted, session.end) = (true, "full")
+            return nil
+        }
         session.framesWithGraphics += 1
         var jobs: [Job] = []
         for (slot, module) in wanted where session.slots[slot] == nil {
@@ -429,7 +489,7 @@ final class GraphicPrefetch: @unchecked Sendable {
             session.slots[slot] = entry
             session.heldBytes += entry.bytes
             heldTotal += entry.bytes
-            heldEntries += 1
+            if entry.bytes > 0 { heldEntries += 1 }
             jobs.append(Job(slot: slot, entry: entry, module: module))
         }
         heldPeakBytes = max(heldPeakBytes, heldTotal)
@@ -459,7 +519,7 @@ final class GraphicPrefetch: @unchecked Sendable {
                 frame: slot.frame, propsJSON: slot.propsJSON, ctxJSON: slot.ctxJSON,
                 budgetMs: resolved.budgetMs)
             else {
-                finish(job.entry, raster: nil)
+                finish(job, in: session, raster: nil)
                 continue
             }
             let key = LayerRenderers.textureKey(
@@ -473,6 +533,18 @@ final class GraphicPrefetch: @unchecked Sendable {
                 job.entry.done = true
                 job.entry.deferred = true
                 release(job.entry, from: session)
+                if session.background, !session.stopped {
+                    if session.slots[job.slot] === job.entry { session.slots[job.slot] = nil }
+                    if keptAlready, kept.raster(session.key, key) != nil {
+                        kept.markAhead(session.key, key, index: job.entry.index)
+                        session.alreadyKept += 1
+                    } else if let first = session.slots.values.first(where: {
+                        !$0.done && $0.textureKey == key && $0.index < job.entry.index
+                    }) {
+                        (first.sharers, first.sharedUpTo) =
+                            (first.sharers + 1, max(first.sharedUpTo, job.entry.index))
+                    }
+                }
                 condition.broadcast()
                 condition.unlock()
                 continue
@@ -483,14 +555,25 @@ final class GraphicPrefetch: @unchecked Sendable {
                 try resolved.set.library.rasterize(
                     drawn.svg, width: slot.width, height: slot.height)
             })
-            finish(job.entry, raster: raster)
+            finish(job, in: session, raster: raster)
         }
     }
 
-    private func finish(_ entry: Entry, raster: Result<GraphicRaster, any Error>?) {
+    /// `job`'s raster in; a pass's entry leaves its slot, its raster kept and marked.
+    private func finish(
+        _ job: Job, in session: Session, raster: Result<GraphicRaster, any Error>?) {
         condition.lock()
-        entry.raster = raster
-        entry.done = true
+        job.entry.raster = raster
+        job.entry.done = true
+        if session.background, !session.stopped {
+            if session.slots[job.slot] === job.entry { session.slots[job.slot] = nil }
+            if release(job.entry, from: session), let textureKey = job.entry.textureKey {
+                let entry = job.entry
+                kept.markAhead(session.key, textureKey, index: max(entry.index, entry.sharedUpTo))
+                (session.drawn, session.alreadyKept) =
+                    (session.drawn + 1, session.alreadyKept + entry.sharers)
+            }
+        }
         condition.broadcast()
         condition.unlock()
     }
@@ -499,6 +582,12 @@ final class GraphicPrefetch: @unchecked Sendable {
     private func logLine(_ session: Session) -> String? {
         guard !session.logged else { return nil }
         session.logged = true
+        if session.background {
+            return backgroundLine(
+                key: session.key, workers: session.workerCount, start: session.startTicks,
+                frames: session.framesWithGraphics, counts: (session.drawn, session.alreadyKept),
+                end: session.end)
+        }
         let line =
             "[framejob] graphic prefetch: key \(session.key), \(session.workerCount) workers, "
             + "\(session.framesWithGraphics) frames with graphics, \(session.hits) hits, "
