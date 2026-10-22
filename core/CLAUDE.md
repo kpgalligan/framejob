@@ -476,10 +476,11 @@ governs a module now.
 - `edit_action_graphic.rs` — `set_action_end`'s graphic arm (G-34):
   `read_graphic_end` checks the patch's `graphic.props` (never the stored
   end's) against the op's `schema` through `check_typed` under
-  `graphic.props.<key>`, discards a `kinds`, refuses an asset, a prop its
-  module marks `animate: false` (G-41), an undeclared prop, a layer key and a missing schema by name, and answers
-  each prop's kind and the default for each the clip lacks
-  (`schema_default`); `write_graphic_end` stores `props` and `kinds` by
+  `graphic.props.<key>`, discards a `kinds`, refuses a prop its module
+  marks `animate: false` (G-41), an undeclared prop, a layer key and a
+  missing schema by name (an asset is an ordinary switch, `""` naming no
+  image, G-42), and answers each prop's kind and the default for each the
+  clip lacks (`schema_default`; an asset's is its string default or `""`); `write_graphic_end` stores `props` and `kinds` by
   `insert` / `shift_remove`.
 - `edit_paste_attributes.rs` — `paste_attributes`, cut out of `edit_paste.rs`
   under the size rule as a pure move ahead of spec §11 G-32: the payload's

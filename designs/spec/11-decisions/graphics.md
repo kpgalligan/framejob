@@ -72,7 +72,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   values, a stored key the schema no longer has is passed through and a
   wrong type falls back to the default, both reported as WARNINGS in the
   graphic's diagnostics and never as errors. A clip whose module was edited
-  keeps drawing, and the agent is told what no longer matches.
+  keeps drawing, and the agent is told what no longer matches. (Amended by
+  G-42: an asset stored as `""` reaches `render` as `null`, with no
+  warning.)
 - **G-5 — A graphic is a pure function of its inputs (R5-5 for code)**
   (road map 10 §4, 2026-09-25). A frame is a function of its source text,
   props, frame number, size, font set and asset bytes only. Anything else is
@@ -1570,7 +1572,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   (`graphic.props.<key> is an asset; an action does not animate an image —
   set it with set_graphic`). (Amended by G-41: a prop whose schema entry
   says `animate: false`, of any type, is refused too, in its own sentence,
-  checked before the asset's.)
+  checked before the asset's.) (Amended by G-42: an asset is no longer
+  refused; it switches at the action's END, as a string does, and `""`
+  names no image in an end.)
   (c) **How the kind is known, and the check.** From the `schema` the op
   carries. The app fills it from the module's CURRENT revision and never
   takes it from a caller (G-4; a `.filledByTheApp` row). A non-null prop
@@ -1605,6 +1609,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   Properties, and `paste_attributes`' `graphic` group, KEEP a target key
   the payload lacks when an action on the target names it, in its slot,
   so the ramp survives the paste. Every other key pastes as G-32 (e) says.
+  (Amended by G-42: an asset's start is its string default, or `""` when
+  its default is `null`.)
   (e) **Numbers arrive fractional (answer 5)**: `a + (b − a) × eased` in
   floating point, never rounded and never snapped to `step`, so two whole
   ends 64 and 129 give 96.5 halfway. A module that needs a whole number
@@ -1696,7 +1702,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   filter's kind (92 → 74), an obscure region's kind (96 → 74) and a
   module's boolean whose label is longer than about 200 pt (its title
   cut at the checkbox's edge), each narrowing only while keyed and full width
-  otherwise (`graphics_inspector_proof.py` K18a, K18b, K18c).
+  otherwise (`graphics_inspector_proof.py` K18a, K18b, K18c). (Amended by
+  G-42: with an action selected an asset's row writes the end like any
+  other row, ◇/◆ and never ⊘, its "None" writing `""` there; Properties'
+  Reset writes an asset's default into the end, `""` for `null`.)
   **Limits accepted (answer 3).** A clip's actions do not overlap, and one
   action has one span and one curve for everything it animates. There is
   no per-prop opt-out: a module's own animation composes by being handed
@@ -2169,7 +2178,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   gets this sentence. A `null` still removes, unchecked (G-34 (j)); only
   the props a patch names are checked. The use: a count, a layout mode, a
   data series — e.g. `new Array(props.count)`, which a fractional ramp
-  breaks (G-34 (e)).
+  breaks (G-34 (e)). (Amended by G-42: there is no asset check any more;
+  an asset marked `animate: false` still gets this sentence.)
   (c) **Stored ends are not re-checked** (G-34 (c)). An end that named the
   prop before its module said `animate: false` still animates it as
   stored, and an edit naming another prop of that end is not refused. The
@@ -2181,4 +2191,36 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   ⊘ and writes `set_graphic`, as an asset's does (G-34 (l)); Properties'
   Reset writes its default to the base. With no action selected it is a
   row like any other. No format bump: the schema lives in the module, not
-  the project.
+  the project. (Amended by G-42: an asset's row writes the end like any
+  other; only an `animate: false` prop's row stays ⊘ and the clip's.)
+
+- **G-42 — An action changes a graphic's image: an `asset` prop in an
+  end switches at the action's END, `""` names no image there, and the
+  Graphic tab's image row writes the end** (#249, graphics gaps phase 3,
+  2026-10-22; amends G-4, G-34 (b), (d), (l) and G-41 (b), (d)).
+  (a) **The switch.** An `asset` prop in an action's end is checked as
+  `set_graphic` checks it (any string), its `kinds` is `asset`, and it
+  switches at the action's END, as a string does. `set_action_end` no
+  longer refuses an asset; its sentence is gone. A prop marked `animate:
+  false` is still refused in G-41's sentence, whatever its type.
+  (b) **No image.** In an end, "no image" is `""`, because a `null` there
+  removes the prop (G-34 (j)). At the base, `null` still removes the key
+  and the module draws its default. `""` is no image even over a string
+  default. The engine's `overlay` hands `render` `null` for an asset
+  stored as `""`, with no warning, so a module sees one "no image" from
+  every path.
+  (c) **The start.** `schema_default` gives an asset its string default,
+  or `""` when the default is `null`. So an action's first naming writes
+  that start into the clip (G-34 (d)), and `set_graphic`'s `null` for an
+  animated asset stores it too.
+  (d) **The Graphic tab.** With an action selected, the image row writes
+  the end (◇/◆, never ⊘). Every asset row lists "None" first. "None"
+  writes `""` into an end. At the base it writes `null` when the default
+  is `null` and `""` when the default is a string. A `""` value reads as
+  "None" and is never a popup item. The popup also lists a name the
+  selected action's end holds that the folder lacks, as it lists a
+  clip's. Properties' Reset writes an asset's default into the end (`""`
+  for `null`). `GraphicSchemaEntry.animatable` is `animate`.
+  (e) **No format bump.** No persisted shape changes; `""` was already a
+  stored string. An older build draws an asset end but hands `""` to the
+  module as `""`; there is no real use yet (owner, 2026-10-09).

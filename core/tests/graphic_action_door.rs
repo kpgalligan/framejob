@@ -133,11 +133,6 @@ fn every_refusal_names_its_prop_in_its_own_sentence() {
         "graphic.props must be a json object, not 5"
     );
     assert_eq!(
-        error(props(json!({"logo": "logo.png"}))),
-        "graphic.props.logo is an asset; an action does not animate an image — set it with \
-         set_graphic"
-    );
-    assert_eq!(
         error(props(json!({"nope": 1}))),
         "unknown key \"graphic.props.nope\" in an action end patch"
     );
@@ -277,6 +272,57 @@ fn set_graphics_null_keeps_an_animated_props_default() {
     assert!(clip(&title, 11)["graphic"]["props"].get("title").is_none());
 }
 
+/// An asset in an end lands as any string does, its kind `asset` (spec §11
+/// G-42 (a)); `""` is no image there, since a `null` removes (G-42 (b)); its
+/// start is `""` for a `null` default and the default for a string one, and
+/// `set_graphic`'s `null` keeps that start once an action names it (G-42 (c)).
+#[test]
+fn an_asset_ends_on_an_image_or_on_none_and_starts_from_none() {
+    let (with, action) = with_action();
+    let props = |props: Value| json!({"graphic": {"props": props}});
+    let named = with.apply(&end(action, props(json!({"logo": "logo.png"}))));
+    assert_eq!(
+        end_of(&named, 11),
+        json!({"graphic": {"props": {"logo": "logo.png"}, "kinds": {"logo": "asset"}}})
+    );
+    assert_eq!(
+        keys(&written(&named), "/clips/0/graphic/props"),
+        ["title", "size", "accent", "boxed", "align", "logo"]
+    );
+    assert_eq!(clip(&named, 11)["graphic"]["props"]["logo"], json!(""));
+    // "No image" in an end.
+    let none = with.apply(&end(action, props(json!({"logo": ""}))));
+    assert_eq!(end_of(&none, 11)["graphic"]["props"], json!({"logo": ""}));
+    // A value that is not a name is `set_graphic`'s own refusal.
+    assert_eq!(
+        with.errors(&end(action, props(json!({"logo": 5})))),
+        "graphic.props.logo must be an asset's file name or null, not 5"
+    );
+    // A string default is the start.
+    let mut named_default = schema();
+    named_default["logo"]["default"] = json!("a.png");
+    let from_default = with.apply(&end_with(
+        action,
+        props(json!({"logo": "b.png"})),
+        named_default,
+    ));
+    assert_eq!(
+        clip(&from_default, 11)["graphic"]["props"]["logo"],
+        json!("a.png")
+    );
+    // Once an action names it, `set_graphic`'s `null` keeps the start `""`.
+    let set = named.apply(&set_graphic(json!({"logo": "b.png"}), Some(schema())));
+    assert_eq!(clip(&set, 11)["graphic"]["props"]["logo"], json!("b.png"));
+    let cleared = set.apply(&set_graphic(json!({"logo": null}), Some(schema())));
+    assert_eq!(clip(&cleared, 11)["graphic"]["props"]["logo"], json!(""));
+    // A `null` in the end removes the prop and its kind.
+    let removed = named.apply(&end(action, props(json!({"logo": null}))));
+    assert_eq!(
+        end_of(&removed, 11),
+        json!({"graphic": {"props": {}, "kinds": {}}})
+    );
+}
+
 /// [`with_action`] on a clip whose `size` is `size`.
 fn with_action_on_size(size: i64) -> (common::Handle, i64) {
     fixture::with_action_on(&project_with("size", json!(size)))
@@ -305,7 +351,7 @@ fn a_paste_keeps_an_animated_start_in_its_slot() {
 }
 
 /// A prop whose schema entry says `animate: false` is refused by name, in
-/// its own sentence and before an asset's (spec §11 G-41 (b)); a stored end
+/// its own sentence (spec §11 G-41 (b)); a stored end
 /// that named it before the mark is not re-checked and still ramps, and a
 /// `null` removes it (G-41 (c)); `animate: true` animates, and any other
 /// value is the schema's own error (G-41 (a)).
@@ -320,7 +366,7 @@ fn a_prop_its_module_marks_animate_false_is_refused_by_name() {
         "graphic.props.size is marked animate: false by its module; an action does not animate \
          it — set it with set_graphic"
     );
-    // An asset marked so gets this sentence, not the asset's.
+    // An asset marked so is refused too; G-42 removed the asset check.
     let mut logo = held.clone();
     logo["logo"]["animate"] = json!(false);
     assert_eq!(

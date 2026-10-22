@@ -1223,10 +1223,10 @@ layer half and G-32 (h) stand.
 
 Owed: the person's checks CT-8 (a keyed graphic row's look, both
 appearances) and GR-8 (a 4K animated prop plays without stutter, G-34 (g))
-in `docs/manual-checks.md`. Left out by G-34's accepted limits and filed
-as an issue: an asset prop in an action (#249). The OKLab blend (#250) and
-the per-prop `animate: false` opt-out (#248) are built: "Graphics gaps"
-below, spec §11 G-40 and G-41.
+in `docs/manual-checks.md`. All three of G-34's accepted limits filed as
+issues are built: the OKLab blend (#250), the per-prop `animate: false`
+opt-out (#248) and an asset prop in an action (#249) — "Graphics gaps"
+below, spec §11 G-40, G-41 and G-42.
 
 ## G6 phase 2 — playback prefetch (#127, spec §11 G-36)
 
@@ -1786,6 +1786,45 @@ the refusal, and with it after the asset check, the door test failed; the
 core's `check_entry` without the `animate` check failed `add_errs…` and the
 door test; the engine's failed `every_compile_sentence`.
 
+**Phase 3 — an action changes a graphic's image (asset) prop (#249, spec
+§11 G-42)**, 2026-10-22, on `2cc4ae8`. `edit_action_graphic.rs`'s
+`read_graphic_end` no longer refuses an asset: it is checked as
+`set_graphic` checks it (any string), its `kinds` is `asset`, and the
+evaluator switches it at the action's END as it does a string, with no code
+change in `actions_graphic.rs`. "No image" in an end is `""`, because a
+`null` there removes; `schema_default` answers an asset's string default,
+or `""` for a `null` one, so an action's first naming writes that start
+into the clip and `set_graphic`'s `null` for an animated asset keeps it. The
+engine's `overlay` (`graphic/src/props.rs`) hands `render` `null` for an
+asset stored as `""`, with no warning, so a module sees one "no image"; the
+core stores `""` as given (G-2). App side: `GraphicSchemaEntry.animatable`
+is `animate` alone, so the image row writes the end with an action
+selected; `GraphicSchemaRows.endValues` turns an asset's `.null` into `""`
+for the split's action closure, so "None" and Properties' Reset write `""`
+into an end; every asset row lists "None" first (at the base it writes
+`null` for a `null` default, `""` for a string one); `assetNames` skips a
+`""` and takes the selected end's names (`end:`, from the row and from
+`GraphicPane.assetSignature`). No format bump, no op-table, gate or parity
+change; the catalog's `set_action_end` prose, §5.4, §6c, §7.10,
+`docs/graphics-api.md` and CT-8 say so.
+
+Verified: `make gate` PASS; against Release, `graphics_inspector_proof.py`
+97/97 (K8a–K8d in K8's place, K17 changed) and `graphic_prop_action_proof.py`
+20/20 (G1, G2 new: ramp v5's square is absent before the end, the module
+handed `null` for the start `""`, and green at it), each exit 0 with Z1
+held and no `DEFAULTS MOVED`. Inspector mutants, each `MUTANT PASS`:
+`asset-held` (K8a K8b K17), `animate-ignored` re-anchored (K19a–c),
+`none-null-in-end` (K8b K17), `null-default-in-end` re-anchored on
+`endValues` (K8b K9 K17), `none-for-string-default` (K8c),
+`empty-name-listed` (K8a–K8d), `end-name-unlisted` (K8d), `row-writes-base`
+widened (K8a, K8b, K18c and K19b added; K18c and K19b were stale since they
+were added) and `schema-dropped` widened (K8a K8b); `asset-to-end` is
+retired and `merged-asset-names` re-anchored on `end: endProps()`. The
+core and engine mutants, applied by hand and reverted: `overlay` without
+the `""` arm failed `an_empty_asset_is_handed_as_null`; `schema_default`'s
+asset arm back to `None` failed the door test; the asset refusal restored
+failed the door test and `an_asset_switches_at_the_end`.
+
 ## Open items
 
 - G6 (#127) has no phase left. The export's parallel rasterization landed
@@ -1804,7 +1843,6 @@ door test; the engine's failed `every_compile_sentence`.
   Tracked in #72.
 - The not-built list: mattes or video input — #240. (HEVC with alpha and
   keyframed props were on it and are built: spec §11 G-33, G-34.)
-- G-34's accepted limits, as a candidate: asset props in an action (#249).
 - Replacing QuickJS with JavaScriptCore — GitHub issue #39.
 
 ## Where to look in the original

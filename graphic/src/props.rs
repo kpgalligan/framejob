@@ -131,7 +131,9 @@ fn options(entry: &Value) -> Vec<Value> {
 
 /// `stored` laid over the schema's defaults, in the schema's key order,
 /// then the stored keys the schema lacks, passed through. Never refuses:
-/// every key that did not fit is the default plus a warning.
+/// every key that did not fit is the default plus a warning. An `asset`
+/// stored as `""` is "no image" and is handed to `render` as `null`, with
+/// no warning (spec §11 G-42).
 pub fn overlay(schema: &Value, stored: &Value) -> (Value, Vec<Diagnostic>) {
     let mut warnings = Vec::new();
     let empty = Map::new();
@@ -152,6 +154,8 @@ pub fn overlay(schema: &Value, stored: &Value) -> (Value, Vec<Diagnostic>) {
         let kind = entry.get("type").and_then(Value::as_str).unwrap_or("");
         let value = match stored.get(key) {
             None => default,
+            // "No image" (G-42): an asset stored as `""` reaches `render` as `null`.
+            Some(Value::String(text)) if kind == "asset" && text.is_empty() => Value::Null,
             Some(value) if fits(kind, entry, value) => value.clone(),
             Some(value) if kind == "enum" && value.is_string() => {
                 warnings.push(Diagnostic::warning(format!(

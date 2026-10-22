@@ -66,7 +66,8 @@ The crate's record is road map 10 §10.4.
   which `Module::compile` builds from `Engine::parse_colours` over the
   schema's colour defaults, G-25 (a); a non-boolean `animate` on an entry
   is refused, G-41), `overlay` (render,
-  lenient; every surprise a warning) and the schema's limits `MAX_PROPS`,
+  lenient; every surprise a warning; an asset stored as `""` is handed to
+  `render` as `null`, silently, G-42) and the schema's limits `MAX_PROPS`,
   `MAX_OPTIONS`, `MAX_STRING` and `TYPES`, which the core restates as
   `GRAPHIC_<X>` (`core/tests/graphic_ffi.rs` pins each pair;
   `tests/reference.rs` pins the numbers the reference states, and its

@@ -11,8 +11,9 @@ struct GraphicSchemaEntry: Equatable {
     /// The module's `animate` (spec §11 G-41); absent is true.
     var animate: Bool = true
     /// Whether an action's end may name this prop: the one test the
-    /// inspector's split and the end's stale rows use.
-    var animatable: Bool { animate && type != "asset" }
+    /// inspector's split and the end's stale rows use. An asset is
+    /// animatable, switching at the end (G-42); only `animate: false` is not.
+    var animatable: Bool { animate }
 }
 
 /// A module's schema, in the module's own key order.

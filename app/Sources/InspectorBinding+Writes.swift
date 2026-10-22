@@ -161,9 +161,10 @@ extension InspectorBinding {
     /// (`patchProps`), so a base write is what it always was; a clip with an
     /// action selected gets one `set_action_end` naming `graphic.props.<key>`
     /// with the module's `schema`, each value as it is — a `null` in an end
-    /// REMOVES (G-34 (j)). A prop that is not `animatable` — an asset, or
-    /// one its module marks `animate: false` (G-41) — is the base's (an end
-    /// refuses either, G-34 (b), G-41 (b)), sent there by CI-3's mechanism.
+    /// REMOVES (G-34 (j)) — except an asset's `null`, which is `""`, no image
+    /// (`endValues`, G-42): an asset is now the end's. A prop that is not
+    /// `animatable`, one its module marks `animate: false` (G-41), is the
+    /// base's (an end refuses it, G-41 (b)), sent there by CI-3's mechanism.
     func ops(
         graphic values: [String: GraphicPropValue], entries: [GraphicSchemaEntry],
         clips: [ClipSnapshot], schema: [String: Any]?
@@ -174,7 +175,7 @@ extension InspectorBinding {
             base: {
                 .setGraphicRaw(clips: $0, patch: ["props": GraphicSchemaRows.patchProps($1, entries: entries)], schema: schema)
             },
-            action: { ActionPatch(graphic: ActionGraphicPatch(props: $0)) },
+            action: { ActionPatch(graphic: ActionGraphicPatch(props: GraphicSchemaRows.endValues($0, entries: entries))) },
             schema: schema,
             structural: { values, _ in
                 let base = values.filter { held.contains($0.key) }

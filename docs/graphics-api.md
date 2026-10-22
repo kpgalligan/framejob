@@ -79,7 +79,7 @@ series a ramp would break.
 | `boolean` | `true` / `false` | |
 | `color` | a CSS colour string: `"#ff5a36"`, `"rgb(255, 90, 54)"`, `"hsl(11, 100%, 61%)"`, `"tomato"` | |
 | `enum` | one of `options` | `options`: 1–32 strings |
-| `asset` | a file name in `graphics/assets/`, or `null` | `kind: "image"` |
+| `asset` | a file name in `graphics/assets/`, `null` or `""` (no image); `render` gets `null` for either of the last two | `kind: "image"` |
 
 A schema that breaks a rule does not compile, and the error says which rule.
 A `color` entry's `default` must be a colour in the grammar
@@ -406,10 +406,12 @@ A graphic clip's props can be the target of an action, as a clip's position or o
 schema as `set_graphic` checks it, `min` and `max` included, using the module as it is now. Across
 the action a `number` and a `color` ramp along its curve, a `color` in OKLab, giving the same middle
 `interpolateColors` gives; a `string`, `boolean` and `enum` change to the end's value when the
-action ends; an `asset`, and a prop whose entry says `animate: false`, cannot be animated
-(`set_action_end` refuses a value for it). A prop the clip holds no value
+action ends, and an `asset` changes to the end's image when the action ends, `""` naming no image
+there (a `null` stops animating the prop); a prop whose entry says `animate: false` cannot be
+animated (`set_action_end` refuses a value for it). A prop the clip holds no value
 for starts from the schema's `default` as it is when an action first names it, and that value is
-written into the clip, so a later change to the default does not move the animation. `render` gets
+written into the clip, so a later change to the default does not move the animation; an asset
+whose default is `null` starts from `""`. `render` gets
 that frame's values every frame, and your own animation from `frame` still runs on top. A `null`
 for a prop in `set_action_end`'s patch stops animating it.
 

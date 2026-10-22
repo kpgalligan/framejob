@@ -53,13 +53,12 @@ The rules every op shares are §6a; the clip ops are §6b.
   `graphic.props.<key>`; no schema (`graphic.props.<key> needs its module's schema to animate, and
   none came with the op`), a prop the schema lacks (an unknown key), a prop whose schema entry says
   `animate: false` (§11 G-41; `graphic.props.<key> is marked animate: false by its module; an
-  action does not animate it — set it with set_graphic`, checked before the asset's) and an `asset`
-  (`graphic.props.<key> is an asset; an action does not animate an image — set it with
-  set_graphic`) are each an **error**, and so are `name`, `width`, `height`, `in` and `length`
+  action does not animate it — set it with set_graphic`) are each an **error**, and so are `name`,
+  `width`, `height`, `in` and `length`
   (`graphic.<key> is not an animation target; an action animates graphic.props`). Each named prop's
   schema `type` is written into the end's `kinds`, and a `kinds` in the patch is read and discarded,
   so an end read back from `get_project` can be sent again. A number and a colour ramp; a string,
-  a boolean and an enum switch at the end. A prop the clip's own `props` lacks gets the schema's
+  a boolean, an enum and an asset switch at the end, and `""` names no image (§11 G-42). A prop the clip's own `props` lacks gets the schema's
   CURRENT default appended to them in the same edit. `graphic: null` or `graphic.props: null`
   removes the group; a `null` prop removes the prop and its kind, unchecked. `graphic` in `off` is
   an **error**: `graphic props cannot be keyed off; name the value a prop ends at in patch`.

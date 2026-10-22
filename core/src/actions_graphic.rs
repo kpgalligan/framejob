@@ -20,7 +20,7 @@
 //!   channel rounded to the nearest byte (G-40, amending G-34 (f)). The
 //!   model's own `[r, g, b, a]` colours keep `actions.rs`'s
 //!   element-by-element `lerp_at`;
-//! - **anything else** — a string, a boolean, an enum, two values of
+//! - **anything else** — a string, a boolean, an enum, an asset (G-42), two values of
 //!   different JSON kinds, a colour it cannot read — holds its start and
 //!   takes the end's value at the action's END.
 //!

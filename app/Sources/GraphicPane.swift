@@ -4,7 +4,8 @@
 // With no action selected every write is `set_graphic`. With one selected, a
 // Properties write — Reset's included — goes to the action's END with the
 // module's current schema, one `set_action_end` naming `graphic.props.<key>`,
-// except an asset's, which stays the clip's (spec §11 G-34 (l)); Size and
+// except an `animate: false` prop's, which stays the clip's (spec §11 G-34
+// (l), G-41 (d), G-42 (d)); Size and
 // Timeline still write `set_graphic`, so their rows are ⊘. The core
 // validates both.
 //
@@ -114,7 +115,8 @@ final class GraphicPane: InspectorPaneView {
     /// The schema's entries whole (a default, bounds or options a row is
     /// built from), the stale keys (the clip's, then the selected action's
     /// end's, `actionStaleKeys`, a declared key no action may animate
-    /// included, G-41), each asset popup's names, the
+    /// included, G-41), each asset popup's names (the selected end's
+    /// included, G-42), the
     /// diagnostics' messages and the folder's warnings. Stored values, the
     /// revision and the playhead are NOT here: they are read fresh by
     /// `refresh()`.
@@ -144,11 +146,12 @@ final class GraphicPane: InspectorPaneView {
     }
 
     /// Each asset entry's popup names, from the rows' own
-    /// `GraphicSchemaRows.assetNames` call: names joined by ",", entries by ";".
+    /// `GraphicSchemaRows.assetNames` call, the selected action's end's names
+    /// counting (G-42 (d)): names joined by ",", entries by ";".
     private func assetSignature(_ schema: GraphicSchema?) -> String {
         let files = assetNames(), clips = binding.graphicClips
         return (schema?.entries ?? []).filter { $0.type == "asset" }.map {
-            GraphicSchemaRows.assetNames(for: $0, files: files, clips: clips)
+            GraphicSchemaRows.assetNames(for: $0, files: files, clips: clips, end: endProps())
                 .joined(separator: ",")
         }.joined(separator: ";")
     }
@@ -160,9 +163,9 @@ final class GraphicPane: InspectorPaneView {
     /// (G-34 (l), O2), a declared key whose entry is not `animatable` among
     /// them (G-41 (c)). With no compiled schema every stored key is stale.
     /// Reset nulls every stored key; with an action selected it writes each
-    /// declared default through the rows' own split, into the END, a
-    /// non-`animatable` one's (an asset's, or an `animate: false` one's,
-    /// G-41 (d)) onto the clip (O7). Its `differs` folds from the rows.
+    /// declared default through the rows' own split, into the END (an
+    /// asset's `null` as `""`, G-42 (d)), an `animate: false` prop's (G-41
+    /// (d)) onto the clip (O7). Its `differs` folds from the rows.
     func propertiesSection() -> InspectorSection {
         let binding = self.binding
         let shared = self.shared()

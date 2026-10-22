@@ -78,6 +78,25 @@ fn a_wrong_type_is_the_default_with_a_warning() {
 }
 
 #[test]
+fn an_empty_asset_is_handed_as_null() {
+    let (props, warnings) = overlay(&schema(), &json!({"logo": "", "title": ""}));
+    assert_eq!(props["logo"], Value::Null);
+    assert_eq!(props["title"], json!(""));
+    assert!(warnings.is_empty(), "{warnings:?}");
+    // CONTROL: a named image is handed as it is.
+    let (props, warnings) = overlay(&schema(), &json!({"logo": "x.png"}));
+    assert_eq!(props["logo"], json!("x.png"));
+    assert!(warnings.is_empty(), "{warnings:?}");
+    // CONTROL: a stale key's `""` is passed through as `""`, with its warning.
+    let (props, warnings) = overlay(&schema(), &json!({"gone": ""}));
+    assert_eq!(props["gone"], json!(""));
+    assert_eq!(
+        messages(&warnings),
+        ["props.gone is not in the schema; it is passed through"]
+    );
+}
+
+#[test]
 fn an_enum_outside_its_options_is_the_default() {
     let (props, warnings) = overlay(&schema(), &json!({"align": "middle"}));
     assert_eq!(props["align"], json!("left"));

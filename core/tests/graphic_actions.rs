@@ -142,6 +142,29 @@ fn a_string_a_boolean_and_an_enum_switch_at_the_end() {
     );
 }
 
+/// An asset switches at the action's end, as a string does, to an image or
+/// to `""`, no image (spec §11 G-42 (a), (b)); the core hands the recipe
+/// `""` as stored, and only the engine reads it as `null`.
+#[test]
+fn an_asset_switches_at_the_end() {
+    let (with, action) = with_action();
+    let named = with.apply(&end(
+        action,
+        json!({"graphic": {"props": {"logo": "logo.png"}}}),
+    ));
+    assert_eq!(props_at(&named, SEC + SEC / 2)["logo"], json!(""));
+    assert_eq!(props_at(&named, 2 * SEC - FRAME)["logo"], json!(""));
+    assert_eq!(props_at(&named, 2 * SEC)["logo"], json!("logo.png"));
+    // The reverse: an image that ends on none.
+    let (with, action) = with_action_on(&project_with("logo", json!("logo.png")));
+    let cleared = with.apply(&end(action, json!({"graphic": {"props": {"logo": ""}}})));
+    assert_eq!(
+        props_at(&cleared, 2 * SEC - FRAME)["logo"],
+        json!("logo.png")
+    );
+    assert_eq!(props_at(&cleared, 2 * SEC)["logo"], json!(""));
+}
+
 #[test]
 fn a_split_through_an_animated_prop_is_invisible() {
     let mut base = fixture::base();

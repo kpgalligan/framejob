@@ -12,8 +12,9 @@
 // row writes `set_graphic` to the clip; with one selected, a row reads the
 // action's END state (`InspectorBinding.graphicProps`) and writes it — one
 // `set_action_end` naming `graphic.props.<key>` with the module's schema —
-// through `InspectorBinding.ops(graphic:…)`, an asset and a prop its module
-// marks `animate: false` (G-41) still the clip's.
+// through `InspectorBinding.ops(graphic:…)`, an asset's included, its "no
+// image" written as `""` there (G-42, `endValues`); only a prop its module
+// marks `animate: false` (G-41) is still the clip's.
 //
 // **A value equal to the schema's default is written as `null`** to the
 // clip (spec §11 G-15): the key leaves the stored props and the module
@@ -141,17 +142,37 @@ enum GraphicSchemaRows {
         return values.contains { $0 != $0.rounded() } ? 2 : 0
     }
 
+    /// An end write's props: each value as it is, except an `asset` entry's `.null`, which is
+    /// `.string("")` — "no image" in an end, where a `null` removes (spec §11 G-42).
+    static func endValues(
+        _ values: [String: GraphicPropValue], entries: [GraphicSchemaEntry]
+    ) -> [String: GraphicPropValue] {
+        var out: [String: GraphicPropValue] = [:]
+        for (key, value) in values {
+            guard let entry = entries.first(where: { $0.key == key }) else {
+                out[key] = value
+                continue
+            }
+            out[key] = entry.type == "asset" && value == .null ? .string("") : value
+        }
+        return out
+    }
+
     /// An asset entry's popup names: the folder's `files`, then, sorted,
-    /// every name a clip holds under `entry.key`, and a string default, that
-    /// `files` lacks. The rows and the pane's signature both call this.
+    /// every name a clip holds under `entry.key`, the selected action's
+    /// `end` holds, and a string default, that `files` lacks. A `""` is no
+    /// image ("None", G-42) and never a name. The rows and the pane's
+    /// signature both call this.
     static func assetNames(
-        for entry: GraphicSchemaEntry, files: [String], clips: [ClipSnapshot]
+        for entry: GraphicSchemaEntry, files: [String], clips: [ClipSnapshot],
+        end: [String: GraphicPropValue]
     ) -> [String] {
         var held = clips.compactMap { clip -> String? in
-            if case .string(let text)? = clip.graphic?.props[entry.key] { return text }
+            if case .string(let text)? = clip.graphic?.props[entry.key], !text.isEmpty { return text }
             return nil
         }
-        if case .string(let text) = entry.default { held.append(text) }
+        if case .string(let text)? = end[entry.key], !text.isEmpty { held.append(text) }
+        if case .string(let text) = entry.default, !text.isEmpty { held.append(text) }
         return files + Set(held).subtracting(files).sorted()
     }
 
@@ -247,19 +268,23 @@ enum GraphicSchemaRows {
         return view
     }
 
-    /// The asset popup: "None" first when the default is null, the folder's
-    /// files, then any name a clip holds (or the default names) that the
-    /// folder does not.
+    /// The asset popup: "None" first on every asset row (G-42 (d)), the
+    /// folder's files, then any name a clip or the selected action's end
+    /// holds (or the default names) that the folder does not. A `""`, a
+    /// `null` or an unknown value reads as "None". "None" writes `null` at
+    /// the base when the default is `null` and `""` when it is a string; an
+    /// end takes `""` either way (`endValues`).
     private static func assetRow(
         _ entry: GraphicSchemaEntry, _ binding: InspectorBinding, name: String,
         clips: @escaping () -> [ClipSnapshot], assets: @escaping () -> [String],
         current: @escaping () -> GraphicPropValue,
         ops: @escaping (GraphicPropValue) -> [ReelOp], mixed: @escaping () -> Bool
     ) -> NSView {
-        let none = entry.default == .null
-        let names = assetNames(for: entry, files: assets(), clips: clips())
-        let items = (none ? ["None"] : []) + names
-        let offset = none ? 1 : 0
+        let names = assetNames(
+            for: entry, files: assets(), clips: clips(),
+            end: binding.selectedAction?.end.graphic?.props ?? [:])
+        let items = ["None"] + names
+        let offset = 1
         return inspectorPopupRow(
             entry.label, binding, name: name, items: items,
             read: {
@@ -269,7 +294,7 @@ enum GraphicSchemaRows {
                 return 0
             },
             ops: { index in
-                if none, index == 0 { return ops(.null) }
+                if index == 0 { return ops(entry.default == .null ? .null : .string("")) }
                 let at = index - offset
                 return names.indices.contains(at) ? ops(.string(names[at])) : []
             },

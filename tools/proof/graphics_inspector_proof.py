@@ -108,15 +108,26 @@ K1–K18 (issue batch B87 phase 3, #239, spec §11 G-34 (l); after I21, before I
     are 1; K4 the slider's start 90, now 120 at mid-span, keyed; K5 a checkbox and a
     pop-up are ◆ "at end"; K6a/K6b the string row too, and laid out at
     `DS.panelWidth` its field narrows below 170 for a whole tag only while keyed
-    (CONTROL: exactly 170 with nothing selected); K7 the colour well ◆, no tag; K8
-    the asset is ⊘ and its write stays `set_graphic`; K9 "Set end value to default"
+    (CONTROL: exactly 170 with nothing selected); K7 the colour well ◆, no tag;
+    K8a–K8d (graphics gaps phase 3, #249, spec §11 G-42, in K8's place) the asset is
+    the end's: K8a Logo is not ⊘ and its write(1) is exactly one `set_action_end
+    {graphic: {props: {logo: "red.png"}}}` with a schema, the end's logo red.png and
+    the base's "" (its start), the popup then [None, red.png]; K8b its write(0)
+    ("None") is one `set_action_end` with `{logo: ""}`, the end's logo "" and the
+    popup's `read` 0; K8c six's logo default rewritten to "red.png" (the anchor
+    `logo: { type: "asset", default: null,` asserted to occur once), no action
+    selected: [None, red.png] reading 1, write(0) one `set_graphic {props: {logo:
+    ""}}` and the base "" reading 0 (CONTROL: write(1) is `{logo: null}`, G-15 (b));
+    K8d an end keyed `{logo: "elsewhere.png"}`, a name the folder lacks: [None,
+    red.png, elsewhere.png] reading 2 (CONTROL: `assetNames` with no clips and no end
+    is [red.png]); K9 "Set end value to default"
     writes 64 into the end; K10 × removes one key; K11 Clear removes all, counts 0;
     K12 a key the module no longer declares gets the action's own stale row, ◆, ⌫
     "… remove it from action 1", counted (O2, O4); K13 with no action selected ◇1 and
     `set_graphic`; K14 Width, Height and Follow Clip are ⊘ (O6; CONTROL blank); K15a/
     K15b the band's label keys and the zoom test (O3); K16 the Text tab's keyed
-    Content row reads "at end" (O5); K17 Properties' Reset writes the end, the
-    asset's null to the base (O7); K18a the text clip's action keys the font, and laid
+    Content row reads "at end" (O5); K17 Properties' Reset writes the end, exactly
+    one `set_action_end` of the seven defaults, the asset's as "" (O7, G-42 (d)); K18a the text clip's action keys the font, and laid
     out at `DS.panelWidth` Font ▸ Family's popup narrows below 150 so its "at end" is
     whole and inside the panel's inset — the CONTROL gives way, never the tag (O8;
     CONTROL: the font not keyed, no tag and exactly 150); K18b the same action keys a
@@ -129,7 +140,7 @@ K1–K18 (issue batch B87 phase 3, #239, spec §11 G-34 (l); after I21, before I
     has no ink between the checkbox and the tag and none over the tag beyond
     the tag's own (its title cut at its edge) while the checkbox's frame has
     some (CONTROL: not keyed, no tag and the checkbox exactly its own width).
-K19a–K19c (graphics gaps phase 2, #248, spec §11 G-41; after K8, before K9) six's
+K19a–K19c (graphics gaps phase 2, #248, spec §11 G-41; after K8d, before K9) six's
     `offset` marked `animate: false` (the anchor `offset: { type: "number", default:
     0,` asserted to occur once): K19a the parsed entry's `animate` and `animatable`
     are false and `structureSignature` changes; K19b the action selected, its end
@@ -188,16 +199,18 @@ nothing else did:
 Issue batch B87 phase 3 adds K12 to `stale` and sixteen more (a bare K id in
 `MUTANTS` names that one row):
   row-writes-base    the graphic split sends every value to the base — K2 K3a K4 K5
-                     K6a K6b K7 K9 K11 K17;
+                     K6a K6b K7 K9 K11 K17 (and, since graphics gaps phase 3, K8a K8b,
+                     K19b, whose CONTROL writes the end, and K18c, whose keyed row is
+                     then ⊘ with no "at end": both stale since they were added);
   count-zero         `keyedCount` of graphic is 0 again — K3b K12;
-  null-default-in-end  the end takes G-15 (b)'s nulls — K9 K17;
+  null-default-in-end  the end takes G-15 (b)'s nulls — K9 K17 (K8b since graphics
+                     gaps phase 3, re-anchored on `endValues`);
   stored-read        `graphicProps` reads the stored props — K3a K4;
   paths-flat         an end's `graphic` group is one path — K3a K10 K11 K13;
   string-continuous  the string row is not discrete — K6a K6b;
   title-fixed-width  the Title field's 170 is required — K6b;
-  asset-to-end       an asset goes to the end — K8 K17 (since graphics gaps phase 2,
-                     `GraphicSchemaEntry.animatable` is `animate` alone);
-  schema-dropped     the typed `setActionEnd` drops `schema` — K2 K5 K9 K17;
+  schema-dropped     the typed `setActionEnd` drops `schema` — K2 K5 K9 K17 (K8a K8b
+                     since graphics gaps phase 3: an asset end with no schema is refused);
   end-stale-dropped  `endProps()` answers nothing — K12 K19c (K19c since graphics gaps
                      phase 2: the end's stale rows are read from it);
   layer-keys-unnamed `set_graphic`'s width/height/length name no path — K14;
@@ -214,9 +227,18 @@ Issue batch B87 phase 4 adds two more:
   checkbox-title-unclipped  the narrowing checkbox is not clipped to its
                      bounds, so its title draws on under the tag — K18c.
 Graphics gaps phase 2 (#248, spec §11 G-41) adds two more:
-  animate-ignored    `animatable` ignores `animate` (`type != "asset"`) — K19a K19b K19c;
+  animate-ignored    `animatable` ignores `animate` (`true`, re-anchored in graphics gaps
+                     phase 3) — K19a K19b K19c;
   end-animate-stale-dropped  `actionStaleKeys` drops its declared non-animatable
                      keys — K19c.
+Graphics gaps phase 3 (#249, spec §11 G-42) retires `asset-to-end` (its anchor is
+gone) and adds five more:
+  asset-held         `animatable` is `animate && type != "asset"` again — K8a K8b K17;
+  none-null-in-end   `endValues` hands an asset's `.null` on as it is — K8b K17;
+  none-for-string-default  "None" is listed only when the default is null — K8c;
+  empty-name-listed  `assetNames` lists a clip's `""` as a name — K8a K8b K8c K8d;
+  end-name-unlisted  `assetNames` drops the selected end's names — K8d.
+`merged-asset-names` is re-anchored on the call's new `end: endProps()` argument.
 """
 
 import argparse
@@ -297,7 +319,7 @@ MUTANTS = {
          "of its own, DS.controlHeight"]),
     "merged-asset-names": (
         "GraphicPane.swift",
-        "GraphicSchemaRows.assetNames(for: $0, files: files, clips: clips)",
+        "GraphicSchemaRows.assetNames(for: $0, files: files, clips: clips, end: endProps())",
         "{ entry -> [String] in _ = clips; let held = [storedProps()[entry.key]].compactMap "
         "{ value -> String? in if case .string(let text)? = value { return text }; return nil }; "
         "return files + Set(held).subtracting(files).sorted() }($0)",
@@ -348,15 +370,17 @@ MUTANTS = {
         "InspectorBinding+Writes.swift",
         "return (base.isEmpty ? nil : base, animated.isEmpty ? nil : animated)",
         "return (values, nil)",
-        ["K2", "K3a", "K4", "K5", "K6a", "K6b", "K7", "K9", "K11", "K17"]),
+        ["K2", "K3a", "K4", "K5", "K6a", "K6b", "K7", "K8a", "K8b", "K9", "K11", "K17",
+         "K18c", "K19b"]),
     "count-zero": (
         "ClipPinnedBlock.swift", "case .graphic: return end.graphic?.props.count ?? 0",
         "case .graphic: return 0", ["K3b", "K12"]),
     "null-default-in-end": (
-        "InspectorBinding+Writes.swift", "ActionGraphicPatch(props: $0)",
+        "InspectorBinding+Writes.swift",
+        "ActionGraphicPatch(props: GraphicSchemaRows.endValues($0, entries: entries))",
         "ActionGraphicPatch(props: GraphicSchemaRows.patchProps($0, entries: entries)"
         ".mapValues { GraphicSchemaRows.value($0) })",
-        ["K9", "K17"]),
+        ["K8b", "K9", "K17"]),
     "stored-read": (
         "InspectorPane.swift", "evaluated(clip).graphic ?? ", "", ["K3a", "K4"]),
     "paths-flat": (
@@ -367,18 +391,34 @@ MUTANTS = {
     "title-fixed-width": (
         "GraphicSchemaRows.swift",
         "            width.priority = NSLayoutConstraint.Priority(249)\n", "", ["K6b"]),
-    "asset-to-end": (
-        "GraphicSchema.swift", "var animatable: Bool { animate && type != \"asset\" }",
-        "var animatable: Bool { animate }", ["K8", "K17"]),
+    "asset-held": (
+        "GraphicSchema.swift", "var animatable: Bool { animate }",
+        "var animatable: Bool { animate && type != \"asset\" }", ["K8a", "K8b", "K17"]),
     "animate-ignored": (
-        "GraphicSchema.swift", "var animatable: Bool { animate && type != \"asset\" }",
-        "var animatable: Bool { type != \"asset\" }", ["K19a", "K19b", "K19c"]),
+        "GraphicSchema.swift", "var animatable: Bool { animate }",
+        "var animatable: Bool { true }", ["K19a", "K19b", "K19c"]),
+    "none-null-in-end": (
+        "GraphicSchemaRows.swift",
+        "entry.type == \"asset\" && value == .null ? .string(\"\") : value", "value",
+        ["K8b", "K17"]),
+    "none-for-string-default": (
+        "GraphicSchemaRows.swift", "let items = [\"None\"] + names",
+        "let items = (entry.default == .null ? [\"None\"] : []) + names", ["K8c"]),
+    "empty-name-listed": (
+        "GraphicSchemaRows.swift",
+        "if case .string(let text)? = clip.graphic?.props[entry.key], !text.isEmpty { return text }",
+        "if case .string(let text)? = clip.graphic?.props[entry.key] { return text }",
+        ["K8a", "K8b", "K8c", "K8d"]),
+    "end-name-unlisted": (
+        "GraphicSchemaRows.swift",
+        "if case .string(let text)? = end[entry.key], !text.isEmpty { held.append(text) }", "",
+        ["K8d"]),
     "end-animate-stale-dropped": (
         "GraphicSchemaRows.swift", "let declaredHeld = end.keys.filter { held.contains($0) }",
         "let declaredHeld = end.keys.filter { held.contains($0) && false }", ["K19c"]),
     "schema-dropped": (
         "ReelOps.swift", "off: off.sorted(), schema: schema)", "off: off.sorted())",
-        ["K2", "K5", "K9", "K17"]),
+        ["K2", "K5", "K8a", "K8b", "K9", "K17"]),
     "end-stale-dropped": (
         "GraphicPane.swift", "binding.selectedAction?.end.graphic?.props ?? [:]", "[:]",
         ["K12", "K19c"]),
@@ -418,9 +458,9 @@ def expected_names(expected, names):
             out += [n for n in names if n.startswith(item + " ")] or [item]
     return out
 
-K_IDS = ["K1", "K2", "K3a", "K3b", "K4", "K5", "K6a", "K6b", "K7", "K8", "K9", "K10", "K11",
-         "K12", "K13", "K14", "K15a", "K15b", "K16", "K17", "K18a", "K18b", "K18c", "K19a",
-         "K19b", "K19c"]
+K_IDS = ["K1", "K2", "K3a", "K3b", "K4", "K5", "K6a", "K6b", "K7", "K8a", "K8b", "K8c",
+         "K8d", "K9", "K10", "K11", "K12", "K13", "K14", "K15a", "K15b", "K16", "K17",
+         "K18a", "K18b", "K18c", "K19a", "K19b", "K19c"]
 
 RESULTS = []
 

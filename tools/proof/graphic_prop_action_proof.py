@@ -21,7 +21,10 @@ The module, `ramp`, draws one rectangle from its props: `x` (number,
 default 64, 0–1000), `fill` (color, default #ff0000) and `mode` (string,
 default "A"; "B" makes the rectangle 300 tall instead of 100). Its v2 lowers
 `x`'s max to 100 and adds `h` (number, default 10, 0–50); its v3 does not
-compile; its v4 is v2 with `h` marked `animate: false` (spec §11 G-41). The canvas is 640×360 at 30 fps; the graphic clip runs 0–2 s and
+compile; its v4 is v2 with `h` marked `animate: false` (spec §11 G-41); its v5 is v2
+plus `logo` (asset, default null), drawn as a 40×40 square at (400,200) only
+when `props.logo` is not null — magenta for `""`, green for a name; it never
+calls `asset()` (spec §11 G-42). The canvas is 640×360 at 30 fps; the graphic clip runs 0–2 s and
 its action 0.5–1.5 s, linear. Ticks: mid 600000 (frame 30), 620000, end−1
 880000, end 900000. Background is the frame's own pixel (5,5).
 
@@ -72,6 +75,14 @@ Instance 1 (the prefetch on, the default), project P:
   included; the end still holds `h` 40 from R2 (a stored end is not
   re-checked); `{x: 50}` lands (CONTROL); `{h: null}` lands and removes `h`
   from the end's props and kinds.
+- **G1** (graphics gaps phase 3, #249, spec §11 G-42): after ramp v5 is
+  written, `{logo: "x.png"}` lands with `kinds.logo` "asset" and the clip's
+  props gaining `logo: ""` (the start); at 880000 (420,220) is that frame's
+  background (the engine handed `render` null for `""`; magenta would mean
+  `""` reached it), and at 900000 it is green.
+- **G2**: `set_graphic {logo: "x.png"}`, then `{logo: ""}` in the end, which
+  lands; at 880000 (420,220) is green, at 900000 that frame's background.
+  The end's logo is then removed by `null`, and the clip's by `set_graphic`'s.
 - **N1**: v2 written again, the graphic clip nested; with `scope` = the
   nest's id, `{x: 30}` on the nested clip's action lands and the nest's
   clip shows `props.x` 30 and `kinds.x` "number".
@@ -131,7 +142,7 @@ BUILD_BOUND = 1500
 WIDTH, HEIGHT = 640, 360
 MID, NEXT, END_LESS_ONE, END = 600_000, 620_000, 880_000, 900_000
 ROWS = ["H0", "T0", "F0", "A1", "B1", "S1", "U1", "C1", "E0", "E1", "R1", "R2", "R3", "R4",
-        "N1", "F1", "F2", "Z1"]
+        "G1", "G2", "N1", "F1", "F2", "Z1"]
 MUTANT_ROWS = [name for name in ROWS if name not in ("F1", "F2")]
 PREFIX = "set_action_end: "
 # The OKLab middle of #ff0000 → #0000ff (spec §11 G-40), from the fixture both
@@ -166,14 +177,20 @@ def check(name, good, detail=""):
 
 
 def module(version):
-    """`ramp` v1, v2 (x's max 100, a new `h`), v3 (does not compile) or v4 (v2 with `h`
-    marked `animate: false`)."""
+    """`ramp` v1, v2 (x's max 100, a new `h`), v3 (does not compile), v4 (v2 with `h`
+    marked `animate: false`) or v5 (v2 plus an asset `logo`, its square magenta for `""`
+    and green for a name, absent for null)."""
     if version == 3:
         return "export const meta = { name: \"Ramp\", durationInFrames: 60 \n"
     x_max = 1000 if version == 1 else 100
     held = ", animate: false" if version == 4 else ""
     extra = ("" if version == 1
              else f"  h: {{ type: \"number\", default: 10, min: 0, max: 50{held} }},\n")
+    if version == 5:
+        extra += "  logo: { type: \"asset\", default: null },\n"
+    logo = ("" if version != 5 else
+            "${props.logo !== null ? `<rect x=\"400\" y=\"200\" width=\"40\" height=\"40\" "
+            "fill=\"${props.logo === \"\" ? \"#ff00ff\" : \"#00ff00\"}\"/>` : \"\"}")
     return ("export const meta = { name: \"Ramp\", durationInFrames: 60 };\n"
             "export const schema = {\n"
             f"  x: {{ type: \"number\", default: 64, min: 0, max: {x_max} }},\n"
@@ -183,7 +200,8 @@ def module(version):
             "};\n"
             "export function render(frame, props, ctx) {\n"
             "  return svg(ctx, `<rect x=\"${props.x}\" y=\"20\" width=\"200\" "
-            "height=\"${props.mode === \"B\" ? 300 : 100}\" fill=\"${props.fill}\"/>`);\n"
+            "height=\"${props.mode === \"B\" ? 300 : 100}\" fill=\"${props.fill}\"/>"
+            + logo + "`);\n"
             "}\n")
 
 
@@ -366,7 +384,8 @@ def run_p(client, log, state):
           f"{g}; action {action}; curve {curved.get('error', 'ok')}, linear {linear}; frame "
           f"{None if base_mid is None else len(base_mid)}")
     if not fixture:
-        for name in ("A1", "B1", "S1", "U1", "C1", "E0", "E1", "R1", "R2", "R3", "R4", "N1"):
+        for name in ("A1", "B1", "S1", "U1", "C1", "E0", "E1", "R1", "R2", "R3", "R4", "G1",
+                     "G2", "N1"):
             check(f"{name} not run: the fixture could not be built", False)
         closed = attempt(client, "close_project", {"project": str(p), "discard": True})
         return closed["ok"]
@@ -554,6 +573,45 @@ def run_p(client, log, state):
           f"v4 {v4} {v4_error}; h {held.get('error', 'APPLIED')!r}, unchanged {unchanged}; "
           f"kept h {kept}; x {other.get('error', 'ok')}; null {gone.get('error', 'ok')}; end "
           f"{canon(end)}")
+
+    # G1 — an image end switches at the end; the start "" reaches render as null (G-42)
+    v5, v5_error = wrote(client, p, 5)
+    named = set_end(client, p, g, action, {"logo": "x.png"})
+    now = project_of(client, p)
+    end = end_graphic(now, g, action)
+    props = (clip_of(now, g).get("graphic") or {}).get("props") or {}
+    before, after = (frame(client, p, "g1-end-less-one", END_LESS_ONE),
+                     frame(client, p, "g1-end", END))
+    square_before, square_after = pixel(before, 420, 220), pixel(after, 420, 220)
+    ground_before = pixel(before, 5, 5)
+    check("G1 after ramp v5: logo x.png lands with kinds.logo asset and the clip's logo \"\"; "
+          "at 880000 (420,220) is background (render got null), at 900000 green",
+          v5 is True and named["ok"] and (end.get("props") or {}).get("logo") == "x.png"
+          and (end.get("kinds") or {}).get("logo") == "asset" and props.get("logo") == ""
+          and near(square_before, ground_before, 2) and near(square_after, (0, 255, 0), 2),
+          f"v5 {v5} {v5_error}; logo {named.get('error', 'ok')}; end {canon(end)}; clip props "
+          f"{canon(props)}; 880000 {square_before} (background {ground_before}); 900000 "
+          f"{square_after}")
+
+    # G2 — an image that ends on none
+    based = attempt(client, "set_graphic", {"project": str(p), "clips": [g],
+                                            "patch": {"props": {"logo": "x.png"}}})
+    cleared = set_end(client, p, g, action, {"logo": ""})
+    end = end_graphic(project_of(client, p), g, action)
+    before, after = (frame(client, p, "g2-end-less-one", END_LESS_ONE),
+                     frame(client, p, "g2-end", END))
+    square_before, square_after = pixel(before, 420, 220), pixel(after, 420, 220)
+    ground_after = pixel(after, 5, 5)
+    check("G2 set_graphic logo x.png, then \"\" in the end lands: at 880000 (420,220) is green, "
+          "at 900000 background",
+          based["ok"] and cleared["ok"] and (end.get("props") or {}).get("logo") == ""
+          and near(square_before, (0, 255, 0), 2) and near(square_after, ground_after, 2),
+          f"set_graphic {based.get('error', 'ok')}; end \"\" {cleared.get('error', 'ok')}; end "
+          f"{canon(end)}; 880000 {square_before}; 900000 {square_after} (background "
+          f"{ground_after})")
+    set_end(client, p, g, action, {"logo": None})
+    attempt(client, "set_graphic", {"project": str(p), "clips": [g],
+                                    "patch": {"props": {"logo": None}}})
 
     # N1 — a clip inside a nest, addressed by scope
     v2_again, _ = wrote(client, p, 2)

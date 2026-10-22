@@ -25,11 +25,13 @@
 //! edit (G-34 (d)). Maps change only by `insert` and `shift_remove`
 //! (`model_graphic.rs`'s rule).
 //!
-//! A prop whose schema entry says `animate: false` is refused by name, as
-//! an asset is (G-41): its module draws it whole, a count or a layout mode a
-//! ramp would break. Like every check here it reads only a named, non-null
-//! prop, so an end that named the prop before its module said so keeps
-//! animating it as stored, and a `null` removes it.
+//! A prop whose schema entry says `animate: false` is refused by name
+//! (G-41): its module draws it whole, a count or a layout mode a ramp would
+//! break. Like every check here it reads only a named, non-null prop, so an
+//! end that named the prop before its module said so keeps animating it as
+//! stored, and a `null` removes it. An `asset` is checked as `set_graphic`
+//! checks it and switches at the action's end, as a string does; "no image"
+//! in an end is `""`, since a `null` there removes (G-42).
 
 use serde_json::{Map, Value};
 
@@ -63,8 +65,8 @@ pub(crate) struct GraphicEnd {
 /// `Err` in the dotted path's own sentence for a body or `props` that is not
 /// an object, a layer key, an unknown key, and for each non-null prop, in
 /// this order: a clip that is not a graphic, no schema, a prop the schema
-/// lacks, a prop marked `animate: false` (G-41), an asset, and whatever
-/// `check_typed` refuses.
+/// lacks, a prop marked `animate: false` (G-41), and whatever `check_typed`
+/// refuses.
 pub(crate) fn read_graphic_end(
     clip: &Clip,
     body: &Value,
@@ -143,12 +145,6 @@ pub(crate) fn read_graphic_end(
             ));
         }
         let kind = entry.get("type").and_then(Value::as_str).unwrap_or("");
-        if kind == "asset" {
-            return Err(format!(
-                "graphic.props.{key} is an asset; an action does not animate an image — set it \
-                 with set_graphic"
-            ));
-        }
         let value = check_typed(key, entry, value).map_err(|why| format!("graphic.{why}"))?;
         read.props.insert(key.clone(), value);
         read.kinds
@@ -215,14 +211,15 @@ pub(crate) fn write_graphic_end(end: &mut Value, read: &GraphicEnd) {
     }
 }
 
-/// The schema entry's default for `key`, a `color` normalised (G-12);
-/// `None` for no entry, no default, or an `asset`, which an action never
-/// animates.
+/// The schema entry's default for `key`, a `color` normalised (G-12), an
+/// `asset`'s `null` answered as `""` (G-42); `None` for no entry or no
+/// default.
 pub(crate) fn schema_default(schema: &Value, key: &str) -> Option<Value> {
     let entry = schema.get(key)?;
     let default = entry.get("default")?;
     match entry.get("type").and_then(Value::as_str) {
-        Some("asset") => None,
+        // "No image" in an end is `""`, since a `null` there removes (G-42).
+        Some("asset") if default.is_null() => Some(Value::String(String::new())),
         Some("color") => default
             .as_str()
             .and_then(normalise_color)

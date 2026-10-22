@@ -727,6 +727,7 @@ func recording(_ body: () -> Void) -> [ReelOp] {
 struct DoubleWrite { let call: (Double) -> Void }
 struct BoolWrite { let call: (Bool) -> Void }
 struct IntWrite { let call: (Int) -> Void }
+struct IntRead { let call: () -> Int }
 struct OptionalRead { let call: () -> Double? }
 struct TabCount { let call: (ClipSubTab) -> Int }
 func closure<Box>(_ object: Any?, _ name: String, as: Box.Type) -> Box? {
@@ -946,20 +947,102 @@ let k7color = row(properties, "Color")
 check("K7 key({color: \"#2d7ff9\"}): Color is ◆ (.keyed) with no visible tag",
       k7color?.gutter.mark == .keyed && !atEndShown(k7color), gutterMark(k7color))
 
-// K8 an asset is the clip's.
+// K8 an asset is the end's, switching at its end, "" no image there (G-42).
+func logoPopup(_ section: InspectorSection?) -> NSView? {
+    row(section, "Logo").flatMap { walk($0).first { $0 is OptionPopupControl } }
+}
+func popupItems(_ popup: NSView?) -> [String]? {
+    popup.flatMap { reflected($0, "items", as: [String].self) }
+}
+func popupWrite(_ popup: NSView?) -> ((Int) -> Void)? {
+    closure(popup, "write", as: IntWrite.self)?.call
+}
+func popupRead(_ popup: NSView?) -> Int? {
+    closure(popup, "read", as: IntRead.self)?.call()
+}
+
+// K8a an image picked with an action selected is one set_action_end.
 properties = section("graphic.properties")
 let k8logo = row(properties, "Logo")
 let k8mark = k8logo?.gutter.mark
-let k8 = recording {
-    k8logo.flatMap { walk($0).first { $0 is OptionPopupControl } }
-        .flatMap { closure($0, "write", as: IntWrite.self)?.call }?(1)
+let k8a = recording { popupWrite(logoPopup(properties))?(1) }
+let k8aOp = onlyOp(k8a, "set_action_end")
+let k8aEnd = end()?.props["logo"], k8aBase = props()["logo"]
+properties = section("graphic.properties")
+let k8aItems = popupItems(logoPopup(properties))
+check("K8a action selected: Logo is not ⊘; its popup's write(1) is exactly one set_action_end "
+        + "{graphic: {props: {logo: \"red.png\"}}} with a schema; the end's logo is red.png, the "
+        + "base's \"\", and the popup is then [None, red.png]",
+      k8mark != nil && k8mark != .notAnimatable && k8aOp != nil
+        && endProps(k8aOp)?.count == 1 && endProps(k8aOp)?["logo"] as? String == "red.png"
+        && k8aOp?.args["schema"] is [String: Any]
+        && k8aEnd == .string("red.png") && k8aBase == .string("") && k8aItems == ["None", "red.png"],
+      "mark \(k8mark.map { "\($0)" } ?? "none"), " + describe(k8a) + " | end "
+        + "\(String(describing: k8aEnd)), base \(String(describing: k8aBase)), items "
+        + "\(k8aItems ?? [])")
+
+// K8b "None" with an action selected writes "" into the end, and reads as None.
+let k8b = recording { popupWrite(logoPopup(properties))?(0) }
+let k8bOp = onlyOp(k8b, "set_action_end")
+let k8bEnd = end()?.props["logo"]
+properties = section("graphic.properties")
+let k8bRead = popupRead(logoPopup(properties))
+check("K8b … its write(0) is exactly one set_action_end {graphic: {props: {logo: \"\"}}}; the "
+        + "end's logo is \"\", and the popup's read answers 0 (None)",
+      k8bOp != nil && endProps(k8bOp)?.count == 1 && endProps(k8bOp)?["logo"] as? String == ""
+        && k8bEnd == .string("") && k8bRead == 0,
+      describe(k8b) + " | end \(String(describing: k8bEnd)), read "
+        + "\(k8bRead.map(String.init) ?? "none")")
+resetEnd()
+base(["logo": NSNull()])
+
+// K8c a string default: "None" is still first, and writes "" to the base.
+let logoAnchor = "logo: { type: \"asset\", default: null,"
+let logoAnchors = sixSource.components(separatedBy: logoAnchor).count - 1
+rewrite("six", sixSource.replacingOccurrences(
+    of: logoAnchor, with: "logo: { type: \"asset\", default: \"red.png\","))
+document.selectAction(nil)
+properties = section("graphic.properties")
+let k8cItems = popupItems(logoPopup(properties))
+let k8cRead = popupRead(logoPopup(properties))
+let k8c = recording { popupWrite(logoPopup(properties))?(0) }
+let k8cBase = props()["logo"]
+properties = section("graphic.properties")
+let k8cNone = popupRead(logoPopup(properties))
+let k8cControl = recording { popupWrite(logoPopup(properties))?(1) }
+check("K8c six's logo default rewritten to \"red.png\", no action selected: the popup is "
+        + "[None, red.png] reading 1; write(0) is exactly one set_graphic {props: {logo: \"\"}}, "
+        + "the base's logo \"\" reading 0; CONTROL: write(1) is one set_graphic {props: {logo: "
+        + "null}} (G-15 (b))",
+      logoAnchors == 1 && k8cItems == ["None", "red.png"] && k8cRead == 1
+        && onlyOp(k8c, "set_graphic") != nil && propsPatch(k8c.first)?.count == 1
+        && propsPatch(k8c.first)?["logo"] as? String == ""
+        && k8cBase == .string("") && k8cNone == 0
+        && onlyOp(k8cControl, "set_graphic") != nil && propsPatch(k8cControl.first)?.count == 1
+        && propsPatch(k8cControl.first)?["logo"] is NSNull,
+      "anchor \(logoAnchors)×, items \(k8cItems ?? []), read \(k8cRead.map(String.init) ?? "none"), "
+        + describe(k8c) + " | base \(String(describing: k8cBase)), read "
+        + "\(k8cNone.map(String.init) ?? "none") | " + describe(k8cControl))
+base(["logo": NSNull()])
+rewrite("six", sixSource)
+document.selectAction(actionID)
+
+// K8d a name the end holds that the folder lacks is listed, as a clip's is.
+fresh(["logo": "elsewhere.png"])
+properties = section("graphic.properties")
+let k8dItems = popupItems(logoPopup(properties))
+let k8dRead = popupRead(logoPopup(properties))
+let k8dEntry = graphic.schema(graphic.shared())?.schema.entries.first { $0.key == "logo" }
+let k8dControl = k8dEntry.map {
+    GraphicSchemaRows.assetNames(for: $0, files: ["red.png"], clips: [], end: [:])
 }
-check("K8 action selected: Logo is ⊘ (.notAnimatable); its popup's write(1) is one set_graphic "
-        + "{props: {logo: \"red.png\"}}, and the end holds no logo",
-      k8mark == .notAnimatable && onlyOp(k8, "set_graphic") != nil
-        && propsPatch(k8.first)?.count == 1 && propsPatch(k8.first)?["logo"] as? String == "red.png"
-        && end()?.props["logo"] == nil && props()["logo"] == .string("red.png"),
-      "mark \(k8mark.map { "\($0)" } ?? "none"), " + describe(k8))
+check("K8d key({logo: \"elsewhere.png\"}): the popup is [None, red.png, elsewhere.png] reading 2; "
+        + "CONTROL: assetNames with no clips and no end is [red.png]",
+      k8dItems == ["None", "red.png", "elsewhere.png"] && k8dRead == 2
+        && k8dControl == ["red.png"],
+      "items \(k8dItems ?? []), read \(k8dRead.map(String.init) ?? "none"), control "
+        + "\(k8dControl ?? [])")
+resetEnd()
 base(["logo": NSNull()])
 
 // K19 a prop its module marks `animate: false` is the clip's (G-41).
@@ -1411,29 +1494,27 @@ let resetButton = properties.flatMap { section in
     }
 }
 let k17 = recording { _ = click(resetButton) }
-let k17first = k17.first, k17second = k17.count > 1 ? k17[1] : nil
-let k17end = endProps(k17second)
+let k17op = onlyOp(k17, "set_action_end")
+let k17end = endProps(k17op)
 let wantDefaults: Bool = {
     guard let props = k17end else { return false }
-    return props.keys.sorted() == ["align", "color", "offset", "showBox", "size", "title"]
+    return props.keys.sorted() == ["align", "color", "logo", "offset", "showBox", "size", "title"]
+        && props["logo"] as? String == ""
         && props["title"] as? String == "Hi {\"}: there" && props["size"] as? Double == 64
         && props["offset"] as? Double == 0 && props["showBox"] as? Bool == true
         && props["color"] as? String == "#FF5A36" && props["align"] as? String == "left"
 }()
 check("K17 resetEnd(): Properties' buttonTitle is nil; its header's Reset clicked records exactly "
-        + "set_graphic {props: {logo: null}} then one set_action_end of six's six non-asset "
-        + "defaults with a schema; applied, the end's size is 64, the end holds no logo, the base "
-        + "size is 90 (O7)",
-      k17title == nil && resetButton != nil && k17.count == 2
-        && k17first?.name == "set_graphic" && propsPatch(k17first)?.count == 1
-        && propsPatch(k17first)?["logo"] is NSNull
-        && k17second?.name == "set_action_end" && wantDefaults
-        && k17second?.args["schema"] is [String: Any]
-        && end()?.props["size"] == .number(64) && end()?.props["logo"] == nil
+        + "one set_action_end, no set_graphic, of six's seven defaults (logo \"\") with a schema; "
+        + "applied, the end's size is 64, the end's logo \"\", the base size is 90 (O7, G-42 (d))",
+      k17title == nil && resetButton != nil && k17op != nil && wantDefaults
+        && k17op?.args["schema"] is [String: Any]
+        && end()?.props["size"] == .number(64) && end()?.props["logo"] == .string("")
         && props()["size"] == .number(90),
       "title \(k17title ?? "nil"), button \(resetButton != nil), " + describe(k17) + " | end "
         + "\(String(describing: end()?.props)), base \(String(describing: props()["size"]))")
 resetEnd()
+base(["logo": NSNull()])
 document.selectAction(nil)
 inspector.onEdit = { [weak document] name, ops in document?.applyEdit(name, ops) }
 

@@ -17377,7 +17377,7 @@ fail, 0 new layout problems.
 
 **Limits.** No row is timed. The inspector predicts no refusal (an end the core
 refuses beeps and shows its sentence, as on every tab). G-34's accepted limits
-stand (no asset ends; the opt-out since G-41, OKLab since G-40).
+stand (asset ends since G-42, the opt-out since G-41, OKLab since G-40).
 
 ## Issue batch B87 phase 4 — a long checkbox label gives way to "at end" (`graphics_inspector_proof.py` K18c and two more mutants; #239, spec §11 G-34 (l))
 
@@ -22028,3 +22028,101 @@ engine's without it — `every_compile_sentence` failed.
 **Limits.** An end stored before its module said `animate: false` keeps
 animating the prop until it is removed (G-41 (c)); the inspector lists it as
 the end's stale row and does not remove it on its own.
+
+## Graphics gaps phase 3 — an action changes a graphic's image (asset) prop (`graphics_inspector_proof.py` K8a–K8d, K17 and five more mutants; `graphic_prop_action_proof.py` G1, G2; #249, spec §11 G-42)
+
+**What it proves.** An `asset` prop in an action's end is checked as
+`set_graphic` checks it and switches at the action's END, as a string does;
+`set_action_end` no longer refuses it. "No image" in an end is `""`, since a
+`null` there removes (G-34 (j)). `schema_default` gives an asset its string
+default, or `""` for a `null` one, so an action's first naming writes that
+start into the clip, and `set_graphic`'s `null` for an animated asset stores
+it too. The engine's `overlay` hands `render` `null` for an asset stored as
+`""`, with no warning. Those are `core/tests/graphic_action_door.rs`'s
+`an_asset_ends_on_an_image_or_on_none_and_starts_from_none`,
+`core/tests/graphic_actions.rs`'s `an_asset_switches_at_the_end` and
+`graphic/tests/props.rs`'s `an_empty_asset_is_handed_as_null`. App side:
+`GraphicSchemaEntry.animatable` is `animate` alone, so with an action
+selected the image row writes the end (◇/◆, never ⊘); every asset row lists
+"None" first; "None" writes `""` into an end (`GraphicSchemaRows.endValues`,
+through the split's action closure) and, at the base, `null` for a `null`
+default and `""` for a string one; a `""` reads as "None" and is never a
+popup item; and the popup lists a name the selected action's end holds that
+the folder lacks (`assetNames(…, end:)`, from both the row and the pane's
+signature).
+
+**The probe's rows** (K8a–K8d in K8's place, after K7, before K19a):
+- **K8a** the action selected: Logo is not ⊘; its popup's write(1) is
+  exactly one `set_action_end {graphic: {props: {logo: "red.png"}}}` with a
+  schema; the end's logo is red.png and the base's `""` (its start); the
+  popup is then [None, red.png].
+- **K8b** its write(0) is exactly one `set_action_end` with `{logo: ""}`,
+  the end's logo `""`, and the popup's `read` (through `closure`, as `write`
+  is) answers 0. The end and the base's logo are restored.
+- **K8c** six's `logo: { type: "asset", default: null,` (asserted to occur
+  once) rewritten to a default of `"red.png"`, no action selected: the popup
+  is [None, red.png] reading 1; write(0) is exactly one `set_graphic {props:
+  {logo: ""}}`, after which the base's logo is `""` and `read` answers 0;
+  CONTROL: write(1) is one `set_graphic {props: {logo: null}}` (G-15 (b)).
+  Six, the base and the selection are restored.
+- **K8d** an end keyed `{logo: "elsewhere.png"}` (not in the folder): the
+  popup is [None, red.png, elsewhere.png] reading 2; CONTROL:
+  `assetNames(for: logo, files: ["red.png"], clips: [], end: [:])` is
+  [red.png].
+- **K17** (changed) Properties' Reset records exactly ONE `set_action_end`,
+  no `set_graphic`, of the seven defaults sorted, `logo` `""`, with a
+  schema; applied, the end's size is 64 and its logo `""`, the base's size
+  90.
+
+**`graphic_prop_action_proof.py` G1, G2** (after R4, before N1): ramp v5 is
+v2 plus `logo: { type: "asset", default: null }`, drawn as a 40×40 square at
+(400,200) when `props.logo` is not null — magenta for `""`, green for a name
+(it never calls `asset()`). **G1** `{logo: "x.png"}` lands with `kinds.logo`
+"asset" and the clip's props gaining `logo: ""`; at 880000 (420,220) is that
+frame's (5,5) background (the module got `null`; magenta would mean `""`),
+at 900000 green. **G2** `set_graphic {logo: "x.png"}`, then `{logo: ""}` in
+the end, which lands; at 880000 the square is green, at 900000 background.
+The end's logo is removed by `null`, then the clip's by `set_graphic`'s.
+
+| Mutant | Anchor | Must fail |
+|---|---|---|
+| `asset-to-end` | retired: its anchor is gone | — |
+| `asset-held` | `GraphicSchema.swift` `var animatable: Bool { animate }` → `var animatable: Bool { animate && type != "asset" }` | K8a K8b K17 |
+| `animate-ignored` (re-anchored) | the same anchor → `var animatable: Bool { true }` | K19a K19b K19c |
+| `none-null-in-end` | `GraphicSchemaRows.swift` `endValues`' `entry.type == "asset" && value == .null ? .string("") : value` → `value` | K8b K17 |
+| `null-default-in-end` (re-anchored) | `InspectorBinding+Writes.swift` `ActionGraphicPatch(props: GraphicSchemaRows.endValues($0, entries: entries))` → the old `patchProps` replacement | K8b K9 K17 |
+| `none-for-string-default` | `let items = ["None"] + names` → `let items = (entry.default == .null ? ["None"] : []) + names` | K8c |
+| `empty-name-listed` | the clips' line without `, !text.isEmpty` | K8a K8b K8c K8d (K8c beyond the spec's list, a correct catch: after its write(0) the base holds `""`, which is then a popup item, so `read` answers 2, not 0) |
+| `end-name-unlisted` | `if case .string(let text)? = end[entry.key], !text.isEmpty { held.append(text) }` → `` | K8d |
+| `row-writes-base` (rows widened) | as before | adds K8a K8b, K19b (stale since phase 2: its CONTROL writes the end) and K18c (stale since B87 phase 4: the keyed showBox row's writes reach no `set_action_end`, so it is ⊘ and its "at end" hidden) |
+| `schema-dropped` (rows widened) | as before | adds K8a K8b (an asset end with no schema is refused) |
+
+`merged-asset-names` is re-anchored on the call's new `end: endProps()`
+argument; its row is unchanged.
+
+The core and engine mutants, applied by hand to the tree, the named test run
+and reverted: M1 `overlay` without the `""` arm — `an_empty_asset_is_handed_as_null`
+failed; M2 `schema_default`'s asset arm back to `None` — the door test
+failed; M3 the asset refusal restored — the door test and
+`an_asset_switches_at_the_end` failed.
+
+| Run (2026-10-22, the worktree, Release, `powermode 0`) | Result |
+|---|---|
+| `make gate` | PASS (names, typecheck, fmt, lint, test, app) |
+| `RC_PROOF_APP=release python3 tools/proof/graphics_inspector_proof.py` | 97/97, exit 0, Z1 held, no `DEFAULTS MOVED` |
+| `--mutant asset-held` | `MUTANT PASS`: K8a K8b K17 |
+| `--mutant animate-ignored` | `MUTANT PASS`: K19a K19b K19c |
+| `--mutant none-null-in-end` | `MUTANT PASS`: K8b K17 |
+| `--mutant null-default-in-end` | `MUTANT PASS`: K8b K9 K17 |
+| `--mutant none-for-string-default` | `MUTANT PASS`: K8c |
+| `--mutant empty-name-listed` | `MUTANT PASS`: K8a K8b K8c K8d (the first run failed K8c beyond the list; recorded above and added) |
+| `--mutant end-name-unlisted` | `MUTANT PASS`: K8d |
+| `--mutant row-writes-base` | `MUTANT PASS`: K2 K3a K4 K5 K6a K6b K7 K8a K8b K9 K11 K17 K18c K19b (the first run failed K18c beyond the list; recorded above and added) |
+| `--mutant schema-dropped` | `MUTANT PASS`: K2 K5 K8a K8b K9 K17 |
+| `--mutant merged-asset-names` (re-anchored) | `MUTANT PASS`: I15's signature row |
+| `RC_PROOF_APP=release python3 tools/proof/graphic_prop_action_proof.py` | 20/20, exit 0, Z1 held, no `DEFAULTS MOVED`; G1's (420,220) (0, 0, 0) at 880000 against a background of (0, 0, 0), (0, 255, 0) at 900000; G2's the reverse |
+
+**Limits.** An image switches at the end; there is no cross-fade. The core
+does not check that a name exists in `graphics/assets/`: `asset()`'s warning
+stays the only check. An older build draws an asset end but hands `""` to
+the module as `""` (no format bump, G-42 (e)).
