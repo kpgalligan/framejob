@@ -439,6 +439,14 @@
    ],
    "note": "presentAsSheet(SilenceSheetController); beeps with no audio"
   },
+  "removeFillerWords:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController.swift `func removeFillerWords(`",
+    "app/Sources/FillerSheetController.swift:302"
+   ],
+   "note": "presentAsSheet(FillerSheetController); beeps with no clip that plays sound from a media file"
+  },
   "setTransitionKind:": {
    "verdict": "sheet",
    "code": [
@@ -1291,6 +1299,15 @@
    "func": "removeSilencesCommand",
    "reached_from": [
     "removeSilences:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/FillerSheetController.swift:302": {
+   "token": "presentAsSheet",
+   "func": "removeFillerWordsCommand",
+   "reached_from": [
+    "removeFillerWords:"
    ],
    "reached_after": [],
    "other_caller": ""

@@ -111,7 +111,11 @@ Apply (Return) or Cancel (Escape), and Cancel changes nothing; since round 3,
 waveforms line up there (a clear GCC-PHAT peak), else the command is refused
 at the inspector's foot), Add Action, Speed…,
 Close Gap, Remove
-Silences…, Transition ▸, Motion ▸ (In ▸ / Out ▸ / During ▸, each the kinds
+Silences…, Remove Filler Words… (cut-by-transcript CT-3, §11 TR-10: a sheet over
+`detect_fillers`' answer whose Remove is one `ripple_delete_ranges` step, undo
+"Remove Filler Words", and whose rows' Transcribe is `transcribe_for_fillers`;
+enabled when a clip plays sound from a media file; no key equivalent, for
+Remove Silences…' reason), Transition ▸, Motion ▸ (In ▸ / Out ▸ / During ▸, each the kinds
 and None; no key equivalent), Look ▸ (the eight looks, a separator, then the
 project's `.cube` LUTs in media-list order and a second separator when there
 are any, then None — §11 GR-8 [b]; a LUT item is named by its file less

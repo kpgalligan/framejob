@@ -108,6 +108,7 @@ final class AgentServer {
     private static let productOffMainTools: Set<String> = [
         "import_media", "relink_media", "render_frame", "export", "save_project", "new_project",
         "transcribe", "record_screen", "render_graphic", "open_project", "sync_audio",
+        "transcribe_for_fillers",
     ]
     // The dev tools' members join here (AgentServer+DevTools.swift).
     static let offMainTools = productOffMainTools.union(devOffMainTools)
@@ -193,7 +194,7 @@ final class AgentServer {
     /// and `prepareCatalog()` checks the two sets match on every launch.
     ///
     /// One entry per row of the op table (spec §6, and the module doc of
-    /// `core/src/edit.rs`) plus the thirty-four tools that are not ops: the
+    /// `core/src/edit.rs`) plus the thirty-five tools that are not ops: the
     /// project-level ones spec §7.9 names, the five view-state and history
     /// mirrors beside them (`set_range`, `set_selection`, `set_scope`,
     /// `undo`, `redo`), the composites later phases added —
@@ -285,6 +286,7 @@ final class AgentServer {
         "detect_silence": { $0.detectSilence },
         // Filler detection (AgentServer+Fillers.swift)
         "detect_fillers": { $0.detectFillers },
+        "transcribe_for_fillers": { $0.transcribeForFillers },
         // Sound (AgentServer+Audio.swift)
         "normalize_clip": { $0.normalizeClip },
         "sync_audio": { $0.syncAudio },

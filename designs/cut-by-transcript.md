@@ -107,7 +107,8 @@ TR-1… live in `designs/spec/11-decisions/cut-by-transcript.md`.
 
 ## Person checks
 
-None yet.
+FIL-1 in `docs/manual-checks.md` (CT-3): a real narrated recording, the estimate
+read, Transcribe pressed, the wash looked at, Remove, every cut played, one ⌘Z.
 
 ## CT-0 record
 
@@ -339,7 +340,87 @@ manual-checks row.
 
 ## CT-3 record
 
-Not started.
+**What landed (2026-10-23):** TR-10 in `designs/spec/11-decisions/cut-by-transcript.md`,
+recorded before the code, with AI-7's "Amended 2026-10-22, by TR-10" line, the index rows and
+the Lines cells. `FillerTranscription.swift` (new): the one media's request
+(`options(for:)` — the marker's language, speakers and vocabulary, the shipped models,
+`disfluencies: true`), `refresh = true`, `jobs(for:in:urls:)` and `estimate(jobs:media:
+cacheDirectory:)`, shared by the sheet and the tool. `FillerSheetController.swift` (new):
+Clip ▸ Remove Filler Words…, `SilenceSheetController`'s shape without controls — the
+summary, the joined note (selection scope, dropped fillers, locked clips, nothing read, no key,
+nowhere to cache, the last run's error), Remove enabled only with spans and no run, the
+`candidateSpans` wash set in `refresh()` and cleared in `viewDidDisappear` (which also stops a
+run), one `ripple_delete_ranges` named "Remove Filler Words", `runStarted`/`runEnded`, and
+`removeFillerWordsCommand`/`validateFillerAction` at its foot.
+`FillerSheetController+Transcribe.swift` (new): the TR-7 section's rows (name, `describe`
+estimate with the `rateSentence` tooltip, a `.secondary` Transcribe button that is Stop on the
+running row), the button's state, and the `CloudTranscriber.run` a press starts.
+`AgentServer+Fillers.swift`: `transcribe_for_fillers {media}`, off main, refusing in the
+spec's order and answering `ready` with `cloudFields`; `detect_fillers`' note names it.
+Wiring: the menu item after Remove Silences… (no key), the frozen forward and validator line
+in `EditorViewController.swift`, `UIMenuTable`'s `.sheet` row, `inventory.json`'s selector
+and site, the handler row and `productOffMainTools` entry in `AgentServer.swift` (the
+`agent_open_proof.py` anchor line untouched), the catalog row after `detect_fillers`, the count
+words (ninety-six tools, thirty-five app-state) and `AssistantToolTable`'s withheld row. No
+Rust, header, FFI, op or format change. The instruments: `filler_sheet_probe.swift` and
+`filler_sheet_proof.py` (new); `fillers_proof.py` M4, `op_argument_proof.py` (96),
+`phase9_proof.py`, `recording_probe.py`, `recording_proof.py`, `assistant_session_proof.py`
+and `assistant_lane_probe.swift`'s fifth L4 case; `tools/proof/README.md`'s "Cut by transcript
+CT-3" section; the screen `designs/screens/14b-remove-filler-words-sheet.md`; FIL-1 and CH-4 in
+`docs/manual-checks.md`. Spec §7.9a, §7.9c, §7.4, §9 and the README name the sheet and tool.
+
+**The runs** (2026-10-22/23, macOS 26.5.1, the worktree on `a4bcbd2` with CT-3's uncommitted
+changes, each on the final instrument; every app proof under `env -u RC_ASSEMBLYAI_KEY`,
+nothing paid):
+
+| Command | Result |
+|---|---|
+| `make typecheck` | 0 errors, the 4 baseline warnings |
+| `swift_build.py typecheck filler_sheet_probe.swift` | exit 0 |
+| `filler_sheet_proof.py --only S0,…,S7` | 8/8, exit 0 |
+| `capture_spike/inventory.py --check` | 5/5, exit 0 |
+| `spec_index_proof.py` | 180/180, exit 0 |
+| `make app-debug && filler_sheet_proof.py` (Debug) | 15/15, exit 0 |
+| `fillers_proof.py --only M0,M1,M4` (Debug) | 3/3, exit 0 |
+| `make gate` | PASS (names, typecheck, test — `assistant_lane_proof.py`'s L4 with its fifth case among it — and app ran; fmt and lint skipped, no Rust changed) |
+| `v2_menu.py --only H` | 5/5, exit 0 (107 rows, `removeFillerWords:` among them) |
+| `RC_PROOF_APP=release filler_sheet_proof.py` | 15/15, exit 0; T1 one submit with `disfluencies` and `speaker_labels` true, then [[1460000, 1780000]]; T5 "1 cut · removes 00:00:00:16", the wash on the timeline only while the sheet is up |
+| `RC_PROOF_APP=release fillers_proof.py` | 17/17, exit 0 |
+| `op_argument_proof.py <dir>/agent.sock` (Release) | 166/166, exit 0 |
+| `phase9_proof.py <dir>/agent.sock` (Release) | 236/236, exit 0; `grep "Frame Job: "` on that instance's log empty |
+| `recording_probe.py --only catalog` | 31/31, exit 0 |
+| `python3 -m py_compile tools/proof/recording_proof.py` | exit 0 |
+| `RC_PROOF_APP=release assistant_session_proof.py` | 13/13, exit 0 (stand-in server, no spend) |
+| `RC_PROOF_APP=release screens.py --only 14b-remove-filler-words-sheet` | 6/6, 4 captures, 0 new problems |
+
+**The mutants.** `filler_sheet_proof.py --mutant NAME` (probe rows only), each anchor asserted
+once, exit 0 when caught; every one was caught:
+
+| Mutant | Must fail | Failed (score) |
+|---|---|---|
+| `options-drop-request` | S4 | S3 S4 (6/8) |
+| `estimate-no-refresh` | S3 | S3 S4 (6/8) |
+| `no-wash` | S1 | S1 S2 (6/8) |
+| `wash-kept` | S2 | S2 (7/8) |
+| `first-span-only` | S2 | S2 (7/8) |
+| `remove-always-enabled` | S3 | S3 S7 (6/8) |
+| `remove-live-during-run` | S7 | S7 (7/8) |
+| `transcribe-without-key` | S3 | S3 (7/8) |
+| `not-withheld` | S6 | S6 (7/8) |
+
+**Deviations:** `mediaRows` is an internal `var`, not `private(set)`, because the rows are
+built in `FillerSheetController+Transcribe.swift` and Swift's `private(set)` reaches only its
+own file; likewise the run's `cloud`, `token`, `lastError`, `runnable` and a `tornDown` flag
+(set by the teardown so a run answering after the sheet has gone cannot put the wash back).
+The targeted `fillers_proof.py --only M0,M4` was run as `--only M0,M1,M4`, since M4 reads M1's
+session. Left alone, as the brief's out-of-scope list says: the undo name of the agent's
+`ripple_delete_ranges` ("Remove Silences").
+
+**Owed:** the root `CLAUDE.md`'s "ninety-five" (Rules) → "ninety-six" and
+`transcribe_for_fillers` after `detect_fillers` in "Verifying a build"'s app-state list;
+`app/CLAUDE.md`'s map entries for `FillerSheetController.swift`,
+`FillerSheetController+Transcribe.swift` and `FillerTranscription.swift`, and its tool counts.
+FIL-1 is the person's check of a real recording's cut.
 
 ## CT-4 record
 

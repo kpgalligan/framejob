@@ -74,6 +74,7 @@ extension UIMenu {
         "synchronizeAudio:": .sheet,
         "showSpeedSheet:": .sheet,
         "removeSilences:": .sheet,
+        "removeFillerWords:": .sheet,
         "setTransitionKind:": .sheet,
         "setMotionIn:": .plain,
         "setMotionOut:": .plain,

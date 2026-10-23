@@ -7545,7 +7545,7 @@ in it calls `start()`, and every row makes its own documents.
   `project` = B's path it is refused with the AI-5 sentence and neither
   changes; once A is closed, "no longer open".
 - **L4** (AI-7): `submit` of `record_screen`, `transcribe {engine:
-  "assemblyai"}` and `snapshot_ui` each answers its refusal as written and the
+  "assemblyai"}`, `transcribe_for_fillers` (TR-10) and `snapshot_ui` each answers its refusal as written and the
   hook is never called; `serve snapshot_ui` is not refused by the lane.
 - **L5** (AI-7): `export` Deny to a fresh path ("export writes P", the
   declined sentence, no file) and onto a sentinel ("export REPLACES S", bytes
@@ -22361,3 +22361,97 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/fillers_proof.py --mutant NAME   # 
 `recording_probe.py` and `recording_proof.py` list `detect_fillers` among the
 thirty-four app-state tools; `assistant_prompt_proof.py --probe` F4 finds it in
 `searchTopics`' audio row.
+
+## Cut by transcript CT-3 — Clip ▸ Remove Filler Words… and `transcribe_for_fillers` (`filler_sheet_proof.py` S0–S7, T0–T6 and nine mutants; `filler_sheet_probe.swift`; spec §11 TR-7, TR-10)
+
+**What it proves.** `FillerSheetController` shows `detect_fillers`' answer
+(`FillerDetector.read(from:clips: nil)`) as a count, washes the same spans onto
+`TimelineView.candidateSpans` and clears them in `viewDidDisappear`, and Remove
+sends ONE `ripple_delete_ranges` named "Remove Filler Words". A media with no
+filler transcript gets a row: `CloudEstimate.describe` of the very request
+`FillerTranscription` builds (the marker's language, speakers and vocabulary,
+the shipped models, `disfluencies: true`, `refresh: true`), R6-2's upload
+sentence above it, and a Transcribe button that is off with no key and while a
+run goes; Remove is off while a run goes. `transcribe_for_fillers {media}` is
+that button over MCP, off main, and the assistant never sees it.
+
+**Host-state input:** `media/speech.mov` (and `speech.aiff` for T3's unplayed
+media); a missing `speech.mov` is a scored FAIL. AssemblyAI is
+`assemblyai_fake.py` serving `cloud_captions_proof.DISFLUENT_WORDS` to an
+instance given the dummy key `proof-key` (T4: no key); the run holds the cloud
+instruments' lock. Run every command under `env -u RC_ASSEMBLYAI_KEY`.
+
+```sh
+python3 tools/proof/swift_build.py typecheck tools/proof/filler_sheet_probe.swift
+python3 tools/proof/filler_sheet_proof.py --only S0,S1,S2,S3,S4,S5,S6,S7   # no app
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/filler_sheet_proof.py
+RC_PROOF_APP=release env -u RC_ASSEMBLYAI_KEY python3 tools/proof/filler_sheet_proof.py   # the record
+python3 tools/proof/filler_sheet_proof.py --mutant NAME   # exit 0 = caught
+```
+
+**The probe rows**, `filler_sheet_probe.swift` copied in as `main.swift` over
+`swift_build.app_sources()` and run with `speech.mov` as its argument (a build
+failure is S0's FAIL). Every sheet gets a `MemoryStore`, an in-memory
+`MemoryDefaults` and an explicit environment; no row presses Transcribe.
+- **S1** one `speech.mov` clip and a hand-built `Input` with "um" and "uh" as
+  two runs: "2 cuts · removes 00:00:00:18", Remove on, the wash equals
+  `outcome.spans`, no rows.
+- **S2** presented with a still animator, Remove's `performClick` gives the
+  clips a twin document gets from `ripple_delete_ranges` of both spans; undo
+  "Remove Filler Words", one undo restores; `viewDidDisappear()` clears the wash.
+- **S3** a marker stamped from `speech.mov`, current for captions (`"en"`,
+  speakers, `disfluencies: false`) with a readable transcript: one row,
+  `FillerTranscription.estimate` fate `.upload(.refresh)`, the row's line its
+  `describe` ("1 file to upload · 00:00:05.249 of audio · under $0.01 …"), the
+  cloud-only note and `uploadHint` of the defaults' region shown; keyless the
+  button is off and the note holds `noKeyNote`, keyed it is on; Remove off,
+  "No cuts".
+- **S4** `options(for:)` with a marker ("fr", speakers, ["Frame Job"]) and nil.
+- **S5** `jobs(for: 1)` over a built snapshot keeps clip 10, not the reversed
+  clip 11 or media 2's clip 12.
+- **S6** `AssistantToolTable.refusal` is the row's sentence; `assistantCatalog`
+  keeps `detect_fillers` and drops `transcribe_for_fillers`.
+- **S7** S1's input needing the media, keyed: Remove and Transcribe on; after
+  `runStarted(media:)` Remove off, `runningMedia` set, the row reads "Stop", on.
+
+**The app rows**, a keyed instance (T0–T3, T5, T6) and a keyless one (T4):
+- **T0** the parity log is empty; the tool takes exactly `media` and
+  `project`, `media` required; `detect_fillers`' text names the sheet and the
+  tool and no longer says "future".
+- **T1** `transcribe` (assemblyai, `place: false`, `speakers: true`), then
+  `fillers_proof.py` M4's raw edits: `needs_transcript` [m]; the tool makes one
+  submit with `disfluencies` and `speaker_labels` true, answers `uploaded` [m],
+  `ready` true, `get_project` unchanged; `detect_fillers` then
+  [[1460000, 1780000]].
+- **T2** a second call: no submit, `uploaded` [], `cached` [m],
+  `audio_seconds` 0, the "already has a transcript" note.
+- **T3** refused by sentence: no `media`, 987654, an imported media no clip plays.
+- **T4** keyless: `CloudTranscriber.AccessError.credentialRequired`'s sentence
+  and no upload.
+- **T5** T1's package, Clip ▸ Remove Filler Words…: the sheet's layout dump
+  reads "1 cut · removes 00:00:00:16"; the timeline PNG with the sheet up
+  differs from the one after `cancel_sheet`, which is byte-equal to the one
+  taken before.
+- **T6** a never-transcribed session: the dump holds "speech.mov",
+  "Transcribe", the cloud-only note and "deleted from AssemblyAI once the
+  words have been read back".
+
+| Mutant | Anchor (asserted once) | Must fail | 2026-10-23 |
+|---|---|---|---|
+| `options-drop-request` | `FillerTranscription.swift` `marker?.speakerLabels ?? false` → `false` | S4 | caught (6/8; S3 too) |
+| `estimate-no-refresh` | `FillerTranscription.swift` `refresh = true` → `false` | S3 | caught (6/8; S4 too) |
+| `no-wash` | `FillerSheetController.swift` `candidateSpans = outcome.spans` → `[]` | S1 | caught (6/8; S2 too) |
+| `wash-kept` | the teardown's `timeline?.candidateSpans = []` removed | S2 | caught (7/8) |
+| `first-span-only` | the commit's `outcome.spans.map` → `.prefix(1).map` | S2 | caught (7/8) |
+| `remove-always-enabled` | `isEnabled = !outcome.spans.isEmpty && runningMedia == nil` → `true` | S3 | caught (6/8; S7 too) |
+| `remove-live-during-run` | `&& runningMedia == nil` removed from that line | S7 | caught (7/8) |
+| `transcribe-without-key` | `FillerSheetController+Transcribe.swift` `idle && hasCredential && runnable` → `idle && runnable` | S3 | caught (7/8) |
+| `not-withheld` | `AssistantToolTable.swift` the row's `tool: "transcribe_for_fillers"` renamed | S6 | caught (7/8) |
+
+**Counts.** `op_argument_proof.py` `PRODUCT_TOOLS = 96`; `phase9_proof.py`,
+`recording_probe.py` and `recording_proof.py` list `transcribe_for_fillers`
+among the thirty-five app-state tools; `assistant_session_proof.py` leaves it
+out of the assistant's catalog; `assistant_lane_probe.swift`'s L4 refuses it
+with the row's sentence; `fillers_proof.py` M4 looks for
+`transcribe_for_fillers` in `detect_fillers`' note. The screen is
+`designs/screens/14b-remove-filler-words-sheet.md`.

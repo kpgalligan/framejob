@@ -295,6 +295,12 @@ extension AppDelegate {
         // resolved ahead of the first responder and steal it back.
         menu.addItem(
             item("Remove Silences…", #selector(EditorViewController.removeSilences(_:))))
+        // Road map "cut-by-transcript" CT-3 (spec §11 TR-10), right after
+        // Remove Silences…: the UI path `detect_fillers` and
+        // `transcribe_for_fillers` name. No key equivalent, for Remove
+        // Silences…' reason above.
+        menu.addItem(
+            item("Remove Filler Words…", #selector(EditorViewController.removeFillerWords(_:))))
         menu.addItem(submenuItem(transitionMenu()))
         // Road map 5's E2, beside Transition ▸: the two "how the clip arrives"
         // submenus together (a recorded deviation from §5f's "after Label").

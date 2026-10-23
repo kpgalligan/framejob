@@ -253,7 +253,7 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Source:** #48, #109.
 
 **CH-4 — The square buttons**
-- **Do:** 1. Close every document so Welcome shows, then open Frame Job ▸ Settings…. 2. In a project: File ▸ Export…, Clip ▸ Speed…, Clip ▸ Remove Silences…, File ▸ Generate Captions…, File ▸ Consolidate Media…, File ▸ New Recording…, Window ▸ Export Queue. 3. In each, hover every button, press and hold one, and look at a disabled one (Settings' Remove with no key set).
+- **Do:** 1. Close every document so Welcome shows, then open Frame Job ▸ Settings…. 2. In a project: File ▸ Export…, Clip ▸ Speed…, Clip ▸ Remove Silences…, Clip ▸ Remove Filler Words…, File ▸ Generate Captions…, File ▸ Consolidate Media…, File ▸ New Recording…, Window ▸ Export Queue. 3. In each, hover every button, press and hold one, and look at a disabled one (Settings' Remove with no key set).
 - **Expect:** square buttons with no shadow. The blue one lightens slightly on hover, and the outlined one takes a faint grey fill. A press shrinks the button a little about its centre, and a disabled one is dimmed. No title is clipped and no row is cramped or off-centre, in both appearances.
 - **Source:** #100 (spec §11 SH-4).
 
@@ -425,6 +425,11 @@ Needs your own AssemblyAI key (Setup 3).
 - **Do:** 1. Open it with one file still being analysed and another judged by level. 2. Look at the shading on the ruler and lanes. 3. Select only silent clips.
 - **Expect:** the two notes read sensibly together; shading marks the spans to remove; the "Selected clips" row is disabled with a silent selection.
 - **Source:** #54.
+
+**FIL-1 — Remove Filler Words on a real recording**
+- **Do:** 1. Open a real narrated recording, with an AssemblyAI key set. 2. Clip ▸ Remove Filler Words…; read the estimate beside the file. 3. Press Transcribe and wait for it to finish. 4. Look at the shading on the ruler and lanes. 5. Press Remove. 6. Play every cut. 7. Press ⌘Z once.
+- **Expect:** the estimate names the file and its price before anything is uploaded; the shading marks only the ums and uhs; no word is clipped at any cut; one undo puts everything back.
+- **Source:** #92 (spec §11 TR-10).
 
 **TRN-1 — Transitions**
 - **Do:** 1. Add a crossfade across a Remove Silences cut. 2. Compare an eased push with a linear one. 3. At a hard cut, use Clip ▸ Transition. 4. Apply each of the three wipes.

@@ -444,7 +444,8 @@ def row_t2(app, ctx):
     tools = first.get("tools", [])
     names = [t.get("name") for t in tools]
     wanted = [SEARCH_TOOL] + [n for n in ctx["catalog"]
-                              if n not in ("record_screen", "close_project")  # withheld (AI-7, #40)
+                              if n not in ("record_screen", "close_project",
+                                           "transcribe_for_fillers")  # withheld (AI-7, #40, TR-10)
                               and n not in DEV_TOOLS]
     if names != wanted:
         extra = sorted(set(names) - set(wanted))

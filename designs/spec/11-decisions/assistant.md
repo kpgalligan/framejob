@@ -68,6 +68,8 @@ in §6).
   written costs a click.
   **Amended 2026-10-01, by #40**: `close_project` is withheld, always: closing a project
   closes the window the conversation lives in (AI-5).
+  **Amended 2026-10-22, by TR-10**: `transcribe_for_fillers` is withheld, always, with R6-2's
+  reason, pointing at Clip ▸ Remove Filler Words…, which shows what is uploaded and what it costs.
 - **AI-8 — The key is the person's own, and is R6-5 and R6-12's key in everything but the
   vendor.** It lives in `SecretStore` under `anthropic-key`; the one override is
   `ANTHROPIC_API_KEY`, read only as R6-5 amended says. It is never a tool argument, a launch

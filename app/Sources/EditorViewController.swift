@@ -892,6 +892,10 @@ final class EditorViewController: NSViewController {
     /// and a second declaration in this file would be a redeclaration, not a
     /// forward.
     @objc func removeSilences(_ sender: Any?) { removeSilencesCommand() }
+    /// Clip ▸ Remove Filler Words… — its body, `removeFillerWordsCommand`, and
+    /// its validator, `validateFillerAction`, are at the foot of
+    /// FillerSheetController.swift, Remove Silences' rule.
+    @objc func removeFillerWords(_ sender: Any?) { removeFillerWordsCommand() }
     /// File ▸ Generate Captions… — the body and its validator are at the foot
     /// of TranscribeSheetController+Commit.swift, and File ▸ Export Captions…' are at
     /// the foot of CaptionExporter.swift: the same rule as Import Captions'
@@ -1048,7 +1052,8 @@ extension EditorViewController: NSUserInterfaceValidations {
             if let answer = validateAudioAction(action) { return answer }
             // The arms whose files are not `EditorViewController+…`: Remove
             // Silences' body and validator live at the foot of
-            // SilenceSheetController.swift, beside the sheet, and phase 4's
+            // SilenceSheetController.swift, beside the sheet, Remove Filler
+            // Words' at the foot of FillerSheetController.swift, and phase 4's
             // two caption commands follow the same rule from the feet of
             // TranscribeSheetController+Commit.swift and CaptionExporter.swift.
             //
@@ -1060,6 +1065,7 @@ extension EditorViewController: NSUserInterfaceValidations {
             // cheap snapshot question its command's own guard asks, so the
             // menu and the command can never disagree.
             if let answer = validateSilenceAction(action) { return answer }
+            if let answer = validateFillerAction(action) { return answer }
             if let answer = validateTranscribeAction(action) { return answer }
             if let answer = validateCaptionExportAction(action) { return answer }
         }

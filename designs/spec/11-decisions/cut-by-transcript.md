@@ -12,14 +12,14 @@ quoted verbatim in the road map's "The owner's choices"), which the owner took u
 ("#92 Cut by transcript"). TR-7, the on-device filler source, was recorded on 2026-10-22 after
 the filler spike ran on the owner's own scripted sample, before CT-2.
 CT-1…CT-4 each record their numbers as a new entry (TR-8 on) or as Amended-by lines before their
-code; TR-8 was recorded in CT-1, before its code.
+code; TR-8 was recorded in CT-1, TR-9 in CT-2 and TR-10 in CT-3, each before its code.
 
 **Stands, and nothing here re-litigates it:** R6-3 (one upload per media, every clip derived from
 it, the words cached verbatim); R6-10 (`MediaTranscript.words(for:in:)` maps a media's words onto
-a clip); AI-7 (the cloud `transcribe` stays withheld from the assistant); W-8 (the on-device
-engine's asset download is a person's act, never a tool's); the silence road map's 32 ms grid
-(Silero VAD's own grid, inward; `silence.md`). R6-15 and AI-6 are amended here, by TR-1 and TR-5;
-W-9 is amended by TR-5 through AI-6.
+a clip); AI-7 (the cloud `transcribe` stays withheld from the assistant; TR-10 adds a row); W-8
+(the on-device engine's asset download is a person's act, never a tool's); the silence road map's
+32 ms grid (Silero VAD's own grid, inward; `silence.md`). R6-15 and AI-6 are amended here, by TR-1
+and TR-5; W-9 is amended by TR-5 through AI-6; AI-7 is amended by TR-10.
 
 - **TR-1 — Fillers come from AssemblyAI's `disfluencies: true`, sent on every cloud request from
   CT-1 on, and the transcript marker records it.** The owner's decision 1 (#92, 2026-09-30).
@@ -164,3 +164,33 @@ W-9 is amended by TR-5 through AI-6.
   - Risk accepted: the cut is only as tight as the words' timings; an inward frame snap can leave
     up to a frame of a filler; speech on an unlocked track whose media has no transcript is not
     protected.
+- **TR-10 — Clip ▸ Remove Filler Words… is a sheet with no tuning controls over `detect_fillers`'
+  answer, and its Transcribe button re-transcribes one media with that media's previous request
+  plus fillers; its mirror, `transcribe_for_fillers`, is always withheld from the assistant
+  (amends AI-7).** Recorded in CT-3, before its code (`FillerSheetController.swift`,
+  `FillerSheetController+Transcribe.swift`, `FillerTranscription.swift`,
+  `AgentServer+Fillers.swift`).
+  - **The sheet:** no controls to tune, because TR-9 has no threshold. Its scope is
+    `detect_fillers`' opening rule (`FillerDetector.read(from:clips: nil)`: the selection when it
+    holds a clip with speech from a media file, else every clip), and its note says when the
+    scope is the selection. Remove sends ONE `ripple_delete_ranges` of the sheet's spans, undo
+    name "Remove Filler Words". The wash is `TimelineView.candidateSpans`, set by the sheet and
+    cleared in its `viewDidDisappear`. The menu item comes right after Remove Silences…, has no
+    key equivalent (Remove Silences…' reason) and is enabled by
+    `Transcriber.hasTranscribableClip`.
+  - **The re-transcribe:** one media per press. It keeps that media's previous request — the
+    marker's language, speaker labels and vocabulary — with the shipped models,
+    `disfluencies: true` and `refresh: true`; with no earlier marker it detects the language,
+    with no speakers and no vocabulary. The row's estimate is `CloudEstimate.describe` of that
+    same request. Before any Transcribe button can be enabled the sheet says where the audio
+    goes, in which region, and that it is deleted once read back (R6-2, kept): Generate
+    Captions…' AssemblyAI sentence with "Transcribe" for "Generate". Remove is disabled while a
+    run is going, so Return can neither cut nor cancel a paid upload mid-run. No caption is
+    placed and no undo step is made: the run only writes the media's transcript cache.
+  - **The mirror:** `transcribe_for_fillers {media}`, an app-state tool that runs off the main
+    thread with the button's request and answers `ready` (whether the media now has a filler
+    transcript) with `transcribe`'s cloud fields; a media already ready makes no request. It is
+    always withheld from the assistant, with R6-2's reason pointing at the sheet, which amends
+    AI-7.
+  - Risk accepted: a request that had speaker labels is billed again with the speakers
+    surcharge, and its vocabulary carries over unseen; the person sees the price first.

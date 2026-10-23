@@ -1965,7 +1965,26 @@ free.
   a candidate is dropped whole — never trimmed — when too short, over a
   neighbour's word, or across a nest or a transition, and a clip on a locked
   track gives none (`onUnlockedTracks`). The cut is the caller's
-  `ripple_delete_ranges`.
+  `ripple_delete_ranges`. `AgentServer+Fillers.swift` also holds
+  `transcribe_for_fillers` (TR-10, AI-7 as amended: off the main thread and
+  withheld from the assistant on every call).
+- `FillerSheetController.swift` (+`Transcribe`) · `FillerTranscription.swift` —
+  Clip ▸ Remove Filler Words… (spec §11 TR-4, TR-7, TR-10), shaped like Remove
+  Silences with no tuning controls and no scope menu (`detect_fillers`' own
+  opening rule): the candidate wash, Remove as ONE `ripple_delete_ranges` step
+  named "Remove Filler Words", `removeFillerWordsCommand` and
+  `validateFillerAction` at its foot. Its constructor takes the timeline, the
+  cache folder, the key store, the defaults and the environment, so a probe
+  drives it without the app. `+Transcribe` is the rows for media with no
+  filler-aware transcript — the cloud-only note, R6-2's upload hint
+  (`uploadHint`: where the audio goes, its region, deleted once read back), the
+  estimate line and a Transcribe button per media; while a run is going Remove
+  is off (`runningMedia`), the running row reads Stop, and a run that ends
+  after the sheet is gone (`tornDown`) never puts the wash back.
+  `FillerTranscription` is the ONE request a press sends (the media's earlier
+  language, speakers and vocabulary from its marker, the shipped models,
+  `disfluencies` and `refresh` true), its jobs and its `CloudEstimate` line,
+  shared by the sheet and `transcribe_for_fillers`.
 - `AudioNormalize.swift` — Normalize Clip as a value type: peaks in, ops out,
   measured PRE-FADER from the plan segment, REPLACING `volume` so a second
   press is a no-op, always to BASE props.
@@ -2284,9 +2303,9 @@ free.
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
   **Every one of the sixty-one op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the thirty-four APP-STATE tools, which have no op behind them
+  callers are the thirty-five APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
-  `AgentCatalog+Audio.swift`'s four composites and
+  `AgentCatalog+Audio.swift`'s five composites and
   `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
   left, the five other file tools (`AgentCatalog+Files.swift`'s `import_media`, `consolidate_media` and `record_screen`, and `AgentCatalog+Render.swift`'s `render_frame`, `export`, `export_status` and `cancel_export`, spliced back where they left), and
   `AgentCatalog+Graphics.swift`'s nine, after its two `opTool` rows.
@@ -2318,7 +2337,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all ninety-five
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all ninety-six
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

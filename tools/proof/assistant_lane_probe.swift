@@ -319,7 +319,7 @@ func rowL3() {
 func rowL4() {
     closeAll()
     let d = newDocument()
-    let hook = Hook([true, true, true, true])
+    let hook = Hook([true, true, true, true, true])
     let cases: [(String, [String: Any], String)] = [
         ("record_screen", [:],
          "record_screen is not available to the assistant: Recording is a person at the "
@@ -329,6 +329,10 @@ func rowL4() {
             + "leaves the machine only by name, with the price in front of the person (spec "
             + "§11 R6-2). Use File ▸ Generate Captions…, which shows what is uploaded and what "
             + "it costs."),
+        ("transcribe_for_fillers", ["media": 1],
+         "transcribe_for_fillers is not available to the assistant: Audio leaves the machine "
+            + "only by name, with the price in front of the person (spec §11 R6-2). Use Clip ▸ "
+            + "Remove Filler Words…, which shows what is uploaded and what it costs."),
         ("snapshot_ui", [:],
          "snapshot_ui is not available to the assistant: a developer tool (spec §11 V-1): "
             + "Distribution has none, and the assistant sees one catalog in both builds."),

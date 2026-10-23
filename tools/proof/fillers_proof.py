@@ -48,7 +48,7 @@ serving `cloud_captions_proof.DISFLUENT_WORDS`; host-state input
   M3  a clip at start 1 s with in 0.5 s → [[1760000, 2080000]].
   M4  a transcript whose marker and `requested` lost `disfluencies`, and a
       media never transcribed, each answer no ranges, the media under
-      `needs_transcript` and the TR-7 note.
+      `needs_transcript` and the TR-7 note naming `transcribe_for_fillers`.
   M5  `clips: []` and an unknown clip id are refused by sentence.
   M6  a second clip on a new track at 0.3 s drops M1's filler as overlapping
       its "everyone"; with that track locked the filler is back; with it
@@ -386,7 +386,7 @@ def app_rows(results, wanted, binary, speech):
                     note = answer.get("note") or ""
                     return (answer.get("ranges") == [] and answer.get("needs_transcript") == [media_id]
                             and f"Media {media_id} has no transcript made with filler words" in note
-                            and "(spec §11 TR-7)" in note and "refresh: true" in note)
+                            and "(spec §11 TR-7)" in note and "transcribe_for_fillers" in note)
                 return (all(found) and fine(old, media) and fine(never, other),
                         f"raw edits found {found}; old transcript → ranges {old.get('ranges')}, "
                         f"needs {old.get('needs_transcript')}, note {old.get('note')!r}; never "

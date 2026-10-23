@@ -58,6 +58,11 @@ enum AssistantToolTable {
                 + "person (spec §11 R6-2). Use File ▸ Generate Captions…, which shows what is "
                 + "uploaded and what it costs."),
         AssistantToolRow(
+            tool: "transcribe_for_fillers", rule: .withheld, onlyWith: nil,
+            reason: "Audio leaves the machine only by name, with the price in front of the "
+                + "person (spec §11 R6-2). Use Clip ▸ Remove Filler Words…, which shows what is "
+                + "uploaded and what it costs."),
+        AssistantToolRow(
             tool: "export", rule: .askFirst, onlyWith: nil,
             reason: "It writes a movie where the model chose, replacing any file already there "
                 + "(A0 E2)."),
