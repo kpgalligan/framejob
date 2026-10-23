@@ -182,6 +182,8 @@ governs a module now.
   action-end payloads or audio envelopes.
 - `source_window.rs` — THE source window: how much material a clip shows,
   how much lies either side of it, and the one way a source in point moves.
+  `content_length_in_source` reads `speed_map.rs`'s map for a ramped clip
+  (SR-10), so the one function still says how much source any clip reads.
   **Every name here carries its UNIT**, because the readers divide by a
   clip's speed where the movers multiply by it: `content_length_in_source`,
   `last_in_point` and `last_still_time` answer in SOURCE ticks;
@@ -476,6 +478,18 @@ governs a module now.
   `graphic` in a `patch` is `edit_action_graphic.rs`'s arm, read against
   the op's `schema` after the three groups' walk (G-34); in an `off` path it
   is an `Err`.
+- `speed_map.rs` — a media clip's SPEED MAP (speed ramps SR-10): the
+  clip-time → source-time function its speed actions make (the ease
+  integrals of `actions.rs`'s curves), `is_ramped` (media clips only),
+  `end_speed`'s clamp, `peak`, `source_at`; what `content_length_in_source`
+  reads for a ramped clip.
+- `speed_segments.rs` — the map cut into plan pieces: `Held` at one rate
+  (an equal-rate action is held), `Ramp` one video segment per canvas
+  frame, and the ramp audio map with a breakpoint every 600 ticks.
+- `edit_action_speed.rs` — `set_action_end`'s speed arm and the overrun
+  refusals R1/R2/R3 for `set_action_end`, `set_action` and
+  `remove_action`: a ramp that would read past the media's end is refused,
+  naming the largest end rate that fits (floored to 0.001).
 - `edit_action_graphic.rs` — `set_action_end`'s graphic arm (G-34):
   `read_graphic_end` checks the patch's `graphic.props` (never the stored
   end's) against the op's `schema` through `check_typed` under
@@ -589,7 +603,12 @@ governs a module now.
   ×0.999–×1.001 (but not ×1) plays `off`, varispeed, whose pitch change is
   under 1.74 cents (SY-39), and elsewhere within ×0.98–×1.02 `time_domain`
   (SY-26; SY-40 for real speed changes). `Segment`, `CompTrack` and
-  `Assignment`'s tracks are `pub(crate)` for `plan.rs` alone.
+  `Assignment`'s tracks are `pub(crate)` for `plan.rs` alone. A ramped
+  clip (speed ramps SR-10) is placed as ONE unit, its frame-per-segment
+  video and its one ramp audio segment (`ramp`, the source map) on the
+  same tracks; its ×12 test reads the peak rate of the instance's own,
+  unlifted clip, so a nest that cuts a ramp short agrees with Swift's
+  `SpeedAudioDrop.peakSpeed`.
 - `plan.rs` — `composition_plan()` (spec §7.2): the plan's JSON from
   `assign()`, the instruction tiling, and the decoder-budget warning
   (`MAX_CONCURRENT_VIDEO_TRACKS`). Deterministic to the byte. A pure move

@@ -184,8 +184,16 @@ extern "C" {
  * whose decoded space is PQ-based carries `media.color.pq` as a PQ video's
  * does, read from its PNG cLLI/mDCV or HEIF/AVIF clli/mdcv, and takes `peak`;
  * no key moves, so every other project writes the text it did, and there is
- * no migration step. 27 and above, 1014 included, are newer. */
-#define RC_FORMAT_VERSION 26
+ * no migration step.
+ *
+ * Version 27 is a clip's rate as an action target (spec §11 SR-10):
+ * `actions[].end.speed`, a number beside the end's groups, which a media clip
+ * ramps to along the action's curve and holds after; no key moves, so every
+ * project without one writes the text it did, and there is no migration step.
+ * An older build would play a ramp at the clip's base rate and lose nothing
+ * visible on save, so it must refuse the file. 28 and above, 1014 included,
+ * are newer. */
+#define RC_FORMAT_VERSION 27
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

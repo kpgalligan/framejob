@@ -78,7 +78,9 @@ extension AgentServer {
             opTool(
                 "set_action",
                 "Moves or re-times an action, or changes its easing curve. Same overlap checks "
-                    + "as add_action.",
+                    + "as add_action. When the action's end names a speed, the change moves how "
+                    + "much source the clip reads, and one that would read past the end of its "
+                    + "media is refused, naming the latest clip end that fits.",
                 [
                     "clip": clipDescription,
                     "action": "Action id (get_project lists each clip's actions).",
@@ -118,19 +120,27 @@ extension AgentServer {
                     + "app writes it and ignores one you send, so an end read back can be sent "
                     + "again. While the module is missing or does not compile a prop value is "
                     + "refused (needs its module's schema) — get_graphic says why — and a null "
-                    + "still removes.",
+                    + "still removes. speed, a number beside the groups, is a MEDIA clip's rate "
+                    + "(×0.1–×1000, clamped): the clip ramps from the rate in force to it along "
+                    + "the curve and holds it after; the clip keeps its start and length and "
+                    + "plays more or less source, and an end rate that would read past the end "
+                    + "of its media is refused, naming the largest end rate that fits. speed: "
+                    + "null removes it. Above ×12 the clip's audio is left out, and the answer "
+                    + "carries audio_left_out and audio_note.",
                 [
                     "clip": clipDescription,
                     "action": "Action id.",
                     "patch": "{video?: {...}, audio?: {...}, text?: {...}, graphic?: {props: "
-                        + "{...}}} — the properties the animation ends at.",
+                        + "{...}}, speed?: number} — the properties the animation ends at.",
                     "off": "\"group.key\" paths (video.shadow, text.width) to switch OFF at the "
                         + "end — stored as null, where a null in patch removes. Optional keys "
                         + "only; never graphic.",
                 ]),
             opTool(
                 "remove_action",
-                "Removes an animation span. The clip keeps its base properties.",
+                "Removes an animation span. The clip keeps its base properties. Removing one "
+                    + "whose end names a speed is refused when the clip would then read past the "
+                    + "end of its media, naming the latest clip end that fits.",
                 ["clip": clipDescription, "action": "Action id."]),
         ]
     }

@@ -61,6 +61,7 @@
 //! returns a value.
 
 use crate::model::{Clip, Media, Project, Source};
+use crate::speed_map::SpeedMap;
 use crate::time::Ticks;
 
 /// What a TIMELINE-tick measurement of a clip's source window answers.
@@ -182,6 +183,12 @@ impl Project {
     /// this is the window, and [`Project::source_length_on_timeline`] is
     /// what a window starting at `in` could still grow to.
     pub fn content_length_in_source(&self, clip: &Clip) -> Ticks {
+        // A RAMPED clip reads S(duration), the integral of its rate (spec
+        // §11 SR-10); a constant clip, every other source among them, is
+        // the one product below.
+        if let Some(map) = SpeedMap::of(clip) {
+            return (map.source_at(clip.duration).round() as Ticks).max(1);
+        }
         let scaled = clip.duration as f64 * clip.speed;
         // The cast saturates rather than wrapping, so an absurd speed
         // cannot produce a negative length; a degenerate one falls back to

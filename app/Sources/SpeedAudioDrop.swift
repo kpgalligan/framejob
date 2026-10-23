@@ -13,12 +13,15 @@ import AppKit
 ///
 /// A clip that is new in the answer (a split's half, a duplicate, a detach)
 /// never counts, and one already above the ceiling is not asked about again.
+/// A clip's rate here is its PEAK (`peakSpeed`): a speed ramp (spec §11
+/// SR-10) leaves the audio out when any rate it reaches is above the
+/// ceiling, as the core's plan does.
 /// Nothing here is a refusal: Set Speed applies the edit exactly as it would
 /// have been applied without the question.
 enum SpeedAudioDrop {
     /// A clip the edit takes above the ceiling. `name` is the after
-    /// snapshot's `name(of:)`; `speed` is the clip's NEW rate as the core
-    /// answered it.
+    /// snapshot's `name(of:)`; `speed` is the clip's NEW peak rate as the
+    /// core answered it.
     struct Clip: Equatable {
         let id: UInt32
         let name: String
@@ -38,18 +41,33 @@ enum SpeedAudioDrop {
     ) -> [Clip] {
         var earlier: [UInt32: Double] = [:]
         for clip in before.clips + before.nests.flatMap(\.clips) {
-            earlier[clip.id] = clip.speed
+            earlier[clip.id] = peakSpeed(of: clip, limits: limits)
         }
         var found: [Clip] = []
         for clip in after.clips + after.nests.flatMap(\.clips) {
+            let peak = peakSpeed(of: clip, limits: limits)
             guard clip.source.hasSourceBound, clip.enabled.audio,
                 after.media(for: clip)?.hasAudio == true,
-                clip.speed > limits.audioMax,
+                peak > limits.audioMax,
                 let was = earlier[clip.id], was <= limits.audioMax
             else { continue }
-            found.append(Clip(id: clip.id, name: after.name(of: clip), speed: clip.speed))
+            found.append(Clip(id: clip.id, name: after.name(of: clip), speed: peak))
         }
         return found.sorted { $0.id < $1.id }
+    }
+
+    /// The greatest rate a clip reaches: its speed, or any action's end
+    /// rate (spec §11 SR-10), never computed. As the core's plan reads it,
+    /// only a `media` clip ramps, and an end rate is clamped to the speed
+    /// limits (a hand-written one may lie outside them).
+    static func peakSpeed(
+        of clip: ClipSnapshot, limits: SpeedLimits = ReelSpeed.limits
+    ) -> Double {
+        guard clip.source.hasSourceBound else { return clip.speed }
+        return clip.actions.compactMap(\.end.speed)
+            .filter(\.isFinite)
+            .map { Swift.min(Swift.max($0, limits.min), limits.max) }
+            .reduce(clip.speed, Swift.max)
     }
 
     /// The crossing `ops` would make on `project`: [] unless the core answers

@@ -18,6 +18,9 @@ struct PlanSegment: Codable, Equatable {
     /// when the media converts: it makes the composition a converting one
     /// (`CompositionPlan.convertsMedia`).
     let input: MediaColor?
+    /// A RAMPED clip's one audio segment (spec §11 SR-6, SR-10): the map its
+    /// rendered sound follows. Nil on every other segment.
+    let ramp: PlanSpeedRamp?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -29,11 +32,29 @@ struct PlanSegment: Codable, Equatable {
         duration = c.lenient(.duration, 0)
         pitch = c.lenient(.pitch)
         input = c.lenient(.input)
+        ramp = c.lenient(.ramp)
     }
 
     /// Whether the segment needs `scaleTimeRange` — speed, or the
     /// one-source-frame freeze idiom.
     var isTimeScaled: Bool { duration != sourceDuration }
+}
+
+/// A ramped clip's audio as the plan names it (spec §11 SR-10): Keep
+/// pitch, the spans that glide like tape with it on (SR-11, clip ticks;
+/// empty with it off), and the map — `[clip tick, source tick]`
+/// breakpoints, linear between them — `RampAudioRenderer` renders.
+struct PlanSpeedRamp: Codable, Equatable {
+    let keepPitch: Bool
+    let glide: [[Ticks]]
+    let map: [[Ticks]]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        keepPitch = c.lenient(.keepPitch, true)
+        glide = c.lenient(.glide, [])
+        map = c.lenient(.map, [])
+    }
 }
 
 /// One piecewise-linear leg of an audio envelope.

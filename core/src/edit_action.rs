@@ -42,11 +42,13 @@ use serde_json::{json, Map, Value};
 
 use crate::actions::{self, MAX_PATCH_DEPTH};
 use crate::edit_action_graphic::{read_graphic_end, write_graphic_end, GRAPHIC_NOT_KEYED_OFF};
+use crate::edit_action_speed::read_speed_end;
 use crate::export::describe;
 use crate::model::{Action, AudioProps, Curve, Project, ShapeProps, TextProps, VideoProps};
 use crate::model_graphic::{check_count, check_schema};
 use crate::outcome::Outcome;
 use crate::patch::{check_group_patch, merge_group, unknown_key, Group};
+use crate::speed_map::end_speed;
 use crate::time::{Ticks, TIMESCALE};
 
 /// Default duration for `add_action`: one second of animation, the length
@@ -151,8 +153,9 @@ fn check_end_patch(patch: &Value) -> Result<(), String> {
         return Ok(());
     };
     for (key, body) in groups {
-        // `graphic` is `edit_action_graphic.rs`'s arm, read after this walk.
-        if key == "graphic" {
+        // `graphic` is `edit_action_graphic.rs`'s arm and `speed`
+        // `edit_action_speed.rs`'s, each read after this walk.
+        if key == "graphic" || key == "speed" {
             continue;
         }
         // The three groups, by their own names rather than by three string
@@ -374,6 +377,13 @@ impl Project {
                 slot.curve = curve;
             }
         }
+        // A rate action moves the out point when it moves (SR-2).
+        if end_speed(&existing).is_some() {
+            let what = format!("retiming action {action}");
+            if let Some(why) = next.clip(clip).and_then(|c| self.overrun_refusal(c, &what)) {
+                return Ok(Outcome::Refused(why));
+            }
+        }
         self.finish(next)
     }
 
@@ -447,10 +457,18 @@ impl Project {
             Some(body) => Some(read_graphic_end(target, body, schema)?),
             None => None,
         };
+        let speed = match patch.get("speed") {
+            Some(value) => Some(read_speed_end(target, value)?),
+            None => None,
+        };
         let off = check_off(patch, off)?;
         let mut rest = patch.clone();
         if let Value::Object(groups) = &mut rest {
             groups.shift_remove("graphic");
+            // The CLAMPED rate is what is stored (SR-10).
+            if let Some(Some(rate)) = speed {
+                groups.insert("speed".to_string(), Value::from(rate));
+            }
         }
         let mut merged = actions::merge(&existing.end, &rest);
         prune_removed(&mut merged, &rest, 0);
@@ -474,6 +492,19 @@ impl Project {
             }
             check_count(&stored.props)?;
         }
+        // The out point the new end rate reads to (SR-2): R1/R2 for a rate,
+        // R3 for one taken away.
+        if let (Some(read), Some(after)) = (speed, next.clip(clip)) {
+            let why = match read {
+                Some(rate) => self.end_rate_refusal(after, action, rate),
+                None => {
+                    self.overrun_refusal(after, &format!("removing action {action}'s end rate"))
+                }
+            };
+            if let Some(why) = why {
+                return Ok(Outcome::Refused(why));
+            }
+        }
         self.finish(next)
     }
 
@@ -483,9 +514,19 @@ impl Project {
         if !target.actions.iter().any(|a| a.id == action) {
             return Err(format!("no action with id {action} on clip {clip}"));
         }
+        let names_speed = target
+            .actions
+            .iter()
+            .any(|a| a.id == action && end_speed(a).is_some());
         let mut next = self.clone();
         if let Some(slot) = next.clip_mut(clip) {
             slot.actions.retain(|a| a.id != action);
+        }
+        if names_speed {
+            let what = format!("removing action {action}");
+            if let Some(why) = next.clip(clip).and_then(|c| self.overrun_refusal(c, &what)) {
+                return Ok(Outcome::Refused(why));
+            }
         }
         self.finish(next)
     }

@@ -187,14 +187,23 @@ re-timing existing captions with a ramp edit.
   composition change. `render_spike.py --verdict on` re-runs SR-7's arm ON and scores the
   rendered pitch by SR-9; the off arm's renders are shown byte-identical to SR1b's. GO lets SR2
   start with both arms; a STOP goes to the owner with the measurement.
-- **SR2 — the core target and the plan (A–E).** `speed_map.rs`, the door, the evaluator's rate,
-  `content_length_in_source` and the plan's segments, format 27, C's refusals, `core/tests/`
-  suites (constant clips' plans byte-identical), spec §5.2, §5.4, §6, §7.2, §7.10; the
-  `set_action_end` prose and its `audio_left_out` (P's MCP half); the Swift lead rule if SR1 asks
-  for it (`CompositionBuilder.swift` is at 581 lines: a pure move first). Its proof,
-  `tools/proof/ramp_proof.py`, is #111's: over MCP on Release, an export compared to expectation
-  frame for frame (an index fixture) and click for click (keep pitch off), playback against
-  export, undo, a constant clip's plan unchanged, and a mutant made to fail on purpose.
+- **SR2a — the core target and the plan (A–D), SR-10 and SR-11.** `speed_map.rs`,
+  `speed_segments.rs`, `edit_action_speed.rs`; `speed` as a number in an action's `end`, the
+  evaluator's rate, `content_length_in_source` and the plan's per-frame video segments, the ramped
+  clip's ONE audio segment carrying its map (silent until SR2b), format 27 with `schema_v27.rs`,
+  C's refusals, `core/tests/` suites (constant clips' plans byte-identical), spec §5.2, §5.4, §6,
+  §7.2, §7.10; the `set_action_end` prose and its `audio_left_out` (P's MCP half, `SpeedAudioDrop`
+  reading the PEAK rate). The Swift lead rule is moot (SR-10). Its proof, `tools/proof/ramp_proof.py`,
+  covers the door over MCP on Release: the speed stored, R1, `audio_left_out`, the errors, undo.
+- **SR2b — the renderer wired in.** `CompositionBuilder.swift` (581 lines) gives up its orientation
+  helpers to `CompositionBuilder+Orientation.swift` first, as a pure move landed alone; then
+  `cache/ramp-audio/` (§5.6), the per-clip render resolution published and pinned beside the plan,
+  renders scheduled on edit, `fill`'s ramp arm (the render at `start`, ×1, no lead), pending =
+  silent, the export queue waiting on pending renders, SR-11's hybrid in `RampAudioRenderer`, a
+  reversed ramped clip's render reading the reversed file; `ramp_proof.py`'s export and playback
+  rows (#111's: an export compared to expectation frame for frame on an index fixture and click
+  for click with keep pitch off, playback against export, a constant clip's export unchanged, a
+  mutant made to fail on purpose); spec §5.6, §7.8.
 - **SR3 — edits on a ramped clip (F–M).** `source_window.rs`'s bounds and movers through the map,
   split, freeze, trims, roll, slip, the handle transition, `set_speed`/`rate_stretch` scaling,
   `detach_audio`, paste, relink, re-snap; a `core/tests/` suite per rule; spec §6.
@@ -536,3 +545,47 @@ sound now that the unit holds a constant rate), SR-7's click template for slowed
 clicks (the clicks land on their samples but no longer match it), and the SR1c review's two nits
 (`TimePitchKept.append`'s per-block `reserveCapacity`, which inflates the recorded cost; the
 PR-source row's unguarded empty track).
+
+## SR2a — the core target and the plan
+
+The decisions were recorded before the code: SR-10 (the target, the rate rule, S, the plan's
+ramped segments and audio form, C's refusals, format 27, the Swift lead rule moot), SR-11 (Keep
+pitch inside a ramp, a known limit until SR1d) and SR-6's two Amended-by lines (the plan names no
+file and carries the map; pending is silent and an export waits).
+
+**What landed.**
+- `core/src/speed_map.rs`: `end_speed`, `is_ramped` (a `media` clip with a speed end, false for
+  every other source), `ease_integral`, and `SpeedMap` — held and ramp pieces split at every speed
+  action's edges, an action ending at the rate in force held — with `source_at`, `time_at`
+  (bisection inside a ramp), `rate_at` (no reader until SR3) and `peak`.
+- `core/src/speed_segments.rs`: `ramp_spans` (one video segment per held piece, one per canvas
+  frame inside a ramp, read through S and clamped into the file) and `ramp_audio` (keep pitch,
+  `glide`, the map every 600 ticks inside a ramp).
+- `core/src/edit_action_speed.rs`: `read_speed_end` and the refusals R1/R2 (`end_rate_refusal`,
+  the fit solved from two readings, floored to 0.001 and stepped down) and R3
+  (`overrun_refusal`), wired into `edit_action.rs`'s `set_action_end`, `set_action` and
+  `remove_action`.
+- `evaluate.rs`: `Segment` carries `ramp`; `place` takes one clip's segments as one unit; a
+  ramped clip's segments come from the lifted clip, its ×12 test from the instance's own clip's
+  peak. `source_window.rs`'s `content_length_in_source` reads S. Format 27.
+- Swift: `PlanSegment.ramp` (`PlanSpeedRamp`), `resolveSource` answering nil for a ramp segment
+  (empty time until SR2b), `ActionPatch.speed`, `SpeedAudioDrop` comparing peak rates, the
+  catalog prose of `set_action_end`, `set_action` and `remove_action`.
+- Tests: `ramp_plan.rs`, `ramp_door.rs`, `schema_v27.rs`; ten mutants (M1–M10) each caught by
+  them. `tools/proof/ramp_proof.py` D0–D5.
+
+**Measured.** `cargo test --release` on the untouched tree passed first, and no existing
+assertion was edited. `ramp_plan.rs` 11, `ramp_door.rs` 9 and `schema_v27.rs` 4 pass; each of the
+ten mutants fails at least one of them (M1 ease_in's integral as u²/2 — the closed-form video
+segments; M2 one segment placed at a time — the overlap row; M3 the ×12 test on the base speed —
+the ×13 peak and the nest rows; M4 the fit rounded to nearest with no step down — R1 names
+×2.667, and R2; M5 a string read as a rate — the error row; M6 any action ramping, M9 any source
+ramping — the twins' byte-equal plans; M7 `remove_action` without R3; M8 an equal-rate action as
+a ramp; M10 the ×12 test on the nest's cut — the ×20 nest row). `make gate` passed (names,
+typecheck at its four warnings, fmt, lint, test 237 s, app 164 s; 417 s).
+`env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py`: 6/6 in 3 s —
+D2's refusal named ×4 over AV.mov's 3 000 000 ticks and ×4 applied; D3 answered
+`audio_left_out` [3] and the one-clip note; the log held no `Frame Job: `.
+
+**Owed.** SR2b (above); `core/CLAUDE.md`'s module map rows for the three new modules and
+`evaluate.rs`'s unit placement and peak rule (agents edit no `CLAUDE.md`).

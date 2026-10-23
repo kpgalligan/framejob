@@ -314,8 +314,16 @@ use crate::model::{Canvas, Project};
 /// PQ still from an older file has no `pq` and renders at 1,000 cd/m² until
 /// imported again. The bump is so an older build refuses the file instead of
 /// refusing an image's `pq`.
-/// Every number from 27 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 26;
+///
+/// Version 27 is a clip's rate as an action target (spec §11 SR-10):
+/// `actions[].end.speed`, a number beside the end's groups, which a media
+/// clip ramps to along the action's curve and holds after. No key moves, so
+/// every project without one writes exactly the text it did, and the reader's
+/// default is none, so there is no migration step. The bump is so an older
+/// build refuses the file: it would play a ramp at the clip's base rate,
+/// losing nothing visible on save, and the ramp would be wrong with no sign.
+/// Every number from 28 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 27;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

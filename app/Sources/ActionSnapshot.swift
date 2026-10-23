@@ -8,21 +8,25 @@ import Foundation
 /// structs of optionals rather than full property groups. The patch types
 /// themselves live in `ReelCore.swift` beside the op builders that send
 /// them, so there is exactly one shape per patch. A graphic clip's end may
-/// also carry `graphic` (spec §11 G-34 (a)): `ActionGraphicPatch` below.
+/// also carry `graphic` (spec §11 G-34 (a)): `ActionGraphicPatch` below. A
+/// media clip's end may carry `speed` (spec §11 SR-10), the rate the clip
+/// ramps to over the action and holds after.
 struct ActionPatch: Codable, Equatable {
     var video: VideoPatch?
     var audio: AudioPatch?
     var text: TextPatch?
     var graphic: ActionGraphicPatch?
+    var speed: Double?
 
     init(
         video: VideoPatch? = nil, audio: AudioPatch? = nil, text: TextPatch? = nil,
-        graphic: ActionGraphicPatch? = nil
+        graphic: ActionGraphicPatch? = nil, speed: Double? = nil
     ) {
         self.video = video
         self.audio = audio
         self.text = text
         self.graphic = graphic
+        self.speed = speed
     }
 
     init(from decoder: Decoder) throws {
@@ -31,9 +35,12 @@ struct ActionPatch: Codable, Equatable {
         audio = c.lenient(.audio)
         text = c.lenient(.text)
         graphic = c.lenient(.graphic)
+        speed = c.lenient(.speed)
     }
 
-    var isEmpty: Bool { video == nil && audio == nil && text == nil && graphic == nil }
+    var isEmpty: Bool {
+        video == nil && audio == nil && text == nil && graphic == nil && speed == nil
+    }
 }
 
 /// An end's `graphic` group (spec §11 G-34 (a)): the props it animates, in

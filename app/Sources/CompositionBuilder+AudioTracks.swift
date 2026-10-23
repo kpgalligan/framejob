@@ -66,6 +66,9 @@ extension CompositionBuilder {
         reverse: ReverseResolution, assets: inout [UInt32: AVURLAsset],
         reversedAssets: inout [UInt32: AVURLAsset]
     ) -> AVAssetTrack? {
+        // A ramped clip's sound is a render SR2b makes (spec §11 SR-6,
+        // SR-10); until it does, the segment is empty time.
+        if segment.ramp != nil { return nil }
         if let reversed = reverse.ready[segment.clip] {
             return assetTrack(
                 at: reversed, key: segment.media, mediaType: mediaType,

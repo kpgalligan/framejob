@@ -29,7 +29,10 @@ The rules every op shares are §6a; the clip ops are §6b.
   names its path (`bad value at "region.width"`). A non-finite or non-positive number is an
   **error** too — `region.width must be greater than 0` — because a zero-width region asks for an
   infinite scale.
-- **`set_action {clip, action, start?, duration?, curve?}`** — Same overlap checks.
+- **`set_action {clip, action, start?, duration?, curve?}`** — Same overlap checks. When the
+  action's end names a `speed` (§11 SR-10) and the change would make the clip read past the end of
+  its media it is **refused** (SR-2): `retiming action {a} would read clip {c} {over} ticks past
+  the end of its media; the latest clip end that fits is {end} ticks`.
 - **`set_action_end {clip, action, patch, off?, schema?}`** — Merges into the end patch; a key set to `null`
   removes it, at any depth. `off` — a list of `"group.key"` paths, `group` one of `video`, `audio`,
   `text` and `key` a top-level key of it — writes a `null` at each AFTER the merge, which keys that
@@ -62,7 +65,25 @@ The rules every op shares are §6a; the clip ops are §6b.
   CURRENT default appended to them in the same edit. `graphic: null` or `graphic.props: null`
   removes the group; a `null` prop removes the prop and its kind, unchecked. `graphic` in `off` is
   an **error**: `graphic props cannot be keyed off; name the value a prop ends at in patch`.
-- **`remove_action {clip, action}`** —
+  `speed` (format version 27, §11 SR-10) is a media clip's rate as a fifth target, a number at the
+  patch's top beside the groups, stored clamped to ×0.1–×1000; `null` removes it, and `off`
+  cannot name it (a path is `group.key`). Any other JSON kind is an **error** (`speed must be a
+  number, not "fast"`), and so is a clip that is not a media clip (`clip {c} is not a media clip,
+  and only a media clip's action can end at a speed`). The clip keeps its start and duration
+  (SR-2); an end rate that would read past the end of its media is **refused**, naming the
+  largest end rate that fits, floored to 0.001: `ending action {a} at ×{x} would read clip {c}
+  {over} ticks past the end of its media; the largest end rate that fits is ×{fit}` — or, when no
+  rate down to ×0.1 fits, `…, and no end rate down to ×0.1 fits; at ×0.1 the latest clip end that
+  fits is {end} ticks`; and a `null` that would do so is refused as `removing action {a}'s end
+  rate would read clip {c} {over} ticks past the end of its media; the latest clip end that fits
+  is {end} ticks`. `over` is `in + round(S(duration))` less the media's duration; `end` is the
+  clip's start plus the latest clip time whose S fits, snapped down to the frame grid. Above ×12
+  the clip's audio is left out of the plan (#190), and an agent's answer carries
+  `audio_left_out` and `audio_note`.
+- **`remove_action {clip, action}`** — Removing an action whose end names a `speed` is
+  **refused** when the clip would then read past the end of its media: `removing action {a}
+  would read clip {c} {over} ticks past the end of its media; the latest clip end that fits is
+  {end} ticks`.
 
 ## Tracks, markers, canvas, media
 

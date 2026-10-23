@@ -22689,3 +22689,33 @@ tap on the editor's item, an `AVPlayerItemVideoOutput` for frames). Exit 0
 when every row answered (whatever the VERDICT), 1 on an instrument failure,
 2 when not performed (no ffmpeg, no staticlib). No app instance, no socket,
 no network; everything is under `tools/proof/work/ramp-spike/`.
+
+## Speed ramps SR2a — `speed` in an action's end, the slot rule (`ramp_proof.py` D0–D5; `core/tests/ramp_plan.rs`, `ramp_door.rs`, `schema_v27.rs` and ten mutants; spec §11 SR-10, SR-11, SR-2)
+
+SR2a of road map "speed-ramps" (#111): a media clip's rate as an action
+target. The plan's ramped segments (per-frame video, one audio segment
+carrying the map, silent until SR2b renders it) are pinned by the core's own
+suites through the FFI; this proof drives the DOOR over MCP.
+
+- **`ramp_proof.py`** — its own instance (`mcp.launch` on `proof_app`'s app,
+  or `--app PATH`), work in `tools/proof/work/ramp/`, fixture
+  `tools/proof/media/AV.mov` (5 s, 30 fps, 48 kHz sound; absent is a scored
+  fail). D1 a 2 s clip, `add_action` [0, 1 s), `set_action_end {speed: 2}`
+  applies, `end.speed` 2 and the slot unchanged; D2 a 2 s clip at in 0 with
+  an action over its length: `speed: 5` refused with R1, the overrun and
+  ×{fit} from the proof's own oracle over `get_project`'s media duration
+  (floor(duration / 1 s − 1, 0.001): ×4 for AV.mov), and that rate applies;
+  D3 a 6-frame clip ramped to ×20 answers `audio_left_out` [clip] and the
+  one-clip `audio_note`; D4 `speed: "fast"` and a text clip's speed each an
+  error with the core's sentence; D5 `undo` / `redo` over D1's edit; D0 the
+  instance listens and its log holds no `Frame Job: `. `--only D1,D5` runs
+  those rows (D0 always). Never `--live`; nothing spends.
+
+```sh
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py
+make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py
+```
+
+| Run (Release, 2026-10-23) | Result |
+|---|---|
+| `ramp_proof.py` | 6/6 in 3 s — D2 refused naming ×4 (media 3000000 ticks, 600000 over), ×4 applied; D3 `audio_left_out` [3] with the one-clip note; D0 no complaint |

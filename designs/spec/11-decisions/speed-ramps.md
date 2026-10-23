@@ -14,8 +14,11 @@ chose on SR1's STOP (2026-10-23), and SR-7, the second spike's rule, were record
 its code and its measured run, whose `results.json` pins this file's SHA-256 again. SR-8, the
 Keep pitch mechanism the owner chose on SR1b's SPLIT (2026-10-23), and SR-9, the third spike's
 rule, were recorded in SR1c before its code and its measured run, whose `results.json` pins this
-file's SHA-256 again. Later phases record their rules as new entries (SR-10 on) or as Amended-by
-lines before their code.
+file's SHA-256 again. SR2 is split in two: SR2a (the core — `speed` as an action target, the
+source map, the plan's ramped segments, C's refusals, format 27) recorded SR-10, SR-11 and SR-6's
+Amended-by lines before its code; SR2b (the renderer wired into the composition and the export)
+builds what those lines say Swift does. Later phases record their rules as new entries (SR-12 on)
+or as Amended-by lines before their code.
 
 **Stands, and nothing here re-litigates it:** SY-24 (the varispeed lead: a time-scaled segment
 on an `off` track reads its source 575 ticks earlier; ×1 untouched); SY-26 (one pitch name per
@@ -140,6 +143,13 @@ plan leaves the audio out, one pitch per plan audio track).
     `AudioRateCopy`'s temporary copy — plus the map, Keep pitch and `RampAudioRenderer.version`.
     What plays while a render is pending, and the plan's form for the rendered audio, are SR2's,
     recorded here as Amended-by lines before SR2's code.
+    *Amended by SR2a:* the plan names no file — a ramped clip's one audio segment carries its map
+    (`ramp.map`, SR-10). Swift resolves the render per clip beside the plan as `ReverseResolution`
+    resolves a reversed asset (ready or pending, published and pinned with the plan), as
+    `cache/ramp-audio/<media>-<digest>.caf`, the digest over the media file's (path, size,
+    modification second), `RampAudioRenderer.version`, Keep pitch, the `glide` spans and the map.
+    *Amended by SR2a:* while a clip's render is pending its audio is empty time (silent) and its
+    picture plays; an export waits for every pending render and never writes a placeholder.
   - **The renderer** (`RampAudioRenderer`, `app/Sources/`) takes the source file, Keep pitch and
     the clip's map: breakpoints of clip ticks → source ticks (media time in the direction the
     clip plays), linear between them, sampled by the caller (SR2: the core). It reads only a
@@ -346,3 +356,57 @@ plan leaves the audio out, one pitch per plan audio track).
   - Risk accepted: a 25-cent bound is a quarter of a semitone, tighter than the ear on speech and
     looser than on a held tone; the pitch reader is a zero-crossing count on a pure sine, so a
     real voice's pitch is a person's check (SR5).
+- **SR-10 — A clip's rate is an action target: `speed`, a number in an action's `end`; the source
+  map S is its integral, and the plan carries a ramped clip as per-frame video segments and ONE
+  audio segment holding the map (SR2a).** The road map's A–D, as built.
+  - **The target.** `end.speed` is a finite number clamped to ×0.1–×1000 as `set_speed` clamps;
+    any other JSON kind is an `Err` (`speed must be a number, not …`), and on a clip that is not a
+    media clip an `Err` naming it; `null` removes it; `off` cannot name it (a path is
+    `group.key`). Only a `media` clip is RAMPED: one whose actions' ends name a speed. Every other
+    clip — no speed end, or a source that is not media — plans, sizes and sounds exactly as
+    before, byte for byte.
+  - **The rate rule** (§5.4 on one number). A ramped clip's span `[0, D)` splits at 0, D and every
+    speed action's start and end clipped to `[0, D)`. In a piece the rate is the merged-ended
+    rate (the base `speed`, then each ended action's `end.speed` in start order) — HELD — unless
+    the first action spanning the piece names a speed: then it RAMPS, r = r_from + (r_to −
+    r_from)·ease(u) over the action's own span. A spanned piece whose two rates are equal is held.
+    S(t) = ∫₀ᵗ r, in closed form per curve (∫₀ᵘ ease: u²/2, u³/3, u² − u³/3, u³ − u⁴/2). The
+    clip's source length is `round(S(D))` (D4-1's one reader, `content_length_in_source`).
+  - **The video.** One segment per held piece, and inside every ramp piece one per canvas frame
+    (G = 1: SR1 read 0 wrong frames at every G, and one segment a frame samples S exactly at every
+    frame start); segment k reads `in + round(S(t_k))` for `round(S(t_k+1)) − round(S(t_k))`
+    (at least 1), clamped into the file as a constant segment is. All of one clip's segments are
+    placed as ONE unit on one composition track, so the recipe names one track.
+  - **The audio.** One segment over the clip's slot, `pitch` `off`, no SY-24 lead, with a `ramp`
+    object: `keep_pitch`, `glide` (the ramp pieces' spans, abutting ones merged, clip ticks; only
+    with keep pitch on) and `map` (breakpoints `[clip tick, source tick]` at 0, D, every piece
+    edge and every 600 ticks from each ramp piece's start, each source strictly above the one
+    before). It is left out when the clip's PEAK rate (the greatest rate at any piece edge of its
+    own, unlifted map, the figure `SpeedAudioDrop` reads) is above ×12 (#190). Until SR2b renders
+    it the segment is empty time.
+  - **The road map's "Swift lead rule" is moot**: SR1's STOP ruled out GO-UNIFORM-LEAD, and SR-6
+    carries ramp audio as one ×1 segment, which takes no lead.
+  - **The slot (SR-2, the road map's C).** `set_action_end` refuses an end rate that would read
+    past the media's end, naming the largest end rate that fits (floored to 0.001, S being affine
+    in one action's end rate) or, when none down to ×0.1 does, the latest clip end that fits at
+    ×0.1; `set_action` and `remove_action` on an action whose end names a speed, and a `null`
+    removing an end rate, refuse naming the latest clip end that fits.
+  - **Format 27**: a ramp in an older build would play at its base rate and lose nothing visible
+    on save, so the older build must refuse the file; there is no migration step.
+  - **Why:** the action lane already holds a value ramped over a span (SR-1); a closed-form S
+    gives every reader one exact answer; per-frame video segments are what SR1 measured clean;
+    one audio segment carrying the map is SR-6's mechanism; and keeping every constant clip's
+    plan text unchanged means no project without a ramp rebuilds or sounds different.
+  - Risk accepted: a long ramp is many video segments (30 a second at 30 fps); until SR2b a
+    ramped clip is silent; until SR3 an edit other than the action ops on a ramped clip uses the
+    one-rate arithmetic.
+- **SR-11 — Keep pitch inside a ramp is a known limit until SR1d: the held spans keep pitch, the
+  ramp spans glide like tape.** The owner's SR1c answer ("SR2 now, fix after").
+  - The whole clip is rendered as ONE file. With keep pitch on, SR-8's arm renders the held
+    spans and the keep-pitch-off arm each `glide` span, joined by a linear crossfade of 480
+    output frames (10 ms) — or half the held span when that is shorter — lying in the held span.
+    The pitch steps by 1200·log₂ r cents at each join, r the rate there.
+  - **Why:** SR1c's arm ON stopped on dropouts while the pitch moves, a placement count, an
+    anchor and a lag; the held rates are what SR-8 rendered cleanly at constant rates, and the
+    glide is what SR1b measured exact.
+  - Risk accepted: a pitch step at each ramp edge with keep pitch on; SR1d lifts it.

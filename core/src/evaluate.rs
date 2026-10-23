@@ -40,6 +40,8 @@ use crate::audio::Voice;
 use crate::edit_clip_timing::AUDIO_SPEED_MAX;
 use crate::model::{Clip, Project, Source};
 use crate::nest::{lifted, Instance};
+use crate::speed_map::SpeedMap;
+use crate::speed_segments::RampAudio;
 use crate::time::{self, Ticks, TIMESCALE};
 
 /// First video and first audio composition track id. Small, stable
@@ -125,7 +127,10 @@ impl Pitch {
 /// One clip's contribution to the composition: a source range placed at a
 /// timeline range. `duration != source_duration` is Swift's signal to
 /// follow the insert with `scaleTimeRange` (spec §7.2).
-#[derive(Debug, Clone, Copy)]
+///
+/// A ramped clip's ONE audio segment carries `ramp`, the map its rendered
+/// sound follows (spec §11 SR-6, SR-10); every other segment has none.
+#[derive(Debug, Clone)]
 pub(crate) struct Segment {
     clip: u32,
     media: u32,
@@ -134,6 +139,7 @@ pub(crate) struct Segment {
     start: Ticks,
     duration: Ticks,
     pitch: Pitch,
+    ramp: Option<RampAudio>,
 }
 
 impl Segment {
@@ -141,7 +147,7 @@ impl Segment {
         self.start.saturating_add(self.duration)
     }
 
-    pub(crate) fn to_json(self, audio: bool) -> Value {
+    pub(crate) fn to_json(&self, audio: bool) -> Value {
         let mut out = Map::new();
         out.insert("clip".to_string(), Value::from(self.clip));
         out.insert("media".to_string(), Value::from(self.media));
@@ -156,6 +162,9 @@ impl Segment {
             // The time-pitch algorithm name Swift sets on the segment when
             // a speed change would otherwise transpose the clip.
             out.insert("pitch".to_string(), Value::from(self.pitch.name()));
+            if let Some(ramp) = &self.ramp {
+                out.insert("ramp".to_string(), ramp.to_json());
+            }
         }
         Value::Object(out)
     }
@@ -189,10 +198,13 @@ pub(crate) struct Assignment<'a> {
     pub(crate) video_of: BTreeMap<Vec<u32>, u32>,
 }
 
-/// Places `segment` (and, on an audio track, the `voice` that says how loud
-/// it is) on the first track whose last segment ends at or before it, adding
-/// a track when none does — the A/B assignment of spec §7.2 — and answers
-/// the id of the track it landed on.
+/// Places `unit` — one clip's segments, in start order: one for a constant
+/// clip, a ramped clip's every video segment — (and, on an audio track, the
+/// `voice` that says how loud it is) on the first track whose last segment
+/// ends at or before the unit's first, adding a track when none does — the
+/// A/B assignment of spec §7.2 — and answers the id of the track it landed
+/// on. A unit is never split across tracks, so the recipe names one track
+/// for one instance (spec §11 SR-10).
 ///
 /// With the overlap rule (§6: at most one neighbour per side, at most half
 /// the shorter clip) two tracks per timeline track is the most a timeline
@@ -207,18 +219,21 @@ pub(crate) struct Assignment<'a> {
 fn place<'a>(
     tracks: &mut Vec<CompTrack<'a>>,
     next_id: &mut u32,
-    segment: Segment,
+    unit: Vec<Segment>,
     voice: Option<Voice<'a>>,
     match_pitch: bool,
 ) -> u32 {
+    let Some(first) = unit.first() else {
+        return 0;
+    };
     let free = tracks.iter().position(|t| {
         t.segments
             .last()
-            .is_none_or(|s| s.end() <= segment.start && (!match_pitch || s.pitch == segment.pitch))
+            .is_none_or(|s| s.end() <= first.start && (!match_pitch || s.pitch == first.pitch))
     });
     match free.and_then(|i| tracks.get_mut(i)) {
         Some(track) => {
-            track.segments.push(segment);
+            track.segments.extend(unit);
             track.voices.extend(voice);
             track.id
         }
@@ -227,7 +242,7 @@ fn place<'a>(
             *next_id = next_id.saturating_add(1);
             tracks.push(CompTrack {
                 id,
-                segments: vec![segment],
+                segments: unit,
                 voices: voice.into_iter().collect(),
             });
             id
@@ -313,7 +328,51 @@ impl Project {
             // base props: the time-pitch algorithm is chosen when the
             // composition is built, not per frame.
             pitch: Pitch::of(clip.audio.map(|a| a.keep_pitch).unwrap_or(true), clip.speed),
+            ramp: None,
         })
+    }
+
+    /// A RAMPED clip's segments (spec §11 SR-10): its video segments, one
+    /// per held piece and one per canvas frame inside each ramp
+    /// (`speed_segments.rs`), and its one audio segment over the whole slot,
+    /// `pitch` `off`, carrying the map. `clip` is the LIFTED clip, so a nest
+    /// clip's tail cut truncates both. `None` for a missing media, which
+    /// draws a slate as a constant clip's does.
+    fn ramp_segments_of(&self, clip: &Clip, map: &SpeedMap) -> Option<(Vec<Segment>, Segment)> {
+        let Source::Media { media, r#in, .. } = &clip.source else {
+            return None;
+        };
+        let found = self.media(*media)?;
+        // `segment_of`'s clamp, for the same reason.
+        let last = found.duration.saturating_sub(1).max(0);
+        let source_in = (*r#in).clamp(0, last);
+        let piece =
+            |start: Ticks, duration: Ticks, source_in: Ticks, source_duration: Ticks| Segment {
+                clip: clip.id,
+                media: *media,
+                source_in,
+                source_duration,
+                start,
+                duration,
+                pitch: Pitch::Off,
+                ramp: None,
+            };
+        let video = self
+            .ramp_spans(clip, map, source_in, found.duration)
+            .into_iter()
+            .map(|s| piece(s.start, s.duration, s.source_in, s.source_duration))
+            .collect();
+        // D4-1's one reader: for a ramped clip it is S(duration) of this map.
+        let length = self.content_length_in_source(clip);
+        let remaining = found.duration.saturating_sub(source_in).max(0);
+        let mut audio = piece(
+            clip.start,
+            clip.duration,
+            source_in,
+            length.min(remaining).max(1),
+        );
+        audio.ramp = Some(self.ramp_audio(clip, map, source_in));
+        Some((video, audio))
     }
 
     /// Every clip's place in the composition (spec §7.2's A/B assignment).
@@ -344,6 +403,33 @@ impl Project {
             instances.sort_by_cached_key(|i| (i.start, i.path()));
             for instance in &instances {
                 let clip = lifted(instance);
+                if let Some(map) = SpeedMap::of(&clip) {
+                    let Some((unit, sound)) = self.ramp_segments_of(&clip, &map) else {
+                        continue;
+                    };
+                    let Some(media) = self.media(sound.media) else {
+                        continue;
+                    };
+                    if media.has_video && instance.shows_video() && !unit.is_empty() {
+                        let id = place(&mut video, &mut next_video, unit, None, false);
+                        assignment.video_of.insert(instance.path(), id);
+                    }
+                    // The ×12 rule on the PEAK rate of the instance's own
+                    // clip, unlifted: the figure `SpeedAudioDrop` reads off
+                    // the snapshot, so a nest clip's tail cut mid-ramp
+                    // cannot make the two disagree (spec §11 SR-10).
+                    let peak = SpeedMap::of(instance.clip).map_or(clip.speed, |m| m.peak());
+                    if media.has_audio && instance.plays_audio() && peak <= AUDIO_SPEED_MAX {
+                        place(
+                            &mut audio,
+                            &mut next_audio,
+                            vec![sound],
+                            Some(Voice::of(&self.tracks, instance)),
+                            true,
+                        );
+                    }
+                    continue;
+                }
                 let Some(segment) = self.segment_of(&clip) else {
                     continue;
                 };
@@ -351,7 +437,13 @@ impl Project {
                     continue;
                 };
                 if media.has_video && instance.shows_video() {
-                    let id = place(&mut video, &mut next_video, segment, None, false);
+                    let id = place(
+                        &mut video,
+                        &mut next_video,
+                        vec![segment.clone()],
+                        None,
+                        false,
+                    );
                     assignment.video_of.insert(instance.path(), id);
                 }
                 // A `still` is a FROZEN PICTURE. Its segment is one source
@@ -379,7 +471,7 @@ impl Project {
                     place(
                         &mut audio,
                         &mut next_audio,
-                        segment,
+                        vec![segment],
                         Some(Voice::of(&self.tracks, instance)),
                         true,
                     );
