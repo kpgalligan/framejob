@@ -16,6 +16,7 @@ CT-1…CT-4 each record their numbers as a new entry (TR-8 on) or as Amended-by 
 code; TR-8 was recorded in CT-1, TR-9 in CT-2, TR-10 in CT-3 and TR-11 in CT-4, each before its
 code. TR-12 was recorded in the #92 residue batch (#333), before its code. TR-13 was recorded in the #92
 residue batch (#331), before its code.
+TR-14 was recorded in the #92 residue batch (#332), before its code.
 
 **Stands, and nothing here re-litigates it:** R6-3 (one upload per media, every clip derived from
 it, the words cached verbatim); R6-10 (`MediaTranscript.words(for:in:)` maps a media's words onto
@@ -248,6 +249,13 @@ TR-11.
     CT-5's residue to file), and an on-device answer is recognised again on every call.
   - **Amended 2026-10-23, by TR-13:** the missing window is `get_transcript`'s `from`/`to`
     (#331); a call without them answers exactly as above.
+  - **Amended 2026-10-23, by TR-14:** an on-device run's words are now cached per media and
+    language (#332), so "The source"'s "no cache is written: an on-device run is repeated on every
+    call" no longer holds, and neither does the risk bullet's "an on-device answer is recognised
+    again on every call": a call whose span is inside a stored run answers from it. "The words"'
+    on-device mapping is TR-14's: stored media source ticks, kept by R6-10's half-open source-window
+    test and mapped by `MediaTranscript.project`, replacing `Transcriber.project` and the
+    mapped-start drop test.
 - **TR-12 — An agent's `ripple_delete_ranges` names its undo step "Ripple Delete", whatever it
   cuts; the tool takes no name.** Recorded in the #92 residue batch (#333), before its code
   (`AgentServer+Clips.swift`).
@@ -300,6 +308,57 @@ TR-11.
     path's alike; `recognitionJob` is only the on-device run's input. So a later per-media,
     per-language cache of on-device words (#332) can recognise wider than the window and answer
     through the same filter.
+    **Amended 2026-10-23, by TR-14:** that cache is built (#332); a stored run wider than the
+    window answers through this filter.
   - Risk accepted: a windowed on-device answer can differ from the whole clip's words at the
     same times, because the recogniser hears less context. The cached path's words in a window
     are identical to the whole clip's in that window.
+- **TR-14 — `get_transcript` caches what this Mac's recogniser heard, per media and language,
+  keyed by the file's identity; a later call whose span is inside a stored run answers from it
+  without recognising again. The cache is `get_transcript`'s alone.** Recorded in the #92 residue
+  batch (#332), before its code (`DeviceTranscriptCache.swift`, `TranscriptReader.swift`,
+  `AgentServer+Transcript.swift`, `AgentCatalog+Captions.swift`).
+  - **What and where:** `cache/device-transcripts/<media id>-<language identifier>.json`, one JSON
+    file per (media, language) holding the whole cached state, written with sorted keys; it never
+    shares `cache/transcripts/` with AssemblyAI's files. It follows the cache folder's rules:
+    regenerable; carried by every save, since `cache/` travels whole; in an untitled document's
+    temporary cache until its first save; written whole and atomic through
+    `MediaImporter.CacheLedger.shared.publish(in:for: nil)`, so it never lands mid-save. A file
+    that is missing, unreadable or of another shape reads as absent. A document with no cache
+    directory, a media the snapshot lacks, or a file that cannot be stat'ed (nil `CacheStamp`)
+    reads nothing and writes nothing, and runs as TR-11 did. Nothing is held in memory between
+    calls. There is no size cap: a file holds only what was heard.
+  - **The key:** the stamp is R6-15's four-field `TranscriptSourceStamp` (the path is not in it,
+    for `CacheStamp`'s reason), the resolved BCP-47 language, the OS version string (the
+    recogniser ships with the OS), and `version` 1. A file whose stamp is not equal is a miss, and
+    the next store replaces it whole. Model availability: `transcriptionLanguage` still runs first
+    on every call, so a language whose model is gone is refused as before; a hit skips
+    `recognize`'s own model questions. Risk accepted: a model asset updated without an OS update
+    is not seen.
+  - **The window rule:** a call needs the source span its run would hear: the clip's window, or,
+    with `from`/`to`, `recognitionJob`'s padded window. A hit is the first stored run, in file
+    order, whose span contains that span. A miss runs exactly that span, so the first windowed
+    call costs what TR-13 costs: the window plus 2 s of source each side. The store then drops
+    every stored run the new one contains. There is no gap-filling and no merging of words across
+    runs. So a whole-clip call after windowed ones runs once, and every window inside it hits
+    after that. Risk accepted: the same windowed call can answer differently before and after a
+    wider run is stored (TR-13's context risk).
+  - **The mapping (replaces TR-11's `Transcriber.project` mapping):** a run's seconds are stored
+    as `run.sourceIn + round(clamp(t × 600000, 0, run.sourceLength))` media source ticks, and a
+    non-finite time is dropped. A clip takes a stored word when its source start is in the clip's
+    `[sourceIn, sourceIn + sourceLength)` (R6-10's half-open test). Its start and its end, read as
+    `max(start, end)`, map through `MediaTranscript.project(_:in:)`. Then come TR-11's sort,
+    TR-8's flag and TR-13's overlap filter. The stored runs are per media, so another clip, speed
+    or window over the same file reuses them.
+  - **Whose cache:** only `get_transcript` reads it. It is never read by captions (on-device or
+    cloud), Remove Filler Words, `detect_fillers` or `transcribe_for_fillers` (TR-7: fillers are
+    cloud-only); `TranscriptReader.cached`, `FillerDetector.transcriptFile` and `CloudEstimate`
+    never read it. A cloud transcript that serves `.captions` still answers first.
+    `fillers_reported` stays false for the on-device engine.
+  - **Stop and failure:** Stop ends a run as before. Nothing is stored when a run throws (cancel
+    or error), when the token was cancelled after the run returned, or when the file's stamp
+    changed during the run.
+  - **The answer and AI-7:** an engine `apple` answer gains `cached` (true when it came from a
+    stored run); an `assemblyai` answer is unchanged. AI-7 still has no row: the tool writes only
+    a regenerable cache, with no edit, no undo step, nothing dirtied and no network. Two calls at
+    once may both run, and the last store wins.

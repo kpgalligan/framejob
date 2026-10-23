@@ -22457,15 +22457,16 @@ with the row's sentence; `fillers_proof.py` M4 looks for
 `transcribe_for_fillers` in `detect_fillers`' note. The screen is
 `designs/screens/14b-remove-filler-words-sheet.md`.
 
-## Cut by transcript CT-4 — `get_transcript` and false starts (`transcript_proof.py` P0–P6, G0–G8, A1–A3 and eleven mutants; `transcript_probe.swift`; spec §11 TR-5, TR-11, TR-13, AI-16 as TR-11 amends it)
+## Cut by transcript CT-4 — `get_transcript` and false starts (`transcript_proof.py` P0–P8, G0–G10, A1–A3 and eighteen mutants; `transcript_probe.swift`; spec §11 TR-5, TR-11, TR-13, TR-14, AI-16 as TR-11 amends it)
 
 **What it proves.** `get_transcript {clip, language?, from?, to?}` answers one clip's
 words in timeline ticks, sorted, each with TR-8's `filler` flag: from the
 media's cached transcript when its marker serves `.captions`
 (`TranscriptReader.cached`, through `FillerDetector.transcriptFile`), mapped by
 `MediaTranscript.words(for:in:)`, else from this Mac's recogniser over the
-clip's window (`TranscriptReader.recognize`), mapped by `Transcriber.project`
-with a word at the clip's end dropped. `fillers_reported` says whether the
+clip's window (`TranscriptReader.recognize`), stored as media source ticks and
+mapped by `MediaTranscript.project`, a word at the window's source end dropped,
+and cached per media and language (TR-14). `fillers_reported` says whether the
 transcript asked for fillers. It never makes a network request and edits
 nothing. The assistant reads it, says which words it will cut and cuts them
 with one `ripple_delete_ranges`; its system text holds the "Cutting words:"
@@ -22473,8 +22474,9 @@ paragraph; and its Stop reaches the on-device run through the run's
 `Transcriber.CancelToken`.
 
 **Host-state input:** `media/speech.mov` (a missing file is a scored FAIL), and
-on-device recognition for G5, G8 and A3, each a named host SKIP when the call
-is refused as not installed or not available (G8 and A3 follow G5).
+on-device recognition for G5, G8, G9, G10 and A3, each a named host SKIP when
+the call is refused as not installed or not available (G8, G9, G10 and A3
+follow G5).
 AssemblyAI is `assemblyai_fake.py` serving `cloud_captions_proof.DISFLUENT_WORDS`,
 Anthropic is `anthropic_fake.py`; ONE `assistant_session_proof.App` launch has a
 0700 `-RCSecretFolder` with 0600 `anthropic-key` and `assemblyai-key`, both the
@@ -22484,7 +22486,7 @@ lock. Run every command under `env -u RC_ASSEMBLYAI_KEY`; nothing is paid.
 
 ```sh
 python3 tools/proof/swift_build.py typecheck tools/proof/transcript_probe.swift
-python3 tools/proof/transcript_proof.py --only P0,P1,P2,P3,P4,P5,P6   # no app
+python3 tools/proof/transcript_proof.py --only P0,P1,P2,P3,P4,P5,P6,P7,P8   # no app
 make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py
 RC_PROOF_APP=release env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py   # the record
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py --mutant NAME   # exit 0 = caught
@@ -22497,13 +22499,16 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py --mutant NAME  
   `in`) lands at 600000; the ticks are `MediaTranscript.words`' own; the order
   is At, um, Uh, so, er, umbrella (so and er share a start; so ends first);
   "um,", "Uh" and "er" are fillers, "umbrella" is not.
-- **P2** `deviceWords` for a 2 s clip at 1 s, speed 2, runs out of order:
-  uh 675000–750000 (flagged), hello 750000–900000, late 1725000–1800000
-  (its end clamped); "past" at 4 s lands on the clip's end and is dropped.
+- **P2** `deviceWords` over `Heard(runs:over:)` of a 2 s clip at 1 s, speed
+  2, runs out of order: uh 675000–750000 (flagged), hello 750000–900000, late
+  1725000–1800000 (its end clamped); "past" at 4 s is stored at the window's
+  source end and dropped.
 - **P3** `cached` over a temp cache stamped as `fillers_probe.swift` P8 stamps
   one: no file → nil; a `disfluencies` marker → `fillersReported` true; one
   without → false; a changed source → nil.
 - **P4–P6** the window (TR-13); "#331 — the window" below.
+- **P7**, **P8** the on-device cache (TR-14); "#332 — the on-device cache"
+  below.
 
 **The app rows**, one launch:
 - **G0** the parity log is empty; the tool takes exactly `clip`, `from`,
@@ -22524,6 +22529,7 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py --mutant NAME  
   flags TR-8's, the filler sentence in `note`, no AssemblyAI request. Its words
   are kept for G8.
 - **G8** the on-device run narrowed to a window (TR-13); below.
+- **G9**, **G10** the on-device cache (TR-14); below.
 - **A1** on G1's project, the stand-in turn `get_transcript` →
   `ripple_delete_ranges [[360000, 960000]]` ("Hello there") → "Cut.":
   finished, neither result an error, the `get_transcript` result holds G1's
@@ -22534,13 +22540,14 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py --mutant NAME  
 - **A3** `assistant_session_proof.long_fixture`'s ~3600 s `long.wav` at 0, no
   cache, the model's `get_transcript` sent with `stop_after: STOP_AFTER`:
   `stopped_turn(…, "get_transcript", "The transcription was cancelled.")` has
-  no problems and the stand-in no failure.
+  no problems, the stand-in no failure, and the package's
+  `cache/device-transcripts/` no file (TR-14).
 
 | Mutant | Anchor (asserted once) | Must fail | 2026-10-23 |
 |---|---|---|---|
 | `no-filler-flag` | `TranscriptReader.swift` both `filler: FillerWords.isFiller(…)` → `false` | P1, P2 | caught (2/4) |
 | `unsorted` | `sortedWords`' sort → `words.map(\.word)` | P1 | caught (2/4; P2 too) |
-| `device-past-clip-end` | `guard start < end else { continue }` removed | P2 | caught (3/4) |
+| `device-past-clip-end` | `guard run.start < end else { continue }` removed (#332's anchor; before it `guard start < end …`) | P2 | caught (3/4; 8/9 on #332's anchor) |
 | `fillers-reported-any` | `FillerDetector.fillersFile(…) != nil` → `true` | P3 | caught (3/4) |
 | `stale-cache-read` | `cached`'s `transcriptFile` guard → `MediaTranscript.read` and `readStamp`, no source stamp | P3 | caught (3/4) |
 | `window-start-only` | `overlapping`'s test → `word.start >= window.from && word.start < window.to` | P5 | caught (6/7) |
@@ -22609,3 +22616,52 @@ fifteen names with `get_transcript` after `transcribe`;
 `assistant_session_proof.py`'s T2 keeps it in the assistant's catalog (no AI-7
 row); `assistant_prompt_proof.py`'s F1 and F4 hold the new paragraph and the
 captions topic (guide 1486 of 1500).
+
+### #332 — the on-device cache (TR-14)
+
+**What it proves.** An on-device `get_transcript` run stores what the
+recogniser heard in `cache/device-transcripts/<media>-<language>.json`
+(`DeviceTranscriptCache`), keyed by the file's four-field source stamp, the
+language, the OS version and a version; a later call whose source span is
+inside a stored run answers from it with `cached: true` and no recognition; a
+miss runs its own span and the store drops the stored runs it contains; and
+nothing is stored on a throw, a cancel or a file changed during the run. The
+cache lives only inside each row's package; G9's copy of speech.mov lives in
+`work/transcript/`, and G9 and G10 remove what they made.
+
+- **P7** over a temp cache and a stat-able file: empty → nil; a run over
+  [0 s, 6 s) stored, [1 s, 2 s) a hit and [5 s, 7 s) nil; the same lookup
+  under language fr-FR, another `system` or `version` + 1 nil; the file
+  rewritten to another size, with a fresh stamp, nil; `merged` narrow then
+  wide → 1 run, then disjoint → 2, another stamp → 1; garbage bytes read nil
+  and a store over them succeeds; `Heard(runs:over:)` clamps −1 s and 9 s to
+  the span's edges and drops a NaN.
+- **P8** `heard()` with a counting `recognize`: the 1st call cached false and
+  the file written, the 2nd cached true with still 1 run; with no `cacheDir`
+  it runs every time and writes nothing; a throwing `recognize` rethrows and
+  writes nothing; `cancelled` true writes nothing; a `recognize` that
+  rewrites the media file writes nothing.
+- **G9** speech.mov copied (`shutil.copy2`) into `work/transcript/`, a new
+  session on the copy: call 1 engine `apple`, `cached` false, the file holding
+  1 run; call 2 `cached` true with the same words (both wall times reported,
+  not scored: 0.24 s and 0.00 s on Debug, 2026-10-23); "planted" written as the
+  file's first word → call 3 answers it, `cached` true; a window on one word →
+  `cached` true, exactly call 3's overlapping words, still 1 run; the copy's
+  mtime moved 10 s forward → `cached` false, no "planted", the stamp's
+  `modified` changed; no AssemblyAI request.
+- **G10** a fresh package: a windowed call → `cached` false, 1 run shorter than
+  the clip; the same window → `cached` true; the whole clip → `cached` false,
+  then 1 run (the windowed one pruned).
+- **A3** gains its no-file check (above).
+
+| Mutant | Anchor (asserted once, `DeviceTranscriptCache.swift`) | Must fail | 2026-10-23 |
+|---|---|---|---|
+| `device-stamp-ignored` | `lookup`'s `guard file.stamp == stamp else { return nil }` removed | P7 | caught (8/9: another system, version + 1 and another size hit) |
+| `device-stamp-source-only` | that guard → `file.stamp.source == stamp.source` | P7 | caught (8/9: another system and version + 1 hit) |
+| `device-overlap-hit` | `covers`' containment → `sourceIn < ownEnd && end > self.sourceIn` | P7 | caught (8/9: [5 s, 7 s) hit) |
+| `device-no-prune` | `merged`'s `filter { !heard.covers(…) }` → `file.runs` | P7 | caught (8/9: 2 runs, then 3) |
+| `device-no-read` | `heard`'s `lookup(…)` → `Optional<Heard>.none` | P8 | caught (8/9: the 2nd call ran) |
+| `device-cancelled-stores` | `heard`'s `guard !cancelled()` removed | P8 | caught (8/9) |
+| `device-no-restamp` | `heard`'s stamp-after-the-run guard removed | P8 | caught (8/9) |
+
+`no-filler-flag` ran again on #332's tree, its anchors unchanged: caught (7/9).

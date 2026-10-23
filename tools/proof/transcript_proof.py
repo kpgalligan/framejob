@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Cut by transcript CT-4 (spec §11 TR-5, TR-11, AI-16 as TR-11 amends it) and
-#331 (TR-13): `get_transcript`, its `from`/`to` window, the false-start turn
-through the assistant, and Stop on its on-device run.
+"""Cut by transcript CT-4 (spec §11 TR-5, TR-11, AI-16 as TR-11 amends it),
+#331 (TR-13) and #332 (TR-14): `get_transcript`, its `from`/`to` window, its
+on-device cache, the false-start turn through the assistant, and Stop on its
+on-device run.
 
     python3 tools/proof/transcript_proof.py [--mutant NAME] [--only IDS]
 
@@ -21,8 +22,8 @@ killed at a 240 s wall):
       of order: a word before `in` absent, one at `in` present; the ticks are
       `MediaTranscript.words`' own and the words sorted; "um,", "Uh" and "er"
       fillers, "umbrella" not.
-  P2  `deviceWords`: runs at start + t / speed, one at the clip's end dropped,
-      sorted, "uh" flagged.
+  P2  `deviceWords` over `Heard(runs:over:)` of the clip: runs at start +
+      t / speed, one at the window's source end dropped, sorted, "uh" flagged.
   P3  `cached` over a temp cache: a disfluent marker → `fillersReported`
       true; a marker without → false; a changed source stamp → nil; no file
       → nil.
@@ -40,6 +41,19 @@ killed at a 240 s wall):
       their padded start, duration, in and length, clamped to the clip; the
       whole clip gives the job itself; 1 s into the middle sub-run is
       `Transcriber.project`'s 7 s into the clip's, within 1 tick.
+  P7  `DeviceTranscriptCache` over a temp cache and a stat-able file (TR-14):
+      empty → nil; a run over [0 s, 6 s) stored, a lookup of [1 s, 2 s) hits
+      and of [5 s, 7 s) is nil; the same lookup under language fr-FR, another
+      system or version + 1 nil; the file rewritten to another size, with a
+      fresh stamp, nil; `merged` narrow then wide → 1 run, then disjoint → 2,
+      another stamp → 1; garbage bytes read nil and a store over them
+      succeeds; `Heard(runs:over:)` clamps to [0, sourceLength] and drops a
+      NaN.
+  P8  `heard()` with a counting `recognize`: the 1st call cached false and
+      the file written, the 2nd cached true with still 1 run; no `cacheDir`
+      runs every time and writes nothing; a throwing `recognize` rethrows and
+      writes nothing; `cancelled` true and a `recognize` that rewrites the
+      media file write nothing.
 
 App rows (the app `proof_app` chooses — Debug by default, `RC_PROOF_APP=release`
 for the record; host-state input `media/speech.mov`, whose absence is a
@@ -79,6 +93,18 @@ scored FAIL):
       apple, a word that normalises to "fox", from/to echoed, every word
       overlapping the echoed window, fewer words than G5's, no AssemblyAI
       request. A named host SKIP when G5 was.
+  G9  speech.mov copied (`shutil.copy2`) into work/transcript/, a new session
+      on the copy (TR-14): call 1 engine apple, cached false, and
+      `<package>/cache/device-transcripts/<media>-<language>.json` holds 1
+      run; call 2 cached true, the same words (both wall times reported, not
+      scored); "planted" written as the file's first word → call 3 answers it,
+      cached true; a window on one word → cached true, call 3's overlapping
+      words, still 1 run; the copy's mtime moved 10 s forward → cached false,
+      no "planted", the stamp's `modified` changed; no AssemblyAI request. The
+      copy and the package are removed. A named host SKIP when G5 was.
+  G10 a fresh package: a windowed call → cached false, 1 run shorter than the
+      clip; the same window → cached true; the whole clip → cached false,
+      then 1 run (the windowed one pruned). A named host SKIP when G5 was.
   A1  on G1's project, the stand-in turn get_transcript → ripple_delete_ranges
       [[360000, 960000]] ("Hello there", the false start) → "Cut.": finished,
       no error result, the get_transcript result holds G1's words, the clips
@@ -89,12 +115,14 @@ scored FAIL):
   A3  Stop reaches the on-device run: `long_fixture`'s ~3600 s long.wav at 0,
       no cache, the model's get_transcript sent with stop_after STOP_AFTER:
       `stopped_turn(…, "get_transcript", "The transcription was cancelled.")`
-      has no problems, no stand-in failure. A named host SKIP when G5 was.
+      has no problems, no stand-in failure, and the package's
+      `cache/device-transcripts/` holds no file (TR-14: a cancelled run stores
+      nothing). A named host SKIP when G5 was.
 
 Mutants (`--mutant`), each anchor asserted to occur once in its file:
   no-filler-flag         filler always false (P1, P2)
   unsorted               no sort (P1)
-  device-past-clip-end   no end filter (P2)
+  device-past-clip-end   no source-end filter (P2)
   fillers-reported-any   fillersReported true for any current marker (P3)
   stale-cache-read       file and marker read with MediaTranscript.read
                          directly, no source stamp (P3)
@@ -103,6 +131,13 @@ Mutants (`--mutant`), each anchor asserted to occur once in its file:
   window-equal-allowed   `to <= from` is `to < from` (P4)
   window-outside-allowed the `.outside` throw removed (P4)
   no-recognition-pad     the pad is 0 (P6)
+  device-stamp-ignored   `lookup`'s stamp test removed (P7)
+  device-stamp-source-only  `lookup` compares only the stamps' `source` (P7)
+  device-overlap-hit     `covers` is an overlap, not containment (P7)
+  device-no-prune        `merged` keeps the runs the new one contains (P7)
+  device-no-read         `heard` never looks the run up (P8)
+  device-cancelled-stores  `heard`'s `!cancelled()` test removed (P8)
+  device-no-restamp      `heard`'s stamp-after-the-run test removed (P8)
   no-transcript-stop     the `stop?.onCancel { token.cancel() }` line deleted
                          from AgentServer+Transcript.swift in a tree copy
                          (`tree_copy.make_copy` into work/transcript/mutant/tree,
@@ -135,8 +170,9 @@ ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/transcript"
 PROBE = ROOT / "tools/proof/transcript_probe.swift"
 SPEECH = ROOT / "tools/proof/media/speech.mov"
-PROBE_ROWS = ["P0", "P1", "P2", "P3", "P4", "P5", "P6"]
-APP_ROWS = ["G0", "G1", "G6", "G7", "G2", "G3", "G4", "G5", "G8", "A1", "A2", "A3"]
+PROBE_ROWS = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"]
+APP_ROWS = ["G0", "G1", "G6", "G7", "G2", "G3", "G4", "G5", "G8", "G9", "G10", "A1", "A2",
+            "A3"]
 ROWS = PROBE_ROWS + APP_ROWS
 WALL = 240
 SEC = 600_000
@@ -144,6 +180,7 @@ KEY = "proof-key"
 
 TR = "TranscriptReader.swift"
 TS = "AgentServer+Transcript.swift"
+DC = "DeviceTranscriptCache.swift"
 STOP_LINE = "stop?.onCancel { token.cancel() }"
 # name: (the rows it must fail, [(file, before, after), ...]); the app mutant's
 # one edit deletes its line.
@@ -157,7 +194,8 @@ MUTANTS = {
              "$1.index)\n"
              "        }.map(\\.word)\n",
          "        words.map(\\.word)\n")]),
-    "device-past-clip-end": (["P2"], [(TR, "            guard start < end else { continue }\n", "")]),
+    "device-past-clip-end": (["P2"], [(TR, "            guard run.start < end else { continue }\n",
+                                       "")]),
     "fillers-reported-any": (["P3"], [
         (TR, "FillerDetector.fillersFile(for: media, url: url, in: cacheDir) != nil", "true")]),
     "stale-cache-read": (["P3"], [
@@ -187,6 +225,26 @@ MUTANTS = {
         (TR, "let pad = Ticks((recognitionPadSeconds * Double(ReelTime.perSecond) / speed)"
              ".rounded(.up))",
          "let pad: Ticks = 0")]),
+    "device-stamp-ignored": (["P7"], [
+        (DC, "        guard file.stamp == stamp else { return nil }\n", "")]),
+    "device-stamp-source-only": (["P7"], [
+        (DC, "guard file.stamp == stamp else { return nil }",
+         "guard file.stamp.source == stamp.source else { return nil }")]),
+    "device-overlap-hit": (["P7"], [
+        (DC, "return self.sourceIn <= sourceIn && end <= ownEnd",
+         "return sourceIn < ownEnd && end > self.sourceIn")]),
+    "device-no-prune": (["P7"], [
+        (DC, "let kept = file.runs.filter { !heard.covers(sourceIn: $0.sourceIn, "
+             "sourceLength: $0.sourceLength) }",
+         "let kept = file.runs")]),
+    "device-no-read": (["P8"], [
+        (DC, "let hit = lookup(run, media: run.media, stamp: stamp, in: cacheDir)",
+         "let hit = Optional<Heard>.none")]),
+    "device-cancelled-stores": (["P8"], [
+        (DC, "        guard !cancelled() else { return (heard, false) }\n", "")]),
+    "device-no-restamp": (["P8"], [
+        (DC, "        guard currentStamp(media, url: run.source, language: language) == stamp "
+             "else { return (heard, false) }\n", "")]),
     "no-transcript-stop": (["A3"], [(TS, STOP_LINE, None)]),
 }
 APP_MUTANT = "no-transcript-stop"
@@ -310,6 +368,29 @@ def grid(session):
 def overlaps(word, lo, hi):
     """TR-13's overlap rule: a word with no length belongs when lo <= start < hi."""
     return word["start"] < hi and max(word["end"], word["start"] + 1) > lo
+
+
+def device_dir(session):
+    return os.path.join(session.path, "cache", "device-transcripts")
+
+
+def device_files(session):
+    """The names in the package's `cache/device-transcripts/` (TR-14)."""
+    try:
+        return sorted(os.listdir(device_dir(session)))
+    except OSError:
+        return []
+
+
+def device_file(session, media, language):
+    """The package's cached on-device file for (media, language), parsed, or
+    None when it is not there or does not parse."""
+    path = os.path.join(device_dir(session), f"{media}-{language}.json")
+    try:
+        with open(path) as handle:
+            return json.load(handle)
+    except (OSError, ValueError):
+        return None
 
 
 def build_mutant_app():
@@ -658,6 +739,141 @@ def app_rows(results, wanted, app_path, mutant=False):
                     close(session)
             run("G8", g8)
 
+            def g9():
+                if state.get("no_device"):
+                    return None, f"G5 was a host skip: {state['no_device'][:160]!r}"
+                copy = WORK / f"speech-G9-{os.getpid()}.mov"
+                shutil.copy2(SPEECH, copy)
+                session = None
+                try:
+                    session = cloud.Session(app, "transcript-G9")
+                    media = session.media_of(str(copy))
+                    clip = session.add(media, at=0)
+                    problems = []
+                    mark = aai_requests()
+
+                    def call(**window):
+                        began = time.monotonic()
+                        answer = session.op("get_transcript", clip=clip, **window)
+                        return answer, time.monotonic() - began
+                    one, first_s = call()
+                    language = one.get("language")
+                    stored = device_file(session, media, language) or {}
+                    if one.get("engine") != "apple" or one.get("cached") is not False:
+                        problems.append(f"call 1 engine {one.get('engine')}, cached "
+                                        f"{one.get('cached')}")
+                    if len(stored.get("runs") or []) != 1:
+                        problems.append(f"call 1 left {len(stored.get('runs') or [])} runs in "
+                                        f"{device_files(session)}")
+                    two, second_s = call()
+                    if two.get("cached") is not True or two.get("words") != one.get("words"):
+                        problems.append(f"call 2 cached {two.get('cached')}, the same words "
+                                        f"{two.get('words') == one.get('words')}")
+                    planted = False
+                    if stored.get("runs") and stored["runs"][0].get("words"):
+                        stored["runs"][0]["words"][0]["text"] = "planted"
+                        path = os.path.join(device_dir(session), f"{media}-{language}.json")
+                        with open(path, "w") as handle:
+                            json.dump(stored, handle, sort_keys=True)
+                        planted = True
+                    three, _ = call()
+                    texts = [w.get("text") for w in three.get("words") or []]
+                    if not planted or three.get("cached") is not True or "planted" not in texts:
+                        problems.append(f"planted {planted}; call 3 cached {three.get('cached')}, "
+                                        f"words {texts[:6]}")
+                    # A window on one word, widened outward to whole frames.
+                    words3 = three.get("words") or []
+                    target = words3[len(words3) // 2] if words3 else None
+                    windowed = None
+                    if target is not None:
+                        num, den = session.project()["canvas"]["fps"]
+                        per = 600_000 * den
+                        lo_f = target["start"] * num // per
+                        hi_f = max(-(-target["end"] * num // per), lo_f + 1)
+                        windowed, _ = call(**{"from": lo_f * per // num, "to": hi_f * per // num})
+                        lo, hi = windowed.get("from"), windowed.get("to")
+                        want = [w for w in words3 if overlaps(w, lo, hi)]
+                        runs_now = len((device_file(session, media, language) or {}).get("runs")
+                                       or [])
+                        if (windowed.get("cached") is not True
+                                or windowed.get("words") != want or runs_now != 1):
+                            problems.append(f"window [{lo}, {hi}) cached {windowed.get('cached')}, "
+                                            f"call 3's words {windowed.get('words') == want}, "
+                                            f"{runs_now} runs")
+                    else:
+                        problems.append("call 3 answered no word to window on")
+                    before = (stored.get("stamp") or {}).get("source", {}).get("modified")
+                    moved = os.stat(copy).st_mtime + 10
+                    os.utime(copy, (moved, moved))
+                    four, _ = call()
+                    after = ((device_file(session, media, language) or {}).get("stamp") or {}) \
+                        .get("source", {}).get("modified")
+                    texts4 = [w.get("text") for w in four.get("words") or []]
+                    if (four.get("cached") is not False or "planted" in texts4
+                            or before is None or after == before):
+                        problems.append(f"after the mtime moved: cached {four.get('cached')}, "
+                                        f"planted {'planted' in texts4}, modified {before} → "
+                                        f"{after}")
+                    sent = aai_requests() - mark
+                    if sent:
+                        problems.append(f"AssemblyAI requests {sent}")
+                    return not problems, (
+                        f"language {language!r}; call 1 {first_s:.2f} s (cached "
+                        f"{one.get('cached')}), call 2 {second_s:.2f} s (cached "
+                        f"{two.get('cached')}); planted answered {'planted' in texts}; window "
+                        f"cached {(windowed or {}).get('cached')}; after the mtime moved cached "
+                        f"{four.get('cached')}, modified {before} → {after}"
+                        + ("" if not problems else " — " + "; ".join(problems)))
+                finally:
+                    if session is not None:
+                        close(session)
+                        shutil.rmtree(session.path, ignore_errors=True)
+                        state.setdefault("made", []).append(session.path)
+                    with contextlib.suppress(OSError):
+                        os.remove(copy)
+            run("G9", g9)
+
+            def g10():
+                if state.get("no_device"):
+                    return None, f"G5 was a host skip: {state['no_device'][:160]!r}"
+                session = cloud.Session(app, "transcript-G10")
+                try:
+                    media = session.media_of(str(SPEECH))
+                    clip = session.add(media, at=0)
+                    placed = session.clip(clip)
+                    _, snap = grid(session)
+                    window = {"from": snap(SEC), "to": snap(2 * SEC)}
+                    problems = []
+                    first = session.op("get_transcript", clip=clip, **window)
+                    language = first.get("language")
+                    runs1 = (device_file(session, media, language) or {}).get("runs") or []
+                    if (first.get("cached") is not False or len(runs1) != 1
+                            or not runs1[0].get("source_length", 0) < placed["duration"]):
+                        problems.append(f"windowed call cached {first.get('cached')}, runs "
+                                        f"{[(r.get('source_in'), r.get('source_length')) for r in runs1]}"
+                                        f" against the clip's {placed['duration']}")
+                    again = session.op("get_transcript", clip=clip, **window)
+                    if again.get("cached") is not True:
+                        problems.append(f"the same window cached {again.get('cached')}")
+                    whole = session.op("get_transcript", clip=clip)
+                    runs2 = (device_file(session, media, language) or {}).get("runs") or []
+                    if whole.get("cached") is not False or len(runs2) != 1:
+                        problems.append(f"the whole clip cached {whole.get('cached')}, "
+                                        f"{len(runs2)} runs")
+                    return not problems, (
+                        f"window [{window['from']}, {window['to']}) → cached "
+                        f"{first.get('cached')}, run lengths "
+                        f"{[r.get('source_length') for r in runs1]} (clip {placed['duration']}); "
+                        f"again cached {again.get('cached')}; whole clip cached "
+                        f"{whole.get('cached')}, then {len(runs2)} run(s) of lengths "
+                        f"{[r.get('source_length') for r in runs2]}"
+                        + ("" if not problems else " — " + "; ".join(problems)))
+                finally:
+                    close(session)
+                    shutil.rmtree(session.path, ignore_errors=True)
+                    state.setdefault("made", []).append(session.path)
+            run("G10", g10)
+
             def a1():
                 session, clip = state.get("g1"), state.get("g1_clip")
                 if session is None:
@@ -750,6 +966,9 @@ def app_rows(results, wanted, app_path, mutant=False):
                     problems = sp.stopped_turn(answer, "get_transcript", CANCELLED)
                     if log.get("failures"):
                         problems.append(f"failures {log['failures']}")
+                    stored = device_files(session)
+                    if stored:
+                        problems.append(f"cache/device-transcripts/ holds {stored} after Stop")
                     results_ = sp.tool_results(answer, "get_transcript")
                     return not problems, (
                         f"a {seconds:.0f} s WAV; {sp.brief(answer)}, stopped_ms "
@@ -762,6 +981,11 @@ def app_rows(results, wanted, app_path, mutant=False):
         finally:
             if app is not None:
                 app.stop()
+            # The app's background media passes (speech, sync) can write into
+            # G9's and G10's packages after their close, so they are removed
+            # again once the instance has stopped and nothing can write.
+            for path in state.get("made", []):
+                shutil.rmtree(path, ignore_errors=True)
             if stand_in is not None:
                 stand_in.stop()
 
@@ -793,7 +1017,8 @@ def main():
         probe_wanted = ["P0"] + probe_wanted
     if not app_mutant and app_wanted and "G0" not in app_wanted:
         app_wanted = ["G0"] + app_wanted
-    needs = {"G3": "G2", "A1": "G1", "A2": "A1", "A3": "G5", "G6": "G1", "G8": "G5"}
+    needs = {"G3": "G2", "A1": "G1", "A2": "A1", "A3": "G5", "G6": "G1", "G8": "G5",
+             "G9": "G5", "G10": "G5"}
     for _ in range(3):
         app_wanted = sorted(set(app_wanted) | {needs[r] for r in app_wanted if r in needs},
                             key=APP_ROWS.index)

@@ -1,4 +1,4 @@
-// Cut by transcript CT-4 (spec §11 TR-11) and #331 (TR-13): the value rows of
+// Cut by transcript CT-4 (spec §11 TR-11), #331 (TR-13) and #332 (TR-14): the value rows of
 // `transcript_proof.py`, compiled as `main.swift` over `app/Sources` (or a
 // mutant's copy of it) through `swift_build.build()`. Prints one JSON object,
 // `{"rows": [{"id", "pass", "detail"}]}`, on stdout. No network, no app, no
@@ -103,10 +103,11 @@ do {
         SpeechEngine.Run(text: "uh", start: 0.25, end: 0.5),
         SpeechEngine.Run(text: "late", start: 3.75, end: 4.5),
     ]
-    let got = TranscriptReader.deviceWords(runs, for: clip)
+    let got = TranscriptReader.deviceWords(
+        DeviceTranscriptCache.Heard(runs: runs, over: clip), for: clip)
     // start + t / speed: 0.25 s → 675000, 0.5 s → 750000, 1.0 s → 900000,
-    // 3.75 s → 1725000; 4.0 s lands on the clip's end (1800000) and is
-    // dropped; 4.5 s is clamped to it.
+    // 3.75 s → 1725000; 4.0 s is stored at the window's source end (2700000)
+    // and dropped; 4.5 s is clamped to it.
     let want: [TranscriptReader.Word] = [
         .init(text: "uh", start: 675_000, end: 750_000, speaker: nil, filler: true),
         .init(text: "hello", start: 750_000, end: 900_000, speaker: nil, filler: false),
@@ -286,6 +287,215 @@ do {
                 + "the clip's → \(full)"
             : problems.joined(separator: "; "))
 }
+
+// MARK: - P7, P8: the on-device cache (spec §11 TR-14)
+
+let cacheFolder = URL(fileURLWithPath: NSTemporaryDirectory())
+    .appendingPathComponent("device-transcript-\(UUID().uuidString)", isDirectory: true)
+try? FileManager.default.createDirectory(at: cacheFolder, withIntermediateDirectories: true)
+
+/// A stat-able "media file" for `id`, and its snapshot.
+func movie(_ id: UInt32, bytes: Int = 1000) -> (url: URL, media: MediaSnapshot) {
+    let url = cacheFolder.appendingPathComponent("speech-\(id).mov")
+    try? Data(repeating: 7, count: bytes).write(to: url)
+    return (url, MediaSnapshot(
+        id: id, path: url.path, duration: 6_000_000, hasVideo: true, hasAudio: true))
+}
+
+/// A job over media `id`'s source [from s, to s) at speed 1.
+func span(_ id: UInt32, _ url: URL, _ from: Double, _ to: Double) -> Transcriber.Job {
+    let sourceIn = Ticks(from * 600_000)
+    let length = Ticks((to - from) * 600_000)
+    return Transcriber.Job(
+        clip: id, media: id, name: "clip \(id)", source: url, sourceIn: sourceIn,
+        sourceLength: length, start: 0, duration: length, speed: 1)
+}
+
+func runs(_ heard: DeviceTranscriptCache.Heard?) -> String {
+    heard.map { "[\($0.sourceIn), +\($0.sourceLength)) \($0.words.count) words" } ?? "nil"
+}
+
+// MARK: - P7: read, lookup, merged, store
+
+do {
+    var problems: [String] = []
+    let cache = cacheFolder.appendingPathComponent("cache-p7", isDirectory: true)
+    let (url, media) = movie(7)
+    guard let source = MediaImporter.CacheStamp.stamp(for: media, url: url) else {
+        fatalError("the P7 media file cannot be stat'ed")
+    }
+    let stamp = DeviceTranscriptCache.Stamp(source: source, language: "en-US")
+    let whole = span(7, url, 0, 6)
+    let heard = DeviceTranscriptCache.Heard(
+        runs: [SpeechEngine.Run(text: "quick", start: 1.0, end: 1.5)], over: whole)
+    let inner = span(7, url, 1, 2)
+    let across = span(7, url, 5, 7)
+    if let got = DeviceTranscriptCache.lookup(inner, media: 7, stamp: stamp, in: cache) {
+        problems.append("empty → \(runs(got))")
+    }
+    let stored = DeviceTranscriptCache.store(heard, media: 7, stamp: stamp, in: cache)
+    let hit = DeviceTranscriptCache.lookup(inner, media: 7, stamp: stamp, in: cache)
+    if !stored || hit != heard { problems.append("stored \(stored); [1, 2) → \(runs(hit))") }
+    if let got = DeviceTranscriptCache.lookup(across, media: 7, stamp: stamp, in: cache) {
+        problems.append("[5, 7) → \(runs(got))")
+    }
+    let others: [(String, DeviceTranscriptCache.Stamp)] = [
+        ("language fr-FR", .init(
+            source: stamp.source, language: "fr-FR", system: stamp.system,
+            version: stamp.version)),
+        ("another system", .init(
+            source: stamp.source, language: stamp.language, system: stamp.system + " (other)",
+            version: stamp.version)),
+        ("version + 1", .init(
+            source: stamp.source, language: stamp.language, system: stamp.system,
+            version: stamp.version + 1)),
+    ]
+    for (name, other) in others {
+        if let got = DeviceTranscriptCache.lookup(inner, media: 7, stamp: other, in: cache) {
+            problems.append("\(name) → \(runs(got))")
+        }
+    }
+    try? Data(repeating: 7, count: 1001).write(to: url)
+    if let fresh = MediaImporter.CacheStamp.stamp(for: media, url: url) {
+        let changed = DeviceTranscriptCache.Stamp(source: fresh, language: "en-US")
+        if changed == stamp { problems.append("the rewritten file's stamp is unchanged") }
+        if let got = DeviceTranscriptCache.lookup(inner, media: 7, stamp: changed, in: cache) {
+            problems.append("another size → \(runs(got))")
+        }
+    } else {
+        problems.append("the rewritten file cannot be stat'ed")
+    }
+    // merged: a narrow run, then a wide one that contains it → 1; a disjoint
+    // one → 2; another stamp → 1.
+    let narrow = DeviceTranscriptCache.Heard(runs: [], over: span(7, url, 1, 2))
+    let wide = DeviceTranscriptCache.Heard(runs: [], over: span(7, url, 0, 3))
+    let apart = DeviceTranscriptCache.Heard(runs: [], over: span(7, url, 4, 5))
+    let one = DeviceTranscriptCache.merged(nil, adding: narrow, stamp: stamp)
+    let pruned = DeviceTranscriptCache.merged(one, adding: wide, stamp: stamp)
+    let two = DeviceTranscriptCache.merged(pruned, adding: apart, stamp: stamp)
+    let replaced = DeviceTranscriptCache.merged(two, adding: narrow, stamp: others[1].1)
+    if pruned.runs != [wide] { problems.append("narrow then wide → \(pruned.runs.map(runs))") }
+    if two.runs != [wide, apart] { problems.append("then disjoint → \(two.runs.map(runs))") }
+    if replaced.runs != [narrow] || replaced.stamp != others[1].1 {
+        problems.append("another stamp → \(replaced.runs.map(runs))")
+    }
+    // Garbage bytes read as absent, and a store over them succeeds.
+    let file = DeviceTranscriptCache.fileURL(for: 7, language: "en-US", in: cache)
+    try? Data("not json".utf8).write(to: file)
+    let garbage = DeviceTranscriptCache.read(for: 7, language: "en-US", in: cache)
+    let over = DeviceTranscriptCache.store(heard, media: 7, stamp: stamp, in: cache)
+    let reread = DeviceTranscriptCache.read(for: 7, language: "en-US", in: cache)
+    if garbage != nil || !over || reread?.runs != [heard] {
+        problems.append("garbage → \(garbage == nil ? "nil" : "a file"); store over it \(over); "
+            + "then \(reread?.runs.count ?? -1) runs")
+    }
+    // Heard(runs:over:): [2 s, 4 s) of source; -1 s and 9 s clamp to its
+    // edges, a NaN is dropped.
+    let clamped = DeviceTranscriptCache.Heard(
+        runs: [
+            SpeechEngine.Run(text: "before", start: -1, end: 0.5),
+            SpeechEngine.Run(text: "nan", start: .nan, end: 1),
+            SpeechEngine.Run(text: "after", start: 1.5, end: 9),
+        ], over: span(7, url, 2, 4))
+    let wantClamped: [DeviceTranscriptCache.Word] = [
+        .init(text: "before", start: 1_200_000, end: 1_500_000),
+        .init(text: "after", start: 2_100_000, end: 2_400_000),
+    ]
+    if clamped.words != wantClamped || clamped.sourceIn != 1_200_000
+        || clamped.sourceLength != 1_200_000
+    {
+        problems.append("Heard(runs:over:) → \(clamped.words)")
+    }
+    row("P7", problems.isEmpty,
+        problems.isEmpty
+            ? "empty → nil; [0, 6) stored, [1, 2) hit, [5, 7) nil; fr-FR, another system, "
+                + "version + 1 and another size nil; merged 1, 2, 1; garbage nil then stored; "
+                + "clamped and NaN dropped"
+            : problems.joined(separator: "; "))
+}
+
+// MARK: - P8: heard() — a hit skips the run, and what is never stored
+
+do {
+    var problems: [String] = []
+    let cache = cacheFolder.appendingPathComponent("cache-p8", isDirectory: true)
+    var count = 0
+    func counting() -> [SpeechEngine.Run] {
+        count += 1
+        return [SpeechEngine.Run(text: "fox", start: 0.5, end: 0.75)]
+    }
+    func exists(_ id: UInt32) -> Bool {
+        FileManager.default.fileExists(
+            atPath: DeviceTranscriptCache.fileURL(for: id, language: "en-US", in: cache).path)
+    }
+    struct Failed: Error {}
+
+    let (url, media) = movie(8)
+    let job = span(8, url, 0, 6)
+    let first = try? DeviceTranscriptCache.heard(
+        job, language: "en-US", media: media, in: cache, cancelled: { false },
+        recognize: counting)
+    let written = exists(8)
+    let second = try? DeviceTranscriptCache.heard(
+        job, language: "en-US", media: media, in: cache, cancelled: { false },
+        recognize: counting)
+    if first?.cached != false || !written || second?.cached != true || count != 1
+        || second?.heard != first?.heard
+    {
+        problems.append("1st cached \(String(describing: first?.cached)), file \(written); 2nd "
+            + "cached \(String(describing: second?.cached)); \(count) runs")
+    }
+
+    count = 0
+    let (noURL, noMedia) = movie(9)
+    let noJob = span(9, noURL, 0, 6)
+    let a = try? DeviceTranscriptCache.heard(
+        noJob, language: "en-US", media: noMedia, in: nil, cancelled: { false },
+        recognize: counting)
+    let b = try? DeviceTranscriptCache.heard(
+        noJob, language: "en-US", media: noMedia, in: nil, cancelled: { false },
+        recognize: counting)
+    if a?.cached != false || b?.cached != false || count != 2 || exists(9) {
+        problems.append("no cacheDir: \(count) runs, file \(exists(9))")
+    }
+
+    let (throwURL, throwMedia) = movie(10)
+    var threw = false
+    do {
+        _ = try DeviceTranscriptCache.heard(
+            span(10, throwURL, 0, 6), language: "en-US", media: throwMedia, in: cache,
+            cancelled: { false }, recognize: { throw Failed() })
+    } catch is Failed {
+        threw = true
+    } catch {}
+    if !threw || exists(10) { problems.append("a throw: rethrown \(threw), file \(exists(10))") }
+
+    let (cancelURL, cancelMedia) = movie(11)
+    let cancelled = try? DeviceTranscriptCache.heard(
+        span(11, cancelURL, 0, 6), language: "en-US", media: cancelMedia, in: cache,
+        cancelled: { true }, recognize: counting)
+    if cancelled?.cached != false || exists(11) {
+        problems.append("cancelled: file \(exists(11))")
+    }
+
+    let (changeURL, changeMedia) = movie(12)
+    let changed = try? DeviceTranscriptCache.heard(
+        span(12, changeURL, 0, 6), language: "en-US", media: changeMedia, in: cache,
+        cancelled: { false },
+        recognize: {
+            try? Data(repeating: 7, count: 1001).write(to: changeURL)
+            return counting()
+        })
+    if changed?.cached != false || exists(12) {
+        problems.append("the file changed during the run: file \(exists(12))")
+    }
+    row("P8", problems.isEmpty,
+        problems.isEmpty
+            ? "1st ran and stored, 2nd cached with 1 run; no cacheDir ran twice and wrote "
+                + "nothing; a throw rethrown, a cancel and a changed file stored nothing"
+            : problems.joined(separator: "; "))
+}
+try? FileManager.default.removeItem(at: cacheFolder)
 
 let answer = (try? JSONSerialization.data(withJSONObject: ["rows": rows], options: [.sortedKeys])) ?? Data()
 print(text(answer))

@@ -6,10 +6,12 @@ import Foundation
 /// handed to the caller so the assistant can choose a false start and cut it
 /// with `ripple_delete_ranges`.
 ///
-/// An APP-STATE tool and a read: nothing is edited, no undo step is made and
-/// no cache is written. The source is the media's cached transcript when one
-/// is current (`TranscriptReader.cached`), else this Mac's recogniser over the
-/// clip's own window; never the network, so it has no AI-7 row.
+/// An APP-STATE tool and a read: nothing is edited and no undo step is made.
+/// The source is the media's cached transcript when one is current
+/// (`TranscriptReader.cached`), else this Mac's recogniser over the clip's own
+/// window, whose words are kept in a regenerable per-media, per-language cache
+/// (`DeviceTranscriptCache`, TR-14) that a later call inside a stored run
+/// answers from; never the network, so it has no AI-7 row.
 ///
 /// **It runs on the SERVER thread** (`AgentServer.offMainTools`), for
 /// `transcribe`'s reason: the on-device run blocks its caller for seconds to
@@ -37,6 +39,9 @@ extension AgentServer {
             let cached: TranscriptReader.Cached?
             /// The `from`/`to` window, snapped and clamped; nil without one (TR-13).
             let window: TranscriptReader.Window?
+            /// Where the on-device cache lives, and the clip's media (TR-14).
+            let cacheDir: URL?
+            let media: MediaSnapshot?
         }
         let context = try onMain { () -> Context in
             let document = try self.target(a)
@@ -56,10 +61,14 @@ extension AgentServer {
                 throw ToolError(message: error.localizedDescription)
             }
             var cached: TranscriptReader.Cached?
-            if let cache = document.cacheDirectory, let media = snapshot.media(job.media) {
+            let cacheDir = document.cacheDirectory
+            let media = snapshot.media(job.media)
+            if let cache = cacheDir, let media {
                 cached = TranscriptReader.cached(for: media, url: job.source, in: cache)
             }
-            return Context(document: document, job: job, cached: cached, window: window)
+            return Context(
+                document: document, job: job, cached: cached, window: window, cacheDir: cacheDir,
+                media: media)
         }
         let wanted = try stringArg(a, "language")
         try Self.checkSpelling(of: wanted)
@@ -83,18 +92,25 @@ extension AgentServer {
             stop?.onCancel { token.cancel() }
             // A window narrows what the recogniser hears to it and 2 s either side (TR-13).
             let run = window.map { TranscriptReader.recognitionJob(job, for: $0) } ?? job
-            let runs: [SpeechEngine.Run]
+            // A stored run that heard this span answers; else it is recognised and kept (TR-14).
+            let answer: (heard: DeviceTranscriptCache.Heard, cached: Bool)
             do {
-                runs = try TranscriptReader.recognize(run, language: language, cancel: token)
+                answer = try DeviceTranscriptCache.heard(
+                    run, language: language.identifier, media: context.media,
+                    in: context.cacheDir, cancelled: { token.isCancelled },
+                    recognize: {
+                        try TranscriptReader.recognize(run, language: language, cancel: token)
+                    })
             } catch {
                 throw ToolError(message: error.localizedDescription)
             }
-            let heard = TranscriptReader.deviceWords(runs, for: run)
+            let heard = TranscriptReader.deviceWords(answer.heard, for: job)
             words = window.map { TranscriptReader.overlapping(heard, in: $0) } ?? heard
             result = [
                 "engine": TranscriptionEngine.apple.rawValue,
                 "fillers_reported": false,
                 "language": language.identifier,
+                "cached": answer.cached,
             ]
         }
 

@@ -1674,13 +1674,22 @@ free.
   `filler`, for the assistant's false starts. The cache door reads the cloud
   transcript when its marker serves `.captions` (`cloudWords`); otherwise the
   on-device engine runs over the clip's window off the main thread
-  (`deviceWords`, `recognize`), never downloading a model and writing no
-  cache; never the network. The handler's first line reads
+  (`deviceWords`, `recognize`), never downloading a model; never the
+  network. The handler's first line reads
   `AgentLane.shared.callCancel` and the on-device token is linked to it, so
   the assistant's Stop ends the run (amends AI-16). An optional `from`/`to`
   window (TR-13) answers only the words that overlap it (`window`,
   `overlapping`, both engines alike), and the on-device run hears only the
   window plus `recognitionPadSeconds` each side (`recognitionJob`).
+- `DeviceTranscriptCache.swift` — `get_transcript`'s own cache of what the
+  on-device recogniser heard (spec §11 TR-14): one file per media and
+  language in the package's `cache/device-transcripts/`, keyed by the
+  file's source stamp, the language, the OS version and `version`, each run
+  a heard source span and its words in source ticks. `heard(...)` answers
+  from a stored run that contains the call's span, else recognises and
+  stores (dropping runs the new one contains), never after a cancel or a
+  file change during the run; written through `CacheLedger`. Captions,
+  the filler tools and the cloud readers never read it.
 - `CaptionPages.swift` — word-caption PAGES (spec §11 W-7), pure and
   synchronous so it runs on whichever engine thread calls it:
   `normalize` (trim, split, sort, the per-engine `lead` — its ONE home —

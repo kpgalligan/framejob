@@ -3,8 +3,9 @@ import Foundation
 /// `get_transcript`'s reader (road map "cut-by-transcript" CT-4, spec §11
 /// TR-11): one clip's words in TIMELINE ticks, each flagged by TR-8's filler
 /// rule, from the media's cached transcript or else from this Mac's
-/// recogniser over the clip's own window. Never the network (TR-5), and no
-/// cache is written.
+/// recogniser over the clip's own window. Never the network (TR-5). What the
+/// recogniser heard is cached per media and language by
+/// `DeviceTranscriptCache` (TR-14), which only `get_transcript` reads.
 ///
 /// Three pieces, kept apart so a probe can reach each one:
 /// - `cached(for:url:in:)` is the cache DOOR, and it is `FillerDetector`'s
@@ -12,8 +13,8 @@ import Foundation
 ///   only when its marker serves `.captions` for the file as it is now.
 /// - `cloudWords` and `deviceWords` are the pure MAPPING, R6-10's two
 ///   conversions (`MediaTranscript.words(for:in:)` for a cached media
-///   transcript, `Transcriber.project` for an extract's seconds), sorted the
-///   same way and flagged the same way.
+///   transcript, `MediaTranscript.project` for an on-device run's stored
+///   source ticks), sorted the same way and flagged the same way.
 /// - `recognize` is the on-device RUN, `Transcriber.transcribe`'s model
 ///   questions and its one-job body without the caption paging: blocking,
 ///   off main, its temporary WAV removed on every exit.
@@ -68,20 +69,24 @@ enum TranscriptReader {
         return sortedWords(mapped)
     }
 
-    /// An on-device run's tokens for one clip: each second into the extract
-    /// through `Transcriber.project`, a token whose mapped start is at or
-    /// past the clip's end dropped (the extract can run past the window),
-    /// sorted as `cloudWords` sorts.
-    static func deviceWords(_ runs: [SpeechEngine.Run], for job: Transcriber.Job) -> [Word] {
-        let end = job.start + job.duration
+    /// A stored on-device run's words for one clip (TR-14): a word is the
+    /// clip's when its source start is in the clip's [sourceIn, sourceIn +
+    /// sourceLength) (R6-10's half-open test); its start and `max(start,
+    /// end)` map through `MediaTranscript.project`. Sorted as `cloudWords`
+    /// sorts.
+    static func deviceWords(
+        _ heard: DeviceTranscriptCache.Heard, for job: Transcriber.Job
+    ) -> [Word] {
+        let end = job.sourceIn + job.sourceLength
         var mapped: [(index: Int, word: Word)] = []
-        for (index, run) in runs.enumerated() {
-            let start = Transcriber.project(run.start, in: job)
-            guard start < end else { continue }
+        for (index, run) in heard.words.enumerated() {
+            guard run.start >= job.sourceIn else { continue }
+            guard run.start < end else { continue }
             mapped.append(
                 (index,
                  Word(
-                    text: run.text, start: start, end: Transcriber.project(run.end, in: job),
+                    text: run.text, start: MediaTranscript.project(run.start, in: job),
+                    end: MediaTranscript.project(max(run.start, run.end), in: job),
                     speaker: nil, filler: FillerWords.isFiller(run.text))))
         }
         return sortedWords(mapped)
