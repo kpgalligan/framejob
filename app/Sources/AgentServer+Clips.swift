@@ -236,9 +236,9 @@ extension AgentServer {
 
     /// `ripple_delete_ranges` — the commit of Clip ▸ Remove Silences…
     /// (`SilenceSheetController`), which is where a caller gets forty cuts
-    /// to make and needs them to be one undo step. Its undo name is that
-    /// sheet's, "Remove Silences", on this path and on the menu's alike, so
-    /// one assertion covers both.
+    /// to make and needs them to be one undo step. Its undo name is "Ripple
+    /// Delete", the name of ⌘⌫ and of the two singular tools, whatever the
+    /// ranges are; the two sheets keep their own names (spec §11 TR-12).
     ///
     /// It is NOT N `ripple_delete_range` calls: the core merges the pairs —
     /// touching as well as overlapping — and cuts the survivors right to
@@ -262,7 +262,7 @@ extension AgentServer {
             throw ToolError(message: "ranges is empty — name at least one [from, to] pair.")
         }
         return try editResult(
-            document, "Remove Silences", [.rippleDeleteRanges(ranges: ranges)])
+            document, "Ripple Delete", [.rippleDeleteRanges(ranges: ranges)])
     }
 
     /// `lift_range` — ⌫ with an in/out range and NOTHING selected

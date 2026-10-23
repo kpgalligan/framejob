@@ -498,8 +498,8 @@ makes the whole clip — and only the clip — read as quiet); then
 `ripple_delete_ranges` cuts them, and the four frames either side of the two
 cuts are byte-identical to the frames that were either side of the spans, the
 export is shorter by exactly the removed total (checked against ffprobe as
-well as against the tool), and one undo step named "Remove Silences" puts the
-whole project JSON back. The plural's ORDER and its merge are pinned against
+well as against the tool), and one undo step named "Ripple Delete" (spec §11 TR-12;
+the sheet's own step keeps "Remove Silences") puts the whole project JSON back. The plural's ORDER and its merge are pinned against
 the singular op: two disjoint ranges equal the two singular calls applied
 right to left and differ from left to right, and a touching or overlapping
 pair cuts exactly as the one range it merges to — `next_id` is in the oracle
@@ -22335,8 +22335,8 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/fillers_proof.py --mutant NAME   # 
   and `get_project` is the same before and after.
 - **M2** `ripple_delete_ranges` of those ranges: clips [0, 1460000) in 0 and
   start 1460000 in 1780000, each edge the frame snap of a multiple of the grid,
-  the filler's source [1470000, 1770000) in neither window; one `undo` gives
-  back the 5 s clip.
+  the filler's source [1470000, 1770000) in neither window; one `undo`, named
+  "Ripple Delete" (TR-12), gives back the 5 s clip.
 - **M3** start 1 s, in 0.5 s → [[1760000, 2080000]].
 - **M4** M1's package with `disfluencies` stripped from the marker and
   `requested` (FL's raw edits), and a media never transcribed: no ranges, the

@@ -14,7 +14,7 @@ filler source, was recorded on 2026-10-22 after the filler spike ran on the owne
 sample, before CT-2.
 CT-1…CT-4 each record their numbers as a new entry (TR-8 on) or as Amended-by lines before their
 code; TR-8 was recorded in CT-1, TR-9 in CT-2, TR-10 in CT-3 and TR-11 in CT-4, each before its
-code.
+code. TR-12 was recorded in the #92 residue batch (#333), before its code.
 
 **Stands, and nothing here re-litigates it:** R6-3 (one upload per media, every clip derived from
 it, the words cached verbatim); R6-10 (`MediaTranscript.words(for:in:)` maps a media's words onto
@@ -245,3 +245,20 @@ TR-11.
     a clip's timed words, export a caption file" and gains `get_transcript` after `transcribe`.
   - Risk accepted: a long clip's answer is large (every word, no window; a `from`/`to` window is
     CT-5's residue to file), and an on-device answer is recognised again on every call.
+- **TR-12 — An agent's `ripple_delete_ranges` names its undo step "Ripple Delete", whatever it
+  cuts; the tool takes no name.** Recorded in the #92 residue batch (#333), before its code
+  (`AgentServer+Clips.swift`).
+  - **The name:** it is the step name of Edit ▸ Ripple Delete (⌘⌫) and of the `ripple_delete` and
+    `ripple_delete_range` tools: what the op does, which is true of silences, fillers (TR-4), a
+    false start (TR-11) or a caller's own ranges. Until now the tool used "Remove Silences", the
+    sheet's name, so Edit ▸ Undo misnamed every cut that was not a silence.
+  - **The menus keep theirs:** Clip ▸ Remove Silences… names its step "Remove Silences" and
+    Clip ▸ Remove Filler Words… "Remove Filler Words" (TR-10). TR-4's "the same single undo step"
+    stands: it means one step, not one name.
+  - **No caller-passed name:** every op tool's step name is fixed by the tool. A name argument
+    would be a tool-only argument (an `AgentCatalog+Declarations.swift` row, §6, the gate), free
+    text an agent writes into Edit ▸ Undo, and one more lesson for the assistant's prompt.
+  - **Proof:** `phase3_proof.py` C3 reads "Ripple Delete" after a silence cut, and
+    `fillers_proof.py` M2 reads it after a filler cut.
+  - Risk accepted: after an agent's silence cut, Edit ▸ Undo reads "Undo Ripple Delete", not the
+    sheet's "Undo Remove Silences".

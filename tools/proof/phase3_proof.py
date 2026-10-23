@@ -541,7 +541,7 @@ def ripple_part(mcp, spans):
         f"and ffprobe measures the file at {measured} s",
     )
 
-    check(s.undo() == "Remove Silences", "undo names the step Remove Silences (C3)")
+    check(s.undo() == "Ripple Delete", "undo names the step Ripple Delete, not the sheet's Remove Silences (C3, spec §11 TR-12)")
     check(s.lanes() == lanes_before, "one step: the whole timeline is back")
     check(s.text() == text_before, "and the whole project JSON with it")
     check(

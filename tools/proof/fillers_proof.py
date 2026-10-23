@@ -44,7 +44,7 @@ serving `cloud_captions_proof.DISFLUENT_WORDS`; host-state input
   M2  `ripple_delete_ranges` of those ranges: two clips [0, 1460000) in 0
       and start 1460000 in 1780000, each cut edge the frame snap of a
       multiple of the grid, the filler's source span outside both windows;
-      one `undo` restores the single clip.
+      one `undo`, named "Ripple Delete" (TR-12), restores the single clip.
   M3  a clip at start 1 s with in 0.5 s → [[1760000, 2080000]].
   M4  a transcript whose marker and `requested` lost `disfluencies`, and a
       media never transcribed, each answer no ranges, the media under
@@ -331,12 +331,15 @@ def app_rows(results, wanted, binary, speech):
                 ok = (len(clips) == 2 and clips[0]["start"] == 0 and clips[0]["duration"] == 1460000
                       and clips[0]["source"]["in"] == 0 and clips[1]["start"] == 1460000
                       and clips[1]["source"]["in"] == 1780000 and on_grid and outside)
-                session.op("undo")
+                undone = session.op("undo")
+                named = isinstance(undone, dict) and undone.get("undone") == "Ripple Delete"
                 restored = media_clips(session)
                 back = [(c["start"], c["duration"], c["source"]["in"]) for c in restored]
-                return (ok and back == [(0, 5 * SEC, 0)],
+                return (ok and back == [(0, 5 * SEC, 0)] and named,
                         f"after the cut (start, duration, in) {shape}, source windows {windows}, "
-                        f"edges on the grid {on_grid}; after undo {back}")
+                        f"edges on the grid {on_grid}; after undo {back}, the step named "
+                        f"{undone.get('undone') if isinstance(undone, dict) else undone!r} "
+                        f"(want Ripple Delete, TR-12)")
             run("M2", m2)
 
             def m3():
