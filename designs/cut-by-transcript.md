@@ -163,11 +163,13 @@ fixture-text rows); `--mutant keep-punctuation` fails K, O and the three fixture
 read a filler, `--mutant replaced-as-kept` fails R and O, and `--mutant o2-ignored` fails V1 and
 V2, each exit 1. o2 has not run: the sample does not exist yet.
 
-**Owed:** TR-7, the on-device filler source, decided by `python3
-tools/proof/filler_spike/filler_spike.py` run on the owner's sample, before CT-2, the first
-phase that reads fillers. Under `reports-real` two owner questions come first: should
-on-device captions filter fillers too (a visible change), and what shape should an on-device
-filler path take? CT-1 (cloud disfluencies) does not depend on it and proceeds meanwhile.
+**The owner's sample, and TR-7** (2026-10-22, after CT-1's merge). The owner recorded the
+script (`filler-sample/test-recording.aifc`, read in place, gitignored); `python3
+tools/proof/filler_spike/filler_spike.py` exited 0 with every row run: f1 6 of 8 and f2 7 of 8
+as before, f3 0 (script 100 %), o1 0 (6 words), and **o2: 59 words, 98.3 % of the script's other
+words recognised, 1 of 8 fillers kept** (the first "um"; um 2, uh 3 and er 2 dropped). The
+verdict printed `reports-real` (any kept filler counts). Shown that, the owner chose
+"Cloud-only (Recommended)": TR-7 records filler removal as cloud-only.
 No `CLAUDE.md` edit is owed by CT-0: no file's role changed and no rule was added.
 
 ## CT-1 record

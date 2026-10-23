@@ -9,8 +9,8 @@ request; CT-2 `detect_fillers` and the cut; CT-3 Clip ▸ Remove Filler Words…
 `get_transcript` and false starts; CT-5 the close). TR-1…TR-6 were recorded in CT-0, before any
 product code, from the owner's decisions of 2026-09-30 on issue #92 (its comment of that day,
 quoted verbatim in the road map's "The owner's choices"), which the owner took up on 2026-10-22
-("#92 Cut by transcript"). TR-7 is kept for the on-device filler source: the filler spike decides
-it on the owner's own scripted sample, before CT-2 (the road map's CT-0 record says what is owed).
+("#92 Cut by transcript"). TR-7, the on-device filler source, was recorded on 2026-10-22 after
+the filler spike ran on the owner's own scripted sample, before CT-2.
 CT-1…CT-4 each record their numbers as a new entry (TR-8 on) or as Amended-by lines before their
 code; TR-8 was recorded in CT-1, before its code.
 
@@ -96,6 +96,20 @@ W-9 is amended by TR-5 through AI-6.
   - Agents edit no `CLAUDE.md`; each phase's handback lists the edits owed.
   - Risk accepted: until the owner's scripted sample (o2) is recorded, no owner recording holds
     a known filler; a real recording's filler CUT stays a person's check.
+- **TR-7 — Filler removal is cloud-only: the on-device engine is not a filler source.** Recorded
+  2026-10-22, before CT-2, by the owner ("Cloud-only (Recommended)") after the filler spike's run
+  on the owner's scripted sample (`tools/proof/filler_spike/`, `answers.json`).
+  - **Measured** (macOS 26.5.1, en-US, on-device): on the owner reading the eight-filler script
+    (o2, 29.4 s), the engine recognised 98.3 % of the script's other words and kept **1 of 8**
+    fillers (the first "um"; the other two um, all three uh and both er dropped). On `say`
+    speech it kept 6 of 8 (f1) and 7 of 8 (f2); the no-filler control kept 0. The spike's
+    mechanical verdict is `reports-real` (any kept filler counts); one in eight is not a source.
+  - **So:** `detect_fillers` and Remove Filler Words… read fillers only from a transcript whose
+    marker serves `.fillers` (TR-2); for media with none, the sheet says filler removal needs a
+    cloud transcript and offers the estimated re-transcribe (TR-2, TR-4). On-device captions are
+    unchanged and filter nothing.
+  - Risk accepted: a person with no AssemblyAI key has no filler removal. One speaker, one
+    script, one Mac; a later engine that keeps fillers would be a new decision.
 - **TR-8 — The caption filler vocabulary is: um, uh, hmm, mhm, uh-huh, ah, huh, hm, m, er, erm.**
   Recorded in CT-1, before its code (`FillerWords.assemblyAI`, `FillerWords.swift`).
   - **The sources, as read on 2026-10-22:** AssemblyAI's Universal-2 "Filler words" page
