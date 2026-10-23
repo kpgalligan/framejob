@@ -22665,3 +22665,27 @@ cache lives only inside each row's package; G9's copy of speech.mov lives in
 | `device-no-restamp` | `heard`'s stamp-after-the-run guard removed | P8 | caught (8/9) |
 
 `no-filler-flag` ran again on #332's tree, its anchors unchanged: caught (7/9).
+
+## Speed ramps — the spike (`ramp_spike/`)
+
+SR1 of road map "speed-ramps" (#111): do the many abutting constant-rate
+segments a ramp's plan will hold click, drop out, or misplace audio or frames,
+in export and in playback? Its own README (`tools/proof/ramp_spike/README.md`)
+is the full one — the instruments, the fixtures, the variants, the rows, the
+selftest and the exit codes — and the ANSWERS are in `designs/speed-ramps.md`'s
+"SR1 — the spike" record, not here. The rule it judges by is spec §11 SR-5,
+fixed before the run and pinned in `results.json` as `rule_sha256`.
+
+```sh
+python3 tools/proof/ramp_spike/ramp_spike.py --selftest     # free, no build; five --mutant NAMEs must exit 1
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_spike/ramp_spike.py   # every group, every variant
+```
+
+The instruments are `ramp_spike.py` (the runner, the classifiers and the
+verdict) and `ramp_spike_probe.swift`, compiled AS `main.swift` over
+`app/Sources` through `swift_build.build`, so the segments go through the
+app's own `CompositionBuilder`, `Exporter` and editor player (a PostEffects
+tap on the editor's item, an `AVPlayerItemVideoOutput` for frames). Exit 0
+when every row answered (whatever the VERDICT), 1 on an instrument failure,
+2 when not performed (no ffmpeg, no staticlib). No app instance, no socket,
+no network; everything is under `tools/proof/work/ramp-spike/`.
