@@ -132,6 +132,11 @@ struct ReverseResolution: Equatable {
     /// FORWARD — the picture silently disagreed with the model — and a slate
     /// is the honest answer: something is meant to be here and is not.
     let pending: Set<UInt32>
+    /// The document's `cache/ramp-audio/` (spec §11 SR-12 (b)), published
+    /// beside the plan with the rest: a ramp segment plays its render when
+    /// the file `RampAudioCache` names is in it when the composition is
+    /// built, and is silent otherwise. Nil with no cache folder.
+    var rampAudio: URL? = nil
 
     static let none = ReverseResolution(ready: [:], pending: [])
 

@@ -17,8 +17,9 @@ rule, were recorded in SR1c before its code and its measured run, whose `results
 file's SHA-256 again. SR2 is split in two: SR2a (the core — `speed` as an action target, the
 source map, the plan's ramped segments, C's refusals, format 27) recorded SR-10, SR-11 and SR-6's
 Amended-by lines before its code; SR2b (the renderer wired into the composition and the export)
-builds what those lines say Swift does. Later phases record their rules as new entries (SR-12 on)
-or as Amended-by lines before their code.
+builds what those lines say Swift does, and recorded SR-12 and SR-6's third Amended-by line
+before its code. Later phases record their rules as new entries (SR-13 on) or as Amended-by lines
+before their code.
 
 **Stands, and nothing here re-litigates it:** SY-24 (the varispeed lead: a time-scaled segment
 on an `off` track reads its source 575 ticks earlier; ×1 untouched); SY-26 (one pitch name per
@@ -150,6 +151,9 @@ plan leaves the audio out, one pitch per plan audio track).
     modification second), `RampAudioRenderer.version`, Keep pitch, the `glide` spans and the map.
     *Amended by SR2a:* while a clip's render is pending its audio is empty time (silent) and its
     picture plays; an export waits for every pending render and never writes a placeholder.
+    *Amended by SR2b:* the key also carries whether the clip is reversed — a forward and a
+    reversed clip with one map are two files (SR-12), the reversed one rendered from the clip's
+    reversed file.
   - **The renderer** (`RampAudioRenderer`, `app/Sources/`) takes the source file, Keep pitch and
     the clip's map: breakpoints of clip ticks → source ticks (media time in the direction the
     clip plays), linear between them, sampled by the caller (SR2: the core). It reads only a
@@ -410,3 +414,51 @@ plan leaves the audio out, one pitch per plan audio track).
     anchor and a lag; the held rates are what SR-8 rendered cleanly at constant rates, and the
     glide is what SR1b measured exact.
   - Risk accepted: a pitch step at each ramp edge with keep pitch on; SR1d lifts it.
+- **SR-12 — The render wired in (SR2b): a ramped clip's audio is rendered off the main thread,
+  one file per plan ramp segment, played as one ×1 segment at the clip's start, silent while
+  pending, and waited for by every export.**
+  - **(a) The file.** One per plan ramp SEGMENT, named `cache/ramp-audio/<media>-<16 hex>.caf`,
+    the hex FNV-1a 64 (`ReverseCache.digest`'s) over `<path>|<size>|<mtime second>|v<version>|
+    r<0|1>|k<0|1>|g<glide pairs>|m<map pairs>`, path, size and modification second the MEDIA
+    file's (never `AudioRateCopy`'s copy, never the reversed file), `r` the clip's reversal, `k`
+    its Keep pitch; so two instances of one nest clip with different cuts are two files. The
+    builder looks a segment's render up by `RampSegmentKey` (clip, Keep pitch, glide, map), never
+    by its start.
+  - **(b) Ready or pending.** The document publishes `cache/ramp-audio/` beside the plan as
+    `ReverseResolution.rampAudio`, captured and pinned with it by the export queue. A ramp segment
+    is READY iff its file exists when the composition is built; otherwise it is empty time and
+    its picture plays.
+  - **(c) Who wants a render.** Renders run one at a time on one serial `.utility` queue, wanted
+    by owners: a document (its `recipeKey`) wants its whole-timeline plan's ramp segments and,
+    with a nest open, the edited plan's; an export (its own key) wants its plan's while it
+    writes. None is wanted during a live gesture. A queued render no owner wants is dropped, a
+    running one cancelled.
+  - **(d) The source.** The media file, or `AudioRateCopy`'s 48 kHz copy where it `needsCopy`; for
+    a reversed clip its ready reversed file. A clip whose reverse is pending, or whose media is
+    missing, is empty time as its picture is slated, and an export does not wait for it.
+  - **(e) Landing.** The renderer writes `<name>.landing`, renamed to `<name>` inside
+    `MediaImporter.CacheLedger.shared.publish(in: cache, for: nil)`, so never during a save. A
+    refused publish removes it and puts the render straight back at the queue's end while any
+    owner still wants that name, so a waiting export and the document's want finish with no
+    further edit; it is not a failure.
+  - **(f) After a landing** the document calls `packageContentsDidChangeOnDisk()`, prunes every
+    file in the folder whose name no owner wants and no in-flight render's name prefixes, and
+    posts `.reversedMediaDidChange`, so the editor rebuilds. An undone ramp is rendered again.
+  - **(g) A failure** is not retried for that name in the launch (one `NSLog` line, never the
+    parity prefix): playback stays silent there, and an export fails `rampAudioFailed`, naming
+    the clip.
+  - **(h) The export waits**, before its build, for every renderable ramp segment of its plan
+    (an image sequence does not wait), reading "Preparing…"; a ramp segment with no cache folder
+    to render into fails it.
+  - **(i) Keep pitch on with glide spans** renders SR-11's mix: SR-6's off arm over the whole map,
+    each held span alone by SR-8's arm on its own two-point map, joined by the crossfade, the
+    temporaries streamed and removed; `RampAudioRenderer.version` 3.
+  - **(j) The dev hold.** `-RCDevRampRenderHold <s>` (dev tools only) holds each render s seconds,
+    polling cancellation, so a proof sees the wait.
+  - **Why:** a file per segment keyed by everything that shapes it is reusable and
+    self-invalidating as the reversed clip's is; owners make "nothing wants it" a fact the queue
+    can act on, so an edit storm costs at most the one render in flight; a ready-iff-exists rule
+    needs no second state to keep in step with the disk; and an export that waits never writes a
+    silent ramp.
+  - Risk accepted: every edit of a map renders the whole clip again (no partial re-render), one at
+    a time, and an undone map's file is not kept; a failure stays failed until relaunch.

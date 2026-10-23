@@ -320,7 +320,7 @@ extension CompositionBuilder {
         for planTrack in plan.audioTracks {
             for segment in planTrack.segments
             where !seen.contains(segment.media) && reverse.ready[segment.clip] == nil
-                && !reverse.pending.contains(segment.clip)
+                && !reverse.pending.contains(segment.clip) && segment.ramp == nil
             {
                 seen.insert(segment.media)
                 guard let url = urls[segment.media],

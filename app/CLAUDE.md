@@ -486,7 +486,9 @@ detail there.
 - `ReverseCache.swift` — `ReverseCache`, `ReverseResolution`, `ReverseStatus`
   and `ReverseSource`, moved whole out of `ReverseRenderer.swift` (issue
   batch B96): where a reversed asset lives (its digest name and pruning) and
-  what the composition is told.
+  what the composition is told. `ReverseResolution.rampAudio` is the
+  document's `cache/ramp-audio/` folder (speed ramps SR-12), so the export
+  queue's capture and pin carry the ramp renders with no change of its own.
 - `ReverseMirror.swift` — the app's ONE spelling of the reversed mirror and
   its pivot (spec §11, D4-6), in the three units its readers hold it in:
   `MediaPeaks.window`, `TimelineView.sourceTime` and `ReverseRenderer`. The
@@ -1177,7 +1179,27 @@ the key map behind it.
   `timePitchDelayFrames`, then a fixed decimation to 48 kHz — measured
   STOP in SR1c (dropouts while the pitch moves, a ~50 ms pitch lag),
   SR1d's to fix; written as a 32-bit float CAF through a `.partial`
-  file (`RampCAFWriter`). No caller in the app until SR2.
+  file (`RampCAFWriter`). Called by `RampAudioRenders` (SR2b); `+Hybrid`
+  is SR-11's interim Keep pitch mix: the tape glide over the whole map,
+  each held span rendered alone by the SR-8 arm, joined by a 480-frame
+  crossfade inside the held span.
+- `RampAudioCache.swift` — `RampSegmentKey` (the clip, Keep pitch, glide and
+  map: equal exactly when the rendered file is), `RampAudioRequest` and the
+  file name from the media file's stat, the version and the reversal
+  (SR-12 (a), SR-6 amended); `prune` keeps files by name prefix.
+- `RampAudioRenders.swift` — the process-wide serial render queue (SR-12):
+  owners (a document's recipe key, an export's key while it writes) WANT
+  file names; a render nobody wants is cancelled, one wanted again while it
+  runs is not, and a cancelled or refused render still wanted is queued
+  again; the finished file is renamed into place inside `CacheLedger.publish`
+  so it never lands mid-save; `wait` returns only on landing, failure or
+  cancellation; `-RCDevRampRenderHold <s>` holds each render (dev only).
+- `ProjectDocument+RampAudio.swift` — the document's wants after each edit,
+  the prune, and `.reversedMediaDidChange` posted when a render lands, so
+  the frozen editor rebuilds with no change. `Exporter+RampAudio.swift` —
+  the export's wait for every ramp render it needs before the build (a
+  failure fails the export as `rampAudioFailed`; it never writes a
+  placeholder).
 - `RampVarispeedStream.swift` — the tape glide as a stream (SR1c): the
   map read at `per` K output frames per 48 kHz frame from any start
   (negative for a pre-roll), dropping source behind a bound from the

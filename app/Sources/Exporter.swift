@@ -263,7 +263,9 @@ final class Exporter {
             // `startWriting`'s `.failure` arm, before the destination is touched.
             let result = Exporter.graphicsRefusal(
                 project: project, settings: settings, graphics: graphics
-            ).map { Result<BuiltComposition, any Error>.failure($0) } ?? Result(catching: build)
+            ).map { Result<BuiltComposition, any Error>.failure($0) } ?? Result {
+                try Exporter.withRampAudio(plan: plan, urls: urls, settings: settings, key: key,
+                    cancelled: { self?.isCancelled ?? true }, then: build) }
             // Read here, not on the main thread: the markers come off the
             // SNAPSHOT, and on a handle nothing has looked at yet that is the
             // first decode of the whole project JSON.
@@ -441,6 +443,7 @@ final class Exporter {
             RecipeSource.shared.unregister(key)
             GraphicPrefetch.shared.stop(key)
             GraphicRegistry.shared.unpin(key)
+            RampAudioRenders.shared.release(owner: key)
             recipeKey = nil
         }
         writer = nil

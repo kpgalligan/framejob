@@ -308,7 +308,9 @@ held and kept, and simulates memory pressure (G-37); and
 drive a window's assistant turn against a stand-in server, with the dev-only
 launch default `-RCDevAssistantSend <text> -RCDevAssistantReport <path>` for
 a turn in a launch without the server; and `-RCDevSyncHold <s>`, which holds
-Synchronize Audio's background analysis so a proof can act during it), which
+Synchronize Audio's background analysis so a proof can act during it; and
+`-RCDevRampRenderHold <s>`, which holds each speed-ramp audio render so a
+proof can act while it is pending), which
 Distribution does not. `rc_op_names`
 and the catalog are the authority for the counts; the parity check compares
 them at startup. `render_frame` writes a PNG and returns its path; `export`

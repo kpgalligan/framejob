@@ -49,12 +49,14 @@ struct RampAudioMap: Equatable {
 /// time-pitch unit held at ×1 shifting the pitch back, and a decimation by K
 /// (`+TimePitch`, SR-8, SY-41).
 ///
-/// Blocking, on the caller's queue; no caller in the app yet (SR2 adds it,
-/// with `cache/ramp-audio/` and its key).
+/// Blocking, on the caller's queue: `RampAudioRenders`' one serial queue
+/// renders into `cache/ramp-audio/`, named by `RampAudioCache` (spec §11
+/// SR-12). Keep pitch on with glide spans is SR-11's mix (`+Hybrid`).
 enum RampAudioRenderer {
     static let sampleRate = 48_000
     /// Part of SR2's cache key: bump it whenever the written file changes.
-    static let version = 2
+    /// 3: keep pitch on with glide spans is SR-11's mix (SR2b).
+    static let version = 3
     /// Clip ticks per output frame: 600 000 / 48 000.
     static let ticksPerFrame = Double(ReelTime.perSecond) / Double(sampleRate)
     /// Output frames computed and written at a time.
@@ -69,6 +71,9 @@ enum RampAudioRenderer {
         let keepPitch: Bool
         /// A `.caf`; written as "<destination>.partial", then renamed.
         let destination: URL
+        /// Keep pitch on: the clip-tick spans that glide like tape (SR-11);
+        /// non-empty renders the hybrid. Ignored with keep pitch off.
+        var glide: [Range<Ticks>] = []
     }
 
     struct Report: Equatable {
@@ -104,6 +109,9 @@ enum RampAudioRenderer {
     static func render(
         _ job: Job, cancelled: () -> Bool = { false }, progress: ((Double) -> Void)? = nil
     ) throws -> Report {
+        if job.keepPitch, !job.glide.isEmpty {
+            return try renderHybrid(job, cancelled: cancelled, progress: progress)
+        }
         let started = Date()
         if let why = job.map.problem { throw RenderError.invalidMap(why) }
         let asset = AVURLAsset(url: job.source)

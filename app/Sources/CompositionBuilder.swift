@@ -118,9 +118,17 @@ enum CompositionBuilder {
         let audioURLs = Self.audioURLs(
             plan: plan, urls: urls, reverse: reverse, assets: &assets)
         var audioAssets = assets.filter { audioURLs[$0.key] == urls[$0.key] }
-        let (inputParameters, meters) = try addAudioTracks(
-            to: composition, plan: plan, urls: audioURLs, reverse: reverse, dsp: dsp,
-            metering: metering, assets: &audioAssets, reversedAssets: &reversedAssets)
+        // A ramped clip's sound is its render, when it is on disk (SR-12 (b)).
+        // Its assets are held across the fill: a track does not retain its
+        // asset, and an optimised build ends a local at its last use.
+        var rampAssets: [URL: AVURLAsset] = [:]
+        let ramps = rampAudioTracks(plan: plan, urls: urls, reverse: reverse, assets: &rampAssets)
+        let (inputParameters, meters) = try withExtendedLifetime(rampAssets) {
+            try addAudioTracks(
+                to: composition, plan: plan, urls: audioURLs, reverse: reverse, dsp: dsp,
+                metering: metering, assets: &audioAssets, reversedAssets: &reversedAssets,
+                ramps: ramps)
+        }
 
         // Source orientation is read once per media and then attached per
         // instruction, so the compositor can turn a rotated source's sampling
@@ -282,10 +290,14 @@ enum CompositionBuilder {
     /// **An audio track's media goes in where `placement(of:shift:)` says**:
     /// the plan's place moved by the track's leads (SY-24, SY-25). Video
     /// passes `.none`, which places every segment exactly where the plan does.
+    ///
+    /// **A ramp segment plays its render** (`ramps`, spec §11 SR-6, SR-12):
+    /// the whole file from 0 at ×1, never scaled, empty time while pending.
     static func fill(
         _ track: AVMutableCompositionTrack, segments: [PlanSegment], mediaType: AVMediaType,
         urls: [UInt32: URL], reverse: ReverseResolution, assets: inout [UInt32: AVURLAsset],
-        reversedAssets: inout [UInt32: AVURLAsset], shift: AudioShift = .none
+        reversedAssets: inout [UInt32: AVURLAsset], shift: AudioShift = .none,
+        ramps: [RampSegmentKey: AVAssetTrack] = [:]
     ) throws {
         var cursor: Ticks = 0
         for segment in segments {
@@ -298,7 +310,7 @@ enum CompositionBuilder {
 
             guard let source = resolveSource(
                 for: segment, mediaType: mediaType, urls: urls, reverse: reverse,
-                assets: &assets, reversedAssets: &reversedAssets)
+                assets: &assets, reversedAssets: &reversedAssets, ramps: ramps)
             else {
                 // Missing media, unreadable media, or a reverse that has not
                 // been rendered: hold the place with empty time so every later
@@ -333,7 +345,7 @@ enum CompositionBuilder {
             } catch {
                 throw BuildError.insertFailed(clip: segment.clip, underlying: error)
             }
-            if segment.isTimeScaled {
+            if segment.isTimeScaled, segment.ramp == nil {
                 // Speed, and the freeze-frame idiom (one source frame
                 // stretched to the still's whole length, §7.2).
                 track.scaleTimeRange(

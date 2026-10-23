@@ -22719,3 +22719,89 @@ make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ra
 | Run (Release, 2026-10-23) | Result |
 |---|---|
 | `ramp_proof.py` | 6/6 in 3 s — D2 refused naming ×4 (media 3000000 ticks, 600000 over), ×4 applied; D3 `audio_left_out` [3] with the one-clip note; D0 no complaint |
+
+## Speed ramps SR2b — a ramped clip's rendered audio in the export and in playback (`ramp_proof.py` X0, U1, E1, E2, N1, K1, R1, W1, P1; spec §11 SR-6, SR-11, SR-12; #111)
+
+SR2b of road map "speed-ramps": a ramped clip's audio rendered off the main
+thread into `cache/ramp-audio/`, played as one ×1 segment, silent while
+pending, waited for by every export. `ramp_proof.py` gains the rows #111 asks
+for, on `ramp_spike.make_fixtures(False)`'s clicks and sine movies, measured
+by `ramp_spike`'s and `render_spike`'s own functions (imported, never copied).
+The instance is launched with `-RCDevRampRenderHold 2`, so every render takes
+at least 2 s and an export asked for straight after the edit must wait.
+
+- **`--baseline`** (before any SR2b app edit, on Release): CX1 (×1), CX2 (×2,
+  keep pitch off) and CK05 (×0.5, keep pitch on), each 4 s of the clicks
+  fixture from in 1 s on a 320 × 180 30 fps canvas, saved and exported
+  `audio_wav` and `prores_422`; `tools/proof/work/ramp-baseline/baseline.json`
+  holds the commit, each plan text (`ramp_spike_probe.swift`'s `plan` read of
+  the saved `project.json`, after the instance stops) and the md5s of the
+  decoded streams (`ffmpeg -map 0:a -c:a pcm_f32le -f md5 -`, `-map 0:v -f
+  md5 -`). **U1** rebuilds them and compares: every plan and every video
+  md5 exactly. Every audio stream, both exports of all three projects, is
+  compared by its decoded samples (pcm_f32le, its own channels): it must be
+  identical to the baseline's same stream
+  (`work/ramp-baseline/<name>-<stream>.f32`) over min(round(timeline ×
+  rate), its length, the baseline's length). Each stream's length against
+  the timeline, short or past the end, is printed, not scored (#337). Why
+  not md5s: an export's audio length is not stable run to run,
+  and that predates SR2b. At `de1e51e`, CK05's exports gave two md5s
+  (Apple's time-pitch), and CX2's `prores_422` audio ran 4 048 frames past
+  its wav in one run and not in another, with the samples identical over
+  their common length. The baseline records the commit and dirt of the
+  app's own tree, so `--app` can name a build of an older checkout.
+- **E1** RV1 (8 s at ×1, keep pitch off, an action [1 s, 3 s) linear ending
+  ×2) exported `audio_wav` as the very next call after `set_action_end`, then
+  `prores_422`: every click on the ideal map (`place_ideal`, `varispeed_pass`),
+  0 wrong frames (`video_wrong` against RV1's G1 segments), one
+  `<media>-<16 hex>.caf` in the package's `cache/ramp-audio/`. **E2** the same
+  on the sine: no `click_events(dense_scan(…), 0)`, no dropout. **N1** E1's
+  constant export (before `set_action_end`) and its export after `undo` have
+  one audio md5. **K1** RK1 (×1.1 base, keep pitch on) on the sine: median
+  |cents| ≤ 25 against 220 Hz in the held spans and against 220 · r(t) in the
+  glide, windows ≥ 30 ms from a join. **R1** RV1 forward, then reversed
+  (`precision_proof.wait_reverse`): the mirrored map's clicks and frames, and
+  the reversed render named apart from the forward one (its audio md5 differs
+  from the forward export's) — the click set is symmetric, so this is what
+  tells a forward render played backwards from the reversed one. **W1** RV1,
+  then `undo` and `redo` as the next two calls, inside the render's hold:
+  the running render is dropped by every owner and wanted again (the redo
+  must follow the edit by less than the hold); its file must land within
+  60 s, else FAIL with no export made (one would wait for ever), and its
+  `audio_wav` then holds every click on the ideal map. **P1** RV1
+  and a ×1 control saved and closed, then the probe's `playback` group on
+  both: the control's tap against its export gives m1 (`pt1`, after a coarse
+  whole-click alignment that brings an offset past `place_ideal`'s 60 ms
+  reach inside it), RV1's corrected tap is placed and agrees with its
+  export, and no frame is wrong.
+- **`--mutant expect-shift`** moves E1's expected clicks 2 ms late (no
+  rebuild): E1 must fail (IM1). The app mutants PM1–PM4 (the ramp placed
+  2 400 ticks late — E1; the export building without waiting — E1;
+  `heldWeight` answering 0 — K1; the name ignoring `reversed` — R1) are each
+  applied by hand, `make app-debug`, `--only <row>` exiting 1, reverted. RM0
+  is the review's fix taken out of `RampAudioRenders` (a re-want neither
+  un-cancels the running render nor re-queues it once cancelled) — W1. W1
+  reaches the race only when the redo's want comes before the hold's next
+  cancellation poll (every 50 ms; the redo followed the edit by 15–21 ms),
+  so RM0 fails it by chance, not by construction: 3 runs out of 3.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py --baseline   # once, before the code
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only E1,K1
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only E1 --mutant expect-shift  # must exit 1
+make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py
+```
+
+| Run (2026-10-23) | Result |
+|---|---|
+| `--baseline` (Release, `de1e51e`) | written: CX1 audio `6b4d7876…` video `b8c33bd0…`; CX2 audio `a54eb075…` video `f8ccd0ea…`; CK05 `audio_wav` `22a0745d…`, `prores_422` audio `63b49c3b…`, video `a00f0f95…` |
+| `ramp_proof.py` (Release, after `make gate`) | 14/14 in 81 s — E1 70/70 at +0.000 ms, 0 wrong frames; E2 clean; N1 md5 back after `undo`; K1 held 0.01 / glide 0.24 cents; R1 70/70 at −0.010 ms, renders named apart; U1 as the baseline; P1 m1 −86.333 ms (this session's tap offset, #335), RV1 70/70 at +0.000, agreement ok; D0 no complaint |
+| `export_offset_proof.py` (Release instance, `proof_app.py launch --app release`) | 75/75, 4 measured, exit 0; no `Frame Job: ` line |
+| mutants (Debug) | PM1 E1 +4.000 ms; PM2 E1 export failed; PM3 K1 1200 cents; PM4 R1 one name; IM1 E1 −2.000 ms — each caught |
+| review fix: W1 on Debug before the fix (RM0) | 3 runs, each W1 FAIL — the redo 15–21 ms after the edit, nothing landed in 60 s |
+| review fix: `ramp_proof.py` (Release, after `make gate`) | 14/15 in 80 s — W1 landed 2.3 s after the edit, 70/70 clicks; U1 FAIL on CK05's `audio_wav`, a third time-pitch md5 `4b08b903…` (a plan with no ramp; its samples equal the run's `prores_422` audio over their common length, 190 978 frames against 190 787); every other row as before |
+| review fix: `--baseline --app` (a Release build of `de1e51e` in a scratch worktree) | written: every plan as the first baseline's; CX1 and CK05 `audio_wav` and every video md5 as the first baseline's; CK05 PCM 190 787 frames in both exports (now one md5, `22a0745d…`); **CX2 `prores_422` audio `800460bc…`**, not the first baseline's `a54eb075…`: 196 095 frames against the wav's 192 047, identical over their common length — keep pitch off is not byte-stable in length either |
+| review fix: `ramp_proof.py` (Release) with U1's PCM rule | 14/15 in 86 s — U1 CK05 audio both streams identical, 0 frames apart; **U1 FAIL on CX2's `prores_422` audio**: `a54eb075…` against the new baseline's `800460bc…` (the exact rule this pass kept for every stream but CK05's audio); W1 3.1 s, 70/70; every other row as before |
+| U1 by the timeline: `--baseline --app` (the same `de1e51e` build) | written: every md5 as the first baseline's (CX2's `prores_422` audio back to `a54eb075…`); audio frames CX1 192 000 in both exports, CX2 192 047 in both, CK05 190 787 in both — CK05's are 1 213 frames (≈ 25 ms) SHORTER than its 4 s timeline |
+| U1 by the timeline: `ramp_proof.py` (Release) | 14/15 in 64 s — U1 CX1 and CX2 audio identical over 192 000 frames (CX2 +47 past the end in run and baseline, #337); **U1 FAIL on CK05**: both streams shorter than the timeline, `audio_wav` 190 851 frames and `prores_422` 190 787 against 192 000, the baseline 190 787 too, identical over their common frames — a stream shorter than the timeline fails by the rule, so CK05 fails at `de1e51e` too; W1 3.0 s, 70/70; every other row as before |
+| U1 over min(timeline, both lengths) (the baseline as above, not rebuilt): `ramp_proof.py` (Release) | **15/15 in 81 s**, exit 0 — U1 every plan and video md5 =; audio identical over CX1 192 000, CX2 192 000 and CK05 190 787 frames in both exports; against the 192 000-frame timeline CX1 +0, CX2 +47, CK05 −1 213 in run and baseline alike (#337, not scored); W1 4.0 s, 70/70; every other row as before |

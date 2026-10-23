@@ -64,11 +64,11 @@ extension CompositionBuilder {
     static func resolveSource(
         for segment: PlanSegment, mediaType: AVMediaType, urls: [UInt32: URL],
         reverse: ReverseResolution, assets: inout [UInt32: AVURLAsset],
-        reversedAssets: inout [UInt32: AVURLAsset]
+        reversedAssets: inout [UInt32: AVURLAsset], ramps: [RampSegmentKey: AVAssetTrack] = [:]
     ) -> AVAssetTrack? {
-        // A ramped clip's sound is a render SR2b makes (spec §11 SR-6,
-        // SR-10); until it does, the segment is empty time.
-        if segment.ramp != nil { return nil }
+        // A ramped clip's sound is its render (spec §11 SR-6, SR-12): the
+        // ready one's track, else empty time while it is pending.
+        if segment.ramp != nil { return RampSegmentKey(segment).flatMap { ramps[$0] } }
         if let reversed = reverse.ready[segment.clip] {
             return assetTrack(
                 at: reversed, key: segment.media, mediaType: mediaType,
@@ -94,7 +94,7 @@ extension CompositionBuilder {
     static func audioFamilies(
         of planTrack: PlanTrack, nextID: inout Int, urls: [UInt32: URL],
         reverse: ReverseResolution, assets: inout [UInt32: AVURLAsset],
-        reversedAssets: inout [UInt32: AVURLAsset]
+        reversedAssets: inout [UInt32: AVURLAsset], ramps: [RampSegmentKey: AVAssetTrack] = [:]
     ) -> [AudioFamily] {
         var families: [AudioFamily] = []
         for segment in planTrack.segments {
@@ -104,7 +104,7 @@ extension CompositionBuilder {
             let source = segment.duration > 0
                 ? resolveSource(
                     for: segment, mediaType: .audio, urls: urls, reverse: reverse,
-                    assets: &assets, reversedAssets: &reversedAssets)
+                    assets: &assets, reversedAssets: &reversedAssets, ramps: ramps)
                 : nil
             let span = segment.start..<(segment.start + max(0, segment.duration))
             guard let key = source.flatMap(audioFormatSignature(of:)) else {
@@ -147,7 +147,8 @@ extension CompositionBuilder {
     static func addAudioTracks(
         to composition: AVMutableComposition, plan: CompositionPlan, urls: [UInt32: URL],
         reverse: ReverseResolution, dsp: AudioDSPParameters, metering: Bool,
-        assets: inout [UInt32: AVURLAsset], reversedAssets: inout [UInt32: AVURLAsset]
+        assets: inout [UInt32: AVURLAsset], reversedAssets: inout [UInt32: AVURLAsset],
+        ramps: [RampSegmentKey: AVAssetTrack] = [:]
     ) throws -> (inputParameters: [AVAudioMixInputParameters], meters: [LevelMeterTrack]) {
         var inputParameters: [AVAudioMixInputParameters] = []
         var meters: [LevelMeterTrack] = []
@@ -155,7 +156,7 @@ extension CompositionBuilder {
         for planTrack in plan.audioTracks {
             let families = audioFamilies(
                 of: planTrack, nextID: &nextID, urls: urls, reverse: reverse,
-                assets: &assets, reversedAssets: &reversedAssets)
+                assets: &assets, reversedAssets: &reversedAssets, ramps: ramps)
             for family in families {
                 let track = try makeTrack(in: composition, mediaType: .audio, id: family.id)
                 let trackDSP = dsp.isEmpty
@@ -165,7 +166,8 @@ extension CompositionBuilder {
                     reverse: reverse, assets: &assets, reversedAssets: &reversedAssets,
                     shift: AudioShift.of(
                         segments: family.segments,
-                        usesNoiseReduction: trackDSP?.usesNoiseReduction ?? false))
+                        usesNoiseReduction: trackDSP?.usesNoiseReduction ?? false),
+                    ramps: ramps)
                 let sink = metering ? LevelMeterSink() : nil
                 if let sink = sink {
                     meters.append(

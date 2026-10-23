@@ -51,14 +51,16 @@ extension CompositionBuilder {
     /// the track's 0 or before the source's 0 cuts the segment's head
     /// instead — that much timeline, and its share of source — so the rest
     /// still lands where it belongs. Nil when nothing of it is left.
-    /// `.none` answers the segment unchanged.
+    /// `.none` answers the segment unchanged. A ramp segment plays its
+    /// render (spec §11 SR-6, SR-12): `[0, duration)` of it at ×1 with no
+    /// lead; the track's lead and the head cut apply to it unchanged.
     static func placement(of segment: PlanSegment, shift: AudioShift) -> AudioPlacement? {
         let start = segment.start
         let duration = segment.duration
-        let sourceIn = segment.sourceIn
-        let sourceDuration = segment.sourceDuration
+        let sourceIn = segment.ramp == nil ? segment.sourceIn : 0
+        let sourceDuration = segment.ramp == nil ? segment.sourceDuration : duration
         guard duration > 0, sourceDuration > 0 else { return nil }
-        let lead = segment.isTimeScaled ? shift.scaledSourceLead : 0
+        let lead = segment.isTimeScaled && segment.ramp == nil ? shift.scaledSourceLead : 0
         let at0 = start - shift.trackLead
         let in0 = sourceIn - lead
         // Timeline ticks to cut: enough to bring `at` to 0, and enough that

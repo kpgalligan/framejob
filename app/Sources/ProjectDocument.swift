@@ -20,7 +20,7 @@ extension Notification.Name {
 
     /// Posted by `ProjectDocument` (object: the document) when the set of
     /// pre-rendered reversed assets on disk changes — a render finished,
-    /// failed or was cancelled (`ReverseRenderer`).
+    /// failed or was cancelled (`ReverseRenderer`) — or a ramp's audio landed.
     ///
     /// It needs a notification of its own because it is the one change the
     /// §7.6 rebuild rule cannot see: reversal is not in the composition plan
@@ -453,6 +453,7 @@ final class ProjectDocument: NSDocument {
         // dropped it, or opened after someone cleaned it out — so an open is
         // as much a reason to render a reverse as ticking the box is.
         ensureReversedMedia()
+        ensureRampAudio()
     }
 
     override func close() {
@@ -464,6 +465,7 @@ final class ProjectDocument: NSDocument {
             didReleaseRecipeKey = true
             RecipeSource.shared.unregister(recipeKey)
             ReverseSource.shared.unpublish(recipeKey)
+            RampAudioRenders.shared.release(owner: recipeKey)
             stopGraphicStore()
         }
         super.close()
@@ -896,7 +898,9 @@ final class ProjectDocument: NSDocument {
         // it — which is what makes ticking the box again a real second ask
         // rather than a silent no.
         refusedReverseMedia.formIntersection(state.jobs.map { $0.media })
-        ReverseSource.shared.publish(state.resolution, project: project, for: recipeKey)
+        var resolution = state.resolution
+        resolution.rampAudio = rampAudioDirectory
+        ReverseSource.shared.publish(resolution, project: project, for: recipeKey)
     }
 
     /// Renders whatever reversed asset is missing, behind a progress sheet.
@@ -965,6 +969,7 @@ final class ProjectDocument: NSDocument {
         }
         renderingReverseMedia = []
         publishReverseResolution()
+        ensureRampAudio()
         // Not `.projectDocumentDidChange`: the project did not change, the
         // disk did, and the §7.6 rebuild rule compares plans. See the
         // notification's own comment.
@@ -1263,6 +1268,7 @@ final class ProjectDocument: NSDocument {
         NotificationCenter.default.post(
             name: .projectDocumentDidChange, object: self, userInfo: ["isLive": isLive])
         ensureReversedMedia()
+        ensureRampAudio()
     }
 
     /// Keeps the non-undoable view state honest about a model that just

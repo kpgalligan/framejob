@@ -72,6 +72,10 @@ extension Exporter {
         /// A graphic failed while the export drew it, at its own frame — nil
         /// when it did not compile. The export stopped and its file is gone.
         case graphicFailed(name: String, frame: Int?, message: String)
+        /// A ramped clip's audio render failed (spec §11 SR-12 (g), (h)): the
+        /// export waits for every ramp segment it plays and never writes one
+        /// silent, so it stops, naming the clip and the renderer's reason.
+        case rampAudioFailed(clip: UInt32, message: String)
 
         var errorDescription: String? {
             switch self {
@@ -103,6 +107,8 @@ extension Exporter {
             case .graphicFailed(let name, nil, let message):
                 return "The export was stopped: the graphic \"\(name)\" does not compile — "
                     + "\(message). No file was written."
+            case .rampAudioFailed(let clip, let message):
+                return "Clip \(clip)'s speed ramp audio could not be rendered: \(message)."
             }
         }
     }
