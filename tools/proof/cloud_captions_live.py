@@ -25,9 +25,12 @@ covers one, and fails row B and skips the rest when it does not. The fixture
 is `say`'s eleven seconds — a fraction of a cent a run; the ceiling is there
 for a loop that should not exist.
 
-**The upload** is only `work/cloudprobe/fixtures/speech.aiff`, the synthetic
-fixture the other proofs make. Nothing else on this machine is ever sent, and
-`cleanup` deletes in a `finally` every transcript this run's own lines named.
+**The upload** is only the two synthetic `say` fixtures:
+`work/cloudprobe/fixtures/speech.aiff`, the one the other proofs make, and
+`work/cloudprobe/fixtures/fillers.aiff`, row 22's, spoken from the filler
+spike's F2 text (`filler_spike.f2_text()`, Cut by transcript CT-1). Nothing
+else on this machine is ever sent, and `cleanup` deletes in a `finally` every
+transcript this run's own lines named.
 
 The money half — the ledger, the line parsing, the deletions and the CONTROLs
 — is `cloud_live_ledger.py`, imported here so that every name is reachable on
@@ -38,11 +41,15 @@ import hashlib
 import json
 import math
 import os
+import shutil
+import subprocess
 import sys
 import threading
 import time
+from collections import Counter
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "cloud_spike"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "filler_spike"))
 
 from cloud_live_ledger import (                                            # noqa: E402,F401
     CEILING_DOLLARS, DELETED_TEXT, DELETED_URL, FOLDER, LEDGER, MAX_TRANSCRIPTIONS,
@@ -54,10 +61,15 @@ from aai import KEY_ENV, Ledger, client_from_env                           # noq
 from fixtures import truth_pauses                                          # noqa: E402
 
 from cloud_captions_probe import SPEECH_TEXT, make_fixture, run_probe      # noqa: E402
+from cloud_captions_probe import WORK as PROBE_WORK, child_env             # noqa: E402
+import filler_spike                                                        # noqa: E402
 
 # What a full run checks, and what a precondition SKIPS BY NAME. The run
 # prints what it actually made beside it, so a drift shows.
-LIVE_ROW_COUNT = 37
+LIVE_ROW_COUNT = 42
+# Row 22's planned seconds: the F2 fixture's 15.429 s, rounded up.
+FILLER_PLANNED_SECONDS = 16
+ROW_TWENTY_TWO_CHECKS = 5
 
 
 # --------------------------------------------------------------------------
@@ -310,6 +322,91 @@ def row_twenty_one(proof, instance, ledger, state):
 
 
 # --------------------------------------------------------------------------
+# Row 22 — what the real service returns as fillers (Cut by transcript CT-1,
+# spec §11 TR-1, TR-8)
+
+
+def make_filler_fixture():
+    """`work/cloudprobe/fixtures/fillers.aiff`, `say -o` of the filler spike's
+    F2 text (imported, not copied), remade only when it is not there; None
+    without `say`."""
+    folder = os.path.join(PROBE_WORK, "fixtures")
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, "fillers.aiff")
+    if not os.path.exists(path):
+        if not shutil.which("say"):
+            return None
+        subprocess.run(["say", "-o", path, filler_spike.f2_text()], check=True,
+                       env=child_env(), timeout=120, stdin=subprocess.DEVNULL)
+    return path if os.path.exists(path) else None
+
+
+def row_twenty_two(proof, instance, ledger, client):
+    """One transcription of the F2 fixture, its own reservation reserved
+    before the submit and closed here by `cleanup`, so `close` and row 20's
+    `state` are untouched. What the service returned that the script does not
+    say is printed for the record; a returned token that is not a script word
+    must not reach a cue."""
+    print("\n22. fillers — what the real service returns with `disfluencies: true`, and "
+          "that no filler is captioned")
+    aiff = make_filler_fixture()
+    if aiff is None:
+        proof.skip_rows(ROW_TWENTY_TWO_CHECKS, "`say` is not on this host, so row 22's "
+                                               "filler fixture cannot be made")
+        return
+    session = proof.Session(instance, "live22")
+    media = session.media_of(aiff)
+    session.add(media)
+    cache = proof.cache_path(session, media)
+    since = instance.mark()
+    rid = reserve(ledger, "22", "fillers", seconds=FILLER_PLANNED_SECONDS)
+    try:
+        result = session.op("transcribe", engine="assemblyai", place=False)
+        lines = instance.client_lines(since)
+        seen = account(ledger, rid, "22", lines)
+        posts = [row for row in requests_in(lines)
+                 if row[0] == "POST" and row[1] == "/v2/transcript"]
+        counted = (uploads_ok(lines), len(posts), len(seen))
+        proof.check("22: exactly one upload answered 200, one `POST /v2/transcript` line and "
+                    "one transcript id", counted == (1, 1, 1),
+                    f"got {counted!r} from {lines!r}")
+        header = read_json(cache)
+        marker = read_json(proof.cache_path(session, media, marker=True))
+        proof.check("22: the request asked `disfluencies: true` — the cache's `requested` and "
+                    "the marker, written from the options the wire body encoded — and the "
+                    "service accepted it (the submit answered 200)",
+                    header.get("requested", {}).get("disfluencies") is True
+                    and marker.get("disfluencies") is True
+                    and len(posts) == 1 and posts[0][2] == "200",
+                    f"requested {header.get('requested')!r}, marker "
+                    f"{marker.get('disfluencies')!r}, posts {posts!r}")
+        served = [filler_spike.normalize(str(one.get("text", "")))
+                  for one in header.get("words") or []]
+        served = [one for one in served if one]
+        script = set(filler_spike.without_fillers(filler_spike.F1_TEXT))
+        extra = Counter(one for one in served if one not in script)
+        print(f"  (row 22: {len(served)} served tokens; not script words, with counts: "
+              f"{dict(sorted(extra.items()))!r})")
+        returned = sorted(one for one in extra if one in filler_spike.FILLERS)
+        proof.check("22: the served words hold at least one scripted filler",
+                    bool(returned), f"non-script tokens {dict(extra)!r}")
+        captioned = Counter(token for cue in result.get("cues") or []
+                            for token in filler_spike.tokens(str(cue.get("text", ""))))
+        shown = sorted(one for one in extra if captioned.get(one))
+        proof.check("22: no served token that is not a script word appears in the cues' text",
+                    bool(result.get("cues")) and not shown,
+                    f"captioned non-script tokens {shown!r}")
+        ledger.billed(rid, header.get("audio_duration", FILLER_PLANNED_SECONDS))
+        billed = header.get("audio_duration", FILLER_PLANNED_SECONDS)
+        print(f"  (row 22 billed {billed} s, ${billed / 3600.0 * budget.assemblyai_rates()['per_hour']:.4f})")
+    finally:
+        cleanup(client, ledger, [rid], instance, cache, since)
+    row = ledger.reservations()[rid]
+    proof.check("22: `cleanup` deleted its transcript and closed its reservation `deleted`",
+                row.get("outcome") == "deleted", f"got {row!r}")
+
+
+# --------------------------------------------------------------------------
 # Closing — the instance down, the transcripts gone, the sweep, the ledger
 
 
@@ -406,6 +503,7 @@ def run(proof, binary, probe):
         row_twenty(proof, instance, probe, ledger, client, make_fixture(), state)
         if state.get("ok"):
             row_twenty_one(proof, instance, ledger, state)
+            row_twenty_two(proof, instance, ledger, client)
     finally:
         close(proof, instance, client, ledger, state)
         sweep(proof, instance, ledger, scrubber, state)

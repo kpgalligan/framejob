@@ -169,14 +169,15 @@ def ids(lines):
     return found
 
 
-def refusal(ledger):
-    """Why the next billable call may not be made, or None.
+def refusal(ledger, seconds=PLANNED_SECONDS):
+    """Why the next billable call — of `seconds` planned seconds — may not be
+    made, or None.
 
     The count is of reservations whose outcome is not `no_transcript` or
     `no_upload` — so open rows, `deleted` rows, `unresolved` rows and every
     `extra` row `account` wrote all count against the six.
     """
-    dollars = ((ledger.total_seconds() + PLANNED_SECONDS) / 3600.0
+    dollars = ((ledger.total_seconds() + seconds) / 3600.0
                * budget.assemblyai_rates()["per_hour"])
     if dollars > CEILING_DOLLARS:
         return (f"the next call would reach ${dollars:.4f}, past the "
@@ -189,11 +190,11 @@ def refusal(ledger):
     return None
 
 
-def reserve(ledger, row, label):
-    why = refusal(ledger)
+def reserve(ledger, row, label, seconds=PLANNED_SECONDS):
+    why = refusal(ledger, seconds)
     if why:
         raise Refused(why)
-    return ledger.reserve(row, label, PLANNED_SECONDS)
+    return ledger.reserve(row, label, seconds)
 
 
 def account(ledger, rid, row, lines):

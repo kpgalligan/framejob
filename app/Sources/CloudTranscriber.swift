@@ -184,8 +184,8 @@ final class CloudTranscriber {
                 if cancel.isCancelled { throw Transcriber.TranscribeError.cancelled }
                 guard let entry = media[id], let url = grouped[id]?.first?.source,
                     let source = MediaImporter.CacheStamp.stamp(for: entry, url: url),
-                    MediaTranscript.readStamp(for: id, in: cacheDirectory)
-                        == TranscriptStamp(source: source, options: options),
+                    MediaTranscript.readStamp(for: id, in: cacheDirectory)?.serves(
+                        TranscriptStamp(source: source, options: options), for: .captions) == true,
                     let file = MediaTranscript.read(for: id, in: cacheDirectory)
                 else { throw AccessError.credentialRequired }
                 keylessFiles[id] = file
@@ -300,7 +300,7 @@ final class CloudTranscriber {
             // (4) Every job on this media, derived from the one transcript.
             guard let file = files[id] else { continue }
             for job in grouped[id] ?? [] {
-                let words = MediaTranscript.words(for: job, in: file)
+                let words = MediaTranscript.captionWords(for: job, in: file)
                     .filter { $0.start < job.start + job.duration }
                 cues.append(
                     contentsOf: CaptionPages.cues(

@@ -247,6 +247,30 @@ if let bare = previewSheet(nil), let clip = bare.jobs(in: bare.scope).first?.cli
         check("S6 a transcript with no words in the clip: the fixed sample, and the no-file "
               + "preview byte for byte", false, "the file or the sheet did not build")
     }
+    // Cut by transcript CT-1 (spec §11 TR-1, TR-8): a transcript holding
+    // fillers previews what the same words make without them.
+    let disfluent = transcriptFile([
+        ("Welcome", 100, 500), ("um,", 520, 580), ("back", 600, 900), ("Uh", 920, 980),
+        ("everyone", 1000, 1600),
+    ])
+    let fluent = transcriptFile([("Welcome", 100, 500), ("back", 600, 900), ("everyone", 1000, 1600)])
+    if let withFillers = disfluent, let without = fluent, let a = previewSheet(withFillers),
+        let b = previewSheet(without), let job = a.jobs(in: a.scope).first
+    {
+        let wordsA = a.sampleWords()
+        let wordsB = b.sampleWords()
+        let previewA = png(a.preview())
+        let previewB = png(b.preview())
+        check("S6 a transcript holding fillers: the same sampleWords() and the same preview, byte "
+              + "for byte, as the same transcript without them",
+              MediaTranscript.words(for: job, in: withFillers).count == 5 && wordsA == wordsB
+                && !wordsA.isEmpty && previewA != nil && previewA == previewB,
+              "\(wordsA.map(\.text)) vs \(wordsB.map(\.text)); equal \(previewA == previewB)")
+    } else {
+        check("S6 a transcript holding fillers: the same sampleWords() and the same preview, byte "
+              + "for byte, as the same transcript without them", false,
+              "the files or the sheets did not build")
+    }
 } else {
     check("S6 the document builds", false, "")
 }

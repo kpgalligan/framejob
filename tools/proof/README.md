@@ -22172,3 +22172,108 @@ K, `--mutant replaced-as-kept` must fail R and `--mutant o2-ignored` must fail
 V1 and V2, each exit 1. The 2026-10-22 spike, on the final instrument with
 no owner's sample, exited 2 (`SPIKE INCOMPLETE`, o2 alone) with the verdict
 `tts-only`; the selftest scored 13/13 and each mutant failed its rows.
+
+## Cut by transcript CT-1 — fillers on the cloud request, kept out of captions (`filler_words_proof.py` B0, W1, D1, D2, S1, S2, E1, V1, C1, C2 and eight mutants; `filler_words_probe.swift`; `cloud_captions_probe.py` 13, 15, V, P/T, KL and `keyless-strict-marker`; `cloud_captions_proof.py` 2, 4, FD, FL; `cloud_captions_live.py` 22; `word_captions_sheet_probe.swift` S6; spec §11 TR-1, TR-2, TR-8)
+
+**What it proves.** Every AssemblyAI request sends `disfluencies: true`
+(`TranscriptOptions.disfluencies`, default true, and `TranscriptRequest`'s
+always-written key); the cache file's `requested` and the marker
+(`TranscriptStamp.disfluencies`) record it, and an old marker or `requested`
+with no key decodes as false. `TranscriptStamp.serves(_:for:)` is TR-2's rule:
+every field but `disfluencies` equal, and `.captions` or a true marker —
+`MediaTranscript.isCurrent`, `CloudTranscriber`'s keyless admission and
+`CloudEstimate.fate` all ask it for `.captions`, so a transcript cached before
+CT-1 stays current for captions. One filler list (`FillerWords.assemblyAI`,
+TR-8) is removed from every caption producer's input by
+`MediaTranscript.captionWords(for:in:)` (the run's step 4 and the sheet's
+`sampleWords()`), so captions equal what the same words make without them; the
+cache keeps every served word verbatim (R6-3).
+
+```sh
+python3 tools/proof/swift_build.py typecheck tools/proof/filler_words_probe.swift
+python3 tools/proof/filler_words_proof.py                      # no app, no network, no key
+python3 tools/proof/filler_words_proof.py --mutant NAME        # exit 0 = caught
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only keyless --mutant keyless-strict-marker
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
+RC_PROOF_APP=release python3 tools/proof/cloud_captions_proof.py --live   # PAID, row 22 among them
+```
+
+**`filler_words_proof.py`'s rows**, `filler_words_probe.swift` copied in as
+`main.swift` over `swift_build.app_sources()` (a build failure is B0's FAIL):
+- **W1** the default request's wire body is exactly `audio_url`,
+  `disfluencies` (true), `speaker_labels`, `speech_models`, and the memberwise
+  init without the argument gives true.
+- **D1** an old `requested` block and an old cache file decode false and
+  `File(data:)` reads; a new file round-trips true.
+- **D2** the old writer's legacy and narrow marker bytes decode false; a new
+  marker encodes the seven sorted outer keys, `disfluencies` first.
+- **S1** a false marker serves `.captions` and not `.fillers`, a true one
+  both; a changed model, language, speakers, vocabulary or source size serves
+  neither.
+- **S2** `MediaTranscript.isCurrent` over a temp cache holding a written file
+  and a raw marker with no key is true.
+- **E1** `CloudEstimate.fate` with that marker is `.cached`, and
+  `.upload(.refresh)` under refresh.
+- **V1** `Um,` `UH.` `Hmm?` `uh-huh` `M` `mhm` `Er,` `erm` are fillers;
+  `umbrella` `uhm` `hum` `Ahh` `them` `I'm` `err` `here` are not.
+- **C1** `captionWords` of a file holding "um,", "Uh", "er" and "Hmm," equals
+  `words(for:in:)` of the same file without them, and the file's bytes keep
+  the fillers.
+- **C2** `CaptionPages.cues` over those two lists is equal (and non-empty) for
+  Subtitles and every word style.
+
+| Mutant | Anchor (asserted once) | Must fail | 2026-10-22 |
+|---|---|---|---|
+| `fillers-kept` | `FillerWords.swift` `.filter { !FillerWords.isFiller($0.text) }` → `` | C1 C2 | caught (8/10; C1 C2) |
+| `captions-need-disfluent` | `TranscriptStamp.swift` `use == .captions \|\| disfluencies` → `disfluencies` | S1 S2 E1 | caught (7/10) |
+| `fillers-take-any-marker` | the same anchor → `true` | S1 | caught (9/10) |
+| `request-omits-disfluencies` | `AssemblyAITranscript.swift` `try container.encode(options.disfluencies, forKey: .disfluencies)` → `` | W1 | caught (9/10) |
+| `legacy-marker-key-required` | `TranscriptStamp.swift` `container.decodeIfPresent(Bool.self, forKey: .disfluencies) ?? false` → `container.decode(…)` | D2 S2 | caught (7/10; E1 too) |
+| `legacy-requested-key-required` | `TranscriptStamp.swift` `keys.decodeIfPresent(Bool.self, forKey: .disfluencies) ?? false` → `keys.decode(…)` | D1 | caught (9/10) |
+| `case-sensitive-fillers` | `FillerWords.swift` `text.lowercased().trimmingCharacters(` → `text.trimmingCharacters(` | V1 | caught (7/10; C1 C2 too) |
+| `estimate-strict-marker` | `CloudEstimate.swift` `facts.marker?.serves(wanted, for: .captions) == true` → `facts.marker == wanted` | E1 | caught (9/10) |
+| `keyless-strict-marker` (`cloud_captions_probe.py`) | `CloudTranscriber.swift`'s keyless admission `…?.serves(TranscriptStamp(…), for: .captions) == true,` → `… == TranscriptStamp(…),` | KL's no-`disfluencies` row | caught (43/44, exit 1: the probe's convention) |
+
+**The fake's new key**, `assemblyai_fake.py`'s `disfluent_words`: an array like
+`words`, serialised once, served (bytes and `text`) iff the submitted request
+had `disfluencies: true` and the `speaker_words` arm did not apply.
+
+**`cloud_captions_probe.py`'s re-pins.** `makeOptions` reads
+`row["disfluencies"] as? Bool ?? true` (behind `#if
+CLOUD_PROBE_BEFORE_SPEAKERS`, so SP3's B46 baseline still builds this file);
+stamp mode answers `servesCaptionsFirst`/`servesFillersFirst` and, per legacy
+case, `servesCaptions`/`servesFillers`, and section 13's "current" checks read
+them, with a new `options.disfluencies: false` row (a different stamp that
+serves captions, not fillers) and "matching legacy" expecting `servesFillers`
+false; `BASE_OPTIONS`/`OUTER_KEYS` hold the writer's seven outer keys; row 15's
+wire bodies have `disfluencies` true; V's and P/T's hand-written `requested`
+blocks carry `"disfluencies":true`. **KL** gains a row: the seeded cache with
+`disfluencies` removed from the marker and the file's `requested` is admitted
+keyless, with the same cues, no HTTP and no byte rewritten.
+
+**`cloud_captions_proof.py`** row 2 adds `body["disfluencies"] is True`; row 4
+that `requested.disfluencies` and the marker's are true; **FD** two sessions on
+`speech.mov` (plain `words`, and `disfluent_words` = the same plus "um,", "Uh"
+and "er" in the 2.4–3.0 s gap), each transcribed with Subtitles then Pill:
+each submit asks `disfluencies: true`, the disfluent cache keeps the fake's
+bytes, the caption text clips (track, start, duration, text) are equal and none
+shows a filler; **FL** FD's plain package with `disfluencies` stripped from the
+marker and `requested` (raw text edits): no upload, no submit, `cached`
+[media], FD's cues and both files byte for byte; under `refresh` one submit
+with `disfluencies: true` and a new marker carrying it.
+
+**Live row 22** (`cloud_captions_live.py`, on L1 after row 21, only when row
+20 was `ok`): `work/cloudprobe/fixtures/fillers.aiff`, `say -o` of
+`filler_spike.f2_text()`, reserved `"22"` at `FILLER_PLANNED_SECONDS` (16)
+before the submit and closed by its own `cleanup`; five checks — the counts
+(one upload, one submit, one id), the request's `disfluencies` (the cache's
+`requested` and the marker, written from the options the wire body encoded,
+and the submit's 200), a scripted filler returned, no returned non-script token
+in the cues' text, and its reservation closed `deleted`. It prints every
+returned token that is not a script word, with its count, for the record.
+`LIVE_ROW_COUNT` is 42. Without `RC_ASSEMBLYAI_KEY` every live row is skipped
+by name.
+
+**`word_captions_sheet_probe.swift` S6** gains a row: a transcript holding
+"um," and "Uh" previews the same `sampleWords()` and the same PNG, byte for
+byte, as the same transcript without them.

@@ -160,7 +160,7 @@ struct CloudEstimate: Equatable {
     static func fate(_ facts: Facts, options: TranscriptOptions, refresh: Bool) -> Fate {
         guard let source = facts.source else { return .unreadable }
         let wanted = TranscriptStamp(source: source, options: options)
-        let current = facts.marker == wanted && facts.cacheReads
+        let current = facts.marker?.serves(wanted, for: .captions) == true && facts.cacheReads
         if current, !refresh { return .cached }
         let reason: Reason
         if current {

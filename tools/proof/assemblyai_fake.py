@@ -56,6 +56,14 @@ the counters):
                                  `speaker_labels: true`, else `words` (issue
                                  batch B46, #93). `GET /__control/words`
                                  still answers `words`
+    disfluent_words              an array like `words`, serialised ONCE: a
+                                 completed transcript serves it (bytes and
+                                 `text`) iff its submitted request had
+                                 `disfluencies: true` and the
+                                 `speaker_words` arm did not apply, else
+                                 `words` (Cut by transcript CT-1, TR-1).
+                                 `GET /__control/words` still answers
+                                 `words`
     polls_before_complete        how many GETs answer `processing` first
     never_complete               every GET answers `processing`
     transcript_error             a string: the transcript ends in `error`
@@ -187,6 +195,10 @@ class Scenario:
         self.speaker_words = given.get("speaker_words")
         self.speaker_words_bytes = (None if self.speaker_words is None
                                     else json.dumps(self.speaker_words).encode("utf-8"))
+        # CT-1 (TR-1): what a transcript asked for WITH disfluencies gets.
+        self.disfluent_words = given.get("disfluent_words")
+        self.disfluent_words_bytes = (None if self.disfluent_words is None
+                                      else json.dumps(self.disfluent_words).encode("utf-8"))
         self.polls_before_complete = int(given.get("polls_before_complete", 0))
         self.never_complete = bool(given.get("never_complete", False))
         self.transcript_error = given.get("transcript_error")
@@ -311,12 +323,17 @@ class Fake:
         """A completed body with the scenario's `words` spliced in as BYTES,
         so what the client reads is what `GET /__control/words` answers —
         or its `speaker_words`, when given and this transcript's request had
-        `speaker_labels: true` (B46)."""
+        `speaker_labels: true` (B46) — or else its `disfluent_words`, when
+        given and the request had `disfluencies: true` (CT-1)."""
         head = json.dumps(self.body(tid, "completed"))[:-1].encode("utf-8")
         words, words_bytes = self.scenario.words, self.scenario.words_bytes
-        labelled = self.transcripts[tid]["request"].get("speaker_labels") is True
+        request = self.transcripts[tid]["request"]
+        labelled = request.get("speaker_labels") is True
+        disfluent = request.get("disfluencies") is True
         if self.scenario.speaker_words is not None and labelled:
             words, words_bytes = self.scenario.speaker_words, self.scenario.speaker_words_bytes
+        elif self.scenario.disfluent_words is not None and disfluent:
+            words, words_bytes = self.scenario.disfluent_words, self.scenario.disfluent_words_bytes
         text = " ".join(str(w.get("text", "")) for w in words)
         return (head + b',"text":' + json.dumps(text).encode("utf-8")
                 + b',"words":' + words_bytes + b"}")

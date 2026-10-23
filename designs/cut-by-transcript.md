@@ -172,7 +172,103 @@ No `CLAUDE.md` edit is owed by CT-0: no file's role changed and no rule was adde
 
 ## CT-1 record
 
-Not started.
+**What landed (2026-10-22):** TR-8 (the caption filler vocabulary) in
+`designs/spec/11-decisions/cut-by-transcript.md`, recorded before the code, with its index row
+and the Lines cells. `TranscriptOptions.disfluencies` (default true, its CodingKey and encode
+line) and `TranscriptRequest`'s always-written `disfluencies` (`AssemblyAITranscript.swift`):
+the default wire body is exactly `audio_url`, `disfluencies: true`, `speaker_labels`,
+`speech_models`. `TranscriptStamp.disfluencies` (encoded; absent decodes false),
+`TranscriptUse`, `TranscriptStamp.serves(_:for:)` and `TranscriptOptions.init(from:)` (absent
+false), in `TranscriptStamp.swift`. A new marker's outer keys are `disfluencies,
+keyterms_prompt, language_code, provider, source, speaker_labels, speech_models`, and a new
+cache file's `requested` gains `"disfluencies":true`, sorted first. `FillerWords.swift` (new):
+`FillerWords.assemblyAI`, `normalized`, `isFiller` and `MediaTranscript.captionWords(for:in:)`.
+The four call sites: `MediaTranscript.isCurrent` and `CloudEstimate.fate`'s `current` through
+`serves(_:for: .captions)`, `CloudTranscriber`'s keyless admission likewise and its step (4)
+through `captionWords`, and the sheet's `sampleWords()` through `captionWords`. No format
+change, no op, no tool and no FFI change; `.fillers` has no product caller yet (CT-2 is its
+first). The instruments: `filler_words_probe.swift` and `filler_words_proof.py` (new),
+`assemblyai_fake.py`'s `disfluent_words`, the re-pins and KL row in `cloud_captions_probe.py`,
+rows 2, 4, FD and FL in `cloud_captions_proof.py`, live row 22 in `cloud_captions_live.py`
+(with `cloud_live_ledger.py`'s `refusal`/`reserve` taking `seconds=PLANNED_SECONDS`), and S6's
+filler row in `word_captions_sheet_probe.swift`; `tools/proof/README.md`'s "Cut by transcript
+CT-1" section lists them.
+
+**TR-8's sources, as read on 2026-10-22** (the orchestrator's reading; the designer could not
+read the page): the current page, https://www.assemblyai.com/docs/pre-recorded-audio/filler-words,
+gives no exact list, only "uh" and "um" as examples, and says `disfluencies` applies to
+Universal-3.5 Pro (English, Spanish, German, French, Portuguese, Italian) and Universal-2
+(English only); a search summary of the Universal-2 page,
+https://www.assemblyai.com/docs/filler-words, gives nine — um, uh, hmm, mhm, uh-huh, ah, huh,
+hm, m; the older core-transcription page lists five — um, uh, hmm, mhm, uh huh; AssemblyAI's
+Universal-3 Pro prompting material names er, erm, ah, hmm and mhm. The app's first model is
+Universal-3.5 Pro, for which no list is published, so the eleven words are a choice and not a
+guarantee; live row 22 records what the real service returns.
+
+**The runs** (2026-10-22, macOS 26.5.1, the worktree on `7ff117f` with CT-1's uncommitted
+changes, each on the final instrument):
+
+| Command | Result |
+|---|---|
+| `make typecheck` | 0 errors, the 4 baseline warnings |
+| `python3 tools/proof/filler_words_proof.py` | 10/10 (B0, W1, D1, D2, S1, S2, E1, V1, C1, C2), exit 0 |
+| `env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py` (whole) | 876/876, one row skipped by name (`work/cloud_spike/fixtures/late.mov` is not on this host — C0's untracked late-audio fixture, as before CT-1), exit 0 |
+| `… cloud_captions_probe.py --only keyless --mutant keyless-strict-marker` | caught: 43/44, the one failure KL's no-`disfluencies` row, exit 1 (the probe's mutant convention: rows failed) |
+| `python3 tools/proof/word_captions_chrome.py` | 50/50, S6's filler row among them, exit 0 |
+| `make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py` (Debug) | 225/225, FD and FL among them; `grep "Frame Job: "` empty in all five instances' logs, exit 0 |
+| `make gate` | PASS: names, typecheck (its 4 baseline warnings), test and app ran and passed; fmt and lint skipped as byte-identical (no Rust changed) |
+| `RC_PROOF_APP=release env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py` (Release, after the gate's `make app`) | 225/225, FD and FL among them; `grep "Frame Job: "` empty in all five instances' logs, exit 0 |
+| `RC_PROOF_APP=release python3 tools/proof/cloud_captions_proof.py --live` (PAID) | 44/44, the live rows' 42 checks (`LIVE_ROW_COUNT` 42) and nothing skipped; `grep "Frame Job: "` empty in L0's and L1's logs, exit 0 |
+
+An earlier pass of the targeted probe sections scored 323/325: SP3 and SP4·off failed because
+the probe file, built against B46's baseline tree with `-D CLOUD_PROBE_BEFORE_SPEAKERS`, now
+named `disfluencies` and `serves`, which that tree lacks. `makeOptions`' new argument and the
+stamp mode's `serves` answers were put behind that flag, as the file's other post-B46 lines
+are, and the re-run scored 328/328. No row any section held before CT-1 fails.
+
+**The mutants.** `filler_words_proof.py --mutant NAME`, each anchor asserted once, exit 0 when
+caught; every one was caught:
+
+| Mutant | Must fail | Failed (score) |
+|---|---|---|
+| `fillers-kept` | C1 C2 | C1 C2 (8/10) |
+| `captions-need-disfluent` | S1 S2 E1 | S1 S2 E1 (7/10) |
+| `fillers-take-any-marker` | S1 | S1 (9/10) |
+| `request-omits-disfluencies` | W1 | W1 (9/10) |
+| `legacy-marker-key-required` | D2 S2 | D2 S2 E1 (7/10) |
+| `legacy-requested-key-required` | D1 | D1 (9/10) |
+| `case-sensitive-fillers` | V1 | V1 C1 C2 (7/10) |
+| `estimate-strict-marker` | E1 | E1 (9/10) |
+
+and `cloud_captions_probe.py`'s `keyless-strict-marker`, above: nine.
+
+**Live row 22, and the spend.** `RC_ASSEMBLYAI_KEY` was present in the environment the
+implementing agent inherited (it was expected to be absent, and the run to skip by name), so the
+live run made its paid calls: row 20's 11 s round trip and row 22's 16 s, 27 billed seconds at
+$0.21 an hour, **$0.0016** (row 22 alone $0.0009); the live ledger
+(`work/cloudlive/ledger.json`) closed with nothing owed at $0.0029 over 49 planned seconds, four
+reservations of which two (20 and 22, both `deleted`) count against `MAX_TRANSCRIPTIONS`' six
+(20d `no_transcript`, 21 `no_upload`). The real service accepted `disfluencies: true` (the
+submit answered 200) on both requests. On `fillers.aiff` (`say` of F2, the spike's text with
+silence around each filler) it served 27 tokens, and the ones that are not script words were
+**um 3, uh 2, er 1, hmm 1** — every one a scripted filler and every one in TR-8's list: seven
+of the script's eight fillers (um 3, uh 3, er 1, hmm 1), one "uh" not returned (which one was
+not recorded). None of them reached a cue. No other non-script token came back. Deviation:
+row 22 reads `disfluencies: true` from the cache's `requested`, the marker and the submit's
+200, not from the submit BODY, because the live client logs no request body; rows 2 and FD
+check the wire body itself against the fake.
+
+**Accepted, harmless:** the janitor's success re-encodes a cache file's header (`File.encoded()`,
+R6-4's `remote_deleted` rewrite, which it already did before CT-1), so on a file written before
+CT-1 it now also writes `"disfluencies":false` into `requested`. That is the old request's true
+value and reads the same as an absent key; the `words` bytes are untouched (R6-3) and the marker
+is not rewritten, so `serves` answers the same for captions and for fillers. It happens only
+when a delete was still owed on a pre-CT-1 cache file. Not an issue.
+
+**Owed:** TR-7, from CT-0, before CT-2 (the owner's scripted sample). `app/CLAUDE.md`'s map
+entries were applied at merge. Review: pass, three nits — two applied at merge (this deviation
+sentence; the janitor note's heading), one left (`cloud_captions_live.py`'s `billed` computed
+twice: a tidy in a paid instrument that cannot be re-run free).
 
 ## CT-2 record
 

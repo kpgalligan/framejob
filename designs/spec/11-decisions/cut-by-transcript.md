@@ -12,7 +12,7 @@ quoted verbatim in the road map's "The owner's choices"), which the owner took u
 ("#92 Cut by transcript"). TR-7 is kept for the on-device filler source: the filler spike decides
 it on the owner's own scripted sample, before CT-2 (the road map's CT-0 record says what is owed).
 CT-1…CT-4 each record their numbers as a new entry (TR-8 on) or as Amended-by lines before their
-code.
+code; TR-8 was recorded in CT-1, before its code.
 
 **Stands, and nothing here re-litigates it:** R6-3 (one upload per media, every clip derived from
 it, the words cached verbatim); R6-10 (`MediaTranscript.words(for:in:)` maps a media's words onto
@@ -96,3 +96,23 @@ W-9 is amended by TR-5 through AI-6.
   - Agents edit no `CLAUDE.md`; each phase's handback lists the edits owed.
   - Risk accepted: until the owner's scripted sample (o2) is recorded, no owner recording holds
     a known filler; a real recording's filler CUT stays a person's check.
+- **TR-8 — The caption filler vocabulary is: um, uh, hmm, mhm, uh-huh, ah, huh, hm, m, er, erm.**
+  Recorded in CT-1, before its code (`FillerWords.assemblyAI`, `FillerWords.swift`).
+  - **The sources, as read on 2026-10-22:** AssemblyAI's Universal-2 "Filler words" page
+    (https://www.assemblyai.com/docs/filler-words, read through a search summary) lists the first
+    nine. The older core-transcription page lists five of them (um, uh, hmm, mhm, uh huh). The
+    current page (https://www.assemblyai.com/docs/pre-recorded-audio/filler-words) gives only "uh"
+    and "um" as examples, and says `disfluencies` applies to Universal-3.5 Pro and Universal-2.
+    AssemblyAI's Universal-3 Pro prompting material names er, erm, ah, hmm and mhm as fillers.
+  - **No published list for the first model:** Universal-3.5 Pro, the first model the app
+    requests, has no published list, so the nine words are documented for Universal-2 only, and
+    no published list guarantees that captions equal those made before CT-1.
+    `cloud_captions_live.py` row 22 records what the real service returns.
+  - **The match:** a word is a filler when its text, lowercased, with leading and trailing
+    punctuation and whitespace trimmed, is in the list. "uh huh" is matched by its two halves,
+    and `uh-huh` as one token. Captions drop exactly these. The cache keeps every served word
+    verbatim (R6-3). Another source's fillers (TR-7) are added by that source's own entry.
+  - **Why:** these are the tokens AssemblyAI itself names as fillers for the models the app
+    requests.
+  - Risk accepted: a real "ah" or "er", or the letter "M", is dropped from captions. A filler the
+    service returns outside this list is captioned until a later decision adds it.

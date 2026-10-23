@@ -1664,6 +1664,11 @@ free.
   on and EVERY other field carried by name (`word_captions_chrome.py`'s
   `rebuild-drops-preset` removes one). The no-argument `wordStyle` is the
   presets and is not edited by a look.
+- `FillerWords.swift` — THE filler vocabulary (spec §11 TR-8): the set,
+  `normalized` (lowercased, punctuation and whitespace trimmed both ends),
+  `isFiller`, and `MediaTranscript.captionWords(for:in:)`, `words(for:in:)`
+  with the fillers removed — every caption producer reads it, so a
+  disfluent transcript captions as before.
 - `CaptionPages.swift` — word-caption PAGES (spec §11 W-7), pure and
   synchronous so it runs on whichever engine thread calls it:
   `normalize` (trim, split, sort, the per-engine `lead` — its ONE home —
@@ -1688,7 +1693,8 @@ free.
   serial queue and the main-thread completion; `transcribe` is the
   synchronous body — the janitor FIRST, the jobs grouped by MEDIA, each
   media classified cached / HELD / to upload, then each job's words cut out
-  of its media's one transcript. `+Report` holds what the `Outcome` has no
+  of its media's one transcript, through `captionWords` (fillers out,
+  TR-1); the keyless admission asks `serves(.captions)`. `+Report` holds what the `Outcome` has no
   room for (`uploaded` with the transcript-write and marker-write results,
   `transcriptWritten` and `stampWritten`, `cached`,
   `janitorDeleted`, `janitorFailed`, `janitorDeferred`, `held`, and
@@ -1748,6 +1754,11 @@ free.
   cache marker: `TranscriptSourceStamp` projects `CacheStamp` to size,
   modification second, duration and audio presence, then pairs those with
   the provider and REQUEST (R6-15); old wide markers decode by projection.
+  The request carries `disfluencies` (TR-2, always `true` on a new request;
+  a marker or `requested` block without the key decodes it as false), and
+  `serves(_:for:)` with `TranscriptUse` (`.captions`, `.fillers`) is the ONE
+  currency comparison: every field but `disfluencies` must match, and
+  `.fillers` also needs the marker's own `disfluencies` true.
   Nothing here speaks HTTP or touches disk. **Three encoders write every key
   with nil as `null`** through
   `encodeOrNull`, because `encodeIfPresent` would drop a key a cache file and
@@ -1812,7 +1823,8 @@ free.
   in after a `.sortedKeys` header, `init(data:)` cuts it back out with
   `JSONValueRange`, and neither ever re-serialises — a `0.98` does not
   survive that. Both `File` inits throw on a `words` that is not an array, so
-  `read` answers nil and `isCurrent` false rather than caching zero words.
+  `read` answers nil and `isCurrent` false rather than caching zero words;
+  `isCurrent` asks `serves(_:for: .captions)`.
   THE MAPPING is here: a word is a clip's when `in ≤ start × 600 <
   in + duration × speed`, landing at `start + (m − in) / speed`, clamped
   through `Transcriber.placed` (R6-10). That `× 600` goes through

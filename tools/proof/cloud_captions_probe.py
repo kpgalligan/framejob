@@ -474,11 +474,22 @@ func makeSpeed(_ raw: Any?) -> Double {
 
 func makeOptions(_ row: [String: Any]?) -> TranscriptOptions {
     let row = row ?? [:]
+    #if CLOUD_PROBE_BEFORE_SPEAKERS
+    // B46's starting tree has no `disfluencies` (CT-1 added it), and SP3 and
+    // SP4 build this file against it.
     return TranscriptOptions(
         speechModels: row["speech_models"] as? [String] ?? TranscriptOptions.shippedModels,
         languageCode: row["language_code"] as? String,
         speakerLabels: row["speaker_labels"] as? Bool ?? false,
         keytermsPrompt: row["keyterms_prompt"] as? [String] ?? [])
+    #else
+    return TranscriptOptions(
+        speechModels: row["speech_models"] as? [String] ?? TranscriptOptions.shippedModels,
+        languageCode: row["language_code"] as? String,
+        speakerLabels: row["speaker_labels"] as? Bool ?? false,
+        keytermsPrompt: row["keyterms_prompt"] as? [String] ?? [],
+        disfluencies: row["disfluencies"] as? Bool ?? true)
+    #endif
 }
 
 func makeHeader(_ options: TranscriptOptions, id: String = "t_probe",
@@ -707,6 +718,15 @@ func modeStamp(_ request: [String: Any]) -> [String: Any] {
     let built = rows.map { stamp($0) }
     var answers: [[String: Any]] = []
     let folder = temporaryDirectory("stamp")
+    #if CLOUD_PROBE_BEFORE_SPEAKERS
+    // B46's starting tree has no `serves` (CT-1, TR-2); SP3 and SP4 never
+    // ask for this mode, so that build answers a fixed false.
+    func serves(_ marker: TranscriptStamp?, _ wanted: TranscriptStamp, _ fillers: Bool) -> Bool { false }
+    #else
+    func serves(_ marker: TranscriptStamp?, _ wanted: TranscriptStamp, _ fillers: Bool) -> Bool {
+        marker?.serves(wanted, for: fillers ? .fillers : .captions) ?? false
+    }
+    #endif
     for (index, one) in built.enumerated() {
         let text = (try? encoder.encode(one)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
         // Written through the same door the run uses, then read back, so the
@@ -719,6 +739,8 @@ func modeStamp(_ request: [String: Any]) -> [String: Any] {
             "json": text,
             "marker": onDisk,
             "equalToFirst": built.first == one,
+            "servesCaptionsFirst": serves(one, built.first!, false),
+            "servesFillersFirst": serves(one, built.first!, true),
             "readsBackEqual": MediaTranscript.readStamp(for: UInt32(index), in: folder) == one,
         ])
     }
@@ -734,6 +756,8 @@ func modeStamp(_ request: [String: Any]) -> [String: Any] {
             "label": row["label"] as? String ?? "\(index)",
             "decodes": decoded != nil,
             "equal": decoded == stamp(row),
+            "servesCaptions": serves(decoded, stamp(row), false),
+            "servesFillers": serves(decoded, stamp(row), true),
             "unchanged": wrote && after == raw,
         ])
     }
@@ -3319,10 +3343,10 @@ BASE_SOURCE = {"size": 1000, "modified": 2000, "duration": 6_000_000, "width": 1
                "height": 1080, "hasVideo": True, "hasAudio": True, "thumbnailHeight": 160.0,
                "maxThumbnails": 600, "peakBucketsPerSecond": 100}
 BASE_OPTIONS = {"speech_models": ["universal-3-5-pro", "universal-2"], "language_code": None,
-                "speaker_labels": False, "keyterms_prompt": []}
+                "speaker_labels": False, "keyterms_prompt": [], "disfluencies": True}
 SOURCE_KEYS = {"size", "modified", "duration", "hasAudio"}
 OUTER_KEYS = {"source", "provider", "speech_models", "language_code", "speaker_labels",
-              "keyterms_prompt"}
+              "keyterms_prompt", "disfluencies"}
 IRRELEVANT_SOURCE = {"width": 1921, "height": 1081, "hasVideo": False,
                      "thumbnailHeight": 200.0, "maxThumbnails": 601,
                      "peakBucketsPerSecond": 101}
@@ -3365,6 +3389,10 @@ def section_stamp(binary, sources):
         options = dict(BASE_OPTIONS)
         options[key] = value
         rows.append({"label": f"options.{key}", "source": dict(BASE_SOURCE), "options": options})
+    # CT-1 (TR-2): a marker that did not ask for fillers is a different
+    # stamp, and still serves captions — never fillers.
+    rows.append({"label": "options.disfluencies", "source": dict(BASE_SOURCE),
+                 "options": dict(BASE_OPTIONS, disfluencies=False)})
     for key, value in {"size": 1001, "modified": 2001, "duration": 6_000_001, "width": 1921,
                        "height": 1081, "hasVideo": False, "hasAudio": False,
                        "thumbnailHeight": 200.0, "maxThumbnails": 601,
@@ -3421,9 +3449,10 @@ def section_stamp(binary, sources):
         inner = list(json.loads(marker).get("source", {}))
     except ValueError:
         keys, inner = [], []
-    check("13: writer emits exact four source and six outer keys in stable sorted bytes, "
-          "with `language_code` null",
+    check("13: writer emits exact four source and seven outer keys in stable sorted bytes, "
+          "with `language_code` null and `disfluencies` true",
           marker == by.get("base", {}).get("json") and '"language_code":null' in marker
+          and '"disfluencies":true' in marker
           and keys == sorted(keys) and inner == sorted(inner)
           and set(keys) == OUTER_KEYS and set(inner) == SOURCE_KEYS,
           f"got {marker!r}")
@@ -3436,14 +3465,23 @@ def section_stamp(binary, sources):
             continue
         invalidates = key.startswith("options.") or label in SOURCE_KEYS
         check(f"13: {key} changing {'INVALIDATES' if invalidates else 'does not invalidate'}",
-              by[key].get("equalToFirst") is (not invalidates),
+              by[key].get("servesCaptionsFirst") is (not invalidates)
+              and by[key].get("servesFillersFirst") is (not invalidates),
               f"got {by[key]!r}")
+    plain = by.get("options.disfluencies", {})
+    check("13: options.disfluencies false is a different stamp that still serves captions "
+          "and not fillers (TR-2)",
+          plain.get("equalToFirst") is False and plain.get("servesCaptionsFirst") is True
+          and plain.get("servesFillersFirst") is False, f"got {plain!r}")
     legacy_by = {row["label"]: row for row in answer.get("legacy", [])}
     for label, _, _, _, decodes, equal in legacy_cases:
         row = legacy_by.get(label, {})
-        check(f"13: raw {label} decodes={decodes}, equal={equal}, read leaves bytes unchanged",
-              row.get("decodes") is decodes and row.get("equal") is equal
-              and row.get("unchanged") is True, f"got {row!r}")
+        fillers = (row.get("servesFillers") is False) if label == "matching legacy" else True
+        check(f"13: raw {label} decodes={decodes}, serves captions={equal}"
+              + (", not fillers" if label == "matching legacy" else "")
+              + ", read leaves bytes unchanged",
+              row.get("decodes") is decodes and row.get("servesCaptions") is equal
+              and fillers and row.get("unchanged") is True, f"got {row!r}")
     regions = answer.get("regions", {})
     check("13: the region `us` resolves to api.assemblyai.com",
           regions.get("us") == "https://api.assemblyai.com", f"got {regions.get('us')!r}")
@@ -3691,16 +3729,18 @@ def section_client(binary, sources):
 
     # The wire body.
     body = json.loads((shipped.get("wireBody") or "{}"))
-    check("15: the wire body carries audio_url, speech_models and speaker_labels and "
-          "NOTHING else when the language is auto and the vocabulary empty",
-          sorted(body) == ["audio_url", "speaker_labels", "speech_models"], f"got {sorted(body)!r}")
+    check("15: the wire body carries audio_url, disfluencies (true, TR-1), speech_models and "
+          "speaker_labels and NOTHING else when the language is auto and the vocabulary empty",
+          sorted(body) == ["audio_url", "disfluencies", "speaker_labels", "speech_models"]
+          and body.get("disfluencies") is True, f"got {body!r}")
     named = call("wire-named", {"call": "verify", "steps": [{"route": "verify", "status": 200,
                                                              "body": "{}"}],
                                 "options": {"language_code": "en", "keyterms_prompt": ["a"]}})
     body2 = json.loads(((named or {}).get("wireBody") or "{}"))
     check("15: a named language and a vocabulary ADD their two keys, and still no other",
-          sorted(body2) == ["audio_url", "keyterms_prompt", "language_code", "speaker_labels",
-                            "speech_models"], f"got {sorted(body2)!r}")
+          sorted(body2) == ["audio_url", "disfluencies", "keyterms_prompt", "language_code",
+                            "speaker_labels", "speech_models"]
+          and body2.get("disfluencies") is True, f"got {body2!r}")
 
     # The retry.
     retry5xx = call("retry-5xx", {
@@ -5132,7 +5172,7 @@ def section_verbatim(binary, sources):
     absent = ('{"audio_duration":11,"audio_track_start_ms":0,"extracted_seconds":10.389,'
               '"fetched_at":"x","language_code":"en_us","language_confidence":0.99,'
               '"provider":"assemblyai","remote_deleted":false,'
-              '"requested":{"keyterms_prompt":[],"language_code":null,'
+              '"requested":{"disfluencies":true,"keyterms_prompt":[],"language_code":null,'
               '"speaker_labels":false,"speech_models":["universal-3-5-pro"]},'
               '"speech_model_used":"universal-3-5-pro","transcript_id":"t_x",'
               '"uploaded_format":"flac"}')
@@ -5200,7 +5240,7 @@ UNDELETED_DOCUMENT = (
     '{"audio_duration":11,"audio_track_start_ms":0,"extracted_seconds":10.389,'
     '"fetched_at":"x","language_code":"en_us","language_confidence":0.99,'
     '"provider":"assemblyai","remote_deleted":false,'
-    '"requested":{"keyterms_prompt":[],"language_code":null,'
+    '"requested":{"disfluencies":true,"keyterms_prompt":[],"language_code":null,'
     '"speaker_labels":false,"speech_models":["universal-3-5-pro"]},'
     '"speech_model_used":"universal-3-5-pro","transcript_id":"%s",'
     '"uploaded_format":"flac","words":[]}')
@@ -7873,6 +7913,33 @@ def section_keyless(binary, sources):
               and cache_bytes(legacy) == prior and len(fake.log()["requests"]) == before_http,
               f"error={error!r}, answer={legacy_result!r}")
 
+        # CT-1 (TR-2): a cache from before CT-1 — no `disfluencies` in the
+        # marker or in the file's `requested` (raw text edits; the words'
+        # bytes untouched) — is still current for captions, keyless.
+        old = fresh("keyless-pre-disfluencies")
+        shutil.copytree(seed, old, dirs_exist_ok=True)
+        edited = []
+        for name, key in (("1.complete.json", '"disfluencies":true,'),
+                          ("1.json", '"requested":{"disfluencies":true,')):
+            path = os.path.join(old, "transcripts", name)
+            text = open(path, "rb").read().decode()
+            edited.append(text.count(key) == 1)
+            with open(path, "wb") as handle:
+                handle.write(text.replace(key, "" if name.endswith("complete.json")
+                                          else '"requested":{').encode())
+        prior = cache_bytes(old)
+        before_old = len(fake.log()["requests"])
+        old_result, error, _ = run_probe(binary, "keyless-pre-disfluencies", request(old))
+        check("KL: a marker and cache file with no `disfluencies` key are admitted keyless "
+              "with the same cues, no HTTP and no byte rewritten",
+              all(edited) and b"disfluencies" not in prior["1.complete.json"]
+              and b"disfluencies" not in prior["1.json"]
+              and old_result is not None and old_result.get("ok") is True
+              and old_result.get("cues") == planted.get("cues")
+              and old_result.get("report", {}).get("cached") == [1, 2]
+              and cache_bytes(old) == prior and len(fake.log()["requests"]) == before_old,
+              f"edited={edited!r}, error={error!r}, answer={old_result!r}")
+
         def negative(tag, mutate=None, expected_deferred=(1, 2, 9, 10), **extra):
             cache = fresh("keyless-negative-" + tag)
             shutil.copytree(seed, cache, dirs_exist_ok=True)
@@ -8052,6 +8119,15 @@ MUTANTS = {
         "        if client == nil {\n            for id in order {\n",
         "        if client == nil {\n            for id in order.prefix(1) {\n",
         "only the first cached media is admitted; a mixed batch partially succeeds"),
+    # CT-1 (TR-2): the keyless admission back to `==`, so a marker from
+    # before CT-1 refuses a keyless run (KL's no-`disfluencies` row).
+    "keyless-strict-marker": (
+        "CloudTranscriber.swift",
+        "                    MediaTranscript.readStamp(for: id, in: cacheDirectory)?.serves(\n"
+        "                        TranscriptStamp(source: source, options: options), for: .captions) == true,\n",
+        "                    MediaTranscript.readStamp(for: id, in: cacheDirectory)\n"
+        "                        == TranscriptStamp(source: source, options: options),\n",
+        "a marker with no `disfluencies` key refuses a keyless run again (KL)"),
     "keyless-omits-deferred": (
         "CloudTranscriber.swift",
         "            report.janitorDeferred = MediaTranscript.undeleted(in: cacheDirectory).map(\\.media)\n",

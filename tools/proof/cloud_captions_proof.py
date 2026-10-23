@@ -33,6 +33,17 @@ Road map 6 §5i's rows 1–11, plus five of this pipeline's own:
 * **4** the cache file's `words` byte-equal to what the fake served, its
   marker equal to the stamp this script computes from `os.stat` and
   `get_project`, and `remote_deleted` true.
+* **FD** (Cut by transcript CT-1, spec §11 TR-1, TR-8) two sessions on
+  `speech.mov`, one against plain `words` and one against the fake's
+  `disfluent_words` (the same words plus "um,", "Uh" and "er" in a gap), each
+  transcribed with Subtitles and then Pill: each submit asks
+  `disfluencies: true`, the disfluent cache keeps the fake's bytes, and the
+  caption text clips of the two sessions are equal.
+* **FL** (CT-1, TR-2) FD's plain package with `disfluencies` stripped from
+  the marker and the cache file's `requested`: `transcribe` uploads and
+  submits nothing, answers `cached`, the same cues and leaves both files byte
+  for byte; under `refresh` one submit with `disfluencies: true` and a new
+  marker that carries it.
 * **5** the cache, `refresh`, a relink and a relink back, a split pair
   partitioning the words, a later `in`, and the two clips `Transcriber.jobs`
   refuses by name.
@@ -721,6 +732,8 @@ def row_two(instance, fake, probe):
           "for either",
           body.get("speaker_labels") is False and "keyterms_prompt" not in body,
           f"got {sorted(body)!r}")
+    check("2: `disfluencies` is true — every request asks for fillers (CT-1, TR-1)",
+          body.get("disfluencies") is True, f"got {body.get('disfluencies')!r}")
     polls = [r for r in log["requests"]
              if r["method"] == "GET" and r["path"].startswith("/v2/transcript/")]
     check("2: the transcript was polled until it completed — 2 `processing` answers then one "
@@ -1000,6 +1013,137 @@ def row_four(instance, fake):
           and marker.get("keyterms_prompt") == []
           and "language_code" in marker,
           f"got {marker!r}")
+    check("4: `requested.disfluencies` and the marker's `disfluencies` are both true "
+          "(CT-1, TR-1)",
+          header.get("requested", {}).get("disfluencies") is True
+          and marker.get("disfluencies") is True,
+          f"got requested {header.get('requested')!r}, marker {marker.get('disfluencies')!r}")
+
+
+# --------------------------------------------------------------------------
+# Rows FD and FL — fillers on the request, kept out of captions, and a cache
+# from before CT-1 still current (Cut by transcript CT-1; spec §11 TR-1, TR-2,
+# TR-8)
+
+# WORDS plus three fillers inside its 2.4–3.0 s gap.
+DISFLUENT_WORDS = (WORDS[:3] + [
+    {"text": "um,", "start": 2450, "end": 2600, "confidence": 0.71, "speaker": None},
+    {"text": "Uh", "start": 2650, "end": 2750, "confidence": 0.69, "speaker": None},
+    {"text": "er", "start": 2800, "end": 2950, "confidence": 0.64, "speaker": None},
+] + WORDS[3:])
+
+
+def text_clips(session):
+    """Every text clip, as (track name, start, duration, text props), by
+    track then start — what a caption run placed."""
+    project = session.project()
+    names = {t["id"]: t["name"] for t in project["tracks"]}
+    order = [t["id"] for t in project["tracks"]]
+    clips = [c for c in project["clips"] if c["source"]["kind"] == "text"]
+    clips.sort(key=lambda c: (order.index(c["track"]), c["start"]))
+    return [(names[c["track"]], c["start"], c["duration"], c.get("text")) for c in clips]
+
+
+fd_plain = {}
+
+
+def row_fd(instance, fake):
+    print("\nFD. a disfluent transcript places the captions the same words make without "
+          "its fillers")
+    speech, _ = fixtures()
+    sessions = {}
+    try:
+        for tag, given in (("plain", {}), ("disfluent", {"disfluent_words": DISFLUENT_WORDS})):
+            scenario(fake, **given)
+            mark = len(fake.log()["requests"])
+            session = Session(instance, "rowFD-" + tag)
+            sessions[tag] = session
+            media = session.media_of(speech)
+            session.add(media, at=0, duration=5 * SEC)
+            first = session.op("transcribe", engine="assemblyai")
+            session.op("transcribe", engine="assemblyai", style="pill")
+            session.save()
+            sent = [r["json"] for r in submits({"requests": fake.log()["requests"][mark:]})]
+            check(f"FD·{tag}: one submit, and its body has `disfluencies: true`",
+                  len(sent) == 1 and sent[0].get("disfluencies") is True, f"got {sent!r}")
+            raw = read(cache_path(session, media))
+            at = raw.find(b'"words":')
+            if tag == "disfluent":
+                want = json.dumps(DISFLUENT_WORDS).encode("utf-8")
+                check("FD·disfluent: the cache file's `words` are byte-equal to the fake's "
+                      "disfluent bytes — the fillers kept verbatim (R6-3)",
+                      at >= 0 and raw[at + len(b'"words":'):-1] == want,
+                      f"got {raw[at + 8:][:160]!r}")
+            else:
+                fd_plain.update(session=session, media=media, cues=first.get("cues"))
+        placed = {tag: text_clips(session) for tag, session in sessions.items()}
+        check("FD: the caption text clips (track, start, duration, text) of the disfluent "
+              "session equal the plain session's, Subtitles and Pill",
+              bool(placed.get("plain")) and placed.get("plain") == placed.get("disfluent"),
+              f"plain {placed.get('plain')!r}\n       disfluent {placed.get('disfluent')!r}")
+        check("FD: and no caption clip shows a filler",
+              not any(word in str((t or {}).get("content", "")).lower().replace(",", " ").split()
+                      for _, _, _, t in placed.get("disfluent", [])
+                      for word in ("um", "uh", "er")),
+              f"got {[(t or {}).get('content') for _, _, _, t in placed.get('disfluent', [])]!r}")
+    finally:
+        one = sessions.get("disfluent")
+        if one is not None:
+            try:
+                one.op("close_project", discard=True)
+            except ToolError:
+                pass
+
+
+def row_fl(instance, fake):
+    print("\nFL. a marker and cache file from before CT-1 stay current for captions")
+    session, media = fd_plain.get("session"), fd_plain.get("media")
+    if session is None:
+        check("FL: FD's plain session is available", False)
+        return
+    try:
+        scenario(fake)
+        edits = ((cache_path(session, media, marker=True), '"disfluencies":true,', ""),
+                 (cache_path(session, media), '"requested":{"disfluencies":true,',
+                  '"requested":{'))
+        found = []
+        for path, before, after in edits:
+            text = read(path).decode("utf-8")
+            found.append(text.count(before) == 1)
+            with open(path, "wb") as handle:
+                handle.write(text.replace(before, after).encode("utf-8"))
+        edited = [read(path) for path, _, _ in edits]
+        check("FL: the marker and the cache file's `requested` lost `disfluencies` (raw text "
+              "edits, the words' bytes untouched)",
+              all(found) and all(b"disfluencies" not in raw for raw in edited),
+              f"found {found!r}")
+        mark = len(fake.log()["requests"])
+        answer = session.op("transcribe", engine="assemblyai", place=False)
+        after = {"requests": fake.log()["requests"][mark:]}
+        check("FL: transcribe with no refresh uploads nothing and submits nothing, and "
+              "answers `cached` [media]",
+              not uploads(after) and not submits(after) and answer.get("cached") == [media],
+              f"routes {routes(after)!r}, cached {answer.get('cached')!r}")
+        check("FL: its cues equal FD's plain Subtitles run",
+              bool(answer.get("cues")) and answer.get("cues") == fd_plain.get("cues"),
+              f"got {answer.get('cues')!r}\n       want {fd_plain.get('cues')!r}")
+        check("FL: both files are byte-identical to the edited ones",
+              [read(path) for path, _, _ in edits] == edited, "a file was rewritten")
+        mark = len(fake.log()["requests"])
+        session.op("transcribe", engine="assemblyai", place=False, refresh=True)
+        after = {"requests": fake.log()["requests"][mark:]}
+        sent = [r["json"] for r in submits(after)]
+        marker = json.loads(read(edits[0][0]) or b"{}")
+        check("FL: under `refresh` one submit with `disfluencies: true`, and the new marker "
+              "carries `disfluencies: true`",
+              len(sent) == 1 and sent[0].get("disfluencies") is True
+              and marker.get("disfluencies") is True,
+              f"submits {sent!r}, marker {marker!r}")
+    finally:
+        try:
+            session.op("close_project", discard=True)
+        except ToolError:
+            pass
 
 
 def row_recovery(instance, fake):
@@ -2563,6 +2707,8 @@ def main():
                 run_row(row_log, a, fake_a)
                 run_row(row_three, a, fake_a, harness)
                 run_row(row_four, a, fake_a)
+                run_row(row_fd, a, fake_a)
+                run_row(row_fl, a, fake_a)
                 run_row(row_recovery, a, fake_a)
                 run_row(row_five, a, fake_a)
                 run_row(row_seven, a, fake_a)

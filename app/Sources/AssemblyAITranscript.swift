@@ -35,6 +35,9 @@ struct TranscriptOptions: Codable, Equatable {
     /// Up to `AssemblyAIClient.maxKeyterms` terms; empty is the wire's
     /// ABSENT `keyterms_prompt`.
     var keytermsPrompt: [String]
+    /// TR-1: fillers ("um", "uh") kept and timed, on every request CT-1 and
+    /// later sends; `requested`'s reader takes an absent key as false.
+    var disfluencies: Bool = true
 
     /// What this build asks for, road map 6 §2's documented default pair.
     static let shippedModels = ["universal-3-5-pro", "universal-2"]
@@ -44,6 +47,7 @@ struct TranscriptOptions: Codable, Equatable {
         case languageCode = "language_code"
         case speakerLabels = "speaker_labels"
         case keytermsPrompt = "keyterms_prompt"
+        case disfluencies = "disfluencies"
     }
 
     /// EVERY key, always, with nil written as JSON `null`. The synthesized
@@ -61,6 +65,7 @@ struct TranscriptOptions: Codable, Equatable {
         }
         try container.encode(speakerLabels, forKey: .speakerLabels)
         try container.encode(keytermsPrompt, forKey: .keytermsPrompt)
+        try container.encode(disfluencies, forKey: .disfluencies)
     }
 }
 
@@ -105,21 +110,23 @@ struct TranscriptRequest: Encodable, Equatable {
         case languageCode = "language_code"
         case speakerLabels = "speaker_labels"
         case keytermsPrompt = "keyterms_prompt"
+        case disfluencies = "disfluencies"
     }
 
-    /// The wire body, and the whole of it: `audio_url`, `speech_models` and
-    /// `speaker_labels` always; `language_code` ABSENT when nil, which is
-    /// what turns detection on; `keyterms_prompt` ABSENT when empty, because
-    /// an empty array is a request for a vocabulary of nothing and the
-    /// service need not be asked to consider one. No other key — every option
-    /// this app does not set is AssemblyAI's own default (road map 6 §2's
-    /// "options refused here" row), and sending it explicitly would pin a
-    /// default that is not ours to pin.
+    /// The wire body, and the whole of it: `audio_url`, `disfluencies`,
+    /// `speech_models` and `speaker_labels` always; `language_code` ABSENT
+    /// when nil, which is what turns detection on; `keyterms_prompt` ABSENT
+    /// when empty, because an empty array is a request for a vocabulary of
+    /// nothing and the service need not be asked to consider one. No other
+    /// key but `disfluencies` (TR-1) — every option this app does not set is
+    /// AssemblyAI's own default (road map 6 §2's "options refused here" row),
+    /// and sending it explicitly would pin a default that is not ours to pin.
     func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(audioURL, forKey: .audioURL)
         try container.encode(options.speechModels, forKey: .speechModels)
         try container.encode(options.speakerLabels, forKey: .speakerLabels)
+        try container.encode(options.disfluencies, forKey: .disfluencies)
         if let code = options.languageCode {
             try container.encode(code, forKey: .languageCode)
         }

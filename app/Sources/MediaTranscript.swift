@@ -258,11 +258,12 @@ enum MediaTranscript {
         return MediaImporter.writeStamp(stamp, to: markerURL(for: media, in: cacheDir))
     }
 
-    /// Whether a run may skip this media: the marker decodes EQUAL to the
-    /// stamp the caller computed from the file as it is NOW, **and** the
+    /// Whether a run may skip this media: the marker SERVES captions for the
+    /// stamp the caller computed from the file as it is NOW (TR-2's
+    /// `serves(_:for: .captions)`: equal but for `disfluencies`), **and** the
     /// transcript itself reads. Both, because they are separate files.
     static func isCurrent(_ stamp: TranscriptStamp, for media: UInt32, in cacheDir: URL) -> Bool {
-        guard readStamp(for: media, in: cacheDir) == stamp else { return false }
+        guard readStamp(for: media, in: cacheDir)?.serves(stamp, for: .captions) == true else { return false }
         return read(for: media, in: cacheDir) != nil
     }
 

@@ -193,7 +193,7 @@ extension TranscribeSheetController {
         if let directory = document?.cacheDirectory,
             let file = MediaTranscript.read(for: job.media, in: directory)
         {
-            words = Array(MediaTranscript.words(for: job, in: file).prefix(12))
+            words = Array(MediaTranscript.captionWords(for: job, in: file).prefix(12))
         }
         let answer = words.isEmpty ? Self.fixedSampleWords : words
         sampleWordsCache[job.clip] = answer
