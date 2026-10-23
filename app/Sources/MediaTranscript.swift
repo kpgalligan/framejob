@@ -358,7 +358,7 @@ enum MediaTranscript {
     /// which the ops cannot write and the reader refuses (#41) —
     /// divides into an offset larger than `Ticks` holds, and the bound has
     /// to be applied in `Double` before the conversion rather than after it.
-    private static func project(_ source: Ticks, in job: Transcriber.Job) -> Ticks {
+    static func project(_ source: Ticks, in job: Transcriber.Job) -> Ticks {
         // A degenerate `speed` — 0, negative, NaN or infinite — would make
         // `Ticks(_:)` trap; `Transcriber.project` guards it the same way.
         let speed = job.speed.isFinite && job.speed > 0 ? job.speed : 1

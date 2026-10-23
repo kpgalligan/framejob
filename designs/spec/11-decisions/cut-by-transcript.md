@@ -130,3 +130,37 @@ W-9 is amended by TR-5 through AI-6.
     requests.
   - Risk accepted: a real "ah" or "er", or the letter "M", is dropped from captions. A filler the
     service returns outside this list is captioned until a later decision adds it.
+- **TR-9 — Filler cut edges are the transcript's filler runs, widened to the Silero 32 ms grid
+  within the words beside them, then snapped inward to the frame grid.** Recorded in CT-2,
+  before its code (`FillerDetector.swift`, `detect_fillers`).
+  - **The words:** a clip's words are its media's cached words that belong to it by R6-10 (start
+    in `[in, in + content_length)`), sorted by `(start, end)`, milliseconds to ticks through
+    `MediaTranscript.sourceTicks` (the end uses `max(start, end)`). A **run** is a maximal
+    sequence of consecutive `FillerWords.isFiller` words in that order; its source span is
+    `[first.start, max end)`.
+  - **The neighbours:** `previousEnd` is the larger of `in` and the latest end of every
+    non-filler word sorted before the run; `nextStart` is the smaller of `in + content_length`
+    and the earliest start of every non-filler word sorted after it.
+  - **The grid:** G = `MediaSpeech.chunkTicks` (512 samples at 16 kHz, absolute source time from
+    0, the speech cache's own index). `start = max(floor(run.start / G)·G,
+    ceil(previousEnd / G)·G)` and `end = min(ceil(run.end / G)·G, floor(nextStart / G)·G)`:
+    outward to the grid so the whole filler goes, never into a neighbouring word. `end ≤ start`
+    drops the run (too short).
+  - **The frame grid:** each edge maps to project time through `MediaTranscript.project` (R6-10's
+    door), then `SilenceDetector.snapUpToFrame` (start) and `snapDownToFrame` (end), inward as
+    Remove Silences snaps; `end ≤ start` drops it (too short).
+  - **A locked track:** a clip on a locked track gives no candidates, because
+    `ripple_delete_ranges` neither splits nor shifts a locked track (`core/src/edit_time.rs`), so
+    the filler would stay and everything else would slide. A track the snapshot cannot find
+    counts as unlocked, as the nest walls do.
+  - **What drops a candidate, whole:** a project span that overlaps (half-open, more than 0
+    ticks) a non-filler word (`MediaTranscript.words(for:in:)`) of any OTHER clip on an unlocked
+    track whose media's transcript serves `.captions` — in scope or not, because the ripple cuts
+    every unlocked track; one that crosses a nest clip; one that crosses a transition wall
+    (`SilenceDetector.overlapWalls`). Checked in that order, and dropped whole, never trimmed, so
+    every kept edge is a grid edge. Kept spans are merged where they overlap or touch.
+  - **Nothing else:** no probability is read, no padding or threshold applies; a reversed clip
+    and a clip `Transcriber.jobs` refuses have no words.
+  - Risk accepted: the cut is only as tight as the words' timings; an inward frame snap can leave
+    up to a frame of a filler; speech on an unlocked track whose media has no transcript is not
+    protected.

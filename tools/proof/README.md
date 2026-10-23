@@ -405,8 +405,9 @@ log is where the startup parity check would complain — `grep "Frame Job: "
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **92** since road map audio-sync AS-1's
-`sync_audio` (91 from grading-3 T3-2's `set_media_color`, 90 from grading
+`op_argument_proof.py` asserts **95** since cut-by-transcript CT-2's
+`detect_fillers` (94 from #326's `export_status` and `cancel_export`, 92 from
+road map audio-sync AS-1's `sync_audio`, 91 from grading-3 T3-2's `set_media_color`, 90 from grading
 GR4a's `add_adjustment_clip`, 89 from issue batch B84's three
 graphics-file tools, 86 from B44's `close_project`, 85 from road map 10's
 G4b, 82 from G4a, 79 from G3b, 77 from D3·5), and
@@ -21639,7 +21640,7 @@ build, which blocks to the file.
   holding the lane's lock in flight at a quit, no longer exists. K15 is the
   in-flight-call row, with `K15_READ_BOUND`; `waits-for-call` names K15
   alone.
-- **Counts** — `op_argument_proof.py` `PRODUCT_TOOLS = 94`;
+- **Counts** — `op_argument_proof.py` `PRODUCT_TOOLS = 94` (95 since CT-2's `detect_fillers`);
   `recording_probe.py`, `phase9_proof.py` and `recording_proof.py` list the
   two new app-state tools, and `recording_probe.py` 7b reads the last
   fourteen names.
@@ -22277,3 +22278,86 @@ by name.
 **`word_captions_sheet_probe.swift` S6** gains a row: a transcript holding
 "um," and "Uh" previews the same `sampleWords()` and the same PNG, byte for
 byte, as the same transcript without them.
+
+## Cut by transcript CT-2 — `detect_fillers` and the cut (`fillers_proof.py` P0–P9, M0–M6 and eight mutants; `fillers_probe.swift`; spec §11 TR-4, TR-7, TR-9)
+
+**What it proves.** `FillerDetector` turns a clip's cached cloud filler words,
+read only from a transcript whose marker serves `.fillers` (TR-7), into project
+ranges on TR-9's rule: a run of consecutive `FillerWords.isFiller` words in
+(start, end) order, widened OUTWARD to the Silero 32 ms grid
+(`MediaSpeech.chunkTicks`, 19 200 ticks) but never past the non-filler words
+beside it, mapped through `MediaTranscript.project` and snapped INWARD to the
+frame grid. A candidate over another unlocked clip's word, a nest clip or a
+transition wall is dropped whole; a clip on a locked track is not read.
+`detect_fillers` answers the ranges and edits nothing; `ripple_delete_ranges`
+cuts them (#92's done-when, read back through `get_project`).
+
+**Host-state input:** `media/speech.mov` (the Phase 4 recipe above); its
+absence is every M row's scored FAIL. AssemblyAI is `assemblyai_fake.py`
+serving `cloud_captions_proof.DISFLUENT_WORDS` ("um," "Uh" "er" in the
+2.4–3.0 s gap) to an instance given the dummy key `proof-key`; the run holds
+the cloud instruments' lock. Run every command under `env -u RC_ASSEMBLYAI_KEY`.
+
+```sh
+python3 tools/proof/swift_build.py typecheck tools/proof/fillers_probe.swift
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/fillers_proof.py --only P0,P1,P2,P3,P4,P5,P6,P7,P8,P9   # no app
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/fillers_proof.py
+RC_PROOF_APP=release env -u RC_ASSEMBLYAI_KEY python3 tools/proof/fillers_proof.py   # the record
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/fillers_proof.py --mutant NAME   # exit 0 = caught
+```
+
+**`fillers_proof.py`'s probe rows**, `fillers_probe.swift` copied in as
+`main.swift` over `swift_build.app_sources()` (a build failure is P0's FAIL):
+- **P1** `gridded` of [1470000, 1770000) with far neighbours is [1459200, 1785600).
+- **P2** neighbours at 1465000 and 1780000 bound it at [1478400, 1766400).
+- **P3** `runs`: "um, Uh er" (served out of order) is one run with its
+  bounds, "um word uh" two, "umbrella" none.
+- **P4** `placed` at start 1 s, in 0.5 s, speed 2, 30 fps: [1459200, 1785600)
+  → [1180000, 1340000).
+- **P5** a 40 ms "um" between touching words is `tooShort`.
+- **P6** another clip's "everyone" over the candidate drops it as
+  `overlapsWord(clip: 2, text: "everyone")`, in scope and only as a neighbour;
+  a word of the candidate's own clip does not.
+- **P7** a nest extent drops it as `nest(clip: 9)`, a wall as `transition`.
+- **P8** `fillersFile` over a temp cache: a `disfluencies` marker → the file,
+  one without → nil, a changed source size → nil; `transcriptFile(…, use:
+  .captions)` over the one without → the file.
+- **P9** `onUnlockedTracks` of a built `ProjectSnapshot`: the locked track's
+  clip is `locked`, an unlocked one and one on an absent track are kept.
+
+**The app rows**, one instance and five sessions:
+- **M0** the parity log is empty; `detect_fillers` publishes exactly `clips`
+  and `project`.
+- **M1** a 5 s `speech.mov` clip at 0, `transcribe` engine `assemblyai`
+  `place: false`: `ranges` is [[1460000, 1780000]], the Python TR-9 rule's
+  answer (grid [1459200, 1785600)), `fillers[0].words` ["um,", "Uh", "er"],
+  and `get_project` is the same before and after.
+- **M2** `ripple_delete_ranges` of those ranges: clips [0, 1460000) in 0 and
+  start 1460000 in 1780000, each edge the frame snap of a multiple of the grid,
+  the filler's source [1470000, 1770000) in neither window; one `undo` gives
+  back the 5 s clip.
+- **M3** start 1 s, in 0.5 s → [[1760000, 2080000]].
+- **M4** M1's package with `disfluencies` stripped from the marker and
+  `requested` (FL's raw edits), and a media never transcribed: no ranges, the
+  media under `needs_transcript`, the TR-7 note.
+- **M5** `clips: []` and clip 987654 are refused by sentence.
+- **M6** a second clip on a new track at 0.3 s: the filler is dropped as
+  overlapping its "everyone" (clip named); that track locked → the filler is
+  back; that track unlocked and track 0 locked → no ranges, `locked` [first]
+  and the locked note.
+
+| Mutant | Anchor in `FillerDetector.swift` (asserted once) | Must fail | 2026-10-22 |
+|---|---|---|---|
+| `grid-nearest` | `max(down(run.source.start, grid)` / `min(up(run.source.end, grid)` → the nearest grid point | P1 | caught (8/10; P6 too) |
+| `no-neighbour-bound` | the two `max(…, up(run.previousEnd, grid))` / `min(…, down(run.nextStart, grid))` bounds removed | P2 | caught (8/10; P5 too) |
+| `no-run-merge` | `open.append(index)` → `close()` first | P3 | caught (9/10) |
+| `frame-outward` | `start: SilenceDetector.snapUpToFrame(` / `end: SilenceDetector.snapDownToFrame(` swapped | P4 | caught (8/10; P6 too) |
+| `no-word-conflict` | `for neighbour in guarded where neighbour.clip != clip {` → `where false` | P6 | caught (9/10) |
+| `no-walls` | the nest and wall `overlap > 0` tests → `false` | P7 | caught (9/10) |
+| `fillers-from-any-marker` | `use: .fillers` → `use: .captions` | P8 | caught (9/10) |
+| `no-lock-filter` | `if snapshot.track(clip.track)?.locked == true {` → `if false {` | P9 | caught (9/10) |
+
+**Counts.** `op_argument_proof.py` `PRODUCT_TOOLS = 95`; `phase9_proof.py`,
+`recording_probe.py` and `recording_proof.py` list `detect_fillers` among the
+thirty-four app-state tools; `assistant_prompt_proof.py --probe` F4 finds it in
+`searchTopics`' audio row.

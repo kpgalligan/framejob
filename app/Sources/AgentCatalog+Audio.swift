@@ -3,10 +3,12 @@ import Foundation
 // MARK: - Catalog: audio
 
 /// The catalog's AUDIO half: `detect_silence` and `normalize_clip`, the two
-/// composite tools road map 2's phases 3 and 5 added, and `sync_audio`, the
-/// third (road map "audio-sync", AS-1) — none of the three is an op. The
+/// composite tools road map 2's phases 3 and 5 added, `sync_audio`, the
+/// third (road map "audio-sync", AS-1), and `detect_fillers`, the fourth
+/// (road map "cut-by-transcript" CT-2) — none of the four is an op. The
 /// first two read the cached waveform `SilenceDetector` and `AudioNormalize`
-/// share; `AudioSync` reads its sync features and samples instead (AS-3, AS-4).
+/// share; `AudioSync` reads its sync features and samples instead (AS-3, AS-4);
+/// `FillerDetector` reads the cached cloud transcript's filler words (TR-9).
 ///
 /// A pure move out of `AgentCatalog+Clips.swift`, road map 4's toll 2, landed
 /// first and alone. `AgentCatalog+Files.swift`'s header is the model: the two
@@ -36,6 +38,8 @@ extension AgentServer {
         let band = String(format: "%g–%g Hz", AudioSyncPHAT.lowHertz, AudioSyncPHAT.highHertz)
         let driftOverlap = String(format: "%g", seconds(AudioSyncMatch.driftMinimumOverlapFrames))
         let driftWindow = String(format: "%g", seconds(AudioSyncMatch.driftWindowFrames))
+        // detect_fillers' vocabulary, from the one list (TR-8).
+        let fillers = FillerWords.assemblyAI.sorted().joined(separator: ", ")
         return [
             tool(
                 "detect_silence",
@@ -236,6 +240,38 @@ extension AgentServer {
                             + "Pass true only after the person has agreed to that move.",
                     ],
                 ], required: ["clips"]),
+            // Road map "cut-by-transcript" CT-2 (spec §11 TR-4, TR-7, TR-9):
+            // the read half of Clip ▸ Remove Filler Words… (CT-3), a
+            // composite like `detect_silence`.
+            tool(
+                "detect_fillers",
+                "Finds the filler words (\(fillers)) in the timeline's speech and REPORTS "
+                    + "them as ranges, changing nothing — the read half of a future Clip ▸ "
+                    + "Remove Filler Words… and today the agent's path: feed ranges to "
+                    + "ripple_delete_ranges to cut them, one undo step. It reads only a cached "
+                    + "AssemblyAI transcript that asked for filler words (spec §11 TR-7), never "
+                    + "the network. Each run of consecutive fillers is widened outward to the "
+                    + "32 ms Silero grid but never into the words beside it, then its edges "
+                    + "snap inward to the frame grid (TR-9). A filler is dropped whole, and "
+                    + "named under dropped with the reason, when it is too short once on both "
+                    + "grids, when it overlaps a word of another clip on any unlocked track "
+                    + "(the ripple cuts every unlocked track, in scope or not), when it crosses "
+                    + "a nest clip, and when it crosses a transition. fillers lists each kept "
+                    + "run with its clip, words and range; ranges merges them. A clip on a "
+                    + "locked track is not read and is named under locked, since "
+                    + "ripple_delete_ranges neither cuts nor moves a locked track. Media with "
+                    + "no such transcript are named under needs_transcript: transcribe with "
+                    + "engine \"assemblyai\" makes one, adding refresh: true over a transcript "
+                    + "made before filler words were asked for (a paid upload).",
+                [
+                    "clips": [
+                        "type": "array", "items": ["type": "integer"], "minItems": 1,
+                        "description": "Read only these clips. Omit to read the project's "
+                            + "current selection when it holds a clip with speech from a "
+                            + "media file, every clip otherwise. The result's scope says "
+                            + "which ran.",
+                    ],
+                ]),
         ]
     }
 }

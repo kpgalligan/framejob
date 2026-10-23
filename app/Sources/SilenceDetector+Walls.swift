@@ -17,6 +17,22 @@ extension SilenceDetector {
 
     // MARK: - The walls
 
+    /// The nest walls of a snapshot. Top-level clips only, which is exactly
+    /// right: a nest INSIDE a nest is already behind the outer one's wall,
+    /// and the op can only ever split what `Project::clip` can name.
+    static func nestExtents(in snapshot: ProjectSnapshot) -> [NestExtent] {
+        snapshot.clips.compactMap { clip in
+            guard case .nest = clip.source, clip.duration > 0,
+                  // A track this build cannot find is treated as unlocked:
+                  // the conservative reading, since being wrong the other
+                  // way is the one that loses material.
+                  snapshot.track(clip.track)?.locked != true
+            else { return nil }
+            return NestExtent(
+                clip: clip.id, span: Span(start: clip.start, end: clip.start + clip.duration))
+        }
+    }
+
     /// Every run cut into the pieces that lie OUTSIDE every nest clip, with
     /// the nests that took a cut's worth of quiet away named alongside.
     ///

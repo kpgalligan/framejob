@@ -81,7 +81,7 @@ Every piece a phase builds on, as the tree stands at `15d3545`:
 - **CT-2, `detect_fillers` and the cut:** a pure detector, from the transcript's filler words to
   project ranges with their edges on the Silero 32 ms grid (`MediaSpeech`,
   `SileroVAD.chunkSamples`), frame-snapped as `SilenceDetector` snaps. The exact grid rule is
-  recorded as a TR entry before the code. `detect_fillers` is the read half
+  TR-9, recorded before the code. `detect_fillers` is the read half
   (`AgentServer+Fillers.swift`, a row in `AgentCatalog+Audio.swift`), and `ripple_delete_ranges`
   makes the cut. This phase's proof is #92's done-when: it cuts a known filler out of a fixture,
   reads the ranges back through `get_project`, and checks the edges on the VAD grid.
@@ -274,7 +274,68 @@ twice: a tidy in a paid instrument that cannot be re-run free).
 
 ## CT-2 record
 
-Not started.
+**What landed (2026-10-22):** TR-9 (filler cut edges) in
+`designs/spec/11-decisions/cut-by-transcript.md`, recorded before the code, with its index row
+and the Lines cells. `FillerDetector.swift` (new): `read(from:clips:)`, the one seam that touches
+the document (the edited project's snapshot, the selection, `mediaURLs()`, the transcript cache),
+and the pure `runs`, `gridded`, `placed` and `detect`; the scope's transcripts come through
+`fillersFile` (`transcriptFile(…, use: .fillers)`), the neighbours' through `transcriptFile(…,
+use: .captions)`, and `onUnlockedTracks` keeps a locked track's clips out. `AgentServer+Fillers.swift`
+(new): `detect_fillers`, an app-state tool on the main thread that edits nothing, answering
+`ranges`, `count`, `removes`, `scope`, `clips`, `fillers`, `dropped`, `needs_transcript`,
+`locked`, `project`, and `skipped`/`note` when there is something to say. Its catalog row is
+the fourth in `AgentCatalog+Audio.swift` (`clips` only), its handler row and the count words in
+`AgentServer.swift`, `AgentCatalog.swift` and `AgentServer+Gate.swift`, and its topic in
+`AssistantPrompt.searchTopics`' audio row. Two pure moves to share one rule: `nestExtents(in:)`
+out of `SilenceDetector.read` into `SilenceDetector+Walls.swift`, and
+`MediaTranscript.project(_:in:)` from `private` to internal (R6-10's one door). No Rust, header,
+FFI, op or format change. The instruments: `fillers_probe.swift` and `fillers_proof.py` (new);
+the tool counts in `op_argument_proof.py` (95), `phase9_proof.py`, `recording_probe.py` and
+`recording_proof.py` (thirty-four app-state tools); `tools/proof/README.md`'s "Cut by transcript
+CT-2" section. Spec §7.9a, §7.9c, §7.4 and the README's tool table name the tool.
+
+**The runs** (2026-10-22, macOS 26.5.1, the worktree on `37b10f7` with CT-2's uncommitted
+changes, each on the final instrument; every proof under `env -u RC_ASSEMBLYAI_KEY`, nothing
+paid):
+
+| Command | Result |
+|---|---|
+| `make typecheck` | 0 errors, the 4 baseline warnings |
+| `fillers_proof.py --only P0,…,P9` | 10/10, exit 0 |
+| `assistant_prompt_proof.py --probe` | 14/14, F4 among them, exit 0 |
+| `spec_index_proof.py` | 180/180, exit 0 |
+| `make app-debug && fillers_proof.py` (Debug) | 17/17 (P0–P9, M0–M6), exit 0 |
+| `make gate` | PASS: names, typecheck (its 4 baseline warnings), test and app ran and passed; fmt and lint skipped as byte-identical (no Rust changed) |
+| `RC_PROOF_APP=release fillers_proof.py` (Release, after the gate's `make app`) | 17/17, exit 0; M1 [[1460000, 1780000]] with words ["um,", "Uh", "er"], M2 clips [0, 1460000) in 0 and 1460000 in 1780000, undo back to one clip |
+| `op_argument_proof.py <dir>/agent.sock` (Release) | 165/165, exit 0 |
+| `phase9_proof.py <dir>/agent.sock` (Release) | 236/236, exit 0; `grep "Frame Job: "` on that instance's log empty |
+| `recording_probe.py --only catalog` | 31/31, exit 0 |
+| `python3 -m py_compile tools/proof/recording_proof.py` | exit 0 (the proof itself needs a Screen Recording grant) |
+
+**The mutants.** `fillers_proof.py --mutant NAME` (probe rows only), each anchor in
+`FillerDetector.swift` asserted once, exit 0 when caught; every one was caught:
+
+| Mutant | Must fail | Failed (score) |
+|---|---|---|
+| `grid-nearest` | P1 | P1 P6 (8/10) |
+| `no-neighbour-bound` | P2 | P2 P5 (8/10) |
+| `no-run-merge` | P3 | P3 (9/10) |
+| `frame-outward` | P4 | P4 P6 (8/10) |
+| `no-word-conflict` | P6 | P6 (9/10) |
+| `no-walls` | P7 | P7 (9/10) |
+| `fillers-from-any-marker` | P8 | P8 (9/10) |
+| `no-lock-filter` | P9 | P9 (9/10) |
+
+**Deviation:** the scope's `use: .fillers` call is its own one-line door,
+`FillerDetector.fillersFile(for:url:in:)`, which `read` calls and P8 calls, so the
+`fillers-from-any-marker` mutant's anchor sits where a probe row can reach it; a probe cannot
+build the `ProjectDocument` `read` takes.
+
+**Owed:** the root `CLAUDE.md`'s "ninety-four" (Rules) → "ninety-five" and `detect_fillers` in
+"Verifying a build"'s app-state list; `app/CLAUDE.md`'s map entries for `FillerDetector.swift`
+and `AgentServer+Fillers.swift` and its two tool counts. A real recording's filler cut stays a
+person's check (TR-6) until CT-3's sheet; CT-3 owes the menu, the sheet, the wash and its
+manual-checks row.
 
 ## CT-3 record
 

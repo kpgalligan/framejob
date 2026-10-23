@@ -61,8 +61,9 @@ enum AssistantPrompt {
           "consolidate_media"]),
         ("captions: import, transcribe speech, export a caption file",
          ["import_captions", "transcribe", "export_captions"]),
-        ("audio: find silences, even out loudness, line up recordings by their sound",
-         ["detect_silence", "normalize_clip", "sync_audio"]),
+        ("audio: find silences and filler words, even out loudness, line up recordings by "
+            + "their sound",
+         ["detect_silence", "detect_fillers", "normalize_clip", "sync_audio"]),
         ("graphics: write a module, place and change a graphic clip, its reference, fonts and "
             + "assets; rename, delete or restore a module",
          ["add_graphic_clip", "set_graphic", "write_graphic", "get_graphic",

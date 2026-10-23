@@ -193,7 +193,7 @@ final class AgentServer {
     /// and `prepareCatalog()` checks the two sets match on every launch.
     ///
     /// One entry per row of the op table (spec §6, and the module doc of
-    /// `core/src/edit.rs`) plus the thirty-three tools that are not ops: the
+    /// `core/src/edit.rs`) plus the thirty-four tools that are not ops: the
     /// project-level ones spec §7.9 names, the five view-state and history
     /// mirrors beside them (`set_range`, `set_selection`, `set_scope`,
     /// `undo`, `redo`), the composites later phases added —
@@ -283,6 +283,8 @@ final class AgentServer {
         "remove_action": { $0.removeAction },
         // Silence detection (AgentServer+Silence.swift)
         "detect_silence": { $0.detectSilence },
+        // Filler detection (AgentServer+Fillers.swift)
+        "detect_fillers": { $0.detectFillers },
         // Sound (AgentServer+Audio.swift)
         "normalize_clip": { $0.normalizeClip },
         "sync_audio": { $0.syncAudio },

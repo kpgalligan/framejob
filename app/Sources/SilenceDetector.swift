@@ -194,19 +194,7 @@ enum SilenceDetector {
                         speech: speechLoader.probabilities(for: segment.media)))
             }
         }
-        // The walls. Top-level clips only, which is exactly right: a nest
-        // INSIDE a nest is already behind the outer one's wall, and the op
-        // can only ever split what `Project::clip` can name.
-        let nests: [NestExtent] = snapshot.clips.compactMap { clip in
-            guard case .nest = clip.source, clip.duration > 0,
-                  // A track this build cannot find is treated as unlocked:
-                  // the conservative reading, since being wrong the other
-                  // way is the one that loses material.
-                  snapshot.track(clip.track)?.locked != true
-            else { return nil }
-            return NestExtent(
-                clip: clip.id, span: Span(start: clip.start, end: clip.start + clip.duration))
-        }
+        let nests = nestExtents(in: snapshot)
         return Input(
             snapshot: snapshot, selection: selection ?? document.selection,
             pendingMedia: loader.pending.sorted(), voiceAvailable: SileroVAD.isAvailable,

@@ -1951,7 +1951,21 @@ free.
   the vendored compiled model, NOT `async`, with one process-wide
   `NSLock`-guarded unavailability reason that never retries until relaunch.
   `MediaPeaks` is the one spelling of the project → source window arithmetic;
-  the reversed MIRROR it applies is `ReverseMirror`'s.
+  the reversed MIRROR it applies is `ReverseMirror`'s. `+Walls` also holds
+  `nestExtents(in:)`, the nest-clip list both detectors read.
+- `FillerDetector.swift` · `AgentServer+Fillers.swift` — `detect_fillers`, the
+  read half of Remove Filler Words (spec §11 TR-4, TR-7, TR-9). `read` is the
+  one seam over a document (snapshot, selection, media URLs, the transcript
+  cache, read once): the scope's words come only through `fillersFile`, whose
+  marker must serve `.fillers`; the NEIGHBOURS' words (any other top-level
+  clip on an unlocked track whose transcript serves `.captions`) protect a span.
+  Then pure arithmetic: `runs` of consecutive fillers, `gridded` outward to
+  the 32 ms grid but never past the words beside them, `placed` through
+  `MediaTranscript.project` (internal for this) and snapped inward to frames;
+  a candidate is dropped whole — never trimmed — when too short, over a
+  neighbour's word, or across a nest or a transition, and a clip on a locked
+  track gives none (`onUnlockedTracks`). The cut is the caller's
+  `ripple_delete_ranges`.
 - `AudioNormalize.swift` — Normalize Clip as a value type: peaks in, ops out,
   measured PRE-FADER from the plan segment, REPLACING `volume` so a second
   press is a no-op, always to BASE props.
@@ -2270,9 +2284,9 @@ free.
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
   **Every one of the sixty-one op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the thirty-three APP-STATE tools, which have no op behind them
+  callers are the thirty-four APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
-  `AgentCatalog+Audio.swift`'s three composites and
+  `AgentCatalog+Audio.swift`'s four composites and
   `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
   left, the five other file tools (`AgentCatalog+Files.swift`'s `import_media`, `consolidate_media` and `record_screen`, and `AgentCatalog+Render.swift`'s `render_frame`, `export`, `export_status` and `cancel_export`, spliced back where they left), and
   `AgentCatalog+Graphics.swift`'s nine, after its two `opTool` rows.
@@ -2304,7 +2318,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all ninety-four
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all ninety-five
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - The argument gate: a call's keys against the tool's published schema
 
-/// One comparison at dispatch, for all ninety-four tools: the keys a
+/// One comparison at dispatch, for all ninety-five tools: the keys a
 /// caller wrote against the properties the tool PUBLISHED, and every
 /// stranger refused by name before a handler reads a thing
 /// (kpgalligan/framejob#21; the measurement behind it is
@@ -39,7 +39,7 @@ import Foundation
 ///
 /// **What it speaks.** The APP's sentence — the tool, the strangers and the
 /// whole of what the tool does take — rather than the core's serde wording:
-/// thirty-three tools have no core sentence to borrow, and `AgentIdScope.noSuchId`
+/// thirty-four tools have no core sentence to borrow, and `AgentIdScope.noSuchId`
 /// set the house style ("No clip has id 17. get_project lists the clips.").
 ///
 /// **What it cannot see.** A DECLARED argument no handler reads: the name

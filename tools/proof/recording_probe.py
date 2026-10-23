@@ -8717,7 +8717,7 @@ APP_STATE_TOOLS = [
     "render_frame", "export", "record_screen", "write_graphic", "get_graphic", "graphic_reference",
     "render_graphic", "import_graphic_font", "import_graphic_asset", "close_project",
     "delete_graphic", "rename_graphic", "restore_graphic", "sync_audio",
-    "export_status", "cancel_export",
+    "export_status", "cancel_export", "detect_fillers",
 ]
 # `git show df6b916^:app/Sources/AgentCatalog.swift`'s last ten rows, in order,
 # with `set_media_color` (c47d97d) after `remove_media` and `export_status`,
@@ -8753,7 +8753,7 @@ def section_catalog(binary, sources):
           len(ops) >= 55 and len(set(ops)) == len(ops), f"{len(ops)}")
     check("7a: the catalog has at least 75 tools, no name twice", len(names) >= 75 and len(set(names)) == len(names),
           f"{len(names)} names, {len(set(names))} distinct")
-    check("7a: they are the 55 ops plus the thirty-three app-state tools, record_screen among them",
+    check("7a: they are the 55 ops plus the thirty-four app-state tools, record_screen among them",
           set(names) == set(ops) | set(APP_STATE_TOOLS), f"missing {sorted(set(ops) | set(APP_STATE_TOOLS) - set(names))}, "
           f"extra {sorted(set(names) - set(ops) - set(APP_STATE_TOOLS))}")
     check("7a: no app-state tool is also an op", not set(APP_STATE_TOOLS) & set(ops),
@@ -8768,7 +8768,7 @@ def section_catalog(binary, sources):
     without = [n for n in ops if not (by.get(n) or {}).get("hasScope")]
     check("7c: every op tool's schema declares `scope`", not without, f"without: {without}")
     with_scope = [n for n in APP_STATE_TOOLS if (by.get(n) or {}).get("hasScope")]
-    check("7c: none of the thirty-three app-state tools declares it", not with_scope, f"with: {with_scope}")
+    check("7c: none of the thirty-four app-state tools declares it", not with_scope, f"with: {with_scope}")
     rs = by.get("record_screen") or {}
     check("7c: record_screen's schema has no `scope` key", rs and rs.get("hasScope") is False, f"{rs}")
     check(f"7c: record_screen declares exactly {RECORD_SCREEN_ARGUMENTS}",
