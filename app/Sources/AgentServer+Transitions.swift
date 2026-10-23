@@ -4,8 +4,9 @@ import AppKit
 /// `set_transition_style`, road map 5 E1's ops (format version 7).
 ///
 /// A file of its own rather than two more handlers in
-/// `AgentServer+Clips.swift`, which is well over the size cap and already
-/// holds `set_transition` and `set_transition_duration`;
+/// `AgentServer+Clips.swift`, which is well over the size cap
+/// (`set_transition` and `set_transition_duration` are now
+/// `AgentServer+Properties.swift`'s);
 /// `AgentServer+Background.swift` is the shape and the precedent. Both
 /// handlers are the canonical form (app/CLAUDE.md's agent-parity rule):
 /// `target(a)`, validate the ids and the vocabulary, build the typed

@@ -643,8 +643,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   app/Sources/VideoPane.swift`: 959 before, 904 after; `VideoPane+Color.swift` is 58. The next
   seam: `chromaSection` to `VideoPane+Chroma.swift`.
 - `AgentServer+Clips.swift`: the property doors (`// MARK: - Properties`, `set_video` …
-  `set_transition_duration`) to `AgentServer+Properties.swift`. The action handlers went to
-  `AgentServer+Actions.swift` in issue batch B87 phase 2.
+  `set_transition_duration`) went to `AgentServer+Properties.swift` as #333's toll, a pure move
+  gated alone before TR-12's change; the action handlers had gone to `AgentServer+Actions.swift`
+  in issue batch B87 phase 2. Nothing widened: no moved member is `private`, and neither of the
+  file's two `private` helpers, `newClipPatchArg` and `pastePayloadArg`, is read by the moved
+  code. `wc -l app/Sources/AgentServer+Clips.swift`: 636 before, 464 after;
+  `AgentServer+Properties.swift` is 187. The next seam: `// MARK: - Removing time`
+  (`deleteClips` … `closeGap`) to `AgentServer+Ripple.swift`.
 - `AgentServer+Render.swift`: grading-2's G2-0 moved `writeWaveform` (its two-line doc and body)
   to the new `AgentServer+Scopes.swift`, the home of `render_frame`'s scope writers (spec §11
   GR-5, GR-10), a pure move gated with G2-0's other three; nothing widened (both are members of

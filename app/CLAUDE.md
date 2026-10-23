@@ -2245,14 +2245,14 @@ free.
   `remainderPlacement` take it unchanged.
 
 **The agent.**
-- `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Actions` / `Tracks`
+- `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Properties` / `Actions` / `Tracks`
   / `Media` / `Render` / `Export` / `ExportResult` / `History` / `Silence` / `Captions` / `Audio` /
   `Background` / `Scope` / `Transitions` / `CloudCaptions` / `Recording` /
   `Graphics` / `Scopes`
   (+`RecordingArguments`, +`RecordingResult`, +`RecordingChrome` —
   `RecordingToolChrome`, the tool's status item, flipped by the recorder's
   `pauseDidChangeNotification` and frozen at its
-  `finishingDidBeginNotification`) — the handlers, one file per group. `+Export` is `export`, a pure move out of `+Render` (issue batch B97); since #326 it refuses up front, enqueues on `ExportQueueController` and answers `{export_id, path, status}`. `+ExportStatus` holds `AgentExports` (the launch's in-memory records of the ids `export` returned, kept past the row's Remove) and the `export_status` and `cancel_export` handlers; `+ExportResult` builds a `done` answer from the queue's job. `+Scopes` is `render_frame`'s scope writers (`writeScopes`: waveform, parade, vectorscope, histogram; grading-2 G2-0, G2-1). `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
+  `finishingDidBeginNotification`) — the handlers, one file per group. `+Properties` is the eight property doors (`set_video` … `set_transition_duration`), a pure move out of `+Clips` (#333). `+Export` is `export`, a pure move out of `+Render` (issue batch B97); since #326 it refuses up front, enqueues on `ExportQueueController` and answers `{export_id, path, status}`. `+ExportStatus` holds `AgentExports` (the launch's in-memory records of the ids `export` returned, kept past the row's Remove) and the `export_status` and `cancel_export` handlers; `+ExportResult` builds a `done` answer from the queue's job. `+Scopes` is `render_frame`'s scope writers (`writeScopes`: waveform, parade, vectorscope, histogram; grading-2 G2-0, G2-1). `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
   reader, the three cloud-only arguments refused by name under `apple`, the
   vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
   the network, and the result keys; `+Captions` dispatches on `engine` and is otherwise the code it was.
