@@ -12,14 +12,16 @@ quoted verbatim in the road map's "The owner's choices"), which the owner took u
 ("#92 Cut by transcript"). TR-7, the on-device filler source, was recorded on 2026-10-22 after
 the filler spike ran on the owner's own scripted sample, before CT-2.
 CT-1…CT-4 each record their numbers as a new entry (TR-8 on) or as Amended-by lines before their
-code; TR-8 was recorded in CT-1, TR-9 in CT-2 and TR-10 in CT-3, each before its code.
+code; TR-8 was recorded in CT-1, TR-9 in CT-2, TR-10 in CT-3 and TR-11 in CT-4, each before its
+code.
 
 **Stands, and nothing here re-litigates it:** R6-3 (one upload per media, every clip derived from
 it, the words cached verbatim); R6-10 (`MediaTranscript.words(for:in:)` maps a media's words onto
 a clip); AI-7 (the cloud `transcribe` stays withheld from the assistant; TR-10 adds a row); W-8
 (the on-device engine's asset download is a person's act, never a tool's); the silence road map's
 32 ms grid (Silero VAD's own grid, inward; `silence.md`). R6-15 and AI-6 are amended here, by TR-1
-and TR-5; W-9 is amended by TR-5 through AI-6; AI-7 is amended by TR-10.
+and TR-5; W-9 is amended by TR-5 through AI-6; AI-7 is amended by TR-10; AI-16 is amended by
+TR-11.
 
 - **TR-1 — Fillers come from AssemblyAI's `disfluencies: true`, sent on every cloud request from
   CT-1 on, and the transcript marker records it.** The owner's decision 1 (#92, 2026-09-30).
@@ -194,3 +196,51 @@ and TR-5; W-9 is amended by TR-5 through AI-6; AI-7 is amended by TR-10.
     AI-7.
   - Risk accepted: a request that had speaker labels is billed again with the speakers
     surcharge, and its vocabulary carries over unseen; the person sees the price first.
+- **TR-11 — `get_transcript {clip, language?}` answers one clip's words in timeline ticks with
+  fillers flagged, from the media's cached transcript or else this Mac's recogniser, never the
+  network; the run is off main and the assistant's Stop reaches it (amends AI-16); the prompt
+  teaches the false-start path.** Recorded in CT-4, before its code (`TranscriptReader.swift`,
+  `AgentServer+Transcript.swift`, `AssistantPrompt.swift`).
+  - **The source:** the media's cached transcript when its marker serves `.captions` for the file
+    as it is now (`FillerDetector.transcriptFile(for:url:in:use: .captions)`, TR-2's one rule, no
+    new marker rule), and only when the document has a cache directory; else the on-device engine
+    over the clip's own source window (`Transcriber().extractAudio`, then
+    `SpeechEngine.transcribe`, the temporary WAV removed on every exit). Never the network (TR-5),
+    and no cache is written: an on-device run is repeated on every call.
+  - **The words:** a cached transcript's through R6-10's mapping (`MediaTranscript.words(for:in:)`),
+    an on-device run's through `Transcriber.project`, a run whose mapped start is at or past the
+    clip's end dropped. Either list is sorted by start, then end, then its order in the source.
+    `filler` is TR-8's rule (`FillerWords.isFiller`) for either engine, and nothing is filtered
+    out. `speaker` only where the cached word has one. `fillers_reported` is whether the
+    transcript was asked for fillers (`FillerDetector.fillersFile` answers): false for every
+    on-device run and for a cached transcript made without `disfluencies`.
+  - **The refusals, in order:** the clip (`clipArg`'s own sentences); a clip `Transcriber.jobs`
+    refuses, "Clip <id> has no words to read: <reason>."; the language's spelling (`transcribe`'s
+    `checkSpelling`); then, with no cached transcript only, the installed model (`transcribe`'s
+    `transcriptionLanguage`) and the recogniser's own `TranscribeError` sentence. `language`
+    applies to the recogniser only. The clip, the jobs and the cache are read in one main-thread
+    hop.
+  - **The answer:** `ok`, `clip`, `media`, `engine` (`assemblyai` or `apple`), `language` (the
+    cached header's `language_code` or the recogniser's identifier; omitted when nil),
+    `fillers_reported`, `count`, `words` (`text`, `start`, `end`, `filler`, and `speaker` when
+    known), `note` when there is something to say ("No words were heard in clip <id>." for an
+    empty list; "These words were not transcribed with filler words, so a filler missing here
+    may still be in the audio." when `fillers_reported` is false), and `project`. Nothing is
+    edited and no undo step is made.
+  - **Off main, and Stop (amends AI-16):** the tool runs on the server thread
+    (`AgentServer.offMainTools`). Its first line reads `AgentLane.shared.callCancel`, and the
+    on-device run's `Transcriber.CancelToken` is linked to it exactly as `transcribe` links its
+    own (`stop?.onCancel { token.cancel() }`), so the assistant's Stop ends the run and the model
+    gets "The transcription was cancelled.".
+  - **No AI-7 row:** it writes nothing, uploads nothing and spends nothing, so the assistant may
+    call it without asking.
+  - **The prompt:** the assistant's system text gains this paragraph, after the Captions and
+    Graphics paragraph, verbatim: "Cutting words: `detect_fillers` answers the filler words (um,
+    uh) as ranges for `ripple_delete_ranges`. A false start, words the speaker abandoned or said
+    again, is a judgement of meaning, so cut one only when the person asks: read the clip's words
+    and their times with `get_transcript`, say which words you will cut, then cut them in one
+    `ripple_delete_ranges` call, each range from the first cut word's start to the last cut
+    word's end." Its search guide's captions row reads "captions: import, transcribe speech, read
+    a clip's timed words, export a caption file" and gains `get_transcript` after `transcribe`.
+  - Risk accepted: a long clip's answer is large (every word, no window; a `from`/`to` window is
+    CT-5's residue to file), and an on-device answer is recognised again on every call.

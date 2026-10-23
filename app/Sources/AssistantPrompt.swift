@@ -59,8 +59,8 @@ enum AssistantPrompt {
         ("media files: import, relink, remove, copy into the project, camera log",
          ["import_media", "add_media", "relink_media", "remove_media", "set_media_color",
           "consolidate_media"]),
-        ("captions: import, transcribe speech, export a caption file",
-         ["import_captions", "transcribe", "export_captions"]),
+        ("captions: import, transcribe speech, read a clip's timed words, export a caption file",
+         ["import_captions", "transcribe", "get_transcript", "export_captions"]),
         ("audio: find silences and filler words, even out loudness, line up recordings by "
             + "their sound",
          ["detect_silence", "detect_fillers", "normalize_clip", "sync_audio"]),
@@ -103,6 +103,12 @@ enum AssistantPrompt {
             + "or `transcribe`. Write or restyle a caption only when the person asks you to. "
             + "Graphics are modules: `write_graphic` writes one, `add_graphic_clip` places it, "
             + "and `graphic_reference` documents what a module can draw.",
+        "Cutting words: `detect_fillers` answers the filler words (um, uh) as ranges for "
+            + "`ripple_delete_ranges`. A false start, words the speaker abandoned or said again, "
+            + "is a judgement of meaning, so cut one only when the person asks: read the clip's "
+            + "words and their times with `get_transcript`, say which words you will cut, then "
+            + "cut them in one `ripple_delete_ranges` call, each range from the first cut "
+            + "word's start to the last cut word's end.",
         "`render_frame` renders one frame of the finished timeline through the compositor an "
             + "export uses, at the playhead unless you pass `t`, and answers the image and the "
             + "PNG's path. Look before and after a visual edit, and pass `max_width` to keep "

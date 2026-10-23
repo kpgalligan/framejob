@@ -108,7 +108,7 @@ final class AgentServer {
     private static let productOffMainTools: Set<String> = [
         "import_media", "relink_media", "render_frame", "export", "save_project", "new_project",
         "transcribe", "record_screen", "render_graphic", "open_project", "sync_audio",
-        "transcribe_for_fillers",
+        "transcribe_for_fillers", "get_transcript",
     ]
     // The dev tools' members join here (AgentServer+DevTools.swift).
     static let offMainTools = productOffMainTools.union(devOffMainTools)
@@ -194,11 +194,11 @@ final class AgentServer {
     /// and `prepareCatalog()` checks the two sets match on every launch.
     ///
     /// One entry per row of the op table (spec §6, and the module doc of
-    /// `core/src/edit.rs`) plus the thirty-five tools that are not ops: the
+    /// `core/src/edit.rs`) plus the thirty-six tools that are not ops: the
     /// project-level ones spec §7.9 names, the five view-state and history
     /// mirrors beside them (`set_range`, `set_selection`, `set_scope`,
     /// `undo`, `redo`), the composites later phases added —
-    /// `detect_silence`, `transcribe`, `import_captions`, `export_captions`,
+    /// `detect_silence`, `transcribe`, `get_transcript`, `import_captions`, `export_captions`,
     /// `normalize_clip`, `sync_audio` — road map 3's `record_screen`, and road map 10's
     /// nine graphics tools (`write_graphic`, `get_graphic`,
     /// `graphic_reference`, `render_graphic`, `import_graphic_font`,
@@ -290,8 +290,9 @@ final class AgentServer {
         // Sound (AgentServer+Audio.swift)
         "normalize_clip": { $0.normalizeClip },
         "sync_audio": { $0.syncAudio },
-        // Captions (AgentServer+Captions.swift)
+        // Captions (AgentServer+Captions.swift, AgentServer+Transcript.swift)
         "transcribe": { $0.transcribe },
+        "get_transcript": { $0.getTranscript },
         "export_captions": { $0.exportCaptions },
         // Recording (AgentServer+Recording.swift)
         "record_screen": { $0.recordScreen },

@@ -228,7 +228,7 @@ else is what bloats files:
   (`AgentServer+Parity.swift`). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all ninety-six product tools (and the dev tools, road
+  stranger by name, for all ninety-seven product tools (and the dev tools, road
   map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
@@ -293,7 +293,7 @@ path: one tool per §6 op, each taking the `scope`
 envelope key, plus the app-state tools — `open_project`, `new_project`,
 `save_project`, `close_project`, `get_project`, `import_media`,
 `import_captions`, `export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
-`detect_fillers`, `transcribe_for_fillers`, `normalize_clip`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
+`detect_fillers`, `transcribe_for_fillers`, `get_transcript`, `normalize_clip`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
 `undo`, `redo`, `render_frame`, `export`, `export_status`, `cancel_export`,
 `record_screen`, `write_graphic`,
 `get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`,

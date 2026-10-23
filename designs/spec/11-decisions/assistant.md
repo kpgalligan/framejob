@@ -145,6 +145,7 @@ in §6).
   its result dropped, as before; cloud `transcribe` is withheld (AI-7) and not linked.
   **Amended by #326**: `export` answers at once, so Stop no longer reaches it; a queued export
   stops by `cancel_export` or the Export Queue's Cancel.
+  **Amended 2026-10-23, by TR-11**: Stop also reaches `get_transcript`'s on-device run, linked to its `Transcriber.CancelToken` the same way, and the model gets "The transcription was cancelled."
 - **AI-17 — The transcript is one selectable text, and the composer is multi-line with K-2's
   Return** (issue batch B18, #153, #154). The transcript is one non-editable text view: the
   entries in order, one "\n" between them, so a selection and a plain-text copy cross entries;

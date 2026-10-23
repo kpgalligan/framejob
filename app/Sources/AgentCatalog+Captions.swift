@@ -3,8 +3,9 @@ import Foundation
 // MARK: - Catalog: captions
 
 /// The catalog's CAPTION rows: `import_captions`, the file reader of the
-/// Media group, and `transcribe` and `export_captions`, the two app-state
-/// tools of spec §7.9 that make and write captions — three of the eleven
+/// Media group, `transcribe` and `export_captions`, the two app-state
+/// tools of spec §7.9 that make and write captions, and `get_transcript`,
+/// which reads a clip's words (CT-4) — four of the eleven app-state rows
 /// `fileTools` publishes, and the ones road map 6's C1 goes on to change.
 ///
 /// A pure move out of `AgentCatalog+Files.swift`, which stood at 601 lines
@@ -277,6 +278,46 @@ extension AgentServer {
                             + "cap named in note. Refused by name with engine \"apple\".",
                     ],
                 ]),
+
+            // It mirrors the words File ▸ Generate Captions… and Clip ▸
+            // Remove Filler Words… read — a media's cached transcript, or this
+            // Mac's recogniser over one clip — handed to the caller rather
+            // than laid out or cut (spec §11 TR-5, TR-11). A read: no op, no
+            // `scope`, no undo step.
+            tool(
+                "get_transcript",
+                "Answers one clip's spoken words with their times in TIMELINE ticks, ready for "
+                    + "ripple_delete_ranges: words is [{text, start, end, filler}] sorted by "
+                    + "start, with speaker on a word whose transcript labelled it, plus count. "
+                    + "The source is the media's cached transcript when it has a current one "
+                    + "(engine assemblyai: made earlier by transcribe with engine assemblyai), "
+                    + "else this Mac's own speech recogniser run over the clip (engine apple), "
+                    + "which takes seconds per minute of speech and is run again on every call. "
+                    + "It NEVER makes a network request and never uploads anything. filler is "
+                    + "true for the filler words um, uh, hmm, mhm, uh-huh, ah, huh, hm, m, er "
+                    + "and erm, matched lowercased with edge punctuation trimmed; "
+                    + "fillers_reported says whether the transcript was asked for filler words "
+                    + "at all — false for every on-device run and for a cached transcript made "
+                    + "without them, where a filler may be missing from words though it is in "
+                    + "the audio (note says so). A clip that plays no speech from a media file "
+                    + "is refused with the reason. It edits nothing and makes no undo step.",
+                [
+                    "clip": [
+                        "type": "integer",
+                        "description": "The clip whose words to read — its own window of its "
+                            + "media, in its own timeline position and speed.",
+                    ],
+                    "language": [
+                        "type": "string",
+                        "description": "A language tag, e.g. en-US, for this Mac's recogniser "
+                            + "only (a cached transcript answers in its own language, reported "
+                            + "as language). Matched as transcribe matches it: this Mac's own "
+                            + "language by default; a tag speech recognition has never heard "
+                            + "of is refused with the tags it knows, and one whose on-device "
+                            + "model is not installed is refused as not installed — a person "
+                            + "installs it, this tool never downloads.",
+                    ],
+                ], required: ["clip"]),
             tool(
                 "export_captions",
                 "Writes one text track out as a subtitle file — File ▸ Export Captions…. Every "

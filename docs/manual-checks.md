@@ -804,6 +804,11 @@ Needs your own Anthropic API key (Setup 3).
 - **Expect:** a small accent dot right of "Assistant" in the strip while the question waits, on every tab, never touching the word at the narrowest width; a click on the tab only shows it; the dot goes at Deny, Stop and Allow; Return in the composer answers nothing.
 - **Source:** issue batch B47 (#152); spec §11 AI-19.
 
+**AS-10 — False starts with a real key**
+- **Do:** With a real recording that holds a false start, ask the assistant to take out the false starts.
+- **Expect:** it names the words before cutting, cuts only those, and one ⌘Z undoes the cuts it made together (it sends them as one `ripple_delete_ranges`, one undo step).
+- **Source:** #92 (spec §11 TR-5, TR-11).
+
 ## Agent connections
 
 Whether an MCP client refetches its tool list when a stdio server says it

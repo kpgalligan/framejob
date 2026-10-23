@@ -22455,3 +22455,100 @@ out of the assistant's catalog; `assistant_lane_probe.swift`'s L4 refuses it
 with the row's sentence; `fillers_proof.py` M4 looks for
 `transcribe_for_fillers` in `detect_fillers`' note. The screen is
 `designs/screens/14b-remove-filler-words-sheet.md`.
+
+## Cut by transcript CT-4 — `get_transcript` and false starts (`transcript_proof.py` P0–P3, G0–G5, A1–A3 and six mutants; `transcript_probe.swift`; spec §11 TR-5, TR-11, AI-16 as TR-11 amends it)
+
+**What it proves.** `get_transcript {clip, language?}` answers one clip's
+words in timeline ticks, sorted, each with TR-8's `filler` flag: from the
+media's cached transcript when its marker serves `.captions`
+(`TranscriptReader.cached`, through `FillerDetector.transcriptFile`), mapped by
+`MediaTranscript.words(for:in:)`, else from this Mac's recogniser over the
+clip's window (`TranscriptReader.recognize`), mapped by `Transcriber.project`
+with a word at the clip's end dropped. `fillers_reported` says whether the
+transcript asked for fillers. It never makes a network request and edits
+nothing. The assistant reads it, says which words it will cut and cuts them
+with one `ripple_delete_ranges`; its system text holds the "Cutting words:"
+paragraph; and its Stop reaches the on-device run through the run's
+`Transcriber.CancelToken`.
+
+**Host-state input:** `media/speech.mov` (a missing file is a scored FAIL), and
+on-device recognition for G5 and A3, each a named host SKIP when the call is
+refused as not installed or not available (A3 follows G5).
+AssemblyAI is `assemblyai_fake.py` serving `cloud_captions_proof.DISFLUENT_WORDS`,
+Anthropic is `anthropic_fake.py`; ONE `assistant_session_proof.App` launch has a
+0700 `-RCSecretFolder` with 0600 `anthropic-key` and `assemblyai-key`, both the
+dummy `proof-key`, `-RCAssemblyAIEndpoint` at the first and
+`RC_ASSISTANT_BASE_URL` at the second. The run holds the cloud instruments'
+lock. Run every command under `env -u RC_ASSEMBLYAI_KEY`; nothing is paid.
+
+```sh
+python3 tools/proof/swift_build.py typecheck tools/proof/transcript_probe.swift
+python3 tools/proof/transcript_proof.py --only P0,P1,P2,P3   # no app
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py
+RC_PROOF_APP=release env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py   # the record
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py --mutant NAME   # exit 0 = caught
+```
+
+**The probe rows**, `transcript_probe.swift` copied in as `main.swift` over
+`swift_build.app_sources()` (a build failure is P0's FAIL):
+- **P1** `cloudWords` for a job at 1 s, in 0.5 s, speed 2, over a file served
+  out of order: "before" (400 ms, ahead of `in`) is absent, "At" (500 ms, at
+  `in`) lands at 600000; the ticks are `MediaTranscript.words`' own; the order
+  is At, um, Uh, so, er, umbrella (so and er share a start; so ends first);
+  "um,", "Uh" and "er" are fillers, "umbrella" is not.
+- **P2** `deviceWords` for a 2 s clip at 1 s, speed 2, runs out of order:
+  uh 675000–750000 (flagged), hello 750000–900000, late 1725000–1800000
+  (its end clamped); "past" at 4 s lands on the clip's end and is dropped.
+- **P3** `cached` over a temp cache stamped as `fillers_probe.swift` P8 stamps
+  one: no file → nil; a `disfluencies` marker → `fillersReported` true; one
+  without → false; a changed source → nil.
+
+**The app rows**, one launch:
+- **G0** the parity log is empty; the tool takes exactly `clip`, `language`
+  and `project`, `clip` required.
+- **G1** a 5 s clip at 0, `transcribe` (assemblyai, `place: false`), saved:
+  engine `assemblyai`, `fillers_reported` true, the words' (text, start, end)
+  `cloud_captions_proof.mapped`'s, `filler` true on "um,", "Uh" and "er" only;
+  `get_project` unchanged and no AssemblyAI request during the call.
+- **G2** `fillers_proof.py` M3's clip (start 1 s, in 0.5 s): `mapped`'s words.
+- **G3** M4's raw edits on G2's package: `fillers_reported` false, the same
+  words, the filler sentence in `note`.
+- **G4** refused by sentence: no `clip`, 987654, a text clip ("Clip N has no
+  words to read: its source is not a media file, so it has no speech."), and
+  `language: "xx-notalanguage"` (`checkSpelling`'s sentence).
+- **G5** speech.mov with no cache: engine `apple`, `fillers_reported` false,
+  "quick" and "fox" among the words, every start inside the clip, sorted, the
+  flags TR-8's, the filler sentence in `note`, no AssemblyAI request.
+- **A1** on G1's project, the stand-in turn `get_transcript` →
+  `ripple_delete_ranges [[360000, 960000]]` ("Hello there") → "Cut.":
+  finished, neither result an error, the `get_transcript` result holds G1's
+  words, the clips (0, 360000, 0) and (360000, 2040000, 960000), one MCP
+  `undo` back to (0, 3000000, 0), no stand-in failure, no AssemblyAI request.
+- **A2** that turn's first POST lists `get_transcript` with `defer_loading`
+  true and its system holds the "Cutting words:" paragraph verbatim.
+- **A3** `assistant_session_proof.long_fixture`'s ~3600 s `long.wav` at 0, no
+  cache, the model's `get_transcript` sent with `stop_after: STOP_AFTER`:
+  `stopped_turn(…, "get_transcript", "The transcription was cancelled.")` has
+  no problems and the stand-in no failure.
+
+| Mutant | Anchor (asserted once) | Must fail | 2026-10-23 |
+|---|---|---|---|
+| `no-filler-flag` | `TranscriptReader.swift` both `filler: FillerWords.isFiller(…)` → `false` | P1, P2 | caught (2/4) |
+| `unsorted` | `sortedWords`' sort → `words.map(\.word)` | P1 | caught (2/4; P2 too) |
+| `device-past-clip-end` | `guard start < end else { continue }` removed | P2 | caught (3/4) |
+| `fillers-reported-any` | `FillerDetector.fillersFile(…) != nil` → `true` | P3 | caught (3/4) |
+| `stale-cache-read` | `cached`'s `transcriptFile` guard → `MediaTranscript.read` and `readStamp`, no source stamp | P3 | caught (3/4) |
+| `no-transcript-stop` | `AgentServer+Transcript.swift`'s `stop?.onCancel { token.cancel() }` line deleted in a `tree_copy.make_copy` tree (`work/transcript/mutant/tree`), built by `tree_copy.build_app`; G5 and A3 in that app | A3 with `LATE` | caught (1/2: A3 waited 49052 − 2029 ms > 5000, the hour recognised to its end) |
+
+A `--mutant` run exits 0 when caught, 1 when it survived, and 2 when the
+control could not be performed (an anchor not found exactly once, the copy did
+not build, a named row unscored or a host SKIP, or `no-transcript-stop`'s A3
+failing without `LATE`).
+
+**Counts.** `op_argument_proof.py` `PRODUCT_TOOLS = 97`; `phase9_proof.py`,
+`recording_probe.py` and `recording_proof.py` list `get_transcript` among the
+thirty-six app-state tools, and `recording_probe.py`'s 7b reads the last
+fifteen names with `get_transcript` after `transcribe`;
+`assistant_session_proof.py`'s T2 keeps it in the assistant's catalog (no AI-7
+row); `assistant_prompt_proof.py`'s F1 and F4 hold the new paragraph and the
+captions topic (guide 1486 of 1500).

@@ -342,7 +342,7 @@ extension AgentServer {
     /// evidence that a tag is wrong — it is evidence that the question could
     /// not be asked at all (`SpeechEngine.askBound`) — and "no such language"
     /// off it would be a false answer.
-    private static func checkSpelling(of wanted: String?) throws {
+    static func checkSpelling(of wanted: String?) throws {
         guard let wanted = wanted else { return }
         let known = Transcriber.supportedLanguages()
         guard !known.isEmpty, Transcriber.language(matching: wanted, in: known) == nil else {
@@ -362,7 +362,7 @@ extension AgentServer {
     /// a bare language code, or the display name), and
     /// `Transcriber.defaultLanguage` the fallback, so the tool and the popup
     /// cannot drift apart.
-    private static func transcriptionLanguage(_ wanted: String?) throws -> Transcriber.Language {
+    static func transcriptionLanguage(_ wanted: String?) throws -> Transcriber.Language {
         let languages = Transcriber.languages()
         guard !languages.isEmpty else {
             throw ToolError(

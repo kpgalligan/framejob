@@ -8718,13 +8718,15 @@ APP_STATE_TOOLS = [
     "render_graphic", "import_graphic_font", "import_graphic_asset", "close_project",
     "delete_graphic", "rename_graphic", "restore_graphic", "sync_audio",
     "export_status", "cancel_export", "detect_fillers", "transcribe_for_fillers",
+    "get_transcript",
 ]
 # `git show df6b916^:app/Sources/AgentCatalog.swift`'s last ten rows, in order,
 # with `set_media_color` (c47d97d) after `remove_media` and `export_status`,
-# `cancel_export` (#326) after `export`.
+# `cancel_export` (#326) after `export`, and `get_transcript` (CT-4) after `transcribe`.
 FILE_GROUP_ORDER = [
     "import_media", "import_captions", "consolidate_media", "add_media", "relink_media",
-    "remove_media", "set_media_color", "transcribe", "export_captions", "render_frame", "export",
+    "remove_media", "set_media_color", "transcribe", "get_transcript", "export_captions",
+    "render_frame", "export",
     "export_status", "cancel_export",
 ]
 RECORD_SCREEN_ARGUMENTS = [
@@ -8753,22 +8755,23 @@ def section_catalog(binary, sources):
           len(ops) >= 55 and len(set(ops)) == len(ops), f"{len(ops)}")
     check("7a: the catalog has at least 75 tools, no name twice", len(names) >= 75 and len(set(names)) == len(names),
           f"{len(names)} names, {len(set(names))} distinct")
-    check("7a: they are the 55 ops plus the thirty-five app-state tools, record_screen among them",
+    check("7a: they are the 55 ops plus the thirty-six app-state tools, record_screen among them",
           set(names) == set(ops) | set(APP_STATE_TOOLS), f"missing {sorted(set(ops) | set(APP_STATE_TOOLS) - set(names))}, "
           f"extra {sorted(set(names) - set(ops) - set(APP_STATE_TOOLS))}")
     check("7a: no app-state tool is also an op", not set(APP_STATE_TOOLS) & set(ops),
           f"{sorted(set(APP_STATE_TOOLS) & set(ops))}")
-    check("7b: the LAST fourteen are the old file's ten file rows in its order, set_media_color "
-          "after remove_media, export_status and cancel_export after export, then record_screen",
-          names[-14:] == FILE_GROUP_ORDER + ["record_screen"], f"{names[-14:]}")
+    check("7b: the LAST fifteen are the old file's ten file rows in its order, set_media_color "
+          "after remove_media, get_transcript after transcribe, export_status and cancel_export "
+          "after export, then record_screen",
+          names[-15:] == FILE_GROUP_ORDER + ["record_screen"], f"{names[-15:]}")
     check("7b: … so everything before them is the groups that stayed and the clip rows — none "
-          "of the thirteen appears earlier", not set(FILE_GROUP_ORDER) & set(names[:-14]),
-          f"{sorted(set(FILE_GROUP_ORDER) & set(names[:-14]))}")
+          "of the fourteen appears earlier", not set(FILE_GROUP_ORDER) & set(names[:-15]),
+          f"{sorted(set(FILE_GROUP_ORDER) & set(names[:-15]))}")
     by = {t.get("name"): t for t in tools}
     without = [n for n in ops if not (by.get(n) or {}).get("hasScope")]
     check("7c: every op tool's schema declares `scope`", not without, f"without: {without}")
     with_scope = [n for n in APP_STATE_TOOLS if (by.get(n) or {}).get("hasScope")]
-    check("7c: none of the thirty-five app-state tools declares it", not with_scope, f"with: {with_scope}")
+    check("7c: none of the thirty-six app-state tools declares it", not with_scope, f"with: {with_scope}")
     rs = by.get("record_screen") or {}
     check("7c: record_screen's schema has no `scope` key", rs and rs.get("hasScope") is False, f"{rs}")
     check(f"7c: record_screen declares exactly {RECORD_SCREEN_ARGUMENTS}",

@@ -1669,6 +1669,15 @@ free.
   `isFiller`, and `MediaTranscript.captionWords(for:in:)`, `words(for:in:)`
   with the fillers removed — every caption producer reads it, so a
   disfluent transcript captions as before.
+- `TranscriptReader.swift` · `AgentServer+Transcript.swift` — `get_transcript`
+  (spec §11 TR-5, TR-11): a clip's words in TIMELINE times, each marked
+  `filler`, for the assistant's false starts. The cache door reads the cloud
+  transcript when its marker serves `.captions` (`cloudWords`); otherwise the
+  on-device engine runs over the clip's window off the main thread
+  (`deviceWords`, `recognize`), never downloading a model and writing no
+  cache; never the network. The handler's first line reads
+  `AgentLane.shared.callCancel` and the on-device token is linked to it, so
+  the assistant's Stop ends the run (amends AI-16).
 - `CaptionPages.swift` — word-caption PAGES (spec §11 W-7), pure and
   synchronous so it runs on whichever engine thread calls it:
   `normalize` (trim, split, sort, the per-engine `lead` — its ONE home —
@@ -2303,10 +2312,10 @@ free.
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
   **Every one of the sixty-one op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the thirty-five APP-STATE tools, which have no op behind them
+  callers are the thirty-six APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
   `AgentCatalog+Audio.swift`'s five composites and
-  `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
+  `AgentCatalog+Captions.swift`'s four, spliced back at the two points they
   left, the five other file tools (`AgentCatalog+Files.swift`'s `import_media`, `consolidate_media` and `record_screen`, and `AgentCatalog+Render.swift`'s `render_frame`, `export`, `export_status` and `cancel_export`, spliced back where they left), and
   `AgentCatalog+Graphics.swift`'s nine, after its two `opTool` rows.
   `set_text`'s clause for `case`, `words` and `word_style` is
@@ -2337,7 +2346,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all ninety-six
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all ninety-seven
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

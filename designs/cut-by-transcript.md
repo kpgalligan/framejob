@@ -109,6 +109,9 @@ TR-1… live in `designs/spec/11-decisions/cut-by-transcript.md`.
 
 FIL-1 in `docs/manual-checks.md` (CT-3): a real narrated recording, the estimate
 read, Transcribe pressed, the wash looked at, Remove, every cut played, one ⌘Z.
+AS-10 (CT-4): with a real key and a real recording that holds a false start, the assistant
+asked to take the false starts out names the words before it cuts, cuts only those, and one ⌘Z
+undoes the cuts it made together (one `ripple_delete_ranges`, one undo step).
 
 ## CT-0 record
 
@@ -424,7 +427,79 @@ FIL-1 is the person's check of a real recording's cut.
 
 ## CT-4 record
 
-Not started.
+**What landed (2026-10-23):** TR-11 in `designs/spec/11-decisions/cut-by-transcript.md`,
+recorded before the code, with AI-16's "Amended 2026-10-23, by TR-11" line, the index rows
+and the Lines cells. `TranscriptReader.swift` (new): the cache door `cached(for:url:in:)`
+(`FillerDetector.transcriptFile(…, use: .captions)`, with `fillersReported` from
+`fillersFile`), the pure mapping `cloudWords` (R6-10's `MediaTranscript.words(for:in:)`) and
+`deviceWords` (`Transcriber.project`, a run at or past the clip's end dropped), both sorted by
+(start, end, source order) and flagged by `FillerWords.isFiller`, and `recognize`, the
+on-device run (`Transcriber.transcribe`'s model questions, `extractAudio`, then
+`SpeechEngine.transcribe`, the WAV removed on every exit). `AgentServer+Transcript.swift`
+(new): `get_transcript {clip, language?}`, off main, reading `AgentLane.shared.callCancel`
+first and linking the on-device token with `stop?.onCancel { token.cancel() }`, the clip, its
+job and the cache read in one `onMain` hop, refused in TR-11's order and answering TR-11's
+keys. `AgentServer+Captions.swift`: `checkSpelling(of:)` and `transcriptionLanguage(_:)`
+internal, bodies unchanged. Wiring: the catalog row after `transcribe` in `captionTools()`;
+the handler row and `productOffMainTools` entry in `AgentServer.swift` (the
+`agent_open_proof.py` anchor line untouched); the count words (ninety-seven tools, thirty-six
+app-state) in `AgentCatalog.swift`, `AgentServer+Gate.swift` and `AgentServer.swift`;
+`AssistantSession.cancel()`'s comment. `AssistantPrompt.swift`: the "Cutting words:" system
+paragraph after the Captions and Graphics one, and the captions search topic with
+`get_transcript` (guide 1486 of 1500, system 3134 of 6000). No `AssistantToolTable.swift` row
+(TR-11). No Rust, header, FFI, op or format change. The instruments: `transcript_probe.swift`
+and `transcript_proof.py` (new); `op_argument_proof.py` (97), `phase9_proof.py`,
+`recording_probe.py` (the app-state list and 7b's last fifteen names) and
+`recording_proof.py`; `tools/proof/README.md`'s "Cut by transcript CT-4" section; AS-10 in
+`docs/manual-checks.md`. Spec §7.9a, §7.9b, §7.9c, §7.4 and the README name the tool.
+
+**The runs** (2026-10-23, macOS 26.5.1, the worktree on `b8586cf` with CT-4's uncommitted
+changes, each on the final instrument; every app proof under `env -u RC_ASSEMBLYAI_KEY`,
+nothing paid):
+
+| Command | Result |
+|---|---|
+| `make typecheck` | 0 errors, the 4 baseline warnings |
+| `swift_build.py typecheck transcript_probe.swift` | exit 0 |
+| `transcript_proof.py --only P0,P1,P2,P3` | 4/4, exit 0 |
+| `assistant_prompt_proof.py --probe` | 14/14, exit 0 (F6: system 3134/6000, guide 1486/1500) |
+| `spec_index_proof.py` | 180/180, exit 0 |
+| `make app-debug && transcript_proof.py` (Debug) | 13/13, exit 0; no host skip |
+| `make gate` | PASS (names, typecheck, test and app ran; fmt and lint skipped, no Rust changed) |
+| `RC_PROOF_APP=release transcript_proof.py` | 13/13, exit 0; G1 the eight `mapped` words with "um,", "Uh", "er" flagged and no AssemblyAI request; G5 17 on-device words, "quick" and "fox" among them; A1 clips (0, 360000, 0) and (360000, 2040000, 960000), one undo back to (0, 3000000, 0); A3 stopped at 2012 ms, answered at 2127 ms with "The transcription was cancelled." |
+| `op_argument_proof.py <dir>/agent.sock` (Release) | 167/167, exit 0 |
+| `phase9_proof.py <dir>/agent.sock` (Release) | 236/236, exit 0; `grep "Frame Job: "` on that instance's log empty |
+| `recording_probe.py --only catalog` | 31/31, exit 0 |
+| `python3 -m py_compile tools/proof/recording_proof.py` | exit 0 |
+| `RC_PROOF_APP=release assistant_session_proof.py` | 13/13, exit 0 (T2: 95 tools, `get_transcript` among them; stand-in server, no spend) |
+
+**The mutants.** `transcript_proof.py --mutant NAME`, each anchor asserted once, exit 0 when
+caught; every one was caught:
+
+| Mutant | Must fail | Failed (score) |
+|---|---|---|
+| `no-filler-flag` | P1, P2 | P1 P2 (2/4) |
+| `unsorted` | P1 | P1 P2 (2/4) |
+| `device-past-clip-end` | P2 | P2 (3/4) |
+| `fillers-reported-any` | P3 | P3 (3/4) |
+| `stale-cache-read` | P3 | P3 (3/4) |
+| `no-transcript-stop` | A3 with `LATE` | A3 (1/2, on the Debug copy built by `tree_copy.build_app` in 38 s): stopped at 2029 ms, answered at 49052 ms — the hour recognised to its end |
+
+**Deviations:** `recording_probe.py`'s 7b (the catalog's last names in order) was widened from
+fourteen to fifteen with `get_transcript` after `transcribe` in `FILE_GROUP_ORDER`: the spec's
+catalog row lands between `transcribe` and `export_captions`, which the old list did not
+allow, and #326's `export_status` was added the same way. The `get_transcript` refusal for a
+clip `Transcriber.jobs` refuses falls back to "it plays no speech" only if the jobs answer
+neither a job nor a problem, which they never do for one clip. In mutant mode
+`no-transcript-stop` also runs G5 in the mutant app, as A3's host check.
+
+**Owed:** nothing in `CLAUDE.md` (the root's count and app-state list and `app/CLAUDE.md`'s
+map entries and counts were applied at merge). Review: pass, one nit applied at merge (AS-10's
+expectation: one ⌘Z undoes the assistant's cuts together, as one `ripple_delete_ranges`); no paid
+`assistant_prompt_proof.py --live` run, since its six live asks touch nothing this paragraph is
+about and a real model's false-start judgement is AS-10's. AS-10 is the person's check of a real false start with a real key. For
+CT-5's residue issues: a `from`/`to` window on `get_transcript` for a long clip's large answer,
+and the on-device recognition repeated on every call (TR-11's risks).
 
 ## CT-5 record
 
