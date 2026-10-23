@@ -14,7 +14,8 @@ filler source, was recorded on 2026-10-22 after the filler spike ran on the owne
 sample, before CT-2.
 CT-1…CT-4 each record their numbers as a new entry (TR-8 on) or as Amended-by lines before their
 code; TR-8 was recorded in CT-1, TR-9 in CT-2, TR-10 in CT-3 and TR-11 in CT-4, each before its
-code. TR-12 was recorded in the #92 residue batch (#333), before its code.
+code. TR-12 was recorded in the #92 residue batch (#333), before its code. TR-13 was recorded in the #92
+residue batch (#331), before its code.
 
 **Stands, and nothing here re-litigates it:** R6-3 (one upload per media, every clip derived from
 it, the words cached verbatim); R6-10 (`MediaTranscript.words(for:in:)` maps a media's words onto
@@ -245,6 +246,8 @@ TR-11.
     a clip's timed words, export a caption file" and gains `get_transcript` after `transcribe`.
   - Risk accepted: a long clip's answer is large (every word, no window; a `from`/`to` window is
     CT-5's residue to file), and an on-device answer is recognised again on every call.
+  - **Amended 2026-10-23, by TR-13:** the missing window is `get_transcript`'s `from`/`to`
+    (#331); a call without them answers exactly as above.
 - **TR-12 — An agent's `ripple_delete_ranges` names its undo step "Ripple Delete", whatever it
   cuts; the tool takes no name.** Recorded in the #92 residue batch (#333), before its code
   (`AgentServer+Clips.swift`).
@@ -262,3 +265,41 @@ TR-11.
     `fillers_proof.py` M2 reads it after a filler cut.
   - Risk accepted: after an agent's silence cut, Edit ▸ Undo reads "Undo Ripple Delete", not the
     sheet's "Undo Remove Silences".
+- **TR-13 — `get_transcript {clip, language?, from?, to?}` answers only the words that overlap
+  the timeline window [from, to), clamped to the clip; an on-device run hears only that window
+  and 2 s of source either side.** Recorded in the #92 residue batch (#331), before its code
+  (`TranscriptReader.swift`, `AgentServer+Transcript.swift`, `AgentCatalog+Captions.swift`).
+  - **The arguments:** `from` and `to` are optional timeline ticks (600000 per second), read by
+    `optionalTimeArg` and so snapped to the frame grid like every tick a tool takes. Either may be
+    given alone: a missing `from` is the clip's start, a missing `to` its end. With neither the
+    call is TR-11's, unchanged.
+  - **The clamp:** the window is [max(from, clip start), min(to, clip end)), so a window wider
+    than the clip answers the whole clip's words.
+  - **Overlap and edges:** a word belongs to the window when it starts before `to` and ends after
+    `from` (a word with no length, when `from` ≤ its start < `to`). A word across either edge is
+    answered whole, with its own times, never cut at the edge; the order is TR-11's.
+  - **The refusals, in TR-11's order:** the clip; the jobs refusal; a `from` or `to` that is not
+    a time (`optionalTimeArg`'s own sentence, "from must be a time in ticks (600000 per
+    second)."); an empty window, both bounds given and `to` not after `from` ("to must be after
+    from: the window from <from> to <to> ticks (both snapped to frames) is empty."); a window
+    outside the clip, empty once clamped ("The window <bounds> is outside clip <id>, which plays
+    from <start> to <end> ticks.", `<bounds>` the bounds the call gave, snapped: "from F to T",
+    "from F" or "to T"); then the language's spelling, the installed model and the recogniser.
+    The window is read in the same main-thread hop as the clip, the jobs and the cache.
+  - **The answer:** a call that gave `from` or `to` gains `from` and `to`, the window as applied
+    (snapped and clamped); `count` counts the words in the window, and an empty list's note is
+    "No words were heard in clip <id> between <from> and <to> ticks.". Every other key and note
+    is TR-11's.
+  - **The on-device run narrowed:** the recogniser hears the window plus 2 s of SOURCE on each
+    side, clamped to the clip (`TranscriptReader.recognitionJob`: a sub-job whose start, duration
+    and `in` point are the padded window's, so `Transcriber.project`'s premise, that the extract
+    begins at the job's `in`, still holds). The pad means a word across an edge is heard whole;
+    words heard in the pad that do not reach the window are dropped by the overlap rule.
+  - **One filter for both engines (#332):** the window is a filter on MAPPED words
+    (`TranscriptReader.overlapping`), applied to the cached path's words and the on-device
+    path's alike; `recognitionJob` is only the on-device run's input. So a later per-media,
+    per-language cache of on-device words (#332) can recognise wider than the window and answer
+    through the same filter.
+  - Risk accepted: a windowed on-device answer can differ from the whole clip's words at the
+    same times, because the recogniser hears less context. The cached path's words in a window
+    are identical to the whole clip's in that window.

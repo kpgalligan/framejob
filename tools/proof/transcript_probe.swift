@@ -1,4 +1,4 @@
-// Cut by transcript CT-4 (spec §11 TR-11): the value rows of
+// Cut by transcript CT-4 (spec §11 TR-11) and #331 (TR-13): the value rows of
 // `transcript_proof.py`, compiled as `main.swift` over `app/Sources` (or a
 // mutant's copy of it) through `swift_build.build()`. Prints one JSON object,
 // `{"rows": [{"id", "pass", "detail"}]}`, on stdout. No network, no app, no
@@ -154,6 +154,138 @@ do {
             + "\(say(withoutFillers)); changed source → \(say(changedSource))")
 }
 try? FileManager.default.removeItem(at: folder)
+
+// MARK: - P4..P6: the window (spec §11 TR-13) — a 10 s clip at 1 s, in 0.5 s, speed 2
+
+/// A 10 s clip at 1 s playing 20 s of source from 0.5 s.
+let windowed = job(
+    clip: 9, sourceIn: 300_000, sourceLength: 12_000_000, start: 600_000, duration: 6_000_000,
+    speed: 2)
+
+func say(_ window: TranscriptReader.Window?) -> String {
+    window.map { "[\($0.from), \($0.to))" } ?? "nil"
+}
+
+/// The window, or the error it threw.
+func attempt(_ from: Ticks?, _ to: Ticks?) -> (TranscriptReader.Window?, TranscriptReader.WindowError?) {
+    do {
+        return (try TranscriptReader.window(from: from, to: to, clip: windowed), nil)
+    } catch let error as TranscriptReader.WindowError {
+        return (nil, error)
+    } catch {
+        return (nil, nil)
+    }
+}
+
+// MARK: - P4: window — defaults, the clamp, and the two refusals
+
+do {
+    var problems: [String] = []
+    func expect(_ from: Ticks?, _ to: Ticks?, _ want: TranscriptReader.Window?) {
+        let (got, error) = attempt(from, to)
+        if got != want || error != nil {
+            problems.append("(\(from.map(String.init) ?? "nil"), \(to.map(String.init) ?? "nil")) → "
+                + "\(say(got)) \(error.map { "\($0)" } ?? ""), want \(say(want))")
+        }
+    }
+    func refuse(_ from: Ticks?, _ to: Ticks?, _ want: TranscriptReader.WindowError, _ sentence: String) {
+        let (got, error) = attempt(from, to)
+        if got != nil || error != want || error?.errorDescription != sentence {
+            problems.append("(\(from.map(String.init) ?? "nil"), \(to.map(String.init) ?? "nil")) → "
+                + "\(say(got)) \(error.map { "\($0)" } ?? "no error"): "
+                + "\(error?.errorDescription ?? "")")
+        }
+    }
+    expect(nil, nil, nil)
+    expect(3_000_000, nil, .init(from: 3_000_000, to: 6_600_000))
+    expect(nil, 1_200_000, .init(from: 600_000, to: 1_200_000))
+    expect(0, 9_000_000, .init(from: 600_000, to: 6_600_000))
+    refuse(1_200_000, 1_200_000, .empty(from: 1_200_000, to: 1_200_000),
+        "to must be after from: the window from 1200000 to 1200000 ticks (both snapped to "
+            + "frames) is empty.")
+    refuse(2_400_000, 1_200_000, .empty(from: 2_400_000, to: 1_200_000),
+        "to must be after from: the window from 2400000 to 1200000 ticks (both snapped to "
+            + "frames) is empty.")
+    refuse(6_600_000, nil,
+        .outside(from: 6_600_000, to: nil, clip: 9, start: 600_000, end: 6_600_000),
+        "The window from 6600000 is outside clip 9, which plays from 600000 to 6600000 ticks.")
+    refuse(nil, 600_000, .outside(from: nil, to: 600_000, clip: 9, start: 600_000, end: 6_600_000),
+        "The window to 600000 is outside clip 9, which plays from 600000 to 6600000 ticks.")
+    refuse(7_000_000, 8_000_000,
+        .outside(from: 7_000_000, to: 8_000_000, clip: 9, start: 600_000, end: 6_600_000),
+        "The window from 7000000 to 8000000 is outside clip 9, which plays from 600000 to "
+            + "6600000 ticks.")
+    row("P4", problems.isEmpty,
+        problems.isEmpty ? "9 cases as wanted" : problems.joined(separator: "; "))
+}
+
+// MARK: - P5: overlapping over [1 000 000, 2 000 000)
+
+do {
+    func word(_ text: String, _ start: Ticks, _ end: Ticks) -> TranscriptReader.Word {
+        .init(text: text, start: start, end: end, speaker: nil, filler: false)
+    }
+    let words = [
+        word("inside", 1_200_000, 1_400_000),
+        word("endsAtFrom", 800_000, 1_000_000),
+        word("acrossTo", 1_900_000, 2_100_000),
+        word("startsAtTo", 2_000_000, 2_200_000),
+        word("acrossFrom", 900_000, 1_100_000),
+        word("pointAtTo", 2_000_000, 2_000_000),
+        word("pointAtFrom", 1_000_000, 1_000_000),
+    ]
+    let got = TranscriptReader.overlapping(
+        words, in: .init(from: 1_000_000, to: 2_000_000))
+    let want = [words[0], words[2], words[4], words[6]]
+    row("P5", got == want, "kept \(brief(got)); want \(brief(want))")
+}
+
+// MARK: - P6: recognitionJob — 2 s of source is 600 000 ticks at speed 2
+
+do {
+    func say(_ job: Transcriber.Job) -> String {
+        "start \(job.start) duration \(job.duration) in \(job.sourceIn) length \(job.sourceLength)"
+    }
+    func same(_ a: Transcriber.Job, _ b: Transcriber.Job) -> Bool {
+        a.clip == b.clip && a.media == b.media && a.name == b.name && a.source == b.source
+            && a.speed == b.speed
+    }
+    var problems: [String] = []
+    func expect(
+        _ from: Ticks, _ to: Ticks, start: Ticks, duration: Ticks, sourceIn: Ticks,
+        sourceLength: Ticks
+    ) -> Transcriber.Job {
+        let got = TranscriptReader.recognitionJob(windowed, for: .init(from: from, to: to))
+        if got.start != start || got.duration != duration || got.sourceIn != sourceIn
+            || got.sourceLength != sourceLength || !same(got, windowed)
+        {
+            problems.append(
+                "[\(from), \(to)) → \(say(got)); want start \(start) duration \(duration) in "
+                    + "\(sourceIn) length \(sourceLength)")
+        }
+        return got
+    }
+    let middle = expect(
+        3_000_000, 4_200_000, start: 2_400_000, duration: 2_400_000, sourceIn: 3_900_000,
+        sourceLength: 4_800_000)
+    _ = expect(
+        600_000, 1_200_000, start: 600_000, duration: 1_200_000, sourceIn: 300_000,
+        sourceLength: 2_400_000)
+    _ = expect(
+        6_000_000, 6_600_000, start: 5_400_000, duration: 1_200_000, sourceIn: 9_900_000,
+        sourceLength: 2_400_000)
+    let whole = TranscriptReader.recognitionJob(windowed, for: .init(from: 600_000, to: 6_600_000))
+    if whole != windowed { problems.append("the whole clip → \(say(whole))") }
+    // 1 s into the sub-extract is 7 s into the clip's: it starts 6 s of source in.
+    let sub = Transcriber.project(1.0, in: middle)
+    let full = Transcriber.project(7.0, in: windowed)
+    if abs(sub - full) > 1 { problems.append("1 s of the sub-run → \(sub), 7 s of the clip's → \(full)") }
+    row("P6", problems.isEmpty,
+        problems.isEmpty
+            ? "three windows and the whole clip as wanted; 1 s of the sub-run → \(sub), 7 s of "
+                + "the clip's → \(full)"
+            : problems.joined(separator: "; "))
+}
 
 let answer = (try? JSONSerialization.data(withJSONObject: ["rows": rows], options: [.sortedKeys])) ?? Data()
 print(text(answer))

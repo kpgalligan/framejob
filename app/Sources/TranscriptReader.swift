@@ -94,6 +94,87 @@ enum TranscriptReader {
         }.map(\.word)
     }
 
+    // MARK: - The window
+
+    /// A part of the timeline, [from, to) in project ticks, already clamped
+    /// to the clip (spec §11 TR-13).
+    struct Window: Equatable {
+        let from: Ticks
+        let to: Ticks
+    }
+
+    /// Why a `from`/`to` pair names no part of the clip, in TR-13's
+    /// sentences (the dispatcher puts the tool's name in front).
+    enum WindowError: LocalizedError, Equatable {
+        case empty(from: Ticks, to: Ticks)
+        case outside(from: Ticks?, to: Ticks?, clip: UInt32, start: Ticks, end: Ticks)
+
+        var errorDescription: String? {
+            switch self {
+            case .empty(let from, let to):
+                return "to must be after from: the window from \(from) to \(to) ticks "
+                    + "(both snapped to frames) is empty."
+            case .outside(let from, let to, let clip, let start, let end):
+                let bounds = [from.map { "from \($0)" }, to.map { "to \($0)" }]
+                    .compactMap { $0 }.joined(separator: " ")
+                return "The window \(bounds) is outside clip \(clip), which plays from \(start) "
+                    + "to \(end) ticks."
+            }
+        }
+    }
+
+    /// The window a call's (already snapped) bounds name on this clip; nil
+    /// when it gave neither. A missing `from` is the clip's start, a missing
+    /// `to` its end, and the window is clamped into the clip. Refused as
+    /// `.empty` when both were given and `to` is not after `from` (checked
+    /// first), and as `.outside` when nothing is left once clamped.
+    static func window(from: Ticks?, to: Ticks?, clip job: Transcriber.Job) throws -> Window? {
+        guard from != nil || to != nil else { return nil }
+        if let from, let to, to <= from { throw WindowError.empty(from: from, to: to) }
+        let clipEnd = job.start + job.duration
+        let lower = max(from ?? job.start, job.start)
+        let upper = min(to ?? clipEnd, clipEnd)
+        guard lower < upper else {
+            throw WindowError.outside(
+                from: from, to: to, clip: job.clip, start: job.start, end: clipEnd)
+        }
+        return Window(from: lower, to: upper)
+    }
+
+    /// The words that overlap the window, in their input order and
+    /// unchanged: a word across an edge is kept whole, with its own times. A
+    /// word with no length belongs when from <= its start < to.
+    static func overlapping(_ words: [Word], in window: Window) -> [Word] {
+        words.filter { word in
+            word.start < window.to && max(word.end, word.start + 1) > window.from
+        }
+    }
+
+    /// The SOURCE seconds an on-device run hears either side of a window.
+    static let recognitionPadSeconds: Double = 2
+
+    /// The sub-job a windowed on-device run hears: the window widened by
+    /// `recognitionPadSeconds` of source on each side, clamped to the clip.
+    /// Its `sourceIn` is the padded start's own source time, so the extract
+    /// still begins at the job's `in` point — `Transcriber.project`'s premise.
+    /// The whole clip answers `job` itself.
+    static func recognitionJob(_ job: Transcriber.Job, for window: Window) -> Transcriber.Job {
+        let speed = job.speed.isFinite && job.speed > 0 ? job.speed : 1
+        let pad = Ticks((recognitionPadSeconds * Double(ReelTime.perSecond) / speed).rounded(.up))
+        let clipEnd = job.start + job.duration
+        let start = max(job.start, window.from - pad)
+        let end = min(clipEnd, window.to + pad)
+        if start == job.start && end == clipEnd { return job }
+        let sourceIn = job.sourceIn + Ticks((Double(start - job.start) * speed).rounded())
+        let sourceLength = end < clipEnd
+            ? Ticks((Double(end - start) * speed).rounded())
+            : job.sourceIn + job.sourceLength - sourceIn
+        return Transcriber.Job(
+            clip: job.clip, media: job.media, name: job.name, source: job.source,
+            sourceIn: sourceIn, sourceLength: sourceLength, start: start, duration: end - start,
+            speed: job.speed)
+    }
+
     // MARK: - The on-device run
 
     /// One clip through this Mac's recogniser, waited for. Off main only:

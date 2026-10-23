@@ -1677,7 +1677,10 @@ free.
   (`deviceWords`, `recognize`), never downloading a model and writing no
   cache; never the network. The handler's first line reads
   `AgentLane.shared.callCancel` and the on-device token is linked to it, so
-  the assistant's Stop ends the run (amends AI-16).
+  the assistant's Stop ends the run (amends AI-16). An optional `from`/`to`
+  window (TR-13) answers only the words that overlap it (`window`,
+  `overlapping`, both engines alike), and the on-device run hears only the
+  window plus `recognitionPadSeconds` each side (`recognitionJob`).
 - `CaptionPages.swift` — word-caption PAGES (spec §11 W-7), pure and
   synchronous so it runs on whichever engine thread calls it:
   `normalize` (trim, split, sort, the per-engine `lead` — its ONE home —

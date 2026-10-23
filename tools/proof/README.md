@@ -22457,9 +22457,9 @@ with the row's sentence; `fillers_proof.py` M4 looks for
 `transcribe_for_fillers` in `detect_fillers`' note. The screen is
 `designs/screens/14b-remove-filler-words-sheet.md`.
 
-## Cut by transcript CT-4 — `get_transcript` and false starts (`transcript_proof.py` P0–P3, G0–G5, A1–A3 and six mutants; `transcript_probe.swift`; spec §11 TR-5, TR-11, AI-16 as TR-11 amends it)
+## Cut by transcript CT-4 — `get_transcript` and false starts (`transcript_proof.py` P0–P6, G0–G8, A1–A3 and eleven mutants; `transcript_probe.swift`; spec §11 TR-5, TR-11, TR-13, AI-16 as TR-11 amends it)
 
-**What it proves.** `get_transcript {clip, language?}` answers one clip's
+**What it proves.** `get_transcript {clip, language?, from?, to?}` answers one clip's
 words in timeline ticks, sorted, each with TR-8's `filler` flag: from the
 media's cached transcript when its marker serves `.captions`
 (`TranscriptReader.cached`, through `FillerDetector.transcriptFile`), mapped by
@@ -22473,8 +22473,8 @@ paragraph; and its Stop reaches the on-device run through the run's
 `Transcriber.CancelToken`.
 
 **Host-state input:** `media/speech.mov` (a missing file is a scored FAIL), and
-on-device recognition for G5 and A3, each a named host SKIP when the call is
-refused as not installed or not available (A3 follows G5).
+on-device recognition for G5, G8 and A3, each a named host SKIP when the call
+is refused as not installed or not available (G8 and A3 follow G5).
 AssemblyAI is `assemblyai_fake.py` serving `cloud_captions_proof.DISFLUENT_WORDS`,
 Anthropic is `anthropic_fake.py`; ONE `assistant_session_proof.App` launch has a
 0700 `-RCSecretFolder` with 0600 `anthropic-key` and `assemblyai-key`, both the
@@ -22484,7 +22484,7 @@ lock. Run every command under `env -u RC_ASSEMBLYAI_KEY`; nothing is paid.
 
 ```sh
 python3 tools/proof/swift_build.py typecheck tools/proof/transcript_probe.swift
-python3 tools/proof/transcript_proof.py --only P0,P1,P2,P3   # no app
+python3 tools/proof/transcript_proof.py --only P0,P1,P2,P3,P4,P5,P6   # no app
 make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py
 RC_PROOF_APP=release env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py   # the record
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py --mutant NAME   # exit 0 = caught
@@ -22503,14 +22503,16 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py --mutant NAME  
 - **P3** `cached` over a temp cache stamped as `fillers_probe.swift` P8 stamps
   one: no file → nil; a `disfluencies` marker → `fillersReported` true; one
   without → false; a changed source → nil.
+- **P4–P6** the window (TR-13); "#331 — the window" below.
 
 **The app rows**, one launch:
-- **G0** the parity log is empty; the tool takes exactly `clip`, `language`
-  and `project`, `clip` required.
+- **G0** the parity log is empty; the tool takes exactly `clip`, `from`,
+  `language`, `project` and `to`, `clip` required.
 - **G1** a 5 s clip at 0, `transcribe` (assemblyai, `place: false`), saved:
   engine `assemblyai`, `fillers_reported` true, the words' (text, start, end)
   `cloud_captions_proof.mapped`'s, `filler` true on "um,", "Uh" and "er" only;
   `get_project` unchanged and no AssemblyAI request during the call.
+- **G6**, **G7** the window on G1's project, and its refusals (TR-13); below.
 - **G2** `fillers_proof.py` M3's clip (start 1 s, in 0.5 s): `mapped`'s words.
 - **G3** M4's raw edits on G2's package: `fillers_reported` false, the same
   words, the filler sentence in `note`.
@@ -22519,7 +22521,9 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py --mutant NAME  
   `language: "xx-notalanguage"` (`checkSpelling`'s sentence).
 - **G5** speech.mov with no cache: engine `apple`, `fillers_reported` false,
   "quick" and "fox" among the words, every start inside the clip, sorted, the
-  flags TR-8's, the filler sentence in `note`, no AssemblyAI request.
+  flags TR-8's, the filler sentence in `note`, no AssemblyAI request. Its words
+  are kept for G8.
+- **G8** the on-device run narrowed to a window (TR-13); below.
 - **A1** on G1's project, the stand-in turn `get_transcript` →
   `ripple_delete_ranges [[360000, 960000]]` ("Hello there") → "Cut.":
   finished, neither result an error, the `get_transcript` result holds G1's
@@ -22539,12 +22543,64 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_proof.py --mutant NAME  
 | `device-past-clip-end` | `guard start < end else { continue }` removed | P2 | caught (3/4) |
 | `fillers-reported-any` | `FillerDetector.fillersFile(…) != nil` → `true` | P3 | caught (3/4) |
 | `stale-cache-read` | `cached`'s `transcriptFile` guard → `MediaTranscript.read` and `readStamp`, no source stamp | P3 | caught (3/4) |
+| `window-start-only` | `overlapping`'s test → `word.start >= window.from && word.start < window.to` | P5 | caught (6/7) |
+| `window-no-clamp` | `window`'s `max`/`min` against the clip removed | P4 | caught (6/7) |
+| `window-equal-allowed` | `to <= from` → `to < from` | P4 | caught (6/7: equal bounds answered `.outside`) |
+| `window-outside-allowed` | `window`'s `.outside` guard removed | P4 | caught (6/7) |
+| `no-recognition-pad` | `recognitionJob`'s pad → `0` | P6 | caught (6/7) |
 | `no-transcript-stop` | `AgentServer+Transcript.swift`'s `stop?.onCancel { token.cancel() }` line deleted in a `tree_copy.make_copy` tree (`work/transcript/mutant/tree`), built by `tree_copy.build_app`; G5 and A3 in that app | A3 with `LATE` | caught (1/2: A3 waited 49052 − 2029 ms > 5000, the hour recognised to its end) |
 
 A `--mutant` run exits 0 when caught, 1 when it survived, and 2 when the
 control could not be performed (an anchor not found exactly once, the copy did
 not build, a named row unscored or a host SKIP, or `no-transcript-stop`'s A3
 failing without `LATE`).
+
+The five old probe mutants ran again on 2026-10-23 after #331 edited
+`TranscriptReader.swift`, their anchors unchanged: each caught, scored out of
+seven (`no-filler-flag` 5/7, `unsorted` 5/7 with P2 too, the other three 6/7).
+
+### #331 — the window (TR-13)
+
+**What it proves.** `get_transcript {clip, language?, from?, to?}` answers only
+the words that overlap the timeline window [from, to), snapped to frames by
+`optionalTimeArg` and clamped to the clip (`TranscriptReader.window`), a word
+across an edge answered whole with its own times
+(`TranscriptReader.overlapping`); `from` and `to` are echoed; an empty window
+and one outside the clip are refused by TR-13's sentences after the jobs
+refusal and before the spelling; and an on-device run hears only the window
+and 2 s of source each side (`TranscriptReader.recognitionJob`). A call
+without `from`/`to` is TR-11's, unchanged (G1–G5, A1–A3).
+
+- **P4** `window` on a 10 s clip at 1 s (in 0.5 s, speed 2): no bound → nil;
+  `from` 3000000 → [3000000, 6600000); `to` 1200000 → [600000, 1200000);
+  (0, 9000000) → [600000, 6600000); (1200000, 1200000) and (2400000,
+  1200000) `.empty`; `from` 6600000, `to` 600000 and (7000000, 8000000)
+  `.outside`; each sentence exact.
+- **P5** `overlapping` over [1000000, 2000000): kept whole, in input order, a
+  word across `from`, one inside, one across `to` and a zero-length word at
+  `from`; dropped a word ending at `from`, one starting at `to` and a
+  zero-length word at `to`.
+- **P6** `recognitionJob` on P4's clip, the pad 600000 ticks at speed 2:
+  [3000000, 4200000) → start 2400000, duration 2400000, in 3900000, length
+  4800000; [600000, 1200000) → start 600000, in 300000, duration 1200000,
+  length 2400000; [6000000, 6600000) → start 5400000, in 9900000, length
+  2400000; the whole clip → the job itself; `Transcriber.project(1.0)` of the
+  first equals `project(7.0)` of the clip within 1 tick.
+- **G6** on G1's project, right after G1 (every bound first asserted on the
+  canvas's frame grid): [600000, 1200000) answers Hello, there and everyone
+  with G1's times (Hello and everyone across the edges), echoed, count 3;
+  `from` 1800000 answers welcome and back with `to` echoed as 3000000; `to`
+  360000 answers count 0 and "No words were heard in clip N between 0 and
+  360000 ticks."; `get_project` unchanged, no AssemblyAI request.
+- **G7** on a fresh 5 s clip at 0, refused by sentence: (600000, 600000) and
+  (1200000, 600000) empty; (600001, 605000) empty naming the snapped
+  (600000, 600000); `from` 3600000 and `to` 0 outside; `from: "soon"`
+  `optionalTimeArg`'s sentence; an empty window with `language:
+  "xx-notalanguage"` the window's sentence, which is the order.
+- **G8** speech.mov added as G5 adds it, the window G5's "fox" [start, end):
+  engine `apple`, "fox" among the words, `from`/`to` echoed, every word
+  overlapping them, fewer words than G5's, no AssemblyAI request; a named
+  host SKIP when G5 was.
 
 **Counts.** `op_argument_proof.py` `PRODUCT_TOOLS = 97`; `phase9_proof.py`,
 `recording_probe.py` and `recording_proof.py` list `get_transcript` among the

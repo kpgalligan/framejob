@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Cut by transcript CT-4 (spec §11 TR-5, TR-11, AI-16 as TR-11 amends it):
-`get_transcript`, the false-start turn through the assistant, and Stop on its
-on-device run.
+"""Cut by transcript CT-4 (spec §11 TR-5, TR-11, AI-16 as TR-11 amends it) and
+#331 (TR-13): `get_transcript`, its `from`/`to` window, the false-start turn
+through the assistant, and Stop on its on-device run.
 
     python3 tools/proof/transcript_proof.py [--mutant NAME] [--only IDS]
 
@@ -26,18 +26,43 @@ killed at a 240 s wall):
   P3  `cached` over a temp cache: a disfluent marker → `fillersReported`
       true; a marker without → false; a changed source stamp → nil; no file
       → nil.
+  P4  `window` on a 10 s clip at 1 s (in 0.5 s, speed 2): neither bound →
+      nil; `from` alone → [from, clip end); `to` alone → [clip start, to);
+      a wider pair clamped to the clip; equal and reversed bounds `.empty`;
+      `from` at the clip's end, `to` at its start and a pair past it
+      `.outside`; each `errorDescription` TR-13's exact sentence.
+  P5  `overlapping` over [1000000, 2000000): a word across `from`, one
+      inside, one across `to` and a zero-length word at `from` kept whole;
+      a word ending at `from`, one starting at `to` and a zero-length word
+      at `to` dropped; the input order kept.
+  P6  `recognitionJob` on P4's clip (the 2 s pad is 600000 ticks at speed
+      2): a middle window, one at the clip's start and one at its end give
+      their padded start, duration, in and length, clamped to the clip; the
+      whole clip gives the job itself; 1 s into the middle sub-run is
+      `Transcriber.project`'s 7 s into the clip's, within 1 tick.
 
 App rows (the app `proof_app` chooses — Debug by default, `RC_PROOF_APP=release`
 for the record; host-state input `media/speech.mov`, whose absence is a
 scored FAIL):
-  G0  no `Frame Job: ` line; `get_transcript` takes exactly clip, language
-      and project, clip required.
+  G0  no `Frame Job: ` line; `get_transcript` takes exactly clip, from,
+      language, project and to, clip required.
   G1  a 5 s clip at 0, `transcribe {engine: assemblyai, place: false}` over
       the fake serving `cloud_captions_proof.DISFLUENT_WORDS`, saved:
       `get_transcript {clip}` answers engine assemblyai, fillers_reported
       true, words (text, start, end) == `mapped(clip, DISFLUENT_WORDS)`,
       filler true exactly on "um,", "Uh", "er"; `get_project` unchanged and
       no AssemblyAI request.
+  G6  on G1's project (TR-13): {from 600000, to 1200000} answers exactly
+      Hello, there and everyone with G1's own times (Hello and everyone
+      across the edges), from/to echoed, count 3; {from 1800000} answers
+      welcome and back with to echoed as 3000000; {to 360000} answers count
+      0 and the windowed note; `get_project` unchanged, no AssemblyAI
+      request. Every bound is asserted on the canvas's frame grid first.
+  G7  the window's refusals by exact sentence on a fresh 5 s clip at 0:
+      (600000, 600000) and (1200000, 600000) empty; (600001, 605000) empty
+      naming the snapped pair; {from 3600000} and {to 0} outside; {from
+      "soon"} the unreadable-time sentence; a bad window with a misspelt
+      language answers the window refusal (the order).
   G2  fillers_proof M3's shape (a clip at 1 s, in 0.5 s): the words equal
       `mapped` for that clip.
   G3  M4's raw edit on G2's package (`disfluencies` out of the marker and
@@ -49,6 +74,11 @@ scored FAIL):
       fillers_reported false, "quick" and "fox" among the normalised words,
       every start in [clip start, clip end), sorted, no AssemblyAI request.
       A named host SKIP when refused as not installed or not available.
+      Its words are kept for G8.
+  G8  speech.mov added as G5 adds it, windowed on G5's "fox" (TR-13): engine
+      apple, a word that normalises to "fox", from/to echoed, every word
+      overlapping the echoed window, fewer words than G5's, no AssemblyAI
+      request. A named host SKIP when G5 was.
   A1  on G1's project, the stand-in turn get_transcript → ripple_delete_ranges
       [[360000, 960000]] ("Hello there", the false start) → "Cut.": finished,
       no error result, the get_transcript result holds G1's words, the clips
@@ -68,6 +98,11 @@ Mutants (`--mutant`), each anchor asserted to occur once in its file:
   fillers-reported-any   fillersReported true for any current marker (P3)
   stale-cache-read       file and marker read with MediaTranscript.read
                          directly, no source stamp (P3)
+  window-start-only      the overlap test is start in [from, to) (P5)
+  window-no-clamp        no max/min against the clip (P4)
+  window-equal-allowed   `to <= from` is `to < from` (P4)
+  window-outside-allowed the `.outside` throw removed (P4)
+  no-recognition-pad     the pad is 0 (P6)
   no-transcript-stop     the `stop?.onCancel { token.cancel() }` line deleted
                          from AgentServer+Transcript.swift in a tree copy
                          (`tree_copy.make_copy` into work/transcript/mutant/tree,
@@ -100,8 +135,8 @@ ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/transcript"
 PROBE = ROOT / "tools/proof/transcript_probe.swift"
 SPEECH = ROOT / "tools/proof/media/speech.mov"
-PROBE_ROWS = ["P0", "P1", "P2", "P3"]
-APP_ROWS = ["G0", "G1", "G2", "G3", "G4", "G5", "A1", "A2", "A3"]
+PROBE_ROWS = ["P0", "P1", "P2", "P3", "P4", "P5", "P6"]
+APP_ROWS = ["G0", "G1", "G6", "G7", "G2", "G3", "G4", "G5", "G8", "A1", "A2", "A3"]
 ROWS = PROBE_ROWS + APP_ROWS
 WALL = 240
 SEC = 600_000
@@ -133,6 +168,25 @@ MUTANTS = {
          "        guard let file = MediaTranscript.read(for: media.id, in: cacheDir),\n"
          "            MediaTranscript.readStamp(for: media.id, in: cacheDir) != nil\n"
          "        else { return nil }\n")]),
+    "window-start-only": (["P5"], [
+        (TR, "word.start < window.to && max(word.end, word.start + 1) > window.from",
+         "word.start >= window.from && word.start < window.to")]),
+    "window-no-clamp": (["P4"], [
+        (TR, "        let lower = max(from ?? job.start, job.start)\n"
+             "        let upper = min(to ?? clipEnd, clipEnd)\n",
+         "        let lower = from ?? job.start\n"
+         "        let upper = to ?? clipEnd\n")]),
+    "window-equal-allowed": (["P4"], [
+        (TR, "if let from, let to, to <= from {", "if let from, let to, to < from {")]),
+    "window-outside-allowed": (["P4"], [
+        (TR, "        guard lower < upper else {\n"
+             "            throw WindowError.outside(\n"
+             "                from: from, to: to, clip: job.clip, start: job.start, end: clipEnd)\n"
+             "        }\n", "")]),
+    "no-recognition-pad": (["P6"], [
+        (TR, "let pad = Ticks((recognitionPadSeconds * Double(ReelTime.perSecond) / speed)"
+             ".rounded(.up))",
+         "let pad: Ticks = 0")]),
     "no-transcript-stop": (["A3"], [(TS, STOP_LINE, None)]),
 }
 APP_MUTANT = "no-transcript-stop"
@@ -237,6 +291,27 @@ def triples(words):
     return [(w.get("text"), w.get("start"), w.get("end")) for w in words]
 
 
+def grid(session):
+    """(on_grid, snap) for the session's canvas rate: whether a tick is a
+    frame boundary, and the frame boundary nearest it (a fixture's expected
+    snapped value, which TR-13's sentences name)."""
+    num, den = session.project()["canvas"]["fps"]
+    per = 600_000 * den
+
+    def on_grid(ticks):
+        return ticks * num % per == 0
+
+    def snap(ticks):
+        frames = (2 * ticks * num + per) // (2 * per)
+        return frames * per // num
+    return on_grid, snap
+
+
+def overlaps(word, lo, hi):
+    """TR-13's overlap rule: a word with no length belongs when lo <= start < hi."""
+    return word["start"] < hi and max(word["end"], word["start"] + 1) > lo
+
+
 def build_mutant_app():
     """(app path, None) or (None, why): the tree copied, the stop line deleted
     from the copy's AgentServer+Transcript.swift, `tree_copy.build_app` run."""
@@ -308,7 +383,7 @@ def app_rows(results, wanted, app_path, mutant=False):
                 schema = app.mcp.schemas().get("get_transcript", {}).get("inputSchema", {})
                 keys = sorted(schema.get("properties", {}))
                 required = schema.get("required")
-                return (not complaints and keys == ["clip", "language", "project"]
+                return (not complaints and keys == ["clip", "from", "language", "project", "to"]
                         and required == ["clip"],
                         f"parity lines {complaints[:3]}; properties {keys}, required {required}")
             run("G0", g0)
@@ -344,6 +419,90 @@ def app_rows(results, wanted, app_path, mutant=False):
                         f"{answer.get('note')!r}; get_project unchanged {before == after}; "
                         f"AssemblyAI requests during the call {sent}")
             run("G1", g1)
+
+            def g6():
+                session, clip = state.get("g1"), state.get("g1_clip")
+                if session is None or clip is None:
+                    return False, "G1's session is not available"
+                on_grid, _ = grid(session)
+                bounds = [600000, 1200000, 1800000, 360000, 0, 5 * SEC]
+                off = [b for b in bounds if not on_grid(b)]
+                if off:
+                    return False, f"fixture bounds {off} are not on the canvas's frame grid"
+                every = {w[0]: w for w in state["g1_words"]}
+                mark = aai_requests()
+                before = session.op("get_project")
+                middle = session.op("get_transcript", clip=clip, **{"from": 600000, "to": 1200000})
+                tail = session.op("get_transcript", clip=clip, **{"from": 1800000})
+                head = session.op("get_transcript", clip=clip, to=360000)
+                after = session.op("get_project")
+                sent = aai_requests() - mark
+                want_middle = [every["Hello"], every["there"], every["everyone"]]
+                want_tail = [every["welcome"], every["back"]]
+                straddle = (every["Hello"][1] < 600000 < every["Hello"][2]
+                            and every["everyone"][1] < 1200000 < every["everyone"][2])
+                note = f"No words were heard in clip {clip} between 0 and 360000 ticks."
+                got_middle = triples(middle.get("words") or [])
+                got_tail = triples(tail.get("words") or [])
+                return (got_middle == want_middle and straddle
+                        and (middle.get("from"), middle.get("to")) == (600000, 1200000)
+                        and middle.get("count") == 3
+                        and got_tail == want_tail
+                        and (tail.get("from"), tail.get("to")) == (1800000, 3000000)
+                        and tail.get("count") == 2
+                        and head.get("count") == 0 and head.get("words") == []
+                        and (head.get("from"), head.get("to")) == (0, 360000)
+                        and head.get("note") == note
+                        and before == after and sent == 0,
+                        f"[600000, 1200000) → {got_middle} (from {middle.get('from')}, to "
+                        f"{middle.get('to')}, count {middle.get('count')}), edges straddled "
+                        f"{straddle}; from 1800000 → {got_tail} (to {tail.get('to')}); to 360000 → "
+                        f"count {head.get('count')}, note {head.get('note')!r}; get_project "
+                        f"unchanged {before == after}; AssemblyAI requests {sent}")
+            run("G6", g6)
+
+            def g7():
+                session = cloud.Session(app, "transcript-G7")
+                try:
+                    media = session.media_of(str(SPEECH))
+                    clip = session.add(media, at=0, duration=5 * SEC)
+                    on_grid, snap = grid(session)
+                    bounds = [600000, 1200000, 3600000, 0, 5 * SEC]
+                    off = [b for b in bounds if not on_grid(b)]
+                    if off:
+                        return False, f"fixture bounds {off} are not on the canvas's frame grid"
+                    lo, hi = snap(600001), snap(605000)
+
+                    def empty(f, to):
+                        return (f"get_transcript: to must be after from: the window from {f} to "
+                                f"{to} ticks (both snapped to frames) is empty.")
+
+                    def outside(bounds_):
+                        return (f"get_transcript: The window {bounds_} is outside clip {clip}, "
+                                f"which plays from 0 to {5 * SEC} ticks.")
+                    cases = [
+                        ({"from": 600000, "to": 600000}, empty(600000, 600000)),
+                        ({"from": 1200000, "to": 600000}, empty(1200000, 600000)),
+                        ({"from": 600001, "to": 605000}, empty(lo, hi)),
+                        ({"from": 3600000}, outside("from 3600000")),
+                        ({"to": 0}, outside("to 0")),
+                        ({"from": "soon"},
+                         "get_transcript: from must be a time in ticks (600000 per second)."),
+                        ({"from": 600000, "to": 600000, "language": "xx-notalanguage"},
+                         empty(600000, 600000)),
+                    ]
+                    wrong = []
+                    for arguments, want in cases:
+                        got = session.error("get_transcript", clip=clip, **arguments)
+                        if got != want:
+                            wrong.append(f"{arguments} → {got!r}, want {want!r}")
+                    return (not wrong and lo == hi,
+                            f"{len(cases) - len(wrong)}/{len(cases)} refusals by their sentence; "
+                            f"(600001, 605000) snapped to ({lo}, {hi})"
+                            + ("" if not wrong else " — " + "; ".join(wrong)))
+                finally:
+                    close(session)
+            run("G7", g7)
 
             def g2():
                 cloud.scenario(aai, disfluent_words=words)
@@ -437,6 +596,7 @@ def app_rows(results, wanted, app_path, mutant=False):
                         return False, f"refused: {refusal!r}"
                     answer = session.op("get_transcript", clip=clip)
                     got = answer.get("words") or []
+                    state["g5_words"] = got
                     spoken = [normalized(w.get("text", "")) for w in got]
                     starts = [w.get("start") for w in got]
                     end = placed["start"] + placed["duration"]
@@ -458,6 +618,45 @@ def app_rows(results, wanted, app_path, mutant=False):
                 finally:
                     close(session)
             run("G5", g5)
+
+            def g8():
+                if state.get("no_device"):
+                    return None, f"G5 was a host skip: {state['no_device'][:160]!r}"
+                whole = state.get("g5_words")
+                fox = next((w for w in whole or [] if normalized(w.get("text", "")) == "fox"),
+                           None)
+                if fox is None:
+                    return False, "G5's words are not available"
+                session = cloud.Session(app, "transcript-G8")
+                try:
+                    media = session.media_of(str(SPEECH))
+                    clip = session.add(media, at=0)
+                    # "fox"'s raw recogniser times widened outward to whole
+                    # frames, so a word shorter than a frame cannot snap to an
+                    # empty window and fail as a refusal.
+                    num, den = session.project()["canvas"]["fps"]
+                    per = 600_000 * den
+                    first = fox["start"] * num // per
+                    last = max(-(-fox["end"] * num // per), first + 1)
+                    mark = aai_requests()
+                    answer = session.op("get_transcript", clip=clip,
+                                        **{"from": first * per // num, "to": last * per // num})
+                    sent = aai_requests() - mark
+                    got = answer.get("words") or []
+                    spoken = [normalized(w.get("text", "")) for w in got]
+                    lo, hi = answer.get("from"), answer.get("to")
+                    inside = (isinstance(lo, int) and isinstance(hi, int)
+                              and all(overlaps(w, lo, hi) for w in got))
+                    return (answer.get("engine") == "apple" and "fox" in spoken and inside
+                            and answer.get("count") == len(got) and len(got) < len(whole)
+                            and sent == 0,
+                            f"fox at [{fox['start']}, {fox['end']}) in G5; window echoed [{lo}, "
+                            f"{hi}); engine {answer.get('engine')}; {len(got)} words {spoken} "
+                            f"against G5's {len(whole)}; every word overlaps {inside}; "
+                            f"AssemblyAI requests {sent}")
+                finally:
+                    close(session)
+            run("G8", g8)
 
             def a1():
                 session, clip = state.get("g1"), state.get("g1_clip")
@@ -594,7 +793,7 @@ def main():
         probe_wanted = ["P0"] + probe_wanted
     if not app_mutant and app_wanted and "G0" not in app_wanted:
         app_wanted = ["G0"] + app_wanted
-    needs = {"G3": "G2", "A1": "G1", "A2": "A1", "A3": "G5"}
+    needs = {"G3": "G2", "A1": "G1", "A2": "A1", "A3": "G5", "G6": "G1", "G8": "G5"}
     for _ in range(3):
         app_wanted = sorted(set(app_wanted) | {needs[r] for r in app_wanted if r in needs},
                             key=APP_ROWS.index)

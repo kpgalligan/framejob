@@ -300,7 +300,10 @@ extension AgentServer {
                     + "at all — false for every on-device run and for a cached transcript made "
                     + "without them, where a filler may be missing from words though it is in "
                     + "the audio (note says so). A clip that plays no speech from a media file "
-                    + "is refused with the reason. It edits nothing and makes no undo step.",
+                    + "is refused with the reason. With from or to it answers only the words "
+                    + "that overlap that part of the timeline, clamped to the clip and echoed "
+                    + "as from and to, and an on-device run then hears only that part and 2 s "
+                    + "either side. It edits nothing and makes no undo step.",
                 [
                     "clip": [
                         "type": "integer",
@@ -316,6 +319,20 @@ extension AgentServer {
                             + "of is refused with the tags it knows, and one whose on-device "
                             + "model is not installed is refused as not installed — a person "
                             + "installs it, this tool never downloads.",
+                    ],
+                    "from": [
+                        "type": "integer",
+                        "description": "Where on the TIMELINE to start reading, in ticks "
+                            + "(600000 per second), snapped to frames; the clip's start by "
+                            + "default. A word across this edge comes back whole, with its own "
+                            + "times.",
+                    ],
+                    "to": [
+                        "type": "integer",
+                        "description": "Where on the TIMELINE to stop reading, in ticks "
+                            + "(600000 per second), snapped to frames; the clip's end by "
+                            + "default. Must be after from. A word across this edge comes back "
+                            + "whole, with its own times.",
                     ],
                 ], required: ["clip"]),
             tool(

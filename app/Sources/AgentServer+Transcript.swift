@@ -21,9 +21,9 @@ extension AgentServer {
 
     /// `get_transcript` — the words Generate Captions… and Remove Filler
     /// Words… read, for one clip. Refused in TR-11's order: the clip, a clip
-    /// with no speech from a media file, the language's spelling, then — with
-    /// no cached transcript only — the installed model and the recogniser's
-    /// own sentence.
+    /// with no speech from a media file, the `from`/`to` window (TR-13), the
+    /// language's spelling, then — with no cached transcript only — the
+    /// installed model and the recogniser's own sentence.
     func getTranscript(_ a: [String: Any]) throws -> String {
         let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16, TR-11)
         guard !Thread.isMainThread else {
@@ -35,6 +35,8 @@ extension AgentServer {
             let document: ProjectDocument
             let job: Transcriber.Job
             let cached: TranscriptReader.Cached?
+            /// The `from`/`to` window, snapped and clamped; nil without one (TR-13).
+            let window: TranscriptReader.Window?
         }
         let context = try onMain { () -> Context in
             let document = try self.target(a)
@@ -45,20 +47,30 @@ extension AgentServer {
                 let reason = outcome.problems.first?.reason ?? "it plays no speech"
                 throw ToolError(message: "Clip \(clip.id) has no words to read: \(reason).")
             }
+            let from = try self.optionalTimeArg(a, "from", document)
+            let to = try self.optionalTimeArg(a, "to", document)
+            let window: TranscriptReader.Window?
+            do {
+                window = try TranscriptReader.window(from: from, to: to, clip: job)
+            } catch let error as TranscriptReader.WindowError {
+                throw ToolError(message: error.localizedDescription)
+            }
             var cached: TranscriptReader.Cached?
             if let cache = document.cacheDirectory, let media = snapshot.media(job.media) {
                 cached = TranscriptReader.cached(for: media, url: job.source, in: cache)
             }
-            return Context(document: document, job: job, cached: cached)
+            return Context(document: document, job: job, cached: cached, window: window)
         }
         let wanted = try stringArg(a, "language")
         try Self.checkSpelling(of: wanted)
 
         let job = context.job
+        let window = context.window
         let words: [TranscriptReader.Word]
         var result: [String: Any]
         if let cached = context.cached {
-            words = TranscriptReader.cloudWords(for: job, in: cached.file)
+            let cloudWords = TranscriptReader.cloudWords(for: job, in: cached.file)
+            words = window.map { TranscriptReader.overlapping(cloudWords, in: $0) } ?? cloudWords
             result = [
                 "engine": TranscriptionEngine.assemblyai.rawValue,
                 "fillers_reported": cached.fillersReported,
@@ -69,13 +81,16 @@ extension AgentServer {
             // The assistant's Stop reaches the run through its own token (AI-16, TR-11).
             let token = Transcriber.CancelToken()
             stop?.onCancel { token.cancel() }
+            // A window narrows what the recogniser hears to it and 2 s either side (TR-13).
+            let run = window.map { TranscriptReader.recognitionJob(job, for: $0) } ?? job
             let runs: [SpeechEngine.Run]
             do {
-                runs = try TranscriptReader.recognize(job, language: language, cancel: token)
+                runs = try TranscriptReader.recognize(run, language: language, cancel: token)
             } catch {
                 throw ToolError(message: error.localizedDescription)
             }
-            words = TranscriptReader.deviceWords(runs, for: job)
+            let heard = TranscriptReader.deviceWords(runs, for: run)
+            words = window.map { TranscriptReader.overlapping(heard, in: $0) } ?? heard
             result = [
                 "engine": TranscriptionEngine.apple.rawValue,
                 "fillers_reported": false,
@@ -87,6 +102,10 @@ extension AgentServer {
         result["clip"] = Int(job.clip)
         result["media"] = Int(job.media)
         result["count"] = words.count
+        if let window {
+            result["from"] = window.from
+            result["to"] = window.to
+        }
         result["words"] = words.map { word -> [String: Any] in
             var row: [String: Any] = [
                 "text": word.text, "start": word.start, "end": word.end, "filler": word.filler,
@@ -95,7 +114,12 @@ extension AgentServer {
             return row
         }
         var notes: [String] = []
-        if words.isEmpty { notes.append("No words were heard in clip \(job.clip).") }
+        if words.isEmpty {
+            notes.append(
+                window.map {
+                    "No words were heard in clip \(job.clip) between \($0.from) and \($0.to) ticks."
+                } ?? "No words were heard in clip \(job.clip).")
+        }
         if result["fillers_reported"] as? Bool != true {
             notes.append(
                 "These words were not transcribed with filler words, so a filler missing here "
