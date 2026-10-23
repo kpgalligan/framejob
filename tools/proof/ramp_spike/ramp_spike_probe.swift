@@ -5,7 +5,7 @@
 // (`-D FRAMEJOB_DEV_TOOLS`), with `Blank.mp4` and a `default.metallib` of the
 // app's own shader beside the binary:
 //
-//     ramp-spike-probe <plan|export|playback> <work-dir> <job.json>
+//     ramp-spike-probe <plan|export|playback|render> <work-dir> <job.json>
 //
 // `job.json` is a list of `{name, project, fixture, reads, length}`: the
 // project is a `project.json` (plan, export) or a `.framejob` package
@@ -38,6 +38,14 @@
 //
 // Each job's document is closed (`document.close()`, `spin(0.5)`) before the
 // next opens: never more than one open (the forty-document deadlock).
+//
+//   render   (SR1b, spec §11 SR-7) `job.json` is a list of `{name, source,
+//            clip_ticks, source_ticks, keep_pitch, destination}`; per job
+//            `RampAudioRenderer.render` writes `destination` and the probe
+//            prints `{name, read: "render", ok, error, path, frames,
+//            channels, wall_s, bytes, latency_frames, pulled_frames,
+//            map_frames, peak_rss_bytes}` (`getrusage`'s `ru_maxrss`, the
+//            process's peak so far). No document is opened.
 import AVFoundation
 import AppKit
 import MediaToolbox
@@ -47,9 +55,9 @@ final class ProbeDocumentController: NSDocumentController {
 }
 
 let arguments = CommandLine.arguments
-guard arguments.count == 4, ["plan", "export", "playback"].contains(arguments[1]) else {
+guard arguments.count == 4, ["plan", "export", "playback", "render"].contains(arguments[1]) else {
     FileHandle.standardError.write(
-        Data("usage: ramp-spike-probe <plan|export|playback> <work-dir> <job.json>\n".utf8))
+        Data("usage: ramp-spike-probe <plan|export|playback|render> <work-dir> <job.json>\n".utf8))
     exit(2)
 }
 let group = arguments[1]
@@ -431,6 +439,63 @@ func framesRead(_ job: Job, _ o: Opened) {
         try data.write(to: url)
         return ["bars": bars, "missing": missing, "frames": count]
     }
+}
+
+// MARK: - Render (SR1b)
+
+struct RenderJob: Decodable {
+    let name: String
+    let source: String
+    let clip_ticks: [Int64]
+    let source_ticks: [Double]
+    let keep_pitch: Bool
+    let destination: String
+}
+
+func peakRSS() -> Int64 {
+    var usage = rusage()
+    guard getrusage(RUSAGE_SELF, &usage) == 0 else { return -1 }
+    return Int64(usage.ru_maxrss)  // bytes on macOS
+}
+
+func renderRead(_ job: RenderJob) {
+    var line: [String: Any] = ["name": job.name, "read": "render", "path": job.destination]
+    let destination = URL(fileURLWithPath: job.destination)
+    try? FileManager.default.removeItem(at: destination)
+    do {
+        let report = try RampAudioRenderer.render(
+            RampAudioRenderer.Job(
+                source: URL(fileURLWithPath: job.source),
+                map: RampAudioMap(clipTicks: job.clip_ticks, sourceTicks: job.source_ticks),
+                keepPitch: job.keep_pitch, destination: destination))
+        line["ok"] = true
+        line["error"] = NSNull()
+        line["frames"] = report.frames
+        line["channels"] = report.channels
+        line["wall_s"] = report.wallSeconds
+        line["bytes"] = report.bytes
+        line["latency_frames"] = report.latencyFrames.map { $0 as Any } ?? NSNull()
+        line["pulled_frames"] = report.pulledFrames.map { $0 as Any } ?? NSNull()
+        line["map_frames"] = report.mapFrames.map { $0 as Any } ?? NSNull()
+    } catch {
+        line["ok"] = false
+        line["error"] = "\(error)"
+    }
+    line["peak_rss_bytes"] = peakRSS()
+    emit(line)
+}
+
+if group == "render" {
+    let renderJobs: [RenderJob]
+    do {
+        renderJobs = try JSONDecoder().decode(
+            [RenderJob].self, from: Data(contentsOf: URL(fileURLWithPath: arguments[3])))
+    } catch {
+        FileHandle.standardError.write(Data("the job file could not be read: \(error)\n".utf8))
+        exit(3)
+    }
+    for job in renderJobs { renderRead(job) }
+    exit(0)
 }
 
 // MARK: - The jobs

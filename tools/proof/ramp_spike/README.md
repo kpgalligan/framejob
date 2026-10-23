@@ -112,3 +112,68 @@ within-2-ticks frame read as its neighbour is excused; S7 keep pitch on, W = 15 
 mutants: `click-off` (the threshold infinite: S2), `dropout-off` (neither dropout test fires:
 S3), `pin-off` (placement always passes: S4), `excuse-all` (every frame may read a neighbour:
 S6), `kwindow-off` (the keep-pitch D window ±2 ms: S7).
+
+## SR1b — the rendered-ramp spike (`render_spike.py`)
+
+SR1 stopped, and the owner chose to render a ramped clip's audio offline (spec §11 SR-6):
+`RampAudioRenderer` (`app/Sources/RampAudioRenderer*.swift`, `RampAudioResampler.swift`,
+`RampCAFWriter.swift`) writes it into a CAF that the composition carries as ONE ×1 clip. **Is
+that rendered audio free of clicks and dropouts, and placed on the ideal map, in export and in
+playback?** The rule is spec §11 SR-7, fixed before the run and pinned by `rule_sha256` in
+`results.json`; the answers are in
+`designs/speed-ramps.md`'s "SR1b — the rendered-audio spike" record.
+
+```sh
+python3 tools/proof/ramp_spike/render_spike.py --selftest                       # S8–S13; no build
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant dense-off    # must exit 1 (S9)
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant merge-all    # must exit 1 (S9)
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant pt1-off      # must exit 1 (S10)
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant identity-off # must exit 1 (S12)
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant on-anchor-off  # must exit 1 (S13)
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_spike/render_spike.py        # every group, every variant
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_spike/render_spike.py --groups render,plan,export --variants RV1,RF1,RC-off-x1
+```
+
+It reuses SR1's fixtures (`work/ramp-spike/fixtures/`), Z0, classifiers and probe; the probe is
+built `-O` as `work/ramp-spike/probe/ramp-render-probe` (render time is measured so), and its
+fourth group, `render`, calls `RampAudioRenderer.render` per job (`{name, source, clip_ticks,
+source_ticks, keep_pitch, destination}`, one stdout line per job with the report and the
+process's peak RSS). Everything else is in `tools/proof/work/ramp-render-spike/` (untracked):
+`renders/` (the CAFs), `projects/`, `runs/`, `r44.wav`, the job and stderr files and
+`results.json`. Groups: `render`, `plan`, `export`, `playback` (bounds 900, 120, 1500 and 2700 s).
+A whole run takes about a quarter of an hour, most of it playback (aloud). Exit codes as SR1's:
+**0** every requested row answered, whatever the VERDICT; **1** an instrument check failed (Z0,
+a render not answered, R44, ID1, a `C-off-*` control in export but C-off-x4's click, F1, PT1's
+tap never called, W0, B1, B2, R-*); **2** not performed.
+
+**The variants** (SR-7). Rendered ramps RV1–RV3 (keep pitch off) and RK1, RK2 (on) are SR1's
+V1–V3 and K1, K2; RF1 is RV1 with every map breakpoint from 2 s reading 2 400 ticks later, judged
+against RV1's map; RV1-edit (RV1 ending ×2.5) is rendered only; RC-off-x0.25…x4 and
+RC-on-x0.5…x2 are rendered constant controls; SR1's composition controls C-off-* and C-on-* run
+unchanged. A rendered variant's map has a breakpoint every 600 ticks; its project holds the
+fixture's video as SR1's G1 segments with `enabled.audio` false and one ×1 clip of the CAF on a
+second track. Playback reads frames for RV1–RV3, RK1, RK2 and every RC-off control.
+
+**The rows.** H0, W0, Z0, B1, B2 as SR1's; R-render (every render answered) and R44 (a 44.1 kHz
+WAV refused as `unreadable`); R-plan, R-export, R-playback; Q-<v> (a rendered variant: the
+written video segments and one ×1 audio segment of the render, pitch `off`); ID1 (RC-off-x1's
+render equals the fixture's samples within 1e-6, both fixtures); RS-<v> (render seconds per audio
+second, bytes per audio second, peak RSS, and with keep pitch on the unit's latency and pulled −
+map frames); RE1 (RV1-edit's render time and how many leading samples equal RV1's); PT1
+(RC-off-x1's tap, the ×1 offset m1 every rendered playback is corrected by, #335); E-<v>, P-<v>
+(placement against the ideal map, the dense click scan, dropout, video), A-<v> (corrected
+playback against export); XR-<v> (export WAV − render at offset 0); PT0 and T335 (C-off-x2's and
+C-off-x1's raw taps); I334 (C-off-x4's export click, #334, reported); F1 (RF1: one click event
+within ±5 ms of 2 s, placement failing); I0. Then the table and `VERDICT: GO | SPLIT — off GO,
+on STOP — … | SPLIT — off STOP, on GO — … | STOP — …`.
+
+**`--selftest`** (no build, no fixture): S8 clean 220, 55 and 880 Hz sines and a 55→880 Hz
+glide — the dense scan finds nothing; S9 4 ms phase jumps at 1.0 and 1.5 s — exactly two events,
+there; S10 a ×1 click train 21 ms early in playback, on time in export — agreement passes with
+PT1's correction and fails without; S11 RF1's shape (1 ms at ×6 phase advance in a 220 Hz sine)
+— one event at its place; S12 a ×1 render one sample late fails the identity check; S13 RC-on
+controls 43 ms late against their C-on reading, the ramps late by the same — the ramps' own rule
+passes and arm ON stops on the anchors. The mutants: `dense-off` (no centre clicks: S9),
+`merge-all` (every clicking centre one event: S9), `pt1-off` (m1 forced to 0: S10),
+`identity-off` (the identity always holds: S12), `on-anchor-off` (the anchor always passes:
+S13).

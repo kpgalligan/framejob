@@ -105,9 +105,14 @@ Each phase records the rules it builds in spec §11 as SR-n entries before its c
   `spectral` with it on (no near-unity band inside a ramp). Audio segments above ×12 are left out
   one by one. Each segment's envelope is the clip's over that span. If SR1 answers
   GO-UNIFORM-LEAD, every audio segment of a ramped clip takes the varispeed lead, scaled or not.
+  *Amended by SR-6 (SR1b):* a ramped clip's AUDIO is not segments: Swift renders it offline into
+  `cache/ramp-audio/` and the composition carries it as one ×1 segment over the clip's slot (no
+  SY-24 lead); the plan's form for it is SR2's, recorded as an SR-6 Amended-by line first.
 - **E — Audio (SR-3).** Keep pitch off glides (varispeed); on is `spectral` under SY-40's
   measured drift and SY-41. Sample agreement between playback, export and expectation is claimed
   for keep pitch off; keep pitch on is measured against the constant-rate controls.
+  *Amended by SR-6 (SR1b):* off is `RampAudioRenderer`'s variable-rate Kaiser-windowed sinc (a
+  tape glide), on is `AVAudioUnitTimePitch` driven offline with its rate set every 256 frames.
 - **F — Reversed clips: no case.** `in` and S are measured in the direction the clip plays
   (`Source::Media` in `model.rs`), so the reversed asset is indexed by the same segments and
   `ReverseMirror` mirrors each.
@@ -164,6 +169,12 @@ re-timing existing captions with a ramp edit.
   playback, against constant-rate controls and a planted fault, by a rule recorded as SR-5 before
   the run. Its verdict — GO, GO-UNIFORM-LEAD, GO-EXPORT-ONLY or STOP — decides G and the lead
   for SR2; anything but GO or GO-UNIFORM-LEAD stops the road map for the owner.
+- **SR1b — the rendered-audio spike, SR-6 and SR-7.** The owner's answer to SR1's STOP: the
+  renderer built as the product files SR2 will call (`RampAudioRenderer.swift`,
+  `RampAudioResampler.swift`, `RampAudioRenderer+TimePitch.swift`, `RampCAFWriter.swift`; no caller, no model, format,
+  plan or composition change) and measured by `tools/proof/ramp_spike/render_spike.py` through
+  SR1's instrument, by SR-7's rule. Its verdict per Keep pitch arm — GO, a named SPLIT, or STOP —
+  decides whether SR2 starts with the renderer (a GO arm only); a STOP goes to the owner.
 - **SR2 — the core target and the plan (A–E).** `speed_map.rs`, the door, the evaluator's rate,
   `content_length_in_source` and the plan's segments, format 27, C's refusals, `core/tests/`
   suites (constant clips' plans byte-identical), spec §5.2, §5.4, §6, §7.2, §7.10; the
@@ -285,3 +296,108 @@ code, and a second spike, SR1b, measures the rendered audio against the same ins
 SR2 starts. The instrument's two failed checks are SR1b's to answer: F1's "clicks at 2 s alone"
 assumed a clean ramp (re-pinned against a rendered ramp), and `C-off-x4`'s export steps are
 #334, a constant-rate defect outside the road map. `C-off-x1`'s −21 ms tap reading is #335.
+
+## SR1b — the rendered-audio spike
+
+**Run 2026-10-23** (ended 13:46:56 −0400, 616 s), the whole spike once on the final instrument:
+`env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_spike/render_spike.py`. Host Mac14,6, macOS
+26.5.1 (25F80), load 22.97 / 36.46 / 41.10 at the start (other sessions on the host), no Frame
+Job running. HEAD `22a332c` with SR1b's files uncommitted (`22a332c…+dirty`). `rule_sha256`
+`4dd0a7def64092d81094e9b2d7e56a5dd6538ab682b07054ebbc0bb8bed2b543` (the §11 file holding SR-6 and
+SR-7, as the run read it). Selftest S8–S13 6/6; each of the five mutants caught (exit 1); SR1's
+`ramp_spike.py --selftest` 7/7 and its five mutants still caught. The probe built `-O`.
+
+Instrument rows: Z0 ok; B2 ok; every read answered (render 33/33, plan 48/48, export 72/72,
+playback 58/58 in 592 s); every Q row ok (a rendered variant's plan: the written video segments
+and one ×1 audio segment of the render, pitch `off`); R44 ok (the 44.1 kHz WAV refused:
+`unreadable("r44.wav is 44100 Hz; only a 48 kHz source with no trim is rendered")`); ID1 ok
+(RC-off-x1's render equals the fixture's samples exactly, max |diff| 0 on both fixtures); PT1 ok
+(RC-off-x1's tap: 348 calls, 30/30, median −21.000 ms, spread 0.000 ms, so m1 = −21.000 ms); every
+C-off-* passes placement and dropout in export and the click rule but for C-off-x4; **F1 ok**
+(RF1 in export: one click event, at 2.000 s, and placement fails, −2.000/2.639 ms); I0 ok, exit 0.
+
+Columns as SR1's: placement (keep pitch off median/spread ms and found; on found and max |diff|
+ms), clicks (events @ the first, s), dropouts, wrong frames, for export (E) and playback (P,
+rendered variants corrected by m1); A playback against export; render s/s the render's wall
+seconds per second of audio. ✗ fails SR-7's rule; `?` a reported keep-pitch control.
+
+| variant | arm | E place | E click | E drop | E video | P place | P click | P drop | P video | A | render s/s |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| RV1 | off | +0.000/0.000 (70/70) | 0 | 0 | 0/240 | +0.000/0.000 (70/70) | 0 | 0 | 0/240 | ok | 0.0274 |
+| RV2 | off | +0.000/0.000 (39/39) | 0 | 0 | 0/240 | +0.000/0.000 (39/39) | 0 | 0 | 0/240 | ok | 0.0147 |
+| RV3 | off | +0.000/0.000 (61/61) | 0 | 0 | 0/180 | +0.000/0.000 (61/61) | 0 | 0 | 0/180 | ok | 0.0248 |
+| RK1 | on | 71/71 max 33.48 ✗ | 0 | 0 | 0/240 | 71/71 max 33.48 ✗ | 0 | 0 | 0/240 | ok | 0.0065 |
+| RK2 | on | 23/23 max 49.36 ✗ | 0 | 0 | 0/240 | 23/23 max 49.36 ✗ | 0 | 0 | 0/240 | ok | 0.0047 |
+| RF1 | — | -2.000/2.639 (70/70) ✗ | 1 @2 ✗ | 0 | 0/240 | -2.000/2.639 (70/70) ✗ | 1 @2 ✗ | 0 | — | ok | 0.0190 |
+| RV1-edit | — | — | — | — | — | — | — | — | — | — | 0.0243 |
+| RC-off-x1 | off | +0.000/0.000 (30/30) | 0 | 0 | 0/180 | +0.000/0.000 (30/30) | 0 | 0 | 0/180 | ok | 0.0096 |
+| C-off-x1 | — | +0.000/0.000 (30/30) | 0 | 0 | 0/180 | -21.000/0.000 (30/30) ✗ | 0 | 0 | — | ✗ | — |
+| RC-off-x0.25 | off | +0.000/0.000 (7/7) | 0 | 0 | 0/180 | +0.000/0.000 (7/7) | 0 | 0 | 0/180 | ok | 0.0135 |
+| C-off-x0.25 | — | -0.063/0.000 (7/7) | 0 | 0 | 0/180 | -0.083/0.000 (7/7) | 0 | 0 | — | ok | — |
+| RC-off-x0.5 | off | +0.000/0.000 (15/15) | 0 | 0 | 0/180 | +0.000/0.000 (15/15) | 0 | 0 | 0/180 | ok | 0.0120 |
+| C-off-x0.5 | — | -0.021/0.000 (15/15) | 0 | 0 | 0/180 | -0.042/0.000 (15/15) | 0 | 0 | — | ok | — |
+| RC-off-x2 | off | +0.000/0.000 (60/60) | 0 | 0 | 0/180 | +0.000/0.000 (60/60) | 0 | 0 | 0/180 | ok | 0.0222 |
+| C-off-x2 | — | +0.010/0.000 (60/60) | 0 | 0 | 0/180 | -0.000/0.000 (60/60) | 0 | 0 | — | ok | — |
+| RC-off-x4 | off | +0.000/0.000 (80/80) | 0 | 0 | 0/120 | +0.000/0.021 (80/80) | 0 | 0 | 0/120 | ok | 0.0405 |
+| C-off-x4 | — | +0.016/0.000 (80/80) | 28 @0.112,0.134,0.304,0.474 ✗ | 0 | 0/120 | +0.000/0.000 (80/80) | 0 | 0 | — | ok | — |
+| RC-on-x0.5 | on (anchor) | 15/15 max 14.14 | 0 | 0 | 0/180 | 15/15 max 14.14 | 0 | 0 | — | ok | 0.0053 |
+| C-on-x0.5 | — | 15/15 max 10.20? | 0 | 2 @0.0694 ✗ | 0/180 | 15/15 max 10.16? | 0 | 0 | — | ok | — |
+| RC-on-x0.9 | on (anchor) | 27/27 max 4.89 | 0 | 0 | 0/180 | 27/27 max 4.89 | 0 | 0 | — | ok | 0.0056 |
+| C-on-x0.9 | — | 25/27 max 4.37? | 0 | 0 | 0/180 | 26/27 max 4.23? | 0 | 0 | — | ok | — |
+| RC-on-x1.1 | on (anchor) | 33/33 max 3.59 | 0 | 0 | 0/180 | 33/33 max 3.59 | 0 | 0 | — | ok | 0.0053 |
+| C-on-x1.1 | — | 33/33 max 3.41? | 0 | 3 @0.1009 ✗ | 0/180 | 33/33 max 3.39? | 0 | 0 | — | ok | — |
+| RC-on-x2 | on (anchor) | 60/60 max 12.60 | 0 | 0 | 0/180 | 60/60 max 12.60 | 0 | 0 | — | ok | 0.0060 |
+| C-on-x2 | — | 59/60 max 10.88? | 0 | 1 @0.265 ✗ | 0/180 | 60/60 max 10.69? | 0 | 0 | — | ok | — |
+
+```
+VERDICT: SPLIT — off GO, on STOP — RK1 export: placement; RK1 playback: placement; RK2 export: placement; RK2 playback: placement
+```
+
+What it shows (findings, for the owner):
+
+- **Keep pitch off: GO.** Every rendered ramp (RV1 ×1→×2 linear, RV2 ×2→×0.5 ease in-out, RV3
+  ×0.25→×4 ease in) and every rendered control places on the ideal map to within 0.000 ms median
+  and 0.000 ms spread (RC-off-x4's playback 0.021 ms), with no click, no dropout and no wrong
+  frame, in export and in playback, and playback agrees with export (after m1). Where SR1's
+  segments clicked at 30–69 boundaries a ramp, the rendered glide clicks nowhere; the planted
+  fault is now the only click the scan finds (RF1, at 2.000 s).
+- **Keep pitch on: STOP, on placement alone.** RK1 (×1.1→×2) and RK2 (×0.9→×0.5) have no click,
+  no dropout and no wrong frame, and agree with export, but are misplaced beyond their controls:
+  RK1 max 33.48 ms against a ceiling of 17.60 (RC-on-x2's 12.60 + 5.0), RK2 49.36 ms against
+  19.14 (RC-on-x0.5's 14.14 + 5.0), identically in export and playback. The error builds across
+  the ramp and then holds: RK1 is about +21 ms late after speeding up, RK2 about −46 ms early
+  after slowing down. Every RC-on anchor passes (each rendered constant control's max |diff| is
+  within 0.2–3.9 ms of the composition's own `spectral` control's), so the unit is right at a constant rate and
+  wrong while its rate moves. The shape fits the rate taking effect about 50 ms after it is set
+  (SR-6 sets it for the block about to be rendered): the unit reports a latency of 0 frames but
+  pulls 3 000–6 000 source frames ahead of the map (pulled − map), i.e. it reads ahead and spends
+  the new rate on input it has already buffered. Not measured further here; a compensation would
+  be a change to SR-6's mechanism, which is the owner's to choose.
+- **Cost.** Render time 0.0047–0.0405 s per second of audio on this loaded host (−O; keep pitch
+  off 0.010–0.041, on 0.005–0.007), 192 512 bytes per second of mono audio (the CAF's header
+  included), the probe's peak RSS 62.6 MiB after 33 renders. An edit re-renders the whole clip:
+  RV1-edit (RV1 ending ×2.5) took 0.194 s against RV1's 0.219 s, and its first 48 000 samples
+  (1.000 s, everything before the ramp starts) are identical to RV1's, so a partial re-render
+  would be possible (not built).
+- **The export is the render.** The export WAV against the render at offset 0: max |diff|
+  0 for RC-off-x1 and ≤ 1.53e-5 (half a 16-bit step, the WAV's quantisation) for every other
+  rendered variant: the ×1 segment passes through untouched.
+- **#334 and #335, answered here.** C-off-x4's export clicks (#334) are outside the verdict: the
+  dense scan finds 28 events in it (I334, reported), its rendered twin RC-off-x4 none. The ×1 tap
+  offset (#335) is −21.000 ms on both C-off-x1 (T335) and RC-off-x1, and only there; PT0
+  (C-off-x2's scaled tap) reads −0.000 ms. Both issues stay open; neither touches the rendered
+  path's verdict.
+
+The verdict is **SPLIT — off GO, on STOP**: SR2 may start with the renderer for Keep pitch off;
+Keep pitch on waits for the owner, with the measurement above.
+
+**The owner's answer (2026-10-23, AskUserQuestion on the SPLIT):** "Resample, then pitch-shift
+(Recommended)". A Keep pitch ramp is made in two stages: the keep-pitch-off resampler sets the
+timing exactly, then Apple's time-pitch unit, held at rate ×1 (so it never changes rate and
+cannot drift), shifts the pitch back by its `pitch` parameter, −1200·log₂(rate) cents, driven
+smoothly from the map. Apple's ±2400-cent range bounds it to ×0.25–×4; outside that range a
+ramp's Keep pitch is refused or falls back to the tape glide, which SR1c decides and records.
+This replaces SR-6's keep-pitch arm (a new §11 entry, SR-8, before the code); a short third
+spike, SR1c, measures it against the same instrument before SR2. The review's two nits (the
+"no audio track" message when a track's format signature is nil, `RampCAFWriter.write`'s
+per-call copy) are SR1c's.

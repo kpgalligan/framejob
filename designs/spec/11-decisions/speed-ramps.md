@@ -9,8 +9,10 @@ Swift's mappers; SR5 the UI and the close). SR-1…SR-3 were recorded in SR1, be
 code, from the owner's decisions of 2026-10-23 on issue #111 (asked and answered in the session
 that opened the road map, quoted in its "The owner's choices"); SR-4 is the working arrangement
 the owner set that day; SR-5, the spike's rule, was recorded before the spike's measured run,
-whose `results.json` pins this file's SHA-256 as `rule_sha256`. Later phases record their rules
-as new entries (SR-6 on) or as Amended-by lines before their code.
+whose `results.json` pins this file's SHA-256 as `rule_sha256`. SR-6, the mechanism the owner
+chose on SR1's STOP (2026-10-23), and SR-7, the second spike's rule, were recorded in SR1b before
+its code and its measured run, whose `results.json` pins this file's SHA-256 again. Later phases
+record their rules as new entries (SR-8 on) or as Amended-by lines before their code.
 
 **Stands, and nothing here re-litigates it:** SY-24 (the varispeed lead: a time-scaled segment
 on an `off` track reads its source 575 ticks earlier; ×1 untouched); SY-26 (one pitch name per
@@ -124,3 +126,130 @@ plan leaves the audio out, one pitch per plan audio track).
   - Risk accepted: the fixtures are synthetic (a click train and one sine), so a real voice's
     artifacts at a boundary are a person's check (SR5); playback is measured at the tap, not at
     the speaker, so device latency stays SY-27's unmeasured part.
+- **SR-6 — A ramped clip's audio is rendered offline by Swift into a cached file, and the
+  composition carries it as ONE ×1 segment over the clip's slot: no rate boundary inside the
+  clip and no SY-24 lead.** The owner's answer to SR1's STOP (2026-10-23, "Render it
+  ourselves"), quoted in the road map; it amends the road map's D and E, and SR-3 stands.
+  - **Where it lives.** In the package's `cache/ramp-audio/` (§5.6, beside `cache/reversed/`):
+    regenerable, never required to open. Swift resolves the file as `ReverseResolution` resolves
+    a reversed clip (`ReverseCache.swift`). Its key is the MEDIA file's (path, size, modification
+    second) as `ReverseCache.digest` keys it — never the file the renderer reads, which may be
+    `AudioRateCopy`'s temporary copy — plus the map, Keep pitch and `RampAudioRenderer.version`.
+    What plays while a render is pending, and the plan's form for the rendered audio, are SR2's,
+    recorded here as Amended-by lines before SR2's code.
+  - **The renderer** (`RampAudioRenderer`, `app/Sources/`) takes the source file, Keep pitch and
+    the clip's map: breakpoints of clip ticks → source ticks (media time in the direction the
+    clip plays), linear between them, sampled by the caller (SR2: the core). It reads only a
+    48 kHz source with no MP3 trim and throws `unreadable` for one that fails
+    `AudioRateCopy.needsCopy(CompositionBuilder.audioFormatSignature(of:),
+    trim: MP3Gapless.leadingTrim(of:track:))`, so the caller hands it `AudioRateCopy`'s copy
+    where one is needed. It streams the source in chunks and drops what is behind the kernel's
+    reach, never holding the clip's whole window (memory is relative to RAM). Its output is
+    32-bit float LPCM CAF at 48 kHz with the source's channels clamped to 1…2,
+    round(duration × 48 000 / 600 000) frames, written as `<destination>.partial` and renamed.
+  - **Keep pitch off: a variable-rate band-limited interpolator, a true tape glide.** Output
+    frame n is at clip tick 12.5·n; p(n) = map(12.5·n) / 12.5 source frames, linear between
+    breakpoints; the local rate r(n) = p(n+1) − p(n). y(n) = Σₖ x[k]·fc·sinc(fc·(p − k))·
+    kaiser((p − k)·fc / Z, β) over |p − k| ≤ Z / fc, fc = min(1, 1/r(n)), Z = 32 zero
+    crossings, β = 9, read from a table of 512 phases per crossing with linear interpolation
+    between phases; a position before the file's frame 0 or past its end reads zero.
+  - **Why that kernel:** a windowed sinc whose cutoff follows the local rate is the standard
+    band-limited resampler — it anti-aliases as the ramp speeds up (fc < 1) and interpolates
+    without imaging as it slows; Kaiser β = 9 puts the stop band near −90 dB, under the 16-bit
+    export's own floor; 32 crossings keep the transition band narrow; and the table's exact
+    zeros make it the identity at ×1 on integer positions, so a constant ×1 render is the
+    source's own samples. A polynomial interpolator (cubic, Lagrange) was not taken: it aliases on
+    a speed-up, and its error on a sine at ×4 is well above that floor.
+  - **Keep pitch on: Apple's time-pitch unit, driven offline.** `AVAudioSourceNode` →
+    `AVAudioUnitTimePitch` (pitch 0, the default overlap) → the main mixer, in `AVAudioEngine`'s
+    offline manual rendering mode (at most 4 096 frames a call). The source is fed sequentially
+    from p(0) − P, P = 4 800 frames always, a position before frame 0 read as zero, so a clip at
+    source 0 runs the same path. Before each 256-frame `renderOffline` the unit's rate is
+    (p(n+256) − p(n)) / 256 clamped to 1/32…32, n counted from output frame round(P / r(0)) (p
+    extended before 0 at r(0) and past the end at the last breakpoint's slope), and the first
+    round(P / r(0)) + the unit's reported latency output frames are discarded. Still Apple's
+    algorithm (SY-41: no own time-stretch).
+  - **Why:** SR1 measured that abutting time-scaled segments click and misplace audio in export
+    and in playback (V1-G1 30 of 61 boundaries clicking in export, a 1.4 ms placement spread);
+    a rendered file has no rate boundary, so the composition plays one ×1 segment, the case
+    SR1's ×1 control showed clean in export. A pre-rendered file in the package's `cache/` is the
+    reversed clip's precedent.
+  - Risk accepted: a ramp's sound waits for a render after every edit of its map (SR1b measures
+    the cost; a partial re-render is not built); the cache holds 192 000 bytes per second of mono
+    audio (384 000 stereo) per rendered map; keep pitch on inherits Apple's unit's own drift and
+    latency, measured against constant-rate controls rather than claimed sample-exact.
+- **SR-7 — The second spike's rule (SR1b), fixed before its run: rendered ramp audio, carried as
+  one ×1 segment, judged against the ideal map, with a verdict per Keep pitch arm.**
+  `tools/proof/ramp_spike/render_spike.py` renders each variant's audio through
+  `RampAudioRenderer` (SR-6; the probe's `render` group, built `-O`), writes it into a project
+  as one ×1 audio clip, and reads that project through the app's own `CompositionBuilder`,
+  `Exporter` and editor player as SR-5's instrument does (export `audio_wav` and `prores_422`;
+  playback the tap and the frames).
+  - **Variants**, on SR-5's fixtures from source `in` 1 s. Rendered ramps RV1, RV2, RV3 (keep
+    pitch off) and RK1, RK2 (on): SR-5's V1–V3 and K1–K2 ramps. RF1, the planted fault: RV1 with
+    every map breakpoint from 2 s reading 2 400 ticks later, judged against RV1's map. Rendered
+    constant controls RC-off-x0.25, -x0.5, -x1, -x2, -x4 and RC-on-x0.5, -x0.9, -x1.1, -x2, at
+    SR-5's control lengths (6 s; ×4 4 s). SR-5's composition controls C-off-* and C-on-*,
+    unchanged (one media clip at the rate). RV1-edit (RV1 ending ×2.5) is rendered only. A
+    rendered variant's map has breakpoints every 600 ticks reading `in + S(t)` in closed form; its
+    project (format 26) holds the fixture's video as SR-5's G1 segments (a control: one segment)
+    with `enabled.audio` false and, on a second track, one ×1 media clip `[0, length)` of the
+    rendered CAF (media `kind` `audio`). Playback reads the frames of RV1–RV3, RK1, RK2 and every
+    RC-off control.
+  - **Placement**, against the ideal map: a click at source c is expected at t = S⁻¹(c − in),
+    clicks within 2 ms of the clip's edges skipped, located by SR-5's method (reach min(60 ms,
+    0.4 × the least expected spacing)) with the template's width ÷ S′(t) when keep pitch is off
+    and unscaled when it is on. **Off**: ≥ 90 % found, |median| ≤ 1.0 ms, spread ≤ 0.5 ms
+    (SY-27). **On, a ramp**: found ≥ (the lower of its two RC-on end-rate controls' found
+    fraction; RK1's are RC-on-x1.1 and -x2, RK2's -x0.9 and -x0.5) − 0.10, and max |diff| ≤ (the
+    greater of their max |diff|) + 5.0 ms. **On, an RC-on-x control (the anchor)**: found ≥
+    C-on-x's (the same rate's composition control) − 0.10 and max |diff| ≤ C-on-x's + 5.0 ms, in
+    the same run and the same output (export or playback), so a renderer-wide offset fails
+    rather than widening the ramps' tolerance. A C-* control's ideal map is its one segment.
+  - **Click** (the sine, channel 0), dense: centres every 2 ms over the clip less 50 ms each end;
+    D(c) = max |x[n] − 2x[n−1] + x[n−2]| over c ± 2 ms; L(c) = the median D over the centres
+    within ±100 ms of c. Keep pitch off, c clicks when D(c) > 4·L(c); keep pitch on, when D(c) >
+    max(4·L(c), D_c), D_c the greatest D the same scan finds over its two RC-on end-rate
+    controls' sine output in the same output (an RC-on or C-on control is its own: reported).
+    Clicking centres within 10 ms of the one before merge into one event, placed at its greatest
+    D. The same scan judges every variant, the C-* controls included.
+  - **Dropout** (the sine): SR-5's (a) and (b), the local output period 1/(220·S′(t)) s with
+    keep pitch off and 1/220 s with it on. **Video**: SR-5's rule, on the written video
+    segments.
+  - **PT1**, the ×1 tap offset (#335): RC-off-x1's playback tap must find ≥ 90 % of its clicks
+    with a spread ≤ 0.5 ms; m1 = its playback median − its export median, and every rendered
+    variant's playback click times are taken − m1 (its playback sine moved by m1 rounded to a
+    sample). When PT1 fails, every rendered variant's playback audio row is unmeasured; the
+    frames are still scored.
+  - **Agreement**, every rendered variant, both arms (one rendered file plays in both outputs):
+    corrected playback minus export click times, |median| ≤ 1.0 ms and spread ≤ 0.5 ms. The C-*
+    controls' agreement is SR-5's, reported.
+  - **Instrument checks** (the run exits 1 and judges nothing): Z0 (SR-5's); every render
+    answered; R44, a 44.1 kHz WAV the runner writes, answers `ok: false` with an `unreadable`
+    error (whenever the `render` group runs); RC-off-x1's render equals the fixture's samples over
+    `[in, in + length)` within 1e-6 on both fixtures; every C-off-* passes placement and dropout in
+    export, and the click rule but for C-off-x4, whose export steps are #334 (reported, never a
+    failure); RF1 in export has exactly one click event, within ±5 ms of 2.000 s, and fails off
+    placement; PT1's tap was called.
+  - **The verdict**, per arm. Arm OFF: RV1, RV2, RV3 and RC-off-*. Arm ON: RK1, RK2, and each
+    RC-on-x's anchor placement (export and playback). An arm is GO when each of its ramps and
+    RC-off controls passes placement, click, dropout and video in export and in playback, plus
+    agreement, and (ON) every anchor passes; a rule not measured fails. `VERDICT: GO` (both
+    arms), `VERDICT: SPLIT — off GO, on STOP — …` or `VERDICT: SPLIT — off STOP, on GO — …`, or
+    `VERDICT: STOP — …`, naming each failing variant and rule. SR2 starts with the renderer for a
+    GO arm only.
+  - Reported, not scored: render wall seconds per audio second, bytes per audio second, the
+    probe's peak RSS, the time-pitch unit's latency and pulled − map frames (on); RV1-edit's
+    render time and how many of its leading samples equal RV1's; the export WAV against the
+    render, max |diff| at offset 0; SR-5's C-on and C-off rows; PT0 (C-off-x2's tap); C-off-x1's
+    raw tap reading (#335); the RC-on rows but for their anchor placement.
+  - **Why:** the owner chose the renderer on SR1's measurement, and this rule reads it through
+    the instrument SR-5 validated, against the continuous map the product will ask for rather
+    than written segments. SR1's two failed checks are answered: F1 is re-pinned on a rendered
+    ramp, where its planted fault must be the only click, and C-off-x4's steps (#334) stay outside
+    the ramp verdict. The dense scan replaces SR-5's boundary windows because a rendered file has
+    no boundary to look at.
+  - Risk accepted: the fixtures are synthetic, so whether a ramp sounds right is a person's check
+    (SR5); the ×1 tap offset is corrected by its own control rather than explained (#335); keep
+    pitch on is measured against controls rendered by the same unit, anchored to the
+    composition's constant-rate `spectral` controls.

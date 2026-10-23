@@ -740,8 +740,9 @@ def z0():
 # ---- the probe ------------------------------------------------------------------
 
 
-def build_probe():
-    """(binary, None) or (None, why)."""
+def build_probe(optimize=False, name="ramp-spike-probe"):
+    """(binary, None) or (None, why). `optimize` builds `-O` (SR1b's render
+    times are measured so, under its own `name`); the defaults are SR1's."""
     PROBE_DIR.mkdir(parents=True, exist_ok=True)
     entry = PROBE_DIR / "main.swift"
     source = PROBE_SWIFT.read_text()
@@ -750,22 +751,24 @@ def build_probe():
     blank = PROBE_DIR / "Blank.mp4"
     if not blank.exists():
         shutil.copy2(BLANK, blank)
-    binary = PROBE_DIR / "ramp-spike-probe"
+    binary = PROBE_DIR / name
     try:
         built = swift_build.build(sources=swift_build.app_sources() + [entry], output=binary,
-                                  defines=["FRAMEJOB_DEV_TOOLS"], timeout=BUILD_WALL)
+                                  defines=["FRAMEJOB_DEV_TOOLS"], optimize=optimize,
+                                  timeout=BUILD_WALL)
     except swift_build.SwiftBuildFailed as error:
         return None, "the probe did not build: " + " | ".join(error.diagnostics[:6])
     return binary, ("reused" if built.reused else f"built in {built.seconds:.1f} s")
 
 
-def run_group(binary, group, jobs):
-    """({(name, read): line}, None) or (partial, why) on a crash or expiry."""
-    job_file = WORK / f"jobs-{group}.json"
+def run_group(binary, group, jobs, work=WORK, walls=WALLS):
+    """({(name, read): line}, None) or (partial, why) on a crash or expiry.
+    `work` and `walls` are SR1b's to move; the defaults are SR1's."""
+    job_file = work / f"jobs-{group}.json"
     job_file.write_text(json.dumps(jobs, indent=1))
-    ran = bounded.run([str(binary), group, str(WORK), str(job_file)], WALLS[group],
+    ran = bounded.run([str(binary), group, str(work), str(job_file)], walls[group],
                       cwd=str(binary.parent))
-    (WORK / f"stderr-{group}.txt").write_text(ran["stderr"] or "")
+    (work / f"stderr-{group}.txt").write_text(ran["stderr"] or "")
     lines = {}
     for text in (ran["stdout"] or "").splitlines():
         if not text.startswith("{"):
@@ -777,7 +780,7 @@ def run_group(binary, group, jobs):
         if "name" in line and "read" in line:
             lines[(line["name"], line["read"])] = line
     if ran["expired"]:
-        return lines, f"the {group} probe ran past {WALLS[group]} s and was killed"
+        return lines, f"the {group} probe ran past {walls[group]} s and was killed"
     if ran["rc"] != 0:
         return lines, f"the {group} probe exited {ran['rc']}: {(ran['stderr'] or '').strip()[-300:]}"
     return lines, None

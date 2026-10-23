@@ -1163,6 +1163,16 @@ the key map behind it.
   source track's time 0 (a leading empty edit is skipped and zero-padded),
   made blocking on the first build that needs it; reversed-only media are
   not copied.
+- `RampAudioRenderer.swift` (+`TimePitch`) · `RampAudioResampler.swift` ·
+  `RampCAFWriter.swift` — a speed ramp's audio rendered offline into one
+  file the composition plays at ×1 (speed ramps SR1b, spec §11 SR-6): a
+  `RampAudioMap` (clip ticks → source ticks) and a 48 kHz source (refused
+  as `unreadable` otherwise, `AudioRateCopy.needsCopy`'s test), streamed
+  through `RampSourceReader`; Keep pitch off by the Kaiser-windowed sinc
+  resampler (`RampAudioResampler`, cutoff following the local rate, exact
+  at ×1), Keep pitch on by Apple's time-pitch offline (+`TimePitch`, the
+  spike arm SR-8 replaces); written as a 32-bit float CAF through a
+  `.partial` file. No caller in the app until SR2.
 - `MP3Gapless.swift` — the LAME/Xing tag reader (pure) and `leadingTrim`, the
   encoder delay Core Audio leaves in when it reports no packet table: the
   48 kHz copy and the sync reader skip it (SY-36, SY-38), and so do the
