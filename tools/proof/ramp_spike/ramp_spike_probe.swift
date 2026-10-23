@@ -44,8 +44,9 @@
 //            `RampAudioRenderer.render` writes `destination` and the probe
 //            prints `{name, read: "render", ok, error, path, frames,
 //            channels, wall_s, bytes, latency_frames, pulled_frames,
-//            map_frames, peak_rss_bytes}` (`getrusage`'s `ru_maxrss`, the
-//            process's peak so far). No document is opened.
+//            delay_frames, oversampling, peak_rss_bytes}` (SR1c: keep pitch
+//            on's D_K and K; `getrusage`'s `ru_maxrss`, the process's peak so
+//            far). No document is opened.
 import AVFoundation
 import AppKit
 import MediaToolbox
@@ -476,7 +477,8 @@ func renderRead(_ job: RenderJob) {
         line["bytes"] = report.bytes
         line["latency_frames"] = report.latencyFrames.map { $0 as Any } ?? NSNull()
         line["pulled_frames"] = report.pulledFrames.map { $0 as Any } ?? NSNull()
-        line["map_frames"] = report.mapFrames.map { $0 as Any } ?? NSNull()
+        line["delay_frames"] = report.delayFrames.map { $0 as Any } ?? NSNull()
+        line["oversampling"] = report.oversampling.map { $0 as Any } ?? NSNull()
     } catch {
         line["ok"] = false
         line["error"] = "\(error)"

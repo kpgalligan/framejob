@@ -11,8 +11,11 @@ that opened the road map, quoted in its "The owner's choices"); SR-4 is the work
 the owner set that day; SR-5, the spike's rule, was recorded before the spike's measured run,
 whose `results.json` pins this file's SHA-256 as `rule_sha256`. SR-6, the mechanism the owner
 chose on SR1's STOP (2026-10-23), and SR-7, the second spike's rule, were recorded in SR1b before
-its code and its measured run, whose `results.json` pins this file's SHA-256 again. Later phases
-record their rules as new entries (SR-8 on) or as Amended-by lines before their code.
+its code and its measured run, whose `results.json` pins this file's SHA-256 again. SR-8, the
+Keep pitch mechanism the owner chose on SR1b's SPLIT (2026-10-23), and SR-9, the third spike's
+rule, were recorded in SR1c before its code and its measured run, whose `results.json` pins this
+file's SHA-256 again. Later phases record their rules as new entries (SR-10 on) or as Amended-by
+lines before their code.
 
 **Stands, and nothing here re-litigates it:** SY-24 (the varispeed lead: a time-scaled segment
 on an `off` track reads its source 575 ticks earlier; ×1 untouched); SY-26 (one pitch name per
@@ -169,6 +172,9 @@ plan leaves the audio out, one pitch per plan audio track).
     extended before 0 at r(0) and past the end at the last breakpoint's slope), and the first
     round(P / r(0)) + the unit's reported latency output frames are discarded. Still Apple's
     algorithm (SY-41: no own time-stretch).
+    *Amended by SR-8 (SR1c):* keep pitch on is three stages — the keep-pitch-off interpolator at
+    48 kHz × K, the time-pitch unit held at ×1 shifting the pitch by −1200·log₂(rate) cents, and a
+    fixed decimation by K — with the delay D_K discarded; the rate-driven unit above is replaced.
   - **Why:** SR1 measured that abutting time-scaled segments click and misplace audio in export
     and in playback (V1-G1 30 of 61 boundaries clicking in export, a 1.4 ms placement spread);
     a rendered file has no rate boundary, so the composition plays one ×1 segment, the case
@@ -253,3 +259,90 @@ plan leaves the audio out, one pitch per plan audio track).
     (SR5); the ×1 tap offset is corrected by its own control rather than explained (#335); keep
     pitch on is measured against controls rendered by the same unit, anchored to the
     composition's constant-rate `spectral` controls.
+- **SR-8 — Keep pitch on is resample, then pitch-shift: the keep-pitch-off glide sets the timing
+  at 48 kHz × K, Apple's time-pitch unit held at ×1 shifts the pitch back, and a fixed decimation
+  by K returns 48 kHz.** The owner's answer to SR1b's SPLIT (2026-10-23, "Resample, then
+  pitch-shift"), quoted in the road map; it replaces SR-6's keep-pitch arm (its Amended-by line),
+  and SR-6's keep-pitch-off arm, the file, the cache and SR-3 stand.
+  - **K**, the oversampling: `oversampling(map)` = min(4, max(1, ⌈the map's steepest slope −
+    1e−9⌉)), so every stage below runs at 48 kHz × K (48–192 kHz).
+  - **Stage 1** is SR-6's keep-pitch-off interpolator on the same map at 48 kHz × K: stage-1
+    frame j is the kernel at p(j / K) (p in 48 kHz source frames, the map read at clip tick
+    12.5 · j / K) with the rate p((j+1)/K) − p(j/K), from j = −P·K, P = 4 800 output frames
+    (100 ms); the map extrapolates before 0 at its first slope and a file frame before 0 reads
+    zero. Below ×K the cutoff stays at the source's 24 kHz. The source reader opens at the first
+    4 096-frame chunk's reach, `chunk(map, from: −P·K, count: 4096, per: K).lo`, so the
+    pre-roll reads the file, not zeros.
+  - **Stage 2**: `AVAudioSourceNode` (stage 1) → `AVAudioUnitTimePitch` (rate 1, the default
+    overlap) → the main mixer, in `AVAudioEngine`'s offline manual rendering at 48 kHz × K, at
+    most 4 096 frames a call. Before each 256-frame `renderOffline` producing stage-2 frames
+    s … s + 255: k = s − P·K − D_K, r = K · (p((k + 256)/K) − p(k/K)) / 256, and the unit's
+    `pitch` = clamp(−1200·log₂ r, −2400 … 2400) cents.
+  - **Discard**: kept stage-2 frame i is stage-2 frame i + P·K + D_K. D_K
+    (`timePitchDelayFrames[K − 1]`, stage-2 frames) is the unit's own delay at ×1, measured by
+    SR1c's render-only run as max(0, round(the median, over that K's constant RC-on renders, of
+    each render's signed median click offset in ms × 48·K)), 0 where every such median is within
+    0.1 ms; the unit's reported latency is reported only. A constant is sound because the unit's
+    rate never changes.
+  - **Stage 3** (K > 1): output frame m is SR-6's kernel at rate K at kept position K·m — a fixed
+    decimation, cut at 24 kHz — the pre-roll supplying the kept frames before 0. K = 1 has no
+    stage 3: output frame m is kept frame m.
+  - **Past ×0.25–×4 the excess glides like tape**: the owner's tape-glide option, applied
+    continuously from the bound so there is no jump. The command is clamped at ±2400 cents, so
+    timing stays exact and the pitch moves by 1200·log₂(r/4) cents above ×4 and 1200·log₂(r/0.25)
+    below ×0.25. Nothing is refused.
+  - **Why:** the unit's rate never changes, so it cannot drift as SR1b's rate-driven unit did
+    (RK1 about +21 ms late, RK2 about −46 ms early); the timing is the glide SR1b measured exact.
+    Oversampling keeps a speed-up's band to 24 kHz up to ×4 — at 48 kHz everything above
+    24 kHz / r would be lost (12 kHz at ×2, 6 kHz at ×4) — and the decimation is SR-6's own
+    kernel. Still Apple's algorithm (SY-41: no own time-stretch).
+  - **Cost:** stage 1 about 64·K kernel taps per output frame per channel, stage 2 K times the
+    48 kHz unit's work, stage 3 64·K taps; measured in SR1c's RS rows.
+  - Risk accepted: the pitch command may lag the content (SR1c's LG rows; not compensated);
+    past ×4 the band above 24 kHz · 4 / r is lost and the pitch rises by the excess; the unit at
+    96–192 kHz is proven only by SR1c's run.
+- **SR-9 — The third spike's rule (SR1c), fixed before its run: SR-7's arm ON re-run on the SR-8
+  renderer, plus the rendered pitch, with a verdict for arm ON alone.**
+  `tools/proof/ramp_spike/render_spike.py --verdict on` with `--variants RK1,RK2,RC-on-x0.5,
+  RC-on-x0.9,RC-on-x1.1,RC-on-x2,C-on-x0.5,C-on-x0.9,C-on-x1.1,C-on-x2,RC-off-x1,RC-on-x1,
+  RC-on-x3,RC-on-x6,RC-on-x0.2,RB-on-x2`, every group, through SR-7's instrument.
+  - **Variants.** SR-7's RK1, RK2, RC-on-x0.5…x2, C-on-x0.5…x2 and RC-off-x1 (PT1), unchanged.
+    Rendered only, both fixtures, never staged into a project: RC-on-x1 (×1, 6 s), RC-on-x3 (×3,
+    4 s), RC-on-x6 (×6, 2 s), RC-on-x0.2 (×0.2, 6 s), keep pitch on. RB-on-x2 (×2, 6 s, keep pitch
+    on), rendered only, from `band.wav`, a 20 s 48 kHz mono 15 kHz sine at amplitude 0.5 the
+    runner writes.
+  - **Scoring**: SR-7's arm ON rule unchanged — RK1 and RK2 against their RC-on end-rate
+    controls (placement, click, dropout, video, in export and in playback, plus agreement), each
+    RC-on anchor against its C-on control in export and in playback — **plus pitch**, read from
+    the sine render's channel 0: each RC-on anchor's, RK1's and RK2's PR |median cents| ≤ 25, and
+    RK1's and RK2's LG RMS cents at the best τ ≤ 25. A rule not measured fails. A failure names
+    the variant and `pitch` or `pitch lag`.
+  - **The pitch reading (PR)**: 40 ms windows every 10 ms over the clip less 50 ms each end; in
+    each, f = (the positive-going zero crossings − 1) / (the last crossing's time − the first's),
+    each crossing linearly interpolated; f_e(t) = 220 · r(t) · 2^(c(t)/1200), r the ideal map's
+    rate and c = clamp(−1200·log₂ r, ±2400) the command; per window the cents
+    1200·log₂(f / f_e); PR's median cents is the median of those (signed), reported with the
+    median f and the median and max |cents|. PR-source reads the sine fixture over [1 s, 7 s)
+    against 220 Hz.
+  - **The lag (LG)**, RK1 and RK2: over τ ∈ [−100, 300] ms in 1 ms steps, the τ minimising the
+    RMS of PR's windows' cents against 220 · r(t) · 2^(c(t − τ)/1200); the RMS at that τ and at 0.
+  - **PT1** from RC-off-x1, as in SR-7. **Instrument checks** (exit 1, nothing judged): Z0, every
+    render answered, R44 refused as `unreadable`, ID1 (RC-off-x1's render is the fixture's
+    samples), PT1's tap called.
+  - **The verdict**: `VERDICT: GO — arm ON …` when arm ON has no failure, else `VERDICT: STOP —
+    <each failing variant and rule>`. GO lets SR2 start with both arms.
+  - **Off-arm identity**, before the measured run: a render-only run of RV1, RV2, RV3, RF1,
+    RV1-edit and RC-off-*, both fixtures, each CAF equal byte for byte to SR1b's
+    (`ramp-render-spike-sr1b/renders/`), or the phase stops.
+  - Reported, not scored: RS (render seconds per audio second, bytes, peak RSS, K, the unit's
+    reported latency, D_K, pulled − K · frames); RP-<name> (a keep-pitch render's clicks against
+    the ideal map: found, signed median ms, max |diff| ms); PR-<name> for every keep-pitch sine
+    render and PR-source; LG-RK1, LG-RK2; BW-RB-on-x2 (the 15 kHz level over [1 s, 5 s) of the
+    render, in dB re `band.wav`'s over [1 s, 11 s)); SR-7's other rows.
+  - **Why:** SR-7's arm ON rule is what stopped SR1b, so it is re-run as it stands; it never
+    looked at pitch, which is the point of Keep pitch, so pitch is scored here, before the run,
+    with a lag reading because a pitch command can only follow the rate behind the unit's
+    window.
+  - Risk accepted: a 25-cent bound is a quarter of a semitone, tighter than the ear on speech and
+    looser than on a held tone; the pitch reader is a zero-crossing count on a pure sine, so a
+    real voice's pitch is a person's check (SR5).

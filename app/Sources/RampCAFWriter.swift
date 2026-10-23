@@ -34,13 +34,15 @@ final class RampCAFWriter {
     /// The first `frames` interleaved frames of `samples`.
     func write(_ samples: [Float], frames: Int) throws {
         guard let file = file, frames > 0 else { return }
-        var copy = samples
-        let status = copy.withUnsafeMutableBytes { raw -> OSStatus in
+        // `ExtAudioFileWrite` only reads the buffer, so the array's own storage
+        // is passed (cast mutable for `AudioBuffer`), never a copy of it.
+        let status = samples.withUnsafeBufferPointer { values -> OSStatus in
             var list = AudioBufferList(
                 mNumberBuffers: 1,
                 mBuffers: AudioBuffer(
                     mNumberChannels: UInt32(channels),
-                    mDataByteSize: UInt32(frames * channels * 4), mData: raw.baseAddress))
+                    mDataByteSize: UInt32(frames * channels * 4),
+                    mData: UnsafeMutableRawPointer(mutating: values.baseAddress)))
             return ExtAudioFileWrite(file, UInt32(frames), &list)
         }
         guard status == noErr else {

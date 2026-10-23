@@ -113,6 +113,11 @@ Each phase records the rules it builds in spec §11 as SR-n entries before its c
   for keep pitch off; keep pitch on is measured against the constant-rate controls.
   *Amended by SR-6 (SR1b):* off is `RampAudioRenderer`'s variable-rate Kaiser-windowed sinc (a
   tape glide), on is `AVAudioUnitTimePitch` driven offline with its rate set every 256 frames.
+  *Amended by SR-8 (SR1c):* on is resample, then pitch-shift — the off arm's glide at 48 kHz × K
+  (K = ⌈max rate⌉, 1…4), `AVAudioUnitTimePitch` held at ×1 with `pitch` = −1200·log₂ rate cents
+  clamped to ±2400 (past ×0.25–×4 the excess glides like tape, the owner's tape-glide option
+  applied continuously from the bound), a measured constant delay D_K discarded, and a fixed
+  decimation by K.
 - **F — Reversed clips: no case.** `in` and S are measured in the direction the clip plays
   (`Source::Media` in `model.rs`), so the reversed asset is indexed by the same segments and
   `ReverseMirror` mirrors each.
@@ -175,6 +180,13 @@ re-timing existing captions with a ramp edit.
   plan or composition change) and measured by `tools/proof/ramp_spike/render_spike.py` through
   SR1's instrument, by SR-7's rule. Its verdict per Keep pitch arm — GO, a named SPLIT, or STOP —
   decides whether SR2 starts with the renderer (a GO arm only); a STOP goes to the owner.
+- **SR1c — Keep pitch as resample, then pitch-shift, SR-8 and SR-9.** The owner's answer to
+  SR1b's SPLIT: `RampAudioRenderer+TimePitch.swift` rewritten as SR-8's three stages over a new
+  `RampVarispeedStream.swift` (the glide as a forward stream, the off arm's own loop moved out of
+  `RampAudioRenderer.swift`); SR1b's two review nits; no caller, model, format, plan or
+  composition change. `render_spike.py --verdict on` re-runs SR-7's arm ON and scores the
+  rendered pitch by SR-9; the off arm's renders are shown byte-identical to SR1b's. GO lets SR2
+  start with both arms; a STOP goes to the owner with the measurement.
 - **SR2 — the core target and the plan (A–E).** `speed_map.rs`, the door, the evaluator's rate,
   `content_length_in_source` and the plan's segments, format 27, C's refusals, `core/tests/`
   suites (constant clips' plans byte-identical), spec §5.2, §5.4, §6, §7.2, §7.10; the
@@ -401,3 +413,126 @@ This replaces SR-6's keep-pitch arm (a new §11 entry, SR-8, before the code); a
 spike, SR1c, measures it against the same instrument before SR2. The review's two nits (the
 "no audio track" message when a track's format signature is nil, `RampCAFWriter.write`'s
 per-call copy) are SR1c's.
+
+## SR1c — Keep pitch as resample, then pitch-shift
+
+**Run 2026-10-23** (ended 15:18:06 −0400, 291 s), the measured run once on the final instrument:
+`env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_spike/render_spike.py --variants
+RK1,RK2,RC-on-x0.5,RC-on-x0.9,RC-on-x1.1,RC-on-x2,C-on-x0.5,C-on-x0.9,C-on-x1.1,C-on-x2,RC-off-x1,
+RC-on-x1,RC-on-x3,RC-on-x6,RC-on-x0.2,RB-on-x2 --verdict on`. Host Mac14,6, macOS 26.5.1
+(25F80), load 74.19 / 54.28 / 37.88 at the start (other sessions on the host), no Frame Job
+running. HEAD `14a0edb` with SR1c's files uncommitted (`14a0edb…+dirty`). `rule_sha256`
+`93b7f2aed524f75232bf828f81e5b583cf25480f834b8a8daa2af3f6865607be` (the §11 file holding SR-8 and
+SR-9, as the run read it). Selftest S8–S17 10/10; each of the nine mutants caught (exit 1); SR1's
+`ramp_spike.py --selftest` 7/7. The probe built `-O`. SR1b's work folder was copied first to
+`tools/proof/work/ramp-render-spike-sr1b/`; its `results.json` still hashes `ad1ddbe8…f9f7f`.
+
+**The mechanism is feasible.** The engine renders at 96, 144 and 192 kHz (K = 2, 3, 4) with no
+refusal, and every constant render holds its pitch: PR median within 0.02 cents of f_e at every
+rate (RC-on-x0.2 175.998 Hz, the excess below ×0.25 gliding down 1200·log₂(0.8) = −386 cents
+as SR-8 says; RC-on-x6 330.001 Hz, the excess above ×4 gliding up by ×1.5; every other rate
+220.000 ± 0.002 Hz; PR-source 220.000 Hz). No fall-back to K = 1 was needed. **The band
+survives**: BW-RB-on-x2, a 15 kHz tone through a ×2 Keep pitch render, +0.01 dB re the source
+(−6.01 against −6.02 dBFS), where a 48 kHz pipeline would have cut everything above 12 kHz.
+
+**D_K**, from the render-only run with every D_K 0 (`--groups render --variants RC-on-x0.5,
+RC-on-x0.9,RC-on-x1,RC-on-x1.1,RC-on-x2,RC-on-x3,RC-on-x6,RB-on-x2`), each RP signed median: K = 1
+x0.9 +0.060 ms, x1 +0.000 ms (x0.5 found no click: below), K = 2 x1.1 +0.006, x2 +0.077, K = 3
+x3 −0.060 — every one within 0.1 ms, so D_1 = D_2 = D_3 = 0; K = 4 x6 +0.9375 ms, so D_4 =
+round(0.9375 × 192) = 180 stage-2 frames. The re-run with D_4 = 180 reads x6 +0.000 ms (max
+|diff| 5.38 → 4.44 ms); the other rates are unchanged (their D is 0). The spread across rates at
+one K is 0.060 ms (K = 1) and 0.071 ms (K = 2). The unit reports a latency of 0 at every K, and
+pulls 3 904 (K = 1), 8 064 (K = 2), 8 128 (K = 3) and 8 448 (K = 4, with D_4) stage-1 frames past
+K · frames: its look-ahead, at a constant rate harmless.
+
+**The off arm is unchanged**: a render-only run of RV1, RV2, RV3, RF1, RV1-edit and RC-off-* wrote
+20 CAFs each equal byte for byte (`cmp`) to SR1b's; ID1 ok (max |diff| 0 on both fixtures). **The
+product mutant** (`pitchCents`'s sign flipped, RC-on-x2) read PR 880.000 Hz, +2400 cents, as
+an octave up from the wrong sign must; the sign restored.
+
+Instrument rows: Z0 ok; B2 ok; every read answered (render 24/24, plan 22/22, export 33/33,
+playback 25/25 in 272 s); every Q row ok; R44 ok (refused `unreadable`); ID1 ok; PT1 ok
+(RC-off-x1's tap: 348 calls, 30/30, median −21.000 ms, spread 0.000, so m1 = −21.000 ms); I0 ok,
+exit 0.
+
+Columns as SR1b's. ✗ fails SR-9's rule (SR-7's arm ON); `?` a reported composition control.
+
+| variant | arm | E place | E click | E drop | E video | P place | P click | P drop | P video | A | render s/s |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| RK1 | on | 66/71 max 0.85 | 0 | 17 @1.089 ✗ | 0/240 | 66/71 max 0.85 | 0 | 17 @1.089 ✗ | 0/240 | ok | 0.0628 |
+| RK2 | on | 9/23 max 1.21 ✗ | 0 | 9 @1.121 ✗ | 0/240 | 9/23 max 1.21 ✗ | 0 | 9 @1.121 ✗ | 0/240 | ok | 0.0184 |
+| RC-on-x0.5 | on (anchor) | 0/15 ✗ | 0 | 0 | 0/180 | 0/15 ✗ | 0 | 0 | — | ✗ | 0.0177 |
+| RC-on-x0.9 | on (anchor) | 27/27 max 0.90 | 0 | 0 | 0/180 | 27/27 max 0.90 | 0 | 0 | — | ok | 0.0208 |
+| RC-on-x1.1 | on (anchor) | 33/33 max 0.99 | 0 | 0 | 0/180 | 33/33 max 0.99 | 0 | 0 | — | ok | 0.0588 |
+| RC-on-x2 | on (anchor) | 55/60 max 0.85 | 0 | 0 | 0/180 | 55/60 max 0.85 | 0 | 0 | — | ok | 0.0451 |
+| C-on-x0.5 | — | 15/15 max 10.20? | 0 | 0 | 0/180 | 15/15 max 10.16? | 0 | 0 | — | ok | — |
+| C-on-x0.9 | — | 26/27 max 4.27? | 0 | 0 | 0/180 | 26/27 max 4.23? | 0 | 0 | — | ok | — |
+| C-on-x1.1 | — | 33/33 max 3.41? | 0 | 1 @0.565 ✗ | 0/180 | 33/33 max 3.39? | 0 | 0 | — | ok | — |
+| C-on-x2 | — | 60/60 max 10.90? | 0 | 1 @0.05 ✗ | 0/180 | 60/60 max 10.69? | 0 | 0 | — | ok | — |
+| RC-off-x1 | off | +0.000/0.000 (30/30) | 0 | 0 | 0/180 | +0.000/0.000 (30/30) | 0 | 0 | 0/180 | ok | 0.0103 |
+| RC-on-x1 | — | — | — | — | — | — | — | — | — | — | 0.0122 |
+| RC-on-x3 | — | — | — | — | — | — | — | — | — | — | 0.0702 |
+| RC-on-x6 | — | — | — | — | — | — | — | — | — | — | 0.1386 |
+| RC-on-x0.2 | — | — | — | — | — | — | — | — | — | — | 0.0200 |
+| RB-on-x2 | — | — | — | — | — | — | — | — | — | — | 0.0451 |
+
+Pitch and lag (from the renders): PR-RK1 787 windows, median 220.001 Hz, median +0.00 cents,
+|cents| median 0.01, max 130.98; PR-RK2 219.999 Hz, −0.01 cents, |cents| median 0.02, max 145.14;
+every RC-on anchor within 0.01 cents (max 0.08). **LG-RK1 τ +56 ms, RMS 28.25 cents at τ (31.84
+at 0) ✗**; LG-RK2 τ +46 ms, RMS 20.65 at τ (24.36 at 0). RP (the renders' own clicks): RK1 66/71
+median −0.017 ms max 0.85; RK2 9/23 +0.709 ms max 1.21; RC-on-x0.5 0/15; RC-on-x0.2 0/6; RC-on-x1
+30/30 +0.000; x0.9, x1.1, x2, x3, x6 as above.
+
+```
+VERDICT: STOP — RK1 export: dropout; RK1 playback: dropout; RK2 export: placement, dropout; RK2 playback: placement, dropout; RC-on-x0.5 export: anchor placement; RC-on-x0.5 playback: anchor placement; RK1: pitch lag
+```
+
+What it shows (findings, for the owner):
+
+- **The timing is fixed.** Every click SR1c finds is within 1.21 ms of the ideal map (RK1 max
+  0.85 ms where SR1b's rate-driven unit read 33.48; RK2 1.21 where it read 49.36), the export is
+  the render (XR ≤ 1.53e-5, the WAV's quantisation) and playback agrees with export (RK1 0.001 ms
+  spread). The drift SR1b stopped on is gone: the unit at ×1 does not drift.
+- **The pitch holds at a constant rate and follows a ramp about 50 ms late.** Every constant
+  render reads f_e within 0.08 cents; across a ramp the median holds (RK1 +0.00, RK2 −0.01 cents)
+  but the windows where the rate is moving read up to 131 (RK1) and 145 (RK2) cents off. The lag
+  fit puts the pitch command τ = +56 ms (RK1) and +46 ms (RK2) behind the content; RK1's residual
+  at τ, 28.25 cents RMS, is over SR-9's 25, RK2's 20.65 under. Compensating it (setting the
+  command ahead by τ) is out of SR1c's scope (the owner's call).
+- **The ramps drop out while the pitch moves.** RK1 shows 17 dropouts between 1.089 and 2.987 s,
+  about every 117 ms through its 1–3 s ramp and nowhere outside it; RK2 9 between 1.121 and
+  2.742 s, their spacing widening as it slows. Identical in export and playback, so they are in
+  the render. No constant render drops out, so the cause is the unit's pitch changing every 256
+  frames; not measured further here.
+- **A slowed click loses its shape.** RC-on-x0.5's render finds 0 of its 15 clicks, RC-on-x0.2 0
+  of 6, and RK2 finds 9 of 23 — every click to ×0.65, one past it (at ×0.53), none from ×0.50 on — although the click energy sits on its
+  expected sample (a look at RC-on-x0.5's render: each click's peak at +0.0 ms): the glide widens
+  a click by 1/r and the unit's octave-up shift does not restore its form, so the template's
+  correlation falls under 0.5. That is the placement rule's reading, and it fails RC-on-x0.5's
+  anchor and RK2's placement; the timing itself is not wrong.
+- **Cost.** 0.012–0.139 s per second of audio on this loaded host (−O): K = 1 0.012–0.021, K = 2
+  0.045–0.063, K = 3 0.070, K = 4 0.139 (x6), against SR1b's rate-driven 0.005–0.007; the
+  keep-pitch-off glide 0.010. Bytes per second as SR1b's (192 512–194 048 with the header); the
+  probe's peak RSS 68.7 MiB after 24 renders.
+- **The clamp** past ×0.25–×4 is the owner's tape-glide option applied to the excess: RC-on-x6
+  reads 330 Hz (×6 / ×4 = ×1.5 above 220) and RC-on-x0.2 176 Hz (×0.8), each exactly on f_e, with
+  the timing exact.
+- **SR1b's two review nits are fixed**: a track whose format signature cannot be read now answers
+  `unreadable("<file>'s audio format cannot be read")`, no longer "has no audio track"; and
+  `RampCAFWriter.write` passes the array's own storage to `ExtAudioFileWrite` instead of copying
+  the buffer on every call (the off arm's CAFs byte-identical).
+
+The verdict is **STOP**: arm ON fails on RK1's and RK2's dropouts, RK2's placement count,
+RC-on-x0.5's anchor placement and RK1's pitch lag. SR2 may start with the renderer for Keep pitch
+off only (SR1b's GO); Keep pitch on waits for the owner, with the measurement above.
+
+**The owner's answer (2026-10-23, AskUserQuestion on the STOP):** "SR2 now, fix after
+(Recommended)". SR2 starts with the renderer. Until the Keep pitch arm passes, a clip with Keep
+pitch on glides like tape INSIDE its ramp (the keep-pitch-off render), Keep pitch applying at the
+held rates; SR2 records this as a §11 entry and a known limit. A phase SR1d, after SR2 and before
+the UI phase, owns the arm: smoother pitch updates against the dropouts (17 in RK1, about every
+117 ms, only while the pitch moves), the pitch commanded ahead by the measured lag (τ +46–56 ms,
+sound now that the unit holds a constant rate), SR-7's click template for slowed Keep pitch
+clicks (the clicks land on their samples but no longer match it), and the SR1c review's two nits
+(`TimePitchKept.append`'s per-block `reserveCapacity`, which inflates the recorded cost; the
+PR-source row's unguarded empty track).

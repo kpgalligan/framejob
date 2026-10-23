@@ -8,10 +8,13 @@ ideal map, in export and in playback? Measured through SR1's instrument
 calls the renderer, built `-O`), against rendered and composition controls
 and a planted fault, by SR-7's rule (fixed before the run; `results.json`
 pins the §11 file's SHA-256). The answers are in `designs/speed-ramps.md`'s
-SR1b record.
+SR1b record. SR1c (SR-9) re-runs arm ON on SR-8's resample-then-pitch-shift
+renderer with `--verdict on`, adding the rendered pitch (PR, LG), rendered-only
+constant controls (`aux`) and a 15 kHz band render (`band`, BW); its answers
+are the SR1c record.
 
     python3 tools/proof/ramp_spike/render_spike.py [--groups render,plan,export,playback]
-        [--variants RV1,RC-off-x1,…] [--remake]
+        [--variants RV1,RC-off-x1,…] [--remake] [--verdict both|on]
     python3 tools/proof/ramp_spike/render_spike.py --selftest [--mutant NAME]
 
 Exit 0: every requested row answered (whatever the VERDICT). Exit 1: an
@@ -30,6 +33,7 @@ network; every child runs under `graphics_spike/bounded.py`.
 
 import argparse
 import array
+import bisect
 import hashlib
 import json
 import math
@@ -52,6 +56,8 @@ PROJECTS = WORK / "projects"
 RENDERS = WORK / "renders"
 RESULTS = WORK / "results.json"
 R44_WAV = WORK / "r44.wav"
+BAND_WAV = WORK / "band.wav"
+BAND_HZ = 15000.0
 RULE_FILE = rs.RULE_FILE
 
 SEC, FRAME, RATE = rs.SEC, rs.FRAME, rs.RATE
@@ -72,6 +78,20 @@ RF1_NEAR_S = 0.005
 IDENTITY_TOL = 1e-6
 AGREE_MS, AGREE_SPREAD_MS = 1.0, 0.5
 
+# SR-9's numbers.
+PITCH_MEDIAN_CENTS = 25.0
+PITCH_LAG_RMS_CENTS = 25.0
+PITCH_WINDOW_S = 0.040
+PITCH_STEP_S = 0.010
+PITCH_EDGE_S = 0.050
+LAG_FROM_MS, LAG_TO_MS = -100, 300
+CENTS_RANGE = 2400.0
+# name: (rate, length s), keep pitch on, rendered only.
+AUX = {"RC-on-x1": (1.0, 6.0), "RC-on-x3": (3.0, 4.0), "RC-on-x6": (6.0, 2.0),
+       "RC-on-x0.2": (0.2, 6.0)}
+BAND = {"RB-on-x2": (2.0, 6.0)}
+UNSTAGED = ("edit", "aux", "band")
+
 RAMP_OF = {"RV1": "V1", "RV2": "V2", "RV3": "V3", "RK1": "K1", "RK2": "K2"}
 OFF_MEMBERS = ["RV1", "RV2", "RV3", "RC-off-x0.25", "RC-off-x0.5", "RC-off-x1", "RC-off-x2",
                "RC-off-x4"]
@@ -80,6 +100,7 @@ ON_ANCHORS = ["RC-on-x0.5", "RC-on-x0.9", "RC-on-x1.1", "RC-on-x2"]
 END_CONTROLS = {"RK1": ("RC-on-x1.1", "RC-on-x2"), "RK2": ("RC-on-x0.9", "RC-on-x0.5")}
 FRAME_SET = set(OFF_MEMBERS + ON_RAMPS)
 MUTANTS = ["dense-off", "merge-all", "pt1-off", "identity-off", "on-anchor-off"]
+MUTANTS += ["pitch-flat", "lag-zero", "on-verdict-off", "pitch-rule-off"]
 
 MUTANT = None
 
@@ -140,9 +161,22 @@ def variants():
                            "map": rendered_map(ramp, length)}
         out[name] = {"kind": "control", "keep": keep, "ramp": ramp, "ideal": ramp,
                      "length": length, "segs": segs, "ref": segs, "map": None}
+    for kind, table in (("aux", AUX), ("band", BAND)):
+        for name, (rate, length_s) in table.items():
+            length = round(length_s * SEC)
+            ramp = control_ramp(True, rate, length_s)
+            segs = [rs.seg(0, length, SOURCE_IN, round(length * rate))]
+            out[name] = {"kind": kind, "keep": True, "ramp": ramp, "ideal": ramp,
+                         "length": length, "segs": segs, "ref": segs,
+                         "map": rendered_map(ramp, length)}
+    out["RB-on-x2"]["fixtures"] = ["band"]
     for v in out.values():
-        v["rendered"] = v["kind"] in ("ramp", "fault", "edit", "rcontrol")
+        v["rendered"] = v["kind"] in ("ramp", "fault", "edit", "rcontrol", "aux", "band")
     return out
+
+
+def fixtures_of(v):
+    return v.get("fixtures", list(rs.FIXTURE_FILES))
 
 
 def source_end_ticks(v):
@@ -337,6 +371,123 @@ def decide(results, agree):
     return "STOP", "; ".join(off + on)
 
 
+# ---- the pitch (SR-9) -----------------------------------------------------------
+
+
+def crossings(x, rate):
+    """The positive-going zero crossings' times (s), linearly interpolated."""
+    out = []
+    for n in range(1, len(x)):
+        a, b = x[n - 1], x[n]
+        if a < 0 <= b:
+            out.append((n - 1 + a / (a - b)) / rate)
+    return out
+
+
+def pitch_track(x, rate, length_s):
+    """[(window centre s, f Hz)]: 40 ms windows every 10 ms over the clip
+    less 50 ms each end; f = (crossings − 1) / (last − first crossing)."""
+    times = crossings(x, rate)
+    out, k = [], 0
+    while True:
+        t0 = PITCH_EDGE_S + k * PITCH_STEP_S
+        t1 = t0 + PITCH_WINDOW_S
+        if t1 > length_s - PITCH_EDGE_S + 1e-9:
+            break
+        k += 1
+        lo, hi = bisect.bisect_left(times, t0), bisect.bisect_left(times, t1)
+        if hi - lo < 2:
+            continue
+        f = (hi - lo - 1) / (times[hi - 1] - times[lo])
+        out.append((t0 + PITCH_WINDOW_S / 2, rs.SINE_HZ if MUTANT == "pitch-flat" else f))
+    return out
+
+
+def command_cents(rate):
+    return min(max(-1200 * math.log2(rate), -CENTS_RANGE), CENTS_RANGE)
+
+
+def expected_hz(ramp, t_s, lag_s=0.0):
+    """f_e: 220 · r(t) · 2^(c(t − lag)/1200), c the clamped command."""
+    r = rate_of(ramp, t_s * SEC)
+    return rs.SINE_HZ * r * 2 ** (command_cents(rate_of(ramp, (t_s - lag_s) * SEC)) / 1200)
+
+
+def cents_of(track, ramp, lag_s=0.0):
+    return [1200 * math.log2(f / expected_hz(ramp, t, lag_s)) for t, f in track]
+
+
+def pitch_reading(track, ramp):
+    """PR: median f, signed median cents, median and max |cents|."""
+    if not track:
+        return {"windows": 0, "median_hz": None, "median_cents": None,
+                "median_abs_cents": None, "max_abs_cents": None}
+    cents = cents_of(track, ramp)
+    return {"windows": len(track), "median_hz": statistics.median(f for _, f in track),
+            "median_cents": statistics.median(cents),
+            "median_abs_cents": statistics.median(abs(c) for c in cents),
+            "max_abs_cents": max(abs(c) for c in cents)}
+
+
+def pitch_lag(track, ramp):
+    """(τ s, RMS cents at τ, RMS cents at 0): τ over [−100, 300] ms in 1 ms
+    steps minimising the RMS against 220 · r(t) · 2^(c(t − τ)/1200)."""
+    def rms(lag_s):
+        cents = cents_of(track, ramp, lag_s)
+        return math.sqrt(sum(c * c for c in cents) / len(cents))
+    at0 = rms(0.0)
+    if MUTANT == "lag-zero":
+        return 0.0, at0, at0
+    best = min((rms(ms / 1000), ms / 1000) for ms in range(LAG_FROM_MS, LAG_TO_MS + 1))
+    return best[1], best[0], at0
+
+
+def band_level_db(x, rate, hz, t0, t1):
+    """The level (dB re full-scale amplitude) at `hz` over [t0, t1), by Goertzel."""
+    lo, hi = int(round(t0 * rate)), int(round(t1 * rate))
+    seg_ = x[lo:hi]
+    n = len(seg_)
+    coeff = 2 * math.cos(2 * math.pi * hz / rate)
+    s1 = s2 = 0.0
+    for v in seg_:
+        s1, s2 = v + coeff * s1 - s2, s1
+    power = s1 * s1 + s2 * s2 - coeff * s1 * s2
+    amp = 2 * math.sqrt(max(power, 0.0)) / n if n else 0.0
+    return 20 * math.log10(amp) if amp > 0 else -math.inf
+
+
+def pitch_failures(results):
+    if MUTANT == "pitch-rule-off":
+        return []
+    out = []
+    for name in ON_RAMPS + ON_ANCHORS:
+        pr = results.get("pitch", {}).get(name)
+        if not pr or pr.get("median_cents") is None:
+            out.append(f"{name}: pitch (unmeasured)")
+        elif abs(pr["median_cents"]) > PITCH_MEDIAN_CENTS:
+            out.append(f"{name}: pitch")
+    for name in ON_RAMPS:
+        lg = results.get("lag", {}).get(name)
+        if not lg or lg.get("rms_at_tau") is None:
+            out.append(f"{name}: pitch lag (unmeasured)")
+        elif lg["rms_at_tau"] > PITCH_LAG_RMS_CENTS:
+            out.append(f"{name}: pitch lag")
+    return out
+
+
+def decide_on(results, agree):
+    """SR-9: arm ON alone — SR-7's arm ON rule plus the rendered pitch."""
+    fails = [f for n in ON_RAMPS for f in member_failures(n, results, agree)]
+    if MUTANT != "on-verdict-off":
+        fails += [f for n in ON_ANCHORS for f in anchor_failures(n, results)]
+    fails += pitch_failures(results)
+    if not fails:
+        return "GO", ("arm ON: RK1 and RK2 pass placement, click, dropout, video and agreement "
+                      "in export and playback, every RC-on anchor passes its placement, and each "
+                      "holds its pitch (SR-9)")
+    return "STOP", "; ".join(fails)
+
+
 # ---- the selftest ---------------------------------------------------------------
 
 
@@ -434,6 +585,57 @@ def selftest():
     row("S13", ramp_ok and bool(fails) and all("anchor" in f for f in fails),
         f"the ramps' own rule {'passes' if ramp_ok else 'fails'}; arm ON "
         + (f"STOP — {len(fails)} anchor failures" if fails else "GO"))
+
+    # S14: the pitch reader on 220 Hz and 220 · 2^(50/1200) Hz sines.
+    flat = control_ramp(True, 1.0, 2.0)
+    worst = []
+    for cents in (0.0, 50.0):
+        hz = rs.SINE_HZ * 2 ** (cents / 1200)
+        got = cents_of(pitch_track(rs.sine(hz, 2.0), RATE, 2.0), flat)
+        worst.append(max(abs(c - cents) for c in got) if got else math.inf)
+    row("S14", all(w <= 0.5 for w in worst),
+        f"220 Hz and +50 cents read within {worst[0]:.4f} and {worst[1]:.4f} cents")
+
+    # S15: a synthetic RK1 track lagging 40 ms, and a flat 220 Hz track.
+    k1 = rs.RAMPS["K1"]
+    centres = [t for t, _ in pitch_track(rs.sine(rs.SINE_HZ, 8.0), RATE, 8.0)]
+    lagged = [(t, expected_hz(k1, t, 0.040)) for t in centres]
+    tau40, _, _ = pitch_lag(lagged, k1)
+    tau0, _, _ = pitch_lag([(t, rs.SINE_HZ) for t in centres], k1)
+    row("S15", abs(tau40 - 0.040) <= 0.001 + 1e-9 and abs(tau0) <= 0.001 + 1e-9,
+        f"a 40 ms lag reads {tau40 * 1000:.0f} ms; a flat track {tau0 * 1000:.0f} ms")
+
+    # S16: decide_on — passing arm-ON results with no OFF member, then one anchor failing.
+    def passing():
+        res = {"export": {}, "playback": {}, "pitch": {}, "lag": {}}
+        for side in ("export", "playback"):
+            for name in ON_RAMPS:
+                res[side][name] = {k: {"ok": True} for k in
+                                   ("placement", "click", "dropout", "video")}
+            for name in ON_ANCHORS:
+                res[side][name] = {"placement": {"ok": True}}
+        for name in ON_RAMPS + ON_ANCHORS:
+            res["pitch"][name] = {"median_cents": 0.0}
+        for name in ON_RAMPS:
+            res["lag"][name] = {"rms_at_tau": 0.0}
+        return res
+    agree = {n: True for n in ON_RAMPS}
+    go, _ = decide_on(passing(), agree)
+    bad = passing()
+    bad["export"]["RC-on-x2"]["placement"]["ok"] = False
+    stop, why = decide_on(bad, agree)
+    row("S16", go == "GO" and stop == "STOP" and "RC-on-x2" in why,
+        f"passing results: {go}; RC-on-x2's export placement failing: {stop} — {why}")
+
+    # S17: decide_on — an anchor's pitch 100 cents off, RK1's lag RMS 40 cents.
+    off = passing()
+    off["pitch"]["RC-on-x0.9"]["median_cents"] = 100.0
+    v1, why1 = decide_on(off, agree)
+    lag = passing()
+    lag["lag"]["RK1"]["rms_at_tau"] = 40.0
+    v2, why2 = decide_on(lag, agree)
+    row("S17", v1 == "STOP" and "RC-on-x0.9: pitch" in why1 and v2 == "STOP"
+        and "RK1: pitch lag" in why2, f"100 cents: {v1} — {why1}; lag 40 cents: {v2} — {why2}")
     return all(rows), len(rows)
 
 
@@ -441,7 +643,7 @@ def selftest():
 
 
 def fixture_path(fixture):
-    return rs.FIXTURES / rs.FIXTURE_FILES[fixture]
+    return BAND_WAV if fixture == "band" else rs.FIXTURES / rs.FIXTURE_FILES[fixture]
 
 
 def render_path(name, fixture):
@@ -457,13 +659,17 @@ def write_r44():
                                         for n in range(44_100))).tobytes())
 
 
+def write_band():
+    rs.write_wav(BAND_WAV, rs.sine(BAND_HZ, rs.FIXTURE_S))
+
+
 def render_jobs(names, everything):
     jobs = []
     for name in names:
         v = everything[name]
         if not v["rendered"]:
             continue
-        for fixture in rs.FIXTURE_FILES:
+        for fixture in fixtures_of(v):
             jobs.append({"name": f"{name}@{fixture}", "source": str(fixture_path(fixture)),
                          "clip_ticks": v["map"][0], "source_ticks": v["map"][1],
                          "keep_pitch": v["keep"], "destination": str(render_path(name, fixture))})
@@ -555,6 +761,7 @@ def main():
     parser.add_argument("--remake", action="store_true")
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--mutant", choices=MUTANTS)
+    parser.add_argument("--verdict", choices=["both", "on"], default="both")
     args = parser.parse_args()
 
     if args.selftest:
@@ -620,6 +827,8 @@ def run(args, groups, names, everything):
     lines = {}
     if "render" in groups:
         write_r44()
+        if any(everything[n]["kind"] == "band" for n in names):
+            write_band()
         jobs = render_jobs(names, everything)
         t0 = time.time()
         got, why = rs.run_group(binary, "render", jobs, work=WORK, walls=WALLS)
@@ -643,7 +852,7 @@ def run(args, groups, names, everything):
             score.instrument.append("R44")
 
     shutil.rmtree(PROJECTS, ignore_errors=True)
-    staged = [n for n in names if everything[n]["kind"] != "edit"]
+    staged = [n for n in names if everything[n]["kind"] not in UNSTAGED]
     for name in staged:
         for fixture in rs.FIXTURE_FILES:
             write_package(name, fixture, everything[name])
@@ -663,7 +872,8 @@ def run(args, groups, names, everything):
                   + (f"; {len(failed)} failed: " + " | ".join(failed[:4]) if failed else ""))
         if not ok:
             score.instrument.append(f"R-{group}")
-    return score_run(score, groups, names, staged, everything, lines, started, rule_sha, info)
+    return score_run(score, groups, names, staged, everything, lines, started, rule_sha, info,
+                     args.verdict)
 
 
 def line_of(lines, name, fixture, read):
@@ -726,6 +936,60 @@ def side_rules(v, name, side, signals, ctx):
     return out
 
 
+def pitch_rows(score, names, everything, results, fixture_samples):
+    """SR-9's reported rows from the renders themselves: RP, PR, PR-source,
+    LG and BW (pitch and its lag are scored by `decide_on`)."""
+    keep = [n for n in names if everything[n]["rendered"] and everything[n]["keep"]
+            and everything[n]["kind"] != "band"]
+    for name in keep:
+        v = everything[name]
+        x, rate = render_samples(name, "clicks")
+        if x:
+            s = place_ideal(x, rate, v)
+            results["rp"][name] = s
+            score.row(f"RP-{name}", "measured",
+                      f"the render's clicks: {s['found']}/{s['of']}, median "
+                      + (f"{s['median_ms']:+.3f} ms, max |diff| {s['max_abs_ms']:.2f} ms"
+                         if s["median_ms"] is not None else "none found"))
+    for name in keep:
+        v = everything[name]
+        x, rate = render_samples(name, "sine")
+        if not x:
+            continue
+        track = pitch_track(x, rate, v["length"] / SEC)
+        pr = pitch_reading(track, v["ideal"])
+        results["pitch"][name] = pr
+        score.row(f"PR-{name}", "measured",
+                  f"{pr['windows']} windows, median {pr['median_hz']:.3f} Hz, median "
+                  f"{pr['median_cents']:+.2f} cents, |cents| median {pr['median_abs_cents']:.2f}, "
+                  f"max {pr['max_abs_cents']:.2f}" if pr["windows"] else "no window read")
+        if name in ON_RAMPS and track:
+            tau, at_tau, at0 = pitch_lag(track, v["ideal"])
+            results["lag"][name] = {"tau_s": tau, "rms_at_tau": at_tau, "rms_at_0": at0}
+            score.row(f"LG-{name}", "measured",
+                      f"τ {tau * 1000:+.0f} ms, RMS {at_tau:.2f} cents at τ, {at0:.2f} at 0")
+    if keep:
+        x = fixture_samples("sine")
+        flat = control_ramp(True, 1.0, 6.0)
+        pr = pitch_reading(pitch_track(x[RATE:7 * RATE], RATE, 6.0), flat)
+        results["pitch_source"] = pr
+        score.row("PR-source", "measured",
+                  f"the sine fixture over [1 s, 7 s): {pr['windows']} windows, median "
+                  f"{pr['median_hz']:.3f} Hz, median {pr['median_cents']:+.3f} cents, max "
+                  f"|cents| {pr['max_abs_cents']:.3f}")
+    for name in [n for n in names if everything[n]["kind"] == "band"]:
+        x, rate = render_samples(name, "band")
+        if not x or not BAND_WAV.exists():
+            continue
+        src, src_rate = rs.read_channel0(BAND_WAV)
+        got = band_level_db(x, rate, BAND_HZ, 1.0, 5.0)
+        ref = band_level_db(src, src_rate, BAND_HZ, 1.0, 11.0)
+        results["bw"][name] = {"render_db": got, "source_db": ref, "db": got - ref}
+        score.row(f"BW-{name}", "measured",
+                  f"{BAND_HZ:g} Hz over [1 s, 5 s): {got - ref:+.2f} dB re band.wav over "
+                  f"[1 s, 11 s) ({got:.2f} against {ref:.2f} dBFS)")
+
+
 def fmt_drop(rule):
     return "?" if rule and rule.get("ok") is None else rs.fmt_drop(rule)
 
@@ -752,7 +1016,8 @@ def signals_of(lines, name, v, side, shift):
     return out[0], out[1], (f["bars"] if f else None), residual
 
 
-def score_run(score, groups, names, staged, everything, lines, started, rule_sha, info):
+def score_run(score, groups, names, staged, everything, lines, started, rule_sha, info,
+              verdict_of="both"):
     if "plan" in groups:
         for name in staged:
             ok_all, problems, pitches = True, [], set()
@@ -800,7 +1065,7 @@ def score_run(score, groups, names, staged, everything, lines, started, rule_sha
         v = everything[name]
         if not v["rendered"]:
             continue
-        got = [lines.get((f"{name}@{fx}", "render")) for fx in rs.FIXTURE_FILES]
+        got = [lines.get((f"{name}@{fx}", "render")) for fx in fixtures_of(v)]
         got = [g for g in got if g and g.get("ok")]
         if not got:
             continue
@@ -810,15 +1075,19 @@ def score_run(score, groups, names, staged, everything, lines, started, rule_sha
                 "bytes_per_audio_s": got[0]["bytes"] / audio_s, "channels": got[0]["channels"],
                 "peak_rss_bytes": max(g["peak_rss_bytes"] for g in got)}
         if v["keep"]:
+            rep_["oversampling"] = got[0]["oversampling"]
             rep_["latency_frames"] = got[0]["latency_frames"]
-            rep_["pulled_minus_map"] = [g["pulled_frames"] - g["map_frames"] for g in got]
+            rep_["delay_frames"] = got[0]["delay_frames"]
+            rep_["pulled_minus_frames"] = [g["pulled_frames"] - g["oversampling"] * g["frames"]
+                                           for g in got]
         reports[name] = rep_
         score.row(f"RS-{name}", "measured",
                   f"{wall:.3f} s for {audio_s:g} s of audio ({rep_['wall_per_audio_s']:.4f} s/s), "
                   f"{rep_['bytes']} bytes ({rep_['bytes_per_audio_s']:.0f} B/s), peak RSS "
                   f"{rep_['peak_rss_bytes'] / 2**20:.1f} MiB"
-                  + (f"; latency {rep_['latency_frames']} frames, pulled − map "
-                     f"{rep_['pulled_minus_map']} frames" if v["keep"] else ""))
+                  + (f"; K {rep_['oversampling']}, latency {rep_['latency_frames']} frames, "
+                     f"D_K {rep_['delay_frames']}, pulled − K·frames "
+                     f"{rep_['pulled_minus_frames']} frames" if v["keep"] else ""))
     if "RV1-edit" in names and "RV1" in names:
         a, _ = render_samples("RV1", "sine")
         b, _ = render_samples("RV1-edit", "sine")
@@ -830,7 +1099,8 @@ def score_run(score, groups, names, staged, everything, lines, started, rule_sha
                       f"({same / RATE:.4f} s) equal RV1's")
             reports.setdefault("RV1-edit", {})["leading_equal"] = same
 
-    results = {"export": {}, "playback": {}}
+    results = {"export": {}, "playback": {}, "pitch": {}, "lag": {}, "rp": {}, "bw": {}}
+    pitch_rows(score, names, everything, results, fixture_samples)
     sides = [s for s in ("export", "playback") if s in groups]
     rank = {"control": 0, "rcontrol": 1, "ramp": 2, "fault": 3}
     order = sorted(staged, key=lambda n: (rank[everything[n]["kind"]], n))
@@ -981,7 +1251,7 @@ def score_run(score, groups, names, staged, everything, lines, started, rule_sha
                  f"{rep_['wall_per_audio_s']:.4f}" if "wall_per_audio_s" in rep_ else "—"]
         table.append("| " + " | ".join(cells) + " |")
     print("\n".join(table))
-    verdict, why = decide(results, agree)
+    verdict, why = decide_on(results, agree) if verdict_of == "on" else decide(results, agree)
     print(f"\nVERDICT: {verdict} — {why}")
     RESULTS.write_text(json.dumps({
         "commit": rs.commit(), "date": time.strftime("%Y-%m-%d %H:%M:%S %z"),
@@ -990,7 +1260,10 @@ def score_run(score, groups, names, staged, everything, lines, started, rule_sha
         "variants": {n: {"map_breakpoints": len(everything[n]["map"][0]) if everything[n]["map"]
                          else None,
                          "export": rs._jsonable(results["export"].get(n)),
-                         "playback": rs._jsonable(results["playback"].get(n))} for n in names},
+                         "playback": rs._jsonable(results["playback"].get(n)),
+                         **{k: rs._jsonable(results[k][n]) for k in ("rp", "pitch", "lag", "bw")
+                            if n in results[k]}} for n in names},
+        "pitch_source": rs._jsonable(results.get("pitch_source")), "verdict_of": verdict_of,
         "table": table, "verdict": {"verdict": verdict, "detail": why},
     }, indent=1))
     return 1 if score.instrument else 0

@@ -177,3 +177,59 @@ passes and arm ON stops on the anchors. The mutants: `dense-off` (no centre clic
 `merge-all` (every clicking centre one event: S9), `pt1-off` (m1 forced to 0: S10),
 `identity-off` (the identity always holds: S12), `on-anchor-off` (the anchor always passes:
 S13).
+
+## SR1c — Keep pitch as resample, then pitch-shift (`render_spike.py --verdict on`)
+
+SR-8 remade the Keep pitch arm as three stages (the glide at 48 kHz × K, Apple's time-pitch unit
+held at ×1 with `pitch` = −1200·log₂ rate cents, a decimation by K; `RampVarispeedStream.swift`,
+`RampAudioRenderer+TimePitch.swift`). SR1c re-runs SR-7's arm ON on it and scores the rendered
+pitch, by spec §11 SR-9 (fixed before the run, pinned by `rule_sha256`); the answers are in
+`designs/speed-ramps.md`'s SR1c record.
+
+```sh
+python3 tools/proof/ramp_spike/render_spike.py --selftest                          # S8–S17
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant pitch-flat      # must exit 1 (S14)
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant lag-zero        # must exit 1 (S15)
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant on-verdict-off  # must exit 1 (S16)
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant pitch-rule-off  # must exit 1 (S17)
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_spike/render_spike.py --variants RK1,RK2,RC-on-x0.5,RC-on-x0.9,RC-on-x1.1,RC-on-x2,C-on-x0.5,C-on-x0.9,C-on-x1.1,C-on-x2,RC-off-x1,RC-on-x1,RC-on-x3,RC-on-x6,RC-on-x0.2,RB-on-x2 --verdict on
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_spike/render_spike.py --groups render --variants RC-on-x0.5,RC-on-x0.9,RC-on-x1,RC-on-x1.1,RC-on-x2,RC-on-x3,RC-on-x6,RB-on-x2   # K, D_K, pitch, band
+```
+
+**`--verdict`** `both` (the default) prints SR-7's verdict unchanged; `on` prints SR-9's,
+`VERDICT: GO — arm ON …` or `VERDICT: STOP — …`, from `decide_on`: SR-7's arm ON rule (RK1, RK2
+and every RC-on anchor) plus pitch — each anchor's, RK1's and RK2's PR |median cents| ≤ 25 and
+RK1's and RK2's LG RMS at the best τ ≤ 25, a failure naming `pitch` or `pitch lag`.
+
+**The variants added.** Kind `aux`, keep pitch on, rendered from both fixtures and never staged
+into a project: RC-on-x1 (×1, 6 s), RC-on-x3 (×3, 4 s), RC-on-x6 (×6, 2 s), RC-on-x0.2 (×0.2,
+6 s). Kind `band`: RB-on-x2 (×2, 6 s, keep pitch on), rendered only from `band.wav` (a 20 s
+48 kHz mono 15 kHz sine at amplitude 0.5 the runner writes into the work folder).
+
+**The rows added** (read from the renders themselves, so a `--groups render` run has them):
+RS-<v> now reads K, the unit's reported latency, D_K and pulled − K · frames (the probe's
+render line carries `oversampling` and `delay_frames`); RP-<v> (a keep-pitch render's clicks
+against the ideal map: found, signed median ms, max |diff| ms — D_K comes from these); PR-<v>
+(40 ms windows every 10 ms over the clip less 50 ms each end, f = (positive-going zero crossings
+− 1) / (last − first crossing time), against f_e = 220 · r · 2^(c/1200), c the clamped command:
+median f, signed median cents, median and max |cents|) for every keep-pitch sine render, and
+PR-source (the fixture over [1 s, 7 s)); LG-RK1, LG-RK2 (the τ in [−100, 300] ms minimising the
+RMS cents against 220 · r(t) · 2^(c(t − τ)/1200), with the RMS at τ and at 0); BW-RB-on-x2 (the
+15 kHz level over [1 s, 5 s) of the render, dB re `band.wav` over [1 s, 11 s), by Goertzel).
+
+**`--selftest`** adds S14 (the pitch reader reads 220 Hz and 220 · 2^(50/1200) Hz sines within
+0.5 cents), S15 (a synthetic RK1 track lagging 40 ms reads 40 ± 1 ms; a flat 220 Hz track
+0 ± 1 ms), S16 (`decide_on` answers GO on passing arm-ON results with no OFF member, STOP naming
+the anchor when one RC-on anchor's placement fails) and S17 (STOP naming `pitch` for an anchor's
+PR median 100 cents off, `pitch lag` for RK1's LG RMS of 40 cents). The mutants: `pitch-flat`
+(the reader answers 220 Hz: S14), `lag-zero` (τ always 0: S15), `on-verdict-off` (the anchors
+ignored: S16), `pitch-rule-off` (pitch never fails: S17).
+
+Before the measured run SR1b's work folder was copied once to
+`tools/proof/work/ramp-render-spike-sr1b/` (never written; its `results.json` is SR1b's record),
+and the off arm's renders compared with it byte for byte:
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_spike/render_spike.py --groups render --variants RV1,RV2,RV3,RF1,RV1-edit,RC-off-x0.25,RC-off-x0.5,RC-off-x1,RC-off-x2,RC-off-x4
+for f in tools/proof/work/ramp-render-spike-sr1b/renders/R{V,F,C-off}*.caf; do cmp "$f" "tools/proof/work/ramp-render-spike/renders/$(basename "$f")" || echo "DIFF $f"; done
+```

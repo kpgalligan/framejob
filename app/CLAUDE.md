@@ -1170,9 +1170,19 @@ the key map behind it.
   as `unreadable` otherwise, `AudioRateCopy.needsCopy`'s test), streamed
   through `RampSourceReader`; Keep pitch off by the Kaiser-windowed sinc
   resampler (`RampAudioResampler`, cutoff following the local rate, exact
-  at ×1), Keep pitch on by Apple's time-pitch offline (+`TimePitch`, the
-  spike arm SR-8 replaces); written as a 32-bit float CAF through a
-  `.partial` file. No caller in the app until SR2.
+  at ×1), Keep pitch on in three stages (+`TimePitch`, SR-8): the tape
+  glide oversampled at 48 kHz·K (K ≤ 4, from the map's steepest slope),
+  Apple's time-pitch held at rate ×1 shifting −1200·log₂ r cents
+  (clamped at ±2400, the excess gliding like tape) with the per-K delay
+  `timePitchDelayFrames`, then a fixed decimation to 48 kHz — measured
+  STOP in SR1c (dropouts while the pitch moves, a ~50 ms pitch lag),
+  SR1d's to fix; written as a 32-bit float CAF through a `.partial`
+  file (`RampCAFWriter`). No caller in the app until SR2.
+- `RampVarispeedStream.swift` — the tape glide as a stream (SR1c): the
+  map read at `per` K output frames per 48 kHz frame from any start
+  (negative for a pre-roll), dropping source behind a bound from the
+  map's steepest slope; the off arm's `renderVarispeed` and the keep-pitch
+  arm's stage 1 both loop over it.
 - `MP3Gapless.swift` — the LAME/Xing tag reader (pure) and `leadingTrim`, the
   encoder delay Core Audio leaves in when it reports no packet table: the
   48 kHz copy and the sync reader skip it (SY-36, SY-38), and so do the
