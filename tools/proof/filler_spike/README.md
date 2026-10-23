@@ -2,8 +2,8 @@
 
 One question the road map asks before any filler code is written: **does the on-device engine
 (`SpeechEngine`, `SpeechTranscriber` with `transcriptionOptions: []`) report fillers at all?**
-**The answers are not here**: they are in `designs/cut-by-transcript.md`'s CT-0 record, and the
-decision they make, once o2 has run on the owner's sample, is spec §11 TR-7
+**The answers are not here**: they are in `archive/cut-by-transcript.md`'s CT-0 record, and the
+decision they made once o2 ran on the owner's sample is spec §11 TR-7
 (`designs/spec/11-decisions/cut-by-transcript.md`). What is here is how to run it again.
 
 Nothing in this directory is a pass or a fail. Every row is a MEASUREMENT, and the two ways a

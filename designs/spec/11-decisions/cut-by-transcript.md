@@ -3,14 +3,15 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map that makes these is open: `designs/cut-by-transcript.md`, which holds each phase's
-record (CT-0 the road map, these decisions and the filler spike; CT-1 fillers on the cloud
-request; CT-2 `detect_fillers` and the cut; CT-3 Clip ▸ Remove Filler Words…; CT-4
-`get_transcript` and false starts; CT-5 the close). TR-1…TR-6 were recorded in CT-0, before any
-product code, from the owner's decisions of 2026-09-30 on issue #92 (its comment of that day,
-quoted verbatim in the road map's "The owner's choices"), which the owner took up on 2026-10-22
-("#92 Cut by transcript"). TR-7, the on-device filler source, was recorded on 2026-10-22 after
-the filler spike ran on the owner's own scripted sample, before CT-2.
+The road map that made these is closed: its condensed record is `designs/adr/cut-by-transcript.md`,
+and the original, `archive/cut-by-transcript.md`, holds each phase's record (CT-0 the road map,
+these decisions and the filler spike; CT-1 fillers on the cloud request; CT-2 `detect_fillers`
+and the cut; CT-3 Clip ▸ Remove Filler Words…; CT-4 `get_transcript` and false starts; CT-5 the
+close). TR-1…TR-6 were recorded in CT-0, before any product code, from the owner's decisions of
+2026-09-30 on issue #92 (its comment of that day, quoted verbatim in the road map's "The owner's
+choices"), which the owner took up on 2026-10-22 ("#92 Cut by transcript"). TR-7, the on-device
+filler source, was recorded on 2026-10-22 after the filler spike ran on the owner's own scripted
+sample, before CT-2.
 CT-1…CT-4 each record their numbers as a new entry (TR-8 on) or as Amended-by lines before their
 code; TR-8 was recorded in CT-1, TR-9 in CT-2, TR-10 in CT-3 and TR-11 in CT-4, each before its
 code.

@@ -503,4 +503,45 @@ and the on-device recognition repeated on every call (TR-11's risks).
 
 ## CT-5 record
 
-Not started.
+**What landed (2026-10-23):** `designs/adr/cut-by-transcript.md` (new), the condensed record;
+this road map moved by `git mv` from `designs/cut-by-transcript.md` to
+`archive/cut-by-transcript.md`, with its row in `archive/INDEX.md` after `hdr.md`'s; the
+decisions file's header in `designs/spec/11-decisions/cut-by-transcript.md` in its closed form
+(the condensed record and the original named; TR-1…TR-11 untouched), with the Lines cells in
+`designs/spec/11-decisions/README.md` (247) and `designs/spec/README.md` (11387 in 27 files);
+the live citations repointed to `archive/cut-by-transcript.md` in `tools/proof/README.md` (the
+filler spike's section, TR-7 "was written from them after o2 ran") and
+`tools/proof/filler_spike/README.md` and `filler_spike.py`'s docstring; and
+`tools/proof/README.md`'s exact tool count brought to **97** since CT-4's `get_transcript`
+(96 from CT-3's `transcribe_for_fillers`, 95 from CT-2's `detect_fillers`). Documents and issues
+only: nothing under `app/`, `core/`, `graphic/`, `mcp-proxy/` or `agent/` changed, no proof ran
+against an app, and nothing was paid for.
+
+**Verification** (2026-10-23, the worktree on `2f9fda8` with CT-5's uncommitted changes):
+
+| Command | Result |
+|---|---|
+| `python3 tools/proof/spec_index_proof.py` | 180/180, exit 0 |
+| `python3 tools/proof/name_residue.py` | no output, exit 0 |
+| `git grep -n "designs/cut-by-transcript\.md" -- . ':!archive'` | no output (exit 1, no match) |
+| `python3 -m py_compile tools/proof/filler_spike/filler_spike.py` | exit 0 |
+| `make gate` | PASS in 74 s: names and test ran and passed; typecheck, fmt, lint and app skipped as byte-identical; again after the review's fix pass (the ADR's five corrections), PASS in 1 s with names re-run, spec_index_proof 180/180 and name_residue clean |
+| `git status --porcelain` | `RM designs/cut-by-transcript.md -> archive/cut-by-transcript.md` (moved, then this record written into it) among the changes |
+| `gh issue view 331`, `332`, `333` | each OPEN with `ai-drafted` and `low-priority` |
+
+No mutants: the phase makes no product decision.
+
+**The issues.** Filed, each `ai-drafted` and `low-priority`: #331, `get_transcript` answers
+every word of a clip at once, with no `from`/`to` window (TR-11's first risk; CT-4's record);
+#332, `get_transcript` recognises a clip again on every call when its media has no cloud
+transcript (TR-11's second risk, CT-4's `no-transcript-stop` 49,052 ms; CT-4's record); #333, an
+agent's `ripple_delete_ranges` is named "Remove Silences" in Edit ▸ Undo whatever it cut (CT-3's
+Deviations). Not filed, each decided: an on-device filler source (TR-7 is the owner's decision;
+`tools/proof/filler_spike/` re-runs it, and a later engine is a new decision);
+`cloud_captions_live.py`'s `billed` computed twice (CT-1's review nit: the output is right, and
+it is a paid instrument that cannot be re-run free); o1's 6 words in 165 s (its mean level
+−46.1 dB, so no defect is established); CT-3's internal-`var` deviations (accepted at review).
+
+**Owed:** the root `CLAUDE.md`'s "Where to look" `designs/adr/` list gains `cut-by-transcript`
+before `remaining-closed`; #92 is closed after the merge, naming the ADR, this original and
+#331, #332, #333; the owner's person checks FIL-1 and AS-10.

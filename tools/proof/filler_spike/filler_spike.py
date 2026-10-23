@@ -11,7 +11,7 @@ one real recording, counts only), o2 (the owner's own reading of `O2_SCRIPT`,
 eight scripted fillers, from `tools/proof/media/filler-sample/`; skipped by
 name while that folder holds no file). The answers go to
 `tools/proof/work/filler_spike/answers.json` and into the road map's CT-0
-record (`designs/cut-by-transcript.md`), never into this directory.
+record (`archive/cut-by-transcript.md`), never into this directory.
 
 Exit 0: every row ran. Exit 2, `SPIKE INCOMPLETE`: a row did not run (named,
 with its reason). Exit 1: an instrument failed (the probe would not build or

@@ -405,8 +405,9 @@ log is where the startup parity check would complain — `grep "Frame Job: "
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **95** since cut-by-transcript CT-2's
-`detect_fillers` (94 from #326's `export_status` and `cancel_export`, 92 from
+`op_argument_proof.py` asserts **97** since cut-by-transcript CT-4's
+`get_transcript` (96 from CT-3's `transcribe_for_fillers`, 95 from CT-2's
+`detect_fillers`, 94 from #326's `export_status` and `cancel_export`, 92 from
 road map audio-sync AS-1's `sync_audio`, 91 from grading-3 T3-2's `set_media_color`, 90 from grading
 GR4a's `add_adjustment_clip`, 89 from issue batch B84's three
 graphics-file tools, 86 from B44's `close_project`, 85 from road map 10's
@@ -22133,8 +22134,8 @@ the module as `""` (no format bump, G-42 (e)).
 CT-0, run 2026-10-22: does the on-device engine report fillers at all? Its
 own README (`tools/proof/filler_spike/README.md`) is the full one — the
 instruments, the fixtures, the owner-media rule, the verdict and the exit
-codes — and the ANSWERS are in `designs/cut-by-transcript.md`'s CT-0 record,
-not here (spec §11 TR-7 is written from them once o2 has run).
+codes — and the ANSWERS are in `archive/cut-by-transcript.md`'s CT-0 record,
+not here (spec §11 TR-7 was written from them after o2 ran).
 
 ```sh
 python3 tools/proof/filler_spike/filler_spike.py --selftest     # free, no engine, no build
