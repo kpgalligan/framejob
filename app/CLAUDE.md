@@ -1189,7 +1189,9 @@ the key map behind it.
   peaks, speech, the transcription extract and the reverse (SY-42, #309).
 - `CompositionBuilder.swift` (`build` takes the composition's colour from its
   key's options: BT.709 for the SDR version, BT.2020/PQ for HDR10, spec §11
-  HD-14; +`InstructionRanges`, +`AudioTracks`,
+  HD-14; +`InstructionRanges`, +`Orientation` (each source's orientation
+  codes and the tracks an instruction needs, a pure move at the 600 cap,
+  SR2b), +`AudioTracks`,
   +`AudioPlacement`: where an audio segment is inserted, with the varispeed
   source lead (575 ticks, SY-24) and the noise-reduction track lead (6,400
   ticks, SY-25); `build` substitutes `AudioRateCopy`'s URLs for the audio

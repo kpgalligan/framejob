@@ -71,8 +71,8 @@ make prices     # NETWORK: regenerate agent/prices/anthropic.json from LiteLLM (
   plus driving the built app over MCP and the probes in `tools/proof/`.
 - `make typecheck` takes seconds; run it before `make app` (~90 s). Its baseline is
   **0 errors and 4 warnings**, and tsc prints no error; the warnings are all
-  AVFoundation deprecations (3 in `CompositionBuilder.swift`, 1 in
-  `Exporter.swift`), deliberate because their replacements are `async`-only
+  AVFoundation deprecations (2 in `CompositionBuilder.swift`, 1 in
+  `CompositionBuilder+Orientation.swift`, 1 in `Exporter.swift`), deliberate because their replacements are `async`-only
   and `async` is confined to `MediaImporter.swift` and `SpeechEngine.swift`
   (spec §11 W-8). Any fifth warning is new and yours; `make gate` holds the
   check to exactly those four (`TYPECHECK_BASELINE` in `tools/proof/gate.py`),

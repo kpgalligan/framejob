@@ -710,8 +710,18 @@ to pay a toll starts from it. A file not listed has no named seam yet.
 - `SilenceSheetController.swift`: the menu command extension (`removeSilencesCommand`,
   `validateSilenceAction`) into `EditorViewController+RemoveSilences.swift`, re-pinning
   `inventory.json`'s site.
-- `CompositionBuilder.swift`: the orientation helpers (`orientationCodes`, `trackOrientations`,
-  `orientationCode`) to `CompositionBuilder+Orientation.swift`.
+- `CompositionBuilder.swift`: speed ramps' SR2b paid this seam before wiring the ramp audio in:
+  the orientation helpers (`orientationCodes`, `trackOrientations`, `orientationCode`, with their
+  docs and `// MARK: - Source orientation`; `trackOrientations`' doc, which had come to sit above
+  `missingClips`', went with it) to `CompositionBuilder+Orientation.swift` (`import
+  AVFoundation`), verbatim but that `orientationCodes` and `trackOrientations` lost `private`;
+  `missingClips` and its doc stayed. A pure move, typechecked alone (0 errors, the 4 baseline
+  warnings, `preferredTransform`'s now in `+Orientation`, its `TYPECHECK_BASELINE` row in
+  `tools/proof/gate.py` renamed with it) before any other edit. `wc -l
+  app/Sources/CompositionBuilder.swift`: 581 before, 507 after;
+  `CompositionBuilder+Orientation.swift` is 77. The next seam: the held last frame (`// MARK: - The held last frame`: `heldTail`,
+  `timeRange(of:)`, `oneFrame(of:)`, `convertsSources`, `keyed`) to
+  `CompositionBuilder+HeldFrame.swift`, taking the `timeRange` warning and its baseline row.
 - `MediaImporter.swift`: audio-sync-2's AS-3 paid a toll before the `syncFeatures` pass landed:
   `ProbeBox` (with its doc) and `hasAlphaChannel` (with its doc), the two members of the file that
   do not await, went verbatim to `MediaImporter+Probe.swift` (which gained `import CoreMedia`),

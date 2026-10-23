@@ -81,7 +81,7 @@ TYPECHECK_BASELINE = (
      "loadTracks(withMediaType:) instead [#DeprecatedDeclaration]"),
     ("CompositionBuilder.swift", "'timeRange' was deprecated in macOS 13.0: Use "
      "load(.timeRange) instead [#DeprecatedDeclaration]"),
-    ("CompositionBuilder.swift", "'preferredTransform' was deprecated in macOS 13.0: Use "
+    ("CompositionBuilder+Orientation.swift", "'preferredTransform' was deprecated in macOS 13.0: Use "
      "load(.preferredTransform) instead [#DeprecatedDeclaration]"),
 )
 DIAGNOSTIC = re.compile(r"^(?P<path>[^\s:][^:]*):\d+(?::\d+)?: (?P<kind>warning|error): (?P<msg>.*)$")
