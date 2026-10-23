@@ -254,6 +254,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   or malformed relevant source field is a cache miss; no project format or
   marker version changes. This identity still uses modification seconds and
   recorded duration, without a content hash or path.
+  **Amended 2026-10-22, by TR-1 (road map "cut-by-transcript"):** from CT-1
+  on, every cloud request sends `disfluencies: true`, and the marker records
+  `disfluencies` as part of the request it identifies. Under TR-2, a caption
+  run takes a current marker whatever its `disfluencies` value (a marker with
+  no key reads as false), and a filler run needs one with `disfluencies` true.
 - **R6-16 — A current transcript batch may be reused without credentials.**
   A keyless cloud run is admitted only when the request is nonempty, refresh is
   false, and EVERY distinct job media has a readable source identity, a

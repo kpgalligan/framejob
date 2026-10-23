@@ -47,6 +47,10 @@ in §6).
   meaning. The assistant writes a caption's text or style only because the person asked it to
   in the conversation, and each such edit is an ordinary undo step (§3g). Risk accepted: a
   person may ask for emphasis by meaning, which no pipeline may do.
+  **Amended 2026-10-22, by TR-5:** the same holds for cutting words. When the person asks,
+  the assistant may choose words to cut by their meaning (a false start), reading them through
+  `get_transcript`, a clip's words in timeline times that never makes a network call. It
+  proposes, then makes ordinary undoable cuts; no pipeline picks words to cut by meaning.
 - **AI-7 — What the assistant may not call, and what it must ask about first.** Withheld: the
   dev tools, always (V-1: they are not in Distribution, and the assistant sees one catalog in
   both builds); `record_screen`, always, because recording is a person at the Record button;

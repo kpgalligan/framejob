@@ -111,6 +111,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   The assistant writes a caption's text or style only because the person
   asked it to in the conversation, and each such edit is an ordinary undo
   step.
+  **Amended 2026-10-22, by TR-5:** the assistant may also choose words to
+  CUT by their meaning (a false start) when the person asks, reading them
+  through `get_transcript`; no pipeline does.
 - **W-10 (the core's sentence) — `set_text` can patch `case`, `words` and
   `word_style`,** because deepening D1 makes every declared key patchable.
   That is the agent's door, and it is not a promise that a hand-restyled

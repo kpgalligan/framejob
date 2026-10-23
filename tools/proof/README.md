@@ -22126,3 +22126,49 @@ failed; M3 the asset refusal restored — the door test and
 does not check that a name exists in `graphics/assets/`: `asset()`'s warning
 stays the only check. An older build draws an asset end but hands `""` to
 the module as `""` (no format bump, G-42 (e)).
+
+## Cut by transcript — the filler spike (`filler_spike/`)
+
+CT-0, run 2026-10-22: does the on-device engine report fillers at all? Its
+own README (`tools/proof/filler_spike/README.md`) is the full one — the
+instruments, the fixtures, the owner-media rule, the verdict and the exit
+codes — and the ANSWERS are in `designs/cut-by-transcript.md`'s CT-0 record,
+not here (spec §11 TR-7 is written from them once o2 has run).
+
+```sh
+python3 tools/proof/filler_spike/filler_spike.py --selftest     # free, no engine, no build
+python3 tools/proof/filler_spike/filler_spike.py                # f1, f2, f3, o1 and o2
+python3 tools/proof/filler_spike/filler_spike.py --no-owner     # o1 and o2 skipped by name
+python3 tools/proof/filler_spike/filler_spike.py --remake       # remake the three say fixtures
+```
+
+**Nothing here is a pass.** Every row is a MEASUREMENT: a row that did not
+run (en-US not installed, the owner's media absent) prints
+`SPIKE INCOMPLETE`, names it and exits **2**; exit **0** means every row ran;
+exit **1** is an instrument failure — the probe would not build, the f3
+control did not hold, or a selftest row failed. `answers.json` is written on
+0 and 2, under `tools/proof/work/filler_spike/`.
+
+The instruments are `filler_spike.py` (the runner, the classifier and the
+verdict) and `filler_spike_probe.swift`, compiled AS `main.swift` over
+`app/Sources` through `swift_build.build`, so the audio goes through the
+app's own `Transcriber.extractAudio` and `SpeechEngine.transcribe`. It never
+downloads a model, asks for Speech authorization or touches the network, and
+nothing costs money. The fixtures are three `say` files (F1 with eight
+scripted fillers, F2 with silence around each, F3 the control without them);
+o1 is the owner's `tools/proof/media/owner-sync/record.aifc`, read in place,
+its words kept in the runner's memory and only its counts written
+(`owner-sync-2/record.aifc` is the same bytes and is not a row). o2 is the
+owner reading the spike's fixed script (eight fillers), the one file in
+`tools/proof/media/filler-sample/` (gitignored; the script and how to record
+it are the spike README's "Recording the owner's sample"); it is aligned like
+f1, skipped by name while the folder holds no file, and decides the verdict
+when it ran.
+
+**`--selftest`** runs the classifier over hand-written runs — K kept, D
+dropped, R `replaced:a`, Z a script with no fillers, O o2's alignment — the
+verdict (V1–V4) and the fixture texts; `--mutant keep-punctuation` must fail
+K, `--mutant replaced-as-kept` must fail R and `--mutant o2-ignored` must fail
+V1 and V2, each exit 1. The 2026-10-22 spike, on the final instrument with
+no owner's sample, exited 2 (`SPIKE INCOMPLETE`, o2 alone) with the verdict
+`tts-only`; the selftest scored 13/13 and each mutant failed its rows.
