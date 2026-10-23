@@ -8,8 +8,9 @@
   - CT-3, Clip ▸ Remove Filler Words… and `transcribe_for_fillers` (TR-10) (`b8586cf`)
   - CT-4, `get_transcript` and false starts through the assistant (TR-11) (`2f9fda8`)
   - CT-5, the close: this record (the commit that moved the original to `archive/`)
+  - After the close, the residue batch: #333's toll (`f77d154`) and step name (TR-12, `71c6f7c`), #331's window (TR-13, `2d42d85`), #332's on-device cache (TR-14, `32db363`)
 - **Original:** `archive/cut-by-transcript.md` is the full record. It has no section numbers, so it is cited by its own headings: "orig CT-2" is its "CT-2 record" section.
-- **Spec decisions:** TR-1..TR-11 in spec §11 (`designs/spec/11-decisions/cut-by-transcript.md`). They stay binding, and where the original words them differently, §11's text wins:
+- **Spec decisions:** TR-1..TR-14 in spec §11 (`designs/spec/11-decisions/cut-by-transcript.md`). They stay binding, and where the original words them differently, §11's text wins:
   - TR-1: fillers come from AssemblyAI's `disfluencies: true` on every cloud request from CT-1 on, the marker records it, and the caption producers never see a filler, so captions stay byte-identical; road map 6's refusal superseded.
   - TR-2: a transcript cached before CT-1 stays current for captions; a filler run needs a `disfluencies` marker, and the re-transcribe is the person's ask on that media after the `CloudEstimate` line.
   - TR-3: two paths, split by who judges: fillers are deterministic, false starts a judgement of meaning.
@@ -21,7 +22,10 @@
   - TR-9: filler cut edges: a run of fillers widened outward to the 32 ms Silero grid but never past the neighbouring words, snapped inward to frames; a locked-track clip gives none; a candidate over another clip's word, a nest or a transition wall dropped whole.
   - TR-10: Clip ▸ Remove Filler Words… has no tuning controls, makes one step named "Remove Filler Words", and its Transcribe re-transcribes one media with its previous request plus fillers; the mirror `transcribe_for_fillers {media}` is always withheld from the assistant.
   - TR-11: `get_transcript {clip, language?}`, one clip's words in timeline ticks with TR-8's `filler` flag, from the cached transcript or this Mac's recogniser, never the network, no cache written; off main and reached by the assistant's Stop; the prompt's false-start paragraph.
-  - Amended: R6-15 (by TR-1); AI-6 and, through it, W-9 (by TR-5); AI-7 (by TR-10); AI-16 (by TR-11).
+  - TR-12: an agent's `ripple_delete_ranges` names its undo step "Ripple Delete", whatever it cuts; the sheets keep their own names; no caller-passed name.
+  - TR-13: `get_transcript` takes optional `from`/`to`, answers the words that overlap the window (an edge word whole), refuses an empty window and one outside the clip by name, and its on-device run hears the window plus 2 s each side.
+  - TR-14: an on-device answer is cached in the package's `cache/device-transcripts/`, per media and language, keyed by the source stamp, the OS version and a format version; a call inside a stored run answers from it; nothing stored after a cancel; read by `get_transcript` alone.
+  - Amended: R6-15 (by TR-1); AI-6 and, through it, W-9 (by TR-5); AI-7 (by TR-10); AI-16 (by TR-11); TR-11 (by TR-13, TR-14).
 
 ## Context
 
@@ -42,6 +46,7 @@
 - Swift, new: `FillerWords.swift` (`FillerWords.assemblyAI`, `normalized`, `isFiller`, `MediaTranscript.captionWords(for:in:)`; CT-1); `FillerDetector.swift` (`read(from:clips:)`, `fillersFile`, the pure `runs`, `gridded`, `placed`, `detect`; CT-2); `AgentServer+Fillers.swift` (`detect_fillers`, CT-2; `transcribe_for_fillers`, CT-3); `FillerTranscription.swift`, `FillerSheetController.swift` and `FillerSheetController+Transcribe.swift` (CT-3); `TranscriptReader.swift` and `AgentServer+Transcript.swift` (`get_transcript`, CT-4).
 - Swift, changed: `AssemblyAITranscript.swift` (`TranscriptOptions.disfluencies`, `TranscriptRequest`'s always-written key), `TranscriptStamp.swift` (`disfluencies`, `TranscriptUse`, `serves(_:for:)`), `MediaTranscript.swift`, `CloudEstimate.swift`, `CloudTranscriber.swift` and the word-captions sheet's `sampleWords()` (CT-1); `AgentCatalog+Audio.swift`, `AgentServer.swift`, `AgentCatalog.swift`, `AgentServer+Gate.swift` and `AssistantPrompt.searchTopics` (CT-2); `AppDelegate+Menus.swift`, `EditorViewController.swift`'s forward and validator line, `UIMenuTable`, `AssistantToolTable`'s withheld row (CT-3); `captionTools()`'s catalog row, `AssistantSession.cancel()`'s comment and `AssistantPrompt.swift`'s "Cutting words:" paragraph and captions topic (CT-4).
 - Pure moves and visibility: `nestExtents(in:)` out of `SilenceDetector.read` into `SilenceDetector+Walls.swift`, and `MediaTranscript.project(_:in:)` made internal (CT-2); `checkSpelling(of:)` and `transcriptionLanguage(_:)` in `AgentServer+Captions.swift` made internal, bodies unchanged (CT-4).
+- After the close: `AgentServer+Properties.swift`, the eight property doors moved out of `AgentServer+Clips.swift` (#333's toll); `rippleDeleteRanges`' step name (TR-12); `TranscriptReader`'s `window`, `overlapping` and `recognitionJob` (TR-13); `DeviceTranscriptCache.swift` (TR-14); `transcript_proof.py`'s P4–P8 and G6–G10.
 - No Rust, header, FFI, op or format change. Tools 94 → 97 (`detect_fillers`, `transcribe_for_fillers`, `get_transcript`), app-state tools to 36.
 - Proofs, probes and the spike: `tools/proof/filler_spike/` (`filler_spike_probe.swift`, `filler_spike.py`, its `README.md`; CT-0); `filler_words_probe.swift` and `filler_words_proof.py`, `assemblyai_fake.py`'s `disfluent_words`, `cloud_captions_probe.py`'s KL row, `cloud_captions_proof.py`'s rows 2, 4, FD and FL, `cloud_captions_live.py`'s row 22, `word_captions_sheet_probe.swift`'s S6 filler row (CT-1); `fillers_probe.swift` and `fillers_proof.py` (CT-2); `filler_sheet_probe.swift` and `filler_sheet_proof.py`, `inventory.json`'s site, `assistant_lane_probe.swift`'s fifth L4 case (CT-3); `transcript_probe.swift` and `transcript_proof.py`, `recording_probe.py`'s 7b (CT-4); the tool counts in `op_argument_proof.py` (97), `phase9_proof.py`, `recording_probe.py`, `recording_proof.py` and `assistant_session_proof.py`; `tools/proof/README.md`'s "Cut by transcript CT-0…CT-4" sections. The screen `designs/screens/14b-remove-filler-words-sheet.md` (CT-3).
 - Person checks, in `docs/manual-checks.md`: FIL-1 (CT-3, a real recording's filler cut), AS-10 (CT-4, false starts with a real key), and Clip ▸ Remove Filler Words… added to CH-4's list (CT-3).
@@ -78,15 +83,13 @@ Mutants, each run once on the final instrument and each caught: CT-0 three (the 
 - **TR-2's second paid transcription:** a project transcribed before CT-1 is transcribed again before its fillers can be cut.
 - **A pre-CT-1 cache file's janitor rewrite** writes `"disfluencies":false` into its `requested` when a delete was owed: the old request's true value, read the same as an absent key, `words` untouched (orig CT-1 record). Harmless.
 - **The assistant's guide** stands at 1486 of its 1500 characters.
-- **`get_transcript`** answers every word with no window (#331), and recognises again on every call when there is no cloud transcript (#332).
-- **An agent's `ripple_delete_ranges` step** reads "Remove Silences" in Edit ▸ Undo whatever it cut (#333).
+- **`get_transcript`'s on-device window** (TR-13): the recogniser hears less context, so a windowed answer can differ from the whole clip's.
+- **The on-device cache** (TR-14): a windowed miss recognises and stores its own span only, and a later call outside every stored run recognises again; no gap-filling, no merging across runs.
+- **An agent's silence cut** reads "Undo Ripple Delete", not the sheet's "Undo Remove Silences" (TR-12).
 
 ## Open items
 
-Filed at CT-5, each `ai-drafted` and `low-priority`, still open:
-- #331: `get_transcript` answers every word of a clip at once, with no `from`/`to` window, so a long clip's answer is large.
-- #332: `get_transcript` recognises a clip again on every call when its media has no cloud transcript.
-- #333: an agent's `ripple_delete_ranges` is named "Remove Silences" in Edit ▸ Undo, whatever it cut.
+None still open. Filed at CT-5 and closed by the residue batch (2026-10-23): #333 (TR-12), #331 (TR-13) and #332 (TR-14).
 
 #92 is closed by the orchestrator after this record's merge.
 
