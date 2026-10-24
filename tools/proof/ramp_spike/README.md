@@ -3,7 +3,7 @@
 One question the road map asks before any ramp code is written: **do the many abutting
 constant-rate segments a ramp's plan will hold click, drop out, or misplace audio or frames, in
 export and in playback?** (`scaleTimeRange` is piecewise-constant, so a ramp is many segments.)
-**The answers are not here**: they are in `designs/speed-ramps.md`'s "SR1 — the spike" record
+**The answers are not here**: they are in `archive/speed-ramps.md`'s "SR1 — the spike" record
 (the table and the VERDICT line). The rule the run is judged by is spec §11 SR-5
 (`designs/spec/11-decisions/speed-ramps.md`), fixed before the run; `results.json` stores that
 file's SHA-256 as `rule_sha256`, so the rule a recorded run read is pinned. What is here is how
@@ -121,7 +121,7 @@ SR1 stopped, and the owner chose to render a ramped clip's audio offline (spec �
 that rendered audio free of clicks and dropouts, and placed on the ideal map, in export and in
 playback?** The rule is spec §11 SR-7, fixed before the run and pinned by `rule_sha256` in
 `results.json`; the answers are in
-`designs/speed-ramps.md`'s "SR1b — the rendered-audio spike" record.
+`archive/speed-ramps.md`'s "SR1b — the rendered-audio spike" record.
 
 ```sh
 python3 tools/proof/ramp_spike/render_spike.py --selftest                       # S8–S13; no build
@@ -184,7 +184,7 @@ SR-8 remade the Keep pitch arm as three stages (the glide at 48 kHz × K, Apple'
 held at ×1 with `pitch` = −1200·log₂ rate cents, a decimation by K; `RampVarispeedStream.swift`,
 `RampAudioRenderer+TimePitch.swift`). SR1c re-runs SR-7's arm ON on it and scores the rendered
 pitch, by spec §11 SR-9 (fixed before the run, pinned by `rule_sha256`); the answers are in
-`designs/speed-ramps.md`'s SR1c record.
+`archive/speed-ramps.md`'s SR1c record.
 
 ```sh
 python3 tools/proof/ramp_spike/render_spike.py --selftest                          # S8–S17
@@ -239,8 +239,9 @@ for f in tools/proof/work/ramp-render-spike-sr1b/renders/R{V,F,C-off}*.caf; do c
 SR-13 put the Keep pitch arm back to SR-6's rate-driven unit with its rate read a lead L ahead
 (`RampAudioRenderer+TimePitch.swift`, `rateLeadFrames`); SR-8's three stages are gone, and
 `RampVarispeedStream` and `position`/`chunk` lost their `per` parameter. SR1d measures the lead
-first and then judges it by spec §11 SR-14 (fixed before the run, pinned by `rule_sha256`); the
-answers are in `designs/speed-ramps.md`'s SR1d record.
+first and then judges it by spec §11 SR-14 (fixed before the run, pinned by `rule_sha256`; since
+the road map's close SR-14 is in `designs/spec/11-decisions/speed-ramps-2.md`, the file
+`--verdict rate` hashes); the answers are in `archive/speed-ramps.md`'s SR1d record.
 
 ```sh
 python3 tools/proof/ramp_spike/render_spike.py --selftest                           # S8–S21
@@ -297,7 +298,7 @@ and the off arm's renders were compared byte for byte with SR1b's by SR1c's two 
 ## SR1e — a corrected playback tap trimmed, not zero-padded (spec §11 SR-17)
 
 SR1e closed as measured (spec §11 SR-16: the 56 ms lead kept, no product change); its diagnostic
-is in `designs/speed-ramps.md`'s SR1e record. What it changed here is the instrument: PT1's
+is in `archive/speed-ramps.md`'s SR1e record. What it changed here is the instrument: PT1's
 whole-sample correction of a playback tap (#335) used to move the samples with `shift_signal` and
 zero-fill the head (k < 0) or tail (k > 0), which SR1d's m1 of −86.333 ms turned into a 0.05 s
 "dropout" and a 36.3 ms placement out of zeros. Now `trim_shift(x, k)` cuts that span off and

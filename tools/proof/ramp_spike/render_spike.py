@@ -7,7 +7,7 @@ ideal map, in export and in playback? Measured through SR1's instrument
 (`ramp_spike.py`'s fixtures, Z0, classifiers and probe, whose `render` group
 calls the renderer, built `-O`), against rendered and composition controls
 and a planted fault, by SR-7's rule (fixed before the run; `results.json`
-pins the §11 file's SHA-256). The answers are in `designs/speed-ramps.md`'s
+pins the §11 file's SHA-256). The answers are in `archive/speed-ramps.md`'s
 SR1b record. SR1c (SR-9) re-runs arm ON on SR-8's resample-then-pitch-shift
 renderer with `--verdict on`, adding the rendered pitch (PR, LG), rendered-only
 constant controls (`aux`) and a 15 kHz band render (`band`, BW); its answers
@@ -69,7 +69,10 @@ BAND_WAV = WORK / "band.wav"
 BAND_HZ = 15000.0
 GLIDE_WAV = WORK / "glide.wav"
 LEAD_DIR = WORK / "lead"
-RULE_FILE = rs.RULE_FILE
+RULE_FILE = rs.RULE_FILE  # SR-7 and SR-9
+# SR-14, the rule `--verdict rate` judges by: the §11 file split at the road
+# map's close, and SR-13 on are in the second file.
+RATE_RULE_FILE = ROOT / "designs/spec/11-decisions/speed-ramps-2.md"
 
 SEC, FRAME, RATE = rs.SEC, rs.FRAME, rs.RATE
 SOURCE_IN = rs.SOURCE_IN
@@ -1144,7 +1147,8 @@ def main():
 def run(args, groups, names, everything):
     score = rs.Score()
     started = time.time()
-    rule_sha = hashlib.sha256(RULE_FILE.read_bytes()).hexdigest()
+    rule_file = RATE_RULE_FILE if args.verdict == "rate" else RULE_FILE
+    rule_sha = hashlib.sha256(rule_file.read_bytes()).hexdigest()
     info = rs.host()
     score.row("H0", "measured", f"{info['model']}, macOS {info['macos']}, load {info['load']}, "
               f"Frame Job pids {info['framejob_pids'] or 'none'}; rule_sha256 {rule_sha[:16]}…")

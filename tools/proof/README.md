@@ -22672,7 +22672,7 @@ SR1 of road map "speed-ramps" (#111): do the many abutting constant-rate
 segments a ramp's plan will hold click, drop out, or misplace audio or frames,
 in export and in playback? Its own README (`tools/proof/ramp_spike/README.md`)
 is the full one — the instruments, the fixtures, the variants, the rows, the
-selftest and the exit codes — and the ANSWERS are in `designs/speed-ramps.md`'s
+selftest and the exit codes — and the ANSWERS are in `archive/speed-ramps.md`'s
 "SR1 — the spike" record, not here. The rule it judges by is spec §11 SR-5,
 fixed before the run and pinned in `results.json` as `rule_sha256`.
 

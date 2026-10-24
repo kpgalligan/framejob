@@ -324,7 +324,7 @@ RAMP_SPAN_S = (1.0, 3.0)
 PITCH_CENTS = 25.0
 SHIFT_S = 0.002
 MUTANTS = ["expect-shift", "keep-shift"]
-# SR1d's measured run (designs/speed-ramps.md's SR1d record, results.json at
+# SR1d's measured run (archive/speed-ramps.md's SR1d record, results.json at
 # 2026-10-23 21:34:59): SR-7's floor (the lower export control found share −
 # 0.10) and ceiling (the greater export control max |diff| + 5.0 ms) for RK1
 # and RK2; RK3's measured worst 22.10 ms + a 5.0 ms margin (SR-15).

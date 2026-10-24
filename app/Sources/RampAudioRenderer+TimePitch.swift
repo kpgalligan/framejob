@@ -23,7 +23,7 @@ extension RampAudioRenderer {
     static let timePitchRates: ClosedRange<Double> = (1.0 / 32)...32
     /// L*, output frames: the lead SR-14's sweep picked, 56 ms (RK1's max
     /// |diff| 8.06 ms, RK2's 5.55 ms, every click found;
-    /// `designs/speed-ramps.md`'s SR1d record). Apple's unpublished
+    /// `archive/speed-ramps.md`'s SR1d record). Apple's unpublished
     /// behaviour, pinned by `ramp_proof.py`'s L1 and L2; a deep slow-down
     /// still lands up to about 24 ms late (RK3 22 ms, pinned by L3; the
     /// owner's accepted limit, SR-15 as SR-16 widens it); SR1e kept it.

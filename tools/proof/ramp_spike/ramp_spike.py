@@ -7,7 +7,7 @@ export and in playback? Measured on synthetic fixtures through the app's own
 `CompositionBuilder`, `Exporter` and editor player, by `ramp_spike_probe.swift`
 compiled AS `main.swift` over `app/Sources`, against constant-rate controls and
 a planted fault, by SR-5's rule (fixed before the run; `results.json` pins the
-§11 file's SHA-256). The answers are in `designs/speed-ramps.md`'s SR1 record.
+§11 file's SHA-256). The answers are in `archive/speed-ramps.md`'s SR1 record.
 
     python3 tools/proof/ramp_spike/ramp_spike.py [--groups plan,export,playback]
         [--variants V1-G1,C-off-x2,…] [--remake]
