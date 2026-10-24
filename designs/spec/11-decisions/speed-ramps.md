@@ -31,8 +31,9 @@ file's SHA-256 again. SR3 is split in two: SR3a (the trims, roll, slip, the spli
 the handle transition, the road map's F–K) recorded SR-18 and SR-10's Amended-by line before its
 code; SR3b (L and M) recorded SR-19 and the Amended-by lines on SR-10 and SR-18 before its code.
 SR4 (Swift's mappers, the road map's N and O) recorded SR-20 and the road map's Amended-by lines
-on N and O before its code. Later phases record their rules as new entries (SR-21 on) or as
-Amended-by lines before their code.
+on N and O before its code. SR5 (the UI, the road map's P and Q, and #338) recorded SR-21,
+SR-22 and the Amended-by lines on SR-19 (i), on rule Q and on CI-6 before its code. Later phases
+record their rules as new entries (SR-23 on) or as Amended-by lines before their code.
 
 **Stands, and nothing here re-litigates it:** SY-24 (the varispeed lead: a time-scaled segment
 on an `off` track reads its source 575 ticks earlier; ×1 untouched); SY-26 (one pitch name per
@@ -815,6 +816,9 @@ plan leaves the audio out, one pitch per plan audio track).
     (`action_past_end`). It is the crate's rule for every clip, a constant clip's trimmed zoom
     action included, so it is not a ramp's. SR5 (rule Q, where a person reaches it) records its
     rule before its code.
+    *Amended by SR-22 (SR5):* the refusal is narrowed for every clip: only an edit that ends the
+    action past the clip's end AND later than it ended before is refused; a curve, the same span,
+    an earlier start or a shorter length applies (#338).
   - **Why:** one factor applied to every rate and every speed span is the only scaling that keeps
     both the shape and the window. A copy or a re-snap that changed what a ramp reads would change
     the picture with no edit. A named figure is one both readers take from stored numbers (no rate
@@ -880,3 +884,62 @@ plan leaves the audio out, one pitch per plan audio track).
   - Risk accepted: words, fillers and silences are placed through a piecewise-linear chord of S
     with 1 ms steps, the chord the renderer plays; captions made before a ramp edit keep their old
     times until they are made again.
+- **SR-21 — The UI of a speed ramp (SR5): the Speed section's Rate writes the selected action's
+  `end.speed`; a band names `speed`; the ×12 question covers a ramp edit; the Speed sheet scales
+  a ramp.** The road map's P and Q, as built.
+  - **(a) Rate inside an action.** With an action SELECTED on the single selected media clip
+    (CI-2; the playhead entering a span selects it, CI-1), the Speed section's Rate writes that
+    action's `end.speed`: one `set_action_end {patch: {speed}}`, undo name "Set Speed". With none
+    selected, or with several clips selected, it is one `set_speed` per media clip as before.
+    The section's Reset does the same at ×1 (×1 at the action's end inside one). Keep pitch is
+    `set_speed` at the clip's BASE rate with `keep_pitch`, and Fit to is `set_speed`'s duration
+    arm: both stay clip-level whatever is selected, and are ⊘ while an action is selected.
+  - **(b) The read.** Inside an action Rate shows the end's stored rate when the end names one,
+    else the rate in force at the action's end, read from the core: `rc_project_clip_state`
+    answers a top-level `speed`, the rate the clip plays at that clip time (`rate_in_force`, the
+    clip's `SpeedMap` read there, or its `speed` when constant). The coral "now" reads the same
+    key at the playhead. No rate is computed in Swift (D2-1); outside an action Rate reads the
+    clip's base `speed` as before.
+  - **(c) The `speed` path.** A row's marks name `speed`: `set_speed` writes it and an end's
+    top-level `speed` keys it. Rate inside an action naming a rate is ◆ with the keyed border,
+    its key is cleared by a `null` (the gutter's ×, "Remove from action N", the section's Clear),
+    the Clip sub-tab's `◆N` counts it (CI-6 amended), and the Speed section is revealed under a
+    keying action (CI-8). Outside an action Rate's mark is ◇ "Changed by action N" when an action
+    names a rate, and so are Keep pitch's and Fit to's: all three write `set_speed`, so they
+    share the `speed` path's marks. Only `speed` is read by its own name; any other non-object
+    value in an end patch keys nothing, as before.
+  - **(d) The band.** A band's label lists `speed` beside the end's other keys (`ActionBands.keys`),
+    and an action naming a rate is never drawn with the zoom glyph, whatever its video keys.
+  - **(e) The ×12 question (#190, rule P).** Asked, and an agent's answer carries `audio_left_out`
+    and `audio_note`, for `set_speed`, `rate_stretch` and a `set_action_end` naming `speed`, read
+    off the core's trial as before, on SR-19 (d)'s named peak. Not for `set_action`,
+    `remove_action` or a Clear: none of them can raise the greatest rate a clip names, so none can
+    cross (amending rule P's list). The Speed section's note reads the named peak too.
+  - **(f) The Speed sheet** (Clip ▸ Speed…) edits the base rate under rule L (SR-19 (a)): Apply
+    is `set_speed` as before, and a ramp keeps its shape. When a selected clip is ramped its
+    readout adds the line "Each speed ramp keeps its shape: the rates it names scale with the base
+    rate." A constant selection's readout is unchanged, byte for byte.
+  - **(g) Menus.** No menu item, key or tool is added, and no validator changes: Clip ▸ Speed…
+    stays live on a ramped clip, which is a media clip.
+  - **(h) Person checks** in `docs/manual-checks.md`, RMP-1..RMP-4: a ramp sounds right with Keep
+    pitch on and off, playback through a ramp looks smooth, a ramped clip's filmstrip and waveform
+    look right (SR-20 (h)), and the Speed section inside an action feels right.
+  - **Why:** the inspector's one rule is that a field inside an action writes that action's end
+    (CI-2), and `speed` is an end key like opacity (SR-10); Keep pitch and Fit to are the clip's,
+    as CI-3's pitch and length are; a read from the core keeps one rate rule.
+  - Risk accepted: the question reads the named peak, so an end rate above ×12 on an action past
+    the clip's end asks though the clip never plays above ×12 (SR-19's risk line).
+- **SR-22 — `set_action` refuses only an edit that takes an action further past its clip's end
+  (#338).** For every clip, ramped or constant: with `new_end = new_start + new_duration`, the
+  edit is refused with `action_past_end`'s sentence, unchanged, only when `new_end` is past the
+  clip's end AND past the action's own end before the edit. So on an action already running past
+  the end, a curve change, the same span, an earlier start and a shorter length apply; a longer
+  length or a later start is refused. An action inside the clip pushed past its end is refused
+  exactly as before. The overlap check and a speed action's slot refusal (R3) after it are
+  unchanged, and `add_action` is unchanged.
+  - **Why:** SR-19 (b) and (g) leave a speed action past its clip's end, and `trim_end` leaves any
+    action there; refusing every edit of one left the person no way to re-curve or pull it in,
+    while an edit that leaves it no further out takes nothing the clip had. A band's drag already
+    stops at its own end (`ActionDragSession`), so the timeline gains nothing new to reach.
+  - Risk accepted: an action may stay past its clip's end after an edit, as `trim_end` already
+    leaves it.

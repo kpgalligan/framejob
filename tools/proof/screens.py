@@ -214,6 +214,8 @@ NOT_SHOWN = {
                             "with it",
     "RCDevSyncHold": "a dev launch default that holds Synchronize Audio's background analysis "
                      "so a proof can act during it; no screen launches with it",
+    "RCDevRampRenderHold": "a dev launch default that holds each speed-ramp audio render so "
+                           "a proof can act while it is pending; no screen launches with it",
     "FrameJobScreenRecordingAsked": "whether the panel has put up the Screen Recording prompt "
                                    "once; read only by a press of Record, which no screen makes",
     "RC_AGENT_SOCKET": "an environment variable, the agent server's socket path; each launch "
@@ -264,6 +266,8 @@ FIXTURES = {
     "qualifier": {"path": os.path.join(FIXTURE_DIR, "Qualifier.framejob"),
                   "clips": ["video", "adjustment"], "media": ["speech.mov"],
                   "sound": ["video"]},
+    "ramp": {"path": os.path.join(FIXTURE_DIR, "Ramp.framejob"),
+             "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -420,6 +424,8 @@ def build_fixture(mcp, name):
             ids = _curves_ops(mcp, path)
         elif name == "qualifier":
             ids = _qualifier_ops(mcp, path)
+        elif name == "ramp":
+            ids = _ramp_ops(mcp, path)
         mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
@@ -600,6 +606,28 @@ def _look_ops(mcp, path):
     ids = {"video": clips[0]["id"]}
     _call(mcp, "set_video", path, clips=[ids["video"]],
           patch={"look": {"kind": "teal_orange", "amount": 0.8}})
+    return ids
+
+
+def _ramp_ops(mcp, path):
+    """Speed ramps SR5 (spec §11 SR-21): one track, "Video", holding `speech.mov`
+    at 0 cut to 2 s, with one action at clip 0.5–1.5 s whose end names `speed`
+    ×2 — a speed ramp, so the Clip tab's Speed section under the selected
+    action shows Rate keyed at its end (10d)."""
+    _call(mcp, "set_track", path, track=1, name="Video")
+    video = _call(mcp, "import_media", path, path=os.path.join(MEDIA, "speech.mov"))
+    _call(mcp, "add_clip", path, media=_media_id(video), track=1, at=0)
+    clips = _project(mcp, path)["clips"]
+    if len(clips) != 1:
+        raise FixtureError(f"building ramp: the project holds {len(clips)} clips, not 1")
+    ids = {"video": clips[0]["id"]}
+    _call(mcp, "trim_end", path, clip=ids["video"], to=2 * SECOND)
+    added = _call(mcp, "add_action", path, clip=ids["video"], at=SECOND // 2, duration=SECOND)
+    actions = added.get("new_actions") if isinstance(added, dict) else None
+    if not actions:
+        raise FixtureError(f"building ramp: add_action answered no new_actions: {added}")
+    _call(mcp, "set_action_end", path, clip=ids["video"], action=actions[0],
+          patch={"speed": 2})
     return ids
 
 

@@ -482,7 +482,10 @@ governs a module now.
   property keyed OFF at the end — written after the merge and the prune;
   `check_off` refuses what `patch` refuses (`not_a_target`'s two sentences,
   and `merge_group`'s read of a `null` for an unknown or a required key),
-  and a non-object group slot is replaced by `{}`, never indexed. `nest` and `unnest`
+  and a non-object group slot is replaced by `{}`, never indexed. `set_action`
+  refuses `action_past_end` only when the new end is past the clip's end AND
+  later than the action's current end (SR-22, #338), so a value-only edit of
+  an action a trim left past the end goes through. `nest` and `unnest`
   (fresh ids, content byte-equal; the nest clip on the front-most non-matte
   track, a matte carried only above the copy of its target, unnest aligned on
   the front-most non-matte track — spec §11 MT-5);
@@ -496,7 +499,8 @@ governs a module now.
   clip-time → source-time function its speed actions make (the ease
   integrals of `actions.rs`'s curves), `is_ramped` (media clips only),
   `end_speed`'s clamp, `peak_rate` (the greatest rate the clip NAMES, its
-  base and every end rate, the ×12 figure, SR-19 (d)), `source_at`, `rate_at`; `of_length` (the
+  base and every end rate, the ×12 figure, SR-19 (d)), `source_at`, `rate_at`,
+  `rate_in_force` (what `clip_state`'s top-level `speed` answers, SR-21); `of_length` (the
   map over any horizon, reading on past the clip's end with its own
   actions, SR-18 (a)), `time_for_source` (its inverse) and `head_end_rate`
   (a split's straddled head re-solved so both halves meet at S(cut),
@@ -556,7 +560,9 @@ governs a module now.
   `enabled.audio`, `audio.duck`, the transition, the actions and the label
   (each a wrong picture or a wrong sound if carried) and refuses a nest.
   Default plate colour is white: the canvas is already black.
-- `actions.rs` — action evaluation and interpolation, and `clip_state`;
+- `actions.rs` — action evaluation and interpolation, and `clip_state`
+  (with a top-level `speed`, `speed_map.rs`'s rate in force, the inspector's
+  Rate inside an action, SR-21);
   `video_json` / `color_json` write all thirteen colour keys, the tone keys at
   0 included, for the five callers that must see them (the base state,
   `clip_state`, `patch.rs`'s template, `recipe_layer.rs`, `edit_split.rs`);

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Speed ramps SR2a, SR2b, SR1d, SR3a, SR3b and SR4 (spec §11 SR-10, SR-2, SR-6,
-SR-12, SR-13, SR-15, SR-18, SR-19, SR-20), against the built app: an action's
+"""Speed ramps SR2a, SR2b, SR1d, SR3a, SR3b, SR4 and SR5 (spec §11 SR-10, SR-2, SR-6,
+SR-12, SR-13, SR-15, SR-18, SR-19, SR-20, SR-21, SR-22), against the built app: an action's
 `end.speed` through `set_action_end` over MCP — the door, the slot rule's R1
 sentence, the ×12 answer, undo and redo (SR2a) — a ramped clip's rendered
 audio in the export and in playback (SR2b, #111), Keep pitch inside a ramp
@@ -11,7 +11,9 @@ agreeing on the rate the clip names, and `set_canvas`'s re-snap keeping a
 speed action past the clip's end (SR3b: V1–V3, C1), and Swift's readers
 through `rc_project_source_map` — the filmstrip, the waveform, transcripts,
 captions, fillers and silence — and Synchronize Audio refusing a ramp (SR4:
-F1–F5, Q0–Q4, Y1).
+F1–F5, Q0–Q4, Y1), and the UI — the Speed section's Rate inside an action, the
+band, the ×12 question for an end rate, the Speed sheet's ramp line — and
+`set_action` on an action past its clip's end (SR5: G1–G6, Z1, Z2).
 
     env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py [--only IDS]
     env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py --baseline
@@ -193,6 +195,49 @@ Y1  (main instance) a 2 s AV.mov clip ramped [0, 1 s) to ×2 and a constant
     AV.mov clip on a second track: `sync_audio` with either as anchor is
     refused, naming `clip <ramped>: ` and `AudioSync.ramped`'s sentence.
 
+SR5's G rows read `ramp_ui_probe.swift`, copied in as `main.swift` under
+`work/ramp/ui/` and built as the mapper probe is, run once under a 60 s wall (a
+timeout fails every G row). Its project is in-process, written to
+`work/ramp/ui/ramp-ui.framejob` and opened in a `ProjectDocument` with an
+`InspectorViewController`: clip "one" (10 s media, at 0.5 s from in 0.5 s, 5 s)
+with action A [0, 2 s) linear to ×2 and action B [3 s, 4 s) to opacity 0.5;
+clip "two" (2 s, an action [0, 2 s) linear to ×3, then `trim_end` to 1 s, so the
+action runs past the end); and, from a 60 s media at in 0, P (0.5 s at ×1, one
+action [0, 0.5 s) to ×2), Q (`set_speed` 13, then 0.5 s, one action to ×13) and
+R (a constant ×2 clip, 0.5 s).
+G1  `VideoPane.rateOps` at ×3: A selected → one `set_action_end {speed: 3}` on
+    A; B selected → the same on B; none selected → one `set_speed` on clip one;
+    two clips → one `set_speed` each. With A selected the Keep pitch row's own
+    ops (its default's) are one `set_speed` at the BASE ×1 with `keep_pitch`,
+    its gutter writes `speed` and is ⊘, and Fit to's is ⊘ too (SR-21 (a)).
+G2  `VideoPane.rateRead`: A → 2 (its end), B → 2 (the core's rate in force at
+    B's end), none → 1 (the base), at the playhead at clip 1 s → 1.5 (and the
+    "now" reading 1.5), the past-end action selected → its end ×3, not the ×2
+    the clip reaches at its end (SR-21 (b)).
+G3  `ActionBands.keys`: A's end → [speed]; a zoom end naming a rate → [scale,
+    speed, x, y] and `isZoom` false; the bare zoom true; A not a zoom (SR-21 (d)).
+G4  `SpeedAudioDrop`: each trial a `set_action_end {speed}`, its outcome arm
+    scored `applied` FIRST (any other arm fails the row): P's end ×14 (it reads
+    3.75 s) → [P] at 14; P's end ×12 → []; Q's end ×14, already above ×12 → [];
+    `mayCross` true for an end naming `speed` and `set_speed`, false for an
+    opacity end and `set_action`; the Speed section's note on P from the
+    applied ×14 snapshot is "Audio is silent above ×12", on R nil (SR-21 (e)).
+G5  `paths(of:)`: `set_speed` → [speed], Rate's ops with A → [speed]; A's keyed
+    paths [speed]; `clearOps([speed])` → one `set_action_end {speed: null}`;
+    the Clip sub-tab's ◆N 1 for A, 0 for B; Rate's mark keyed with A, other(1)
+    with none selected (SR-21 (c)).
+G6  `SpeedSheetController.readout` of clip one at ×2: its last line
+    `rampLine`, once; the trial's A end ×4 at base ×2 (rule L); R at ×1 reads
+    exactly ["1 clip · 00:00:00:15 → 00:00:01:00"], no ramp line (SR-21 (f)).
+Z1  (main instance) a constant AV.mov clip, `add_action` [1 s, 2 s), `trim_end`
+    to 1.5 s: `set_action curve` applies with the span unchanged; duration +1
+    frame is refused in `action_past_end`'s whole sentence; start −1 frame
+    applies; start +1 frame (from 1 s) is refused likewise; `undo` restores the
+    start (SR-22, #338).
+Z2  (main instance) AV.mov 2 s ramped [0, 2 s) to ×2, `trim_end` to 1 s: `set_action
+    curve ease_out` applies on the past-end speed action and `set_action_end
+    {speed: 2.5}` applies; the span and the clip's duration are kept.
+
 `--baseline` (before any SR2b app edit, on Release) builds CX1, CX2 and CK05
 and writes `tools/proof/work/ramp-baseline/baseline.json`: the commit and dirt
 of the app's own tree (`--app` may name another checkout's build), the app,
@@ -245,6 +290,9 @@ SPEECH_MOV = ROOT / "tools/proof/media/speech.mov"
 SILENCE_MOV = ROOT / "tools/proof/media/silence.mov"
 MAPPER_PROBE = ROOT / "tools/proof/ramp_mapper_probe.swift"
 MAPPER_WORK = WORK / "mapper"
+UI_PROBE = ROOT / "tools/proof/ramp_ui_probe.swift"
+UI_WORK = WORK / "ui"
+UI_WALL = 60
 MAPPER_WALL = 60
 F5_BOUND_S = 2.0
 Q4_BUCKET = 6_000
@@ -262,8 +310,12 @@ SR3B_ROWS = ["V1", "V2", "V3", "C1"]
 SR4_PROBE_ROWS = ["F1", "F2", "F3", "F4", "F5"]
 SR4_CLOUD_ROWS = ["Q0", "Q1", "Q2", "Q3"]
 SR4_APP_ROWS = ["Q4", "Y1"]
+SR5_PROBE_ROWS = ["G1", "G2", "G3", "G4", "G5", "G6"]
+SR5_APP_ROWS = ["Z1", "Z2"]
 ROWS = (["D0"] + SR2A_ROWS + SR2B_ROWS + SR3A_ROWS + SR3B_ROWS + SR4_PROBE_ROWS
-        + SR4_CLOUD_ROWS + SR4_APP_ROWS)
+        + SR4_CLOUD_ROWS + SR4_APP_ROWS + SR5_PROBE_ROWS + SR5_APP_ROWS)
+RAMP_LINE = "Each speed ramp keeps its shape: the rates it names scale with the base rate."
+SILENT_NOTE = "Audio is silent above ×12"
 # name: (rate, keep pitch or None for the default, length ticks)
 CONSTANTS = {"CX1": (1.0, None, 4 * SEC), "CX2": (2.0, False, 4 * SEC),
              "CK05": (0.5, True, 4 * SEC)}
@@ -1359,6 +1411,217 @@ def y1(client, state):
 APP_RUNNERS.update({"Q4": q4, "Y1": y1})
 
 
+# ---- SR5 -------------------------------------------------------------------------
+
+
+def past_end(sentence_clip, start, duration, length):
+    """`action_past_end`'s sentence (core/src/edit_action.rs), written out."""
+    return (f"an action of {duration} ticks at {start} would end at {start + duration}, past "
+            f"clip {sentence_clip}'s own end at {length} ticks")
+
+
+def z1(client, state):
+    doc = Doc(client, "z1")
+    clip, _ = doc.av_clip(3 * SEC)
+    action = doc.action(clip, SEC, SEC)
+    doc.must("trim_end", clip=clip, to=3 * SEC // 2)
+    placed = doc.clip(clip)
+    length = placed["duration"]
+
+    def span():
+        stored = doc.clip(clip)["actions"][0]
+        return stored["start"], stored["duration"], stored["curve"]
+
+    before = span()
+    curve = doc.call("set_action", clip=clip, action=action, curve="ease_in")
+    after_curve = span()
+    longer = doc.call("set_action", clip=clip, action=action, duration=SEC + FRAME)
+    want_longer = past_end(clip, SEC, SEC + FRAME, length)
+    earlier = doc.call("set_action", clip=clip, action=action, start=SEC - FRAME)
+    after_earlier = span()
+    later = doc.call("set_action", clip=clip, action=action, start=SEC + FRAME)
+    want_later = past_end(clip, SEC + FRAME, SEC, length)
+    undone = doc.call("undo")
+    after_undo = span()
+    doc.close()
+    good = (length == 3 * SEC // 2 and before == (SEC, SEC, before[2])
+            and curve["ok"] and after_curve == (SEC, SEC, "ease_in")
+            and not longer["ok"] and longer["error"].endswith(want_longer)
+            and earlier["ok"] and after_earlier == (SEC - FRAME, SEC, "ease_in")
+            and not later["ok"] and later["error"].endswith(want_later)
+            and undone["ok"] and after_undo == (SEC, SEC, "ease_in"))
+    check("Z1", good,
+          f"clip {clip} {length} ticks, action {before}; curve "
+          f"{'applied' if curve['ok'] else curve.get('error')} → {after_curve}; +1 frame "
+          f"{longer.get('error', 'APPLIED')!r} (want …{want_longer!r}); start −1 frame "
+          f"{'applied' if earlier['ok'] else earlier.get('error')} → {after_earlier}; start "
+          f"+1 frame {later.get('error', 'APPLIED')!r} (want …{want_later!r}); undo → "
+          f"{after_undo}")
+
+
+def z2(client, state):
+    doc = Doc(client, "z2")
+    clip, _ = doc.av_clip(2 * SEC)
+    action = ramp_it(doc, clip)
+    doc.must("trim_end", clip=clip, to=SEC)
+    placed = doc.clip(clip)
+    curve = doc.call("set_action", clip=clip, action=action, curve="ease_out")
+    rate = doc.call("set_action_end", clip=clip, action=action, patch={"speed": 2.5})
+    after = doc.clip(clip)
+    stored = after["actions"][0]
+    doc.close()
+    good = (placed["duration"] == SEC and placed["actions"][0]["duration"] == 2 * SEC
+            and curve["ok"] and rate["ok"] and stored["curve"] == "ease_out"
+            and stored["end"].get("speed") == 2.5 and stored["start"] == 0
+            and stored["duration"] == 2 * SEC and after["duration"] == SEC)
+    check("Z2", good,
+          f"clip {clip} {placed['duration']} ticks holding {placed['actions'][0]}; curve "
+          f"{'applied' if curve['ok'] else curve.get('error')}; end ×2.5 "
+          f"{'applied' if rate['ok'] else rate.get('error')}; now {stored}, duration "
+          f"{after['duration']}")
+
+
+APP_RUNNERS.update({"Z1": z1, "Z2": z2})
+
+
+def ui_probe():
+    """(readings, None) or (None, why): `ramp_ui_probe.swift` copied in as
+    `main.swift`, built over this tree's `app/Sources` (`mapper_probe`'s shape),
+    run once under a UI_WALL s wall in `work/ramp/ui/`, where it writes its
+    package."""
+    UI_WORK.mkdir(parents=True, exist_ok=True)
+    entry = UI_WORK / "main.swift"
+    shutil.copyfile(UI_PROBE, entry)
+    binary = UI_WORK / "ramp-ui-probe"
+    try:
+        swift_build.build(sources=swift_build.app_sources(ROOT / "app/Sources") + [entry],
+                          output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        return None, "swiftc: " + "; ".join([str(error)] + list(error.diagnostics[:8]))
+    try:
+        ran = subprocess.run([str(binary)], capture_output=True, text=True,
+                             timeout=UI_WALL, cwd=UI_WORK)
+    except subprocess.TimeoutExpired:
+        return None, f"no answer within {UI_WALL} s"
+    (UI_WORK / "stderr.txt").write_text(ran.stderr)
+    (UI_WORK / "answer.json").write_text(ran.stdout)
+    try:
+        answer = json.loads(ran.stdout)
+    except ValueError:
+        return None, f"no answer (exit {ran.returncode}): {ran.stderr[-300:]}"
+    if answer.get("error") or answer.get("problems"):
+        return None, f"the fixtures: {answer.get('error')} {answer.get('problems', '')}"
+    return answer, None
+
+
+def op(name, **args):
+    return {"name": name, "args": args}
+
+
+def g1(got):
+    ids, clips, f = got["ids"], got["clips"], got["G1"]
+    one, two = clips["one"]["id"], clips["two"]["id"]
+    want_a = [op("set_action_end", clip=one, action=ids["A"], patch={"speed": 3})]
+    want_b = [op("set_action_end", clip=one, action=ids["B"], patch={"speed": 3})]
+    want_none = [op("set_speed", clip=one, rate=3)]
+    want_two = [op("set_speed", clip=one, rate=3), op("set_speed", clip=two, rate=3)]
+    keep = f["keep_pitch"]
+    keep_ops = keep["ops"]
+    keep_ok = (len(keep_ops) == 1 and keep_ops[0]["name"] == "set_speed"
+               and keep_ops[0]["args"].get("clip") == one
+               and keep_ops[0]["args"].get("rate") == 1
+               and isinstance(keep_ops[0]["args"].get("keep_pitch"), bool)
+               and keep["writes"] == ["speed"] and keep["mark"] == "notAnimatable")
+    fit_ok = f["fit"]["writes"] == ["speed"] and f["fit"]["mark"] == "notAnimatable"
+    good = (f["A"] == want_a and f["B"] == want_b and f["none"] == want_none
+            and f["two"] == want_two and keep_ok and fit_ok and f["base_rate"] == 1)
+    check("G1", good,
+          f"A {f['A']} (want {want_a}); B {f['B']}; none {f['none']}; two clips {f['two']}; "
+          f"Keep pitch with A selected {keep} (want set_speed at the base ×1, writes speed, "
+          f"⊘); Fit to {f['fit']}; base {f['base_rate']}")
+
+
+def g2(got):
+    f = got["G2"]
+    near = (lambda a, b: a is not None and abs(a - b) < 1e-9)
+    good = (near(f["A"], 2) and near(f["B"], 2) and near(f["none"], 1)
+            and near(f["playhead"], 1.5) and near(f["now"], 1.5) and near(f["past"], 3)
+            and f["past_selected"] == got["ids"]["past"])
+    check("G2", good,
+          f"A {f['A']} (want 2, its end); B {f['B']} (want 2, the rate in force at its end); "
+          f"none {f['none']} (want the base 1); at the playhead, clip 1 s, {f['playhead']} "
+          f"and now {f['now']} (want 1.5); the past-end action {f['past']} (want its end ×3, "
+          f"not the ×2 at the clip's end), selected {f['past_selected']}")
+
+
+def g3(got):
+    f = got["G3"]
+    good = (f["keys_A"] == ["speed"] and f["keys_zoom_rate"] == ["scale", "speed", "x", "y"]
+            and f["keys_zoom"] == ["scale", "x", "y"] and f["zoom"] is True
+            and f["zoom_rate"] is False and f["A_zoom"] is False)
+    check("G3", good, f"{f}")
+
+
+def g4(got):
+    clips, f, may = got["clips"], got["G4"], got["G4_may"]
+    p = clips["P"]["id"]
+    by = {t["name"]: t for t in f["trials"]}
+    applied = all(by.get(n, {}).get("arm") == "applied" for n in ("P14", "P12", "Q14"))
+    want = {"P14": [{"id": p, "speed": 14}], "P12": [], "Q14": []}
+    crossings = applied and all(by[n]["crossing"] == w for n, w in want.items())
+    may_ok = (may == {"end_speed": True, "end_opacity": False, "set_action": False,
+                      "set_speed": True} and all(by[n]["may"] is True for n in want))
+    notes = f["note_P14"] == SILENT_NOTE and f["note_R"] is None
+    check("G4", applied and crossings and may_ok and notes,
+          f"P {clips['P']}, Q {clips['Q']}; trials "
+          + "; ".join(f"{n} {t['arm']} → {t['crossing']}" for n, t in by.items())
+          + f" (want each applied, then {want}); mayCross {may}; the note on P at ×14 "
+          f"{f['note_P14']!r} (want {SILENT_NOTE!r}), on the constant ×2 clip {f['note_R']!r}")
+
+
+def g5(got):
+    ids, clips, f = got["ids"], got["clips"], got["G5"]
+    want_clear = [op("set_action_end", clip=clips["one"]["id"], action=ids["A"],
+                     patch={"speed": None})]
+    good = (f["set_speed"] == ["speed"] and f["rate_A"] == ["speed"]
+            and f["keyed_A"] == ["speed"] and f["clear"] == want_clear
+            and f["count_A"] == 1 and f["count_B"] == 0
+            and f["rate_mark_A"] == "keyed" and f["rate_mark_none"] == "other(1)")
+    check("G5", good,
+          f"paths(set_speed) {f['set_speed']}, paths(Rate with A) {f['rate_A']}, A keys "
+          f"{f['keyed_A']}; clearOps([speed]) {f['clear']} (want {want_clear}); Clip ◆N A "
+          f"{f['count_A']} B {f['count_B']}; Rate's mark with A {f['rate_mark_A']}, with none "
+          f"{f['rate_mark_none']} (want keyed, other(1))")
+
+
+def g6(got):
+    f = got["G6"]
+    ramped, const = f["ramped"], f["constant"]
+    want_const = ["1 clip · 00:00:00:15 → 00:00:01:00"]
+    good = (f["ramp_line"] == RAMP_LINE and len(ramped) >= 2 and ramped[-1] == RAMP_LINE
+            and ramped.count(RAMP_LINE) == 1 and f["trial_A"] == 4 and f["trial_speed"] == 2
+            and const == want_const)
+    check("G6", good,
+          f"ramped readout {ramped} (want its last line {RAMP_LINE!r}); the trial's A end "
+          f"{f['trial_A']} at base {f['trial_speed']} (want 4 at 2); the constant ×2 clip at "
+          f"×1 {const} (want {want_const})")
+
+
+def run_ui_probe(chosen):
+    wanted = [r for r in SR5_PROBE_ROWS if r in chosen]
+    if not wanted:
+        return
+    got, why = ui_probe()
+    for name in wanted:
+        if got is None:
+            check(name, False, f"the UI probe: {why}")
+            continue
+        try:
+            {"G1": g1, "G2": g2, "G3": g3, "G4": g4, "G5": g5, "G6": g6}[name](got)
+        except Exception as error:
+            check(name, False, f"the row could not run: {type(error).__name__}: {error}")
+
+
 def secrets():
     """`transcript_proof.secret_folder()`'s shape: a 0700 folder holding 0600
     `anthropic-key` and `assemblyai-key`, both the dummy."""
@@ -1524,7 +1787,8 @@ def complaints(log):
 
 
 def needs(name):
-    if name in SR2A_ROWS or name in SR3A_ROWS or name in SR3B_ROWS or name == "Y1":
+    if (name in SR2A_ROWS or name in SR3A_ROWS or name in SR3B_ROWS or name == "Y1"
+            or name in SR5_APP_ROWS):
         return [AV_MOV]
     if name == "Q4":
         return [SILENCE_MOV]
@@ -1668,13 +1932,15 @@ def main():
         chosen.insert(chosen.index(next(r for r in chosen if r in SR4_CLOUD_ROWS)), "Q0")
     if "Q3" in chosen and "Q1" not in chosen:
         chosen.insert(chosen.index("Q3"), "Q1")
-    print(f"speed ramps SR2a/SR2b/SR3a/SR3b/SR4 — set_action_end's speed, the rendered ramp "
-          f"audio, edits on a ramped clip, its rate scaled and carried, and Swift's mappers — "
+    print(f"speed ramps SR2a/SR2b/SR3a/SR3b/SR4/SR5 — set_action_end's speed, the rendered "
+          f"ramp audio, edits on a ramped clip, its rate scaled and carried, Swift's mappers, "
+          f"and the UI — "
           f"{binary}" + (f" — mutant {MUTANT}" if MUTANT else ""), flush=True)
     state = {}
     run_app(binary, chosen, state)
     run_probe(chosen, state)
     run_mapper(chosen)
+    run_ui_probe(chosen)
     run_cloud(binary, chosen)
     scored = ["D0"] + chosen
     passed = sum(1 for name in scored if rows.get(name))

@@ -73,6 +73,9 @@ final class InspectorBinding {
         var audio: AudioProps?
         var text: TextProps?
         var graphic: [String: GraphicPropValue]?
+        /// `clip_state`'s `speed`: the rate in force at the read's clip time
+        /// (spec §11 SR-21 (b)).
+        var speed: Double?
     }
     private struct CacheKey: Hashable {
         let clip: UInt32
@@ -198,6 +201,7 @@ final class InspectorBinding {
             state.audio = InspectorBinding.decode(AudioProps.self, raw["audio"])
             state.text = InspectorBinding.decode(TextProps.self, raw["text"])
             state.graphic = InspectorBinding.decode(GraphicSnapshot.self, raw["graphic"])?.props
+            state.speed = raw["speed"] as? Double
         }
         cache[key] = state
         return state
@@ -226,6 +230,16 @@ final class InspectorBinding {
     /// answers none, so every row reads its schema default.
     func graphicProps(_ clip: ClipSnapshot) -> [String: GraphicPropValue] {
         mode == .defaults ? [:] : evaluated(clip).graphic ?? clip.graphic?.props ?? [:]
+    }
+    /// A clip's rate (spec §11 SR-21 (b)): `.defaults` answers ×1; at `.end`
+    /// the selected action's stored `end.speed` when it names one; otherwise
+    /// the core's rate in force at the read's time (`clip_state`'s `speed`),
+    /// or the clip's base `speed` when no time is read. No rate is computed
+    /// here (D2-1).
+    func speed(_ clip: ClipSnapshot) -> Double {
+        if mode == .defaults { return 1 }
+        if mode == .end, let named = action(clip)?.end.speed { return named }
+        return evaluated(clip).speed ?? clip.speed
     }
     /// Shapes are not animatable (§5.4's patch covers video, audio and text),
     /// so this is always the base description.

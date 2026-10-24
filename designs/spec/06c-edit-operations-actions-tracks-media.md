@@ -29,7 +29,11 @@ The rules every op shares are §6a; the clip ops are §6b.
   names its path (`bad value at "region.width"`). A non-finite or non-positive number is an
   **error** too — `region.width must be greater than 0` — because a zero-width region asks for an
   infinite scale.
-- **`set_action {clip, action, start?, duration?, curve?}`** — Same overlap checks. When the
+- **`set_action {clip, action, start?, duration?, curve?}`** — Same overlap checks. **Refused**
+  (`add_action`'s past-end sentence) only when the new end is past the clip's end AND later than
+  the action's end before the edit (§11 SR-22, #338): an action already running past the end — a
+  trim or a ramp scale can leave one there — can be re-curved, moved earlier or shortened, and one
+  inside the clip still cannot be pushed past it. When the
   action's end names a `speed` (§11 SR-10) and the change would make the clip read past the end of
   its media it is **refused** (SR-2): `retiming action {a} would read clip {c} {over} ticks past
   the end of its media; the latest clip end that fits is {end} ticks`.

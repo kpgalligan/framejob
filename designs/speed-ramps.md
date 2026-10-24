@@ -185,6 +185,13 @@ Each phase records the rules it builds in spec §11 as SR-n entries before its c
 - **Q — UI.** With the playhead in an action, the Speed section's Rate writes that action's
   `end.speed` (the inspector's `in_action` rule); Keep pitch and Fit to stay clip-level. A band's
   label names `speed` (`ActionPatch` gains it). The Speed sheet edits the base rate under L.
+  *Amended by SR-21 (SR5):* "the playhead in an action" is the SELECTED action (CI-2), which the
+  playhead entering a span selects (CI-1); Rate reads the end's rate, else the core's
+  `clip_state.speed`; Keep pitch and Fit to are ⊘ inside one; the ×12 question is asked for
+  `set_speed`, `rate_stretch` and a `set_action_end` naming `speed`, not for `set_action` or
+  `remove_action` (which cannot raise the named peak); `ActionPatch` already held `speed`, so
+  the band's label and the zoom test read it. #338 is SR-22: `set_action` refuses only an edit
+  that takes an action further past its clip's end.
 
 **Deferred, filed as issues at the close unless built:** a rate graph drawn on the lane, ramp
 presets (a Speed ▸ Ramp… sheet), Frame Job's own time-stretch for keep pitch (#299, SY-41),
@@ -1506,3 +1513,79 @@ The orchestrator applied the map entries in `core/CLAUDE.md` (`speed_segments.rs
 group) and `app/CLAUDE.md` (`ReelCore.swift`, `SourceMap.swift` with
 `TimelineView+SourceMap.swift`, `MediaPeaks`, `CompositionPlan.swift`, `MediaTranscript.swift`,
 `AudioSync.swift`; `CoreValues.swift` and `ReelOpSchema.swift` with SR4-0's toll, 05c889d).
+
+## SR5 — the UI (P, Q) and #338
+
+SR5 builds P and Q. SR-21 (the Speed section's Rate writes the SELECTED action's `end.speed`, read
+as the end's rate or the core's `clip_state.speed`; Keep pitch and Fit to clip-level and ⊘; the
+`speed` path; the band; the ×12 question for an end rate; the Speed sheet's ramp line; no menu
+change; RMP-1..RMP-4), SR-22 (#338: `set_action` refuses only an edit that takes an action
+further past its clip's end, for every clip), and the Amended-by lines on SR-19 (i), on rule Q and
+on CI-6 were recorded before the code. The design review's objection (G4's ×14 and ×12 trials on
+the 5 s probe clip were refused by R1, so its crossings passed or failed vacuously) is answered by
+G4's own clips P and Q cut 0.5 s from 60 s media and every trial scored `applied` before its
+crossing. SR5-0, the pure move that paid for `InspectorPane.swift`'s growth (its small labels and
+fields to `InspectorLabels.swift`, 737 → 491), landed alone as 69142c8.
+
+**What landed.**
+- Core: `speed_map.rs`'s `rate_in_force` (the map's `rate_at`, or `speed` on a constant clip);
+  `clip_state` answers it as a top-level `speed` (`actions.rs`, 585 lines); `set_action`'s
+  past-end test is `new_end > D && new_end > old_end` (`edit_action.rs`), its sentence unchanged;
+  `edit.rs`'s `set_action` row.
+- Swift: `InspectorBinding.speed(_:)` and `Evaluated.speed` (`InspectorPane.swift`, 505);
+  `VideoPane+Speed.swift`'s `baseRate`, `rateRead`, `rateOps` (Rate, its presets and the section's
+  Reset), Keep pitch at the base rate, Fit to's `writes:` (so it is ⊘), the note on the named
+  peak; `InspectorMarks.swift`'s `speed` path (`set_speed` writes it, an end's top-level key keys
+  it, `clearOps` nulls it — so outside an action Keep pitch and Fit to, which write `set_speed`
+  too, carry Rate's ◇ when an action names a rate); `ClipSubTab.clip` counts it; `ActionBands.keys` names it and
+  `isZoom` refuses a rate; `SpeedAudioDrop.mayCross` takes a `set_action_end` naming `speed`, so
+  the inspector's existing `inspectorEdit` asks the #190 question and `editResult` already answers
+  an agent; `SpeedSheetController.rampLine` closes the readout of a ramped selection. No menu,
+  key, tool, schema, export or header changed; `set_action`'s catalog prose (one sentence) and two
+  handler comments name the UI paths.
+- Documents: spec §4.3a (the Speed bullet), §4.4 (the band's keys), §6 (`06c`'s `set_action`),
+  §7.1 (`clip_state`'s `speed`), §7.10 (`actions.rs`, `speed_map.rs`), §9 (Speed… on a ramp), the
+  index's Lines cells; `docs/manual-checks.md`'s new "Speed ramps" section, RMP-1..RMP-4 (a ramp's
+  sound with Keep pitch off and on, smooth playback, SR-20 (h)'s filmstrip and waveform, the
+  Speed section inside an action); the README's Editing bullet; the screen
+  `designs/screens/10d-clip-speed-action.md` on the new `ramp` fixture (`screens.py`'s
+  `_ramp_ops`, listed in the screens README); `tools/proof/README.md`'s SR5 section.
+- Tests: `core/tests/ramp_inspector.rs` (8, oracles in the file); `ramp_ui_probe.swift` and
+  `ramp_proof.py`'s G1–G6, Z1, Z2.
+
+**Measured.** `cargo test --release --test ramp_inspector` 8/8; `refusal`, `time_bounds_edits`
+and `ramp_door` unedited, 35/35; `make lint` clean; `make typecheck` 0 errors, its 4 baseline
+warnings; `spec_index_proof.py` 183/183; `speed_audio_probe.py` 18/18, `speed_limits_probe.py` 24
+rows with none failed, `speed_sheet_probe.py` 10/10 and `clip_inspector4_proof.py` 46/46, all
+unedited. Debug `ramp_proof.py --only G1,…,Z2` 8/9 — Z2's instrument re-set the curve
+`add_action` already writes, an identity — then `--only Z2` 2/2 with that step dropped. The nine
+mutants, each applied alone, its rows run (the G rows from the edited tree through the probe; Z1
+and Z2 after `make app-debug`), then reverted, were each caught: M1 (`rateOps` ignoring the
+action) G1 and G5; M2 (`speed(_:)` reading `clip.speed` only) G2 — B and the playhead read 1;
+M3 (the `.end` stored-rate preference dropped) G2 — the past-end action read ×2; M4 (`keys`
+without `speed`) G3; M5 (`mayCross` without `set_action_end`) G4; M6 (the note on `clip.speed`)
+G4; M7 (`paths(inPatch:)` skipping `speed`) G5 — Rate unkeyed; M8 (SR-22 reverted to `new_end >
+D`) `ramp_inspector.rs` 2 failures, Z1 and Z2; M9 (`rate_in_force` answering `clip.speed`)
+`ramp_inspector.rs` 2 failures and G2. `make gate` **PASS** in 281 s (names 1 s, typecheck 6 s,
+fmt 3 s, lint 6 s, test 158 s, app 108 s). `env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3
+tools/proof/ramp_proof.py`: **43/43 in 150 s**, exit 0 — G1–G6 and Z1–Z2 as on Debug; every SR2a–SR4
+row as before (E1 70/70 at +0.000 ms, L1 71/71 max 8.55 ms, L2 23/23 max 5.54, L3 35/35 max 21.47,
+R1 70/70 at −0.010, W1 2.4 s, U1 as the baseline, P1 m1 −86.333 ms, T1 1 640 000, Q4 edges off
+21 539 and 0 ticks); D0 and Q0 no `Frame Job: ` in either log. Release `screens.py --only
+10-clip-clip-tab,10d-clip-speed-action` 7/7, both screens light and dark with their expects and
+no new layout problem; its P2 first failed on SR2b's `-RCDevRampRenderHold`, which no screen
+launches with, now listed in `NOT_SHOWN`. Every instance was the proof's own and stopped itself.
+
+**#338** is fixed by SR-22 (Z1, Z2, `ramp_inspector.rs`): close it.
+
+**Review.** Pass, two nits, both settled by the orchestrator before the commit: (1) Keep pitch
+and Fit to carry Rate's ◇ "Changed by action N" outside an action, since all three write
+`set_speed`'s `speed` path, now stated in SR-21 (c); (2) `InspectorMarks.paths(inPatch:)` named
+ANY non-object group by its bare name, not only `speed`, and now names only `speed`; any other
+keys nothing, as before SR5. After that fix, `make gate` PASS and Release `ramp_proof.py --only
+G1,G2,G3,G4,G5,G6` re-ran: 7/7 in 24 s (D0 and G1–G6). The orchestrator applied the map entries in `app/CLAUDE.md`
+and `core/CLAUDE.md`.
+
+**Owed.** The close (the orchestrator's): the ADR, the deferred list filed as issues (a rate
+graph on the lane, ramp presets, Frame Job's own time-stretch #299, re-timing captions), the
+archive. The person checks RMP-1..RMP-4.

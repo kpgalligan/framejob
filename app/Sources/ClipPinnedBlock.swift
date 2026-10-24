@@ -29,7 +29,8 @@ enum ClipSubTab: String, CaseIterable {
     /// one key however many of its nine it names (GR-11), and its `curves`,
     /// one key however many channels it names (GR-12), and its `qualifier`,
     /// one key however many ranges it names (GR-13); Picture counts none of
-    /// them.
+    /// them. Clip also counts an end's `speed`, the Speed section's Rate (CI-6
+    /// amended by SR-21).
     func keyedCount(in end: ActionPatch, adjustment: Bool = false) -> Int {
         switch self {
         case .text: return end.text?.dictionary.count ?? 0
@@ -46,7 +47,8 @@ enum ClipSubTab: String, CaseIterable {
                 + (end.video?.qualifier?.isEmpty == false ? 1 : 0)
                 + (adjustment && end.video?.dictionary["opacity"] != nil ? 1 : 0)
         case .sound: return end.audio?.dictionary.count ?? 0
-        case .clip: return end.video?.dictionary["motion"] == nil ? 0 : 1
+        case .clip:
+            return (end.video?.dictionary["motion"] == nil ? 0 : 1) + (end.speed == nil ? 0 : 1)
         }
     }
 }

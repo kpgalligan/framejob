@@ -22951,3 +22951,53 @@ make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/r
 | `make gate` | PASS 374 s (names 1 s, typecheck 20 s, fmt 7 s, lint 12 s, test 219 s, app 114 s) |
 | `ramp_proof.py` (Release, after the gate) | **35/35 in 162 s**, exit 0 — the SR4 rows as Debug's; every SR2a–SR3b row as before (E1 70/70 at +0.000 ms, L1 71/71 max 8.55 ms, L2 23/23 max 5.54, L3 35/35 max 21.47, R1 70/70 at −0.010, W1 2.3 s, U1 as the baseline, P1 m1 −86.333 ms, T1 1 640 000); no `Frame Job: ` in either log |
 | mutants M1–M11 | each caught: M1 (`source_map`'s constant arm for a ramp) `ramp_source_map.rs` 2 failures and F1; M2 (`MediaTranscript.project`'s arm) F3, Q1; M3 (`Transcriber.project`'s) F3; M4 (`recognitionJob`'s) F3; M5 (the ramp `sourceLength` at `contentLength`) F3, Q1; M6 (the three-argument guard) F3; M7 (`sourceTick`'s arm) F4, Q4; M8 (`sourceTime` ignoring the map) F2; M9 (Sync's refusal) Y1; M10 (linear scans) F1–F5 at the 60 s wall; M11 (a per-call map in `sourceTick`) F4, F5 at the wall |
+
+## Speed ramps SR5 — the UI and #338 (`ramp_proof.py` G1–G6, Z1, Z2; `ramp_ui_probe.swift`; `core/tests/ramp_inspector.rs`; screen `10d-clip-speed-action`; nine mutants; spec §11 SR-21, SR-22; #111, #338)
+
+SR5 of road map "speed-ramps": with an action selected on one media clip the Clip tab's Speed
+section's Rate (and Reset) writes that action's `end.speed`, read as the end's stored rate or else
+the core's `clip_state.speed` (`rate_in_force`); Keep pitch (at the base rate) and Fit to stay the
+clip's and are ⊘; the `speed` path is keyed, cleared by a null and counted by the Clip sub-tab's
+◆N; a band's label names `speed` and a rate is never a zoom; the ×12 question is asked for a
+`set_action_end` naming `speed`; the Speed sheet's readout says a ramp scales with the base rate.
+`set_action` refuses only an edit taking an action further past its clip's end (SR-22, #338).
+The G rows read `ramp_ui_probe.swift`, built through `swift_build.build()` over this tree's
+`app/Sources` into `work/ramp/ui/` and run under a 60 s wall; it writes its in-process project
+to `work/ramp/ui/ramp-ui.framejob` and opens it in a `ProjectDocument` with an
+`InspectorViewController` (clip "one": 5 s from in 0.5 s of a 10 s media, A [0, 2 s) linear to
+×2, B [3 s, 4 s) to opacity 0.5; clip "two" with a speed action past its end; P, Q and R cut 0.5 s
+from a 60 s media, P at ×1 ramping to ×2, Q at ×13 to ×13, R a constant ×2).
+
+- **G1** — `VideoPane.rateOps`: A or B selected → one `set_action_end {speed}` on it; none or two
+  clips → `set_speed` per clip; with A selected Keep pitch's own ops are `set_speed` at the base
+  ×1, it and Fit to ⊘.
+- **G2** — `VideoPane.rateRead`: A 2, B 2 (the core's rate at B's end), none 1, at the playhead
+  1.5, the past-end action its stored ×3.
+- **G3** — `ActionBands.keys` names `speed`; an end naming a rate is not a zoom.
+- **G4** — each `set_action_end {speed}` trial scored `applied` first: P ×14 → [P] at 14, P ×12 →
+  [], Q ×14 → []; `mayCross`; the Speed note on the named peak.
+- **G5** — `paths(of:)`, `clearOps([speed])`, `keyedCount(.clip)`, Rate's mark keyed / other(1).
+- **G6** — the Speed sheet's readout ends with `rampLine` on a ramped clip (its trial doubling
+  A's end), and a constant clip's readout is the summary alone.
+- **Z1** — a constant AV.mov clip's action [1 s, 2 s) left past a 1.5 s end: curve applies,
+  +1 frame of length and +1 frame of start are refused in `action_past_end`'s whole sentence,
+  −1 frame of start applies, `undo` restores it.
+- **Z2** — a ramped clip trimmed inside its speed action: `set_action curve` and
+  `set_action_end {speed: 2.5}` apply.
+
+```sh
+cd core && cargo test --release --test ramp_inspector
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only G1,G2,G3,G4,G5,G6,Z1,Z2
+make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py
+env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/screens.py --only 10-clip-clip-tab,10d-clip-speed-action
+```
+
+| Run (2026-10-24) | Result |
+|---|---|
+| `ramp_inspector.rs` | 8/8; `refusal`, `time_bounds_edits`, `ramp_door` unedited, 35/35 |
+| Debug `--only G1,…,Z2` | 8/9 in 2 s: Z2's instrument set the curve to linear, which `add_action` already writes, an identity; with that step dropped `--only Z2` 2/2 |
+| `make gate` | PASS 281 s (names 1 s, typecheck 6 s, fmt 3 s, lint 6 s, test 158 s, app 108 s) |
+| `ramp_proof.py` (Release, after the gate) | **43/43 in 150 s**, exit 0 — G1–G6 and Z1–Z2 as Debug's; every SR2a–SR4 row as before (E1 70/70 at +0.000 ms, L1 71/71 max 8.55 ms, L2 23/23 max 5.54, L3 35/35 max 21.47, R1 70/70 at −0.010, W1 2.4 s, U1 as the baseline, P1 m1 −86.333 ms, T1 1 640 000, Q4 edges off 21 539 and 0); no `Frame Job: ` in either log |
+| `screens.py --only 10-clip-clip-tab,10d-clip-speed-action` (Release) | 7/7, both screens light and dark with their expects, 0 new problems (P2 after listing `RCDevRampRenderHold` in `NOT_SHOWN`) |
+| existing probes, unedited | `speed_audio_probe.py` 18/18, `speed_limits_probe.py` 24 rows none failed, `speed_sheet_probe.py` 10/10, `clip_inspector4_proof.py` 46/46 |
+| mutants M1–M9 | each caught: M1 (`rateOps` ignoring the action) G1, G5; M2 (`speed(_:)` reading `clip.speed` only) G2 (B 1, playhead 1); M3 (the `.end` stored-rate preference dropped) G2 (past-end 2); M4 (`keys` without `speed`) G3; M5 (`mayCross` without `set_action_end`) G4; M6 (the note on `clip.speed`) G4; M7 (`paths(inPatch:)` skipping `speed`) G5; M8 (SR-22 reverted to `new_end > D`) `ramp_inspector.rs` 2 failures, Z1, Z2; M9 (`rate_in_force` answering `clip.speed`) `ramp_inspector.rs` 2 failures, G2 |

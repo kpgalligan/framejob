@@ -314,8 +314,13 @@ impl Project {
     }
 
     /// Retimes or re-curves one action; every argument left `None` keeps
-    /// its current value (spec §6). Same overlap and clip-end checks as
-    /// `add_action`.
+    /// its current value (spec §6). The same overlap check as `add_action`;
+    /// the clip-end check refuses ([`action_past_end`]) only an edit that
+    /// ends the action past the clip's end AND later than it ended before
+    /// (spec §11 SR-22, #338), so an action already running past the end —
+    /// a trim or a ramp scale leaves one there — can be re-curved, moved
+    /// earlier or shortened, and one inside the clip still cannot be pushed
+    /// past it.
     pub fn set_action(
         &self,
         clip: u32,
@@ -352,7 +357,9 @@ impl Project {
                 snapped
             }
         };
-        if new_start.saturating_add(new_duration) > target.duration {
+        let new_end = new_start.saturating_add(new_duration);
+        let old_end = existing.start.saturating_add(existing.duration);
+        if new_end > target.duration && new_end > old_end {
             return Ok(Outcome::Refused(action_past_end(
                 clip,
                 new_start,

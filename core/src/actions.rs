@@ -44,6 +44,7 @@ use crate::model::{
     Action, AudioProps, Clip, ColorAdjust, Curve, GraphicProps, Project, ShapeProps, Source,
     TextProps, VideoProps, Wheels,
 };
+use crate::speed_map::rate_in_force;
 use crate::time::Ticks;
 
 /// How deep [`merge`] and [`lerp`] will walk a patch. The deepest real path
@@ -546,7 +547,8 @@ impl Project {
     /// `shape`, `graphic`), so the inspector binds to this exactly as it binds to the
     /// clip itself; `in_action` is the action the playhead is inside, or
     /// `null`, which is how the inspector knows an edit would set a
-    /// keyframe rather than the base value.
+    /// keyframe rather than the base value. `speed` is the rate in force at
+    /// that clip time (`rate_in_force`, spec §11 SR-21 (b)).
     ///
     /// `None` for an unknown clip id — the header's NULL return.
     pub fn clip_state(&self, clip_id: u32, t: Ticks) -> Option<Value> {
@@ -577,6 +579,7 @@ impl Project {
         out.insert("text".to_string(), to_json(&evaluated.text));
         out.insert("shape".to_string(), to_json(&evaluated.shape));
         out.insert("graphic".to_string(), to_json(&evaluated.graphic));
+        out.insert("speed".into(), rate_in_force(clip, clip_t).into());
         Some(Value::Object(out))
     }
 }

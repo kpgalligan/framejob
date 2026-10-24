@@ -78,9 +78,13 @@ extension AgentServer {
             opTool(
                 "set_action",
                 "Moves or re-times an action, or changes its easing curve. Same overlap checks "
-                    + "as add_action. When the action's end names a speed, the change moves how "
-                    + "much source the clip reads, and one that would read past the end of its "
-                    + "media is refused, naming the latest clip end that fits.",
+                    + "as add_action. Refused when the action would then end past the clip's "
+                    + "end and later than it ended before, so an action already running past "
+                    + "the clip's end (a trim can leave one there) can still be re-curved, "
+                    + "moved earlier or shortened. When the action's end names a speed, the "
+                    + "change moves how much source the clip reads, and one that would read "
+                    + "past the end of its media is refused, naming the latest clip end that "
+                    + "fits.",
                 [
                     "clip": clipDescription,
                     "action": "Action id (get_project lists each clip's actions).",

@@ -164,7 +164,9 @@ extension AgentServer {
     /// `set_action` — the Clip tab's action lane: the selected action's
     /// Start, Length and Curve in its detail row, and dragging a band's body
     /// (move) or its outer 5 pt (resize) in that lane or on the timeline's
-    /// action lane (spec §11 CI-11).
+    /// action lane (spec §11 CI-11). An action running past its clip's end
+    /// can be re-curved there (the detail row's Curve popup), moved earlier
+    /// or shortened, never taken further out (spec §11 SR-22, #338).
     func setAction(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
@@ -189,7 +191,8 @@ extension AgentServer {
     /// is the action's END state, merged; a key set to null is REMOVED from
     /// it — the UI path of a null is a section header's Clear, a keyed row's
     /// × and its menu's "Remove from action N" (`InspectorBinding.clearOps`,
-    /// spec §11 CI-9).
+    /// spec §11 CI-9). A patch naming `speed` is the Clip tab's Speed section's
+    /// Rate with the action selected (`VideoPane.rateOps`, spec §11 SR-21 (a)).
     ///
     /// **The patch goes to the core UNREAD** (deepening D1·5,
     /// `archive/roadmap-7.md` §2.5) — the LAST door of the six, and

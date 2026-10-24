@@ -143,6 +143,11 @@ Built by `screens.py` on the first screen that names one, into
   qualifier hue {25, 30, 15} and saturation {0.15, 1, 0.05}, so only the
   video's warm, saturated pixels go grey. Ready once `video`'s peaks are
   cached.
+- `ramp` — `Ramp.framejob` (speed ramps SR5, spec §11 SR-21): one track,
+  "Video", holding `video` — `media/speech.mov` at 0 cut to 2 s — with one
+  action at clip 0.5–1.5 s whose end names `speed` ×2, a speed ramp. A playhead
+  inside the span selects the action (CI-1), so the Speed section reads the
+  action's end rate. Ready once `video`'s peaks are cached.
 
 ## Adding a screen
 

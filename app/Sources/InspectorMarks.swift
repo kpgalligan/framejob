@@ -302,11 +302,16 @@ extension InspectorBinding {
     /// The `"group.key"` paths a list of ops writes: `set_video`, `set_audio`
     /// and `set_text` by their patch's keys, `set_graphic` and an end's
     /// `graphic` by `graphicPaths`, `set_action_end` by each group of its
-    /// patch; every other op (a trim, a speed, a reverse) writes none.
+    /// patch, and `set_speed` by `speed`, the end's top-level rate key (spec
+    /// §11 SR-21 (c)); every other op (a trim, a reverse) writes none.
     static func paths(of ops: [ReelOp]) -> [String] {
         let groups = ["set_video": "video", "set_audio": "audio", "set_text": "text"]
         var found = Set<String>()
         for op in ops {
+            if op.name == "set_speed" {
+                found.insert("speed")
+                continue
+            }
             guard let patch = op.args["patch"] as? [String: Any] else { continue }
             if let group = groups[op.name] {
                 found.formUnion(patch.keys.map { group + "." + $0 })
@@ -318,11 +323,14 @@ extension InspectorBinding {
         return found.sorted()
     }
 
-    /// An end patch's paths, spelled as `paths(of:)` spells them.
+    /// An end patch's paths, spelled as `paths(of:)` spells them: a top-level
+    /// key that is not a group — `speed` (spec §11 SR-21 (c)) — by its own
+    /// name.
     private static func paths(inPatch patch: [String: Any]) -> [String] {
         patch.flatMap { group, value -> [String] in
             if group == "graphic" { return graphicPaths(value) }
-            return ((value as? [String: Any])?.keys).map { $0.map { group + "." + $0 } } ?? []
+            guard let fields = value as? [String: Any] else { return group == "speed" ? [group] : [] }
+            return fields.keys.map { group + "." + $0 }
         }
     }
 
@@ -387,23 +395,30 @@ extension InspectorBinding {
 
     /// ONE `set_action_end` that nulls every `"group.key"` of `paths` in the
     /// selected action's end patch — a null REMOVES the key (spec §11 CI-9),
-    /// so the value falls back to what was held. Nothing without a selected
-    /// action on a single clip, or without a path.
+    /// so the value falls back to what was held. A one-part path (`speed`,
+    /// spec §11 SR-21 (c)) is nulled at the patch's top. Nothing without a
+    /// selected action on a single clip, or without a path.
     func clearOps(_ paths: Set<String>) -> [ReelOp] {
         guard let action = selectedAction, isSingle, let clip = primary, !paths.isEmpty
         else { return [] }
-        var patch: [String: [String: Any]] = [:]
+        var patch: [String: Any] = [:]
         for path in paths.sorted() {
             let parts = path.split(separator: ".", maxSplits: 1).map(String.init)
-            guard parts.count == 2 else { continue }
-            if parts[0] == "graphic", parts[1].hasPrefix("props.") {
-                // An end's prop nests one level deeper (G-34 (a)).
-                var props = patch["graphic"]?["props"] as? [String: Any] ?? [:]
-                props[String(parts[1].dropFirst("props.".count))] = NSNull()
-                patch["graphic", default: [:]]["props"] = props
+            if parts.count == 1 {
+                patch[parts[0]] = NSNull()
                 continue
             }
-            patch[parts[0], default: [:]][parts[1]] = NSNull()
+            guard parts.count == 2 else { continue }
+            var group = patch[parts[0]] as? [String: Any] ?? [:]
+            if parts[0] == "graphic", parts[1].hasPrefix("props.") {
+                // An end's prop nests one level deeper (G-34 (a)).
+                var props = group["props"] as? [String: Any] ?? [:]
+                props[String(parts[1].dropFirst("props.".count))] = NSNull()
+                group["props"] = props
+            } else {
+                group[parts[1]] = NSNull()
+            }
+            patch[parts[0]] = group
         }
         guard !patch.isEmpty else { return [] }
         return [.setActionEndRaw(clip: clip.id, action: action.id, patch: patch)]

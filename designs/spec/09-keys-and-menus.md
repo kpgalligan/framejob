@@ -109,7 +109,8 @@ where the clip sits — is asked about first in the Weak match alert sheet,
 Apply (Return) or Cancel (Escape), and Cancel changes nothing; since round 3,
 §11 SY-29, either tier — the sheet included — comes only when the two
 waveforms line up there (a clear GCC-PHAT peak), else the command is refused
-at the inspector's foot), Add Action, Speed…,
+at the inspector's foot), Add Action, Speed… (on a ramped clip it sets the base rate and
+scales the ramp with it, §11 SR-19 (a), SR-21 (f)),
 Close Gap, Remove
 Silences…, Remove Filler Words… (cut-by-transcript CT-3, §11 TR-10: a sheet over
 `detect_fillers`' answer whose Remove is one `ripple_delete_ranges` step, undo

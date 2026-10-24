@@ -549,7 +549,8 @@ the key map behind it.
   Back just added.
 - `SpeedAudioDrop.swift` — the ×`audio_max` crossing (a trial through the
   core), the question's and the agent note's copy, and its one alert sheet
-  (`ask`); every door that sets speed asks through it (#212, §11 #190).
+  (`ask`); every door that sets speed asks through it (#212, §11 #190), and
+  `mayCross` takes a `set_action_end` naming `speed` (SR-21 (e)).
   `EditorViewController+SpeedAudio` holds the Speed section's and the rate
   stretch's doors; the latter ends the live edit BEFORE asking (an autosave
   must never write a speed Cancel then takes back) and re-applies the
@@ -715,8 +716,8 @@ the key map behind it.
   cursor call and three one-line overrides on `TimelineContentView`).
   `ActionBands.swift` is what the timeline and the Clip tab's lane share:
   time order (an action's NUMBER is its index there plus one), the label's
-  keys (`graphic.props` keys included), the zoom test (an empty `graphic.props` does not stop
-  `isZoom`), the 5 pt `grip` and `gripEdge` (none on a band 15 pt
+  keys (`graphic.props` keys included, and `speed`, SR-21 (d)), the zoom test (an empty
+  `graphic.props` does not stop `isZoom`; an end naming `speed` does), the 5 pt `grip` and `gripEdge` (none on a band 15 pt
   wide or less), `curvePath`, and the ONE band painter — hover and grips
   are its `hovered:` argument, never a second painter.
   `ActionDragSession.swift` is the ONE session both lanes drag a band with,
@@ -887,7 +888,8 @@ the key map behind it.
   queries, `selectedActionNumber`, `actionID(number:)` and `clearOps`, the
   ONE `set_action_end` of nulls (a `graphic.props.<key>` path nested one level deeper); `paths` read
   `set_graphic` (`graphic.props.<key>`, and `graphic.<key>` for width/height/length, so those rows
-  are ⊘) and an end's `graphic.props.<key>`; `InspectorRowTag` is one line
+  are ⊘) and an end's `graphic.props.<key>`; `set_speed` and an end's top-level `speed` both write
+  the one-part path `speed` (SR-21 (c)), so Rate, Keep pitch and Fit to share its marks; `InspectorRowTag` is one line
   (`maximumNumberOfLines = 1`) so a row short of room narrows a CONTROL — the string field (O1) or
   the row's widest popup, else its widest checkbox (`inspectorRow`, O8) — never the tag; a row's paths come from the ops it WRITES,
   `writes:` / `follows:`, and an un-annotated row is `.none`, never ⊘) ·
@@ -953,7 +955,11 @@ the key map behind it.
   by `LookMenuFiller` in `AppDelegate+ClipMenus.swift`; `-RCDevLookGalleryDump`
   also writes `lut-<id>.png` and the manifest's `tiles`); +`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
-  Speed section, Fit to and the "Audio is silent above ×12" note, #190) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
+  Speed section, Fit to and the "Audio is silent above ×12" note, #190;
+  inside an action Rate writes the selected action's `end.speed`
+  (`rateRead`, `rateOps`, read through `InspectorBinding.speed(_:)`, which is
+  `clip_state.speed`), while Keep pitch writes `set_speed` at `baseRate` and
+  Fit to is ⊘, SR-21; the note reads the peak a clip names) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
   a factory `ClipPane` calls when EVERY selected clip is a graphic; the
   shared module from `GraphicRegistry.entry(named:for:)`, main only, never a

@@ -48,6 +48,14 @@ pub(crate) fn peak_rate(clip: &Clip) -> f64 {
         .fold(clip.speed, f64::max)
 }
 
+/// The rate the clip plays at clip time `t`: [`SpeedMap::of`]'s
+/// [`SpeedMap::rate_at`] on a ramped clip (`t` clamped into `[0, D]` as it
+/// clamps), `clip.speed` otherwise. `clip_state`'s `speed`, the Speed
+/// section's read inside an action (spec §11 SR-21 (b)).
+pub(crate) fn rate_in_force(clip: &Clip, t: Ticks) -> f64 {
+    SpeedMap::of(clip).map_or(clip.speed, |map| map.rate_at(t))
+}
+
 /// Whether the clip's rate changes over its length: a `media` clip, and an
 /// action whose end names a speed. False for every other source, whatever
 /// its actions say.

@@ -106,6 +106,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   **Amended by GR-2** (grading GR2): Color counts
   `color` (1 when the end holds `video.color`), and Picture counts `video`
   minus `motion` and `color`.
+  **Amended by SR-21** (speed ramps SR5): Clip also counts `speed` (1 when the
+  end names a rate), the Speed section's Rate.
 - **CI-7 — Every inspector row carries the 14 pt mark gutter, and the label
   stays 76** (road map 9 §5, the clip inspector redesign's phase 3a). The
   gutter is the FIRST view of every `inspectorRow`, blank when its mark is

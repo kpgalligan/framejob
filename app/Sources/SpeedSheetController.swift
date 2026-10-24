@@ -271,9 +271,16 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
         }
     }
 
+    /// The readout's last line when a selected clip ramps its speed: Apply
+    /// sets the base rate and scales the ramp with it (rule L, spec §11
+    /// SR-19 (a), SR-21 (f)).
+    static let rampLine =
+        "Each speed ramp keeps its shape: the rates it names scale with the base rate."
+
     /// "3 clips · 00:00:12:00 → 00:00:06:00", then one `changeLine` per clip
     /// whose transition the trial makes play, grow or shrink — every line
-    /// read off one trial handle.
+    /// read off one trial handle — then `rampLine` when a selected clip is
+    /// ramped (the core's `sourceMap`).
     static func readout(
         of clips: [UInt32], rate: Double, keepPitch: Bool, in project: ReelProject
     ) -> String {
@@ -286,7 +293,8 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
             count + " · " + ReelTime.format(from, fps: fps, frames: true) + " → "
             + ReelTime.format(to, fps: fps, frames: true)
         let changes = transitionChanges(of: clips, before: before, after: after)
-        return ([summary] + changes.map(changeLine)).joined(separator: "\n")
+        let ramp = clips.contains { project.sourceMap($0)?.ramped == true } ? [rampLine] : []
+        return ([summary] + changes.map(changeLine) + ramp).joined(separator: "\n")
     }
 
     private func syncReadout() {

@@ -350,6 +350,32 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does Keep pitch sound clean?
 - **Source:** #299, spec §11 SY-39, SY-40.
 
+## Speed ramps
+
+**RMP-1 — A ramp sounds right with Keep pitch off and on**
+- **Do:** 1. Put a clip of speech (or music with a steady beat) on the timeline, cut to about 6 s. 2. Put the playhead at 1 s, Add Action, and drag its band to run 1 s–4 s; with the playhead inside it, set the Clip tab's Speed ▸ Rate to 2. 3. Untick Keep pitch, play the clip through the ramp, then export it and play the export. 4. Tick Keep pitch and do the same.
+- **Expect:** with Keep pitch off the sound speeds up smoothly through the ramp and its pitch rises like tape, then holds at ×2; with it on the voice speeds up at its own pitch. Neither has a click, a dropout, a stutter or a jump at the ramp's start or end, and the export sounds like the preview.
+- **Answer:** does the ramp sound right with Keep pitch off and with it on?
+- **Source:** #111 (speed ramps SR5, spec §11 SR-3, SR-13, SR-15, SR-21).
+
+**RMP-2 — Playback through a ramp looks smooth**
+- **Do:** 1. Use RMP-1's clip, or one with steady motion (a pan, a ticking clock). 2. Play through the ramp at View ▸ Preview Quality ▸ Full, then at Quarter. 3. Set the action's curve to Ease In Out and play again; then a ramp down, ×1 to ×0.5.
+- **Expect:** the motion speeds up (or slows down) smoothly through the ramp with no stutter, repeated frame or jump, and the picture stays in step with the sound.
+- **Answer:** does playback through a ramp look smooth?
+- **Source:** #111 (speed ramps SR5, spec §11 SR-10, SR-21).
+
+**RMP-3 — A ramped clip's filmstrip and waveform look right**
+- **Do:** 1. With RMP-1's ramped clip on the timeline, look at its filmstrip and its waveform at View ▸ Timeline Track Height Large, zoomed in until single frames show. 2. Compare with the same clip, un-ramped, on the track below.
+- **Expect:** the filmstrip's frames and the waveform's peaks bunch up through the ramp and after it in step with what plays under the playhead; a loud word in the waveform sits where you hear it.
+- **Answer:** do the filmstrip and waveform follow the ramp?
+- **Source:** #111 (speed ramps SR4/SR5, spec §11 SR-20 (h)).
+
+**RMP-4 — The Speed section inside an action feels right**
+- **Do:** 1. On RMP-1's clip, move the playhead into the action and out of it, and press esc inside it. 2. Inside it, type a Rate, pick a preset, hover the Rate row's ◆ and click its ×, then press the Speed header's Clear. 3. Outside it, look at Rate, Keep pitch and Fit to, and hover Rate's ◇. 4. Set a Rate above 12 inside the action on a clip with sound.
+- **Expect:** inside the action Rate reads the action's end rate with a mint ◆ and border and a coral "now" figure; the band's label reads "speed" at the Large track height; Keep pitch and Fit to show ⊘ and still change the clip; × and Clear take the rate out of the action; outside it Rate reads the clip's own rate and ◇ names the action; step 4 asks the ×12 question once, and Cancel changes nothing. Nothing is clipped or cramped, in both appearances.
+- **Answer:** does editing a ramp from the Speed section feel right?
+- **Source:** #111 (speed ramps SR5, spec §11 SR-21); `tools/proof/screens.py --only 10d-clip-speed-action` captures it.
+
 ## Captions
 
 **CAP-1 — Text reveals and legibility**

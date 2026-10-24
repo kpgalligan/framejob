@@ -18,23 +18,26 @@ enum ActionBands {
 
     /// Which properties an action changes — the end patch's keys, spelled
     /// the way the model spells them, sorted (what the old Actions table
-    /// printed beside each curve).
+    /// printed beside each curve); `speed` when the end names a rate (spec
+    /// §11 SR-21 (d)).
     static func keys(of patch: ActionPatch) -> [String] {
         var keys: [String] = []
         if let video = patch.video { keys.append(contentsOf: video.dictionary.keys) }
         if let audio = patch.audio { keys.append(contentsOf: audio.dictionary.keys) }
         if let text = patch.text { keys.append(contentsOf: text.dictionary.keys) }
         if let graphic = patch.graphic { keys.append(contentsOf: graphic.props.keys) }
+        if patch.speed != nil { keys.append("speed") }
         return keys.sorted()
     }
 
     /// A screencast zoom's shape — `add_zoom_action` writes exactly `scale`,
     /// `x` and `y` and nothing else, so an end patch of those three keys is
-    /// drawn with the zoom glyph whichever door wrote it.
+    /// drawn with the zoom glyph whichever door wrote it. An end naming a rate
+    /// is not a zoom (spec §11 SR-21 (d)).
     static func isZoom(_ action: ActionSnapshot) -> Bool {
         let end = action.end
         guard let video = end.video, end.audio?.isEmpty ?? true, end.text?.isEmpty ?? true,
-              end.graphic?.props.isEmpty ?? true
+              end.graphic?.props.isEmpty ?? true, end.speed == nil
         else { return false }
         return Set(video.dictionary.keys) == ["scale", "x", "y"]
     }
