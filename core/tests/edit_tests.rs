@@ -667,6 +667,10 @@ fn op_table() -> Vec<Value> {
         // centred, which `fit` answers with a scale of 3.
         json!({"op": "add_zoom_action", "clip": 10, "at": 3000000,
                "region": {"x": 0.0, "y": 0.0, "width": 640.0, "height": 360.0}}),
+        // Clear of action 11 too: a dip over clip time 4 s – 8 s, two speed
+        // actions ending at ×0.5 and back at ×1.
+        json!({"op": "add_speed_ramp", "clip": 10, "shape": "speed_dip", "rate": 0.5,
+               "from": 2400000, "to": 4800000}),
         json!({"op": "set_action", "clip": 10, "action": 11, "curve": "linear"}),
         json!({"op": "set_action_end", "clip": 10, "action": 11,
                "patch": {"video": {"opacity": 0.2}}}),

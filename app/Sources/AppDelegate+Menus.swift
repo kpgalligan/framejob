@@ -286,6 +286,11 @@ extension AppDelegate {
                 "Add Action", #selector(EditorViewController.addActionAtPlayhead(_:)), "k",
                 [.command, .option]))
         menu.addItem(item("Speed…", #selector(EditorViewController.showSpeedSheet(_:))))
+        // #340 (spec §11 SR-24), right after Speed…: the UI path
+        // `add_speed_ramp` names. No key equivalent, for Remove Silences…'
+        // reason below.
+        menu.addItem(
+            item("Speed Ramp…", #selector(EditorViewController.showSpeedRampSheet(_:))))
         menu.addItem(
             item("Close Gap", #selector(EditorViewController.closeGapAtPlayhead(_:))))
         // Road map 2's phase 3a — a cutting command, so it sits with Close Gap

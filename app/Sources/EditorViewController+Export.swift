@@ -1,12 +1,12 @@
 import AppKit
 
 /// The editor's dialogs: Export… (⌘E and the toolbar button), Clip ▸ Speed…,
-/// and the missing-media offer a document makes when its window appears.
+/// Clip ▸ Speed Ramp…, and the missing-media offer a document makes when its window appears.
 ///
-/// The three are one file because they are one shape — capture what the sheet
-/// needs, present it, and let it commit through `ProjectDocument` — and
-/// because none of them owns any editor state. Everything durable lives in
-/// the sheet controllers (`ExportSheetController`, `SpeedSheetController`,
+/// The four are one file because they are one shape — capture what the sheet needs,
+/// present it, and let it commit through `ProjectDocument` — and because none of
+/// them owns any editor state. Everything durable lives in the sheet controllers
+/// (`ExportSheetController`, `SpeedSheetController`, `SpeedRampSheetController`,
 /// `RelinkSheetController`); this is only the seam that puts them up.
 ///
 /// **Every editor action is validated false while a sheet is attached**
@@ -106,6 +106,25 @@ extension EditorViewController {
             return
         }
         presentAsSheet(SpeedSheetController(document: document, clips: clips.map { $0.id }))
+    }
+
+    /// Clip ▸ Speed Ramp… (spec §11 SR-24): the speed ramp presets on the ONE
+    /// selected media clip. Its validator is the same test.
+    @objc func showSpeedRampSheet(_ sender: Any?) { presentSpeedRampSheet() }
+
+    /// Opens the sheet on the selected clip, over the in/out range when it
+    /// lies inside the clip and the whole clip otherwise
+    /// (`SpeedRampSheetController.span(of:range:)`).
+    func presentSpeedRampSheet() {
+        let clips = selectedClips
+        guard let document = document, clips.count == 1, let clip = clips.first,
+            clip.source.hasSourceBound
+        else {
+            NSSound.beep()
+            return
+        }
+        let span = SpeedRampSheetController.span(of: clip, range: document.inOutRange)
+        presentAsSheet(SpeedRampSheetController(document: document, clip: clip.id, span: span))
     }
 
     // MARK: - Missing media

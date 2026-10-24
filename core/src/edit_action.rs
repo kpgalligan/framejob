@@ -60,7 +60,7 @@ const DEFAULT_ACTION_DURATION: Ticks = TIMESCALE;
 /// Actions on a clip may not overlap (spec §5.4); this is the question both
 /// `add_action` and `set_action` refuse on, and it answers the offender
 /// rather than a yes, because the refusal names it.
-fn overlapping_action(
+pub(crate) fn overlapping_action(
     actions: &[Action],
     skip: Option<u32>,
     start: Ticks,
@@ -78,7 +78,7 @@ fn overlapping_action(
 /// (deepening D2·3). Each names the span the caller asked for and the span
 /// in its way, which is the pair of numbers a caller needs to pick another
 /// one without asking the project again.
-fn action_overlaps(clip: u32, other: &Action) -> String {
+pub(crate) fn action_overlaps(clip: u32, other: &Action) -> String {
     format!(
         "action {} on clip {clip} already runs from {} to {} ticks, and two actions on one \
          clip may not overlap",
@@ -88,7 +88,7 @@ fn action_overlaps(clip: u32, other: &Action) -> String {
     )
 }
 
-fn action_past_end(clip: u32, start: Ticks, duration: Ticks, length: Ticks) -> String {
+pub(crate) fn action_past_end(clip: u32, start: Ticks, duration: Ticks, length: Ticks) -> String {
     format!(
         "an action of {duration} ticks at {start} would end at {}, past clip {clip}'s own \
          end at {length} ticks",

@@ -157,6 +157,7 @@
 //! |---|---|
 //! | `add_action` | A new action at CLIP time `at` (the caller subtracts `clip.start`), 1 s long when `duration` is absent, end patch empty. Refuses when it would overlap another action or run past the clip. |
 //! | `add_zoom_action` | An `add_action` whose end patch is the `scale`, `x` and `y` that bring `region` to the canvas — the screencast zoom. An absent `duration` is 1 s, an absent `fit` is `fit` and an absent `curve` is `ease_in_out`. `region`'s `x`/`y` are its **CENTRE** and `width`/`height` its size, both SOURCE pixels from the centre of the clip's cropped rect (the spotlight's frame); `fit` shows the whole region, `fill` covers the whole canvas, both measured THROUGH the clip's rotation. Rotation and crop are read from the clip evaluated at `at`; the scale clamps to the layer maximum and the offsets follow the CLAMPED value, so a region too small to fill the canvas still lands centred. `region` absent or `null` is a zoom BACK: the end patch is the clip's base `scale`, `x`, `y`. The region is read the way a patch is: it must BE an object (a four-number list is refused, not read member by member), and an unknown, missing or wrong-typed member is an `Err` naming it. Same refusals as `add_action`; a clip with no video properties is an `Err`. |
+//! | `add_speed_ramp` | A speed ramp preset in one step (spec §11 SR-23, #340), made of ordinary Speed actions (`end.speed`, SR-10). `shape` is `ramp_up`, `ramp_down`, `speed_dip` or `speed_burst`; `from` and `to` are CLIP time, both given or both absent (the whole clip, [0, D)). The base b is the rate the clip plays at `from` before the edit. Up and Down are one action [from, to) ending at `rate`; Dip and Burst are two, of r = max(snapped_down((to − from)·(1 − hold)/2), one frame) each, [from, from + r) ending at `rate` and [to − r, to) ending at b, the span between holding the target. `hold` (Dip and Burst only) is clamped to 0–0.9, 0.5 when absent; `curve` is every new action's, `ease_in_out` when absent. A positive `rate` is clamped to ×0.1–×1000. `Err` on an unknown or non-media clip, a non-positive rate, one of `from`/`to` alone, a negative `from`, `to` not after `from`, and a `hold` on Up or Down. Refused, in order: `to` past the clip (`add_action`'s sentence); any action the span [from, to) runs into, named — a hold gap included; a Dip or Burst under two frames; a rate not above b (Up, Burst) or not below it (Down, Dip); and a preset that would read past the end of the media (SR-2), naming the largest rate that fits. `edit_action_ramp.rs`'s module doc. |
 //! | `set_action` | Retimes or re-curves one action; omitted fields keep their value, same overlap checks. Refused (`action_past_end`) only when the new end is past the clip's end AND later than the action's end before the edit (spec §11 SR-22, #338): an action already past the end can be re-curved, moved earlier or shortened, and one inside the clip cannot be pushed past it. When the action's end names a `speed` (spec §11 SR-10) and the change would make the clip read past the end of its media it is refused (SR-2, R3), naming the latest clip end that fits. |
 //! | `set_action_end` | Merges into the action's `end` patch; a key set to `null` is removed from it, at any depth. Walked for keys and kinds like every other patch, over the three groups §5.4 allows (a `shape` object is an unknown key); values are NOT range-checked, except a graphic prop's (G-34 (c)). A `video` object naming `motion` is an `Err`, and so is a `text` object naming `words`, a `null` included (W-6). `off` (absent or `null`: none) is a list of `"group.key"` paths written as `null` AFTER the merge — the optional property keyed OFF at the end, where a `null` in `patch` removes (spec §11 CI-14); each is an `Err` when malformed, when it is `video.motion` or `text.words` (the same two sentences), when it names a key the group lacks or a required key, and when `patch` names it too. A `graphic` object is a graphic clip's props as a fourth target (G-34): `{props: {<key>: <value>}}`, each non-null prop checked as `set_graphic` checks it against `schema` (the module's current revision, which the app fills) under `graphic.props.<key>` — no schema, a prop the schema lacks and a prop its module marks `animate: false` (G-41) are each an `Err` naming the prop, and so are `name`, `width`, `height`, `in` and `length` — and its schema `type` written into `kinds`; a `kinds` in the patch is discarded. A number and a colour ramp, anything else — an `asset` included, `""` naming no image (G-42) — switches at the end. A prop the clip's own `props` lacks gets the schema's current default appended in the same step. `graphic: null` or `graphic.props: null` removes the group; a `null` prop removes it and its kind, unchecked. `graphic` in `off` is an `Err`: "graphic props cannot be keyed off; name the value a prop ends at in patch". `speed` (format 27, SR-10) is a media clip's rate as a fifth target, a number at the patch's top beside the groups, stored clamped to ×0.1–×1000; `null` removes it and `off` cannot name it. Any other JSON kind is an `Err` (`speed must be a number, not "fast"`), and so is a clip that is not a media clip. The clip keeps its start and duration (SR-2): an end rate that would read past the end of its media is refused naming the largest end rate that fits, floored to 0.001 (R1), or, when no rate down to ×0.1 fits, the latest clip end that fits at ×0.1 (R2); a `null` that would do so is refused naming the latest clip end that fits (R3). |
 //! | `remove_action` | Removes the action. Refused when the action's end names a `speed` and the clip would then read past the end of its media (R3, spec §11 SR-10), naming the latest clip end that fits. |
@@ -224,6 +225,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::edit_action_ramp::RampShape;
 use crate::edit_paste_attributes::PasteGroup;
 use crate::edit_transition::TransitionAlign;
 use crate::edit_zoom::{ZoomFit, ZoomRegion};
@@ -530,6 +532,21 @@ pub enum Op {
         #[serde(default)]
         curve: Option<Curve>,
     },
+    /// The speed ramp presets (spec §11 SR-23): `from` and `to` CLIP time,
+    /// both or neither; `hold` for a dip or a burst only.
+    AddSpeedRamp {
+        clip: u32,
+        shape: RampShape,
+        rate: f64,
+        #[serde(default)]
+        from: Option<Ticks>,
+        #[serde(default)]
+        to: Option<Ticks>,
+        #[serde(default)]
+        curve: Option<Curve>,
+        #[serde(default)]
+        hold: Option<f64>,
+    },
     SetAction {
         clip: u32,
         action: u32,
@@ -657,8 +674,8 @@ pub enum Op {
 ///
 /// A struct rather than a bare [`Op`] because `scope` is the envelope's
 /// key and not any op's argument — it is spelled once, it means the same
-/// thing over all sixty-one, and folding it into the enum would mean
-/// sixty-one copies of one optional field. [`Project::apply_op`] still
+/// thing over all sixty-two, and folding it into the enum would mean
+/// sixty-two copies of one optional field. [`Project::apply_op`] still
 /// takes an `&Op` and knows nothing about nests.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Envelope {
@@ -684,7 +701,7 @@ pub struct Envelope {
 /// envelope key. A `#[serde(flatten)]` wrapper is not the way round it
 /// either: serde documents `deny_unknown_fields` as unsupported with
 /// `flatten`, and it would silently stop refusing typos. Removing the key
-/// before the typed decode keeps all three — the refusal, all sixty-one
+/// before the typed decode keeps all three — the refusal, all sixty-two
 /// variants, and an envelope key that is not an argument.
 pub fn parse(op_json: &str) -> Result<Envelope, String> {
     let mut value: Value =
@@ -869,6 +886,15 @@ impl Project {
                 fit,
                 curve,
             } => self.add_zoom_action(*clip, *at, *duration, *region, *fit, *curve),
+            Op::AddSpeedRamp {
+                clip,
+                shape,
+                rate,
+                from,
+                to,
+                curve,
+                hold,
+            } => self.add_speed_ramp(*clip, *shape, *rate, *from, *to, *curve, *hold),
             Op::SetAction {
                 clip,
                 action,

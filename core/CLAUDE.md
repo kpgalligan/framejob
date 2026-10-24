@@ -259,7 +259,7 @@ governs a module now.
   `edit.rs` so no caller moved. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
   `op_schema.rs`, which carries the rows out through the FFI; the APP's
-  reader is every one of the sixty-one op tools in the agent catalog,
+  reader is every one of the sixty-two op tools in the agent catalog,
   which print these rows instead of restating them. **A `Bound` is
   published only where the core REFUSES outside it** — `set_canvas`'s two
   dimensions, sourced from `edit_canvas.rs`'s own constants, and
@@ -515,7 +515,15 @@ governs a module now.
   refusals R1/R2/R3 for `set_action_end`, `set_action` and
   `remove_action`: a ramp that would read past the media's end is refused,
   naming the largest end rate that fits (floored to 0.001,
-  `largest_fitting_end_rate`, which split's eased tail also uses).
+  `largest_fitting_end_rate`, which split's eased tail also uses, over the
+  shared `largest_fitting_rate` that `add_speed_ramp` also solves through).
+- `edit_action_ramp.rs` — `add_speed_ramp`, the ramp presets (SR-23, #340):
+  Ramp Up, Ramp Down, Speed Dip or Speed Burst as ordinary Speed actions in
+  one step, in clip time over `[from, to)` or the whole clip, from the BASE
+  `rate_in_force` at `from`; Up and Burst need a rate above it, Down and Dip
+  one below. An action anywhere in the span (a dip's hold gap included) is
+  refused by name, never replaced, and a preset that would read past the
+  media's end is refused naming the rate that fits.
 - `edit_action_graphic.rs` — `set_action_end`'s graphic arm (G-34):
   `read_graphic_end` checks the patch's `graphic.props` (never the stored
   end's) against the op's `schema` through `check_typed` under

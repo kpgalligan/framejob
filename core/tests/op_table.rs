@@ -119,7 +119,8 @@ fn value_of(kind: Kind) -> Value {
         | Kind::Fit
         | Kind::Matte
         | Kind::Output
-        | Kind::Blending => {
+        | Kind::Blending
+        | Kind::RampShape => {
             json!(kind.values()[0])
         }
     }
@@ -157,7 +158,8 @@ fn wrong_values(kind: Kind) -> Vec<(Value, String)> {
         | Kind::Fit
         | Kind::Matte
         | Kind::Output
-        | Kind::Blending => {
+        | Kind::Blending
+        | Kind::RampShape => {
             vec![wrong(json!(5), "expected string or map")]
         }
     }

@@ -88,7 +88,7 @@ struct ReelOp {
 
     /// The nest this op resolves its ids INSIDE, or nil for the timeline —
     /// the envelope's `scope` key (`core/src/scope.rs`, spec §6), which is
-    /// not an argument of any op and is spelled once for all sixty-one.
+    /// not an argument of any op and is spelled once for all sixty-two.
     ///
     /// It is a `var` with an initial value so the memberwise initialiser
     /// defaults it, which is what let every factory below stay untouched: an
@@ -941,6 +941,30 @@ enum ZoomFit: String, CaseIterable {
     }
 }
 
+/// The four speed ramp presets, `RampShape` in `core/src/edit_action_ramp.rs`
+/// (spec §11 SR-23). Up and Burst rise above the rate the clip plays at the
+/// span's start; Down and Dip fall below it; Dip and Burst return to it.
+enum SpeedRampShape: String, CaseIterable {
+    case rampUp = "ramp_up"
+    case rampDown = "ramp_down"
+    case speedDip = "speed_dip"
+    case speedBurst = "speed_burst"
+
+    /// The sheet's popup title, and the undo step's name (SR-24 (e)).
+    var displayName: String {
+        switch self {
+        case .rampUp: return "Ramp Up"
+        case .rampDown: return "Ramp Down"
+        case .speedDip: return "Speed Dip"
+        case .speedBurst: return "Speed Burst"
+        }
+    }
+
+    /// Whether the shape holds the target between two actions, and so takes
+    /// a `hold`: Dip and Burst.
+    var holds: Bool { self == .speedDip || self == .speedBurst }
+}
+
 extension ReelOp {
     /// `at` is CLIP time. Refuses on an overlap with another action or a
     /// span past the clip end. The end patch starts empty.
@@ -1009,6 +1033,25 @@ extension ReelOp {
         a.put("fit", fit?.rawValue)
         a.put("curve", curve?.rawValue)
         return ReelOp(name: "add_zoom_action", args: a.values)
+    }
+
+    /// A speed ramp preset in one step (spec §11 SR-23): `from` and `to` are
+    /// CLIP time, both or neither (the whole clip); `hold` only for a dip or a
+    /// burst. Every nil is omitted, so the core's defaults apply —
+    /// `ease_in_out` and a hold of 0.5 — and the core reads every rate.
+    static func addSpeedRamp(
+        clip: UInt32, shape: SpeedRampShape, rate: Double, from: Ticks? = nil,
+        to: Ticks? = nil, curve: Curve? = nil, hold: Double? = nil
+    ) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        a.put("shape", shape.rawValue)
+        a.put("rate", rate)
+        a.put("from", from)
+        a.put("to", to)
+        a.put("curve", curve?.rawValue)
+        a.put("hold", hold)
+        return ReelOp(name: "add_speed_ramp", args: a.values)
     }
 
     /// Moves or re-curves an action; the same overlap checks apply.

@@ -23002,6 +23002,58 @@ env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/screens.py --o
 | existing probes, unedited | `speed_audio_probe.py` 18/18, `speed_limits_probe.py` 24 rows none failed, `speed_sheet_probe.py` 10/10, `clip_inspector4_proof.py` 46/46 |
 | mutants M1–M9 | each caught: M1 (`rateOps` ignoring the action) G1, G5; M2 (`speed(_:)` reading `clip.speed` only) G2 (B 1, playhead 1); M3 (the `.end` stored-rate preference dropped) G2 (past-end 2); M4 (`keys` without `speed`) G3; M5 (`mayCross` without `set_action_end`) G4; M6 (the note on `clip.speed`) G4; M7 (`paths(inPatch:)` skipping `speed`) G5; M8 (SR-22 reverted to `new_end > D`) `ramp_inspector.rs` 2 failures, Z1, Z2; M9 (`rate_in_force` answering `clip.speed`) `ramp_inspector.rs` 2 failures, G2 |
 
+## Speed ramps — presets (#340) (`ramp_preset_proof.py` P0–P11; `ramp_preset_probe.swift`; `core/tests/ramp_preset.rs`; screen `13b-speed-ramp-sheet`; nine mutants; spec §11 SR-23..SR-25)
+
+`add_speed_ramp`, one core op making a Ramp Up, Ramp Down, Speed Dip or Speed Burst out of
+ordinary Speed actions (`edit_action_ramp.rs`), Clip ▸ Speed Ramp…'s sheet over it
+(`SpeedRampSheetController`), and its op tool. The app rows run on one owned instance, one project
+per row, each closed with `discard`, over `tools/proof/media/AV.mov` (5 s, 30 fps, with sound) at 0
+from in 0 cut to 2 s, so 3 s of media lie past its out point. P11 reads `ramp_preset_probe.swift`,
+built through `swift_build.build()` over this tree's `app/Sources` into `work/ramp-preset/probe/`
+and run under a 60 s wall on in-process projects (X the same 2 s cut of a 5 s A/V media, Y a
+second cut at 3 s, and a copy with an opacity action inside a whole-clip dip's hold gap); a probe
+that does not build fails every A row.
+
+- **P0** — no `Frame Job: ` line in the instance's log.
+- **P1** — Ramp Up ×2 over the whole clip: one action [0, 2 s) `ease_in_out` ending at ×2,
+  `new_actions` naming it, no `audio_left_out`, the clip's start and length kept.
+- **P2** — Ramp Down ×0.5 at base ×1.5 over clip time 0.5–1.5 s, linear: one action.
+- **P3** — Speed Dip ×0.5, hold 0.25: two actions of r = (2 s × 0.75 / 2) snapped down (22
+  frames), ending at ×0.5 and back at ×1; **P5** one `undo` removes both, `redo` restores them.
+- **P4** — Speed Burst ×2 at base ×1.25 with the defaults: action 2 ends at ×1.25.
+- **P6** — Up ×10 linear over the whole clip is refused naming the oracle's fit (S(D) =
+  D(1 + x)/2 against the media's duration read back), and that fit then applies.
+- **P7** — an action inside a dip's hold gap (clip time 27–33 frames) is refused naming its id;
+  `add_action`'s answer keeps its four keys.
+- **P8** — the direction refusal, exact (Up ×0.5 at ×1).
+- **P9** — a 6-frame Up ×20 over the clip's last six frames answers `audio_left_out` [clip] and
+  the one-clip note.
+- **P10** — `hold` on Up, shape `"zigzag"` and `from` without `to` are errors in their
+  sentences; nothing applied.
+- **P11** — A1 `span(of:range:)` (inside, past the end, before the start, empty, absent, exact);
+  A2 `op(…)`'s arguments, `hold` only for a dip and a burst, the default rates, the hold choices
+  and the names; A3 the applied readout's exact lines for a dip and for Up; A4 an overrun, an
+  overlap and the direction print the core's sentence with `canApply` false; A5 `crossing` for Up
+  ×14 over the last six frames → [X], ×12 → [], and `mayCross`.
+
+```sh
+cd core && cargo test --release --test ramp_preset
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_preset_proof.py
+make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_preset_proof.py
+env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/screens.py --only 13b-speed-ramp-sheet
+```
+
+| Run (2026-10-24) | Result |
+|---|---|
+| `ramp_preset.rs` | 13/13; `ramp_door`, `ramp_split`, `op_table`, `op_schemas`, `op_nullability`, `op_ticks`, `edit_tests`, `scope` all pass (the count tests moved, no ramp assertion edited) |
+| Debug `ramp_preset_proof.py` | 12/12 in 25 s |
+| `make gate` | PASS 259 s (names 1 s, typecheck 5 s, fmt 2 s, lint 1 s, test 148 s, app 103 s) |
+| `ramp_preset_proof.py` (Release, after the gate) | **12/12 in 3 s**, exit 0; P6's fit ×4 (AV.mov 3 000 000 ticks, 3 600 000 over at ×10); no `Frame Job: ` in the log |
+| `op_argument_proof.py`, `op_catalog_proof.py` (Release) | 168/168, 23/23; no `Frame Job: ` in the log |
+| `v2_menu.py --only H` | 5/5: 108 live selectors and 108 rows, 54 grep sites |
+| `screens.py --only 13b-speed-ramp-sheet` (Release) | 6/6, light and dark, 0 new problems |
+| mutants M1–M9 | each caught: M1 (b = `clip.speed`) the return-rate test; M2 (an equal rate taken for Up) `every_refusal_carries_its_sentence`; M3 (r from `hold`) the dip and burst spans at hold 0.25; M4 (action 2 ends at the target) the span tests and P4 (×2 where ×1.25); M5 (floor ×0.1 for Up) the no-rate-above-b test; M6 (the overlap per new action) the hold-gap test and P7 (APPLIED); M7 (default `linear`) the defaults test; M8 (`span` taking a range past the clip's end) A1; M9 (`canApply` true on a refusal) A4 |
+
 ## Issue #336 — an audio track whose only clip has no source (missing_audio_proof.py D0, X0, M1–M4, R1–R4, V0, K1, K2, P1, mutants MU1–MU3; spec §11 #336)
 
 **The fix case.** An audio track whose only clip has no source (its media file gone, or its

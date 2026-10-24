@@ -73,6 +73,7 @@ extension UIMenu {
         "normalizeClips:": .plain,
         "synchronizeAudio:": .sheet,
         "showSpeedSheet:": .sheet,
+        "showSpeedRampSheet:": .sheet,
         "removeSilences:": .sheet,
         "removeFillerWords:": .sheet,
         "setTransitionKind:": .sheet,

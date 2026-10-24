@@ -44,7 +44,7 @@ The sections, in order:
    type, an enum, a minimum, an items, a required list — must have a row that
    says so, and each row must be visible somewhere, so a row that does nothing
    is a failure too.
-3. **A stranger argument, for every op tool.** For each of the sixty-one:
+3. **A stranger argument, for every op tool.** For each of the sixty-two:
    one CONTROL call with every required argument spelled
    right, which must not be refused for a missing argument — that is the
    tool's required list proved SUFFICIENT against the running app; one call
@@ -125,21 +125,22 @@ WORK = os.path.join(ROOT, "tools", "proof", "work", "op-argument-probe")
 MEDIA = os.path.join(ROOT, "tools", "proof", "media", "AV.mov")
 
 # This script owns the EXACT tool count (`tools/proof/README.md`'s handover
-# rule): 61 ops plus the thirty-six app-state tools (G3b added the two graphic ops'
+# rule): 62 ops plus the thirty-six app-state tools (G3b added the two graphic ops'
 # tools, G4a the three app-state graphics tools, G4b three more, B44 close_project,
 # B84 delete_graphic, rename_graphic and restore_graphic; grading GR4a's op tool
 # add_adjustment_clip is the sixtieth op, grading-3 T3-2's set_media_color the
 # sixty-first; audio-sync AS-1's app-state sync_audio the ninety-second; #326's export_status
 # and cancel_export the ninety-third and ninety-fourth; cut-by-transcript CT-2's
 # detect_fillers the ninety-fifth; CT-3's transcribe_for_fillers the ninety-sixth; CT-4's
-# get_transcript the ninety-seventh). D3 adds no tool and renames
+# get_transcript the ninety-seventh; #340's op tool add_speed_ramp the sixty-second op and
+# the ninety-eighth tool). D3 adds no tool and renames
 # none, so it is road map 3's 75 plus phase 9's set_scope and… no: it is the
 # number the catalog has had since road map 5's E1, taken exactly here for the
 # first time. Every older script keeps its floor. It counts PRODUCT tools:
 # road map 11's dev tools (`dev_tools.py`) are in a Release catalog and not a
 # Distribution one, so section 1 counts them apart.
-PRODUCT_TOOLS = 97
-OPS = 61
+PRODUCT_TOOLS = 98
+OPS = 62
 PARITY = "Frame Job: "
 
 passed = 0

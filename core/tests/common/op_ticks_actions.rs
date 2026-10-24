@@ -78,6 +78,28 @@ pub fn cases(fps: [u32; 2], f: i64) -> Vec<TickCase> {
             ],
         ),
         applied(
+            "add_speed_ramp.from",
+            "from",
+            one.clone(),
+            json!({"op":"add_speed_ramp","clip":10,"shape":"ramp_down","rate":0.5,
+                   "from":off(3,f),"to":10*f}),
+            vec![
+                ("/clips/0/actions/0/start", json!(4 * f)),
+                ("/clips/0/actions/0/duration", json!(6 * f)),
+            ],
+        ),
+        applied(
+            "add_speed_ramp.to",
+            "to",
+            one.clone(),
+            json!({"op":"add_speed_ramp","clip":10,"shape":"ramp_down","rate":0.5,
+                   "from":2*f,"to":off(9,f)}),
+            vec![
+                ("/clips/0/actions/0/start", json!(2 * f)),
+                ("/clips/0/actions/0/duration", json!(8 * f)),
+            ],
+        ),
+        applied(
             "set_action.start",
             "start",
             with_action.clone(),

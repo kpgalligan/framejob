@@ -9,7 +9,7 @@
 //!
 //! It is a module of its own because the table is a published interface —
 //! the tool catalog will read it rather than restate it — while the [`Op`]
-//! enum and the sixty-one-way dispatch are the implementation of that
+//! enum and the sixty-two-way dispatch are the implementation of that
 //! interface. [`OP_NAMES`] is a projection of this table and is re-exported
 //! from `edit.rs` under its old name, so no caller anywhere moved.
 //!
@@ -47,7 +47,7 @@
 //! [`Kind::Text`], [`Kind::Texts`], [`Kind::Ids`] and [`Kind::Ranges`] are
 //! `Ticks`, `f64`, `bool`, `String`, `Vec<String>` (`set_action_end`'s
 //! `off` paths), `Vec<u32>` and the silence cut's `Vec<[Ticks; 2]>`, and
-//! the fourteen named types map like this:
+//! the fifteen named types map like this:
 //!
 //! - [`Kind::Id`] — `u32`: an id naming a clip, track, action, marker or
 //!   media, and the canvas's two pixel dimensions, which are the same whole
@@ -58,9 +58,9 @@
 //!   two. Named rather than "a list of numbers" because their LENGTH is
 //!   part of what serde refuses.
 //! - [`Kind::Transition`], [`Kind::Alignment`], [`Kind::Curve`],
-//!   [`Kind::Fit`], [`Kind::Matte`], [`Kind::Output`] and [`Kind::Blending`]
-//!   — `TransitionKind`, `TransitionAlign`, `Curve`, `ZoomFit`, `TrackMatte`,
-//!   `CanvasOutput`, `CanvasBlending`: closed
+//!   [`Kind::Fit`], [`Kind::Matte`], [`Kind::Output`], [`Kind::Blending`]
+//!   and [`Kind::RampShape`] — `TransitionKind`, `TransitionAlign`, `Curve`,
+//!   `ZoomFit`, `TrackMatte`, `CanvasOutput`, `CanvasBlending`, `RampShape`: closed
 //!   vocabularies, each carrying its members in [`Kind::values`] rather
 //!   than flattened to a string, because an agent
 //!   picking a legal value out of a schema is a reason this table exists.
@@ -83,7 +83,7 @@ use Kind::*;
 
 /// How many ops there are. `edit.rs`'s enum, its dispatch and this table
 /// all have exactly this many arms.
-pub const OP_COUNT: usize = 61;
+pub const OP_COUNT: usize = 62;
 
 /// One op's row: its name, and its arguments in the order the enum declares
 /// them — which is the order the decoder lists them back in.
@@ -151,6 +151,7 @@ pub enum Kind {
     Matte,
     Output,
     Blending,
+    RampShape,
 }
 
 impl Kind {
@@ -187,6 +188,7 @@ impl Kind {
             Matte => &["none", "alpha", "alpha_inverted", "luma", "luma_inverted"],
             Output => &["sdr", "hlg"],
             Blending => &["encoded", "linear"],
+            RampShape => &["ramp_up", "ramp_down", "speed_dip", "speed_burst"],
             Ticks | Id | Index | Ids | Ranges | Number | Boolean | Text | Texts | Object
             | Color | FrameRate | Region => &[],
         }
@@ -296,6 +298,9 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("add_zoom_action",
        &[req("clip", Id), req("at", Ticks), opt("duration", Ticks), opt("region", Region),
          opt("fit", Fit), opt("curve", Curve)]),
+    op("add_speed_ramp",
+       &[req("clip", Id), req("shape", RampShape), req("rate", Number), opt("from", Ticks),
+         opt("to", Ticks), opt("curve", Curve), opt("hold", Number)]),
     op("set_action",
        &[req("clip", Id), req("action", Id), opt("start", Ticks), opt("duration", Ticks),
          opt("curve", Curve)]),

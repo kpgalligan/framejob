@@ -279,6 +279,7 @@ final class AgentServer {
         // Actions (AgentServer+Actions.swift)
         "add_action": { $0.addAction },
         "add_zoom_action": { $0.addZoomAction },
+        "add_speed_ramp": { $0.addSpeedRamp },
         "set_action": { $0.setAction },
         "set_action_end": { $0.setActionEnd },
         "remove_action": { $0.removeAction },

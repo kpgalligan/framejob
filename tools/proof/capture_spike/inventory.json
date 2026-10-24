@@ -431,6 +431,14 @@
    ],
    "note": "presentAsSheet(SpeedSheetController); a reverse committed there brings the reverse sheet (reached_after); Apply on a rate that takes a clip with sound above the audio ceiling asks first, an alert sheet on the Speed sheet (reached_after)"
   },
+  "showSpeedRampSheet:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+Export.swift `func showSpeedRampSheet(`",
+    "app/Sources/EditorViewController+Export.swift:127"
+   ],
+   "note": "presentAsSheet(SpeedRampSheetController), on one selected media clip (SR-24); Apply on a preset that takes a clip with sound above the audio ceiling asks first, an alert sheet on the Speed Ramp sheet (reached_after)"
+  },
   "removeSilences:": {
    "verdict": "sheet",
    "code": [
@@ -990,7 +998,16 @@
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+Export.swift:121": {
+  "app/Sources/EditorViewController+Export.swift:127": {
+   "token": "presentAsSheet",
+   "func": "presentSpeedRampSheet",
+   "reached_from": [
+    "showSpeedRampSheet:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+Export.swift:140": {
    "token": "presentAsSheet",
    "func": "offerRelinkIfNeeded",
    "reached_from": [],
@@ -1312,7 +1329,7 @@
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/SpeedAudioDrop.swift:137": {
+  "app/Sources/SpeedAudioDrop.swift:164": {
    "token": "beginSheetModal",
    "func": "ask",
    "reached_from": [],
@@ -1321,6 +1338,11 @@
      "selector": "showSpeedSheet:",
      "via": "app/Sources/SpeedSheetController.swift `SpeedAudioDrop.ask(crossing, on: window)`",
      "gate": "app/Sources/SpeedSheetController.swift `guard !crossing.isEmpty else {` — the rate takes a clip with sound from at or below the audio ceiling to above it (the sheet's Apply)"
+    },
+    {
+     "selector": "showSpeedRampSheet:",
+     "via": "app/Sources/SpeedRampSheetController.swift `SpeedAudioDrop.ask(crossing, on: window)`",
+     "gate": "app/Sources/SpeedRampSheetController.swift `guard !crossing.isEmpty else {` — the preset takes a clip with sound from at or below the audio ceiling to above it (the sheet's Apply)"
     }
    ],
    "other_caller": "app/Sources/EditorViewController+SpeedAudio.swift `SpeedAudioDrop.ask(clips, on: window) { [weak self, weak document]` — the inspector's Speed section (Rate, its presets, Keep pitch, Reset, Fit to) through inspector.onEdit; app/Sources/EditorViewController+SpeedAudio.swift `SpeedAudioDrop.ask(clips, on: window) { [weak document]` — the timeline's ⌥-drag rate stretch through timeline.onLiveEnd, the gesture already put back"

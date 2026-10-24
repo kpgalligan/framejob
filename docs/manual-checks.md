@@ -376,6 +376,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does editing a ramp from the Speed section feel right?
 - **Source:** #111 (speed ramps SR5, spec §11 SR-21); `tools/proof/screens.py --only 10d-clip-speed-action` captures it.
 
+**RMP-5 — The Speed Ramp sheet feels right, and its shapes look and sound right**
+- **Do:** 1. Select one clip of speech or steady motion, about 6 s long, and choose Clip ▸ Speed Ramp…. 2. Walk the Shape pop-up through Ramp Up, Ramp Down, Speed Dip and Speed Burst, change the rate, the curve and the hold, and read the line under them each time. 3. Apply a Speed Dip at ×0.5, play the clip through it, then undo. 4. Set an in/out range inside the clip, open the sheet again and apply a Speed Burst at ×2; play it. 5. Open it once more on a clip that already plays its whole media and ask for a Ramp Up at ×4.
+- **Expect:** the line under the controls follows every change (the shape and its span, then "×1 → ×0.5, held … s, → ×1" or the like); Hold greys out for Ramp Up and Ramp Down; the dip slows smoothly into a held slow stretch and smoothly back, and the burst speeds through the range alone; one undo takes the whole preset away; in step 5 the line names the largest rate that fits and Apply is disabled. A preset that takes a clip with sound above ×12 asks once. Nothing is clipped or cramped, in both appearances.
+- **Answer:** does the Speed Ramp sheet feel right, and do its shapes look and sound right?
+- **Source:** #340 (spec §11 SR-23, SR-24); `tools/proof/screens.py --only 13b-speed-ramp-sheet` captures it.
+
 ## Captions
 
 **CAP-1 — Text reveals and legibility**

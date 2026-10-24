@@ -127,7 +127,9 @@ schema, §6 the op table, §7 the architecture.
   the clip ramps to over the action and holds after; the clip keeps its
   length and plays more or less of its source, its sound gliding like tape
   or keeping its pitch, and Clip ▸ Speed… scales a ramp with the clip's
-  rate), freeze frame, detach audio, transitions,
+  rate; Clip ▸ Speed Ramp… makes a Ramp Up, Ramp Down, Speed Dip or Speed
+  Burst in one step, over the in/out range or the whole clip, with its
+  rate, curve and hold), freeze frame, detach audio, transitions,
   actions, markers, tracks, canvas size and rate; a clip's own name and
   colour label (Clip ▸ Rename…, Clip ▸ Label ▸; a clip with no name of
   its own is called what it shows), solo (Track ▸ Solo — the other tracks

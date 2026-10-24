@@ -2,8 +2,9 @@ import Foundation
 
 // MARK: - Catalog: actions
 
-/// The catalog's five ACTION rows — `add_action`, `add_zoom_action`,
-/// `set_action`, `set_action_end` and `remove_action` — the tools that animate
+/// The catalog's six ACTION rows — `add_action`, `add_zoom_action`,
+/// `add_speed_ramp`, `set_action`, `set_action_end` and `remove_action` — the
+/// tools that animate
 /// a clip, built with `opTool` as the clip rows beside them are.
 ///
 /// A pure move out of `AgentCatalog+Clips.swift` (issue batch B87 phase 2),
@@ -74,6 +75,40 @@ extension AgentServer {
                     "curve": "How the zoom eases. Default ease_in_out, not linear: "
                         + "a zoom that starts and stops abruptly is the thing this exists "
                         + "to avoid.",
+                ]),
+            opTool(
+                "add_speed_ramp",
+                "Makes a speed ramp preset on a MEDIA clip in one step, out of ordinary speed "
+                    + "actions (actions whose end names a speed) — what Clip ▸ Speed Ramp… "
+                    + "sends. ramp_up and ramp_down are ONE action over the span, ramping from "
+                    + "the base rate (the rate the clip plays at `from` before the edit, which "
+                    + "after an earlier speed action is that action's end rate) to `rate` and "
+                    + "holding it after. speed_dip and speed_burst are TWO actions: one ramping "
+                    + "to `rate` at the start of the span and one ramping back to the base rate "
+                    + "at its end, holding `rate` between them for `hold` of the span. Up and "
+                    + "burst need a rate above the base rate, down and dip one below it. `from` "
+                    + "and `to` are CLIP time, measured from the clip's own start; give both or "
+                    + "neither (the whole clip). The clip keeps its start and length and plays "
+                    + "more or less source. Refused when the span runs past the clip's end, when "
+                    + "it overlaps any action on the clip (one inside a dip's or a burst's hold "
+                    + "included), for a dip or a burst under two frames, for a rate on the wrong "
+                    + "side of the base rate, and when the clip would read past the end of its "
+                    + "media, naming the largest rate that fits. One undo step; the new actions' "
+                    + "ids come back as new_actions. Above ×12 the clip's audio is left out, and "
+                    + "the answer carries audio_left_out and audio_note.",
+                [
+                    "clip": clipDescription,
+                    "shape": "ramp_up, ramp_down, speed_dip or speed_burst.",
+                    "rate": "The target rate (1 = normal speed), clamped to ×0.1–×1000; "
+                        + "above the base rate for ramp_up and speed_burst, below it for "
+                        + "ramp_down and speed_dip.",
+                    "from": "Where the span starts, in CLIP time, \(ticks) Give it with `to`.",
+                    "to": "Where the span ends, in CLIP time, \(ticks) Give it with `from`; "
+                        + "both absent is the whole clip.",
+                    "curve": "How every new action eases. Default ease_in_out.",
+                    "hold": "speed_dip and speed_burst only: how much of the span the hold at "
+                        + "`rate` takes, 0 to 0.9 (clamped). Default 0.5; 0 makes the two ramps "
+                        + "meet.",
                 ]),
             opTool(
                 "set_action",

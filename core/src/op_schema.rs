@@ -155,7 +155,8 @@ fn schema_of_kind(kind: Kind) -> Value {
         | Kind::Fit
         | Kind::Matte
         | Kind::Output
-        | Kind::Blending => {
+        | Kind::Blending
+        | Kind::RampShape => {
             json!({"type": "string", "enum": kind.values()})
         }
         Kind::Groups => json!({

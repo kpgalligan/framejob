@@ -424,6 +424,11 @@ extension EditorViewController {
             // item is live only when the selection holds something it can act
             // on — the same subset `presentSpeedSheet` opens the sheet with.
             return selectedClips.contains { $0.source.hasSourceBound }
+        case #selector(showSpeedRampSheet(_:)):
+            // Exactly one selected clip, and a media one: `add_speed_ramp`
+            // edits one clip and is an error on any other source (spec §11
+            // SR-24 (a)) — `presentSpeedRampSheet`'s own test.
+            return selectedClips.count == 1 && selectedClips[0].source.hasSourceBound
         case #selector(rippleDeleteClips(_:)):
             // The same guard as Delete: ⌘⌫ in a field editor is "delete to
             // the start of the line", not a ripple delete of the selection —

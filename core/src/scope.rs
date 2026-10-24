@@ -7,7 +7,7 @@
 //! — `unnest`, edit, `nest` — which is the identity on clip content but
 //! throws the nest clip's own group-level properties away.
 //!
-//! **The fix is not to teach sixty-one ops about nests.** It is to give
+//! **The fix is not to teach sixty-two ops about nests.** It is to give
 //! the ENVELOPE a scope, and to hand the op a project in which the nest's
 //! own tracks and clips are the top level. Then `Project::clip` keeps its
 //! one meaning, `apply_op` keeps its flat dispatch, every refusal and every
@@ -261,6 +261,7 @@ fn refused_inside(op: &Op) -> Option<&'static str> {
         | Op::SetTransitionStyle { .. }
         | Op::AddAction { .. }
         | Op::AddZoomAction { .. }
+        | Op::AddSpeedRamp { .. }
         | Op::SetAction { .. }
         | Op::SetActionEnd { .. }
         | Op::RemoveAction { .. }

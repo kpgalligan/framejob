@@ -30,11 +30,13 @@ enum SpeedAudioDrop {
 
     /// True when any op is one that can change a speed: `set_speed`,
     /// `rate_stretch`, or a `set_action_end` whose patch names `speed` — the
-    /// Speed section's Rate inside an action (spec §11 SR-21 (e)).
+    /// Speed section's Rate inside an action (spec §11 SR-21 (e)) — or an
+    /// `add_speed_ramp`, Clip ▸ Speed Ramp… (SR-24 (e)).
     /// `set_action` and `remove_action` cannot raise the rate a clip names.
     static func mayCross(_ ops: [ReelOp]) -> Bool {
         ops.contains {
             $0.name == "set_speed" || $0.name == "rate_stretch"
+                || $0.name == "add_speed_ramp"
                 || ($0.name == "set_action_end"
                     && ($0.args["patch"] as? [String: Any])?["speed"] != nil)
         }

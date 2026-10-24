@@ -29,6 +29,21 @@ The rules every op shares are §6a; the clip ops are §6b.
   names its path (`bad value at "region.width"`). A non-finite or non-positive number is an
   **error** too — `region.width must be greater than 0` — because a zero-width region asks for an
   infinite scale.
+- **`add_speed_ramp {clip, shape, rate, from?, to?, curve="ease_in_out", hold=0.5}`** — A speed
+  ramp preset in one step, made of ordinary Speed actions (§11 SR-23, #340): `shape` is `ramp_up`,
+  `ramp_down`, `speed_dip` or `speed_burst`; `from` and `to` are CLIP time, both or neither (the
+  whole clip). The base b is the rate the clip plays at `from` before the edit. Up and Down are one
+  action [from, to) ending at `rate`; Dip and Burst are two of r = max(snapped_down((to − from)·(1 −
+  hold)/2), one frame) each, [from, from + r) ending at `rate` and [to − r, to) ending at b, the
+  target held between. `hold` (Dip and Burst only) is clamped to 0–0.9. Up and Burst need a rate
+  above b, Down and Dip one below it. **Errors**: a non-media clip (the end-rate door's sentence),
+  `rate must be a positive number`, one of `from`/`to` alone, a negative `from`, `to` not after
+  `from`, `hold is for speed_dip and speed_burst only`. **Refused**, in order: `to` past the clip
+  (`add_action`'s sentence); any action the span runs into, named, a hold gap included; a Dip or
+  Burst under two frames; the direction (`a ramp up needs a rate above ×{b}, the rate clip {c}
+  plays at {from} ticks into it; ×{rate} is not`); and a preset that would read past the end of
+  its media (SR-2), `{name} to ×{rate} would read clip {c} {over} ticks past the end of its media;
+  the largest rate that fits is ×{fit}`. One undo step.
 - **`set_action {clip, action, start?, duration?, curve?}`** — Same overlap checks. **Refused**
   (`add_action`'s past-end sentence) only when the new end is past the clip's end AND later than
   the action's end before the edit (§11 SR-22, #338): an action already running past the end — a

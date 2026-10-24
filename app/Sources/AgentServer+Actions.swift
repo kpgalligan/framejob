@@ -1,7 +1,8 @@
 import AppKit
 
-/// The agent's five action tools — `add_action`, `add_zoom_action`,
-/// `set_action`, `set_action_end` and `remove_action`: the action rows of
+/// The agent's six action tools — `add_action`, `add_zoom_action`,
+/// `add_speed_ramp`, `set_action`, `set_action_end` and `remove_action`: the
+/// action rows of
 /// spec §6 (and of the op table in the module doc of `core/src/edit.rs`),
 /// with the same names and the same argument names.
 ///
@@ -83,7 +84,41 @@ extension AgentServer {
             ])
     }
 
-    /// The tail both action-adding tools share: run the ops, then report the
+    /// `add_speed_ramp` — Clip ▸ Speed Ramp… (`SpeedRampSheetController`,
+    /// spec §11 SR-24): a speed ramp preset in one step. `from` and `to` are
+    /// CLIP time, like `add_action`'s `at`.
+    ///
+    /// One op rather than `add_action` + `set_action_end` (SR-25), for
+    /// `add_zoom_action`'s reasons: the base rate, the overlap and the rate
+    /// that fits are the core's reads (D2-1), and a preset is one undo step.
+    /// The undo step is named for the shape, as the sheet names it.
+    func addSpeedRamp(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let name = try requiredString(a, "shape")
+        guard let shape = SpeedRampShape(rawValue: name) else {
+            throw ToolError(
+                message: "shape must be one of "
+                    + SpeedRampShape.allCases.map { $0.rawValue }.joined(separator: ", ")
+                    + " (got \"\(name)\").")
+        }
+        guard let rate = try doubleArg(a, "rate") else {
+            throw ToolError(message: "Missing required argument: rate")
+        }
+        let from = try optionalTimeArg(a, "from", document)
+        let to = try optionalTimeArg(a, "to", document)
+        let curve = try curveArg(a, "curve")
+        let hold = try doubleArg(a, "hold")
+        return try addedActionResult(
+            document, clip, shape.displayName,
+            [
+                .addSpeedRamp(
+                    clip: clip.id, shape: shape, rate: rate, from: from, to: to, curve: curve,
+                    hold: hold)
+            ])
+    }
+
+    /// The tail every action-adding tool shares: run the ops, then report the
     /// action the clip GAINED. Actions are not top-level ids, so
     /// `created(from:to:)` cannot see them, and the new one is the difference
     /// between the clip's action ids before and after.
@@ -100,7 +135,7 @@ extension AgentServer {
         // on the document", so these two tools (`add_action`, `add_zoom_action`)
         // would otherwise report a nested edit as a document one.
         let landing = scopeLanding(ops, document)
-        try performGroupedEdit(document, actionName, ops)
+        let snapshot = try performGroupedEdit(document, actionName, ops)
         // Read back through `idScope`, not the top level: inside a scope the
         // clip that just gained an action is one of the nest's, and the
         // timeline's array has never heard of it — which would answer with an
@@ -109,6 +144,11 @@ extension AgentServer {
         var result: [String: Any] = ["ok": true, "clip": Int(clip.id)]
         let added = after.filter { !before.contains($0) }.map { Int($0) }
         if !added.isEmpty { result["new_actions"] = added }
+        // Empty unless the edit took a clip with sound above the ceiling,
+        // which only `add_speed_ramp` of these tools can (SR-21 (e)).
+        result.merge(
+            SpeedAudioDrop.answerFields(from: snapshot, to: document.project.snapshot)
+        ) { _, new in new }
         result.merge(landing) { _, new in new }
         result["project"] = summary(document)
         return try jsonResult(result)

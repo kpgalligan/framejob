@@ -207,7 +207,7 @@ extension AgentServer {
     ///
     /// **The container is the phase-9 change and it is entirely in the
     /// BODY**: `idScope` answers the timeline's clips, or — inside a
-    /// `scope` — the nest's own (`AgentServer+Scope.swift`), so all sixty-one
+    /// `scope` — the nest's own (`AgentServer+Scope.swift`), so all sixty-two
     /// call sites of the six id readers were untouched and cannot be
     /// half-converted. Without it a `trim_start {clip: <inside the nest>,
     /// scope: 4}` was refused by the APP, with "No clip has id 17", before

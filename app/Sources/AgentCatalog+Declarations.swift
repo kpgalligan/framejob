@@ -102,11 +102,12 @@ struct AgentDeclaration {
     /// it may NARROW what the core published and never relax it** — a
     /// `minimum` tighter than the core's is a truer promise, one looser than
     /// the core's is a false one, and nothing here can tell the two apart.
-    /// All five rows that use it today NARROW — `set_speed.rate` a range,
-    /// `set_canvas.fps` a floor on its items, three lists a `minItems` — so
-    /// the rule is written down rather than enforced: a guard that silently
-    /// dropped the key would put a row in the list that does nothing, which
-    /// is the trap this file's one shared predicate exists to avoid.
+    /// All six rows that use it today NARROW — `set_speed.rate` and
+    /// `add_speed_ramp.rate` a range, `set_canvas.fps` a floor on its items,
+    /// three lists a `minItems` — so the rule is written down rather than
+    /// enforced: a guard that silently dropped the key would put a row in the
+    /// list that does nothing, which is the trap this file's one shared
+    /// predicate exists to avoid.
     func applied(to fragment: [String: Any]) -> [String: Any] {
         var property = fragment
         if !alsoTypes.isEmpty, let core = property["type"] as? String {
@@ -123,9 +124,9 @@ struct AgentDeclaration {
 extension AgentServer {
 
     /// Every declaration, in one list (`AgentDeclaration`'s doc has the rule
-    /// an entry has to pass). Eighteen rows over seven kinds of difference:
+    /// an entry has to pass). Nineteen rows over seven kinds of difference:
     /// two bare-string shorthands, one reading of a whole JSON kind, two
-    /// nulls that mean something, one range the core clamps to rather than
+    /// nulls that mean something, two ranges the core clamps to rather than
     /// refusing, one the APP refuses outside where the core's kind is
     /// looser, four times the tool takes from the app what the op would
     /// have made the caller send, and three times a list the tool will not
@@ -210,6 +211,14 @@ extension AgentServer {
                 + "guidance the tool gives instead. What the core does refuse is a non-positive "
                 + "or non-finite rate, which no JSON-Schema bound this table carries can say; "
                 + "the handler refuses it by name first."),
+        AgentDeclaration(
+            .argument("rate", of: "add_speed_ramp"),
+            alsoKeys: ["minimum": ReelSpeed.limits.min, "maximum": ReelSpeed.limits.max],
+            why: "set_speed.rate's reason: the core CLAMPS a preset's target into "
+                + "\(ReelSpeed.limits.min)–\(ReelSpeed.limits.max) rather than refusing outside "
+                + "it (core/src/edit_action_ramp.rs, the limits published by rc_speed_limits), "
+                + "so the range is guidance the tool gives. A non-positive or non-finite rate "
+                + "is the core's error, by name."),
 
         // ---- a bound the app refuses outside and the core does not ---------
 

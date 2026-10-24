@@ -69,7 +69,7 @@ detail there.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for all sixty-one op tools.
+  `AgentCatalog.opTool` prints for all sixty-two op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -550,7 +550,8 @@ the key map behind it.
 - `SpeedAudioDrop.swift` — the ×`audio_max` crossing (a trial through the
   core), the question's and the agent note's copy, and its one alert sheet
   (`ask`); every door that sets speed asks through it (#212, §11 #190), and
-  `mayCross` takes a `set_action_end` naming `speed` (SR-21 (e)).
+  `mayCross` takes a `set_action_end` naming `speed` (SR-21 (e)) and an
+  `add_speed_ramp` (SR-24).
   `EditorViewController+SpeedAudio` holds the Speed section's and the rate
   stretch's doors; the latter ends the live edit BEFORE asking (an autosave
   must never write a speed Cancel then takes back) and re-applies the
@@ -2145,7 +2146,11 @@ free.
   version on the rows that carry HDR and a disabled "SDR version" on every
   other, never part of `ExportChoice`, spec §11 HD-14) · `ExportProgressSheetController.swift` ·
   `ReverseProgressSheetController.swift` ·
-  `SpeedSheetController.swift` · `RelinkSheetController.swift` ·
+  `SpeedSheetController.swift` · `SpeedRampSheetController.swift` (Clip ▸
+  Speed Ramp…, SR-24: shape, rate, curve and hold over the range inside the
+  clip or the whole clip; its readout and Apply follow every keystroke, read
+  off one trial of `add_speed_ramp`, a refusal showing the core's sentence) ·
+  `RelinkSheetController.swift` ·
   `GraphicFileSheetController.swift`. A sheet
   captures a project handle and trusts it; every editor action and
   `handleEditorKey` refuse while one is attached. The export card's controls
@@ -2400,7 +2405,7 @@ free.
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
-  **Every one of the sixty-one op tools is `opTool`'s** and carries no
+  **Every one of the sixty-two op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
   callers are the thirty-six APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
@@ -2436,7 +2441,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all ninety-seven
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all ninety-eight
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

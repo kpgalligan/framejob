@@ -97,13 +97,29 @@ impl Project {
         action: u32,
         rate: f64,
     ) -> Option<f64> {
-        let (source_in, file) = self.window_of(after)?;
-        let fits = |x: f64| self.overrun(&ending_at(after, action, x)).is_none();
-        // S(D) = α + β·x in the action's end rate x: read at two rates in
-        // range, solved for the file's remainder.
-        let read = |x: f64| {
-            SpeedMap::of(&ending_at(after, action, x)).map(|m| m.source_at(after.duration))
-        };
+        let floor = (SPEED_MIN * 1000.0).round() as i64;
+        self.largest_fitting_rate(&|x| ending_at(after, action, x), rate, floor)
+    }
+
+    /// The largest rate x on the 0.001 grid, below `rate` and at or above
+    /// `floor_k` thousandths, at which the clip `at_rate(x)` reads inside
+    /// its file: R1's solve, then its step down. `None` when none does.
+    /// `at_rate` must make S(D) affine in x — one action's end rate
+    /// (`largest_fitting_end_rate`), or a preset's target, which every
+    /// piece it builds ramps to, holds or ramps from (`add_speed_ramp`,
+    /// spec §11 SR-23 (g)).
+    pub(crate) fn largest_fitting_rate(
+        &self,
+        at_rate: &dyn Fn(f64) -> Clip,
+        rate: f64,
+        floor_k: i64,
+    ) -> Option<f64> {
+        let probe = at_rate(rate);
+        let (source_in, file) = self.window_of(&probe)?;
+        let fits = |x: f64| self.overrun(&at_rate(x)).is_none();
+        // S(D) = α + β·x in the rate x: read at two rates in range, solved
+        // for the file's remainder.
+        let read = |x: f64| SpeedMap::of(&at_rate(x)).map(|m| m.source_at(probe.duration));
         let solved = match (read(SPEED_MIN), read(1.0)) {
             (Some(low), Some(one)) => {
                 let beta = (one - low) / (1.0 - SPEED_MIN);
@@ -113,15 +129,14 @@ impl Project {
             }
             _ => None,
         };
-        let floor = (SPEED_MIN * 1000.0).round() as i64;
         let x = solved.filter(|x| x.is_finite())?;
         // Floored to 0.001, never at or above the rate that overran, then
         // stepped down a thousandth until it fits. The millionth keeps a
         // solve that lands a hair under an exact thousandth (×4 read as
         // 3.9999999) on it; the step down catches the rest.
         let below = (rate * 1000.0).ceil() as i64 - 1;
-        let mut k = ((x * 1000.0 + 1e-6).floor() as i64).min(below).max(floor);
-        while k >= floor {
+        let mut k = ((x * 1000.0 + 1e-6).floor() as i64).min(below).max(floor_k);
+        while k >= floor_k {
             if fits(thousandths(k)) {
                 return Some(thousandths(k));
             }

@@ -22,8 +22,8 @@ Amended-by line before its code; SR3b (L and M) recorded SR-19 and the Amended-b
 and SR-18 before its code. SR4 (Swift's mappers, the road map's N and O) recorded SR-20 and the
 road map's Amended-by lines on N and O before its code. SR5 (the UI, the road map's P and Q, and
 #338) recorded SR-21, SR-22 and the Amended-by lines on SR-19 (i), on rule Q and on CI-6 before
-its code. A later change records its rule as a new entry here (SR-23 on) or as an Amended-by
-line, before its code.
+its code. A later change records its rule as a new entry in
+[`speed-ramps-3.md`](speed-ramps-3.md) (SR-23 on) or as an Amended-by line, before its code.
 
 - **SR-13 — Keep pitch on is Apple's time-pitch unit in RATE mode, its rate commanded a measured
   lead ahead: SR-6's arm plus the lead, for ramps and held spans alike; it supersedes SR-8 whole.**
@@ -438,12 +438,16 @@ line, before its code.
     off the core's trial as before, on SR-19 (d)'s named peak. Not for `set_action`,
     `remove_action` or a Clear: none of them can raise the greatest rate a clip names, so none can
     cross (amending rule P's list). The Speed section's note reads the named peak too.
+    *Amended by SR-24 (#340):* `add_speed_ramp` asks the question, and answers
+    `audio_left_out` and `audio_note`, as `set_speed` does.
   - **(f) The Speed sheet** (Clip ▸ Speed…) edits the base rate under rule L (SR-19 (a)): Apply
     is `set_speed` as before, and a ramp keeps its shape. When a selected clip is ramped its
     readout adds the line "Each speed ramp keeps its shape: the rates it names scale with the base
     rate." A constant selection's readout is unchanged, byte for byte.
   - **(g) Menus.** No menu item, key or tool is added, and no validator changes: Clip ▸ Speed…
     stays live on a ramped clip, which is a media clip.
+    *Amended by SR-24 (#340):* Clip ▸ Speed Ramp… is added after Speed…, with its validator and
+    no key, and so is its tool, `add_speed_ramp` (SR-25).
   - **(h) Person checks** in `docs/manual-checks.md`, RMP-1..RMP-4: a ramp sounds right with Keep
     pitch on and off, playback through a ramp looks smooth, a ramped clip's filmstrip and waveform
     look right (SR-20 (h)), and the Speed section inside an action feels right.

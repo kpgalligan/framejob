@@ -33,6 +33,7 @@ pub mod dynamic_range;
 pub mod edit;
 pub mod edit_action;
 mod edit_action_graphic;
+pub mod edit_action_ramp;
 mod edit_action_speed;
 mod edit_adjustment;
 pub mod edit_background;
