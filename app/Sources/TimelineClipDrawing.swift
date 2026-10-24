@@ -364,9 +364,10 @@ extension TimelineContentView {
             NSGraphicsContext.current?.saveGraphicsState()
             NSBezierPath(rect: rect).addClip()
             NSGraphicsContext.current?.cgContext.setAlpha(0.72)
+            let map = owner.sourceMaps(clip.id)
             while x < limit {
                 let time = max(owner.layout.time(atX: x + tile / 2), clip.start)
-                let source = TimelineView.sourceTime(of: clip, in: media, at: time)
+                let source = TimelineView.sourceTime(of: clip, in: media, at: time, map: map)
                 let index = Int(max(source, 0) / ReelTime.perSecond)
                 let image = owner.caches.thumbnail(
                     media: media.id, index: index, in: directory)
@@ -417,9 +418,10 @@ extension TimelineContentView {
         let to = min(rect.maxX, visible.maxX)
         var x = from.rounded(.down)
         let bucketsPerSecond = Double(MediaImporter.peakBucketsPerSecond)
+        let map = owner.sourceMaps(clip.id)
         while x < to {
             let time = max(owner.layout.time(atX: x), clip.start)
-            let source = TimelineView.sourceTime(of: clip, in: media, at: time)
+            let source = TimelineView.sourceTime(of: clip, in: media, at: time, map: map)
             let bucket = Int(
                 (Double(max(source, 0)) / Double(ReelTime.perSecond) * bucketsPerSecond)
                     .rounded(.down))

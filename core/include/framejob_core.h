@@ -383,6 +383,14 @@ char *rc_project_frame_recipe_opts(const RcProject *p, int64_t t, const char *op
  * inspector. NULL if the clip id is unknown. */
 char *rc_project_clip_state(const RcProject *p, uint32_t clip, int64_t t);
 
+/* A media clip's source map (spec §11 SR-20 (a)), compact JSON:
+ * {"ramped":bool,"map":[[clip_tick,source_tick],...]}. A ramped clip's map is
+ * its plan audio segment's ramp map; a constant clip's is two points,
+ * [[0,in],[duration,in+length]], `in` clamped into the file. NULL for a NULL
+ * project, an unknown clip id, a clip that is not a media clip, or one whose
+ * media is gone. */
+char *rc_project_source_map(const RcProject *p, uint32_t clip);
+
 /* Snap candidates for a timeline drag: a JSON object with sorted tick
  * arrays. `exclude_clips_json` is a JSON array of clip ids to omit (the
  * clips being dragged), or NULL for none. */

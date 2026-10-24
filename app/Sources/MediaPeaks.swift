@@ -164,7 +164,17 @@ enum MediaPeaks {
     /// Source time under a project tick, at the rate the plan resolved:
     /// `sourceDuration / duration` IS the speed, exactly, with no second
     /// rounding of `clip.speed` here.
+    ///
+    /// A RAMPED clip's one audio segment is one ×1 segment over its slot, so
+    /// that rate would misplace a moment mid-clip: it reads `⌊S(t − start)⌋`
+    /// off the segment's own map, checked once at plan decode (spec §11
+    /// SR-20 (c), (d)). A segment with no ramp, or a map that failed its
+    /// check, takes the expression below.
     static func sourceTick(_ segment: PlanSegment, at t: Ticks) -> Ticks {
+        if let map = segment.ramp?.source {
+            let read = map.source(atClip: Double(t - segment.start)).rounded(.down)
+            return TimelineLayout.ticks(clamping: read)
+        }
         guard segment.duration > 0 else { return segment.sourceIn }
         let offset =
             Double(t - segment.start) * Double(segment.sourceDuration) / Double(segment.duration)

@@ -50,7 +50,7 @@ use framejob_core::ffi_query::{
     rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_op_schemas,
     rc_project_clip_state, rc_project_composition_plan, rc_project_duration,
     rc_project_frame_recipe, rc_project_frame_recipe_opts, rc_project_snap_candidates,
-    rc_snap_resolve, rc_speed_limits,
+    rc_project_source_map, rc_snap_resolve, rc_speed_limits,
 };
 use framejob_core::format::RC_FORMAT_VERSION;
 
@@ -2014,6 +2014,9 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
 
     assert!(unsafe { rc_project_clip_state(ptr::null(), 1, 0) }.is_null());
     cover("rc_project_clip_state");
+
+    assert!(unsafe { rc_project_source_map(ptr::null(), 1) }.is_null());
+    cover("rc_project_source_map");
 
     // A NULL exclude list means "exclude nothing", so only the project may
     // be NULL here.

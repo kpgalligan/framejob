@@ -67,6 +67,9 @@ extension EditorViewController {
         // every op it builds out of that snapshot is stamped with the scope
         // on its way through `ProjectDocument.applyEdit`. At the top level
         // this is `document.project` and nothing about the push changed.
+        // The source maps come from the same handle as the snapshot (spec
+        // §11 SR-20 (d)), set first so the redraw `update` asks for reads them.
+        timeline.sourceMaps = document.editedProject.sourceMap
         timeline.update(
             snapshot: document.editedProject.snapshot,
             selection: document.selection,

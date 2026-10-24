@@ -30,8 +30,9 @@ recorded in SR1e before its instrument code; SR1e has no measured run, so nothin
 file's SHA-256 again. SR3 is split in two: SR3a (the trims, roll, slip, the splitters, freeze and
 the handle transition, the road map's F–K) recorded SR-18 and SR-10's Amended-by line before its
 code; SR3b (L and M) recorded SR-19 and the Amended-by lines on SR-10 and SR-18 before its code.
-Later phases record their rules as new entries (SR-20 on) or as Amended-by lines before their
-code.
+SR4 (Swift's mappers, the road map's N and O) recorded SR-20 and the road map's Amended-by lines
+on N and O before its code. Later phases record their rules as new entries (SR-21 on) or as
+Amended-by lines before their code.
 
 **Stands, and nothing here re-litigates it:** SY-24 (the varispeed lead: a time-scaled segment
 on an `off` track reads its source 575 ticks earlier; ×1 untouched); SY-26 (one pitch name per
@@ -824,3 +825,58 @@ plan leaves the audio out, one pitch per plan audio track).
     rounding; a speed action can lie past its clip's end after any of these ops; a ramp that names
     a rate above ×12 past its clip's end leaves the audio out though the clip never plays above
     ×12.
+- **SR-20 — Swift's mappers (SR4): one core answer per clip, `rc_project_source_map`; a reader
+  takes it only for a ramped clip; one read-side interpolation, checked once and read by binary
+  search; Synchronize Audio refuses a ramp.** The road map's N and O, as built.
+  - **(a) The export.** `rc_project_source_map(project, clip)` answers a media clip's map as
+    compact JSON, `{"ramped": bool, "map": [[clip_tick, source_tick], …]}`, from
+    `Project::source_map` (`speed_segments.rs`). Let in′ be the clip's `in` clamped to
+    [0, media.duration − 1], as the plan's ramp segment clamps it. A RAMPED clip (`SpeedMap::of`
+    is `Some`) answers `ramped: true` and `ramp_audio`'s map from in′: byte-equal to the plan's
+    audio segment's `ramp.map` for a top-level clip. A constant clip answers `ramped: false` and
+    the two points [[0, in′], [D, in′ + `content_length_in_source`]]. A clip is read from the
+    handle it is asked of, unlifted, so a clip in a nest answers through `rc_project_scoped` its
+    own map, not the nest clip's cut of it. NULL for a NULL project, an unknown id, a clip that
+    is not a media clip, or one whose media is gone; a query has no `err_out`.
+  - **(b) Only a ramp takes it.** A reader converts through the map only when it is `ramped`. A
+    constant clip, or a nil map, reads exactly as before, byte for byte: Swift computes no rate
+    (D2-1), and no existing assertion changes.
+  - **(c) One read-side interpolation.** `SourceMap` (`SourceMap.swift`) holds the core's pairs
+    and is the one place Swift reads between them, linearly, as the renderer does; the renderer's
+    `RampAudioMap` is not touched. A map is checked ONCE, O(n), when it is decoded — at least two
+    pairs of two, the first clip tick 0, both columns strictly increasing — in
+    `ReelProject.sourceMap`'s memo (per handle and clip) and in `PlanSpeedRamp.source` at plan
+    decode; a map that fails is nil and its reader takes the constant path. Each reading finds
+    its bracketing pair by binary search, O(log n), in both directions (clip → source,
+    source → clip), each clamped to the map's ends. Why: a map holds a point every `MAP_STEP` =
+    600 ticks, about 100 000 for a 60 s ramp, and the waveform reads it per pixel column and the
+    silence walk per 10 ms bucket, so a linear scan or a per-call check would be quadratic.
+  - **(d) The readers.** The filmstrip and the waveform read `TimelineView.sourceMaps`, set from
+    `document.editedProject` with the snapshot, through a map-aware `sourceTime` (a reversed clip
+    mirrored about the media's duration, as today). `Transcriber.Job.ramp` carries the map and the
+    clip's start, so a job's source window is the map's (`sourceIn`, `sourceLength` held to the
+    recognition cap) and every word is placed through `clip(atSource:)`: captions, `transcribe`,
+    `detect_fillers`, `get_transcript` and its TR-13 window (whose recognition sub-job pads 2 s
+    of SOURCE each side and maps its ends back through the map) follow it. `detect_silence` and
+    voice mode read the plan's ramp audio segment's map through `MediaPeaks.sourceTick`; this
+    amends N's "tested, not changed": the audio segment is one ×1 segment over the slot, so its
+    linear reading would misplace a span mid-clip. Normalize Clip is unchanged: it reads the whole
+    segment, whose two ends both readings agree on.
+  - **(e) Synchronize Audio refuses a ramped clip**, mover or anchor, through the menu and
+    `sync_audio` alike, by `AudioSync.ramped`: "ramps its speed (a speed action changes its rate
+    over its length); Synchronize Audio lines up clips playing at one rate." Its drift line
+    assumes one rate.
+  - **(f) The instrument door.** `Transcriber.jobs(for:in:urls:)`, the three-argument form old
+    trees' probes build, keeps its signature and reads no map; for a media clip whose actions
+    name `end.speed` it answers no job and the problem "its speed ramps, and no speed map was read
+    for it", so no caller places a ramp's words at one rate unawares.
+  - **(g) Rule O.** Words placed before a ramp edit are not re-timed by it, as `set_speed` does not
+    re-time them; captions and transcripts made after it follow the ramp.
+  - **(h) The person check** — a ramped clip's filmstrip and waveform look right — is SR5's row in
+    `docs/manual-checks.md`, because no UI makes a ramp until SR5.
+  - **Why:** the core owns S (D2-1), and its plan already holds the map the renderer plays, so the
+    readers take the same pairs rather than a second rate rule; gating on `ramped` keeps every
+    constant clip's arithmetic as it is.
+  - Risk accepted: words, fillers and silences are placed through a piecewise-linear chord of S
+    with 1 ms steps, the chord the renderer plays; captions made before a ramp edit keep their old
+    times until they are made again.

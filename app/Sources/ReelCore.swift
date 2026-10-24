@@ -87,6 +87,7 @@ final class ReelProject {
     private var memoJSON: String?
     private var memoSnapshot: ProjectSnapshot?
     private var memoPlanJSON: String?
+    private var memoSourceMaps: [UInt32: SourceMap?] = [:]
 
     init(owning pointer: OpaquePointer) {
         self.ptr = pointer
@@ -250,6 +251,20 @@ final class ReelProject {
     /// and the inspector reads individual keys. nil for an unknown clip id.
     func clipState(_ clip: UInt32, at t: Ticks) -> [String: Any]? {
         CoreJSON.value(takeString(rc_project_clip_state(ptr, clip, t))) as? [String: Any]
+    }
+
+    /// A media clip's source map (spec §11 SR-20): its `ramped` flag and the
+    /// core's own [clip tick, source tick] pairs, decoded and checked ONCE
+    /// per handle and clip, so a reader per pixel or per bucket never pays
+    /// for the check. nil for an unknown id, a clip that is not a media
+    /// clip, one whose media is gone, or a map that fails `SourceMap`'s check.
+    func sourceMap(_ clip: UInt32) -> SourceMap? {
+        lock.lock()
+        defer { lock.unlock() }
+        if let memo = memoSourceMaps[clip] { return memo }
+        let decoded = takeString(rc_project_source_map(ptr, clip)).flatMap(SourceMap.init(json:))
+        memoSourceMaps[clip] = .some(decoded)
+        return decoded
     }
 
     /// Sorted, de-duplicated snap targets for a timeline drag: clip edges,

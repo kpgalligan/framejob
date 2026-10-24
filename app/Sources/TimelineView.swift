@@ -28,6 +28,10 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     private(set) var playhead: Ticks = 0
     private(set) var inOutRange: (start: Ticks, end: Ticks)?
     private(set) var cacheDirectory: URL?
+    /// The source maps of the handle `snapshot` came from (spec §11 SR-20
+    /// (d)), set by `refreshTimeline` beside `update(...)`; the filmstrip
+    /// and the waveform read a ramped clip through them.
+    var sourceMaps: SourceMaps = { _ in nil }
 
     /// Remove Silences' candidate spans, washed over the lanes and the ruler
     /// while its sheet is up (`TimelineView+Candidates.swift` draws them).

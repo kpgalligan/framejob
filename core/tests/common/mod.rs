@@ -52,7 +52,7 @@ use framejob_core::ffi_edit::rc_project_apply;
 use framejob_core::ffi_query::{
     rc_export_settings, rc_export_sizes, rc_project_clip_state, rc_project_composition_plan,
     rc_project_duration, rc_project_frame_recipe, rc_project_frame_recipe_opts,
-    rc_project_snap_candidates,
+    rc_project_snap_candidates, rc_project_source_map,
 };
 use framejob_core::model::Project;
 
@@ -472,6 +472,13 @@ impl Handle {
     pub fn clip_state(&self, clip: u32, t: i64) -> Option<Value> {
         take_string(unsafe { rc_project_clip_state(self.ptr, clip, t) })
             .map(|text| parse_json(&text, "rc_project_clip_state"))
+    }
+
+    /// A media clip's source map (spec §11 SR-20 (a)); `None` for an
+    /// unknown id or a clip that is not a media clip.
+    pub fn source_map(&self, clip: u32) -> Option<Value> {
+        take_string(unsafe { rc_project_source_map(self.ptr, clip) })
+            .map(|text| parse_json(&text, "rc_project_source_map"))
     }
 
     /// Snap candidates, with the dragged clips excluded.

@@ -14,11 +14,15 @@
 //! breakpoints of clip ticks to source ticks, linear between them — and, with
 //! keep pitch on, the spans that glide like tape until SR1d (SR-11).
 //!
+//! **The source map** (spec §11 SR-20 (a)) is what Swift's readers take
+//! for a media clip, ramped or not, through `rc_project_source_map`: a
+//! ramped clip's audio map, or a constant clip's two points.
+//!
 //! Nothing here edits; `evaluate.rs` places what these answer.
 
 use serde_json::{Map, Value};
 
-use crate::model::{Clip, Project};
+use crate::model::{Clip, Project, Source};
 use crate::speed_map::{Piece, SpeedMap};
 use crate::time::{self, Ticks};
 
@@ -192,5 +196,32 @@ impl Project {
             glide,
             map: points,
         }
+    }
+
+    /// A media clip's source map (spec §11 SR-20 (a)): `{"ramped", "map"}`
+    /// from `in` clamped into the file, as `ramp_segments_of` clamps it. A
+    /// ramped clip answers [`Project::ramp_audio`]'s map, the plan's audio
+    /// segment's own; a constant one `[[0, in], [D, in + length]]`. The clip
+    /// is this project's own, unlifted. `None` for an unknown id, a clip
+    /// that is not a media clip, or one whose media is gone.
+    pub(crate) fn source_map(&self, clip_id: u32) -> Option<Value> {
+        let clip = self.clip(clip_id)?;
+        let Source::Media { media, r#in, .. } = &clip.source else {
+            return None;
+        };
+        let found = self.media(*media)?;
+        let last = found.duration.saturating_sub(1).max(0);
+        let source_in = (*r#in).clamp(0, last);
+        let (ramped, points) = match SpeedMap::of(clip) {
+            Some(map) => (true, self.ramp_audio(clip, &map, source_in).map),
+            None => {
+                let end = source_in.saturating_add(self.content_length_in_source(clip));
+                (false, vec![(0, source_in), (clip.duration, end)])
+            }
+        };
+        let mut out = Map::new();
+        out.insert("ramped".to_string(), Value::from(ramped));
+        out.insert("map".to_string(), pairs(&points));
+        Some(Value::Object(out))
     }
 }

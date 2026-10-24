@@ -17,7 +17,8 @@ detail there.
 - `ReelCore.swift` — the **only** home for `rc_*` calls: `ReelProject`
   (handle + lazily decoded `ProjectSnapshot`; `json`, `snapshot` and
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
-  them), timecode, snapping (export presets/sizes/settings are
+  them; so is `sourceMap(_:)`, `rc_project_source_map` decoded and checked
+  once per handle and clip, SR-20), timecode, snapping (export presets/sizes/settings are
   `ExportValues.swift`'s, a pure move, HDR H-1), `ReelSpeed.limits` (the
   core's speed range and audio ceiling, typed as `SpeedLimits` in
   `CoreValues.swift` — no Swift file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25) and
@@ -128,7 +129,8 @@ detail there.
   `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` · `CurveProps.swift` — the `Codable`, READ-ONLY mirror
   of spec §5.2 every view draws from. `CompositionPlan.swift` (a pure move out of
   `ProjectSnapshot.swift`, grading GR1) is the plan's Swift side (spec §7.2): `PlanSegment`,
-  `PlanRamp`, `PlanTrack`, `PlanInstruction` and `CompositionPlan`. `ShapeProps.swift` (a pure
+  `PlanRamp`, `PlanTrack`, `PlanInstruction` and `CompositionPlan`; `PlanSpeedRamp.source` is
+  its `map` as a `SourceMap`, checked once at decode and not a coding key (SR-20 (c)). `ShapeProps.swift` (a pure
   move out of `ProjectSnapshot.swift`, grading L3) holds the shape group: `StrokeProps`,
   `GradientStop`, `Gradient` and `ShapeProps`. `GradeProps.swift` holds `ColorAdjust` (a pure move out of `ProjectSnapshot.swift`, grading-2 G2-0) beside grading's other value types. `ActionSnapshot.swift` (a pure move out of
   `ProjectSnapshot.swift`, B87) holds `ActionPatch`, `ActionSnapshot` and `ActionGraphicPatch` — an
@@ -497,6 +499,18 @@ detail there.
   `MediaPeaks.window`, `TimelineView.sourceTime` and `ReverseRenderer`. The
   core keeps no mirror on purpose; `CompositionBuilder` needs none because it
   swaps the asset.
+- `SourceMap.swift` — a media clip's source map (speed ramps SR-20): the
+  core's `[clip tick, source tick]` pairs, and the ONE place Swift reads
+  between them (linearly, as the ramp renderer plays them; no rate computed
+  here, D2-1). Checked ONCE on decode, read by BINARY SEARCH both ways
+  (`source(atClip:)`, `clip(atSource:)`), because a ramp holds a point every
+  600 ticks and the waveform and the silence walk read per column and per
+  bucket; `SourceMaps` is how a reader is handed the maps of its snapshot's
+  handle. A reader takes the map only when it is `ramped`, so a constant
+  clip keeps today's arithmetic exactly. `TimelineView+SourceMap.swift` is
+  the filmstrip's and the waveform's map-aware `sourceTime`
+  (`TimelineView.swift` is frozen; it holds only `sourceMaps`, set in
+  `refreshTimeline` from the same handle as the snapshot).
 
 **Frozen files.** `EditorViewController.swift`, `TimelineView.swift`,
 `PreviewCanvasView.swift`, `AgentServer.swift` are **frozen at current
@@ -1894,7 +1908,11 @@ free.
   through `Transcriber.placed` (R6-10). That `× 600` goes through
   `sourceTicks(milliseconds:)`, the one integer multiply on the caption
   path, clamped in `Int` to ±`Ticks.max / 600` first and deliberately NOT to
-  `maxSourceTicks` (R6-10's extension).
+  `maxSourceTicks` (R6-10's extension). A RAMPED clip's job carries
+  `Transcriber.Job.ramp` and lands a word at `clip.start + S⁻¹(m)` through
+  its `SourceMap`, its window `[in, in + S(D))` (SR-20 (d)); the
+  three-argument `Transcriber.jobs(for:in:urls:)` stays for the instruments
+  and refuses a ramped clip.
   `Loader` is `MediaPeaks.Loader`'s shape; `undeleted(in:)` is the janitor's.
 - `SpeechEngine.swift` — the on-device engine (`SpeechAnalyzer`,
   `SpeechTranscriber`, `AssetInventory`) and the ONE file under
@@ -2015,6 +2033,8 @@ free.
   the vendored compiled model, NOT `async`, with one process-wide
   `NSLock`-guarded unavailability reason that never retries until relaunch.
   `MediaPeaks` is the one spelling of the project → source window arithmetic;
+  a ramped clip's one ×1 audio segment is read through its `ramp.source`
+  map in `sourceTick` (SR-20 (d)), not the segment's linear rate;
   the reversed MIRROR it applies is `ReverseMirror`'s. `+Walls` also holds
   `nestExtents(in:)`, the nest-clip list both detectors read.
 - `FillerDetector.swift` · `AgentServer+Fillers.swift` — `detect_fillers`, the
@@ -2071,7 +2091,9 @@ free.
   gate): a refinement that is not clear refuses (`incoherent`), and one that
   cannot run on real samples refuses too (`unconfirmed`, fail closed) —
   MFCC similarity cannot tell the same words spoken twice from one take
-  (SY-28, the owner's IMG_0018 pair). A mover that would start
+  (SY-28, the owner's IMG_0018 pair). A RAMPED clip, anchor or mover, is
+  refused (`AudioSync.ramped`, SR-20 (e)) before the rate check: the drift
+  line reads one rate. A mover that would start
   before 0 is trimmed at its head instead (SY-16). `plan` is pure and
   answers frame-snapped `move_clip` ops, with a `set_speed {keep_pitch:
   false}` (a resample) per mover whose drift passes SY-8's significance

@@ -79,6 +79,11 @@ extension AudioSync {
             + "lines up clips whose speed is the rate they play at."
     }
 
+    /// Why a RAMPED clip, mover or anchor, cannot be matched (spec §11
+    /// SR-20 (e)): the drift line assumes one rate over the clip.
+    static let ramped = "ramps its speed (a speed action changes its rate over its length); "
+        + "Synchronize Audio lines up clips playing at one rate."
+
     /// `|rate − 1| ≤ maximumRateDeviation`, as a closed range so that the
     /// band's own edges (×1.002, ×0.998) are inside it in binary arithmetic.
     private static func inBand(_ rate: Double) -> Bool {

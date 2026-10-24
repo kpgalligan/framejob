@@ -315,7 +315,10 @@ enum MediaTranscript {
     /// (`core/src/source_window.rs`, `Transcriber.contentLength` in Swift),
     /// and it lands at `clip.start + (m − in) / speed`. Its end is the same
     /// arithmetic over `e × 600`, and both are clamped into
-    /// `[clip.start, clip.start + clip.duration]`.
+    /// `[clip.start, clip.start + clip.duration]`. A RAMPED clip's window is
+    /// its source map's, `[in, in + S(D))`, and a tick lands at
+    /// `clip.start + S⁻¹(m)` through the core's map (`Transcriber.Job.ramp`,
+    /// spec §11 SR-20 (d)), never through a rate computed here.
     ///
     /// **This is where phase 4's "no `in` term" simplicity is given back.**
     /// The on-device engine extracts a clip's source WINDOW and hands the
@@ -358,7 +361,17 @@ enum MediaTranscript {
     /// which the ops cannot write and the reader refuses (#41) —
     /// divides into an offset larger than `Ticks` holds, and the bound has
     /// to be applied in `Double` before the conversion rather than after it.
+    ///
+    /// A RAMPED job (spec §11 SR-20 (d)) places the tick through its clip's
+    /// map instead: `clip.start + S⁻¹(m)`, where the map's own source ticks
+    /// begin at `in` and its window is `[in, in + S(D))`.
     static func project(_ source: Ticks, in job: Transcriber.Job) -> Ticks {
+        if let ramp = job.ramp {
+            return Transcriber.placed(
+                offset: Double(ramp.clipStart - job.start)
+                    + ramp.map.clip(atSource: Double(source)),
+                in: job)
+        }
         // A degenerate `speed` — 0, negative, NaN or infinite — would make
         // `Ticks(_:)` trap; `Transcriber.project` guards it the same way.
         let speed = job.speed.isFinite && job.speed > 0 ? job.speed : 1

@@ -1,9 +1,9 @@
 //! C FFI: the read-only queries (`rc_project_duration`,
 //! `rc_project_composition_plan`, `rc_project_frame_recipe`,
 //! `rc_project_frame_recipe_opts`, `rc_project_clip_state`,
-//! `rc_project_snap_candidates`, `rc_snap_resolve`, `rc_op_names`,
-//! `rc_op_schemas`, `rc_speed_limits` and the three `rc_export_*` queries in
-//! the header).
+//! `rc_project_source_map`, `rc_project_snap_candidates`, `rc_snap_resolve`,
+//! `rc_op_names`, `rc_op_schemas`, `rc_speed_limits` and the three
+//! `rc_export_*` queries in the header).
 //!
 //! Thin shims only, all of them pure: a query never changes the project
 //! and never allocates a handle. Every JSON answer here is COMPACT, unlike
@@ -128,6 +128,23 @@ pub unsafe extern "C" fn rc_project_clip_state(
     unsafe {
         project_json(p, |project| {
             project.clip_state(clip, t).map(|state| state.to_string())
+        })
+    }
+}
+
+/// A media clip's source map for Swift's readers (spec §11 SR-20 (a)):
+/// `{"ramped": bool, "map": [[clip_tick, source_tick], …]}`, compact. NULL
+/// for a NULL project, an unknown clip id, a clip that is not a media clip,
+/// or one whose media is gone.
+///
+/// # Safety
+/// `p` must be NULL or a valid handle from this library that has not been
+/// freed. The returned string is freed with [`crate::ffi::rc_string_free`].
+#[no_mangle]
+pub unsafe extern "C" fn rc_project_source_map(p: *const Project, clip: u32) -> *mut c_char {
+    unsafe {
+        project_json(p, |project| {
+            project.source_map(clip).map(|map| map.to_string())
         })
     }
 }

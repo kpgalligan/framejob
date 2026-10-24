@@ -22906,3 +22906,48 @@ make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/r
 | `make gate` | PASS 287 s (names 1 s, typecheck 6 s, fmt 2 s, lint 1 s, test 155 s, app 122 s) |
 | `ramp_proof.py` (Release, after the gate) | **24/24 in 111 s**, exit 0 — V1–V3 and C1 as Debug's; every SR2a, SR2b, SR1d and SR3a row as before (E1 70/70 at +0.000 ms, L1 71/71 max 8.55 ms, L2 23/23 max 5.54, L3 35/35 max 21.47, R1 70/70 at −0.010, W1 2.3 s, U1 as the baseline, P1 m1 −86.333 ms, T1 1 640 000); no `Frame Job: ` in the log |
 | core mutants M1–M10 (the two new suites) | each caught: M1 8 failures, M2 1, M3 1, M4 1, M5 1, M6 2, M7 6, M8 1, M9 1, M10 1 |
+
+## Speed ramps SR4 — Swift's mappers (`ramp_proof.py` F1–F5, Q0–Q4, Y1; `ramp_mapper_probe.swift`; `core/tests/ramp_source_map.rs` and eleven mutants; spec §11 SR-20; #111)
+
+SR4 of road map "speed-ramps": `rc_project_source_map` answers a media clip's source map — a
+ramped clip's plan ramp map, a constant clip's two points — and every Swift reader that converts
+between source and timeline time on a media clip reads a RAMPED clip through it (`SourceMap`,
+checked once at decode, binary-searched both ways); a constant clip, or a nil map, reads exactly
+as before. Synchronize Audio refuses a ramped clip. The F rows read `ramp_mapper_probe.swift`,
+built through `swift_build.build()` over this tree's `app/Sources` into `work/ramp/mapper/` and
+run under a 60 s wall: in-process projects (a 10 s A/V media with no file, a clip at 0.5 s from
+in 0.5 s, 5 s long, ramped [0, 2 s) linear to ×2, beside a ×1.5 constant twin and a reversed
+ramped twin), scored against the proof's own S and S⁻¹.
+
+- **F1** — the map: ramped, 0, every 600 ticks to 2 s, 2 s and D at in + round(S) (±1), equal
+  to the plan's audio `ramp.map`; the constant twin's two points; the reversed twin's the
+  forward one's.
+- **F2** — `TimelineView.sourceTime(…map:)` at every frame against in + ⌊S(t − start)⌋ (±1),
+  mirrored for the reversed twin; the constant map and a nil map equal the three-argument form.
+- **F3** — `Transcriber.jobs(…maps:)`, `MediaTranscript.project`, `Transcriber.project` and
+  `recognitionJob` (windows [2 s, 3 s), each end and the whole clip) against start +
+  round½(S⁻¹(m − in)) (±2); the three-argument form refuses the ramped clip by SR-20 (f).
+- **F4** — `MediaPeaks.sourceTick` on the plan's ramp audio segment (±1); a constant segment
+  unchanged.
+- **F5** — a 100 000-point map: 100 000 lookups each way and 10 000 `sourceTick` calls, each
+  batch under 2 s (a linear scan or a per-call check runs past the 60 s wall).
+- **Q0–Q3** — a second owned instance with dummy keys against `cloud_captions_probe.Fake("ramp")`
+  under the cloud lock: no `Frame Job: ` in its log; speech.mov ramped at 1 s, its
+  `get_transcript` words through S⁻¹; a ×1.5 clip's words exactly `cloud_captions_proof.mapped`;
+  `detect_fillers` on the ramped clip at TR-9's grid placed through S⁻¹.
+- **Q4** — silence.mov ramped: `detect_silence` (`mode: level`, `min_length: 120000`) finds both
+  quiet spans at S⁻¹ of their source edges, within a bucket and a frame.
+- **Y1** — `sync_audio` over a ramped and a constant AV.mov clip, either as anchor, refused with
+  `clip <ramped>: ` and `AudioSync.ramped`.
+
+```sh
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only F1,F2,F3,F4,F5,Q0,Q1,Q2,Q3,Q4,Y1
+make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py
+```
+
+| Run (2026-10-24) | Result |
+|---|---|
+| Debug `--only F1,…,Y1` | 12/12 in 30 s — F1 2002 points, 0 ticks off; F2 150 frames, 0 off; F3 project and Transcriber.project ≤ 1 tick off, every window as the oracle; F4 0 off; F5 0.13 s / 0.12 s / 0.02 s; Q1 8 words, 0 off; Q2 exact; Q3 [[1640000, 1780000]]; Q4 edges off 21 539 and 0 ticks (≤ 26 000); Y1 refused both ways |
+| `make gate` | PASS 374 s (names 1 s, typecheck 20 s, fmt 7 s, lint 12 s, test 219 s, app 114 s) |
+| `ramp_proof.py` (Release, after the gate) | **35/35 in 162 s**, exit 0 — the SR4 rows as Debug's; every SR2a–SR3b row as before (E1 70/70 at +0.000 ms, L1 71/71 max 8.55 ms, L2 23/23 max 5.54, L3 35/35 max 21.47, R1 70/70 at −0.010, W1 2.3 s, U1 as the baseline, P1 m1 −86.333 ms, T1 1 640 000); no `Frame Job: ` in either log |
+| mutants M1–M11 | each caught: M1 (`source_map`'s constant arm for a ramp) `ramp_source_map.rs` 2 failures and F1; M2 (`MediaTranscript.project`'s arm) F3, Q1; M3 (`Transcriber.project`'s) F3; M4 (`recognitionJob`'s) F3; M5 (the ramp `sourceLength` at `contentLength`) F3, Q1; M6 (the three-argument guard) F3; M7 (`sourceTick`'s arm) F4, Q4; M8 (`sourceTime` ignoring the map) F2; M9 (Sync's refusal) Y1; M10 (linear scans) F1–F5 at the 60 s wall; M11 (a per-call map in `sourceTick`) F4, F5 at the wall |

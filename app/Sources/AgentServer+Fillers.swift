@@ -109,7 +109,8 @@ extension AgentServer {
             }
             let snapshot = document.editedProject.snapshot
             let jobs = FillerTranscription.jobs(
-                for: media.id, in: snapshot, urls: document.mediaURLs())
+                for: media.id, in: snapshot, urls: document.mediaURLs(),
+                maps: document.editedProject.sourceMap)
             guard let first = jobs.first else {
                 throw ToolError(
                     message: "No clip in this timeline plays media \(media.id) from its file, so "

@@ -504,6 +504,9 @@ governs a module now.
 - `speed_segments.rs` — the map cut into plan pieces: `Held` at one rate
   (an equal-rate action is held), `Ramp` one video segment per canvas
   frame, and the ramp audio map with a breakpoint every 600 ticks.
+  `Project::source_map` (SR-20) answers a media clip's source map: a ramped
+  clip its ramp audio map, byte-equal to the plan segment's `ramp.map`, a
+  constant clip its two points, flagged `ramped` as `is_ramped` is.
 - `edit_action_speed.rs` — `set_action_end`'s speed arm and the overrun
   refusals R1/R2/R3 for `set_action_end`, `set_action` and
   `remove_action`: a ramp that would read past the media's end is refused,
@@ -787,6 +790,7 @@ governs a module now.
   `ffi_query.rs`'s rule: a query never allocates a handle and has no
   `err_out`, which is why `rc_project_scoped` lives in `ffi.rs`.
   `rc_speed_limits` is its answer for the speed range and the audio ceiling;
+  `rc_project_source_map` (`ffi_query.rs`, SR-20) a clip's source map;
   `rc_normalise_color` (`ffi.rs`) is the colour grammar's (G-25).
   `ffi_agent.rs` has one slot, one listener per process: `SOCKET`
   (`rc_agent_socket_start` / `_release`; MC4 deleted the TCP pair and its

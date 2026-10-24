@@ -76,6 +76,8 @@ final class TranscribeSheetController: NSViewController {
     /// Everything a run reads, taken off the document once. The document
     /// cannot change under an open sheet, which is what makes that safe.
     let snapshot: ProjectSnapshot
+    /// The source maps of the handle `snapshot` came from (spec §11 SR-20 (d)).
+    let sourceMaps: SourceMaps
     let mediaURLs: [UInt32: URL]
     private let selection: Set<UInt32>
     private let inOutRange: (start: Ticks, end: Ticks)?
@@ -175,6 +177,7 @@ final class TranscribeSheetController: NSViewController {
         // `CaptionImporter.plan`'s paragraph. A scope cannot change under
         // an open sheet, so capturing it here is as safe as the rest.
         self.snapshot = document.editedProject.snapshot
+        self.sourceMaps = document.editedProject.sourceMap
         self.mediaURLs = document.mediaURLs()
         self.selection = document.selection
         self.inOutRange = document.inOutRange
@@ -205,7 +208,9 @@ final class TranscribeSheetController: NSViewController {
     }
 
     func jobs(in scope: Scope) -> [Transcriber.Job] {
-        Transcriber.jobs(for: clips(in: scope), in: snapshot, urls: mediaURLs).jobs
+        Transcriber.jobs(
+            for: clips(in: scope), in: snapshot, urls: mediaURLs, maps: sourceMaps
+        ).jobs
     }
 
     /// The scope the sheet opens on: what the user pointed at, if it holds

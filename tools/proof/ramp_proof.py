@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Speed ramps SR2a, SR2b, SR1d, SR3a and SR3b (spec §11 SR-10, SR-2, SR-6,
-SR-12, SR-13, SR-15, SR-18, SR-19), against the built app: an action's
+"""Speed ramps SR2a, SR2b, SR1d, SR3a, SR3b and SR4 (spec §11 SR-10, SR-2, SR-6,
+SR-12, SR-13, SR-15, SR-18, SR-19, SR-20), against the built app: an action's
 `end.speed` through `set_action_end` over MCP — the door, the slot rule's R1
 sentence, the ×12 answer, undo and redo (SR2a) — a ramped clip's rendered
 audio in the export and in playback (SR2b, #111), Keep pitch inside a ramp
@@ -8,7 +8,10 @@ kept and placed by SR-13's led rate-mode arm (SR1d: K1, L1–L3), `trim_end`
 and `split` on a ramped clip read through its map (SR3a: T1, S1), and
 `set_speed` scaling a ramp's whole profile, the ×12 answer and the export
 agreeing on the rate the clip names, and `set_canvas`'s re-snap keeping a
-speed action past the clip's end (SR3b: V1–V3, C1).
+speed action past the clip's end (SR3b: V1–V3, C1), and Swift's readers
+through `rc_project_source_map` — the filmstrip, the waveform, transcripts,
+captions, fillers and silence — and Synchronize Audio refusing a ramp (SR4:
+F1–F5, Q0–Q4, Y1).
 
     env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py [--only IDS]
     env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py --baseline
@@ -136,6 +139,60 @@ C1  a 2 s AV.mov clip at in 0, `add_action` [0, 2 s), `set_action_end
     {speed: 3}`, `trim_end` to 1 s, then `set_canvas fps [25, 1]`: the
     action stays [0, 1200000) with end 3, the duration 600000 (SR-19 (g)).
 
+SR4's F rows read `ramp_mapper_probe.swift`, copied in as `main.swift` under
+`work/ramp/mapper/` and built with `swift_build.build()` over this tree's
+`app/Sources` (as `transcript_proof.build` builds its probe), run once under a
+60 s wall (a timeout fails every F row). Its projects are in-process, a 10 s
+A/V media with no file, a clip at 0.5 s from in 0.5 s, 5 s long, ramped by an
+action [0, 2 s), linear, to ×2 — S(t) = t + t²/4 s, then 3 s + 2(t − 2 s), so
+it reads S(5 s) = 9 s — beside a ×1.5 constant twin and a reversed ramped
+twin. Every oracle is this file's S and S⁻¹ (`s_of`, `s_inv`).
+F1  `ReelProject.sourceMap`: ramped true, the breakpoints 0, every 600 ticks
+    to 2 s, 2 s and D, each source in + round(S) (±1), equal to the plan's
+    audio `ramp.map`; the constant twin [[0, in], [D, in + round(D × 1.5)]]
+    and ramped false; the reversed twin's map the forward one's; an unknown
+    id nil.
+F2  `TimelineView.sourceTime(…map:)` at every frame: in + ⌊S(t − start)⌋
+    (±1), the reversed twin file − that; the constant map and a nil map equal
+    the three-argument form exactly at every frame.
+F3  `Transcriber.jobs(…maps:)`'s job (in, round(S(D)), the map, the base
+    speed); `MediaTranscript.project` and `Transcriber.project` against
+    start + round½(S⁻¹(m − in)) (±2); `recognitionJob` for [2 s, 3 s), each
+    end and the whole clip, padded 2 s of SOURCE and mapped back (±2), its
+    1 s placed as the whole job places it; the three-argument form refuses
+    the ramped clip by SR-20 (f)'s sentence and gives the constant twin the
+    four-argument form's job.
+F4  `MediaPeaks.sourceTick` on the plan's ramp audio segment at every frame
+    against in + ⌊S(t − start)⌋ (±1); the constant segment's reading exactly
+    in + ⌊(t − start) × source_duration / duration⌋.
+F5  SR-20 (c): a 100 000-point map (clip 600·k, source 600·k + 3k(k + 1)) is
+    made; 100 000 `source(atClip:)`, 100 000 `clip(atSource:)` at an LCG's
+    positions and 10 000 `sourceTick` on a decoded `PlanSegment` carrying it,
+    each batch under 2 s, every breakpoint hit exact.
+Q0–Q3 run on a second owned instance (`mcp.launch` with `-RCSecretFolder` a
+0700 folder of dummy 0600 keys and `-RCAssemblyAIEndpoint` at
+`cloud_captions_probe.Fake("ramp")`, under `hold_cloud_lock(1800)`, logging
+to `work/ramp/framejob-cloud.log`), serving `cloud_captions_proof`'s
+DISFLUENT_WORDS; `transcribe {engine: assemblyai, place: false}`, no paid
+request.
+Q0  that instance listens and its log holds no `Frame Job: `.
+Q1  speech.mov at 1 s, in 0, 3 s long, ramped [0, 2 s) to ×2 (it reads 5 s
+    of 5.248 s): `get_transcript`'s words, crossing the ramp and the ×2
+    piece, at start + round½(S⁻¹(m − in)) (±2), kept by in ≤ m < in +
+    round(S(D)).
+Q2  a ×1.5 speech.mov clip: its words exactly `cloud_captions_proof.mapped`.
+Q3  `detect_fillers` on Q1's clip: TR-9's grid (`fillers_proof.tr9`) placed
+    through S⁻¹ and snapped inward to frames, each edge equal (or a frame
+    off where S⁻¹ lies within 2 ticks of a frame boundary, reported).
+Q4  (main instance) silence.mov at 0, in 0, 5 s, ramped as F's (it reads 9 s
+    of 10 s): `detect_silence {clips, mode: level, min_length: 120000}`,
+    re-asked while `pending_peaks`, finds [S⁻¹(2 s), S⁻¹(3.5 s)] and
+    [S⁻¹(6 s), S⁻¹(7 s)] inset by `padding`, each edge within a 10 ms bucket
+    and a frame.
+Y1  (main instance) a 2 s AV.mov clip ramped [0, 1 s) to ×2 and a constant
+    AV.mov clip on a second track: `sync_audio` with either as anchor is
+    refused, naming `clip <ramped>: ` and `AudioSync.ramped`'s sentence.
+
 `--baseline` (before any SR2b app edit, on Release) builds CX1, CX2 and CK05
 and writes `tools/proof/work/ramp-baseline/baseline.json`: the commit and dirt
 of the app's own tree (`--app` may name another checkout's build), the app,
@@ -146,7 +203,8 @@ must fail. `--mutant keep-shift` moves each L row's expectation
 `keep_shift_s(variant)` late, 2 × its ceiling + 1 ms, so a shifted click lands
 past the ceiling or outside the reach whatever the residuals' sign: L1, L2
 and L3 must fail. Rows print `<ID> pass|fail — <detail>`, then `n/m`; exit 0 iff every
-row run passed. `--only D1,E1` runs those rows (D0 always).
+row run passed. `--only D1,E1` runs those rows (D0 always; Q0 with any Q1–Q3,
+and Q1 with Q3).
 """
 
 import argparse
@@ -155,10 +213,12 @@ import json
 import math
 import os
 import re
+import shutil
 import statistics
 import subprocess
 import sys
 import time
+from fractions import Fraction
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -171,6 +231,7 @@ import precision_proof  # noqa: E402
 import proof_app  # noqa: E402
 import ramp_spike as rs  # noqa: E402
 import render_spike as rsp  # noqa: E402
+import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 from export_offset_proof import read_ffmpeg  # noqa: E402
 from media_less_playback_probe import build_shader  # noqa: E402
@@ -180,6 +241,15 @@ EXPORTS = WORK / "exports"
 PROBE_WORK = WORK / "probe"
 BASELINE = ROOT / "tools/proof/work/ramp-baseline/baseline.json"
 AV_MOV = ROOT / "tools/proof/media/AV.mov"
+SPEECH_MOV = ROOT / "tools/proof/media/speech.mov"
+SILENCE_MOV = ROOT / "tools/proof/media/silence.mov"
+MAPPER_PROBE = ROOT / "tools/proof/ramp_mapper_probe.swift"
+MAPPER_WORK = WORK / "mapper"
+MAPPER_WALL = 60
+F5_BOUND_S = 2.0
+Q4_BUCKET = 6_000
+SYNC_RAMPED = ("ramps its speed (a speed action changes its rate over its length); "
+               "Synchronize Audio lines up clips playing at one rate.")
 SEC = 600_000
 FRAME = 20_000
 CALL_BOUND = 600
@@ -189,7 +259,11 @@ SR2A_ROWS = ["D1", "D2", "D3", "D4", "D5"]
 SR2B_ROWS = ["X0", "U1", "E1", "E2", "N1", "K1", "L1", "L2", "L3", "R1", "W1", "P1"]
 SR3A_ROWS = ["T1", "S1"]
 SR3B_ROWS = ["V1", "V2", "V3", "C1"]
-ROWS = ["D0"] + SR2A_ROWS + SR2B_ROWS + SR3A_ROWS + SR3B_ROWS
+SR4_PROBE_ROWS = ["F1", "F2", "F3", "F4", "F5"]
+SR4_CLOUD_ROWS = ["Q0", "Q1", "Q2", "Q3"]
+SR4_APP_ROWS = ["Q4", "Y1"]
+ROWS = (["D0"] + SR2A_ROWS + SR2B_ROWS + SR3A_ROWS + SR3B_ROWS + SR4_PROBE_ROWS
+        + SR4_CLOUD_ROWS + SR4_APP_ROWS)
 # name: (rate, keep pitch or None for the default, length ticks)
 CONSTANTS = {"CX1": (1.0, None, 4 * SEC), "CX2": (2.0, False, 4 * SEC),
              "CK05": (0.5, True, 4 * SEC)}
@@ -1000,6 +1074,444 @@ def p1_probe(binary, state):
           f"{len(wrong['control'])}")
 
 
+# ---- SR4: Swift's mappers (spec §11 SR-20) ---------------------------------------
+#
+# Every oracle here is the one ramp the rows build: base ×1, ONE linear speed
+# action over clip time [0, a) ending at ×r, held after. S(t) = t + (r − 1)t²/(2a)
+# inside it, then S(a) + r(t − a); S⁻¹ its inverse, closed form.
+
+
+def s_of(t, a=2 * SEC, r=2):
+    """S(t) in source ticks, exact (a Fraction), for clip tick t ≥ 0."""
+    t = Fraction(t)
+    if t <= a:
+        return t + (r - 1) * t * t / (2 * a)
+    return Fraction(a * (1 + r), 2) + r * (t - a)
+
+
+def s_inv(u, a=2 * SEC, r=2):
+    """S⁻¹(u) in clip ticks, a float, for source ticks u ≥ 0."""
+    u = float(u)
+    edge = a * (1 + r) / 2
+    if u <= edge:
+        return (-1 + math.sqrt(1 + 2 * (r - 1) * u / a)) * a / (r - 1)
+    return a + (u - edge) / r
+
+
+def half_up(x):
+    """Round half away from zero, Swift's `.toNearestOrAwayFromZero` and Rust's `round`."""
+    return int(math.floor(x + 0.5)) if x >= 0 else -int(math.floor(-x + 0.5))
+
+
+def placed_at(source, start, source_in, duration):
+    """`MediaTranscript.project` on a ramped job: start + round½(S⁻¹(m − in)),
+    the offset clamped into [0, D]."""
+    reach = s_of(duration)
+    offset = s_inv(min(max(source - source_in, 0), reach))
+    return start + half_up(min(max(offset, 0), duration))
+
+
+def worst(pairs):
+    """The largest |got − want| over (got, want) pairs; 0 for none."""
+    return max((abs(g - w) for g, w in pairs), default=0)
+
+
+def mapper_probe():
+    """(readings, None) or (None, why): `ramp_mapper_probe.swift` copied in as
+    `main.swift`, built over this tree's `app/Sources` (`transcript_proof.build`'s
+    shape), run once under a MAPPER_WALL s wall."""
+    MAPPER_WORK.mkdir(parents=True, exist_ok=True)
+    entry = MAPPER_WORK / "main.swift"
+    shutil.copyfile(MAPPER_PROBE, entry)
+    binary = MAPPER_WORK / "ramp-mapper-probe"
+    try:
+        swift_build.build(sources=swift_build.app_sources(ROOT / "app/Sources") + [entry],
+                          output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        return None, "swiftc: " + "; ".join([str(error)] + list(error.diagnostics[:8]))
+    started = time.monotonic()
+    try:
+        ran = subprocess.run([str(binary)], capture_output=True, text=True,
+                             timeout=MAPPER_WALL, cwd=MAPPER_WORK)
+    except subprocess.TimeoutExpired:
+        return None, f"no answer within {MAPPER_WALL} s"
+    (MAPPER_WORK / "stderr.txt").write_text(ran.stderr)
+    (MAPPER_WORK / "answer.json").write_text(ran.stdout)
+    try:
+        answer = json.loads(ran.stdout)
+    except ValueError:
+        return None, f"no answer (exit {ran.returncode}): {ran.stderr[-300:]}"
+    if answer.get("error") or answer.get("problems"):
+        return None, f"the fixtures: {answer.get('error') or answer.get('problems')}"
+    answer["wall"] = time.monotonic() - started
+    return answer, None
+
+
+def f1(got):
+    clips, f = got["clips"], got["F1"]
+    ramp, const = clips["ramped"], clips["constant"]
+    points = f["ramped"]["map"] or []
+    times = [0] + list(range(0, 2 * SEC, 600)) + [2 * SEC, ramp["duration"]]
+    times = sorted(set(times))
+    off = worst((s, ramp["in"] + half_up(s_of(c))) for c, s in points)
+    shape = [c for c, _ in points] == times
+    want_const = [[0, const["in"]],
+                  [const["duration"], const["in"] + half_up(const["duration"] * const["speed"])]]
+    good = (f["ramped"]["ramped"] is True and shape and off <= 1 and f["plan_map_equal"] is True
+            and f["constant"]["ramped"] is False and f["constant"]["map"] == want_const
+            and f["reversed"]["ramped"] is True and f["reversed"]["map"] == points
+            and f["text_clip_nil"] is True)
+    check("F1", good,
+          f"ramped {f['ramped']['ramped']}, {len(points)} points (want {len(times)} at 0, every "
+          f"600 to 2 s, 2 s and D; shape {shape}), max |source − in − round(S)| {off} tick(s), "
+          f"equal to the plan's ramp.map {f['plan_map_equal']}; constant "
+          f"{f['constant']} (want {want_const}); reversed twin's map the forward one's "
+          f"{f['reversed']['map'] == points}; unknown id nil {f['text_clip_nil']}")
+
+
+def f2(got):
+    clips, f = got["clips"], got["F2"]
+    ramp, rev = clips["ramped"], clips["reversed"]
+    fwd = worst((s, ramp["in"] + math.floor(s_of(t - ramp["start"]))) for t, s in f["ramped"])
+    back = worst((s, rev["file"] - (rev["in"] + math.floor(s_of(t - rev["start"]))))
+                 for t, s in f["reversed"])
+    frames = ramp["duration"] // FRAME
+    good = (len(f["ramped"]) == frames and len(f["reversed"]) == frames and fwd <= 1
+            and back <= 1 and f["constant_equal"] is True and f["nil_equal"] is True
+            and f["ramp_nil_equal"] is True)
+    check("F2", good,
+          f"{len(f['ramped'])} frames (want {frames}): ramped max |off| {fwd} tick(s) against "
+          f"in + ⌊S(t − start)⌋, reversed {back} against file − that; the constant map and a "
+          f"nil map equal the 3-argument form at every frame {f['constant_equal']}/"
+          f"{f['nil_equal']}, a ramped clip with a nil map too {f['ramp_nil_equal']}")
+
+
+def f3(got):
+    clips, f = got["clips"], got["F3"]
+    ramp = clips["ramped"]
+    start, src, dur = ramp["start"], ramp["in"], ramp["duration"]
+    job = f["job"] or {}
+    reach = half_up(s_of(dur))
+    job_ok = (job.get("start") == start and job.get("duration") == dur
+              and job.get("in") == src and abs(job.get("length", 0) - reach) <= 1
+              and job.get("ramp") is True and job.get("speed") == 1
+              and job.get("clip_start") == start)
+    refusal = f"clip {ramp['clip']}: its speed ramps, and no speed map was read for it"
+    three_ok = f["three_jobs"] == 0 and f["three_problems"] == [refusal]
+    proj = worst((p, placed_at(m, start, src, dur)) for m, p in f.get("project", []))
+    trans = worst((p, placed_at(src + t * SEC, start, src, dur))
+                  for t, p in f.get("transcriber", []))
+    win_ok, win_text = True, []
+    for w in f.get("windows", []):
+        lo = s_of(w["from"] - start) - 2 * SEC
+        hi = s_of(w["to"] - start) + 2 * SEC
+        low = math.floor(s_inv(min(max(lo, 0), s_of(dur))))
+        high = math.ceil(s_inv(min(max(hi, 0), s_of(dur))))
+        sub_start, sub_end = max(start, start + low), min(start + dur, start + high)
+        whole = sub_start == start and sub_end == start + dur
+        sub_in = src + half_up(s_of(sub_start - start))
+        sub_len = (src + half_up(s_of(sub_end - start)) - sub_in if sub_end < start + dur
+                   else src + reach - sub_in)
+        sub = w["job"]
+        one = placed_at(sub["in"] + SEC, start, src, dur)
+        ok = (w["same"] is whole and w["map_kept"] is True
+              and abs(sub["start"] - sub_start) <= 2
+              and abs(sub["start"] + sub["duration"] - sub_end) <= 2
+              and abs(sub["in"] - sub_in) <= 2 and abs(sub["length"] - sub_len) <= 2
+              and abs(w["one_second"] - one) <= 2
+              and abs(w["one_second"] - w["one_second_whole"]) <= 1)
+        win_ok = win_ok and ok
+        win_text.append(f"[{w['from']}, {w['to']}) → {sub['start']}+{sub['duration']} in "
+                        f"{sub['in']} length {sub['length']} (want {sub_start}+"
+                        f"{sub_end - sub_start} in {sub_in} length {sub_len}, whole {whole}); "
+                        f"1 s in {w['one_second']} (want {one})")
+    good = (job_ok and three_ok and f["constant_equal"] is True and proj <= 2 and trans <= 2
+            and len(f.get("project", [])) > 0 and len(f.get("windows", [])) == 4 and win_ok)
+    check("F3", good,
+          f"job {job} (length want {reach}); 3-argument form {f['three_jobs']} jobs, "
+          f"{f['three_problems']}; the constant twin's 3- and 4-argument jobs equal "
+          f"{f['constant_equal']}; MediaTranscript.project max |off| {proj}, "
+          f"Transcriber.project {trans} tick(s) against start + round½(S⁻¹(m − in)); "
+          + "; ".join(win_text))
+
+
+def f4(got):
+    clips, f = got["clips"], got["F4"]
+    if "error" in f:
+        check("F4", False, f["error"])
+        return
+    ramp = clips["ramped"]
+    seg, cseg = f["segment"], f["constant_segment"]
+    off = worst((s, seg["in"] + math.floor(s_of(t - seg["start"]))) for t, s in f["ramped"])
+    const = all(s == cseg["in"] + (t - cseg["start"]) * cseg["source_duration"]
+                // cseg["duration"] for t, s in f["constant"])
+    good = (seg["has_map"] is True and seg["start"] == ramp["start"] and seg["in"] == ramp["in"]
+            and abs(seg["source_duration"] - half_up(s_of(ramp["duration"]))) <= 1
+            and len(f["ramped"]) == ramp["duration"] // FRAME and off <= 1
+            and cseg["ramp"] is False and const and len(f["constant"]) > 0)
+    check("F4", good,
+          f"the ramp audio segment {seg}: sourceTick max |off| {off} tick(s) against "
+          f"in + ⌊S(t − start)⌋ over {len(f['ramped'])} frames; the constant segment {cseg} "
+          f"reads in + ⌊(t − start) × sd / d⌋ exactly {const}")
+
+
+def f5(got):
+    f = got["F5"]
+    times = {k: f.get(k) for k in ("source_seconds", "clip_seconds", "tick_seconds")}
+    good = (f.get("made") is True and f.get("points") == 100_000
+            and all(v is not None and v < F5_BOUND_S for v in times.values())
+            and f.get("breakpoints", 0) > 0 and f.get("breakpoints_wrong") == 0
+            and f.get("tick_wrong") == 0 and "tick_error" not in f)
+    check("F5", good,
+          f"100 000-point map made {f.get('made')} (checked in "
+          f"{(f.get('check_seconds') or 0):.3f} s); 100 000 source(atClip:) "
+          f"{times['source_seconds']}, 100 000 clip(atSource:) {times['clip_seconds']}, "
+          f"10 000 sourceTick {times['tick_seconds']} s (each under {F5_BOUND_S} s); "
+          f"{f.get('breakpoints')} breakpoints hit, {f.get('breakpoints_wrong')} inexact; "
+          f"sourceTick at breakpoints {f.get('tick_wrong')} wrong "
+          f"{f.get('tick_error', '')}; the probe's wall {got.get('wall', 0):.1f} s")
+
+
+def run_mapper(chosen):
+    wanted = [r for r in SR4_PROBE_ROWS if r in chosen]
+    if not wanted:
+        return
+    got, why = mapper_probe()
+    for name in wanted:
+        if got is None:
+            check(name, False, f"the mapper probe: {why}")
+            continue
+        try:
+            {"F1": f1, "F2": f2, "F3": f3, "F4": f4, "F5": f5}[name](got)
+        except Exception as error:
+            check(name, False, f"the row could not run: {type(error).__name__}: {error}")
+
+
+def media_clip(doc, path, at, length):
+    """`path` imported and added at `at` on the first track, cut to `length`;
+    (clip, media row)."""
+    media = doc.must("import_media", path=str(path))["media"]
+    track = doc.project()["tracks"][0]["id"]
+    clip = doc.must("add_clip", track=track, media=media, at=at)["new_clips"][0]
+    doc.must("trim_end", clip=clip, to=at + length)
+    row = next(m for m in doc.project()["media"] if m["id"] == media)
+    return clip, row
+
+
+def ramp_it(doc, clip, length=2 * SEC):
+    """The rows' ramp: an action at clip time 0 for `length`, linear, to ×2."""
+    action = doc.action(clip, 0, length)
+    doc.must("set_action_end", clip=clip, action=action, patch={"speed": 2})
+    return action
+
+
+def q4(client, state):
+    doc = Doc(client, "q4")
+    clip, _ = media_clip(doc, SILENCE_MOV, 0, 5 * SEC)
+    ramp_it(doc, clip)
+    placed = doc.clip(clip)
+    answer = None
+    deadline = time.monotonic() + 30
+    while True:
+        answer = doc.must("detect_silence", clips=[clip], mode="level", min_length=120_000)
+        if "pending_peaks" not in answer or time.monotonic() > deadline:
+            break
+        time.sleep(0.5)
+    doc.close()
+    pad = answer.get("padding", 0)
+    want = [[round(placed["start"] + s_inv(a * SEC - placed["source"].get("in", 0))) + pad,
+             round(placed["start"] + s_inv(b * SEC - placed["source"].get("in", 0))) - pad]
+            for a, b in ((2.0, 3.5), (6.0, 7.0))]
+    ranges = answer.get("ranges") or []
+    slack = Q4_BUCKET + FRAME
+    off = [max(abs(g[0] - w[0]), abs(g[1] - w[1])) for g, w in zip(ranges, want)]
+    good = ("pending_peaks" not in answer and len(ranges) == 2 and all(o <= slack for o in off))
+    check("Q4", good,
+          f"clip {placed['start']}+{placed['duration']} from in {placed['source'].get('in')}; "
+          f"ranges {ranges}, want {want} (padding {pad}); edges off {off} (≤ {slack}); "
+          f"mode {answer.get('mode')}, pending {answer.get('pending_peaks')}")
+
+
+def y1(client, state):
+    doc = Doc(client, "y1")
+    clip, _ = doc.av_clip(2 * SEC)
+    ramp_it(doc, clip, SEC)
+    doc.must("add_track")
+    project = doc.project()
+    own = doc.clip(clip)["track"]
+    second = next(t["id"] for t in project["tracks"] if t["id"] != own)
+    media = project["media"][0]["id"]
+    other = doc.must("add_clip", track=second, media=media, at=0)["new_clips"][0]
+    doc.must("trim_end", clip=other, to=2 * SEC)
+    sentence = f"clip {clip}: {SYNC_RAMPED}"
+    answers = {}
+    for anchor in (clip, other):
+        answers[anchor] = doc.call("sync_audio", clips=[clip, other], anchor=anchor)
+    doc.close()
+    good = all(not a["ok"] and sentence in a["error"] for a in answers.values())
+    check("Y1", good,
+          f"ramped clip {clip}, constant clip {other}: "
+          + "; ".join(f"anchor {k}: {'refused' if not v['ok'] else 'APPLIED'} "
+                      f"{v.get('error', v.get('reply'))!r:.300}" for k, v in answers.items())
+          + f"; want …{sentence!r}")
+
+
+APP_RUNNERS.update({"Q4": q4, "Y1": y1})
+
+
+def secrets():
+    """`transcript_proof.secret_folder()`'s shape: a 0700 folder holding 0600
+    `anthropic-key` and `assemblyai-key`, both the dummy."""
+    folder = WORK / "secrets"
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir(parents=True)
+    os.chmod(folder, 0o700)
+    for name in ("anthropic-key", "assemblyai-key"):
+        descriptor = os.open(folder / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w") as handle:
+            handle.write("proof-key\n")
+    return str(folder)
+
+
+def words_of(answer):
+    return [(w.get("text"), w.get("start"), w.get("end")) for w in answer.get("words") or []]
+
+
+def q1(client, aai, words, state):
+    import cloud_captions_proof as cloud
+    cloud.scenario(aai, disfluent_words=words)
+    doc = Doc(client, "q1")
+    state["q1"] = doc
+    clip, _ = media_clip(doc, SPEECH_MOV, SEC, 3 * SEC)
+    ramp_it(doc, clip)
+    doc.must("transcribe", engine="assemblyai", place=False)
+    doc.must("save_project")
+    placed = doc.clip(clip)
+    state["q1_clip"] = (clip, placed)
+    start, src, dur = placed["start"], placed["source"].get("in", 0), placed["duration"]
+    reach = half_up(s_of(dur))
+    want = []
+    for w in words:
+        m = w["start"] * 600
+        if src <= m < src + reach:
+            want.append((w["text"], placed_at(m, start, src, dur),
+                         placed_at(max(w["start"], w["end"]) * 600, start, src, dur)))
+    answer = doc.must("get_transcript", clip=clip)
+    got = words_of(answer)
+    texts = [g[0] for g in got] == [w[0] for w in want]
+    off = worst([(g[1], w[1]) for g, w in zip(got, want)] + [(g[2], w[2]) for g, w in zip(got, want)])
+    good = (answer.get("engine") == "assemblyai" and texts and len(got) == len(words)
+            and off <= 2 and start == SEC and dur == 3 * SEC and src == 0)
+    check("Q1", good,
+          f"clip {start}+{dur} in {src}, reads round(S(D)) {reach}; words {got}; want {want}; "
+          f"max |off| {off} tick(s)")
+
+
+def q2(client, aai, words, state):
+    import cloud_captions_proof as cloud
+    cloud.scenario(aai, disfluent_words=words)
+    doc = Doc(client, "q2")
+    media = doc.must("import_media", path=str(SPEECH_MOV))["media"]
+    track = doc.project()["tracks"][0]["id"]
+    clip = doc.must("add_clip", track=track, media=media, at=0)["new_clips"][0]
+    doc.must("set_speed", clip=clip, rate=1.5)
+    doc.must("transcribe", engine="assemblyai", place=False)
+    doc.must("save_project")
+    placed = doc.clip(clip)
+    want = words_of({"words": cloud.mapped(placed, words)})
+    got = words_of(doc.must("get_transcript", clip=clip))
+    doc.close()
+    check("Q2", bool(want) and got == want,
+          f"a ×{placed.get('speed')} clip {placed['start']}+{placed['duration']}: words {got}; "
+          f"want cloud.mapped {want}")
+
+
+def q3(client, aai, words, state):
+    import fillers_proof as fp
+    doc, got_clip = state.get("q1"), state.get("q1_clip")
+    if doc is None or got_clip is None:
+        check("Q3", False, "Q1 made no clip")
+        return
+    clip, placed = got_clip
+    start, src, dur = placed["start"], placed["source"].get("in", 0), placed["duration"]
+    reach = half_up(s_of(dur))
+    fps = doc.project()["canvas"]["fps"]
+    frame = SEC * fps[1] // fps[0]
+    grids = fp.tr9(words, src, src, reach, 1)
+    want, near = [], []
+    for _, grid, _ in grids:
+        a = start + s_inv(grid[0] - src)
+        b = start + s_inv(grid[1] - src)
+        edges = (fp.ceil_to(half_up(a), frame), fp.floor_to(half_up(b), frame))
+        if edges[1] > edges[0]:
+            want.append(list(edges))
+            near.append([min(x % frame, frame - x % frame) <= 2 for x in (a, b)])
+    answer = doc.must("detect_fillers", clips=[clip])
+    doc.close()
+    ranges = answer.get("ranges") or []
+    ok = len(ranges) == len(want)
+    for g, w, n in zip(ranges, want, near):
+        for k in range(2):
+            ok = ok and (g[k] == w[k] or (n[k] and abs(g[k] - w[k]) == frame))
+    fillers = answer.get("fillers") or [{}]
+    good = ok and bool(want) and fillers[0].get("words") == ["um,", "Uh", "er"]
+    check("Q3", good,
+          f"TR-9's grid {[g for _, g, _ in grids]} through S⁻¹ → {want} (an edge within 2 "
+          f"ticks of a frame boundary {near}); ranges {ranges}, fillers "
+          f"{[f.get('words') for f in answer.get('fillers') or []]}, dropped "
+          f"{answer.get('dropped')}")
+
+
+def run_cloud(binary, chosen):
+    """Q0–Q3 on a second owned instance with a dummy AssemblyAI key against the
+    fake, under the cloud instruments' lock."""
+    wanted = [r for r in SR4_CLOUD_ROWS if r in chosen]
+    if not wanted:
+        return
+    import cloud_captions_probe
+    import cloud_captions_proof as cloud
+    os.makedirs(cloud.WORK, exist_ok=True)
+    if not SPEECH_MOV.exists():
+        for name in wanted:
+            check(name, False, f"the fixture is missing: {SPEECH_MOV}")
+        return
+    lock, _, holder = cloud_captions_probe.hold_cloud_lock(1800)
+    if lock is None:
+        for name in wanted:
+            check(name, False, f"not run: the cloud instruments' lock is held by {holder}")
+        return
+    words = cloud.DISFLUENT_WORDS
+    log = WORK / "framejob-cloud.log"
+    state = {}
+    with contextlib.closing(lock), cloud_captions_probe.Fake("ramp") as aai:
+        launched = mcp.launch(str(binary), arguments=["-RCSecretFolder", secrets(),
+                                                      "-RCAssemblyAIEndpoint", aai.base],
+                              env=bounded.child_env(), log_path=str(log), timeout=CALL_BOUND)
+        up = launched.client is not None
+        try:
+            if up:
+                print(f"  cloud instance PID {launched.child.pid} at {launched.socket_path}",
+                      flush=True)
+            for name in [r for r in wanted if r != "Q0"]:
+                if not up:
+                    check(name, False, f"the app did not listen at {launched.socket_path}")
+                    continue
+                try:
+                    {"Q1": q1, "Q2": q2, "Q3": q3}[name](launched.client, aai, words, state)
+                except Exception as error:
+                    check(name, False,
+                          f"the row could not run: {type(error).__name__}: {error}")
+            if state.get("q1") is not None:
+                with contextlib.suppress(Exception):
+                    state["q1"].close()
+        finally:
+            launched.stop()
+            mcp.remove_scratch(launched.socket_path)
+    found = complaints(log)
+    if "Q0" in wanted:
+        check("Q0", up and found == [], f"listening {up}; complaints {found[:5]}")
+
+
 # ---- the run ---------------------------------------------------------------------
 
 
@@ -1012,8 +1524,10 @@ def complaints(log):
 
 
 def needs(name):
-    if name in SR2A_ROWS or name in SR3A_ROWS or name in SR3B_ROWS:
+    if name in SR2A_ROWS or name in SR3A_ROWS or name in SR3B_ROWS or name == "Y1":
         return [AV_MOV]
+    if name == "Q4":
+        return [SILENCE_MOV]
     if name == "X0":
         return []
     return [rs.FIXTURES / f for f in rs.FIXTURE_FILES.values()]
@@ -1030,7 +1544,7 @@ def run_app(binary, chosen, state):
                 check(name, False, f"the app did not listen at {launched.socket_path}")
         else:
             print(f"  instance PID {launched.child.pid} at {launched.socket_path}", flush=True)
-            for name in chosen:
+            for name in [n for n in chosen if n in APP_RUNNERS]:
                 missing = [p for p in needs(name) if not p.exists()]
                 if missing:
                     check(name, False, f"the fixture is missing: {missing[0]}")
@@ -1150,12 +1664,18 @@ def main():
     chosen = [r for r in ROWS[1:] if not args.only or r in args.only.split(",")]
     if any(r in SR2B_ROWS[1:] for r in chosen) and "X0" not in chosen:
         chosen.insert(0, "X0")
-    print(f"speed ramps SR2a/SR2b/SR3a/SR3b — set_action_end's speed, the rendered ramp "
-          f"audio, edits on a ramped clip and its rate scaled and carried — "
+    if any(r in SR4_CLOUD_ROWS[1:] for r in chosen) and "Q0" not in chosen:
+        chosen.insert(chosen.index(next(r for r in chosen if r in SR4_CLOUD_ROWS)), "Q0")
+    if "Q3" in chosen and "Q1" not in chosen:
+        chosen.insert(chosen.index("Q3"), "Q1")
+    print(f"speed ramps SR2a/SR2b/SR3a/SR3b/SR4 — set_action_end's speed, the rendered ramp "
+          f"audio, edits on a ramped clip, its rate scaled and carried, and Swift's mappers — "
           f"{binary}" + (f" — mutant {MUTANT}" if MUTANT else ""), flush=True)
     state = {}
     run_app(binary, chosen, state)
     run_probe(chosen, state)
+    run_mapper(chosen)
+    run_cloud(binary, chosen)
     scored = ["D0"] + chosen
     passed = sum(1 for name in scored if rows.get(name))
     print(f"{passed}/{len(scored)} in {time.monotonic() - started:.0f} s")

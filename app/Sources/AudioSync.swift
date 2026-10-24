@@ -200,6 +200,12 @@ enum AudioSync {
                             + "inside."))
                 continue
             }
+            // A ramp's rate changes over the clip, and the drift line reads
+            // one (spec §11 SR-20 (e)); the map is the snapshot's handle's.
+            if document.editedProject.sourceMap(id)?.ramped == true {
+                problems.append(Problem(clip: id, reason: AudioSync.ramped))
+                continue
+            }
             guard let segments = audio[id]?.sorted(by: { $0.start < $1.start }),
                   let first = segments.first
             else {

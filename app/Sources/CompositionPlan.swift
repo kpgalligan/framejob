@@ -49,12 +49,22 @@ struct PlanSpeedRamp: Codable, Equatable {
     let keepPitch: Bool
     let glide: [[Ticks]]
     let map: [[Ticks]]
+    /// `map` as a `SourceMap`, decoded and checked ONCE here at plan decode
+    /// (spec §11 SR-20 (c)), so `MediaPeaks.sourceTick` reads it per bucket
+    /// without re-checking; nil when the map fails the check. Not a coding
+    /// key: the coded form is the three keys above.
+    let source: SourceMap?
+
+    private enum CodingKeys: String, CodingKey {
+        case keepPitch, glide, map
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         keepPitch = c.lenient(.keepPitch, true)
         glide = c.lenient(.glide, [])
         map = c.lenient(.map, [])
+        source = SourceMap(ramped: true, points: map)
     }
 }
 

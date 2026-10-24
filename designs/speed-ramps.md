@@ -162,8 +162,20 @@ Each phase records the rules it builds in spec §11 as SR-n entries before its c
   `MediaTranscript.project`, `TranscriptReader` and `Transcriber+Jobs`. `detect_silence` and
   Normalize Clip already read plan segments: tested, not changed. Synchronize Audio refuses a
   ramped clip, mover or anchor, by name (its drift line assumes one rate).
+  *Amended by SR-20 (SR4):* the export answers `{"ramped", "map"}` — a ramped clip's plan ramp
+  map, a constant clip's two points — and a reader takes it only when `ramped`; `SourceMap` is the
+  one read-side interpolation, checked once at decode and binary-searched both ways; the readers
+  are the filmstrip and waveform (`TimelineView+SourceMap.swift`), `Transcriber.Job.ramp`
+  (`MediaTranscript.project`, `Transcriber.project`, `TranscriptReader.recognitionJob`,
+  `Transcriber+Jobs`, `FillerTranscription`) and `MediaPeaks.sourceTick`. `detect_silence` is
+  changed, not only tested: its plan segment is one ×1 segment over the slot, so `sourceTick` reads
+  the segment's ramp map; Normalize Clip is unchanged. The three-argument `Transcriber.jobs`
+  refuses a ramped clip.
 - **O — Captions.** Words made before a ramp edit are not re-timed by it, as `set_speed` does not
   re-time them today; captions regenerated after the edit follow the ramp (N).
+  *Amended by SR-20 (SR4):* "regenerated" is any caption, transcript, filler or silence answer made
+  after the edit, each through the clip's map (SR-20 (d), (g)); the person check of a ramped clip's
+  filmstrip and waveform is SR5's `docs/manual-checks.md` row (SR-20 (h)).
 - **P — The ×12 question (#190).** Asked when an edit takes a clip with sound from a peak rate at
   or below ×12 to above it; `set_action_end`'s, `set_action`'s and `remove_action`'s answers
   carry `audio_left_out` / `audio_note` when an agent's edit crosses.
@@ -1416,3 +1428,81 @@ M3, whose anchor the second fix sits beside, still is (now by both hold cases). 
 running past its clip's end, which SR5's rule Q must decide). The orchestrator applied
 `core/CLAUDE.md`'s module-map entries for `frame_grid.rs`, `edit_clip_timing.rs` (with the
 re-clamp after a hold), `speed_map.rs` and `evaluate.rs`.
+
+## SR4 — Swift's mappers (N, O)
+
+SR4 builds N and O. SR-20 (one core answer per clip, `rc_project_source_map`; a reader takes it
+only for a ramped clip; one read-side interpolation, checked once and binary-searched; Synchronize
+Audio refuses a ramp) and the Amended-by lines on rules N and O were recorded before the code. The
+design review's objection (a dense map, a point every 600 ticks, read per pixel column and per
+10 ms bucket, would be quadratic under a linear scan or a per-call check) is answered by SR-20
+(c): the map is checked once at decode and each reading binary-searches its pair, and F5 times
+it. SR4-0, the pure move that paid for the wrapper (`ReelTime`'s seconds conversions to
+`CoreValues.swift`, the op-schema reader to `ReelOpSchema.table(from:)`, `ReelCore.swift` 803 →
+774), landed alone as 05c889d.
+
+**What landed.**
+- Core: `Project::source_map` (`speed_segments.rs`): `{"ramped", "map"}` from `in` clamped into
+  the file — a ramped clip's `ramp_audio` map, a constant clip's `[[0, in], [D, in + length]]`;
+  `rc_project_source_map` (`ffi_query.rs`), its header entry after `rc_project_clip_state`, and
+  `ReelProject.sourceMap(_:)` (`ReelCore.swift`, memoised per handle and clip under its lock).
+- `SourceMap.swift`: the value, its decoder, the one check and the two binary-searched readings;
+  `SourceMaps`, how a reader is handed its handle's maps. `PlanSpeedRamp.source`
+  (`CompositionPlan.swift`) decodes each ramp segment's map once, with explicit `CodingKeys` so
+  the coded form is unchanged.
+- The readers: the filmstrip and the waveform through `TimelineView+SourceMap.swift`'s
+  map-aware `sourceTime` and the timeline's `sourceMaps` (set by `refreshTimeline` from
+  `document.editedProject`); `Transcriber.Job.ramp` (`Transcriber.swift`), set by
+  `Transcriber.jobs(for:in:urls:maps:)` and followed by `MediaTranscript.project`,
+  `Transcriber.project` and `TranscriptReader.recognitionJob` (its 2 s pad read as source), so
+  captions, `transcribe`, `detect_fillers`, `transcribe_for_fillers`, `get_transcript` and its
+  TR-13 window follow the map; every caller passes `document.editedProject.sourceMap`
+  (`FillerTranscription.jobs` gained `maps:`); the three-argument `jobs` keeps its signature and
+  refuses a ramped clip (SR-20 (f)). `MediaPeaks.sourceTick` reads a ramp segment's map, so
+  `detect_silence` and voice mode place a quiet span mid-ramp correctly — rule N's "tested, not
+  changed" amended. Normalize Clip is unchanged.
+- `AudioSync.read` refuses a ramped clip, mover or anchor, by `AudioSync.ramped`; one sentence
+  in `sync_audio`'s catalog prose.
+- Documents: spec §7.1, §7.2 (the export answers the ramp segment's map), §7.9a (`detect_silence`,
+  `detect_fillers`, `get_transcript`, `transcribe`, `sync_audio`), §7.10 (`speed_segments.rs`,
+  `ffi_query.rs`), the index's Lines cells; `tools/proof/README.md`'s SR4 section.
+- Tests: `core/tests/ramp_source_map.rs` (5, closed-form oracles in the file: a linear and an
+  `ease_in_out` ramp's map at in + round(S) on every breakpoint and equal to the plan's
+  `ramp.map`, a ×1.5 constant clip's two points, a reversed twin, a clip in a nest through
+  `rc_project_scoped` answering its unlifted map, NULL for a text clip, an unknown id and NULL);
+  the null sweep's `rc_project_source_map`; `ramp_mapper_probe.swift` and `ramp_proof.py`'s
+  F1–F5, Q0–Q4 and Y1.
+
+**Measured.** `cargo test --release --test ramp_source_map` 5/5; `model_tests null_safety` 1/1;
+`make lint` clean; `make typecheck` 0 errors, its 4 baseline warnings; `spec_index_proof.py`
+183/183. Debug `ramp_proof.py --only F1,F2,F3,F4,F5,Q0,Q1,Q2,Q3,Q4,Y1` 12/12 in 30 s. The eleven
+mutants, each applied alone, its rows run (the F rows from the edited tree; the app rows after
+`make app-debug`), then reverted, were each caught: M1 (`source_map`'s constant arm for a
+ramped clip) by `ramp_source_map.rs` (2 failures) and F1; M2 (`MediaTranscript.project`'s ramp
+arm skipped) by F3 (1 200 000 ticks off) and Q1; M3 (`Transcriber.project`'s) by F3; M4
+(`recognitionJob`'s) by F3; M5 (the ramp `sourceLength` left at `contentLength(of:)`, 3 000 000
+against 5 400 000) by F3 and Q1 (welcome and back lost); M6 (the three-argument guard dropped) by
+F3; M7 (`sourceTick`'s arm skipped) by F4 (384 000 ticks off) and Q4 (198 461 ticks off); M8
+(`sourceTime` ignoring the map) by F2; M9 (Sync's refusal dropped) by Y1 — the clip is then
+refused only as "plays at ×1.75"; M10 (linear scans in `SourceMap`) and M11 (`sourceTick`
+building a `SourceMap` per call) by the 60 s wall (F1–F5, and F4–F5). `make gate` **PASS** in
+374 s (names 1 s, typecheck 20 s, fmt 7 s, lint 12 s, test 219 s, app 114 s).
+`env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py`: **35/35 in
+162 s**, exit 0 — F1 2 002 points, 0 ticks off, equal to the plan's map; F2 150 frames, 0 off;
+F3 the job (in 300 000, length 5 400 000), both projections ≤ 1 tick off, every window equal to
+the oracle; F4 0 off; F5 100 000 lookups in 0.10 s and 0.11 s and 10 000 `sourceTick` in
+0.015 s, every breakpoint exact; Q1 eight words, 0 ticks off; Q2 exactly `mapped`; Q3
+[[1640000, 1780000]]; Q4 [[960000, 1280000], [2160000, 2340000]] against [[938461, 1290000],
+[2160000, 2340000]], 21 539 ticks the worst edge (a bucket and a frame is 26 000); Y1 refused
+with either anchor; every SR2a–SR3b row as before (E1 70/70 at +0.000 ms, L1 71/71 max 8.55 ms,
+L2 23/23 max 5.54, L3 35/35 max 21.47, R1 70/70 at −0.010, W1 2.3 s, U1 as the baseline, P1 m1
+−86.333 ms, T1 1 640 000); D0 and Q0 no `Frame Job: ` in either log. Release
+`transcript_proof.py` 23/23, `fillers_proof.py` 17/17; `source_mirror_probe.py` 40/40. Every
+instance was the proof's own and stopped itself.
+
+**Owed.** SR5 (P, Q), and with it SR-20 (h)'s person check — a ramped clip's filmstrip and
+waveform look right — as a `docs/manual-checks.md` row, since no UI makes a ramp before SR5.
+The orchestrator applied the map entries in `core/CLAUDE.md` (`speed_segments.rs`, the `ffi.rs`
+group) and `app/CLAUDE.md` (`ReelCore.swift`, `SourceMap.swift` with
+`TimelineView+SourceMap.swift`, `MediaPeaks`, `CompositionPlan.swift`, `MediaTranscript.swift`,
+`AudioSync.swift`; `CoreValues.swift` and `ReelOpSchema.swift` with SR4-0's toll, 05c889d).

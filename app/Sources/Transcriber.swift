@@ -69,6 +69,20 @@ final class Transcriber {
         let start: Ticks
         let duration: Ticks
         let speed: Double
+        /// A RAMPED clip's map (spec §11 SR-20 (d)): every word is placed
+        /// through it rather than at `speed`, which stays the base rate.
+        /// nil for every constant clip, whose arithmetic is unchanged.
+        /// Declared last, so every memberwise call without it compiles.
+        var ramp: Ramp? = nil
+
+        /// A ramped clip's source map and the project tick its clip starts
+        /// at, which a windowed sub-job (`TranscriptReader.recognitionJob`)
+        /// keeps though its own `start` moves: the map's clip ticks count
+        /// from the CLIP's first tick.
+        struct Ramp: Equatable {
+            let map: SourceMap
+            let clipStart: Ticks
+        }
     }
 
     /// What a whole run produced.
@@ -337,7 +351,16 @@ final class Transcriber {
     /// with no source-window term left. Clamped into the clip through
     /// `placed` — the one door both caption mappings convert through, and
     /// the place R6-10's bound on a hand-written `speed` is applied.
+    ///
+    /// A ramped job (spec §11 SR-20 (d)) reads its extract's second as the
+    /// source tick `sourceIn + t × 600 000` and places it through the map.
     static func project(_ t: Double, in job: Job) -> Ticks {
+        if let ramp = job.ramp {
+            let source = Double(job.sourceIn) + max(0, t) * Double(ReelTime.perSecond)
+            return placed(
+                offset: Double(ramp.clipStart - job.start) + ramp.map.clip(atSource: source),
+                in: job)
+        }
         let speed = job.speed.isFinite && job.speed > 0 ? job.speed : 1
         return placed(offset: max(0, t) / speed * Double(ReelTime.perSecond), in: job)
     }

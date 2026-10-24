@@ -239,7 +239,9 @@ extension AgentServer {
         let snapshot = document.editedProject.snapshot
         let named = try optionalClipsArg(a, "clips", document)
         let clips = named.map { ids in ids.compactMap { snapshot.clip($0) } } ?? snapshot.clips
-        let outcome = Transcriber.jobs(for: clips, in: snapshot, urls: document.mediaURLs())
+        let outcome = Transcriber.jobs(
+            for: clips, in: snapshot, urls: document.mediaURLs(),
+            maps: document.editedProject.sourceMap)
         // An unnamed scope is every clip in the project, and most of them are
         // legitimately not speech — listing "clip 3: its source is not a media
         // file" for a whole timeline would bury the one entry that matters.

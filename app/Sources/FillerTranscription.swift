@@ -37,15 +37,17 @@ enum FillerTranscription {
 
     /// `Transcriber.jobs` over the snapshot's clips that play `media`; the
     /// clips it refuses (a reversed one, one whose audio is off, a missing
-    /// file) are left out, as a caption run leaves them.
+    /// file) are left out, as a caption run leaves them. `maps` are the
+    /// source maps of the snapshot's handle, so a ramped clip's job follows
+    /// its map (spec §11 SR-20 (d)).
     static func jobs(
-        for media: UInt32, in snapshot: ProjectSnapshot, urls: [UInt32: URL]
+        for media: UInt32, in snapshot: ProjectSnapshot, urls: [UInt32: URL], maps: SourceMaps
     ) -> [Transcriber.Job] {
         let clips = snapshot.clips.filter { clip in
             guard case .media(let id, _, _) = clip.source else { return false }
             return id == media
         }
-        return Transcriber.jobs(for: clips, in: snapshot, urls: urls).jobs
+        return Transcriber.jobs(for: clips, in: snapshot, urls: urls, maps: maps).jobs
     }
 
     /// What one press would upload and cost, by `CloudEstimate`'s own rules

@@ -163,7 +163,14 @@ enum TranscriptReader {
     /// Its `sourceIn` is the padded start's own source time, so the extract
     /// still begins at the job's `in` point — `Transcriber.project`'s premise.
     /// The whole clip answers `job` itself.
+    ///
+    /// A RAMPED job (spec §11 SR-20 (d)) pads in SOURCE through its map: the
+    /// window's ends read as source ticks, widened by the pad, mapped back
+    /// (the start floored, the end ceiled, both clamped to the clip); the
+    /// sub-job's `sourceIn` and `sourceLength` are read off the map, its tail
+    /// as the constant arm's, and it carries the map unchanged.
     static func recognitionJob(_ job: Transcriber.Job, for window: Window) -> Transcriber.Job {
+        if let ramp = job.ramp { return recognitionJob(job, for: window, ramp: ramp) }
         let speed = job.speed.isFinite && job.speed > 0 ? job.speed : 1
         let pad = Ticks((recognitionPadSeconds * Double(ReelTime.perSecond) / speed).rounded(.up))
         let clipEnd = job.start + job.duration
@@ -178,6 +185,31 @@ enum TranscriptReader {
             clip: job.clip, media: job.media, name: job.name, source: job.source,
             sourceIn: sourceIn, sourceLength: sourceLength, start: start, duration: end - start,
             speed: job.speed)
+    }
+
+    /// `recognitionJob`'s ramp arm: the pad is source time, so it is applied
+    /// on the map's source column and read back through `clip(atSource:)`.
+    private static func recognitionJob(
+        _ job: Transcriber.Job, for window: Window, ramp: Transcriber.Job.Ramp
+    ) -> Transcriber.Job {
+        let map = ramp.map
+        let pad = recognitionPadSeconds * Double(ReelTime.perSecond)
+        let fromSource = map.source(atClip: Double(window.from - ramp.clipStart))
+        let toSource = map.source(atClip: Double(window.to - ramp.clipStart))
+        let lowClip = map.clip(atSource: fromSource - pad).rounded(.down)
+        let highClip = map.clip(atSource: toSource + pad).rounded(.up)
+        let clipEnd = job.start + job.duration
+        let start = max(job.start, ramp.clipStart + Ticks(lowClip))
+        let end = min(clipEnd, ramp.clipStart + Ticks(highClip))
+        if start == job.start && end == clipEnd { return job }
+        let sourceIn = Ticks(map.source(atClip: Double(start - ramp.clipStart)).rounded())
+        let sourceLength = end < clipEnd
+            ? Ticks(map.source(atClip: Double(end - ramp.clipStart)).rounded()) - sourceIn
+            : job.sourceIn + job.sourceLength - sourceIn
+        return Transcriber.Job(
+            clip: job.clip, media: job.media, name: job.name, source: job.source,
+            sourceIn: sourceIn, sourceLength: sourceLength, start: start, duration: end - start,
+            speed: job.speed, ramp: ramp)
     }
 
     // MARK: - The on-device run

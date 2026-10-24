@@ -47,7 +47,9 @@ extension AgentServer {
             let document = try self.target(a)
             let clip = try self.clipArg(a, "clip", document)
             let snapshot = document.editedProject.snapshot
-            let outcome = Transcriber.jobs(for: [clip], in: snapshot, urls: document.mediaURLs())
+            let outcome = Transcriber.jobs(
+                for: [clip], in: snapshot, urls: document.mediaURLs(),
+                maps: document.editedProject.sourceMap)
             guard let job = outcome.jobs.first else {
                 let reason = outcome.problems.first?.reason ?? "it plays no speech"
                 throw ToolError(message: "Clip \(clip.id) has no words to read: \(reason).")

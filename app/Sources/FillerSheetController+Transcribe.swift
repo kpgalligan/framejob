@@ -30,13 +30,16 @@ extension FillerSheetController {
         mediaRows = []
         runnable = []
         let snapshot = document?.editedProject.snapshot
+        let maps: SourceMaps = document?.editedProject.sourceMap ?? { _ in nil }
         let urls = document?.mediaURLs() ?? [:]
         var records: [UInt32: MediaSnapshot] = [:]
         for entry in snapshot?.media ?? [] { records[entry.id] = entry }
         let textWidth = sheetWidth - sheetInset * 2 - 120
         for media in input.needsTranscript {
             let jobs =
-                snapshot.map { FillerTranscription.jobs(for: media, in: $0, urls: urls) } ?? []
+                snapshot.map {
+                    FillerTranscription.jobs(for: media, in: $0, urls: urls, maps: maps)
+                } ?? []
             let name = NSTextField(labelWithString: records[media]?.name ?? "Media \(media)")
             name.font = DS.sans(13)
             name.textColor = DS.textStrong
@@ -155,7 +158,9 @@ extension FillerSheetController {
             return
         }
         let snapshot = document.editedProject.snapshot
-        let jobs = FillerTranscription.jobs(for: media, in: snapshot, urls: document.mediaURLs())
+        let jobs = FillerTranscription.jobs(
+            for: media, in: snapshot, urls: document.mediaURLs(),
+            maps: document.editedProject.sourceMap)
         guard !jobs.isEmpty else {
             NSSound.beep()
             return

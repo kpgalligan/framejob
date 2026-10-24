@@ -218,7 +218,7 @@ if let three = fixture(), let cache = three.document.cacheDirectory,
     var records: [UInt32: MediaSnapshot] = [:]
     for entry in snapshot.media { records[entry.id] = entry }
     let jobs = FillerTranscription.jobs(
-        for: three.media, in: snapshot, urls: three.document.mediaURLs())
+        for: three.media, in: snapshot, urls: three.document.mediaURLs(), maps: { _ in nil })
     let estimate = FillerTranscription.estimate(jobs: jobs, media: records, cacheDirectory: cache)
     let fate = estimate?.rows.first?.fate
     let line = estimate.map { CloudEstimate.describe($0, fps: snapshot.canvas.fps) } ?? "<nil>"
@@ -292,7 +292,8 @@ do {
                 id: 12, track: 2, start: 0, duration: 600_000,
                 source: .media(id: 2, in: 0, reversed: false)),
         ])
-    let jobs = FillerTranscription.jobs(for: 1, in: snapshot, urls: [1: speech, 2: speech])
+    let jobs = FillerTranscription.jobs(
+        for: 1, in: snapshot, urls: [1: speech, 2: speech], maps: { _ in nil })
     row("S5", jobs.map(\.clip) == [10] && jobs.allSatisfy { $0.media == 1 },
         "media 1's jobs: clips \(jobs.map(\.clip)) (want [10]: 11 is reversed, 12 plays media 2)")
 }

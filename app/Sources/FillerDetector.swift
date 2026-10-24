@@ -118,6 +118,7 @@ enum FillerDetector {
     static func read(from document: ProjectDocument, clips named: [UInt32]?) -> Input {
         let snapshot = document.editedProject.snapshot
         let urls = document.mediaURLs()
+        let maps = document.editedProject.sourceMap
         let scope: Scope
         let chosen: [ClipSnapshot]
         if let named {
@@ -126,7 +127,7 @@ enum FillerDetector {
             scope = .selected
         } else {
             let selected = snapshot.clips.filter { document.selection.contains($0.id) }
-            if !Transcriber.jobs(for: selected, in: snapshot, urls: urls).jobs.isEmpty {
+            if !Transcriber.jobs(for: selected, in: snapshot, urls: urls, maps: maps).jobs.isEmpty {
                 chosen = selected
                 scope = .selected
             } else {
@@ -135,7 +136,7 @@ enum FillerDetector {
             }
         }
         let (kept, locked) = onUnlockedTracks(chosen, in: snapshot)
-        let (jobs, problems) = Transcriber.jobs(for: kept, in: snapshot, urls: urls)
+        let (jobs, problems) = Transcriber.jobs(for: kept, in: snapshot, urls: urls, maps: maps)
         let cacheDirectory = document.cacheDirectory
 
         var clips: [ClipWords] = []
@@ -161,7 +162,8 @@ enum FillerDetector {
         if let cacheDirectory {
             let unlocked = onUnlockedTracks(snapshot.clips, in: snapshot).kept
             var files: [UInt32: MediaTranscript.File?] = [:]
-            for job in Transcriber.jobs(for: unlocked, in: snapshot, urls: urls).jobs {
+            let found = Transcriber.jobs(for: unlocked, in: snapshot, urls: urls, maps: maps)
+            for job in found.jobs {
                 if files[job.media] == nil {
                     files[job.media] = .some(
                         snapshot.media(job.media).flatMap {

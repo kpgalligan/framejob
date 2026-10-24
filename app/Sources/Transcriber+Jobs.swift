@@ -78,8 +78,26 @@ extension Transcriber {
     /// and `speed` on the track below, so asking the media would recognise one
     /// recording twice, place two identical cues at one time, and then report
     /// the pile-up it made as captions that had to be shortened.
+    ///
+    /// The three-argument form is the instrument door old trees' probes
+    /// build: it reads no map, so it refuses a clip whose speed ramps (spec
+    /// §11 SR-20 (f)) rather than place its words at one rate.
     static func jobs(
         for clips: [ClipSnapshot], in snapshot: ProjectSnapshot, urls: [UInt32: URL]
+    ) -> (jobs: [Job], problems: [CaptionLayout.Problem]) {
+        jobs(for: clips, in: snapshot, urls: urls, maps: { _ in nil })
+    }
+
+    /// `jobs(for:in:urls:)` with the source maps of the handle `snapshot`
+    /// came from (spec §11 SR-20 (d)): a clip whose map is RAMPED gets its
+    /// window from the map — `sourceIn` its first source tick, `sourceLength`
+    /// what it reads, held to `maxSourceTicks` — and carries the map in
+    /// `Job.ramp`; `speed` stays the base. A constant map, or none, is the
+    /// old job exactly. A clip whose actions name `end.speed` with no ramped
+    /// map is refused, by SR-20 (f)'s sentence.
+    static func jobs(
+        for clips: [ClipSnapshot], in snapshot: ProjectSnapshot, urls: [UInt32: URL],
+        maps: SourceMaps
     ) -> (jobs: [Job], problems: [CaptionLayout.Problem]) {
         var jobs: [Job] = []
         var problems: [CaptionLayout.Problem] = []
@@ -116,6 +134,23 @@ extension Transcriber {
             guard clip.speed.isFinite, clip.speed > 0, clip.duration > 0 else {
                 problems.append(
                     CaptionLayout.Problem(tag: tag, reason: "its speed or length is degenerate"))
+                continue
+            }
+            let map = maps(clip.id).flatMap { $0.ramped ? $0 : nil }
+            if map == nil, clip.actions.contains(where: { $0.end.speed != nil }) {
+                problems.append(
+                    CaptionLayout.Problem(
+                        tag: tag, reason: "its speed ramps, and no speed map was read for it"))
+                continue
+            }
+            if let map = map {
+                jobs.append(
+                    Job(
+                        clip: clip.id, media: media, name: snapshot.name(of: clip), source: url,
+                        sourceIn: min(max(0, map.sourceIn), maxSourceTicks),
+                        sourceLength: min(map.sourceLength, maxSourceTicks),
+                        start: clip.start, duration: clip.duration, speed: clip.speed,
+                        ramp: Job.Ramp(map: map, clipStart: clip.start)))
                 continue
             }
             jobs.append(
