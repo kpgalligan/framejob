@@ -74,7 +74,7 @@
 - Pure moves: `CompositionBuilder+Orientation.swift` (581 → 507), `CoreValues.swift` and `ReelOpSchema.swift` (`ReelCore.swift` 803 → 774), `InspectorLabels.swift` (`InspectorPane.swift` 737 → 491) (`designs/adr/app-file-history.md`).
 - No op, tool, menu item or key added; no export setting changed. One FFI export, `rc_project_source_map`.
 - Proofs and spikes: `tools/proof/ramp_spike/` (`ramp_spike.py`, `render_spike.py`, `ramp_spike_probe.swift`, its `README.md`; SR1–SR1e); `tools/proof/ramp_proof.py` (D0–D5, X0, E1, E2, N1, K1, R1, W1, U1, P1, L1–L3, T1, S1, V1–V3, C1, F1–F5, Q0–Q4, Y1, G1–G6, Z1, Z2, its `--baseline` and mutants), `ramp_mapper_probe.swift` (SR4), `ramp_ui_probe.swift` (SR5); `tools/proof/README.md`'s speed-ramps sections; the screen `designs/screens/10d-clip-speed-action.md` on `screens.py`'s `ramp` fixture.
-- Documents: spec §4.3a, §4.4, §5.2, §5.4, §5.6, §6 (`06b`, `06c`), §7.1, §7.2, §7.4, §7.8, §7.9a, §7.10 and §9; the README's Editing bullet.
+- Documents: spec §4.3b, §4.4, §5.2, §5.4, §5.6, §6 (`06b`, `06c`), §7.1, §7.2, §7.4, §7.8, §7.9a, §7.10 and §9; the README's Editing bullet.
 - Person checks, in `docs/manual-checks.md`'s "Speed ramps" section: RMP-1 (a ramp sounds right with Keep pitch off and on), RMP-2 (playback through a ramp looks smooth), RMP-3 (a ramped clip's filmstrip and waveform look right, SR-20 (h)), RMP-4 (the Speed section inside an action feels right).
 
 **Headline numbers** (Mac14,6, macOS 26.5.1; every run under `env -u RC_ASSEMBLYAI_KEY`, none `--live`, so nothing was spent).

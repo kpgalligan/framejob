@@ -8,9 +8,9 @@ through [`11-decisions/README.md`](11-decisions/README.md).
 **Never read the whole spec.** Read this index, then only the file for the section you need.
 For a decision, look its ID up in `11-decisions/README.md`, or grep this directory
 (`grep -rn "W-8 —" designs/spec/`). A file that grows past ~500 lines splits by subsection into
-lettered files that keep its number (§4.3 is `04.3a` and `04.3b`, §6 is `06a`, `06b` and `06c`, §7.9 is `07.9a`, `07.9b` and `07.9c`);
+lettered files that keep its number (§4.3 is `04.3a`, `04.3b` and `04.3c`, §5.2 is `05.2a` and `05.2b`, §6 is `06a`, `06b` and `06c`, §7.5 is `07.5a` and `07.5b`, §7.9 is `07.9a`, `07.9b` and `07.9c`);
 a citation of the bare number names them together, and this index gets their rows in the same
-change.
+change. Until #342 (2026-10-24) §4.3b was the Media, Document and Assistant tabs, now §4.3c; an older citation of §4.3b (in `archive/` or git history) means §4.3c.
 
 The Lines column is `wc -l`; the `11-decisions/` cell is that folder's total, its README
 included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
@@ -23,12 +23,14 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | **§4 — The regions in detail** | | |
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 25 | The toolbar. |
 | [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 171 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping, Show Ungraded and the scopes panel (its two slots, their sizes and the four scopes drawn). |
-| [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 523 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear; every video, audio, text and shape section. |
-| [`04.3b-inspector-media-document-assistant.md`](04.3b-inspector-media-document-assistant.md) | 225 | The inspector's Media tab (find band, rows, drags, Consolidate, import, generate and export captions), Document tab and Assistant tab. |
+| [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 141 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear, the note on the section list, and the controls the sections use (Rasterize's `OptionControls`). |
+| [`04.3b-inspector-clip-sections.md`](04.3b-inspector-clip-sections.md) | 385 | The Clip tab's sections: every video, audio, text and shape section. |
+| [`04.3c-inspector-media-document-assistant.md`](04.3c-inspector-media-document-assistant.md) | 225 | The inspector's Media tab (find band, rows, drags, Consolidate, import, generate and export captions), Document tab and Assistant tab. |
 | [`04.4-timeline.md`](04.4-timeline.md) | 214 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
-| [`05.2-project-schema.md`](05.2-project-schema.md) | 550 | The project JSON schema: every persisted field (format version 19). |
+| [`05.2a-project-schema-canvas-media-video.md`](05.2a-project-schema-canvas-media-video.md) | 369 | The project JSON schema (format version 27): what a patch means, the example document, `source`, `canvas`, `media[]`, `graphic`, an action end's graphic and speed, `enabled`, and every `video.*` field. |
+| [`05.2b-project-schema-audio-text-shape-tracks.md`](05.2b-project-schema-audio-text-shape-tracks.md) | 187 | The schema's `audio.*`, `text.*` and `shape.*` fields, `actions[].end` and `transition_in`, a clip's `name` and `label`, `tracks[].solo` and `matte`, `nests`, ids, and what is not in the model. |
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
 | [`05.4-actions.md`](05.4-actions.md) | 156 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
 | [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
@@ -43,7 +45,8 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 191 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 488 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 57 | The spec's Swift file map (app/CLAUDE.md is the live one). |
-| [`07.5-compositor.md`](07.5-compositor.md) | 524 | The Metal compositor's step 0 (per composition), passes, mattes, and transitions, and the scopes' tap (the shown set, the kernels, the counting rule). |
+| [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 204 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
+| [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 326 | The compositor's per-layer passes and pipelines, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 46 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 225 | `MediaImporter.probe`, the formats import accepts, the WebM/Matroska rewrap and its PQ copy's HDR10 fields, its copy's progress window, the copy's original, and the opt-in ffmpeg step's original and checked VP9 copy. |
 | [`07.8-export.md`](07.8-export.md) | 443 | Export: writers, formats, loudness, the queue, the wait for ramp audio. |
