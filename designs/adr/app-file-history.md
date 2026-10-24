@@ -419,7 +419,7 @@ Files that were split since the notes wrote them:
 | `MediaCacheFiles` | `MediaPeakBuckets.swift`, `MediaImporter+Peaks.swift` (#23) |
 | `Playback` | `Playback+Meter.swift`, `Playback+PreviewQuality.swift`, `Playback+Step.swift` (B21; `onMain`, B53), `Playback+Scope.swift` (B30) |
 | `ReelCore` | `RecipeSource.swift`, `TextPatch.swift`, `MediaDescriptor.swift`, `OpDictionaries.swift` (#190) |
-| `InspectorPane` | `InspectorSection.swift`, `InspectorSectionHeader.swift`, `InspectorSlider.swift`, `InspectorBinding+Writes.swift`, `InspectorNameField.swift` (#171), `InspectorRows.swift` (B87) |
+| `InspectorPane` | `InspectorSection.swift`, `InspectorSectionHeader.swift`, `InspectorSlider.swift`, `InspectorBinding+Writes.swift`, `InspectorNameField.swift` (#171), `InspectorRows.swift` (B87), `InspectorLabels.swift` (speed ramps SR5-0) |
 | `ClipPane` | `ClipSelectionHeader.swift`, `ClipPane+Timing.swift` |
 | `VideoPane` | `VideoPane+Obscure.swift`, `VideoPane+Speed.swift` (#190) |
 | `Transcriber` | `+Languages`, `+Jobs`, `+Extract`; `SpeechEngine.swift` |
@@ -630,9 +630,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
 - `InspectorPane.swift`: the precedents are `InspectorSection.swift`, `InspectorSlider.swift`,
   `InspectorBinding+Writes.swift` and `InspectorRows.swift` (issue batch B87 phase 3: `// MARK: -
   Row builders` through `changedRGBA`, a pure move gated alone before `inspectorRow(discrete:)`
-  and `graphicProps` landed). The next seam: the small labels and the multi-line text (`// MARK: -
-  Small labels`, `// MARK: - Multi-line text`: `InspectorRowLabel`, `InspectorMixedBadge`,
-  `InspectorTimecodeField`, `InspectorNoteLabel`, `InspectorTextArea`).
+  and `graphicProps` landed). Speed ramps SR5-0 paid the seam this entry named: the small labels
+  and the multi-line text (`// MARK: - Small labels` through `InspectorTextArea`:
+  `InspectorRowLabel`, `InspectorMixedBadge`, `InspectorTimecodeField`, `InspectorNoteLabel`,
+  `InspectorTextArea`) went verbatim to `InspectorLabels.swift`, a pure move gated alone before
+  the Speed section's action-aware Rate landed. `wc -l app/Sources/InspectorPane.swift`: 737
+  before, 491 after; `InspectorLabels.swift` is 250. The next seam: the pane (`// MARK: - Pane`,
+  `InspectorPaneView`).
 - `ExporterWriter.swift`: issue batch B92 paid the seam this entry named: the chapter half
   (`ExportChapter`, still at file scope, and `addChapters`, `pumpChapters`, `textFormat`,
   `chapterSamples(_:in:format:)` and `chapterSample`) went verbatim to

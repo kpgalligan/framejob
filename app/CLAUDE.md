@@ -779,6 +779,10 @@ the key map behind it.
   field is (spec §11 SH-3); its placeholder is kept off the cell, which draws
   it at rest and under an empty field editor, so the field editor draws none
   (#199).
+- `InspectorLabels.swift` — a pure move out of `InspectorPane.swift` (speed
+  ramps SR5-0): the small labels and fields every section uses,
+  `InspectorRowLabel`, `InspectorMixedBadge`, `InspectorTimecodeField`,
+  `InspectorNoteLabel` and `InspectorTextArea`.
 - `InspectorViewController.swift` (frozen: the tab strip, and the PINNED
   container between it and the scroll view that hosts a pane's
   `pinnedBlock`, one generation retired like the strip; the FOOT container
