@@ -22846,3 +22846,29 @@ make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/r
 | `make gate` | PASS 262 s (names, typecheck, test 146 s, app 108 s) |
 | `ramp_proof.py` (Release, after the gate) | **18/18 in 66 s**, exit 0 — K1, L1–L3 as Debug's to the hundredth; E1 70/70 +0.000 ms; R1 70/70 −0.010; W1 2.3 s; U1 as the baseline; P1 m1 −86.333 ms; no `Frame Job: ` in the log |
 | product mutants (Debug, `--only K1,L1,L2`) | PM1 `rateLeadFrames` 0: L1 max 33.58, L2 49.51 — caught; PM2 the rate read at n − L: L1 57/71 max 40.97, L2 max 60.33 — caught; PM3 glide spans routed to the restored hybrid: K1 inside 758.70 cents — caught |
+
+## Speed ramps SR3a — edits on a ramped clip (`ramp_proof.py` T1, S1; `core/tests/ramp_trim.rs`, `ramp_split.rs`, `ramp_freeze.rs`, `ramp_transition.rs`, `ramp_reversed.rs`, `ramp_nest.rs` and nine mutants; spec §11 SR-18; #111)
+
+SR3a of road map "speed-ramps": the trims, roll, slip, every splitter, freeze and the handle
+transition measure and move a ramped clip's window through its map. The rules are pinned by the
+core's six suites through the FFI against closed-form oracles; the proof drives two of them over
+MCP on AV.mov, its oracles from `get_project`'s media duration.
+
+- **T1** — a 2 s clip at in 0, `add_action` [0, 1 s), `set_action_end {speed: 2}`, then
+  `trim_end` to 10 s: the duration is snapped_down(1 s + (file − 1.5 s) / 2), the end S∞
+  reaches inside the file, and the end rate is kept.
+- **S1** — a 2 s clip at in 0, `add_action` [0, 2 s) (linear), `set_action_end {speed: 3}`,
+  then `split` at 1 s: the second half at in 900000 and ×2, the head's end ×2 and the tail's
+  ×3, the rates within 1e-9.
+
+```sh
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only T1,S1
+make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py
+```
+
+| Run (2026-10-24) | Result |
+|---|---|
+| Debug `--only T1,S1` | 3/3 in 2 s — T1 1 640 000 over 3 000 000 ticks; S1 (900000, ×2), head ×2, tail ×3 |
+| `make gate` | PASS 278 s (names, typecheck, fmt, lint, test 163 s, app 102 s) |
+| `ramp_proof.py` (Release, after the gate) | **20/20 in 89 s**, exit 0 — T1 and S1 as Debug's; every SR2a, SR2b and SR1d row as before; no `Frame Job: ` in the log |
+| core mutants M1–M9 (the six new suites) | each caught: M1 14 failures, M2 6, M3 2, M4 8, M5 6, M6 1, M7 1, M8 1, M9 5 |

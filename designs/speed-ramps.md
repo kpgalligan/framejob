@@ -132,6 +132,12 @@ Each phase records the rules it builds in spec §11 as SR-n entries before its c
   one re-eases from the cut as every property does, so the second half's out point moves. A
   splitter never refuses for it: when that out point would pass the media's end, the second
   half's end rate is lowered to the largest that fits.
+  *Amended by SR-18 (SR3a):* the first half does not end at the rate at the cut: its straddled
+  speed action's end rate is SOLVED (`head_end_rate`, R1's affine solve in closed form) so the
+  first half reads exactly S(cut) and the halves meet at `in + round(S(cut))` for every curve;
+  for `ease_out` and `ease_in_out` the rate steps at the cut. The second half is exact for
+  `linear` and `ease_out`, re-eased for `ease_in` and `ease_in_out`, and only those two are
+  lowered when they would pass the media's end.
 - **J — freeze_frame.** The still's `at` is `in + S(at − start)`.
 - **K — Trims, roll, slip.** Actions stay in clip time (the crate rule, `trim_start`'s doc).
   `trim_start` advances `in` by S(Δ) under the map before the edit, a head extension at the base
@@ -221,9 +227,14 @@ re-timing existing captions with a ramp edit.
   diagnostic and widens SR-15's risk line; SR-17 makes the instruments trim a corrected playback
   tap rather than zero-pad it (#335's artifact): `render_spike.py`'s PT1 and corrected playback,
   `ramp_proof.py`'s P1, selftest S22 and two mutants. No product behaviour changes.
-- **SR3 — edits on a ramped clip (F–M).** `source_window.rs`'s bounds and movers through the map,
-  split, freeze, trims, roll, slip, the handle transition, `set_speed`/`rate_stretch` scaling,
-  `detach_audio`, paste, relink, re-snap; a `core/tests/` suite per rule; spec §6.
+- **SR3a — edits on a ramped clip (F–K), SR-18.** `source_window.rs`'s bounds and movers through
+  the map (`time_for_source`, `source_read_by`, `source_advanced_through`, `front_edge_held`),
+  split, freeze, trims, roll, slip, the handle transition; a `core/tests/` suite per rule
+  (`ramp_reversed`, `ramp_nest`, `ramp_transition`, `ramp_split`, `ramp_freeze`, `ramp_trim`);
+  spec §6; `ramp_proof.py`'s T1 and S1.
+- **SR3b — edits on a ramped clip (L, M), SR-19.** `set_speed`/`rate_stretch` scaling the whole
+  profile, `detach_audio`, paste and `paste_attributes`, relink, re-snap; `ramp_scale.rs`,
+  `ramp_carry.rs`; spec §6.
 - **SR4 — Swift's mappers (N, O).** `rc_project_source_map` (Rust → header → `ReelCore.swift`),
   the filmstrip and waveform, transcripts, captions, `detect_fillers`, `get_transcript`,
   `detect_silence` checked, Synchronize Audio's refusal; proof rows added to `ramp_proof.py`.
@@ -1260,3 +1271,62 @@ tap offset was −21 ms, inside the 50 ms edge, so the Release run does not repr
 **Owed.** `app/CLAUDE.md` line 1181, `RampAudioRenderer+TimePitch.swift`'s row: "SR1e's to
 tighten" becomes "kept by SR-16" (agents edit no `CLAUDE.md`). #335 gains "the instruments trim,
 SR-17" (the orchestrator's, after the commit).
+
+## SR3a — edits on a ramped clip (F–K)
+
+SR3 is split in two: SR3a (this record) builds F–K, and SR3b builds L and M. SR-18 (the window
+measured through S, the head at the base rate, a split's halves meeting at S(cut)), SR-10's
+Amended-by line and rule I's Amended-by line were recorded before the code. The design review's
+objection (an eased split's head re-eased to the rate at the cut read past S(cut) and repeated
+1/3 s of footage at an `ease_out` join) is answered by SR-18 (e): the head's end rate is solved.
+
+**What landed.**
+- `core/src/speed_map.rs`: `SpeedMap::of_length` (the map run on past the clip's end, S∞; `of`
+  is it at the clip's duration), `time_for_source` (S∞⁻¹ floored, over a horizon past the file),
+  `head_end_rate` (r_from + (r_to − r_from)·E(c)/(c·E(1)), R1's affine solve in closed form);
+  `rate_at` gains its reader.
+- `core/src/source_window.rs`: the ramp arms of `source_length_on_timeline`,
+  `longest_duration_on_grid` and `latest_end_on_grid` (through `time_for_source`, gated on the
+  map, so constant clips take the old expressions); `source_read_by`, `source_advanced_through`
+  and `front_edge_held` (the bisection over grid positions from the asked edge back toward the
+  start); `window_of` and `overrun` moved here verbatim from `edit_action_speed.rs`.
+- `core/src/edit_action_speed.rs`: `largest_fitting_end_rate` factored out of R1, whose
+  sentences are unchanged (`ramp_door.rs` passes unedited).
+- Ops: `trim_start` and `roll` hold their front edge with `front_edge_held` and move `in` with
+  `source_advanced_through`; `split_clip` (every splitter) gives the second half
+  `in + round(S(cut))` and `rate_at(cut)`, sets the straddled head's `end.speed` to
+  `head_end_rate`, and lowers an `ease_in`/`ease_in_out` second half that would overrun to
+  `largest_fitting_end_rate`; `freeze_frame` holds `in + source_read_by`. `trim_end`, `slip`
+  and `add_transition` change no code: their bounds became ramp-aware.
+- Documents: spec §6 (`06b`) and `edit.rs`'s rows for `trim_start`, `trim_end`, `slip`, `roll`,
+  `split`, `freeze_frame` and `add_transition`; §7.10's `source_window.rs` and `speed_map.rs`
+  rows; `trim_start`'s catalog prose (one sentence, no schema change).
+- Tests: `ramp_trim.rs` (K, 8), `ramp_split.rs` (I, 10), `ramp_freeze.rs` (J, 1),
+  `ramp_transition.rs` (H, 2), `ramp_reversed.rs` (F, 2), `ramp_nest.rs` (G, 2), each against
+  closed-form oracles written in the file; `ramp_proof.py`'s T1 and S1.
+
+**Measured.** `cargo test --release` in `core/` passed with every existing suite unedited
+(`ramp_door.rs` 9 and `ramp_plan.rs` 11 among them). The nine mutants, each applied alone against
+the six new suites and reverted, were each caught: M1 (`source_read_by` at the base rate) 14
+failures — the joins, the freeze, the trims and roll; M2 (`time_for_source`'s horizon the clip's
+duration) 6 — `trim_end`, roll's predecessor, the tail handle, F and G; M3 (`front_edge_held`
+answering `to`) 2 — the shrink and the extension past the file; M4 (the second half's speed left
+at the base) 8; M5 (the head's `end.speed` not set) 6; M6 (the eased guard skipped) 1 — the
+×3 → ×1 `ease_in_out` lowered to ×0.75; M7 (the `linear`/`ease_out` exemption dropped) 1 — the
+linear straddle one tick over by rounding; M8 (the constant arm in `source_length_on_timeline`)
+1 — the tail handle; M9 (the head at `rate_at(cut)`) 5 — `ease_out`'s 2.25 against 2.5, the
+freeze and the `ease_in_out` head. `make typecheck`: 0 errors, its 4 baseline warnings.
+`spec_index_proof.py` 183/183. Debug `ramp_proof.py --only T1,S1` 3/3 in 2 s. `make gate`
+**PASS** in 278 s (names 1 s, typecheck 5 s, fmt 2 s, lint 5 s, test 163 s, app 102 s).
+`env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py`: **20/20 in
+89 s**, exit 0 — T1 1 640 000 over AV.mov's 3 000 000 ticks (snapped_down(1 s + 1.75 s)), the
+end rate kept; S1 the second half at in 900 000 and ×2, the head ending at ×2 and the tail at
+×3; every SR2a, SR2b and SR1d row as before (E1 70/70 at +0.000 ms, L1 71/71 max 8.55 ms, L2
+23/23 max 5.54, L3 35/35 max 21.47, R1 70/70 at −0.010, W1 2.2 s, U1 as the baseline, P1 m1
+−21.000 ms); D0 no `Frame Job: ` in the log. Every instance was the proof's own and stopped
+itself.
+
+**Owed.** SR3b (L, M). `core/CLAUDE.md`'s module map: the `source_window.rs` entry (the ramp
+arms, `source_read_by`, `source_advanced_through`, `front_edge_held`, `window_of`/`overrun`),
+the `speed_map.rs` entry (`of_length`, `time_for_source`, `head_end_rate`, `rate_at`'s reader)
+and the `edit_action_speed.rs` entry (`largest_fitting_end_rate`) — agents edit no `CLAUDE.md`.

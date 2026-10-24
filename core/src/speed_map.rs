@@ -159,16 +159,45 @@ fn ended_rate(base: f64, actions: &[&Action], t: Ticks) -> f64 {
     rate
 }
 
+/// S∞⁻¹, FLOORED: the latest clip tick t ≥ 0 at which the clip, read on
+/// past its end ([`SpeedMap::of_length`]), has read no more than `source`
+/// ticks of source. The map is built over a horizon of the clip's duration
+/// or its last speed action's end, whichever is later, plus
+/// `ceil(source / SPEED_MIN) + 1` — every rate is at least ×0.1, so S
+/// passes `source` before it (saturating). `None` when
+/// [`SpeedMap::of`] is.
+pub(crate) fn time_for_source(clip: &Clip, source: Ticks) -> Option<Ticks> {
+    let last_end = clip
+        .actions
+        .iter()
+        .filter(|a| end_speed(a).is_some())
+        .map(|a| a.start.saturating_add(a.duration))
+        .fold(clip.duration, Ticks::max);
+    // The cast saturates, so an absurd `source` reaches as far as a tick can.
+    let reach = (source.max(0) as f64 / SPEED_MIN).ceil() as Ticks;
+    let horizon = last_end.saturating_add(reach).saturating_add(1);
+    let map = SpeedMap::of_length(clip, horizon)?;
+    Some(map.time_at(source as f64))
+}
+
 impl SpeedMap {
     /// The clip's map, or `None` when it is not ramped ([`is_ramped`]) —
     /// so for every source but `media` — or its base speed is not a
     /// positive finite number.
     pub(crate) fn of(clip: &Clip) -> Option<SpeedMap> {
+        SpeedMap::of_length(clip, clip.duration)
+    }
+
+    /// The clip's map as if it ran `duration` long; `of(clip)` is
+    /// `of_length(clip, clip.duration)`. Past the clip's own end it reads
+    /// on with the clip's actions (spec §11 SR-18 (a)): an action running
+    /// past the end keeps ramping, otherwise the last rate holds.
+    pub(crate) fn of_length(clip: &Clip, duration: Ticks) -> Option<SpeedMap> {
         if !(is_ramped(clip) && clip.speed.is_finite() && clip.speed > 0.0) {
             return None;
         }
         let base = clip.speed;
-        let duration = clip.duration.max(0);
+        let duration = duration.max(0);
         let actions = ordered_actions(clip);
 
         let mut bounds: Vec<Ticks> = vec![0, duration];
@@ -287,16 +316,36 @@ impl SpeedMap {
         self.duration
     }
 
-    /// The rate at clip time `t`, `t` clamped to `[0, duration]`. No reader
-    /// yet: SR3's split takes the rate at the cut as the second half's base
-    /// (the road map's I).
-    #[allow(dead_code)]
+    /// The rate at clip time `t`, `t` clamped to `[0, duration]`. A split
+    /// takes the rate at the cut as the second half's base (spec §11
+    /// SR-18 (e)).
     pub(crate) fn rate_at(&self, t: Ticks) -> f64 {
         let t = t.clamp(0, self.duration);
         match self.index_at(t).and_then(|i| self.pieces.get(i)) {
             Some(piece) => piece.rate_at(t.min(piece.to())),
             None => self.base,
         }
+    }
+
+    /// The end rate at which `action`, cut to end at clip time `cut`, reads
+    /// by `cut` exactly the source this map reads by `cut` (spec §11 SR-18
+    /// (e)): `r_from + (r_to − r_from)·E(c)/(c·E(1))`, E the action's
+    /// curve's [`ease_integral`], `c = (cut − start)/duration`, `r_from`
+    /// the rate at the action's start and `r_to` its end rate — R1's affine
+    /// solve in closed form. Clamped to `SPEED_MIN`–`SPEED_MAX`. `None`
+    /// when the action names no speed or does not straddle `cut`
+    /// (`start < cut < start + duration`).
+    pub(crate) fn head_end_rate(&self, action: &Action, cut: Ticks) -> Option<f64> {
+        let to_rate = end_speed(action)?;
+        let end = action.start.saturating_add(action.duration);
+        if !(action.start < cut && cut < end) {
+            return None;
+        }
+        let c = cut.saturating_sub(action.start) as f64 / action.duration as f64;
+        let from_rate = self.rate_at(action.start);
+        let whole = ease_integral(action.curve, 1.0);
+        let rate = from_rate + (to_rate - from_rate) * ease_integral(action.curve, c) / (c * whole);
+        rate.is_finite().then(|| rate.clamp(SPEED_MIN, SPEED_MAX))
     }
 
     /// The greatest rate the clip reaches: every ease is monotone, so it is

@@ -91,11 +91,18 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   D4-5), `to < end − one frame`. A text clip's `text.words` are rebased by `to − start` — unlike its
   actions, because a word is anchored to speech that stays where it is on the timeline (§11 W-3). A
   graphic clip's `graphic.in` advances by `to − start` — no speed and no head bound, so a start can
-  be dragged to 0 and `in` saturates at 0 (§11 G-9).
+  be dragged to 0 and `in` saturates at 0 (§11 G-9). On a RAMPED clip (a media clip with a speed
+  action) the speed actions stay in clip time: `in` advances by round(S(to − start)) moving in and
+  moves back at the base rate moving out, and when the clip would then read past its file the edge
+  is held at a fitting frame between `to` and the clip's current start, found by bisection on the
+  frame grid — not necessarily the fitting frame nearest `to`, as the fit is not monotone (§11 SR-18
+  (c)).
 - **`trim_end {clip, to}`** — New end `to`; clamps to the source's remaining length (`media`
   sources), snapped DOWN to a whole frame so the clamp cannot put the end past the file (§11), and
   `> start`. A graphic's `length` is untouched: `null` keeps ending with the clip, a number stays
-  (§11 G-9).
+  (§11 G-9). On a ramped clip the remaining length is read through S∞ — its map run on past the end,
+  an action past it still ramping, else the last rate held — and its speed actions are untouched
+  (§11 SR-18 (a)).
 - **`rate_stretch {clip, to_end}`** — `speed = source_len / (to_end − start)`; duration follows.
   Media sources only — a non-media clip is an **error**, not a refusal, so an MCP caller gets a
   message it can correct from (the UI never offers it). The audio ceiling is `set_speed`'s: the
@@ -106,7 +113,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   material. Clamped so the window stays inside the media (`in ≥ 0`, `in + duration × speed ≤
   media.duration`), and a slip the clamps reduce to nothing refuses. A `still` moves its `at`
   instead — it has a source time if not a window. Any other source is an **error**, as
-  `rate_stretch` is. Actions are clip-relative and do not move.
+  `rate_stretch` is. Actions are clip-relative and do not move. On a ramped clip the delta is
+  converted at the base rate and the tail clamp is `in ≤ media.duration − S(duration)`; its speed
+  actions do not move (§11 SR-18 (d)).
 - **`roll {clip, to}`** — Moves a hard cut: this clip's start and its predecessor's end both become
   `to`, and nothing else moves — the pair's outer edges and its total length are invariants. The
   predecessor is the clip on the same track ending EXACTLY at this one's start; with a gap or an
@@ -115,7 +124,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   source head, and the predecessor's remaining source. Front-trim semantics here (`in` follows), a
   plain end trim there. This clip's `text.words` are rebased by the move, as `trim_start` rebases
   them (§11 W-3), and its `graphic.in` advances by the move as `trim_start`'s does; the
-  predecessor's `length` is untouched (§11 G-9).
+  predecessor's `length` is untouched (§11 G-9). Ramped clips keep their speed actions in clip time:
+  this clip's `in` moves as `trim_start`'s does and the cut is held where it still fits its file,
+  and the predecessor's source is read through S∞ as `trim_end`'s is (§11 SR-18).
 - **`split {clips?, at}`** — Two clips. Second: `start = at`, `in += (at − start) × speed`, base
   props = the evaluated state at `at`. Actions before `at` stay with the first; after go to the
   second (start rebased); a straddling action becomes two — the first half's end patch is the
@@ -137,7 +148,14 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   and the second arrive again there. A `during` slot survives on both, since it is anchored to
   neither end, and restarts at each cut. Every splitter in the crate routes through this — `split`,
   `delete` and the two range cuts, `lift_range`, `insert_clip`, `overwrite_clip` and `freeze_frame`
-  — so the rule is stated once (`edit_split.rs`, §7.10). Refuses when `at` is not strictly inside.
+  — so the rule is stated once (`edit_split.rs`, §7.10). On a ramped clip the halves meet at the
+  source the clip read by the cut: the second half's `in` is `in + round(S(at − start))` and its
+  `speed` the rate at the cut; a straddled speed action's first half ends at the rate that reads
+  exactly that (solved, so for `ease_out` and `ease_in_out` the rate steps at the cut), and its
+  second half runs on to the original end rate along the original curve from the rate at the cut —
+  exact for `linear` and `ease_out`, re-eased for `ease_in` and `ease_in_out`, which alone are lowered
+  to the largest end rate that fits when they would read past the file (§11 SR-18 (e)). Refuses when
+  `at` is not strictly inside.
   **Omitting** `clips` — not passing a flag — means every unlocked clip `at` is strictly inside, the
   ⌘T-with-no-selection case.
 - **`delete {clips}`** — Removes; gaps stay.
@@ -193,7 +211,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   props, LESS its `video.motion` (format version 8): a still is a new clip with new ends, so one
   taken mid-arrival would otherwise arrive again and one taken anywhere would carry a departure onto
   a frame that is meant to hold. The placement it keeps is the un-moved one, since evaluation never
-  applies a preset, so a freeze taken mid-motion jumps to where the inspector said the clip was.
+  applies a preset, so a freeze taken mid-motion jumps to where the inspector said the clip was. On
+  a ramped clip the still's source time is `in + round(S(at − start))`, the tick the split's halves
+  meet at, and the speed actions divide as `split`'s do (§11 SR-18 (f)).
   Media sources only, an **error** on any other kind (as `rate_stretch`).
 - **`detach_audio {clip}`** — `enabled.audio = false` on the clip; a new clip with `enabled =
   {video: false, audio: true}`, same source/in/duration/speed and the audio props, on the track
@@ -376,7 +396,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   move with it, as do its `text.words` (§11 W-3) — where `trim_start` deliberately leaves actions
   alone, because a transition reveals material in front of a first frame nobody asked to move. A
   graphic's own `in` moves back by the extension too, saturating at 0 (UNBOUNDED like a still;
-  §11 G-18·a).
+  §11 G-18·a). A ramped incoming clip's head is read at its base rate and its speed actions move
+  with its first frame, so its out point stays; a ramped outgoing clip's tail is read through S∞
+  (§11 SR-18 (a), (b)).
   `kind` absent uses the clip's own stored kind if it has one, else `cross_dissolve`; a stored
   transition keeps its style and a new one is minted. **Error** for a non-positive duration, an
   unknown clip, and for not being at a hard cut — naming which of: no predecessor, a gap, an overlap

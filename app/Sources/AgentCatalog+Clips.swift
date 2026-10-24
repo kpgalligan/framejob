@@ -241,7 +241,9 @@ extension AgentServer {
                 "Moves a clip's START to `to`, keeping the content in place: the source "
                     + "in-point advances by the same amount, so nothing after the new start "
                     + "shifts. Clamped by the source's own beginning and by the clip's end (a "
-                    + "clip is at least one frame long).",
+                    + "clip is at least one frame long). On a clip with a speed ramp the ramp "
+                    + "stays where it is in the clip, so what plays after the new start can "
+                    + "change, and the start is held where the clip still fits its media.",
                 ["clip": clipDescription, "to": "New start, \(ticks)"]),
             opTool(
                 "trim_end",

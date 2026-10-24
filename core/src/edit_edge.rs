@@ -26,7 +26,7 @@ use crate::model::{Project, Source};
 use crate::model_words::rebase_words;
 use crate::outcome::Outcome;
 use crate::recipe_graphic::graphic_advanced;
-use crate::source_window::{source_advanced, timeline_to_source};
+use crate::source_window::{source_advanced_through, timeline_to_source};
 use crate::time::Ticks;
 
 impl Project {
@@ -41,7 +41,10 @@ impl Project {
     ///
     /// Clamped so the window stays inside the media — `in ≥ 0` at the head,
     /// `in + duration × speed ≤ media.duration` at the tail — and a slip
-    /// the clamps reduce to nothing is an identity.
+    /// the clamps reduce to nothing is an identity. On a RAMPED clip the
+    /// delta is converted at the base rate and the tail clamp is
+    /// `file − S(D)` (`last_in_point` reads S); the actions do not move
+    /// (spec §11 SR-18 (d)).
     ///
     /// A `still` has one source TIME rather than a window, so it moves that
     /// instead, clamped inside the media the same way. Every other source
@@ -126,6 +129,11 @@ impl Project {
     /// clamps that cross — a cut with no legal position is not one this op
     /// can move.
     ///
+    /// On a RAMPED clip this clip's `in` advances through its map, and the
+    /// cut is held where it still fits its media (`front_edge_held`); the
+    /// predecessor's bound reads its map on past its end (spec §11 SR-18
+    /// (a), (c)).
+    ///
     /// Neither clip's outer edge moves, so the pair still abuts exactly and
     /// no transition can be gained; the actions on both are clip-relative
     /// and stay where they are, as they do for a trim. This clip's
@@ -169,16 +177,15 @@ impl Project {
             return Ok(Outcome::Identity);
         }
         let to = self.snapped(to).clamp(earliest, latest);
+        // A ramped target's front edge is held where it still fits its
+        // media, as `trim_start`'s is (spec §11 SR-18 (c)).
+        let to = self.front_edge_held(&target, to);
         if to == target.start {
             return Ok(Outcome::Identity);
         }
 
         let mut moved = target.clone();
-        moved.source = source_advanced(
-            &target.source,
-            to.saturating_sub(target.start),
-            target.speed,
-        );
+        moved.source = source_advanced_through(&target, to.saturating_sub(target.start));
         moved.graphic = graphic_advanced(target.graphic.as_ref(), to.saturating_sub(target.start));
         moved.start = to;
         moved.duration = clip_end(&target).saturating_sub(to);

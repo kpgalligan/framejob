@@ -63,24 +63,6 @@ fn thousandths(k: i64) -> f64 {
 }
 
 impl Project {
-    /// A media clip's `in` and its file's duration, or `None` for any other
-    /// source and an unknown media.
-    fn window_of(&self, clip: &Clip) -> Option<(Ticks, Ticks)> {
-        let Source::Media { media, r#in, .. } = &clip.source else {
-            return None;
-        };
-        Some((*r#in, self.media(*media)?.duration))
-    }
-
-    /// How many ticks past the end of its media `clip` reads, when it does.
-    fn overrun(&self, clip: &Clip) -> Option<Ticks> {
-        let (source_in, file) = self.window_of(clip)?;
-        let over = source_in
-            .saturating_add(self.content_length_in_source(clip))
-            .saturating_sub(file);
-        (over > 0).then_some(over)
-    }
-
     /// The latest clip END that fits: the clip's start plus S⁻¹ of what the
     /// file holds past `in`, snapped DOWN onto the grid, never before the
     /// start.
@@ -105,12 +87,17 @@ impl Project {
             .max(clip.start)
     }
 
-    /// R1 / R2: `after` is the clip with action `action` ending at `rate`
-    /// (already clamped). `None` when it fits.
-    pub(crate) fn end_rate_refusal(&self, after: &Clip, action: u32, rate: f64) -> Option<String> {
-        let over = self.overrun(after)?;
+    /// The largest end rate on the 0.001 grid, below `rate`, at which
+    /// action `action` of `after` reads inside its file: R1's solve, then
+    /// its step down. `None` when none down to ×0.1 does. Read by R1 and by
+    /// a split's second half (spec §11 SR-18 (e)).
+    pub(crate) fn largest_fitting_end_rate(
+        &self,
+        after: &Clip,
+        action: u32,
+        rate: f64,
+    ) -> Option<f64> {
         let (source_in, file) = self.window_of(after)?;
-        let clip = after.id;
         let fits = |x: f64| self.overrun(&ending_at(after, action, x)).is_none();
         // S(D) = α + β·x in the action's end rate x: read at two rates in
         // range, solved for the file's remainder.
@@ -127,23 +114,32 @@ impl Project {
             _ => None,
         };
         let floor = (SPEED_MIN * 1000.0).round() as i64;
-        if let Some(x) = solved.filter(|x| x.is_finite()) {
-            // Floored to 0.001, never at or above the rate that overran,
-            // then stepped down a thousandth until it fits. The millionth
-            // keeps a solve that lands a hair under an exact thousandth (×4
-            // read as 3.9999999) on it; the step down catches the rest.
-            let below = (rate * 1000.0).ceil() as i64 - 1;
-            let mut k = ((x * 1000.0 + 1e-6).floor() as i64).min(below).max(floor);
-            while k >= floor {
-                if fits(thousandths(k)) {
-                    return Some(format!(
-                        "ending action {action} at ×{rate} would read clip {clip} {over} ticks \
-                         past the end of its media; the largest end rate that fits is ×{}",
-                        thousandths(k)
-                    ));
-                }
-                k -= 1;
+        let x = solved.filter(|x| x.is_finite())?;
+        // Floored to 0.001, never at or above the rate that overran, then
+        // stepped down a thousandth until it fits. The millionth keeps a
+        // solve that lands a hair under an exact thousandth (×4 read as
+        // 3.9999999) on it; the step down catches the rest.
+        let below = (rate * 1000.0).ceil() as i64 - 1;
+        let mut k = ((x * 1000.0 + 1e-6).floor() as i64).min(below).max(floor);
+        while k >= floor {
+            if fits(thousandths(k)) {
+                return Some(thousandths(k));
             }
+            k -= 1;
+        }
+        None
+    }
+
+    /// R1 / R2: `after` is the clip with action `action` ending at `rate`
+    /// (already clamped). `None` when it fits.
+    pub(crate) fn end_rate_refusal(&self, after: &Clip, action: u32, rate: f64) -> Option<String> {
+        let over = self.overrun(after)?;
+        let clip = after.id;
+        if let Some(fitting) = self.largest_fitting_end_rate(after, action, rate) {
+            return Some(format!(
+                "ending action {action} at ×{rate} would read clip {clip} {over} ticks past the \
+                 end of its media; the largest end rate that fits is ×{fitting}"
+            ));
         }
         let end = self.latest_fitting_end(&ending_at(after, action, SPEED_MIN));
         Some(format!(

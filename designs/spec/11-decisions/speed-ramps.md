@@ -27,8 +27,10 @@ product switch it allows. SR-16, SR1e closed as measured on the owner's answer t
 STOP (2026-10-23), with SR-15's Amended-by line, and SR-17, the instrument rule that trims a
 corrected playback tap rather than zero-padding it, with SR-7's PT1 Amended-by line, were
 recorded in SR1e before its instrument code; SR1e has no measured run, so nothing pins this
-file's SHA-256 again. Later phases record their rules as new entries (SR-18 on) or as Amended-by
-lines before their code.
+file's SHA-256 again. SR3 is split in two: SR3a (the trims, roll, slip, the splitters, freeze and
+the handle transition, the road map's F–K) recorded SR-18 and SR-10's Amended-by line before its
+code; SR3b (L and M) follows. Later phases record their rules as new entries (SR-19 on) or as
+Amended-by lines before their code.
 
 **Stands, and nothing here re-litigates it:** SY-24 (the varispeed lead: a time-scaled segment
 on an `off` track reads its source 575 ticks earlier; ×1 untouched); SY-26 (one pitch name per
@@ -423,6 +425,10 @@ plan leaves the audio out, one pitch per plan audio track).
   - Risk accepted: a long ramp is many video segments (30 a second at 30 fps); until SR2b a
     ramped clip is silent; until SR3 an edit other than the action ops on a ramped clip uses the
     one-rate arithmetic.
+  - *Amended by SR-18 (SR3a):* the trims, `roll`, `slip`, every splitter, `freeze_frame` and
+    `add_transition`'s handles measure and move a ramped clip's window through S; until SR3b,
+    `set_speed`/`rate_stretch` scaling, `detach_audio`, `paste` and the re-snaps keep their
+    interim (SR-18 (h)).
 - **SR-11 — Keep pitch inside a ramp is a known limit until SR1d: the held spans keep pitch, the
   ramp spans glide like tape.** The owner's SR1c answer ("SR2 now, fix after").
   - The whole clip is rendered as ONE file. With keep pitch on, SR-8's arm renders the held
@@ -691,3 +697,53 @@ plan leaves the audio out, one pitch per plan audio track).
     reproduces the −86.333 ms case synthetically, and SR-14's text and SR1d's `results.json` stand
     as run.
   - Risk accepted: clicks in the trimmed span plus its edge go unscored.
+- **SR-18 — Edits on a ramped clip (SR3a): the window measured through S, the head at the base
+  rate, a split's halves meeting at S(cut).** The road map's F–K, as built; L and M are SR3b's.
+  - **(a) S∞.** Past a clip's end the map reads on with the clip's own actions: an action running
+    past the end keeps ramping, otherwise the last rate holds — H's "tail at its last rate". It is
+    how `trim_end`, `roll`'s predecessor and the tail handle measure (`source_length_on_timeline`,
+    `longest_duration_on_grid`, `latest_end_on_grid`). S∞ is monotone, so each is closed form
+    through `time_for_source` (S∞⁻¹, floored, over a horizon past the file).
+  - **(b) The head reads at the base rate.** `trim_start`'s extension, `roll`'s target and the
+    transition head all read at it (`source_head_on_timeline` is unchanged). `add_transition`
+    already rebases the incoming clip's actions by the head, so its out point stays.
+  - **(c) Trims and roll hold the out point's fit.** `trim_start` and `roll`'s target keep their
+    actions in clip time: `in` advances by round(S(Δ)) when the edge moves in, and moves back at
+    the base rate when it moves out (`source_advanced_through`). When the resulting out point
+    would pass the file, the edge clamps through `front_edge_held`: a bisection over the grid
+    positions from the asked edge back toward the clip's start, because the fit is not monotone
+    in the edge. A gesture clamps; it never refuses.
+  - **(d) `slip`** converts its delta at the base rate and clamps at `file − S(D)`. No code
+    changes.
+  - **(e) `split`, and every splitter: the halves meet at in + round(S(cut)), for every curve.**
+    The second half's `in` is `in + round(S(cut))`, and its `speed` is `rate_at(cut)`. A
+    straddled speed action's head ends at the cut (an action never runs past its clip:
+    `add_action`/`set_action` refuse it, `frame_grid.rs` clamps it), keeps its curve, and its
+    `end.speed` is `head_end_rate(action, cut)` = r_from + (r_to − r_from)·E(c)/(c·E(1)), the
+    closed form of R1's affine solve, so the first half reads exactly S(cut). For `linear` and
+    `ease_in` that equals `rate_at(cut)`; for `ease_out` and `ease_in_out` the rate steps at the
+    cut from the head's end rate to the second half's `rate_at(cut)`: the source position is
+    continuous, the rate is not. The head's other end keys keep `narrow_to`'s value at the cut.
+    The tail keeps the original end and curve from `rate_at(cut)`: exact when the curve is
+    `linear` or `ease_out`; for `ease_in` and `ease_in_out` the second half's out point moves
+    (rule I's accepted re-ease). The head never overruns, because it reads exactly what the
+    original read by the cut. When the second half's straddled speed action is `ease_in` or
+    `ease_in_out` and the second half would overrun, that action's end rate is lowered to
+    `largest_fitting_end_rate` (R1's solve and step down); when none fits it is left as is (the
+    plan's clamp holds it). A `linear` or `ease_out` tail is never lowered, because its rounding
+    is the constant clip's ±1 tick. No splitter gains a refusal.
+  - **(f) `freeze_frame`'s** still `at` is `in + round(S(at − start))`: the join tick of (e), the
+    frame the first half ends on and the second half starts on.
+  - **(g) F and G are no case.** `in` and S are measured in play direction, and `scope` applies
+    the op unchanged.
+  - **(h) Interim until SR3b.** `relink_media`, the re-snaps and `set_speed`'s hold already read
+    the ramp-aware bound through `duration_resnapped` / `source_length_on_timeline`; L's profile
+    scaling and M's carry rules are SR3b's.
+  - **Why:** S is what the clip reads, so a bound that divides by one rate is wrong on every
+    ramped clip; the head has no actions in front of it to read; and a split whose halves met at
+    two different source ticks would play footage twice or skip it at an invisible join (the
+    objection's `ease_out` case repeated 1/3 s), which the owner's preference for precision rules
+    out — a rate step at the cut is the cheaper loss.
+  - Risk accepted: an `ease_out` or `ease_in_out` split steps the rate at the cut; an `ease_in` or
+    `ease_in_out` split moves the second half's out point; a `trim_start` that would read a
+    ramped clip past its file lands nearer its old start than asked.

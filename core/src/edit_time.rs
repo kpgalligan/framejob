@@ -28,7 +28,7 @@
 use crate::edit_clip::clip_end;
 use crate::model::{Clip, Enabled, Project, Source, VideoProps};
 use crate::outcome::Outcome;
-use crate::source_window::in_advanced;
+use crate::source_window::source_read_by;
 use crate::time::{Ticks, TIMESCALE};
 
 /// Default freeze length (spec §6). Two seconds is long enough for a hold
@@ -492,7 +492,10 @@ impl Project {
         };
 
         let clip_t = at.saturating_sub(target.start);
-        let source_at = in_advanced(r#in, clip_t, target.speed);
+        // The source the clip has read by the cut: through its map on a
+        // ramped clip, the tick a split's two halves meet at (spec §11
+        // SR-18 (f)).
+        let source_at = r#in.saturating_add(source_read_by(&target, clip_t)).max(0);
         // The clamp only has to keep the still's source time inside the
         // media, which is `source_window.rs`'s `last_still_time`; a media
         // the project does not have cannot bound anything.

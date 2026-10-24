@@ -5,7 +5,7 @@ use crate::model::{Action, Project, Source};
 use crate::model_words::rebase_words;
 use crate::outcome::Outcome;
 use crate::recipe_graphic::graphic_advanced;
-use crate::source_window::source_advanced;
+use crate::source_window::source_advanced_through;
 use crate::time::Ticks;
 
 /// Speed range, `SPEED_MIN`–`SPEED_MAX` (spec §4.3, §11 #190). Three
@@ -81,7 +81,11 @@ impl Project {
     /// D4-5) — and to leaving at least one frame of clip. Actions are
     /// deliberately left alone: clip-relative, rebasing would drop or bake
     /// whatever fell off the front, which is lossy and makes trimming back
-    /// out not an identity. `text.words` are the opposite, on purpose
+    /// out not an identity. On a RAMPED clip the actions keep their clip
+    /// time too, so `in` advances by round(S(Δ)) moving in and at the base
+    /// rate moving out, and the edge is held where the clip still fits its
+    /// media (`front_edge_held`, spec §11 SR-18 (c)): what plays after the
+    /// new start can change. `text.words` are the opposite, on purpose
     /// (spec §11, W-3): a word is anchored to speech that stays where it is
     /// on the timeline, so every word is rebased by the trim's delta and a
     /// word trimmed off the front keeps its (negative) time. A graphic's
@@ -96,6 +100,9 @@ impl Project {
         if let Some(earliest) = self.earliest_start_on_grid(&target) {
             to = to.max(earliest.max(0));
         }
+        // A ramped clip's edge is held where the clip still fits its media
+        // (spec §11 SR-18 (c)); a constant clip's is `to` as clamped.
+        let to = self.front_edge_held(&target, to);
         // The two clamps can cross when the source has almost nothing left
         // in front: then there is no legal new start, so nothing happens.
         if to > latest || to == target.start {
@@ -104,7 +111,7 @@ impl Project {
 
         let delta = to.saturating_sub(target.start);
         let mut moved = target.clone();
-        moved.source = source_advanced(&target.source, delta, target.speed);
+        moved.source = source_advanced_through(&target, delta);
         moved.start = to;
         moved.duration = end.saturating_sub(to);
         moved.graphic = graphic_advanced(target.graphic.as_ref(), delta);
@@ -119,8 +126,9 @@ impl Project {
     /// The source in point and the actions are untouched. The bound is
     /// `source_window.rs`'s `latest_end_on_grid`, measured at this clip's
     /// OWN start: the last frame at or before the end of the file, and
-    /// never the one past it (spec §11, #22 and D4-2). A graphic's `length`
-    /// is untouched: null follows the new end, a number stays (G-9).
+    /// never the one past it (spec §11, #22 and D4-2). A ramped clip's bound
+    /// reads its map on past the end (S∞, spec §11 SR-18 (a)). A graphic's
+    /// `length` is untouched: null follows the new end, a number stays (G-9).
     pub fn trim_end(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let earliest = target.start.saturating_add(self.frame());

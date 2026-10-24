@@ -184,6 +184,11 @@ governs a module now.
   how much lies either side of it, and the one way a source in point moves.
   `content_length_in_source` reads `speed_map.rs`'s map for a ramped clip
   (SR-10), so the one function still says how much source any clip reads.
+  On a ramped clip (SR-18) the tail readers go through `time_for_source`,
+  `in` moves by `source_read_by` / `source_advanced_through` (trims, roll,
+  split, freeze), `front_edge_held` bisects the front edge to a frame that
+  fits, and `window_of` / `overrun` (moved here from `edit_action_speed.rs`)
+  are the fit test.
   **Every name here carries its UNIT**, because the readers divide by a
   clip's speed where the movers multiply by it: `content_length_in_source`,
   `last_in_point` and `last_still_time` answer in SOURCE ticks;
@@ -481,15 +486,19 @@ governs a module now.
 - `speed_map.rs` — a media clip's SPEED MAP (speed ramps SR-10): the
   clip-time → source-time function its speed actions make (the ease
   integrals of `actions.rs`'s curves), `is_ramped` (media clips only),
-  `end_speed`'s clamp, `peak`, `source_at`; what `content_length_in_source`
-  reads for a ramped clip.
+  `end_speed`'s clamp, `peak`, `source_at`, `rate_at`; `of_length` (the
+  map over any horizon, reading on past the clip's end with its own
+  actions, SR-18 (a)), `time_for_source` (its inverse) and `head_end_rate`
+  (a split's straddled head re-solved so both halves meet at S(cut),
+  SR-18 (e)); what `content_length_in_source` reads for a ramped clip.
 - `speed_segments.rs` — the map cut into plan pieces: `Held` at one rate
   (an equal-rate action is held), `Ramp` one video segment per canvas
   frame, and the ramp audio map with a breakpoint every 600 ticks.
 - `edit_action_speed.rs` — `set_action_end`'s speed arm and the overrun
   refusals R1/R2/R3 for `set_action_end`, `set_action` and
   `remove_action`: a ramp that would read past the media's end is refused,
-  naming the largest end rate that fits (floored to 0.001).
+  naming the largest end rate that fits (floored to 0.001,
+  `largest_fitting_end_rate`, which split's eased tail also uses).
 - `edit_action_graphic.rs` — `set_action_end`'s graphic arm (G-34):
   `read_graphic_end` checks the patch's `graphic.props` (never the stored
   end's) against the op's `schema` through `check_typed` under

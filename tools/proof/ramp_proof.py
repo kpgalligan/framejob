@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Speed ramps SR2a, SR2b and SR1d (spec §11 SR-10, SR-2, SR-6, SR-12, SR-13,
-SR-15), against the built app: an action's `end.speed` through
+"""Speed ramps SR2a, SR2b, SR1d and SR3a (spec §11 SR-10, SR-2, SR-6, SR-12,
+SR-13, SR-15, SR-18), against the built app: an action's `end.speed` through
 `set_action_end` over MCP — the door, the slot rule's R1 sentence, the ×12
 answer, undo and redo (SR2a) — a ramped clip's rendered audio in the export
-and in playback (SR2b, #111), and Keep pitch inside a ramp kept and placed by
-SR-13's led rate-mode arm (SR1d: K1, L1–L3).
+and in playback (SR2b, #111), Keep pitch inside a ramp kept and placed by
+SR-13's led rate-mode arm (SR1d: K1, L1–L3), and `trim_end` and `split` on a
+ramped clip read through its map (SR3a: T1, S1).
 
     env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py [--only IDS]
     env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py --baseline
@@ -17,7 +18,7 @@ One owned instance (`mcp.launch` on `proof_app`'s app — Debug by default,
 wait), on a scratch socket, logging to `tools/proof/work/ramp/framejob.log`,
 stopped by its PID; nothing else is ever killed. Every project is written under
 `tools/proof/work/ramp/`, which each run empties, and closed once its row is
-scored. No row performs a menu item. SR2a's fixture is
+scored. No row performs a menu item. SR2a's and SR3a's fixture is
 `tools/proof/media/AV.mov` (5 s, 30 fps, 48 kHz sound); SR2b's are
 `ramp_spike.make_fixtures(False)`'s clicks and sine movies (20 s, 320 × 180,
 30 fps, frame i showing i in ten bars); a missing fixture is a scored FAIL.
@@ -107,6 +108,14 @@ P1  RV1 (exported once) and a ×1 control (6 s) saved and closed, then the
     `agreement(export, playback)` ok. Both corrected taps are trimmed, not
     zero-padded (`render_spike.place_corrected`, SR-17): a click outside the
     samples the tap carried is unobserved, not missed.
+T1  a 2 s AV.mov clip at in 0, `add_action` [0, 1 s), `set_action_end
+    {speed: 2}`, then `trim_end` to 10 s: the duration is snapped_down(1 s +
+    (file − 1.5 s) / 2), the end S∞ reaches inside the file, from
+    `get_project`'s media duration (SR-18 (a)); the end rate is kept.
+S1  a 2 s AV.mov clip at in 0, `add_action` [0, 2 s) (linear), `set_action_end
+    {speed: 3}`, then `split` at 1 s: the second half's `in` is 900000
+    (S(1 s) = 1.5 s) and its `speed` ×2, the head's end `speed` ×2 and the
+    tail's ×3, the rates within 1e-9 (SR-18 (e)).
 
 `--baseline` (before any SR2b app edit, on Release) builds CX1, CX2 and CK05
 and writes `tools/proof/work/ramp-baseline/baseline.json`: the commit and dirt
@@ -159,7 +168,8 @@ HOLD_S = 2
 W1_BOUND_S = 60
 SR2A_ROWS = ["D1", "D2", "D3", "D4", "D5"]
 SR2B_ROWS = ["X0", "U1", "E1", "E2", "N1", "K1", "L1", "L2", "L3", "R1", "W1", "P1"]
-ROWS = ["D0"] + SR2A_ROWS + SR2B_ROWS
+SR3A_ROWS = ["T1", "S1"]
+ROWS = ["D0"] + SR2A_ROWS + SR2B_ROWS + SR3A_ROWS
 # name: (rate, keep pitch or None for the default, length ticks)
 CONSTANTS = {"CX1": (1.0, None, 4 * SEC), "CX2": (2.0, False, 4 * SEC),
              "CK05": (0.5, True, 4 * SEC)}
@@ -387,6 +397,51 @@ def d5(client, state):
           and after_redo.get("speed") == 2,
           f"undo {undone.get('reply', undone.get('error'))!r:.80} → end {after_undo}; "
           f"redo {redone.get('reply', redone.get('error'))!r:.80} → end {after_redo}")
+    doc.close()
+
+
+# ---- SR3a ------------------------------------------------------------------------
+
+
+def t1(client, state):
+    doc = Doc(client, "t1")
+    clip, media = doc.av_clip(2 * SEC)
+    action = doc.action(clip, 0, SEC)
+    doc.must("set_action_end", clip=clip, action=action, patch={"speed": 2})
+    got = doc.call("trim_end", clip=clip, to=10 * SEC)
+    after = doc.clip(clip)
+    # S∞: 1.5 s by 1 s, then ×2 held, so the file's remainder is reached at
+    # 1 s + (file − 1.5 s) / 2, floored, the end snapped down onto the grid.
+    file = media["duration"]
+    reach = SEC + (file - 900_000) // 2
+    expected = (reach // FRAME) * FRAME
+    check("T1", got["ok"] and after["duration"] == expected
+          and after["actions"][0]["end"].get("speed") == 2,
+          f"media {file} ticks; trim_end {got.get('reply', got.get('error'))!r:.80}; "
+          f"duration {after['duration']} (expected {expected}); end {after['actions'][0]['end']}")
+    doc.close()
+
+
+def s1(client, state):
+    doc = Doc(client, "s1")
+    clip, _ = doc.av_clip(2 * SEC)
+    action = doc.action(clip, 0, 2 * SEC)
+    doc.must("set_action_end", clip=clip, action=action, patch={"speed": 3})
+    got = doc.call("split", clips=[clip], at=SEC)
+    project = doc.project()
+    first = next(c for c in project["clips"] if c["id"] == clip)
+    second = next((c for c in project["clips"] if c["start"] == SEC), None)
+    close = lambda a, b: a is not None and abs(a - b) < 1e-9  # noqa: E731
+    head = first["actions"][0]["end"].get("speed")
+    tail = second["actions"][0]["end"].get("speed") if second and second["actions"] else None
+    # Linear ×1 → ×3 over 2 s cut at 1 s: S(1 s) = 1 s + 2·2 s·⅛ = 1.5 s, ×2
+    # there; the head ends at ×2, the tail runs on from ×2 to ×3.
+    good = (got["ok"] and second is not None and second["source"].get("in") == 900_000
+            and close(second.get("speed"), 2.0) and close(head, 2.0) and close(tail, 3.0))
+    check("S1", good,
+          f"split {got.get('reply', got.get('error'))!r:.80}; second "
+          f"{None if second is None else (second['source'].get('in'), second.get('speed'))} "
+          f"(expected (900000, 2)); head end ×{head}, tail end ×{tail}")
     doc.close()
 
 
@@ -702,7 +757,7 @@ def p1_app(client, state):
 APP_RUNNERS = {"D1": d1, "D2": d2, "D3": d3, "D4": d4, "D5": d5, "X0": x0, "U1": u1, "E1": e1,
                "E2": e2, "N1": n1, "K1": k1, "R1": r1, "W1": w1,
                **{row: (lambda client, state, row=row: l_row(row, client)) for row in L_ROWS},
-               "P1": p1_app}
+               "P1": p1_app, "T1": t1, "S1": s1}
 
 
 # ---- SR2b: the probe's reads, after the instance stopped -------------------------
@@ -831,7 +886,7 @@ def complaints(log):
 
 
 def needs(name):
-    if name in SR2A_ROWS:
+    if name in SR2A_ROWS or name in SR3A_ROWS:
         return [AV_MOV]
     if name == "X0":
         return []
@@ -969,7 +1024,8 @@ def main():
     chosen = [r for r in ROWS[1:] if not args.only or r in args.only.split(",")]
     if any(r in SR2B_ROWS[1:] for r in chosen) and "X0" not in chosen:
         chosen.insert(0, "X0")
-    print(f"speed ramps SR2a/SR2b — set_action_end's speed and the rendered ramp audio — "
+    print(f"speed ramps SR2a/SR2b/SR3a — set_action_end's speed, the rendered ramp audio "
+          f"and edits on a ramped clip — "
           f"{binary}" + (f" — mutant {MUTANT}" if MUTANT else ""), flush=True)
     state = {}
     run_app(binary, chosen, state)

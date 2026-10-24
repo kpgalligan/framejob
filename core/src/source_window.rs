@@ -11,16 +11,33 @@
 //!   everything `timeline_to_source` produces. Timeline × speed.
 //! - **TIMELINE ticks** are a position or a length on the timeline —
 //!   `source_head_on_timeline`, `source_length_on_timeline`,
-//!   `longest_duration_on_grid`. Source ÷ speed, FLOORED, so a clip can
-//!   never outrun its source by a partial frame.
+//!   `longest_duration_on_grid`. Source ÷ speed on a constant clip,
+//!   FLOORED, so a clip can never outrun its source by a partial frame; a
+//!   RAMPED clip's reads S∞⁻¹ instead (below).
 //!
 //! The asymmetry was the hazard this module exists to remove: the three
 //! readers sat in `model_query.rs` with only their prose to say that one
 //! multiplied where the other two divided, and every caller that had to
 //! convert back wrote the multiplication out again — six copies of it
-//! (`archive/roadmap-7.md` §10.1). `in_advanced` is now the only
-//! one, and `source_advanced` is it applied to a whole [`Source`], which is
-//! what `trim_start`, `roll`, `split_clip` and `add_transition` each want.
+//! (`archive/roadmap-7.md` §10.1). For a constant clip `in_advanced` is
+//! now the only one, and `source_advanced` is it applied to a whole
+//! [`Source`], which is what `add_transition` wants; `trim_start`, `roll`,
+//! `split_clip` and `freeze_frame` go through `source_advanced_through`,
+//! which is the same number on a constant clip.
+//!
+//! **A ramped clip** (a media clip with a speed action, spec §11 SR-18) is
+//! measured through its speed map. The TIMELINE readers of a window's tail
+//! — `source_length_on_timeline`, `longest_duration_on_grid`,
+//! `latest_end_on_grid` — read S∞, the map run on past the clip's end,
+//! through `time_for_source` (SR-18 (a)); the head still reads at the base
+//! rate (SR-18 (b)). The mover is `source_read_by` — round(S(t)) for a `t`
+//! inside the clip, the base rate before its start — and
+//! `source_advanced_through` is it applied to a clip's [`Source`].
+//! `front_edge_held` is the front-edge clamp `trim_start` and `roll` share:
+//! a fitting frame between the asked edge and the clip's current start,
+//! found by bisection on the frame grid (SR-18 (c)). `window_of` and
+//! `overrun` are its fit test, a media clip's `in` and file length and how
+//! far past that file it reads.
 //!
 //! **Three answers, not two.** A measurement of a window is a
 //! [`SourceBound`], because `Option` meant two opposite things in two
@@ -60,9 +77,10 @@
 //! Nothing here edits: every function takes `&self` or a `&Source` and
 //! returns a value.
 
+use crate::edit_clip::clip_end;
 use crate::model::{Clip, Media, Project, Source};
-use crate::speed_map::SpeedMap;
-use crate::time::Ticks;
+use crate::speed_map::{time_for_source, SpeedMap};
+use crate::time::{frames_back, frames_between, Ticks};
 
 /// What a TIMELINE-tick measurement of a clip's source window answers.
 ///
@@ -172,7 +190,120 @@ pub(crate) fn source_advanced(source: &Source, timeline: Ticks, speed: f64) -> S
     }
 }
 
+/// SOURCE ticks a clip has read by clip time `timeline`, from its `in`:
+/// `round(S(t))` on a RAMPED clip for `t ≥ 0`, `t` clamped at the duration
+/// (spec §11 SR-18); [`timeline_to_source`] at the clip's base rate
+/// otherwise, and for a `t` before the clip's start, where nothing ramps
+/// (SR-18 (b)).
+pub(crate) fn source_read_by(clip: &Clip, timeline: Ticks) -> Ticks {
+    match SpeedMap::of(clip) {
+        Some(map) if timeline >= 0 => {
+            let read = map.source_at(timeline).round();
+            if read.is_finite() {
+                read as Ticks
+            } else {
+                0
+            }
+        }
+        _ => timeline_to_source(timeline, clip.speed),
+    }
+}
+
+/// `clip.source` with a media `in` advanced by [`source_read_by`], never
+/// below 0; every other source cloned, as [`source_advanced`] rules. On a
+/// constant clip the two are the same number.
+pub(crate) fn source_advanced_through(clip: &Clip, timeline: Ticks) -> Source {
+    match &clip.source {
+        Source::Media {
+            media,
+            r#in,
+            reversed,
+        } => Source::Media {
+            media: *media,
+            r#in: r#in.saturating_add(source_read_by(clip, timeline)).max(0),
+            reversed: *reversed,
+        },
+        other => other.clone(),
+    }
+}
+
+/// A RAMPED clip's TIMELINE ticks from `source_in` to the end of `media`,
+/// read through S∞ ([`time_for_source`], spec §11 SR-18 (a)); `None` for a
+/// constant clip, which takes [`available_on_timeline`].
+fn ramped_available_on_timeline(clip: &Clip, media: &Media, source_in: Ticks) -> Option<Ticks> {
+    time_for_source(clip, media.duration.saturating_sub(source_in).max(0))
+}
+
 impl Project {
+    /// A media clip's `in` and its file's duration, or `None` for any other
+    /// source and an unknown media.
+    pub(crate) fn window_of(&self, clip: &Clip) -> Option<(Ticks, Ticks)> {
+        let Source::Media { media, r#in, .. } = &clip.source else {
+            return None;
+        };
+        Some((*r#in, self.media(*media)?.duration))
+    }
+
+    /// How many ticks past the end of its media `clip` reads, when it does.
+    pub(crate) fn overrun(&self, clip: &Clip) -> Option<Ticks> {
+        let (source_in, file) = self.window_of(clip)?;
+        let over = source_in
+            .saturating_add(self.content_length_in_source(clip))
+            .saturating_sub(file);
+        (over > 0).then_some(over)
+    }
+
+    /// A front-edge TIMELINE position for `clip` asked to start at `to`
+    /// (spec §11 SR-18 (c)). `to` itself when the clip is constant, or when
+    /// its trial — the source through [`source_advanced_through`], start
+    /// `to`, its end kept, its actions unchanged — does not read past its
+    /// file. Otherwise a fitting frame between `to` and `clip.start`, found
+    /// by bisection on the frame grid, the start taken as fitting (the clip
+    /// as it stands): a frame that fits beside one nearer `to` that does
+    /// not, or `clip.start`. Because the fit is not monotone in the edge,
+    /// that frame is not necessarily the fitting frame nearest `to`. A
+    /// clamp because a gesture never refuses.
+    pub(crate) fn front_edge_held(&self, clip: &Clip, to: Ticks) -> Ticks {
+        if SpeedMap::of(clip).is_none() {
+            return to;
+        }
+        let end = clip_end(clip);
+        let fits = |position: Ticks| {
+            let mut trial = clip.clone();
+            trial.source = source_advanced_through(clip, position.saturating_sub(clip.start));
+            trial.start = position;
+            trial.duration = end.saturating_sub(position);
+            self.overrun(&trial).is_none()
+        };
+        if fits(to) {
+            return to;
+        }
+        let fps = self.canvas.fps;
+        // Whole grid frames from `to` to the start, and the direction to
+        // step them in: back toward an earlier start, forward toward a later.
+        let (frames, step) = if to > clip.start {
+            (frames_between(clip.start, to, fps), 1)
+        } else {
+            (frames_between(to, clip.start, fps), -1)
+        };
+        let at = |k: i64| frames_back(to, k.saturating_mul(step), fps);
+        // `lo` does not fit; `hi` does, `frames + 1` standing for the start.
+        let (mut lo, mut hi) = (0_i64, frames.max(0).saturating_add(1));
+        while hi - lo > 1 {
+            let mid = lo + (hi - lo) / 2;
+            if fits(at(mid)) {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        if hi > frames.max(0) {
+            clip.start
+        } else {
+            at(hi)
+        }
+    }
+
     /// The source material one clip shows, in SOURCE ticks: its timeline
     /// length times its speed. The same quantity `evaluate::segment_of`
     /// inserts into the composition — it reads this function, so a speed
@@ -241,6 +372,10 @@ impl Project {
         if !(clip.speed.is_finite() && clip.speed > 0.0) {
             return SourceBound::Unmeasured;
         }
+        // A RAMPED clip reads on through S∞ (spec §11 SR-18 (a)).
+        if let Some(available) = ramped_available_on_timeline(clip, media, source_in) {
+            return SourceBound::Timeline(available);
+        }
         SourceBound::Timeline(available_on_timeline(media, source_in, clip.speed))
     }
 
@@ -294,6 +429,11 @@ impl Project {
         let Some(media) = self.media(media_id) else {
             return SourceBound::Unmeasured;
         };
+        // A RAMPED clip's window through S∞ (spec §11 SR-18 (a)), snapped
+        // down from tick 0 as the constant reading is.
+        if let Some(available) = ramped_available_on_timeline(clip, media, source_in) {
+            return SourceBound::Timeline(self.snapped_down(available).max(0));
+        }
         self.longest_duration_on_grid_of(0, media, source_in, clip.speed)
     }
 
@@ -311,6 +451,12 @@ impl Project {
             _ => return None,
         };
         let media = self.media(media_id)?;
+        // A RAMPED clip's window through S∞ (spec §11 SR-18 (a)), its END
+        // snapped down from the clip's own start as the constant reading is.
+        if let Some(available) = ramped_available_on_timeline(clip, media, source_in) {
+            let end = self.snapped_down(clip.start.saturating_add(available));
+            return Some(end.max(clip.start));
+        }
         let bound = self
             .longest_duration_on_grid_of(clip.start, media, source_in, clip.speed)
             .or_unbounded()?;
