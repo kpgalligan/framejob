@@ -23001,3 +23001,58 @@ env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/screens.py --o
 | `screens.py --only 10-clip-clip-tab,10d-clip-speed-action` (Release) | 7/7, both screens light and dark with their expects, 0 new problems (P2 after listing `RCDevRampRenderHold` in `NOT_SHOWN`) |
 | existing probes, unedited | `speed_audio_probe.py` 18/18, `speed_limits_probe.py` 24 rows none failed, `speed_sheet_probe.py` 10/10, `clip_inspector4_proof.py` 46/46 |
 | mutants M1–M9 | each caught: M1 (`rateOps` ignoring the action) G1, G5; M2 (`speed(_:)` reading `clip.speed` only) G2 (B 1, playhead 1); M3 (the `.end` stored-rate preference dropped) G2 (past-end 2); M4 (`keys` without `speed`) G3; M5 (`mayCross` without `set_action_end`) G4; M6 (the note on `clip.speed`) G4; M7 (`paths(inPatch:)` skipping `speed`) G5; M8 (SR-22 reverted to `new_end > D`) `ramp_inspector.rs` 2 failures, Z1, Z2; M9 (`rate_in_force` answering `clip.speed`) `ramp_inspector.rs` 2 failures, G2 |
+
+## Issue #336 — an audio track whose only clip has no source (missing_audio_proof.py D0, X0, M1–M4, R1–R4, V0, K1, K2, P1, mutants MU1–MU3; spec §11 #336)
+
+**The fix case.** An audio track whose only clip has no source (its media file gone, or its
+reverse held pending) is nothing but empty edits in its composition track. Measured at 3aa92f7
+(`--baseline`, before any app edit), with no other track that sounds, `audio_wav` and
+`prores_422` both failed with "export: The operation could not be completed" (M1, M2, R1, R2),
+and so did a missing `AV.mov` alone (V0). Beside a track that sounds, both exports finished and
+matched that track alone (M3, M4, R3, R4). The fix (spec §11 #336,
+`CompositionBuilder+Silence.swift`): such a track holds the bundled `Silence.caf` (10 s of ALAC
+zeros, 48 kHz stereo) back to back over [0, its last segment's end), and every other track builds
+as before. **V0 was fixed by the silence**, so no placeholder change was needed and MU4 does not
+apply.
+
+Every M, R and K clip is at 12 s, so the timeline is 17 s. "Gone" is a fixture copy imported,
+placed and deleted; "pending" is `mixed_audio_proof.py`'s hold, an empty regular file at
+`<pkg>/cache/reversed` before `set_reversed`. C is toneB alone on track 1, and T is toneA and
+toneB on tracks 1 and 2. Each document's canvas is 640×360.
+
+- **D0** — the instance listens; no `Frame Job: ` line in its log.
+- **X0** — CONTROLs: an M document's and V0's `missing_media` is the copy's id; an R document's is
+  empty, and its `cache/reversed` is still a file after the exports; an R document's reverse sheet
+  closes through `cancel_sheet` (ending on `button: "Close"`, `sheet: null`); every
+  `close_project {discard: true}` succeeds.
+- **M1 / M2** — gone toneA alone, `audio_wav` / `prores_422` (the latter with a video stream):
+  done, every pcm_f32le sample 0.0, and frames ≥ C's frames − 1024 for the same preset.
+- **M3 / M4** — gone toneA beside toneB: PCM identical to C's over min(timeline, both lengths); M4
+  also has C's video md5.
+- **R1–R4** — M1–M4 with "pending" in place of "gone".
+- **V0** — a gone `AV.mov` alone at 0, `prores_422`: done, a video stream, all-zero audio, frames ≥
+  round(5 × 48000) − 1024.
+- **K1 / K2** — C's and T's `audio_wav` PCM, `prores_422` PCM and video md5 identical to
+  `work/missing-audio-baseline/` (written by `--baseline` at 3aa92f7).
+- **P1** — `play_preview {seconds: 2}` on M1's document moves ≥ 900 000 ticks.
+
+**The length is scored against control C, not the timeline** (owner, 2026-10-24). Every
+composition whose picture is the Blank placeholder exports one frame short of its timeline:
+814,400 frames for a 17 s timeline at 30 fps (−1600 frames). The shortfall is the same in C and T
+before and after the fix, and absent in V0, which has a video track. It is recorded on #337 and
+in #336's risk line, and reported (not scored) by every row.
+
+```sh
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/missing_audio_proof.py --baseline   # at 3aa92f7 only
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/missing_audio_proof.py --only X0,M1,M2,M3,M4,R1,R2,R3,R4,V0,K1,K2,P1
+make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/missing_audio_proof.py
+```
+
+| Run (2026-10-24) | Result |
+|---|---|
+| `--baseline` at 3aa92f7 (Debug) | 9/14 — M1, M2, R1, R2 and V0 failed "export: The operation could not be completed"; M3, M4, R3, R4, P1 (1 203 004 ticks), X0 16/16 and D0 passed; K1 and K2 wrote the baseline |
+| Debug, after the fix | 14/14 in 19 s — M1, M2, R1, R2 all zero at 814 400 frames (≥ C's 814 400 − 1024); V0 240 000 frames all zero; M3, M4, R3, R4 = C; K1, K2 = baseline; P1 903 289 ticks |
+| `mixed_audio_proof.py` (Debug, after the fix) | 22/22, missing-first and pending-first unchanged |
+| mutants MU1–MU3 (Debug) | each caught: MU1 (`fillSilence` false at its head) M1, M2, R1, R2, V0 fail "The operation could not be completed"; MU2 (`silentEnd` without the `sounding.isEmpty` guard) K1, K2 audio ≠ baseline; MU3 (the last, partial copy not inserted) M1 480 000 frames < 813 376 |
+| `make gate` | PASS 234 s (names 1 s, typecheck 5 s, fmt and lint skipped, test 119 s, app 108 s) |
+| `missing_audio_proof.py` (Release, after the gate) | **14/14 in 14 s**, exit 0 — M1, M2, R1, R2 all zero at 814 400 frames (≥ C's − 1024); V0 240 000 frames all zero with a video stream; M3, M4, R3, R4 = C; K1, K2 = the 3aa92f7 baseline; P1 906 455 ticks; X0 16/16; no `Frame Job: ` in its log |

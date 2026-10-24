@@ -1327,3 +1327,32 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   every proof that expected the file on return follows the job through
   `MCP.export_with` in `tools/proof/mcp.py`, which returns an older build's
   blocking answer as it is.
+- **#336 — A composition audio track none of whose segments has a source
+  (missing media, a pending reverse, a pending ramp render) holds bundled
+  silence over [0, its last segment's end).** Measured at 3aa92f7
+  (`tools/proof/missing_audio_proof.py --baseline`): with one audio track
+  whose only clip's media file is missing, or whose reverse is pending, and
+  no other track that sounds, both `audio_wav` and `prores_422` failed with
+  "export: The operation could not be completed" (M1, M2, R1, R2), as did a
+  missing `AV.mov` alone (V0); beside a track that sounds, both exports
+  finished and matched that track alone (M3, M4, R3, R4). A composition
+  audio track of nothing but empty edits is what the writer could not read.
+  The silence is `app/Resources/Silence.caf`, 10 s of ALAC zeros at 48 kHz
+  in two channels (spec §11 SY-23: an empty edit before a non-48 kHz segment
+  is rate-converted wrongly, so the silence is 48 kHz), inserted back to back
+  from 0 (`CompositionBuilder.fillSilence`, `CompositionBuilder+Silence.swift`)
+  and never scaled, the last copy cut at the end. The track's id, its input
+  parameters, its envelope, its onset (still nil, so no hold), its meter and
+  its `sounding` spans (still empty, so the meter counts nothing there) are
+  unchanged; only the empty edits become silent media. Every track with a
+  resolved segment builds byte for byte as before. Where the resource is
+  absent (the probes and the harness, which bundle no app resources), or its
+  extent is not numeric or floors to 0 ticks, the track keeps its empty
+  edits, as today. It applies to the preview and every export alike, through
+  `addAudioTracks`. **Risk accepted:** one edit per 10 s of such a track;
+  and the length is scored against the same project with its media present
+  (control C), not the timeline (owner, 2026-10-24): every composition whose
+  picture is the Blank placeholder exports one frame short of its timeline —
+  814,400 frames for a 17 s timeline at 30 fps, the same in C and T before
+  and after this change, and none short for a missing `AV.mov`, which has a
+  video track — a shortfall beside #337.

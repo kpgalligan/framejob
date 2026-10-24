@@ -425,9 +425,9 @@ enum CompositionBuilder {
     }
 
     /// **The one synchronous `timeRange` read in the app**, on `firstTrack`'s
-    /// terms: the deprecated getter stays, funnelled here so the placeholder
-    /// and `heldTail` cost one warning between them and not one each.
-    private static func timeRange(of track: AVAssetTrack) -> CMTimeRange {
+    /// terms: the deprecated getter stays, funnelled here so the placeholder,
+    /// `heldTail` and `fillSilence` cost one warning between them and not one each.
+    static func timeRange(of track: AVAssetTrack) -> CMTimeRange {
         track.timeRange
     }
 

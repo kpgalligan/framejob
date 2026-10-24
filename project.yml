@@ -32,6 +32,11 @@ targets:
       # track to tick against; the compositor never samples it.
       - path: app/Resources/Blank.mp4
         buildPhase: resources
+      # 10 s of ALAC digital silence, 48 kHz stereo (spec §11 #336). An audio
+      # track whose every clip has no source is nothing but empty edits, which
+      # an export cannot read; this fills it back to back with real silence.
+      - path: app/Resources/Silence.caf
+        buildPhase: resources
       - path: app/Resources/Shaders
         buildPhase: sources
     settings:

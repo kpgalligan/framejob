@@ -1236,7 +1236,10 @@ the key map behind it.
   key's options: BT.709 for the SDR version, BT.2020/PQ for HDR10, spec §11
   HD-14; +`InstructionRanges`, +`Orientation` (each source's orientation
   codes and the tracks an instruction needs, a pure move at the 600 cap,
-  SR2b), +`AudioTracks`,
+  SR2b), +`AudioTracks`, +`Silence` (an audio track none of whose segments
+  has a readable source, its media missing or its reverse pending, holds the
+  bundled `Silence.caf` copies back to back instead of empty edits, which
+  failed the export; spec §11 #336),
   +`AudioPlacement`: where an audio segment is inserted, with the varispeed
   source lead (575 ticks, SY-24) and the noise-reduction track lead (6,400
   ticks, SY-25); `build` substitutes `AudioRateCopy`'s URLs for the audio

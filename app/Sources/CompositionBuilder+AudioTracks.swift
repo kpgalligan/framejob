@@ -161,13 +161,15 @@ extension CompositionBuilder {
                 let track = try makeTrack(in: composition, mediaType: .audio, id: family.id)
                 let trackDSP = dsp.isEmpty
                     ? nil : AudioTrackDSP(segments: family.segments, parameters: dsp)
-                try fill(
-                    track, segments: family.segments, mediaType: .audio, urls: urls,
-                    reverse: reverse, assets: &assets, reversedAssets: &reversedAssets,
-                    shift: AudioShift.of(
-                        segments: family.segments,
-                        usesNoiseReduction: trackDSP?.usesNoiseReduction ?? false),
-                    ramps: ramps)
+                if try !fillSilence(track, for: family) {
+                    try fill(
+                        track, segments: family.segments, mediaType: .audio, urls: urls,
+                        reverse: reverse, assets: &assets, reversedAssets: &reversedAssets,
+                        shift: AudioShift.of(
+                            segments: family.segments,
+                            usesNoiseReduction: trackDSP?.usesNoiseReduction ?? false),
+                        ramps: ramps)
+                }
                 let sink = metering ? LevelMeterSink() : nil
                 if let sink = sink {
                     meters.append(
