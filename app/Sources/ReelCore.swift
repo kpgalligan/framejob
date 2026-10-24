@@ -27,6 +27,10 @@ import AppKit
 /// cache, for the same reason. The JSON-reading halves of `clipState(_:at:)`
 /// and `snapCandidates(excluding:)` are `CoreJSON` there, the payment it owed
 /// at 810 before `ReelHDR10.stillPeak(file:)`; their `rc_*` calls stayed.
+/// `ReelTime.perSecond`, `ticks(seconds:)` and `seconds(_:)` are an extension
+/// there too, and `coreSchemas()`'s map-reading half is
+/// `ReelOpSchema.table(from:)`, the payment it owed at 803 before
+/// `rc_project_source_map`'s wrapper; its `rc_op_schemas()` call stayed.
 /// Only `ReelOp.coreNames()` and `ReelOp.coreSchemas()` stayed behind — the
 /// op table read BACK, its names and its arguments — because they read
 /// `rc_op_names()` and `rc_op_schemas()` and the rule above admits no second
@@ -320,10 +324,6 @@ enum ReelSnap {
 /// toolbar, the ruler, the inspector and the agent all spell a time the same
 /// way (§4.1).
 enum ReelTime {
-    /// Ticks per second — `RC_TIMESCALE`. Divides every common frame
-    /// duration exactly, and `CMTime` at this timescale round-trips.
-    static let perSecond: Ticks = 600_000
-
     /// Rounds `t` to the nearest frame boundary. EVERY tick value that
     /// reaches an op goes through here first; the model never stores a
     /// sub-frame time (§5.1).
@@ -347,20 +347,6 @@ enum ReelTime {
         var out: Int64 = 0
         guard rc_timecode_parse(s, rate.num, rate.den, &out) else { return nil }
         return out
-    }
-
-    /// Seconds to ticks, rounded. 0 for a non-finite input.
-    static func ticks(seconds: Double) -> Ticks {
-        guard seconds.isFinite else { return 0 }
-        let scaled = (seconds * Double(perSecond)).rounded()
-        guard scaled >= Double(Ticks.min), scaled <= Double(Ticks.max) else { return 0 }
-        return Ticks(scaled)
-    }
-
-    /// Ticks to seconds, for `CMTime` and for anything measured in seconds
-    /// in the inspector (fades, ducking attack/release).
-    static func seconds(_ t: Ticks) -> Double {
-        Double(t) / Double(perSecond)
     }
 }
 
@@ -467,23 +453,8 @@ extension ReelOp {
     /// for `coreNames()`'s reason: it names an `rc_*` symbol, and this file
     /// is the only one that may.
     static func coreSchemas() -> [String: ReelOpSchema] {
-        guard let json = takeString(rc_op_schemas()),
-            let data = json.data(using: .utf8),
-            let object = try? JSONSerialization.jsonObject(with: data),
-            let map = object as? [String: Any]
-        else { return [:] }
-        var schemas: [String: ReelOpSchema] = [:]
-        for (name, value) in map {
-            // A row that is not an object is dropped rather than defaulted:
-            // the op then has no schema at all, which the caller's own
-            // check can see, where an empty one would look like an op that
-            // takes nothing.
-            guard let schema = value as? [String: Any] else { continue }
-            schemas[name] = ReelOpSchema(
-                properties: schema["properties"] as? [String: Any] ?? [:],
-                required: schema["required"] as? [String] ?? [])
-        }
-        return schemas
+        guard let json = takeString(rc_op_schemas()) else { return [:] }
+        return ReelOpSchema.table(from: json)
     }
 
     /// Every op name the core accepts, in the order of its table

@@ -24,4 +24,26 @@ struct ReelOpSchema {
     let properties: [String: Any]
     /// The arguments the core requires, in table order.
     let required: [String]
+
+    /// The table out of `rc_op_schemas()`'s JSON, the map-reading half of
+    /// `ReelOp.coreSchemas()` (a pure move, speed ramps SR4-0's toll); empty
+    /// when the answer could not be read.
+    static func table(from json: String) -> [String: ReelOpSchema] {
+        guard let data = json.data(using: .utf8),
+            let object = try? JSONSerialization.jsonObject(with: data),
+            let map = object as? [String: Any]
+        else { return [:] }
+        var schemas: [String: ReelOpSchema] = [:]
+        for (name, value) in map {
+            // A row that is not an object is dropped rather than defaulted:
+            // the op then has no schema at all, which the caller's own
+            // check can see, where an empty one would look like an op that
+            // takes nothing.
+            guard let schema = value as? [String: Any] else { continue }
+            schemas[name] = ReelOpSchema(
+                properties: schema["properties"] as? [String: Any] ?? [:],
+                required: schema["required"] as? [String] ?? [])
+        }
+        return schemas
+    }
 }

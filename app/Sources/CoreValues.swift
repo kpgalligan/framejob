@@ -92,3 +92,25 @@ struct GraphicRaster {
     let bgra: [UInt8]
     let warnings: [GraphicDiagnostic]
 }
+
+/// `ReelTime`'s three members that name no `rc_*` symbol, moved out of `ReelCore.swift` (a pure
+/// move, speed ramps SR4-0's toll).
+extension ReelTime {
+    /// Ticks per second — `RC_TIMESCALE`. Divides every common frame
+    /// duration exactly, and `CMTime` at this timescale round-trips.
+    static let perSecond: Ticks = 600_000
+
+    /// Seconds to ticks, rounded. 0 for a non-finite input.
+    static func ticks(seconds: Double) -> Ticks {
+        guard seconds.isFinite else { return 0 }
+        let scaled = (seconds * Double(perSecond)).rounded()
+        guard scaled >= Double(Ticks.min), scaled <= Double(Ticks.max) else { return 0 }
+        return Ticks(scaled)
+    }
+
+    /// Ticks to seconds, for `CMTime` and for anything measured in seconds
+    /// in the inspector (fades, ducking attack/release).
+    static func seconds(_ t: Ticks) -> Double {
+        Double(t) / Double(perSecond)
+    }
+}

@@ -24,8 +24,9 @@ detail there.
   `ReelContainer` (`rc_container_*`, a WebM/Matroska file's index,
   #216-R) and `ReelHDR10` (`rc_hdr10_peak`, spec §11 HD-6; `av1Peak`,
   `rc_hdr10_av1_peak`, HD-18; `stillPeak`, `rc_hdr10_still_peak`, HD-20), and `GraphicLibrary.imageCache(limit:)`
-  (`rc_graphic_image_cache`, G-39); `ReelCoreError` and `Fps.ffiPair` are
-  `CoreValues.swift`'s (G6 phase 5's toll T2, a pure move); the typed patches are `TypedPatches.swift`'s (`VideoPatch`,
+  (`rc_graphic_image_cache`, G-39); `ReelCoreError`, `Fps.ffiPair` and `ReelTime`'s
+  seconds conversions are `CoreValues.swift`'s (G6 phase 5's toll T2 and speed ramps SR4-0,
+  pure moves); the typed patches are `TypedPatches.swift`'s (`VideoPatch`,
   `AudioPatch`, `ClipPatch`, the `ActionPatch` extension; a pure move, B73),
   `TextPatch` (with `case`, `words` and `word_style`) is `TextPatch.swift`'s,
   moved out so it could grow, and `ShapePatch` `ShapePatch.swift`'s (a pure
@@ -106,7 +107,9 @@ detail there.
   `edit.rs`'s size exemption.
 - `ReelOpSchema.swift` — what an op TAKES, mirroring what
   `core/src/op_schema.rs` publishes: the `properties` and `required` of one
-  op's arguments, which are the two things `AgentServer.tool` takes. Here
+  op's arguments, which are the two things `AgentServer.tool` takes, and
+  `table(from:)`, which reads `rc_op_schemas`' JSON into them (SR4-0's pure
+  move out of `ReelCore.swift`, whose `coreSchemas()` keeps the call). Here
   rather than next door for `ReelEdit.swift`'s reason — it names no `rc_*`
   symbol — and `properties` stays `[String: Any]` because a Swift type per
   kind would be another spelling of the table.

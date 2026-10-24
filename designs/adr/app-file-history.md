@@ -610,7 +610,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   staying, and the header gained its payment sentence. A pure move gated alone, nothing widened.
   `wc -l app/Sources/ReelCore.swift`: 810 before, 795 after; `CoreValues.swift` is 94. The next
   seam: the private `jsonArray` above `ReelProject` (it names no `rc_*` symbol) to `CoreJSON`,
-  widened to internal.
+  widened to internal. Speed ramps SR4-0 paid a different seam before `rc_project_source_map`'s
+  wrapper (#111, spec §11 SR-20) landed: `ReelTime.perSecond`, `ticks(seconds:)` and
+  `seconds(_:)` went whole to an `extension ReelTime` in `CoreValues.swift`, and the
+  JSON-reading half of `ReelOp.coreSchemas()` to `ReelOpSchema.table(from:)`, the
+  `rc_op_schemas()` call staying; a pure move gated alone, nothing widened. `wc -l
+  app/Sources/ReelCore.swift`: 803 before, 774 after; `CoreValues.swift` is 116. The next seam is
+  still `jsonArray`.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,
