@@ -22872,3 +22872,37 @@ make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ra
 | `make gate` | PASS 278 s (names, typecheck, fmt, lint, test 163 s, app 102 s) |
 | `ramp_proof.py` (Release, after the gate) | **20/20 in 89 s**, exit 0 — T1 and S1 as Debug's; every SR2a, SR2b and SR1d row as before; no `Frame Job: ` in the log |
 | core mutants M1–M9 (the six new suites) | each caught: M1 14 failures, M2 6, M3 2, M4 8, M5 6, M6 1, M7 1, M8 1, M9 5 |
+
+## Speed ramps SR3b — a ramp's rate scaled and carried (`ramp_proof.py` V1, V2, V3, C1; `core/tests/ramp_scale.rs`, `ramp_carry.rs` and ten mutants; spec §11 SR-19; #111)
+
+SR3b of road map "speed-ramps": `set_speed` and `rate_stretch` scale a ramped clip's whole rate
+profile by one factor, and what copies, re-snaps or holds a ramped clip keeps what it reads; the
+plan's ×12 test reads the greatest rate the clip names, the figure `SpeedAudioDrop` reads. The
+rules are pinned by the core's two suites through the FFI against closed-form oracles; the proof
+drives the MCP-visible ones on AV.mov (5 s, a 440 Hz tone).
+
+- **V1** — a 2 s clip at in 0, `add_action` [0, 1 s), `set_action_end {speed: 2}`, then
+  `set_speed rate 2`: speed 2, end 4, duration 600000 and the action [0, 300000).
+- **V2** — the same clip at `set_speed rate 7` (end ×14) answers `audio_left_out` [clip] and D3's
+  one-clip `audio_note`.
+- **V3** — a 1 s clip at in 0, `add_action` [0, 1 s), `set_action_end {speed: 6}`, `trim_end` to
+  300000, and AV.mov ×1 at 1 s cut to 1.5 s; then `set_speed rate 2.5`: duration 120000, the
+  action [0, 240000) and end 15, and the answer carries `audio_left_out` [clip] though the clip
+  reaches only ×8.75 inside itself; an `audio_wav` export read by `read_ffmpeg` is silent
+  (max |x| < 1e-4) over [0, 0.2 s) and carries the tone (RMS > 0.01) over [1.1 s, 1.4 s] — the
+  answer and the export agree.
+- **C1** — a 2 s clip at in 0, `add_action` [0, 2 s), `set_action_end {speed: 3}`, `trim_end` to
+  1 s, then `set_canvas fps [25, 1]`: the action stays [0, 1200000) with end 3, the duration
+  600000.
+
+```sh
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only V1,V2,V3,C1
+make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py
+```
+
+| Run (2026-10-24) | Result |
+|---|---|
+| Debug `--only V1,V2,V3,C1` | 5/5 in 2 s — V1 (2, 4, 600000, [0, 300000)); V2 `audio_left_out` [3], the note; V3 (120000, [0, 240000), 15), `audio_left_out` [3], max \|x\| 0.00e+00 over [0, 0.2 s), RMS 0.0883 over [1.1 s, 1.4 s]; C1 (600000, [0, 1200000), 3) |
+| `make gate` | PASS 287 s (names 1 s, typecheck 6 s, fmt 2 s, lint 1 s, test 155 s, app 122 s) |
+| `ramp_proof.py` (Release, after the gate) | **24/24 in 111 s**, exit 0 — V1–V3 and C1 as Debug's; every SR2a, SR2b, SR1d and SR3a row as before (E1 70/70 at +0.000 ms, L1 71/71 max 8.55 ms, L2 23/23 max 5.54, L3 35/35 max 21.47, R1 70/70 at −0.010, W1 2.3 s, U1 as the baseline, P1 m1 −86.333 ms, T1 1 640 000); no `Frame Job: ` in the log |
+| core mutants M1–M10 (the two new suites) | each caught: M1 8 failures, M2 1, M3 1, M4 1, M5 1, M6 2, M7 6, M8 1, M9 1, M10 1 |

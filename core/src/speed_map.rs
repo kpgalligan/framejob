@@ -32,6 +32,22 @@ pub(crate) fn end_speed(action: &Action) -> Option<f64> {
     rate.is_finite().then(|| rate.clamp(SPEED_MIN, SPEED_MAX))
 }
 
+/// The greatest rate the clip NAMES: `clip.speed` and, on a ramped clip
+/// ([`is_ramped`]), every action's [`end_speed`], whether or not the clip
+/// reaches it inside [0, D). The figure `SpeedAudioDrop.peakSpeed` reads off
+/// the snapshot, so the plan's ×12 test and the Speed sheet's question agree
+/// on every clip, trimmed or not (spec §11 SR-19 (d)). `clip.speed` when not
+/// ramped.
+pub(crate) fn peak_rate(clip: &Clip) -> f64 {
+    if !is_ramped(clip) {
+        return clip.speed;
+    }
+    clip.actions
+        .iter()
+        .filter_map(end_speed)
+        .fold(clip.speed, f64::max)
+}
+
 /// Whether the clip's rate changes over its length: a `media` clip, and an
 /// action whose end names a speed. False for every other source, whatever
 /// its actions say.
@@ -346,18 +362,6 @@ impl SpeedMap {
         let whole = ease_integral(action.curve, 1.0);
         let rate = from_rate + (to_rate - from_rate) * ease_integral(action.curve, c) / (c * whole);
         rate.is_finite().then(|| rate.clamp(SPEED_MIN, SPEED_MAX))
-    }
-
-    /// The greatest rate the clip reaches: every ease is monotone, so it is
-    /// at a piece's edge. The base rate for a clip with no length.
-    pub(crate) fn peak(&self) -> f64 {
-        self.pieces
-            .iter()
-            .flat_map(|p| [p.rate_at(p.from()), p.rate_at(p.to())])
-            .fold(None, |best: Option<f64>, r| {
-                Some(best.map_or(r, |b| b.max(r)))
-            })
-            .unwrap_or(self.base)
     }
 
     pub(crate) fn pieces(&self) -> &[Piece] {

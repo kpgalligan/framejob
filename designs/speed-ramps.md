@@ -152,6 +152,10 @@ Each phase records the rules it builds in spec §11 as SR-n entries before its c
   end names `speed`, reduced to its `speed` and `audio` keys, so the sound stays with the
   picture. `paste`, `relink_media` and `frame_grid.rs`'s re-snap hold a ramped window inside its
   file through the ramp-aware bound, as they hold a constant one today.
+  *Amended by SR-19 (SR3b):* the detached twin copies every action whole, with new ids, so it
+  reads the same map (the reduction to `speed` and `audio` is not built: re-enabling the twin's
+  video stays lossless); a re-snap snaps a ramped clip's speed action without clamping it into
+  the clip and holds the duration again against it (SR-19 (e), (g)).
 - **N — Swift's mappers.** One core answer, `rc_project_source_map(project, clip)` → the clip's
   breakpoints `[[clip_t, source_t], …]` (its plan segment boundaries, ramped or not), wrapped in
   `ReelCore.swift`, read by `TimelineView.sourceTime` (through a non-frozen helper),
@@ -163,6 +167,9 @@ Each phase records the rules it builds in spec §11 as SR-n entries before its c
 - **P — The ×12 question (#190).** Asked when an edit takes a clip with sound from a peak rate at
   or below ×12 to above it; `set_action_end`'s, `set_action`'s and `remove_action`'s answers
   carry `audio_left_out` / `audio_note` when an agent's edit crosses.
+  *Amended by SR-19 (SR3b):* the peak is the greatest rate the clip NAMES — its base and every
+  end rate, reached inside the clip or not — the one figure the plan's ×12 test and
+  `SpeedAudioDrop` both read (SR-19 (d)).
 - **Q — UI.** With the playhead in an action, the Speed section's Rate writes that action's
   `end.speed` (the inspector's `in_action` rule); Keep pitch and Fit to stay clip-level. A band's
   label names `speed` (`ActionPatch` gains it). The Speed sheet edits the base rate under L.
@@ -1330,3 +1337,82 @@ itself.
 arms, `source_read_by`, `source_advanced_through`, `front_edge_held`, `window_of`/`overrun`),
 the `speed_map.rs` entry (`of_length`, `time_for_source`, `head_end_rate`, `rate_at`'s reader)
 and the `edit_action_speed.rs` entry (`largest_fitting_end_rate`) — agents edit no `CLAUDE.md`.
+
+## SR3b — a ramp's rate scaled and carried (L, M)
+
+SR3b builds L and M. SR-19 (one factor scales the whole profile; what copies, re-snaps or holds a
+ramped clip keeps what it reads; one ×12 figure), the Amended-by lines on SR-10 (its SR-18 line
+and its audio bullet) and on SR-18 (e) and (h), and rule M's and rule P's Amended-by lines were
+recorded before the code. The design review's objections are answered there: a past-end speed
+action is scaled with the clip and not clamped into it (SR-19 (b)), and the plan's ×12 test reads
+the figure Swift already reads, the greatest rate a clip names, rather than Swift computing the
+in-clip peak (SR-19 (d); no rate computed in Swift, D2-1). The orchestrator's question on
+`set_action` refusing an edit to a past-end action is decided as SR-19 (i): the refusal stays, as
+the crate's rule for every clip, and SR5 records rule Q's before its code.
+
+**What landed.**
+- `core/src/edit_clip_timing.rs`: `scaled_span` (an action's span × a factor, rounded then
+  snapped, not clamped), which `rescale_actions` is refactored onto with its clamp and behaviour
+  unchanged; `profile_factors` (SPEED_MIN ÷ r_min, SPEED_MAX ÷ r_max over the base and every end
+  rate); `scaled_profile` (every rate × f, each product clamped, none rewritten at f = 1; every
+  speed action's span × D′/D unclamped, the others through `rescale_actions`; then the hold
+  through `duration_resnapped`); the ramp arms of `set_speed` (f from the clamped rate or D ÷ d,
+  clamped into `profile_factors`; D′ = d, or snapped(round(D ÷ f)) when f clamped or the rate arm
+  set it) and `rate_stretch` (f = D ÷ (to_end − start), an identity outside the range), each
+  gated on `profile_factors`, which is `None` for every constant clip.
+- `core/src/speed_map.rs`: `peak_rate`, the greatest rate a clip names; `SpeedMap::peak` deleted.
+  `core/src/evaluate.rs`'s ×12 test reads `peak_rate(instance.clip)`.
+- `core/src/frame_grid.rs`: `resnap_actions` snaps a ramped clip's speed actions without clamping
+  them; `resnap_clip_times` holds a ramped clip's duration a second time against them and
+  re-clamps its other actions. Its five callers are unedited. `detach_audio`, `paste_attributes`
+  and `relink_media` change no code (SR-19 (e), (f), (h)).
+- Documents: spec §6 (`06b`: `set_speed`, `rate_stretch`, `detach_audio`, `paste`,
+  `paste_attributes`, `unnest`; `06c`: `set_canvas`, `relink_media`), §7.2's ×12 figure, §7.10's
+  `frame_grid.rs`, `edit_clip_timing.rs`, `speed_map.rs` and `evaluate.rs` rows; `edit.rs`'s
+  module-doc rows for the same eight ops; `edit_canvas.rs`'s `resnap` doc; one catalog sentence
+  each on `set_speed` and `rate_stretch` (prose, no schema); `SpeedAudioDrop.swift`'s doc
+  ("names", no code).
+- Tests: `ramp_scale.rs` (L and the ×12 figure, 10) and `ramp_carry.rs` (M, 10), each against
+  closed-form oracles written in the file; `ramp_proof.py`'s V1, V2, V3 and C1.
+
+**Measured.** `cargo test --release` in `core/` passed with every existing suite unedited
+(`speed_bounds.rs`, `speed_x1000.rs`, `frame_grid_canvas.rs`, `frame_grid_transfer.rs`,
+`paste.rs`, `relink.rs`, `nest.rs`, `ramp_plan.rs` and `ramp_nest.rs` among them). The ten
+mutants, each applied alone against the two new suites and reverted, were each caught: M1 (only
+the base scaled) 8 failures; M2 (each rate clamped alone instead of f) 1 — ×1 → ×500 at rate 4;
+M3 (`scaled_profile`'s hold skipped) 1 — the rate-5.5 hold; M4 (rates rewritten at f = 1) 1 —
+the integer `end.speed` 2; M5 (`rate_stretch`'s out-of-range f clamped) 1; M6 (`rate_stretch`'s
+constant arm on a ramped clip) 2; M7 (`resnap_actions` clamping a ramped clip's speed action) 6 —
+every paste, `set_canvas` and `unnest`; M8 (the second hold pass skipped) 1 — the 260 000 →
+250 000 re-snap; M9 (`scaled_profile` clamping a speed action into D′) 1 — the trimmed
+[0, 4 s)-on-2 s case; M10 (the ×12 test on the rates reached inside [0, D)) 1 — the ×1 → ×13
+named figure. `make lint` clean; `make typecheck`: 0 errors, its 4 baseline warnings.
+`spec_index_proof.py` 183/183. Debug `ramp_proof.py --only V1,V2,V3,C1` 5/5 in 2 s. `make gate`
+**PASS** in 287 s (names 1 s, typecheck 6 s, fmt 2 s, lint 1 s, test 155 s, app 122 s).
+`env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py`: **24/24 in
+111 s**, exit 0 — V1 speed 2, end 4, duration 600 000, the action [0, 300 000); V2
+`audio_left_out` [3] and D3's note at ×14; V3 duration 120 000, the action [0, 240 000), end 15,
+`audio_left_out` [3] at an in-clip peak of ×8.75, the export silent over [0, 0.2 s) (max |x| 0)
+and the tone over [1.1 s, 1.4 s] (RMS 0.0883); C1 the action [0, 1 200 000) with end 3 and
+duration 600 000 at 25 fps; every SR2a, SR2b, SR1d and SR3a row as before (E1 70/70 at
++0.000 ms, L1 71/71 max 8.55 ms, L2 23/23 max 5.54, L3 35/35 max 21.47, R1 70/70 at −0.010, W1
+2.3 s, U1 as the baseline, P1 m1 −86.333 ms, T1 1 640 000); D0 no `Frame Job: ` in the log.
+Every instance was the proof's own and stopped itself.
+
+**The review's fix pass.** Two findings fixed, both recorded in SR-19 before the code. (1) The
+`rate` arm wrote the base as `speed` × (rate ÷ `speed`), which doubles can miss by an ULP (×49
+asked ×1 gave 0.9999999999999999), so a repeat at the shown rate rewrote every rate and took an
+undo step: an unclamped f now writes the clamped rate itself (SR-19 (a)). (2) `scaled_profile`
+clamped the other actions into the pre-hold duration, so after a hold one could end past the
+clip, unlike the re-snap's second pass: when the hold shortens the clip they are re-clamped into
+what is left through `resnap_actions` (SR-19 (b)). `ramp_scale.rs` gained two cases (×49 → ×1,
+its base exactly ×1 and the repeat an identity; the rate-5.5 hold with an opacity action
+[2 s, 4 s) landing at [220 000, 420 000) in the held 420 000), 12 tests in all. Mutants M11 (the
+base written as `speed`·f) and M12 (the re-clamp skipped) were each caught by its new case, and
+M3, whose anchor the second fix sits beside, still is (now by both hold cases). `make gate`
+**PASS** in 273 s; Release `ramp_proof.py --only V1,V2,V3` 4/4 in 3 s with the values above.
+
+**Owed.** SR4 and SR5. SR-19 (i) is filed as #338 (`set_action` refusing any edit to an action
+running past its clip's end, which SR5's rule Q must decide). The orchestrator applied
+`core/CLAUDE.md`'s module-map entries for `frame_grid.rs`, `edit_clip_timing.rs` (with the
+re-clamp after a hold), `speed_map.rs` and `evaluate.rs`.

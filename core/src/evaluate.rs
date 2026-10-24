@@ -40,7 +40,7 @@ use crate::audio::Voice;
 use crate::edit_clip_timing::AUDIO_SPEED_MAX;
 use crate::model::{Clip, Project, Source};
 use crate::nest::{lifted, Instance};
-use crate::speed_map::SpeedMap;
+use crate::speed_map::{peak_rate, SpeedMap};
 use crate::speed_segments::RampAudio;
 use crate::time::{self, Ticks, TIMESCALE};
 
@@ -414,11 +414,12 @@ impl Project {
                         let id = place(&mut video, &mut next_video, unit, None, false);
                         assignment.video_of.insert(instance.path(), id);
                     }
-                    // The ×12 rule on the PEAK rate of the instance's own
-                    // clip, unlifted: the figure `SpeedAudioDrop` reads off
-                    // the snapshot, so a nest clip's tail cut mid-ramp
-                    // cannot make the two disagree (spec §11 SR-10).
-                    let peak = SpeedMap::of(instance.clip).map_or(clip.speed, |m| m.peak());
+                    // The ×12 rule on the greatest rate the instance's own
+                    // clip, unlifted, NAMES: the figure `SpeedAudioDrop`
+                    // reads off the snapshot, so a nest clip's tail cut or
+                    // a trimmed ramp cannot make the two disagree (spec
+                    // §11 SR-10, SR-19 (d)).
+                    let peak = peak_rate(instance.clip);
                     if media.has_audio && instance.plays_audio() && peak <= AUDIO_SPEED_MAX {
                         place(
                             &mut audio,

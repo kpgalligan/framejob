@@ -1,11 +1,15 @@
 //! Clip timing operations: trims and rate changes with source and action bounds.
 
+use serde_json::Value;
+
 use crate::edit_clip::clip_end;
-use crate::model::{Action, Project, Source};
+use crate::frame_grid::resnap_actions;
+use crate::model::{Action, Clip, Project, Source};
 use crate::model_words::rebase_words;
 use crate::outcome::Outcome;
 use crate::recipe_graphic::graphic_advanced;
 use crate::source_window::source_advanced_through;
+use crate::speed_map::{end_speed, SpeedMap};
 use crate::time::Ticks;
 
 /// Speed range, `SPEED_MIN`–`SPEED_MAX` (spec §4.3, §11 #190). Three
@@ -35,6 +39,20 @@ pub(crate) fn speed_limits() -> serde_json::Value {
     })
 }
 
+/// The range of factors one rate edit may scale a RAMPED clip's whole
+/// profile by: `(SPEED_MIN / r_min, SPEED_MAX / r_max)`, r over the base
+/// and every action's `end_speed` (the rates `peak_rate` reads), so no rate
+/// the clip names leaves `SPEED_MIN`–`SPEED_MAX` (spec §11 SR-19 (a)).
+/// `None` when [`SpeedMap::of`] is, which is every constant clip.
+fn profile_factors(clip: &Clip) -> Option<(f64, f64)> {
+    SpeedMap::of(clip)?;
+    let rates = std::iter::once(clip.speed).chain(clip.actions.iter().filter_map(end_speed));
+    let (low, high) = rates.fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), r| {
+        (lo.min(r), hi.max(r))
+    });
+    Some((SPEED_MIN / low, SPEED_MAX / high))
+}
+
 impl Project {
     /// Scales every action's span with the clip, so an action keeps the
     /// same clip-relative FRACTION when the clip's length changes (spec §6,
@@ -50,18 +68,7 @@ impl Project {
         let frame = self.frame();
         let factor = new as f64 / old as f64;
         for action in actions.iter_mut() {
-            let scaled_start = (action.start as f64 * factor).round();
-            let scaled_duration = (action.duration as f64 * factor).round();
-            let start = if scaled_start.is_finite() {
-                self.snapped(scaled_start as Ticks)
-            } else {
-                action.start
-            };
-            let duration = if scaled_duration.is_finite() {
-                self.snapped(scaled_duration as Ticks)
-            } else {
-                action.duration
-            };
+            let (start, duration) = self.scaled_span(action, factor);
             // Clamped so the action still fits the clip and still has a
             // positive duration, which `validate` requires.
             action.start = start.clamp(0, new.saturating_sub(frame).max(0));
@@ -70,6 +77,68 @@ impl Project {
                 .min(new.saturating_sub(action.start))
                 .max(1);
         }
+    }
+
+    /// `action`'s start and duration × `factor`, each rounded then snapped
+    /// to the grid. A product that is not finite keeps the old value. NOT
+    /// clamped: `rescale_actions` clamps what it takes from here, and
+    /// `scaled_profile` leaves a speed action where it lands (spec §11
+    /// SR-19 (b)).
+    fn scaled_span(&self, action: &Action, factor: f64) -> (Ticks, Ticks) {
+        let scaled_start = (action.start as f64 * factor).round();
+        let scaled_duration = (action.duration as f64 * factor).round();
+        let start = if scaled_start.is_finite() {
+            self.snapped(scaled_start as Ticks)
+        } else {
+            action.start
+        };
+        let duration = if scaled_duration.is_finite() {
+            self.snapped(scaled_duration as Ticks)
+        } else {
+            action.duration
+        };
+        (start, duration)
+    }
+
+    /// `clip` with its whole rate profile × `factor`, `duration` long (spec
+    /// §11 SR-19 (a), (b)): `speed` and every action's numeric `end.speed`,
+    /// each product clamped to `SPEED_MIN`–`SPEED_MAX` (no rate is
+    /// rewritten when `factor` is 1). Every SPEED action's span scales by
+    /// `duration / clip.duration`, snapped and NOT clamped into the clip, so
+    /// one running past the end still does and S∞′(t·D′/D) = S∞(t); every
+    /// other action is rescaled and clamped as `rescale_actions` does. The
+    /// duration is then held through S∞ with the speed actions as they stand
+    /// (D4-3's `duration_resnapped`), as `trim_end` leaves them; when the
+    /// hold shortens the clip, the other actions are re-clamped into what is
+    /// left, as `resnap_clip_times`' second pass does (`resnap_actions`).
+    fn scaled_profile(&self, clip: &Clip, factor: f64, duration: Ticks) -> Clip {
+        let mut scaled = clip.clone();
+        if factor != 1.0 {
+            scaled.speed = (clip.speed * factor).clamp(SPEED_MIN, SPEED_MAX);
+        }
+        let frame = self.frame();
+        let span = duration as f64 / clip.duration as f64;
+        for action in scaled.actions.iter_mut() {
+            let Some(rate) = end_speed(action) else {
+                self.rescale_actions(std::slice::from_mut(action), clip.duration, duration);
+                continue;
+            };
+            if factor != 1.0 {
+                if let Value::Object(end) = &mut action.end {
+                    let product = (rate * factor).clamp(SPEED_MIN, SPEED_MAX);
+                    end.insert("speed".to_string(), Value::from(product));
+                }
+            }
+            let (start, length) = self.scaled_span(action, span);
+            action.start = start.max(0);
+            action.duration = length.max(frame).max(1);
+        }
+        scaled.duration = duration;
+        scaled.duration = self.duration_resnapped(&scaled);
+        if scaled.duration != duration {
+            resnap_actions(self, &mut scaled);
+        }
+        scaled
     }
 
     /// Moves the clip's start edge to `to`, advancing the source in point
@@ -152,6 +221,11 @@ impl Project {
     /// Refuses when the resulting rate falls outside `SPEED_MIN`–`SPEED_MAX`,
     /// when the new length is under a frame, or when the placement breaks the
     /// overlap rule. Actions keep their clip-relative fraction.
+    ///
+    /// On a RAMPED clip the whole rate profile scales by f = D ÷ (to_end −
+    /// start) through `scaled_profile`, so the ramp keeps its shape and its
+    /// window; an f that would take any rate the clip names past the limits
+    /// (`profile_factors`) changes nothing (spec §11 SR-19 (a), (b)).
     pub fn rate_stretch(&self, clip: u32, to_end: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         if !matches!(target.source, Source::Media { .. }) {
@@ -161,6 +235,14 @@ impl Project {
         let duration = to_end.saturating_sub(target.start);
         if duration < self.frame() {
             return Ok(Outcome::Identity);
+        }
+        if let Some((low, high)) = profile_factors(&target) {
+            let factor = target.duration as f64 / duration as f64;
+            if !factor.is_finite() || !(low..=high).contains(&factor) {
+                return Ok(Outcome::Identity);
+            }
+            let moved = self.scaled_profile(&target, factor, duration);
+            return self.commit_replacements(vec![moved]);
         }
         let rate = self.content_length_in_source(&target) as f64 / duration as f64;
         if !rate.is_finite() || !(SPEED_MIN..=SPEED_MAX).contains(&rate) {
@@ -189,6 +271,15 @@ impl Project {
     /// fastest thing available. `Err` for both or neither, a non-media clip,
     /// a rate that is not a positive finite number or a duration that is not
     /// positive; refuses on an overlap-rule violation.
+    ///
+    /// On a RAMPED clip the whole rate profile scales by one factor f — the
+    /// clamped rate over the base, or D ÷ d — clamped so no rate the clip
+    /// names passes a limit (`profile_factors`): the ramp keeps its shape
+    /// and its window, and its base may stop short of the rate asked; when
+    /// f does not clamp, the base is the clamped rate itself. The
+    /// new duration is d, or snapped(round(D ÷ f)) when f clamped or the
+    /// rate arm set it, held through `scaled_profile` (spec §11 SR-19 (a),
+    /// (b)). An f of 1 changes nothing but `keep_pitch`.
     pub fn set_speed(
         &self,
         clip: u32,
@@ -222,6 +313,43 @@ impl Project {
             if duration <= 0 {
                 return Err(format!("duration must be positive, not {duration}"));
             }
+        }
+        if let Some((low, high)) = profile_factors(&target) {
+            let frame = self.frame();
+            let (asked, fitted) = match (rate, duration) {
+                (Some(rate), _) => (rate.clamp(SPEED_MIN, SPEED_MAX) / target.speed, None),
+                (None, Some(duration)) => {
+                    let d = self.snapped(duration).max(frame);
+                    if d == target.duration {
+                        (1.0, None)
+                    } else {
+                        (target.duration as f64 / d as f64, Some(d))
+                    }
+                }
+                (None, None) => (1.0, None),
+            };
+            let factor = asked.clamp(low, high);
+            let length = match fitted {
+                Some(d) if factor == asked => d,
+                _ => {
+                    let scaled = (target.duration as f64 / factor).round();
+                    if scaled.is_finite() {
+                        self.snapped(scaled as Ticks).max(frame)
+                    } else {
+                        target.duration
+                    }
+                }
+            };
+            let mut moved = self.scaled_profile(&target, factor, length);
+            // An unclamped rate arm writes the rate asked itself: `speed ×
+            // (rate ÷ speed)` can miss it by an ULP (spec §11 SR-19 (a)).
+            if let (Some(rate), true) = (rate, factor == asked) {
+                moved.speed = rate.clamp(SPEED_MIN, SPEED_MAX);
+            }
+            if let (Some(keep), Some(audio)) = (keep_pitch, moved.audio.as_mut()) {
+                audio.keep_pitch = keep;
+            }
+            return self.commit_replacements(vec![moved]);
         }
         let rate = match (rate, duration) {
             (Some(rate), _) => rate,

@@ -107,7 +107,8 @@ fn rescale(project: &mut Project, old_width: u32, old_height: u32) {
 /// duration that would round to zero becomes one frame (a zero-length clip
 /// is what `validate` rejects), which is the ONE case the source bound
 /// cannot hold and `evaluate.rs`'s clamp covers; and an action is kept
-/// inside its clip.
+/// inside its clip — but a ramped clip's speed action, which is snapped and
+/// left running past the end, the duration held again (spec §11 SR-19 (g)).
 fn resnap(project: &mut Project) {
     let fps = project.canvas.fps;
     // Temporarily own each list so source/media lookup can borrow the whole

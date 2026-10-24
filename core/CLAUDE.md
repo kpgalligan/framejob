@@ -179,7 +179,10 @@ governs a module now.
   present base motion/text timing through the patch snappers, and snaps a
   graphic's `in` and `length` through `recipe_graphic.rs`'s
   `graphic_resnapped` (spec §11 G-18). It does not change source positions,
-  action-end payloads or audio envelopes.
+  action-end payloads or audio envelopes. On a ramped clip (SR-19 (g))
+  `resnap_actions` snaps the speed actions without clamping them into the
+  clip (clamping would change what it reads), and `resnap_clip_times` holds
+  the duration a second time over the snapped map.
 - `source_window.rs` — THE source window: how much material a clip shows,
   how much lies either side of it, and the one way a source in point moves.
   `content_length_in_source` reads `speed_map.rs`'s map for a ramped clip
@@ -318,6 +321,12 @@ governs a module now.
   their speed bounds and clip-relative action rescaling; `AUDIO_SPEED_MAX`
   (×12, spec §11 #190) and `speed_limits`, which `rc_speed_limits` publishes;
   `set_speed` takes a `rate` or a `duration` (Fit to duration), exactly one.
+  On a ramped clip (SR-19 (a), (b)) both rate edits scale the WHOLE profile
+  by one factor (`profile_factors`, None on every constant clip):
+  `scaled_profile` scales the base, every end rate and every speed span
+  (`scaled_span`, snapped, never clamped, which `rescale_actions` also uses),
+  writes an unclamped rate as asked, holds the window, then re-clamps the
+  other actions into the held duration through `resnap_actions`.
   `trim_start` advances a graphic's `in` through `graphic_advanced` (no speed,
   no head bound, saturating at 0); `trim_end` leaves `length` alone.
 - `edit_detach.rs` — `detach_audio` and `set_enabled`, a clip's video and
@@ -486,7 +495,8 @@ governs a module now.
 - `speed_map.rs` — a media clip's SPEED MAP (speed ramps SR-10): the
   clip-time → source-time function its speed actions make (the ease
   integrals of `actions.rs`'s curves), `is_ramped` (media clips only),
-  `end_speed`'s clamp, `peak`, `source_at`, `rate_at`; `of_length` (the
+  `end_speed`'s clamp, `peak_rate` (the greatest rate the clip NAMES, its
+  base and every end rate, the ×12 figure, SR-19 (d)), `source_at`, `rate_at`; `of_length` (the
   map over any horizon, reading on past the clip's end with its own
   actions, SR-18 (a)), `time_for_source` (its inverse) and `head_end_rate`
   (a split's straddled head re-solved so both halves meet at S(cut),
@@ -615,9 +625,9 @@ governs a module now.
   `Assignment`'s tracks are `pub(crate)` for `plan.rs` alone. A ramped
   clip (speed ramps SR-10) is placed as ONE unit, its frame-per-segment
   video and its one ramp audio segment (`ramp`, the source map) on the
-  same tracks; its ×12 test reads the peak rate of the instance's own,
-  unlifted clip, so a nest that cuts a ramp short agrees with Swift's
-  `SpeedAudioDrop.peakSpeed`.
+  same tracks; its ×12 test reads `speed_map.rs`'s `peak_rate` (the greatest
+  rate named, not reached, SR-19 (d)) of the instance's own, unlifted clip,
+  the same stored numbers Swift's `SpeedAudioDrop.peakSpeed` reads.
 - `plan.rs` — `composition_plan()` (spec §7.2): the plan's JSON from
   `assign()`, the instruction tiling, and the decoder-budget warning
   (`MAX_CONCURRENT_VIDEO_TRACKS`). Deterministic to the byte. A pure move

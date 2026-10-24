@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Speed ramps SR2a, SR2b, SR1d and SR3a (spec §11 SR-10, SR-2, SR-6, SR-12,
-SR-13, SR-15, SR-18), against the built app: an action's `end.speed` through
-`set_action_end` over MCP — the door, the slot rule's R1 sentence, the ×12
-answer, undo and redo (SR2a) — a ramped clip's rendered audio in the export
-and in playback (SR2b, #111), Keep pitch inside a ramp kept and placed by
-SR-13's led rate-mode arm (SR1d: K1, L1–L3), and `trim_end` and `split` on a
-ramped clip read through its map (SR3a: T1, S1).
+"""Speed ramps SR2a, SR2b, SR1d, SR3a and SR3b (spec §11 SR-10, SR-2, SR-6,
+SR-12, SR-13, SR-15, SR-18, SR-19), against the built app: an action's
+`end.speed` through `set_action_end` over MCP — the door, the slot rule's R1
+sentence, the ×12 answer, undo and redo (SR2a) — a ramped clip's rendered
+audio in the export and in playback (SR2b, #111), Keep pitch inside a ramp
+kept and placed by SR-13's led rate-mode arm (SR1d: K1, L1–L3), `trim_end`
+and `split` on a ramped clip read through its map (SR3a: T1, S1), and
+`set_speed` scaling a ramp's whole profile, the ×12 answer and the export
+agreeing on the rate the clip names, and `set_canvas`'s re-snap keeping a
+speed action past the clip's end (SR3b: V1–V3, C1).
 
     env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py [--only IDS]
     env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py --baseline
@@ -18,7 +21,7 @@ One owned instance (`mcp.launch` on `proof_app`'s app — Debug by default,
 wait), on a scratch socket, logging to `tools/proof/work/ramp/framejob.log`,
 stopped by its PID; nothing else is ever killed. Every project is written under
 `tools/proof/work/ramp/`, which each run empties, and closed once its row is
-scored. No row performs a menu item. SR2a's and SR3a's fixture is
+scored. No row performs a menu item. SR2a's, SR3a's and SR3b's fixture is
 `tools/proof/media/AV.mov` (5 s, 30 fps, 48 kHz sound); SR2b's are
 `ramp_spike.make_fixtures(False)`'s clicks and sine movies (20 s, 320 × 180,
 30 fps, frame i showing i in ten bars); a missing fixture is a scored FAIL.
@@ -116,6 +119,22 @@ S1  a 2 s AV.mov clip at in 0, `add_action` [0, 2 s) (linear), `set_action_end
     {speed: 3}`, then `split` at 1 s: the second half's `in` is 900000
     (S(1 s) = 1.5 s) and its `speed` ×2, the head's end `speed` ×2 and the
     tail's ×3, the rates within 1e-9 (SR-18 (e)).
+V1  a 2 s AV.mov clip at in 0, `add_action` [0, 1 s), `set_action_end
+    {speed: 2}`, then `set_speed rate 2`: speed 2, end `speed` 4, duration
+    600000 and the action [0, 300000) — one factor scales the whole profile
+    (SR-19 (a), (b)).
+V2  the same clip at `set_speed rate 7` (end ×14) answers `audio_left_out`
+    [clip] and D3's one-clip `audio_note`.
+V3  a 1 s AV.mov clip at in 0, `add_action` [0, 1 s), `set_action_end
+    {speed: 6}`, `trim_end` to 300000, and AV.mov ×1 at 1 s cut to 1.5 s;
+    then `set_speed rate 2.5`: duration 120000, the action [0, 240000) and
+    end 15, and the answer carries `audio_left_out` [clip] though the clip
+    reaches only ×8.75 inside itself (SR-19 (d), the rate it names); an
+    `audio_wav` export (`read_ffmpeg`) is silent (max |x| < 1e-4) over
+    [0, 0.2 s) and carries the tone (RMS > 0.01) over [1.1 s, 1.4 s].
+C1  a 2 s AV.mov clip at in 0, `add_action` [0, 2 s), `set_action_end
+    {speed: 3}`, `trim_end` to 1 s, then `set_canvas fps [25, 1]`: the
+    action stays [0, 1200000) with end 3, the duration 600000 (SR-19 (g)).
 
 `--baseline` (before any SR2b app edit, on Release) builds CX1, CX2 and CK05
 and writes `tools/proof/work/ramp-baseline/baseline.json`: the commit and dirt
@@ -169,7 +188,8 @@ W1_BOUND_S = 60
 SR2A_ROWS = ["D1", "D2", "D3", "D4", "D5"]
 SR2B_ROWS = ["X0", "U1", "E1", "E2", "N1", "K1", "L1", "L2", "L3", "R1", "W1", "P1"]
 SR3A_ROWS = ["T1", "S1"]
-ROWS = ["D0"] + SR2A_ROWS + SR2B_ROWS + SR3A_ROWS
+SR3B_ROWS = ["V1", "V2", "V3", "C1"]
+ROWS = ["D0"] + SR2A_ROWS + SR2B_ROWS + SR3A_ROWS + SR3B_ROWS
 # name: (rate, keep pitch or None for the default, length ticks)
 CONSTANTS = {"CX1": (1.0, None, 4 * SEC), "CX2": (2.0, False, 4 * SEC),
              "CK05": (0.5, True, 4 * SEC)}
@@ -442,6 +462,112 @@ def s1(client, state):
           f"split {got.get('reply', got.get('error'))!r:.80}; second "
           f"{None if second is None else (second['source'].get('in'), second.get('speed'))} "
           f"(expected (900000, 2)); head end ×{head}, tail end ×{tail}")
+    doc.close()
+
+
+# ---- SR3b ------------------------------------------------------------------------
+
+
+def left_out_note(clip, media):
+    """D3's one-clip `audio_note`, SpeedAudioDrop's template."""
+    return (f"Clip {clip} (“{media_name(media)}”) now plays above ×12, so its audio is left "
+            f"out: it is silent in the preview and the export.")
+
+
+def v_ramp(doc):
+    """V1's and V2's clip: 2 s of AV.mov at in 0, [0, 1 s) ending at ×2."""
+    clip, media = doc.av_clip(2 * SEC)
+    action = doc.action(clip, 0, SEC)
+    doc.must("set_action_end", clip=clip, action=action, patch={"speed": 2})
+    return clip, media
+
+
+def v1(client, state):
+    doc = Doc(client, "v1")
+    clip, _ = v_ramp(doc)
+    got = doc.call("set_speed", clip=clip, rate=2)
+    after = doc.clip(clip)
+    ramp = after["actions"][0]
+    # One factor, 2: the base and the end rate double, every span halves.
+    good = (got["ok"] and after["speed"] == 2 and ramp["end"].get("speed") == 4
+            and after["duration"] == SEC and (ramp["start"], ramp["duration"]) == (0, SEC // 2))
+    check("V1", good,
+          f"set_speed {got.get('reply', got.get('error'))!r:.80}; speed {after['speed']}, end "
+          f"{ramp['end']}, duration {after['duration']}, action [{ramp['start']}, "
+          f"{ramp['start'] + ramp['duration']}) (expected 2, 4, {SEC}, [0, {SEC // 2}))")
+    doc.close()
+
+
+def v2(client, state):
+    doc = Doc(client, "v2")
+    clip, media = v_ramp(doc)
+    got = doc.call("set_speed", clip=clip, rate=7)
+    answer = got.get("reply") if got["ok"] else {}
+    note = left_out_note(clip, media)
+    good = (got["ok"] and isinstance(answer, dict)
+            and answer.get("audio_left_out") == [clip] and answer.get("audio_note") == note)
+    check("V2", good,
+          f"audio_left_out {answer.get('audio_left_out') if isinstance(answer, dict) else None}; "
+          f"audio_note {answer.get('audio_note') if isinstance(answer, dict) else got}; "
+          f"expected {note!r}; end {doc.clip(clip)['actions'][0]['end']}")
+    doc.close()
+
+
+def v3(client, state):
+    doc = Doc(client, "v3")
+    media = doc.must("import_media", path=str(AV_MOV))["media"]
+    track = doc.project()["tracks"][0]["id"]
+    clip = doc.must("add_clip", track=track, media=media, at=0)["new_clips"][0]
+    doc.must("trim_end", clip=clip, to=SEC)
+    action = doc.action(clip, 0, SEC)
+    doc.must("set_action_end", clip=clip, action=action, patch={"speed": 6})
+    doc.must("trim_end", clip=clip, to=300_000)
+    tone = doc.must("add_clip", track=track, media=media, at=SEC)["new_clips"][0]
+    doc.must("trim_end", clip=tone, to=SEC + SEC // 2)
+    row = next(m for m in doc.project()["media"] if m["id"] == media)
+    got = doc.call("set_speed", clip=clip, rate=2.5)
+    answer = got.get("reply") if got["ok"] else {}
+    after = doc.clip(clip)
+    ramp = after["actions"][0]
+    # The clip ends at t = 120 000 inside [0, 240 000) ×2.5 → ×15: it reaches
+    # 2.5 + 12.5 / 2 = ×8.75 and names ×15, so its audio is left out, and the
+    # answer and the export agree on that.
+    shaped = (after["duration"] == 120_000 and (ramp["start"], ramp["duration"]) == (0, 240_000)
+              and ramp["end"].get("speed") == 15)
+    answered = (got["ok"] and isinstance(answer, dict) and answer.get("audio_left_out") == [clip]
+                and answer.get("audio_note") == left_out_note(clip, row))
+    x, rate = read_ffmpeg(doc.export("audio_wav", "v3-wav"))
+    head = x[:int(0.2 * rate)]
+    body = x[int(1.1 * rate):int(1.4 * rate)]
+    peak = max((abs(v) for v in head), default=1.0)
+    rms = math.sqrt(sum(v * v for v in body) / len(body)) if body else 0.0
+    check("V3", shaped and answered and head and peak < 1e-4 and rms > 0.01,
+          f"duration {after['duration']}, action [{ramp['start']}, "
+          f"{ramp['start'] + ramp['duration']}), end {ramp['end']} (expected 120000, "
+          f"[0, 240000), 15); audio_left_out "
+          f"{answer.get('audio_left_out') if isinstance(answer, dict) else got}; export "
+          f"max |x| over [0, 0.2 s) {peak:.2e} (< 1e-4), RMS over [1.1 s, 1.4 s] {rms:.4f} "
+          f"(> 0.01)")
+    doc.close()
+
+
+def c1(client, state):
+    doc = Doc(client, "c1")
+    clip, _ = doc.av_clip(2 * SEC)
+    action = doc.action(clip, 0, 2 * SEC)
+    doc.must("set_action_end", clip=clip, action=action, patch={"speed": 3})
+    doc.must("trim_end", clip=clip, to=SEC)
+    got = doc.call("set_canvas", fps=[25, 1])
+    after = doc.clip(clip)
+    ramp = after["actions"][0]
+    # The re-snap keeps the speed action running past the clip's end.
+    good = (got["ok"] and after["duration"] == SEC
+            and (ramp["start"], ramp["duration"]) == (0, 2 * SEC)
+            and ramp["end"].get("speed") == 3)
+    check("C1", good,
+          f"set_canvas {got.get('reply', got.get('error'))!r:.80}; duration "
+          f"{after['duration']}, action [{ramp['start']}, {ramp['start'] + ramp['duration']}), "
+          f"end {ramp['end']} (expected {SEC}, [0, {2 * SEC}), 3)")
     doc.close()
 
 
@@ -757,7 +883,7 @@ def p1_app(client, state):
 APP_RUNNERS = {"D1": d1, "D2": d2, "D3": d3, "D4": d4, "D5": d5, "X0": x0, "U1": u1, "E1": e1,
                "E2": e2, "N1": n1, "K1": k1, "R1": r1, "W1": w1,
                **{row: (lambda client, state, row=row: l_row(row, client)) for row in L_ROWS},
-               "P1": p1_app, "T1": t1, "S1": s1}
+               "P1": p1_app, "T1": t1, "S1": s1, "V1": v1, "V2": v2, "V3": v3, "C1": c1}
 
 
 # ---- SR2b: the probe's reads, after the instance stopped -------------------------
@@ -886,7 +1012,7 @@ def complaints(log):
 
 
 def needs(name):
-    if name in SR2A_ROWS or name in SR3A_ROWS:
+    if name in SR2A_ROWS or name in SR3A_ROWS or name in SR3B_ROWS:
         return [AV_MOV]
     if name == "X0":
         return []
@@ -1024,8 +1150,8 @@ def main():
     chosen = [r for r in ROWS[1:] if not args.only or r in args.only.split(",")]
     if any(r in SR2B_ROWS[1:] for r in chosen) and "X0" not in chosen:
         chosen.insert(0, "X0")
-    print(f"speed ramps SR2a/SR2b/SR3a — set_action_end's speed, the rendered ramp audio "
-          f"and edits on a ramped clip — "
+    print(f"speed ramps SR2a/SR2b/SR3a/SR3b — set_action_end's speed, the rendered ramp "
+          f"audio, edits on a ramped clip and its rate scaled and carried — "
           f"{binary}" + (f" — mutant {MUTANT}" if MUTANT else ""), flush=True)
     state = {}
     run_app(binary, chosen, state)

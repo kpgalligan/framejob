@@ -14,8 +14,8 @@ import AppKit
 /// A clip that is new in the answer (a split's half, a duplicate, a detach)
 /// never counts, and one already above the ceiling is not asked about again.
 /// A clip's rate here is its PEAK (`peakSpeed`): a speed ramp (spec §11
-/// SR-10) leaves the audio out when any rate it reaches is above the
-/// ceiling, as the core's plan does.
+/// SR-10) leaves the audio out when any rate it names is above the
+/// ceiling, as the core's plan does (SR-19 (d)).
 /// Nothing here is a refusal: Set Speed applies the edit exactly as it would
 /// have been applied without the question.
 enum SpeedAudioDrop {
@@ -56,8 +56,8 @@ enum SpeedAudioDrop {
         return found.sorted { $0.id < $1.id }
     }
 
-    /// The greatest rate a clip reaches: its speed, or any action's end
-    /// rate (spec §11 SR-10), never computed. As the core's plan reads it,
+    /// The greatest rate a clip names: its speed, or any action's end
+    /// rate (spec §11 SR-10, SR-19 (d)), never computed. As the core's plan reads it,
     /// only a `media` clip ramps, and an end rate is clamped to the speed
     /// limits (a hand-written one may lie outside them).
     static func peakSpeed(

@@ -107,7 +107,10 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   Media sources only — a non-media clip is an **error**, not a refusal, so an MCP caller gets a
   message it can correct from (the UI never offers it). The audio ceiling is `set_speed`'s: the
   timeline's ⌥-drag asks before it crosses, and the MCP answer carries `audio_left_out` /
-  `audio_note` (§11 #190's "The question").
+  `audio_note` (§11 #190's "The question"). On a ramped clip the whole rate profile scales by f =
+  D ÷ (to_end − start) — the base, every end rate and every speed action's span, which is not
+  clamped into the clip — and an f that would take any of its rates past ×0.1–×1000 is the
+  identity (§11 SR-19 (a), (b)).
 - **`slip {clip, delta}`** — Slides the source under a fixed clip: `in += delta × speed`, start and
   duration unchanged, so nothing downstream moves. `delta` is TIMELINE ticks; positive shows later
   material. Clamped so the window stays inside the media (`in ≥ 0`, `in + duration × speed ≤
@@ -199,7 +202,11 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   edit takes a clip with sound from at or below ×12 to above it (the Speed sheet, the inspector's
   Speed section); an agent gets no dialog, and the tool's answer instead carries `audio_left_out`
   (the clip ids) and `audio_note` (a sentence naming them) whenever its edit crossed (§11 #190's
-  "The question").
+  "The question"). On a ramped clip one factor f (the clamped rate ÷ `speed`, or D ÷ d) scales the
+  base, every end rate and every speed action's span, which is not clamped into the clip, so the
+  clip keeps its shape and its window; f is clamped so no rate it names passes ×0.1–×1000, and the
+  duration is held through S∞; the audio ceiling reads the greatest rate the clip names (§11 SR-19
+  (a)–(d)).
 - **`set_reversed {clip, reversed}`** — Plays the media back to front, or forward again. The core
   does no pixel work, so this changes neither the plan nor the recipe: Swift substitutes a
   pre-rendered reversed asset for that media's segments (§11). `in` is measured in the direction the
@@ -218,7 +225,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
 - **`detach_audio {clip}`** — `enabled.audio = false` on the clip; a new clip with `enabled =
   {video: false, audio: true}`, same source/in/duration/speed and the audio props, on the track
   below (a track is inserted at index 0 if needed). Refuses, naming why (§11 #88), on a clip that
-  is not media, whose media has no audio, or whose audio is already detached.
+  is not media, whose media has no audio, or whose audio is already detached. A ramped clip's
+  twin copies every action whole, with new ids, so it reads the same map (§11 SR-19 (e)).
 - **`duplicate {clips}`** — Copies placed after the originals' span on the same tracks (⌥-drag then
   moves them).
 - **`paste {at, track?, payload}`** — Inserts the clips of a clipboard payload — `{"clips": [...],
@@ -237,7 +245,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   outside ×0.1–×1000 gets the same `pasted clip N: …` error), then has its start, source-bounded
   duration, action spans, present base motion/text timings and a graphic's `in` and `length`
   normalized to this document's grid, since the payload may come from another
-  frame rate (§11, D7-3, G-18·b).
+  frame rate (§11, D7-3, G-18·b). On a ramped clip a speed action is snapped but not clamped into
+  the clip, and the duration is held again against it (§11 SR-19 (f), (g)).
 - **`paste_attributes {clips, payload, groups?, skip_missing?}`** — Copies the payload's EARLIEST
   clip's property groups onto each clip (at one start the front-most, then the lower id — never the
   array's first, which is Copy's creation order) — `payload` is the same Copy payload `paste` takes,
@@ -252,7 +261,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   and so is a copied value the inspector would refuse — each copied layer group passes the patches'
   range checks. Copied video motion and text animation pass the same original-value range checks as
   a patch, then snap to the target grid; audio envelopes retain sample precision. Speed, enabled,
-  actions, the transition, the source and the clip's own name and label stay. A video group's
+  actions, the transition, the source and the clip's own name and label stay, so a ramped payload
+  or target carries no rate profile and no window changes (§11 SR-19 (f)). A video group's
   `qualifier` follows the clip kind (§11 GR-13): dropped onto a picture clip (said in the tool's
   description, not its answer — D2-1), an adjustment target's own kept when the payload clip is
   not an adjustment clip, copied between two adjustment clips. **`graphic` is the
@@ -305,7 +315,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   `nest`, not of the trim. The nest is dropped from `nests[]` when no clip anywhere still shows it.
   Each returning clip has its translated start, source-bounded duration, action spans and present
   base motion/text timings normalized to the document's grid (§11, D7-3), including a legacy
-  off-grid nest. An **error** when `clip` is not a nest clip.
+  off-grid nest; a ramped clip's speed actions are snapped but not clamped into it, and its
+  duration held again against them (§11 SR-19 (g)). An **error** when `clip` is not a nest clip.
 - **`set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape`** — Merge the patch into the
   base props. Refuses if nothing changes. An unknown key, a value of the wrong JSON kind or a
   misspelt variant anywhere in the patch is an **error** that names the dotted path to it, array

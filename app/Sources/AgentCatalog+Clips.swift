@@ -255,7 +255,9 @@ extension AgentServer {
                 "Stretches a clip to end at `to_end` by changing its SPEED instead of trimming "
                     + "it — the whole source still plays, faster or slower (⌥-dragging the end "
                     + "edge). Media clips only: a text, shape, image or freeze clip has no "
-                    + "source to stretch and is an error.",
+                    + "source to stretch and is an error. A speed ramp on the clip scales with "
+                    + "it; a stretch that would take any of its rates past the limits changes "
+                    + "nothing.",
                 ["clip": clipDescription, "to_end": "New end, \(ticks)"]),
             opTool(
                 "slip",
@@ -367,7 +369,10 @@ extension AgentServer {
                         + "one. Any non-media clip is an error. The duration follows (source "
                         + "length ÷ rate, snapped and held to what the file holds); actions keep "
                         + "their place. Rate is clamped to %g–%g. Above ×%g, with or without "
-                        + "keep_pitch, the clip's audio is left out of the mix.", speed.min,
+                        + "keep_pitch, the clip's audio is left out of the mix. On a clip with "
+                        + "a speed ramp every rate in the ramp scales with it, so the ramp keeps "
+                        + "its shape; the scale stops where any of its rates would pass the "
+                        + "limits.", speed.min,
                     speed.max, speed.audioMax),
                 [
                     "clip": clipDescription,

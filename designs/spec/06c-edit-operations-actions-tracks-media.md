@@ -107,7 +107,9 @@ The rules every op shares are §6a; the clip ops are §6b.
   timecode_frames?, output?, blending?}`** — `rescale_clips` multiplies every clip's `x`, `y`, `scale` by the size
   ratio. Changing fps normalizes top-level and every stored nest's clip starts, source-bounded
   durations, action spans, present base motion/text timing and a graphic's `in` and `length`, plus
-  top-level markers (§11, D7-3, G-18·b). Size-only and same-fps edits leave legacy timing alone.
+  top-level markers (§11, D7-3, G-18·b); a ramped clip's speed actions are snapped but not clamped
+  into it, and its duration is held again against them (§11 SR-19 (g)). Size-only and same-fps
+  edits leave legacy timing alone.
   `output` (`sdr` or `hlg`, format 23, §11 HD-2, HD-13) sets the project's dynamic range and
   changes no clip or grade; the output the canvas has is an identity, and another value is
   invalid input naming serde's list (`unknown variant \`pq\`, expected \`sdr\` or \`hlg\``).
@@ -118,8 +120,9 @@ The rules every op shares are §6a; the clip ops are §6b.
   `remove_media {media, with_clips=false}`** — The descriptor is the `media[]` element minus `id`;
   the host probes the file. `relink_media`'s `probe` is the new file's descriptor minus `path` and
   `bookmark`, filled by the host: the media takes its duration, size, rate and flags, a file of
-  another kind is refused, and a media clip that runs past a shorter file's end is held to it; an
-  absent `probe` keeps the record (§11, #63). The descriptor and the probe both carry `original`,
+  another kind is refused, and a media clip that runs past a shorter file's end is held to it (a
+  ramped one through S∞, its actions unchanged, §11 SR-19 (h)); an absent `probe` keeps the
+  record (§11, #63). The descriptor and the probe both carry `original`,
   the WebM or Matroska file a `.mov` copy was made from (§11 #228-O): `add_media` stores it, a
   probe with one replaces the stored one, a probe without one clears it, and no probe keeps it.
   A `lut` row (§11 GR-8) — a `.cube` file — carries no video, audio,

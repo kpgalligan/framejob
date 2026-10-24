@@ -29,8 +29,9 @@ corrected playback tap rather than zero-padding it, with SR-7's PT1 Amended-by l
 recorded in SR1e before its instrument code; SR1e has no measured run, so nothing pins this
 file's SHA-256 again. SR3 is split in two: SR3a (the trims, roll, slip, the splitters, freeze and
 the handle transition, the road map's F–K) recorded SR-18 and SR-10's Amended-by line before its
-code; SR3b (L and M) follows. Later phases record their rules as new entries (SR-19 on) or as
-Amended-by lines before their code.
+code; SR3b (L and M) recorded SR-19 and the Amended-by lines on SR-10 and SR-18 before its code.
+Later phases record their rules as new entries (SR-20 on) or as Amended-by lines before their
+code.
 
 **Stands, and nothing here re-litigates it:** SY-24 (the varispeed lead: a time-scaled segment
 on an `off` track reads its source 575 ticks earlier; ×1 untouched); SY-26 (one pitch name per
@@ -409,6 +410,9 @@ plan leaves the audio out, one pitch per plan audio track).
     before). It is left out when the clip's PEAK rate (the greatest rate at any piece edge of its
     own, unlifted map, the figure `SpeedAudioDrop` reads) is above ×12 (#190). Until SR2b renders
     it the segment is empty time.
+    *Amended by SR-19 (SR3b):* the peak is SR-19 (d)'s named figure, `peak_rate`: the base and
+    every end rate the clip names, reached inside [0, D) or not, the figure `SpeedAudioDrop`
+    reads.
   - **The road map's "Swift lead rule" is moot**: SR1's STOP ruled out GO-UNIFORM-LEAD, and SR-6
     carries ramp audio as one ×1 segment, which takes no lead.
   - **The slot (SR-2, the road map's C).** `set_action_end` refuses an end rate that would read
@@ -429,6 +433,9 @@ plan leaves the audio out, one pitch per plan audio track).
     `add_transition`'s handles measure and move a ramped clip's window through S; until SR3b,
     `set_speed`/`rate_stretch` scaling, `detach_audio`, `paste` and the re-snaps keep their
     interim (SR-18 (h)).
+  - *Amended by SR-19 (SR3b):* the interim is ended: `set_speed` and `rate_stretch` scale the whole
+    profile, and `detach_audio`, `paste`, `paste_attributes`, `relink_media` and the re-snaps
+    carry it (SR-19).
 - **SR-11 — Keep pitch inside a ramp is a known limit until SR1d: the held spans keep pitch, the
   ramp spans glide like tape.** The owner's SR1c answer ("SR2 now, fix after").
   - The whole clip is rendered as ONE file. With keep pitch on, SR-8's arm renders the held
@@ -732,6 +739,9 @@ plan leaves the audio out, one pitch per plan audio track).
     `largest_fitting_end_rate` (R1's solve and step down); when none fits it is left as is (the
     plan's clamp holds it). A `linear` or `ease_out` tail is never lowered, because its rounding
     is the constant clip's ±1 tick. No splitter gains a refusal.
+    *Amended by SR-19 (SR3b):* "`frame_grid.rs` clamps it" no longer holds for a ramped clip's
+    speed action, which a re-snap snaps without clamping into the clip (SR-19 (g)); the head rule
+    above stands.
   - **(f) `freeze_frame`'s** still `at` is `in + round(S(at − start))`: the join tick of (e), the
     frame the first half ends on and the second half starts on.
   - **(g) F and G are no case.** `in` and S are measured in play direction, and `scope` applies
@@ -739,6 +749,10 @@ plan leaves the audio out, one pitch per plan audio track).
   - **(h) Interim until SR3b.** `relink_media`, the re-snaps and `set_speed`'s hold already read
     the ramp-aware bound through `duration_resnapped` / `source_length_on_timeline`; L's profile
     scaling and M's carry rules are SR3b's.
+    *Amended by SR-19 (SR3b):* the interim ends. `set_speed` and `rate_stretch` scale the whole
+    rate profile by one factor and their hold reads the scaled actions (SR-19 (a), (b)); the
+    re-snaps snap a ramped clip's speed actions without clamping them and hold again (SR-19 (g));
+    `relink_media`'s hold stands as built (SR-19 (h)).
   - **Why:** S is what the clip reads, so a bound that divides by one rate is wrong on every
     ramped clip; the head has no actions in front of it to read; and a split whose halves met at
     two different source ticks would play footage twice or skip it at an invisible join (the
@@ -747,3 +761,66 @@ plan leaves the audio out, one pitch per plan audio track).
   - Risk accepted: an `ease_out` or `ease_in_out` split steps the rate at the cut; an `ease_in` or
     `ease_in_out` split moves the second half's out point; a `trim_start` that would read a
     ramped clip past its file lands nearer its old start than asked.
+- **SR-19 — Rate edits and carries on a ramped clip (SR3b): one factor scales the whole profile;
+  what copies, re-snaps or holds a ramped clip keeps what it reads; one ×12 figure.** The road
+  map's L and M, as built.
+  - **(a) The factor f.** `set_speed`'s `rate` arm sets f = clamp(rate, ×0.1, ×1000) ÷ `speed`.
+    Its `duration` arm sets d = snapped(duration), at least a frame: f = 1 when d is the clip's
+    duration D, else f = D ÷ d. `rate_stretch` sets f = D ÷ (to_end − start). `set_speed` clamps f
+    into the range that keeps every rate the clip names — its base and every action's `end.speed`
+    — inside ×0.1–×1000 (`profile_factors`): when one rate would pass a limit, the whole profile
+    stops there, so the clip keeps its shape and its base is `speed`·f rather than the rate asked.
+    When f does not clamp, the `rate` arm writes the base as the clamped rate itself, never
+    `speed`·f, which doubles can miss by an ULP (×49 → ×1), so a repeat is an identity.
+    When f clamps to 1 the edit is an identity apart from `keep_pitch`. A `rate_stretch` whose f
+    lies outside that range is an identity, as today's out-of-range rate is. Every rate is
+    multiplied by the same f, each product clamped to the limits; at f = 1 no rate is rewritten.
+  - **(b) Duration and actions.** For `set_speed`, D′ = snapped(round(D ÷ f)), at least a frame;
+    the `duration` arm with an unclamped f writes d itself, and `rate_stretch` writes to_end −
+    start. Every SPEED action's start and duration scale by D′/D, snapped and NOT clamped into
+    D′: one that ran past the clip's end, or started past it, still does. Every other action is
+    rescaled and clamped into the clip as before. Exactly, S∞′(t·D′/D) = S∞(t) at every t, so the
+    window is the same and only the grid's rounding can pass the file; D4-3's hold through
+    `duration_resnapped` (S∞) catches that, and leaves the speed actions where they are, as
+    `trim_end` does (SR-18 (a)); when it shortens the clip, every other action is re-clamped into
+    what is left, as the re-snap's second pass (g) does.
+  - **(c) No refusal.** R1–R3 refuse because a ramp edit keeps its slot and so cannot shorten. L
+    changes the slot by definition and keeps the window, so it clamps like a constant
+    `set_speed`.
+  - **(d) One ×12 figure.** The plan leaves a ramped clip's audio out when `peak_rate` of its own,
+    unlifted clip is above ×12. `peak_rate` is the greatest rate the clip NAMES: its base and
+    every end rate, reached inside [0, D) or not. That is the figure `SpeedAudioDrop.peakSpeed`
+    already reads off the snapshot, so the Speed sheet's question, an MCP answer's
+    `audio_left_out` / `audio_note` and the plan agree on every clip, trimmed or not. No Swift
+    code changes. It amends SR-10's piece-edge figure, which SR3a's past-end actions made
+    disagree with Swift's.
+  - **(e) `detach_audio`** copies every action whole with new ids, so the twin reads the same
+    map. The road map M's reduction to `{speed, audio}` is not built: the twin keeps its video
+    props and video actions so that re-enabling its video is not lossy, which is that op's
+    existing rule.
+  - **(f) `paste` and `paste_attributes`.** `paste` lands every clip, the clips inside the nests
+    it brings, and a paste under `scope` into a nest through the re-snap (g). `paste_attributes`
+    carries no profile: speed and actions are not properties, so a target keeps its own speed and
+    actions, and its window does not change.
+  - **(g) The re-snap** (`set_canvas`'s fps change, both paste loops, `unnest`). On a ramped clip
+    a speed action is snapped onto the grid and not clamped into the clip: it keeps running past
+    the end, as `trim_end` leaves it, so S∞ and what the clip reads by its end are kept up to the
+    grid's rounding. The duration is then held again with the re-snapped actions, and the other
+    actions are re-clamped into it. Every other action, and every clip that is not ramped, clamps
+    as before.
+  - **(h) `relink_media`** needs no code: `hold_to_file`'s `duration_resnapped` reads S∞ with the
+    actions unchanged (SR-18 (a)), so the held clip fits the shorter file exactly.
+  - **(i) `set_action` on an action running past its clip's end** keeps its refusal
+    (`action_past_end`). It is the crate's rule for every clip, a constant clip's trimmed zoom
+    action included, so it is not a ramp's. SR5 (rule Q, where a person reaches it) records its
+    rule before its code.
+  - **Why:** one factor applied to every rate and every speed span is the only scaling that keeps
+    both the shape and the window. A copy or a re-snap that changed what a ramp reads would change
+    the picture with no edit. A named figure is one both readers take from stored numbers (no rate
+    computed in Swift, D2-1); it is never below the reached peak, so audio is never kept above
+    ×12, and a trim never changes whether a clip sounds.
+  - Risk accepted: a clamped f leaves the base off the asked rate; a ramped `rate_stretch` that
+    the hold trims lands up to a frame short; a re-snap moves a ramp's out point by the grid's
+    rounding; a speed action can lie past its clip's end after any of these ops; a ramp that names
+    a rate above ×12 past its clip's end leaves the audio out though the clip never plays above
+    ×12.
