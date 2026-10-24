@@ -15,7 +15,11 @@ are the SR1c record. SR1d (SR-14) sweeps the lead of SR-13's rate-mode arm
 with `--lead-sweep`, then judges it with `--verdict rate`: SR-7's arm ON over
 RK1, RK2 and the held-out RK3, SR-9's pitch rows under the rate-mode command
 and constant renders of a gliding fixture (`sweep`, RW); its answers are the
-SR1d record.
+SR1d record. SR1e (SR-17) trims a corrected playback tap rather than
+zero-padding it (`trim_shift`, `corrected_signal`, `place_corrected`): every
+rule reads the samples the tap carried as the signal's extent, and a click
+outside them is unobserved, not missed (selftest S22, mutants `trim-off` and
+`window-off`); SR1e closed with no measured run (SR-16).
 
     python3 tools/proof/ramp_spike/render_spike.py [--groups render,plan,export,playback]
         [--variants RV1,RC-off-x1,…] [--remake] [--verdict both|on|rate]
@@ -123,6 +127,7 @@ FRAME_SET = set(OFF_MEMBERS + RATE_ON_RAMPS)
 MUTANTS = ["dense-off", "merge-all", "pt1-off", "identity-off", "on-anchor-off"]
 MUTANTS += ["pitch-flat", "lag-zero", "on-verdict-off", "pitch-rule-off"]
 MUTANTS += ["rk3-off", "sweep-drop-off", "lead-pick-max"]
+MUTANTS += ["trim-off", "window-off"]
 
 MUTANT = None
 
@@ -266,14 +271,19 @@ def expected_ideal(v):
     return out
 
 
-def place_ideal(samples, rate, v, residual_s=0.0):
+def place_ideal(samples, rate, v, residual_s=0.0, window=None):
     """SR-5's location against the ideal map; `residual_s` is the part of a
-    playback correction a whole-sample shift of the signal left over."""
+    playback correction a whole-sample shift of the signal left over.
+    `window` (lo s, hi s), a trimmed tap's extent (SR-17): samples[0] sits at
+    lo s, and a click expected outside [lo + EDGE_SKIP_S, hi − EDGE_SKIP_S]
+    is unobserved — None in "times", out of "of", counted in "unobserved"."""
     exp = expected_ideal(v)
     times = [t for _, t, _ in exp]
     rates = [r if not v["keep"] else 1.0 for _, _, r in exp]
     spacing = min((b - a for a, b in zip(times, times[1:])), default=1.0) * 1000
     reach = min(rs.REACH_MAX_MS, rs.REACH_SHARE * spacing)
+    if window is not None:
+        return place_window(samples, rate, times, rates, reach, residual_s, window)
     found = rs.locate_scaled(samples, rate, [t + residual_s for t in times], rates, reach)
     found = [(None if f is None else f - residual_s, r) for f, r in found]
     s = summary(found, times)
@@ -281,6 +291,25 @@ def place_ideal(samples, rate, v, residual_s=0.0):
     s["max_abs_ms"] = max((abs(d) for d in s["diffs"]), default=None)
     s["times"] = [f for f, _ in found]
     s["reach_ms"] = reach
+    return s
+
+
+def place_window(samples, rate, times, rates, reach, residual_s, window):
+    """`place_ideal` over a trimmed tap whose samples[0] sits at window[0] s."""
+    lo, hi = window
+    seen = [MUTANT == "window-off" or lo + rs.EDGE_SKIP_S <= t <= hi - rs.EDGE_SKIP_S
+            for t in times]
+    obs_t = [t for t, ok in zip(times, seen) if ok]
+    obs_r = [r for r, ok in zip(rates, seen) if ok]
+    found = rs.locate_scaled(samples, rate, [t - lo + residual_s for t in obs_t], obs_r, reach)
+    found = [(None if f is None else f + lo - residual_s, r) for f, r in found]
+    s = summary(found, obs_t)
+    s["found_share"] = s["found"] / s["of"] if s["of"] else 0.0
+    s["max_abs_ms"] = max((abs(d) for d in s["diffs"]), default=None)
+    located = iter(f for f, _ in found)
+    s["times"] = [next(located) if ok else None for ok in seen]
+    s["reach_ms"] = reach
+    s["unobserved"] = seen.count(False)
     return s
 
 
@@ -334,6 +363,32 @@ def shift_signal(x, k):
     for j in range(max(0, k), min(n, n + k)):
         out[j - k] = x[j]
     return out
+
+
+def trim_shift(x, k):
+    """(samples, first): x corrected k samples EARLIER (k < 0: later) by
+    trimming what `shift_signal` would zero-fill (SR-17); corrected sample
+    `first + i` is samples[i]."""
+    if MUTANT == "trim-off":
+        return shift_signal(x, k), 0
+    if k == 0:
+        return x, 0
+    return x[max(0, k):len(x) + min(0, k)], max(0, -k)
+
+
+def corrected_signal(x, rate, k):
+    """(samples, rate, window): a playback tap corrected by k samples, its
+    window (first / rate, (first + len) / rate) s, None when k is 0."""
+    if k == 0:
+        return x, rate, None
+    samples, first = trim_shift(x, k)
+    return samples, rate, (first / rate, (first + len(samples)) / rate)
+
+
+def place_corrected(x, rate, v, k, residual_s=0.0):
+    """`place_ideal` over a tap corrected by k samples, trimmed (SR-17)."""
+    samples, rate, window = corrected_signal(x, rate, k)
+    return place_ideal(samples, rate, v, residual_s, window)
 
 
 def correction(m1_ms, rate):
@@ -891,6 +946,39 @@ def selftest():
         CENTS_BOUND = kept_bound
     row("S21", all(abs(h - rs.SINE_HZ) <= 1e-9 for h in rate_hz) and abs(sr9_hz - 330.0) <= 1e-9,
         f"rate mode: ×0.2 {rate_hz[0]:.6f} Hz, ×6 {rate_hz[1]:.6f} Hz; SR-9's ×6 {sr9_hz:.6f} Hz")
+
+    # S22: SR-17 — a ×2 tap ±86.333 ms off (#335), corrected by trimming, then by padding.
+    v = {"keep": True, "kind": "control", "ideal": control_ramp(True, 2.0, 6.0),
+         "length": 6 * SEC}
+    export = place_ideal(train(v), RATE, v)
+    sine = rs.sine(rs.SINE_HZ, 6.0)
+    holds, notes = [], []
+    for m1 in (-86.333, 86.333):
+        k, residual = correction(m1, RATE)
+        clicks = train(v, m1 / 1000)
+        trimmed = side_rules(v, "S22", "playback",
+                             (corrected_signal(clicks, RATE, k), corrected_signal(sine, RATE, k),
+                              None, residual), {"place": {}, "dmax": {}})
+        p = trimmed["placement"]["summary"]
+        worst = p["max_abs_ms"]
+        drops = trimmed["dropout"]["events"]
+        agree_ok, agree_detail = agreement(export, p)
+        trim_ok = (p["of"] > 0 and p["found"] == p["of"] and p.get("unobserved", 0) >= 1
+                   and worst is not None and worst <= rs.SPREAD_MS and not drops
+                   and agree_ok is True)
+        padded = side_rules(v, "S22", "playback",
+                            ((shift_signal(clicks, k), RATE, None),
+                             (shift_signal(sine, k), RATE, None), None, residual),
+                            {"place": {}, "dmax": {}})
+        pad_drops = padded["dropout"]["events"]
+        holds.append(trim_ok and len(pad_drops) >= 1)
+        notes.append(f"m1 {m1:+.3f} ms (k {k}): trimmed {p['found']}/{p['of']}, "
+                     f"{p.get('unobserved', 0)} unobserved, max |diff| "
+                     + ("—" if worst is None else f"{worst:.3f} ms")
+                     + f", {len(drops)} dropouts, agreement {agree_detail} "
+                     f"({'passes' if agree_ok else 'fails'}); padded: {len(pad_drops)} dropouts "
+                     f"at {[t for t, _ in pad_drops[:3]]}")
+    row("S22", all(holds), "; ".join(notes))
     return all(rows), len(rows)
 
 
@@ -1153,12 +1241,14 @@ def render_samples(name, fixture):
 
 def side_rules(v, name, side, signals, ctx):
     """SR-7's rule outcomes for one variant on one side: {rule: {...}}.
-    `ctx` holds this side's placements and D maxima so far, by name."""
+    `ctx` holds this side's placements and D maxima so far, by name. A
+    signal is (x, rate, window); with a window (SR-17) every rule reads the
+    trimmed samples as the extent and reports its times + lo."""
     clicks_sig, sine_sig, bars, residual = signals
     out = {}
     length_s = v["length"] / SEC
     if clicks_sig is not None:
-        s = place_ideal(clicks_sig[0], clicks_sig[1], v, residual)
+        s = place_ideal(clicks_sig[0], clicks_sig[1], v, residual, clicks_sig[2])
         ctx["place"][name] = s
         if not v["keep"]:
             ok = rs.varispeed_pass(s)
@@ -1174,8 +1264,10 @@ def side_rules(v, name, side, signals, ctx):
         else:
             out["placement"] = {"ok": None, "summary": s}
     if sine_sig is not None:
-        x, rate = sine_sig
-        scan = dense_scan(x, rate, length_s)
+        x, rate, window = sine_sig
+        lo = 0.0 if window is None else window[0]
+        span = length_s if window is None else window[1] - window[0]
+        scan = dense_scan(x, rate, span)
         own = max(scan[1], default=0.0)
         if not v["keep"]:
             floor = 0.0
@@ -1189,10 +1281,16 @@ def side_rules(v, name, side, signals, ctx):
             out["click"] = {"ok": None, "at": [], "events": []}
         else:
             ev = click_events(scan, floor)
+            if window is not None:
+                ev = [(round(t + lo, 4), d, r) for t, d, r in ev]
             out["click"] = {"ok": not ev, "at": [t for t, _, _ in ev], "floor": floor,
                             "events": [[t, d, r] for t, d, r in ev[:20]],
                             "worst_ratio": max((r for _, _, r in ev), default=None)}
-        drops = rs.events(rs.dropouts(x, rate, length_s, period_fn(v)))
+        if window is None:
+            drops = rs.events(rs.dropouts(x, rate, length_s, period_fn(v)))
+        else:
+            drops = rs.events(rs.dropouts(x, rate, span, lambda t: period_fn(v)(t + lo)))
+            drops = [(round(t + lo, 4), kind) for t, kind in drops]
         out["dropout"] = {"ok": not drops, "events": drops[:20], "count": len(drops)}
     if bars is not None:
         wrong = rs.video_wrong(bars, v)
@@ -1271,13 +1369,14 @@ def fmt_drop(rule):
 
 
 def signals_of(lines, name, v, side, shift):
-    """(clicks (x, rate), sine (x, rate), bars, residual s) for one side;
-    `shift` = (k, residual) moves a rendered variant's playback by m1."""
+    """(clicks (x, rate, window), sine (x, rate, window), bars, residual s)
+    for one side; `shift` = (k, residual) moves a rendered variant's playback
+    by m1, trimmed (SR-17). Export's window is None."""
     if side == "export":
         c, s, p = (line_of(lines, name, "clicks", "wav"), line_of(lines, name, "sine", "wav"),
                    line_of(lines, name, "clicks", "prores"))
-        return (rs.read_channel0(Path(c["path"])) if c else None,
-                rs.read_channel0(Path(s["path"])) if s else None,
+        return (rs.read_channel0(Path(c["path"])) + (None,) if c else None,
+                rs.read_channel0(Path(s["path"])) + (None,) if s else None,
                 rs.gray_bars(Path(p["path"])) if p else None, 0.0)
     c, s, f = (line_of(lines, name, "clicks", "tap"), line_of(lines, name, "sine", "tap"),
                line_of(lines, name, "clicks", "frames"))
@@ -1286,7 +1385,7 @@ def signals_of(lines, name, v, side, shift):
     for got in (c, s):
         if got and got.get("chunks"):
             x, rate = rs.tap_signal(got, v["length"])
-            out.append((shift_signal(x, k) if k else x, rate))
+            out.append(corrected_signal(x, rate, k))
         else:
             out.append(None)
     return out[0], out[1], (f["bars"] if f else None), residual
@@ -1400,8 +1499,7 @@ def score_run(score, groups, names, staged, everything, lines, started, rule_sha
                 else:
                     x, rate = rs.tap_signal(got, everything["RC-off-x1"]["length"])
                     k0 = int(round(coarse_ms(x, rate, everything["RC-off-x1"]) * rate / 1000))
-                    raw_x1 = place_ideal(shift_signal(x, k0) if k0 else x, rate,
-                                         everything["RC-off-x1"])
+                    raw_x1 = place_corrected(x, rate, everything["RC-off-x1"], k0)
                     pt1_ok, fine = pt1(e["summary"], raw_x1)
                     m1 = None if fine is None else fine + k0 * 1000 / rate
                     score.row("PT1", "ok" if pt1_ok else "measured",

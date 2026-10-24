@@ -1176,9 +1176,9 @@ the key map behind it.
   SR-13, superseding SR-8's pitch-shift stages, which drop out at every
   analysis-bin crossing of a gliding partial): the rate, clamped 1/32…32,
   is read from the map `rateLeadFrames` (56 ms, measured) ahead before each
-  256-frame block, for held spans and ramps alike; up to ~22 ms late after
-  a deep slow-down is the owner's accepted limit (SR-15, `ramp_proof.py`
-  L3), SR1e's to tighten; written as a 32-bit float CAF through a
+  256-frame block, for held spans and ramps alike; up to ~24 ms late after
+  a deep slow-down is the owner's accepted limit (SR-15 as SR-16 widens
+  it, `ramp_proof.py` L3), kept by SR1e (SR-16); written as a 32-bit float CAF through a
   `.partial` file (`RampCAFWriter`). Called by `RampAudioRenders` (SR2b).
 - `RampAudioCache.swift` — `RampSegmentKey` (the clip, Keep pitch, glide and
   map: equal exactly when the rendered file is), `RampAudioRequest` and the

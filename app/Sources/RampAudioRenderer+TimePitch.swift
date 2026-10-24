@@ -25,8 +25,8 @@ extension RampAudioRenderer {
     /// |diff| 8.06 ms, RK2's 5.55 ms, every click found;
     /// `designs/speed-ramps.md`'s SR1d record). Apple's unpublished
     /// behaviour, pinned by `ramp_proof.py`'s L1 and L2; a deep slow-down
-    /// still lands up to about 22 ms late (RK3, the owner's accepted limit,
-    /// SR-15, pinned by L3) until SR1e.
+    /// still lands up to about 24 ms late (RK3 22 ms, pinned by L3; the
+    /// owner's accepted limit, SR-15 as SR-16 widens it); SR1e kept it.
     static let rateLeadFrames = 2688
 
     /// Feeds the source node: frame after frame from `next`, every channel,

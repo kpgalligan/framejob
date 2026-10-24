@@ -293,3 +293,37 @@ render never fails: S19), `lead-pick-max` (the greatest maximum picked: S20).
 Before the sweep SR1c's work folder was copied once to
 `tools/proof/work/ramp-render-spike-sr1c/` (never written; its `results.json` is SR1c's record),
 and the off arm's renders were compared byte for byte with SR1b's by SR1c's two commands above.
+
+## SR1e — a corrected playback tap trimmed, not zero-padded (spec §11 SR-17)
+
+SR1e closed as measured (spec §11 SR-16: the 56 ms lead kept, no product change); its diagnostic
+is in `designs/speed-ramps.md`'s SR1e record. What it changed here is the instrument: PT1's
+whole-sample correction of a playback tap (#335) used to move the samples with `shift_signal` and
+zero-fill the head (k < 0) or tail (k > 0), which SR1d's m1 of −86.333 ms turned into a 0.05 s
+"dropout" and a 36.3 ms placement out of zeros. Now `trim_shift(x, k)` cuts that span off and
+answers where the samples start; `corrected_signal(x, rate, k)` answers `(samples, rate, window)`,
+the window `(first / rate, (first + len) / rate)` s, None at k = 0; and `place_corrected` places
+the trimmed samples. Every corrected playback signal (`signals_of`), PT1 and `ramp_proof.py`'s P1
+go through it. `place_ideal(…, window=)` puts samples[0] at the window's start and counts a click
+expected outside [lo + EDGE_SKIP_S, hi − EDGE_SKIP_S] as **unobserved**: None in `times` (so
+`agreement` still pairs by index), out of `of` and the found share, counted in `unobserved`.
+`side_rules` runs the dense scan and SR-5's dropouts over the trimmed samples with the window's
+span as their length and reports every event time + lo. With no window (export, k = 0, the
+composition controls) every result is as before. `shift_signal` stays, for S10 and
+`ramp_proof.py`'s `placement()` (the `expect-shift` / `keep-shift` mutants' moved expectation).
+
+```sh
+python3 tools/proof/ramp_spike/render_spike.py --selftest                       # S8–S22, 15/15
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant trim-off     # must exit 1 (S22)
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant window-off   # must exit 1 (S22)
+```
+
+**`--selftest`** adds S22: a ×2 keep-pitch control (6 s) whose synthetic tap sits m1 = −86.333
+and +86.333 ms off, corrected by `correction(m1)`. Trimmed, `side_rules` must place every
+observed click (found = of > 0), count at least one unobserved, read max |diff| ≤ 0.5 ms, find no
+dropout, and agree with the export's placement; padded the old way (`shift_signal`, no window),
+the same call must show a dropout (at 0.05 s for −86 ms, near 5.914 s for +86 ms). Both halves,
+both signs, or the row fails. The mutants: `trim-off` (`trim_shift` zero-pads again, window
+starting at 0: S22's trimmed half drops out) and `window-off` (every click counted as observed:
+the click outside the window is missed rather than unobserved). No measured run was made: the
+selftest reproduces the −86.333 ms case, and SR1d's `results.json` stands as run.

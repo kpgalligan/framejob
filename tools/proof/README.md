@@ -22831,6 +22831,7 @@ Apple's unpublished behaviour, on Release.
   `L_CEILING_MS` + 1) ms late through `placement(…, shift_s)`: L1, L2 and L3 must fail whatever
   the sign of their residuals.
 - P1's coarse tap alignment is `render_spike.coarse_ms`, shared with the spike's PT1.
+- Since SR1e P1's two corrected taps are trimmed, not zero-padded (`render_spike.place_corrected`, spec §11 SR-17): a click outside the samples a tap carried is unobserved, not missed.
 
 ```sh
 make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only U1,K1,L1,L2,L3

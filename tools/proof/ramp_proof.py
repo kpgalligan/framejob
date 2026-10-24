@@ -84,7 +84,8 @@ L2  RK2 (×0.9 base, `ramp_doc` curve ease_out, `ramp_end` ×0.5), likewise
 L3  RK3 (×2 base, ease_in_out, `ramp_end` ×0.5), the owner's accepted limit
     (SR-15): found share ≥ 0.90 and max |diff| ≤ its measured worst in SR1d's
     run, 22.10 ms, plus a 5.0 ms margin (SR-7's own slack) = 27.10 ms, so the
-    limit cannot grow unseen; SR1e tightens it to SR-7's 19.14 ms.
+    limit cannot grow unseen; SR1e kept the 56 ms lead and this ceiling
+    (SR-16), and no other L row was added: H7 and H8 cross the same cliff.
 R1  RV1 on clicks exported forward, then `set_reversed true`, the reverse
     waited for (`precision_proof.wait_reverse`), exported again: 0 wrong
     frames and clicks found == expected on the mirrored map (the reversed
@@ -103,7 +104,9 @@ P1  RV1 (exported once) and a ×1 control (6 s) saved and closed, then the
     spike probe's `playback` group (`tap`, `frames`) on both packages: 0 wrong
     frames on both, RV1's tap after `pt1`'s m1 (the control's playback against
     its export) found == expected and `varispeed_pass`, and
-    `agreement(export, playback)` ok.
+    `agreement(export, playback)` ok. Both corrected taps are trimmed, not
+    zero-padded (`render_spike.place_corrected`, SR-17): a click outside the
+    samples the tap carried is unobserved, not missed.
 
 `--baseline` (before any SR2b app edit, on Release) builds CX1, CX2 and CK05
 and writes `tools/proof/work/ramp-baseline/baseline.json`: the commit and dirt
@@ -794,12 +797,12 @@ def p1_probe(binary, state):
     control_export = rsp.place_ideal(control_x, control_rate, control_v)
     cx, crate = rs.tap_signal(taps["control"], control_v["length"])
     k0 = int(round(rsp.coarse_ms(cx, crate, control_v) * crate / 1000))
-    control_play = rsp.place_ideal(rsp.shift_signal(cx, k0) if k0 else cx, crate, control_v)
+    control_play = rsp.place_corrected(cx, crate, control_v, k0)
     ok_pt1, fine = rsp.pt1(control_export, control_play)
     m1 = None if fine is None else fine + k0 * 1000 / crate
     x, rate = rs.tap_signal(taps["RV1"], rv1_v["length"])
     k, residual = rsp.correction(m1, rate)
-    played = rsp.place_ideal(rsp.shift_signal(x, k) if k else x, rate, rv1_v, residual)
+    played = rsp.place_corrected(x, rate, rv1_v, k, residual)
     ex, erate = read_ffmpeg(got["rv1"][1])
     exported = rsp.place_ideal(ex, erate, rv1_v)
     agree, agree_detail = rsp.agreement(exported, played)

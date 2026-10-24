@@ -23,8 +23,12 @@ before its code. SR-13, the Keep pitch mechanism the owner chose on SR1d's diagn
 and on SR-8 were recorded in SR1d before its code and its measured run, whose `results.json` pins
 this file's SHA-256 again. SR-15, the owner's acceptance of that run's STOP (2026-10-23), with
 SR-11's lifted-by line and SR-12 (i)'s Amended-by line, was recorded after the run and before the
-product switch it allows. Later phases record their rules as new entries (SR-16 on) or as
-Amended-by lines before their code.
+product switch it allows. SR-16, SR1e closed as measured on the owner's answer to its diagnostic
+STOP (2026-10-23), with SR-15's Amended-by line, and SR-17, the instrument rule that trims a
+corrected playback tap rather than zero-padding it, with SR-7's PT1 Amended-by line, were
+recorded in SR1e before its instrument code; SR1e has no measured run, so nothing pins this
+file's SHA-256 again. Later phases record their rules as new entries (SR-18 on) or as Amended-by
+lines before their code.
 
 **Stands, and nothing here re-litigates it:** SY-24 (the varispeed lead: a time-scaled segment
 on an `off` track reads its source 575 ticks earlier; ×1 untouched); SY-26 (one pitch name per
@@ -249,6 +253,9 @@ plan leaves the audio out, one pitch per plan audio track).
     variant's playback click times are taken − m1 (its playback sine moved by m1 rounded to a
     sample). When PT1 fails, every rendered variant's playback audio row is unmeasured; the
     frames are still scored.
+    *Amended by SR-17 (SR1e):* "its playback sine moved by m1 rounded to a sample" now trims, not
+    pads: the head (k < 0) or tail (k > 0) a whole-sample correction would zero-fill is cut off,
+    and every rule reads the samples left as the signal's extent.
   - **Agreement**, every rendered variant, both arms (one rendered file plays in both outputs):
     corrected playback minus export click times, |median| ≤ 1.0 ms and spread ≤ 0.5 ms. The C-*
     controls' agreement is SR-5's, reported.
@@ -602,3 +609,85 @@ plan leaves the audio out, one pitch per plan audio track).
   - Risk accepted: a Keep pitch clip that slows hard plays its audio up to about 22 ms behind its
     picture after the slow-down, until SR1e; a ramp steeper than RK3 may lag more, and only L3's
     pinned case is guarded.
+  - *Amended by SR-16 (SR1e):* SR1e did not tighten, and the 56 ms lead stays. The limit, as SR1e
+    measured it at 56 ms (render-only): ×2 → ×0.5 linear (H7) and ease-out (H8) over 1–3 s read
+    22.47 and 23.90 ms against SR-7's 19.14 ms, and RK3 reads 22.10. ×4 → ×1 linear over 1–3 s
+    (H3) finds 44/70 clicks. SR-7's reach there is 20 ms (0.4 × the 50 ms click spacing at ×4),
+    and the constant ×4 render sits at that edge (92/95, max 21.00 ms). The loss depends on the
+    lead (68–69/70 at 46–52 ms, 42/70 at 53, 44/70 at 56) with the same template on the same
+    content, so it is the render's output at that lead, not the template failing on ×4 content.
+    The diagnostic does not separate misplacement past 20 ms from a smeared click found at r < 0.5,
+    so about 26 of H3's 70 clicks are **unmeasured**: each either more than 20 ms off or found at
+    r < 0.5, and the diagnostic does not say which. ×3 → ×0.5 linear over 0.5 s (H5) drops out
+    once (1.452 s) with a 150-cent window at both 50 and 56 ms: the unit's own behaviour, which
+    SR-15's "no dropout" did not cover. L3 stays the one pinned case.
+- **SR-16 — SR1e closes as measured: the 56 ms lead stays, no closed loop and no re-fit lands, and
+  product behaviour is unchanged.** The owner's answer to SR1e's diagnostic STOP (2026-10-23,
+  "Keep 56 ms, close SR1e"), quoted in the road map: `rateLeadFrames` stays 2 688,
+  `RampAudioRenderer.version` stays 4, no product code changes; SR-13's mechanism and SR-15's
+  acceptance stand, SR-15's risk line widened by its Amended-by line.
+  - **The diagnostic** (render-only, a scratch probe of SR-13's `renderTimePitch` loop compiled
+    from b4b63c9's `app/Sources` with `-O`, scored by SR-7's reach and edge rules, `ramp_spike`'s
+    dropouts and `render_spike.pitch_track`, imported unchanged; not run under a SHA-pinned rule).
+    Its sources are at `~/.claude/litecode/framejob/speed-ramps-sr1e/diag/` (`main.swift`,
+    `build.py`, `run.py`, `look.py`, `dlag.py`, `tail.py`, `series.py`, `grid.py`, `ilc.py`); their
+    `H` names that session's scratchpad, where the outputs went. **The replica is exact**: at
+    56 ms it reads RK1 71/71 max 8.06 ms, RK2 23/23 5.55 ms and RK3 35/35 22.10 ms, SR1d's measured
+    run to the hundredth.
+  - **The look-ahead.** At a constant rate the unit pulls exactly r × 256 frames a block, and
+    fed − p(output) holds constant: 3 264, 3 456, 3 840, 5 632, 7 424 and 9 216 frames at ×0.25,
+    ×0.5, ×1, ×2, ×3 and ×4, which is A(r) = 3 072 + 768·r for r ≤ 1 and 2 048 + 1 792·r for
+    r ≥ 1, exact at constant rates and the same on either fixture. **While the rate moves it pulls
+    on its own**: RK3 at lead 0, commanded r(n) exactly, climbs from 5 632 to 6 718 (+1 086 frames
+    beyond the command, in lumps). **What it pulls depends on the content**: the same map and
+    commands pull 512 frames apart on the clicks and the sine by RK3's end, 768 on the dip (H2).
+  - **Consumed input does not fix placement; it is path-dependent.** In the held ×1 tail, X1
+    (constant) has fed − p 3 840 and places at 0.00 ms; the dip at 56 ms 4 896 (+1 056) and
+    0.00 ms; the dip with a loop holding fed at p + A(r) 3 837 (−3) and +20 ms (17–23). RK3's ×0.5
+    tails follow no one curve: lead 0 excess +3 262 at −41 ms, the loop 0 at −5 to −8 ms, lead 56
+    −759 at +20 ms, the ×0.5 control 0 at −12 ms.
+  - **The controller fails.** Target fed(m) = p(m + tl) + A(r(m + tl)), a proportional correction
+    cmd = ff + (need − ff)·256/horizon bounded to ±bound × ff, ff = r(n + lead); swept horizon 5,
+    10, 20, 40, 80, 320 ms, bound 0.1, 0.25, 0.5, feed-forward lead 0, 28, 56 ms and tl 0, 28,
+    56 ms. Its best rows (max |diff| ms, RK1 / RK2 / RK3 / H1 / H2 / H4 / H5), against the
+    product's 8.06 / 5.55 / 22.10 / 20.56 / 2.08 / 14.14 / 27.54: h 20 b 0.25 ff 28 16.02 / 14.06
+    / 18.54 / 27.66 / 33.44 / 35.48 / 26.62; h 40 b 0.1 ff 0 14.86 / 14.61 / 20.05 (34/35) / 26.68
+    / 55.96 / 24.99 / 25.68; deadbeat h 5.3 b 0.5 ff 0 16.86 / 14.19 / 20.08 / 27.66 / 55.23 /
+    33.96 / 26.16. It fixes the ×2 → ×0.5 tails (RK3, H7, H8 end within 0–2 ms) and costs
+    everything else; every loop row rides its bound, 10–25 % around the map's rate, and tl > 0
+    makes every row worse (RK1 29–41 ms, RK2 42–60 ms).
+  - **The oracle loop does not converge.** The true click error of each pass, warped into the map
+    as r·e·48 source frames at 56 ms, over passes 0–3: RK1 8.06 → 5.44 → 18.31 → 21.97; RK3 22.10
+    → 19.06 → 17.86 → 21.90; H5 27.54 → 27.67 → 27.67 → 27.67 (≈ 27.6).
+  - **The re-fit, not taken.** SR-14's sweep rule over RK1, RK2 and RK3 together (2 ms grid, every
+    click found, minimax, a tie to the smaller lead) picks 50 ms (2 400 frames), minimax 11.38 ms,
+    with every held-out shape H1–H8 under its SR-7 ceiling; RK3 is flat at 11.38 ms over 46–52 ms
+    and meets a cliff at 53 (15.01, then 22.10 at 56, 36.60 at 60). The owner chose not to take it.
+  - **The guard: no new `ramp_proof.py` L row.** H7 and H8 are the same deep ×2 → ×0.5 slow-down
+    L3 already pins: at 53 → 60 ms all three move together across one cliff (RK3 15.01 → 36.60,
+    H7 14.30 → 33.81, H8 14.09 → 33.94), so L3 already fails when they would. H3's 44/70 is below
+    any found floor an L row can hold.
+  - **Why:** the closed loop the request named cannot pass on this unit (its consumed input does
+    not fix where its output sits), and the owner judged the measured 56 ms limit acceptable
+    rather than re-fitting a constant that sits 3 ms from a cliff.
+  - Risk accepted: SR-15's, as widened by its Amended-by line — a deep slow-down plays up to about
+    24 ms late, a ×4 → ×1 ramp's placement is partly unmeasured, a 0.5 s ×3 → ×0.5 slow-down (H5) can drop out
+    once; only L3's case is pinned.
+- **SR-17 — A corrected playback tap holds only the samples the tap carried: the whole-sample
+  correction trims, never zero-pads.** The instrument rule for #335's artifact, fixed in SR1e.
+  - **The rule.** PT1's correction by k = round(m1 · rate / 1000) samples cuts off the head
+    (k < 0) or the tail (k > 0) that a shift would zero-fill. Every SR-5/SR-7 rule reads the
+    trimmed window as the signal's extent, with its own edges: EDGE_SKIP_S for placement, the
+    50 ms dense-scan and dropout edges. A click expected outside the window is **unobserved**, not
+    missed: it is out of the found share, counted apart, and agreement still pairs by index. k = 0
+    is unchanged.
+  - **Where.** PT1, every corrected playback signal in `render_spike.py`, and `ramp_proof.py`'s
+    P1.
+  - **Why:** SR1d's m1 of −86.333 ms zero-filled every corrected playback signal's first 86 ms,
+    which SR-5's dropout rule (b) read as a 0.05 s "dropout" and placement matched to a 36.3 ms
+    miss, out of zeros (SR-15).
+  - **Shown by** `render_spike.py --selftest`'s S22 (a synthetic ±86.333 ms tap, trimmed and
+    padded) and the mutants `trim-off` and `window-off`. No measured re-run: the selftest
+    reproduces the −86.333 ms case synthetically, and SR-14's text and SR1d's `results.json` stand
+    as run.
+  - Risk accepted: clicks in the trimmed span plus its edge go unscored.
