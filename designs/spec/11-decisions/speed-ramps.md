@@ -18,8 +18,13 @@ file's SHA-256 again. SR2 is split in two: SR2a (the core — `speed` as an acti
 source map, the plan's ramped segments, C's refusals, format 27) recorded SR-10, SR-11 and SR-6's
 Amended-by lines before its code; SR2b (the renderer wired into the composition and the export)
 builds what those lines say Swift does, and recorded SR-12 and SR-6's third Amended-by line
-before its code. Later phases record their rules as new entries (SR-13 on) or as Amended-by lines
-before their code.
+before its code. SR-13, the Keep pitch mechanism the owner chose on SR1d's diagnostic STOP
+(2026-10-23), SR-14, the fourth spike's rule, and the Amended-by lines on SR-6's keep-pitch arm
+and on SR-8 were recorded in SR1d before its code and its measured run, whose `results.json` pins
+this file's SHA-256 again. SR-15, the owner's acceptance of that run's STOP (2026-10-23), with
+SR-11's lifted-by line and SR-12 (i)'s Amended-by line, was recorded after the run and before the
+product switch it allows. Later phases record their rules as new entries (SR-16 on) or as
+Amended-by lines before their code.
 
 **Stands, and nothing here re-litigates it:** SY-24 (the varispeed lead: a time-scaled segment
 on an `off` track reads its source 575 ticks earlier; ×1 untouched); SY-26 (one pitch name per
@@ -189,6 +194,9 @@ plan leaves the audio out, one pitch per plan audio track).
     *Amended by SR-8 (SR1c):* keep pitch on is three stages — the keep-pitch-off interpolator at
     48 kHz × K, the time-pitch unit held at ×1 shifting the pitch by −1200·log₂(rate) cents, and a
     fixed decimation by K — with the delay D_K discarded; the rate-driven unit above is replaced.
+    *Amended by SR-13 (SR1d):* SR-8's three stages are withdrawn and the rate-driven unit above is
+    restored, its rate read at n + L rather than at n (L = `rateLeadFrames`, the lead SR-14's
+    sweep measures); held spans render through it too.
   - **Why:** SR1 measured that abutting time-scaled segments click and misplace audio in export
     and in playback (V1-G1 30 of 61 boundaries clicking in export, a 1.4 ms placement spread);
     a rendered file has no rate boundary, so the composition plays one ×1 segment, the case
@@ -315,6 +323,10 @@ plan leaves the audio out, one pitch per plan audio track).
   - Risk accepted: the pitch command may lag the content (SR1c's LG rows; not compensated);
     past ×4 the band above 24 kHz · 4 / r is lost and the pitch rises by the excess; the unit at
     96–192 kHz is proven only by SR1c's run.
+  - *Amended by SR-13 (SR1d):* superseded whole. Stage 2's pitch mode drops out once each time a
+    gliding partial crosses one of the unit's analysis bins (SR1d's diagnostic), which no setting
+    of the unit removes, and rate mode makes stages 1 and 3 moot; the ±2400-cent clamp, the tape
+    excess past ×0.25–×4, K and D_K go with it.
 - **SR-9 — The third spike's rule (SR1c), fixed before its run: SR-7's arm ON re-run on the SR-8
   renderer, plus the rendered pitch, with a verdict for arm ON alone.**
   `tools/proof/ramp_spike/render_spike.py --verdict on` with `--variants RK1,RK2,RC-on-x0.5,
@@ -414,6 +426,9 @@ plan leaves the audio out, one pitch per plan audio track).
     anchor and a lag; the held rates are what SR-8 rendered cleanly at constant rates, and the
     glide is what SR1b measured exact.
   - Risk accepted: a pitch step at each ramp edge with keep pitch on; SR1d lifts it.
+  - *Lifted by SR-13 and SR-15 (SR1d):* keep pitch on renders the whole map through SR-13's
+    rate-mode arm, ramps and held spans alike; the `glide` spans shape nothing, the crossfade and
+    `RampAudioRenderer+Hybrid.swift` are gone, and there is no pitch step at a ramp's edge.
 - **SR-12 — The render wired in (SR2b): a ramped clip's audio is rendered off the main thread,
   one file per plan ramp segment, played as one ×1 segment at the clip's start, silent while
   pending, and waited for by every export.**
@@ -453,6 +468,9 @@ plan leaves the audio out, one pitch per plan audio track).
   - **(i) Keep pitch on with glide spans** renders SR-11's mix: SR-6's off arm over the whole map,
     each held span alone by SR-8's arm on its own two-point map, joined by the crossfade, the
     temporaries streamed and removed; `RampAudioRenderer.version` 3.
+    *Amended by SR-15 (SR1d):* keep pitch on renders the whole map through SR-13's arm whatever its
+    `glide` spans, with no mix and no temporaries; `RampAudioRenderer.version` 4. The key still
+    names `g<glide pairs>`.
   - **(j) The dev hold.** `-RCDevRampRenderHold <s>` (dev tools only) holds each render s seconds,
     polling cancellation, so a proof sees the wait.
   - **Why:** a file per segment keyed by everything that shapes it is reusable and
@@ -462,3 +480,125 @@ plan leaves the audio out, one pitch per plan audio track).
     silent ramp.
   - Risk accepted: every edit of a map renders the whole clip again (no partial re-render), one at
     a time, and an undone map's file is not kept; a failure stays failed until relaunch.
+- **SR-13 — Keep pitch on is Apple's time-pitch unit in RATE mode, its rate commanded a measured
+  lead ahead: SR-6's arm plus the lead, for ramps and held spans alike; it supersedes SR-8 whole.**
+  The owner's answer to SR1d's diagnostic STOP (2026-10-23, "Rate mode + 60 ms lead"), quoted in
+  the road map; SR-6's keep-pitch-off arm, the file, the cache and SR-3 stand.
+  - **Feeding.** `AVAudioSourceNode` → `AVAudioUnitTimePitch` (pitch 0, the default overlap) →
+    the main mixer, in `AVAudioEngine`'s offline manual rendering at 48 kHz (at most 4 096 frames
+    a call). The source is fed as is, sequentially, from ⌊p(0)⌋ − P, P = 4 800 frames, a position
+    before frame 0 read as zero.
+  - **The rate.** Before each 256-frame `renderOffline`, with n = rendered − round(P / r(0)), the
+    unit's rate is (p̃(n + L + 256) − p̃(n + L)) / 256 clamped to 1/32…32, p̃ being p extended
+    before 0 at r(0) and past the end at the last breakpoint's slope, and L =
+    `RampAudioRenderer.rateLeadFrames` (output frames), the lead SR-14's sweep picks.
+  - **Discard.** The first round(P / r(0)) + the unit's reported latency output frames are
+    discarded, so kept frame 0 is p(0).
+  - **The bound is 1/32…32.** It contains every rate a ramp sounds at (the ×0.1 floor, and the
+    ×12 peak above which the plan leaves the audio out, #190), so Keep pitch holds the source's
+    pitch everywhere: SR-8's ±2400-cent clamp and its tape excess past ×0.25–×4 are gone.
+  - **Held spans** render through the same arm. Once SR-14's run answers GO, keep pitch on
+    renders the whole map through it and the plan's `glide` spans are ignored (SR-11 lifted); the
+    core still writes `glide` and the cache key still names it, a harmless redundancy.
+  - **Why:** SR1d's diagnostic (the road map's SR1d record) found SR-8's dropouts are the unit's
+    own in pitch mode: one at each crossing of an 11.7 Hz analysis bin (FFT 4096 at 48 kHz) by a
+    gliding partial — RK1's 17 crossings gave 17 dropouts, and no block size, flag, smoothness or
+    K removed them — while the unit in rate mode gave none. SR1b's rate-driven arm misplaced
+    clicks only because its rate was read at n while the unit's window follows behind it; read
+    60 ms ahead, RK1's placement max was 8.86 ms (71/71 found) and RK2's 2.92 ms (23/23), with 0
+    dropouts, inside SR-7's ceilings (17.60 and 19.14 ms). Apple's other unit (`AUTimePitch`,
+    'tmpt') was not taken: its latency moves with the pitch and its timing jitters 7–15 ms. Still
+    Apple's algorithm (SY-41: no own time-stretch).
+  - Risk accepted: **the lead rests on Apple's unpublished internal behaviour** — a macOS change
+    to the unit's window could move it — so `ramp_proof.py`'s L1 and L2 (Release, no spike) pin a
+    Keep pitch ramp's placement under ceilings from SR-14's run and fail when the lead stops
+    fitting. **The constant-rate finding:** SR-8's arm dropped out on gliding content at CONSTANT
+    rates too (18 dropouts at ×2 on a 220→440 Hz sweep, where the composition's `spectral` gave
+    0), and so did SR2b's held spans until this phase. One lead serves every map; keep pitch on
+    stays measured against controls, never claimed sample-exact.
+- **SR-14 — The fourth spike's rule (SR1d), fixed before its run: the lead swept first, then
+  SR-7's arm ON over RK1, RK2 and a held-out RK3, SR-9's pitch rows under the rate-mode command,
+  and a gliding fixture's dropouts, with a verdict for arm ON alone.**
+  `tools/proof/ramp_spike/render_spike.py --lead-sweep`, then `--verdict rate` with `--variants
+  RK1,RK2,RK3,RC-on-x0.5,RC-on-x0.9,RC-on-x1.1,RC-on-x2,C-on-x0.5,C-on-x0.9,C-on-x1.1,C-on-x2,
+  RC-off-x1,RC-on-x1,RC-on-x3,RC-on-x6,RC-on-x0.2,RB-on-x2,RW-on-x0.9,RW-on-x1.1,RW-on-x2`, every
+  group, through SR-7's instrument.
+  - **The lead, first.** A render-only sweep over L ∈ {0, 2, …, 100} ms (round(L · 48) output
+    frames): RK1 and RK2 rendered from the clicks fixture into the work folder's `lead/`, each
+    render's clicks placed against the ideal map by SR-7's keep-pitch method (the template
+    unscaled), reading found, of and max |diff|. Only a lead at which BOTH ramps find every click
+    (found = of, of > 0) is eligible; L* is the eligible lead minimising the greater of the two
+    maxima, a tie going to the smaller lead. No eligible lead is a STOP (`STOP — lead: no lead
+    finds every click`). Each ramp's own best lead is reported. Per K is not applicable: there is
+    one rate, 48 kHz. L* is written into `rateLeadFrames` before the measured run.
+  - **Variants.** SR-9's, unchanged, plus RK3 (keep pitch on, ×2 → ×0.5 ease in-out over 1–3 s,
+    8 s; rendered and staged as RK1 is, its frames read in playback, its end-rate controls
+    RC-on-x2 and RC-on-x0.5), which the sweep never renders, so the lead is not fitted to
+    everything scored; and RW-on-x0.9, RW-on-x1.1, RW-on-x2 (keep pitch on, constant, 6 s),
+    rendered only, from `glide.wav`: 20 s, 48 kHz, mono, amplitude 0.5, phase-continuous, 220 Hz
+    to 2 s, an exponential sweep to 440 Hz at 4 s, then 440 Hz — the content that made SR-8's
+    held spans drop out.
+  - **Scoring.** SR-7's arm ON rule unchanged over RK1, RK2 and RK3 — placement against their
+    RC-on end-rate controls, click, dropout and video in export and in playback, plus agreement —
+    and each RC-on anchor's placement against its C-on control in export and in playback. **Pitch**
+    is SR-9's with c the rate-mode command, c = clamp(−1200 · log₂ r, ±6000) cents (the rate's
+    1/32…32 bound), so f_e = 220 Hz at every rate a variant sounds: PR |median cents| ≤ 25 for
+    RK1, RK2, RK3 and each RC-on anchor, and LG RMS at the best τ ≤ 25 for RK1, RK2 and RK3.
+    **The sweep:** each RW-on-* render shows no dropout by SR-5's (a) and (b), its local period
+    1 / glide_hz(1 + r · t) s, glide_hz the fixture's frequency at source second 1 + r · t. A rule
+    not measured fails.
+  - **The template.** SR-7's unscaled template stands: SR1c's slowed-click problem does not
+    arise in rate mode (SR1b's rate-driven RC-on controls found 15/15 at ×0.5), and RC-on-x0.5's
+    anchor row confirms it in this run.
+  - **Instrument checks** (exit 1, nothing judged): as SR-9 — Z0, every render answered, R44
+    refused as `unreadable`, ID1, PT1's tap called. **Off-arm identity**, before the measured run:
+    a render-only run of RV1, RV2, RV3, RF1, RV1-edit and RC-off-*, both fixtures, each CAF equal
+    byte for byte to SR1b's (`ramp-render-spike-sr1b/renders/`), or the phase stops.
+  - **The verdict**: `VERDICT: GO — arm ON (rate) …` when nothing above fails, else `VERDICT:
+    STOP — <each failing variant and rule>`. GO lifts SR-11 (SR-13); a STOP lands nothing and goes
+    to the owner with the measurement.
+  - Reported, not scored: RS (render seconds per audio second, bytes, peak RSS, the lead, the
+    unit's reported latency, and pulled − map frames, the map frames read from the variant's
+    map); RP-<name>; PR-<name> for every keep-pitch sine render (RC-on-x0.2 and RC-on-x6 now
+    expect 220 Hz) and PR-source; LG-RK1…RK3; BW-RB-on-x2; RW-<name>'s dropout events; the
+    sweep's table; SR-7's other rows.
+  - **Why:** the lead is a fitted constant, so it is fitted first, on two ramps only, and the
+    rule then judges it on a third ramp it never saw and on constant renders of a gliding source,
+    the case the diagnostic found SR-8 failing at constant rates; SR-9's pitch rows still apply
+    because keeping the pitch is the point, and the rate-mode command makes their expectation the
+    source's own 220 Hz.
+  - Risk accepted: the fixtures stay synthetic (a click train, one sine, one sweep), so whether a
+    ramp sounds right is a person's check (SR5); one lead is fitted for every map, so a ramp much
+    steeper than RK1–RK3 is judged only by L1 and L2's ceilings after the switch.
+- **SR-15 — SR-13's arm lands with L* = 56 ms though SR-14's run stopped: a deep slow-down plays
+  up to about 22 ms late, accepted by the owner as a known limit until SR1e.** The owner's answer to
+  SR1d's measured STOP (2026-10-23, "Land it, then tighten"), quoted in the road map; SR-14's text
+  and its verdict stand as recorded.
+  - **What lands.** Keep pitch on renders every ramped clip through SR-13's arm at
+    `rateLeadFrames` = 2 688 (56 ms, the sweep's L*), ramps and held spans alike: SR-11 is lifted,
+    `+Hybrid` is deleted, `RampAudioRenderer.version` is 4.
+  - **The limit, measured.** RK3 (×2 → ×0.5 ease in-out over 1–3 s), which the sweep never saw,
+    placed its export clicks up to 22.10 ms from the ideal map against SR-14's ceiling of 19.14 ms
+    (RC-on-x0.5's 14.14 + 5.0): −1.7 to +12.9 ms through the ×2 head, climbing through the
+    slow-down, +18.2 to +22.1 ms late through the held ×0.5 tail, where a constant ×0.5 render sits
+    12.6 ms early — the unit about 33 ms behind after a ×4 slow-down, which one constant lead cannot
+    correct. RK1 (8.06 ms against 17.60) and RK2 (5.55 against 19.14) passed, with no dropout and
+    every pitch reading within 0.01 cents of 220 Hz.
+  - **The run's playback failures are the instrument's.** That session's ×1 tap read 86.333 ms
+    early (#335), so PT1's correction moved every corrected playback signal 4 144 samples later and
+    its first 86 ms are zeros: SR-5's dropout rule (b) reads them as a dropout at 0.05 s, and a
+    click expected at 0.050 s is matched to the onset at 0.086 s (36.3 ms). RC-off-x1, a keep-pitch-
+    off ×1 render, showed the same 0.05 s "dropout"; so RK1's, RK2's and RK3's playback dropouts,
+    RC-on-x2's playback anchor and RK3's agreement are not the arm.
+  - **The guard.** `ramp_proof.py`'s L1 (RK1) and L2 (RK2) hold a Keep pitch ramp's export under
+    SR-7's floor and ceiling from that run's export controls; L3 holds RK3's case under its measured
+    worst plus a stated margin, so a macOS change to the unit that moves the lead fails a Release
+    row rather than passing unseen.
+  - **SR1e follows**, in its own handoff: a closed-loop correction that steers the rate from how
+    much source the unit has actually consumed, so the lag cannot accumulate; if it passes, it
+    replaces the constant lead and L3 tightens to SR-7's ceiling.
+  - **Why:** the owner judged a ≤ 22 ms lag after a deep slow-down, with the pitch kept and no
+    dropout, better than SR-11's tape glide inside every Keep pitch ramp.
+  - Risk accepted: a Keep pitch clip that slows hard plays its audio up to about 22 ms behind its
+    picture after the slow-down, until SR1e; a ramp steeper than RK3 may lag more, and only L3's
+    pinned case is guarded.

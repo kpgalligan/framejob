@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Speed ramps SR2a and SR2b (spec §11 SR-10, SR-2, SR-6, SR-11, SR-12), against
-the built app: an action's `end.speed` through `set_action_end` over MCP — the
-door, the slot rule's R1 sentence, the ×12 answer, undo and redo (SR2a) — and
-a ramped clip's rendered audio in the export and in playback (SR2b, #111).
+"""Speed ramps SR2a, SR2b and SR1d (spec §11 SR-10, SR-2, SR-6, SR-12, SR-13,
+SR-15), against the built app: an action's `end.speed` through
+`set_action_end` over MCP — the door, the slot rule's R1 sentence, the ×12
+answer, undo and redo (SR2a) — a ramped clip's rendered audio in the export
+and in playback (SR2b, #111), and Keep pitch inside a ramp kept and placed by
+SR-13's led rate-mode arm (SR1d: K1, L1–L3).
 
     env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py [--only IDS]
     env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py --baseline
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only E1 --mutant expect-shift
+    env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only L1,L2,L3 --mutant keep-shift
 
 One owned instance (`mcp.launch` on `proof_app`'s app — Debug by default,
 `RC_PROOF_APP=release` for the record), launched with `-RCDevRampRenderHold 2`
@@ -66,9 +69,22 @@ E1  RV1 on clicks, `audio_wav` exported as the very next call after
 E2  RV1 on sine: no `click_events(dense_scan(…), 0)` and no dropout.
 N1  E1's document: an `audio_wav` export of the constant clip, made before
     `set_action_end`, and one after `undo` of it, have equal audio md5s.
-K1  RK1 on sine: `pitch_track` windows centred ≥ 30 ms from a join (1 s, 3 s),
-    median |cents| ≤ 25 against 220 Hz in the held spans and against
-    220 · r(t) in the glide.
+K1  RK1 on sine: `pitch_track`'s windows, median |cents| ≤ 25 against
+    220 Hz, separately over the windows inside the ramp (1 s, 3 s) and those
+    outside it — Keep pitch holds inside a ramp (SR-13; SR-11 lifted).
+L1  RK1 (×1.1 base, linear, `ramp_end` ×2) on clicks, keep pitch on,
+    `audio_wav`: found share ≥ L_FOUND and max |diff| ≤ L_CEILING_MS against
+    the ideal map — SR-7's floor and ceiling from SR1d's measured run's export
+    controls (RC-on-x1.1 33/33 max 3.59 ms, RC-on-x2 60/60 max 12.60 ms:
+    floor 1.00 − 0.10, ceiling 12.60 + 5.0). The lead is Apple's unpublished
+    behaviour (SR-13): a macOS change that moves it fails here.
+L2  RK2 (×0.9 base, `ramp_doc` curve ease_out, `ramp_end` ×0.5), likewise
+    (RC-on-x0.9 27/27 max 4.89 ms, RC-on-x0.5 15/15 max 14.14 ms: floor 0.90,
+    ceiling 19.14 ms).
+L3  RK3 (×2 base, ease_in_out, `ramp_end` ×0.5), the owner's accepted limit
+    (SR-15): found share ≥ 0.90 and max |diff| ≤ its measured worst in SR1d's
+    run, 22.10 ms, plus a 5.0 ms margin (SR-7's own slack) = 27.10 ms, so the
+    limit cannot grow unseen; SR1e tightens it to SR-7's 19.14 ms.
 R1  RV1 on clicks exported forward, then `set_reversed true`, the reverse
     waited for (`precision_proof.wait_reverse`), exported again: 0 wrong
     frames and clicks found == expected on the mirrored map (the reversed
@@ -95,7 +111,10 @@ of the app's own tree (`--app` may name another checkout's build), the app,
 each project's plan text and md5s, and every audio stream's decoded PCM beside
 it (`<name>-<stream>.f32`); it runs no row but X0 and prints `BL`.
 `--mutant expect-shift` moves E1's expected clicks 2 ms late (no rebuild): E1
-must fail. Rows print `<ID> pass|fail — <detail>`, then `n/m`; exit 0 iff every
+must fail. `--mutant keep-shift` moves each L row's expectation
+`keep_shift_s(variant)` late, 2 × its ceiling + 1 ms, so a shifted click lands
+past the ceiling or outside the reach whatever the residuals' sign: L1, L2
+and L3 must fail. Rows print `<ID> pass|fail — <detail>`, then `n/m`; exit 0 iff every
 row run passed. `--only D1,E1` runs those rows (D0 always).
 """
 
@@ -136,17 +155,25 @@ CALL_BOUND = 600
 HOLD_S = 2
 W1_BOUND_S = 60
 SR2A_ROWS = ["D1", "D2", "D3", "D4", "D5"]
-SR2B_ROWS = ["X0", "U1", "E1", "E2", "N1", "K1", "R1", "W1", "P1"]
+SR2B_ROWS = ["X0", "U1", "E1", "E2", "N1", "K1", "L1", "L2", "L3", "R1", "W1", "P1"]
 ROWS = ["D0"] + SR2A_ROWS + SR2B_ROWS
 # name: (rate, keep pitch or None for the default, length ticks)
 CONSTANTS = {"CX1": (1.0, None, 4 * SEC), "CX2": (2.0, False, 4 * SEC),
              "CK05": (0.5, True, 4 * SEC)}
 CONTROL_LENGTH = 6 * SEC
-JOIN_S = (1.0, 3.0)
-JOIN_GUARD_S = 0.030
+RAMP_SPAN_S = (1.0, 3.0)
 PITCH_CENTS = 25.0
 SHIFT_S = 0.002
-MUTANTS = ["expect-shift"]
+MUTANTS = ["expect-shift", "keep-shift"]
+# SR1d's measured run (designs/speed-ramps.md's SR1d record, results.json at
+# 2026-10-23 21:34:59): SR-7's floor (the lower export control found share −
+# 0.10) and ceiling (the greater export control max |diff| + 5.0 ms) for RK1
+# and RK2; RK3's measured worst 22.10 ms + a 5.0 ms margin (SR-15).
+L_FOUND = {"RK1": 0.90, "RK2": 0.90, "RK3": 0.90}
+L_CEILING_MS = {"RK1": 17.60, "RK2": 19.14, "RK3": 27.10}
+# row: (variant, base rate, curve, end rate), keep pitch on, on clicks.
+L_ROWS = {"L1": ("RK1", 1.1, "linear", 2), "L2": ("RK2", 0.9, "ease_out", 0.5),
+          "L3": ("RK3", 2.0, "ease_in_out", 0.5)}
 NAME = re.compile(r"^(\d+)-[0-9a-f]{16}\.caf$")
 
 rows = {}
@@ -442,21 +469,22 @@ def mirrored_wrong(bars, v):
     return wrong
 
 
-def ramp_doc(client, name, fixture, base, keep):
-    """A document holding RV1's (or RK1's, at `base`) ramp, `set_action_end`
-    the last call made; (doc, clip, media, action)."""
+def ramp_doc(client, name, fixture, base, keep, curve="linear"):
+    """A document holding a ramp's clip at `base` with its action over
+    [1 s, 3 s) on `curve`, the end not applied (`ramp_end` does it, so N1's
+    constant export comes first); (doc, clip, media, action)."""
     doc = Doc(client, name)
     doc.canvas()
     clip, media = doc.fixture_clip(fixture, 8 * SEC, base, keep)
     action = doc.action(clip, SEC, 2 * SEC)
     made = next(a for a in doc.clip(clip)["actions"] if a["id"] == action)
-    if made.get("curve", "linear") != "linear":  # set_action of the same curve is an identity
-        doc.must("set_action", clip=clip, action=action, curve="linear")
+    if made.get("curve", "linear") != curve:  # set_action of the same curve is an identity
+        doc.must("set_action", clip=clip, action=action, curve=curve)
     return doc, clip, media, action
 
 
-def ramp_end(doc, clip, action):
-    doc.must("set_action_end", clip=clip, action=action, patch={"speed": 2})
+def ramp_end(doc, clip, action, speed=2):
+    doc.must("set_action_end", clip=clip, action=action, patch={"speed": speed})
 
 
 def build_constants(client):
@@ -559,21 +587,41 @@ def k1(client, state):
     v = variant("RK1")
     x, rate = read_ffmpeg(wav)
     track = rsp.pitch_track(x, rate, v["length"] / SEC)
-    held, glide = [], []
+    inside, outside = [], []
     for t, f in track:
-        if min(abs(t - j) for j in JOIN_S) < JOIN_GUARD_S:
-            continue
-        if JOIN_S[0] < t < JOIN_S[1]:
-            glide.append(abs(1200 * math.log2(f / (rs.SINE_HZ * rsp.rate_of(v["ramp"], t * SEC)))))
-        else:
-            held.append(abs(1200 * math.log2(f / rs.SINE_HZ)))
-    mh = statistics.median(held) if held else None
-    mg = statistics.median(glide) if glide else None
-    good = mh is not None and mg is not None and mh <= PITCH_CENTS and mg <= PITCH_CENTS
-    check("K1", good, f"held: {len(held)} windows, median |cents| "
-                      f"{'—' if mh is None else f'{mh:.2f}'} against 220 Hz; glide: {len(glide)} "
-                      f"windows, median |cents| {'—' if mg is None else f'{mg:.2f}'} against "
-                      f"220 · r(t)")
+        cents = abs(1200 * math.log2(f / rs.SINE_HZ))
+        (inside if RAMP_SPAN_S[0] < t < RAMP_SPAN_S[1] else outside).append(cents)
+    mi = statistics.median(inside) if inside else None
+    mo = statistics.median(outside) if outside else None
+    good = mi is not None and mo is not None and mi <= PITCH_CENTS and mo <= PITCH_CENTS
+    check("K1", good, f"inside the ramp: {len(inside)} windows, median |cents| "
+                      f"{'—' if mi is None else f'{mi:.2f}'}; outside: {len(outside)} windows, "
+                      f"median |cents| {'—' if mo is None else f'{mo:.2f}'}; both against 220 Hz")
+
+
+def keep_shift_s(variant):
+    """The keep-shift mutant's move: 2 × the row's ceiling + 1 ms, in s."""
+    return (2 * L_CEILING_MS[variant] + 1) / 1000
+
+
+def l_row(row, client):
+    """L1–L3: a Keep pitch ramp's export placement under its pinned floor
+    and ceiling (SR-13's lead, SR-15's accepted limit)."""
+    name, base, curve, end = L_ROWS[row]
+    doc, clip, _, action = ramp_doc(client, f"{row.lower()}-{name.lower()}", "clicks", base,
+                                    True, curve)
+    ramp_end(doc, clip, action, end)
+    wav = doc.export("audio_wav", f"{row.lower()}-{name.lower()}-wav")
+    doc.close()
+    v = variant(name)
+    x, rate = read_ffmpeg(wav)
+    s = placement(x, rate, v, keep_shift_s(name) if MUTANT == "keep-shift" else 0.0)
+    worst = s["max_abs_ms"]
+    good = (s["of"] > 0 and worst is not None and s["found_share"] >= L_FOUND[name]
+            and worst <= L_CEILING_MS[name])
+    check(row, good, f"{name}: {s['found']}/{s['of']} clicks (floor {L_FOUND[name]:.2f}), median "
+                     + (f"{s['median_ms']:+.3f} ms, max |diff| {worst:.2f} ms" if worst is not None
+                        else "—") + f" (ceiling {L_CEILING_MS[name]:.2f} ms)")
 
 
 def r1(client, state):
@@ -650,6 +698,7 @@ def p1_app(client, state):
 
 APP_RUNNERS = {"D1": d1, "D2": d2, "D3": d3, "D4": d4, "D5": d5, "X0": x0, "U1": u1, "E1": e1,
                "E2": e2, "N1": n1, "K1": k1, "R1": r1, "W1": w1,
+               **{row: (lambda client, state, row=row: l_row(row, client)) for row in L_ROWS},
                "P1": p1_app}
 
 
@@ -721,25 +770,6 @@ def u1_probe(binary, state):
     check("U1", same, "; ".join(detail) + f" (baseline {json.loads(BASELINE.read_text())['commit']})")
 
 
-def coarse_ms(x, rate, v):
-    """The tap's whole offset against `v`'s expected clicks, to the nearest
-    click peak (|x| > 0.25, ±200 ms): the median, in ms, 0 with none. It
-    brings an offset past `place_ideal`'s 60 ms reach (the host's playback
-    path, #335) inside it, so `pt1` reads only the rest."""
-    peaks, last = [], None
-    for i in range(1, len(x) - 1):
-        if abs(x[i]) > 0.25 and abs(x[i]) >= abs(x[i - 1]) and abs(x[i]) >= abs(x[i + 1]):
-            if last is None or i - last > rate // 500:
-                peaks.append(i / rate)
-            last = i
-    diffs = []
-    for _, t, _ in rsp.expected_ideal(v):
-        near = min(peaks, key=lambda p: abs(p - t), default=None)
-        if near is not None and abs(near - t) <= 0.2:
-            diffs.append(near - t)
-    return statistics.median(diffs) * 1000 if diffs else 0.0
-
-
 def p1_probe(binary, state):
     got = state.get("p1")
     if got is None:
@@ -763,7 +793,7 @@ def p1_probe(binary, state):
     control_x, control_rate = read_ffmpeg(got["control"][1])
     control_export = rsp.place_ideal(control_x, control_rate, control_v)
     cx, crate = rs.tap_signal(taps["control"], control_v["length"])
-    k0 = int(round(coarse_ms(cx, crate, control_v) * crate / 1000))
+    k0 = int(round(rsp.coarse_ms(cx, crate, control_v) * crate / 1000))
     control_play = rsp.place_ideal(rsp.shift_signal(cx, k0) if k0 else cx, crate, control_v)
     ok_pt1, fine = rsp.pt1(control_export, control_play)
     m1 = None if fine is None else fine + k0 * 1000 / crate

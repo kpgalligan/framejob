@@ -1172,17 +1172,14 @@ the key map behind it.
   as `unreadable` otherwise, `AudioRateCopy.needsCopy`'s test), streamed
   through `RampSourceReader`; Keep pitch off by the Kaiser-windowed sinc
   resampler (`RampAudioResampler`, cutoff following the local rate, exact
-  at ×1), Keep pitch on in three stages (+`TimePitch`, SR-8): the tape
-  glide oversampled at 48 kHz·K (K ≤ 4, from the map's steepest slope),
-  Apple's time-pitch held at rate ×1 shifting −1200·log₂ r cents
-  (clamped at ±2400, the excess gliding like tape) with the per-K delay
-  `timePitchDelayFrames`, then a fixed decimation to 48 kHz — measured
-  STOP in SR1c (dropouts while the pitch moves, a ~50 ms pitch lag),
-  SR1d's to fix; written as a 32-bit float CAF through a `.partial`
-  file (`RampCAFWriter`). Called by `RampAudioRenders` (SR2b); `+Hybrid`
-  is SR-11's interim Keep pitch mix: the tape glide over the whole map,
-  each held span rendered alone by the SR-8 arm, joined by a 480-frame
-  crossfade inside the held span.
+  at ×1), Keep pitch on by Apple's time-pitch in RATE mode (+`TimePitch`,
+  SR-13, superseding SR-8's pitch-shift stages, which drop out at every
+  analysis-bin crossing of a gliding partial): the rate, clamped 1/32…32,
+  is read from the map `rateLeadFrames` (56 ms, measured) ahead before each
+  256-frame block, for held spans and ramps alike; up to ~22 ms late after
+  a deep slow-down is the owner's accepted limit (SR-15, `ramp_proof.py`
+  L3), SR1e's to tighten; written as a 32-bit float CAF through a
+  `.partial` file (`RampCAFWriter`). Called by `RampAudioRenders` (SR2b).
 - `RampAudioCache.swift` — `RampSegmentKey` (the clip, Keep pitch, glide and
   map: equal exactly when the rendered file is), `RampAudioRequest` and the
   file name from the media file's stat, the version and the reversal
@@ -1200,11 +1197,10 @@ the key map behind it.
   the export's wait for every ramp render it needs before the build (a
   failure fails the export as `rampAudioFailed`; it never writes a
   placeholder).
-- `RampVarispeedStream.swift` — the tape glide as a stream (SR1c): the
-  map read at `per` K output frames per 48 kHz frame from any start
-  (negative for a pre-roll), dropping source behind a bound from the
-  map's steepest slope; the off arm's `renderVarispeed` and the keep-pitch
-  arm's stage 1 both loop over it.
+- `RampVarispeedStream.swift` — the Keep pitch off tape glide as a stream
+  (SR1c): the map read at 48 kHz from any start (negative for a
+  pre-roll), dropping source behind a bound from the map's steepest
+  slope; `renderVarispeed` loops over it.
 - `MP3Gapless.swift` — the LAME/Xing tag reader (pure) and `leadingTrim`, the
   encoder delay Core Audio leaves in when it reports no packet table: the
   48 kHz copy and the sync reader skip it (SY-36, SY-38), and so do the

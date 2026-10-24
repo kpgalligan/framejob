@@ -40,7 +40,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | **§7 — Architecture: Rust decides, AVFoundation and Metal do** | | |
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 151 | The `rc_*` exports and their contracts. |
-| [`07.2-composition-plan.md`](07.2-composition-plan.md) | 188 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
+| [`07.2-composition-plan.md`](07.2-composition-plan.md) | 190 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 488 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 57 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5-compositor.md`](07.5-compositor.md) | 524 | The Metal compositor's step 0 (per composition), passes, mattes, and transitions, and the scopes' tap (the shown set, the kernels, the counting rule). |
@@ -54,7 +54,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 192 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 11984 in 28 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 12127 in 28 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

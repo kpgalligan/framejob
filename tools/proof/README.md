@@ -22805,3 +22805,43 @@ make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ra
 | U1 by the timeline: `--baseline --app` (the same `de1e51e` build) | written: every md5 as the first baseline's (CX2's `prores_422` audio back to `a54eb075…`); audio frames CX1 192 000 in both exports, CX2 192 047 in both, CK05 190 787 in both — CK05's are 1 213 frames (≈ 25 ms) SHORTER than its 4 s timeline |
 | U1 by the timeline: `ramp_proof.py` (Release) | 14/15 in 64 s — U1 CX1 and CX2 audio identical over 192 000 frames (CX2 +47 past the end in run and baseline, #337); **U1 FAIL on CK05**: both streams shorter than the timeline, `audio_wav` 190 851 frames and `prores_422` 190 787 against 192 000, the baseline 190 787 too, identical over their common frames — a stream shorter than the timeline fails by the rule, so CK05 fails at `de1e51e` too; W1 3.0 s, 70/70; every other row as before |
 | U1 over min(timeline, both lengths) (the baseline as above, not rebuilt): `ramp_proof.py` (Release) | **15/15 in 81 s**, exit 0 — U1 every plan and video md5 =; audio identical over CX1 192 000, CX2 192 000 and CK05 190 787 frames in both exports; against the 192 000-frame timeline CX1 +0, CX2 +47, CK05 −1 213 in run and baseline alike (#337, not scored); W1 4.0 s, 70/70; every other row as before |
+
+## Speed ramps SR1d — Keep pitch inside a ramp, the led rate-mode arm (`ramp_proof.py` K1, L1, L2, L3 and `keep-shift`; spec §11 SR-13, SR-15; #111)
+
+SR1d of road map "speed-ramps" switched Keep pitch on to SR-13's arm — Apple's time-pitch in
+rate mode, its rate read `rateLeadFrames` (2 688 frames, 56 ms) ahead — for ramps and held spans
+alike: SR-11's tape glide inside a ramp is lifted and `RampAudioRenderer+Hybrid.swift` is gone
+(SR-15, the owner's answer to SR1d's measured STOP). The spike's half is
+`tools/proof/ramp_spike/README.md`'s SR1d section; this proof's half guards the lead, which is
+Apple's unpublished behaviour, on Release.
+
+- **K1** (re-expected) RK1 (×1.1 base, linear, ending ×2, keep pitch on) on the sine,
+  `audio_wav`: `pitch_track`'s windows, median |cents| ≤ 25 against 220 Hz, separately over those
+  inside the ramp (1 s, 3 s) and those outside it. Before SR1d the ramp's windows were held to
+  220 · r(t), the tape glide.
+- **L1** RK1 and **L2** RK2 (×0.9 base, `ramp_doc(…, curve="ease_out")`, `ramp_end(…, speed=0.5)`)
+  on the clicks, keep pitch on, `audio_wav`: found share ≥ `L_FOUND` and max |diff| ≤
+  `L_CEILING_MS` against `render_spike.variants()`'s ideal map — SR-7's floor and ceiling from
+  SR1d's measured run's export controls (RK1: RC-on-x1.1 33/33 max 3.59, RC-on-x2 60/60 max
+  12.60 → 0.90, 17.60 ms; RK2: RC-on-x0.9 27/27 max 4.89, RC-on-x0.5 15/15 max 14.14 → 0.90,
+  19.14 ms). **L3** RK3 (×2 base, ease_in_out, ending ×0.5), SR-15's accepted limit: 0.90 and
+  its measured worst 22.10 ms + a 5.0 ms margin = 27.10 ms. `ramp_doc` never applies the end, so
+  N1's constant export before `ramp_end` is unchanged.
+- **`--mutant keep-shift`** moves each L row's expectation `keep_shift_s(variant)` = (2 ×
+  `L_CEILING_MS` + 1) ms late through `placement(…, shift_s)`: L1, L2 and L3 must fail whatever
+  the sign of their residuals.
+- P1's coarse tap alignment is `render_spike.coarse_ms`, shared with the spike's PT1.
+
+```sh
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only U1,K1,L1,L2,L3
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only L1,L2,L3 --mutant keep-shift   # must exit 1
+make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py
+```
+
+| run (2026-10-23) | result |
+|---|---|
+| Debug `--only U1,K1,L1,L2,L3` | 7/7 in 48 s — K1 inside 5.34 cents (199 windows), outside 0.01 (588); L1 71/71 max 8.55 ms; L2 23/23 max 5.54; L3 35/35 max 21.47; U1 as the baseline |
+| Debug `--mutant keep-shift` | 2/5, exit 1 — L1 max 41.00 ms, L2 44.81, L3 31/35 max 41.00: each caught |
+| `make gate` | PASS 262 s (names, typecheck, test 146 s, app 108 s) |
+| `ramp_proof.py` (Release, after the gate) | **18/18 in 66 s**, exit 0 — K1, L1–L3 as Debug's to the hundredth; E1 70/70 +0.000 ms; R1 70/70 −0.010; W1 2.3 s; U1 as the baseline; P1 m1 −86.333 ms; no `Frame Job: ` in the log |
+| product mutants (Debug, `--only K1,L1,L2`) | PM1 `rateLeadFrames` 0: L1 max 33.58, L2 49.51 — caught; PM2 the rate read at n − L: L1 57/71 max 40.97, L2 max 60.33 — caught; PM3 glide spans routed to the restored hybrid: K1 inside 758.70 cents — caught |

@@ -190,11 +190,10 @@ final class RampAudioRenders: @unchecked Sendable {
                 withIntermediateDirectories: true)
             hold(cancelled: cancelled)
             if cancelled() { return .cancelled }
-            var job = RampAudioRenderer.Job(
+            let job = RampAudioRenderer.Job(
                 source: try RampAudioCache.renderSource(for: request.source),
                 map: RampAudioCache.map(of: request.ramp), keepPitch: request.ramp.keepPitch,
                 destination: landing)
-            job.glide = RampAudioCache.glide(of: request.ramp)
             _ = try RampAudioRenderer.render(job, cancelled: cancelled)
         } catch RampAudioRenderer.RenderError.cancelled {
             try? FileManager.default.removeItem(at: landing)

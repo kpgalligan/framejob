@@ -45,18 +45,21 @@ struct RampAudioMap: Equatable {
 /// reversed clip's media is pre-rendered: the composition then carries it as
 /// ONE ×1 segment, with no rate boundary inside the clip. Keep pitch off is a
 /// variable-rate band-limited interpolator (`RampAudioResampler`,
-/// `RampVarispeedStream`); keep pitch on is that glide at 48 kHz × K, Apple's
-/// time-pitch unit held at ×1 shifting the pitch back, and a decimation by K
-/// (`+TimePitch`, SR-8, SY-41).
+/// `RampVarispeedStream`); keep pitch on is Apple's time-pitch unit in rate
+/// mode, its rate commanded a measured lead ahead (`+TimePitch`, SR-13,
+/// SY-41).
 ///
 /// Blocking, on the caller's queue: `RampAudioRenders`' one serial queue
 /// renders into `cache/ramp-audio/`, named by `RampAudioCache` (spec §11
-/// SR-12). Keep pitch on with glide spans is SR-11's mix (`+Hybrid`).
+/// SR-12). Keep pitch on renders the whole map through `+TimePitch`, ramps
+/// and held spans alike: the plan's `glide` spans shape nothing (SR-13, SR-11
+/// lifted).
 enum RampAudioRenderer {
     static let sampleRate = 48_000
     /// Part of SR2's cache key: bump it whenever the written file changes.
-    /// 3: keep pitch on with glide spans is SR-11's mix (SR2b).
-    static let version = 3
+    /// 3: keep pitch on with glide spans is SR-11's mix (SR2b). 4: keep pitch
+    /// on is SR-13's led rate mode (SR1d).
+    static let version = 4
     /// Clip ticks per output frame: 600 000 / 48 000.
     static let ticksPerFrame = Double(ReelTime.perSecond) / Double(sampleRate)
     /// Output frames computed and written at a time.
@@ -71,9 +74,9 @@ enum RampAudioRenderer {
         let keepPitch: Bool
         /// A `.caf`; written as "<destination>.partial", then renamed.
         let destination: URL
-        /// Keep pitch on: the clip-tick spans that glide like tape (SR-11);
-        /// non-empty renders the hybrid. Ignored with keep pitch off.
-        var glide: [Range<Ticks>] = []
+        /// Keep pitch on: the lead in output frames; nil is `rateLeadFrames`.
+        /// Only SR-14's sweep sets it.
+        var leadFrames: Int? = nil
     }
 
     struct Report: Equatable {
@@ -83,14 +86,12 @@ enum RampAudioRenderer {
         let channels: Int
         let wallSeconds: Double
         let bytes: Int64
-        /// Keep pitch on: K, the stages' rate over 48 kHz.
-        let oversampling: Int?
-        /// Keep pitch on: the unit's reported latency, reported only.
+        /// Keep pitch on: the unit's reported latency, discarded.
         let latencyFrames: Int?
-        /// Keep pitch on: D_K, the stage-2 frames discarded for the unit's delay.
-        let delayFrames: Int?
-        /// Keep pitch on: stage-1 frames the unit pulled past kept frame 0.
+        /// Keep pitch on: source frames the unit pulled past p(0).
         let pulledFrames: Int64?
+        /// Keep pitch on: the lead the rate was read at, output frames.
+        let leadFrames: Int?
     }
 
     enum RenderError: LocalizedError, Equatable {
@@ -109,9 +110,6 @@ enum RampAudioRenderer {
     static func render(
         _ job: Job, cancelled: () -> Bool = { false }, progress: ((Double) -> Void)? = nil
     ) throws -> Report {
-        if job.keepPitch, !job.glide.isEmpty {
-            return try renderHybrid(job, cancelled: cancelled, progress: progress)
-        }
         let started = Date()
         if let why = job.map.problem { throw RenderError.invalidMap(why) }
         let asset = AVURLAsset(url: job.source)
@@ -137,18 +135,15 @@ enum RampAudioRenderer {
         var writer: RampCAFWriter?
         do {
             writer = try RampCAFWriter(url: partial, channels: channels)
-            var oversampled: Int?
             var extra: (latency: Int, pulled: Int64)?
+            var lead: Int?
             if job.keepPitch {
-                let k = oversampling(job.map)
-                let start = -Int64(timePitchPreroll * k)
-                let first = chunk(job.map, from: start, count: chunkFrames, per: k)
                 let source = try RampSourceReader(
-                    asset: asset, track: track, channels: channels, from: first.lo)
-                let stream = RampVarispeedStream(map: job.map, source: source, from: start, per: k)
-                oversampled = k
+                    asset: asset, track: track, channels: channels,
+                    from: Int64(position(job.map, 0).rounded(.down)) - Int64(timePitchPreroll))
+                lead = job.leadFrames ?? rateLeadFrames
                 extra = try renderTimePitch(
-                    job.map, stream: stream, frames: frames, writer: writer!,
+                    job.map, source: source, frames: frames, lead: lead!, writer: writer!,
                     cancelled: cancelled, progress: progress)
             } else {
                 let first = chunk(job.map, from: 0, count: Int(min(Int64(chunkFrames), frames)))
@@ -168,10 +163,8 @@ enum RampAudioRenderer {
             return Report(
                 frames: frames, channels: channels,
                 wallSeconds: Date().timeIntervalSince(started),
-                bytes: size?.int64Value ?? 0, oversampling: oversampled,
-                latencyFrames: extra?.latency,
-                delayFrames: oversampled.map { timePitchDelayFrames[$0 - 1] },
-                pulledFrames: extra?.pulled)
+                bytes: size?.int64Value ?? 0, latencyFrames: extra?.latency,
+                pulledFrames: extra?.pulled, leadFrames: lead)
         } catch {
             writer?.abandon()
             try? FileManager.default.removeItem(at: partial)
@@ -180,22 +173,21 @@ enum RampAudioRenderer {
         }
     }
 
-    /// p(n): stage frame n's source position in 48 kHz frames at 48 kHz · k,
-    /// the map read at clip tick 12.5 · n / k (k = 1: output frame n).
-    static func position(_ map: RampAudioMap, _ n: Int64, per k: Int = 1) -> Double {
-        if k == 1 { return map.source(at: Double(n) * ticksPerFrame) / ticksPerFrame }
-        return map.source(at: Double(n) * ticksPerFrame / Double(k)) / ticksPerFrame
+    /// p(n): output frame n's source position in 48 kHz frames, the map read
+    /// at clip tick 12.5 · n.
+    static func position(_ map: RampAudioMap, _ n: Int64) -> Double {
+        map.source(at: Double(n) * ticksPerFrame) / ticksPerFrame
     }
 
-    /// One chunk's positions p(n … n + count) at 48 kHz · k and the source
-    /// frames the kernel reads for them, `lo … hi`.
-    static func chunk(_ map: RampAudioMap, from n: Int64, count: Int, per k: Int = 1)
+    /// One chunk's positions p(n … n + count) and the source frames the
+    /// kernel reads for them, `lo … hi`.
+    static func chunk(_ map: RampAudioMap, from n: Int64, count: Int)
         -> (positions: [Double], lo: Int64, hi: Int64)
     {
         var positions = [Double](repeating: 0, count: count + 1)
         var fastest = 0.0
         for i in 0...count {
-            positions[i] = position(map, n + Int64(i), per: k)
+            positions[i] = position(map, n + Int64(i))
             if i > 0 { fastest = max(fastest, positions[i] - positions[i - 1]) }
         }
         let reach = Int64(RampAudioResampler.reach(rate: fastest))

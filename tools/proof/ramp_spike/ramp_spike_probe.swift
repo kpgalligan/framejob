@@ -40,13 +40,14 @@
 // next opens: never more than one open (the forty-document deadlock).
 //
 //   render   (SR1b, spec §11 SR-7) `job.json` is a list of `{name, source,
-//            clip_ticks, source_ticks, keep_pitch, destination}`; per job
-//            `RampAudioRenderer.render` writes `destination` and the probe
-//            prints `{name, read: "render", ok, error, path, frames,
+//            clip_ticks, source_ticks, keep_pitch, destination, lead_frames?}`;
+//            per job `RampAudioRenderer.render` writes `destination` and the
+//            probe prints `{name, read: "render", ok, error, path, frames,
 //            channels, wall_s, bytes, latency_frames, pulled_frames,
-//            delay_frames, oversampling, peak_rss_bytes}` (SR1c: keep pitch
-//            on's D_K and K; `getrusage`'s `ru_maxrss`, the process's peak so
-//            far). No document is opened.
+//            lead_frames, peak_rss_bytes}` (SR1d: keep pitch on's lead, a
+//            job's `lead_frames` overriding `rateLeadFrames` for SR-14's
+//            sweep; `getrusage`'s `ru_maxrss`, the process's peak so far). No
+//            document is opened.
 import AVFoundation
 import AppKit
 import MediaToolbox
@@ -451,6 +452,7 @@ struct RenderJob: Decodable {
     let source_ticks: [Double]
     let keep_pitch: Bool
     let destination: String
+    let lead_frames: Int?
 }
 
 func peakRSS() -> Int64 {
@@ -464,11 +466,12 @@ func renderRead(_ job: RenderJob) {
     let destination = URL(fileURLWithPath: job.destination)
     try? FileManager.default.removeItem(at: destination)
     do {
-        let report = try RampAudioRenderer.render(
-            RampAudioRenderer.Job(
-                source: URL(fileURLWithPath: job.source),
-                map: RampAudioMap(clipTicks: job.clip_ticks, sourceTicks: job.source_ticks),
-                keepPitch: job.keep_pitch, destination: destination))
+        var renderJob = RampAudioRenderer.Job(
+            source: URL(fileURLWithPath: job.source),
+            map: RampAudioMap(clipTicks: job.clip_ticks, sourceTicks: job.source_ticks),
+            keepPitch: job.keep_pitch, destination: destination)
+        renderJob.leadFrames = job.lead_frames
+        let report = try RampAudioRenderer.render(renderJob)
         line["ok"] = true
         line["error"] = NSNull()
         line["frames"] = report.frames
@@ -477,8 +480,7 @@ func renderRead(_ job: RenderJob) {
         line["bytes"] = report.bytes
         line["latency_frames"] = report.latencyFrames.map { $0 as Any } ?? NSNull()
         line["pulled_frames"] = report.pulledFrames.map { $0 as Any } ?? NSNull()
-        line["delay_frames"] = report.delayFrames.map { $0 as Any } ?? NSNull()
-        line["oversampling"] = report.oversampling.map { $0 as Any } ?? NSNull()
+        line["lead_frames"] = report.leadFrames.map { $0 as Any } ?? NSNull()
     } catch {
         line["ok"] = false
         line["error"] = "\(error)"

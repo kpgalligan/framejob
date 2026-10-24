@@ -1,7 +1,9 @@
 import AVFoundation
 
 /// One plan ramp segment's render as the builder looks it up (spec §11
-/// SR-12 (a)): the clip and everything in the segment that shapes the file.
+/// SR-12 (a)): the clip and everything in the segment that shapes the file,
+/// plus `glide`, keyed though it shapes nothing since SR-13 (a harmless
+/// redundancy: the core still writes it).
 /// Equal exactly when the render file is the same one — the media and the
 /// reversal are the clip's own, so they need no field — and never keyed by
 /// the segment's start, so two instances of one nest clip with different
@@ -76,11 +78,6 @@ enum RampAudioCache {
         RampAudioMap(
             clipTicks: ramp.map.map { $0.first ?? -1 },
             sourceTicks: ramp.map.map { $0.count > 1 ? Double($0[1]) : -1 })
-    }
-
-    /// The plan's glide spans as ranges, an empty or malformed one dropped.
-    static func glide(of ramp: PlanSpeedRamp) -> [Range<Ticks>] {
-        ramp.glide.compactMap { $0.count == 2 && $0[0] < $0[1] ? $0[0]..<$0[1] : nil }
     }
 
     /// Every ramp segment of `plan` that can be rendered, one request per

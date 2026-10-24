@@ -41,8 +41,9 @@ struct PlanSegment: Codable, Equatable {
 }
 
 /// A ramped clip's audio as the plan names it (spec §11 SR-10): Keep
-/// pitch, the spans that glide like tape with it on (SR-11, clip ticks;
-/// empty with it off), and the map — `[clip tick, source tick]`
+/// pitch, the core's ramp spans with it on (`glide`, clip ticks; empty
+/// with it off — kept in the plan and the cache key but shaping nothing
+/// since SR-13, SR-11 lifted by SR-15), and the map — `[clip tick, source tick]`
 /// breakpoints, linear between them — `RampAudioRenderer` renders.
 struct PlanSpeedRamp: Codable, Equatable {
     let keepPitch: Bool

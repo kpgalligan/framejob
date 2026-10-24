@@ -233,3 +233,63 @@ and the off arm's renders compared with it byte for byte:
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_spike/render_spike.py --groups render --variants RV1,RV2,RV3,RF1,RV1-edit,RC-off-x0.25,RC-off-x0.5,RC-off-x1,RC-off-x2,RC-off-x4
 for f in tools/proof/work/ramp-render-spike-sr1b/renders/R{V,F,C-off}*.caf; do cmp "$f" "tools/proof/work/ramp-render-spike/renders/$(basename "$f")" || echo "DIFF $f"; done
 ```
+
+## SR1d — Keep pitch as Apple's time-pitch in rate mode, led (`--lead-sweep`, `--verdict rate`)
+
+SR-13 put the Keep pitch arm back to SR-6's rate-driven unit with its rate read a lead L ahead
+(`RampAudioRenderer+TimePitch.swift`, `rateLeadFrames`); SR-8's three stages are gone, and
+`RampVarispeedStream` and `position`/`chunk` lost their `per` parameter. SR1d measures the lead
+first and then judges it by spec §11 SR-14 (fixed before the run, pinned by `rule_sha256`); the
+answers are in `designs/speed-ramps.md`'s SR1d record.
+
+```sh
+python3 tools/proof/ramp_spike/render_spike.py --selftest                           # S8–S21
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant rk3-off          # must exit 1 (S18)
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant sweep-drop-off   # must exit 1 (S19)
+python3 tools/proof/ramp_spike/render_spike.py --selftest --mutant lead-pick-max    # must exit 1 (S20)
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_spike/render_spike.py --lead-sweep
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_spike/render_spike.py --variants RK1,RK2,RK3,RC-on-x0.5,RC-on-x0.9,RC-on-x1.1,RC-on-x2,C-on-x0.5,C-on-x0.9,C-on-x1.1,C-on-x2,RC-off-x1,RC-on-x1,RC-on-x3,RC-on-x6,RC-on-x0.2,RB-on-x2,RW-on-x0.9,RW-on-x1.1,RW-on-x2 --verdict rate
+```
+
+**`--lead-sweep`** renders RK1 and RK2 from the clicks fixture at every lead in 0, 2, …, 100 ms
+(round(L · 48) output frames, passed as the render job's `lead_frames`) into
+`tools/proof/work/ramp-render-spike/lead/` (it writes nothing else), places each render's clicks
+against the ideal map (found, of, max |diff|; SR-7's keep-pitch method) and prints the table,
+each ramp's own best lead and `L*: <ms> ms = <frames> frames`, or `STOP — lead: no lead finds
+every click`. `pick_lead` takes only the leads at which both ramps find every click and picks
+the one with the least greater maximum, a tie going to the smaller lead. `lead/sweep.json` keeps
+the rows. Exit 0 with an L*, 1 without. L* is then written into `rateLeadFrames` by hand.
+
+**`--verdict rate`** prints SR-14's verdict, `VERDICT: GO — arm ON (rate) …` or `VERDICT: STOP
+— …`, from `decide_rate`: SR-7's arm ON rule over RK1, RK2 and RK3 (`RATE_ON_RAMPS`), every RC-on
+anchor, SR-9's pitch rows (PR for the ramps and anchors, LG for the ramps) with the command
+clamped at ±6000 cents (the unit's 1/32…32 bound, so f_e = 220 Hz everywhere; `CENTS_BOUND`),
+and no dropout in any RW render. `both` and `on` are unchanged but for PT1's coarse alignment
+below, which applies under every `--verdict`.
+
+**The variants added.** RK3 (keep pitch on, ×2 → ×0.5 ease in-out over 1–3 s, 8 s), rendered
+and staged as RK1, its frames read in playback, its end-rate controls RC-on-x2 and RC-on-x0.5;
+the sweep never renders it. Kind `sweep`, keep pitch on, 6 s, rendered only from `glide.wav` (20 s,
+48 kHz, mono, amplitude 0.5, phase-continuous: 220 Hz to 2 s, exponential to 440 Hz at 4 s, then
+440 Hz; the runner writes it into the work folder): RW-on-x0.9, RW-on-x1.1, RW-on-x2.
+
+**The rows added or changed.** RS-<v> with keep pitch on now reads the lead, the unit's latency
+and pulled − map frames (the map frames from the variant's own map; the probe's render line
+carries `lead_frames` in place of SR1c's `oversampling` and `delay_frames`); RW-on-x0.9,
+RW-on-x1.1, RW-on-x2 (SR-5's (a) and (b) on the render, the local period 1 / glide_hz(1 + r · t),
+scored); LG-RK3; PR-source reads "no window read" rather than failing on an empty fixture track;
+PT1 now aligns RC-off-x1's tap coarsely first (`coarse_ms`, as `ramp_proof.py`'s P1: the tap
+moved by whole samples to its nearest click peaks), then `pt1` reads the rest, m1 = coarse +
+fine, and its row is guarded against a tap that finds no click.
+
+**`--selftest`** adds S18 (`decide_rate` answers GO on passing results and STOP naming RK3 when
+its export placement fails), S19 (a synthetic ×2 render of the glide is clean, and the same with a
+20 ms dip to 0.03 is one dropout), S20 (`pick_lead` takes the least greater maximum with ties to
+the smaller lead; a lead with a lower maximum but one click missed loses; no eligible lead answers
+None) and S21 (the rate-mode command expects 220 Hz at ×0.2 and ×6, where SR-9's expected 330 Hz
+at ×6). The mutants: `rk3-off` (RK3 left out of `decide_rate`: S18), `sweep-drop-off` (an RW
+render never fails: S19), `lead-pick-max` (the greatest maximum picked: S20).
+
+Before the sweep SR1c's work folder was copied once to
+`tools/proof/work/ramp-render-spike-sr1c/` (never written; its `results.json` is SR1c's record),
+and the off arm's renders were compared byte for byte with SR1b's by SR1c's two commands above.
