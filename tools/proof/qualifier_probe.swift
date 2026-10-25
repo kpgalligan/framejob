@@ -96,14 +96,25 @@ do {
     }
     let rust = QualifierSample([102.0 / 255, 26.0 / 255, 26.0 / 255])
     let dark = QualifierSample([5.0 / 255, 2.0 / 255, 2.0 / 255])
+    // #347: an HLG project's pick reads Y′ on BT.2020's weights, as the pass
+    // does (`gradeWeights(q.hlgOutput)`, spec §11 HD-13 (g)); hue, C and S′
+    // are the same either way.
+    let sdr = QualifierSample([0.8, 0.2, 0.1])
+    let hlg = QualifierSample([0.8, 0.2, 0.1], hlg: true)
+    let y709 = 0.2126 * 0.8 + 0.7152 * 0.2 + 0.0722 * 0.1
+    let y2020 = 0.2627 * 0.8 + 0.6780 * 0.2 + 0.0593 * 0.1
+    let hlgOk = near(sdr.luma, y709) && near(hlg.luma, y2020, 1e-6) && hlg.hue == sdr.hue
+        && hlg.chroma == sdr.chroma && hlg.saturation == sdr.saturation
     check(
         "K1 QualifierSample of \(samples.count) colours (R, G, B, C, M, Y, grey, skin, "
             + "(102, 26, 26), (5, 2, 2)) equals the proof's GR-13 readings to 1e-9; (102, 26, "
-            + "26) reads S 0.745, C 0.298 and (5, 2, 2) S′ 0",
+            + "26) reads S 0.745, C 0.298 and (5, 2, 2) S′ 0; (0.8, 0.2, 0.1) reads Y′ on "
+            + "Rec. 709's weights (0.32034) and with hlg on BT.2020's (0.35169), hue, C and S′ "
+            + "unchanged",
         samples.count == 10 && misses.isEmpty && near(rust.saturation, 0.745, 5e-4)
-            && near(rust.chroma, 0.298, 5e-4) && dark.saturation == 0,
+            && near(rust.chroma, 0.298, 5e-4) && dark.saturation == 0 && hlgOk,
         "\(misses.prefix(4)); (102,26,26) S \(rust.saturation) C \(rust.chroma); (5,2,2) "
-            + "S′ \(dark.saturation)")
+            + "S′ \(dark.saturation); (0.8,0.2,0.1) Y′ \(sdr.luma), hlg \(hlg.luma)")
 }
 
 do {

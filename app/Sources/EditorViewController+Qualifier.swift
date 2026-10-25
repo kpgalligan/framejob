@@ -88,6 +88,7 @@ extension EditorViewController {
         }
         let clips = picker.clips
         let behind = picker.behind
+        let hlg = snapshot.output == .hlg
         endQualifierPick()
         let project = document.editedProject
         let urls = document.mediaURLs()
@@ -97,14 +98,15 @@ extension EditorViewController {
             let color = QualifierPick.sample(
                 project: project, urls: urls, at: time, clip: behind, point: target,
                 canvas: snapshot, graphics: graphics)
-            DispatchQueue.main.async { self?.qualifierSampled(color, clips: clips) }
+            DispatchQueue.main.async { self?.qualifierSampled(color, clips: clips, hlg: hlg) }
         }
     }
 
     /// Back on the main thread with the sampled colour: the ranges centred on
     /// it, through the binding's off-event door (an action's end when one is
-    /// selected), unless the selection moved while the frame composed.
-    private func qualifierSampled(_ color: RGBA?, clips: [UInt32]) {
+    /// selected), unless the selection moved while the frame composed. `hlg`
+    /// is the canvas output's, read with the click: the pass's luma weights.
+    private func qualifierSampled(_ color: RGBA?, clips: [UInt32], hlg: Bool) {
         guard let inspector = inspector, let color = color else {
             NSSound.beep()
             return
@@ -114,7 +116,7 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let patch = binding.videoProps.qualifier.picked(QualifierSample(color))
+        let patch = binding.videoProps.qualifier.picked(QualifierSample(color, hlg: hlg))
         binding.applyGrouped("Qualifier", binding.ops(video: VideoPatch(qualifier: patch)))
     }
 }

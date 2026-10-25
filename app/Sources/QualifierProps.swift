@@ -277,14 +277,16 @@ struct QualifierUniforms {
 
 /// One pixel read as the shader reads it (GR-13), in Double: HSV hue in
 /// degrees (0 with no chroma), chroma C = max − min, the GUARDED saturation
-/// S′ = (C / max) · smoothstep(0.03, 0.10, max), and Rec. 709 Y′.
+/// S′ = (C / max) · smoothstep(0.03, 0.10, max), and Y′ on Rec. 709's
+/// weights or, with `hlg` (the canvas output is HLG, as the pass's
+/// `hlgOutput`), BT.2020's (spec §11 HD-13 (g)).
 struct QualifierSample {
     let hue: Double
     let chroma: Double
     let saturation: Double
     let luma: Double
 
-    init(_ rgb: RGBA) {
+    init(_ rgb: RGBA, hlg: Bool = false) {
         let r = rgb.count > 0 ? rgb[0] : 0
         let g = rgb.count > 1 ? rgb[1] : 0
         let b = rgb.count > 2 ? rgb[2] : 0
@@ -303,7 +305,12 @@ struct QualifierSample {
         hue = h
         chroma = c
         saturation = (mx > 0 ? c / mx : 0) * Self.smoothstep(0.03, 0.10, mx)
-        luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        if hlg {
+            let w = InputConversions.luma2020
+            luma = Double(w.x) * r + Double(w.y) * g + Double(w.z) * b
+        } else {
+            luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        }
     }
 
     /// Metal's `smoothstep`, Hermite.

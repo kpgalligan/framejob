@@ -2278,7 +2278,8 @@ static inline float qualifierLevel(float v, float low, float high, float softnes
 // colour (GR-13): HSV hue against the band (wrapping), times the chroma
 // guard (no hue below C 0.02, full from 0.06); HSV saturation C / max
 // times the near-black guard (dark noise reads unsaturated: 0 at V ≤ 0.03,
-// full from 0.10); Rec. 709 Y′. The product of the ranges present, then its
+// full from 0.10); Y′ on Rec. 709's weights, BT.2020's in an HLG project
+// (spec §11 HD-13 (g)). The product of the ranges present, then its
 // complement when inverted. S and Y′ are saturated: a fast-math division can
 // put C / max an ulp past 1, which a hard edge at 1 would refuse.
 static inline float qualifierWeight(float3 c, constant QualifierUniforms &q) {
