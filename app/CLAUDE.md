@@ -352,7 +352,8 @@ detail there.
   features and speech passes once. The cache order is thumbnails → peaks →
   sync features (`cache/sync/<id>.bin` and the 8 kHz `<id>.pcm`,
   `MediaImporter+SyncFeatures.swift`, version 4: decoded at the file's own
-  rate and brought to 8 kHz by `SyncResampler`, so two passes write the same
+  rate through `speechReader(…, sampleRate: nil)` and brought to 8 kHz by
+  `SyncResampler`, so two passes write the same
   bytes, SY-34; a file under one frame publishes an empty `.bin`, SY-31; an
   MP3 read past its tag's encoder delay, SY-38) →
   speech.
@@ -1960,7 +1961,7 @@ free.
   its `SourceMap`, its window `[in, in + S(D))` (SR-20 (d)); the
   three-argument `Transcriber.jobs(for:in:urls:)` stays for the instruments
   and refuses a ramped clip.
-  `Loader` is `MediaPeaks.Loader`'s shape; `undeleted(in:)` is the janitor's.
+  `undeleted(in:)` is the janitor's.
 - `SpeechEngine.swift` — the on-device engine (`SpeechAnalyzer`,
   `SpeechTranscriber`, `AssetInventory`) and the ONE file under
   `app/Sources` that imports Speech or says `async` for it (spec §11 W-8).
@@ -2080,6 +2081,8 @@ free.
   the vendored compiled model, NOT `async`, with one process-wide
   `NSLock`-guarded unavailability reason that never retries until relaunch.
   `MediaPeaks` is the one spelling of the project → source window arithmetic;
+  `MediaCacheLoader` (in `MediaPeaks.swift`) is the one per-media cache memo,
+  and `MediaPeaks.loader` and `MediaSpeech.loader` are the two it is built as;
   a ramped clip's one ×1 audio segment is read through its `ramp.source`
   map in `sourceTick` (SR-20 (d)), not the segment's linear rate;
   the reversed MIRROR it applies is `ReverseMirror`'s. `+Walls` also holds
@@ -2121,6 +2124,7 @@ free.
   press is a no-op, always to BASE props.
 - `AudioSync.swift` (+`Correction`, +`Region`, +`Search`, +`Weak`) ·
   `AudioSyncMatch.swift` · `AudioSyncDrift.swift` · `AudioSyncPHAT.swift` ·
+  `RealFFT.swift` ·
   `SyncFeatures.swift` · `SyncResampler.swift` ·
   `AudioSyncSheetController.swift` — Synchronize Audio (spec §11 SY-1..SY-38,
   ADR `audio-sync`), `AudioNormalize`'s shape: `read` takes the plan
@@ -2156,7 +2160,9 @@ free.
   fits the drift as a robust line (Theil–Sen, MAD inliers) through feature
   windows, then PHAT per window (SY-21);
   `+Correction` decides whether to correct it, the ±0.2% band and the op
-  order. `EditorViewController+Audio` holds the Clip menu's sound
+  order. `RealFFT` is the vDSP real-FFT plumbing `summedCorrelation` and
+  `AudioSyncPHAT.correlation` share, over the setup each owns.
+  `EditorViewController+Audio` holds the Clip menu's sound
   commands (Normalize, moved whole out of the frozen file, and Synchronize
   Audio) with their validator arms.
 - `LevelMeter.swift` · `LevelMeterView.swift` · `Loudness.swift` — the meter

@@ -16,9 +16,9 @@ import AudioToolbox
 /// `leadingTrim` answers that delay, read from the file's own LAME/Xing tag
 /// and applied as written, only when Core Audio has no packet table: a packet
 /// table is never second-guessed. Every reader of the file's sound starts
-/// there: the 48 kHz copy (`AudioRateCopy`), the sync reader
-/// (`MediaImporter.writeSyncFeatures`), the speech reader
-/// (`MediaImporter.speechReader`), the transcription extract
+/// there: the 48 kHz copy (`AudioRateCopy`), the speech reader and the sync
+/// reader (`MediaImporter.speechReader`, which `writeSpeech` and
+/// `writeSyncFeatures` both read through), the transcription extract
 /// (`Transcriber.extractAudio`, whose session starts there too) and the
 /// reverse (`ReverseRenderer`, each slice read that far on behind a lead of
 /// silence); the peaks decode from zero and place every buffer at PTS − trim

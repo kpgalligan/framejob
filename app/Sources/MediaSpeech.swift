@@ -8,8 +8,9 @@ import Foundation
 /// exactly 19,200, and written as the division rather than as the number for
 /// the same reason `MediaPeaks.bucketTicks` is. `MediaPeaks.window` already
 /// generalises the project-time → bucket-index arithmetic over the bucket
-/// size, so this file adds only the chunk grid and the max-over-window
-/// question `SilenceDetector`'s voice test asks.
+/// size, and `MediaPeaks.peak` takes the max over it on any grid, so this
+/// file adds only the chunk grid, its loader and the question
+/// `SilenceDetector`'s voice test asks.
 enum MediaSpeech {
 
     /// One probability's worth of source time, in ticks. Written as the
@@ -27,46 +28,23 @@ enum MediaSpeech {
     }
 
     /// One media's cached probabilities read at most once, however many
-    /// segments cite it — `MediaPeaks.Loader`'s shape over `loadSpeech`
-    /// instead of `loadPeaks`.
-    final class Loader {
-        private let cacheDirectory: URL?
-        private var loaded: [UInt32: [Float]] = [:]
-        private(set) var pending: Set<UInt32> = []
-
-        init(cacheDirectory: URL?) {
-            self.cacheDirectory = cacheDirectory
-        }
-
-        func probabilities(for media: UInt32) -> [Float]? {
-            if let cached = loaded[media] { return cached }
-            if pending.contains(media) { return nil }
-            guard let cacheDirectory = cacheDirectory,
-                let read = MediaImporter.loadSpeech(for: media, in: cacheDirectory)
-            else {
-                pending.insert(media)
-                return nil
-            }
-            loaded[media] = read
-            return read
+    /// segments cite it — a `MediaCacheLoader` over `loadSpeech` instead of
+    /// `loadPeaks`.
+    static func loader(cacheDirectory: URL?) -> MediaCacheLoader<[Float]> {
+        MediaCacheLoader(cacheDirectory: cacheDirectory) {
+            MediaImporter.loadSpeech(for: $0, in: $1)
         }
     }
 
     /// The loudest — here, most confident — probability the project span
     /// `[from, to)` of `segment` covers, or 0 when it falls outside the
-    /// window the cache was built from. `MediaPeaks.window` generalised over
-    /// the bucket size is the whole of the arithmetic; this only picks the
-    /// grid and takes the max.
+    /// window the cache was built from: `MediaPeaks.peak` asked on the chunk
+    /// grid.
     static func speechMax(
         _ p: [Float], over segment: PlanSegment, from: Ticks, to: Ticks, reversedPivot: Ticks?
     ) -> Float {
-        guard
-            let range = MediaPeaks.window(
-                of: segment, from: from, to: to, reversedPivot: reversedPivot,
-                bucketTicks: chunkTicks, count: p.count)
-        else { return 0 }
-        var loudest: Float = 0
-        for index in range { loudest = max(loudest, p[index]) }
-        return loudest
+        MediaPeaks.peak(
+            p, over: segment, from: from, to: to, reversedPivot: reversedPivot,
+            bucketTicks: chunkTicks)
     }
 }

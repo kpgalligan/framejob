@@ -217,26 +217,17 @@ enum TranscriptReader {
     /// One clip through this Mac's recogniser, waited for. Off main only:
     /// `SpeechEngine.transcribe` blocks its caller.
     ///
-    /// The model questions are `Transcriber.transcribe`'s, in its order and
-    /// with its sentences: the engine's availability, then whether the ONE
-    /// chosen locale is installed (a question that could not be answered is
-    /// `.unavailable`, never "not installed"). It never downloads (W-8). The
-    /// extract is the clip's own source window, removed on every exit.
+    /// The model questions are `Transcriber.requireModel`, the ones
+    /// `Transcriber.transcribe` asks, in its order and with its sentences:
+    /// the engine's availability, then whether the ONE chosen locale is
+    /// installed (a question that could not be answered is `.unavailable`,
+    /// never "not installed"). It never downloads (W-8). The extract is the
+    /// clip's own source window, removed on every exit.
     static func recognize(
         _ job: Transcriber.Job, language: Transcriber.Language,
         cancel: Transcriber.CancelToken
     ) throws -> [SpeechEngine.Run] {
-        guard SpeechEngine.isAvailable else {
-            throw Transcriber.TranscribeError.unavailable(language.displayName)
-        }
-        switch SpeechEngine.isInstalled(language.locale) {
-        case .none:
-            throw Transcriber.TranscribeError.unavailable(language.displayName)
-        case .some(false):
-            throw Transcriber.TranscribeError.notInstalled(language.displayName)
-        case .some(true):
-            break
-        }
+        try Transcriber.requireModel(language)
         if cancel.isCancelled { throw Transcriber.TranscribeError.cancelled }
         let extract = try Transcriber().extractAudio(job, cancel: cancel)
         defer { try? FileManager.default.removeItem(at: extract.url) }

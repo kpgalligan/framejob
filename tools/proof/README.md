@@ -23471,3 +23471,33 @@ python3 tools/proof/editor_dedup_probe.py --mutant esc-keeps-session compare DIR
 | `e2_chrome.py`; `graphics_inspector_proof.py`, Debug then Release; `graphics_proof.py`, Release | 52/52; 100/100 and 100/100; 51/51 |
 | `make gate` | PASS |
 | Release run of this probe | not applicable: the probe compiles its own binary from `app/Sources` and drives no built app |
+
+## Issue #362 — one per-media cache loader, a shared real FFT, one mono float reader, one model check (no new instrument)
+
+A pure refactor: `MediaCacheLoader<Value>` (`MediaPeaks.swift`) is the one per-media cache
+memo `MediaPeaks.loader` and `MediaSpeech.loader` are built as, and `MediaTranscript.Loader`,
+which nothing called, is gone; `RealFFT.swift` is the vDSP pack, forward, inverse, unpack and
+lag order `AudioSyncMatch.summedCorrelation` and `AudioSyncPHAT.correlation` share, each over
+the setup it owns (SY-22); `MediaImporter.speechReader(asset:track:sampleRate:)` and
+`monoFloats(of:)` are the one reader and buffer copy of the speech and sync passes (the sync
+pass passes `sampleRate: nil`, SY-34); `Transcriber.requireModel` is the model check
+`transcribe` and `TranscriptReader.recognize` share. Every number is held to the tree before
+the change, so the instruments are the existing ones. `export_offset_proof.py`'s
+`M13-no-sync-trim` now mutates `MediaImporter+Speech.swift`, where the one `if trim > .zero {`
+both passes read through lives; it and `M20-no-speech-trim` each now fail both X12 and X16.
+
+| Run (2026-10-25, lane worktree, shared host) | Before (d581ac5) | After |
+|---|---|---|
+| `speech_cache_probe.py` | 16/16 | 16/16 |
+| `silence2_probe.py` | 74/78 (the two `'peaks'`/`'speech'` post re-read rows, two checks each, fail on this host) | 74/78, the same four rows; 12a's unscored note read 64 then 67 of 325 chunks not bit-identical, the 30–70 range roadmap-04's ADR records |
+| `export_offset_proof.py --only X12,X16` | 2/2 | 2/2, every X12/X16 median, spread and count identical (the unscored X14 export table row timed out at 120 s under host load) |
+| `export_offset_proof.py --mutants --mutant M13-no-sync-trim,M20-no-speech-trim` | 2/2 killed | 2/2 killed |
+| `audio_sync_proof.py --only P1–P18,P20,P21,P23,P24` | 22/22 | 22/22, every number identical (only P18's wall-clock plan seconds differ) |
+| `transcript_proof.py` (Debug) | 23/23 | 23/23 |
+| `silence2_proof.py`, Debug | 100/100 | 100/100 |
+| `phase5_proof.py`, Debug | 90/90 | 90/90 (a dict's key order and an export file's pid differ) |
+| `speech_engine_proof.py`, Debug, with its six mutants | 35/35, 6/6 killed | 35/35, 6/6 killed (`skip-installed-check`'s anchor now inside `requireModel`) |
+| `audio_sync_proof.py`, Debug | 54/54 | 32/54: the 32 rows that ran carry every number of the baseline's; S4–S9, S11, S15, S16, S19–S21, S23–S32 were not run because media 2's sync marker landed past the 120 s wait while three other proofs ran beside it on a shared host (the marker was on disk, complete, when the run ended) |
+| `make gate` | — | PASS 268 s (typecheck exactly the four baseline warnings) |
+| `audio_sync_proof.py`, Release (the recorded run) | — | 54/54; every offset, coarse offset, z, candidate, drift, lag and T identical to the Debug baseline's (S14's sheet snapshot read `None`: the sheet was gone before it on Release; the row is ok) |
+| `audio_sync_proof.py --cost` | — | P19 ok, total CPU 0.875 s (want ≤ 1.5), host load 5.76 |

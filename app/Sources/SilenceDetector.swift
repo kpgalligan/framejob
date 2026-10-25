@@ -127,7 +127,7 @@ enum SilenceDetector {
         let voiceAvailable: Bool
         /// Every media in the timeline whose `cache/speech/<id>.bin` is not
         /// on disk yet, whether or not it is in scope — `pendingMedia`'s
-        /// shape for the voice cache. `MediaSpeech.Loader.pending`, sorted.
+        /// shape for the voice cache. `MediaSpeech.loader`'s `pending`, sorted.
         let pendingSpeech: [UInt32]
         fileprivate let voices: [Voice]
         /// The spans no candidate may reach into — see `NestExtent`.
@@ -174,12 +174,12 @@ enum SilenceDetector {
         let snapshot = document.editedProject.snapshot
         let cacheDirectory = document.cacheDirectory
 
-        // One read per media, however many segments cite it — `MediaPeaks.Loader`
-        // is that memo, and its `pending` set is what this reports as "still
-        // analysing".
-        let loader = MediaPeaks.Loader(cacheDirectory: cacheDirectory)
+        // One read per media, however many segments cite it — `MediaPeaks.loader`
+        // (a `MediaCacheLoader`) is that memo, and its `pending` set is what
+        // this reports as "still analysing".
+        let loader = MediaPeaks.loader(cacheDirectory: cacheDirectory)
         // One read per media, exactly `loader`'s shape, for the voice cache.
-        let speechLoader = MediaSpeech.Loader(cacheDirectory: cacheDirectory)
+        let speechLoader = MediaSpeech.loader(cacheDirectory: cacheDirectory)
 
         var voices: [Voice] = []
         for track in plan.audioTracks {
@@ -188,10 +188,10 @@ enum SilenceDetector {
                 voices.append(
                     Voice(
                         segment: segment, ramps: track.ramps,
-                        peaks: loader.peaks(for: segment.media),
+                        peaks: loader.value(for: segment.media),
                         reversedPivot: MediaPeaks.reversedPivot(for: segment, in: snapshot),
                         audible: isAudible(track.ramps, over: span),
-                        speech: speechLoader.probabilities(for: segment.media)))
+                        speech: speechLoader.value(for: segment.media)))
             }
         }
         let nests = nestExtents(in: snapshot)

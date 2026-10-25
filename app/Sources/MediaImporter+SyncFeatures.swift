@@ -131,7 +131,7 @@ extension MediaImporter {
 
     /// Reads `track` from `MP3Gapless.leadingTrim` (an MP3's encoder delay
     /// Core Audio left in, SY-38; zero for every other file) as mono float at
-    /// its own rate (speech's output settings without a rate), the rate the
+    /// its own rate (`speechReader` with no rate), the rate the
     /// first buffer says, brought to `SyncFeatures.sampleRate` by a
     /// `SyncResampler` (SY-34: AVFoundation's own conversion wrote different
     /// bytes on every pass), then through a
@@ -149,22 +149,8 @@ extension MediaImporter {
         for media: MediaSnapshot, asset: AVURLAsset, track: AVAssetTrack, stamp: CacheStamp?,
         into cacheDir: URL, pass: CachePass?
     ) {
-        guard let reader = try? AVAssetReader(asset: asset) else { return }
-        let trim = MP3Gapless.leadingTrim(of: asset.url, track: track)
-        if trim > .zero {
-            reader.timeRange = CMTimeRange(start: trim, duration: .positiveInfinity)
-        }
-        let output = AVAssetReaderTrackOutput(
-            track: track,
-            outputSettings: [
-                AVFormatIDKey: kAudioFormatLinearPCM,
-                AVNumberOfChannelsKey: 1,
-                AVLinearPCMBitDepthKey: 32,
-                AVLinearPCMIsFloatKey: true,
-                AVLinearPCMIsBigEndianKey: false,
-                AVLinearPCMIsNonInterleaved: false,
-            ])
-        output.alwaysCopiesSampleData = false
+        guard let (reader, output) = speechReader(asset: asset, track: track, sampleRate: nil)
+        else { return }
         guard reader.canAdd(output) else { return }
         reader.add(output)
         guard reader.startReading() else { return }
@@ -180,16 +166,7 @@ extension MediaImporter {
             }
         }
         while let sample = output.copyNextSampleBuffer() {
-            guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
-            let byteCount = CMBlockBufferGetDataLength(block)
-            guard byteCount >= 4 else { continue }
-            var samples = [Float](repeating: 0, count: byteCount / 4)
-            let copied = samples.withUnsafeMutableBytes { raw -> OSStatus in
-                guard let base = raw.baseAddress else { return -1 }
-                return CMBlockBufferCopyDataBytes(
-                    block, atOffset: 0, dataLength: byteCount, destination: base)
-            }
-            guard copied == noErr else { continue }
+            guard let samples = monoFloats(of: sample) else { continue }
             if resampler == nil {
                 let rate = CMSampleBufferGetFormatDescription(sample)
                     .flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0) }?

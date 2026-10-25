@@ -70,16 +70,7 @@ extension MediaImporter {
         }
 
         while let sample = output.copyNextSampleBuffer() {
-            guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
-            let byteCount = CMBlockBufferGetDataLength(block)
-            guard byteCount >= 4 else { continue }
-            var samples = [Float](repeating: 0, count: byteCount / 4)
-            let copied = samples.withUnsafeMutableBytes { raw -> OSStatus in
-                guard let base = raw.baseAddress else { return -1 }
-                return CMBlockBufferCopyDataBytes(
-                    block, atOffset: 0, dataLength: byteCount, destination: base)
-            }
-            guard copied == noErr else { continue }
+            guard let samples = monoFloats(of: sample) else { continue }
             do {
                 absorb(try vad.feed(samples))
             } catch {
@@ -127,31 +118,52 @@ extension MediaImporter {
         }
     }
 
-    /// `writeSpeech`'s reader and output, neither added nor started. The
+    /// `writeSpeech`'s and `writeSyncFeatures`' reader and output, neither
+    /// added nor started: mono 32-bit float at `sampleRate`, 16 kHz for the
+    /// speech pass, and at the file's own rate when it is nil (the sync
+    /// pass, which `SyncResampler` brings to 8 kHz, spec §11 SY-34). The
     /// reader starts at `MP3Gapless.leadingTrim` when it is past zero — the
-    /// MP3 encoder delay Core Audio leaves in (spec §11 SY-42) — so chunk 0
-    /// is the recording's first 32 ms; for every other file it reads the
-    /// whole track, as it always has.
-    static func speechReader(asset: AVURLAsset, track: AVAssetTrack)
-        -> (reader: AVAssetReader, output: AVAssetReaderTrackOutput)?
-    {
+    /// MP3 encoder delay Core Audio leaves in (spec §11 SY-38, SY-42) — so
+    /// chunk 0 is the recording's first 32 ms; for every other file it reads
+    /// the whole track, as it always has.
+    static func speechReader(
+        asset: AVURLAsset, track: AVAssetTrack,
+        sampleRate: Double? = Double(SileroVAD.sampleRate)
+    ) -> (reader: AVAssetReader, output: AVAssetReaderTrackOutput)? {
         guard let reader = try? AVAssetReader(asset: asset) else { return nil }
         let trim = MP3Gapless.leadingTrim(of: asset.url, track: track)
         if trim > .zero {
             reader.timeRange = CMTimeRange(start: trim, duration: .positiveInfinity)
         }
-        let output = AVAssetReaderTrackOutput(
-            track: track,
-            outputSettings: [
-                AVFormatIDKey: kAudioFormatLinearPCM,
-                AVSampleRateKey: Double(SileroVAD.sampleRate),
-                AVNumberOfChannelsKey: 1,
-                AVLinearPCMBitDepthKey: 32,
-                AVLinearPCMIsFloatKey: true,
-                AVLinearPCMIsBigEndianKey: false,
-                AVLinearPCMIsNonInterleaved: false,
-            ])
+        var settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
+        ]
+        if let sampleRate { settings[AVSampleRateKey] = sampleRate }
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: settings)
         output.alwaysCopiesSampleData = false
         return (reader, output)
+    }
+
+    /// The mono floats one buffer of `speechReader`'s output holds, or nil
+    /// when it has no data block, holds under 4 bytes, or will not copy —
+    /// a buffer both passes skip, never one that fails them (a zero-sample
+    /// marker buffer is an ordinary part of a read).
+    static func monoFloats(of sample: CMSampleBuffer) -> [Float]? {
+        guard let block = CMSampleBufferGetDataBuffer(sample) else { return nil }
+        let byteCount = CMBlockBufferGetDataLength(block)
+        guard byteCount >= 4 else { return nil }
+        var samples = [Float](repeating: 0, count: byteCount / 4)
+        let copied = samples.withUnsafeMutableBytes { raw -> OSStatus in
+            guard let base = raw.baseAddress else { return -1 }
+            return CMBlockBufferCopyDataBytes(
+                block, atOffset: 0, dataLength: byteCount, destination: base)
+        }
+        guard copied == noErr else { return nil }
+        return samples
     }
 }

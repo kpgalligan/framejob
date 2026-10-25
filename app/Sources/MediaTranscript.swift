@@ -378,36 +378,4 @@ enum MediaTranscript {
         let offset = Double(source - job.sourceIn) / speed
         return Transcriber.placed(offset: offset, in: job)
     }
-
-    // MARK: - Reading one per media
-
-    /// `MediaPeaks.Loader`'s shape: one read per media for a whole pass,
-    /// with the media that had no cache remembered.
-    final class Loader {
-        private let cacheDirectory: URL?
-        private var loaded: [UInt32: File] = [:]
-        /// Media whose `cache/transcripts/<id>.json` was asked for and was
-        /// not there, or was there and would not read.
-        private(set) var pending: Set<UInt32> = []
-
-        /// nil is a document with nowhere to keep caches, which answers every
-        /// media as pending — the same answer as a cache that has not been
-        /// written yet, and the correct one.
-        init(cacheDirectory: URL?) {
-            self.cacheDirectory = cacheDirectory
-        }
-
-        func file(for media: UInt32) -> File? {
-            if let cached = loaded[media] { return cached }
-            if pending.contains(media) { return nil }
-            guard let cacheDirectory = cacheDirectory,
-                let read = MediaTranscript.read(for: media, in: cacheDirectory)
-            else {
-                pending.insert(media)
-                return nil
-            }
-            loaded[media] = read
-            return read
-        }
-    }
 }

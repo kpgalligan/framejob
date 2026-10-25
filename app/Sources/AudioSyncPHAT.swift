@@ -114,7 +114,7 @@ enum AudioSyncPHAT {
 
     /// The band-limited PHAT correlation `r[L]` for L from −(ny−1) to nx−1, at
     /// index L + ny − 1: n the least power of two holding every lag, one
-    /// zero-padded `vDSP_fft_zrip` each (`summedCorrelation`'s pattern), the
+    /// zero-padded `vDSP_fft_zrip` each (`RealFFT`, as `summedCorrelation`), the
     /// cross-spectrum `X·conj(Y)` kept on the bins `1..<n/2` whose `k·8000/n`
     /// lies in [`lowHertz`, `highHertz`], each divided by its magnitude (0
     /// under 1e-20), DC and Nyquist 0, then one inverse: `r[L] = (1/n)·Σ_k
@@ -125,8 +125,7 @@ enum AudioSyncPHAT {
         let ny = y.count
         guard nx > 0, ny > 0 else { return [] }
         let lags = nx + ny - 1
-        var log2n = 1
-        while (1 << log2n) < lags { log2n += 1 }
+        let log2n = RealFFT.log2n(holding: lags)
         let n = 1 << log2n
         let half = n / 2
         let borrowed = fft.flatMap { $0.log2n >= log2n ? $0 : nil }
@@ -140,21 +139,7 @@ enum AudioSyncPHAT {
         func spectrum(_ values: [Float]) -> ([Float], [Float]) {
             var padded = [Float](repeating: 0, count: n)
             padded.replaceSubrange(0..<values.count, with: values)
-            var real = [Float](repeating: 0, count: half)
-            var imaginary = [Float](repeating: 0, count: half)
-            real.withUnsafeMutableBufferPointer { re in
-                imaginary.withUnsafeMutableBufferPointer { im in
-                    var split = DSPSplitComplex(realp: re.baseAddress!, imagp: im.baseAddress!)
-                    padded.withUnsafeBufferPointer { source in
-                        source.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: half) {
-                            vDSP_ctoz($0, 2, &split, 1, vDSP_Length(half))
-                        }
-                    }
-                    vDSP_fft_zrip(
-                        setup, &split, 1, vDSP_Length(log2n), FFTDirection(kFFTDirection_Forward))
-                }
-            }
-            return (real, imaginary)
+            return RealFFT.forward(setup, log2n: log2n, padded: padded)
         }
 
         let (xr, xi) = spectrum(x)
@@ -174,27 +159,10 @@ enum AudioSyncPHAT {
             real[bin] = Float(re / magnitude)
             imaginary[bin] = Float(im / magnitude)
         }
-        var circular = [Float](repeating: 0, count: n)
-        real.withUnsafeMutableBufferPointer { re in
-            imaginary.withUnsafeMutableBufferPointer { im in
-                var split = DSPSplitComplex(realp: re.baseAddress!, imagp: im.baseAddress!)
-                vDSP_fft_zrip(
-                    setup, &split, 1, vDSP_Length(log2n), FFTDirection(kFFTDirection_Inverse))
-                circular.withUnsafeMutableBufferPointer { out in
-                    out.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: half) {
-                        vDSP_ztoc(&split, 1, $0, 2, vDSP_Length(half))
-                    }
-                }
-            }
-        }
+        let circular = RealFFT.inverse(setup, log2n: log2n, real: &real, imaginary: &imaginary)
         // The whitened spectrum carries no forward scale; the inverse sums n bins.
         let scale = 1 / Double(n)
-        var result = [Double](repeating: 0, count: lags)
-        for index in 0..<lags {
-            let lag = index - (ny - 1)
-            result[index] = Double(circular[lag >= 0 ? lag : n + lag]) * scale
-        }
-        return result
+        return RealFFT.lagOrdered(circular, lags: lags, ny: ny, scale: scale)
     }
 
     // MARK: - The refinement (SY-20)

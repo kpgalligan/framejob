@@ -287,18 +287,17 @@ extension MediaImporter {
     /// Clears a waveform a pass is about to rebuild — `clearThumbnails`'
     /// posture for the other half. The marker goes FIRST, for the same
     /// reason; then the `.bin`, because it is the old file's. `loadPeaks` is
-    /// the ONE reader; the timeline, `MediaPeaks.Loader` (Remove Silences and
-    /// Normalize) and the Media row all read through it, and each memoises
-    /// what it read as a hit. The old file must be withdrawn rather than
-    /// left for a later marker to recertify after a pass
-    /// that returned early (a file replaced in place by one with no audio
-    /// track keeps its record, `hasAudio` true, and returns at the track
-    /// load). Returns
-    /// whether a `.bin` was REMOVED — the fact that requires a reader
-    /// notification — and the pass posts at
-    /// once when it was, so every memo drops the withdrawn floats and the
-    /// detector reports the media as pending rather than measuring them. A
-    /// media with no audio left (#180) runs it too, and posts the same way.
+    /// the ONE reader; the timeline, `MediaPeaks.loader` (a
+    /// `MediaCacheLoader`; Remove Silences and Normalize) and the Media row
+    /// all read through it, and each memoises what it read as a hit. The old
+    /// file must be withdrawn rather than left for a later marker to
+    /// recertify after a pass that returned early (a file replaced in place
+    /// by one with no audio track keeps its record, `hasAudio` true, and
+    /// returns at the track load). Returns whether a `.bin` was REMOVED — the
+    /// fact that requires a reader notification — and the pass posts at once
+    /// when it was, so every memo drops the withdrawn floats and the detector
+    /// reports the media as pending rather than measuring them. A media with
+    /// no audio left (#180) runs it too, and posts the same way.
     static func clearPeaks(for media: UInt32, in cacheDir: URL) -> Bool {
         let manager = FileManager.default
         try? manager.removeItem(at: peaksMarkerURL(for: media, in: cacheDir))

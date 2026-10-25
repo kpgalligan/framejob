@@ -55,42 +55,11 @@ enum MediaPeaks {
 
     // MARK: - Reading the cache
 
-    /// One media's peaks read at most once, however many segments cite it.
-    ///
-    /// `loadPeaks` is a whole-file `Data(contentsOf:)` and a forty-minute
-    /// screencast is a megabyte of floats, so a timeline with a dozen clips off
-    /// one recording must not read it a dozen times. A failure is remembered as
-    /// well as a success — `pending` is what a caller reports as "still
-    /// analysing" — because a missing file is a fact about this moment, not an
-    /// error to retry inside one pass.
-    ///
-    /// It is a class rather than a struct on purpose: it is a cache, two
-    /// callers share one, and a value type would have made "did that read land
-    /// in MY copy?" a question anyone extending this has to ask.
-    final class Loader {
-        private let cacheDirectory: URL?
-        private var loaded: [UInt32: [Float]] = [:]
-        /// Media whose `cache/peaks/<id>.bin` was asked for and was not there.
-        private(set) var pending: Set<UInt32> = []
-
-        /// nil is a document with nowhere to keep caches, which answers every
-        /// media as pending — the same answer as a cache that has not been
-        /// written yet, and the correct one.
-        init(cacheDirectory: URL?) {
-            self.cacheDirectory = cacheDirectory
-        }
-
-        func peaks(for media: UInt32) -> [Float]? {
-            if let cached = loaded[media] { return cached }
-            if pending.contains(media) { return nil }
-            guard let cacheDirectory = cacheDirectory,
-                  let read = MediaImporter.loadPeaks(for: media, in: cacheDirectory)
-            else {
-                pending.insert(media)
-                return nil
-            }
-            loaded[media] = read
-            return read
+    /// One media's peaks read at most once, however many segments cite it —
+    /// a `MediaCacheLoader` over `MediaImporter.loadPeaks`.
+    static func loader(cacheDirectory: URL?) -> MediaCacheLoader<[Float]> {
+        MediaCacheLoader(cacheDirectory: cacheDirectory) {
+            MediaImporter.loadPeaks(for: $0, in: $1)
         }
     }
 
@@ -105,10 +74,12 @@ enum MediaPeaks {
     /// answer can take in up to 10 ms of neighbouring source at each end: an
     /// overestimate, which is the conservative direction for both callers (a
     /// span is judged too loud to cut rather than cut wrongly; a clip is
-    /// normalised a shade quiet rather than into clipping).
+    /// normalised a shade quiet rather than into clipping). `bucketTicks` is
+    /// the cache's grid, the peaks' 10 ms unless a caller names another
+    /// (`MediaSpeech.speechMax` names the 32 ms Silero chunk).
     static func peak(
         _ peaks: [Float], over segment: PlanSegment, from: Ticks, to: Ticks,
-        reversedPivot: Ticks?
+        reversedPivot: Ticks?, bucketTicks: Ticks = MediaPeaks.bucketTicks
     ) -> Float {
         guard
             let range = window(
@@ -122,10 +93,10 @@ enum MediaPeaks {
 
     /// The bucket-index range a project span `[from, to)` of `segment` covers
     /// in a cache built at `bucketTicks` per bucket over `count` buckets, or
-    /// nil when it falls outside the file the cache was built from —
-    /// `peak`'s lines 115–128 generalised over the bucket size, so
-    /// `MediaSpeech.speechMax` can ask the same question of the 32 ms Silero
-    /// grid without a second copy of the reversed-mirror arithmetic.
+    /// nil when it falls outside the file the cache was built from — the
+    /// whole of `peak`'s arithmetic, generalised over the bucket size so the
+    /// 32 ms Silero grid asks the same question without a second copy of
+    /// the reversed-mirror arithmetic.
     static func window(
         of segment: PlanSegment, from: Ticks, to: Ticks, reversedPivot: Ticks?,
         bucketTicks: Ticks, count: Int
@@ -236,5 +207,47 @@ enum MediaPeaks {
         guard t < ramp.start + ramp.duration else { return ramp.to }
         let fraction = Double(t - ramp.start) / Double(ramp.duration)
         return ramp.from + (ramp.to - ramp.from) * fraction
+    }
+}
+
+/// One media's cache read at most once, however many segments cite it.
+///
+/// A cache read is a whole-file `Data(contentsOf:)` and a forty-minute
+/// screencast is a megabyte of floats, so a timeline with a dozen clips off
+/// one recording must not read it a dozen times. A failure is remembered as
+/// well as a success — `pending` is what a caller reports as "still
+/// analysing" — because a missing file is a fact about this moment, not an
+/// error to retry inside one pass. `MediaPeaks.loader` and
+/// `MediaSpeech.loader` are the two it is built as.
+///
+/// It is a class rather than a struct on purpose: it is a cache, two
+/// callers share one, and a value type would have made "did that read land
+/// in MY copy?" a question anyone extending this has to ask.
+final class MediaCacheLoader<Value> {
+    private let cacheDirectory: URL?
+    private let read: (UInt32, URL) -> Value?
+    private var loaded: [UInt32: Value] = [:]
+    /// Media whose cache was asked for and was not there.
+    private(set) var pending: Set<UInt32> = []
+
+    /// nil is a document with nowhere to keep caches, which answers every
+    /// media as pending — the same answer as a cache that has not been
+    /// written yet, and the correct one.
+    init(cacheDirectory: URL?, read: @escaping (UInt32, URL) -> Value?) {
+        self.cacheDirectory = cacheDirectory
+        self.read = read
+    }
+
+    func value(for media: UInt32) -> Value? {
+        if let cached = loaded[media] { return cached }
+        if pending.contains(media) { return nil }
+        guard let cacheDirectory = cacheDirectory,
+              let value = read(media, cacheDirectory)
+        else {
+            pending.insert(media)
+            return nil
+        }
+        loaded[media] = value
+        return value
     }
 }

@@ -317,7 +317,7 @@ MUTANTS = {
                         "signature.sampleRate != Double(sampleRate)"),
     "M12-no-copy-trim": (["X10", "X11", "X15"], "AudioRateCopy.swift",
                          "if trim > .zero {", "if false && trim > .zero {"),
-    "M13-no-sync-trim": (["X12"], "MediaImporter+SyncFeatures.swift",
+    "M13-no-sync-trim": (["X12"], "MediaImporter+Speech.swift",
                          "if trim > .zero {", "if false && trim > .zero {"),
     "M14-delay-field": (["X10", "X11"], "MP3Gapless.swift",
                         "let delay = Int(packed >> 12)", "let delay = Int(packed & 0xFFF)"),

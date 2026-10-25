@@ -163,15 +163,15 @@ enum AudioSyncMatch {
     /// `c[L] = Σ_k Σ_m x_k[m+L]·y_k[m]` over the `SyncFeatures.coefficients`
     /// of two frame-major arrays, for L from −(ny−1) to nx−1 at index
     /// L + ny − 1: each coefficient's zero-padded `vDSP_fft_zrip`, the
-    /// cross-spectra summed, and ONE inverse transform.
+    /// cross-spectra summed, and ONE inverse transform (`RealFFT`, over a
+    /// setup made and destroyed here, SY-22).
     static func summedCorrelation(_ x: [Float], _ y: [Float]) -> [Double] {
         let width = SyncFeatures.coefficients
         let nx = x.count / width
         let ny = y.count / width
         guard nx > 0, ny > 0 else { return [] }
         let lags = nx + ny - 1
-        var log2n = 1
-        while (1 << log2n) < lags { log2n += 1 }
+        let log2n = RealFFT.log2n(holding: lags)
         let n = 1 << log2n
         let half = n / 2
         guard let setup = vDSP_create_fftsetup(vDSP_Length(log2n), FFTRadix(kFFTRadix2)) else {
@@ -188,21 +188,7 @@ enum AudioSyncMatch {
         var padded = [Float](repeating: 0, count: n)
         func spectrum(_ values: [Float], count: Int, column: Int) -> ([Float], [Float]) {
             for index in 0..<n { padded[index] = index < count ? values[index * width + column] : 0 }
-            var real = [Float](repeating: 0, count: half)
-            var imaginary = [Float](repeating: 0, count: half)
-            real.withUnsafeMutableBufferPointer { re in
-                imaginary.withUnsafeMutableBufferPointer { im in
-                    var split = DSPSplitComplex(realp: re.baseAddress!, imagp: im.baseAddress!)
-                    padded.withUnsafeBufferPointer { source in
-                        source.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: half) {
-                            vDSP_ctoz($0, 2, &split, 1, vDSP_Length(half))
-                        }
-                    }
-                    vDSP_fft_zrip(
-                        setup, &split, 1, vDSP_Length(log2n), FFTDirection(kFFTDirection_Forward))
-                }
-            }
-            return (real, imaginary)
+            return RealFFT.forward(setup, log2n: log2n, padded: padded)
         }
 
         // Σ_k X_k · conj(Y_k). DC and Nyquist are real and multiply on their own.
@@ -218,27 +204,10 @@ enum AudioSyncMatch {
                 imaginary[bin] += xi[bin] * yr[bin] - xr[bin] * yi[bin]
             }
         }
-        var circular = [Float](repeating: 0, count: n)
-        real.withUnsafeMutableBufferPointer { re in
-            imaginary.withUnsafeMutableBufferPointer { im in
-                var split = DSPSplitComplex(realp: re.baseAddress!, imagp: im.baseAddress!)
-                vDSP_fft_zrip(
-                    setup, &split, 1, vDSP_Length(log2n), FFTDirection(kFFTDirection_Inverse))
-                circular.withUnsafeMutableBufferPointer { out in
-                    out.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: half) {
-                        vDSP_ztoc(&split, 1, $0, 2, vDSP_Length(half))
-                    }
-                }
-            }
-        }
+        let circular = RealFFT.inverse(setup, log2n: log2n, real: &real, imaginary: &imaginary)
         // Each forward spectrum is scaled by 2 and the inverse by n.
         let scale = 1 / (4 * Double(n))
-        var result = [Double](repeating: 0, count: lags)
-        for index in 0..<lags {
-            let lag = index - (ny - 1)
-            result[index] = Double(circular[lag >= 0 ? lag : n + lag]) * scale
-        }
-        return result
+        return RealFFT.lagOrdered(circular, lags: lags, ny: ny, scale: scale)
     }
 
     /// One search (SY-12, SY-14, SY-17): the anchor's and the mover's

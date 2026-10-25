@@ -247,14 +247,10 @@ final class Transcriber {
         }
     }
 
-    /// The synchronous body. Call it off the main thread; a tool that already
-    /// runs on the server thread may call it directly rather than through
-    /// `run`. `pages` is the caption style and canvas each job's words are
-    /// paged for (`CaptionPages.cues`).
-    func transcribe(
-        _ jobs: [Job], language: Language, frame: Ticks, pages: CaptionPages.Request,
-        cancel: CancelToken, progress: ((Double, String) -> Void)? = nil
-    ) throws -> Outcome {
+    /// The model questions every on-device run asks first, in this order:
+    /// the engine's availability, then whether the ONE chosen locale is
+    /// installed. `transcribe` and `TranscriptReader.recognize` both call it.
+    static func requireModel(_ language: Language) throws {
         guard SpeechEngine.isAvailable else {
             throw TranscribeError.unavailable(language.displayName)
         }
@@ -269,6 +265,17 @@ final class Transcriber {
         case .some(true):
             break
         }
+    }
+
+    /// The synchronous body. Call it off the main thread; a tool that already
+    /// runs on the server thread may call it directly rather than through
+    /// `run`. `pages` is the caption style and canvas each job's words are
+    /// paged for (`CaptionPages.cues`).
+    func transcribe(
+        _ jobs: [Job], language: Language, frame: Ticks, pages: CaptionPages.Request,
+        cancel: CancelToken, progress: ((Double, String) -> Void)? = nil
+    ) throws -> Outcome {
+        try Self.requireModel(language)
 
         let total = jobs.reduce(0.0) { $0 + ReelTime.seconds($1.sourceLength) }
         var done = 0.0

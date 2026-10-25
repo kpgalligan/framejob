@@ -217,7 +217,7 @@ enum AudioNormalize {
         // audio segment for it (road map 2's phase 9).
         guard let plan = document.editedProject.plan else { return nil }
         let snapshot = document.editedProject.snapshot
-        let loader = MediaPeaks.Loader(cacheDirectory: document.cacheDirectory)
+        let loader = MediaPeaks.loader(cacheDirectory: document.cacheDirectory)
 
         // Every audio segment in the timeline, indexed by the clip it plays.
         // A clip normally has exactly one; the list is kept whole because
@@ -290,7 +290,7 @@ enum AudioNormalize {
             var loudest = 0.0
             var missing = false
             for segment in cited {
-                guard let peaks = loader.peaks(for: segment.media) else {
+                guard let peaks = loader.value(for: segment.media) else {
                     missing = true
                     break
                 }
