@@ -32,6 +32,15 @@ export function render(frame, props, ctx) {
   const kept = textLines(["a  b"], { font: preserved });
   assert(kept.includes(`xml:space="preserve"`), `textLines writes xml:space: ${kept}`);
   assert(!textLines(["a  b"], { font: plain }).includes("xml:space"), "and only when asked");
+  // #348: textLines draws the style and letterSpacing wrapText measured with.
+  const slanted = { family: "Source Sans 3", size: 40, style: "italic", letterSpacing: 4 };
+  const drawn = textLines(wrapText("one two three four five six", 300, slanted), { font: slanted });
+  assert(drawn.includes(`font-style="italic"`) && drawn.includes(`letter-spacing="4"`),
+    `textLines writes style and letter-spacing: ${drawn}`);
+  assert(textLines(["x"], { font: { style: "oblique" } }).includes(`font-style="oblique"`), "oblique passes");
+  const upright = textLines(["x"], { font: { style: "slanted", letterSpacing: 0 } });
+  assert(!upright.includes("font-style") && !upright.includes("letter-spacing"),
+    `and only when not normal / 0: ${upright}`);
   assertThrows(() => measureText("a", Object.assign({}, plain, { xmlSpace: "keep" })),
     ['measureText: xmlSpace must be "default" or "preserve", not "keep"'], "a bad xmlSpace");
 

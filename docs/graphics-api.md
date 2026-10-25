@@ -254,7 +254,9 @@ generic such as `sans-serif` is written bare, as it must be).
 `anchor` is `"start"`, `"middle"` or `"end"`; `lineHeight` defaults to
 1.2 × the size. A font with `xmlSpace: "preserve"` writes
 `xml:space="preserve"` on the `<text>`, so it draws the spaces `measureText`
-counted.
+counted; a `style` of `"italic"` or `"oblique"` and a non-zero
+`letterSpacing` are written as `font-style` and `letter-spacing`, so it draws
+the font `wrapText` broke the lines with.
 
 ```js
 const font = { family: "Source Sans 3", size: 48, weight: 600 };

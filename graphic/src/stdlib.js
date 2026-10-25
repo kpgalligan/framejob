@@ -296,7 +296,9 @@ function fitText(text, maxWidth, font, options) {
 // `<text>` + one `<tspan>` per line. The family is QUOTED (G-6), so a name
 // with a word that starts with a digit (`Source Sans 3`) parses — except a
 // CSS generic keyword, written bare as `measureText`'s probe writes it.
-// `xmlSpace: "preserve"` is written on the `<text>` (G-22).
+// `xmlSpace: "preserve"` is written on the `<text>` (G-22), and a style or
+// letterSpacing other than normal / 0 as the probe writes them, normalised
+// as the host does, so what is drawn is what was measured (#348).
 const __GENERIC_FAMILIES = ["serif", "sans-serif", "cursive", "fantasy", "monospace"];
 
 function textLines(lines, options) {
@@ -307,6 +309,9 @@ function textLines(lines, options) {
     ? name
     : `'${escapeXml(name.replace(/'/g, ""))}'`;
   const space = f.xmlSpace === "preserve" ? ` xml:space="preserve"` : "";
+  const style = f.style === "italic" || f.style === "oblique" ? ` font-style="${f.style}"` : "";
+  const spacing = Number(f.letterSpacing) || 0;
+  const tracking = spacing ? ` letter-spacing="${spacing}"` : "";
   const anchor = o.anchor || "start";
   const size = f.size || 16;
   const lineHeight = o.lineHeight || size * 1.2;
@@ -316,7 +321,7 @@ function textLines(lines, options) {
     .join("");
   const fill = o.fill ? ` fill="${escapeXml(o.fill)}"` : "";
   return `<text x="${x}" y="${o.y || 0}" font-family="${family}" ` +
-    `font-size="${size}" font-weight="${f.weight || 400}" text-anchor="${anchor}"${fill}${space}>` +
+    `font-size="${size}" font-weight="${f.weight || 400}"${style}${tracking} text-anchor="${anchor}"${fill}${space}>` +
     `${spans}</text>`;
 }
 
