@@ -60,17 +60,8 @@ extension AgentServer {
         let at = try timeArg(a, "at", document)
         let duration = try optionalTimeArg(a, "duration", document)
         let region = try zoomRegionArg(a, "region")
-        var fit: ZoomFit?
-        if let name = try stringArg(a, "fit") {
-            guard let parsed = ZoomFit(rawValue: name) else {
-                throw ToolError(
-                    message: "fit must be one of "
-                        + ZoomFit.allCases.map { $0.rawValue }.joined(separator: ", ")
-                        + " (got \"\(name)\").")
-            }
-            fit = parsed
-        }
-        let curve = try curveArg(a, "curve")
+        let fit = try enumArg(a, "fit", ZoomFit.self)
+        let curve = try enumArg(a, "curve", Curve.self)
         // The undo step's NAME is the one thing left that reads the region,
         // and it reads only whether it is a null: a zoom back and a zoom to
         // a rectangle are different edits to a person looking at the Edit
@@ -95,19 +86,13 @@ extension AgentServer {
     func addSpeedRamp(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
-        let name = try requiredString(a, "shape")
-        guard let shape = SpeedRampShape(rawValue: name) else {
-            throw ToolError(
-                message: "shape must be one of "
-                    + SpeedRampShape.allCases.map { $0.rawValue }.joined(separator: ", ")
-                    + " (got \"\(name)\").")
-        }
+        let shape = try requiredEnumArg(a, "shape", SpeedRampShape.self)
         guard let rate = try doubleArg(a, "rate") else {
             throw ToolError(message: "Missing required argument: rate")
         }
         let from = try optionalTimeArg(a, "from", document)
         let to = try optionalTimeArg(a, "to", document)
-        let curve = try curveArg(a, "curve")
+        let curve = try enumArg(a, "curve", Curve.self)
         let hold = try doubleArg(a, "hold")
         return try addedActionResult(
             document, clip, shape.displayName,
@@ -183,24 +168,6 @@ extension AgentServer {
         return raw
     }
 
-    /// An action's easing curve, by the name the model spells it with. One
-    /// reader for the two tools that take one, so their refusals say the
-    /// same thing.
-    /// Internal rather than private for ONE reason:
-    /// `AgentServer+Transitions.swift` reads `set_transition_style`'s curve
-    /// with it, and `private` on an extension member reaches only its own
-    /// file (`ExporterLoudness.swift`'s toll). Nothing else about it moved.
-    func curveArg(_ a: [String: Any], _ key: String) throws -> Curve? {
-        guard let name = try stringArg(a, key) else { return nil }
-        guard let curve = Curve(rawValue: name) else {
-            throw ToolError(
-                message: "\(key) must be one of "
-                    + Curve.allCases.map { $0.rawValue }.joined(separator: ", ")
-                    + " (got \"\(name)\").")
-        }
-        return curve
-    }
-
     /// `set_action` — the Clip tab's action lane: the selected action's
     /// Start, Length and Curve in its detail row, and dragging a band's body
     /// (move) or its outer 5 pt (resize) in that lane or on the timeline's
@@ -213,7 +180,7 @@ extension AgentServer {
         let action = try actionArg(a, "action", clip)
         let start = try optionalTimeArg(a, "start", document)
         let duration = try optionalTimeArg(a, "duration", document)
-        let curve = try curveArg(a, "curve")
+        let curve = try enumArg(a, "curve", Curve.self)
         guard start != nil || duration != nil || curve != nil else {
             throw ToolError(message: "set_action needs start, duration or curve.")
         }

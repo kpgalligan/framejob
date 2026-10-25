@@ -30,7 +30,6 @@ extension AgentServer {
 
     func selectInspectorTab(_ a: [String: Any]) throws -> String {
         let tabs = InspectorTab.allCases.map { $0.title.lowercased() }
-        let subs = ClipSubTab.allCases.map(\.rawValue)
         var tab: InspectorTab?
         if let raw = try stringArg(a, "tab") {
             guard let found = InspectorTab.allCases.first(where: { $0.title.lowercased() == raw })
@@ -40,15 +39,7 @@ extension AgentServer {
             }
             tab = found
         }
-        var sub: ClipSubTab?
-        if let raw = try stringArg(a, "sub_tab") {
-            guard let found = ClipSubTab(rawValue: raw) else {
-                throw ToolError(
-                    message: "sub_tab must be one of \(subs.joined(separator: ", ")) "
-                        + "(got \"\(raw)\").")
-            }
-            sub = found
-        }
+        let sub = try enumArg(a, "sub_tab", ClipSubTab.self)
         let section = try stringArg(a, "section")
         if sub != nil, tab != .clip {
             throw ToolError(

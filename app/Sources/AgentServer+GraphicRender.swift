@@ -220,22 +220,10 @@ extension AgentServer {
     /// `.png`, its folder required to exist; else a temporary file.
     private func graphicSheetDestination(_ a: [String: Any], name: String) throws -> URL {
         guard let path = try stringArg(a, "path") else {
-            return FileManager.default.temporaryDirectory.appendingPathComponent(
-                "framejob-graphic-\(name)-\(UUID().uuidString.prefix(8)).png")
+            return Self.temporaryOutput("framejob-graphic-\(name)", extension: "png")
         }
-        guard !path.isEmpty else {
-            throw ToolError(
-                message: "path must name a file to write — omit it for a temporary one.")
-        }
-        let url = Self.destinationURL(path, extension: "png")
-        let folder = url.deletingLastPathComponent()
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory),
-            isDirectory.boolValue
-        else {
-            throw ToolError(message: "There is no folder at \(folder.path) to write into.")
-        }
-        return url
+        return try Self.requireFolder(
+            of: Self.destinationURL(try Self.nonEmptyOutputPath(path), extension: "png"))
     }
 
     /// `recipe_graphic.rs`'s ctx for `frame` of a `length`-frame graphic.

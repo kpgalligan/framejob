@@ -193,17 +193,6 @@ extension AgentServer {
             url: try snapshotDestination(path, window, region), fill: fill, layout: layout)
     }
 
-    private func enumArg<T: RawRepresentable & CaseIterable>(
-        _ a: [String: Any], _ key: String, _ type: T.Type
-    ) throws -> T? where T.RawValue == String {
-        guard let raw = try stringArg(a, key) else { return nil }
-        guard let value = T(rawValue: raw) else {
-            let words = T.allCases.map { $0.rawValue }.joined(separator: ", ")
-            throw ToolError(message: "\(key) must be one of \(words) (got \"\(raw)\").")
-        }
-        return value
-    }
-
     /// `render_frame`'s rule: an explicit path through `destinationURL`, its
     /// folder required to exist; none is a temporary file named for what it
     /// holds.
@@ -213,22 +202,10 @@ extension AgentServer {
         guard let path else {
             let name = ["framejob-ui", window.rawValue, region?.rawValue].compactMap { $0 }
                 .joined(separator: "-")
-            return FileManager.default.temporaryDirectory
-                .appendingPathComponent("\(name)-\(UUID().uuidString.prefix(8)).png")
+            return Self.temporaryOutput(name, extension: "png")
         }
-        guard !path.isEmpty else {
-            throw ToolError(
-                message: "path must name a file to write — omit it for a temporary one.")
-        }
-        let url = Self.destinationURL(path, extension: "png")
-        let folder = url.deletingLastPathComponent()
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory),
-            isDirectory.boolValue
-        else {
-            throw ToolError(message: "There is no folder at \(folder.path) to write into.")
-        }
-        return url
+        return try Self.requireFolder(
+            of: Self.destinationURL(try Self.nonEmptyOutputPath(path), extension: "png"))
     }
 
     // MARK: - Main-thread reads

@@ -18,16 +18,7 @@ import Foundation
 extension AgentServer {
 
     func graphicMemory(_ a: [String: Any]) throws -> String {
-        let levels = MemoryPressure.allCases.map(\.rawValue)
-        var level: MemoryPressure?
-        if let raw = try stringArg(a, "pressure") {
-            guard let found = MemoryPressure(rawValue: raw) else {
-                throw ToolError(
-                    message: "pressure must be one of \(levels.joined(separator: ", ")) "
-                        + "(got \"\(raw)\").")
-            }
-            level = found
-        }
+        let level = try enumArg(a, "pressure", MemoryPressure.self)
         if let level { GraphicPrefetch.shared.setPressure(level, simulated: true) }
         let report = GraphicPrefetch.shared.memoryReport(resettingPeaks: true)
         return try jsonResult([

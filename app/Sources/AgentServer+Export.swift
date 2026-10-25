@@ -130,14 +130,8 @@ extension AgentServer {
             )
         }
         let (document, project, urls, settings, graphics) = prepared
-        let url = Self.destinationURL(path, extension: Exporter.fileExtension(for: settings))
-        let folder = url.deletingLastPathComponent()
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory),
-            isDirectory.boolValue
-        else {
-            throw ToolError(message: "There is no folder at \(folder.path) to write into.")
-        }
+        let url = try Self.requireFolder(
+            of: Self.destinationURL(path, extension: Exporter.fileExtension(for: settings)))
 
         // The graphics gate, here rather than only in the writer: a module
         // that does not compile refuses the CALL, so nothing is queued that

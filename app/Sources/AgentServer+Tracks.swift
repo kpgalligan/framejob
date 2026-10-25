@@ -84,7 +84,7 @@ extension AgentServer {
         let muted = try boolArg(a, "muted")
         let locked = try boolArg(a, "locked")
         let solo = try boolArg(a, "solo")
-        let matte = try trackMatteArg(a, "matte")
+        let matte = try enumArg(a, "matte", TrackMatte.self)
         guard
             name != nil || hidden != nil || muted != nil || locked != nil || solo != nil
                 || matte != nil
@@ -100,19 +100,6 @@ extension AgentServer {
                     track: track.id, name: name, hidden: hidden, muted: muted, locked: locked,
                     solo: solo, matte: matte)
             ])
-    }
-
-    /// A track's matte mode by name — `transitionKindArg`'s shape: an
-    /// unknown name is refused listing the five, and a null is absent.
-    func trackMatteArg(_ a: [String: Any], _ key: String) throws -> TrackMatte? {
-        guard let name = try stringArg(a, key) else { return nil }
-        guard let matte = TrackMatte(rawValue: name) else {
-            throw ToolError(
-                message: "\(key) must be one of "
-                    + TrackMatte.allCases.map { $0.rawValue }.joined(separator: ", ")
-                    + " (got \"\(name)\").")
-        }
-        return matte
     }
 
     /// `remove_empty_tracks` — Track ▸ Remove Empty Tracks

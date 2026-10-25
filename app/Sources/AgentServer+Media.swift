@@ -275,16 +275,7 @@ extension AgentServer {
                     + allowed.sorted().joined(separator: ", ") + ".")
         }
         let path = try requiredString(object, "path")
-        var kind = MediaKind.video
-        if let name = try stringArg(object, "kind") {
-            guard let parsed = MediaKind(rawValue: name) else {
-                throw ToolError(
-                    message: "kind must be one of "
-                        + MediaKind.allCases.map { $0.rawValue }.joined(separator: ", ")
-                        + " (got \"\(name)\").")
-            }
-            kind = parsed
-        }
+        let kind = try enumArg(object, "kind", MediaKind.self) ?? .video
         var fps = Fps.thirty
         if let array = object["fps"] as? [Any] {
             fps = try fpsPair(array, "descriptor.fps")
@@ -326,24 +317,9 @@ extension AgentServer {
                     + allowed.sorted().joined(separator: ", ") + ".")
         }
         var color = MediaColor(detected: try boolArg(object, "detected") ?? false)
-        if let name = try stringArg(object, "log") {
-            guard let log = LogCurve(rawValue: name) else {
-                throw ToolError(
-                    message: "descriptor.color.log must be one of "
-                        + LogCurve.allCases.map(\.rawValue).joined(separator: ", ")
-                        + " (got \"\(name)\").")
-            }
-            color.log = log
-        }
-        if let name = try stringArg(object, "gamut") {
-            guard let gamut = CameraGamut(rawValue: name) else {
-                throw ToolError(
-                    message: "descriptor.color.gamut must be one of "
-                        + CameraGamut.allCases.map(\.rawValue).joined(separator: ", ")
-                        + " (got \"\(name)\").")
-            }
-            color.gamut = gamut
-        }
+        color.log = try enumArg(object, "log", LogCurve.self, label: "descriptor.color.log")
+        color.gamut = try enumArg(
+            object, "gamut", CameraGamut.self, label: "descriptor.color.gamut")
         if object["lut"] != nil, !(object["lut"] is NSNull) {
             color.lut = try idArg(object, "lut")
         }
@@ -369,15 +345,7 @@ extension AgentServer {
                     + allowed.sorted().joined(separator: ", ") + ".")
         }
         var pq = PQColor(file: try peakArg(object, "file"), peak: try peakArg(object, "peak"))
-        if let name = try stringArg(object, "from") {
-            guard let from = PeakSource(rawValue: name) else {
-                throw ToolError(
-                    message: "descriptor.color.pq.from must be one of "
-                        + PeakSource.allCases.map(\.rawValue).joined(separator: ", ")
-                        + " (got \"\(name)\").")
-            }
-            pq.from = from
-        }
+        pq.from = try enumArg(object, "from", PeakSource.self, label: "descriptor.color.pq.from")
         return pq
     }
 

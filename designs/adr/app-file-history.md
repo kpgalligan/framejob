@@ -660,6 +660,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   code. `wc -l app/Sources/AgentServer+Clips.swift`: 636 before, 464 after;
   `AgentServer+Properties.swift` is 187. The next seam: `// MARK: - Removing time`
   (`deleteClips` … `closeGap`) to `AgentServer+Ripple.swift`.
+- `AgentServer+Project.swift`: #356 moved the output-path family (the doc beginning "An output
+  path as the tools take one", `replaceableExtensions` and both `destinationURL`s) byte for byte
+  to the new `AgentServer+Destinations.swift`, a pure move typechecked alone before the same
+  file took `requireFolder`, `temporaryOutput` and `nonEmptyOutputPath`, the five output tools'
+  shared folder check, temporary name and empty-path refusal. Nothing widened:
+  `replaceableExtensions` stays `private` because it moved with its one reader, and both
+  `destinationURL`s were already internal. `wc -l app/Sources/AgentServer+Project.swift`: 508
+  before, 448 after; `AgentServer+Destinations.swift` was 70 after the move and 103 with the
+  three helpers. No next seam is named.
 - `AgentServer+Render.swift`: grading-2's G2-0 moved `writeWaveform` (its two-line doc and body)
   to the new `AgentServer+Scopes.swift`, the home of `render_frame`'s scope writers (spec §11
   GR-5, GR-10), a pure move gated with G2-0's other three; nothing widened (both are members of

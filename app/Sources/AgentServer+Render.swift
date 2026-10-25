@@ -261,31 +261,19 @@ extension AgentServer {
         _ a: [String: Any], at time: Ticks
     ) throws -> (url: URL, format: FrameWriter.Format) {
         let requested = try requestedFrameFormat(a)
-        guard let path = try stringArg(a, "path") else {
+        guard let given = try stringArg(a, "path") else {
             let format = requested ?? .png
-            let name = "framejob-frame-\(time)-\(UUID().uuidString.prefix(8))"
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("\(name).\(format.fileExtension)")
-            return (url, format)
+            return (
+                Self.temporaryOutput("framejob-frame-\(time)", extension: format.fileExtension),
+                format
+            )
         }
-        // Empty is refused rather than read as absent: a caller that sent a
-        // `path` meant to name a file, and silently writing to a temporary
-        // one instead is a success reported for a file nobody can find.
-        guard !path.isEmpty else {
-            throw ToolError(
-                message: "path must name a file to write — omit it for a temporary one.")
-        }
+        let path = try Self.nonEmptyOutputPath(given)
         let format = FrameWriter.format(
             for: URL(fileURLWithPath: (path as NSString).expandingTildeInPath),
             requested: requested)
-        let url = Self.destinationURL(path, extension: format.fileExtension)
-        let folder = url.deletingLastPathComponent()
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory),
-            isDirectory.boolValue
-        else {
-            throw ToolError(message: "There is no folder at \(folder.path) to write into.")
-        }
+        let url = try Self.requireFolder(
+            of: Self.destinationURL(path, extension: format.fileExtension))
         return (url, format)
     }
 

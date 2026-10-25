@@ -259,14 +259,7 @@ extension AgentServer {
     /// is not one of them; Subtitles when absent, so today's calls are
     /// unchanged.
     private func captionStyle(_ a: [String: Any]) throws -> CaptionStyle {
-        guard let name = try stringArg(a, "style") else { return .subtitles }
-        guard let style = CaptionStyle(rawValue: name) else {
-            throw ToolError(
-                message: "style must be one of "
-                    + CaptionStyle.allCases.map(\.rawValue).joined(separator: ", ")
-                    + " (got \"\(name)\").")
-        }
-        return style
+        try enumArg(a, "style", CaptionStyle.self) ?? .subtitles
     }
 
     /// `slide`, `fill` and `dim` (spec §11 W-15): the looks the call asked
@@ -450,14 +443,7 @@ extension AgentServer {
         let expanded = (path as NSString).expandingTildeInPath
         let format = CaptionExporter.format(
             for: URL(fileURLWithPath: expanded), requested: try requestedFormat(a))
-        let url = Self.captionDestinationURL(path, format: format)
-        let folder = url.deletingLastPathComponent()
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory),
-            isDirectory.boolValue
-        else {
-            throw ToolError(message: "There is no folder at \(folder.path) to write into.")
-        }
+        let url = try Self.requireFolder(of: Self.captionDestinationURL(path, format: format))
 
         // Read through `trackArg` rather than handed to the exporter raw, so
         // an id that names nothing is refused as "No track has id N" here
@@ -501,13 +487,6 @@ extension AgentServer {
     /// containers — nil when it is absent, which is what lets
     /// `CaptionExporter.format(for:requested:)` fall back to the path.
     private func requestedFormat(_ a: [String: Any]) throws -> CaptionExporter.Format? {
-        guard let name = try stringArg(a, "format") else { return nil }
-        guard let format = CaptionExporter.Format(rawValue: name.lowercased()) else {
-            let known = CaptionExporter.Format.allCases.map { $0.rawValue }
-            throw ToolError(
-                message: "format must be one of " + known.joined(separator: ", ")
-                    + " (got \"\(name)\").")
-        }
-        return format
+        try enumArg(a, "format", CaptionExporter.Format.self, folding: true)
     }
 }

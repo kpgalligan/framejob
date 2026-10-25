@@ -53,7 +53,7 @@ extension AgentServer {
         let clip = try clipArg(a, "clip", document)
         let kind = try transitionKindArg(a, "kind")
         let duration = try timeArg(a, "duration", document)
-        let align = try alignArg(a, "align")
+        let align = try enumArg(a, "align", TransitionAlign.self)
         let ripple = try boolArg(a, "ripple") ?? false
         return try editResult(
             document, "Set Transition",
@@ -80,7 +80,7 @@ extension AgentServer {
     func setTransitionStyle(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
-        let curve = try curveArg(a, "curve")
+        let curve = try enumArg(a, "curve", Curve.self)
         let audio = try boolArg(a, "audio")
         guard curve != nil || audio != nil else {
             throw ToolError(
@@ -108,17 +108,5 @@ extension AgentServer {
                     + "remove a transition.")
         }
         return kind
-    }
-
-    /// `add_transition`'s `align`, in `addZoomAction`'s `fit` shape.
-    private func alignArg(_ a: [String: Any], _ key: String) throws -> TransitionAlign? {
-        guard let name = try stringArg(a, key) else { return nil }
-        guard let align = TransitionAlign(rawValue: name) else {
-            throw ToolError(
-                message: "\(key) must be one of "
-                    + TransitionAlign.allCases.map { $0.rawValue }.joined(separator: ", ")
-                    + " (got \"\(name)\").")
-        }
-        return align
     }
 }

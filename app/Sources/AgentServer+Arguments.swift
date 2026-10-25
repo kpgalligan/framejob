@@ -128,6 +128,39 @@ extension AgentServer {
         return value
     }
 
+    /// A string-valued enum argument, by its raw value: nil when `key` is
+    /// absent or null, a wrong type `stringArg`'s error, and a string that
+    /// names no case refused with every case listed. `label` is the name the
+    /// refusal gives the argument when that is not `key` (a member of a
+    /// nested object); `folding` lower-cases the caller's string before the
+    /// lookup, for the arguments documented as case-insensitive. The refusal
+    /// quotes the string as the caller sent it.
+    func enumArg<T: RawRepresentable & CaseIterable>(
+        _ a: [String: Any], _ key: String, _ type: T.Type,
+        label: String? = nil, folding: Bool = false
+    ) throws -> T? where T.RawValue == String {
+        guard let raw = try stringArg(a, key) else { return nil }
+        return try Self.enumCase(raw, T.self, label: label ?? key, folding: folding)
+    }
+
+    /// `enumArg` for a required argument: absent, null and empty are all
+    /// `requiredString`'s "Missing required argument".
+    func requiredEnumArg<T: RawRepresentable & CaseIterable>(
+        _ a: [String: Any], _ key: String, _ type: T.Type
+    ) throws -> T where T.RawValue == String {
+        try Self.enumCase(try requiredString(a, key), T.self, label: key, folding: false)
+    }
+
+    private static func enumCase<T: RawRepresentable & CaseIterable>(
+        _ raw: String, _ type: T.Type, label: String, folding: Bool
+    ) throws -> T where T.RawValue == String {
+        guard let value = T(rawValue: folding ? raw.lowercased() : raw) else {
+            let words = T.allCases.map(\.rawValue).joined(separator: ", ")
+            throw ToolError(message: "\(label) must be one of \(words) (got \"\(raw)\").")
+        }
+        return value
+    }
+
     /// A list of strings (`paste_attributes`'s `groups`), or nil when `key`
     /// is absent or null. A lone string is taken as a one-element list — the
     /// courtesy `clipsArg` extends to a lone id, for the same reason — and an

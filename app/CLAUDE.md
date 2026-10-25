@@ -145,7 +145,8 @@ detail there.
   `ClipSource` case in the same phase (road map 10's G2a added `graphic`): no
   agent handler reads a caller-authored OBJECT at all. A scalar enum
   argument is a different thing and several handlers still parse one by name
-  (`add_zoom_action`'s `fit`, `curveArg`, `set_transition`'s `kind`): the
+  (`enumArg` for `add_zoom_action`'s `fit` or an action's `curve`,
+  `set_transition`'s `kind` by hand): the
   core refuses those too, and what this rule forbids is decoding a caller's
   object through a lenient type.
   `MotionProps.dictionary` always writes all three keys, `NSNull` for a nil
@@ -2350,7 +2351,7 @@ free.
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Properties` / `Actions` / `Tracks`
   / `Media` / `Render` / `Export` / `ExportResult` / `History` / `Silence` / `Captions` / `Audio` /
   `Background` / `Scope` / `Transitions` / `CloudCaptions` / `Recording` /
-  `Graphics` / `Scopes`
+  `Graphics` / `Scopes` / `Destinations`
   (+`RecordingArguments`, +`RecordingResult`, +`RecordingChrome` —
   `RecordingToolChrome`, the tool's status item, flipped by the recorder's
   `pauseDidChangeNotification` and frozen at its
@@ -2358,6 +2359,10 @@ free.
   reader, the three cloud-only arguments refused by name under `apple`, the
   vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
   the network, and the result keys; `+Captions` dispatches on `engine` and is otherwise the code it was.
+  `+Destinations` is where every output tool's path is decided:
+  `destinationURL` (a pure move out of `+Project`, #356), `requireFolder`
+  (the one "There is no folder at …" sentence), `temporaryOutput` and
+  `nonEmptyOutputPath`.
   `+Actions` is the five action tools (a pure move out of `+Clips`, issue
   batch B87 phase 2); `set_action_end` fills `schema` from the CURRENT
   revision of the module its clip — found in the call's scope — is drawn
@@ -2798,7 +2803,9 @@ free.
   AI-17). It is pure over an `NSView` tree, so
   `tools/proof/v2_layout_probe.swift` calls it.
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
-  (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, …), each refusing a
+  (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, `enumArg` /
+  `requiredEnumArg` — the one reader of a string-valued enum, with its
+  `label` and `folding` — …), each refusing a
   value it cannot read BY NAME, and ONLY what the core cannot know: target
   and scope, an id checked against the container it names, a time on the
   document's frame grid, and the in-band refusal. A whole number is read
@@ -2906,8 +2913,8 @@ leniency is a silent correction, so a caller-authored object (a patch, a
 colour, a region, a new clip's text or shape) goes to the core unread
 through `rawPatchArg` and the RAW factory beside its typed one, and the core
 names the dotted path and the value it refused. A scalar enum ARGUMENT
-parsed by name is not this (`add_zoom_action`'s `fit`, `curveArg`,
-`set_transition`'s `kind`): what the rule forbids is decoding a caller's
+parsed by name is not this (`enumArg` for `add_zoom_action`'s `fit` or an
+action's `curve`, `set_transition`'s `kind`): what the rule forbids is decoding a caller's
 object through a lenient type, and the ONE caller-authored object the app
 still reads by hand is `add_media`'s descriptor, which is a media row rather
 than a patch and has no op of its own to be refused by

@@ -40,13 +40,7 @@ extension AgentServer {
     /// together, in `voiceOverScreenOnlyArguments` order, then
     /// `microphone: false`.
     func recordingSourceKind(_ a: [String: Any]) throws -> RecordingSourceKind {
-        guard let name = try stringArg(a, "source") else { return .screen }
-        guard let kind = RecordingSourceKind(rawValue: name) else {
-            let known = RecordingSourceKind.allCases.map { $0.rawValue }
-            throw ToolError(
-                message: "source must be one of " + known.joined(separator: ", ")
-                    + " (got \"\(name)\").")
-        }
+        let kind = try enumArg(a, "source", RecordingSourceKind.self) ?? .screen
         guard kind == .voiceOver else { return kind }
         let strangers = Self.voiceOverScreenOnlyArguments.filter { a[$0] != nil && !(a[$0] is NSNull) }
         guard strangers.isEmpty else {
@@ -100,14 +94,7 @@ extension AgentServer {
 
     /// `size`: `nominal` (default) or `best`, `requestedFrameFormat`'s form.
     func recordingResolution(_ a: [String: Any]) throws -> RecordingResolution {
-        guard let name = try stringArg(a, "size") else { return .nominal }
-        guard let resolution = RecordingResolution(rawValue: name.lowercased()) else {
-            let known = RecordingResolution.allCases.map { $0.rawValue }
-            throw ToolError(
-                message: "size must be one of " + known.joined(separator: ", ")
-                    + " (got \"\(name)\").")
-        }
-        return resolution
+        try enumArg(a, "size", RecordingResolution.self, folding: true) ?? .nominal
     }
 
     /// `path`, the FOLDER: trimmed, tilde-expanded, and an empty or blank
