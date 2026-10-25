@@ -108,7 +108,7 @@ Screen and camera recording, multicam, colour grading beyond the per-clip
 controls, audio beyond volume / fade / duck / pan / compression / noise
 reduction, a plugin system, and any platform but macOS. These are the
 non-goals from spec §1 — the boundary that keeps the app the size of
-a screencast editor's editor rather than Final Cut's.
+a screencast editor rather than Final Cut.
 
 ## 5. What "done" means here
 

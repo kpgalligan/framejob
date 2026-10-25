@@ -231,7 +231,7 @@ impl Default for VideoProps {
 }
 
 /// Edges removed IN PLACE, in source pixels — cropping never shifts the
-/// content (a screencast editor's behaviour, spec §5.3).
+/// content (spec §5.3).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Crop {

@@ -10,7 +10,7 @@ rules, written before measuring") with the constants below.
 
 Nothing is merged into `app/`. Every shader is made in
 `work/grading_spike/<tag>/` from `app/Resources/Shaders/Compositor.metal` as it
-stood at `SHADER_COMMIT` 4d742cc, the tree GR0 measured (pinned in grading GR2,
+stood at `SHADER_COMMIT` d58a580, the tree GR0 measured (pinned in grading GR2,
 when the tree's own shader took tone: `git show`, matte_spike's pattern; a
 failed show is the scored FAILURE row B0): V0 that shader unpatched; VF-T and VF-TL
 (tone, and tone plus a look, behind a uniform flag that joins the effects sum,
@@ -56,7 +56,7 @@ shut. README: `tools/proof/grading_spike/README.md`.
 
 `--tree` (grading GR7a) measures what the branch built instead of the routes,
 matte_spike's `--tree` pattern: V0 is `Compositor.metal` at `--tree-base REV`
-(default `TREE_BASE` f407f87, main at the grading branch point; grading-2 G2-2
+(default `TREE_BASE` 5d04e47, main at the grading branch point; grading-2 G2-2
 passes the commit before its own change; `git show`, a failed show is B0), VT
 the tree's own file unpatched; both compiled (B1) and timed by
 `tree_bench.swift` (B2), which hands both the app's whole 512-byte
@@ -65,7 +65,7 @@ both sizes: VT:S1 = V0:S1 within 1/1023 over the frame; KA (grading-2 G2-4):
 VT:SA = V0:SA, the scene S1 then one unqualified adjustment pass at +1 EV with a
 neutral `QualifierUniforms` at `buffer(1)`. A base whose shader names no
 `framejob_adjust_fragment` (one before grading GR4a's adjustment pass, the
-default f407f87 among them) has no V0:SA: B0 says so, the bench runs with
+default 5d04e47 among them) has no V0:SA: B0 says so, the bench runs with
 `--adjust 0`, and KA (and `--measure`'s TA) is a SKIP by name at each size,
 which leaves the verdict to KT (issue #284). `--measure --tree` adds
 H0, C0, F, T0 (VT:S1 − V0:S1), TC (a RECORD: T0 ≤ `BOUND[h]` + C0, "What it
@@ -109,8 +109,8 @@ ROUTE_ORDER = ("VA", "VF", "VC")
 WIN_SHARE = 0.5
 
 SHADER = "app/Resources/Shaders/Compositor.metal"
-SHADER_COMMIT = "4d742cc"
-TREE_BASE = "f407f87"   # --tree: main at the grading branch point (GR7a)
+SHADER_COMMIT = "d58a580"
+TREE_BASE = "5d04e47"   # --tree: main at the grading branch point (GR7a)
 TREE_MUTANTS = ("tree-graded",)
 WORK = PROOF / "work/grading_spike"
 SIZES = [(1920, 1080), (3840, 2160)]
@@ -255,7 +255,7 @@ fragment float4 framejob_adjust_fragment(ShadowVaryings in [[stage_in]],
 
 # VB (#258).
 BIPLANAR_CONSTANT = "constant bool kBiplanar [[function_constant(4)]];\n"
-TOKEN_REWRITES = (  # (label, regex, replacement, the count pinned at HEAD 3cc61e7)
+TOKEN_REWRITES = (  # (label, regex, replacement, the count pinned at HEAD ab20ab5)
     ("`texture2d<float> source,` signatures", r"texture2d<float> source,",
      "texture2d<float> source, texture2d<float> chroma,", 3),
     ("`texture2d<float> source [[texture(0)]],` entry points",

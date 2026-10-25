@@ -1,7 +1,7 @@
 # Road map "cut-by-transcript" — remove the ums and false starts on the words' timings
 
 **Opened 2026-10-22** (CT-0, in the worktree `~/devel/framejob-tcut` on branch `transcript-cut`,
-from `15d3545`, each phase merged into main after its gate), for issue #92. This road map's
+from `c3731fa`, each phase merged into main after its gate), for issue #92. This road map's
 decisions are TR-1 onwards, in `designs/spec/11-decisions/cut-by-transcript.md`.
 
 ## Goal
@@ -35,7 +35,7 @@ And the owner's ask that took it up (2026-10-22): "#92 Cut by transcript".
 
 ## How it fits the tree
 
-Every piece a phase builds on, as the tree stands at `15d3545`:
+Every piece a phase builds on, as the tree stands at `c3731fa`:
 
 - **The words and their mapping.** `MediaTranscript.words(for:in:)`
   (`app/Sources/MediaTranscript.swift`) maps a media's cached words onto a clip (R6-10); its
@@ -122,7 +122,7 @@ the filler spike, `tools/proof/filler_spike/` (`filler_spike_probe.swift`, `fill
 its `README.md`) and its section in `tools/proof/README.md`. TR-7 was not written (below).
 No product code: nothing under `app/`, `core/`, `graphic/`, `mcp-proxy/` or `agent/` changed.
 
-**The filler spike.** Run 2026-10-22 on macOS 26.5.1 (25F80), tree `15d3545` with CT-0's
+**The filler spike.** Run 2026-10-22 on macOS 26.5.1 (25F80), tree `c3731fa` with CT-0's
 uncommitted changes, through the app's own `Transcriber.extractAudio` and
 `SpeechEngine.transcribe` (en-US installed; `transcriptionOptions: []`), once, on the final
 instrument (the runner and probe as committed). The runner exited 2, `SPIKE INCOMPLETE`, naming
@@ -211,7 +211,7 @@ Universal-3 Pro prompting material names er, erm, ah, hmm and mhm. The app's fir
 Universal-3.5 Pro, for which no list is published, so the eleven words are a choice and not a
 guarantee; live row 22 records what the real service returns.
 
-**The runs** (2026-10-22, macOS 26.5.1, the worktree on `7ff117f` with CT-1's uncommitted
+**The runs** (2026-10-22, macOS 26.5.1, the worktree on `5ee9710` with CT-1's uncommitted
 changes, each on the final instrument):
 
 | Command | Result |
@@ -298,7 +298,7 @@ the tool counts in `op_argument_proof.py` (95), `phase9_proof.py`, `recording_pr
 `recording_proof.py` (thirty-four app-state tools); `tools/proof/README.md`'s "Cut by transcript
 CT-2" section. Spec §7.9a, §7.9c, §7.4 and the README's tool table name the tool.
 
-**The runs** (2026-10-22, macOS 26.5.1, the worktree on `37b10f7` with CT-2's uncommitted
+**The runs** (2026-10-22, macOS 26.5.1, the worktree on `a8995a3` with CT-2's uncommitted
 changes, each on the final instrument; every proof under `env -u RC_ASSEMBLYAI_KEY`, nothing
 paid):
 
@@ -372,7 +372,7 @@ and `assistant_lane_probe.swift`'s fifth L4 case; `tools/proof/README.md`'s "Cut
 CT-3" section; the screen `designs/screens/14b-remove-filler-words-sheet.md`; FIL-1 and CH-4 in
 `docs/manual-checks.md`. Spec §7.9a, §7.9c, §7.4, §9 and the README name the sheet and tool.
 
-**The runs** (2026-10-22/23, macOS 26.5.1, the worktree on `a4bcbd2` with CT-3's uncommitted
+**The runs** (2026-10-22/23, macOS 26.5.1, the worktree on `1f7be20` with CT-3's uncommitted
 changes, each on the final instrument; every app proof under `env -u RC_ASSEMBLYAI_KEY`,
 nothing paid):
 
@@ -453,7 +453,7 @@ and `transcript_proof.py` (new); `op_argument_proof.py` (97), `phase9_proof.py`,
 `recording_proof.py`; `tools/proof/README.md`'s "Cut by transcript CT-4" section; AS-10 in
 `docs/manual-checks.md`. Spec §7.9a, §7.9b, §7.9c, §7.4 and the README name the tool.
 
-**The runs** (2026-10-23, macOS 26.5.1, the worktree on `b8586cf` with CT-4's uncommitted
+**The runs** (2026-10-23, macOS 26.5.1, the worktree on `f17c139` with CT-4's uncommitted
 changes, each on the final instrument; every app proof under `env -u RC_ASSEMBLYAI_KEY`,
 nothing paid):
 
@@ -517,7 +517,7 @@ filler spike's section, TR-7 "was written from them after o2 ran") and
 only: nothing under `app/`, `core/`, `graphic/`, `mcp-proxy/` or `agent/` changed, no proof ran
 against an app, and nothing was paid for.
 
-**Verification** (2026-10-23, the worktree on `2f9fda8` with CT-5's uncommitted changes):
+**Verification** (2026-10-23, the worktree on `d8ea2c9` with CT-5's uncommitted changes):
 
 | Command | Result |
 |---|---|

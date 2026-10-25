@@ -72,7 +72,7 @@ nothing of Concat is opened, at design time or build time.
     phase).
   - **#296 (clean-up 4, 2026-10-17): kept (worst fixture).** Does the central 64 × 64
     threadgroup path still pay after the same-bin add? `python3 tools/proof/scopes_proof.py
-    --central-ab` times the ×1 vectorscope of `base` (`c7c0dbf`'s shader, the central path),
+    --central-ab` times the ×1 vectorscope of `base` (`be0187f`'s shader, the central path),
     `tree` (the kernel a drop would ship: every bin global with the same-bin add, no threadgroup
     array) and `twin` (`base` with `bool central = false`, T3's twin, a record only) on the six
     4K fixtures, 60 rounds each, round r in `[base, tree, twin]` rotated by r mod 3, each a T1

@@ -1,6 +1,6 @@
 # Reelcut — road map 4: Remove Silences, second pass
 
-**Status: BUILT, PROVED and REVIEWED — S1 landed in `1c3e92e` (2026-09-15),
+**Status: BUILT, PROVED and REVIEWED — S1 landed in `77934fe` (2026-09-15),
 §4g's two instruments on 2026-09-19, and the reader review 2026-09-20,
 CLOSED on that date including its second sceptic pass and the residue that
 pass left (§8).** The spike (S0) was RUN on 2026-09-13 and
@@ -534,7 +534,7 @@ binary and quoted "against the N it had at the time".
 
 ## 8. S1 — the record (written 2026-09-17, after the fact)
 
-**`1c3e92e` (2026-09-15).** 23 files, +1343 / −211. From the commit's own
+**`77934fe` (2026-09-15).** 23 files, +1343 / −211. From the commit's own
 account; the plan above is kept as written.
 
 - The second signal is Silero VAD v6.2.1 as a Core ML program, vendored
@@ -929,7 +929,7 @@ than this one's, left alone here and written down so the next pass through
 that table has it.
 
 **Reader 4 — the proof and the tests.** Two builds, each a copy of TODAY's
-tree (the binary at `1c3e92e^` is not built and would measure nothing: it has
+tree (the binary at `77934fe^` is not built and would measure nothing: it has
 75 tools, writes no `cache/speech/<id>.bin`, and the probe names the S1 types
 on 20 lines and cannot compile against it, so both instruments would ABORT and
 every claim would read as "caught"):
@@ -1049,7 +1049,7 @@ touched feed them: `phase3_proof.py` **123/123** and
 **79/79**, `remaining_probe.py` **170/170** and `source_mirror_probe.py`
 **40/40** — every one full. `e1_proof.py`, whose E1 section drives
 `detect_silence` over a transition wall, scores **85/95 with 10 rows SKIPPED
-by name**: it wants a SECOND instance built from the frozen `1c3e92e` tree on
+by name**: it wants a SECOND instance built from the frozen `77934fe` tree on
 a reference port and this run launched only one, so those ten are the
 counts-and-version-6 rows that need it. Every row of it that calls
 `detect_silence` PASSED, including the wall rows and the crossfade-dip row.
@@ -1281,7 +1281,7 @@ unavailable immediately; a normal cache pass withdraws them before awaited
 track loads and rebuilds them. Thumbnail, speech and paid transcript stamps are
 not migrated or rewritten by this change.
 
-**Separate size gate.** At baseline `e1411be701442878e12becd85a4cbe8424f6a909`
+**Separate size gate.** At baseline `cf26a85a60a1f2bf1e6834ded5f8fc971d62fe56`
 the tree was clean, `MediaImporter.swift` was 604 lines and
 `MediaCacheFiles.swift` 556. The synchronous reader/writer moved to
 `MediaImporter+Peaks.swift` and the bucket accumulator moved verbatim to

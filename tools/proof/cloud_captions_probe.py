@@ -7221,9 +7221,9 @@ def section_chrome(binary, sources):
               "given": 0}),
             ("a vocabulary, trimmed and de-duplicated",
              {"languageIndex": 0, "speakers": False, "refresh": False,
-              "vocabulary": " Frame Job , a screencast editor ,Frame Job,  , AVFoundation "},
+              "vocabulary": " Frame Job , ProRes ,Frame Job,  , AVFoundation "},
              {"language": "<auto>", "speakers": False,
-              "keyterms": ["Frame Job", "a screencast editor", "AVFoundation"], "refresh": False,
+              "keyterms": ["Frame Job", "ProRes", "AVFoundation"], "refresh": False,
               "given": 5}),
         ]
         for label, controls, want in states:
@@ -7582,7 +7582,7 @@ def section_chrome(binary, sources):
         # and spec §11 PUB-2, the two version strings read from build settings
         # (one hunk with the minimum: the three lines are adjacent); and the
         # Debug app's identity (build velocity, issue batch B88 phase 2,
-        # 6e74f26), the two name strings and the document type's handler rank
+        # 0576acf), the two name strings and the document type's handler rank
         # read from build settings, defaulting to the Release values (one hunk
         # with the version strings and the minimum: the five lines are adjacent).
         check("18: `project.yml`'s `info:` and `entitlements:` blocks changed in the two "

@@ -14,7 +14,7 @@ import AppKit
 /// drop onto the panel.
 ///
 /// The cut is road map 2's phase 8c paying the ~600-line rule a second time
-/// for this pane. The first payment (commit d69de99) moved the row and its
+/// for this pane. The first payment (commit b189ac3) moved the row and its
 /// drag out at 822 lines, precisely so this phase's four additions would have
 /// room; the additions cost more than the room left, as phase 6 warned they
 /// would ("budget the cut against the pessimistic number"). It costs ONE

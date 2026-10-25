@@ -8,7 +8,7 @@ The handoff is `designs/design_handoff_clip_inspector/` — its README is the
 normative text for the redesign's metrics, inks and behaviour, with this
 document's §1 and spec §11's CI-1 to CI-4 as the decisions taken where the
 README had to be read against Reelcut. It answers the Clip inspector brief
-(`87aa425`): P1 density, P2 no audio/video split, P3/P4 buried actions and
+(`77b96ee`): P1 density, P2 no audio/video split, P3/P4 buried actions and
 no selected action, P5/P6 marking, P7 silent no-op writes, P8 fields that
 move with the playhead, P9–P12. The product owner chose direction 1b
 (pinned lane + sub-tabs), mint `#5CD6B0` as the action ink and 1g (fields
@@ -394,7 +394,7 @@ control column's x. `e2_chrome.py` scored **51/52** until one row was
 updated in place, dated: "zero In inside an action keeps the base-props
 note" looked for Motion presets' deleted sentence and now looks for the ⊘
 note that replaces it. **`e1_chrome.py` scores 10/15**, its first run since
-phase 1, and scores the SAME 10/15 on phase 2's tree (`835c399`, run in a
+phase 1, and scores the SAME 10/15 on phase 2's tree (`a376738`, run in a
 worktree): five rows fail for a phase-2 reason — the Transition section
 lives on the Clip sub-tab since phase 2, and the instrument photographs and
 probes a shape clip on its default tab (Shape), so "this tree's Transition
@@ -878,7 +878,7 @@ PASS (4 suites, 15 tests), `op_schema_probe.py` **28/28**,
 **29/29**, `phase4_proof.py` **83/83** (4901). `phase6_proof.py` scores
 **167/168** (4823): its one failure, "the saved project.json is version 8",
 is the script's own `VERSION = 8` against format version 9, stale since
-road map 8's W1b (`532e115`) and nothing this phase touched; it is left
+road map 8's W1b (`a4cca90`) and nothing this phase touched; it is left
 for its own fix. Rows re-measured in place, each dated 2026-09-24 in its
 file:
 

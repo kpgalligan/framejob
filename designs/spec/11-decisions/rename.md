@@ -15,7 +15,7 @@ the old folders moved by hand; and now, in the worktree `~/devel/reelcut-rename`
 phase, each gated and merged into main alone (`archive/rename.md`, "The owner's choices").
 The new icon and mark are the owner's, in `designs/frame-job/`. NM-12…NM-14 were made by the
 second road map, "rename-2", also closed: its condensed record is `designs/adr/rename-2.md`, and
-the original, `archive/rename-2.md`, holds the inventory at `ed8f282`, the two name maps, the
+the original, `archive/rename-2.md`, holds the inventory at `8445ee6`, the two name maps, the
 rules, the sweep's table and each phase's record (N0 the plan and these three decisions; N1 the
 archive's names; N2 the handoffs' names; N3 the issue rule; N4 the prose rule; N5 the sweep and
 the close).
@@ -217,7 +217,7 @@ workflow FILE, whose name does not change.
   two tables. **The link rule:** every reference to a renamed path — the full path, the path
   from `designs/`, or the bare name — is rewritten wherever it appears, archive text, decision
   text, ADRs and designer files included, and that rewrite is the only edit archive text and
-  designer files take. Kept: (a) a path already stale at `ed8f282` (`designs/reelcut-*.md`,
+  designer files take. Kept: (a) a path already stale at `8445ee6` (`designs/reelcut-*.md`,
   the road maps before the archive, and `designs/reelcut-design.md`), with each archived
   file's old name noted in `archive/INDEX.md` so these still resolve; (b) a command, pathspec
   or path that runs against an old commit or tree; (c) the generated bundles, manifests and
@@ -260,14 +260,14 @@ workflow FILE, whose name does not change.
   its unused `OLD_APP_DOMAIN`. **Kept, and why:** every site that serves an instrument building
   or running a commit from before rename R1, which spells the old names:
   `tools/proof/mcp.py`'s `wait_listening` app-name match (`grading_verdict.py`'s main tree at
-  `f407f87`); `tools/proof/harness/main.swift`'s old-key pin mapping and its old inspector
+  `5d04e47`); `tools/proof/harness/main.swift`'s old-key pin mapping and its old inspector
   section clear (the meter and welcome comparisons paint old `app/Sources` with this harness
-  through `reference_build.py`); `tools/proof/grading_verdict.py` (`BASE = "f407f87"`: its old
+  through `reference_build.py`); `tools/proof/grading_verdict.py` (`BASE = "5d04e47"`: its old
   binary, timing argument, package extension, `TIMING` regex and dual parity prefix);
   `reference_build.py`, `reference_build_selftest.py`, `cloud_captions_probe.py`,
   `grading_spike/grading_spike.py` and `matte_spike/matte_spike.py` (NM-14's old-tree inputs).
   `proof_defaults.py`'s refusal of the old app's domains and executables: an old-tree Release
-  build (the e1 reference at `1c3e92e`, `grading_verdict.py`'s main tree) writes
+  build (the e1 reference at `77934fe`, `grading_verdict.py`'s main tree) writes
   `com.kgalligan.Reelcut`, an app's domain, which is refused as the new one is. Its `Reelcut*`
   key families: an old-tree probe or harness paint writes them into a probe's domain, which the
   sweep removes whole. `tools/proof/stale_registrations.py`'s `reelcut` match: old-tree builds

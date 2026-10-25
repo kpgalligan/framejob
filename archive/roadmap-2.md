@@ -174,16 +174,16 @@ copies, and the orchestrator is the only one who does.
 
 | Phase | Theme | Sessions | Schema | Status |
 |---|---|---|---|---|
-| 0 | Groundwork | ½ | — | **done** 2026-09-06 (`4fb72c6`) |
-| 1 | Cutting moves | 1–2 | — | **done** 2026-09-06 (`4fb72c6`) |
-| 2 | Clip identity | 1 | v3 | **done** 2026-09-07 (`c1b5188`) |
-| 3 | The screencast trio | 2 | v4 | **done** 2026-09-07 (`ac7f849`) |
-| 4 | Words | 2 | v5 | **done** 2026-09-08 (`8ec3be5`) |
-| 5 | Sound | 1–2 | — | **done** 2026-09-08 (`65d43ae`) |
-| 6 | Looks | 1–2 | v6 | **done** 2026-09-08 (`d2f7767`) |
-| 7 | Output | 1–2 | — | **done** 2026-09-09 (`a16b0dd`) |
-| 8 | Viewing and finding | 1 | — | **done** 2026-09-09 (`5f0bc61`) |
-| 9 | Inside the nest | 2 | — | **done** 2026-09-10 (`046603e`) |
+| 0 | Groundwork | ½ | — | **done** 2026-09-06 (`febb324`) |
+| 1 | Cutting moves | 1–2 | — | **done** 2026-09-06 (`febb324`) |
+| 2 | Clip identity | 1 | v3 | **done** 2026-09-07 (`ccc5c34`) |
+| 3 | The screencast trio | 2 | v4 | **done** 2026-09-07 (`3a64d85`) |
+| 4 | Words | 2 | v5 | **done** 2026-09-08 (`17b80ba`) |
+| 5 | Sound | 1–2 | — | **done** 2026-09-08 (`4abad43`) |
+| 6 | Looks | 1–2 | v6 | **done** 2026-09-08 (`9d02cc6`) |
+| 7 | Output | 1–2 | — | **done** 2026-09-09 (`488e55d`) |
+| 8 | Viewing and finding | 1 | — | **done** 2026-09-09 (`5083fde`) |
+| 9 | Inside the nest | 2 | — | **done** 2026-09-10 (`2373567`) |
 
 Order is by value over dependency. Phases 1–3 pay back first and share
 nothing that later phases need; 6 depends on 3's list-interpolation rule; 9
@@ -306,7 +306,7 @@ goes in `edit_clip.rs`.
 | `slip` | `clip: u32, delta: ticks` | Moves the source window under a fixed clip: `in += delta × speed`, start and duration unchanged. Clamped so `in ≥ 0` and `in + duration × speed ≤ media duration`; a delta the clamps reduce to nothing is `None`. A `still` moves its `at` instead. Any other source is an `Err` (the non-media rule). Actions are clip-relative and do not move. |
 | `roll` | `clip: u32, to: ticks` | Moves a hard cut: the clip's start and its predecessor's end both become `to`. The predecessor is the clip on the same track that ends exactly at `clip.start`; with no such clip, or with an overlap (a transition's length is `set_transition_duration`'s job), refuses. Clamps to the predecessor's source tail, this clip's source head, and one frame on each. Front trim semantics for this clip (`in` follows), plain end trim for the predecessor. |
 | `lift_range` | `from: ticks, to: ticks` | `ripple_delete_range` without the close: every unlocked clip is split at both bounds and the middles removed; nothing moves, markers stay. A reversed range is the same range. |
-| `close_gap` | `track: u32, at: ticks` | The empty span on `track` that contains `at`, bounded by the nearest clip ends on that track. Shifts every unlocked clip on every track whose start ≥ the gap's end left by the gap's length — `ripple_delete`'s shift with the gap as the span, straddlers on other tracks staying put. **Refuses** when a shifted clip would break the overlap rule; deciding in-phase whether to clamp to the largest closable amount instead is allowed, but a screencast editor closes fully or not at all and so should we. No clip after the gap is `None`. |
+| `close_gap` | `track: u32, at: ticks` | The empty span on `track` that contains `at`, bounded by the nearest clip ends on that track. Shifts every unlocked clip on every track whose start ≥ the gap's end left by the gap's length — `ripple_delete`'s shift with the gap as the span, straddlers on other tracks staying put. **Refuses** when a shifted clip would break the overlap rule; deciding in-phase whether to clamp to the largest closable amount instead is allowed, but the rule is to close fully or not at all. No clip after the gap is `None`. |
 | `insert_clip` | `track: u32, media: u32, at: ticks` | The insert edit: on `track`, a clip strictly containing `at` is split first; then `insert_time(at, media duration)`; then `add_clip`. One op so it is one undo step and one tool. |
 | `overwrite_clip` | `track: u32, media: u32, at: ticks` | The overwrite edit: clears `[at, at + media duration)` **on `track` only** (split at both bounds, remove the middles), then `add_clip`. Other tracks are untouched. |
 
@@ -1695,7 +1695,7 @@ and 39 keys (T2), against a stated tolerance of 1 pt; the editor's line
 count equals CoreText's at every key on both. CONTROLS, passing on both
 trees: the font resolves, every key reached the editor, every prefix
 applied, and the applied box moved (T1 218 → 916 px wide on one line; T2
-185 → 593 px tall, four lines). `--baseline b76a2f3` (`git archive`,
+185 → 593 px tall, four lines). `--baseline fe5fe0d` (`git archive`,
 `-D HARNESS_REFERENCE_BUILD`, nothing compiled out) fails EXACTLY the four
 fix rows and exits 0: worst deviation 493.06 pt (T1, the editor 134 pt
 wide and 578 pt tall against a 553 pt-wide one-line box) and 122.61 pt
@@ -1771,7 +1771,7 @@ with Apply, Revert, Cancel, Apply the default button, Cancel on Esc. A9:
 Cancel → sheet gone, editor open with "Hello!", the field first responder,
 a typed "?" lands ("Hello!?"). A10: Revert → editor gone, "Hello", no undo
 step. A11: Apply → editor gone, "Hello!", one undo step. A0 (CONTROL): the
-editor opens as first responder. `--baseline 7e946ed` (K1 compiled out)
+editor opens as first responder. `--baseline 6e2c7da` (K1 compiled out)
 fails EXACTLY A1, A2, A4, A6, A8, A9, A10, A11 and exits 0, as predicted:
 A1 left the editor open with "Hello!\n", A2 with "Hello\n", A4's ⌘Return
 committed and closed the editor, A6's ⌃Return inserted U+2028, and A8–A11
@@ -2189,7 +2189,7 @@ section 4 RUN (output device: AirPods Max). Its player rows on the fix:
 `mixed` at 0.5 s before 0.500 → after 1.207 s, peakLeftDB −20.9; `mixed` at
 3.5 s 3.500 → 4.191 s, −21.1; CONTROL `split` 3.500 → 4.255 s, −21.1;
 CONTROL `same` 3.500 → 4.206 s, −20.8; all silent after pause. Over the
-baseline tree (`git archive 3e1bd19 app/Sources`, `--sources`) **31/37**,
+baseline tree (`git archive 632b26f app/Sources`, `--sources`) **31/37**,
 failing by name: section 1 (1001 carries two descriptions, AAC and LPCM);
 section 2's `mixed` ids `[1001]`, `three` ids `[1001]` and `three`'s 1001
 holding four segments; and section 4's `mixed` at 0.5 s and at 3.5 s — the
@@ -2315,9 +2315,9 @@ it left open. **Seven deviations, and the first is not a detail about
 mechanism but about what this phase actually did:**
 
 - **6d was already shipped, and this phase did not write it.**
-  `set_action_end` has carried `video.filters` since M3 (`d3fbaa0`),
+  `set_action_end` has carried `video.filters` since M3 (`a4bedf1`),
   phase 3's list rule already interpolates them per index, `structural`
-  already routes an add or a remove to the base props (`ac7f849`), and
+  already routes an add or a remove to the base props (`3a64d85`), and
   `core/tests/schema_v2.rs` already carried green tests for it under its
   own `// ---- interpolation ----` banner. So the honest description of
   6d's session is PROOF, two residual defects and one refusal made loud,
@@ -3105,7 +3105,7 @@ state (`selectedMedia` has never had a mirror either), Preview Quality changes
 nothing an agent can observe, and Reveal is `set_selection`, which is already a
 tool. Phases 6 and 7 assert `== 73` exactly and still pass.
 
-*Two size tolls first and alone* (`d69de99`): `AppDelegate.swift` 625 → 223
+*Two size tolls first and alone* (`b189ac3`): `AppDelegate.swift` 625 → 223
 (`AppDelegate+Menus.swift`) before the View menu grew two items, and
 `MediaPane.swift` 822 → 389 (`MediaRowView.swift`) before the pane grew a find
 band. `MediaPane` then paid a SECOND toll mid-phase (`MediaPaneCommands.swift`)
@@ -3260,7 +3260,7 @@ toggles; S2c the timecode field's field editor types the Space (string
 `" "`, paused); S2d the canvas overlay's down leaves play alone and its up
 toggles; S2e an `NSButton` first responder is handed the Space (its keyDown
 sees it once); S2f an auto-repeat is swallowed; S2g the document's window is
-an `EditorWindow`. `--baseline b69972e` (`git archive`,
+an `EditorWindow`. `--baseline 1888069` (`git archive`,
 `-D HARNESS_REFERENCE_BUILD`) fails EXACTLY S2a (isPlaying false after both
 Spaces — the beep path) and S2b (keyDowns 1, the key walked the chain), as
 predicted, and exits 0.
@@ -3363,7 +3363,7 @@ handle, `AgentServer+Arguments.swift`, `AgentServer+Project.swift`, catalog.
 No schema change (v6 stands), NO new op (`OP_NAMES` is still 55) and ONE new
 tool (`set_scope`; the catalog is **74**, and phases 6, 7 and 8's exact `== 73`
 assertions became floors in the same change). One new FFI export. Two size
-tolls paid first and alone (`b410125`): `AgentCatalog.swift` 1552 → 665 and
+tolls paid first and alone (`edbeb2e`): `AgentCatalog.swift` 1552 → 665 and
 `ReelCore.swift` 2242 → 1446.
 
 **(1) The envelope could not simply gain a key.** `Op` is internally tagged

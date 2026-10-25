@@ -1,9 +1,9 @@
 # Precision-2: deep stills and the 10-bit reverse (road map "precision-2", #257)
 
 - **Status:** Built and closed 2026-10-11. Each phase was one litecode pipeline with its own review, worked in `~/devel/reelcut-i257` on branch `i257` and merged into main after its gate:
-  - P2-0, the road map, PR-6..PR-8 and the toll, `ReverseProgressSheetController.swift` (`34445fa`)
-  - P2-1, deep stills (PR-6) (`44b2077`)
-  - P2-2, the 10-bit reverse (PR-7) (`aed143d`)
+  - P2-0, the road map, PR-6..PR-8 and the toll, `ReverseProgressSheetController.swift` (`3fe1b40`)
+  - P2-1, deep stills (PR-6) (`aeca9f9`)
+  - P2-2, the 10-bit reverse (PR-7) (`92cee74`)
   - P2-3, the close: this record (uncommitted when this was written)
 - **Original:** `archive/precision-2.md` is the full record. It has no section numbers, so it is cited by phase: "orig P2-1" is its "P2-1 — deep stills" section.
 - **Spec decisions:** PR-6..PR-8 in spec §11 (`designs/spec/11-decisions/precision.md`), with the amendments they wrote into PR-4 and PR-5. They stay binding, and where the original words them differently, §11's text wins:
@@ -14,7 +14,7 @@
 
 ## Context
 
-PR-5 left four paths 8-bit and deferred them to #257: 10-bit `hevc_alpha`, the reversed-clip intermediate, still images and screen recording. The #257 brief (`~/.claude/litecode/reelcut/i257-8bit-paths/I-257.md`, 2026-10-11, tree `19ef985`) measured each, and the owner's answers (`…/i257-8bit-paths/answers.md`) were "All as recommended": build deep stills (1a) and the 10-bit reverse for every reverse with the source's colour labels (2a), close 10-bit `hevc_alpha` (3) and 10-bit recording (4) as not wanted, and work the grading-2 way in one worktree, each phase merged when its gate passes (5). The odd-size reverse defect the brief found (a 1919×1079 source reversed to 1918×1078) was fixed in P2-2 rather than filed. Two items were built and two closed.
+PR-5 left four paths 8-bit and deferred them to #257: 10-bit `hevc_alpha`, the reversed-clip intermediate, still images and screen recording. The #257 brief (`~/.claude/litecode/reelcut/i257-8bit-paths/I-257.md`, 2026-10-11, tree `390bf57`) measured each, and the owner's answers (`…/i257-8bit-paths/answers.md`) were "All as recommended": build deep stills (1a) and the 10-bit reverse for every reverse with the source's colour labels (2a), close 10-bit `hevc_alpha` (3) and 10-bit recording (4) as not wanted, and work the grading-2 way in one worktree, each phase merged when its gate passes (5). The odd-size reverse defect the brief found (a 1919×1079 source reversed to 1918×1078) was fixed in P2-2 rather than filed. Two items were built and two closed.
 
 ## Decisions
 
@@ -49,7 +49,7 @@ PR-5 left four paths 8-bit and deferred them to #257: 10-bit `hevc_alpha`, the r
 
 `render_frame` depth: S4 8 for both stills; S5 8 (256 greens); S6 16 (1,920 greens, the still's; 256 when it is drawn 8-bit). `compare ctl-p21`: 10/10, S3 byte-identical on all three scenes. Brief figures (Apple M2 Max, macOS 26.5.1, AC power): 1,024 levels from the deep draw against 256; decode+draw 87.5 against 87.3 ms (1080p PNG); a deep 4K texture 66.4 MB against 33.2 MB.
 
-**Reverse** (Release, `precision_proof.py --control ctl-p21`, 24/24; the old figures from a Debug copy whose `ReverseRenderer.swift` is `44b2077`'s, 1/8):
+**Reverse** (Release, `precision_proof.py --control ctl-p21`, 24/24; the old figures from a Debug copy whose `ReverseRenderer.swift` is `aeca9f9`'s, 1/8):
 
 | Row | old renderer | after PR-7 |
 |---|---|---|
@@ -94,7 +94,7 @@ Commented: #256 (the reverse now carries the source's colour labels, so HLG stay
 ## Where to look in the original
 
 - "The owner's choices": the five answers, verbatim and dated, and the odd-size fix taken into P2-2.
-- "Deep stills (P2-1)": where the depth was lost (line numbers at `19ef985`), what changes, the brief's still measurements, `render_frame`'s mechanism.
+- "Deep stills (P2-1)": where the depth was lost (line numbers at `390bf57`), what changes, the brief's still measurements, `render_frame`'s mechanism.
 - "The 10-bit reverse (P2-2)": where the depth and labels were lost, the colour-label measurements, the odd-size fix and its cost, the brief's real-renderer table and its host.
 - "Closed as not wanted": PR-8's two measurements.
 - "Not established": the seven open points as planned, each settled or carried in the phase records and the close.

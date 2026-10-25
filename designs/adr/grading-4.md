@@ -1,12 +1,12 @@
 # Grading tier 4: the grading extras (road map "grading-4")
 
 - **Status:** Built and closed 2026-10-15. Each phase was one litecode pipeline with its own review, worked in `~/devel/framejob-grading4` on branch `grading-4` and merged into main alone after its gate (GR-25):
-  - T4-0, the road map, GR-24…GR-30 and the curve types' pure move to `CurveProps.swift` (`31f3aa1`)
-  - T4-1, the scopes: the vectorscope's same-bin add and its zoom (#265, GR-26, GR-31) (`a8ef6fd`)
-  - T4-2, hue curves and the curve editor's extras (#267, #270, GR-32, format 20) (`510f181`)
-  - T4-2b, Color's Hue by the exact HSV shift (GR-33) (`d22f8e2`)
-  - T4-3, curves of different point counts blend their values (#271, GR-34) (`ac874f6`)
-  - T4-4, the qualifier's cleanup blur (#268, GR-35, format 21) (`23832cf`)
+  - T4-0, the road map, GR-24…GR-30 and the curve types' pure move to `CurveProps.swift` (`28ada7d`)
+  - T4-1, the scopes: the vectorscope's same-bin add and its zoom (#265, GR-26, GR-31) (`c9875ca`)
+  - T4-2, hue curves and the curve editor's extras (#267, #270, GR-32, format 20) (`a3f36dc`)
+  - T4-2b, Color's Hue by the exact HSV shift (GR-33) (`b4f6bbf`)
+  - T4-3, curves of different point counts blend their values (#271, GR-34) (`f98e7a0`)
+  - T4-4, the qualifier's cleanup blur (#268, GR-35, format 21) (`f5969b9`)
   - T4-5, the close: this record (the commit that moved this record to `archive/`)
 - **Original:** `archive/grading-4.md` is the full record. It has no section numbers, so it is cited by phase: "orig T4-2" is its "T4-2 — hue curves and the curve editor's extras" section.
 - **Spec decisions:** GR-24..GR-35 in spec §11 (`designs/spec/11-decisions/grading-4.md`). They stay binding, and where the original words them differently, §11's text wins:
@@ -61,14 +61,14 @@ Tier 2 left the extras out on purpose: "each extra can be its own issue once the
 | `render_frame {vectorscope_zoom}` (T4-1) | the script's count | `off_plot` 147960 against the script's 147960; 3 refused by name | `… scopes_proof.py` S13 (26/26) |
 | Hue vs Hue ±40 over a 720-column sweep (T4-2) | its row | worst HSV-hue error 0.540° (+40) and 0.624° (−40, chroma ≥ 64; 1.176° over all 720) | `RC_PROOF_APP=release curves_proof.py compare tools/proof/work/t4-2/ctl` H15 (49/49) |
 | Luma kept by the shift (T4-2) | its row | the (153, 102, 102) card 112.84 → 112.79 under +90°; the sweep's worst 0.488 levels | `… compare …` H12 |
-| An uncurved layer, and the adjustment pass (T4-2) | TC caps 0.069 / 0.061 ms; TA 0.081 / 0.060 | TC 0.002 / −0.001 ms; TA 0.002 / 0.008 ms (1080p / 2160p) | `grading_spike.py --measure --tree --tree-base a8ef6fd` |
+| An uncurved layer, and the adjustment pass (T4-2) | TC caps 0.069 / 0.061 ms; TA 0.081 / 0.060 | TC 0.002 / −0.001 ms; TA 0.002 / 0.008 ms (1080p / 2160p) | `grading_spike.py --measure --tree --tree-base c9875ca` |
 | Color's Hue +40 (T4-2b) | H16 (±40 by colorsys, luma kept) | worst 0.540°, luma worst 0.488 levels, red → 39.49°, green → 159.92° (control on the old tree: worst 98.225° off, red → 304.48°) | `RC_PROOF_APP=release curves_proof.py compare tools/proof/work/t4-2/ctl` H16 (53/53) |
 | A near-grey turned by Color's Hue (T4-2b) | not left grey (no guard) | (132, 128, 128) → (130, 129, 126), hue 45.0° | `… compare …` H19 |
 | A 3 → 5 action's blend (T4-3) | the mean strip within a 10-bit level; ends exact | worst 0.489 ten-bit levels at t 0.3, 0.499 at t 0.5; both ends byte-equal | `RC_PROOF_APP=release curves_proof.py compare tools/proof/work/t4-3/ctl` B1 (59/59, N0's 18 frames byte-identical) |
 | A same-count action stays the lerp (T4-3) | the lerp | 0.495 levels from the lerp, 124.90 from the value blend | `… compare …` B3 |
 | The selection's variance on a noisy card (T4-4) | falls as the blur rises | 16256.25 at 0, 799.70 at 0.05, 113.10 at 0.15, 19.78 at 0.4 | `RC_PROOF_APP=release qualifier_proof.py compare tools/proof/work/t4-4/ctl` Q1 (40/40, N0's eight frames byte-identical) |
 | The selection against a scripted Gaussian (T4-4) | max 4, mean 1 levels | max 1.078, mean 0.336 | `… compare …` Q2 |
-| The blurred qualifier's cost over the inline pass (T4-4) | recorded | VT:SQ 0.249 / 0.958 ms; σ 2 +0.121 / +0.480, σ 8 +0.098 / +0.355, σ 24 +0.095 / +0.323 ms (1080p / 2160p); unblurred TA −0.000 / −0.002 ms | `grading_spike.py --measure --tree --tree-base ac874f6` TB, TA |
+| The blurred qualifier's cost over the inline pass (T4-4) | recorded | VT:SQ 0.249 / 0.958 ms; σ 2 +0.121 / +0.480, σ 8 +0.098 / +0.355, σ 24 +0.095 / +0.323 ms (1080p / 2160p); unblurred TA −0.000 / −0.002 ms | `grading_spike.py --measure --tree --tree-base f98e7a0` TB, TA |
 
 Mutants, each run once on the final instrument and each answering MUTANT PASS (a list amended and re-run where a row failed by construction, as each phase records): T4-1 eight (`scopes_proof.py --mutant`), T4-2 nine, T4-2b six, T4-3 six (`curves_proof.py --mutant`), T4-4 eight (`qualifier_proof.py --mutant`, `blur-zero-breaks-pass` through `compare`); T4-0 none, a pure move. The gates passed in 364 s (T4-0), 263 s (T4-1), 249 s (T4-2), 227 s (T4-2b), 377 s (T4-3) and 282 s (T4-4).
 
@@ -101,7 +101,7 @@ Not filed, each decided at the close:
 
 - "The owner's choices" and "Tier 4 as answered": the owner's answers verbatim, the eleven choices, and what each of the eight issues asked, with the corrections to #268 and #271.
 - "How it fits the tree": each extra's design as planned (the zoom's spread table and the bench's vectorscope variants, the hue curves, the editor's extras, the blend and its resampling table, the blur and its bench) and the three "Why … is closed" sections.
-- "The standard recipe, file by file, and the tolls": the toll and the per-file plan at `3c3ac36`.
+- "The standard recipe, file by file, and the tolls": the toll and the per-file plan at `e94d3a2`.
 - "Spec §11: the plan": what stands, what was amended when, and the new entries.
 - "Costs": the brief's bench (`bench.swift`), its build keys and commands, the host's load, and what was reasoned from them.
 - "Not established"; "Found while reading" (the solid-colour slowdown, #268's and #271's corrections, the GPU clock state).

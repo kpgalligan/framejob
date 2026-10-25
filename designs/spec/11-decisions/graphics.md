@@ -1114,7 +1114,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   miss is within a pixel; a missing encoder ends in the preset's own
   sentence and no file** (issue #103, 2026-10-05, issue batch B85, phase
   3). Built in two phases, gated in order and committed apart: A is the
-  even rule alone, which moved the REPORT and no picture (commit fcfeebf);
+  even rule alone, which moved the REPORT and no picture (commit 979440f);
   B is the row, the fill rule, the guard's test, the encoder outcome and
   the Document tab's note. Every figure below was measured by the designer
   on 2026-10-05 (Apple M2 Max, macOS 26.5.1, ffmpeg 9.0.2) in a scratch

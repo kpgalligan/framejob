@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Frame Job — a screencast-style video editor for macOS: a Swift/AppKit UI over a
+Frame Job — a video editor for macOS: a Swift/AppKit UI over a
 Rust staticlib core, the same shape as `~/devel/rasterize`, whose three
 `CLAUDE.md` files are the parent text for anything not settled here. It
 builds and runs.

@@ -13,7 +13,7 @@
 //   scopes_probe <request.json> <answer.json>
 //
 // `request.json` names `shader` (the tree's `Waveform.metal`),
-// `baseline_shader` (the T4-0 tree's, `31f3aa1`, which S12 compares ×1 counts
+// `baseline_shader` (the T4-0 tree's, `28ada7d`, which S12 compares ×1 counts
 // against) and `package`, a project the proof saved over MCP. One JSON object
 // out: `rows` (S2–S14, each a name, ok and detail, the name starting with its
 // row id), `data` (S1's bins, which the proof scores against its own BT.709

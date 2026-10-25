@@ -91,7 +91,7 @@ TR-11.
     proposal first and undo takes back what it cut.
 - **TR-6 — The working arrangement: the `transcript-cut` worktree, each phase gated, committed and
   merged into main alone.** The owner's ask of 2026-10-22.
-  - The worktree is `~/devel/framejob-tcut` on branch `transcript-cut`, from `15d3545`; each
+  - The worktree is `~/devel/framejob-tcut` on branch `transcript-cut`, from `c3731fa`; each
     phase passes `make gate`, is committed and is merged into main alone, with main's next
     numbers if main moved.
   - Fixtures are synthetic (`say`) and AssemblyAI is `assemblyai_fake.py`; a paid call runs only

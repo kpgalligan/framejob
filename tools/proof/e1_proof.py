@@ -12,7 +12,7 @@ exports. Nothing reads a source file.
 move: a version-6 project's overlap must go on drawing linearly and sounding
 silent, exactly as it did before `curve` and `audio` existed (spec §11,
 R5-2). "Exactly" is only checkable against a build that never had them, so
-the reference tree is `1c3e92e` — the commit before E1's first toll —
+the reference tree is `77934fe` — the commit before E1's first toll —
 extracted into `tools/proof/work/e1-reference`, built there, and launched
 with `RC_AGENT_PORT=0`. A tree that old listens on TCP alone, and road map
 14's MC4 made `mcp.py` socket-only, so the reference alone is reached by
@@ -113,7 +113,7 @@ def format_version():
 VERSION = format_version()
 
 # This build's floors (D3's `op_argument_proof.py` owns the exact numbers),
-# and the reference build's exact counts — that tree is frozen at 1c3e92e.
+# and the reference build's exact counts — that tree is frozen at 77934fe.
 TOOLS_FLOOR = 77
 OPS_FLOOR = 57
 REFERENCE_TOOLS = 75
@@ -673,7 +673,7 @@ def tool_counts(mcp):
 
 
 class ReferenceMCP(MCP):
-    """The reference build alone, over TCP: the tree at 1c3e92e predates road
+    """The reference build alone, over TCP: the tree at 77934fe predates road
     map 14's socket, and `mcp.py` stays socket-only for every other proof."""
 
     def __init__(self, port, timeout=600):
@@ -725,7 +725,7 @@ def counts_part(mcp, reference, socket_path, reference_log):
     rtools, rops = tool_counts(reference)
     if len(rtools) != REFERENCE_TOOLS:
         skip(3, f"the reference instance answered {len(rtools)} tools, not {REFERENCE_TOOLS}"
-                " — it is not the build at 1c3e92e")
+                " — it is not the build at 77934fe")
         return None
     check(len(rtools) == REFERENCE_TOOLS,
           f"the reference build publishes exactly {REFERENCE_TOOLS} tools ({len(rtools)})")

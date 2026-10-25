@@ -14,7 +14,7 @@
 
 ## Context
 
-The Clip inspector brief (`87aa425`) listed twelve problems, P1–P12:
+The Clip inspector brief (`77b96ee`) listed twelve problems, P1–P12:
 - The inspector was dense.
 - It split audio from video.
 - Actions were buried in a section, and there was no selected action.

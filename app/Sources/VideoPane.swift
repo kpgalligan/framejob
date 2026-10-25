@@ -782,7 +782,7 @@ final class VideoPane: InspectorPaneView {
     // MARK: Spotlight
 
     /// Darkens the canvas outside a rectangle or ellipse and optionally
-    /// magnifies what is inside it — the stand-in for a screencast editor's freehand
+    /// magnifies what is inside it — a stand-in for a freehand
     /// callout (§4.3's M3 list).
     ///
     /// It lives HERE and not in the Shape pane, where spec §4.3 first listed

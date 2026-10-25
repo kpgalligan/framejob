@@ -31,7 +31,7 @@ app for `proof_app.py` to choose.
   rows, the figures, the route).
 
 **The variants.** V0 is `Compositor.metal` as it stood before MT2
-(`git show 464a3aa:app/Resources/Shaders/Compositor.metal`; a failed show is
+(`git show 63f1524:app/Resources/Shaders/Compositor.metal`; a failed show is
 a B0 failure). V1 (placeholder) and V2
 (function constant) both add `kMatte*` codes, `MatteUniforms`,
 `framejob_matte_resolve_fragment` (it reads the matte target at the fragment's

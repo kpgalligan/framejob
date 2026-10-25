@@ -56,7 +56,7 @@ Sections:
 
 On the fix every row passes. Over the baseline tree
 (`--sources tools/proof/work/mixed-audio/baseline/app/Sources`, made with
-`git archive 3e1bd19 app/Sources | tar -x -C tools/proof/work/mixed-audio/baseline`)
+`git archive 632b26f app/Sources | tar -x -C tools/proof/work/mixed-audio/baseline`)
 section 1 fails, section 4's `mixed` 3.5 s row fails while both CONTROLs pass,
 and section 3 passes. Every player row prints `before`, `after` and
 `peakLeftDB`, so the record carries which form this host showed.

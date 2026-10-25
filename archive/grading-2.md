@@ -2,7 +2,7 @@
 
 **Opened 2026-10-10** (G2-0, in the worktree `~/devel/reelcut-grading` on branch `grading-2`,
 merged into main after its gate). The design brief this road map answers is
-`~/.claude/litecode/reelcut/grading-tier2/I-grading-tier2.md` (2026-10-10, tree `4f8e276`); it
+`~/.claude/litecode/reelcut/grading-tier2/I-grading-tier2.md` (2026-10-10, tree `7f6d112`); it
 lives outside the repo, so everything a later phase needs from it is written here. Where the
 brief and this file differ, this file wins. Tier 1's road map is closed: its condensed record is
 `designs/adr/grading.md`, the original `archive/grading.md`, and its decisions are spec §11
@@ -92,7 +92,7 @@ entry before code, a `render_frame`-bytes or probe proof on a fixture, and a GRD
 
 ## How it fits the tree
 
-### What tier 1 left (read in the tree at `4f8e276`)
+### What tier 1 left (read in the tree at `7f6d112`)
 
 - **The stage order** (`Compositor.metal`, the comment above `layerColorPremultiplied`): 1 zoom
   remap, 2 pixelate, 3 sample (chroma key, then Color's four — brightness, contrast, saturation,
@@ -356,7 +356,7 @@ as it needs.
 
 ### Tolls (G2-0, pure moves gated before any tier-2 code)
 
-| File | Lines at `4f8e276` | Why it is touched later | The move |
+| File | Lines at `7f6d112` | Why it is touched later | The move |
 |---|---|---|---|
 | `ProjectSnapshot.swift` | 1,570 | `VideoProps` gains `wheels`, `curves`, `qualifier` | Its named next seam: `ColorAdjust` out whole to `GradeProps.swift`. New snapshot types go there. |
 | `AgentServer+Render.swift` | 584 | `render_frame` gains `parade`, `vectorscope`, `histogram`, `selection` | No seam was named; the brief named one: `writeWaveform` (the scope writers' home) out to a new `AgentServer+Scopes.swift`. |
@@ -683,7 +683,7 @@ only the shape is read. Wheels are free; the strip and the qualifier cost at mos
 
 ## G2-0 — the road map, GR-10 and four pure moves
 
-**What landed** (2026-10-10, in the worktree on `grading-2`, from `4f8e276`). This road map;
+**What landed** (2026-10-10, in the worktree on `grading-2`, from `7f6d112`). This road map;
 `designs/spec/11-decisions/grading-2.md` with GR-10, its README rows, GR-5's "Amended by GR-10"
 line and the Lines cells; and four pure moves, gated as one change with no tier-2 code and no
 behaviour change. Each moved block was diffed against `git show HEAD:<file>`: identical apart
@@ -740,7 +740,7 @@ computing them from the Rec. 709 matrix in Python before they were written (the 
 - `RC_PROOF_APP=release python3 tools/proof/word_looks_proof.py --only B1` on the gate's Release
   build: 3/3, B1 `moved: []`, the same as the control
   (`after-word_looks-B1-release.txt`): the 41 frames of fixture B still match the digests
-  recorded from `c66d8ab`.
+  recorded from `914b56a`.
 - No mutants: a pure move adds no decision.
 
 **Owed.** Nothing; the `app/CLAUDE.md` and `core/CLAUDE.md` map entries for the four moves are
@@ -748,7 +748,7 @@ applied. G2-1 (scopes, GR-10) is next, from main after this phase's merge.
 
 ## G2-1 — the scopes (#263, GR-10)
 
-**What landed** (2026-10-10, in the worktree on `grading-2`, from `9dec954`). The RGB parade,
+**What landed** (2026-10-10, in the worktree on `grading-2`, from `9d5c659`). The RGB parade,
 the Rec. 709 vectorscope and the R′G′B′Y′ histogram beside the luma waveform, in the two stacked
 slots of View ▸ Scopes (⌃⌘W, renamed from View ▸ Waveform), and `render_frame {parade,
 vectorscope, histogram}`; the owner's choices 1–10 as settled before the code (choice 5 option B:
@@ -851,7 +851,7 @@ such mutant is written.
 
 ## G2-2 — the wheels (#260, GR-11, GR-14)
 
-**What landed** (2026-10-10, in the worktree on `grading-2`, from `4f52ead`). GR-11 and GR-14
+**What landed** (2026-10-10, in the worktree on `grading-2`, from `3eecaad`). GR-11 and GR-14
 first (`designs/spec/11-decisions/grading-2.md`, README rows, "Amended by GR-11" lines on GR-2,
 GR-4, GR-6 and GR-7, the Lines cells), from the owner's "All as recommended" to G2-2's choices
 1–8 (choice 9 internal); then `video.wheels {lift, gamma, gain}`, each `{x, y, master}`, at format
@@ -931,7 +931,7 @@ other falls": a yellow push lifts R and G by only 2–4 levels (yellow's luma is
   `clip_inspector2_proof.py` 33/33; `phase8_chrome.py` 145/150 — its uniform-size row passes at
   512/128/32 × 16, and its five failures are the View menu's last group (Show Ungraded and Scopes
   now follow Preview Window), rows this phase does not touch.
-- `grading_spike.py --measure --tree --tree-base 4f52ead`: KT 0/1023 at both sizes; TC held —
+- `grading_spike.py --measure --tree --tree-base 3eecaad`: KT 0/1023 at both sizes; TC held —
   1080p T0 +0.003 ms against 0.020, 2160p −0.001 ms against 0.061 (V0 0.346 / 0.630 ms; load
   before 48.1, another session's).
 - `screens.py --only 05b-clip-color,05c-clip-adjustment,05f-clip-wheels`: 8/8, both looks, 0 new
@@ -960,7 +960,7 @@ wheel types, `model_grade.rs`, `grade_check.rs`), applied by the orchestrator.
 
 ## G2-3 — the curves (#261, GR-12)
 
-**What landed** (2026-10-11, in the worktree on `grading-2`, from `b2fd1f9`). GR-12 first
+**What landed** (2026-10-11, in the worktree on `grading-2`, from `f952e88`). GR-12 first
 (`designs/spec/11-decisions/grading-2.md`, its README rows, "Amended by GR-12" lines on GR-2,
 GR-4, GR-6 and GR-7 and their README cells, the Lines cells), from the owner's answers to G2-3's
 choices 1–10 ("All as recommended", choice 9 (a)) and 11–13 (internal); then `video.curves
@@ -1000,7 +1000,7 @@ sentences replace the draft sentence in "Curves (#261), G2-3" above.
 - Proofs: `curves_proof.py` and `curves_probe.swift` (new); `wheels_proof.py` N2 reads the
   header's version; the Color section lists of `wheels_probe.swift` P1, `look_probe.swift` B4 and
   `clip_inspector2_probe.swift`; `grading_spike/tree_bench.swift` binds an identity strip at
-  `texture(3)` and its README names `--tree-base b2fd1f9`; `screens.py` (`video.curves` pinned
+  `texture(3)` and its README names `--tree-base f952e88`; `screens.py` (`video.curves` pinned
   open, the `curves` fixture) and screens `05g` (new), `05b`, `05c`, `05f`; tests the new key
   moved: `core/tests/recipe.rs` (`LAYER_KEYS` 24 → 25), `schema_v8.rs` (`clip_state`'s
   `curves`), `ungraded.rs` (curves stripped and neutralised), `wheels.rs` (the recipe's key
@@ -1047,7 +1047,7 @@ section and key moved them, as G2-2's `LAYER_KEYS` did.
   (`tools/proof/work/g2-3/curves-release.txt`).
 - `RC_PROOF_APP=release wheels_proof.py` 22/22 (P1 after its section list); `look_proof.py
   --only B4` 1/1; `clip_inspector2_proof.py` 33/33.
-- `grading_spike.py --measure --tree --tree-base b2fd1f9`, twice. The first (load before 27, a
+- `grading_spike.py --measure --tree --tree-base f952e88`, twice. The first (load before 27, a
   rustc of another session at 96 %): KT 0/1023 at both sizes; 2160p T0 +0.001 ms against 0.061
   (held); 1080p T0 +0.077 ms against 0.020, MISSED — but the GPU changed clock state inside the
   run: V0b's first series and VT's third ran at 0.35 ms where every other series ran at 0.120, so
@@ -1081,7 +1081,7 @@ PASS (232 s); `RC_PROOF_APP=release curves_proof.py compare` 29/29; `catmull-rom
 
 ## G2-4 — the qualifier (#262, GR-13)
 
-**What landed** (2026-10-11, in the worktree on `grading-2`, from `75ebf34`). GR-13 first
+**What landed** (2026-10-11, in the worktree on `grading-2`, from `12f5e81`). GR-13 first
 (`designs/spec/11-decisions/grading-2.md`, its README row and Lines cells, "Amended by GR-13" on
 GR-4 and GR-6 and their README cells), from the owner's answers of 2026-10-11 to G2-4's choices
 1–13 (1–10 and 12–13 as recommended, 11 changed to the short way round) and the orchestrator's
@@ -1170,7 +1170,7 @@ header's comment, the contract, does (the review's fix pass).
   line, no `DEFAULTS MOVED` (`tools/proof/work/g2-4/qualifier-release.txt`).
 - Release: `adjustment_proof.py` 36/36, `seeing_proof.py` 19/19 (G1 recorded: 0.096 / 0.195
   ms), `look_proof.py --only B4` 1/1, `phase8_chrome.py` 150/150.
-- `grading_spike.py --measure --tree --tree-base 75ebf34`, once, under heavy host load (load
+- `grading_spike.py --measure --tree --tree-base 12f5e81`, once, under heavy host load (load
   67 before, 81 after — another session's build): KT and KA 0/1023 at both sizes; TC held
   (1080p −0.066 ms, 2160p −0.000 ms); **TA held**: 1080p VT:SA − V0:SA −0.023 ms against 0.036,
   2160p +0.044 ms against 0.061 (V0:SA 0.812, VT:SA 0.856 ms, its runs 0.855–0.856: a real
@@ -1198,7 +1198,7 @@ mutant re-run, since no instrument changed.
 
 ## G2-5 — the close (2026-10-11)
 
-**What landed** (2026-10-11, in the worktree on `grading-2`, from `c948fad`). G2-1's accepted
+**What landed** (2026-10-11, in the worktree on `grading-2`, from `fea3435`). G2-1's accepted
 limit, "a mutant forcing `banded` off would survive T1", is closed here rather than filed, with an
 instrument row and no product code:
 - `scopes_probe.swift`: T1's inner loop factored into `gpuMedian(_:_:_:_:)`, unchanged in

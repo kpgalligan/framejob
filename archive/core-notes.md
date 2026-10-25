@@ -872,7 +872,7 @@ deliberately left: the first differs from `start + longest_duration_on_grid`
 for an off-grid start, and the second has no clip to ask about
 (`designs/reelcut-roadmap-7.md` §10.6).
 
-Line counts, `wc -l` against `47db3ae`: `source_window.rs` **251** (of the
+Line counts, `wc -l` against `b7b434e`: `source_window.rs` **251** (of the
 400-line cap for a new module); `model_query.rs` 503 → **440**;
 `edit_clip.rs` 1036 → **1021**; `edit_edge.rs` 220 → **197**;
 `edit_split.rs` 210 → **195**; `edit_transition.rs` 586 → **572**;

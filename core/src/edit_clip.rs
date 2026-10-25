@@ -54,7 +54,7 @@ use crate::props_check::{check_shape, check_text, SCALE_MAX, SCALE_MIN};
 use crate::time::{self, Ticks, TIMESCALE};
 
 /// Default duration for a source with no source bound — text, shape, and an
-/// image whose descriptor carries no duration. Five seconds is a screencast editor's
+/// image whose descriptor carries no duration. Five seconds is a common
 /// title default and long enough to read.
 const DEFAULT_CLIP_DURATION: Ticks = 5 * TIMESCALE;
 

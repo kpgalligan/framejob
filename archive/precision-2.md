@@ -1,8 +1,8 @@
 # Road map "precision-2" — the paths still 8-bit (#257): deep stills and the 10-bit reverse
 
 **Opened 2026-10-11** (P2-0, in the worktree `~/devel/reelcut-i257` on branch `i257`, from
-`19ef985`, merged into main after its gate). The design brief this road map answers is
-`~/.claude/litecode/reelcut/i257-8bit-paths/I-257.md` (2026-10-11, tree `19ef985`), and the
+`390bf57`, merged into main after its gate). The design brief this road map answers is
+`~/.claude/litecode/reelcut/i257-8bit-paths/I-257.md` (2026-10-11, tree `390bf57`), and the
 owner's answers are `~/.claude/litecode/reelcut/i257-8bit-paths/answers.md`. Both live outside
 the repo, so everything a later phase needs from them is written here. Where the brief and this
 file differ, this file wins. The precision road map is closed: its condensed record is
@@ -43,7 +43,7 @@ choices therefore read:
 
 ## Deep stills (P2-1)
 
-**Where the depth is lost** (all line numbers as at `19ef985`). `MediaCacheFiles.decodeImage`
+**Where the depth is lost** (all line numbers as at `390bf57`). `MediaCacheFiles.decodeImage`
 (ImageIO's `CGImageSourceCreateThumbnailAtIndex` with `FromImageAlways`, `WithTransform`, max
 8192) returns a 16-bit-a-component image for a 16-bit PNG and a 16-bit TIFF, measured (bpc 16,
 bpp 64). The depth is thrown away by `LayerRenderers.renderImage` (`LayerRenderers.swift:446`),
@@ -76,7 +76,7 @@ below). The deep claim is proven through `prores_422` (S1).
 ## The 10-bit reverse (P2-2)
 
 **Where the depth and the labels are lost** (all in `ReverseRenderer.swift`, line numbers as at
-`19ef985`):
+`390bf57`):
 - `read` (`:752`) asks the reader for 32BGRA. It asks for `x420`
   (`kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange`) for an even-sized source and `x422` for an
   odd-sized one. The `dimensions` read can stay 32BGRA.
@@ -233,7 +233,7 @@ Stills come before the reverse because they are smaller and touch nothing the re
 
 ## P2-0 — the road map, PR-6…PR-8 and the toll
 
-**What landed** (2026-10-11, in the worktree on `i257`, from `19ef985`). This road map; PR-6,
+**What landed** (2026-10-11, in the worktree on `i257`, from `390bf57`). This road map; PR-6,
 PR-7 and PR-8 appended to `designs/spec/11-decisions/precision.md`, with a paragraph in its
 opening saying who recorded them and one `**Amended by PR-6 and PR-7**` line under PR-5
 (PR-1..PR-5's bodies untouched); the index rows in `11-decisions/README.md` (`precision.md`'s Lines and
@@ -294,7 +294,7 @@ P2-1 (deep stills, PR-6) is next, from main after this phase's merge.
 
 ## P2-1 — deep stills
 
-**What landed** (2026-10-11, in the worktree on `i257`, from `34445fa`; main had not moved).
+**What landed** (2026-10-11, in the worktree on `i257`, from `3fe1b40`; main had not moved).
 - **The product.** `app/Sources/LayerRenderers.swift` went from 498 to 537 lines and pays no
   toll.
   - `renderImage` decides on one line, `let deep = image.bitsPerComponent > 8`. A deep image is
@@ -513,7 +513,7 @@ P2-2 (the 10-bit reverse, PR-7) is next, from main after this phase's merge.
 
 ## P2-2 — the 10-bit reverse
 
-**What landed** (2026-10-11, in the worktree on `i257`, from `44b2077`).
+**What landed** (2026-10-11, in the worktree on `i257`, from `aeca9f9`).
 - **The product.** `app/Sources/ReverseRenderer.swift` went from 1,120 to 1,220 lines, under
   the 1,311 it was before P2-0's toll, so no pure move.
   - `ReverseRenderer.Intermediate`: `.hevcMain10` (`x420`, 3 bytes a held pixel) for an even
@@ -684,7 +684,7 @@ P2-3 (the close) is next, from main after this phase's merge.
 
 ## P2-3 — the close
 
-**What landed** (2026-10-11, in the worktree on `i257`, from `aed143d`; main had not moved). No
+**What landed** (2026-10-11, in the worktree on `i257`, from `92cee74`; main had not moved). No
 product or proof code:
 - This road map condensed into `designs/adr/precision-2.md`; this file moved to
   `archive/precision-2.md` with its `archive/INDEX.md` row.
@@ -693,7 +693,7 @@ product or proof code:
 - `tools/proof/README.md`'s "precision-2 P2-1" and "precision-2 P2-2" paragraphs: their record
   is this file's P2-1 and P2-2 sections.
 
-**The review of what was left**, against the tree at `aed143d`:
+**The review of what was left**, against the tree at `92cee74`:
 - "Not established": S4 settled in P2-1 (the owner's "Accept it", PR-4's amendment); V3 settled
   in P2-2 (the chroma ramp, 0.078 levels); the 10-bit HEIF settled in P2-1's fix pass 1 (S7);
   `source_mirror_probe.py` §3 on the new renderer settled in P2-2 (40/40, and V0's and V5's
@@ -717,8 +717,8 @@ product or proof code:
   video source is in the frame.
 
 Drafted comments: #256 (the reverse carries the source's colour labels, PR-7; a deep still is
-drawn half-float in sRGB, PR-6; tier 3 inherits both); #257's close, naming `34445fa`, `44b2077`,
-`aed143d` and this phase's commit.
+drawn half-float in sRGB, PR-6; tier 3 inherits both); #257's close, naming `3fe1b40`, `aeca9f9`,
+`92cee74` and this phase's commit.
 
 **Verification**, 2026-10-11, AC power (`pmset -g`: powermode 0). No app launched and no MCP
 proof run: nothing a proof drives changed.

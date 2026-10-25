@@ -69,7 +69,7 @@ plan leaves the audio out, one pitch per plan audio track).
     until SR-5's spike has measured it; the road map stops for the owner if it does.
 - **SR-4 — The working arrangement: the `framejob-ramps` worktree, each phase gated, committed
   and merged into main alone.** The owner's ask of 2026-10-23.
-  - The worktree is `~/devel/framejob-ramps` on branch `speed-ramps`, from `81900d9`; each phase
+  - The worktree is `~/devel/framejob-ramps` on branch `speed-ramps`, from `80291b7`; each phase
     passes `make gate`, is committed and is merged into main alone, with main's next numbers if
     main moved.
   - Fixtures are synthetic; the owner's `tools/proof/media/owner-sync*` and `filler-sample/` are

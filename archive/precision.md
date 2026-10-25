@@ -58,7 +58,7 @@ by".
 
 **The toll.** `Compositor.swift`'s file-level `// MARK: - Uniforms` through
 `TransitionCode` (`LayerUniforms`, `ShadowUniforms`, `TransitionCode`; HEAD
-7ef96c5's lines 258–522) moved whole to the new `LayerUniforms.swift` with
+335bc32's lines 258–522) moved whole to the new `LayerUniforms.swift` with
 `import Foundation` and nothing else; the moved block is byte-identical to
 the removed one (`git show HEAD:app/Sources/Compositor.swift | sed -n
 258,522p` against the new file's body, `diff` silent), and the
@@ -70,7 +70,7 @@ whole (`designs/adr/app-file-history.md`).
 **Verification of the move.** `make typecheck` (0 errors, the 4 baseline
 warnings) and `spec_index_proof.py` (147/147) in the loop; `make gate` PASS
 (typecheck, test, app run; fmt and lint skipped as unchanged).
-`video_configuration_proof.py capture` on a Release build of HEAD 7ef96c5
+`video_configuration_proof.py capture` on a Release build of HEAD 335bc32
 BEFORE the move (C1, C2: 2/2), then `compare` on the gate's post-move
 Release: 7/7 — the three renders, the APNG, the GIF and both ProRes exports
 byte for byte (ProRes masked), the probe now built from 350 sources where it
@@ -238,7 +238,7 @@ own render byte for byte.
 
 | Script | Row | Old | New | Cause |
 |---|---|---|---|---|
-| `e1_proof.py` | the version-6 `wipe` against 1c3e92e | byte-identical (3f25059c…) | within ±1 a channel (5e6ff5dc…; \|Δ\| 1 on 1,080 channels) | PR-1: the wipe's soft edge is blended at 16-bit float; PR-5's rule for a frozen reference that holds pixels |
+| `e1_proof.py` | the version-6 `wipe` against 77934fe | byte-identical (3f25059c…) | within ±1 a channel (5e6ff5dc…; \|Δ\| 1 on 1,080 channels) | PR-1: the wipe's soft edge is blended at 16-bit float; PR-5's rule for a frozen reference that holds pixels |
 | `e1_proof.py` | five version-6 cross-dissolve ticks | byte-identical | within ±1 (still \|Δ\| 0 on every tick) | PR-5's rule, the same row family |
 | `hevc_alpha_proof.py` | B1 | frame 0's digest d038e20d… scored; samples exact | WITHDRAWN in the fix pass: exact again, digest d038e20d… | was: `hevc` fed 64RGBAHalf moved the digest to 2da5cab7… and the centre red to 254; `hevc` is now rounded to 8 bits first (below) |
 | `word_looks_baseline.json` | B1 (fixture B, 41 frames) | PR0's digests (PR0's Release reproduced all 41) | to re-record after PR1's commit | PR-1: 40 frames moved, 76,550 channels, every one by exactly 1, measured against a scratch Release build of PR0. `--record-baseline` refuses an uncommitted tree, so the recording is owed to the commit |
@@ -258,7 +258,7 @@ own render byte for byte.
 
 **The review's fix pass (2026-10-09).**
 - **Q2 was PR1's, and a proof defect, not a product race.** The pin probe (`graphics_pin_probe.swift`, built `-Onone` by `swift_build`) was run as the proof runs it, Q1's `queue pin`/`nopin` then Q2's `direct pin`/`nopin` over ONE package, from a black-canvas copy of PQ, 3 rounds per tree, each tree's probe built from its own `app/Sources` and shader:
-  - PR0 (7b80810): 12 of 12 runs drew (1440, 540) black (Q1 3/3, Q2 3/3); each run took 9.3–10.2 s; the package's canvas stayed black.
+  - PR0 (179376d): 12 of 12 runs drew (1440, 540) black (Q1 3/3, Q2 3/3); each run took 9.3–10.2 s; the package's canvas stayed black.
   - PR1: Q1 3/3 black, Q2 `direct pin` **0/3** (blue every time); each run took 17.3–32.4 s, and after every round's first run the package's saved canvas was blue.
   - The cause: `swapOut`'s blue canvas is a document edit, and `ProjectDocument` autosaves in place. A run that outlasts AppKit's autosave delay writes the blue canvas into the package, so the NEXT run opens blue. Each export itself drew black, from the project it was handed. PR1 doubled the probe's `-Onone` `prores_4444` export time (the half-float path), which crossed that delay; PR0's runs finished first. The earlier "PR0 races too" run was over a PQ an earlier run had already autosaved.
   - The fix: `graphics_proof.py`'s `run_probe` hands each run its own copy of the package (`work/graphics/<tag>.reelcut`). Over the fixed `run_probe`, PR1's probe drew black in 10 of 10 pin runs (5 rounds, Q1 and Q2); every copy was autosaved blue and the source package stayed black. `graphics_proof.py` whole on Release: 51/51.
@@ -266,7 +266,7 @@ own render byte for byte.
 
 | Build | `hevc` | `prores_422` | `h264` |
 |---|---|---|---|
-| PR0 Release (scratch build of 7b80810) | 6.462 | 3.159 (PR0's capture: 3.159) | 7.863 |
+| PR0 Release (scratch build of 179376d) | 6.462 | 3.159 (PR0's capture: 3.159) | 7.863 |
 | PR1 Release, `hevc` fed 64RGBAHalf | **9.040** | 2.007 | 7.863 |
 | PR1 Release, `hevc` rounded to 8 bits | 6.462 | 2.007 | 7.863 |
 
@@ -291,7 +291,7 @@ reworded within its old lines, because the file is over the ~600-line cap
 and takes nothing on. The trim is comment-only; the gate and M1's second run
 ran on the trimmed build.
 
-**PR2's controls, on PR1's committed tree** (HEAD b95d752, Release, before
+**PR2's controls, on PR1's committed tree** (HEAD bb5de2a, Release, before
 the product edit; `tools/proof/work/precision/ctl-pr1/`, gitignored).
 `precision_proof.py` now records the tree's formats in a capture (`formats`,
 read from `Compositor.swift`; a capture without them is PR0's) and picks each
@@ -380,13 +380,13 @@ K row's rule from the control's formats against the tree's:
     move: its claims hold at PR2's decode), phase7 92/92, phase8 79/79,
     phase9 222/222;
   - `phase6_chrome` 70/70, `phase7_chrome` 79/79;
-  - `e1_proof` 101/101 (the 1c3e92e reference rows within ±1, as PR1 left
+  - `e1_proof` 101/101 (the 77934fe reference rows within ±1, as PR1 left
     them; the wipe's |Δ| 1 on 1,080 channels again), `e2_proof` 75/75;
   - `matte_proof` 46/46, `matte_probe` 6/6, `hevc_alpha_proof` 43/43;
   - `graphics_proof` 51/51, `graphics_files_proof` 10/10,
     `graphics_prefetch_proof` 7/7, `graphic_prop_action_proof` 17/17,
     `paste_graphic_proof` 8/8;
-  - `word_looks_proof` 16/16 (b95d752's baseline holds), `word_looks_sheet_proof`
+  - `word_looks_proof` 16/16 (bb5de2a's baseline holds), `word_looks_sheet_proof`
     9/9, `words_picture_proof` 7/7, `word_captions_proof` 20/20;
   - `codec_import_proof` 10/10, `container_import_proof` 16/16,
     `clip_inspector6_proof` 25/25, `debug_release_proof` 10/10,

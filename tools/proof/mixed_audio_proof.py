@@ -39,7 +39,7 @@ Fixtures are `mixed_audio_probe.py`'s, written fresh by importing it (the
     python3 tools/proof/mixed_audio_proof.py --mutant old-onset
 
 `--mutant old-onset` builds a tree copy (`tree_copy.make_copy`, under
-`work/mixed-audio-mutant`) with the pre-B61 onset (`git show 16d4934`: the
+`work/mixed-audio-mutant`) with the pre-B61 onset (`git show d94e87e`: the
 track's first segment of positive duration, sounding or not) in
 `CompositionBuilder+AudioTracks.swift`, the anchor asserted once, built by
 `tree_copy.build_app`; launches it on a scratch socket of its own

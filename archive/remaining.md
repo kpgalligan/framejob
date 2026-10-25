@@ -97,7 +97,7 @@ get new ones, and Remove Silences and Normalize would measure the old file.
 
 What landed (spec §5.6; `MediaCacheFiles.swift`, after a pure move took the
 await-free half of the cache out of `MediaImporter.swift` first and alone,
-`3e5b598`): `CacheStamp` — the source's byte size and modification second
+`302d03b`): `CacheStamp` — the source's byte size and modification second
 plus the record fields and generator constants that size a cache — written
 LAST by a finished pass as `thumbs/<id>/complete.json` and
 `peaks/<id>.complete.json`, and carrying NO path, deliberately: the reversed
@@ -250,7 +250,7 @@ naming `rc_op_schemas`, and the value type it answers went to
 `ReelOpSchema.swift` instead.
 
 **What road map 7 §10's phase A did to it** (2026-09-19, measured with
-`wc -l` against `47db3ae`). The source-window module is a PURE MOVE, so the
+`wc -l` against `b7b434e`). The source-window module is a PURE MOVE, so the
 test is that every file it touched came down. `core/src/model_query.rs`
 **503 → 440** and the three readers, the mover, the bound and the two tail
 readers are `core/src/source_window.rs` (**251** of the 400-line cap for a
@@ -370,7 +370,7 @@ cannot move purely; `TextPane.swift` **513 → 530**. New and inside the cap:
 `TextProps.swift` / `TextPatch.swift` at **274** / **133** with the feature.
 
 **What road map 10's G1a did to it** (2026-09-24, `wc -l` against
-`c5f3265`; road map 10 §10.4). One toll, a pure move gated alone before
+`3d4f487`; road map 10 §10.4). One toll, a pure move gated alone before
 G1d's graphics wrappers take anything on: `ReelCore.swift` **1440 → 1309**
 (`RecipeSource`, the compositor's recipe registry, to `RecipeSource.swift`,
 **135**, new — a 133-line block and the blank before it out, 3 header lines
@@ -378,7 +378,7 @@ in). It frees 131 lines against G1d's ~110; if the wrappers measure more,
 the next seam is road map 10 §5e's own candidate, the media helpers (~94).
 
 **What road map 10's G1d did to it** (2026-09-25, `wc -l` against
-`cea2ddf`; road map 10 §10.4). The graphics wrappers — `GraphicDiagnostic`,
+`601f4ee`; road map 10 §10.4). The graphics wrappers — `GraphicDiagnostic`,
 `GraphicFailure`, `GraphicRaster`, `GraphicLibrary`, `GraphicModule` and a
 private diag-taker, plus the header's type list — took `ReelCore.swift`
 **1309 → 1440**, 131 lines net, exactly the room G1a made; no second move.
@@ -388,7 +388,7 @@ toll first: the media helpers (~94) are still the named seam, then the
 `recipe.rs` grew **582 → 594** (`content_hash`'s sort).
 
 **What road map 10's G2a did to it** (2026-09-25, `wc -l` against
-`fe16e94`; road map 10 §10.5). The graphic clip and its two ops, with no
+`bc52dac`; road map 10 §10.5). The graphic clip and its two ops, with no
 toll: every new line that could go in a new module did. In the core,
 `model_graphic.rs` (**399** of 400) and `edit_graphic.rs` (**283**) are
 new; `edit_clip.rs` **751 → 757** (`Described` and `add_described_clip`
@@ -403,7 +403,7 @@ semantics rows — its standing exemption), `recipe.rs` **594 → 596** (the
 exempt).
 
 **What road map 10's G2b did to it** (2026-09-25, `wc -l` against
-`986cf5a`; road map 10 §10.5). The graphic's timeline rules and its layer,
+`2f3198f`; road map 10 §10.5). The graphic's timeline rules and its layer,
 core only, with no toll: the arithmetic went into a new
 `recipe_graphic.rs` (**129**) because both natural homes are at their caps
 (`model_graphic.rs` **399**, a comment reworded in place;
@@ -415,7 +415,7 @@ cap); `edit.rs` **893 → 893** (six row clauses, no new lines);
 **95 → 96**. Nothing in the app moved.
 
 **What road map 10's G4b did to it** (2026-09-25, `wc -l` against
-`e7dfacb`; road map 10 §10.7 G4b). Two tolls, each landed and gated alone
+`df84c6f`; road map 10 §10.7 G4b). Two tolls, each landed and gated alone
 before the tenth export: `read_bytes` moved verbatim and the two frees'
 identical bodies deduplicated into `ffi_util.rs`'s `free_boxed` took
 `ffi_graphic.rs` **397 → 373**, and `rc_graphic_library_families` took it
@@ -484,9 +484,9 @@ when a fix took each over its line — and left two files AT the cap:
 |---|---|---|
 | `AgentServer+Scope.swift` | 592 | ON the cap. Seam: the envelope rule (`checkCallScope`, `effectiveScope`, `idScope`, `addressed`, `checkDocumentLevelTicks`, `scopeLanding`, `scopeFailure`) against `set_scope` THE TOOL and its path arithmetic (`setScope`, `nestScopePath`, `pathToClip`, `applyNestScope`, `commonPrefix`, `scopeReport`) |
 | `MediaImporter.swift` | 580 after #23's pure move | Went to 619 when road map 3's held tail landed in it, and paid mid-wave: the await-free half — `ImportError`, `isImage`/`probeImage`, the rate table — to `MediaImporter+Probe.swift` (121), a pure move. #23's separate move takes the synchronous reader and writer to `MediaImporter+Peaks.swift` (39) and the buckets from `MediaCacheFiles.swift` (556 → 478) to `MediaPeakBuckets.swift` (82); the asset and track awaits stay here. |
-| `AgentCatalog.swift` | 454 | Was cut to 665 in `b410125`, phase 9 put it back over at 807, and road map 3's R1·toll paid the cut the file's own header had named, first and alone: the FILE groups — Media, Captions, Rendering and export — are `AgentCatalog+Files.swift` (**609** with `record_screen`'s entry — over the cap since R2 hoisted the entry's pause and result paragraphs into two locals for the type checker's budget; the cut it owes is that entry's sentences, whose description is the longest in the catalog; the cut it will owe is that entry's sentences), spliced after the Canvas group as the clip rows are. The header's "sharing no hoisted local" was false by ONE, `ticks`, which `fileTools(ticks:)` takes as an argument |
+| `AgentCatalog.swift` | 454 | Was cut to 665 in `edbeb2e`, phase 9 put it back over at 807, and road map 3's R1·toll paid the cut the file's own header had named, first and alone: the FILE groups — Media, Captions, Rendering and export — are `AgentCatalog+Files.swift` (**609** with `record_screen`'s entry — over the cap since R2 hoisted the entry's pause and result paragraphs into two locals for the type checker's budget; the cut it owes is that entry's sentences, whose description is the longest in the catalog; the cut it will owe is that entry's sentences), spliced after the Canvas group as the clip rows are. The header's "sharing no hoisted local" was false by ONE, `ticks`, which `fileTools(ticks:)` takes as an argument |
 | `CompositionBuilder.swift` | 577 after #34's pure move | Was AT the cap (601) since road map 3's held tail (+83); #34 paid first and alone — the audio loop of `build` and `fill`'s source resolution moved to `CompositionBuilder+AudioTracks.swift` (159 with the format families), a pure move gated before the families landed. `audioParameters` stays here; it is the next cut |
-| `ReelOps.swift` | 925 | Created by `b410125` at 853. It is a TABLE — one factory per row of `edit.rs`'s op table — so it has the same standing exemption `edit.rs` has on the Rust side |
+| `ReelOps.swift` | 925 | Created by `edbeb2e` at 853. It is a TABLE — one factory per row of `edit.rs`'s op table — so it has the same standing exemption `edit.rs` has on the Rust side |
 | `ProjectDocument.swift` | 1348 | Stored properties cannot move to an extension; the natural cut is the media/reverse machinery, NOT the scope. `ProjectDocument+DisplayStem.swift` is the shape a pure addition takes meanwhile; road map 3 added ONE internal method (`adoptImported`, +12 lines) so `ProjectDocument+Recording.swift` could build the untitled document by File ▸ Open's own spelling |
 | `TimelineView.swift` | 1652 | Frozen. Of the five lines the cache marker added, one is behaviour (the hit-clearing under `replaced`); the marquee's `.outside` case and `beginMarquee` added fourteen net on 2026-09-19, and road map 7 §10's phase C eight more for `sourceTime`'s reversed arm on 2026-09-20 — the dispatch the file says it holds |
 | `ExporterWriter.swift` | 1096 after road map 10's G3c | Over since phase 7; its seam — the settings/encoder half — is still unpaid |
@@ -574,8 +574,8 @@ the probe and the proof grew again in that pass, 5182 → 5202 and 1934 →
 1982.)
 
 **None of this is work on its own.** It is the list a feature phase consults
-so it pays the toll first and alone, the way `d69de99`, `b410125` and
-`3e5b598` did.
+so it pays the toll first and alone, the way `b189ac3`, `edbeb2e` and
+`302d03b` did.
 
 ---
 
@@ -610,7 +610,7 @@ product cap.
 
 **Road map 9's phase 1, the selected action (2026-09-23, `wc -l`; road map
 9 §2).** Four over-cap files paid or took the tolls the phase's spec set,
-each measured against `87aa425`: `app/Sources/ProjectDocument.swift`
+each measured against `77b96ee`: `app/Sources/ProjectDocument.swift`
 1352 → **1368** (+16 of the +20 allowed: the two stored properties of the
 sixth piece of view state, `selection`'s new `didSet`, the sync call in
 `playhead`'s, and the two clamp lines above `clampViewState`'s playhead
@@ -812,7 +812,7 @@ The instruments, exempt: `tools/proof/graphics_store_probe.swift` **415**,
 `graphics_store_probe.py` **317** and `graphics_store_proof.py` **281**, new.
 
 **A graphic clip drawn (road map 10's G3b, 2026-09-25, `wc -l` against
-`7bf518c`).** No toll: every ledger file took only the lines the spec
+`76e0404`).** No toll: every ledger file took only the lines the spec
 allowed it. `ProjectSnapshot.swift` **2309 → 2313** (`case graphic`, its
 decode and encode dispatch lines, its `cacheHash` arm; the bodies are in
 `ProjectSnapshot+Graphic.swift` **88 → 130**). `Compositor.swift` **1391 →
@@ -837,7 +837,7 @@ cache as a `Pool` struct, with graphics given their own six-entry pool),
 → 1016** and `op_catalog_proof.py` **500 → 505**.
 
 **A failing graphic, its export gate and pin (road map 10's G3c,
-2026-09-25, `wc -l` against `b29d981`).** One toll, a pure move landed and
+2026-09-25, `wc -l` against `1730874`).** One toll, a pure move landed and
 gated alone first (`make typecheck` 0 errors and the 7 baseline warnings,
 `make app` succeeded): `Exporter.ExportError` from `Exporter.swift` to the
 new `ExporterErrors.swift`, **609 → 539** and **74**. Then the feature:
@@ -859,7 +859,7 @@ its paragraph went). Under the cap: `AgentServer+Render.swift` **563 →
 `tools/proof/graphics_pin_probe.swift` **146**, new.
 
 **The Graphic sub-tab (road map 10's G5a, 2026-09-25, `wc -l` against
-`f0e3472`).** One toll, a pure move landed and gated alone first (`make
+`24ff931`).** One toll, a pure move landed and gated alone first (`make
 typecheck` 0 errors and the 7 baseline warnings; the patch is the
 pipeline's `step1-move.patch`, touching the two files and nothing else):
 `timingSection`, `reverseTimingSection` and `reverseRows` went verbatim from
@@ -880,7 +880,7 @@ and `graphics_inspector_probe.swift` **447**, both new, and
 store.
 
 **What G5b did to it (road map 10's G5b, the menus and templates,
-2026-09-25, `wc -l` against `2317a18`).** No toll: every file it touched
+2026-09-25, `wc -l` against `c26566a`).** No toll: every file it touched
 stayed under the cap, and it added nothing over it. The FROZEN
 `EditorViewController.swift` **1127 → 1128** (one validator line, its row
 above). `AppDelegate+Menus.swift` **549 → 561** — the closest to the cap
@@ -902,7 +902,7 @@ instruments, exempt: `tools/proof/graphics_menu_probe.swift` **321** and
 (W1).
 
 **What the playhead-echo fix did to it (2026-09-26, `wc -l` against
-`f7dd9e3`).** `Playback.swift` was **600**, AT the cap, so it paid a toll
+`4f18f0b`).** `Playback.swift` was **600**, AT the cap, so it paid a toll
 first, a pure move gated alone: the level meter's three functions went to
 `Playback+Meter.swift`, **new, 60**, and `Playback.swift` went **600 →
 546**. The fix then took it **546 → 598**, back under the cap by two lines;
@@ -939,7 +939,7 @@ and the closing above added the rest.
   the error card in the live preview, a slower machine or a heavier graphic.
   **A timeline of ONLY graphics now plays** (road map 10 §10.8, FIXED
   2026-09-25; `tools/proof/media_less_playback_probe.py` 32/32 on the
-  editor's own player, 8/32 over cadc45d). Still for the person: open the
+  editor's own player, 8/32 over 65bcb75). Still for the person: open the
   three playback-check projects (`tools/proof/work/playback-check/`) with
   NO video beneath them, then watch that the preview shows the graphics,
   that Play runs rather than beeps, and that scrubbing and a loop over an
@@ -1422,7 +1422,7 @@ and the closing above added the rest.
 
 ## 5. Where a third road map would start
 
-**Road map 10, graphics (MERGED into `main` 2026-09-25, road map 10 §10.10; G0 spiked 2026-09-24, G1 the engine BUILT 2026-09-24/25; G2 the model BUILT 2026-09-25; G3 the picture BUILT 2026-09-25; G4 the agent BUILT 2026-09-25; G5 the person BUILT 2026-09-25; G6 deferred by the user 2026-09-25 — no stutter at 4K on an M2 Max).** The user asked for Remotion-style motion graphics: a clip whose JavaScript module, in the package's `graphics/` folder, returns SVG per frame, written mostly by an agent over MCP. `designs/reelcut-roadmap-10.md` is the design, reviewing the user's input plan `designs/svg-motion-components-plan.md` in its §1. **Its spike G0 ran complete** (§10.1, instruments in `tools/proof/graphics_spike/`, all nine rows `run`, `core/` and `app/` back at `c874069`): `rquickjs` 0.14 vendors quickjs-ng 0.16.2 and takes §5c's module verbatim; the engine builds into the one staticlib with `make test` only 1.12× slower warm (no cargo feature), at +18 s per cold build, +11.8 MB of staticlib and +7.2 MB of app binary that the linker keeps even with nothing calling it; the six sample graphics cost a worst p95 of 7.62 ms per frame at 1080p (so G6 is not owed; 4K full-frame fills reach 26 ms); 864 renders across 8 threads in shuffled orders matched byte for byte, and the on-purpose module-level-counter mutant was caught (137 mismatches); eighteen sandbox cases each answered in words with the process alive (four of them, `constructor` routes back to the wall clock and to compiling code from strings, added and closed after G0's review); `measureText` must answer the INK box as well as the advance, a font family the set lacks draws nothing, and `Source Sans 3` must be quoted; a directory `DispatchSource` raises `.write` (never `.rename`) and misses in-place saves, and only CREATING a folder inside an open package trips "changed by another application". §3a lists every section a row rewrote. **G1 (the engine) starts from road map 10 §9a**, which lists what each later phase must carry from G0, and from those rewritten sections: `raster-images` on, `serde_json` with `preserve_order`, the `ReelCore.swift` toll first (§5e), and the spike's `src/runtime.rs`, `raster.rs` and `stdlib.js` as the working reference for `graphic/`. Its decisions G-1 to G-13 are proposals until the phase that needs each copies it into spec §11; G-1 and G-2 amend spec §1's plugin non-goal and §7's pixel rule. **G1 is BUILT** (road map 10 §10.4, G1a–G1d): the `graphic/` crate (resvg drawing, QuickJS runtime, sandbox, standard library), linked into the core through `core/src/ffi_graphic.rs` alone, with nine `rc_graphic_*` exports, their `ReelCore.swift` wrappers, `docs/graphics-api.md` evaluated by a test, and `tools/proof/graphics_ffi_probe.py` (9/9); the app binary grew 12 661 536 → 20 596 752 bytes; spec §11 holds G-1, G-2 and G-5. Linking `graphic` unified `serde_json`'s `preserve_order` into the core, so `content_hash` now sorts before it hashes. Nothing a person sees exists yet. **G2 (the model, format version 10) is next**, from road map 10 §5g and §4. **G2a is BUILT** (road map 10 §10.5): `Source::Graphic`, `Clip.graphic` and format version 10, the ops `add_graphic_clip` and `set_graphic` in the core (props checked against the schema the op carries, a colour normalised to hex, the 64-key limit on the stored map, the props order kept), the app decoding a graphic clip, and spec §11 G-3, G-4, G-12 and G-13; the two ops sit in `AgentServer.opsWithoutTools` until G3 writes their tools. Owed from it: `tools/proof/op_catalog_proof.py:282` (`len(ops) == 57 and ops <= tools`) FAILS from G2a until G3 adds the two tools; `tools/proof/words_core_proof.py` hard-codes the format version (moved 9/10 → 10/11 by G2a) where it should read the header's `RC_FORMAT_VERSION` as `phase9_proof.py:168-173` does; named CSS colours and `hsl()` in a `color` prop. **G2b is BUILT, and G2 is closed** (road map 10 §10.5): `split` gives a graphic's second half `in + cut` and pins both halves' `length` to the original's effective length, `trim_start` and `roll` advance `in` with no head bound, `trim_end` leaves `length` alone, `set_action_end` refuses `graphic` in G-10's sentence, and the recipe publishes a graphic layer (`recipe_graphic.rs`: `frame`, the engine's `ctx`, the stored props and a hash over all of them); spec §11 now holds G-6 to G-11, G-9 with G2b's three decisions G-9·a/b/c. Owed from G2b: `add_transition`'s handle form extends a graphic's head without moving `graphic.in`; a canvas rate change does not re-snap `in`/`length`. **G3 (the picture) is BUILT** (road map 10 §10.6, G3a–G3c): the package's `graphics/` folder with its store and watcher; a graphic clip drawn from the registry's compiled set, with `add_graphic_clip` and `set_graphic` as tools; and failure and export — a graphic that fails draws its error card, `render_frame` names every graphic that warned or failed in the frame, an export refuses a module that does not compile before it starts and stops at the first frame that fails with no file left, and every export and offline frame PINS the document's compiled set as it was when asked (queued jobs included). G3c also fixed a crash the export's Cancel button had since phase 7 (`ExportWriter.cancel` cancelled the reader under a running pump; road map 10 §10.6 G3c). Owed from G3: the playback check (§4 above); a nest inside a nest is not reached by the export gate; the loudness measurement's own cancel still cancels its reader from main (`Exporter.cancel`); and G3b's list (the frozen `AgentServer.swift`'s numerals, `words_core_proof.py`'s version literal, `add_transition`'s handle form). **G4 (the agent) is BUILT** (road map 10 §10.7, G4a and G4b): the six app-state tools of §5h — `graphic_reference`, `write_graphic`, `get_graphic`, `render_graphic` (a contact sheet of up to 16 frames with no clip, or one frame's SVG), `import_graphic_font` and `import_graphic_asset` — and `get_project`'s `graphics`, proved end to end by `graphics_proof.py` (39 rows, the loop of §5h in one). The FFI has ten exports: G4b's `rc_graphic_library_families` answers the engine's own family names, because CoreText and fontdb disagree on 13 of 2500 font files on this host. After G4 an agent can make a motion graphic end to end. **G5a is BUILT** (road map 10 §10.9, 2026-09-25): the Clip tab's Graphic sub-tab — Source (module, file, revision, Open/Reveal/Duplicate, the compile's and the first frame's diagnostics), Properties (one row per schema key in the module's order, stale keys dimmed with ⌫, Reset writes `null`), Size and Timeline — proved by `tools/proof/graphics_inspector_proof.py` (50 rows). **G5b is BUILT, and G5 is closed** (road map 10 §10.9, 2026-09-25): Insert ▸ Graphic (the six bundled templates, copied into the app's `GraphicTemplates/`, and From File…; `write_graphic` then `add_graphic_clip`, one undo step, spec §11 G-16), File ▸ Add Font to Graphics… and Add Image to Graphics… (the two imports' own body), Help ▸ Graphics Reference, and G4b's watcher library gap closed in `GraphicStore.drain()` (a library change posts with no module names; `catchUpLibrary` deleted) — proved by `tools/proof/graphics_menu_proof.py` (14 rows) and `graphics_proof.py`'s W1 (40 rows). **G6 is deferred** (2026-09-25): the user played several graphics at 4K and saw no performance issues, on an M2 Max with 96 GB and simple graphics; noted, not scheduled (road map 10 §9). **Merged into `main` 2026-09-25** at the user's word (road map 10 §10.10). Owed from G5: G5a's and G4b's nits (road map 10 §10.9). Insert ▸ Graphic into an empty document now lands a clip that plays (the fix below). **The export Cancel button could crash `main`** (12 of 30 mid-export cancels on expensive 4K frames, since road map 2's phase 7); G3c fixed it on `svg-motion` (3a5df08), and it reached `main` with the merge (kpgalligan/reelcut#38, road map 10 §10.10). **FIXED (2026-09-25): a timeline of ONLY graphics, text, shapes or images now plays.** Before, there was no preview and Play beeped. `Playback.startRebuild` dropped the player item when the plan had no video or audio track, and those clips never get one, so the builder's `Blank.mp4` placeholder was never reached. That was a defect since the first commit, and not only graphics'. The guard now drops the item only for a plan of duration 0, the empty timeline, which still beeps. `tools/proof/media_less_playback_probe.py` reads the editor's own player and scores 32/32 at the fix and 8/32 over cadc45d's sources. Road map 10 §10.8 has the record. The person's watched re-check of the playback-check projects with no video beneath them is owed (§4 above).
+**Road map 10, graphics (MERGED into `main` 2026-09-25, road map 10 §10.10; G0 spiked 2026-09-24, G1 the engine BUILT 2026-09-24/25; G2 the model BUILT 2026-09-25; G3 the picture BUILT 2026-09-25; G4 the agent BUILT 2026-09-25; G5 the person BUILT 2026-09-25; G6 deferred by the user 2026-09-25 — no stutter at 4K on an M2 Max).** The user asked for Remotion-style motion graphics: a clip whose JavaScript module, in the package's `graphics/` folder, returns SVG per frame, written mostly by an agent over MCP. `designs/reelcut-roadmap-10.md` is the design, reviewing the user's input plan `designs/svg-motion-components-plan.md` in its §1. **Its spike G0 ran complete** (§10.1, instruments in `tools/proof/graphics_spike/`, all nine rows `run`, `core/` and `app/` back at `fbb881f`): `rquickjs` 0.14 vendors quickjs-ng 0.16.2 and takes §5c's module verbatim; the engine builds into the one staticlib with `make test` only 1.12× slower warm (no cargo feature), at +18 s per cold build, +11.8 MB of staticlib and +7.2 MB of app binary that the linker keeps even with nothing calling it; the six sample graphics cost a worst p95 of 7.62 ms per frame at 1080p (so G6 is not owed; 4K full-frame fills reach 26 ms); 864 renders across 8 threads in shuffled orders matched byte for byte, and the on-purpose module-level-counter mutant was caught (137 mismatches); eighteen sandbox cases each answered in words with the process alive (four of them, `constructor` routes back to the wall clock and to compiling code from strings, added and closed after G0's review); `measureText` must answer the INK box as well as the advance, a font family the set lacks draws nothing, and `Source Sans 3` must be quoted; a directory `DispatchSource` raises `.write` (never `.rename`) and misses in-place saves, and only CREATING a folder inside an open package trips "changed by another application". §3a lists every section a row rewrote. **G1 (the engine) starts from road map 10 §9a**, which lists what each later phase must carry from G0, and from those rewritten sections: `raster-images` on, `serde_json` with `preserve_order`, the `ReelCore.swift` toll first (§5e), and the spike's `src/runtime.rs`, `raster.rs` and `stdlib.js` as the working reference for `graphic/`. Its decisions G-1 to G-13 are proposals until the phase that needs each copies it into spec §11; G-1 and G-2 amend spec §1's plugin non-goal and §7's pixel rule. **G1 is BUILT** (road map 10 §10.4, G1a–G1d): the `graphic/` crate (resvg drawing, QuickJS runtime, sandbox, standard library), linked into the core through `core/src/ffi_graphic.rs` alone, with nine `rc_graphic_*` exports, their `ReelCore.swift` wrappers, `docs/graphics-api.md` evaluated by a test, and `tools/proof/graphics_ffi_probe.py` (9/9); the app binary grew 12 661 536 → 20 596 752 bytes; spec §11 holds G-1, G-2 and G-5. Linking `graphic` unified `serde_json`'s `preserve_order` into the core, so `content_hash` now sorts before it hashes. Nothing a person sees exists yet. **G2 (the model, format version 10) is next**, from road map 10 §5g and §4. **G2a is BUILT** (road map 10 §10.5): `Source::Graphic`, `Clip.graphic` and format version 10, the ops `add_graphic_clip` and `set_graphic` in the core (props checked against the schema the op carries, a colour normalised to hex, the 64-key limit on the stored map, the props order kept), the app decoding a graphic clip, and spec §11 G-3, G-4, G-12 and G-13; the two ops sit in `AgentServer.opsWithoutTools` until G3 writes their tools. Owed from it: `tools/proof/op_catalog_proof.py:282` (`len(ops) == 57 and ops <= tools`) FAILS from G2a until G3 adds the two tools; `tools/proof/words_core_proof.py` hard-codes the format version (moved 9/10 → 10/11 by G2a) where it should read the header's `RC_FORMAT_VERSION` as `phase9_proof.py:168-173` does; named CSS colours and `hsl()` in a `color` prop. **G2b is BUILT, and G2 is closed** (road map 10 §10.5): `split` gives a graphic's second half `in + cut` and pins both halves' `length` to the original's effective length, `trim_start` and `roll` advance `in` with no head bound, `trim_end` leaves `length` alone, `set_action_end` refuses `graphic` in G-10's sentence, and the recipe publishes a graphic layer (`recipe_graphic.rs`: `frame`, the engine's `ctx`, the stored props and a hash over all of them); spec §11 now holds G-6 to G-11, G-9 with G2b's three decisions G-9·a/b/c. Owed from G2b: `add_transition`'s handle form extends a graphic's head without moving `graphic.in`; a canvas rate change does not re-snap `in`/`length`. **G3 (the picture) is BUILT** (road map 10 §10.6, G3a–G3c): the package's `graphics/` folder with its store and watcher; a graphic clip drawn from the registry's compiled set, with `add_graphic_clip` and `set_graphic` as tools; and failure and export — a graphic that fails draws its error card, `render_frame` names every graphic that warned or failed in the frame, an export refuses a module that does not compile before it starts and stops at the first frame that fails with no file left, and every export and offline frame PINS the document's compiled set as it was when asked (queued jobs included). G3c also fixed a crash the export's Cancel button had since phase 7 (`ExportWriter.cancel` cancelled the reader under a running pump; road map 10 §10.6 G3c). Owed from G3: the playback check (§4 above); a nest inside a nest is not reached by the export gate; the loudness measurement's own cancel still cancels its reader from main (`Exporter.cancel`); and G3b's list (the frozen `AgentServer.swift`'s numerals, `words_core_proof.py`'s version literal, `add_transition`'s handle form). **G4 (the agent) is BUILT** (road map 10 §10.7, G4a and G4b): the six app-state tools of §5h — `graphic_reference`, `write_graphic`, `get_graphic`, `render_graphic` (a contact sheet of up to 16 frames with no clip, or one frame's SVG), `import_graphic_font` and `import_graphic_asset` — and `get_project`'s `graphics`, proved end to end by `graphics_proof.py` (39 rows, the loop of §5h in one). The FFI has ten exports: G4b's `rc_graphic_library_families` answers the engine's own family names, because CoreText and fontdb disagree on 13 of 2500 font files on this host. After G4 an agent can make a motion graphic end to end. **G5a is BUILT** (road map 10 §10.9, 2026-09-25): the Clip tab's Graphic sub-tab — Source (module, file, revision, Open/Reveal/Duplicate, the compile's and the first frame's diagnostics), Properties (one row per schema key in the module's order, stale keys dimmed with ⌫, Reset writes `null`), Size and Timeline — proved by `tools/proof/graphics_inspector_proof.py` (50 rows). **G5b is BUILT, and G5 is closed** (road map 10 §10.9, 2026-09-25): Insert ▸ Graphic (the six bundled templates, copied into the app's `GraphicTemplates/`, and From File…; `write_graphic` then `add_graphic_clip`, one undo step, spec §11 G-16), File ▸ Add Font to Graphics… and Add Image to Graphics… (the two imports' own body), Help ▸ Graphics Reference, and G4b's watcher library gap closed in `GraphicStore.drain()` (a library change posts with no module names; `catchUpLibrary` deleted) — proved by `tools/proof/graphics_menu_proof.py` (14 rows) and `graphics_proof.py`'s W1 (40 rows). **G6 is deferred** (2026-09-25): the user played several graphics at 4K and saw no performance issues, on an M2 Max with 96 GB and simple graphics; noted, not scheduled (road map 10 §9). **Merged into `main` 2026-09-25** at the user's word (road map 10 §10.10). Owed from G5: G5a's and G4b's nits (road map 10 §10.9). Insert ▸ Graphic into an empty document now lands a clip that plays (the fix below). **The export Cancel button could crash `main`** (12 of 30 mid-export cancels on expensive 4K frames, since road map 2's phase 7); G3c fixed it on `svg-motion` (88c78b3), and it reached `main` with the merge (kpgalligan/reelcut#38, road map 10 §10.10). **FIXED (2026-09-25): a timeline of ONLY graphics, text, shapes or images now plays.** Before, there was no preview and Play beeped. `Playback.startRebuild` dropped the player item when the plan had no video or audio track, and those clips never get one, so the builder's `Blank.mp4` placeholder was never reached. That was a defect since the first commit, and not only graphics'. The guard now drops the item only for a plan of duration 0, the empty timeline, which still beeps. `tools/proof/media_less_playback_probe.py` reads the editor's own player and scores 32/32 at the fix and 8/32 over 65bcb75's sources. Road map 10 §10.8 has the record. The person's watched re-check of the playback-check projects with no video beneath them is owed (§4 above).
 
 **Road map 9, the clip inspector redesign, is COMPLETE (phases 1, 2, 3a
 and 3b 2026-09-23, phases 4 and 5 2026-09-24; road map 9 §2, §4, §6, §8,
@@ -1547,7 +1547,7 @@ while playing, and a restore that rests off the tick last reported once.
 The record, the baseline's failing rows and what is owed are
 `designs/reelcut-app-notes.md`, "The playhead echo, 2026-09-26 —
 Playback's own seeks"; `tools/proof/playhead_echo_probe.py` scores 20/20
-at the fix and 13/20 over f7dd9e3's sources. A look at the machine is §4's.
+at the fix and 13/20 over 4f18f0b's sources. A look at the machine is §4's.
 
 **Bounded recovery after a lost AssemblyAI submit reply (#28).** R6-14 reads
 only the newest page of 200 transcripts at most three times. An outage,
@@ -2085,4 +2085,4 @@ above the table before the change (first run 40–50 s, then ~9 s and
    that cannot be closed by writing code.
 2. **§3** is consulted, not done.
 3. **§5** is a decision, and the user's.
-4. **§6** landed 2026-09-19, committed as `2d69fa4`.
+4. **§6** landed 2026-09-19, committed as `af5907c`.

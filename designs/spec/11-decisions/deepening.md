@@ -579,7 +579,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   **Why accepted:** each is a cache — regenerable, never required to open
   (§5.6) — lost or stale for at most the session, and each window is
   bounded by a save or by the two limits. The review's two nits are not
-  limits: they landed in f5571fd (issue batch B29) — `awaitPass` cancels
+  limits: they landed in 9cfa035 (issue batch B29) — `awaitPass` cancels
   its sleeper (`cache_pass_probe.py` W1, mutant `no-cancel-sleeper`) and
   the doc lines say one CURRENT pass per key. **The bound it keeps by
   design:** a relink away from a stuck pass starts only after the full
@@ -1329,7 +1329,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   blocking answer as it is.
 - **#336 — A composition audio track none of whose segments has a source
   (missing media, a pending reverse, a pending ramp render) holds bundled
-  silence over [0, its last segment's end).** Measured at 3aa92f7
+  silence over [0, its last segment's end).** Measured at bb73b35
   (`tools/proof/missing_audio_proof.py --baseline`): with one audio track
   whose only clip's media file is missing, or whose reverse is pending, and
   no other track that sounds, both `audio_wav` and `prores_422` failed with

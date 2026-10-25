@@ -1,10 +1,10 @@
 # Build velocity (issue batch B88)
 
 - **Status:** Built and closed 2026-10-08. Each phase was one litecode pipeline with its own review:
-  - 1a, `make typecheck` in batch mode and the probe builder (`edeba18`)
-  - 1b, every proof through the probe builder, and its guard (`724250e`)
-  - 2, the Debug app, its identity and the stale refusal (`6e74f26`)
-  - 3, Debug against Release, the qualification, the default flips to Debug (`ab24de4`)
+  - 1a, `make typecheck` in batch mode and the probe builder (`e9b6138`)
+  - 1b, every proof through the probe builder, and its guard (`dcde997`)
+  - 2, the Debug app, its identity and the stale refusal (`0576acf`)
+  - 3, Debug against Release, the qualification, the default flips to Debug (`0b380d2`)
   - 4, `make gate`, the Verification rule, the close (uncommitted when this was written)
 - **Original:** `archive/build-velocity.md` (623 lines) is the full record. It has no section numbers, so it is cited by section name: "orig Record ▸ Phase 2" is its "Record" section's phase 2 entry.
 - **Spec decisions:** V-4 and V-5 in spec §11 (`designs/spec/11-decisions/dev-tools.md`). They stay binding, and where the original words them differently, §11's text wins:

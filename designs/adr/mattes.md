@@ -1,11 +1,11 @@
 # The matte track (road map "mattes", issue batch B89, #240)
 
 - **Status:** Built and closed 2026-10-08. Each phase was one litecode pipeline with its own review:
-  - MT0, the decisions and the spike (`ee05bff`)
-  - MT1, three pure moves to make room (`464a3aa`)
-  - MT2, the matte end to end over MCP (`bead60f`)
-  - MT3, nests, dissolves, shadow, reflection, Preview Quality, every export (`763cbd1`)
-  - MT4, the chrome (`8843261`)
+  - MT0, the decisions and the spike (`745a36a`)
+  - MT1, three pure moves to make room (`63f1524`)
+  - MT2, the matte end to end over MCP (`a3c54d3`)
+  - MT3, nests, dissolves, shadow, reflection, Preview Quality, every export (`a8ec753`)
+  - MT4, the chrome (`b333661`)
   - MT5, documents, the spike against the tree, the close (uncommitted when this was written)
 - **Original:** `archive/mattes.md` (548 lines) is the full record. It has no section numbers, so it is cited by phase: "orig MT2" is its "MT2" section.
 - **Spec decisions:** MT-1..MT-7 in spec §11 (`designs/spec/11-decisions/mattes.md`). They stay binding, and where the original words them differently, §11's text wins:

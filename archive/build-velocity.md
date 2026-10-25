@@ -96,7 +96,7 @@ section "The probe builder (swift_build.py)".
 **Timings** (one session, 12 logical cores; the 1-minute load average at
 start → end; another session shared the machine throughout):
 
-| command | before (HEAD fe22fac) | after | load |
+| command | before (HEAD 75a99c2) | after | load |
 |---|---|---|---|
 | `make typecheck`, clean | 81 s (tsc ≈ 1 s of it) | 3.4 s, the same four warnings | 3.7 → 3.1; 2.1 → 2.6 |
 | typecheck line over a scratch copy with one type error | 17 s, exit 1, the error named | 3.2 s, exit 1, the error named | 3.3 → 3.0; 2.7 |
@@ -200,7 +200,7 @@ lacks them. `swift_build.py` is 445 lines with the guard (1a's spec held it
 to 400; CLAUDE.md holds proof instruments to neither cap).
 
 **Verified.** `swift_build.py --selftest` 9/9 `PASS` (G1 lists nothing;
-over HEAD edeba18's `tools/proof`, the same scan names exactly the 68).
+over HEAD e9b6138's `tools/proof`, the same scan names exactly the 68).
 
 - **The 56 not run whole**, by a throwaway driver (`work/b88/build_each.py`,
   not committed) that imports each script in a child of its own and calls its
@@ -212,7 +212,7 @@ over HEAD edeba18's `tools/proof`, the same scan names exactly the 68).
   Each cold build took 14–22 s at load 6–29; `speed_limits_probe.py`'s `-O`
   whole-module build 99 s (that line was already serial: 108 s recorded on
   2026-10-01).
-- **The 12 changed since 7da4b1c, whole**, once, against the Release build:
+- **The 12 changed since 6b48547, whole**, once, against the Release build:
   agent_open_proof 15/15; cloud_captions_probe 863/865 with 3 skipped by
   name, exit 1, as recorded on 2026-10-06 (SP3, SP4·off and row W's
   baseline: historical trees that no longer build against today's header);
@@ -366,7 +366,7 @@ re-sign the executable and rewrite `agent-catalog.json`, so a build where
 nothing else changed skips it, and the bundle kept the step's ad-hoc
 signature: no entitlements (no `audio-input`, so no microphone) and a seal
 that `codesign --verify --deep --strict` rejects (`file modified:
-…/agent-catalog.json`). It is HEAD's: a `tree_copy` copy of 724250e with
+…/agent-catalog.json`). It is HEAD's: a `tree_copy` copy of dcde997 with
 HEAD's `project.yml`, `Makefile` and `VERSION` passed its first `make dist`
 (161 s, 24/24 and 16/16), and the second (5 s) failed D14 with both apps
 unverifiable. The implementer's two `make dist` runs passed only because
@@ -490,7 +490,7 @@ stderr empty but a `swift_build:` line, no `DEFAULTS MOVED`):
 | paste_graphic_proof | 8/8 | 8/8 | 1 s |
 | container_import_proof | 16/16 | 16/16 | 8 s |
 | word_looks_sheet_proof | 9/9 | 9/9 | 3 s |
-| word_looks_proof | 16/16 | 16/16; B1's 41 frames equal the digests recorded on Release from `d8fa4fa` | 4 s |
+| word_looks_proof | 16/16 | 16/16; B1's 41 frames equal the digests recorded on Release from `c0ba615` | 4 s |
 | hevc_alpha_proof | 30/30 | 30/30 | 16 s |
 | agent_socket_proof | 17/17 (135 s) | 17/17 | 27 s (15 s probe build) |
 | export_cancel_proof `--runs 3` | 7/7 (256 s) | 7/7 | 137 s (15 s probe build; M rows time the probe, not the app) |
@@ -605,7 +605,7 @@ restored byte-for-byte with `cp` and `cmp`):
 | unchanged, the final tree | none | PASS 0.37 s wall |
 
 **Headline timings on the final tree** (load in brackets; before = phase
-1a's at fe22fac, or no Debug app):
+1a's at 75a99c2, or no Debug app):
 
 | Command | Before | After |
 |---|---|---|

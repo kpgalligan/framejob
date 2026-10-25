@@ -156,7 +156,7 @@ are `framework` rows, read and not run.
 
 ## Runs
 
-**B58, 2026-10-01**, over HEAD `69fa216` with the three bare run-loop waits
+**B58, 2026-10-01**, over HEAD `24d7b00` with the three bare run-loop waits
 (`probe_sheets.swift` :160 and :185, `probe_well.swift` :132) changed to
 `ProbeSupport.pump()`, run once as
 `perl -e 'alarm shift; exec @ARGV' 2700 python3 tools/proof/capture_spike/capture_spike.py --rebuild`
@@ -192,7 +192,7 @@ presentError 5, runModal 6`.
 I4 was a control failure, and the checker was not at fault. `i4` removed
 the first site in sorted order, `app/Sources/AppDelegate.swift:121`, and
 expected exactly one I1 report and one I2 report. But `terminate:`'s `note`
-cites that same site by its SITE ref (added in `c5504fe`, after V1's run), so
+cites that same site by its SITE ref (added in `7c9bdf9`, after V1's run), so
 I3 also reported, correctly, that the citation now dangled.
 
 **The I rows brought up to the grown inventory, 2026-10-01.** `i4` now
@@ -212,7 +212,7 @@ this run's.
 
 After the change, `inventory.py --check` prints 5/5 and exits 0.
 
-**#132's foreground run, 2026-10-02**, over HEAD `7faf625`, run once as
+**#132's foreground run, 2026-10-02**, over HEAD `794376b`, run once as
 `perl -e 'alarm shift; exec @ARGV' 900 python3 tools/proof/capture_spike/capture_spike.py --rebuild`
 from the agent's shell, with the owner away from the Mac, the display on and
 the terminal running the agent session left in front.
@@ -235,7 +235,7 @@ is unmeasured: since macOS 14, `NSApp.activate()` is a request that the
 frontmost app must yield to (`yieldActivation`), and a child process of a
 terminal's shell is not handed activation the way V1's runs were.
 
-**B70's direct run and bundle check, 2026-10-02**, over HEAD `4d9b80a` plus
+**B70's direct run and bundle check, 2026-10-02**, over HEAD `0ec95d9` plus
 issue batch B70 (the bundle, the routes, `ProbeAppDelegate`, the fonts
 through `ProjectDocument.bundledFontsDirectory`, the `activation` mode). The
 agent launched nothing over the bundle route. First
@@ -264,7 +264,7 @@ and L7. S1a–S3 and A1–A7 skip with `host: probe not active`, which is what
 the direct route is expected to give: S0 `active False in None ms, key False,
 main False`, A0 `active False in None ms, key False`.
 
-**The bundle-route runs, 2026-10-02,** over HEAD `fca4978`, after the owner
+**The bundle-route runs, 2026-10-02,** over HEAD `74b7c75`, after the owner
 paused another session's UI tests and said they were away and the Mac could
 take focus.
 

@@ -3,7 +3,7 @@
 // over every other file in `app/Sources` through `swift_build.build(…,
 // optimize=True)`, for the app's own types: it fills the app's `LayerUniforms`
 // and hands the shader its first 104 floats (416 bytes, asserted below — the
-// block the shader pinned at 4d742cc reads; the tree's own grew a tone group in
+// block the shader pinned at d58a580 reads; the tree's own grew a tone group in
 // grading GR2) followed by 16 grade floats (480 bytes, asserted),
 // builds its pipelines the way `MetalRenderer.pipelineDescriptor` does with
 // `MetalRenderer.workingFormat` (`rgba16Float`, spec §11 PR-1), and wraps #258's
@@ -187,7 +187,7 @@ struct GradeBlock {
 }
 
 /// The 104 floats every variant's shader reads before the grade: the block as
-/// it stood at 4d742cc, which ends at `canvasPerDestY`.
+/// it stood at d58a580, which ends at `canvasPerDestY`.
 let layerBytes = 416
 guard MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.canvasPerDestY) == layerBytes - 4,
     MemoryLayout<LayerUniforms>.stride >= layerBytes

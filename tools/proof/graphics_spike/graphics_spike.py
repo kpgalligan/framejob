@@ -120,7 +120,7 @@ def main():
             else:
                 before = rows_build.git_check()
                 if not before["clean"]:
-                    raise RuntimeError("core/ or app/ differs from c874069 before q9")
+                    raise RuntimeError("core/ or app/ differs from fbb881f before q9")
                 rows_build.patch(say)
             if "q9" in selected and answers["rows"].get("q1", {}).get("state") != "failed":
                 say("q9:")

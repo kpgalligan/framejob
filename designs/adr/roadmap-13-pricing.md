@@ -1,6 +1,6 @@
 # Pricing and spend (road map 13)
 
-- **Status:** Built and closed 2026-09-28. P1 the price table and the price function (`79a8b56`); P2 the helper prices every response (`0f0a442`); P3 the proofs' ledger and the monthly budgets (`86162c2`); P4 spend in the UI and the close (uncommitted when this was written). Each phase was one litecode pipeline; P2's review found five nits and P3's three, each fixed in its phase.
+- **Status:** Built and closed 2026-09-28. P1 the price table and the price function (`30b44fa`); P2 the helper prices every response (`ca3fe7e`); P3 the proofs' ledger and the monthly budgets (`2785978`); P4 spend in the UI and the close (uncommitted when this was written). Each phase was one litecode pipeline; P2's review found five nits and P3's three, each fixed in its phase.
 - **Original:** `archive/roadmap-13.md` (415 lines) is the full record. Sections cited below as "orig §x" refer to it.
 - **Spec decisions:** P-1..P-8 in spec §11 (`designs/spec/11-decisions/pricing.md`), which stay binding:
   - P-1: prices come from LiteLLM's table; only AssemblyAI's rate is hand-kept; Anthropic's page is the cross-check.

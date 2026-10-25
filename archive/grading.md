@@ -1,12 +1,12 @@
 # Road map "grading" — colour grading, tier 1, as an experiment on a branch
 
 **Opened 2026-10-09** (GR0, on main). The design brief this road map answers is
-`~/.claude/litecode/reelcut/grading/I-grading.md` (2026-10-09, tree `7ef96c5`);
+`~/.claude/litecode/reelcut/grading/I-grading.md` (2026-10-09, tree `335bc32`);
 it lives outside the repo, so everything a later phase needs from it is
 written here. Where the brief and this file differ, this file wins: the brief
-was written before the precision road map closed (`3cc61e7`,
+was written before the precision road map closed (`ab20ab5`,
 `designs/adr/precision.md`, spec §11 PR-1..PR-5) and before `LayerUniforms`
-left `Compositor.swift` (`7b80810`).
+left `Compositor.swift` (`179376d`).
 
 ## Goal
 
@@ -82,7 +82,7 @@ import, plus seeing, moved up from tier 2.
   the experiment; none is grading.
 
 What changed in the tree since the four issues were written (re-read at
-`3cc61e7`):
+`ab20ab5`):
 
 | The issues say | The tree |
 |---|---|
@@ -214,7 +214,7 @@ R5-5's spirit).
 
 ## The standard recipe, file by file
 
-Counts are `wc -l` at `3cc61e7`. The cap is ~600 lines, new files 400, frozen
+Counts are `wc -l` at `ab20ab5`. The cap is ~600 lines, new files 400, frozen
 files wiring only. `Compositor.metal` (1,691) is not on the ledger, so a shader
 split is a choice, not a toll.
 
@@ -237,7 +237,7 @@ split is a choice, not a toll.
 |---|---|---|
 | Snapshot | `ProjectSnapshot.swift` (**1,871**): `ColorAdjust`, `VideoProps`, `ClipSource`, `MediaKind`. | **Paid in GR1:** the composition plan out whole to `CompositionPlan.swift` (1,871 → 1,750). New grading types in a new `GradeProps.swift`. |
 | Recipe decode | `FrameRecipe.swift` (365). | No. |
-| Uniforms | `LayerUniforms.swift` (267; out of `Compositor.swift`, now 724, in `7b80810`). A tone group (12 floats) and a look group (4) take it from 104 to 120 floats, 480 bytes. | **No longer a toll** (paid). The three 416 assertions above move in the same change. |
+| Uniforms | `LayerUniforms.swift` (267; out of `Compositor.swift`, now 724, in `179376d`). A tone group (12 floats) and a look group (4) take it from 104 to 120 floats, 480 bytes. | **No longer a toll** (paid). The three 416 assertions above move in the same change. |
 | Fill and bind | `Compositor+Uniforms.swift` (152), `CompositorEffects.swift` (430), `Compositor+Dissolve.swift` (190, `drawLayer`: binds `texture(2)`). New `LookTextures.swift` (the 3D textures, the LRU, the bake). | No. |
 | Shader | `Compositor.metal`: steps 4c and 4d by GR0's route; `reelcut_adjust_fragment`, the eighth pipeline; the LUT at `texture(2)` with a placeholder. | A split into headers is optional; if made, one helper builds the shader for every instrument and lands on main first. |
 | Inspector | A seventh `ClipSubTab` case, `color` (`ClipPinnedBlock.swift`, 235); `ClipPane.makeSections()` (`ClipPane.swift`, 221) registers its sections (an unregistered section is invisible); `VideoPane.swift` (**959**) holds `colorSection`. New `VideoPane+Light.swift`, `VideoPane+Look.swift`. | **Paid in GR1 for `VideoPane.swift`:** `colorSection` to `VideoPane+Color.swift` (959 → 904), pure, before Light joins it. |
@@ -377,7 +377,7 @@ owner's; the numbers are what he decides with.
 | Measure | Cap | Measured (GR7a) |
 |---|---|---|
 | Frozen files | Wiring only; no frozen file grows by more than ~50 lines in total | `EditorViewController.swift` 1,139 → 1,142 (+3); the other four net 0: held. (L2) |
-| Files over the cap | None left unpaid | Held after the L3 payment (6f68daa): `ProjectSnapshot.swift` 1,750 → 1,570, `edit_clip.rs` 755 → 661, both paid by pure moves. GR7a had measured them at 1,769 and 757. (`grading_verdict.py sizes` L3) |
+| Files over the cap | None left unpaid | Held after the L3 payment (df40ac1): `ProjectSnapshot.swift` 1,750 → 1,570, `edit_clip.rs` 755 → 661, both paid by pure moves. GR7a had measured them at 1,769 and 757. (`grading_verdict.py sizes` L3) |
 | Inspector | One new sub-tab (Color) of at most four sections; Picture loses one section (Color) and gains none | Color added, 4 sections (Light, Color, Adjustment, Look); Picture lost Color and gained none: held. (L4) |
 | Menus | Clip ▸ Look ▸, Insert ▸ Adjustment Clip, View ▸ Show Ungraded, View ▸ Waveform; nothing else | 175 → 187 leaves: Clip ▸ Look ▸ (9: the eight and None), Insert ▸ Adjustment Clip, View ▸ Show Ungraded, View ▸ Waveform; none removed: held. (`measure` M1) |
 | An UNGRADED layer | At most +0.02 ms at 1080p and +0.06 ms at 4K over main, by the matte spike's method (the placeholder's 0.054 ms at 4K is the precedent) | +0.009 ms at 1080p, +0.002 ms at 4K (C0 noise 0.000 at both): held. (`grading_spike.py --measure --tree` TC) |
@@ -456,7 +456,7 @@ numstat (±50 %).
 | Phase | Where | What lands | Its proof holds |
 |---|---|---|---|
 | GR0 | main | This document; the spike against the tree's OWN shader: what tone and a 3D LUT cost an ungraded and a graded layer under three routes, the route chosen by a rule written beforehand; #258's biplanar measurement. | The spike's figures, host and power state named. |
-| GR1 | main | **Paid in GR1** (its record below): five pure moves, gated as one change with no grading code: `VideoPane.colorSection` → `VideoPane+Color.swift`; `ProjectSnapshot.swift`'s composition plan → `CompositionPlan.swift`; `AgentCatalog+Clips.swift`'s property rows and their vocabularies → `AgentCatalog+Properties.swift`; the Clip menu's submenu builders out of `AppDelegate+Menus.swift` → `AppDelegate+ClipMenus.swift`; `evaluate.rs` (590)'s composition plan → `plan.rs`, since GR4 must edit its exhaustive `Source` matches. (`LayerUniforms` already moved, `7b80810`.) | Renders byte-identical before and after; `make test` unchanged. |
+| GR1 | main | **Paid in GR1** (its record below): five pure moves, gated as one change with no grading code: `VideoPane.colorSection` → `VideoPane+Color.swift`; `ProjectSnapshot.swift`'s composition plan → `CompositionPlan.swift`; `AgentCatalog+Clips.swift`'s property rows and their vocabularies → `AgentCatalog+Properties.swift`; the Clip menu's submenu builders out of `AppDelegate+Menus.swift` → `AppDelegate+ClipMenus.swift`; `evaluate.rs` (590)'s composition plan → `plan.rs`, since GR4 must edit its exhaustive `Source` matches. (`LayerUniforms` already moved, `179376d`.) | Renders byte-identical before and after; `make test` unchanged. |
 | GR2 | branch | GR-1..GR-3 and GR-9 with README rows, then **tone**: the nine keys, ranges, defaults, the schema file, recipe keys, `core/tests/tone.rs`; uniforms, step 4c by GR0's route, the Color sub-tab (Color moved, Light added), `set_video`'s prose. The branch's format number. | `tone_proof.py` over MCP: defaults byte-identical to main's build on one fixture; +1 EV on a mid-grey card where linear-light doubling says (±1); temperature raises red and lowers blue; whites and blacks move only their ends; fade lifts black; `render_frame` = export frame; undo and redo; a banding fixture's distinct-level count recorded. Mutants: exposure in encoded space; tone before the obscure regions; the flag gate ignoring a negative value; a range check dropped. |
 | GR3 | branch | **Seeing**: the `ungraded` recipe option (View ▸ Show Ungraded, `render_frame {ungraded}`) and the luma waveform panel (View ▸ Waveform), its compute pass run only while shown. | The option's bytes = the ungraded bytes; an export ignores the view switch; a known ramp's waveform (a probe, no photograph); harness captures light and dark; a manual-check row. |
 | GR4 | branch | GR-6, then **adjustment clips**: `Source::Adjustment`, every `Source` match classified, `add_adjustment_clip`, the refusals, the recipe role, `core/tests/adjustment.rs`; the eighth pipeline (`reelcut_adjust_fragment`, blending OFF, reads `[[color(0)]]`, weights by the matte coverage), Insert ▸ Adjustment Clip, the clip body, the inspector (Color and Clip only), the MCP tool. | Grades both tracks behind and not the one in front; opacity 0.5 halfway; matted = inside only; on a matte track it grades the matte group; each refusal in its sentence; Preview Quality; every export row including the two alpha rows (the ALPHA channel over a transparent canvas); blending OFF (a mutant turning it on, caught only over a translucent destination). |
@@ -523,11 +523,11 @@ interim, tone-only figure.
 product code: nothing under `app/`, `core/`, `graphic/` or `designs/spec/`
 changed, and the spike's shaders exist only under `tools/proof/work/`. GR0
 records no §11 entry. The brief's "22 %" residue in `Compositor.metal` was
-already fixed by precision PR1 (`c66d8ab`): lines 922–924 say "about 24 %
+already fixed by precision PR1 (`914b56a`): lines 922–924 say "about 24 %
 (61/255)".
 
 **The instrument.** The tree's own `Compositor.metal` (1,691 lines, read from
-the working tree at `3cc61e7`) patched at anchors asserted once into V0 and
+the working tree at `ab20ab5`) patched at anchors asserted once into V0 and
 eight variants (VF-T, VF-TL, VC-T, VC-TL, VA-T, VA-TL, VE, VB; the folder
 README has each), compiled with `xcrun metal`, timed by a bench built over
 `app/Sources` with `swift_build.build(…, optimize=True)` (key
@@ -696,7 +696,7 @@ is the one the file's own banner drew. `place`, `segment_of`, `assign` and
 - Controls taken from the untouched tree before any edit, never by stashing.
   The Debug catalog was copied to `tools/proof/work/gr1/catalog-before.json`.
   `RC_PROOF_APP=release python3 tools/proof/word_looks_proof.py --only B1`
-  ran on the `bd5bb65` Release build: 3/3, B1 `moved: []`
+  ran on the `f6da385` Release build: 3/3, B1 `moved: []`
   (`tools/proof/work/gr1/b1-before.txt`).
 - `cd core && cargo test --release --test evaluate_tests` (55 passed),
   `--test matte` (8), `--test model_tests` (31) and `--test source_window`
@@ -717,7 +717,7 @@ is the one the file's own banner drew. `place`, `segment_of`, `assign` and
 - `RC_PROOF_APP=release python3 tools/proof/word_looks_proof.py --only B1`
   ran on the gate's Release build: 3/3, B1 `moved: []`, the same as the
   control (`tools/proof/work/gr1/b1-after.txt`). The 41 frames of fixture B
-  still match the digests recorded from `c66d8ab`.
+  still match the digests recorded from `914b56a`.
 - No mutants: a pure move adds no decision.
 
 **Owed.** Nothing from GR1. GR2 opens the `grading` branch. The next named
@@ -728,7 +728,7 @@ seams are in `designs/adr/app-file-history.md` and `core-file-history.md`:
 ## GR2 — the decisions and tone (2026-10-09, on the `grading` branch)
 
 **Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, cut from
-main at `4d742cc` (main had not moved, so no merge was due). The owner's
+main at `d58a580` (main had not moved, so no merge was due). The owner's
 answers to GR2's nine choices were "All as recommended" (2026-10-09).
 
 **What landed.**
@@ -762,7 +762,7 @@ answers to GR2's nine choices were "All as recommended" (2026-10-09).
   nine keys and ranges.
 - Instruments: `tone_proof.py` and `tone_probe.swift`; `phase8_chrome.py`'s
   size row (464); both spikes' benches hand their shader the first 104 floats,
-  and `grading_spike.py` reads the shader at `4d742cc`; `clip_inspector2`'s
+  and `grading_spike.py` reads the shader at `d58a580`; `clip_inspector2`'s
   T1/T2; the screen catalog's `05b-clip-color` and `05-clip-picture`'s prose;
   `phase9_proof.py`'s version loop over 1–`BRANCH_BASE_VERSION` and the
   current version. GRD-1 in `docs/manual-checks.md`; the README's Light bullet.
@@ -776,7 +776,7 @@ frozen file was touched. The inspector gained one sub-tab with
 two sections; Picture lost Color and gained nothing.
 
 **Measured.** Every run on 2026-10-09, Apple M2 Max, macOS 26.5.1, AC power.
-- The control: `make app` on the untouched worktree (main's `4d742cc` plus
+- The control: `make app` on the untouched worktree (main's `d58a580` plus
   only the §11 text), then `RC_PROOF_APP=release tone_proof.py capture
   tools/proof/work/gr2/control`: six neutral frames.
 - `tone_proof.py` on Debug in the loop: 18/18 scored rows.
@@ -833,7 +833,7 @@ them (GR2's spec kept `CLAUDE.md` untouched). GR3, seeing, is next.
 
 ## GR3 — seeing the grade: Show Ungraded and the luma waveform (2026-10-09/10, on the `grading` branch)
 
-**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `0545902`
+**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `a144a32`
 (main merged in). The owner's answers to GR3's eleven choices were "All as
 recommended" (2026-10-09): View ▸ Show Ungraded ⌃⌘U and View ▸ Waveform ⌃⌘W after
 Preview Window; Show Ungraded strips all thirteen `video.color` keys on every layer;
@@ -931,7 +931,7 @@ GR4, adjustment clips, is next, and extends `layer`'s neutralising to them.
 
 ## GR4a — adjustment clips: the kind, the op, the pass, the MCP tool (2026-10-10, on the `grading` branch)
 
-**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `6ecf46c`.
+**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `aecdb44`.
 GR4 did not fit one spec and is split: GR4a (this) is the core, the compositor,
 the MCP tool, the timeline style and the proof of the picture; GR4b is
 Insert ▸ Adjustment Clip, the inspector (Color and Clip only) and its screen. The
@@ -1040,7 +1040,7 @@ map's `edit_adjustment.rs` and `Source::Adjustment`, and `op_table.rs`'s
 
 ## GR4b — adjustment clips in the chrome: Insert ▸ Adjustment Clip, the Color/Clip inspector, the matte note, screen 05c (2026-10-10, on the `grading` branch)
 
-**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `a5a6cdf`
+**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `5a692c8`
 (GR4a). The owner's choices are GR-6's [b] items, decided 2026-10-10; none new.
 Decided inside GR-6: the undo name is "Add Adjustment Clip" (the MCP tool's); a
 range counts only when its end is after its start; the Adjustment section's
@@ -1136,7 +1136,7 @@ six"; the core map's `edit_adjustment.rs` and `Source::Adjustment`, and
 
 ## GR5a — looks: `video.look`, the eight as core data, the GPU bake, step 4d (2026-10-10, on the `grading` branch)
 
-**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `09b056c`
+**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `0cf4a72`
 (GR4b). GR5 did not fit one spec and is split like GR4: GR5a (this) is the
 model, the picture and the MCP mirror; GR5b is the Look section, its gallery and
 Clip ▸ Look ▸. The owner's answer to GR5's thirteen choices was "All as
@@ -1249,7 +1249,7 @@ GR4a's and GR4b's still-owed lines above.
 
 ## GR5b — looks in the chrome: the Look section and its gallery, Clip ▸ Look ▸, screen 05d (2026-10-10, on the `grading` branch)
 
-**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `e3e391e`
+**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `b10ad7d`
 (GR5a). GR5b is the rest of GR5: GR-7's [b] items. The four user-visible points
 GR-7 [b] left open were put to the owner and accepted "As described" on
 2026-10-10, and are written into GR-7 [b] before the code: with an action
@@ -1339,7 +1339,7 @@ owner's. GR5a's, GR4a's and GR4b's still-owed lines above.
 
 ## GR6a — `.cube` LUTs: media of kind `lut`, the core's parser, a look at step 4d (2026-10-10, on the `grading` branch)
 
-**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `c2b2794`
+**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `c3ba6c7`
 (GR5b). GR6 is split like GR4 and GR5: GR6a (this) is GR-8, the log/HDR check,
 the core, the FFI, import, the picture, the Media tab's row and the MCP mirror;
 GR6b is the Look gallery's Imported group and its "Import LUT…" button, Clip ▸
@@ -1522,7 +1522,7 @@ media}}` already carried it from GR6a).
 - Documents: README's **Imported LUTs** bullet; GRD-6 (new) and GRD-5's step 4
   through the gallery rather than MCP.
 
-**Sizes.** Product code (`git diff --numstat 9d237f0 -- app/Sources core/src
+**Sizes.** Product code (`git diff --numstat 0902226 -- app/Sources core/src
 core/include app/Resources/Shaders`) +267 −47, **220 net**:
 `EditorViewController+Look.swift` +68 −10 (64 → 122), `LookGalleryView.swift`
 +64 −7 (190 → 247), `LookGallery.swift` +51 −16 (261 → 296),
@@ -1610,9 +1610,9 @@ lines above.
 
 ## GR7a — the verdict's figures: every cap measured, T4's script half, the trial guide (2026-10-10, on the `grading` branch)
 
-**Where.** The `grading` branch at 892bfd1, against main at the branch point
-`f407f87`. Main's comparison build came only from a throwaway `git worktree
-add --detach tools/proof/work/gr7/main f407f87` and a cold `make app` there
+**Where.** The `grading` branch at bbbae59, against main at the branch point
+`5d04e47`. Main's comparison build came only from a throwaway `git worktree
+add --detach tools/proof/work/gr7/main 5d04e47` and a cold `make app` there
 (`grading_verdict.py main-tree make`: built in 169 s, load `{ 4.82 5.86 12.83 }`
 before and `{ 49.52 34.59 24.06 }` after), removed at the end by `main-tree
 remove` (`tree_copy.remove_tree`, then `git worktree prune`; `git worktree
@@ -1625,7 +1625,7 @@ product code changed; no verdict is written here — it is GR7b's, the owner's.
   with four mutants; the module doc is the row list.
 - `tools/proof/grading_spike/tree_bench.swift` (new) and `grading_spike.py
   --tree`: GR0's GPU method on two libraries, V0 (`Compositor.metal` at
-  `f407f87`) and VT (the tree's own, unpatched), both handed the app's whole
+  `5d04e47`) and VT (the tree's own, unpatched), both handed the app's whole
   464-byte `LayerUniforms`; rows B0–B2, KT, and with `--measure` H0, C0, F, T0
   and TC; mutant `tree-graded`. The default mode is unchanged (`--check`: B0–B2
   and 44 K rows pass).
@@ -1670,12 +1670,12 @@ compositor does no more work; F4 is the frame-time figure.
 
 **L1 per commit**, `git diff --numstat <commit>^1 <commit>` over the three
 capped roots (the records' own figures, which some took with the header, in
-brackets): GR2 99c0d8f +512 −66, net 446 (about 448); the merge 0545902 net 0;
-GR3 6ecf46c +841 −35, net 806 (about 806); GR4a a5a6cdf +528 −68, net 460
-(about 460); GR4b 09b056c +201 −20, net 181 (179); GR5a e3e391e +772 −60, net
-712 (about 710); GR5b c2b2794 +682 −11, net 671 (about 670 by GR6a's record;
-its own: 558 new, +120 −11 changed); GR6a 9d237f0 +1,224 −192, net 1,032 (about 1,067, with the
-header); GR6b 892bfd1 +268 −48, net 220 (220). The records summed to about
+brackets): GR2 ad0c099 +512 −66, net 446 (about 448); the merge a144a32 net 0;
+GR3 aecdb44 +841 −35, net 806 (about 806); GR4a 5a692c8 +528 −68, net 460
+(about 460); GR4b 0cf4a72 +201 −20, net 181 (179); GR5a b10ad7d +772 −60, net
+712 (about 710); GR5b c3ba6c7 +682 −11, net 671 (about 670 by GR6a's record;
+its own: 558 new, +120 −11 changed); GR6a 0902226 +1,224 −192, net 1,032 (about 1,067, with the
+header); GR6b bbbae59 +268 −48, net 220 (220). The records summed to about
 4,560; the measured total over the cap's own roots is 4,528.
 
 **T4's script half.** Project T (the movie at 0, 1920×1080) at 0.5 s through
@@ -1746,10 +1746,10 @@ and `ShapeProps` went whole from `ProjectSnapshot.swift` to a new
 from `core/src/edit_clip.rs` to a new `core/src/edit_detach.rs` inside its own
 `impl Project` (`mod edit_detach;` in `lib.rs`, nothing widened; the banner
 left above `set_reversed` now reads `reversal`). `wc -l`:
-`ProjectSnapshot.swift` 1,769 → 1,570 (1,750 at `f407f87`), `edit_clip.rs`
-757 → 661 (755 at `f407f87`); `ShapeProps.swift` is 204 and `edit_detach.rs`
+`ProjectSnapshot.swift` 1,769 → 1,570 (1,750 at `5d04e47`), `edit_clip.rs`
+757 → 661 (755 at `5d04e47`); `ShapeProps.swift` is 204 and `edit_detach.rs`
 108, both under the new-file cap. L1's product-code net rises by the moves'
-header lines: `git diff --numstat --no-renames f407f87 -- app/Sources core/src
+header lines: `git diff --numstat --no-renames 5d04e47 -- app/Sources core/src
 app/Resources/Shaders`, with the two new files intent-added in a scratch copy
 of the index, sums to +5,194 −648 = **4,546** (`app/Sources` 2,922, `core/src`
 1,397, the shaders 227), 18 over GR7a's 4,528: `ShapeProps.swift`'s header +5
@@ -1764,7 +1764,7 @@ detach_audio` (2 passed), `--test refusal_non_edits` (9 passed) and `--test
 op_default_booleans` (5 passed), `make lint` and `spec_index_proof.py`
 (150/150) exit 0; `make gate` PASS in 221 s (typecheck, fmt, lint, test 126 s,
 app 86 s). `grading_verdict.py sizes` reads committed `HEAD`, so its L3 lines
-cannot exist before this commit. Run after it at 6f68daa: L3 PASS, "0
+cannot exist before this commit. Run after it at df40ac1: L3 PASS, "0
 unpaid against none: cap held" (`ProjectSnapshot.swift` 1750 → 1570,
 `edit_clip.rs` 755 → 661, both paid; the frozen files referred to L2; the two
 tables exempt); L1 "net 4546 against ≤ 4500: cap missed by 46 lines". No
@@ -1774,7 +1774,7 @@ the same commit (`edit_detach.rs`, `ShapeProps.swift`).
 **The product-lines budget removed (owner, 2026-10-10).** "We need as much
 code as we need." The brief's ≤ 4,500 net-line budget is gone from "What it
 may cost" and from `grading_verdict.py` (L1 now prints the totals as a record:
-4,546 net at e969058); the root `CLAUDE.md` now says size rules are per file,
+4,546 net at 969f3f1); the root `CLAUDE.md` now says size rules are per file,
 never per feature. The phase records above that measure a running total
 against that budget are history, kept as written.
 

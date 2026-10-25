@@ -417,7 +417,7 @@ wait and B9's JSON-value comparison.
 ### MC2 — the socket, beside TCP (2026-10-01)
 
 The app binds the agent server on a Unix socket at every launch, beside the TCP listener, under
-MC-1, MC-2 and MC1's findings. Over `ffe5a9f`:
+MC-1, MC-2 and MC1's findings. Over `d1eae41`:
 
 - **The toll first.** `ReelCore.swift` (1353 lines) gave up its `dictionary` extensions to
   `PropsDictionaries.swift` (the 106-line section moved whole; only the section doc's "nothing outside"
@@ -481,7 +481,7 @@ scope). MC3 (`reelcut-mcp`) is next; MC4 owes the interim rule's deletion and th
 
 ### MC3 — `reelcut-mcp` (2026-10-01)
 
-External MCP clients now have their stdio server. Over `ba8ed00`:
+External MCP clients now have their stdio server. Over `72a9c4d`:
 
 - **The versions.** `core/src/mcp_versions.rs` (std only) holds `SUPPORTED_VERSIONS`,
   `LATEST_VERSION` and `negotiate`; `agent.rs` lost its two constants and its `initialize` calls
@@ -600,7 +600,7 @@ the README's agent section (which still names TCP).
 
 ### MC4 — TCP goes (2026-10-01)
 
-The socket is the agent server's only listener. Over `38b9487`:
+The socket is the agent server's only listener. Over `a059de1`:
 
 - **Core.** `agent.rs` lost `start` (TCP on 127.0.0.1) and its two imports; its module doc names
   one listener. `ffi_agent.rs` lost `rc_agent_server_start`, `rc_agent_server_stop` and the
@@ -716,7 +716,7 @@ for the ones that take a running instance), against its last record:
 | `patch_door_proof.py` · `refusal_proof.py` | 261/261 · 145/145 | 261/261 (2026-09-24) · 116/116 (2026-09-22; rows added since without a record) |
 | `clip_catalog_proof.py` | **0/1**: its probe does not compile (`switch must be exhaustive` over `AgentDeclaration.Requirement`, which gained `.filledByTheApp` in road map 10) — not this phase's; nothing reached the app; #214 | 24/24 (2026-09-20, road map 7) |
 | `op_catalog_proof.py` · `op_argument_proof.py` | 23/23 · 153/153 (150/153 first, run beside the mutant builds: its graphics-root wait raced another instance's untitled project, as B16 recorded) | 23/23 (2026-09-29, B16) · 153/153 (2026-10-01, B44) |
-| `e1_proof.py` | 89/99, exit 1: every measured row ok; the 10 cross-build rows SKIP by name, because the reference tree (`1c3e92e`) listens on TCP alone and cannot answer at a socket; #215 | 99/99 (2026-09-24, road map 9) |
+| `e1_proof.py` | 89/99, exit 1: every measured row ok; the 10 cross-build rows SKIP by name, because the reference tree (`77934fe`) listens on TCP alone and cannot answer at a socket; #215 | 99/99 (2026-09-24, road map 9) |
 | `e2_proof.py` · `mixed_audio_proof.py` | 75/75 · 13/13 | 75/75 (2026-09-30, B30) · 13/13 (2026-09-21) |
 | `peaks_proof.py` | 21/21 (1/3 first: its fixtures are `peaks_probe.py`'s, made next — that probe 79/80, its one FAIL the delayed-AAC row road map 4 also recorded) | 21/21 (road map 4) |
 | `relink_proof.py` · `remaining_proof.py` | 22/22 · 80/80 | 22/22 · 80/80 (2026-09-30, B29) |
@@ -751,7 +751,7 @@ LaunchServices registrations.
 
 ### MC5 — closing (2026-10-01)
 
-The road map is closed under root `CLAUDE.md`'s closing rule. Over `20c947d`:
+The road map is closed under root `CLAUDE.md`'s closing rule. Over `4a3065f`:
 
 - **The ADR.** `designs/adr/roadmap-14-agent-socket.md` condenses this document, with
   `designs/adr/roadmap-13-pricing.md`'s headings and a "Where to look in the original" section.

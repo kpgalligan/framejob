@@ -1614,7 +1614,7 @@ which is noise — for one of those, `git show <tree>:<path> | diff - <path>`.
 
 | Tree | What it holds |
 |---|---|
-| `cfcd09598e7ea7ec31ec229c943d1edfc51fc0d3` | the baseline, `HEAD^{tree}` at `7f04e59` |
+| `cfcd09598e7ea7ec31ec229c943d1edfc51fc0d3` | the baseline, `HEAD^{tree}` at `cf9d5f7` |
 | **T0** `44f77338cdcb1cd2cfdb537c8322f77027fe0986` | spec §11's R6-1..R6-8, and nothing else |
 | **T1** `55beb03dcd0c20118e56f0931dbbcfdf9aff0fe5` | toll 1 |
 | **T2** `634ea96b7123b34e02ec0809fca3cccb0d4548f4` | toll 2 |
@@ -2666,7 +2666,7 @@ score.** Each is quoted as it printed, against the N it had at the time:
   R0 measured +66 and +70 ms with the microphone LEADING. The script already
   skips its TONE rows by name for a Bluetooth OUTPUT and has no such arm for
   a Bluetooth INPUT, so the row fails rather than skipping. **It is not a
-  regression**: C1 touched no recording file at all (`git diff 7f04e59 --
+  regression**: C1 touched no recording file at all (`git diff cf9d5f7 --
   app/Sources` names none), and nothing else in the 41 moved. It is in
   `designs/reelcut-remaining.md` §4 for a person with a wired input, and the
   re-run was carried on past it by name rather than stopped for good.

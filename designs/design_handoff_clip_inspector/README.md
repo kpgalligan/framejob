@@ -2,7 +2,7 @@
 
 ## Overview
 
-A redesign of the **Clip** tab of Reelcut's inspector (the 304 pt right-hand panel). It answers the brief in `uploads/clip_inspector_brief/README.md` (build `7975456`, 2026-09-23). It solves:
+A redesign of the **Clip** tab of Reelcut's inspector (the 304 pt right-hand panel). It answers the brief in `uploads/clip_inspector_brief/README.md` (build `6e3f5c7`, 2026-09-23). It solves:
 
 - **P1 density and P2 no audio/video split:** the Clip tab gets sub-tabs, Picture · Sound · Clip (Text · Picture · Clip for text clips).
 - **P3/P4 buried actions:** a **pinned action lane** sits at the top of the Clip tab. It is a mini timeline of the selected clip's actions, where you select, move and retime them.

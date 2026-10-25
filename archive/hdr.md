@@ -1,8 +1,8 @@
 # Road map "hdr" — HDR and colour: HDR10-aware PQ, the HLG timeline, log curves, linear light
 
 **Opened 2026-10-19** (H-0, in the worktree `~/devel/framejob-hdr` on branch `hdr`, from
-`24672e2`, merged into main after its gate). The design brief this road map answers is
-`~/.claude/litecode/framejob/hdr-brief/I-hdr.md` (2026-10-19, tree `35fba69`), with the owner's
+`0f8c9f5`, merged into main after its gate). The design brief this road map answers is
+`~/.claude/litecode/framejob/hdr-brief/I-hdr.md` (2026-10-19, tree `b6aac41`), with the owner's
 answers beside it in `~/.claude/litecode/framejob/hdr-brief/answers.md`; both live outside the
 repo, so everything a later phase needs from them is written here. Where the brief and this file
 differ, this file wins. The grading road maps are closed (`designs/adr/grading.md`,
@@ -321,13 +321,13 @@ road map, H-7 measures it and records the figure under PR-7; otherwise it stays 
 ## The standard recipe, file by file, and the tolls
 
 The ledger is `wc -l app/Sources/*.swift core/src/*.rs graphic/src/*.rs | sort -rn`, here at
-`24672e2` as printed in H-0 before any edit. The cap is ~600 lines, new files 400, and frozen
+`0f8c9f5` as printed in H-0 before any edit. The cap is ~600 lines, new files 400, and frozen
 files take wiring only. Size is per file only (root `CLAUDE.md`): nothing here is a budget on a
 feature or a phase.
 
 ### Tolls (H-0, two pure moves gated alone)
 
-| File | Lines at `24672e2` | Why it is touched | The move |
+| File | Lines at `0f8c9f5` | Why it is touched | The move |
 |---|---|---|---|
 | `ExportSheetController.swift` | 639 (over the cap) | H-3's Dynamic Range popup and the rows' "HDR (HLG)" / "SDR version" wording | `// MARK: - Commit` through `panelMessage` (`cancelClicked`, `exportClicked`, `queueClicked`, `commit(queue:)`, `recipeOptions`, `suggestedName`, `panelMessage`) out to `ExportSheetCommit.swift`, the three `@objc private func` made `@objc func` for `loadView`'s `#selector`s. **Paid in H-0**: 639 → 528, the new file 120. Next seam: `// MARK: - Controls` and the `NSTextFieldDelegate` extension out whole to `ExportSheetControls.swift`. |
 | `MediaImporter.swift` | 599 | H-1's peak read is called from the probe | Its named seam ("a pass's await-free body out to its `+` file"): inside `thumbnails`, the image branch and the closing publication out to `MediaImporter+Thumbnails.swift` as `writeImageThumbnail` and `publishThumbnails`. **Paid in H-0**: 599 → 573, the new file 57. Next seam: the frames loop's per-result write (the `switch result` body) out to `+Thumbnails`. |
@@ -337,7 +337,7 @@ feature or a phase.
 Each designer pays a toll only where the phase must add lines to that file, as a pure move gated
 alone before the phase's code:
 
-| File | Lines at `24672e2` | The phase that may touch it | Its named seam (`designs/adr/app-file-history.md`) |
+| File | Lines at `0f8c9f5` | The phase that may touch it | Its named seam (`designs/adr/app-file-history.md`) |
 |---|---|---|---|
 | `Exporter.swift` | 595 | H-3 | none named; the designer names one |
 | `Playback.swift` | 588 | H-2, H-3 (Show SDR Version's key) | `seekFinished()` and `report(_:)` to `Playback+Scope.swift` |
@@ -672,7 +672,7 @@ a script.
 
 ## H-0 — the road map, HD-1…HD-11 and the two moves
 
-**What landed** (2026-10-19, in the worktree on `hdr`, from `24672e2`). This road map;
+**What landed** (2026-10-19, in the worktree on `hdr`, from `0f8c9f5`). This road map;
 `designs/spec/11-decisions/hdr.md` with HD-1…HD-11, its Files row and eleven ID rows in
 `11-decisions/README.md`, and the Lines cells in both READMEs; sixteen "Amended by HD-n" lines,
 one per (entry, HD) pair, at the end of twelve entries — HD-2 on GR-2 (`grading.md`), GR-13
@@ -690,8 +690,8 @@ header or FFI change.
 
 | Move | `wc -l` before → after | New file | What widened |
 |---|---|---|---|
-| `ExportSheetController.swift` → `ExportSheetCommit.swift`: the blank line, then `// MARK: - Commit` through `panelMessage`'s closing brace (lines 513–623 at `24672e2`: `cancelClicked`, `exportClicked`, `queueClicked`, `commit(queue:)`, `recipeOptions`, `suggestedName`, `panelMessage`) into `extension ExportSheetController`, with `import AppKit`, `import UniformTypeIdentifiers` and a five-line doc; the type's doc (its lines 44–48) names the fourth extension | 639 → 528 | 120 | the three `@objc private func` (`cancelClicked`, `exportClicked`, `queueClicked`) became `@objc func`, because `loadView`'s `#selector`s must reach them from the other file; nothing else (`commit(queue:)`, `suggestedName` and `panelMessage` stay `private`, `recipeOptions` was internal; every member they reach — `resolved`, `currentChoice`, `burnInCheckbox`, `isFrameSequence` — was already internal) |
-| `MediaImporter.swift` → `MediaImporter+Thumbnails.swift`: inside `thumbnails`, the image branch's body (lines 353–366 at `24672e2`) as `writeImageThumbnail`, with its own `written` and line 349's comment, and the closing publication (lines 451–457, its comment 440–450 as the doc) as `publishThumbnails`; each called from where its lines stood, so `defer { reader.finish() }` still runs after the publication; with `import AVFoundation` and a doc in `MediaImporter+Speech.swift`'s style | 599 → 573 | 57 | nothing (`decodeImage`, `writeJPEG`, `stripHolds`, `writeStamp`, `writeThumbsStamp`, `postCacheChange`, `thumbsKind`, `thumbnailHeight` and `ThumbnailReader`'s fields were already internal); every `await` stays in `MediaImporter.swift`, and `cache_pass_probe.py`'s six anchors there still occur once each |
+| `ExportSheetController.swift` → `ExportSheetCommit.swift`: the blank line, then `// MARK: - Commit` through `panelMessage`'s closing brace (lines 513–623 at `0f8c9f5`: `cancelClicked`, `exportClicked`, `queueClicked`, `commit(queue:)`, `recipeOptions`, `suggestedName`, `panelMessage`) into `extension ExportSheetController`, with `import AppKit`, `import UniformTypeIdentifiers` and a five-line doc; the type's doc (its lines 44–48) names the fourth extension | 639 → 528 | 120 | the three `@objc private func` (`cancelClicked`, `exportClicked`, `queueClicked`) became `@objc func`, because `loadView`'s `#selector`s must reach them from the other file; nothing else (`commit(queue:)`, `suggestedName` and `panelMessage` stay `private`, `recipeOptions` was internal; every member they reach — `resolved`, `currentChoice`, `burnInCheckbox`, `isFrameSequence` — was already internal) |
+| `MediaImporter.swift` → `MediaImporter+Thumbnails.swift`: inside `thumbnails`, the image branch's body (lines 353–366 at `0f8c9f5`) as `writeImageThumbnail`, with its own `written` and line 349's comment, and the closing publication (lines 451–457, its comment 440–450 as the doc) as `publishThumbnails`; each called from where its lines stood, so `defer { reader.finish() }` still runs after the publication; with `import AVFoundation` and a doc in `MediaImporter+Speech.swift`'s style | 599 → 573 | 57 | nothing (`decodeImage`, `writeJPEG`, `stripHolds`, `writeStamp`, `writeThumbsStamp`, `postCacheChange`, `thumbsKind`, `thumbnailHeight` and `ThumbnailReader`'s fields were already internal); every `await` stays in `MediaImporter.swift`, and `cache_pass_probe.py`'s six anchors there still occur once each |
 
 The ledger, `wc -l app/Sources/*.swift core/src/*.rs graphic/src/*.rs | sort -rn`: 144,622 lines
 before the moves and 144,662 after (the two new files' imports, docs, signatures and calls).
@@ -715,7 +715,7 @@ brief's spike copied into `tools/proof/work/h0/spike/` and built by `swift_build
   13/13; `python3 tools/proof/screens.py --only 12-export-sheet --out
   tools/proof/work/h0/screens-ctl`: exit 1, 5 pass, 1 fail of 6 — **the control's own failure**,
   P2 "keys neither pinned nor in NOT_SHOWN ['RCDevSyncHold']" (the dev-only launch default
-  audio-sync AS-4 added in `87fb100` is not in `screens.py`'s pinned or `NOT_SHOWN` lists; not
+  audio-sync AS-4 added in `eeb894b` is not in `screens.py`'s pinned or `NOT_SHOWN` lists; not
   this phase's), with the screen itself "pass — 2 captures, 0 new problems";
   `python3 tools/proof/log_thumbs_proof.py --only T1,T7,T9`: 3/3.
 - After the moves: `make typecheck` exit 0, 0 errors, exactly the 4 baseline warnings, tsc
@@ -790,13 +790,13 @@ brief's spike copied into `tools/proof/work/h0/spike/` and built by `swift_build
   `ExportSheetCommit.swift` (the two commits that end in the save panel, a pure move, hdr H-0).
 
 The root `CLAUDE.md` needs nothing until the road map closes. **Residue:** none. `screens.py`'s
-P2, which failed on the untouched tree (`RCDevSyncHold`, added in `87fb100`, neither pinned nor
+P2, which failed on the untouched tree (`RCDevSyncHold`, added in `eeb894b`, neither pinned nor
 in `NOT_SHOWN`), is fixed in this phase by its `NOT_SHOWN` row. H-1 (#281) is next, from main
 after this phase's merge.
 
 ## H-1 — #281, the PQ peak (HD-6, HD-12)
 
-**What landed** (2026-10-19, in the worktree on `hdr`, from `82184d4`). Spec §11 **HD-12**, written
+**What landed** (2026-10-19, in the worktree on `hdr`, from `dcd08f3`). Spec §11 **HD-12**, written
 before the code (`11-decisions/hdr.md`: the key `media.color.pq {file?, from?, peak?}`, both
 routes, the 64-bit rounding and the clamp, the op's `peak` and its three new sentences, `null`
 keeping the reading, the `input`'s `peak`, the marker's `peak`, the Media tab's HDR10 section in
@@ -804,7 +804,7 @@ place of this road map's popup, no re-read on relink or for a pre-22 file), its 
 Lines cells, and "Amended by HD-12" lines on GR-15 (B96's route named: SEI only, unread by
 AVFoundation, M5's digest `d34d90b3f676a425`), GR-16 and GR-21 with their index suffixes. Then:
 
-- **The toll, gated alone first:** `ReelCore.swift` lines 411–583 at `82184d4` (`ExportPreset`,
+- **The toll, gated alone first:** `ReelCore.swift` lines 411–583 at `dcd08f3` (`ExportPreset`,
   `ExportSettings`, `ExportSize` and their docs; no `rc_*` call) out whole to `ExportValues.swift`
   under `import AppKit` and a three-line doc — 989 → 815, the new file 178, nothing widened; the
   verbatim `diff` of the block and of the kept lines both exit 0; `make typecheck` 0 errors and the
@@ -939,7 +939,7 @@ is HDR-4's file.
 
 ## H-2 — #277, the HLG working space (HD-2, HD-3, HD-13)
 
-**What landed** (2026-10-19, in the worktree on `hdr`, from `9ccefec`). Spec §11 **HD-13**, written
+**What landed** (2026-10-19, in the worktree on `hdr`, from `ec08cb9`). Spec §11 **HD-13**, written
 before the code (`11-decisions/hdr.md`: (a) the lift's arithmetic, (b) the SDR arms' decodes, (c)
 PQ through BT.2390's EETF above 1,000 cd/m², (d) HLG over P3 or BT.709, (e) camera log at
 ×0.26741, (f) every drawn layer lifted at upload, (g) the grade's BT.2020 weights and tone's HLG
@@ -1113,7 +1113,7 @@ its pid; no `Frame Job: ` line in any run (Z1) and no `DEFAULTS MOVED`:
   (L1, `--control …/log-ctl --only L1,Z1`): MUTANT PASS. `curves_proof.py`'s
   `hue-shift-reversed` first answered MUTANT FAILURE: its five rows all FAILED (caught), and B2
   failed beside them — B2 (T4-3's hue-curve blend, whose oracle is the same hue shift) postdates
-  the mutant's row list, and the same mutant on a detached worktree of `9ccefec` (before any H-2
+  the mutant's row list, and the same mutant on a detached worktree of `ec08cb9` (before any H-2
   edit) failed the same way, the same B2 columns (52/58), filed as #313. B2 is now in its row
   list (`curves_proof.py`'s `MUTANTS` and docstring), and on Release (2026-10-20) it answered
   MUTANT PASS: H15 H1 H4 H13 H17 B2 all FAILED, survived none, other rows failed none, B2 at
@@ -1140,7 +1140,7 @@ person check is HDR-1, with the HLG steps added to GRD-16 and GRD-17.
 
 ## H-3 — #277, the deliverables (HD-4, HD-5, HD-7, HD-14)
 
-**What landed** (2026-10-20, in the worktree on `hdr`, from `742ae32`). Spec §11 **HD-14**, written
+**What landed** (2026-10-20, in the worktree on `hdr`, from `7aef1e8`). Spec §11 **HD-14**, written
 before the code (`11-decisions/hdr.md`: (a) the knee at 0.9, recomputed on HD-3's lift by
 `tools/proof/work/h3/sdr_version_math.py` — the white title 248.4/255, HLG 0.50 125.7/255 —
 with BT.2408's own reading beside it; (b) the one output pass and the composition's colour;
@@ -1274,7 +1274,7 @@ by its pid; no `Frame Job: ` line in any run and no `DEFAULTS MOVED`:
   `proof_app.py launch`); `recording_probe.py --only catalog` 31/31.
 - `phase8_chrome.py`: **147/150** — the View group's new row passes ("Preview Quality | Preview
   Window | Show Ungraded | Show Selection | Show SDR Version | Scopes"); three checks FAILED, and
-  a detached worktree of `742ae32` (before any H-3 edit, its own core built) failed the same three
+  a detached worktree of `7aef1e8` (before any H-3 edit, its own core built) failed the same three
   (147/150): `LayerUniforms` 528 bytes against the check's 512 (H-2's growth), and the Media pane's
   `mediaFilter` finding two `OptionPopupControl`s, which blanks the sort-popup check. Filed as
   #314. The review's fix pass mended all three on the instrument side: the size check expects
@@ -1315,7 +1315,7 @@ phase) fixed in this phase, to close with its commit. The owner's person checks 
 
 ## H-4 — #277, HDR scopes (HD-8, HD-15)
 
-**What landed** (2026-10-20, in the worktree on `hdr`, from `a08d072`). Spec §11 **HD-15**, written
+**What landed** (2026-10-20, in the worktree on `hdr`, from `b2c247c`). Spec §11 **HD-15**, written
 before the code (`11-decisions/hdr.md`: (a) the scopes read the picture shown; (b) Show SDR
 Version, `render_frame {sdr_version}` and an HLG project's JPEG read the SDR version as an SDR
 project's — Rec. 709, the 0/50/100 labels, "Rec. 709 · encoded", JSON with no `signal` key —
@@ -1404,7 +1404,7 @@ tools/proof/work/h4/ctl --only H1,H7i,SI,Z1` on the untouched tree's Release bui
   `histogram-709-in-hlg` (SW), `ref-line-at-100` (SS, P8), `sdr-version-read-as-hlg` (SD, SP),
   `tap-signal-dropped` (SP), `render-scopes-sdr` (SW, SV, SS), `sdr-json-names-scale` (SI, P8),
   `vectorscope-view-709-targets` (P8), `parade-graticule-sdr` (P8).
-- `scopes_proof.py` whole: **27/27** — S12 holds every ×1 SDR count to `31f3aa1`'s shader; S15
+- `scopes_proof.py` whole: **27/27** — S12 holds every ×1 SDR count to `28ada7d`'s shader; S15
   9 of 9 cards part Rec. 709 from BT.2020 (CONTROL); T1's worst 4K: parade 0.629 ms, vectorscope
   ×1/×2/×4 0.407/0.362/0.336, histogram 0.667; in HLG vectorscope 0.401/0.326/0.324, histogram
   0.559 (recorded: waveform 0.451, waveform + vectorscope 0.815, HLG waveform 0.452). The
@@ -1430,7 +1430,7 @@ HDR footage).
 
 ## H-6 — #276, linear light (HD-9, HD-16; format 24)
 
-**What landed** (2026-10-20, in the worktree on `hdr`, from `7c053a6`). **H-6 runs before H-5**:
+**What landed** (2026-10-20, in the worktree on `hdr`, from `fe551cc`). **H-6 runs before H-5**:
 H-5 waits on Canon's own log document, which the owner has not supplied, and H-6 needs nothing H-5
 adds, so under HD-11 H-6 took **format 24** and H-5 will take 25. Spec §11 **HD-16**, written
 before the code (`11-decisions/hdr.md`: (a) the key, `set_canvas {blending}`, the recipe canvas
@@ -1563,7 +1563,7 @@ then H-7.
 
 ## H-5 — #278, Canon Log 2 and Canon Log 3 (HD-10, HD-17; format 25)
 
-**What landed** (2026-10-20, in the worktree on `hdr`, from `60aa387`). The designer's first spec
+**What landed** (2026-10-20, in the worktree on `hdr`, from `13ccb1f`). The designer's first spec
 stopped: Canon's own Cinema Gamut paper only plots the triangle. The owner chose on 2026-10-20
 "Use ACES, both gamuts (Recommended)": the curves from Canon's *Canon Log Gamma Curves* white
 paper (Canon U.S.A., November 1st, 2018; read in place in the main tree, never copied), Cinema
@@ -1675,7 +1675,7 @@ as before, not run here. The owner's person check is GRD-19. Next: H-7.
 
 ## H-7 — the close
 
-**What landed** (2026-10-20, in the worktree on `hdr`, from `6b88c38`). `designs/adr/hdr.md`.
+**What landed** (2026-10-20, in the worktree on `hdr`, from `105ac08`). `designs/adr/hdr.md`.
 This road map `git mv`'d to `archive/hdr.md`, with its `archive/INDEX.md` row. Every
 `designs/hdr.md` citation outside `archive/` now points at the ADR or here: §11 `hdr.md`'s first
 paragraph in the closed form, its line naming "The owner's choices" and HD-4's "copied into"

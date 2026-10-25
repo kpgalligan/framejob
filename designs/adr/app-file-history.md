@@ -1,7 +1,7 @@
 # App file history — why the Swift files are the shape they are
 
 - **Status:** Closed, reference only (2026-09-26). The notes stopped at the playhead-echo fix
-  (`538db30`). `app/CLAUDE.md` is the live rulebook. This record holds only the reasons and traps
+  (`ce22294`). `app/CLAUDE.md` is the live rulebook. This record holds only the reasons and traps
   that file does not state.
 - **Original:** `archive/app-notes.md` (2,934 lines) is the full record. "orig §x" below
   points to one of its headed sections or file-map rows, quoted by name.
@@ -163,7 +163,7 @@ lenient-decoding rule.
   player: the OUTGOING one, measured in the old container. A time past that item's end clamped
   there and was heard, and the rebuild then restored to the clamped time — `phase9_proof.py`'s
   "mapped back out" failed on every run and three rows now and then (216, 215 and 216 of 218 at
-  HEAD `f6bc11f`; 217, 215 and 216 at `538db30^`, so 538db30 did not cause it). The time is the NEW
+  HEAD `c84f5f9`; 217, 215 and 216 at `ce22294^`, so ce22294 did not cause it). The time is the NEW
   container's: with a rebuild in flight (`rebuilding`) it is HELD (`holding`, `isSeeking` true so
   `currentTime` answers it) and the rebuild's existing restore lands there, heard once; with none,
   it is a restore on the current item. Two neighbours of the same race went with it. An asked
@@ -197,7 +197,7 @@ lenient-decoding rule.
   AVFoundation can deliver a periodic-observer callback for a seek since superseded or an item
   since swapped out, and `timeAdvanced` reported it, so `document.playhead` took a tick the player
   was neither at nor seeking to: D2's drop heard 1.5 s then 2.5 s and selected action 4 (6 of 8
-  runs of `clip_inspector5_probe` at `c39efca`), and S1's move once heard 0 (1 of 8). While
+  runs of `clip_inspector5_probe` at `bc31998`), and S1's move once heard 0 (1 of 8). While
   `player.rate == 0` a tick is now heard only when it equals `currentTime` and differs from
   `reported`; while playing nothing changed. Because the observer may now say nothing, every seek's
   landing in `seekFinished` reports its rest once when it differs from `reported` — an asked seek
@@ -410,7 +410,7 @@ lenient-decoding rule.
 ## What it built — where it lives now
 
 Every file named above exists under `app/Sources/`. The one exception is
-`AgentServer+Motion.swift`, deleted by D1·3 (`eb17289`).
+`AgentServer+Motion.swift`, deleted by D1·3 (`dacf19d`).
 
 Files that were split since the notes wrote them:
 
@@ -457,7 +457,7 @@ What follows is only the SEAM each over-cap or at-edge file's record named, so t
 to pay a toll starts from it. A file not listed has no named seam yet.
 
 - `GraphicPrefetch.swift`: at 600 since #127 G6 phase 4 (spec §11 G-38), which moved `Slot`
-  unchanged to the foot of `LayerRenderersGraphic.swift` (a pure move committed alone, 9cedb2d).
+  unchanged to the foot of `LayerRenderersGraphic.swift` (a pure move committed alone, 3551b60).
   The next seam: the background-pass branches (`start(background:)`'s arm, `stopBackground`,
   the pass's end line) out whole to a `GraphicPrefetch+Background.swift` extension, with what
   they read made internal, a pure move gated alone before anything else lands in the file.
@@ -580,7 +580,7 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `OpDictionaries.swift`, whose code is identical (only its
   `import` and the doc comment's file name differ). It stays the only file that calls
   `rc_*`. The HDR road map's H-1 paid a toll before `ReelHDR10` (#281) landed: lines 411–583 at
-  `82184d4` — `ExportPreset`, `ExportSettings`, `ExportSize` and their docs, none naming an `rc_*`
+  `dcd08f3` — `ExportPreset`, `ExportSettings`, `ExportSize` and their docs, none naming an `rc_*`
   symbol but in a doc comment — went whole to `ExportValues.swift` under `import AppKit` and a
   three-line doc, a pure move gated alone; nothing widened (no member was `private` to the file).
   `wc -l app/Sources/ReelCore.swift`: 989 before, 815 after; `ExportValues.swift` is 178. The next
@@ -750,7 +750,7 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `MediaImporter+Thumbnails.swift` is 57. The next seam: the frames loop's per-result write
   (the `switch result` body) out to `+Thumbnails`.
 - `ExportSheetController.swift`: the HDR road map's H-0 paid a toll before H-3's export range:
-  `// MARK: - Commit` through `panelMessage`'s closing brace (lines 514–623 at `24672e2`, and
+  `// MARK: - Commit` through `panelMessage`'s closing brace (lines 514–623 at `0f8c9f5`, and
   the blank line before) moved verbatim into `extension ExportSheetController` in
   `ExportSheetCommit.swift` (`import AppKit`, `import UniformTypeIdentifiers`): `cancelClicked`,
   `exportClicked`, `queueClicked`, `commit(queue:)`, `recipeOptions`, `suggestedName` and
@@ -785,15 +785,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   app/Sources/ReverseRenderer.swift`: 1311 before, 1120 after;
   `ReverseProgressSheetController.swift` is 192. The next seam: `// MARK: - Where a reversed
   asset lives` and `// MARK: - What the composition is told` (`ReverseCache`,
-  `ReverseResolution`, `ReverseStatus`, `ReverseSource`; lines 4–331 at `19ef985`) out whole to
+  `ReverseResolution`, `ReverseStatus`, `ReverseSource`; lines 4–331 at `390bf57`) out whole to
   `ReverseCache.swift`. Issue batch B96 paid that seam before GR-23's log reverse: lines 1–341
-  at `7765ba8` (the three imports through `ReverseSource`'s closing brace) moved byte for byte
+  at `58efc68` (the three imports through `ReverseSource`'s closing brace) moved byte for byte
   to `ReverseCache.swift`, a pure move gated alone; nothing widened, and
   `precision_proof.py`'s `reverse-unversioned` mutant re-anchored to the new file. `wc -l
   app/Sources/ReverseRenderer.swift`: 1221 before, 883 after; `ReverseCache.swift` is 341. The
   next seam: the audio helpers (`appendAudioBytes` … `audioSample`) out to
   `ReverseRenderer+Audio.swift`, which widens their `private`. Issue batch B98 paid it before
-  #289's full-range read: lines 627–787 at `f6d28ce` (`appendAudioBytes`, `// MARK: - Audio`,
+  #289's full-range read: lines 627–787 at `1fc984d` (`appendAudioBytes`, `// MARK: - Audio`,
   the LPCM settings and `audioFormat`, `audioFrames`, `audioBlocks`, `reversedFrames`,
   `audioSample`) moved byte for byte into `extension ReverseRenderer` in
   `ReverseRenderer+Audio.swift` with `import AVFoundation`, a pure move gated alone; each moved
@@ -805,7 +805,7 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `ReverseRenderer+Read.swift`, widening their `private`, with `precision_proof.py`'s reverse
   mutants whose anchors live there (`reverse-bgra`, `reverse-planar-drop`,
   `reverse-no-attachments`) re-anchored to the new file. Clean-up round 3's batch A paid it
-  before #309's encoder-delay shift: lines 463–641 at `904d28a` (`// MARK: - Reading one slice`
+  before #309's encoder-delay shift: lines 463–641 at `9edda55` (`// MARK: - Reading one slice`
   through `copyRows`' closing brace) moved byte for byte into `extension ReverseRenderer` in
   `ReverseRenderer+Read.swift` with `import AVFoundation`, a pure move gated alone; `Frame`,
   `Slice`, `read`, `copyBuffer` and `copyRows` lost `private` and nothing else changed, and
@@ -815,7 +815,7 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   183. The next seam: `// MARK: - Settings` (`dimensions`, `videoSettings`, `sliceDuration`) out
   to `ReverseRenderer+Settings.swift`.
 - `LayerRenderers.swift`: clean-up round 3's batch B phase 3 paid its toll before #322's
-  gain-map still (spec §11 HD-22). `image(url:media:)` with its doc (lines 177–196 at `b7846d9`),
+  gain-map still (spec §11 HD-22). `image(url:media:)` with its doc (lines 177–196 at `189af58`),
   `renderImage` and `renderHDRImage` (466–502) and `deepBitmap` and `hdrBitmap` (528–558) moved
   byte for byte into `extension LayerRenderers` in `LayerRenderersImage.swift` with `import
   AppKit` and `import Metal`, a pure move gated alone; all five live in that one file, so

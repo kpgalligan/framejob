@@ -26,7 +26,7 @@ sound crossfade, and a way to be added at a hard cut without hand-trimming.
 E2 gave clips In / Out / During motion presets (fade, slide, zoom, spin, pop,
 pulse, shake, bounce, drift) that compose with what the clip already is.
 
-Both landed in one commit (`e8028a2`) because they share every file a schema
+Both landed in one commit (`062091a`) because they share every file a schema
 bump touches: E1 is format v7, E2 is v8. No FFI change and no shader change
 in either.
 
@@ -107,7 +107,7 @@ handles.** Whole files butted at a cut have no handles, so the menu beeped;
 the user chose that the incoming clip and everything at or after the cut on
 every unlocked track slide left (`close_gap`'s set). `align` ignored; capped
 at half the shorter clip; a locked incoming track is refused. Lives in
-`edit_transition_shift.rs` (orig §12 `5da056c`; R5-3 amendment).
+`edit_transition_shift.rs` (orig §12 `00c74f7`; R5-3 amendment).
 
 **The menu's sheet re-decides each ripple op against the running project.**
 Two chosen cuts can collide (the first shift turns the second cut into an
@@ -303,7 +303,7 @@ Measured and rejected (do not re-try blind):
 - `add_transition`'s handle form does not advance `graphic.in` for a graphic
   incoming clip — road map 10's G2b item, tracked in #72.
 - Issues #25, #26, #27 filed from this road map are CLOSED (D7-2 and D7-3 in
-  `e1411be`; E2-27 in `71f3a8d`).
+  `cf26a85`; E2-27 in `c75224d`).
 
 ## Where to look in the original
 
@@ -327,5 +327,5 @@ Measured and rejected (do not re-try blind):
   25 mutants, three strengthened fixtures, two host limits (the 12 ms mix
   point; the tones are 2 986 400 ticks, not 5 s), the E1 reader review
   (R1·1–R4·2, the sceptic's sweeps) and the E2 reader review (R1·1–R4·4, the
-  four `6dda2c7` nits, the rotation-band restatement).
+  four `c00678b` nits, the rotation-band restatement).
 - orig §13 — issue #27, zero-duration motion presentation.

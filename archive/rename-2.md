@@ -1,10 +1,10 @@
 # Road map "rename-2" — the old name leaves what is not history
 
 **Opened 2026-10-13** (N0, in the worktree `/Users/kevingalligan/devel/reelcut-rename2` on branch
-`rename2`, from `ed8f282`, each phase merged into main after its gate). The request this road map
+`rename2`, from `8445ee6`, each phase merged into main after its gate). The request this road map
 answers is the owner's of 2026-10-13; its decisions are spec §11 NM-12…NM-14, in
 `designs/spec/11-decisions/rename.md`, recorded in N0 before any rename. Every count below was
-printed by the command written beside it, at the pinned commit `ed8f282`.
+printed by the command written beside it, at the pinned commit `8445ee6`.
 
 ## Goal
 
@@ -58,14 +58,14 @@ touch §11 text too (for example `deepening.md`'s six `archive/reelcut-roadmap-7
 ## Inventory
 
 **The command** (run in the worktree; `f <pathspec>…` prints files and lines matching `reelcut`
-case-insensitively at the pinned commit; round 1's `f()`, re-pointed at `ed8f282`):
+case-insensitively at the pinned commit; round 1's `f()`, re-pointed at `8445ee6`):
 
 ```sh
-cd /Users/kevingalligan/devel/reelcut-rename2 && f(){ echo "$(git grep -l -i reelcut ed8f282 -- "$@" | wc -l) files / $(git grep -h -i -c reelcut ed8f282 -- "$@" | awk -F: '{s+=$NF} END{print s+0}') lines :: $*"; }
+cd /Users/kevingalligan/devel/reelcut-rename2 && f(){ echo "$(git grep -l -i reelcut 8445ee6 -- "$@" | wc -l) files / $(git grep -h -i -c reelcut 8445ee6 -- "$@" | awk -F: '{s+=$NF} END{print s+0}') lines :: $*"; }
 ```
 
-The whole tree: `git grep -I -i -c reelcut ed8f282` finds 2,107 lines in 213 files (`f .` prints
-the same), and `git ls-tree -r --name-only ed8f282 | grep -ic reelcut` finds 72 paths: 19 archive
+The whole tree: `git grep -I -i -c reelcut 8445ee6` finds 2,107 lines in 213 files (`f .` prints
+the same), and `git ls-tree -r --name-only 8445ee6 | grep -ic reelcut` finds 72 paths: 19 archive
 files and 53 handoff files (16 under `designs/design_handoff_reelcut/`, 20 under
 `designs/design_handoff_reelcut_sharp/`, 17 under `designs/design_handoff_clip_inspector/`).
 
@@ -147,11 +147,11 @@ archive text, decision text, ADRs and designer files included. A reference is th
 the path from `designs/`, or the bare name. The rewrite is the only edit those files take.
 Exceptions:
 
-- (a) a path already stale at `ed8f282`, which is kept: `designs/reelcut-*.md` (the road maps
+- (a) a path already stale at `8445ee6`, which is kept: `designs/reelcut-*.md` (the road maps
   before the archive) and `designs/reelcut-design.md`. `archive/INDEX.md` gains each file's old
   name so these still resolve.
 - (b) a command, pathspec or path that runs against an old commit or tree, such as
-  `archive/rename.md`'s inventory at `ae56899`.
+  `archive/rename.md`'s inventory at `98f0ee3`.
 - (c) the generated bundles, manifests and lint configs inside designer folders
   (`_ds_bundle.js`, `_ds_manifest.json`, `_adherence.oxlintrc.json`,
   `design/runtime/ds_bundle.js`).
@@ -219,7 +219,7 @@ incl. `INDEX.md` (new names plus an "old name" note); `designs/adr`; the 6 §11 
 `designs/spec/09-keys-and-menus.md`; `README.md`; `app/CLAUDE.md`; `graphic/CLAUDE.md`;
 `app/Sources` (10 files); `core/src/source_window.rs`; and `tools/proof` (28 files). The full
 list comes from `git grep -l -E 'reelcut-(roadmap(-[0-9]+)?|milestones|effects-survey|app-notes|core-notes|remaining)\.md'`
-(88 files at `ed8f282`), with each hit in a file read against exception (e).
+(88 files at `8445ee6`), with each hit in a file read against exception (e).
 
 `name_residue.py` takes, verbatim:
 
@@ -238,7 +238,7 @@ It also drops the `archive/reelcut-…` `KEPT_PATTERNS` entry and re-pins.
 `git mv` the handoff folders and files (the table above). Rewrite links in every file
 `git grep -l -E 'design_handoff_reelcut|reelcut-design-system|Reelcut (Editor|Logo)\.dc\.html|reelcut-(icon|mark|mark-mono)\.svg'`
 lists, less exception (c)'s files and each hit read against exceptions (a), (b), (d) and (e). At
-`ed8f282` it lists 28 files, 26 after exception (c) (`_ds_bundle.js` and
+`8445ee6` it lists 28 files, 26 after exception (c) (`_ds_bundle.js` and
 `_adherence.oxlintrc.json` out): root `CLAUDE.md` (lines 43 and 45),
 `designs/spec/03-window-layout.md`, NM-1's text, five archive files
 (`reelcut-app-notes.md`, `reelcut-milestones.md`, `reelcut-roadmap-12.md`,
@@ -253,7 +253,7 @@ handoff READMEs and `tokens.css` files (`designs/design_handoff_reelcut/README.m
 ### N3 — the issue rule
 
 The issue rule over the 55 files `git grep -l -E 'kpgalligan/reelcut#[0-9]+' -- ':!archive'`
-lists at `ed8f282`. Each of `tools/proof/README.md`'s 12 such lines is classified as recorded
+lists at `8445ee6`. Each of `tools/proof/README.md`'s 12 such lines is classified as recorded
 output or not. Drop that `KEPT_PATTERNS` entry and re-pin.
 
 ### N4 — the prose rule
@@ -290,10 +290,10 @@ phase that touches only `archive/` forces it, the first trap). N1 also runs
 
 ## N0 — the record
 
-**Landed** (2026-10-13, commit `0c703b4`, from `ed8f282` in the worktree):
+**Landed** (2026-10-13, commit `815344a`, from `8445ee6` in the worktree):
 
 - `designs/rename-2.md` (new): this road map — the owner's choices verbatim, the inventory at
-  `ed8f282` (213 files / 2,107 lines, 72 paths), the two name maps, the rules, the traps, the
+  `8445ee6` (213 files / 2,107 lines, 72 paths), the two name maps, the rules, the traps, the
   phases N0–N5 and these record headings.
 - `designs/spec/11-decisions/rename.md`: NM-12, NM-13 and NM-14 appended; an "Amended by NM-12
   and NM-13" paragraph at the end of NM-1 and an "Amended by NM-14" paragraph at the end of NM-8
@@ -308,7 +308,7 @@ phase that touches only `archive/` forces it, the first trap). N1 also runs
 **Measured:** `make gate` PASS in 348 s with every step run (names 1 s, typecheck 7 s, fmt 2 s,
 lint 24 s, test 209 s, app 105 s); `name_residue.py` exit 0, silent; its selftest 7/7 and
 `PASS`; `spec_index_proof.py` 159/159. Every count in the inventory and the phases was checked
-against `ed8f282` and matched.
+against `8445ee6` and matched.
 
 **Review:** pass, with four nits, all applied by the orchestrator before the commit: "four"
 handoff pathspecs (not six), the `.gitignore` row's class (o) named in words, and two
@@ -402,9 +402,9 @@ commits):
   `sharp_chrome.py` (2). The "Reelcut dark chrome" words leading the three `tokens.css`-style
   comments are the designers' text, kept.
 - Kept, each read: `archive/rename.md`'s six hits — 44 (a wildcard inside the owner's verbatim
-  quote), 94 (the inventory pathspec at `ae56899`, (b)), 274 (the literal `HISTORY` tuple R1
+  quote), 94 (the inventory pathspec at `98f0ee3`, (b)), 274 (the literal `HISTORY` tuple R1
   ran against its tree, (b)), 673 and 678 (edit instructions matched against the R2 tree, (b)),
-  757 (what the proof README's line 3705 held at `6fa50c8`, (b)/(d)); the `_ds` folder's
+  757 (what the proof README's line 3705 held at `9dfbf63`, (b)/(d)); the `_ds` folder's
   `_adherence.oxlintrc.json`, `_ds_bundle.js` and `_ds_manifest.json` and the sharp handoff's
   `design/runtime/ds_bundle.js`, (c); NM-13's map in `designs/spec/11-decisions/rename.md`
   (lines 199, 200, 202, 204), (e). Root `CLAUDE.md` lines 43 and 45 were kept for the
@@ -518,7 +518,7 @@ applied before the commit.
 commits):
 
 - The prose rule (NM-12) over `designs/adr/*.md` and `designs/spec/11-decisions/*.md`, each of
-  the 355 old-name lines at `def5418` (126 ADR, 229 §11) read in its paragraph and either
+  the 355 old-name lines at `a87ddc9` (126 ADR, 229 §11) read in its paragraph and either
   substituted in place or kept with its class: 196 lines substituted in 38 files, no file
   changing length, no line reflowed, no "Amended by" line added. Two lines are partly
   substituted and count as kept (`build-velocity.md` 12, `roadmap-10-graphics.md` 981).
@@ -580,7 +580,7 @@ rules"' classes; (x) lines are the ones `KEPT_PATTERNS` already allows):
 `04-checks.txt`):
 
 - `git grep -n -i reelcut -- designs/adr designs/spec/11-decisions | wc -l`: `355` at
-  `def5418`, `161` after (136 counted, 25 (x)).
+  `a87ddc9`, `161` after (136 counted, 25 (x)).
 - The same grep less `\.claude/litecode/reelcut/|devel/reelcut`: `136`, the sum of the new pins
   in both folders (37 ADR, 99 §11); every line it prints is in the classification above.
 - `git diff --numstat -- designs/adr designs/spec`: 38 rows, added equals removed on each, 196
@@ -608,7 +608,7 @@ edit is owed: its `make test` line names `HISTORY` without its members.
 **Landed** (2026-10-13, in the worktree, not committed by the implementer; the orchestrator
 commits):
 
-- **The sweep.** `git grep -n -i reelcut 752af19 -- . ':!archive' ':!designs/design_handoff_chrome'
+- **The sweep.** `git grep -n -i reelcut 60b5857 -- . ':!archive' ':!designs/design_handoff_chrome'
   ':!designs/design_handoff_sharp' ':!designs/design_handoff_clip_inspector'
   ':!designs/clip_inspector_brief' ':!.dupscan' ':!designs/rename-2.md'` printed 432 lines in 47
   files. Each line outside `designs/adr/` and `designs/spec/11-decisions/` was read in its
@@ -648,7 +648,7 @@ commits):
 ### The sweep's table
 
 Classes are "The rules"' letters plus (o), an input for building or running an old tree. Line
-numbers are at `752af19`. Every file outside `HISTORY` and `TEXT_HISTORY` that held the name
+numbers are at `60b5857`. Every file outside `HISTORY` and `TEXT_HISTORY` that held the name
 there has a row.
 
 | File | Kept lines by class | Renamed in N5 |

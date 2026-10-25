@@ -1,6 +1,6 @@
 # M1–M3: the spec's milestones, built and proved
 
-- **Status:** Built (M1 2026-09-05, M2 and M3 2026-09-06, commit `d3fbaa0`); closed. Every
+- **Status:** Built (M1 2026-09-05, M2 and M3 2026-09-06, commit `a4bedf1`); closed. Every
   feature in spec §10's milestone list is implemented and was verified against a running binary.
 - **Original:** `archive/roadmap-1.md` (118 lines) — sections cited below as "orig §x" refer
   to it. The per-milestone narrative it points at is `archive/milestones.md`, condensed in

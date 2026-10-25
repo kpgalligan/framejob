@@ -45,7 +45,7 @@
 // frames in the same run, so a loaded host slows both alike.
 // `equivalence` (K1, issue batch B93 phase 2, #254): the product's
 // `straighten(bgra:…)` against `referenceStraighten` — the fill as it was
-// before B93 (commit 7308ace's `ExportStraightAlpha`, its square of offsets
+// before B93 (commit d149aa1's `ExportStraightAlpha`, its square of offsets
 // sorted by distance), copied verbatim as the oracle — byte for byte over
 // whole planes, padding included: seeded frames of 1 × 1, 3 × 17, 17 × 3,
 // 64 × 64 and 257 × 129 with 16 bytes of padding a row at four visible
@@ -386,7 +386,7 @@ func timing() {
 
 // MARK: - equivalence
 
-/// The fill before B93 phase 2 (commit 7308ace's `ExportStraightAlpha`),
+/// The fill before B93 phase 2 (commit d149aa1's `ExportStraightAlpha`),
 /// copied verbatim but for its names and `bleedRadius`, which is that
 /// commit's 4: K1's oracle.
 enum ReferenceStraightAlpha {

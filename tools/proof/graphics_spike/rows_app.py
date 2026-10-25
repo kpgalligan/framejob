@@ -1,6 +1,6 @@
 """q7 of road map 10 §3: the package, with the UNCHANGED app.
 
-The app at c874069 whitelists only `project.json`, `cache/` and `media/` in
+The app at fbb881f whitelists only `project.json`, `cache/` and `media/` in
 `fileWrapper(ofType:)` (`ProjectDocument.swift:659-677`), so a `graphics/`
 folder cannot survive a save today. `media/` is the STAND-IN: it goes
 through the same lazy `directoryWrapper` a `graphics/` line would call, and
@@ -152,7 +152,7 @@ def q7(say):
     check = git_check()
     measured = {"git_check": check}
     if not check["clean"]:
-        return {"state": "failed", "reason": "tree not at c874069", "measured": measured}
+        return {"state": "failed", "reason": "tree not at fbb881f", "measured": measured}
     app = bounded.run(["make", "app"], 600, cwd=REPO)
     measured["make_app"] = {"rc": app["rc"], "seconds": app["seconds"], "expired": app["expired"]}
     if app["rc"] != 0 or not os.path.exists(APP_BINARY):

@@ -1,9 +1,9 @@
 # Precision: 16-bit-float compositing, deep decode, 10-bit exports (road map "precision", issue batch B94)
 
 - **Status:** Built and closed 2026-10-09. Each phase was one litecode pipeline with its own review:
-  - PR0, the decisions, the `LayerUniforms` toll, PR1's controls and the preview-display spike (`7b80810`)
-  - PR1, the 16-bit-float working depth and output, with its fix pass (`c66d8ab`; `word_looks_baseline.json` re-recorded on its Release build in `b95d752`)
-  - PR2, deep decode (`7853330`)
+  - PR0, the decisions, the `LayerUniforms` toll, PR1's controls and the preview-display spike (`179376d`)
+  - PR1, the 16-bit-float working depth and output, with its fix pass (`914b56a`; `word_looks_baseline.json` re-recorded on its Release build in `bb5de2a`)
+  - PR2, deep decode (`8cb26d9`)
   - PR3, the `hevc_10bit` row, the documents, the close (uncommitted when this was written)
 - **Original:** `archive/precision.md` is the full record. It has no section numbers, so it is cited by phase: "orig PR1" is its "PR1 — …" section.
 - **Spec decisions:** PR-1..PR-5 in spec §11 (`designs/spec/11-decisions/precision.md`). They stay binding, and where the original words them differently, §11's text wins:

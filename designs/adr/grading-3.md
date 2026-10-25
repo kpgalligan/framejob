@@ -1,9 +1,9 @@
 # Grading tier 3: honest sources, HDR→SDR at step 0, camera log (road map "grading-3")
 
 - **Status:** Built and closed 2026-10-12. Each phase was one litecode pipeline with its own review, worked in `~/devel/reelcut-grading3` on branch `grading-3` and merged into main alone after its gate (GR-17):
-  - T3-0, the road map, GR-15…GR-20 and `DestinationPass`'s pure move (`716720c`)
-  - T3-1, honest sources and Frame Job's HDR→SDR at step 0 (GR-15) (`e76d827`)
-  - T3-2, camera log footage (#264, GR-16, format 19) (`c47d97d`)
+  - T3-0, the road map, GR-15…GR-20 and `DestinationPass`'s pure move (`e4f9ec1`)
+  - T3-1, honest sources and Frame Job's HDR→SDR at step 0 (GR-15) (`8e20fff`)
+  - T3-2, camera log footage (#264, GR-16, format 19) (`2a8421b`)
   - T3-3, the close: H1a, H7 and TI's export wall time, this record (the commit that moved this record to `archive/`)
 - **Original:** `archive/grading-3.md` is the full record. It has no section numbers, so it is cited by phase: "orig T3-1" is its "T3-1 — honest sources and Reelcut's HDR→SDR at step 0" section.
 - **Spec decisions:** GR-15..GR-20 in spec §11 (`designs/spec/11-decisions/grading-3.md`). They stay binding, and where the original words them differently, §11's text wins:
@@ -50,8 +50,8 @@ GR-1 deferred tier 3 "as issues, not out"; tier 1's close filed #256 (HDR above 
 
 | Measure | Bound | Measured | Command |
 |---|---|---|---|
-| SDR identity (T3-1) | byte-identical, picks equal | 12 single-source scenes byte-identical, picks equal; H1m's two mixed projects equal to 716720c's | `RC_PROOF_APP=release hdr_proof.py compare tools/proof/work/t3-1/ctl` H1, H1m |
-| Alpha and WebM in a converting composition (T3-3) | byte-identical to 716720c at the non-HLG ticks; CONTROL: the HLG tick differs | ProRes 4444 alpha, HEVC alpha and VP9 WebM frames byte-identical with equal picks; the HLG tick differs (143,449 16-bit samples, grey pick 0.424 against 0.545) | `RC_PROOF_APP=release hdr_proof.py --only H1a,H7,Z1` H1a |
+| SDR identity (T3-1) | byte-identical, picks equal | 12 single-source scenes byte-identical, picks equal; H1m's two mixed projects equal to e4f9ec1's | `RC_PROOF_APP=release hdr_proof.py compare tools/proof/work/t3-1/ctl` H1, H1m |
+| Alpha and WebM in a converting composition (T3-3) | byte-identical to e4f9ec1 at the non-HLG ticks; CONTROL: the HLG tick differs | ProRes 4444 alpha, HEVC alpha and VP9 WebM frames byte-identical with equal picks; the HLG tick differs (143,449 16-bit samples, grey pick 0.424 against 0.545) | `RC_PROOF_APP=release hdr_proof.py --only H1a,H7,Z1` H1a |
 | The first-frame flash (T3-1) | frame 0 = frame +5 ±1; render = export ±1 | frame 0 = frame +5 exactly on all four scenes; render vs export ≤ 1 | `… compare …` H2 |
 | The conversion against its formula and Apple (T3-1) | ±1 at 8 bits; Apple's points within 3/255 | worst 1 level; HLG +0.96 / −0.86 / +0.12 / 0.00, PQ −0.81 / −0.37 | `… compare …` H3 |
 | A saturated HLG patch (T3-1) | hue within 2°, inside the envelope | 383 columns, worst hue gap 0.21°; patch [0, 144, 255] against the oracle's [0, 143, 255] (control [107, 215, 255]) | `… compare …` H4 |
@@ -59,7 +59,7 @@ GR-1 deferred tier 3 "as issues, not out"; tier 1's close filed #256 (HDR above 
 | HDR10 static metadata naming a 4,000 cd/m² peak, not the conversion's 1,000 (T3-3) | CONTROL: ffprobe names both and the peak on `pq_hdr10`, none on `pq_plain`; grey row = oracle ±1; renders equal | both and `max_luminance=40000000/10000`, `max_content=4000` named, and none; worst 1 level on each, x=512 183 = 183; the two PNGs byte-identical | `RC_PROOF_APP=release hdr_proof.py --only H7,Z1` H7 |
 | Step 0 at 4K (T3-1) | recorded | HLG twin averages 2.02 / 1.76 ms (120 input passes each), BT.709 1.55 / 1.32 ms, mean difference 0.455 ms; loadavg 17.39 / 29.86 / 23.86 | `RC_PROOF_APP=release hdr_proof.py --measure` TI |
 | Step 0 at 4K, and the export's wall time (T3-3) | recorded | HLG 2.12 / 1.74 ms (120 passes each), wall 0.96 s; BT.709 1.62 / 1.29 ms (0 passes), wall 0.95 s; battery, powermode 0, loadavg 21.41 / 24.27 / 17.23 before | `RC_PROOF_APP=release hdr_proof.py --measure` TI |
-| An unconverted layer (T3-1) | +0.028 / +0.061 ms (1080p / 4K) | −0.007 / −0.001 ms; TA 0.001 / 0.000 | `grading_spike.py --measure --tree --tree-base 716720c` TC |
+| An unconverted layer (T3-1) | +0.028 / +0.061 ms (1080p / 4K) | −0.007 / −0.001 ms; TA 0.001 / 0.000 | `grading_spike.py --measure --tree --tree-base e4f9ec1` TC |
 | Each log curve on its ramp (T3-2) | within a level | worst 1 level on every grey fixture, 0 on both cards; patches [1/2/3, 107, 200] = the oracle | `RC_PROOF_APP=release log_proof.py compare tools/proof/work/t3-2/ctl` L1 |
 | Use LUT… against ffmpeg's `lut3d` (T3-2) | ±2 | worst 1 (S-Log3), 0 (both cards) | `… compare …` L5 |
 | The log maths in the probe (T3-2) | 2·10⁻³ | worst 9.1·10⁻⁴; the makers' codes within ±0.005 of reflectance | `… compare …` LP3 |
@@ -109,7 +109,7 @@ Filed at the close, each `ai-drafted` and `low-priority`:
 - #293: an AV1 track's range — measured in issue batch B101: AV1 in profiles 0 and 1 carries `FullRangeVideo`, read by AVFoundation from its `av1C`, but profile 2 gets no key, so a full-range profile 2 AV1 reads as video range; no code; the owner accepted it as a known limit (2026-10-14), closed (GR-23's "Measured (issue batch B101, #293)"; `log_proof.py` L15 stays as a guard).
 - #294: the VP9 gap L14 allows — measured in issue batch B101 (`log_proof.py decode-gap`): verdict **neither**, since VP9's reader codes and `64RGBAHalf` frames equal HEVC's, so the cause lies between the reader and the compositor's source frames; left open for the owner with the figures (GR-23's "Measured (issue batch B101, #294)"); issue batch B102 placed it in the generator's 8-bit image of a VP9 file, and it is closed by PR-12 (issue batch B103): a frame showing a deep VP9 track is read through export's reader.
 
-Closed: #264 as built (T3-2, `c47d97d`, GR-16); its "done when" on a real clip is GRD-17 and GRD-18. #256 is closed into GR-15 (HDR sources converted honestly, T3-1), GR-20 (wide gamut for SDR projects, closed by the owner, choice 9a), #276 (linear light) and #277 (HDR, EDR and HDR export).
+Closed: #264 as built (T3-2, `2a8421b`, GR-16); its "done when" on a real clip is GRD-17 and GRD-18. #256 is closed into GR-15 (HDR sources converted honestly, T3-1), GR-20 (wide gamut for SDR projects, closed by the owner, choice 9a), #276 (linear light) and #277 (HDR, EDR and HDR export).
 
 ## Where to look in the original
 

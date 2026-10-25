@@ -62,7 +62,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Darkens the canvas outside a rectangle or ellipse, optionally magnifying
-/// what is inside it (spec §4.2, M3) — the stand-in for a screencast editor's
+/// what is inside it (spec §4.2, M3) — a stand-in for a
 /// freehand callout that works on any footage.
 ///
 /// A `video` prop, not a `shape` one, though spec §4.2 first listed it

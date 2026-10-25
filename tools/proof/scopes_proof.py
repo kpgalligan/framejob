@@ -62,7 +62,7 @@ kernels compiled from the tree's `Waveform.metal`):
   and Cr extents at ×2 and ×4 are 2× and 4× ×1's, ±1 bin.
 - **S12**: 75 % red counts every pixel at ×1 and none at ×2, `off_plot` the
   pixels; at ×1 all four kinds' counts equal an analyser over the T4-0 tree's
-  shader (`git show 31f3aa1:…/Waveform.metal`) on the six fixtures, the six
+  shader (`git show 28ada7d:…/Waveform.metal`) on the six fixtures, the six
   75 % cards and pure red.
 - **S14**: the panel's zoom: both slots ×1 on open; a zoom re-attaches that
   slot's pass and asks for one frame; vectorscope ×1 over ×4 is two passes,
@@ -242,10 +242,10 @@ H_ROWS = {"H1", "H2", "H3", "H4"}
 SCOPES = ["View", "Scopes"]
 ZOOMS = [1, 2, 4]
 # The T4-0 tree, whose ×1 counts S12 holds the tree's to.
-BASELINE = "31f3aa1"
+BASELINE = "28ada7d"
 # `--central-ab` (#296): the last tree with the vectorscope's central path,
 # the rounds, and the precision every fixture's spread must reach.
-CENTRAL_BASE = "c7c0dbf"
+CENTRAL_BASE = "be0187f"
 CENTRAL_ROUNDS = 60
 CENTRAL_PRECISION = 0.10
 CENTRAL_ANCHOR = "bool central = "

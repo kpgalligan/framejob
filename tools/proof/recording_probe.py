@@ -470,8 +470,8 @@ check reads — parsed for its 75 names, the 55 core ops (`ReelOp.coreNames()`)
 plus the twenty app-state tools; the LAST twelve in the order the old file
 had them (`import_media`, `import_captions`, `consolidate_media`,
 `add_media`, `relink_media`, `remove_media`, `transcribe`,
-`export_captions`, `render_frame`, `export` — `df6b916^`'s order — with
-`set_media_color`, which c47d97d added among the media rows, after
+`export_captions`, `render_frame`, `export` — `7a198db^`'s order — with
+`set_media_color`, which 2a8421b added among the media rows, after
 `remove_media`, then `record_screen`); `scope` on every op tool's schema and on none of the
 twenty, `record_screen`'s among them; and `record_screen`'s declared
 argument names. 7d (R2d): the tool's description names the two menus'
@@ -925,7 +925,7 @@ running). Three of them put back the code before the batch:
                     27/34: W1's six titles from 59:59 up, W2's label row.
 
 `--sources` over `git archive HEAD` of the tree before the batch
-(`22b1a68`) scores 0/1 and exits 1: the probe names `unreadable`,
+(`5e81c5a`) scores 0/1 and exits 1: the probe names `unreadable`,
 `UnreadableSegment` and `pauseOrResumeRecording`, so it does not build
 there — a build failure, the three mutants above being the behavioural
 controls.
@@ -8720,8 +8720,8 @@ APP_STATE_TOOLS = [
     "export_status", "cancel_export", "detect_fillers", "transcribe_for_fillers",
     "get_transcript",
 ]
-# `git show df6b916^:app/Sources/AgentCatalog.swift`'s last ten rows, in order,
-# with `set_media_color` (c47d97d) after `remove_media` and `export_status`,
+# `git show 7a198db^:app/Sources/AgentCatalog.swift`'s last ten rows, in order,
+# with `set_media_color` (2a8421b) after `remove_media` and `export_status`,
 # `cancel_export` (#326) after `export`, and `get_transcript` (CT-4) after `transcribe`.
 FILE_GROUP_ORDER = [
     "import_media", "import_captions", "consolidate_media", "add_media", "relink_media",

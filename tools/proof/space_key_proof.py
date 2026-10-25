@@ -2,7 +2,7 @@
 """kpgalligan/framejob#35 — Space toggles play wherever nothing is typing.
 
     python3 tools/proof/space_key_proof.py
-    python3 tools/proof/space_key_proof.py --baseline b69972e
+    python3 tools/proof/space_key_proof.py --baseline 1888069
 
 One instrument, the probe `space_key_probe.swift`, compiled AS `main.swift`
 over every file in `app/Sources` but the app's own `main.swift` on

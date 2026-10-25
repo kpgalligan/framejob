@@ -1,6 +1,6 @@
 # Reelcut — road map 7: deepening
 
-**Status, reviewed 2026-09-21 at `49af3f4`: FOUR CANDIDATES BUILT AND CLOSED.**
+**Status, reviewed 2026-09-21 at `484ab2f`: FOUR CANDIDATES BUILT AND CLOSED.**
 **D1** centralized caller-patch validation (§1–§3); **D2** separated applied,
 identity and refusal outcomes (§4–§6); **D3** published the core's operation
 arguments and made the tools read them (§7–§9). **The source window** is
@@ -150,7 +150,7 @@ One entry per ticket, written when it lands.
 
 ### 2.1 D1·1 — the core names the path and the value (kpgalligan/reelcut#2)
 
-**Commits.** `ebab0db` (the ticket) and `b02e4df` (what its review found,
+**Commits.** `0b3df4e` (the ticket) and `99d9ab5` (what its review found,
 below).
 
 **What landed.** Core and documents only. No Swift changed, so an agent does
@@ -372,7 +372,7 @@ back behind the strip (1 test), `without_nulls` made the identity (2), and
 
 ### 2.2 D1·2 — what a patch may carry (kpgalligan/reelcut#3)
 
-**Commits.** `a36314b` (the toll), `a5424cf` (the ticket) and `5157501` (what
+**Commits.** `1e425ad` (the toll), `50392a1` (the ticket) and `52feffd` (what
 its review found, below).
 
 **What landed.** Core and documents only, again: the agent door still
@@ -608,7 +608,7 @@ the Swift launder comes out.
 
 ### 2.3 D1·3 — `set_video` forwards the caller's patch (kpgalligan/reelcut#4)
 
-**Commits.** `eb17289` (the ticket) and `439d083` (what its review found,
+**Commits.** `dacf19d` (the ticket) and `65d058a` (what its review found,
 below).
 
 **What landed.** The first door. `set_video` hands the core the object the
@@ -827,8 +827,8 @@ script in the run list and a section of its own.
 
 ### 2.4 D1·4 — the remaining property doors forward raw (kpgalligan/reelcut#5)
 
-**Commits.** `7144586` (the proof's harness, alone), `07a75eb` (the ticket)
-and `f9b5276` (what its review found, below).
+**Commits.** `08ea034` (the proof's harness, alone), `d19d785` (the ticket)
+and `6938f0b` (what its review found, below).
 
 **What landed.** Eight doors, all of them copying D1·3's shape. Every
 caller-authored object the agent can send is now the core's to read, bar
@@ -1084,7 +1084,7 @@ are #6 by design, and the deletion sweep is #7's.
 
 ### 2.5 D1·5 — the end-state and region doors forward raw (kpgalligan/reelcut#6)
 
-**Commits.** `d8b9c58` (the ticket) and `8c156da` (what its review found,
+**Commits.** `be3a04b` (the ticket) and `209ccb1` (what its review found,
 below).
 
 **What landed.** The last two doors, and with them the last hand check in
@@ -1139,7 +1139,7 @@ core's to read.
   spotlight shape or text animation kind is ``bad value at "<path>" in an
   action end patch: unknown variant `glow`, expected one of …``.
 - **Three things that used to LAND do not** (all measured against the build
-  at `09879b8`): `{"video": {"shadow": 5}}` was `.some(nil)` through
+  at `9bcb5f2`): `{"video": {"shadow": 5}}` was `.some(nil)` through
   `ActionPatch`'s lenient decode and REMOVED the shadow the action was
   animating, answering ok; `{"video": {"shadow": {"color": [1,0,0]}}}` had
   its alpha filled in by `withOpaqueColors`, the last door where a
@@ -1232,7 +1232,7 @@ handler kept.
 | the `video.motion` refusal deleted from `set_action_end` | patch_door **252/258** |
 | `prune_removed` made a no-op (a null stops removing) | patch_door **256/258** |
 | the region's root-path fix reverted (`region..` again) | patch_door **257/258** |
-| **D1·5's whole Swift half reverted** (both files at `09879b8`) | patch_door **219/238, ABORTED**; phase3 123/123; phase6 166/168 |
+| **D1·5's whole Swift half reverted** (both files at `9bcb5f2`) | patch_door **219/238, ABORTED**; phase3 123/123; phase6 166/168 |
 
 Two rows are worth reading rather than counting. **phase3 stays green under
 the region mutants**, and that is the honest reason §11 had to exist: its
@@ -1353,7 +1353,7 @@ above.
 
 ### 2.6 D1·6 — contract and record (kpgalligan/reelcut#7)
 
-**Commits.** `89ace12` (the ticket) and `cc9ab58` (what its review found,
+**Commits.** `d3d289d` (the ticket) and `5cac1c3` (what its review found,
 below).
 
 **What landed, and what deliberately did not.** No behaviour changed at any
@@ -1766,7 +1766,7 @@ One entry per ticket, written when it lands.
 
 ### 5.1 D2·1 — the core answers in three arms (kpgalligan/reelcut#9)
 
-**Commits.** `5cd4fcf` (the ticket) and `2148190` (what its review found,
+**Commits.** `a6c48f1` (the ticket) and `0571d86` (what its review found,
 below).
 
 **What landed.** Core, the FFI's three files, and the documents those
@@ -1903,7 +1903,7 @@ file 220, against a 400-line cap.
   `scope.rs`'s contract, `edit_track.rs`'s module doc and
   `check_overlap_rule`'s own.
 
-**What its review found.** The two-axis review ran against `a981bbd`.
+**What its review found.** The two-axis review ran against `6946428`.
 Fixed:
 
 - **Five doc comments still spelled an op's answer `None`** after the
@@ -1979,7 +1979,7 @@ the seam's proof is born.
 
 ### 5.2 D2·2 — the app switches on three arms (kpgalligan/reelcut#10)
 
-**Commits.** `25d3030` (the ticket) and `3042b3e` (what its review found,
+**Commits.** `169bf5e` (the ticket) and `a225bfb` (what its review found,
 below).
 
 **What landed.** The app side of the seam D2·1 opened, and the seam's proof.
@@ -2131,7 +2131,7 @@ core's edge"; `tools/proof/README.md` gains a section for the proof and one
 for the probe, and both are in its run list. Spec §6's op table, the
 glossary and `app/CLAUDE.md`'s Rules are still D2·5's.
 
-**What its review found.** The two-axis review ran against `25d3030`, twice
+**What its review found.** The two-axis review ran against `169bf5e`, twice
 on each axis (the first pair of agents was re-run after a lost hand-off, and
 the second pair found one thing the first had not). Fixed:
 
@@ -2167,7 +2167,7 @@ the second pair found one thing the first had not). Fixed:
 Judged not real:
 
 - *The size toll was not "landed and gated alone".* It was a tightening, not
-  a pure move, and D2·1's own review set that precedent (`2148190` tightened
+  a pure move, and D2·1's own review set that precedent (`0571d86` tightened
   `ReelCore.swift` back to 1507 inside the fix commit). No file grew.
 - *`ReelEdit.swift`'s doc names a future ticket* ("until road map 7's D2·3
   gives them their sentences"). It mirrors `Outcome::Identity`'s doc, which
@@ -2220,8 +2220,8 @@ files came down or held. Three things are named rather than done:
 
 ### 5.3 D2·3 — the remaining rules speak (kpgalligan/reelcut#11)
 
-**Commits.** `1f8cf38` (the size toll, alone and pure), `a531fb0` (the
-ticket) and `0b91795` (what its review found, below).
+**Commits.** `83c9db0` (the size toll, alone and pure), `454f2aa` (the
+ticket) and `f4d5880` (what its review found, below).
 
 **What landed.** Core only, plus the tests and the proof that measure it and
 four app comments the change made false. No FFI change, no new export, no op
@@ -2342,7 +2342,7 @@ instrument that can. The eighth is the same shape for a sentence no MCP
 caller can reach at all. Both are the reason those sections are `shadowed`
 and not `refused`, and both become proof mutants at D2·4.
 
-**Size.** The toll was paid first and alone (`1f8cf38`): `edit_track.rs` was
+**Size.** The toll was paid first and alone (`83c9db0`): `edit_track.rs` was
 671 and had to take three refusals, so `set_canvas` with `check_dimension`,
 `rescale` and `resnap` left for `core/src/edit_canvas.rs` (**224** lines,
 under the 400-line new-file cap) — the cut `core/CLAUDE.md` had already
@@ -2394,9 +2394,9 @@ glossary, spec §5.5 and both rulebooks' Errors rules are D2·5's.
   `core/src/edit_track.rs` at 674 and `core/src/edit_clip.rs` at 1042. D2·5
   regenerates it against the tree; `edit_track.rs` comes off it.
 
-**What its review found.** The two-axis review ran against `a531fb0`. The
+**What its review found.** The two-axis review ran against `454f2aa`. The
 standards axis found no hard violation of a documented standard; both axes
-found real things. Fixed in `0b91795`:
+found real things. Fixed in `f4d5880`:
 
 - **A latent panic in `clip_list`.** `some[..some.len() - 1]` underflows on
   an empty slice, which `core/CLAUDE.md`'s "no input may panic" forbids
@@ -2456,8 +2456,8 @@ Judged not real:
 
 ### 5.4 D2·4 — the app's guesses are deleted (kpgalligan/reelcut#12)
 
-**Commits.** `06dd67b` (the ticket), `aefb0b9` (the mutant table) and
-`4d54d69` (what its review found, below).
+**Commits.** `7d8c968` (the ticket), `86ee23a` (the mutant table) and
+`b434d62` (what its review found, below).
 
 **What landed.** App only — three agent handlers, two proof scripts, the
 app's rulebook and the proof README. No core change, no FFI change, no op
@@ -2640,9 +2640,9 @@ still D2·5's.
   spelling. Only the comments this ticket made FALSE were fixed; the sweep
   is still D2·5's.
 
-**What its review found.** The two-axis review ran against `aefb0b9`. Both
+**What its review found.** The two-axis review ran against `86ee23a`. Both
 axes found real things; neither found a hard violation of a documented
-standard in the CODE. Fixed in `4d54d69`:
+standard in the CODE. Fixed in `b434d62`:
 
 - **A spec decision reversed in a commit message.** The spec axis put it
   exactly right: the reason for keeping `set_transition_style`'s refusal was
@@ -2675,7 +2675,7 @@ standard in the CODE. Fixed in `4d54d69`:
   that it points a caller at its volumes instead of its cache. Both are
   rewritten, and the file is **162** against the 156 it started at.
 - **`designs/reelcut-app-notes.md` still described the deleted rewording**
-  as live behaviour, and `aefb0b9` was not named in the Commits line.
+  as live behaviour, and `86ee23a` was not named in the Commits line.
 
 Judged not real:
 
@@ -2695,9 +2695,9 @@ Judged not real:
 
 ### 5.5 D2·5 — contract and record (kpgalligan/reelcut#13)
 
-**Commits.** `315b7f6` (the ticket), `dcdc7fc` (the mutant table), `bfbc2ac`
-and `33a8ecc` (the adversarial read-back: four corrections to the record, and
-the one design document that is not a closed record), and `c91c6fc` (what
+**Commits.** `eebff72` (the ticket), `0e90b83` (the mutant table), `50816cf`
+and `7990e07` (the adversarial read-back: four corrections to the record, and
+the one design document that is not a closed record), and `3320182` (what
 its review found, below).
 
 **What landed.** Documents, doc comments and two rotted instruments. No
@@ -2941,8 +2941,8 @@ point of phase 8c — where a year's worth of scripts would once have passed it.
 **And the probe's one failing check is the one no MCP call can reach**: a
 refusal in front of `applyEdit`, which is where a person meets it.
 
-**What its review found.** The two-axis review ran against `bfbc2ac`, and
-everything below landed in `c91c6fc`. The
+**What its review found.** The two-axis review ran against `50816cf`, and
+everything below landed in `3320182`. The
 spec axis found all seven acceptance criteria met; both axes found the same
 two numbers wrong, and the standards axis found two lines of my own making.
 Fixed in the follow-up commit:
@@ -2950,7 +2950,7 @@ Fixed in the follow-up commit:
 - **The one number the ticket's own claim rests on was not regenerated.**
   `core/src/edit_track.rs` is **522**, and both this record and the ledger's
   header said 520 — D2·3's record's figure, which was its TICKET commit's;
-  its review fix (`0b91795`) took the file to 522 and the number was never
+  its review fix (`f4d5880`) took the file to 522 and the number was never
   chased. §6's measured table below had it right, so the document
   contradicted itself. "Regenerated row by row against `wc -l`" has to
   include the prose, not only the table.
@@ -3250,7 +3250,7 @@ and the two cross-build reference instruments that can no longer be built.
 
 ### 8.1 D3·1 — the op table, and a test that asks the decoder (kpgalligan/reelcut#15)
 
-**Commits.** `589d5b1` (the ticket) and `ade23da` (what its review found,
+**Commits.** `af10345` (the ticket) and `338de9f` (what its review found,
 below).
 
 **What landed.** Core only. No Swift file, no FFI export, no catalog entry,
@@ -3371,7 +3371,7 @@ two mutants of its own, and raised the four extra kinds and the unproven
 table having no production consumer YET is the spec's own expand-then-migrate
 sequence; `Kind::Object` having no wrong-kind probe IS the claim the kind
 makes; and `OP_COUNT` having no compile-time tie to the enum's arm count is
-the exposure the old `[&str; 57]` already had. The fixes are `ade23da`.
+the exposure the old `[&str; 57]` already had. The fixes are `338de9f`.
 
 **Owed.** The whole of D3 past this ticket: the JSON Schema function over the
 17 kinds, the query export, the catalog's migration, the fifth part of the
@@ -3380,8 +3380,8 @@ argument names in Python.
 
 ### 8.2 D3·2 — the table goes out through the FFI (kpgalligan/reelcut#16)
 
-**Commits.** `ca84058` (the ticket), `b71d71b` (the probe's required-ness
-claim and the mutant table) and `18cd231` (what the review found,
+**Commits.** `a506e4f` (the ticket), `8042095` (the probe's required-ness
+claim and the mutant table) and `beaa389` (what the review found,
 below).
 
 **What landed.** The table leaves the core. No catalog file and no
@@ -3507,7 +3507,7 @@ after the tree was committed, and each caught by both instruments:
 | `scope` inserted into every published schema | `no_schema_carries_an_envelope_key` and `every_schema_declares_its_arguments_and_only_them` FAILED, 8 passed | 26/28 |
 | a required argument (`clips`) published as optional | `required_is_what_the_table_requires_in_table_order` FAILED, 9 passed | 27/28 (the check the mutant bought) |
 
-**What the review found.** Two axes, fixed point `e7c1883`, spec source the
+**What the review found.** Two axes, fixed point `0e0ea21`, spec source the
 ticket plus #14. The **Spec** axis re-ran both instruments rather than
 trusting this record — the ten Rust tests, the probe's 28, `cargo fmt
 --check` and `make lint` — and re-derived the kind mapping against the real
@@ -3520,7 +3520,7 @@ because the sweep fails on an export the header declares and it never calls.
 The **Standards** axis found eight things, five of which changed code or
 documents:
 
-- **the record's `PLACEHOLDER_TWO`**, which is the very omission `e7c1883`,
+- **the record's `PLACEHOLDER_TWO`**, which is the very omission `0e0ea21`,
   the commit before this ticket, exists to fix;
 - **`ReelCore.swift` taking 63 lines while over its cap** when only the
   function naming `rc_op_schemas` had to be there. `ReelOpSchema` went to a
@@ -3553,9 +3553,9 @@ stop re-typing argument names in Python.
 
 ### 8.3 D3·3 — the clip tools read the core (kpgalligan/reelcut#17)
 
-**Commits.** `a14f39e` (the prefactor: the table's bound), `e6c600b` (the
-migration, the declarations list and the proof), `a9e487c` (the mutants
-and the neighbouring proofs) and `f8156c9` (what the review found, below).
+**Commits.** `b599b8d` (the prefactor: the table's bound), `8cf2e64` (the
+migration, the declarations list and the proof), `5fd6b15` (the mutants
+and the neighbouring proofs) and `484b5fb` (what the review found, below).
 
 **The ticket's amendment, and why it came first.** #16 measured two facts
 that would have made two tools WORSE on the way through, so the ticket
@@ -3659,7 +3659,7 @@ a caller nothing; one wider than what is accepted is a promise the app
 breaks.**
 
 **The before/after capture, and every difference it found.** `tools/list`
-was captured from the binary built at `f3a8d06` and from the migrated one on
+was captured from the binary built at `6120154` and from the migrated one on
 the same client, 77 tools each, the catalog's ORDER byte-identical and every
 tool description and every argument description identical word for word.
 Forty tools differ, in exactly five ways — three fixes, one declared
@@ -3759,7 +3759,7 @@ mutant that took two rows down would mean the rows were not independent.
 | `split.at`'s required-ness row set back to `.theCores`, so the tool demands what the playhead supplies | *split takes the playhead when `at` is left out* — `required ['at']` |
 | `wipe_down` dropped from the CORE's `Kind::Transition` | *set_transition's kinds* — the core's twelve against `TransitionKind.allCases`'s thirteen. Caught twice over: `core/tests/op_table.rs`'s vocabulary test fails on the same mutant |
 
-**What the review found.** Two axes, fixed point `f3a8d06`, spec source the
+**What the review found.** Two axes, fixed point `6120154`, spec source the
 ticket with its amendment plus spec kpgalligan/reelcut#14. The **Spec** axis
 re-ran the Rust suite and re-measured every count in this record rather than
 trusting it (941 → 791, 472 → 535, 254, `"enum":` 0, `required: [` 0,
@@ -3791,7 +3791,7 @@ documents:
 - **the size ledger was stale for a file this ticket touched** —
   `AgentServer.swift` 771 → 779, eight lines of doc comment;
 - **`PLACEHOLDER_THREE` in this record's own Commits line**, which is exactly
-  the omission `e7c1883` exists to fix for D3·1;
+  the omission `0e0ea21` exists to fix for D3·1;
 - **status prose in a frozen file**: the parity check's doc comment said
   which ticket the fifth part waits for and why. It now says what is true of
   the code — the four other groups declare their own arguments, which is why
@@ -3811,7 +3811,7 @@ schemas accessor (#19); the four other catalog groups; and the proof scripts
 that still re-type argument names in Python.
 
 **The orchestrator's verification found one more, and it is the one worth
-reading** (`22a0d47`). This ticket's capture recorded
+reading** (`3f57020`). This ticket's capture recorded
 `ripple_delete_ranges.ranges` losing its `minItems: 1` as one of three
 FIXES. It is not a fix. `AgentServer+Clips.swift`'s `rippleDeleteRanges`
 refuses an empty list by name — *"ranges is empty — name at least one
@@ -3835,8 +3835,8 @@ comparison is a tautology.
 
 ### 8.4 D3·4 — the remaining tools read the core (kpgalligan/reelcut#18)
 
-**Commits.** `74e9b29` (the migration and the proof), `4a0b33f` (the
-mutants and the whole proof tree) and `dcd9466` (what the review found,
+**Commits.** `0747205` (the migration and the proof), `190f8dd` (the
+mutants and the whole proof tree) and `f249059` (what the review found,
 below — including the one row the review added).
 
 **What landed.** The last fourteen op tools stopped restating the table:
@@ -3878,7 +3878,7 @@ declarations list is thirteen rows now, and `split`, `paste`, `freeze_frame`
 and `add_marker` are one reason written four times. Nothing else needed one.
 
 **The before/after capture, and every difference it found.** `tools/list`
-was captured from the binary built at `17c91cf` and from the migrated one,
+was captured from the binary built at `d09a04e` and from the migrated one,
 both canonicalised with sorted keys: 77 tools, the catalog's ORDER
 identical, **every tool description and every argument description identical
 word for word** (no prose arrived and none went, which is the criterion D3·3
@@ -4003,7 +4003,7 @@ and the app rebuilt, `tools/list` is byte-identical to the capture taken when
 the migration landed, `op_catalog_proof.py` is 22/22 and the parity log on
 port 4893 printed nothing.
 
-**What the review found.** Two axes, fixed point `17c91cf`, spec source the
+**What the review found.** Two axes, fixed point `d09a04e`, spec source the
 ticket plus spec kpgalligan/reelcut#14. The **Spec** axis re-derived the
 counts rather than trusting this record (58 `opTool(` occurrences less the
 one declaration = 57 call sites; every surviving `"type"`, `"enum"` and
@@ -4026,7 +4026,7 @@ Five findings changed code or documents:
   rather than a regression — and it is the fourth difference an agent sees:
   `set_canvas.fps` items `minimum` 0 → **1**;
 - **`PLACEHOLDER_ONE` and `PLACEHOLDER_TWO` in this record's own Commits
-  line**, which is the omission `e7c1883` exists to fix and which D3·3's
+  line**, which is the omission `0e0ea21` exists to fix and which D3·3's
   review found in the same place;
 - **the size ledger was stale for the one file that went UP** —
   `AgentServer.swift` 779 → 783, four lines of doc comment, which the §3
@@ -4060,7 +4060,7 @@ declarations too — and `op_schema_probe.py` **28/28**, which asserts the
 CORE's frame rate and is untouched by a narrowing the app makes.
 
 **The orchestrator's verification found the same asymmetry one layer down**
-(`dd32de9`). D3·3's prefactor proved that every bound the table PUBLISHES is
+(`3a3e80b`). D3·3's prefactor proved that every bound the table PUBLISHES is
 one the core refuses outside. That is half a check: a row with no bound makes
 no claim, so nothing falsifies its absence. Measured rather than reasoned —
 the mutant was run — dropping `set_canvas.width`'s bound from the table left
@@ -4088,9 +4088,9 @@ sentence for a bound.
 
 ### 8.5 D3·5 — the fifth part of the check, and a proof for all 57 (kpgalligan/reelcut#19)
 
-**Commits.** `77b0bb8` (the fifth part and the proof), `c8fbe12` (the
-mutants and the whole proof tree), `3d120bb` (what the review found, below)
-and `dd61cb1` (the fifth mutant, and all five re-scored against the
+**Commits.** `64a25da` (the fifth part and the proof), `dfc671d` (the
+mutants and the whole proof tree), `0c28aa6` (what the review found, below)
+and `a3ef217` (the fifth mutant, and all five re-scored against the
 rows the review added).
 
 **What landed.** The startup parity check's fifth part, the proof that puts
@@ -4330,9 +4330,9 @@ three that read the catalog's shape plus the two that drive that tool:
 `clip_catalog_proof` **24/24**, `phase1_proof` **66/66** and `phase2_proof`
 **85/85**, parity log empty on all five ports.
 
-**What the review found.** Two axes, fixed point `10b301b`, spec source the
+**What the review found.** Two axes, fixed point `f3b9724`, spec source the
 ticket plus spec kpgalligan/reelcut#14. The **Spec** axis re-derived the drift
-from `10b301b`'s own catalog against `op_table.rs` rather than trusting the
+from `f3b9724`'s own catalog against `op_table.rs` rather than trusting the
 table above — exactly ten undescribed over `set_track` (5), `set_marker` (2),
 `add_marker` (1) and `set_canvas` (2), zero orphan prose, zero of either at
 HEAD — confirmed both directions, the envelope exclusion, the declarations
@@ -4355,7 +4355,7 @@ Five findings changed code or documents:
   and one named exception, and it is the only part of this ticket that found a
   question nothing in the tree was asking;
 - **`PLACEHOLDER_TWO` in this record's own Commits line**, which is the third
-  consecutive ticket with that finding — `e7c1883` exists to fix it for D3·1,
+  consecutive ticket with that finding — `0e0ea21` exists to fix it for D3·1,
   D3·3's review found it and D3·4's review found it again;
 - **`recording_proof.py` had a SECOND stale exact-count comment** two lines
   above the one this ticket corrected, saying "this is that script" — so the
@@ -4394,8 +4394,8 @@ files depend on a third to save four lines.
 
 ### 8.6 D3·6 — contract and record (kpgalligan/reelcut#20)
 
-**Commits.** `acb75ed` (the documents, the read-back and this section) and
-`f39614b` (what the review found, below).
+**Commits.** `b63e8ad` (the documents, the read-back and this section) and
+`cafb228` (what the review found, below).
 
 **What landed.** Documents, and seventeen corrections to sentences that had
 gone false — thirteen of them this series' doing. No behaviour anywhere:
@@ -4548,7 +4548,7 @@ what it leaves owed. The two probes that still skip (`preview_validity_probe`
 `phase5_chrome`'s 45 and `recording_probe`'s 2, which are the standing
 reference-tree skip.
 
-**What the review found.** Two axes, fixed point `26f393c`, spec source the
+**What the review found.** Two axes, fixed point `f22744f`, spec source the
 ticket plus spec kpgalligan/reelcut#14. The **Spec** axis went criterion by
 criterion and re-derived every number here rather than trusting it: twelve
 met, the twenty-five mutant scores reproducing row for row against §8.1–§8.5,
@@ -5189,7 +5189,7 @@ two tail readers `last_in_point` and `last_still_time`. Its `//!` doc states
 the two units and the three answers, and nothing in the crate restates the
 arithmetic.
 
-**Every caller came down.** `wc -l` against `47db3ae`:
+**Every caller came down.** `wc -l` against `b7b434e`:
 
 | File | Before | After |
 |---|---|---|
@@ -6016,7 +6016,7 @@ which is now the gate's refusal by name.
 
 ### 12.1 What was reviewed, and what stays closed
 
-Reviewed the code at `49af3f4`, the changes since the gate's `a9103b1`,
+Reviewed the code at `484ab2f`, the changes since the gate's `d74fcce`,
 the later source-window commits, the records above, and the open GitHub
 issues. The working tree also contains the user's documentation-only C2
 deferral; that is a separate product decision. This review changes documents,
@@ -6028,9 +6028,9 @@ tests run in this review; earlier proof scores remain earlier evidence.
 | D1, patch validation | `AgentServer+Clips.swift` still passes caller patches through `rawPatchArg`; `patch.rs` owns their validation and merge. Closed; do not rebuild Swift validators. |
 | D2, outcomes | `outcome.rs`, the FFI and `ProjectDocument.applyEdit` retain the three answers. `finish` compares projects, validates a changed one and returns `Applied`; it deliberately does not invent a refusal. Closed. |
 | D3, published arguments | `op_table.rs` / `op_schema.rs`, `AgentCatalog.opTool`, declarations and parity checks remain the contract. C1 moved caption declarations to `AgentCatalog+Captions.swift`; these are app-state tools, not new core ops. Closed. |
-| Source window | `source_window.rs` is 396 lines; phases B and C landed in `2bbceed` and `1f03132`. `ReverseMirror.swift` is shared, and `SpeedSheetController.lengths` asks the core using the same ops as Apply. The old un-held readout and unmirrored timeline are closed. |
+| Source window | `source_window.rs` is 396 lines; phases B and C landed in `61aba61` and `fa61483`. `ReverseMirror.swift` is shared, and `SpeedSheetController.lengths` asks the core using the same ops as Apply. The old un-held readout and unmirrored timeline are closed. |
 | Handler forward | `AgentServer.dispatch` calls `checkArgumentNames` before handler dispatch. The gate is built; the broader forwarding rewrite remains retired for §11's reasons. |
-| Fractional frame-rate terms | `rateTerm` / `fpsPair` in `AgentServer+Arguments.swift` replaced both truncating readers in `7f04e59`. This is no longer an open residue of #21. |
+| Fractional frame-rate terms | `rateTerm` / `fpsPair` in `AgentServer+Arguments.swift` replaced both truncating readers in `cf9d5f7`. This is no longer an open residue of #21. |
 | Size debt | Old phase deltas are historical, not current toll estimates. At this review the examples were `edit_clip.rs` 1021, `edit.rs` 838, `edit_paste.rs` 599, `AgentCatalog+Clips.swift` 792 and `ReelCore.swift` 1542 lines. Consult remaining §3 and measure again before touching one. |
 
 ### 12.2 Six proposed work items, completed in order
@@ -6184,7 +6184,7 @@ remaining work items. This review implements none of them.
 
 `python3 tools/proof/op_argument_proof.py 5340` also passed **133/133**
 against an owned instance of the current Release app, built from the same
-product sources as `49af3f4` during road map 6's final verification. Its
+product sources as `484ab2f` during road map 6's final verification. Its
 startup log contained no `Reelcut: ` parity complaint before or after the
 proof. The proof compiled its current-source probe, checked the 57 core ops
 and 77 tools, exercised their required/unknown arguments and the exact
@@ -6402,8 +6402,8 @@ commit's `app/Sources`, `app/Bridging` and `core` together. It builds that
 core under the caller's private `before/target`, then compiles the archived
 Swift and header with the current guarded `harness/main.swift`; it never
 links the current staticlib or calls the historical harness. Phase 5 selected
-`3187c5d7d0595b3ecde6310732bf453edfcbd2b8`; recording selected
-`c1dce5f01840a500b6093d70fa7d5beed2feaa4b`, both through their
+`7fcbbd8122b8d6994616ef5657291c2f10291de7`; recording selected
+`cf83dc744e58fe45274ac8f1fd1da6b8d553916b`, both through their
 existing dynamic history queries. Each caller keeps its own archived tree,
 module caches, Fonts, binary, cargo/swiftc logs and atomic stamp. Its key
 hashes current source/core/staticlib, instrument/builder/caller/Fonts bytes,

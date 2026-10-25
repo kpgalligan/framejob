@@ -1,7 +1,7 @@
 # The milestone record, M1 to road map 3's R2
 
 - **Status:** Closed record (2026-09-17). The "Milestone status" section the root `CLAUDE.md`
-  carried until 2026-09-17 (`fc5e07f`), moved verbatim and never maintained after. It stops at road
+  carried until 2026-09-17 (`6f7ce4c`), moved verbatim and never maintained after. It stops at road
   map 3's R2 (2026-09-12). Its closing line, "Keep this file current as code lands", is a leftover
   from its `CLAUDE.md` days and contradicts its own header.
 - **Original:** `archive/milestones.md` (1448 lines) — sections cited below as "orig

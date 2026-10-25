@@ -437,7 +437,7 @@ of 2026-10-16, SY-22's precedent, and SY-29's fail-closed clause is the orchestr
   overlap there PHAT reads 25.98, clear). So SY-17's 7.92, SY-18's "the owner's true unmasked
   match 4.2", SY-20's 9.00 and 9.01 and #303 were a false pair, which PHAT read correctly as not
   one recording. The measurement (the probe built by `swift_build.py` over `app/Sources` at
-  e8add54, -Onone, each file decoded by copies of `writeSyncFeatures`' and `writeSpeech`'s reader
+  8c0409d, -Onone, each file decoded by copies of `writeSyncFeatures`' and `writeSpeech`'s reader
   loops, then the app's own `AudioSync.plan`, `AudioSyncMatch.search` and `AudioSyncPHAT.refine`;
   "PHAT" the refinement along the coarse lag over the played overlap, "files" over the files'
   overlap at that lag, centred, capped 30 s; 30 fps):

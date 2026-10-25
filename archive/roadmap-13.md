@@ -1,9 +1,9 @@
 # Road map 13 — pricing and spend
 
 **Status: CLOSED 2026-09-28. Proposed and approved 2026-09-28; P1 (the table and the price function)
-built 2026-09-28 and committed 79a8b56; P2 (the helper prices every response) built 2026-09-28 and
-committed 0f0a442; P3 (the proofs' ledger and the monthly budgets) built 2026-09-28 and committed
-86162c2; P4 (spend in the UI) built 2026-09-28, uncommitted. Records in §5; the condensed record is
+built 2026-09-28 and committed 30b44fa; P2 (the helper prices every response) built 2026-09-28 and
+committed ca3fe7e; P3 (the proofs' ledger and the monthly budgets) built 2026-09-28 and committed
+2785978; P4 (spend in the UI) built 2026-09-28, uncommitted. Records in §5; the condensed record is
 `designs/adr/roadmap-13-pricing.md`.**
 
 The user asked three things: to set a spend budget, to price each call the assistant and the proofs
@@ -120,7 +120,7 @@ Each phase follows the root `CLAUDE.md` recipe and is built with /litecode.
 
 ## 5. Records
 
-### P1 — the table and the price function (built 2026-09-28, committed 79a8b56)
+### P1 — the table and the price function (built 2026-09-28, committed 30b44fa)
 
 **What landed.**
 
@@ -184,7 +184,7 @@ when input + cache writes + cache reads > 200 000; a class with tokens but no us
 `agent/prices/` files the test reads) until #147 lands (commented there). No residue issue was filed:
 every row above passed and every control failed as stated. P2–P4 as §4 plans them.
 
-### P2 — the helper prices every response (built 2026-09-28, committed 0f0a442)
+### P2 — the helper prices every response (built 2026-09-28, committed ca3fe7e)
 
 **What landed.**
 

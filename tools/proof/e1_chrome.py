@@ -9,7 +9,7 @@ Two instruments, neither of which is a photograph of a running app:
   `app/Sources` with a `main.swift` of its own, opens a `.framejob` package,
   puts an `EditorViewController` in an `NSWindow` and `cacheDisplay`s it into
   a PNG — the same paint path the window uses, no TCC grant. It is run on
-  THIS tree and on the REFERENCE tree (`1c3e92e`, the commit before E1's
+  THIS tree and on the REFERENCE tree (`77934fe`, the commit before E1's
   first toll, extracted and built under `tools/proof/work/e1-reference`), so
   what the section GAINED is a difference between two photographs rather than
   a number read off a layout constant.
@@ -795,7 +795,7 @@ def main():
     if not os.path.exists(reference_build):
         check(f"the reference tree is built at {reference_tree}", False,
               "no harness build script there — "
-              "`git archive 1c3e92e | tar -x -C tools/proof/work/e1-reference` "
+              "`git archive 77934fe | tar -x -C tools/proof/work/e1-reference` "
               "then `make app` in it")
         ref_extent = None
     else:

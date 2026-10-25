@@ -105,7 +105,7 @@ lockstep are in the root `CLAUDE.md`; the full design is
   base motion and leaves the action's `end` with no `motion` in it.
   `tools/proof/e1_proof.py` and `tools/proof/e1_chrome.py` are the same pair
   for E1's transitions.
-- `AgentServer+Motion.swift` — **DELETED by road map 7's D1·3 (`eb17289`),
+- `AgentServer+Motion.swift` — **DELETED by road map 7's D1·3 (`dacf19d`),
   where `set_video` began forwarding the caller's patch to the core
   unread; `motion` goes over the wire as written and is refused by the
   core's own decoder. The entry below is history, kept because it says what
@@ -504,7 +504,7 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `MediaImporter.x` call site in the tree is untouched, while
   `generateCaches`, `thumbnails` and `peaks`, the three that do await, kept
   the file that holds the exception. The cut was a PURE MOVE landed alone
-  (`3e5b598`), the toll for the completion marker that followed it, paid at
+  (`302d03b`), the toll for the completion marker that followed it, paid at
   619 lines against the ~600 cap; it cost three widenings —
   `ensureDirectory`, `writeJPEG` and `postCacheChange`, `private` →
   internal — because the two async writers call them and `private` does not
@@ -2878,7 +2878,7 @@ was: the document heard 0 and then its own playhead, the timeline's
 `setPlayhead` revealed each one (`revealPlayhead` scrolls on any change
 outside its band), and the action entry rule (spec §11 CI-1) saw the
 playhead leave a span and come back, selecting it. The paused refresh's
-round trip was reported the same way. It had echoed before too, but e50dd64
+round trip was reported the same way. It had echoed before too, but f347a2a
 (2026-09-17) replaced the same-time seek — a no-op on macOS 26.5.1 — with a
 one-tick step to `here ± 1` and back, which made the refresh's echo a
 CHANGE: the document heard `here + 1` and then `here`, and every property
@@ -2915,7 +2915,7 @@ and they pass.
 
 **Measured** by `tools/proof/playhead_echo_probe.py` (its README section has
 the instrument and the rows): **20/20** at the fix, console unlocked. Over
-f7dd9e3's `app/Sources`: **13/20** — refresh·2 (`[600001, 600000]`),
+4f18f0b's `app/Sources`: **13/20** — refresh·2 (`[600001, 600000]`),
 rebuild·2 (`0, 600000` for each of the live drag's five rebuilds),
 rebuild·4 (`[0, 600000]`), action·1 (`selectedAction` 5 after the
 structural edit) and reveal·2 (the clip view's `minX` 16132 → 3685) fail

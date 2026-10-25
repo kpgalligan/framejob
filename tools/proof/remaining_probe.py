@@ -233,7 +233,7 @@ survivors; every section-5 row but the preconditions and the settle rows
 is taken by at least one of the five. 5f grew the total to **156** and its
 own mutant is the pass as it stood before road map 3 — `thumbnails` with
 the video track's end unread, every second asked for at its own time
-(`git show be14253:app/Sources/MediaImporter.swift` over a copy of the
+(`git show f3b5e04:app/Sources/MediaImporter.swift` over a copy of the
 tree) — which scores **153/156**: 5f's "five tiles" (two land, `0.jpg` and
 `1.jpg`, the one at 1 s inside the tolerance), 5f's identity row (there is
 no `2.jpg`), and 5d's "all TWENTY tiles" (eleven frames, the ten past the

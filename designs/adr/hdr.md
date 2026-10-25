@@ -1,13 +1,13 @@
 # HDR: the PQ peak, the HLG timeline, its deliverables and scopes, linear light, Canon Log (road map "hdr")
 
 - **Status:** Built and closed 2026-10-20. Each phase was one litecode pipeline with its own review, worked in `~/devel/framejob-hdr` on branch `hdr` and merged into main alone after its gate (HD-11). H-6 ran before H-5 (HD-16 (j)), so H-6 took format 24 and H-5 format 25:
-  - H-0, the road map, HD-1…HD-11 and two pure moves (`ExportSheetCommit.swift`, `MediaImporter+Thumbnails.swift`) (`82184d4`)
-  - H-1, #281: an HDR10 file's PQ white placed at its own peak (HD-6, HD-12, format 22) (`a0ced6e`, the toll; `9ccefec`)
-  - H-2, #277 part 1: the HLG working space (HD-2, HD-3, HD-13, format 23) (`742ae32`)
-  - H-3, #277 part 2: the deliverables — HLG, HDR10 and the SDR version (HD-4, HD-5, HD-7, HD-14) (`6946a2e`, the toll; `a08d072`)
-  - H-4, #277 part 3: HDR scopes (HD-8, HD-15) (`7c053a6`)
-  - H-6, #276: linear-light blending as an opt-in project switch (GR-18, HD-9, HD-16, format 24) (`ba93d56`)
-  - H-5, #278: Canon Log 2 and Canon Log 3, with Cinema Gamut or BT.2020 (HD-10, HD-17, format 25) (`60aa387`, Canon's paper ignored by git; `6b88c38`)
+  - H-0, the road map, HD-1…HD-11 and two pure moves (`ExportSheetCommit.swift`, `MediaImporter+Thumbnails.swift`) (`dcd08f3`)
+  - H-1, #281: an HDR10 file's PQ white placed at its own peak (HD-6, HD-12, format 22) (`d93ece2`, the toll; `ec08cb9`)
+  - H-2, #277 part 1: the HLG working space (HD-2, HD-3, HD-13, format 23) (`7aef1e8`)
+  - H-3, #277 part 2: the deliverables — HLG, HDR10 and the SDR version (HD-4, HD-5, HD-7, HD-14) (`2540545`, the toll; `b2c247c`)
+  - H-4, #277 part 3: HDR scopes (HD-8, HD-15) (`fe551cc`)
+  - H-6, #276: linear-light blending as an opt-in project switch (GR-18, HD-9, HD-16, format 24) (`f35e56d`)
+  - H-5, #278: Canon Log 2 and Canon Log 3, with Cinema Gamut or BT.2020 (HD-10, HD-17, format 25) (`13ccb1f`, Canon's paper ignored by git; `105ac08`)
   - H-7, the close: this record (the commit that moved this record to `archive/`)
 - **Original:** `archive/hdr.md` is the full record. It has no section numbers, so it is cited by its own headings: "orig H-2" is its "H-2 — #277, the HLG working space (HD-2, HD-3, HD-13)" section.
 - **Spec decisions:** HD-1..HD-17 in spec §11 (`designs/spec/11-decisions/hdr.md`). They stay binding, and where the original words them differently, §11's text wins:

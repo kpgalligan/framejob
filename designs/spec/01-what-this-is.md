@@ -1,11 +1,11 @@
 # 1. What this is
 
-a screencast editor's editor without a screencast editor's recorder — and, since road map 3,
+A screencast editor without a recorder — and, since road map 3,
 a recorder of the SCREEN alone, whose output is ordinary media. Open one or
 more video files from disk, arrange them on layered tracks over a fixed canvas, trim,
 split, annotate, animate, and export. Mac only, Apple Silicon, macOS 26+.
 
-The bar is a screencast editor's balance: enough to make a real cut with text,
+The bar is a balance: enough to make a real cut with text,
 shapes, transitions and simple animation, without Final Cut's magnetic
 timeline, roles, multicam, scopes, or a plugin ecosystem.
 

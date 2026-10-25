@@ -1,7 +1,7 @@
 # Word captions — the social-video style (road map 8)
 
 - **Status:** Built (2026-09-23), phases W0 (spike) to W4b. Landed in one
-  commit, `532e115`. Nothing in the phase list is left. The not-built list
+  commit, `a4cca90`. Nothing in the phase list is left. The not-built list
   (orig §7) is where the next work starts. Issue batch B86 (2026-10-05, #96)
   builds three of its looks: phase 1, recorded below, put them in the model,
   the recipe and the picture (spec §11 W-12..W-14); phase 2 put them in the

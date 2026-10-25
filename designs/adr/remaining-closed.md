@@ -71,7 +71,7 @@ history. The history moved into this record; the open items became GitHub issues
 
 ### Issues closed from the "filed and not fixed" paragraphs (orig §5)
 
-- **#24, #25, #26, #31 were closed 2026-09-22 by D7-1..D7-3 (`e1411be`, road map 7 §12.6–§12.7).**
+- **#24, #25, #26, #31 were closed 2026-09-22 by D7-1..D7-3 (`cf26a85`, road map 7 §12.6–§12.7).**
   #24: a clip's `start` was bounded per call, not cumulatively; ~1020 maximum `move_clip`s walked
   it to `Int64.max` and the app trapped on `ClipSnapshot.end`. #31: a hand-written
   `duration: Int64.max` killed `open_project`. D7-1 bounds stored times and computed ends to ±9e15
@@ -82,7 +82,7 @@ history. The history moved into this record; the open items became GitHub issues
   `frame_grid.rs` covers stored nests, property timings, paste, attributes and unnest.
 - **Lesson:** where a bound belongs is a spec §11 decision taken before code. #24 and #25 were
   deliberately labelled `bug` and not `ready-for-agent` until it was taken.
-- **#27, E2-27 (`71f3a8d`):** a zero-duration In/Out stays legal, stored and inactive; the
+- **#27, E2-27 (`c75224d`):** a zero-duration In/Out stays legal, stored and inactive; the
   timeline draws no wedge, and the inspector and Clip ▸ Motion name the inactive edge.
 - **#23 (road map 4 §9):** the peaks pass certified a partial decode; a peaks-only versioned marker
   and a strict reader keep a failed decode pending. **#28–#30, #32, #33** (road map 6
@@ -91,7 +91,7 @@ history. The history moved into this record; the open items became GitHub issues
   (R6-16), Verify's stale answer. **#34–#37** (road map 2 §2): one composition audio track per
   source format (R2-1); Space routed by the window (K-1); the canvas editor sized on every change;
   Return applies and Esc asks (K-2). **#38**: the export Cancel crash, fixed in G3c and merged.
-- **The playhead echo (2026-09-26, `538db30`):** `Playback` reported its own restore seeks as
+- **The playhead echo (2026-09-26, `ce22294`):** `Playback` reported its own restore seeks as
   playhead moves; it now reports only seeks someone asked for. Paid first: `Playback.swift` 600 →
   546 by moving the meter to `Playback+Meter.swift`.
 

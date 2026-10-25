@@ -41,12 +41,12 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   structural facts.
 - **Overlap rule**: at most one neighbour per side, each overlap ≤ half
   the shorter clip; larger overlaps refuse. Clips never push.
-- **Ripple is timeline-wide** across unlocked tracks (a screencast editor's
-  behaviour); straddling clips on other tracks stay put.
+- **Ripple is timeline-wide** across unlocked tracks; straddling clips
+  on other tracks stay put.
 - **Freeze frame keeps sync** by inserting time across all unlocked
   tracks, and is a one-source-frame segment scaled in the composition —
   no image extraction.
-- **Ducking is by clip extent**, not voice activity (a screencast editor's rule),
+- **Ducking is by clip extent**, not voice activity,
   so no audio analysis is needed for it.
 - **Speed and pitch** come from `scaleTimeRange` and the time-pitch
   algorithm. Reverse is not native; M3 pre-renders reversed segments.

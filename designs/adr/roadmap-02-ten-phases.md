@@ -1,8 +1,8 @@
 # Road map 2 — ten phases beyond the spec
 
-- **Status:** Built. All ten phases were done between 2026-09-06 and 2026-09-10 (commits `4fb72c6`
-  (phases 0 and 1), `c1b5188`, `ac7f849`, `8ec3be5`, `65d43ae`, `d2f7767`, `a16b0dd`, `5f0bc61`,
-  `046603e`). Three later fixes, #34, #35 and #36/#37, were recorded under it on 2026-09-24.
+- **Status:** Built. All ten phases were done between 2026-09-06 and 2026-09-10 (commits `febb324`
+  (phases 0 and 1), `ccc5c34`, `3a64d85`, `17b80ba`, `4abad43`, `9d02cc6`, `488e55d`, `5083fde`,
+  `2373567`). Three later fixes, #34, #35 and #36/#37, were recorded under it on 2026-09-24.
 - **Original:** `archive/roadmap-2.md` (3601 lines) is the full record. Sections cited
   below as "orig §x" refer to it.
 - **Spec decisions:** it introduced two unnumbered spec §11 entries. First, "`async`/`await` is
@@ -77,7 +77,7 @@ those rules, so they are condensed first below.
   undo step and one tool.
 - **Locks.** `close_gap` and `insert_clip` refuse on a locked track, and `overwrite_clip` does
   not, because a lock only governs what may shift. `close_gap` checks overlap per touched track
-  only, and it closes fully or not at all, as a screencast editor does.
+  only, and it closes fully or not at all.
 - **A source window's head, window and remaining length have one home.** That home is now
   `source_window.rs` (D4). A clamp BOUND snaps directionally (`time.rs`
   `snap_up_to_frame`/`snap_down_to_frame`), never to the nearest frame. `whole_media_length`

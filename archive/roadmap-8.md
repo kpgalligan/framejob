@@ -19,7 +19,7 @@ why, is §7; what only a person can check is
 
 This document holds the research, the design, and — since W0 — the
 measurements.
-- Every claim about the code is a scout's reading at `71f3a8d`, given with a
+- Every claim about the code is a scout's reading at `c75224d`, given with a
   `file:line`.
 - Every claim about a framework or a service was a cited document, not a
   measurement, **until §10.1**. Where §10.1 measured something this document
@@ -1890,10 +1890,10 @@ log grep empty before and after), its probe cache deleted first:
 probe: … (built in 62.9 s)".
 
 **(i) The historical instruments, at `SWIFT_TARGET = "arm64-apple-macos26.0"`.**
-`phase5_chrome.py`: **81/81**, 93.7 s — "reference: built 3187c5d7 in 48 s";
+`phase5_chrome.py`: **81/81**, 93.7 s — "reference: built 7fcbbd81 in 48 s";
 its harness line read "up to date", which is the (d) build.
 `recording_probe.py --only welcome`: **29/29**, 125.3 s — "recording probe:
-… (built in 63.4 s from …/app/Sources)", "reference: built c1dce5f0 in
+… (built in 63.4 s from …/app/Sources)", "reference: built cf83dc74 in
 56 s". **Decision: 26.0 kept.** Both old trees compiled at 26.0 with their
 own core and header and scored as before, so the spec's fallback (restoring
 15.0 in `reference_build.py`) was not needed.
@@ -1919,7 +1919,7 @@ macOS 15) — and are left: they say what was measured.
   `SpeechTranscriber` code in `app/Sources`. That is W2's to move.
 - Spec §7.7's format list (spec line 2185) was measured on macOS 15 and was
   not re-measured on 26.
-- `tools/proof/work/e1-reference`'s archived `build.sh` (commit `1c3e92e`)
+- `tools/proof/work/e1-reference`'s archived `build.sh` (commit `77934fe`)
   pins 15.0 outside the tree; `e1_chrome.py` builds its reference from it.
 - Every other probe binary cached in `tools/proof/work/` on source mtimes
   (`b6probe`, `bcprobe`, `clip-catalog-probe`, …) was built at 15.0 and stays

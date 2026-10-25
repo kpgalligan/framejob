@@ -7,7 +7,7 @@
 // with pipelines of its own, built the way `MetalRenderer.init` builds them,
 // from the metallibs `matte_spike.py` compiles:
 //
-//   V0  `Compositor.metal` as it stood before MT2 (464a3aa)
+//   V0  `Compositor.metal` as it stood before MT2 (63f1524)
 //   V1  + the placeholder route: every layer samples `texture(1)` (a 1×1
 //         white texture for an unmatted layer)
 //   V2  + the function-constant route: `kMatte [[function_constant(1)]]`,

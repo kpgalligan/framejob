@@ -67,7 +67,7 @@ U1  CX1 (×1), CX2 (×2, keep pitch off) and CK05 (×0.5, keep pitch on), each
     stream's length against the timeline, short or past the end, is
     reported, not scored (#337). Why not
     md5s: an export's audio length is not stable run to run, which predates
-    SR2b — at `de1e51e` CK05's two exports gave two md5s (Apple's
+    SR2b — at `5042934` CK05's two exports gave two md5s (Apple's
     time-pitch), and CX2's `prores_422` audio ran 4 048 frames (≈ 84 ms) past
     its wav in one run and not in another, the samples identical over their
     common length.

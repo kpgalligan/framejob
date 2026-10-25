@@ -6,7 +6,7 @@
 // `main.swift`, module `FrameJob`, against `libframejob_core.a` —
 // `tools/proof/harness/build.sh`'s swiftc line, `-D FRAMEJOB_DEV_TOOLS`
 // included — with the app's `Compositor.metal` built beside it. It calls ONLY
-// what HEAD0 (ffae505) already had — the grips are found from the regions'
+// what HEAD0 (a117185) already had — the grips are found from the regions'
 // own boxes through `CanvasLayerBox.canvasPoint(source:)` and `canvasToView`,
 // never through the new code — so the proof's `--baseline` builds the same
 // source over the unfixed tree, where the fixed rows fail.

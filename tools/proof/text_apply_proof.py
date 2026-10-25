@@ -3,7 +3,7 @@
 asks before dropping a change (spec §11 K-2).
 
     python3 tools/proof/text_apply_proof.py
-    python3 tools/proof/text_apply_proof.py --baseline 7e946ed
+    python3 tools/proof/text_apply_proof.py --baseline 6e2c7da
 
 One instrument, the probe `text_apply_probe.swift`, compiled AS `main.swift`
 over every file in `app/Sources` but the app's own `main.swift` on

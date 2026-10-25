@@ -1,11 +1,11 @@
 # Grading tier 2: scopes, wheels, curves and qualifiers (road map "grading-2")
 
 - **Status:** Built and closed 2026-10-11. Each phase was one litecode pipeline with its own review, worked in `~/devel/reelcut-grading` on branch `grading-2` and merged into main alone after its gate (GR-14):
-  - G2-0, the road map, GR-10 and four pure moves (`9dec954`)
-  - G2-1, the scopes (#263, GR-10) (`4f52ead`)
-  - G2-2, the wheels (#260, GR-11, GR-14) (`b2fd1f9`)
-  - G2-3, the curves (#261, GR-12) (`75ebf34`)
-  - G2-4, the qualifier (#262, GR-13) (`c948fad`)
+  - G2-0, the road map, GR-10 and four pure moves (`9d5c659`)
+  - G2-1, the scopes (#263, GR-10) (`3eecaad`)
+  - G2-2, the wheels (#260, GR-11, GR-14) (`f952e88`)
+  - G2-3, the curves (#261, GR-12) (`12f5e81`)
+  - G2-4, the qualifier (#262, GR-13) (`fea3435`)
   - G2-5, the close: T2 and the `parade-global` mutant, this record (the commit that moved this record to `archive/`)
 - **Original:** `archive/grading-2.md` is the full record. It has no section numbers, so it is cited by phase: "orig G2-3" is its "G2-3 — the curves" section.
 - **Spec decisions:** GR-10..GR-14 in spec §11 (`designs/spec/11-decisions/grading-2.md`), with the amendments they wrote into tier 1's entries (`designs/spec/11-decisions/grading.md`). They stay binding, and where the original words them differently, §11's text wins:
@@ -55,9 +55,9 @@ GR-1 kept tier 1 and deferred tiers 2 and 3 "as issues, not out"; tier 1's close
 |---|---|---|---|
 | Each scope's GPU time at 4K, worst of five fixtures (G2-1) | ≤ 1.1 ms (GR-10) | parade 0.622 ms (near-grey), vectorscope 0.390 (gradient), histogram 0.668 (flat); recorded waveform 0.450, waveform + vectorscope 0.798; every 1080p figure ≤ 0.394 | `RC_PROOF_APP=release scopes_proof.py` T1 |
 | The banded parade against a forced-global one at 4K (G2-5) | banded ≤ 0.75 × global, on the fixture where global is slowest | flat: banded 0.440 ms against forced-global 1.153, ratio 0.382 (0.381–0.384 over four runs of one probe build); under the `parade-global` mutant 0.995–0.999 | `RC_PROOF_APP=release scopes_proof.py` T2 |
-| An unwheeled layer (G2-2) | +0.020 / +0.061 ms (1080p / 4K) | +0.003 / −0.001 ms | `grading_spike.py --measure --tree --tree-base 4f52ead` TC |
-| An uncurved layer (G2-3) | +0.020 / +0.061 ms | +0.001 / +0.000 ms (the second run; the first missed at 1080p, +0.077, with the GPU changing clock state inside the run) | `grading_spike.py --measure --tree --tree-base b2fd1f9` TC |
-| An unqualified layer (G2-4) | +0.020 / +0.061 ms | −0.066 / −0.000 ms | `grading_spike.py --measure --tree --tree-base 75ebf34` TC |
+| An unwheeled layer (G2-2) | +0.020 / +0.061 ms (1080p / 4K) | +0.003 / −0.001 ms | `grading_spike.py --measure --tree --tree-base 3eecaad` TC |
+| An uncurved layer (G2-3) | +0.020 / +0.061 ms | +0.001 / +0.000 ms (the second run; the first missed at 1080p, +0.077, with the GPU changing clock state inside the run) | `grading_spike.py --measure --tree --tree-base f952e88` TC |
+| An unqualified layer (G2-4) | +0.020 / +0.061 ms | −0.066 / −0.000 ms | `grading_spike.py --measure --tree --tree-base 12f5e81` TC |
 | An adjustment pass with the qualifier's reading (G2-4) | +0.036 / +0.061 ms | −0.023 / +0.044 ms (V0:SA 0.812, VT:SA 0.856 ms at 4K) | the same run's TA |
 | A curve's points on a 16-bit `render_frame` (G2-3) | within a 10-bit level | 0, 0, 0.375 and 0 of a 10-bit level | `curves_proof.py compare` K1 |
 

@@ -9,8 +9,8 @@
 //! Three rules run through all of it (spec §11):
 //!
 //! 1. **Ripple is timeline-wide.** A ripple shifts every UNLOCKED track,
-//!    not only the tracks the removed clips were on — that is a screencast editor's
-//!    behaviour and the only one that keeps a music bed in sync with the
+//!    not only the tracks the removed clips were on — that is the one
+//!    behaviour that keeps a music bed in sync with the
 //!    picture it was cut to.
 //! 2. **Locked tracks never move.** Locking a track is how the user says
 //!    "this stays where it is", and it is the only protection from a

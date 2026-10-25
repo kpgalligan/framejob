@@ -1,5 +1,5 @@
 """q1 and q9 of road map 10 §3: the spike crate as a path dependency of
-`framejob-core`, measured against the tree at c874069, then REVERTED.
+`framejob-core`, measured against the tree at fbb881f, then REVERTED.
 
 Every build and test runs under `bounded.run` (600 s). The four core files
 are patched only between `patch()` and `revert()`, and `revert()` always
@@ -17,7 +17,7 @@ from rows_local import FONTS, GRAPHICS, REPO, SPIKE, WORK, binary
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import proof_app  # noqa: E402
 
-BASE = "c874069"
+BASE = "fbb881f"
 CORE = os.path.join(REPO, "core")
 OUTCOME = os.path.join(CORE, "src", "outcome.rs")
 LIB_A = os.path.join(CORE, "target", "release", "libframejob_core.a")
@@ -205,7 +205,7 @@ def q1(say):
     if not before["clean"]:
         return {"state": "failed", "reason": f"core/ or app/ differs from {BASE} before q1",
                 "measured": {"git_check": before}}
-    baseline = measure("BASELINE at c874069", say)
+    baseline = measure("BASELINE at fbb881f", say)
     patch(say)
     patched = measure("PATCHED (graphics_spike as a path dependency)", say)
     q1c = raster_images(say)

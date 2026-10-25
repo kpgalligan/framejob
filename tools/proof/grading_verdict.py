@@ -72,7 +72,7 @@ import mcp  # noqa: E402
 import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 
-BASE = "f407f87"
+BASE = "5d04e47"
 PRODUCT = ("app/Sources", "core/src", "app/Resources/Shaders")
 HEADER = ("core/include",)
 FROZEN = ("app/Sources/EditorViewController.swift", "app/Sources/TimelineView.swift",

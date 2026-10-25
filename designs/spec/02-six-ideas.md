@@ -1,6 +1,6 @@
-# 2. The a screencast editor model, and why it stays simple
+# 2. The six ideas, and why the model stays simple
 
-Six ideas do most of the work. Frame Job copies all six.
+Six ideas do most of the work. Frame Job is built on all six.
 
 1. **One kind of track.** Every track holds any clip — video, audio,
    still, text, shape. There are no video-vs-audio track types; an
@@ -21,6 +21,6 @@ Six ideas do most of the work. Frame Job copies all six.
 6. **A small keyboard vocabulary.** ⌘T split, W/E trim to playhead,
    ⌘⌫ ripple delete, ⇧⌘F freeze frame, M marker, Space/JKL transport.
 
-Dropped from a screencast editor: everything that only makes sense for a recording
+Left out: everything that only makes sense for a recording
 it made itself (mouse/keyboard/touch callouts, pointer effects), templates,
 publishing to YouTube/Vimeo, the stock-media library.

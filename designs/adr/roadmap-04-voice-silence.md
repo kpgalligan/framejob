@@ -1,6 +1,6 @@
 # Remove Silences judged by voice (road map 4)
 
-- **Status:** Built (S1 `1c3e92e`, 2026-09-15; proved 2026-09-19; reader review and residue closed
+- **Status:** Built (S1 `77934fe`, 2026-09-15; proved 2026-09-19; reader review and residue closed
   2026-09-20; its #23 follow-up closed 2026-09-22). Only the person-at-the-machine checks are left.
 - **Original:** `archive/roadmap-4.md` (1378 lines). This file cites its sections as "orig §x".
 - **Spec decisions:** spec §11 has five unnumbered bullets for road map 4's S0/S1, starting "The

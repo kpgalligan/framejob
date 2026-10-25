@@ -1,11 +1,11 @@
 # Reaching the agent server (road map 14)
 
 - **Status:** Built 2026-10-01 and closed 2026-10-02. Each phase was one litecode pipeline:
-  - MC0, the decisions (`b58c458`)
-  - MC1, the spike (`ffe5a9f`)
-  - MC2, the socket beside TCP (`ba8ed00`)
-  - MC3, `framejob-mcp` (`38b9487`)
-  - MC4, TCP goes and Copy MCP Command arrives (`20c947d`)
+  - MC0, the decisions (`7e7b6d0`)
+  - MC1, the spike (`d1eae41`)
+  - MC2, the socket beside TCP (`72a9c4d`)
+  - MC3, `framejob-mcp` (`a059de1`)
+  - MC4, TCP goes and Copy MCP Command arrives (`4a3065f`)
   - MC5, the close (uncommitted when this was written)
 - **Original:** `archive/roadmap-14.md` (798 lines) is the full record. It has no section numbers, so it is cited by section name: "orig Record ▸ MC1" is its "Record" section's MC1 entry.
 - **Spec decisions:** MC-1..MC-6 in spec §11 (`designs/spec/11-decisions/agent-connection.md`). They stay binding, and where the original's "Decisions" section words them differently, §11's text wins:

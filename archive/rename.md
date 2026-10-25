@@ -1,10 +1,10 @@
 # Road map "rename" — Reelcut becomes Frame Job
 
 **Opened 2026-10-13** (R0, in the worktree `/Users/kevingalligan/devel/reelcut-rename` on branch
-`rename`, from `ae56899`, merged into main after its gate). The request this road map answers is
+`rename`, from `98f0ee3`, merged into main after its gate). The request this road map answers is
 the owner's of 2026-10-12; its decisions are spec §11 NM-1…NM-11, in
 `designs/spec/11-decisions/rename.md`, recorded in R0 before any rename code. Every count below
-was printed by the command written beside it, at the pinned commit `ae56899`. Where this file
+was printed by the command written beside it, at the pinned commit `98f0ee3`. Where this file
 and an older document differ about a name, this file wins until R3 brings the documents in line.
 
 ## Goal
@@ -59,7 +59,7 @@ of the app is leaning on the name 'Reelcut'." New logos: `designs/frame-job/`):
 >    exact commands for the orchestrator to give him. Old .reelcut projects need
 >    not open (owner, 2026-10-09: no real use yet).
 > 4. Timing: now, in the worktree /Users/kevingalligan/devel/reelcut-rename
->    (branch `rename`, from main ae56899), phase by phase, each phase gated and
+>    (branch `rename`, from main 98f0ee3), phase by phase, each phase gated and
 >    ff-merged into main by the orchestrator. Main stays usable meanwhile.
 
 ## The spelling (NM-2)
@@ -84,7 +84,7 @@ bump — the package format does not change, so a `.reelcut` renamed by hand to 
 case-insensitively at the pinned commit):
 
 ```sh
-cd /Users/kevingalligan/devel/reelcut-rename && f(){ echo "$(git grep -l -i reelcut ae56899 -- "$@" | wc -l) files / $(git grep -h -i -c reelcut ae56899 -- "$@" | awk -F: '{s+=$NF} END{print s+0}') lines :: $*"; }
+cd /Users/kevingalligan/devel/reelcut-rename && f(){ echo "$(git grep -l -i reelcut 98f0ee3 -- "$@" | wc -l) files / $(git grep -h -i -c reelcut 98f0ee3 -- "$@" | awk -F: '{s+=$NF} END{print s+0}') lines :: $*"; }
 ```
 
 | Category | Pathspec given to `f` | Files | Lines | Phase |
@@ -115,7 +115,7 @@ The twenty category rows add up to the total row (662 files, 4,926 lines); the d
 expected counts and R0's run agree in every row.
 
 **Sub-counts in `app/Sources`**, each printed by
-`c(){ echo "$(git grep -l -E "$1" ae56899 -- app/Sources | wc -l) files / $(git grep -h -c -E "$1" ae56899 -- app/Sources | awk -F: '{s+=$NF} END{print s+0}') lines :: $1"; }`:
+`c(){ echo "$(git grep -l -E "$1" 98f0ee3 -- app/Sources | wc -l) files / $(git grep -h -c -E "$1" 98f0ee3 -- app/Sources | awk -F: '{s+=$NF} END{print s+0}') lines :: $1"; }`:
 
 | Regex | Files | Lines | What it is |
 |---|---|---|---|
@@ -128,7 +128,7 @@ expected counts and R0's run agree in every row.
 | `NSLog\("Reelcut\|\[reelcut\]` | 7 | 10 | log lines (NM-5) |
 | `reelcut-(mcp\|agent)` | 5 | 7 | the two helpers (NM-5) |
 
-**Paths** (`git ls-tree -r --name-only ae56899 | grep -i reelcut`): outside the history folders
+**Paths** (`git ls-tree -r --name-only 98f0ee3 | grep -i reelcut`): outside the history folders
 only two, both renamed with `git mv` in R1 — `app/Bridging/Reelcut-Bridging-Header.h` →
 `app/Bridging/FrameJob-Bridging-Header.h` and `core/include/reelcut_core.h` →
 `core/include/framejob_core.h`. Every other path that matches is under `archive/` or the
@@ -141,7 +141,7 @@ handoffs, and keeps its name.
 hand or left (they are ignored and nothing reads them).
 
 **Regenerated:** `core/Cargo.lock` and `mcp-proxy/Cargo.lock` each name their own root package
-once (`git grep -c -i reelcut ae56899 -- '*Cargo.lock'` printed 1 for each); R1 lets `cargo build`
+once (`git grep -c -i reelcut 98f0ee3 -- '*Cargo.lock'` printed 1 for each); R1 lets `cargo build`
 rewrite them after renaming the packages, never by hand.
 
 **Replaced:** `app/Assets.xcassets/AppIcon.appiconset` (`Contents.json` and seven PNGs,
@@ -157,20 +157,20 @@ run counter); every pointer `name_residue.py`'s `KEPT_PATTERNS` names — issue 
 `~/.claude/litecode/reelcut/…` and `~/devel/reelcut…`, which are real until the owner's renames.
 R1 does not rewrite those pointers.
 
-**Files at or over the ~600-line cap that R1 edits** (`for f in $(git grep -l -i reelcut ae56899
--- app/Sources core/src graphic/src mcp-proxy/src | sed 's/^ae56899://'); do n=$(git show
-ae56899:$f | wc -l); [ $n -ge 600 ] && echo "$n $f"; done | sort -rn`): 1523
+**Files at or over the ~600-line cap that R1 edits** (`for f in $(git grep -l -i reelcut 98f0ee3
+-- app/Sources core/src graphic/src mcp-proxy/src | sed 's/^98f0ee3://'); do n=$(git show
+98f0ee3:$f | wc -l); [ $n -ge 600 ] && echo "$n $f"; done | sort -rn`): 1523
 `ProjectSnapshot.swift`, 1328 `ProjectDocument.swift`, 1255 `ReelOps.swift` (exempt), 1142
 `EditorViewController.swift`, 989 `ReelCore.swift`, 786 `AgentServer.swift`, 648
 `Controls.swift`, 636 `AgentServer+Clips.swift`, 600 `Compositor.swift`. A substitution in any
 of them adds no net line: where "Frame Job" is longer than "Reelcut" and a line overflows, the
 paragraph is rewrapped within the file.
 
-**Builders of an old tree** (the trap below): `git grep -l -E 'git", *"archive"|BASE_COMMIT|build_baseline' ae56899 -- tools/proof`
+**Builders of an old tree** (the trap below): `git grep -l -E 'git", *"archive"|BASE_COMMIT|build_baseline' 98f0ee3 -- tools/proof`
 printed `tools/proof/cloud_captions_probe.py tools/proof/hdr_proof.py`; `git grep -l -E
-'reference_build' ae56899 -- tools/proof` printed `README.md cloud_captions_probe.py
+'reference_build' 98f0ee3 -- tools/proof` printed `README.md cloud_captions_probe.py
 e1_chrome.py phase5_chrome.py recording_probe.py reference_build_selftest.py swift_build.py`;
-and `git grep -l -E '"archive"' ae56899 -- tools/proof` printed `assistant_spike/assistant_spike.py
+and `git grep -l -E '"archive"' 98f0ee3 -- tools/proof` printed `assistant_spike/assistant_spike.py
 editor_keys_undo_proof.py hdr_proof.py name_field_proof.py obscure_handles_probe.py
 reference_build.py space_key_proof.py text_apply_proof.py text_break_proof.py
 text_edit_proof.py`. R1 reads each file in the union and routes every one that compiles old
@@ -189,7 +189,7 @@ answer to every one.
    `CFBundleName` / `CFBundleDisplayName` read `$(PRODUCT_NAME)`. Release and Distribution keep
    identical settings and Info.plist bytes (V-5).
 3. **The offscreen harness is compiled against old trees too.** `tools/proof/harness/main.swift`
-   (45 lines matching at the pinned commit, `git grep -c -i reelcut ae56899 --
+   (45 lines matching at the pinned commit, `git grep -c -i reelcut 98f0ee3 --
    tools/proof/harness/main.swift`) reads the document type through
    `ProjectDocument.projectTypeIdentifier` rather than a spelled UTI, and pins every defaults key
    under BOTH its `FrameJob` and its `Reelcut` name, so a paint of an old tree (the meter and
@@ -396,7 +396,7 @@ GitHub redirects them after the rename.
 `agent/src` is meant to be byte-identical with `~/devel/rasterize/agent/src`, and is: `diff -r
 agent/src ~/devel/rasterize/agent/src` exited 0 on 2026-10-13 (so root `CLAUDE.md`'s "NOT YET"
 note is stale, an edit owed). Its old-name lines are exactly three
-(`git grep -n -i reelcut ae56899 -- agent/src`), and R1 changes them so, recording the same diff
+(`git grep -n -i reelcut 98f0ee3 -- agent/src`), and R1 changes them so, recording the same diff
 here for kpgalligan/rasterize to apply; no agent here writes `~/devel/rasterize`:
 
 ```diff
@@ -496,7 +496,7 @@ commits):
   `obscure_handles_probe.py`, `text_break_proof.py`) now name the shader's entry points as the
   tree's Swift asks for them; without it an old tree's compositor finds no `reelcut_*`.
 - `mcp.wait_listening` accepts the old ready and not-bound lines too: `grading_verdict.py`'s
-  main tree (f407f87) is launched through `mcp.launch` and says them under its old name.
+  main tree (5d04e47) is launched through `mcp.launch` and says them under its old name.
 - `obscure_handles_probe.swift` and `text_break_probe.swift` pin their three defaults keys
   through `EditorViewController`'s own key constants, and every probe opens a package with
   `ProjectDocument.projectTypeIdentifier`, so one probe source reads the same against an old
@@ -519,7 +519,7 @@ app); `make dist` D1–D27 and `published_check.py` 15/15 over "Frame Job.app"; 
 `agent_socket_proof.py` 17/17, `makefile_env_proof.py` 4/4, `assistant_helper_proof.py` 6/6,
 `spend_proof.py` 21/21, `screens.py` 36/36, `recording_proof.py --no-screen` 151/151 (section 5
 skipped by name), `log_thumbs_proof.py` 7/8, `matte_spike.py --check --tree` all rows,
-`grading_spike.py --check --tree --tree-base bde8319` all rows; `reference_build_selftest.py
+`grading_spike.py --check --tree --tree-base 869b5e2` all rows; `reference_build_selftest.py
 --integration` all rows; mutants: `name_residue` `ge-count` S4 and `no-untracked` S2; the
 budget guard removed fails B1 B2, the guard after `_open` fails B1; `tree_names` always new
 fails the old-tree row; `proof_defaults` without the old prefixes fails P10; the gate's
@@ -532,8 +532,8 @@ fails the old-tree row; `proof_defaults` without the old prefixes fails P10; the
 - `log_thumbs_proof.py` TH needs `tools/proof/work/i282/ctl/h0.json`, captured on the
   untouched pre-#282 tree; this worktree has none, so TH failed on that alone (its own
   comparison held: HLG, PQ and the SDR pair worst |Δ| 1).
-- `grading_spike.py --check --tree` at its default base f407f87 failed R1080/R2160: the
-  shader at f407f87 has no adjustment fragment (`git show` of it lists seven entry points, none
+- `grading_spike.py --check --tree` at its default base 5d04e47 failed R1080/R2160: the
+  shader at 5d04e47 has no adjustment fragment (`git show` of it lists seven entry points, none
   `*_adjust_fragment`), which KA (grading-2 G2-4) asks of V0, so that base cannot pass whatever
   the names; an issue for the default.
 - The owner's hand steps above, after the merge.
@@ -724,7 +724,7 @@ commits):
   `framejob.proof-defaults-selftest.<pid>`, `host: Frame Job active …`, "Hello Frame Job.",
   `/nonexistent/Frame Job.app/Contents/Helpers/framejob-mcp`, `-module-name FrameJob`. Shell
   lines naming a product quote it (`open -a "./build/…/Frame Job.app"`, `--app "…"`, `--dist
-  "…"`, `pgrep -f "<copy>/Contents/MacOS/Frame Job"`). Lines 1721–1724 (at 6fa50c8) were
+  "…"`, `pgrep -f "<copy>/Contents/MacOS/Frame Job"`). Lines 1721–1724 (at 9dfbf63) were
   rewritten to the truth, not substituted: Debug's product is `Frame Job Debug.app` with
   executable `MacOS/Frame Job Debug`, and `pgrep -f "MacOS/Frame Job"` lists both apps; line
   1779 names the Debug product apart from Release's and Distribution's. Lines that must keep
@@ -752,13 +752,13 @@ past run's artefact 6 (`/tmp/reelcut-4823.log`, `/tmp/reelcut-4960.log`, the `.i
 past run printed or measured 67 (among them the B82 audit's heading and paragraph, the B83
 designer's measurements, the phase A `hevc_alpha` paragraph's guard sentences, and the
 mutation records at 1352 and 6989); (e) an old tree's path 5 (e1's reference build and its log,
-the archived cloud baseline's `.codex` path, 055a5ed's `Reelcut.app`); (e) and (f) together 1
+the archived cloud baseline's `.codex` path, 61e43b4's `Reelcut.app`); (e) and (f) together 1
 (line 270, the reference's pre-MC4 launch line). One more line, 3705, names
 `designs/design_handoff_reelcut_sharp/`, a folder that keeps its name (NM-1). Lines that hold a
 record part and a how-to part (a definition naming a pre-MC4 port: 7990, 8285, 8480, 9900,
 11687) keep the port and rewrite only the key or prefix.
 
-**Definition-table rows rewritten** (line numbers at 6fa50c8; six, the count `git diff -U0 --
+**Definition-table rows rewritten** (line numbers at 9dfbf63; six, the count `git diff -U0 --
 tools/proof/README.md | grep -c '^-|'` prints):
 
 - "Road map 12's A4 — the helper in both bundles", `dist_check_mutants.py`'s `| Case | The
@@ -815,7 +815,7 @@ began, and `origin` already pointed at `https://github.com/kpgalligan/framejob.g
 - `git mv designs/rename.md archive/rename.md` (this file); its row in `archive/INDEX.md`, after
   `grading-3.md`'s.
 - `designs/adr/rename.md`, condensed from this file (template `designs/adr/grading-3.md`): the
-  status with each phase's commit (`bde8319`, `a0da14e`, `6fa50c8`, `17561e2`, and R4's), NM-1…NM-11
+  status with each phase's commit (`869b5e2`, `5f7f1d3`, `9dfbf63`, `4df3128`, and R4's), NM-1…NM-11
   one line each, the decisions, what each phase built, the Rasterize diff, the known limits, the
   open items, the owner's hand steps (steps 1–10 as above, numbering kept, then 11 the folder move
   with the three-worktree repair, 12 the Claude memory folders, 13 the forced gate) and where to

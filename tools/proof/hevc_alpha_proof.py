@@ -28,7 +28,7 @@ With no option it scores every row below but G1 and X1. `--rows size` is
 Gate A, phase A's gate: the rows marked ◆, and G1. **G1 is RED BY DESIGN on
 a build that holds phase B** — it requires the pad the baseline recorded
 and an unknown `hevc_alpha` — and the script says so on G1's line and on
-its last line; Gate A was passed on the phase A build (commit fcfeebf).
+its last line; Gate A was passed on the phase A build (commit 979440f).
 `--rows sheet` is the export sheet's rows alone, each launch with CLEAR as
 its one fixture and no baseline read: H0, E1 and Z1 in one launch, then E3's
 launches. `--rows alpha-mode` is H0, A2, I1, M1, T1, T2, F1, F2, R0, K1, Q1 and
@@ -258,7 +258,7 @@ Rows (◆ = also Gate A's):
   colour. The milliseconds for one 1920 × 1080 frame are printed.
 - **K1** (B93 phase 2, #254): the probe's `equivalence`: the product's
   `straighten(bgra:…)` and `referenceStraighten` — the fill as it was before
-  B93 (commit 7308ace's square of offsets sorted by distance), copied
+  B93 (commit d149aa1's square of offsets sorted by distance), copied
   verbatim into the probe as the oracle — give the same bytes over whole
   planes, padding included, on the seeded frames (1 × 1, 3 × 17, 17 × 3,
   64 × 64 and 257 × 129, 16 bytes of padding a row, visible densities 0.2 %,
@@ -1637,7 +1637,7 @@ def row_g1(s):
     if absent["ok"]:
         design = ("\n       RED BY DESIGN: this build holds phase B — hevc_alpha is a row "
                   "and a miss within a pixel is filled, so the pad the baseline recorded is "
-                  "gone. G1 is Gate A's row, passed on the phase A build (fcfeebf); this "
+                  "gone. G1 is Gate A's row, passed on the phase A build (979440f); this "
                   "build's proof is the full rows (no --rows).")
         details["G1"] = "by design"
     check("G1 ODDFULL and TALLFULL as h264, hevc and prores_422: frame 0's digest and the "

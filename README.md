@@ -1,6 +1,6 @@
 # Frame Job
 
-A native macOS video editor in a screencast editor's shape: open a movie, arrange it on
+A native macOS video editor: open a movie, arrange it on
 layered tracks over a fixed canvas, trim, split, annotate, animate, export.
 Swift/AppKit UI over a Rust core — the core decides, AVFoundation and Metal do.
 Apple Silicon, macOS 26+.

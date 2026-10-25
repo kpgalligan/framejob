@@ -812,7 +812,7 @@ gated alone at the typecheck baseline (0 errors, 7 warnings) before `case assist
   entries `['person: Put a marker at two seconds.']` and Send still reading Stop; exit 1.
 - The A1 proofs: `assistant_session_proof.py` 11/11 (K2's "No Anthropic API key is set."
   unchanged); `assistant_helper_proof.py` 6/6, exit 0.
-- `space_key_proof.py` 29/29 with S2h; `--baseline b69972e` still fails exactly S2a and S2b.
+- `space_key_proof.py` 29/29 with S2h; `--baseline 1888069` still fails exactly S2a and S2b.
   `v3_tools.py --only L,T` 5/5.
 - `cloud_captions_probe.py --only hygiene,chrome,settings_verify` 144/145: the one failure is
   row 18's `project.yml` diff, which predates this phase (road map 11 V0's Distribution
@@ -1001,8 +1001,8 @@ section, the ADR, the archive.
   exit 1.
 
 **The reviews, corrected.** §9 and §10 each say "the pipeline's reader review has not run on it
-yet"; both ran before their commits. A2 (`dae833a`): the review's fix, one-line JSON in tool
-summaries, and two nits. A3 (`172cf0c`): the fix, `assistant_prompt_eval.py`'s
+yet"; both ran before their commits. A2 (`550b346`): the review's fix, one-line JSON in tool
+summaries, and two nits. A3 (`754e931`): the fix, `assistant_prompt_eval.py`'s
 `Evaluation.send` answering stop to a non-E6 turn left asking; two proof nits fixed and two
 filed as #158.
 

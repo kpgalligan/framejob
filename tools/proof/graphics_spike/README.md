@@ -9,7 +9,7 @@ Nothing in this directory is a pass or a fail. Every row is a MEASUREMENT.
 The ways a run can be wrong are a row that did not run (the runner prints
 `SPIKE INCOMPLETE` and names it, exit 1), an instrument that failed (the
 spike crate or a probe that would not build — exit 1), and a tree left
-different from `c874069` in `core/` or `app/` (`GIT CHECK NOT CLEAN`, exit 1).
+different from `fbb881f` in `core/` or `app/` (`GIT CHECK NOT CLEAN`, exit 1).
 
 ```sh
 python3 tools/proof/graphics_spike/graphics_spike.py                    # all nine
@@ -23,7 +23,7 @@ The rows run in the order q2, q8, q3, q4, q5, q6, q1, q9, q7. q1 and q9
 PATCH the core — `graphics_spike` as a path dependency in `core/Cargo.toml`,
 `pub mod ffi_graphic;` in `core/src/lib.rs`, a throwaway
 `core/src/ffi_graphic.rs` — and `rows_build.revert()` always runs after them
-(`git checkout c874069 -- core/Cargo.toml core/Cargo.lock core/src/lib.rs`,
+(`git checkout fbb881f -- core/Cargo.toml core/Cargo.lock core/src/lib.rs`,
 the new file removed, the core and the app rebuilt), so q7 launches the app
 built from the reverted tree and records its SHA-256. **q1 deletes
 `core/target`** twice (the cold builds); a full run takes about half an

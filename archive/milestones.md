@@ -1014,7 +1014,7 @@ maintained.
   either), Preview Quality changes nothing an agent can observe, and Reveal in
   Timeline is `set_selection`, which is already a tool. Phases 6 and 7 assert
   `== 73` exactly and still pass.
-  Two size tolls were paid FIRST and alone (`d69de99`): `AppDelegate.swift`
+  Two size tolls were paid FIRST and alone (`b189ac3`): `AppDelegate.swift`
   625 → 223 (`AppDelegate+Menus.swift`) and `MediaPane.swift` 822 → 389
   (`MediaRowView.swift`), which cut below the row to take the whole DRAG with
   it, since the pasteboard type, `MediaDropMode`, `MediaDropTarget` and
@@ -1203,7 +1203,7 @@ maintained.
 - **After road map 2 — the remainder: done.** `designs/reelcut-remaining.md`
   §1 and §2 are closed and carry the record; §3–§5 are what is still open.
   Four items, no schema change, no new op, no new tool (the catalog is still
-  **74**), one size toll paid alone first (`3e5b598`).
+  **74**), one size toll paid alone first (`302d03b`).
   **§1a** — the 28 marker-scope checks phase 9's fix wave measured with an
   untracked script are `phase9_proof.py`'s section 9 (30 with a tightened
   check and two the fold added; **214/214**; the two mutants — the refusal
@@ -1389,7 +1389,7 @@ maintained.
   schema change (v6 stands), NO new op (`OP_NAMES` is 55), NO new tool
   (the catalog is still **75**; `record_screen`'s result grows `pauses`
   and `segments`, `duration` becoming the total), no FFI change. Two pure
-  moves paid the toll first and alone (`91fb287`: `RecordingResult.swift`,
+  moves paid the toll first and alone (`54d71da`: `RecordingResult.swift`,
   `RecordingLanding+Microphone.swift`); three more files are new
   (`ScreenRecorder+Pause.swift`, `RecorderPanelController+Pause.swift`,
   `RecordingLanding+Placing.swift`) and one is a mid-phase pure move

@@ -56,7 +56,7 @@ gives it a home.
 
 Inspector and timeline are `NSSplitView` panes; sizes persist in
 `UserDefaults`. There is no left panel: the media library is an inspector
-tab, as in a screencast editor, so the canvas gets the width. Below about 1080 pt wide,
+tab, so the canvas gets the width. Below about 1080 pt wide,
 narrow the inspector before anything else. The window has a welcome sibling
 (`WelcomeWindowController`, as in Rasterize) offering Open Video…, New
 Project, New Recording… (road map 3) and Recent, under the stacked wordmark.

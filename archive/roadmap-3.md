@@ -27,7 +27,7 @@ marked so; **the scouts verify both, they do not trust them** — the road map
 ## 0. What this reverses, and the decisions to record first
 
 Spec §1: "Deliberate non-goals: screen or camera recording, multicam …".
-Spec §2 drops from a screencast editor "everything that only makes sense for a
+Spec §2 drops "everything that only makes sense for a
 recording it made itself (mouse/keyboard/touch callouts, pointer effects)".
 Road map 1 §4 and road map 2 §4 repeat the exclusion; road map 2 §4 puts
 microphone capture "on the boundary" and calls it the user's decision.
@@ -35,7 +35,7 @@ microphone capture "on the boundary" and calls it the user's decision.
 The decision this road map records: **screen recording is IN; camera
 recording and callouts stay OUT.** The line is drawn there because a screen
 recording is the input the whole product was shaped around (spec §1's first
-sentence is "a screencast editor's editor without a screencast editor's recorder"; phase 3 of
+sentence is "A screencast editor without a recorder"; phase 3 of
 road map 2 is "the screencast trio"), while camera capture is a second
 capture stack and callouts are a metadata format plus an Input Monitoring
 grant. What ScreenCaptureKit draws into the pixels for free — the cursor,
@@ -127,8 +127,8 @@ first forced by the framework, the second asked for by the user:
 | Phase | Theme | Sessions | Schema | Status |
 |---|---|---|---|---|
 | R0 | The spike — five questions measured before design leans on them (and a sixth from the scouts) | ½ | — | **done** 2026-09-10; the answers are in §3 |
-| R1 | Screen recording | 2–3 | — | **done** 2026-09-11, `a4c476f` (the fix wave's record and the proof scores are in "R1 — the record") |
-| R2 | Pause and resume; the panel that goes away | 1 | — | **done** 2026-09-12, `d5b3c3e` (the review's record, the deviations and the proof scores are in "R2 — the record") |
+| R1 | Screen recording | 2–3 | — | **done** 2026-09-11, `dd1d54f` (the fix wave's record and the proof scores are in "R1 — the record") |
+| R2 | Pause and resume; the panel that goes away | 1 | — | **done** 2026-09-12, `7a8fe31` (the review's record, the deviations and the proof scores are in "R2 — the record") |
 
 R0 comes first and its answers are written into R1's section before R1's
 waves are briefed. Two of R1's branches (the audio landing, the panel's
@@ -239,7 +239,7 @@ The five questions, each with the two designs it chooses between:
    delegate API, macOS-only, `.m4a` or `.wav`), started in the same runloop
    turn as `startCapture`, and lands it as a second clip on a second track;
    the offset between the two files' first samples is measured by the
-   spike (a screencast editor keeps them separate for the same reason). **Outcome B
+   spike. **Outcome B
    (two tracks, system first, mic second, or the reverse):** ONE file, and
    the landing puts TWO clips on it — `CompositionBuilder.firstTrack` gains
    a track-index argument threaded from a new `Source::Media` field? NO: that
@@ -1367,7 +1367,7 @@ returning only with a note).
   first use switched profiles mid-recording and poisoned the file output
   for every later file (`'pck?'`) — so the spike grew a way to name the
   microphone, and the built-in one measured clean.
-- **Two pure moves paid the toll first and alone** (`91fb287`):
+- **Two pure moves paid the toll first and alone** (`54d71da`):
   `RecordingResult.swift` off the foot of `RecordingSetup.swift` and
   `RecordingLanding+Microphone.swift` out of `RecordingLanding.swift`;
   `recording_probe.py` 662/662 against the moved tree. A THIRD pure move

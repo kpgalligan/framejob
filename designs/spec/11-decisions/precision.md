@@ -174,7 +174,7 @@ it amends PR-4 and PR-9.
     10-bit `hevc_alpha`, reverse intermediate, still images and recording.
   - A proof row that compares against a frozen pre-change reference, and so cannot be
     re-recorded:
-    - where it holds the reference's pixels (`e1_proof.py`'s 1c3e92e build), it compares
+    - where it holds the reference's pixels (`e1_proof.py`'s 77934fe build), it compares
       decoded pixels within ±1 a channel;
     - where it holds only a digest (`hevc_alpha_baseline.json`'s B1/G1), it prints the digest
       unscored beside the reference's and names this decision.
@@ -263,7 +263,7 @@ it amends PR-4 and PR-9.
     `422YpCbCr10BiPlanarFullRange` frames, not `x422`.
   - **Accepted limit** (owner, 2026-10-14, #280): the HEVC Main 10 intermediate moves a log
     clip's toe up 3 codes (S-Log3 95 → 98, Apple Log 196 → 199; about 7 levels after the curve),
-    every other sample within 2. Measured in B96 (4bea569, `log_proof.py reverse-variants`): the
+    every other sample within 2. Measured in B96 (5b14a35, `log_proof.py reverse-variants`): the
     rate is the cause, not 4:2:0. 2× rate leaves 1–3 codes at 2× the file, 4× rate 1–2 at 4×
     (867 MB/min at 2160p30), 4:2:2 HEVC no better at 1×; ProRes 422 HQ costs 32×. Nothing held
     ±1 within 2× the size, so the rate stays; `log_proof.py` L6 holds the reversed render to the

@@ -1,10 +1,10 @@
 # The rename: Reelcut becomes Frame Job (road map "rename")
 
 - **Status:** Built and closed 2026-10-13. Worked in `~/devel/reelcut-rename` on branch `rename`, each phase gated there and merged into main alone (NM-9):
-  - R0, the plan: the road map, NM-1…NM-11, the 39 amendments, `designs/frame-job/` (`bde8319`)
-  - R1, the code in one phase: the app, the build, the crates, the MCP surface, the proof tooling and the residue check (`a0da14e`)
-  - R2, the mark and the icon (NM-11) (`6fa50c8`)
-  - R3, the documents (`17561e2`)
+  - R0, the plan: the road map, NM-1…NM-11, the 39 amendments, `designs/frame-job/` (`869b5e2`)
+  - R1, the code in one phase: the app, the build, the crates, the MCP surface, the proof tooling and the residue check (`5f7f1d3`)
+  - R2, the mark and the icon (NM-11) (`9dfbf63`)
+  - R3, the documents (`4df3128`)
   - R4, the close: the repository's name in the documents, this record (the commit that moved this record to `archive/`)
 - **Original:** `archive/rename.md` is the full record. It has no section numbers, so it is cited by section name: "orig R1" is its "R1 — the record" section.
 - **Spec decisions:** NM-1..NM-11 in spec §11 (`designs/spec/11-decisions/rename.md`). They stay binding, and where the original words them differently, §11's text wins:
@@ -22,7 +22,7 @@
 
 ## Context
 
-On 2026-10-12 the owner said "'Reelcut' is a terrible name from a trademark perspective. The new name will be 'Frame Job'", and that the rename cuts very deep. He chose four things: rename everything that spells the old name in any case and keep the generic `Reel*` names, `rc_` and `RC_*`; the spelling "Frame Job" for people and `FrameJob` / `framejob` for machines; no migration code, the old folders moved by hand; and the work now, phase by phase, in a worktree, each phase gated and merged into main alone. He supplied the new icon and mark (`designs/frame-job/`). R0's inventory counted 4,926 lines in 662 files spelling the old name at `ae56899`. The GitHub repository was renamed `kpgalligan/framejob` on 2026-10-13, on the owner's OK. (orig "Goal", "The owner's choices", "Inventory")
+On 2026-10-12 the owner said "'Reelcut' is a terrible name from a trademark perspective. The new name will be 'Frame Job'", and that the rename cuts very deep. He chose four things: rename everything that spells the old name in any case and keep the generic `Reel*` names, `rc_` and `RC_*`; the spelling "Frame Job" for people and `FrameJob` / `framejob` for machines; no migration code, the old folders moved by hand; and the work now, phase by phase, in a worktree, each phase gated and merged into main alone. He supplied the new icon and mark (`designs/frame-job/`). R0's inventory counted 4,926 lines in 662 files spelling the old name at `98f0ee3`. The GitHub repository was renamed `kpgalligan/framejob` on 2026-10-13, on the owner's OK. (orig "Goal", "The owner's choices", "Inventory")
 
 ## Decisions
 
@@ -36,10 +36,10 @@ On 2026-10-12 the owner said "'Reelcut' is a terrible name from a trademark pers
 
 ## What it built — where it lives now
 
-- **R0** (`bde8319`): spec §11 NM-1…NM-11 (`designs/spec/11-decisions/rename.md`); 39 amendment paragraphs on existing decisions that name an old identifier, path or sentence; both spec indexes; `designs/frame-job/` (14 files: `AppIcon.appiconset/` with `Contents.json` and ten PNGs, `frame-job-icon-1024.png`, `frame-job-icon.svg`, `frame-job.icns`), byte for byte as the owner supplied it. Measured: the socket path for the owner's home is 75 bytes, against `MAX_SOCKET_PATH_BYTES` 103.
-- **R1** (`a0da14e`): `project.yml` (project, target and scheme `FrameJob`, the products, `PRODUCT_MODULE_NAME`, NM-3's UTI and document types, `-lframejob_core`, `framejob-mcp`), the `Makefile` (`APP := FrameJob`, quoted product paths, `-D FRAMEJOB_DEV_TOOLS`, `name_residue.py --selftest` and `name_residue.py` last in `make test`), the publish workflow's contents, `.gitignore`; `app/Bridging/FrameJob-Bridging-Header.h` and `core/include/framejob_core.h` by `git mv`; the crates `framejob-core` and `framejob-mcp` (both `Cargo.lock`s rewritten by `cargo build`); every spelling in `app/Sources` but `BrandMark.swift`; `agent/`'s package, lock, build script, `update.py` and NM-10's three lines; every file in `tools/` but the proof README (`proof_app.py`'s `PRODUCTS` and `executable()`, `reference_build.py`'s `TreeNames`, `tree_names`, `tree_defines`, `tree_shader`, `gate.py`'s `names` step, `budget.py`'s `unmoved`, `proof_defaults.py`'s both-name refusals, `stale_registrations.py`'s S4, the new `name_residue.py`); `designs/screens/`; `docs/graphics-api.md` and `.d.ts`; NAME-1 in `docs/manual-checks.md`. Measured: `make gate` PASS; `make dist` D1–D27 and `published_check.py` 15/15 over "Frame Job.app"; on Release `defaults_proof.py` 11/11, `debug_release_proof.py` 10/10, `mcp_proxy_proof.py` 14/14, `agent_socket_proof.py` 17/17, `spend_proof.py` 21/21, `screens.py` 36/36, `recording_proof.py --no-screen` 151/151; the argument gate refuses `include_reelcut_windows` by name.
-- **R2** (`6fa50c8`): `BrandMark.draw(in:)` draws `frame-job-icon.svg` without its tile, every coordinate as the SVG writes it (`designBox` 824, `tileOrigin` 100); the wordmark "Frame Job", `clearSpace` the constant 38 so the welcome column's height does not move; the icon set copied in byte for byte; `01-welcome.md`; NAME-2; `recording_probe.py`'s section 6 leaves the lockup's rows out of "above the band". Measured: `recording_probe.py --only welcome` 35/35; `screens.py --compare` against R1 36/36 with `01-welcome` differing only in the lockup; the Release `Assets.car` holds exactly the ten new `icon_*` renditions.
-- **R3** (`17561e2`): `README.md` (37 lines), `CONTEXT.md`, `designs/spec/` (every file kept its line count), `11-decisions/README.md`'s Files table, `docs/manual-checks.md` (65 lines), the proof README's how-to (269 lines rewritten, 200 kept) and its "**Names in records.**" paragraph; the CLAUDE.md prose as an edit script the orchestrator applied. Measured: `make gate` PASS in 73 s.
+- **R0** (`869b5e2`): spec §11 NM-1…NM-11 (`designs/spec/11-decisions/rename.md`); 39 amendment paragraphs on existing decisions that name an old identifier, path or sentence; both spec indexes; `designs/frame-job/` (14 files: `AppIcon.appiconset/` with `Contents.json` and ten PNGs, `frame-job-icon-1024.png`, `frame-job-icon.svg`, `frame-job.icns`), byte for byte as the owner supplied it. Measured: the socket path for the owner's home is 75 bytes, against `MAX_SOCKET_PATH_BYTES` 103.
+- **R1** (`5f7f1d3`): `project.yml` (project, target and scheme `FrameJob`, the products, `PRODUCT_MODULE_NAME`, NM-3's UTI and document types, `-lframejob_core`, `framejob-mcp`), the `Makefile` (`APP := FrameJob`, quoted product paths, `-D FRAMEJOB_DEV_TOOLS`, `name_residue.py --selftest` and `name_residue.py` last in `make test`), the publish workflow's contents, `.gitignore`; `app/Bridging/FrameJob-Bridging-Header.h` and `core/include/framejob_core.h` by `git mv`; the crates `framejob-core` and `framejob-mcp` (both `Cargo.lock`s rewritten by `cargo build`); every spelling in `app/Sources` but `BrandMark.swift`; `agent/`'s package, lock, build script, `update.py` and NM-10's three lines; every file in `tools/` but the proof README (`proof_app.py`'s `PRODUCTS` and `executable()`, `reference_build.py`'s `TreeNames`, `tree_names`, `tree_defines`, `tree_shader`, `gate.py`'s `names` step, `budget.py`'s `unmoved`, `proof_defaults.py`'s both-name refusals, `stale_registrations.py`'s S4, the new `name_residue.py`); `designs/screens/`; `docs/graphics-api.md` and `.d.ts`; NAME-1 in `docs/manual-checks.md`. Measured: `make gate` PASS; `make dist` D1–D27 and `published_check.py` 15/15 over "Frame Job.app"; on Release `defaults_proof.py` 11/11, `debug_release_proof.py` 10/10, `mcp_proxy_proof.py` 14/14, `agent_socket_proof.py` 17/17, `spend_proof.py` 21/21, `screens.py` 36/36, `recording_proof.py --no-screen` 151/151; the argument gate refuses `include_reelcut_windows` by name.
+- **R2** (`9dfbf63`): `BrandMark.draw(in:)` draws `frame-job-icon.svg` without its tile, every coordinate as the SVG writes it (`designBox` 824, `tileOrigin` 100); the wordmark "Frame Job", `clearSpace` the constant 38 so the welcome column's height does not move; the icon set copied in byte for byte; `01-welcome.md`; NAME-2; `recording_probe.py`'s section 6 leaves the lockup's rows out of "above the band". Measured: `recording_probe.py --only welcome` 35/35; `screens.py --compare` against R1 36/36 with `01-welcome` differing only in the lockup; the Release `Assets.car` holds exactly the ten new `icon_*` renditions.
+- **R3** (`4df3128`): `README.md` (37 lines), `CONTEXT.md`, `designs/spec/` (every file kept its line count), `11-decisions/README.md`'s Files table, `docs/manual-checks.md` (65 lines), the proof README's how-to (269 lines rewritten, 200 kept) and its "**Names in records.**" paragraph; the CLAUDE.md prose as an edit script the orchestrator applied. Measured: `make gate` PASS in 73 s.
 - **R4** (the commit that moved this record to `archive/`): `README.md`'s release URL (`kpgalligan/framejob/releases/latest/download/FrameJob.dmg`) and `08-repo-layout.md`'s root folder `framejob/`; the §11 file's intro rewritten for the closed road map and its four citations of it repointed to this record and `archive/rename.md`; `budget.py`'s refusal and docstring cite this record's hand steps; `name_residue.py`'s R4 pins and its `designs/rename.md` history entry gone; this record, the `git mv` and its `archive/INDEX.md` row; the root `CLAUDE.md` edits (the issue-tracker line, the agent note's citation, this record's entry in "Where to look") as a script the orchestrator applies.
 
 ## The Rasterize side (NM-10)
@@ -76,7 +76,7 @@ The three lines R1 changed in `agent/src`, recorded for kpgalligan/rasterize to 
 ## Open items
 
 Filed, each `ai-drafted` and `low-priority`:
-- #284: `grading_spike --check --tree` fails KA at its default base f407f87 (orig "R1 — the record" Owed).
+- #284: `grading_spike --check --tree` fails KA at its default base 5d04e47 (orig "R1 — the record" Owed).
 - #285: the peaks cache is not deterministic: the same media gives different peaks files (orig "R2 — the record" Measured).
 - #286: `Theme.swift`'s brand inks' comments are stale.
 
@@ -160,7 +160,7 @@ Also the owner's: rebase or delete the branches `worktree-side-work` and `worktr
 
 - "Goal" and "The owner's choices": the owner's words and his four choices, verbatim.
 - "The spelling (NM-2)": the spelling table and what is kept everywhere.
-- "Inventory": the command, the twenty category rows at `ae56899`, the sub-counts in `app/Sources`, the paths, the generated and regenerated files, the files at the cap, the builders of an old tree.
+- "Inventory": the command, the twenty category rows at `98f0ee3`, the sub-counts in `app/Sources`, the paths, the generated and regenerated files, the files at the cap, the builders of an old tree.
 - "The traps": the thirteen ways R1 could build and still break, and each answer.
 - "Phases" and "Verification per phase": what each phase was to do and how it was to be checked.
 - "The owner's hand steps": the steps as given after R1, and the renames as planned for R4.

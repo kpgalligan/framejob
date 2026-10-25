@@ -1,8 +1,8 @@
 # Road map "grading-4" — colour grading, tier 4: the grading extras
 
 **Opened 2026-10-14** (T4-0, in the worktree `~/devel/framejob-grading4` on branch `grading-4`,
-from `3c3ac36`, merged into main after its gate). The design brief this road map answers is
-`~/.claude/litecode/reelcut/grading-tier4/I-grading-tier4.md` (2026-10-14, tree `3c3ac36`), with
+from `e94d3a2`, merged into main after its gate). The design brief this road map answers is
+`~/.claude/litecode/reelcut/grading-tier4/I-grading-tier4.md` (2026-10-14, tree `e94d3a2`), with
 the owner's answers beside it in `~/.claude/litecode/reelcut/grading-tier4/answers.md`; both live
 outside the repo, so everything a later phase needs from them is written here. Where the brief
 and this file differ, this file wins. Tier 1's road map is closed (`designs/adr/grading.md`,
@@ -407,17 +407,17 @@ GPU's clock state as well ("Found while reading", item 4).
 ## The standard recipe, file by file, and the tolls
 
 The ledger is `wc -l app/Sources/*.swift core/src/*.rs graphic/src/*.rs | sort -rn`, here at
-`3c3ac36` (the brief's §10, 2026-10-14). The cap is ~600 lines, new files 400, and frozen files
+`e94d3a2` (the brief's §10, 2026-10-14). The cap is ~600 lines, new files 400, and frozen files
 take wiring only. Size is per file only (root `CLAUDE.md`): nothing here is a budget on a feature
 or a phase.
 
 ### Tolls (T4-0, a pure move gated alone)
 
-| File | Lines at `3c3ac36` | Why it is touched | The move |
+| File | Lines at `e94d3a2` | Why it is touched | The move |
 |---|---|---|---|
 | `GradeProps.swift` | 526 | T4-2 and T4-3 both add to the curve types | Its named seam, the curve types (`// MARK: - The curves`) out whole to `CurveProps.swift`. **Paid in T4-0**: 526 → 343, `CurveProps.swift` 184 (below, "T4-0"). Its next named seams: `GradeProps.swift`'s `// MARK: - The wheels` block out whole to `WheelProps.swift`, and `CurveProps.swift`'s `ColorCurvesPatch` out whole to `CurvePatch.swift` should T4-2/T4-3 carry it past ~400 (`designs/adr/app-file-history.md`). |
 
-### The other files the phases touch (`wc -l` at `3c3ac36`; none at the cap)
+### The other files the phases touch (`wc -l` at `e94d3a2`; none at the cap)
 
 | Area | Files |
 |---|---|
@@ -738,7 +738,7 @@ written by a script.
 
 ## T4-0 — the road map, GR-24…GR-30 and the move
 
-**What landed** (2026-10-14, in the worktree on `grading-4`, from `3c3ac36`). This road map;
+**What landed** (2026-10-14, in the worktree on `grading-4`, from `e94d3a2`). This road map;
 `designs/spec/11-decisions/grading-4.md` with GR-24…GR-30, its Files row and seven ID rows in
 `11-decisions/README.md`, and the Lines cells; two "Amended by" lines at the end of GR-10 (GR-26,
 GR-29) and two at the end of GR-13 (GR-24, GR-28) in `grading-2.md`, and "— amended by GR-26,
@@ -815,7 +815,7 @@ text leaves on line 37) was carried into the owed edit.
 
 ## T4-1 — scopes: the same-bin add and the vectorscope zoom
 
-**What landed** (2026-10-14, in the worktree on `grading-4`, from `31f3aa1`). GR-31 in
+**What landed** (2026-10-14, in the worktree on `grading-4`, from `28ada7d`). GR-31 in
 `designs/spec/11-decisions/grading-4.md`, written before any code, with its index row, the
 "Amended by GR-31" line under GR-10 in `grading-2.md` and ", amended by GR-31" on GR-10's index row;
 then:
@@ -1003,7 +1003,7 @@ the tree's), both applied by the orchestrator with the owed `app/CLAUDE.md` edit
 
 ## T4-2 — hue curves and the curve editor's extras
 
-**What landed** (2026-10-15, in the worktree on `grading-4`, from `a8ef6fd`). First the control:
+**What landed** (2026-10-15, in the worktree on `grading-4`, from `c9875ca`). First the control:
 `curves_proof.py`'s N0 gained four tone-curved frames (M1's card, J1's adjustment clip, K1's
 ramp, X1's movie) and `RC_PROOF_APP=release python3 tools/proof/curves_proof.py capture
 tools/proof/work/t4-2/ctl` took all eleven on `make app` of the untouched product (exit 0, Z1
@@ -1086,7 +1086,7 @@ Power'"):
   10.0° at 0°, 30.625° at 5°, −10.625° at 355°.
 - `RC_PROOF_APP=release python3 tools/proof/qualifier_proof.py`: exit 0, 31/31 (`qualifierWeight`
   reading its hue through `hsvHue`).
-- `python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base a8ef6fd`:
+- `python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base c9875ca`:
   exit 0, every scored row PASS; KT and KA max |Δ| 0.0 at 1080p and 2160p; TC 0.002 ms
   (1080p, cap 0.069) and −0.001 ms (2160p, cap 0.061); TA 0.002 ms (1080p, cap 0.081) and
   0.008 ms (2160p, cap 0.060). `vm.loadavg` 96.36 57.31 38.59 before and 161.04 81.10 48.54
@@ -1144,7 +1144,7 @@ or near-grey up to chroma 0.02 is left alone and the effect fades in up to 0.06.
 
 ## T4-2b — Color's Hue by the exact HSV shift
 
-**What landed** (2026-10-15, in the worktree on `grading-4`, from `510f181`), from the owner's
+**What landed** (2026-10-15, in the worktree on `grading-4`, from `a3f36dc`), from the owner's
 answer to T4-2's H16 ("Fix with the new exact shift (Recommended)"). First GR-33 in
 `designs/spec/11-decisions/grading-4.md`, written before any code, with its index row, the
 "Amended by GR-33" lines under GR-32 (its "Not: … a change to Color's Hue" lifted) and GR-2
@@ -1241,8 +1241,8 @@ H17's comparison fails by construction; `luma-not-kept` and `gamut-limit-dropped
 - Found while checking every proof's mutant anchors against the edited shader, and done in this
   phase (fix pass 1, the orchestrator's ruling): `adjustment_proof.py`'s `WEIGHT` anchor
   (`float w = saturate(u.opacity * matte.sample(samp, local).r);`, used by its `ignores-matte`
-  and `ignores-opacity` mutants) occurred 0 times in `Compositor.metal` at `510f181` too — the
-  adjustment pass reads `saturate(u.opacity * coverage * selected)` since G2-4 (`c948fad`), so
+  and `ignores-opacity` mutants) occurred 0 times in `Compositor.metal` at `a3f36dc` too — the
+  adjustment pass reads `saturate(u.opacity * coverage * selected)` since G2-4 (`fea3435`), so
   those two mutants could not build. `WEIGHT` is re-anchored on that line (once in the shader;
   every other `adjustment_proof` anchor occurs exactly once), `ignores-matte` writing
   `saturate(u.opacity * selected)` and `ignores-opacity` `saturate(coverage * selected)`. Each
@@ -1258,7 +1258,7 @@ is −500 against −140) was taken into the final spec. No `CLAUDE.md` edit was
 
 ## T4-3 — curves of different point counts blend their values
 
-**What landed** (2026-10-15, in the worktree on `grading-4`, from `d22f8e2`), #271. First GR-34
+**What landed** (2026-10-15, in the worktree on `grading-4`, from `b4f6bbf`), #271. First GR-34
 in `designs/spec/11-decisions/grading-4.md`, written before any code, with its index row, the
 "Amended by GR-34" lines under GR-32 and GR-12 (`grading-2.md`) and the index's GR-12 and GR-32
 rows; then the instrument and its control on the untouched product (below); then:
@@ -1360,7 +1360,7 @@ final spec. The three owed `CLAUDE.md` edits were applied by the orchestrator.
 
 ## T4-4 — the qualifier's cleanup blur
 
-**What landed** (2026-10-15, in the worktree on `grading-4`, from `ac874f6`), #268. First the
+**What landed** (2026-10-15, in the worktree on `grading-4`, from `f98e7a0`), #268. First the
 instrument and its control on the untouched product (below), then GR-35 in
 `designs/spec/11-decisions/grading-4.md`, written before any code, with its index row, the
 "Amended by GR-35" line under GR-13 (`grading-2.md`) and the index's GR-13 row; then:
@@ -1439,7 +1439,7 @@ capture tools/proof/work/t4-4/ctl`: exit 0, 8 frames captured, Z1 ok, no `DEFAUL
   0.05, 113.10 at 0.15, 19.78 at 0.4. Q2: max |Δ| 1.078 levels, mean 0.336 against oracle(6)
   (bound 4 and 1); Q3 worst 1 level (bound 2); Q4: nothing lit right of the edge, left of it max
   1.078, mean 0.338; Q5: max 1.078, mean 0.336 at 0.5 s and max 1.005, mean 0.334 at 1.5 s.
-- `python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base ac874f6`: exit
+- `python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base f98e7a0`: exit
   0; KT and KA PASS at |Δ| 0 at both sizes; TA −0.000 ms at 1080p and −0.002 ms at 2160p (cap
   held); **TB**, over VT:SQ (the qualified pass inline: 0.249 ms at 1080p, 0.958 ms at 2160p):
   1080p σ 2 +0.121 ms, σ 8 +0.098 ms, σ 24 +0.095 ms; 2160p σ 2 +0.480 ms, σ 8 +0.355 ms, σ 24
@@ -1484,7 +1484,7 @@ without the input pass (nine from seven), `MetalRenderer.swift` and §7.5 with i
 
 ## T4-5 — the close
 
-**What landed** (2026-10-15, in the worktree on `grading-4`, from `23832cf`).
+**What landed** (2026-10-15, in the worktree on `grading-4`, from `f5969b9`).
 `designs/adr/grading-4.md`. This road map `git mv`'d to `archive/grading-4.md`, with its
 `archive/INDEX.md` row. Every `designs/grading-4.md` citation outside `archive/` now points here:
 §11 `grading-4.md`'s first paragraph in the closed form and its line naming "The owner's

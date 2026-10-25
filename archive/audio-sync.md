@@ -1,7 +1,7 @@
 # Road map "audio-sync" — lining clips up by their sound
 
 **Opened 2026-10-15** (AS-1, in the worktree `~/devel/framejob-audio-sync` on branch
-`audio-sync`, from `ad86760`); **closed 2026-10-15** at AS-2 into `designs/adr/audio-sync.md`. The request and the spec this phase was built from live outside
+`audio-sync`, from `3cb7fa6`); **closed 2026-10-15** at AS-2 into `designs/adr/audio-sync.md`. The request and the spec this phase was built from live outside
 the repo (`~/.claude/litecode/framejob/audio-sync-1/`); everything a later phase needs from
 them is written here. Its decisions are spec §11 SY-1..SY-10, in
 `designs/spec/11-decisions/audio-sync.md`.
@@ -113,7 +113,7 @@ q 1.10, refused; S10 the +200 ppm fixture (199.96 in this sign) measured 172.2 p
 product tools); `phase9_proof.py` 231/231. `recording_probe.py --only catalog` 29/31: 7a (the
 catalog is the ops plus the thirty-one app-state tools) passes; the two 7b rows (the file rows'
 order: `set_media_color` and the media ops among the last eleven, `import_media` earlier) fail
-the same way over `ad86760`'s untouched sources (28/31 there, 7a failing only because the
+the same way over `3cb7fa6`'s untouched sources (28/31 there, 7a failing only because the
 probe's set now names `sync_audio`), so they predate this phase.
 
 **Mutants** (`--mutants`, probe-only): 8/8 killed — `lag-sign` (P1, and P6), `anchor-inverted`
@@ -197,7 +197,7 @@ warnings, fmt and lint skipped as unchanged, test 115 s, app 97 s).
 - Every other row as in AS-1 (S6 now reads "plays at ×2; … within 0.2% of it.").
 
 `recording_probe.py --only catalog` 31/31: both 7b rows pass. The catalog was right and the probe
-stale: c47d97d added `set_media_color` among the media rows, after `remove_media`; the probe's
+stale: 2a8421b added `set_media_color` among the media rows, after `remove_media`; the probe's
 order now includes it and reads the last twelve. The tool set and arguments did not change, so
 `op_argument_proof.py` and `phase9_proof.py` were not re-run.
 

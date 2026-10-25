@@ -1,14 +1,14 @@
 # Cut by transcript: filler words cut on their timings, false starts through the assistant (road map "cut-by-transcript")
 
 - **Status:** Built and closed 2026-10-23, for #92. Each phase was one litecode pipeline with its own review, worked in `~/devel/framejob-tcut` on branch `transcript-cut` and merged into main alone after its gate (TR-6):
-  - CT-0, the road map, TR-1…TR-6 and the on-device filler spike (`7ff117f`)
-  - CT-1, fillers on every cloud request, filtered out of captions (TR-1, TR-2, TR-8) (`f8e5a4b`)
-  - TR-7, filler removal cloud-only, after the spike's o2 row on the owner's sample (`37b10f7`)
-  - CT-2, `detect_fillers` and the cut (TR-9) (`a4bcbd2`)
-  - CT-3, Clip ▸ Remove Filler Words… and `transcribe_for_fillers` (TR-10) (`b8586cf`)
-  - CT-4, `get_transcript` and false starts through the assistant (TR-11) (`2f9fda8`)
+  - CT-0, the road map, TR-1…TR-6 and the on-device filler spike (`5ee9710`)
+  - CT-1, fillers on every cloud request, filtered out of captions (TR-1, TR-2, TR-8) (`8b498d3`)
+  - TR-7, filler removal cloud-only, after the spike's o2 row on the owner's sample (`a8995a3`)
+  - CT-2, `detect_fillers` and the cut (TR-9) (`1f7be20`)
+  - CT-3, Clip ▸ Remove Filler Words… and `transcribe_for_fillers` (TR-10) (`f17c139`)
+  - CT-4, `get_transcript` and false starts through the assistant (TR-11) (`d8ea2c9`)
   - CT-5, the close: this record (the commit that moved the original to `archive/`)
-  - After the close, the residue batch: #333's toll (`f77d154`) and step name (TR-12, `71c6f7c`), #331's window (TR-13, `2d42d85`), #332's on-device cache (TR-14, `32db363`)
+  - After the close, the residue batch: #333's toll (`dbbb123`) and step name (TR-12, `6730ace`), #331's window (TR-13, `7e81ea7`), #332's on-device cache (TR-14, `7704897`)
 - **Original:** `archive/cut-by-transcript.md` is the full record. It has no section numbers, so it is cited by its own headings: "orig CT-2" is its "CT-2 record" section.
 - **Spec decisions:** TR-1..TR-14 in spec §11 (`designs/spec/11-decisions/cut-by-transcript.md`). They stay binding, and where the original words them differently, §11's text wins:
   - TR-1: fillers come from AssemblyAI's `disfluencies: true` on every cloud request from CT-1 on, the marker records it, and the caption producers never see a filler, so captions stay byte-identical; road map 6's refusal superseded.
@@ -103,7 +103,7 @@ Not filed, each decided at the close:
 
 - "Goal": #92's ask, the two paths and the done-when.
 - "The owner's choices": the owner's comment of 2026-09-30 verbatim and the ask of 2026-10-22.
-- "How it fits the tree": every piece the phases built on at `15d3545` — the words' mapping, the cloud request, the caption producers, Remove Silences, the cut, the assistant, the on-device engine.
+- "How it fits the tree": every piece the phases built on at `c3731fa` — the words' mapping, the cloud request, the caption producers, Remove Silences, the cut, the assistant, the on-device engine.
 - "Phases": what each of CT-0…CT-5 was to build.
 - "Person checks": FIL-1 and AS-10.
 - CT-0: the spike's run, its table and the o1 format, what the answer means, why TR-7 was held back, the owner's sample and TR-7.

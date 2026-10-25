@@ -48,7 +48,7 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
     /// outside them rather than letting the core silently clamp a number the
     /// user typed.
     static let rateRange = ReelSpeed.limits.range
-    /// The rates the pull-down offers: a screencast editor's set, then ×10 and ×100
+    /// The rates the pull-down offers: the common editing rates, then ×10 and ×100
     /// for a long recording (spec §11 #190).
     static let presets: [Double] = [0.25, 0.5, 1, 1.5, 2, 4, 10, 100]
 

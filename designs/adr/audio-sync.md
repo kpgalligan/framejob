@@ -1,10 +1,10 @@
 # Audio sync: lining clips up by their sound (road maps "audio-sync" and "audio-sync-2", and round 3)
 
 - **Status:** Built and closed 2026-10-15. Each phase was one litecode pipeline with its own review, worked in `~/devel/framejob-audio-sync` on branch `audio-sync`:
-  - AS-1, Clip ▸ Synchronize Audio and `sync_audio`: the onset match, the anchor rule, frame-snapped placement, drift measured and reported (SY-1..SY-5) (`d92e1d3`)
+  - AS-1, Clip ▸ Synchronize Audio and `sync_audio`: the onset match, the anchor rule, frame-snapped placement, drift measured and reported (SY-1..SY-5) (`4e44fbe`)
   - AS-2, drift corrected by `set_speed` at varispeed, the rate band, the corrected span, `recording_probe.py`'s 7b rows, and the close (SY-6..SY-10) (the commit that moved this record to `archive/`)
 - **Round 2 status:** Built and closed 2026-10-16, worked in `~/devel/framejob-sync2` on branch `sync-2`, one litecode pipeline per phase:
-  - AS-3, the MFCC feature match, the played windows first, candidates and the refusal naming them, the head trim, speech-only matching, the confident and weak tiers and the Weak match sheet (SY-11..SY-19) (`a794639`)
+  - AS-3, the MFCC feature match, the played windows first, candidates and the refusal naming them, the head trim, speech-only matching, the confident and weak tiers and the Weak match sheet (SY-11..SY-19) (`6199b50`)
   - AS-4, the GCC-PHAT refinement, drift on the features with a robust line, the plan off the main thread under the Synchronizing Audio sheet, #300's re-test, and the round's close (SY-20..SY-22) (the commit that moved round 2's record to `archive/`)
 - **Round 3 status:** Built 2026-10-16, worked in `~/devel/framejob-sync3`, one litecode pipeline ("sync-tighten") with no road map of its own; this record is its record: the owner's first pair found to be two takes (SY-28), the waveform gate on both tiers with the files' overlap under 2 s and the fail-closed ruling (SY-29), speech-only matching kept and the owner's rows retargeted onto a second pair that is one recording (SY-30). #303 closed.
 - **Clean-up status:** Built 2026-10-16, worked in `~/devel/framejob-c1` on branch `cleanup-2`, one litecode pipeline ("cleanup-sync-residue") from the owner's "Do the small followups"; this record is its record: #301 (SY-31), #302 (SY-32), #305 (SY-34) and #308's P13 slice fixed; #304 measured and stopped (SY-33), still open.

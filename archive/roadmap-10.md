@@ -9,7 +9,7 @@ until §10.10. The input to this design was `designs/svg-motion-components-plan.
 a tech plan the user had drafted. §1 reviews that plan against this codebase,
 and every section after §1 is the design that came out of the review.
 
-Every claim about the code is a scout's reading at `ed42a56`, cited with a
+Every claim about the code is a scout's reading at `f6505e7`, cited with a
 `file:line`. The claims about the crates and frameworks that §3 asked about
 were MEASURED by G0 on 2026-09-24 (§10.1), and every section that depended
 on one was REWRITTEN, not annotated, as in road map 8; §3a lists them. A
@@ -1326,8 +1326,8 @@ the branch `svg-motion`. G2 alone bumps the format.
 - After G4 the feature works end to end for an agent. Merging
   `svg-motion` into `main` is the user's decision at that point, so stop
   after G4 and report.
-- The commits so far on `svg-motion`: `c874069` (the design), `0d3c376`
-  (G0), `9899fca` (§5a's features, after the user's ruling on size).
+- The commits so far on `svg-motion`: `fbb881f` (the design), `3e5af80`
+  (G0), `5da1d49` (§5a's features, after the user's ruling on size).
 - **Do not re-run the spike.** Its output under
   `tools/proof/work/graphics_spike/` is what §10.1 quotes, and a re-run
   overwrites it (§10.3).
@@ -1390,7 +1390,7 @@ as designed.
 ### 10.1. G0 — the spike, run on 2026-09-24
 
 Nine rows, all `run`, exit 0, and the tree's `core/` and `app/` back at
-`c874069` (`git diff c874069 --stat -- core app` and `git status --short --
+`fbb881f` (`git diff fbb881f --stat -- core app` and `git status --short --
 core app` both empty, in `answers.json`'s `git_check`). The instruments are
 `tools/proof/graphics_spike/` and its README says how to run them again;
 every number below was printed by a run and is in the CURRENT
@@ -1431,7 +1431,7 @@ and `make test` again, the comment removed, then `make app`. PATCHED is
 `graphics_spike = { path = "../tools/proof/graphics_spike" }` in
 `core/Cargo.toml`, `pub mod ffi_graphic;` and the one throwaway export.
 
-| | BASELINE (`c874069`) | PATCHED | |
+| | BASELINE (`fbb881f`) | PATCHED | |
 |---|---|---|---|
 | cold `cargo build --release` | 25.0 s | 43.2 s | +18.2 s (QuickJS's C) |
 | `make test`, first | 47.0 s, 827 passed | 48.0 s, 827 passed | |
@@ -1621,7 +1621,7 @@ One owned instance on port
 4843, by PID, launched twice; `grep "Reelcut: "` over its log printed
 nothing.
 
-The app at `c874069` whitelists `project.json`, `cache/` and `media/` in
+The app at `fbb881f` whitelists `project.json`, `cache/` and `media/` in
 `fileWrapper(ofType:)` (`ProjectDocument.swift:659-677`), so `graphics/`
 cannot survive a save today. **`media/` is the STAND-IN**: it goes through
 the same lazy `directoryWrapper` (`:694-702`) a `graphics/` line would call,
@@ -1695,7 +1695,7 @@ the export is referenced, which is q1's +7 194 848 bytes of app.
 Every row and sub-row ran. Two things were measured by PROXY and are named
 as such: q7's (a), (a2) and (a-auto) used `media/` as the stand-in for
 `graphics/`, because adding the whitelist line is G1's and `app/` had to
-stay at `c874069` (the direct measurement is §5l's "Package" proof row, in
+stay at `fbb881f` (the direct measurement is §5l's "Package" proof row, in
 G3); and no `<image>` was rendered, so "resvg 0.48.1 decodes nothing
 without `raster-images`" is a reading of `src/image.rs:26-32`, priced by
 q1c but not photographed. q1's `make app` times are incremental builds
@@ -1748,7 +1748,7 @@ what each can prove alone.
 #### G1a — the ReelCore.swift toll (2026-09-24)
 
 A pure move, landed and gated alone before G1d's wrappers (§5e, §9 step 9),
-against baseline `c5f3265`.
+against baseline `3d4f487`.
 
 **What moved, and why this and not §5e's candidate.** `final class
 RecipeSource` — the compositor's process-wide recipe registry, from its
@@ -1773,7 +1773,7 @@ new sentence naming `RecipeSource.swift` as the payment owed at 1440.
 `RecipeSource.swift` **135**, new (133 + the import and its blank). The
 move frees 131 lines net against G1d's ~110.
 
-**Verbatim check.** `git show c5f3265:app/Sources/ReelCore.swift | sed -n
+**Verbatim check.** `git show 3d4f487:app/Sources/ReelCore.swift | sed -n
 '1274,1406p' | diff - <(sed -n '3,$p' app/Sources/RecipeSource.swift)`
 printed nothing, then `VERBATIM`.
 
@@ -1814,7 +1814,7 @@ candidate, `MediaDescriptor` + `mediaURL(for:)` + `bookmarkString(for:)`
 #### G1b — the drawing half (2026-09-25)
 
 The `graphic/` crate at the repo root, its drawing half only, against
-baseline `b54c1be`: the Library, `rasterize`, `measure_text` and the
+baseline `46d16a5`: the Library, `rasterize`, `measure_text` and the
 Diagnostic, with no QuickJS (G1c) and no dependency from `core/` (G1d).
 
 **What landed.** `graphic/Cargo.toml` (resvg 0.48.1 with `text`,
@@ -1926,7 +1926,7 @@ scan, `xml:space="preserve"` measurement, an in-place render when
 
 #### G1c — the JavaScript half (2026-09-25)
 
-The `graphic/` crate's JavaScript half, against baseline `93c0181`:
+The `graphic/` crate's JavaScript half, against baseline `5ef62fa`:
 QuickJS through `rquickjs` 0.14.0 (`loader` feature only), a `Module`
 compiled once, a sandboxed engine per (thread, module), the §5c standard
 library, G-4's props overlay and `svg(module, frame, props, ctx,
@@ -2039,7 +2039,7 @@ name `eval_script`, whose frames `position` would take for a module's.
 
 #### G1d — the link into the core and the app (2026-09-25)
 
-Against baseline `cea2ddf`: the nine exports of §5e in one new core module,
+Against baseline `601f4ee`: the nine exports of §5e in one new core module,
 the header and `ReelCore.swift` in lockstep, a probe that draws through the
 app's own wrappers, and `docs/graphics-api.md` with a test that runs it. No
 format bump (G2's); nothing user-visible, so the README is untouched.
@@ -2261,7 +2261,7 @@ version 10) is next**, from §5g and §4's G-3, G-4 and G-6 to G-13.
 
 #### G2a — the persisted graphic clip and its two ops (2026-09-25)
 
-Against baseline `fe16e94`: §5g's model and §5h's two ops in the core,
+Against baseline `bc52dac`: §5g's model and §5h's two ops in the core,
 format version 10, and the app decoding a graphic clip rather than
 emptying the project. The timeline rules (`split`, the trims, the
 action-end refusal, `paste_attributes`), `recipe_graphic.rs` and the tools
@@ -2343,7 +2343,7 @@ patch's `5000000000` is named as sent.
 
 #### G2b — the graphic's timeline rules and its recipe (2026-09-25)
 
-Against baseline `986cf5a`: G-9's timeline arithmetic under `split`,
+Against baseline `2f3198f`: G-9's timeline arithmetic under `split`,
 `trim_start`, `roll` and `trim_end`, G-10's refusal in `set_action_end`,
 and the real layer source in place of `recipe.rs`'s `missing`
 placeholder. Core only; the app still draws an unknown source kind as the
@@ -2493,7 +2493,7 @@ diagnostics, the export pin, the missing-font warning).
 
 #### G3a — the package's `graphics/` folder, its store and its watcher (2026-09-25)
 
-Against baseline `b1f045e`: §5f's store and watch, §9a's G3 items 1 to 3,
+Against baseline `e7b9deb`: §5f's store and watch, §9a's G3 items 1 to 3,
 and the decode of a clip's `graphic`. Nothing draws yet (G3b); nothing
 observes the two notifications yet.
 
@@ -2635,7 +2635,7 @@ found none. Its four nits, owed:
 
 #### G3b — a graphic clip drawn (2026-09-25)
 
-Against baseline `7bf518c`: §5d's rendering, §5f's registry paragraph, G-7,
+Against baseline `76e0404`: §5d's rendering, §5f's registry paragraph, G-7,
 G-4's render-time leniency, G-13's "preview follows the newest revision"
 and §5h's two OP tools. Failure still draws the `missing` slate — the error
 card, `render_frame`'s diagnostics and the export pin are G3c's.
@@ -2810,7 +2810,7 @@ while no nest is open. Nil, therefore:
 
 #### G3c — failure and export: the error card, `render_frame`'s diagnostics, the export gate and pin (2026-09-25)
 
-Against baseline `b29d981`: G-8 (the error card, the reply, the gate and the
+Against baseline `1730874`: G-8 (the error card, the reply, the gate and the
 abort), G-13's export pin, §9a's G3 items 4 and 5, and G3b's three slate
 cases (a)–(c), which the pin retires.
 
@@ -3055,7 +3055,7 @@ Help menu item is G5's.
 
 #### G4a — `write_graphic`, `get_graphic`, `graphic_reference`, and the reference in three places (2026-09-25)
 
-Against baseline `7ff17ce`, branch `svg-motion`.
+Against baseline `3cad33f`, branch `svg-motion`.
 
 **What landed.**
 - **The toll, first and alone.** `GraphicModuleFile`, `GraphicFile` and
@@ -3188,13 +3188,13 @@ written by the orchestrator from the pipeline's drafts after the review.
 
 #### G4b — `render_graphic`, `import_graphic_font`, `import_graphic_asset`; the tenth export (2026-09-25)
 
-Against baseline `e7dfacb`, branch `svg-motion`.
+Against baseline `df84c6f`, branch `svg-motion`.
 
 **What landed.**
 - **Two tolls, each landed and gated alone, each its own patch, before any
   feature line.** *Core* (`step1a-move.patch`): `read_bytes` moved out of
   `ffi_graphic.rs` into `ffi_util.rs` verbatim but for `pub(crate)` (the
-  diff of the ten lines against `e7dfacb` is that one line), and the two
+  diff of the ten lines against `df84c6f` is that one line), and the two
   frees' identical bodies became `ffi_util.rs`'s `free_boxed<T>(p, what)`,
   each free keeping its doc, attribute and signature with a one-line body —
   nothing else crate-free in the file was large enough (`diag_json` and
@@ -3205,7 +3205,7 @@ Against baseline `e7dfacb`, branch `svg-motion`.
   block (`MediaDescriptor`) and `// MARK: - Media files` block
   (`mediaURL(for:)`, `bookmarkString(for:)`) moved verbatim into the new
   `MediaDescriptor.swift` after `import Foundation` — `git show
-  e7dfacb:app/Sources/ReelCore.swift | sed -n '732,793p;1277,1309p'` diffs
+  df84c6f:app/Sources/ReelCore.swift | sed -n '732,793p;1277,1309p'` diffs
   EMPTY against `sed -n '3,$p' app/Sources/MediaDescriptor.swift` — and the
   header's type list and size-payment paragraph say so. `ReelCore.swift`
   **1440 → 1346**, `MediaDescriptor.swift` **97**; gated alone — `make
@@ -3443,7 +3443,7 @@ has no tracks at all and never reaches `CompositionBuilder.build`, whose
 exactly that case (a one-frame `Blank.mp4` scaled to `plan.duration`).
 `render_frame` and export go through the builder directly, which is why
 they drew all three samples. The guard dates from the first commit
-(`da962fa`), so the defect is **not graphics-specific**: a timeline of
+(`7eed76c`), so the defect is **not graphics-specific**: a timeline of
 only text, shapes or images should fail the same way — inferred from the
 code, not run.
 
@@ -3484,7 +3484,7 @@ every clip.
 instrument `media_less_playback_probe.swift`, drives the editor's own
 `Playback` in a real window. Its fixtures are four one-clip timelines
 (`graphic`, `text`, `shape`, `image`) and the CONTROL `empty`. It prints
-**32/32** at the fix, console unlocked. Over cadc45d's `app/Sources`
+**32/32** at the fix, console unlocked. Over 65bcb75's `app/Sources`
 (`--sources tools/proof/work/media-less-playback/baseline/app/Sources`) it
 prints **8/32**. The rows that fail there are the ones predicted before the
 fix: F·1, F·2, F·4, F·5 and F·6 for all four media-less fixtures, plus G·7,
@@ -3849,7 +3849,7 @@ comment names its UI path. The watcher gap G4b owed is closed.
 
 The user said "Merge both to main": the branch `svg-motion` and the
 export-Cancel crash fix (kpgalligan/reelcut#38). The fix, G3c's
-`ExporterWriter.swift` hunk (3a5df08), is on `svg-motion`, so the one merge
+`ExporterWriter.swift` hunk (88c78b3), is on `svg-motion`, so the one merge
 carries both and no cherry-pick was made. `main` had no commit that
 `svg-motion` lacked. The merge was made with `--no-ff`, so the branch's
 history stays visible as one merge commit. What `main` holds from here:

@@ -644,7 +644,7 @@ struct ReflectionProps: Codable, Equatable {
 }
 
 /// Darkens the canvas outside a rectangle or ellipse and optionally magnifies
-/// what is inside it (M3) — the stand-in for a screencast editor's freehand callout.
+/// what is inside it (M3) — a stand-in for a freehand callout.
 ///
 /// A VIDEO prop even though spec §4.2 first listed it under Shape: the zoom
 /// half can only be drawn by the layer that owns the pixels. The centre and
@@ -1496,7 +1496,7 @@ struct ProjectSnapshot: Codable, Equatable {
 /// snaps calls this — never re-derives it, because the pitfall is subtle:
 /// cropping removes edges IN PLACE, so a cropped clip's rectangle is a
 /// sub-rectangle of where the uncropped one sat, and the content under it
-/// does not move (a screencast editor's behaviour, §5.3).
+/// does not move (§5.3).
 ///
 /// Returns the CROPPED rectangle in CANVAS pixel space with the origin at
 /// the canvas's top-left and **y increasing downward** — the model's

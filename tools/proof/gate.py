@@ -72,7 +72,7 @@ EXCLUDED = ("archive/", ".secrets/")
 TOOLS = (["xcrun", "swiftc", "--version"], ["xcodebuild", "-version"],
          ["xcrun", "--show-sdk-path"], ["rustc", "-Vv"], ["cargo", "clippy", "-V"],
          ["bun", "--version"], ["xcodegen", "--version"], ["cargo", "fmt", "--version"])
-# `make typecheck`'s warnings at HEAD ab24de4, verbatim (CLAUDE.md: "0 errors and 4 warnings",
+# `make typecheck`'s warnings at HEAD 0b380d2, verbatim (CLAUDE.md: "0 errors and 4 warnings",
 # deliberate, spec §11 W-8): (file basename, message). A fifth, or one gone, fails the step.
 TYPECHECK_BASELINE = (
     ("Exporter.swift", "'copyCGImage(at:actualTime:)' was deprecated in macOS 15.0: Use "

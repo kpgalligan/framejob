@@ -1,7 +1,7 @@
 # Road map "speed-ramps" — a clip's rate changing over time
 
 **Opened 2026-10-23** (SR1, in the worktree `~/devel/framejob-ramps` on branch `speed-ramps`,
-from `81900d9`, each phase gated, committed and merged into main alone), for issue #111. This
+from `80291b7`, each phase gated, committed and merged into main alone), for issue #111. This
 road map's decisions are SR-1 onwards, in `designs/spec/11-decisions/speed-ramps.md`.
 
 ## Goal
@@ -34,7 +34,7 @@ once); undo works; spec §5.2 and §6 describe it.
 Also the owner's, standing: no feature size budget; memory limits relative to physical RAM;
 features before performance.
 
-## How it fits the tree (at `81900d9`)
+## How it fits the tree (at `80291b7`)
 
 - **The rate.** `Clip.speed` (`core/src/model.rs`, serde default 1). `set_speed`, `rate_stretch`,
   the trims and `rescale_actions` (actions keep their clip-relative fraction) are
@@ -277,7 +277,7 @@ today's one-rate arithmetic; only an MCP `set_action_end` makes a ramp before SR
 **Run 2026-10-23** (ended 12:48 −0400, 714 s), the whole spike once on the final instrument:
 `env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_spike/ramp_spike.py`. Host Mac14,6, macOS
 26.5.1 (25F80), load 7.08 / 20.78 / 18.77 at the start (other sessions on the host), no Frame
-Job running. HEAD `81900d9` with SR1's files uncommitted (`81900d9…+dirty`). `rule_sha256`
+Job running. HEAD `80291b7` with SR1's files uncommitted (`80291b7…+dirty`). `rule_sha256`
 `9d6b0cd7b000f8b74f0762a35a9f734dfe9d54a5547eeefaa1d2b07edd25688c` (the §11 file holding SR-5,
 as the run read it). Selftest S1–S7 7/7; each of the five mutants caught (exit 1).
 
@@ -377,7 +377,7 @@ assumed a clean ramp (re-pinned against a rendered ramp), and `C-off-x4`'s expor
 **Run 2026-10-23** (ended 13:46:56 −0400, 616 s), the whole spike once on the final instrument:
 `env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_spike/render_spike.py`. Host Mac14,6, macOS
 26.5.1 (25F80), load 22.97 / 36.46 / 41.10 at the start (other sessions on the host), no Frame
-Job running. HEAD `22a332c` with SR1b's files uncommitted (`22a332c…+dirty`). `rule_sha256`
+Job running. HEAD `ffcb4b5` with SR1b's files uncommitted (`ffcb4b5…+dirty`). `rule_sha256`
 `4dd0a7def64092d81094e9b2d7e56a5dd6538ab682b07054ebbc0bb8bed2b543` (the §11 file holding SR-6 and
 SR-7, as the run read it). Selftest S8–S13 6/6; each of the five mutants caught (exit 1); SR1's
 `ramp_spike.py --selftest` 7/7 and its five mutants still caught. The probe built `-O`.
@@ -484,7 +484,7 @@ per-call copy) are SR1c's.
 RK1,RK2,RC-on-x0.5,RC-on-x0.9,RC-on-x1.1,RC-on-x2,C-on-x0.5,C-on-x0.9,C-on-x1.1,C-on-x2,RC-off-x1,
 RC-on-x1,RC-on-x3,RC-on-x6,RC-on-x0.2,RB-on-x2 --verdict on`. Host Mac14,6, macOS 26.5.1
 (25F80), load 74.19 / 54.28 / 37.88 at the start (other sessions on the host), no Frame Job
-running. HEAD `14a0edb` with SR1c's files uncommitted (`14a0edb…+dirty`). `rule_sha256`
+running. HEAD `874ecc8` with SR1c's files uncommitted (`874ecc8…+dirty`). `rule_sha256`
 `93b7f2aed524f75232bf828f81e5b583cf25480f834b8a8daa2af3f6865607be` (the §11 file holding SR-8 and
 SR-9, as the run read it). Selftest S8–S17 10/10; each of the nine mutants caught (exit 1); SR1's
 `ramp_spike.py --selftest` 7/7. The probe built `-O`. SR1b's work folder was copied first to
@@ -650,11 +650,11 @@ The decisions were recorded before the code: SR-12 (the file per plan ramp segme
 `RampSegmentKey`, ready iff on disk, owners and one serial queue, the landing under the cache
 ledger and its re-queue, the prune, a failure not retried, the export's wait, SR-11's mix, the dev
 hold) and SR-6's third Amended-by line (the key carries the reversal). The toll was paid first, as
-a pure move landed alone (`de1e51e`): `CompositionBuilder.swift`'s orientation helpers to
+a pure move landed alone (`5042934`): `CompositionBuilder.swift`'s orientation helpers to
 `CompositionBuilder+Orientation.swift`, 581 → 507 lines (`designs/adr/app-file-history.md`).
 
 **The baseline, before any other app edit.** `ramp_proof.py --baseline` on the Release app the
-move's gate built (`de1e51e`, app inputs clean): CX1 (×1), CX2 (×2, keep pitch off) and CK05
+move's gate built (`5042934`, app inputs clean): CX1 (×1), CX2 (×2, keep pitch off) and CK05
 (×0.5, keep pitch on), 4 s of the clicks fixture each, their plan texts and decoded md5s in
 `tools/proof/work/ramp-baseline/baseline.json` — CX1 audio `6b4d7876…` (both exports), video
 `b8c33bd0…`; CX2 audio `a54eb075…`, video `f8ccd0ea…`; CK05 `audio_wav` `22a0745d…`, `prores_422`
@@ -720,7 +720,7 @@ with its export, 0 wrong frames on both packages; the log held no `Frame Job: `.
 
 **The tap offset (#335) is host state.** SR1 and SR1b read the ×1 tap 21.000 ms early; this
 session reads it 86.333 ms early — on SR1's own `C-off-x1` package too, and through a probe built
-from `de1e51e`'s sources, so it is not SR2b's. It is past `place_ideal`'s 60 ms reach, so P1
+from `5042934`'s sources, so it is not SR2b's. It is past `place_ideal`'s 60 ms reach, so P1
 aligns the control's tap to its clicks by whole samples before `pt1` reads the rest; m1 is the
 sum.
 
@@ -742,14 +742,14 @@ against 190 787.
 U1 then changed. CK05's two audio streams are compared by their decoded samples against the
 baseline's, kept beside `baseline.json`. They must be identical over their common length, with
 the lengths within 10 ms. Every other stream keeps its exact md5. The reason is Apple's
-time-pitch run-to-run variance, which predates this change: the baseline at `de1e51e` already
+time-pitch run-to-run variance, which predates this change: the baseline at `5042934` already
 held two CK05 audio md5s. The baseline was rebuilt with `--baseline --app` on a Release build of
-`de1e51e` in a scratch worktree, so that it could store the PCM.
+`5042934` in a scratch worktree, so that it could store the PCM.
 - Every plan, every video md5, CX1's audio and CK05's `audio_wav` came back as the first
   baseline's.
 - CX2's `prores_422` audio did not: `800460bc…` against `a54eb075…`. It has 196 095 frames
   against the wav's 192 047 and is identical over their common length. So keep pitch off at ×2
-  is not byte-stable in length either, at `de1e51e`.
+  is not byte-stable in length either, at `5042934`.
 - The Release run that followed read 14/15. U1's CK05 audio passed: both streams identical, 0
   frames apart. U1 failed on CX2's `prores_422` audio: `a54eb075…` against the new baseline's
   `800460bc…`.
@@ -760,7 +760,7 @@ U1 then changed again, to one rule for every audio stream, and the CK05 10 ms ru
   identical to the baseline's. A stream shorter than the timeline fails. Frames past the end are
   printed, not scored; that overrun predates this change and is #337.
 - Plans and video keep their exact md5s.
-- The baseline was rebuilt once more on the same `de1e51e` build, storing every audio stream's
+- The baseline was rebuilt once more on the same `5042934` build, storing every audio stream's
   samples. Every md5 came back as the first baseline's; CX2's `prores_422` audio was `a54eb075…`
   again.
 - Audio lengths: CX1 192 000 frames in both exports, CX2 192 047 in both. CK05 is 190 787 in
@@ -770,7 +770,7 @@ U1 then changed again, to one rule for every audio stream, and the CK05 10 ms ru
     and in the baseline).
   - U1 failed on CK05, both streams shorter than the timeline: `audio_wav` 190 851 frames,
     `prores_422` 190 787, the baseline 190 787. They are identical over their common frames.
-  - By this rule CK05 fails at `de1e51e` as well: the ×0.5 keep-pitch export's audio ends ≈ 25 ms
+  - By this rule CK05 fails at `5042934` as well: the ×0.5 keep-pitch export's audio ends ≈ 25 ms
     before its timeline.
 
 The "shorter fails" rule was then dropped, because U1 exists to show that SR2b changed nothing in a
@@ -868,7 +868,7 @@ byte-identical.
 SR-13 (the mechanism), SR-14 (the rule) and the Amended-by lines on SR-6's keep-pitch arm and on
 SR-8 were written into §11 before any code; `spec_index_proof.py` 183/183. Then:
 
-- `RampAudioRenderer+TimePitch.swift` (211 → 147): SR1b's rate-driven loop (`14a0edb`) with the
+- `RampAudioRenderer+TimePitch.swift` (211 → 147): SR1b's rate-driven loop (`874ecc8`) with the
   rate read `lead` output frames ahead, `rateLeadFrames` (2 880 provisionally, then the sweep's
   2 688); `TimePitchKept`, `oversampling`, `pitchCents`, `timePitchCents`,
   `timePitchMaxOversampling` and `timePitchDelayFrames` gone.
@@ -906,7 +906,7 @@ the twelve mutants caught (exit 1): `dense-off`, `merge-all`, `pt1-off`, `identi
 CAFs, each equal byte for byte (`cmp`) to SR1b's in `ramp-render-spike-sr1b/renders/`.
 
 **The lead sweep** (`--lead-sweep`, 102/102 renders read in 15 s; H0 load 54.61 / 24.40 / 15.43,
-HEAD `ea8b846…+dirty`; `lead/sweep.json`), each cell max |diff| ms (found/of) against the ideal
+HEAD `a579f71…+dirty`; `lead/sweep.json`), each cell max |diff| ms (found/of) against the ideal
 map:
 
 | lead ms | frames | RK1 | RK2 |
@@ -971,8 +971,8 @@ into `rateLeadFrames` before the measured run. The 0, 50 and 60 ms rows repeat t
 RK1,RK2,RK3,RC-on-x0.5,RC-on-x0.9,RC-on-x1.1,RC-on-x2,C-on-x0.5,C-on-x0.9,C-on-x1.1,C-on-x2,
 RC-off-x1,RC-on-x1,RC-on-x3,RC-on-x6,RC-on-x0.2,RB-on-x2,RW-on-x0.9,RW-on-x1.1,RW-on-x2 --verdict
 rate`, ended 2026-10-23 21:34:59 −0400, 315 s. Host Mac14,6, macOS 26.5.1 (25F80), load 6.35 /
-15.90 / 16.44 at the start, no Frame Job running. HEAD `ea8b846` with SR1d's files uncommitted
-(`ea8b846…+dirty`). `rule_sha256`
+15.90 / 16.44 at the start, no Frame Job running. HEAD `a579f71` with SR1d's files uncommitted
+(`a579f71…+dirty`). `rule_sha256`
 `3b90e2c5019a97afe43dbdd2240c7d6b4351a24cccc673d3659d40d4b23f2c04` (the §11 file holding SR-13
 and SR-14, unchanged since they were written). Every read answered (render 29/29, plan 24/24,
 export 36/36, playback 28/28 in 298 s); every Q row ok; R44 ok; ID1 ok; PT1 ok (RC-off-x1's tap,
@@ -1145,7 +1145,7 @@ rule; and fix #335's zero-padding artifact in the instrument as a new rule.
 ### The diagnostic (render-only, before any code)
 
 The designer measured first: a scratch probe of SR-13's `renderTimePitch` loop (the same
-`TimePitchFeeder`, `RampSourceReader`, preroll and discard) compiled from b4b63c9's `app/Sources`
+`TimePitchFeeder`, `RampSourceReader`, preroll and discard) compiled from 242f104's `app/Sources`
 through `swift_build.build` with `-O`, logging each 256-frame block's output, input pulled and
 rate commanded, with options for a closed loop and an additive source warp; scored by
 `ramp_spike.locate_scaled` with SR-7's reach and edge rules (keep pitch: the unscaled template),
@@ -1446,7 +1446,7 @@ design review's objection (a dense map, a point every 600 ticks, read per pixel 
 (c): the map is checked once at decode and each reading binary-searches its pair, and F5 times
 it. SR4-0, the pure move that paid for the wrapper (`ReelTime`'s seconds conversions to
 `CoreValues.swift`, the op-schema reader to `ReelOpSchema.table(from:)`, `ReelCore.swift` 803 →
-774), landed alone as 05c889d.
+774), landed alone as 0b4be0b.
 
 **What landed.**
 - Core: `Project::source_map` (`speed_segments.rs`): `{"ramped", "map"}` from `in` clamped into
@@ -1512,7 +1512,7 @@ waveform look right — as a `docs/manual-checks.md` row, since no UI makes a ra
 The orchestrator applied the map entries in `core/CLAUDE.md` (`speed_segments.rs`, the `ffi.rs`
 group) and `app/CLAUDE.md` (`ReelCore.swift`, `SourceMap.swift` with
 `TimelineView+SourceMap.swift`, `MediaPeaks`, `CompositionPlan.swift`, `MediaTranscript.swift`,
-`AudioSync.swift`; `CoreValues.swift` and `ReelOpSchema.swift` with SR4-0's toll, 05c889d).
+`AudioSync.swift`; `CoreValues.swift` and `ReelOpSchema.swift` with SR4-0's toll, 0b4be0b).
 
 ## SR5 — the UI (P, Q) and #338
 
@@ -1525,7 +1525,7 @@ on CI-6 were recorded before the code. The design review's objection (G4's ×14 
 the 5 s probe clip were refused by R1, so its crossings passed or failed vacuously) is answered by
 G4's own clips P and Q cut 0.5 s from 60 s media and every trial scored `applied` before its
 crossing. SR5-0, the pure move that paid for `InspectorPane.swift`'s growth (its small labels and
-fields to `InspectorLabels.swift`, 737 → 491), landed alone as 69142c8.
+fields to `InspectorLabels.swift`, 737 → 491), landed alone as a572d3f.
 
 **What landed.**
 - Core: `speed_map.rs`'s `rate_in_force` (the map's `rate_at`, or `speed` on a constant clip);

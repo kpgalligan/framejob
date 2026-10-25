@@ -79,7 +79,7 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   HEVC-with-alpha path" in a converting composition): prores4444 | hlg |
   hevc_alpha | webm, 1 s each on one 640×360 track, saved; at 0.5 s into
   each non-HLG clip the tree probe's PNG bytes and picks equal the base
-  tree's (716720c, a version-18 copy, as H1m). CONTROL: at the HLG clip the
+  tree's (e4f9ec1, a version-18 copy, as H1m). CONTROL: at the HLG clip the
   tree's PNG differs from the base's (the composition converts).
 - **H2**: the HLG, PQ and HLG HEVC ramps alone, and BT.709 | HLG | BT.709 (1 s
   each): each `prores_422` export's first frame of the HDR clip equals its
@@ -721,7 +721,7 @@ L_SCENES = {}
 LIN_T = 2 * SEC + LIN_D // 2
 
 
-BASE_COMMIT = "716720c"
+BASE_COMMIT = "e4f9ec1"
 BASE_TREE = BASE / f"base-{BASE_COMMIT}"
 INPUT_SWIFT = "app/Sources/InputConversions.swift"
 STAGE_SWIFT = "app/Sources/Compositor+Input.swift"
@@ -1951,7 +1951,7 @@ def build_probe(source, sources, name):
 
 
 def base_sources():
-    """716720c's `app/Sources` (and `app/Resources`, and `app/Bridging`, whose
+    """e4f9ec1's `app/Sources` (and `app/Resources`, and `app/Bridging`, whose
     name says which dev-tools flag the tree spells), by `git archive` into
     BASE_TREE, made once and kept; None and why when the archive fails."""
     sources = BASE_TREE / "app/Sources"
@@ -1972,7 +1972,7 @@ def base_sources():
 
 def base_copy(package):
     """A copy of `package` whose `project.json` says version 18 — the base tree
-    (716720c) refuses a newer file, and every number up to 18 it reads — or
+    (e4f9ec1) refuses a newer file, and every number up to 18 it reads — or
     None and why when the package's media carry `color` (T3-2, GR-16), which
     the base tree would drop, so its frame would not be the tree's."""
     source = Path(package)
@@ -2408,7 +2408,7 @@ def run_h1m(client, control, sources, state):
         if a.get("picked") != b.get("picked"):
             misses.append(f"{tag}: picks {a.get('picked')} vs base {b.get('picked')}")
     check("H1m (STOP) srgb|bt709|untagged and untagged|hlg|bt709|applelog, at ticks showing no "
-          "converted source: the tree's PNG bytes and picks equal the base tree's (716720c)",
+          "converted source: the tree's PNG bytes and picks equal the base tree's (e4f9ec1)",
           not misses and bool(asks["tree"]), f"{misses or 'all equal'}")
 
 
@@ -2421,7 +2421,7 @@ def run_h1a(client, sources, state):
     members = ["prores4444", "hlg", "hevc_alpha", "webm"]
     paths = [fixture(n) for n in members]
     name = "H1a prores4444|hlg|hevc_alpha|webm (640×360): at the non-HLG ticks the tree's PNG " \
-           "bytes and picks equal the base tree's (716720c); at the HLG tick the PNGs differ " \
+           "bytes and picks equal the base tree's (e4f9ec1); at the HLG tick the PNGs differ " \
            "(CONTROL)"
     if any(path is None for path in paths):
         check(name, False, f"a fixture is missing: {[n for n, p in zip(members, paths) if p is None]} "

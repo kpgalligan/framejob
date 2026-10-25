@@ -2,7 +2,7 @@
 """kpgalligan/framejob#36 — the canvas text editor grows as you type.
 
     python3 tools/proof/text_edit_proof.py
-    python3 tools/proof/text_edit_proof.py --baseline b76a2f3
+    python3 tools/proof/text_edit_proof.py --baseline fe5fe0d
 
 One instrument, the probe `text_edit_probe.swift`, compiled AS `main.swift`
 over every file in `app/Sources` but the app's own `main.swift` on

@@ -1,17 +1,17 @@
 # Speed ramps: a clip's rate changing over time, as a Speed action (road map "speed-ramps")
 
 - **Status:** Built and closed 2026-10-24, for #111. Each phase was one litecode pipeline with its own review, worked in `~/devel/framejob-ramps` on branch `speed-ramps` and merged into main alone after its gate (SR-4). Five of them were spikes, each judged by a rule fixed before its run:
-  - SR1, the road map, SR-1…SR-5 and the segment spike: STOP (`22a332c`)
-  - SR1b, the rendered-audio spike (SR-6, SR-7): SPLIT, off GO, on STOP (`14a0edb`)
-  - SR1c, Keep pitch as resample, then pitch-shift (SR-8, SR-9): STOP (`30ce979`)
-  - SR2a, `speed` as an action target, the speed map and the plan (SR-10, SR-11; format 27) (`c5e22ed`)
-  - SR2b, the render wired into playback and export (SR-12) (`ea8b846`), after its toll, `CompositionBuilder+Orientation.swift` (`de1e51e`)
-  - SR1d, Keep pitch through Apple's time-pitch in rate mode with a 56 ms lead (SR-13…SR-15): STOP, landed on the owner's answer (`b4b63c9`)
-  - SR1e, the closed loop measured and closed (SR-16, SR-17) (`7cdad51`)
-  - SR3a, trims, roll, slip, split, freeze and the handle on a ramped clip (SR-18) (`2619b99`)
-  - SR3b, rate edits scale the whole profile; copies and re-snaps carry a ramp (SR-19) (`6a8361e`)
-  - SR4, Swift's mappers (SR-20) (`32c0f80`), after its toll, `CoreValues.swift` and `ReelOpSchema.swift` (`05c889d`)
-  - SR5, the UI and #338 (SR-21, SR-22) (`843fc2c`), after its toll, `InspectorLabels.swift` (`69142c8`)
+  - SR1, the road map, SR-1…SR-5 and the segment spike: STOP (`ffcb4b5`)
+  - SR1b, the rendered-audio spike (SR-6, SR-7): SPLIT, off GO, on STOP (`874ecc8`)
+  - SR1c, Keep pitch as resample, then pitch-shift (SR-8, SR-9): STOP (`214aee8`)
+  - SR2a, `speed` as an action target, the speed map and the plan (SR-10, SR-11; format 27) (`2ee4e34`)
+  - SR2b, the render wired into playback and export (SR-12) (`a579f71`), after its toll, `CompositionBuilder+Orientation.swift` (`5042934`)
+  - SR1d, Keep pitch through Apple's time-pitch in rate mode with a 56 ms lead (SR-13…SR-15): STOP, landed on the owner's answer (`242f104`)
+  - SR1e, the closed loop measured and closed (SR-16, SR-17) (`e2e79b9`)
+  - SR3a, trims, roll, slip, split, freeze and the handle on a ramped clip (SR-18) (`27bbe72`)
+  - SR3b, rate edits scale the whole profile; copies and re-snaps carry a ramp (SR-19) (`d35c716`)
+  - SR4, Swift's mappers (SR-20) (`6a1b7a9`), after its toll, `CoreValues.swift` and `ReelOpSchema.swift` (`0b4be0b`)
+  - SR5, the UI and #338 (SR-21, SR-22) (`6d1a968`), after its toll, `InspectorLabels.swift` (`a572d3f`)
   - The close: this record (the commit that moved the original to `archive/`)
 - **Original:** `archive/speed-ramps.md` is the full record. It has no section numbers, so it is cited by its own headings: "orig SR2b" is its "SR2b — the renderer wired in" section, and "orig rule I" is the rule I bullet of its "Decided here".
 - **Spec decisions:** SR-1..SR-22 in spec §11: SR-1…SR-12 in `designs/spec/11-decisions/speed-ramps.md`, SR-13…SR-22 in `speed-ramps-2.md` (split at the close by the spec's ~500-line rule). They stay binding, and where the original words them differently, §11's text wins:
@@ -91,7 +91,7 @@ The spikes:
 
 | Measure | Measured | Command |
 |---|---|---|
-| The final product proof (SR5) | 43/43 in 150 s: E1 70/70 clicks at +0.000 ms, 0 wrong frames; L1 71/71 max 8.55 ms, L2 23/23 5.54, L3 35/35 21.47; R1 70/70 at −0.010 ms; W1 landed 2.4 s after the edit; U1 every constant clip's plan, video and audio as the `de1e51e` baseline; T1 1 640 000; Q4 edges 21 539 and 0 ticks off | `RC_PROOF_APP=release ramp_proof.py` |
+| The final product proof (SR5) | 43/43 in 150 s: E1 70/70 clicks at +0.000 ms, 0 wrong frames; L1 71/71 max 8.55 ms, L2 23/23 5.54, L3 35/35 21.47; R1 70/70 at −0.010 ms; W1 landed 2.4 s after the edit; U1 every constant clip's plan, video and audio as the `5042934` baseline; T1 1 640 000; Q4 edges 21 539 and 0 ticks off | `RC_PROOF_APP=release ramp_proof.py` |
 | A Keep pitch ramp's pitch (SR1d) | K1 inside the ramp 5.34 cents median, outside 0.01; the spike's PR medians within 0.01 cents of 220 Hz | `ramp_proof.py` K1; `render_spike.py --verdict rate` |
 | The render's cost | Keep pitch off 0.010–0.041 s per second of audio (SR1b), Keep pitch on in rate mode 0.0049–0.0143 (SR1d); 192 512 bytes per second of mono audio | `render_spike.py`'s RS rows |
 | The map's reads (SR4) | 100 000 lookups in 0.10 s and 0.11 s, 10 000 `sourceTick` in 0.015 s, every breakpoint exact | `ramp_proof.py` F5 |
@@ -144,7 +144,7 @@ Not filed, each decided at the close:
 
 - "Goal": #111's done-when.
 - "The owner's choices": the three decisions of 2026-10-23.
-- "How it fits the tree (at `81900d9`)": the rate, the source window, actions, the plan, Swift's composition and readers, the UI and the instruments the phases built on.
+- "How it fits the tree (at `80291b7`)": the rate, the source window, actions, the plan, Swift's composition and readers, the UI and the instruments the phases built on.
 - "Decided here": rules A–Q, each with its Amended-by lines, and the deferred list.
 - "Phases": what each of SR1…SR5 was to build, including SR1b–SR1e as they were added.
 - "SR1 — the spike": the full table, the VERDICT line, the findings and the owner's "Render it ourselves".

@@ -1,11 +1,11 @@
 # Reelcut — road map 5: transitions and motion (E1, E2)
 
-**Status: BUILT AND PROVED — E1 and E2's core in `e8028a2` (2026-09-16),
-`add_transition`'s `ripple` form in `5da056c` (2026-09-16), E2's chrome in
-`6dda2c7` (2026-09-17), and §4e's and §6e's four instruments on 2026-09-19.
+**Status: BUILT AND PROVED — E1 and E2's core in `062091a` (2026-09-16),
+`add_transition`'s `ripple` form in `00c74f7` (2026-09-16), E2's chrome in
+`c00678b` (2026-09-17), and §4e's and §6e's four instruments on 2026-09-19.
 What is left is §4g's and §6g's checks by a person — §12 is the record, and
 both reader reviews are in it (2026-09-20), E1's and E2's, the latter
-carrying the four `6dda2c7` nits.** Two phases, taken on
+carrying the four `c00678b` nits.** Two phases, taken on
 2026-09-15 from the
 survey of another editor's transitions, effects and filters
 (`designs/reelcut-effects-survey.md`): **E1**, transitions learn direction,
@@ -1287,7 +1287,7 @@ and nothing in them is planned.
 The plan above is kept as written. What landed, from the three commits'
 own accounts; the sections above say what each was meant to be.
 
-**`e8028a2` (2026-09-16) — E1 and E2's core, both in one commit** because
+**`062091a` (2026-09-16) — E1 and E2's core, both in one commit** because
 they share the files a schema bump touches (`format.rs`, the header,
 `model_tests.rs`, the `schema_v*` tests, the proof scripts' version
 literals, both side `CLAUDE.md` maps, spec §5/§6) and no E1-only tree was
@@ -1334,7 +1334,7 @@ kept to verify a split against. 68 files, +7656 / −918.
   Two host-state numbers, neither a regression: phase8_chrome 144/150 on a
   locked console, recording_proof 186/187 with a Bluetooth default input.
 
-**`5da056c` (2026-09-16) — `add_transition`'s `ripple` form and the sheet.**
+**`00c74f7` (2026-09-16) — `add_transition`'s `ripple` form and the sheet.**
 At a hard cut between two whole files there are no handles, so the menu
 beeped; `setTransitionKindCommand` now tries the batch and, when no
 `add_transition` in it would land, puts up a sheet saying why, whose Shift
@@ -1352,7 +1352,7 @@ each killed); `tools/proof/transition_sheet_probe.py` 32/32 in a real window
 28/32; one survivor — `applyEdit` for `performGroupedEdit` — recorded in
 `tools/proof/README.md`). 12 files, +968 / −28.
 
-**`6dda2c7` (2026-09-17) — E2's chrome.** The Clip tab's Motion section
+**`c00678b` (2026-09-17) — E2's chrome.** The Clip tab's Motion section
 (`VideoPane+Motion.swift`), shut by default and registered after Obscure:
 In and Out (kind or None, duration), During (kind or None, Amount %, Period
 — disabled for Drift) and Preview, which sets the in/out range to the clip
@@ -1384,7 +1384,7 @@ through `get_project`, a byte comparison of two PNGs, a sample-for-sample
 comparison of two decoded exports, or a number a mutant moves.
 
 - `tools/proof/e1_proof.py` — **95/95**, over MCP against TWO instances: this
-  build on 4825 and the build at `1c3e92e` on 4826. Sections 0–6 are §4e's
+  build on 4825 and the build at `77934fe` on 4826. Sections 0–6 are §4e's
   table.
 - `tools/proof/e1_chrome.py` — **14/14**, the harness on both trees plus a
   probe compiled from `app/Sources`.
@@ -1393,8 +1393,8 @@ comparison of two decoded exports, or a number a mutant moves.
 - `tools/proof/e2_chrome.py` — **24/24**, the harness and a second probe.
 
 `tools/proof/README.md` has a section on all four saying what each measures.
-The reference build is the whole tree at `1c3e92e` — the commit before E1's
-first toll; `e8028a2` is E1 and E2 together — extracted with
+The reference build is the whole tree at `77934fe` — the commit before E1's
+first toll; `062091a` is E1 and E2 together — extracted with
 `git archive | tar -x` into `tools/proof/work/e1-reference` and built there.
 It reads only version-6 packages, so every cross-build fixture is
 hand-written back to version 6, which is also exactly the file a person who
@@ -1459,7 +1459,7 @@ worth having written down:
 (i) the tool counts are FLOORS here and exact on the reference, because since
 road map 7's D3 `op_argument_proof.py` owns the exact number
 (`tools/proof/README.md`); (ii) "writes version 7" is version 8, since both
-phases landed in `e8028a2`; (iii) `spin`'s "quarter period" is an EIGHTH at
+phases landed in `062091a`; (iii) `spin`'s "quarter period" is an EIGHTH at
 A = 0.5, where the turn is `720·A·t/P`; (iv) p = 0.25 is read on a TWO-second
 overlap, because a one-second one puts it off the 30 fps grid; (v) §6(b)'s
 control is a faded tail rather than an `audio: false` pair, since the walls
@@ -1576,15 +1576,15 @@ The four questions, verbatim from §4f:
 4. the proof and the tests — which claims would pass against a build
    without the feature.
 
-**Which STATE each reading came from.** E1 landed in `e8028a2` (E1 + E2
-core) and `5da056c` (`ripple` and the sheet), its instruments in `50a2e63`.
+**Which STATE each reading came from.** E1 landed in `062091a` (E1 + E2
+core) and `00c74f7` (`ripple` and the sheet), its instruments in `74347b2`.
 Since then D2/D3 rewrote the refusal sentences and published the op table,
 and road map 7 §10's UNCOMMITTED phases A–B changed the handle arithmetic:
 `extended` now runs `source_advanced(.., head.saturating_neg(), speed)`,
 `head_handle_frames` reads `earliest_start_on_grid` and `tail_handle_frames`
 reads `source_length_on_timeline(..).or_empty()`. The review is of the
 WORKING TREE, and each line's bracket says where its reading came from —
-**[E1]** the text is already in `git show 5da056c:<path>`, **[D2-D3]** it
+**[E1]** the text is already in `git show 00c74f7:<path>`, **[D2-D3]** it
 arrived by `HEAD`, **[SW]** it exists only in the working tree.
 
 **The baseline, step 0, every command through rule H at a flat 1800 s.**
@@ -1884,7 +1884,7 @@ because findings route by ROOT file and no question names them —
 #### Reader 4 — which claims would pass against a build without the feature
 
 **No old binary was scored as "the build without the feature."** Run as the
-BUILD port, the `1c3e92e` binary has 75 tools, `e1_proof.py`'s first
+BUILD port, the `77934fe` binary has 75 tools, `e1_proof.py`'s first
 `set_transition_style` call raises `ToolError`, `main()` has no handler for
 it, and the script aborts inside §1 with §2–§6 never run: it measures
 nothing. (The reference instance keeps its designed role on the SECOND
@@ -2080,7 +2080,7 @@ and run.
   kpgalligan/reelcut#25's residual can be closed by a closed form rather
   than a bound at the door, which needs a decision the loop's own doc argues
   against (it calls the predicate "not monotone in an obvious direction");
-  and E2's files inside `e8028a2`, which are §6f's.
+  and E2's files inside `062091a`, which are §6f's.
 
 **Final scores.** `make test` green with two new files;
 `core/tests/add_transition_edges.rs` **9/9** and
@@ -2107,9 +2107,9 @@ expiry is in the record (the residual at 9.0e15, `expired at 120 s (pid
 ### The E2 reader review (2026-09-20)
 
 Road map 5 §6f's four questions, verbatim, against the tree as it STANDS —
-not against `e8028a2` and `6dda2c7` as they landed. Every finding below was
+not against `062091a` and `c00678b` as they landed. Every finding below was
 reproduced by RUNNING it, every fix has a test or a proof row made to fail on
-purpose, and the four `6dda2c7` nits each have a verdict.
+purpose, and the four `c00678b` nits each have a verdict.
 
 **The deviation, named.** §6f asks for four readers and earlier reviews put
 every finding to three sceptics. This ran as SEQUENTIAL single-context
@@ -2121,7 +2121,7 @@ list: **UNFIXED — recorded as a limit of the instrument**, used twice for a
 gap in `e2_proof.py` that this run measured but did not close.
 
 **Which STATE each reading came from.** `[E2]` the text is already in
-`git show 6dda2c7:<path>`; `[D1-D3]` it arrived by `HEAD` (road map 7's
+`git show c00678b:<path>`; `[D1-D3]` it arrived by `HEAD` (road map 7's
 deepening series); `[SW]` it exists only in the working tree.
 
 **The baseline, before anything was read** (every command through rule H at a
@@ -2299,7 +2299,7 @@ file would have been FILED; none was.
   the house convention, and the section's row names are what an inspector row
   is named after. (Lead L9.)
 
-#### The four `6dda2c7` nits
+#### The four `c00678b` nits
 
 - **N·1** [E2] `EditorViewController+Motion.swift:67,93,100,143-145` — any
   NEGATIVE menu tag read as None. `guard tag < 0 || tag < count` let a tag
@@ -2372,7 +2372,7 @@ file would have been FILED; none was.
 
 #### Reader 4 — "the proof — which claims would pass against a build without the feature"
 
-No old binary is scored (§12 already records why: the `1c3e92e` tree cannot
+No old binary is scored (§12 already records why: the `77934fe` tree cannot
 compile against the current header, and `e2_proof.py` has no handler for the
 `ToolError` that would follow). The builds are eight NAMED MUTANTS of today's
 tree in an `rsync` copy under a scratch directory, each patch asserting its

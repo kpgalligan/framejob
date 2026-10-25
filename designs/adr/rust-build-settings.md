@@ -1,6 +1,6 @@
 # The Rust build settings: no LTO, incremental release builds
 
-- **Status:** Decided and landed 2026-09-19 (`2d69fa4`), in `core/Cargo.toml`, and in
+- **Status:** Decided and landed 2026-09-19 (`af5907c`), in `core/Cargo.toml`, and in
   `graphic/Cargo.toml` since G1. Measured on an M2 Max at 12 jobs.
 - **Original:** `archive/remaining.md` §6 (the measurement run); summarised with its
   lesson in `designs/adr/remaining-closed.md` ("§6 — the Rust build settings run").

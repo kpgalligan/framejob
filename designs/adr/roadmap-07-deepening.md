@@ -336,7 +336,7 @@ reversed in a commit message); run EVERY proof script when the FFI changes; meas
   today — tracked in #88.~~ Struck (issue batch B12): decided, the fold stays (spec §11 #88).
 - Nullability as an op-table column (optional design) — tracked in #90.
 - ~~Residual argument-name literals in older proof scripts (app-state tools; `phase4`/`phase5` prose
-  claims) — tracked in #82.~~ Struck (issue batch B7): since 77b0bb8 those scripts read `tools/list`
+  claims) — tracked in #82.~~ Struck (issue batch B7): since 64a25da those scripts read `tools/list`
   through `mcp.schemas()`; the literals left are property names a check has to spell.
 - Stale doc comment: `app/Sources/ReelEdit.swift` still says refusals answer `.identity` "until road
   map 7's D2·3 gives them their sentences" — fixed by 2026-09-26 (`ReelEdit.swift:64`).

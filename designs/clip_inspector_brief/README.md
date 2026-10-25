@@ -1,7 +1,7 @@
 # Design brief: the Clip inspector
 
 A brief for redesigning the **Clip** tab of Reelcut's inspector. Everything
-below describes the app as built on 2026-09-23 (commit `7975456`). The
+below describes the app as built on 2026-09-23 (commit `6e3f5c7`). The
 screenshots in `screenshots/` are real renders of that build. `tokens.css`
 is the design-token file from the last shipped design pass.
 
@@ -35,7 +35,7 @@ Section 9 lists the deliverables.
 
 ## 2. What Reelcut is
 
-Reelcut is a screencast-style video editor for **macOS 26+ on Apple
+Reelcut is a video editor for **macOS 26+ on Apple
 Silicon**. It aims to be enough for a real cut with text, shapes,
 transitions and simple animation, without Final Cut's complexity. It
 records the screen itself (with pause/resume). The typical user makes
@@ -49,7 +49,7 @@ The features that define it:
 - Remove Silences;
 - audio ducking.
 
-Its model follows a screencast editor's ideas:
+Its model rests on six ideas:
 
 - one kind of track;
 - a fixed canvas you manipulate directly;

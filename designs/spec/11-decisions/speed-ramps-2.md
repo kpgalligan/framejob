@@ -165,7 +165,7 @@ its code. A later change records its rule as a new entry in
   `RampAudioRenderer.version` stays 4, no product code changes; SR-13's mechanism and SR-15's
   acceptance stand, SR-15's risk line widened by its Amended-by line.
   - **The diagnostic** (render-only, a scratch probe of SR-13's `renderTimePitch` loop compiled
-    from b4b63c9's `app/Sources` with `-O`, scored by SR-7's reach and edge rules, `ramp_spike`'s
+    from 242f104's `app/Sources` with `-O`, scored by SR-7's reach and edge rules, `ramp_spike`'s
     dropouts and `render_spike.pitch_track`, imported unchanged; not run under a SHA-pinned rule).
     Its sources are at `~/.claude/litecode/framejob/speed-ramps-sr1e/diag/` (`main.swift`,
     `build.py`, `run.py`, `look.py`, `dlag.py`, `tail.py`, `series.py`, `grid.py`, `ilc.py`); their

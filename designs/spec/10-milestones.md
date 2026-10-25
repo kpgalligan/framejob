@@ -1,6 +1,6 @@
 # 10. Milestones and the M1 build order
 
-**M1 — Cut.** The point at which a screencast editor stops getting opened: open a
+**M1 — Cut.** The point at which Frame Job is enough for a real cut: open a
 file into a project at the source's size and rate; import more; tracks;
 move / trim / split / delete / ripple; play, scrub, JKL; transform, crop
 and opacity on the canvas and in the inspector; markers; save and open

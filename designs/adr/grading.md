@@ -1,14 +1,14 @@
 # Grading: tone, adjustment clips, looks and `.cube` LUTs, kept (road map "grading")
 
 - **Status:** Built and closed 2026-10-10, kept by the owner's verdict and merged into main. Each phase was one litecode pipeline with its own review:
-  - GR0, the road map and the spike on the tree's own shader (`bd5bb65`, on main)
-  - GR1, five pure moves that made room (`4d742cc`, on main)
-  - GR2, the decisions and tone (`99c0d8f`, the `grading` branch from here on)
-  - GR3, Show Ungraded and the luma waveform (`6ecf46c`)
-  - GR4a, adjustment clips in the core, the compositor and MCP (`a5a6cdf`); GR4b, in the chrome (`09b056c`)
-  - GR5a, looks as core data, the GPU bake and step 4d (`e3e391e`); GR5b, the Look section and its gallery (`c2b2794`)
-  - GR6a, `.cube` LUTs as media and looks (`9d237f0`); GR6b, imported LUTs in the chrome (`892bfd1`)
-  - GR7a, the verdict's figures (`e2dbb9e`); L3, the two over-cap files paid by pure moves (`6f68daa`)
+  - GR0, the road map and the spike on the tree's own shader (`f6da385`, on main)
+  - GR1, five pure moves that made room (`d58a580`, on main)
+  - GR2, the decisions and tone (`ad0c099`, the `grading` branch from here on)
+  - GR3, Show Ungraded and the luma waveform (`aecdb44`)
+  - GR4a, adjustment clips in the core, the compositor and MCP (`5a692c8`); GR4b, in the chrome (`0cf4a72`)
+  - GR5a, looks as core data, the GPU bake and step 4d (`b10ad7d`); GR5b, the Look section and its gallery (`c3ba6c7`)
+  - GR6a, `.cube` LUTs as media and looks (`0902226`); GR6b, imported LUTs in the chrome (`bbbae59`)
+  - GR7a, the verdict's figures (`c9f0cb5`); L3, the two over-cap files paid by pure moves (`df40ac1`)
   - GR7b, the verdict, format 15 and the close (the commit that moved this record to `archive/`)
 - **Original:** `archive/grading.md` is the full record. It has no section numbers, so it is cited by phase: "orig GR4a" is its "GR4a — …" section.
 - **Spec decisions:** GR-1..GR-9 in spec §11 (`designs/spec/11-decisions/grading.md`). They stay binding, and where the original words them differently, §11's text wins:
@@ -51,12 +51,12 @@ GR0, one ungraded full-bleed layer, overhead over the tree (ms, 1080p / 4K): fla
 
 #258's X1 (GR0, four video layers at 4K): G = H16 − B8 = 0.135 ms, W = H16 − min(X420, X422) = 0.131 ms ≥ 0.5·G, so a 10-bit biplanar source wins back nearly all the half-float source's layer-stage cost; #258 stays open for the owner.
 
-GR7a's caps against main at the branch point `f407f87`:
+GR7a's caps against main at the branch point `5d04e47`:
 
 | Measure | Cap | Measured | Command |
 |---|---|---|---|
 | Frozen files | wiring only, ~50 lines | `EditorViewController.swift` +3, the other four net 0: held | `grading_verdict.py sizes` L2 |
-| Files over the cap | none unpaid | held after L3: `ProjectSnapshot.swift` 1,750 → 1,570, `edit_clip.rs` 755 → 661 | `sizes` L3 (at `6f68daa`) |
+| Files over the cap | none unpaid | held after L3: `ProjectSnapshot.swift` 1,750 → 1,570, `edit_clip.rs` 755 → 661 | `sizes` L3 (at `df40ac1`) |
 | Inspector | one sub-tab, ≤ 4 sections | Color: Light, Color, Adjustment, Look; Picture −Color: held | `sizes` L4 |
 | Menus | the four named items | 175 → 187 leaves, those four, none removed: held | `RC_PROOF_APP=release grading_verdict.py measure --only H0,M1,G0,E1,E2,Z1` M1 |
 | An ungraded layer | +0.02 ms 1080p, +0.06 ms 4K | +0.009 / +0.002 ms (C0 noise 0.000): held | `grading_spike.py --measure --tree` TC |
@@ -95,7 +95,7 @@ Filed or touched at the close; the new ones are each `ai-drafted` and `low-prior
 
 Closed as built: #118 (tone; its mask answered by a matte track over an adjustment clip), #120 (eight looks), #121 (adjustment clips), #122 (LUT import).
 
-Clean-up batch 1 (#310): `look_proof.py`'s G1 and S1 and `lut_proof.py`'s LG1 had failed since before the HDR road map. All three were stale instruments, not product defects. G1 and LG1 held a gallery tile's dumped PNG byte-identical to `render_frame`'s file. B102 (`bf1f711`, spec §11 PR-11) labels that file BT.709 at the write (`FrameWriter.writeFrame`'s `iCCP`) and keeps `FrameWriter.write`, which the gallery's dump uses, unlabelled, so the two files differ in their colour chunk alone. Both rows now compare the IHDR and the inflated IDAT, and require PR-11's label on `render_frame`'s file (`look_proof.tile_matches`). The tile and the click still render through the same `Exporter.renderFrame`. S1's expected refusal named Light, Color and Look; it now names the Wheels (GR-11, `b2fd1f9`) and Curves (GR-12, `75ebf34`) sections too. No §11 decision changed. The control on the untouched tree's Release build failed G1 and LG1 ("bytes differ") and S1 (the refusal named all five sections). After the change, on Release, `look_proof.py compare` scored 30/30 and `lut_proof.py` scored 28/28, each exiting 0. Two new mutants, `frame-unlabelled` (G1) and `wheels-section-dropped` (S1, B4), and the five re-run because G1's or LG1's comparator changed (`kind-drops-amount`, `gallery-ignores-playhead`, `thumbnail-not-click`, `luts-reversed`, `lut-tile-amount-one`), each printed MUTANT PASS.
+Clean-up batch 1 (#310): `look_proof.py`'s G1 and S1 and `lut_proof.py`'s LG1 had failed since before the HDR road map. All three were stale instruments, not product defects. G1 and LG1 held a gallery tile's dumped PNG byte-identical to `render_frame`'s file. B102 (`9b0c923`, spec §11 PR-11) labels that file BT.709 at the write (`FrameWriter.writeFrame`'s `iCCP`) and keeps `FrameWriter.write`, which the gallery's dump uses, unlabelled, so the two files differ in their colour chunk alone. Both rows now compare the IHDR and the inflated IDAT, and require PR-11's label on `render_frame`'s file (`look_proof.tile_matches`). The tile and the click still render through the same `Exporter.renderFrame`. S1's expected refusal named Light, Color and Look; it now names the Wheels (GR-11, `f952e88`) and Curves (GR-12, `12f5e81`) sections too. No §11 decision changed. The control on the untouched tree's Release build failed G1 and LG1 ("bytes differ") and S1 (the refusal named all five sections). After the change, on Release, `look_proof.py compare` scored 30/30 and `lut_proof.py` scored 28/28, each exiting 0. Two new mutants, `frame-unlabelled` (G1) and `wheels-section-dropped` (S1, B4), and the five re-run because G1's or LG1's comparator changed (`kind-drops-amount`, `gallery-ignores-playhead`, `thumbnail-not-click`, `luts-reversed`, `lut-tile-amount-one`), each printed MUTANT PASS.
 
 ## Where to look in the original
 

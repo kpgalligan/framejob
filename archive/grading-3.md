@@ -1,8 +1,8 @@
 # Road map "grading-3" — colour grading, tier 3: honest sources, HDR→SDR, camera log
 
 **Opened 2026-10-11** (T3-0, in the worktree `~/devel/reelcut-grading3` on branch `grading-3`,
-from `f02a1f3`, merged into main after its gate). The design brief this road map answers is
-`~/.claude/litecode/reelcut/grading-tier3/I-grading-tier3.md` (2026-10-11, tree `f02a1f3`), with
+from `8707ada`, merged into main after its gate). The design brief this road map answers is
+`~/.claude/litecode/reelcut/grading-tier3/I-grading-tier3.md` (2026-10-11, tree `8707ada`), with
 the owner's answers beside it in `…/grading-tier3/answers.md`; both live outside the repo, so
 everything a later phase needs from them is written here. Where the brief and this file differ,
 this file wins. Tier 1's road map is closed (`designs/adr/grading.md`, `archive/grading.md`,
@@ -227,13 +227,13 @@ look, `texture(3)` the curve strip, and #124's `texture(4)` is untouched.
 ## The standard recipe, file by file, and the tolls
 
 The ledger is `wc -l app/Sources/*.swift core/src/*.rs graphic/src/*.rs | sort -rn`, here at
-`f02a1f3`. The cap is ~600 lines, new files 400, and frozen files (`EditorViewController.swift`,
+`8707ada`. The cap is ~600 lines, new files 400, and frozen files (`EditorViewController.swift`,
 `TimelineView.swift`, `PreviewCanvasView.swift`, `AgentServer.swift`) take wiring only. Size is per
 file only (root `CLAUDE.md`): nothing here is a budget on a feature or a phase.
 
 ### Tolls (T3-0, each a pure move gated alone)
 
-| File | Lines at `f02a1f3` | Why it is touched | The move |
+| File | Lines at `8707ada` | Why it is touched | The move |
 |---|---|---|---|
 | `Compositor.swift` | 723 | T3-1: `canConformColorOfSourceFrames`, `supportsHDRSourceFrames`, the input pass's call | Its named seam, `DestinationPass` out whole. **Paid in T3-0**: 723 → 658, `DestinationPass.swift` 66 (below). Its next named seam is `MetalRenderer`'s `// MARK: - Sources` → `Compositor+Sources.swift`, where step 0 meets a track's buffer (`designs/adr/app-file-history.md`). |
 | `AgentServer+Render.swift` | 595 | only if `render_frame` changes (it should not: parity comes by construction) | Its named seam (`// MARK: - Export` → `AgentServer+Export.swift`), only if touched |
@@ -509,7 +509,7 @@ runs), `vm.loadavg` 1.2–3.5 across the session, 2026-10-11. Folder:
   gather. Half-float precision: a linear value in half-float returns every 10-bit code within
   0.162 of a level (encoded half-float storage: 0.250), and every 8-bit code survives the round
   trip. Off, it is byte-identical by GR0's route rule (the PR-5 frozen references —
-  `e1_proof.py`'s 1c3e92e pixels within ±1 and `hevc_alpha_baseline.json`'s digests —
+  `e1_proof.py`'s 77934fe pixels within ±1 and `hevc_alpha_baseline.json`'s digests —
   `precision_proof.py` K1–K6, every tier-1 and tier-2 neutral row); on, the proof measures the
   table as `render_frame` rows plus the output pass's 4K frame time.
 - **The HDR timeline** (GR-19, filed at T3-3): `canvas.output: "sdr" | "hlg"` (absent = SDR; PQ
@@ -603,7 +603,7 @@ instead:
 
 ## T3-0 — the road map, GR-15…GR-20 and the move
 
-**What landed** (2026-10-11, in the worktree on `grading-3`, from `f02a1f3`). This road map;
+**What landed** (2026-10-11, in the worktree on `grading-3`, from `8707ada`). This road map;
 `designs/spec/11-decisions/grading-3.md` with GR-15…GR-20, its "Holds" row and six ID rows in
 `11-decisions/README.md`, and the Lines cells; "Amended by GR-15" under PR-2 (`precision.md`) and
 at the end of GR-8 (`grading.md`), "Amended by GR-16" at the end of GR-8, and "— amended by GR-15"
@@ -650,7 +650,7 @@ MetalRenderer`, where T3-1's step 0 meets a track's buffer.
   `RC_PROOF_APP=release python3 tools/proof/matte_proof.py --only C0,S1,T1,N7`: 4/4 (S1 the shadow's
   suspend and resume, T1 and N7 the dissolves; `after-matte-release.txt`);
   `RC_PROOF_APP=release python3 tools/proof/word_looks_proof.py --only B1`: 3/3, B1 `moved: []`,
-  the 41 frames of fixture B still matching the digests recorded from `c66d8ab`
+  the 41 frames of fixture B still matching the digests recorded from `914b56a`
   (`after-word_looks-B1-release.txt`). No `DEFAULTS MOVED` in any of them.
 - No mutants: a pure move adds no decision.
 
@@ -676,7 +676,7 @@ marks its cut quote of T0 with "…". The `app/CLAUDE.md` entry above is applied
 
 ## T3-1 — honest sources and Reelcut's HDR→SDR at step 0
 
-**What landed** (2026-10-11/12, in the worktree on `grading-3`, from `716720c`; GR-15 as appended
+**What landed** (2026-10-11/12, in the worktree on `grading-3`, from `e4f9ec1`; GR-15 as appended
 and as amended after the H1 stop).
 - **The pure move first**: `Compositor.swift`'s `// MARK: - Sources` (`LayerSource`,
   `source(for:…)`, `texture(from:live:)`) to `Compositor+Sources.swift` as `extension
@@ -746,8 +746,8 @@ two controls, the instruments, GR-15's append, step 0 itself and the comment edi
   recorded, not a budget.
 - `precision_proof.py compare …/precision-ctl --only K1…K6` 7/7 byte-identical; `--only V2,V3`
   3/3 (V2 mean |Δ| 0.108 codes, V3 0.097 levels, the HLG reverse now through step 0);
-  `hevc_alpha_proof.py` 43/43; `e1_proof.py` 101/101 against the 1c3e92e reference (PR-5's frozen
-  pixels within ±1); `grading_spike.py --measure --tree --tree-base 716720c` (TC): 1080p
+  `hevc_alpha_proof.py` 43/43; `e1_proof.py` 101/101 against the 77934fe reference (PR-5's frozen
+  pixels within ±1); `grading_spike.py --measure --tree --tree-base e4f9ec1` (TC): 1080p
   VT:S1 − V0:S1 −0.007 ms (cap 0.028), 4K −0.001 ms (cap 0.061), TA 0.001 / 0.000 ms: held.
 - `make gate` PASS (240 s, typecheck 0 errors and the 4 baseline warnings).
 - **Mutants**, once each on the final instrument (Debug copies), all caught; every failing row:
@@ -771,7 +771,7 @@ compare tools/proof/work/t3-1/ctl` 14/14 (no `Reelcut: ` complaint, no DEFAULTS 
 
 ## T3-2 — camera log footage at step 0 (GR-16, #264)
 
-**What landed** (2026-10-12, in the worktree on `grading-3`, from `e76d827`; GR-16 as appended
+**What landed** (2026-10-12, in the worktree on `grading-3`, from `8e20fff`; GR-16 as appended
 before the code).
 - **The sources first.** T3-2's first run stopped at its step 1: Apple's paper sat behind the
   developer login and pro.sony refused this host (403). The owner downloaded Apple's *Apple Log 2
@@ -850,7 +850,7 @@ before the code).
 **Measured** (2026-10-12, AC power, `pmset -g` powermode 0, loadavg 15.5 / 13.4 / 11.9 at the
 first recorded runs and 31.1 / 32.2 / 26.1 after the last, other sessions' work; Release unless
 said; every recorded run is on the final product and instrument):
-- Control on the untouched product tree (`make app` at e76d827's sources, Release):
+- Control on the untouched product tree (`make app` at 8e20fff's sources, Release):
   `log_proof.py capture tools/proof/work/t3-2/ctl` — L9's references for 5 of 5 fixtures; LP1–LP4
   and L1–L8 all FAILED (`set_media_color` unknown, the probe would not build); Z1 ok.
 - `make gate` PASS (227 s after the last product edit; typecheck at its 4 baseline warnings).
@@ -902,7 +902,7 @@ and `media_color.rs`, the recipe's twenty-six keys) are applied.
 
 ## T3-3 — the close
 
-**What landed** (2026-10-12, in the worktree on `grading-3`, from `c47d97d`). `designs/adr/grading-3.md`. This road map
+**What landed** (2026-10-12, in the worktree on `grading-3`, from `2a8421b`). `designs/adr/grading-3.md`. This road map
 `git mv`'d to `archive/grading-3.md`, with its `archive/INDEX.md` row. Every `designs/grading-3.md` citation outside
 `archive/` now points here: §11 `grading-3.md`'s first paragraph in the closed form, `grading.md` (GR-8's amendment),
 `precision.md` (PR-2's amendment) and `tools/proof/README.md`'s two record lines. Each "PR-2 stands" outside `archive/`
@@ -918,7 +918,7 @@ the host was loaded by other sessions):
 - `RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --only H1a,H7,Z1` (loadavg 24.04 / 24.86 / 17.35 before):
   3/3, with the same figures as Debug, no `Reelcut: ` line and no DEFAULTS MOVED.
   - **H1a**: prores4444 | hlg | hevc_alpha | webm at 640×360. At 0.5 s into the ProRes 4444, HEVC-alpha and WebM
-    clips the tree's PNG bytes are equal to 716720c's and its picks are equal (e.g. HEVC alpha [0, 0.541, 0.541],
+    clips the tree's PNG bytes are equal to e4f9ec1's and its picks are equal (e.g. HEVC alpha [0, 0.541, 0.541],
     [0.173, 0, 0], [0, 0.863, 0.863] on both). At the HLG clip (CONTROL) the PNGs differ in 143,449 16-bit samples,
     grey pick 0.424 (tree, converted) against 0.545 (base). So GR-15's switch holds for alpha and the WebM rewrap.
   - **H7** in these runs carried metadata naming 1,000 cd/m² (`L(10000000,1):max-cll=1000,400`), the
@@ -955,7 +955,7 @@ beyond four points (moot: H3 holds Reelcut's own formula); the maker LUTs' licen
 footage (GRD-16…GRD-18); the player's first frame and the player at length (GRD-16, extended here); a recording's
 labels (R0 read `bt709`); the brief's scratch H.264 reader hang (a scratch instrument's).
 
-**Close comments**: #264 closed as built (T3-2, `c47d97d`, GR-16; L1–L9 on synthetic fixtures; its "done when" on
+**Close comments**: #264 closed as built (T3-2, `2a8421b`, GR-16; L1–L9 on synthetic fixtures; its "done when" on
 a real clip is GRD-17/GRD-18). #256 closed: HDR sources converted honestly (GR-15, T3-1), wide gamut for SDR
 projects closed by the owner (GR-20, choice 9a), linear light → #276, HDR/EDR/HDR export → #277.
 

@@ -350,7 +350,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   id still owed a delete (R6-11). DECLINED: a second persisted id list,
   which R6-11 already declined (issue batch B43, #201).
 - **R6-21 — A cached transcript is not re-checked for the key when it is
-  read (accepted).** Since issue batch B34 (a861f8c, 2026-09-30) a
+  read (accepted).** Since issue batch B34 (095cfc0, 2026-09-30) a
   transcript whose words carry the key is refused before any write. Before
   B34 only a server that put the key in the words could have made such a
   file, and the stand-in does that only in the probe's section `echo` row

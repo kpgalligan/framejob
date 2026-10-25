@@ -948,7 +948,7 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   readout, the size fields and the tool's answer now say 320 × 180 on a
   321 × 181 document where they said 321 × 181. **The baseline came
   first**: `tools/proof/hevc_alpha_baseline.json` was recorded twice on
-  the build of main at 055a5ed before any core or Swift edit, 17 cases,
+  the build of main at 61e43b4 before any core or Swift edit, 17 cases,
   the two recordings agreeing on every value; the recorder requires that
   build's answer to say the odd size over an evened file and each
   odd-canvas file to hold a black edge pixel, and Gate A's rows on that
@@ -960,7 +960,7 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   rows print the host and, on another host, score nothing and exit 2
   (the instrument, not the product). The host was stamped into the
   existing file without re-recording — the recorder cannot run on a tree
-  with the resolver — so the 17 cases are the two 055a5ed recordings,
+  with the resolver — so the 17 cases are the two 61e43b4 recordings,
   unchanged (`tools/proof/README.md` says how). **Gate A, on phase A's
   build:** `cargo test --release --test export_size` 20 passed (five new
   tests, three rewritten; five hand mutants of `core/src/`, each
@@ -1173,7 +1173,7 @@ seven choices "as recommended" (G-34's preamble names which sub-entry holds
 each; the paste answer is G-34 (d)). G-10's props half is superseded; its
 layer half and G-32 (h) stand.
 
-- **Phase 1, the core rule (826439d).** Toll A first, gated alone:
+- **Phase 1, the core rule (c0f766d).** Toll A first, gated alone:
   `actions.rs`'s clamps to `actions_clamp.rs`. Then `set_action_end` takes
   `graphic.props` with an app-filled `schema` (`edit_action_graphic.rs`);
   the end stores each prop's schema type in `kinds` (a caller's is
@@ -1187,7 +1187,7 @@ layer half and G-32 (h) stand.
   binaries, `graphic_actions.rs`, `graphic_action_door.rs`,
   `schema_v13.rs`); seventeen mutants (M1–M16, M2 in two forms), each
   failing its named test.
-- **Phase 2, the agent's door (34c11e4).** Toll B first, gated alone (the
+- **Phase 2, the agent's door (987deb8).** Toll B first, gated alone (the
   action handlers and catalog rows to `AgentServer+Actions.swift` and
   `AgentCatalog+Actions.swift`, the bundle's catalog equal to the
   baseline's). The `set_action_end` handler fills `schema` from the
@@ -1198,7 +1198,7 @@ layer half and G-32 (h) stand.
   switches on the end tick, undo and redo restore the bytes, the export with
   the prefetch on equals it off — and its two mutants
   (`handler-no-schema`, `recipe-stored-props`) caught.
-- **Phase 3, the Graphic tab (242c33d).** Tolls C and D first, each gated
+- **Phase 3, the Graphic tab (cbbe420).** Tolls C and D first, each gated
   alone (`ActionSnapshot.swift`, `InspectorRows.swift`). With an action
   selected the Properties rows read and write the action's END (G-34 (l)):
   ◆ and "at end", the mint segment and playhead tick, ×, Clear, `◆N` with a
@@ -1230,7 +1230,7 @@ below, spec §11 G-40, G-41 and G-42.
 
 ## G6 phase 2 — playback prefetch (#127, spec §11 G-36)
 
-2026-10-21, on `858146a`. A preview playing forward over a project that
+2026-10-21, on `1fa006d`. A preview playing forward over a project that
 draws a graphic now runs G-26's workers on the document's own key
 (`Playback+Prefetch.swift`'s `syncPrefetch(from:)`, called from the rate
 KVO, `startSeek` with its target, and a property-only edit while playing;
@@ -1332,7 +1332,7 @@ transport, not graphics speed).
 
 ## G6 phase 3 — one memory budget and kept frames (#127, spec §11 G-37)
 
-2026-10-21, on `1e7f64c`. G-26 (d)'s and G-36 (e)'s fixed bounds (1 GiB
+2026-10-21, on `d9fd94f`. G-26 (d)'s and G-36 (e)'s fixed bounds (1 GiB
 and `4 × workers` slots a session) are gone. Every session's held rasters,
 export and playback, and the graphic frames a document keeps share one
 process-wide budget, `ProcessInfo.physicalMemory / 4` (the owner's choice:
@@ -1421,7 +1421,7 @@ setting.
 
 ## G6 phase 4 — background render (#127, spec §11 G-38)
 
-2026-10-21, on `adf9807`. Settings gets a fourth pane, Playback
+2026-10-21, on `c7a009b`. Settings gets a fourth pane, Playback
 (`PlaybackSettingsPane.swift`): "Background render", on, and "Start after
 [5] seconds" (1–60), a person's setting with no tool, stored in
 `FrameJobBackgroundRender` and `FrameJobBackgroundRenderDelay`. The idle
@@ -1567,7 +1567,7 @@ scrolling step.
 
 ## G6 phase 5 — decoded-image cache (#127, spec §11 G-39)
 
-2026-10-22, on `2d003d1`. resvg decodes each `<image>` asset's PNG or JPEG
+2026-10-22, on `5ba34c7`. resvg decodes each `<image>` asset's PNG or JPEG
 on every frame. Measured first: `tools/proof/image_cache_bench.py` copies a
 package under `work/image-cache-bench/`, dumps 40 evenly spaced frames of
 the graphic clip covering `--from` as SVG through `render_graphic {format:
@@ -1658,7 +1658,7 @@ one digest across a limit of 0; the race has no instrument.
 
 ## G6 phase 6 — in-place raster (#127)
 
-2026-10-22, on `f06c9bb`. Measured first, and stopped by its rule before
+2026-10-22, on `312c44d`. Measured first, and stopped by its rule before
 any product code. The question: how much of a graphic frame's raster time
 sits outside resvg's own render — the pixmap's allocation and first touch,
 the RGBA→BGRA copy, the Swift buffer's zero-fill and the copy into the
@@ -1720,7 +1720,7 @@ identical across the arms). #127's phases are all done; it can close.
 Three of G-34's accepted limits, one phase each.
 
 **Phase 1 — an animated colour prop blends in OKLab (#250, spec §11
-G-40)**, 2026-10-22, on `d2a3b82`. The owner's answer: "OKLab always" — no
+G-40)**, 2026-10-22, on `1583b9e`. The owner's answer: "OKLab always" — no
 setting, no per-action or per-end key. Every action on a graphic `color`
 prop now blends as stdlib's `interpolateColors` does: `core/src/model_color.rs`
 gains `oklab_mix`, the stdlib's `__toLinear`, `__toOklab`, `__fromOklab`
@@ -1754,7 +1754,7 @@ shadow colours, and the chroma key, changed by Phase 4, G-43; background and
 shape colours are not action targets).
 
 **Phase 2 — a module marks a prop `animate: false` (#248, spec §11
-G-41)**, 2026-10-22, on `fa328f2`. Any schema entry may carry an optional
+G-41)**, 2026-10-22, on `25c907b`. Any schema entry may carry an optional
 boolean `animate`; absent or `true` animates. The engine's and the core's
 `check_entry` refuse a non-boolean in one copied sentence, `schema.<key>.animate
 <value> is not a boolean`, after the default's. `edit_action_graphic.rs`'s
@@ -1789,7 +1789,7 @@ core's `check_entry` without the `animate` check failed `add_errs…` and the
 door test; the engine's failed `every_compile_sentence`.
 
 **Phase 3 — an action changes a graphic's image (asset) prop (#249, spec
-§11 G-42)**, 2026-10-22, on `2cc4ae8`. `edit_action_graphic.rs`'s
+§11 G-42)**, 2026-10-22, on `6d003a5`. `edit_action_graphic.rs`'s
 `read_graphic_end` no longer refuses an asset: it is checked as
 `set_graphic` checks it (any string), its `kinds` is `asset`, and the
 evaluator switches it at the action's END as it does a string, with no code
@@ -1828,7 +1828,7 @@ asset arm back to `None` failed the door test; the asset refusal restored
 failed the door test and `an_asset_switches_at_the_end`.
 
 **Phase 4 — every action colour in OKLab (spec §11 G-43)**, 2026-10-22, on
-`4da64a5`. The model's nine colour keys in an action's state now blend as a
+`c0cf42c`. The model's nine colour keys in an action's state now blend as a
 graphic `color` prop does: `video.shadow.color`, `text.color`,
 `text.outline.color`, `text.backdrop.color`, the word style's
 `active_color`, `spoken_color`, `upcoming_color` and `active_pill.color`

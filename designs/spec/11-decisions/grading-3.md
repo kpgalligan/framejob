@@ -139,7 +139,7 @@ opened, at design time or build time.
       must, to keep it looking converted: decode L = signal^2.4 (BT.1886), the matrix, the
       encode; no lift and no shoulder (the layer stage's clamp, PR-1). It also covers a screen
       recording labelled Display P3, should one turn up. Measured on the control
-      (`hdr_proof.py capture` at 716720c, Release): a BT.2020/BT.709-transfer, a P3/BT.709 and
+      (`hdr_proof.py capture` at e4f9ec1, Release): a BT.2020/BT.709-transfer, a P3/BT.709 and
       a BT.2020/BT.2020-10 file each drew a grey of 128 as 65 or 66 on `render_frame`.
     - **The screen recording's labels** (owner, 2026-10-11, "Yes, read labels"): `hdr_proof.py`
       R0 reads only the colour labels (ffprobe) of the newest existing recording in
@@ -209,7 +209,7 @@ opened, at design time or build time.
       - **Measured at T3-3** (`hdr_proof.py` H1a, H7; `--only H1a,H7,Z1` on Debug and on
         Release, 3/3 each): in a converting composition (ProRes 4444 with an alpha ramp | HLG |
         HEVC with alpha | VP9 WebM, 640×360), the tree's frames at 0.5 s into each non-HLG clip
-        are byte-identical to 716720c's, with equal picks, while the HLG clip's differ (143,449
+        are byte-identical to e4f9ec1's, with equal picks, while the HLG clip's differ (143,449
         16-bit samples; grey pick 0.424 converted against 0.545), so the switch holds for alpha
         and the WebM rewrap. A PQ ramp with HDR10 static metadata naming a 4,000 cd/m² peak
         (x265's mastering display and content light level, which ffprobe names on its first

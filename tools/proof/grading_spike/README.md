@@ -39,10 +39,10 @@ the first frame read back against its own graph).
   the route, #258's outcome).
 
 **The variants**, each made from `app/Resources/Shaders/Compositor.metal` as it
-stood at `4d742cc` (`SHADER_COMMIT`, `git show`; a failed show is a B0 failure),
+stood at `d58a580` (`SHADER_COMMIT`, `git show`; a failed show is a B0 failure),
 the tree GR0 measured: grading GR2 built tone into the tree's own shader, so
 the spike was pinned there, matte_spike's pattern. Every patch anchor must occur
-exactly once and every token rewrite must hit its count pinned at `3cc61e7`;
+exactly once and every token rewrite must hit its count pinned at `ab20ab5`;
 otherwise B0 fails naming it.
 
 - **V0** — the tree, unpatched (and V0b, the same library drawn as a second
@@ -139,10 +139,10 @@ grey) K4 on the ramp; `biplanar-full-range` (Y' = code/1023, C =
 K1. The script prints `mutant NAME: killed by …` or `SURVIVED`.
 
 **`--tree` (grading GR7a).** In place of the routes, what the branch BUILT:
-V0 is `Compositor.metal` as it stood at `--tree-base REV` (by default `f407f87`,
-`TREE_BASE`, main at the branch point; grading-2 G2-2 passes `4f52ead`, the
-commit before its wheels, G2-3 `b2fd1f9`, the commit before its curves, and
-G2-4 `75ebf34`, the commit before its qualifier; `git show`,
+V0 is `Compositor.metal` as it stood at `--tree-base REV` (by default `5d04e47`,
+`TREE_BASE`, main at the branch point; grading-2 G2-2 passes `3eecaad`, the
+commit before its wheels, G2-3 `f952e88`, the commit before its curves, and
+G2-4 `12f5e81`, the commit before its qualifier; `git show`,
 a failed show is a B0 failure) and VT is the tree's
 own file, unpatched — matte_spike's `--tree` pattern. B1 compiles the two;
 B2 builds `tree_bench.swift` (`-O`, over `app/Sources`), which hands BOTH
@@ -186,28 +186,28 @@ of the same shape, `result.json`).
 
 **A base with no adjustment pass (issue #284).** KA needs V0's
 `framejob_adjust_fragment`, and a base before grading GR4a's adjustment pass
-has none — the default `f407f87` among them, where the bench used to stop at
+has none — the default `5d04e47` among them, where the bench used to stop at
 the adjustment pipeline and R1080 and R2160 failed. B0 now says whether V0
 has the fragment; without it the bench runs with `--adjust 0` (no adjustment
 pipeline, no KA, only V0:S1, VT:S1 and V0b:S1 timed; its `k` holds only KT),
 KA is a SKIP by name at each size, and `--measure`'s TA is too, so the
-verdict is KT's. **The default stays `f407f87`**: it is GR7a's record (the
+verdict is KT's. **The default stays `5d04e47`**: it is GR7a's record (the
 `--measure --tree` line below), and its KT answers the question the spike
 stands for — does an UNGRADED layer draw exactly as it did before grading?
 KA belongs to a base that already has an adjustment pass, and each phase
-that needs it names that base with `--tree-base`, as G2-4 (`75ebf34`) and
-T3-1 (`716720c`) did. B94's run: at the default, KT PASS at |Δ| 0 at both
-sizes with KA SKIP; at `--tree-base bde8319`, KT and KA PASS at |Δ| 0 at both
+that needs it names that base with `--tree-base`, as G2-4 (`12f5e81`) and
+T3-1 (`e4f9ec1`) did. B94's run: at the default, KT PASS at |Δ| 0 at both
+sizes with KA SKIP; at `--tree-base 869b5e2`, KT and KA PASS at |Δ| 0 at both
 sizes; `tree-graded` killed by KT (|Δ| 0.1416).
 
 ```
-python3 tools/proof/grading_spike/grading_spike.py --check --tree                    # B0–B2, KT (KA SKIP at f407f87)
+python3 tools/proof/grading_spike/grading_spike.py --check --tree                    # B0–B2, KT (KA SKIP at 5d04e47)
 python3 tools/proof/grading_spike/grading_spike.py --check --tree --mutant tree-graded
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree   # GR7a's record
-perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base 4f52ead   # G2-2's
-perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base b2fd1f9   # G2-3's
-perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base 75ebf34   # G2-4's
-perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base ac874f6   # T4-4's TB
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base 3eecaad   # G2-2's
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base f952e88   # G2-3's
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base 12f5e81   # G2-4's
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree --tree-base f98e7a0   # T4-4's TB
 ```
 
 **Its record** is `archive/grading.md`, "GR0 — the road map and the spike"
