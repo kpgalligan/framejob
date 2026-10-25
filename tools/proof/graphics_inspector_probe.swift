@@ -497,7 +497,58 @@ if let start = clip()?.start {
           shown == want && shown != ReelTime.format(0, fps: canvas.fps,
                                                     frames: canvas.timecodeFrames),
           "\(shown ?? "no readout")")
+
+    // #346 (G-9·c): with Follow Clip on, a null length is in + duration — the
+    // clip's 5 s, not the trimmed 3 s — in the field, the summary and the
+    // write that unticking Follow Clip makes.
+    let lengthField = row(timeline, "Length").flatMap {
+        walk($0).first { $0 is InspectorTimecodeField } as? InspectorTimecodeField
+    }
+    let summary = timeline.flatMap {
+        Mirror(reflecting: $0.header).children.first { $0.label == "lastSummary" }?.value
+            as? String
+    }
+    let trimmed = clip()
+    let whole = (trimmed?.graphic?.sourceIn ?? 0) + (trimmed?.duration ?? 0)
+    let wantLength = ReelTime.format(whole, fps: canvas.fps, frames: canvas.timecodeFrames)
+    let shortLength = ReelTime.format(trimmed?.duration ?? 0, fps: canvas.fps,
+                                      frames: canvas.timecodeFrames)
+    check("I12b (#346, G-9·c) with Follow Clip on (length null) the Length field and the "
+            + "Timeline summary read in + duration, not the clip's duration",
+          trimmed?.graphic?.length == nil && trimmed?.graphic?.sourceIn == 2 * second
+            && lengthField?.stringValue == wantLength && summary == wantLength
+            && wantLength != shortLength,
+          "field \(lengthField?.stringValue ?? "no field"), summary \(summary ?? "none"), "
+            + "want \(wantLength), short \(shortLength)")
+    let follow = timeline.flatMap { section in
+        walk(section).first {
+            $0 is OptionCheckboxControl && reflected($0, "label", as: String.self) == "Follow Clip"
+        }
+    }
+    _ = click(follow)
+    let pinned = clip()?.graphic?.length
+    check("I12c (#346) unticking Follow Clip writes length = in + duration",
+          follow != nil && pinned == whole,
+          "follow \(follow != nil), length \(String(describing: pinned)), want \(whole)")
+    document.applyEdit("probe", [.setGraphicRaw(clips: [clipID], patch: ["length": NSNull()])])
 }
+
+// The same rule as arithmetic (#346): ClipSnapshot.graphicEffectiveLength
+// against recipe_graphic.rs's effective_length — length when set, else
+// in + duration, saturating; nil without a graphic.
+let effective: [Ticks?] = [
+    ClipSnapshot(id: 1, track: 1, duration: 3 * second,
+                 graphic: GraphicSnapshot(sourceIn: 2 * second)).graphicEffectiveLength,
+    ClipSnapshot(id: 1, track: 1, duration: 3 * second,
+                 graphic: GraphicSnapshot(sourceIn: 2 * second, length: 4 * second))
+        .graphicEffectiveLength,
+    ClipSnapshot(id: 1, track: 1, duration: 3 * second).graphicEffectiveLength,
+    ClipSnapshot(id: 1, track: 1, duration: 5,
+                 graphic: GraphicSnapshot(sourceIn: .max - 1)).graphicEffectiveLength,
+]
+check("I12d (#346) graphicEffectiveLength: in 2 s + duration 3 s → 5 s; length 4 s → 4 s; no graphic "
+        + "→ nil; in Ticks.max − 1 + 5 saturates to Ticks.max",
+      effective == [5 * second, 4 * second, nil, .max], "\(effective)")
 
 // MARK: - I16 the memos
 

@@ -54,7 +54,12 @@ I8  the report names Nope Sans and the set's families, with no size warning;
 I9  the TOOL's size 90 shows in the Size field; the checkbox's write lands
     under the module's spelling (`showBox`);
 I10 `fitToCanvasOps`; I11 `sourceSize(of:)`; I12 after `trim_start` by 2 s
-    the In readout shows the graphic's own in point;
+    the In readout shows the graphic's own in point; I12b–I12d (#346, spec
+    §11 G-9·c) with Follow Clip on the Length field and the Timeline summary
+    read `in + duration` (5 s), not the clip's 3 s; clicking Follow Clip off
+    writes `length` = `in + duration` (then nulled again); and
+    `ClipSnapshot.graphicEffectiveLength` answers 5 s, a pinned 4 s, nil
+    without a graphic, and `Ticks.max` for `in` = max − 1 plus 5 (saturating);
 I13 (B8) `decimals(for:)`: no step with default 0.5 → 2, step 0.1 → 2, step 1
     with default 0.5 → 0, no step with default 3 → 0, no step with max 1.5 →
     2; with six's `offset` default rewritten to 0.5 the Offset field reads
@@ -196,6 +201,10 @@ nothing else did:
                      I20 a and I20 b (B69);
   first-frame-note-unconditional  the first-frame note is shown whatever
                      `report.frame` is — I20 b (B69).
+#346 adds two:
+  length-drops-in    the Timeline section's `length()` is `graphic?.length ??
+                     duration` again — I12b I12c;
+  length-wraps       `graphicEffectiveLength` answers the wrapped sum — I12d.
 Issue batch B87 phase 3 adds K12 to `stale` and sixteen more (a bare K id in
 `MUTANTS` names that one row):
   row-writes-base    the graphic split sends every value to the base — K2 K3a K4 K5
@@ -444,6 +453,12 @@ MUTANTS = {
         "InspectorRows.swift",
         "        if narrowing is OptionCheckboxControl { narrowing.clipsToBounds = true }\n",
         "", ["K18c"]),
+    "length-drops-in": (
+        "GraphicPane.swift", "return clip.graphicEffectiveLength ?? clip.duration",
+        "return clip.graphic?.length ?? clip.duration", ["I12b", "I12c"]),
+    "length-wraps": (
+        "ProjectSnapshot+Graphic.swift", "return overflow ? (duration < 0 ? .min : .max) : sum",
+        "_ = overflow; return sum", ["I12d"]),
 }
 
 

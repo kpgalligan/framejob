@@ -21,7 +21,8 @@ struct GraphicSnapshot: Codable, Equatable {
     /// The graphic's own frame the clip's first frame shows, in ticks. The
     /// core's key is `in`, a Swift keyword, hence the explicit coding key.
     let sourceIn: Ticks
-    /// The graphic's own length in ticks; nil is "the clip's duration" (G-9).
+    /// The graphic's own length in ticks; nil ends it with the clip, at
+    /// graphic time `in + duration` (G-9·c) — `ClipSnapshot.graphicEffectiveLength`.
     let length: Ticks?
     /// The values the module is drawn with.
     let props: [String: GraphicPropValue]
@@ -51,6 +52,20 @@ struct GraphicSnapshot: Codable, Equatable {
         sourceIn = c.lenient(.sourceIn, 0)
         length = c.lenient(.length)
         props = c.lenient(.props, [:])
+    }
+}
+
+extension ClipSnapshot {
+    /// How long the graphic's own timeline runs, in ticks, or nil for a clip
+    /// that describes no graphic — `core/src/recipe_graphic.rs`'s
+    /// `effective_length`: `length` when set, else `in + duration`, not
+    /// `duration`, so a front trim never shortens it (G-9·c). Saturating, as
+    /// the core's `saturating_add` is.
+    var graphicEffectiveLength: Ticks? {
+        guard let graphic else { return nil }
+        if let length = graphic.length { return length }
+        let (sum, overflow) = graphic.sourceIn.addingReportingOverflow(duration)
+        return overflow ? (duration < 0 ? .min : .max) : sum
     }
 }
 

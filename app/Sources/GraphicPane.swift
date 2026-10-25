@@ -282,7 +282,8 @@ final class GraphicPane: InspectorPaneView {
 
     /// The graphic's own timeline (G-9): In, read-only — the point
     /// `trim_start`, `roll` and `split` move — and Length, typed, which pins
-    /// it; Follow Clip gives it back to the clip's duration (`null`).
+    /// it; Follow Clip gives it back to the clip (`null`, which ends it at
+    /// `in + duration`, G-9·c).
     ///
     /// Binds by clip ID and reads fresh through it, `timingSection`'s rule.
     func timelineSection(_ id: UInt32) -> InspectorSection {
@@ -292,7 +293,7 @@ final class GraphicPane: InspectorPaneView {
         func frames() -> Bool { binding.canvas.timecodeFrames }
         func length() -> Ticks {
             guard let clip = clip() else { return 0 }
-            return clip.graphic?.length ?? clip.duration
+            return clip.graphicEffectiveLength ?? clip.duration
         }
         let field = InspectorTimecodeField(
             read: length,
