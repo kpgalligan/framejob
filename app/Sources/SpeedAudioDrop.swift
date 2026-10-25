@@ -165,4 +165,37 @@ enum SpeedAudioDrop {
             answer(response == .alertFirstButtonReturn)
         }
     }
+
+    /// The one door a person's speed edit goes through — the Speed and Speed
+    /// Ramp sheets' Apply and the inspector's commit. An edit that takes no
+    /// clip with sound above the ceiling runs `before` and is applied at once;
+    /// one that does asks on `window` first: Set Speed runs `before` and
+    /// applies, Cancel runs `declined`. With no window to ask on it beeps and
+    /// runs `declined`, applying nothing.
+    static func commit(
+        _ name: String, _ ops: [ReelOp], to document: ProjectDocument, asking window: NSWindow?,
+        before: @escaping () -> Void = {}, declined: @escaping () -> Void = {}
+    ) {
+        let crossing = mayCross(ops) ? Self.crossing(applying: ops, to: document.editedProject) : []
+        guard !crossing.isEmpty else {
+            before()
+            document.applyEdit(name, ops)
+            return
+        }
+        guard let window else {
+            NSSound.beep()
+            declined()
+            return
+        }
+        ask(crossing, on: window) { [weak document] confirmed in
+            guard confirmed else {
+                declined()
+                return
+            }
+            before()
+            // A sheet's completion is not an AppKit event: the grouped entry
+            // point is mandatory here (app/CLAUDE.md's undo pitfall).
+            document?.performGroupedEdit(name, ops)
+        }
+    }
 }

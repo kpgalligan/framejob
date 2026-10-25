@@ -131,3 +131,104 @@ func sheetCancelButton(target: AnyObject, action: Selector) -> NSButton {
 func sheetApplyButton(target: AnyObject, action: Selector) -> NSButton {
     StickerButton(title: "Apply", style: .primary, target: target, action: action)
 }
+
+// MARK: - Frame Job's own pieces (not in Rasterize's copy)
+//
+// The progress sheets' chrome and the settings sheets' grid, once each, so a
+// sheet is built from them rather than re-typing the metrics (#359).
+
+/// A progress sheet's bar: determinate 0…1 unless `indeterminate`, as wide as
+/// the sheet's content.
+func styleSheetProgressBar(_ bar: NSProgressIndicator, indeterminate: Bool = false) {
+    bar.style = .bar
+    bar.isIndeterminate = indeterminate
+    bar.minValue = 0
+    bar.maxValue = 1
+    bar.doubleValue = 0
+    bar.usesThreadedAnimation = true
+    bar.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2).isActive = true
+}
+
+/// A progress sheet's 12px muted status line, wrapping at the content width.
+func styleSheetStatusLabel(_ label: NSTextField) {
+    label.font = DS.sans(12)
+    label.textColor = DS.textMuted
+    label.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
+}
+
+/// A progress sheet's 11px mono detail line (the file being worked on),
+/// truncated in the middle at the content width.
+func styleSheetDetailLabel(_ label: NSTextField) {
+    label.font = DS.mono(11)
+    label.textColor = DS.textFaint
+    label.lineBreakMode = .byTruncatingMiddle
+    label.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2).isActive = true
+}
+
+/// A progress sheet's content: bar, status and detail, 8px apart.
+func makeProgressStack(_ views: [NSView]) -> NSStackView {
+    let stack = NSStackView(views: views)
+    stack.orientation = .vertical
+    stack.alignment = .leading
+    stack.spacing = 8
+    return stack
+}
+
+/// The button a progress sheet shows only once it is over.
+func hideReturnTarget(_ button: NSButton) {
+    // Hidden AND disabled while the work runs: AppKit skips both when it
+    // looks for the Return key's target, so the sheet's only live button is
+    // Cancel until there is a result to act on.
+    button.isHidden = true
+    button.isEnabled = false
+}
+
+/// A settings sheet's label grid: rows 10px apart, a 106px right-aligned
+/// label column (`fieldLabel`), 12px to the controls.
+func makeSheetGrid(_ rows: [[NSView]]) -> NSGridView {
+    let grid = NSGridView(views: rows)
+    grid.rowSpacing = 10
+    grid.columnSpacing = 12
+    grid.column(at: 0).xPlacement = .trailing
+    grid.column(at: 0).width = 106
+    return grid
+}
+
+/// A settings sheet's content column: its pieces stacked 10px apart.
+func sheetColumn(_ views: [NSView]) -> NSStackView {
+    let stack = NSStackView(views: views)
+    stack.orientation = .vertical
+    stack.alignment = .leading
+    stack.spacing = 10
+    return stack
+}
+
+/// The controls of one grid row, side by side, 6px apart.
+func sheetRow(_ views: [NSView]) -> NSStackView {
+    let row = NSStackView(views: views)
+    row.orientation = .horizontal
+    row.alignment = .centerY
+    row.spacing = 6
+    return row
+}
+
+/// The muted 13px unit after a field ("×", "s", "dB").
+func sheetUnitLabel(_ text: String) -> NSTextField {
+    let label = NSTextField(labelWithString: text)
+    label.font = DS.sans(13)
+    label.textColor = DS.textMuted
+    return label
+}
+
+extension NSViewController {
+    /// Ends a field's editing before a sheet acts on its values: true when
+    /// there is no window or the window resigned its first responder;
+    /// otherwise beeps and answers false.
+    func endSheetFieldEditing() -> Bool {
+        if let window = view.window, !window.makeFirstResponder(nil) {
+            NSSound.beep()
+            return false
+        }
+        return true
+    }
+}

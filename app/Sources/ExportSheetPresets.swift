@@ -35,11 +35,7 @@ extension ExportSheetController {
     /// The card's width is the owner's (`cardWidth`, #243), not this row's:
     /// the row fitted the 420-wide card it was built on exactly.
     func presetRow() -> NSStackView {
-        let stack = NSStackView(views: [presetPopup, presetMenuButton])
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.spacing = 6
-        return stack
+        sheetRow([presetPopup, presetMenuButton])
     }
 
     /// The gear: a pull-down, whose item 0 is its own face rather than a row.
@@ -153,10 +149,7 @@ extension ExportSheetController {
         // be the one from before the edit. It is also what makes the guard
         // under it read the CURRENT card — ending the edit runs
         // `controlTextDidEndEditing`, which re-resolves.
-        if let window = view.window, !window.makeFirstResponder(nil) {
-            NSSound.beep()
-            return
-        }
+        guard endSheetFieldEditing() else { return }
         // **A card that cannot be exported cannot be named**, which is the
         // same fact `commit(queue:)` guards on one file over and the one
         // Export… is greyed out by. Without it Save… was the single

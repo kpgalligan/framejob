@@ -1336,16 +1336,16 @@
    "reached_after": [
     {
      "selector": "showSpeedSheet:",
-     "via": "app/Sources/SpeedSheetController.swift `SpeedAudioDrop.ask(crossing, on: window)`",
-     "gate": "app/Sources/SpeedSheetController.swift `guard !crossing.isEmpty else {` — the rate takes a clip with sound from at or below the audio ceiling to above it (the sheet's Apply)"
+     "via": "app/Sources/SpeedSheetController.swift `SpeedAudioDrop.commit(`",
+     "gate": "app/Sources/SpeedAudioDrop.swift `guard !crossing.isEmpty else {` — the rate takes a clip with sound from at or below the audio ceiling to above it (the sheet's Apply)"
     },
     {
      "selector": "showSpeedRampSheet:",
-     "via": "app/Sources/SpeedRampSheetController.swift `SpeedAudioDrop.ask(crossing, on: window)`",
-     "gate": "app/Sources/SpeedRampSheetController.swift `guard !crossing.isEmpty else {` — the preset takes a clip with sound from at or below the audio ceiling to above it (the sheet's Apply)"
+     "via": "app/Sources/SpeedRampSheetController.swift `SpeedAudioDrop.commit(`",
+     "gate": "app/Sources/SpeedAudioDrop.swift `guard !crossing.isEmpty else {` — the preset takes a clip with sound from at or below the audio ceiling to above it (the sheet's Apply)"
     }
    ],
-   "other_caller": "app/Sources/EditorViewController+SpeedAudio.swift `SpeedAudioDrop.ask(clips, on: window) { [weak self, weak document]` — the inspector's Speed section (Rate, its presets, Keep pitch, Reset, Fit to) through inspector.onEdit; app/Sources/EditorViewController+SpeedAudio.swift `SpeedAudioDrop.ask(clips, on: window) { [weak document]` — the timeline's ⌥-drag rate stretch through timeline.onLiveEnd, the gesture already put back"
+   "other_caller": "app/Sources/EditorViewController+SpeedAudio.swift `SpeedAudioDrop.commit(` — the inspector's Speed section (Rate, its presets, Keep pitch, Reset, Fit to) through inspector.onEdit; app/Sources/EditorViewController+SpeedAudio.swift `SpeedAudioDrop.ask(clips, on: window) { [weak document]` — the timeline's ⌥-drag rate stretch through timeline.onLiveEnd, the gesture already put back"
   },
   "app/Sources/TranscribeSheetController+Commit.swift:182": {
    "token": "presentAsSheet",

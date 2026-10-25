@@ -557,7 +557,11 @@ the key map behind it.
   core), the question's and the agent note's copy, and its one alert sheet
   (`ask`); every door that sets speed asks through it (#212, §11 #190), and
   `mayCross` takes a `set_action_end` naming `speed` (SR-21 (e)) and an
-  `add_speed_ramp` (SR-24).
+  `add_speed_ramp` (SR-24). `commit` is the one door a person's speed edit
+  goes through — the Speed and Speed Ramp sheets' Apply and the inspector's
+  commit: `before` runs ahead of the edit (a sheet dismisses there),
+  `declined` on Cancel or the no-window beep (the inspector refreshes there),
+  and it holds the undo pitfall's one comment (#359).
   `EditorViewController+SpeedAudio` holds the Speed section's and the rate
   stretch's doors; the latter ends the live edit BEFORE asking (an autosave
   must never write a speed Cancel then takes back) and re-applies the
@@ -2161,7 +2165,10 @@ free.
   keeps its last buffer across silence.
 
 **Dialogs and windows.**
-- `Sheets.swift` (the `makeSheetView` builders every sheet uses) ·
+- `Sheets.swift` (the `makeSheetView` builders every sheet uses, and under
+  its own MARK the progress sheets' bar, status and detail lines, stack and
+  hidden Return target, the settings sheets' label grid, column, row and unit
+  label, and `endSheetFieldEditing()`, #359) ·
   `ExportSheetController.swift` (+`Options`, +`Resolve`, +`Presets`,
   `ExportPresetsStore.swift`, `ExportSheetCommit.swift`: Export… and Add
   to Queue, the save panel and the job; `ExportSheetDynamicRange.swift`: the
@@ -2172,7 +2179,10 @@ free.
   `SpeedSheetController.swift` · `SpeedRampSheetController.swift` (Clip ▸
   Speed Ramp…, SR-24: shape, rate, curve and hold over the range inside the
   clip or the whole clip; its readout and Apply follow every keystroke, read
-  off one trial of `add_speed_ramp`, a refusal showing the core's sentence) ·
+  off one trial of `add_speed_ramp`, a refusal showing the core's sentence;
+  `SpeedRateControls.swift` is the two sheets' shared rate field, presets
+  pull-down of `NSMenuItem`s carrying their rate, row and range footnote,
+  #359) ·
   `RelinkSheetController.swift` ·
   `GraphicFileSheetController.swift`. A sheet
   captures a project handle and trusts it; every editor action and
@@ -2847,7 +2857,10 @@ free.
 heights S/M/L per kind), `Controls.swift`, `OptionControls.swift`,
 `Sheets.swift`, `EditorChrome.swift` (`BarView`), `FileDropView.swift`
 (Finder drops + the first responder the bare-key map needs) — copied from
-Rasterize; keep them in sync rather than forking. `BrandMark.swift` is
+Rasterize; keep them in sync rather than forking. `Sheets.swift`'s section
+under `// MARK: - Frame Job's own pieces (not in Rasterize's copy)` is
+Frame Job's alone (#359): add there, and leave the copied functions' bodies
+as Rasterize has them. `BrandMark.swift` is
 Frame Job's own: the mark of `designs/frame-job/frame-job-icon.svg` without
 its tile (spec §11 NM-11).
 `Controls.swift`'s `BlockSlider` is the timeline's zoom slider. Four known

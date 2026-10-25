@@ -145,10 +145,7 @@ final class FillerSheetController: NSViewController {
             transcribeSection.addArrangedSubview(view)
         }
 
-        let content = NSStackView(views: [summaryLabel, noteLabel, transcribeSection])
-        content.orientation = .vertical
-        content.alignment = .leading
-        content.spacing = 10
+        let content = sheetColumn([summaryLabel, noteLabel, transcribeSection])
 
         let cancelButton = sheetCancelButton(target: self, action: #selector(cancelClicked(_:)))
         applyButton = StickerButton(
@@ -253,10 +250,7 @@ final class FillerSheetController: NSViewController {
     /// run goes, and AppKit skips a disabled button for Return, so the guard
     /// below should be unreachable.
     @objc private func applyClicked(_ sender: Any?) {
-        if let window = view.window, !window.makeFirstResponder(nil) {
-            NSSound.beep()
-            return
-        }
+        guard endSheetFieldEditing() else { return }
         let document = self.document
         dismiss(self)
         guard let document = document, !outcome.spans.isEmpty, runningMedia == nil else { return }

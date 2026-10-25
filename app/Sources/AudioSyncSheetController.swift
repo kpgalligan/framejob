@@ -48,28 +48,17 @@ final class AudioSyncSheetController: NSViewController {
     }
 
     override func loadView() {
-        bar.style = .bar
-        bar.isIndeterminate = true
-        bar.usesThreadedAnimation = true
-        bar.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2).isActive = true
+        styleSheetProgressBar(bar, indeterminate: true)
 
-        statusLabel.font = DS.sans(12)
-        statusLabel.textColor = DS.textMuted
-        statusLabel.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
+        styleSheetStatusLabel(statusLabel)
         statusLabel.stringValue = "Matching the sound of \(input.readings.count) clips…"
 
-        let content = NSStackView(views: [bar, statusLabel])
-        content.orientation = .vertical
-        content.alignment = .leading
-        content.spacing = 8
+        let content = makeProgressStack([bar, statusLabel])
 
         cancelButton = StickerButton(
             title: "Cancel", style: .secondary, target: self, action: #selector(cancelClicked(_:)))
-        // Hidden AND disabled: Return finds no target, so Cancel (Escape) is
-        // the only live button, Reverse's pattern.
         hiddenButton = StickerButton(title: "Apply", style: .primary, target: nil, action: nil)
-        hiddenButton.isHidden = true
-        hiddenButton.isEnabled = false
+        hideReturnTarget(hiddenButton)
 
         view = makeSheetView(
             title: "Synchronizing Audio",

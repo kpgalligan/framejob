@@ -52,32 +52,17 @@ final class RewrapProgressWindowController: NSWindowController {
     }
 
     private func loadView() {
-        bar.style = .bar
-        bar.isIndeterminate = true
-        bar.minValue = 0
-        bar.maxValue = 1
-        bar.usesThreadedAnimation = true
-        bar.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2).isActive = true
+        styleSheetProgressBar(bar, indeterminate: true)
 
-        detailLabel.font = DS.mono(11)
-        detailLabel.textColor = DS.textFaint
-        detailLabel.lineBreakMode = .byTruncatingMiddle
+        styleSheetDetailLabel(detailLabel)
         detailLabel.stringValue = Self.detail(for: progress)
-        detailLabel.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2)
-            .isActive = true
 
-        let content = NSStackView(views: [bar, detailLabel])
-        content.orientation = .vertical
-        content.alignment = .leading
-        content.spacing = 8
+        let content = makeProgressStack([bar, detailLabel])
 
         cancelButton = StickerButton(
             title: "Cancel", style: .secondary, target: self, action: #selector(cancelCopy(_:)))
-        // The row's apply slot, hidden AND disabled, as the reverse sheet's
-        // Close is while it runs: Cancel is the only live button.
         let apply = StickerButton(title: "Close", style: .primary, target: nil, action: nil)
-        apply.isHidden = true
-        apply.isEnabled = false
+        hideReturnTarget(apply)
 
         let view = makeSheetView(
             title: "Copying “\(progress.source.lastPathComponent)”",

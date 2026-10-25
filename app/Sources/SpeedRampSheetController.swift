@@ -148,30 +148,10 @@ final class SpeedRampSheetController: NSViewController, NSTextFieldDelegate {
         shapePopup.target = self
         shapePopup.action = #selector(shapeChosen(_:))
 
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.allowsFloats = true
-        formatter.minimumFractionDigits = 0
-        formatter.maximumFractionDigits = 3
-        formatter.minimum = NSNumber(value: SpeedSheetController.rateRange.lowerBound)
-        formatter.maximum = NSNumber(value: SpeedSheetController.rateRange.upperBound)
-        rateField.formatter = formatter
-        rateField.delegate = self
-        rateField.alignment = .right
-        rateField.doubleValue = Self.defaultRate(for: Self.initialShape)
-        rateField.widthAnchor.constraint(equalToConstant: 80).isActive = true
-        DSField.style(rateField)
-
-        // A pull-down's first item is its title and is never chosen.
-        presetPopup.menu?.addItem(menuItem("Presets", nil))
-        for preset in SpeedSheetController.presets {
-            presetPopup.menu?.addItem(
-                menuItem(SpeedSheetController.title(for: preset), NSNumber(value: preset)))
-        }
-        presetPopup.font = DS.sans(13)
-        presetPopup.target = self
-        presetPopup.action = #selector(presetChosen(_:))
-        presetPopup.widthAnchor.constraint(equalToConstant: 96).isActive = true
+        SpeedRateControls.styleRateField(
+            rateField, initial: Self.defaultRate(for: Self.initialShape), delegate: self)
+        SpeedRateControls.fillPresets(
+            presetPopup, target: self, action: #selector(presetChosen(_:)))
 
         for curve in [Curve.easeInOut, Curve.linear] {
             curvePopup.menu?.addItem(menuItem(curve.displayName, curve.rawValue))
@@ -198,34 +178,20 @@ final class SpeedRampSheetController: NSViewController, NSTextFieldDelegate {
         readoutLabel.textColor = DS.textMuted
         readoutLabel.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
 
-        let times = NSTextField(labelWithString: "×")
-        times.font = DS.sans(13)
-        times.textColor = DS.textMuted
-        let rateRow = NSStackView(views: [rateField, times, presetPopup])
-        rateRow.orientation = .horizontal
-        rateRow.alignment = .centerY
-        rateRow.spacing = 6
+        let rateRow = SpeedRateControls.rateRow(field: rateField, presets: presetPopup)
 
-        let grid = NSGridView(views: [
+        let grid = makeSheetGrid([
             [fieldLabel("Shape:"), shapePopup],
             [fieldLabel("Rate:"), rateRow],
             [fieldLabel("Curve:"), curvePopup],
             [fieldLabel("Hold:"), holdPopup],
         ])
-        grid.rowSpacing = 10
-        grid.columnSpacing = 12
-        grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 0).width = 106
 
-        let content = NSStackView(views: [grid, readoutLabel])
-        content.orientation = .vertical
-        content.alignment = .leading
-        content.spacing = 10
+        let content = sheetColumn([grid, readoutLabel])
 
         let cancelButton = sheetCancelButton(target: self, action: #selector(cancelClicked(_:)))
         let apply = sheetApplyButton(target: self, action: #selector(applyClicked(_:)))
         applyButton = apply
-        let range = SpeedSheetController.rateRange
         view = makeSheetView(
             title: "Speed Ramp",
             hint: "Up and Burst rise above the clip's rate where the ramp starts; Down and Dip "
@@ -234,10 +200,7 @@ final class SpeedRampSheetController: NSViewController, NSTextFieldDelegate {
             content: content,
             buttonRow: makeButtonRow(
                 cancel: cancelButton, apply: apply,
-                leading: [
-                    sheetFootnote(
-                        String(format: "×%g – ×%g", range.lowerBound, range.upperBound))
-                ]))
+                leading: [SpeedRateControls.rangeFootnote()]))
         syncControls()
     }
 
@@ -261,8 +224,7 @@ final class SpeedRampSheetController: NSViewController, NSTextFieldDelegate {
     }
 
     private var rate: Double {
-        let range = SpeedSheetController.rateRange
-        return min(max(rateField.doubleValue, range.lowerBound), range.upperBound)
+        SpeedRateControls.clamp(rateField.doubleValue)
     }
 
     private var curve: Curve {
@@ -299,7 +261,7 @@ final class SpeedRampSheetController: NSViewController, NSTextFieldDelegate {
     }
 
     @objc private func presetChosen(_ sender: Any?) {
-        if let preset = (presetPopup.selectedItem?.representedObject as? NSNumber)?.doubleValue {
+        if let preset = SpeedRateControls.preset(of: presetPopup) {
             rateField.doubleValue = preset
         }
         // The pull-down always shows its own title, so put it back.
@@ -337,24 +299,8 @@ final class SpeedRampSheetController: NSViewController, NSTextFieldDelegate {
             dismiss(self)
             return
         }
-        let ops = [currentOp]
-        let name = shape.displayName
-        let crossing = SpeedAudioDrop.crossing(applying: ops, to: document.editedProject)
-        guard !crossing.isEmpty else {
-            dismiss(self)
-            document.applyEdit(name, ops)
-            return
-        }
-        guard let window = view.window else {
-            NSSound.beep()
-            return
-        }
-        SpeedAudioDrop.ask(crossing, on: window) { [weak self, weak document] confirmed in
-            guard confirmed else { return }
-            if let self { self.dismiss(self) }
-            // A sheet's completion is not an AppKit event: the grouped entry
-            // point is mandatory here (app/CLAUDE.md's undo pitfall).
-            document?.performGroupedEdit(name, ops)
-        }
+        SpeedAudioDrop.commit(
+            shape.displayName, [currentOp], to: document, asking: view.window,
+            before: { [weak self] in if let self { self.dismiss(self) } })
     }
 }

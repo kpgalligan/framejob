@@ -31,6 +31,12 @@ Rows:
   S5   CONTROL: an unchanged Apply closes the sheet, asks nothing, no step.
   S4   CONTROL: [A] at exactly the ceiling, [N] ×20, [M] ×20, [H] ×30 each
        apply with no question within 1 s.
+  P1   Speed Ramp sheet on A trimmed to 10 s, Ramp Up ×20 over its last
+       0.2 s, Apply: the one-clip question is attached to the Ramp sheet's
+       window with nothing applied; Set Speed closes the sheet and leaves one
+       step named "Ramp Up".
+  P2   CONTROL: the Ramp sheet's opening Speed Dip ×0.5 over the whole clip:
+       no question within 1 s, the sheet closed, one step named "Speed Dip".
   I1   `inspector.onEdit("Set Speed", [set_speed A ×20])`: the question on the
        editor window; Set Speed makes one step.
   I2   I1 answered Cancel: no change and no step.
@@ -50,8 +56,7 @@ Rows:
   A3   MCP `rate_stretch` B above the ceiling: both keys.
 
 Mutants (`--mutant`):
-  no-ask          the crossing test's `clip.speed > limits.audioMax` is
-                  `false`.
+  no-ask          the crossing test's `peak > limits.audioMax` is `false`.
   cancel-applies  `ask` answers true for any return code.
 
 Exit (rule R): a plain run exits 0 iff every row passed and 1 when a row
@@ -72,14 +77,14 @@ import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/speed-audio"
-ROWS = ["B0", "C0", "S1", "S2", "S3", "S5", "S4", "I1", "I2", "I3", "I5", "I4", "R1", "R2",
-        "R3", "A1", "A2", "A3"]
+ROWS = ["B0", "C0", "S1", "S2", "S3", "S5", "S4", "P1", "P2", "I1", "I2", "I3", "I5", "I4",
+        "R1", "R2", "R3", "A1", "A2", "A3"]
 WALL = 240
 
 # name: (the rows it must fail, [(file, before, after), ...])
 MUTANTS = {
-    "no-ask": (["S1", "S2", "S3", "I1", "I2", "I3", "I5", "R1", "R2", "A1", "A3"], [
-        ("SpeedAudioDrop.swift", "clip.speed > limits.audioMax", "false")]),
+    "no-ask": (["S1", "S2", "S3", "P1", "I1", "I2", "I3", "I5", "R1", "R2", "A1", "A3"], [
+        ("SpeedAudioDrop.swift", "peak > limits.audioMax", "false")]),
     "cancel-applies": (["S2", "I2", "R2"], [
         ("SpeedAudioDrop.swift", "response == .alertFirstButtonReturn", "true")]),
 }

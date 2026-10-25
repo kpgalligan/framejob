@@ -75,37 +75,22 @@ final class ExportProgressSheetController: NSViewController {
     }
 
     override func loadView() {
-        bar.style = .bar
-        bar.isIndeterminate = false
-        bar.minValue = 0
-        bar.maxValue = 1
-        bar.doubleValue = 0
-        bar.usesThreadedAnimation = true
-        bar.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2).isActive = true
+        styleSheetProgressBar(bar)
 
-        statusLabel.font = DS.sans(12)
-        statusLabel.textColor = DS.textMuted
-        statusLabel.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
+        styleSheetStatusLabel(statusLabel)
         statusLabel.stringValue = "Preparing “\(destination.lastPathComponent)”…"
 
         percentLabel.font = DS.mono(11)
         percentLabel.textColor = DS.textFaint
 
-        let content = NSStackView(views: [bar, statusLabel, percentLabel])
-        content.orientation = .vertical
-        content.alignment = .leading
-        content.spacing = 8
+        let content = makeProgressStack([bar, statusLabel, percentLabel])
 
         stopButton = StickerButton(
             title: "Cancel", style: .secondary, target: self, action: #selector(stopClicked(_:)))
         revealButton = StickerButton(
             title: "Show in Finder", style: .primary, target: self,
             action: #selector(revealClicked(_:)))
-        // Hidden AND disabled while the export runs: AppKit skips both when it
-        // looks for the Return key's target, so the sheet's only live button
-        // is Cancel until there is a file to show.
-        revealButton.isHidden = true
-        revealButton.isEnabled = false
+        hideReturnTarget(revealButton)
 
         view = makeSheetView(
             title: "Exporting",

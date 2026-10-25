@@ -148,26 +148,19 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
         noteLabel.textColor = DS.textFaint
         noteLabel.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
 
-        let thresholdRow = row([thresholdSlider, thresholdReadout])
-        let minimumRow = row([minimumField, unitLabel("seconds")])
-        let paddingRow = row([paddingField, unitLabel("seconds")])
+        let thresholdRow = sheetRow([thresholdSlider, thresholdReadout])
+        let minimumRow = sheetRow([minimumField, sheetUnitLabel("seconds")])
+        let paddingRow = sheetRow([paddingField, sheetUnitLabel("seconds")])
 
-        let grid = NSGridView(views: [
+        let grid = makeSheetGrid([
             [fieldLabel("Judge by:"), modePopup],
             [thresholdLabel, thresholdRow],
             [fieldLabel("Longer than:"), minimumRow],
             [fieldLabel("Keep at ends:"), paddingRow],
             [fieldLabel("In:"), scopePopup],
         ])
-        grid.rowSpacing = 10
-        grid.columnSpacing = 12
-        grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 0).width = 106
 
-        let content = NSStackView(views: [grid, summaryLabel, noteLabel])
-        content.orientation = .vertical
-        content.alignment = .leading
-        content.spacing = 10
+        let content = sheetColumn([grid, summaryLabel, noteLabel])
 
         let cancelButton = sheetCancelButton(target: self, action: #selector(cancelClicked(_:)))
         applyButton = StickerButton(
@@ -203,21 +196,6 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
         field.alignment = .right
         field.widthAnchor.constraint(equalToConstant: 72).isActive = true
         DSField.style(field)
-    }
-
-    private func unitLabel(_ text: String) -> NSTextField {
-        let label = NSTextField(labelWithString: text)
-        label.font = DS.sans(13)
-        label.textColor = DS.textMuted
-        return label
-    }
-
-    private func row(_ views: [NSView]) -> NSStackView {
-        let stack = NSStackView(views: views)
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.spacing = 6
-        return stack
     }
 
     // MARK: - Values
@@ -477,10 +455,7 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
         // field, so a just-typed length has not been committed yet. Ending
         // editing runs `controlTextDidEndEditing`, which re-detects; the
         // spans are therefore read AFTER it.
-        if let window = view.window, !window.makeFirstResponder(nil) {
-            NSSound.beep()
-            return
-        }
+        guard endSheetFieldEditing() else { return }
         let spans = outcome.spans
         let document = self.document
         dismiss(self)

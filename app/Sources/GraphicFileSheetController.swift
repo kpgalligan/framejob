@@ -225,16 +225,9 @@ final class GraphicFileSheetController: NSViewController, NSTextFieldDelegate {
         var rows: [[NSView]] = [[fieldLabel("Graphic:"), popup]]
         if act == .rename { rows.append([fieldLabel("New name:"), nameField]) }
         if act == .restore { rows.append([NSGridCell.emptyContentView, keptLabel]) }
-        let grid = NSGridView(views: rows)
-        grid.rowSpacing = 10
-        grid.columnSpacing = 12
-        grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 0).width = 106
+        let grid = makeSheetGrid(rows)
 
-        let content = NSStackView(views: [grid, messageLabel])
-        content.orientation = .vertical
-        content.alignment = .leading
-        content.spacing = 10
+        let content = sheetColumn([grid, messageLabel])
 
         confirmButton.target = self
         confirmButton.action = #selector(confirmClicked(_:))

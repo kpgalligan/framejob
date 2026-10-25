@@ -310,7 +310,7 @@ final class TranscribeSheetController: NSViewController {
         hintLabel.isEditable = false
         hintLabel.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
 
-        grid = NSGridView(views: [
+        grid = makeSheetGrid([
             [fieldLabel("Language:"), languagePopup],
             makeDownloadRow(),
             [fieldLabel("Engine:"), enginePopup],
@@ -323,36 +323,14 @@ final class TranscribeSheetController: NSViewController {
             makePreviewRow(),
             makeReplaceRow(),
         ])
-        grid.rowSpacing = 10
-        grid.columnSpacing = 12
-        grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 0).width = 106
 
-        settingsStack = NSStackView(views: [grid, summaryLabel, noteLabel])
-        settingsStack.orientation = .vertical
-        settingsStack.alignment = .leading
-        settingsStack.spacing = 10
+        settingsStack = sheetColumn([grid, summaryLabel, noteLabel])
 
-        bar.style = .bar
-        bar.isIndeterminate = false
-        bar.minValue = 0
-        bar.maxValue = 1
-        bar.doubleValue = 0
-        bar.usesThreadedAnimation = true
-        bar.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2).isActive = true
-        statusLabel.font = DS.sans(12)
-        statusLabel.textColor = DS.textMuted
-        statusLabel.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
-        detailLabel.font = DS.mono(11)
-        detailLabel.textColor = DS.textFaint
-        detailLabel.lineBreakMode = .byTruncatingMiddle
-        detailLabel.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2)
-            .isActive = true
+        styleSheetProgressBar(bar)
+        styleSheetStatusLabel(statusLabel)
+        styleSheetDetailLabel(detailLabel)
 
-        progressStack = NSStackView(views: [bar, statusLabel, detailLabel])
-        progressStack.orientation = .vertical
-        progressStack.alignment = .leading
-        progressStack.spacing = 8
+        progressStack = makeProgressStack([bar, statusLabel, detailLabel])
         progressStack.isHidden = true
 
         let content = NSStackView(views: [hintLabel, settingsStack, progressStack])
@@ -522,11 +500,7 @@ final class TranscribeSheetController: NSViewController {
     func showProgress() {
         settingsStack.isHidden = true
         progressStack.isHidden = false
-        // Hidden AND disabled: AppKit skips both when it looks for the Return
-        // key's target, so Cancel is the sheet's only live button while it
-        // runs.
-        startButton.isHidden = true
-        startButton.isEnabled = false
+        hideReturnTarget(startButton)
     }
 
     func progressed(_ fraction: Double, _ name: String) {

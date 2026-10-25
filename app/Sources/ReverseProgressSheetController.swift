@@ -48,42 +48,23 @@ final class ReverseProgressSheetController: NSViewController {
     }
 
     override func loadView() {
-        bar.style = .bar
-        bar.isIndeterminate = false
-        bar.minValue = 0
-        bar.maxValue = 1
-        bar.doubleValue = 0
-        bar.usesThreadedAnimation = true
-        bar.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2).isActive = true
+        styleSheetProgressBar(bar)
 
-        statusLabel.font = DS.sans(12)
-        statusLabel.textColor = DS.textMuted
-        statusLabel.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
+        styleSheetStatusLabel(statusLabel)
         statusLabel.stringValue =
             jobs.count == 1
             ? "Rendering a reversed copy of “\(jobs[0].name)”…"
             : "Rendering reversed copies of \(jobs.count) files…"
 
-        detailLabel.font = DS.mono(11)
-        detailLabel.textColor = DS.textFaint
-        detailLabel.lineBreakMode = .byTruncatingMiddle
-        detailLabel.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2)
-            .isActive = true
+        styleSheetDetailLabel(detailLabel)
 
-        let content = NSStackView(views: [bar, statusLabel, detailLabel])
-        content.orientation = .vertical
-        content.alignment = .leading
-        content.spacing = 8
+        let content = makeProgressStack([bar, statusLabel, detailLabel])
 
         stopButton = StickerButton(
             title: "Cancel", style: .secondary, target: self, action: #selector(stopClicked(_:)))
         closeButton = StickerButton(
             title: "Close", style: .primary, target: self, action: #selector(closeClicked(_:)))
-        // Hidden AND disabled while it runs: AppKit skips both when it looks
-        // for the Return key's target, so Cancel is the only live button until
-        // there is a result to read.
-        closeButton.isHidden = true
-        closeButton.isEnabled = false
+        hideReturnTarget(closeButton)
 
         view = makeSheetView(
             title: "Reversing", hint: "AVFoundation cannot play a clip backwards, so Frame Job "

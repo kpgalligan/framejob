@@ -345,12 +345,15 @@ final class ExportSheetController: NSViewController {
             // The custom fields get a row of their own under the popup: on the
             // 480-wide card a 240 popup fits beside its 106 label column and
             // the popup plus two fields does not.
-            [NSGridCell.emptyContentView, sizeRow()],
+            [
+                NSGridCell.emptyContentView,
+                sheetRow([widthField, sheetUnitLabel("×"), heightField]),
+            ],
             [fieldLabel("Frame rate:"), ratePopup],
             [fieldLabel("Quality:"), qualityPopup],
             // ONE row, popup and field together: 186 + 6 + 64 fits the 318
             // points the 480-wide card leaves beside a 106 label column.
-            [fieldLabel("Loudness:"), loudnessRow()],
+            [fieldLabel("Loudness:"), sheetRow([loudnessPopup, loudnessField])],
             [fieldLabel("Range:"), rangePopup],
             // No label: the checkbox carries its own, the way
             // `SpeedSheetController`'s "Preserve pitch" does.
@@ -360,19 +363,12 @@ final class ExportSheetController: NSViewController {
         if isHLGProject {
             rows.insert([fieldLabel("Dynamic Range:"), dynamicRangePopup], at: 2)
         }
-        let grid = NSGridView(views: rows)
-        grid.rowSpacing = 10
-        grid.columnSpacing = 12
-        grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 0).width = 106
+        let grid = makeSheetGrid(rows)
 
         // The readout and the footnote sit UNDER the grid, each on a line of
         // its own: from the grid's indented column the readout would run past
         // the card's edge, and beside the buttons a footnote with a bit rate is cut (#243).
-        let content = NSStackView(views: [grid, summaryLabel, footnote])
-        content.orientation = .vertical
-        content.alignment = .leading
-        content.spacing = 10
+        let content = sheetColumn([grid, summaryLabel, footnote])
 
         let cancelButton = sheetCancelButton(target: self, action: #selector(cancelClicked(_:)))
         exportButton = StickerButton(
@@ -414,25 +410,6 @@ final class ExportSheetController: NSViewController {
     func resolveCard() {
         resolve()
         queueButton?.isEnabled = exportButton?.isEnabled ?? false
-    }
-
-    private func sizeRow() -> NSStackView {
-        let times = NSTextField(labelWithString: "×")
-        times.font = DS.sans(13)
-        times.textColor = DS.textMuted
-        let stack = NSStackView(views: [widthField, times, heightField])
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.spacing = 6
-        return stack
-    }
-
-    private func loudnessRow() -> NSStackView {
-        let stack = NSStackView(views: [loudnessPopup, loudnessField])
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.spacing = 6
-        return stack
     }
 
     /// Lists the core's rows for the current format, refills the Size popup

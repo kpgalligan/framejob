@@ -77,30 +77,9 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
     // MARK: - View
 
     override func loadView() {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.allowsFloats = true
-        formatter.minimumFractionDigits = 0
-        formatter.maximumFractionDigits = 3
-        formatter.minimum = NSNumber(value: Self.rateRange.lowerBound)
-        formatter.maximum = NSNumber(value: Self.rateRange.upperBound)
-        rateField.formatter = formatter
-        rateField.delegate = self
-        rateField.alignment = .right
-        rateField.doubleValue = originalRate
-        rateField.widthAnchor.constraint(equalToConstant: 80).isActive = true
-        DSField.style(rateField)
-
-        // A pull-down's first item is its title and is never chosen, so the
-        // presets start at index 1 and `applyPreset` subtracts it.
-        presetPopup.addItem(withTitle: "Presets")
-        for preset in Self.presets {
-            presetPopup.addItem(withTitle: Self.title(for: preset))
-        }
-        presetPopup.font = DS.sans(13)
-        presetPopup.target = self
-        presetPopup.action = #selector(presetChosen(_:))
-        presetPopup.widthAnchor.constraint(equalToConstant: 96).isActive = true
+        SpeedRateControls.styleRateField(rateField, initial: originalRate, delegate: self)
+        SpeedRateControls.fillPresets(
+            presetPopup, target: self, action: #selector(presetChosen(_:)))
 
         pitchCheckbox.state = originalKeepPitch ? .on : .off
         pitchCheckbox.font = DS.sans(13)
@@ -111,27 +90,14 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
         durationLabel.textColor = DS.textMuted
         durationLabel.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
 
-        let times = NSTextField(labelWithString: "×")
-        times.font = DS.sans(13)
-        times.textColor = DS.textMuted
-        let rateRow = NSStackView(views: [rateField, times, presetPopup])
-        rateRow.orientation = .horizontal
-        rateRow.alignment = .centerY
-        rateRow.spacing = 6
+        let rateRow = SpeedRateControls.rateRow(field: rateField, presets: presetPopup)
 
-        let grid = NSGridView(views: [
+        let grid = makeSheetGrid([
             [fieldLabel("Rate:"), rateRow],
             [NSGridCell.emptyContentView, pitchCheckbox],
         ])
-        grid.rowSpacing = 10
-        grid.columnSpacing = 12
-        grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 0).width = 106
 
-        let content = NSStackView(views: [grid, durationLabel])
-        content.orientation = .vertical
-        content.alignment = .leading
-        content.spacing = 10
+        let content = sheetColumn([grid, durationLabel])
 
         let cancelButton = sheetCancelButton(target: self, action: #selector(cancelClicked(_:)))
         let applyButton = sheetApplyButton(target: self, action: #selector(applyClicked(_:)))
@@ -144,12 +110,7 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
             content: content,
             buttonRow: makeButtonRow(
                 cancel: cancelButton, apply: applyButton,
-                leading: [
-                    sheetFootnote(
-                        String(
-                            format: "×%g – ×%g", Self.rateRange.lowerBound,
-                            Self.rateRange.upperBound))
-                ]))
+                leading: [SpeedRateControls.rangeFootnote()]))
         syncReadout()
     }
 
@@ -161,7 +122,7 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
 
     /// The rate the controls describe, always inside §6's clamp.
     private var rate: Double {
-        min(max(rateField.doubleValue, Self.rateRange.lowerBound), Self.rateRange.upperBound)
+        SpeedRateControls.clamp(rateField.doubleValue)
     }
 
     private var keepPitch: Bool { pitchCheckbox.state == .on }
@@ -309,9 +270,8 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
     // MARK: - Controls
 
     @objc private func presetChosen(_ sender: Any?) {
-        let index = presetPopup.indexOfSelectedItem - 1
-        guard index >= 0, index < Self.presets.count else { return }
-        rateField.doubleValue = Self.presets[index]
+        guard let preset = SpeedRateControls.preset(of: presetPopup) else { return }
+        rateField.doubleValue = preset
         // The pull-down always shows its own title, so put it back.
         presetPopup.selectItem(at: 0)
         syncReadout()
@@ -351,23 +311,8 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
             dismiss(self)
             return
         }
-        let ops = Self.ops(for: clips, rate: rate, keepPitch: keepPitch)
-        let crossing = SpeedAudioDrop.crossing(applying: ops, to: document.editedProject)
-        guard !crossing.isEmpty else {
-            dismiss(self)
-            document.applyEdit("Set Speed", ops)
-            return
-        }
-        guard let window = view.window else {
-            NSSound.beep()
-            return
-        }
-        SpeedAudioDrop.ask(crossing, on: window) { [weak self, weak document] confirmed in
-            guard confirmed else { return }
-            if let self { self.dismiss(self) }
-            // A sheet's completion is not an AppKit event: the grouped entry
-            // point is mandatory here (app/CLAUDE.md's undo pitfall).
-            document?.performGroupedEdit("Set Speed", ops)
-        }
+        SpeedAudioDrop.commit(
+            "Set Speed", Self.ops(for: clips, rate: rate, keepPitch: keepPitch), to: document,
+            asking: view.window, before: { [weak self] in if let self { self.dismiss(self) } })
     }
 }

@@ -12814,6 +12814,16 @@ while it is up. `inventory.py --check` 5/5 with the new
     question within 1 s, no step. **S4** (CONTROL) [A] at exactly
     `audio_max`, [N] ×20, [M] ×20 and [H] ×30 each apply with no question
     within 1 s.
+  - **P1** (#359) Clip ▸ Speed Ramp… (`presentAsSheet(SpeedRampSheetController(document:
+    clip: A, span: (9.8 s, 10 s)))`, the call `presentSpeedRampSheet` makes) on A trimmed to
+    10 s (`trim_end`, then the undo stack emptied): Ramp Up chosen in the shape popup (its
+    item's action, which resets the field), 20 typed into the rate field, Apply: the
+    one-clip question ("×20") attaches to the Ramp sheet's window with nothing applied; Set
+    Speed closes the sheet and leaves one step named "Ramp Up" that one undo removes. A
+    disabled Apply before the click is an instrument failure naming the readout.
+    **P2** (CONTROL) the sheet over the whole clip, its opening Speed Dip ×0.5 untouched,
+    Apply: no question within 1 s, the sheet closed, one step named "Speed Dip". Both run
+    through `SpeedAudioDrop.commit`, the one door the two sheets and the inspector share.
   - **I1** `inspector.onEdit("Set Speed", [set_speed A ×20])`: the question
     on the editor window, nothing applied while it is up; Set Speed makes a
     step named "Set Speed" that one undo removes. **I2** I1 answered
@@ -12833,9 +12843,10 @@ while it is up. `inventory.py --check` 5/5 with the new
   - **A1** MCP `set_speed` A ×20: `audio_left_out` [A] and the exact
     `audio_note`, no sheet within 1 s. **A2** `set_speed` N ×20: neither
     key. **A3** `rate_stretch` B to 1/20 of its length: both keys.
-  - Mutants: `no-ask` (`clip.speed > limits.audioMax` → `false` in
-    `SpeedAudioDrop.swift`) must fail S1, S2, S3, I1, I2, I3, I5, R1, R2,
-    A1, A3; `cancel-applies` (`response == .alertFirstButtonReturn` →
+  - Mutants: `no-ask` (`peak > limits.audioMax` → `false` in
+    `SpeedAudioDrop.swift`'s `crossing(from:to:limits:)`; #359 re-anchored it, the old
+    `clip.speed > limits.audioMax` having gone with the ramps' peak rate) must fail S1, S2,
+    S3, P1, I1, I2, I3, I5, R1, R2, A1, A3; `cancel-applies` (`response == .alertFirstButtonReturn` →
     `true`) must fail S2, I2, R2. Exits follow rule R (1 / 0 / 2).
 
 Runs on 2026-10-02 over `c645b31` plus this batch:
@@ -12846,9 +12857,10 @@ Runs on 2026-10-02 over `c645b31` plus this batch:
 | `speed_audio_probe.py --mutant no-ask` | 1/12 (B0), exit 1: caught — every named row failed with "no question attached … within 3 s" (A1/A3: no `audio_*` keys). |
 | `speed_audio_probe.py --mutant cancel-applies` | 1/4 (B0), exit 1: caught — S2, I2, R2 failed (after Cancel the handle changed and `canUndo` true). |
 | `speed_sheet_probe.py`, `sheet_queue_probe.py` | unchanged full marks (see the batch's checks). |
+| #359 (2026-10-25), with P1, P2 and the re-anchored `no-ask` | `speed_audio_probe.py` 20/20, exit 0; `--mutant no-ask` 1/13 (B0), exit 1, caught (S1, S2, S3, P1, I1, I2, I3, I5, R1, R2, A1, A3 failed); `--mutant cancel-applies` 1/4, exit 1, caught. |
 
 ```sh
-perl -e 'alarm shift; exec @ARGV' 600 python3 tools/proof/speed_audio_probe.py   # 18/18
+perl -e 'alarm shift; exec @ARGV' 600 python3 tools/proof/speed_audio_probe.py   # 20/20 since #359
 perl -e 'alarm shift; exec @ARGV' 600 python3 tools/proof/speed_audio_probe.py --mutant no-ask   # exit 1
 perl -e 'alarm shift; exec @ARGV' 600 python3 tools/proof/speed_audio_probe.py --mutant cancel-applies   # exit 1
 ```
@@ -23301,3 +23313,50 @@ python3 tools/proof/props_mutate_proof.py --baseline f1dce3011f951bfea6e5aa20753
 | `clip_inspector6_proof.py`, Debug then Release | 25/25 and 25/25 |
 | `make gate` | PASS (241 s) |
 | Release run of this probe | not applicable: the probe compiles its own binary from `app/Sources` and drives no built app |
+
+## Issue #359 — sheet chrome from shared pieces (`sheet_chrome_probe.py` B0, C0, C1, X1–X6; `sheet_chrome_probe.swift`)
+
+The progress sheets' bar, status line, detail line, stack and hidden Return target, the
+settings sheets' 106 pt label grid, 10 pt column, 6 pt row and muted unit label, and the
+end-editing guard are built by `Sheets.swift`'s Frame Job-only helpers
+(`styleSheetProgressBar`, `styleSheetStatusLabel`, `styleSheetDetailLabel`,
+`makeProgressStack`, `hideReturnTarget`, `makeSheetGrid`, `sheetColumn`, `sheetRow`,
+`sheetUnitLabel`, `endSheetFieldEditing`); the Speed and Speed Ramp sheets share
+`SpeedRateControls` and commit through `SpeedAudioDrop.commit`, which `inspectorEdit` also
+uses. A pure refactor: no pixel, sentence, undo name or result key moves.
+
+- **`sheet_chrome_probe.py --baseline REV`** — no instance. `git archive REV app/Sources`
+  is extracted into `tools/proof/work/sheet-chrome/baseline/`; `sheet_chrome_probe.swift` is
+  built as `main.swift` over that tree and over the working tree's `app/Sources`, each to
+  its own output path, through `swift_build.build(defines=["FRAMEJOB_DEV_TOOLS"])` (both
+  link the one staticlib). Each binary runs once per look (`light`, `dark`); a run sets
+  `NSApp.appearance` before any view is built, loads six sheets' views without presenting
+  them (so no `viewDidAppear` starts a job) — Export (`prores_4444` over a one-clip project),
+  Reverse (one job), Consolidate (an empty plan), Transcribe after `showProgress()`,
+  AudioSync (an empty input), Rewrap (its own panel's content view) — puts each in an
+  offscreen borderless window sized to fit, and captures it with `UISnapshot.pass` (PNG)
+  and `UISnapshotLayout.report(root:skipping: nil)` (JSON).
+  - **B0** both builds succeed (a build failure is a scored FAIL, never an exit).
+  - **C0** (CONTROL) each run produced all six captures, and the Export sheet's light and
+    dark PNGs differ, in both builds.
+  - **C1** (CONTROL) the baseline tree's `Sheets.swift` does not contain
+    `func styleSheetProgressBar`, the working tree's does, and the two binaries' SHA-256
+    digests differ — the two builds came from two trees.
+  - **X1–X6** Export, Reverse, Consolidate, Transcribe, AudioSync, Rewrap: in both looks the
+    two builds' layout reports are equal and `v2_snapshot.differing` finds no pixel between
+    PNGs of one size. When B0, C0 or C1 fails, X1–X6 are scored FAIL naming it.
+  - Exit (rule R): 0 iff every row passed, else 1.
+- **When to run it:** after any change to `Sheets.swift`'s progress pieces or to one of the
+  six sheets' `loadView`, with `--baseline` the commit before the change. The settings
+  sheets (Export, Speed, Speed Ramp, Remove Silences, Remove Filler Words, Generate
+  Captions, the graphic sheets, the recorder panel) are covered by `screens.py --compare`
+  over their catalogued screens instead.
+
+```sh
+python3 tools/proof/sheet_chrome_probe.py --baseline HEAD   # → 9/9, exit 0 (before the commit)
+```
+
+| Run (2026-10-25) | Result |
+|---|---|
+| `sheet_chrome_probe.py --baseline HEAD` (b7aaa1f) | 9/9, exit 0: every sheet's report equal and 0 differing pixels in both looks |
+| `screens.py --only <the ten sheet screens> --compare` the pre-change captures, Debug and Release | 15/15 rows, exit 0; 19/24 (Debug) and 21/24 (Release) PNGs byte-identical, every layout dump identical. The differing PNGs (14-remove-silences light, 15b-rename-graphic light and dark, 16-recorder-panel light and dark) differ only in the active-versus-inactive accent (selected text and slider fill blue against grey): the instance's activation, which the run did not control, flipped between captures |

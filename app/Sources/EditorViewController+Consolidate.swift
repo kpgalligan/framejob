@@ -141,40 +141,21 @@ final class ConsolidateProgressSheetController: NSViewController {
     }
 
     override func loadView() {
-        bar.style = .bar
-        bar.isIndeterminate = false
-        bar.minValue = 0
-        bar.maxValue = 1
-        bar.doubleValue = 0
-        bar.usesThreadedAnimation = true
-        bar.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2).isActive = true
+        styleSheetProgressBar(bar)
 
-        statusLabel.font = DS.sans(12)
-        statusLabel.textColor = DS.textMuted
-        statusLabel.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
+        styleSheetStatusLabel(statusLabel)
         statusLabel.stringValue = summaryOfPlan()
 
-        detailLabel.font = DS.mono(11)
-        detailLabel.textColor = DS.textFaint
-        detailLabel.lineBreakMode = .byTruncatingMiddle
-        detailLabel.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2)
-            .isActive = true
+        styleSheetDetailLabel(detailLabel)
 
-        let content = NSStackView(views: [bar, statusLabel, detailLabel])
-        content.orientation = .vertical
-        content.alignment = .leading
-        content.spacing = 8
+        let content = makeProgressStack([bar, statusLabel, detailLabel])
 
         stopButton = StickerButton(
             title: "Cancel", style: .secondary, target: self, action: #selector(stopClicked(_:)))
         revealButton = StickerButton(
             title: "Show in Finder", style: .primary, target: self,
             action: #selector(revealClicked(_:)))
-        // Hidden AND disabled while it runs: AppKit skips both when it looks
-        // for the Return key's target, so Cancel is the sheet's only live
-        // button until there is something to show.
-        revealButton.isHidden = true
-        revealButton.isEnabled = false
+        hideReturnTarget(revealButton)
 
         view = makeSheetView(
             title: "Consolidating Media",

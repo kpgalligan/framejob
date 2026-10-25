@@ -63,7 +63,7 @@ extension RecorderPanelController {
         sizeNote.font = DS.mono(11)
         sizeNote.textColor = DS.textFaint
 
-        let grid = NSGridView(views: [
+        let grid = makeSheetGrid([
             [fieldLabel("Source:"), sourcePopup],
             [NSGridCell.emptyContentView, includeFrameJobCheckbox],
             [fieldLabel("Microphone:"), microphoneRow],
@@ -74,10 +74,6 @@ extension RecorderPanelController {
             [NSGridCell.emptyContentView, sizeNote],
             [fieldLabel("Record Into:"), destinationPopup],
         ])
-        grid.rowSpacing = 10
-        grid.columnSpacing = 12
-        grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 0).width = 106
 
         let inner = Self.cardWidth - sheetInset * 2
         countdownLabel.font = DS.display(56)

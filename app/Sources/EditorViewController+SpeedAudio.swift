@@ -10,27 +10,9 @@ extension EditorViewController {
     /// was; one that does asks first, and Cancel puts the fields back.
     func inspectorEdit(_ name: String, _ ops: [ReelOp]) {
         guard let document = document else { return }
-        let clips =
-            SpeedAudioDrop.mayCross(ops)
-            ? SpeedAudioDrop.crossing(applying: ops, to: document.editedProject) : []
-        guard !clips.isEmpty else {
-            document.applyEdit(name, ops)
-            return
-        }
-        guard let window = view.window else {
-            NSSound.beep()
-            refreshInspector(isLive: false)
-            return
-        }
-        SpeedAudioDrop.ask(clips, on: window) { [weak self, weak document] confirmed in
-            guard confirmed else {
-                self?.refreshInspector(isLive: false)
-                return
-            }
-            // A sheet's completion is not an AppKit event: the grouped entry
-            // point is mandatory here (app/CLAUDE.md's undo pitfall).
-            document?.performGroupedEdit(name, ops)
-        }
+        SpeedAudioDrop.commit(
+            name, ops, to: document, asking: view.window,
+            declined: { [weak self] in self?.refreshInspector(isLive: false) })
     }
 
     /// `timeline.onLiveUpdate`: one tick, and its ops remembered when the

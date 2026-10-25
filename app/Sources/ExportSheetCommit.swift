@@ -41,10 +41,7 @@ extension ExportSheetController {
         // synchronously, so the read below sees the numbers on screen. A
         // field whose text its formatter rejects refuses to resign; that is
         // the person's to fix, so the click just beeps.
-        if let sheetWindow = view.window, !sheetWindow.makeFirstResponder(nil) {
-            NSSound.beep()
-            return
-        }
+        guard endSheetFieldEditing() else { return }
         guard let editor = editor, let settings = resolved,
               let window = editor.view.window
         else {

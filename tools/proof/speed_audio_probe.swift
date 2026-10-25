@@ -431,6 +431,115 @@ if let why = fresh() {
 }
 settle()
 
+// MARK: - P1, P2 — the Speed Ramp sheet's Apply (`SpeedAudioDrop.commit`)
+
+/// Clip ▸ Speed Ramp… on A over `span` (the call `presentSpeedRampSheet`
+/// makes); nil when it did not attach.
+func rampSheet(span: (from: Ticks, to: Ticks)?) -> (NSWindow, SpeedRampSheetController)? {
+    controller.presentAsSheet(SpeedRampSheetController(document: doc, clip: a, span: span))
+    guard waitUntil(3, { window.attachedSheet != nil }) != nil,
+        let sheet = window.attachedSheet,
+        let ramp = sheet.contentViewController as? SpeedRampSheetController
+    else { return nil }
+    return (sheet, ramp)
+}
+
+/// The sheet's Apply button, or nil.
+func applyButton(_ sheet: NSWindow) -> NSButton? {
+    let click = NSSelectorFromString("applyClicked:")
+    return views(sheet).compactMap { $0 as? NSButton }.first { $0.action == click }
+}
+
+// P1: Ramp Up ×20 over A's last 0.2 s, A trimmed to 10 s so the ramp fits.
+if let why = fresh() {
+    row("P1", false, "instrument: fixture: \(why)", instrument: true)
+} else {
+    doc.performGroupedEdit("Trim", [.trimEnd(clip: a, to: 10 * second)])
+    doc.undoManager?.removeAllActions()
+    let trimmed = doc.project.snapshot.clip(a)?.duration == 10 * second
+    let span: (from: Ticks, to: Ticks) = (98 * second / 10, 10 * second)
+    if !trimmed {
+        row("P1", false, "instrument: A was not trimmed to 10 s", instrument: true)
+    } else if let (sheet, ramp) = rampSheet(span: span) {
+        let popups = views(sheet).compactMap { $0 as? NSPopUpButton }
+        let shapePopup = popups.first { popup in
+            popup.itemArray.contains { $0.representedObject as? String == "ramp_up" }
+        }
+        let item = shapePopup?.itemArray.first { $0.representedObject as? String == "ramp_up" }
+        let field = views(sheet).compactMap { $0 as? NSTextField }
+            .first { $0.delegate === ramp }
+        if let shapePopup, let item, let action = shapePopup.action, let field {
+            shapePopup.select(item)
+            _ = NSApp.sendAction(action, to: shapePopup.target, from: shapePopup)
+            field.doubleValue = 20
+            ramp.controlTextDidEndEditing(
+                Notification(name: NSControl.textDidEndEditingNotification, object: field))
+            let before = doc.project
+            if let button = applyButton(sheet), button.isEnabled {
+                _ = NSApp.sendAction(
+                    NSSelectorFromString("applyClicked:"), to: button.target, from: button)
+                if let asked = question(on: sheet, within: 3) {
+                    let expected = oneMessage("Alpha", rateText(20))
+                    let text = reads(asked, expected, oneDetail)
+                    let shown = describe(asked)
+                    let untouched = doc.project === before
+                    sheet.endSheet(asked, returnCode: .alertFirstButtonReturn)
+                    let closed = waitUntil(3) { window.attachedSheet == nil } != nil
+                    let step = canUndo && undoName == "Ramp Up"
+                    let named = undoName
+                    doc.undoManager?.undo()
+                    let one = doc.project.snapshot.clip(a)?.actions.isEmpty == true && !canUndo
+                    row("P1", text && untouched && closed && step && one,
+                        "question \(shown); expected [\(expected) | \(oneDetail)] on the Ramp "
+                            + "sheet: \(text); nothing applied while asked: \(untouched); after "
+                            + "Set Speed the sheet closed \(closed), a step named \"\(named)\" "
+                            + "(expected Ramp Up) \(step); one undo removes the ramp and "
+                            + "empties the stack: \(one)")
+                } else {
+                    row("P1", false, "no question attached to the Ramp sheet within 3 s; the "
+                        + "handle is the same: \(doc.project === before), the sheet attached: "
+                        + "\(window.attachedSheet != nil), canUndo \(canUndo)")
+                }
+            } else {
+                row("P1", false, "instrument: Apply is disabled or missing; the readout "
+                    + "[\(texts(sheet).joined(separator: " | "))]", instrument: true)
+            }
+        } else {
+            row("P1", false, "instrument: no shape popup with ramp_up, or no rate field",
+                instrument: true)
+        }
+    } else {
+        row("P1", false, "instrument: the Ramp sheet did not attach", instrument: true)
+    }
+}
+settle()
+
+// P2: CONTROL — the opening Speed Dip ×0.5 over the whole clip asks nothing.
+if let why = fresh() {
+    row("P2", false, "instrument: fixture: \(why)", instrument: true)
+} else if let (sheet, _) = rampSheet(span: nil) {
+    if let button = applyButton(sheet), button.isEnabled {
+        _ = NSApp.sendAction(
+            NSSelectorFromString("applyClicked:"), to: button.target, from: button)
+        let asked = anyQuestion(1, besides: sheet)
+        let closed = waitUntil(3) { window.attachedSheet == nil } != nil
+        let step = canUndo && undoName == "Speed Dip"
+        let named = undoName
+        doc.undoManager?.undo()
+        let one = !canUndo
+        row("P2", !asked && closed && step && one,
+            "a question attached within 1 s: \(asked); the sheet closed: \(closed); a step "
+                + "named \"\(named)\" (expected Speed Dip) \(step); one undo empties the "
+                + "stack: \(one)")
+    } else {
+        row("P2", false, "instrument: Apply is disabled or missing; the readout "
+            + "[\(texts(sheet).joined(separator: " | "))]", instrument: true)
+    }
+} else {
+    row("P2", false, "instrument: the Ramp sheet did not attach", instrument: true)
+}
+settle()
+
 // MARK: - I1, I2 — the inspector's Speed section (`inspector.onEdit`)
 
 for (id, confirm) in [("I1", true), ("I2", false)] {
