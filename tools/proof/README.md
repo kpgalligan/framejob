@@ -23501,3 +23501,40 @@ both passes read through lives; it and `M20-no-speech-trim` each now fail both X
 | `make gate` | — | PASS 268 s (typecheck exactly the four baseline warnings) |
 | `audio_sync_proof.py`, Release (the recorded run) | — | 54/54; every offset, coarse offset, z, candidate, drift, lag and T identical to the Debug baseline's (S14's sheet snapshot read `None`: the sheet was gone before it on Release; the row is ok) |
 | `audio_sync_proof.py --cost` | — | P19 ok, total CPU 0.875 s (want ≤ 1.5), host load 5.76 |
+
+## Issue #363 — the render side, no byte changed (`render_dedup_proof.py`)
+
+#363 folds six hand-synced copies into one shared piece each: `halfFloatBitmap` and
+`halfFloatBitmapInfo` (`LayerRenderersImage.swift`), `LRUCache` (the texture, lift, LUT,
+curve and look caches), `InputPass` (step 0's pipeline for `InputStage` and `LayerLift`),
+`WaveformAnalyzer.traces` (the scope tap and `analyze`), the word-fade geometry
+(`tokensOnLine`, `clipBounds`, `drawClipped`) and `gradeSteps` in `Compositor.metal` (steps
+4c–4d for the layer stage and the adjustment pass). A refactor is proved by drawing the same
+frames from both builds, `reveal_toll_proof.py`'s shape: the caller owns the instance, the
+script builds its projects over MCP, closes each one (discard), performs no menu item and
+writes only under `<dir>` and `tools/proof/work/render-dedup/`.
+
+```sh
+python3 tools/proof/hdr_proof.py capture <hdr-dir> --only HG0,Z1        # makes tools/proof/work/hdr/media/
+python3 tools/proof/render_dedup_proof.py <dir>/agent.sock capture <ctl>   # the control build
+python3 tools/proof/render_dedup_proof.py <dir>/agent.sock compare <ctl>   # the build under test
+```
+
+`capture` makes `<ctl>/media/card.png` (ffmpeg `testsrc2`, 640×360, one frame) and copies
+`still8.png`, `still16_srgb.png`, `still_hlg.heic` and `still_gainmap.heic` from
+`tools/proof/work/hdr/media/` (a missing one exits 2 naming `hdr_proof.py capture <dir>
+--only HG0,Z1`); `compare` reads the same `<ctl>/media/`. The projects, each 640×360 at 30 fps:
+
+- **G**: the card graded on its clip — exposure, Color's contrast, the three wheels, a master
+  and a red curve, the hue curves, the built-in look `vivid` at 0.7 and sepia at 0.3, in the
+  argument shapes `wheels_proof.py`, `curves_proof.py` and `look_proof.py` send — rendered with
+  `waveform`, `parade`, `vectorscope` and `histogram` (`G.png`), then with `vectorscope: true,
+  vectorscope_zoom: 2` (`G-zoom2.png`).
+- **A**: the card ungraded under an `add_adjustment_clip` carrying G's grade (`A.png`).
+- **S** (SDR) and **H** (`set_canvas` output `hlg`): each of the four stills alone at its own
+  time, back to back on one track (`S-<still>.png`, `H-<still>.png`); H then has an
+  `add_text_clip` title alone at its own time, rendered with all four scopes (`H-title.png`).
+
+Rows (`compare`): each PNG and each `<png>.<scope>.json` byte-equal to `<ctl>`'s, one row per
+file (21 files: 12 PNGs, 9 scope JSONs); a missing control file is a FAIL by name. Exit 0 only
+when every row passes, 1 on a failed row, 2 when a fixture call was refused or wrote nothing.

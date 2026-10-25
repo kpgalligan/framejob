@@ -161,13 +161,8 @@ final class WaveformTaps {
             withExtendedLifetime((wrapper, frame)) {}
             var traces: [ScopePass: ScopeTrace]?
             if done.status == .completed {
-                var read: [ScopePass: ScopeTrace] = [:]
-                for pass in ScopePass.ordered(passes) {
-                    guard let buffer = counts[pass] else { continue }
-                    read[pass] = analyzer.trace(
-                        pass, of: buffer, width: width, height: height, signal: signal)
-                }
-                traces = read
+                traces = analyzer.traces(
+                    passes, counts: counts, width: width, height: height, signal: signal)
             }
             self?.finished(key: key, token: token, traces: traces)
         }
@@ -204,13 +199,9 @@ final class WaveformTaps {
 
     /// The frame as a Metal texture over the same IOSurface.
     private func wrap(_ frame: CVPixelBuffer) -> CVMetalTexture? {
-        let format: MTLPixelFormat
-        switch CVPixelBufferGetPixelFormatType(frame) {
-        case kCVPixelFormatType_64RGBAHalf: format = .rgba16Float
-        case kCVPixelFormatType_32BGRA: format = .bgra8Unorm
-        default: return nil
-        }
-        guard let textureCache else { return nil }
+        guard let format = MetalRenderer.metalFormat(for: CVPixelBufferGetPixelFormatType(frame)),
+            let textureCache
+        else { return nil }
         cacheLock.lock()
         defer { cacheLock.unlock() }
         CVMetalTextureCacheFlush(textureCache, 0)

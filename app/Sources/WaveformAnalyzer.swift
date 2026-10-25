@@ -245,13 +245,19 @@ final class WaveformAnalyzer {
         }
     }
 
-    /// The waveform trace a completed pass left in `counts`.
-    func trace(of counts: MTLBuffer, width: Int, height: Int) -> WaveformTrace {
-        let count = Self.countsCount(.waveform)
-        let bound = counts.contents().bindMemory(to: UInt32.self, capacity: count)
-        return WaveformTrace(
-            counts: Array(UnsafeBufferPointer(start: bound, count: count)), width: width,
-            height: height)
+    /// Each of `passes`' traces from its completed buffer in `counts`, in
+    /// `ScopePass.ordered` order (`trace(_:of:width:height:signal:)`); a pass
+    /// with no buffer is skipped.
+    func traces(
+        _ passes: Set<ScopePass>, counts: [ScopePass: MTLBuffer], width: Int, height: Int,
+        signal: ScopeSignal
+    ) -> [ScopePass: ScopeTrace] {
+        var traces: [ScopePass: ScopeTrace] = [:]
+        for pass in ScopePass.ordered(passes) {
+            guard let buffer = counts[pass] else { continue }
+            traces[pass] = trace(pass, of: buffer, width: width, height: height, signal: signal)
+        }
+        return traces
     }
 
     /// `passes`' traces of `texture`, waiting for the GPU.
@@ -264,13 +270,8 @@ final class WaveformAnalyzer {
         buffer.commit()
         buffer.waitUntilCompleted()
         guard buffer.status == .completed else { return nil }
-        var traces: [ScopePass: ScopeTrace] = [:]
-        for pass in ScopePass.ordered(passes) {
-            guard let buffer = counts[pass] else { continue }
-            traces[pass] = trace(
-                pass, of: buffer, width: texture.width, height: texture.height, signal: signal)
-        }
-        return traces
+        return traces(
+            passes, counts: counts, width: texture.width, height: texture.height, signal: signal)
     }
 
     /// `kinds`' ×1 traces of `texture`, waiting for the GPU.
@@ -304,9 +305,7 @@ final class WaveformAnalyzer {
             let context = CGContext(
                 data: nil, width: width, height: height, bitsPerComponent: 16,
                 bytesPerRow: width * 8, space: space,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-                    | CGBitmapInfo.floatComponents.rawValue
-                    | CGBitmapInfo.byteOrder16Little.rawValue)
+                bitmapInfo: LayerRenderers.halfFloatBitmapInfo)
         else { return nil }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(

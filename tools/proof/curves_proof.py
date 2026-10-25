@@ -288,27 +288,24 @@ TEXTURES = "app/Sources/CurveTextures.swift"
 CURVES_CORE = "core/src/actions_curves.rs"
 WRITES = "app/Sources/InspectorBinding+Writes.swift"
 EDITOR = "app/Sources/CurveEditorView.swift"
-STEP_4C1 = ("        // (4c.1) The wheels (spec §11 GR-11): once per pixel, after tone and\n"
-            "        // before the look. Behind `wheelsEnabled`, so an unwheeled layer never\n"
-            "        // enters it.\n"
-            "        if (u.wheelsEnabled > 0.5) {\n"
-            "            rgb = gradeWheels(rgb, u);\n"
-            "        }\n\n")
-STEP_4C2 = ("        // (4c.2) The curves (spec §11 GR-12): once per pixel, after the wheels\n"
-            "        // and before the look, through the strip at `texture(3)`. Behind\n"
-            "        // `curvesEnabled`, so an uncurved layer never enters it.\n"
-            "        if (u.curvesEnabled > 0.5) {\n"
-            "            rgb = gradeCurves(rgb, curves, samp);\n"
-            "        }\n\n")
-ADJUST_4C2 = ("    if (u.curvesEnabled > 0.5) {\n"
-              "        c = gradeCurves(c, curves, samp);\n"
-              "    }\n")
-STEP_HUE = ("        // (4c.2) The hue curves (spec §11 GR-32): once per pixel, after the\n"
-            "        // channel curves and before the look, through the strip's second row.\n"
-            "        // Behind `hueCurvesEnabled`, so a layer without them never enters it.\n"
-            "        if (u.hueCurvesEnabled > 0.5) {\n"
-            "            rgb = gradeHueCurves(rgb, curves, samp, gradeWeights(u.hlgOutput));\n"
-            "        }\n\n")
+# The layer stage's and the adjustment pass's one call into steps 4c–4d (#363), and the
+# five gated calls `gradeSteps` holds, written out at a site's indentation and variable: a
+# mutant replaces a site's call by them in its mutated order or with its step dropped.
+LAYER_STEPS = "        rgb = gradeSteps(rgb, u, curves, look, samp);\n"
+ADJUST_STEPS = "    c = gradeSteps(c, u, curves, look, samp);\n"
+GRADE_CALLS = {"tone": ("toneEnabled", "gradeTone({v}, u)"),
+               "wheels": ("wheelsEnabled", "gradeWheels({v}, u)"),
+               "curves": ("curvesEnabled", "gradeCurves({v}, curves, samp)"),
+               "hue": ("hueCurvesEnabled",
+                       "gradeHueCurves({v}, curves, samp, gradeWeights(u.hlgOutput))"),
+               "look": ("lookEnabled", "gradeLook({v}, look, samp, u)")}
+
+
+def grade_inline(steps, indent="        ", v="rgb"):
+    return "".join(f"{indent}if (u.{flag} > 0.5) {{\n{indent}    {v} = {call.format(v=v)};\n"
+                   f"{indent}}}\n" for flag, call in (GRADE_CALLS[s] for s in steps))
+
+
 HUE_GAIN = ("    if (abs(curve.g - 1.0) > 1e-6) {\n"
             "        out = mix(float3(dot(out, w)), out, curve.g);\n"
             "    }\n")
@@ -348,13 +345,15 @@ MUTANTS = {
         "            if index > 0 && point[0] <= points[index - 1][0] {\n",
         "            if false {\n")], ["R1", "CT"]),
     "curves-before-wheels": ([
-        (SHADER, STEP_4C2, ""),
-        (SHADER, STEP_4C1, STEP_4C2 + STEP_4C1)], ["O1"]),
+        (SHADER, LAYER_STEPS, grade_inline(["tone", "curves", "wheels", "hue", "look"]))],
+        ["O1"]),
     "ungraded-misses-curves": ([(
         "core/src/recipe.rs",
         "            moved.curves = Curves::default();\n",
         "")], ["V1", "CT"]),
-    "adjust-without-curves": ([(SHADER, ADJUST_4C2, "")], ["J1"]),
+    "adjust-without-curves": ([(SHADER, ADJUST_STEPS,
+                                grade_inline(["tone", "wheels", "hue", "look"], "    ", "c"))],
+                              ["J1"]),
     "identity-kept": ([(
         "core/src/edit_props.rs",
         "                    props.curves.drop_identities();\n",
@@ -402,8 +401,8 @@ MUTANTS = {
         "    return mix(rgb, out, smoothstep(0.02, 0.06, chroma));\n",
         "    return out;\n")], ["H3"]),
     "hue-before-channel-curves": ([
-        (SHADER, STEP_HUE, ""),
-        (SHADER, STEP_4C2, STEP_HUE + STEP_4C2)], ["H14"]),
+        (SHADER, LAYER_STEPS, grade_inline(["tone", "wheels", "hue", "curves", "look"]))],
+        ["H14"]),
     "row-0-at-centre": ([(
         SHADER,
         "    return float3(strip.sample(samp, float2(at.r, 0.25)).r,\n"

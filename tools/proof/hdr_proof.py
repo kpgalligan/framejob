@@ -756,8 +756,8 @@ GAINMAP_SWIFT = "app/Sources/StillGainMap.swift"
 # The `.image` arm's peak line (clean-up 3 batch B, phase 3): the anchor of `still-peak-dropped`
 # and `gainmap-peak-dropped`.
 GAINMAP_PEAK_LINE = "            let peak = layer.input?.peak ?? rendered.peak\n"
-LIFT_HIT = ("        if let hit = entries[key], hit.source === texture, hit.conversion == "
-            "conversion,\n            hit.output == output, hit.peak == peak\n")
+LIFT_HIT = ("            $0.source === texture && $0.conversion == conversion\n"
+            "                && $0.output == output && $0.peak == peak\n")
 P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13",
           "P14"}
 RECORDS = {"R0"}
@@ -1001,9 +1001,9 @@ MUTANTS = {
     # hdr H-6 (#276, spec §11 HD-16): linear light, one mutant per new branch.
     # The decode moved before 4c, so tone, the wheels, curves and look grade linear values.
     "linear-before-grade": ([
-        (SHADER, "        // (4c) Tone (spec §11 GR-2): once per pixel, after the regions' own\n",
+        (SHADER, "        rgb = gradeSteps(rgb, u, curves, look, samp);\n",
          "        if (u.linearLight > 0.5) {\n            rgb = blendDecode(rgb, u.hlgOutput);\n"
-         "        }\n        // (4c) Tone (spec §11 GR-2): once per pixel, after the regions' own\n"),
+         "        }\n        rgb = gradeSteps(rgb, u, curves, look, samp);\n"),
         (SHADER, "    if (u.linearLight > 0.5) {\n        rgb = blendDecode(rgb, u.hlgOutput);\n"
          "    }\n", "")], ["LG"]),
     # The adjustment pass grading the linear destination as it stands.
@@ -1111,8 +1111,11 @@ MUTANTS = {
                            "        guard hlg || CGColorSpaceIsPQBased(space), false else "
                            "{ return nil }\n")], ["HI", "P13"]),
     # The HDR still drawn into sRGB, so Core Graphics converts its codes before the arm.
-    "still-drawn-srgb": ([(LAYER_RENDERERS_SWIFT, "            space: own,\n",
-                           "            space: CGColorSpace(name: CGColorSpace.sRGB)!,\n")],
+    "still-drawn-srgb": ([(LAYER_RENDERERS_SWIFT,
+                           "            let context = LayerRenderers.halfFloatBitmap(size, "
+                           "space: space)\n",
+                           "            let context = LayerRenderers.halfFloatBitmap(size, "
+                           "space: CGColorSpace(name: CGColorSpace.sRGB)!)\n")],
                          ["HI"]),
     # A PQ still read as HLG.
     "still-pq-as-hlg": ([(STILL_SWIFT, "        return hlg ? .hlg(p) : .pq(p)\n",
@@ -1129,9 +1132,9 @@ MUTANTS = {
     # The lift's pool hits on its source, conversion and peak alone, whatever the output
     # (re-anchored by clean-up 3 batch B, which added the peak to the hit).
     "lift-pool-ignores-output": ([(LIFT_SWIFT, LIFT_HIT,
-                                   "        if let hit = entries[key], hit.source === texture, "
-                                   "hit.conversion == conversion,\n            hit.peak == "
-                                   "peak\n")], ["P13"]),
+                                   "            $0.source === texture && $0.conversion == "
+                                   "conversion\n                && $0.peak == peak\n")],
+                                 ["P13"]),
     # The shader always un-lifts (the reading written, never read).
     "key-reading-dropped": ([(SHADER, "            ? keyReadSDR(rgb, u.keyReading) : "
                               "hlgUnliftSDR(rgb)) : rgb, key);\n",
@@ -1172,9 +1175,9 @@ MUTANTS = {
                              "            let peak = nil as UInt32?\n")], ["HIp"]),
     # The lift's pool hits whatever the peak, so a peak asked after another is not drawn.
     "lift-pool-ignores-peak": ([(LIFT_SWIFT, LIFT_HIT,
-                                 "        if let hit = entries[key], hit.source === texture, "
-                                 "hit.conversion == conversion,\n            hit.output == "
-                                 "output\n")], ["P14"]),
+                                 "            $0.source === texture && $0.conversion == "
+                                 "conversion\n                && $0.output == output\n")],
+                               ["P14"]),
     # Clean-up 3 batch B, phase 3 (#322, spec §11 HD-22): one per decision, each run with
     # `--only <its rows>,Z1` (HGu's with `--control`, the capture made before the phase's code).
     # No still has a gain map, so the fixture is drawn as its SDR base in HLG too.

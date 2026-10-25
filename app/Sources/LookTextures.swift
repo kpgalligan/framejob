@@ -42,9 +42,7 @@ final class LookTextures {
     private let queue: MTLCommandQueue
     private let pipeline: MTLComputePipelineState
     private let lock = NSLock()
-    private var cache: [LookDefinition: MTLTexture] = [:]
-    /// Least recently used first.
-    private var order: [LookDefinition] = []
+    private var cache = LRUCache<LookDefinition, MTLTexture>(limit: LookTextures.capacity)
 
     init?(device: MTLDevice, library: MTLLibrary) {
         guard let function = library.makeFunction(name: "framejob_look_bake"),
@@ -72,19 +70,11 @@ final class LookTextures {
         let key = look.definition
         lock.lock()
         defer { lock.unlock() }
-        if let hit = cache[key] {
-            order.removeAll { $0 == key }
-            order.append(key)
-            return hit
-        }
+        if let hit = cache.value(for: key) { return hit }
         // A failed bake caches the placeholder, so the frame after it does not
         // wait on the GPU again (the definition draws unchanged until evicted).
         let baked = bake(key) ?? placeholder
-        cache[key] = baked
-        order.append(key)
-        while order.count > LookTextures.capacity {
-            cache[order.removeFirst()] = nil
-        }
+        cache.insert(baked, for: key)
         return baked
     }
 

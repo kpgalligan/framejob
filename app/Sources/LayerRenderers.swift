@@ -9,10 +9,10 @@ import UniformTypeIdentifiers
 /// hands the compositor a premultiplied BGRA `MTLTexture`, with ONE exception:
 /// a still whose decoded image is deeper than 8 bits a component is drawn
 /// into a 16-bit-float premultiplied RGBA bitmap and uploaded `rgba16Float`
-/// (`deepBitmap`, spec §11 PR-6), which the layer stage samples as it does
-/// `bgra8Unorm` (PR-2); and a still labelled HLG or PQ is drawn the same way
-/// in its OWN space (`hdrBitmap`, spec §11 HD-19 (a)), its `Rendered` carrying
-/// the step-0 arm `source(for:…)` runs on it.
+/// (`halfFloatBitmap` in sRGB, spec §11 PR-6), which the layer stage samples
+/// as it does `bgra8Unorm` (PR-2); and a still labelled HLG or PQ is drawn the
+/// same way in its OWN space (`halfFloatBitmap` in that space, spec §11 HD-19
+/// (a)), its `Rendered` carrying the step-0 arm `source(for:…)` runs on it.
 ///
 /// Premultiplied is not a detail: `Compositor.metal` blends source-over with
 /// `(one, one_minus_source_alpha)` and un-premultiplies these textures before
@@ -35,9 +35,8 @@ import UniformTypeIdentifiers
 /// before it added gradients; its own doc argues the seam and names the
 /// three members that widened for it. **Stills live in
 /// `LayerRenderersImage.swift`** — the image entry point, its two draws and
-/// the deep and HDR bitmaps, a pure move that widened nothing. What stays
-/// here is the cache, the text and shape entry points, shapes and the
-/// bitmap/texture pair.
+/// the half-float bitmap. What stays here is the cache, the text and shape
+/// entry points, shapes and the bitmap/texture pair.
 ///
 /// The cache key is the RECIPE's hash and never anything this file assembles,
 /// and phase 6 is the second feature to depend on that. `recipe.rs`'s
@@ -67,8 +66,8 @@ final class LayerRenderers {
 
     let device: MTLDevice
     private let lock = NSLock()
-    private var layers = Pool(limit: LayerRenderers.cacheLimit)
-    private var graphics = Pool(limit: LayerRenderers.graphicCacheLimit)
+    private var layers = LRUCache<String, Rendered>(limit: LayerRenderers.cacheLimit)
+    private var graphics = LRUCache<String, Rendered>(limit: LayerRenderers.graphicCacheLimit)
 
     /// A cached rasterization: the texture plus the SOURCE SIZE it was drawn
     /// at, which is what §5.3 placement uses for this layer.
@@ -102,46 +101,19 @@ final class LayerRenderers {
     /// `graphic` picks the graphics' own pool (`graphicCacheLimit`).
     func cached(_ key: String, graphic: Bool = false, _ make: () -> Rendered?) -> Rendered? {
         lock.lock()
-        let hit = graphic ? graphics.hit(key) : layers.hit(key)
+        let hit = graphic ? graphics.value(for: key) : layers.value(for: key)
         lock.unlock()
         if let hit = hit { return hit }
 
         guard let rendered = make() else { return nil }
         lock.lock()
-        if graphic { graphics.store(key, rendered) } else { layers.store(key, rendered) }
+        if graphic {
+            graphics.insert(rendered, for: key)
+        } else {
+            layers.insert(rendered, for: key)
+        }
         lock.unlock()
         return rendered
-    }
-
-    /// One least-recently-used pool of textures. Call with the lock held.
-    private struct Pool {
-        let limit: Int
-        var entries: [String: Rendered] = [:]
-        /// Least recently used first.
-        var order: [String] = []
-
-        init(limit: Int) { self.limit = limit }
-
-        mutating func hit(_ key: String) -> Rendered? {
-            guard let hit = entries[key] else { return nil }
-            touch(key)
-            return hit
-        }
-
-        mutating func store(_ key: String, _ rendered: Rendered) {
-            entries[key] = rendered
-            touch(key)
-            while order.count > limit, let oldest = order.first {
-                order.removeFirst()
-                entries.removeValue(forKey: oldest)
-            }
-        }
-
-        /// Moves `key` to the most-recent end.
-        private mutating func touch(_ key: String) {
-            if let index = order.firstIndex(of: key) { order.remove(at: index) }
-            order.append(key)
-        }
     }
 
     /// Drops every texture. Called when the render context changes size —
@@ -149,8 +121,8 @@ final class LayerRenderers {
     /// resize invalidates nothing else and this keeps memory honest.
     func purge() {
         lock.lock()
-        layers = Pool(limit: LayerRenderers.cacheLimit)
-        graphics = Pool(limit: LayerRenderers.graphicCacheLimit)
+        layers.removeAll()
+        graphics.removeAll()
         lock.unlock()
     }
 
@@ -451,8 +423,8 @@ final class LayerRenderers {
     // MARK: - Bitmaps and textures
 
     /// A premultiplied BGRA bitmap context — the pixel layout this renderer
-    /// produces for everything but a deep still (`deepBitmap`), and the one
-    /// `Compositor.metal` samples (`.bgra8Unorm`).
+    /// produces for everything but a still drawn into a `halfFloatBitmap`, and
+    /// the one `Compositor.metal` samples (`.bgra8Unorm`).
     ///
     /// Internal rather than private since the text machinery moved to
     /// `LayerRenderersText.swift` and draws into one of these; `private` on
@@ -478,7 +450,7 @@ final class LayerRenderers {
     /// nothing is flipped anywhere in this pipeline.
     ///
     /// Internal for `bitmap`'s reason: `renderText` ends here too.
-    /// `pixelFormat` is `.rgba16Float` for a `deepBitmap` or an `hdrBitmap` only.
+    /// `pixelFormat` is `.rgba16Float` for a `halfFloatBitmap` only.
     func upload(
         _ context: CGContext, size: CGSize, pixelFormat: MTLPixelFormat = .bgra8Unorm
     ) -> Rendered? {

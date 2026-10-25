@@ -410,12 +410,13 @@ extension MediaImporter {
 
     /// ImageIO decode bounded by `maxPixelSize` (0 = the file's own size).
     /// Used for still media and for reading a cached thumbnail back.
-    static func decodeImage(_ url: URL, maxPixelSize: Int) -> CGImage? {
+    static func decodeImage(_ url: URL, maxPixelSize: Int, hdr: Bool = false) -> CGImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         var options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
         ]
+        if hdr { options[kCGImageSourceDecodeRequest] = kCGImageSourceDecodeToHDR }
         if maxPixelSize > 0 { options[kCGImageSourceThumbnailMaxPixelSize] = maxPixelSize }
         return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }

@@ -227,21 +227,29 @@ def pins(closed, dump):
 
 
 SHADER = "app/Resources/Shaders/Compositor.metal"
-STEP_4D = ("        // (4d) The look (spec §11 GR-7): once per pixel, right after tone and\n"
-           "        // before the point filters. Behind `lookEnabled`, so a look-less layer\n"
-           "        // never samples `texture(2)`.\n"
-           "        if (u.lookEnabled > 0.5) {\n"
-           "            rgb = gradeLook(rgb, look, samp, u);\n"
-           "        }\n\n")
-STEP_4C = "        // (4c) Tone (spec §11 GR-2): once per pixel, after the regions' own\n"
-ADJUST_4D = ("    if (u.lookEnabled > 0.5) {\n"
-             "        c = gradeLook(c, look, samp, u);\n"
-             "    }\n")
+# The layer stage's and the adjustment pass's one call into steps 4c–4d (#363), and the
+# five gated calls `gradeSteps` holds, written out at a site's indentation and variable: a
+# mutant replaces a site's call by them in its mutated order or with its step dropped.
+LAYER_STEPS = "        rgb = gradeSteps(rgb, u, curves, look, samp);\n"
+ADJUST_STEPS = "    c = gradeSteps(c, u, curves, look, samp);\n"
+GRADE_CALLS = {"tone": ("toneEnabled", "gradeTone({v}, u)"),
+               "wheels": ("wheelsEnabled", "gradeWheels({v}, u)"),
+               "curves": ("curvesEnabled", "gradeCurves({v}, curves, samp)"),
+               "hue": ("hueCurvesEnabled",
+                       "gradeHueCurves({v}, curves, samp, gradeWeights(u.hlgOutput))"),
+               "look": ("lookEnabled", "gradeLook({v}, look, samp, u)")}
+
+
+def grade_inline(steps, indent="        ", v="rgb"):
+    return "".join(f"{indent}if (u.{flag} > 0.5) {{\n{indent}    {v} = {call.format(v=v)};\n"
+                   f"{indent}}}\n" for flag, call in (GRADE_CALLS[s] for s in steps))
+
+
 # name: ([(file, anchor, replacement), …], the rows that must fail)
 MUTANTS = {
     "look-before-tone": ([
-        (SHADER, STEP_4D, ""),
-        (SHADER, STEP_4C, STEP_4D + STEP_4C)], ["O1"]),
+        (SHADER, LAYER_STEPS, grade_inline(["look", "tone", "wheels", "curves", "hue"]))],
+        ["O1"]),
     "amount-ignored": ([(
         "app/Sources/LookProps.swift",
         "lookAmount = Float(min(max(amount, 0), 1))",
@@ -250,7 +258,9 @@ MUTANTS = {
         "core/src/recipe.rs",
         "            moved.look = None;\n",
         "")], ["U1", "CT"]),
-    "adjustment-ignores-look": ([(SHADER, ADJUST_4D, "")], ["J1"]),
+    "adjustment-ignores-look": ([(SHADER, ADJUST_STEPS,
+                                  grade_inline(["tone", "wheels", "curves", "hue"], "    ", "c"))],
+                                ["J1"]),
     "amount-range-dropped": ([(
         "core/src/props_check.rs",
         "        in_range(\"video.look.amount\", look.amount, 0.0, 1.0)?;\n",

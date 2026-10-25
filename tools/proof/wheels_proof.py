@@ -162,21 +162,29 @@ R_ROWS = {"L1", "G1", "Y1"}
 M_ROWS = {"X1"}
 P_ROWS = {"P1", "P2", "P3", "P4", "P5", "P6", "P7"}
 SHADER = "app/Resources/Shaders/Compositor.metal"
-STEP_4C = "        // (4c) Tone (spec §11 GR-2): once per pixel, after the regions' own\n"
-STEP_4C1 = ("        // (4c.1) The wheels (spec §11 GR-11): once per pixel, after tone and\n"
-            "        // before the look. Behind `wheelsEnabled`, so an unwheeled layer never\n"
-            "        // enters it.\n"
-            "        if (u.wheelsEnabled > 0.5) {\n"
-            "            rgb = gradeWheels(rgb, u);\n"
-            "        }\n\n")
-ADJUST_4C1 = ("    if (u.wheelsEnabled > 0.5) {\n"
-              "        c = gradeWheels(c, u);\n"
-              "    }\n")
+# The layer stage's and the adjustment pass's one call into steps 4c–4d (#363), and the
+# five gated calls `gradeSteps` holds, written out at a site's indentation and variable: a
+# mutant replaces a site's call by them in its mutated order or with its step dropped.
+LAYER_STEPS = "        rgb = gradeSteps(rgb, u, curves, look, samp);\n"
+ADJUST_STEPS = "    c = gradeSteps(c, u, curves, look, samp);\n"
+GRADE_CALLS = {"tone": ("toneEnabled", "gradeTone({v}, u)"),
+               "wheels": ("wheelsEnabled", "gradeWheels({v}, u)"),
+               "curves": ("curvesEnabled", "gradeCurves({v}, curves, samp)"),
+               "hue": ("hueCurvesEnabled",
+                       "gradeHueCurves({v}, curves, samp, gradeWeights(u.hlgOutput))"),
+               "look": ("lookEnabled", "gradeLook({v}, look, samp, u)")}
+
+
+def grade_inline(steps, indent="        ", v="rgb"):
+    return "".join(f"{indent}if (u.{flag} > 0.5) {{\n{indent}    {v} = {call.format(v=v)};\n"
+                   f"{indent}}}\n" for flag, call in (GRADE_CALLS[s] for s in steps))
+
+
 # name: ([(file, anchor, replacement), …], the rows that must fail)
 MUTANTS = {
     "wheels-before-tone": ([
-        (SHADER, STEP_4C1, ""),
-        (SHADER, STEP_4C, STEP_4C1 + STEP_4C)], ["O1"]),
+        (SHADER, LAYER_STEPS, grade_inline(["wheels", "tone", "curves", "hue", "look"]))],
+        ["O1"]),
     "gamma-sign": ([(
         SHADER,
         "    v = pow(max(v, 0.0), exp2(-gamma * kGamma));\n",
@@ -203,7 +211,9 @@ MUTANTS = {
         "core/src/recipe.rs",
         "        moved.wheels = Wheels::default();\n",
         "")], ["V1", "CT"]),
-    "adjust-without-wheels": ([(SHADER, ADJUST_4C1, "")], ["J1"]),
+    "adjust-without-wheels": ([(SHADER, ADJUST_STEPS,
+                                grade_inline(["tone", "curves", "hue", "look"], "    ", "c"))],
+                              ["J1"]),
     "puck-writes-group": ([(
         "app/Sources/VideoPane+Wheels.swift",
         "                let moved = ColorWheelPatch(x: x, y: y)\n",

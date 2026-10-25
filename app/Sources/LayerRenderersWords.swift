@@ -182,12 +182,9 @@ extension LayerRenderers {
         in context: CGContext
     ) {
         guard ink.layout.lines.indices.contains(index), ink.alpha > 0 else { return }
-        context.saveGState()
-        // The clip BEFORE the alpha: a transparency layer is bounded by the
-        // clip standing when it opens.
-        context.clip(to: CGRect(x: left, y: 0, width: max(right - left, 0), height: height))
-        drawFaded(ink.layout.lines[index], alpha: ink.alpha, in: context)
-        context.restoreGState()
+        drawClipped(
+            ink.layout.lines[index], alpha: ink.alpha, left: left, right: right, height: height,
+            in: context)
     }
 
     /// `1 − (1 − u)³`, the curve a gliding pill rides: fast off the word it
@@ -216,9 +213,7 @@ extension LayerRenderers {
         var found: [TokenPiece] = []
         for (index, laid) in layout.lines.enumerated() {
             let line = laid.range.location..<(laid.range.location + laid.range.length)
-            let here = tokens.indices.filter {
-                tokens[$0].lowerBound < line.upperBound && tokens[$0].upperBound > line.lowerBound
-            }
+            let here = tokensOnLine(tokens, line)
             guard let position = here.firstIndex(of: token) else { continue }
             let range = tokens[token].clamped(to: line)
             let left = laid.origin.x
@@ -438,10 +433,8 @@ extension LayerRenderers {
         let height = layout.size.height
         for (index, laid) in layout.lines.enumerated() {
             let line = laid.range.location..<(laid.range.location + laid.range.length)
-            // `wordFade`'s filter: the tokens with ink on THIS line.
-            let here = tokens.indices.filter {
-                tokens[$0].lowerBound < line.upperBound && tokens[$0].upperBound > line.lowerBound
-            }
+            // `tokensOnLine`: the tokens with ink on THIS line.
+            let here = tokensOnLine(tokens, line)
             for (position, token) in here.enumerated() where token != active {
                 if token >= word, mode == .build { continue }
                 let bounds = clipBounds(layout, laid, tokens, here, position, line)
@@ -450,31 +443,5 @@ extension LayerRenderers {
                     right: bounds.right, height: height, in: context)
             }
         }
-    }
-
-    /// The clip for token `here[position]` on one line: from the middle of
-    /// the gap on its left to the middle of the gap on its right, or the
-    /// box's own edge where it is the line's first or last — `wordFade`'s
-    /// arithmetic exactly.
-    private static func clipBounds(
-        _ layout: TextLayout, _ laid: TextLine, _ tokens: [Range<Int>], _ here: [Int],
-        _ position: Int, _ line: Range<Int>
-    ) -> (left: CGFloat, right: CGFloat) {
-        let range = tokens[here[position]].clamped(to: line)
-        let left: CGFloat
-        if position == 0 {
-            left = 0
-        } else {
-            let previous = tokens[here[position - 1]].clamped(to: line)
-            left = midpoint(laid, previous.upperBound, range.lowerBound)
-        }
-        let right: CGFloat
-        if position == here.count - 1 {
-            right = layout.size.width
-        } else {
-            let next = tokens[here[position + 1]].clamped(to: line)
-            right = midpoint(laid, range.upperBound, next.lowerBound)
-        }
-        return (left: left, right: right)
     }
 }

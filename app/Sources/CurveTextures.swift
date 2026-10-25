@@ -28,9 +28,7 @@ final class CurveTextures {
     let format: MTLPixelFormat
     private let device: MTLDevice
     private let lock = NSLock()
-    private var cache: [ColorCurves: MTLTexture] = [:]
-    /// Least recently used first.
-    private var order: [ColorCurves] = []
+    private var cache = LRUCache<ColorCurves, MTLTexture>(limit: CurveTextures.capacity)
 
     init?(device: MTLDevice) {
         self.device = device
@@ -53,21 +51,13 @@ final class CurveTextures {
         guard !curves.isIdentity else { return placeholder }
         lock.lock()
         defer { lock.unlock() }
-        if let hit = cache[curves] {
-            order.removeAll { $0 == curves }
-            order.append(curves)
-            return hit
-        }
+        if let hit = cache.value(for: curves) { return hit }
         let strip = CurveTextures.upload(
             CurveTable.strip(curves), width: CurveTable.stripSize, height: CurveTable.stripRows,
             format: format, device: device)
         strip?.label = "Frame Job curves"
         let made = strip ?? placeholder
-        cache[curves] = made
-        order.append(curves)
-        while order.count > CurveTextures.capacity {
-            cache[order.removeFirst()] = nil
-        }
+        cache.insert(made, for: curves)
         return made
     }
 

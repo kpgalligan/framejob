@@ -135,12 +135,23 @@ R_ROWS = {"K1", "F1", "B1"}
 M_ROWS = {"X1", "M1"}
 P_ROWS = {"P1", "P2", "P3", "P4"}
 SHADER = "app/Resources/Shaders/Compositor.metal"
-STEP_4C = ("        // (4c) Tone (spec §11 GR-2): once per pixel, after the regions' own\n"
-           "        // re-sample and before the point filters. Behind `toneEnabled`, so an\n"
-           "        // untoned layer never enters it.\n"
-           "        if (u.toneEnabled > 0.5) {\n"
-           "            rgb = gradeTone(rgb, u);\n"
-           "        }\n\n")
+# The layer stage's one call into steps 4c–4d (#363), and the five gated calls
+# `gradeSteps` holds, written out at a site's indentation and variable: a mutant replaces
+# the call by them in its mutated order or with its step dropped.
+LAYER_STEPS = "        rgb = gradeSteps(rgb, u, curves, look, samp);\n"
+GRADE_CALLS = {"tone": ("toneEnabled", "gradeTone({v}, u)"),
+               "wheels": ("wheelsEnabled", "gradeWheels({v}, u)"),
+               "curves": ("curvesEnabled", "gradeCurves({v}, curves, samp)"),
+               "hue": ("hueCurvesEnabled",
+                       "gradeHueCurves({v}, curves, samp, gradeWeights(u.hlgOutput))"),
+               "look": ("lookEnabled", "gradeLook({v}, look, samp, u)")}
+
+
+def grade_inline(steps, indent="        ", v="rgb"):
+    return "".join(f"{indent}if (u.{flag} > 0.5) {{\n{indent}    {v} = {call.format(v=v)};\n"
+                   f"{indent}}}\n" for flag, call in (GRADE_CALLS[s] for s in steps))
+
+
 STEP_4B = "        // (4b) The obscured regions. COLOUR ONLY"
 # name: ([(file, anchor, replacement), …], the rows that must fail)
 MUTANTS = {
@@ -153,8 +164,8 @@ MUTANTS = {
         "    rgb = clamp((hlg ? hlgOETF(saturate(lin)) : gradeEncode(lin)) * exp2(u.exposure), "
         "0.0, 1.0);\n")], ["E1", "E2"]),
     "tone-before-obscure": ([
-        (SHADER, STEP_4C, ""),
-        (SHADER, STEP_4B, STEP_4C + STEP_4B)], ["O1"]),
+        (SHADER, LAYER_STEPS, grade_inline(["wheels", "curves", "hue", "look"])),
+        (SHADER, STEP_4B, grade_inline(["tone"]) + "\n" + STEP_4B)], ["O1"]),
     "flag-ignores-negative": ([(
         "app/Sources/GradeProps.swift",
         "toneEnabled = values.contains { $0 != 0 } ? 1 : 0",

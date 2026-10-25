@@ -12,7 +12,8 @@ import CoreText
 /// fade, the tokenizer and the whitespace midpoint stay there too and widen
 /// from `private` to internal, because `private` on an extension member
 /// reaches only its own file. The three routines widen for the same reason;
-/// nothing else crosses.
+/// beside them only the word-clip geometry `wordFade` shares with the word
+/// caption crosses (`tokensOnLine`, `clipBounds`, `drawClipped`, #363).
 extension LayerRenderers {
 
     /// Each word's fade is half covered by the next one's, so a `word_fade`
@@ -119,41 +120,16 @@ extension LayerRenderers {
         guard !tokens.isEmpty else { return }
         for laid in layout.lines {
             let line = laid.range.location..<(laid.range.location + laid.range.length)
-            // The tokens with ink on THIS line, in string order. A token can
-            // straddle a line break when a single word is wider than the box,
-            // so each half is clipped to its own line.
-            let here = tokens.indices.filter {
-                tokens[$0].lowerBound < line.upperBound && tokens[$0].upperBound > line.lowerBound
-            }
+            let here = tokensOnLine(tokens, line)
             for (position, token) in here.enumerated() {
                 let alpha = staggered(
                     amount, index: staggerIndex(token, count: tokens.count, leaving: leaving),
                     count: tokens.count)
                 guard alpha > 0 else { continue }
-                let range = tokens[token].clamped(to: line)
-                let left: CGFloat
-                if position == 0 {
-                    left = 0
-                } else {
-                    let previous = tokens[here[position - 1]].clamped(to: line)
-                    left = midpoint(laid, previous.upperBound, range.lowerBound)
-                }
-                let right: CGFloat
-                if position == here.count - 1 {
-                    right = layout.size.width
-                } else {
-                    let next = tokens[here[position + 1]].clamped(to: line)
-                    right = midpoint(laid, range.upperBound, next.lowerBound)
-                }
-                context.saveGState()
-                // The clip is set BEFORE the alpha, because `drawFaded` may
-                // open a transparency layer and a layer is bounded by the
-                // clip that was standing when it opened.
-                context.clip(
-                    to: CGRect(
-                        x: left, y: 0, width: max(right - left, 0), height: layout.size.height))
-                drawFaded(laid, alpha: alpha, in: context)
-                context.restoreGState()
+                let bounds = clipBounds(layout, laid, tokens, here, position, line)
+                drawClipped(
+                    laid, alpha: alpha, left: bounds.left, right: bounds.right,
+                    height: layout.size.height, in: context)
             }
         }
     }

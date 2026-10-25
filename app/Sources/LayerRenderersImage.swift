@@ -3,12 +3,14 @@ import Metal
 
 /// The STILL half of `LayerRenderers`: the `image` entry point, the two
 /// ways a decoded still is drawn (`renderImage`, `renderHDRImage`) and the
-/// two 16-bit-float bitmaps only a still uses (`deepBitmap`, `hdrBitmap`).
+/// one 16-bit-float bitmap a still is drawn into (`halfFloatBitmap`, with its
+/// layout `halfFloatBitmapInfo`).
 ///
-/// A pure move out of `LayerRenderers.swift` (clean-up 3, #322's toll): all
-/// five members live in this one file, so nothing widened — `private` on an
-/// extension member reaches its own file, which is where every caller of the
-/// private four now is. The cache, `bitmap`, `upload` and `maxTextureSide`
+/// A pure move out of `LayerRenderers.swift` (clean-up 3, #322's toll): the
+/// draws are `private` here, which is where every caller of them is. The
+/// bitmap and its layout are internal (#363): `StillGainMap.linearBitmap`
+/// draws into the same bitmap, and `DeepStillFrame` and `WaveformAnalyzer`
+/// read the same layout. The cache, `bitmap`, `upload` and `maxTextureSide`
 /// stay with the type, as they do for `LayerRenderersText.swift`.
 extension LayerRenderers {
 
@@ -43,15 +45,17 @@ extension LayerRenderers {
     }
 
     /// A still drawn at its own size. A decoded image deeper than 8 bits a
-    /// component (a 16-bit PNG or TIFF, a 10-bit HEIC) is drawn into `deepBitmap` and
-    /// uploaded `rgba16Float`, so its levels reach the 16-bit-float compositor
-    /// (spec §11 PR-6); every other still takes the 8-bit path byte for byte.
+    /// component (a 16-bit PNG or TIFF, a 10-bit HEIC) is drawn into a
+    /// `halfFloatBitmap` in sRGB and uploaded `rgba16Float`, so its levels reach
+    /// the 16-bit-float compositor (spec §11 PR-6); every other still takes the
+    /// 8-bit path byte for byte.
     private func renderImage(_ image: CGImage) -> Rendered? {
         let size = CGSize(width: image.width, height: image.height)
         let deep = image.bitsPerComponent > 8
         if deep {
-            guard size.width >= 1, size.height >= 1,
-                let context = LayerRenderers.deepBitmap(size)
+            let deepSpace = CGColorSpace(name: CGColorSpace.sRGB)
+            guard size.width >= 1, size.height >= 1, let deepSpace,
+                let context = LayerRenderers.halfFloatBitmap(size, space: deepSpace)
             else { return nil }
             context.interpolationQuality = .high
             context.draw(image, in: CGRect(origin: .zero, size: size))
@@ -66,11 +70,11 @@ extension LayerRenderers {
 
     /// An HLG or PQ still (spec §11 HD-19 (a)) drawn in its own colour space,
     /// so Core Graphics converts nothing and the bitmap holds the file's codes,
-    /// into `hdrBitmap` and uploaded `rgba16Float`, carrying its arm.
+    /// into a `halfFloatBitmap` and uploaded `rgba16Float`, carrying its arm.
     private func renderHDRImage(_ image: CGImage, conversion: InputConversion) -> Rendered? {
         let size = CGSize(width: image.width, height: image.height)
         guard size.width >= 1, size.height >= 1, let space = image.colorSpace,
-            let context = LayerRenderers.hdrBitmap(size, space: space)
+            let context = LayerRenderers.halfFloatBitmap(size, space: space)
         else { return nil }
         context.interpolationQuality = .high
         context.draw(image, in: CGRect(origin: .zero, size: size))
@@ -100,35 +104,24 @@ extension LayerRenderers {
         return rendered
     }
 
-    /// A 16-bit-float premultiplied RGBA bitmap context in sRGB, for a still
-    /// deeper than 8 bits a component only (spec §11 PR-6); its bytes are
-    /// `rgba16Float`'s. The same size guard as `bitmap(_:)`.
-    private static func deepBitmap(_ size: CGSize) -> CGContext? {
-        let width = Int(size.width.rounded())
-        let height = Int(size.height.rounded())
-        guard width > 0, height > 0, width <= maxTextureSide, height <= maxTextureSide,
-            let deepSpace = CGColorSpace(name: CGColorSpace.sRGB)
-        else { return nil }
-        return CGContext(
-            data: nil, width: width, height: height, bitsPerComponent: 16, bytesPerRow: 0,
-            space: deepSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-                | CGBitmapInfo.floatComponents.rawValue
-                | CGBitmapInfo.byteOrder16Little.rawValue)
-    }
+    /// RGBA, 16-bit half float, premultiplied, little-endian: `rgba16Float`'s
+    /// bytes and 64RGBAHalf's layout.
+    static let halfFloatBitmapInfo =
+        CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.floatComponents.rawValue
+        | CGBitmapInfo.byteOrder16Little.rawValue
 
-    /// A 16-bit-float premultiplied RGBA bitmap context in an HDR still's own
-    /// space (spec §11 HD-19 (a)); `deepBitmap`'s layout and size guard.
-    private static func hdrBitmap(_ size: CGSize, space own: CGColorSpace) -> CGContext? {
+    /// A 16-bit-float premultiplied RGBA bitmap context (`halfFloatBitmapInfo`)
+    /// in `space`: sRGB for a still deeper than 8 bits a component (spec §11
+    /// PR-6), an HDR still's own space (HD-19 (a)), extended-linear BT.2020
+    /// for a gain-map still's rendition (`StillGainMap.linearBitmap`, HD-22).
+    /// The same size guard as `bitmap(_:)`.
+    static func halfFloatBitmap(_ size: CGSize, space: CGColorSpace) -> CGContext? {
         let width = Int(size.width.rounded())
         let height = Int(size.height.rounded())
         guard width > 0, height > 0, width <= maxTextureSide, height <= maxTextureSide
         else { return nil }
         return CGContext(
             data: nil, width: width, height: height, bitsPerComponent: 16, bytesPerRow: 0,
-            space: own,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-                | CGBitmapInfo.floatComponents.rawValue
-                | CGBitmapInfo.byteOrder16Little.rawValue)
+            space: space, bitmapInfo: halfFloatBitmapInfo)
     }
 }

@@ -1290,6 +1290,48 @@ static inline float3 gradeLook(float3 rgb, texture3d<float> look, sampler samp,
     return mix(rgb, look.sample(samp, coord).rgb, u.lookAmount);
 }
 
+// Steps 4c to 4d, the grade, in their one order: what the layer stage runs
+// after the obscured regions and the adjustment pass after its colour
+// adjust, both before the point filters.
+static inline float3 gradeSteps(float3 rgb, constant LayerUniforms &u, texture2d<float> curves,
+                                texture3d<float> look, sampler samp) {
+    // (4c) Tone (spec §11 GR-2): once per pixel, after the regions' own
+    // re-sample and before the point filters. Behind `toneEnabled`, so an
+    // untoned layer never enters it.
+    if (u.toneEnabled > 0.5) {
+        rgb = gradeTone(rgb, u);
+    }
+
+    // (4c.1) The wheels (spec §11 GR-11): once per pixel, after tone and
+    // before the look. Behind `wheelsEnabled`, so an unwheeled layer never
+    // enters it.
+    if (u.wheelsEnabled > 0.5) {
+        rgb = gradeWheels(rgb, u);
+    }
+
+    // (4c.2) The curves (spec §11 GR-12): once per pixel, after the wheels
+    // and before the look, through the strip at `texture(3)`. Behind
+    // `curvesEnabled`, so an uncurved layer never enters it.
+    if (u.curvesEnabled > 0.5) {
+        rgb = gradeCurves(rgb, curves, samp);
+    }
+
+    // (4c.2) The hue curves (spec §11 GR-32): once per pixel, after the
+    // channel curves and before the look, through the strip's second row.
+    // Behind `hueCurvesEnabled`, so a layer without them never enters it.
+    if (u.hueCurvesEnabled > 0.5) {
+        rgb = gradeHueCurves(rgb, curves, samp, gradeWeights(u.hlgOutput));
+    }
+
+    // (4d) The look (spec §11 GR-7): once per pixel, after the curves and
+    // the hue curves and before the point filters. Behind `lookEnabled`, so
+    // a look-less layer never samples `texture(2)`.
+    if (u.lookEnabled > 0.5) {
+        rgb = gradeLook(rgb, look, samp, u);
+    }
+    return rgb;
+}
+
 // MARK: - The layer fragment stage
 
 // ORDER OF OPERATIONS. Fixed by the M3 contract, and each stage is where it
@@ -1324,8 +1366,9 @@ static inline float3 gradeLook(float3 rgb, texture3d<float> look, sampler samp,
 //                              after the channel curves, at the hue they
 //                              leave, through the strip's second row
 //  4d. the look                `gradeLook`, once per pixel (spec §11 GR-7):
-//                              right after tone, so a look grades the
-//                              corrected colour, and before the point filters
+//                              after the curves and hue curves, so a look
+//                              grades the corrected colour, and before the
+//                              point filters
 //   5. the point filters       sepia, noir, vignette, invert, IN SLOT ORDER
 //   6. spotlight dim           after every colour stage: the dim is a light
 //                              on the layer, not something the filters act on
@@ -1654,40 +1697,8 @@ static inline float4 layerColorPremultiplied(Varyings in,
             }
         }
 
-        // (4c) Tone (spec §11 GR-2): once per pixel, after the regions' own
-        // re-sample and before the point filters. Behind `toneEnabled`, so an
-        // untoned layer never enters it.
-        if (u.toneEnabled > 0.5) {
-            rgb = gradeTone(rgb, u);
-        }
-
-        // (4c.1) The wheels (spec §11 GR-11): once per pixel, after tone and
-        // before the look. Behind `wheelsEnabled`, so an unwheeled layer never
-        // enters it.
-        if (u.wheelsEnabled > 0.5) {
-            rgb = gradeWheels(rgb, u);
-        }
-
-        // (4c.2) The curves (spec §11 GR-12): once per pixel, after the wheels
-        // and before the look, through the strip at `texture(3)`. Behind
-        // `curvesEnabled`, so an uncurved layer never enters it.
-        if (u.curvesEnabled > 0.5) {
-            rgb = gradeCurves(rgb, curves, samp);
-        }
-
-        // (4c.2) The hue curves (spec §11 GR-32): once per pixel, after the
-        // channel curves and before the look, through the strip's second row.
-        // Behind `hueCurvesEnabled`, so a layer without them never enters it.
-        if (u.hueCurvesEnabled > 0.5) {
-            rgb = gradeHueCurves(rgb, curves, samp, gradeWeights(u.hlgOutput));
-        }
-
-        // (4d) The look (spec §11 GR-7): once per pixel, right after tone and
-        // before the point filters. Behind `lookEnabled`, so a look-less layer
-        // never samples `texture(2)`.
-        if (u.lookEnabled > 0.5) {
-            rgb = gradeLook(rgb, look, samp, u);
-        }
+        // (4c)–(4d) The grade (`gradeSteps`), after the regions' own re-sample.
+        rgb = gradeSteps(rgb, u, curves, look, samp);
 
         // (5) The four point filters, in the order the model lists them. A slot
         // holding a neighbourhood filter — or nothing — falls through untouched.
@@ -2330,8 +2341,7 @@ fragment float4 framejob_qualifier_map_fragment(ShadowVaryings in [[stage_in]],
 // An adjustment clip's layer: no texture, one full-frame quad, blending OFF.
 // It reads what is already drawn behind it — the target `encodeLayers` is
 // drawing into — un-premultiplies it, grades it as step 3's colour adjust
-// (`gradeSample`, the chroma key off), step 4c's tone, step 4c.1's wheels,
-// step 4c.2's curves and hue curves, step 4d's look and
+// (`gradeSample`, the chroma key off), steps 4c to 4d's `gradeSteps` and
 // step 5's point filters would (the canvas's uv as the filters' local position), and
 // premultiplies it back by the destination's own alpha, so alpha is
 // preserved. The weight is the layer's opacity, its strength, times the
@@ -2374,21 +2384,7 @@ fragment float4 framejob_adjust_fragment(ShadowVaryings in [[stage_in]],
         return float4(linear ? blendDecode(grey, u.hlgOutput) : grey, 1.0);
     }
     c = gradeSample(c, 1.0, u).rgb;
-    if (u.toneEnabled > 0.5) {
-        c = gradeTone(c, u);
-    }
-    if (u.wheelsEnabled > 0.5) {
-        c = gradeWheels(c, u);
-    }
-    if (u.curvesEnabled > 0.5) {
-        c = gradeCurves(c, curves, samp);
-    }
-    if (u.hueCurvesEnabled > 0.5) {
-        c = gradeHueCurves(c, curves, samp, gradeWeights(u.hlgOutput));
-    }
-    if (u.lookEnabled > 0.5) {
-        c = gradeLook(c, look, samp, u);
-    }
+    c = gradeSteps(c, u, curves, look, samp);
     for (int i = 0; i < 4; ++i) {
         float2 slot = filterSlot(u, i);
         c = pointFilter(int(slot.x + 0.5), clamp(slot.y, 0.0, 1.0), c, local);

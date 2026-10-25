@@ -39,7 +39,10 @@ import CoreText
 /// reaches only its own file, and a stored property cannot move into an
 /// extension at all. Road map 8's W3 widened more for the same reason: the
 /// layout types, `layout(for:)`, `drawLaidLine`, `drawFaded`, `tokens(of:)`,
-/// `midpoint` and `attributedString`, which the two sibling files draw with.
+/// `midpoint` and `attributedString`, which the two sibling files draw with;
+/// and #363 added the word-clip geometry both of them share, `tokensOnLine`,
+/// `clipBounds` (moved here from `LayerRenderersWords.swift`) and
+/// `drawClipped`.
 extension LayerRenderers {
 
     // MARK: - Measured text
@@ -470,5 +473,55 @@ extension LayerRenderers {
         let first = CTLineGetOffsetForStringIndex(laid.line, a, nil)
         let second = CTLineGetOffsetForStringIndex(laid.line, b, nil)
         return laid.origin.x + (first + second) / 2
+    }
+
+    /// The tokens with ink on the line spanning `line`, in string order. A
+    /// token can straddle a line break when a single word is wider than the
+    /// box, so it is on both lines and each half is clipped to its own.
+    static func tokensOnLine(_ tokens: [Range<Int>], _ line: Range<Int>) -> [Int] {
+        tokens.indices.filter {
+            tokens[$0].lowerBound < line.upperBound && tokens[$0].upperBound > line.lowerBound
+        }
+    }
+
+    /// The clip for token `here[position]` on one line: from the middle of
+    /// the gap on its left to the middle of the gap on its right, or the
+    /// box's own edge where it is the line's first or last — never a glyph
+    /// edge, where two clips would double-composite an antialiased pixel.
+    static func clipBounds(
+        _ layout: TextLayout, _ laid: TextLine, _ tokens: [Range<Int>], _ here: [Int],
+        _ position: Int, _ line: Range<Int>
+    ) -> (left: CGFloat, right: CGFloat) {
+        let range = tokens[here[position]].clamped(to: line)
+        let left: CGFloat
+        if position == 0 {
+            left = 0
+        } else {
+            let previous = tokens[here[position - 1]].clamped(to: line)
+            left = midpoint(laid, previous.upperBound, range.lowerBound)
+        }
+        let right: CGFloat
+        if position == here.count - 1 {
+            right = layout.size.width
+        } else {
+            let next = tokens[here[position + 1]].clamped(to: line)
+            right = midpoint(laid, range.upperBound, next.lowerBound)
+        }
+        return (left: left, right: right)
+    }
+
+    /// Draws `laid` at `alpha` (`drawFaded`), clipped to `left…right` over
+    /// the box's `height`.
+    static func drawClipped(
+        _ laid: TextLine, alpha: Double, left: CGFloat, right: CGFloat, height: CGFloat,
+        in context: CGContext
+    ) {
+        context.saveGState()
+        // The clip is set BEFORE the alpha, because `drawFaded` may open a
+        // transparency layer and a layer is bounded by the clip that was
+        // standing when it opened.
+        context.clip(to: CGRect(x: left, y: 0, width: max(right - left, 0), height: height))
+        drawFaded(laid, alpha: alpha, in: context)
+        context.restoreGState()
     }
 }

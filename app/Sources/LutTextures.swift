@@ -40,9 +40,7 @@ final class LutTextures {
 
     private let device: MTLDevice
     private let lock = NSLock()
-    private var cache: [Key: Entry] = [:]
-    /// Least recently used first.
-    private var order: [Key] = []
+    private var cache = LRUCache<Key, Entry>(limit: LutTextures.capacity)
 
     init(device: MTLDevice) {
         self.device = device
@@ -64,18 +62,12 @@ final class LutTextures {
         let key = Key(path: path, size: bytes, modified: modified)
         lock.lock()
         defer { lock.unlock() }
-        if let hit = cache[key] {
-            order.removeAll { $0 == key }
-            order.append(key)
+        if let hit = cache.value(for: key) {
             if case .texture(let texture) = hit { return texture }
             return nil
         }
         let made = (try? MediaImporter.readLUT(url)).flatMap { upload($0) }
-        cache[key] = made.map { .texture($0) } ?? .failed
-        order.append(key)
-        while order.count > LutTextures.capacity {
-            cache[order.removeFirst()] = nil
-        }
+        cache.insert(made.map { .texture($0) } ?? .failed, for: key)
         return made
     }
 

@@ -36,30 +36,16 @@ final class LayerLift {
     }
 
     private let device: MTLDevice
-    private let pipeline: MTLRenderPipelineState
-    /// A 1³ lattice bound at `texture(1)`: the SDR arm samples no LUT, but the
-    /// slot is never left empty (`InputStage`'s rule).
-    private let noLUT: MTLTexture
-    private var entries: [ObjectIdentifier: Entry] = [:]
-    /// Least recently used first.
-    private var order: [ObjectIdentifier] = []
+    /// Step 0's pass; the SDR arm samples no LUT, and the pass binds its
+    /// empty lattice in the slot.
+    private let pass: InputPass
+    private var entries = LRUCache<ObjectIdentifier, Entry>(limit: LayerLift.limit)
 
     init?(device: MTLDevice, library: MTLLibrary) {
-        guard let vertex = library.makeFunction(name: "framejob_shadow_vertex"),
-            let fragment = library.makeFunction(name: "framejob_input_fragment"),
-            let pipeline = try? device.makeRenderPipelineState(
-                descriptor: MetalRenderer.pipelineDescriptor(
-                    label: "Frame Job layer lift", vertex: vertex, fragment: fragment,
-                    blending: false))
+        guard let pass = InputPass(device: device, library: library, label: "Frame Job layer lift")
         else { return nil }
-        let lattice = MTLTextureDescriptor()
-        lattice.textureType = .type3D
-        lattice.pixelFormat = .rgba16Float
-        lattice.usage = [.shaderRead]
-        guard let noLUT = device.makeTexture(descriptor: lattice) else { return nil }
         self.device = device
-        self.pipeline = pipeline
-        self.noLUT = noLUT
+        self.pass = pass
     }
 
     /// `texture` run through `conversion`'s arm for a project of `output` —
@@ -73,50 +59,27 @@ final class LayerLift {
         peak: UInt32? = nil, queue: MTLCommandQueue
     ) -> MTLTexture? {
         let key = ObjectIdentifier(texture)
-        if let hit = entries[key], hit.source === texture, hit.conversion == conversion,
-            hit.output == output, hit.peak == peak
-        {
-            touch(key)
+        if let hit = entries.value(for: key, where: {
+            $0.source === texture && $0.conversion == conversion
+                && $0.output == output && $0.peak == peak
+        }) {
             return hit.lifted
         }
-        // The working format, `rgba16Float` (spec §11 PR-1), the pipeline's own.
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: MetalRenderer.workingFormat, width: max(1, texture.width),
-            height: max(1, texture.height), mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .private
-        guard let target = device.makeTexture(descriptor: descriptor),
-            let buffer = queue.makeCommandBuffer()
+        guard let target = InputPass.target(
+                device: device, width: texture.width, height: texture.height),
+            let buffer = queue.makeCommandBuffer(),
+            pass.encode(
+                conversion, premultiplied: true, from: texture, into: target, buffer: buffer,
+                peak: peak, output: output)
         else { return nil }
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = target
-        pass.colorAttachments[0].loadAction = .dontCare
-        pass.colorAttachments[0].storeAction = .store
-        guard let encoder = buffer.makeRenderCommandEncoder(descriptor: pass) else { return nil }
-        encoder.label = "Frame Job layer lift"
-        encoder.setRenderPipelineState(pipeline)
-        var u = conversion.uniforms(premultiplied: true, peak: peak, output: output)
-        encoder.setFragmentBytes(&u, length: MemoryLayout<InputUniforms>.stride, index: 0)
-        encoder.setFragmentTexture(texture, index: 0)
-        encoder.setFragmentTexture(noLUT, index: 1)
-        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
-        encoder.endEncoding()
         buffer.commit()
         buffer.waitUntilCompleted()
         guard buffer.status == .completed else { return nil }
-        entries[key] = Entry(
-            source: texture, conversion: conversion, output: output, peak: peak, lifted: target)
-        touch(key)
-        while order.count > Self.limit, let oldest = order.first {
-            order.removeFirst()
-            entries.removeValue(forKey: oldest)
-        }
+        entries.insert(
+            Entry(
+                source: texture, conversion: conversion, output: output, peak: peak,
+                lifted: target),
+            for: key)
         return target
-    }
-
-    /// Moves `key` to the most-recent end.
-    private func touch(_ key: ObjectIdentifier) {
-        if let index = order.firstIndex(of: key) { order.remove(at: index) }
-        order.append(key)
     }
 }

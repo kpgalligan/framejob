@@ -123,6 +123,78 @@ enum InputError: LocalizedError {
     }
 }
 
+/// Step 0's pass itself: the pipeline (`framejob_shadow_vertex` and
+/// `framejob_input_fragment`, blending off) and the empty LUT slot, the one
+/// copy `InputStage` and `LayerLift` each draw through (#363). `label` names
+/// the pipeline and every encoder it makes.
+struct InputPass {
+    private let label: String
+    private let pipeline: MTLRenderPipelineState
+    /// A 1³ lattice bound at `texture(1)` when the conversion is not a LUT,
+    /// so the slot is never empty.
+    private let noLUT: MTLTexture
+
+    init?(device: MTLDevice, library: MTLLibrary, label: String) {
+        guard let vertex = library.makeFunction(name: "framejob_shadow_vertex"),
+            let fragment = library.makeFunction(name: "framejob_input_fragment"),
+            let pipeline = try? device.makeRenderPipelineState(
+                descriptor: MetalRenderer.pipelineDescriptor(
+                    label: label, vertex: vertex, fragment: fragment, blending: false))
+        else { return nil }
+        let lattice = MTLTextureDescriptor()
+        lattice.textureType = .type3D
+        lattice.pixelFormat = .rgba16Float
+        lattice.usage = [.shaderRead]
+        guard let noLUT = device.makeTexture(descriptor: lattice) else { return nil }
+        self.label = label
+        self.pipeline = pipeline
+        self.noLUT = noLUT
+    }
+
+    /// A new `width` × `height` target (at least 1 × 1) in the working
+    /// format, `rgba16Float` (spec §11 PR-1), the pipeline's own; private to
+    /// the GPU. Nil only when Metal cannot make one.
+    static func target(device: MTLDevice, width: Int, height: Int) -> MTLTexture? {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: MetalRenderer.workingFormat, width: max(1, width),
+            height: max(1, height), mipmapped: false)
+        descriptor.usage = [.renderTarget, .shaderRead]
+        descriptor.storageMode = .private
+        return device.makeTexture(descriptor: descriptor)
+    }
+
+    /// One conversion of `source` into `target`, encoded on `buffer` and
+    /// never committed; false when no encoder could be made. `lut` is a
+    /// `.lut` conversion's lattice (spec §11 GR-16), sampled at `texture(1)`;
+    /// `fullRange` is the source media's range flag, which a log curve's code
+    /// domain follows (GR-22); `peak` a PQ media's effective peak, where the
+    /// PQ arm's shoulder ends (spec §11 HD-12); `output` the project's dynamic
+    /// range (HD-2).
+    func encode(
+        _ conversion: InputConversion, premultiplied: Bool, from source: MTLTexture,
+        into target: MTLTexture, buffer: MTLCommandBuffer, lut: MTLTexture? = nil,
+        fullRange: Bool = false, peak: UInt32? = nil, output: CanvasOutput = .sdr
+    ) -> Bool {
+        let descriptor = MTLRenderPassDescriptor()
+        descriptor.colorAttachments[0].texture = target
+        descriptor.colorAttachments[0].loadAction = .dontCare
+        descriptor.colorAttachments[0].storeAction = .store
+        guard let encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor) else {
+            return false
+        }
+        encoder.label = label
+        encoder.setRenderPipelineState(pipeline)
+        var u = conversion.uniforms(
+            premultiplied: premultiplied, fullRange: fullRange, peak: peak, output: output)
+        encoder.setFragmentBytes(&u, length: MemoryLayout<InputUniforms>.stride, index: 0)
+        encoder.setFragmentTexture(source, index: 0)
+        encoder.setFragmentTexture(lut ?? noLUT, index: 1)
+        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        encoder.endEncoding()
+        return true
+    }
+}
+
 /// The input pass's pipeline, its targets and this frame's conversions.
 ///
 /// The pool is `MattePool`'s policy per size: targets are keyed by their
@@ -140,10 +212,7 @@ final class InputStage {
     }
 
     private let device: MTLDevice
-    private let pipeline: MTLRenderPipelineState
-    /// A 1³ lattice bound at `texture(1)` when the conversion is not a LUT,
-    /// so the slot is never empty.
-    private let noLUT: MTLTexture
+    private let pass: InputPass
     private var targets: [Size: [MTLTexture]] = [:]
     /// How many of each size's targets this frame holds (the first n).
     private var taken: [Size: Int] = [:]
@@ -154,21 +223,10 @@ final class InputStage {
     private var passes = 0
 
     init?(device: MTLDevice, library: MTLLibrary) {
-        guard let vertex = library.makeFunction(name: "framejob_shadow_vertex"),
-            let fragment = library.makeFunction(name: "framejob_input_fragment"),
-            let pipeline = try? device.makeRenderPipelineState(
-                descriptor: MetalRenderer.pipelineDescriptor(
-                    label: "Frame Job input", vertex: vertex, fragment: fragment,
-                    blending: false))
+        guard let pass = InputPass(device: device, library: library, label: "Frame Job input")
         else { return nil }
-        let lattice = MTLTextureDescriptor()
-        lattice.textureType = .type3D
-        lattice.pixelFormat = .rgba16Float
-        lattice.usage = [.shaderRead]
-        guard let noLUT = device.makeTexture(descriptor: lattice) else { return nil }
         self.device = device
-        self.pipeline = pipeline
-        self.noLUT = noLUT
+        self.pass = pass
     }
 
     /// Starts a frame: every target free, no source converted.
@@ -207,12 +265,8 @@ final class InputStage {
         let index = taken[size] ?? 0
         var held = targets[size] ?? []
         if index >= held.count {
-            let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-                pixelFormat: MetalRenderer.workingFormat, width: max(1, width),
-                height: max(1, height), mipmapped: false)
-            descriptor.usage = [.renderTarget, .shaderRead]
-            descriptor.storageMode = .private
-            guard let made = device.makeTexture(descriptor: descriptor) else { return nil }
+            guard let made = InputPass.target(device: device, width: width, height: height)
+            else { return nil }
             held.append(made)
             targets[size] = held
         }
@@ -225,33 +279,17 @@ final class InputStage {
         byTrack[trackID] = texture
     }
 
-    /// One conversion of `source` into `target`, encoded on `buffer`; false
-    /// when no encoder could be made. `lut` is a `.lut` conversion's lattice
-    /// (spec §11 GR-16), sampled at `texture(1)`; `fullRange` is the source
-    /// media's range flag, which a log curve's code domain follows (GR-22);
-    /// `peak` a PQ media's effective peak, where the PQ arm's shoulder ends
-    /// (spec §11 HD-12); `output` the project's dynamic range (HD-2).
+    /// One conversion of `source` into `target` through `InputPass.encode`,
+    /// counted when it was encoded; false when no encoder could be made.
     func encode(
         _ conversion: InputConversion, premultiplied: Bool, from source: MTLTexture,
         into target: MTLTexture, buffer: MTLCommandBuffer, lut: MTLTexture? = nil,
         fullRange: Bool = false, peak: UInt32? = nil, output: CanvasOutput = .sdr
     ) -> Bool {
-        let descriptor = MTLRenderPassDescriptor()
-        descriptor.colorAttachments[0].texture = target
-        descriptor.colorAttachments[0].loadAction = .dontCare
-        descriptor.colorAttachments[0].storeAction = .store
-        guard let encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor) else {
-            return false
-        }
-        encoder.label = "Frame Job input"
-        encoder.setRenderPipelineState(pipeline)
-        var u = conversion.uniforms(
-            premultiplied: premultiplied, fullRange: fullRange, peak: peak, output: output)
-        encoder.setFragmentBytes(&u, length: MemoryLayout<InputUniforms>.stride, index: 0)
-        encoder.setFragmentTexture(source, index: 0)
-        encoder.setFragmentTexture(lut ?? noLUT, index: 1)
-        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
-        encoder.endEncoding()
+        guard pass.encode(
+            conversion, premultiplied: premultiplied, from: source, into: target,
+            buffer: buffer, lut: lut, fullRange: fullRange, peak: peak, output: output)
+        else { return false }
         passes += 1
         return true
     }

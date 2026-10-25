@@ -91,17 +91,12 @@ enum DeepStillFrame {
         guard let space = image.colorSpace,
             let context = CGContext(
                 data: nil, width: width, height: height, bitsPerComponent: 16, bytesPerRow: 0,
-                space: space, bitmapInfo: bitmapInfo)
+                space: space, bitmapInfo: LayerRenderers.halfFloatBitmapInfo)
         else { return nil }
         context.interpolationQuality = .high
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         return context.makeImage()
     }
-
-    /// RGBA, 16-bit half float, premultiplied, little-endian: 64RGBAHalf's layout.
-    private static let bitmapInfo =
-        CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.floatComponents.rawValue
-        | CGBitmapInfo.byteOrder16Little.rawValue
 
     /// A CGImage owning a copy of `buffer`'s rows.
     private static func image(of buffer: CVImageBuffer, space: CGColorSpace) -> CGImage? {
@@ -114,7 +109,8 @@ enum DeepStillFrame {
         else { return nil }
         return CGImage(
             width: width, height: height, bitsPerComponent: 16, bitsPerPixel: 64,
-            bytesPerRow: rowBytes, space: space, bitmapInfo: CGBitmapInfo(rawValue: bitmapInfo),
+            bytesPerRow: rowBytes, space: space,
+            bitmapInfo: CGBitmapInfo(rawValue: LayerRenderers.halfFloatBitmapInfo),
             provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
     }
 }

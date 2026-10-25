@@ -1442,7 +1442,9 @@ the key map behind it.
   `Compositor.swift`, issue batch B95) · `Compositor+Sources.swift` (a
   layer's source texture: `source(for:…)`, `texture(from:)`) ·
   `Compositor+Input.swift` (step 0,
-  `InputStage`, `InputUniforms`, and `ConvertingCompositor`, the class a
+  `InputStage`, `InputUniforms`, `InputPass` — the input pipeline and its
+  empty LUT slot, which `InputStage` and `LayerLift` both draw through — and
+  `ConvertingCompositor`, the class a
   composition holding an HLG, PQ or wide-gamut source, or a media with
   Camera Log, is built with, spec §11 GR-15, GR-16; a layer's `input`
   chooses before the frame's labels; in an HLG project the HLG arms,
@@ -1463,6 +1465,10 @@ the key map behind it.
   its own step-0 arm in either output, spec §11 HD-19; an LRU of
   `LayerRenderers.cacheLimit + graphicCacheLimit` entries keyed by the
   source texture, hit only when source, conversion and output all match) ·
+  `LRUCache.swift` (the one least-recently-used policy the renderers' texture
+  pools, the lift and the grade textures' caches — `LutTextures`,
+  `CurveTextures`, `LookTextures` — hold; not thread-safe, each caller keeps
+  its own lock) ·
   `StillColor.swift` (a still's step-0 arm from its colour space: HLG or PQ
   over BT.2020, P3 or BT.709, else none — SDR stills draw as before) ·
   `StillGainMap.swift` (a still with an ISO or Apple HDR gain map, HD-22,

@@ -32,34 +32,18 @@ enum StillGainMap {
     /// at most `maxPixelSize`, its EXIF orientation applied) with the gain map
     /// applied; nil unless `hasGainMap`.
     static func decodeHDR(_ url: URL, maxPixelSize: Int) -> CGImage? {
-        guard hasGainMap(at: url),
-            let source = CGImageSourceCreateWithURL(url as CFURL, nil)
-        else { return nil }
-        var options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceDecodeRequest: kCGImageSourceDecodeToHDR,
-        ]
-        if maxPixelSize > 0 { options[kCGImageSourceThumbnailMaxPixelSize] = maxPixelSize }
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        guard hasGainMap(at: url) else { return nil }
+        return MediaImporter.decodeImage(url, maxPixelSize: maxPixelSize, hdr: true)
     }
 
     /// A 16-bit-float premultiplied RGBA bitmap context in extended-linear
     /// BT.2020, where 1.0 is SDR white and a highlight runs above it; its bytes
     /// are `rgba16Float`'s. `LayerRenderers.bitmap`'s size guard.
     static func linearBitmap(_ size: CGSize) -> CGContext? {
-        let width = Int(size.width.rounded())
-        let height = Int(size.height.rounded())
-        let side = LayerRenderers.maxTextureSide
-        guard width > 0, height > 0, width <= side, height <= side,
-            let linear = CGColorSpace(name: CGColorSpace.extendedLinearITUR_2020)
-        else { return nil }
-        return CGContext(
-            data: nil, width: width, height: height, bitsPerComponent: 16, bytesPerRow: 0,
-            space: linear,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-                | CGBitmapInfo.floatComponents.rawValue
-                | CGBitmapInfo.byteOrder16Little.rawValue)
+        guard let linear = CGColorSpace(name: CGColorSpace.extendedLinearITUR_2020) else {
+            return nil
+        }
+        return LayerRenderers.halfFloatBitmap(size, space: linear)
     }
 
     /// Encodes a `linearBitmap` to PQ in place (HD-22 (b)): each pixel
