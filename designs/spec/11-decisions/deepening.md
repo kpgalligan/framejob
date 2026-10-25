@@ -1356,3 +1356,32 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   814,400 frames for a 17 s timeline at 30 fps, the same in C and T before
   and after this change, and none short for a missing `AV.mov`, which has a
   video track — a shortfall beside #337.
+- **#355 — The Audio inspector's Fade in, Fade out and Ducking Attack and
+  Release write the typed length off the frame grid, as `set_audio` stores
+  it (core/CLAUDE.md Times); dragging a fade handle on the timeline still
+  snaps the length to whole frames, a deliberate gesture exception (owner,
+  2026-10-25).** The four rows each snapped the seconds typed to the
+  canvas's frame grid before the op was built (`AudioPane`'s two local
+  `ticks`), so at 30 fps a 10 ms attack was written as 0 and a 0.26 s fade
+  as 0.2667 s; the same `set_audio` from an agent is stored as sent,
+  because the core's Times rule keeps the audio ramps — the fades, the
+  duck's and the compressor's attack and release — off the grid on
+  purpose: they are envelope lengths sampled at the audio rate, not
+  positions in the picture. The rows now convert seconds to ticks with no
+  snap (`AudioPane.rampTicks`), as the Compressor's millisecond rows
+  already did. Three reasons: the core's rule; agent parity, one length
+  stored for one length asked, whichever side asks; and the compressor
+  rows, the same family, already unsnapped. The fade handle's drag
+  (`FadeHandleSession`) keeps its snap, because a drag lands on whatever
+  pixel the pointer reaches and a whole frame is what a person can see.
+  The inspector's other seconds→ticks copies that do snap — Motion's In
+  and Out Duration and Period, the transition's Duration, Reveal's In and
+  Out, the action lane's duration field — become one
+  `InspectorBinding.frameTicks(seconds:)`, which changes nothing stored:
+  its only addition, a negative read as 0, is below every one of those
+  fields' minimums.
+  `tools/proof/audio_ramp_grid_proof.py` (A1–A5, G1–G3) is the proof;
+  `--baseline` shows A1–A4 snapped on the old tree. **Risk accepted:** a
+  field shows 2 decimals, so 10 ms is the smallest length a person can
+  type, and a stored 0.083 s reads 0.08; a later handle drag re-snaps a
+  typed length.

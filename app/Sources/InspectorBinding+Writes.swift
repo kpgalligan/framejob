@@ -285,4 +285,11 @@ extension InspectorBinding {
     /// The refresh a control asks for after it writes, so the readouts and
     /// dependent fields in the same section catch up.
     func edited() { inspector?.refresh(isLive: false) }
+
+    // MARK: Times
+
+    /// Seconds as ticks on the clip tab's frame grid (`canvas.fps`), a negative as 0.
+    func frameTicks(seconds: Double) -> Ticks {
+        ReelTime.snapToFrame(ReelTime.ticks(seconds: max(seconds, 0)), fps: canvas.fps)
+    }
 }

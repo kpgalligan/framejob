@@ -23360,3 +23360,48 @@ python3 tools/proof/sheet_chrome_probe.py --baseline HEAD   # → 9/9, exit 0 (b
 |---|---|
 | `sheet_chrome_probe.py --baseline HEAD` (b7aaa1f) | 9/9, exit 0: every sheet's report equal and 0 differing pixels in both looks |
 | `screens.py --only <the ten sheet screens> --compare` the pre-change captures, Debug and Release | 15/15 rows, exit 0; 19/24 (Debug) and 21/24 (Release) PNGs byte-identical, every layout dump identical. The differing PNGs (14-remove-silences light, 15b-rename-graphic light and dark, 16-recorder-panel light and dark) differ only in the active-versus-inactive accent (selected text and slider fill blue against grey): the instance's activation, which the run did not control, flipped between captures |
+
+## Issue #355 — the Audio inspector's fades and duck attack/release off the frame grid (`audio_ramp_grid_proof.py` A1–A5, G1–G3, mutants M1–M3; `audio_ramp_grid_probe.swift`)
+
+**The change** (spec §11 #355). Fades ▸ Fade in / Fade out and Ducking ▸ Attack / Release
+convert the seconds typed to ticks with no snap (`AudioPane.rampTicks`), as `set_audio` stores
+an agent's length and core/CLAUDE.md's Times rule keeps the audio ramps off the grid. The fade
+handle's drag (`FadeHandleSession.update`) still snaps to whole frames. The inspector's
+seconds→ticks copies that still snap (Motion's In/Out Duration and Period, the transition's
+Duration, Reveal's In/Out, the action lane's duration) are one
+`InspectorBinding.frameTicks(seconds:)`.
+
+The probe compiles `audio_ramp_grid_probe.swift` as `main.swift` over `app/Sources` on
+`swift_build.py`'s line and uses only what the tree had before #355 (no `frameTicks`, no
+`rampTicks`), so `--baseline` builds it unchanged over `git archive <commit> app/Sources
+app/Bridging`. Both fixtures are on a 30 fps canvas, where a frame is 20 000 ticks:
+
+- **A1–A5** — one row write each, over a clip seeded with a value that differs from the one
+  committed: Ducking ▸ Attack `0.01` (seed `DuckProps(level: 0.375, attack: 120_000, release:
+  540_000)`), Ducking ▸ Release `0.11`, Fades ▸ Fade in `0.01` and Fade out `0.26` (seed
+  120 000 each), Compressor ▸ Attack `10` ms (seed #357's N8 compressor). The value goes in
+  through the row's own field (`controlTextDidEndEditing`); the row passes only when exactly
+  one edit is heard, under the row's undo name, whose ops equal `binding.ops` of the object at
+  the literal ticks (6000, 66000, 6000, 156000, 6000), and the document stores that value once
+  the heard ops are applied.
+- **G1–G2** — `FadeHandleSession(clip: 2, edge: .start / .end, clipStart: 0, clipEnd: 6 s,
+  length: 0)` updated to 6000 and 156000 ticks from its edge at 30/1 fps: lengths 0 and
+  160 000, and the op writes `fade_in` / `fade_out` 160000.
+- **G3** — Reveal ▸ In `0.26` over #357's W8 animation seed: the heard op and the stored
+  value are 160 000, still snapped.
+
+```sh
+python3 tools/proof/audio_ramp_grid_proof.py                  # → 9/9 (the build row and the eight), exit 0
+python3 tools/proof/audio_ramp_grid_proof.py --baseline <commit>   # → BASELINE PASS when exactly A1–A4 fail there, exit 0
+```
+
+| Run (2026-10-25) | Result |
+|---|---|
+| probe, the changed tree | 9/9, exit 0 |
+| `--baseline HEAD` (4743bf205ff48c4787e044a903b719903f24685f) | 5/9, BASELINE PASS: exactly A1–A4 failed, stored 0, 60000, 0, 160000; exit 0 |
+| mutant M1: `frameTicks` without `snapToFrame` | 8/9: G3 fails (heard `in` 156000; the core still stored 160000) |
+| mutant M2: `FadeHandleSession.update` without `snapToFrame` | 7/9: G1 and G2 fail (lengths 6000 / 156000) |
+| mutant M3: `rampTicks` wrapped in `snapToFrame` at 30/1 fps | 5/9: A1–A4 fail (stored 0, 60000, 0, 160000) |
+| `props_mutate_proof.py` | 28/28, exit 0 |
+| `make gate` | PASS (346 s; fmt and lint skipped, unchanged) |
+| Release run of this probe | not applicable: the probe compiles its own binary from `app/Sources` and drives no built app |

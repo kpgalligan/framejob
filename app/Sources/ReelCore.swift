@@ -339,9 +339,9 @@ enum ReelSnap {
 /// toolbar, the ruler, the inspector and the agent all spell a time the same
 /// way (§4.1).
 enum ReelTime {
-    /// Rounds `t` to the nearest frame boundary. EVERY tick value that
-    /// reaches an op goes through here first; the model never stores a
-    /// sub-frame time (§5.1).
+    /// Rounds `t` to the nearest frame boundary. Every tick value that reaches
+    /// an op goes through here first, except the audio ramps' lengths, kept off
+    /// the grid (core/CLAUDE.md Times, §11 #355); no other sub-frame time is stored.
     static func snapToFrame(_ t: Ticks, fps: Fps) -> Ticks {
         guard let rate = fps.ffiPair else { return t }
         return rc_time_snap_to_frame(t, rate.num, rate.den)

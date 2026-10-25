@@ -43,9 +43,6 @@ extension VideoPane {
             guard let kind = kind else { return nil }
             return MotionEdge(kind: kind, duration: stored?.duration ?? MotionEdge().duration)
         }
-        func ticks(_ seconds: Double) -> Ticks {
-            ReelTime.snapToFrame(ReelTime.ticks(seconds: seconds), fps: binding.canvas.fps)
-        }
         func summary() -> String {
             let m = motion()
             var parts: [String] = []
@@ -96,7 +93,9 @@ extension VideoPane {
                     ops: { value in
                         perClip { _, m in
                             guard m.inEdge != nil else { return nil }
-                            return m.with { $0.inEdge?.duration = ticks(value) }
+                            return m.with {
+                                $0.inEdge?.duration = binding.frameTicks(seconds: value)
+                            }
                         }
                     },
                     mixed: { binding.mixedVideo { $0.motion?.inEdge?.duration } },
@@ -118,7 +117,7 @@ extension VideoPane {
                     ops: { value in
                         perClip { _, m in
                             guard m.out != nil else { return nil }
-                            return m.with { $0.out?.duration = ticks(value) }
+                            return m.with { $0.out?.duration = binding.frameTicks(seconds: value) }
                         }
                     },
                     mixed: { binding.mixedVideo { $0.motion?.out?.duration } },
@@ -166,7 +165,7 @@ extension VideoPane {
                     ops: { value in
                         perClip { _, m in
                             guard m.during != nil else { return nil }
-                            return m.with { $0.during?.period = ticks(value) }
+                            return m.with { $0.during?.period = binding.frameTicks(seconds: value) }
                         }
                     },
                     mixed: { binding.mixedVideo { $0.motion?.during?.period } },

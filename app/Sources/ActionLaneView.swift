@@ -191,8 +191,7 @@ final class ActionLaneView: NSView, OptionControl {
                     [
                         .setAction(
                             clip: clipID, action: actionID,
-                            duration: ReelTime.snapToFrame(
-                                ReelTime.ticks(seconds: seconds), fps: binding.canvas.fps))
+                            duration: binding.frameTicks(seconds: seconds))
                     ])
             },
             enabled: { true }, onEdit: { binding.edited() })

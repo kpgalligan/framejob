@@ -78,7 +78,7 @@ Some clips in a selection are skipped and the rest are still normalized: nests (
 | Fade in | How long the sound takes to rise from silence at the clip's start. Quick picks: 0, 0.25, 0.5, 1, 2 s. | 0–10 s | 0 |
 | Fade out | How long the sound takes to fall to silence at the clip's end. Same quick picks. | 0–10 s | 0 |
 
-In the inspector, fade lengths snap to whole frames. The section summary shows both lengths ("0.50 · 1.00 s"), or "none".
+In the inspector, a fade length is stored as you type it, not rounded to whole frames. The section summary shows both lengths ("0.50 · 1.00 s"), or "none".
 
 A fade is a straight-line ramp in level from silence (fade in) or to silence (fade out), measured from the clip's own edges. It travels with the clip when you move it, and it stays at the edge when you trim. Where a fade in and a fade out overlap, or a fade is longer than the clip, the two multiply, which gives a dip in the middle rather than a jump.
 
@@ -107,6 +107,8 @@ Ducking lowers every *other* clip while this one plays. The usual use is to turn
 | Release | How long they take to come back up, starting after this clip ends. Quick picks: 0.25, 0.5, 1, 2 s. | 0–5 s | 1 s |
 
 Level, Attack and Release are disabled until ducking is turned on.
+
+Attack and Release are stored as you type them, not rounded to whole frames.
 
 Ducking follows the clip's length on the timeline, not whether anyone is talking. The other audio stays lowered for the whole length of the ducking clip, through pauses, and comes back up only after the clip ends. You can therefore see exactly when ducking applies by looking at the timeline. If the attack is longer than the clip, the level never fully reaches Level, and the release starts from wherever it got to.
 

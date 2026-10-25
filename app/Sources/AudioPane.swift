@@ -145,13 +145,18 @@ final class AudioPane: InspectorPaneView {
 
     // MARK: Fades
 
+    /// An audio ramp's length in ticks, NOT snapped (core/CLAUDE.md Times,
+    /// §11 #355); a negative as 0.
+    private static func rampTicks(seconds: Double) -> Ticks {
+        ReelTime.ticks(seconds: max(seconds, 0))
+    }
+
     /// Fades are also the corner handles on the clip (§4.4), so the numbers
-    /// here and the drag there write the same two fields.
+    /// here and the drag there write the same two fields. The rows store the
+    /// length typed, off the frame grid (`rampTicks`); the handle's drag
+    /// snaps it to whole frames (§11 #355).
     func fadeSection() -> InspectorSection {
         let binding = self.binding
-        func ticks(_ seconds: Double) -> Ticks {
-            ReelTime.snapToFrame(ReelTime.ticks(seconds: max(seconds, 0)), fps: binding.canvas.fps)
-        }
         return InspectorSection(
             id: "audio.fades", title: "Fades",
             summary: {
@@ -168,13 +173,13 @@ final class AudioPane: InspectorPaneView {
                     "Fade in", binding, name: "Fade In", unit: " s", decimals: 2, min: 0, max: 10,
                     quick: [0, 0.25, 0.5, 1, 2],
                     read: { ReelTime.seconds(binding.audioProps.fadeIn) },
-                    ops: { binding.ops(audio: AudioPatch(fadeIn: ticks($0))) },
+                    ops: { binding.ops(audio: AudioPatch(fadeIn: Self.rampTicks(seconds: $0))) },
                     mixed: { binding.mixedAudio { $0.fadeIn } }),
                 inspectorValueRow(
                     "Fade out", binding, name: "Fade Out", unit: " s", decimals: 2, min: 0,
                     max: 10, quick: [0, 0.25, 0.5, 1, 2],
                     read: { ReelTime.seconds(binding.audioProps.fadeOut) },
-                    ops: { binding.ops(audio: AudioPatch(fadeOut: ticks($0))) },
+                    ops: { binding.ops(audio: AudioPatch(fadeOut: Self.rampTicks(seconds: $0))) },
                     mixed: { binding.mixedAudio { $0.fadeOut } }),
             ])
     }
@@ -187,14 +192,13 @@ final class AudioPane: InspectorPaneView {
     ///
     /// Every control writes a whole `DuckProps`: the patch replaces the
     /// object, so each edit re-sends the other two values as they stand.
+    /// Attack and release are stored as typed, off the frame grid
+    /// (§11 #355).
     func duckSection() -> InspectorSection {
         let binding = self.binding
         func current() -> DuckProps { binding.audioProps.duck ?? DuckProps() }
         func ops(_ next: DuckProps) -> [ReelOp] { binding.ops(audio: AudioPatch(duck: .some(next))) }
         func on() -> Bool { binding.audioProps.duck != nil }
-        func ticks(_ seconds: Double) -> Ticks {
-            ReelTime.snapToFrame(ReelTime.ticks(seconds: max(seconds, 0)), fps: binding.canvas.fps)
-        }
         return InspectorSection(
             id: "audio.duck", title: "Ducking",
             summary: { on() ? String(format: "%.0f%%", current().level * 100) : "off" },
@@ -226,7 +230,7 @@ final class AudioPane: InspectorPaneView {
                     read: { ReelTime.seconds(current().attack) },
                     ops: { value in
                         var d = current()
-                        d.attack = ticks(value)
+                        d.attack = Self.rampTicks(seconds: value)
                         return ops(d)
                     },
                     mixed: { binding.mixedAudio { $0.duck?.attack } },
@@ -237,7 +241,7 @@ final class AudioPane: InspectorPaneView {
                     read: { ReelTime.seconds(current().release) },
                     ops: { value in
                         var d = current()
-                        d.release = ticks(value)
+                        d.release = Self.rampTicks(seconds: value)
                         return ops(d)
                     },
                     mixed: { binding.mixedAudio { $0.duck?.release } },
@@ -296,10 +300,10 @@ final class AudioPane: InspectorPaneView {
     /// re-sends the other four values as they stand.
     ///
     /// The two times are in MILLISECONDS and are not snapped to the frame
-    /// grid, unlike every other time in this pane. A compressor's attack is
-    /// 10 ms where a frame is 33; snapping it would round the default to
-    /// nothing. The core agrees — `check_audio` asks only that they are
-    /// positive.
+    /// grid — nor are the fades' and the duck's, which are in seconds
+    /// (`rampTicks`, §11 #355). A compressor's attack is 10 ms where a frame
+    /// is 33; snapping it would round the default to nothing. The core
+    /// agrees — `check_audio` asks only that they are positive.
     func compressorSection() -> InspectorSection {
         let binding = self.binding
         func current() -> CompressorProps { binding.audioProps.compressor ?? CompressorProps() }

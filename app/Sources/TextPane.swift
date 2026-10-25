@@ -366,9 +366,6 @@ final class TextPane: InspectorPaneView {
         func current() -> TextAnimation { binding.textProps.animation ?? TextAnimation() }
         func on() -> Bool { binding.textProps.animation != nil }
         func free() -> Bool { binding.textProps.wordStyle == nil }
-        func ticks(_ seconds: Double) -> Ticks {
-            ReelTime.snapToFrame(ReelTime.ticks(seconds: max(seconds, 0)), fps: binding.canvas.fps)
-        }
         func ops(_ next: TextAnimation) -> [ReelOp] {
             binding.ops(text: TextPatch(animation: .some(next)))
         }
@@ -406,7 +403,7 @@ final class TextPane: InspectorPaneView {
                     read: { ReelTime.seconds(current().inDuration) },
                     ops: { value in
                         var a = current()
-                        a.inDuration = ticks(value)
+                        a.inDuration = binding.frameTicks(seconds: value)
                         return ops(a)
                     },
                     mixed: { binding.mixedText { $0.animation?.inDuration } },
@@ -417,7 +414,7 @@ final class TextPane: InspectorPaneView {
                     read: { ReelTime.seconds(current().outDuration) },
                     ops: { value in
                         var a = current()
-                        a.outDuration = ticks(value)
+                        a.outDuration = binding.frameTicks(seconds: value)
                         return ops(a)
                     },
                     mixed: { binding.mixedText { $0.animation?.outDuration } },

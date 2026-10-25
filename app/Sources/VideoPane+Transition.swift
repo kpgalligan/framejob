@@ -104,8 +104,7 @@ extension VideoPane {
                         [
                             .setTransitionDuration(
                                 clip: clip,
-                                duration: ReelTime.snapToFrame(
-                                    ReelTime.ticks(seconds: value), fps: binding.canvas.fps))
+                                duration: binding.frameTicks(seconds: value))
                         ]
                     }, resets: false),
             ])
