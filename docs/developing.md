@@ -1,0 +1,220 @@
+# Developing Frame Job
+
+Frame Job is a Swift/AppKit app over a Rust staticlib core. This page is for
+someone building it from source or changing it: what you need, the `make`
+targets, how the repository is laid out, the shape of the architecture,
+publishing a release, and driving a build over MCP to check it. The rules a
+change must follow live in the `CLAUDE.md` files next to the code they govern;
+this page points to them rather than repeating them.
+
+## Requirements
+
+- **Xcode 26 or later** (the macOS 26 SDK). The build compiles a Metal shader;
+  if `xcrun metal --version` fails, install the Metal toolchain with
+  `xcodebuild -downloadComponent MetalToolchain`.
+- **Rust** (stable, through `rustup`/`cargo`).
+- **[xcodegen](https://github.com/yonaskolb/XcodeGen)**, which generates the
+  Xcode project.
+- **[bun](https://bun.sh)**, which builds and tests the assistant helper in
+  `agent/`. Every `make app` builds it, `make typecheck` typechecks it and
+  `make test` runs its tests; without bun they fail with
+  `error: bun is not installed` rather than skipping.
+- **Python 3** for the scripts in `tools/proof/`, and `ffmpeg` for the proofs
+  that compare exported sound sample for sample (proof time only — the product
+  has no ffmpeg dependency).
+
+## Make targets
+
+| Target | What it does |
+|---|---|
+| `make app` | Builds the Rust core (release), generates the Xcode project, and builds the Release app into `build/Build/Products/Release/Frame Job.app` (about 90 s). |
+| `make app-debug` | The same with the Debug configuration: `build/Build/Products/Debug/Frame Job Debug.app`, an app called "Frame Job Debug" with its own bundle id (`com.kgalligan.FrameJob.debug`) and settings. Unoptimised, so it rebuilds in seconds after a one-file edit. |
+| `make run` | `make app`, then opens it. |
+| `make typecheck` | Typechecks every Swift file in `app/Sources` with `swiftc` (with the dev tools compiled in), then the helper's TypeScript with `tsc --noEmit`. Seconds. It is the only authoritative Swift check, but it stops before code generation, so only `make app` proves the app builds. |
+| `make test` | The Rust tests of `core/`, `graphic/` and `mcp-proxy/`, then the scripted checks that need no app: the assistant's agent lane and prompt texts, the price function and the proofs' spend budgets (no network), the menu inventory and spec index against the tree, the self-tests of the build, app-choice and gate scripts, the defaults clean-up, and the old-name residue check. |
+| `make lint` | `cargo clippy --all-targets -- -D warnings` in `core/`, `graphic/` and `mcp-proxy/`. |
+| `make fmt` | `cargo fmt` in the same three crates. |
+| `make gate` | The one full verification: the name residue check, typecheck (held to exactly its known warnings), `cargo fmt --check`, lint, test, then `make app` with the Release app's entitlements and signature checked. Serial, stops at the first failure, and skips a step whose inputs and tools are byte-identical to its last pass (its state is in `build/gate/`). `make gate GATE_ARGS=--force` runs every step. |
+| `make dist` | `make app`, then the Distribution configuration — Release without the dev tools — into `build/Build/Products/Distribution/Frame Job.app`, then the binary and signature checks (`tools/proof/dist_check.py`) and the check the publish workflow runs on what it ships (`tools/proof/published_check.py`). |
+| `make project` | `xcodegen generate`, with the base version from `VERSION`. |
+| `make prices` | **Network.** Regenerates `agent/prices/anthropic.json` from LiteLLM's price table; the file's only writer, never run by another target. |
+| `make clean` | Removes `build/`, the generated project and `app/Info.plist`, and runs `cargo clean` in the three crates. |
+
+A single Rust test runs as `cd core && cargo test --release --test edge slip`
+(the test file's name, then a name filter). Finish Rust work with `make fmt`
+and a clean `make lint`.
+
+There are no Swift unit tests. The app is checked with `make typecheck`, by
+driving the built app over MCP, and with the probes in `tools/proof/` (see
+[Verifying a build](#verifying-a-build)).
+
+### The Xcode project is generated
+
+`FrameJob.xcodeproj` is generated from `project.yml`, the source of truth.
+Never commit it. Run `make project` after editing `project.yml`, never a bare
+`xcodegen generate`: `make project` feeds the base version from `VERSION` into
+the project, and a bare run leaves the version blank. Both xcodegen and
+`make typecheck` glob `app/Sources/`, so a new Swift file needs no
+registration.
+
+## Repository layout
+
+```
+core/            Rust staticlib: the project model, every edit, the composition
+  include/         plan, the per-frame recipe, export settings, the MCP server,
+  src/             the WebM/Matroska index. include/framejob_core.h is the
+  tests/           hand-maintained C header, the FFI contract. Tests are
+                   black-box, through the FFI.
+graphic/         Rust crate (a path dependency of core): the graphics engine —
+  src/ tests/      a JavaScript module in sandboxed QuickJS returns SVG per
+                   frame, rasterized to BGRA.
+mcp-proxy/       Rust crate: framejob-mcp, the stdio MCP server bundled in
+  src/ tests/      Contents/Helpers, which forwards to the app's socket and
+                   launches the app on a tool call.
+agent/           The assistant helper: Bun and the Anthropic SDK's Tool Runner,
+  src/             built into Contents/Helpers/framejob-agent by build.sh.
+  prices/          The Anthropic price table and the fixtures its readers run.
+app/
+  Sources/         The AppKit app, programmatic UI (no storyboards).
+  Resources/       Shaders/Compositor.metal, Models/ (the voice model),
+                   Fonts/ (the bundled typefaces), and bundled media.
+  Bridging/        The bridging header importing framejob_core.h.
+designs/         spec/ (the normative spec, one file per section), adr/
+                 (condensed decision records), the design handoffs, screens/
+                 (the screen catalog).
+docs/            guide/ (the user guide), graphics-api.md, manual-checks.md,
+                 agents/ (what the engineering skills read), this file.
+tools/proof/     The verification scripts: mcp.py (the MCP client), the
+                 per-feature proofs and probes, harness/ (the offscreen chrome
+                 capture), swift_build.py, proof_app.py, gate.py.
+archive/         Closed road maps and histories, verbatim; INDEX.md.
+.github/         workflows/publish.yml and ExportOptions.plist.
+project.yml      The xcodegen definition.
+Makefile         Build orchestration.
+VERSION          The base version, MAJOR.MINOR.
+```
+
+## Architecture
+
+**Rust decides, AVFoundation and Metal do.** The core holds the project (as
+JSON), every edit, the composition plan and the per-frame recipe, and reads a
+WebM or Matroska file's index for the import's copy. Swift owns the windows,
+gestures, undo, AVFoundation playback and export, the Metal compositor, media
+import and its caches, and agent dispatch. There is no pixel or sample work in
+Rust and no ffmpeg dependency in the product. The preview and the export share
+one description of the movie, so a frame that differs between them is a bug in
+the compositor or the builder, never in a second rendering path.
+
+**The FFI contract.** `core/include/framejob_core.h` is a hand-maintained C
+header and the single contract between the two worlds. It is three files in
+lockstep: a Rust `#[no_mangle]` export, its entry in the header, and its
+wrapper in `app/Sources/ReelCore.swift`, the only Swift file that calls `rc_*`.
+
+- A project handle is **immutable**. Every edit is pure and returns a new
+  handle, so undo is a stack of handles and publishing a handle to the
+  compositor's queue is safe. Complex data crosses as UTF-8 JSON, which also
+  gives an MCP agent the same vocabulary the app has.
+- Edits are JSON ops through `rc_project_apply`, which answers one of three
+  ways: applied (a new project, the only one that makes an undo step), an
+  identity (NULL with no message: nothing needed to change), or a refusal
+  (NULL with `reason_out` set: the rule's own sentence). NULL with `err_out`
+  set means the input could not be read, and only that is an error.
+- What an op means is the module doc of `core/src/edit.rs`; what it takes is
+  `core/src/op_table.rs`, published as JSON Schema. The Swift builders, the
+  MCP tool catalog and spec §6 mirror them.
+- A change to persisted state bumps `RC_FORMAT_VERSION` in
+  `core/src/format.rs` and in the header.
+
+**Where the maps are.** The module map, file sizes and per-side rules are in
+the `CLAUDE.md` beside each side's code: [`core/CLAUDE.md`](../core/CLAUDE.md),
+[`app/CLAUDE.md`](../app/CLAUDE.md) (which also has the Swift file map),
+[`graphic/CLAUDE.md`](../graphic/CLAUDE.md) and
+[`mcp-proxy/CLAUDE.md`](../mcp-proxy/CLAUDE.md). The spec's
+[§7](../designs/spec/07-architecture.md) is the architecture, with the Swift
+file map in [§7.4](../designs/spec/07.4-swift-file-map.md) and the Rust module
+map in [§7.10](../designs/spec/07.10-rust-module-map.md). The root
+[`CLAUDE.md`](../CLAUDE.md) has the standard recipe for where each part of a new
+feature lands, and the rules every change follows (an MCP mirror for every
+user-visible edit, the per-file line caps, the decisions in spec §11 that are
+not re-opened).
+
+## Publishing a release
+
+A build for another Mac comes only from a push to the `publish` branch, which
+runs `.github/workflows/publish.yml`. Pushing there publishes, so it is the
+owner's call. The workflow:
+
+1. archives the Distribution configuration signed with Developer ID and
+   exports it;
+2. checks the exported app with `tools/proof/published_check.py`;
+3. packs it, with an Applications link, into `FrameJob.dmg`, signs the DMG,
+   notarizes and staples it;
+4. attaches it to a GitHub Release tagged `v<version>`, creating the release or
+   replacing the DMG on a re-run.
+
+The version is the `VERSION` file (MAJOR.MINOR) plus the workflow's run
+number, and the build number is the run number, so bump `VERSION` for a new
+minor line. The run counter belongs to the workflow file's name; never rename
+it. The newest build is always at
+`https://github.com/kpgalligan/framejob/releases/latest/download/FrameJob.dmg`.
+
+The workflow runs no tests: run `make gate` and `make dist` on what you push.
+
+The signing and notarization credentials are secrets in the repository's
+`publish` environment (Settings ▸ Environments), whose deployment branches are
+restricted to `publish`:
+
+| Secret | What it is |
+|---|---|
+| `DEVELOPER_ID_P12_BASE64` | The Developer ID Application certificate with its private key, exported as a `.p12` and base64-encoded. |
+| `DEVELOPER_ID_P12_PASSWORD` | That `.p12`'s export password. |
+| `KEYCHAIN_PASSWORD` | Any random string, for the temporary signing keychain. |
+| `APPLE_TEAM_ID` | The Apple Developer team id. |
+| `ASC_KEY_ID`, `ASC_ISSUER_ID` | An App Store Connect API key's id and issuer, for notarization. |
+| `ASC_KEY_P8_BASE64` | That key's `.p8`, base64-encoded. |
+
+Every local build stays ad-hoc signed and needs none of them.
+
+## Verifying a build
+
+The app is verified by driving the built binary over MCP and comparing what it
+renders, not by reading code. Launch your own instance on its own socket, and
+only ever stop that one (another session may have one running):
+
+```sh
+make app-debug
+python3 tools/proof/proof_app.py launch   # prints folder, socket, log, pid
+```
+
+The launcher gives the instance a scratch socket (`RC_AGENT_SOCKET`) and a
+scratch home folder, launches "Frame Job Debug" unless told `--app release`
+(or `RC_PROOF_APP=release`), and refuses a build older than its sources,
+naming the file and the `make` target. Point `tools/proof/mcp.py`'s
+`mcp.MCP("<folder>/agent.sock")`, or `framejob-mcp` with `RC_AGENT_SOCKET` set
+to the same path, at the socket it prints, and stop it by the printed pid.
+
+Before trusting any run, `grep "Frame Job: " <folder>/framejob.log` must print
+nothing: that prefix is the startup check that the tool catalog matches the
+core's op table. On a Debug build the same mismatch traps instead.
+
+The instance still shares its bundle's settings domain, so never perform a
+menu item that persists a setting (the View menu's Snapping, Safe Areas, Hide
+Inspector, Timeline Track Height, Preview Quality) from a script.
+
+A Debug or Release build, never Distribution, also has dev-only tools over
+MCP: `snapshot_ui` (a capture of the editor, a sheet, Settings, Welcome or the
+recorder panel, with a layout dump), `perform_menu_item`, `cancel_sheet`,
+`select_inspector_tab`, `play_preview` (plays a preview and answers the frames
+composed), `graphic_memory` (the graphic rasters' memory budget, and a
+simulated memory-pressure event) and `assistant_send` / `assistant_answer` (an
+assistant turn against a stand-in server). To look at the chrome without a
+running app or a Screen Recording grant, use the offscreen harness in
+`tools/proof/harness/`.
+
+The root [`CLAUDE.md`](../CLAUDE.md) ("Verifying a build", "Verification",
+"Seeing the chrome") has the full rules: what a proof may claim, which build a
+recorded run drives, and the dev-only launch defaults.
+[`tools/proof/README.md`](../tools/proof/README.md) lists the proofs, says how
+to make their test media, and describes the MCP client and the harness. What no
+script can confirm is a row in [`docs/manual-checks.md`](manual-checks.md),
+which the owner runs before each release.

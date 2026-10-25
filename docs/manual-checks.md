@@ -899,8 +899,8 @@ on your own account, never the spike's.
 
 ## Published build
 
-After a push to `publish` has made a release (README, "Publishing a
-release"). These use the DOWNLOADED app, not the tree's build, and one
+After a push to `publish` has made a release (`docs/developing.md`,
+"Publishing a release"). These use the DOWNLOADED app, not the tree's build, and one
 appearance is enough.
 
 **REL-1 — The DMG installs and opens on another Mac**

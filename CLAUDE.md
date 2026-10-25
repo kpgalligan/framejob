@@ -47,7 +47,9 @@ comment citing "road map N §x" refers to the archived original.
 | `designs/screens/` | The screen catalog (road map 11's V3). One file per screen: a JSON front block (the fixture, the MCP steps that reach it, the captures) and prose for a designer. `tools/proof/screens.py` captures them light and dark into `tools/proof/work/screens/<date>/screens.md`; its `README.md` has the format and how to add a screen. |
 | `agent/prices/` | The price table (spec §11 P-1, P-2, P-5): `anthropic.json` is LiteLLM's Anthropic rows in $/MTok with the LiteLLM commit it came from, written only by `make prices` and bundled into the helper, which refreshes its own daily copy into the spend folder (`agent/src/priceTable.ts`); `cases.json` the hand-checked cases `agent/src/pricing.ts` and `tools/proof/prices.py` both answer; `reduce_cases.json` the LiteLLM document both reducers (`update.py`, `priceTable.ts`) answer. `designs/adr/roadmap-13-pricing.md` holds the record. |
 | `tools/proof/README.md` | The proof scripts, the MCP client and the offscreen harness. |
-| `README.md` | User-facing. |
+| `README.md` | User-facing front page: the feature highlights, each linking its page in `docs/guide/`. |
+| `docs/guide/` | **The user guide**, one page per feature area (index: its `README.md`), every claim written from the code; `menus-and-shortcuts.md` is the full menu and key reference. A user-visible change edits its page. |
+| `docs/developing.md` | Building, the make targets, the layout, publishing a release, driving a build over MCP — for a contributor. |
 
 ## Commands
 
@@ -143,7 +145,7 @@ tools/proof/         mcp.py, the per-phase proof scripts, harness/ (offscreen ch
                      gate.py (make gate: the Full tier, skipping what already passed)
 .github/             workflows/publish.yml (the publish branch's signed, notarized DMG, spec §11
                      PUB-1..PUB-5) and ExportOptions.plist (its developer-id export)
-project.yml          xcodegen definition; Makefile; README.md (user-facing)
+project.yml          xcodegen definition; Makefile; README.md (user-facing, linking docs/guide/)
 VERSION              the base version, MAJOR.MINOR; `make project` feeds it to xcodegen and
                      the publish workflow appends its run number (spec §11 PUB-2)
 ```
@@ -208,8 +210,10 @@ else is what bloats files:
 4. **MCP mirror:** a handler in `AgentServer+<Feature>.swift`, a catalog entry
    declaring `scope`, and a comment naming the UI path it mirrors.
 5. **Documents:** spec §5.2 / §6 / §7.10 for anything they mirror; the map
-   entry in the per-side `CLAUDE.md` if a file's role changed; the README's
-   feature bullets; the phase's record in its road map.
+   entry in the per-side `CLAUDE.md` if a file's role changed; the feature's
+   page in `docs/guide/` (and its README highlight and
+   `menus-and-shortcuts.md` row when it adds one); the phase's record in its
+   road map.
 6. **Verify:** as "Verification" below says; then read the change back
    adversarially before committing.
 
