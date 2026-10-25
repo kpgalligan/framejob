@@ -171,11 +171,7 @@ final class Exporter {
 
     deinit {
         timer?.invalidate()
-        if let key = recipeKey {
-            RecipeSource.shared.unregister(key)
-            GraphicPrefetch.shared.stop(key)
-            GraphicRegistry.shared.unpin(key)
-        }
+        releaseRecipeKey { DispatchQueue.global(qos: .utility).async(execute: $0) }
         scratchStorage?.deallocate()
     }
 
@@ -439,18 +435,22 @@ final class Exporter {
         pendingLoudness = nil
         timer?.invalidate()
         timer = nil
-        if let key = recipeKey {
-            RecipeSource.shared.unregister(key)
-            GraphicPrefetch.shared.stop(key)
-            GraphicRegistry.shared.unpin(key)
-            RampAudioRenders.shared.release(owner: key)
-            recipeKey = nil
-        }
+        releaseRecipeKey()
         writer = nil
         let completion = completionHandler
         completionHandler = nil
         progressHandler = nil
         completion?(result)
+    }
+
+    /// For `finish` and `deinit`; `deinit` defers `ramp`, as it can run in `RampAudioRenders.wait`.
+    private func releaseRecipeKey(ramp: (@escaping () -> Void) -> Void = { $0() }) {
+        guard let key = recipeKey else { return }
+        RecipeSource.shared.unregister(key)
+        GraphicPrefetch.shared.stop(key)
+        GraphicRegistry.shared.unpin(key)
+        ramp { RampAudioRenders.shared.release(owner: key) }
+        recipeKey = nil
     }
 
     // MARK: - Shared state

@@ -1227,7 +1227,7 @@ the key map behind it.
   the frozen editor rebuilds with no change. `Exporter+RampAudio.swift` —
   the export's wait for every ramp render it needs before the build (a
   failure fails the export as `rampAudioFailed`; it never writes a
-  placeholder).
+  placeholder), its wants released by `Exporter.releaseRecipeKey`.
 - `RampVarispeedStream.swift` — the Keep pitch off tape glide as a stream
   (SR1c): the map read at 48 kHz from any start (negative for a
   pre-roll), dropping source behind a bound from the map's steepest
@@ -1297,7 +1297,8 @@ the key map behind it.
   offline key at 2 s, else nil — the slate. **An offline key draws only what
   its caller pinned** (`pin(set, for: key)` with the document's
   `snapshot(for: recipeKey)`, captured on main): every `pin` has its `unpin`
-  — `Exporter.finish` AND `deinit`, and `renderFrameReported`'s `defer`. A
+  — `Exporter.releaseRecipeKey` (from `finish` AND `deinit`), and
+  `renderFrameReported`'s `defer`. A
   pin also keeps its REPORTS: the first failure in a slot of its own for the
   pin's life, then at most 64 warnings distinct by graphic and messages,
   frame aside (`sameWarning`, G-24 (c)), so a warning can never displace a
@@ -1655,8 +1656,10 @@ the key map behind it.
   ABORTS on a recorded failure: `pollProgress` cancels and `finish` removes
   the file and answers `.graphicFailed`, whatever the pipeline said.
   `startWriting` starts the graphic prefetch (`startGraphicPrefetch`, G-26)
-  after the pipeline is picked, and `finish` and `deinit` `stop` it on the
-  line before each `unpin`.
+  after the pipeline is picked, and `releaseRecipeKey` (from `finish` and
+  `deinit`) `stop`s it on the line before the `unpin`, then releases the
+  export's ramp-audio wants — dispatched off the caller's thread from
+  `deinit`, which can run inside `RampAudioRenders.wait`'s lock.
   `Exporter.graphicWarnings` (`ExporterGraphics.swift`'s
   `ExportGraphicWarning`, each (name, message) once with its first frame) is
   published in `finish` before the unpin and read by the progress sheet

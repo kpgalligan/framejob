@@ -147,6 +147,7 @@ final class ExportProgressSheetController: NSViewController {
     /// into its own result panel rather than trading it for an alert.
     private func finished(_ result: Result<URL, any Error>) {
         didFinish = true
+        stopButton.isEnabled = true
         switch result {
         case .success(let url):
             bar.doubleValue = 1

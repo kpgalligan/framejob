@@ -495,7 +495,7 @@ extension ExportSheetController {
             // What a GIF or an APNG costs is frames, not seconds — and it
             // carries no audio however much of it the timeline has, which is
             // worth saying before the export rather than after it.
-            text += " · \(frameCount(settings)) frames, no audio"
+            text += " · \(settings.sequenceFrameCount ?? 0) frames, no audio"
         }
         return text
     }
@@ -541,14 +541,6 @@ extension ExportSheetController {
         // it reports the core rather than the popup.
         if settings.alpha { parts.append("alpha") }
         return parts.joined(separator: " · ")
-    }
-
-    /// How many frames the resolved range holds. Arithmetic on what the core
-    /// answered, not a second opinion about it.
-    private func frameCount(_ settings: ExportSettings) -> Int {
-        let step = settings.fps.frameDuration
-        guard step > 0 else { return 0 }
-        return Int(settings.duration / step)
     }
 }
 

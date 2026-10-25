@@ -23147,3 +23147,67 @@ make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/m
 | mutants MU1–MU3 (Debug) | each caught: MU1 (`fillSilence` false at its head) M1, M2, R1, R2, V0 fail "The operation could not be completed"; MU2 (`silentEnd` without the `sounding.isEmpty` guard) K1, K2 audio ≠ baseline; MU3 (the last, partial copy not inserted) M1 480 000 frames < 813 376 |
 | `make gate` | PASS 234 s (names 1 s, typecheck 5 s, fmt and lint skipped, test 119 s, app 108 s) |
 | `missing_audio_proof.py` (Release, after the gate) | **14/14 in 14 s**, exit 0 — M1, M2, R1, R2 all zero at 814 400 frames (≥ C's − 1024); V0 240 000 frames all zero with a video stream; M3, M4, R3, R4 = C; K1, K2 = the bb73b35 baseline; P1 906 455 ticks; X0 16/16; no `Frame Job: ` in its log |
+
+## Issue #350 — export drift: the sheet's frame readout, the writer's count, Close, the teardown (export_frame_count_proof.py S0–S6, W1–W3, M0–M2, mutant no-min-one)
+
+**The fix.** The export sheet's "N frames, no audio" readout counted `Int(duration / step)`
+while the image-sequence writer wrote `max(1, Int(max(0, duration) / step))`, so a range
+shorter than one frame of the preset's rate read "0 frames" and wrote one. Both now read
+`ExportSettings.sequenceFrameCount` (`ExporterImageSequence.swift`): floor, at least one, nil
+when the rate cannot step (the sheet shows 0 there, the writer refuses in its own sentence).
+The other two fixes have no row a script can reach:
+
+- **Close** — `ExportProgressSheetController.finished` sets `stopButton.isEnabled = true` after
+  `didFinish = true`. Cancel disables the button, and `Exporter.graphicOutcome` can rewrite a
+  requested cancel into `.graphicFailed`, so a failure can follow Cancel; the button stayed
+  disabled. Verified by reading `finished` and by `make typecheck`: reaching a cancel followed by
+  a graphic failure needs the progress sheet's Export pressed, which no proof does.
+- **Teardown** — `Exporter.releaseRecipeKey(ramp:)` is `finish`'s and `deinit`'s one release of
+  the recipe slot (unregister, prefetch stop, unpin, the ramp-audio wants, `recipeKey = nil`);
+  `deinit` used to skip the ramp-audio release. `deinit` runs the ramp release on a utility
+  queue: `RampAudioRenders.wait` calls `cancelled()` while it holds its non-recursive
+  `NSCondition`, and `Exporter.swift`'s `{ self?.isCancelled ?? true }` takes a strong
+  temporary, so the last release can run `deinit` on `buildQueue` inside that lock, where a
+  synchronous `release(owner:)` would re-lock it. `release(owner:)` is safe on any thread.
+  `finish` keeps the synchronous release (main, which never holds that condition). Verified by
+  that reasoning and by `ramp_proof.py --only E1,W1` (an export of a ramped clip, through
+  `finish`'s release).
+
+The probe (`export_frame_count_probe.swift`, compiled as `main.swift` over `app/Sources` on
+`swift_build.py`'s line; no window, no Metal) decodes each fixture as the core answers it,
+`{"container":"gif","fps":[N,D],"range":{"start":0,"duration":T}}`:
+
+- **S0** — every S and W fixture decodes the fps it names (`Fps` decodes only the two-element
+  array; anything else would be 30 fps).
+- **S1–S6** — `sequenceFrameCount` at 12.5 fps (48 000 ticks a frame): T = 0 → 1; T = 40 000 →
+  1; 144 000 → 3; 168 000 → 3 (floor); −48 000 → 1; fps 0/1 → nil.
+- **W1–W3** — `ImageSequenceWriter.init`: 601 frames throws `.failed` naming "this range is
+  601"; fps 0/1 throws the rate sentence exactly; 600 frames is made.
+
+The MCP rows run on `proof_app`'s app in a scratch home with every `screens.py` pin and the
+export choice pinned to `gif`, on a 320 × 180, 30 fps project holding one 40 000-tick shape
+clip (two 30 fps frames, shorter than one GIF frame):
+
+- **M0** — no `Frame Job: ` line in the log.
+- **M1** — `export` preset `gif` is done and `ffprobe -count_frames` reads 1 frame.
+- **M2** — File ▸ Export…, `snapshot_ui` of the sheet, `cancel_sheet`: a text contains
+  "· 1 frames, no audio" and none contains "0 frames". Nothing on the sheet is pressed.
+
+**Mutant no-min-one** drops the `max(1, …)` from a copy of `app/Sources`; MUTANT PASS means
+exactly S1, S2 and S5 failed over the copy.
+
+```sh
+python3 tools/proof/export_frame_count_proof.py --only probe
+python3 tools/proof/export_frame_count_proof.py --only probe --mutant no-min-one
+make app-debug && python3 tools/proof/export_frame_count_proof.py --only mcp
+make gate && RC_PROOF_APP=release python3 tools/proof/export_frame_count_proof.py
+```
+
+| Run (2026-10-25) | Result |
+|---|---|
+| `--only probe` | 12/12, exit 0 — S2 1, S4 3, S5 1, S6 nil; W1 "…this range is 601…" |
+| `--only probe --mutant no-min-one` | MUTANT PASS — S1, S2, S5 each counted 0, nothing else failed |
+| `--only mcp` (Debug) | 6/6, exit 0 — the GIF 681 bytes, ffprobe 1 frame; the sheet "320 × 180 · 12.50 fps · 00:00:00:01 · 1 frames, no audio" |
+| `ramp_proof.py --only E1,W1` (Debug) | 4/4 in 18 s, exit 0 — E1 70/70 clicks; W1 the ramp audio after 6.7 s |
+| `make gate` | PASS 234 s (names 1 s, typecheck 5 s, fmt and lint skipped, test 120 s, app 108 s) |
+| `export_frame_count_proof.py` (Release, after the gate) | **18/18**, exit 0 — S0–S6, W1–W3 as above; the GIF 681 bytes, ffprobe 1 frame; the sheet "· 1 frames, no audio", no "0 frames"; no `Frame Job: ` in the log |

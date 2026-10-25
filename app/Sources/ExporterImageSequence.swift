@@ -47,6 +47,15 @@ extension ExportSettings {
     /// instead would hand `AVAssetWriter` a file type it raises on rather
     /// than throws for.
     var isImageSequence: Bool { avPreset == nil }
+
+    /// How many frames the range holds: the writer's count and the export
+    /// sheet's readout alike. Floor, and at least one (a range shorter than a
+    /// frame is a still); nil when the rate cannot be stepped.
+    var sequenceFrameCount: Int? {
+        let step = fps.frameDuration
+        guard step > 0 else { return nil }
+        return max(1, Int(max(0, duration) / step))
+    }
 }
 
 extension Exporter {
@@ -324,19 +333,14 @@ final class ImageSequenceWriter: ExportPipeline {
         guard let format = ImageSequenceFormat(container: settings.container) else {
             throw Exporter.ExportError.fileTypeUnsupported(settings.container)
         }
-        let step = settings.fps.frameDuration
-        guard step > 0 else {
+        // `sequenceFrameCount`, which the sheet's "N frames" readout reads
+        // too. The core has already snapped the range to this very grid, so
+        // its division is usually exact.
+        guard let count = settings.sequenceFrameCount else {
             throw Exporter.ExportError.failed(
                 "The export frame rate is not one this build can step through.")
         }
-        // Floor, and deliberately the same arithmetic the sheet's "N frames"
-        // readout does (`ExportSheetController.frameCount`): a partial frame
-        // at the end of the range is not a frame. The core has already
-        // snapped the range to this very grid, so the division is usually
-        // exact; `max(1, …)` keeps a range shorter than one frame — which
-        // clamping against a short project can produce — a still rather than
-        // an empty file.
-        let count = max(1, Int(max(0, settings.duration) / step))
+        let step = settings.fps.frameDuration
         guard count <= Self.maxFrames else {
             throw Exporter.ExportError.failed(
                 "An animated \(format.displayName) is limited to \(Self.maxFrames) frames and "

@@ -6,10 +6,11 @@ import Foundation
 extension Exporter {
     /// Runs `build` once every renderable ramp segment of `plan` has its
     /// file, wanting them under this export's `key` meanwhile (released by
-    /// `finish`). An image sequence has no sound and does not wait; a plan
-    /// with no ramp segment builds at once. A ramp segment with no cache
-    /// folder to render into, or a render that failed, fails the export
-    /// `rampAudioFailed`; `cancelled()` answering true fails it `cancelled`.
+    /// `releaseRecipeKey`, from `finish` and `deinit`). An image sequence has
+    /// no sound and does not wait; a plan with no ramp segment builds at once.
+    /// A ramp segment with no cache folder to render into, or a render that
+    /// failed, fails the export `rampAudioFailed`; `cancelled()` answering
+    /// true fails it `cancelled`.
     /// The sheet reads "Preparing…" throughout. On `buildQueue`, never main.
     static func withRampAudio<T>(
         plan: CompositionPlan, urls: [UInt32: URL], settings: ExportSettings, key: Int,
