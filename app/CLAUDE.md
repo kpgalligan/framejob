@@ -103,7 +103,7 @@ detail there.
   explicit null are opposite intentions there, and only the tool can tell
   them apart.
   `scope` is a member folded into `json`; `documentLevelNames` MIRRORS
-  `scope.rs`'s `refused_inside` (seven names) so one edit can mix a
+  `scope.rs`'s `refused_inside` (eight names) so one edit can mix a
   document-level op with scoped ones. A table, with
   `edit.rs`'s size exemption.
 - `ReelOpSchema.swift` — what an op TAKES, mirroring what
@@ -730,8 +730,8 @@ the key map behind it.
 - `ClipLabel.swift` — the ONE home of the label and marker colour
   vocabulary; the core stores names unvalidated, so an unknown name draws in
   `DS.textStrong`. `ClipKindStyle.swift` — the ONE mapping from a clip to its
-  tint, symbol and kind word; it asks whether the FILE has pictures, not
-  `enabled.video`, which is the Detach switch.
+  tint, symbol and kind word; it asks whether the FILE has pictures AND
+  `enabled.video` (the Detach switch) is on, so a detached clip reads as audio.
 
 **Canvas.**
 - `PreviewCanvasView.swift` (frozen, 1124 lines) · `CanvasSessions.swift`

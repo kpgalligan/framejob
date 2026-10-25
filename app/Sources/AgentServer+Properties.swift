@@ -140,9 +140,9 @@ extension AgentServer {
     }
 
     /// `set_transition` — Clip ▸ Transition ▸ (`setTransitionKindCommand`) and
-    /// the Video tab's transition row. The transition is INTO the clip and its
-    /// duration is the overlap with the clip before it; `kind: null` clears
-    /// it.
+    /// the Clip tab's Transition section's transition row. The transition is
+    /// INTO the clip and its duration is the overlap with the clip before it;
+    /// `kind: null` clears it.
     func setTransition(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
@@ -167,7 +167,8 @@ extension AgentServer {
             [.setTransition(clip: clip.id, kind: kind)])
     }
 
-    /// `set_transition_duration` — the Video tab's transition length field.
+    /// `set_transition_duration` — the Clip tab's Transition section's length
+    /// field.
     /// It MOVES the clip so the overlap equals `duration`, subject to the
     /// overlap rule, which is why a too-long value is a refusal.
     func setTransitionDuration(_ a: [String: Any]) throws -> String {

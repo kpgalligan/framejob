@@ -26,7 +26,7 @@
 | C | Crop mode on the selected clip |
 | Z | Region mode on the canvas — drag a rectangle over the selected clip to zoom to it (⇧ fills instead of fits), Esc cancels. Z again disarms it, and so does moving the selection: one key in and out, because a modal overlay that has lost focus can no longer be dismissed by Esc |
 | ⇧Z | Fit timeline |
-| ⌘= / ⌘- / ⌘0 | Zoom in / out / fit (canvas, or timeline when focused) |
+| ⌘= (⌘+ too) / ⌘- / ⌘0 | Zoom the canvas in / out / fit — the timeline zooms by pinch and ⌥/⌘-scroll, and ⇧Z fits it |
 | ⇧⌘N | New track |
 | ⇧⌘I | Add media… |
 | ⌘G / ⇧⌘G | Nest / un-nest (M3) |
@@ -36,16 +36,16 @@
 | ⌘E | Export… |
 | ⌥⌘E | Save Frame… — the frame under the playhead as a PNG, JPEG or HEIC still (road map 2's phase 7a). Export…'s still-image sibling, under the same letter |
 | ⌥⌘N | New Recording… — the recorder panel (road map 3). The same item reads Stop Recording while one runs, paused included, and stops it; a nil-target action on `AppDelegate`, so it resolves with no document open, as New Project does. Pause Recording and Resume Recording are the status item's rows (R2) and File ▸ Pause Recording, directly under this item, retitled Resume Recording while paused, with no key (#98) |
-| ⌘, | Settings… — Frame Job ▸ Settings…, the app's one window for something PERSISTED beyond view state (road map 6 §5d): four panes, "MCP" (§11 MC-7), holding a visible blurb on how an MCP client reaches Frame Job, the bundled helper's path and the Copy MCP Command button, then "Assistant" (road map 12 A2), holding the Anthropic key and the model (§11 AI-8, AI-11) with no Verify, under it "Transcription", holding the AssemblyAI key, the region and a Verify button, and last "Playback", holding Background render and its delay (§11 G-38); the Assistant, Transcription and Playback headings each carry an info button whose popover holds the pane's explanation (§11 SH-5). macOS's own place for the item and its own key; the nudge pair below is the BARE `,` and `.`, so nothing is displaced. A nil-target selector on `AppDelegate`, so it resolves with no document open, as New Project does |
+| ⌘, | Settings… — Frame Job ▸ Settings…, the app's one window for something PERSISTED beyond view state (road map 6 §5d): four panes, "MCP" (§11 MC-7), holding a visible blurb on how an MCP client reaches Frame Job, the bundled helper's path and the Copy MCP Command button, then "Assistant" (road map 12 A2), holding the Anthropic key and the model (§11 AI-8, AI-11) with no Verify, the chat settings (§11 AI-20) and the month's spend line and its note (§11 P-7), under it "Transcription", holding the AssemblyAI key, the region and a Verify button, and last "Playback", holding Background render and its delay (§11 G-38); the Assistant, Transcription and Playback headings each carry an info button whose popover holds the pane's explanation (§11 SH-5). macOS's own place for the item and its own key; the nudge pair below is the BARE `,` and `.`, so nothing is displaced. A nil-target selector on `AppDelegate`, so it resolves with no document open, as New Project does |
 | ⌥⌘I | Toggle inspector |
-| ⌃⌘A | View ▸ Assistant — show the inspector, pick its Assistant tab and focus the composer (road map 12 A2, §11 AI-4). ⌘A is Select All and ⌥⌘A Deselect All; ⌃⌘A was free. Not a toggle: pressed on the Assistant tab it only refocuses the composer |
+| ⌃⌘A | View ▸ Assistant — show the inspector, pick its Assistant tab and focus the composer (road map 12 A2, §11 AI-4). ⌘A is Select All and ⌥⌘A Select After Playhead; ⌃⌘A was free. Not a toggle: pressed on the Assistant tab it only refocuses the composer |
 | ⇧⌘P | Preview Window — a second window showing the same picture as the canvas, with no overlay (road map 2's phase 8b). A TOGGLE: the item carries a checkmark and the key both opens the window and puts it away |
 | ⌃⌘U | View ▸ Show Ungraded — the preview (and the Preview Window) as if no clip were graded, with an "Ungraded" tag (grading GR3, §11 GR-4). A checkmark toggle; view state, not persisted; never an export or Save Frame… |
 | ⌃⌘W | View ▸ Scopes — the scopes panel beside the preview, two slots each picking Waveform, Parade, Vectorscope or Histogram (grading GR3, grading-2 G2-1, §11 GR-5, GR-10). A checkmark toggle; view state, not persisted, and the picks have no item or key |
 | `,` / `.` (⇧ ×10) | Nudge the selection one frame |
 | ⌥-drag clip | Duplicate |
 | ⌥⇧-drag clip | Slip — the source under a fixed clip |
-| ⌥-drag clip edge | Rate stretch |
+| ⌥-drag a media clip's END edge | Rate stretch (on the start edge ⌥ trims like a bare drag) |
 | ⌥⇧-drag clip edge | Roll — the hard cut that edge sits on |
 | Double-click an empty lane span | Close that gap |
 | Double-click a clip | Rename it in place — EXCEPT a nest clip, which opens (road map 2's phase 9); rename it with ⇧⌘R, Clip ▸ Rename… or the Clip tab's header field |
@@ -94,8 +94,8 @@ Edit (Undo, Redo, Cut, Copy, Paste, Paste Attributes, Paste Graphic
 Properties (no key equivalent; the copied graphic's props onto the selected
 clips drawn by the same graphic, §11 G-32), Duplicate, Delete,
 Ripple Delete, Insert at Playhead, Overwrite at Playhead, Select All,
-Select After Playhead, Select All on Track), Clip (Split, Trim Start, Trim
-End, Freeze Frame, Detach Audio, Normalize (road map 2's phase 5, beside
+Select After Playhead, Select All on Track), Clip (Split, Trim Start to Playhead,
+Trim End to Playhead, Freeze Frame, Detach Audio, Normalize (road map 2's phase 5, beside
 Detach Audio because those two are the menu's only sound commands; no key
 equivalent, and it duplicates the Audio section's button deliberately —
 a command reachable from a pane alone can be lost), Synchronize Audio (road

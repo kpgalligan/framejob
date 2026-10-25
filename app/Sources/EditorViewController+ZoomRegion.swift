@@ -40,7 +40,7 @@ extension EditorViewController {
 
     // MARK: - Commands
 
-    /// `Z`, and the Actions section's "Zoom to Region…" button.
+    /// `Z`, and the action lane's Zoom to Region button.
     ///
     /// It TOGGLES, which the eyedropper had to learn the hard way: once focus
     /// has left the overlay — a click in the inspector, a menu — Esc no

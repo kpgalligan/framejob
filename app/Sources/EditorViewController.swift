@@ -836,7 +836,7 @@ final class EditorViewController: NSViewController {
     @objc func toggleCropMode(_ sender: Any?) { toggleCanvasCropMode() }
     @objc func nextMarker(_ sender: Any?) { stepMarker(forward: true) }
     @objc func previousMarker(_ sender: Any?) { stepMarker(forward: false) }
-    /// ⌥⌘K — the Video tab's Actions section owns the body
+    /// ⌥⌘K — the body is `addActionAtPlayheadCommand`
     /// (EditorViewController+Inspector.swift).
     @objc func addActionAtPlayhead(_ sender: Any?) { addActionAtPlayheadCommand() }
     /// Clip ▸ Transition ▸ — the sender's tag indexes `TransitionKind.allCases`.

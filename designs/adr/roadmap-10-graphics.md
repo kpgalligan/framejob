@@ -257,7 +257,8 @@ no preview strip. The pane rebuilds when the schema's keys or types change,
 not when a default changes.
 
 **The reference is one document in three places** (orig §5i):
-`docs/graphics-api.md`, kept at 400 lines or fewer so it fits a prompt, and
+`docs/graphics-api.md`, held at 400 lines or fewer through the G phases so it
+fit a prompt — 600 lines since G-40..G-42, and nothing checks its length — and
 `docs/graphics-api.d.ts`. The build copies them into the bundle, and the
 store writes them into an existing `graphics/` as `API.md` and `API.d.ts`.
 `graphic/tests/reference.rs` runs every `js` block and checks that every
@@ -315,7 +316,9 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   An export's graphics are rasterized ahead on `activeProcessorCount − 1`
   worker threads (G-26); each graphic's JavaScript then runs twice per frame
   (worker and compositor), and resvg still decodes an embedded image inside
-  every render. Preview playback is still serial.
+  every render. A forward-playing preview prefetches the same way since
+  G-36; only a paused or reversing preview, or one with
+  `FrameJobGraphicPrefetchOff`, is serial.
 - **quickjs-ng 0.16.2 has no `Intl` and no `structuredClone`.**
   `formatNumber` exists for that reason (issue #39).
 - **Largest string `render` can return:** 8 MiB (`graphic::SVG_BYTES`,

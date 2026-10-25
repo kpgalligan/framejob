@@ -259,7 +259,7 @@ extension AgentServer {
         AgentDeclaration(
             .argument("at", of: "split"), requirement: .optional,
             why: "The op requires a time; the TOOL takes the playhead when the call leaves it "
-                + "out, exactly as ⌘K does with nothing typed. The playhead is app state, "
+                + "out, exactly as Clip ▸ Split (⌘T) does with nothing typed. The playhead is app state, "
                 + "which the core has not got, so an argument the core calls required is one "
                 + "an agent may omit here."),
         AgentDeclaration(

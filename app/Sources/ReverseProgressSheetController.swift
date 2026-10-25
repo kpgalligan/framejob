@@ -166,7 +166,8 @@ final class ReverseProgressSheetController: NSViewController {
         statusLabel.stringValue =
             outcome.cancelled
             ? "Stopped. Clips that are still reversed show a slate until their frames are "
-                + "rendered — reach the Speed section of the Video tab to try again."
+                + "rendered — press Render Reverse in the Timing section of the Clip tab to "
+                + "try again."
             : "\(outcome.failures.count) file"
                 + "\(outcome.failures.count == 1 ? "" : "s") could not be reversed. Those clips "
                 + "show a slate rather than play forwards."

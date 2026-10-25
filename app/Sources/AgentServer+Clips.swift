@@ -194,7 +194,7 @@ extension AgentServer {
         return try editResult(document, "Roll", [.roll(clip: clip.id, to: to)])
     }
 
-    /// `split` — ⌘K / T (`splitAtPlayheadCommand`). With no `clips` the core
+    /// `split` — ⌘T (`splitAtPlayheadCommand`). With no `clips` the core
     /// splits every unlocked clip under the playhead, which is what the menu
     /// command does with an empty selection; `at` defaults to the playhead for
     /// the same reason.
@@ -315,9 +315,10 @@ extension AgentServer {
             .setSpeed(clip: clip.id, rate: rate, duration: duration, keepPitch: keepPitch)])
     }
 
-    /// `set_reversed` — Clip ▸ Reverse. Media sources only, and nothing on the
-    /// timeline moves: the core changes one boolean and the app substitutes a
-    /// pre-rendered reversed asset for that media's segments (spec §11).
+    /// `set_reversed` — the Reverse checkbox in the Clip tab's Timing section.
+    /// Media sources only, and nothing on the timeline moves: the core changes
+    /// one boolean and the app substitutes a pre-rendered reversed asset for
+    /// that media's segments (spec §11).
     ///
     /// `reversed` is required rather than a toggle on purpose: an agent that
     /// cannot see the current value would otherwise have to read the project

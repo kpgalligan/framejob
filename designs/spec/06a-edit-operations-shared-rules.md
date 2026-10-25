@@ -59,13 +59,13 @@ and `rc_op_names` gains no name — a scope is an envelope key, not an op.
 Times inside a scope are the nest's own, measured from its zero; a nest has
 no speed, so `t − nest_clip.start` is the whole mapping.
 
-**Eight ops are an error with a scope**, each naming itself and the nest
+**Nine ops are an error with a scope**, each naming itself and the nest
 (`add_marker has no meaning inside nest 4`): `add_marker`, `set_marker`,
 `remove_marker` — a nest has no `markers[]`, and the timeline's are project
 time and chapter points on the file; `set_canvas` — a nest's size is frozen
 at the size the parent had when it was made (§5.2), deliberately, and the
 rest of a canvas is the document's; and `add_media`, `relink_media`,
-`remove_media` — a nest references the parent's `media[]` in the parent's
+`remove_media`, `set_media_color` — a nest references the parent's `media[]` in the parent's
 one id space, so a media edit inside a scope is a media edit on the
 document wearing a scope; and `add_adjustment_clip` — an adjustment clip
 grades what is behind it at the top level only (§11 GR-6). An unknown

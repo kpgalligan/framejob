@@ -1,8 +1,9 @@
 import AppKit
 
-/// Clip ▸ Remove Silences… — road map 2 phase 3a's dialog: four controls, a
-/// live count of what they would cut, the same spans washed onto the timeline
-/// behind the sheet, and one `ripple_delete_ranges` op when Remove is pressed.
+/// Clip ▸ Remove Silences… — road map 2 phase 3a's dialog: five controls
+/// (Judge by, the threshold, Longer than, Keep at ends, In), a live count of
+/// what they would cut, the same spans washed onto the timeline behind the
+/// sheet, and one `ripple_delete_ranges` op when Remove is pressed.
 ///
 /// **Everything it measures is read once, in `init`.** `SilenceDetector.Input`
 /// is the snapshot, the composition plan, the selection and every peaks file
@@ -370,8 +371,8 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
             let subject = count == 1 ? "a nest" : "\(count) nests"
             notes.append(
                 "Quiet inside \(subject) is left alone: a nest plays from its first frame, "
-                    + "so cutting into one would strand the rest of it. Un-nest (⇧⌘G) first "
-                    + "to take the dead air out.")
+                    + "so cutting into one would strand the rest of it. Open the nest (⌘↓) "
+                    + "and remove its silences there to take the dead air out.")
         }
         return notes.joined(separator: " ")
     }

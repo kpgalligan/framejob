@@ -51,8 +51,8 @@ extension AgentServer {
             opTool(
                 "add_zoom_action",
                 "Adds an animation that zooms the picture to a rectangle — the screencast "
-                    + "zoom, and what the canvas's Z mode and the Video tab's Zoom to Region… "
-                    + "both send. Over `duration` starting at `at`, the clip's scale, x and y "
+                    + "zoom, and what the canvas's Z mode and the Zoom to Region button in "
+                    + "the Clip tab's action lane both send. Over `duration` starting at `at`, the clip's scale, x and y "
                     + "ease to the values that bring `region` to the canvas: `fit` shows the "
                     + "whole region, `fill` covers the whole canvas, both measured THROUGH the "
                     + "clip's rotation. `region: null` is a zoom BACK — the end state is the "

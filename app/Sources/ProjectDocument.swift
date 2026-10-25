@@ -360,7 +360,7 @@ final class ProjectDocument: NSDocument {
     /// retried on the next edit: a render the user stopped must not restart
     /// itself the moment they touch the timeline, and one that cannot work
     /// would put its sheet up for ever. Their clips keep drawing the slate,
-    /// and the Video tab's Speed section offers the retry.
+    /// and the Clip tab's Timing section offers the retry.
     private var refusedReverseMedia: Set<UInt32> = []
 
     /// The media the sheet now on screen is rendering, so the outcome can say
@@ -934,14 +934,14 @@ final class ProjectDocument: NSDocument {
     }
 
     /// Asks for `clip`'s reverse again after a cancel or a failure — the
-    /// Video tab's "Render Reverse" button.
+    /// Clip tab's Timing section's "Render Reverse" button.
     func retryReversedMedia(for clip: ClipSnapshot) {
         guard let media = clip.source.mediaID else { return }
         refusedReverseMedia.remove(media)
         ensureReversedMedia()
     }
 
-    /// What the Video tab's Reverse row should say about one clip.
+    /// What the Clip tab's Timing section's Reverse row should say about one clip.
     func reverseStatus(of clip: ClipSnapshot) -> ReverseStatus {
         guard clip.source.isReversed, let id = clip.source.mediaID,
             let media = project.snapshot.media.first(where: { $0.id == id }),

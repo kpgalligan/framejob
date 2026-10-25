@@ -155,9 +155,9 @@ extension EditorViewController {
         // The whole image family rather than `ProjectDocument.readableTypes`:
         // a movie behind the timeline is an ordinary clip on a track the user
         // puts where they want it, while a background is by definition the
-        // thing that runs the WHOLE cut — and the op does not clamp a timed
-        // media to its own length, so a five-second movie chosen here would
-        // show nothing for the rest of the timeline.
+        // thing that runs the WHOLE cut — and the op clamps a timed media to
+        // its own file's length, so a five-second movie plate would stop where
+        // its file does; only an image runs the whole timeline.
         panel.allowedContentTypes = [.image]
         panel.message = "Choose a picture to put behind everything."
         panel.beginSheetModal(for: window) { [weak self] response in

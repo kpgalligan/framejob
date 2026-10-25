@@ -155,8 +155,8 @@ extension AgentServer {
                     "ungraded": [
                         "type": "boolean",
                         "description": "Render as if no clip were graded — every clip's "
-                            + "video.color (Light and Color) neutral, everything else kept: "
-                            + "View ▸ Show Ungraded's picture. The view switch itself never "
+                            + "video.color (Light and Color), video.wheels and video.curves "
+                            + "neutral and no video.look: View ▸ Show Ungraded's picture. The view switch itself never "
                             + "reaches this tool or an export. Default false.",
                     ],
                     // View ▸ Show SDR Version's mirror (spec §11 HD-7, HD-14).
@@ -279,8 +279,8 @@ extension AgentServer {
                     "audio_bitrate": [
                         "type": "integer", "minimum": 1,
                         "description": "Target AAC rate in BITS per second (192000 is "
-                            + "192 kbps) — the sheet's Quality popup. Omit for the preset's "
-                            + "own. Ignored where the sound is not AAC: ProRes, WAV and AIFF "
+                            + "192 kbps) — the sheet's Quality popup. Omit for 192 "
+                            + "kbps. Ignored where the sound is not AAC: ProRes, WAV and AIFF "
                             + "all write LPCM, whose rate is its sample format.",
                     ],
                     "loudness_lufs": [

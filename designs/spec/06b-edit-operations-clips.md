@@ -182,7 +182,7 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   split at both bounds and the middles removed, and NOTHING moves — every clip after the range keeps
   the moment it had, and so do the markers. ⌫ with a range and nothing selected, where ⌘⌫ ripples.
 - **`insert_time {at, length}`** — Shifts every unlocked clip whose start ≥ `at` right by `length`.
-  Straddling clips are left in place.
+  Straddling clips are left in place. Every marker at or after `at` moves right by `length` too.
 - **`close_gap {track, at}`** — Closes the empty span on `track` that contains `at`, bounded by the
   nearest clip edges there (0 in front when nothing precedes it): everything from the gap's far side
   shifts left by its length, across every unlocked track, straddlers staying put. Refuses on a

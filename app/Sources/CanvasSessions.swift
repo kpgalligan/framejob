@@ -909,7 +909,7 @@ struct CanvasEyedropperSession {
 /// it in exactly one place: the commit. The geometry below reads it only to
 /// say whether the resolved frame is worth drawing.
 enum CanvasRegionPurpose {
-    /// `Z`, and the Actions section's "Zoom to Region…".
+    /// `Z`, and the action lane's Zoom to Region button.
     case zoom
     /// The Obscure section's "Place on Canvas".
     case obscure

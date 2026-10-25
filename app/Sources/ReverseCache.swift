@@ -143,7 +143,7 @@ struct ReverseResolution: Equatable {
     var isEmpty: Bool { ready.isEmpty && pending.isEmpty }
 }
 
-/// What the Video tab's Speed section says about one clip's reverse, and the
+/// What the Clip tab's Timing section says about one clip's reverse, and the
 /// state machine behind the "Render Reverse" button.
 ///
 /// There is no state that means "reversed and playing forwards", which is the

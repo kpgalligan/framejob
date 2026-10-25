@@ -71,7 +71,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     /// Captions sheet can re-enable its button without being reopened.
     static let didChangeNotification = Notification.Name("FrameJobSettingsDidChange")
 
-    /// §5d's "one pane for now", as the heading this window opens with.
+    /// The Transcription pane's heading, the third of the window's four panes.
     static let paneTitle = "Transcription"
 
     /// What the field shows when a key IS stored. Fixed length on purpose:

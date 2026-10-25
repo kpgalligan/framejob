@@ -218,9 +218,9 @@ impl Project {
     /// source range it shows: `speed = source_len / (to_end - start)`
     /// (spec §6). Media sources only.
     ///
-    /// Refuses when the resulting rate falls outside `SPEED_MIN`–`SPEED_MAX`,
-    /// when the new length is under a frame, or when the placement breaks the
-    /// overlap rule. Actions keep their clip-relative fraction.
+    /// An IDENTITY when the new length is under a frame or the resulting rate
+    /// falls outside `SPEED_MIN`–`SPEED_MAX`; refused only when the placement
+    /// breaks the overlap rule. Actions keep their clip-relative fraction.
     ///
     /// On a RAMPED clip the whole rate profile scales by f = D ÷ (to_end −
     /// start) through `scaled_profile`, so the ramp keeps its shape and its

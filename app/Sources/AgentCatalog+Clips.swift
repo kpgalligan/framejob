@@ -172,8 +172,8 @@ extension AgentServer {
                 [
                     "media": "Media id to show as the background — get_project lists "
                         + "them and import_media adds a file. Omit for a colour plate. A "
-                        + "timed media is NOT clamped to its own length, so a short movie "
-                        + "used here shows nothing for the rest of the timeline.",
+                        + "timed media is clamped to its own file's length, so a short movie "
+                        + "stops where its file does; only an image runs the whole timeline.",
                     "color": colorDescription("The plate's colour; white when omitted"),
                     "duration": "Length \(ticks) Default: the whole timeline's length, "
                         + "and never less than one frame.",
@@ -284,7 +284,7 @@ extension AgentServer {
                 ["clip": clipDescription, "to": "Where the cut moves to, \(ticks)"]),
             opTool(
                 "split",
-                "Cuts clips in two at `at` — ⌘K. The second piece keeps playing the source from "
+                "Cuts clips in two at `at` — Clip ▸ Split (⌘T). The second piece keeps playing the source from "
                     + "where the first stopped, and each keeps the animation actions that fall "
                     + "on its side (an action straddling the cut becomes two). With no clips "
                     + "every unlocked clip under the time is split, which is what the menu "
@@ -343,7 +343,8 @@ extension AgentServer {
                 "insert_time",
                 "Opens a gap: every unlocked clip starting at or after `at` moves right by "
                     + "`length`. Straddling clips are left in place, so this makes room without "
-                    + "cutting anything — split first if you want the gap inside a clip.",
+                    + "cutting anything — split first if you want the gap inside a clip. Every "
+                    + "marker at or after `at` moves right by `length` too.",
                 [
                     "at": "Where the gap opens, \(ticks)",
                     "length": "How much room, \(ticks)",
@@ -382,7 +383,8 @@ extension AgentServer {
                 ]),
             opTool(
                 "set_reversed",
-                "Plays a media clip back to front, or forward again — Clip ▸ Reverse. Nothing "
+                "Plays a media clip back to front, or forward again — the Reverse checkbox in the "
+                    + "Clip tab's Timing section. Nothing "
                     + "about the timeline moves: the clip keeps its start, its duration and its "
                     + "in point, and the in point is measured in the direction the clip plays, "
                     + "so reversing a trimmed clip shows the other end of the file. Media clips "

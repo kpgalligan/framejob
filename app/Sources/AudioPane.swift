@@ -250,7 +250,7 @@ final class AudioPane: InspectorPaneView {
 
     // MARK: Noise reduction
 
-    /// "Remove background noise" (spec §4.2's M3 line).
+    /// "Remove noise", the Noise Reduction section's row (spec §4.3b's M3 line).
     ///
     /// The read-out states the strongest attenuation any part of the spectrum
     /// can receive, which is the one number that describes this honestly: the

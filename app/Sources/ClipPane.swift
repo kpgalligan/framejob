@@ -73,8 +73,8 @@ final class ClipPane: InspectorPaneView {
     /// selection has PIXELS and whether it has AUDIO each add or remove a
     /// whole group of sections while every clip id stays exactly as it was.
     /// The audio half is the one that moves under an edit: `hasAudio` reads
-    /// `clip.enabled.audio`, so Detach Audio and the clip menu's toggle change
-    /// it (`set_enabled`, §6). The video half does NOT track that flag —
+    /// `clip.enabled.audio`, so Detach Audio changes it, and so does the
+    /// agent's `set_enabled` (§6), which no UI control sends. The video half does NOT track that flag —
     /// `hasPixels` asks the MEDIA whether it has a video track, not the clip
     /// whether its video is on — so what moves it is a relink or a consolidate
     /// that puts different media under the clip. Both are cheap to ask and

@@ -158,7 +158,8 @@ extension EditorViewController {
     }
 
     /// Clip ▸ Transition ▸ — the sender's tag indexes `TransitionKind.allCases`
-    /// and −1 is None, the same table the Video tab's popup offers.
+    /// and −1 is None, the same table the Clip tab's Transition section's popup
+    /// offers.
     ///
     /// A kind is sent one of two ways per clip, and the choice is the
     /// clip's own placement: a clip that already OVERLAPS its predecessor
