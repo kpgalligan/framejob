@@ -256,7 +256,9 @@ nest shares the document's media. The answer echoes the `scope` it landed in.
 `normalize_clip`, `sync_audio`, `transcribe`, `import_captions`,
 `export_captions` and `record_screen` take no `scope` argument. They work in
 whatever nest `set_scope` has open (`record_screen` places its clip there),
-so open the nest first to measure or place inside it. The
+so open the nest first to measure or place inside it. `detect_silence`
+names, under `protected_nests`, the nest clips a quiet run crossed and left
+uncut; open one with `set_scope` and call again to look for dead air inside it. The
 `ripple_delete_ranges` call that acts on `detect_silence`'s answer takes
 `scope` like any op.
 

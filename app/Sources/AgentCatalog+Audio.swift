@@ -64,7 +64,10 @@ extension AgentServer {
                     + "the waveform, or in voice mode the speech. judged_by_level_clips names each "
                     + "clip judged by level, and proposed_by_mix_clips each clip a range is "
                     + "proposed inside only because the mix turns it down while its analysis is "
-                    + "still running.",
+                    + "still running. A nest clip is a wall: no candidate reaches into one, and "
+                    + "protected_nests names each nest clip a quiet run of at least min_length "
+                    + "crossed — set_scope into it and call again to look for any dead air "
+                    + "inside.",
                 [
                     "clips": [
                         "type": "array", "items": ["type": "integer"], "minItems": 1,

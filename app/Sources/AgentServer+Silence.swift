@@ -33,7 +33,8 @@ extension AgentServer {
     /// (`SilenceSheetController`, whose four controls are these four
     /// arguments and whose live "N cuts · removes M:SS" line is this
     /// result). Nothing is edited: feed `ranges` to `ripple_delete_ranges`
-    /// to make the cut, which is what that sheet's button does.
+    /// to make the cut, which is what that sheet's button does. The
+    /// `protected_nests` note is the tool's spelling of the sheet's nest note.
     ///
     /// Quiet is measured IN THE MIX — the peak bucket times the plan's audio
     /// envelope at that tick — so a clip turned down, faded, ducked, muted or
@@ -192,6 +193,30 @@ extension AgentServer {
         } else if byLevel.count > 1 {
             notes.append(
                 "Clips \(Self.listed(byLevel)) hold no voice and were judged by level.")
+        }
+        // The sheet's nest note, spelled for an agent (#352): a candidate
+        // held back at a nest's wall, dropped without a word, reads as "there
+        // is no dead air here". A listed nest clip is one a quiet run of the
+        // SCOPED voices crossed (`SilenceDetector+Walls.swift`'s
+        // `excludingNests`); the nest's own sound is not tested, so it MAY
+        // hold dead air, and the reader is told to look, not that it does.
+        // Last, as the sheet puts its nest note last.
+        if !outcome.protectedNests.isEmpty {
+            let ids = outcome.protectedNests
+            result["protected_nests"] = ids.map { Int($0) }
+            let lead =
+                ids.count == 1
+                ? "Quiet that runs across nest clip \(ids[0]) is left alone"
+                : "Quiet that runs across nest clips \(Self.listed(ids)) is left alone"
+            let reach =
+                ids.count == 1
+                ? "To look for dead air inside it, call set_scope with clip \(ids[0]), then "
+                    + "detect_silence again."
+                : "To look for dead air inside them, call set_scope with each clip, then "
+                    + "detect_silence again."
+            notes.append(
+                lead + ": a nest plays from its first frame, so cutting into one would "
+                    + "strand the rest of it. " + reach)
         }
         if !notes.isEmpty { result["note"] = notes.joined(separator: " ") }
         result["project"] = summary(document)

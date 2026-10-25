@@ -431,6 +431,10 @@ def silence_part(mcp):
     padding = found["padding"]
     ranges = found["ranges"]
     check(
+        "protected_nests" not in found,
+        f"a project with no nest answers no protected_nests ({found.get('protected_nests')!r})",
+    )
+    check(
         found["scope"] == "audible" and found["clips"] == [clip],
         f"the default scope is every audible clip, and it is clip {clip}",
     )
@@ -655,6 +659,16 @@ def nest_part(mcp):
 
     found = detect(s)
     ranges = found["ranges"]
+    # The nest's quiet is held back at its wall, and the answer SAYS so
+    # (#352): a dropped candidate left unsaid reads as "no dead air here".
+    note = found.get("note", "")
+    check(
+        found.get("protected_nests") == [nest["id"]]
+        and "set_scope" in note
+        and f"clip {nest['id']}" in note,
+        f"protected_nests names nest clip {nest['id']} and the note says set_scope into it "
+        f"({found.get('protected_nests')!r}; {note!r})",
+    )
     # The trap itself: the segments the detector reads inside the nest carry
     # the INNER clip's id, which `get_project` shows nowhere in `clips[]` —
     # nest_clips moves clips whole, so the id survives into the nest.
