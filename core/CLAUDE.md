@@ -582,12 +582,13 @@ governs a module now.
   crate's**: an end patch interpolates a list per index when the lengths
   match and each pair of entries agrees on its discrete fields (`kind`,
   `shape`), and switches at the end otherwise; `video.filters` and `video.obscure` are both governed by it and carry no code of their own.
-- `actions_clamp.rs` — `clamp_video` and `clamp_audio`, the evaluator's
-  last line of defence (`set_action_end` checks a `video`, `audio` or
-  `text` end patch's keys and kinds but deliberately not its VALUES, and
-  never looks at the clip for them; this bounds every value such a patch
-  can carry and forces `normal` on a nest clip), with `bounded` /
-  `finite_or`; a pure move out of `actions.rs` (issue batch B87, toll A).
+- `actions_clamp.rs` — `clamp_video`, `clamp_audio` and `clamp_text`, the
+  evaluator's last line of defence (`set_action_end` checks a `video`,
+  `audio` or `text` end patch's keys and kinds but deliberately not its
+  VALUES, and never looks at the clip for them; this bounds every value
+  such a patch can carry and forces `normal` on a nest clip), with
+  `bounded` / `finite_or`; the first two a pure move out of `actions.rs`
+  (issue batch B87, toll A), `clamp_text` added by #353.
 - `actions_curves.rs` — `curves_json` (all six curves, an absent one
   as its domain's identity, for `video_json`'s callers),
   `align_identity_curves` (spec §11 GR-12, GR-32: an identity curve

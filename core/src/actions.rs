@@ -32,7 +32,7 @@
 use serde::Serialize;
 use serde_json::{Map, Number, Value};
 
-use crate::actions_clamp::{clamp_audio, clamp_video};
+use crate::actions_clamp::{clamp_audio, clamp_text, clamp_video};
 use crate::actions_color::blend_colors;
 use crate::actions_curves::{
     align_identity_curves, blended_curves_json, curve_blends, curves_json, CurveBlend,
@@ -529,7 +529,7 @@ impl Project {
         Evaluated {
             video,
             audio: clamp_audio(evaluated_audio),
-            text: evaluated_text,
+            text: evaluated_text.map(clamp_text),
             // Shapes are not animatable in version 1: the §5.4 patch is a
             // subset of video/audio/text only, so the description passes
             // through untouched.

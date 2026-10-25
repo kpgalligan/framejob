@@ -194,7 +194,7 @@ impl Reveal {
 /// A phase of zero length is complete from the start rather than a division
 /// by zero, and so is a NEGATIVE one — which only an action end patch or a
 /// hand-written file can produce, since `set_action_end` is deliberately
-/// lenient and `clamp_video` does not touch text. This is where an absurd
+/// lenient and `clamp_text` leaves `animation` alone. This is where an absurd
 /// value is caught, because this is where it is consumed.
 pub(crate) fn ramp(elapsed: Ticks, over: Ticks) -> f64 {
     if over <= 0 {

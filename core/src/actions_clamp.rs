@@ -1,18 +1,19 @@
-//! The evaluator's last line of defence: [`clamp_video`] and
-//! [`clamp_audio`] bound every value an action's end patch can carry, after
+//! The evaluator's last line of defence: [`clamp_video`], [`clamp_audio`]
+//! and [`clamp_text`] bound every value an action's end patch can carry, after
 //! `actions.rs` has merged and interpolated it, using the same table
-//! `props_check.rs` holds for a direct edit. A pure move out of `actions.rs`
-//! (issue batch B87, toll A); the rule and its reasons are unchanged.
+//! `props_check.rs` holds for a direct edit. The video and audio clamps
+//! were a pure move out of `actions.rs` (issue batch B87, toll A);
+//! `clamp_text` was added by #353.
 
 use crate::audio::MAX_GAIN;
 use crate::model::{
-    AudioProps, BlendMode, CurveDomain, CurvePoint, Curves, HueRange, LevelRange, Qualifier,
-    VideoProps, Wheels, CURVE_POINTS_MAX, CURVE_POINTS_MIN, HUE_SOFTNESS_MAX, HUE_TURN,
+    AudioProps, BlendMode, Color, CurveDomain, CurvePoint, Curves, HueRange, LevelRange, Qualifier,
+    TextProps, VideoProps, Wheels, CURVE_POINTS_MAX, CURVE_POINTS_MIN, HUE_SOFTNESS_MAX, HUE_TURN,
     MAX_FILTERS, MAX_OBSCURE, QUALIFIER_BLUR_MAX, WHEEL_MAX,
 };
 use crate::props_check::{
     COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, EXPOSURE_MAX,
-    SCALE_MAX, SCALE_MIN, SPOT_ZOOM_MAX, TONE_MAX,
+    SCALE_MAX, SCALE_MIN, SPOT_ZOOM_MAX, TONE_MAX, WORD_SCALE_MAX, WORD_SCALE_MIN,
 };
 
 /// Brings an evaluated value back into the range the ops enforce.
@@ -294,6 +295,92 @@ pub(crate) fn clamp_audio(mut props: AudioProps) -> AudioProps {
         compressor.attack = compressor.attack.max(0);
         compressor.release = compressor.release.max(0);
         compressor.makeup_db = bounded(compressor.makeup_db, 0.0, COMPRESSOR_MAKEUP_MAX_DB, 0.0);
+    }
+    props
+}
+
+/// One colour's channels to 0..1, a NaN channel to that channel of
+/// `neutral` — the colour's own default, so a NaN never blanks or tints
+/// the layer it paints.
+fn clamp_color(color: Color, neutral: Color) -> Color {
+    let mut out = color;
+    for (i, channel) in out.iter_mut().enumerate() {
+        *channel = bounded(*channel, 0.0, 1.0, neutral[i]);
+    }
+    out
+}
+
+/// The text group, bounded as `clamp_video` bounds the picture: every NaN
+/// to its field's own default, every other number into the range
+/// `props_check.rs`'s `check_text` holds a direct edit to.
+///
+/// A value `check_text` accepts passes unchanged, with ONE exception: a
+/// size in (0, 1) is raised to 1.0, the size Swift already draws it at
+/// (`max(1, size)` in the text and word renderers) — the spotlight's pixel
+/// floor is the precedent. `width` is floored at `f64::MIN_POSITIVE`, not
+/// 1.0, so a legal width in (0, 1) is NOT an exception: the renderer sizes
+/// its texture from the unfloored value, and a 1.0 floor would change the
+/// picture of a width the op accepts.
+///
+/// `words` and `animation` are left alone: `set_action_end` refuses
+/// `text.words` as a target, and `recipe_text.rs`'s `ramp` bounds the
+/// animation where it is consumed.
+///
+/// Check and clamp stay two tables on purpose (#353): a check names the key
+/// and refuses, a clamp has nobody to tell, and their neutrals, floors and
+/// list policies differ.
+///
+/// The neutrals are written as literals rather than read from
+/// `TextProps::default()`, which allocates a `String` on every evaluation;
+/// each one names the `Default` it mirrors.
+pub(crate) fn clamp_text(mut props: TextProps) -> TextProps {
+    // `TextProps::default`'s size, colour, line spacing and tracking.
+    props.size = bounded(props.size, 1.0, f64::MAX, 72.0);
+    props.color = clamp_color(props.color, [1.0, 1.0, 1.0, 1.0]);
+    // Not a positive floor: the renderer already draws a spacing of 0 or
+    // less as the font's natural spacing, so mapping it to 1.0 draws the
+    // same picture, where a floor such as 0.01 would change it.
+    if !(props.line_spacing.is_finite() && props.line_spacing > 0.0) {
+        props.line_spacing = 1.0;
+    }
+    props.tracking = finite_or(props.tracking, 0.0);
+    // `Outline::default`.
+    if let Some(outline) = props.outline.as_mut() {
+        outline.width = bounded(outline.width, 0.0, f64::MAX, 2.0);
+        outline.color = clamp_color(outline.color, [0.0, 0.0, 0.0, 1.0]);
+    }
+    // `Backdrop::default`.
+    if let Some(backdrop) = props.backdrop.as_mut() {
+        backdrop.color = clamp_color(backdrop.color, [0.0, 0.0, 0.0, 0.6]);
+        backdrop.padding = bounded(backdrop.padding, 0.0, f64::MAX, 12.0);
+        backdrop.radius = bounded(backdrop.radius, 0.0, f64::MAX, 8.0);
+    }
+    // A NaN width is `TextProps::default`'s `None`, a single line; any
+    // other is kept above 0, the bound `check_text` holds.
+    props.width = match props.width {
+        Some(width) if width.is_nan() => None,
+        Some(width) => Some(width.clamp(f64::MIN_POSITIVE, f64::MAX)),
+        None => None,
+    };
+    // `WordStyle::default`'s scale and dim, `WordStyle::template`'s colours
+    // and `ActivePill::default`'s plate.
+    if let Some(style) = props.word_style.as_mut() {
+        style.active_scale = bounded(style.active_scale, WORD_SCALE_MIN, WORD_SCALE_MAX, 1.0);
+        style.pause_dim = bounded(style.pause_dim, 0.0, 1.0, 0.0);
+        for color in [
+            &mut style.active_color,
+            &mut style.spoken_color,
+            &mut style.upcoming_color,
+        ] {
+            if let Some(c) = color.as_mut() {
+                *c = clamp_color(*c, [1.0, 1.0, 1.0, 1.0]);
+            }
+        }
+        if let Some(pill) = style.active_pill.as_mut() {
+            pill.color = clamp_color(pill.color, [0.55, 0.27, 0.93, 1.0]);
+            pill.padding = bounded(pill.padding, 0.0, f64::MAX, 0.2);
+            pill.radius = bounded(pill.radius, 0.0, f64::MAX, 0.25);
+        }
     }
     props
 }

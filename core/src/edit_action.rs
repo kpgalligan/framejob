@@ -404,9 +404,9 @@ impl Project {
     /// the group's name in it and the value sent. What it does NOT do is
     /// range-check — the state a clip interpolates toward may legitimately
     /// name a value no stored group could hold, and `actions_clamp.rs`'s
-    /// `clamp_video` bounds the evaluated value instead (spec §5.4); a
-    /// graphic prop's end is the exception, checked against the op's
-    /// `schema` (G-34 (c)).
+    /// `clamp_video`, `clamp_audio` and `clamp_text` bound the evaluated
+    /// value instead (spec §5.4); a graphic prop's end is the exception,
+    /// checked against the op's `schema` (G-34 (c)).
     ///
     /// A `null` is the one value the walk lets past at any depth, because
     /// here it is a REMOVAL rather than a clear.

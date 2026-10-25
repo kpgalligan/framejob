@@ -494,6 +494,11 @@ impl Project {
         if props.muted {
             return 0.0;
         }
+        // The NaN branch is unreachable defence: JSON carries no NaN, a
+        // base volume out of range is refused by `check_audio`, and the
+        // actions path has already run `clamp_audio`, which maps NaN to 1.
+        // Its 0 is the gain of a silenced clip, a different question from
+        // a prop's neutral.
         let mut gain = if props.volume.is_finite() {
             props.volume.clamp(0.0, MAX_GAIN)
         } else {

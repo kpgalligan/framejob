@@ -16,7 +16,7 @@
 //! `Ducker` is re-exported by `audio.rs`, so `crate::audio::Ducker` — the
 //! path `evaluate.rs` names — still resolves.
 
-use crate::audio::{covers, Side, MAX_GAIN};
+use crate::audio::{covers, Side};
 use crate::model::{Duck, Project};
 use crate::nest::Instance;
 use crate::time::Ticks;
@@ -53,7 +53,9 @@ pub(crate) fn duck_gain(ducker: &Ducker, t: Ticks, side: Side) -> f64 {
     if !level.is_finite() {
         return 1.0;
     }
-    let level = level.clamp(0.0, MAX_GAIN);
+    // The vocabulary's 0..1 (`check_audio`'s `audio.duck.level`, and
+    // `clamp_audio`'s matching bound): a duck lowers, it never boosts.
+    let level = level.clamp(0.0, 1.0);
     // Negative lengths are meaningless; treat them as instantaneous rather
     // than dividing by them.
     let attack = ducker.duck.attack.max(0);
