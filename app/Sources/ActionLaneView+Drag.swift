@@ -100,23 +100,11 @@ extension ActionLaneView {
     /// over a zero-length band, which a press will not move.
     func addBandCursorRects() {
         guard let clip = clip else { return }
-        let grip = ActionBands.grip
         for band in bandRects() {
             guard let action = clip.actions.first(where: { $0.id == band.id }),
                   action.duration > 0
             else { continue }
-            let rect = band.rect
-            guard rect.width > grip * 3 else {
-                addCursorRect(rect, cursor: .openHand)
-                continue
-            }
-            addCursorRect(rect.insetBy(dx: grip, dy: 0), cursor: .openHand)
-            addCursorRect(
-                CGRect(x: rect.minX, y: rect.minY, width: grip, height: rect.height),
-                cursor: .resizeLeftRight)
-            addCursorRect(
-                CGRect(x: rect.maxX - grip, y: rect.minY, width: grip, height: rect.height),
-                cursor: .resizeLeftRight)
+            addGripCursorRects(band.rect)
         }
     }
 

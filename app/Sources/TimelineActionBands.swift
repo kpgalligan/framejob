@@ -33,13 +33,18 @@ extension TimelineContentView {
     /// The action whose band holds `point` — the LANE only, so a press on the
     /// clip body below it is still the clip. `hit(at:)` asks after the fade
     /// handles, which on an audio-only clip sit inside this lane and are
-    /// painted over it, and before the edge grabs.
+    /// painted over it, and before the edge grabs. Where bands overlap (the
+    /// 2 pt minimum width, or a hand-written project) the LAST holding the
+    /// point in `ActionBands.ordered` order wins, because bands paint in that
+    /// order and it is the one on top — the Clip tab lane's `bandHit` rule. A
+    /// zero-length band is never painted here, so unlike the lane it is never
+    /// hit.
     func actionBandHit(_ clip: ClipSnapshot, rect: CGRect, at point: CGPoint) -> UInt32? {
         guard let owner = timeline else { return nil }
         let lane = Self.actionLane(
             content: Self.contentRect(rect), sizeIndex: owner.trackHeightIndex)
         guard lane.height > 0, lane.contains(point) else { return nil }
-        return clip.actions.first { action in
+        return ActionBands.ordered(clip).last { action in
             action.duration > 0
                 && Self.bandRect(action, clip: clip, lane: lane, layout: owner.layout)
                     .contains(point)

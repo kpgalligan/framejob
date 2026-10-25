@@ -323,6 +323,29 @@ if let document = opened("shapes"), let clip = document.project.snapshot.clip(2)
               inside == 10 && below == nil && lane.height == DS.actionLaneHeights[size],
               "lane \(lane), band \(band), inside \(describe(inside)), below \(describe(below))")
     }
+    // Overlapping bands: a 1-tick action is drawn 2 pt wide, so it reaches
+    // over the next band's start. The press takes the band painted ON TOP —
+    // the last in `ActionBands.ordered` — and never the zero-length one.
+    timeline.trackHeightIndex = 1
+    let layout = timeline.layout
+    let index = document.project.snapshot.tracks.firstIndex { $0.id == clip.track } ?? 0
+    let rect = layout.clipRect(clip, row: layout.row(forTrackIndex: index))
+    let lane = TimelineContentView.actionLane(
+        content: TimelineContentView.contentRect(rect), sizeIndex: 1)
+    let first = ActionSnapshot(id: 30, start: at(1.0), duration: 1)
+    let onTop = ActionSnapshot(id: 31, start: at(1.0) + 1, duration: second)
+    let empty = ActionSnapshot(id: 32, start: at(1.0) + 1, duration: 0)
+    let overlapped = ClipSnapshot(
+        id: clip.id, track: clip.track, start: clip.start, duration: clip.duration,
+        source: clip.source, video: clip.video, actions: [first, onTop, empty])
+    let a = TimelineContentView.bandRect(first, clip: overlapped, lane: lane, layout: layout)
+    let b = TimelineContentView.bandRect(onTop, clip: overlapped, lane: lane, layout: layout)
+    let press = CGPoint(x: (b.minX + a.maxX) / 2, y: lane.midY)
+    let hit = timeline.content.actionBandHit(overlapped, rect: rect, at: press)
+    check("S5 overlapping bands: actionBandHit answers the band painted on top (31), not "
+            + "model order's first (30), and skips the zero-length band (32)",
+          a.maxX > b.minX && hit == 31,
+          "30 at \(a), 31 at \(b), press \(press), hit \(describe(hit))")
 }
 
 if let document = opened("media") {
@@ -409,6 +432,32 @@ if let (document, controller) = editor("shapes", select: [2]) {
     }
     check("S6 selecting an action parks the playhead at its end",
           document.playhead == at(2.0), "\(document.playhead)")
+}
+
+// MARK: - S7 a canvas re-click
+
+let reclick = "S7 a re-click of the already selected clip on the canvas switches the inspector to Clip"
+if let (document, controller) = editor("move", select: [2]) {
+    controller.setPlayhead(at(2.5))
+    spin(0.3)
+    if let inspector = controller.inspector, let canvas = controller.previewCanvas,
+        canvas.canvasFrame.width > 2, let box = canvas.box(for: 2)
+    {
+        inspector.select(.document)
+        let before = inspector.tab
+        let centre = canvas.canvasToView(CGPoint(x: box.bounds.midX, y: box.bounds.midY))
+        canvas.beginGesture(at: centre, flags: [], clicks: 1)
+        canvas.endGesture(at: centre, flags: [])
+        spin(0.3)
+        let after = inspector.tab
+        check(reclick,
+              before == .document && after == .clip && document.selection == [2]
+                && canvas.moving == nil,
+              "before \(before), after \(after), selection \(document.selection), "
+                + "moving \(canvas.moving != nil), at \(centre)")
+    } else {
+        check(reclick, false, "no inspector, no canvas frame, or no box for clip 2")
+    }
 }
 
 let answer: [String: Any] = ["rows": rows]

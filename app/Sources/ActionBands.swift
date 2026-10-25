@@ -161,3 +161,24 @@ enum ActionBands {
         }
     }
 }
+
+extension NSView {
+    /// A band's cursor rects, the timeline's and the Clip tab lane's alike:
+    /// `.openHand` over the body and `.resizeLeftRight` over the two
+    /// `ActionBands.grip`-wide ends; a band too narrow for both grips and a
+    /// body is all `.openHand`. Which bands get them is the caller's.
+    func addGripCursorRects(_ band: CGRect) {
+        let grip = ActionBands.grip
+        guard band.width > grip * 3 else {
+            addCursorRect(band, cursor: .openHand)
+            return
+        }
+        addCursorRect(band.insetBy(dx: grip, dy: 0), cursor: .openHand)
+        addCursorRect(
+            CGRect(x: band.minX, y: band.minY, width: grip, height: band.height),
+            cursor: .resizeLeftRight)
+        addCursorRect(
+            CGRect(x: band.maxX - grip, y: band.minY, width: grip, height: band.height),
+            cursor: .resizeLeftRight)
+    }
+}

@@ -3760,7 +3760,7 @@ moved with the pass, in place and dated: `phase8_chrome.py` section 7 told
 the find band's hairlines from the search field by the field's rounded
 corners, and now excludes the square field's box by position (150/150).
 
-**The selected action** — `python3 tools/proof/clip_inspector_proof.py` (and `--mutant entry`, exit 0 when only S1 fails): road map 9 phase 1's probe rows S1–S6 and five harness rows over the harness's thirteenth argument, `selectAction`, with the expected inks converted into the PNG's own colour space by the probe's `--convert`; road map 9 §2 is the record.
+**The selected action** — `python3 tools/proof/clip_inspector_proof.py` (and `--mutant entry`, exit 0 when only S1 fails, in a copy whose `syncSelectedAction` ignores `lastInsideAction`; `--mutant topband`, exit 0 when only S5's overlapping-bands row fails, in a copy whose `actionBandHit` takes model order's first band; `--mutant reclick`, exit 0 when only S7 fails, in a copy whose canvas `selectClip` returns before telling its owner of an unchanged selection): road map 9 phase 1's probe rows S1–S7 — S5 includes overlapping bands, where the band painted on top wins and a zero-length band is never hit, and S7 is a canvas re-click of the already selected clip switching the inspector to Clip (#354) — and five harness rows over the harness's thirteenth argument, `selectAction`, with the expected inks converted into the PNG's own colour space by the probe's `--convert`; road map 9 §2 is the record.
 
 Road map 9's phase 2 took a FOURTEENTH argument, appended after
 `selectAction` in the shape phase 3 set, so every earlier call's argument

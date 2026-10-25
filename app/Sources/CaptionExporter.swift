@@ -105,10 +105,9 @@ enum CaptionExporter {
         /// unique nor fixed (`edit_track.rs` accepts any name and a track is
         /// renamed from its header, so two imported caption tracks renamed
         /// alike are ordinary), and two rows a person cannot tell apart are
-        /// not a choice. It also keeps the row TITLES distinct, which
-        /// `NSPopUpButton` requires of anything it is asked to list —
-        /// `addItem(withTitle:)` REMOVES an existing row with the same title
-        /// before adding the new one.
+        /// not a choice. It also keeps the row TITLES distinct, though the
+        /// popup's rows are `NSMenuItem`s carrying the track, so a repeated
+        /// title could no longer drop a row as `addItem(withTitle:)` would.
         var menuTitle: String { "\(name) — \(cues) cue\(cues == 1 ? "" : "s") (track \(track))" }
     }
 
@@ -369,16 +368,18 @@ private final class CaptionExportOptions: NSObject {
         self.stem = stem
 
         for candidate in candidates {
-            trackPopup.addItem(withTitle: candidate.menuTitle)
-            // The row carries the TRACK, never its position in the list.
-            // `NSPopUpButton.addItem(withTitle:)` removes an existing row with
-            // the same title before adding the new one — measured: three rows
-            // two of which read alike come back as two — so a popup indexed by
+            // The row is an `NSMenuItem` carrying the TRACK, never its
+            // position in the list: `NSPopUpButton.addItem(withTitle:)`
+            // removes an existing row with the same title before adding the
+            // new one — measured: three rows two of which read alike come
+            // back as two — so a popup built that way and indexed by
             // `indexOfSelectedItem` would hand the exporter a different track
             // than the one the row named and report the write as a success.
-            // `menuTitle` keeps the titles distinct so nothing is dropped;
-            // this makes the mapping right whatever the titles do.
-            trackPopup.lastItem?.representedObject = candidate.track
+            // `menuTitle` keeps the titles distinct; this makes the mapping
+            // right whatever the titles do.
+            let item = NSMenuItem(title: candidate.menuTitle, action: nil, keyEquivalent: "")
+            item.representedObject = candidate.track
+            trackPopup.menu?.addItem(item)
         }
         trackPopup.font = DS.sans(13)
         trackPopup.selectItem(at: 0)

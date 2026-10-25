@@ -166,6 +166,18 @@ fn exact_half_frames_signed_motion_and_zero_clamp() {
             answer: TickAnswer::Applied(vec![("/clips/0/actions/0/start", json!(0))]),
         });
         execute(TickCase {
+            label: "negative action start names what the caller sent",
+            argument: "at",
+            project: p.clone(),
+            op: json!({"op":"add_action","clip":10,
+                "at":-frame*7/5,"duration":5*frame}),
+            answer: TickAnswer::Error(if frame == 20_000 {
+                "action start must not be negative, not -28000"
+            } else {
+                "action start must not be negative, not -28028"
+            }),
+        });
+        execute(TickCase {
             label: "negative transition duration",
             argument: "duration",
             project: vectors::pair(fps, frame),

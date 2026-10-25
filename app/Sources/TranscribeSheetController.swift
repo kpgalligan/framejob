@@ -228,11 +228,12 @@ final class TranscribeSheetController: NSViewController {
     }
 
     /// The row's own language, read off the item rather than counted off the
-    /// list: `NSPopUpButton.addItem(withTitle:)` REMOVES an existing row with
-    /// the same title before adding the new one, and two locales can localize
-    /// to one display name, so an index into `languages` can name a different
-    /// language than the row the person clicked. `CaptionExporter`'s track
-    /// popup carries the same guard for the same reason.
+    /// list: two locales can localize to one display name, and the rows are
+    /// `NSMenuItem`s because `NSPopUpButton.addItem(withTitle:)` would REMOVE
+    /// an existing row with the same title before adding the new one — so an
+    /// index into `languages` could name a different language than the row
+    /// the person clicked. `CaptionExporter`'s track popup carries the same
+    /// guard for the same reason (app/CLAUDE.md's popup rule).
     var language: Transcriber.Language? {
         guard let identifier = languagePopup.selectedItem?.representedObject as? String else {
             return languages.first
@@ -250,8 +251,9 @@ final class TranscribeSheetController: NSViewController {
         // an agent call out of this key). An absent or unknown value is the
         // on-device engine, which is what every build before this one did.
         for engine in TranscriptionEngine.allCases {
-            enginePopup.addItem(withTitle: engine.displayName)
-            enginePopup.lastItem?.representedObject = engine.rawValue
+            let item = NSMenuItem(title: engine.displayName, action: nil, keyEquivalent: "")
+            item.representedObject = engine.rawValue
+            enginePopup.menu?.addItem(item)
         }
         let remembered = defaults.string(forKey: TranscriptionEngine.defaultsKey)
         if let index = enginePopup.itemArray.firstIndex(where: {

@@ -709,9 +709,9 @@ the key map behind it.
   the band hit — `actionHit`, which `hit(at:)` asks AFTER the fade handles,
   since on an audio-only clip they sit inside the lane, and BEFORE the edge
   grabs, answering `.actionEdge` in a band's grip and `.action` in its body
-  over the unchanged `actionBandHit` — the selected span's wash down the
-  body and its shade on the ruler) · `TimelineActionDrag.swift` (spec §11
-  CI-11: the band drag's begin/continue/end bodies, the hover, the cursor
+  over `actionBandHit`, where the band painted on top (last in time
+  order) wins — the selected span's wash down the body and its shade on
+  the ruler) · `TimelineActionDrag.swift` (spec §11 CI-11: the band drag's begin/continue/end bodies, the hover, the cursor
   rects and the ghost with its HUD; `TimelineView.swift` keeps
   `actionDrag`, `bandHover`, one arm per gesture phase, a draw call, a
   cursor call and three one-line overrides on `TimelineContentView`).
@@ -719,8 +719,9 @@ the key map behind it.
   time order (an action's NUMBER is its index there plus one), the label's
   keys (`graphic.props` keys included, and `speed`, SR-21 (d)), the zoom test (an empty
   `graphic.props` does not stop `isZoom`; an end naming `speed` does), the 5 pt `grip` and `gripEdge` (none on a band 15 pt
-  wide or less), `curvePath`, and the ONE band painter — hover and grips
-  are its `hovered:` argument, never a second painter.
+  wide or less), `curvePath`, the band cursor rects `addGripCursorRects`
+  (both lanes' drags), and the ONE band painter — hover and grips are its
+  `hovered:` argument, never a second painter.
   `ActionDragSession.swift` is the ONE session both lanes drag a band with,
   in clip time: frame snap, the two walls the core's refusals name, one
   `set_action` of start AND duration per tick, "Move Action" / "Resize

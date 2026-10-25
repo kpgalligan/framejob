@@ -179,8 +179,9 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         // index — app/CLAUDE.md's popup rule, and `CaptionExporter`'s.
         regionPopup.menu?.autoenablesItems = false
         for region in AssemblyAIConfiguration.Region.allCases {
-            regionPopup.addItem(withTitle: region.displayName)
-            regionPopup.lastItem?.representedObject = region.rawValue
+            let item = NSMenuItem(title: region.displayName, action: nil, keyEquivalent: "")
+            item.representedObject = region.rawValue
+            regionPopup.menu?.addItem(item)
         }
         regionPopup.font = DS.sans(13)
         regionPopup.target = self

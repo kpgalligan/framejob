@@ -60,32 +60,40 @@ extension TranscribeSheetController {
             // `language_code`, and it is the row the card opens on: a person
             // who has not said which language they are speaking is better
             // served by the service's own answer than by this Mac's locale.
-            languagePopup.addItem(withTitle: "Detect automatically")
-            languagePopup.lastItem?.representedObject = ""
+            let detect = NSMenuItem(title: "Detect automatically", action: nil, keyEquivalent: "")
+            detect.representedObject = ""
+            languagePopup.menu?.addItem(detect)
             for entry in AssemblyAILanguages.all {
-                languagePopup.addItem(withTitle: entry.displayName)
-                languagePopup.lastItem?.representedObject = entry.code
+                let item = NSMenuItem(title: entry.displayName, action: nil, keyEquivalent: "")
+                item.representedObject = entry.code
+                languagePopup.menu?.addItem(item)
             }
             languagePopup.selectItem(at: 0)
             return
         }
         for language in languages {
-            languagePopup.addItem(
-                withTitle: language.installed
-                    ? language.displayName : "\(language.displayName) — not installed")
+            let item = NSMenuItem(
+                title: language.installed
+                    ? language.displayName : "\(language.displayName) — not installed",
+                action: nil, keyEquivalent: "")
             // The identifier, not the row's position — see `language`.
-            languagePopup.lastItem?.representedObject = language.identifier
+            item.representedObject = language.identifier
+            languagePopup.menu?.addItem(item)
         }
         if languages.isEmpty {
-            languagePopup.addItem(withTitle: "No on-device language")
+            let none = NSMenuItem(title: "No on-device language", action: nil, keyEquivalent: "")
+            languagePopup.menu?.addItem(none)
             languagePopup.item(at: 0)?.isEnabled = false
             languagePopup.isEnabled = false
+            languagePopup.selectItem(at: 0)
         } else if let preferred = Transcriber.defaultLanguage(in: languages),
             let index = languagePopup.itemArray.firstIndex(where: {
                 $0.representedObject as? String == preferred.identifier
             })
         {
             languagePopup.selectItem(at: index)
+        } else {
+            languagePopup.selectItem(at: 0)
         }
     }
 

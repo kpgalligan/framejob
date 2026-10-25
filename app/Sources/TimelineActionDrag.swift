@@ -81,7 +81,6 @@ extension TimelineContentView {
     /// `.openHand` over a band's body and `.resizeLeftRight` over its grips,
     /// for the bands a press can drag: unlocked tracks, positive lengths.
     func addActionBandCursorRects(owner: TimelineView, layout: TimelineLayout, visible: CGRect) {
-        let grip = ActionBands.grip
         for (index, track) in owner.snapshot.tracks.enumerated() where !track.locked {
             let row = layout.row(forTrackIndex: index)
             for clip in owner.snapshot.clips(onTrack: track.id) {
@@ -91,18 +90,8 @@ extension TimelineContentView {
                     content: Self.contentRect(rect), sizeIndex: owner.trackHeightIndex)
                 guard lane.height > 0 else { continue }
                 for action in clip.actions where action.duration > 0 {
-                    let band = Self.bandRect(action, clip: clip, lane: lane, layout: layout)
-                    guard band.width > grip * 3 else {
-                        addCursorRect(band, cursor: .openHand)
-                        continue
-                    }
-                    addCursorRect(band.insetBy(dx: grip, dy: 0), cursor: .openHand)
-                    addCursorRect(
-                        CGRect(x: band.minX, y: band.minY, width: grip, height: band.height),
-                        cursor: .resizeLeftRight)
-                    addCursorRect(
-                        CGRect(x: band.maxX - grip, y: band.minY, width: grip, height: band.height),
-                        cursor: .resizeLeftRight)
+                    addGripCursorRects(
+                        Self.bandRect(action, clip: clip, lane: lane, layout: layout))
                 }
             }
         }

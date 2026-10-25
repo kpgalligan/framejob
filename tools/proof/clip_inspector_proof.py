@@ -2,16 +2,18 @@
 """Road map 9, phase 1 — the selected action, the action lane, the bands.
 
     python3 tools/proof/clip_inspector_proof.py
-    python3 tools/proof/clip_inspector_proof.py --mutant entry
+    python3 tools/proof/clip_inspector_proof.py --mutant entry|topband|reclick
 
 Two instruments, `sharp_chrome.py`'s shape:
 
 * **the probe**, `clip_inspector_probe.swift`, compiled AS `main.swift` over
   every file in `app/Sources` but the app's own `main.swift` on
   `swift_build.py`'s line (a probe that will not build is a scored
-  FAILURE, never an exit). Rows S1–S6: the entry rule, a selection change,
+  FAILURE, never an exit). Rows S1–S7: the entry rule, a selection change,
   removal and a two-clip selection, the binding's END-state reads and its
-  routing, the band hit against the fade handles, the Clip tab's lane.
+  routing, the band hit against the fade handles and overlapping bands (the
+  one painted on top wins), the Clip tab's lane, and a canvas re-click of the
+  already selected clip switching the inspector to Clip.
 * **the harness**, the editor at 1440 × 862, dark, M, one shape card of 6 s
   (`e2_chrome.clip`, so the tint under the lane is `DS.clipShape` exactly)
   with two linear actions of at least 1 s — 0.5–1.5 s and 2.5–4.0 s — the
@@ -20,10 +22,19 @@ Two instruments, `sharp_chrome.py`'s shape:
   sampled at (maxX − 2, maxY − 2), which the painter keeps clear of the
   number, the glyph and the curve.
 
-`--mutant entry` builds the probe over a COPY of `app/Sources` whose
-`syncSelectedAction` ignores `lastInsideAction` (every sync selects the span
-under the playhead). Exit 0 means an S1 row FAILED in the copy and no other
-row did — the entry rule is what S1 measures, and only S1.
+`--mutant <mode>` builds the probe over a COPY of `app/Sources` with one
+decision undone, and exit 0 means exactly the rows that decision answers
+FAILED in the copy and no other row did:
+
+* `entry` — `syncSelectedAction` ignores `lastInsideAction` (every sync
+  selects the span under the playhead); the S1 rows fail.
+* `topband` — `actionBandHit` takes the first band in model order, not the
+  one painted on top; the S5 overlapping-bands row fails.
+* `reclick` — the canvas's `selectClip` returns before telling its owner when
+  the selection did not change; the S7 row fails.
+
+An anchor that does not occur exactly once in its file is `MUTANT FAILURE`,
+exit 2.
 """
 
 import json
@@ -59,8 +70,36 @@ CLIP_SECONDS = 6
 ACTIONS = [(0.5, 1.5), (2.5, 4.0)]        # the second is selected
 PLAYHEAD = 5
 
-MUTANT_FILE = "ProjectDocument+SelectedAction.swift"
-MUTANT_ANCHOR = "        guard under != lastInsideAction else { return }\n"
+OVERLAP_ROW = "S5 overlapping bands"
+RECLICK_ANCHOR = (
+    "        if next != selection {\n"
+    "            selection = next\n"
+    "            overlay.needsDisplay = true\n"
+    "        }\n"
+    "        onSelectionChanged?(next)\n")
+RECLICK_MUTANT = (
+    "        guard next != selection else { return }\n"
+    "        selection = next\n"
+    "        onSelectionChanged?(next)\n"
+    "        overlay.needsDisplay = true\n")
+
+# mode → (file, anchor, replacement, what the copy does, the rows it must fail)
+MUTANTS = {
+    "entry": (
+        "ProjectDocument+SelectedAction.swift",
+        "        guard under != lastInsideAction else { return }\n", "",
+        "syncSelectedAction ignores lastInsideAction",
+        lambda name: name.startswith("S1 ")),
+    "topband": (
+        "TimelineActionBands.swift",
+        "ActionBands.ordered(clip).last {", "clip.actions.first {",
+        "actionBandHit takes model order's first band",
+        lambda name: name.startswith(OVERLAP_ROW)),
+    "reclick": (
+        "PreviewCanvasView.swift", RECLICK_ANCHOR, RECLICK_MUTANT,
+        "the canvas's selectClip swallows a re-click",
+        lambda name: name.startswith("S7 ")),
+}
 
 RESULTS = []
 
@@ -165,7 +204,8 @@ def build_probe(sources, out):
 
 
 def probe_checks(sources, out, paths):
-    print("\n1 — the probe: S1 entry, S2 selection, S3 removal, S4 binding, S5 hits, S6 lane")
+    print("\n1 — the probe: S1 entry, S2 selection, S3 removal, S4 binding, S5 hits, S6 lane, "
+          "S7 re-click")
     binary, error = build_probe(sources, out)
     check("the probe builds over app/Sources", binary is not None, error or "")
     if binary is None:
@@ -183,8 +223,8 @@ def probe_checks(sources, out, paths):
         return binary
     with open(answer) as f:
         rows = json.load(f)["rows"]
-    check("the probe answers every S-row (S1–S6 present)",
-          all(any(r["name"].startswith(f"S{n} ") for r in rows) for n in range(1, 7)),
+    check("the probe answers every S-row (S1–S7 present)",
+          all(any(r["name"].startswith(f"S{n} ") for r in rows) for n in range(1, 8)),
           f"{len(rows)} rows")
     for row in rows:
         check(row["name"], row["ok"], "" if row["ok"] else row["detail"])
@@ -337,40 +377,42 @@ def harness_checks(chrome, probe):
 # ---------------------------------------------------------------------------
 
 
-def mutant():
+def mutant(mode):
     began = time.time()
-    with tempfile.TemporaryDirectory(prefix="framejob-clip-inspector-entry-") as temp:
+    file, anchor, replacement, note, expected = MUTANTS[mode]
+    with tempfile.TemporaryDirectory(prefix=f"framejob-clip-inspector-{mode}-") as temp:
         sources = os.path.join(temp, "Sources")
         shutil.copytree(os.path.join(ROOT, "app", "Sources"), sources)
-        path = os.path.join(sources, MUTANT_FILE)
+        path = os.path.join(sources, file)
         with open(path) as f:
             text = f.read()
-        if text.count(MUTANT_ANCHOR) != 1:
-            print(f"MUTANT FAILURE: the anchor occurs {text.count(MUTANT_ANCHOR)} times")
+        if text.count(anchor) != 1:
+            print(f"MUTANT FAILURE: {mode} — the anchor occurs {text.count(anchor)} times "
+                  f"in {file}")
             return 2
         with open(path, "w") as f:
-            f.write(text.replace(MUTANT_ANCHOR, ""))
-        print(f"MUTANT entry: syncSelectedAction ignores lastInsideAction, in {sources}")
+            f.write(text.replace(anchor, replacement))
+        print(f"MUTANT {mode}: {note}, in {sources}")
         paths = packages()
         del paths["chrome"]
         probe_checks(sources, os.path.join(temp, "out"), paths)
     built = bool(RESULTS) and RESULTS[0][1]
     failed = [n for n, ok in RESULTS if not ok]
-    s1 = [n for n in failed if n.startswith("S1 ")]
-    others = [n for n in failed if not n.startswith("S1 ")]
+    wanted = [n for n in failed if expected(n)]
+    others = [n for n in failed if not expected(n)]
     elapsed = time.time() - began
-    if built and s1 and not others:
-        print(f"MUTANT PASS: entry — {len(s1)} S1 row(s) FAILED in the copy and nothing "
-              f"else did, {elapsed:.0f} s")
+    if built and wanted and not others:
+        print(f"MUTANT PASS: {mode} — {len(wanted)} row(s) it answers FAILED in the copy "
+              f"and nothing else did, {elapsed:.0f} s")
         return 0
-    print(f"MUTANT FAILURE: entry — built {built}, S1 failures {len(s1)}, other failures "
-          f"{others}, {elapsed:.0f} s")
+    print(f"MUTANT FAILURE: {mode} — built {built}, expected failures {len(wanted)}, other "
+          f"failures {others}, {elapsed:.0f} s")
     return 1
 
 
 def main():
-    if len(sys.argv) == 3 and sys.argv[1] == "--mutant" and sys.argv[2] == "entry":
-        return mutant()
+    if len(sys.argv) == 3 and sys.argv[1] == "--mutant" and sys.argv[2] in MUTANTS:
+        return mutant(sys.argv[2])
     if len(sys.argv) != 1:
         sys.exit(__doc__)
     print("Road map 9, phase 1 — the selected action, the lane, the bands")

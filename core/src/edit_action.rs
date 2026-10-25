@@ -273,9 +273,10 @@ impl Project {
         duration: Option<Ticks>,
     ) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
+        let given = at;
         let at = self.snapped(at);
         if at < 0 {
-            return Err(format!("action start must not be negative, not {at}"));
+            return Err(format!("action start must not be negative, not {given}"));
         }
         let duration = match duration {
             None => DEFAULT_ACTION_DURATION,

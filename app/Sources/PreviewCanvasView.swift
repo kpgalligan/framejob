@@ -397,10 +397,11 @@ final class PreviewCanvasView: NSView {
         } else if !next.contains(id) {
             next = [id]
         }
-        guard next != selection else { return }
-        selection = next
+        if next != selection {
+            selection = next
+            overlay.needsDisplay = true
+        }
         onSelectionChanged?(next)
-        overlay.needsDisplay = true
     }
 
     private func clearSelection() {
