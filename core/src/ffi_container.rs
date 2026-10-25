@@ -12,7 +12,7 @@ use std::path::Path;
 use std::ptr;
 
 use crate::container::{Container, RcContainerSample};
-use crate::ffi_util::{boxed, fallible_op, free_boxed, out_string, read_cstr};
+use crate::ffi_util::{boxed, fallible_op, free_boxed, handle_get, handle_json, read_cstr};
 use crate::time::Fps;
 
 /// Opens and indexes the WebM or Matroska file at `path`, read-only. NULL
@@ -43,19 +43,7 @@ pub unsafe extern "C" fn rc_container_open(
 /// string is freed with `rc_string_free`.
 #[no_mangle]
 pub unsafe extern "C" fn rc_container_describe(container: *const Container) -> *mut c_char {
-    if container.is_null() {
-        return ptr::null_mut();
-    }
-    let body = || Ok(unsafe { &*container }.describe().to_string());
-    unsafe {
-        fallible_op(
-            ptr::null_mut(),
-            "describing a container",
-            ptr::null_mut(),
-            body,
-            out_string,
-        )
-    }
+    unsafe { handle_json(container, |c| Some(c.describe().to_string())) }
 }
 
 /// Snaps the video to the grid of `fps_num`/`fps_den` when every frame lies
@@ -88,11 +76,7 @@ pub unsafe extern "C" fn rc_container_retime(
 /// `container` must be NULL or a live handle from [`rc_container_open`].
 #[no_mangle]
 pub unsafe extern "C" fn rc_container_sample_count(container: *const Container, track: u32) -> u64 {
-    if container.is_null() {
-        return 0;
-    }
-    let body = || Ok(unsafe { &*container }.sample_count(track));
-    unsafe { fallible_op(ptr::null_mut(), "counting samples", 0, body, |n| n) }
+    unsafe { handle_get(container, 0, |c| Some(c.sample_count(track))) }
 }
 
 /// Writes the `index`th sample of `track`, in decode order, through `out`;

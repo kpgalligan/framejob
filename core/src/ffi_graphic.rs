@@ -34,8 +34,8 @@ use serde_json::Value;
 use crate::ffi_graphic_pending::{lock, Pending, FROZEN};
 pub use crate::ffi_graphic_pending::{rc_graphic_library_add_asset, rc_graphic_library_new};
 use crate::ffi_util::{
-    boxed, fallible_op, fallible_op_wrapped, free_boxed, out_string, read_bytes, read_cstr,
-    read_opt_cstr, set_message,
+    boxed, fallible_op, fallible_op_wrapped, free_boxed, handle_json, out_string, read_bytes,
+    read_cstr, read_opt_cstr, set_message,
 };
 
 /// A font and asset set being assembled, then the one `Library` it froze
@@ -122,18 +122,10 @@ pub unsafe extern "C" fn rc_graphic_library_add_font(
 /// string is freed with `rc_string_free`.
 #[no_mangle]
 pub unsafe extern "C" fn rc_graphic_library_families(lib: *const RcGraphicLibrary) -> *mut c_char {
-    if lib.is_null() {
-        return ptr::null_mut();
-    }
-    let body = || Ok(Value::from(frozen(unsafe { &*lib }).families().to_vec()).to_string());
     unsafe {
-        fallible_op(
-            ptr::null_mut(),
-            "listing families",
-            ptr::null_mut(),
-            body,
-            out_string,
-        )
+        handle_json(lib, |lib| {
+            Some(Value::from(frozen(lib).families().to_vec()).to_string())
+        })
     }
 }
 
@@ -195,28 +187,19 @@ pub unsafe extern "C" fn rc_graphic_compile(
 /// is freed with `rc_string_free`.
 #[no_mangle]
 pub unsafe extern "C" fn rc_graphic_describe(g: *const RcGraphic) -> *mut c_char {
-    if g.is_null() {
-        return ptr::null_mut();
-    }
-    let body = || {
-        let module = unsafe { &(*g).module };
-        Ok(serde_json::json!({
-            "meta": module.meta(),
-            "schema": module.schema(),
-            "revision": module.revision(),
-            "warnings": module.warnings().iter().map(Diagnostic::to_json).collect::<Vec<_>>(),
-        })
-        .to_string())
-    };
-    unsafe {
-        fallible_op(
-            ptr::null_mut(),
-            "describing",
-            ptr::null_mut(),
-            body,
-            out_string,
+    let describe = |g: &RcGraphic| {
+        let module = &g.module;
+        Some(
+            serde_json::json!({
+                "meta": module.meta(),
+                "schema": module.schema(),
+                "revision": module.revision(),
+                "warnings": module.warnings().iter().map(Diagnostic::to_json).collect::<Vec<_>>(),
+            })
+            .to_string(),
         )
-    }
+    };
+    unsafe { handle_json(g, describe) }
 }
 
 /// The SVG of frame `frame`, `props_json` overlaid on the schema's defaults

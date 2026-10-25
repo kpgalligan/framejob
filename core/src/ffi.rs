@@ -17,7 +17,9 @@ use std::ffi::{c_char, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
-use crate::ffi_util::{boxed, fallible_op, out_string, project_json, read_cstr};
+use crate::ffi_util::{
+    boxed, fallible_op, free_boxed, handle_get, handle_json, out_string, quiet_string, read_cstr,
+};
 use crate::format;
 use crate::model::Project;
 use crate::model_color::normalise_color;
@@ -108,7 +110,7 @@ pub unsafe extern "C" fn rc_project_from_json(
 /// freed. The returned string is freed with [`rc_string_free`].
 #[no_mangle]
 pub unsafe extern "C" fn rc_project_to_json(p: *const Project) -> *mut c_char {
-    unsafe { project_json(p, |project| format::write(project).ok()) }
+    unsafe { handle_json(p, |project| format::write(project).ok()) }
 }
 
 /// Deep-copies the handle. NULL-tolerant.
@@ -119,13 +121,7 @@ pub unsafe extern "C" fn rc_project_to_json(p: *const Project) -> *mut c_char {
 /// [`rc_project_free`].
 #[no_mangle]
 pub unsafe extern "C" fn rc_project_clone(p: *const Project) -> *mut Project {
-    if p.is_null() {
-        return ptr::null_mut();
-    }
-    match catch_unwind(AssertUnwindSafe(|| unsafe { (*p).clone() })) {
-        Ok(copy) => boxed(copy),
-        Err(_) => ptr::null_mut(),
-    }
+    unsafe { handle_get(p, ptr::null_mut(), |project| Some(boxed(project.clone()))) }
 }
 
 /// The project INSIDE nest `nest_id`, as a new handle — the same view an
@@ -189,10 +185,7 @@ pub unsafe extern "C" fn rc_project_scoped(
 /// already been freed; no other pointer to it may be used afterwards.
 #[no_mangle]
 pub unsafe extern "C" fn rc_project_free(p: *mut Project) {
-    if p.is_null() {
-        return;
-    }
-    let _ = catch_unwind(AssertUnwindSafe(|| drop(unsafe { Box::from_raw(p) })));
+    unsafe { free_boxed(p, "freeing a project") }
 }
 
 // ---- time ----------------------------------------------------------------
@@ -292,13 +285,5 @@ pub unsafe extern "C" fn rc_normalise_color(text: *const c_char) -> *mut c_char 
         let text = unsafe { read_cstr(text, "text") }?;
         normalise_color(&text).ok_or_else(|| format!("{text:?} is not a colour"))
     };
-    unsafe {
-        fallible_op(
-            ptr::null_mut(),
-            "normalising a colour",
-            ptr::null_mut(),
-            body,
-            out_string,
-        )
-    }
+    quiet_string("normalising a colour", body)
 }

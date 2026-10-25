@@ -553,7 +553,7 @@ fn the_burn_in_is_placed_as_a_fraction_of_the_canvas_height() {
 fn text_that_is_not_json_answers_null() {
     // NULL is the only answer available: the queries carry no err_out. What
     // this really stands over is the pointer being read INSIDE the closure
-    // `project_json` wraps in catch_unwind — an unwrap outside it would take
+    // `handle_json` wraps in catch_unwind — an unwrap outside it would take
     // the whole test binary down rather than fail one assertion.
     let project = rich(30, 1);
     for bad in ["{", "", "not json", "{\"burn_in_timecode\":", "}{"] {

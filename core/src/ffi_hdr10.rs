@@ -6,10 +6,9 @@
 //! still's whole file, and stores the answer on the media.
 
 use std::ffi::c_char;
-use std::ptr;
 use std::slice;
 
-use crate::ffi_util::{fallible_op, out_string};
+use crate::ffi_util::quiet_string;
 use crate::hdr10;
 use crate::hdr10_still;
 
@@ -55,15 +54,7 @@ pub unsafe extern "C" fn rc_hdr10_peak(
         let read = hdr10::peak(mastering, content_light, sample, length);
         serde_json::to_string(&read).map_err(|e| e.to_string())
     };
-    unsafe {
-        fallible_op(
-            ptr::null_mut(),
-            "reading an HDR10 peak",
-            ptr::null_mut(),
-            body,
-            out_string,
-        )
-    }
+    quiet_string("reading an HDR10 peak", body)
 }
 
 /// The peak `hdr10::av1_peak` reads from an AV1 track whose description
@@ -88,15 +79,7 @@ pub unsafe extern "C" fn rc_hdr10_av1_peak(
         let read = hdr10::av1_peak(config, sample);
         serde_json::to_string(&read).map_err(|e| e.to_string())
     };
-    unsafe {
-        fallible_op(
-            ptr::null_mut(),
-            "reading an AV1 HDR10 peak",
-            ptr::null_mut(),
-            body,
-            out_string,
-        )
-    }
+    quiet_string("reading an AV1 HDR10 peak", body)
 }
 
 /// The peak `hdr10_still::still_peak` reads from a PQ still's whole file
@@ -115,13 +98,5 @@ pub unsafe extern "C" fn rc_hdr10_still_peak(file: *const u8, file_len: usize) -
             .unwrap_or_default();
         serde_json::to_string(&read).map_err(|e| e.to_string())
     };
-    unsafe {
-        fallible_op(
-            ptr::null_mut(),
-            "reading a still's HDR10 peak",
-            ptr::null_mut(),
-            body,
-            out_string,
-        )
-    }
+    quiet_string("reading a still's HDR10 peak", body)
 }

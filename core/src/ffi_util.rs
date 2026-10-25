@@ -1,6 +1,6 @@
-//! Shared plumbing for the FFI shims (`ffi`, `ffi_edit`, `ffi_query`,
-//! `ffi_agent`): error reporting through `err_out`, panic-safe wrappers, and
-//! the string conversions every shim needs. Nothing here is exported through
+//! Shared plumbing for every `ffi*` shim: error reporting through
+//! `err_out`, panic-safe wrappers, the handle getters every handle type
+//! shares, and the string conversions every shim needs. Nothing here is exported through
 //! the C header — these are the helpers the exported functions are built
 //! from, so the conventions (catch_unwind everywhere, NULL tolerance, heap
 //! CString errors freed with `rc_string_free`) live in ONE place.
@@ -9,8 +9,6 @@ use std::ffi::{c_char, CStr, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 use std::slice;
-
-use crate::model::Project;
 
 /// Stores a heap-allocated copy of `msg` through a `char **` out-parameter
 /// (if non-NULL). Interior NUL bytes are replaced so the `CString`
@@ -157,33 +155,45 @@ pub(crate) unsafe fn fallible_op_wrapped<T, R>(
     }
 }
 
-/// Runs a pure query against `p`, returning `default` for NULL input, `None`,
-/// or a panic. The one place the query-or-default mapping is written.
+/// Runs a pure query against the handle `h`, returning `default` for NULL
+/// input, `None`, or a panic. The one place the query-or-default mapping is
+/// written, for every handle type the header hands out.
 ///
 /// # Safety
-/// `p` must be NULL or a valid pointer to a live `Project`.
-pub(crate) unsafe fn project_get<T, F>(p: *const Project, default: T, get: F) -> T
+/// `h` must be NULL or a valid pointer to a live `H`.
+pub(crate) unsafe fn handle_get<H, T, F>(h: *const H, default: T, get: F) -> T
 where
-    F: FnOnce(&Project) -> Option<T>,
+    F: FnOnce(&H) -> Option<T>,
 {
-    if p.is_null() {
+    if h.is_null() {
         return default;
     }
-    let project = unsafe { &*p };
-    match catch_unwind(AssertUnwindSafe(|| get(project))) {
+    let handle = unsafe { &*h };
+    match catch_unwind(AssertUnwindSafe(|| get(handle))) {
         Ok(Some(value)) => value,
         _ => default,
     }
 }
 
-/// A JSON-returning query against `p`: NULL input, `None`, or a panic all
-/// yield NULL.
+/// A JSON-returning query against the handle `h`: NULL input, `None`, or a
+/// panic all yield NULL.
 ///
 /// # Safety
-/// `p` must be NULL or a valid pointer to a live `Project`.
-pub(crate) unsafe fn project_json<F>(p: *const Project, get: F) -> *mut c_char
+/// `h` must be NULL or a valid pointer to a live `H`.
+pub(crate) unsafe fn handle_json<H, F>(h: *const H, get: F) -> *mut c_char
 where
-    F: FnOnce(&Project) -> Option<String>,
+    F: FnOnce(&H) -> Option<String>,
 {
-    unsafe { project_get(p, ptr::null_mut(), |project| get(project).map(out_string)) }
+    unsafe { handle_get(h, ptr::null_mut(), |handle| get(handle).map(out_string)) }
+}
+
+/// A string answer with no message channel: [`fallible_op`] with a NULL
+/// `err_out`, so an `Err` and a caught panic ("internal error: `what`") both
+/// answer NULL and write nothing. Safe, because the one pointer it would
+/// need is the NULL it supplies.
+pub(crate) fn quiet_string(
+    what: &str,
+    body: impl FnOnce() -> Result<String, String>,
+) -> *mut c_char {
+    unsafe { fallible_op(ptr::null_mut(), what, ptr::null_mut(), body, out_string) }
 }

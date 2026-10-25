@@ -28,7 +28,7 @@ use crate::edit;
 use crate::edit_clip_timing::speed_limits;
 use crate::export;
 use crate::ffi_util::{
-    fallible_op, out_string, project_get, project_json, read_cstr, read_opt_cstr,
+    fallible_op, handle_get, handle_json, out_string, quiet_string, read_cstr, read_opt_cstr,
 };
 use crate::model::Project;
 use crate::op_schema;
@@ -43,7 +43,7 @@ use crate::time::Ticks;
 /// freed.
 #[no_mangle]
 pub unsafe extern "C" fn rc_project_duration(p: *const Project) -> i64 {
-    unsafe { project_get(p, 0, |project| Some(project.duration())) }
+    unsafe { handle_get(p, 0, |project| Some(project.duration())) }
 }
 
 /// The composition plan (spec §7.2): what Swift builds an
@@ -57,7 +57,7 @@ pub unsafe extern "C" fn rc_project_duration(p: *const Project) -> i64 {
 /// freed. The returned string is freed with [`crate::ffi::rc_string_free`].
 #[no_mangle]
 pub unsafe extern "C" fn rc_project_composition_plan(p: *const Project) -> *mut c_char {
-    unsafe { project_json(p, |project| Some(project.composition_plan().to_string())) }
+    unsafe { handle_json(p, |project| Some(project.composition_plan().to_string())) }
 }
 
 /// The frame recipe at project time `t` (spec §7.3): the back-to-front
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn rc_project_composition_plan(p: *const Project) -> *mut 
 /// freed. The returned string is freed with [`crate::ffi::rc_string_free`].
 #[no_mangle]
 pub unsafe extern "C" fn rc_project_frame_recipe(p: *const Project, t: i64) -> *mut c_char {
-    unsafe { project_json(p, |project| Some(project.frame_recipe(t).to_string())) }
+    unsafe { handle_json(p, |project| Some(project.frame_recipe(t).to_string())) }
 }
 
 /// [`rc_project_frame_recipe`] with the caller's recipe options (spec §7.3;
@@ -98,9 +98,9 @@ pub unsafe extern "C" fn rc_project_frame_recipe_opts(
     opts_json: *const c_char,
 ) -> *mut c_char {
     unsafe {
-        project_json(p, |project| {
+        handle_json(p, |project| {
             // Read inside the closure so the whole body, pointer read
-            // included, runs under the one catch_unwind project_json owns —
+            // included, runs under the one catch_unwind handle_json owns —
             // `rc_project_snap_candidates` above does the same for the same
             // reason.
             let text = read_opt_cstr(opts_json, "opts_json").ok()?;
@@ -126,7 +126,7 @@ pub unsafe extern "C" fn rc_project_clip_state(
     t: i64,
 ) -> *mut c_char {
     unsafe {
-        project_json(p, |project| {
+        handle_json(p, |project| {
             project.clip_state(clip, t).map(|state| state.to_string())
         })
     }
@@ -143,7 +143,7 @@ pub unsafe extern "C" fn rc_project_clip_state(
 #[no_mangle]
 pub unsafe extern "C" fn rc_project_source_map(p: *const Project, clip: u32) -> *mut c_char {
     unsafe {
-        project_json(p, |project| {
+        handle_json(p, |project| {
             project.source_map(clip).map(|map| map.to_string())
         })
     }
@@ -166,9 +166,9 @@ pub unsafe extern "C" fn rc_project_snap_candidates(
     exclude_clips_json: *const c_char,
 ) -> *mut c_char {
     unsafe {
-        project_json(p, |project| {
+        handle_json(p, |project| {
             // Read inside the closure so the whole body, pointer read
-            // included, runs under the one catch_unwind project_json owns.
+            // included, runs under the one catch_unwind handle_json owns.
             let text = read_opt_cstr(exclude_clips_json, "exclude_clips_json").ok()?;
             let exclude: Vec<u32> = match text {
                 None => Vec::new(),
@@ -228,18 +228,10 @@ pub unsafe extern "C" fn rc_snap_resolve(
 /// [`crate::ffi::rc_string_free`].
 #[no_mangle]
 pub unsafe extern "C" fn rc_op_names() -> *mut c_char {
-    unsafe {
-        fallible_op(
-            ptr::null_mut(),
-            "listing op names",
-            ptr::null_mut(),
-            || {
-                serde_json::to_string(&edit::OP_NAMES[..])
-                    .map_err(|e| format!("op names are not serializable: {e}"))
-            },
-            out_string,
-        )
-    }
+    quiet_string("listing op names", || {
+        serde_json::to_string(&edit::OP_NAMES[..])
+            .map_err(|e| format!("op names are not serializable: {e}"))
+    })
 }
 
 /// Every op's ARGUMENTS as JSON Schema: an object mapping each name
@@ -265,15 +257,9 @@ pub unsafe extern "C" fn rc_op_names() -> *mut c_char {
 /// [`crate::ffi::rc_string_free`].
 #[no_mangle]
 pub unsafe extern "C" fn rc_op_schemas() -> *mut c_char {
-    unsafe {
-        fallible_op(
-            ptr::null_mut(),
-            "listing op schemas",
-            ptr::null_mut(),
-            || Ok(op_schema::op_schemas().to_string()),
-            out_string,
-        )
-    }
+    quiet_string("listing op schemas", || {
+        Ok(op_schema::op_schemas().to_string())
+    })
 }
 
 /// Every number about a clip's speed, as JSON:
@@ -291,15 +277,7 @@ pub unsafe extern "C" fn rc_op_schemas() -> *mut c_char {
 /// [`crate::ffi::rc_string_free`].
 #[no_mangle]
 pub unsafe extern "C" fn rc_speed_limits() -> *mut c_char {
-    unsafe {
-        fallible_op(
-            ptr::null_mut(),
-            "listing speed limits",
-            ptr::null_mut(),
-            || Ok(speed_limits().to_string()),
-            out_string,
-        )
-    }
+    quiet_string("listing speed limits", || Ok(speed_limits().to_string()))
 }
 
 /// The export presets as a JSON array (spec §7.8), in menu order: one row
@@ -313,15 +291,9 @@ pub unsafe extern "C" fn rc_speed_limits() -> *mut c_char {
 /// [`crate::ffi::rc_string_free`].
 #[no_mangle]
 pub unsafe extern "C" fn rc_export_presets() -> *mut c_char {
-    unsafe {
-        fallible_op(
-            ptr::null_mut(),
-            "listing export presets",
-            ptr::null_mut(),
-            || Ok(export::presets().to_string()),
-            out_string,
-        )
-    }
+    quiet_string("listing export presets", || {
+        Ok(export::presets().to_string())
+    })
 }
 
 /// The output sizes the export sheet offers for `preset_id` against the

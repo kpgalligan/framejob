@@ -9,7 +9,7 @@ use std::ptr;
 use std::slice;
 
 use crate::cube::Cube;
-use crate::ffi_util::{boxed, fallible_op, free_boxed, read_bytes};
+use crate::ffi_util::{boxed, fallible_op, free_boxed, handle_get, read_bytes};
 
 /// Parses `len` bytes at `bytes` as a `.cube` file. NULL with the reason
 /// through `err_out` — the parser's lowercase sentence (`line 2:
@@ -39,11 +39,7 @@ pub unsafe extern "C" fn rc_cube_parse(
 /// `cube` must be NULL or a live handle from [`rc_cube_parse`].
 #[no_mangle]
 pub unsafe extern "C" fn rc_cube_size(cube: *const Cube) -> u32 {
-    if cube.is_null() {
-        return 0;
-    }
-    let body = || Ok(unsafe { &*cube }.size());
-    unsafe { fallible_op(ptr::null_mut(), "reading a LUT's size", 0, body, |n| n) }
+    unsafe { handle_get(cube, 0, |cube| Some(cube.size())) }
 }
 
 /// Copies the table, red fastest, into the `count` floats at `out`; false
