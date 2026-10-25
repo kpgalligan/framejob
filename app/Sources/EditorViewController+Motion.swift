@@ -85,11 +85,11 @@ extension EditorViewController {
             let next: MotionProps
             switch slot {
             case .inEdge:
-                next = current.with(inEdge: edge(tag, keeping: current.inEdge))
+                next = current.with { $0.inEdge = edge(tag, keeping: current.inEdge) }
             case .out:
-                next = current.with(out: edge(tag, keeping: current.out))
+                next = current.with { $0.out = edge(tag, keeping: current.out) }
             case .during:
-                next = current.with(during: during(tag, keeping: current.during))
+                next = current.with { $0.during = during(tag, keeping: current.during) }
             }
             ops.append(.setVideo(clips: [clip.id], patch: VideoPatch(motion: .some(next))))
         }
@@ -118,9 +118,9 @@ extension EditorViewController {
     /// The caller's gate has already refused a stranger, as in [`edge`].
     private func during(_ tag: Int, keeping stored: MotionDuring?) -> MotionDuring? {
         guard tag >= 0 else { return nil }
-        let base = stored ?? MotionDuring()
-        return MotionDuring(
-            kind: DuringMotion.allCases[tag], amount: base.amount, period: base.period)
+        var next = stored ?? MotionDuring()
+        next.kind = DuringMotion.allCases[tag]
+        return next
     }
 
     /// The kind the targets agree on in one slot: `.some(kind)` when every

@@ -34,11 +34,12 @@ import AppKit
 extension PreviewCanvasView {
     func fitTextEditor(_ editor: NSTextView, to box: CanvasLayerBox) {
         guard let props = box.clip.text else { return }
-        let typed = props.withContent(editor.string)
+        var typed = props
+        typed.content = editor.string
         styleTextEditor(editor, as: typed, scale: box.video.scale * canvasScale)
         let size = LayerRenderers.measuredSize(for: typed)
         let rect = canvasToView(
-            canvasRect(of: box.clip, in: box.canvas, sourceSize: size, video: box.uncropped)
+            canvasRect(of: box.clip, in: box.canvas, sourceSize: size, video: box.video.uncropped)
                 .insetBy(dx: -2, dy: -2))
         editor.isHorizontallyResizable = false
         editor.isVerticallyResizable = false
@@ -100,17 +101,5 @@ extension PreviewCanvasView {
         storage.addAttributes(attributes, range: whole)
         if attributes[.kern] == nil { storage.removeAttribute(.kern, range: whole) }
         storage.endEditing()
-    }
-}
-
-extension TextProps {
-    /// This description with `content` replaced and every other field kept —
-    /// what `set_text {content}` will make of it.
-    fileprivate func withContent(_ value: String) -> TextProps {
-        TextProps(
-            content: value, font: font, size: size, color: color, align: align,
-            valign: valign, lineSpacing: lineSpacing, tracking: tracking, outline: outline,
-            backdrop: backdrop, width: width, animation: animation, textCase: textCase,
-            words: words, wordStyle: wordStyle)
     }
 }

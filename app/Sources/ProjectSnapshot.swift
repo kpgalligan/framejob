@@ -539,11 +539,11 @@ struct CropInsets: Codable, Equatable {
 /// and the crop, so `Compositor.encodeShadow` scales both by the layer's
 /// scale before it resolves them into canvas-space offsets.
 struct ShadowProps: Codable, Equatable {
-    let color: RGBA
-    let opacity: Double
-    let blur: Double
-    let angle: Double
-    let distance: Double
+    var color: RGBA
+    var opacity: Double
+    var blur: Double
+    var angle: Double
+    var distance: Double
 
     init(
         color: RGBA = [0, 0, 0, 1], opacity: Double = 0.5, blur: Double = 12,
@@ -568,10 +568,10 @@ struct ShadowProps: Codable, Equatable {
 
 /// Chroma key (M3). `key` is a THREE-component colour — no alpha.
 struct ChromaProps: Codable, Equatable {
-    let key: [Double]
-    let tolerance: Double
-    let softness: Double
-    let spill: Double
+    var key: [Double]
+    var tolerance: Double
+    var softness: Double
+    var spill: Double
 
     init(
         key: [Double] = [0, 1, 0], tolerance: Double = 0.2, softness: Double = 0.1,
@@ -621,11 +621,11 @@ struct FilterProps: Codable, Equatable {
 /// a reflection survives a scale change; `gap` is source pixels, like the
 /// corner radius and the crop.
 struct ReflectionProps: Codable, Equatable {
-    let opacity: Double
-    let height: Double
-    let gap: Double
+    var opacity: Double
+    var height: Double
+    var gap: Double
     /// 0 does not fade at all; 1 reaches transparent exactly at `height`.
-    let falloff: Double
+    var falloff: Double
 
     init(opacity: Double = 0.35, height: Double = 0.5, gap: Double = 0, falloff: Double = 1) {
         self.opacity = opacity
@@ -651,17 +651,17 @@ struct ReflectionProps: Codable, Equatable {
 /// the box are SOURCE pixels from the centre of the cropped rect, the same
 /// frame `cornerRadius` and `crop` use.
 struct SpotlightProps: Codable, Equatable {
-    let shape: SpotShape
-    let x: Double
-    let y: Double
-    let width: Double
-    let height: Double
+    var shape: SpotShape
+    var x: Double
+    var y: Double
+    var width: Double
+    var height: Double
     /// Source pixels the edge is blurred over; 0 is a hard edge.
-    let feather: Double
+    var feather: Double
     /// How much darker everything OUTSIDE is; 1 is black.
-    let dim: Double
+    var dim: Double
     /// Magnification inside the region; 1 is none.
-    let zoom: Double
+    var zoom: Double
 
     init(
         shape: SpotShape = .rect, x: Double = 0, y: Double = 0, width: Double = 480,
@@ -708,16 +708,16 @@ struct SpotlightProps: Codable, Equatable {
 /// `SpotShape` rather than a second rect/ellipse enum, for the reason
 /// `ObscureRegion` in `model_regions.rs` gives: shared vocabulary has one home.
 struct ObscureProps: Codable, Equatable {
-    let shape: SpotShape
-    let x: Double
-    let y: Double
-    let width: Double
-    let height: Double
+    var shape: SpotShape
+    var x: Double
+    var y: Double
+    var width: Double
+    var height: Double
     /// Source pixels the effect is ramped in over; 0 is a hard edge.
-    let feather: Double
-    let kind: ObscureKind
+    var feather: Double
+    var kind: ObscureKind
     /// 0 = the region is there but hides nothing, 1 = its full effect.
-    let amount: Double
+    var amount: Double
 
     /// The most one layer may carry — `MAX_OBSCURE` in `model_regions.rs`. The
     /// same shader budget `FilterProps.max` is: the uniform block carries
@@ -766,43 +766,43 @@ struct ObscureProps: Codable, Equatable {
 /// The pixel half of a clip. `x`/`y` are canvas pixels from the canvas
 /// CENTRE, y down; `scale` 1 = native pixels; `rotation` degrees clockwise.
 struct VideoProps: Codable, Equatable {
-    let x: Double
-    let y: Double
-    let scale: Double
-    let rotation: Double
-    let opacity: Double
-    let crop: CropInsets
+    var x: Double
+    var y: Double
+    var scale: Double
+    var rotation: Double
+    var opacity: Double
+    var crop: CropInsets
     /// Rounds the CROPPED rectangle, in source pixels, before rotation.
-    let cornerRadius: Double
-    let shadow: ShadowProps?
-    let color: ColorAdjust
-    let chroma: ChromaProps?
+    var cornerRadius: Double
+    var shadow: ShadowProps?
+    var color: ColorAdjust
+    var chroma: ChromaProps?
     /// Applied in order, at most `FilterProps.max` of them (M3).
-    let filters: [FilterProps]
-    let reflection: ReflectionProps?
-    let spotlight: SpotlightProps?
+    var filters: [FilterProps]
+    var reflection: ReflectionProps?
+    var spotlight: SpotlightProps?
     /// The obscured regions, at most `ObscureProps.max` of them (phase 3c).
     /// An empty list is how they are cleared, which is why this is a plain
     /// array and not an optional.
-    let obscure: [ObscureProps]
+    var obscure: [ObscureProps]
     /// How this layer combines with what is already on the canvas (format
     /// version 6). `.normal` is source-over, so it is both the default and
     /// how a blend is cleared; there is no null form.
-    let blend: BlendMode
+    var blend: BlendMode
     /// What the clip DOES — an entrance, an exit, a continuous motion
     /// (format version 8). Nothing on this side reads it to DRAW: the core
     /// turns a preset into placement inside the recipe, so the inspector and
     /// the canvas see the clip UN-MOVED while the picture moves (spec §5.4),
     /// which is why a drag begun mid-motion starts from the base box.
-    let motion: MotionProps?
+    var motion: MotionProps?
     /// Lift, gamma and gain (spec §11 GR-11, `GradeProps.swift`).
-    let wheels: ColorWheels
+    var wheels: ColorWheels
     /// The tone curves (spec §11 GR-12, `CurveProps.swift`).
-    let curves: ColorCurves
+    var curves: ColorCurves
     /// An adjustment clip's qualifier (spec §11 GR-13, `QualifierProps.swift`).
-    let qualifier: ColorQualifier
+    var qualifier: ColorQualifier
     /// The clip's look (spec §11 GR-7, `LookProps.swift`); nil is none.
-    let look: LookProps?
+    var look: LookProps?
 
     init(
         x: Double = 0, y: Double = 0, scale: Double = 1, rotation: Double = 0,
@@ -879,9 +879,9 @@ struct VideoProps: Codable, Equatable {
 /// By clip extent, never by voice activity — the core folds it into every
 /// other track's envelope.
 struct DuckProps: Codable, Equatable {
-    let level: Double
-    let attack: Ticks
-    let release: Ticks
+    var level: Double
+    var attack: Ticks
+    var release: Ticks
 
     init(level: Double = 0.2, attack: Ticks = 300_000, release: Ticks = 600_000) {
         self.level = level
@@ -903,13 +903,13 @@ struct DuckProps: Codable, Equatable {
 /// the parameters and the DSP happens on this side.
 struct CompressorProps: Codable, Equatable {
     /// dBFS above which gain reduction starts.
-    let thresholdDb: Double
+    var thresholdDb: Double
     /// N:1 — 1 is no compression, 20 is effectively a limiter.
-    let ratio: Double
-    let attack: Ticks
-    let release: Ticks
+    var ratio: Double
+    var attack: Ticks
+    var release: Ticks
     /// dB applied after compression, to win back what it took.
-    let makeupDb: Double
+    var makeupDb: Double
 
     init(
         thresholdDb: Double = -18, ratio: Double = 3, attack: Ticks = 6000,

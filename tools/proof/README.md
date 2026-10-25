@@ -23259,3 +23259,45 @@ python3 tools/proof/speech_cache_probe.py --mutant all
 | `--mutant all` | 7/7 MUTANT PASS, exit 0 |
 | `make gate` | PASS (230 s) |
 | Release run | not applicable: the probe compiles its own binary from `app/Sources` and drives no built app |
+
+## Issue #357 — props edited by copy-and-mutate, tri-state keys through one writer (`props_mutate_proof.py` N1–N17, W1–W9; `props_mutate_probe.swift`)
+
+**The refactor.** The mirror props types' stored properties are `var`, so an inspector row
+edits a COPY of the current value (`var s = current(); s.blur = v`) instead of rebuilding it
+through the defaulted memberwise initialiser, which drops a field it does not spell out.
+Spotlight, Obscure and Gradient take an `edited { … }` closure; `MotionProps.with(_:)` is the
+per-slot copy; `VideoProps.uncropped` replaces the two ten-field rebuilds that zeroed the
+crop and silently dropped every field after `chroma`. The seventeen three-state (`T??`) patch keys are written by
+`Dictionary.putNullable(_:_:_:)` in `OpDictionaries.swift`. No op byte, undo name or refusal
+moves, and the probe is the evidence.
+
+The probe compiles `props_mutate_probe.swift` as `main.swift` over `app/Sources` on
+`swift_build.py`'s line and uses only what the tree had before #357, so `--baseline` builds it
+unchanged over `git archive f1dce3011f951bfea6e5aa20753c331b88d3179c app/Sources app/Bridging`:
+
+- **N1–N17** — one per tri-state key (shadow, chroma, reflection, spotlight, motion, look,
+  duck, compressor, name, label, outline, backdrop, width, animation, stroke, fill, gradient):
+  its patch at `.none`, `.some(nil)` and `.some(v)`, `v` with every field off its default
+  (motion also at `.some(MotionProps())`, still written as null), wrapped in its op on clip 2;
+  the ops' `json` equals literals taken from the probe's output on
+  f1dce3011f951bfea6e5aa20753c331b88d3179c.
+- **W1–W9** — one row write each in Chroma Key (Tolerance), Reflection (Gap), Spotlight
+  (Shape), Obscure (region 1's Center X), Gradient (Kind), Outline (Width), Backdrop
+  (Padding), Reveal (In) and Ducking (Attack), over a clip whose object has every field off
+  its default: the value goes in through the row's own field (`controlTextDidEndEditing`) or
+  popup (its item action), and the one op and undo name `inspector.onEdit` hears equal
+  `binding.ops` of the whole object rebuilt through its memberwise initialiser.
+
+```sh
+python3 tools/proof/props_mutate_proof.py                 # → 28/28, exit 0
+python3 tools/proof/props_mutate_proof.py --baseline f1dce3011f951bfea6e5aa20753c331b88d3179c   # → BASELINE PASS, exit 0
+```
+
+| Run (2026-10-25) | Result |
+|---|---|
+| probe, the changed tree | 28/28, exit 0 |
+| `--baseline f1dce3011f951bfea6e5aa20753c331b88d3179c` | BASELINE PASS (every row), exit 0 |
+| `clip_inspector4_proof.py`, `e2_chrome.py`, `text_edit_proof.py`, `words_picture_probe.py` | 46/46, 52/52, 15/15, 22/22 |
+| `clip_inspector6_proof.py`, Debug then Release | 25/25 and 25/25 |
+| `make gate` | PASS (241 s) |
+| Release run of this probe | not applicable: the probe compiles its own binary from `app/Sources` and drives no built app |

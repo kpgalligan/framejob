@@ -182,3 +182,21 @@ extension Gradient {
         ["kind": kind.rawValue, "stops": stops.map { $0.dictionary }, "angle": angle]
     }
 }
+
+// MARK: - Three-state patch keys
+
+extension Dictionary where Key == String, Value == Any {
+    /// The one writer of a three-state (`T??`) patch key: `nil` leaves the
+    /// key out, `.some(nil)` writes an explicit JSON null (`NSNull`, the
+    /// spelling that clears the field), `.some(v)` writes `encode(v)`.
+    ///
+    /// A name of its own, never an overload of a `put`: optional promotion
+    /// would let a `T??` reach a single-optional `put` and box a nil into
+    /// `Any` (`OpArgs.put` in `ReelOps.swift` says how). The encoded value is
+    /// held as `Any?` so the null is always `NSNull`, never a boxed nil.
+    mutating func putNullable<T>(_ key: String, _ value: T??, _ encode: (T) -> Any) {
+        guard let value else { return }
+        let encoded: Any? = value.map(encode)
+        self[key] = encoded ?? NSNull()
+    }
+}

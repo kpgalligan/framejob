@@ -64,28 +64,14 @@ struct ShapePatch: Equatable {
         if let kind = kind { d["kind"] = kind.rawValue }
         if let width = width { d["width"] = width }
         if let height = height { d["height"] = height }
-        if let stroke = stroke {
-            if let stroke = stroke {
-                d["stroke"] = stroke.dictionary
-            } else {
-                d["stroke"] = NSNull()
-            }
-        }
-        if let fill = fill {
-            if let fill = fill { d["fill"] = fill } else { d["fill"] = NSNull() }
-        }
+        d.putNullable("stroke", stroke) { $0.dictionary }
+        d.putNullable("fill", fill) { $0 }
         if let arrowStart = arrowStart { d["arrow_start"] = arrowStart }
         if let arrowEnd = arrowEnd { d["arrow_end"] = arrowEnd }
         if let radius = radius { d["radius"] = radius }
         if let from = from { d["from"] = from }
         if let to = to { d["to"] = to }
-        if let gradient = gradient {
-            if let gradient = gradient {
-                d["gradient"] = gradient.dictionary
-            } else {
-                d["gradient"] = NSNull()
-            }
-        }
+        d.putNullable("gradient", gradient) { $0.dictionary }
         return d
     }
 

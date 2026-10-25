@@ -647,12 +647,8 @@ final class PreviewCanvasView: NSView {
     /// target's props (what the op merges into, CI-13) rather than the
     /// recipe's evaluated ones — the two differ only once a clip has actions.
     private func startRect(of box: CanvasLayerBox, base: VideoProps) -> CGRect {
-        let uncropped = VideoProps(
-            x: base.x, y: base.y, scale: base.scale, rotation: base.rotation,
-            opacity: base.opacity, crop: .zero, cornerRadius: base.cornerRadius,
-            shadow: base.shadow, color: base.color, chroma: base.chroma)
-        return canvasRect(
-            of: box.clip, in: snapshot.canvas, sourceSize: box.sourceSize, video: uncropped)
+        canvasRect(
+            of: box.clip, in: snapshot.canvas, sourceSize: box.sourceSize, video: base.uncropped)
     }
 
     // MARK: - Keyboard

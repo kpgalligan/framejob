@@ -158,16 +158,7 @@ struct CanvasLayerBox {
     /// The same rectangle with the crop taken out — the crop-mode ghost, and
     /// the box a shape's unit-space endpoints are measured in.
     var uncroppedRect: CGRect {
-        canvasRect(of: clip, in: canvas, sourceSize: sourceSize, video: uncropped)
-    }
-
-    /// `video` with the crop zeroed. Built through the real initializer so a
-    /// property added to `VideoProps` cannot be silently dropped here.
-    var uncropped: VideoProps {
-        VideoProps(
-            x: video.x, y: video.y, scale: video.scale, rotation: video.rotation,
-            opacity: video.opacity, crop: .zero, cornerRadius: video.cornerRadius,
-            shadow: video.shadow, color: video.color, chroma: video.chroma)
+        canvasRect(of: clip, in: canvas, sourceSize: sourceSize, video: video.uncropped)
     }
 
     /// A point in the layer's axis-aligned space, taken into canvas space.

@@ -86,7 +86,9 @@ extension VideoPane {
                     "In", binding, name: "Motion In", items: ["None"] + edges.map(\.displayName),
                     read: { motion().inEdge.map { (edges.firstIndex(of: $0.kind) ?? 0) + 1 } ?? 0 },
                     ops: { index in
-                        perClip { _, m in m.with(inEdge: edge(edgeKind(index), keeping: m.inEdge)) }
+                        perClip { _, m in
+                            m.with { $0.inEdge = edge(edgeKind(index), keeping: m.inEdge) }
+                        }
                     },
                     mixed: { binding.mixedVideo { $0.motion?.inEdge?.kind } }),
                 // 0.1 s to 10 s: a few frames at the short end, and far longer
@@ -97,8 +99,8 @@ extension VideoPane {
                     read: { ReelTime.seconds(motion().inEdge?.duration ?? MotionEdge().duration) },
                     ops: { value in
                         perClip { _, m in
-                            guard let e = m.inEdge else { return nil }
-                            return m.with(inEdge: MotionEdge(kind: e.kind, duration: ticks(value)))
+                            guard m.inEdge != nil else { return nil }
+                            return m.with { $0.inEdge?.duration = ticks(value) }
                         }
                     },
                     mixed: { binding.mixedVideo { $0.motion?.inEdge?.duration } },
@@ -107,7 +109,9 @@ extension VideoPane {
                     "Out", binding, name: "Motion Out", items: ["None"] + edges.map(\.displayName),
                     read: { motion().out.map { (edges.firstIndex(of: $0.kind) ?? 0) + 1 } ?? 0 },
                     ops: { index in
-                        perClip { _, m in m.with(out: edge(edgeKind(index), keeping: m.out)) }
+                        perClip { _, m in
+                            m.with { $0.out = edge(edgeKind(index), keeping: m.out) }
+                        }
                     },
                     mixed: { binding.mixedVideo { $0.motion?.out?.kind } }),
                 // The same range as In Duration, for the same reason.
@@ -117,8 +121,8 @@ extension VideoPane {
                     read: { ReelTime.seconds(motion().out?.duration ?? MotionEdge().duration) },
                     ops: { value in
                         perClip { _, m in
-                            guard let e = m.out else { return nil }
-                            return m.with(out: MotionEdge(kind: e.kind, duration: ticks(value)))
+                            guard m.out != nil else { return nil }
+                            return m.with { $0.out?.duration = ticks(value) }
                         }
                     },
                     mixed: { binding.mixedVideo { $0.motion?.out?.duration } },
@@ -131,14 +135,12 @@ extension VideoPane {
                     },
                     ops: { index in
                         perClip { _, m in
-                            guard index > 0 else { return m.with(during: nil) }
-                            let kind = durings[min(index - 1, durings.count - 1)]
+                            guard index > 0 else { return m.with { $0.during = nil } }
                             // A kind keeps the stored amount and period, else
                             // the core's own defaults (`MotionDuring()`).
-                            let stored = m.during ?? MotionDuring()
-                            return m.with(
-                                during: MotionDuring(
-                                    kind: kind, amount: stored.amount, period: stored.period))
+                            var during = m.during ?? MotionDuring()
+                            during.kind = durings[min(index - 1, durings.count - 1)]
+                            return m.with { $0.during = during }
                         }
                     },
                     mixed: { binding.mixedVideo { $0.motion?.during?.kind } }),
@@ -150,10 +152,8 @@ extension VideoPane {
                     read: { (motion().during?.amount ?? MotionDuring().amount) * 100 },
                     ops: { value in
                         perClip { _, m in
-                            guard let d = m.during else { return nil }
-                            return m.with(
-                                during: MotionDuring(
-                                    kind: d.kind, amount: value / 100, period: d.period))
+                            guard m.during != nil else { return nil }
+                            return m.with { $0.during?.amount = value / 100 }
                         }
                     },
                     mixed: { binding.mixedVideo { $0.motion?.during?.amount } },
@@ -169,10 +169,8 @@ extension VideoPane {
                     },
                     ops: { value in
                         perClip { _, m in
-                            guard let d = m.during else { return nil }
-                            return m.with(
-                                during: MotionDuring(
-                                    kind: d.kind, amount: d.amount, period: ticks(value)))
+                            guard m.during != nil else { return nil }
+                            return m.with { $0.during?.period = ticks(value) }
                         }
                     },
                     mixed: { binding.mixedVideo { $0.motion?.during?.period } },

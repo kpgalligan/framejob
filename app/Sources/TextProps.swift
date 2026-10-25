@@ -43,8 +43,8 @@ enum TextAnimationKind: String, Codable, CaseIterable {
 
 /// A text outline (stroke), in canvas pixels.
 struct OutlineProps: Codable, Equatable {
-    let width: Double
-    let color: RGBA
+    var width: Double
+    var color: RGBA
 
     init(width: Double = 2, color: RGBA = [0, 0, 0, 1]) {
         self.width = width
@@ -60,9 +60,9 @@ struct OutlineProps: Codable, Equatable {
 
 /// The plate drawn behind text.
 struct BackdropProps: Codable, Equatable {
-    let color: RGBA
-    let padding: Double
-    let radius: Double
+    var color: RGBA
+    var padding: Double
+    var radius: Double
 
     init(color: RGBA = [0, 0, 0, 0.6], padding: Double = 12, radius: Double = 8) {
         self.color = color
@@ -99,13 +99,13 @@ struct BackdropProps: Codable, Equatable {
 /// `core/src/model_props.rs`'s `#[serde(rename = "in")]`; the property name
 /// is this side's business alone.
 struct TextAnimation: Codable, Equatable {
-    let kind: TextAnimationKind
+    var kind: TextAnimationKind
     /// How long the reveal takes, from the clip's first frame (the model's
     /// `in`).
-    let inDuration: Ticks
+    var inDuration: Ticks
     /// How long the un-reveal takes, back from the clip's last frame (the
     /// model's `out`).
-    let outDuration: Ticks
+    var outDuration: Ticks
 
     /// The core's own default (`TextAnimation::default`): a one-second
     /// typewriter that does not un-reveal. Mirrored rather than derived, so
@@ -138,34 +138,34 @@ struct TextAnimation: Codable, Equatable {
 /// size — only `LayerRenderers` knows it, and it reports it to the canvas
 /// overlay through a hash-keyed cache (§5.3, §11).
 struct TextProps: Codable, Equatable {
-    let content: String
-    let font: String
-    let size: Double
-    let color: RGBA
+    var content: String
+    var font: String
+    var size: Double
+    var color: RGBA
     /// "left" | "center" | "right".
-    let align: String
+    var align: String
     /// "top" | "middle" | "bottom", within the box.
-    let valign: String
-    let lineSpacing: Double
+    var valign: String
+    var lineSpacing: Double
     /// Letter spacing, in points.
-    let tracking: Double
-    let outline: OutlineProps?
-    let backdrop: BackdropProps?
+    var tracking: Double
+    var outline: OutlineProps?
+    var backdrop: BackdropProps?
     /// Fixed box width in canvas pixels; nil auto-sizes to the content.
-    let width: Double?
+    var width: Double?
     /// How the words arrive and leave, or nil for text that is simply there
     /// for the length of its clip (format version 5). LAST, as it is in the
     /// model, and absent from `LayerRenderers.layoutKey` on purpose: an
     /// animation cannot move a glyph, and a per-frame value in that key
     /// would churn the measured-size cache and walk the overlay's handles.
-    let animation: TextAnimation?
+    var animation: TextAnimation?
     /// Format version 9's three word-caption fields, in the model's order
     /// after `animation` (`core/src/model_text.rs`); their types and what
     /// they mean are `WordProps.swift`'s. `case` is a Swift keyword, so the
     /// property is `textCase` and the model's key lives in `CodingKeys`.
-    let textCase: TextCase
-    let words: [TextWord]
-    let wordStyle: WordStyle?
+    var textCase: TextCase
+    var words: [TextWord]
+    var wordStyle: WordStyle?
 
     private enum CodingKeys: String, CodingKey {
         case content, font, size, color, align, valign, lineSpacing, tracking, outline, backdrop,

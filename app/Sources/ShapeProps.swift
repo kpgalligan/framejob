@@ -6,8 +6,8 @@ import Foundation
 
 /// A shape's stroke.
 struct StrokeProps: Codable, Equatable {
-    let width: Double
-    let color: RGBA
+    var width: Double
+    var color: RGBA
 
     init(width: Double = 6, color: RGBA = [1, 1, 1, 1]) {
         self.width = width
@@ -79,12 +79,12 @@ struct GradientStop: Codable, Equatable {
 /// fragment stage at all, since `LayerRenderers.renderShape` hands the stops
 /// to `CGGradient` on the CPU, which takes as many as it is given.
 struct Gradient: Codable, Equatable {
-    let kind: GradientKind
-    let stops: [GradientStop]
+    var kind: GradientKind
+    var stops: [GradientStop]
     /// Degrees from the RIGHT, counter-clockwise — `ShadowProps.angle`'s
     /// convention, which is the crate's only one. Meaningless for `radial`;
     /// stored all the same, so flipping the kind and back does not lose it.
-    let angle: Double
+    var angle: Double
 
     /// The most stops one gradient may carry — `MAX_GRADIENT_STOPS` in
     /// `model_props.rs`, which NAMES the overflow rather than trimming it.

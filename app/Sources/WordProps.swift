@@ -176,11 +176,9 @@ extension TextProps {
     /// The same description in another fill colour — the key a second
     /// cached layout is drawn from (`frameKey` carries the colour).
     func recolored(_ color: RGBA) -> TextProps {
-        TextProps(
-            content: content, font: font, size: size, color: color, align: align,
-            valign: valign, lineSpacing: lineSpacing, tracking: tracking, outline: outline,
-            backdrop: backdrop, width: width, animation: animation, textCase: textCase,
-            words: words, wordStyle: wordStyle)
+        var next = self
+        next.color = color
+        return next
     }
 }
 

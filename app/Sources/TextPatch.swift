@@ -106,30 +106,10 @@ struct TextPatch: Codable, Equatable {
         if let valign = valign { d["valign"] = valign }
         if let lineSpacing = lineSpacing { d["line_spacing"] = lineSpacing }
         if let tracking = tracking { d["tracking"] = tracking }
-        if let outline = outline {
-            if let outline = outline {
-                d["outline"] = outline.dictionary
-            } else {
-                d["outline"] = NSNull()
-            }
-        }
-        if let backdrop = backdrop {
-            if let backdrop = backdrop {
-                d["backdrop"] = backdrop.dictionary
-            } else {
-                d["backdrop"] = NSNull()
-            }
-        }
-        if let width = width {
-            if let width = width { d["width"] = width } else { d["width"] = NSNull() }
-        }
-        if let animation = animation {
-            if let animation = animation {
-                d["animation"] = animation.dictionary
-            } else {
-                d["animation"] = NSNull()
-            }
-        }
+        d.putNullable("outline", outline) { $0.dictionary }
+        d.putNullable("backdrop", backdrop) { $0.dictionary }
+        d.putNullable("width", width) { $0 }
+        d.putNullable("animation", animation) { $0.dictionary }
         if let textCase = textCase { d["case"] = textCase.rawValue }
         if let words = words { d["words"] = words.map { $0.dictionary } }
         if let wordStyle = wordStyle { d["word_style"] = wordStyle.dictionary }

@@ -90,3 +90,14 @@ struct CanvasEditTarget: Equatable {
         return self
     }
 }
+
+extension VideoProps {
+    /// These props with the crop zeroed and every other field kept — the
+    /// rectangle the crop is taken out of (`CanvasLayerBox.uncroppedRect`,
+    /// a session's start rect).
+    var uncropped: VideoProps {
+        var next = self
+        next.crop = .zero
+        return next
+    }
+}

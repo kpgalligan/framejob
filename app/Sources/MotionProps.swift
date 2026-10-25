@@ -93,8 +93,8 @@ enum DuringMotion: String, Codable, CaseIterable {
 /// from the clip's first frame and an `out` back from its last — so
 /// trimming a clip moves the preset with the edge it belongs to.
 struct MotionEdge: Codable, Equatable {
-    let kind: EdgeMotion
-    let duration: Ticks
+    var kind: EdgeMotion
+    var duration: Ticks
 
     /// A zero duration keeps its stored kind but has no render-time effect.
     var isActive: Bool { duration > 0 }
@@ -133,9 +133,9 @@ struct MotionEdge: Codable, Equatable {
 /// doing. `amount` is 0–1 and `period` is one cycle in ticks; `drift`
 /// ignores the period.
 struct MotionDuring: Codable, Equatable {
-    let kind: DuringMotion
-    let amount: Double
-    let period: Ticks
+    var kind: DuringMotion
+    var amount: Double
+    var period: Ticks
 
     /// The core's own default (`MotionDuring::default`): a half-strength
     /// one-second pulse.
@@ -171,11 +171,11 @@ struct MotionDuring: Codable, Equatable {
 /// name is this side's business alone.
 struct MotionProps: Codable, Equatable {
     /// The entrance (the model's `in`).
-    let inEdge: MotionEdge?
+    var inEdge: MotionEdge?
     /// The exit.
-    let out: MotionEdge?
+    var out: MotionEdge?
     /// What the clip does for its whole length.
-    let during: MotionDuring?
+    var during: MotionDuring?
 
     init(inEdge: MotionEdge? = nil, out: MotionEdge? = nil, during: MotionDuring? = nil) {
         self.inEdge = inEdge
@@ -210,21 +210,16 @@ struct MotionProps: Codable, Equatable {
     }
 }
 
-// MARK: - One slot replaced
+// MARK: - A changed copy
 
-/// A copy with ONE slot replaced and the other two kept — the step both the
-/// Motion section and Clip ▸ Motion take per clip, because a `motion` patch
-/// replaces the whole object and a clip keeps its own other slots.
+/// A copy with `change` applied to it and everything `change` does not touch
+/// kept — the step both the Motion section and Clip ▸ Motion take per clip,
+/// because a `motion` patch replaces the whole object and a clip keeps its
+/// own other slots.
 extension MotionProps {
-    func with(inEdge next: MotionEdge?) -> MotionProps {
-        MotionProps(inEdge: next, out: out, during: during)
-    }
-
-    func with(out next: MotionEdge?) -> MotionProps {
-        MotionProps(inEdge: inEdge, out: next, during: during)
-    }
-
-    func with(during next: MotionDuring?) -> MotionProps {
-        MotionProps(inEdge: inEdge, out: out, during: next)
+    func with(_ change: (inout MotionProps) -> Void) -> MotionProps {
+        var next = self
+        change(&next)
+        return next
     }
 }

@@ -80,7 +80,8 @@ detail there.
   MC2 made the same move as `PropsDictionaries.swift`, and the merge kept
   main's file). With
   `ReelCore.swift` and `ReelOps.swift`, the only files that write an op
-  argument.
+  argument. `putNullable` is the one writer of a three-state (`T??`)
+  patch key: absent, an explicit null, or the value.
 - `ReelOps.swift` — `OpArgs`, `ReelOp` and one typed factory per row of
   `core/src/edit.rs`'s op table, plus a RAW factory beside the typed one at
   each door that takes a CALLER's own object — ELEVEN of them (`setVideoRaw`,
@@ -127,7 +128,11 @@ detail there.
   identity — and the FIRST refusal is answered only when nothing applied.
 - `ProjectSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
   `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` · `CurveProps.swift` — the `Codable`, READ-ONLY mirror
-  of spec §5.2 every view draws from. `CompositionPlan.swift` (a pure move out of
+  of spec §5.2 every view draws from. READ-ONLY means never written back as
+  is: the stored properties are `var`, so a writer edits a COPY
+  (`var s = current(); s.blur = v`) rather than rebuilding one through the
+  defaulted memberwise initialiser, which silently drops a field it does not
+  spell out; `MotionProps.with(_:)` is motion's per-slot copy (#357). `CompositionPlan.swift` (a pure move out of
   `ProjectSnapshot.swift`, grading GR1) is the plan's Swift side (spec §7.2): `PlanSegment`,
   `PlanRamp`, `PlanTrack`, `PlanInstruction` and `CompositionPlan`; `PlanSpeedRamp.source` is
   its `map` as a `SourceMap`, checked once at decode and not a coding key (SR-20 (c)). `ShapeProps.swift` (a pure

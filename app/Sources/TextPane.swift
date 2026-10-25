@@ -221,18 +221,18 @@ final class TextPane: InspectorPaneView {
                     max: 40, quick: [1, 2, 4, 8],
                     read: { current().width },
                     ops: { value in
-                        binding.ops(
-                            text: TextPatch(
-                                outline: .some(OutlineProps(width: value, color: current().color))))
+                        var o = current()
+                        o.width = value
+                        return binding.ops(text: TextPatch(outline: .some(o)))
                     },
                     mixed: { binding.mixedText { $0.outline?.width } },
                     enabled: on),
                 inspectorColorRow(
                     "Color", binding, name: "Outline Color", read: { current().color },
                     ops: { color in
-                        binding.ops(
-                            text: TextPatch(
-                                outline: .some(OutlineProps(width: current().width, color: color))))
+                        var o = current()
+                        o.color = color
+                        return binding.ops(text: TextPatch(outline: .some(o)))
                     },
                     mixed: { binding.mixedText { $0.outline?.color } },
                     enabled: on),
@@ -264,10 +264,9 @@ final class TextPane: InspectorPaneView {
                 inspectorColorRow(
                     "Fill", binding, name: "Backdrop Color", read: { current().color },
                     ops: { color in
-                        ops(
-                            BackdropProps(
-                                color: color, padding: current().padding,
-                                radius: current().radius))
+                        var b = current()
+                        b.color = color
+                        return ops(b)
                     },
                     mixed: { binding.mixedText { $0.backdrop?.color } },
                     enabled: on),
@@ -276,9 +275,9 @@ final class TextPane: InspectorPaneView {
                     min: 0, max: 200, quick: [0, 8, 12, 24, 48],
                     read: { current().padding },
                     ops: { value in
-                        ops(
-                            BackdropProps(
-                                color: current().color, padding: value, radius: current().radius))
+                        var b = current()
+                        b.padding = value
+                        return ops(b)
                     },
                     mixed: { binding.mixedText { $0.backdrop?.padding } },
                     enabled: on),
@@ -287,9 +286,9 @@ final class TextPane: InspectorPaneView {
                     max: 200, quick: [0, 4, 8, 16, 32],
                     read: { current().radius },
                     ops: { value in
-                        ops(
-                            BackdropProps(
-                                color: current().color, padding: current().padding, radius: value))
+                        var b = current()
+                        b.radius = value
+                        return ops(b)
                     },
                     mixed: { binding.mixedText { $0.backdrop?.radius } },
                     enabled: on),
@@ -396,11 +395,9 @@ final class TextPane: InspectorPaneView {
                         }
                         // The durations as they stand: switching the reveal
                         // must not reset the timing the user chose for it.
-                        let animation = current()
-                        return ops(
-                            TextAnimation(
-                                kind: kinds[index - 1], inDuration: animation.inDuration,
-                                outDuration: animation.outDuration))
+                        var a = current()
+                        a.kind = kinds[index - 1]
+                        return ops(a)
                     },
                     mixed: { binding.mixedText { $0.animation?.kind } }, enabled: free),
                 inspectorValueRow(
@@ -408,10 +405,9 @@ final class TextPane: InspectorPaneView {
                     quick: [0, 0.25, 0.5, 1, 2],
                     read: { ReelTime.seconds(current().inDuration) },
                     ops: { value in
-                        ops(
-                            TextAnimation(
-                                kind: current().kind, inDuration: ticks(value),
-                                outDuration: current().outDuration))
+                        var a = current()
+                        a.inDuration = ticks(value)
+                        return ops(a)
                     },
                     mixed: { binding.mixedText { $0.animation?.inDuration } },
                     enabled: { on() && free() }),
@@ -420,10 +416,9 @@ final class TextPane: InspectorPaneView {
                     max: 10, quick: [0, 0.25, 0.5, 1, 2],
                     read: { ReelTime.seconds(current().outDuration) },
                     ops: { value in
-                        ops(
-                            TextAnimation(
-                                kind: current().kind, inDuration: current().inDuration,
-                                outDuration: ticks(value)))
+                        var a = current()
+                        a.outDuration = ticks(value)
+                        return ops(a)
                     },
                     mixed: { binding.mixedText { $0.animation?.outDuration } },
                     enabled: { on() && free() }),

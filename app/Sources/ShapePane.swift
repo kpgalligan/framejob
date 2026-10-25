@@ -96,18 +96,18 @@ final class ShapePane: InspectorPaneView {
                     max: 200, quick: [1, 2, 4, 6, 12, 24],
                     read: { current().width },
                     ops: { value in
-                        binding.ops(
-                            shape: ShapePatch(
-                                stroke: .some(StrokeProps(width: value, color: current().color))))
+                        var s = current()
+                        s.width = value
+                        return binding.ops(shape: ShapePatch(stroke: .some(s)))
                     },
                     mixed: { binding.mixedShape { $0.stroke?.width } },
                     enabled: on),
                 inspectorColorRow(
                     "Color", binding, name: "Stroke Color", read: { current().color },
                     ops: { color in
-                        binding.ops(
-                            shape: ShapePatch(
-                                stroke: .some(StrokeProps(width: current().width, color: color))))
+                        var s = current()
+                        s.color = color
+                        return binding.ops(shape: ShapePatch(stroke: .some(s)))
                     },
                     mixed: { binding.mixedShape { $0.stroke?.color } },
                     enabled: on),
@@ -197,23 +197,19 @@ final class ShapePane: InspectorPaneView {
         func ops(_ next: Gradient?) -> [ReelOp] {
             binding.ops(shape: ShapePatch(gradient: .some(next)))
         }
-        /// One key of the gradient changed and the other two as they stand.
-        /// This is the "send it whole" rule above, spelled once so that no
-        /// row has to remember it.
-        func edited(
-            kind: GradientKind? = nil, stops next: [GradientStop]? = nil, angle: Double? = nil
-        ) -> [ReelOp] {
-            guard let gradient = current() else { return [] }
-            return ops(
-                Gradient(
-                    kind: kind ?? gradient.kind, stops: next ?? gradient.stops,
-                    angle: angle ?? gradient.angle))
+        /// The gradient with `change` applied and the other keys as they
+        /// stand. This is the "send it whole" rule above, spelled once so that
+        /// no row has to remember it.
+        func edited(_ change: (inout Gradient) -> Void) -> [ReelOp] {
+            guard var gradient = current() else { return [] }
+            change(&gradient)
+            return ops(gradient)
         }
         func edited(replacing index: Int, _ stop: GradientStop) -> [ReelOp] {
             var next = list()
             guard next.indices.contains(index) else { return [] }
             next[index] = stop
-            return edited(stops: next)
+            return edited { $0.stops = next }
         }
         /// The mixed badge for one stop's field: a selection where some clip
         /// has no gradient, or none at that index, disagrees — which the
@@ -282,7 +278,7 @@ final class ShapePane: InspectorPaneView {
                 read: { kinds.firstIndex(of: current()?.kind ?? .linear) ?? 0 },
                 ops: { index in
                     guard kinds.indices.contains(index) else { return [] }
-                    return edited(kind: kinds[index])
+                    return edited { $0.kind = kinds[index] }
                 },
                 mixed: { binding.mixedShape { $0.gradient?.kind } },
                 enabled: { on() && area() }),
@@ -293,7 +289,7 @@ final class ShapePane: InspectorPaneView {
                 "Angle", binding, name: "Gradient Angle", unit: "°", decimals: 0, min: 0,
                 max: 360, quick: [0, 45, 90, 135, 180, 225, 270, 315],
                 read: { current()?.angle ?? 0 },
-                ops: { edited(angle: $0) },
+                ops: { v in edited { $0.angle = v } },
                 mixed: { binding.mixedShape { $0.gradient?.angle } },
                 // A radial gradient has no direction to point: the model
                 // stores the angle through the flip all the same, so coming
@@ -336,7 +332,7 @@ final class ShapePane: InspectorPaneView {
                         return
                     }
                     next.remove(at: index)
-                    binding.apply("Remove Stop", edited(stops: next))
+                    binding.apply("Remove Stop", edited { $0.stops = next })
                 },
                 enabled: { area() && list().count > 2 }, onEdit: {})
             remove.toolTip =
@@ -358,7 +354,7 @@ final class ShapePane: InspectorPaneView {
                     NSSound.beep()
                     return
                 }
-                binding.apply("Add Stop", edited(stops: next))
+                binding.apply("Add Stop", edited { $0.stops = next })
             },
             enabled: { area() && on() && list().count < Gradient.maxStops }, onEdit: {})
         add.toolTip =

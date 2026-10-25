@@ -78,26 +78,18 @@ extension VideoPane {
             regions[index] = next
             return regions
         }
-        /// One field of one region changed, the other seven as they stand —
-        /// `spotlightSection`'s `edited(…)` over a list. Eight fields is
+        /// One region with `change` applied, the other fields as they stand —
+        /// `spotlightSection`'s `edited { … }` over a list. Eight fields is
         /// enough that spelling all of them out at every row would bury the
-        /// one that changes.
+        /// one that changes. No change is the region rewritten as it is.
         func edited(
-            _ index: Int, shape: SpotShape? = nil, x: Double? = nil, y: Double? = nil,
-            width: Double? = nil, height: Double? = nil, feather: Double? = nil,
-            kind: ObscureKind? = nil, amount: Double? = nil
+            _ index: Int, _ change: (inout ObscureProps) -> Void = { _ in }
         ) -> [ReelOp] {
             // `writeAt`, not `at`: the seven fields that ride along are the
             // ones the edit is replacing, never the ones the playhead shows.
-            guard let o = writeAt(index) else { return [] }
-            return ops(
-                replacing(
-                    index,
-                    ObscureProps(
-                        shape: shape ?? o.shape, x: x ?? o.x, y: y ?? o.y,
-                        width: width ?? o.width, height: height ?? o.height,
-                        feather: feather ?? o.feather, kind: kind ?? o.kind,
-                        amount: amount ?? o.amount)))
+            guard var o = writeAt(index) else { return [] }
+            change(&o)
+            return ops(replacing(index, o))
         }
         /// The mixed badge for one region's field: a selection where some
         /// clip has no region at that index disagrees, which the `nil` says.
@@ -133,7 +125,7 @@ extension VideoPane {
                 read: { kinds.firstIndex(of: at(index)?.kind ?? .pixelate) ?? 0 },
                 write: { choice in
                     guard kinds.indices.contains(choice) else { return }
-                    binding.apply("Obscure Kind", edited(index, kind: kinds[choice]))
+                    binding.apply("Obscure Kind", edited(index) { $0.kind = kinds[choice] })
                 },
                 enabled: { true },
                 onEdit: { binding.edited() })
@@ -165,7 +157,7 @@ extension VideoPane {
                     read: { shapes.firstIndex(of: at(index)?.shape ?? .rect) ?? 0 },
                     ops: { choice in
                         guard shapes.indices.contains(choice) else { return [] }
-                        return edited(index, shape: shapes[choice])
+                        return edited(index) { $0.shape = shapes[choice] }
                     },
                     mixed: { mixedAt(index) { $0.shape } }))
             rows.append(
@@ -173,14 +165,14 @@ extension VideoPane {
                     "Amount", binding, name: "Obscure Amount", unit: "%", decimals: 0, min: 0,
                     max: 100, quick: [0, 25, 50, 75, 100],
                     read: { (at(index)?.amount ?? 0) * 100 },
-                    ops: { edited(index, amount: $0 / 100) },
+                    ops: { v in edited(index) { $0.amount = v / 100 } },
                     mixed: { mixedAt(index) { $0.amount } }))
             rows.append(
                 inspectorValueRow(
                     "Feather", binding, name: "Obscure Feather", unit: " px", decimals: 0,
                     min: 0, max: 200, quick: [0, 10, 20, 40, 80],
                     read: { at(index)?.feather ?? 0 },
-                    ops: { edited(index, feather: $0) },
+                    ops: { v in edited(index) { $0.feather = v } },
                     mixed: { mixedAt(index) { $0.feather } }))
             rows.append(
                 inspectorRow(
@@ -188,13 +180,13 @@ extension VideoPane {
                     [
                         field(
                             index, name: "Obscure Center", min: -20000, max: 20000,
-                            read: { $0.x }, write: { i, value in edited(i, x: value) }),
+                            read: { $0.x }, write: { i, value in edited(i) { $0.x = value } }),
                         field(
                             index, name: "Obscure Center", min: -20000, max: 20000,
-                            read: { $0.y }, write: { i, value in edited(i, y: value) }),
+                            read: { $0.y }, write: { i, value in edited(i) { $0.y = value } }),
                     ],
                     mixed: { mixedAt(index) { $0.x } || mixedAt(index) { $0.y } },
-                    binding: binding, writes: edited(index, x: writeAt(index)?.x)))
+                    binding: binding, writes: edited(index)))
             // The core takes width and height as strictly greater than zero
             // (`above`, not `at_least`), exactly as it does the spotlight's:
             // a region with no area hides nothing and cannot be grabbed back,
@@ -206,14 +198,14 @@ extension VideoPane {
                         field(
                             index, name: "Obscure Size", min: 1, max: 20000,
                             quick: [120, 240, 480, 960], read: { $0.width },
-                            write: { i, value in edited(i, width: value) }),
+                            write: { i, value in edited(i) { $0.width = value } }),
                         field(
                             index, name: "Obscure Size", min: 1, max: 20000,
                             quick: [68, 135, 270, 540], read: { $0.height },
-                            write: { i, value in edited(i, height: value) }),
+                            write: { i, value in edited(i) { $0.height = value } }),
                     ],
                     mixed: { mixedAt(index) { $0.width } || mixedAt(index) { $0.height } },
-                    binding: binding, writes: edited(index, width: writeAt(index)?.width)))
+                    binding: binding, writes: edited(index)))
         }
         if count == 0 {
             rows.append(inspectorRow(nil, [InspectorRowLabel("No obscured regions.")]))

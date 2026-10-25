@@ -243,11 +243,9 @@ func inspectorShadowSection(_ binding: InspectorBinding) -> InspectorSection {
             inspectorColorRow(
                 "Color", binding, name: "Shadow Color", read: { current().color },
                 ops: { color in
-                    let s = current()
-                    return ops(
-                        ShadowProps(
-                            color: color, opacity: s.opacity, blur: s.blur, angle: s.angle,
-                            distance: s.distance))
+                    var s = current()
+                    s.color = color
+                    return ops(s)
                 },
                 mixed: { binding.mixedVideo { $0.shadow?.color } },
                 enabled: on),
@@ -256,11 +254,9 @@ func inspectorShadowSection(_ binding: InspectorBinding) -> InspectorSection {
                 max: 100, quick: [0, 25, 50, 75, 100],
                 read: { current().opacity * 100 },
                 ops: { value in
-                    let s = current()
-                    return ops(
-                        ShadowProps(
-                            color: s.color, opacity: value / 100, blur: s.blur, angle: s.angle,
-                            distance: s.distance))
+                    var s = current()
+                    s.opacity = value / 100
+                    return ops(s)
                 },
                 mixed: { binding.mixedVideo { $0.shadow?.opacity } },
                 enabled: on),
@@ -269,11 +265,9 @@ func inspectorShadowSection(_ binding: InspectorBinding) -> InspectorSection {
                 quick: [0, 4, 8, 12, 24, 48],
                 read: { current().blur },
                 ops: { value in
-                    let s = current()
-                    return ops(
-                        ShadowProps(
-                            color: s.color, opacity: s.opacity, blur: value, angle: s.angle,
-                            distance: s.distance))
+                    var s = current()
+                    s.blur = value
+                    return ops(s)
                 },
                 mixed: { binding.mixedVideo { $0.shadow?.blur } },
                 enabled: on),
@@ -282,11 +276,9 @@ func inspectorShadowSection(_ binding: InspectorBinding) -> InspectorSection {
                 quick: [0, 45, 90, 135, 180, 225, 270, 315],
                 read: { current().angle },
                 ops: { value in
-                    let s = current()
-                    return ops(
-                        ShadowProps(
-                            color: s.color, opacity: s.opacity, blur: s.blur, angle: value,
-                            distance: s.distance))
+                    var s = current()
+                    s.angle = value
+                    return ops(s)
                 },
                 mixed: { binding.mixedVideo { $0.shadow?.angle } },
                 enabled: on),
@@ -295,11 +287,9 @@ func inspectorShadowSection(_ binding: InspectorBinding) -> InspectorSection {
                 max: 200, quick: [0, 4, 8, 16, 32],
                 read: { current().distance },
                 ops: { value in
-                    let s = current()
-                    return ops(
-                        ShadowProps(
-                            color: s.color, opacity: s.opacity, blur: s.blur, angle: s.angle,
-                            distance: value))
+                    var s = current()
+                    s.distance = value
+                    return ops(s)
                 },
                 mixed: { binding.mixedVideo { $0.shadow?.distance } },
                 enabled: on),

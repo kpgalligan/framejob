@@ -442,11 +442,9 @@ final class VideoPane: InspectorPaneView {
                     // mouse-moved event that changed nothing.
                     read: { current().key + [1] },
                     ops: { color in
-                        let c = current()
-                        return ops(
-                            ChromaProps(
-                                key: chromaKeyComponents(color), tolerance: c.tolerance,
-                                softness: c.softness, spill: c.spill))
+                        var c = current()
+                        c.key = chromaKeyComponents(color)
+                        return ops(c)
                     },
                     mixed: { binding.mixedVideo { $0.chroma?.key } },
                     enabled: on),
@@ -456,11 +454,9 @@ final class VideoPane: InspectorPaneView {
                     min: 0, max: 100, quick: [0, 10, 20, 40, 60],
                     read: { current().tolerance * 100 },
                     ops: { value in
-                        let c = current()
-                        return ops(
-                            ChromaProps(
-                                key: c.key, tolerance: value / 100, softness: c.softness,
-                                spill: c.spill))
+                        var c = current()
+                        c.tolerance = value / 100
+                        return ops(c)
                     },
                     mixed: { binding.mixedVideo { $0.chroma?.tolerance } },
                     enabled: on),
@@ -469,11 +465,9 @@ final class VideoPane: InspectorPaneView {
                     min: 0, max: 100, quick: [0, 5, 10, 25, 50],
                     read: { current().softness * 100 },
                     ops: { value in
-                        let c = current()
-                        return ops(
-                            ChromaProps(
-                                key: c.key, tolerance: c.tolerance, softness: value / 100,
-                                spill: c.spill))
+                        var c = current()
+                        c.softness = value / 100
+                        return ops(c)
                     },
                     mixed: { binding.mixedVideo { $0.chroma?.softness } },
                     enabled: on),
@@ -482,11 +476,9 @@ final class VideoPane: InspectorPaneView {
                     min: 0, max: 100, quick: [0, 25, 50, 75, 100],
                     read: { current().spill * 100 },
                     ops: { value in
-                        let c = current()
-                        return ops(
-                            ChromaProps(
-                                key: c.key, tolerance: c.tolerance, softness: c.softness,
-                                spill: value / 100))
+                        var c = current()
+                        c.spill = value / 100
+                        return ops(c)
                     },
                     mixed: { binding.mixedVideo { $0.chroma?.spill } },
                     enabled: on),
@@ -729,11 +721,9 @@ final class VideoPane: InspectorPaneView {
                     min: 0, max: 100, quick: [0, 20, 35, 50, 75],
                     read: { current().opacity * 100 },
                     ops: { value in
-                        let r = current()
-                        return ops(
-                            ReflectionProps(
-                                opacity: value / 100, height: r.height, gap: r.gap,
-                                falloff: r.falloff))
+                        var r = current()
+                        r.opacity = value / 100
+                        return ops(r)
                     },
                     mixed: { binding.mixedVideo { $0.reflection?.opacity } },
                     enabled: on),
@@ -742,11 +732,9 @@ final class VideoPane: InspectorPaneView {
                     min: 0, max: 100, quick: [25, 50, 75, 100],
                     read: { current().height * 100 },
                     ops: { value in
-                        let r = current()
-                        return ops(
-                            ReflectionProps(
-                                opacity: r.opacity, height: value / 100, gap: r.gap,
-                                falloff: r.falloff))
+                        var r = current()
+                        r.height = value / 100
+                        return ops(r)
                     },
                     mixed: { binding.mixedVideo { $0.reflection?.height } },
                     enabled: on),
@@ -755,11 +743,9 @@ final class VideoPane: InspectorPaneView {
                     max: 200, quick: [0, 4, 8, 16, 32],
                     read: { current().gap },
                     ops: { value in
-                        let r = current()
-                        return ops(
-                            ReflectionProps(
-                                opacity: r.opacity, height: r.height, gap: value,
-                                falloff: r.falloff))
+                        var r = current()
+                        r.gap = value
+                        return ops(r)
                     },
                     mixed: { binding.mixedVideo { $0.reflection?.gap } },
                     enabled: on),
@@ -768,11 +754,9 @@ final class VideoPane: InspectorPaneView {
                     min: 0, max: 100, quick: [0, 25, 50, 75, 100],
                     read: { current().falloff * 100 },
                     ops: { value in
-                        let r = current()
-                        return ops(
-                            ReflectionProps(
-                                opacity: r.opacity, height: r.height, gap: r.gap,
-                                falloff: value / 100))
+                        var r = current()
+                        r.falloff = value / 100
+                        return ops(r)
                     },
                     mixed: { binding.mixedVideo { $0.reflection?.falloff } },
                     enabled: on),
@@ -797,26 +781,17 @@ final class VideoPane: InspectorPaneView {
     ///
     /// Eight fields is enough that spelling all of them out at every row
     /// would bury the one that changes, so the whole-object write the patch
-    /// needs goes through `edited(…)` — one named argument per row, the other
-    /// seven re-read from the current value.
+    /// needs goes through `edited { … }` — each row sets its one field on a
+    /// copy of the current value, and the other seven ride along.
     func spotlightSection() -> InspectorSection {
         let binding = self.binding
         let shapes = SpotShape.allCases
         func current() -> SpotlightProps { binding.videoProps.spotlight ?? SpotlightProps() }
         func on() -> Bool { binding.videoProps.spotlight != nil }
-        func edited(
-            shape: SpotShape? = nil, x: Double? = nil, y: Double? = nil, width: Double? = nil,
-            height: Double? = nil, feather: Double? = nil, dim: Double? = nil, zoom: Double? = nil
-        ) -> [ReelOp] {
-            let s = current()
-            return binding.ops(
-                video: VideoPatch(
-                    spotlight: .some(
-                        SpotlightProps(
-                            shape: shape ?? s.shape, x: x ?? s.x, y: y ?? s.y,
-                            width: width ?? s.width, height: height ?? s.height,
-                            feather: feather ?? s.feather, dim: dim ?? s.dim,
-                            zoom: zoom ?? s.zoom))))
+        func edited(_ change: (inout SpotlightProps) -> Void) -> [ReelOp] {
+            var s = current()
+            change(&s)
+            return binding.ops(video: VideoPatch(spotlight: .some(s)))
         }
         return InspectorSection(
             id: "video.spotlight", title: "Spotlight",
@@ -839,7 +814,7 @@ final class VideoPane: InspectorPaneView {
                     read: { shapes.firstIndex(of: current().shape) ?? 0 },
                     ops: { index in
                         guard shapes.indices.contains(index) else { return [] }
-                        return edited(shape: shapes[index])
+                        return edited { $0.shape = shapes[index] }
                     },
                     mixed: { binding.mixedVideo { $0.spotlight?.shape } },
                     enabled: on),
@@ -847,14 +822,14 @@ final class VideoPane: InspectorPaneView {
                     "Center X", binding, name: "Spotlight Center", unit: " px", decimals: 0,
                     min: -20000, max: 20000, slider: false,
                     read: { current().x },
-                    ops: { edited(x: $0) },
+                    ops: { v in edited { $0.x = v } },
                     mixed: { binding.mixedVideo { $0.spotlight?.x } },
                     enabled: on),
                 inspectorValueRow(
                     "Center Y", binding, name: "Spotlight Center", unit: " px", decimals: 0,
                     min: -20000, max: 20000, slider: false,
                     read: { current().y },
-                    ops: { edited(y: $0) },
+                    ops: { v in edited { $0.y = v } },
                     mixed: { binding.mixedVideo { $0.spotlight?.y } },
                     enabled: on),
                 // The core takes width and height as strictly greater than
@@ -865,28 +840,28 @@ final class VideoPane: InspectorPaneView {
                     "Width", binding, name: "Spotlight Size", unit: " px", decimals: 0, min: 1,
                     max: 20000, quick: [240, 480, 720, 960], slider: false,
                     read: { current().width },
-                    ops: { edited(width: $0) },
+                    ops: { v in edited { $0.width = v } },
                     mixed: { binding.mixedVideo { $0.spotlight?.width } },
                     enabled: on),
                 inspectorValueRow(
                     "Height", binding, name: "Spotlight Size", unit: " px", decimals: 0, min: 1,
                     max: 20000, quick: [135, 270, 405, 540], slider: false,
                     read: { current().height },
-                    ops: { edited(height: $0) },
+                    ops: { v in edited { $0.height = v } },
                     mixed: { binding.mixedVideo { $0.spotlight?.height } },
                     enabled: on),
                 inspectorValueRow(
                     "Feather", binding, name: "Spotlight Feather", unit: " px", decimals: 0,
                     min: 0, max: 200, quick: [0, 10, 20, 40, 80],
                     read: { current().feather },
-                    ops: { edited(feather: $0) },
+                    ops: { v in edited { $0.feather = v } },
                     mixed: { binding.mixedVideo { $0.spotlight?.feather } },
                     enabled: on),
                 inspectorValueRow(
                     "Dim", binding, name: "Spotlight Dim", unit: "%", decimals: 0, min: 0,
                     max: 100, quick: [0, 30, 60, 80, 100],
                     read: { current().dim * 100 },
-                    ops: { edited(dim: $0 / 100) },
+                    ops: { v in edited { $0.dim = v / 100 } },
                     mixed: { binding.mixedVideo { $0.spotlight?.dim } },
                     enabled: on),
                 // 1 is "no zoom" and 2× is the ceiling `SPOT_ZOOM_MAX` puts
@@ -896,7 +871,7 @@ final class VideoPane: InspectorPaneView {
                     "Zoom", binding, name: "Spotlight Zoom", unit: "×", decimals: 2, min: 1,
                     max: 2, quick: [1, 1.2, 1.5, 2],
                     read: { current().zoom },
-                    ops: { edited(zoom: $0) },
+                    ops: { v in edited { $0.zoom = v } },
                     mixed: { binding.mixedVideo { $0.spotlight?.zoom } },
                     enabled: on),
             ])

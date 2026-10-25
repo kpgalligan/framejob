@@ -155,48 +155,18 @@ struct VideoPatch: Codable, Equatable {
         if let opacity = opacity { d["opacity"] = opacity }
         if let crop = crop { d["crop"] = crop.dictionary }
         if let cornerRadius = cornerRadius { d["corner_radius"] = cornerRadius }
-        if let shadow = shadow {
-            if let shadow = shadow {
-                d["shadow"] = shadow.dictionary
-            } else {
-                d["shadow"] = NSNull()
-            }
-        }
+        d.putNullable("shadow", shadow) { $0.dictionary }
         if let color = color { d["color"] = color.dictionary }
-        if let chroma = chroma {
-            if let chroma = chroma {
-                d["chroma"] = chroma.dictionary
-            } else {
-                d["chroma"] = NSNull()
-            }
-        }
+        d.putNullable("chroma", chroma) { $0.dictionary }
         if let filters = filters { d["filters"] = filters.map { $0.dictionary } }
-        if let reflection = reflection {
-            if let reflection = reflection {
-                d["reflection"] = reflection.dictionary
-            } else {
-                d["reflection"] = NSNull()
-            }
-        }
-        if let spotlight = spotlight {
-            if let spotlight = spotlight {
-                d["spotlight"] = spotlight.dictionary
-            } else {
-                d["spotlight"] = NSNull()
-            }
-        }
+        d.putNullable("reflection", reflection) { $0.dictionary }
+        d.putNullable("spotlight", spotlight) { $0.dictionary }
         if let obscure = obscure { d["obscure"] = obscure.map { $0.dictionary } }
         if let blend = blend { d["blend"] = blend.rawValue }
-        if let motion = motion {
-            if let motion = motion, !motion.isEmpty {
-                d["motion"] = motion.dictionary
-            } else {
-                d["motion"] = NSNull()
-            }
-        }
-        if let look = look {
-            if let look = look { d["look"] = look.dictionary } else { d["look"] = NSNull() }
-        }
+        d.putNullable(
+            "motion", motion.map { m -> MotionProps? in m.flatMap { $0.isEmpty ? nil : $0 } }
+        ) { $0.dictionary }
+        d.putNullable("look", look) { $0.dictionary }
         if let wheels = wheels, !wheels.isEmpty { d["wheels"] = wheels.dictionary }
         if let curves = curves, !curves.isEmpty { d["curves"] = curves.dictionary }
         if let qualifier = qualifier, !qualifier.isEmpty { d["qualifier"] = qualifier.dictionary }
@@ -257,19 +227,11 @@ struct AudioPatch: Codable, Equatable {
         if let muted = muted { d["muted"] = muted }
         if let fadeIn = fadeIn { d["fade_in"] = fadeIn }
         if let fadeOut = fadeOut { d["fade_out"] = fadeOut }
-        if let duck = duck {
-            if let duck = duck { d["duck"] = duck.dictionary } else { d["duck"] = NSNull() }
-        }
+        d.putNullable("duck", duck) { $0.dictionary }
         if let mono = mono { d["mono"] = mono }
         if let keepPitch = keepPitch { d["keep_pitch"] = keepPitch }
         if let pan = pan { d["pan"] = pan }
-        if let compressor = compressor {
-            if let compressor = compressor {
-                d["compressor"] = compressor.dictionary
-            } else {
-                d["compressor"] = NSNull()
-            }
-        }
+        d.putNullable("compressor", compressor) { $0.dictionary }
         if let noiseReduction = noiseReduction { d["noise_reduction"] = noiseReduction }
         return d
     }
@@ -303,12 +265,8 @@ struct ClipPatch: Equatable {
 
     var dictionary: [String: Any] {
         var d: [String: Any] = [:]
-        if let name = name {
-            if let name = name { d["name"] = name } else { d["name"] = NSNull() }
-        }
-        if let label = label {
-            if let label = label { d["label"] = label } else { d["label"] = NSNull() }
-        }
+        d.putNullable("name", name) { $0 }
+        d.putNullable("label", label) { $0 }
         return d
     }
 

@@ -214,10 +214,9 @@ final class AudioPane: InspectorPaneView {
                     quick: [0, 10, 20, 30, 50],
                     read: { current().level * 100 },
                     ops: { value in
-                        ops(
-                            DuckProps(
-                                level: value / 100, attack: current().attack,
-                                release: current().release))
+                        var d = current()
+                        d.level = value / 100
+                        return ops(d)
                     },
                     mixed: { binding.mixedAudio { $0.duck?.level } },
                     enabled: on),
@@ -226,10 +225,9 @@ final class AudioPane: InspectorPaneView {
                     max: 5, quick: [0.1, 0.25, 0.5, 1],
                     read: { ReelTime.seconds(current().attack) },
                     ops: { value in
-                        ops(
-                            DuckProps(
-                                level: current().level, attack: ticks(value),
-                                release: current().release))
+                        var d = current()
+                        d.attack = ticks(value)
+                        return ops(d)
                     },
                     mixed: { binding.mixedAudio { $0.duck?.attack } },
                     enabled: on),
@@ -238,10 +236,9 @@ final class AudioPane: InspectorPaneView {
                     max: 5, quick: [0.25, 0.5, 1, 2],
                     read: { ReelTime.seconds(current().release) },
                     ops: { value in
-                        ops(
-                            DuckProps(
-                                level: current().level, attack: current().attack,
-                                release: ticks(value)))
+                        var d = current()
+                        d.release = ticks(value)
+                        return ops(d)
                     },
                     mixed: { binding.mixedAudio { $0.duck?.release } },
                     enabled: on),
@@ -336,11 +333,9 @@ final class AudioPane: InspectorPaneView {
                     min: -60, max: 0, quick: [-30, -24, -18, -12, -6],
                     read: { current().thresholdDb },
                     ops: { value in
-                        ops(
-                            CompressorProps(
-                                thresholdDb: value, ratio: current().ratio,
-                                attack: current().attack, release: current().release,
-                                makeupDb: current().makeupDb))
+                        var c = current()
+                        c.thresholdDb = value
+                        return ops(c)
                     },
                     mixed: { binding.mixedAudio { $0.compressor?.thresholdDb } },
                     enabled: on),
@@ -349,11 +344,9 @@ final class AudioPane: InspectorPaneView {
                     max: 20, quick: [1.5, 2, 3, 4, 8, 20],
                     read: { current().ratio },
                     ops: { value in
-                        ops(
-                            CompressorProps(
-                                thresholdDb: current().thresholdDb, ratio: value,
-                                attack: current().attack, release: current().release,
-                                makeupDb: current().makeupDb))
+                        var c = current()
+                        c.ratio = value
+                        return ops(c)
                     },
                     mixed: { binding.mixedAudio { $0.compressor?.ratio } },
                     enabled: on),
@@ -362,11 +355,9 @@ final class AudioPane: InspectorPaneView {
                     max: 200, quick: [1, 5, 10, 30, 100],
                     read: { milliseconds(current().attack) },
                     ops: { value in
-                        ops(
-                            CompressorProps(
-                                thresholdDb: current().thresholdDb, ratio: current().ratio,
-                                attack: ticks(value), release: current().release,
-                                makeupDb: current().makeupDb))
+                        var c = current()
+                        c.attack = ticks(value)
+                        return ops(c)
                     },
                     mixed: { binding.mixedAudio { $0.compressor?.attack } },
                     enabled: on),
@@ -375,11 +366,9 @@ final class AudioPane: InspectorPaneView {
                     min: 10, max: 2000, quick: [50, 100, 200, 500, 1000],
                     read: { milliseconds(current().release) },
                     ops: { value in
-                        ops(
-                            CompressorProps(
-                                thresholdDb: current().thresholdDb, ratio: current().ratio,
-                                attack: current().attack, release: ticks(value),
-                                makeupDb: current().makeupDb))
+                        var c = current()
+                        c.release = ticks(value)
+                        return ops(c)
                     },
                     mixed: { binding.mixedAudio { $0.compressor?.release } },
                     enabled: on),
@@ -388,11 +377,9 @@ final class AudioPane: InspectorPaneView {
                     max: 24, quick: [0, 3, 6, 12],
                     read: { current().makeupDb },
                     ops: { value in
-                        ops(
-                            CompressorProps(
-                                thresholdDb: current().thresholdDb, ratio: current().ratio,
-                                attack: current().attack, release: current().release,
-                                makeupDb: value))
+                        var c = current()
+                        c.makeupDb = value
+                        return ops(c)
                     },
                     mixed: { binding.mixedAudio { $0.compressor?.makeupDb } },
                     enabled: on),
