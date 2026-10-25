@@ -51,17 +51,7 @@ extension EditorViewController {
 
     /// Disarms it, from Esc, a second press, a completed pick, `syncQualifierPick`
     /// and `armCanvasMode` arming another mode.
-    func endQualifierPick() {
-        guard let picker = qualifierPick else { return }
-        // The eyedropper's re-entry pitfall: callbacks cleared first.
-        picker.onPick = nil
-        picker.onCancel = nil
-        picker.removeFromSuperview()
-        NSCursor.arrow.set()
-        if let overlay = previewCanvas?.overlay {
-            view.window?.makeFirstResponder(overlay)
-        }
-    }
+    func endQualifierPick() { dismissCanvasMode(qualifierPick) }
 
     /// Called from `refreshCanvas`: armed for the clips selected when it
     /// opened, it closes the moment the selection is anything else.
@@ -76,16 +66,14 @@ extension EditorViewController {
 
     /// One click on the preview, `point` in WINDOW coordinates.
     private func qualifierPicked(at point: CGPoint) {
-        guard let document = document, let canvas = previewCanvas, let picker = qualifierPick
+        guard let document = document, previewCanvas != nil, let picker = qualifierPick
         else { return }
-        let target = canvas.viewToCanvas(canvas.convert(point, from: nil))
-        let snapshot = document.editedProject.snapshot.canvas
-        let size = snapshot.size
-        guard target.x >= 0, target.y >= 0, target.x < size.width, target.y < size.height else {
+        guard let target = pickedCanvasPixel(atWindow: point) else {
             // A click in the void is a miss, not a decision: the mode stays.
             NSSound.beep()
             return
         }
+        let snapshot = document.editedProject.snapshot.canvas
         let clips = picker.clips
         let behind = picker.behind
         let hlg = snapshot.output == .hlg

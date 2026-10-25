@@ -147,9 +147,7 @@ extension GraphicPane {
         switch shared.entry {
         case nil:
             return GraphicClipReport(
-                compile: [GraphicDiagnostic(
-                    level: "error", message: "No module named \"\(shared.name)\" in graphics/",
-                    line: nil, column: nil, frame: nil)],
+                compile: [GraphicDiagnostic.noModule(shared.name)],
                 render: [], frame: nil)
         case .failed(let diagnostics, _)?:
             return GraphicClipReport(compile: diagnostics, render: [], frame: nil)
@@ -181,10 +179,10 @@ extension GraphicPane {
                     drawn.svg, width: graphic.width, height: graphic.height)
                 render += raster.warnings
             } catch {
-                render += Self.diagnostics(of: error)
+                render += GraphicDiagnostic.of(error)
             }
         } catch {
-            render += Self.diagnostics(of: error)
+            render += GraphicDiagnostic.of(error)
         }
         let report = GraphicClipReport(
             compile: module.compileWarnings, render: render, frame: frame)
@@ -209,17 +207,6 @@ extension GraphicPane {
         else { return nil }
         layerMemo[clip.id] = layer.source
         return layer.source
-    }
-
-    /// The engine's diagnostics out of a thrown error, else one error
-    /// saying what was thrown.
-    private static func diagnostics(of error: any Error) -> [GraphicDiagnostic] {
-        if let failure = error as? GraphicFailure, !failure.diagnostics.isEmpty {
-            return failure.diagnostics
-        }
-        return [GraphicDiagnostic(
-            level: "error", message: error.localizedDescription, line: nil, column: nil,
-            frame: nil)]
     }
 
     /// Copies the module's file under a new name the person types, then

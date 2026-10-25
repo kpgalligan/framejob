@@ -2,7 +2,8 @@ import Foundation
 
 /// The values the core's speed limits and graphics engine decode into — `SpeedLimits`,
 /// `GraphicDiagnostic`, `GraphicFailure` and `GraphicRaster` — moved out of `ReelCore.swift`
-/// (a pure move, clean-up batch 2) because they name no `rc_*` symbol but in a doc comment;
+/// (a pure move, clean-up batch 2) because they name no `rc_*` symbol but in a doc comment,
+/// with `GraphicDiagnostic.of`, `.error` and `.noModule`, the one reading of a thrown error;
 /// and, for the same reason, the core's error `ReelCoreError` and `Fps.ffiPair` (a pure
 /// move, #127 G6 phase 5's toll); and the JSON-reading halves of `ReelProject.clipState(_:at:)`
 /// and `snapCandidates(excluding:)` as `CoreJSON` (a pure move, clean-up 3 batch B's toll).
@@ -82,6 +83,27 @@ struct GraphicDiagnostic: Decodable, Equatable {
 /// A graphic that did not compile, draw or rasterize: the engine's one error.
 struct GraphicFailure: Error {
     let diagnostics: [GraphicDiagnostic]
+}
+
+extension GraphicDiagnostic {
+    /// An error with no place in the source: no line, column or frame.
+    static func error(_ message: String) -> GraphicDiagnostic {
+        GraphicDiagnostic(level: "error", message: message, line: nil, column: nil, frame: nil)
+    }
+
+    /// A clip naming a module the graphics folder does not hold.
+    static func noModule(_ name: String) -> GraphicDiagnostic {
+        .error("No module named \"\(name)\" in graphics/")
+    }
+
+    /// The engine's diagnostics out of a thrown error — one error saying
+    /// what was thrown when it carries none.
+    static func of(_ error: any Error) -> [GraphicDiagnostic] {
+        if let failure = error as? GraphicFailure, !failure.diagnostics.isEmpty {
+            return failure.diagnostics
+        }
+        return [.error(error.localizedDescription)]
+    }
 }
 
 /// One drawn frame: premultiplied BGRA rows `stride` bytes apart.

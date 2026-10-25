@@ -45,9 +45,7 @@ extension LayerRenderers {
         let module: GraphicModule
         switch set.modules[name] {
         case nil:
-            let missing = GraphicDiagnostic(
-                level: "error", message: "No module named \"\(name)\" in graphics/",
-                line: nil, column: nil, frame: nil)
+            let missing = GraphicDiagnostic.noModule(name)
             return failed(name, frame: frame, [missing], size: size, recipeKey: recipeKey)
         case .failed(let diagnostics, _)?:
             return failed(name, frame: nil, diagnostics, size: size, recipeKey: recipeKey)
@@ -61,7 +59,7 @@ extension LayerRenderers {
                 budgetMs: resolved.budgetMs)
         } catch {
             return failed(
-                name, frame: frame, Self.diagnostics(of: error), size: size, recipeKey: recipeKey)
+                name, frame: frame, GraphicDiagnostic.of(error), size: size, recipeKey: recipeKey)
         }
         if !drawn.warnings.isEmpty {
             GraphicRegistry.shared.record(
@@ -88,7 +86,7 @@ extension LayerRenderers {
                     raster = try set.library.rasterize(drawn.svg, width: width, height: height)
                 }
             } catch {
-                refused = Self.diagnostics(of: error)
+                refused = GraphicDiagnostic.of(error)
                 return nil
             }
             GraphicPrefetch.shared.keep(recipeKey, textureKey: key, raster: raster)
@@ -121,17 +119,6 @@ extension LayerRenderers {
         return errorCard(
             text: Self.errorCardText(name: name, frame: frame, diagnostic: diagnostics.first),
             size: size)
-    }
-
-    /// The engine's diagnostics out of a thrown error — one error saying
-    /// what was thrown when it carries none.
-    private static func diagnostics(of error: any Error) -> [GraphicDiagnostic] {
-        if let failure = error as? GraphicFailure, !failure.diagnostics.isEmpty {
-            return failure.diagnostics
-        }
-        return [GraphicDiagnostic(
-            level: "error", message: error.localizedDescription, line: nil, column: nil,
-            frame: nil)]
     }
 
     /// The card's lines: `<name> · frame <N>` (or `· does not compile`), the

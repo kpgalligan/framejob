@@ -23405,3 +23405,69 @@ python3 tools/proof/audio_ramp_grid_proof.py --baseline <commit>   # → BASELIN
 | `props_mutate_proof.py` | 28/28, exit 0 |
 | `make gate` | PASS (346 s; fmt and lint skipped, unchanged) |
 | Release run of this probe | not applicable: the probe compiles its own binary from `app/Sources` and drives no built app |
+
+## Issue #364 — the editor's canvas modes, added-clip selection, graphic diagnostics and the LPCM question shared (`editor_dedup_probe.py` B0, V1, E1, C1–C3, N1, X1 and four mutants; `editor_dedup_probe.swift`)
+
+**The refactor.** The three modal canvas modes' views sit on one base,
+`CanvasModeOverlay` (Esc, the crosshair, the hint pill, `detachCallbacks`), and
+`endChromaEyedropper`, `endQualifierPick` and `endRegionMode` are each one call of
+`dismissCanvasMode`; both picks map a click through `pickedCanvasPixel(atWindow:)`.
+Nest, Un-nest and Paste select what they added through
+`selectClips(addedSince:in:)`. The four copies of "the diagnostics out of a thrown
+error" are `GraphicDiagnostic.of`, beside `.error` and `.noModule`. The export sheet's
+fixed-rate rows and the writer's audio settings ask
+`ExportSettings.carriesLinearPCM(codec:)`; the dead `Exporter.fallbackPreset` is gone.
+No pixel, hint, refusal, beep, undo name, ordering or result key moves, and the probe is
+the evidence.
+
+The probe compiles `editor_dedup_probe.swift` as `main.swift` over `app/Sources` (or
+`--sources DIR`) on `swift_build.py`'s line and runs it once under
+`tools/proof/work/editor-dedup/` at a 120 s wall. It names only what the tree had
+before #364, so the same source builds on both sides. Its fixture is `e2_chrome.py`'s
+project JSON, copied: two 4 s shape clips on track 1. No general pasteboard, no
+persisting menu item, no instance, no MCP. `capture DIR` stores the PNGs and
+`answer.json` of the tree as it stands; `compare DIR` passes a row when its own check
+passes AND its record (V1: each PNG) is byte-equal to the capture's.
+
+- **B0** the probe builds (a build failure is a scored FAIL).
+- **V1** `cacheDisplay` PNGs, appearance aqua, of `CanvasEyedropperView`,
+  `QualifierPickView`, `CanvasRegionView(.zoom, note: duringNote)` and
+  `CanvasRegionView(.obscure)`, at 640×360 (the pill drawn; each must have ink) and
+  160×90 (where it does not fit).
+- **E1** Esc on each constructed view runs `onCancel` once; on the region, after a press
+  with `canvasPoint` set, `session` is already nil when `onCancel` runs.
+- **C1** one clip selected: `pickChromaKey(nil)` arms and the overlay is first responder;
+  `onPick` at window (−5000, −5000) leaves it armed and the project unchanged; a second
+  press disarms: no superview, `onPick` and `onCancel` nil, focus on
+  `previewCanvas.overlay`.
+- **C2** with the eyedropper armed, `armCanvasMode(QualifierPickView(clips: [], behind: 0))`
+  leaves one `CanvasModalMode` and the eyedropper's callbacks nil; `endQualifierPick()`
+  leaves none and focus on the canvas overlay.
+- **C3** `insertAdjustmentClip(nil)` with nothing selected selects the new clip;
+  `pickQualifier(nil)` then passes C1's arm, miss and disarm checks.
+- **N1** both clips selected: `nestSelection()` selects the one new clip, a nest;
+  `nestSelection()` on the lone nest keeps the selection; `unnestSelection()` selects the
+  two new clips. (Paste has no pasteboard parameter, so its line is typecheck-only.)
+- **X1** `Applies(preset)`'s two bitrate answers for nil and every preset;
+  `ExportWriter.audioSettings` for every preset's settings and for `{codec, container}`
+  over `ProRes_HQ`, `LPCM`, `""`, `H264` × `mov`, `aiff`, as sorted `key=value` lines; and
+  `kAudioFormatLinearPCM` exactly where the codec is `lpcm` or starts `prores`.
+- **Mutants** (`--mutant NAME compare DIR`, on a copy of the sources):
+  `esc-keeps-session` (E1), `dismiss-keeps-callbacks` (C1, C2), `pcm-prefix-dropped` (X1),
+  `nest-unselected` (N1). Exit (rule R): 1 caught, 0 survived, 2 the control could not
+  be performed.
+
+```sh
+python3 tools/proof/editor_dedup_probe.py capture DIR    # on the tree BEFORE the change
+python3 tools/proof/editor_dedup_probe.py compare DIR    # → 8/8, exit 0
+python3 tools/proof/editor_dedup_probe.py --mutant esc-keeps-session compare DIR   # → caught, exit 1
+```
+
+| Run (2026-10-25) | Result |
+|---|---|
+| `capture` on the tree before the change (f4260a1), then `compare` against it on that same tree | 8/8 and 8/8, exit 0 |
+| `compare`, the changed tree | 8/8, exit 0: 8 PNGs and every record byte-equal to the capture |
+| the four mutants | each caught (exit 1): `esc-keeps-session` E1, `dismiss-keeps-callbacks` C1 and C2, `pcm-prefix-dropped` X1, `nest-unselected` N1 |
+| `e2_chrome.py`; `graphics_inspector_proof.py`, Debug then Release; `graphics_proof.py`, Release | 52/52; 100/100 and 100/100; 51/51 |
+| `make gate` | PASS |
+| Release run of this probe | not applicable: the probe compiles its own binary from `app/Sources` and drives no built app |

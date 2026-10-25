@@ -67,7 +67,7 @@ import AVFoundation
 /// everything that does not ask writes what it wrote before.
 ///
 /// **Settings → AVFoundation lives in `ExporterSettings.swift`** — the time
-/// range, the fallback session preset, the file type, the UTI, the extension
+/// range, the file type, the UTI, the extension
 /// and `ExportSettings.isAudioOnly`, an extension of this class in a file of
 /// its own, cut out when phase 7 came to add the options argument and this
 /// file stood at exactly 600 lines. It is the same toll `ExporterLoudness.swift`

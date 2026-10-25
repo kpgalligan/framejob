@@ -108,8 +108,7 @@ final class GraphicRegistry {
         } catch {
             // The library could not be built (a font the engine refused):
             // every module fails with that sentence and draws the slate.
-            let reason = [GraphicDiagnostic(
-                level: "error", message: error.localizedDescription, line: nil, column: nil, frame: nil)]
+            let reason = GraphicDiagnostic.of(error)
             set = GraphicSet(
                 library: GraphicLibrary(), libraryVersion: scan.libraryVersion,
                 modules: scan.modules.mapValues { .failed(reason, revision: $0.revision) },
@@ -259,13 +258,8 @@ final class GraphicRegistry {
                 module, revision: file.revision,
                 meta: described?["meta"] as? [String: Any] ?? [:],
                 schema: described?["schema"] as? [String: Any] ?? [:])
-        } catch let failure as GraphicFailure {
-            return .failed(failure.diagnostics, revision: file.revision)
         } catch {
-            return .failed(
-                [GraphicDiagnostic(
-                    level: "error", message: error.localizedDescription, line: nil, column: nil, frame: nil)],
-                revision: file.revision)
+            return .failed(GraphicDiagnostic.of(error), revision: file.revision)
         }
     }
 }

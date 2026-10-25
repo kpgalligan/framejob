@@ -2,7 +2,7 @@ import AVFoundation
 import UniformTypeIdentifiers
 
 /// The resolved export settings translated into AVFoundation's vocabulary —
-/// a time range, a session preset name, a file type, a UTI, an extension, and
+/// a time range, a file type, a UTI, an extension, and
 /// the one question the sheet and the agent both ask of a row.
 ///
 /// **Why this is a file of its own, and why it is this half.** `Exporter.swift`
@@ -40,38 +40,6 @@ extension Exporter {
             return CMTimeRange(start: start, duration: composition.duration)
         }
         return CMTimeRange(start: start, duration: CompositionBuilder.time(settings.duration))
-    }
-
-    /// The `AVAssetExportSession` preset for settings the core did not name
-    /// one for. Deliberately a fallback rather than the rule: §7.8 makes the
-    /// preset the core's decision, and this only exists so a core that adds a
-    /// preset before this build knows about it still exports something
-    /// sensible instead of refusing.
-    ///
-    /// **Not on the export path any more** — the writer sets the codec, the
-    /// size and the bitrate itself and needs no preset name. Kept because
-    /// `ExportSettings.isAudioOnly` reads `avPreset` against one of these
-    /// names, and as the one record of which fixed-frame session preset a
-    /// codec at a size would have meant, now that the core's rows carry only
-    /// the "highest quality" names (§7.8): the mapping has not left the
-    /// project, only the session has. (It used to say "has not left this
-    /// FILE", which phase 7's cut made false — `isAudioOnly` came with it,
-    /// which is the half of that sentence that still matters: the two are
-    /// still read side by side.)
-    static func fallbackPreset(for settings: ExportSettings) -> String {
-        if settings.isAudioOnly { return AVAssetExportPresetAppleM4A }
-        switch settings.codec.lowercased() {
-        case "hevc", "h265":
-            return settings.width >= 3840
-                ? AVAssetExportPresetHEVC3840x2160 : AVAssetExportPresetHEVC1920x1080
-        case "prores_422", "prores", "prores422":
-            return AVAssetExportPresetAppleProRes422LPCM
-        default:
-            if settings.width >= 3840 { return AVAssetExportPreset3840x2160 }
-            if settings.width >= 1920 { return AVAssetExportPreset1920x1080 }
-            if settings.width >= 1280 { return AVAssetExportPreset1280x720 }
-            return AVAssetExportPreset960x540
-        }
     }
 
     /// The output file type: the core's UTI when it gave one, else the

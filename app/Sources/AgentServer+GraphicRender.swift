@@ -111,7 +111,7 @@ extension AgentServer {
                     frame: frame, propsJSON: propsJSON, ctxJSON: Self.jsonText(ctx),
                     budgetMs: GraphicRegistry.offlineBudgetMs)
             } catch {
-                let diagnostics = Self.graphicDiagnostics(of: error)
+                let diagnostics = GraphicDiagnostic.of(error)
                 if format == "svg" {
                     return try svgReply(name, frame, nil, diagnostics, ctx)
                 }
@@ -136,7 +136,7 @@ extension AgentServer {
                 }
                 cells.append(GraphicSheetCell(frame: frame, image: raster.cgImage(), cardText: nil))
             } catch {
-                let diagnostics = Self.graphicDiagnostics(of: error)
+                let diagnostics = GraphicDiagnostic.of(error)
                 reports.append(
                     GraphicReport(name: name, frame: frame, failed: true, diagnostics: diagnostics))
                 cells.append(Self.cardCell(name, frame, diagnostics))
@@ -258,17 +258,6 @@ extension AgentServer {
             frame: frame, image: nil,
             cardText: LayerRenderers.errorCardText(
                 name: name, frame: frame, diagnostic: diagnostics.first))
-    }
-
-    /// The engine's diagnostics out of a thrown error — one error saying
-    /// what was thrown when it carries none.
-    private static func graphicDiagnostics(of error: any Error) -> [GraphicDiagnostic] {
-        if let failure = error as? GraphicFailure, !failure.diagnostics.isEmpty {
-            return failure.diagnostics
-        }
-        return [GraphicDiagnostic(
-            level: "error", message: error.localizedDescription, line: nil, column: nil,
-            frame: nil)]
     }
 
     private static func jsonText(_ object: [String: Any]) -> String {

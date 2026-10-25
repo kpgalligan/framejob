@@ -179,17 +179,9 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let before = Set(document.editedProject.snapshot.clips.map { $0.id })
+        let before = document.editedProject.snapshot
         document.applyEdit("Paste", .paste(at: document.playhead, payload: payload))
-
-        // Comparing id sets rather than trusting ids we predicted: the core
-        // mints them, and this stays correct if it ever mints them
-        // differently (`EditorViewController+AddClips.swift` does the same).
-        let added = document.editedProject.snapshot.clips.map { $0.id }
-            .filter { !before.contains($0) }
-        guard !added.isEmpty else { return }
-        document.selection = Set(added)
-        viewStateDidChange()
+        selectClips(addedSince: before, in: document)
     }
 
     // MARK: - Paste Attributes

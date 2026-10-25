@@ -420,10 +420,10 @@ extension ExportWriter {
     /// when the core resolved one, else 192 kbps — stereo AAC's
     /// transparent-enough rate and what the M1 presets landed on.
     ///
-    /// **Two codecs mean LPCM, and the CONTAINER decides the byte order.**
-    /// ProRes has since M2 (§7.8 pairs the profile with uncompressed sound),
-    /// and phase 5's `audio_wav` / `audio_aiff` rows carry the codec `lpcm`
-    /// outright. The dictionary handed to the encoder is then literally
+    /// **Two codecs mean LPCM (`ExportSettings.carriesLinearPCM(codec:)`), and
+    /// the CONTAINER decides the byte order.** ProRes has since M2 (§7.8
+    /// pairs the profile with uncompressed sound), and phase 5's `audio_wav`
+    /// / `audio_aiff` rows carry the codec `lpcm` outright. The dictionary handed to the encoder is then literally
     /// `decodedAudioSettings`, so nothing is converted on the way: an export
     /// with no gain reads the mix in it, and on a gained export
     /// `ExportAudioGain` produces it from the float read. The exception is
@@ -441,8 +441,7 @@ extension ExportWriter {
     /// uncompressed container is the failure that reads as
     /// `.presetUnavailable` and sends the reader looking at the preset table.
     static func audioSettings(_ settings: ExportSettings) -> [String: Any] {
-        let codec = settings.codec.lowercased()
-        guard codec == "lpcm" || codec.hasPrefix("prores") else {
+        guard ExportSettings.carriesLinearPCM(codec: settings.codec) else {
             return [
                 AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
                 AVSampleRateKey: 48000,

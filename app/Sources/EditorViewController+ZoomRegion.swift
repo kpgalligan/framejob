@@ -88,7 +88,7 @@ extension EditorViewController {
         let region = CanvasRegionView(
             purpose: purpose, clip: target.id, note: regionNote(purpose, clip: target.id))
         // One-line forwards only (app/CLAUDE.md).
-        region.canvasPoint = { [weak self] point in self?.regionCanvasPoint(point) }
+        region.canvasPoint = { [weak self] point in self?.canvasPixel(atWindow: point) }
         region.viewPoint = { [weak self] point in self?.regionViewPoint(point) ?? point }
         region.resolvedFrame = { [weak self] session in self?.regionResolvedFrame(session) }
         region.onCommit = { [weak self] session in self?.regionCommitted(session) }
@@ -100,26 +100,7 @@ extension EditorViewController {
 
     /// Disarms it, from Esc, from a second press of the key or the button,
     /// from a completed drag, and from `syncRegionMode`.
-    func endRegionMode() {
-        guard let region = canvasRegion else { return }
-        // The teardown runs from inside the view's OWN event handler, so the
-        // callbacks go before the view does and a second entry finds nothing
-        // to do instead of recursing (the pitfall
-        // `PreviewCanvasView.finishTextEditing` documents).
-        region.canvasPoint = nil
-        region.viewPoint = nil
-        region.resolvedFrame = nil
-        region.onCommit = nil
-        region.onCancel = nil
-        region.removeFromSuperview()
-        // The crosshair belonged to a view that is now gone.
-        NSCursor.arrow.set()
-        // Focus goes back where the canvas keys live, or the arrow-key nudge
-        // and the Space pan stay dead until the canvas is clicked again.
-        if let overlay = previewCanvas?.overlay {
-            view.window?.makeFirstResponder(overlay)
-        }
-    }
+    func endRegionMode() { dismissCanvasMode(canvasRegion) }
 
     /// Called from `refreshCanvas`, beside `syncChromaEyedropper`: the mode is
     /// armed for ONE clip, so the moment the selection stops being that clip
@@ -192,14 +173,6 @@ extension EditorViewController {
     }
 
     // MARK: - The overlay's five questions
-
-    /// A window point as canvas pixels. `PreviewCanvasView` owns the only
-    /// mapping (spec §11) and the overlay is not allowed to know about zoom
-    /// or panning, so it asks.
-    private func regionCanvasPoint(_ point: CGPoint) -> CGPoint? {
-        guard let canvas = previewCanvas else { return nil }
-        return canvas.viewToCanvas(canvas.convert(point, from: nil))
-    }
 
     /// The inverse, landed in the OVERLAY's own coordinates — which are the
     /// canvas view's today (the overlay fills the canvas, both are flipped),
@@ -302,7 +275,7 @@ extension EditorViewController {
 /// and what to do about it are all the view controller's — the same division
 /// `CanvasOverlayView` keeps with `PreviewCanvasView`, and the reason the
 /// five closures below take and answer plain points and rectangles.
-final class CanvasRegionView: NSView, CanvasModalMode {
+final class CanvasRegionView: CanvasModeOverlay {
     /// What the band is for. Read here only for the hint pill; the commit
     /// branches on the session's copy.
     let purpose: CanvasRegionPurpose
@@ -326,13 +299,10 @@ final class CanvasRegionView: NSView, CanvasModalMode {
     /// The rectangle the zoom will frame, in canvas pixels.
     var resolvedFrame: ((ZoomRegionSession) -> CGRect?)?
     var onCommit: ((ZoomRegionSession) -> Void)?
-    var onCancel: (() -> Void)?
 
     private static let zoomHint = "Drag a rectangle to zoom to it · ⇧ fills · Esc to cancel"
     private static let obscureHint = "Drag a rectangle to obscure · Esc to cancel"
     static let duringNote = "This clip has During motion — the zoom is solved without it"
-    private static let hintPadding: CGFloat = 9
-    private static let hintTop: CGFloat = 10
     /// The band's own stroke, and the resolved frame's at a lower alpha —
     /// the same ink, because they are two readings of one rectangle.
     private static let frameAlpha: CGFloat = 0.45
@@ -342,21 +312,12 @@ final class CanvasRegionView: NSView, CanvasModalMode {
         self.clip = clip
         self.note = note
         super.init(frame: .zero)
-        wantsLayer = true
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("CanvasRegionView does not support NSCoder")
     }
-
-    /// The canvas's own y-down space, so the band's rectangle and the hint's
-    /// placement both read the way they look.
-    override var isFlipped: Bool { true }
-
-    /// Esc has to reach `keyDown`, which means holding first responder for as
-    /// long as the mode lasts.
-    override var acceptsFirstResponder: Bool { true }
 
     // MARK: Events
 
@@ -399,28 +360,19 @@ final class CanvasRegionView: NSView, CanvasModalMode {
         needsDisplay = true
     }
 
+    /// Esc drops a band in progress BEFORE the base runs `onCancel`, so the
+    /// mode never ends with a live session on it.
     override func keyDown(with event: NSEvent) {
-        guard event.keyCode == 53 else {  // Esc
-            super.keyDown(with: event)
-            return
-        }
-        session = nil
-        withExtendedLifetime(self) { onCancel?() }
+        if event.keyCode == 53 { session = nil }
+        super.keyDown(with: event)
     }
 
-    /// AppKit publishes no "draw a region" cursor, so the band gets the
-    /// crosshair — the bargain the eyedropper and `CanvasHandle.cursor` both
-    /// make for a shape they cannot spell.
-    override func resetCursorRects() {
-        addCursorRect(bounds, cursor: .crosshair)
-    }
-
-    /// The view is installed before Auto Layout has given it a size, so its
-    /// first cursor rect would be cut over an empty rectangle and the
-    /// crosshair would never appear. Re-cut it once the size is real.
-    override func layout() {
-        super.layout()
-        window?.invalidateCursorRects(for: self)
+    override func detachCallbacks() {
+        canvasPoint = nil
+        viewPoint = nil
+        resolvedFrame = nil
+        onCommit = nil
+        super.detachCallbacks()
     }
 
     // MARK: Drawing
@@ -468,36 +420,12 @@ final class CanvasRegionView: NSView, CanvasModalMode {
             x: min(a.x, b.x), y: min(a.y, b.y), width: abs(b.x - a.x), height: abs(b.y - a.y))
     }
 
-    /// A modal cursor is not enough on its own: the pill is what tells
-    /// someone who pressed the key by accident that they are in a mode and
-    /// how to leave it. Copied from `CanvasEyedropperView` so the two modes
-    /// announce themselves identically.
+    /// The mode's hint, and the During note under it: two of the base's
+    /// pills (`drawPill`), so every canvas mode announces itself the same way.
     private func drawHint() {
         let hint = purpose == .zoom ? Self.zoomHint : Self.obscureHint
         let height = drawPill(hint, top: Self.hintTop)
         // 6 pt between the two pills: a gap that reads as two lines of one hint.
         if let note = note { _ = drawPill(note, top: Self.hintTop + height + 6) }
-    }
-
-    /// One pill centred at `top`, skipped when it would not fit; answers its
-    /// height either way, so a second pill's place does not depend on the first.
-    private func drawPill(_ text: String, top: CGFloat) -> CGFloat {
-        let label = NSAttributedString(
-            string: text,
-            attributes: [.font: DS.sans(11), .foregroundColor: DS.textStrong])
-        let size = label.size()
-        let pill = CGRect(
-            x: ((bounds.width - size.width) / 2 - Self.hintPadding).rounded(),
-            y: top,
-            width: (size.width + Self.hintPadding * 2).rounded(),
-            height: (size.height + 6).rounded())
-        guard pill.width < bounds.width else { return pill.height }
-        let path = NSBezierPath(rect: pill)
-        DS.chromeBackground.withAlphaComponent(0.92).setFill()
-        path.fill()
-        DS.accent.setStroke()
-        path.stroke()
-        label.draw(at: NSPoint(x: pill.minX + Self.hintPadding, y: pill.minY + 3))
-        return pill.height
     }
 }

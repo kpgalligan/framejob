@@ -177,6 +177,18 @@ struct ExportSettings: Decodable, Equatable {
     var renderSize: CGSize { CGSize(width: width, height: height) }
 }
 
+extension ExportSettings {
+    /// Whether an encoding's sound is LPCM: the `lpcm` codec of the
+    /// uncompressed audio rows, and every ProRes profile, which §7.8 pairs
+    /// with uncompressed sound. The export sheet's fixed-rate rows
+    /// (`ExportSheetController.Applies`) and the writer's audio settings
+    /// (`ExportWriter.audioSettings`) both ask it.
+    static func carriesLinearPCM(codec: String) -> Bool {
+        let c = codec.lowercased()
+        return c == "lpcm" || c.hasPrefix("prores")
+    }
+}
+
 /// One row of the export sheet's Size popup, from `rc_export_sizes`: the
 /// document's own size, an image format's cap, or a standard size fitted to
 /// the document's aspect.

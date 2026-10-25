@@ -74,9 +74,9 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let before = Set(document.editedProject.snapshot.clips.map { $0.id })
+        let before = document.editedProject.snapshot
         document.applyEdit("Nest", .nest(clips: clips))
-        selectClipsAdded(since: before, in: document)
+        selectClips(addedSince: before, in: document)
     }
 
     // MARK: - Un-nest
@@ -98,27 +98,11 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let before = Set(document.editedProject.snapshot.clips.map { $0.id })
+        let before = document.editedProject.snapshot
         document.applyEdit(
             nests.count == 1 ? "Un-nest" : "Un-nest Clips",
             nests.map { ReelOp.unnest(clip: $0.id) })
-        selectClipsAdded(since: before, in: document)
-    }
-
-    // MARK: - Shared
-
-    /// Selects whatever the edit put on the timeline that was not there
-    /// before, and tells the views.
-    ///
-    /// Nothing added means the core refused — it has beeped already — so the
-    /// selection is left as `ProjectDocument.clampViewState` left it, which
-    /// for a refusal is untouched.
-    private func selectClipsAdded(since before: Set<UInt32>, in document: ProjectDocument) {
-        let added = document.editedProject.snapshot.clips.map { $0.id }
-            .filter { !before.contains($0) }
-        guard !added.isEmpty else { return }
-        document.selection = Set(added)
-        viewStateDidChange()
+        selectClips(addedSince: before, in: document)
     }
 
     // MARK: - Validation

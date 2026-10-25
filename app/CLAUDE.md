@@ -56,7 +56,9 @@ detail there.
   `addAsset`, `rasterize`, `families()`; frozen by its first compile,
   rasterize or `families()`) and
   `GraphicModule` (`compile`, `describeJSON`, `svg`; it holds its library
-  strongly); their values `GraphicDiagnostic`, `GraphicFailure` (what a
+  strongly); their values `GraphicDiagnostic` (with `.error`, `.noModule`
+  and `.of(_:)`, the one spelling of a diagnostic made from a message, a
+  missing module or a thrown error), `GraphicFailure` (what a
   `diag_out` failure throws; `err_out` stays `ReelCoreError`) and
   `GraphicRaster` are `CoreValues.swift`'s, with `SpeedLimits` (a pure move,
   clean-up batch 2), `ReelCoreError` and `Fps.ffiPair` (G6 phase 5's toll), and
@@ -638,7 +640,11 @@ the key map behind it.
   `CanvasPickOverlay`, `+ZoomRegion` on `CanvasRegionView`) install a bare view
   over the canvas whose PRESENCE is the mode, through `armCanvasMode`, which
   ends every OTHER armed mode first; a fourth mode inherits that by being
-  installed at all. The region frame reads the EVALUATED props (the opposite
+  installed at all. Both overlays subclass `CanvasModeOverlay`
+  (`+Eyedropper`), which owns Esc, the crosshair, the hint pill and
+  `detachCallbacks`, and every mode is torn down by `dismissCanvasMode`;
+  a pick maps its press through `pickedCanvasPixel(atWindow:)`, a region
+  through `canvasPixel(atWindow:)`. The region frame reads the EVALUATED props (the opposite
   of every session in `CanvasSessions.swift`) because a region is drawn on
   what is on screen; ⇧ during the drag chooses `fill`. Their overlays sit
   above the canvas's region grips (CI-16) and take every press while armed;

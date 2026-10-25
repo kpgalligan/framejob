@@ -173,10 +173,10 @@ extension ExportSheetController {
         /// fixed-rate intra codec — the profile decides — and §7.8's preset
         /// pairs it with LPCM audio; the two LPCM audio rows are
         /// uncompressed by definition, so offering either of them an AAC bit
-        /// rate would be a control that changes nothing about the file.
+        /// rate would be a control that changes nothing about the file. Both
+        /// are `ExportSettings.carriesLinearPCM(codec:)`.
         private var fixedRate: Bool {
-            let codec = preset?.codec.lowercased() ?? ""
-            return codec.hasPrefix("prores") || codec == "lpcm"
+            ExportSettings.carriesLinearPCM(codec: preset?.codec ?? "")
         }
 
         private var hasVideo: Bool { preset.map { !$0.audioOnly } ?? false }

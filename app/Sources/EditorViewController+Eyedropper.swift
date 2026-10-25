@@ -13,7 +13,9 @@ import AppKit
 /// either could see the other. So the rule lives in the one place both entry
 /// points have to pass through anyway — `armCanvasMode`, the only code that
 /// installs one of these views — and this protocol is what lets it end the
-/// others without naming them.
+/// others without naming them. Every one of them is a `CanvasModeOverlay`
+/// (below), which holds what they share — Esc, the crosshair, the hint pill,
+/// `detachCallbacks` — and `dismissCanvasMode` is their one teardown.
 protocol CanvasModalMode: NSView {}
 
 extension EditorViewController {
@@ -52,6 +54,51 @@ extension EditorViewController {
         endChromaEyedropper()
         endQualifierPick()
         endRegionMode()
+    }
+
+    /// Tears one armed mode down: every `end…` is this with its own mode. A
+    /// no-op for nil, which is "that mode is not armed".
+    func dismissCanvasMode(_ mode: CanvasModeOverlay?) {
+        guard let mode else { return }
+        // The pitfall `PreviewCanvasView.finishTextEditing` documents: the
+        // teardown runs from inside the overlay's OWN event handler, so the
+        // callbacks are cleared before the view goes and a second entry finds
+        // nothing to do instead of recursing.
+        mode.detachCallbacks()
+        mode.removeFromSuperview()
+        // The crosshair belonged to a view that is now gone; without this the
+        // pointer keeps it until the next mouse-moved event lands somewhere
+        // with a cursor rect of its own.
+        NSCursor.arrow.set()
+        // Focus goes back where the canvas keys live, or Esc would leave the
+        // arrow-key nudge and the Space pan dead until the user clicked the
+        // canvas again.
+        if let overlay = previewCanvas?.overlay {
+            view.window?.makeFirstResponder(overlay)
+        }
+    }
+
+    /// A WINDOW point as canvas pixels; nil when there is no canvas to ask.
+    /// `PreviewCanvasView` owns the only mapping from points to canvas pixels
+    /// (spec §11), and an overlay is not allowed to know about zoom or pan,
+    /// so it asks. Unbounded: a region band may start in the void.
+    func canvasPixel(atWindow point: CGPoint) -> CGPoint? {
+        guard let canvas = previewCanvas else { return nil }
+        return canvas.viewToCanvas(canvas.convert(point, from: nil))
+    }
+
+    /// `canvasPixel(atWindow:)` for a pick: nil unless it lands on the
+    /// picture — the void around the canvas is a miss. Measured against the
+    /// EDITED project's canvas: inside a nest the preview IS the nest, at its
+    /// own frozen size, so the rectangle a point is mapped into and the frame
+    /// that is rendered to sample it must both be that one (road map 2's
+    /// phase 9).
+    func pickedCanvasPixel(atWindow point: CGPoint) -> CGPoint? {
+        guard let document, let target = canvasPixel(atWindow: point) else { return nil }
+        let size = document.editedProject.snapshot.canvas.size
+        guard target.x >= 0, target.y >= 0, target.x < size.width, target.y < size.height
+        else { return nil }
+        return target
     }
 }
 
@@ -129,25 +176,7 @@ extension EditorViewController {
 
     /// Disarms it, from Esc, from a second press of the button, from a
     /// completed pick, and from `syncChromaEyedropper`.
-    func endChromaEyedropper() {
-        guard let picker = chromaEyedropper else { return }
-        // The pitfall `PreviewCanvasView.finishTextEditing` documents: the
-        // teardown runs from inside the picker's OWN event handler, so the
-        // callbacks are cleared before the view goes and a second entry finds
-        // nothing to do instead of recursing.
-        picker.onPick = nil
-        picker.onCancel = nil
-        picker.removeFromSuperview()
-        // The crosshair belonged to a view that is now gone; without this the
-        // pointer keeps it until the next mouse-moved event lands somewhere
-        // with a cursor rect of its own.
-        NSCursor.arrow.set()
-        // Focus goes back where the canvas keys live, or Esc would leave the
-        // arrow-key nudge dead until the user clicked the canvas again.
-        if let overlay = previewCanvas?.overlay {
-            view.window?.makeFirstResponder(overlay)
-        }
-    }
+    func endChromaEyedropper() { dismissCanvasMode(chromaEyedropper) }
 
     /// Called from `refreshCanvas`: the mode is armed for the clips that were
     /// selected when it opened, so the moment the selection stops being those
@@ -165,22 +194,16 @@ extension EditorViewController {
     /// view owns the only mapping from points to canvas pixels (spec §11),
     /// and the overlay is not allowed to know about zoom or pan.
     private func chromaKeyPicked(at point: CGPoint) {
-        guard let document = document, let canvas = previewCanvas,
+        guard let document = document, previewCanvas != nil,
               let session = chromaEyedropper?.session
         else { return }
-        let target = canvas.viewToCanvas(canvas.convert(point, from: nil))
-        // The EDITED project's canvas: inside a nest the preview IS the
-        // nest, at its own frozen size, so the rectangle a point is mapped
-        // into and the frame that is rendered to sample it must both be that
-        // one (road map 2's phase 9).
-        let snapshot = document.editedProject.snapshot.canvas
-        let size = snapshot.size
-        guard target.x >= 0, target.y >= 0, target.x < size.width, target.y < size.height else {
+        guard let target = pickedCanvasPixel(atWindow: point) else {
             // The void around the canvas. The mode stays armed — a click that
             // missed the picture is a miss, not a decision.
             NSSound.beep()
             return
         }
+        let snapshot = document.editedProject.snapshot.canvas
         endChromaEyedropper()
 
         let urls = document.mediaURLs()
@@ -257,51 +280,39 @@ extension CanvasEyedropperSession {
     }
 }
 
-// MARK: - The overlay
+// MARK: - The overlays
 
-/// A pick mode's view (the chroma eyedropper's, Pick from Canvas's): a
-/// transparent sheet over the whole canvas pane that takes the one click,
-/// wears the crosshair, and says how to get back out in a pill. Subclassed
-/// for the state each mode carries.
-///
-/// It holds nothing else. Where the click landed on the canvas, what is
-/// under it, and what to do about it are all the view controller's — this
-/// is the same division `CanvasOverlayView` keeps with `PreviewCanvasView`.
-class CanvasPickOverlay: NSView, CanvasModalMode {
-    /// The picked point in WINDOW coordinates.
-    var onPick: ((CGPoint) -> Void)?
+/// What every modal canvas mode's view shares: a transparent sheet over the
+/// whole picture that holds first responder so Esc reaches it, wears the
+/// crosshair, and says how to get back out in a pill. `CanvasPickOverlay`
+/// (a click) and `CanvasRegionView` (a drag) subclass it for the gesture and
+/// the state each mode carries; `dismissCanvasMode` tears any of them down.
+class CanvasModeOverlay: NSView, CanvasModalMode {
     var onCancel: (() -> Void)?
 
-    private let hint: String
+    static let hintTop: CGFloat = 10
     private static let hintPadding: CGFloat = 9
-    private static let hintTop: CGFloat = 10
 
-    init(hint: String) {
-        self.hint = hint
-        super.init(frame: .zero)
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
         wantsLayer = true
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
-        fatalError("CanvasPickOverlay does not support NSCoder")
+        fatalError("CanvasModeOverlay does not support NSCoder")
     }
 
-    /// The canvas's own y-down space, so the hint is placed from the top edge
-    /// the way it reads.
+    /// The canvas's own y-down space, so the hint — and a region's band — is
+    /// placed from the top edge the way it reads.
     override var isFlipped: Bool { true }
 
     /// Esc has to reach `keyDown`, which means holding first responder for as
     /// long as the mode lasts.
     override var acceptsFirstResponder: Bool { true }
 
-    /// The pick tears this view down from inside this very call — the same
-    /// shape as the canvas text editor committing on ⌘Return — so the last
-    /// reference to it must not be the superview's.
-    override func mouseDown(with event: NSEvent) {
-        withExtendedLifetime(self) { onPick?(event.locationInWindow) }
-    }
-
+    /// Esc cancels. The cancel tears this view down from inside this very
+    /// call, so the last reference to it must not be the superview's.
     override func keyDown(with event: NSEvent) {
         guard event.keyCode == 53 else {  // Esc
             super.keyDown(with: event)
@@ -310,9 +321,9 @@ class CanvasPickOverlay: NSView, CanvasModalMode {
         withExtendedLifetime(self) { onCancel?() }
     }
 
-    /// AppKit publishes no eyedropper cursor, so a pick gets the crosshair —
-    /// the same bargain `CanvasHandle.cursor` makes for the diagonal resize
-    /// it also cannot spell.
+    /// AppKit publishes no eyedropper or "draw a region" cursor, so a mode
+    /// gets the crosshair — the same bargain `CanvasHandle.cursor` makes for
+    /// the diagonal resize it also cannot spell.
     override func resetCursorRects() {
         addCursorRect(bounds, cursor: .crosshair)
     }
@@ -325,26 +336,73 @@ class CanvasPickOverlay: NSView, CanvasModalMode {
         window?.invalidateCursorRects(for: self)
     }
 
-    /// A modal cursor is not enough on its own: the pill is what tells
-    /// someone who clicked the button by accident that they are in a mode and
-    /// how to leave it.
-    override func draw(_ dirtyRect: NSRect) {
+    /// One hint pill centred at `top`, skipped when it would not fit; answers
+    /// its height either way, so a second pill's place does not depend on the
+    /// first. A modal cursor is not enough on its own: the pill is what tells
+    /// someone who armed a mode by accident that they are in one and how to
+    /// leave it, and every mode announces itself with this one.
+    final func drawPill(_ text: String, top: CGFloat) -> CGFloat {
         let label = NSAttributedString(
-            string: hint,
+            string: text,
             attributes: [.font: DS.sans(11), .foregroundColor: DS.textStrong])
         let size = label.size()
         let pill = CGRect(
             x: ((bounds.width - size.width) / 2 - Self.hintPadding).rounded(),
-            y: Self.hintTop,
+            y: top,
             width: (size.width + Self.hintPadding * 2).rounded(),
             height: (size.height + 6).rounded())
-        guard pill.width < bounds.width else { return }
+        guard pill.width < bounds.width else { return pill.height }
         let path = NSBezierPath(rect: pill)
         DS.chromeBackground.withAlphaComponent(0.92).setFill()
         path.fill()
         DS.accent.setStroke()
         path.stroke()
         label.draw(at: NSPoint(x: pill.minX + Self.hintPadding, y: pill.minY + 3))
+        return pill.height
+    }
+
+    /// Clears every callback before the view goes (`dismissCanvasMode`). A
+    /// subclass clears its own, then calls this.
+    func detachCallbacks() {
+        onCancel = nil
+    }
+}
+
+/// A pick mode's view (the chroma eyedropper's, Pick from Canvas's): the
+/// overlay that takes the one click. Subclassed for the state each mode
+/// carries.
+///
+/// It holds nothing else. Where the click landed on the canvas, what is
+/// under it, and what to do about it are all the view controller's — this
+/// is the same division `CanvasOverlayView` keeps with `PreviewCanvasView`.
+class CanvasPickOverlay: CanvasModeOverlay {
+    /// The picked point in WINDOW coordinates.
+    var onPick: ((CGPoint) -> Void)?
+
+    private let hint: String
+
+    init(hint: String) {
+        self.hint = hint
+        super.init(frame: .zero)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("CanvasPickOverlay does not support NSCoder")
+    }
+
+    /// The pick tears this view down from inside this very call — the same
+    /// shape as the canvas text editor committing on ⌘Return — so the last
+    /// reference to it must not be the superview's.
+    override func mouseDown(with event: NSEvent) {
+        withExtendedLifetime(self) { onPick?(event.locationInWindow) }
+    }
+
+    override func draw(_ dirtyRect: NSRect) { _ = drawPill(hint, top: Self.hintTop) }
+
+    override func detachCallbacks() {
+        onPick = nil
+        super.detachCallbacks()
     }
 }
 
