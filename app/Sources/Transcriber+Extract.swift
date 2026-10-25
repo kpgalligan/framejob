@@ -155,15 +155,17 @@ extension Transcriber {
                 try? FileManager.default.removeItem(at: destination)
                 throw TranscribeError.cancelled
             }
-            // 5 ms is far shorter than any buffer and far longer than a
-            // context switch — `ReverseRenderer`'s number, for its reason.
-            while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.005) }
-            guard input.append(sample) else {
+            // The wait leaves when the writer stops writing or Cancel lands
+            // during it (#351), not only when the input is ready.
+            if let failure = AudioRateCopy.append(
+                sample, to: input, writer: writer, cancelled: { cancel.isCancelled },
+                appendFailure: "the extract could not be written")
+            {
                 reader.cancelReading()
                 writer.cancelWriting()
                 try? FileManager.default.removeItem(at: destination)
-                throw TranscribeError.failed(
-                    writer.error?.localizedDescription ?? "the extract could not be written")
+                if cancel.isCancelled { throw TranscribeError.cancelled }
+                throw TranscribeError.failed(failure)
             }
             frames += CMSampleBufferGetNumSamples(sample)
             progress?(frames)

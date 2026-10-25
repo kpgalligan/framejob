@@ -252,18 +252,24 @@ enum AudioRateCopy {
         return box.end
     }
 
-    /// Appends once the input is ready; nil on success, else why not.
-    private static func append(
-        _ buffer: CMSampleBuffer, to input: AVAssetWriterInput, writer: AVAssetWriter
+    /// Appends once the input is ready; nil on success, else why not. The
+    /// wait ends when the writer stops writing — a failed writer may never
+    /// ask for more — or when `cancelled` answers true ("cancelled"; the
+    /// caller cleans up). `Transcriber.extract` shares it (#351);
+    /// `appendFailure` is the text for a refused append with no writer error.
+    static func append(
+        _ buffer: CMSampleBuffer, to input: AVAssetWriterInput, writer: AVAssetWriter,
+        cancelled: () -> Bool = { false }, appendFailure: String = "an append failed"
     ) -> String? {
         while !input.isReadyForMoreMediaData {
             guard writer.status == .writing else {
                 return writer.error?.localizedDescription ?? "the writer stopped"
             }
+            if cancelled() { return "cancelled" }
             Thread.sleep(forTimeInterval: 0.002)
         }
         guard input.append(buffer) else {
-            return writer.error?.localizedDescription ?? "an append failed"
+            return writer.error?.localizedDescription ?? appendFailure
         }
         return nil
     }

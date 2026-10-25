@@ -17,15 +17,16 @@ extension MediaImporter {
     static let speechVersion = 2
 
     /// Whether the speech cache for `media` is already current: a stamp,
-    /// a marker equal to `SpeechStamp(stamp)`, and the `.bin` actually there.
-    /// A nil stamp (the file could not be stat'ed) never says yes.
+    /// a marker equal to `SpeechStamp(stamp)`, and a `.bin` `loadSpeech`
+    /// accepts, so a file it refuses is made again (#351). A nil stamp (the
+    /// file could not be stat'ed) never says yes.
     static func speechIsCurrent(for media: MediaSnapshot, stamp: CacheStamp?, in cacheDir: URL)
         -> Bool
     {
         guard let stamp else { return false }
         let marker = speechMarkerURL(for: media.id, in: cacheDir)
         guard readSpeechStamp(at: marker) == SpeechStamp(stamp) else { return false }
-        return FileManager.default.fileExists(atPath: speechURL(for: media.id, in: cacheDir).path)
+        return loadSpeech(for: media.id, in: cacheDir) != nil
     }
 
     /// Writes `cache/speech/<id>.bin`: one Silero VAD probability per
@@ -33,8 +34,10 @@ extension MediaImporter {
     /// extraction of `track` (the spike's own output settings, NOT
     /// `Transcriber.extractSettings`'s 16-bit int — the model wants float).
     ///
-    /// A `canAdd`/`startReading` failure returns silently, `peaks`' posture:
-    /// no marker, no `.bin`, retried on the next open. `SileroVAD.bundled()`
+    /// A nil stamp, or a `canAdd`/`startReading` failure, returns silently,
+    /// `peaks`' posture: no marker, no `.bin`, retried on the next open — a
+    /// `.bin` no marker certifies is never written, and one whose marker will
+    /// not write is removed (#351). `SileroVAD.bundled()`
     /// answering nil means it has already `markUnavailable`d and logged, so
     /// this returns too. Probabilities land in a zero-filled buffer sized by
     /// `chunkCount(duration:)` from index 0; extra chunks past that (a track
@@ -47,7 +50,7 @@ extension MediaImporter {
         for media: MediaSnapshot, asset: AVURLAsset, track: AVAssetTrack, stamp: CacheStamp?,
         into cacheDir: URL, pass: CachePass? = nil
     ) {
-        guard let vad = SileroVAD.bundled() else { return }
+        guard let stamp, let vad = SileroVAD.bundled() else { return }
         guard let (reader, output) = speechReader(asset: asset, track: track) else { return }
         guard reader.canAdd(output) else { return }
         reader.add(output)
@@ -115,8 +118,10 @@ extension MediaImporter {
         CacheLedger.shared.publish(in: cacheDir, for: pass) {
             guard ensureDirectory(file.deletingLastPathComponent()) else { return }
             guard (try? data.write(to: file, options: .atomic)) != nil else { return }
-            if let stamp {
-                writeStamp(SpeechStamp(stamp), to: speechMarkerURL(for: media.id, in: cacheDir))
+            let marker = speechMarkerURL(for: media.id, in: cacheDir)
+            guard writeStamp(SpeechStamp(stamp), to: marker) else {
+                try? FileManager.default.removeItem(at: file)
+                return
             }
             postCacheChange(media: media.id, kind: speechKind)
         }

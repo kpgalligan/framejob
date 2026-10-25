@@ -23211,3 +23211,51 @@ make gate && RC_PROOF_APP=release python3 tools/proof/export_frame_count_proof.p
 | `ramp_proof.py --only E1,W1` (Debug) | 4/4 in 18 s, exit 0 — E1 70/70 clicks; W1 the ramp audio after 6.7 s |
 | `make gate` | PASS 234 s (names 1 s, typecheck 5 s, fmt and lint skipped, test 120 s, app 108 s) |
 | `export_frame_count_proof.py` (Release, after the gate) | **18/18**, exit 0 — S0–S6, W1–W3 as above; the GIF 681 bytes, ffprobe 1 frame; the sheet "· 1 frames, no audio", no "0 frames"; no `Frame Job: ` in the log |
+
+## Issue #351 — the transcription extract's wait, the speech cache's certification (`speech_cache_probe.py` B0, S1–S9, W0–W3, A1–A3 and seven mutants; `speech_cache_probe.swift`)
+
+**The fixes.** `Transcriber.extract`'s wait for `isReadyForMoreMediaData` was
+`while !ready { sleep(5 ms) }`: a writer that failed mid-extract never asks for more, so the
+thread spun and Cancel never reached it. It now calls `AudioRateCopy.append` (no longer
+`private`), whose wait leaves when `writer.status != .writing` and, through its new
+`cancelled` closure, when Cancel lands; the extract keeps its own cleanup (cancel both,
+remove the destination) and its own wording ("the extract could not be written", through
+`appendFailure`), and throws `.cancelled` when the token is set. `loadSpeech` now requires a
+marker of the current `speechVersion` and whole Float32s (`loadPeaks`' rule), so
+`speechIsCurrent` asks `loadSpeech` and a refused `.bin` is made again; `writeSpeech` returns
+for a nil stamp before it decodes and removes the `.bin` when its marker will not write
+(`finishPeaks`' rule). The file format is unchanged: a version-2 pair still loads. The extract
+itself has no row a script can reach (its writer is local to `extract`); A1–A3 drive the wait
+it now calls.
+
+The probe compiles `speech_cache_probe.swift` as `main.swift` over `app/Sources` on
+`swift_build.py`'s line, with `app/Resources/Models` copied beside the binary, over a 1 s
+16 kHz mono tone it authors in `tools/proof/work/speech-cache-probe/`:
+
+- **S1–S7** — `loadSpeech`: a current marker and 12 bytes load the three values; no marker,
+  version 1, an undecodable marker, 14 bytes, 0 bytes, and no `.bin` are each nil.
+- **S8, S9** — `speechIsCurrent`: true for S1's pair; false for the 14-byte `.bin` and for a
+  nil stamp.
+- **W0–W3** — the model is beside the probe; a nil stamp writes neither file; a folder where
+  the marker goes leaves no `.bin`; a refused pair is written again with `chunkCount` values.
+- **A1** — a cancelled writer, input finished: `isReadyForMoreMediaData` is false (the old
+  loop spins) and `append` answers a reason within 5 s.
+- **A2** — a writing writer whose input is finished (never ready again): `append` answers
+  "cancelled" on the third `cancelled()` ask. **A3** — the same wait with no cancel is still
+  waiting after 1 s (the hang A2 escapes).
+
+**Mutants** (`--mutant NAME|all`, a copy of `app/Sources`; MUTANT PASS when exactly the named
+rows fail): `no-marker-gate` S2–S4, `no-whole-floats` S5 S9, `current-by-exists` S9,
+`nil-stamp-writes` W1, `no-rollback` W2, `no-cancel-in-wait` A2, `no-status-exit` A1.
+
+```sh
+python3 tools/proof/speech_cache_probe.py
+python3 tools/proof/speech_cache_probe.py --mutant all
+```
+
+| Run (2026-10-25) | Result |
+|---|---|
+| probe | 16/16, exit 0 |
+| `--mutant all` | 7/7 MUTANT PASS, exit 0 |
+| `make gate` | PASS (230 s) |
+| Release run | not applicable: the probe compiles its own binary from `app/Sources` and drives no built app |

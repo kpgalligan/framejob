@@ -376,11 +376,16 @@ extension MediaImporter {
         return values
     }
 
-    /// The cached Silero VAD probabilities, or nil when they have not been
-    /// generated — `loadPeaks`' shape for `cache/speech/<id>.bin`.
+    /// The cached Silero VAD probabilities, or nil until a marker of the
+    /// current `speechVersion` certifies them and the `.bin` is whole Float32s
+    /// — `loadPeaks`' shape for `cache/speech/<id>.bin` (#351).
     static func loadSpeech(for media: UInt32, in cacheDir: URL) -> [Float]? {
+        guard readSpeechStamp(at: speechMarkerURL(for: media, in: cacheDir))?.version
+            == speechVersion
+        else { return nil }
         let url = speechURL(for: media, in: cacheDir)
-        guard let data = try? Data(contentsOf: url), data.count >= 4 else { return nil }
+        guard let data = try? Data(contentsOf: url), data.count >= 4, data.count % 4 == 0
+        else { return nil }
         return data.withUnsafeBytes { raw in Array(raw.bindMemory(to: Float.self)) }
     }
 
