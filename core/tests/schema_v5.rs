@@ -366,8 +366,8 @@ fn paste_attributes_carries_the_animation_and_re_checks_it() {
     // look does not paste the words.
     assert_eq!(text(&landed, "/clips/0/text/content"), "Hello");
 
-    // The payload is the one caller that runs `Project::check_group` rather
-    // than the patch path, so a value the inspector would refuse is refused
+    // The payload runs `Project::normalise_and_check_group` rather than
+    // the patch path, so a value the inspector would refuse is refused
     // here too, with the same message, rather than being smuggled past the
     // ranges by a hand-written pasteboard.
     let msg = plain().errors(&json!({

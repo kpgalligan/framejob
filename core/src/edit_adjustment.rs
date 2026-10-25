@@ -109,7 +109,7 @@ pub(crate) fn is_adjustment(clip: &Clip) -> bool {
 
 /// The one rule about an adjustment CLIP's video group: no neighbourhood
 /// filter and no blend mode. An `Err`, as `check_blend`'s is, so `paste` and
-/// `paste_attributes` meet it through `check_group` and refuse the whole
+/// `paste_attributes` meet it through `settle_video` and refuse the whole
 /// paste. Any other clip passes.
 pub(crate) fn check_adjustment_video(clip: &Clip, props: &VideoProps) -> Result<(), String> {
     if !is_adjustment(clip) {
@@ -142,7 +142,7 @@ pub(crate) fn check_adjustment_video(clip: &Clip, props: &VideoProps) -> Result<
 /// adjustment clip takes one. A neutral qualifier passes on any clip, so a
 /// `null` patch is an identity everywhere. An `Err` (the error tier, as
 /// [`check_adjustment_video`]'s), so `paste` and `paste_attributes` meet it
-/// through `check_group`.
+/// through `settle_video`.
 pub(crate) fn check_qualifier_clip(clip: &Clip, props: &VideoProps) -> Result<(), String> {
     if is_adjustment(clip) || props.qualifier.is_neutral() {
         return Ok(());

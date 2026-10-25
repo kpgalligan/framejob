@@ -348,12 +348,13 @@ governs a module now.
   `effective_length` (G-9), so every splitter obeys it, and its `props` the
   evaluated ones, a straddled action's first half ending at them (G-34).
 - `edit_props.rs` — the five patches (`set_video`, `set_audio`, `set_text`,
-  `set_shape`, `set_clip`), `Project::check_group` (the range check
-  `paste_attributes` runs on each group it has just replaced and `paste` on
-  every group of every clip it lands — the same `check_video` /
-  `check_audio` / `check_text` / `check_shape` the patch path calls
-  directly; its only caller is `normalise_and_check_group`) and
-  `normalise_and_check_group` beside it (the one NORMALISATION a copied
+  `set_shape`, `set_clip`), `Project::settle_video` (the one chain that
+  makes a video group storable — empty motion → null, `check_video`,
+  identity curves dropped, `check_blend` / `check_adjustment_video` /
+  `check_qualifier_clip` / `check_look_media`, `snap_motion` — run by
+  `set_video` and by every pasted video group) and
+  `normalise_and_check_group` beside it (`settle_video` for a video group,
+  the range check for the other three) (the one NORMALISATION a copied
   group needs first: a clipboard payload is a third door for a `Motion`, and
   an empty one has two spellings; only the file reader does not normalise;
   the copied group is checked before its present video/text timing is
@@ -413,7 +414,8 @@ governs a module now.
   sentence a caller can read — shared by `remove_track` and `remove_media`. It
   keeps `MEDIA_KEYS` and `check_media_fields` (the post-schema checks a media
   record passes, in one order and one set of sentences), which
-  `edit_relink.rs` reads for a relink's probe; `relink_media` itself moved to
+  `edit_relink.rs` reads for a relink's probe and `edit_paste.rs` (after
+  `normalize_original`) for a pasted row it appends; `relink_media` moved to
   `edit_relink.rs`.
 - `edit_relink.rs` — `relink_media` (spec §11 #63): points a media at another
   file and, given the new file's `probe` (the host's `MediaImporter.probe`

@@ -334,7 +334,8 @@ fn a_duplicate_a_detach_and_a_paste_all_keep_the_whole_preset() {
 fn paste_attributes_copies_the_preset_with_the_rest_of_the_video_group() {
     // `paste_attributes` replaces a group WHOLE, so a motion travels with
     // it — and, like every other value in the group, it passes the same
-    // range checks a patch would (`Project::check_group`).
+    // range checks a patch would (`Project::settle_video`, the chain
+    // `set_video` runs).
     let mut source = moving().value();
     source["clips"].as_array_mut().unwrap().push(json!({
         "id": 12, "track": 2, "start": 20 * SEC, "duration": 5 * SEC,

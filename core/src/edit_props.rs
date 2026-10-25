@@ -70,8 +70,8 @@ use crate::props_check::{check_audio, check_shape, check_text, check_video};
 /// It lives HERE rather than in `props_check.rs` because it is not a fact
 /// about the vocabulary: the value is perfectly legal and it is the CLIP it
 /// was written onto that refuses it, where `props_check.rs` never sees a
-/// clip. Both callers — the patch path and `paste_attributes`' `check_group`
-/// — run this one function, so the two give the identical message.
+/// clip. Both callers — the patch path and every pasted video group — run
+/// it inside [`Project::settle_video`], so the two give the identical message.
 ///
 /// It is not the whole story either: `set_action_end` checks the VOCABULARY
 /// and never the clip, and a blend mode is a legal value, so an end patch
@@ -227,48 +227,86 @@ impl Project {
         animation.out = self.snapped(animation.out);
     }
 
-    /// What `paste_attributes` runs on each copied group, and `paste` on
-    /// every group of every clip it lands ([`Self::normalise_and_check_pasted`]):
-    /// canonicalize an empty motion, check the original values, then snap
-    /// present video or text timing to the destination grid.
+    /// The chain that makes a video group storable — `set_video`'s and every
+    /// pasted video group's (issue #349), so a group written by hand into a
+    /// clipboard payload meets exactly what a patch meets, in the same
+    /// order and with the same sentences.
     ///
-    /// "One clip has one spelling of no motion" (road map 5 §5a) is kept by
-    /// the patch path and by the split rule, and a clipboard payload is a
-    /// third door: `{"motion": {}}`, or three explicit nulls, deserialises to
-    /// a `Motion` with three `None`s and would be stored as `{"in": null,
-    /// "out": null, "during": null}` where those two store `null`. Both
-    /// clipboard ops close that door here; the invariant stays open only at
-    /// the FILE reader, which keeps the long spelling on purpose until a patch
-    /// touches it (`core/tests/schema_v8.rs`'s
-    /// `a_motion_whose_slots_are_all_cleared_normalises_back_to_null`; road
-    /// map 7 §2.2). Normalising is not a range check, so it happens here
-    /// rather than inside one, beside `check_group` and the snappers whose
-    /// check-before-snap order the copied group must follow.
+    /// 1. **One spelling of "no motion"** (format version 8, road map 5
+    ///    §5a): a patch that clears the last filled slot leaves a `Motion`
+    ///    with three `None`s behind, and a payload's `{"motion": {}}` or
+    ///    three explicit nulls deserialise to the same thing; either would
+    ///    round-trip as `{"in": null, "out": null, "during": null}` and make
+    ///    two equal clips compare unequal. It is normalised HERE rather than
+    ///    in serde, because the deep merge is what produces the empty one —
+    ///    a caller who writes `{"motion": {}}` means the same thing and gets
+    ///    the same answer. The invariant stays open only at the FILE reader,
+    ///    which keeps the long spelling on purpose until a patch touches it
+    ///    (`core/tests/schema_v8.rs`'s
+    ///    `a_motion_whose_slots_are_all_cleared_normalises_back_to_null`;
+    ///    road map 7 §2.2).
+    /// 2. The vocabulary's ranges (`check_video`), on the values the caller
+    ///    sent.
+    /// 3. An identity curve is stored as none (spec §11 GR-12), AFTER the
+    ///    range check so a malformed identity-shaped curve is still refused
+    ///    by name; an identity curve on an uncurved clip is then an identity.
+    /// 4. The rules about this CLIP rather than the values — [`check_blend`],
+    ///    the adjustment and qualifier rules, the look's media.
+    /// 5. Motion timings snapped to the grid ([`Self::snap_motion`]).
+    ///
+    /// The look's own normalisation (`normalise_look`) is the patch path's
+    /// alone: it reads the PATCH, which a pasted group does not have.
+    pub(crate) fn settle_video(&self, clip: &Clip, props: &mut VideoProps) -> Result<(), String> {
+        if props.motion.is_some_and(|motion| motion.is_empty()) {
+            props.motion = None;
+        }
+        check_video(props, self.source_size(clip))?;
+        props.curves.drop_identities();
+        check_blend(clip, props)?;
+        check_adjustment_video(clip, props)?;
+        check_qualifier_clip(clip, props)?;
+        self.check_look_media(props)?;
+        self.snap_motion(props);
+        Ok(())
+    }
+
+    /// What `paste_attributes` runs on each group it has just replaced, and
+    /// `paste` on every group of every clip it lands
+    /// ([`Self::normalise_and_check_pasted`]), so a payload written by hand
+    /// meets the bounds a patch does and a group `paste_attributes` did not
+    /// touch is not its business. A video group goes through
+    /// [`Self::settle_video`], `set_video`'s own chain; the other three
+    /// through the same `check_audio` / `check_text` / `check_shape` the
+    /// patch path calls, a text group's timings then snapped to the
+    /// destination grid. A group the clip lacks has nothing to check.
     pub(crate) fn normalise_and_check_group(
         &self,
         clip: &mut Clip,
         group: Group,
     ) -> Result<(), String> {
-        if group == Group::Video {
-            if let Some(video) = clip.video.as_mut() {
-                if video.motion.is_some_and(|motion| motion.is_empty()) {
-                    video.motion = None;
-                }
-            }
-        }
-        self.check_group(clip, group)?;
         match group {
             Group::Video => {
-                if let Some(video) = clip.video.as_mut() {
-                    self.snap_motion(video);
+                if let Some(mut video) = clip.video.clone() {
+                    self.settle_video(clip, &mut video)?;
+                    clip.video = Some(video);
+                }
+            }
+            Group::Audio => {
+                if let Some(audio) = clip.audio.as_ref() {
+                    check_audio(audio)?;
                 }
             }
             Group::Text => {
                 if let Some(text) = clip.text.as_mut() {
+                    check_text(text)?;
                     self.snap_animation(text);
                 }
             }
-            Group::Audio | Group::Shape => {}
+            Group::Shape => {
+                if let Some(shape) = clip.shape.as_ref() {
+                    check_shape(shape)?;
+                }
+            }
         }
         Ok(())
     }
@@ -298,36 +336,6 @@ impl Project {
                 .map_err(|why| format!("pasted clip {payload_id}: {why}"))?;
         }
         Ok(())
-    }
-
-    /// The range check for ONE of a clip's groups — the second half of
-    /// [`Self::normalise_and_check_group`], its only caller, which
-    /// `paste_attributes` runs on each group it has just replaced and `paste`
-    /// on every group of every clip it lands, so a payload written by hand
-    /// meets the bounds a patch does (the same `check_video` / `check_audio`
-    /// / `check_text` / `check_shape` the patch path calls) and a group
-    /// `paste_attributes` did not touch is not its business. A group the clip
-    /// lacks has nothing to check.
-    pub(crate) fn check_group(&self, clip: &Clip, group: Group) -> Result<(), String> {
-        match group {
-            Group::Video => match &clip.video {
-                // The vocabulary's ranges, then the one rule that is about
-                // this CLIP rather than about the values — so a payload
-                // pasted onto a nest clip is refused with the same sentence
-                // `set_video` would have used.
-                Some(video) => {
-                    check_video(video, self.source_size(clip))?;
-                    check_blend(clip, video)?;
-                    check_adjustment_video(clip, video)?;
-                    check_qualifier_clip(clip, video)?;
-                    self.check_look_media(video)
-                }
-                None => Ok(()),
-            },
-            Group::Audio => clip.audio.as_ref().map_or(Ok(()), check_audio),
-            Group::Text => clip.text.as_ref().map_or(Ok(()), check_text),
-            Group::Shape => clip.shape.as_ref().map_or(Ok(()), check_shape),
-        }
     }
 
     /// The one implementation behind the four `set_*` property ops: merge,
@@ -363,28 +371,8 @@ impl Project {
                         .clone()
                         .ok_or_else(|| format!("clip {id} has no video properties"))?;
                     let mut props = merge_group(&base, patch, group)?;
-                    // One spelling of "no motion" (format version 8): a
-                    // patch that clears the last filled slot leaves a
-                    // `Motion` with three `None`s behind, which round-trips
-                    // as `{"in": null, "out": null, "during": null}` and
-                    // would make two equal clips compare unequal. It is
-                    // normalised HERE rather than in serde, because the
-                    // deep merge is what produces the empty one — a caller
-                    // who writes `{"motion": {}}` means the same thing and
-                    // gets the same answer.
-                    if props.motion.is_some_and(|motion| motion.is_empty()) {
-                        props.motion = None;
-                    }
                     normalise_look(&mut props, patch)?;
-                    check_video(&props, self.source_size(&clip))?;
-                    // An identity curve is stored as none (spec §11 GR-12),
-                    // so an identity patch on an uncurved clip is an identity.
-                    props.curves.drop_identities();
-                    check_blend(&clip, &props)?;
-                    check_adjustment_video(&clip, &props)?;
-                    check_qualifier_clip(&clip, &props)?;
-                    self.check_look_media(&props)?;
-                    self.snap_motion(&mut props);
+                    self.settle_video(&clip, &mut props)?;
                     if let Some(slot) = next.clip_mut(id) {
                         slot.video = Some(props);
                     }

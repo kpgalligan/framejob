@@ -99,7 +99,8 @@ pub(crate) fn clip_list(ids: &[u32]) -> String {
 /// A media's `original` as it is stored (spec §11 #228-O): the path
 /// trimmed, and a blank bookmark dropped, for the reason `add_media` drops
 /// a blank media bookmark. An empty path is left for `check_media_fields`
-/// to refuse by name. `add_media` and a relink's probe both read it.
+/// to refuse by name. `add_media`, a relink's probe and a media row
+/// `paste` or `paste_attributes` appends (`edit_paste.rs`) all read it.
 pub(crate) fn normalize_original(original: Option<MediaOriginal>) -> Option<MediaOriginal> {
     original.map(|given| MediaOriginal {
         path: given.path.trim().to_string(),
@@ -108,8 +109,10 @@ pub(crate) fn normalize_original(original: Option<MediaOriginal>) -> Option<Medi
 }
 
 /// The checks a media record's fields must pass once the descriptor has
-/// matched the schema — `add_media`'s, and a relink probe's
-/// (`edit_relink.rs`), in one order and one set of sentences: an empty
+/// matched the schema — `add_media`'s, a relink probe's
+/// (`edit_relink.rs`) and a pasted media row's that `paste` or
+/// `paste_attributes` appends (`edit_paste.rs`), in one order and one set
+/// of sentences: an empty
 /// path, a `lut` row with a picture, sound or duration (`lut.rs`), a
 /// negative duration, a media with pixels whose size or rate is not
 /// usable, an original with an empty path.

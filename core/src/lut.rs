@@ -5,8 +5,8 @@
 //! - **The row.** A LUT is media so it is referenced, relinked and
 //!   consolidated like footage, but it has no picture of its own: its row
 //!   carries no video, audio, alpha or duration ([`check_lut_fields`], which
-//!   `edit_track.rs`'s `check_media_fields` calls for `add_media` and a
-//!   relink's probe), and it is never placed as a clip — `add_clip`,
+//!   `edit_track.rs`'s `check_media_fields` calls for `add_media`, a
+//!   relink's probe and a pasted media row), and it is never placed as a clip — `add_clip`,
 //!   `insert_clip`, `overwrite_clip` and `add_background` answer
 //!   [`lut_not_placeable`].
 //! - **The look.** `media` is required with `lut` and goes with nothing

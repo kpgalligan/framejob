@@ -42,8 +42,8 @@
 //!   list is ACCEPTED on purpose, and that is pinned here so a later reader
 //!   does not "fix" it into a refusal (`props_check.rs` argues it).
 //! - **Both travel through `paste_attributes`**, which replaces a group
-//!   whole out of a payload written by hand and runs `Project::check_group`
-//!   rather than the patch path.
+//!   whole out of a payload written by hand and runs
+//!   `Project::normalise_and_check_group` rather than the patch path.
 //!
 //! What a blend or a gradient DOES to the picture is the compositor's claim
 //! and cannot be made here — the core touches no pixel (spec §7); the
@@ -681,8 +681,8 @@ fn paste_attributes_carries_both_and_re_checks_them() {
     // ...and the clip the payload was not aimed at is untouched.
     assert_eq!(text(&landed, "/clips/0/video/blend"), "normal");
 
-    // The payload is the one caller that runs `Project::check_group` rather
-    // than the patch path, so a gradient the inspector would refuse is
+    // The payload runs `Project::normalise_and_check_group` rather than
+    // the patch path, so a gradient the inspector would refuse is
     // refused here too, with the same message, rather than being smuggled
     // past the ranges by a hand-written pasteboard.
     let msg = plain().errors(&json!({

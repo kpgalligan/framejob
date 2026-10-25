@@ -41,8 +41,8 @@
 //!   dropping it while `set_video` reports success.
 //! - **The same check is reachable from `paste_attributes`**, which copies
 //!   the video group whole out of a payload written by hand. It runs
-//!   `Project::check_group`, not the patch path, so a payload cannot smuggle
-//!   in a region the inspector would refuse.
+//!   `Project::settle_video`, the same chain `set_video` runs, so a payload
+//!   cannot smuggle in a region the inspector would refuse.
 //! - **Every layer of the frame recipe carries the list**, present or
 //!   empty, because a stored region the compositor is never told about
 //!   hides nothing.
@@ -391,8 +391,9 @@ fn payload_with(regions: Value) -> Value {
 #[test]
 fn paste_attributes_carries_the_regions_and_re_checks_them() {
     // `paste_attributes` replaces the video group WHOLE out of a payload
-    // that never went through a patch, so it is the one caller that runs
-    // `Project::check_group` rather than `set_video`'s own check. Both
+    // that never went through a patch, so it runs
+    // `Project::normalise_and_check_group` — for a video group
+    // `Project::settle_video`, the same chain `set_video` runs. Both
     // arms matter: a legal list lands...
     let landed = plain()
         .apply(&json!({

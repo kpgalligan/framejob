@@ -236,7 +236,10 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   not an id, since the ids belong to the document copied from: `track` names where depth 0 lands
   (default: the front-most track), the rest follow by the same index delta, and tracks missing
   behind it are added. Media is matched to `media[]` **by path** — reused when it is there, appended
-  when it is not — so a paste between documents brings the entry with it. A clip the overlap rule
+  when it is not — so a paste between documents brings the entry with it. An appended row first
+  passes `add_media`'s field checks, with its `original` stored as `add_media` stores it (an
+  **error**, `pasted media N: …`, N the payload's id); a row matched by path is the project's own
+  and is not checked. A clip the overlap rule
   refuses on its target track goes on a new track in front (as Add Text does, §4.1), so the only
   refusal is an empty clip list; a malformed payload is an **error**. Every landed clip — the
   payload's own and those inside the nests it brings — first has every group pass
@@ -290,8 +293,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   value is NORMALISED on the way in, not merely checked: a copied `video.motion` whose three slots
   are all null lands as `null`, the same one spelling of "no motion" `set_video` and `split` keep —
   this op's payload is a third door for a `Motion`, and `{"motion": {}}` means the same thing; the
-  file reader does NOT normalise (`core/tests/schema_v8.rs`). Refuses when nothing changes, and on
-  an empty `groups` list.
+  file reader does NOT normalise (`core/tests/schema_v8.rs`). And a copied identity curve is dropped
+  after the range check, as `set_video` drops one (§11 GR-12), so pasting one onto an uncurved clip
+  is an identity. Refuses when nothing changes, and on an empty `groups` list.
 - **`nest {clips, name?}`** — Collapses the selection into ONE clip showing a nest (§5.2), on the
   front-most track the selection occupied that is not a matte track (the front-most when all are,
   §11 MT-5), running from the earliest start to the latest end. The

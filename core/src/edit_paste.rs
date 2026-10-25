@@ -51,9 +51,13 @@
 //! not the canvas's. Media is matched to the existing `media[]` **by path**,
 //! which is `add_media`'s one-entry-per-path rule, so pasting between two
 //! documents that both reference `/m/talk.mov` reuses the row that is there
-//! and pasting into a document that has never seen it brings the row along.
-//! Every group of every clip that lands, nested ones included, first passes
-//! the patch path's normalise-and-check, as `paste_attributes`' do.
+//! and pasting into a document that has never seen it brings the row along;
+//! a row brought along first passes `add_media`'s field checks, with its
+//! `original` stored as `add_media` stores it, and a row matched by path is
+//! the project's own and is not checked. Every group of every clip that
+//! lands, nested ones included, first passes the patch path's
+//! normalise-and-check, as `paste_attributes`' do — a video group
+//! `set_video`'s own chain, `Project::settle_video`.
 //!
 //! Placement obeys the overlap rule like everything else (spec §11), and a
 //! clip the rule refuses on its target track goes on a NEW track in front —
@@ -71,6 +75,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use serde_json::Value;
 
+use crate::edit_track::{check_media_fields, normalize_original};
 use crate::export::describe;
 use crate::format::MAX_TRACKS;
 use crate::lut::{look_media_ids, remap_look_media};
@@ -262,8 +267,12 @@ fn absorb_nests(
 ///
 /// `Err` when a clip shows a media the payload does not carry (a truncated
 /// or hand-written payload — the clip would otherwise become a dangling
-/// reference `validate` refuses) or when a row's path is empty. A look's id
-/// the payload lacks is skipped (spec §11 GR-8).
+/// reference `validate` refuses), when a row's path is empty, or when a row
+/// about to be APPENDED fails `add_media`'s field checks
+/// (`edit_track.rs`'s `check_media_fields`, on the row with its `original`
+/// stored as `add_media` stores it; `pasted media N: …`, N the payload's
+/// id). A row matched by path is the project's own and is not checked. A
+/// look's id the payload lacks is skipped (spec §11 GR-8).
 ///
 /// A row APPENDED here keeps its Camera Log (spec §11 GR-16) with its
 /// `color.lut` pointed at this project's id for that LUT, or loses its
@@ -304,10 +313,14 @@ pub(crate) fn absorb_media(
             Some(found) => found.id,
             None => {
                 let mut record = entry.clone();
-                record.id = project.allocate_id();
                 record.path = path;
                 // An empty bookmark is not a bookmark — `add_media`'s rule.
                 record.bookmark = record.bookmark.filter(|b| !b.trim().is_empty());
+                // `add_media`'s own field checks, on the row as it would be
+                // stored (issue #349), before it takes an id.
+                record.original = normalize_original(record.original);
+                check_media_fields(&record).map_err(|why| format!("pasted media {id}: {why}"))?;
+                record.id = project.allocate_id();
                 let new_id = record.id;
                 project.media.push(record);
                 appended.push(new_id);
