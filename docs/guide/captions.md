@@ -224,7 +224,7 @@ On a word caption page:
 
 - **Case.** The style's capitals come from **Text ▸ Style ▸ UPPERCASE**. Untick it to show a page as written. Case is applied when the page is drawn, so the Content box shows the words as written, and changing case never drops the word timing.
 - **Word style colours.** There is no inspector section for a page's word style (highlight colour, pop scale, pill colour). To change them, generate again with a different style, or have an agent use `set_text`'s `word_style`.
-- **Editing the words.** Changing the text while keeping the same number of words keeps every word's timing. Changing the number of words drops the timing, and the page then shows plainly. The Content section notes "Not timed — regenerate to time it again".
+- **Editing the words.** Changing the text while keeping the same number of words keeps every word's timing. Changing the number of words drops the timing, and the page then shows plainly. The Content section notes "Not timed — regenerate to time it again". The same rule holds whether you edit in the Content box or in place on the canvas (double-click the page).
 - **Reveal.** The text reveals (typewriter, word fade, line rise) do not apply to a timed page. The Reveal section says "Word style wins; the reveal does not apply."
 - **Trimming and splitting.** These keep each word on the speech it times. Retiming a page by dragging it moves its words with it.
 

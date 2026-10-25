@@ -59,9 +59,9 @@ extension PreviewCanvasView {
             case .alertFirstButtonReturn:
                 let value = editor.string
                 self.cancelTextEditing()
-                guard self.snapshot.clip(id)?.text?.content != value else { return }
-                self.onGroupedEdit?(
-                    "Edit Text", [.setText(clips: [id], patch: TextPatch(content: value))])
+                guard let op = Self.textCommitOp(clip: id, value: value, in: self.snapshot)
+                else { return }
+                self.onGroupedEdit?("Edit Text", [op])
             case .alertSecondButtonReturn:
                 self.cancelTextEditing()
             default:
@@ -69,5 +69,18 @@ extension PreviewCanvasView {
                 self.window?.makeFirstResponder(editor)
             }
         }
+    }
+
+    /// The one op an in-canvas text commit sends — `finishTextEditing`'s
+    /// Return or blur and the Esc sheet's Apply both build it here: nil when
+    /// `id` is not in `snapshot`, has no text, or its base content already
+    /// equals `value`; else one base `set_text` through
+    /// `TextPatch.contentEdit`, so a timed page whose word count changes
+    /// carries `words: []` beside the content and lands untimed instead of
+    /// erroring (W-2). Pure, so a probe can call it.
+    static func textCommitOp(clip id: UInt32, value: String,
+                             in snapshot: ProjectSnapshot) -> ReelOp? {
+        guard let props = snapshot.clip(id)?.text, props.content != value else { return nil }
+        return .setText(clips: [id], patch: TextPatch.contentEdit(value, over: props))
     }
 }

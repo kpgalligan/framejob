@@ -6869,6 +6869,45 @@ python3 tools/proof/text_apply_proof.py                      # → 27/27
 python3 tools/proof/text_apply_proof.py --baseline 6e2c7da   # exit 0 = exactly A1 A2 A4 A6 A8–A11 FAIL
 ```
 
+## Both canvas text commits keep W-2's count rule (`canvas_text_commit_proof.py`, `canvas_text_commit_probe.swift`)
+
+kpgalligan/framejob#345 (spec §11 W-2): the in-canvas text editor's two
+commits — Return or a blur (`finishTextEditing`) and the Esc sheet's Apply —
+both build their `set_text` with `PreviewCanvasView.textCommitOp`, which goes
+through `TextPatch.contentEdit`, so an edit that changes a word-timed page's
+word count carries `words: []` and lands untimed instead of erroring. The
+probe is built like `text_apply_probe.swift` (compiled AS `main.swift` over
+`app/Sources` through `swift_build.build`, a build failure is a scored
+FAILURE, the app's `Compositor.metal` beside it through
+`text_apply_proof.build_shader`). It opens the app's own window over one text
+clip "so here's the thing" (`text_edit_proof.text_clip`), times it itself
+with one `set_text` of four half-second word timings and empties the undo
+stack, so undoing every step comes back to the timed page. C0 is the
+CONTROL. W1 types " now" and presses Return, W2 types "!" and presses Return
+(the count unchanged), W3 types " now", presses Esc and the sheet's Apply
+(`performClick`), W4 presses Return on the unchanged string, W5 types " now"
+and moves the first responder to the canvas overlay (the blur commit). Each
+reads the page's content and its number of word timings from the canvas's
+snapshot, `window.attachedSheet` (a failed commit is an error sheet) and the
+undo stack (one step named "Edit Text", and one undo back to the timed
+page). P1 asks `textCommitOp` directly (pure): nil for the unchanged string
+and for a clip not in the snapshot, `"words": []` in the patch for " now",
+no `words` key for "!". No fonts, no media, no ffmpeg.
+
+`--baseline <commit>` builds the same probe over `git archive <commit>
+app/Sources app/Bridging` with `-D HARNESS_REFERENCE_BUILD` (P1 compiled out)
+in `work/canvas-text-commit/baseline/`, and exits 0 only when EXACTLY the
+labels in `BASELINE_EXPECTED` fail there and no P1 row is present: each of
+W1, W3 and W5 catches its own commit path's bare `TextPatch(content:)`.
+Measured 2026-10-25: 12/12 on the fix; `--baseline 0038186` fails exactly
+W1, W3 and W5 (each with the error sheet attached and the page unchanged)
+and exits 0.
+
+```sh
+python3 tools/proof/canvas_text_commit_proof.py                      # → 12/12
+python3 tools/proof/canvas_text_commit_proof.py --baseline 0038186   # exit 0 = exactly W1 W3 W5 FAIL
+```
+
 ## Road map 10 — the person's playback-check projects (`graphics_playback_samples.py`)
 
 Not a proof: it BUILDS the three projects #56's "Graphics playing,

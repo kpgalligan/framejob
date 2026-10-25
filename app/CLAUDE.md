@@ -750,7 +750,10 @@ the key map behind it.
   editor's keys (spec §11 K-2): bare Return applies, a modified Return is a
   newline, Esc over changed text asks Cancel · Revert · Apply in a sheet
   whose Apply goes through `performGroupedEdit` (a sheet completion is
-  outside an AppKit event).
+  outside an AppKit event). Its `textCommitOp` is the one op both canvas
+  commits send (Return or blur, and the sheet's Apply), through
+  `TextPatch.contentEdit`, so a timed page whose count changes lands
+  untimed (W-2).
 - `PreviewCanvasView+Obscure.swift` — the selected clip's obscure regions on
   the canvas (spec §11 CI-16): outline, centre and eight resize grips drawn
   through the layer's transform; hit test after the layer's own handles

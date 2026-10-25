@@ -825,8 +825,8 @@ final class PreviewCanvasView: NSView {
         // window itself as first responder silently drops every one of them.
         if focus { window?.makeFirstResponder(overlay) }
         overlay.needsDisplay = true
-        guard commit, let clip = snapshot.clip(id), clip.text?.content != value else { return }
-        onEdit?("Edit Text", [.setText(clips: [id], patch: TextPatch(content: value))])
+        guard commit, let op = Self.textCommitOp(clip: id, value: value, in: snapshot) else { return }
+        onEdit?("Edit Text", [op])
     }
 
     // MARK: - Drawing
