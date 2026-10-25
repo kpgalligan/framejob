@@ -139,7 +139,12 @@ jobs:
           mkdir -p "$STAGE"
           cp -R "$EXPORT/Frame Job.app" "$STAGE/"
           ln -s /Applications "$STAGE/Applications"
-          hdiutil create -volname "Frame Job" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+          # hdiutil's own estimate of the scratch volume from -srcfolder now
+          # and then comes out short ("No space left on device" copying the
+          # helper), so the size is the staged folder's plus a quarter and
+          # 64 MB; UDZO compresses the free space away.
+          SIZE_MB=$(( $(du -sm "$STAGE" | cut -f1) * 5 / 4 + 64 ))
+          hdiutil create -volname "Frame Job" -srcfolder "$STAGE" -size "${SIZE_MB}m" -ov -format UDZO "$DMG"
           codesign --sign "Developer ID Application" --timestamp --keychain "$KEYCHAIN" "$DMG"
 
       - name: Notarize
