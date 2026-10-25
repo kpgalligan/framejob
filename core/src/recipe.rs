@@ -343,12 +343,11 @@ impl Project {
         // file, a still of it and its reverse alike, and the ungraded branch
         // above does not touch it. An image publishes a PQ still's peak
         // (HD-20 (b)), the only colour an image takes.
-        let input = match instance.clip.source {
-            Source::Media { media, .. } | Source::Still { media, .. } | Source::Image { media } => {
-                self.media_input(media)
-            }
-            _ => Value::Null,
-        };
+        let input = instance
+            .clip
+            .source
+            .media()
+            .map_or(Value::Null, |m| self.media_input(m));
 
         RecipeLayer {
             clip: instance.clip.id,

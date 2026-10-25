@@ -159,7 +159,7 @@
 
 use crate::model::{
     AudioProps, BlendMode, Clip, Color, Crop, Enabled, Filter, FilterKind, MediaKind, Project,
-    ShapeKind, ShapeProps, Source, Track, VideoProps,
+    ShapeKind, ShapeProps, Source, VideoProps,
 };
 use crate::outcome::Outcome;
 use crate::props_check::check_shape;
@@ -194,20 +194,9 @@ impl Project {
     /// free to put anything else on it.
     fn with_back_track(&self) -> (Project, u32) {
         let mut next = self.clone();
-        let id = next.allocate_id();
-        let name = format!("Track {}", next.tracks.len().saturating_add(1));
-        next.tracks.insert(
-            0,
-            Track {
-                id,
-                name,
-                hidden: false,
-                muted: false,
-                locked: false,
-                solo: false,
-                matte: crate::model::TrackMatte::None,
-            },
-        );
+        let track = next.numbered_track();
+        let id = track.id;
+        next.tracks.insert(0, track);
         (next, id)
     }
 
@@ -352,22 +341,11 @@ impl Project {
 
         let (mut next, track) = self.with_back_track();
         let clip = Clip {
-            id: next.allocate_id(),
-            track,
-            start: 0,
-            duration,
-            source,
-            enabled: Enabled::default(),
-            speed: 1.0,
             video: Some(video),
             audio,
-            text: None,
             shape,
-            graphic: None,
-            actions: Vec::new(),
-            transition_in: None,
             name: Some(BACKGROUND_NAME.to_string()),
-            label: None,
+            ..Clip::placed(next.allocate_id(), track, 0, duration, source)
         };
         next.clips.push(clip);
         self.finish(next)

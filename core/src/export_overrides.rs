@@ -34,7 +34,9 @@
 //! outside this one (`edit.rs`, `edit_props.rs`, `edit_action.rs`,
 //! `edit_paste.rs`, `edit_track.rs`) name it `crate::export::describe` for
 //! their own error messages, so `export.rs` re-exports it under that path
-//! and the cut costs those files nothing.
+//! and the cut costs those files nothing. [`spelled`] sits beside it for
+//! the same reason: a vocabulary value's own JSON spelling, for a sentence
+//! (`lut.rs`, `media_color.rs`, `edit_relink.rs`).
 
 use serde_json::Value;
 
@@ -52,6 +54,15 @@ pub(crate) fn describe(value: &Value) -> String {
     } else {
         format!("{} …", text.chars().take(40).collect::<String>())
     }
+}
+
+/// A vocabulary value's JSON spelling (`warm`, `video`), serde's own, so a
+/// sentence names it as the file and the schema do.
+pub(crate) fn spelled<T: serde::Serialize>(value: T) -> String {
+    serde_json::to_value(value)
+        .ok()
+        .and_then(|value| value.as_str().map(str::to_string))
+        .unwrap_or_default()
 }
 
 /// The overrides object itself: `None` for absent, null or an empty

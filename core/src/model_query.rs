@@ -4,7 +4,12 @@
 //! — and nothing else. This module is everything the rest of the crate asks
 //! a project *about*: build an empty one, find a clip / track / media /
 //! marker / nest by id, hand out the next id, measure a duration, and check
-//! that every invariant the editing modules assume actually holds. The
+//! that every invariant the editing modules assume actually holds. It also
+//! holds the shared spellings of a fresh thing: `Track::ordinary`,
+//! `Project::next_track_name` and `Project::numbered_track` (the one track
+//! literal and the count rule its name follows), `Project::remint` (a
+//! copy's fresh clip and action ids), and `Source::media` (which media a
+//! source names). The
 //! source-window arithmetic — how much material a clip shows, and how much
 //! lies either side of it — was here and is `source_window.rs`, moved out
 //! whole by road map 7 §10's phase A: the readers' units were not in their
@@ -19,7 +24,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::edit_clip_timing::{SPEED_MAX, SPEED_MIN};
 use crate::format::{self, RC_FORMAT_VERSION};
-use crate::model::{Canvas, Clip, Marker, Media, Nest, Project, Source, Track};
+use crate::model::{Canvas, Clip, Marker, Media, Nest, Project, Source, Track, TrackMatte};
 use crate::model_graphic::{check_name, NAME_RULE};
 use crate::time::{Fps, Ticks};
 
@@ -34,6 +39,42 @@ pub(crate) fn clips_on(clips: &[Clip], track: u32) -> Vec<&Clip> {
     let mut found: Vec<&Clip> = clips.iter().filter(|c| c.track == track).collect();
     found.sort_by_key(|c| (c.start, c.id));
     found
+}
+
+impl Track {
+    /// An ordinary track: every flag off, no matte. The one spelling of a
+    /// fresh track, so a flag added to [`Track`] later is off on every track
+    /// the core makes.
+    pub(crate) fn ordinary(id: u32, name: String) -> Track {
+        Track {
+            id,
+            name,
+            hidden: false,
+            muted: false,
+            locked: false,
+            solo: false,
+            matte: TrackMatte::None,
+        }
+    }
+}
+
+impl Source {
+    /// The media a source shows, or `None` for the kinds with no file behind
+    /// them (spec §5.2) — a nest names a nest, and the generated kinds name
+    /// nothing. Exhaustive on purpose: a source kind added to `model.rs`
+    /// must say here whether it reads a media, or the build fails.
+    pub(crate) fn media(&self) -> Option<u32> {
+        match self {
+            Source::Media { media, .. } | Source::Still { media, .. } | Source::Image { media } => {
+                Some(*media)
+            }
+            Source::Text
+            | Source::Shape
+            | Source::Graphic
+            | Source::Nest { .. }
+            | Source::Adjustment => None,
+        }
+    }
 }
 
 impl Project {
@@ -53,15 +94,7 @@ impl Project {
                 ..Canvas::default()
             },
             media: Vec::new(),
-            tracks: vec![Track {
-                id: 1,
-                name: "Track 1".to_string(),
-                hidden: false,
-                muted: false,
-                locked: false,
-                solo: false,
-                matte: crate::model::TrackMatte::None,
-            }],
+            tracks: vec![Track::ordinary(1, "Track 1".to_string())],
             clips: Vec::new(),
             markers: Vec::new(),
             next_id: 2,
@@ -105,6 +138,32 @@ impl Project {
         let id = self.next_id;
         self.next_id = self.next_id.saturating_add(1);
         id
+    }
+
+    /// The name a new track gets when nobody names it: "Track N" where N is
+    /// the track COUNT plus one, the rule `add_track`'s fallback and
+    /// [`Project::numbered_track`] share.
+    pub(crate) fn next_track_name(&self) -> String {
+        format!("Track {}", self.tracks.len().saturating_add(1))
+    }
+
+    /// A fresh ordinary track, its id allocated FIRST and then named by the
+    /// count the way `add_track` names one, so inserting it behind the stack
+    /// does not renumber the tracks above. Does not insert it: the caller
+    /// chooses where (behind the stack, or in front).
+    pub(crate) fn numbered_track(&mut self) -> Track {
+        let id = self.allocate_id();
+        Track::ordinary(id, self.next_track_name())
+    }
+
+    /// Gives a copied clip fresh ids: the clip's own, then each action's in
+    /// vector order. Actions move with the clip, and an action id is unique
+    /// project-wide, so a copy that kept them would collide.
+    pub(crate) fn remint(&mut self, clip: &mut Clip) {
+        clip.id = self.allocate_id();
+        for action in &mut clip.actions {
+            action.id = self.allocate_id();
+        }
     }
 
     /// Every clip on `track`, in start order. Ties break by id so the order
@@ -362,16 +421,7 @@ impl Project {
             }
             // Only the media-bound sources name a media; a nest names a
             // nest, and the generated kinds name nothing.
-            let referenced = match &clip.source {
-                Source::Media { media, .. } => Some(*media),
-                Source::Still { media, .. } => Some(*media),
-                Source::Image { media } => Some(*media),
-                Source::Text
-                | Source::Shape
-                | Source::Graphic
-                | Source::Nest { .. }
-                | Source::Adjustment => None,
-            };
+            let referenced = clip.source.media();
             if let Some(media) = referenced {
                 if self.is_missing_media(media) {
                     return Err(format!(

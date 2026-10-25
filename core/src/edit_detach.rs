@@ -5,7 +5,7 @@
 //! `edit_clip.rs` decides where a clip sits, this decides which of its halves
 //! plays.
 
-use crate::model::{AudioProps, Enabled, Project, Source, Track};
+use crate::model::{AudioProps, Enabled, Project, Source};
 use crate::outcome::Outcome;
 
 impl Project {
@@ -41,38 +41,24 @@ impl Project {
                 // The clip is on the bottom track, so the audio needs a new
                 // one under it. Naming by the count keeps it unique without
                 // renumbering the tracks above.
-                let id = next.allocate_id();
-                let name = format!("Track {}", next.tracks.len().saturating_add(1));
-                next.tracks.insert(
-                    0,
-                    Track {
-                        id,
-                        name,
-                        hidden: false,
-                        muted: false,
-                        locked: false,
-                        solo: false,
-                        matte: crate::model::TrackMatte::None,
-                    },
-                );
+                let track = next.numbered_track();
+                let id = track.id;
+                next.tracks.insert(0, track);
                 id
             }
         };
 
         let mut audio_clip = target.clone();
-        audio_clip.id = next.allocate_id();
+        // Actions move with the clip and need their own ids; a video action
+        // on a non-drawing clip is inert, and dropping it would lose the
+        // volume actions that belong here.
+        next.remint(&mut audio_clip);
         audio_clip.track = below;
         audio_clip.enabled = Enabled {
             video: false,
             audio: true,
         };
         audio_clip.audio = target.audio.or_else(|| Some(AudioProps::default()));
-        // Actions move with the clip and need their own ids; a video action
-        // on a non-drawing clip is inert, and dropping it would lose the
-        // volume actions that belong here.
-        for action in audio_clip.actions.iter_mut() {
-            action.id = next.allocate_id();
-        }
         // The transition describes an overlap on the ORIGINAL track.
         audio_clip.transition_in = None;
 

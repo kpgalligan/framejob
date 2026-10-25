@@ -25,18 +25,10 @@ use serde_json::Value;
 
 use crate::edit_track::{check_media_fields, normalize_original, MEDIA_KEYS};
 use crate::export::describe;
-use crate::model::{Clip, Media, MediaKind, Project, Source};
+use crate::export_overrides::spelled;
+use crate::model::{Clip, Media, Project, Source};
 use crate::outcome::Outcome;
 use crate::source_window::SourceBound;
-
-/// A kind's JSON spelling, for the refusal: serde's own, so the sentence
-/// names the kind the way the file and the schema do.
-fn kind_name(kind: MediaKind) -> String {
-    serde_json::to_value(kind)
-        .ok()
-        .and_then(|value| value.as_str().map(str::to_string))
-        .unwrap_or_default()
-}
 
 impl Project {
     /// Points a media at a new file, and — given its `probe` — takes the
@@ -84,8 +76,8 @@ impl Project {
                 return Ok(Outcome::Refused(format!(
                     "media {media} is {} media and {path} is {}: relink it to a file of the \
                      same kind, or import this one as new media",
-                    kind_name(old_kind),
-                    kind_name(new.kind)
+                    spelled(old_kind),
+                    spelled(new.kind)
                 )));
             }
         }

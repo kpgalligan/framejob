@@ -38,6 +38,7 @@
 use serde_json::{Map, Value};
 
 use crate::export::describe;
+use crate::export_overrides::spelled;
 use crate::model::{Media, MediaColor, MediaKind, Project};
 use crate::model_media_color::{PqColor, PEAK_MAX, PEAK_MIN};
 use crate::outcome::Outcome;
@@ -60,14 +61,6 @@ fn kind_phrase(kind: MediaKind) -> &'static str {
         MediaKind::Image => "an image",
         MediaKind::Lut => "a LUT",
     }
-}
-
-/// A vocabulary value's JSON spelling, serde's own.
-fn spelled<T: serde::Serialize>(value: T) -> String {
-    serde_json::to_value(value)
-        .ok()
-        .and_then(|value| value.as_str().map(str::to_string))
-        .unwrap_or_default()
 }
 
 /// The sentence for a setting with nothing to convert by.
@@ -266,21 +259,7 @@ impl Project {
             }
         }
         if let Some(id) = color.lut {
-            match self.media(id) {
-                None => return Err(format!("color.lut {id} is not a media of this project")),
-                Some(found) if found.kind != MediaKind::Lut => {
-                    let kind = spelled(found.kind);
-                    let article = if kind.starts_with(['a', 'e', 'i', 'o', 'u']) {
-                        "an"
-                    } else {
-                        "a"
-                    };
-                    return Err(format!(
-                        "color.lut {id} is {article} {kind} media, not a lut"
-                    ));
-                }
-                Some(_) => {}
-            }
+            self.check_lut_reference("color.lut", id)?;
         }
         color.pq.map_or(Ok(()), check_pq)
     }

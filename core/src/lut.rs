@@ -12,7 +12,9 @@
 //! - **The look.** `media` is required with `lut` and goes with nothing
 //!   else, and must name a `lut` media of the project
 //!   ([`Project::check_look_media`], beside `check_adjustment_video` on the
-//!   patch path and on every pasted group, and in `validate` for a file). A
+//!   patch path and on every pasted group, and in `validate` for a file),
+//!   through [`Project::check_lut_reference`], which `media_color.rs`'s
+//!   `color.lut` shares. A
 //!   patch naming a built-in kind and no `media` drops a stored one
 //!   ([`normalise_look`]), so a built-in kind on a LUT clip replaces the LUT.
 //! - **An action's end** is never checked against the media list
@@ -31,20 +33,11 @@
 
 use std::collections::HashMap;
 
-use serde::Serialize;
 use serde_json::Value;
 
+use crate::export_overrides::spelled;
 use crate::model::{Clip, Look, LookKind, Media, MediaKind, Project, VideoProps};
 use crate::outcome::Outcome;
-
-/// A vocabulary value's JSON spelling (`warm`, `video`), serde's own, so a
-/// sentence names it as the file and the schema do.
-fn spelled<T: Serialize>(value: T) -> String {
-    serde_json::to_value(value)
-        .ok()
-        .and_then(|value| value.as_str().map(str::to_string))
-        .unwrap_or_default()
-}
 
 /// The refusal for `media` on a built-in kind.
 fn media_goes_with_lut(kind: LookKind) -> String {
@@ -160,6 +153,25 @@ pub(crate) fn remap_look_media(clip: &mut Clip, map: &HashMap<u32, u32>) {
 }
 
 impl Project {
+    /// A reference to a LUT by media id, named by its `key`
+    /// (`video.look.media`, `color.lut`): the id names a media of this
+    /// project, and that media is a `lut`.
+    pub(crate) fn check_lut_reference(&self, key: &str, id: u32) -> Result<(), String> {
+        match self.media(id) {
+            None => Err(format!("{key} {id} is not a media of this project")),
+            Some(found) if found.kind != MediaKind::Lut => {
+                let kind = spelled(found.kind);
+                let article = if kind.starts_with(['a', 'e', 'i', 'o', 'u']) {
+                    "an"
+                } else {
+                    "a"
+                };
+                Err(format!("{key} {id} is {article} {kind} media, not a lut"))
+            }
+            Some(_) => Ok(()),
+        }
+    }
+
     /// A look's `media` against this project: required with `lut` and naming
     /// a `lut` media of it, and absent with a built-in kind.
     pub(crate) fn check_look_media(&self, props: &VideoProps) -> Result<(), String> {
@@ -168,23 +180,7 @@ impl Project {
         };
         match (look.kind, look.media) {
             (LookKind::Lut, None) => Err("video.look.media is required with kind lut".to_string()),
-            (LookKind::Lut, Some(id)) => match self.media(id) {
-                None => Err(format!(
-                    "video.look.media {id} is not a media of this project"
-                )),
-                Some(found) if found.kind != MediaKind::Lut => {
-                    let kind = spelled(found.kind);
-                    let article = if kind.starts_with(['a', 'e', 'i', 'o', 'u']) {
-                        "an"
-                    } else {
-                        "a"
-                    };
-                    Err(format!(
-                        "video.look.media {id} is {article} {kind} media, not a lut"
-                    ))
-                }
-                Some(_) => Ok(()),
-            },
+            (LookKind::Lut, Some(id)) => self.check_lut_reference("video.look.media", id),
             (kind, Some(_)) => Err(media_goes_with_lut(kind)),
             (_, None) => Ok(()),
         }

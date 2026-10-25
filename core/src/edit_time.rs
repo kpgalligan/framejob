@@ -519,21 +519,12 @@ impl Project {
         }
 
         let still = Clip {
-            id: next.allocate_id(),
-            track: target.track,
-            start: at,
-            duration,
-            source: Source::Still {
-                media,
-                at: source_at,
-            },
             // A held frame has no sound, so the audio side is off and there
             // are no audio props to carry.
             enabled: Enabled {
                 video: true,
                 audio: false,
             },
-            speed: 1.0,
             // A still is a NEW clip with new ends, so it does not inherit
             // the preset anchored to the ones it was taken from (format
             // version 8): a freeze taken mid-arrival would otherwise arrive
@@ -546,14 +537,16 @@ impl Project {
                 motion: None,
                 ..video
             }),
-            audio: None,
-            text: None,
-            shape: None,
-            graphic: None,
-            actions: Vec::new(),
-            transition_in: None,
-            name: None,
-            label: None,
+            ..Clip::placed(
+                next.allocate_id(),
+                target.track,
+                at,
+                duration,
+                Source::Still {
+                    media,
+                    at: source_at,
+                },
+            )
         };
         if let Err(why) = next.check_overlap_rule(std::slice::from_ref(&still), still.track, &[]) {
             return Ok(Outcome::Refused(why));

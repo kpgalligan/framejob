@@ -112,7 +112,9 @@ governs a module now.
   four `rc_cube_*` exports. `lut.rs` — a LUT media's rules: placing one is
   refused, removing one clears the looks that name it (the clips stay) and
   the Camera Log of the media it converts, refusing first without
-  `with_clips`; paste carries it by path.
+  `with_clips`; paste carries it by path. `Project::check_lut_reference` is
+  the one check of a LUT named by media id, keyed by its field
+  (`video.look.media`, `color.lut`).
 - `model_media_color.rs` — camera log's vocabulary (format version 19,
   spec §11 GR-16): `LogCurve`, `CameraGamut` (`LogCurve::gamuts`, its
   default first) and `MediaColor` (`log`, `gamut`, `lut`, `detected`, and
@@ -171,8 +173,13 @@ governs a module now.
   the stdlib's, `graphic_actions.rs` and `action_colours.rs`.
 - `model_query.rs` — reading a project: `Project::new`, id allocation, the
   `clip`/`track`/`media`/`marker`/`nest` lookups, `clips_on`, `duration`,
-  `validate` with its nesting walk, and `source_size`. The three
-  source-window measurements moved out to `source_window.rs`.
+  `validate` with its nesting walk, and `source_size`; and the shared
+  spellings of a fresh thing: `Track::ordinary` (every flag off),
+  `Source::media` (the media a source reads, exhaustive over the kinds),
+  `next_track_name` ("Track N" by the count), `numbered_track` (allocated
+  and named, not inserted) and `remint` (a copied clip's fresh ids: the
+  clip's, then each action's). The three source-window measurements moved
+  out to `source_window.rs`.
 - `frame_grid.rs` — clip-time normalization shared by canvas rate changes,
   both full-paste paths and unnest. It snaps placement start, delegates the
   source-bounded duration to `source_window.rs`, clamps action spans, snaps
@@ -336,7 +343,11 @@ governs a module now.
   check caller-allocated candidates against the input project; both write
   one draft and call `finish_placement`, which mints gained transitions on
   exactly the chosen tracks before `finish`. `finish` remains equality first,
-  validation second, and does not itself refuse.
+  validation second, and does not itself refuse. `Clip::placed` is the one
+  literal of a newly placed clip (each placing site overrides it by struct
+  update); `add_tracks_behind` and `Landing` are unnest's and paste's shared
+  landing: deficit tracks inserted behind, fallbacks pushed in front, the
+  touched tracks in first-seen order for `finish_placement`.
 - `edit_split.rs` — `split_clip` and what the SECOND clip inherits: base
   props from the evaluation at the cut, unfinished actions rebased, a
   straddled one narrowed, presets and motion halves anchored to the two
@@ -772,7 +783,9 @@ governs a module now.
   `hlg`, `pq` or `sdr`, from `dynamic_range.rs`); how an
   override is READ and REFUSED, naming the key and the value (`peak_dbtp`
   without `loudness_lufs` is an `Err`, because a ceiling with nothing to cap
-  would be a key accepted and silently inert); the sizes the sheet offers and
+  would be a key accepted and silently inert; `describe` shortens a value
+  and `spelled` gives a vocabulary value's JSON spelling for any sentence
+  in the crate); the sizes the sheet offers and
   `fit_within`, and `even_size` — on every row AVFoundation writes but
   `prores_4444` an odd edge resolves one pixel smaller, in the list's
   Document row (named "Document (even)") and in the resolved settings alike,

@@ -75,11 +75,12 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use serde_json::Value;
 
+use crate::edit_commit::Landing;
 use crate::edit_track::{check_media_fields, normalize_original};
 use crate::export::describe;
 use crate::format::MAX_TRACKS;
 use crate::lut::{look_media_ids, remap_look_media};
-use crate::model::{Clip, Media, Nest, Project, Source, Track};
+use crate::model::{Clip, Media, Nest, Project, Source};
 use crate::outcome::Outcome;
 use crate::time::Ticks;
 
@@ -93,21 +94,6 @@ pub(crate) struct Payload {
     pub(crate) media: Vec<Media>,
     #[serde(default)]
     pub(crate) nests: Vec<Nest>,
-}
-
-/// The media a source shows, or `None` for the kinds with no file behind
-/// them (spec §5.2).
-fn source_media(source: &Source) -> Option<u32> {
-    match source {
-        Source::Media { media, .. } | Source::Still { media, .. } | Source::Image { media } => {
-            Some(*media)
-        }
-        Source::Text
-        | Source::Shape
-        | Source::Graphic
-        | Source::Nest { .. }
-        | Source::Adjustment => None,
-    }
 }
 
 /// The nest a source shows, or `None` for every other kind.
@@ -221,10 +207,7 @@ fn absorb_nests(
             track.id = id;
         }
         for clip in copy.clips.iter_mut() {
-            clip.id = project.allocate_id();
-            for action in clip.actions.iter_mut() {
-                action.id = project.allocate_id();
-            }
+            project.remint(clip);
             clip.track = tracks.get(&clip.track).copied().unwrap_or(clip.track);
             clip.source = remap_source(&clip.source, media, &map);
             remap_look_media(clip, media);
@@ -356,7 +339,7 @@ fn wanted_media(clips: &[&Clip], payload: &Payload) -> (Vec<u32>, Vec<u32>) {
     let mut sources: Vec<u32> = Vec::new();
     let mut looks: Vec<u32> = Vec::new();
     for clip in clips {
-        if let Some(id) = source_media(&clip.source) {
+        if let Some(id) = clip.source.media() {
             if !sources.contains(&id) {
                 sources.push(id);
             }
@@ -377,22 +360,6 @@ fn wanted_media(clips: &[&Clip], payload: &Payload) -> (Vec<u32>, Vec<u32>) {
         }
     }
     (sources, looks)
-}
-
-/// A track with a fresh id, named by the COUNT the way `add_track` names
-/// one, so inserting behind the stack does not renumber the tracks above it.
-fn new_track(project: &mut Project) -> Track {
-    let id = project.allocate_id();
-    let name = format!("Track {}", project.tracks.len().saturating_add(1));
-    Track {
-        id,
-        name,
-        hidden: false,
-        muted: false,
-        locked: false,
-        solo: false,
-        matte: crate::model::TrackMatte::None,
-    }
 }
 
 /// Parses the payload, naming what was wrong.
@@ -464,12 +431,7 @@ impl Project {
 
         // Tracks missing behind the destination. Inserting at index 0 shifts
         // every existing track up, so the destination index moves with them.
-        let deficit = (deepest - base).max(0);
-        for _ in 0..deficit {
-            let track = new_track(&mut next);
-            next.tracks.insert(0, track);
-        }
-        let base = base + deficit;
+        let base = next.add_tracks_behind(deepest, base);
 
         // The earliest clip lands ON `at`, so every other one keeps its own
         // distance from it. Offsets are non-negative by construction, which
@@ -482,14 +444,10 @@ impl Project {
         let mut ordered: Vec<&Clip> = payload.clips.iter().collect();
         ordered.sort_by_key(|c| (std::cmp::Reverse(c.track), c.start, c.id));
 
-        let mut fallbacks: Vec<u32> = Vec::new();
-        let mut touched: Vec<u32> = Vec::new();
+        let mut landing = Landing::new(base);
         for source in ordered {
             let mut clip = source.clone();
-            clip.id = next.allocate_id();
-            for action in clip.actions.iter_mut() {
-                action.id = next.allocate_id();
-            }
+            next.remint(&mut clip);
             clip.source = remap_source(&source.source, &media, &nests);
             remap_look_media(&mut clip, &media);
             // The payload is trusted about WHAT a clip is and checked about
@@ -508,40 +466,10 @@ impl Project {
             next.resnap_clip_times(&mut clip);
 
             // The target track, then the fallbacks already added, then a new
-            // one. A brand-new track holds nothing, so the last arm always
-            // succeeds and the loop always terminates.
-            let target = next
-                .tracks
-                .get((base - source.track as i64).max(0) as usize)
-                .map(|t| t.id);
-            let mut chosen: Option<u32> = None;
-            for candidate in target.into_iter().chain(fallbacks.iter().copied()) {
-                clip.track = candidate;
-                if next
-                    .check_overlap_rule(std::slice::from_ref(&clip), candidate, &[])
-                    .is_ok()
-                {
-                    chosen = Some(candidate);
-                    break;
-                }
-            }
-            let landed = match chosen {
-                Some(id) => id,
-                None => {
-                    let track = new_track(&mut next);
-                    let id = track.id;
-                    next.tracks.push(track);
-                    fallbacks.push(id);
-                    id
-                }
-            };
-            clip.track = landed;
-            if !touched.contains(&landed) {
-                touched.push(landed);
-            }
-            next.clips.push(clip);
+            // one.
+            landing.land(&mut next, clip, source.track as i64);
         }
 
-        self.finish_placement(next, &touched)
+        self.finish_placement(next, landing.touched())
     }
 }

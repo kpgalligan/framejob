@@ -45,8 +45,8 @@ use serde_json::Value;
 
 use crate::edit_split::split_clip;
 use crate::model::{
-    AudioProps, Clip, Enabled, GraphicProps, Media, MediaKind, Project, ShapeKind, ShapeProps,
-    Source, TextProps, Track, VideoProps,
+    AudioProps, Clip, GraphicProps, Media, MediaKind, Project, ShapeKind, ShapeProps, Source,
+    TextProps, Track, VideoProps,
 };
 use crate::outcome::Outcome;
 use crate::patch::{merge_group, Group};
@@ -261,22 +261,9 @@ impl Project {
 
         let mut next = self.clone();
         let clip = Clip {
-            id: next.allocate_id(),
-            track,
-            start: at,
-            duration,
-            source,
-            enabled: Enabled::default(),
-            speed: 1.0,
             video,
             audio,
-            text: None,
-            shape: None,
-            graphic: None,
-            actions: Vec::new(),
-            transition_in: None,
-            name: None,
-            label: None,
+            ..Clip::placed(next.allocate_id(), track, at, duration, source)
         };
         self.commit_additions(next, vec![clip])
     }
@@ -410,25 +397,14 @@ impl Project {
 
         let mut next = self.clone();
         let clip = Clip {
-            id: next.allocate_id(),
-            track,
-            start: at,
-            duration,
-            source: described.source,
-            enabled: Enabled::default(),
-            speed: 1.0,
             video: Some(VideoProps {
                 scale: described.scale,
                 ..VideoProps::default()
             }),
-            audio: None,
             text: described.text,
             shape: described.shape,
             graphic: described.graphic,
-            actions: Vec::new(),
-            transition_in: None,
-            name: None,
-            label: None,
+            ..Clip::placed(next.allocate_id(), track, at, duration, described.source)
         };
         self.commit_additions(next, vec![clip])
     }
@@ -603,11 +579,8 @@ impl Project {
         let mut copies: Vec<Clip> = Vec::new();
         for clip in &selection {
             let mut copy = clip.clone();
-            copy.id = next.allocate_id();
+            next.remint(&mut copy);
             copy.start = clip.start.saturating_add(delta);
-            for action in copy.actions.iter_mut() {
-                action.id = next.allocate_id();
-            }
             copies.push(copy);
         }
         self.commit_additions(next, copies)

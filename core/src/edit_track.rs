@@ -25,8 +25,7 @@ use serde_json::Value;
 
 use crate::export::describe;
 use crate::model::{
-    Clip, Marker, Media, MediaKind, MediaOriginal, Project, Source, Track, TrackMatte,
-    DEFAULT_MARKER_COLOR,
+    Clip, Marker, Media, MediaKind, MediaOriginal, Project, Track, TrackMatte, DEFAULT_MARKER_COLOR,
 };
 use crate::outcome::Outcome;
 use crate::time::Ticks;
@@ -65,11 +64,7 @@ pub(crate) const MEDIA_KEYS: [&str; 12] = [
 /// what that group references is asked of its own clips, which live in the
 /// same id space and are swept alongside the timeline's.
 fn uses_media(clip: &Clip, media: u32) -> bool {
-    matches!(
-        clip.source,
-        Source::Media { media: id, .. } | Source::Still { media: id, .. } | Source::Image { media: id }
-            if id == media
-    )
+    clip.source.media() == Some(media)
 }
 
 /// The clips of a `with_clips` refusal, as English (deepening D2·3).
@@ -199,19 +194,8 @@ impl Project {
             .map(str::trim)
             .filter(|given| !given.is_empty())
             .map(|given| given.to_string())
-            .unwrap_or_else(|| format!("Track {}", next.tracks.len().saturating_add(1)));
-        next.tracks.insert(
-            at,
-            Track {
-                id,
-                name,
-                hidden: false,
-                muted: false,
-                locked: false,
-                solo: false,
-                matte: TrackMatte::None,
-            },
-        );
+            .unwrap_or_else(|| next.next_track_name());
+        next.tracks.insert(at, Track::ordinary(id, name));
         self.finish(next)
     }
 

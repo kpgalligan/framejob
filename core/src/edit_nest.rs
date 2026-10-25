@@ -49,7 +49,8 @@
 
 use crate::edit_adjustment::{adjustment_cannot_nest, is_adjustment};
 use crate::edit_clip::clip_end;
-use crate::model::{AudioProps, Clip, Enabled, Nest, Project, Source, Track, VideoProps};
+use crate::edit_commit::Landing;
+use crate::model::{AudioProps, Clip, Nest, Project, Source, Track, VideoProps};
 use crate::outcome::Outcome;
 use crate::recipe_matte::matte_target;
 
@@ -72,22 +73,6 @@ fn nested_track(project: &mut Project, from: &Track) -> Track {
         locked: from.locked,
         solo: from.solo,
         matte: from.matte,
-    }
-}
-
-/// A track for a clip coming OUT of a nest, named by the count the way
-/// `add_track` names one.
-fn new_track(project: &mut Project) -> Track {
-    let id = project.allocate_id();
-    let name = format!("Track {}", project.tracks.len().saturating_add(1));
-    Track {
-        id,
-        name,
-        hidden: false,
-        muted: false,
-        locked: false,
-        solo: false,
-        matte: crate::model::TrackMatte::None,
     }
 }
 
@@ -219,27 +204,20 @@ impl Project {
         });
 
         let clip_id = next.allocate_id();
+        // A transition INTO the selection belonged to a clip that is now
+        // inside the group, so the nest clip gets the default cross
+        // dissolve over whatever overlap it inherits — the same rule
+        // every other op uses for a clip that gains one.
         next.clips.push(Clip {
-            id: clip_id,
-            track: front_track,
-            start: earliest,
-            duration: latest.saturating_sub(earliest),
-            source: Source::Nest { project: nest_id },
-            enabled: Enabled::default(),
-            speed: 1.0,
             video: Some(VideoProps::default()),
             audio: audible.then(AudioProps::default),
-            text: None,
-            shape: None,
-            graphic: None,
-            actions: Vec::new(),
-            // A transition INTO the selection belonged to a clip that is now
-            // inside the group, so the nest clip gets the default cross
-            // dissolve over whatever overlap it inherits — the same rule
-            // every other op uses for a clip that gains one.
-            transition_in: None,
-            name: None,
-            label: None,
+            ..Clip::placed(
+                clip_id,
+                front_track,
+                earliest,
+                latest.saturating_sub(earliest),
+                Source::Nest { project: nest_id },
+            )
         });
 
         if let Err(why) = next.check_overlap_rule(&[], front_track, &[]) {
@@ -303,12 +281,7 @@ impl Project {
         // Tracks missing behind the destination, exactly as `paste` adds
         // them: inserting at index 0 shifts every existing track up, so the
         // destination index moves with them.
-        let deficit = (deepest - base).max(0);
-        for _ in 0..deficit {
-            let track = new_track(&mut next);
-            next.tracks.insert(0, track);
-        }
-        let base = base + deficit;
+        let base = next.add_tracks_behind(deepest, base);
 
         // Back-most first, then time: the order clips are placed in is the
         // order the overlap rule sees them, so it has to be deterministic or
@@ -316,56 +289,20 @@ impl Project {
         let mut ordered: Vec<&Clip> = nest.clips.iter().collect();
         ordered.sort_by_key(|c| (std::cmp::Reverse(depth(c.track)), c.start, c.id));
 
-        let mut fallbacks: Vec<u32> = Vec::new();
-        let mut touched: Vec<u32> = Vec::new();
+        let mut landing = Landing::new(base);
         for source in ordered {
             let mut moved = source.clone();
-            moved.id = next.allocate_id();
-            for action in moved.actions.iter_mut() {
-                action.id = next.allocate_id();
-            }
+            next.remint(&mut moved);
             // Translate first; the shared normalization then handles a
             // hand-written or legacy off-grid nest on the parent grid.
             moved.start = target.start.saturating_add(source.start);
             next.resnap_clip_times(&mut moved);
-
-            let wanted = next
-                .tracks
-                .get((base - depth(source.track)).max(0) as usize)
-                .map(|t| t.id);
-            let mut chosen: Option<u32> = None;
-            for candidate in wanted.into_iter().chain(fallbacks.iter().copied()) {
-                moved.track = candidate;
-                if next
-                    .check_overlap_rule(std::slice::from_ref(&moved), candidate, &[])
-                    .is_ok()
-                {
-                    chosen = Some(candidate);
-                    break;
-                }
-            }
-            // A brand-new track holds nothing, so the last arm always
-            // succeeds and the loop always terminates.
-            let landed = match chosen {
-                Some(id) => id,
-                None => {
-                    let track = new_track(&mut next);
-                    let id = track.id;
-                    next.tracks.push(track);
-                    fallbacks.push(id);
-                    id
-                }
-            };
-            moved.track = landed;
-            if !touched.contains(&landed) {
-                touched.push(landed);
-            }
-            next.clips.push(moved);
+            landing.land(&mut next, moved, depth(source.track));
         }
 
         if !next.nest_is_shown(project) {
             next.nests.retain(|n| n.id != project);
         }
-        self.finish_placement(next, &touched)
+        self.finish_placement(next, landing.touched())
     }
 }
