@@ -14,10 +14,7 @@ import AppKit
 /// playhead's value when it differs. `press`, `drag` and `release` are the
 /// mouse handlers' bodies, internal so a probe drives the gesture.
 final class WheelStripControl: NSView, OptionControl {
-    private static let lower: Double = -1
-    private static let upper: Double = 1
-    private static let knobSize = NSSize(width: 7, height: 11)
-    private static let track: CGFloat = 3
+    private static let rail = InspectorRail(lower: -1, upper: 1)
 
     private let read: () -> Double
     private let write: (Double) -> Void
@@ -74,22 +71,14 @@ final class WheelStripControl: NSView, OptionControl {
         needsDisplay = true
     }
 
-    private var span: CGFloat { max(bounds.width - Self.knobSize.width, 1) }
-
-    private func fraction(of raw: Double) -> CGFloat {
-        let value = min(max(raw, Self.lower), Self.upper)
-        return CGFloat((value - Self.lower) / (Self.upper - Self.lower))
-    }
+    private var span: CGFloat { Self.rail.span(width: bounds.width) }
 
     /// The knob's centre for `raw`, the x `draw` puts it at.
     private func knobX(of raw: Double) -> CGFloat {
-        Self.knobSize.width / 2 + span * fraction(of: raw)
+        Self.rail.knobX(of: raw, width: bounds.width)
     }
 
-    func value(atX x: CGFloat) -> Double {
-        let t = min(max((x - Self.knobSize.width / 2) / span, 0), 1)
-        return Self.lower + Double(t) * (Self.upper - Self.lower)
-    }
+    func value(atX x: CGFloat) -> Double { Self.rail.value(atX: x, width: bounds.width) }
 
     // MARK: Gesture
 
@@ -111,7 +100,7 @@ final class WheelStripControl: NSView, OptionControl {
         let offset = x - knobX(of: current)
         if fine {
             dragged = current
-        } else if abs(offset) <= Self.knobSize.width / 2 {
+        } else if abs(offset) <= InspectorRail.knobSize.width / 2 {
             grab = offset
             dragged = current
         } else {
@@ -128,8 +117,9 @@ final class WheelStripControl: NSView, OptionControl {
         guard let from = dragged else { return }
         let next: Double
         if fine {
-            let delta = Double((x - lastX) / span) * (Self.upper - Self.lower)
-            next = min(max(from + delta * ColorWheelControl.fine, Self.lower), Self.upper)
+            let rail = Self.rail
+            let delta = Double((x - lastX) / span) * (rail.upper - rail.lower)
+            next = min(max(from + delta * ColorWheelControl.fine, rail.lower), rail.upper)
         } else {
             next = value(atX: x - grab)
         }
@@ -163,38 +153,8 @@ final class WheelStripControl: NSView, OptionControl {
     // MARK: Drawing
 
     override func draw(_ dirtyRect: NSRect) {
-        let knobSize = Self.knobSize
-        let mid = bounds.midY
-        let rail = NSRect(
-            x: knobSize.width / 2, y: mid - Self.track / 2, width: span, height: Self.track)
-        DS.border.setFill()
-        rail.fill()
-        let value = dragged ?? read()
-        let centre = rail.minX + rail.width * fraction(of: value)
-        let knob = backingAlignedRect(
-            NSRect(x: centre - knobSize.width / 2, y: mid - knobSize.height / 2,
-                   width: knobSize.width, height: knobSize.height),
-            options: .alignAllEdgesNearest)
-        let isKeyed = keyed()
-        if let from = start(), isKeyed {
-            let startX = rail.minX + rail.width * fraction(of: from)
-            DS.action.setFill()
-            NSRect(x: min(startX, knob.midX), y: rail.minY, width: abs(knob.midX - startX),
-                   height: rail.height).fill()
-        } else {
-            DS.accent.setFill()
-            NSRect(x: rail.minX, y: rail.minY, width: max(knob.midX - rail.minX, 0),
-                   height: rail.height).fill()
-        }
-        if let at = now(), abs(at - value) > (Self.upper - Self.lower) / 1000 {
-            let x = rail.minX + rail.width * fraction(of: at)
-            DS.playhead.setFill()
-            backingAlignedRect(
-                NSRect(x: x - 1, y: mid - knobSize.height / 2, width: 2, height: knobSize.height),
-                options: .alignAllEdgesNearest
-            ).fill()
-        }
-        (isKeyed ? DS.action : DS.textStrong.withAlphaComponent(1)).setFill()
-        knob.fill()
+        Self.rail.draw(
+            in: self, value: dragged ?? read(), start: start(), now: now(), keyed: keyed(),
+            keyedKnobInk: DS.action)
     }
 }

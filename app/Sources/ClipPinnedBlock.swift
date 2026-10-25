@@ -185,7 +185,7 @@ final class ClipHeaderBlock: NSView, OptionControl {
         header = ClipSelectionHeaderView(binding: binding)
         lane = ActionLaneView(binding: binding, inspector: inspector)
         strip = subTabs
-        noteLabel = note.map { InspectorNoteLabel(note: $0) }
+        noteLabel = note.map { InspectorNoteLabel(wraps: true, note: $0) }
         super.init(frame: .zero)
         var views: [NSView] = [header, lane]
         if let subTabs { views.append(subTabs) }
@@ -202,9 +202,6 @@ final class ClipHeaderBlock: NSView, OptionControl {
         }
         if let label = noteLabel {
             // A sentence of two lines at the panel's width: it wraps.
-            label.lineBreakMode = .byWordWrapping
-            label.maximumNumberOfLines = 0
-            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
             label.translatesAutoresizingMaskIntoConstraints = false
             addSubview(label)
             NSLayoutConstraint.activate([
@@ -235,16 +232,6 @@ final class ClipHeaderBlock: NSView, OptionControl {
 
     /// The matte note's words as shown, for a probe; nil when it has none.
     var noteText: String? { noteLabel.flatMap { $0.isHidden ? nil : $0.stringValue } }
-
-    /// A wrapping label needs its width to know its height.
-    override func layout() {
-        super.layout()
-        guard let label = noteLabel else { return }
-        let width = max(bounds.width - 2 * InspectorMetrics.inset, 0)
-        guard label.preferredMaxLayoutWidth != width else { return }
-        label.preferredMaxLayoutWidth = width
-        super.layout()
-    }
 
     func refresh() {
         header.refresh()

@@ -788,7 +788,9 @@ func rowControl(_ root: NSView, _ name: String) -> NSView? {
 }
 
 func noteState(_ root: NSView) -> [String: Any] {
-    guard let note = walk(root).compactMap({ $0 as? MotionInactiveNote }).first else {
+    guard let motion = walk(root).first(where: { ($0 as? InspectorSection)?.id == "video.motion" }),
+          let note = walk(motion).compactMap({ $0 as? InspectorNoteLabel }).first(where: { $0.wraps })
+    else {
         return ["found": false]
     }
     let next = rowControl(root, "In")

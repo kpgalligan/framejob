@@ -327,13 +327,9 @@ final class VideoPane: InspectorPaneView {
         let binding = self.binding
         func crop() -> CropInsets { binding.videoProps.crop }
         func ops(_ next: CropInsets) -> [ReelOp] { binding.ops(video: VideoPatch(crop: next)) }
-        let cropButton = OptionButtonControl(
-            title: "Crop on Canvas",
-            action: { [weak self] in
-                self?.inspector?.onCommand?(#selector(EditorViewController.toggleCropMode(_:)))
-            },
-            enabled: { true }, onEdit: {})
-        cropButton.toolTip = "Drag the crop edges on the canvas (C)"
+        let cropButton = commandButton(
+            "Crop on Canvas", #selector(EditorViewController.toggleCropMode(_:)),
+            toolTip: "Drag the crop edges on the canvas (C)")
         return InspectorSection(
             id: "video.crop", title: "Crop",
             summary: {
@@ -411,13 +407,9 @@ final class VideoPane: InspectorPaneView {
             binding.ops(video: VideoPatch(chroma: .some(next)))
         }
         func on() -> Bool { binding.videoProps.chroma != nil }
-        let pick = OptionButtonControl(
-            title: "Pick from Canvas",
-            action: { [weak self] in
-                self?.inspector?.onCommand?(#selector(EditorViewController.pickChromaKey(_:)))
-            },
-            enabled: { true }, onEdit: {})
-        pick.toolTip = "Click the preview to sample the key color (Esc cancels)"
+        let pick = commandButton(
+            "Pick from Canvas", #selector(EditorViewController.pickChromaKey(_:)),
+            toolTip: "Click the preview to sample the key color (Esc cancels)")
         return InspectorSection(
             id: "video.chroma", title: "Chroma Key",
             summary: { on() ? String(format: "%.0f%%", current().tolerance * 100) : "off" },

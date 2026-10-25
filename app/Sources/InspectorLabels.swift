@@ -126,11 +126,15 @@ final class InspectorTimecodeField: NSTextField, OptionControl, NSTextFieldDeleg
 
 /// A section's one-line note — "Editing action 2's end state" (§4.3). Hides
 /// itself when the closure returns nil, so a section pays nothing for a note
-/// it does not currently have.
+/// it does not currently have. With `wraps` it is a sentence of several lines
+/// at the panel's width instead (the Motion and Speed notes, the Clip tab's
+/// matte note), measured at its own width in `layout()`.
 final class InspectorNoteLabel: NSTextField, OptionControl {
+    let wraps: Bool
     private let note: () -> String?
 
-    init(note: @escaping () -> String?) {
+    init(wraps: Bool = false, note: @escaping () -> String?) {
+        self.wraps = wraps
         self.note = note
         super.init(frame: .zero)
         isEditable = false
@@ -139,7 +143,15 @@ final class InspectorNoteLabel: NSTextField, OptionControl {
         drawsBackground = false
         font = DS.sans(11)
         textColor = DS.accent
-        lineBreakMode = .byTruncatingTail
+        if wraps {
+            usesSingleLineMode = false
+            lineBreakMode = .byWordWrapping
+            cell?.wraps = true
+            maximumNumberOfLines = 0
+            setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        } else {
+            lineBreakMode = .byTruncatingTail
+        }
         refresh()
     }
 
@@ -148,9 +160,18 @@ final class InspectorNoteLabel: NSTextField, OptionControl {
         fatalError("InspectorNoteLabel does not support NSCoder")
     }
 
+    /// A wrapping label needs its width to know its height.
+    override func layout() {
+        if wraps, preferredMaxLayoutWidth != bounds.width {
+            preferredMaxLayoutWidth = bounds.width
+        }
+        super.layout()
+    }
+
     func refresh() {
         let text = note()
-        stringValue = text ?? ""
+        let shown = text ?? ""
+        if stringValue != shown { stringValue = shown }
         isHidden = text == nil
     }
 }

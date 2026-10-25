@@ -398,13 +398,9 @@ final class AudioPane: InspectorPaneView {
     /// says which side, so "0" is never ambiguous.
     func mixSection() -> InspectorSection {
         let binding = self.binding
-        let detach = OptionButtonControl(
-            title: "Detach Audio",
-            action: { [weak self] in
-                self?.inspector?.onCommand?(#selector(EditorViewController.detachAudio(_:)))
-            },
-            enabled: { true }, onEdit: {})
-        detach.toolTip = "Move the audio to its own clip on the track below (⌥⌘D)"
+        let detach = commandButton(
+            "Detach Audio", #selector(EditorViewController.detachAudio(_:)),
+            toolTip: "Move the audio to its own clip on the track below (⌥⌘D)")
         return InspectorSection(
             id: "audio.mix", title: "Mix",
             summary: {

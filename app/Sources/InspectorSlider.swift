@@ -30,9 +30,6 @@ final class InspectorSliderControl: NSView, OptionControl {
     private var isActive = true
     private var dragging = false
 
-    private static let knobSize = NSSize(width: 7, height: 11)
-    private static let track: CGFloat = 3
-
     init(
         min lower: Double, max upper: Double, read: @escaping () -> Double,
         write: @escaping (Double) -> Void, begin: @escaping () -> Void,
@@ -74,19 +71,7 @@ final class InspectorSliderControl: NSView, OptionControl {
         needsDisplay = true
     }
 
-    private var fraction: CGFloat { fraction(of: read()) }
-
-    private func fraction(of raw: Double) -> CGFloat {
-        let value = Swift.min(Swift.max(raw, lower), upper)
-        return CGFloat((value - lower) / (upper - lower))
-    }
-
-    private func value(atX x: CGFloat) -> Double {
-        let inset = Self.knobSize.width / 2
-        let span = Swift.max(bounds.width - Self.knobSize.width, 1)
-        let t = Swift.min(Swift.max((x - inset) / span, 0), 1)
-        return lower + Double(t) * (upper - lower)
-    }
+    private var rail: InspectorRail { InspectorRail(lower: lower, upper: upper) }
 
     // MARK: Mouse
 
@@ -94,13 +79,13 @@ final class InspectorSliderControl: NSView, OptionControl {
         guard isActive else { return }
         dragging = true
         begin()
-        write(value(atX: convert(event.locationInWindow, from: nil).x))
+        write(rail.value(atX: convert(event.locationInWindow, from: nil).x, width: bounds.width))
         needsDisplay = true
     }
 
     override func mouseDragged(with event: NSEvent) {
         guard dragging else { return }
-        write(value(atX: convert(event.locationInWindow, from: nil).x))
+        write(rail.value(atX: convert(event.locationInWindow, from: nil).x, width: bounds.width))
         needsDisplay = true
     }
 
@@ -116,46 +101,8 @@ final class InspectorSliderControl: NSView, OptionControl {
     // MARK: Drawing
 
     override func draw(_ dirtyRect: NSRect) {
-        let knobSize = Self.knobSize
-        let mid = bounds.midY
-        let rail = NSRect(
-            x: knobSize.width / 2, y: mid - Self.track / 2,
-            width: max(bounds.width - knobSize.width, 1), height: Self.track)
-        DS.border.setFill()
-        rail.fill()
-
-        // The block knob (`BlockSliderCell.drawKnob`'s shape), snapped to
-        // device pixels; the fill runs to the SNAPPED centre so the two meet
-        // on a pixel edge.
-        let center = rail.minX + rail.width * fraction
-        let knob = backingAlignedRect(
-            NSRect(x: center - knobSize.width / 2, y: mid - knobSize.height / 2,
-                   width: knobSize.width, height: knobSize.height),
-            options: .alignAllEdgesNearest)
-        // Keyed (spec §4.3's marks): no accent fill, and the action ink from
-        // the value at the action's START to the knob, either way round.
-        if let from = start(), keyed() {
-            let startX = rail.minX + rail.width * fraction(of: from)
-            DS.action.setFill()
-            NSRect(x: min(startX, knob.midX), y: rail.minY, width: abs(knob.midX - startX),
-                   height: rail.height).fill()
-        } else {
-            DS.accent.setFill()
-            NSRect(x: rail.minX, y: rail.minY, width: max(knob.midX - rail.minX, 0),
-                   height: rail.height).fill()
-        }
-        // The playhead's value: a coral tick over the fill, under the knob,
-        // when it is not where the knob is.
-        if let value = now(), abs(value - read()) > (upper - lower) / 1000 {
-            let x = rail.minX + rail.width * fraction(of: value)
-            DS.playhead.setFill()
-            backingAlignedRect(
-                NSRect(x: x - 1, y: mid - knobSize.height / 2, width: 2,
-                       height: knobSize.height),
-                options: .alignAllEdgesNearest
-            ).fill()
-        }
-        DS.textStrong.withAlphaComponent(1).setFill()
-        knob.fill()
+        rail.draw(
+            in: self, value: read(), start: start(), now: now(), keyed: keyed(),
+            keyedKnobInk: DS.textStrong.withAlphaComponent(1))
     }
 }

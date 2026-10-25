@@ -709,7 +709,9 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `ScopeSlotView.swift` 216, `WaveformTraceView.swift` 133, `ParadeView.swift` 50,
   `VectorscopeView.swift` 97, `HistogramView.swift` 61. Grading-2's G2-4 put `SelectionTagView`
   (GR-13's "Selection" tag) beside `UngradedTagView`: 216 → 242. The next seam: the two tags
-  (GR-4's and GR-13's, not scopes) out whole to `PreviewTagViews.swift`.
+  (GR-4's and GR-13's, not scopes) out whole to `PreviewTagViews.swift`. #358 made that cut,
+  with HD-7's "SDR Version" tag beside them: the three tags became one `PreviewTagView` keyed by
+  `PreviewTag`; `wc -l`: `ScopesPanelView.swift` 291 → 212, `PreviewTagViews.swift` 62.
 - `AgentCatalog+Clips.swift`: the action rows went to `AgentCatalog+Actions.swift` in issue batch
   B87 phase 2. The grading road map's GR1 paid the next cut: the five property rows (`set_video`,
   `set_audio`, `set_text`, `set_shape`, `set_clip`) and the nineteen hoisted locals they read went

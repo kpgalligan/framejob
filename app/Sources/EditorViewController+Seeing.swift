@@ -39,17 +39,15 @@ extension EditorViewController {
         canvasContainer.subviews.compactMap { $0 as? SeeingTagStack }.first
     }
 
-    var ungradedTag: UngradedTagView? {
-        seeingTags?.arrangedSubviews.compactMap { $0 as? UngradedTagView }.first
+    func previewTag(_ kind: PreviewTag) -> PreviewTagView? {
+        seeingTags?.arrangedSubviews.compactMap { $0 as? PreviewTagView }.first { $0.kind == kind }
     }
 
-    var selectionTag: SelectionTagView? {
-        seeingTags?.arrangedSubviews.compactMap { $0 as? SelectionTagView }.first
-    }
+    var ungradedTag: PreviewTagView? { previewTag(.ungraded) }
 
-    var sdrVersionTag: SDRVersionTagView? {
-        seeingTags?.arrangedSubviews.compactMap { $0 as? SDRVersionTagView }.first
-    }
+    var selectionTag: PreviewTagView? { previewTag(.selection) }
+
+    var sdrVersionTag: PreviewTagView? { previewTag(.sdrVersion) }
 
     /// The panel at the pane's right edge, the canvas's trailing edge pinned
     /// to its leading one, and the tags in the void's top-left corner. Called
@@ -59,7 +57,7 @@ extension EditorViewController {
         let panel = ScopesPanelView()
         panel.onNeedsFrame = { [weak self] in self?.refreshSeeing() }
         let tag = SeeingTagStack(
-            views: [UngradedTagView(), SelectionTagView(), SDRVersionTagView()])
+            views: [.ungraded, .selection, .sdrVersion].map(PreviewTagView.init))
         tag.orientation = .horizontal
         tag.spacing = 4
         tag.detachesHiddenViews = true

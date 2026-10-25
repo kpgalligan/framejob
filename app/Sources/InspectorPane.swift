@@ -446,6 +446,22 @@ class InspectorPaneView: NSView, InspectorPane {
         return clips.joined(separator: ",")
     }
 
+    // MARK: Commands
+
+    /// A button that hands an editor command back through `onCommand`, read
+    /// at click time, rather than re-implementing it in the pane.
+    func commandButton(
+        _ title: String, _ command: Selector, toolTip: String,
+        enabled: @escaping () -> Bool = { true }
+    ) -> OptionButtonControl {
+        let button = OptionButtonControl(
+            title: title,
+            action: { [weak self] in self?.inspector?.onCommand?(command) },
+            enabled: enabled, onEdit: {})
+        button.toolTip = toolTip
+        return button
+    }
+
     // MARK: Building
 
     func rebuild() {

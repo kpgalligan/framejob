@@ -225,15 +225,12 @@ extension VideoPane {
         add.toolTip =
             "Add a 480 × 270 pixelated box at the centre of the layer — on the clip "
             + "itself, not on the action under the playhead"
-        let place = OptionButtonControl(
-            title: "Place on Canvas",
-            action: { [weak self] in
-                self?.inspector?.onCommand?(#selector(EditorViewController.placeObscureRegion(_:)))
-            },
-            enabled: { list().count < ObscureProps.max }, onEdit: {})
-        place.toolTip =
-            "Drag a rectangle on the canvas (Esc cancels) — it is appended to the clip "
-            + "itself, not to the action under the playhead"
+        let place = commandButton(
+            "Place on Canvas", #selector(EditorViewController.placeObscureRegion(_:)),
+            toolTip:
+                "Drag a rectangle on the canvas (Esc cancels) — it is appended to the clip "
+                + "itself, not to the action under the playhead",
+            enabled: { list().count < ObscureProps.max })
         rows.append(
             inspectorButtonRow([add, place, InspectorRowLabel("\(ObscureProps.max) at most")]))
 

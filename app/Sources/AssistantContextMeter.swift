@@ -79,33 +79,19 @@ final class AssistantContextMeterView: NSView {
     /// last when none does. The 12 is the constraints' 2 pt inset, 8 pt gap
     /// and 2 pt inset.
     private func showFittingFigure() {
-        let ladder = Self.figureLadder(usage)
         let room = bounds.width - title.intrinsicContentSize.width - 12
-        let shown = ladder.first { rung in
-            measure.stringValue = rung
-            return measure.intrinsicContentSize.width <= room
-        } ?? ladder[ladder.count - 1]
+        let shown = fittingRung(Self.figureLadder(usage), room: room, measure: measure)
         if figuresLabel.stringValue != shown { figuresLabel.stringValue = shown }
     }
 
-    /// "Nothing reported yet", "N of L tokens · P%", or "N tokens (window
-    /// size unknown)".
+    /// The full figures — "Nothing reported yet", "N of L tokens · P%", or
+    /// "N tokens (window size unknown)": `figureLadder`'s first rung.
     static func figures(_ usage: AssistantContextUsage) -> String {
-        let used = usage.used.formatted()
-        switch (usage.reported, usage.limit) {
-        case (false, _):
-            return "Nothing reported yet"
-        case (true, let limit?) where limit > 0:
-            let percent = (fraction(usage) * 100)
-                .formatted(.number.precision(.fractionLength(0...1)))
-            return "\(used) of \(limit.formatted()) tokens · \(percent)%"
-        case (true, _):
-            return "\(used) tokens (window size unknown)"
-        }
+        figureLadder(usage)[0]
     }
 
-    /// The figures from longest to shortest: `figures(_:)` first, then
-    /// "N / L · P%" and "P%", or "N tokens".
+    /// The figures from longest to shortest: the full figures (`figures(_:)`)
+    /// first, then "N / L · P%" and "P%", or "N tokens".
     static func figureLadder(_ usage: AssistantContextUsage) -> [String] {
         let used = usage.used.formatted()
         switch (usage.reported, usage.limit) {
@@ -188,14 +174,19 @@ final class AssistantConversationCostView: NSView {
     /// The first rung of `figureLadder` that fits beside the title, or the
     /// last when none does (spec §11 P-8) — the meter's shape and its 12 pt.
     private func showFittingFigure() {
-        let ladder = cost.figureLadder
         let room = bounds.width - title.intrinsicContentSize.width - 12
-        let shown = ladder.first { rung in
-            measure.stringValue = rung
-            return measure.intrinsicContentSize.width <= room
-        } ?? ladder[ladder.count - 1]
+        let shown = fittingRung(cost.figureLadder, room: room, measure: measure)
         if figureLabel.stringValue != shown { figureLabel.stringValue = shown }
     }
+}
+
+/// The first rung of `ladder` whose width in `measure`'s font fits `room`, or
+/// the last when none does — the meter's and the Spend row's one search.
+private func fittingRung(_ ladder: [String], room: CGFloat, measure: NSTextField) -> String {
+    ladder.first { rung in
+        measure.stringValue = rung
+        return measure.intrinsicContentSize.width <= room
+    } ?? ladder[ladder.count - 1]
 }
 
 /// A square track with the used fraction filled in the accent; the fill

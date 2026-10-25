@@ -65,15 +65,11 @@ extension VideoPane {
                 + "Increase Duration to reactivate; choose None to clear."
         }
 
-        let preview = OptionButtonControl(
-            title: "Preview",
-            action: { [weak self] in
-                self?.inspector?.onCommand?(#selector(EditorViewController.previewClipMotion(_:)))
-            },
-            enabled: { true }, onEdit: {})
-        preview.toolTip =
-            "Play the clip in a loop: sets the in/out range to the clip and turns Loop on"
-            + " — both stay until you clear them"
+        let preview = commandButton(
+            "Preview", #selector(EditorViewController.previewClipMotion(_:)),
+            toolTip:
+                "Play the clip in a loop: sets the in/out range to the clip and turns Loop on"
+                + " — both stay until you clear them")
 
         return InspectorSection(
             id: "video.motion", title: "Motion presets",
@@ -81,7 +77,7 @@ extension VideoPane {
             reset: { binding.apply("Motion", video: VideoPatch(motion: .some(nil))) },
             defaultExpanded: false,
             rows: [
-                MotionInactiveNote(note: inactiveNote),
+                InspectorNoteLabel(wraps: true, note: inactiveNote),
                 inspectorPopupRow(
                     "In", binding, name: "Motion In", items: ["None"] + edges.map(\.displayName),
                     read: { motion().inEdge.map { (edges.firstIndex(of: $0.kind) ?? 0) + 1 } ?? 0 },
@@ -180,56 +176,5 @@ extension VideoPane {
                     }),
                 inspectorButtonRow([preview]),
             ])
-    }
-}
-
-/// The Motion section's selection note may need several lines at 304 pt.
-final class MotionInactiveNote: NSTextField, OptionControl {
-    private let note: () -> String?
-    private var measuredWidth: CGFloat = 0
-
-    init(note: @escaping () -> String?) {
-        self.note = note
-        super.init(frame: .zero)
-        isEditable = false
-        isBordered = false
-        isBezeled = false
-        drawsBackground = false
-        font = DS.sans(11)
-        textColor = DS.accent
-        usesSingleLineMode = false
-        lineBreakMode = .byWordWrapping
-        cell?.wraps = true
-        refresh()
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("MotionInactiveNote does not support NSCoder")
-    }
-
-    override var intrinsicContentSize: NSSize {
-        guard !isHidden else { return NSSize(width: NSView.noIntrinsicMetric, height: 0) }
-        let width = bounds.width > 0 ? bounds.width : 264
-        let text = NSAttributedString(string: stringValue, attributes: [.font: font ?? DS.sans(11)])
-        let height = text.boundingRect(
-            with: NSSize(width: width, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading]).height
-        return NSSize(width: NSView.noIntrinsicMetric, height: ceil(height) + 2)
-    }
-
-    override func layout() {
-        super.layout()
-        if bounds.width != measuredWidth {
-            measuredWidth = bounds.width
-            invalidateIntrinsicContentSize()
-        }
-    }
-
-    func refresh() {
-        let text = note()
-        stringValue = text ?? ""
-        isHidden = text == nil
-        invalidateIntrinsicContentSize()
     }
 }

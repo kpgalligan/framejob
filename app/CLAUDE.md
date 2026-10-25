@@ -794,7 +794,9 @@ the key map behind it.
 - `InspectorLabels.swift` — a pure move out of `InspectorPane.swift` (speed
   ramps SR5-0): the small labels and fields every section uses,
   `InspectorRowLabel`, `InspectorMixedBadge`, `InspectorTimecodeField`,
-  `InspectorNoteLabel` and `InspectorTextArea`.
+  `InspectorNoteLabel` and `InspectorTextArea`. `InspectorNoteLabel(wraps:)`
+  with `wraps: true` is the one wrapping note: Motion's zero-duration note,
+  Speed's silent-audio note and the Clip tab's matte note (#358).
 - `InspectorViewController.swift` (frozen: the tab strip, and the PINNED
   container between it and the scroll view that hosts a pane's
   `pinnedBlock`, one generation retired like the strip; the FOOT container
@@ -821,7 +823,8 @@ the key map behind it.
   is not forked; `showAssistantBadge(_:)` is its inspector-side setter) ·
   `InspectorPane.swift`
   (the pane base — `pinnedBlock` is the header `makeHeader()` built, never
-  stacked — and
+  stacked; `commandButton(_:_:toolTip:enabled:)`, every section's one-click
+  command button such as Crop on Canvas or Detach Audio, #358 — and
   `InspectorBinding` — the one place that knows the fields read the
   SELECTED action's END state
   (`action(_:)` answers the selected action and never consults the playhead;
@@ -843,14 +846,18 @@ the key map behind it.
   filter's and an obscure region's kind, a module's boolean with a long label)) ·
   `InspectorSlider.swift` (`InspectorSliderControl`, a pure move: the 7 × 11
   block knob snapped to device pixels (CI-6) and, keyed, the mint segment
-  from the action's start value and the coral playhead tick) ·
+  from the action's start value and the coral playhead tick; it maps and
+  draws through `InspectorRail.swift`, which `WheelStripControl` shares, the
+  keyed knob's ink passed in: textStrong here, CI-6, the action ink there,
+  §4.3b, #358) ·
   `ColorWheelControl.swift` (`ColorWheelControl`: a hue disc drawn at
   `hueRotation` 103° so each hue sits near its vectorscope target, its 7 × 7
   square puck dragged as a live edit by the pointer's delta, ⌥ a tenth, clamped
   to the rim, double-click resets the push; spec §11 GR-11) ·
   `WheelStripControl.swift` (`WheelStripControl`: the master strip with the
   slider's knob, a press on the knob grabs it, elsewhere jumps, ⌥ drags relative
-  at a tenth, double-click resets, one undo step on or off the knob, #272) ·
+  at a tenth, double-click resets, one undo step on or off the knob, #272;
+  its rail is `InspectorRail.swift`'s) ·
   `CurveEditorView.swift` (`CurveEditorView`: the curve plot in its channel's
   domain units — grid, diagonal (a hue curve's neutral line over its spectrum
   strip), the other channels of the same domain faint, 7 × 7 square points; a
@@ -1023,8 +1030,8 @@ the key map behind it.
   `RecipeCanvas.blended`, which decodes a colour Frame Job draws — the
   background, a shadow — on a linear canvas) · `OptionControls.swift` (the descriptor-driven
   row controls) · `OptionControls+Choices.swift` (the typed, value-carrying
-  `OptionPopupControl` init over the index one). `VideoPane+Motion.swift` owns the local wrapping
-  `MotionInactiveNote` for selected zero-duration edges; it refreshes with
+  `OptionPopupControl` init over the index one). `VideoPane+Motion.swift` owns the wrapping
+  `InspectorNoteLabel` (`wraps: true`) for selected zero-duration edges; it refreshes with
   the section and leaves stored kind and Duration editable. Its old "Motion
   belongs to the clip" note is gone: every Motion presets row is ⊘, so the
   section's own ⊘ note says it.
@@ -1391,7 +1398,10 @@ the key map behind it.
   are two passes; one pass in flight per key and one pending slot the newest
   frame replaces) · `ScopesPanelView.swift` (View ▸ Scopes' panel: two slots
   with pickers, the shrink-to-fit layout and its 360 pt floor,
-  `zoom(_:slot:)`, `UngradedTagView`, `SelectionTagView`, `SDRVersionTagView`) ·
+  `zoom(_:slot:)`) · `PreviewTagViews.swift` (`PreviewTag` and
+  `PreviewTagView`: the Ungraded, Selection and SDR Version tags over the
+  preview, one view per kind with its accessibility id unchanged; `+Seeing`'s
+  `previewTag(_:)`, #358) ·
   `ScopeSlotView.swift` (a slot: the picker, the caption — it follows the
   trace's signal — the body and its readouts, and the vectorscope's zoom,
   kept across a pick away and back) ·

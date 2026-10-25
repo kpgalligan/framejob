@@ -150,13 +150,9 @@ final class MediaPane: InspectorPaneView {
     /// still not an `OptionControl`: those read the model, and this reads the
     /// pane's own view state.
     private func actionRow() -> NSView {
-        let add = OptionButtonControl(
-            title: "Add Media…",
-            action: { [weak self] in
-                self?.inspector?.onCommand?(#selector(EditorViewController.addMediaFiles(_:)))
-            },
-            enabled: { true }, onEdit: {})
-        add.toolTip = "Import files into this project (⇧⌘I)"
+        let add = commandButton(
+            "Add Media…", #selector(EditorViewController.addMediaFiles(_:)),
+            toolTip: "Import files into this project (⇧⌘I)")
 
         let count = binding.snapshot.media.count
         let label = MediaPane.caption(MediaPane.tally(shown: count, of: count))
@@ -342,13 +338,10 @@ final class MediaPane: InspectorPaneView {
     /// halves of the row.
     private func footerRow() -> NSView {
         let binding = self.binding
-        let consolidate = OptionButtonControl(
-            title: "Consolidate…",
-            action: { [weak self] in
-                self?.inspector?.onCommand?(#selector(EditorViewController.consolidateMedia(_:)))
-            },
-            enabled: { !binding.snapshot.media.isEmpty }, onEdit: {})
-        consolidate.toolTip = MediaPane.consolidateNote
+        let consolidate = commandButton(
+            "Consolidate…", #selector(EditorViewController.consolidateMedia(_:)),
+            toolTip: MediaPane.consolidateNote,
+            enabled: { !binding.snapshot.media.isEmpty })
 
         let note = MediaPane.caption(MediaPane.consolidateLine, font: DS.sans(11))
         note.toolTip = MediaPane.consolidateNote

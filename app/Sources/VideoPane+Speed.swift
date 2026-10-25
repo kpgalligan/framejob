@@ -39,10 +39,10 @@ extension VideoPane {
                     },
                     mixed: { binding.mixedAudio { $0.keepPitch } }),
                 fitRow(),
-                MotionInactiveNote(note: {
+                InspectorNoteLabel(wraps: true) {
                     Self.silentAudioNote(
                         for: binding.clips, in: binding.snapshot, limits: ReelSpeed.limits)
-                }),
+                },
             ])
     }
 

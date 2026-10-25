@@ -41,13 +41,9 @@ extension VideoPane {
                 read: { qualifier().blur * 100 },
                 ops: { ops(ColorQualifierPatch(blur: $0 / 100)) },
                 mixed: { binding.mixedVideo { $0.qualifier.blur } }))
-        let pick = OptionButtonControl(
-            title: "Pick from Canvas",
-            action: { [weak self] in
-                self?.inspector?.onCommand?(#selector(EditorViewController.pickQualifier(_:)))
-            },
-            enabled: { true }, onEdit: {})
-        pick.toolTip = "Click the preview to centre the ranges on a colour (Esc cancels)"
+        let pick = commandButton(
+            "Pick from Canvas", #selector(EditorViewController.pickQualifier(_:)),
+            toolTip: "Click the preview to centre the ranges on a colour (Esc cancels)")
         let show = OptionCheckboxControl(
             label: "Show Selection",
             read: { [weak self] in
