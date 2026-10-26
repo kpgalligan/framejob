@@ -168,7 +168,7 @@ extension AgentServer {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
         let toEnd = try timeArg(a, "to_end", document)
-        return try editResult(
+        return try retimingEditResult(
             document, "Rate Stretch", [.rateStretch(clip: clip.id, toEnd: toEnd)])
     }
 
@@ -311,7 +311,7 @@ extension AgentServer {
             throw ToolError(message: "rate must be a positive number (1 = normal speed).")
         }
         let keepPitch = try boolArg(a, "keep_pitch")
-        return try editResult(document, "Speed", [
+        return try retimingEditResult(document, "Speed", [
             .setSpeed(clip: clip.id, rate: rate, duration: duration, keepPitch: keepPitch)])
     }
 

@@ -120,7 +120,11 @@ extension AgentServer {
         // on the document", so these two tools (`add_action`, `add_zoom_action`)
         // would otherwise report a nested edit as a document one.
         let landing = scopeLanding(ops, document)
-        let snapshot = try performGroupedEdit(document, actionName, ops)
+        // The captions `add_speed_ramp` re-times ride in the same step
+        // (spec §11 SR-27); every other action-adding tool plans nothing.
+        let plan = captionRetime(ops, document)
+        let snapshot = try performGroupedEdit(
+            document, plan.undoName(actionName), ops + plan.ops)
         // Read back through `idScope`, not the top level: inside a scope the
         // clip that just gained an action is one of the nest's, and the
         // timeline's array has never heard of it — which would answer with an
@@ -129,6 +133,7 @@ extension AgentServer {
         var result: [String: Any] = ["ok": true, "clip": Int(clip.id)]
         let added = after.filter { !before.contains($0) }.map { Int($0) }
         if !added.isEmpty { result["new_actions"] = added }
+        result.merge(plan.answerFields) { _, new in new }
         // Empty unless the edit took a clip with sound above the ceiling,
         // which only `add_speed_ramp` of these tools can (SR-21 (e)).
         result.merge(
@@ -184,7 +189,7 @@ extension AgentServer {
         guard start != nil || duration != nil || curve != nil else {
             throw ToolError(message: "set_action needs start, duration or curve.")
         }
-        return try editResult(
+        return try retimingEditResult(
             document, "Action",
             [
                 .setAction(
@@ -240,7 +245,7 @@ extension AgentServer {
         // `off` (CI-14) is the caller's own choice; its refusals are the core's.
         let off = try stringsArg(a, "off") ?? []
         let schema = graphicEndSchema(patch, clip, document)
-        return try editResult(
+        return try retimingEditResult(
             document, "Action End",
             [
                 .setActionEndRaw(
@@ -271,7 +276,7 @@ extension AgentServer {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
         let action = try actionArg(a, "action", clip)
-        return try editResult(
+        return try retimingEditResult(
             document, "Remove Action", [.removeAction(clip: clip.id, action: action.id)])
     }
 

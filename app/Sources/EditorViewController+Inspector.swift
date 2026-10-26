@@ -48,8 +48,8 @@ extension EditorViewController {
             self?.document?.applyEdit(name, ops, amending: step)
         }
         inspector.onLiveBegin = { [weak self] in self?.document?.beginLiveEdit() }
-        inspector.onLiveUpdate = { [weak self] ops in self?.document?.updateLiveEdit(ops) }
-        inspector.onLiveEnd = { [weak self] name in self?.document?.endLiveEdit(name) }
+        inspector.onLiveUpdate = { [weak self] ops in self?.timelineLiveUpdated(ops) }
+        inspector.onLiveEnd = { [weak self] name in self?.timelineLiveEnded(name) }
         inspector.onImportFiles = { [weak self] urls in self?.document?.importMedia(urls) }
         inspector.onProbe = { [weak self] ops in self?.inspectorProbe(ops) }
         inspector.onSeek = { [weak self] time in self?.inspectorSeek(time) }

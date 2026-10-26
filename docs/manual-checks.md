@@ -388,6 +388,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does the rate line read as the ramp's shape, without crowding the bands?
 - **Source:** #339 (spec §11 SR-26).
 
+**CRT-1 — Captions stay on the speech after a speed change**
+- **Do:** 1. On a talking clip about 10 s long, File ▸ Generate Captions… with a word style, then again on a copy of the clip with Subtitles. 2. On each, apply Clip ▸ Speed Ramp…'s Speed Dip at ×0.5 and play through the dip. 3. Undo, then set the speed to ×2 in Clip ▸ Speed… and play. 4. Undo, then ⌥-drag the clip's end edge to stretch it, and play.
+- **Expect:** after each edit the captions land on the words as they are heard, the word highlight keeps time through the dip, and one undo puts the speed and the captions back together; the step is named "… and Re-time Captions". After the ×2, nothing past the end of the old speech is captioned until Generate Captions runs again.
+- **Answer:** do the captions still land on the speech after each edit?
+- **Source:** #341 (spec §11 SR-27).
+
 ## Captions
 
 **CAP-1 — Text reveals and legibility**

@@ -110,7 +110,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   `audio_note` (§11 #190's "The question"). On a ramped clip the whole rate profile scales by f =
   D ÷ (to_end − start) — the base, every end rate and every speed action's span, which is not
   clamped into the clip — and an f that would take any of its rates past ×0.1–×1000 is the
-  identity (§11 SR-19 (a), (b)).
+  identity (§11 SR-19 (a), (b)). The app's doors append, in the same step, the re-time of the
+  caption clips over a clip with sound (§11 SR-27, #341: the tool's answer adds `captions_retimed` /
+  `captions_removed`); the op itself moves no caption.
 - **`slip {clip, delta}`** — Slides the source under a fixed clip: `in += delta × speed`, start and
   duration unchanged, so nothing downstream moves. `delta` is TIMELINE ticks; positive shows later
   material. Clamped so the window stays inside the media (`in ≥ 0`, `in + duration × speed ≤
@@ -206,7 +208,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   base, every end rate and every speed action's span, which is not clamped into the clip, so the
   clip keeps its shape and its window; f is clamped so no rate it names passes ×0.1–×1000, and the
   duration is held through S∞; the audio ceiling reads the greatest rate the clip names (§11 SR-19
-  (a)–(d)).
+  (a)–(d)). The app's doors append, in the same step, the re-time of the caption clips over a clip
+  with sound (§11 SR-27, #341: the tool's answer adds `captions_retimed` / `captions_removed`); the
+  op itself moves no caption.
 - **`set_reversed {clip, reversed}`** — Plays the media back to front, or forward again. The core
   does no pixel work, so this changes neither the plan nor the recipe: Swift substitutes a
   pre-rendered reversed asset for that media's segments (§11). `in` is measured in the direction the

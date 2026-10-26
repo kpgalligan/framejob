@@ -13,7 +13,7 @@ shapes Ramp Up, Ramp Down, Speed Dip and Speed Burst, a dip and a burst being tw
 in one undo step; the span the timeline range when one is set inside the selected clip, else
 the clip's whole length; the controls the target rate (×0.1–×1000), the curve (ease in-out by
 default, or linear) and, for a dip and a burst, how much of the span the hold at the target
-takes. A later change records its rule as a new entry here (SR-26 on) or as an Amended-by line,
+takes. A later change records its rule as a new entry here (SR-27 on) or as an Amended-by line,
 before its code.
 
 - **SR-23 — A speed ramp preset is one core op, `add_speed_ramp`, making ordinary Speed
@@ -119,3 +119,51 @@ before its code.
     second source of truth.
   - Risk accepted: the scale is the clip's own, so a ×1→×1.1 ramp looks as tall as ×1→×10; the
     figures stay the Speed section's.
+- **SR-27 — A speed or ramp edit of a clip with sound re-times, in the same undo step, the
+  caption clips over it (#341), amending SR-20 (g) and rule O.** The owner's answer
+  (2026-10-25): option B, "Re-time automatically", for a person and an agent alike.
+  - **(a) The gate.** Only an edit holding `set_speed`, `rate_stretch`, `add_speed_ramp`,
+    `set_action`, `remove_action`, or a `set_action_end` whose patch names `speed` (any value)
+    re-times; every other edit is untouched. Synchronize Audio's `set_speed` rides a `move_clip`
+    and is not wired: captions following a move are a later road map's.
+  - **(b) The edited clips.** The edit is applied to the container it addresses; a clip is edited
+    when it is in both answers, speaks before the edit (a `media` source, not reversed, media
+    with sound, its audio enabled: `Transcriber.jobs`' eligibility) and its source map's points
+    or its start differ between the two handles.
+  - **(c) The captions.** A caption track is one named "Captions"/"Captions N"
+    (`CaptionLayout.isCaptionTrackName`), holding at least one clip, only text clips, and not
+    locked. A caption belongs to the edited clip whose old span `[start, start + duration]`
+    holds it wholly, the lowest id when two do; a straddling caption is left alone. A nest is
+    never crossed: a scoped edit reads only its own container.
+  - **(d) The mapping.** Each time goes clip tick → the old map's source → the new map's clip
+    tick, through `SourceMap` alone (no rate in Swift, D2-1), into the new window
+    `[sourceIn, sourceIn + sourceLength]`. A subtitle whose source lies wholly outside the window
+    is removed, else both ends map with the source clamped into it. A word page keeps the words
+    whose source start is before the window's end and the prefix of its content through the last
+    kept token (W-2); none kept removes it. Start and end snap to the frame grid; an end not after
+    its start removes the caption. Word times are written relative to the new start, unsnapped
+    (`set_text` snaps them).
+  - **(e) Cut back (sub-rule 3).** On its track a re-timed caption is cut back to abut a caption
+    that was not re-timed; one whose new start lies inside such a caption, or left under a frame,
+    is removed.
+  - **(f) The ops**, appended after the edit's own in one step: one `delete` of the removed; a
+    one-frame stub (`trim_end`) of every re-timed caption whose start or end changes, before any
+    move; `move_clip`s, those moving earlier ascending, then those moving later descending;
+    `trim_end` to the new ends; `set_text` only where words or content changed. `trim_start` is
+    never used (it rebases words, W-3). An unchanged caption gets no op.
+  - **(g) The check.** The whole list is tried, and every planned start, duration and word count,
+    and every removal, is read back; on any mismatch the edit goes alone, as before SR-27.
+  - **(h) The doors.** The Speed and Speed Ramp sheets and the inspector (`SpeedAudioDrop.commit`),
+    the timeline's and the Clip tab's live gestures at their end (the captions jump at mouse-up),
+    ⌫ Remove Action, and the six op tools. The step is named "<edit> and Re-time Captions" when
+    anything re-times; an agent's answer gains `captions_retimed` and `captions_removed`, each
+    only when non-empty. No op, argument, tool, menu item or format changes.
+  - **(i) Newly revealed source** (sub-rule 2) is left uncaptioned: Generate Captions again
+    captions it.
+  - **Why:** captions drifting off the speech after every speed edit made the person regenerate
+    them, losing any hand edits to their text; the map the core already answers places them again
+    with no second rate rule, and the trial-and-read-back keeps a plan the core would not take
+    from ever reaching the document.
+  - Risk accepted: a caption made from another clip's speech that happens to lie inside the
+    edited clip moves with it; transcripts, fillers and silences are not re-timed (they read the
+    current map); the person check is `docs/manual-checks.md`'s CRT-1.

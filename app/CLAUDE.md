@@ -566,12 +566,18 @@ the key map behind it.
   goes through — the Speed and Speed Ramp sheets' Apply and the inspector's
   commit: `before` runs ahead of the edit (a sheet dismisses there),
   `declined` on Cancel or the no-window beep (the inspector refreshes there),
-  and it holds the undo pitfall's one comment (#359).
+  and it holds the undo pitfall's one comment (#359). `commit` plans
+  `CaptionRetime` first and applies `ops + plan.ops` as one step named by
+  `plan.undoName` ("… and Re-time Captions", spec §11 SR-27).
   `EditorViewController+SpeedAudio` holds the Speed section's and the rate
   stretch's doors; the latter ends the live edit BEFORE asking (an autosave
   must never write a speed Cancel then takes back) and re-applies the
   frozen file's `lastLiveOps` on Set Speed, so it reads `ProjectDocument`'s
-  `private(set)` `liveEditBase`.
+  `private(set)` `liveEditBase`. `timelineLiveUpdated`/`timelineLiveEnded`
+  are also the inspector's live closures (the Clip tab lane's band drags),
+  and `timelineLiveEnded` adds the caption re-time as one more live tick
+  before its crossing test; `+Actions`' `removeSelectedActionCommand`
+  appends the plan too.
 - `+AddClips` (Add Text / Add Shape: the front track, else a new one;
   `addGeneratedClip` is internal and takes `grouped:` — `performGroupedEdit`
   when the edit lands outside the menu's event, as a panel's completion does),
@@ -1759,7 +1765,16 @@ free.
   new track is still `next_id`), and `replaceableTracks` is the one
   test of which qualify: named "Captions"/"Captions N", AT LEAST ONE
   clip, only text clips, each overlapping a job's `span` — an empty caption
-  track is never replaced.
+  track is never replaced. `isCaptionTrackName` is the one caption-track
+  name test.
+- `CaptionRetime.swift` — the re-time a speed or ramp edit appends (spec
+  §11 SR-27): the gate (`mayRetime`); captions wholly inside an edited clip
+  with sound (`speaks`) on unlocked caption tracks; placement through the
+  old and new `SourceMap` (never a rate); cut-back and removal; the op
+  order (delete, one-frame stubs, moves earlier-ascending then
+  later-descending, trims, `set_text`); and the trial read-back (`holds`)
+  that drops a plan the core would not take. Newly revealed source is left
+  uncaptioned.
 - `CaptionStyle.swift` — road map 8 §5h's five word styles and
   Subtitles as one enum: the PostScript face, `case`, size (of
   min(W, H)), `y` (of H), outline, `word_style`, `maxWords`, `maxLines`,
@@ -2706,6 +2721,12 @@ free.
   nest, the playhead in ticks and seconds, the selection ascending, each
   label a key of `get_project`'s answer; `init(document:)` is main only. The
   system prompt names it by `tag`; F7 holds its text to the template.
+- `AgentServer+CaptionRetime.swift` — `captionRetime` (planned on
+  `effectiveScope`'s container) and `retimingEditResult`, used by
+  `set_speed`, `rate_stretch`, `set_action`, `set_action_end` and
+  `remove_action`, and the plan `addedActionResult` applies for
+  `add_speed_ramp`; their answers gain `captions_retimed` and
+  `captions_removed` (spec §11 SR-27).
 - `AgentServer+Grading.swift` — the grading tools' handlers: `add_adjustment_clip`
   (spec §11 GR-6), mirroring Insert ▸ Adjustment Clip.
 - `AgentServer+DevTools.swift` — the dev tools' seam (road map 11, spec

@@ -375,14 +375,8 @@ enum CaptionLayout {
     static func replaceableTracks(
         in snapshot: ProjectSnapshot, jobs: [Transcriber.Job]
     ) -> [UInt32] {
-        func captionName(_ name: String) -> Bool {
-            if name == "Captions" { return true }
-            guard name.hasPrefix("Captions ") else { return false }
-            let suffix = name.dropFirst("Captions ".count)
-            return !suffix.isEmpty && suffix.allSatisfy { $0.isASCII && $0.isNumber }
-        }
-        return snapshot.tracks.compactMap { track -> UInt32? in
-            guard captionName(track.name) else { return nil }
+        snapshot.tracks.compactMap { track -> UInt32? in
+            guard isCaptionTrackName(track.name) else { return nil }
             guard snapshot.clips.contains(where: { $0.track == track.id }) else { return nil }
             for clip in snapshot.clips where clip.track == track.id {
                 guard case .text = clip.source else { return nil }
@@ -393,6 +387,14 @@ enum CaptionLayout {
             }
             return track.id
         }
+    }
+
+    /// A name this file gives a caption track: "Captions" or "Captions N".
+    static func isCaptionTrackName(_ name: String) -> Bool {
+        if name == "Captions" { return true }
+        guard name.hasPrefix("Captions ") else { return false }
+        let suffix = name.dropFirst("Captions ".count)
+        return !suffix.isEmpty && suffix.allSatisfy { $0.isASCII && $0.isNumber }
     }
 
     /// "Captions", then "Captions 2" — so two runs are tellable apart in the

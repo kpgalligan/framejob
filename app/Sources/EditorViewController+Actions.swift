@@ -66,7 +66,11 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        document.applyEdit("Remove Action", .removeAction(clip: clip.id, action: action.id))
+        // The captions a removed Speed action re-times ride in the same step
+        // (spec §11 SR-27).
+        let ops: [ReelOp] = [.removeAction(clip: clip.id, action: action.id)]
+        let plan = CaptionRetime.plan(ops, on: document.editedProject)
+        document.applyEdit(plan.undoName("Remove Action"), ops + plan.ops)
     }
 
     /// After an add: the new action — the one at `start` — when the clip's

@@ -15,7 +15,8 @@ extension EditorViewController {
             declined: { [weak self] in self?.refreshInspector(isLive: false) })
     }
 
-    /// `timeline.onLiveUpdate`: one tick, and its ops remembered when the
+    /// `timeline.onLiveUpdate` and `inspector.onLiveUpdate` (the Clip tab
+    /// lane's band drags): one tick, and its ops remembered when the
     /// tick applied, so a stretch put back for the question can be re-applied
     /// exactly as the person last saw it.
     func timelineLiveUpdated(_ ops: [ReelOp]) {
@@ -25,19 +26,28 @@ extension EditorViewController {
         if document.project !== before { lastLiveOps = ops }
     }
 
-    /// `timeline.onLiveEnd`: a gesture that crossed the ceiling is put back
+    /// `timeline.onLiveEnd` and `inspector.onLiveEnd`: the captions the
+    /// gesture re-times are added as one more tick (spec §11 SR-27), so they
+    /// jump at mouse-up and the step is named "and Re-time Captions". A
+    /// gesture that crossed the ceiling is put back
     /// BEFORE the question (no step, no change count), so nothing is live
     /// while it is up — a save writes the base and an agent call is not held
     /// (spec §11 AI-12). Set Speed re-applies the last applied ops as one
     /// step; Cancel leaves the base.
     func timelineLiveEnded(_ name: String) {
-        let ops = lastLiveOps
+        var ops = lastLiveOps
         lastLiveOps = []
         guard let document = document else { return }
         guard let base = document.liveEditBase else {
             document.endLiveEdit(name)
             return
         }
+        let plan = CaptionRetime.plan(ops, on: document.scope.flatMap { base.scoped($0) } ?? base)
+        if !plan.isEmpty {
+            ops += plan.ops
+            document.updateLiveEdit(ops)
+        }
+        let name = plan.undoName(name)
         let clips =
             SpeedAudioDrop.mayCross(ops)
             ? SpeedAudioDrop.crossing(from: base.snapshot, to: document.project.snapshot) : []

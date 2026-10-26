@@ -247,9 +247,30 @@ moment. **Edit ▸ Paste Attributes** never copies a speed or a ramp.
   takes it further past the end is refused. Its end rate still counts for
   the ×12 rule, even though that part never plays.
 - **Transcripts and captions.** Transcribing a ramped clip places each word
-  where the ramp plays it. Captions and word captions made before you change
-  a ramp keep their old times, so make them again after editing the ramp
-  (see [Captions](captions.md)).
+  where the ramp plays it. Captions and word captions already on the timeline
+  follow a later change to the ramp, as below.
+
+### Captions follow a speed change
+
+When you change the speed of a clip with sound, or add, move, resize, edit or
+remove a Speed action on it, the captions over that clip move with its speech
+in the same undo step. The step is named after the edit with "and Re-time
+Captions" added, such as **Set Speed and Re-time Captions**; one undo puts the
+captions back too. A drag moves them when you let go of the mouse.
+
+- **Which captions.** Text clips on a track named "Captions" or "Captions N"
+  that holds only text clips and is not locked, each lying wholly inside the
+  clip you edited. A caption that runs past either edge of the clip, and
+  anything on another track, is left where it is.
+- **Speech the clip no longer plays.** A caption whose speech the clip no
+  longer reaches is removed. A word caption page that is only partly reached
+  keeps the words that still play, and its text is cut to match.
+- **Newly revealed speech.** When a speed-up or a ramp makes the clip play
+  further into its file, the new part gets no captions. Generate Captions
+  again to caption it ([Captions](captions.md)).
+- **Neighbours.** A moved caption is cut back where it would run into a
+  caption that did not move. One that would start inside such a caption, or
+  would end up shorter than a frame, is removed.
 
 ### When a ramp is refused
 
@@ -323,7 +344,11 @@ is not asked about.
 
 *Agents:* no question is asked. The answer to any edit that takes a clip past
 ×12 carries `audio_left_out` (the clip ids) and `audio_note` (a sentence
-saying the clip is now silent in the preview and the export).
+saying the clip is now silent in the preview and the export). `set_speed`,
+`rate_stretch`, `add_speed_ramp`, `set_action`, `set_action_end` with a
+`speed` and `remove_action` re-time captions as above, and their answer
+carries `captions_retimed` and `captions_removed` (caption clip ids), each
+only when it is not empty.
 
 ## Reverse a clip
 

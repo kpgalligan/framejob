@@ -257,7 +257,10 @@ extension AgentServer {
                     + "edge). Media clips only: a text, shape, image or freeze clip has no "
                     + "source to stretch and is an error. A speed ramp on the clip scales with "
                     + "it; a stretch that would take any of its rates past the limits changes "
-                    + "nothing.",
+                    + "nothing. "
+                    + "Captions on a Captions track wholly inside a clip with sound are "
+                    + "re-timed with it in the same step: captions_retimed lists them, and "
+                    + "captions_removed those whose speech it no longer plays.",
                 ["clip": clipDescription, "to_end": "New end, \(ticks)"]),
             opTool(
                 "slip",
@@ -373,7 +376,10 @@ extension AgentServer {
                         + "keep_pitch, the clip's audio is left out of the mix. On a clip with "
                         + "a speed ramp every rate in the ramp scales with it, so the ramp keeps "
                         + "its shape; the scale stops where any of its rates would pass the "
-                        + "limits.", speed.min,
+                        + "limits. Captions on a Captions track wholly inside a clip with sound "
+                        + "are re-timed with it in the same step: captions_retimed lists them, "
+                        + "and captions_removed those whose speech it no longer plays.",
+                    speed.min,
                     speed.max, speed.audioMax),
                 [
                     "clip": clipDescription,

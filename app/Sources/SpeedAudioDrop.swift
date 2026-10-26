@@ -167,7 +167,9 @@ enum SpeedAudioDrop {
     }
 
     /// The one door a person's speed edit goes through — the Speed and Speed
-    /// Ramp sheets' Apply and the inspector's commit. An edit that takes no
+    /// Ramp sheets' Apply and the inspector's commit. The captions the edit
+    /// re-times ride in the same step, under its name "and Re-time Captions"
+    /// (`CaptionRetime`, spec §11 SR-27). An edit that takes no
     /// clip with sound above the ceiling runs `before` and is applied at once;
     /// one that does asks on `window` first: Set Speed runs `before` and
     /// applies, Cancel runs `declined`. With no window to ask on it beeps and
@@ -176,6 +178,9 @@ enum SpeedAudioDrop {
         _ name: String, _ ops: [ReelOp], to document: ProjectDocument, asking window: NSWindow?,
         before: @escaping () -> Void = {}, declined: @escaping () -> Void = {}
     ) {
+        let plan = CaptionRetime.plan(ops, on: document.editedProject)
+        let ops = ops + plan.ops
+        let name = plan.undoName(name)
         let crossing = mayCross(ops) ? Self.crossing(applying: ops, to: document.editedProject) : []
         guard !crossing.isEmpty else {
             before()

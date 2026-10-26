@@ -399,6 +399,9 @@ its code. A later change records its rule as a new entry in
     for it", so no caller places a ramp's words at one rate unawares.
   - **(g) Rule O.** Words placed before a ramp edit are not re-timed by it, as `set_speed` does not
     re-time them; captions and transcripts made after it follow the ramp.
+    *Amended by SR-27 (#341):* caption clips on a "Captions" track wholly inside a clip with sound
+    are re-timed by a speed or ramp edit of it, in the same undo step; transcripts, fillers and
+    silences still read the current map.
   - **(h) The person check** — a ramped clip's filmstrip and waveform look right — is SR5's row in
     `docs/manual-checks.md`, because no UI makes a ramp until SR5.
   - **Why:** the core owns S (D2-1), and its plan already holds the map the renderer plays, so the
@@ -407,6 +410,8 @@ its code. A later change records its rule as a new entry in
   - Risk accepted: words, fillers and silences are placed through a piecewise-linear chord of S
     with 1 ms steps, the chord the renderer plays; captions made before a ramp edit keep their old
     times until they are made again.
+    *Amended by SR-27 (#341):* captions made before a speed or ramp edit follow it; only source
+    the edit newly reveals is left uncaptioned until they are made again.
 - **SR-21 — The UI of a speed ramp (SR5): the Speed section's Rate writes the selected action's
   `end.speed`; a band names `speed`; the ×12 question covers a ramp edit; the Speed sheet scales
   a ramp.** The road map's P and Q, as built.

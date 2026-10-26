@@ -64,7 +64,7 @@ A clip can be transcribed only if it plays a movie or sound file that has an aud
 - its speed ramps, and no speed map was read for it
 - its speed or length is degenerate
 
-Captions follow a clip's speed. On a sped-up, slowed or speed-ramped clip, each word lands where it is heard on the timeline ([Speed](speed.md)).
+Captions follow a clip's speed. On a sped-up, slowed or speed-ramped clip, each word lands where it is heard on the timeline ([Speed](speed.md)). They keep following it afterwards: change the speed or a ramp of a clip with sound and the captions over it move with its speech in the same undo step ([Speed](speed.md#captions-follow-a-speed-change)).
 
 ### The sheet
 

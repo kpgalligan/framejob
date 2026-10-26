@@ -95,7 +95,10 @@ extension AgentServer {
                     + "side of the base rate, and when the clip would read past the end of its "
                     + "media, naming the largest rate that fits. One undo step; the new actions' "
                     + "ids come back as new_actions. Above ×12 the clip's audio is left out, and "
-                    + "the answer carries audio_left_out and audio_note.",
+                    + "the answer carries audio_left_out and audio_note. "
+                    + "Captions on a Captions track wholly inside a clip with sound are "
+                    + "re-timed with it in the same step: captions_retimed lists them, and "
+                    + "captions_removed those whose speech it no longer plays.",
                 [
                     "clip": clipDescription,
                     "shape": "ramp_up, ramp_down, speed_dip or speed_burst.",
@@ -119,7 +122,10 @@ extension AgentServer {
                     + "moved earlier or shortened. When the action's end names a speed, the "
                     + "change moves how much source the clip reads, and one that would read "
                     + "past the end of its media is refused, naming the latest clip end that "
-                    + "fits.",
+                    + "fits. "
+                    + "Captions on a Captions track wholly inside a clip with sound are "
+                    + "re-timed with it in the same step: captions_retimed lists them, and "
+                    + "captions_removed those whose speech it no longer plays.",
                 [
                     "clip": clipDescription,
                     "action": "Action id (get_project lists each clip's actions).",
@@ -165,7 +171,10 @@ extension AgentServer {
                     + "plays more or less source, and an end rate that would read past the end "
                     + "of its media is refused, naming the largest end rate that fits. speed: "
                     + "null removes it. Above ×12 the clip's audio is left out, and the answer "
-                    + "carries audio_left_out and audio_note.",
+                    + "carries audio_left_out and audio_note. With speed in the patch, "
+                    + "captions on a Captions track wholly inside a clip with sound are "
+                    + "re-timed with it in the same step: captions_retimed lists them, and "
+                    + "captions_removed those whose speech it no longer plays.",
                 [
                     "clip": clipDescription,
                     "action": "Action id.",
@@ -179,7 +188,10 @@ extension AgentServer {
                 "remove_action",
                 "Removes an animation span. The clip keeps its base properties. Removing one "
                     + "whose end names a speed is refused when the clip would then read past the "
-                    + "end of its media, naming the latest clip end that fits.",
+                    + "end of its media, naming the latest clip end that fits. "
+                    + "Captions on a Captions track wholly inside a clip with sound are "
+                    + "re-timed with it in the same step: captions_retimed lists them, and "
+                    + "captions_removed those whose speech it no longer plays.",
                 ["clip": clipDescription, "action": "Action id."]),
         ]
     }

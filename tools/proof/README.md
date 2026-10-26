@@ -23724,3 +23724,88 @@ make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/r
 | `ramp_proof.py --only P1` (Release) | 3/3 — P1 pass, m1 −86.333 ms (coarse −4 144 samples), RV1 70/70 at +0.000 ms |
 | `missing_audio_proof.py --only M1–M4,R1–R4,V0,P1` (Release) | 12/12 in 12 s; M1, M2, R1, R2 all zero at 814 400 frames (its "against the timeline's 816 000" still assumes 17 s) |
 | `export_offset_proof.py` (Release, own instance) | scores: 75/75 (4 of them measured, not pinned); no `Frame Job: ` |
+
+## Captions follow a speed or ramp edit (`caption_retime_probe.py`, `caption_retime_proof.py`; #341)
+
+Spec §11 SR-27 (the owner's option B): a speed or ramp edit of a clip with
+sound re-times, in the same undo step, the caption clips on its "Captions"
+tracks that lie wholly inside it. `CaptionRetime.swift` holds the gate, the
+mapping through the old and new `SourceMap` (no rate in Swift, D2-1), the
+cut-back, the removals, the ops and the plan's trial read-back; every door
+appends its `ops` after the edit's own: `SpeedAudioDrop.commit` (the Speed and
+Speed Ramp sheets, the inspector), `timelineLiveEnded` (the timeline's and the
+Clip tab lane's live gestures, at their end), `removeSelectedActionCommand`
+(⌫ Remove Action), and `AgentServer.retimingEditResult` /
+`addedActionResult` (the six op tools, `captions_retimed` /
+`captions_removed`).
+
+- **`caption_retime_probe.py [--sources DIR] [--mutant NAME] [--only IDS]`** —
+  no instance. `caption_retime_probe.swift` is built through `swift_build.py`
+  over `--sources` and run once in its own process under
+  `tools/proof/work/caption-retime/<tree|mutant-NAME>/`, a 240 s wall,
+  `speed_audio_probe.py`'s shape and rule R exits. Each row gets an untitled
+  30 fps document with one 60 s media file with sound and an editor window;
+  every expected place is a literal oracle (a constant rate's halving or
+  doubling, or a linear ramp's closed form S(t) = t + (r − 1)t²/(2D)) snapped
+  by the core's `ReelTime.snapToFrame`, and only the plan's two id lists are
+  read from `CaptionRetime`.
+  - **B0** builds. **M1** `set_speed` ×2: three abutting subtitles from the
+    clip's start land at S + snap((t − S)/2). **M2** ×0.5: the third is cut
+    back to abut the next clip's caption, the fourth (its new start inside
+    that caption) removed. **M3** linear Ramp Up ×2 over the whole clip:
+    c′ = D(√(1 + 2c/D) − 1). **M4** linear Ramp Down ×0.5: two past-out
+    subtitles removed, a straddling word page cut to "alpha bravo" and two
+    words (each start within a frame of the oracle). **M6** `set_speed` ×12: a
+    5-frame word page snaps to nothing and is removed, its neighbours
+    re-timed. **M5** (CONTROLS) a straddling caption, a "Titles" track, a
+    Captions track holding a shape, a locked Captions track, a detached
+    picture clip's `set_speed`, a zoom action's `set_action`: each an empty
+    plan and the caption unmoved.
+  - **D1** the Speed sheet at ×0.5: one step "Set Speed and Re-time
+    Captions", one undo restores. **D2** `inspector.onEdit` with
+    `set_action_end {speed: 2}` on a linear whole-clip action (M3's oracle).
+    **D3** the timeline's live rate stretch: unchanged during the drag,
+    halved at its end, "Rate Stretch and Re-time Captions". **D4** the
+    inspector's live closures resizing a linear ×2 action from [0, D/2) to
+    [0, D). **D5** ⌫ Remove Action on a Ramp Up: back to ×1, the past-out
+    caption removed. **D6** a ×20 Speed sheet asks; Cancel leaves the same
+    handle and no step.
+  - **A1** `AgentServer.shared.execute("set_speed")` ×2: `captions_retimed`,
+    no `captions_removed`, step "Speed and Re-time Captions". **A2**
+    `add_speed_ramp` ramp_down: `captions_removed` and `captions_retimed`.
+    **A3** a zoom action's `set_action`: no `captions_` key.
+  - Mutants (each a text swap in the copy; the rows it must fail):
+    `overlap-not-inside` → M5, `no-cutback` → M2, `keep-past-out` → M4,
+    `no-word-cut` → M4, `speaks-any` → M5, `locked-too` → M5,
+    `ascending-later` → M2, D1, `stub-movers-only` → M1, M3,
+    `keep-zero-length` → M6, `agent-unwired` → A1, A2.
+- **`caption_retime_proof.py [--only IDS]`** — one owned instance
+  (`proof_app`'s app), one project per row closed with `discard`, the fixture
+  `tools/proof/media/AV.mov` cut to D. **C0** no `Frame Job: ` line. **C1**
+  `set_speed` ×2 (and `undo` answering "Speed and Re-time Captions"), **C2**
+  `rate_stretch`, **C3** `add_speed_ramp` ramp_up ×2 linear, **C4**
+  `set_action_end {speed: 2}`, **C5** `set_action` shortening a linear ×2
+  action, **C6** `remove_action` of a ramp (one caption in
+  `captions_removed`): each answer names the ids and `get_project` matches
+  the oracle. **C7** one `undo` puts every clip back byte for byte, `redo`
+  re-applies. **C8** `set_speed` with `scope` the nest holding the clip and
+  its captions. **C9** (CONTROLS) a zoom action's `set_action`, a "Titles"
+  track, a straddling caption: no `captions_` key, the caption unmoved.
+
+```sh
+python3 tools/proof/caption_retime_probe.py
+python3 tools/proof/caption_retime_probe.py --mutant <name>   # each of the ten, exit 1
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/caption_retime_proof.py
+make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/caption_retime_proof.py
+```
+
+| Run (2026-10-25) | Result |
+|---|---|
+| `caption_retime_probe.py` | 16/16, exit 0 |
+| each of the ten mutants | caught, exit 1 — every named row failed and no other row was scored |
+| `speed_audio_probe.py` | 20/20, exit 0 |
+| `caption_retime_proof.py`, Debug | 10/10 in 4 s |
+| `ramp_preset_proof.py`, Debug | 12/12 in 27 s |
+| `clip_inspector_proof.py` | 41/41 |
+| `make gate` | PASS 354 s (names 1 s, typecheck 5 s, fmt 2 s, lint 25 s, test 206 s, app 114 s) |
+| **`caption_retime_proof.py`, Release, after the gate (the recorded run)** | **10/10 in 4 s**, exit 0; no `Frame Job: ` |
