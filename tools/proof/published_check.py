@@ -10,8 +10,10 @@ Developer ID; it says nothing about the rest, and each of these ships a
 broken or wrong app in a DMG that notarizes cleanly:
 
 * the dev tools compiled in (spec §11 V-1): the wrong configuration archived;
-* the app without `com.apple.security.device.audio-input`: the microphone
-  grant is refused however the person answers the prompt (road map 3, R0);
+* the app without `com.apple.security.device.audio-input` or
+  `com.apple.security.device.camera`: the microphone or camera grant is
+  refused however the person answers the prompt (road map 3, R0; spec §11
+  CAM-3);
 * the assistant helper without `com.apple.security.cs.allow-jit`: it dies at
   launch under the hardened runtime ("Ran out of executable memory");
 * `framejob-mcp` missing or holding an entitlement it has no use for;
@@ -33,7 +35,7 @@ and the exit is 0 only at 16/16:
 * P1  the needle reads from the seam (`dist_check.read_needle`);
 * P2  the app's binary exists; P3 it does not hold the needle;
 * P4  the app is signed with the hardened runtime and verifies strictly;
-* P5  the app's entitlements are exactly `audio-input`;
+* P5  the app's entitlements are exactly `audio-input` and `camera`;
 * P6  the helper exists; P7 hardened runtime; P8 entitlements exactly
   `allow-jit`; P9 it does not hold the needle;
 * P10 the MCP proxy exists; P11 hardened runtime; P12 no entitlements;
@@ -120,7 +122,8 @@ def main():
     else:
         ok, detail = dist_check.helper_runtime(os.path.realpath(where))
         check(name, ok, "" if ok else detail)
-    name = "P5 the app's entitlements are exactly com.apple.security.device.audio-input"
+    name = ("P5 the app's entitlements are exactly com.apple.security.device.audio-input and "
+            "com.apple.security.device.camera")
     if binary is None:
         check(name, False, "no binary (P2)")
     else:

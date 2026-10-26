@@ -94,13 +94,14 @@ app-debug: rust project
 # (Contents/Helpers/framejob-agent) must be present, signed with the hardened
 # runtime, hold exactly the allow-jit entitlement and not hold the marker
 # (road map 12 A4, D6–D13); and the Distribution app must be signed with
-# exactly the audio-input entitlement, never get-task-allow (#145, D14); and
+# exactly the audio-input and camera entitlements, never get-task-allow
+# (#145, spec §11 CAM-3, D14); and
 # each bundle's MCP proxy (Contents/Helpers/framejob-mcp) must be present,
 # signed with the hardened runtime and hold no entitlements, and its catalog
 # snapshot (Contents/Resources/agent-catalog.json) must be at the bundle's
 # version, Release's naming every dev tool and Distribution's none (road map
 # 14 MC3, D15–D24); and the Release app must be signed with exactly Xcode's
-# audio-input and get-task-allow, and both apps must pass `codesign --verify
+# audio-input, camera and get-task-allow, and both apps must pass `codesign --verify
 # --deep --strict` (issue batch B88, D25–D27). The file-wide `unexport RC_ASSEMBLYAI_KEY` above covers
 # this recipe too. `published_check.py` is the check the publish workflow runs
 # over the app it is about to pack (spec §11 PUB-4), run here over the

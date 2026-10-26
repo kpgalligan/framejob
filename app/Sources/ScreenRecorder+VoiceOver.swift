@@ -224,22 +224,29 @@ extension ScreenRecorder {
         }
     }
 
-    /// Segments the recorder holds — a screen recording's or a voice-over's
-    /// — 0 idle.
+    /// Segments the recorder holds — a screen recording's, a voice-over's or
+    /// a camera recording's — 0 idle.
     var heldSegmentCount: Int {
         if let voiceSession { return voiceSession.segments.count }
+        if let cameraSession { return cameraSession.segments.count }
         return session?.segments.count ?? 0
     }
 
-    /// A voice-over's first segment's did-start, nil until the writer
-    /// reports it (and for a screen recording, or idle). `record_screen`
-    /// waits for it before its span: `startVoiceOver` answers first.
-    var heldFirstStartedAt: Date? { voiceSession?.segments.first?.startedAt }
+    /// A voice-over's first segment's did-start, or a camera recording's
+    /// first segment's first buffer; nil until it lands (and for a screen
+    /// recording, or idle). `record_screen` waits for it before its span:
+    /// `startVoiceOver` answers first, and `startCamera` before the first
+    /// buffer.
+    var heldFirstStartedAt: Date? {
+        voiceSession?.segments.first?.startedAt ?? cameraSession?.segments.first?.startedAt
+    }
 
     /// The files the recorder holds, in order: a screen recording's movies,
-    /// or a voice-over's `.m4a` files; empty idle.
+    /// a voice-over's `.m4a` files, or a camera recording's movies; empty
+    /// idle.
     var heldFilePaths: [String] {
         if let voiceSession { return voiceSession.segments.map(\.url.path) }
+        if let cameraSession { return cameraSession.segments.map(\.movieURL.path) }
         return session?.segments.map(\.movieURL.path) ?? []
     }
 

@@ -98,9 +98,10 @@ edit lands everything; undo leaves the files on disk; every door has an MCP mirr
   camera entitlement are needed, the "best format" rule, and which rows a proof can run. A STOP
   verdict goes to the owner with the measurement. **Proof**: the spike itself, run whole once;
   its selftest and mutants.
-CR1 was one phase until CR0 landed. It is three now: its two tolls are a pure-move phase of
-their own (the size rule lands a toll alone), and the camera recorder with its tool is a
-separate phase from the panel that drives it.
+CR1 was one phase until CR0 landed. It is four now: its two tolls are a pure-move phase of
+their own (the size rule lands a toll alone); the camera recorder is a phase of its own, proven
+by a probe under the terminal's grant, because CR1a's spec could not hold the recorder and its
+tool in the space a spec is given; the tool follows it; and the panel that drives both is last.
 
 - **CR1-0 — the tolls.** Two pure moves, landed and gated alone, with nothing widened.
   `AgentCatalog+Files.swift` (409) gives `record_screen`'s row and its four hoisted clauses to a
@@ -112,16 +113,18 @@ separate phase from the panel that drives it.
   after (compared parsed: key order aside, since `JSONSerialization` writes no sorted keys; tool
   order kept, `record_screen` last); `recording_probe.py --only chrome,chrome_pause,catalog`; the two re-aimed mutants are
   caught.
-- **CR1a — the camera recorder and the tool; CAM-3.** CAM-3 is recorded in §11 before the code
-  and settles five things:
-  - **Best format.** CAM-2's rule picks the built-in camera's square 1552 × 1552. CAM-3 says
-    whether "best" means the largest area or the largest landscape area. If landscape, the writer
-    is measured at that format first, because CR0 measured it only at 1552 × 1552.
+- **CR1a — the camera recorder; CAM-3.** CAM-3 is recorded in §11 before the code and settles
+  every rule CR1a and CR1b build on:
+  - **Best format.** CAM-2's rule picks the built-in camera's square 1552 × 1552. CAM-3 makes
+    "best" the largest LANDSCAPE area (CAM-2's rule over the formats wider than tall): the
+    built-in camera's 1760 × 1328 @ 30, the iPhone's 1920 × 1440 @ 60, OBS's 1920 × 1080 @ 60.
+    The writer is measured at 1760 × 1328 first (the spike's new `--format`), because CR0
+    measured it only at 1552 × 1552. CR2's Format popup is where a person picks 1920 × 1080.
   - **The microphone's offset.** By `startPTS` on the host clock or by callbacks. CR0's M1, M2
     and P2 found the two differ by 63–241 ms; the writer's camera start is its first buffer's PTS.
   - **The camera entitlement.** CAM-2's `not-needed` speaks only for a shell-launched binary
     under the terminal's grant.
-  - **The files and the tool's refusal order.**
+  - **The files, a camera that stops on its own, and the tool's refusal order** (CR1b's).
   - **The canvas rule.**
 
   The camera recorder goes in new files:
@@ -131,34 +134,52 @@ separate phase from the panel that drives it.
     to after `stopRunning`, and the format set again once the session runs (CR0);
   - the microphone as a second file per segment;
   - pause as a new writer on the running session (CR0's P2: resumes in 5–26 ms);
-  - a camera that stops on its own ends the recording, as a microphone ends a voice-over;
+  - a camera that stops on its own ends the recording, as a microphone ends a voice-over; a
+    microphone that stops on its own does not: the picture keeps recording and that segment
+    carries a `micProblem`, the screen recording's rule;
   - `ScreenRecorder` forwarding to it, as it forwards to `voiceSession`.
 
-  Also in CR1a:
-  - `RecordingSource.camera`;
-  - files named `Camera Recording <date> at <time>.mov`;
-  - `NSCameraUsageDescription`, and no `NSCameraUseContinuityCameraDeviceType` (CR0's D2);
-  - `RecordingGrant`'s camera read and refusal;
-  - the landing: into an open project by the picture rule; as a new project with the canvas at
-    the camera format's size and rate;
-  - `record_screen`'s `source: "camera"` and `camera` (a device's name or unique id; an unknown
-    name is refused, naming the cameras present).
-
-  **Proof**: a new `tools/proof/camera_recording_proof.py` over MCP, with two tiers. The
-  headless tier checks the refusals in order, the catalog count and parity. The granted tier
-  skips by name without a camera or the grant. Beside it: probe rows for the pure values and the
-  landing ops, and mutants. Docs: spec §6, §7.4 and §7.9; `docs/guide/screen-recording.md`; a
-  manual-check row for the camera prompt from the signed bundle.
-- **CR1b — the panel's Camera source.** The panel gains:
+  Also in CR1a: `RecordingSource.camera`; files named `Camera Recording <date> at <time>.mov`;
+  `NSCameraUsageDescription`, and no `NSCameraUseContinuityCameraDeviceType` (CR0's D2); the
+  camera entitlement if CAM-3 says so, with the dist checks' exact sets; `RecordingGrant`'s
+  camera read and refusal; the result's camera facts. **Proof**: a new
+  `tools/proof/camera_recording_probe.py`. Its pure rows are the format rule, the names, the
+  offset arithmetic and a camera result through `RecordingLanding`. Its granted section runs a
+  real recorder under the terminal's grant, pausing once, and skips by name without a camera or
+  the grant. Mutants. No door reaches the recorder yet, so nothing user-visible changes; the
+  docs are spec §7.4's row and `tools/proof/README.md`.
+- **CR1b — the tool.** `record_screen`'s `source: "camera"` and `camera` (a device's name or
+  unique id; an unknown name is refused, naming the cameras present), in CAM-3's refusal order;
+  the answer's camera keys; the landing: into an open project by the picture rule; as a new
+  project with the canvas at the camera format's size and rate. **Proof**: a new
+  `tools/proof/camera_recording_proof.py` over MCP, with two tiers. The headless tier checks the
+  refusals in order, the catalog and parity. The granted tier skips by name without a camera or
+  the grant. Beside it: probe rows for the argument refusals; `recording_proof.py`'s and
+  `recording_probe.py`'s `record_screen` schema rows; mutants. Docs: spec §7.9 (§6 lists ops
+  only, and `record_screen` is an app-state tool); `docs/guide/screen-recording.md` and
+  `mcp.md`; a manual-check row for the voice lined up with the picture (a clap). The camera
+  prompt's row moves to CR1c: the tool never asks, so until the panel has a Camera source
+  nothing in the signed bundle can put the prompt up.
+- **CR1c — the panel's Camera source.** The panel gains:
   - a Source ▸ Camera row and a Camera popup (devices by name, the best format);
   - the camera grant, asked by the panel, with its System Settings pane door (`Privacy_Camera`)
     and `RecordingGrant`'s camera step;
   - its defaults key and the harness pin;
-  - the status item, as for every source.
+  - the status item, as for every source;
+  - the microphone meter's camera arm (`publishMicrophoneLevel` reads a camera recording's
+    microphone output), and the panel's note for a result's camera problem and for a
+    `system_stopped` camera (CR1a puts both on the result; until CR1c only the tool reads them),
+    and the result's warm-up `camera.note`;
+  - the camera's session started during the countdown, as `prepareMicrophone` warms the
+    microphone, so CAM-3's warm-up hold is spent there (CR1a pays it inside the recorder's
+    start, about 0.5 s on the built-in camera).
 
   **Decides** whether the panel stays up for a camera recording (the voice-over's precedent) or
   goes away. **Proof**: probe rows for the grant steps and for the rows → choice; `snapshot_ui`
-  of the panel; mutants; a manual-check row for framing. Docs: `docs/guide/screen-recording.md`.
+  of the panel; mutants; manual-check rows for framing and for the camera prompt from the signed
+  bundle (`open -a`, moved here from CR1b). Docs: `docs/guide/screen-recording.md`; the
+  camera refusal's `notDetermined` sentence, written in CR1a to name the panel's Camera source,
+  becomes true here.
 - **CR2 — the preview and the formats.** The live preview in the panel: an
   `AVCaptureVideoPreviewLayer`, which CR0's V1 measured at about 155–160 MB of RSS, so it runs
   only while the panel shows the Camera row or the camera row. The Format popup lists the
@@ -338,8 +359,9 @@ one of the first 4 frames decoded, the truth came from frame 0 each time, E2 rea
   area at 30 fps) over its 1920 × 1080; the iPhone's 1920 × 1440 @ 60. A camera-alone canvas sized
   to "the best format" (CR1) would be square on this Mac. CR1 records whether "best" means the
   largest area or the largest landscape area, as an amendment of CAM-2's Best format before its
-  code. If it chooses landscape (1920 × 1080 here), it first measures the writer there, because
-  only the movie output has been measured at that format.
+  code. If it chooses landscape, it first measures the writer there. On this Mac the largest
+  landscape format at 30 fps is 1760 × 1328 (format 3, area 2,337,280), not 1920 × 1080 (format
+  0, 2,073,600). No run of either path has used format 3.
 - **The microphone (CR1, CR3):** both shapes work: one session with an `AVCaptureAudioFileOutput`
   beside the camera (M1, `canAddOutput` true) and today's separate microphone session (M2). The
   offset by `startPTS` and by callbacks differ by 210–241 ms with the movie output (most of it the
@@ -418,11 +440,129 @@ after the record edit, and only names re-ran. None in the code.
 `+Recording` in the catalog's) landed with it. `designs/adr/app-file-history.md`'s
 next-seam line for `AgentCatalog+Files.swift` is condensed at CR4.
 
-## CR1a — the camera recorder and the tool
+## CR1a — the camera recorder
 
 ### Record
 
-## CR1b — the panel's Camera source
+**Landed** (2026-10-26).
+The phase stopped once, on the granted probe's G3 (below), and resumed on the orchestrator's
+ruling: the camera's stream is warmed before segment 0, road map 3's `prepareMicrophone`
+precedent.
+- Spec §11 CAM-3, written before any code, and its index rows (CAM-2's row says "amended by
+  CAM-3"); then its **warm-up** bullet, added on the ruling before the hold's code. The
+  `11-decisions/` cell is 13074 in 31 files; `camera-recording.md` is 144 lines.
+- The spike's `--format WxH` (`camera_spike.py`, its docstring and README): D3 is the chosen
+  camera's first format of that size at a maximum rate ≥ 30, recorded as `formatOverride`; a
+  size the camera lacks prints `NOT PERFORMED` and exits 2; the selftest is unchanged.
+- New: `CameraDevices.swift` (136 lines: the list, facts, lookup, default, CAM-3's best
+  format, `spelled`, `canvasRate`, the two sentences), `CameraCapture.swift` (399: the
+  session, the configuration lock, the data output, one writer per segment, the warm-up),
+  `ScreenRecorder+Camera.swift` (396: `CameraSession`, `CameraSegment`, start, pause, resume,
+  stop, elapsed, names), `ScreenRecorder+CameraFinishing.swift` (366: the capture's and the
+  microphone's reports, the one finishing path, settle, the probe walk, conclude,
+  `cameraMicOffset`, `CameraMicrophoneDelegate`), `RecordingSetup+Camera.swift` (51:
+  `cameraStem`, `RecordingGrant.cameraStatus`, `cameraRefusal`).
+- Changed: `RecordingSetup.swift` (381 → 387: `RecordingSource.camera`,
+  `RecordingChoice.camera`); `RecordingResult.swift` (293 → 317: `RecordingCamera` with
+  `problem` and the warm-up's `note`, `RecordingResult.camera`, `isCamera`,
+  `RecorderError.cameraDevice`); `ScreenRecorder.swift` (372 → 385: `cameraSession`, `elapsed`
+  and `stop()` forwarded, `start()` refusing `.camera`); `+Pause`, `+VoiceOver` (the three
+  `held*` reads) and `+Content` (`filter`'s `.camera` arm throws) gain the camera's arm.
+- `project.yml`: `NSCameraUsageDescription` and `com.apple.security.device.camera`; the camera
+  in every exact entitlement set: the Makefile's comments, `dist_check.py`
+  (`APP_ENTITLEMENTS`, D14, D25), `dist_check_mutants.py` (`held` is now
+  `dict(dist_check.APP_ENTITLEMENTS)`), `gate.py`'s D25 name, `published_check.py`'s P5.
+- **The warm-up** (CAM-3): `CameraCapture.start`'s completion waits until five consecutive
+  frame intervals, by PTS, are each within 15 % of the format's frame duration, bounded at 1 s
+  from the session's start; past the bound it completes anyway and `WarmUp.note` (the result's
+  `camera.note`) names the rate measured. Segment 0's writer is armed only after it, so it
+  starts at a steady buffer; a resume, on the running session, does not wait. **CR1c moves the
+  warm-up into the countdown**: until the panel's countdown starts the camera's session early,
+  the hold is paid inside the recorder's start.
+- `tools/proof/camera_recording_probe.py` and `.swift` (values V1–V17, landing L1–L3, granted
+  G0–G6; seven mutants); spec §7.4's row 50; `tools/proof/README.md`'s CR1a section and its
+  four entitlement passages.
+- `tools/proof/recording_probe.py`: one re-aim — `caseName`'s switch over `RecorderError` gains
+  `.cameraDevice` (the probe did not compile without it).
+
+**Measured** (the built-in camera, the default microphone, the terminal's grants):
+- Step 2 (CAM-3's criterion): `python3 tools/proof/camera_spike/camera_spike.py --groups
+  write,pause --camera FaceTime --format 1760x1328`, exit 0, 152.7 s, `rule_sha256
+  634e08997566e1aec9f0c4f46fa02f593841354e22c509af8918456376e6ef6a` (CAM-3 before its warm-up
+  bullet), `formatOverride {asked 1760x1328, index 3}`. W3 (the writer at format 3, locked):
+  ratio 0.9993, 0.9993, 0.9993 (151/151.1, 151/151.1, 150/150.1 frames), every run read back
+  format 3 at 1760 × 1328, `offFormatRuns` 0, HEVC, 0 not-ready, 0 dropped. P2: median resume
+  start 15.16 ms [1.235, 32.862] over 6 resumes, under one frame (33.3 ms); every segment read
+  back format 3 (60–61 frames per 2 s segment). W1 and W2 (the movie output) 0.932 in every
+  run, as in CR0. The criterion holds. Every run warmed the session 1 s before arming.
+- **The cold start, before the warm-up** (`--only granted`, three runs): G0, G1, G2, G4, G5
+  passed every run; G3 failed every run on segment 0 (61 frames, 0.976; 59, 0.9752; 59,
+  0.9752) while segment 1 passed (0.9992). Segment 0's first intervals were 33.3, 33.3, then
+  five at 43.3 ms, then 33.3 ms steadily. A temporarily instrumented run (reverted) read the
+  format NOT moved by `startRunning`, both frame durations 1/30 s at start, and the 43 ms
+  buffers arriving before the writer was armed: the device's cold start, not the format hold
+  or the writer.
+- **With the warm-up**: `--only granted` exit 0, 8/8: G3 59/0.9992 and 61/0.9992; G6 hold
+  0.540 s from the session's start, 13 buffers, steady, intervals 33.4, 33.4, 43.3, 43.2,
+  43.3, 43.3, 43.2, then 33.4, 33.3, 33.4, 33.4, 33.4 ms; the call to `.recording` 1.962 s;
+  no note. The whole probe, `python3 tools/proof/camera_recording_probe.py`: exit 0, `scores:
+  31/31`, all checks passed; G3 59/0.9992 and 59/0.9992, G4 micOffset −0.070 and −0.108 s,
+  G6 hold 0.530 s, 13 buffers, steady, the call to `.recording` 1.943 s.
+- Mutants (each exit 1, caught): `format-any-shape` (V1: 6, 1552x1552@30),
+  `offset-by-arrival` (V12a −600000), `offset-sign` (V12a −30000, V12c 12000),
+  `canvas-rate-60` (V6), `grant-unread` (V16), `mic-ends-recording` (V15), each `--only
+  values`, run before the warm-up (their anchors are unchanged since); and `no-hold`
+  (`warmUpRun` 0, `--only granted`): G3 60/0.9796 on segment 0, 0.9992 on segment 1, G6 hold
+  0.085 s, 1 buffer. The margin is small (0.9796 against 0.98) and holds only on a cold
+  camera.
+- `make typecheck`: exit 0, the 4 baseline warnings, tsc clean. `spec_index_proof.py`:
+  201/201.
+- `make gate`: `gate: PASS 228s` (names 1 s, typecheck 5 s, fmt 2 s, lint 1 s, test 115 s,
+  app 103 s). `make dist`: exit 0, `dist_check: 27/27` (D14 the Distribution app's
+  entitlements exactly audio-input and camera; D25 the Release app's audio-input, camera and
+  get-task-allow), `published_check: 16/16` (P5). `python3 tools/proof/dist_check_mutants.py`:
+  `dist_check_mutants: 23/23`.
+- `python3 tools/proof/recording_probe.py`: exit 1, `1220/1222 checks passed`. The two
+  failures are X4's `recordScreen` reads ("… passes it to RecordingExclusion.make( with
+  panelWindowID: nil", "… and to RecordingChoice("): the row finds the variable's name on the
+  line that reads `"include_framejob_windows"`, and since the rename (5f7f1d3) its `let
+  includeFrameJob =` is on the line above. `AgentServer+Recording.swift` is not changed by
+  CR1a, so both fail the same at `9d0c60e`.
+
+**Deviations.**
+- `CameraCapture` sets both frame durations (`activeVideoMinFrameDuration` and
+  `activeVideoMaxFrameDuration`) under the lock, `spikeApplyFormat`'s measured reference; the
+  spec named the minimum.
+- `closeCameraSegment` and `CameraSession`'s two index lookups live in `+CameraFinishing`, so
+  `+Camera` stays under 400 lines.
+- A dropped (frameless) segment's microphone file, if any, is left on disk unnamed; a left-out
+  segment's readable voice is probed and kept for its slot, as the screen machine does (#181
+  item 2).
+- The warm-up (the ruling): the spec's start armed segment 0 when `capture.start` completed;
+  that completion now waits for a steady stream. G6, V17 and `no-hold` are rows and a mutant
+  the spec did not list. `step 2`'s `rule_sha256` is CAM-3's text before its warm-up bullet;
+  the spike was not re-run for the amendment, which does not touch what the spike measures.
+- The probe's sections run under `TZ=UTC` (V7's fixed stem), so the granted recordings'
+  names are UTC times.
+
+**Owed.**
+- CR1c: the panel's countdown starts the camera's session, so the warm-up is spent there.
+- `recording_probe.py`'s two X4 `recordScreen` rows, failing since the rename: #371.
+- The review's four nits (the frame durations after `startRunning`, `no-hold`'s thin margin
+  in G3, a stopped segment's discarded first stamp, segment 0's elapsed before its first
+  buffer): #372.
+- Applied with the commit (the orchestrator's): `app/CLAUDE.md`'s Recording family gains
+  `+Camera`, `+CameraFinishing`, `CameraDevices.swift`, `CameraCapture.swift`,
+  `RecordingSetup+Camera.swift` and the camera's sentence; its Hygiene seams list gains
+  `CameraCapture`'s two queues (`sessionQueue` for `startRunning`/`stopRunning`,
+  `sampleQueue` the data output's delegate queue and the only one that touches the armed
+  writer and the warm-up).
+
+## CR1b — the tool
+
+### Record
+
+## CR1c — the panel's Camera source
 
 ### Record
 

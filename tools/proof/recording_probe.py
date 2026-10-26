@@ -1447,6 +1447,7 @@ func caseName(_ error: RecorderError) -> String {
     case .startTimedOut: return "startTimedOut"
     case .timedOut: return "timedOut"
     case .microphoneDevice: return "microphoneDevice"
+    case .cameraDevice: return "cameraDevice"
     case .filesKept(let inner, _, _): return "filesKept(\(caseName(inner)))"
     }
 }

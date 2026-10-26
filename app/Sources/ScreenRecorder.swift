@@ -19,7 +19,10 @@ import ScreenCaptureKit
 /// error codes. A VOICE-OVER (`voiceSession`, spec §11 recording) is the
 /// same machine with no stream — the microphone writer alone, a file per
 /// segment — in `+VoiceOver.swift` and `+VoiceOverFinishing.swift`;
-/// `stop()`, `elapsed`, `pause()` and `resume()` forward to it.
+/// `stop()`, `elapsed`, `pause()` and `resume()` forward to it. A CAMERA
+/// recording (`cameraSession`, spec §11 CAM-3) is the same machine with a
+/// camera where the stream was, in `+Camera.swift` and
+/// `+CameraFinishing.swift`, forwarded to on the same terms.
 ///
 /// **A paused recording is a sequence of files over one stream** (decision
 /// 6). ScreenCaptureKit has no pause, so `pause()` REMOVES the segment's
@@ -124,6 +127,7 @@ final class ScreenRecorder: NSObject {
     /// them is footage).
     var elapsed: TimeInterval {
         if voiceSession != nil { return voiceElapsed }
+        if cameraSession != nil { return cameraElapsed }
         guard state != .idle, let session else { return 0 }
         let now = Date()
         var total: TimeInterval = 0
@@ -138,6 +142,9 @@ final class ScreenRecorder: NSObject {
     /// A voice-over's session (`ScreenRecorder+VoiceOver.swift`); never set
     /// beside `session`.
     var voiceSession: VoiceSession?
+    /// A camera recording's session (`ScreenRecorder+Camera.swift`); never
+    /// set beside `session` or `voiceSession`.
+    var cameraSession: CameraSession?
     var startCompletion: ((Error?) -> Void)?
     /// Every `stop()` completion registered since the arm began, delivered
     /// together at conclude (or by `failStart`, with its error).
@@ -184,6 +191,11 @@ final class ScreenRecorder: NSObject {
         guard choice.source != .voiceOver else {
             return refuse(
                 .startFailed("A voice-over has no picture; it starts through startVoiceOver."),
+                completion)
+        }
+        guard choice.source != .camera else {
+            return refuse(
+                .startFailed("A camera recording has no screen; it starts through startCamera."),
                 completion)
         }
         guard RecordingGrant.screenRecordingGranted else {
@@ -354,6 +366,7 @@ final class ScreenRecorder: NSObject {
     /// and an unfinished movie that will not probe is answered `.timedOut`.
     func stop(completion: ((Result<RecordingResult, Error>) -> Void)? = nil) {
         if voiceSession != nil { return stopVoiceOver(completion: completion) }
+        if cameraSession != nil { return stopCamera(completion: completion) }
         switch state {
         case .idle:
             completion?(.failure(RecorderError.notRecording))

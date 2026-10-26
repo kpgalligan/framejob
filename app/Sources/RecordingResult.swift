@@ -108,6 +108,20 @@ struct UnreadableSegment {
     }
 }
 
+/// What a camera recording records with (spec §11 CAM-3): the device's name,
+/// the format it recorded at as `CameraDevices.spelled` writes it
+/// (`1760x1328@30`), and `problem` — the sentence of a camera that stopped on
+/// its own (a runtime error, an interruption, a disconnect), which ended the
+/// recording with `stoppedBy` `.systemStopped`; nil when it did not. `note`
+/// is the warm-up's sentence when the stream had not reached the format's
+/// rate by the bound and the recording began anyway (`CameraCapture.WarmUp`).
+struct RecordingCamera: Equatable {
+    let name: String
+    let format: String
+    var problem: String?
+    var note: String?
+}
+
 /// What a recording ends as: its segments, in order — ONE for a recording
 /// never paused — and what `RecordingLanding` turns into ops, one clip per
 /// segment placed at the previous segment's end. `unreadable` is every
@@ -128,6 +142,8 @@ struct RecordingResult {
     let segments: [RecordingSegment]
     let choice: RecordingChoice
     let stoppedBy: StopReason
+    /// A camera recording's camera (`isCamera`); nil for every other source.
+    let camera: RecordingCamera?
 
     /// The FIRST segment's movie.
     var descriptor: MediaDescriptor { segments[0].descriptor }
@@ -136,6 +152,9 @@ struct RecordingResult {
     /// A voice-over: the microphone alone, every segment's `descriptor` its
     /// `.m4a` (spec §11 recording, #99).
     var isVoiceOver: Bool { choice.source == .voiceOver }
+    /// A camera alone (spec §11 CAM-3): every segment's `descriptor` is the
+    /// camera's `.mov`, landed by the picture rule as a screen's is.
+    var isCamera: Bool { choice.source == .camera }
     /// Every segment's microphone problem, in order, joined by a space; nil
     /// when no segment has one.
     var micProblem: String? {
@@ -173,7 +192,7 @@ struct RecordingResult {
 
     init(
         segments: [RecordingSegment], choice: RecordingChoice, stoppedBy: StopReason,
-        pauses: Int, unreadable: [UnreadableSegment] = []
+        pauses: Int, unreadable: [UnreadableSegment] = [], camera: RecordingCamera? = nil
     ) {
         precondition(!segments.isEmpty, "a RecordingResult carries at least one segment")
         self.segments = segments
@@ -181,6 +200,7 @@ struct RecordingResult {
         self.stoppedBy = stoppedBy
         self.pauses = pauses
         self.unreadable = unreadable
+        self.camera = camera
     }
 
     /// ONE segment — R1's shape, kept so a single-segment construction (the
@@ -255,6 +275,8 @@ extension RecordingResult {
 /// side (finding 6); with segments its `movie` and `microphone` strings are
 /// comma-joined lists, and the one-file sentence is byte for byte R1's; an
 /// EMPTY `movie` (no movie on disk) names the microphone files alone (B55).
+/// `.cameraDevice` is the camera's `.microphoneDevice`: no such camera, or one
+/// that cannot be recorded from (spec §11 CAM-3).
 indirect enum RecorderError: Error, LocalizedError {
     case busy
     case notRecording
@@ -265,6 +287,7 @@ indirect enum RecorderError: Error, LocalizedError {
     case startTimedOut
     case timedOut
     case microphoneDevice(String)
+    case cameraDevice(String)
     case filesKept(RecorderError, movie: String, microphone: String?)
 
     var errorDescription: String? {
@@ -281,6 +304,7 @@ indirect enum RecorderError: Error, LocalizedError {
             return "The recording did not finish writing within "
                 + "\(Int(ScreenRecorder.finishCeiling)) s."
         case .microphoneDevice(let why): return why
+        case .cameraDevice(let why): return why
         case .filesKept(let inner, let movie, let microphone):
             let base = inner.errorDescription ?? "The recording failed."
             guard !movie.isEmpty else {

@@ -2387,12 +2387,13 @@ free.
   meter live, Record reading Stop, a Pause/Resume button beside it.
 
 **Recording.**
-- `RecordingSetup.swift` · `RecordingResult.swift` — the half a probe can
+- `RecordingSetup.swift` (+`Camera`) · `RecordingResult.swift` — the half a probe can
   call: choices, file naming, `RecordingConfiguration.make` (PURE), the grant
   reads, the step a press takes, the two pane URLs, the result types;
   nothing here prompts or opens.
 - `ScreenRecorder.swift` (+`Pause`, +`Delegates`, +`Microphone`,
-  +`Finishing`, +`Content`, +`VoiceOver`, +`VoiceOverFinishing`) — the machine `idle → arming → recording ⇄ paused
+  +`Finishing`, +`Content`, +`VoiceOver`, +`VoiceOverFinishing`, +`Camera`,
+  +`CameraFinishing`) · `CameraDevices.swift` · `CameraCapture.swift` — the machine `idle → arming → recording ⇄ paused
   → finishing → idle`. **The microphone is a SECOND FILE** through an
   `AVCaptureSession`, because `SCRecordingOutput` folds it inseparably into
   the system track; its offset is measured per SEGMENT. **A pause is a
@@ -2411,7 +2412,16 @@ free.
   at <time>`, its own `VoiceOverFileDelegate`; `stop()`, `elapsed`, `pause()`
   and `resume()` forward to it, there is no arming state, and a writer that
   stops on its own — judged by when its report arrived, so a Pause or Stop
-  press that reached main first does not hide it — ends it.
+  press that reached main first does not hide it — ends it. **A camera
+  recording is the same machine with a camera where the stream was**
+  (camera-recording CR1a, spec §11 CAM-3): `cameraSession` instead of
+  `session` (`+Camera`, `+CameraFinishing`), one `AVAssetWriter` per
+  segment over one running capture session, `stop()`, `elapsed`, `pause()`
+  and `resume()` forward to it, and segment 0's writer is armed only after
+  the warm-up hold. `CameraDevices.swift` is the camera list, CAM-3's best
+  format and its sentences; `CameraCapture.swift` the session, the
+  configuration lock, the data output, the writers and the warm-up;
+  `RecordingSetup+Camera.swift` the camera's stem, grant read and refusal.
 - `RecordingLanding.swift` (+`Microphone`, +`Placing`, +`LeftOut`,
   +`VoiceOver`) · `ProjectDocument+Recording.swift`
   — a `RecordingResult` and a document in, an UNSCOPED op list out; nothing
@@ -3094,10 +3104,13 @@ straightening and the 8-bit rounding (`ExportStraightAlpha.swift`,
 inside the video pump), and the spend-month
 queue (`AssistantSpendMonth.queue`, Settings' ledger fold, answered by a
 main hop), the waveform tap's main hop (`WaveformTaps.finished` →
-`DispatchQueue.main.async`, from Metal's completion thread), and — not a
+`DispatchQueue.main.async`, from Metal's completion thread), the camera
+recorder's two (`CameraCapture.sessionQueue` for `startRunning` and
+`stopRunning`; `CameraCapture.sampleQueue`, the data output's delegate queue
+and the only place the armed writer and the warm-up are touched), and — not a
 queue but a seam all the same — the graphic
-prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-26, G-36). The recorder adds
-NO queue of its own:
+prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-26, G-36). Beyond the camera's
+two, the recorder adds NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in
 `Controls.swift`. **A refusal and an identity both beep** (`NSSound.beep()`)

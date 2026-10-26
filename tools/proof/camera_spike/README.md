@@ -23,6 +23,7 @@ python3 tools/proof/camera_spike/camera_spike.py --selftest --mutant continuity-
 python3 tools/proof/camera_spike/camera_spike.py --ask      # once, from the terminal that will run it: asks Camera and Microphone
 python3 tools/proof/camera_spike/camera_spike.py            # every group but aimed
 python3 tools/proof/camera_spike/camera_spike.py --groups write,pause --runs 5 --camera FaceTime
+python3 tools/proof/camera_spike/camera_spike.py --groups write,pause --camera FaceTime --format 1760x1328   # CR1a: D3 = that size
 python3 tools/proof/camera_spike/camera_spike.py --aimed    # adds A1: a person points the camera at the screen
 ```
 
@@ -111,6 +112,11 @@ capture mode 120 s, `analyze` 60 s. `--camera` picks a device by name or unique 
 built-in wide-angle, non-Continuity device named "FaceTime", else the first); `--mic` by name
 (default `"MacBook"`: a Bluetooth input switches profiles and poisons the file, R0's lesson). A
 camera group asked without `devices` runs `devices` first (the camera and D3 come from D1).
+`--format WxH` (CR1a, spec §11 CAM-3's step 2) sets D3 to the chosen camera's first format of
+that size whose maximum rate is ≥ 30, so W2, W3, P1 and P2 run there rather than at CAM-2's
+best; `results.json` records it as `formatOverride` (`{asked, index}`, null without the flag),
+D3's row still lists CAM-2's picks, and a size the camera lacks prints `NOT PERFORMED` and exits
+**2** once D1 has listed it. The selftest is unchanged.
 
 ## The rows
 

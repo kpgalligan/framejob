@@ -217,7 +217,8 @@ def release_signature(log):
     import proof_app  # noqa: E402
 
     exe = str(proof_app.executable(dist_check.DEFAULT_RELEASE))
-    rows = (("D25 the Release app's entitlements are exactly audio-input and get-task-allow",
+    rows = (("D25 the Release app's entitlements are exactly audio-input, camera and "
+             "get-task-allow",
              dist_check.entitlements(os.path.realpath(exe), dist_check.RELEASE_ENTITLEMENTS)),
             ("D26 the Release app passes codesign --verify --deep --strict",
              dist_check.sealed(exe)))

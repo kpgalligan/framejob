@@ -32,18 +32,21 @@ flags are read there; the entitlements are read from stdout.
 injects unless `CODE_SIGN_INJECT_BASE_ENTITLEMENTS` is off (`project.yml`
 turns it off for Distribution alone). D14 reads the Distribution app's
 signature through its executable, `realpath`ed so a skeleton's symlink reads
-the real app, and wants exactly `com.apple.security.device.audio-input`.
+the real app, and wants exactly `com.apple.security.device.audio-input` and
+`com.apple.security.device.camera` (the camera's since camera-recording CR1a,
+spec §11 CAM-3).
 
 **Release's signature and both seals (issue batch B88).** A no-op build once
 left the Release app signed ad hoc by Write Agent Catalog alone: no
 entitlements (no microphone) and a seal broken by the catalog written after
 it, which nothing here read, because D14 reads Distribution's alone. D25
 reads the Release app's entitlements the same way and wants exactly what
-Xcode's own CodeSign gives it, the Distribution pair plus the
+Xcode's own CodeSign gives it, the Distribution set plus the
 `com.apple.security.get-task-allow` Xcode injects outside Distribution (the
-processed `Frame Job.app.xcent` of a Release build holds those two): an exact
-set, so a build signed with anything but Xcode's processed entitlements — a
-missing `get-task-allow` as much as a missing microphone — fails, and a
+processed `Frame Job.app.xcent` of a Release build holds those three): an
+exact set, so a build signed with anything but Xcode's processed entitlements —
+a missing `get-task-allow` as much as a missing microphone or camera — fails,
+and a
 no-op build cannot ship a different signature from a linking one. D26 / D27
 run `codesign --verify --deep --strict` over each app, the bundle being the
 one its executable `realpath`s into (so a skeleton reads the real app, as
@@ -75,7 +78,8 @@ The twenty-seven rows, none ever skipped:
 * D10 / D11 — its entitlements are exactly `com.apple.security.cs.allow-jit`;
 * D12 / D13 — it does not hold the needle;
 * D14 — the Distribution app's entitlements are exactly
-  `com.apple.security.device.audio-input`;
+  `com.apple.security.device.audio-input` and
+  `com.apple.security.device.camera`;
 * D15 / D16 — the Release / Distribution MCP proxy exists;
 * D17 / D18 — it is signed with the hardened runtime and `codesign --verify
   --strict` accepts it;
@@ -88,7 +92,8 @@ The twenty-seven rows, none ever skipped:
   positive control);
 * D24 — Distribution's snapshot names none of them;
 * D25 — the Release app's entitlements are exactly
-  `com.apple.security.device.audio-input` and
+  `com.apple.security.device.audio-input`,
+  `com.apple.security.device.camera` and
   `com.apple.security.get-task-allow`;
 * D26 / D27 — the Release / Distribution app passes `codesign --verify
   --deep --strict`.
@@ -127,8 +132,10 @@ MIN_BYTES = 16
 # The assistant helper, inside each bundle; its one entitlement (agent/entitlements.plist).
 HELPER = os.path.join("Contents", "Helpers", "framejob-agent")
 ENTITLEMENTS = {"com.apple.security.cs.allow-jit": True}
-# The Distribution app's one entitlement (#145): the microphone, never get-task-allow.
-APP_ENTITLEMENTS = {"com.apple.security.device.audio-input": True}
+# The Distribution app's entitlements (#145, spec §11 CAM-3): the microphone and the camera,
+# never get-task-allow.
+APP_ENTITLEMENTS = {"com.apple.security.device.audio-input": True,
+                    "com.apple.security.device.camera": True}
 # The Release app's (B88): Distribution's plus the get-task-allow Xcode injects outside it.
 RELEASE_ENTITLEMENTS = {**APP_ENTITLEMENTS, "com.apple.security.get-task-allow": True}
 # The MCP proxy and its catalog snapshot, inside each bundle (road map 14 MC3).
@@ -431,7 +438,7 @@ def main():
             check(name, count == 0, f"{count} occurrences in {helper_where}")
 
     name = ("D14 the Distribution app's entitlements are exactly "
-            "com.apple.security.device.audio-input")
+            "com.apple.security.device.audio-input and com.apple.security.device.camera")
     if dist is None:
         check(name, False, "no Distribution binary (D3)")
     else:
@@ -496,7 +503,8 @@ def main():
         check(name, not held, f"holds {held} in {where}")
 
     name = ("D25 the Release app's entitlements are exactly "
-            "com.apple.security.device.audio-input and com.apple.security.get-task-allow")
+            "com.apple.security.device.audio-input, com.apple.security.device.camera and "
+            "com.apple.security.get-task-allow")
     if release is None:
         check(name, False, "no Release binary (D2)")
     else:

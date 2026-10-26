@@ -73,3 +73,72 @@ its code.
   **Risk accepted:** a bare binary's grant is its responsible process's (road map 3 R0 q1), so
   T2 and T3 measure the hardened runtime under the terminal's grant, not a signed bundle's own
   prompt; that prompt is a person's check in CR1.
+
+- **CAM-3 — The camera recorder's rules (CR1a), recorded before its code; amends CAM-2's Best
+  format.** CR0's verdict chose `AVAssetWriter` (CAM-2 Writer) and E1; these are the rules CR1a's
+  recorder and CR1b's tool build on.
+  - **Best format.** CAM-2's rule (the largest width × height whose maximum rate is ≥ 30, ties
+    to the higher maximum rate, then to the format listed first) is applied to the formats
+    WIDER THAN TALL. If none qualifies, CAM-2's rule over every format; if that finds none
+    either, the device's active format. The recording is made at the chosen format's maximum
+    rate. On CR0's host it picks the FaceTime HD Camera's 1760 × 1328 @ 30 (format 3), OBS
+    Virtual Camera's 1920 × 1080 @ 60 and the iPhone's 1920 × 1440 @ 60 (over its 1920 × 1440 @
+    30 on rate). A person picks 1920 × 1080 in CR2's Format popup.
+  - **Step 2's criterion.** Before the recorder is relied on, the spike's writer row W3 runs at
+    the format this rule picks (the spike's `--format`): every W3 run writes ≥ 98 % of span ×
+    rate with the format read back as asked, and P2's median resume start latency is ≤ one
+    frame interval. A failure is a STOP for the owner, with no product code.
+  - **The microphone's offset.** The camera's first appended buffer's PTS and the microphone
+    file output's `startPTS`, each converted to the host clock through its own session's
+    `synchronizationClock`; the offset is the camera's minus the microphone's. If either is
+    missing, the two arrival stamps (the first buffer's and the did-start's) are used instead;
+    if those are missing too, 0. POSITIVE means the picture began after the microphone, the
+    sign `RecordingSegment.micOffset` already has. The truth is a person's (CR1b's clap row).
+  - **The camera entitlement is ADDED.** `com.apple.security.device.camera` joins the app's
+    entitlements and `NSCameraUsageDescription` its Info.plist. CAM-2's `not-needed` speaks
+    only for a shell-launched binary under the terminal's grant; road map 3 R0 found the signed
+    app needed the microphone's entitlement where a bare probe did not, and the camera follows
+    that finding. The dist checks' exact sets (D14, D25, P5) gain it.
+  - **Files.** `Camera Recording <yyyy-MM-dd> at <HH.mm.ss>.mov`, and the microphone's
+    ` (Microphone).m4a` beside it (`RecordingFiles.microphoneURL(beside:)`). HEVC where the
+    writer `canApply` it at the format's size, else H.264. Each later segment is named by its
+    own start and is unique against the names the session holds (the voice-over's rule). A
+    segment that wrote no frame is cancelled and dropped; if none wrote a frame, the recording
+    fails: "The camera delivered no frame."
+  - **The warm-up** (added when CR1a's granted probe found it). A cold camera's first frames
+    come slower than its format's rate: the built-in camera at 1760 × 1328 @ 30 delivered its
+    first intervals at 33.3, 33.3, then five at 43.3 ms, then 33.3 ms steadily, which left
+    segment 0 at 0.975 of span × rate in every run, while a resumed segment, on a warm session,
+    was 0.999. So a camera recording begins on a warm stream, as a screen recording's
+    microphone does (`prepareMicrophone`, warmed during the countdown): `.arming` holds until
+    the stream runs at the format's rate — FIVE consecutive frame intervals, by PTS, each
+    within 15 % of the format's frame duration (the cold intervals are 30 % long, the spike's
+    steady W3 never passed 35.0 ms, 5 %, and five rather than three because the cold start
+    opens with two on-time intervals) — bounded at 1 s from the session's start. Segment 0's
+    writer is armed only then, so it starts at a steady buffer. Past the bound the recording
+    starts anyway and the result's `camera.note` names the rate measured; the hold never fails
+    a start. A start pays the hold once, up to the bound; a resume, on the running session,
+    does not. Until CR1c's countdown exists the hold is paid inside the recorder's start; CR1c
+    starts the camera's session during the countdown, so the hold is spent there.
+  - **A camera that stops on its own** — a runtime error, an interruption or a disconnect,
+    while recording or paused — ends the recording: `stoppedBy` is `.systemStopped`, the
+    sentence is the result's `camera.problem`, and what was written lands.
+  - **A microphone that stops on its own** (a did-finish that arrived before its segment's
+    stop, the voice-over's arrival test) does NOT end a camera recording: the screen
+    recording's rule. The picture keeps recording, that segment's `micProblem` carries the
+    sentence, and the recorder's `microphoneProblem` is set once for the session. A later
+    segment's microphone is started again at resume, and a start that fails is that segment's
+    `micProblem`.
+  - **The tool's refusal order** (CR1b builds it): (1) `seconds`; (2) `source`; (3) the
+    arguments the source refuses — with `camera`, `display`, `window`, `system_audio`,
+    `show_clicks`, `size`, `include_framejob_windows` and `rate`, refused together; with any
+    other source, `camera`; (4) the screen's own checks; (5) `microphone: true` without its
+    grant; (6) `project`; (7) the camera lookup, which needs no grant and so comes before the
+    grant read: the system's preferred camera, else the first built-in, else the first, when
+    `camera` is absent; "No camera is connected." when none is; a sentence naming every camera
+    present when the name or id is unknown; (8) the Camera grant; (9) the recording.
+  - **Canvas.** A new project's canvas is the file's size at the format's maximum rate,
+    rounded (at least 1). In an open project the camera lands by the screen recording's picture
+    rule (`RecordingLanding.placement`, unchanged).
+  - **The rule's hash.** This entry changes the file's SHA-256, so step 2's run records a new
+    `rule_sha256`; CR0's pinned hash stays CR0's.

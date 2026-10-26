@@ -1,0 +1,424 @@
+#!/usr/bin/env python3
+"""Camera recording CR1a (spec §11 CAM-3): the camera recorder, measured through the app's own
+sources with no door reaching it yet.
+
+    python3 tools/proof/camera_recording_probe.py [--sources DIR] [--only SECTIONS] [--mutant NAME]
+
+`camera_recording_probe.swift` is built with `swift_build.py`'s line over `--sources` (every
+file but `main.swift`) and an Info.plist section (`-sectcreate __TEXT __info_plist`,
+`recording_probe.build_voice_probe`'s line) holding `NSCameraUsageDescription` and
+`NSMicrophoneUsageDescription`, then run once per section, each in a process of its own, under
+`TZ=UTC`. Prints `<ID> pass|fail|skip — <detail>` per row, then `scores: N/M`. Everything is
+written under `tools/proof/work/camera-recording-probe/`.
+
+Sections and rows:
+  values   V1–V3 CAM-3's best format on CR0's three D1 lists (FaceTime HD's 7 → index 3,
+           1760×1328@30; OBS → 1920×1080@60; the iPhone's 8 → index 7, 1920×1440@60, over
+           index 6 on rate); V4 a portrait-only list (CAM-2 over every format); V5 an all-under-30
+           list (→ the active format, nil without one); V6 `canvasRate` and `spelled`; V7
+           `cameraStem` at a fixed date; V8 `nextCameraURL` against a held movie, a held
+           microphone file and a file on disk; V9 `match`; V10 `defaultIndex`; V11 the two
+           sentences; V12a–d `cameraMicOffset` (the PTS path over contrary arrivals, the arrival
+           fallback, the sign, 0); V13 `cameraRefusal`'s four statuses; V14
+           `RecorderError.cameraDevice`. Two SOURCE reads: V15 `cameraMicFinished`'s body sets
+           `micProblem` and never calls `beginCameraFinishing(`; V16 `startCamera` reads
+           `RecordingGrant.cameraStatus` before any `CameraCapture(`. V17 CAM-3's warm-up:
+           `isSteady` over the cold start's intervals (33.3, 35.0, 43.3, 30.0 ms at 30 fps), the
+           run of 5 and the 1 s bound, and `WarmUp.note` (nil steady; the rate named; no frame).
+  landing  L1 a `.camera` result over ffmpeg fixtures (a 1920×1080 30 fps `.mov`, an `.m4a`)
+           through `RecordingLanding.placement`: the picture on a track, the voice on a back
+           track named Microphone; L2 `ProjectDocument.untitled(around:)`: the canvas 1920×1080
+           at 30; L3 the result is `isCamera`, not `isVoiceOver`, and carries its camera.
+  granted  a real `ScreenRecorder()` on `defaultIndex`'s camera and the default microphone:
+           2 s, a 1 s pause, 2 s more. G0 it recorded; G1 2 segments, `pauses` 1, stopped by
+           `stop()`, no camera problem; G2 each `.mov`'s size (ffprobe) equals the format applied,
+           which is CAM-3's pick for that camera; G3 each `.mov`'s decoded frames are ≥ 98 % of
+           (last − first PTS + one frame) × rate; G4 each |micOffset| < 0.5 s; G5 the names
+           (`Camera Recording <date> at <time>.mov`, its ` (Microphone).m4a`) and the choice's rate
+           the format's; G6 the warm-up hold (CAM-3): its length from the session's start within
+           the bound (+ 0.15 s for the timer), its buffers, intervals and rate, and the result's
+           `camera.note` nil when the stream was steady, naming the rate when the bound passed.
+           Skipped by name when no camera is connected or the Camera grant is not
+           authorized (nothing is recorded); G4 is skipped by name when the Microphone grant is
+           not authorized (the recording is made without one). Never asks for a grant.
+
+Mutants (each a `--mutant` edit of a copy of `--sources`), run with `--only values` but
+`no-hold`, run with `--only granted` (it needs the camera, and a cold start):
+  format-any-shape    no landscape filter                                 → V1
+  offset-by-arrival   the PTS ignored                                     → V12a
+  offset-sign         the PTS difference negated                          → V12a, V12c
+  canvas-rate-60      `canvasRate` answers 60                             → V6
+  grant-unread        the `cameraStatus` guard deleted from `startCamera` → V16
+  mic-ends-recording  an unasked microphone did-finish ends the recording → V15
+  no-hold             `warmUpRun` 0: the warm-up ends at its first buffer → G3
+
+Exit (cache_pass_probe.py's rule): a plain run exits 0 iff no row failed (a skip by name is
+not a failure) and 1 when one did; a build failure is B0's FAIL. A `--mutant` run exits 1 when
+every row it names failed (caught), 0 when one passed (survived), and 2 when the control could
+not be performed: a `before` text not found exactly once, the copy did not build, or a named
+row was not scored. No ffmpeg (needed by landing and granted) exits 2.
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+
+import swift_build
+
+ROOT = Path(__file__).resolve().parents[2]
+WORK = ROOT / "tools/proof/work/camera-recording-probe"
+SECTIONS = ["values", "landing", "granted"]
+ROWS = {
+    "values": ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12a", "V12b",
+               "V12c", "V12d", "V13", "V14", "V15", "V16", "V17"],
+    "landing": ["L1", "L2", "L3"],
+    "granted": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"],
+}
+SECTION_WALL = 180
+STEM_EPOCH = 1793034873   # 2026-10-26 17:14:33 UTC
+STEM_WANT = "Camera Recording 2026-10-26 at 17.14.33"
+FRAMES_PASS = 0.98
+HOLD_BOUND = 1.0          # CameraCapture.warmUpBound
+HOLD_SLACK = 0.15         # the bound's timer and the hop to main
+INFO_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>NSCameraUsageDescription</key><string>The Frame Job camera recording probe records a short camera clip to check the recorder.</string>
+<key>NSMicrophoneUsageDescription</key><string>The Frame Job camera recording probe records the microphone beside the camera.</string>
+</dict></plist>
+"""
+
+GRANT_GUARD = """        let cameraGrant = RecordingGrant.cameraStatus
+        guard cameraGrant == .authorized else {
+            return refuseCamera(.startFailed(RecordingGrant.cameraRefusal(cameraGrant)), completion)
+        }
+"""
+# name: (the rows it must fail, [(file, before, after), ...])
+MUTANTS = {
+    "format-any-shape": (["V1"], [
+        ("CameraDevices.swift",
+         "let landscape = formats.indices.filter { formats[$0].width > formats[$0].height }",
+         "let landscape = Array(formats.indices)")]),
+    "offset-by-arrival": (["V12a"], [
+        ("ScreenRecorder+CameraFinishing.swift", "if let cameraPTS, let micPTS {",
+         "if let cameraPTS, let micPTS, cameraPTS.isNaN {")]),
+    "offset-sign": (["V12a", "V12c"], [
+        ("ScreenRecorder+CameraFinishing.swift", "seconds = cameraPTS - micPTS",
+         "seconds = micPTS - cameraPTS")]),
+    "canvas-rate-60": (["V6"], [
+        ("CameraDevices.swift", "max(1, Int(format.maxRate.rounded()))", "60")]),
+    "grant-unread": (["V16"], [("ScreenRecorder+Camera.swift", GRANT_GUARD, "")]),
+    "mic-ends-recording": (["V15"], [
+        ("ScreenRecorder+CameraFinishing.swift",
+         "// The picture records on: a microphone never ends a camera recording (CAM-3).",
+         "if unasked, state == .recording { beginCameraFinishing() }")]),
+    "no-hold": (["G3"], [
+        ("CameraCapture.swift", "static let warmUpRun = 5", "static let warmUpRun = 0")]),
+}
+# The section a mutant runs when `--only` is not given.
+MUTANT_SECTION = {"no-hold": "granted"}
+
+
+def run(command, **kw):
+    return subprocess.run(command, capture_output=True, text=True, **kw)
+
+
+def build(sources, here):
+    """(binary, None) or (None, why): `swift_build.build` with the Info.plist section."""
+    entry = here / "main.swift"
+    shutil.copyfile(ROOT / "tools/proof/camera_recording_probe.swift", entry)
+    plist = here / "Info.plist"
+    plist.write_text(INFO_PLIST)
+    binary = here / "camera-recording-probe"
+    swift = sorted(str(p) for p in sources.glob("*.swift") if p.name != "main.swift")
+    if len(swift) < 100:
+        return None, "app source set incomplete"
+    try:
+        swift_build.build(
+            sources=swift + [str(entry)], output=binary,
+            link_args=["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker",
+                       "__info_plist", "-Xlinker", str(plist)],
+            link_inputs=[str(plist)])
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
+        return None, "swiftc: " + "; ".join((errors or error.diagnostics)[:6])
+    return binary, None
+
+
+def mutate(sources, name, dest):
+    """A copy of `sources` with the mutant's edits; why when a `before` is not found once."""
+    shutil.copytree(sources, dest)
+    for file, before, after in MUTANTS[name][1]:
+        path = dest / file
+        text = path.read_text() if path.exists() else ""
+        if text.count(before) != 1:
+            return f"{file}: `{before.strip()[:60]}` found {text.count(before)} times"
+        path.write_text(text.replace(before, after))
+    return None
+
+
+def section(binary, here, name, request):
+    """(rows, facts) one section's process answered, or (None, why)."""
+    path = here / f"request-{name}.json"
+    path.write_text(json.dumps(request))
+    env = dict(os.environ, TZ="UTC")
+    try:
+        result = run([str(binary), name, str(path)], timeout=SECTION_WALL, env=env)
+    except subprocess.TimeoutExpired:
+        return None, f"no answer within {SECTION_WALL} s"
+    (here / f"stderr-{name}.txt").write_text(result.stderr)
+    try:
+        answer = json.loads(result.stdout.strip().splitlines()[-1])
+        return (answer["rows"], answer["facts"]), None
+    except (ValueError, KeyError, IndexError):
+        return None, f"no answer (exit {result.returncode}): {result.stderr[-300:]}"
+
+
+def body_of(text, signature):
+    """The text of the function whose declaration starts `signature`, through its matching
+    closing brace; None when it is not there exactly once."""
+    if text.count(signature) != 1:
+        return None
+    start = text.index(signature)
+    depth, i, opened = 0, start, False
+    while i < len(text):
+        if text[i] == "{":
+            depth += 1
+            opened = True
+        elif text[i] == "}":
+            depth -= 1
+            if opened and depth == 0:
+                return text[start:i + 1]
+        i += 1
+    return None
+
+
+def source_rows(sources):
+    """V15 and V16: the two source reads."""
+    rows = {}
+    finishing = (sources / "ScreenRecorder+CameraFinishing.swift")
+    body = body_of(finishing.read_text() if finishing.exists() else "", "func cameraMicFinished(")
+    if body is None:
+        rows["V15"] = (False, "cameraMicFinished not found exactly once")
+    else:
+        sets = "micProblem =" in body
+        ends = "beginCameraFinishing(" in body
+        rows["V15"] = (sets and not ends,
+                       f"cameraMicFinished sets micProblem {sets}, calls beginCameraFinishing( {ends}")
+    camera = sources / "ScreenRecorder+Camera.swift"
+    body = body_of(camera.read_text() if camera.exists() else "", "func startCamera(")
+    if body is None:
+        rows["V16"] = (False, "startCamera not found exactly once")
+    else:
+        grant = body.find("RecordingGrant.cameraStatus")
+        capture = body.find("CameraCapture(")
+        rows["V16"] = (grant >= 0 and capture >= 0 and grant < capture,
+                       f"RecordingGrant.cameraStatus at {grant}, the first CameraCapture( at {capture}")
+    return rows
+
+
+def fixtures(here):
+    """The landing's two files, made by ffmpeg; (movie, voice) or None and why."""
+    movie, voice = here / "camera-1080p30.mov", here / "camera-voice.m4a"
+    for argv in (
+            ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30",
+             "-t", "2", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(movie)],
+            ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000",
+             "-t", "2", "-c:a", "aac", str(voice)]):
+        done = run(argv, timeout=120)
+        if done.returncode != 0:
+            return None, f"{' '.join(argv[:6])}… exit {done.returncode}: {done.stderr[-200:]}"
+    return (movie, voice), None
+
+
+def movie_facts(path):
+    """ffprobe's decoded frame count, size and the packets' PTS span of a movie."""
+    done = run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames",
+                "-show_entries", "stream=width,height,nb_read_frames", "-of", "json", path],
+               timeout=120)
+    stream = (json.loads(done.stdout or "{}").get("streams") or [{}])[0]
+    pts = run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+               "packet=pts_time", "-of", "csv=p=0", path], timeout=120)
+    times = sorted(float(t) for t in pts.stdout.split() if t.strip() and t != "N/A")
+    return {"width": stream.get("width"), "height": stream.get("height"),
+            "frames": int(stream.get("nb_read_frames") or 0),
+            "first": times[0] if times else None, "last": times[-1] if times else None}
+
+
+def granted_rows(facts):
+    """G0–G5 from the granted section's facts; a dict of id → (state, detail) where state is
+    True, False or "skip"."""
+    rows = {}
+    if facts.get("skip"):
+        return {row: ("skip", facts["skip"]) for row in ROWS["granted"]}
+    if facts.get("error"):
+        rows["G0"] = (False, facts["error"])
+        return rows
+    segments = facts.get("segments") or []
+    rows["G0"] = (bool(segments) and facts.get("isCamera") is True and facts.get("idle") is True
+                  and facts.get("onFinishCalls") == 1,
+                  f"{len(segments)} segment(s), the recorder idle {facts.get('idle')}, onFinish "
+                  f"{facts.get('onFinishCalls')}×, steps {facts.get('steps')}")
+    rows["G1"] = (len(segments) == 2 and facts.get("pauses") == 1 and facts.get("stoppedBy") == "stopped"
+                  and facts.get("problem") is None and not facts.get("unreadable"),
+                  f"segments {len(segments)}, pauses {facts.get('pauses')}, stoppedBy "
+                  f"{facts.get('stoppedBy')}, problem {facts.get('problem')}, left out "
+                  f"{facts.get('unreadable')}")
+    applied = facts.get("format", "")
+    match = re.match(r"^(\d+)x(\d+)@([\d.]+)$", applied)
+    width, height, rate = (int(match[1]), int(match[2]), float(match[3])) if match else (0, 0, 0)
+    measured = [movie_facts(s["movie"]) for s in segments]
+    rows["G2"] = (bool(match) and applied == facts.get("best")
+                  and all(m["width"] == width and m["height"] == height for m in measured),
+                  f"applied {applied} (CAM-3's pick {facts.get('best')}); files "
+                  + ", ".join(f"{m['width']}×{m['height']}" for m in measured))
+    ratios = []
+    for m in measured:
+        if m["first"] is None or not rate:
+            ratios.append(None)
+            continue
+        expected = (m["last"] - m["first"] + 1.0 / rate) * rate
+        ratios.append(round(m["frames"] / expected, 4) if expected else None)
+    rows["G3"] = (bool(ratios) and all(r is not None and r >= FRAMES_PASS for r in ratios),
+                  "decoded frames / span × rate: " + ", ".join(
+                      f"{m['frames']}/{r}" for m, r in zip(measured, ratios)))
+    if not facts.get("microphone"):
+        rows["G4"] = ("skip", f"the Microphone grant is {facts.get('micGrant')}: recorded without "
+                              "a microphone")
+    else:
+        offsets = [s.get("micOffset") for s in segments]
+        problems = [s.get("micProblem") for s in segments]
+        rows["G4"] = (all(s.get("mic") for s in segments)
+                      and all(o is not None and abs(o) < 0.5 for o in offsets),
+                      f"micOffset s {offsets}; problems {problems}")
+    names_ok, shown = True, []
+    pattern = re.compile(r"^Camera Recording \d{4}-\d\d-\d\d at \d\d\.\d\d\.\d\d( \(\d+\))?\.mov$")
+    for s in segments:
+        movie = os.path.basename(s["movie"])
+        ok = bool(pattern.match(movie))
+        if s.get("mic"):
+            ok = ok and os.path.basename(s["mic"]) == movie[:-4] + " (Microphone).m4a"
+        names_ok = names_ok and ok
+        shown.append(movie + (" + " + os.path.basename(s["mic"]) if s.get("mic") else ""))
+    rows["G5"] = (names_ok and facts.get("rate") == facts.get("bestRate"),
+                  f"{shown}; rate {facts.get('rate')} (want {facts.get('bestRate')})")
+    warm = facts.get("warmUp")
+    if not warm:
+        rows["G6"] = (False, "no warm-up was recorded")
+    else:
+        if warm["steady"]:
+            noted = warm.get("note") is None and facts.get("note") is None
+        else:
+            noted = (facts.get("note") is not None and facts.get("note") == warm.get("note")
+                     and f"{warm['rate']:.1f} fps" in facts["note"])
+        rows["G6"] = (warm["seconds"] <= HOLD_BOUND + HOLD_SLACK and warm["buffers"] >= 1 and noted,
+                      f"hold {warm['seconds']:.3f} s (bound {HOLD_BOUND:g} s), {warm['buffers']} "
+                      f"buffers, steady {warm['steady']}, ran at {warm['rate']:.2f} fps (want "
+                      f"{warm['wanted']:g}); intervals ms {warm['intervals']}; the call to "
+                      f"recording {facts.get('startSeconds') or 0:.3f} s; note {facts.get('note')}")
+    return rows
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sources", type=Path, default=ROOT / "app/Sources")
+    parser.add_argument("--mutant", choices=sorted(MUTANTS))
+    parser.add_argument("--only", help="comma-separated sections: " + ",".join(SECTIONS))
+    args = parser.parse_args()
+    wanted = (args.only.split(",") if args.only
+              else ([MUTANT_SECTION.get(args.mutant, "values")] if args.mutant
+                    else list(SECTIONS)))
+    unknown = [s for s in wanted if s not in SECTIONS]
+    if unknown:
+        print("unknown section " + ", ".join(unknown))
+        return 2
+    if {"landing", "granted"} & set(wanted) and not shutil.which("ffmpeg"):
+        print("instrument failure: ffmpeg is not on PATH (landing and granted need it)")
+        return 2
+    here = WORK / (f"mutant-{args.mutant}" if args.mutant else "tree")
+    if here.exists():
+        shutil.rmtree(here)
+    here.mkdir(parents=True)
+    sources = args.sources.resolve()
+    if args.mutant:
+        why = mutate(sources, args.mutant, here / "Sources")
+        if why:
+            print(f"mutant {args.mutant}: the control could not be performed — {why}")
+            return 2
+        sources = here / "Sources"
+
+    results = {}
+    binary, why = build(sources, here)
+    results["B0"] = (binary is not None, why or f"built from {sources}")
+    order = ["B0"]
+    if binary is None and args.mutant:
+        print(f"B0 fail — {why}")
+        print(f"mutant {args.mutant}: the control could not be performed — the copy did not build")
+        return 2
+    for name in wanted:
+        order += ROWS[name]
+        if binary is None:
+            for row in ROWS[name]:
+                results[row] = (False, "not run: the probe did not build")
+            continue
+        request = {"work": str(here / name)}
+        if name == "values":
+            request.update(stemEpoch=STEM_EPOCH, stemWant=STEM_WANT)
+        if name == "landing":
+            made, why = fixtures(here)
+            if made is None:
+                for row in ROWS[name]:
+                    results[row] = (False, f"fixtures: {why}")
+                continue
+            request.update(movie=str(made[0]), voice=str(made[1]))
+        if name == "granted":
+            folder = here / "recordings"
+            folder.mkdir(parents=True, exist_ok=True)
+            request.update(folder=str(folder))
+        answer, why = section(binary, here, name, request)
+        if answer is None:
+            for row in ROWS[name]:
+                results.setdefault(row, (False, f"no row: {why}"))
+            continue
+        rows, facts = answer
+        (here / f"facts-{name}.json").write_text(json.dumps(facts, indent=1))
+        for row in rows:
+            results[row["id"]] = (bool(row["pass"]), row["detail"])
+        if name == "values":
+            results.update(source_rows(sources))
+        if name == "granted":
+            results.update(granted_rows(facts))
+        for row in ROWS[name]:
+            results.setdefault(row, (False, "the section did not answer it"))
+
+    failed = 0
+    for row in order:
+        state, detail = results[row]
+        word = "skip" if state == "skip" else ("pass" if state else "fail")
+        failed += word == "fail"
+        print(f"{row} {word} — {detail}")
+    scored = [r for r in order if results[r][0] != "skip"]
+    passed = sum(1 for r in scored if results[r][0] is True)
+    print(f"scores: {passed}/{len(scored)}"
+          + (f" ({len(order) - len(scored)} skipped by name)" if len(scored) < len(order) else ""))
+    if args.mutant:
+        named = MUTANTS[args.mutant][0]
+        missing = [r for r in named if r not in results]
+        if missing:
+            print(f"mutant {args.mutant}: the control could not be performed — "
+                  f"{', '.join(missing)} not scored")
+            return 2
+        caught = all(results[r][0] is False for r in named)
+        print(f"mutant {args.mutant}: {'caught' if caught else 'survived'} ({', '.join(named)})")
+        return 1 if caught else 0
+    if failed == 0:
+        print("all checks passed")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

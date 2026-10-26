@@ -142,9 +142,11 @@ extension ScreenRecorder {
     /// `.finishFailed` — it is a file that could not be closed — and the
     /// recorder STAYS `.recording` with nothing changed, since the output is
     /// still attached and a Stop will close it. A voice-over's pause is
-    /// `pauseVoiceOver` (`+VoiceOver.swift`), forwarded first.
+    /// `pauseVoiceOver` (`+VoiceOver.swift`), forwarded first; a camera
+    /// recording's `pauseCamera` (`+Camera.swift`) next.
     func pause() throws {
         if voiceSession != nil { return try pauseVoiceOver() }
+        if cameraSession != nil { return try pauseCamera() }
         guard state != .paused else { throw RecorderError.alreadyPaused }
         guard state == .recording, let current = session else {
             throw RecorderError.notRecording
@@ -183,9 +185,11 @@ extension ScreenRecorder {
     /// did-starts are stamped where they land (`+Delegates.swift`). Never
     /// waits for the paused segment's did-finish (the header). A
     /// microphone that failed on an earlier segment is asked again. A
-    /// voice-over's resume is `resumeVoiceOver`, forwarded first.
+    /// voice-over's resume is `resumeVoiceOver`, forwarded first; a camera
+    /// recording's `resumeCamera` next.
     func resume() throws {
         if voiceSession != nil { return try resumeVoiceOver() }
+        if cameraSession != nil { return try resumeCamera() }
         guard state == .paused, let current = session else { throw RecorderError.notPaused }
         let at = Date()
         let movieURL = Self.nextMovieURL(for: current, at: at)

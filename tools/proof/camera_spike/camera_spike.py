@@ -12,7 +12,7 @@ It judges by CAM-2 (fixed before the run; `results.json` pins the §11 file's SH
 The answers are in `designs/camera-recording.md`'s CR0 record, not here.
 
     python3 tools/proof/camera_spike/camera_spike.py [--groups devices,grant,write,mic,screen,pause,preview,virtual,aimed]
-        [--camera SUBSTR] [--mic SUBSTR] [--runs N] [--ask] [--aimed]
+        [--camera SUBSTR] [--mic SUBSTR] [--runs N] [--ask] [--aimed] [--format WxH]
     python3 tools/proof/camera_spike/camera_spike.py --selftest [--mutant NAME]
 
 Exit 0: every requested row answered or skipped by name (whatever the VERDICT). Exit 1: an
@@ -454,6 +454,7 @@ class Ctx:
     screen_runs = []
     t2 = t3 = None
     d1 = d2 = None
+    format_override = None  # `--format`: {asked, index} (CR1a)
 
 
 def camera_skip(row):
@@ -502,6 +503,17 @@ def group_devices(paths, args):
     Ctx.camera = default_camera(Ctx.d1, args.camera)
     if Ctx.camera:
         Ctx.d3 = best_format(Ctx.camera["formats"])
+        if args.format:
+            # CR1a (spec §11 CAM-3): D3 set to the chosen camera's first format of that size
+            # whose maximum rate is ≥ 30, so the writer is measured at the format CAM-3 picks.
+            width, height = args.format
+            Ctx.d3 = next((f["index"] for f in Ctx.camera["formats"]
+                           if f["width"] == width and f["height"] == height and f["maxRate"] >= 30), None)
+            Ctx.format_override = {"asked": f"{width}x{height}", "index": Ctx.d3}
+            if Ctx.d3 is None:
+                print(f"NOT PERFORMED: the chosen camera has no {width}x{height} format at ≥ 30 fps",
+                      file=sys.stderr)
+                sys.exit(2)
         f = Ctx.camera["formats"][Ctx.d3] if Ctx.d3 is not None else None
         Ctx.frame_ms = 1000.0 / f["maxRate"] if f else None
     mics = [m for m in d1["microphones"]
@@ -977,6 +989,14 @@ def print_table():
         print(f"{row:4} {r.get('outcome', '?'):9} {what[:400]}")
 
 
+def format_size(text):
+    """`--format`'s `WxH`, as (width, height)."""
+    parts = text.lower().split("x")
+    if len(parts) != 2 or not all(p.isdigit() and int(p) > 0 for p in parts):
+        raise argparse.ArgumentTypeError(f"{text!r} is not WxH")
+    return int(parts[0]), int(parts[1])
+
+
 def main():
     global MUTANT
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
@@ -988,6 +1008,8 @@ def main():
     parser.add_argument("--aimed", action="store_true")
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--mutant", choices=MUTANTS)
+    parser.add_argument("--format", type=format_size, default=None,
+                        help="WxH: D3 is the chosen camera's first format of that size at ≥ 30 fps")
     args = parser.parse_args()
 
     if args.selftest:
@@ -1035,6 +1057,7 @@ def main():
         "date": time.strftime("%Y-%m-%d %H:%M:%S"), "head": commit(), "rule_sha256": rule_sha,
         "python": platform.python_version(), "groups": groups, "runs": args.runs,
         "camera": Ctx.camera and Ctx.camera["localizedName"], "d3": Ctx.d3, "microphone": Ctx.mic,
+        "formatOverride": Ctx.format_override,
         "rows": ROWS, "verdict": line, "decided": decided, "failures": FAILURES,
         "seconds": round(time.time() - started, 1),
     }

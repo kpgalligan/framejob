@@ -14,10 +14,14 @@ for every mutation: the helper or the proxy mutated and re-signed ad hoc, or
 the snapshot removed, re-versioned or swapped for the OTHER side's. The
 other side is the real app. Nothing is written into `build/`. Four cases
 mutate a whole bundle, the real app `ditto`ed to `<case>/<side>/Frame Job.app`:
-`app-entitlements` re-signs Distribution ad hoc with HEAD's pair
-(`audio-input` and `get-task-allow`, #145), which D14 must refuse;
-`app-entitlements-mic-only` re-signs Release with `audio-input` alone, which
-D25's exact set must refuse (a "contains" check would pass it); `noop-sign`
+`app-entitlements` re-signs Distribution ad hoc with
+`dist_check.APP_ENTITLEMENTS` plus `get-task-allow` (#145), which D14 must
+refuse for the `get-task-allow` alone; `app-entitlements-mic-only` re-signs
+Release with `dist_check.APP_ENTITLEMENTS` alone — Distribution's exact set
+(`audio-input` and, since camera-recording CR1a, `camera`) without
+`get-task-allow`; the name is kept from when that set was the microphone
+alone — which D25's exact set must refuse (a "contains" check would pass
+it); `noop-sign`
 does to Release what a no-op build did before issue batch B88's fix — `codesign
 -s - -f` of the executable alone, then a byte appended to
 `agent-catalog.json` — which D25 (no entitlements) and D26 (the seal) must
@@ -169,7 +173,7 @@ def skeleton(case_dir, side, real, mutation, needle):
             except OSError as error:
                 raise SetupError(f"append to the snapshot: {error}")
             return app
-        held = {"com.apple.security.device.audio-input": True}
+        held = dict(dist_check.APP_ENTITLEMENTS)
         if mutation == "app-entitlements":
             held["com.apple.security.get-task-allow"] = True
         plist = os.path.join(case_dir, "app.plist")

@@ -1859,7 +1859,8 @@ move, a fifth warning or a missing one fails); `fmt` (`cargo fmt --check` in
 `core`, `graphic`, `mcp-proxy`, 120 s); `lint` (`make lint`, 600 s); `test`
 (`make test`, 900 s); `app` (`make app`, 1500 s, whose Write Agent Catalog
 step is the parity check), then dist_check's D25 and D26 over the Release
-app: its entitlements are exactly `audio-input` and `get-task-allow`, and it
+app: its entitlements are exactly `audio-input`, `camera` (since
+camera-recording CR1a, spec §11 CAM-3) and `get-task-allow`, and it
 passes `codesign --verify --deep --strict`. Those two rows are the defect
 class a no-op build once shipped (Release signed by Write Agent Catalog
 alone), which before this read only at `make dist`; D27 (Distribution's
@@ -7044,7 +7045,9 @@ and prints the needle and both paths before its rows:
   12's A4, the last section of this file);
 - **D14** (#145) — the Distribution app's entitlements, read through its
   `realpath`ed executable with `codesign -d --entitlements - --xml`, are
-  exactly `{com.apple.security.device.audio-input: true}`: no
+  exactly `{com.apple.security.device.audio-input: true,
+  com.apple.security.device.camera: true}` (the camera's since
+  camera-recording CR1a, spec §11 CAM-3): no
   `get-task-allow`, which notarization refuses (`project.yml` sets
   `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO` for Distribution alone); no
   Distribution binary FAILs it ("no Distribution binary (D3)").
@@ -7053,11 +7056,11 @@ and prints the needle and both paths before its rows:
   snapshot at the bundle's version, Release's naming every dev tool and
   Distribution's none (the MC3 section of this file).
 - **D25–D27** (issue batch B88) — the Release app's entitlements, read as
-  D14 reads Distribution's, are EXACTLY `audio-input` and the
+  D14 reads Distribution's, are EXACTLY `audio-input`, `camera` and the
   `get-task-allow` Xcode injects outside Distribution (what a Release
   build's processed `Frame Job.app.xcent` holds, so a signature that is not
-  Xcode's — a missing `get-task-allow` as much as a missing microphone —
-  fails); and each app passes `codesign --verify --deep --strict`, the
+  Xcode's — a missing `get-task-allow` as much as a missing microphone or
+  camera — fails); and each app passes `codesign --verify --deep --strict`, the
   bundle being the one its executable `realpath`s into. A no-op build once
   left Release signed ad hoc by Write Agent Catalog alone, with no
   entitlements and a broken seal, and no row saw it (`archive/build-velocity.md`'s
@@ -16811,7 +16814,8 @@ at, read with `dist_check.py`'s own readers (imported, not copied):
   D4, which needs a Release bundle the workflow never builds);
 - **P4** the app is signed with the hardened runtime and `codesign --verify
   --strict` accepts it, which also fails when anything nested was changed
-  after the app was sealed; **P5** its entitlements are exactly `audio-input`;
+  after the app was sealed; **P5** its entitlements are exactly `audio-input`
+  and `camera`;
 - **P6–P9** the assistant helper: present, hardened runtime, entitlements
   exactly `allow-jit`, no needle;
 - **P10–P12** the MCP proxy: present, hardened runtime, no entitlements;
@@ -24281,3 +24285,40 @@ The probe is compiled through `swift_build.build` with nothing from `app/Sources
 bare binary, so every grant is its responsible process's (the terminal). Exit 0 when every row
 answered or was skipped by name (whatever the VERDICT), 1 on an instrument failure, 2 when not
 performed (no staticlib).
+
+## Camera recording CR1a — the camera recorder (`camera_recording_probe.py`, `--format`; spec §11 CAM-3)
+
+CR1a writes the camera recorder (`CameraDevices`, `CameraCapture`, `ScreenRecorder+Camera`,
+`+CameraFinishing`, `RecordingSetup+Camera`) with no door reaching it yet, so it is proven by a
+probe under the terminal's grant, `cache_pass_probe.py`'s shape: `camera_recording_probe.swift`
+is compiled as `main.swift` over `app/Sources` through `swift_build.build`, linked with
+`-sectcreate __TEXT __info_plist` over a plist holding the camera's and the microphone's usage
+strings (`recording_probe.build_voice_probe`'s line), and run once per section under `TZ=UTC`.
+
+```sh
+python3 tools/proof/camera_recording_probe.py --only values,landing   # no camera, no grant
+python3 tools/proof/camera_recording_probe.py                         # + granted: records 2 s, pauses 1 s, 2 s more
+python3 tools/proof/camera_recording_probe.py --only values --mutant format-any-shape   # each of the six values mutants exits 1
+python3 tools/proof/camera_recording_probe.py --mutant no-hold          # granted; exits 1 on a cold start
+```
+
+Sections: `values` (V1–V17: CAM-3's best format on CR0's three D1 lists, a portrait-only and an
+all-under-30 list, `canvasRate`, `spelled`, `cameraStem`, `nextCameraURL`, `match`,
+`defaultIndex`, the sentences, `cameraMicOffset`, `cameraRefusal`'s four statuses,
+`RecorderError.cameraDevice`, and two source reads: `cameraMicFinished` never ends the
+recording, `startCamera` reads the Camera grant before any `CameraCapture`; and the warm-up's
+`isSteady`, run, bound and note); `landing` (L1–L3: a
+`.camera` result over ffmpeg fixtures through `RecordingLanding.placement` and
+`ProjectDocument.untitled(around:)`); `granted` (G0–G6: a real `ScreenRecorder()` on
+`defaultIndex`'s camera and the default microphone, skipped by name with no camera or no Camera
+grant, G4 skipped by name with no Microphone grant; G6 measures the warm-up hold, CAM-3's wait
+for a steady stream before segment 0). The seven mutants are `format-any-shape`,
+`offset-by-arrival`, `offset-sign`, `canvas-rate-60`, `grant-unread` and `mic-ends-recording`,
+run with `--only values`, and `no-hold` (`warmUpRun` 0), run with `--only granted` by default:
+G3 catches it only on a cold camera, the first recording in a process.
+Exit: `cache_pass_probe.py`'s rule. The work is under `tools/proof/work/camera-recording-probe/`.
+
+The spike's `--format WxH` (`camera_spike/README.md`) runs W2, W3, P1 and P2 at the chosen
+camera's first format of that size at ≥ 30 fps; CAM-3's step 2 ran it at `1760x1328`. The
+numbers are in `designs/camera-recording.md`'s CR1a record.
+

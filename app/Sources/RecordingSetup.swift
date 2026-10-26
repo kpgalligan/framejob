@@ -44,11 +44,14 @@ import ScreenCaptureKit
 /// its own argument), so the source enum never holds a framework object.
 /// `.voiceOver` is the microphone alone, no picture (spec §11 recording, #99):
 /// `ScreenRecorder.startVoiceOver` records it and `start` refuses it.
+/// `.camera` is a camera alone, the device in `RecordingChoice.camera` (spec
+/// §11 CAM-3): `ScreenRecorder.startCamera` records it and `start` refuses it.
 enum RecordingSource: Equatable {
     case display(CGDirectDisplayID)
     case window(CGWindowID)
     case picked
     case voiceOver
+    case camera
 }
 
 /// `nominal` records the display's POINT size, `best` its pixel size
@@ -71,7 +74,9 @@ enum RecordingDestination: Equatable {
 
 /// Every control of the recorder panel and every argument of
 /// `record_screen`, as one value. `microphone` is an
-/// `AVCaptureDevice.uniqueID`, nil for off; `rate` is 30 or 60.
+/// `AVCaptureDevice.uniqueID`, nil for off; `rate` is 30 or 60 (a camera
+/// recording's is its format's, `CameraDevices.canvasRate`). `camera` is an
+/// `AVCaptureDevice.uniqueID`, set iff `source` is `.camera`.
 struct RecordingChoice: Equatable {
     var source: RecordingSource = .display(CGMainDisplayID())
     var includeFrameJobWindows: Bool = false
@@ -82,6 +87,7 @@ struct RecordingChoice: Equatable {
     var resolution: RecordingResolution = .nominal
     var destination: RecordingDestination = .newProject
     var folder: URL = RecordingFiles.folder()
+    var camera: String? = nil
 }
 
 // MARK: - Where the files go
