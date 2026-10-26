@@ -173,14 +173,16 @@ enum SpeedAudioDrop {
     /// clip with sound above the ceiling runs `before` and is applied at once;
     /// one that does asks on `window` first: Set Speed runs `before` and
     /// applies, Cancel runs `declined`. With no window to ask on it beeps and
-    /// runs `declined`, applying nothing.
+    /// runs `declined`, applying nothing. A document that changed while the
+    /// question was up is planned again on Set Speed (SR-27 (h)), not asked
+    /// again.
     static func commit(
         _ name: String, _ ops: [ReelOp], to document: ProjectDocument, asking window: NSWindow?,
         before: @escaping () -> Void = {}, declined: @escaping () -> Void = {}
     ) {
-        let plan = CaptionRetime.plan(ops, on: document.editedProject)
-        let ops = ops + plan.ops
-        let name = plan.undoName(name)
+        let (rawName, rawOps) = (name, ops)
+        let handle = document.project
+        let (name, ops) = CaptionRetime.withRetime(rawName, rawOps, on: document.editedProject)
         let crossing = mayCross(ops) ? Self.crossing(applying: ops, to: document.editedProject) : []
         guard !crossing.isEmpty else {
             before()
@@ -198,9 +200,14 @@ enum SpeedAudioDrop {
                 return
             }
             before()
+            guard let document else { return }
+            let step =
+                document.project === handle
+                ? (name: name, ops: ops)
+                : CaptionRetime.withRetime(rawName, rawOps, on: document.editedProject)
             // A sheet's completion is not an AppKit event: the grouped entry
             // point is mandatory here (app/CLAUDE.md's undo pitfall).
-            document?.performGroupedEdit(name, ops)
+            document.performGroupedEdit(step.name, step.ops)
         }
     }
 }

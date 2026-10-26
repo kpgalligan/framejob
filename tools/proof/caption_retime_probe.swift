@@ -362,6 +362,48 @@ rowGuard("M6") {
         "got \(show(got)); want \(show(want)); retimed \(plan.retimed) removed \(plan.removed)")
 }
 
+// MARK: - M7 — a word at the page's start never lands before its snapped start
+
+rowGuard("M7") {
+    let a = try addClip(v1, at: 0, length: 4 * second)
+    let caps = try addTrack("Captions")
+    let p1 = try addCaption(
+        caps, frame, second + frame, words: [(0, 200_000), (200_000, 600_000)], content: "one two")
+    let p2 = try addCaption(
+        caps, 2 * second, 3 * second, words: [(-frame, 100_000), (100_000, 400_000)],
+        content: "already said")
+    let (plan, after) = planned([.setSpeed(clip: a, rate: 2)])
+    let got = after.map { spans([p1, p2], $0) } ?? []
+    let want: [[Ticks]?] = [[frame, 16 * frame], [second, 3 * second / 2]]
+    let first1 = after?.clip(p1)?.text?.words.first?.start
+    let first2 = after?.clip(p2)?.text?.words.first?.start
+    // P1's start maps to 10000 and snaps half-away to 20000: its first word
+    // at −10000 unclamped, which the core snaps to −20000.
+    row("M7", got == want && first1 == 0 && (first2 ?? 0) < 0 && plan.retimed == [p1, p2],
+        "got \(show(got)); want \(show(want)); first word P1 \(first1.map { "\($0)" } ?? "nil") "
+            + "(want 0), P2 \(first2.map { "\($0)" } ?? "nil") (want < 0); retimed "
+            + "\(plan.retimed) removed \(plan.removed)")
+}
+
+// MARK: - M8 — cut back at a fixed caption's place AFTER the edit
+
+rowGuard("M8") {
+    let a = try addClip(v1, at: 0, length: 3 * second)
+    let caps = try addTrack("Captions")
+    let c1 = try addCaption(caps, 0, second / 2)
+    let c2 = try addCaption(caps, 2 * second, 5 * second / 2)
+    let next = try addCaption(caps, 11 * second / 2, 13 * second / 2)
+    let (plan, after) = planned([
+        .setSpeed(clip: a, rate: 0.5), .moveClip(clips: [next], delta: -second),
+    ])
+    let got = after.map { spans([c1, c2, next], $0) } ?? []
+    let want: [[Ticks]?] = [
+        [0, second], [4 * second, 9 * second / 2], [9 * second / 2, 11 * second / 2],
+    ]
+    row("M8", got == want && plan.retimed == [c1, c2] && plan.removed.isEmpty,
+        "got \(show(got)); want \(show(want)); retimed \(plan.retimed) removed \(plan.removed)")
+}
+
 // MARK: - M5 — controls, each left untouched
 
 var controls: [String] = []
@@ -621,6 +663,76 @@ rowGuard("D6") {
     let got = spans(ids, doc.project.snapshot)
     row("D6", same && !canUndo && got == [[0, second], [second, 2 * second]],
         "asked; after Cancel the same handle \(same), canUndo \(canUndo), captions \(show(got))")
+}
+
+/// The D7/D8 fixture: a 4 s clip and two abutting captions.
+func questionFixture() throws -> (a: UInt32, c1: UInt32, c2: UInt32) {
+    let a = try addClip(v1, at: 0, length: 4 * second)
+    let caps = try addTrack("Captions")
+    return (a, try addCaption(caps, 0, 20 * frame), try addCaption(caps, 20 * frame, 40 * frame))
+}
+
+/// Moves `c2` 20 frames later while the question is up; throws when the
+/// document did not change.
+func moveWhileAsked(_ c2: UInt32) throws {
+    let handle = doc.project
+    doc.performGroupedEdit("Move", [.moveClip(clips: [c2], delta: 20 * frame)])
+    if doc.project === handle { throw Fixture.failed("the move while asked changed nothing") }
+}
+
+/// D7: a ×20 Speed sheet asks; a caption is moved while the question is up;
+/// Set Speed re-plans on the moved document.
+rowGuard("D7") {
+    let (a, c1, c2) = try questionFixture()
+    guard let sheet = speedSheetApply([a], rate: 20) else {
+        throw Fixture.failed("the Speed sheet did not attach or apply")
+    }
+    var question: NSWindow?
+    _ = waitUntil(3) {
+        question = sheet.attachedSheet
+        return question != nil
+    }
+    guard let asked = question else {
+        row("D7", false, "no question attached to the Speed sheet within 3 s")
+        return
+    }
+    try moveWhileAsked(c2)
+    sheet.endSheet(asked, returnCode: .alertFirstButtonReturn)
+    pause(0.3)
+    let got = spans([c1, c2], doc.project.snapshot)
+    let speed = doc.project.snapshot.clip(a)?.speed
+    row("D7", got == [[0, frame], [2 * frame, 3 * frame]] && speed == 20
+            && undoName == "Set Speed and Re-time Captions",
+        "after the move and Set Speed: captions \(show(got)) (want [0, \(frame)] "
+            + "[\(2 * frame), \(3 * frame)]), speed \(speed.map { "\($0)" } ?? "nil"), step "
+            + "\"\(undoName)\"")
+}
+
+/// D8: the timeline's live rate stretch to ×20 asks at its end; a caption is
+/// moved while the question is up; Set Speed re-plans on the moved document.
+rowGuard("D8") {
+    let (a, c1, c2) = try questionFixture()
+    guard let timeline = controller.timeline, let begin = timeline.onLiveBegin,
+        let update = timeline.onLiveUpdate, let end = timeline.onLiveEnd
+    else { throw Fixture.failed("no timeline live closures") }
+    begin()
+    update([.rateStretch(clip: a, toEnd: 6 * frame)])
+    end("Rate Stretch")
+    guard waitUntil(3, { window.attachedSheet != nil }) != nil, let asked = window.attachedSheet
+    else {
+        row("D8", false, "no question attached to the window within 3 s")
+        return
+    }
+    try moveWhileAsked(c2)
+    window.endSheet(asked, returnCode: .alertFirstButtonReturn)
+    pause(0.3)
+    let got = spans([c1, c2], doc.project.snapshot)
+    let duration = doc.project.snapshot.clip(a)?.duration
+    row("D8", got == [[0, frame], [2 * frame, 3 * frame]] && duration == 6 * frame
+            && undoName == "Rate Stretch and Re-time Captions",
+        "after the move and Set Speed: captions \(show(got)) (want [0, \(frame)] "
+            + "[\(2 * frame), \(3 * frame)]), duration \(duration.map { "\($0)" } ?? "nil"), "
+            + "step \"\(undoName)\"")
 }
 
 // MARK: - A1–A3 — MCP: the answer names what was re-timed and removed

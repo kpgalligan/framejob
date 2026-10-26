@@ -23212,10 +23212,10 @@ zeros, 48 kHz stereo) back to back over [0, its last segment's end), and every o
 as before. **V0 was fixed by the silence**, so no placeholder change was needed and MU4 does not
 apply.
 
-Every M, R and K clip is at 12 s, so the timeline is 17 s. "Gone" is a fixture copy imported,
-placed and deleted; "pending" is `mixed_audio_proof.py`'s hold, an empty regular file at
-`<pkg>/cache/reversed` before `set_reversed`. C is toneB alone on track 1, and T is toneA and
-toneB on tracks 1 and 2. Each document's canvas is 640×360.
+Every M, R and K clip is at 12 s, so the timeline is 10 180 000 ticks (16.967 s). "Gone" is a
+fixture copy imported, placed and deleted; "pending" is `mixed_audio_proof.py`'s hold, an empty
+regular file at `<pkg>/cache/reversed` before `set_reversed`. C is toneB alone on track 1, and T
+is toneA and toneB on tracks 1 and 2. Each document's canvas is 640×360.
 
 - **D0** — the instance listens; no `Frame Job: ` line in its log.
 - **X0** — CONTROLs: an M document's and V0's `missing_media` is the copy's id; an R document's is
@@ -23228,16 +23228,15 @@ toneB on tracks 1 and 2. Each document's canvas is 640×360.
   also has C's video md5.
 - **R1–R4** — M1–M4 with "pending" in place of "gone".
 - **V0** — a gone `AV.mov` alone at 0, `prores_422`: done, a video stream, all-zero audio, frames ≥
-  round(5 × 48000) − 1024.
+  its own timeline's frames − 1024 (240 000 − 1024).
 - **K1 / K2** — C's and T's `audio_wav` PCM, `prores_422` PCM and video md5 identical to
   `work/missing-audio-baseline/` (written by `--baseline` at bb73b35).
 - **P1** — `play_preview {seconds: 2}` on M1's document moves ≥ 900 000 ticks.
 
-**The length is scored against control C, not the timeline** (owner, 2026-10-24). Every
-composition whose picture is the Blank placeholder exports one frame short of its timeline:
-814,400 frames for a 17 s timeline at 30 fps (−1600 frames). The shortfall is the same in C and T
-before and after the fix, and absent in V0, which has a video track. It is recorded on #337 and
-in #336's risk line, and reported (not scored) by every row.
+**The length is scored against control C, not the timeline** (owner, 2026-10-24). C's exports
+end exactly at its 10 180 000-tick timeline (814 400 frames): there is no shortfall, as the #337
+section below measured. Each row reports its excess against its own document's timeline, read
+from `get_project` as the end of its last clip (#366), not scored.
 
 ```sh
 make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/missing_audio_proof.py --baseline   # at bb73b35 only
@@ -23253,6 +23252,14 @@ make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/m
 | mutants MU1–MU3 (Debug) | each caught: MU1 (`fillSilence` false at its head) M1, M2, R1, R2, V0 fail "The operation could not be completed"; MU2 (`silentEnd` without the `sounding.isEmpty` guard) K1, K2 audio ≠ baseline; MU3 (the last, partial copy not inserted) M1 480 000 frames < 813 376 |
 | `make gate` | PASS 234 s (names 1 s, typecheck 5 s, fmt and lint skipped, test 119 s, app 108 s) |
 | `missing_audio_proof.py` (Release, after the gate) | **14/14 in 14 s**, exit 0 — M1, M2, R1, R2 all zero at 814 400 frames (≥ C's − 1024); V0 240 000 frames all zero with a video stream; M3, M4, R3, R4 = C; K1, K2 = the bb73b35 baseline; P1 906 455 ticks; X0 16/16; no `Frame Job: ` in its log |
+
+| Run (2026-10-26, #366: each row against its document's own timeline) | Result |
+|---|---|
+| `--baseline` (Debug; no baseline in the worktree, written fresh) | 13/14 in 20 s — K1, K2 wrote the baseline; M1, M2, R1, R2 "against the timeline's 814400: +0"; M3, M4, R3, R4 "run +0, control +0"; V0 240 000 frames ≥ 238 976 (the timeline − 1024), +0; **P1 FAIL 867 707 ticks** (host load, below) |
+| Debug | 13/14 in 19 s — every row as above, K1, K2 = baseline "run +0, control +0"; **P1 FAIL 857 345 ticks** |
+| `make gate` | PASS 251 s (names 1 s, typecheck 6 s, fmt and lint skipped, test 133 s, app 110 s) |
+| Release, after the gate | 13/14 in 15 s — every row as above; **P1 FAIL 846 123 ticks**. The 1-minute load was 13–19 on 12 cores (the other lanes); `--only P1` three more times: 860 043, 898 300, 899 508 ticks, each a FAIL. P1 and `play_preview` are unchanged by #366 |
+| **Release, after the gate (the recorded run)** | **14/14 in 14 s**, exit 0, load 11 — M1, M2, R1, R2 all zero, "against the timeline's 814400: +0"; M3, M4, R3, R4, K1, K2 "run +0, control +0"; V0 240 000 frames ≥ 238 976, +0; P1 915 294 ticks; X0 16/16; no `Frame Job: ` in its log |
 
 ## Issue #350 — export drift: the sheet's frame readout, the writer's count, Close, the teardown (export_frame_count_proof.py S0–S6, W1–W3, M0–M2, mutant no-min-one)
 
@@ -23757,10 +23764,15 @@ Clip tab lane's live gestures, at their end), `removeSelectedActionCommand`
     subtitles removed, a straddling word page cut to "alpha bravo" and two
     words (each start within a frame of the oracle). **M6** `set_speed` ×12: a
     5-frame word page snaps to nothing and is removed, its neighbours
-    re-timed. **M5** (CONTROLS) a straddling caption, a "Titles" track, a
-    Captions track holding a shape, a locked Captions track, a detached
-    picture clip's `set_speed`, a zoom action's `set_action`: each an empty
-    plan and the caption unmoved.
+    re-timed. **M7** `set_speed` ×2: a page whose start maps to 10 000 and
+    snaps half-away to 20 000 writes its first word at 0, not −10 000 (which
+    the core would snap to −20 000); a page whose first word was already said
+    (W-3, negative) keeps it negative. **M8** `set_speed` ×0.5 with a
+    `move_clip` of a later caption in the same edit: a re-timed caption is cut
+    back at that caption's place after the edit. **M5** (CONTROLS) a
+    straddling caption, a "Titles" track, a Captions track holding a shape, a
+    locked Captions track, a detached picture clip's `set_speed`, a zoom
+    action's `set_action`: each an empty plan and the caption unmoved.
   - **D1** the Speed sheet at ×0.5: one step "Set Speed and Re-time
     Captions", one undo restores. **D2** `inspector.onEdit` with
     `set_action_end {speed: 2}` on a linear whole-clip action (M3's oracle).
@@ -23769,7 +23781,11 @@ Clip tab lane's live gestures, at their end), `removeSelectedActionCommand`
     inspector's live closures resizing a linear ×2 action from [0, D/2) to
     [0, D). **D5** ⌫ Remove Action on a Ramp Up: back to ×1, the past-out
     caption removed. **D6** a ×20 Speed sheet asks; Cancel leaves the same
-    handle and no step.
+    handle and no step. **D7** a ×20 Speed sheet asks; a caption is moved
+    while the question is up; Set Speed plans again on the moved document
+    (SR-27 (h)), the caption re-timed from its new place, one step "Set Speed
+    and Re-time Captions". **D8** D7 through the timeline's live rate
+    stretch, "Rate Stretch and Re-time Captions".
   - **A1** `AgentServer.shared.execute("set_speed")` ×2: `captions_retimed`,
     no `captions_removed`, step "Speed and Re-time Captions". **A2**
     `add_speed_ramp` ramp_down: `captions_removed` and `captions_retimed`.
@@ -23778,7 +23794,12 @@ Clip tab lane's live gestures, at their end), `removeSelectedActionCommand`
     `overlap-not-inside` → M5, `no-cutback` → M2, `keep-past-out` → M4,
     `no-word-cut` → M4, `speaks-any` → M5, `locked-too` → M5,
     `ascending-later` → M2, D1, `stub-movers-only` → M1, M3,
-    `keep-zero-length` → M6, `agent-unwired` → A1, A2.
+    `keep-zero-length` → M6, `agent-unwired` → A1, A2, `no-word-clamp` (no
+    clamp at 0) → M7, `clamp-all` (an already-said word clamped too) → M7,
+    `fixed-from-before` (cut back at the fixed caption's place before the
+    edit) → M8, `stale-sheet-plan` (the Speed sheet's Set Speed applies the
+    plan made before the question) → D7, `stale-live-plan` (the live
+    gesture's) → D8.
 - **`caption_retime_proof.py [--only IDS]`** — one owned instance
   (`proof_app`'s app), one project per row closed with `discard`, the fixture
   `tools/proof/media/AV.mov` cut to D. **C0** no `Frame Job: ` line. **C1**
@@ -23794,7 +23815,7 @@ Clip tab lane's live gestures, at their end), `removeSelectedActionCommand`
 
 ```sh
 python3 tools/proof/caption_retime_probe.py
-python3 tools/proof/caption_retime_probe.py --mutant <name>   # each of the ten, exit 1
+python3 tools/proof/caption_retime_probe.py --mutant <name>   # each of the fifteen, exit 1
 make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/caption_retime_proof.py
 make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/caption_retime_proof.py
 ```
@@ -23808,6 +23829,15 @@ make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/c
 | `ramp_preset_proof.py`, Debug | 12/12 in 27 s |
 | `clip_inspector_proof.py` | 41/41 |
 | `make gate` | PASS 354 s (names 1 s, typecheck 5 s, fmt 2 s, lint 25 s, test 206 s, app 114 s) |
+| **`caption_retime_proof.py`, Release, after the gate (the recorded run)** | **10/10 in 4 s**, exit 0; no `Frame Job: ` |
+
+| Run (2026-10-26, the review's three nits: M7, M8, D7, D8) | Result |
+|---|---|
+| `caption_retime_probe.py --only M7,M8,D7,D8` | 4/4, exit 0 |
+| `caption_retime_probe.py` | 20/20, exit 0 |
+| each of the fifteen mutants | caught, exit 1 — `no-word-clamp` M7 (P1's first word −20 000), `clamp-all` M7 (P2's 0), `fixed-from-before` M8 (c2 [2 400 000, 3 000 000]), `stale-sheet-plan` D7 and `stale-live-plan` D8 (c2 [420 000, 440 000]); the ten earlier ones as before |
+| `speed_audio_probe.py` | 20/20, exit 0 |
+| `make gate` | PASS 251 s (names 1 s, typecheck 6 s, fmt and lint skipped, test 133 s, app 110 s) |
 | **`caption_retime_proof.py`, Release, after the gate (the recorded run)** | **10/10 in 4 s**, exit 0; no `Frame Job: ` |
 
 ## Issue #334 — the cost of rendering constant Keep pitch off audio offline (`constant_render_spike.py` H0, B0, F0, D0, I1, A-*, R-*, Q-*, W-*, WOK; selftest S1–S3, mutants `per-second`, `ideal-phase`, `order-off`)

@@ -142,10 +142,11 @@ before its code.
     whose source start is before the window's end and the prefix of its content through the last
     kept token (W-2); none kept removes it. Start and end snap to the frame grid; an end not after
     its start removes the caption. Word times are written relative to the new start, unsnapped
-    (`set_text` snaps them).
+    (`set_text` snaps them). A word time at or after its page's old start is written at least 0;
+    one before it (W-3's "already said") keeps its mapped time.
   - **(e) Cut back (sub-rule 3).** On its track a re-timed caption is cut back to abut a caption
-    that was not re-timed; one whose new start lies inside such a caption, or left under a frame,
-    is removed.
+    that was not re-timed, at its place after the edit; one whose new start lies inside such a
+    caption, or left under a frame, is removed.
   - **(f) The ops**, appended after the edit's own in one step: one `delete` of the removed; a
     one-frame stub (`trim_end`) of every re-timed caption whose start or end changes, before any
     move; `move_clip`s, those moving earlier ascending, then those moving later descending;
@@ -157,7 +158,9 @@ before its code.
     the timeline's and the Clip tab's live gestures at their end (the captions jump at mouse-up),
     ⌫ Remove Action, and the six op tools. The step is named "<edit> and Re-time Captions" when
     anything re-times; an agent's answer gains `captions_retimed` and `captions_removed`, each
-    only when non-empty. No op, argument, tool, menu item or format changes.
+    only when non-empty. No op, argument, tool, menu item or format changes. A door that asks the
+    ×12 question first plans again on Set Speed when the document changed while the question was
+    up.
   - **(i) Newly revealed source** (sub-rule 2) is left uncaptioned: Generate Captions again
     captions it.
   - **Why:** captions drifting off the speech after every speed edit made the person regenerate

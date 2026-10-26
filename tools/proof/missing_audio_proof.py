@@ -9,7 +9,9 @@ beside a track that sounds, and a missing clip with picture and sound
 (`AV.mov`) alone; the constant projects' exports are compared with a
 baseline this script writes under `--baseline`.
 
-Rows (every M, R and K clip at 12 s; the timeline is 10 180 000 ticks,
+Rows (every M, R and K clip at 12 s; every row reads its document's
+timeline from `get_project`, the end of its last clip, and reports each
+export's length against it (#366): for C, M, R and T 10 180 000 ticks,
 16.967 s):
 
   D0  the instance listens; `Frame Job: ` never appears in its log (re-read
@@ -21,10 +23,11 @@ Rows (every M, R and K clip at 12 s; the timeline is 10 180 000 ticks,
       on `button: "Close"` and `sheet: null`).
   M1  gone toneA alone, `audio_wav`: done, every pcm_f32le sample 0.0, frames
       ≥ control C's `audio_wav` frames − 1024 (owner, 2026-10-24: the length
-      is scored against C, and the excess against the timeline reported).
-      C's 814,400 frames are its whole timeline, which is 16.967 s rather
-      than 17 s because `add_clip` snaps toneB down to whole frames (spec §11
-      #337). On a failure the export's reason sentence is printed.
+      is scored against C, and the excess against the document's own
+      timeline from `get_project` reported, #366). C's 814,400 frames are its
+      whole timeline, which is 16.967 s rather than 17 s because `add_clip`
+      snaps toneB down to whole frames (spec §11 #337). On a failure the
+      export's reason sentence is printed.
   M2  as M1 with `prores_422` (against C's `prores_422`), which must also
       have a video stream.
   M3  gone on track 1, toneB on track 2, `audio_wav`: PCM identical to C's
@@ -36,7 +39,8 @@ Rows (every M, R and K clip at 12 s; the timeline is 10 180 000 ticks,
       before `set_reversed {reversed: true}` on the present toneA clip, as
       `mixed_audio_proof.py`'s pending-first) in place of "gone".
   V0  a gone copy of `AV.mov` alone at 0, `prores_422`: done, a video
-      stream, every audio sample 0.0, audio frames ≥ round(5 × rate) − 1024.
+      stream, every audio sample 0.0, audio frames ≥ its timeline's frames
+      − 1024.
   K1  C (toneB alone on track 1): its `audio_wav` PCM, its `prores_422` PCM
       and video md5 identical to `work/missing-audio-baseline/`'s over the
       common length; a missing baseline is a FAIL. Under `--baseline` the row
@@ -83,7 +87,6 @@ TONE_B = MEDIA / "toneB.m4a"
 AV_MOV = MEDIA / "AV.mov"
 SEC = 600_000
 AT = 12 * SEC
-TIMELINE = 17 * SEC
 SLACK = 1024
 CALL_BOUND = 600
 PLAY_FLOOR = 900_000
@@ -151,6 +154,11 @@ class Doc:
 
     def missing(self):
         return self.must("get_project").get("missing_media")
+
+    def timeline(self):
+        """The timeline's length in ticks, the end of its last clip, as
+        `retimed_audio_proof.timeline` reads it."""
+        return max(c["start"] + c["duration"] for c in self.project()["clips"])
 
     def tracks(self, count):
         """The first `count` track ids, adding the second as `mixed_audio_proof` does."""
@@ -234,14 +242,21 @@ def pcm_of(path):
     return data, int(found[0]["channels"]), int(found[0]["sample_rate"])
 
 
-def pcm_compare(got, base, length):
-    """`ramp_proof.pcm_compare`: identical over min(round(length × rate), both
-    lengths); each length against the timeline reported (#337), not scored."""
+def frames_of_ticks(ticks, rate):
+    """`ExportAudioEnd.frames(ofTicks:)` (`retimed_audio_proof.frames_target`):
+    ⌊(ticks · rate + SEC/2) / SEC⌋."""
+    return (ticks * rate + SEC // 2) // SEC
+
+
+def pcm_compare(got, base, timeline):
+    """`ramp_proof.pcm_compare`: identical over min(the timeline's frames, both
+    lengths), `timeline` in ticks; each length against the timeline reported
+    (#337), not scored."""
     (a, ca, ra), (b, cb, rb) = got, base
     if (ca, ra) != (cb, rb):
         return False, f"{ca} ch {ra} Hz ≠ {cb} ch {rb} Hz"
     width = 4 * ca
-    n = round(length / SEC * ra)
+    n = frames_of_ticks(timeline, ra)
     fa, fb = len(a) // width, len(b) // width
     m = min(n, fa, fb)
     same = m > 0 and a[:m * width] == b[:m * width]
@@ -254,31 +269,33 @@ def frames_of(pcm):
     return len(data) // (4 * channels)
 
 
-def silent(pcm, seconds, control_frames=None):
+def silent(pcm, timeline, control_frames=None):
     """(ok, detail): every sample 0.0 and frames ≥ the floor — control C's
     frames − SLACK when `control_frames` is given (M1, M2, R1, R2: C's
     export is its whole 16.967 s timeline, toneB snapped down to whole
-    frames, #337), else round(seconds × rate) − SLACK."""
+    frames, #337), else the timeline's frames − SLACK. `timeline` is the
+    document's, in ticks (#366)."""
     data, channels, rate = pcm
     values = array("f")
     values.frombytes(data[:len(data) - len(data) % 4])
     loud = sum(1 for v in values if v != 0.0)
     peak = max((abs(v) for v in values), default=0.0)
     frames = len(values) // channels
-    timeline = round(seconds * rate)
+    target = frames_of_ticks(timeline, rate)
     if control_frames is None:
-        floor, against = timeline - SLACK, "the timeline"
+        floor, against = target - SLACK, "the timeline"
     else:
         floor, against = control_frames - SLACK, f"C's {control_frames}"
     ok = loud == 0 and frames >= floor
     return ok, (f"{loud} non-zero samples (peak {peak:.6g}); {frames} frames at {rate} Hz × "
                 f"{channels} ch ≥ {floor} ({against} − {SLACK}) {frames >= floor}; against "
-                f"the timeline's {timeline}: {frames - timeline:+d} (#337, not scored)")
+                f"the timeline's {target}: {frames - target:+d} (#337, not scored)")
 
 
-def score_alone(row, doc, preset, seconds, control_set=None):
+def score_alone(row, doc, preset, control_set=None):
     """M1/M2/R1/R2/V0: the export done, (a video stream,) silent and long
     enough. `control_set` given (M1, M2, R1, R2): the floor is C's frames."""
+    timeline = doc.timeline()
     control_frames = None
     if control_set is not None:
         if preset not in control_set:
@@ -292,7 +309,7 @@ def score_alone(row, doc, preset, seconds, control_set=None):
     try:
         kinds = streams(path)
         video = preset == "audio_wav" or "video" in kinds
-        ok, detail = silent(pcm_of(path), seconds, control_frames)
+        ok, detail = silent(pcm_of(path), timeline, control_frames)
     except Exception as error:  # an unreadable file is a FAIL, not an exit
         check(row, False, f"the {preset} export is done but could not be read: {error}")
         return
@@ -305,13 +322,14 @@ def score_pair(row, doc, preset, control_set):
     if control_set is None or preset not in control_set:
         check(row, False, f"control C's {preset} export is not there to compare with")
         return
+    timeline = doc.timeline()
     path, why = doc.export(preset)
     if path is None:
         check(row, False, f"the {preset} export failed: {why}")
         return
     base = control_set[preset]
     try:
-        same, detail = pcm_compare(pcm_of(path), base["pcm"], TIMELINE)
+        same, detail = pcm_compare(pcm_of(path), base["pcm"], timeline)
         if preset != "audio_wav":
             video = md5_of(path, "v")
             same = same and video == base["video"]
@@ -402,7 +420,7 @@ def write_baseline(tag, exports):
     return table
 
 
-def score_baseline(row, tag, exports, writing):
+def score_baseline(row, tag, exports, writing, timeline):
     if writing:
         if set(exports) != {"audio_wav", "prores_422"}:
             check(row, False, f"{tag}'s exports did not both finish ({sorted(exports)}); "
@@ -425,7 +443,7 @@ def score_baseline(row, tag, exports, writing):
         base = table[preset]
         data = (BASELINE / f"{tag}-{preset}.f32").read_bytes()
         same, detail = pcm_compare(exports[preset]["pcm"],
-                                   (data, base["channels"], base["rate"]), TIMELINE)
+                                   (data, base["channels"], base["rate"]), timeline)
         details.append(f"{preset} audio {detail}")
         good = good and same
         if preset != "audio_wav":
@@ -456,7 +474,7 @@ def run_rows(client, chosen, writing):
         c.place(TONE_B, track, AT)
         found["C"] = control_exports(c)
         if "K1" in want:
-            score_baseline("K1", "C", found["C"], writing)
+            score_baseline("K1", "C", found["C"], writing, c.timeline())
         c.close()
 
     if want & {"K1", "M1", "M2", "M3", "M4", "R1", "R2", "R3", "R4"}:
@@ -469,9 +487,9 @@ def run_rows(client, chosen, writing):
             media, _ = d.gone(TONE_A, track, AT)
             missing_control(d, media)
             if "M1" in want:
-                score_alone("M1", d, "audio_wav", 17, found["C"] or {})
+                score_alone("M1", d, "audio_wav", found["C"] or {})
             if "M2" in want:
-                score_alone("M2", d, "prores_422", 17, found["C"] or {})
+                score_alone("M2", d, "prores_422", found["C"] or {})
             if "P1" in want:
                 p1(d)
             d.close()
@@ -498,9 +516,9 @@ def run_rows(client, chosen, writing):
             d.pending(track, AT)
             pending_control(d)
             if "R1" in want:
-                score_alone("R1", d, "audio_wav", 17, found["C"] or {})
+                score_alone("R1", d, "audio_wav", found["C"] or {})
             if "R2" in want:
-                score_alone("R2", d, "prores_422", 17, found["C"] or {})
+                score_alone("R2", d, "prores_422", found["C"] or {})
             hold_control(d)
             close_sheet(d)
             d.close()
@@ -528,7 +546,7 @@ def run_rows(client, chosen, writing):
             (track,) = d.tracks(1)
             media, _ = d.gone(AV_MOV, track, 0)
             missing_control(d, media)
-            score_alone("V0", d, "prores_422", 5)
+            score_alone("V0", d, "prores_422")
             d.close()
         guarded(["V0"], v0)
 
@@ -538,7 +556,7 @@ def run_rows(client, chosen, writing):
             first, second = t.tracks(2)
             t.place(TONE_A, first, AT)
             t.place(TONE_B, second, AT)
-            score_baseline("K2", "T", control_exports(t), writing)
+            score_baseline("K2", "T", control_exports(t), writing, t.timeline())
             t.close()
         guarded(["K2"], doc_t)
 

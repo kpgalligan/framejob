@@ -33,9 +33,11 @@ extension EditorViewController {
     /// BEFORE the question (no step, no change count), so nothing is live
     /// while it is up — a save writes the base and an agent call is not held
     /// (spec §11 AI-12). Set Speed re-applies the last applied ops as one
-    /// step; Cancel leaves the base.
+    /// step, planned again when the document changed while the question was
+    /// up (SR-27 (h)); Cancel leaves the base.
     func timelineLiveEnded(_ name: String) {
-        var ops = lastLiveOps
+        let (rawName, rawOps) = (name, lastLiveOps)
+        var ops = rawOps
         lastLiveOps = []
         guard let document = document else { return }
         guard let base = document.liveEditBase else {
@@ -61,8 +63,12 @@ extension EditorViewController {
             return
         }
         SpeedAudioDrop.ask(clips, on: window) { [weak document] confirmed in
-            guard confirmed else { return }
-            document?.performGroupedEdit(name, ops)
+            guard confirmed, let document else { return }
+            let step =
+                document.project === base
+                ? (name: name, ops: ops)
+                : CaptionRetime.withRetime(rawName, rawOps, on: document.editedProject)
+            document.performGroupedEdit(step.name, step.ops)
         }
     }
 }

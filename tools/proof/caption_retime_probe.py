@@ -28,6 +28,13 @@ Rows:
       page cut to its two kept words and "alpha bravo".
   M6  `set_speed` ×12: a 5-frame word page whose snapped ends coincide is
       removed and listed; its neighbours are re-timed.
+  M7  `set_speed` ×2: a page whose start snaps later (10000 → 20000) writes
+      its first word at 0, not −10000 (which the core would snap to −20000);
+      a page whose first word was already said (W-3, negative) keeps it
+      negative.
+  M8  `set_speed` ×0.5 with a `move_clip` of a later caption in the same
+      edit: a re-timed caption is cut back at that caption's place AFTER the
+      edit.
   M5  CONTROLS, each left untouched with an empty plan: a straddling caption,
       a "Titles" track, a Captions track holding a shape, a locked Captions
       track, a detached picture clip's `set_speed`, a zoom action's
@@ -40,6 +47,9 @@ Rows:
   D4  the Clip tab lane's band drag (the inspector's live closures).
   D5  ⌫ Remove Action on a Ramp Up: re-timed, the past-out one removed.
   D6  a ×20 Speed sheet asks; Cancel leaves the captions and makes no step.
+  D7  a ×20 Speed sheet asks; a caption moved while the question is up; Set
+      Speed re-plans on the moved document: re-timed from its new place.
+  D8  D7 through the timeline's live rate stretch to ×20.
   A1  MCP `set_speed` ×2: `captions_retimed`, no `captions_removed`.
   A2  MCP `add_speed_ramp` Ramp Down: `captions_removed` and `captions_retimed`.
   A3  MCP zoom `set_action`: neither key.
@@ -55,6 +65,11 @@ Mutants (`--mutant`):
   stub-movers-only    only captions whose start moves are stubbed → M1, M3
   keep-zero-length    a caption whose snapped end equals its start is kept → M6
   agent-unwired       the agent's plan is always empty → A1, A2
+  no-word-clamp       a word time is never clamped at 0 → M7
+  clamp-all           every word time, an already-said one too, is clamped → M7
+  fixed-from-before   cut back at a fixed caption's place BEFORE the edit → M8
+  stale-sheet-plan    the Speed sheet's Set Speed applies the stale plan → D7
+  stale-live-plan     the live gesture's Set Speed applies the stale plan → D8
 
 Exit (rule R): a plain run exits 0 iff every row passed and 1 when a row
 failed, an instrument failure included; a build failure is B0's FAIL there.
@@ -74,8 +89,8 @@ import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/caption-retime"
-ROWS = ["B0", "M1", "M2", "M3", "M4", "M6", "M5", "D1", "D2", "D3", "D4", "D5", "D6",
-        "A1", "A2", "A3"]
+ROWS = ["B0", "M1", "M2", "M3", "M4", "M6", "M7", "M8", "M5", "D1", "D2", "D3", "D4", "D5",
+        "D6", "D7", "D8", "A1", "A2", "A3"]
 WALL = 240
 F = "CaptionRetime.swift"
 
@@ -85,7 +100,8 @@ MUTANTS = {
         (F, "owner.start <= caption.start && end <= owner.start + owner.duration",
          "owner.start < end && caption.start < owner.start + owner.duration")]),
     "no-cutback": (["M2"], [
-        (F, "let kept = cutBack(placed, on: before, frame: frame)", "let kept = placed")]),
+        (F, "let kept = cutBack(placed, on: before, after: now, frame: frame)",
+         "let kept = placed")]),
     "keep-past-out": (["M4"], [
         (F, "guard source(end) > low, source(caption.start) < high else { return nil }",
          "guard source(end) > low, source(caption.start) < high else {\n"
@@ -107,6 +123,14 @@ MUTANTS = {
         ("AgentServer+CaptionRetime.swift",
          "return CaptionRetime.plan(ops, on: container ?? document.project)",
          "_ = container\n        return .none")]),
+    "no-word-clamp": (["M7"], [(F, "t >= 0 ? max(r, 0) : r", "r")]),
+    "clamp-all": (["M7"], [(F, "t >= 0 ? max(r, 0) : r", "max(r, 0)")]),
+    "fixed-from-before": (["M8"], [
+        (F, "let fixed = now.clips.filter", "let fixed = before.clips.filter")]),
+    "stale-sheet-plan": (["D7"], [
+        ("SpeedAudioDrop.swift", "document.project === handle", "true")]),
+    "stale-live-plan": (["D8"], [
+        ("EditorViewController+SpeedAudio.swift", "document.project === base", "true")]),
 }
 
 

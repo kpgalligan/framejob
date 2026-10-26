@@ -126,8 +126,12 @@ enum CaptionRetime {
         guard !words.isEmpty else {
             return Placement(start: start, end: finish, words: nil, content: nil)
         }
+        // A word at or after the page's old start never lands before its
+        // snapped new start; one before it (W-3's "already said") keeps its
+        // mapped time.
         func relative(_ t: Ticks) -> Ticks {
-            Ticks((timeline(source(caption.start + t)) - Double(start)).rounded())
+            let r = Ticks((timeline(source(caption.start + t)) - Double(start)).rounded())
+            return t >= 0 ? max(r, 0) : r
         }
         let placed = kept.map { TextWord(start: relative($0.start), end: relative($0.end)) }
         return Placement(start: start, end: finish, words: placed, content: content)
@@ -171,7 +175,7 @@ enum CaptionRetime {
             if let place, unchanged(place, caption) { continue }
             placed[caption.id] = .some(place)
         }
-        let kept = cutBack(placed, on: before, frame: frame)
+        let kept = cutBack(placed, on: before, after: now, frame: frame)
         let planned = Plan(
             ops: retimeOps(kept, before, frame),
             retimed: kept.filter { $0.value != nil }.keys.sorted(),
@@ -180,6 +184,15 @@ enum CaptionRetime {
             return .none
         }
         return planned
+    }
+
+    /// `ops` with the re-time `plan` makes on `project` appended, under the
+    /// step's name: the edit alone, under `name`, when nothing re-times.
+    static func withRetime(
+        _ name: String, _ ops: [ReelOp], on project: ReelProject
+    ) -> (name: String, ops: [ReelOp]) {
+        let planned = plan(ops, on: project)
+        return (planned.undoName(name), ops + planned.ops)
     }
 
     /// The clips the edit changed (SR-27 (b)), lowest id first: in both
@@ -203,15 +216,17 @@ enum CaptionRetime {
     }
 
     /// SR-27 (e): on its track a re-timed caption is cut back to abut a
-    /// caption that was not re-timed; one whose new start such a caption
+    /// caption that was not re-timed, at that caption's place AFTER the edit
+    /// (`now`: the edit may move it); one whose new start such a caption
     /// covers, or left under a frame, is removed.
     private static func cutBack(
-        _ placed: [UInt32: Placement?], on before: ProjectSnapshot, frame: Ticks
+        _ placed: [UInt32: Placement?], on before: ProjectSnapshot, after now: ProjectSnapshot,
+        frame: Ticks
     ) -> [UInt32: Placement?] {
         var kept = placed
         for (id, place) in placed {
             guard let place, let track = before.clip(id)?.track else { continue }
-            let fixed = before.clips.filter { $0.track == track && !placed.keys.contains($0.id) }
+            let fixed = now.clips.filter { $0.track == track && !placed.keys.contains($0.id) }
             let covered = fixed.contains {
                 $0.start <= place.start && place.start < $0.start + $0.duration
             }
