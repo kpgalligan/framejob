@@ -29,6 +29,12 @@
 //            file is channel 0, float32 LE, in order; the line adds `variant`,
 //            `chunks: [[pts_ticks, frames]…]`, `range_ticks`,
 //            `composition_ticks` and `audio_track_ends: [ticks]`.
+//            For `wav`, `prores` and `mix` the loaded handle is pinned
+//            (`pinRampAudio`) with the project's folder's (the package, or
+//            `project.json`'s folder) `cache/ramp-audio/` as its render folder,
+//            and `mix` builds through `buildRendered`, the export's own wait,
+//            so a ramp or a constant Keep pitch off clip (spec §11 SR-28)
+//            plays its render, as the app's export does.
 //   tap      the package opened as a `ProjectDocument` with its editor
 //            (`media_less_playback_probe.swift`'s `Opened`); once the editor's
 //            item is ready its `audioMix` is replaced by one whose inputs are
@@ -41,8 +47,16 @@
 //            `MTAudioProcessingTapGetSourceAudio`'s time range (as
 //            `AudioTap.swift` reads it). `playback.seek(to: 0)`, `play()`,
 //            run to the clip's end + 0.5 s (bound 3 × its length), `pause()`.
-//            The line adds `chunks: [[item_ticks | null, frames]…]`, `format`
-//            and `calls`; the file is the kept samples, float32 LE, in order.
+//            When the plan carries a `"ramp":` segment the item is ready only
+//            once the build carries the package's render (bound 120 s).
+//            Every composition audio track has its own tap and recorder, kept
+//            apart (spec §11 SR-28: a rendered segment's CAF and a movie's
+//            sound sit on two tracks). The line adds `calls` (summed) and
+//            `tracks: [{track_id, chunks: [[item_ticks | null, frames]…],
+//            format, calls, path}…]`, each `path` that track's kept samples,
+//            float32 LE, in order (the first track's is the read's own file,
+//            each other's `<name>-tap.track<id>.f32`). With one track its
+//            `chunks` and `format` are also at the top, as before.
 //   frames   in the same document: an `AVPlayerItemVideoOutput` (32BGRA) on
 //            the item; for each timeline frame k `playback.seek(to: k·20 000)`,
 //            the seek settled, `copyPixelBuffer(forItemTime:)` polled up to
@@ -62,13 +76,16 @@
 //            sweep; `getrusage`'s `ru_maxrss`, the process's peak so far). No
 //            document is opened.
 //
-//   window   (#334, `constant_render_spike.py`) `job.json` is a list of `{name,
-//            project, clip, action, speed, bound_s}`, each project a
-//            `.framejob` package with no render yet. Per job the package is
-//            opened as `Opened` (the `.accessory` policy, as `playback`), its
-//            item made ready, then `performGroupedEdit("Speed",
+//   window   (#334, `constant_render_spike.py`, `constant_render_proof.py`)
+//            `job.json` is a list of `{name, project, clip, action?, edit?,
+//            speed, bound_s}`, each project a `.framejob` package with no
+//            render yet. Per job the package is opened as `Opened` (the
+//            `.accessory` policy, as `playback`), its item made ready, then
+//            with no `edit` `performGroupedEdit("Speed",
 //            [setActionEndRaw(clip:action:patch: ["speed": speed])])` — the
-//            agent's own `set_action_end` path — and the run loop turned in
+//            agent's own `set_action_end` path — or with `edit` `set_speed`
+//            `performGroupedEdit("Speed", [setSpeed(clip:rate: speed,
+//            keepPitch: false)])` (SR-28's constant clip), and the run loop turned in
 //            5 ms steps up to `bound_s`. The line `{name, read: "window", ok,
 //            error, pre_edit_caf, plan_bytes, landed_s, audible_s, caf_bytes}`:
 //            whether the item built before the edit already carried a segment
@@ -166,6 +183,36 @@ func mediaURLs(_ project: ReelProject) -> [UInt32: URL] {
     return urls
 }
 
+/// The folder whose `cache/` a job's renders land in: the package, or the
+/// folder holding a bare `project.json`.
+func projectFolder(_ path: String) -> URL {
+    let url = URL(fileURLWithPath: path)
+    return url.pathExtension == "framejob" ? url : url.deletingLastPathComponent()
+}
+
+/// Pins `project`'s reverse resolution with `<folder>/cache/ramp-audio/` as
+/// its render folder (spec §11 SR-12 (b), SR-28), so a build or an export of
+/// it renders and plays its ramp segments; `ReverseSource.shared.unpin` after.
+func pinRampAudio(_ project: ReelProject, folder: URL) {
+    let rampAudio = folder.appendingPathComponent("cache", isDirectory: true)
+        .appendingPathComponent(RampAudioCache.directoryName, isDirectory: true)
+    ReverseSource.shared.pin(
+        ReverseResolution(ready: [:], pending: [], rampAudio: rampAudio), for: project)
+}
+
+/// `build` once every ramp segment of `plan` has its render, through the
+/// export's own wait (`Exporter.withRampAudio`) under `key`, whose wants are
+/// released after.
+func buildRendered<T>(
+    _ project: ReelProject, plan: CompositionPlan, urls: [UInt32: URL], key: Int,
+    then build: () throws -> T
+) throws -> T {
+    defer { RampAudioRenders.shared.release(owner: key) }
+    return try Exporter.withRampAudio(
+        plan: plan, urls: urls, settings: try ReelExport.settings(project, preset: "audio_wav"),
+        key: key, cancelled: { false }, then: build)
+}
+
 // MARK: - Plan and export
 
 func planRead(_ job: Job) {
@@ -180,6 +227,8 @@ func exportRead(_ job: Job, _ kind: String, preset: String, ext: String) {
     read(job, kind, ext: ext) { url in
         let project = try loadProject(job.project)
         let settings = try ReelExport.settings(project, preset: preset)
+        pinRampAudio(project, folder: projectFolder(job.project))
+        defer { ReverseSource.shared.unpin(project) }
         let exporter = Exporter()
         var outcome: Result<URL, any Error>?
         exporter.export(
@@ -216,8 +265,13 @@ func mixRead(_ job: Job) {
         let key = RecipeSource.shared.register()
         defer { RecipeSource.shared.unregister(key) }
         RecipeSource.shared.set(project, for: key)
-        let built = try CompositionBuilder.build(
-            plan: plan, planJSON: project.planJSON, urls: mediaURLs(project), recipeKey: key)
+        pinRampAudio(project, folder: projectFolder(job.project))
+        defer { ReverseSource.shared.unpin(project) }
+        let urls = mediaURLs(project)
+        let built = try buildRendered(project, plan: plan, urls: urls, key: key) {
+            try CompositionBuilder.build(
+                plan: plan, planJSON: project.planJSON, urls: urls, recipeKey: key)
+        }
         let range = Exporter.timeRange(
             try ReelExport.settings(project, preset: "audio_wav"), composition: built.composition)
         let tracks = built.composition.tracks(withMediaType: .audio)
@@ -382,9 +436,12 @@ final class Opened {
     let document: ProjectDocument
     let editor: EditorViewController
     let player: AVPlayer
+    /// The package's `cache/ramp-audio/`.
+    let rampAudio: URL
 
     init(_ path: String) throws {
         let url = URL(fileURLWithPath: path)
+        rampAudio = url.appendingPathComponent("cache/ramp-audio", isDirectory: true)
         document = ProjectDocument()
         try document.read(from: url, ofType: ProjectDocument.projectTypeIdentifier)
         document.fileURL = url
@@ -399,19 +456,26 @@ final class Opened {
         spin(3)
     }
 
-    /// The editor's item, ready, with no rebuild in flight (bound 15 s).
+    /// The editor's item, ready, with no rebuild in flight (bound 15 s) —
+    /// and, when the plan carries a ramp segment (a ramp, or SR-28's constant
+    /// Keep pitch off clip), built carrying the package's render (bound 120 s).
     func readyItem() throws -> AVPlayerItem {
-        let deadline = Date().addingTimeInterval(15)
+        let renders = document.project.planJSON.contains("\"ramp\":")
+        let bound: Double = renders ? 120 : 15
+        let deadline = Date().addingTimeInterval(bound)
         while Date() < deadline {
             if let item = player.currentItem, item.status == .readyToPlay,
-                editor.playback.built != nil, !editor.playback.rebuilding
+                editor.playback.built != nil, !editor.playback.rebuilding,
+                !renders || carriesRender(editor.playback.built, from: rampAudio)
             {
                 return item
             }
             RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.02))
         }
-        throw ProbeError("the editor's item was not ready within 15 s "
-            + "(status \(player.currentItem?.status.rawValue ?? -1))")
+        throw ProbeError("the editor's item was not ready within \(Int(bound)) s "
+            + "(status \(player.currentItem?.status.rawValue ?? -1)"
+            + (renders ? ", render carried: "
+                + "\(carriesRender(editor.playback.built, from: rampAudio))" : "") + ")")
     }
 
     func seekAndSettle(_ t: Ticks) {
@@ -434,16 +498,14 @@ func tapRead(_ job: Job, _ o: Opened) {
         let item = try o.readyItem()
         guard let plan = o.document.editedProject.plan else { throw ProbeError("no plan") }
         let tracks = item.asset.tracks(withMediaType: .audio)
-        guard tracks.count == 1 else {
-            throw ProbeError("\(tracks.count) composition audio tracks, not one")
-        }
-        let recorder = TapRecorder()
+        guard !tracks.isEmpty else { throw ProbeError("no composition audio track") }
         guard ["post", "pre"].contains(job.tap_flag ?? "post") else {
             throw ProbeError("unknown tap_flag \(job.tap_flag ?? "")")
         }
-        guard let tap = makeTap(recorder, pre: job.tap_flag == "pre") else {
-            throw ProbeError("no tap was made")
-        }
+        // One recorder and one tap per composition audio track, kept apart
+        // (SR-28: a rendered segment's CAF and a movie segment's sound sit
+        // on two composition tracks, one per source format, R2-1).
+        var recorders: [(CMPersistentTrackID, TapRecorder)] = []
         var how = "audioParameters"
         let mix = AVMutableAudioMix()
         mix.inputParameters = try tracks.map { track -> AVAudioMixInputParameters in
@@ -465,6 +527,11 @@ func tapRead(_ job: Job, _ o: Opened) {
             } else {
                 throw ProbeError("composition audio track \(track.trackID) has no parameters")
             }
+            let recorder = TapRecorder()
+            guard let tap = makeTap(recorder, pre: job.tap_flag == "pre") else {
+                throw ProbeError("no tap was made")
+            }
+            recorders.append((track.trackID, recorder))
             parameters.audioTapProcessor = tap
             return parameters
         }
@@ -484,24 +551,39 @@ func tapRead(_ job: Job, _ o: Opened) {
         o.editor.playback.pause()
         spin(0.3)
         let reached = CompositionBuilder.ticks(o.player.currentTime())
-        recorder.lock.lock()
-        let samples = recorder.samples
-        let chunks = recorder.chunks.map { chunk -> [Any] in
-            [chunk.0.map { NSNumber(value: $0) as Any } ?? NSNull(), chunk.1]
+        var kept: [[String: Any]] = []
+        for (index, (trackID, recorder)) in recorders.enumerated() {
+            recorder.lock.lock()
+            let samples = recorder.samples
+            let chunks = recorder.chunks.map { chunk -> [Any] in
+                [chunk.0.map { NSNumber(value: $0) as Any } ?? NSNull(), chunk.1]
+            }
+            let entry: [String: Any] = [
+                "track_id": Int(trackID), "chunks": chunks, "calls": recorder.calls,
+                "format": [
+                    "rate": recorder.rate, "channels": recorder.channels,
+                    "flags": Int(recorder.flags), "bits": Int(recorder.bits),
+                    "unreadable": recorder.unreadable,
+                ] as [String: Any],
+            ]
+            recorder.lock.unlock()
+            let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
+            let file = index == 0 ? url : url.deletingPathExtension()
+                .appendingPathExtension("track\(trackID).f32")
+            try data.write(to: file)
+            kept.append(entry.merging(["path": file.path]) { _, new in new })
         }
-        let line: [String: Any] = [
-            "chunks": chunks, "calls": recorder.calls, "mix": how, "reached": reached,
+        var line: [String: Any] = [
+            "calls": recorders.reduce(0) { $0 + $1.1.calls }, "mix": how, "reached": reached,
             "tap_flag": job.tap_flag ?? "post",
-            "played_s": Date().timeIntervalSince(started),
-            "format": [
-                "rate": recorder.rate, "channels": recorder.channels,
-                "flags": Int(recorder.flags), "bits": Int(recorder.bits),
-                "unreadable": recorder.unreadable,
-            ] as [String: Any],
+            "played_s": Date().timeIntervalSince(started), "tracks": kept,
         ]
-        recorder.lock.unlock()
-        let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
-        try data.write(to: url)
+        // One track: its chunks and format at the top, as before SR-28. Several:
+        // only under `tracks`, so a reader of one tap never reads the first alone.
+        if kept.count == 1 {
+            line["chunks"] = kept[0]["chunks"]
+            line["format"] = kept[0]["format"]
+        }
         return line
     }
 }
@@ -640,7 +722,11 @@ struct WindowJob: Decodable {
     let name: String
     let project: String
     let clip: UInt32
-    let action: UInt32
+    /// The Speed action `set_action_end` edits; nil with `edit` `set_speed`.
+    let action: UInt32?
+    /// Nil: `set_action_end` on `action`; `set_speed`: the clip's constant
+    /// rate, Keep pitch off (SR-28).
+    let edit: String?
     let speed: Double
     let bound_s: Double
 }
@@ -677,10 +763,18 @@ func windowRead(_ job: WindowJob) {
         let folder = URL(fileURLWithPath: job.project, isDirectory: true)
             .appendingPathComponent("cache/ramp-audio", isDirectory: true)
         line["pre_edit_caf"] = carriesRender(o.editor.playback.built, from: folder)
+        let op: ReelOp
+        switch job.edit {
+        case nil:
+            guard let action = job.action else { throw ProbeError("a set_action_end job names no action") }
+            op = ReelOp.setActionEndRaw(clip: job.clip, action: action, patch: ["speed": job.speed])
+        case "set_speed"?:
+            op = ReelOp.setSpeed(clip: job.clip, rate: job.speed, keepPitch: false)
+        case let other?:
+            throw ProbeError("unknown edit \(other)")
+        }
         let t0 = Date()
-        o.document.performGroupedEdit(
-            "Speed",
-            [ReelOp.setActionEndRaw(clip: job.clip, action: job.action, patch: ["speed": job.speed])])
+        o.document.performGroupedEdit("Speed", [op])
         line["plan_bytes"] = o.document.project.planJSON.utf8.count
         var landed: URL?
         while Date().timeIntervalSince(t0) < job.bound_s {

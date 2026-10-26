@@ -70,7 +70,10 @@ U1  CX1 (×1), CX2 (×2, keep pitch off) and CK05 (×0.5, keep pitch on), each
     SR2b — at `5042934` CK05's two exports gave two md5s (Apple's
     time-pitch), and CX2's `prores_422` audio ran 4 048 frames (≈ 84 ms) past
     its wav in one run and not in another, the samples identical over their
-    common length.
+    common length. Only CX1 and CK05 are scored: CX2 (×2, Keep pitch off)
+    now carries SR-28's constant `ramp` and plays its offline render, so its
+    plan and audio differ from the baseline's by design; its comparison is
+    reported, not scored (`constant_render_proof.py` scores that sound).
 E1  RV1 on clicks, `audio_wav` exported as the very next call after
     `set_action_end`, then `prores_422`: 0 wrong frames (`video_wrong` against
     RV1's G1 segments), clicks found == expected and `varispeed_pass` on the
@@ -166,7 +169,10 @@ F3  `Transcriber.jobs(…maps:)`'s job (in, round(S(D)), the map, the base
     four-argument form's job.
 F4  `MediaPeaks.sourceTick` on the plan's ramp audio segment at every frame
     against in + ⌊S(t − start)⌋ (±1); the constant segment's reading exactly
-    in + ⌊(t − start) × source_duration / duration⌋.
+    in + ⌊(t − start) × source_duration / duration⌋; and the ×1.5 Keep pitch
+    off constant twin's segment (spec §11 SR-28) carries a `ramp` flagged
+    `constant` with no `source` map, read by the same constant arithmetic
+    exactly.
 F5  SR-20 (c): a 100 000-point map (clip 600·k, source 600·k + 3k(k + 1)) is
     made; 100 000 `source(atClip:)`, 100 000 `clip(atSource:)` at an LCG's
     positions and 10 000 `sourceTick` on a decoded `PlanSegment` carrying it,
@@ -319,6 +325,9 @@ SILENT_NOTE = "Audio is silent above ×12"
 # name: (rate, keep pitch or None for the default, length ticks)
 CONSTANTS = {"CX1": (1.0, None, 4 * SEC), "CX2": (2.0, False, 4 * SEC),
              "CK05": (0.5, True, 4 * SEC)}
+# U1's scored projects: CX2 renders its sound offline since SR-28, so it is
+# compared and reported, not scored.
+U1_PINNED = ("CX1", "CK05")
 CONTROL_LENGTH = 6 * SEC
 RAMP_SPAN_S = (1.0, 3.0)
 PITCH_CENTS = 25.0
@@ -1073,8 +1082,10 @@ def u1_probe(binary, state):
                                        kept["channels"], kept["rate"]), CONSTANTS[name][2])
             pcm_ok = pcm_ok and ok
             pcm_text.append(f"{stream} {why}")
-        same = same and plan_ok and md5_ok and pcm_ok
-        detail.append(f"{name} plan {'=' if plan_ok else '≠'}, md5 "
+        if name in U1_PINNED:
+            same = same and plan_ok and md5_ok and pcm_ok
+        detail.append(f"{name}{'' if name in U1_PINNED else ' (reported, SR-28)'} plan "
+                      f"{'=' if plan_ok else '≠'}, md5 "
                       + ("=" if md5_ok else f"{exact} ≠ {base[name]['md5']}")
                       + (f", pcm {'; '.join(pcm_text)}" if pcm_text else ""))
     check("U1", same, "; ".join(detail) + f" (baseline {json.loads(BASELINE.read_text())['commit']})")
@@ -1294,17 +1305,26 @@ def f4(got):
         return
     ramp = clips["ramped"]
     seg, cseg = f["segment"], f["constant_segment"]
+    oseg = f.get("constant_off_segment")
     off = worst((s, seg["in"] + math.floor(s_of(t - seg["start"]))) for t, s in f["ramped"])
     const = all(s == cseg["in"] + (t - cseg["start"]) * cseg["source_duration"]
                 // cseg["duration"] for t, s in f["constant"])
+    readings = f.get("constant_off", [])
+    twin = oseg is not None and all(
+        s == oseg["in"] + (t - oseg["start"]) * oseg["source_duration"] // oseg["duration"]
+        for t, s in readings)
+    twin_good = (twin and len(readings) > 0 and oseg["ramp"] is True
+                 and oseg["constant"] is True and oseg["has_map"] is False)
     good = (seg["has_map"] is True and seg["start"] == ramp["start"] and seg["in"] == ramp["in"]
             and abs(seg["source_duration"] - half_up(s_of(ramp["duration"]))) <= 1
             and len(f["ramped"]) == ramp["duration"] // FRAME and off <= 1
-            and cseg["ramp"] is False and const and len(f["constant"]) > 0)
+            and cseg["ramp"] is False and const and len(f["constant"]) > 0 and twin_good)
     check("F4", good,
           f"the ramp audio segment {seg}: sourceTick max |off| {off} tick(s) against "
           f"in + ⌊S(t − start)⌋ over {len(f['ramped'])} frames; the constant segment {cseg} "
-          f"reads in + ⌊(t − start) × sd / d⌋ exactly {const}")
+          f"reads in + ⌊(t − start) × sd / d⌋ exactly {const}; the Keep pitch off twin "
+          f"{oseg} (SR-28: ramp, constant, no map) reads it exactly {twin} over "
+          f"{len(readings)} frames")
 
 
 def f5(got):

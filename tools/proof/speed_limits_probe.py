@@ -55,7 +55,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof/speed_spike"))
 import bounded  # noqa: E402
-from speed_spike import astats, ffprobe_json, has_audio, probe, run, sync_tree  # noqa: E402
+from speed_spike import ffprobe_json, has_audio, probe, run, sync_tree  # noqa: E402
 import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/speed-limits"
@@ -276,10 +276,25 @@ def u_rows(binary):
 
 def span_level(path, key, start, length=None):
     """`key` of astats' Overall over [start, start + length) — None when the
-    span has no answer."""
-    extra = ["-ss", f"{start}"] + (["-t", f"{length}"] if length is not None else [])
-    value = astats(path, extra)["overall"].get(key)
-    return value if isinstance(value, float) else None
+    span has no answer. `-ss`/`-t` are INPUT options here, before `-i`:
+    after it (`speed_spike.astats`'s `extra`) they trim only the output, after
+    astats has read the whole file, so every span read the whole file's level."""
+    span = ["-ss", f"{start}"] + (["-t", f"{length}"] if length is not None else [])
+    got = run(["ffmpeg", "-nostdin", "-v", "info"] + span
+              + ["-i", str(path), "-af", "astats", "-f", "null", "-"], 600)
+    overall = False
+    for line in got["stderr"].splitlines():
+        if "Parsed_astats" not in line:
+            continue
+        body = line.split("] ", 1)[-1].strip()
+        if body == "Overall" or body.startswith("Channel:"):
+            overall = body == "Overall"
+        elif overall and body.split(":", 1)[0].strip() == key:
+            try:
+                return float(body.split(":", 1)[1].strip())
+            except ValueError:
+                return None
+    return None
 
 
 def audio_end(path):

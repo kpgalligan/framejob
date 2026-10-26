@@ -34,7 +34,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
 | [`05.4-actions.md`](05.4-actions.md) | 156 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
 | [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
-| [`05.6-persistence.md`](05.6-persistence.md) | 227 | The package on disk: Consolidate, bookmarks, reversed assets, ramp audio, caches and their markers, transcripts. |
+| [`05.6-persistence.md`](05.6-persistence.md) | 228 | The package on disk: Consolidate, bookmarks, reversed assets, ramp audio, caches and their markers, transcripts. |
 | **§6 — Edit operations: exact semantics** | | |
 | [`06a-edit-operations-shared-rules.md`](06a-edit-operations-shared-rules.md) | 84 | The rules every op shares: caller ticks snapped to the frame grid, an omitted argument against `null`, how to read a "refuses", the one way a patch is read, and the `scope` envelope key (the view project, the eight ops that are an error with a scope, the checks on the merged parent). |
 | [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 443 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, paste and paste attributes; nest and unnest; the patch ops; the transition ops. |
@@ -42,7 +42,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | **§7 — Architecture: Rust decides, AVFoundation and Metal do** | | |
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 152 | The `rc_*` exports and their contracts. |
-| [`07.2-composition-plan.md`](07.2-composition-plan.md) | 195 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
+| [`07.2-composition-plan.md`](07.2-composition-plan.md) | 202 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 488 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 57 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 204 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
@@ -57,7 +57,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 196 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 12881 in 30 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 12922 in 30 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

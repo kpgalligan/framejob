@@ -522,7 +522,10 @@ governs a module now.
   edges, and `RATE_SAMPLES` + 1 samples across a ramp piece, SR-26).
 - `speed_segments.rs` — the map cut into plan pieces: `Held` at one rate
   (an equal-rate action is held), `Ramp` one video segment per canvas
-  frame, and the ramp audio map with a breakpoint every 600 ticks.
+  frame, and the ramp audio map with a breakpoint every 600 ticks;
+  `constant_ramp_audio` is the two-point map, flagged `constant`, that
+  `evaluate.rs` puts on a constant Keep pitch off time-scaled audio segment
+  so Swift renders it as a ramp's (SR-28).
   `Project::source_map` (SR-20) answers a media clip's source map: a ramped
   clip its ramp audio map, byte-equal to the plan segment's `ramp.map`, a
   constant clip its two points, flagged `ramped` as `is_ramped` is; a

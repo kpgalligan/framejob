@@ -170,3 +170,43 @@ before its code.
   - Risk accepted: a caption made from another clip's speech that happens to lie inside the
     edited clip moves with it; transcripts, fillers and silences are not re-timed (they read the
     current map); the person check is `docs/manual-checks.md`'s CRT-1.
+- **SR-28 — Every constant Keep pitch off time-scaled media segment's audio is rendered offline
+  as a ramp's is, and played as one ×1 segment (#334, option (a)), amending SR-6, SR-12 and
+  SR-20 (b).** The owner's answer (2026-10-26): option (a).
+  - **(a) The core's rule.** A constant (not ramped) clip's AUDIO plan segment carries
+    `"ramp": {"keep_pitch": false, "map": [[0, in], [D, in + sd]], "constant": true}` exactly
+    when its source is a `media`, its Keep pitch is off, D > 0 and D ≠ sd, where `in`, `sd` and D
+    are the segment's own `source_in`, `source_duration` and `duration` (lifted: a nest clip's
+    tail cut shortens D and sd alike, a reversed clip's `in` is its own). Its `pitch` stays
+    `off`; the ×12 rule and the still exclusion come first, as before. The video segment is
+    unchanged. A ramped clip's `ramp` object carries no `constant` key.
+  - **(b) Swift renders and plays it exactly as SR-6 and SR-12 say:** `RampAudioRenderer`
+    version 4 unchanged, the same file name rule, owners, serial queue, cache ledger and prune;
+    a failure not retried; every export waiting for it or failing `rampAudioFailed`; the segment
+    silent until its file exists; `-RCDevRampRenderHold` holding it. A constant clip and a flat
+    Speed action with the same map share one file.
+  - **(c) `constant` shapes no file and is not keyed** (`RampSegmentKey`, `RampAudioCache.name`).
+    It sends a reader to SR-20 (b)'s constant arithmetic byte for byte: `PlanSpeedRamp.source`
+    is nil for it, so `MediaPeaks.sourceTick` and silence read as before.
+    `rc_project_source_map` is unchanged (`ramped: false`).
+  - **(d) Keep pitch on**, in or out of SY-39's band, stays as it is (SY-41). SY-24's lead now
+    applies only to the segments still played `off` unrendered: Keep pitch on inside SY-39's band.
+  - **(e) Synchronize Audio's drift-corrected clips** (SY-6, Keep pitch off near ×1) are
+    included: after the correction such a clip is silent in the preview until its sound is
+    rendered, and every edit that changes its map (a trim, a split, a rate) renders the whole
+    clip again.
+  - **(f) The failure sentence** names the retimed audio, not a ramp: "Clip N's retimed audio
+    could not be rendered: …", and the renderer's own sentences say "the retimed audio".
+  - **(g) The proof rows.** `constant_render_proof.py`'s C1 (a render lands at ×0.25, ×0.5, ×2
+    and ×4), C2 (none for Keep pitch on ×2 or Keep pitch off ×1), E-x0.25…E-x4 (the plain
+    `set_speed` export: frames exact, no step, max |x − ideal| ≤ 5e-4 on sine, clicks found at
+    |median| and spread ≤ 0.005 ms), WOK and U1; `retimed_audio_proof.py`'s B1 scored;
+    `ramp_mapper_probe` F4's Keep pitch off constant twin (`source` nil). On the old tree C1 and
+    E-x4 fail.
+  - **Why:** #334's measurements (the issue's last comment, 2026-10-25): AVFoundation's own read
+    of a ×4 varispeed segment had 32 step events (max |diff| 0.517) that Frame Job's writer
+    cannot remove, and rendering offline took it to 0 (0.000031) and every rate's placement to
+    +0.000 ms, for 0.62–4.18 s of render per output minute and the same cache as a ramp.
+  - Risk accepted: the silent window and the cache per output minute grow with the clip's length
+    and rate (0.55–4.09 s for a 60 s clip on the spike's host, 11.5 MB a minute mono, 23.0 MB
+    stereo); the person check is `docs/manual-checks.md`'s SE-16.

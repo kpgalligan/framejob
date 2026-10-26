@@ -41,7 +41,7 @@ use crate::edit_clip_timing::AUDIO_SPEED_MAX;
 use crate::model::{Clip, Project, Source};
 use crate::nest::{lifted, Instance};
 use crate::speed_map::{peak_rate, SpeedMap};
-use crate::speed_segments::RampAudio;
+use crate::speed_segments::{constant_ramp_audio, RampAudio};
 use crate::time::{self, Ticks, TIMESCALE};
 
 /// First video and first audio composition track id. Small, stable
@@ -129,7 +129,9 @@ impl Pitch {
 /// follow the insert with `scaleTimeRange` (spec §7.2).
 ///
 /// A ramped clip's ONE audio segment carries `ramp`, the map its rendered
-/// sound follows (spec §11 SR-6, SR-10); every other segment has none.
+/// sound follows (spec §11 SR-6, SR-10), and so does a constant media
+/// clip's time-scaled Keep pitch off audio segment (SR-28,
+/// [`Segment::with_constant_render`]); every other segment has none.
 #[derive(Debug, Clone)]
 pub(crate) struct Segment {
     clip: u32,
@@ -145,6 +147,23 @@ pub(crate) struct Segment {
 impl Segment {
     fn end(&self) -> Ticks {
         self.start.saturating_add(self.duration)
+    }
+
+    /// A constant `clip`'s AUDIO segment, carrying the two-point constant
+    /// `ramp` when its sound is rendered offline (spec §11 SR-28): a
+    /// `media` source, Keep pitch off, a duration above 0 and time-scaled.
+    /// `pitch` stays `off`.
+    fn with_constant_render(mut self, clip: &Clip) -> Segment {
+        let media = matches!(clip.source, Source::Media { .. });
+        let keep_pitch = clip.audio.map(|a| a.keep_pitch).unwrap_or(true);
+        if media && !keep_pitch && self.duration > 0 && self.duration != self.source_duration {
+            self.ramp = Some(constant_ramp_audio(
+                self.source_in,
+                self.source_duration,
+                self.duration,
+            ));
+        }
+        self
     }
 
     pub(crate) fn to_json(&self, audio: bool) -> Value {
@@ -472,7 +491,7 @@ impl Project {
                     place(
                         &mut audio,
                         &mut next_audio,
-                        vec![segment],
+                        vec![segment.with_constant_render(&clip)],
                         Some(Voice::of(&self.tracks, instance)),
                         true,
                     );

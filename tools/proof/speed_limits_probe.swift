@@ -173,8 +173,34 @@ func runUI() -> Never {
 
 // MARK: - Export
 
+/// Pins `project`'s reverse resolution with `<folder>/cache/ramp-audio/` as
+/// its render folder (spec §11 SR-12 (b), SR-28), so a build or an export of
+/// it renders and plays its ramp segments; `ReverseSource.shared.unpin` after.
+func pinRampAudio(_ project: ReelProject, folder: URL) {
+    let rampAudio = folder.appendingPathComponent("cache", isDirectory: true)
+        .appendingPathComponent(RampAudioCache.directoryName, isDirectory: true)
+    ReverseSource.shared.pin(
+        ReverseResolution(ready: [:], pending: [], rampAudio: rampAudio), for: project)
+}
+
+/// `build` once every ramp segment of `plan` has its render, through the
+/// export's own wait (`Exporter.withRampAudio`) under `key`, whose wants are
+/// released after.
+func buildRendered<T>(
+    _ project: ReelProject, plan: CompositionPlan, urls: [UInt32: URL], key: Int,
+    then build: () throws -> T
+) throws -> T {
+    defer { RampAudioRenders.shared.release(owner: key) }
+    return try Exporter.withRampAudio(
+        plan: plan, urls: urls, settings: try ReelExport.settings(project, preset: "audio_wav"),
+        key: key, cancelled: { false }, then: build)
+}
+
 /// One h264 export through `Exporter().export`, polled on the main run loop
 /// in slices of at most 10 ms, under a deadline (`speed_probe.swift:379-431`).
+/// The handle is pinned with the out file's folder's `cache/ramp-audio/`, so
+/// a constant Keep pitch off clip's sound is rendered first (spec §11 SR-28),
+/// inside the deadline.
 func runExport() -> Never {
     let project = buildTimeline(string("media"), entries(string("clips")))
     let file = URL(fileURLWithPath: string("file"))
@@ -191,6 +217,8 @@ func runExport() -> Never {
     var urls: [UInt32: URL] = [:]
     for media in project.snapshot.media { urls[media.id] = URL(fileURLWithPath: media.path) }
 
+    pinRampAudio(project, folder: file.deletingLastPathComponent())
+    defer { ReverseSource.shared.unpin(project) }
     let exporter = Exporter()
     var outcome: Result<URL, any Error>?
     let start = Date()

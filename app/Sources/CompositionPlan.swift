@@ -44,19 +44,27 @@ struct PlanSegment: Codable, Equatable {
 /// pitch, the core's ramp spans with it on (`glide`, clip ticks; empty
 /// with it off — kept in the plan and the cache key but shaping nothing
 /// since SR-13, SR-11 lifted by SR-15), and the map — `[clip tick, source tick]`
-/// breakpoints, linear between them — `RampAudioRenderer` renders.
+/// breakpoints, linear between them — `RampAudioRenderer` renders. A
+/// constant clip's time-scaled Keep pitch off audio segment carries one too
+/// (spec §11 SR-28): its two points, Keep pitch off, `constant` true.
 struct PlanSpeedRamp: Codable, Equatable {
     let keepPitch: Bool
     let glide: [[Ticks]]
     let map: [[Ticks]]
+    /// A constant clip's render, not a ramp's (SR-28). It shapes no file —
+    /// `RampSegmentKey` and `RampAudioCache.name` never read it — and only
+    /// sends readers to the constant arithmetic through `source`.
+    let constant: Bool
     /// `map` as a `SourceMap`, decoded and checked ONCE here at plan decode
     /// (spec §11 SR-20 (c)), so `MediaPeaks.sourceTick` reads it per bucket
-    /// without re-checking; nil when the map fails the check. Not a coding
-    /// key: the coded form is the three keys above.
+    /// without re-checking; nil when the map fails the check, and nil for a
+    /// `constant` segment, whose readers read as before byte for byte
+    /// (SR-20 (b), SR-28 (c)). Not a coding key: the coded form is the four
+    /// keys above.
     let source: SourceMap?
 
     private enum CodingKeys: String, CodingKey {
-        case keepPitch, glide, map
+        case keepPitch, glide, map, constant
     }
 
     init(from decoder: Decoder) throws {
@@ -64,7 +72,8 @@ struct PlanSpeedRamp: Codable, Equatable {
         keepPitch = c.lenient(.keepPitch, true)
         glide = c.lenient(.glide, [])
         map = c.lenient(.map, [])
-        source = SourceMap(ramped: true, points: map)
+        constant = c.lenient(.constant, false)
+        source = constant ? nil : SourceMap(ramped: true, points: map)
     }
 }
 

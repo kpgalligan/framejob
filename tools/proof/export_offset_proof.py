@@ -130,8 +130,13 @@ Rows:
   L12  `MP3Gapless`'s tag reader and trim, checked inside the probe (no read)
   X1–X15  the probe's in-process exports and the sync cache (its header lists
       them), each located and pinned: ≥ 10 found, |median| ≤ 1.0 ms, spread
-      ≤ 0.5 ms; X14 (no tag) instead 12 found and |X14 − X2 − 576/44.1| ≤
-      0.1 ms
+      ≤ 0.5 ms, but X6 at |median| ≤ 0.5 ms (`X6_TARGET_MS`); X14 (no tag)
+      instead 12 found and |X14 − X2 − 576/44.1| ≤ 0.1 ms. X3 (×0.5, Keep
+      pitch off) plays its offline render since spec §11 SR-28 — a ×1 file,
+      no SY-24 lead — so SY-24's lead is pinned on X6 (×0.99999 Keep pitch
+      on, SY-39's band, the one `off` segment still played unrendered),
+      recorded at −0.001 ms on 2026-10-19: with the lead gone it moves by
+      ≈ 0.958 ms, inside SY-27's 1.0 ms but past X6's 0.5
   X16  (SY-42) the product's speech reader (`MediaImporter.speechReader`,
       placed from its range start), extract (`Transcriber.extractAudio`,
       `wholeAsset`) and reverse (`ReverseRenderer`, its audio turned back into
@@ -154,7 +159,8 @@ the stage before it, and native against asset48 (the decoder's SRC).
 `--mutants` (`audio_sync_proof.py`'s pattern): each copies `app/Sources`
 under `work/export-offset/mutants/<name>/`, applies its edit (its `before`
 asserted to occur exactly once), rebuilds the probe (900 s wall) and runs its
-X group (240 s wall); killed when every named row fails. `before` — the
+X group (240 s wall); killed when every named row fails. M2 and M6 (SY-24's
+lead) name X6, not X3, since X3 renders offline (SR-28). `before` — the
 unmutated tree — runs exactly once first and must pass every X row; a copy
 that does not build or answer is a failed control, never a kill. M19 is
 killed only when X17 fails on each of clicks44-mp3, clicks48-mp3 and
@@ -203,6 +209,8 @@ F206 = 206 * 20_000
 LENGTH_S = 10
 LEAD = 37
 TARGET_MS = 1.0
+# X6, SY-24's lead's one pinned row since SR-28 (the docstring's X1–X15).
+X6_TARGET_MS = 0.5
 TARGET_SPREAD_MS = 0.5
 KEEP_TARGET_MS = 5.0
 NR_DELAY_MS = 512 / 48_000 * 1000
@@ -295,7 +303,7 @@ NO_APP = {"Z0", "Z2"} | set(L_ROWS) | set(X_ROWS)
 MUTANTS = {
     "M1-no-copy": (["X1", "X2"], "AudioRateCopy.swift",
                    "signature.sampleRate != Double(sampleRate)", "false"),
-    "M2-no-varispeed-lead": (["X3"], "CompositionBuilder+AudioPlacement.swift",
+    "M2-no-varispeed-lead": (["X6"], "CompositionBuilder+AudioPlacement.swift",
                              "static let varispeedSourceLead: Ticks = 575",
                              "static let varispeedSourceLead: Ticks = 0"),
     "M3-noise-lead-everywhere": (["X7"], "CompositionBuilder+AudioPlacement.swift",
@@ -306,7 +314,7 @@ MUTANTS = {
                          "0"),
     "M5-no-head-cut": (["X5"], "CompositionBuilder+AudioPlacement.swift",
                        "let cut = max(0, -at0, sourceCut)", "let cut = max(0, sourceCut)"),
-    "M6-source-clamp": (["X3"], "CompositionBuilder+AudioPlacement.swift",
+    "M6-source-clamp": (["X6"], "CompositionBuilder+AudioPlacement.swift",
                         "let in0 = sourceIn - lead", "let in0 = max(0, sourceIn - lead)"),
     "M9-no-gap-padding": (["X8"], "AudioRateCopy.swift",
                           "if start - end > 1 {", "if false && start - end > 1 {"),
@@ -845,14 +853,15 @@ def run_e(mcp, row, fixture_override=None):
     return result
 
 
-def pinned(s):
-    """SY-27's exact pin over a located summary: (ok, sentence)."""
+def pinned(s, target_ms=TARGET_MS):
+    """SY-27's exact pin over a located summary, |median| held to
+    `target_ms`: (ok, sentence)."""
     if s is None or s["median_ms"] is None:
         return False, "pin missed (nothing found)"
-    met = (s["found"] >= 10 and abs(s["median_ms"]) <= TARGET_MS
+    met = (s["found"] >= 10 and abs(s["median_ms"]) <= target_ms
            and s["spread_ms"] <= TARGET_SPREAD_MS)
     return met, ("pin " + ("met" if met else "missed")
-                 + f" (≥ 10 found, |median| ≤ {TARGET_MS} ms, spread ≤ {TARGET_SPREAD_MS} ms)")
+                 + f" (≥ 10 found, |median| ≤ {target_ms} ms, spread ≤ {TARGET_SPREAD_MS} ms)")
 
 
 def e_target(row, r):
@@ -1246,7 +1255,8 @@ def probe_scores(manifest, rows, wanted, table=None):
         if row in X_ROWS:
             x2 = next((s for e, s in measured if e["row"] == "X2"), None)
             pins = [noxing_pin(s, x2) if row == "X14" else x17_pin(e, s, measured)
-                    if row == "X17" else pinned(s) for e, s in mine]
+                    if row == "X17" else pinned(s, X6_TARGET_MS if row == "X6" else TARGET_MS)
+                    for e, s in mine]
             ok = ok and all(met for met, _ in pins)
             medians = "; ".join(
                 (f"{e['fixture']} {e['variant']} {pin[1]}" if row == "X17" else

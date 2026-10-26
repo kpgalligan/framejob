@@ -99,10 +99,10 @@ enum RampAudioRenderer {
 
         var errorDescription: String? {
             switch self {
-            case .invalidMap(let why): return "The ramp's map cannot be rendered: \(why)."
-            case .unreadable(let why): return "The ramp's source cannot be read: \(why)."
-            case .failed(let why): return "The ramp's audio could not be rendered: \(why)."
-            case .cancelled: return "The ramp's audio render was cancelled."
+            case .invalidMap(let why): return "The retimed audio's map cannot be rendered: \(why)."
+            case .unreadable(let why): return "The retimed audio's source cannot be read: \(why)."
+            case .failed(let why): return "The retimed audio could not be rendered: \(why)."
+            case .cancelled: return "The retimed audio's render was cancelled."
             }
         }
     }

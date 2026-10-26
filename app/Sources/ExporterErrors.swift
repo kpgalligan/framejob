@@ -108,7 +108,7 @@ extension Exporter {
                 return "The export was stopped: the graphic \"\(name)\" does not compile — "
                     + "\(message). No file was written."
             case .rampAudioFailed(let clip, let message):
-                return "Clip \(clip)'s speed ramp audio could not be rendered: \(message)."
+                return "Clip \(clip)'s retimed audio could not be rendered: \(message)."
             }
         }
     }

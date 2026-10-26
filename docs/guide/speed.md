@@ -113,10 +113,12 @@ Keep pitch belongs to the clip and is on by default.
 
 - **On:** the voice or music keeps its own pitch at the new speed.
 - **Off:** the pitch follows the speed, higher when faster and lower when
-  slower, like tape or a record.
+  slower, like tape or a record. At any rate but ×1 (up to ×12) the clip's
+  sound is rendered in the background first, so it is briefly silent in the
+  preview after the change (see [Rendered audio](#rendered-audio)).
 
 Keep pitch always applies to the whole clip, even when an action is selected.
-It also controls how a speed ramp sounds (see [Ramp audio](#ramp-audio)).
+It also controls how a speed ramp sounds (see [Rendered audio](#rendered-audio)).
 Above ×12 there is no sound either way.
 
 ## Speed ramps
@@ -295,27 +297,32 @@ Speed Ramp… is also refused when:
 A refusal changes nothing. The inspector shows the reason at its foot, and
 the Speed Ramp… sheet shows it in its readout.
 
-### Ramp audio
+### Rendered audio
 
-A ramped clip's sound is rendered into a separate file in the background and
-saved in the project package. Renders run one at a time, and a new one starts
-after each edit that changes a ramp. Each render covers the whole clip's
-sound. Undo and redo render again too, because the file from before the edit
-is not kept, so the clip is briefly silent after an undo as well.
+Two kinds of clip have their sound rendered into a separate file in the
+background, saved in the project package: a clip with a speed ramp, and a
+clip at a constant speed other than ×1 with Keep pitch off. Renders run one
+at a time, and a new one starts after each edit that changes the clip's
+timing: a ramp, its rate, a trim or a split. Each render covers the whole
+clip's sound. Undo and redo render again too, because the file from before
+the edit is not kept, so the clip is briefly silent after an undo as well.
+How long the silence lasts grows with the clip's length and rate: well under
+a second for a 10 s clip, and a few seconds for a minute of ×4.
 
 - **Keep pitch off:** the sound glides smoothly up and down in pitch with the
-  rate, like tape, and stays in step with the picture.
+  rate, like tape, and stays in step with the picture. At a constant speed it
+  plays at that speed's tape pitch, sample-exact.
 - **Keep pitch on:** the sound keeps its own pitch as the speed changes.
   After a steep slow-down (for example ×2 → ×0.5) it can run up to about
   22 ms behind the picture.
 
-While a ramp's sound is still rendering, that clip plays silent in the
-preview. An export waits for every ramp it needs (its progress reads
-"Preparing…" during the wait) and never writes a silent ramp. If a render
-fails, the export fails with "Clip N's speed ramp audio could not be
+While a clip's sound is still rendering, that clip plays silent in the
+preview. An export waits for every render it needs (its progress reads
+"Preparing…" during the wait) and never writes that sound silent. If a render
+fails, the export fails with "Clip N's retimed audio could not be
 rendered: …". A failed render is not tried again while Frame Job stays open:
 the clip stays silent and exports that need it keep failing until you change
-the ramp (which starts a new render) or quit and reopen Frame Job.
+the clip's timing (which starts a new render) or quit and reopen Frame Job.
 
 ## The ×12 question
 
@@ -444,9 +451,10 @@ moves the frame it holds.
 - Speed Ramp… works on one clip at a time. From the menu it offers only the
   Ease In Out and Linear curves and four hold values. An agent can use any
   action curve and any hold from 0 to 0.9.
-- A ramp's sound is silent in the preview until its render finishes, and
-  every ramp edit, undo and redo renders the whole clip's sound again. A
-  failed render stays failed until the ramp changes or Frame Job is reopened.
+- A ramp's sound, and a constant speed's other than ×1 with Keep pitch off,
+  is silent in the preview until its render finishes, and every edit of its
+  timing, undo and redo renders the whole clip's sound again. A failed render
+  stays failed until the clip's timing changes or Frame Job is reopened.
 - With Keep pitch on, a ramp's sound can lag the picture by up to about
   22 ms after a steep slow-down.
 - A reversed clip shows a slate until its backwards copy has been rendered.

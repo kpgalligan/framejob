@@ -77,6 +77,23 @@ ready and no rebuild in flight. `build_probe(optimize=, name=, wmo=)`: `wmo=True
 whole-module optimisation (Xcode's Release Swift settings with `optimize=True`); the default
 leaves every earlier caller's build line as it was.
 
+Since spec §11 SR-28 (#334's option (a), `constant_render_proof.py`) a constant Keep pitch off
+time-scaled clip's sound is rendered offline as a ramp's is, and three groups changed to play it
+as the app does. `wav`, `prores` and `mix` pin the loaded handle (`pinRampAudio`) with the
+project's folder's `cache/ramp-audio/` (the package, or the folder holding `project.json`) as its
+render folder, and `mix` builds through `buildRendered` (`Exporter.withRampAudio`, the export's
+own wait), so a ramp or a constant Keep pitch off clip reads its render. `Opened.readyItem()`,
+when the plan carries a `"ramp":` segment, also waits (bound 120 s) until the build carries a
+segment from the package's `cache/ramp-audio/`. A `window` job may omit `action` and name
+`edit: "set_speed"`: the edit is then `set_speed {rate: speed, keep_pitch: false}` through
+`performGroupedEdit("Speed", …)`; with no `edit` it is `set_action_end` as before.
+`tap` taps every composition audio track apart, one recorder and one tap each (a rendered
+segment's 32-bit float CAF and a movie's 16-bit sound sit on two tracks, one per source format;
+it used to refuse anything but one track). Its line adds `tracks: [{track_id, chunks, format,
+calls, path}…]`, the first track's samples in the read's own file and each other's in
+`<name>-tap.track<id>.f32`; with one track `chunks` and `format` are also at the top, as before,
+so `ramp_proof.py`'s P1 reads it unchanged.
+
 **The runner** works in `tools/proof/work/ramp-spike/` (untracked): `fixtures/`, `projects/`
 (a `<variant>@<fixture>.framejob` package per pair), `probe/`, `runs/` (what the probe wrote),
 `jobs-<group>.json`, `stderr-<group>.txt` and `results.json`. It imports `click_value`,

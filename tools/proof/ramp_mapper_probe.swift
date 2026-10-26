@@ -1,7 +1,9 @@
 // Speed ramps SR4 (spec §11 SR-20): the F rows' readings for `ramp_proof.py`,
 // compiled as `main.swift` over `app/Sources` through `swift_build.build()`.
 // Prints one JSON object on stdout: what the readers answer for a ramped clip,
-// its ×1.5 constant twin and its reversed twin, and F5's timings. The proof
+// its ×1.5 constant twin and its reversed twin, F4's ×1.5 Keep pitch off
+// constant twin (spec §11 SR-28: its plan segment carries a constant `ramp`
+// and no `source`), and F5's timings. The proof
 // scores every reading against its own closed form; this file decides nothing.
 // No network, no app, no defaults, no disk.
 //
@@ -30,8 +32,11 @@ func pairs(_ map: SourceMap?) -> Any {
 }
 
 /// One clip's project: `ramp` adds the speed action, `rate` a constant
-/// speed, `reversed` plays it backwards.
-func make(ramp: Bool, rate: Double? = nil, reversed: Bool = false) -> ReelProject? {
+/// speed (with `keepPitch`, nil the core's default), `reversed` plays it
+/// backwards.
+func make(
+    ramp: Bool, rate: Double? = nil, reversed: Bool = false, keepPitch: Bool? = nil
+) -> ReelProject? {
     guard var project = ReelProject.new(width: 320, height: 180, fps: .thirty) else { return nil }
     /// Applied or an identity; a refusal or an error is a problem.
     func step(_ op: ReelOp) -> Bool {
@@ -65,7 +70,7 @@ func make(ramp: Bool, rate: Double? = nil, reversed: Bool = false) -> ReelProjec
               step(.setActionEndRaw(clip: clip, action: action, patch: ["speed": 2]))
         else { return nil }
     }
-    if let rate, !step(.setSpeed(clip: clip, rate: rate)) { return nil }
+    if let rate, !step(.setSpeed(clip: clip, rate: rate, keepPitch: keepPitch)) { return nil }
     if reversed, !step(.setReversed(clip: clip, reversed: true)) { return nil }
     return project
 }
@@ -190,7 +195,10 @@ out["F3"] = f3
 
 // MARK: - F4: the silence walk's source tick
 
-if let segment = audioSegment(ramped), let constSegment = audioSegment(constant) {
+let constantOff = make(ramp: false, rate: 1.5, keepPitch: false)
+if let segment = audioSegment(ramped), let constSegment = audioSegment(constant),
+   let offSegment = constantOff.flatMap(audioSegment)
+{
     let ticks = stride(from: segment.start, to: segment.start + segment.duration, by: Int(frame))
     out["F4"] = [
         "segment": ["start": Int(segment.start), "duration": Int(segment.duration),
@@ -206,6 +214,16 @@ if let segment = audioSegment(ramped), let constSegment = audioSegment(constant)
             from: constSegment.start, to: constSegment.start + constSegment.duration,
             by: Int(frame)
         ).map { [Int($0), Int(MediaPeaks.sourceTick(constSegment, at: $0))] },
+        "constant_off_segment": [
+            "start": Int(offSegment.start), "duration": Int(offSegment.duration),
+            "in": Int(offSegment.sourceIn),
+            "source_duration": Int(offSegment.sourceDuration),
+            "ramp": offSegment.ramp != nil, "constant": offSegment.ramp?.constant ?? false,
+            "has_map": offSegment.ramp?.source != nil],
+        "constant_off": stride(
+            from: offSegment.start, to: offSegment.start + offSegment.duration,
+            by: Int(frame)
+        ).map { [Int($0), Int(MediaPeaks.sourceTick(offSegment, at: $0))] },
     ]
 } else {
     out["F4"] = ["error": "no audio segment in a plan"]

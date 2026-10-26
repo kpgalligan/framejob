@@ -34,7 +34,11 @@
 // tracks), one `add_clip` and, where a row names one, `set_speed(rate,
 // keep_pitch)`, each through the app's own `applying`. Builds go through
 // `CompositionBuilder.build(…, metering: false)`, the export through
-// `Exporter().export` with `ReelExport.settings(_:preset: "audio_wav")`.
+// `Exporter().export` with `ReelExport.settings(_:preset: "audio_wav")`. A
+// constant Keep pitch off time-scaled clip's sound is rendered offline (spec
+// §11 SR-28): every handle built or exported is pinned (`pinRampAudio`) with
+// `<out-dir>/cache/ramp-audio/` as its render folder, and every build runs
+// through `buildRendered`, the export's own wait (`Exporter.withRampAudio`).
 //
 // Stages (the variant is `<speed>[-off|-keep][+…]`; the part before `+` is the
 // speed the proof chains the stages by):
@@ -383,7 +387,31 @@ func place(
                   urls: urls)
 }
 
-/// The build, with its recipe key published for its life (`body`'s).
+/// Pins `project`'s reverse resolution with `<folder>/cache/ramp-audio/` as
+/// its render folder (spec §11 SR-12 (b), SR-28), so a build or an export of
+/// it renders and plays its ramp segments; `ReverseSource.shared.unpin` after.
+func pinRampAudio(_ project: ReelProject, folder: URL) {
+    let rampAudio = folder.appendingPathComponent("cache", isDirectory: true)
+        .appendingPathComponent(RampAudioCache.directoryName, isDirectory: true)
+    ReverseSource.shared.pin(
+        ReverseResolution(ready: [:], pending: [], rampAudio: rampAudio), for: project)
+}
+
+/// `build` once every ramp segment of `plan` has its render, through the
+/// export's own wait (`Exporter.withRampAudio`) under `key`, whose wants are
+/// released after.
+func buildRendered<T>(
+    _ project: ReelProject, plan: CompositionPlan, urls: [UInt32: URL], key: Int,
+    then build: () throws -> T
+) throws -> T {
+    defer { RampAudioRenders.shared.release(owner: key) }
+    return try Exporter.withRampAudio(
+        plan: plan, urls: urls, settings: try ReelExport.settings(project, preset: "audio_wav"),
+        key: key, cancelled: { false }, then: build)
+}
+
+/// The build, with its recipe key published for its life (`body`'s), its
+/// ramp segments rendered first.
 func withBuild<T>(_ placed: Placed, _ body: (BuiltComposition, CompositionPlan) throws -> T)
     throws -> T
 {
@@ -392,9 +420,13 @@ func withBuild<T>(_ placed: Placed, _ body: (BuiltComposition, CompositionPlan) 
     defer { RecipeSource.shared.unregister(key) }
     RecipeSource.shared.set(placed.project, for: key)
     RecipeSource.shared.setOptions(.none, for: key)
-    let built = try CompositionBuilder.build(
-        plan: plan, planJSON: placed.project.planJSON, urls: placed.urls, recipeKey: key,
-        metering: false)
+    pinRampAudio(placed.project, folder: outDir)
+    defer { ReverseSource.shared.unpin(placed.project) }
+    let built = try buildRendered(placed.project, plan: plan, urls: placed.urls, key: key) {
+        try CompositionBuilder.build(
+            plan: plan, planJSON: placed.project.planJSON, urls: placed.urls, recipeKey: key,
+            metering: false)
+    }
     return try body(built, plan)
 }
 
@@ -537,6 +569,8 @@ func readExport(
     record(row, fixture, "export", variant, rate: 48_000, start: placed.start,
            speed: placed.speed) { url in
         let settings = try ReelExport.settings(placed.project, preset: "audio_wav")
+        pinRampAudio(placed.project, folder: outDir)
+        defer { ReverseSource.shared.unpin(placed.project) }
         let exporter = Exporter()
         var outcome: Result<URL, any Error>?
         exporter.export(

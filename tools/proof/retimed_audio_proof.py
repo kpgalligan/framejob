@@ -25,8 +25,16 @@ pitch off; CK05 ×0.5 keep pitch on; X4 ×4 keep pitch off (`C-off-x4`), on
 clicks and on sine. C is missing_audio_proof's control: toneB.m4a at 12 s on
 track 1 of a 640 × 360 canvas, whose picture is the Blank placeholder; its
 timeline is 10 180 000 ticks (16.967 s), not 17 s, because `add_clip` snaps
-toneB's 2 986 400 ticks down to whole frames. T335 is one track: A ×1 keep pitch off over [0, 3 s) from source
-1 s, B ×2 keep pitch off over [3 s, 6 s) from source 4 s, on clicks.
+toneB's 2 986 400 ticks down to whole frames. T335 is one timeline track: A ×1 keep pitch off over [0, 3 s) from source
+1 s, B ×2 keep pitch off over [3 s, 6 s) from source 4 s, on clicks. Since
+spec §11 SR-28 B's sound is rendered offline: a 32-bit float CAF beside A's
+16-bit movie, so `CompositionBuilder` puts them on TWO composition audio
+tracks (one per source format), and the varispeed ×2 neighbour #335 was read
+beside no longer exists with Keep pitch off. T335K keeps #335's own shape: A
+as T335's, B ×0.9995 with Keep pitch ON (SY-39's band, so pitch `off`, scaled
+by AVFoundation, unrendered) over [3 s, 6 s) from source 4 s, one composition
+track. The probe's `tap` read taps every composition audio track apart; a
+segment is read on the track whose stamps find most of its clicks.
 
 D0  the instance listens, and `Frame Job: ` never appears in its log.
 S1  `frames_target`, the mirror of `ExportAudioEnd.frames(ofTicks:)`
@@ -51,12 +59,15 @@ A3  (content) CX1, CX2 and C's `audio_wav` channel 0 equals the probe's
     the same way against its two `app` mix reads (either may match). C's
     `composition_ticks` and `audio_track_ends` against its timeline are
     printed (#337's shortfall, read).
-B1  (#334, reported) X4's `audio_wav` and `prores_422`: on sine no
+B1  (#334, scored) X4's `audio_wav` and `prores_422`: on sine no
     `click_events(dense_scan(x, rate, 4.0), 0)`; on clicks
-    `varispeed_pass(place_ideal(…))` against `C-off-x4`. Its verdict is
-    printed and not scored: B2 found the steps in AVFoundation's own read of
-    the mix under every variant, so #334 is the owner's question (arm (c)).
-    `--mutant plant-step` plants a step into the sine.
+    `varispeed_pass(place_ideal(…))` against `C-off-x4`. Scored since spec
+    §11 SR-28: a constant Keep pitch off ×4 clip's sound is rendered offline
+    and played as one ×1 segment, so AVFoundation's varispeed read that B2
+    found the steps in is no longer on the path. On the old tree it failed
+    (32 / 30 step events). `--mutant plant-step` plants a step into the sine.
+    CX2 (×2, Keep pitch off) is rendered the same way, so A1's and A3's CX2
+    streams are its render's.
 B2  (#334, reported) CK05 through `mix` twice with `app` and twice with
     `output_varispeed` (is each `output_varispeed` read PCM-identical to an
     `app` read?); X4 on sine through `mix` with `app`, `float` and
@@ -65,23 +76,30 @@ B2  (#334, reported) CK05 through `mix` twice with `app` and twice with
     against `RampAudioRenderer`'s ideal (the `render` group, a constant ×4
     map, keep pitch off); and whether X4's `audio_wav` equals its `app` read
     (A3's rule) on sine and on clicks.
-C1  (#335) T335 through the `playback` group's `tap` read, 3 runs. A's and
-    B's clicks are placed by stamps (`ramp_spike.tap_signal`) and by order
-    (`by_order`: every frame counted from the first chunk stamped ≥ 3.5 s,
-    inside B), and in T335's `audio_wav` export. Instrument: B within 0.5 ms
-    of the export by both placements. Score: A by order within 1.0 ms of A's
-    export placement, every run. Then CX1, a track holding a ×1 clip alone
+C1  (#335, SR-28) T335 through the `playback` group's `tap` read with the
+    product's PreEffects tap, 3 runs. A's and B's clicks are placed by stamps
+    (`ramp_spike.tap_signal`) and by order (`by_order`: every frame counted
+    from the first chunk stamped ≥ 3.5 s, inside B), each on its own
+    composition track, and in T335's `audio_wav` export. Score, every run: A
+    and B on two tracks; the rendered B by stamps and by order within 0.5 ms
+    of B's export placement; A by order within 1.0 ms of A's. The PostEffects
+    readings are printed, not scored (on a track holding one source alone
+    PostEffects stamps are off, as CX1's below). Then CX1, a track holding a ×1 clip alone
     (SR1's `C-off-x1` shape, where #335 was read), through the PreEffects
     tap (the product `AudioTap`'s flag) and the PostEffects tap, 3 runs
     each, by stamps (60 ms reach) and by SR2b's coarse method
     (`render_spike.coarse_ms`, ±200 ms), beside CX1's `audio_wav` export.
     Score: the PreEffects tap within 1.0 ms of the export by both methods,
     every run; the PostEffects offset is printed, not scored.
-    `--mutant stamp-place` scores CX1's PostEffects stamps as the product's
-    and must fail.
-C2  (#335, reported) C1's package with `tap_flag: "pre"` (the product
+    `--mutant stamp-place` scores T335's and CX1's PostEffects stamps as
+    the product's and must fail.
+C2  (#335, reported) T335K with `tap_flag: "pre"` (the product
     `AudioTap`'s PreEffects), 3 runs: A's and B's offsets by stamps and by
     order.
+C3  (#335's own shape) T335K through the PostEffects tap, 3 runs, scored as
+    C1 scored T335 before SR-28: A and B on one track; B by stamps and by
+    order within 0.5 ms of B's export placement; A by order within 1.0 ms of
+    A's.
 
 Exit 0 when every scored row passes, else 1.
 """
@@ -117,6 +135,9 @@ C_AT = 12 * SEC
 T335_A = 3 * SEC
 T335_B_IN = 4 * SEC
 T335_LENGTH = 6 * SEC
+# name: (B's rate, B's keep pitch). T335 is #335's fixture; T335K keeps its
+# original shape since SR-28 (a varispeed B beside a ×1 A on one track).
+T335S = {"T335": (2.0, False), "T335K": (0.9995, True)}
 ORDER_FROM = 2_100_000          # 3.5 s: the first chunk inside B
 A_TOLERANCE_MS = 1.0
 B_TOLERANCE_MS = 0.5
@@ -124,10 +145,9 @@ TIMING_RUNS = 3
 STEP_AT_S = 2.0
 STEP = 0.2
 WALLS = {"export": 1500, "playback": 1800, "render": 900}
-ROWS = ["D0", "S1", "S2", "S3", "X0", "A1", "A2", "A3", "B1", "B2", "C1", "C2"]
-# B1 is reported, not scored: #334's steps are in AVFoundation's own read
-# of the mix, every variant (B2), so #334 is arm (c), the owner's question.
-REPORTED = {"B1", "B2", "C2"}
+ROWS = ["D0", "S1", "S2", "S3", "X0", "A1", "A2", "A3", "B1", "B2", "C1", "C2", "C3"]
+# B1 is scored since SR-28 (#334's option (a): the ×4 clip renders offline).
+REPORTED = {"B2", "C2"}
 MUTANTS = ["plant-step", "stamp-place"]
 # name: (fixture, rate, keep pitch or None)
 CONSTANTS = {"CX1": ("clicks", 1.0, None), "CX2": ("clicks", 2.0, False),
@@ -250,8 +270,10 @@ def wanted_docs(chosen):
         add("CK05")
         for name in ("X4S", "X4C"):
             add(name, ("audio_wav", f"{name}-audio_wav-1"))
-    if "C1" in chosen or "C2" in chosen:
+    if "C1" in chosen:
         add("T335", ("audio_wav", "T335-audio_wav-1"))
+    if "C3" in chosen or "C2" in chosen:
+        add("T335K", ("audio_wav", "T335K-audio_wav-1"))
     if "C1" in chosen:
         add("CX1", ("audio_wav", "CX1-audio_wav-1"))
     return need
@@ -271,19 +293,20 @@ def build_doc(client, name):
         doc.must("add_clip", track=track, media=media, at=C_AT)
         doc.media_duration = next(m["duration"] for m in doc.project()["media"]
                                   if m["id"] == media)
-    elif name == "T335":
+    elif name in T335S:
+        rate, keep = T335S[name]
         doc.canvas()
         _, media = doc.fixture_clip("clicks", T335_A, 1.0, False)
         track = doc.project()["tracks"][0]["id"]
         b = doc.must("add_clip", track=track, media=media, at=T335_A)["new_clips"][0]
         doc.must("trim_start", clip=b, to=T335_A + T335_B_IN)
         doc.must("move_clip", clips=[b], delta=-T335_B_IN)
-        doc.must("set_speed", clip=b, rate=2.0, keep_pitch=False)
+        doc.must("set_speed", clip=b, rate=rate, keep_pitch=keep)
         doc.must("trim_end", clip=b, to=T335_LENGTH)
         placed = doc.clip(b)
-        if (placed["start"], placed["duration"], placed["source"].get("in")) != (
-                T335_A, T335_LENGTH - T335_A, T335_B_IN):
-            raise RuntimeError(f"T335's B landed as {placed}")
+        if (placed["start"], placed["duration"], placed["source"].get("in"),
+                placed["speed"]) != (T335_A, T335_LENGTH - T335_A, T335_B_IN, rate):
+            raise RuntimeError(f"{name}'s B landed as {placed}")
     else:
         fixture, rate, keep = CONSTANTS[name]
         doc.canvas()
@@ -359,8 +382,8 @@ def mix_jobs(state, chosen):
 def tap_jobs(state, chosen):
     docs = state.get("docs", {})
     jobs = []
-    wanted = [("T335", "post", "C1"), ("T335", "pre", "C2"), ("CX1", "post", "C1"),
-              ("CX1", "pre", "C1")]
+    wanted = [("T335", "post", "C1"), ("T335", "pre", "C1"), ("CX1", "post", "C1"),
+              ("CX1", "pre", "C1"), ("T335K", "post", "C3"), ("T335K", "pre", "C2")]
     for name, flag, row in wanted:
         if row in chosen and name in docs:
             jobs += [{"name": f"{name}-{flag}-{k}", "project": docs[name]["package"],
@@ -383,7 +406,7 @@ def run_probe(chosen, state):
         groups.append(("export", mix_jobs(state, chosen)))
     if "B2" in chosen:
         groups.append(("render", render_jobs()))
-    if "C1" in chosen or "C2" in chosen:
+    if any(r in chosen for r in ("C1", "C2", "C3")):
         groups.append(("playback", tap_jobs(state, chosen)))
     groups = [(g, j) for g, j in groups if j]
     if not groups:
@@ -525,8 +548,7 @@ def b1(state):
         parts.append(f"{preset}: sine {len(events)} events "
                      f"{[(t, round(r, 2)) for t, _, r in events[:8]]}; clicks "
                      f"{rp.place_text(placed)}, varispeed_pass {rs.varispeed_pass(placed)}")
-    report("B1", f"verdict {'pass' if ok else 'fail'} (#334, arm (c): not scored); "
-           + "; ".join(parts))
+    check("B1", ok, "(#334, SR-28: rendered offline) " + "; ".join(parts))
 
 
 def nearest_boundary(chunks, t_s):
@@ -582,9 +604,11 @@ def b2(state):
     report("B2", "; ".join(parts))
 
 
-def t335_variant():
+def t335_variant(name="T335"):
+    rate = T335S[name][0]
+    b = T335_LENGTH - T335_A
     segs = [rs.seg(0, T335_A, rs.SOURCE_IN, T335_A),
-            rs.seg(T335_A, T335_LENGTH - T335_A, T335_B_IN, 2 * (T335_LENGTH - T335_A))]
+            rs.seg(T335_A, b, T335_B_IN, round(rate * b))]
     return {"keep": False, "segs": segs, "ref": segs, "length": T335_LENGTH, "kind": "ramp"}
 
 
@@ -610,35 +634,63 @@ def cx1_variant():
     return {"keep": False, "segs": segs, "ref": segs, "length": LENGTH, "kind": "control"}
 
 
+def carriers(per_track):
+    """For A and for B, the index of the track whose stamped read finds the
+    most of that half's clicks (each segment read from its own track)."""
+    return [max(range(len(per_track)), key=lambda i: per_track[i]["stamp"][h][1])
+            for h in (0, 1)]
+
+
 def tap_readings(state, flag, name="T335"):
-    v = t335_variant() if name == "T335" else cx1_variant()
+    """Per run: CX1's whole placement; a T335 fixture's A and B, each by
+    stamps and by order on the composition track that carries it (the probe
+    taps every track apart, spec §11 SR-28), with the track ids."""
+    v = t335_variant(name) if name in T335S else cx1_variant()
     out = []
     for k in range(1, TIMING_RUNS + 1):
         got = line(state, f"{name}-{flag}-{k}", "tap")
-        if got is None or not got.get("chunks"):
+        tracks = (got or {}).get("tracks") or []
+        if got is None or not tracks or not all(t.get("chunks") for t in tracks):
             raw = state.get("lines", {}).get((f"{name}-{flag}-{k}", "tap"))
             out.append({"error": (raw or {}).get("error") or state.get("probe_error")
                         or state.get("probe_errors") or "no line"})
             continue
-        stamped, rate = rs.tap_signal(got, v["length"])
-        if name != "T335":
+        if name not in T335S:
+            if len(tracks) != 1:
+                out.append({"error": f"{len(tracks)} composition audio tracks, not one"})
+                continue
+            stamped, rate = rs.tap_signal(tracks[0], v["length"])
             s = rs.place(stamped, rate, v)
             coarse = rsp.coarse_ms(stamped, rate, {
                 "ideal": rsp.control_ramp(False, 1.0, LENGTH / SEC), "length": LENGTH,
                 "keep": False})
             out.append({"whole": (s["median_ms"], s["found"], s["of"]), "coarse": coarse})
             continue
-        data = list(array.array("f", Path(got["path"]).read_bytes()))
-        ordered = by_order(got["chunks"], data, v["length"], rate)
-        out.append({"stamp": halves(stamped, rate, v), "order": halves(ordered, rate, v),
-                    "rate": rate, "calls": got.get("calls")})
+        per_track = []
+        for t in tracks:
+            stamped, rate = rs.tap_signal(t, v["length"])
+            data = list(array.array("f", Path(t["path"]).read_bytes()))
+            ordered = by_order(t["chunks"], data, v["length"], rate)
+            per_track.append({"stamp": halves(stamped, rate, v),
+                              "order": halves(ordered, rate, v), "rate": rate,
+                              "first": next((c[0] for c in t["chunks"] if c[0] is not None),
+                                            None),
+                              "last": max((c[0] for c in t["chunks"] if c[0] is not None),
+                                          default=None)})
+        a, b = carriers(per_track)
+        out.append({"stamp": (per_track[a]["stamp"][0], per_track[b]["stamp"][1]),
+                    "order": (per_track[a]["order"][0], per_track[b]["order"][1]),
+                    "ids": (tracks[a]["track_id"], tracks[b]["track_id"]),
+                    "tracks": len(tracks), "calls": got.get("calls"),
+                    "spans": [(tracks[i]["track_id"], p["first"], p["last"])
+                              for i, p in enumerate(per_track)]})
     return out
 
 
-def c_export(state):
-    path = export_path(state, "T335", "T335-audio_wav-1")
+def c_export(state, name="T335"):
+    path = export_path(state, name, f"{name}-audio_wav-1")
     x, rate = read_ffmpeg(path)
-    return halves(x, rate, t335_variant())
+    return halves(x, rate, t335_variant(name))
 
 
 def cx1_export(state):
@@ -672,48 +724,76 @@ def cx1_scored(state, exported):
     return ok, parts
 
 
-def c1(state):
-    if not need(state, ["T335", "CX1"], "C1"):
-        return
-    exported = c_export(state)
-    runs = tap_readings(state, "post")
+def within(got, want, tolerance):
+    return got[0] is not None and want[0] is not None and abs(got[0] - want[0]) <= tolerance
+
+
+def t335_scored(state, name, flag, apart):
+    """(ok, parts): `name` through the `flag` tap, 3 runs — A by order within
+    1.0 ms of A's export placement; B by stamps and by order within 0.5 ms of
+    B's; A and B on two composition tracks when `apart` (SR-28's rendered B),
+    on one otherwise."""
+    exported = c_export(state, name)
     ok, parts = exported[0][0] is not None and exported[1][0] is not None, []
-    parts.append(f"export A {fmt(exported[0])}, B {fmt(exported[1])}")
-    for k, r in enumerate(runs, 1):
+    parts.append(f"{name} export A {fmt(exported[0])}, B {fmt(exported[1])}; {flag} tap")
+    for k, r in enumerate(tap_readings(state, flag, name), 1):
         if "error" in r:
             ok = False
-            parts.append(f"run {k}: {r['error']}")
+            parts.append(f"{name} {flag} run {k}: {r['error']}")
             continue
-        a_scored = r["order"][0]
-        b_ok = all(h[1][0] is not None and exported[1][0] is not None
-                   and abs(h[1][0] - exported[1][0]) <= B_TOLERANCE_MS
-                   for h in (r["stamp"], r["order"]))
-        a_ok = (a_scored[0] is not None and exported[0][0] is not None
-                and abs(a_scored[0] - exported[0][0]) <= A_TOLERANCE_MS)
-        ok = ok and a_ok and b_ok
-        parts.append(f"run {k}: A by stamps {fmt(r['stamp'][0])} (#335's reading), by order "
-                     f"{fmt(r['order'][0])}; B by stamps {fmt(r['stamp'][1])}, by order "
-                     f"{fmt(r['order'][1])}; instrument B {b_ok}; A by order {a_ok}")
+        shape = (r["ids"][0] != r["ids"][1]) == apart
+        b_ok = all(within(h[1], exported[1], B_TOLERANCE_MS) for h in (r["stamp"], r["order"]))
+        a_ok = within(r["order"][0], exported[0], A_TOLERANCE_MS)
+        ok = ok and a_ok and b_ok and shape
+        parts.append(f"{name} {flag} run {k}: {r['tracks']} track(s), A on {r['ids'][0]}, B on "
+                     f"{r['ids'][1]} (shape {shape}; spans {r['spans']}); A by stamps "
+                     f"{fmt(r['stamp'][0])}, by order {fmt(r['order'][0])}; B by stamps "
+                     f"{fmt(r['stamp'][1])}, by order {fmt(r['order'][1])}; B {b_ok}; "
+                     f"A by order {a_ok}")
+    return ok, parts
+
+
+def c1(state):
+    """T335 (SR-28's shape: A's movie and B's render on two tracks) through
+    the product's tap, PreEffects (`--mutant stamp-place`: PostEffects),
+    scored; the other flag reported; then CX1."""
+    if not need(state, ["T335", "CX1"], "C1"):
+        return
+    product = "post" if MUTANT == "stamp-place" else "pre"
+    other = "pre" if product == "post" else "post"
+    ok, parts = t335_scored(state, "T335", product, apart=True)
+    _, reported = t335_scored(state, "T335", other, apart=True)
+    parts += [f"(reported) {p}" for p in reported[1:]]
     cx_ok, cx_parts = cx1_scored(state, cx1_export(state))
     ok = ok and cx_ok
     parts += cx_parts
     check("C1", ok, "; ".join(parts))
 
 
+def c3(state):
+    """T335K (#335's own shape: a varispeed B beside a ×1 A on one track)
+    through the PostEffects tap, as #335 was read."""
+    if not need(state, ["T335K"], "C3"):
+        return
+    ok, parts = t335_scored(state, "T335K", "post", apart=False)
+    check("C3", ok, "; ".join(parts))
+
+
 def c2(state):
-    if not need(state, ["T335"], "C2"):
+    if not need(state, ["T335K"], "C2"):
         return
     parts = []
-    for k, r in enumerate(tap_readings(state, "pre"), 1):
+    for k, r in enumerate(tap_readings(state, "pre", "T335K"), 1):
         if "error" in r:
-            parts.append(f"run {k}: {r['error']}")
+            parts.append(f"T335K run {k}: {r['error']}")
             continue
-        parts.append(f"run {k}: A by stamps {fmt(r['stamp'][0])}, by order {fmt(r['order'][0])}; "
-                     f"B by stamps {fmt(r['stamp'][1])}, by order {fmt(r['order'][1])}")
+        parts.append(f"T335K run {k}: {r['tracks']} track(s); A by stamps "
+                     f"{fmt(r['stamp'][0])}, by order {fmt(r['order'][0])}; B by stamps "
+                     f"{fmt(r['stamp'][1])}, by order {fmt(r['order'][1])}")
     report("C2", "; ".join(parts))
 
 
-SCORERS = {"A1": a1, "A2": a2, "A3": a3, "B1": b1, "B2": b2, "C1": c1, "C2": c2}
+SCORERS = {"A1": a1, "A2": a2, "A3": a3, "B1": b1, "B2": b2, "C1": c1, "C2": c2, "C3": c3}
 
 
 def main():

@@ -14,6 +14,11 @@
 //! breakpoints of clip ticks to source ticks, linear between them — and, with
 //! keep pitch on, the spans that glide like tape until SR1d (SR-11).
 //!
+//! **A constant clip's** time-scaled Keep pitch off audio segment carries
+//! the same object (spec §11 SR-28): [`constant_ramp_audio`]'s two points
+//! over the segment's own range, flagged `constant`, so Swift renders and
+//! plays it as one ×1 segment as it does a ramp's.
+//!
 //! **The source map** (spec §11 SR-20 (a)) is what Swift's readers take
 //! for a media clip, ramped or not, through `rc_project_source_map`: a
 //! ramped clip's audio map, or a constant clip's two points. A ramped clip's
@@ -42,7 +47,8 @@ pub(crate) struct SourceSpan {
     pub(crate) source_duration: Ticks,
 }
 
-/// The ramp object a ramped clip's audio segment carries.
+/// The ramp object a ramped clip's audio segment carries, or a constant
+/// Keep pitch off one's (spec §11 SR-28).
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RampAudio {
     pub(crate) keep_pitch: bool,
@@ -50,6 +56,27 @@ pub(crate) struct RampAudio {
     pub(crate) glide: Vec<(Ticks, Ticks)>,
     /// `(clip tick, source tick)`, each source strictly above the last.
     pub(crate) map: Vec<(Ticks, Ticks)>,
+    /// A constant clip's segment, not a ramp's: written only when true.
+    pub(crate) constant: bool,
+}
+
+/// A constant time-scaled Keep pitch off segment's ramp object (spec §11
+/// SR-28): keep pitch off, no glide, the map `[[0, source_in], [duration,
+/// source_in + source_duration]]`, flagged `constant`.
+pub(crate) fn constant_ramp_audio(
+    source_in: Ticks,
+    source_duration: Ticks,
+    duration: Ticks,
+) -> RampAudio {
+    RampAudio {
+        keep_pitch: false,
+        glide: Vec::new(),
+        map: vec![
+            (0, source_in),
+            (duration, source_in.saturating_add(source_duration)),
+        ],
+        constant: true,
+    }
 }
 
 fn pairs(list: &[(Ticks, Ticks)]) -> Value {
@@ -61,8 +88,9 @@ fn pairs(list: &[(Ticks, Ticks)]) -> Value {
 }
 
 impl RampAudio {
-    /// `{"keep_pitch", ["glide",] "map"}` — `glide` only with keep pitch
-    /// on, since only that arm renders a span differently (SR-11).
+    /// `{"keep_pitch", ["glide",] "map", ["constant"]}` — `glide` only with
+    /// keep pitch on, since only that arm renders a span differently
+    /// (SR-11); `"constant": true` only for a constant clip's (SR-28).
     pub(crate) fn to_json(&self) -> Value {
         let mut out = Map::new();
         out.insert("keep_pitch".to_string(), Value::from(self.keep_pitch));
@@ -70,6 +98,9 @@ impl RampAudio {
             out.insert("glide".to_string(), pairs(&self.glide));
         }
         out.insert("map".to_string(), pairs(&self.map));
+        if self.constant {
+            out.insert("constant".to_string(), Value::from(true));
+        }
         Value::Object(out)
     }
 }
@@ -197,6 +228,7 @@ impl Project {
             keep_pitch: clip.audio.map(|a| a.keep_pitch).unwrap_or(true),
             glide,
             map: points,
+            constant: false,
         }
     }
 

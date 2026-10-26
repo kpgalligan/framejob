@@ -12096,6 +12096,17 @@ own binary stalls the same way at ×24 alone in both modes. The owner chose
 | E15 / E17 | 12:2:k / 12:2:v (the trimmed start): success in 0.8 s · RMS −24.66 / −24.24 |
 | E16 | 16:0:k: success in 1.6 s · 337 video frames, no audio stream |
 
+**A span read the whole file (fixed 2026-10-26, #334's batch).** `span_level` passed `-ss`/`-t`
+through `speed_spike.astats`'s `extra`, which puts them after `-i`: there they trim only the
+output, after `astats` has read every sample, so each "span" was the whole file's level. It went
+unseen while E8, E9 and E11's audio ended at 2.0 s ("audio ends at 2.0"). Since #337 an export's
+audio runs to the timeline's end, zero-padded, so those rows measured the span and failed on the
+whole file's peak (−20.545 dB) though `ffmpeg -ss 2.05 -i E8.mp4` reads −inf. `span_level` now runs
+its own ffmpeg line with `-ss`/`-t` before `-i`. Re-run: 24 rows, none failed, in 174 s; E8, E9
+and E11 peak after 2.05 s −inf; E4, E5 and E13 RMS after 2.05 s −24.08 to −24.09 dB.
+`--mutant ceiling-16` still CAUGHT (exit 1, 354 s): E8 / E9 now read the span's own peak, −18.88 /
+−20.76 dB, with U1, U2, E10 and E16 as before.
+
 ### Mutants (rule R)
 
 | Mutant | Edit | Named rows | Result |
@@ -21034,6 +21045,15 @@ SY-24, SY-25), and keep pitch at 0.98–1.02 plays `time_domain` (`evaluate.rs`'
 The script is now the standing pin (SY-27): every E, R and X row is scored, not printed against a
 target.
 
+**Since spec §11 SR-28 (#334's option (a)).** A constant Keep pitch off time-scaled clip plays its
+offline render as one ×1 segment with no SY-24 lead, so X3 (and E28, R2, R6, R7, E5–E8's Keep
+pitch off reads, through the app's own export wait) now read a render; the probe pins its handles
+to `<out-dir>/cache/ramp-audio/` and builds through the export's wait (`pinRampAudio`,
+`buildRendered`). SY-24's lead is pinned on X6 instead (×0.99999 Keep pitch on, SY-39's band, the
+one `off` segment still played unrendered; −0.001 ms on 2026-10-19) at |median| ≤ 0.5 ms
+(`X6_TARGET_MS`): with the lead gone it moves by ≈ 0.958 ms, inside SY-27's 1.0 ms. M2
+(`no-varispeed-lead`) and M6 (`source-clamp`) name X6, not X3.
+
 **New fixtures** (made once, `-v1`): `clicks44` (the click WAV at 44.1 kHz); `clicks44-aac` (.m4a)
 and `clicks44-mp3` (.mp3), clicks44 through ffmpeg at 192 kbps; `clicks44-late` (.mov), 11 s of grey
 H.264 with clicks44 as `pcm_s16le` from 0.5 s (`-itsoffset 0.5`) — Z0 requires ffprobe's audio
@@ -22826,6 +22846,23 @@ by `ramp_spike`'s and `render_spike`'s own functions (imported, never copied).
 The instance is launched with `-RCDevRampRenderHold 2`, so every render takes
 at least 2 s and an export asked for straight after the edit must wait.
 
+Since spec §11 SR-28, CX2 (×2, Keep pitch off) carries a constant `ramp` and
+plays its offline render, so its plan and audio differ from the baseline by
+design: **U1** scores CX1 and CK05 only and reports CX2's comparison.
+
+`work/` is untracked, so a fresh worktree has no `ramp-baseline/`. For #334's
+batch it was recorded on the batch's base commit (2026-10-26): a detached
+worktree at a34bea5 with `tools/proof/media` and `agent/node_modules` CoW-copied
+in, its `make app`, then from the lane `RC_PROOF_APP=release python3
+tools/proof/ramp_proof.py --baseline --app <base>/build/Build/Products/Release/"Frame
+Job.app"/Contents/MacOS/"Frame Job"` (`--app` takes the executable), and the
+worktree unregistered (`lsregister -u`) and removed. The plan text is read by
+the lane's own probe (`plans()` runs `ramp_spike_probe` over the lane's core),
+so CX2's baseline plan already carries SR-28's constant `ramp` and compares
+equal; its `wav_audio` and `prores_audio` PCM differ from the base app's
+varispeed export, as SR-28 means; its video md5 is equal. U1 on the lane's
+Release build then passed: CX1 and CK05 plan, md5 and PCM all equal.
+
 - **`--baseline`** (before any SR2b app edit, on Release): CX1 (×1), CX2 (×2,
   keep pitch off) and CK05 (×0.5, keep pitch on), each 4 s of the clicks
   fixture from in 1 s on a 320 × 180 30 fps canvas, saved and exported
@@ -23014,6 +23051,10 @@ built through `swift_build.build()` over this tree's `app/Sources` into `work/ra
 run under a 60 s wall: in-process projects (a 10 s A/V media with no file, a clip at 0.5 s from
 in 0.5 s, 5 s long, ramped [0, 2 s) linear to ×2, beside a ×1.5 constant twin and a reversed
 ramped twin), scored against the proof's own S and S⁻¹.
+
+Since spec §11 SR-28, **F4** also reads a ×1.5 Keep pitch off constant twin (`make(…,
+keepPitch: false)`): its plan audio segment carries a `ramp` flagged `constant` with no `source`
+map, and `MediaPeaks.sourceTick` reads it by the constant arithmetic exactly.
 
 - **F1** — the map: ramped, 0, every 600 ticks to 2 s, 2 s and D at in + round(S) (±1), equal
   to the plan's audio `ramp.map`; the constant twin's two points; the reversed twin's the
@@ -23642,7 +23683,7 @@ Rows (`compare`): each PNG and each `<png>.<scope>.json` byte-equal to `<ctl>`'s
 file (21 files: 12 PNGs, 9 scope JSONs); a missing control file is a FAIL by name. Exit 0 only
 when every row passes, 1 on a failed row, 2 when a fixture call was refused or wrote nothing.
 
-## Issues #337, #334, #335 — retimed-audio timing (`retimed_audio_proof.py` D0, S1–S3, X0, A1–A3, B1, B2, C1, C2; mutants PM1–PM4, `plant-step`, `stamp-place`; spec §11 #337, #335)
+## Issues #337, #334, #335 — retimed-audio timing (`retimed_audio_proof.py` D0, S1–S3, X0, A1–A3, B1, B2, C1–C3; mutants PM1–PM4, `plant-step`, `stamp-place`; spec §11 #337, #335)
 
 **#337 — the fix.** An export's sound is exactly round(range × 48 000) frames.
 `ExportAudioEnd` counts what `ExportWriter`'s audio pump hands on, in order. It cuts the
@@ -23665,12 +23706,33 @@ differed from frame 279 (from 5 399 at HEAD). The clicks fixture's placement pas
 No variant is clean, so nothing in Frame Job's writer can be fixed, and B1 is reported, not
 scored.
 
+**Since spec §11 SR-28 (#334's option (a), the owner's choice of 2026-10-26)** a constant Keep
+pitch off ×4 clip's sound is rendered offline and played as one ×1 segment, so AVFoundation's
+varispeed read is off its path: **B1 is scored**, and failed on the old tree (32 / 30 step
+events). CX2's A1 and A3 streams are its render's (the probe's `mix` read builds through the
+export's wait, `buildRendered`). `constant_render_proof.py` scores the same at ×0.25–×4.
+
 **#335 — an instrument stamp.** On T335 (A ×1 over [0, 3 s), B ×2 over [3 s, 6 s), Keep pitch
 off, one track), the PostEffects tap places A at −0.979 ms both by its stamps and by order. By
 order means every frame counted from the first chunk stamped inside B. The export places A at
 −0.958 ms. On CX1 (a ×1 clip alone on its track, SR1's `C-off-x1` shape), the PostEffects tap
 reads −85.333 ms, exactly one 4 096-frame buffer. The PreEffects tap (the product `AudioTap`'s
 flag) and the export both read +0.000 ms. Preview is in sync, and no product code changed.
+
+**Since spec §11 SR-28, T335's old shape is gone.** Its B (×2, Keep pitch off) is rendered
+offline into a 32-bit float CAF, and A's movie sound is 16-bit, so `CompositionBuilder` puts them
+on two composition audio tracks, one per source format (R2-1). No varispeed segment sits beside
+the ×1 one any more, and the probe's `tap` read refused the build ("2 composition audio tracks,
+not one"). Two changes keep both concerns scored:
+- The `tap` read now taps every composition audio track apart (one recorder and tap each, the
+  line's `tracks`), and C1 reads each segment on the track that carries it. T335 is scored
+  through the product's PreEffects tap: the rendered B's tap reads where its export does. Each
+  track there holds one source alone, so its PostEffects stamps are off as CX1's are (A none
+  within reach, B +13.667 ms); they are printed, not scored.
+- **T335K** keeps #335's own shape: B is ×0.9995 with Keep pitch ON (SY-39's band, pitch `off`,
+  still scaled by AVFoundation, unrendered) beside the same ×1 A, on one composition track. **C3**
+  scores it through the PostEffects tap exactly as C1 scored T335 before SR-28, and C2 reports its
+  PreEffects reads.
 
 One owned instance (`mcp.launch` on `proof_app.binary()`), `tools/proof/work/retimed-audio/`
 emptied each run, every document closed, no menu item. The probe reads (`mix`, `render`, `tap`)
@@ -23696,13 +23758,16 @@ are `ramp_spike_probe.swift`'s, run after the instance stops.
   on sine with `app`, `float` and `output_varispeed`: events, nearest chunk boundaries, track
   ends, max |diff| against `RampAudioRenderer`'s ×4 ideal; and X4's export against its `app`
   read.
-- **C1** (#335) — T335's PostEffects tap, 3 runs: B within 0.5 ms of the export by stamps and
-  by order (instrument); A by order within 1.0 ms of the export (scored). CX1 through the
-  PreEffects and PostEffects taps, 3 runs each (by stamps, and by `render_spike.coarse_ms`): the
-  PreEffects tap (the product's flag) within 1.0 ms of CX1's export both ways, every run
-  (scored); the PostEffects offset printed. `--mutant stamp-place` scores the PostEffects tap
-  as the product's.
-- **C2** (reported, #335) — T335 through the PreEffects tap, 3 runs.
+- **C1** (#335, SR-28) — T335 through the product's PreEffects tap, 3 runs, each segment on
+  its own composition track: A and B on two tracks; B within 0.5 ms of the export by stamps and
+  by order; A by order within 1.0 ms of the export (all scored). Its PostEffects reads printed.
+  CX1 through the PreEffects and PostEffects taps, 3 runs each (by stamps, and by
+  `render_spike.coarse_ms`): the PreEffects tap (the product's flag) within 1.0 ms of CX1's
+  export both ways, every run (scored); the PostEffects offset printed. `--mutant stamp-place`
+  scores the PostEffects taps as the product's.
+- **C2** (reported, #335) — T335K through the PreEffects tap, 3 runs.
+- **C3** (#335's own shape) — T335K's PostEffects tap, 3 runs: A and B on one track; B within
+  0.5 ms of the export by stamps and by order; A by order within 1.0 ms of the export.
 
 ```sh
 python3 tools/proof/retimed_audio_proof.py --only S1,S2,S3
@@ -23733,6 +23798,14 @@ make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/r
 | `ramp_proof.py --only P1` (Release) | 3/3 — P1 pass, m1 −86.333 ms (coarse −4 144 samples), RV1 70/70 at +0.000 ms |
 | `missing_audio_proof.py --only M1–M4,R1–R4,V0,P1` (Release) | 12/12 in 12 s; M1, M2, R1, R2 all zero at 814 400 frames (its "against the timeline's 816 000" still assumes 17 s) |
 | `export_offset_proof.py` (Release, own instance) | scores: 75/75 (4 of them measured, not pinned); no `Frame Job: ` |
+
+| Run (2026-10-26, spec §11 SR-28) | Result |
+|---|---|
+| Before the per-track tap, Release | exit 1: C1 "run k: 2 composition audio tracks, not one" (T335's rendered B on its own track); B1 pass, scored |
+| Debug, `--only C1,C2,C3`, PostEffects scored on T335 (first try) | C1 fail: T335's A track's PostEffects stamps find no click within reach and B's read +13.667 ms (29/30), each track holding one source alone, as CX1's −85.333 ms; the PreEffects reads (then C2) +0.000 ms on both. T335 is scored through the product's PreEffects tap since |
+| Debug, `--only C1,C2,C3` | 5/5 in 203 s — C1 T335 two tracks (A 1001, B 1003), PreEffects A and B +0.000 ms by stamps and by order against the export's +0.000 / +0.000 ms, 3 runs; C3 T335K one track, PostEffects A −0.979 ms by stamps, −1.000 ms by order against the export's −0.958 ms, B −0.042 ms against +0.000 ms, 3 runs |
+| Debug, `--only C1 --mutant stamp-place` | **caught**: 2/3, exit 1 — T335's and CX1's PostEffects reads scored as the product's |
+| **Release, whole, after `make gate` (the recorded run)** | **13/13 in 214 s**, exit 0 — A1 192 000 in all 8 streams, CX2's and CK05's runs identical; A2; A3 CX1, CX2 (its render), C equal to their `app` reads; B1 pass (sine 0 events in `audio_wav` and `prores_422`, clicks 80/80 at +0.000 ms); C1 T335 PreEffects A and B +0.000 ms on two tracks ×3, PostEffects reported, CX1 PreEffects +0.000 ms ×3; C2 T335K PreEffects A +0.000 / +0.292 ms, B +0.937 / +0.500 ms; C3 T335K PostEffects A −0.979 / −1.000 ms against −0.958 ms, B −0.042 ms, ×3; no `Frame Job: ` |
 
 ## Captions follow a speed or ramp edit (`caption_retime_probe.py`, `caption_retime_proof.py`; #341)
 
@@ -23855,6 +23928,10 @@ settings) as `work/ramp-spike/probe/constant-render-probe` through
 `ramp_spike.build_probe(optimize=True, wmo=True, …)`. There is one owned instance on its own
 socket, stopped by its PID, with no menu item and no `UserDefaults` write. The work folder is
 `tools/proof/work/constant-render/`.
+
+The owner chose (a) on 2026-10-26 (spec §11 SR-28); `constant_render_proof.py` (its own section
+below) is the standing proof. This spike's records stand and it is not re-run: its W packages
+(Keep pitch off ×N with an action) now render on import of the clip, before any window read.
 
 ```sh
 python3 tools/proof/constant_render_spike.py --selftest                       # S1–S3, exit 0
@@ -24132,3 +24209,54 @@ the cause is the cooperative pool, not the number of readers.
 
 **The host.** A Mac14,6 (12 cores) with macOS 26.5.1 (25F80), on AC power; the cooperative pool
 there is 12 threads. The Release runs' app came from this change's passing `make gate`.
+
+## Issue #334 option (a) — constant Keep pitch off audio rendered offline (`constant_render_proof.py` X0, D0, C1, C2, E-x0.25…E-x4, W-*, WOK, U1; selftest S1, S2; spec §11 SR-28)
+
+The owner chose option (a) on 2026-10-26 (spec §11 SR-28): a constant clip's time-scaled Keep
+pitch off audio segment carries a two-point constant `ramp` (`"constant": true`), and Swift's
+SR-6/SR-12 path renders it into `cache/ramp-audio/` and plays it as one ×1 segment, silent until
+the file lands, every export waiting for it. The proof has one owned instance on its own socket,
+stopped by its PID, with no menu item and no `UserDefaults` write; the window reads are
+`ramp_spike_probe.swift`'s `window` group with `edit: "set_speed"`, built as #334's spike builds
+it. The work folder is `tools/proof/work/constant-render-proof/`; the long fixtures are the
+spike's (`constant_render_spike.make_long`). The rows are the script's docstring.
+
+```sh
+python3 tools/proof/constant_render_proof.py --selftest                                              # S1, S2; exit 0
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/constant_render_proof.py --groups app --runs 1          # Debug loop
+env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/constant_render_proof.py           # the record (wedge is Release-only)
+```
+
+| Run | Result |
+|---|---|
+| `--selftest` | 2/2: S1 the clean ×4 sine 0 events, max \|diff\| 0.000000, the stepped one 1 event at 1.998 s; S2 0.000 ms passes, ±0.010 ms fail |
+| Debug, `--groups app --runs 1` | exit 0 in 53 s: C1 landed 1.50–5.35 s; C2 no `.caf`; every E row passes as below |
+| Release, whole (3 runs; before `ramp_spike_probe`'s per-track `tap`) | exit 0 in 406 s, 27 rows, none failed. **C1** ×0.25 / ×0.5 / ×2 / ×4 landed 0.27 / 0.16 / 0.16 / 0.17 s. **C2** ×2 Keep pitch on and ×1 Keep pitch off: no `.caf` after 5 s. **E** (frames all equal `frames_target`; sine 0 step events; clicks every one found at +0.000 ms, spread 0.000 ms): ×0.25 max \|diff\| 0.000048, 7/7; ×0.5 0.000048, 15/15; ×2 0.000030, 60/60; ×4 0.000031, 80/80. **U1** landed 1.035 / 1.091 / 1.046 s behind 20 unsettled packages. **WOK** 48 of 48 lines. D0 no complaint |
+| **Release, whole, after `make gate` (the recorded run, final instrument, 3 runs)** | exit 0 in 463 s, 27 rows, none failed. **C1** ×0.25 / ×0.5 / ×2 / ×4 landed 0.23 / 0.12 / 0.16 / 0.17 s. **C2** no `.caf` after 5 s. **E** frames all equal `frames_target`, sine 0 step events, clicks every one at +0.000 ms, spread 0.000 ms: ×0.25 max \|diff\| 0.000048, 7/7; ×0.5 0.000048, 15/15; ×2 0.000030, 60/60; ×4 0.000031, 80/80. **U1** landed 6.304 / 0.973 / 1.037 s (median 1.037; the first run's 6.3 s is the spread, bound 120 s). **WOK** 48 of 48. D0 no complaint |
+
+**The silent window** (W, the recorded run, median of 3, edit → audible s; caf bytes identical every run):
+
+| Rate | sine 10 s | sine 60 s | speech 10 s | speech 60 s |
+|---|---|---|---|---|
+| ×0.25 | 0.155 | 0.616 | 0.240 | 1.138 |
+| ×0.5 | 0.150 | 0.547 | 0.222 | 1.074 |
+| ×2 | 0.206 | 0.957 | 0.358 | 1.915 |
+| ×4 | 0.400 | 2.107 | 0.725 | 4.053 |
+
+A 10 s render is 1 924 096 bytes mono and 3 844 096 stereo; a 60 s one 11 524 096 and 23 044 096.
+
+**Mutants** (each applied by hand, run, reverted byte for byte; Release app rebuilt for the app
+ones):
+
+| Mutant | Edit | Result |
+|---|---|---|
+| `no-render` (the old tree) | `assign` places `segment`, not `segment.with_constant_render(&clip)` | caught: `constant_render_plan` 3 of 7 fail; `--groups app --runs 1` exit 1 — C1 no `.caf` at any rate, E-x0.25 / ×0.5 / ×2 max \|diff\| 0.010815 / 0.007218 / 0.014408 at −0.063 / −0.021 / +0.010 ms, E-x4 27 step events, max \|diff\| 0.517412, 79/80 at +0.016 ms |
+| `keep-on` | the Keep pitch condition dropped | caught: `keep_pitch_on_unity_and_a_freeze_carry_no_ramp` fails; C2 ×2 Keep pitch on rendered a `.caf` |
+| `unscaled` | `duration != source_duration` dropped | caught: `keep_pitch_on_unity_and_a_freeze_carry_no_ramp` fails (×1 Keep pitch off) |
+| `map-zero` | the map from 0, not `source_in` | caught: 2 of 7 fail |
+| `no-flag` | `"constant"` never written | caught: 3 of 7 fail |
+| `source-always` | `PlanSpeedRamp.source` decoded for a constant segment too | caught: `ramp_proof.py --only F4` fails (the twin's `has_map` True; its readings stay exact, a two-point map reads the same) |
+| `M2-no-varispeed-lead`, `M6-source-clamp` (`export_offset_proof.py`, re-anchored on X6) | as listed there | `before` passes every X row (X6 −0.001 ms); both killed on X6 alone (−0.958 ms, pin 0.5 ms) |
+
+**The host.** A Mac14,6 (12 cores, 96 GB) with macOS 26.5.1, on AC power, at a34bea5 plus this
+change; the Release runs' app came from this change's passing `make gate`.

@@ -1243,8 +1243,10 @@ the key map behind it.
   made blocking on the first build that needs it; reversed-only media are
   not copied.
 - `RampAudioRenderer.swift` (+`TimePitch`) · `RampAudioResampler.swift` ·
-  `RampCAFWriter.swift` — a speed ramp's audio rendered offline into one
-  file the composition plays at ×1 (speed ramps SR1b, spec §11 SR-6): a
+  `RampCAFWriter.swift` — a speed ramp's audio, or a constant Keep pitch
+  off clip's time-scaled audio (its plan `ramp` marked `constant`, spec §11
+  SR-28), rendered offline into one file the composition plays at ×1
+  (speed ramps SR1b, spec §11 SR-6): a
   `RampAudioMap` (clip ticks → source ticks) and a 48 kHz source (refused
   as `unreadable` otherwise, `AudioRateCopy.needsCopy`'s test), streamed
   through `RampSourceReader`; Keep pitch off by the Kaiser-windowed sinc
