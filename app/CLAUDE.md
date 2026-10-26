@@ -2364,7 +2364,9 @@ free.
   `addWindowController`, which would silence the save prompt on close. It
   forwards bare keys to `handleEditorKey`, the one key map.
 - `RecorderPanelController.swift` (+`Rows`, +`Recording`, +`Grants`,
-  +`Pause`, +`Landing`, +`Picker`, +`VoiceOver`) · `RecorderStatusItem.swift`
+  +`Pause`, +`Landing`, +`Picker`, +`VoiceOver`, +`Showing` — `show()`, the
+  sync timer, `setNote` and the refit, a pure move out of the base file,
+  camera-recording CR1-0) · `RecorderStatusItem.swift`
   — File ▸ New
   Recording… A `.floating`, `.nonactivatingPanel` with `hidesOnDeactivate`
   false, ONE instance, no window delegate. `show()` makes it key only when
@@ -2488,7 +2490,7 @@ free.
   `GraphicLibrary.maxSide`), `maxCellPixels`, the painter and
   `GraphicRaster.cgImage()`. `AgentCatalog.swift` (+`Clips`, +`Properties` — the five property rows and the patch
   vocabularies, spliced in place by `propertyTools`, a pure move out of `+Clips`, grading GR1 —
-  +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Render` — `render_frame` and `export`, spliced in place by `renderTools`, a pure move out of `+Files`, grading-2 G2-0 —, +`Graphics`,
+  +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Render` — `render_frame` and `export`, spliced in place by `renderTools`, a pure move out of `+Files`, grading-2 G2-0 —, +`Recording` — `recordingTools()`, `record_screen`'s row and its four hoisted clauses, spliced back last by `fileTools`, a pure move out of `+Files`, camera-recording CR1-0 —, +`Graphics`,
   +`Declarations`)
   — the catalog, spliced in ORDER (`+Actions`' rows are appended to
   `+Clips`' array last) (`recording_probe.py` reads the last eleven
@@ -2501,7 +2503,7 @@ free.
   and so nothing to read from the table — the eleven of the Projects group,
   `AgentCatalog+Audio.swift`'s five composites and
   `AgentCatalog+Captions.swift`'s four, spliced back at the two points they
-  left, the five other file tools (`AgentCatalog+Files.swift`'s `import_media`, `consolidate_media` and `record_screen`, and `AgentCatalog+Render.swift`'s `render_frame`, `export`, `export_status` and `cancel_export`, spliced back where they left), and
+  left, the five other file tools (`AgentCatalog+Files.swift`'s `import_media` and `consolidate_media`, `AgentCatalog+Recording.swift`'s `record_screen`, and `AgentCatalog+Render.swift`'s `render_frame`, `export`, `export_status` and `cancel_export`, spliced back where they left), and
   `AgentCatalog+Graphics.swift`'s nine, after its two `opTool` rows.
   `set_text`'s clause for `case`, `words` and `word_style` is
   `AgentServer.textWordsClause` in `AgentCatalog+Captions.swift` (a pure move

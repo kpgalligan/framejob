@@ -784,12 +784,12 @@ Lane P2's, the R1 review's chrome fixes (section 5's rows), measured
                    (RecorderPanelController+Rows.swift) — 660/662: 5l's
                    two rows, the seeded row rebuilt away (fix 4).
   no-constrain     the grown card is not constrained to its screen
-                   (RecorderPanelController.swift) — 661/662: 5h's
+                   (RecorderPanelController+Showing.swift) — 661/662: 5h's
                    fitWindowToContent read — NSWindow.setFrame re-seats an
                    off-screen titled panel on this multi-display host, so
                    the source read is the kill and not the geometry (fix 5).
   show-while-hidden  show() un-hides the panel into a picked recording
-                   (RecorderPanelController.swift) — 661/662: 5j (fix 7).
+                   (RecorderPanelController+Showing.swift) — 661/662: 5j (fix 7).
   window-row-unguarded  Record over the Window… row with no filter falls
                    through (RecorderPanelController+Recording.swift) —
                    660/662: 5k's two rows (fix 8).
@@ -7729,15 +7729,16 @@ def section_chrome(binary, sources):
     grants = read_code(sources, "RecorderPanelController+Grants.swift")
     land = read_code(sources, "RecorderPanelController+Landing.swift")
     base = read_code(sources, "RecorderPanelController.swift")
+    showing = read_code(sources, "RecorderPanelController+Showing.swift")
     rows = read_code(sources, "RecorderPanelController+Rows.swift")
     route = read_code(sources, "AppDelegate+Recording.swift")
     status = read_code(sources, "RecorderStatusItem.swift")
     for name, code in [
         ("+Recording", rec), ("+Grants", grants), ("+Landing", land), ("base", base),
-        ("+Rows", rows), ("+Recording (route)", route), ("status item", status),
+        ("+Showing", showing), ("+Rows", rows), ("+Recording (route)", route), ("status item", status),
     ]:
         check(f"5h: {name} is in the sources", code is not None)
-    if None in (rec, grants, land, base, rows, route, status):
+    if None in (rec, grants, land, base, showing, rows, route, status):
         return
     # fix 1: the grant is asked on every press — no `canAsk` gate survives here
     # (canask-restored puts one back).
@@ -7759,7 +7760,7 @@ def section_chrome(binary, sources):
     check("5h: `RecorderStatusItem.swift`'s doc names the .common run-loop mode (fix 6)",
           ".common" in status_raw)
     # fix 5: fitWindowToContent constrains the grown frame to its screen.
-    fit_body = "\n".join(function_body(base.splitlines(), "func fitWindowToContent()") or [])
+    fit_body = "\n".join(function_body(showing.splitlines(), "func fitWindowToContent()") or [])
     check("5h: fitWindowToContent constrains the frame to its screen before setFrame "
           "(fix 5, no-constrain)",
           "constrainFrameRect" in fit_body and "window.screen" in fit_body, fit_body)
@@ -8021,12 +8022,13 @@ def section_chrome_pause(binary, sources):
     tool_chrome = read_code(sources, "AgentServer+RecordingChrome.swift")
     pause = read_code(sources, "RecorderPanelController+Pause.swift")
     base = read_code(sources, "RecorderPanelController.swift")
+    showing = read_code(sources, "RecorderPanelController+Showing.swift")
     for name, code in [("+Recording", rec), ("+Landing", land), ("status item", status),
                        ("+Recording (route)", route), ("AgentServer+Recording", tool),
                        ("AgentServer+RecordingChrome", tool_chrome), ("+Pause", pause),
-                       ("base", base)]:
+                       ("base", base), ("+Showing", showing)]:
         check(f"5u: {name} is in the sources", code is not None)
-    if None in (rec, land, status, route, tool, tool_chrome, pause, base):
+    if None in (rec, land, status, route, tool, tool_chrome, pause, base, showing):
         return
     body = "\n".join(function_body(rec.splitlines(), "func recordingDidStart()") or [])
     check("5u: recordingDidStart hides the panel for EVERY source — hiddenForRecording = true and "
@@ -8064,8 +8066,8 @@ def section_chrome_pause(binary, sources):
           "three closures and paused: recorder.isPaused",
           all(t in tool_chrome for t in ("onPause:", "onResume:", "onStop:", "paused: recorder.isPaused")))
     check("5u: show()'s guard is unchanged — beeps while hiddenForRecording",
-          "guard !hiddenForRecording else {" in base
-          and "NSSound.beep()" in "\n".join(function_body(base.splitlines(), "func show()") or []))
+          "guard !hiddenForRecording else {" in showing
+          and "NSSound.beep()" in "\n".join(function_body(showing.splitlines(), "func show()") or []))
     resume_body = "\n".join(function_body(pause.splitlines(), "func resumeRecording()") or [])
     check("5u: +Pause.swift — a refused pause beeps; a refused resume keeps resumeProblem and redraws "
           "the note through syncMicrophoneNote; a landed resume clears it",
@@ -10274,14 +10276,14 @@ MUTANTS = {
         "rebuildDestinations runs during a recording — Record Into follows the front document "
         "away from the captured choice (fix 4 undone)"),
     "no-constrain": (
-        "RecorderPanelController.swift",
+        "RecorderPanelController+Showing.swift",
         "        let screen = window.screen ?? NSScreen.main ?? NSScreen.screens.first\n"
         "        frame = window.constrainFrameRect(frame, to: screen)\n",
         "",
         "the grown card is not constrained to its screen — the countdown pushes a bottom-parked "
         "panel under the Dock (fix 5 undone)"),
     "show-while-hidden": (
-        "RecorderPanelController.swift",
+        "RecorderPanelController+Showing.swift",
         "        guard !hiddenForRecording else {\n"
         "            NSSound.beep()\n"
         "            return\n"

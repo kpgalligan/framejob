@@ -61,9 +61,9 @@ extension AgentServer {
     /// `consolidate_media`, `transcribe`, `get_transcript`, `export_captions`,
     /// `render_frame`, `export`, `export_status`, `cancel_export`,
     /// `record_screen` — the four caption rows of them built in
-    /// `AgentCatalog+Captions.swift`,
-    /// `render_frame`, `export`, `export_status` and `cancel_export` in
-    /// `AgentCatalog+Render.swift`) and the nine of
+    /// `AgentCatalog+Captions.swift`, `render_frame`, `export`,
+    /// `export_status` and `cancel_export` in `AgentCatalog+Render.swift`,
+    /// `record_screen` in `AgentCatalog+Recording.swift`) and the nine of
     /// `AgentCatalog+Graphics.swift` (`write_graphic`, `get_graphic`,
     /// `graphic_reference`, `render_graphic`, `import_graphic_font`,
     /// `import_graphic_asset`, `delete_graphic`, `rename_graphic`,
@@ -563,9 +563,9 @@ extension AgentServer {
                 ]),
         ]
         // The file rows — Media, Captions, Rendering and export — are
-        // `AgentCatalog+Files.swift`'s (the caption rows built in
-        // `AgentCatalog+Captions.swift`, rendering and export in
-        // `AgentCatalog+Render.swift`). They are the catalog's LAST three
+        // `AgentCatalog+Files.swift`'s (captions built in `+Captions`,
+        // rendering and export in `+Render`, `record_screen` in
+        // `+Recording`). They are the catalog's LAST three
         // groups, so this splice is an append and the order is unchanged;
         // `ticks` is the one local they share with the groups above.
         // The dev tools' rows (AgentServer+DevTools.swift) go HERE, before the file

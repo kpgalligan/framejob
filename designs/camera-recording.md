@@ -74,8 +74,11 @@ edit lands everything; undo leaves the files on disk; every door has an MCP mirr
   session's `synchronizationClock`); on macOS a second `startRecording(to:)` switches files
   without losing samples. `AVCaptureDeviceTypeContinuityCamera` is reported only with the
   Info.plist key `NSCameraUseContinuityCameraDeviceType`; otherwise a Continuity Camera reports
-  `builtInWideAngleCamera`. `SCRecordingOutput` reports no start time; `SCStream` has a
-  `synchronizationClock`.
+  `builtInWideAngleCamera` (CR0's D2 found the second half false on this host: without the key
+  the iPhone is listed as `AVCaptureDeviceTypeExternal`, `isContinuityCamera` still true).
+  `SCRecordingOutput` reports no start time; `SCStream` has a `synchronizationClock`. macOS has
+  no `.inputPriority` session preset; a session keeps a requested format only while the device's
+  configuration lock is held (CR0).
 - **The host (2026-10-26).** `system_profiler SPCameraDataType` lists FaceTime HD Camera, OBS
   Virtual Camera (a camera extension) and an iPhone's Continuity Camera.
 
@@ -95,35 +98,83 @@ edit lands everything; undo leaves the files on disk; every door has an MCP mirr
   camera entitlement are needed, the "best format" rule, and which rows a proof can run. A STOP
   verdict goes to the owner with the measurement. **Proof**: the spike itself, run whole once;
   its selftest and mutants.
-- **CR1 — camera alone.** Tolls first, each a pure move landed and gated alone:
-  `RecorderPanelController.swift` (399) and `AgentCatalog+Files.swift` (409). Then: a camera
-  recorder in new files beside `ScreenRecorder` (CR0's writer, the microphone second file placed
-  by CR0's offset, pause as a file sequence, a camera that stops on its own ends the recording as
-  a microphone ends a voice-over); `RecordingSource.camera`; files `Camera Recording <date> at
-  <time>.mov`; the camera grant (`NSCameraUsageDescription`, the entitlement, the panel's ask and
-  System Settings pane door, `RecordingGrant`'s camera read and refusal); the panel's Source ▸
-  Camera row and a Camera popup (devices by name, the best format); the landing (open project:
-  the picture rule's two-try; new project: the canvas sized to the camera's format at its rate);
-  `record_screen`'s `source: "camera"` and `camera` (a device's name or unique id; an unknown
-  name refused naming the cameras present). **Decides** CAM-3 onward: the files, the grant
-  doors and the tool's refusal order, the canvas rule, whether the panel stays up for a camera
-  recording (the voice-over's precedent) or goes away. **Proof**: a new
-  `tools/proof/camera_recording_proof.py` (MCP: the headless tier — refusals in order, the
-  catalog count, parity — and a granted tier skipping by name without a camera or the grant),
-  `recording_probe.py` sections for the pure values and the landing ops, mutants. Spec §6,
-  §7.4, §7.9; `docs/guide/screen-recording.md`; manual-check rows (the camera prompt from the
-  signed bundle, framing).
-- **CR2 — the preview and the formats.** The live preview in the panel (CR0's cost decides how,
-  and when it runs: only while the panel shows the Camera row or the camera row); the Format
-  popup (the camera's formats as resolution × frame rate, Best first); hot-plug (a camera
-  connected or removed while the panel is up); Continuity Camera listed by its own type; the
-  tool's `camera_format`. **Decides** the popup's rows and its persistence, the preview's
-  lifetime, what a removed camera does to a running recording. **Proof**: probe rows for the
-  format list → popup items, `snapshot_ui` of the panel, MCP `camera_format` rows; a screen in
-  `designs/screens/`; manual-check rows (the preview's look, the Continuity Camera pairing).
+CR1 was one phase until CR0 landed. It is three now: its two tolls are a pure-move phase of
+their own (the size rule lands a toll alone), and the camera recorder with its tool is a
+separate phase from the panel that drives it.
+
+- **CR1-0 — the tolls.** Two pure moves, landed and gated alone, with nothing widened.
+  `AgentCatalog+Files.swift` (409) gives `record_screen`'s row and its four hoisted clauses to a
+  new `AgentCatalog+Recording.swift` (`recordingTools()`, spliced back in where they left), the
+  seam `designs/adr/app-file-history.md` names. `RecorderPanelController.swift` (399) gives its
+  `// MARK: - Showing` (`show()`, the sync timer, `setNote`, `fitWindowToContent`) to a new
+  `RecorderPanelController+Showing.swift`. `recording_probe.py`'s reads and mutants of the moved
+  code are re-aimed. **Proof**: the Release bundle's catalog snapshot is the same JSON before and
+  after (compared parsed: key order aside, since `JSONSerialization` writes no sorted keys; tool
+  order kept, `record_screen` last); `recording_probe.py --only chrome,chrome_pause,catalog`; the two re-aimed mutants are
+  caught.
+- **CR1a — the camera recorder and the tool; CAM-3.** CAM-3 is recorded in §11 before the code
+  and settles five things:
+  - **Best format.** CAM-2's rule picks the built-in camera's square 1552 × 1552. CAM-3 says
+    whether "best" means the largest area or the largest landscape area. If landscape, the writer
+    is measured at that format first, because CR0 measured it only at 1552 × 1552.
+  - **The microphone's offset.** By `startPTS` on the host clock or by callbacks. CR0's M1, M2
+    and P2 found the two differ by 63–241 ms; the writer's camera start is its first buffer's PTS.
+  - **The camera entitlement.** CAM-2's `not-needed` speaks only for a shell-launched binary
+    under the terminal's grant.
+  - **The files and the tool's refusal order.**
+  - **The canvas rule.**
+
+  The camera recorder goes in new files:
+  - an `AVCaptureSession` with an `AVCaptureVideoDataOutput` feeding one `AVAssetWriter` per
+    segment (CR0's writer), `startSession` at the first buffer's PTS;
+  - whenever a format is set, the device's configuration lock held from before `startRunning`
+    to after `stopRunning`, and the format set again once the session runs (CR0);
+  - the microphone as a second file per segment;
+  - pause as a new writer on the running session (CR0's P2: resumes in 5–26 ms);
+  - a camera that stops on its own ends the recording, as a microphone ends a voice-over;
+  - `ScreenRecorder` forwarding to it, as it forwards to `voiceSession`.
+
+  Also in CR1a:
+  - `RecordingSource.camera`;
+  - files named `Camera Recording <date> at <time>.mov`;
+  - `NSCameraUsageDescription`, and no `NSCameraUseContinuityCameraDeviceType` (CR0's D2);
+  - `RecordingGrant`'s camera read and refusal;
+  - the landing: into an open project by the picture rule; as a new project with the canvas at
+    the camera format's size and rate;
+  - `record_screen`'s `source: "camera"` and `camera` (a device's name or unique id; an unknown
+    name is refused, naming the cameras present).
+
+  **Proof**: a new `tools/proof/camera_recording_proof.py` over MCP, with two tiers. The
+  headless tier checks the refusals in order, the catalog count and parity. The granted tier
+  skips by name without a camera or the grant. Beside it: probe rows for the pure values and the
+  landing ops, and mutants. Docs: spec §6, §7.4 and §7.9; `docs/guide/screen-recording.md`; a
+  manual-check row for the camera prompt from the signed bundle.
+- **CR1b — the panel's Camera source.** The panel gains:
+  - a Source ▸ Camera row and a Camera popup (devices by name, the best format);
+  - the camera grant, asked by the panel, with its System Settings pane door (`Privacy_Camera`)
+    and `RecordingGrant`'s camera step;
+  - its defaults key and the harness pin;
+  - the status item, as for every source.
+
+  **Decides** whether the panel stays up for a camera recording (the voice-over's precedent) or
+  goes away. **Proof**: probe rows for the grant steps and for the rows → choice; `snapshot_ui`
+  of the panel; mutants; a manual-check row for framing. Docs: `docs/guide/screen-recording.md`.
+- **CR2 — the preview and the formats.** The live preview in the panel: an
+  `AVCaptureVideoPreviewLayer`, which CR0's V1 measured at about 155–160 MB of RSS, so it runs
+  only while the panel shows the Camera row or the camera row. The Format popup lists the
+  camera's formats as resolution × frame rate, Best first, and sets the chosen one under the
+  device's configuration lock (CR0). Hot-plug: a camera connected or removed while the panel is
+  up. A Continuity Camera is marked by `isContinuityCamera`, since CR0's D2 lists it without the
+  key, as External. The tool gains `camera_format`. **Decides** the popup's rows and their
+  persistence, the preview's lifetime, and what a removed camera does to a running recording.
+  **Proof**: probe rows for the format list → popup items; `snapshot_ui` of the panel; MCP
+  `camera_format` rows; a screen in `designs/screens/`; manual-check rows for the preview's look
+  and the Continuity Camera pairing.
 - **CR3 — camera + screen.** The camera row under Source when recording a display or a window;
-  the camera capture started beside the `SCStream` (CR0's order); per-segment offsets by CR0's
-  estimator; pause and resume in step; the landing: the screen on its track, the camera on a
+  the camera capture started beside the `SCStream` (CR0: the order of the starts made no
+  measurable difference, and started in one run-loop turn the writer's camera began 87–130 ms
+  before the screen file); per-segment offsets by E2 (CR0: the PTS of the first `.screen` frame
+  at or after the did-start's arrival); pause and resume in step; the landing: the screen on its track, the camera on a
   new track ABOVE it at a corner picture-in-picture (the corner, scale and inset decided here),
   the microphone on its back track, one grouped edit; a camera failure in a screen recording is
   that recording's note, never its failure; `record_screen`'s `camera` with the screen source.
@@ -311,7 +362,67 @@ arrival, and here the callback offset differs from the `startPTS` offset by more
 (M2 213.6 ms, P2 about 63 ms; the screen's own E1 is within 21 ms of its truth and E2 within 0.5 ms); whether it
 should move to `startPTS` is an issue, not CR0's (recording.md's "two FILES" bullet stands).
 
-## CR1 — camera alone
+## CR1-0 — the tolls
+
+### Record
+
+**Landed** (2026-10-26). Two pure moves with nothing widened and no body changed:
+- `record_screen`'s row (its `// MARK: Recording` block and the `tool("record_screen", …)` entry)
+  and its four hoisted clauses (`recordingPauseClause`, `recordingUnreadableClause`,
+  `recordingResultClause`, `recordingVoiceOverClause`, with the comment that explains the
+  hoisting) moved from `AgentCatalog+Files.swift` to a new `AgentCatalog+Recording.swift`.
+  The new file's `recordingTools()` is spliced back in LAST with `rows += recordingTools()`, so
+  `record_screen` is still the catalog's last row. The `+Files` header now counts eight rows built
+  elsewhere, and `AgentCatalog.swift`'s `tool` doc and its splice comment name the new file.
+  These edits are comments only, and `AgentCatalog.swift` stays at 578 lines.
+- The panel's `// MARK: - Showing` (`show()`, the private `armSyncTimer()`, the `syncPhase()`
+  pointer comment, `setNote`, `fitWindowToContent()`) moved from `RecorderPanelController.swift`
+  to a new `RecorderPanelController+Showing.swift`. The base header lists the ninth file.
+- `tools/proof/recording_probe.py`: 5h's `fitWindowToContent` read and 5u's `show()` guard and
+  body reads now come from `+Showing.swift`. The file is in both sections' "is in the sources"
+  lists. `no-constrain` and `show-while-hidden` mutate `+Showing.swift` with their text
+  unchanged, and the docstring names it.
+- `designs/spec/07.4-swift-file-map.md` row 52 lists `+Showing.swift`. The file still has 57
+  lines.
+
+**Sizes** (`wc -l`, before → after): `AgentCatalog+Files.swift` 409 → 166,
+`AgentCatalog+Recording.swift` new, 273; `RecorderPanelController.swift` 399 → 326,
+`RecorderPanelController+Showing.swift` new, 85.
+
+**Measured** (from the worktree; each command run once but `make gate`, which the build ran
+three times):
+- `git diff 4855e70 HEAD -- app core project.yml`: empty. `python3 tools/proof/proof_app.py
+  --app release check`: `fresh: …/Release/Frame Job.app/Contents/MacOS/Frame Job`, exit 0. The
+  bundle's `agent-catalog.json` (298163 bytes) was copied as the "before" snapshot.
+- `make typecheck`: exit 0, 0 errors, the 4 baseline warnings, and tsc printed no error.
+- `python3 tools/proof/recording_probe.py --only chrome,chrome_pause,catalog`: exit 0,
+  `212/212 checks passed`.
+- `… --only chrome,chrome_pause --mutant no-constrain`: exit 1, `181/182 checks passed`
+  (FAIL 5h: fitWindowToContent constrains the frame to its screen).
+- `… --only chrome,chrome_pause --mutant show-while-hidden`: exit 1, `180/182 checks passed`
+  (FAIL 5j: show() leaves the panel invisible…; FAIL 5u: show()'s guard is unchanged).
+- `make gate`: `gate: PASS 224s` (names pass 1 s, typecheck pass 5 s, fmt skip, lint skip,
+  test pass 115 s, app pass 103 s). That was the one full pass. A second invocation, after a
+  failed edit of this record that changed nothing, skipped every step; a third, after this
+  record was written, re-ran only names (pass) and skipped the rest as byte-identical,
+  `gate: PASS 1s`.
+- The structural catalog comparison of the "before" snapshot against the gate's Release
+  bundle printed `106 record_screen` and exited 0: the parsed documents are equal, the tool
+  names are equal in order, and the last is `record_screen`.
+
+**Deviations.** The step order: `make gate` ran before this record was written (the spec has
+the record first), so the record could carry the gate's printed numbers; the gate was run again
+after the record edit, and only names re-ran. None in the code.
+
+**Owed.** Nothing for CR1-0. Its `app/CLAUDE.md` map entries (`+Showing` in the panel's family,
+`+Recording` in the catalog's) landed with it. `designs/adr/app-file-history.md`'s
+next-seam line for `AgentCatalog+Files.swift` is condensed at CR4.
+
+## CR1a — the camera recorder and the tool
+
+### Record
+
+## CR1b — the panel's Camera source
 
 ### Record
 

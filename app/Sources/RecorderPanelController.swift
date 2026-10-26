@@ -17,8 +17,9 @@ import ScreenCaptureKit
 /// everything from the recording's end to the note that says where it
 /// went, `+Picker.swift` the window picker, `+Pause.swift` the pause
 /// and the resume, the hidden recording's one door and the phases drawn
-/// (R2c), and `+VoiceOver.swift` the Source row "Microphone Only" (#99).
-/// Eight files at the 400-line cap, and the
+/// (R2c), `+VoiceOver.swift` the Source row "Microphone Only" (#99), and
+/// `+Showing.swift` `show()`, the sync timer, `setNote` and the refit.
+/// Nine files at the 400-line cap, and the
 /// crossing members are internal for it, the tree's rule for a class split
 /// across files.
 ///
@@ -321,79 +322,5 @@ final class RecorderPanelController: NSWindowController {
         recorder.discardPreparedMicrophone()
         syncTimer?.invalidate()
         syncTimer = nil
-    }
-
-    // MARK: - Showing
-
-    /// Beeps and shows nothing while a recording has the panel hidden (the
-    /// type doc): the welcome window's button is the caller that would
-    /// otherwise un-hide it into the recording.
-    func show() {
-        guard !hiddenForRecording else {
-            NSSound.beep()
-            return
-        }
-        if phase == .idle {
-            rebuildSources()
-            rebuildMicrophones()
-            restoreChoices()
-        }
-        rebuildDestinations()
-        refreshSizeNote()
-        fitWindowToContent()
-        floatAgain()
-        if NSApp.isActive {
-            showWindow(nil)
-            window?.makeKeyAndOrderFront(nil)
-        } else {
-            window?.orderFrontRegardless()
-        }
-        armSyncTimer()
-    }
-
-    /// One second, while the panel is up: the Record Into rows follow the
-    /// documents that open and close and the one in front — while idle,
-    /// which `rebuildDestinations` itself decides.
-    private func armSyncTimer() {
-        guard syncTimer == nil else { return }
-        syncTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
-            guard let self else {
-                timer.invalidate()
-                return
-            }
-            guard self.window?.isVisible == true else { return }
-            self.rebuildDestinations()
-        }
-    }
-
-    // `syncPhase()` and `refreshStatusLabel()` — the phases drawn — are
-    // `+Pause.swift`'s since the R2 review, the base file's toll.
-
-    func setNote(_ text: String) {
-        noteLabel.stringValue = text
-        noteLabel.isHidden = text.isEmpty
-        fitWindowToContent()
-    }
-
-    /// The window takes the card's fitting size, keeping its TOP-LEFT where
-    /// it was — `setContentSize` would keep the bottom-left and walk the
-    /// title bar up the screen every time the note appeared — and then
-    /// CONSTRAINED to its screen (`window.screen`, else the main one), so a
-    /// panel whose bottom edge sits near the Dock is pushed up when the
-    /// countdown grows it rather than growing under the Dock (R1 review;
-    /// measured, the numeral adds 88 pt below the rows and a note 42 more).
-    /// `setFrame` itself constrains nothing — a window can be put anywhere
-    /// programmatically, on screen or off — which is why the call is
-    /// explicit.
-    func fitWindowToContent() {
-        guard let window else { return }
-        card.layoutSubtreeIfNeeded()
-        let content = NSRect(origin: .zero, size: card.fittingSize)
-        var frame = window.frameRect(forContentRect: content)
-        let current = window.frame
-        frame.origin = NSPoint(x: current.minX, y: current.maxY - frame.height)
-        let screen = window.screen ?? NSScreen.main ?? NSScreen.screens.first
-        frame = window.constrainFrameRect(frame, to: screen)
-        window.setFrame(frame, display: window.isVisible)
     }
 }
