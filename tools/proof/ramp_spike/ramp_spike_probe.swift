@@ -5,7 +5,7 @@
 // (`-D FRAMEJOB_DEV_TOOLS`), with `Blank.mp4` and a `default.metallib` of the
 // app's own shader beside the binary:
 //
-//     ramp-spike-probe <plan|export|playback|render> <work-dir> <job.json>
+//     ramp-spike-probe <plan|export|playback|render|window> <work-dir> <job.json>
 //
 // `job.json` is a list of `{name, project, fixture, reads, length}`: the
 // project is a `project.json` (plan, export) or a `.framejob` package
@@ -61,6 +61,23 @@
 //            job's `lead_frames` overriding `rateLeadFrames` for SR-14's
 //            sweep; `getrusage`'s `ru_maxrss`, the process's peak so far). No
 //            document is opened.
+//
+//   window   (#334, `constant_render_spike.py`) `job.json` is a list of `{name,
+//            project, clip, action, speed, bound_s}`, each project a
+//            `.framejob` package with no render yet. Per job the package is
+//            opened as `Opened` (the `.accessory` policy, as `playback`), its
+//            item made ready, then `performGroupedEdit("Speed",
+//            [setActionEndRaw(clip:action:patch: ["speed": speed])])` — the
+//            agent's own `set_action_end` path — and the run loop turned in
+//            5 ms steps up to `bound_s`. The line `{name, read: "window", ok,
+//            error, pre_edit_caf, plan_bytes, landed_s, audible_s, caf_bytes}`:
+//            whether the item built before the edit already carried a segment
+//            from `<project>/cache/ramp-audio/`, the plan's UTF-8 size after
+//            the edit, the seconds from the edit until a `*.caf` (not
+//            `.landing` or `.partial`) exists there, and until the built
+//            composition carries a segment from there with the item ready
+//            and no rebuild in flight (null when not within the bound), and
+//            the landed file's size. The document is closed after each job.
 import AVFoundation
 import AppKit
 import MediaToolbox
@@ -70,9 +87,13 @@ final class ProbeDocumentController: NSDocumentController {
 }
 
 let arguments = CommandLine.arguments
-guard arguments.count == 4, ["plan", "export", "playback", "render"].contains(arguments[1]) else {
+guard arguments.count == 4,
+    ["plan", "export", "playback", "render", "window"].contains(arguments[1])
+else {
     FileHandle.standardError.write(
-        Data("usage: ramp-spike-probe <plan|export|playback|render> <work-dir> <job.json>\n".utf8))
+        Data(
+            "usage: ramp-spike-probe <plan|export|playback|render|window> <work-dir> <job.json>\n"
+                .utf8))
     exit(2)
 }
 let group = arguments[1]
@@ -80,7 +101,8 @@ let runs = URL(fileURLWithPath: arguments[2], isDirectory: true).appendingPathCo
 try? FileManager.default.createDirectory(at: runs, withIntermediateDirectories: true)
 
 _ = ProbeDocumentController()
-NSApplication.shared.setActivationPolicy(group == "playback" ? .accessory : .prohibited)
+NSApplication.shared.setActivationPolicy(
+    group == "playback" || group == "window" ? .accessory : .prohibited)
 // Preview Quality pinned to Full in the argument domain (volatile, never
 // written), so a stored Half cannot halve the frames this probe reads.
 UserDefaults.standard.setVolatileDomain(
@@ -609,6 +631,96 @@ if group == "render" {
         exit(3)
     }
     for job in renderJobs { renderRead(job) }
+    exit(0)
+}
+
+// MARK: - The silent-until-rendered window (#334)
+
+struct WindowJob: Decodable {
+    let name: String
+    let project: String
+    let clip: UInt32
+    let action: UInt32
+    let speed: Double
+    let bound_s: Double
+}
+
+/// The landed renders in `folder`: `*.caf`, not `.landing` or `.partial`.
+func landedRenders(_ folder: URL) -> [URL] {
+    let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+    return names.filter { $0.hasSuffix(".caf") }.sorted()
+        .map { folder.appendingPathComponent($0) }
+}
+
+/// Whether `built`'s audio carries a segment whose source is in `folder`.
+func carriesRender(_ built: BuiltComposition?, from folder: URL) -> Bool {
+    guard let built else { return false }
+    let root = folder.resolvingSymlinksInPath().path
+    return built.composition.tracks(withMediaType: .audio).contains { track in
+        track.segments.contains { segment in
+            guard let source = segment.sourceURL else { return false }
+            return source.deletingLastPathComponent().resolvingSymlinksInPath().path == root
+        }
+    }
+}
+
+func windowRead(_ job: WindowJob) {
+    var line: [String: Any] = [
+        "name": job.name, "read": "window", "pre_edit_caf": false, "plan_bytes": 0,
+        "landed_s": NSNull(), "audible_s": NSNull(), "caf_bytes": NSNull(),
+    ]
+    var opened: Opened?
+    do {
+        let o = try Opened(job.project)
+        opened = o
+        _ = try o.readyItem()
+        let folder = URL(fileURLWithPath: job.project, isDirectory: true)
+            .appendingPathComponent("cache/ramp-audio", isDirectory: true)
+        line["pre_edit_caf"] = carriesRender(o.editor.playback.built, from: folder)
+        let t0 = Date()
+        o.document.performGroupedEdit(
+            "Speed",
+            [ReelOp.setActionEndRaw(clip: job.clip, action: job.action, patch: ["speed": job.speed])])
+        line["plan_bytes"] = o.document.project.planJSON.utf8.count
+        var landed: URL?
+        while Date().timeIntervalSince(t0) < job.bound_s {
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.005))
+            let now = Date().timeIntervalSince(t0)
+            if landed == nil, let first = landedRenders(folder).first {
+                landed = first
+                line["landed_s"] = now
+            }
+            if line["audible_s"] is NSNull, carriesRender(o.editor.playback.built, from: folder),
+                o.player.currentItem?.status == .readyToPlay, !o.editor.playback.rebuilding
+            {
+                line["audible_s"] = now
+            }
+            if landed != nil, !(line["audible_s"] is NSNull) { break }
+        }
+        if let landed {
+            let size = (try? FileManager.default.attributesOfItem(atPath: landed.path))?[.size]
+            line["caf_bytes"] = (size as? NSNumber)?.int64Value ?? NSNull()
+        }
+        line["ok"] = true
+        line["error"] = NSNull()
+    } catch {
+        line["ok"] = false
+        line["error"] = "\(error)"
+    }
+    opened?.close()
+    emit(line)
+}
+
+if group == "window" {
+    let windowJobs: [WindowJob]
+    do {
+        windowJobs = try JSONDecoder().decode(
+            [WindowJob].self, from: Data(contentsOf: URL(fileURLWithPath: arguments[3])))
+    } catch {
+        FileHandle.standardError.write(Data("the job file could not be read: \(error)\n".utf8))
+        exit(3)
+    }
+    for job in windowJobs { windowRead(job) }
     exit(0)
 }
 

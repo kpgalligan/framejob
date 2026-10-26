@@ -23809,3 +23809,206 @@ make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/c
 | `clip_inspector_proof.py` | 41/41 |
 | `make gate` | PASS 354 s (names 1 s, typecheck 5 s, fmt 2 s, lint 25 s, test 206 s, app 114 s) |
 | **`caption_retime_proof.py`, Release, after the gate (the recorded run)** | **10/10 in 4 s**, exit 0; no `Frame Job: ` |
+
+## Issue #334 — the cost of rendering constant Keep pitch off audio offline (`constant_render_spike.py` H0, B0, F0, D0, I1, A-*, R-*, Q-*, W-*, WOK; selftest S1–S3, mutants `per-second`, `ideal-phase`, `order-off`)
+
+A spike, not a proof: it measures option (a) of #334 (render every constant ×0.25/×0.5/×2/×4
+Keep pitch off segment offline through SR-6's `RampAudioRenderer`, as a ramp is rendered) so
+the owner can choose between (a) and (b), accepting the limit in spec §11. It changes no
+product file, and #334 stays open. The measuring is imported from `ramp_proof`, `ramp_spike`,
+`render_spike`, `retimed_audio_proof` (`frames_target`) and `export_offset_proof`
+(`read_ffmpeg`). Probe reads are `ramp_spike_probe.swift`'s `render` and its new `window`
+group (`ramp_spike/README.md`), built `-O` with whole-module optimisation (Xcode's Release Swift
+settings) as `work/ramp-spike/probe/constant-render-probe` through
+`ramp_spike.build_probe(optimize=True, wmo=True, …)`. There is one owned instance on its own
+socket, stopped by its PID, with no menu item and no `UserDefaults` write. The work folder is
+`tools/proof/work/constant-render/`.
+
+```sh
+python3 tools/proof/constant_render_spike.py --selftest                       # S1–S3, exit 0
+python3 tools/proof/constant_render_spike.py --selftest --mutant per-second   # exit 1
+python3 tools/proof/constant_render_spike.py --selftest --mutant ideal-phase  # exit 1
+python3 tools/proof/constant_render_spike.py --selftest --mutant order-off    # exit 1
+make gate
+env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/constant_render_spike.py --groups app
+env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/constant_render_spike.py --groups render,quality
+env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/constant_render_spike.py --groups window
+```
+
+**The fixtures.**
+- `long-sine.wav`: mono s16 48 kHz, 0.5·sin(2π·220·n/48000), 250 s.
+- `long-speech.wav`: `media/speech.mov`'s audio, looped and cut to 250 s, stereo pcm_s16le 48 kHz.
+- `ramp_spike`'s 20 s sine and clicks movies.
+
+A constant clip is ×N with Keep pitch off, from source in 1 s. The ramp is RV1's shape: ×1, then
+[1 s, 3 s) linear to ×2.
+
+**The rows.**
+- **H0**: `host_snapshot()` at the start and after each group. It holds `ramp_spike.host()`, the
+  top five processes by CPU, the count of `swift-frontend|xcodebuild|cargo|rustc` processes (the
+  other lanes' builds) and the power source.
+- **B0**: the probe build.
+- **F0**: the long fixtures (48 kHz, ≥ 241 s, speech 2 channels and sine 1, sine sample 1000
+  within 1e-4 of its formula) and `ramp_spike.z0()`.
+- **D0**: the instance listened, and no `Frame Job: ` line appeared.
+- **A-<media>-x<N>** (app, over MCP): a fresh 60 s document with an action over the whole clip,
+  then `set_action_end {speed: N}`. It records the seconds from the edit until a `.caf` is in
+  `cache/ramp-audio/` (polled every 10 ms, bound 300 s), and that file's bytes.
+- **R-<media>-x<N>, R-<media>-ramp** (probe `render`): 60 s of output from the long fixture over
+  a 1 ms map. It gives wall seconds and bytes per output minute, and peak RSS (`ru_maxrss`, the
+  probe process's peak so far, so it rises through the group). On sine it also counts B2's
+  step events, `click_events(dense_scan(x, 48000, 60.0), 0)`.
+- **I1** (scored): RC-off-x1's render on the 20 s sine equals the fixture (`render_spike.identity`).
+- **Q-x<N>** (probe `render` on the 20 s fixtures), with these readings:
+  - steps on sine;
+  - max |render − `ideal_sine`| over [0.05 s, D − 0.05 s]. This reading cannot see a source-in
+    error of a whole number of 1/220 s; the clicks placement is the timing reading;
+  - the clicks placement (`place_ideal`, `varispeed_pass`);
+  - frames against `frames_target`;
+  - R's 60 s step counts;
+  - the same readings on E-x<N>'s two `audio_wav` exports, read on channel 0. "Flat" is the clip
+    plus an action over its whole length with end speed N, which the app already renders through
+    the ramp path. "Plain" is `set_speed` only, today's path.
+- **W-<media>-x<N>-<L>, W-<media>-ramp-<L>** (probe `window`): a fresh copy of a pristine package
+  per run, opened in a real editor. `set_action_end {speed}` is applied through
+  `performGroupedEdit` and timed until the `.caf` lands (landed_s) and until the item plays it
+  (audible_s). It also records caf_bytes and plan_bytes.
+- **WOK** (scored): every window line passes `window_ok`. That means it is ok, it had no render
+  before the edit, and 0 ≤ landed ≤ audible ≤ 300 s.
+
+Exit 0 when every scored row passes, 1 on an instrument failure, and 2 when not performed.
+
+**The host.** Every recorded run was on a Mac14,6 (12 cores, 96 GB) with macOS 26.5.1 (25F80),
+on AC power. The tree was 0a3249e plus this change, and the Release app came from the passing
+`make gate`. H0's seven snapshots read a 1-minute load of 3.05–4.52, 0
+`swift-frontend|xcodebuild|cargo|rustc` processes (no other lane was building), and no other
+Frame Job process (`framejob_pids` empty in all seven). The top CPU users were the runner's own Python (up to 94 %), Docker Desktop's
+renderer (up to 89.7 %), the Virtualization VM (up to 61.6 %), WindowServer, Brave, Plex,
+Preview and coreaudiod.
+
+**Runs (2026-10-25).**
+
+| Run | Result |
+|---|---|
+| `--selftest` | S1–S3 3/3, exit 0 |
+| `--selftest --mutant per-second` | caught: S1 fail (`per_minute` → 0.025, 384 000), exit 1 |
+| `--selftest --mutant ideal-phase` | caught: S2 fail (max \|diff\| 0.988 at source in 0.0025 s), exit 1 |
+| `--selftest --mutant order-off` | caught: S3 fail (audible before landed accepted), exit 1 |
+| Debug shakedown, `--runs 1 --groups app` | stopped by hand: the first A render never landed (see "the cache-pass wedge" below) |
+| First Release shakedown, `--runs 1` | stopped by hand: the same cache-pass wedge |
+| Release shakedown with `settle`, `--runs 1` (app, then render,quality,window) | exit 0 both; all rows answered |
+| **Release, `--groups app`, 3 runs (recorded)** | exit 0 in 86 s: F0, D0 ok; 20 W packages; A rows below |
+| **Release, `--groups render,quality`, 3 runs (recorded)** | exit 0 in 63 s: B0 (reused), F0, I1 ok (max \|diff\| 0.00e+00 over 288 000 frames); R and Q rows below |
+| **Release, `--groups window`, 3 runs (recorded)** | exit 0 in 273 s: WOK ok, `window_ok` held for all 60 lines; W rows below |
+
+**R: the render's cost (probe, 60 s of output, 3 runs each).** All runs gave 2 880 000 frames.
+Bytes per output minute were identical in every run: 11 524 096 mono and 23 044 096 stereo, a
+32-bit float CAF at 48 kHz. Peak RSS was 217–238 MB.
+
+| Row | wall s per output minute (runs) | median | long-sine steps |
+|---|---|---|---|
+| R-sine-x0.25 | 0.805, 0.706, 0.689 | 0.706 | 0, 0, 0 |
+| R-sine-x0.5 | 0.616, 0.641, 0.620 | 0.620 | 0, 0, 0 |
+| R-sine-x2 | 1.022, 1.071, 1.034 | 1.034 | 0, 0, 0 |
+| R-sine-x4 | 2.163, 2.194, 2.164 | 2.164 | 0, 0, 0 |
+| R-sine-ramp | 1.039, 1.022, 1.022 | 1.022 | 0, 0, 0 |
+| R-speech-x0.25 | 1.214, 1.173, 1.215 | 1.214 | — |
+| R-speech-x0.5 | 1.111, 1.076, 1.109 | 1.109 | — |
+| R-speech-x2 | 1.894, 1.890, 1.919 | 1.894 | — |
+| R-speech-x4 | 4.168, 4.185, 4.180 | 4.180 | — |
+| R-speech-ramp | 1.941, 1.904, 1.871 | 1.904 | — |
+
+**A: the app's own render, edit to landed (Release, over MCP, 60 s clip, 3 runs each).** Each
+file was 11 524 096 bytes (sine) or 23 044 096 bytes (speech) in every run.
+
+| Row | seconds (runs) | median |
+|---|---|---|
+| A-sine-x0.25 | 0.588, 0.577, 0.590 | 0.588 |
+| A-sine-x0.5 | 0.510, 0.516, 0.500 | 0.510 |
+| A-sine-x2 | 0.946, 0.936, 0.927 | 0.936 |
+| A-sine-x4 | 2.078, 2.070, 2.069 | 2.070 |
+| A-speech-x0.25 | 1.122, 1.134, 1.145 | 1.134 |
+| A-speech-x0.5 | 0.963, 0.988, 1.012 | 0.988 |
+| A-speech-x2 | 1.828, 1.844, 1.839 | 1.839 |
+| A-speech-x4 | 4.064, 4.049, 4.058 | 4.058 |
+
+**W: the silent-until-rendered window (probe `window`, 3 runs each, a fresh package copy each
+run).** caf_bytes per run: 1 924 096 for sine 10 s, 11 524 096 for sine 60 s, 3 844 096 for
+speech 10 s and 23 044 096 for speech 60 s. plan_bytes per run: 457–466 for every constant,
+35 810 for the ramp at 10 s and 35 815 for the ramp at 60 s.
+
+| Row | landed s (runs) | audible s (runs) | audible median |
+|---|---|---|---|
+| W-sine-x0.25-10 | 0.142, 0.127, 0.140 | 0.157, 0.154, 0.168 | 0.157 |
+| W-sine-x0.25-60 | 0.607, 0.604, 0.603 | 0.620, 0.619, 0.621 | 0.620 |
+| W-sine-x0.5-10 | 0.120, 0.122, 0.142 | 0.134, 0.153, 0.162 | 0.153 |
+| W-sine-x0.5-60 | 0.533, 0.535, 0.538 | 0.546, 0.548, 0.554 | 0.548 |
+| W-sine-x2-10 | 0.209, 0.209, 0.196 | 0.226, 0.243, 0.229 | 0.229 |
+| W-sine-x2-60 | 0.936, 0.934, 0.954 | 0.949, 0.946, 0.970 | 0.949 |
+| W-sine-x4-10 | 0.390, 0.393, 0.387 | 0.402, 0.406, 0.408 | 0.406 |
+| W-sine-x4-60 | 2.025, 2.087, 2.069 | 2.038, 2.103, 2.084 | 2.084 |
+| W-sine-ramp-10 | 0.214, 0.215, 0.221 | 0.228, 0.241, 0.255 | 0.241 |
+| W-sine-ramp-60 | 1.026, 1.018, 1.000 | 1.039, 1.032, 1.015 | 1.032 |
+| W-speech-x0.25-10 | 0.238, 0.225, 0.237 | 0.257, 0.243, 0.267 | 0.257 |
+| W-speech-x0.25-60 | 1.124, 1.058, 1.160 | 1.137, 1.078, 1.175 | 1.137 |
+| W-speech-x0.5-10 | 0.209, 0.211, 0.230 | 0.231, 0.236, 0.257 | 0.236 |
+| W-speech-x0.5-60 | 1.014, 1.008, 1.031 | 1.027, 1.024, 1.047 | 1.027 |
+| W-speech-x2-10 | 0.343, 0.335, 0.352 | 0.355, 0.348, 0.374 | 0.355 |
+| W-speech-x2-60 | 1.769, 1.779, 1.818 | 1.787, 1.791, 1.838 | 1.791 |
+| W-speech-x4-10 | 0.731, 0.712, 0.762 | 0.745, 0.728, 0.779 | 0.745 |
+| W-speech-x4-60 | 4.080, 4.064, 4.113 | 4.093, 4.080, 4.129 | 4.093 |
+| W-speech-ramp-10 | 0.347, 0.330, 0.348 | 0.360, 0.343, 0.366 | 0.360 |
+| W-speech-ramp-60 | 1.881, 1.897, 1.956 | 1.897, 1.913, 1.973 | 1.913 |
+
+Audible came 12.2–33.9 ms after landed across the 60 runs.
+
+The spec assumed that the window's flat stand-in carries a 1 ms map in its plan, a cost (a)
+would not need. The run says otherwise. A flat action's plan was 457–466 bytes, the ramp's was
+35 810–35 815 bytes, and the flat render still landed and played. So the core already writes a
+constant segment's ramp entry compactly, and the plan is not a cost (a) adds.
+
+**Q: is the render free of #334's steps, and placed on the timeline (3 runs of R, 1 render and
+1 export each for Q).** I1 held: RC-off-x1's render matched the sine fixture, max |diff|
+0.00e+00 over 288 000 frames. Every frame count below equals `frames_target`: 288 000, or
+192 000 for ×4.
+
+| Row | render: steps, max \|diff\| vs ideal, clicks | 60 s long-sine steps | E flat (rendered) export: steps, max \|diff\|, clicks | E plain (today) export: steps, max \|diff\|, clicks |
+|---|---|---|---|---|
+| Q-x0.25 | 0, 0.000038, 7/7 at +0.000 ms | 0, 0, 0 | 0, 0.000048, 7/7 at +0.000 ms | 0, 0.010815, 7/7 at −0.063 ms |
+| Q-x0.5 | 0, 0.000038, 15/15 at +0.000 ms | 0, 0, 0 | 0, 0.000048, 15/15 at +0.000 ms | 0, 0.007218, 15/15 at −0.021 ms |
+| Q-x2 | 0, 0.000027, 60/60 at +0.000 ms | 0, 0, 0 | 0, 0.000030, 60/60 at +0.000 ms | 0, 0.014408, 60/60 at +0.010 ms |
+| Q-x4 | 0, 0.000020, 80/80 at +0.000 ms | 0, 0, 0 | 0, 0.000031, 80/80 at +0.000 ms | **32**, 0.517412, 80/80 at +0.016 ms |
+
+Every placement above had spread 0.000 ms and passed `varispeed_pass`.
+
+**The cache-pass wedge (found by this spike, not fixed here).** The first Debug shakedown and the
+first Release shakedown each made the 20 W packages back to back. For each package that meant
+importing a 250 s fixture, editing, saving and closing, without waiting for the import's cache
+pass. Afterwards the next A render never landed: its `.landing.partial` stayed at 4 096 bytes at
+0 % CPU for 300 s, and the later renders queued behind it. `sample` of the Release instance
+showed 13 `MediaImporter.generateCaches` tasks (10 in `speech`, 1 in `peaks`, 2 in
+`writeSyncFeatures`) and the ramp-audio queue's `RampSourceReader.fill`, all blocked in
+`-[AVAssetReaderOutput copyNextSampleBuffer]`. On its own, one import's pass finished in 0.77–1.06 s
+(peaks, sync, speech). The instrument now waits for each import's three markers (`settle`,
+bound 120 s) before the next op, and with that every run above finished.
+
+**Recommendation.** The numbers favour (a). Rendering a constant Keep pitch off segment offline
+removes #334's steps, which today's path does not: the ×4 export went from 32 step events
+(max |diff| 0.517 against the ideal) to 0 (max |diff| 0.000031). It also brings the ×0.25, ×0.5
+and ×2 exports from max |diff| 0.007–0.014 and placements of −0.063 to +0.010 ms down to ≤
+0.000048 and +0.000 ms, with every frame count exact. Across all 60 s long-sine renders there
+were 0 steps. The cost is small on this host:
+- **Render time:** 0.62–2.16 s per output minute for mono and 1.11–4.18 s for stereo (medians;
+  ×4 is the dearest, because it reads four minutes of source per output minute). A constant ×2
+  costs within 1.2 % of an existing ×1→×2 ramp (1.034 against 1.022 s mono, 1.894 against
+  1.904 s stereo).
+- **Cache:** 11.5 MB per output minute mono and 23.0 MB stereo, the same as a ramp's.
+- **Silent window:** from the edit to an audible preview, 0.15–0.75 s for a 10 s clip and
+  0.55–4.09 s for a 60 s clip (medians). It grows with clip length and rate and is longest at ×4
+  stereo.
+- **Plan:** no larger. The flat stand-in's plan was 457–466 bytes.
+
+What (a) carries over from ramps is their known costs: silence until the file lands, an export
+that waits for it, and disk in `cache/ramp-audio/`. Before (a) ships, the cache-pass wedge above
+should be fixed or understood. It blocked this very render queue, so under (a) every constant
+×N clip would also go silent behind it.

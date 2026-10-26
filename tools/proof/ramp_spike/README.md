@@ -38,7 +38,7 @@ not performed. Under `--selftest --mutant`: 1 caught, 0 survived.
 | File | What it is |
 |---|---|
 | `ramp_spike.py` | the runner: the fixtures, the map S and the variants' projects, the build, the probe groups, the classifiers (SR-5), the rows, the table, the VERDICT, `results.json`, the selftest and its mutants |
-| `ramp_spike_probe.swift` | compiled AS `main.swift` over every file in `app/Sources` but the app's own, through `swift_build.build` (`-D FRAMEJOB_DEV_TOOLS`), `Blank.mp4` and the app's `default.metallib` beside it; `ramp-spike-probe <plan\|export\|playback> <work-dir> <job.json>` |
+| `ramp_spike_probe.swift` | compiled AS `main.swift` over every file in `app/Sources` but the app's own, through `swift_build.build` (`-D FRAMEJOB_DEV_TOOLS`), `Blank.mp4` and the app's `default.metallib` beside it; `ramp-spike-probe <plan\|export\|playback\|render\|window> <work-dir> <job.json>` |
 
 **The probe** reads, per job, what `job.json` asks: `plan` (`ReelProject.from(json:)`, its
 `planJSON` verbatim), `wav` and `prores` (`Exporter().export` with the `audio_wav` and
@@ -64,6 +64,18 @@ above unchanged. The export group's `mix` builds the composition as `Exporter` d
 `variant`, `chunks: [[pts_ticks, frames]…]`, `range_ticks`, `composition_ticks` and
 `audio_track_ends`. A job's optional `tap_flag` makes `tap`'s tap `post` (PostEffects, the
 default) or `pre` (PreEffects, the product `AudioTap`'s flag), and the line echoes it.
+
+A `window` group came after, for `constant_render_spike.py` (#334), and also leaves every read
+above unchanged: `ramp-spike-probe window <work-dir> <jobs.json>`, each job `{name, project,
+clip, action, speed, bound_s}`. Per job it opens the package as `Opened` (the `.accessory`
+policy, as `playback`), waits for the item, applies `set_action_end {speed}` through
+`performGroupedEdit("Speed", …)` (the agent's own path) and turns the run loop in 5 ms steps up
+to `bound_s`; the line `{name, read: "window", ok, error, pre_edit_caf, plan_bytes, landed_s,
+audible_s, caf_bytes}` gives the seconds from the edit until a `*.caf` lands in the package's
+`cache/ramp-audio/` and until the built composition carries a segment from there with the item
+ready and no rebuild in flight. `build_probe(optimize=, name=, wmo=)`: `wmo=True` adds
+whole-module optimisation (Xcode's Release Swift settings with `optimize=True`); the default
+leaves every earlier caller's build line as it was.
 
 **The runner** works in `tools/proof/work/ramp-spike/` (untracked): `fixtures/`, `projects/`
 (a `<variant>@<fixture>.framejob` package per pair), `probe/`, `runs/` (what the probe wrote),

@@ -740,9 +740,11 @@ def z0():
 # ---- the probe ------------------------------------------------------------------
 
 
-def build_probe(optimize=False, name="ramp-spike-probe"):
+def build_probe(optimize=False, name="ramp-spike-probe", wmo=False):
     """(binary, None) or (None, why). `optimize` builds `-O` (SR1b's render
-    times are measured so, under its own `name`); the defaults are SR1's."""
+    times are measured so, under its own `name`), `wmo` with whole-module
+    optimisation (#334's spike, Xcode's Release settings); the defaults are
+    SR1's."""
     PROBE_DIR.mkdir(parents=True, exist_ok=True)
     entry = PROBE_DIR / "main.swift"
     source = PROBE_SWIFT.read_text()
@@ -755,7 +757,7 @@ def build_probe(optimize=False, name="ramp-spike-probe"):
     try:
         built = swift_build.build(sources=swift_build.app_sources() + [entry], output=binary,
                                   defines=["FRAMEJOB_DEV_TOOLS"], optimize=optimize,
-                                  timeout=BUILD_WALL)
+                                  wmo=wmo, timeout=BUILD_WALL)
     except swift_build.SwiftBuildFailed as error:
         return None, "the probe did not build: " + " | ".join(error.diagnostics[:6])
     return binary, ("reused" if built.reused else f"built in {built.seconds:.1f} s")
