@@ -195,18 +195,63 @@ tool in the space a spec is given; the tool follows it; and the panel that drive
   bundle (`open -a`, moved here from CR1b) and for framing. Docs: `docs/guide/screen-recording.md`;
   the camera refusal's `notDetermined` sentence, written in CR1a to name the panel's Camera
   source, becomes true here.
-- **CR2 — the preview and the formats.** The live preview in the panel: an
-  `AVCaptureVideoPreviewLayer`, which CR0's V1 measured at about 155–160 MB of RSS, so it runs
-  only while the panel shows the Camera row or the camera row. The Format popup lists the
-  camera's formats as resolution × frame rate, Best first, and sets the chosen one under the
-  device's configuration lock (CR0). Hot-plug: a camera connected or removed while the panel is
-  up. A Continuity Camera is marked by `isContinuityCamera`, since CR0's D2 lists it without the
-  key, as External. The tool gains `camera_format`. **Decides** the popup's rows and their
-  persistence, the preview's lifetime (and whether it runs on CR1c's prepared capture or a
-  session of its own), and what a removed camera does to a running recording.
-  **Proof**: probe rows for the format list → popup items; `snapshot_ui` of the panel; MCP
-  `camera_format` rows; a screen in `designs/screens/`; manual-check rows for the preview's look
-  and the Continuity Camera pairing.
+CR2 was one phase until CR1c landed. It is three now. CR1c left `CameraCapture.swift` and
+`ScreenRecorder+Camera.swift` at 399 lines each, and CR2 must grow both: the start takes the
+chosen format, and #373 needs `CameraCapture.stop` to answer. So their tolls are a pure-move phase
+of their own, as CR1-0's were. #373 is CR1c's finding: a fresh `CameraCapture` built in the same
+main turn as the stop of another capture of the same device recorded no frame. That is the path a
+preview takes whenever the person changes camera or format. So the formats, which never rebuild
+a capture while one runs, land first, and the preview lands with #373's fix.
+
+- **CR2-0 — the tolls.** Two pure moves, landed and gated alone, with nothing widened.
+  - `CameraCapture.swift` (399) gives the warm-up's rule to a new `CameraCapture+WarmUp.swift`:
+    `warmUpRun`, `warmUpTolerance`, `warmUpBound`, `WarmUp` and `isSteady`. `Warming` and the two
+    private functions that touch its stored state stay.
+  - `ScreenRecorder+Camera.swift` (399) gives `CameraSession` and `CameraSegment` to a new
+    `ScreenRecorder+CameraSession.swift`, the precedent of `Session` moving whole into
+    `ScreenRecorder+Pause.swift`.
+  - `camera_recording_probe.py`'s `no-hold` mutant is re-aimed at the new file.
+
+  **Proof**: `camera_recording_probe.py` whole (its granted tier skips by name without a camera
+  or the grant); `no-hold` caught; every mutant's anchor found once.
+- **CR2a — the formats; CAM-6.** CAM-6 is recorded in §11 before the code.
+  - **The Format popup** (`Format:`, under Camera) lists "Best (<the best format>)" first, then
+    the chosen camera's formats as resolution × frame rate. Its persistence and live rule follow
+    the Camera popup's.
+  - **The choice and the start.** `RecordingChoice` carries the format. `prepareCamera` and
+    `startCamera` record at it, and a stale or absent format means Best. The capture sets it
+    under the device's configuration lock (CR0).
+  - **The tool** gains `camera_format`, refused in CAM-3's step (7) after the lookup when the
+    camera lacks it, naming the camera's formats. The answer's `camera.format` already spells
+    what was recorded.
+  - **Continuity Camera** rows are marked by `isContinuityCamera` (CR0's D2 lists them without
+    the key, as External).
+  - **Decides** the rows (duplicates, and whether a format's lower rates are rows of their own),
+    their spelling, the persistence key, and the tool's spelling.
+
+  **Proof**: probe rows for format list → rows, the choice and the persistence, and the tool's
+  refusal and pick, with mutants; a granted row recording at a non-best format (the built-in
+  camera's 1920 × 1080), its size and rate read back; `camera_recording_proof.py`'s
+  `camera_format` rows and `snapshot_ui` of the panel. Docs: §7.9a, the guide.
+- **CR2b — the preview and hot-plug; CAM-7.** CAM-7 is recorded in §11 before the code.
+  - **The preview.** An `AVCaptureVideoPreviewLayer` in the panel runs on the PREPARED capture's
+    session, CR1c's `prepareCamera`, not on a session of its own: two captures of one device
+    collide (#373), and a preview on the capture the start adopts spends the warm-up long before
+    the countdown. It runs only while the panel is visible with Source Camera and the Camera
+    grant authorized; CR0's V1 measured about 155–160 MB of RSS. Showing the panel never
+    prompts. The preview stays on through a camera recording, on that recording's session.
+  - **#373 fixed.** A change of camera or format rebuilds the prepared capture only after the
+    old capture's session has stopped (`CameraCapture.stop(completion:)`).
+  - **Hot-plug.** `AVCaptureDevice.wasConnectedNotification` and `wasDisconnectedNotification`,
+    observed while the panel is up, rebuild the Camera and Format popups while idle. A camera
+    removed during a recording ends it, CAM-3's "stops on its own", unchanged.
+  - **Decides** the preview's size and place in the card, its lifetime's exact edges, and what
+    it shows with no grant or no camera.
+
+  **Proof**: granted probe rows for the preview's capture adopted by the start, and a format
+  change that rebuilds and records (#373); a probe row for the hot-plug rebuild; `snapshot_ui`
+  of the panel; `screens.py`'s recorder screen; manual-check rows for the preview's look and the
+  Continuity Camera pairing.
 - **CR3 — camera + screen.** The camera row under Source when recording a display or a window;
   the camera capture started beside the `SCStream` (CR0: the order of the starts made no
   measurable difference, and started in one run-loop turn the writer's camera began 87–130 ms
@@ -806,7 +851,71 @@ precedent.
   on, and `CameraCapture.swift` stands at 399.
 - CR2: the preview, the Format popup, `camera_format`, hot-plug while the panel is up.
 
-## CR2 — the preview and the formats
+## CR2-0 — the tolls
+
+### Record
+
+**Landed** (2026-10-26). Two pure moves with nothing widened, no name changed and no body
+changed:
+- CAM-3's warm-up rule moved from `CameraCapture.swift` to a new `CameraCapture+WarmUp.swift`,
+  one `extension CameraCapture`: the warm-up's doc, `warmUpRun`, `warmUpTolerance`,
+  `warmUpBound`, `struct WarmUp` with its `note`, and `isSteady` with its doc. The moved text is
+  byte-identical to HEAD's (checked by a script against `git show HEAD:…`). `Warming`,
+  `warming`, `warmUpBuffer` and `endWarmUp` stay, because they are private stored state, and the
+  new file's header says so. `CameraCapture.swift`'s "The stream is warm before the first
+  segment" paragraph names the new file.
+- `CameraSession` and `CameraSegment` moved, with their docs, from `ScreenRecorder+Camera.swift`
+  to a new `ScreenRecorder+CameraSession.swift`, one `extension ScreenRecorder`, byte-identical
+  to HEAD's. `static let cameraNeedsCameraSentence` is now `+Camera.swift`'s first member, and
+  the header sentence lists `+CameraSession.swift` as "the two types it holds".
+- `tools/proof/camera_recording_probe.py`: `MUTANTS["no-hold"]` names
+  `CameraCapture+WarmUp.swift`. Its `before` and `after` text are unchanged.
+- `designs/spec/07.4-swift-file-map.md` row 50 lists `CameraCapture+WarmUp.swift` after
+  `CameraCapture.swift` and `+CameraSession.swift` after `+Camera.swift`. The file still has
+  57 lines.
+
+**Sizes** (`wc -l`, before → after): `CameraCapture.swift` 399 → 364,
+`CameraCapture+WarmUp.swift` new, 46; `ScreenRecorder+Camera.swift` 399 → 339,
+`ScreenRecorder+CameraSession.swift` new, 70.
+
+**Measured** (from the worktree, each command run once except `make gate`, which ran once
+before this record and once after it):
+- `make typecheck`: exit 0, 0 errors, the 4 baseline warnings, and tsc printed no error.
+- The anchor check (every `MUTANTS` `before` found exactly once in its file): `all once`,
+  exit 0.
+- `python3 tools/proof/camera_recording_probe.py --only values,landing,tool,panel`: exit 0,
+  `scores: 39/39`. V17 read `isSteady` 33.3, 35.0, 43.3, 30.0 ms at 30 fps as
+  `[true, true, false, true]`, run 5, bound 1.0 s, and the notes.
+- `… --only granted --mutant no-hold`: exit 1, `scores: 9/11`, `mutant no-hold: caught (G6)`.
+  G6 printed hold 0.085 s, 1 buffer, rate 0.00 fps. G8 also failed under the mutant: after
+  `discardPreparedCamera` the slot was nil but its session was still running. G8 passed in the
+  unmutated run below, as it did at CR1c.
+- `python3 tools/proof/spec_index_proof.py`: exit 0, `201/201 checks passed`.
+- `make gate`: `gate: PASS 232s` (names 1 s, typecheck 6 s, fmt and lint skipped, test 119 s,
+  app 107 s). After this record was written, `gate: PASS 1s` (names alone re-ran).
+- `python3 tools/proof/camera_recording_probe.py`: exit 0, `scores: 49/49`, with G0–G9 all run
+  and no skip. G3 59/0.9992 and 60/0.9992; G4 micOffset −0.124 and −0.130 s; G6 hold 0.555 s,
+  13 buffers, steady, the call to `.recording` 1.923 s; G7 `startCamera` answered in 0.034 s;
+  G8 the slot nil and the session stopped; G9 answered in 0.698 s.
+
+**Deviations.** None in the code. The headers' added clauses cost `CameraCapture.swift` two
+lines and `+Camera.swift` one beyond the cuts.
+
+**Owed.**
+- Applied with the commit (the orchestrator's): `app/CLAUDE.md`'s recorder family gains
+  `+CameraSession` in its parenthesis and `CameraCapture+WarmUp.swift` beside
+  `CameraCapture.swift`, and its sentence on `CameraCapture.swift` names `+WarmUp` as the
+  warm-up's rule and its facts' type.
+- `designs/adr/app-file-history.md`'s seams for the two files are condensed at CR4.
+- CR2b, with #373's `CameraCapture.stop(completion:)`: say whether G8's failure under
+  `no-hold` (a discarded prepared capture's session still running) is #373's asynchronous stop
+  seen early by the mutant, or a discard that can lose a session still starting.
+
+## CR2a — the formats
+
+### Record
+
+## CR2b — the preview and hot-plug
 
 ### Record
 

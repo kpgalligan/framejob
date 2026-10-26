@@ -2397,7 +2397,8 @@ free.
   nothing here prompts or opens.
 - `ScreenRecorder.swift` (+`Pause`, +`Delegates`, +`Microphone`,
   +`Finishing`, +`Content`, +`VoiceOver`, +`VoiceOverFinishing`, +`Camera`,
-  +`CameraFinishing`, +`CameraPrepare`) · `CameraDevices.swift` · `CameraCapture.swift` — the machine `idle → arming → recording ⇄ paused
+  +`CameraFinishing`, +`CameraPrepare`, +`CameraSession`) · `CameraDevices.swift` · `CameraCapture.swift`
+  (+`WarmUp`) — the machine `idle → arming → recording ⇄ paused
   → finishing → idle`. **The microphone is a SECOND FILE** through an
   `AVCaptureSession`, because `SCRecordingOutput` folds it inseparably into
   the system track; its offset is measured per SEGMENT. **A pause is a
@@ -2419,12 +2420,15 @@ free.
   press that reached main first does not hide it — ends it. **A camera
   recording is the same machine with a camera where the stream was**
   (camera-recording CR1a, spec §11 CAM-3): `cameraSession` instead of
-  `session` (`+Camera`, `+CameraFinishing`), one `AVAssetWriter` per
+  `session` (`+Camera`, `+CameraFinishing`; its two types in
+  `+CameraSession`), one `AVAssetWriter` per
   segment over one running capture session, `stop()`, `elapsed`, `pause()`
   and `resume()` forward to it, and segment 0's writer is armed only after
   the warm-up hold. `CameraDevices.swift` is the camera list, CAM-3's best
   format and its sentences; `CameraCapture.swift` the session, the
-  configuration lock, the data output, the writers and the warm-up;
+  configuration lock, the data output, the writers and the warm-up's running
+  state, `CameraCapture+WarmUp.swift` the warm-up's rule and its facts' type
+  (`WarmUp`, `isSteady`, the run, tolerance and bound);
   `ScreenRecorder+CameraPrepare.swift` the panel countdown's prepared
   capture (CR1c, CAM-5), which `startCamera` adopts or joins: its start's
   completion is the one retained closure that holds its object strongly, by

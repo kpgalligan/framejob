@@ -210,7 +210,7 @@ MUTANTS = {
          "// The picture records on: a microphone never ends a camera recording (CAM-3).",
          "if unasked, state == .recording { beginCameraFinishing() }")]),
     "no-hold": (["G6"], [
-        ("CameraCapture.swift", "static let warmUpRun = 5", "static let warmUpRun = 0")]),
+        ("CameraCapture+WarmUp.swift", "static let warmUpRun = 5", "static let warmUpRun = 0")]),
     # CR1b (spec §11 CAM-4), each run with `--only tool`.
     "camera-strangers-admitted": (["T1"], [
         ("AgentServer+RecordingCamera.swift",
