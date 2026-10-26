@@ -184,6 +184,26 @@ extension AgentServer {
         return values
     }
 
+    /// A list of whole numbers (`play_preview`'s `stale_ticks`), or nil when
+    /// `key` is absent or null. Each element is read exactly, as `whole`
+    /// reads it, and a JSON boolean is refused, under the same rule as the
+    /// scalar readers above. Whether an empty list is a mistake is the
+    /// caller's to decide.
+    func intsArg(_ a: [String: Any], _ key: String) throws -> [Int]? {
+        guard let raw = a[key], !(raw is NSNull) else { return nil }
+        guard let array = raw as? [Any] else {
+            throw ToolError(message: "\(key) must be an array of whole numbers.")
+        }
+        var values: [Int] = []
+        for value in array {
+            guard let number = Self.numeric(value), let int = Self.whole(number) else {
+                throw ToolError(message: "\(key) must contain whole numbers only.")
+            }
+            values.append(int)
+        }
+        return values
+    }
+
     /// The envelope's `scope` (spec §6, `core/src/scope.rs`): a nest id, or
     /// nil for absent and for an explicit null, which the envelope reads the
     /// same way.

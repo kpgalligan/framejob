@@ -1412,7 +1412,13 @@ a loop lap (Clip ▸ Motion ▸ Preview on H's first `heavy` clip, 6 s): Release
 `unguarded`, `no-follow`, `seek-reads-player` caught again, and
 `no-arming` (P11: the laps 0 hits) is a new mutant. `no-range-guard`
 (`reach`'s `ticks < session.endTicks` out) survived P11 twice (the lap 169
-and 156 hits), so it is residue like P10's, not a mutant.
+and 156 hits), so it is residue like P10's, not a mutant. #329 closed
+that residue: `play_preview`'s `stale_ticks` and `stale_armed` hand a seek's
+session a stale request deterministically, so P12–P14 make `reach`'s range
+guard (both ends) and the seek's arming load-bearing (`follows-stale`,
+`no-range-guard`, `no-start-guard`), and `graphic/tests/image_cache.rs`'s
+I7–I8 race two builds of one digest across a limit of 0 under a doc-hidden
+build hook (`no-building-recheck`).
 `graphics_prefetch_proof.py` 7/7 (S2 301 hits; S6 OFF 16.01 s, ON 3.79 s)
 with both mutants caught: the export without slots is the serial path's
 file. `op_argument_proof.py` 162/162 (31 product and 8 dev tools);

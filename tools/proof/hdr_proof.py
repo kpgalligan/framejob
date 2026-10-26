@@ -394,8 +394,10 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
 - **HG0, HG, HGu, HGk, P15** (clean-up 3 batch B, phase 3, #322, spec §11 HD-22; the rules
   fixed before the phase's control ran, `tools/proof/work/i322/ctl`). The fixture
   (`gainmap_still`): `gainmap_writer.swift`, built through `swift_build.build`, writes eight
-  equal vertical bands of extended-linear grey, L = 0.05, 0.18, 0.5, 1, 2, 4, 6, 8 left to
-  right (each band named by its L; centres x = 64 + 128i, y = 64), as a HEIC with an ISO
+  equal vertical bands of extended-linear grey, L = 0.05, 0.18, 0.5, 1, 2, 4, 5, 8 left to
+  right (each band named by its L; centres x = 64 + 128i, y = 64; #330 moved the L = 6
+  band to L = 5, 1,015 cd/m², so a dropped peak moves it about 10/1023; a file older than
+  the writer is remade), as a HEIC with an ISO
   gain map over ImageIO's own SDR base (Display P3, 8 bits) — `still_gainmap.heic` (1024×128)
   and `still_gainmap_wide.heic` (9000×600), kept under `work/hdr/media/`, a refused one its
   row's FAIL by name. It proves the route on Apple's own encoder; Apple's pre-ISO gain map, a
@@ -413,9 +415,10 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   `decodeHDR` of the wide fixture 8192 on its longest side and of the O6 copy 128×1024, each
   with its L = 8 band above 2.0; the answer's `gainmap` (the eight bands in linear BT.2020, the
   rendition's peak). HG: in an HLG project each band = pq_hlg(pq_signal(203·rgb), peak)
-  ±2/1023, the L = 2, 4, 6, 8 bands ≥ 40/1023 above L = 1, the bands increasing in L, L = 1
-  within ±6/1023 of pq_hlg(pq_signal(203)), and the worst gap from the lifted base printed
-  (HD-22 (c)). HGu (`--only` with `--control`): the gain-map still's SDR render and the three
+  ±2/1023, the L = 2, 4, 5, 8 bands ≥ 40/1023 above L = 1, the bands increasing in L, L = 1
+  within ±6/1023 of pq_hlg(pq_signal(203)), the peak check (#330, HD-22 (l)): the L = 5
+  band's mean ≥ 5/1023 below its no-peak oracle pq_hlg(pq_signal(203·rgb)) with no EETF,
+  and the worst gap from the lifted base printed (HD-22 (c)). HGu (`--only` with `--control`): the gain-map still's SDR render and the three
   others' HLG renders, from DIR/media/, byte-equal to DIR/hg0/'s; a missing control file
   returns 2 before anything runs. HGk: over a [0.5, 0.5, 0.5, 1] background in HLG, keyed at
   unlift(the L = 0.5 band's working colour) at `hkh_oracle`'s rule (the right reading the
@@ -703,7 +706,7 @@ B3_ROWS = {"HIp"}
 B4_ROWS = {"HG0", "HG", "HGu", "HGk"}
 GAINMAP_FILES = {"fixture": ("still_gainmap.heic", W, H),
                  "wide": ("still_gainmap_wide.heic", 9000, 600)}
-GAINMAP_L = (0.05, 0.18, 0.5, 1, 2, 4, 6, 8)
+GAINMAP_L = (0.05, 0.18, 0.5, 1, 2, 4, 5, 8)
 GAINMAP_Y = 64
 HG0_FILES = {"gainmap": "still_gainmap.heic", "still8": "still8.png",
              "still16_srgb": "still16_srgb.png", "still_hlg_heic": "still_hlg.heic"}
@@ -1192,8 +1195,9 @@ MUTANTS = {
                             "pqReferenceWhite, 10_000)\n",
                             "                        let nits = min(v * 100, 10_000)\n")],
                           ["HG", "P15"]),
-    # The rendition's own peak not passed to the lift, so the EETF never runs (the L = 6 band,
-    # 1218 cd/m², clips at 1,000).
+    # The rendition's own peak not passed to the lift, so the EETF never runs (the L = 5 band,
+    # 1,015 cd/m², clips at 1,000: about 10/1023 off its oracle, and HG's peak check fails;
+    # #330 moved the band from L = 6, 1218 cd/m², 2.32/1023 off).
     "gainmap-peak-dropped": ([(SOURCES_SWIFT, GAINMAP_PEAK_LINE,
                                "            let peak = layer.input?.peak\n")], ["HG"]),
     # The HDR decode in an SDR project too.
@@ -6618,14 +6622,16 @@ def run_h7h(client, state):
 def gainmap_still():
     """HG's, HGk's, HG0's and P15's fixtures, `gainmap_writer.swift` built through
     `swift_build.build` and run once each, kept under MEDIA: `still_gainmap.heic` (W×H) and
-    `still_gainmap_wide.heic` (9000×600). name → path, None with REFUSED[name] saying why;
-    the writer exits 0 only when its file reads back with a gain map over a base no HDR
+    `still_gainmap_wide.heic` (9000×600), each remade when missing or older than the writer.
+    name → path, None with REFUSED[name] saying why; the writer exits 0 only when its file reads back with a gain map over a base no HDR
     label claims."""
     out = {}
     writer = BASE / "gainmap-writer" / "gainmap_writer"
     for name, (file, width, height) in GAINMAP_FILES.items():
         path = MEDIA / file
-        if not path.exists():
+        # A file older than the writer is an earlier fixture (#330 moved a band): remade.
+        if not path.exists() or path.stat().st_mtime < GAINMAP_WRITER.stat().st_mtime:
+            path.unlink(missing_ok=True)
             try:
                 swift_build.build(sources=[GAINMAP_WRITER], output=writer, timeout=BUILD_BOUND)
             except swift_build.SwiftBuildFailed as failure:
@@ -6793,9 +6799,12 @@ def run_hg(client, state):
     """HG (#322, spec §11 HD-22 (b), (c)): the fixture alone in a W×H SDR project, rendered,
     then `set_canvas {output: hlg}` and rendered again. In HLG each band centre =
     pq_hlg([pq_signal(203·r), pq_signal(203·g), pq_signal(203·b)], peak) ±2/1023, [r, g, b]
-    and peak from P15's answer; the L = 2, 4, 6 and 8 bands each above the L = 1 band by
+    and peak from P15's answer; the L = 2, 4, 5 and 8 bands each above the L = 1 band by
     ≥ 40/1023 and the eight bands increasing in L; the L = 1 band within ±6/1023 of
-    pq_hlg([pq_signal(203)] × 3, peak). The worst gap from the lifted base (HG0's lift of the
+    pq_hlg([pq_signal(203)] × 3, peak); the peak check (#330, the rule set before the run):
+    the L = 5 band's mean (1,015 cd/m²) ≥ 5/1023 below the mean of the same band's no-peak
+    oracle, pq_hlg(pq_signal(203·rgb), None), which clips at 1,000 cd/m² with no EETF, the gap
+    printed in levels. The worst gap from the lifted base (HG0's lift of the
     same band's SDR-project code) is printed for HD-22 (c)."""
     path = gainmap_still().get("fixture")
     answer = state.get("gainmap") or {}
@@ -6829,12 +6838,19 @@ def run_hg(client, state):
                            f"({levels(gap):.2f} levels); the lifted base {round(based[1], 5)}")
             if not gap <= 2 * LEVEL:
                 misses.append(f"L = {l}: {levels(gap):.2f} levels from the oracle")
-        for l in (2, 4, 6, 8):
+        for l in (2, 4, 5, 8):
             if not min(a - b for a, b in zip(got[l], got[1])) >= 40 * LEVEL:
                 misses.append(f"L = {l} is not above the L = 1 band by 40/1023")
         means = [sum(got[l]) / 3 for l in GAINMAP_L]
         if not all(b > a for a, b in zip(means, means[1:])):
             misses.append(f"the bands are not increasing in L: {[round(m, 5) for m in means]}")
+        clipped = pq_hlg([pq_signal(PQ_REFERENCE * c) for c in bands[GAINMAP_L.index(5)]], None)
+        below = sum(clipped) / 3 - sum(got[5]) / 3
+        figures.append(f"the peak check: the L = 5 band {levels(below):.2f} levels below its "
+                       f"no-peak oracle (5/1023 needed)")
+        if not below >= 5 * LEVEL:
+            misses.append(f"the peak check: the L = 5 band is {levels(below):.2f} levels below its "
+                          f"no-peak oracle, under 5/1023")
         white = pq_hlg([pq_signal(PQ_REFERENCE)] * 3, peak)
         if not close_to(got[1], white, 6 * LEVEL):
             misses.append(f"L = 1 {[round(v, 5) for v in got[1]]} is not BT.2408's white "
@@ -6845,8 +6861,9 @@ def run_hg(client, state):
                        f"{[(l, round(levels(g), 1)) for l, g in base_gaps]}, the worst "
                        f"{levels(far[1]):+.1f} at L = {far[0]}")
     check("HG a gain-map still in an HLG project (#322): each band = pq_hlg(pq_signal(203·rgb), "
-          "peak) ±2/1023 from P15's bands and peak; L = 2, 4, 6, 8 each ≥ 40/1023 above L = 1, "
-          "the bands increasing in L, L = 1 within ±6/1023 of BT.2408's white", not misses,
+          "peak) ±2/1023 from P15's bands and peak; L = 2, 4, 5, 8 each ≥ 40/1023 above L = 1, "
+          "the bands increasing in L, L = 1 within ±6/1023 of BT.2408's white, the L = 5 band "
+          "≥ 5/1023 below its no-peak oracle (#330)", not misses,
           f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
 
 

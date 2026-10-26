@@ -47,7 +47,10 @@ not the bytes) → I2; `premultiplied-copy` (the copy encodes the premultiplied
 pixmap) → I1's bytes; `unchecked` (that, with the check removed) → I1's
 pixels; `no-trim` (`set_image_cache_limit` evicts nothing) → I3;
 `over-limit` (a copy over the limit is kept) → I4's bytes; `no-skip-marker`
-(a copy over the limit leaves no `Skipped` entry) → I4's builds. The app
+(a copy over the limit leaves no `Skipped` entry) → I4's builds;
+`no-building-recheck` (a build writes its copy whether or not its digest is
+still `Building`) → I7, whose two builds of one digest straddle a limit of 0
+under the crate's doc-hidden build hook (#329). The app
 mutant `pressure-ignored` (`imageCacheLimit` always at `.normal`'s budget) is
 built through `tree_copy.make_copy` and `build_app` and driven through every
 row; it must fail C3. Exit 0 = caught, 1 = survived, 2 = the control could not
@@ -141,6 +144,12 @@ GRAPHIC_MUTANTS = {
           "            cache.entries.remove(&asset.digest);\n"
           "        }\n")],
         "I4", "i4_a_copy_over_the_limit_is_kept_nowhere_and_not_rebuilt", "the copy was rebuilt"),
+    "no-building-recheck": (
+        [(IMAGES, "    if !matches!(cache.entries.get(&asset.digest), Some(Entry::Building)) {\n"
+                  "        return built.map(usvg::ImageKind::PNG);\n"
+                  "    }\n", "")],
+        "I7", "i7_two_builds_of_one_digest_across_a_limit_of_zero_count_one_copy",
+        "two builds of one digest counted its copy twice"),
 }
 APP_MUTANTS = {
     "pressure-ignored": (
@@ -376,7 +385,7 @@ def run_graphic_mutant(name):
                       env=bounded.child_env({"CARGO_TARGET_DIR": str(TARGET)}))
     output = got["stdout"] + got["stderr"]
     (WORK / f"mutant-{name}.log").write_text(output)
-    if got["expired"] or "running 6 tests" not in output:
+    if got["expired"] or "running 8 tests" not in output:
         errors = [line for line in output.splitlines() if line.startswith("error")][:5]
         print(f"mutant {name}: the control could not be performed — the tests did not run "
               f"(rc {got['rc']}, expired {got['expired']}): {errors}")

@@ -57,6 +57,14 @@ final class PlaybackTrials: @unchecked Sendable {
         lock.unlock()
     }
 
+    /// A copy of what `key`'s running trial has recorded so far, in serving
+    /// order, without ending it; [] when none runs.
+    func recorded(_ key: Int) -> [Served] {
+        lock.lock()
+        defer { lock.unlock() }
+        return trials[key]?.served ?? []
+    }
+
     /// Ends `key`'s trial and answers what it recorded, in serving order.
     func end(_ key: Int) -> [Served] {
         lock.lock()

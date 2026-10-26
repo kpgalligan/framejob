@@ -95,10 +95,9 @@ Mutants, each run once on the final instrument and each answering MUTANT PASS: H
 
 Still open:
 - #278: S-Log3/V-Log detection from the makers' metadata (Canon Log 2 and 3 built by H-5, HD-17).
-- #330 (clean-up 3, batch B phase 3): `hdr_proof` HG's gain-map peak mutant is caught only by the bands' order (HD-22 (k)).
 - #274: the odd-size reverse's ProRes 422 cost on camera footage — not measured: no owner HDR or log clip reached the road map (HD-1).
 
-Closed: #281 (H-1, HD-6, HD-12), #277 (H-2…H-4, HD-2…HD-5, HD-7, HD-8, HD-13…HD-15) and #276 (H-6, HD-9, HD-16) as built; #313 and #314, instrument defects older than the road map, fixed in H-2 and H-3; #310 (clean-up batch 1, the instruments held to the spec) and #315, #316, #317 (clean-up batch 2, HD-18; #317 measured, no defect), and #311, #312, #321 (clean-up batch 2, phase 2, HD-19); #324 and #325 (clean-up 3 batch B phase 1, HD-20: a Camera Log clip's key, a PQ still's HDR10 peak, format 26), #323 (phase 2, HD-21: an HDR still's thumbnails through step 0) and #322 (phase 3, HD-22: a gain-map still drawn as HDR in an HLG project).
+Closed: #281 (H-1, HD-6, HD-12), #277 (H-2…H-4, HD-2…HD-5, HD-7, HD-8, HD-13…HD-15) and #276 (H-6, HD-9, HD-16) as built; #313 and #314, instrument defects older than the road map, fixed in H-2 and H-3; #310 (clean-up batch 1, the instruments held to the spec) and #315, #316, #317 (clean-up batch 2, HD-18; #317 measured, no defect), and #311, #312, #321 (clean-up batch 2, phase 2, HD-19); #324 and #325 (clean-up 3 batch B phase 1, HD-20: a Camera Log clip's key, a PQ still's HDR10 peak, format 26), #323 (phase 2, HD-21: an HDR still's thumbnails through step 0), #322 (phase 3, HD-22: a gain-map still drawn as HDR in an HLG project), and #330 (HD-22 (l): the fixture's L = 6 band moved to L = 5 and HG given a peak check, so `gainmap-peak-dropped` fails them both).
 
 Not filed, each decided at the close:
 - How the XDR panel and an SDR external display show an HLG preview: HDR-1's steps 3–4.

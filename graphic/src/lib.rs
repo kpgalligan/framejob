@@ -23,7 +23,10 @@ mod runtime;
 mod sandbox;
 
 pub use diagnostic::{Diagnostic, Level};
-pub use images::{image_cache_builds, image_cache_bytes, set_image_cache_limit};
+pub use images::{
+    image_cache_builds, image_cache_bytes, set_image_build_hook, set_image_cache_limit,
+    ImageBuildHook,
+};
 pub use library::{Face, Library};
 pub use measure::{measure_text, FontStyle, TextFont, TextMetrics};
 pub use module::Module;

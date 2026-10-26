@@ -2726,7 +2726,13 @@ free.
   the transport's own `setRate` and `seek(to:)` (an optional `seek_to` half
   way) on the SERVER thread, and answers the frames expected against those
   composed per key, compose milliseconds and, when asked, each frame's
-  digest. `tools/proof/playback_prefetch_proof.py` drives it.
+  digest. `stale_ticks` (with `seek_to`, #329) reports those ticks to
+  `GraphicPrefetch.reach` as requests reached after the seek, in the seek's
+  own step or, with `stale_armed`, once a frame in the seek's first
+  `armFrames` frames was composed (waited for at most `min(2 s, seconds /
+  2)`); `stale_reached` answers the ticks reported. Its four refusals are
+  read before the first hop to main. `tools/proof/playback_prefetch_proof.py`
+  drives it.
 - `AgentServer+GraphicMemory.swift` — `graphic_memory {pressure?}` (dev
   only, wholly under the flag, off main; spec §11 G-37): the graphic
   rasters' budget, held and kept bytes and their peaks, a pass's
@@ -2737,7 +2743,8 @@ free.
   drives it.
 - `PlaybackTrial.swift` — `PlaybackTrials`, `play_preview`'s record (dev
   only): `Compositor.serve` reports each finished frame's time, compose
-  time and, while a trial asks, a SHA-256 of the destination's pixels.
+  time and, while a trial asks, a SHA-256 of the destination's pixels;
+  `recorded(_:)` copies a running trial's record without ending it.
 - `AgentServer+MenuItem.swift` — `perform_menu_item` and `cancel_sheet`
   (road map 11's V2b, dev only, wholly under the flag). It runs a main-menu
   item by path in a NAMED project window's own responder chain, never
@@ -2857,7 +2864,7 @@ free.
   AI-17). It is pure over an `NSView` tree, so
   `tools/proof/v2_layout_probe.swift` calls it.
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
-  (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, `enumArg` /
+  (`intArg`, `intsArg`, `timeArg`, `rangesArg`, `rawPatchArg`, `enumArg` /
   `requiredEnumArg` — the one reader of a string-valued enum, with its
   `label` and `folding` — …), each refusing a
   value it cannot read BY NAME, and ONLY what the core cannot know: target

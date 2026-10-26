@@ -54,6 +54,33 @@ static CACHE: Mutex<Cache> = Mutex::new(Cache {
 
 static BUILDS: AtomicUsize = AtomicUsize::new(0);
 
+/// What every copy build calls between its two locks; tests install one to
+/// hold a build there.
+#[doc(hidden)]
+pub type ImageBuildHook = Arc<dyn Fn() + Send + Sync>;
+
+static BUILD_HOOK: Mutex<Option<ImageBuildHook>> = Mutex::new(None);
+
+/// Installs (Some) or clears (None) the hook every copy build calls between
+/// its two locks.
+#[doc(hidden)]
+pub fn set_image_build_hook(hook: Option<ImageBuildHook>) {
+    *BUILD_HOOK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = hook;
+}
+
+/// Calls the hook, if one is installed, with no lock held.
+fn call_build_hook() {
+    let hook = BUILD_HOOK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone();
+    if let Some(hook) = hook {
+        hook();
+    }
+}
+
 fn lock() -> MutexGuard<'static, Cache> {
     CACHE
         .lock()
@@ -182,6 +209,7 @@ pub(crate) fn cached_kind(asset: &Asset) -> Option<usvg::ImageKind> {
     };
     BUILDS.fetch_add(1, Ordering::SeqCst);
     let built = stored_copy(&asset.data, source).map(Arc::new);
+    call_build_hook();
     guard.armed = false;
     let mut cache = lock();
     // A limit of 0 since the build began cleared its mark, and another

@@ -954,3 +954,17 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
     only by HG's bands-increasing test (L = 6 and L = 8 both render 0.99951); the L = 6 band
     sat 1.85/1023 from its oracle, inside ±2/1023, so the per-band check alone would miss it
     (#330).
+  - **(l) The band moved to L = 5** (#330, 2026-10-25). The fixture's bands are L = 0.05, 0.18,
+    0.5, 1, 2, 4, 5, 8 (`gainmap_writer.swift`, `GAINMAP_L`): the L = 5 band, 1,015 cd/m², sits
+    just above the 1,000 cd/m² a dropped peak clips at, where the EETF still moves it. The
+    oracle (computed, peak 1621): with the EETF the L = 5 band sits 10.19/1023 below the same
+    band's no-peak clip, against 2.32/1023 at L = 6; a half-float ULP of its PQ signal moves it
+    0.29/1023. So `gainmap-peak-dropped` fails the per-band check (±2/1023) by about 10/1023.
+    HG also gains a check aimed at the peak, its rule set before the run: the L = 5 band's mean
+    is at least 5/1023 below the mean of pq_hlg(pq_signal(203·rgb)) with no EETF, the gap
+    printed in levels. HG's ≥ 40/1023 rows are L = 2, 4, 5 and 8. A fixture under
+    `work/hdr/media/` older than the writer is remade. (a) and (c) stay as measured on the
+    L = 6 fixture. **Measured** (Release, 2026-10-25): the L = 5 band (linear 5.0078) 0.40/1023
+    from its oracle and 10.49/1023 below its no-peak clip; under `gainmap-peak-dropped` 9.59/1023
+    from its oracle and 0.50/1023 below the clip, so the per-band check, the bands' order and the
+    peak check all fail.

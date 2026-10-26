@@ -20,7 +20,9 @@ The crate's record is road map 10 §10.4.
   decodes to exactly the original's pixmap and `imagesize` reads the same
   size. No lock is held across a decode, an encode or a usvg call; a
   build writes only while its digest is still `Building`; the default limit
-  is 0, so a binary that sets none takes the original route.
+  is 0, so a binary that sets none takes the original route. The doc-hidden
+  `set_image_build_hook` installs an `ImageBuildHook` every build calls
+  between its two locks with none held, so a test can hold a build there.
 - `library.rs` — `Library`: the font set (`fontdb`, from bytes, never
   `load_system_fonts`, G-6) and the asset map (each asset keeps its own
   SHA-256; a PNG or JPEG kind is asked of the cache first), their content `version`

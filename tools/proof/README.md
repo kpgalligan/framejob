@@ -10635,25 +10635,45 @@ only in the CONTROL rows.
   `seek_to` 1800000: a line `playback from 1800000`. **P10** H from
   1200000 for 2 s with `seek_to` 0, a seek behind the play: a line
   `playback from 0` with hits > 0 (the old position's requests still in
-  flight do not move the new session's floor). P10 has no mutant: with
-  `reach`'s range guard and the seek session's arming taken out it passed
-  twice on Release, because this play seldom has an old request served
-  between the seek and AVFoundation's cancel; the stranded floor was seen
-  once, in an `unguarded` run of a build without the arming (0 hits, 86
-  skipped). **P11** (G6 phase 3), ON's last play, a loop lap:
+  flight do not move the new session's floor). P10 stays a real-world row
+  with no mutant: with `reach`'s range guard and the seek session's arming
+  taken out it passed twice on Release (G6 phase 2), because this play
+  seldom has an old request served between the seek and AVFoundation's
+  cancel; the stranded floor was seen once, in an `unguarded` run of a
+  build without the arming (0 hits, 86 skipped). P12–P14 now hand the
+  seek's session such a request deterministically (#329). **P11** (G6 phase 3), ON's last play, a loop lap:
   `set_selection` on H's first `heavy` clip, then `perform_menu_item
   ["Clip", "Motion", "Preview"]` (the in/out range set to the clip, Loop
   on, playing from its start), 6 s, then `play_preview {seconds: 0.5}` to
   pause: at least two `playback from 0` lines since, the last with hits >
-  0. `no-range-guard` (`reach`'s `ticks < session.endTicks` out) is not a
-  mutant: it passed P11 twice on Release (the lap 169 and 156 hits) —
-  presumably because the old position's requests are served below the
-  loop's end, where the arming alone holds them off (not measured). **Z1** no `Frame Job: ` in any log.
+  0. It stays a real-world row: `no-range-guard` (`reach`'s `ticks <
+  session.endTicks` out) passed it twice on Release in G6 phase 3 (the lap
+  169 and 156 hits) — presumably because the old position's requests are
+  served below the loop's end, where the arming alone holds them off (not
+  measured); P13 is now that mutant's row (#329). **P12** (#329) H from
+  1200000 for 2 s with `seek_to` 0 and `stale_ticks [2700000]`, reported in
+  the seek's own step, before the session is armed: a line `playback from
+  0` with hits > 0 and skipped < 75, and `stale_reached` [2700000]. Hits
+  alone do not catch a followed stale request — the frames the workers
+  claimed before it still hit (10 in the first `follows-stale` run, which
+  scored 1800000 by hits alone and survived) — but its floor at frame 135
+  makes them skip at least 136 − workers frames. **P13** P12 with
+  `stale_ticks [6000000]` and `stale_armed: true`, reported once a frame in
+  the seek's first 4 frames was composed: a line `playback from 0` with
+  hits > 0 and skipped < 75 (half of H's 150 frames, the rule set before
+  the run), and `stale_reached` [6000000], far past H's 5 s end. **P14** H
+  from 1200000 for 2 s with `seek_to` 600000 and `stale_ticks [0,
+  2700000]`, unarmed: a line `playback from 600000` with hits > 0 and
+  skipped < 75 (P12's reason), and `stale_reached` [0, 2700000] (without the range's start, the request at 0
+  would arm the session for the one at 2700000). **Z1** no `Frame Job: ` in any log.
 - `--mutant NAME`, each anchor exactly once in its file, driven through
   every row: `worker-frame-plus-one` → P2, `unguarded` → P8,
   `no-stop-on-pause` → P2, `no-graphic-gate` → P4, `no-follow` → P6,
-  `seek-reads-player` → P9, `no-arming` → P11. Exit 0 caught, 1 survived,
-  2 a CONTROL row (P0, P7) failed.
+  `seek-reads-player` → P9, `no-arming` → P11, and (#329, each anchored on
+  `reach`'s range guard) `follows-stale` (the guard `true`, plus
+  `no-arming`'s edit) → P12, `no-range-guard` (`ticks < session.endTicks`
+  out) → P13, `no-start-guard` (`ticks >= session.startTicks` out) → P14.
+  Exit 0 caught, 1 survived, 2 a CONTROL row (P0, P7) failed.
 - `--bench PACKAGE --from T --seconds S` plays a COPY under
   `work/playback-prefetch-bench/`, one owned instance per cell — OFF and ON,
   each at Full and Quarter (`-FrameJobPreviewQuality 0` / `2`, argument
@@ -10678,6 +10698,10 @@ Run on 2026-10-21 over `1fa006d` plus the phase, every instance my own, on a
 | G6 phase 3, `--mutant` `worker-frame-plus-one`, `unguarded`, `no-follow`, `seek-reads-player`, `no-arming` (Release) | each caught, exit 0: P2 (24 mismatched); P8 (45 of 46 differ); P6 (0 skipped); P9 (no line from 1800000); P11 (the laps 0 hits) |
 | G6 phase 3, `--mutant no-range-guard` (Release, twice) | survived both (P11's lap 169, then 156 hits); not kept as a mutant |
 | G6 phase 3, `graphics_prefetch_proof.py` and its two mutants (Release) | 7/7 (S2 301 hits, S6 OFF 16.01 s, ON 3.79 s); both caught |
+| #329 (2026-10-25, over `c721417` plus the batch, 12-CPU host shared with two other lanes, load 11–40), `playback_prefetch_proof.py` (Debug), first two runs with P12 at 1800000 | 12/15 twice: P14, P11 and P8 failed, the instance stalled from P14's first half on (frames composed 0, a compose up to 1 070 ms); the same stall came on the 10th of eleven plain `seek_to` plays with no stale tick, so it is the Debug build under this load, not the rows |
+| #329, `--mutant follows-stale` (Release), P12 scored by hits alone at 1800000 | survived: P12's line 10 hits, 87 skipped (the frames claimed before the stale request still hit); P13 failed (279 skipped). P12 moved to 2700000 and gained skipped < 75, P14 too |
+| #329, `playback_prefetch_proof.py` (Debug, then Release) | 15/15, exit 0, each; Release P2 240 hits; P8 49 common ticks equal; P10 91 hits; P12 86 hits, 0 skipped, `stale_reached` [2700000]; P13 91 hits, 0 skipped, [6000000]; P14 75 hits, 0 skipped, [0, 2700000]; P11 the lap 158 hits |
+| #329, `--mutant` `follows-stale`, `no-range-guard`, `no-start-guard` (Release) | each caught, exit 0: P12 (0 hits, 136 skipped); P13 (6 hits, 279 skipped); P14 (0 hits, 106 skipped) |
 
 ## Issue #127 — one memory budget and kept frames (`graphic_memory_proof.py`)
 
@@ -10898,7 +10922,14 @@ in one process-wide cache in the engine (`graphic/src/images.rs`) keyed by
 the SHA-256 of the asset's bytes, its limit `budget_bytes / 16` at the
 level in force (`GraphicPrefetch+Memory.swift`), 0 under
 `-FrameJobGraphicImageCacheOff YES`. Its unit rows are
-`graphic/tests/image_cache.rs`'s I1–I6.
+`graphic/tests/image_cache.rs`'s I1–I8. I7 and I8 (#329) hold a build
+between its two locks with the crate's doc-hidden `set_image_build_hook`
+(called once per build, with no lock held; none by default): in I7 a
+build of `ramp.png` pauses, the limit goes to 0 and back to 64 MiB, a second
+`Library` with the same bytes builds and holds its copy, and the paused
+build, released, must leave the bytes as they were (one copy counted once,
+two builds, both draws the original route's); in I8 the paused build alone,
+released across the same limits, must write nothing.
 
 - **`image_cache_bench.py PACKAGE [--from T] [--frames 40] [--rounds 5]`**:
   copies PACKAGE under `work/image-cache-bench/` (the original is never
@@ -10936,7 +10967,9 @@ level in force (`GraphicPrefetch+Memory.swift`), 0 under
   target dir `work/image-cache-target/`, kept between runs) and must fail
   their row with its assertion's text: `name-key` → I2, `premultiplied-copy`
   → I1 (bytes), `unchecked` → I1 (pixels), `no-trim` → I3, `over-limit` →
-  I4 (bytes), `no-skip-marker` → I4 (builds). The app mutant
+  I4 (bytes), `no-skip-marker` → I4 (builds), `no-building-recheck` (the
+  `Building` re-check after a build deleted) → I7 (`two builds of one
+  digest counted its copy twice`; I8 fails too). The app mutant
   `pressure-ignored` is built by `tree_copy` and must fail C3. Exit 0
   caught, 1 survived, 2 the control was not performed.
 
@@ -10950,6 +10983,8 @@ a 12-CPU host with 96 GiB, `powermode 0`, shared with other sessions:
 | `cargo test --release --test image_cache` | I1–I6 pass |
 | `image_cache_proof.py` (Debug; Release) | 6/6 each; C2 ON 922 430 bytes, limit 1 610 612 736; C3 critical 0 and 0, warning 805 306 368, normal 1 610 612 736 |
 | `--mutant` (Release) | caught, exit 0: `name-key` I2, `premultiplied-copy` I1 (`the cache holds`), `unchecked` I1 (`a cached draw differs`), `no-trim` I3, `over-limit` I4 (`a copy over the limit was kept`), `no-skip-marker` I4 (`the copy was rebuilt`), `pressure-ignored` C3 (critical answered a 1 610 612 736 limit) |
+| #329 (2026-10-25), `cargo test --release --test image_cache` | I1–I8 pass |
+| #329, `--mutant no-building-recheck` | caught, exit 0: I7 `two builds of one digest counted its copy twice` (164 114 bytes against 82 057); I8 failed too (82 057 bytes against 0) |
 | `RC_PROOF_APP=release graphic_memory_proof.py` | 13/13; `--mutant no-pressure-trim` caught (M7) |
 | `RC_PROOF_APP=release screens.py --only 02-settings` | 6/6, 0 new problems (P2: `FrameJobGraphicImageCacheOff` in NOT_SHOWN) |
 
@@ -21956,7 +21991,8 @@ rules are the script's header, fixed before the phase's code and the control cap
 
 - **The fixture** (`gainmap_still`): `gainmap_writer.swift`, built through
   `swift_build.build`, draws eight equal vertical bands of extended-linear grey, L = 0.05,
-  0.18, 0.5, 1, 2, 4, 6, 8 left to right (each band is named by its L; centres x = 64 + 128i,
+  0.18, 0.5, 1, 2, 4, 5, 8 left to right (#330 moved the L = 6 band to L = 5, 1,015 cd/m², just
+  above the 1,000 cd/m² a dropped peak clips at; a file older than the writer is remade) (each band is named by its L; centres x = 64 + 128i,
   y = 64 at 1024×128), into a 16-bit-float `extendedLinearSRGB` image with content headroom 8
   and writes it with `kCGImageDestinationEncodeToISOGainmap` — M2's writer (HD-22 (a); at the
   default headroom the gain is lost). ImageIO writes its own tone-mapped SDR base (Display P3,
@@ -21979,6 +22015,11 @@ rules are the script's header, fixed before the phase's code and the control cap
 - **P15** runs before HG on the instance (its stills made there) and answers the fixture's
   bands in linear BT.2020 and the rendition's peak, which HG's oracle reads; selecting HG or
   HGk adds it.
+- **HG's peak check** (#330, HD-22 (l), the rule set before the run): the L = 5 band's mean is at
+  least 5/1023 below the mean of the same band's no-peak oracle, pq_hlg(pq_signal(203·rgb)) with
+  no EETF, which clips at 1,000 cd/m²; the gap is printed in levels. The oracle puts it 10.19/1023
+  below at peak 1621 (2.32 at the old L = 6), so `gainmap-peak-dropped` now fails both the
+  per-band check and this one. HG's ≥ 40/1023 bands are L = 2, 4, 5 and 8.
 - **HG**, **HGk** run in a plain run, `compare` and `--only`; **HGu** only under `--only`, with
   `--control`.
 
@@ -22006,6 +22047,8 @@ same `let peak` line.
 | `--mutant gainmap-unread --only HG,P15,Z1` | caught: `hasGainMap` false on all three gain-map files; no bands for HG |
 | `--mutant gainmap-white-100 --only HG,P15,Z1` | caught: `encodePQ` 78.96/1023 off; HG's bands 35.5–138.5/1023 off |
 | `--mutant gainmap-peak-dropped --only HG,Z1` | caught, by the bands' order only: L = 6 and L = 8 both 0.99951. The L = 6 band sat 1.85/1023 from the oracle, inside its ±2/1023, so the per-band check alone would not have caught it |
+| #330 (2026-10-25, the L = 5 fixture, remade from the writer), `--only HG,HGk,P15,Z1` (Debug; Release) | 4/4 each. Release HG: the L = 5 band (linear 5.0078) 0.40/1023 from its oracle, worst 0.58; the peak check 10.49 levels below the no-peak oracle; peak 1621 |
+| #330, `RC_PROOF_APP=release … --mutant gainmap-peak-dropped --only HG,Z1` | caught, exit 0, by all three: the L = 5 band 9.59/1023 from its oracle; the bands not increasing (L = 5 and L = 8 both 0.99951); the peak check 0.50 levels below, under 5/1023 |
 | `--mutant gainmap-sdr-project --only HGu,P15,Z1 --control …` | caught: the fixture at `.sdr` `pq(bt2020)` peak 1621; the SDR render differs from the control's |
 | `--mutant gainmap-cache-shared --only P15,Z1` | caught: the fixture at `.hlg` the SDR texture, conversion nil |
 | `--mutant gainmap-key-pq --only HGk,Z1` | caught: the L = 0.5 band not keyed |

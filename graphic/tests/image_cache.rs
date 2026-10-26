@@ -1,4 +1,4 @@
-//! The decoded-image cache (spec §11 G-39), rows I1–I6. The cache is one
+//! The decoded-image cache (spec §11 G-39), rows I1–I8. The cache is one
 //! per process, so every row holds `SERIAL`, starts at a limit of 0 (which
 //! empties it), sets its own limit and makes its own draws: no row reads
 //! state another row left. Every pixel claim compares a draw at a positive
@@ -7,10 +7,14 @@
 mod common;
 
 use std::collections::BTreeMap;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::thread::JoinHandle;
+use std::time::Duration;
 
 use common::{pixel, render, svg};
-use graphic::{image_cache_builds, image_cache_bytes, set_image_cache_limit, Library};
+use graphic::{
+    image_cache_builds, image_cache_bytes, set_image_build_hook, set_image_cache_limit, Library,
+};
 
 const MIB: usize = 1 << 20;
 const RAMP: (u32, u32) = (320, 64);
@@ -235,4 +239,151 @@ fn i6_gif_and_webp_never_reach_the_cache() {
     set_image_cache_limit(64 * MIB);
     render(&lib, &svg(400, 300, &body), 400, 300);
     assert_eq!(image_cache_bytes(), 0, "a GIF or WebP asset was cached");
+}
+
+/// The pause's state: whether the first build reached the hook, whether it
+/// may go on, and how many builds called it.
+#[derive(Default)]
+struct PauseState {
+    paused: bool,
+    released: bool,
+    calls: usize,
+}
+
+/// A build hook that holds only its first call until released. Dropping it
+/// releases the pause, clears the hook and joins the paused thread, so a
+/// failed row neither hangs the binary nor leaks the hook.
+struct Pause {
+    state: Arc<(Mutex<PauseState>, Condvar)>,
+    thread: Option<JoinHandle<Vec<u8>>>,
+}
+
+impl Pause {
+    fn install() -> Pause {
+        let state = Arc::new((Mutex::new(PauseState::default()), Condvar::new()));
+        let shared = state.clone();
+        set_image_build_hook(Some(Arc::new(move || {
+            let (lock, signal) = &*shared;
+            let mut state = lock.lock().unwrap_or_else(|p| p.into_inner());
+            state.calls += 1;
+            if state.calls == 1 {
+                state.paused = true;
+                signal.notify_all();
+                while !state.released {
+                    state = signal.wait(state).unwrap_or_else(|p| p.into_inner());
+                }
+            }
+        })));
+        Pause {
+            state,
+            thread: None,
+        }
+    }
+
+    /// Waits, at most 30 s, for the first build to reach the hook.
+    fn wait_paused(&self) {
+        let (lock, signal) = &*self.state;
+        let state = lock.lock().unwrap_or_else(|p| p.into_inner());
+        let (state, _) = signal
+            .wait_timeout_while(state, Duration::from_secs(30), |s| !s.paused)
+            .unwrap_or_else(|p| p.into_inner());
+        assert!(state.paused, "the first build never reached the hook");
+    }
+
+    fn release(&self) {
+        let (lock, signal) = &*self.state;
+        lock.lock().unwrap_or_else(|p| p.into_inner()).released = true;
+        signal.notify_all();
+    }
+
+    /// Releases the pause and answers the paused thread's draw.
+    fn finish(&mut self) -> Vec<u8> {
+        self.release();
+        let thread = self.thread.take().expect("a paused thread");
+        thread.join().expect("the paused draw")
+    }
+}
+
+impl Drop for Pause {
+    fn drop(&mut self) {
+        self.release();
+        set_image_build_hook(None);
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+fn ramp_library() -> Library {
+    library(BTreeMap::from([(
+        "ramp.png".into(),
+        ramp(RAMP.0, RAMP.1, 0),
+    )]))
+}
+
+fn ramp_scene() -> String {
+    svg(
+        400,
+        300,
+        &image("ramp.png", "x=\"10\" y=\"10\" width=\"380\" height=\"280\""),
+    )
+}
+
+#[test]
+fn i7_two_builds_of_one_digest_across_a_limit_of_zero_count_one_copy() {
+    let _hold = serial();
+    let scene = ramp_scene();
+    let original = render(&ramp_library(), &scene, 400, 300).0;
+    set_image_cache_limit(64 * MIB);
+    let builds = image_cache_builds();
+    let mut pause = Pause::install();
+    let (first, second) = (ramp_library(), ramp_library());
+    let in_thread = scene.clone();
+    pause.thread = Some(std::thread::spawn(move || {
+        render(&first, &in_thread, 400, 300).0
+    }));
+    pause.wait_paused();
+    set_image_cache_limit(0);
+    set_image_cache_limit(64 * MIB);
+    let drawn_b = render(&second, &scene, 400, 300).0;
+    let one = image_cache_bytes();
+    assert!(one > 0, "build B's copy is held");
+    let drawn_a = pause.finish();
+    assert_eq!(
+        image_cache_bytes(),
+        one,
+        "two builds of one digest counted its copy twice"
+    );
+    assert_eq!(image_cache_builds() - builds, 2, "two builds ran");
+    assert!(
+        drawn_a == original && drawn_b == original,
+        "a draw differs from the original route"
+    );
+}
+
+#[test]
+fn i8_a_build_across_a_limit_of_zero_and_back_writes_nothing() {
+    let _hold = serial();
+    let scene = ramp_scene();
+    let lib = ramp_library();
+    let original = render(&lib, &scene, 400, 300).0;
+    set_image_cache_limit(64 * MIB);
+    let mut pause = Pause::install();
+    let in_thread = scene.clone();
+    pause.thread = Some(std::thread::spawn(move || {
+        render(&lib, &in_thread, 400, 300).0
+    }));
+    pause.wait_paused();
+    set_image_cache_limit(0);
+    set_image_cache_limit(64 * MIB);
+    let drawn_a = pause.finish();
+    assert_eq!(
+        image_cache_bytes(),
+        0,
+        "a build begun before a limit of 0 wrote its copy"
+    );
+    assert_eq!(
+        drawn_a, original,
+        "the draw differs from the original route"
+    );
 }

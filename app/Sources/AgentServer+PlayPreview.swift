@@ -18,6 +18,15 @@ import AppKit
 /// notes the playhead, starts the trial, sets the rate and sleeps; with
 /// `seek_to`, half way through it notes the playhead (`seek_from`) and seeks
 /// there through the asked door. It ends paused where the play reached.
+///
+/// **`stale_ticks`** (issue #329) hands the prefetch requests the seek's
+/// session must not follow, through `GraphicPrefetch.reach`, the
+/// compositor's own call: in the seek's hop, before the session is armed,
+/// or with `stale_armed` once a frame in its first `armFrames` frames was
+/// composed (so its request armed it), waited for at most `min(2 s,
+/// seconds / 2)` from the seek. The second half is still `seconds / 2` from
+/// the seek, the wait included. `stale_reached` answers the ticks reported:
+/// all of them, or none when the armed wait ran out.
 extension AgentServer {
 
     /// What the first hop read, carried to the next ones.
@@ -40,6 +49,25 @@ extension AgentServer {
             throw ToolError(message: "rate must be 1, 2 or 4 (got \(rate)).")
         }
         let digests = try boolArg(a, "digests") ?? false
+        let staleTicks = try intsArg(a, "stale_ticks").map { $0.map(Ticks.init) }
+        let staleArmed = try boolArg(a, "stale_armed")
+        let asksSeek = a["seek_to"].map { !($0 is NSNull) } ?? false
+        if let staleTicks {
+            guard asksSeek else {
+                throw ToolError(
+                    message: "stale_ticks needs seek_to: a stale request is served after a seek.")
+            }
+            guard !staleTicks.isEmpty else {
+                throw ToolError(message: "stale_ticks must list at least one tick.")
+            }
+            if let negative = staleTicks.first(where: { $0 < 0 }) {
+                throw ToolError(
+                    message: "stale_ticks must hold ticks of 0 or more (got \(negative)).")
+            }
+        } else if staleArmed != nil {
+            throw ToolError(
+                message: "stale_armed needs stale_ticks: it says when those ticks are reported.")
+        }
 
         let run = try onMain { () throws -> PlayRun in
             let document = try self.target(a)
@@ -81,14 +109,32 @@ extension AgentServer {
             return (from, started)
         }
         var seekFrom: Ticks?
+        var staleReached: [Ticks]?
         if let seekTo = run.seekTo {
             Thread.sleep(forTimeInterval: seconds / 2)
-            seekFrom = onMain { () -> Ticks in
+            let armed = staleArmed ?? false
+            let (here, before) = onMain { () -> (Ticks, Int) in
                 let here = playback.currentTime
+                let before = PlaybackTrials.shared.recorded(run.key).count
+                // The seek's session is installed synchronously here
+                // (`startSeek` → `syncPrefetch(seeking: true)`).
                 playback.seek(to: seekTo)
-                return here
+                if let staleTicks, !armed {
+                    for tick in staleTicks { GraphicPrefetch.shared.reach(run.key, ticks: tick) }
+                }
+                return (here, before)
             }
-            Thread.sleep(forTimeInterval: seconds / 2)
+            let seekAt = Date()
+            seekFrom = here
+            if let staleTicks {
+                staleReached = armed
+                    ? reachOnceArmed(
+                        run, staleTicks, after: before, from: seekTo,
+                        by: seekAt.addingTimeInterval(min(2, seconds / 2)))
+                    : staleTicks
+            }
+            Thread.sleep(
+                forTimeInterval: max(0, seconds / 2 - Date().timeIntervalSince(seekAt)))
         } else {
             Thread.sleep(forTimeInterval: seconds)
         }
@@ -116,6 +162,7 @@ extension AgentServer {
             ("compose_ms", Self.composeMs(served)),
         ]
         if let seekFrom { fields.append(("seek_from", seekFrom)) }
+        if let staleReached { fields.append(("stale_reached", staleReached)) }
         if digests {
             var table: [String: String] = [:]
             for frame in served {
@@ -125,6 +172,26 @@ extension AgentServer {
             fields.append(("digests", table))
         }
         return try orderedResult(fields)
+    }
+
+    /// `stale_armed`'s wait: polls every 10 ms, until `deadline`, for a frame
+    /// served after the first `before` with ticks in the seek's first
+    /// `armFrames` frames — composed, so its `reach` armed the session —
+    /// then reports `ticks` and answers them; [] when the deadline came
+    /// first. On the server thread.
+    private func reachOnceArmed(
+        _ run: PlayRun, _ ticks: [Ticks], after before: Int, from seekTo: Ticks, by deadline: Date
+    ) -> [Ticks] {
+        let window = seekTo..<(seekTo + Ticks(GraphicPrefetch.armFrames) * run.frameTicks)
+        while true {
+            let served = PlaybackTrials.shared.recorded(run.key)
+            if served.dropFirst(before).contains(where: { window.contains($0.ticks) }) {
+                for tick in ticks { GraphicPrefetch.shared.reach(run.key, ticks: tick) }
+                return ticks
+            }
+            guard Date() < deadline else { return [] }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
     }
 
     /// ⌊a / b⌋ for a positive `b`, negative `a` included.
@@ -179,7 +246,15 @@ extension AgentServer {
                 + "frame it served. It pauses first and waits up to 5 s for a seek to land. "
                 + "digests: true adds a tick → SHA-256 table of each served frame's pixels "
                 + "(slower). seek_to seeks there half way through, as a click on the ruler "
-                + "would, and adds seek_from, where the play was. Refused, changing nothing: "
+                + "would, and adds seek_from, where the play was. stale_ticks (with seek_to) "
+                + "reports those ticks to the graphics prefetch as requests the compositor "
+                + "reached just after the seek, the way a request for the old position served "
+                + "before AVFoundation cancels it would; stale_armed: true reports them only "
+                + "once a frame in the seek's first 4 frames was composed (waiting at most 2 s "
+                + "or half of seconds, whichever is less). Either adds stale_reached, the ticks "
+                + "actually reported ([] when the armed wait ran out). Refused, changing "
+                + "nothing: stale_ticks without seek_to, an empty or negative stale_ticks, "
+                + "stale_armed without stale_ticks, "
                 + "a project with no editor window and a preview with nothing to play. "
                 + "Refused after pausing the preview: a preview still seeking after 5 s.",
             [
@@ -200,6 +275,18 @@ extension AgentServer {
                     "type": "integer",
                     "description": "A time in ticks (600000 per second), snapped to the frame "
                         + "grid, to seek to half way through the play.",
+                ],
+                "stale_ticks": [
+                    "type": "array", "items": ["type": "integer", "minimum": 0], "minItems": 1,
+                    "description": "Times in ticks to report to the graphics prefetch as "
+                        + "requests reached after the seek (needs seek_to). Answered back as "
+                        + "stale_reached.",
+                ],
+                "stale_armed": [
+                    "type": "boolean",
+                    "description": "Report stale_ticks only once the seek's session is armed: "
+                        + "a frame in its first 4 frames composed. Default false: report "
+                        + "them in the seek's own step.",
                 ],
             ],
             required: ["seconds"])

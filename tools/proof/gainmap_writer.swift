@@ -1,9 +1,9 @@
 // gainmap_writer — hdr_proof.py's gain-map HEIC (clean-up 3 batch B, phase 3, #322,
 // spec §11 HD-22): `gainmap_writer <out.heic> <width> <height>`.
 //
-// Eight equal vertical bands of extended-linear grey, L = 0.05, 0.18, 0.5, 1, 2, 4, 6,
-// 8 left to right, drawn into a 16-bit-float `extendedLinearSRGB` image whose content
-// headroom is set to 8, then written by ImageIO's HEIC writer with
+// Eight equal vertical bands of extended-linear grey, L = 0.05, 0.18, 0.5, 1, 2, 4, 5,
+// 8 left to right (#330 moved the L = 6 band to 5), drawn into a 16-bit-float
+// `extendedLinearSRGB` image whose content headroom is set to 8, then written by ImageIO's HEIC writer with
 // `kCGImageDestinationEncodeRequest: kCGImageDestinationEncodeToISOGainmap` at
 // quality 0.99 — M2's writer route (HD-22 (a)): at the image's default headroom (0)
 // the file carries a gain map but every band from L = 1 up reads back 1.0. ImageIO
@@ -30,7 +30,7 @@ guard arguments.count == 4, let width = Int(arguments[2]), let height = Int(argu
     width >= 8, height >= 1
 else { fail("usage: gainmap_writer <out.heic> <width ≥ 8> <height ≥ 1>") }
 let output = URL(fileURLWithPath: arguments[1])
-let bands: [CGFloat] = [0.05, 0.18, 0.5, 1, 2, 4, 6, 8]
+let bands: [CGFloat] = [0.05, 0.18, 0.5, 1, 2, 4, 5, 8]
 
 guard let space = CGColorSpace(name: CGColorSpace.extendedLinearSRGB),
     let context = CGContext(

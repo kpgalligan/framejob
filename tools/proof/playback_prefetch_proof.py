@@ -46,22 +46,43 @@ P9  ON: H from 0 for 2 s with seek_to 1800000; within 10 s a further line
     `playback from 1800000`;
 P10 ON: H from 1200000 for 2 s with seek_to 0, a seek BEHIND the play; within
     10 s a line `playback from 0` with hits > 0 (the old position's requests
-    still in flight do not move the new session's floor). No mutant: with
-    `reach`'s range guard and the seek session's arming taken out, P10
-    passed twice on Release, because this play seldom has an old request
-    served between the seek and AVFoundation's cancel (the stranded floor
-    was seen once, in an `unguarded` run of a build without the arming: 0
-    hits, 86 skipped);
+    still in flight do not move the new session's floor). A real-world row
+    with no mutant: with `reach`'s range guard and the seek session's arming
+    taken out, it passed twice on Release, because this play seldom has an
+    old request served between the seek and AVFoundation's cancel (the
+    stranded floor was seen once, in an `unguarded` run of a build without
+    the arming: 0 hits, 86 skipped). P12–P14 hand the seek's session such a
+    request deterministically (#329);
 P11 ON, its last play: a loop lap. `set_selection` on H's first `heavy` clip,
     then `perform_menu_item ["Clip", "Motion", "Preview"]` (the in/out range
     set to the clip, Loop on, playing from its start), 6 s, then
     `play_preview {seconds: 0.5}` to pause; at least two `playback from 0`
     lines since, the last (the lap after the loop's return) with hits > 0.
-    `no-range-guard` (`reach`'s `ticks < session.endTicks` taken out) is
-    not a mutant here: it passed P11 twice on Release (the lap 169 and 156
-    hits) — presumably because the old position's requests are served
-    below the loop's end, inside the range, where the arming alone holds
-    them off (not measured);
+    A real-world row: `no-range-guard` (`reach`'s `ticks < session.endTicks`
+    taken out) passed it twice on Release (the lap 169 and 156 hits) —
+    presumably because the old position's requests are served below the
+    loop's end, inside the range, where the arming alone holds them off
+    (not measured); P13 is that guard's row (#329);
+P12 ON: H from 1200000 for 2 s with seek_to 0 and `stale_ticks [2700000]`,
+    reported in the seek's own step, before the session is armed; within
+    10 s a line `playback from 0` with hits > 0 and skipped < 75, and
+    stale_reached [2700000] (the arming holds off a stale request inside
+    the range). Hits alone do not catch a followed stale request: the
+    frames the workers claimed before it still hit (10 in the first
+    `follows-stale` run); its floor at frame 135 makes the workers skip at
+    least 136 − workers frames;
+P13 ON: P12 with `stale_ticks [6000000]` and `stale_armed: true`, reported
+    once a frame in the seek's first 4 frames was composed; within 10 s a
+    line `playback from 0` with hits > 0 and skipped < 75 (half of H's 150
+    frames; the rule set before the run), and stale_reached [6000000] (far
+    past H's 5 s end: the range's end holds off a request past it once the
+    session is armed);
+P14 ON: H from 1200000 for 2 s with seek_to 600000 and `stale_ticks [0,
+    2700000]`, unarmed; within 10 s a line `playback from 600000` with
+    hits > 0 and skipped < 75 (P12's reason; the floor would be frame 105),
+    and stale_reached [0, 2700000] (the range's start holds off
+    a request before it, which would otherwise arm the session for the
+    second);
 Z1  `grep "Frame Job: "` over every log prints nothing.
 
     python3 tools/proof/playback_prefetch_proof.py [--app PATH]
@@ -75,7 +96,10 @@ texture-key guard) → P8, `no-stop-on-pause` (`syncPrefetch`'s `stop`) → P2,
 `no-graphic-gate` (`drawsGraphics` not consulted) → P4, `no-follow` (`reach`'s
 floor raise) → P6, `seek-reads-player` (`startSeek` starts from `currentTime`)
 → P9, `no-arming` (`reach` arms a seek's session at its first request) →
-P11. Exit 0 = caught, 1 = survived, 2 = the control (P0, P7) could not be
+P11, `follows-stale` (`reach`'s range guard `true`, and `no-arming`'s edit)
+→ P12, `no-range-guard` (the guard's `ticks < session.endTicks` taken out)
+→ P13, `no-start-guard` (its `ticks >= session.startTicks` taken out) →
+P14. Exit 0 = caught, 1 = survived, 2 = the control (P0, P7) could not be
 performed.
 
 `--bench PACKAGE` launches one owned instance per cell — OFF and ON, each at
@@ -112,7 +136,8 @@ WORK = ROOT / "tools/proof/work/playback-prefetch"
 BENCH_WORK = ROOT / "tools/proof/work/playback-prefetch-bench"
 APP = proof_app.binary()
 SECOND = 600_000
-ROWS = ["P0", "P1", "P2", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "Z1"]
+ROWS = ["P0", "P1", "P2", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14",
+        "Z1"]
 CONTROLS = ("P0", "P7")
 PLAY = re.compile(gp.LINE.pattern + r", playback from (\d+), (\d+) skipped")
 PLAY_FIELDS = gp.FIELDS + ("start", "skipped")
@@ -122,6 +147,8 @@ SYNC = "app/Sources/Playback+Prefetch.swift"
 PLAYBACK = "app/Sources/Playback.swift"
 WORKER_PLUS_ONE = (PREFETCH, gp.WORKER_SVG,
                    gp.WORKER_SVG.replace("frame: slot.frame,", "frame: slot.frame + 1,"))
+NO_ARMING = (PREFETCH, "            guard index < Self.armFrames else { return }\n", "")
+RANGE_GUARD = "            ticks >= session.startTicks, ticks < session.endTicks\n"
 # name: ([(file, anchor, replacement)], the row it must fail)
 MUTANTS = {
     "worker-frame-plus-one": ([WORKER_PLUS_ONE], "P2"),
@@ -132,8 +159,11 @@ MUTANTS = {
     "no-follow": ([(PREFETCH, "session.floor = index", "_ = index")], "P6"),
     "seek-reads-player": (
         [(PLAYBACK, "syncPrefetch(from: clamped,", "syncPrefetch(from: currentTime,")], "P9"),
-    "no-arming": (
-        [(PREFETCH, "            guard index < Self.armFrames else { return }\n", "")], "P11"),
+    "no-arming": ([NO_ARMING], "P11"),
+    "no-range-guard": ([(PREFETCH, RANGE_GUARD, "            ticks >= session.startTicks\n")],
+                       "P13"),
+    "no-start-guard": ([(PREFETCH, RANGE_GUARD, "            ticks < session.endTicks\n")], "P14"),
+    "follows-stale": ([(PREFETCH, RANGE_GUARD, "            true\n"), NO_ARMING], "P12"),
 }
 FRAME = SECOND // 30
 
@@ -223,7 +253,7 @@ def brief(answer):
     if not isinstance(answer, dict) or "error" in answer:
         return f"{answer}"
     keys = ("from", "to", "rate", "wall_seconds", "frames_expected", "frames_composed",
-            "composed_ratio", "compose_ms", "seek_from")
+            "composed_ratio", "compose_ms", "seek_from", "stale_reached")
     return "{" + ", ".join(f"{k} {answer[k]}" for k in keys if k in answer) + "}"
 
 
@@ -376,6 +406,41 @@ def run_all(app):
               and line["hits"] > 0,
               f"ON H from 1200000 seek_to 0 {brief(plays['on-H-behind'])}; line {line}; every "
               f"line since {gp.lines_since(on_log, offset)}")
+
+        offset = gp.log_size(on_log)
+        plays["on-H-stale"] = play(client, heavy, 2 * SECOND, 2, seek_to=0,
+                                   stale_ticks=[2_700_000])
+        line = await_playback(on_log, offset, 0)
+        check("P12", "error" not in plays["on-H-stale"] and line is not None
+              and line["hits"] > 0 and line["skipped"] < 75
+              and plays["on-H-stale"].get("stale_reached") == [2_700_000],
+              f"ON H from 1200000 seek_to 0, stale 2700000 unarmed "
+              f"{brief(plays['on-H-stale'])}; line {line} (skipped under 75 needed); every line "
+              f"since "
+              f"{gp.lines_since(on_log, offset)}")
+
+        offset = gp.log_size(on_log)
+        plays["on-H-past-end"] = play(client, heavy, 2 * SECOND, 2, seek_to=0,
+                                      stale_ticks=[10 * SECOND], stale_armed=True)
+        line = await_playback(on_log, offset, 0)
+        check("P13", "error" not in plays["on-H-past-end"] and line is not None
+              and line["hits"] > 0 and line["skipped"] < 75
+              and plays["on-H-past-end"].get("stale_reached") == [10 * SECOND],
+              f"ON H from 1200000 seek_to 0, stale 6000000 armed "
+              f"{brief(plays['on-H-past-end'])}; line {line} (skipped under 75 needed); every "
+              f"line since {gp.lines_since(on_log, offset)}")
+
+        offset = gp.log_size(on_log)
+        plays["on-H-before-start"] = play(client, heavy, 2 * SECOND, 2, seek_to=SECOND,
+                                          stale_ticks=[0, 2_700_000])
+        line = await_playback(on_log, offset, SECOND)
+        check("P14", "error" not in plays["on-H-before-start"] and line is not None
+              and line["hits"] > 0 and line["skipped"] < 75
+              and plays["on-H-before-start"].get("stale_reached") == [0, 2_700_000],
+              f"ON H from 1200000 seek_to 600000, stale 0 and 2700000 unarmed "
+              f"{brief(plays['on-H-before-start'])}; line {line} (skipped under 75 needed); "
+              f"every line since "
+              f"{gp.lines_since(on_log, offset)}")
 
         plays["on-L-digests"] = play(client, light, 0, 3, digests=True)
         plays["on-H-digests"] = [play(client, heavy, start, 3, digests=True)
