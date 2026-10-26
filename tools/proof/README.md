@@ -1762,7 +1762,9 @@ at its socket, so start that one with `proof_app.py launch --app release`) and
 on Debug its render_frame took 2.04 s of the 3 s bound, so it was pinned), and
 `precision_proof.py --measure` ("M1 measures the compositor's frame times and
 the app's memory", and `--measure ab`'s MA beside it; its rows, `capture` and
-`compare` run on either); the
+`compare` run on either), and `reader_wedge_proof.py`'s app group ("W1 and W2
+bound decode work in wall seconds, and a Debug decode runs about 17x slower";
+its probe group runs on either, spec §11 #367); the
 18 app-driving proofs changed since issue batch B80 each scored their full
 score on Debug, the two with a recorded Release time (agent_socket_proof
 135 s, export_cancel_proof 256 s) faster on Debug (`archive/build-velocity.md`'s
@@ -23930,6 +23932,8 @@ Preview and coreaudiod.
 | **Release, `--groups app`, 3 runs (recorded)** | exit 0 in 86 s: F0, D0 ok; 20 W packages; A rows below |
 | **Release, `--groups render,quality`, 3 runs (recorded)** | exit 0 in 63 s: B0 (reused), F0, I1 ok (max \|diff\| 0.00e+00 over 288 000 frames); R and Q rows below |
 | **Release, `--groups window`, 3 runs (recorded)** | exit 0 in 273 s: WOK ok, `window_ok` held for all 60 lines; W rows below |
+| Debug, `--runs 1 --groups app --no-settle`, before #367 (2026-10-26) | APP FAIL in 1,508 s: the first A row's `.caf.landing.partial` stayed at 4 096 bytes and no A row landed (the wedge, reproduced) |
+| **Release, `--runs 1 --groups app --no-settle`, with #367's lane (2026-10-26, recorded)** | exit 0 in 24 s: F0, D0 ok; all 8 A rows landed, 0.53–2.16 s mono and 1.09–4.07 s stereo |
 
 **R: the render's cost (probe, 60 s of output, 3 runs each).** All runs gave 2 880 000 frames.
 Bytes per output minute were identical in every run: 11 524 096 mono and 23 044 096 stereo, a
@@ -24011,7 +24015,7 @@ constant segment's ramp entry compactly, and the plan is not a cost (a) adds.
 
 Every placement above had spread 0.000 ms and passed `varispeed_pass`.
 
-**The cache-pass wedge (found by this spike, not fixed here).** The first Debug shakedown and the
+**The cache-pass wedge (found by this spike, fixed by #367).** The first Debug shakedown and the
 first Release shakedown each made the 20 W packages back to back. For each package that meant
 importing a 250 s fixture, editing, saving and closing, without waiting for the import's cache
 pass. Afterwards the next A render never landed: its `.landing.partial` stayed at 4 096 bytes at
@@ -24020,7 +24024,10 @@ showed 13 `MediaImporter.generateCaches` tasks (10 in `speech`, 1 in `peaks`, 2 
 `writeSyncFeatures`) and the ramp-audio queue's `RampSourceReader.fill`, all blocked in
 `-[AVAssetReaderOutput copyNextSampleBuffer]`. On its own, one import's pass finished in 0.77–1.06 s
 (peaks, sync, speech). The instrument now waits for each import's three markers (`settle`,
-bound 120 s) before the next op, and with that every run above finished.
+bound 120 s) before the next op, and with that every run above finished. `--no-settle` turns
+the wait off and reproduces the wedge. #367 fixed it: a cache pass's decodes now run on a lane
+of their own, two at a time and off the Swift cooperative pool, whose 12 threads the passes had
+filled (spec §11 #367; "Issue #367 — many cache passes in flight" below).
 
 **Recommendation.** The numbers favour (a). Rendering a constant Keep pitch off segment offline
 removes #334's steps, which today's path does not: the ×4 export went from 32 step events
@@ -24040,5 +24047,88 @@ were 0 steps. The cost is small on this host:
 
 What (a) carries over from ramps is their known costs: silence until the file lands, an export
 that waits for it, and disk in `cache/ramp-audio/`. Before (a) ships, the cache-pass wedge above
-should be fixed or understood. It blocked this very render queue, so under (a) every constant
+should be fixed or understood (fixed by #367). It blocked this very render queue, so under (a) every constant
 ×N clip would also go silent behind it.
+
+## Issue #367 — many cache passes in flight (`reader_wedge_proof.py` B0, L1–L4, C1, F0, P1, W1, W2, S0, D0; `cache_lane_probe.swift`; mutants `wide`, `lifo`, `slot-leak`, `inline`, `no-lane`; expected survivors `unbounded`, `app-inline`)
+
+Twenty imports of long files that nobody waited for wedged every `AVAssetReader` in the process
+(#334's spike found it: "The cache-pass wedge" above). The cache lane (`MediaImporter.CacheLane`,
+`app/Sources/MediaCacheLane.swift`, spec §11 #367) runs a cache pass's peaks, sync and speech
+decodes at most two at a time, FIFO, on its own `.utility` GCD queue and never on the Swift
+cooperative pool. The proof has one owned instance on its own socket, stopped by its PID, with no
+menu item and no `UserDefaults` write. The work folder is `tools/proof/work/reader-wedge/`, and
+the long fixtures are #334's (`constant_render_spike.make_long`).
+
+```sh
+python3 tools/proof/reader_wedge_proof.py --groups probe                     # B0, L1–L4, C1; exit 0
+for m in wide lifo slot-leak inline; do python3 tools/proof/reader_wedge_proof.py --groups probe --mutant $m; done   # each exit 1
+make gate
+env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/reader_wedge_proof.py                            # exit 0
+env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/reader_wedge_proof.py --groups app --mutant no-lane     # exit 1
+env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/reader_wedge_proof.py --groups app --mutant unbounded   # expected survivor, exit 0
+env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/reader_wedge_proof.py --groups app --mutant app-inline  # expected survivor, exit 0
+env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/constant_render_spike.py --runs 1 --groups app --no-settle
+```
+
+**The rows.**
+- **probe** (no app; `cache_lane_probe.swift` built over `app/Sources` through `swift_build.build`):
+  - **B0**: the probe builds. A failed build is a scored FAIL.
+  - **L1**: 40 bodies of 20 ms submitted from 40 threads. At most exactly 2 ran at once (the
+    literal 2, not `width`).
+  - **L2**: 40 bodies from one thread. Each start rank is within 1 of its submission index.
+  - **L3**: L1's 40 bodies all finish within 10 s.
+  - **L4**: a body through `MediaImporter.onCacheLane` from a `Task.detached` runs on the queue
+    labelled `CacheLane.label`.
+  - **C1** (reported, plain runs only): 30 s of `long-sine` read on a GCD queue alone, then again
+    while one blocking `Task.detached` per core holds the cooperative pool (bound 15 s), then
+    after the tasks are released. It answers whether a GCD-queue reader stalls while the pool is
+    full, with no reader on the pool.
+- **app** (Release only):
+  - **F0**: the long fixtures exist and are 48 kHz.
+  - **P1**: the spike's 20 W packages (`constant_render_spike.w_package`, `SETTLE` off), each saved
+    and closed with no wait for its cache pass.
+  - **W1** (scored): a fresh document, a 60 s long-sine clip, an action over it,
+    `set_action_end {speed: 2}`. A `.caf` lands in `cache/ramp-audio/` within 120 s.
+  - **W2** (scored, plain runs only): every P1 package holds
+    `cache/{peaks,sync,speech}/<media>.complete.json` within 180 s of W1's end (60 markers).
+  - **S0** (reported, only when W1 fails): `sample <pid> 5` into `sample-W1.txt`, and the count of
+    lines naming `copyNextSampleBuffer`, `generateCaches`, `RampSourceReader`, `readerOfflineMixer`,
+    `audioqueue.source` and `cooperative`.
+  - **D0**: the instance listened, and no `Frame Job: ` line appeared.
+
+Exit (rule R, `cache_pass_probe.py`'s): a plain run exits 0 when every scored row passes, 1 when
+one fails, 2 when not performed. A mutant run exits 1 when its row failed (caught), 0 when it
+passed (survived), 2 when its control was not performed.
+
+**Release only.** The app group passes `release_only=` (spec §11 V-4): W1 and W2 bound decode work
+in wall seconds, and a Debug decode runs about 17× slower. On Debug with the lane, one 250 s pass
+took 17.66 and 17.36 s alone and a ramp render 35.8–36.1 s alone; W1 landed in 100.05 s and W2
+found 34 of 60 markers in its 180 s. App mutants are built as Release copies.
+
+**Mutants.** The lane has two guards, each enough alone on this host (spec §11 #367): guard 1 runs
+the decodes off the cooperative pool, and guard 2 runs at most two at once. The scored set is
+the probe's `wide` (width 64; L1, guard 2), `lifo` (L2), `slot-leak` (L3) and `inline` (the body
+run on the submitting thread; L4, guard 1), and the app's `no-lane` (the three `onCacheLane` call
+sites back to direct calls, which takes away both guards; W1). Two app mutants take away one
+guard each. They survive by design, and are recorded here, not scored
+(`EXPECTED_SURVIVORS`): `unbounded` (width 64, still off the pool) and `app-inline` (width 2, the
+body run on the submitting cooperative-pool thread). `unbounded` surviving is the evidence that
+the cause is the cooperative pool, not the number of readers.
+
+**Runs (2026-10-25/26).**
+
+| Run | Result |
+|---|---|
+| Before the lane, Debug, `constant_render_spike.py --runs 1 --groups app --no-settle` | APP FAIL in 1,508 s: the first A row's `.caf.landing.partial` stayed at 4 096 bytes, and no A row landed |
+| Before the lane, Debug, `--groups app`, twice | exit 1 both: W1 FAIL (no `.caf` in 120 s); S0 12 cooperative threads, 28 `copyNextSampleBuffer` lines, 13 `readerOfflineMixer`, 16 `audioqueue.source`, 1 `RampSourceReader`; W2 FAIL, 5 and 4 of 60 markers |
+| With the lane, Debug, `--groups app` | exit 1: W1 ok in 100.05 s; W2 FAIL, 34 of 60 markers (Debug's decode speed, hence the pin) |
+| `--groups probe --mutant wide` / `lifo` / `slot-leak` / `inline` | each caught, exit 1: L1 40 at once; L2 largest rank offset 37; L3 2 of 40 finished; L4 ran on `com.apple.root.default-qos.cooperative` |
+| Release, `--groups app --mutant no-lane` | caught, exit 1 in 241 s: W1 FAIL; S0 12 cooperative threads, 28 `copyNextSampleBuffer` lines |
+| Release, `--groups app --mutant unbounded` | survived as expected, exit 0: W1 1.61 s |
+| Release, `--groups app --mutant app-inline` | survived as expected, exit 0: W1 1.37 s. A sample of the same build after P1, with all 20 passes in flight: 4 cooperative threads, 2 of them in `copyNextSampleBuffer` (the lane's width), and W1 1.28 s |
+| **Release, plain (recorded)** | exit 0 in 55 s: B0, L1 (peak 2), L2 (offset 0), L3 (3.327 s), L4 ok; C1 alone 0.11 s, with 12 of 12 cooperative threads held STALLED (no finish in 15 s), finished 15.03 s from its start after the release; F0, P1 (3.3 s), W1 (1.37 s), W2 (60 of 60, 4.7 s), D0 ok |
+| **Release, `constant_render_spike.py --runs 1 --groups app --no-settle` (recorded)** | exit 0 in 24 s: all 8 A rows landed, 0.53–4.07 s |
+
+**The host.** A Mac14,6 (12 cores) with macOS 26.5.1 (25F80), on AC power; the cooperative pool
+there is 12 threads. The Release runs' app came from this change's passing `make gate`.

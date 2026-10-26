@@ -1450,3 +1450,57 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   apart. **Risk accepted:** an instrument that reads a
   ×1-only track through a PostEffects tap must correct by a measured
   control, as P1 does, and not trust the stamp.
+- **#367 — A media cache pass's three audio decodes (`writePeaks`,
+  `writeSyncFeatures`, `writeSpeech`) run on a lane of their own
+  (`MediaImporter.CacheLane`): at most two at a time, FIFO, on the lane's
+  own concurrent `.utility` GCD queue and never on the Swift cooperative
+  pool. No synchronous `AVAssetReader` read may run on the cooperative
+  pool.** The cause, measured on a Mac14,6 with 12 cores, where the
+  cooperative pool is 12 threads: twenty imports of 250 s files that
+  nobody waited for (#334's spike with `--no-settle`, and
+  `tools/proof/reader_wedge_proof.py`'s P1) start twenty cache passes, and
+  each pass's decode was a synchronous `copyNextSampleBuffer` loop inside
+  its `Task`. On the build before this change W1's ramp render never
+  landed (two runs out of two; the spike's first A row never landed in its
+  1,500 s), and S0's `sample` showed all 12
+  `com.apple.root.utility-qos.cooperative` threads in
+  `copyNextSampleBuffer` under `writePeaks` and `writeSyncFeatures`, the
+  ramp-audio queue's thread in `RampSourceReader.fill` →
+  `copyNextSampleBuffer`, and 13 `readerOfflineMixer`, 16
+  `audioqueue.source` and 16 `audiomentor` threads parked in
+  `FigSemaphoreWaitRelative` at 0 % CPU. The probe's C1 measures the cause
+  with no app and no reader on the pool: 30 s of audio read on a GCD queue
+  took 0.10 s alone; with 12 of 12 cooperative threads held by blocking
+  tasks it made no progress in 15 s, and finished only once they were
+  released, 15.03 s from its start. So an `AVAssetReader` on a GCD queue
+  needs the cooperative pool, and a pool filled by synchronous reads stops
+  every reader in the process. The lane has two guards, each sufficient
+  alone on this host, kept together as defence in depth. Guard 1, off the
+  pool, is the rule above. Guard 2, width 2, can never fill a 12-thread
+  pool; it also bounds the CPU and readers that cache passes take from
+  playback, export and the ramp renderer, and it keeps passes FIFO. The two
+  app mutants that take away one guard each survive by design, and their
+  Release W1 times are the evidence: `unbounded` (width 64, off the pool)
+  1.61 s, and `app-inline` (width 2, on the pool) 1.37 s, with a sample
+  after P1 showing 2 cooperative threads in `copyNextSampleBuffer`. The
+  scored mutants are `no-lane`, which takes away both and restores the old
+  path (W1 FAIL on Release, S0 again 12 cooperative threads in
+  `copyNextSampleBuffer`), and the probe's `wide` (L1, guard 2) and
+  `inline` (L4, guard 1). With the lane on Release, W1's render landed
+  1.37 s after its edit and W2 found all 60 of P1's cache markers 4.7 s
+  after W1. Two is a concurrency bound, not a memory limit. Off the lane:
+  thumbnails (`AVAssetImageGenerator`), the head checks
+  (`peaksAreCurrent`, `syncFeaturesAreCurrent`, `speechIsCurrent`) and
+  `pass.isCurrent()`, which run before a pass reaches the lane so a current
+  cache never queues, and every other reader in the app (transcription's
+  extract, the reverse renderer, export's loudness, the rate copy, the
+  decoders, colour detection, sync analysis), which this change does not
+  move. A pass's order (thumbnails, peaks, sync, speech, `retryPeaks`) is
+  unchanged. W1 and W2 are `release_only` (V-4): they bound decode work in
+  wall seconds, and a Debug decode runs about 17× slower (≈ 17.5 s for one
+  250 s pass). **Risk accepted:** with many imports, later files' waveforms
+  and sync and speech caches arrive later, two at a time in import order; a
+  document closed while its passes wait still decodes them when their turn
+  comes, as a running pass already did; and on a host whose cooperative
+  pool is two threads or fewer, guard 2 alone would not hold, so there
+  guard 1 is the only one.

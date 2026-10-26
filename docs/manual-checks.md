@@ -350,6 +350,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does Keep pitch sound clean?
 - **Source:** #299, spec §11 SY-39, SY-40.
 
+**SE-15 — Importing many long files at once keeps sound playing**
+- **Do:** import 20 or more long audio files at once (File ▸ Add Media…, ⇧⌘I), then at once play a clip, and set a speed ramp on another clip and play it.
+- **Expect:** playback is heard, the ramp's sound arrives, and the waveforms fill in over time.
+- **Answer:** does sound keep playing while the imports' caches are built?
+- **Source:** #367 (spec §11 #367).
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

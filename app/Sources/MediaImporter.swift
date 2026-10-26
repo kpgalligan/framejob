@@ -183,6 +183,7 @@ enum MediaImporter {
     /// A waveform pass that published nothing is retried in the same task
     /// after each of `peaksRetryDelays` while the pass is current
     /// (`retryPeaks`), so a lost waveform does not wait for the next open.
+    /// Its three audio decodes run on the cache lane (`onCacheLane`, spec §11 #367).
     static func generateCaches(
         for media: MediaSnapshot, url: URL, in cacheDir: URL, urls: [UInt32: URL] = [:]
     ) {
@@ -213,6 +214,11 @@ enum MediaImporter {
                 pass.done()
             }
         }
+    }
+
+    /// `body` on `CacheLane.shared`, awaited (spec §11 #367).
+    static func onCacheLane<T>(_ body: @escaping () -> T) async -> T {
+        await withCheckedContinuation { cont in CacheLane.shared.submit { cont.resume(returning: body()) } }
     }
 
     /// The waits between a failed waveform pass and its in-session retries.
@@ -508,8 +514,10 @@ enum MediaImporter {
             let segments = try? await track.load(.segments),
             let expected = expectedPeaksRanges(trackRange: trackRange, segments: segments)
         else { return false }
-        return writePeaks(for: media, asset: asset, track: track, expectedRanges: expected,
-                          stamp: stamp, into: cacheDir, pass: pass)
+        return await onCacheLane {
+            writePeaks(for: media, asset: asset, track: track, expectedRanges: expected,
+                       stamp: stamp, into: cacheDir, pass: pass)
+        }
     }
 
     // MARK: - Sync features
@@ -535,8 +543,10 @@ enum MediaImporter {
         guard let track = (try? await asset.loadTracks(withMediaType: .audio))?.first else {
             return
         }
-        writeSyncFeatures(for: media, asset: asset, track: track, stamp: stamp, into: cacheDir,
-                          pass: pass)
+        await onCacheLane {
+            writeSyncFeatures(for: media, asset: asset, track: track, stamp: stamp,
+                              into: cacheDir, pass: pass)
+        }
     }
 
     // MARK: - Speech
@@ -577,7 +587,9 @@ enum MediaImporter {
         guard let track = (try? await asset.loadTracks(withMediaType: .audio))?.first else {
             return
         }
-        writeSpeech(for: media, asset: asset, track: track, stamp: stamp, into: cacheDir,
-                    pass: pass)
+        await onCacheLane {
+            writeSpeech(for: media, asset: asset, track: track, stamp: stamp,
+                        into: cacheDir, pass: pass)
+        }
     }
 }

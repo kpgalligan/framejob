@@ -8,7 +8,7 @@ product file is changed; #334 stays open.
 
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/constant_render_spike.py [--selftest]
         [--mutant per-second|ideal-phase|order-off]
-        [--groups app,render,quality,window] [--runs N] [--app PATH]
+        [--groups app,render,quality,window] [--runs N] [--app PATH] [--no-settle]
 
 Groups run in the order app, render, quality, window. The work folder is
 `tools/proof/work/constant-render/` (untracked): `fixtures/` (kept), `packages/`
@@ -30,7 +30,8 @@ app      one owned instance (`mcp.launch`, `bounded.child_env()`, stopped by its
          clip, the seconds until a `.caf` lands (bound 300 s) and its bytes.
          E-x<N>: on the 20 s sine and clicks, "flat" (that action, end speed N)
          and "plain" (`set_speed` only), each exported `audio_wav`. D0. Every
-         import waits for its cache pass (`settle`) before the next op.
+         import waits for its cache pass (`settle`) before the next op;
+         `--no-settle` skips the wait (#367's wedge, `reader_wedge_proof.py`).
 render   (probe) R-<media>-x<N> / R-<media>-ramp: 60 s of output rendered from
          the long fixture over a 1 ms map, per run and median wall s and bytes
          per output minute, peak RSS; each long-sine render's step events.
@@ -112,6 +113,7 @@ GROUPS = ["app", "render", "quality", "window"]
 WALLS = {"app": 1500, "render": 1800, "quality": 900, "window": 2400}
 MUTANTS = ["per-second", "ideal-phase", "order-off"]
 MUTANT = None
+SETTLE = True
 
 
 def RAMP(length_s):
@@ -304,7 +306,10 @@ def settle(doc, media):
     `peaks`, `sync` and `speech` markers in the package — so passes never
     pile up: twenty unsettled imports of the 250 s fixtures, saved and closed
     back to back, left every `AVAssetReader` in the instance blocked, the
-    ramp render's with them (Debug and Release, 2026-10-25)."""
+    ramp render's with them (Debug and Release, 2026-10-25). Returns at once
+    when `SETTLE` is False (`--no-settle`, #367)."""
+    if not SETTLE:
+        return
     cache = Path(doc.path) / "cache"
     started = time.monotonic()
     while time.monotonic() - started < CACHE_BOUND_S:
@@ -340,10 +345,11 @@ def new_doc(client, folder, name):
     return doc
 
 
-def w_package(client, media, rate, length_s):
-    """A pristine W package (saved, closed): its {package, clip, action, speed}."""
+def w_package(client, media, rate, length_s, folder=PACKAGES):
+    """A pristine W package (saved, closed) in `folder`: its {package, clip,
+    action, speed}."""
     name = f"W-{media}-{'ramp' if rate is None else label(rate)}-{length_s}"
-    doc = new_doc(client, PACKAGES, name)
+    doc = new_doc(client, folder, name)
     try:
         clip, _ = long_clip(doc, LONG[media], length_s * SEC, 1.0 if rate is None else rate)
         if rate is None:
@@ -682,15 +688,18 @@ def window_group(run, binary, runs, state):
 
 
 def main():
-    global MUTANT
+    global MUTANT, SETTLE
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--mutant", choices=MUTANTS, default=None)
     parser.add_argument("--groups", default=",".join(GROUPS))
     parser.add_argument("--runs", type=int, default=RUNS)
     parser.add_argument("--app", type=Path, default=None)
+    parser.add_argument("--no-settle", action="store_true",
+                        help="never wait for an import's cache pass (#367)")
     args = parser.parse_args()
     MUTANT = args.mutant
+    SETTLE = not args.no_settle
     if args.selftest:
         return selftest()
     chosen = [g for g in GROUPS if g in args.groups.split(",")]

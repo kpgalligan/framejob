@@ -72,7 +72,7 @@ A package is a folder that the Finder shows as one file:
 
 **Media is referenced, not copied.** By default a project remembers where each file lives (its path and a Finder bookmark, so a moved file is often found again) and reads it from there. The package stays small, but it depends on the footage staying put. Consolidate Media is how you make a package hold everything it needs.
 
-Caches are built in the background after an open, an import or a relink, and the timeline fills in as they finish. A cache that already matches its file is never rebuilt. Moving, copying or consolidating the package keeps its caches. Until an untitled project is first saved, its caches live in a temporary folder; the first save copies them in.
+Caches are built in the background after an open, an import or a relink, and the timeline fills in as they finish. Frame Job builds at most two files' sound caches at a time, on threads of their own, so importing many long files at once does not hold up playback or a speed ramp's sound. A cache that already matches its file is never rebuilt. Moving, copying or consolidating the package keeps its caches. Until an untitled project is first saved, its caches live in a temporary folder; the first save copies them in.
 
 *Transcripts* cost money to rebuild when they came from the cloud engine, so treat `cache/transcripts/` as worth keeping. See [Captions](captions.md).
 

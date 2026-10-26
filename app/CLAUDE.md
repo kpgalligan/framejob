@@ -296,6 +296,7 @@ detail there.
   +`ThumbnailSource`: the converted strip, below; +`Thumbnails`: the
   await-free halves of `thumbnails`, the image branch and the publish) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
+  `MediaCacheLane.swift` ·
   `FFmpegRewrap.swift` (+`Plan`) · `AppSupport.swift` · `DecoderSupport.swift` ·
   `ContainerRewrap.swift` (+`Writer`) · `RewrapProgress.swift` ·
   `RewrapProgressWindowController.swift` — the import funnel and the three per-media caches (`thumbs/`, `peaks/`,
@@ -318,8 +319,14 @@ detail there.
   non-modal window shown after 1 s, which never takes the keyboard from a
   Frame Job window, and Cancel removes the partial copy (spec §11 #228-P). A
   tool call passes no watch.
+  `MediaCacheLane.swift` (await-free) is `MediaImporter.CacheLane`, the cache
+  lane: every pass's peaks, sync and speech decodes run on it, at most two at
+  a time, first in first out, on a queue of its own and never on the Swift
+  cooperative pool, where synchronous reads would stop every `AVAssetReader`
+  in the process (spec §11 #367).
   `async`/`await` is confined to `MediaImporter.swift`; the await-free halves
-  are the `+` files, `MediaPeakBuckets`, `MediaCacheFiles` and `MediaCacheLedger`. A cache is CURRENT when its
+  are the `+` files, `MediaPeakBuckets`, `MediaCacheFiles`, `MediaCacheLedger`
+  and `MediaCacheLane`. A cache is CURRENT when its
   `complete.json` marker matches `CacheStamp` (the source's size and
   modification second plus the constants that size the cache — no path, so a
   moved or consolidated package keeps its caches); the marker is written
@@ -3063,7 +3070,8 @@ inversion and `main.async` allocates; every other cross-thread value is an
 `NSLock`, the cache ledger's `NSCondition`, the prefetch's `NSCondition`, or
 a main hop. `DispatchQueue`
 only at the documented seams: the
-compositor's render queue, the composition rebuild, import, the export
+compositor's render queue, the composition rebuild, import, the cache lane's
+queue (`MediaImporter.CacheLane`, spec §11 #367), the export
 progress timer, `Transcriber`'s serial queue, `CloudTranscriber`'s serial
 queue and the AssemblyAI client's delegate `OperationQueue` (spec §11's
 R6-7), the transcribe sheet's Download row's KVO main hop
