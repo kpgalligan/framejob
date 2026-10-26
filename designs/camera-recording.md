@@ -148,13 +148,20 @@ tool in the space a spec is given; the tool follows it; and the panel that drive
   real recorder under the terminal's grant, pausing once, and skips by name without a camera or
   the grant. Mutants. No door reaches the recorder yet, so nothing user-visible changes; the
   docs are spec §7.4's row and `tools/proof/README.md`.
-- **CR1b — the tool.** `record_screen`'s `source: "camera"` and `camera` (a device's name or
-  unique id; an unknown name is refused, naming the cameras present), in CAM-3's refusal order;
-  the answer's camera keys; the landing: into an open project by the picture rule; as a new
-  project with the canvas at the camera format's size and rate. **Proof**: a new
+- **CR1b — the tool; CAM-4.** CAM-4 is recorded in §11 before the code: the tool's own
+  choices CAM-3 left open (`camera` with another source, the camera answer key, the span
+  counted from the first buffer). `record_screen`'s `source: "camera"` and `camera` (a device's
+  name or unique id; an unknown name is refused, naming the cameras present), in CAM-3's
+  refusal order; the answer's camera keys; the landing: into an open project by the picture
+  rule; as a new project with the canvas at the camera format's size and rate. CR1a's residue
+  lands here, because the tool is what exposes it: #372 (the review's four nits — the frame
+  durations re-set once running, `no-hold` caught by G6's buffer count rather than G3's thin
+  margin, a stopped segment's first stamp kept, segment 0's elapsed counted from its mint) and
+  #371 (`recording_probe.py`'s two X4 rows, in the file this phase re-aims). **Proof**: a new
   `tools/proof/camera_recording_proof.py` over MCP, with two tiers. The headless tier checks the
   refusals in order, the catalog and parity. The granted tier skips by name without a camera or
-  the grant. Beside it: probe rows for the argument refusals; `recording_proof.py`'s and
+  the grant. Beside it: `camera_recording_probe.py` rows for the argument refusals, the
+  lookup and the answer, with their mutants; `recording_proof.py`'s and
   `recording_probe.py`'s `record_screen` schema rows; mutants. Docs: spec §7.9 (§6 lists ops
   only, and `record_screen` is an app-state tool); `docs/guide/screen-recording.md` and
   `mcp.md`; a manual-check row for the voice lined up with the picture (a clap). The camera
@@ -561,6 +568,101 @@ precedent.
 ## CR1b — the tool
 
 ### Record
+
+**Landed** (2026-10-26).
+- Spec §11 CAM-4, written before any code: `camera` (a `uniqueID` or a name in any case,
+  trimmed, blank or null absent, absent the default), `camera` refused with `screen` or
+  `voice_over` right after `source`, the seven arguments a camera refuses, the default
+  microphone, the span from segment 0's first buffer, the `camera` answer key, the status item.
+  Its index row and the `camera-recording.md` row (144 → 170 lines); the `11-decisions/` cell
+  is 13101 in 31 files.
+- New: `AgentServer+RecordingCamera.swift` (116 lines: `cameraRefusedArguments`,
+  `recordingCameraArgument`, `recordingCameraStrangers`, the pure `recordingCameraID` — CAM-3
+  (7), then (8) — `recordingCamera`'s one `onMain` hop over `CameraDevices.connected()`'s
+  facts, `systemPreferredCamera` and `RecordingGrant.cameraStatus`, and `cameraFields`).
+- Changed: `AgentServer+RecordingArguments.swift` (182 → 187: `RecordingSourceKind.camera`,
+  `recordingCameraStrangers` called after `source`'s value; the voice-over's `strangers` line
+  byte-identical); `AgentServer+Recording.swift` (375 → 393: `let screen`, the screen-only
+  reads defaulted for a camera, the camera lookup and grant after `project`, `camera:` in the
+  choice, `record`'s three starts, `awaitVoiceOverDidStart` renamed `awaitFirstStart`, the
+  header's order sentence); `AgentServer+RecordingResult.swift` (379 → 387: `camera` in
+  `recordingFields`, the camera's `problem` and `note` last in `resultNotes`);
+  `AgentCatalog+Recording.swift` (273 → 317: the hoisted `recordingCameraClause`, the `camera`
+  property, `source`'s, `rate`'s and the REFUSAL ORDER's sentences, `stopped_by`'s
+  `system_stopped`, the Camera grant in THE GRANTS). `record_screen` stays withheld from the
+  assistant and the tool count is unchanged.
+- #372: item 1, `CameraCapture.start` re-applies the format and both frame durations whenever
+  the session runs (399 → 399); item 3, `onSegmentStarted` keeps a stopped segment's first
+  stamp; item 4, `openCameraSegment(named:in:)` mints each segment's `calledAt` now, still named
+  by the session's call time, so segment 0's elapsed starts at its mint
+  (`ScreenRecorder+Camera.swift` 396 → 398); item 2, G6 requires a steady warm-up to have seen
+  `WARM_UP_RUN` + 1 buffers and `no-hold` is aimed at G6.
+- #371: `recording_probe.py`'s X4 reads the variable's name from the whole `let` statement,
+  from its `let` line through the line that reads `"include_framejob_windows"`.
+- Proofs: `tools/proof/camera_recording_proof.py` (new, headless and granted tiers);
+  `camera_recording_probe.py` and `.swift` gain the `tool` section (T1–T6) and five mutants;
+  `recording_probe.py` (D10's vocabulary sentence, 7c's arguments, X4's name read, its
+  docstring) and `recording_proof.py` (`RECORD_PROPERTIES`, "thirteen", `source`'s enum,
+  `camera` a string, section 1's `source: "x"` sentence, its docstring) re-aimed.
+- Docs: spec §7.9a's `record_screen` paragraph (490 → 499 lines) and §7.4's row 52;
+  `docs/guide/screen-recording.md` ("For agents": the `source` and `camera` rows, the camera
+  paragraph, the order, `system_stopped`; Limits) and `mcp.md` (the grants line, the
+  `record_screen` row); `docs/manual-checks.md` REC-12 (the clap); `tools/proof/README.md`'s
+  CR1b section and CR1a's `no-hold` line.
+
+**Measured** (the built-in camera, the default microphone, the terminal's grants):
+- `python3 tools/proof/spec_index_proof.py`: 201/201, after CAM-4 and again after §7.9a.
+- `make typecheck`: exit 0, the 4 baseline warnings, tsc clean.
+- `python3 tools/proof/camera_recording_probe.py --only values,landing,tool`: exit 0, `scores:
+  30/30`. Each tool mutant, `--only tool`, exit 1, `scores: 6/7`, caught:
+  `camera-strangers-admitted` (T1: one stranger and all seven answered `ok: camera`),
+  `camera-elsewhere-admitted` (T2: `camera` with screen answered `ok: screen`),
+  `grant-before-lookup` (T3: unknown + denied answered the Camera grant's sentence),
+  `camera-key-dropped` (T5: no `camera` keys), `camera-notes-dropped` (T6: 1 clause).
+- `python3 tools/proof/recording_probe.py --only voiceover_doors,catalog,exclusion`: exit 0,
+  88/88 (D10, 7c and X4's rows among them).
+- `make app-debug`, then `camera_recording_proof.py` on the Debug instance: exit 0, 36/36, the
+  granted tier run: 2.035 s recorded for a 2 s span, `camera` FaceTime HD Camera at
+  `1760x1328@30`, by id and by `FACETIME HD CAMERA` the same camera, `mic_offset` −62.0 ms
+  (picture at 1 200 000, voice at 1 240 000), one undo ("Add Recording"), and the new project's
+  canvas 1760 × 1328 at [30, 1].
+- `make gate`: `gate: PASS 224s` (names 1 s, typecheck 5 s, fmt and lint skipped, test 115 s,
+  app 103 s); after this record was written, `gate: PASS 1s` (names alone re-ran).
+- `python3 tools/proof/recording_probe.py`: exit 0, `1222/1222 checks passed` (#371: CR1a's
+  1220/1222).
+- `python3 tools/proof/camera_recording_probe.py`: exit 0, `scores: 37/37`, all checks passed;
+  G3 59/0.9992 and 59/0.9992; G4 micOffset −0.103 and −0.141 s; G6 hold 0.533 s, 13 buffers,
+  steady, intervals 33.4, 33.3, then five at about 43.3 ms, then 33.4 ms; the call to
+  `.recording` 1.979 s.
+- `python3 tools/proof/camera_recording_probe.py --mutant no-hold`: exit 1, `scores: 7/8`,
+  caught by G6 (hold 0.082 s, 1 buffer). G3 PASSED in that run (58/0.9839 on segment 0), the
+  thin margin #372 item 2 named: G3 alone would have reported the mutant as survived.
+- Release (`proof_app.py launch --app release`, after the gate's `make app`):
+  `RC_PROOF_APP=release python3 tools/proof/camera_recording_proof.py <dir>/agent.sock`: exit
+  0, 36/36, the granted tier run (2.035 s; `mic_offset` −62.2 ms; canvas 1760 × 1328 at
+  [30, 1]). `RC_PROOF_APP=release python3 tools/proof/recording_proof.py <dir>/agent.sock
+  --no-screen --no-microphone`: exit 0, 141/141, sections 5 and 6 skipped by flag (79 checks).
+  `grep "Frame Job: " <dir>/framejob.log`: nothing. The instance was stopped by its pid.
+
+**Deviations.**
+- `recordingCameraStrangers` reads `camera` through `recordingCameraArgument` for every
+  source, so a `camera` that is not a string is refused by type ("camera must be a string.")
+  right after `source`, before any grant; CAM-4 says nothing of a wrong type.
+- `recordingFields`' camera key is an `if let` block of three lines rather than one line.
+- The probe's tables carry rows beyond the spec's list: T1 a camera named; T2 a null camera
+  with voice_over; T3 an unknown name against an empty list and the default with `restricted`;
+  T5 also `has_audio` false and `stopped_by` system_stopped.
+- `camera_recording_proof.py` checks that the refusals left `get_project` byte-identical, and
+  that they pushed no undo step, once over the whole refusal section, not after each call.
+
+**Owed.**
+- Applied with the commit (the orchestrator's): `app/CLAUDE.md`'s Recording family gains
+  `AgentServer+RecordingCamera.swift` (the tool's camera: its arguments, lookup, grant and
+  answer).
+- #371 and #372 are closed by this phase's commit.
+- REC-12 (the clap), the owner's.
+- CR1c: the panel's Camera source, its grant ask, the warm-up in the countdown, the microphone
+  choice.
 
 ## CR1c — the panel's Camera source
 

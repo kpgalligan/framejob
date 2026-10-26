@@ -142,3 +142,29 @@ its code.
     rule (`RecordingLanding.placement`, unchanged).
   - **The rule's hash.** This entry changes the file's SHA-256, so step 2's run records a new
     `rule_sha256`; CR0's pinned hash stays CR0's.
+
+- **CAM-4 — `record_screen`'s camera (CR1b), recorded before its code.** The tool's own choices
+  CAM-3 left open; CAM-3's refusal order stands, and this entry fills in its steps (3) and (7).
+  1. **`camera`** is a string matched by `CameraDevices.match`: a device's `uniqueID` exactly,
+     else its name case-insensitively. It is trimmed; a blank string or a JSON null counts as
+     absent, and absent takes CAM-3 (7)'s default (the system's preferred camera, else the
+     first built-in, else the first).
+  2. **`camera` with another source.** With source `screen` or `voice_over`, a given `camera`
+     is refused right after `source`'s value and before the voice-over's own checks: "With
+     source <screen|voice_over>, camera cannot be given — only source camera records a
+     camera." CR3 lifts this for `screen`.
+  3. **The arguments a camera refuses.** With source `camera`, the given ones of `display`,
+     `window`, `system_audio`, `show_clicks`, `size`, `include_framejob_windows` and `rate`
+     are refused together, in that order: "With source camera, <a, b> cannot be given — a
+     camera recording records the camera alone, at the camera's own format."
+  4. **The microphone.** `microphone: true` records the DEFAULT microphone, as with the screen
+     source. Choosing a microphone is the panel's (CR1c).
+  5. **The span** counts from segment 0's first buffer (the recorder's `heldFirstStartedAt`,
+     the voice-over's wait), so `seconds` is the picture recorded and the warm-up is not in it.
+  6. **The answer** carries `camera: {name, id, format, problem?, note?}` exactly when the
+     result has a camera. `id` is the chosen device's `uniqueID`, `format` the format recorded
+     at as `CameraDevices.spelled` writes it, and `problem` and `note` appear only when set;
+     each is also appended verbatim to `note`, after the microphone's clause. `stopped_by:
+     system_stopped` also means a camera that stopped on its own. `has_audio` is false: the
+     movie holds no audio.
+  7. **The chrome.** The menu-bar status item goes up as for every source.

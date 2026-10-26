@@ -1096,7 +1096,9 @@ refusal for that choice (no device carries "probe-mic"), idle, never hidden
 D9 the Pause / Resume button; D10 `record_screen`'s `recordingSourceKind`
 — nine calls, the exact sentences, a JSON null not a stranger; D11 the
 voice-over's `microphoneNote` and "its file is at". 5d now ends the Source
-rows at Microphone Only (screens + 3), 7c's arguments gain `source` and 7d's
+rows at Microphone Only (screens + 3), 7c's arguments gain `source` (and,
+with camera-recording CR1b, spec §11 CAM-4, `camera`; D10's vocabulary
+sentence lists `screen, voice_over, camera` since) and 7d's
 phrases `voice_over` and `Microphone Only`. Measured 2026-10-02, each
 `--mutant <name> --only voiceover,voiceover_doors`, against a tree at 66/66
 there:
@@ -1138,7 +1140,9 @@ sets `excludedBundleIDs` and `excludedWindowIDs` from
 `Bundle.main.bundleIdentifier`; `startRecording` passes `excluding:` and
 builds the exclusion from `choice.includeFrameJobWindows` above the
 `shareableContent` closure; `recordScreen` reads
-`"include_framejob_windows"` above `screenRecordingGranted` and passes it
+`"include_framejob_windows"` above `screenRecordingGranted` (the name it is
+read into taken from the whole `let` statement, which wraps onto the line
+above since the rename — #371) and passes it
 to `RecordingExclusion.make(` (with `panelWindowID: nil`) and to
 `RecordingChoice(`; and `filter`'s display arm holds
 `excludingApplications:` and `excludingWindows:`. What no row here can see
@@ -8733,7 +8737,7 @@ FILE_GROUP_ORDER = [
     "export_status", "cancel_export",
 ]
 RECORD_SCREEN_ARGUMENTS = [
-    "display", "include_framejob_windows", "microphone", "path", "place", "project", "rate",
+    "camera", "display", "include_framejob_windows", "microphone", "path", "place", "project", "rate",
     "seconds", "show_clicks", "size", "source", "system_audio", "window",
 ]
 
@@ -9840,7 +9844,7 @@ def section_voiceover_doors(binary, sources):
         ("{} → .screen", "empty", "ok: screen"),
         ("{source: screen} → .screen", "screen", "ok: screen"),
         ("{source: x} → the vocabulary sentence", "x",
-         'error: source must be one of screen, voice_over (got "x").'),
+         'error: source must be one of screen, voice_over, camera (got "x").'),
         ("{source: voice_over, display: 0} → display refused by name (voice-strangers-admitted)",
          "display", "error: With source voice_over, display" + VOICE_TAIL),
         ("all five strangers → named in voiceOverScreenOnlyArguments order "
@@ -10135,7 +10139,11 @@ def section_exclusion(binary, sources):
           f"read at {read_at}, grant at {grant_at}")
     name = None
     if read_at is not None:
-        m = re.search(r"let\s+(\w+)\s*=", tool[read_at])
+        # #371: the `let` may wrap, its name on a line above the read — join the
+        # statement from its `let` through the read's line before matching.
+        start = next((i for i in range(read_at, -1, -1) if re.search(r"\blet\s+\w+\s*=", tool[i])),
+                     read_at)
+        m = re.search(r"let\s+(\w+)\s*=", " ".join(tool[start:read_at + 1]))
         name = m.group(1) if m else None
     tool_text = "\n".join(tool)
 

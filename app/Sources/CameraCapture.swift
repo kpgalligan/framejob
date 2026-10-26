@@ -13,8 +13,8 @@ import AppKit
 /// **The format is held.** macOS has no `.inputPriority` preset, so a session
 /// may re-take the device's format when it starts: the device is locked for
 /// configuration in `init`, the format and both frame durations (its maximum
-/// rate, `spikeApplyFormat`'s lock) are set under the lock, set AGAIN if
-/// `startRunning` moved them, and the lock is let go only after
+/// rate, `spikeApplyFormat`'s lock) are set under the lock, set AGAIN once
+/// `startRunning` returns, and the lock is let go only after
 /// `stopRunning` (CR0's carry-over; its owner run kept the format with the
 /// format set again).
 ///
@@ -185,14 +185,14 @@ final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         }
     }
 
-    /// Starts the session on `sessionQueue`, the format set again if starting
-    /// moved it; `completion` on main, nil once the stream is warm (or the
-    /// bound passed), an error when the session did not run.
+    /// Starts the session on `sessionQueue`, the format and both frame
+    /// durations set again once it runs; `completion` on main, nil once the
+    /// stream is warm (or the bound passed), an error when it did not run.
     func start(completion: @escaping (Error?) -> Void) {
         observe()
         sessionQueue.async { [self] in
             session.startRunning()
-            if session.isRunning, device.activeFormat != format { applyFormat() }
+            if session.isRunning { applyFormat() }
             guard session.isRunning else {
                 return DispatchQueue.main.async {
                     completion(

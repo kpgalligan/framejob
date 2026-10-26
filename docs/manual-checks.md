@@ -811,6 +811,11 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Expect:** the first file holds no Frame Job window. The second shows the editor from its first frame. The New Recording panel is in neither. The picker offers no Frame Job window with the box off; with it on, it offers the editor but not the panel. The box keeps its setting.
 - **Source:** spec §11 recording.md (Include Frame Job windows).
 
+**REC-12 — A camera recording's voice lined up with its picture (a clap)**
+- **Do:** 1. Launch Frame Job from Terminal as in REC-7 (a scratch socket in `<dir>`, the terminal holding Camera and Microphone), with the camera facing you. 2. In a second Terminal tab, in the repository, run `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP("<dir>/agent.sock").call("record_screen", seconds=6, source="camera", microphone=True)'` and, about two seconds in, clap once in front of the camera. 3. In the project that opens, play the clap and step through it a frame at a time (← / →).
+- **Expect:** the movie is `Camera Recording <date> at <time>.mov` with its ` (Microphone).m4a` beside it, landed as a picture clip with the voice on a back track named Microphone. The frame where your hands meet and the clap's sound line up: the sound is no more than a frame or two early or late, and the playback sounds in sync.
+- **Source:** spec §11 CAM-3 (the microphone's offset), CAM-4.
+
 ## Assistant
 
 Needs your own Anthropic API key (Setup 3).

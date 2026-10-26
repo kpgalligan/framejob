@@ -28,7 +28,10 @@ import ScreenCaptureKit
 /// open, answered by `target(_:)`'s own sentence and never turned into a
 /// fresh document. A voice-over stops there: it reads no other grant and
 /// looks nothing up (spec §11 recording, "A voice-over is a recording with
-/// no picture"). A screen recording then reads the Screen Recording grant,
+/// no picture"). A camera recording (spec §11 CAM-4) then looks the camera
+/// up — the named one, else the default, refused naming every camera present
+/// — and only then reads the Camera grant (`+RecordingCamera.swift`). A
+/// screen recording then reads the Screen Recording grant,
 /// synchronously, named with the System Settings pane. Only then the
 /// display or window lookup, which cannot be asked without the grant — a
 /// list with NO display in it (a locked console) is named as that, not as
@@ -98,17 +101,18 @@ extension AgentServer {
         let seconds = try recordingSeconds(a)
         let kind = try recordingSourceKind(a)
         let voiceOver = kind == .voiceOver
-        let (displayIndex, windowID) = voiceOver ? (0, nil) : try recordingSourceArguments(a)
+        let screen = kind == .screen
+        let (displayIndex, windowID) = !screen ? (0, nil) : try recordingSourceArguments(a)
         let rate = try intArg(a, "rate") ?? 60
         guard rate == 30 || rate == 60 else {
             throw ToolError(message: "rate must be 30 or 60 (got \(rate)).")
         }
-        let resolution = voiceOver ? .nominal : try recordingResolution(a)
+        let resolution = !screen ? .nominal : try recordingResolution(a)
         let microphone = voiceOver ? true : try boolArg(a, "microphone") ?? false
-        let systemAudio = voiceOver ? false : try boolArg(a, "system_audio") ?? true
-        let showClicks = voiceOver ? false : try boolArg(a, "show_clicks") ?? false
+        let systemAudio = !screen ? false : try boolArg(a, "system_audio") ?? true
+        let showClicks = !screen ? false : try boolArg(a, "show_clicks") ?? false
         let includeFrameJob =
-            voiceOver ? false : try boolArg(a, "include_framejob_windows") ?? false
+            !screen ? false : try boolArg(a, "include_framejob_windows") ?? false
         let place = try boolArg(a, "place") ?? true
         let folder = try recordingFolder(a)
         if microphone {
@@ -125,6 +129,13 @@ extension AgentServer {
         // read, and there is nothing to look up.
         var source = RecordingSource.voiceOver
         var filter: SCContentFilter?
+        var cameraID: String?
+        if kind == .camera {
+            // CAM-3 (7) and (8): the camera lookup, then the Camera grant —
+            // read, never requested.
+            cameraID = try recordingCamera(a)
+            source = .camera
+        }
         if kind == .screen {
             // 2. The Screen Recording grant — read, never requested.
             guard RecordingGrant.screenRecordingGranted else {
@@ -160,7 +171,7 @@ extension AgentServer {
             source: source, includeFrameJobWindows: includeFrameJob,
             microphone: microphoneID, systemAudio: systemAudio,
             showClicks: showClicks, rate: rate, resolution: resolution,
-            destination: destination, folder: folder ?? RecordingFiles.folder())
+            destination: destination, folder: folder ?? RecordingFiles.folder(), camera: cameraID)
 
         // 5. The recording: start, the span, stop — all waits on this thread.
         let result = try record(filter: filter, choice: choice, seconds: seconds)
@@ -176,9 +187,10 @@ extension AgentServer {
     // MARK: - The recording
 
     /// Start, the span, stop. See the header for the hook and the waits. A
-    /// nil filter is a voice-over (`choice.source == .voiceOver`), started
-    /// through `startVoiceOver`, whose completion answers before it returns
-    /// and before its writer's did-start, which the span waits for first.
+    /// filter is a screen recording, started through `start`; with none, a
+    /// camera (`choice.source == .camera`) is started through `startCamera`
+    /// and a voice-over through `startVoiceOver`, and the span waits first
+    /// for their first segment's start (`awaitFirstStart`).
     private func record(
         filter: SCContentFilter?, choice: RecordingChoice, seconds: Double
     ) throws -> RecordingResult {
@@ -204,6 +216,10 @@ extension AgentServer {
                 recorder.start(
                     filter: filter, choice: choice, mayAsk: false, onFinish: deliver,
                     completion: startCompletion)
+            } else if choice.source == .camera {
+                recorder.startCamera(
+                    choice: choice, mayAsk: false, onFinish: deliver,
+                    completion: startCompletion)
             } else {
                 recorder.startVoiceOver(
                     choice: choice, mayAsk: false, onFinish: deliver,
@@ -221,7 +237,7 @@ extension AgentServer {
             throw ToolError(message: Self.startSentence(of: error))
         }
         onMain { chrome.show(recorder) }
-        if filter == nil { awaitVoiceOverDidStart(recorder, ended: box) }
+        if filter == nil { awaitFirstStart(recorder, ended: box) }
 
         // The span: the recording runs on main's run loop, this thread waits,
         // and only `onFinish` — an external stop, a failure — wakes it early.
@@ -259,12 +275,14 @@ extension AgentServer {
 
     /// SERVER THREAD. A voice-over's start completion answers BEFORE its
     /// writer's did-start, so a span counted from it comes out short by the
-    /// input's start-up time (a second on a Bluetooth input). This polls
-    /// `heldFirstStartedAt` through `onMain` until it lands, the recording
-    /// has already ended (`ended` written by `onFinish`), or
+    /// input's start-up time (a second on a Bluetooth input); a camera's
+    /// answers when segment 0's writer is armed, before its first buffer
+    /// (CAM-4 point 5: the span is the picture recorded, the warm-up not in
+    /// it). This polls `heldFirstStartedAt` through `onMain` until it lands,
+    /// the recording has already ended (`ended` written by `onFinish`), or
     /// `ScreenRecorder.armCeiling` passes — past which the span runs as
     /// before. A screen recording's start already answers after its arm.
-    private func awaitVoiceOverDidStart(
+    private func awaitFirstStart(
         _ recorder: ScreenRecorder, ended: AgentBox<Result<RecordingResult, Error>>
     ) {
         let deadline = Date().addingTimeInterval(ScreenRecorder.armCeiling)

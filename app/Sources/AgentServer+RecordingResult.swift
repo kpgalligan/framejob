@@ -91,7 +91,8 @@ extension AgentServer {
     /// `kept_files` still on disk and the `reason` — and, when its
     /// microphone file read (#181 item 2), `mic_path` and `mic_duration`,
     /// with `mic_media` and `mic_clip` from `leftOutIds` (one entry per
-    /// left-out segment) when known.
+    /// left-out segment) when known. `camera` (spec §11 CAM-4) is present
+    /// exactly when the result has one (`cameraFields`).
     static func recordingFields(
         _ result: RecordingResult, ids: [RecordingSegmentIds] = [],
         leftOutIds: [RecordingSegmentIds] = []
@@ -114,6 +115,9 @@ extension AgentServer {
             fields["mic_duration"] = mic.duration
         }
         if let problem = result.micProblem { fields["mic_problem"] = problem }
+        if let camera = result.camera {
+            fields["camera"] = cameraFields(camera, id: result.choice.camera)
+        }
         if !result.unreadable.isEmpty {
             fields["unreadable"] = result.unreadable.enumerated().map { i, left -> [String: Any] in
                 var entry: [String: Any] = [
@@ -204,11 +208,15 @@ extension AgentServer {
     }
 
     /// The result's own `note` clauses, in order: the segments left out as
-    /// unreadable (#97), the left-out voices that landed (#181 item 2), then
-    /// the microphone's. Both doors append these after their own, on a
-    /// landing that succeeded only.
+    /// unreadable (#97), the left-out voices that landed (#181 item 2), the
+    /// microphone's, then a camera's `problem` and `note`, verbatim (CAM-4).
+    /// Both doors append these after their own, on a landing that succeeded
+    /// only.
     static func resultNotes(_ result: RecordingResult) -> [String] {
-        [result.unreadableNote, result.leftOutVoiceNote, microphoneNote(result)].compactMap { $0 }
+        [
+            result.unreadableNote, result.leftOutVoiceNote, microphoneNote(result),
+            result.camera?.problem, result.camera?.note,
+        ].compactMap { $0 }
     }
 
     /// The ids a new project holds for every segment's files, read off its

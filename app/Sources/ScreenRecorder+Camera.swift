@@ -67,6 +67,7 @@ extension ScreenRecorder {
     struct CameraSegment {
         let movieURL: URL
         let micURL: URL?
+        /// When it was minted: `cameraElapsed`'s start until its first buffer.
         let calledAt: Date
         var startedAt: Date?
         var firstPTS: Double?
@@ -190,7 +191,7 @@ extension ScreenRecorder {
         capture.onSegmentStarted = { [weak self, weak capture] url, pts, arrived in
             guard let self, let current = self.cameraSession, current.capture === capture,
                 let index = current.segments.firstIndex(where: { $0.movieURL.path == url.path }),
-                current.segments[index].startedAt == nil, current.segments[index].stoppedAt == nil
+                current.segments[index].startedAt == nil
             else { return }
             self.cameraSession?.segments[index].startedAt = arrived
             self.cameraSession?.segments[index].firstPTS = pts.isFinite ? pts : nil
@@ -222,7 +223,7 @@ extension ScreenRecorder {
     }
 
     /// The capture runs on a warm stream (or did not): the warm-up's note,
-    /// then segment 0 is minted, named by the call's time, its writer armed
+    /// then segment 0 is minted now, named by the call's time, its writer armed
     /// and its microphone file started; then `.recording`, the completion,
     /// and a held stop.
     private func cameraCaptureStarted(_ capture: CameraCapture, error: (any Error)?) {
@@ -236,7 +237,7 @@ extension ScreenRecorder {
         timer?.invalidate()
         timer = nil
         cameraSession?.camera.note = capture.warmUp?.note
-        openCameraSegment(at: current.calledAt, in: current)
+        openCameraSegment(named: current.calledAt, in: current)
         state = .recording
         let completion = startCompletion
         startCompletion = nil
@@ -247,15 +248,16 @@ extension ScreenRecorder {
         }
     }
 
-    /// Mints the next segment, named by `at`, appends it BEFORE anything is
-    /// asked of it (so a report finds it), arms its writer and starts its
-    /// microphone file.
-    private func openCameraSegment(at: Date, in current: CameraSession) {
+    /// Mints the next segment NOW (its `calledAt`), named by `named`, appends
+    /// it BEFORE anything is asked of it (so a report finds it), arms its
+    /// writer and starts its microphone file.
+    private func openCameraSegment(named: Date, in current: CameraSession) {
         var held = Set(current.segments.map(\.movieURL.path))
         held.formUnion(current.segments.compactMap { $0.micURL?.path })
-        let movie = Self.nextCameraURL(in: current.choice.folder, at: at, holding: held)
+        let movie = Self.nextCameraURL(in: current.choice.folder, at: named, holding: held)
         let micURL = current.micOutput == nil ? nil : RecordingFiles.microphoneURL(beside: movie)
-        cameraSession?.segments.append(CameraSegment(movieURL: movie, micURL: micURL, calledAt: at))
+        cameraSession?.segments.append(
+            CameraSegment(movieURL: movie, micURL: micURL, calledAt: Date()))
         current.capture.beginSegment(movie)
         if let output = current.micOutput, let micURL, let delegate = current.micDelegate {
             output.startRecording(to: micURL, outputFileType: .m4a, recordingDelegate: delegate)
@@ -331,7 +333,7 @@ extension ScreenRecorder {
     /// reports.
     func resumeCamera() throws {
         guard state == .paused, let current = cameraSession else { throw RecorderError.notPaused }
-        openCameraSegment(at: Date(), in: current)
+        openCameraSegment(named: Date(), in: current)
         state = .recording
         NotificationCenter.default.post(name: Self.pauseDidChangeNotification, object: self)
     }
@@ -359,7 +361,7 @@ extension ScreenRecorder {
 
     // MARK: - What is held
 
-    /// Seconds recorded: each segment from its first buffer (else its call)
+    /// Seconds recorded: each segment from its first buffer (else its mint)
     /// to its `stoppedAt` (else now), each floored at 0, so it freezes while
     /// paused; 0 idle and while arming.
     var cameraElapsed: TimeInterval {

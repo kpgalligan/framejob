@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Camera recording CR1a (spec §11 CAM-3): the camera recorder, measured through the app's own
-sources with no door reaching it yet.
+sources; and CR1b (CAM-4): `record_screen`'s camera, through the server's own functions.
 
     python3 tools/proof/camera_recording_probe.py [--sources DIR] [--only SECTIONS] [--mutant NAME]
 
@@ -37,20 +37,40 @@ Sections and rows:
            (`Camera Recording <date> at <time>.mov`, its ` (Microphone).m4a`) and the choice's rate
            the format's; G6 the warm-up hold (CAM-3): its length from the session's start within
            the bound (+ 0.15 s for the timer), its buffers, intervals and rate, and the result's
-           `camera.note` nil when the stream was steady, naming the rate when the bound passed.
+           `camera.note` nil when the stream was steady, naming the rate when the bound passed;
+           a steady warm-up must have seen at least `WARM_UP_RUN` + 1 buffers (#372 item 2).
            Skipped by name when no camera is connected or the Camera grant is not
            authorized (nothing is recorded); G4 is skipped by name when the Microphone grant is
            not authorized (the recording is made without one). Never asks for a grant.
+  tool     CR1b, `AgentServer.shared`'s own functions, no camera and no grant: T1
+           `recordingSourceKind` with source camera — alone, a camera named, one stranger, all
+           seven in `cameraRefusedArguments` order, a null size — and `source: "x"`'s
+           vocabulary; T2 `camera` with screen (the default and named) and with voice_over
+           beating `display`, a blank camera with screen and a null with voice_over admitted;
+           T3 `recordingCameraID` over V1–V3's three lists: the default (built-in, then
+           `preferredID`), a name in any case, an id, unknown, an empty list, unknown + denied
+           (the lookup sentence), known + notDetermined and the default + restricted
+           (`cameraRefusal`), known + authorized; T4 `cameraFields` without and with
+           `problem`/`note`; T5 `recordingFields` of a camera result carries `camera` (and
+           `has_audio` false, `stopped_by` system_stopped), a screen result's none; T6
+           `resultNotes` of a camera result ends with its `problem` and `note`, a screen
+           result's is the microphone's clause alone.
 
-Mutants (each a `--mutant` edit of a copy of `--sources`), run with `--only values` but
-`no-hold`, run with `--only granted` (it needs the camera, and a cold start):
+Mutants (each a `--mutant` edit of a copy of `--sources`), run with `--only values` but the
+`tool` five, run with `--only tool`, and `no-hold`, run with `--only granted` (it needs the
+camera):
   format-any-shape    no landscape filter                                 → V1
   offset-by-arrival   the PTS ignored                                     → V12a
   offset-sign         the PTS difference negated                          → V12a, V12c
   canvas-rate-60      `canvasRate` answers 60                             → V6
   grant-unread        the `cameraStatus` guard deleted from `startCamera` → V16
   mic-ends-recording  an unasked microphone did-finish ends the recording → V15
-  no-hold             `warmUpRun` 0: the warm-up ends at its first buffer → G3
+  no-hold             `warmUpRun` 0: the warm-up ends at its first buffer → G6
+  camera-strangers-admitted  a camera's strangers list emptied                 → T1
+  camera-elsewhere-admitted  `camera` taken with any source                    → T2
+  grant-before-lookup  the Camera grant read before the lookup                 → T3
+  camera-key-dropped  `recordingFields` writes no `camera`                     → T5
+  camera-notes-dropped  `resultNotes` leaves out the camera's two sentences    → T6
 
 Exit (cache_pass_probe.py's rule): a plain run exits 0 iff no row failed (a skip by name is
 not a failure) and 1 when one did; a build failure is B0's FAIL. A `--mutant` run exits 1 when
@@ -71,12 +91,13 @@ import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/camera-recording-probe"
-SECTIONS = ["values", "landing", "granted"]
+SECTIONS = ["values", "landing", "granted", "tool"]
 ROWS = {
     "values": ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12a", "V12b",
                "V12c", "V12d", "V13", "V14", "V15", "V16", "V17"],
     "landing": ["L1", "L2", "L3"],
     "granted": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"],
+    "tool": ["T1", "T2", "T3", "T4", "T5", "T6"],
 }
 SECTION_WALL = 180
 STEM_EPOCH = 1793034873   # 2026-10-26 17:14:33 UTC
@@ -84,6 +105,7 @@ STEM_WANT = "Camera Recording 2026-10-26 at 17.14.33"
 FRAMES_PASS = 0.98
 HOLD_BOUND = 1.0          # CameraCapture.warmUpBound
 HOLD_SLACK = 0.15         # the bound's timer and the hop to main
+WARM_UP_RUN = 5           # CameraCapture.warmUpRun, written here rather than read from Swift
 INFO_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -95,6 +117,11 @@ INFO_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 GRANT_GUARD = """        let cameraGrant = RecordingGrant.cameraStatus
         guard cameraGrant == .authorized else {
             return refuseCamera(.startFailed(RecordingGrant.cameraRefusal(cameraGrant)), completion)
+        }
+"""
+# `recordingCameraID`'s grant guard, which `grant-before-lookup` moves above the lookup.
+GRANT_AFTER_LOOKUP = """        guard status == .authorized else {
+            throw ToolError(message: RecordingGrant.cameraRefusal(status))
         }
 """
 # name: (the rows it must fail, [(file, before, after), ...])
@@ -116,11 +143,31 @@ MUTANTS = {
         ("ScreenRecorder+CameraFinishing.swift",
          "// The picture records on: a microphone never ends a camera recording (CAM-3).",
          "if unasked, state == .recording { beginCameraFinishing() }")]),
-    "no-hold": (["G3"], [
+    "no-hold": (["G6"], [
         ("CameraCapture.swift", "static let warmUpRun = 5", "static let warmUpRun = 0")]),
+    # CR1b (spec §11 CAM-4), each run with `--only tool`.
+    "camera-strangers-admitted": (["T1"], [
+        ("AgentServer+RecordingCamera.swift",
+         "let strangers = Self.cameraRefusedArguments.filter { a[$0] != nil && !(a[$0] is NSNull) }",
+         "let strangers = [String]()")]),
+    "camera-elsewhere-admitted": (["T2"], [
+        ("AgentServer+RecordingCamera.swift", "guard kind == .camera || camera == nil else {",
+         "guard kind == .camera || camera == nil || true else {")]),
+    "grant-before-lookup": (["T3"], [
+        ("AgentServer+RecordingCamera.swift", GRANT_AFTER_LOOKUP, ""),
+        ("AgentServer+RecordingCamera.swift", "        let index: Int?\n",
+         GRANT_AFTER_LOOKUP + "        let index: Int?\n")]),
+    "camera-key-dropped": (["T5"], [
+        ("AgentServer+RecordingResult.swift",
+         '            fields["camera"] = cameraFields(camera, id: result.choice.camera)\n', "")]),
+    "camera-notes-dropped": (["T6"], [
+        ("AgentServer+RecordingResult.swift",
+         "            result.camera?.problem, result.camera?.note,\n", "")]),
 }
 # The section a mutant runs when `--only` is not given.
-MUTANT_SECTION = {"no-hold": "granted"}
+MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
+                  "camera-elsewhere-admitted": "tool", "grant-before-lookup": "tool",
+                  "camera-key-dropped": "tool", "camera-notes-dropped": "tool"}
 
 
 def run(command, **kw):
@@ -315,9 +362,13 @@ def granted_rows(facts):
         else:
             noted = (facts.get("note") is not None and facts.get("note") == warm.get("note")
                      and f"{warm['rate']:.1f} fps" in facts["note"])
-        rows["G6"] = (warm["seconds"] <= HOLD_BOUND + HOLD_SLACK and warm["buffers"] >= 1 and noted,
+        # #372 item 2: a steady warm-up saw a run of WARM_UP_RUN intervals, so at least
+        # WARM_UP_RUN + 1 buffers — `no-hold`'s ends at its first.
+        enough = warm["buffers"] >= (WARM_UP_RUN + 1 if warm["steady"] else 1)
+        rows["G6"] = (warm["seconds"] <= HOLD_BOUND + HOLD_SLACK and enough and noted,
                       f"hold {warm['seconds']:.3f} s (bound {HOLD_BOUND:g} s), {warm['buffers']} "
-                      f"buffers, steady {warm['steady']}, ran at {warm['rate']:.2f} fps (want "
+                      f"buffers (a steady one needs ≥ {WARM_UP_RUN + 1}), steady "
+                      f"{warm['steady']}, ran at {warm['rate']:.2f} fps (want "
                       f"{warm['wanted']:g}); intervals ms {warm['intervals']}; the call to "
                       f"recording {facts.get('startSeconds') or 0:.3f} s; note {facts.get('note')}")
     return rows

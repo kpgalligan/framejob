@@ -14,7 +14,8 @@ import Foundation
 /// came here whole, with its body untouched, and so did the four hoisted
 /// clauses only it reads (`recordingPauseClause`,
 /// `recordingUnreadableClause`, `recordingResultClause` and
-/// `recordingVoiceOverClause`), still hoisted for the type checker's budget.
+/// `recordingVoiceOverClause`), still hoisted for the type checker's budget;
+/// CR1b's `recordingCameraClause` (spec §11 CAM-4) is a fifth, for the same.
 /// It is SPLICED back in where it left — LAST, after `cancel_export` — so the
 /// catalog's order, which `recording_probe.py` reads and `tools/list`
 /// publishes, and the description `recording_proof.py` section 0 reads, are
@@ -43,7 +44,8 @@ extension AgentServer {
             + "EARLY and it still lands, with stopped_by: stopped — the same value the "
             + "tool's own stop at the span's end yields — and a duration shorter than the "
             + "span, which is what says so; user_stopped is only the SYSTEM's own "
-            + "screen-recording indicator, and system_stopped a display that slept. PAUSE: "
+            + "screen-recording indicator, and system_stopped a display that slept or a "
+            + "camera that stopped on its own. PAUSE: "
             + "the span is wall clock, so a person's pause SHORTENS what the call records — "
             + "the paused stretch is in no file — and the result's pauses says how many "
             + "times Pause was pressed (0 when never; a pause with no resume before the stop "
@@ -92,7 +94,8 @@ extension AgentServer {
             + "when they are known); stopped_by — stopped for the tool's own stop and for a "
             + "person's Stop from Frame Job's menu-bar item or the File menu, user_stopped "
             + "for the system's own screen-recording indicator, system_stopped for a "
-            + "display that slept; landed (document or new_project); note, when "
+            + "display that slept or a camera that stopped on its own; landed (document or "
+            + "new_project); note, when "
             + "there is something to say; project, the usual summary; and for a document "
             + "landing the created ids as every edit reports them — new_media, new_clips, "
             + "and new_tracks when a track was minted — plus scope and document_ops when it "
@@ -122,6 +125,30 @@ extension AgentServer {
             + "width and height 0, with no mic_path, and mic_offset 0; a microphone that "
             + "stops on its own ends the voice-over, what it wrote lands, and mic_problem "
             + "and the note say so."
+        // CR1b's camera paragraph (spec §11 CAM-4), hoisted for the same budget
+        // reason; recording_proof.py and camera_recording_proof.py read its phrases.
+        let recordingCameraClause: String =
+            " A CAMERA: source: \"camera\" records a camera alone, with no screen — the one "
+            + "camera names (a device's unique id, or its name in any case), else the default "
+            + "camera (the system's preferred camera, else the first built-in, else the "
+            + "first) — at its best format (the largest size wider than tall at 30 fps or "
+            + "more, at that format's highest rate), into files named Camera Recording <date> "
+            + "at <time>.mov, one file per stretch between pauses; microphone: true adds the "
+            + "DEFAULT microphone as a second file, as for a screen. It lands as a screen "
+            + "recording's picture does; as a new project the canvas is the file's size at "
+            + "the format's rate, rounded. display, window, system_audio, show_clicks, size, "
+            + "include_framejob_windows and rate are refused by name with source camera, and "
+            + "camera is refused with any other source. The camera is looked up after "
+            + "project — an unknown one is refused naming every camera connected, and \"No "
+            + "camera is connected.\" when there is none — and only then is the Camera grant "
+            + "read, never the Screen Recording one. The span counts from the camera's first "
+            + "frame, after it settles at its rate (up to a second). The result carries "
+            + "camera: {name, id, format, problem, note} — format spelled 1920x1080@30; "
+            + "camera.problem the sentence of a camera that stopped on its own, which ends "
+            + "the recording with stopped_by: system_stopped and lands what it wrote; "
+            + "camera.note when the camera had not settled at its rate when the recording "
+            + "began; each of the two also said in the note — and has_audio false: the movie "
+            + "holds no sound."
         return [
             // MARK: Recording
             //
@@ -161,20 +188,25 @@ extension AgentServer {
                     + "the picture lands, that segment's mic_path and mic ids are absent, and "
                     + "mic_problem carries the sentence (the note repeats it). THE GRANTS: this tool never "
                     + "asks for one and never opens the picker. The Screen Recording grant "
-                    + "(and the Microphone grant when microphone is true) must already be held "
+                    + "(and the Microphone grant when microphone is true, and the Camera "
+                    + "grant for source camera) must already be held "
                     + "by this process — the panel is where somebody grants them — and a "
                     + "missing one is refused by name with the System Settings pane in the "
                     + "sentence. A Frame Job launched from a shell runs under the TERMINAL's "
                     + "grants, not the app icon's, and both refusals then also name the "
                     + "launching process (its pid) and the way out — relaunch with open -a "
                     + "\"Frame Job\", or grant the terminal. THE REFUSAL ORDER is fixed: your own "
-                    + "mistakes first (seconds missing or outside 1…600, display and window "
+                    + "mistakes first (seconds missing or outside 1…600, a source outside the "
+                    + "vocabulary and the arguments that source refuses, display and window "
                     + "both given, a rate or size outside the vocabulary, microphone: true "
-                    + "without the Microphone grant, a project naming nothing open), then the "
-                    + "Screen Recording grant, then the display or window lookup — where a "
+                    + "without the Microphone grant, a project naming nothing open), then for "
+                    + "a screen recording the Screen Recording grant, then the display or "
+                    + "window lookup — where a "
                     + "console that is locked or asleep lists NO display and is refused as "
-                    + "that, by name — then the recording itself. " + recordingPauseClause
-                    + recordingUnreadableClause + recordingResultClause + recordingVoiceOverClause,
+                    + "that, by name — and for a camera recording the camera lookup, then the "
+                    + "Camera grant; then the recording itself. " + recordingPauseClause
+                    + recordingUnreadableClause + recordingResultClause + recordingVoiceOverClause
+                    + recordingCameraClause,
                 [
                     "seconds": [
                         "type": "number", "minimum": 1, "maximum": 600,
@@ -185,11 +217,22 @@ extension AgentServer {
                         "type": "string",
                         "enum": AgentServer.RecordingSourceKind.allCases.map(\.rawValue),
                         "description": "What is recorded: screen (default) — a display or a "
-                            + "window — or voice_over, the default microphone alone with no "
-                            + "picture (the panel's Microphone Only). With voice_over, "
+                            + "window — voice_over, the default microphone alone with no "
+                            + "picture (the panel's Microphone Only), or camera, a camera "
+                            + "alone (see camera). With voice_over, "
                             + "display, window, system_audio, show_clicks, size, "
                             + "include_framejob_windows and microphone: false are refused "
-                            + "by name.",
+                            + "by name; with camera, display, window, system_audio, "
+                            + "show_clicks, size, include_framejob_windows and rate are.",
+                    ],
+                    "camera": [
+                        "type": "string",
+                        "description": "With source camera, which camera: a device's unique id, "
+                            + "or its name in any case; trimmed, and blank means none. Absent, "
+                            + "the default camera — the system's preferred camera, else the "
+                            + "first built-in, else the first. One no connected camera carries "
+                            + "is refused naming every camera connected. Refused with any "
+                            + "other source.",
                     ],
                     "display": [
                         "type": "integer", "minimum": 0,
@@ -241,7 +284,8 @@ extension AgentServer {
                         "description": "The capture's frame rate, 30 or 60 (default 60) — the "
                             + "most frames a second the file may hold — and the canvas rate "
                             + "of a new project the recording opens as. The file's own fps "
-                            + "is whatever the screen did.",
+                            + "is whatever the screen did. Refused with source camera, which "
+                            + "records at the camera's own format's rate.",
                     ],
                     "size": [
                         "type": "string", "enum": RecordingResolution.allCases.map { $0.rawValue },

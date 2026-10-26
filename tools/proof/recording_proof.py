@@ -20,8 +20,10 @@ count rather than passing vacuously.
   added two, and the exact count belongs to road map 7's
   `op_argument_proof.py` at 77 (`tools/proof/README.md`'s handover) — with
   `record_screen` declaring exactly its
-  twelve arguments (issue batch B66 added `source`, a string whose enum is
-  `["screen", "voice_over"]`, and the recorder's Include Frame Job windows
+  thirteen arguments (issue batch B66 added `source`, a string whose enum is
+  `["screen", "voice_over"]` — `["screen", "voice_over", "camera"]` since
+  camera-recording CR1b, spec §11 CAM-4, which added `camera`, a string —
+  and the recorder's Include Frame Job windows
   option added `include_framejob_windows`, a boolean) plus the injected
   `project`, `seconds` its only required
   one, and NO `scope`: it is an app-state tool like `transcribe`, and
@@ -448,6 +450,8 @@ RECORD_PROPERTIES = {
     "size", "place", "path", "include_framejob_windows",
     # Issue batch B66 (#99 phase 2): what is recorded — the screen or a voice-over.
     "source",
+    # Camera-recording CR1b (spec §11 CAM-4): which camera, with source camera.
+    "camera",
 }
 
 # `RecordingGrant.screenRecordingPaneSentence`, verbatim — the PREFIX of
@@ -800,7 +804,7 @@ def catalog_part(mcp):
     schema = schemas.get("record_screen", {"properties": {}})
     declared = set(schema.get("properties", {}))
     check(declared == RECORD_PROPERTIES | {"project"},
-          "record_screen declares exactly its twelve arguments plus the injected project: "
+          "record_screen declares exactly its thirteen arguments plus the injected project: "
           f"{sorted(declared - RECORD_PROPERTIES - {'project'})} unexpected, "
           f"{sorted((RECORD_PROPERTIES | {'project'}) - declared)} missing")
     check(schema.get("required") == ["seconds"],
@@ -813,15 +817,16 @@ def catalog_part(mcp):
                        ("rate", "integer"), ("size", "string"), ("path", "string"),
                        ("microphone", "boolean"), ("system_audio", "boolean"),
                        ("show_clicks", "boolean"), ("place", "boolean"),
-                       ("include_framejob_windows", "boolean"), ("source", "string")):
+                       ("include_framejob_windows", "boolean"), ("source", "string"),
+                       ("camera", "string")):
         check(schema["properties"].get(name, {}).get("type") == kind,
               f"{name} is declared {kind}")
     check(schema["properties"].get("rate", {}).get("enum") == [30, 60],
           "rate's enum is [30, 60]")
     check(schema["properties"].get("size", {}).get("enum") == ["nominal", "best"],
           "size's enum is [nominal, best]")
-    check(schema["properties"].get("source", {}).get("enum") == ["screen", "voice_over"],
-          "source's enum is [screen, voice_over] (B66)")
+    check(schema["properties"].get("source", {}).get("enum") == ["screen", "voice_over", "camera"],
+          "source's enum is [screen, voice_over, camera] (B66; camera since CR1b)")
     description = [tool for tool in listed if tool["name"] == "record_screen"][0]["description"]
     for phrase in ("File ▸ New Recording…", "Frame Job Recordings", "new_project", "Microphone",
                    "REFUSAL ORDER", "mic_problem", "Add Microphone", "launching process",
@@ -977,8 +982,9 @@ def refusal_part(mcp):
     # Its three sentences exactly, then the ORDER around them, then the
     # grant the voice-over reads — the Microphone's alone.
     voice_tail = " cannot be given — a voice-over records the microphone alone."
-    refused({"seconds": 2, "source": "x"}, 'source must be one of screen, voice_over (got "x").',
-            "an unknown source is refused listing both")
+    refused({"seconds": 2, "source": "x"},
+            'source must be one of screen, voice_over, camera (got "x").',
+            "an unknown source is refused listing all three (camera since CR1b)")
     refused({"seconds": 2, "source": "voice_over", "display": 0},
             "With source voice_over, display" + voice_tail,
             "a voice-over refuses display by name")

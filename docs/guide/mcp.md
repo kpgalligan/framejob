@@ -133,7 +133,7 @@ normally ask you something, the call answers instead:
 
 - An import that would offer to convert an unsupported file with ffmpeg
   treats the offer as declined and answers with the reason.
-- `record_screen` never asks for the Screen Recording or Microphone grant.
+- `record_screen` never asks for the Screen Recording, Microphone or Camera grant.
   A missing grant is refused, naming the System Settings pane. A Frame Job
   started from a terminal runs under the terminal's grants, not the app's.
 - `close_project` refuses a project with unsaved changes unless it is
@@ -581,7 +581,7 @@ See [Export](export.md).
 
 | Tool | What it does |
 |---|---|
-| `record_screen` | Records a display or window for 1–600 `seconds` and lands it as media (**File ▸ New Recording…**), or records the microphone alone with `source: "voice_over"`. |
+| `record_screen` | Records a display or window for 1–600 `seconds` and lands it as media (**File ▸ New Recording…**), records the microphone alone with `source: "voice_over"`, or a camera alone with `source: "camera"` (and `camera` to choose one). |
 
 See [Screen recording](screen-recording.md).
 

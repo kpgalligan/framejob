@@ -1,6 +1,7 @@
 // camera-recording CR1a (spec §11 CAM-3): the camera recorder's pure values,
 // a camera result through the landing, and a real recording under the
-// terminal's grant. Compiled AS `main.swift` beside every file of
+// terminal's grant; CR1b (CAM-4): `record_screen`'s camera through the
+// server's own functions (`tool`). Compiled AS `main.swift` beside every file of
 // app/Sources (but its own main.swift) through `swift_build.build`, with an
 // Info.plist section holding the camera's and the microphone's usage strings;
 // `camera_recording_probe.py` builds it, runs one section per process and
@@ -379,6 +380,148 @@ func granted(_ request: [String: Any]) {
     }
 }
 
+// MARK: - tool
+
+/// CR1b (spec §11 CAM-4): `record_screen`'s camera through `AgentServer.shared`'s
+/// own functions — the argument checks, the lookup and grant, the answer —
+/// with no camera and no grant.
+func toolRows(_ request: [String: Any]) {
+    let server = AgentServer.shared
+    func kind(_ a: [String: Any]) -> String {
+        do {
+            return "ok: " + (try server.recordingSourceKind(a)).rawValue
+        } catch let error as AgentServer.ToolError {
+            return "error: " + error.message
+        } catch {
+            return "other: \(error)"
+        }
+    }
+    func table(_ id: String, _ cases: [(String, [String: Any], String)]) {
+        let got = cases.map { kind($0.1) }
+        let wrong = zip(cases, got).filter { $0.0.2 != $0.1 }
+        probeRow(id, wrong.isEmpty,
+                 wrong.isEmpty
+                    ? cases.map { "\($0.0) → \(kind($0.1))" }.joined(separator: " | ")
+                    : wrong.map { "\($0.0.0): got \($0.1), want \($0.0.2)" }.joined(separator: " | "))
+    }
+    let tail = " cannot be given — a camera recording records the camera alone, at the camera's own format."
+    table("T1", [
+        ("camera", ["source": "camera"], "ok: camera"),
+        ("camera named", ["source": "camera", "camera": "FaceTime HD Camera"], "ok: camera"),
+        ("one stranger", ["source": "camera", "rate": 30], "error: With source camera, rate" + tail),
+        ("all seven", [
+            "source": "camera", "rate": 30, "include_framejob_windows": true, "size": "best",
+            "show_clicks": true, "system_audio": false, "window": 5, "display": 0,
+        ], "error: With source camera, display, window, system_audio, show_clicks, size, "
+            + "include_framejob_windows, rate" + tail),
+        ("a null size", ["source": "camera", "size": NSNull()], "ok: camera"),
+        ("source x", ["source": "x"], "error: source must be one of screen, voice_over, camera (got \"x\")."),
+    ])
+    let elsewhere = " cannot be given — only source camera records a camera."
+    table("T2", [
+        ("camera, no source", ["camera": "FaceTime HD Camera"], "error: With source screen, camera" + elsewhere),
+        ("camera with screen", ["source": "screen", "camera": "FT-ID"], "error: With source screen, camera" + elsewhere),
+        ("camera with voice_over and display", ["source": "voice_over", "camera": "FT-ID", "display": 0],
+         "error: With source voice_over, camera" + elsewhere),
+        ("a blank camera with screen", ["source": "screen", "camera": "  "], "ok: screen"),
+        ("a null camera with voice_over", ["source": "voice_over", "camera": NSNull()], "ok: voice_over"),
+    ])
+
+    let cams = [
+        CameraDeviceFacts(uniqueID: "OBS-ID", name: "OBS Virtual Camera", isBuiltIn: false,
+                          formats: obs, activeFormat: 0),
+        CameraDeviceFacts(uniqueID: "FT-ID", name: "FaceTime HD Camera", isBuiltIn: true,
+                          formats: faceTime, activeFormat: 1),
+        CameraDeviceFacts(uniqueID: "PHONE-ID", name: "Owner iPhone Camera", isBuiltIn: false,
+                          formats: iPhone, activeFormat: 0),
+    ]
+    func lookup(_ wanted: String?, _ list: [CameraDeviceFacts], _ preferred: String?,
+                _ status: AVAuthorizationStatus) -> String {
+        do {
+            return "ok: " + (try AgentServer.recordingCameraID(
+                wanted, in: list, preferredID: preferred, status: status))
+        } catch let error as AgentServer.ToolError {
+            return "error: " + error.message
+        } catch {
+            return "other: \(error)"
+        }
+    }
+    let unknown = "error: " + CameraDevices.noSuchCameraSentence("Zed", cameras: cams)
+    let lookups: [(String, String, String)] = [
+        ("the default: the built-in", lookup(nil, cams, nil, .authorized), "ok: FT-ID"),
+        ("the default: preferredID", lookup(nil, cams, "PHONE-ID", .authorized), "ok: PHONE-ID"),
+        ("by name, any case", lookup("owner IPHONE camera", cams, nil, .authorized), "ok: PHONE-ID"),
+        ("by id", lookup("OBS-ID", cams, "PHONE-ID", .authorized), "ok: OBS-ID"),
+        ("unknown", lookup("Zed", cams, nil, .authorized), unknown),
+        ("an empty list", lookup(nil, [], "FT-ID", .authorized), "error: No camera is connected."),
+        ("an empty list, named", lookup("Zed", [], nil, .authorized), "error: No camera is connected."),
+        ("unknown + denied", lookup("Zed", cams, nil, .denied), unknown),
+        ("known + notDetermined", lookup("FT-ID", cams, nil, .notDetermined),
+         "error: " + RecordingGrant.cameraRefusal(.notDetermined)),
+        ("the default + restricted", lookup(nil, cams, nil, .restricted),
+         "error: " + RecordingGrant.cameraRefusal(.restricted)),
+        ("known + authorized", lookup("facetime hd camera", cams, nil, .authorized), "ok: FT-ID"),
+    ]
+    let badLookups = lookups.filter { $0.1 != $0.2 }
+    probeRow("T3", badLookups.isEmpty,
+             badLookups.isEmpty
+                ? lookups.map { "\($0.0) → \($0.1.prefix(60))" }.joined(separator: " | ")
+                : badLookups.map { "\($0.0): got \($0.1), want \($0.2)" }.joined(separator: " | "))
+
+    let plain = RecordingCamera(name: "Probe Camera", format: "1920x1080@30")
+    var troubled = plain
+    troubled.problem = "The camera Probe Camera stopped on its own: it was disconnected."
+    troubled.note = "The camera ran at 23.1 fps, not its 30, in the 1 s it was given to settle; "
+        + "the recording began anyway."
+    let plainFields = AgentServer.cameraFields(plain, id: "PROBE-ID")
+    let troubledFields = AgentServer.cameraFields(troubled, id: "PROBE-ID")
+    let plainWant: [String: Any] = ["name": "Probe Camera", "id": "PROBE-ID", "format": "1920x1080@30"]
+    var troubledWant = plainWant
+    troubledWant["problem"] = troubled.problem
+    troubledWant["note"] = troubled.note
+    probeRow("T4",
+             NSDictionary(dictionary: plainFields).isEqual(to: plainWant)
+                && NSDictionary(dictionary: troubledFields).isEqual(to: troubledWant),
+             "without: \(plainFields.keys.sorted()); with: \(troubledFields.keys.sorted())")
+
+    let movie = MediaDescriptor(
+        path: "/probe/Camera Recording.mov", duration: 1_200_000, width: 1920, height: 1080,
+        hasVideo: true)
+    var cameraChoice = RecordingChoice()
+    cameraChoice.source = .camera
+    cameraChoice.camera = "PROBE-ID"
+    let micProblem = "The microphone stopped on its own."
+    let cameraResult = RecordingResult(
+        segments: [
+            RecordingSegment(
+                descriptor: movie, micDescriptor: nil, micOffset: 0, startedAt: Date(),
+                micProblem: micProblem)
+        ], choice: cameraChoice, stoppedBy: .systemStopped, pauses: 0, camera: troubled)
+    let screenResult = RecordingResult(
+        descriptor: movie, micDescriptor: nil, micOffset: 0, choice: RecordingChoice(),
+        startedAt: Date(), stoppedBy: .stopped, micProblem: micProblem)
+    let cameraAnswer = AgentServer.recordingFields(cameraResult)
+    let screenAnswer = AgentServer.recordingFields(screenResult)
+    let answered = cameraAnswer["camera"] as? [String: Any]
+    probeRow("T5",
+             answered.map { NSDictionary(dictionary: $0).isEqual(to: troubledWant) } == true
+                && screenAnswer["camera"] == nil
+                && cameraAnswer["has_audio"] as? Bool == false
+                && cameraAnswer["stopped_by"] as? String == "system_stopped",
+             "camera result's camera \(answered.map { $0.keys.sorted() } ?? []); screen result has "
+                + "camera \(screenAnswer["camera"] != nil); has_audio \(cameraAnswer["has_audio"] ?? "nil"), "
+                + "stopped_by \(cameraAnswer["stopped_by"] ?? "nil")")
+
+    let cameraNotes = AgentServer.resultNotes(cameraResult)
+    let screenNotes = AgentServer.resultNotes(screenResult)
+    let micNote = AgentServer.microphoneNote(screenResult)
+    probeRow("T6",
+             cameraNotes == [micNote, troubled.problem, troubled.note].compactMap { $0 }
+                && screenNotes == [micNote].compactMap { $0 } && micNote != nil,
+             "camera: \(cameraNotes.count) clauses, the last two \(cameraNotes.suffix(2)); screen: "
+                + "\(screenNotes)")
+}
+
 // MARK: - main
 
 let arguments = CommandLine.arguments
@@ -393,6 +536,7 @@ switch arguments[1] {
 case "values": values(request)
 case "landing": landing(request)
 case "granted": granted(request)
+case "tool": toolRows(request)
 default:
     FileHandle.standardError.write(Data("unknown section \(arguments[1])\n".utf8))
     exit(2)

@@ -24299,7 +24299,7 @@ strings (`recording_probe.build_voice_probe`'s line), and run once per section u
 python3 tools/proof/camera_recording_probe.py --only values,landing   # no camera, no grant
 python3 tools/proof/camera_recording_probe.py                         # + granted: records 2 s, pauses 1 s, 2 s more
 python3 tools/proof/camera_recording_probe.py --only values --mutant format-any-shape   # each of the six values mutants exits 1
-python3 tools/proof/camera_recording_probe.py --mutant no-hold          # granted; exits 1 on a cold start
+python3 tools/proof/camera_recording_probe.py --mutant no-hold          # granted; exits 1 (G6)
 ```
 
 Sections: `values` (V1–V17: CAM-3's best format on CR0's three D1 lists, a portrait-only and an
@@ -24315,10 +24315,43 @@ grant, G4 skipped by name with no Microphone grant; G6 measures the warm-up hold
 for a steady stream before segment 0). The seven mutants are `format-any-shape`,
 `offset-by-arrival`, `offset-sign`, `canvas-rate-60`, `grant-unread` and `mic-ends-recording`,
 run with `--only values`, and `no-hold` (`warmUpRun` 0), run with `--only granted` by default:
-G3 catches it only on a cold camera, the first recording in a process.
+G6 catches it, since a steady warm-up must have seen `warmUpRun` + 1 buffers and the mutant's
+sees one (#372 item 2; G3 caught it only on a cold camera, by 0.0004).
 Exit: `cache_pass_probe.py`'s rule. The work is under `tools/proof/work/camera-recording-probe/`.
 
 The spike's `--format WxH` (`camera_spike/README.md`) runs W2, W3, P1 and P2 at the chosen
 camera's first format of that size at ≥ 30 fps; CAM-3's step 2 ran it at `1760x1328`. The
 numbers are in `designs/camera-recording.md`'s CR1a record.
+
+## Camera recording CR1b — `record_screen`'s camera (`camera_recording_proof.py`, `camera_recording_probe.py` `tool`; spec §11 CAM-4)
+
+CR1b is the tool's door to the camera recorder: `record_screen {source: "camera", camera?}`.
+`camera_recording_proof.py` drives it over MCP in `recording_proof.py`'s shape, against an
+instance `proof_app.py launch` started (Debug by default, `RC_PROOF_APP=release` for the
+recorded run); started from the shell, it records under the terminal's Camera and
+Microphone grants. Its headless tier always runs: the catalog (the thirteen arguments,
+`camera` a string, `source`'s three members, the description's camera phrases, no parity
+line in the log) and the refusals, each the exact sentence, in CAM-3's order by combined
+calls, leaving `get_project` byte-identical with no undo step. A detection call then records
+2 s; the Camera grant's sentence or "No camera is connected." skips the granted tier by name
+with its count. The granted tier reads that answer, records by id and by the upper-cased
+name, records with `microphone: true` and place (the voice on the Microphone track,
+`mic_offset` apart; skipped with its count without the Microphone grant) and, once its own
+document is closed and none is open, as a new project with the canvas at the format.
+
+```sh
+make app-debug && python3 tools/proof/proof_app.py launch            # prints <dir>
+python3 tools/proof/camera_recording_proof.py <dir>/agent.sock         # stop the instance by its pid after
+python3 tools/proof/camera_recording_probe.py --only tool              # T1–T6, no camera, no grant
+python3 tools/proof/camera_recording_probe.py --only tool --mutant camera-strangers-admitted   # each of the five exits 1
+```
+
+The probe's `tool` section (T1–T6) calls `AgentServer.shared`'s own functions: the argument
+checks, `recordingCameraID` over V1–V3's three lists, `cameraFields`, and `recordingFields` and
+`resultNotes` of a camera result. Its five mutants, each run with `--only tool` by default:
+`camera-strangers-admitted` (T1), `camera-elsewhere-admitted` (T2), `grant-before-lookup`
+(T3), `camera-key-dropped` (T5) and `camera-notes-dropped` (T6). `recording_probe.py`'s D10,
+7c and X4 and `recording_proof.py`'s sections 0 and 1 read the new vocabulary
+(`screen, voice_over, camera`) and the thirteenth argument. The numbers are in
+`designs/camera-recording.md`'s CR1b record.
 
