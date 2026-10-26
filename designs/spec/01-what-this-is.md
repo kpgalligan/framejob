@@ -1,7 +1,8 @@
 # 1. What this is
 
 A screencast editor without a recorder — and, since road map 3,
-a recorder of the SCREEN alone, whose output is ordinary media. Open one or
+a recorder of the SCREEN, and since §11 CAM-1 of a camera beside it or on its
+own, whose output is ordinary media. Open one or
 more video files from disk, arrange them on layered tracks over a fixed canvas, trim,
 split, annotate, animate, and export. Mac only, Apple Silicon, macOS 26+.
 
@@ -9,7 +10,7 @@ The bar is a balance: enough to make a real cut with text,
 shapes, transitions and simple animation, without Final Cut's magnetic
 timeline, roles, multicam, scopes, or a plugin ecosystem.
 
-Deliberate non-goals: camera recording, multicam, color grading beyond
+Deliberate non-goals: multicam, color grading beyond
 per-clip controls (§11 GR-1: tier 1 of grading — tone, adjustment clips,
 looks, LUT import, an ungraded switch and one luma waveform — is in, kept by
 the owner's verdict of 2026-10-10, and tier 2's scopes, colour wheels,
@@ -33,7 +34,9 @@ any platform but macOS. **Screen recording was on this list until road map 3
 reversed it** (§11): the app records a display or a window through
 ScreenCaptureKit into a file it then imports exactly as File ▸ Open would —
 paused and resumed from the menu bar, each stretch its own file and its own
-clip; camera capture and callouts reconstructed after the fact stay out.
+clip; callouts reconstructed after the fact stay out. **Camera recording
+was on it too until §11 CAM-1** (road map "camera-recording") reversed it: a
+camera alone or beside a screen recording, each its own file and clip.
 
 **The opening flow is the point.** File > Open on a `.mov` or `.mp4` (or a
 drop on the Dock icon, or the welcome window's Open Video…) creates an

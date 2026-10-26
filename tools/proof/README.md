@@ -24260,3 +24260,24 @@ ones):
 
 **The host.** A Mac14,6 (12 cores, 96 GB) with macOS 26.5.1, on AC power, at a34bea5 plus this
 change; the Release runs' app came from this change's passing `make gate`.
+
+## Camera recording — the spike (`camera_spike/`)
+
+CR0 of road map "camera-recording": before any camera code, what do camera capture alone and
+beside a running screen recording measure — the devices and formats, the Camera grant and the
+hardened runtime, `AVCaptureMovieFileOutput` against `AVAssetWriter`, the microphone's offset,
+the screen file's start against a display-link counter, pause as a file sequence, the preview's
+cost? Its own README (`tools/proof/camera_spike/README.md`) is the full one — the instruments,
+the rows, the selftest and the exit codes — and the ANSWERS are in
+`designs/camera-recording.md`'s "CR0 — the spike" record, not here. The rule it judges by is
+spec §11 CAM-2, fixed before the run and pinned in `results.json` as `rule_sha256`.
+
+```sh
+python3 tools/proof/camera_spike/camera_spike.py --selftest   # free, no build; five --mutant NAMEs must exit 1
+python3 tools/proof/camera_spike/camera_spike.py              # every group but aimed (needs the terminal's Camera grant: --ask once)
+```
+
+The probe is compiled through `swift_build.build` with nothing from `app/Sources` and run as a
+bare binary, so every grant is its responsible process's (the terminal). Exit 0 when every row
+answered or was skipped by name (whatever the VERDICT), 1 on an instrument failure, 2 when not
+performed (no staticlib).

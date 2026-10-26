@@ -9,6 +9,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   stack and callouts are a metadata format plus an Input Monitoring grant.
   What ScreenCaptureKit draws into the pixels for free — the cursor, and
   a ring around each click — is taken; nothing is reconstructed afterwards.
+  **Amended by CAM-1** (camera recording, CR0): camera recording is now IN
+  — a camera alone or beside a screen recording, each its own file and
+  track, through this recorder's panel (`camera-recording.md`); callouts
+  stay OUT.
 - **A recording is ordinary media.** The recorder writes a file and the app
   imports it through exactly the path File ▸ Open and Add Media… use
   (`adoptImported`, the two-try placement). The model learns nothing: no
