@@ -157,6 +157,10 @@ impl Piece {
     }
 }
 
+/// Samples across one ramp piece in [`SpeedMap::rate_profile`], edges
+/// included: 32 chords.
+pub(crate) const RATE_SAMPLES: Ticks = 32;
+
 /// A ramped clip's rate profile over `[0, duration)` and its integral.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct SpeedMap {
@@ -370,6 +374,38 @@ impl SpeedMap {
         let whole = ease_integral(action.curve, 1.0);
         let rate = from_rate + (to_rate - from_rate) * ease_integral(action.curve, c) / (c * whole);
         rate.is_finite().then(|| rate.clamp(SPEED_MIN, SPEED_MAX))
+    }
+
+    /// `(clip tick, rate)` over `[0, duration]` (spec §11 SR-26): a held
+    /// piece its `from` and `to` at its rate; a ramp piece
+    /// [`RATE_SAMPLES`] + 1 ticks `from + (to − from)·k / RATE_SAMPLES`,
+    /// each at THAT piece's rate (so the rate at a piece's `to` is its own
+    /// end, and a step is two points at one tick); a point equal to the last
+    /// kept one is dropped. Empty for no pieces.
+    pub(crate) fn rate_profile(&self) -> Vec<(Ticks, f64)> {
+        let mut out: Vec<(Ticks, f64)> = Vec::new();
+        let mut push = |point: (Ticks, f64)| {
+            if out.last() != Some(&point) {
+                out.push(point);
+            }
+        };
+        for piece in &self.pieces {
+            let (from, to) = (piece.from(), piece.to());
+            match piece {
+                Piece::Held { rate, .. } => {
+                    push((from, *rate));
+                    push((to, *rate));
+                }
+                Piece::Ramp { .. } => {
+                    let span = to.saturating_sub(from);
+                    for k in 0..=RATE_SAMPLES {
+                        let t = from.saturating_add(span.saturating_mul(k) / RATE_SAMPLES);
+                        push((t, piece.rate_at(t)));
+                    }
+                }
+            }
+        }
+        out
     }
 
     pub(crate) fn pieces(&self) -> &[Piece] {

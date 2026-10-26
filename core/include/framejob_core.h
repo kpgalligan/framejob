@@ -386,7 +386,10 @@ char *rc_project_clip_state(const RcProject *p, uint32_t clip, int64_t t);
 /* A media clip's source map (spec §11 SR-20 (a)), compact JSON:
  * {"ramped":bool,"map":[[clip_tick,source_tick],...]}. A ramped clip's map is
  * its plan audio segment's ramp map; a constant clip's is two points,
- * [[0,in],[duration,in+length]], `in` clamped into the file. NULL for a NULL
+ * [[0,in],[duration,in+length]], `in` clamped into the file. A ramped clip's
+ * answer also carries "rate":[[clip_tick,rate],...], its rate profile (piece
+ * edges and 33 samples per ramp piece, spec §11 SR-26); a constant clip's has
+ * no "rate" key. NULL for a NULL
  * project, an unknown clip id, a clip that is not a media clip, or one whose
  * media is gone. */
 char *rc_project_source_map(const RcProject *p, uint32_t clip);

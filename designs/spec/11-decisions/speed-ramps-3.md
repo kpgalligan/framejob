@@ -100,3 +100,22 @@ before its code.
   parity check need no change: they read the published schema and the core's table.
   - **Why:** the pairing is two or four undo steps where the sheet makes one, and Swift would
     have to read b and solve the fit; one op is one call, one step and the core's own refusals.
+- **SR-26 — A ramped clip's rate is drawn as a line across its action lane (#339), amending
+  SR-1's risk line.** The core answers the profile: `rc_project_source_map`'s `rate`, a list of
+  `[clip_tick, rate]` at every piece edge and 33 samples across each ramp piece (its edges
+  included, 32 chords), on a ramped clip only; a constant clip's answer is unchanged. Swift maps
+  it to pixels and computes no rate (SR-21 (b)).
+  - **(a) The scale** is linear in rate, from the clip's own slowest to its fastest over
+    [0, D], the fastest at the top. The line is drawn only when the rate moves inside the clip:
+    a constant clip, and a ramped clip whose rate never moves, draw exactly as before.
+  - **(b) Where.** The timeline at track heights M and L (not S), the lane inset 2 pt top and
+    bottom, after the bands; the Clip tab's lane inset 4 pt (the bands' rows), after the bands.
+    Both through one painter (`RateGraph`, CI-4's shared-painter rule).
+  - **(c) The look.** White at 1.25 pt over a black 50 % under-stroke at 2.75 pt, round joins,
+    clipped to the lane. A selected Speed band drops its ease stroke while the line is drawn.
+  - **(d) Nothing else moves:** no interaction, label, op, tool or menu change.
+  - **Why:** the band shows where a ramp is, not what the rate does across it; a line read off
+    the core's own profile shows the shape of every ramp, held span and step at once without a
+    second source of truth.
+  - Risk accepted: the scale is the clip's own, so a ×1→×1.1 ramp looks as tall as ×1→×10; the
+    figures stay the Speed section's.

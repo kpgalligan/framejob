@@ -87,8 +87,10 @@ extension TimelineContentView {
     }
 
     /// The lane's black-22 % backing and every band on it, numbered in time
-    /// order. The backing is drawn only on a clip that has an action with a
-    /// length (road map 9 §2's deviation: the handoff draws it on every clip).
+    /// order, then — from M, on a clip whose rate moves — the rate line over
+    /// them, inset 2 pt top and bottom (spec §11 SR-26). The backing is drawn
+    /// only on a clip that has an action with a length (road map 9 §2's
+    /// deviation: the handoff draws it on every clip).
     func drawActionBands(_ clip: ClipSnapshot, rect: CGRect, owner: TimelineView) {
         guard clip.actions.contains(where: { $0.duration > 0 }) else { return }
         let lane = Self.actionLane(
@@ -97,16 +99,21 @@ extension TimelineContentView {
         NSColor.black.withAlphaComponent(0.22).setFill()
         lane.fill()
         let level = ActionBands.Level(sizeIndex: owner.trackHeightIndex)
+        let graph = level == .bars ? nil : RateGraph.points(
+            owner.sourceMaps(clip.id), in: lane.insetBy(dx: 0, dy: 2),
+            x: { owner.layout.x(for: clip.start + $0) })
         for (index, action) in ActionBands.ordered(clip).enumerated() where action.duration > 0 {
             ActionBands.draw(
                 band: Self.bandRect(action, clip: clip, lane: lane, layout: owner.layout),
                 number: index + 1,
                 label: ActionBands.keys(of: action.end).joined(separator: ", "),
-                curve: action.curve, zoom: ActionBands.isZoom(action),
+                curve: RateGraph.bandCurve(action, graphed: graph != nil),
+                zoom: ActionBands.isZoom(action),
                 selected: owner.selectedAction == action.id,
                 hovered: owner.bandHover?.clip == clip.id && owner.bandHover?.action == action.id,
                 level: level)
         }
+        if let graph { RateGraph.draw(graph, in: lane) }
     }
 }
 

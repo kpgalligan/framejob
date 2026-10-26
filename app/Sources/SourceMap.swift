@@ -5,6 +5,13 @@ import Foundation
 /// never asks the core itself (spec §11 SR-20 (d)).
 typealias SourceMaps = (UInt32) -> SourceMap?
 
+/// One sample of the core's rate profile (spec §11 SR-26): the rate the clip
+/// plays at clip tick `tick`.
+struct RatePoint: Equatable {
+    let tick: Ticks
+    let rate: Double
+}
+
 /// A media clip's source map (spec §11 SR-20): the core's own
 /// `[clip tick, source tick]` pairs from `rc_project_source_map`, or a plan
 /// ramp segment's map, and the ONE place Swift reads between them — linearly,
@@ -26,11 +33,18 @@ struct SourceMap: Equatable {
     /// `[clip tick, source tick]`, the core's own, both columns strictly
     /// increasing from clip tick 0.
     let points: [[Ticks]]
+    /// The core's `rate` list, checked (spec §11 SR-26): what the action
+    /// lanes draw (`RateGraph`). [] for a constant map, a missing key, or a
+    /// list that fails the check — which never costs the map its `points`.
+    let rate: [RatePoint]
 
     /// The one check: at least two pairs, each of two, the first at clip
     /// tick 0, both columns strictly increasing. nil otherwise, and a nil map
-    /// sends its reader down the constant path.
-    init?(ramped: Bool, points: [[Ticks]]) {
+    /// sends its reader down the constant path. `rate` is kept on a ramped
+    /// map when it has at least two points, the first at tick 0 and the last
+    /// at the map's last clip tick, ticks never falling, every rate finite
+    /// and above 0; otherwise it is [].
+    init?(ramped: Bool, points: [[Ticks]], rate: [RatePoint] = []) {
         guard points.count >= 2, let first = points.first, first.count == 2, first[0] == 0
         else { return nil }
         var previous = first
@@ -40,16 +54,36 @@ struct SourceMap: Equatable {
         }
         self.ramped = ramped
         self.points = points
+        self.rate = ramped && Self.rateHolds(rate, end: previous[0]) ? rate : []
     }
 
-    /// `rc_project_source_map`'s answer, `{"ramped": bool, "map": [[c, s], …]}`,
-    /// decoded and then checked by the initialiser above.
+    /// `rate`'s check, against the map's last clip tick `end`.
+    private static func rateHolds(_ rate: [RatePoint], end: Ticks) -> Bool {
+        guard rate.count >= 2, rate[0].tick == 0, rate[rate.count - 1].tick == end else {
+            return false
+        }
+        var previous = rate[0].tick
+        for point in rate {
+            guard point.tick >= previous, point.rate.isFinite, point.rate > 0 else { return false }
+            previous = point.tick
+        }
+        return true
+    }
+
+    /// `rc_project_source_map`'s answer, `{"ramped": bool, "map": [[c, s], …]}`
+    /// and, on a ramped clip, `"rate": [[c, r], …]`, decoded and then checked
+    /// by the initialiser above; a `rate` row that is not two numbers makes
+    /// the whole list [].
     init?(json: String) {
         guard let object = CoreJSON.value(json) as? [String: Any],
               let ramped = object["ramped"] as? Bool,
               let rows = object["map"] as? [[NSNumber]]
         else { return nil }
-        self.init(ramped: ramped, points: rows.map { row in row.map { $0.int64Value } })
+        let rateRows = object["rate"] as? [[NSNumber]] ?? []
+        let rate = rateRows.allSatisfy { $0.count == 2 }
+            ? rateRows.map { RatePoint(tick: $0[0].int64Value, rate: $0[1].doubleValue) } : []
+        self.init(
+            ramped: ramped, points: rows.map { row in row.map { $0.int64Value } }, rate: rate)
     }
 
     /// The source tick at the clip's first tick.

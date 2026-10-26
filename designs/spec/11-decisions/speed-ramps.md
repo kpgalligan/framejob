@@ -46,6 +46,8 @@ plan leaves the audio out, one pitch per plan audio track).
   - Risk accepted: a rate is not a property drawn at one instant — it is integrated into the
     source the clip reads — so every reader of a clip's source window must learn the map
     (the road map's B, K, N), and a ramp's look on the lane is a band, not a graph.
+    *Amended by SR-26 (#339):* a ramped clip whose rate moves also draws its rate as a line across
+    its action lane, the core's profile mapped by Swift.
 - **SR-2 — The clip keeps its slot: a ramp never changes the clip's timeline length; it changes
   how much SOURCE the clip plays, and an edit whose ramp would read past the media's end is
   REFUSED, naming the rate or the end that fits.** The owner's decision 2.

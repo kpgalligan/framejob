@@ -516,7 +516,9 @@ detail there.
   600 ticks and the waveform and the silence walk read per column and per
   bucket; `SourceMaps` is how a reader is handed the maps of its snapshot's
   handle. A reader takes the map only when it is `ramped`, so a constant
-  clip keeps today's arithmetic exactly. `TimelineView+SourceMap.swift` is
+  clip keeps today's arithmetic exactly. `rate` is the core's rate profile
+  (`RatePoint`s, SR-26), checked on decode; a list that fails the check is
+  [] and the map is kept. `TimelineView+SourceMap.swift` is
   the filmstrip's and the waveform's map-aware `sourceTime`
   (`TimelineView.swift` is frozen; it holds only `sourceMaps`, set in
   `refreshTimeline` from the same handle as the snapshot).
@@ -739,6 +741,12 @@ the key map behind it.
   wide or less), `curvePath`, the band cursor rects `addGripCursorRects`
   (both lanes' drags), and the ONE band painter — hover and grips are its
   `hovered:` argument, never a second painter.
+  `RateGraph.swift` is the ramped clip's rate line both lanes draw after
+  their bands (SR-26): `points` maps the core's `SourceMap.rate` to the
+  lane, linear from the clip's slowest to its fastest, nil when the rate
+  never moves; `draw` is its ONE painter; `bandCurve` drops a selected
+  Speed band's ease stroke while the line is drawn. No rate is computed
+  here.
   `ActionDragSession.swift` is the ONE session both lanes drag a band with,
   in clip time: frame snap, the two walls the core's refusals name, one
   `set_action` of start AND duration per tick, "Move Action" / "Resize

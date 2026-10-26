@@ -139,8 +139,14 @@ it play less of the file. Its start, its end and every clip around it stay
 where they are.
 
 On the timeline, a Speed action's band is labelled `speed` when the track is
-tall enough to show labels. The clip's filmstrip and waveform follow the
-ramp.
+tall enough to show labels. When the clip's rate changes, a white line across
+its action lane draws the rate over the clip's length: higher where it plays
+faster, lower where it plays slower, scaled from the clip's own slowest rate
+to its fastest (so a gentle ramp draws as tall as a steep one; the Speed
+section has the figures). The line shows at the Medium and Large track
+heights and in the Clip tab's lane, and while it is drawn a selected Speed
+band leaves out its curve. A clip whose rate never changes draws no line.
+The clip's filmstrip and waveform follow the ramp.
 
 ### Make a ramp in one step: Clip ▸ Speed Ramp…
 

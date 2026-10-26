@@ -72,14 +72,15 @@ enum ActionBands {
     /// One band. Normal: the action ink at 34 % with 1 pt ends at 75 %;
     /// hovered, 62 % with solid ends. Selected: solid, its text in
     /// `DS.actionInk`, and — from M — the curve as a 1.25 pt black-45 % line
-    /// from the bottom-left corner to the top-right. The number, the glyph
-    /// and the label run from the LEADING edge, so the band's bottom-right
-    /// corner holds fill only (the proof samples it there). Hovered, a band
-    /// wide enough to resize draws its two 5 pt grips last — white 80 %, or
-    /// black 45 % on the selected band — so an unhovered band never has
-    /// them (CI-11).
+    /// from the bottom-left corner to the top-right, unless `curve` is nil
+    /// (a Speed band under the rate line, `RateGraph.bandCurve`, spec §11
+    /// SR-26). The number, the glyph and the label run from the LEADING
+    /// edge, so the band's bottom-right corner holds fill only (the proof
+    /// samples it there). Hovered, a band wide enough to resize draws its two
+    /// 5 pt grips last — white 80 %, or black 45 % on the selected band — so
+    /// an unhovered band never has them (CI-11).
     static func draw(
-        band: CGRect, number: Int, label: String?, curve: Curve, zoom: Bool, selected: Bool,
+        band: CGRect, number: Int, label: String?, curve: Curve?, zoom: Bool, selected: Bool,
         hovered: Bool, level: Level
     ) {
         guard band.width > 0, band.height > 0 else { return }
@@ -105,7 +106,7 @@ enum ActionBands {
             NSGraphicsContext.current?.restoreGraphicsState()
         }
         guard level != .bars else { return }
-        if selected {
+        if selected, let curve {
             let path = curvePath(curve, in: band)
             path.lineWidth = 1.25
             NSColor.black.withAlphaComponent(0.45).setStroke()

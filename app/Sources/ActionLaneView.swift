@@ -313,13 +313,18 @@ final class ActionLaneView: NSView, OptionControl {
                 in: CGRect(x: lane.minX, y: lane.midY - 7, width: lane.width, height: 14),
                 font: DS.mono(10), color: DS.textFaint, centered: true)
         }
+        let graph = clip.duration > 0 ? RateGraph.points(
+            binding.project?.sourceMap(clip.id), in: lane.insetBy(dx: 0, dy: 4),
+            x: { lane.minX + lane.width * CGFloat($0) / CGFloat(clip.duration) }) : nil
         for (index, band) in bandRects().enumerated() where ordered.indices.contains(index) {
             let a = ordered[index]
             ActionBands.draw(
-                band: band.rect, number: index + 1, label: nil, curve: a.curve,
+                band: band.rect, number: index + 1, label: nil,
+                curve: RateGraph.bandCurve(a, graphed: graph != nil),
                 zoom: ActionBands.isZoom(a), selected: a.id == action?.id,
                 hovered: hover?.action == a.id, level: .number)
         }
+        if let graph { RateGraph.draw(graph, in: lane) }
         drawDragOverlay()
         if clip.contains(binding.playhead), clip.duration > 0 {
             let fraction = CGFloat(clip.clipTime(binding.playhead)) / CGFloat(clip.duration)

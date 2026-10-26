@@ -382,6 +382,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does the Speed Ramp sheet feel right, and do its shapes look and sound right?
 - **Source:** #340 (spec §11 SR-23, SR-24); `tools/proof/screens.py --only 13b-speed-ramp-sheet` captures it.
 
+**RMP-6 — A ramped clip's rate line reads right**
+- **Do:** 1. On a media clip about 6 s long, apply Clip ▸ Speed Ramp…'s Speed Dip at ×0.5, then on a second clip a Ramp Up at ×2. 2. Look at both clips' action lanes at View ▸ Timeline Track Height Small, Medium and Large, and at the Clip tab's lane with each selected. 3. Select the Speed bands one at a time. 4. Undo back to a clip with no ramp.
+- **Expect:** the dip's line falls into a flat low stretch and rises back; the Up's line climbs and holds at the top; the line is white with a dark edge, readable over the bands and the lane in both appearances; it shows at Medium and Large and in the Clip tab, not at Small; a selected Speed band shows no curve under the line; with no ramp there is no line.
+- **Answer:** does the rate line read as the ramp's shape, without crowding the bands?
+- **Source:** #339 (spec §11 SR-26).
+
 ## Captions
 
 **CAP-1 — Text reveals and legibility**

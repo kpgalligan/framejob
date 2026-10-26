@@ -517,13 +517,17 @@ governs a module now.
   map over any horizon, reading on past the clip's end with its own
   actions, SR-18 (a)), `time_for_source` (its inverse) and `head_end_rate`
   (a split's straddled head re-solved so both halves meet at S(cut),
-  SR-18 (e)); what `content_length_in_source` reads for a ramped clip.
+  SR-18 (e)); what `content_length_in_source` reads for a ramped clip;
+  `rate_profile` (the rate over clip time for the lane's rate line: piece
+  edges, and `RATE_SAMPLES` + 1 samples across a ramp piece, SR-26).
 - `speed_segments.rs` — the map cut into plan pieces: `Held` at one rate
   (an equal-rate action is held), `Ramp` one video segment per canvas
   frame, and the ramp audio map with a breakpoint every 600 ticks.
   `Project::source_map` (SR-20) answers a media clip's source map: a ramped
   clip its ramp audio map, byte-equal to the plan segment's `ramp.map`, a
-  constant clip its two points, flagged `ramped` as `is_ramped` is.
+  constant clip its two points, flagged `ramped` as `is_ramped` is; a
+  ramped clip's answer also carries `rate`, `rate_profile`'s list (SR-26),
+  and a constant clip's has no `rate` key.
 - `edit_action_speed.rs` — `set_action_end`'s speed arm and the overrun
   refusals R1/R2/R3 for `set_action_end`, `set_action` and
   `remove_action`: a ramp that would read past the media's end is refused,

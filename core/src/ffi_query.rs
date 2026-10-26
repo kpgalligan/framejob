@@ -133,7 +133,9 @@ pub unsafe extern "C" fn rc_project_clip_state(
 }
 
 /// A media clip's source map for Swift's readers (spec §11 SR-20 (a)):
-/// `{"ramped": bool, "map": [[clip_tick, source_tick], …]}`, compact. NULL
+/// `{"ramped": bool, "map": [[clip_tick, source_tick], …]}`, compact; a
+/// ramped clip's also carries `"rate": [[clip_tick, rate], …]`, its rate
+/// profile (piece edges and 33 samples per ramp piece, spec §11 SR-26). NULL
 /// for a NULL project, an unknown clip id, a clip that is not a media clip,
 /// or one whose media is gone.
 ///

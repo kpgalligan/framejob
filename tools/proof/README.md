@@ -23105,6 +23105,57 @@ env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/screens.py --o
 | `screens.py --only 13b-speed-ramp-sheet` (Release) | 6/6, light and dark, 0 new problems |
 | mutants M1–M9 | each caught: M1 (b = `clip.speed`) the return-rate test; M2 (an equal rate taken for Up) `every_refusal_carries_its_sentence`; M3 (r from `hold`) the dip and burst spans at hold 0.25; M4 (action 2 ends at the target) the span tests and P4 (×2 where ×1.25); M5 (floor ×0.1 for Up) the no-rate-above-b test; M6 (the overlap per new action) the hold-gap test and P7 (APPLIED); M7 (default `linear`) the defaults test; M8 (`span` taking a range past the clip's end) A1; M9 (`canApply` true on a refusal) A4 |
 
+## Speed ramps — the rate graph (#339) (`rate_graph_proof.py` R1–R7, H1, H2; `rate_graph_probe.swift`; `core/tests/ramp_rate_profile.rs`; seven mutants; spec §11 SR-26)
+
+A ramped clip's rate drawn as a line across its action lane: the core answers the profile
+(`rc_project_source_map`'s `rate`, `SpeedMap::rate_profile`: every piece edge and 33 samples
+across each ramp piece), `SourceMap` decodes and checks it, and `RateGraph` maps it to pixels and
+paints it on the timeline's lane (M and L) and the Clip tab's lane. No app instance: the probe is
+built through `swift_build.build()` over this tree's `app/Sources` into `work/rate-graph/probe/`
+and run in process (a 60 s A/V media with no file; U ×1 → ×2 linear over [1 s, 3 s) of 5 s, D ×1
+→ ×0.5 `ease_in`, C a constant ×2, F an action ending at ×1, T a ×3 action over [0, 2 s) trimmed
+to 1 s, X a text clip), and the harness (`harness/build.sh`) renders two packages that differ
+only in one Speed action's end rate, U (→ ×2) and its twin F (→ ×1), dark at 1440 × 862 with the
+clip selected, the Clip tab, the playhead at 0.5 s (before the ramp, so the Speed section reads ×1
+in both).
+
+- **R1** — U's `rate` is the oracle (0, 1), 33 samples at 1 + (t − 1 s)/2 s, (5 s, 2), ±1e-12;
+  D's 2 s sample 0.875; T's last point (1 s, 2).
+- **R2** — `RateGraph.points` is nil for C, F, a nil map and the text clip.
+- **R3** — U on a 200 × 14 rect: first (minX, maxY), 3 s at (minX + 120, minY), last (maxX,
+  minY), y never rising. **R4** — D: first at minY, 3 s and last at maxY.
+- **R5** — `bandCurve`: U's Speed action under the line nil, without it `linear`; an opacity
+  action under the line its `ease_out`.
+- **R6** — `SourceMap(json:)`: a good list kept; a list starting at tick 5, a rate of 0 and no
+  key each keep the map with `rate` [].
+- **R7** — `RateGraph.draw` of hand-built points at y 10.5 across a 200 × 20 1× flipped bitmap:
+  row 10 at x 150 white ≥ 0.8 with α ≥ 0.9, row 16 α 0.
+- **H1** — at size L the two PNGs differ, every differing pixel in the clip's timeline action
+  lane (x 132–342, y 643–661 pt) or the Clip tab's lane row (x from 1190, y 152–180 pt — the
+  row `clip_inspector_proof.py` measures its band in, inset 4 and 4), with differences in both.
+  **H2** — at size S only in the Clip tab's lane row.
+
+Mutants (`--mutant <name>`; Swift over a copy of `app/Sources`, the harness rebuilt over the copy
+only for `timeline-unwired`; core over a copy of `core/` with its own `CARGO_TARGET_DIR`, scored
+by `ramp_rate_profile`): `rate-edges-only` (a ramp piece pushes only its edges), `no-rate-key`
+(`source_map` omits `rate`), `flat-drawn` (R2), `y-inverted` (R3, R4), `curve-kept` (R5),
+`rate-unchecked` (R6), `timeline-unwired` (H1).
+
+```sh
+cd core && cargo test --release --test ramp_rate_profile
+make rust && python3 tools/proof/rate_graph_proof.py
+for m in rate-edges-only no-rate-key flat-drawn y-inverted curve-kept rate-unchecked timeline-unwired; do
+  python3 tools/proof/rate_graph_proof.py --mutant $m; done
+```
+
+| Run (2026-10-25) | Result |
+|---|---|
+| `ramp_rate_profile.rs`, `ramp_source_map.rs` | 6/6, 5/5 (the constant clip's exact-JSON answer unchanged) |
+| `make gate` | PASS 366 s (names 1 s, typecheck 5 s, fmt 2 s, lint 10 s, test 227 s, app 119 s) |
+| `rate_graph_proof.py` | **23/23**, exit 0; H1 5 566 px differ (2 572 in the timeline lane, 2 994 in the Clip tab's lane row at y 154.5–177.5 pt, 0 elsewhere), H2 2 994 (all in the row) |
+| mutants | each caught: `flat-drawn` R2 (F); `y-inverted` R3, R4; `curve-kept` R5; `rate-unchecked` R6 (tick 5); `timeline-unwired` H1 (0 px in the timeline lane), H2 still passing; `rate-edges-only` 2 tests (the 33 samples, the ease-in middle); `no-rate-key` 5 tests |
+| `ramp_proof.py --only F1,F2,F3,F4,F5` (Release, after the gate) | 6/6 in 28 s: every map reader unchanged with the `rate` key in the answer |
+
 ## Issue #336 — an audio track whose only clip has no source (missing_audio_proof.py D0, X0, M1–M4, R1–R4, V0, K1, K2, P1, mutants MU1–MU3; spec §11 #336)
 
 **The fix case.** An audio track whose only clip has no source (its media file gone, or its
