@@ -12,14 +12,15 @@ import ScreenCaptureKit
 /// file is the window, its rows and its phases; `+Rows.swift` is what fills
 /// the popups and turns them into a `RecordingChoice` and back;
 /// `+Recording.swift` is everything from Record pressed to the recording
-/// running, `+Grants.swift` the two grants a press checks first and the
+/// running, `+Grants.swift` the three grants a press checks first and the
 /// one place System Settings is opened for them, `+Landing.swift`
 /// everything from the recording's end to the note that says where it
 /// went, `+Picker.swift` the window picker, `+Pause.swift` the pause
 /// and the resume, the hidden recording's one door and the phases drawn
-/// (R2c), `+VoiceOver.swift` the Source row "Microphone Only" (#99), and
-/// `+Showing.swift` `show()`, the sync timer, `setNote` and the refit.
-/// Nine files at the 400-line cap, and the
+/// (R2c), `+VoiceOver.swift` the Source row "Microphone Only" (#99),
+/// `+Showing.swift` `show()`, the sync timer, `setNote` and the refit, and
+/// `+Camera.swift` the Source row "Camera" and its popup (spec §11 CAM-5).
+/// Ten files at the 400-line cap, and the
 /// crossing members are internal for it, the tree's rule for a class split
 /// across files.
 ///
@@ -46,8 +47,8 @@ import ScreenCaptureKit
 /// Dock.
 ///
 /// **Visibility during a recording** (decision 7, R2c): the panel orders
-/// OUT at `recordingDidStart` for every source but Microphone Only (below),
-/// and the status item is the
+/// OUT at `recordingDidStart` for every source but Microphone Only and
+/// Camera (below), and the status item is the
 /// recording's whole chrome — Pause, Resume and Stop are its menu; File ▸
 /// Stop Recording still stops. R1 kept a DISPLAY recording's panel up, its
 /// filter excluding Frame Job (R0 q3), and hid only a PICKED window's; the
@@ -69,7 +70,9 @@ import ScreenCaptureKit
 /// the rows lock, the meter stays live, Record reads Stop with a Pause /
 /// Resume button beside it; Close takes the panel away and the recording
 /// carries on — the welcome button and the quit guard show the panel again,
-/// and ⌥⌘N (File ▸ Stop Recording) and the status item stop it.
+/// and ⌥⌘N (File ▸ Stop Recording) and the status item stop it. **So does
+/// a camera recording** (CAM-5), on the same terms: nothing on screen is
+/// filmed.
 ///
 /// Two limits of that chrome, accepted (R2 review). With the panel hidden
 /// the status item is the ONLY Pause and Resume, and macOS drops a status
@@ -107,10 +110,11 @@ import ScreenCaptureKit
 /// the row on screen and the destination in the choice agree.
 ///
 /// Every choice persists under a `FrameJobRecording…` key (written on change,
-/// read on show); the harness pins all seven on `FrameJobExportChoice`'s terms.
+/// read on show); the harness pins all eight on `FrameJobExportChoice`'s terms.
 /// `.picked` is the one source that cannot persist — a filter is not a
 /// value — so a reopened panel with a picked window keeps the row only while
-/// the filter is still held; Microphone Only persists for the session only.
+/// the filter is still held; Microphone Only and Camera persist for the
+/// session only (the camera itself is remembered, the row is not).
 final class RecorderPanelController: NSWindowController {
     static let shared = RecorderPanelController()
 
@@ -123,6 +127,7 @@ final class RecorderPanelController: NSWindowController {
     static let rateKey = "FrameJobRecordingRate"
     static let sizeKey = "FrameJobRecordingSize"
     static let includeFrameJobWindowsKey = "FrameJobRecordingIncludeFrameJobWindows"
+    static let cameraKey = "FrameJobRecordingCamera"
 
     // MARK: - Metrics and vocabulary
 
@@ -158,6 +163,7 @@ final class RecorderPanelController: NSWindowController {
     let sourcePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let includeFrameJobCheckbox = NSButton(
         checkboxWithTitle: "Include Frame Job windows", target: nil, action: nil)
+    let cameraPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let microphonePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let meterView = LevelMeterView(meter: ScreenRecorder.shared.meter)
     let systemAudioSwitch = NSSwitch()
@@ -262,6 +268,7 @@ final class RecorderPanelController: NSWindowController {
 
         rebuildSources()
         rebuildMicrophones()
+        rebuildCameras()
         rebuildDestinations()
         restoreChoices()
         refreshSizeNote()
@@ -302,7 +309,7 @@ final class RecorderPanelController: NSWindowController {
     }
 
     /// A countdown must not go on in a panel nobody can see: closing cancels
-    /// it, and a microphone the countdown prepared is let go with it — said
+    /// it, and a microphone or camera the countdown prepared is let go with it — said
     /// again here rather than left to `cancelCountdown`, because a panel
     /// closed during the microphone PROMPT (before any countdown) may also
     /// hold one, and an input left open past the panel is the leak the
@@ -320,6 +327,7 @@ final class RecorderPanelController: NSWindowController {
         default: break
         }
         recorder.discardPreparedMicrophone()
+        recorder.discardPreparedCamera()
         syncTimer?.invalidate()
         syncTimer = nil
     }

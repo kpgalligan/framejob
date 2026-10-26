@@ -18,7 +18,9 @@ import AppKit
 /// Nothing here asks for it: the grant is READ (`RecordingGrant.cameraStatus`)
 /// and a missing one is refused by `RecordingGrant.cameraRefusal`'s
 /// sentence; the panel is where a person grants (recording.md decision 4).
-/// `ScreenRecorder.startCamera` reads it again, its own guard.
+/// `ScreenRecorder.startCamera` reads it again, its own guard. The UI path
+/// it mirrors is File ▸ New Recording… with Source ▸ Camera and the Camera
+/// popup (`RecorderPanelController+Camera.swift`, spec §11 CAM-5).
 extension AgentServer {
 
     /// The arguments a camera recording refuses by name (CAM-4 point 3),

@@ -10514,8 +10514,9 @@ full), and three are `recording_proof.py`'s.
   `RecordingChoice(`; `filter`'s display arm holds `excludingApplications:`
   and `excludingWindows:`.
 - **1f, 5d, 7c** — `RecordingChoice()`'s `includeFrameJobWindows` is false;
-  the panel's row reads false and its title; `out["keys"]` lists seven, the
-  harness pins all seven by value (`"FrameJobRecordingIncludeFrameJobWindows":
+  the panel's row reads false and its title; `out["keys"]` lists eight (seven
+  until camera-recording CR1c added `FrameJobRecordingCamera`), the harness pins
+  all eight by value (`"FrameJobRecordingIncludeFrameJobWindows":
   false`, a literal) and `screens.py`'s `PINS` carries it for P2;
   `record_screen` declares `include_framejob_windows`. Every probe mode that
   pins the six keys pins the seventh false.
@@ -24355,3 +24356,52 @@ checks, `recordingCameraID` over V1–V3's three lists, `cameraFields`, and `rec
 (`screen, voice_over, camera`) and the thirteenth argument. The numbers are in
 `designs/camera-recording.md`'s CR1b record.
 
+## Camera recording CR1c — the recorder panel's Camera source (`camera_recording_probe.py` `panel` and G7–G9, `camera_recording_proof.py` section D; spec §11 CAM-5)
+
+CR1c gives the recorder panel a Source ▸ Camera row (tag 3, between Window… and Microphone
+Only), a Camera popup (`FrameJobRecordingCamera`, pinned in the harness and `screens.py`), the
+Camera grant asked by the panel, the panel kept up while a camera records, and the camera's
+capture prepared during the countdown (`ScreenRecorder+CameraPrepare.swift`) so CAM-3's warm-up
+is spent there.
+
+```sh
+python3 tools/proof/camera_recording_probe.py --only panel        # P1–P9, no camera opened, no grant asked
+python3 tools/proof/camera_recording_probe.py --only panel --mutant camera-row-live   # each of the eight exits 1
+python3 tools/proof/camera_recording_probe.py --only granted      # G0–G9 on a real camera (the terminal's grant)
+python3 tools/proof/camera_recording_probe.py --only granted --mutant join-weak       # and prepare-ignored; exit 1
+python3 tools/proof/camera_recording_proof.py <dir>/agent.sock    # section D last: the panel's snapshot
+```
+
+The probe's `panel` section runs in its own process: `NSApplication` with the `.prohibited`
+policy, a spy sealed in `RecorderPanelController.grantDoors` before `shared` exists (every
+read counted, the prompts held, nothing opened), the eight `FrameJobRecording…` keys put back
+as they were, the panel never shown. Fake rows — "Probe Camera" (`probe-camera`), a "None
+connected" row with no id and "Probe Microphone" (`probe-mic`) — find no device, so no camera
+or microphone opens. **P1** the Source rows end Window… (1), Camera (3), Microphone Only (2),
+screens + 4, and the Camera popup lists `CameraDevices.connected()`'s names; **P2** Camera via
+`controlChanged` gives `.camera` with the popup's id, greys System Audio, Show Clicks, Size,
+Include Frame Job windows and Rate with their values kept, leaves Camera, Microphone, Record
+Into and Source live, and the size note is `cameraSizeNote(nil)`; a display row brings the five
+back, disables Camera and leaves `camera` nil; **P3** session only (the display key's sentinel
+777 kept, the camera key written, eight keys, the row kept through `rebuildSources` +
+`restoreChoices`); **P4** `cameraStep`, `cameraPaneURL`, `cameraOpenedNote`; **P5** the press
+(no camera, `notDetermined` asking and its held answer on the hidden panel, denied and
+restricted opening `Privacy_Camera`, the microphone's ask, the countdown with Microphone Off;
+no Screen Recording read or request) and a comment-stripped read of `cameraAnswered` (the
+grant re-read before `checkMicrophoneGrant` and `beginCountdown`); **P6** `hidesForRecording`
+and the Pause / Resume button; **P7** `landingNote`'s camera sentences; **P8**
+`cameraSizeNote` on CR0's FaceTime and iPhone lists; **P9** comment-stripped reads of the
+countdown's prepare, the four discards, `startRecording`'s dispatch and the meter's camera arm.
+
+The granted tier gains three rows after G0–G6's stop has answered: **G7** a fresh recorder
+prepares, waits the countdown's 3 s, and `startCamera` adopts the warm capture and answers in
+under `PREPARED_START_MAX` (0.3 s), then 2 s recorded at ≥ 98 % frames with no `camera.note`;
+**G8** a discarded prepared capture's session stops; **G9** `startCamera` straight after
+`prepareCamera`, before the prepared start answers, JOINS it and reaches `.recording` before
+the arm ceiling. Ten mutants: `camera-screen-grant-read` (P5), `camera-grant-unasked` (P4,
+P5), `camera-row-live` (P2), `camera-row-persisted` (P3), `camera-panel-hides` (P6),
+`camera-problem-unsaid` (P7), `countdown-unprepared` (P9), `camera-answer-unread` (P5), each
+`--only panel`; `prepare-ignored` (G7) and `join-weak` (G9), each `--only granted`.
+`recording_probe.py` is re-aimed for the fourth Source row, the eighth key, the grant doors'
+two camera members and `voice-panel-hides`. The numbers are in
+`designs/camera-recording.md`'s CR1c record.

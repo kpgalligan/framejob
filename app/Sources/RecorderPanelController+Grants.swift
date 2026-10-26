@@ -1,8 +1,8 @@
 import AVFoundation
 import AppKit
 
-/// The seven calls a press of Record makes about the two grants, as values
-/// a probe can replace: the reads, the two system prompts, the remembered
+/// The nine calls a press of Record makes about the three grants, as values
+/// a probe can replace: the reads, the three system prompts, the remembered
 /// "asked" flag and the one opener of System Settings. `live` is the app's;
 /// `tools/proof/recording_probe.py` puts a sealed spy in
 /// `RecorderPanelController.grantDoors` before any mode runs, so no probe
@@ -20,6 +20,9 @@ struct RecorderGrantDoors {
     var microphoneStatus: () -> AVAuthorizationStatus
     var requestMicrophone: (@escaping () -> Void) -> Void
     var openSettings: (URL) -> Bool
+    /// The Camera grant (CR1c, spec §11 CAM-5), asked only for Source Camera.
+    var cameraStatus: () -> AVAuthorizationStatus
+    var requestCamera: (@escaping () -> Void) -> Void
 
     static var live: RecorderGrantDoors {
         RecorderGrantDoors(
@@ -36,7 +39,14 @@ struct RecorderGrantDoors {
                     DispatchQueue.main.async { answered() }
                 }
             },
-            openSettings: { url in NSWorkspace.shared.open(url) })
+            openSettings: { url in NSWorkspace.shared.open(url) },
+            cameraStatus: { RecordingGrant.cameraStatus },
+            requestCamera: { answered in
+                // As the microphone's: the answer hops to main.
+                AVCaptureDevice.requestAccess(for: .video) { _ in
+                    DispatchQueue.main.async { answered() }
+                }
+            })
     }
 }
 
@@ -69,7 +79,11 @@ struct RecorderGrantDoors {
 /// note told the person to press the button they had just pressed, and a
 /// `notDetermined` microphone could never be granted from anywhere.
 /// `canAsk` is the tool's rule about a prompt nobody would see; it does not
-/// apply to a button somebody clicked.
+/// apply to a button somebody clicked. **The Camera grant** (CR1c, spec §11
+/// CAM-5) is the third, read only for Source Camera, whose press never reads
+/// Screen Recording: the microphone's steps, through its own pane
+/// (`Privacy_Camera`), and its prompt's answer RE-READS the grant before the
+/// microphone and the countdown, so a refused prompt stops there.
 extension RecorderPanelController {
     /// The doors every grant call goes through; a probe replaces it.
     static var grantDoors = RecorderGrantDoors.live
@@ -151,6 +165,50 @@ extension RecorderPanelController {
         }
         setNote("")
         floatAgain()
+        beginCountdown()
+    }
+
+    /// The camera, for a press with Source Camera: true to go on
+    /// (authorized); false when it asked (the answer continues the press) or
+    /// opened its pane — `checkMicrophoneGrant`'s three arms.
+    func checkCameraGrant() -> Bool {
+        let doors = Self.grantDoors
+        let status = doors.cameraStatus()
+        switch RecordingGrant.cameraStep(status) {
+        case .proceed:
+            return true
+        case .ask:
+            recordButton.isEnabled = false
+            stepAsideForSystemUI()
+            doors.requestCamera { [weak self] in self?.cameraAnswered() }
+            return false
+        case .openPane:
+            stepAsideForSystemUI()
+            let opened = RecordingGrant.cameraPaneURL.map(doors.openSettings) ?? false
+            setNote(
+                opened
+                    ? RecordingGrant.cameraOpenedNote(status)
+                    : RecordingGrant.cameraRefusal(status))
+            return false
+        }
+    }
+
+    /// The camera prompt's answer, `microphoneAnswered`'s rule: the button
+    /// comes back either way, and the press goes on only in an idle panel
+    /// still on screen. The grant is READ AGAIN first — anything but
+    /// authorized stops with the refusal, no microphone prompt and no
+    /// countdown — then the microphone's grant, then the countdown.
+    private func cameraAnswered() {
+        recordButton.isEnabled = true
+        guard phase == .idle, window?.isVisible == true else { return }
+        let status = Self.grantDoors.cameraStatus()
+        guard status == .authorized else {
+            setNote(RecordingGrant.cameraRefusal(status))
+            return
+        }
+        setNote("")
+        floatAgain()
+        guard checkMicrophoneGrant() else { return }
         beginCountdown()
     }
 }

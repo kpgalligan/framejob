@@ -124,7 +124,9 @@ extension ScreenRecorder {
     /// connection must not light the bar again; a closed segment's state is
     /// not this segment's). A VOICE-OVER (`voiceSession`) is read the same
     /// way: its output while recording and its last segment has neither
-    /// finished nor failed. One
+    /// finished nor failed; and so is a CAMERA recording (`cameraSession`,
+    /// spec §11 CAM-5): its microphone output while recording, until the
+    /// latest segment's microphone finishes or reports a problem. One
     /// channel is reported on both sides, `LevelMeterSink`'s rule for a
     /// mono track (R0 q6c: the connection exposes `averagePowerLevel` and
     /// `peakHoldLevel` in dB on every poll, so there is no sample buffer and
@@ -137,6 +139,10 @@ extension ScreenRecorder {
             connection = voice.micOutput.connection(with: .audio)
         } else if state == .recording, let current = session, !current.latest.micFinished,
             current.latest.micFailure == nil, let output = current.micOutput
+        {
+            connection = output.connection(with: .audio)
+        } else if state == .recording, let camera = cameraSession, let last = camera.segments.last,
+            !last.micFinished, last.micProblem == nil, let output = camera.micOutput
         {
             connection = output.connection(with: .audio)
         } else if state == .idle, let prepared = preparedMicrophone, prepared.session.isRunning {

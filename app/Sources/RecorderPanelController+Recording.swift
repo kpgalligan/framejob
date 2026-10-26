@@ -46,7 +46,9 @@ import ScreenCaptureKit
 /// `ScreenRecorder+Microphone.swift` says why — `startRunning()`'s first-use
 /// cost, up to 0.4 s of voice missing from the file) and discarded on cancel,
 /// on close and on a refused start, so an input never stays open past the
-/// recording it was for. **The meter moves during the countdown** (#98 c):
+/// recording it was for. **So is a camera's capture** (spec §11 CAM-5,
+/// `ScreenRecorder+CameraPrepare.swift`), so CAM-3's warm-up runs through the
+/// 3-2-1, and it is let go on the same four occasions. **The meter moves during the countdown** (#98 c):
 /// `beginCountdown` arms the tick, which through `.countdown` and
 /// `.starting` does nothing but `publishMicrophoneLevel()`, read from the
 /// prepared session; the discard publishes the silence. **The tick shows a
@@ -115,6 +117,7 @@ extension RecorderPanelController {
 
     private func beginIfGranted() {
         if voiceOverSelected { return beginVoiceOverIfGranted() }
+        if cameraSelected { return beginCameraIfGranted() }
         if sourcePopup.selectedItem?.tag == Self.windowTag, pickedFilter == nil {
             setNote(Self.chooseWindowSentence)
             return
@@ -140,6 +143,7 @@ extension RecorderPanelController {
         countdownTimer?.invalidate()
         resumeProblem = nil
         phase = .countdown(Self.countdownSeconds)
+        recorder.prepareCamera(for: currentChoice())
         recorder.prepareMicrophone(currentChoice().microphone)
         armTick()
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] timer in
@@ -163,6 +167,7 @@ extension RecorderPanelController {
         countdownTimer?.invalidate()
         countdownTimer = nil
         recorder.discardPreparedMicrophone()
+        recorder.discardPreparedCamera()
         if case .countdown = phase { phase = .idle }
     }
 
@@ -184,6 +189,8 @@ extension RecorderPanelController {
         phase = .starting
         // A voice-over has no lookup to bound (`+VoiceOver.swift`).
         if choice.source == .voiceOver { return launchVoiceOver(choice) }
+        // Nor does a camera: the recorder's own arm ceiling bounds it.
+        if choice.source == .camera { return launchCamera(choice) }
         startTimer?.invalidate()
         startTimer = Timer.scheduledTimer(
             withTimeInterval: ScreenRecorder.armCeiling, repeats: false
@@ -229,6 +236,7 @@ extension RecorderPanelController {
         startTimer?.invalidate()
         startTimer = nil
         recorder.discardPreparedMicrophone()
+        recorder.discardPreparedCamera()
         phase = .idle
         setNote(Self.abandonedSentence)
     }
@@ -258,6 +266,7 @@ extension RecorderPanelController {
         startTimer = nil
         launched = false
         recorder.discardPreparedMicrophone()
+        recorder.discardPreparedCamera()
         phase = .idle
         setNote(error.localizedDescription)
     }
@@ -270,8 +279,8 @@ extension RecorderPanelController {
     /// `revealIfNoted` reads it). R1 hid it for a picked window only,
     /// because a display's filter excludes Frame Job (R0 q3); the user asked
     /// for the dialog to go away whatever is recorded, and the menu bar's
-    /// item is the recording's controls now. A voice-over is the exception
-    /// (`hidesForRecording`): the panel stays as it was, so it is never
+    /// item is the recording's controls now. A voice-over and a camera are
+    /// the exceptions (`hidesForRecording`): the panel stays as it was, so it is never
     /// `hiddenForRecording` and `showWhenLanded` is simply whether it is up.
     func recordingDidStart() {
         // A stop asked for while arming has moved the phase on; the end

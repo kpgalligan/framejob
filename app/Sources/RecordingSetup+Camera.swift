@@ -2,12 +2,16 @@ import AVFoundation
 import AppKit
 
 /// A camera recording's half of `RecordingSetup.swift` (camera-recording
-/// CR1a, spec §11 CAM-3): its file stem and its grant's read and refusal.
-/// Values a probe can call, in a file of their own because
-/// `RecordingSetup.swift` stands near the 400-line cap. Nothing here prompts:
-/// `AVCaptureDevice.requestAccess(for: .video)` is the recorder panel's alone
-/// (CR1c), and `cameraStatus` is read before any `AVCaptureDeviceInput`
-/// exists, because that initializer prompts on `.notDetermined`.
+/// CR1a, spec §11 CAM-3): its file stem and its grant's read and refusal;
+/// and the panel's step for the grant and the note once its pane is open
+/// (CR1c, CAM-5; the pane's URL is `RecordingSetup.swift`'s, beside the
+/// others, the one file a System Settings URL is spelled in). Values a probe
+/// can call, in a file of their own because `RecordingSetup.swift` stands
+/// near the 400-line cap. Nothing here
+/// prompts: `AVCaptureDevice.requestAccess(for: .video)` is the recorder
+/// panel's alone (`RecorderPanelController+Grants.swift`), and `cameraStatus`
+/// is read before any `AVCaptureDeviceInput` exists, because that
+/// initializer prompts on `.notDetermined`.
 
 extension RecordingFiles {
     /// `Camera Recording 2026-10-26 at 17.14.33` — a camera recording's file,
@@ -47,5 +51,25 @@ extension RecordingGrant {
             return head + "Turn it on in System Settings ▸ Privacy & Security ▸ Camera, "
                 + "then relaunch." + launchClause
         }
+    }
+
+    /// The camera, for a press with Source Camera: `microphoneStep`'s
+    /// mapping — authorized goes on, `.notDetermined` asks, any other opens
+    /// the pane.
+    static func cameraStep(_ status: AVAuthorizationStatus) -> Step {
+        switch status {
+        case .authorized: return .proceed
+        case .notDetermined: return .ask
+        case .denied, .restricted: return .openPane
+        @unknown default: return .openPane
+        }
+    }
+
+    /// The camera note after its pane opened: the refusal's head and fix,
+    /// the opened sentence, then `launchClause`.
+    static func cameraOpenedNote(_ status: AVAuthorizationStatus) -> String {
+        "The camera is not granted to Frame Job (status: \(name(of: status))). "
+            + "Turn it on in System Settings ▸ Privacy & Security ▸ Camera, then relaunch."
+            + paneOpenedSentence + launchClause
     }
 }

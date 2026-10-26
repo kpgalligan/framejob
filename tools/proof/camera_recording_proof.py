@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Camera recording CR1b (spec §11 CAM-4) — `record_screen {source: "camera", camera?}`, driven
-against a running instance over MCP, in `recording_proof.py`'s shape: two tiers, the split
+against a running instance over MCP — and CR1c's recorder panel (CAM-5), seen through
+`snapshot_ui`, in `recording_proof.py`'s shape: two tiers, the split
 between them the whole design. A host with no camera, or whose terminal holds no Camera grant,
 still measures the catalog, every refusal and their order; the recording itself is measured
 only where one can be made, and a run that could not make one SAYS so with a count.
@@ -41,6 +42,12 @@ Microphone grant): the picture at the playhead, the voice on the Microphone trac
 `mic_offset` apart within half a frame, one undo taking both and leaving the files; and, with
 no project open once its own document is closed (else skipped by name), `landed: new_project`
 with the canvas the file's size at the format's rate, rounded.
+
+**The panel** (CR1c, run LAST, after its own document is closed): `perform_menu_item ["File",
+"New Recording…"]` answers; `snapshot_ui {window: "recorder"}`'s layout dump lists a view whose
+text is `Camera:` and reports no layout problem; the log still holds no `Frame Job: ` line. Its
+rows only show the panel: no row is changed, so no defaults key moves. The panel is left up;
+the instance is stopped by its pid.
 
 Exit 0 when nothing failed (a skip is not a failure; it is printed with its count), 1 when a
 check failed.
@@ -389,11 +396,43 @@ def new_project_rows(mcp):
         close(mcp, path)
 
 
+# ---- the panel (CR1c) ------------------------------------------------------------------
+
+
+def panel_part(mcp):
+    try:
+        mcp.call_with("perform_menu_item", {"path": ["File", "New Recording…"]})
+        performed = None
+    except ToolError as error:
+        performed = str(error)
+    check(performed is None, f"perform_menu_item File ▸ New Recording… answers: {performed!r}")
+    result = mcp._request("tools/call", {"name": "snapshot_ui",
+                                         "arguments": {"window": "recorder"}})
+    text = "".join(p.get("text", "") for p in result.get("content", []) if p.get("type") == "text")
+    check(not result.get("isError"), f"snapshot_ui {{window: recorder}} answers: {text[:200]!r}")
+    if result.get("isError"):
+        skip("the panel's layout rows: no capture", 2)
+        return
+    answer = json.loads(text)
+    with open(answer["layout_path"]) as handle:
+        layout = json.load(handle)
+    texts = [view.get("text") for view in layout.get("views", [])]
+    check("Camera:" in texts, f"the recorder panel's layout lists a view reading 'Camera:': "
+                              f"{[t for t in texts if t and t.endswith(':')]}")
+    problems = layout.get("problems", [])
+    check(problems == [], f"the recorder panel's layout reports no problem: {problems}")
+    lines = None
+    if os.path.exists(LOG):
+        with open(LOG, encoding="utf-8", errors="replace") as handle:
+            lines = [line.rstrip() for line in handle if PARITY in line]
+    check(lines == [], f"the log still holds no {PARITY!r} line: {lines}")
+
+
 def main():
     os.makedirs(RUN, exist_ok=True)
     os.makedirs(DOCS, exist_ok=True)
     mcp = MCP(SOCKET, timeout=180)
-    print(f"camera recording CR1b — record_screen's camera, against {SOCKET}")
+    print(f"camera recording CR1b/CR1c — record_screen's camera and the panel, against {SOCKET}")
     document = os.path.join(DOCS, f"camera-{os.getpid()}.framejob")
     try:
         section("A — the catalog", catalog_part, mcp)
@@ -411,6 +450,7 @@ def main():
         time.sleep(0.5)
         shutil.rmtree(os.path.join(WORK, f"{os.getpid()}-files"), ignore_errors=True)
         shutil.rmtree(DOCS, ignore_errors=True)
+    section("D — the recorder panel's Camera row (CR1c)", panel_part, mcp)
 
     print(f"\n{checks - len(failures)}/{checks} checks passed")
     for what, count in skipped:

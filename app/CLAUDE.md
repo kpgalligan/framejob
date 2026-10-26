@@ -2366,18 +2366,22 @@ free.
 - `RecorderPanelController.swift` (+`Rows`, +`Recording`, +`Grants`,
   +`Pause`, +`Landing`, +`Picker`, +`VoiceOver`, +`Showing` — `show()`, the
   sync timer, `setNote` and the refit, a pure move out of the base file,
-  camera-recording CR1-0) · `RecorderStatusItem.swift`
+  camera-recording CR1-0, +`Camera` — Source ▸ Camera and the Camera popup,
+  camera-recording CR1c, spec §11 CAM-5) · `RecorderStatusItem.swift`
   — File ▸ New
   Recording… A `.floating`, `.nonactivatingPanel` with `hidesOnDeactivate`
   false, ONE instance, no window delegate. `show()` makes it key only when
   Frame Job is active; from the background it is ordered front without key, so
   the person's Return stays in the app in front (spec §11 recording.md, #137).
   **The panel is the only place the
-  two grants are requested, and the only place System Settings is opened
-  for them** (`+Grants`, through `RecorderPanelController.grantDoors`, which
-  a probe seals), both before the countdown; it orders OUT at
-  `recordingDidStart` for every source but Microphone Only and comes back
-  only with a note. The
+  three grants (Screen Recording, Microphone, Camera) are requested, and the
+  only place System Settings is opened for them** (`+Grants`, through
+  `RecorderPanelController.grantDoors`, which a probe seals), all before the
+  countdown; it orders OUT at `recordingDidStart` for every source but
+  Microphone Only and Camera, and comes back only with a note. **A camera**
+  (the Source row "Camera", session-only, `+Camera`) keeps the panel UP as a
+  voice-over does, and its countdown spends the camera's warm-up on a
+  prepared capture (`ScreenRecorder+CameraPrepare.swift`). The
   status item is the recording's chrome (Pause / Resume / Stop). File ▸
   Pause/Resume Recording (`AppDelegate+Recording.swift`) is a second door to
   the same two calls. **A voice-over** (the Source row "Microphone Only",
@@ -2389,11 +2393,11 @@ free.
 **Recording.**
 - `RecordingSetup.swift` (+`Camera`) · `RecordingResult.swift` — the half a probe can
   call: choices, file naming, `RecordingConfiguration.make` (PURE), the grant
-  reads, the step a press takes, the two pane URLs, the result types;
+  reads, the step a press takes, the three pane URLs, the result types;
   nothing here prompts or opens.
 - `ScreenRecorder.swift` (+`Pause`, +`Delegates`, +`Microphone`,
   +`Finishing`, +`Content`, +`VoiceOver`, +`VoiceOverFinishing`, +`Camera`,
-  +`CameraFinishing`) · `CameraDevices.swift` · `CameraCapture.swift` — the machine `idle → arming → recording ⇄ paused
+  +`CameraFinishing`, +`CameraPrepare`) · `CameraDevices.swift` · `CameraCapture.swift` — the machine `idle → arming → recording ⇄ paused
   → finishing → idle`. **The microphone is a SECOND FILE** through an
   `AVCaptureSession`, because `SCRecordingOutput` folds it inseparably into
   the system track; its offset is measured per SEGMENT. **A pause is a
@@ -2421,7 +2425,11 @@ free.
   the warm-up hold. `CameraDevices.swift` is the camera list, CAM-3's best
   format and its sentences; `CameraCapture.swift` the session, the
   configuration lock, the data output, the writers and the warm-up;
-  `RecordingSetup+Camera.swift` the camera's stem, grant read and refusal.
+  `ScreenRecorder+CameraPrepare.swift` the panel countdown's prepared
+  capture (CR1c, CAM-5), which `startCamera` adopts or joins: its start's
+  completion is the one retained closure that holds its object strongly, by
+  design; `RecordingSetup+Camera.swift` the camera's stem, grant read,
+  refusal and the press's camera step.
 - `RecordingLanding.swift` (+`Microphone`, +`Placing`, +`LeftOut`,
   +`VoiceOver`) · `ProjectDocument+Recording.swift`
   — a `RecordingResult` and a document in, an UNSCOPED op list out; nothing
@@ -3074,7 +3082,9 @@ same title. `menu.autoenablesItems = false` comes before disabling a row. An
 implicitly-unwrapped optionals only for post-`loadView` view refs. Every
 non-NSCoder class: `@available(*, unavailable) required init?(coder:)
 { fatalError("<Type> does not support NSCoder") }`. `[weak self]` in retained
-closures, never `unowned`. Main-thread AppKit. **`async`/`await` is allowed
+closures, never `unowned` (the one deliberate strong hold:
+`ScreenRecorder+CameraPrepare.swift`'s prepared start completion keeps its
+`PreparedCamera`, so a start that comes first can join it). Main-thread AppKit. **`async`/`await` is allowed
 only inside `MediaImporter.swift`** (AVFoundation's loading API is
 async-only) **and `SpeechEngine.swift`** (spec §11 W-8: `SpeechAnalyzer`
 is async-only; every caller gets a synchronous wrapper or a main-queue

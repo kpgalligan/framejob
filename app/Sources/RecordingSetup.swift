@@ -368,6 +368,10 @@ enum RecordingGrant {
     static let microphonePaneURL = URL(
         string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
 
+    /// System Settings ▸ Privacy & Security ▸ Camera (camera-recording CR1c).
+    static let cameraPaneURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")
+
     /// What a note adds once the pane has been opened.
     static let paneOpenedSentence = " System Settings is open at that pane."
 

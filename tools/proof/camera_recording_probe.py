@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Camera recording CR1a (spec §11 CAM-3): the camera recorder, measured through the app's own
-sources; and CR1b (CAM-4): `record_screen`'s camera, through the server's own functions.
+sources; CR1b (CAM-4): `record_screen`'s camera, through the server's own functions; and CR1c
+(CAM-5): the recorder panel's Camera source and the countdown's prepared capture.
 
     python3 tools/proof/camera_recording_probe.py [--sources DIR] [--only SECTIONS] [--mutant NAME]
 
@@ -39,9 +40,18 @@ Sections and rows:
            the bound (+ 0.15 s for the timer), its buffers, intervals and rate, and the result's
            `camera.note` nil when the stream was steady, naming the rate when the bound passed;
            a steady warm-up must have seen at least `WARM_UP_RUN` + 1 buffers (#372 item 2).
-           Skipped by name when no camera is connected or the Camera grant is not
-           authorized (nothing is recorded); G4 is skipped by name when the Microphone grant is
-           not authorized (the recording is made without one). Never asks for a grant.
+           Then, after that stop has answered plus 1 s, CR1c's prepared capture (CAM-5 (5)) on
+           fresh recorders with no microphone: G7 `prepareCamera` (how long it held main), the
+           countdown's 3 s, then `startCamera` adopts it and answers in < `PREPARED_START_MAX`
+           with the slot emptied, 2 s recorded as one segment at ≥ 98 % frames by G3's decode,
+           no `camera.note`; G8 a prepared capture discarded after 1 s: the slot nil and its
+           session stopped 0.5 s later; G9 `startCamera` straight after `prepareCamera`, the
+           prepared start not yet answered, JOINS it: no error before `armCeiling`, `.recording`,
+           the slot nil, 1 s recorded as one segment, no note (the call-to-answer time beside
+           CR1a's cold 1.943–1.962 s). Skipped by name when no camera is connected or the
+           Camera grant is not authorized (nothing is recorded); G4 is skipped by name when the
+           Microphone grant is not authorized (the recording is made without one). Never asks
+           for a grant.
   tool     CR1b, `AgentServer.shared`'s own functions, no camera and no grant: T1
            `recordingSourceKind` with source camera — alone, a camera named, one stranger, all
            seven in `cameraRefusedArguments` order, a null size — and `source: "x"`'s
@@ -55,10 +65,30 @@ Sections and rows:
            `has_audio` false, `stopped_by` system_stopped), a screen result's none; T6
            `resultNotes` of a camera result ends with its `problem` and `note`, a screen
            result's is the microphone's clause alone.
+  panel    CR1c, `RecorderPanelController.shared` never shown, `.prohibited`, a spy sealed in
+           `grantDoors` before `shared` exists, the eight `FrameJobRecording…` keys put back; fake
+           rows (`probe-camera`, a "None connected" row, `probe-mic`) find no device. P1 the
+           Source rows end Window… (1), Camera (3), Microphone Only (2), screens + 4, and the
+           Camera popup is `connected()`'s names (or "None connected"); P2 Camera via
+           `controlChanged` → `.camera` with `probe-camera`, the five (System Audio, Show Clicks,
+           Size, Include Frame Job windows, Rate) disabled with their values kept, Camera,
+           Microphone, Record Into and Source live, the size note `cameraSizeNote(nil)`; a
+           display row → the five back, Camera disabled, `camera` nil; P3 session only: the
+           display key's 777 kept, the camera key `probe-camera`, eight keys, the row and camera
+           kept through `rebuildSources()` + `restoreChoices()`; P4 `cameraStep` over four
+           statuses, `cameraPaneURL`, `cameraOpenedNote(.denied)` exact; P5 the press (no camera,
+           `notDetermined` and its held answer on the hidden panel, denied and restricted, the
+           microphone's ask, the countdown with Microphone Off; 0 Screen Recording reads or
+           requests) and a comment-stripped read of `cameraAnswered` (its `cameraStatus()`
+           before `checkMicrophoneGrant` and `beginCountdown`); P6 `hidesForRecording` and the
+           Pause / Resume button; P7 `landingNote`'s camera sentences; P8 `cameraSizeNote` on
+           V1's FaceTime and V3's iPhone lists and nil; P9 comment-stripped reads: the
+           countdown's `prepareCamera`, the four `discardPreparedCamera`s, `startRecording`'s
+           `launchCamera`, the meter's `cameraSession`.
 
 Mutants (each a `--mutant` edit of a copy of `--sources`), run with `--only values` but the
-`tool` five, run with `--only tool`, and `no-hold`, run with `--only granted` (it needs the
-camera):
+`tool` five, run with `--only tool`, the `panel` eight, run with `--only panel`, and `no-hold`,
+`prepare-ignored` and `join-weak`, run with `--only granted` (they need the camera):
   format-any-shape    no landscape filter                                 → V1
   offset-by-arrival   the PTS ignored                                     → V12a
   offset-sign         the PTS difference negated                          → V12a, V12c
@@ -71,6 +101,16 @@ camera):
   grant-before-lookup  the Camera grant read before the lookup                 → T3
   camera-key-dropped  `recordingFields` writes no `camera`                     → T5
   camera-notes-dropped  `resultNotes` leaves out the camera's two sentences    → T6
+  camera-screen-grant-read  `beginIfGranted`'s camera line deleted             → P5
+  camera-grant-unasked  `cameraStep` `.notDetermined` → `.openPane`            → P4, P5
+  camera-row-live     `syncCameraControls` leaves the five live                → P2
+  camera-row-persisted  the persist guard's `, !cameraSelected` dropped        → P3
+  camera-panel-hides  `hidesForRecording` → `source != .voiceOver`             → P6
+  camera-problem-unsaid  `landingNote` ignores `camera`                        → P7
+  countdown-unprepared  `beginCountdown`'s `prepareCamera` line deleted        → P9
+  camera-answer-unread  `cameraAnswered`'s `cameraStatus()` re-read deleted    → P5
+  prepare-ignored     `takeCameraCapture` never adopts                         → G7
+  join-weak           the prepared start's completion holds `[weak prepared]`  → G9
 
 Exit (cache_pass_probe.py's rule): a plain run exits 0 iff no row failed (a skip by name is
 not a failure) and 1 when one did; a build failure is B0's FAIL. A `--mutant` run exits 1 when
@@ -91,13 +131,14 @@ import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/camera-recording-probe"
-SECTIONS = ["values", "landing", "granted", "tool"]
+SECTIONS = ["values", "landing", "granted", "tool", "panel"]
 ROWS = {
     "values": ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12a", "V12b",
                "V12c", "V12d", "V13", "V14", "V15", "V16", "V17"],
     "landing": ["L1", "L2", "L3"],
-    "granted": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"],
+    "granted": ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9"],
     "tool": ["T1", "T2", "T3", "T4", "T5", "T6"],
+    "panel": ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"],
 }
 SECTION_WALL = 180
 STEM_EPOCH = 1793034873   # 2026-10-26 17:14:33 UTC
@@ -106,6 +147,7 @@ FRAMES_PASS = 0.98
 HOLD_BOUND = 1.0          # CameraCapture.warmUpBound
 HOLD_SLACK = 0.15         # the bound's timer and the hop to main
 WARM_UP_RUN = 5           # CameraCapture.warmUpRun, written here rather than read from Swift
+PREPARED_START_MAX = 0.3  # G7: a start that adopts a warm prepared capture answers within this
 INFO_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -122,6 +164,30 @@ GRANT_GUARD = """        let cameraGrant = RecordingGrant.cameraStatus
 # `recordingCameraID`'s grant guard, which `grant-before-lookup` moves above the lookup.
 GRANT_AFTER_LOOKUP = """        guard status == .authorized else {
             throw ToolError(message: RecordingGrant.cameraRefusal(status))
+        }
+"""
+# `cameraAnswered`'s re-read of the Camera grant, which `camera-answer-unread` deletes.
+CAMERA_REREAD = """        let status = Self.grantDoors.cameraStatus()
+        guard status == .authorized else {
+            setNote(RecordingGrant.cameraRefusal(status))
+            return
+        }
+"""
+# The prepared start's completion, holding its `PreparedCamera` strongly; `join-weak` weakens it.
+JOIN_STRONG = """        capture.start { error in
+            prepared.answered = true
+            prepared.startError = error
+            let waiting = prepared.waiting
+            prepared.waiting = nil
+            waiting?(error)
+        }
+"""
+JOIN_WEAK = """        capture.start { [weak prepared] error in
+            prepared?.answered = true
+            prepared?.startError = error
+            let waiting = prepared?.waiting
+            prepared?.waiting = nil
+            waiting?(error)
         }
 """
 # name: (the rows it must fail, [(file, before, after), ...])
@@ -163,11 +229,50 @@ MUTANTS = {
     "camera-notes-dropped": (["T6"], [
         ("AgentServer+RecordingResult.swift",
          "            result.camera?.problem, result.camera?.note,\n", "")]),
+    # CR1c (spec §11 CAM-5): the panel's eight, each run with `--only panel`, and the
+    # recorder's two, each run with `--only granted` (they need the camera).
+    "camera-screen-grant-read": (["P5"], [
+        ("RecorderPanelController+Recording.swift",
+         "        if cameraSelected { return beginCameraIfGranted() }\n", "")]),
+    "camera-grant-unasked": (["P4", "P5"], [
+        ("RecordingSetup+Camera.swift", "        case .notDetermined: return .ask\n",
+         "        case .notDetermined: return .openPane\n")]),
+    "camera-row-live": (["P2"], [
+        ("RecorderPanelController+Camera.swift",
+         "        for control in screenAndRate { control.isEnabled = false }\n",
+         "        _ = screenAndRate\n")]),
+    "camera-row-persisted": (["P3"], [
+        ("RecorderPanelController+Rows.swift",
+         "        if sourcePopup.selectedItem?.tag != Self.windowTag, !voiceOverSelected, !cameraSelected {\n",
+         "        if sourcePopup.selectedItem?.tag != Self.windowTag, !voiceOverSelected {\n")]),
+    "camera-panel-hides": (["P6"], [
+        ("RecorderPanelController+VoiceOver.swift",
+         "-> Bool { source != .voiceOver && source != .camera }\n", "-> Bool { source != .voiceOver }\n")]),
+    "camera-problem-unsaid": (["P7"], [
+        ("RecorderPanelController+Landing.swift",
+         "    ) -> String {\n        var sentences: [String] = []\n",
+         "    ) -> String {\n        let camera: RecordingCamera? = nil\n        var sentences: [String] = []\n")]),
+    "countdown-unprepared": (["P9"], [
+        ("RecorderPanelController+Recording.swift",
+         "        recorder.prepareCamera(for: currentChoice())\n", "")]),
+    "camera-answer-unread": (["P5"], [
+        ("RecorderPanelController+Grants.swift", CAMERA_REREAD, "")]),
+    "prepare-ignored": (["G7"], [
+        ("ScreenRecorder+CameraPrepare.swift",
+         "            prepared.adopted = true\n            return prepared.capture\n",
+         "            _ = prepared\n")]),
+    "join-weak": (["G9"], [
+        ("ScreenRecorder+CameraPrepare.swift", JOIN_STRONG, JOIN_WEAK)]),
 }
 # The section a mutant runs when `--only` is not given.
 MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
                   "camera-elsewhere-admitted": "tool", "grant-before-lookup": "tool",
-                  "camera-key-dropped": "tool", "camera-notes-dropped": "tool"}
+                  "camera-key-dropped": "tool", "camera-notes-dropped": "tool",
+                  "camera-screen-grant-read": "panel", "camera-grant-unasked": "panel",
+                  "camera-row-live": "panel", "camera-row-persisted": "panel",
+                  "camera-panel-hides": "panel", "camera-problem-unsaid": "panel",
+                  "countdown-unprepared": "panel", "camera-answer-unread": "panel",
+                  "prepare-ignored": "granted", "join-weak": "granted"}
 
 
 def run(command, **kw):
@@ -268,6 +373,50 @@ def source_rows(sources):
     return rows
 
 
+def uncommented(path):
+    """The file's text with every `//` comment taken out (no string in the bodies read holds
+    `//`); "" when the file is missing."""
+    text = path.read_text() if path.exists() else ""
+    return "\n".join(re.sub(r"//.*$", "", line) for line in text.splitlines())
+
+
+def panel_source_rows(sources):
+    """P5's read of the camera prompt's answer, and P9: comment-stripped reads of the panel's
+    countdown, its discards and its dispatch, and the recorder's meter."""
+    rows = {}
+    grants = uncommented(sources / "RecorderPanelController+Grants.swift")
+    body = body_of(grants, "func cameraAnswered(")
+    if body is None:
+        rows["P5"] = (False, "cameraAnswered not found exactly once")
+    else:
+        names = all(n in body for n in ("isVisible == true", "recordButton.isEnabled = true",
+                                        "cameraStatus()", "cameraRefusal"))
+        read, mic, count = (body.find("cameraStatus()"), body.find("checkMicrophoneGrant"),
+                            body.find("beginCountdown"))
+        ordered = 0 <= read < mic and read < count and count >= 0
+        rows["P5"] = (names and ordered,
+                      f"cameraAnswered names the visible guard, Record re-enabled, cameraStatus() and "
+                      f"cameraRefusal {names}; cameraStatus() at {read}, checkMicrophoneGrant at {mic}, "
+                      f"beginCountdown at {count}")
+    recording = uncommented(sources / "RecorderPanelController+Recording.swift")
+    base = uncommented(sources / "RecorderPanelController.swift")
+    microphone = uncommented(sources / "ScreenRecorder+Microphone.swift")
+    reads = []
+    for text, signature, wanted in (
+            (recording, "func beginCountdown(", ["prepareCamera("]),
+            (recording, "func cancelCountdown(", ["discardPreparedCamera("]),
+            (recording, "func abandonStart(", ["discardPreparedCamera("]),
+            (recording, "func startFailed(", ["discardPreparedCamera("]),
+            (base, "func panelWillClose(", ["discardPreparedCamera("]),
+            (recording, "func startRecording(", [".camera", "launchCamera(choice)"]),
+            (microphone, "func publishMicrophoneLevel(", ["cameraSession"])):
+        body = body_of(text, signature)
+        reads.append((signature, body is not None and all(w in body for w in wanted), wanted))
+    rows["P9"] = (all(ok for _, ok, _ in reads),
+                  "; ".join(f"{sig[5:-1]} names {' and '.join(w)} {ok}" for sig, ok, w in reads))
+    return rows
+
+
 def fixtures(here):
     """The landing's two files, made by ffmpeg; (movie, voice) or None and why."""
     movie, voice = here / "camera-1080p30.mov", here / "camera-voice.m4a"
@@ -296,14 +445,67 @@ def movie_facts(path):
             "first": times[0] if times else None, "last": times[-1] if times else None}
 
 
+def decoded_ratio(path, rate):
+    """G3's measure: decoded frames / ((last − first PTS + one frame) × rate); None when it
+    cannot be read."""
+    m = movie_facts(path)
+    if m["first"] is None or not rate:
+        return None, m
+    expected = (m["last"] - m["first"] + 1.0 / rate) * rate
+    return (round(m["frames"] / expected, 4) if expected else None), m
+
+
+def prepared_rows(facts):
+    """G7–G9 (CR1c, CAM-5 (5)): the countdown's prepared capture adopted, let go, joined."""
+    rows = {}
+    match = re.match(r"^(\d+)x(\d+)@([\d.]+)$", facts.get("best") or "")
+    rate = float(match[3]) if match else 0
+    g7 = facts.get("G7") or {}
+    segments = g7.get("segments") or []
+    ratios = [decoded_ratio(path, rate) for path in segments]
+    took = g7.get("startSeconds")
+    rows["G7"] = (g7.get("prepared") is True and not g7.get("error") and not g7.get("stopError")
+                  and took is not None and took < PREPARED_START_MAX
+                  and g7.get("preparedAfter") is False and len(segments) == 1
+                  and all(r is not None and r >= FRAMES_PASS for r, _ in ratios)
+                  and g7.get("note") is None,
+                  f"prepareCamera held main {g7.get('prepareSeconds') or 0:.3f} s; the prepared start "
+                  f"had answered {g7.get('answeredAtStart')} after the countdown's 3 s; "
+                  f"startCamera answered in {took if took is None else round(took, 3)} s "
+                  f"(< {PREPARED_START_MAX} s), the slot nil after {g7.get('preparedAfter') is False}; "
+                  f"{len(segments)} segment(s), frames "
+                  + ", ".join(f"{m['frames']}/{r}" for r, m in ratios)
+                  + f"; note {g7.get('note')}; {g7.get('error') or g7.get('stopError') or ''}")
+    g8 = facts.get("G8") or {}
+    rows["G8"] = (g8.get("held") is True and g8.get("slotNil") is True and g8.get("running") is False,
+                  f"a capture prepared {g8.get('held')}; after discardPreparedCamera the slot nil "
+                  f"{g8.get('slotNil')}, its session running {g8.get('running')}")
+    g9 = facts.get("G9") or {}
+    took = g9.get("startSeconds")
+    ceiling = g9.get("ceiling") or 20
+    joined = g9.get("prepared") is True and g9.get("answeredAtStart") is False
+    rows["G9"] = (joined and not g9.get("error") and not g9.get("stopError") and took is not None
+                  and took < ceiling and g9.get("state") == "recording"
+                  and g9.get("preparedAfter") is False and len(g9.get("segments") or []) == 1
+                  and g9.get("note") is None,
+                  f"startCamera called with the prepared start unanswered {joined} (else it did not "
+                  f"reach the join); answered in {took if took is None else round(took, 3)} s "
+                  f"(ceiling {ceiling:g} s; CR1a's cold start 1.943–1.962 s), state {g9.get('state')}, "
+                  f"the slot nil {g9.get('preparedAfter') is False}; "
+                  f"{len(g9.get('segments') or [])} segment(s), note {g9.get('note')}; "
+                  f"{g9.get('error') or g9.get('stopError') or ''}")
+    return rows
+
+
 def granted_rows(facts):
-    """G0–G5 from the granted section's facts; a dict of id → (state, detail) where state is
+    """G0–G9 from the granted section's facts; a dict of id → (state, detail) where state is
     True, False or "skip"."""
     rows = {}
     if facts.get("skip"):
         return {row: ("skip", facts["skip"]) for row in ROWS["granted"]}
     if facts.get("error"):
         rows["G0"] = (False, facts["error"])
+        rows.update(prepared_rows(facts))
         return rows
     segments = facts.get("segments") or []
     rows["G0"] = (bool(segments) and facts.get("isCamera") is True and facts.get("idle") is True
@@ -371,6 +573,7 @@ def granted_rows(facts):
                       f"{warm['steady']}, ran at {warm['rate']:.2f} fps (want "
                       f"{warm['wanted']:g}); intervals ms {warm['intervals']}; the call to "
                       f"recording {facts.get('startSeconds') or 0:.3f} s; note {facts.get('note')}")
+    rows.update(prepared_rows(facts))
     return rows
 
 
@@ -443,6 +646,15 @@ def main():
             results.update(source_rows(sources))
         if name == "granted":
             results.update(granted_rows(facts))
+        if name == "panel":
+            swift_p5 = results.get("P5", (False, "the section did not answer it"))
+            read = panel_source_rows(sources)
+            results["P9"] = read["P9"]
+            results["P5"] = (swift_p5[0] is True and read["P5"][0] is True,
+                             f"{swift_p5[1]} | the answer's re-read: {read['P5'][1]}")
+            visible = facts.get("visible") is False and facts.get("visibleAtEnd") is False
+            if not visible:
+                results["P1"] = (False, f"the panel was shown: {facts}")
         for row in ROWS[name]:
             results.setdefault(row, (False, "the section did not answer it"))
 

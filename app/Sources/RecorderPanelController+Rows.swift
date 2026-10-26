@@ -22,12 +22,12 @@ extension RecorderPanelController {
     // MARK: - Rows
 
     func buildRows(into content: NSStackView) {
-        for popup in [sourcePopup, microphonePopup, ratePopup, sizePopup, destinationPopup] {
+        for popup in [sourcePopup, cameraPopup, microphonePopup, ratePopup, sizePopup, destinationPopup] {
             popup.font = DS.sans(13)
             popup.target = self
             popup.action = #selector(controlChanged(_:))
         }
-        for popup in [sourcePopup, ratePopup, sizePopup, destinationPopup] {
+        for popup in [sourcePopup, cameraPopup, ratePopup, sizePopup, destinationPopup] {
             popup.widthAnchor.constraint(equalToConstant: Self.controlWidth).isActive = true
         }
         microphonePopup.widthAnchor.constraint(equalToConstant: Self.controlWidth).isActive = true
@@ -66,6 +66,7 @@ extension RecorderPanelController {
         let grid = makeSheetGrid([
             [fieldLabel("Source:"), sourcePopup],
             [NSGridCell.emptyContentView, includeFrameJobCheckbox],
+            [fieldLabel("Camera:"), cameraPopup],
             [fieldLabel("Microphone:"), microphoneRow],
             [fieldLabel("System Audio:"), systemAudioSwitch],
             [fieldLabel("Show Clicks:"), showClicksSwitch],
@@ -105,15 +106,16 @@ extension RecorderPanelController {
     // MARK: - Sources, microphones, destinations
 
     /// One row per `NSScreen`, by `localizedName`, carrying its
-    /// `CGDirectDisplayID`; then "Window…", which presents the picker, and
-    /// "Microphone Only" (`+VoiceOver.swift`). Built
-    /// from `NSScreen` and NOT from `SCShareableContent`, because listing
+    /// `CGDirectDisplayID`; then "Window…", which presents the picker,
+    /// "Camera" (`+Camera.swift`) and "Microphone Only" (`+VoiceOver.swift`).
+    /// Built from `NSScreen` and NOT from `SCShareableContent`, because listing
     /// shareable content needs the Screen Recording grant and the panel must
-    /// open without one. Reselects Microphone Only, the picked row or the
-    /// current display.
+    /// open without one. Reselects Microphone Only, Camera, the picked row or
+    /// the current display.
     func rebuildSources() {
         let current = selectedDisplayID
         let voiceOver = voiceOverSelected
+        let camera = cameraSelected
         let picked = pickedFilter != nil && sourcePopup.selectedItem?.tag == Self.windowTag
         sourcePopup.removeAllItems()
         for screen in NSScreen.screens {
@@ -126,12 +128,17 @@ extension RecorderPanelController {
             title: picked ? "Window (picked)" : "Window…", action: nil, keyEquivalent: "")
         window.tag = Self.windowTag
         sourcePopup.menu?.addItem(window)
+        let cameraRow = NSMenuItem(title: Self.cameraTitle, action: nil, keyEquivalent: "")
+        cameraRow.tag = Self.cameraTag
+        sourcePopup.menu?.addItem(cameraRow)
         let microphoneOnly = NSMenuItem(
             title: Self.microphoneOnlyTitle, action: nil, keyEquivalent: "")
         microphoneOnly.tag = Self.voiceOverTag
         sourcePopup.menu?.addItem(microphoneOnly)
         if voiceOver {
             sourcePopup.select(microphoneOnly)
+        } else if camera {
+            sourcePopup.select(cameraRow)
         } else if picked {
             sourcePopup.select(window)
         } else {
@@ -232,7 +239,8 @@ extension RecorderPanelController {
     }
 
     var selectedScreen: NSScreen? {
-        guard sourcePopup.selectedItem?.tag != Self.windowTag, !voiceOverSelected else { return nil }
+        guard sourcePopup.selectedItem?.tag != Self.windowTag, !voiceOverSelected, !cameraSelected
+        else { return nil }
         let id = selectedDisplayID
         return NSScreen.screens.first { Self.displayID(of: $0) == id }
     }
@@ -257,11 +265,15 @@ extension RecorderPanelController {
 
     /// The controls as one value. `.picked` only while the picker's filter
     /// is held; a "Window…" row with no filter (the picker was cancelled and
-    /// the row not reselected) falls back to the main display.
+    /// the row not reselected) falls back to the main display. `camera` is
+    /// the Camera popup's id with Source Camera, and nil for every other.
     func currentChoice() -> RecordingChoice {
         var choice = RecordingChoice()
         if voiceOverSelected {
             choice.source = .voiceOver
+        } else if cameraSelected {
+            choice.source = .camera
+            choice.camera = selectedCameraID
         } else if sourcePopup.selectedItem?.tag == Self.windowTag, pickedFilter != nil {
             choice.source = .picked
         } else {
@@ -285,16 +297,18 @@ extension RecorderPanelController {
 
     /// Writes every control but the destination (a `recipeKey` is minted per
     /// process) and a picked window (a filter is not a value). The display
-    /// key is left alone while the Window row or Microphone Only (a
-    /// session-only row) is selected.
+    /// key is left alone while the Window row, Microphone Only or Camera (the
+    /// two session-only rows) is selected. The camera key is written only
+    /// while the Camera popup names one, so "None connected" forgets nothing.
     func persistChoices() {
         let defaults = UserDefaults.standard
-        if sourcePopup.selectedItem?.tag != Self.windowTag, !voiceOverSelected {
+        if sourcePopup.selectedItem?.tag != Self.windowTag, !voiceOverSelected, !cameraSelected {
             defaults.set(Int(selectedDisplayID), forKey: Self.displayKey)
         }
         defaults.set(
             microphonePopup.selectedItem?.representedObject as? String ?? "",
             forKey: Self.microphoneKey)
+        if let camera = selectedCameraID { defaults.set(camera, forKey: Self.cameraKey) }
         defaults.set(systemAudioSwitch.state == .on, forKey: Self.systemAudioKey)
         defaults.set(showClicksSwitch.state == .on, forKey: Self.showClicksKey)
         defaults.set(
@@ -305,17 +319,20 @@ extension RecorderPanelController {
 
     /// The stored choices, each falling back to `RecordingChoice`'s default
     /// for an absent or stale value: a display no longer attached is the
-    /// main one, a microphone no longer connected is Off, system audio is ON
+    /// main one, a microphone no longer connected is Off, a camera no longer
+    /// connected is the default camera, system audio is ON
     /// when nothing is stored (`bool(forKey:)` of an absent key is false, so
     /// the absence is tested by name).
     func restoreChoices() {
         let defaults = UserDefaults.standard
-        if pickedFilter == nil, !voiceOverSelected {
+        if pickedFilter == nil, !voiceOverSelected, !cameraSelected {
             let stored = defaults.integer(forKey: Self.displayKey)
             selectDisplay(stored > 0 ? CGDirectDisplayID(clamping: stored) : CGMainDisplayID())
         }
         let mic = defaults.string(forKey: Self.microphoneKey) ?? ""
         selectMicrophone(mic.isEmpty ? nil : mic)
+        let camera = defaults.string(forKey: Self.cameraKey) ?? ""
+        selectCamera(camera.isEmpty ? nil : camera)
         let systemAudio =
             defaults.object(forKey: Self.systemAudioKey) == nil
             ? RecordingChoice().systemAudio : defaults.bool(forKey: Self.systemAudioKey)
@@ -332,10 +349,14 @@ extension RecorderPanelController {
 
     /// `1728×1117 points · 3456×2234 pixels` for the chosen display; a picked
     /// window records at its own size, which the panel cannot know; a
-    /// voice-over has no picture.
+    /// voice-over has no picture; a camera records at its best format.
     func refreshSizeNote() {
         if voiceOverSelected {
             sizeNote.stringValue = Self.voiceOverSizeNote
+            return
+        }
+        if cameraSelected {
+            sizeNote.stringValue = selectedCameraSizeNote
             return
         }
         guard let screen = selectedScreen else {

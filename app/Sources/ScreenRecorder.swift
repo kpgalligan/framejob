@@ -155,6 +155,9 @@ final class ScreenRecorder: NSObject {
     /// `prepareMicrophone`'s running session, adopted by the next `start`
     /// whose choice names its device (`ScreenRecorder+Microphone.swift`).
     var preparedMicrophone: PreparedMicrophone?
+    /// `prepareCamera`'s started capture, adopted by the next `startCamera`
+    /// for its device and format (`+CameraPrepare.swift`, spec §11 CAM-5).
+    var preparedCamera: PreparedCamera?
     var timer: Timer?
 
     override init() { super.init() }

@@ -755,7 +755,7 @@ These rows are run on a Release build (`make app`), with real HDR footage of you
 
 Launch Frame Job from the Finder or Dock unless the check says otherwise.
 To take a permission away again: System Settings ▸ Privacy & Security, or
-`tccutil reset ScreenCapture com.kgalligan.FrameJob` (and `Microphone`).
+`tccutil reset ScreenCapture com.kgalligan.FrameJob` (and `Microphone`, and `Camera`).
 
 **REC-1 — Record without Screen Recording permission opens Settings**
 - **Do:** 1. With Frame Job's Screen Recording permission off, File ▸ New Recording…, press Record. 2. Answer or dismiss the system prompt. 3. Press Record again.
@@ -815,6 +815,16 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Do:** 1. Launch Frame Job from Terminal as in REC-7 (a scratch socket in `<dir>`, the terminal holding Camera and Microphone), with the camera facing you. 2. In a second Terminal tab, in the repository, run `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP("<dir>/agent.sock").call("record_screen", seconds=6, source="camera", microphone=True)'` and, about two seconds in, clap once in front of the camera. 3. In the project that opens, play the clap and step through it a frame at a time (← / →).
 - **Expect:** the movie is `Camera Recording <date> at <time>.mov` with its ` (Microphone).m4a` beside it, landed as a picture clip with the voice on a back track named Microphone. The frame where your hands meet and the clap's sound line up: the sound is no more than a frame or two early or late, and the playback sounds in sync.
 - **Source:** spec §11 CAM-3 (the microphone's offset), CAM-4.
+
+**REC-13 — The Camera prompt from the app itself**
+- **Do:** 1. Run `tccutil reset Camera com.kgalligan.FrameJob`, then open the Release app with `open -a "Frame Job"` (not from a terminal). 2. File ▸ New Recording…, choose Source ▸ Camera, and press Record. 3. Deny the prompt. 4. Press Record again. 5. Turn the camera on for Frame Job in System Settings, relaunch with `open -a`, and press Record with Source ▸ Camera.
+- **Expect:** in step 2 the system's camera prompt names Frame Job and comes up IN FRONT of the New Recording panel, not behind it. In step 3 the panel stays idle with the camera refusal in its note: no Microphone prompt and no countdown follow. In step 4 System Settings opens at Privacy & Security ▸ Camera, in front of the panel, and the note says it is open at that pane. In step 5 (allowing) the countdown starts. No Screen Recording prompt or pane appears at any step.
+- **Source:** spec §11 CAM-5 (the press, the prompt's answer re-read), moved here from CR1b: the tool never asks.
+
+**REC-14 — A camera recording from the panel**
+- **Do:** 1. With a project open, File ▸ New Recording…, choose Source ▸ Camera, the camera facing you, and a real microphone (not a virtual device). 2. Press Record and watch the camera's light through the 3-2-1; press Cancel. 3. Press Record again and let it start. 4. Speak and hold a page of text up to the camera; press the panel's Pause, wait, then Resume. 5. Press Stop. 6. Play the recording in the project.
+- **Expect:** in step 1 System Audio, Show Clicks, Size, Include Frame Job windows and Rate grey out with their values kept, the Camera popup is live, and the note under Size names the camera's format (for example `1760×1328 at 30 fps — the camera's best format`). In step 2 the camera's light comes on during the countdown and goes off on Cancel. In step 3 the recording starts at the countdown's end with no pause or stall. Through step 4 the panel stays up: its rows locked, the meter moving with your voice, the footnote showing the coral dot and the time (the pause glyph and a frozen time while paused), Record reading Stop with Pause / Resume beside it. In step 6 the held-up text reads as it did to the camera (not mirrored), your voice is in it, and it lands as REC-12's does: the picture at the playhead, the voice on a back track named Microphone, in sync, two stretches end to end with the paused span missing.
+- **Source:** spec §11 CAM-5 (the row, the warm-up in the countdown, the panel kept up).
 
 ## Assistant
 

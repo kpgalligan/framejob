@@ -1081,22 +1081,25 @@ stamped after it is not (the control), and one stamped before `pause()`
 finishes the voice-over from paused (`pauses` 1, idle after). Section 16
 (`voiceover_doors`, Swift mode `voiceover-doors`, its own process) drives
 `RecorderPanelController.shared`, never shown, under a `GrantSpy` whose
-Screen Recording READ is counted: D1 the Source rows end "Window…" (tag 1)
-and "Microphone Only" (tag 2), screens + 3; D2 choosing it greys System
+Screen Recording READ is counted: D1 the Source rows end "Window…" (tag 1),
+"Camera" (tag 3, camera-recording CR1c) and "Microphone Only" (tag 2),
+screens + 4; D2 choosing it greys System
 Audio, Show Clicks and Size with their values kept, Microphone, Rate and
 Record Into live, the size note `voiceOverSizeNote`; D3 the display key
-(a sentinel) and the set of `FrameJobRecording…` keys unchanged, the row
+(a sentinel) and the set of eight `FrameJobRecording…` keys unchanged, the row
 kept through `rebuildSources()` + `restoreChoices()`; D4 a display row
 brings the three back; D5 Microphone Off refuses with
 `microphoneOffSentence`, no screen read, no microphone request; D6 a
 microphone authorized with the screen absent counts down, no screen read or
 request, nothing opened; D7 the countdown's end is the recorder's own
 refusal for that choice (no device carries "probe-mic"), idle, never hidden
-— begun by the row itself when D6 did not reach it; D8 `hidesForRecording`;
+— begun by the row itself when D6 did not reach it; D8 `hidesForRecording`
+(false for a camera too, since CR1c);
 D9 the Pause / Resume button; D10 `record_screen`'s `recordingSourceKind`
 — nine calls, the exact sentences, a JSON null not a stranger; D11 the
 voice-over's `microphoneNote` and "its file is at". 5d now ends the Source
-rows at Microphone Only (screens + 3), 7c's arguments gain `source` (and,
+rows at Microphone Only (screens + 4 since CR1c's Camera row, whose key makes
+5d's eight), 7c's arguments gain `source` (and,
 with camera-recording CR1b, spec §11 CAM-4, `camera`; D10's vocabulary
 sentence lists `screen, voice_over, camera` since) and 7d's
 phrases `voice_over` and `Microphone Only`. Measured 2026-10-02, each
@@ -3728,11 +3731,12 @@ func chrome(_ request: [String: Any]) -> [String: Any] {
                     "topKept": abs(grown.maxY - before.maxY) < 0.5,
                     "back": abs(back.height - before.height) < 0.5,
                     "noteShown": noteShownWhileSet, "noteHiddenAfter": panel.noteLabel.isHidden]
-    // The seven keys the harness pins are the panel's own, by name.
+    // The eight keys the harness pins are the panel's own, by name.
     out["keys"] = [RecorderPanelController.displayKey, RecorderPanelController.microphoneKey,
                    RecorderPanelController.systemAudioKey, RecorderPanelController.showClicksKey,
                    RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
-                   RecorderPanelController.includeFrameJobWindowsKey]
+                   RecorderPanelController.includeFrameJobWindowsKey,
+                   RecorderPanelController.cameraKey]
 
     // AccentButton stores its fill.
     let plain = AccentButton(title: "x", symbol: nil, fallback: "", tooltip: "", action: nil)
@@ -4730,7 +4734,9 @@ func sealedDoors() -> RecorderGrantDoors {
         rememberScreenAsked: {},
         microphoneStatus: { RecordingGrant.microphoneStatus },
         requestMicrophone: { _ in },
-        openSettings: { _ in false })
+        openSettings: { _ in false },
+        cameraStatus: { RecordingGrant.cameraStatus },
+        requestCamera: { _ in })
 }
 
 /// One row's doors: an in-memory asked flag, the launchd answer, the grant
@@ -4772,7 +4778,9 @@ final class GrantSpy {
             openSettings: { url in
                 self.opened.append(url.absoluteString)
                 return self.openAnswer
-            })
+            },
+            cameraStatus: { RecordingGrant.cameraStatus },
+            requestCamera: { _ in })
     }
 }
 
@@ -5528,7 +5536,7 @@ func voiceoverGranted(_ request: [String: Any]) -> [String: Any] {
 
 /// D1–D11 (issue batch B66) over `RecorderPanelController.shared`, NEVER
 /// shown, under a `GrantSpy`'s doors whose Screen Recording read is counted,
-/// and `AgentServer.shared`'s argument reader. The seven `FrameJobRecording…`
+/// and `AgentServer.shared`'s argument reader. The eight `FrameJobRecording…`
 /// values are put back as they were at the end, so the probe's own defaults
 /// domain is left as it was found.
 func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
@@ -5538,7 +5546,7 @@ func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.displayKey, RecorderPanelController.microphoneKey,
         RecorderPanelController.systemAudioKey, RecorderPanelController.showClicksKey,
         RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
-        RecorderPanelController.includeFrameJobWindowsKey,
+        RecorderPanelController.includeFrameJobWindowsKey, RecorderPanelController.cameraKey,
     ]
     let originals = keys.map { UserDefaults.standard.object(forKey: $0) }
     defer {
@@ -5587,7 +5595,7 @@ func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
     // D1 — the Source rows.
     let items = panel.sourcePopup.itemArray
     out["D1"] = [
-        "titles": items.suffix(2).map { $0.title }, "tags": items.suffix(2).map { $0.tag },
+        "titles": items.suffix(3).map { $0.title }, "tags": items.suffix(3).map { $0.tag },
         "count": items.count, "screens": NSScreen.screens.count,
         "separatorIndex": items.firstIndex { $0.isSeparatorItem } ?? -1,
     ]
@@ -5681,6 +5689,7 @@ func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
     // D8 — which sources the panel hides for.
     out["D8"] = [
         "voiceOver": RecorderPanelController.hidesForRecording(.voiceOver),
+        "camera": RecorderPanelController.hidesForRecording(.camera),
         "display": RecorderPanelController.hidesForRecording(.display(CGMainDisplayID())),
         "window": RecorderPanelController.hidesForRecording(.window(1)),
         "picked": RecorderPanelController.hidesForRecording(.picked),
@@ -7663,8 +7672,9 @@ def section_chrome(binary, sources):
     p = answer.get("panel") or {}
     for key, want in PANEL_ROWS:
         check(f"5d: panel.{key} == {want!r}", p.get(key) == want, f"got {p.get(key)!r}")
-    check("5d: Source rows = NSScreen.screens + a separator + Window… + Microphone Only (B66)",
-          p.get("sourceCount") == p.get("screens", -9) + 3
+    check("5d: Source rows = NSScreen.screens + a separator + Window… + Camera + Microphone Only "
+          "(B66, CR1c)",
+          p.get("sourceCount") == p.get("screens", -9) + 4
           and p.get("sourceSeparatorIndex") == p.get("screens"),
           f"count {p.get('sourceCount')}, screens {p.get('screens')}, separator at {p.get('sourceSeparatorIndex')}")
     check("5d: the window content is the card's size, 500 pt wide",
@@ -7683,8 +7693,8 @@ def section_chrome(binary, sources):
     check("5d: … and setNote(\"\") hides it and shrinks the window back",
           rf.get("back") is True and rf.get("noteHiddenAfter") is True, f"{rf}")
     keys = answer.get("keys") or []
-    check("5d: seven distinct FrameJobRecording… keys",
-          len(set(keys)) == 7 and all(k.startswith("FrameJobRecording") for k in keys), f"{keys}")
+    check("5d: eight distinct FrameJobRecording… keys",
+          len(set(keys)) == 8 and all(k.startswith("FrameJobRecording") for k in keys), f"{keys}")
     harness = open(HARNESS_MAIN).read()
     # The pins are spelled as string LITERALS in the harness, not as
     # `RecorderPanelController.<key>`, so that a tree from before the recorder
@@ -7692,7 +7702,7 @@ def section_chrome(binary, sources):
     # (the phase-5 cross-build); the probe reads the constants' VALUES off the
     # app and looks for each of those strings in the harness's text.
     check("5d: the harness pins every one of them by VALUE",
-          len(keys) == 7 and all(f'"{k}"' in harness for k in keys), f"{keys}")
+          len(keys) == 8 and all(f'"{k}"' in harness for k in keys), f"{keys}")
     print("  5e — AccentButton(fill:) and RecorderStatusItem.label")
     a = answer.get("accent") or {}
     check("5e: AccentButton's default fill is DS.accent", a.get("defaultIsAccent") is True, f"{a}")
@@ -9760,11 +9770,11 @@ def section_voiceover_doors(binary, sources):
     check("16: the panel is never shown", answer.get("visible") is False, f"{answer.get('visible')}")
 
     d1 = answer.get("D1") or {}
-    check("D1: the Source rows end \"Window…\" (tag 1), \"Microphone Only\" (tag 2), with no "
-          "separator between",
-          d1.get("titles") == ["Window…", "Microphone Only"] and d1.get("tags") == [1, 2]
+    check("D1: the Source rows end \"Window…\" (tag 1), \"Camera\" (tag 3), \"Microphone Only\" "
+          "(tag 2), with no separator between",
+          d1.get("titles") == ["Window…", "Camera", "Microphone Only"] and d1.get("tags") == [1, 3, 2]
           and d1.get("separatorIndex") == d1.get("screens"), f"{d1}")
-    check("D1: count = NSScreen.screens + 3", d1.get("count") == (d1.get("screens") or -9) + 3, f"{d1}")
+    check("D1: count = NSScreen.screens + 4", d1.get("count") == (d1.get("screens") or -9) + 4, f"{d1}")
 
     d2 = answer.get("D2") or {}
     before = d2.get("before") or {}
@@ -9790,7 +9800,7 @@ def section_voiceover_doors(binary, sources):
     check("D3: the display key is not written for the row (the sentinel 777 kept), and the set of "
           "FrameJobRecording… keys is unchanged — session only",
           d3.get("display") == 777 and d3.get("keysBefore") == d3.get("keysAfter")
-          and len(d3.get("keysAfter") or []) == 7, f"{d3}")
+          and len(d3.get("keysAfter") or []) == 8, f"{d3}")
     check("D3: rebuildSources() + restoreChoices() keep the row",
           d3.get("kept") is True and d3.get("keptSource") is True, f"{d3}")
 
@@ -9823,9 +9833,9 @@ def section_voiceover_doors(binary, sources):
           and d7.get("hidden") is False, f"{d7}")
 
     d8 = answer.get("D8") or {}
-    check("D8: hidesForRecording — false for .voiceOver, true for .display, .window, .picked "
-          "(voice-panel-hides)",
-          d8.get("voiceOver") is False and d8.get("display") is True and d8.get("window") is True
+    check("D8: hidesForRecording — false for .voiceOver and .camera, true for .display, .window, "
+          ".picked (voice-panel-hides)",
+          d8.get("voiceOver") is False and d8.get("camera") is False and d8.get("display") is True and d8.get("window") is True
           and d8.get("picked") is True, f"{d8}")
 
     d9 = answer.get("D9") or {}
@@ -10655,7 +10665,7 @@ MUTANTS = {
         "the Microphone track is tried even when no file can make a clip (the code before B66)"),
     "voice-panel-hides": (
         "RecorderPanelController+VoiceOver.swift",
-        "    static func hidesForRecording(_ source: RecordingSource) -> Bool { source != .voiceOver }\n",
+        "    static func hidesForRecording(_ source: RecordingSource) -> Bool { source != .voiceOver && source != .camera }\n",
         "    static func hidesForRecording(_ source: RecordingSource) -> Bool { true }\n",
         "the panel orders out for a voice-over too"),
     "voice-screen-grant-read": (

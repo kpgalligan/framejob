@@ -370,14 +370,15 @@ enum Harness {
             // preview window at all, but ordinary use of the app writes this
             // key on every move and resize of one.
             "NSWindow Frame FrameJobPreviewWindow": "",
-            // The recorder panel's seven remembered choices (road map 3, R1c:
+            // The recorder panel's eight remembered choices (road map 3, R1c:
             // `RecorderPanelController.<key>` — spelled as LITERALS here, because this
             // file must also compile against a tree from before the recorder existed
             // under `-D HARNESS_REFERENCE_BUILD`, the phase-5 cross-build), pinned to their first-run
             // values — the display 0 (the main one), no microphone, system
-            // audio ON (the one of the seven whose absent-key reading is not
+            // audio ON (the one of the eight whose absent-key reading is not
             // the default, which the panel tests by name), clicks off, 60,
-            // nominal, Frame Job's windows left out. NOTHING the harness photographs reads them: the panel
+            // nominal, Frame Job's windows left out, no camera (the default
+            // camera, camera-recording CR1c). NOTHING the harness photographs reads them: the panel
             // is a floating `NSPanel` and never in the editor's content
             // view. Pinned on `FrameJobExportChoice`'s terms — written by
             // ORDINARY USE of the app on the machine that runs the proofs,
@@ -393,6 +394,7 @@ enum Harness {
             "FrameJobRecordingRate": 60,
             "FrameJobRecordingSize": "nominal",
             "FrameJobRecordingIncludeFrameJobWindows": false,
+            "FrameJobRecordingCamera": "",
             // The two keys road map 6's chrome reads (`TranscriptionEngine.defaultsKey`
             // and `AssemblyAIConfiguration.regionKey` — spelled as LITERALS
             // here for the recorder keys' reason above, the phase-5

@@ -14,8 +14,9 @@ In the panel, Return presses **Record** and Esc presses **Close**.
 
 | Control | What it does | Default |
 |---|---|---|
-| **Source** | What to record. Lists one row per connected display by name, then **Window…** (pick one window), then **Microphone Only** (a voice-over with no picture). | The display you used last, else the main display |
+| **Source** | What to record. Lists one row per connected display by name, then **Window…** (pick one window), then **Camera** (a camera on its own), then **Microphone Only** (a voice-over with no picture). | The display you used last, else the main display |
 | **Include Frame Job windows** | Puts Frame Job's own windows, such as the editor and the preview, into a display recording. When it's off, they're left out of the picture. | Off |
+| **Camera** | With **Source** set to **Camera**, which camera to record: each connected camera by name, or **None connected**. It's greyed out for every other source. | The camera you used last, else the Mac's preferred camera, then the first built-in camera, then the first one connected |
 | **Microphone** | **Off**, or one of the connected microphones. A live level meter sits beside it. | Off |
 | **System Audio** | Records what the system plays, as the movie's own stereo 48 kHz sound track. | On |
 | **Show Clicks** | Draws a ring around each mouse click. The pointer itself is always recorded. | Off |
@@ -23,11 +24,11 @@ In the panel, Return presses **Record** and Esc presses **Close**.
 | **Size** | **Nominal (points)** records the display at its point size. **Best (pixels)** records every pixel, which is twice the points on a Retina display. | Nominal (points) |
 | **Record Into** | **New Project**, or any open project by name. | The front project, else New Project |
 
-Under Size, a note shows what you'll get for the chosen display, for example `1728×1117 points · 3456×2234 pixels`. For a picked window it reads "the picked window's own size". For Microphone Only it reads "no picture — the microphone alone".
+Under Size, a note shows what you'll get for the chosen display, for example `1728×1117 points · 3456×2234 pixels`. For a picked window it reads "the picked window's own size". For Microphone Only it reads "no picture — the microphone alone". For Camera it names the format the camera records at, for example `1760×1328 at 30 fps — the camera's best format`, or "no camera connected".
 
 The footnote at the bottom left shows where recordings are saved (for example `saved in ~/Movies/Frame Job Recordings`). While a recording runs, it shows the elapsed time instead.
 
-The panel remembers your choices between uses, including the display, microphone, switches, rate, size and the Include Frame Job windows box. It doesn't remember a picked window, Microphone Only (which lasts for the session only), or Record Into. A display or microphone that is no longer connected falls back to the main display, or to Off.
+The panel remembers your choices between uses, including the display, microphone, camera, switches, rate, size and the Include Frame Job windows box. It doesn't remember a picked window, the Camera or Microphone Only source (each lasts for the session only), or Record Into. A display, microphone or camera that is no longer connected falls back to the main display, to Off, or to the default camera. The Camera list is read when the panel opens: a camera plugged in while the panel is up appears the next time it opens.
 
 ### Record Into
 
@@ -49,6 +50,21 @@ When **Include Frame Job windows** is off, the picker lists none of Frame Job's 
 
 If you press Record while the row reads **Window…** with nothing picked, the panel says "Choose a window with Window… first, or pick a display." and nothing records.
 
+### A camera
+
+Choose **Camera** in **Source**, then the camera in **Camera**:
+
+- **System Audio**, **Show Clicks**, **Size**, **Include Frame Job windows** and **Rate** grey out. Their values are kept for next time. A camera records at its own best format: the largest size wider than tall that runs at 30 fps or more, at that format's highest frame rate, which the note under Size names.
+- **Microphone** and **Record Into** stay live. The microphone you choose, which can be the camera's own when macOS lists it, is recorded to its own file beside the movie. **Off** records the camera alone.
+- With no camera connected, Record says "No camera is connected."
+- Only the Camera permission (and the Microphone permission, when one is chosen) is checked. Screen Recording isn't needed.
+
+The camera starts when the countdown does, so it has settled at its frame rate by the time recording begins, and its light comes on during the 3, 2, 1. Cancel or closing the panel turns it off again. **The panel stays up** while a camera records, as it does for a voice-over: nothing on screen is filmed. Its controls lock, the meter stays live, the footnote shows ● or ❚❚ and the elapsed time, Record reads **Stop**, and a **Pause** / **Resume** button appears beside it. If you close the panel, the recording carries on.
+
+The camera's movie lands like a screen recording's picture: on the front track if it fits, else on a new track in front, with the microphone on a new back track named **Microphone**. As a new project, the canvas is the movie's size at the format's frame rate. If the camera stops on its own (for example, it's unplugged), the recording ends there, what was captured lands, and the note gives the reason followed by "What was captured was added." If the camera hadn't settled at its frame rate when recording began, the note says what rate it ran at.
+
+There's no live preview of the camera in the panel yet, and no choice of format.
+
 ### Microphone Only (voice-over)
 
 See [Voice-overs](#voice-overs-microphone-only) below.
@@ -58,7 +74,7 @@ See [Voice-overs](#voice-overs-microphone-only) below.
 1. Set up the panel and press **Record**.
 2. Frame Job checks the permissions it needs (see [Permissions](#permissions)).
 3. A **3, 2, 1** countdown appears in the panel. During the countdown the Record button reads **Cancel**, and the microphone meter already moves so you can check your level. Click **Cancel** or close the panel to stop the countdown. Nothing is recorded.
-4. The recording starts and the panel leaves the screen.
+4. The recording starts and the panel leaves the screen. For a camera or a voice-over, the panel stays up instead.
 
 While the recording starts, the button reads **Starting…**. If the recording hasn't started within 20 seconds, the panel says "The recording did not start within 20 s." and goes back to idle. A Stop pressed while the button reads **Starting…** (for example **File ▸ Stop Recording**) abandons the recording, and the note reads "Stopped before the recording began; nothing was recorded."
 
@@ -83,11 +99,11 @@ You can pause, resume and stop from any of these places:
 - **File ▸ Pause Recording**, directly under New Recording…, which reads **Resume Recording** while paused and works only while a recording runs (it has no shortcut)
 - **File ▸ Stop Recording** (⌥⌘N). While any recording runs, including a paused one, **File ▸ New Recording…** reads **Stop Recording** and stops it.
 
-The welcome window's **New Recording…** button never stops a recording. During a screen recording it only beeps, so use **File ▸ Stop Recording** or the menu-bar item.
+The welcome window's **New Recording…** button never stops a recording. During a screen recording it only beeps, so use **File ▸ Stop Recording** or the menu-bar item. During a camera recording or a voice-over it shows the panel again.
 
 macOS's own screen-recording indicator in the menu bar can also stop the recording. Frame Job keeps what was captured and adds it.
 
-If you choose **Quit Frame Job** (⌘Q) during a recording, Frame Job doesn't quit. Instead it opens the menu-bar item's menu so you can stop or resume first. For a voice-over, it shows the panel instead.
+If you choose **Quit Frame Job** (⌘Q) during a recording, Frame Job doesn't quit. Instead it opens the menu-bar item's menu so you can stop or resume first. For a camera recording or a voice-over, it shows the panel instead.
 
 ### Paused recordings are stretches
 
@@ -120,7 +136,7 @@ With **Record Into** set to **New Project**, the recording opens as a new projec
 
 A recording that lands cleanly doesn't bring the panel back. Press ⌥⌘N to open it again. The panel returns on its own, with a note, only when it was on screen when the recording began and there's something to say, for example:
 
-- the recording was stopped from macOS's indicator, or the display slept or went away
+- the recording was stopped from macOS's indicator, or the display slept or went away, or the camera stopped on its own
 - the project you chose had closed, so it opened as a new project
 - a stretch's movie couldn't be read (for example an empty file from a pause right after a resume) and was left out. Its microphone file still lands on the Microphone track where the picture would have been, and the next picture starts after that gap. The note names the left-out file and the files it kept. Only a recording with no readable movie at all fails, and its note names every file.
 - the files didn't finish writing within 10 s of Stop. The note reads "The recording did not finish writing within 10 s." and names the movie and microphone files kept on disk.
@@ -138,6 +154,7 @@ Recordings are saved in **`~/Movies/Frame Job Recordings/`**, which Frame Job cr
 | Screen recording | `Screen Recording 2026-09-10 at 14.03.22.mov` | QuickTime movie, HEVC (H.264 where HEVC isn't available), with system audio as one stereo 48 kHz track when System Audio is on |
 | Its microphone | `Screen Recording 2026-09-10 at 14.03.22 (Microphone).m4a` | Mono 48 kHz AAC, beside the movie |
 | Voice-over | `Voice-over 2026-10-02 at 09.15.04.m4a` | Mono 48 kHz AAC |
+| Camera recording | `Camera Recording 2026-10-26 at 17.14.33.mov` | QuickTime movie at the camera's format, HEVC (H.264 where HEVC isn't available), no sound of its own; its microphone file sits beside it as for a screen recording |
 
 When a name is already taken, Frame Job adds ` (2)`, ` (3)` and so on.
 
@@ -166,10 +183,11 @@ If the microphone stops on its own (for example, it's unplugged), the voice-over
 
 ## Permissions
 
-A screen recording needs macOS's **Screen Recording** permission (**System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording**). A recording with a microphone, and every voice-over, also needs the **Microphone** permission (**System Settings ▸ Privacy & Security ▸ Microphone**). Frame Job asks for each one when you press Record, before the countdown begins:
+A screen recording needs macOS's **Screen Recording** permission (**System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording**). A recording with a microphone, and every voice-over, also needs the **Microphone** permission (**System Settings ▸ Privacy & Security ▸ Microphone**). A camera recording needs the **Camera** permission instead of Screen Recording. Frame Job asks for each one when you press Record, before the countdown begins:
 
 - **Screen Recording.** The first press without it shows macOS's prompt, and the panel explains what to do. Once you've turned it on, relaunch Frame Job if macOS asks you to, then press Record again. Every later press without the permission opens System Settings at the right pane.
 - **Microphone.** Asked only when a microphone is chosen. If you've never answered, macOS's prompt appears, and the countdown starts as soon as you allow it. If you denied it before, the press opens System Settings at the Microphone pane.
+- **Camera.** Asked only with **Source** set to **Camera** (**System Settings ▸ Privacy & Security ▸ Camera**), before the microphone. If you've never answered, macOS's prompt appears; allowing it goes on to the microphone and the countdown, and denying it leaves the panel idle with a note. If you denied it before, the press opens System Settings at the Camera pane and the note says so.
 
 While a system prompt or System Settings is up, the panel stops floating above other windows, so it doesn't cover them. It floats again on your next press of Record, or when the panel is opened again.
 
@@ -214,7 +232,7 @@ The answer includes `path` (the first file), `duration` (the total recorded), `s
 
 ## Limits
 
-- The panel records displays and single windows. A camera can be recorded only through `record_screen` for now: the panel has no Camera source yet. There's no keystroke or callout overlay.
+- The panel records displays, single windows and a camera on its own. A camera records at its best format, with no live preview in the panel and no choice of format yet, and not at the same time as the screen. There's no keystroke or callout overlay.
 - There's no global shortcut to stop. Use the menu-bar item or the File menu.
 - While a screen recording runs, the menu-bar item is the only place to pause or resume besides the File menu. If macOS hides the item, for example behind the notch or in a crowded menu bar, **File ▸ Stop Recording** and **File ▸ Pause Recording** still work.
 - A recording longer than 9:59:59 shows a label wider than the item was sized for.

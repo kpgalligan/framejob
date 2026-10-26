@@ -1,7 +1,9 @@
 // camera-recording CR1a (spec §11 CAM-3): the camera recorder's pure values,
 // a camera result through the landing, and a real recording under the
 // terminal's grant; CR1b (CAM-4): `record_screen`'s camera through the
-// server's own functions (`tool`). Compiled AS `main.swift` beside every file of
+// server's own functions (`tool`); CR1c (CAM-5): the recorder panel's Camera
+// source (`panel`) and the countdown's prepared capture (granted G7–G9).
+// Compiled AS `main.swift` beside every file of
 // app/Sources (but its own main.swift) through `swift_build.build`, with an
 // Info.plist section holding the camera's and the microphone's usage strings;
 // `camera_recording_probe.py` builds it, runs one section per process and
@@ -297,6 +299,21 @@ func granted(_ request: [String: Any]) {
         return
     }
     let camera = facts[index]
+    grantedRun(request, camera: camera)
+    // G7–G9 (CR1c): after G0–G6's stop has answered, plus 1 s.
+    probeSpin(1)
+    var prepared = RecordingChoice()
+    prepared.source = .camera
+    prepared.camera = camera.uniqueID
+    prepared.folder = URL(fileURLWithPath: request["folder"] as? String ?? NSTemporaryDirectory())
+    probeFacts["G7"] = preparedStart(prepared)
+    probeFacts["G8"] = preparedDiscard(prepared)
+    probeSpin(1)
+    probeFacts["G9"] = preparedJoin(prepared)
+}
+
+/// G0–G6: 2 s, a 1 s pause, 2 s more, on `camera`.
+func grantedRun(_ request: [String: Any], camera: CameraDeviceFacts) {
     let best = CameraDevices.bestFormat(camera.formats, active: camera.activeFormat)
     probeFacts["isBuiltIn"] = camera.isBuiltIn
     probeFacts["best"] = best.map { CameraDevices.spelled(camera.formats[$0]) } ?? "none"
@@ -378,6 +395,419 @@ func granted(_ request: [String: Any]) {
             ]
         }
     }
+}
+
+/// The recorder's state, for a fact.
+func stateName(_ state: ScreenRecorder.State) -> String { "\(state)" }
+
+/// A started recorder recorded for `seconds` and stopped: the stop's facts.
+func recordAndStop(_ recorder: ScreenRecorder, _ seconds: Double) -> [String: Any] {
+    var out: [String: Any] = [:]
+    var finished: Result<RecordingResult, Error>?
+    probeSpin(seconds)
+    recorder.stop { finished = $0 }
+    probeSpin(30) { finished != nil }
+    switch finished {
+    case nil:
+        out["stopError"] = "the stop did not answer in 30 s"
+    case .failure(let error):
+        out["stopError"] = "the recording failed: \(error.localizedDescription)"
+    case .success(let result):
+        out["segments"] = result.segments.map { $0.descriptor.path }
+        out["note"] = result.camera?.note ?? NSNull()
+        out["problem"] = result.camera?.problem ?? NSNull()
+        out["format"] = result.camera?.format ?? "none"
+    }
+    return out
+}
+
+/// G7 (CAM-5 (5)): the countdown's prepared capture adopted by `startCamera`.
+func preparedStart(_ choice: RecordingChoice) -> [String: Any] {
+    let recorder = ScreenRecorder()
+    var out: [String: Any] = [:]
+    let held = Date()
+    recorder.prepareCamera(for: choice)
+    out["prepareSeconds"] = Date().timeIntervalSince(held)
+    out["prepared"] = recorder.preparedCamera != nil
+    probeSpin(Double(RecorderPanelController.countdownSeconds))
+    out["answeredAtStart"] = recorder.preparedCamera?.answered ?? false
+    var started: Error??
+    let called = Date()
+    var startSeconds: Double?
+    recorder.startCamera(choice: choice, mayAsk: false, onFinish: { _ in }) {
+        startSeconds = Date().timeIntervalSince(called)
+        started = .some($0)
+    }
+    probeSpin(ScreenRecorder.armCeiling + 2) { started != nil }
+    out["startSeconds"] = startSeconds ?? NSNull()
+    out["preparedAfter"] = recorder.preparedCamera != nil
+    guard let answer = started else {
+        out["error"] = "the start did not answer"
+        return out
+    }
+    if let answer {
+        out["error"] = "the start failed: \(answer.localizedDescription)"
+        return out
+    }
+    return out.merging(recordAndStop(recorder, 2)) { $1 }
+}
+
+/// G8: a prepared capture let go stops its session.
+func preparedDiscard(_ choice: RecordingChoice) -> [String: Any] {
+    let recorder = ScreenRecorder()
+    recorder.prepareCamera(for: choice)
+    probeSpin(1)
+    let capture = recorder.preparedCamera?.capture
+    recorder.discardPreparedCamera()
+    probeSpin(0.5)
+    return [
+        "held": capture != nil, "slotNil": recorder.preparedCamera == nil,
+        "running": capture?.session.isRunning ?? true,
+    ]
+}
+
+/// G9: `startCamera` straight after `prepareCamera`, before the prepared
+/// start can have answered — the join.
+func preparedJoin(_ choice: RecordingChoice) -> [String: Any] {
+    let recorder = ScreenRecorder()
+    var out: [String: Any] = [:]
+    recorder.prepareCamera(for: choice)
+    out["prepared"] = recorder.preparedCamera != nil
+    out["answeredAtStart"] = recorder.preparedCamera?.answered ?? false
+    var started: Error??
+    let called = Date()
+    var startSeconds: Double?
+    recorder.startCamera(choice: choice, mayAsk: false, onFinish: { _ in }) {
+        startSeconds = Date().timeIntervalSince(called)
+        started = .some($0)
+    }
+    probeSpin(ScreenRecorder.armCeiling + 5) { started != nil }
+    out["startSeconds"] = startSeconds ?? NSNull()
+    out["ceiling"] = ScreenRecorder.armCeiling
+    out["state"] = stateName(recorder.state)
+    out["preparedAfter"] = recorder.preparedCamera != nil
+    guard let answer = started else {
+        out["error"] = "the start did not answer"
+        return out
+    }
+    if let answer {
+        out["error"] = "the start failed: \(answer.localizedDescription)"
+        recorder.stop { _ in }
+        return out
+    }
+    return out.merging(recordAndStop(recorder, 1)) { $1 }
+}
+
+// MARK: - panel
+
+/// The panel's grant doors as a spy: every read counted, the prompts held,
+/// nothing opened. Sealed in before `RecorderPanelController.shared` exists.
+final class PanelGrantSpy {
+    var camera: AVAuthorizationStatus = .authorized
+    var mic: AVAuthorizationStatus = .authorized
+    var screenReads = 0
+    var screenRequests = 0
+    var cameraReads = 0
+    var cameraRequests = 0
+    var micRequests = 0
+    var opened: [String] = []
+    var heldCamera: (() -> Void)?
+
+    var doors: RecorderGrantDoors {
+        RecorderGrantDoors(
+            screenGranted: {
+                self.screenReads += 1
+                return false
+            },
+            launchedByLaunchd: { true },
+            requestScreen: { self.screenRequests += 1 },
+            screenAsked: { true },
+            rememberScreenAsked: {},
+            microphoneStatus: { self.mic },
+            requestMicrophone: { _ in self.micRequests += 1 },
+            openSettings: { url in
+                self.opened.append(url.absoluteString)
+                return true
+            },
+            cameraStatus: {
+                self.cameraReads += 1
+                return self.camera
+            },
+            requestCamera: { answered in
+                self.cameraRequests += 1
+                self.heldCamera = answered
+            })
+    }
+}
+
+/// CR1c (spec §11 CAM-5): `RecorderPanelController.shared`, never shown,
+/// under `PanelGrantSpy`, with the eight `FrameJobRecording…` values put back
+/// as they were at the end. Neither fake id finds a device, so no camera or
+/// microphone opens.
+func panelRows(_ request: [String: Any]) {
+    NSApplication.shared.setActivationPolicy(.prohibited)
+    let spy = PanelGrantSpy()
+    RecorderPanelController.grantDoors = spy.doors
+    let keys = [
+        RecorderPanelController.displayKey, RecorderPanelController.microphoneKey,
+        RecorderPanelController.systemAudioKey, RecorderPanelController.showClicksKey,
+        RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
+        RecorderPanelController.includeFrameJobWindowsKey, RecorderPanelController.cameraKey,
+    ]
+    let originals = keys.map { UserDefaults.standard.object(forKey: $0) }
+    defer {
+        for (key, value) in zip(keys, originals) {
+            if let value { UserDefaults.standard.set(value, forKey: key) } else {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
+    }
+    let panel = RecorderPanelController.shared
+    probeFacts["visible"] = panel.window?.isVisible ?? true
+
+    // P1 — the rows, before any fake.
+    let items = panel.sourcePopup.itemArray
+    let screens = NSScreen.screens.count
+    let tail = items.suffix(3)
+    let separator = items.firstIndex { $0.isSeparatorItem } ?? -1
+    let connected = CameraDevices.connected().map(\.localizedName)
+    let cameraTitles = panel.cameraPopup.itemArray.map(\.title)
+    let wantTitles = connected.isEmpty ? [RecorderPanelController.noCameraTitle] : connected
+    probeRow("P1",
+             tail.map(\.title) == ["Window…", "Camera", "Microphone Only"]
+                && tail.map(\.tag) == [1, 3, 2] && separator == screens && items.count == screens + 4
+                && cameraTitles == wantTitles,
+             "last three \(tail.map(\.title)) tags \(tail.map(\.tag)); separator at \(separator), "
+                + "\(items.count) rows for \(screens) screen(s); Camera popup \(cameraTitles), "
+                + "connected \(connected)")
+
+    let fakeCamera = NSMenuItem(title: "Probe Camera", action: nil, keyEquivalent: "")
+    fakeCamera.representedObject = "probe-camera"
+    panel.cameraPopup.menu?.addItem(fakeCamera)
+    let noCamera = NSMenuItem(
+        title: RecorderPanelController.noCameraTitle, action: nil, keyEquivalent: "")
+    panel.cameraPopup.menu?.addItem(noCamera)
+    let fakeMic = NSMenuItem(title: "Probe Microphone", action: nil, keyEquivalent: "")
+    fakeMic.representedObject = "probe-mic"
+    panel.microphonePopup.menu?.addItem(fakeMic)
+    func cameraRow() -> NSMenuItem? {
+        panel.sourcePopup.menu?.item(withTag: RecorderPanelController.cameraTag)
+    }
+    func choose(_ item: NSMenuItem?) {
+        if let item { panel.sourcePopup.select(item) }
+        panel.controlChanged(panel.sourcePopup)
+    }
+    func reset() {
+        panel.cancelCountdown()
+        panel.phase = .idle
+        panel.setNote("")
+        panel.recordButton.isEnabled = true
+    }
+    func five() -> [String: Any] {
+        [
+            "enabled": [
+                panel.systemAudioSwitch.isEnabled, panel.showClicksSwitch.isEnabled,
+                panel.sizePopup.isEnabled, panel.includeFrameJobCheckbox.isEnabled,
+                panel.ratePopup.isEnabled,
+            ],
+            "values": [
+                panel.systemAudioSwitch.state == .on ? 1 : 0, panel.showClicksSwitch.state == .on ? 1 : 0,
+                panel.sizePopup.indexOfSelectedItem, panel.includeFrameJobCheckbox.state == .on ? 1 : 0,
+                panel.ratePopup.selectedTag(),
+            ],
+        ]
+    }
+    func recordingKeys() -> [String] {
+        UserDefaults.standard.dictionaryRepresentation().keys
+            .filter { $0.hasPrefix("FrameJobRecording") }.sorted()
+    }
+
+    // P2 — choosing Camera. A display row first, its values off their
+    // defaults, so "kept" means something.
+    reset()
+    choose(panel.sourcePopup.item(at: 0))
+    panel.systemAudioSwitch.state = .off
+    panel.showClicksSwitch.state = .on
+    panel.sizePopup.selectItem(at: 1)
+    panel.includeFrameJobCheckbox.state = .on
+    _ = panel.ratePopup.selectItem(withTag: 30)
+    panel.cameraPopup.select(fakeCamera)
+    panel.controlChanged(panel.cameraPopup)
+    let before = five()
+    UserDefaults.standard.set(777, forKey: RecorderPanelController.displayKey)
+    choose(cameraRow())
+    let choice = panel.currentChoice()
+    let after = five()
+    let others = [
+        panel.cameraPopup.isEnabled, panel.microphonePopup.isEnabled,
+        panel.destinationPopup.isEnabled, panel.sourcePopup.isEnabled,
+    ]
+    let note = panel.sizeNote.stringValue
+    let wantNote = RecorderPanelController.cameraSizeNote(nil)
+    let p2a = choice.source == .camera && choice.camera == "probe-camera"
+        && (after["enabled"] as? [Bool]) == [false, false, false, false, false]
+        && (after["values"] as? [Int]) == (before["values"] as? [Int])
+        && (before["values"] as? [Int]) == [0, 1, 1, 1, 30]
+        && others == [true, true, true, true] && note == wantNote
+
+    // P3 — session only, read before the display row is chosen again.
+    let display = UserDefaults.standard.integer(forKey: RecorderPanelController.displayKey)
+    let stored = UserDefaults.standard.string(forKey: RecorderPanelController.cameraKey)
+    let keysNow = recordingKeys()
+    panel.rebuildSources()
+    panel.restoreChoices()
+    let kept = panel.cameraSelected && panel.currentChoice().source == .camera
+        && panel.selectedCameraID == "probe-camera"
+    probeRow("P3", display == 777 && stored == "probe-camera" && keysNow.count == 8 && kept,
+             "display key \(display) (sentinel 777), camera key \(stored ?? "nil"), \(keysNow.count) "
+                + "keys \(keysNow), the row and the camera kept through rebuildSources + "
+                + "restoreChoices \(kept)")
+
+    choose(panel.sourcePopup.item(at: 0))
+    let back = five()
+    let displayChoice = panel.currentChoice()
+    let p2b = (back["enabled"] as? [Bool]) == [true, true, true, true, true]
+        && !panel.cameraPopup.isEnabled && displayChoice.camera == nil
+        && displayChoice.source == .display(panel.selectedDisplayID)
+    probeRow("P2", p2a && p2b,
+             "camera: source \(choice.source), camera \(choice.camera ?? "nil"); five before "
+                + "\(before), after \(after); Camera, Microphone, Record Into, Source enabled "
+                + "\(others); size note \(note) (want \(wantNote)) | a display row: five \(back), "
+                + "Camera enabled \(panel.cameraPopup.isEnabled), camera \(displayChoice.camera ?? "nil")")
+
+    // P4 — the step, the pane, the opened note.
+    let steps = [AVAuthorizationStatus.authorized, .notDetermined, .denied, .restricted].map {
+        RecordingGrant.cameraStep($0)
+    }
+    let pane = RecordingGrant.cameraPaneURL?.absoluteString ?? ""
+    let opened = RecordingGrant.cameraOpenedNote(.denied)
+    let wantOpened = "The camera is not granted to Frame Job (status: denied). Turn it on in System "
+        + "Settings ▸ Privacy & Security ▸ Camera, then relaunch." + RecordingGrant.paneOpenedSentence
+        + RecordingGrant.launchClause
+    probeRow("P4", steps == [.proceed, .ask, .openPane, .openPane]
+                 && pane.hasSuffix("Privacy_Camera") && opened == wantOpened,
+             "authorized, notDetermined, denied, restricted → \(steps); pane \(pane); opened note "
+                 + "exact \(opened == wantOpened)")
+
+    // P5 — the press.
+    var press: [String] = []
+    var pressOK = true
+    func expect(_ what: String, _ ok: Bool) {
+        press.append("\(what) \(ok ? "ok" : "WRONG")")
+        pressOK = pressOK && ok
+    }
+    reset()
+    choose(cameraRow())
+    panel.microphonePopup.selectItem(at: 0)
+    panel.cameraPopup.select(noCamera)
+    var reads = spy.cameraReads
+    panel.record(nil)
+    expect("no camera: idle, noCameraSentence, 0 camera reads (\(panel.noteLabel.stringValue))",
+           panel.phase == .idle && panel.noteLabel.stringValue == CameraDevices.noCameraSentence
+               && spy.cameraReads == reads)
+    reset()
+    panel.cameraPopup.select(fakeCamera)
+    spy.camera = .notDetermined
+    panel.record(nil)
+    expect("notDetermined: 1 camera request (\(spy.cameraRequests)), idle, Record disabled",
+           spy.cameraRequests == 1 && panel.phase == .idle && !panel.recordButton.isEnabled)
+    spy.heldCamera?()
+    spy.heldCamera = nil
+    expect("the held answer on the hidden panel: Record enabled, idle",
+           panel.recordButton.isEnabled && panel.phase == .idle)
+    for status in [AVAuthorizationStatus.denied, .restricted] {
+        reset()
+        spy.camera = status
+        spy.opened = []
+        panel.record(nil)
+        expect("\(RecordingGrant.name(of: status)): opened \(spy.opened)",
+               spy.opened == [pane] && panel.noteLabel.stringValue
+                   == RecordingGrant.cameraOpenedNote(status) && panel.phase == .idle)
+    }
+    reset()
+    spy.camera = .authorized
+    spy.mic = .notDetermined
+    panel.microphonePopup.select(fakeMic)
+    let micBefore = spy.micRequests
+    panel.record(nil)
+    expect("authorized, probe-mic notDetermined: 1 microphone request (\(spy.micRequests - micBefore))",
+           spy.micRequests - micBefore == 1 && panel.phase == .idle)
+    reset()
+    spy.mic = .authorized
+    panel.microphonePopup.selectItem(at: 0)
+    reads = spy.cameraReads
+    panel.record(nil)
+    expect("authorized, Microphone Off: \(panel.phase)",
+           panel.phase == .countdown(RecorderPanelController.countdownSeconds)
+               && spy.cameraReads == reads + 1)
+    panel.cancelCountdown()
+    expect("cancelCountdown: idle, nothing prepared",
+           panel.phase == .idle && ScreenRecorder.shared.preparedCamera == nil)
+    expect("screen reads \(spy.screenReads), requests \(spy.screenRequests)",
+           spy.screenReads == 0 && spy.screenRequests == 0)
+    probeRow("P5", pressOK, press.joined(separator: "; "))
+    reset()
+
+    // P6 — the panel stays up, its Pause / Resume button.
+    choose(cameraRow())
+    panel.phase = .recording
+    let recording = (panel.voiceOverPauseButton.isHidden, panel.voiceOverPauseButton.title)
+    panel.phase = .paused
+    let paused = (panel.voiceOverPauseButton.isHidden, panel.voiceOverPauseButton.title)
+    panel.phase = .idle
+    let hides = (
+        RecorderPanelController.hidesForRecording(.camera),
+        RecorderPanelController.hidesForRecording(.display(CGMainDisplayID()))
+    )
+    probeRow("P6", !hides.0 && hides.1 && recording == (false, "Pause") && paused == (false, "Resume"),
+             "hidesForRecording camera \(hides.0), display \(hides.1); recording \(recording), "
+                + "paused \(paused)")
+    choose(panel.sourcePopup.item(at: 0))
+    reset()
+
+    // P7 — the landing note.
+    let problem = "The camera Probe Camera stopped on its own: it was disconnected."
+    let warm = "The camera ran at 23.1 fps, not its 30, in the 1 s it was given to settle; "
+        + "the recording began anyway."
+    let mic = "The microphone stopped on its own."
+    func cam(_ problem: String?, _ note: String?) -> RecordingCamera {
+        var camera = RecordingCamera(name: "Probe Camera", format: "1920x1080@30")
+        camera.problem = problem
+        camera.note = note
+        return camera
+    }
+    func landing(_ stopped: StopReason, _ micProblem: String?, _ camera: RecordingCamera?) -> String {
+        RecorderPanelController.landingNote(
+            stoppedBy: stopped, chosen: .newProject, landedAsNewProject: true,
+            micProblem: micProblem, camera: camera)
+    }
+    let notes = [
+        landing(.systemStopped, nil, cam(problem, nil)), landing(.systemStopped, nil, cam(nil, nil)),
+        landing(.stopped, mic, cam(nil, warm)), landing(.systemStopped, nil, nil),
+    ]
+    let wantNotes = [
+        problem + " What was captured was added.",
+        "The camera stopped on its own. What was captured was added.",
+        mic + " " + warm,
+        "The system stopped the recording (the display slept or went away); what was captured was added.",
+    ]
+    probeRow("P7", notes == wantNotes, notes.joined(separator: " | "))
+
+    // P8 — the size note on CR0's lists.
+    let sizes = [
+        RecorderPanelController.cameraSizeNote(
+            CameraDeviceFacts(uniqueID: "FT-ID", name: "FaceTime HD Camera", isBuiltIn: true,
+                              formats: faceTime, activeFormat: 1)),
+        RecorderPanelController.cameraSizeNote(
+            CameraDeviceFacts(uniqueID: "PHONE-ID", name: "Owner iPhone Camera", isBuiltIn: false,
+                              formats: iPhone, activeFormat: 0)),
+        RecorderPanelController.cameraSizeNote(nil),
+    ]
+    probeRow("P8", sizes == [
+        "1760×1328 at 30 fps — the camera's best format",
+        "1920×1440 at 60 fps — the camera's best format", "no camera connected",
+    ], sizes.joined(separator: " | "))
+    probeFacts["visibleAtEnd"] = panel.window?.isVisible ?? true
 }
 
 // MARK: - tool
@@ -537,6 +967,7 @@ case "values": values(request)
 case "landing": landing(request)
 case "granted": granted(request)
 case "tool": toolRows(request)
+case "panel": panelRows(request)
 default:
     FileHandle.standardError.write(Data("unknown section \(arguments[1])\n".utf8))
     exit(2)

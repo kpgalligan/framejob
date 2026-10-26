@@ -168,3 +168,47 @@ its code.
      system_stopped` also means a camera that stopped on its own. `has_audio` is false: the
      movie holds no audio.
   7. **The chrome.** The menu-bar status item goes up as for every source.
+
+- **CAM-5 — The panel's Camera source (CR1c), recorded before its code.** The recorder panel
+  records a camera; CAM-3's recorder and CAM-4's tool stand.
+  1. **The Source row "Camera"** has tag 3 and sits between "Window…" (1) and "Microphone Only"
+     (2). It is session-only, as Microphone Only is: the display key is left alone while it is
+     chosen, and `rebuildSources` reselects it.
+  2. **The Camera popup** (`Camera:`, under Include Frame Job windows) lists
+     `CameraDevices.connected()` by name, each row carrying its `uniqueID`; with none connected,
+     one row "None connected" with no id. Its selection is the stored `FrameJobRecordingCamera`
+     when that camera is connected, else CAM-3 (7)'s default (the system's preferred camera,
+     else the first built-in, else the first). It is written on change, rebuilt on `show()`
+     while idle, and enabled only while idle with Source Camera. Hot-plug while the panel is up
+     is CR2's.
+  3. **With Source Camera**, System Audio, Show Clicks, Size, Include Frame Job windows and Rate
+     grey out, keeping their values; Microphone and Record Into stay live, and the size note
+     names the camera's best format ("1760×1328 at 30 fps — the camera's best format"). The
+     choice is `.camera` with `camera` the popup's id; every other source keeps `camera` nil.
+  4. **The press** never reads or asks for Screen Recording. In order: no camera →
+     "No camera is connected."; the Camera grant — authorized goes on, `notDetermined` asks
+     (`AVCaptureDevice.requestAccess(for: .video)`), denied or restricted opens System Settings
+     at `Privacy_Camera` and the note says so (the refusal sentence if the pane did not open);
+     the Microphone grant, as for every source (Off is allowed); the countdown. A camera
+     prompt's answer re-enables Record and continues the press only in an idle, visible panel
+     (the microphone prompt's rule), and it re-reads the Camera grant: anything but authorized
+     stops there with the refusal sentence — no Microphone prompt, no countdown; authorized
+     checks the microphone and starts the countdown.
+  5. **The warm-up is spent in the countdown.** The countdown's start builds and starts the
+     camera's capture (`ScreenRecorder.prepareCamera`), so CAM-3's warm-up runs through the
+     3-2-1. `startCamera` adopts it when it is the same device at the same format, not adopted
+     before, with no failed start and no stop on its own; otherwise it lets it go and builds a
+     fresh one. A start that comes before the prepared warm-up has answered JOINS it rather
+     than starting it again. Cancel, close, an abandoned start and a failed start let it go.
+     The tool never prepares, so its start still pays the hold (CAM-3).
+  6. **The panel stays UP while a camera records** (the voice-over's precedent: nothing on
+     screen is filmed): the rows lock, the meter stays live, the footnote shows ● or ❚❚ and the
+     time, and Record reads Stop with Pause / Resume beside it. Close leaves the recording
+     running; the quit guard and the welcome button show the panel again. Camera + screen is
+     CR3's.
+  7. **The meter** reads the camera recording's latest segment's microphone output while
+     recording, until that segment's microphone finishes or reports a problem.
+  8. **The landing note**, for a result with a camera: `.systemStopped`'s sentence is the
+     camera's `problem` (else "The camera stopped on its own.") followed by " What was captured
+     was added.", in place of the display's sentence; the warm-up's `camera.note` follows the
+     microphone's problem; a landing that fails carries both.

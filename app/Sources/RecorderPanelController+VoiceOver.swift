@@ -7,7 +7,8 @@ import AppKit
 /// base file, `+Rows.swift` and `+Recording.swift` learn it only by a line or
 /// two each.
 ///
-/// **The row** is the Source popup's last, directly under "Window…", by tag.
+/// **The row** is the Source popup's last, directly under "Camera" (tag 3,
+/// `+Camera.swift`, which sits under "Window…"), by tag.
 /// It persists for the session only, as a picked window does: no defaults key
 /// is written for it, and the display key is left alone while it is chosen.
 /// Chosen, it greys System Audio, Show Clicks and Size with their values
@@ -26,10 +27,11 @@ import AppKit
 /// or the pause glyph and the elapsed time, Record reads Stop, and a Pause /
 /// Resume button stands beside it. `hidesForRecording` is the one decision
 /// `recordingDidStart` reads; Close takes the panel away and the recording
-/// carries on under the status item.
+/// carries on under the status item. A camera recording stays up on the same
+/// terms (spec §11 CAM-5), so the decision and the button cover it too.
 extension RecorderPanelController {
-    /// The Source row, by tag: last, directly under "Window…" (tag 1), with
-    /// no separator between them.
+    /// The Source row, by tag: last, directly under "Camera" (tag 3), which
+    /// sits under "Window…" (tag 1), with no separator between them.
     static let voiceOverTag = 2
     static let microphoneOnlyTitle = "Microphone Only"
     static let microphoneOffSentence =
@@ -38,12 +40,14 @@ extension RecorderPanelController {
 
     var voiceOverSelected: Bool { sourcePopup.selectedItem?.tag == Self.voiceOverTag }
 
-    /// Whether the panel orders out at `recordingDidStart` for `source`.
-    static func hidesForRecording(_ source: RecordingSource) -> Bool { source != .voiceOver }
+    /// Whether the panel orders out at `recordingDidStart` for `source`:
+    /// not for a voice-over or a camera, which film nothing on screen.
+    static func hidesForRecording(_ source: RecordingSource) -> Bool { source != .voiceOver && source != .camera }
 
     /// Every control unlocked only while idle; the four screen-only ones
     /// (Include Frame Job windows among them, set only here) greyed besides
-    /// while Microphone Only is chosen, their values kept.
+    /// while Microphone Only is chosen, their values kept; then the camera's
+    /// locks (`syncCameraControls`), last.
     func syncControlsEnabled() {
         let idle = phase == .idle
         let controls: [NSControl] = [
@@ -58,14 +62,15 @@ extension RecorderPanelController {
         for control in screenControls {
             control.isEnabled = screenOnly
         }
+        syncCameraControls()
     }
 
     /// The Pause / Resume button beside Stop: on screen only while a
-    /// voice-over records or is paused — a screen recording's panel is off
-    /// screen, and its pause is the status item's.
+    /// voice-over or a camera records or is paused — a screen recording's
+    /// panel is off screen, and its pause is the status item's.
     func syncPauseButton() {
         let live = phase == .recording || phase == .paused
-        voiceOverPauseButton.isHidden = !(voiceOverSelected && live)
+        voiceOverPauseButton.isHidden = !((voiceOverSelected || cameraSelected) && live)
         let title = phase == .paused ? "Resume" : "Pause"
         if voiceOverPauseButton.title != title {
             voiceOverPauseButton.title = title

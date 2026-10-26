@@ -177,22 +177,26 @@ extension RecorderPanelController {
                 stoppedBy: result.stoppedBy, chosen: result.choice.destination,
                 landedAsNewProject: asNewProject, micProblem: result.micProblem,
                 resumeProblem: resumeProblem, notes: notes,
-                unreadable: leftOut.isEmpty ? nil : leftOut.joined(separator: " ")))
+                unreadable: leftOut.isEmpty ? nil : leftOut.joined(separator: " "),
+                camera: result.camera))
         revealIfNoted()
     }
 
     /// The files are on disk whatever went wrong after them, so the note
     /// names every one (`filesClause`: each segment's movie, and the
     /// microphone files that landed) — then what became of an unreadable
-    /// segment, the microphone and a refused resume, when the result or the
-    /// panel carries those sentences — and the reveal last.
+    /// segment, the microphone, the camera (its `problem` and warm-up `note`,
+    /// spec §11 CAM-5) and a refused resume, when the result or the panel
+    /// carries those sentences — and the reveal last.
     private func failedToLand(_ result: RecordingResult, _ error: any Error) {
         phase = .idle
         var note =
             "The recording was saved at \(result.filesClause) but could not be added: "
             + error.localizedDescription
-        for sentence in [result.unreadableNote, result.micProblem, resumeProblem]
-            .compactMap({ $0 })
+        for sentence in [
+            result.unreadableNote, result.micProblem, result.camera?.problem, result.camera?.note,
+            resumeProblem,
+        ].compactMap({ $0 })
         {
             note += " " + sentence
         }
@@ -217,12 +221,15 @@ extension RecorderPanelController {
     /// document was gone by the time the recording ended; the unreadable
     /// segments' sentences; the microphone's problem; a refused resume's
     /// sentence; then the placement's notes. Empty for the ordinary case, so
-    /// `setNote` hides the label. The R2 arguments and #97's `unreadable`
-    /// are LAST and default, so the probe's R1 rows read as they did.
+    /// `setNote` hides the label. The R2 arguments, #97's `unreadable` and
+    /// CR1c's `camera` are LAST and default, so the probe's R1 rows read as
+    /// they did. A CAMERA result (spec §11 CAM-5) says its own stop — the
+    /// camera's `problem`, else that it stopped on its own — in place of the
+    /// display's, and its warm-up `note` follows the microphone's problem.
     static func landingNote(
         stoppedBy: StopReason, chosen: RecordingDestination, landedAsNewProject: Bool,
         micProblem: String?, resumeProblem: String? = nil, notes: [String] = [],
-        unreadable: String? = nil
+        unreadable: String? = nil, camera: RecordingCamera? = nil
     ) -> String {
         var sentences: [String] = []
         switch stoppedBy {
@@ -232,15 +239,22 @@ extension RecorderPanelController {
             sentences.append(
                 "Stopped from the system's screen-recording indicator; the recording was added.")
         case .systemStopped:
-            sentences.append(
-                "The system stopped the recording (the display slept or went away); "
-                    + "what was captured was added.")
+            if let camera {
+                sentences.append(
+                    (camera.problem ?? "The camera stopped on its own.")
+                        + " What was captured was added.")
+            } else {
+                sentences.append(
+                    "The system stopped the recording (the display slept or went away); "
+                        + "what was captured was added.")
+            }
         }
         if case .document = chosen, landedAsNewProject {
             sentences.append(destinationClosedSentence)
         }
         if let unreadable { sentences.append(unreadable) }
         if let micProblem { sentences.append(micProblem) }
+        if let note = camera?.note { sentences.append(note) }
         if let resumeProblem { sentences.append(resumeProblem) }
         sentences.append(contentsOf: notes)
         return sentences.joined(separator: " ")

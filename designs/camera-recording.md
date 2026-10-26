@@ -167,26 +167,34 @@ tool in the space a spec is given; the tool follows it; and the panel that drive
   `mcp.md`; a manual-check row for the voice lined up with the picture (a clap). The camera
   prompt's row moves to CR1c: the tool never asks, so until the panel has a Camera source
   nothing in the signed bundle can put the prompt up.
-- **CR1c — the panel's Camera source.** The panel gains:
-  - a Source ▸ Camera row and a Camera popup (devices by name, the best format);
+- **CR1c — the panel's Camera source; CAM-5.** CAM-5 is recorded in §11 before the code. The
+  panel gains:
+  - a Source ▸ Camera row (between Window… and Microphone Only, session-only as Microphone Only
+    is) and a Camera popup (devices by name, `FrameJobRecordingCamera`, pinned in the harness
+    and `screens.py`), with the size note naming the camera's best format;
   - the camera grant, asked by the panel, with its System Settings pane door (`Privacy_Camera`)
-    and `RecordingGrant`'s camera step;
-  - its defaults key and the harness pin;
-  - the status item, as for every source;
-  - the microphone meter's camera arm (`publishMicrophoneLevel` reads a camera recording's
-    microphone output), and the panel's note for a result's camera problem and for a
-    `system_stopped` camera (CR1a puts both on the result; until CR1c only the tool reads them),
-    and the result's warm-up `camera.note`;
-  - the camera's session started during the countdown, as `prepareMicrophone` warms the
-    microphone, so CAM-3's warm-up hold is spent there (CR1a pays it inside the recorder's
-    start, about 0.5 s on the built-in camera).
+    and `RecordingGrant.cameraStep`; Screen Recording is neither read nor asked;
+  - the microphone: the panel's existing Microphone popup is the chosen microphone (CAM-1's
+    fourth answer) — a camera's own microphone is a row there when macOS lists it;
+  - the status item, as for every source, and **the panel kept UP** while a camera records (the
+    voice-over's precedent: nothing on screen is filmed), its Pause / Resume button beside Stop;
+  - the microphone meter's camera arm, and the landing note's camera sentences (a camera that
+    stopped on its own in place of the display's sentence, and the warm-up `camera.note`);
+  - the camera's capture prepared at the countdown's start (`ScreenRecorder.prepareCamera`, a new
+    `ScreenRecorder+CameraPrepare.swift`) and adopted by `startCamera`, so CAM-3's warm-up hold
+    is spent in the countdown; the tool never prepares, so its start still pays the hold.
 
-  **Decides** whether the panel stays up for a camera recording (the voice-over's precedent) or
-  goes away. **Proof**: probe rows for the grant steps and for the rows → choice; `snapshot_ui`
-  of the panel; mutants; manual-check rows for framing and for the camera prompt from the signed
-  bundle (`open -a`, moved here from CR1b). Docs: `docs/guide/screen-recording.md`; the
-  camera refusal's `notDetermined` sentence, written in CR1a to name the panel's Camera source,
-  becomes true here.
+  `CameraCapture.swift` (399) is not edited and `ScreenRecorder+Camera.swift` (398) takes only
+  two replaced calls and its doc, ending ≤ 400, so no toll phase is needed. **Proof**: `camera_recording_probe.py`'s `panel`
+  section (the rows → choice, the grant steps and the press, the prompt's answer re-reading the
+  grant, the panel kept up, the landing note, the countdown's wiring) and granted G7–G9 (a
+  prepared start, a discard, a start that joins a warm-up still running); `snapshot_ui`
+  of the panel in `camera_recording_proof.py`; `recording_probe.py` re-aimed (a fourth Source
+  row, an eighth key, the grant doors' two camera members, `voice-panel-hides`); mutants;
+  `screens.py`'s recorder screen; manual-check rows for the camera prompt from the signed
+  bundle (`open -a`, moved here from CR1b) and for framing. Docs: `docs/guide/screen-recording.md`;
+  the camera refusal's `notDetermined` sentence, written in CR1a to name the panel's Camera
+  source, becomes true here.
 - **CR2 — the preview and the formats.** The live preview in the panel: an
   `AVCaptureVideoPreviewLayer`, which CR0's V1 measured at about 155–160 MB of RSS, so it runs
   only while the panel shows the Camera row or the camera row. The Format popup lists the
@@ -194,7 +202,8 @@ tool in the space a spec is given; the tool follows it; and the panel that drive
   device's configuration lock (CR0). Hot-plug: a camera connected or removed while the panel is
   up. A Continuity Camera is marked by `isContinuityCamera`, since CR0's D2 lists it without the
   key, as External. The tool gains `camera_format`. **Decides** the popup's rows and their
-  persistence, the preview's lifetime, and what a removed camera does to a running recording.
+  persistence, the preview's lifetime (and whether it runs on CR1c's prepared capture or a
+  session of its own), and what a removed camera does to a running recording.
   **Proof**: probe rows for the format list → popup items; `snapshot_ui` of the panel; MCP
   `camera_format` rows; a screen in `designs/screens/`; manual-check rows for the preview's look
   and the Continuity Camera pairing.
@@ -667,6 +676,135 @@ precedent.
 ## CR1c — the panel's Camera source
 
 ### Record
+
+**Landed** (2026-10-26).
+- Spec §11 CAM-5, written before any code: the Source row "Camera" (tag 3, between Window… and
+  Microphone Only, session-only), the Camera popup (`FrameJobRecordingCamera`, the stored
+  camera else CAM-3 (7)'s default, live only idle with Source Camera), the five controls a
+  camera greys with their values kept, the press (no camera, the Camera grant, the microphone,
+  the countdown; the prompt's answer re-reading the grant), the warm-up spent in the countdown
+  (adopt, join, let go), the panel kept up, the meter, the landing note's camera sentences. Its
+  index row and the `camera-recording.md` row (170 → 214 lines); the `11-decisions/` cell is
+  13146 in 31 files.
+- New: `RecorderPanelController+Camera.swift` (153 lines: `cameraTag`, the titles,
+  `cameraSelected`, `selectedCameraID`, `rebuildCameras`, `selectCamera`, `syncCameraControls`,
+  `cameraSizeNote`, `beginCameraIfGranted`, `launchCamera`); `ScreenRecorder+CameraPrepare.swift`
+  (139: `PreparedCamera`, `prepareCamera(for:)`, `discardPreparedCamera`, `adoptable`,
+  `takeCameraCapture`, `startCameraCapture` — the prepared start's completion holds its
+  `PreparedCamera` strongly, so a start that comes before the warm-up has answered joins it).
+- Changed: `RecorderPanelController.swift` (326 → 334: `cameraKey`, `cameraPopup`,
+  `rebuildCameras()` in `init`, `panelWillClose` lets the prepared camera go, the type doc's
+  eight keys and ten files); `+Rows` (351 → 372: the popup in the grid under Include Frame Job
+  windows, the Camera row in `rebuildSources`, a camera arm in `currentChoice`,
+  `persistChoices`, `restoreChoices`, `refreshSizeNote` and `selectedScreen`); `+Grants`
+  (156 → 214: the doors' `cameraStatus` and `requestCamera`, `checkCameraGrant`,
+  `cameraAnswered`); `+Recording` (357 → 366: the camera line in `beginIfGranted`, the prepare in
+  `beginCountdown`, the discard in `cancelCountdown`, `abandonStart` and `startFailed`, the
+  `.camera` dispatch to `launchCamera`); `+VoiceOver` (116 → 121: `hidesForRecording` and the
+  Pause / Resume button cover the camera, `syncCameraControls()` last in
+  `syncControlsEnabled`); `+Showing` (85 → 86); `+Landing` (255 → 269: `landingNote(…, camera:)`
+  and `failedToLand`'s camera sentences); `RecordingSetup+Camera.swift` (51 → 75: `cameraStep`,
+  `cameraOpenedNote`); `RecordingSetup.swift` (387 → 391: `cameraPaneURL`, Deviations);
+  `ScreenRecorder.swift` (385 → 388: `preparedCamera`); `ScreenRecorder+Camera.swift` (398 → 399:
+  the two replaced calls and `startCamera`'s doc); `ScreenRecorder+Microphone.swift` (157 → 163:
+  the meter's camera arm); `AgentServer+RecordingCamera.swift` (116 → 118: the UI path it
+  mirrors). `CameraCapture.swift` is not edited. The camera refusal's `notDetermined` sentence,
+  written in CR1a to name the panel's Camera source, is true from here.
+- **Decided: the panel stays UP while a camera records** (CAM-5 (6)), the voice-over's precedent.
+- Proofs: `camera_recording_probe.py` and `.swift` gain the `panel` section (P1–P9), granted
+  G7–G9 and ten mutants; `camera_recording_proof.py` gains section D, run last (the panel's
+  `snapshot_ui`); `recording_probe.py` re-aimed (the grant doors' two camera members in
+  `sealedDoors()` and `GrantSpy.doors`, 5d's screens + 4 and eight keys, D1's last three rows,
+  D3's eight keys, D8's `.camera`, `voice-panel-hides`' `before`, the docstring);
+  `harness/main.swift` and `screens.py`'s `PINS` pin `FrameJobRecordingCamera` to "".
+- Docs: spec §7.9a (`source: "camera"` names the panel's row, 499 lines unchanged) and §7.4's
+  rows 50 and 52; `designs/screens/16-recorder-panel.md`'s prose; `docs/guide/screen-recording.md`
+  (the Source and Camera rows, the size note, what the panel remembers, "A camera", Recording's
+  step 4, the welcome button and the quit guard, the files table, the Camera permission, the
+  panel's return note, Limits); `docs/manual-checks.md` REC-13 and REC-14 and the reset line;
+  `tools/proof/README.md`'s CR1c section and the Include Frame Job windows section's eight keys.
+
+**Measured** (the built-in camera, the default microphone, the terminal's grants):
+- `python3 tools/proof/spec_index_proof.py` after CAM-5: exit 0, 201/201.
+- `make typecheck`: exit 0, the 4 baseline warnings, tsc clean (after the Swift, and again
+  after `cameraPaneURL` moved).
+- The anchor check (every `before` of both probes' MUTANTS once in its file): `all once`, before
+  and after the move.
+- `python3 tools/proof/camera_recording_probe.py --only values,landing,tool,panel`: exit 0,
+  `scores: 39/39`, twice (before and after the move). P8: `1760×1328 at 30 fps — the camera's
+  best format`, `1920×1440 at 60 fps — the camera's best format`, `no camera connected`.
+- The eight panel mutants, each `--only panel --mutant <name>`, each exit 1, caught:
+  `camera-screen-grant-read` 9/10 (P5: the no-camera press read Screen Recording and opened its
+  pane), `camera-grant-unasked` 8/10 (P4, P5: 0 camera requests), `camera-row-live` 9/10 (P2),
+  `camera-row-persisted` 9/10 (P3: the display key 1, not 777), `camera-panel-hides` 9/10 (P6),
+  `camera-problem-unsaid` 9/10 (P7: the display's sentence for a camera), `countdown-unprepared`
+  9/10 (P9), `camera-answer-unread` 9/10 (P5's read).
+- `python3 tools/proof/recording_probe.py --only chrome,grants,preroll,voiceover_doors,exclusion`:
+  first exit 1, 252/253 — 10f, a `x-apple.systempreferences` URL outside `RecordingSetup.swift`
+  (Deviations); after the move exit 0, 253/253.
+- `make app-debug`, then `camera_recording_proof.py` on the Debug instance: exit 0, 41/41, the
+  granted tier run (2.002 s recorded for a 2 s span, `mic_offset` −61.8 ms, the new project's
+  canvas 1760 × 1328 at [30, 1]); section D: the menu item answered, the layout lists `Source:`,
+  `Camera:`, `Microphone:` … and no problem; `grep "Frame Job: "` nothing. Stopped by its pid.
+- `make gate`: `gate: PASS 228s` (names 1 s, typecheck 6 s, fmt and lint skipped, test 117 s,
+  app 104 s); after this record was written, `gate: PASS 1s` (names alone re-ran).
+- `python3 tools/proof/recording_probe.py`: exit 0, `1222/1222 checks passed`.
+  `--only voiceover_doors --mutant voice-panel-hides`: exit 1, 30/31, D8 caught.
+- `python3 tools/proof/camera_recording_probe.py`: exit 0, `scores: 49/49`, G0–G9 all RUN; G3
+  59/0.9992 and 60/0.9992; G4 micOffset −0.071 and −0.141 s; G6 hold 0.543 s, 13 buffers,
+  steady, the call to `.recording` 1.823 s; **G7** `prepareCamera` held main 0.024 s, the
+  prepared start had answered after the countdown's 3 s, `startCamera` answered in 0.036 s, the
+  slot emptied, one segment at 60/0.9992, no note; **G8** the slot nil and the session stopped;
+  **G9** `startCamera` called with the prepared start unanswered, answered in 0.716 s (CR1a's
+  cold start 1.943–1.962 s), `.recording`, the slot nil, one segment, no note.
+- `--only granted --mutant prepare-ignored`: exit 1, 9/11, G7 caught (`startCamera` 1.081 s, and
+  the recording failed "The camera delivered no frame."; G9 failed the same way, 1.176 s).
+  `--only granted --mutant join-weak`: exit 1, 10/11, G9 caught (20.015 s, "The recording did
+  not start within 20 s.", the state idle); G7 passed (0.047 s, 61/0.9992).
+- Release (`proof_app.py launch --app release`, after the gate's `make app`):
+  `RC_PROOF_APP=release python3 tools/proof/camera_recording_proof.py <dir>/agent.sock`: exit 0,
+  41/41, the granted tier run (2.035 s; `mic_offset` −65.9 ms; canvas 1760 × 1328 at [30, 1]),
+  section D as on Debug. `grep "Frame Job: " <dir>/framejob.log`: nothing. Stopped by its pid.
+- `RC_PROOF_APP=release python3 tools/proof/screens.py --only 16-recorder-panel`: exit 0, `6
+  pass, 0 fail, 0 skip of 6`, 0 new problems, P2 pass (46 key literals, 30 pinned). The capture
+  shows the greyed Camera row reading "FaceTime HD Camera" between Include Frame Job windows
+  and Microphone.
+
+**Deviations.**
+- `cameraPaneURL` is in `RecordingSetup.swift` beside the other two panes, not in
+  `RecordingSetup+Camera.swift` as the spec placed it: `recording_probe.py`'s 10f holds that a
+  System Settings URL is spelled in `RecordingSetup.swift` alone, and the spec required every
+  row to pass with only its listed re-aims. `RecordingSetup.swift` was outside the spec's list.
+- `persistChoices` writes the camera key only while the popup names a camera, so a panel opened
+  with none connected does not forget the stored one; the spec said "written on change".
+- `ScreenRecorder.adoptable(_:device:format:)`, CAM-5 (5)'s rule as one static, is shared by
+  `prepareCamera` (keep a live one) and `takeCameraCapture`; `selectedCameraSizeNote` reads the
+  chosen camera's facts for `refreshSizeNote`.
+- `selectedScreen` returns nil for Source Camera too (its row carries no display id).
+- The probe's P5 row is the Swift press facts AND the Python read of `cameraAnswered`; P1 also
+  fails if the panel was ever shown. `sealedDoors()` and `GrantSpy.doors` read the real Camera
+  status, as their other reads are real, and their `requestCamera` does nothing.
+- G9 waits `armCeiling` + 5 s for the start; G7 `armCeiling` + 2 s.
+- The guide also gained the camera in "When the panel comes back" and the Permissions intro,
+  and §7.4's row 52 names Camera beside Microphone Only in its parenthesis.
+- The review's nit, left as `microphoneAnswered`'s precedent: `cameraAnswered` re-checks idle,
+  visibility and the grant but not that Source is still Camera; a Source switched while the
+  prompt is up is caught by the recorder's own refusal.
+
+**Owed.**
+- Applied with the commit (the orchestrator's): `app/CLAUDE.md`'s panel family gains `+Camera`
+  (Source ▸ Camera; the panel kept up for a camera), the Recording family `+CameraPrepare` (the
+  countdown's prepared capture, adopted or joined; its one deliberate strong hold, also named
+  in Hygiene), "two grants" becomes three, the orders-OUT sentence excepts Camera, and the
+  setup's pane URLs are three.
+- REC-13 (the Camera prompt from the signed app) and REC-14 (a camera recording from the panel),
+  the owner's.
+- #373: a fresh `CameraCapture` built in the same main turn as another capture of the same
+  device is stopped recorded no frame (`prepare-ignored`, G7 and G9). In the product that path
+  is `takeCameraCapture`'s and `prepareCamera`'s fallback for a prepared capture that is not
+  adoptable (a failed start, a stop on its own); `CameraCapture.stop()` has no completion to wait
+  on, and `CameraCapture.swift` stands at 399.
+- CR2: the preview, the Format popup, `camera_format`, hot-plug while the panel is up.
 
 ## CR2 — the preview and the formats
 

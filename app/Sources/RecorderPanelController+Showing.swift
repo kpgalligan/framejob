@@ -22,6 +22,7 @@ extension RecorderPanelController {
         if phase == .idle {
             rebuildSources()
             rebuildMicrophones()
+            rebuildCameras()
             restoreChoices()
         }
         rebuildDestinations()
