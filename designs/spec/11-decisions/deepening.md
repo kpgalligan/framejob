@@ -1355,7 +1355,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   picture is the Blank placeholder exports one frame short of its timeline —
   814,400 frames for a 17 s timeline at 30 fps, the same in C and T before
   and after this change, and none short for a missing `AV.mov`, which has a
-  video track — a shortfall beside #337.
+  video track — a shortfall beside #337. *Amended by #337:* the shortfall
+  is the timeline's own. toneB.m4a is 2,986,400 ticks, and `add_clip`
+  snaps it down to whole frames, so C's timeline is 10,180,000 ticks
+  (16.967 s), not 17 s. Its exports are exactly 814,400 frames, which is
+  that timeline, and its composition and audio track end there too.
 - **#355 — The Audio inspector's Fade in, Fade out and Ducking Attack and
   Release write the typed length off the frame grid, as `set_audio` stores
   it (core/CLAUDE.md Times); dragging a fade handle on the timeline still
@@ -1385,3 +1389,64 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   field shows 2 decimals, so 10 ms is the smallest length a person can
   type, and a stored 0.083 s reads 0.08; a later handle drag re-snaps a
   typed length.
+- **#337 — Every export's audio is exactly round(range × 48 000) frames, cut
+  at the range's end and padded with silence after a read that ends early.**
+  `ExportAudioEnd` counts the frames `ExportWriter`'s audio pump hands on,
+  in order and never from their stamps. The target is ⌊(ticks · 48 000 +
+  300 000) / 600 000⌋ of the range's ticks, round half up in integers. A
+  buffer that ends at or before the target goes on unchanged. The one that
+  crosses it keeps its first (target − written) frames
+  (`CMSampleBufferCopySampleBufferForRange`). Every buffer after that is
+  read and dropped, so the reader never stalls the video output, and the
+  input is never marked finished early. When the audio output runs dry
+  with the reader not failed and the write not stopping (the dry branch's
+  own test, never `.completed`, which stays `.reading` while the video is
+  still composed), zero buffers in `ExportWriter.decodedAudioSettings`'
+  shape (48 kHz, two channels, 16-bit) are appended up to the target, each
+  only while the input has room. The loudness measurement feeds the meter
+  only the target's frames. Measured at HEAD 3f7c948
+  (`tools/proof/retimed_audio_proof.py`, A1): CX2 (×2, Keep pitch off, a
+  4 s timeline of 192,000 frames) wrote 192,047 frames in both runs of
+  `audio_wav` and `prores_422`. CK05 (×0.5, Keep pitch on) wrote 190,787 and
+  190,851 in `audio_wav` and 190,787 twice in `prores_422`. The writer passed
+  on whatever the reader handed it: the mix read alone, with no writer,
+  gave the same lengths (A3). An export whose read already ended exactly on
+  the target is byte-identical to before. CX1 (×1) and C read exactly to
+  their targets at HEAD (A3), so spec §7.8's "byte-identical by
+  construction" still holds for such exports. The pad's shape is the one both arms
+  already write: the 16-bit decode, and `ExportAudioGain`'s output. A file
+  readers decode to more frames than were handed in (AAC's priming and
+  remainder) is the encoder's own and outside this rule. **Risk accepted:**
+  a Keep pitch on read that ends short is made up with silence at the end,
+  up to ≈ 25 ms in CK05, rather than with the sound Apple's time-pitch
+  did not deliver. The ×2 overrun is dropped rather than kept. After the
+  change all 8 of A1's streams were 192,000 frames, and CK05's two runs per
+  preset were PCM-identical.
+- **#335 — The ×1 playback tap's early reading is the PostEffects tap's
+  stamp on a track with no time-scaled segment. Preview audio is in sync
+  with the export, and no product code changes.** Measured with
+  `tools/proof/retimed_audio_proof.py`, 3 runs of each read, on this
+  change's Debug build and again on its Release build, with the same
+  readings. C1: on T335 (one track, A ×1 over [0, 3 s), B ×2
+  over [3 s, 6 s), Keep pitch off, clicks), the PostEffects tap placed A at
+  −0.979 ms by its stamps and −0.979 ms by order. By order means every frame
+  counted from the first chunk stamped inside B. The tap placed B at
+  −0.010 ms both ways. The `audio_wav` export placed A at −0.958 ms and B at
+  +0.010 ms. C1 also reads CX1, a track holding a ×1 clip alone (SR1's
+  `C-off-x1` shape, where #335 was read): the PostEffects tap read
+  −85.333 ms by SR2b's coarse method in all 3 runs, reported. That is
+  exactly one 4,096-frame tap buffer, past the 60 ms placement reach. The
+  PreEffects tap, which is the product `AudioTap`'s flag, read +0.000 ms
+  (20/20) by stamps and by the coarse method in all 3 runs, as did the
+  export, and C1 scores it within 1.0 ms of the export. So the same
+  samples carry different stamps at the two taps. The per-clip DSP spans
+  `AudioTap.process` places from its PreEffects stamps land where the
+  export puts them. SR1's −21.000 ms and SR2b's −86.333 ms were this stamp.
+  `ramp_proof.py` P1's self-correction by m1 (SR-17) stands. C1's scored
+  CX1 row and its mutant replace "unexplained": `--mutant stamp-place`
+  scores CX1's PostEffects stamps as the product's, and C1 fails (none
+  within the 60 ms reach, −85.333 ms coarse, 3 of 3 runs). On T335 the
+  stamps were not early in any run, so its A row cannot tell the two taps
+  apart. **Risk accepted:** an instrument that reads a
+  ×1-only track through a PostEffects tap must correct by a measured
+  control, as P1 does, and not trust the stamp.

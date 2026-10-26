@@ -51,7 +51,7 @@ A control the chosen format cannot use is greyed out rather than hidden. Its val
 | Animated GIF | `.gif` | A short silent loop. Capped at 480 × 270 and 12.5 fps by default. |
 | Animated PNG | `.png` | A lossless silent loop with real transparency. Capped at 960 × 540 and 25 fps by default. |
 
-Sound in the movie formats is stereo at 48 kHz: AAC in H.264, HEVC and HEVC with Alpha, and 16-bit LPCM in both ProRes formats. GIF and APNG carry no sound.
+Sound in the movie formats is stereo at 48 kHz: AAC in H.264, HEVC and HEVC with Alpha, and 16-bit LPCM in both ProRes formats. GIF and APNG carry no sound. A file's sound is exactly as long as the range it exports, including when a clip in it plays faster or slower.
 
 Changing the format rebuilds the Size list and puts it back on that format's default. Your frame rate, quality, loudness and range choices stay as they were.
 

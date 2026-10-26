@@ -9,7 +9,8 @@ beside a track that sounds, and a missing clip with picture and sound
 (`AV.mov`) alone; the constant projects' exports are compared with a
 baseline this script writes under `--baseline`.
 
-Rows (every M, R and K clip at 12 s, so the timeline is 17 s):
+Rows (every M, R and K clip at 12 s; the timeline is 10 180 000 ticks,
+16.967 s):
 
   D0  the instance listens; `Frame Job: ` never appears in its log (re-read
       at the end).
@@ -19,11 +20,11 @@ Rows (every M, R and K clip at 12 s, so the timeline is 17 s):
       document's reverse sheet first, through `cancel_sheet`, which must end
       on `button: "Close"` and `sheet: null`).
   M1  gone toneA alone, `audio_wav`: done, every pcm_f32le sample 0.0, frames
-      ≥ control C's `audio_wav` frames − 1024 (owner, 2026-10-24: every
-      composition whose picture is the Blank placeholder exports one frame
-      short of its timeline, C included — 814,400 frames for 17 s at 30 fps,
-      #337 — so the length is scored against C, and the excess against the
-      timeline reported). On a failure the export's reason sentence is printed.
+      ≥ control C's `audio_wav` frames − 1024 (owner, 2026-10-24: the length
+      is scored against C, and the excess against the timeline reported).
+      C's 814,400 frames are its whole timeline, which is 16.967 s rather
+      than 17 s because `add_clip` snaps toneB down to whole frames (spec §11
+      #337). On a failure the export's reason sentence is printed.
   M2  as M1 with `prores_422` (against C's `prores_422`), which must also
       have a video stream.
   M3  gone on track 1, toneB on track 2, `audio_wav`: PCM identical to C's
@@ -255,9 +256,9 @@ def frames_of(pcm):
 
 def silent(pcm, seconds, control_frames=None):
     """(ok, detail): every sample 0.0 and frames ≥ the floor — control C's
-    frames − SLACK when `control_frames` is given (M1, M2, R1, R2: every
-    composition whose picture is the Blank placeholder exports one frame short
-    of its timeline, C included, #337), else round(seconds × rate) − SLACK."""
+    frames − SLACK when `control_frames` is given (M1, M2, R1, R2: C's
+    export is its whole 16.967 s timeline, toneB snapped down to whole
+    frames, #337), else round(seconds × rate) − SLACK."""
     data, channels, rate = pcm
     values = array("f")
     values.frombytes(data[:len(data) - len(data) % 4])

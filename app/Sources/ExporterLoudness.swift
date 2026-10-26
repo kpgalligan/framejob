@@ -116,6 +116,9 @@ extension Exporter {
         let range = Exporter.timeRange(settings, composition: built.composition)
         let seconds = max(0, CMTimeGetSeconds(range.duration))
         reader.timeRange = range
+        // Only the frames the file will hold are measured (spec §11 #337).
+        let limit = ExportAudioEnd.frames(ofTicks: CompositionBuilder.ticks(range.duration))
+        var fed = 0
 
         var isFloat = true
         var output = Exporter.mixOutput(tracks, mix: built.audioMix, float: true)
@@ -140,7 +143,7 @@ extension Exporter {
                 reader.cancelReading()
                 return nil
             }
-            feed(sample, to: meter, float: isFloat)
+            fed += feed(sample, to: meter, float: isFloat, limit: limit - fed)
             guard seconds > 0 else { continue }
             let elapsed = CMTimeGetSeconds(
                 CMSampleBufferGetPresentationTimeStamp(sample) - range.start)
@@ -167,22 +170,26 @@ extension Exporter {
         return output
     }
 
-    /// One sample buffer into the meter.
+    /// One sample buffer into the meter, at most `limit` frames of it; the
+    /// frames fed.
     ///
     /// A `CMBlockBuffer` may be several non-contiguous chunks, and
     /// `CMBlockBufferGetDataPointer` on the first one silently truncates the
     /// buffer — the trap `MediaImporter.peaks` records and
     /// `ReverseRenderer.appendAudioBytes` avoids the same way.
-    private func feed(_ sample: CMSampleBuffer, to meter: LoudnessMeter, float: Bool) {
-        guard let block = CMSampleBufferGetDataBuffer(sample) else { return }
-        let byteCount = CMBlockBufferGetDataLength(block)
+    private func feed(
+        _ sample: CMSampleBuffer, to meter: LoudnessMeter, float: Bool, limit: Int
+    ) -> Int {
+        guard limit > 0, let block = CMSampleBufferGetDataBuffer(sample) else { return 0 }
         let width = float ? MemoryLayout<Float>.size : MemoryLayout<Int16>.size
-        let frames = byteCount / (width * Exporter.measureChannelCount)
-        guard frames > 0, let bytes = scratch(ofAtLeast: byteCount) else { return }
+        let frames = min(
+            CMBlockBufferGetDataLength(block) / (width * Exporter.measureChannelCount), limit)
+        let byteCount = frames * width * Exporter.measureChannelCount
+        guard frames > 0, let bytes = scratch(ofAtLeast: byteCount) else { return 0 }
         guard CMBlockBufferCopyDataBytes(
             block, atOffset: 0, dataLength: byteCount, destination: bytes)
             == kCMBlockBufferNoErr
-        else { return }
+        else { return 0 }
         if float {
             meter.feed(
                 bytes.bindMemory(to: Float.self, capacity: byteCount / width), frames: frames)
@@ -190,6 +197,7 @@ extension Exporter {
             meter.feedInt16(
                 bytes.bindMemory(to: Int16.self, capacity: byteCount / width), frames: frames)
         }
+        return frames
     }
 
     private func scratch(ofAtLeast bytes: Int) -> UnsafeMutableRawPointer? {

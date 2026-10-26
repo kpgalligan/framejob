@@ -108,6 +108,9 @@ final class ExportWriter {
     /// `start`; nil hands each frame on as drawn.
     private var frames: ExportFrames?
 
+    /// The audio pump's `end`: the sound cut at the range, padded to it (#337).
+    private let audioEnd: ExportAudioEnd
+
     /// Builds the reader, the writer and every track, or throws the
     /// `Exporter.ExportError` the sheet should show. Nothing is read or
     /// written until `start`.
@@ -121,6 +124,7 @@ final class ExportWriter {
         self.destination = url
         self.range = Exporter.timeRange(settings, composition: built.composition)
         self.totalSeconds = max(0, CMTimeGetSeconds(range.duration))
+        self.audioEnd = ExportAudioEnd(range: range)
 
         do {
             reader = try AVAssetReader(asset: built.composition)
@@ -319,7 +323,7 @@ final class ExportWriter {
             // and it is the only pump that can carry a gain.
             pump(
                 input, from: output, on: audioQueue, group: group,
-                tracksProgress: videoInput == nil, gain: audioGain)
+                tracksProgress: videoInput == nil, gain: audioGain, end: audioEnd)
         }
         if let input = chapterInput {
             pumpChapters(input, on: chapterQueue, group: group)
@@ -375,7 +379,7 @@ final class ExportWriter {
     private func pump(
         _ input: AVAssetWriterInput, from output: AVAssetReaderOutput, on queue: DispatchQueue,
         group: DispatchGroup, tracksProgress: Bool, gain: ExportAudioGain? = nil,
-        frames: ExportFrames? = nil
+        frames: ExportFrames? = nil, end: ExportAudioEnd? = nil
     ) {
         group.enter()
         var finished = false
@@ -393,7 +397,8 @@ final class ExportWriter {
                     stop()
                     return
                 }
-                guard let decoded = output.copyNextSampleBuffer() else {
+                guard let decoded = end?.isPadding == true ? nil : output.copyNextSampleBuffer()
+                else {
                     // Dry for one of three reasons: the range is written, the
                     // read was cancelled (which `allInputsFinished` reports),
                     // or the read failed — and only the last is ours to name.
@@ -402,6 +407,13 @@ final class ExportWriter {
                             with: self.reader.error
                                 ?? Exporter.ExportError.failed(
                                     "The composition could not be read to the end."))
+                    } else if let end = end, !self.isStopping {
+                        // Silence up to the range's end, while the input has room (#337).
+                        guard let padded = end.pad(input) else { return }
+                        if !padded {
+                            self.stopped(with: self.writer.error
+                                ?? Exporter.ExportError.failed("The file could not be written."))
+                        }
                     }
                     stop()
                     return
@@ -439,7 +451,9 @@ final class ExportWriter {
                     stop()
                     return
                 }
-                guard input.append(rebased) else {
+                // A buffer past the range's end is cut or dropped (#337).
+                guard let fitted = end == nil ? rebased : end?.fit(rebased) else { continue }
+                guard input.append(fitted) else {
                     self.stopped(
                         with: self.writer.error
                             ?? Exporter.ExportError.failed("The file could not be written."))

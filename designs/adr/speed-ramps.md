@@ -118,14 +118,17 @@ Mutants, each run once on the final instrument and each caught: SR1 five (the sp
 - **`glide` shapes nothing** (SR-13): the core still writes it and the cache key still names it.
 - **Synthetic fixtures only** (SR-4, SR-5): a click train, one sine and one sweep. A real voice and a real picture are the person's checks RMP-1..RMP-4 (SR-20 (h), SR-21 (h)).
 - **Older defects the road map found, filed and outside it:**
-  - #334: a constant ×4 clip's exported audio has sample steps (3 in SR1, 28 events in SR1b's dense scan; its rendered twin none).
-  - #335: the ×1 playback tap reads 21.000 or 86.333 ms early, by host session; the instruments trim it (SR-17).
+  - #334: a constant ×4 clip's exported audio has sample steps (3 in SR1, 28 events in SR1b's dense scan; its rendered twin none). `retimed_audio_proof.py` B2 found them in AVFoundation's own read of the mix with no writer, about 0.17 s apart and at different times on each read, under the 16-bit read, the float read and an output-level varispeed alike. Frame Job's writer cannot fix it. The owner's question is whether to render constant Keep pitch off segments offline or to accept the limit.
+  - #335: the ×1 playback tap reads 21.000 or 86.333 ms early, by host session; the instruments trim it (SR-17). Answered by spec §11 #335: on a track holding a ×1 clip alone, the PostEffects tap stamps its samples one 4,096-frame buffer early (−85.333 ms, 3 runs). The PreEffects tap, which is the product `AudioTap`'s flag, reads +0.000 ms, as does the export. Preview audio is in sync, and no product code changed.
   - #336: an export may fail when an audio track's only clip is all empty time (SR2b's PM2).
-  - #337: a time-scaled clip's exported audio overruns or falls short of the timeline, run to run. CX2's `prores_422` audio was 196 095 frames in one run on a 4 s (192 000-frame) timeline, and CK05's was 1 213 frames (≈ 25 ms) short. U1 compares over the common length.
+  - #337: a time-scaled clip's exported audio overruns or falls short of the timeline, run to run. CX2's `prores_422` audio was 196 095 frames in one run on a 4 s (192 000-frame) timeline, and CK05's was 1 213 frames (≈ 25 ms) short. U1 compares over the common length. Fixed by spec §11 #337: every export's audio is now exactly round(range × 48 000) frames, cut at the end and padded with silence (`ExportAudioEnd`; `retimed_audio_proof.py` A1–A3).
 
 ## Open items
 
-- #334, #335, #336, #337: the older defects above, open.
+- #334: open, with the owner's question (render constant Keep pitch off segments offline, or accept the limit).
+- #335: answered by spec §11 #335, an instrument stamp with no product change.
+- #336: closed by spec §11 #336.
+- #337: fixed by spec §11 #337.
 - #299: Frame Job's own time-stretch for Keep pitch (SY-41), deferred by the road map; its comment of 2026-10-24 names a ramp's case and SR-15/SR-16's measured lateness.
 - A rate graph drawn on the action lane (SR-1's risk line: a ramp is a band, not a graph): #339.
 - Ramp presets, a Speed ▸ Ramp… sheet: #340.

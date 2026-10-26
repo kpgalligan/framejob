@@ -23589,3 +23589,95 @@ python3 tools/proof/render_dedup_proof.py <dir>/agent.sock compare <ctl>   # the
 Rows (`compare`): each PNG and each `<png>.<scope>.json` byte-equal to `<ctl>`'s, one row per
 file (21 files: 12 PNGs, 9 scope JSONs); a missing control file is a FAIL by name. Exit 0 only
 when every row passes, 1 on a failed row, 2 when a fixture call was refused or wrote nothing.
+
+## Issues #337, #334, #335 — retimed-audio timing (`retimed_audio_proof.py` D0, S1–S3, X0, A1–A3, B1, B2, C1, C2; mutants PM1–PM4, `plant-step`, `stamp-place`; spec §11 #337, #335)
+
+**#337 — the fix.** An export's sound is exactly round(range × 48 000) frames.
+`ExportAudioEnd` counts what `ExportWriter`'s audio pump hands on, in order. It cuts the
+buffer that crosses the range's end, drops every later one, and pads a read that ends early with
+16-bit zeros once the audio output is dry. The loudness measurement feeds only those frames.
+Measured at HEAD 3f7c948: CX2 (×2, Keep pitch off, 4 s) wrote 192 047 frames in both presets,
+and CK05 (×0.5, Keep pitch on) wrote 190 787 / 190 851 (`audio_wav`) and 190 787 twice
+(`prores_422`). The mix read with no writer (`mix`) gave the same lengths, so the writer passed
+on whatever the reader handed it. **The placeholder's "one frame short" (#336's section above)
+is the timeline's own length.** toneB.m4a is 2 986 400 ticks, `add_clip` snaps it down to whole
+frames, and C's timeline is 10 180 000 ticks (16.967 s). Its composition, its audio track and
+both exports end exactly there (814 400 frames), at HEAD and after, so `CompositionBuilder` is
+unchanged.
+
+**#334 — arm (c), the owner's question.** The ×4 steps are in AVFoundation's own read of the
+mix (B2): about 0.17 s apart and at different times on each read. They appear under the
+writer's 16-bit read (`app`), the float read (`float`) and an output-level varispeed
+(`output_varispeed`), all with no writer. The export and an `app` read of the same sine project
+differed from frame 279 (from 5 399 at HEAD). The clicks fixture's placement passes either way.
+No variant is clean, so nothing in Frame Job's writer can be fixed, and B1 is reported, not
+scored.
+
+**#335 — an instrument stamp.** On T335 (A ×1 over [0, 3 s), B ×2 over [3 s, 6 s), Keep pitch
+off, one track), the PostEffects tap places A at −0.979 ms both by its stamps and by order. By
+order means every frame counted from the first chunk stamped inside B. The export places A at
+−0.958 ms. On CX1 (a ×1 clip alone on its track, SR1's `C-off-x1` shape), the PostEffects tap
+reads −85.333 ms, exactly one 4 096-frame buffer. The PreEffects tap (the product `AudioTap`'s
+flag) and the export both read +0.000 ms. Preview is in sync, and no product code changed.
+
+One owned instance (`mcp.launch` on `proof_app.binary()`), `tools/proof/work/retimed-audio/`
+emptied each run, every document closed, no menu item. The probe reads (`mix`, `render`, `tap`)
+are `ramp_spike_probe.swift`'s, run after the instance stops.
+
+- **D0** — the instance listens; no `Frame Job: ` line in its log.
+- **S1** — `frames_target` (the mirror of `ExportAudioEnd.frames(ofTicks:)`): 4 s → 192 000,
+  17 s → 816 000, 20 020 ticks → 1 602.
+- **S2** — `by_order` places a synthetic chunk list whose first half is stamped 21 ms early
+  exactly; placing it by stamps does not.
+- **S3** — a step planted into a sine is found by `click_events(dense_scan(…), 0)`; the clean
+  sine has none.
+- **X0** — `ramp_spike.make_fixtures(False)` and `z0()`.
+- **A1** — CX2 and CK05, `audio_wav` and `prores_422` twice each: all 8 streams 192 000
+  frames at 48 kHz; CX2's runs PCM-identical (CK05's identity reported).
+- **A2** — C's `audio_wav` and `prores_422`: exactly `frames_target` of its timeline (814 400).
+- **A3** — CX1's, CX2's and C's `audio_wav` channel 0 equals the `mix` read (`app`) over
+  min(target, mix) frames with no tolerance, and is 0.0 past the mix's end. CK05 is reported
+  against its two `app` reads. C's `composition_ticks` and `audio_track_ends` are printed.
+- **B1** (reported, #334) — X4 (×4, Keep pitch off, 4 s): on sine no
+  `click_events(dense_scan(x, rate, 4.0), 0)`; on clicks `varispeed_pass(place_ideal(…))`.
+- **B2** (reported, #334) — CK05 through `mix` with `app` and `output_varispeed` twice each; X4
+  on sine with `app`, `float` and `output_varispeed`: events, nearest chunk boundaries, track
+  ends, max |diff| against `RampAudioRenderer`'s ×4 ideal; and X4's export against its `app`
+  read.
+- **C1** (#335) — T335's PostEffects tap, 3 runs: B within 0.5 ms of the export by stamps and
+  by order (instrument); A by order within 1.0 ms of the export (scored). CX1 through the
+  PreEffects and PostEffects taps, 3 runs each (by stamps, and by `render_spike.coarse_ms`): the
+  PreEffects tap (the product's flag) within 1.0 ms of CX1's export both ways, every run
+  (scored); the PostEffects offset printed. `--mutant stamp-place` scores the PostEffects tap
+  as the product's.
+- **C2** (reported, #335) — T335 through the PreEffects tap, 3 runs.
+
+```sh
+python3 tools/proof/retimed_audio_proof.py --only S1,S2,S3
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/retimed_audio_proof.py --only A1,A2,A3,B1,B2,C1,C2
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/retimed_audio_proof.py --only B1 --mutant plant-step
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/retimed_audio_proof.py --only C1 --mutant stamp-place
+make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/retimed_audio_proof.py
+```
+
+| Run (2026-10-25) | Result |
+|---|---|
+| S1–S3 (no app) | 3/3 |
+| HEAD 3f7c948, Debug | 7/9 — A1 fail (CX2 192 047 ×4; CK05 `audio_wav` 190 787 / 190 851, `prores_422` 190 787 ×2); A2 pass (814 400 = its timeline); A3 pass; B1 fail (sine 25 / 29 events); B2 every variant steps (`app` 28, `float` 27, `output_varispeed` 31 events), `output_varispeed` ≡ one `app` read for CK05; C1 pass (A −0.979 ms by stamps and by order, export −0.958 ms; B −0.010 / +0.010 ms, 3 runs); C2 T335 pre A +0.000 ms |
+| HEAD, `--mutant stamp-place` | **survived**: C1 3/3; T335's stamps were not early in any run |
+| After the fix, Debug | 9/9 in 154 s — A1 192 000 in all 8, CK05's runs identical; A2 814 400; A3 CX2 = mix over 192 000 (the mix read 192 047), CK05 = both `app` reads over 190 787 then 0.0; B1 verdict fail (32 / 30 events, reported); C1 as at HEAD |
+| C2 with CX1, Debug | CX1 PostEffects tap −85.333 ms (coarse; none within the 60 ms reach), 3 runs; PreEffects +0.000 ms (20/20), 3 runs; export +0.000 ms (20/20) |
+| PM1 (`fit` passes every buffer whole) | caught: A1 (CX2 192 047) |
+| PM2 (`padding()` returns []) | caught by A1 (CK05 190 787); **A2 survived**: C's read ends on its target, so no pad is owed |
+| PM3 (target + 1) | caught: A1 (192 001), A2 (814 401) |
+| PM4 (`fit` keeps the last frames) | caught: A3 (CX2 differs from frame 189 580) |
+| `--mutant plant-step` | B1's verdict fail (vacuous: B1 already reads #334's steps and is reported; S3 is the planted-step check) |
+| `--mutant stamp-place` (before the review fix) | **survived**, as at HEAD |
+| Review fix: CX1 scored in C1, Debug `--only C1,C2` | 4/4 in 131 s — C1 pass: T335 as before; CX1 export +0.000 ms (20/20), PreEffects +0.000 ms (20/20) by stamps and coarse ×3 (scored), PostEffects — by stamps, −85.333 ms coarse ×3 (reported); C2 T335 pre A +0.000 ms (14/15) |
+| Review fix: `--only C1 --mutant stamp-place`, Debug | **caught**: 2/3, exit 1 — C1 fail, CX1's PostEffects tap scored as the product's: none within 60 ms by stamps, −85.333 ms coarse, 3 of 3 runs |
+| **Review fix: Release, after the gate (the recorded run)** | **12/12 in 143 s**, exit 0 — every row as the recorded run; C1 CX1 PreEffects +0.000 ms (20/20) by stamps and coarse ×3 (scored), PostEffects −85.333 ms coarse ×3 (reported); no `Frame Job: ` |
+| `make gate` | PASS 364 s (names 1 s, typecheck 5 s, fmt 2 s, lint 26 s, test 213 s, app 117 s) |
+| Release, after the gate (before the review fix) | **12/12 in 143 s**, exit 0 — A1 192 000 in all 8 streams, CX2's and CK05's runs identical; A2 814 400 ×2; A3 CX1, CX2, C equal to their `app` reads, CK05 equal to both over 190 787 then 0.0; B1 verdict fail (sine 28 / 34 events; clicks 79/80, `varispeed_pass` True), reported; B2 `app` 24, `float` 28, `output_varispeed` 27 events, CK05's `output_varispeed` reads ≡ both `app` reads, X4S's export ≠ its `app` read from frame 10 521, X4C's from 1 189; C1 3/3 runs A −0.979 ms by stamps and by order against the export's −0.958 ms, B −0.010 ms against +0.010 ms; C2 T335 pre A +0.000 ms, CX1 post −85.333 ms ×3, CX1 pre +0.000 ms ×3; no `Frame Job: ` |
+| `ramp_proof.py --only P1` (Release) | 3/3 — P1 pass, m1 −86.333 ms (coarse −4 144 samples), RV1 70/70 at +0.000 ms |
+| `missing_audio_proof.py --only M1–M4,R1–R4,V0,P1` (Release) | 12/12 in 12 s; M1, M2, R1, R2 all zero at 814 400 frames (its "against the timeline's 816 000" still assumes 17 s) |
+| `export_offset_proof.py` (Release, own instance) | scores: 75/75 (4 of them measured, not pinned); no `Frame Job: ` |

@@ -18,12 +18,25 @@
 //   wav      `Exporter().export` with `ReelExport.settings(_:preset: "audio_wav")`
 //   prores   the same with `prores_422` (`export_offset_probe.swift`'s loop,
 //            the run loop turned to a 120 s bound)
+//   mix      (#334, #337) `CompositionBuilder.build` with a `RecipeSource` key,
+//            as `Exporter` builds; one `AVAssetReader` over
+//            `Exporter.timeRange(ReelExport.settings(_:preset: "audio_wav"), …)`
+//            with an `AVAssetReaderAudioMixOutput` over every audio track and
+//            the plan's mix, per the job's optional `mix_variant`: `app`
+//            (`ExportWriter.decodedAudioSettings`, the default), `float`
+//            (`ExportAudioGain.floatMixSettings`) or `output_varispeed` (`app`
+//            with the output's `audioTimePitchAlgorithm` `.varispeed`). The
+//            file is channel 0, float32 LE, in order; the line adds `variant`,
+//            `chunks: [[pts_ticks, frames]…]`, `range_ticks`,
+//            `composition_ticks` and `audio_track_ends: [ticks]`.
 //   tap      the package opened as a `ProjectDocument` with its editor
 //            (`media_less_playback_probe.swift`'s `Opened`); once the editor's
 //            item is ready its `audioMix` is replaced by one whose inputs are
 //            `CompositionBuilder.audioParameters(for:segments:ramps:onset:dsp:
 //            nil, meter: nil)` per composition audio track, carrying this
-//            probe's own `MTAudioProcessingTap` created PostEffects; each
+//            probe's own `MTAudioProcessingTap` created PostEffects (the
+//            job's optional `tap_flag`: `post`, the default, or `pre`, the
+//            product `AudioTap`'s PreEffects, #335); each
 //            buffer's channel 0 is kept, stamped with the start of
 //            `MTAudioProcessingTapGetSourceAudio`'s time range (as
 //            `AudioTap.swift` reads it). `playback.seek(to: 0)`, `play()`,
@@ -79,6 +92,10 @@ struct Job: Decodable {
     let fixture: String
     let reads: [String]
     let length: Int64
+    /// The `mix` read's output (#334): `app`, `float` or `output_varispeed`.
+    let mix_variant: String?
+    /// The `tap` read's tap: `post` (nil) or `pre` (#335).
+    let tap_flag: String?
 }
 
 struct ProbeError: Error, CustomStringConvertible {
@@ -162,6 +179,91 @@ func exportRead(_ job: Job, _ kind: String, preset: String, ext: String) {
     }
 }
 
+// MARK: - The mix (#334, #337)
+
+/// The plan's mix read the way the export's writer reads it, with no writer:
+/// channel 0 of every buffer in order, each buffer's stamp and frame count.
+func mixRead(_ job: Job) {
+    let variant = job.mix_variant ?? "app"
+    read(job, "mix", ext: "f32") { url in
+        guard ["app", "float", "output_varispeed"].contains(variant) else {
+            throw ProbeError("unknown mix_variant \(variant)")
+        }
+        let project = try loadProject(job.project)
+        guard let plan = project.plan else { throw ProbeError("no plan") }
+        let key = RecipeSource.shared.register()
+        defer { RecipeSource.shared.unregister(key) }
+        RecipeSource.shared.set(project, for: key)
+        let built = try CompositionBuilder.build(
+            plan: plan, planJSON: project.planJSON, urls: mediaURLs(project), recipeKey: key)
+        let range = Exporter.timeRange(
+            try ReelExport.settings(project, preset: "audio_wav"), composition: built.composition)
+        let tracks = built.composition.tracks(withMediaType: .audio)
+        guard !tracks.isEmpty else { throw ProbeError("the composition has no audio track") }
+        let reader = try AVAssetReader(asset: built.composition)
+        reader.timeRange = range
+        let output = AVAssetReaderAudioMixOutput(
+            audioTracks: tracks,
+            audioSettings: variant == "float"
+                ? ExportAudioGain.floatMixSettings : ExportWriter.decodedAudioSettings)
+        output.audioMix = built.audioMix
+        if variant == "output_varispeed" { output.audioTimePitchAlgorithm = .varispeed }
+        output.alwaysCopiesSampleData = true
+        guard reader.canAdd(output) else { throw ProbeError("the reader refused the output") }
+        reader.add(output)
+        guard reader.startReading() else {
+            throw ProbeError("the read did not start: \(String(describing: reader.error))")
+        }
+        var samples: [Float] = []
+        var chunks: [Any] = []
+        while let sample = output.copyNextSampleBuffer() {
+            let frames = CMSampleBufferGetNumSamples(sample)
+            chunks.append([
+                NSNumber(value: CompositionBuilder.ticks(
+                    CMSampleBufferGetPresentationTimeStamp(sample))), frames,
+            ])
+            guard frames > 0, let block = CMSampleBufferGetDataBuffer(sample),
+                let format = CMSampleBufferGetFormatDescription(sample),
+                let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee
+            else { continue }
+            let channels = Int(asbd.mChannelsPerFrame)
+            let isFloat = asbd.mFormatFlags & kAudioFormatFlagIsFloat != 0
+            let width = Int(asbd.mBitsPerChannel) / 8
+            guard channels > 0, asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved == 0,
+                (isFloat && width == 4) || (!isFloat && width == 2)
+            else { throw ProbeError("an unexpected format: \(asbd)") }
+            var bytes = [UInt8](repeating: 0, count: CMBlockBufferGetDataLength(block))
+            guard CMBlockBufferCopyDataBytes(
+                block, atOffset: 0, dataLength: bytes.count, destination: &bytes)
+                == kCMBlockBufferNoErr
+            else { throw ProbeError("a buffer could not be copied") }
+            let count = min(frames, bytes.count / (width * channels))
+            bytes.withUnsafeBytes { raw in
+                for i in 0..<count {
+                    let offset = i * width * channels
+                    samples.append(
+                        isFloat
+                            ? raw.loadUnaligned(fromByteOffset: offset, as: Float.self)
+                            : Float(raw.loadUnaligned(fromByteOffset: offset, as: Int16.self))
+                                / 32768)
+                }
+            }
+        }
+        guard reader.status == .completed else {
+            throw ProbeError("the read ended \(reader.status.rawValue): "
+                + "\(String(describing: reader.error))")
+        }
+        let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
+        try data.write(to: url)
+        return [
+            "variant": variant, "chunks": chunks,
+            "range_ticks": CompositionBuilder.ticks(range.duration),
+            "composition_ticks": CompositionBuilder.ticks(built.composition.duration),
+            "audio_track_ends": tracks.map { CompositionBuilder.ticks($0.timeRange.end) },
+        ]
+    }
+}
+
 // MARK: - The tap
 
 /// What the probe's tap kept: channel 0 of every buffer, in order, with each
@@ -209,7 +311,7 @@ final class TapRecorder {
 
 /// A PostEffects `MTAudioProcessingTap` feeding `recorder` (`AudioTap.make`'s
 /// shape: the context retained by the tap and released in `finalize`).
-func makeTap(_ recorder: TapRecorder) -> MTAudioProcessingTap? {
+func makeTap(_ recorder: TapRecorder, pre: Bool = false) -> MTAudioProcessingTap? {
     let context = Unmanaged.passRetained(recorder).toOpaque()
     var callbacks = MTAudioProcessingTapCallbacks(
         version: kMTAudioProcessingTapCallbacksVersion_0,
@@ -239,7 +341,9 @@ func makeTap(_ recorder: TapRecorder) -> MTAudioProcessingTap? {
         })
     var tap: MTAudioProcessingTap?
     guard MTAudioProcessingTapCreate(
-        kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap)
+        kCFAllocatorDefault, &callbacks,
+        pre ? kMTAudioProcessingTapCreationFlag_PreEffects
+            : kMTAudioProcessingTapCreationFlag_PostEffects, &tap)
         == noErr
     else {
         Unmanaged<TapRecorder>.fromOpaque(context).release()
@@ -312,7 +416,12 @@ func tapRead(_ job: Job, _ o: Opened) {
             throw ProbeError("\(tracks.count) composition audio tracks, not one")
         }
         let recorder = TapRecorder()
-        guard let tap = makeTap(recorder) else { throw ProbeError("no tap was made") }
+        guard ["post", "pre"].contains(job.tap_flag ?? "post") else {
+            throw ProbeError("unknown tap_flag \(job.tap_flag ?? "")")
+        }
+        guard let tap = makeTap(recorder, pre: job.tap_flag == "pre") else {
+            throw ProbeError("no tap was made")
+        }
         var how = "audioParameters"
         let mix = AVMutableAudioMix()
         mix.inputParameters = try tracks.map { track -> AVAudioMixInputParameters in
@@ -360,6 +469,7 @@ func tapRead(_ job: Job, _ o: Opened) {
         }
         let line: [String: Any] = [
             "chunks": chunks, "calls": recorder.calls, "mix": how, "reached": reached,
+            "tap_flag": job.tap_flag ?? "post",
             "played_s": Date().timeIntervalSince(started),
             "format": [
                 "rate": recorder.rate, "channels": recorder.channels,
@@ -522,6 +632,7 @@ for job in jobs {
             switch kind {
             case "wav": exportRead(job, "wav", preset: "audio_wav", ext: "wav")
             case "prores": exportRead(job, "prores", preset: "prores_422", ext: "mov")
+            case "mix": mixRead(job)
             default: emit(["name": job.name, "read": kind, "ok": false, "error": "unknown read"])
             }
         }

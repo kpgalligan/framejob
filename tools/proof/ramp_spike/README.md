@@ -53,6 +53,18 @@ bar's centre 16 × 16 block. Each job's document is closed before the next opens
 (ffmpeg, the build, each probe group) runs under `graphics_spike/bounded.py`: build 900 s, plan
 120 s, export 900 s, playback 1800 s; an expiry is that group's FAIL.
 
+Two reads came later, for `retimed_audio_proof.py` (#334, #335, #337), and leave every read
+above unchanged. The export group's `mix` builds the composition as `Exporter` does
+(`CompositionBuilder.build` with a `RecipeSource` key) and reads it through one
+`AVAssetReaderAudioMixOutput` over every audio track and the plan's mix, over
+`Exporter.timeRange` of the `audio_wav` settings, with no writer. A job's optional
+`mix_variant` picks the output: `app` (`ExportWriter.decodedAudioSettings`, the default),
+`float` (`ExportAudioGain.floatMixSettings`) or `output_varispeed` (`app` with the output's
+`audioTimePitchAlgorithm` `.varispeed`). The file is channel 0 as float32 LE, and the line adds
+`variant`, `chunks: [[pts_ticks, frames]…]`, `range_ticks`, `composition_ticks` and
+`audio_track_ends`. A job's optional `tap_flag` makes `tap`'s tap `post` (PostEffects, the
+default) or `pre` (PreEffects, the product `AudioTap`'s flag), and the line echoes it.
+
 **The runner** works in `tools/proof/work/ramp-spike/` (untracked): `fixtures/`, `projects/`
 (a `<variant>@<fixture>.framejob` package per pair), `probe/`, `runs/` (what the probe wrote),
 `jobs-<group>.json`, `stderr-<group>.txt` and `results.json`. It imports `click_value`,

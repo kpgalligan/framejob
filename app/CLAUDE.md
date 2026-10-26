@@ -1651,7 +1651,7 @@ the key map behind it.
   `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
   `ExporterWriter+Chapters.swift` · `ExporterAudioGain.swift` ·
   `ExportStraightAlpha.swift` · `ExportStraightAlphaHalf.swift` ·
-  `ExporterImageSequence.swift` ·
+  `ExporterImageSequence.swift` · `ExportAudioEnd.swift` ·
   `ExporterErrors.swift` · `ExporterGraphics.swift` — the writer
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render (the generator, or
@@ -1661,7 +1661,10 @@ the key map behind it.
   32-bit float, then the write: un-normalised from a 16-bit decode (a mix
   past full scale clips there, and `mixClipped` says so); normalised from the
   same float decode the measurement read, gained and quantised once by
-  `ExportAudioGain` (#86). The alpha movie rows' frames (`prores_4444`,
+  `ExportAudioGain` (#86). Where the sound ends is `ExportAudioEnd`'s
+  (spec §11 #337): exactly round(range × 48 000) frames, the crossing buffer
+  cut, later buffers read and dropped, a short read padded with 16-bit
+  silence; the measurement feeds the same count. The alpha movie rows' frames (`prores_4444`,
   `hevc_alpha`) are straightened in the video pump before `retimed`:
   un-premultiplied, each transparent pixel within 4 px of a visible one
   filled with the nearest one's colour, and labelled `StraightAlpha`, with
