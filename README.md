@@ -1,4 +1,10 @@
+<p align="center">
+  <img src="designs/frame-job/frame-job-icon-1024.png" alt="Frame Job icon" width="128">
+</p>
+
 # Frame Job
+
+[![Frame Job in 90 seconds: watch on YouTube](https://img.youtube.com/vi/An7KjPoofzI/maxresdefault.jpg)](https://www.youtube.com/watch?v=An7KjPoofzI)
 
 A native macOS video editor. Open a movie, arrange it on layered tracks over a
 fixed canvas, then trim, cut, grade, caption, animate and export it. Every edit
