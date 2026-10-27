@@ -20,7 +20,9 @@ unticked checkbox, "Include Frame Job windows"; Camera, a greyed pop-up naming
 the default camera ("FaceTime HD Camera" on the machine that captured this),
 live only when Source is Camera; Format, a greyed pop-up reading "Best
 (1760×1328 at 30 fps)" — the default camera's best format, then its other
-formats as size and rate — with the same live rule; Microphone "Off", with an
+formats as size and rate — with the same live rule; under Format, a row
+holding the camera's live preview (a 200 × 150 pt well) appears only when
+Source is Camera, so it is absent here; Microphone "Off", with an
 empty level meter beside it; System Audio, a switch that is on (blue); Show
 Clicks, a switch that is off; Rate "60 fps"; Size "Nominal (points)", with the
 line "1728×1117 points · 3456×2234 pixels" under it — the recorded size of that

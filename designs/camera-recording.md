@@ -202,6 +202,9 @@ of their own, as CR1-0's were. #373 is CR1c's finding: a fresh `CameraCapture` b
 main turn as the stop of another capture of the same device recorded no frame. That is the path a
 preview takes whenever the person changes camera or format. So the formats, which never rebuild
 a capture while one runs, land first, and the preview lands with #373's fix.
+CR2b was the preview and hot-plug until CR2a landed. It is two now: one spec could not hold the
+preview's lifetime, #373's fix and hot-plug in the space a spec is given, and hot-plug rebuilds
+what the preview shows, so it follows the preview as CR2c.
 
 - **CR2-0 — the tolls.** Two pure moves, landed and gated alone, with nothing widened.
   - `CameraCapture.swift` (399) gives the warm-up's rule to a new `CameraCapture+WarmUp.swift`:
@@ -233,29 +236,45 @@ a capture while one runs, land first, and the preview lands with #373's fix.
   refusal and pick, with mutants; a granted row recording at a non-best format (the built-in
   camera's 1920 × 1080), its size and rate read back; `camera_recording_proof.py`'s
   `camera_format` rows and `snapshot_ui` of the panel. Docs: §7.9a, the guide.
-- **CR2b — the preview and hot-plug; CAM-7.** CAM-7 is recorded in §11 before the code.
-  - **The preview.** An `AVCaptureVideoPreviewLayer` in the panel runs on the PREPARED capture's
-    session, CR1c's `prepareCamera`, not on a session of its own: two captures of one device
-    collide (#373), and a preview on the capture the start adopts spends the warm-up long before
-    the countdown. It runs only while the panel is visible with Source Camera and the Camera
-    grant authorized; CR0's V1 measured about 155–160 MB of RSS. Showing the panel never
-    prompts. The preview stays on through a camera recording, on that recording's session.
-  - **#373 fixed.** A change of camera or format rebuilds the prepared capture only after the
-    old capture's session has stopped (`CameraCapture.stop(completion:)`). The same change
-    answers CR2-0's G8 observation: under `no-hold`, a discarded prepared capture's session was
-    still running 0.5 s after `discardPreparedCamera`. CR2b says whether that is the
-    asynchronous stop seen early or a discard that loses a session still starting, and G8 waits
-    on the stop's completion rather than on a fixed 0.5 s.
-  - **Hot-plug.** `AVCaptureDevice.wasConnectedNotification` and `wasDisconnectedNotification`,
-    observed while the panel is up, rebuild the Camera and Format popups while idle. A camera
-    removed during a recording ends it, CAM-3's "stops on its own", unchanged.
-  - **Decides** the preview's size and place in the card, its lifetime's exact edges, and what
-    it shows with no grant or no camera.
+- **CR2b — the preview and #373; CAM-7.** CAM-7 is recorded in §11 before the code.
+  - **The preview.** A 200 × 150 pt well under Format, its row shown only with Source Camera,
+    the picture aspect-fit and NOT mirrored (what is seen is what lands). Its
+    `AVCaptureVideoPreviewLayer` is made WITH the prepared capture (CR1c's `prepareCamera`,
+    now `CameraCapture(…, preview: true)`), never on a session of its own: two captures of one
+    device collide (#373). Hosting it is a sublayer swap, so no running session is
+    reconfigured; the tool's captures have no layer, and a tool start never adopts the panel's
+    prepared capture: it lets it go and builds its own, so CAM-5 (5)'s "the tool … still pays
+    the hold" stands. The panel prepares that capture whenever it is visible, not closing, and
+    idle with Source Camera, the Camera grant authorized and a camera chosen, so the warm-up is
+    spent before the countdown, whose `prepareCamera` keeps it. A capture whose construction
+    throws is remembered for its device and format, shown in the well, and not rebuilt until
+    it is let go. Through a camera recording the well shows the recording's capture. CR0's V1
+    measured about 155–160 MB of RSS while it runs. Showing the panel never prompts.
+  - **#373 fixed.** Every capture's configuration lock, format, `startRunning` and
+    `stopRunning` run on ONE serial queue (the lock moves there from `init`), so a capture
+    built in the same main turn as another capture of its device is let go starts only after
+    that stop, and lock/unlock pairs never interleave. `CameraCapture.stop(completion:)`
+    answers on main once the session has stopped. G8 waits on that completion rather than a
+    fixed 0.5 s, and runs again under `no-hold` to answer CR2-0's question: the asynchronous
+    stop seen early, or a discard that loses a session still starting.
+  - **Decides** the well's size, place and sentences, the steps a sync takes and when it runs,
+    mirroring, the lock's move, that a tool start never adopts, and a thrown prepare's record.
 
-  **Proof**: granted probe rows for the preview's capture adopted by the start, and a format
-  change that rebuilds and records (#373); a probe row for the hot-plug rebuild; `snapshot_ui`
-  of the panel; `screens.py`'s recorder screen; manual-check rows for the preview's look and the
-  Continuity Camera pairing.
+  **Proof**: probe rows for the step rule, the row and the wiring; granted rows for the
+  preview's layer on the prepared capture (adopted and recorded, its format kept), a format
+  change that rebuilds and records and the fallback rebuild (#373), a tool start beside a
+  prepared capture, a thrown prepare not retried, and G8 on the completion;
+  mutants; the Release `camera_recording_proof.py` and `screens.py`'s recorder screen as
+  regressions; manual-check rows for the preview's look and the Continuity Camera pairing.
+- **CR2c — hot-plug; CAM-8.** CAM-8 is recorded in §11 before the code.
+  `AVCaptureDevice.wasConnectedNotification` and `wasDisconnectedNotification`, observed while
+  the panel is up, rebuild the Camera and Format popups while idle and re-sync the preview
+  (CAM-5 (2)'s rebuild on `show()` gains a live one). A camera removed during a recording ends
+  it, CAM-3's "stops on its own", unchanged. **Decides** the observers' lifetime, and what the
+  popups select when the chosen camera goes and comes back. **Proof**: probe rows posting the
+  notifications to a hidden panel (the rebuild, the selection, idle only), the observers gone
+  after close; mutants; a manual-check row (a USB camera or the iPhone plugged and unplugged
+  with the panel up).
 - **CR3 — camera + screen.** The camera row under Source when recording a display or a window;
   the camera capture started beside the `SCStream` (CR0: the order of the starts made no
   measurable difference, and started in one run-loop turn the writer's camera began 87–130 ms
@@ -1045,7 +1064,149 @@ listed as a Continuity Camera and OBS Virtual Camera as a third camera):
   Format popup (CAM-6), and the panel's remembered keys become nine.
 - CR2b: the preview, hot-plug, #373's `CameraCapture.stop(completion:)` and CR2-0's G8 question.
 
-## CR2b — the preview and hot-plug
+## CR2b — the preview and #373
+
+### Record
+
+**Landed** (2026-10-26).
+- Spec §11 CAM-7, written before any code: the well (a grid row under Format, 200 × 150 pt,
+  `DS.canvasVoid` with a 1 pt `DS.border`, aspect-fit, not mirrored, shown only with Source
+  Camera); its layer made only with `prepareCamera`'s capture; the step rule (first match wins:
+  hidden or closing or not Camera → off, a camera recording, countdown or starting → the
+  prepared layer, busy → blank, no camera, the grant read only at its step, a failure, else
+  prepare); what each step does and when the sync runs; #373's one shared session queue
+  holding the lock; a tool start never adopting; a thrown prepare remembered. It amends CAM-5
+  (2)'s hot-plug clause (now CR2c's) and CAM-5 (5)'s "the countdown's start builds". Its index
+  row and the `camera-recording.md` row (255 → 311 lines); the `11-decisions/` cell is 13245 in
+  31 files.
+- `CameraCapture.swift` (364 → 399): `sharedSessionQueue`, one static queue every capture's
+  `sessionQueue` names; the configuration lock moved from `init` into `start`, on that queue
+  (lock, format, `startRunning`, format again; a refused lock is the start's error in `init`'s
+  old sentence); `init(…, preview:)` and `previewLayer`, set to the session inside `init`'s
+  configuration with its connection's `automaticallyAdjustsVideoMirroring` and
+  `isVideoMirrored` false; `stop(completion:)`, whose completion hops to main after the first
+  stop's work ran on the queue (also for a repeated stop); the header's format, queue and
+  preview paragraphs.
+- `ScreenRecorder.swift` (388 → 391): `preparedCameraFailure`.
+  `ScreenRecorder+CameraPrepare.swift` (141 → 170): `PreparedCameraFailure`; `prepareCamera`
+  returning for a matching record after the adoptable check, building with `preview: true` and
+  recording a throw; `discardPreparedCamera` clearing the record; `takeCameraCapture(…,
+  adopting:)`; the type doc. `ScreenRecorder+Camera.swift` (342 → 343): `adopting: mayAsk` and
+  its doc.
+- The panel: `CameraPreviewWell.swift` (new, 94); `RecorderPanelController+CameraPreview.swift`
+  (new, 138: `CameraPreviewStep`, the two sentences, `cameraPreviewStep`, `cameraPreviewRow`,
+  `previewFailure`, `syncCameraPreview`); the base file (338 → 348: `cameraPreview`,
+  `panelClosing`, `controlChanged` syncing last, `panelWillClose` setting `panelClosing` first
+  and emptying the well last, the type doc's eleven files); `+Rows` (382 → 383: the well's row
+  under Format); `+Showing` (86 → 93: `show()` clearing `panelClosing`, letting a failed
+  prepared capture go while idle, syncing last; the tick syncing); `+Pause` (194 → 196:
+  `syncPhase` syncing before its refit); `+Camera` (211 → 214: the header's preview pointer,
+  hot-plug now CR2c's).
+- Proofs: `camera_recording_probe.py` (797 → 992) and `.swift` (1202 → 1468): P13–P15, G8
+  re-aimed, G11–G15, eleven mutants, the docstring; G7, G9 and G10 now start with `mayAsk:
+  true` (the panel's start, the only one that adopts); a helper `startAndRecord` shared by G7
+  and G11–G14. `tools/proof/README.md`'s CR2b section.
+- Docs: spec §7.4's rows 50 and 52 (57 lines, unchanged count);
+  `designs/screens/16-recorder-panel.md`'s prose (the preview row absent with a display);
+  `docs/guide/screen-recording.md` (the Preview row, "A camera"'s preview paragraph in place of
+  the countdown-light sentences and "no live preview … yet", Limits, the tool paragraph's
+  "The camera is recording."); `docs/manual-checks.md` REC-14's step 2 and Expect, new REC-15
+  (the preview's look) and REC-16 (the Continuity Camera pairing).
+
+**Measured** (the built-in camera, the default microphone, the terminal's grants; each command
+once unless said):
+- `python3 tools/proof/spec_index_proof.py` after CAM-7: exit 0, `201/201 checks passed`.
+- `make typecheck`: exit 0, the 4 baseline warnings, tsc clean.
+- The anchor check (every `before` of both probes' `MUTANTS` once in its file): `all once`
+  (43 and 78 mutants).
+- `python3 tools/proof/camera_recording_probe.py --only values,landing,tool,panel`: exit 0,
+  `scores: 51/51`. P13 `20 cases`; P14 the well 200.0×150.0, the card 501.0 → 661.0 pt.
+- `… --only granted`: exit 0, `scores: 17/17` (twice: before and after G8 gained its did-stop
+  read).
+- The eleven mutants, each exit 1, caught: `preview-without-grant`,
+  `preview-builds-in-countdown`, `preview-retries-failure` 15/16 (P13); `preview-row-always`
+  15/16 (P14); `preview-unsynced-phase`, `preview-builds-on-close` 15/16 (P15);
+  `preview-tool-capture` 16/17 (G13); `tool-adopts` 16/17 (G14: adopted True, a previewLayer
+  True); `prepare-retries-thrown` 16/17 (G15: built something, the record not kept);
+  `stop-answers-early` 16/17 (G8: the completion at 0.000 s, the session running, no did-stop
+  yet; see Deviations for its first run); `session-queue-per-capture` 15/17 (G12 and G14: their
+  fresh starts answered in 1.035 and 1.037 s and recorded "The camera delivered no frame." —
+  #373 reproduced; G11 passed under it, 1920×1080 60/0.9992, in this run and the first one).
+- `… --only granted --mutant no-hold`: exit 1, `scores: 13/17`, `caught (G6)` (G6 hold 0.090 s,
+  1 buffer; G3 58/0.9797; G12 and G14 56/0.9739). **G8 under it passed**: stop's completion
+  answered in 0.090 s, the session's did-stop at 0.090 s, before the completion, the session
+  not running.
+- `python3 tools/proof/recording_probe.py --only chrome,grants,voiceover_doors`: exit 0,
+  `217/217 checks passed`.
+- `make gate`: `gate: PASS 286s` (names 1 s, typecheck 11 s, fmt and lint skipped, test 152 s,
+  app 121 s); after this record was written, `gate: PASS 1s` (names alone re-ran).
+- `python3 tools/proof/camera_recording_probe.py`: exit 0, `scores: 67/67`, G0–G15 all run. G3
+  61/0.9992 and 60/0.9992; G4 micOffset −0.051 and −0.055 s; G6 hold 0.523 s, 13 buffers,
+  steady; G7 `prepareCamera` held main 0.013 s, `startCamera` 0.03 s; **G8** the completion in
+  0.070 s, did-stop at 0.070 s before it, not running; G9 0.694 s; G10 1920×1080 60/0.9992;
+  **G11** best 1760x1328@30 answered, row 1920x1080@30 rebuilt in the same turn, adopted in
+  0.018 s, 1920×1080 60/0.9992; **G12** not adopted, rebuilt, 0.768 s, 1760×1328 58/0.9991;
+  **G13** the prepared capture's layer on its session, a connection, mirrored False; G0's
+  capture no layer; **G14** not adopted, no layer, the slot nil after the call, 0.768 s,
+  1760×1328 60/0.9992; **G15** blocked, kept, cleared, built, stopped.
+- `python3 tools/proof/recording_probe.py`: exit 0, `1222/1222 checks passed`.
+- Release (`proof_app.py launch --app release`, after the gate's `make app`):
+  `RC_PROOF_APP=release python3 tools/proof/camera_recording_proof.py <dir>/agent.sock`: exit 0,
+  `48/48`, the granted tier run (a 2 s span recorded 1.968 s; `camera_format 1920x1080@30`
+  recorded at it; `mic_offset` −59.9 ms; canvas 1760 × 1328 at [30, 1]; section D's labels
+  `Source:`, `Camera:`, `Format:`, `Microphone:` …). `grep "Frame Job: " <dir>/framejob.log`:
+  nothing. Stopped by its pid.
+- `RC_PROOF_APP=release python3 tools/proof/screens.py --only 16-recorder-panel`: exit 0, `6
+  pass, 0 fail, 0 skip of 6`, 0 new problems, P2 pass (47 key literals, 31 pinned).
+
+**CR2-0's G8 question, answered.** Under `no-hold`, with the stop on the shared queue and G8
+waiting on `stop(completion:)`, the discarded capture's session stopped: the did-stop
+notification came 0.090 s after `discardPreparedCamera`, before the completion, and the session
+was not running. So, with the shared queue, a discard does not lose a session still starting:
+its stop runs after the start's work on the one serial queue, and the session reports that it
+stopped. CR2-0's read was the asynchronous stop checked at a fixed 0.5 s, with nothing ordering
+the read after the stop. The old per-capture code was not re-run, so why its stop had not
+landed by 0.5 s is not measured.
+
+**Deviations.**
+- G8 also requires the session's `didStopRunningNotification` to arrive before the completion.
+  On the first run of `stop-answers-early`, the spec's G8 (completion within 5 s, `isRunning`
+  false) passed under the mutant: the early completion came at 0.000 s and `isRunning` already
+  read false, so the mutant survived. `isRunning` alone cannot tell a completion that hopped
+  early. With the did-stop read the mutant is caught.
+- `session-queue-per-capture` names G12 and G14, not G11 and G12: G11 passed under the mutant
+  in both runs (the format-change rebuild recorded 60 frames at 1920×1080 after its 3 s
+  countdown), while the two fresh starts with no countdown recorded no frame. G11 stays as a
+  regression row for the format-change path.
+- G7, G9 and G10 call `startCamera(mayAsk: true)`: with CAM-7 (7) only the panel's start
+  adopts, and the rows exist to prove an adoption.
+- `previewFailure` reads the prepared capture's failure only when its device and format match
+  the chosen camera at its resolved format, as it does for the record; `show()` lets a failure
+  go when `previewFailure` is non-nil (the chosen camera's), since a failure for another
+  camera is let go by the next `prepareCamera` anyway.
+- The mirroring is set only when the connection reports `isVideoMirroringSupported`; G13 read
+  the built-in camera's connection unmirrored.
+
+**Review** (verdict pass). The reviewer re-ran the eleven mutants and `--only granted --mutant
+no-hold` once each: every mutant exit 1 at the rows above; under `no-hold` G6 caught and G8
+passed (did-stop and completion both at 0.081 s). Two nits: REC-14's Expect said the light
+"stays on after Cancel", but Cancel still lets the prepared capture go and the idle sync builds
+a fresh one, so it now reads "is on again after Cancel, a brief blink allowed" (applied with the
+commit); and the `failed` step calls `stop()` on the failed prepared capture every tick, which
+enqueues one empty block on the shared session queue a second while the preview shows a
+failure (not changed).
+
+**Owed.**
+- Applied with the commit (the orchestrator's): `app/CLAUDE.md`'s recorder panel family gains
+  `+CameraPreview` and `CameraPreviewWell.swift`; its `CameraCapture` sentence says the session
+  queue is shared by every capture and holds the configuration lock (start to stop), and the
+  "two queues" stay two; the panel's prepared capture lives while the panel shows Camera, and a
+  tool start never adopts it.
+- REC-15 and REC-16 (the preview's look, the Continuity Camera pairing) and REC-14's revised
+  step 2 are the owner's.
+- CR2c: hot-plug (CAM-8), which re-syncs the preview.
+
+## CR2c — hot-plug
 
 ### Record
 

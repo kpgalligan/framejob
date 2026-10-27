@@ -158,6 +158,9 @@ final class ScreenRecorder: NSObject {
     /// `prepareCamera`'s started capture, adopted by the next `startCamera`
     /// for its device and format (`+CameraPrepare.swift`, spec §11 CAM-5).
     var preparedCamera: PreparedCamera?
+    /// `prepareCamera`'s capture that could not be built, until
+    /// `discardPreparedCamera` (spec §11 CAM-7 (8)). Main only.
+    var preparedCameraFailure: PreparedCameraFailure?
     var timer: Timer?
 
     override init() { super.init() }

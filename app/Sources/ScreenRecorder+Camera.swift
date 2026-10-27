@@ -39,8 +39,9 @@ extension ScreenRecorder {
     /// `.camera`; no camera named; the Camera grant not `.authorized` (read,
     /// never asked); an id no connected camera carries (`.cameraDevice`);
     /// the Microphone grant and device, as `start` checks them; a folder
-    /// that cannot be made; a capture that throws (`takeCameraCapture`, the
-    /// countdown's adopted, CAM-5). Then the microphone's session is adopted
+    /// that cannot be made; a capture that throws (`takeCameraCapture`: the
+    /// panel's prepared capture adopted only when `mayAsk`, CAM-5; the tool
+    /// never adopts it, CAM-7 (7)). Then the microphone's session is adopted
     /// and run on main, the state is `.arming`, and the capture starts (or
     /// joins its prepared start) under `armCeiling`. `onFinish` is the
     /// session's, never called for a start that fails.
@@ -96,7 +97,7 @@ extension ScreenRecorder {
         }
         let capture: CameraCapture
         do {
-            capture = try takeCameraCapture(device: device, format: index)
+            capture = try takeCameraCapture(device: device, format: index, adopting: mayAsk)
         } catch let failure as RecorderError {
             return refuseCamera(failure, completion)
         } catch {

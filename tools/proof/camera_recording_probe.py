@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Camera recording CR1a (spec §11 CAM-3): the camera recorder, measured through the app's own
 sources; CR1b (CAM-4): `record_screen`'s camera, through the server's own functions; CR1c
-(CAM-5): the recorder panel's Camera source and the countdown's prepared capture; and CR2a
-(CAM-6): the camera's formats — the rows, `camera_format`, the Format popup, a chosen format.
+(CAM-5): the recorder panel's Camera source and the countdown's prepared capture; CR2a
+(CAM-6): the camera's formats — the rows, `camera_format`, the Format popup, a chosen format;
+and CR2b (CAM-7): the preview — its step, its row and well, its layer on the prepared capture —
+and #373 (one session queue every capture shares, `stop(completion:)`).
 
     python3 tools/proof/camera_recording_probe.py [--sources DIR] [--only SECTIONS] [--mutant NAME]
 
@@ -52,15 +54,29 @@ Sections and rows:
            fresh recorders with no microphone: G7 `prepareCamera` (how long it held main), the
            countdown's 3 s, then `startCamera` adopts it and answers in < `PREPARED_START_MAX`
            with the slot emptied, 2 s recorded as one segment at ≥ 98 % frames by G3's decode,
-           no `camera.note`; G8 a prepared capture discarded after 1 s: the slot nil and its
-           session stopped 0.5 s later; G9 `startCamera` straight after `prepareCamera`, the
+           no `camera.note`; G8 (re-aimed in CR2b) a prepared capture discarded after 1 s: the slot
+           nil, then `capture.stop { … }` answers within 5 s with its session stopped and the
+           session's did-stop notification already posted (both seconds printed); G9 `startCamera` straight after `prepareCamera`, the
            prepared start not yet answered, JOINS it: no error before `armCeiling`, `.recording`,
            the slot nil, 1 s recorded as one segment, no note (the call-to-answer time beside
            CR1a's cold 1.943–1.962 s); G10 (CR2a) G7's prepared start at the camera's first
            `formatRows` row whose spelling is not the best format's (`cameraFormat` set): adopted
            in < `PREPARED_START_MAX`, 2 s as one segment, the `.mov` the row's size (ffprobe),
            ≥ 98 % frames at its rate by G3's decode, `camera.format` the row's spelling — skipped
-           by name when the camera lists no such row. Skipped by name when no camera is connected or the
+           by name when the camera lists no such row. CR2b (CAM-7): the prepared starts above
+           are the panel's (`mayAsk` true), which alone adopts. G11 (#373, a format change)
+           `prepareCamera` at best, answered, then in one main turn `prepareCamera` at G10's row
+           (the first capture let go, the second built and started), the 3 s countdown, the
+           panel's start adopting it, 2 s: one segment, the row's size by ffprobe, ≥ 98 % frames
+           by G3's decode, no error — skipped by name as G10 is; G12 (#373, the fallback) a
+           prepared capture marked stopped on its own, the panel's start building afresh in the
+           same turn, 2 s: one segment, ≥ 98 % frames, no error; G13 (CAM-7 (2)) G7's prepared
+           capture had a `previewLayer` on its own session with a connection not mirrored, and
+           G0's tool start's capture none; G14 (CAM-7 (7)) a tool start (`mayAsk` false) beside a
+           prepared capture: not adopted, no layer, the slot nil, 2 s as one segment at ≥ 98 %
+           frames, no error; G15 (CAM-7 (8)) a failed build's record at best: `prepareCamera`
+           builds nothing and keeps it, `discardPreparedCamera` clears it, the next builds.
+           Skipped by name when no camera is connected or the
            Camera grant is not authorized (nothing is recorded); G4 is skipped by name when the
            Microphone grant is not authorized (the recording is made without one). Never asks
            for a grant.
@@ -109,6 +125,16 @@ Sections and rows:
            writing `FrameJobRecordingCameraFormat` with its spelling, Best writing "", a display
            row's `cameraFormat` nil; P12 `selectCamera("probe-camera")`'s early return, then
            `restoreChoices()` with it stored, each leaving the emptied Format popup ["Best"].
+           CR2b (CAM-7): P13 `cameraPreviewStep` over every step and each first-match boundary
+           (hidden, a display, a recording in each phase, countdown, starting, landing, stopping,
+           a busy recorder, no camera, the three unauthorized grants, a failure, authorized),
+           counting the `grant` and `failure` calls; P14 on the hidden panel, the well's row shown
+           with Camera (200 × 150, the card ≥ 150 pt taller) and hidden with a display, and
+           `CameraPreviewWell`'s `showMessage` and `show`; P15 comment-stripped reads: the sync in
+           `show(`, `controlChanged(`, `syncPhase(` and `armSyncTimer(`, `panelWillClose(`'s first
+           statement `panelClosing = true` and its discard but no sync, `show(` clearing
+           `panelClosing`, the sync reading it, `prepareCamera(`'s `preview: true` and
+           `preparedCameraFailure`, `startCamera(`'s `adopting: mayAsk`.
 
 Mutants (each a `--mutant` edit of a copy of `--sources`), run by default in the section(s)
 `MUTANT_SECTION` names — `values` unless named; `tool`, `panel`, `granted` (which need the
@@ -145,6 +171,17 @@ camera), or `values,tool` for `format-size-lowest`:
   format-unpersisted  the format key's write deleted                           → P11
   format-rebuild-skipped-on-match  the `defer` deleted, the rebuild after the early return → P12
   format-ignored      both resolutions back to best (`cameraFormat` read as nil) → G10
+  session-queue-per-capture  each capture its own session queue again       → G12, G14
+  stop-answers-early  `stop`'s completion hopped to main before the queue's stop → G8
+  preview-tool-capture  `prepareCamera` builds with `preview: false`           → G13
+  tool-adopts         `adopting` dropped from `takeCameraCapture`'s condition  → G14
+  prepare-retries-thrown  `prepareCamera`'s matching-record return removed     → G15
+  preview-without-grant  the step's grant step removed                         → P13
+  preview-builds-in-countdown  countdown and starting step to prepare          → P13
+  preview-retries-failure  the step's failure step removed                     → P13
+  preview-row-always  the well's row never hidden                              → P14
+  preview-unsynced-phase  `syncPhase`'s sync removed                           → P15
+  preview-builds-on-close  `panelWillClose`'s `panelClosing = true` removed    → P15
 
 Exit (cache_pass_probe.py's rule): a plain run exits 0 iff no row failed (a skip by name is
 not a failure) and 1 when one did; a build failure is B0's FAIL. A `--mutant` run exits 1 when
@@ -170,9 +207,11 @@ ROWS = {
     "values": ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12a", "V12b",
                "V12c", "V12d", "V13", "V14", "V15", "V16", "V17", "V18", "V19", "V20", "V21"],
     "landing": ["L1", "L2", "L3"],
-    "granted": ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10"],
+    "granted": ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12",
+                "G13", "G14", "G15"],
     "tool": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"],
-    "panel": ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12"],
+    "panel": ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13",
+              "P14", "P15"],
 }
 SECTION_WALL = 180
 STEM_EPOCH = 1793034873   # 2026-10-26 17:14:33 UTC
@@ -182,6 +221,7 @@ HOLD_BOUND = 1.0          # CameraCapture.warmUpBound
 HOLD_SLACK = 0.15         # the bound's timer and the hop to main
 WARM_UP_RUN = 5           # CameraCapture.warmUpRun, written here rather than read from Swift
 PREPARED_START_MAX = 0.3  # G7: a start that adopts a warm prepared capture answers within this
+STOP_ANSWER_MAX = 5.0     # G8: `stop`'s completion answers within this
 INFO_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -225,6 +265,10 @@ JOIN_WEAK = """        capture.start { [weak prepared] error in
             waiting?(error)
         }
 """
+# `stop`'s completion, on the queue after the stop's work; `stop-answers-early` hops it to main
+# before the queue runs.
+STOP_COMPLETION = "            if let completion { DispatchQueue.main.async(execute: completion) }\n"
+STOP_QUEUE = "        sessionQueue.async { [self] in\n            if first {\n"
 # name: (the rows it must fail, [(file, before, after), ...])
 MUTANTS = {
     "format-any-shape": (["V1"], [
@@ -340,6 +384,46 @@ MUTANTS = {
         ("ScreenRecorder+Camera.swift",
          "choice.cameraFormat, in: facts.formats, active: facts.activeFormat)",
          "nil, in: facts.formats, active: facts.activeFormat)")]),
+    # CR2b (spec §11 CAM-7): the preview and #373.
+    "session-queue-per-capture": (["G12", "G14"], [
+        ("CameraCapture.swift", "    private let sessionQueue = CameraCapture.sharedSessionQueue\n",
+         '    private let sessionQueue = DispatchQueue(label: "com.kgalligan.FrameJob.camera.session")\n')]),
+    "stop-answers-early": (["G8"], [
+        ("CameraCapture.swift", STOP_COMPLETION, ""),
+        ("CameraCapture.swift", STOP_QUEUE,
+         "        if let completion { DispatchQueue.main.async(execute: completion) }\n" + STOP_QUEUE)]),
+    "preview-tool-capture": (["G13"], [
+        ("ScreenRecorder+CameraPrepare.swift",
+         "capture = try CameraCapture(device: device, format: format, preview: true)",
+         "capture = try CameraCapture(device: device, format: format, preview: false)")]),
+    "tool-adopts": (["G14"], [
+        ("ScreenRecorder+CameraPrepare.swift", "        if adopting, let prepared = preparedCamera,\n",
+         "        if let prepared = preparedCamera,\n")]),
+    "prepare-retries-thrown": (["G15"], [
+        ("ScreenRecorder+CameraPrepare.swift",
+         "        if let failure = preparedCameraFailure, failure.deviceID == id, failure.format == format {\n"
+         "            return\n        }\n", "")]),
+    "preview-without-grant": (["P13"], [
+        ("RecorderPanelController+CameraPreview.swift",
+         "        guard grant() == .authorized else { return .message(Self.previewGrantSentence) }\n",
+         "")]),
+    "preview-builds-in-countdown": (["P13"], [
+        ("RecorderPanelController+CameraPreview.swift",
+         "        case .countdown, .starting: return .prepared\n",
+         "        case .countdown, .starting: return .prepare\n")]),
+    "preview-retries-failure": (["P13"], [
+        ("RecorderPanelController+CameraPreview.swift",
+         "        if let failure = failure() { return .failed(failure) }\n", "")]),
+    "preview-row-always": (["P14"], [
+        ("RecorderPanelController+CameraPreview.swift", "        let hidden = !cameraSelected\n",
+         "        let hidden = false\n")]),
+    "preview-unsynced-phase": (["P15"], [
+        ("RecorderPanelController+Pause.swift",
+         "        refreshStatusLabel()\n        syncCameraPreview()\n",
+         "        refreshStatusLabel()\n")]),
+    "preview-builds-on-close": (["P15"], [
+        ("RecorderPanelController.swift", "        panelClosing = true\n        switch phase {\n",
+         "        switch phase {\n")]),
 }
 # The section a mutant runs when `--only` is not given.
 MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
@@ -353,7 +437,12 @@ MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
                   "format-size-lowest": "values,tool", "format-after-grant": "tool",
                   "camera-format-elsewhere-admitted": "tool", "format-popup-live": "panel",
                   "format-unpersisted": "panel", "format-rebuild-skipped-on-match": "panel",
-                  "format-ignored": "granted"}
+                  "format-ignored": "granted", "session-queue-per-capture": "granted",
+                  "stop-answers-early": "granted", "preview-tool-capture": "granted",
+                  "tool-adopts": "granted", "prepare-retries-thrown": "granted",
+                  "preview-without-grant": "panel", "preview-builds-in-countdown": "panel",
+                  "preview-retries-failure": "panel", "preview-row-always": "panel",
+                  "preview-unsynced-phase": "panel", "preview-builds-on-close": "panel"}
 
 
 def run(command, **kw):
@@ -495,7 +584,37 @@ def panel_source_rows(sources):
         reads.append((signature, body is not None and all(w in body for w in wanted), wanted))
     rows["P9"] = (all(ok for _, ok, _ in reads),
                   "; ".join(f"{sig[5:-1]} names {' and '.join(w)} {ok}" for sig, ok, w in reads))
+    rows["P15"] = preview_source_row(sources, base)
     return rows
+
+
+def preview_source_row(sources, base):
+    """P15 (CR2b, CAM-7 (5)): comment-stripped reads of the preview's wiring."""
+    showing = uncommented(sources / "RecorderPanelController+Showing.swift")
+    pause = uncommented(sources / "RecorderPanelController+Pause.swift")
+    preview = uncommented(sources / "RecorderPanelController+CameraPreview.swift")
+    prepare = uncommented(sources / "ScreenRecorder+CameraPrepare.swift")
+    camera = uncommented(sources / "ScreenRecorder+Camera.swift")
+    checks = []
+    for text, signature, wanted, unwanted in (
+            (showing, "func show(", ["syncCameraPreview(", "panelClosing = false"], []),
+            (base, "func controlChanged(", ["syncCameraPreview("], []),
+            (pause, "func syncPhase(", ["syncCameraPreview("], []),
+            (showing, "func armSyncTimer(", ["syncCameraPreview("], []),
+            (base, "func panelWillClose(", ["discardPreparedCamera("], ["syncCameraPreview("]),
+            (preview, "func syncCameraPreview(", ["panelClosing"], []),
+            (prepare, "func prepareCamera(", ["preview: true", "preparedCameraFailure"], []),
+            (camera, "func startCamera(", ["adopting: mayAsk"], [])):
+        body = body_of(text, signature)
+        ok = (body is not None and all(w in body for w in wanted)
+              and not any(u in body for u in unwanted))
+        checks.append((f"{signature[5:-1]} names {' and '.join(wanted)}"
+                       + (f", not {' '.join(unwanted)}" if unwanted else ""), ok))
+    body = body_of(base, "func panelWillClose(") or ""
+    statements = [line.strip() for line in body[body.find("{") + 1:].splitlines() if line.strip()]
+    first = statements[0] if statements else None
+    checks.append((f"panelWillClose's first statement {first!r}", first == "panelClosing = true"))
+    return (all(ok for _, ok in checks), "; ".join(f"{what} {ok}" for what, ok in checks))
 
 
 def fixtures(here):
@@ -558,9 +677,17 @@ def prepared_rows(facts):
                   + ", ".join(f"{m['frames']}/{r}" for r, m in ratios)
                   + f"; note {g7.get('note')}; {g7.get('error') or g7.get('stopError') or ''}")
     g8 = facts.get("G8") or {}
-    rows["G8"] = (g8.get("held") is True and g8.get("slotNil") is True and g8.get("running") is False,
+    seconds = g8.get("seconds")
+    did_stop = g8.get("didStopSeconds")
+    rows["G8"] = (g8.get("held") is True and g8.get("slotNil") is True and seconds is not None
+                  and seconds < STOP_ANSWER_MAX and g8.get("running") is False
+                  and g8.get("didStopFirst") is True,
                   f"a capture prepared {g8.get('held')}; after discardPreparedCamera the slot nil "
-                  f"{g8.get('slotNil')}, its session running {g8.get('running')}")
+                  f"{g8.get('slotNil')}; stop's completion answered "
+                  f"{'never' if seconds is None else f'in {seconds:.3f} s'} (< {STOP_ANSWER_MAX:g} s), "
+                  f"its session running then {g8.get('running')}; the session's did-stop "
+                  f"{'never' if did_stop is None else f'at {did_stop:.3f} s'}, before the completion "
+                  f"{g8.get('didStopFirst')}")
     g9 = facts.get("G9") or {}
     took = g9.get("startSeconds")
     ceiling = g9.get("ceiling") or 20
@@ -576,6 +703,73 @@ def prepared_rows(facts):
                   f"{len(g9.get('segments') or [])} segment(s), note {g9.get('note')}; "
                   f"{g9.get('error') or g9.get('stopError') or ''}")
     rows["G10"] = chosen_format_row(facts.get("G10") or {})
+    rows.update(preview_rows(facts, rate))
+    return rows
+
+
+def recorded(out, rate, size=None):
+    """(ok, detail) for a CR2b start's 2 s: answered with no error, one segment, ≥ 98 % frames at
+    `rate` by G3's decode, and the file `size` (width, height) when given."""
+    segments = out.get("segments") or []
+    ratios = [decoded_ratio(path, rate) for path in segments]
+    sized = size is None or all((m["width"], m["height"]) == size for _, m in ratios)
+    took = out.get("startSeconds")
+    ok = (not out.get("error") and not out.get("stopError") and len(segments) == 1 and sized
+          and all(r is not None and r >= FRAMES_PASS for r, _ in ratios))
+    return ok, (f"startCamera answered in {took if took is None else round(took, 3)} s; "
+                f"{len(segments)} segment(s), files "
+                + ", ".join(f"{m['width']}×{m['height']} {m['frames']}/{r}" for r, m in ratios)
+                + f"; note {out.get('note')}; {out.get('error') or out.get('stopError') or ''}")
+
+
+def preview_rows(facts, rate):
+    """G11–G15 (CR2b, CAM-7): #373's two rebuilds, the layer, a tool start beside a prepared
+    capture, a thrown prepare."""
+    rows = {}
+    g11 = facts.get("G11") or {}
+    if g11.get("skip"):
+        rows["G11"] = ("skip", g11["skip"])
+    else:
+        match = re.match(r"^(\d+)x(\d+)@([\d.]+)$", g11.get("row") or "")
+        if not match:
+            rows["G11"] = (False, f"no row was chosen: {g11}")
+        else:
+            ok, detail = recorded(g11, float(match[3]), (int(match[1]), int(match[2])))
+            rows["G11"] = (ok and g11.get("firstAnswered") is True and g11.get("rebuilt") is True
+                           and g11.get("adopted") is True,
+                           f"best {g11.get('best')} answered {g11.get('firstAnswered')}, then row "
+                           f"{g11.get('row')} rebuilt in the same turn {g11.get('rebuilt')}; adopted "
+                           f"{g11.get('adopted')}; {detail}")
+    g12 = facts.get("G12") or {}
+    ok, detail = recorded(g12, rate)
+    rows["G12"] = (ok and g12.get("prepared") is True and g12.get("answered") is True
+                   and g12.get("adopted") is False,
+                   f"prepared {g12.get('prepared')}, answered {g12.get('answered')}, marked stopped on "
+                   f"its own; adopted {g12.get('adopted')} (want False: rebuilt); {detail}")
+    g7 = facts.get("G7") or {}
+    tool_layer = facts.get("toolLayer")
+    rows["G13"] = (g7.get("layer") is True and g7.get("layerSession") is True
+                   and g7.get("connection") is True and g7.get("mirrored") is False
+                   and tool_layer is False,
+                   f"G7's prepared capture: a previewLayer {g7.get('layer')}, on its session "
+                   f"{g7.get('layerSession')}, a connection {g7.get('connection')}, mirrored "
+                   f"{g7.get('mirrored')}; G0's tool start's capture a previewLayer {tool_layer}")
+    g14 = facts.get("G14") or {}
+    ok, detail = recorded(g14, rate)
+    rows["G14"] = (ok and g14.get("prepared") is True and g14.get("adopted") is False
+                   and g14.get("sessionLayer") is False and g14.get("preparedAtCall") is False,
+                   f"prepared {g14.get('prepared')}, answered {g14.get('answered')}; a tool start: "
+                   f"adopted {g14.get('adopted')}, its capture a previewLayer "
+                   f"{g14.get('sessionLayer')}, the slot after the call "
+                   f"{'nil' if g14.get('preparedAtCall') is False else g14.get('preparedAtCall')}; "
+                   f"{detail}")
+    g15 = facts.get("G15") or {}
+    rows["G15"] = (all(g15.get(k) is True for k in ("blocked", "kept", "cleared", "built"))
+                   and not g15.get("error"),
+                   f"a record at best: prepareCamera built nothing {g15.get('blocked')}, the record "
+                   f"kept {g15.get('kept')}; discardPreparedCamera cleared it {g15.get('cleared')}; "
+                   f"the next prepareCamera built {g15.get('built')}; let go and stopped "
+                   f"{g15.get('stopped')} {g15.get('error') or ''}")
     return rows
 
 
@@ -760,6 +954,7 @@ def main():
             swift_p5 = results.get("P5", (False, "the section did not answer it"))
             read = panel_source_rows(sources)
             results["P9"] = read["P9"]
+            results["P15"] = read["P15"]
             results["P5"] = (swift_p5[0] is True and read["P5"][0] is True,
                              f"{swift_p5[1]} | the answer's re-read: {read['P5'][1]}")
             visible = facts.get("visible") is False and facts.get("visibleAtEnd") is False

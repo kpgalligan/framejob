@@ -11,21 +11,33 @@ import AppKit
 /// `SpikeCamera`, `spikeMakeWriter` and `spikeFinishWriter`.
 ///
 /// **The format is held.** macOS has no `.inputPriority` preset, so a session
-/// may re-take the device's format when it starts: the device is locked for
-/// configuration in `init`, the format and both frame durations (its maximum
-/// rate, `spikeApplyFormat`'s lock) are set under the lock, set AGAIN once
-/// `startRunning` returns, and the lock is let go only after
+/// may re-take the device's format when it starts: `start` locks the device
+/// for configuration, sets the format and both frame durations (its maximum
+/// rate, `spikeApplyFormat`'s lock) under the lock, sets them AGAIN once
+/// `startRunning` returns, and `stop` lets the lock go only after
 /// `stopRunning` (CR0's carry-over; its owner run kept the format with the
 /// format set again).
 ///
-/// **Two queues of its own**, the one exception to the recorder's no-queue
-/// rule, both forced by the framework: `startRunning` and `stopRunning` block
-/// their caller, so they run on `sessionQueue`; and a data output delivers
-/// its buffers on a serial queue it is given, `sampleQueue`, which alone
-/// touches the armed writer — `beginSegment` and `endSegment` hand their
-/// writer to it, so the appends need no lock. Every report to the machine
-/// is stamped where it arrives and hopped to main: `start`'s completion,
-/// `onSegmentStarted`, `endSegment`'s completion and `onStoppedOnItsOwn`.
+/// **Two queues**, the one exception to the recorder's no-queue rule, both
+/// forced by the framework: `startRunning` and `stopRunning` block their
+/// caller, so they run on `sessionQueue`; and a data output delivers its
+/// buffers on a serial queue it is given, `sampleQueue`, which alone touches
+/// the armed writer — `beginSegment` and `endSegment` hand their writer to
+/// it, so the appends need no lock. `sessionQueue` is ONE queue every capture
+/// shares (spec §11 CAM-7 (6), #373): the lock, the format and `startRunning`
+/// of one capture, and `stopRunning` and the unlock of another, run in the
+/// order they were asked for, so a capture built in the same main turn as
+/// another capture of its device is let go starts only after that stop, and
+/// lock and unlock pairs never interleave. Every report to the machine is
+/// stamped where it arrives and hopped to main: `start`'s completion,
+/// `onSegmentStarted`, `endSegment`'s completion, `stop`'s completion and
+/// `onStoppedOnItsOwn`.
+///
+/// **The preview** (CAM-7 (2)): a capture made with `preview: true` — only
+/// the panel's prepared one — carries an `AVCaptureVideoPreviewLayer` on its
+/// own session, made before it starts, its connection NOT mirrored, so the
+/// panel's well hosts it as a sublayer and no running session is ever
+/// reconfigured for it.
 ///
 /// **The stream is warm before the first segment** (spec §11 CAM-3's
 /// warm-up): a cold camera's first frames come slower than its rate, so
@@ -50,8 +62,12 @@ final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     private let format: AVCaptureDevice.Format
     private let frameDuration: CMTime?
     private let output = AVCaptureVideoDataOutput()
-    private let sessionQueue = DispatchQueue(label: "com.kgalligan.FrameJob.camera.session")
+    private static let sharedSessionQueue = DispatchQueue(label: "com.kgalligan.FrameJob.camera.session")
+    private let sessionQueue = CameraCapture.sharedSessionQueue
     private let sampleQueue = DispatchQueue(label: "com.kgalligan.FrameJob.camera.samples")
+    /// The preview's layer on `session`; nil unless made with `preview`.
+    let previewLayer: AVCaptureVideoPreviewLayer?
+    /// `sessionQueue` only: the configuration lock is held.
     private var holding = false
     private var stopped = false
     private var observers: [NSObjectProtocol] = []
@@ -94,12 +110,13 @@ final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     /// interruption, the device disconnected — with the sentence to say.
     var onStoppedOnItsOwn: ((String) -> Void)?
 
-    /// MAIN THREAD. Builds the session for `device` at `formats[format]` and
-    /// takes the configuration lock. Throws `RecorderError.cameraDevice` for
-    /// an index the device lacks, an input or output the session will not
-    /// take, or a lock it will not give. The caller has read the Camera
-    /// grant: `AVCaptureDeviceInput(device:)` prompts on `.notDetermined`.
-    init(device: AVCaptureDevice, format index: Int) throws {
+    /// MAIN THREAD. Builds the session for `device` at `formats[format]`,
+    /// with a preview layer on it when `preview`; the lock is `start`'s.
+    /// Throws `RecorderError.cameraDevice` for an index the device lacks, or
+    /// an input or output the session will not take. The caller has read the
+    /// Camera grant: `AVCaptureDeviceInput(device:)` prompts on
+    /// `.notDetermined`.
+    init(device: AVCaptureDevice, format index: Int, preview: Bool = false) throws {
         guard device.formats.indices.contains(index) else {
             throw RecorderError.cameraDevice(
                 "The camera \(device.localizedName) has no format \(index).")
@@ -110,6 +127,7 @@ final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         frameDuration =
             format.videoSupportedFrameRateRanges
             .max { $0.maxFrameRate < $1.maxFrameRate }?.minFrameDuration
+        previewLayer = preview ? AVCaptureVideoPreviewLayer() : nil
         super.init()
         let input: AVCaptureDeviceInput
         do {
@@ -129,15 +147,13 @@ final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         }
         session.addInput(input)
         session.addOutput(output)
-        do {
-            try device.lockForConfiguration()
-        } catch {
-            throw RecorderError.cameraDevice(
-                "The camera \(device.localizedName) could not be configured: "
-                    + error.localizedDescription)
+        if let previewLayer {
+            previewLayer.session = session
+            if let connection = previewLayer.connection, connection.isVideoMirroringSupported {
+                connection.automaticallyAdjustsVideoMirroring = false
+                connection.isVideoMirrored = false
+            }
         }
-        holding = true
-        applyFormat()
     }
 
     @available(*, unavailable)
@@ -145,8 +161,8 @@ final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         fatalError("CameraCapture does not support NSCoder")
     }
 
-    /// Under the held lock: the format, and both frame durations at its
-    /// maximum rate.
+    /// `sessionQueue`, under the held lock: the format, and both frame
+    /// durations at its maximum rate.
     private func applyFormat() {
         if device.activeFormat != format { device.activeFormat = format }
         if let frameDuration {
@@ -155,12 +171,24 @@ final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         }
     }
 
-    /// Starts the session on `sessionQueue`, the format and both frame
-    /// durations set again once it runs; `completion` on main, nil once the
-    /// stream is warm (or the bound passed), an error when it did not run.
+    /// On `sessionQueue`: takes the configuration lock, sets the format,
+    /// starts the session and sets the format again once it runs;
+    /// `completion` on main, nil once the stream is warm (or the bound
+    /// passed), an error when the lock was refused or the session did not
+    /// run.
     func start(completion: @escaping (Error?) -> Void) {
         observe()
         sessionQueue.async { [self] in
+            do {
+                try device.lockForConfiguration()
+            } catch {
+                let sentence =
+                    "The camera \(device.localizedName) could not be configured: "
+                    + error.localizedDescription
+                return DispatchQueue.main.async { completion(RecorderError.cameraDevice(sentence)) }
+            }
+            holding = true
+            applyFormat()
             session.startRunning()
             if session.isRunning { applyFormat() }
             guard session.isRunning else {
@@ -314,18 +342,25 @@ final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     // MARK: - Stopping
 
     /// MAIN THREAD, idempotent. Stops listening, then on `sessionQueue`
-    /// stops the session and lets the configuration lock go.
-    func stop() {
-        guard !stopped else { return }
-        stopped = true
-        observers.forEach(NotificationCenter.default.removeObserver)
-        observers = []
+    /// stops the session and lets the configuration lock go; `completion` on
+    /// main once that has run — also for a capture stopped before, after its
+    /// first stop's work.
+    func stop(completion: (() -> Void)? = nil) {
+        let first = !stopped
+        if first {
+            stopped = true
+            observers.forEach(NotificationCenter.default.removeObserver)
+            observers = []
+        }
         sessionQueue.async { [self] in
-            if session.isRunning { session.stopRunning() }
-            if holding {
-                device.unlockForConfiguration()
-                holding = false
+            if first {
+                if session.isRunning { session.stopRunning() }
+                if holding {
+                    device.unlockForConfiguration()
+                    holding = false
+                }
             }
+            if let completion { DispatchQueue.main.async(execute: completion) }
         }
     }
 

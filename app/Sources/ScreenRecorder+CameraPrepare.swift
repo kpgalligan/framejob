@@ -1,15 +1,20 @@
 import AVFoundation
 import AppKit
 
-/// A camera's capture PREPARED during the panel's countdown (camera-recording
-/// CR1c, spec §11 CAM-5): `prepareMicrophone`'s precedent for the camera.
+/// A camera's capture PREPARED by the panel (camera-recording CR1c, spec §11
+/// CAM-5; CR2b, CAM-7): `prepareMicrophone`'s precedent for the camera.
 /// CAM-3's warm-up holds `startCamera` until the stream runs at the format's
 /// rate — about 0.5 s on the built-in camera, on top of the session's own
-/// start — so the countdown builds and starts the capture at its first
-/// second, and `startCamera` ADOPTS it when it is the same device at the same
+/// start — so the panel builds and starts the capture while it shows Source
+/// Camera (`syncCameraPreview`, the countdown keeping it), with the preview's
+/// layer on it (`preview: true`, the only capture that has one), and the
+/// panel's `startCamera` ADOPTS it when it is the same device at the same
 /// format, not adopted before, with no failed start and no stop on its own.
 /// Otherwise it is let go and a fresh one is built, as before. The tool never
-/// prepares, so its start still pays the hold.
+/// prepares and never adopts (`adopting: false`, CAM-7 (7)), so its start
+/// still pays the hold. A capture that cannot be built is remembered
+/// (`preparedCameraFailure`, CAM-7 (8)) and not built again for that camera
+/// and format until `discardPreparedCamera`.
 ///
 /// **A start never calls `CameraCapture.start` twice.** The prepared
 /// capture's start completion is recorded on its `PreparedCamera`
@@ -28,6 +33,14 @@ import AppKit
 extension ScreenRecorder {
     /// One prepared capture: what it was made for, and what its start has
     /// answered so far. Main thread only.
+    /// A prepared capture that could not be built: for which camera and
+    /// format, and the sentence its `init` threw.
+    struct PreparedCameraFailure: Equatable {
+        let deviceID: String
+        let format: Int
+        let sentence: String
+    }
+
     final class PreparedCamera {
         let deviceID: String
         let format: Int
@@ -56,9 +69,10 @@ extension ScreenRecorder {
     /// camera, with the Camera grant `.authorized`, the camera connected and
     /// a format (the choice's, else CAM-3's best: CAM-6 (3)); otherwise it
     /// does nothing and leaves nothing behind. A prepared capture that `startCamera` could still adopt for
-    /// the same device and format is kept; any other is let go first. Blocks
-    /// main for the capture's construction; the session starts on its own
-    /// queue.
+    /// the same device and format is kept, and nothing is built while a
+    /// failed build's record names them (CAM-7 (8)); any other is let go
+    /// first. Blocks main for the capture's construction; the session starts
+    /// on its own queue.
     func prepareCamera(for choice: RecordingChoice) {
         guard state == .idle, choice.source == .camera, let id = choice.camera,
             RecordingGrant.cameraStatus == .authorized,
@@ -72,8 +86,18 @@ extension ScreenRecorder {
         if let prepared = preparedCamera, Self.adoptable(prepared, device: id, format: format) {
             return
         }
+        if let failure = preparedCameraFailure, failure.deviceID == id, failure.format == format {
+            return
+        }
         discardPreparedCamera()
-        guard let capture = try? CameraCapture(device: device, format: format) else { return }
+        let capture: CameraCapture
+        do {
+            capture = try CameraCapture(device: device, format: format, preview: true)
+        } catch {
+            preparedCameraFailure = PreparedCameraFailure(
+                deviceID: id, format: format, sentence: error.localizedDescription)
+            return
+        }
         let prepared = PreparedCamera(deviceID: id, format: format, capture: capture)
         capture.onStoppedOnItsOwn = { [weak prepared] sentence in
             prepared?.stoppedOnItsOwn = sentence
@@ -90,11 +114,12 @@ extension ScreenRecorder {
         }
     }
 
-    /// MAIN THREAD. Stops and forgets the prepared capture, if there is one;
-    /// idempotent.
+    /// MAIN THREAD. Stops and forgets the prepared capture, if there is one,
+    /// and a failed build's record; idempotent.
     func discardPreparedCamera() {
         preparedCamera?.capture.stop()
         preparedCamera = nil
+        preparedCameraFailure = nil
     }
 
     /// Whether a start for `device` at `format` may adopt `prepared` (CAM-5
@@ -107,11 +132,15 @@ extension ScreenRecorder {
 
     // MARK: - Take and start
 
-    /// `startCamera`'s capture: the prepared one, marked adopted, when it is
+    /// `startCamera`'s capture: the prepared one, marked adopted, when
+    /// `adopting` (the panel's start, never the tool's: CAM-7 (7)) and it is
     /// adoptable for `device` at `format`; else the prepared one is let go
-    /// and a fresh `CameraCapture` built (throwing as its `init` does).
-    func takeCameraCapture(device: AVCaptureDevice, format: Int) throws -> CameraCapture {
-        if let prepared = preparedCamera,
+    /// and a fresh `CameraCapture` built, with no preview layer (throwing as
+    /// its `init` does).
+    func takeCameraCapture(device: AVCaptureDevice, format: Int, adopting: Bool) throws
+        -> CameraCapture
+    {
+        if adopting, let prepared = preparedCamera,
             Self.adoptable(prepared, device: device.uniqueID, format: format)
         {
             prepared.adopted = true

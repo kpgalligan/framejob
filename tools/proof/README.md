@@ -24444,3 +24444,51 @@ Best: adopted under `PREPARED_START_MAX`, the file the row's size, ≥ 98 % fram
 nine keys, 7c's fourteen arguments) and `recording_proof.py` (fourteen arguments,
 `camera_format` a string) are re-aimed. The numbers are in `designs/camera-recording.md`'s
 CR2a record.
+
+## Camera recording CR2b — the preview and #373 (`camera_recording_probe.py` P13–P15, G8 re-aimed, G11–G15; spec §11 CAM-7)
+
+CR2b gives the recorder panel a 200 × 150 pt preview well under Format, shown only with Source
+Camera, hosting the `AVCaptureVideoPreviewLayer` of the capture the panel prepares
+(`CameraCapture(…, preview: true)`, made only by `prepareCamera`), and fixes #373: every
+capture's lock, format, `startRunning` and `stopRunning` run on ONE session queue all captures
+share, and `CameraCapture.stop(completion:)` answers once its stop has run. A tool's start
+(`mayAsk` false) never adopts the panel's prepared capture.
+
+```sh
+python3 tools/proof/camera_recording_probe.py --only panel                # P13–P15
+python3 tools/proof/camera_recording_probe.py --only granted              # G8, G11–G15 (needs the camera)
+python3 tools/proof/camera_recording_probe.py --mutant tool-adopts        # each of the eleven exits 1, in MUTANT_SECTION's section
+python3 tools/proof/camera_recording_probe.py --only granted --mutant no-hold   # G8 under no-hold: CR2-0's question
+```
+
+**P13** `cameraPreviewStep` over twenty cases — every step and each first-match boundary
+(hidden, a display source, a recording in each of the seven phases, countdown, starting,
+landing, stopping without a camera, a busy recorder, no camera, the three unauthorized grants,
+a failure, authorized) — counting the `grant` and `failure` closures: once each only where the
+step reaches them. **P14** on the hidden panel: the well's grid row hidden with a display row,
+shown with Camera via `controlChanged` (the well 200 × 150 after layout, the card's fitting
+height ≥ 150 pt taller), hidden again with a display row; `CameraPreviewWell`'s
+`showMessage("x")` and `show(_:)`. **P15** comment-stripped reads: `syncCameraPreview(` in
+`show(`, `controlChanged(`, `syncPhase(` and `armSyncTimer(`; `panelWillClose(`'s first
+statement `panelClosing = true`, its discard and no sync; `show(` clearing `panelClosing`;
+the sync reading it; `prepareCamera(`'s `preview: true` and `preparedCameraFailure`;
+`startCamera(`'s `adopting: mayAsk`. The prepared starts G7, G9 and G10 now call
+`startCamera(mayAsk: true)`, the panel's start, since only it adopts. **G8** a prepared capture
+let go, then `capture.stop { … }`: it answers within 5 s, its session not running, and the
+session's did-stop notification came BEFORE the completion (`isRunning` alone reads false as
+soon as a stop begins, so it cannot tell a completion hopped early). **G11** (#373, a format
+change) prepared at best and answered, then in one main turn prepared at G10's row, the 3 s
+countdown, the panel's start adopting it: one segment at the row's size, ≥ 98 % frames.
+**G12** (#373, the fallback) a prepared capture marked stopped on its own, so the panel's
+start lets it go and builds afresh in the same turn: one segment, ≥ 98 % frames. **G13** G7's
+prepared capture has a `previewLayer` on its own session with a connection not mirrored; G0's
+tool start's capture has none. **G14** a tool start beside a prepared capture: not adopted,
+no layer, the slot nil after the call, one segment at ≥ 98 % frames. **G15** a failed build's
+record at best: `prepareCamera` builds nothing and keeps it, `discardPreparedCamera` clears
+it, the next builds. Eleven mutants: `session-queue-per-capture` (G12, G14 — each capture its
+own queue again: their fresh starts deliver no frame; G11's rebuild records under it, so it is
+not named), `stop-answers-early` (G8), `preview-tool-capture` (G13), `tool-adopts` (G14),
+`prepare-retries-thrown` (G15), all `granted`; `preview-without-grant`,
+`preview-builds-in-countdown` and `preview-retries-failure` (P13), `preview-row-always` (P14),
+`preview-unsynced-phase` and `preview-builds-on-close` (P15), all `panel`. The numbers are in
+`designs/camera-recording.md`'s CR2b record.

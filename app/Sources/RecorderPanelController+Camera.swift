@@ -19,7 +19,7 @@ import AppKit
 /// carrying its `uniqueID` (app/CLAUDE.md "Popups"), or one row "None
 /// connected" with no id. Its selection is the stored `FrameJobRecordingCamera`
 /// when that camera is listed, else CAM-3 (7)'s default. It is rebuilt on
-/// `show()` while idle; a camera plugged in while the panel is up is CR2's.
+/// `show()` while idle; a camera plugged in while the panel is up is CR2c's.
 /// A Continuity Camera's row reads "<name> (Continuity Camera)" (CAM-6 (5)).
 ///
 /// **The Format popup** (CR2a, spec §11 CAM-6) lists "Best (<CAM-3's pick>)"
@@ -39,6 +39,9 @@ import AppKit
 /// precedent, `hidesForRecording`): nothing on screen is filmed, so the rows
 /// lock, the meter is live, and Record reads Stop with the Pause / Resume
 /// button beside it.
+///
+/// **The live preview** under Format is `+CameraPreview.swift`'s (spec §11
+/// CAM-7): its well, its step and its sync.
 extension RecorderPanelController {
     static let cameraTag = 3
     static let cameraTitle = "Camera"

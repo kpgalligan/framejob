@@ -2368,7 +2368,9 @@ free.
   sync timer, `setNote` and the refit, a pure move out of the base file,
   camera-recording CR1-0, +`Camera` — Source ▸ Camera, the Camera popup
   (camera-recording CR1c, spec §11 CAM-5) and the Format popup under it
-  (CR2a, CAM-6)) · `RecorderStatusItem.swift`
+  (CR2a, CAM-6), +`CameraPreview` — the preview's step rule and its sync,
+  CR2b, CAM-7)) · `CameraPreviewWell.swift` (the camera's preview well
+  under Format, CR2b) · `RecorderStatusItem.swift`
   — File ▸ New
   Recording… A `.floating`, `.nonactivatingPanel` with `hidesOnDeactivate`
   false, ONE instance, no window delegate. `show()` makes it key only when
@@ -2382,7 +2384,10 @@ free.
   Microphone Only and Camera, and comes back only with a note. **A camera**
   (the Source row "Camera", session-only, `+Camera`) keeps the panel UP as a
   voice-over does, and its countdown spends the camera's warm-up on a
-  prepared capture (`ScreenRecorder+CameraPrepare.swift`). The panel
+  prepared capture (`ScreenRecorder+CameraPrepare.swift`). That prepared
+  capture lives while the panel shows Camera, its layer the panel's live
+  preview (CR2b, spec §11 CAM-7); the panel's start adopts it and a tool's
+  start (`record_screen`) never does. The panel
   remembers nine `FrameJobRecording…` keys (the Camera's and the Format's
   among them; the type doc lists them), and a probe or the harness that
   touches them handles all nine. The
@@ -2431,10 +2436,15 @@ free.
   the warm-up hold. `CameraDevices.swift` is the camera list, CAM-3's best
   format and its sentences; `CameraCapture.swift` the session, the
   configuration lock, the data output, the writers and the warm-up's running
-  state, `CameraCapture+WarmUp.swift` the warm-up's rule and its facts' type
+  state (its session queue is ONE queue shared by every capture, holding the
+  configuration lock from `start` to `stop`, so a capture rebuilt right after
+  another of its device is let go starts after that stop — #373, CAM-7
+  (6)), `CameraCapture+WarmUp.swift` the warm-up's rule and its facts' type
   (`WarmUp`, `isSteady`, the run, tolerance and bound);
-  `ScreenRecorder+CameraPrepare.swift` the panel countdown's prepared
-  capture (CR1c, CAM-5), which `startCamera` adopts or joins: its start's
+  `ScreenRecorder+CameraPrepare.swift` the panel's prepared capture (CR1c,
+  CAM-5; built with the preview's layer and a thrown build remembered,
+  CAM-7), which the panel's `startCamera` adopts or joins and a tool's never
+  does (`adopting: mayAsk`): its start's
   completion is the one retained closure that holds its object strongly, by
   design; `RecordingSetup+Camera.swift` the camera's stem, grant read,
   refusal and the press's camera step.
@@ -3125,8 +3135,9 @@ inside the video pump), and the spend-month
 queue (`AssistantSpendMonth.queue`, Settings' ledger fold, answered by a
 main hop), the waveform tap's main hop (`WaveformTaps.finished` →
 `DispatchQueue.main.async`, from Metal's completion thread), the camera
-recorder's two (`CameraCapture.sessionQueue` for `startRunning` and
-`stopRunning`; `CameraCapture.sampleQueue`, the data output's delegate queue
+recorder's two (`CameraCapture.sessionQueue` — one static queue shared by
+every capture — for the configuration lock, `startRunning`, `stopRunning`
+and the unlock; `CameraCapture.sampleQueue`, the data output's delegate queue
 and the only place the armed writer and the warm-up are touched), and — not a
 queue but a seam all the same — the graphic
 prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-26, G-36). Beyond the camera's

@@ -132,7 +132,8 @@ extension RecorderPanelController {
 
     /// Draws the phase: the button's title and enabled state, the controls
     /// locked while anything is in flight, the countdown numeral, the
-    /// footnote, and the window refitted to whatever appeared or went.
+    /// footnote, the camera preview (CAM-7), and the window refitted to
+    /// whatever appeared or went.
     func syncPhase() {
         syncControlsEnabled()
         syncPauseButton()
@@ -162,6 +163,7 @@ extension RecorderPanelController {
         countdownLabel.stringValue = countdown ?? ""
         countdownLabel.isHidden = countdown == nil
         refreshStatusLabel()
+        syncCameraPreview()
         fitWindowToContent()
     }
 

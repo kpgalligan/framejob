@@ -71,6 +71,7 @@ extension RecorderPanelController {
             [NSGridCell.emptyContentView, includeFrameJobCheckbox],
             [fieldLabel("Camera:"), cameraPopup],
             [fieldLabel("Format:"), formatPopup],
+            [NSGridCell.emptyContentView, cameraPreview],
             [fieldLabel("Microphone:"), microphoneRow],
             [fieldLabel("System Audio:"), systemAudioSwitch],
             [fieldLabel("Show Clicks:"), showClicksSwitch],

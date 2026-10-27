@@ -253,3 +253,59 @@ its code.
      <name> has no format <wanted>. Its formats are best, <the rows spelled, joined ", ">."
      The answer's `camera.format` and the canvas rule are unchanged: the format recorded,
      spelled.
+
+- **CAM-7 — The camera's preview and #373 (CR2b), recorded before its code; amends CAM-5 (2)'s
+  hot-plug clause and CAM-5 (5)'s "the countdown's start builds".** With Source Camera the
+  recorder panel shows a live preview of the chosen camera, on the capture CAM-5 (5) prepares.
+  CAM-3, CAM-5 and CAM-6 stand except where this entry amends them; CAM-5 (5)'s "The tool never
+  prepares, so its start still pays the hold" stands (7). CAM-5 (2)'s "Hot-plug while the panel
+  is up is CR2's" is now CR2c's.
+  1. **The well.** A grid row with no label, holding a 200 × 150 pt well, sits right under
+     Format. The well is `DS.canvasVoid` with a 1 pt `DS.border`, and the picture is aspect-fit
+     (`.resizeAspect`). It is NOT mirrored (`automaticallyAdjustsVideoMirroring` false,
+     `isVideoMirrored` false): what is seen is what lands. The row is shown only with Source
+     Camera; with any other source the panel is as it was.
+  2. **Its layer** is an `AVCaptureVideoPreviewLayer` made with the PREPARED capture
+     (`CameraCapture(…, preview: true)`, on that capture's session), so hosting it is a sublayer
+     swap and never reconfigures a running session. Only `prepareCamera` asks for a layer: a
+     fresh capture built by `startCamera`, and every capture of the tool, has none.
+  3. **The step**, first match wins: (1) the panel not visible (`isVisible` false, or closing)
+     or Source not Camera → off; (2) the recorder holds a camera recording → recording; (3) the
+     phase is the countdown or starting → prepared; (4) any other phase but idle, or the
+     recorder not idle → blank; (5) no camera chosen → "No camera is connected."; (6) the
+     Camera grant not authorized → "The preview shows once Frame Job may use the camera.";
+     (7) the prepared capture for the chosen camera and format stopped on its own, failed to
+     start, or failed to be built (8) → that sentence; (8) → prepare. The grant is read only at
+     step 6 and the failure only at step 7. Showing the panel never prompts.
+  4. **What each step does.** Off and the two sentences let the prepared capture go when the
+     panel's phase and the recorder are both idle, and leave the well blank or showing the
+     sentence. A failure stops the prepared capture but keeps its record, so the step is not
+     retried, and shows its sentence. Prepare calls `prepareCamera` and shows its layer.
+     Prepared shows the prepared capture's layer if there is one and never builds. Recording
+     shows the recording's capture's layer, else "The camera is recording." Blank is blank.
+     The row's visibility follows Source Camera on every step, and a change refits the panel.
+  5. **When it steps**: at the end of `show()`, which first lets a failed prepared capture (or
+     a failed build's record) go while idle, so showing the panel again retries; at the end of
+     every control change; whenever the phase is drawn; and at the one-second tick while the
+     panel is visible. Closing the panel marks it closing before anything else, so the
+     countdown's cancel and a starting stop never build; it lets the prepared capture go and
+     empties the well. Cancel, an abandoned start and a failed start still let the capture go
+     (CAM-5 (5)); the idle step that follows prepares a fresh one, so the camera's light stays
+     on while the panel shows Camera.
+  6. **#373 fixed.** Every capture runs its device's configuration lock, its format,
+     `startRunning` and the format again (`start`), and `stopRunning` then the unlock
+     (`stop`), on ONE serial queue all captures share; the lock moves there from `init`, and a
+     lock the device refuses is the start's error, in the sentence `init` gave it ("The camera
+     <name> could not be configured: …"). So a capture built in the same main turn as another
+     capture of its device is let go starts only after that stop, and lock and unlock pairs
+     never interleave. `CameraCapture.stop(completion:)` answers on main once its stop has run
+     on the queue, also when the capture was stopped before.
+  7. **A tool start never adopts.** `startCamera` adopts the prepared capture only for the
+     panel's own start (`mayAsk` true). A tool's start lets the prepared capture go and builds
+     its own, with no layer, paying CAM-3's hold; the panel's well reads "The camera is
+     recording." until that recording ends, and its idle step then prepares again.
+  8. **A thrown prepare is remembered.** When `prepareCamera`'s capture cannot be built, the
+     recorder records the camera, the format and the sentence; `prepareCamera` does not build
+     again while that record matches the camera and format, and the well shows the sentence.
+     Letting the prepared capture go (`discardPreparedCamera`) clears the record: leaving Source
+     Camera, showing the panel again, or Cancel retries once.

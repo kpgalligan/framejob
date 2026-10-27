@@ -5,7 +5,10 @@
 // source (`panel`) and the countdown's prepared capture (granted G7–G9);
 // CR2a (CAM-6): the camera's formats — the rows, the choice, the tool's
 // `camera_format`, the panel's Format popup, and a recording at a chosen
-// format (granted G10).
+// format (granted G10); CR2b (CAM-7): the preview's step, row and well
+// (panel P13, P14), the preview layer on the prepared capture, #373's
+// rebuilds, a tool start beside a prepared capture and a thrown prepare
+// (granted G8 re-aimed, G11–G15).
 // Compiled AS `main.swift` beside every file of
 // app/Sources (but its own main.swift) through `swift_build.build`, with an
 // Info.plist section holding the camera's and the microphone's usage strings;
@@ -388,15 +391,144 @@ func granted(_ request: [String: Any]) {
     // G10 (CR2a): a prepared capture at a chosen format, adopted and recorded.
     probeSpin(1)
     probeFacts["G10"] = chosenFormatStart(prepared, camera: camera)
+    // G11, G12, G14, G15 (CR2b, CAM-7): #373's two rebuilds, a tool start
+    // beside a prepared capture, a thrown prepare.
+    probeSpin(1)
+    probeFacts["G11"] = formatChangeStart(prepared, camera: camera)
+    probeSpin(1)
+    probeFacts["G12"] = fallbackStart(prepared)
+    probeSpin(1)
+    probeFacts["G14"] = toolBesidePrepared(prepared)
+    probeSpin(1)
+    probeFacts["G15"] = thrownPrepare(prepared)
+}
+
+/// The camera's first Format row whose spelling is not the best format's,
+/// and the best's spelling; a nil row when there is none.
+func nonBestRow(_ camera: CameraDeviceFacts) -> (row: String?, best: String?) {
+    let best = CameraDevices.bestFormat(camera.formats, active: camera.activeFormat)
+        .map { CameraDevices.spelled(camera.formats[$0]) }
+    let rows = CameraDevices.formatRows(camera.formats).map { CameraDevices.spelled(camera.formats[$0]) }
+    return (rows.first(where: { $0 != best }), best)
+}
+
+/// Waits up to 5 s for `recorder`'s prepared start to answer.
+@discardableResult
+func awaitPrepared(_ recorder: ScreenRecorder) -> Bool {
+    probeSpin(5) { recorder.preparedCamera?.answered == true }
+}
+
+/// `startCamera` for `choice` on `recorder` (answered within the arm
+/// ceiling), then `seconds` recorded and stopped: whether it adopted the
+/// capture prepared before the call, the slot right after the call and after
+/// the answer, and whether the session's capture has a preview layer.
+func startAndRecord(
+    _ recorder: ScreenRecorder, _ choice: RecordingChoice, mayAsk: Bool, seconds: Double = 2
+) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let prepared = recorder.preparedCamera?.capture
+    var started: Error??
+    let called = Date()
+    var startSeconds: Double?
+    recorder.startCamera(choice: choice, mayAsk: mayAsk, onFinish: { _ in }) {
+        startSeconds = Date().timeIntervalSince(called)
+        started = .some($0)
+    }
+    out["preparedAtCall"] = recorder.preparedCamera != nil
+    out["adopted"] = prepared != nil && recorder.cameraSession?.capture === prepared
+    out["sessionLayer"] = recorder.cameraSession.map { $0.capture.previewLayer != nil } ?? NSNull()
+    probeSpin(ScreenRecorder.armCeiling + 2) { started != nil }
+    out["startSeconds"] = startSeconds ?? NSNull()
+    out["preparedAfter"] = recorder.preparedCamera != nil
+    guard let answer = started else {
+        out["error"] = "the start did not answer"
+        return out
+    }
+    if let answer {
+        out["error"] = "the start failed: \(answer.localizedDescription)"
+        return out
+    }
+    return out.merging(recordAndStop(recorder, seconds)) { $1 }
+}
+
+/// G11 (#373, a format change): prepared at best and answered, then in one
+/// main turn prepared again at the first non-best row — the first capture let
+/// go and the second built and started in the same turn — then the
+/// countdown's 3 s and the panel's start, which adopts the second.
+func formatChangeStart(_ base: RecordingChoice, camera: CameraDeviceFacts) -> [String: Any] {
+    let (found, best) = nonBestRow(camera)
+    guard let row = found else {
+        return ["skip": "the camera \(camera.name) lists no format but its best (\(best ?? "none"))"]
+    }
+    let recorder = ScreenRecorder()
+    var out: [String: Any] = ["row": row, "best": best ?? NSNull()]
+    recorder.prepareCamera(for: base)
+    out["firstAnswered"] = awaitPrepared(recorder)
+    let first = recorder.preparedCamera?.capture
+    var choice = base
+    choice.cameraFormat = row
+    recorder.prepareCamera(for: choice)
+    out["rebuilt"] = first != nil && recorder.preparedCamera != nil
+        && recorder.preparedCamera?.capture !== first
+    probeSpin(Double(RecorderPanelController.countdownSeconds))
+    return out.merging(startAndRecord(recorder, choice, mayAsk: true)) { $1 }
+}
+
+/// G12 (#373, the fallback): a prepared capture marked stopped on its own,
+/// so the panel's start lets it go and builds a fresh one in the same turn.
+func fallbackStart(_ choice: RecordingChoice) -> [String: Any] {
+    let recorder = ScreenRecorder()
+    recorder.prepareCamera(for: choice)
+    var out: [String: Any] = ["answered": awaitPrepared(recorder)]
+    out["prepared"] = recorder.preparedCamera != nil
+    recorder.preparedCamera?.stoppedOnItsOwn = "probe"
+    return out.merging(startAndRecord(recorder, choice, mayAsk: true)) { $1 }
+}
+
+/// G14 (CAM-7 (7)): a tool's start (`mayAsk` false) beside a prepared
+/// capture builds its own, with no layer, and lets the prepared one go.
+func toolBesidePrepared(_ choice: RecordingChoice) -> [String: Any] {
+    let recorder = ScreenRecorder()
+    recorder.prepareCamera(for: choice)
+    var out: [String: Any] = ["answered": awaitPrepared(recorder)]
+    out["prepared"] = recorder.preparedCamera != nil
+    return out.merging(startAndRecord(recorder, choice, mayAsk: false)) { $1 }
+}
+
+/// G15 (CAM-7 (8)): a failed build's record for the camera at best blocks
+/// `prepareCamera` until `discardPreparedCamera` clears it.
+func thrownPrepare(_ choice: RecordingChoice) -> [String: Any] {
+    guard let id = choice.camera, let device = CameraDevices.device(withID: id) else {
+        return ["error": "the camera is gone"]
+    }
+    let facts = CameraDevices.facts(of: device)
+    guard let best = CameraDevices.chosenFormat(nil, in: facts.formats, active: facts.activeFormat)
+    else { return ["error": "the camera lists no format"] }
+    let recorder = ScreenRecorder()
+    recorder.preparedCameraFailure = ScreenRecorder.PreparedCameraFailure(
+        deviceID: id, format: best, sentence: "probe")
+    recorder.prepareCamera(for: choice)
+    var out: [String: Any] = [
+        "blocked": recorder.preparedCamera == nil,
+        "kept": recorder.preparedCameraFailure?.sentence == "probe",
+    ]
+    recorder.discardPreparedCamera()
+    out["cleared"] = recorder.preparedCameraFailure == nil
+    recorder.prepareCamera(for: choice)
+    out["built"] = recorder.preparedCamera != nil
+    let capture = recorder.preparedCamera?.capture
+    recorder.discardPreparedCamera()
+    var stopped = false
+    capture?.stop { stopped = true }
+    out["stopped"] = probeSpin(5) { stopped }
+    return out
 }
 
 /// G10 (CAM-6 (3)): G7's prepared start at `camera`'s first Format row whose
 /// spelling is not the best format's; a skip by name when there is none.
 func chosenFormatStart(_ base: RecordingChoice, camera: CameraDeviceFacts) -> [String: Any] {
-    let best = CameraDevices.bestFormat(camera.formats, active: camera.activeFormat)
-        .map { CameraDevices.spelled(camera.formats[$0]) }
-    let rows = CameraDevices.formatRows(camera.formats).map { CameraDevices.spelled(camera.formats[$0]) }
-    guard let row = rows.first(where: { $0 != best }) else {
+    let (found, best) = nonBestRow(camera)
+    guard let row = found else {
         return ["skip": "the camera \(camera.name) lists no format but its best (\(best ?? "none"))"]
     }
     var choice = base
@@ -441,6 +573,8 @@ func grantedRun(_ request: [String: Any], camera: CameraDeviceFacts) {
         return
     }
     probeFacts["startSeconds"] = startSeconds ?? NSNull()
+    // G13: a tool's start, with nothing prepared, has no preview layer.
+    probeFacts["toolLayer"] = recorder.cameraSession.map { $0.capture.previewLayer != nil } ?? NSNull()
     if let warm = recorder.cameraSession?.capture.warmUp {
         probeFacts["warmUp"] = [
             "seconds": warm.seconds, "buffers": warm.buffers, "steady": warm.steady,
@@ -513,7 +647,9 @@ func recordAndStop(_ recorder: ScreenRecorder, _ seconds: Double) -> [String: An
     return out
 }
 
-/// G7 (CAM-5 (5)): the countdown's prepared capture adopted by `startCamera`.
+/// G7 (CAM-5 (5)): the countdown's prepared capture adopted by the panel's
+/// `startCamera` (`mayAsk` true, CAM-7 (7)); G13 (CAM-7 (2)): its preview
+/// layer, read before the start.
 func preparedStart(_ choice: RecordingChoice) -> [String: Any] {
     let recorder = ScreenRecorder()
     var out: [String: Any] = [:]
@@ -523,38 +659,53 @@ func preparedStart(_ choice: RecordingChoice) -> [String: Any] {
     out["prepared"] = recorder.preparedCamera != nil
     probeSpin(Double(RecorderPanelController.countdownSeconds))
     out["answeredAtStart"] = recorder.preparedCamera?.answered ?? false
-    var started: Error??
-    let called = Date()
-    var startSeconds: Double?
-    recorder.startCamera(choice: choice, mayAsk: false, onFinish: { _ in }) {
-        startSeconds = Date().timeIntervalSince(called)
-        started = .some($0)
+    if let capture = recorder.preparedCamera?.capture {
+        let layer = capture.previewLayer
+        out["layer"] = layer != nil
+        out["layerSession"] = layer?.session === capture.session
+        out["connection"] = layer?.connection != nil
+        out["mirrored"] = layer?.connection?.isVideoMirrored ?? NSNull()
     }
-    probeSpin(ScreenRecorder.armCeiling + 2) { started != nil }
-    out["startSeconds"] = startSeconds ?? NSNull()
-    out["preparedAfter"] = recorder.preparedCamera != nil
-    guard let answer = started else {
-        out["error"] = "the start did not answer"
-        return out
-    }
-    if let answer {
-        out["error"] = "the start failed: \(answer.localizedDescription)"
-        return out
-    }
-    return out.merging(recordAndStop(recorder, 2)) { $1 }
+    return out.merging(startAndRecord(recorder, choice, mayAsk: true)) { $1 }
 }
 
-/// G8: a prepared capture let go stops its session.
+/// G8 (CAM-7 (6)): a prepared capture let go, then `stop`'s completion asked
+/// for: it answers, its session has stopped by then, and the session's
+/// did-stop notification (posted by `stopRunning`, on the queue) came first
+/// — `isRunning` alone reads false as soon as the stop begins.
 func preparedDiscard(_ choice: RecordingChoice) -> [String: Any] {
     let recorder = ScreenRecorder()
     recorder.prepareCamera(for: choice)
     probeSpin(1)
     let capture = recorder.preparedCamera?.capture
+    let lock = NSLock()
+    var didStop: Date?
+    let observer = NotificationCenter.default.addObserver(
+        forName: AVCaptureSession.didStopRunningNotification, object: capture?.session, queue: nil
+    ) { _ in
+        lock.lock()
+        didStop = didStop ?? Date()
+        lock.unlock()
+    }
+    defer { NotificationCenter.default.removeObserver(observer) }
+    let asked = Date()
     recorder.discardPreparedCamera()
-    probeSpin(0.5)
+    var answered: Date?
+    var running: Bool?
+    capture?.stop {
+        answered = Date()
+        running = capture?.session.isRunning
+    }
+    probeSpin(5) { answered != nil }
+    lock.lock()
+    let stoppedAt = didStop
+    lock.unlock()
     return [
         "held": capture != nil, "slotNil": recorder.preparedCamera == nil,
-        "running": capture?.session.isRunning ?? true,
+        "seconds": answered.map { $0.timeIntervalSince(asked) } ?? NSNull(),
+        "running": running ?? NSNull(),
+        "didStopSeconds": stoppedAt.map { $0.timeIntervalSince(asked) } ?? NSNull(),
+        "didStopFirst": answered.flatMap { a in stoppedAt.map { $0 <= a } } ?? false,
     ]
 }
 
@@ -569,7 +720,7 @@ func preparedJoin(_ choice: RecordingChoice) -> [String: Any] {
     var started: Error??
     let called = Date()
     var startSeconds: Double?
-    recorder.startCamera(choice: choice, mayAsk: false, onFinish: { _ in }) {
+    recorder.startCamera(choice: choice, mayAsk: true, onFinish: { _ in }) {
         startSeconds = Date().timeIntervalSince(called)
         started = .some($0)
     }
@@ -903,7 +1054,122 @@ func panelRows(_ request: [String: Any]) {
         "1920×1440 at 60 fps — the camera's best format", "no camera connected",
     ], sizes.joined(separator: " | "))
     formatPanelRows(panel, fakeCamera: fakeCamera, cameraRow: cameraRow(), choose: choose, reset: reset)
+    previewStepRows()
+    previewPanelRows(panel, cameraRow: cameraRow(), choose: choose, reset: reset)
     probeFacts["visibleAtEnd"] = panel.window?.isVisible ?? true
+}
+
+/// P13 (CR2b, spec §11 CAM-7 (3)): `cameraPreviewStep` over every step and
+/// each first-match boundary, counting the `grant` and `failure` calls.
+func previewStepRows() {
+    typealias Phase = RecorderPanelController.Phase
+    struct Case {
+        let name: String
+        var visible = true
+        var camera = true
+        var phase: Phase = .idle
+        var idle = true
+        var recording = false
+        var chosen = true
+        var grant: AVAuthorizationStatus = .authorized
+        var failure: String?
+        let want: CameraPreviewStep
+        let grants: Int
+        let failures: Int
+    }
+    var cases = [
+        Case(name: "hidden", visible: false, want: .off, grants: 0, failures: 0),
+        Case(name: "a display source", camera: false, want: .off, grants: 0, failures: 0),
+    ]
+    let phases: [(String, Phase)] = [
+        ("idle", .idle), ("countdown(2)", .countdown(2)), ("starting", .starting),
+        ("recording", .recording), ("paused", .paused), ("stopping", .stopping), ("landing", .landing),
+    ]
+    for (name, phase) in phases {
+        cases.append(Case(name: "a recording, \(name)", phase: phase, idle: false, recording: true,
+                          want: .recording, grants: 0, failures: 0))
+    }
+    cases += [
+        Case(name: "countdown(2)", phase: .countdown(2), want: .prepared, grants: 0, failures: 0),
+        Case(name: "starting", phase: .starting, idle: false, want: .prepared, grants: 0, failures: 0),
+        Case(name: "landing", phase: .landing, want: .blank, grants: 0, failures: 0),
+        Case(name: "stopping without a camera", phase: .stopping, idle: false, want: .blank,
+             grants: 0, failures: 0),
+        Case(name: "idle, the recorder busy", idle: false, want: .blank, grants: 0, failures: 0),
+        Case(name: "no camera", chosen: false,
+             want: .message(CameraDevices.noCameraSentence), grants: 0, failures: 0),
+    ]
+    for status in [AVAuthorizationStatus.notDetermined, .denied, .restricted] {
+        cases.append(Case(name: RecordingGrant.name(of: status), grant: status,
+                          want: .message(RecorderPanelController.previewGrantSentence),
+                          grants: 1, failures: 0))
+    }
+    cases += [
+        Case(name: "authorized, a failure", failure: "x", want: .failed("x"), grants: 1, failures: 1),
+        Case(name: "authorized", want: .prepare, grants: 1, failures: 1),
+    ]
+    var wrong: [String] = []
+    for c in cases {
+        var grants = 0
+        var failures = 0
+        let step = RecorderPanelController.cameraPreviewStep(
+            visible: c.visible, cameraSource: c.camera, phase: c.phase, recorderIdle: c.idle,
+            recordingCamera: c.recording, cameraChosen: c.chosen,
+            grant: {
+                grants += 1
+                return c.grant
+            },
+            failure: {
+                failures += 1
+                return c.failure
+            })
+        if step != c.want || grants != c.grants || failures != c.failures {
+            wrong.append("\(c.name) → \(step), grant \(grants)×, failure \(failures)× "
+                + "(want \(c.want), \(c.grants)×, \(c.failures)×)")
+        }
+    }
+    probeRow("P13", wrong.isEmpty,
+             wrong.isEmpty ? "\(cases.count) cases, each step and its grant and failure calls as wanted"
+                : wrong.joined(separator: "; "))
+}
+
+/// P14 (CAM-7 (1)): the well's row on the hidden panel — shown with Source
+/// Camera, 200 × 150 after layout, the card taller by at least the well;
+/// hidden with a display row — and `CameraPreviewWell`'s two calls.
+func previewPanelRows(
+    _ panel: RecorderPanelController, cameraRow: NSMenuItem?, choose: (NSMenuItem?) -> Void,
+    reset: () -> Void
+) {
+    reset()
+    choose(panel.sourcePopup.item(at: 0))
+    panel.card.layoutSubtreeIfNeeded()
+    let hiddenFirst = panel.cameraPreviewRow?.isHidden
+    let displayHeight = panel.card.fittingSize.height
+    choose(cameraRow)
+    panel.card.layoutSubtreeIfNeeded()
+    let shown = panel.cameraPreviewRow?.isHidden == false
+    let size = panel.cameraPreview.frame.size
+    let cameraHeight = panel.card.fittingSize.height
+    choose(panel.sourcePopup.item(at: 0))
+    let hiddenAgain = panel.cameraPreviewRow?.isHidden
+    let well = CameraPreviewWell()
+    well.showMessage("x")
+    let message = well.message
+    let messageHosted = well.hostedLayer != nil
+    let layer = AVCaptureVideoPreviewLayer()
+    well.show(layer)
+    let hosted = well.hostedLayer === layer && layer.superlayer === well.layer
+    let hostedMessage = well.message
+    probeRow("P14",
+             hiddenFirst == true && shown && size == CameraPreviewWell.size
+                && cameraHeight - displayHeight >= 150 && hiddenAgain == true && message == "x"
+                && !messageHosted && hosted && hostedMessage == nil,
+             "a display row: hidden \(hiddenFirst.map { "\($0)" } ?? "no row"); Camera: shown \(shown), "
+                + "the well \(size.width)×\(size.height), the card \(displayHeight) → \(cameraHeight) "
+                + "pt; a display row again: hidden \(hiddenAgain.map { "\($0)" } ?? "no row") | the "
+                + "well: showMessage(x) → message \(message ?? "nil"), hosted \(messageHosted); "
+                + "show(layer) → hosted \(hosted), message \(hostedMessage ?? "nil")")
+    reset()
 }
 
 /// P10–P12 (CR2a, spec §11 CAM-6): the Format popup — its fill, its live

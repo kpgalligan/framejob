@@ -13,17 +13,21 @@ extension RecorderPanelController {
 
     /// Beeps and shows nothing while a recording has the panel hidden (the
     /// type doc): the welcome window's button is the caller that would
-    /// otherwise un-hide it into the recording.
+    /// otherwise un-hide it into the recording. Shown while idle, a prepared
+    /// capture that failed (or a build that threw) is let go first, so the
+    /// preview's sync tries again (spec §11 CAM-7 (5)).
     func show() {
         guard !hiddenForRecording else {
             NSSound.beep()
             return
         }
+        panelClosing = false
         if phase == .idle {
             rebuildSources()
             rebuildMicrophones()
             rebuildCameras()
             restoreChoices()
+            if recorder.state == .idle, previewFailure != nil { recorder.discardPreparedCamera() }
         }
         rebuildDestinations()
         refreshSizeNote()
@@ -36,11 +40,13 @@ extension RecorderPanelController {
             window?.orderFrontRegardless()
         }
         armSyncTimer()
+        syncCameraPreview()
     }
 
     /// One second, while the panel is up: the Record Into rows follow the
     /// documents that open and close and the one in front — while idle,
-    /// which `rebuildDestinations` itself decides.
+    /// which `rebuildDestinations` itself decides — and the camera preview
+    /// steps again (CAM-7 (5)).
     private func armSyncTimer() {
         guard syncTimer == nil else { return }
         syncTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
@@ -50,6 +56,7 @@ extension RecorderPanelController {
             }
             guard self.window?.isVisible == true else { return }
             self.rebuildDestinations()
+            self.syncCameraPreview()
         }
     }
 

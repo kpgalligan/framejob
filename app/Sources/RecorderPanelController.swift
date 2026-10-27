@@ -18,10 +18,11 @@ import ScreenCaptureKit
 /// went, `+Picker.swift` the window picker, `+Pause.swift` the pause
 /// and the resume, the hidden recording's one door and the phases drawn
 /// (R2c), `+VoiceOver.swift` the Source row "Microphone Only" (#99),
-/// `+Showing.swift` `show()`, the sync timer, `setNote` and the refit, and
+/// `+Showing.swift` `show()`, the sync timer, `setNote` and the refit,
 /// `+Camera.swift` the Source row "Camera", its popup and the Format popup
-/// (spec §11 CAM-5, CAM-6).
-/// Ten files at the 400-line cap, and the
+/// (spec §11 CAM-5, CAM-6), and `+CameraPreview.swift` the camera's live
+/// preview in `CameraPreviewWell` (CAM-7).
+/// Eleven files at the 400-line cap, and the
 /// crossing members are internal for it, the tree's rule for a class split
 /// across files.
 ///
@@ -186,6 +187,7 @@ final class RecorderPanelController: NSWindowController {
         title: "Close", style: .secondary, target: nil, action: #selector(closePanel(_:)))
     let voiceOverPauseButton = StickerButton(
         title: "Pause", style: .secondary, target: nil, action: #selector(pauseButtonPressed(_:)))
+    let cameraPreview = CameraPreviewWell()
     let card: NSView
 
     /// The picker's filter, held while the Source popup shows "Window
@@ -202,6 +204,9 @@ final class RecorderPanelController: NSWindowController {
     /// `revealIfNoted` reads after the landing.
     var hiddenForRecording = false
     var showWhenLanded = false
+    /// From `panelWillClose`'s first line until `show()`: the preview's
+    /// step reads the panel as not visible, so a close never builds a capture.
+    var panelClosing = false
     /// The recorder's sentence for a resume it refused (`+Pause.swift`):
     /// REPLACED by each retry, cleared when a resume lands or the next
     /// countdown begins, one of the two parts the live note is rebuilt
@@ -306,6 +311,7 @@ final class RecorderPanelController: NSWindowController {
         persistChoices()
         refreshSizeNote()
         syncControlsEnabled()
+        syncCameraPreview()
     }
 
     @objc private func closePanel(_ sender: Any?) {
@@ -323,8 +329,11 @@ final class RecorderPanelController: NSWindowController {
     /// a start that ran on behind a closed panel would read `showWhenLanded`
     /// false and land every later note where nobody sees it. A RECORDING
     /// carries on — the status item and File ▸ Stop Recording can end it —
-    /// and the sync timer stops until the next `show()`.
+    /// and the sync timer stops until the next `show()`. `panelClosing` is
+    /// set FIRST, so the phase change below steps the preview to off and
+    /// never builds a capture (CAM-7 (5)), and the well is emptied last.
     @objc private func panelWillClose(_ note: Notification) {
+        panelClosing = true
         switch phase {
         case .countdown: cancelCountdown()
         case .starting: stopRecording()
@@ -334,5 +343,6 @@ final class RecorderPanelController: NSWindowController {
         recorder.discardPreparedCamera()
         syncTimer?.invalidate()
         syncTimer = nil
+        cameraPreview.showMessage(nil)
     }
 }
