@@ -18,12 +18,21 @@ DEBUG_APP_PATH := $(BUILD_DIR)/Build/Products/Debug/Frame Job Debug.app
 unexport RC_ASSEMBLYAI_KEY
 unexport ANTHROPIC_API_KEY
 
-.PHONY: all app app-debug dist rust test lint fmt typecheck project run clean prices gate
+.PHONY: all app app-debug dist rust codecs test lint fmt typecheck project run clean prices gate
 
 all: app
 
 rust:
 	cd core && cargo build --release
+
+# The bundled encoders (road map "codec-export" C0, spec §11 CX-4, CX-5): SVT-AV1
+# and libvpx from pinned, SHA-256-checked tarballs, built arm64, static and
+# encoder-only into build/codecs/ (headers, archives, licence texts), reused
+# by its stamp — like cargo, a no-op when nothing changed. Needs cmake
+# (`brew install cmake`), the system perl, and the network for the first
+# fetch. project.yml's "Build Codecs" step runs the same script.
+codecs:
+	python3 tools/codecs/build_codecs.py
 
 # `assistant_lane_proof.py` is spec §11 AI-3's `make test`-reachable probe
 # (the agent lane); `rust` first, because it links the staticlib.
@@ -44,8 +53,10 @@ rust:
 # on any line or path spelling the old name that its allow-list does not
 # hold; its selftest runs first. `appcast.py --selftest` (spec §11 PUB-6, PUB-8)
 # is the publish workflow's appcast writer over a stand-in `sign_update`: no
-# network, no key.
-test: rust
+# network, no key. `build_codecs.py --selftest` (codec-export C0) is the
+# encoder build's key, reuse and digest rules, no network and no cmake; `codecs`
+# first, because swift_build.py's selftest links the archives.
+test: rust codecs
 	cd core && cargo test --release
 	cd graphic && cargo test --release
 	cd mcp-proxy && cargo test --release
@@ -55,6 +66,7 @@ test: rust
 	python3 tools/proof/budget_proof.py
 	python3 tools/proof/capture_spike/inventory.py --check
 	python3 tools/proof/spec_index_proof.py
+	python3 tools/codecs/build_codecs.py --selftest
 	python3 tools/proof/swift_build.py --selftest
 	python3 tools/proof/proof_app.py --selftest
 	python3 tools/proof/gate.py --selftest
@@ -80,13 +92,13 @@ fmt:
 project:
 	base="$$(cat VERSION)" && RC_BASE_VERSION="$$base" xcodegen generate
 
-app: rust project
+app: rust codecs project
 	xcodebuild -project $(APP).xcodeproj -scheme $(APP) -configuration Release \
 		-derivedDataPath $(BUILD_DIR) build
 
 # The Debug app the proofs can drive (tools/proof/proof_app.py): unoptimised,
 # so it rebuilds in seconds after a one-file edit; never the index store.
-app-debug: rust project
+app-debug: rust codecs project
 	xcodebuild -project $(APP).xcodeproj -scheme $(APP) -configuration Debug \
 		-derivedDataPath $(BUILD_DIR) COMPILER_INDEX_STORE_ENABLE=NO build
 
@@ -135,13 +147,15 @@ gate:
 # so is `FRAMEJOB_UPDATER` (AppDelegate+Updates.swift, Sparkle, Distribution
 # alone, spec §11 PUB-7): this check has no Sparkle module to import.
 # The last line is agent/'s `tsc --noEmit`, through bun (agent/build.sh),
-# which fails rather than skips when bun is missing.
-typecheck:
+# which fails rather than skips when bun is missing. `codecs` first: the
+# bridging header includes the encoders' headers (CX-4), found by `-Xcc -I`.
+typecheck: codecs
 	swiftc -typecheck -enable-batch-mode -j "$$(sysctl -n hw.logicalcpu)" \
 		-D FRAMEJOB_DEV_TOOLS \
 		-sdk "$$(xcrun --show-sdk-path --sdk macosx)" \
 		-target arm64-apple-macos26.0 \
 		-import-objc-header app/Bridging/FrameJob-Bridging-Header.h \
+		-Xcc -Ibuild/codecs/include \
 		app/Sources/*.swift
 	/bin/sh agent/build.sh typecheck
 

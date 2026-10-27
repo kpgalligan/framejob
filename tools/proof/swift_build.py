@@ -11,8 +11,9 @@ into `work/swift-build/<key>/`. The key hashes this file, `swiftc --version`, th
 SDK and its `SDKSettings.json`, the argv less its `-o`/`-j` values, the output's
 file name (linked under it: the signature's identifier), the bytes of
 every source, of the bridging header and each header it reaches by a quoted
-`#include`, of the staticlib and each link input, four toolchain variables and the
-tree's path (`#file` embeds it). An entry is reused only when its binary still
+`#include`, of the staticlib, the two encoder archives and their stamp
+(`build/codecs/`, spec §11 CX-4: every app build links them, `codec_args()`) and each
+link input, four toolchain variables and the tree's path (`#file` embeds it). An entry is reused only when its binary still
 hashes to its manifest's digest, and is delivered to the caller's own path and
 name (a bare binary's defaults domain and `proof_defaults.py --ran` are that name).
 Every child runs under `bounded.run`, in its own process group; README: the selftest.
@@ -41,6 +42,11 @@ CACHE = ROOT / "tools/proof/work/swift-build"
 KEEP_ENTRIES = 32
 BRIDGING = ROOT / "app/Bridging/FrameJob-Bridging-Header.h"
 LIBRARY = ROOT / "core/target/release/libframejob_core.a"
+# The bundled encoders (road map "codec-export" C0): `make codecs` installs them, and
+# every swiftc line that compiles app/Sources finds their headers and links them.
+CODECS = ROOT / "build/codecs"
+CODEC_ARCHIVES = (CODECS / "lib/libSvtAv1Enc.a", CODECS / "lib/libvpx.a")
+CODEC_STAMP = CODECS / "stamp.json"
 TARGET = "arm64-apple-macos26.0"
 ENV_KEYS = ("DEVELOPER_DIR", "SDKROOT", "TOOLCHAINS", "MACOSX_DEPLOYMENT_TARGET")
 STRIPPED = ("-o", "-j", "-output-file-map")  # flags whose VALUES the key ignores
@@ -116,6 +122,11 @@ def _headers(header):
     return seen
 
 
+def codec_args():
+    """The encoders' header path and archives, for any swiftc line over app/Sources."""
+    return ["-Xcc", f"-I{CODECS}/include", *map(str, CODEC_ARCHIVES)]
+
+
 def _argv(*, sources, output, defines=(), optimize=False, wmo=False, link_args=(),
           bridging_header=None, library=None, jobs=None):
     """The one place the line is spelled."""
@@ -125,6 +136,7 @@ def _argv(*, sources, output, defines=(), optimize=False, wmo=False, link_args=(
     argv += ["-whole-module-optimization"] if wmo else ["-j", str(jobs or os.cpu_count())]
     argv += ["-sdk", _tools()["sdk"], "-target", TARGET, "-module-name", "FrameJob",
              "-import-objc-header", str(bridging), "-L", str(library.parent), "-lframejob_core"]
+    argv += codec_args()
     argv += [str(s) for s in sources] + [str(a) for a in link_args] + ["-o", str(output)]
     return argv
 
@@ -147,7 +159,8 @@ def _key(argv, files, output):
 
 def _key_files(sources, bridging_header, library, link_inputs):
     return ([Path(s) for s in sources] + _headers(bridging_header or BRIDGING)
-            + [Path(library or LIBRARY)] + [Path(p) for p in link_inputs])
+            + [Path(library or LIBRARY)] + list(CODEC_ARCHIVES) + [CODEC_STAMP]
+            + [Path(p) for p in link_inputs])
 
 
 def cache_key(*, sources, output, defines=(), optimize=False, wmo=False, link_args=(),
@@ -203,6 +216,9 @@ def build(*, sources: Sequence, output, defines: Sequence[str] = (), optimize: b
     if not library.exists():
         raise SwiftBuildFailed(f"{library} is missing — run `cd core && cargo build --release` "
                                "first")
+    absent = [str(p) for p in CODEC_ARCHIVES + (CODEC_STAMP,) if not p.exists()]
+    if absent:
+        raise SwiftBuildFailed(f"{', '.join(absent)} missing — run `make codecs` first")
     missing = [str(s) for s in list(sources) + list(link_inputs) if not Path(s).exists()]
     if missing:
         raise SwiftBuildFailed(f"swift_build: no such input: {', '.join(missing[:4])}")
@@ -262,7 +278,8 @@ def typecheck(*, sources, defines=(), timeout: float = 300):
     """(exit status, swiftc's output): `-typecheck` in batch mode on every core, no link."""
     argv = ["xcrun", "swiftc", "-typecheck", "-enable-batch-mode", "-j", str(os.cpu_count())]
     argv += [x for d in defines for x in ("-D", d)] + ["-sdk", _tools()["sdk"], "-target",
-             TARGET, "-module-name", "FrameJob", "-import-objc-header", str(BRIDGING)]
+             TARGET, "-module-name", "FrameJob", "-import-objc-header", str(BRIDGING),
+             "-Xcc", f"-I{CODECS}/include"]
     ran = bounded.run(argv + [str(s) for s in sources], timeout, env=bounded.child_env())
     text = ran["stdout"] + ran["stderr"]
     if ran["expired"]:
@@ -306,11 +323,12 @@ def own_lines(folder=None):
 
 
 def selftest():
-    global CACHE
+    global CACHE, CODEC_ARCHIVES, CODEC_STAMP
     scratch = ROOT / "tools/proof/work/swift-build-selftest"
     shutil.rmtree(scratch, ignore_errors=True)
     (scratch / "src").mkdir(parents=True)
     saved, CACHE = CACHE, scratch / "cache"
+    saved_codecs = (CODEC_ARCHIVES, CODEC_STAMP)
     results, names = [], []
 
     def row(name, ok, detail):
@@ -328,6 +346,9 @@ def selftest():
         inner = write("inner.h", "int inner(void);\n")
         header = write("bridge.h", '#include "inner.h"\n')
         lib, extra = write("libframejob_core.a", "lib-1"), write("extra.plist", "plist-1")
+        # The K rows key stand-in encoder archives, never the tree's build/codecs/.
+        CODEC_ARCHIVES = (write("libSvtAv1Enc.a", "svt-1"), write("libvpx.a", "vpx-1"))
+        CODEC_STAMP = write("stamp.json", "{}")
         base = dict(sources=[a, b], output="/z/one", defines=["X"], link_inputs=[extra],
                     bridging_header=header, library=lib)
         first = cache_key(**base)
@@ -339,7 +360,9 @@ def selftest():
         for name, path, changed in (("a source byte", a, "let a = 3\n"),
                                     ("a link input", extra, "plist-2"),
                                     ("a header reached by #include", inner, "int inner(int);\n"),
-                                    ("the library's bytes", lib, "lib-2")):
+                                    ("the library's bytes", lib, "lib-2"),
+                                    ("an encoder archive's bytes", CODEC_ARCHIVES[1], "vpx-2"),
+                                    ("the encoders' stamp", CODEC_STAMP, '{"key": 2}')):
             was = path.read_text()
             path.write_text(changed)
             changes[name] = cache_key(**base)
@@ -352,6 +375,7 @@ def selftest():
         row("K1", not unchanged and same and first == cache_key(**base),
             f"changed for {len(changes) - len(unchanged)}/{len(changes)} "
             f"(unchanged: {unchanged or 'none'}); another -o folder and -j keep the key: {same}")
+        CODEC_ARCHIVES, CODEC_STAMP = saved_codecs  # the B rows link the real ones
 
         program = write("main.swift", 'print("swift_build selftest \\(20 + 22)")\n')
         out = scratch / "out" / "selftest-binary"
@@ -420,6 +444,7 @@ def selftest():
             f"app swiftc line: {found or 'none'}")
     finally:
         CACHE = saved
+        CODEC_ARCHIVES, CODEC_STAMP = saved_codecs
     ok = bool(results) and all(results)
     print(f"{sum(results)}/{len(results)} rows pass")
     print("PASS" if ok else "FAIL")

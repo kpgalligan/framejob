@@ -77,6 +77,7 @@ sys.path.insert(0, HERE)
 import bounded  # noqa: E402
 import inventory  # noqa: E402
 import rows as rowtable  # noqa: E402
+import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 from media_less_playback_probe import build_shader, console_locked  # noqa: E402
 
@@ -187,7 +188,7 @@ def build(force):
              "-import-objc-header", os.path.join(ROOT, "app", "Bridging",
                                                   "FrameJob-Bridging-Header.h"),
              "-L", os.path.dirname(LIB), "-lframejob_core"]
-            + swift + PROBE_FILES + [entry, "-o", binary])
+            + swift + PROBE_FILES + [entry, "-o", binary] + swift_build.codec_args())
     record["argv"] = [a.replace(ROOT + "/", "") for a in argv[:16]] + [
         f"<{len(swift)} app/Sources files>", "<5 probe_*.swift>", "<probe>/main.swift", "-o",
         "<probe>/capture_probe"]

@@ -40,7 +40,8 @@ FOLDER_TARGET = {"Debug": "app-debug", "Release": "app", "Distribution": "dist"}
 WALKED = ("app", "agent", "mcp-proxy/src", "core/src", "graphic/src", "graphic/vendor")
 LISTED = ("mcp-proxy/Cargo.*", "core/Cargo.*", "graphic/Cargo.*", "core/include/framejob_core.h",
           "core/target/release/libframejob_core.a", "docs/graphics-api.md",
-          "docs/graphics-api.d.ts", "graphic/tests/graphics/*.js", "project.yml", "VERSION")
+          "docs/graphics-api.d.ts", "graphic/tests/graphics/*.js", "project.yml", "VERSION",
+          "tools/codecs/build_codecs.py", "build/codecs/stamp.json")
 SKIPPED_DIRS = {"node_modules", "target", "build", ".git", "__pycache__"}
 SKIPPED_FILES = {"app/Info.plist", "app/FrameJob.entitlements"}
 KEPT_MD = "docs/graphics-api.md"

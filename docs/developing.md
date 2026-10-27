@@ -19,31 +19,41 @@ this page points to them rather than repeating them.
   `agent/`. Every `make app` builds it, `make typecheck` typechecks it and
   `make test` runs its tests; without bun they fail with
   `error: bun is not installed` rather than skipping.
-- **Python 3** for the scripts in `tools/proof/`, and `ffmpeg` for the proofs
+- **[cmake](https://cmake.org)** (`brew install cmake`), which builds the
+  bundled AV1 and VP9 encoders (SVT-AV1 and libvpx, spec §11 CX-5) with the
+  system's `/usr/bin/perl` and Xcode's clang; no nasm, yasm, meson or ninja.
+  `make app`, `make app-debug`, `make typecheck` and `make test` build them
+  first; without cmake they fail, naming `brew install cmake`.
+- **Python 3** for the scripts in `tools/proof/` and `tools/codecs/`, and `ffmpeg` for the proofs
   that compare exported sound sample for sample (proof time only — the product
   has no ffmpeg dependency).
 - **Network access for the first build.** The app links
   [Sparkle](https://sparkle-project.org) 2 (the published build's updater,
   spec §11 PUB-6..PUB-9) as a Swift package, pinned in `project.yml`; the
   first `make app`, `make app-debug` or `make dist` fetches it into
-  `build/SourcePackages/`, and later builds reuse that copy.
+  `build/SourcePackages/`, and later builds reuse that copy. The first
+  `make codecs` (which those targets and `make typecheck` and `make test` run)
+  likewise fetches the encoders' two pinned tarballs, about 17 MB, into
+  `build/codecs-downloads/`, checks each by SHA-256, and builds them into
+  `build/codecs/` in about a minute; later builds reuse them by their stamp.
 
 ## Make targets
 
 | Target | What it does |
 |---|---|
-| `make app` | Builds the Rust core (release), generates the Xcode project, and builds the Release app into `build/Build/Products/Release/Frame Job.app` (about 90 s). |
-| `make app-debug` | The same with the Debug configuration: `build/Build/Products/Debug/Frame Job Debug.app`, an app called "Frame Job Debug" with its own bundle id (`com.kgalligan.FrameJob.debug`) and settings. Unoptimised, so it rebuilds in seconds after a one-file edit. |
+| `make app` | Builds the Rust core (release) and the bundled encoders (`make codecs`), generates the Xcode project, and builds the Release app into `build/Build/Products/Release/Frame Job.app` (about 90 s). |
+| `make codecs` | Builds the bundled encoders, SVT-AV1 v4.2.0 and libvpx v1.17.0 (spec §11 CX-2..CX-5), with `tools/codecs/build_codecs.py`: each pinned tarball fetched and checked by SHA-256 (a mismatch fails, naming both digests), built arm64, static and encoder-only, and installed with its headers and licence texts into `build/codecs/`. A stamp keyed on the script, the pins and the tool versions makes a repeat a no-op; Xcode's "Build Codecs" step runs the same script. `tools/codecs/PROVENANCE.md` records the pins. |
+| `make app-debug` | The same (the Rust core and `make codecs` first) with the Debug configuration: `build/Build/Products/Debug/Frame Job Debug.app`, an app called "Frame Job Debug" with its own bundle id (`com.kgalligan.FrameJob.debug`) and settings. Unoptimised, so it rebuilds in seconds after a one-file edit. |
 | `make run` | `make app`, then opens it. |
-| `make typecheck` | Typechecks every Swift file in `app/Sources` with `swiftc` (with the dev tools compiled in), then the helper's TypeScript with `tsc --noEmit`. Seconds. It is the only authoritative Swift check, but it stops before code generation, so only `make app` proves the app builds. |
-| `make test` | The Rust tests of `core/`, `graphic/` and `mcp-proxy/`, then the scripted checks that need no app: the assistant's agent lane and prompt texts, the price function and the proofs' spend budgets (no network), the menu inventory and spec index against the tree, the self-tests of the build, app-choice, gate and appcast scripts, the defaults clean-up, and the old-name residue check. |
+| `make typecheck` | `make codecs` first (the bridging header includes the encoders' headers, found with `-Xcc -Ibuild/codecs/include`), then typechecks every Swift file in `app/Sources` with `swiftc` (with the dev tools compiled in), then the helper's TypeScript with `tsc --noEmit`. Seconds. It is the only authoritative Swift check, but it stops before code generation, so only `make app` proves the app builds. |
+| `make test` | `make codecs` first, then the Rust tests of `core/`, `graphic/` and `mcp-proxy/`, then the scripted checks that need no app: the assistant's agent lane and prompt texts, the price function and the proofs' spend budgets (no network), the menu inventory and spec index against the tree, the self-tests of the encoder build, the probe build, app-choice, gate and appcast scripts, the defaults clean-up, and the old-name residue check. |
 | `make lint` | `cargo clippy --all-targets -- -D warnings` in `core/`, `graphic/` and `mcp-proxy/`. |
 | `make fmt` | `cargo fmt` in the same three crates. |
 | `make gate` | The one full verification: the name residue check, typecheck (held to exactly its known warnings), `cargo fmt --check`, lint, test, then `make app` with the Release app's entitlements and signature checked. Serial, stops at the first failure, and skips a step whose inputs and tools are byte-identical to its last pass (its state is in `build/gate/`). `make gate GATE_ARGS=--force` runs every step. |
 | `make dist` | `make app`, then the Distribution configuration — Release without the dev tools — into `build/Build/Products/Distribution/Frame Job.app`, then the binary and signature checks (`tools/proof/dist_check.py`) and the check the publish workflow runs on what it ships (`tools/proof/published_check.py`); both run, and it fails if either does. Only this target compiles the updater (Sparkle, `FRAMEJOB_UPDATER`), so only its build loads Sparkle.framework, and, signed ad hoc, it cannot be launched: library validation refuses the framework (spec §11 PUB-7). It is only ever checked, never run. Until the owner's EdDSA public key is in `project.yml`, the key rows (D31 and P20) fail, by design. |
 | `make project` | `xcodegen generate`, with the base version from `VERSION`. |
 | `make prices` | **Network.** Regenerates `agent/prices/anthropic.json` from LiteLLM's price table; the file's only writer, never run by another target. |
-| `make clean` | Removes `build/`, the generated project and `app/Info.plist`, and runs `cargo clean` in the three crates. |
+| `make clean` | Removes `build/` (the built encoders and their downloaded tarballs with it, so the next build fetches them again), the generated project and `app/Info.plist`, and runs `cargo clean` in the three crates. |
 
 A single Rust test runs as `cd core && cargo test --release --test edge slip`
 (the test file's name, then a name filter). Finish Rust work with `make fmt`
@@ -83,12 +93,15 @@ app/
   Sources/         The AppKit app, programmatic UI (no storyboards).
   Resources/       Shaders/Compositor.metal, Models/ (the voice model),
                    Fonts/ (the bundled typefaces), and bundled media.
-  Bridging/        The bridging header importing framejob_core.h.
+  Bridging/        The bridging header importing framejob_core.h and the
+                   encoders' headers.
 designs/         spec/ (the normative spec, one file per section), adr/
                  (condensed decision records), the design handoffs, screens/
                  (the screen catalog).
 docs/            guide/ (the user guide), graphics-api.md, manual-checks.md,
                  agents/ (what the engineering skills read), this file.
+tools/codecs/    build_codecs.py (`make codecs`: the bundled encoders' pins, their
+                 fetch, digest check, build and stamp) and PROVENANCE.md.
 tools/proof/     The verification scripts: mcp.py (the MCP client), the
                  per-feature proofs and probes, harness/ (the offscreen chrome
                  capture), swift_build.py, proof_app.py, gate.py.
@@ -174,6 +187,9 @@ it. The newest build is always at
 `https://github.com/kpgalligan/framejob/releases/latest/download/FrameJob.dmg`.
 
 The workflow runs no tests: run `make gate` and `make dist` on what you push.
+The runner builds the bundled encoders itself: the workflow installs cmake
+when the image lacks it, and the archive's "Build Codecs" step fetches the
+pinned tarballs and builds them, as a local build does.
 
 The signing and notarization credentials are secrets in the repository's
 `publish` environment (Settings ▸ Environments), whose deployment branches are

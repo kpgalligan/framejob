@@ -20,13 +20,17 @@ preceded by a name character — `app/Sources`, `$PROJECT_DIR/core`,
 directory is linked into every copy the day it lands, and no builder's copy
 can miss it (#146: `graphics_proof.py`'s copy missed `agent/` and `docs/`).
 `GENERATED` (`build`, `FrameJob.xcodeproj`) is never linked: a copy writes
-its own.
+its own. The one exception is `build/codecs` (road map "codec-export" C0, spec
+§11 CX-5): the copy's `build/` is a real directory and its `build/codecs` a
+symlink to the tree's, whether or not that exists yet, so a copy never builds
+the encoders itself — `tools/codecs/build_codecs.py` resolves its own path to
+the tree's and reuses (or, on a key change, rebuilds under its lock) the tree's.
 
 `make_copy(dest, agent=True)`, in order: remove `dest` (`remove_tree`), make it; copy `app/`
 without `Info.plist` or `*.entitlements`; copy `project.yml`, `Makefile`
 and `VERSION` (`COPIED_FILES`: the copy's own `make project` reads all
 three, spec §11 PUB-2); when `agent`, copy `agent/` without `node_modules`; link every
-other build input. It answers `(dest, None)`, or `(None, reason)` on an
+other build input; make `build/` and link `build/codecs` to the tree's. It answers `(dest, None)`, or `(None, reason)` on an
 `OSError`. `agent=False` is the assistant spike's, which splices
 Rasterize's `agent/` in its place.
 
@@ -50,8 +54,8 @@ deletes a folder that can hold a built `.app` deletes it through
 
 The selftest, in a fresh `work/tree_copy/`:
 
-* T1 — the tree's `project.yml` names `agent`, `app`, `core`, `docs` and
-  `graphic`, and neither `GENERATED` name;
+* T1 — the tree's `project.yml` names `agent`, `app`, `core`, `docs`,
+  `graphic` and `tools`, and neither `GENERATED` name;
 * T2 — a copy's `app/` is a real directory holding `Sources/main.swift` and
   no `Info.plist` or `*.entitlements` at its top; its `agent/` is real, holds
   `build.sh` and no `node_modules`; every other input is a symlink resolving
@@ -62,7 +66,9 @@ The selftest, in a fresh `work/tree_copy/`:
   is seen;
 * T5 — no LaunchServices effect: a fake `.app` (an `Info.plist` only) under
   `work/tree_copy/ls/` is found by `unregister_apps`, one under an
-  `Intermediates.noindex/` is not, and `remove_tree` leaves nothing.
+  `Intermediates.noindex/` is not, and `remove_tree` leaves nothing;
+* T6 — a copy's `build/` is a real directory and its `build/codecs` is a
+  symlink whose `realpath` is the tree's `build/codecs`.
 
 An instrument that cannot run is a FAIL, never an exit.
 """
@@ -172,6 +178,8 @@ def make_copy(dest, agent=True):
             if name in COPIED:
                 continue
             os.symlink(os.path.join(ROOT, name), os.path.join(dest, name))
+        os.makedirs(os.path.join(dest, "build"))
+        os.symlink(os.path.join(ROOT, "build", "codecs"), os.path.join(dest, "build", "codecs"))
     except OSError as error:
         return None, f"the tree copy at {dest} could not be made: {error}"
     return dest, None
@@ -214,7 +222,7 @@ def selftest():
     # T1
     try:
         found = build_inputs()
-        want = ["agent", "app", "core", "docs", "graphic"]
+        want = ["agent", "app", "core", "docs", "graphic", "tools"]
         missing = [name for name in want if name not in found]
         generated = [name for name in GENERATED if name in found]
         row("T1", not missing and not generated,
@@ -317,6 +325,24 @@ def selftest():
     except Exception as error:
         row("T5", False, f"the LaunchServices row raised {error!r}")
 
+    # T6 — the encoders are the tree's (codec-export C0)
+    try:
+        dest = os.path.join(WORK, "full")
+        build = os.path.join(dest, "build")
+        codecs = os.path.join(build, "codecs")
+        tree_codecs = os.path.realpath(os.path.join(ROOT, "build", "codecs"))
+        problems = []
+        if os.path.islink(build) or not os.path.isdir(build):
+            problems.append("build/ is not a real directory")
+        if not os.path.islink(codecs):
+            problems.append("build/codecs is not a symlink")
+        elif os.path.realpath(codecs) != tree_codecs:
+            problems.append(f"build/codecs resolves to {os.path.realpath(codecs)}")
+        row("T6", not problems, "; ".join(problems) if problems
+            else f"build/ is real and build/codecs resolves to {tree_codecs}")
+    except Exception as error:
+        row("T6", False, f"the build/codecs row raised {error!r}")
+
     print(f"{sum(rows)}/{len(rows)}")
     return 0 if all(rows) else 1
 
@@ -324,7 +350,7 @@ def selftest():
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--selftest", action="store_true",
-                        help="T1–T5 in a fresh work/tree_copy/")
+                        help="T1–T6 in a fresh work/tree_copy/")
     arguments = parser.parse_args(argv)
     if arguments.selftest:
         return selftest()

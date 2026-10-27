@@ -57,6 +57,7 @@ sys.path.insert(0, PROOF)
 import bounded  # noqa: E402
 import mcp  # noqa: E402
 import proof_app  # noqa: E402
+import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = os.path.join(PROOF, "work", "assistant_spike")
@@ -336,7 +337,8 @@ def build_probe():
              "-target", "arm64-apple-macos26.0", "-module-name", "FrameJob",
              "-import-objc-header", os.path.join(ROOT, "app", "Bridging",
                                                   "FrameJob-Bridging-Header.h"),
-             "-L", os.path.dirname(LIB), "-lframejob_core"] + swift + [entry, "-o", binary])
+             "-L", os.path.dirname(LIB), "-lframejob_core"] + swift_build.codec_args()
+            + swift + [entry, "-o", binary])
     print(f"probe: building (up to {WALL_PROBE_BUILD} s)…", flush=True)
     built = run(argv, WALL_PROBE_BUILD)
     record = {"rc": built["rc"], "seconds": built["seconds"], "expired": built["expired"],

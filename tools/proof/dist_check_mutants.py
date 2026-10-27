@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Road map 12 A4, #145, road map 14 MC3, B88 and Sparkle — `dist_check.py`'s helper rows
-(D6–D13), D14, the MCP proxy's and snapshot's rows (D15–D24), the Release entitlements and
-seal rows (D25–D27) and the updater's rows (D28–D32 and D35, spec §11 PUB-6..PUB-9), each
-made to fail on purpose.
+"""Road map 12 A4, #145, road map 14 MC3, B88, Sparkle and codec export — `dist_check.py`'s
+helper rows (D6–D13), D14, the MCP proxy's and snapshot's rows (D15–D24), the Release
+entitlements and seal rows (D25–D27), the updater's rows (D28–D32 and D35, spec §11
+PUB-6..PUB-9) and the encoders' (D36, D38, D40, D41, spec §11 CX-4, CX-5), each made to fail
+on purpose.
 
     python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]
 
@@ -10,16 +11,19 @@ Every case runs `dist_check.py` as a child with one side a SKELETON bundle,
 `work/dist_check_mutants/<case>/Frame Job.app`: `Contents/MacOS/Frame Job` a
 symlink to the real app's untouched binary, and COPIES (never links) of the
 real `Contents/Info.plist`, `Contents/Helpers/framejob-agent`,
-`Contents/Helpers/framejob-mcp` and `Contents/Resources/agent-catalog.json`,
-and a `ditto` copy of the real `Contents/Frameworks/Sparkle.framework`, for
+`Contents/Helpers/framejob-mcp`, `Contents/Resources/agent-catalog.json` and
+every file under `Contents/Resources/Licenses/`, and a `ditto` copy of the real `Contents/Frameworks/Sparkle.framework`, for
 every mutation: the helper or the proxy mutated and re-signed ad hoc, the
 snapshot removed, re-versioned or swapped for the OTHER side's, the
 framework removed, its binary's signature removed (`sparkle-unsigned`) or its
 first helper (`dist_check.sparkle_helper_paths`' order) re-signed ad hoc
 without the hardened runtime, or the Info.plist copy's `SUFeedURL` emptied
 (`feed-empty`), its `SUPublicEDKey` made base64 of 31 bytes (`key-short`) or,
-in Release's, its `SUFeedURL` set to Distribution's (`release-feed`). The
-other side is the real app. Nothing is written into `build/`. Five cases
+in Release's, its `SUFeedURL` set to Distribution's (`release-feed`), or a
+licence text removed (`licence-missing`: Distribution's `libvpx/LICENSE`, which
+D41 must refuse) or changed (`licence-changed`: a byte appended to Release's
+`svt-av1/PATENTS.md`, which D40 must refuse). The
+other side is the real app. Nothing is written into `build/`. Seven cases
 mutate a whole bundle, the real app `ditto`ed to `<case>/<side>/Frame Job.app`:
 `app-entitlements` re-signs Distribution ad hoc with
 `dist_check.APP_ENTITLEMENTS` plus `get-task-allow` (#145), which D14 must
@@ -38,16 +42,21 @@ restores the Sparkle load command Release's `-dead_strip_dylibs` drops (spec
 §11 PUB-7): `install_name_tool -change` turns the first of Release's load
 commands at least as long as Distribution's Sparkle one into it, then the
 bundle is re-signed ad hoc with the hardened runtime and
-`dist_check.RELEASE_ENTITLEMENTS`, which D35 alone must refuse.
+`dist_check.RELEASE_ENTITLEMENTS`, which D35 alone must refuse;
+`codec-stripped` `strip`s Release's executable and re-signs it as `sparkle-load`
+does, which D36 alone must refuse (the encoders' symbols gone); `codec-dylib`
+turns the first of Release's load commands at least as long as
+`@rpath/libvpx.dylib` into it and re-signs the same way, which D38 alone must
+refuse (CX-4: never a codec dylib).
 
 A case passes iff dist_check's FAIL ids equal the expected set exactly, its
-last line is `dist_check: <35 - |set|>/35`, and it exits 0 for an empty set
+last line is `dist_check: <41 - |set|>/41`, and it exits 0 for an empty set
 and 1 otherwise. `control` (both real) and `skeleton` (both skeletons,
 helpers, proxies and snapshots copied untouched) expect nothing to fail: they
 prove the skeleton is not itself a failure. A setup command that fails (a
 copy, a `codesign`, the offset not found) is a scored FAIL naming it. Each
 case's directory is removed after scoring. The last line is
-`dist_check_mutants: <passed>/30`; the exit is 0 only at 30/30.
+`dist_check_mutants: <passed>/34`; the exit is 0 only at 34/34.
 
 The control needs a Distribution build whose `SUPublicEDKey` passes D31: until
 the owner's key lands, build Distribution with a stand-in 32-byte key on the
@@ -109,10 +118,16 @@ CASES = [
     ("key-short-dist", ("dist",), "key-short", {"D31"}),
     ("release-feed", ("release",), "release-feed", {"D32"}),
     ("sparkle-load-release", ("release",), "sparkle-load", {"D35"}),
+    ("codec-stripped-release", ("release",), "codec-stripped", {"D36"}),
+    ("codec-dylib-release", ("release",), "codec-dylib", {"D38"}),
+    ("licence-missing-dist", ("dist",), "licence-missing", {"D41"}),
+    ("licence-changed-release", ("release",), "licence-changed", {"D40"}),
 ]
 # The cases that mutate a whole `ditto`ed bundle rather than a skeleton.
 WHOLE = {"app-entitlements", "app-entitlements-mic-only", "noop-sign", "seal-broken",
-         "sparkle-load"}
+         "sparkle-load", "codec-stripped", "codec-dylib"}
+# The load command codec-dylib writes (spec §11 CX-4 forbids any codec dylib).
+CODEC_DYLIB = "@rpath/libvpx.dylib"
 OTHER = {"release": "dist", "dist": "release"}
 
 
@@ -224,6 +239,51 @@ def sparkle_load(app, real, case_dir):
     sign(app, "--options", "runtime", "--entitlements", plist)
 
 
+def resign_release(app, case_dir):
+    """Re-sign a `ditto`ed bundle as Release is signed (`sparkle_load`'s signing)."""
+    plist = os.path.join(case_dir, "release.plist")
+    with open(plist, "wb") as handle:
+        plistlib.dump(dist_check.RELEASE_ENTITLEMENTS, handle)
+    sign(app, "--options", "runtime", "--entitlements", plist)
+
+
+def codec_mutation(app, case_dir, mutation):
+    """`codec-stripped`: the executable `strip`ped; `codec-dylib`: its first load command
+    at least as long as CODEC_DYLIB turned into it; then re-signed as Release (D36, D38)."""
+    binary = os.path.realpath(str(proof_app.executable(app)))
+    if mutation == "codec-stripped":
+        run_tool(["strip", binary], f"strip {binary}")
+    else:
+        paths, reason = dist_check.load_commands(binary)
+        if paths is None:
+            raise SetupError(f"the copy's load commands: {reason}")
+        room = [path for path in paths if len(path) >= len(CODEC_DYLIB)]
+        if not room:
+            raise SetupError(f"no load command in {binary} as long as {CODEC_DYLIB}")
+        run_tool(["install_name_tool", "-change", room[0], CODEC_DYLIB, binary],
+                 f"install_name_tool -change {room[0]}")
+    resign_release(app, case_dir)
+
+
+def licences(app, real_app, mutation):
+    """The skeleton's Licenses/, a COPY of every file under the real bundle's, one text
+    removed or changed (spec §11 CX-5, D40/D41)."""
+    source = os.path.join(real_app, dist_check.LICENSES)
+    target = os.path.join(app, dist_check.LICENSES)
+    try:
+        shutil.copytree(source, target)
+    except OSError as error:
+        raise SetupError(f"copy {source}: {error}")
+    try:
+        if mutation == "licence-missing":
+            os.remove(os.path.join(target, "libvpx", "LICENSE"))
+        elif mutation == "licence-changed":
+            with open(os.path.join(target, "svt-av1", "PATENTS.md"), "ab") as handle:
+                handle.write(b"\n")
+    except OSError as error:
+        raise SetupError(f"mutate {target}: {error}")
+
+
 def proxy_and_snapshot(case_dir, app, real_app, other_app, mutation):
     """The skeleton's Info.plist, MCP proxy and snapshot, each a COPY of the real
     bundle's, the proxy or the snapshot mutated (road map 14 MC3, D15–D24)."""
@@ -271,6 +331,9 @@ def skeleton(case_dir, side, real, mutation, needle):
         if mutation == "sparkle-load":
             sparkle_load(app, real, case_dir)
             return app
+        if mutation in ("codec-stripped", "codec-dylib"):
+            codec_mutation(app, case_dir, mutation)
+            return app
         if mutation == "noop-sign":
             sign(str(proof_app.executable(app)))
         if mutation in ("noop-sign", "seal-broken"):
@@ -296,6 +359,7 @@ def skeleton(case_dir, side, real, mutation, needle):
     os.symlink(binary, os.path.join(macos, "Frame Job"))
     proxy_and_snapshot(case_dir, app, real_app, real[OTHER[side]], mutation)
     sparkle(app, real_app, mutation)
+    licences(app, real_app, mutation)
     if mutation == "no-helper":
         return app
     source = os.path.join(real_app, dist_check.HELPER)
@@ -370,9 +434,9 @@ def main():
     real = {"release": os.path.abspath(arguments.release),
             "dist": os.path.abspath(arguments.dist)}
 
-    print("road map 12 A4, #145, road map 14 MC3, B88 and spec §11 PUB-6..PUB-9 — "
-          "dist_check's helper rows (D6–D13), D14, D15–D32 and D35, each made to fail on "
-          "purpose\n")
+    print("road map 12 A4, #145, road map 14 MC3, B88, spec §11 PUB-6..PUB-9 and CX-4, CX-5 — "
+          "dist_check's helper rows (D6–D13), D14, D15–D32, D35, D36, D38, D40 and D41, each "
+          "made to fail on purpose\n")
     print(f"  release:      {real['release']}")
     print(f"  distribution: {real['dist']}\n")
     needle, reason = dist_check.read_needle()

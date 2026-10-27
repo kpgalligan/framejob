@@ -68,7 +68,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
+sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
+import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/speed_spike"
 TREE = WORK / "tree"
@@ -425,15 +427,17 @@ def build_probe(lib_dir, probe_dir, score):
     swift = sorted(p for p in (ROOT / "app/Sources").glob("*.swift") if p.name != "main.swift")
     lib = lib_dir / "libframejob_core.a"
     headers = [ROOT / "app/Bridging/FrameJob-Bridging-Header.h", ROOT / "core/include/framejob_core.h"]
-    if binary.exists() and all(p.stat().st_mtime < binary.stat().st_mtime
-                               for p in swift + [entry, lib] + headers):
+    if binary.exists() and all(p.exists() and p.stat().st_mtime < binary.stat().st_mtime
+                               for p in swift + [entry, lib] + headers
+                               + list(swift_build.CODEC_ARCHIVES)):
         emit("B1", "ok", f"probe up to date — {binary} (linked to {lib_dir})")
         return binary
     sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
     built = run(["swiftc", "-D", "FRAMEJOB_DEV_TOOLS", "-O", "-whole-module-optimization",
                  "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "FrameJob",
                  "-import-objc-header", ROOT / "app/Bridging/FrameJob-Bridging-Header.h",
-                 "-L", lib_dir, "-lframejob_core"] + swift + [entry, "-o", binary], 1800)
+                 "-L", lib_dir, "-lframejob_core"] + swift_build.codec_args() + swift
+                + [entry, "-o", binary], 1800)
     if built["rc"] != 0 or not binary.exists():
         errors = [line for line in built["stderr"].splitlines() if ": error:" in line]
         emit("B1", "FAIL", f"swiftc rc {built['rc']} expired {built['expired']}: "

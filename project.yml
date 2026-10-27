@@ -68,8 +68,16 @@ targets:
         SWIFT_OBJC_BRIDGING_HEADER: app/Bridging/FrameJob-Bridging-Header.h
         LIBRARY_SEARCH_PATHS:
           - $(PROJECT_DIR)/core/target/release
+        # The bundled encoders (spec §11 CX-4, CX-5): their headers for the
+        # bridging header, and their two static archives linked by full path
+        # (never -l, so no codec dylib can ever be picked instead) in this list
+        # and in Debug's and Release's, which replace it; Distribution inherits it.
+        HEADER_SEARCH_PATHS:
+          - $(PROJECT_DIR)/build/codecs/include
         OTHER_LDFLAGS:
           - -lframejob_core
+          - $(PROJECT_DIR)/build/codecs/lib/libSvtAv1Enc.a
+          - $(PROJECT_DIR)/build/codecs/lib/libvpx.a
         MTL_LANGUAGE_REVISION: UseDeploymentTarget
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
         ENABLE_HARDENED_RUNTIME: "YES"
@@ -94,9 +102,11 @@ targets:
           # refuses an ad-hoc framework under the hardened runtime's library
           # validation ("different Team IDs") and the app cannot launch. A
           # per-config OTHER_LDFLAGS replaces the base one, so the core is
-          # restated.
+          # restated, and so are the encoders' archives (CX-4).
           OTHER_LDFLAGS:
             - -lframejob_core
+            - $(PROJECT_DIR)/build/codecs/lib/libSvtAv1Enc.a
+            - $(PROJECT_DIR)/build/codecs/lib/libvpx.a
             - -Xlinker
             - -dead_strip_dylibs
           # Xcode 26 splits a Debug executable into a stub and __preview.dylib,
@@ -114,9 +124,12 @@ targets:
         Release:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) FRAMEJOB_DEV_TOOLS"
           # As Debug's: Sparkle embedded, never loaded (spec §11 PUB-7;
-          # tools/proof/dist_check.py D35 holds it).
+          # tools/proof/dist_check.py D35 holds it). The encoders' archives
+          # restated as Debug's are (CX-4).
           OTHER_LDFLAGS:
             - -lframejob_core
+            - $(PROJECT_DIR)/build/codecs/lib/libSvtAv1Enc.a
+            - $(PROJECT_DIR)/build/codecs/lib/libvpx.a
             - -Xlinker
             - -dead_strip_dylibs
         # Distribution is the build that ships (spec §11 V-1), and notarization
@@ -229,6 +242,23 @@ targets:
         com.apple.security.device.audio-input: true
         com.apple.security.device.camera: true
     preBuildScripts:
+      # The bundled encoders (road map "codec-export" C0, spec §11 CX-5):
+      # tools/codecs/build_codecs.py fetches, checks and builds SVT-AV1 and
+      # libvpx into build/codecs/, or reuses them by its stamp (a no-op costs
+      # well under a second), so the step runs every build. The PATH is Build
+      # Rust Core's without cargo; the script also finds cmake in
+      # /opt/homebrew/bin or /usr/local/bin when Xcode's PATH lacks Homebrew,
+      # and builds under its own scrubbed environment, so this step and a
+      # shell's `make codecs` compute one key.
+      - name: Build Codecs
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          export PATH="/usr/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+          python3 "$PROJECT_DIR/tools/codecs/build_codecs.py"
+        outputFiles:
+          - $(PROJECT_DIR)/build/codecs/lib/libSvtAv1Enc.a
+          - $(PROJECT_DIR)/build/codecs/lib/libvpx.a
       - name: Build Rust Core
         # cargo decides staleness, so the step runs every build (a no-op
         # costs 0.1 s).
@@ -290,6 +320,17 @@ targets:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicTemplates/kinetic-type.js
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicTemplates/lower-third.js
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicTemplates/title-card.js
+      # The encoders' licence and patent texts (spec §11 CX-5 (4), #376):
+      # build/codecs/licenses/<library>/ as Build Codecs installed them, into
+      # Contents/Resources/Licenses/ (tools/proof/dist_check.py D40/D41).
+      - name: Copy Codec Licences
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          dest="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Licenses"
+          rm -rf "$dest"
+          mkdir -p "$dest"
+          cp -R "$PROJECT_DIR"/build/codecs/licenses/* "$dest/"
       # The assistant's agent helper (agent/, spec §11 AI-1): compiled with
       # Bun, placed in Contents/Helpers and signed by agent/build.sh, before
       # Xcode signs the app around it — the app's own signature does not

@@ -59,6 +59,11 @@ jobs:
           rustup default stable
           rustc --version
           brew install xcodegen
+          # The bundled encoders (spec §11 CX-5): Xcode's "Build Codecs" step
+          # fetches the pinned tarballs and builds them with cmake, which a
+          # runner image may or may not carry; the system perl is enough.
+          command -v cmake >/dev/null || brew install cmake
+          cmake --version
           # Compositor.metal is compiled by the build, and Xcode 26 ships the
           # Metal toolchain as a separate component an image may not carry.
           if ! xcrun metal --version > /dev/null 2>&1; then

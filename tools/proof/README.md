@@ -1634,15 +1634,22 @@ is a folder's `*.swift` but `main.swift`, sorted.
 - **The line**: `xcrun swiftc [-D d]… [-O] [-whole-module-optimization | -j
   <cores>] -sdk <sdk> -target arm64-apple-macos26.0 -module-name FrameJob
   -import-objc-header app/Bridging/FrameJob-Bridging-Header.h -L
-  core/target/release -lframejob_core <sources, entry last> [link args] -o
-  <tmp>/link/<the caller's file name>`. A missing staticlib is refused,
-  naming `cd core && cargo build --release`.
+  core/target/release -lframejob_core -Xcc -I build/codecs/include
+  build/codecs/lib/libSvtAv1Enc.a build/codecs/lib/libvpx.a <sources, entry
+  last> [link args] -o <tmp>/link/<the caller's file name>`. A missing
+  staticlib is refused, naming `cd core && cargo build --release`; a missing
+  encoder archive or `build/codecs/stamp.json` is refused, naming `make codecs`
+  (road map "codec-export" C0, spec §11 CX-4: the bridging header includes the
+  encoders' headers, so every line over `app/Sources` finds them and links the
+  archives; `swift_build.codec_args()` is those four arguments, for the closed
+  spikes' own lines).
 - **The key** is a sha256 over the helper's own bytes, `swiftc --version`, the
   SDK's path and its `SDKSettings.json`, the argv (ROOT-relative, less the
   values of `-o`, `-j` and `-output-file-map`), the output's file name, the
   bytes of every source, of the bridging header and every header it reaches
-  by a quoted `#include` (`core/include/framejob_core.h`), of the staticlib and
-  each link input, the
+  by a quoted `#include` (`core/include/framejob_core.h`), of the staticlib, the
+  two encoder archives and `build/codecs/stamp.json` (whose key covers the
+  encoders' headers), and each link input, the
   `DEVELOPER_DIR`, `SDKROOT`, `TOOLCHAINS` and `MACOSX_DEPLOYMENT_TARGET`
   variables, and the tree's own path (`#file` embeds it). Nothing about it is
   an mtime: a `touch` rebuilds nothing, and any byte change rebuilds.
@@ -1669,6 +1676,7 @@ is a folder's `*.swift` but `main.swift`, sorted.
   `--sources DIR`) in batch mode on every core, in seconds. The last probe is
   compiled AS `main.swift` (top-level code is allowed only there), from a
   temporary copy whose path is written back to the probe's own in the output.
+  It passes `-Xcc -I build/codecs/include` too.
 
 **Who goes through it.** Every proof, probe and the harness that compiles app
 sources. Phase 1a moved `harness/build.sh`, and the `build_probe` of
@@ -1686,14 +1694,19 @@ bridging header or staticlib, now gets both (one line for every build).
 `reference_build_selftest.py` (historical trees, with their own key and module
 caches) and the closed spikes (`*_spike/`, `recording_spike.py`). A swiftc
 line that compiles no app source also stays: `phase8_proof.py`'s extracted
-`PreviewQuality.swift` and `v2_snapshot.py`'s `v2_cover`.
+`PreviewQuality.swift` and `v2_snapshot.py`'s `v2_cover`. Since codec-export C0
+the four closed spikes that compile `app/Sources` on their own line
+(`assistant_spike.py`, `capture_spike.py`, `words_spike/text_rows.py`,
+`speed_spike.py`) append `swift_build.codec_args()`, and `speed_spike.py`'s
+mtime check counts the two archives.
 
 **The selftest** (`--selftest`, a line of `make test`), over a scratch cache
 in `work/swift-build-selftest/`: K0 (CONTROL) the same inputs give the same
 key twice; K1 the key changes for a source byte, the source order, a define,
-`optimize`, a link input's bytes, a header reached by `#include` and the
-library's bytes and the output's file name, and NOT for another `-o` folder
-or `-j`; B1 a one-file program builds and runs; B2 the same call reuses; B6
+`optimize`, a link input's bytes, a header reached by `#include`, the
+library's bytes, an encoder archive's bytes, the encoders' stamp and the
+output's file name (the K rows key stand-in archives in the scratch folder,
+never `build/codecs/`), and NOT for another `-o` folder or `-j`; B1 a one-file program builds and runs; B2 the same call reuses; B6
 the delivered binary's signature identifier is its own file name; B3 an entry whose binary was
 tampered with fails its digest and is rebuilt (the instrument's own first run
 caught the rebuild landing beside the tampered entry and the tampered binary
@@ -1847,12 +1860,14 @@ imports `dist_check`.
 ```
 make gate                                   # or: python3 tools/proof/gate.py [--force] [--wait SECONDS]
 make gate GATE_ARGS=--force                 # run every step, stamps or not
-python3 tools/proof/gate.py --selftest      # H0, M1–M7, H2–H4, W0–W4 (make test)
+python3 tools/proof/gate.py --selftest      # H0, M1–M8, H2–H4, W0–W4 (make test)
 python3 tools/proof/gate.py --mutant no-tools|stamp-always|md-counted|warning-count
 ```
 
 **The steps**, serially, stopping at the first failure, each under its
-bound (running past it is a FAIL): `typecheck` (`make typecheck`, 300 s) —
+bound (running past it is a FAIL): `typecheck` (`make typecheck`, 600 s,
+which first builds or reuses the bundled encoders, `make codecs`: a cold
+fetch and build of SVT-AV1 and libvpx is about a minute, codec-export C0) —
 passes only with no `error:` and exactly the four baseline warnings by file
 basename and message (`TYPECHECK_BASELINE`, spec §11 W-8; a line number may
 move, a fifth warning or a missing one fails); `fmt` (`cargo fmt --check` in
@@ -1870,11 +1885,12 @@ seal) and the rest of dist_check still run only there.
 files among `git ls-files -co --exclude-standard` and a tool fingerprint
 (the output of `xcrun swiftc --version`, `xcodebuild -version`, `xcrun
 --show-sdk-path`, `rustc -Vv`, `cargo clippy -V`, `bun --version`,
-`xcodegen --version` and `cargo fmt --version`).
+`xcodegen --version`, `cargo fmt --version` and `cmake --version`).
 `gate.py` and the `Makefile` are in every step's files. `typecheck`:
-`app/Sources`, `app/Bridging`, `core/include`, `agent`. `fmt`, `lint`:
-`core`, `graphic`, `mcp-proxy`. `test`: everything but `archive/`. `app`:
-`app`, `agent`, `core`, `graphic`, `mcp-proxy`, `project.yml`, `VERSION`,
+`app/Sources`, `app/Bridging`, `core/include`, `agent`, `tools/codecs`. `fmt`,
+`lint`: `core`, `graphic`, `mcp-proxy`. `test`: everything but `archive/`. `app`:
+`app`, `agent`, `core`, `graphic`, `mcp-proxy`, `tools/codecs`, `project.yml`,
+`VERSION`,
 `docs/graphics-api.md`, `docs/graphics-api.d.ts` and
 `tools/proof/dist_check.py`. A `*.md` counts only under `designs/spec/` and
 `docs/` (for `test`) and as `docs/graphics-api.md` (for `app`); `.secrets/`
@@ -1896,12 +1912,13 @@ and `times.tsv` (UTC, commit with `-dirty`, step, seconds, result:
 `pass`, `skip`, `FAIL` or `pass-unstamped`).
 
 **The selftest**, pure (no tree, no lock): H0 (CONTROL) identical digests
-give identical hashes and every step is stamped; M1–M7 one file of each
+give identical hashes and every step is stamped; M1–M8 one file of each
 input class moves exactly its steps' hashes (an app source, the bridging
 header folder, the C header, the helper; a crate's source and `Cargo.toml`;
 `project.yml`, `VERSION`, a shader, the graphics reference, dist_check, a
 proof, a spec file, `docs/manual-checks.md`; `archive/`, `README.md`, a
-`CLAUDE.md` and an ADR move none; `gate.py` and the `Makefile` move all); H2
+`CLAUDE.md` and an ADR move none; `gate.py` and the `Makefile` move all;
+M8 `tools/codecs/build_codecs.py` moves names, typecheck, test and app); H2
 a substituted tool string moves every step; H3 unequal before and after
 hashes record no pass; H4 (CONTROL) a `.secrets/` path is in no step; W0
 (CONTROL) the four baseline warnings at other line numbers, each with its
@@ -7090,12 +7107,24 @@ and prints the needle and both paths before its rows:
   "mapping process and mapped file (non-platform) have different Team IDs",
   measured 2026-10-27); Distribution keeps the load command (its code uses
   Sparkle), so a local Distribution build cannot be launched (PUB-7).
+- **D36–D41** (the bundled encoders, road map "codec-export" C0, spec §11
+  CX-4, CX-5). **D36 / D37** the Release / Distribution binary's symbol table
+  (`nm -j`) names `_svt_av1_enc_init_handle` and `_vpx_codec_vp9_cx`, so both
+  encoders are linked statically; **D38 / D39** every one of its load commands
+  (`otool -L`) is under `/usr/lib/` or `/System/Library/`, or is an
+  `@rpath/Sparkle.framework/` path (Sparkle's presence in Release stays D35's),
+  so no codec dylib — nor any other non-system library — is ever loaded;
+  **D40 / D41** the bundle holds
+  `Contents/Resources/Licenses/<library>/<file>` for every licence text every
+  pin names (`tools/codecs/build_codecs.py`'s `PINS`: SVT-AV1's five, libvpx's
+  three), byte-identical to `build/codecs/licenses/` (#376 lists them).
 
 No row is ever skipped: if D1 fails, D4, D5, D12 and D13 FAIL too, and so
 does each when its binary, helper, proxy or snapshot is missing. The last
-line is `dist_check: <passed>/35`; the exit is 0 only at 35/35.
-`dist_check_mutants.py` makes each helper row, D14, D15–D32 and D35 fail on
-purpose; the A4 and MC3 sections of this file have its cases.
+line is `dist_check: <passed>/41`; the exit is 0 only at 41/41.
+`dist_check_mutants.py` makes each helper row, D14, D15–D32, D35, D36, D38,
+D40 and D41 fail on purpose; the A4 and MC3 sections of this file have its
+cases.
 
 **Why a marker and not the tool names.** Swift string literals of 15 UTF-8
 bytes or fewer are stored inline in the code of an `-O` binary, not as
@@ -7108,7 +7137,7 @@ optimised binary by the log line the flag-on `devTools()` writes, so a dev
 tool added to the seam needs no edit here.
 
 ```sh
-make dist                                                  # → dist_check: 34/35 (D31) until the owner's key lands, then 35/35
+make dist                                                  # → dist_check: 40/41 (D31) until the owner's key lands, then 41/41
 python3 tools/proof/dist_check.py [--release APP] [--dist APP]
 ```
 
@@ -7119,7 +7148,7 @@ only ever read, never used to verify anything):
 ```sh
 make app && xcodebuild -project FrameJob.xcodeproj -scheme FrameJob -configuration Distribution \
   -derivedDataPath build RC_SPARKLE_PUBLIC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= build
-python3 tools/proof/dist_check.py                          # → dist_check: 35/35
+python3 tools/proof/dist_check.py                          # → dist_check: 41/41
 ```
 
 **Made to fail by hand (2026-09-26, when there were five rows)**, each
@@ -8275,10 +8304,11 @@ bundle under `work/dist_check_mutants/<case>/`: `Contents/MacOS/Frame Job` a
 symlink to the real app's untouched binary and the helper a COPY, mutated
 and re-signed ad hoc; nothing is written into `build/`. A case passes iff
 the FAIL ids equal its expected set exactly, the last line is
-`dist_check: <35 − |set|>/35` and the exit is 0 for an empty set, 1
+`dist_check: <41 − |set|>/41` and the exit is 0 for an empty set, 1
 otherwise; a failed setup step is a scored FAIL naming it. Since Sparkle
 (spec §11 PUB-7) every skeleton also carries a `ditto` copy of the real
-`Sparkle.framework`.
+`Sparkle.framework`, and since codec-export C0 (spec §11 CX-5) a copy of the
+real `Contents/Resources/Licenses/`.
 
 | Case | The mutation | Expected FAIL |
 |---|---|---|
@@ -8300,12 +8330,22 @@ otherwise; a failed setup step is a scored FAIL naming it. Since Sparkle
 | `key-short-dist` (PUB-8) | the Info.plist copy's `SUPublicEDKey` base64 of 31 bytes | D31 |
 | `release-feed` (PUB-7) | the Release Info.plist copy's `SUFeedURL` set to Distribution's | D32 |
 | `sparkle-load-release` (PUB-7) | the whole Release app `ditto`ed, `install_name_tool -change` turning the first of its load commands at least as long as Distribution's Sparkle one into it, then re-signed ad hoc `--options runtime` with `dist_check.RELEASE_ENTITLEMENTS` — the load command `-dead_strip_dylibs` drops, restored | D35 |
+| `codec-stripped-release` (CX-4) | the whole Release app `ditto`ed, its executable `strip`ped, then re-signed as `sparkle-load-release` is | D36 |
+| `codec-dylib-release` (CX-4) | the whole Release app `ditto`ed, `install_name_tool -change` turning the first of its load commands at least as long as `@rpath/libvpx.dylib` into it, then re-signed the same way | D38 |
+| `licence-missing-dist` (CX-5) | the Distribution skeleton's `Licenses/` copy without `libvpx/LICENSE` | D41 |
+| `licence-changed-release` (CX-5) | the Release skeleton's `Licenses/` copy with a byte appended to `svt-av1/PATENTS.md` | D40 |
 
 ```sh
-make dist                                                  # → dist_check: 34/35 (D31) until the owner's key lands
-python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 30/30 (a stand-in-key Distribution, V0's section)
-python3 tools/proof/dist_check.py --dist "/nonexistent/Frame Job.app"    # D3 D5 D7 D9 D11 D13 D14 D16 D18 D20 D22 D24 D27 D28 D29 D30 D31 D33 FAIL, 17/35, exit 1
+make dist                                                  # → dist_check: 40/41 (D31) until the owner's key lands
+python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 34/34 (a stand-in-key Distribution, V0's section)
+python3 tools/proof/dist_check.py --dist "/nonexistent/Frame Job.app"    # D3 D5 D7 D9 D11 D13 D14 D16 D18 D20 D22 D24 D27 D28 D29 D30 D31 D33 D37 D39 D41 FAIL, 20/41, exit 1
 ```
+
+**Measured 2026-10-27 (codec export C0, the stand-in-key Distribution build):**
+`dist_check.py` 41/41 (D38 read 47 Release and 48 Distribution load commands,
+D40/D41 8 texts each); `dist_check_mutants.py` 34/34, each of the four new cases
+failing exactly its row (40/41); `--dist` at a missing path 20/41, exit 1, the
+FAIL set above. `make dist` alone: 40/41 (D31) and `published_check` 20/21 (P20).
 
 **Measured 2026-10-27 (Sparkle, the stand-in-key Distribution build):**
 `dist_check_mutants.py` 30/30, each Sparkle case failing exactly its set
@@ -24926,3 +24966,51 @@ Exit 0 means caught, 1 survived, and 2 the control could not be performed.
 - The variant tables that chose B4a and B4b (round 1: h264, hevc and ProRes, static and moving,
   at 8 and 16 Mbit/s; round 2: `hevc_10bit`, and spans of ±1 and ±1.5) come from the throwaway
   `work/raster-dither/b4_variants.py`. PR-13 quotes them.
+
+## Codec export C0 — the bundled encoders' link (`codecs_proof.py` L1–L3; `tools/codecs/build_codecs.py --selftest`; spec §11 CX-4, CX-5)
+
+`tools/codecs/build_codecs.py` (`make codecs`, and project.yml's "Build Codecs"
+pre-build step) fetches SVT-AV1 v4.2.0 and libvpx v1.17.0 as pinned tarballs,
+checks each by SHA-256, and builds them arm64, static and encoder-only into
+`build/codecs/` (`tools/codecs/PROVENANCE.md` has the pins). Every app
+configuration links both archives by full path, and the bridging header includes
+their headers. `CodecLibraries.swift` reads each library's version and opens an
+SVT-AV1 handle; `-RCCodecProbe 1` prints them and exits, before the app starts.
+
+```
+python3 tools/proof/codecs_proof.py [--app debug|release|PATH]     # L1–L3; no window, no socket
+python3 tools/codecs/build_codecs.py --selftest                     # K0–K2, R0–R3, S0, S1, P1, C1, C2 (make test)
+python3 tools/codecs/build_codecs.py --mutant key-no-tools|reuse-unchecked|sha-unchecked
+```
+
+**`codecs_proof.py`** picks its app through `proof_app.py` (`--app`, else
+`RC_PROOF_APP`, else Debug), refuses a stale build, and runs its executable with
+`-RCCodecProbe 1`: L1 exit 0 and exactly two stdout lines; L2 the
+`svt-av1 <version>` line's version is `v` + the SVT-AV1 pin's; L3 the
+`libvpx <version> (<name>)` line's version is `v` + the libvpx pin's and the
+VP9 encoder's name contains "VP9 Encoder". SVT-AV1's own banner goes to stderr.
+
+**The builder's selftest** (no network, no cmake, a scratch folder): K0
+(CONTROL) the same inputs give one key; K1 a changed cmake version or SDK
+changes it; K2 the script's bytes, a pin's digest and the deployment target
+each change it; R0 (CONTROL) an equal key with every output as recorded is
+reused; R1 an output's changed byte and R2 a removed output rebuild; R3 another
+key, no stamp and a broken stamp rebuild; S0 (CONTROL) a matching download is
+kept; S1 a mismatched one raises naming both digests and is deleted; P1 the
+pins are well formed; C1 with only the system PATH, cmake is found in a
+`CMAKE_DIRS` folder and `build_env()` is the scrubbed environment; C2 no cmake
+anywhere raises naming `brew install cmake`. Each mutant must fail exactly its
+rows (exit 0 then): `key-no-tools` K1, `reuse-unchecked` R1 R2,
+`sha-unchecked` S1.
+
+**A tree copy** (`tree_copy.make_copy`) links its `build/codecs` to the tree's
+(T6), and the builder resolves its own path to the tree's, so a copy reuses the
+tree's encoders and never fetches them.
+
+**Runs (2026-10-27).** `build_codecs.py` cold: fetched both tarballs and built in
+30 s (1-minute load 7.1 at the start), then `reused` on the next run and under
+`env -i HOME=… PATH=/usr/bin:/bin:/usr/sbin:/sbin` (the same key, cmake found in
+`/opt/homebrew/bin`). Every archive member's `minos` is 26.0 (235 in
+`libSvtAv1Enc.a`, 178 in `libvpx.a`). Selftest 12/12; the three mutants each
+failed exactly their rows. `codecs_proof.py` 3/3 on Debug and on Release
+(`svt-av1 v4.2.0`, `libvpx v1.17.0 (WebM Project VP9 Encoder v1.17.0)`).

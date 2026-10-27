@@ -298,6 +298,8 @@ detail there.
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
   `MediaCacheLane.swift` ·
   `FFmpegRewrap.swift` (+`Plan`) · `AppSupport.swift` · `DecoderSupport.swift` ·
+  `CodecLibraries.swift` (the SVT-AV1 and libvpx link and its `-RCCodecProbe`;
+  export rows arrive with road map codec-export's C1) ·
   `ContainerRewrap.swift` (+`Writer`) · `RewrapProgress.swift` ·
   `RewrapProgressWindowController.swift` — the import funnel and the three per-media caches (`thumbs/`, `peaks/`,
   `speech/`) inside the package. `DecoderSupport.swift` (await-free) is the
@@ -682,8 +684,10 @@ the key map behind it.
   `ProjectDocumentController.complainUnlessShared()`, and releases the
   socket at quit. Copy MCP Command is Settings' MCP pane's (`MCPSettingsPane.swift`,
   spec §11 MC-7); there is no Tools menu.
-  `main.swift` calls `ProjectDocumentController.install()` straight after
-  `DecoderSupport.enable()`, and `AgentCatalogSnapshot.writeIfAsked()`
+  `main.swift` calls `CodecLibraries.probeIfAsked()` straight after
+  `DecoderSupport.enable()` (it prints the bundled encoders' versions and
+  exits under `-RCCodecProbe 1`, in every configuration, spec §11 CX-4), then
+  `ProjectDocumentController.install()`, and `AgentCatalogSnapshot.writeIfAsked()`
   straight after `AgentLane.prepareAtLaunch()`, at `#if` depth 0.
 - `ProjectDocumentController.swift` — the app's `NSDocumentController`
   (spec §11 #234), made once by `main.swift` before any other can be (the

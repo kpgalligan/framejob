@@ -28,11 +28,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PROOF = os.path.normpath(os.path.join(HERE, ".."))
 ROOT = os.path.normpath(os.path.join(PROOF, "..", ".."))
 CLOUD = os.path.join(PROOF, "cloud_spike")
-for folder in (CLOUD,):
+for folder in (CLOUD, PROOF):
     if folder not in sys.path:
         sys.path.append(folder)
 
 import local_rows                                                    # noqa: E402
+import swift_build                                                   # noqa: E402
 
 APP_FONTS = os.path.join(ROOT, "app", "Resources", "Fonts")
 FONTS = os.path.join(HERE, "fonts")
@@ -87,7 +88,8 @@ def build_text_probe(work):
         "swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
         "-module-name", "FrameJob", "-import-objc-header",
         os.path.join(ROOT, "app", "Bridging", "FrameJob-Bridging-Header.h"),
-        "-L", library, "-lframejob_core", *sources, entry, "-o", binary]
+        "-L", library, "-lframejob_core", *sources, entry, "-o", binary,
+        *swift_build.codec_args()]
     result = local_rows.run_bounded(command, timeout=900)
     if result["rc"] != 0 or not os.path.exists(binary):
         lines = [line for line in (result["stderr"] or "").splitlines() if ": error:" in line]

@@ -8,8 +8,10 @@
 Six steps, serially, stopping at the first failure: `names`
 (`name_residue.py`, spec §11 NM-8: no line or path spells the old name
 outside its allow-list; every file is its input, `*.md` included), `typecheck` (`make
-typecheck`, passing only with no `error:` and exactly TYPECHECK_BASELINE's
-warnings, by file and message), `fmt` (`cargo fmt --check` in core, graphic,
+typecheck`, which builds or reuses the bundled encoders first, `make codecs`, spec §11
+CX-5, passing only with no `error:` and exactly TYPECHECK_BASELINE's
+warnings, by file and message; `tools/codecs` is among its and `app`'s inputs, and
+`cmake --version` in the tool fingerprint), `fmt` (`cargo fmt --check` in core, graphic,
 mcp-proxy), `lint` (`make lint`), `test` (`make test`) and `app` (`make app`,
 then dist_check's D25 and D26 over the Release app: its entitlements and its
 seal, the defect a no-op build once shipped and only `make dist` read).
@@ -47,7 +49,7 @@ HERE = "tools/proof/gate.py"
 GATE = ROOT / "build/gate"
 ALWAYS = (HERE, "Makefile")
 STEPS = ("names", "typecheck", "fmt", "lint", "test", "app")
-BOUNDS = {"names": 120, "typecheck": 300, "fmt": 120, "lint": 600, "test": 900, "app": 1500}
+BOUNDS = {"names": 120, "typecheck": 600, "fmt": 120, "lint": 600, "test": 900, "app": 1500}
 COMMANDS = {
     "names": [["python3", "tools/proof/name_residue.py"]],
     "typecheck": [["make", "typecheck"]],
@@ -60,18 +62,20 @@ FOLDERS = {"fmt": ("core", "graphic", "mcp-proxy")}
 # The step's own files: folders and files, then which `*.md` count (none, unless named).
 STEP_INPUTS = {
     "names": (("",), ("",)),
-    "typecheck": (("app/Sources", "app/Bridging", "core/include", "agent"), ()),
+    "typecheck": (("app/Sources", "app/Bridging", "core/include", "agent", "tools/codecs"), ()),
     "fmt": (("core", "graphic", "mcp-proxy"), ()),
     "lint": (("core", "graphic", "mcp-proxy"), ()),
     "test": (("",), ("designs/spec/", "docs/")),
-    "app": (("app", "agent", "core", "graphic", "mcp-proxy", "project.yml", "VERSION",
+    "app": (("app", "agent", "core", "graphic", "mcp-proxy", "tools/codecs", "project.yml",
+             "VERSION",
              "docs/graphics-api.md", "docs/graphics-api.d.ts", "tools/proof/dist_check.py"),
             ("docs/graphics-api.md",)),
 }
 EXCLUDED = ("archive/", ".secrets/")
 TOOLS = (["xcrun", "swiftc", "--version"], ["xcodebuild", "-version"],
          ["xcrun", "--show-sdk-path"], ["rustc", "-Vv"], ["cargo", "clippy", "-V"],
-         ["bun", "--version"], ["xcodegen", "--version"], ["cargo", "fmt", "--version"])
+         ["bun", "--version"], ["xcodegen", "--version"], ["cargo", "fmt", "--version"],
+         ["cmake", "--version"])
 # `make typecheck`'s warnings at HEAD 0b380d2, verbatim (CLAUDE.md: "0 errors and 4 warnings",
 # deliberate, spec §11 W-8): (file basename, message). A fifth, or one gone, fails the step.
 TYPECHECK_BASELINE = (
@@ -319,6 +323,7 @@ def selftest(mutant=None):
         ("M1", "app/Bridging/x.h", {"names", "typecheck", "test", "app"}),
         ("M1", "core/include/framejob_core.h", every),
         ("M1", "agent/src/agent.ts", {"names", "typecheck", "test", "app"}),
+        ("M8", "tools/codecs/build_codecs.py", {"names", "typecheck", "test", "app"}),
         ("M2", "core/src/lib.rs", {"names", "fmt", "lint", "test", "app"}),
         ("M2", "graphic/src/lib.rs", {"names", "fmt", "lint", "test", "app"}),
         ("M2", "mcp-proxy/Cargo.toml", {"names", "fmt", "lint", "test", "app"}),

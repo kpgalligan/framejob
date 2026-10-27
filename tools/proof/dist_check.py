@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Road map 11 V0, road map 12 A4, #145, road map 14 MC3, build velocity and Sparkle — the binary check `make dist` runs.
+"""Road map 11 V0, road map 12 A4, #145, road map 14 MC3, build velocity, Sparkle and codec export — the binary check `make dist` runs.
 
 The Distribution configuration is Release without the Swift condition
 `FRAMEJOB_DEV_TOOLS` (spec §11 V-1), so its binary must hold none of the dev
@@ -84,7 +84,19 @@ class name, and D33 is that row's positive control: the Distribution binary
 holds `SPUStandardUpdaterController`. D35 wants no `Sparkle.framework`
 path among the Release binary's load commands (`otool -L`).
 
-The thirty-five rows, none ever skipped:
+**The bundled encoders (road map "codec-export" C0, spec §11 CX-4, CX-5).** SVT-AV1
+and libvpx are linked statically into every configuration from `build/codecs/`
+(`tools/codecs/build_codecs.py`), and their licence and patent texts are copied
+into `Contents/Resources/Licenses/<library>/` (project.yml's "Copy Codec
+Licences"). D36 / D37 read each executable's symbol table (`nm -j`) for one
+entry point of each encoder; D38 / D39 want every load command (`otool -L`)
+under `/usr/lib/` or `/System/Library/`, or an `@rpath/Sparkle.framework/` path
+(whose presence in Release stays D35's), so no codec dylib, nor any other
+non-system library, is ever loaded; D40 / D41 want every licence text the pins
+name (`build_codecs.PINS`) in each bundle, byte-identical to
+`build/codecs/licenses/`.
+
+The forty-one rows, none ever skipped:
 
 * D1 — the needle is read from the seam file: exactly one bare declaration
   line, ASCII, at least 16 UTF-8 bytes;
@@ -131,19 +143,29 @@ The thirty-five rows, none ever skipped:
   positive control for D34);
 * D34 — the Release binary does not hold it;
 * D35 — `otool -L` lists the Release binary's load commands (at least one)
-  and none is a `Sparkle.framework` path.
+  and none is a `Sparkle.framework` path;
+* D36 / D37 — the Release / Distribution binary's symbol table (`nm -j`)
+  names `_svt_av1_enc_init_handle` and `_vpx_codec_vp9_cx`;
+* D38 / D39 — every load command of the Release / Distribution binary
+  (at least one) is under `/usr/lib/` or `/System/Library/`, or is an
+  `@rpath/Sparkle.framework/` path;
+* D40 / D41 — the Release / Distribution bundle holds
+  `Contents/Resources/Licenses/<library>/<file>` for every licence text of
+  every pin, byte-identical to `build/codecs/licenses/<library>/<file>`.
 
 If D1 fails, D4, D5, D12 and D13 FAIL too, and so does each when its binary
 or helper is missing; D14 FAILs when the Distribution binary is, D25 and
 D26 when the Release binary is, and D27 when the Distribution binary is; D33
 and D34 FAIL when their binary is missing, and D35 when the Release binary
-is, or `otool` is missing or fails. D17–D20
+is, or `otool` is missing or fails; D36–D39 FAIL when their binary is missing
+or `nm`/`otool` is missing or fails, and D40 / D41 when `build/codecs/` has no
+licences to compare. D17–D20
 FAIL when their proxy is missing; D23 and D24 when their snapshot has no
 readable `tools` or the dev names cannot be read. A missing `codesign`, a
 timeout or output that does not parse FAILs the row with the reason.
 `tools/proof/dist_check_mutants.py` makes each helper row, D14 and each of
-D15–D32 and D35 fail on purpose. The last line is `dist_check: <passed>/35`;
-the exit is 0 only at 35/35.
+D15–D32, D35, D36, D38, D40 and D41 fail on purpose. The last line is
+`dist_check: <passed>/41`; the exit is 0 only at 41/41.
 """
 
 import argparse
@@ -160,6 +182,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import proof_app  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(ROOT, "tools", "codecs"))
+import build_codecs  # noqa: E402
 SEAM = os.path.join(ROOT, "app", "Sources", "AgentServer+DevTools.swift")
 DEFAULT_RELEASE = os.path.join(ROOT, "build", "Build", "Products", "Release", "Frame Job.app")
 DEFAULT_DIST = os.path.join(ROOT, "build", "Build", "Products", "Distribution", "Frame Job.app")
@@ -201,7 +225,14 @@ SPARKLE_LOAD = "/Sparkle.framework/"
 # The first four bytes of a Mach-O, thin or universal, either byte order.
 MACHO_MAGIC = {bytes.fromhex(m) for m in
                ("feedface", "cefaedfe", "feedfacf", "cffaedfe", "cafebabe", "bebafeca")}
-TOTAL = 35
+# The bundled encoders (codec-export C0, spec §11 CX-4, CX-5): one entry point of each,
+# the load commands a binary may hold, and where each bundle's licence texts are.
+CODEC_SYMBOLS = ("_svt_av1_enc_init_handle", "_vpx_codec_vp9_cx")
+SYSTEM_LOADS = ("/usr/lib/", "/System/Library/")
+SPARKLE_RPATH = "@rpath/Sparkle.framework/"
+LICENSES = os.path.join("Contents", "Resources", "Licenses")
+CODEC_LICENSES = os.path.join(ROOT, "build", "codecs", "licenses")
+TOTAL = 41
 # The CodeDirectory line's flags; `Executable Segment flags=0x1` has no parentheses.
 FLAGS = re.compile(r"flags=0x[0-9a-fA-F]+\(([^)]*)\)")
 TIMEOUT = 120
@@ -568,6 +599,64 @@ def load_commands(binary):
     return paths, ""
 
 
+def codec_symbols(binary):
+    """Whether the executable's symbol table (`nm -j`) names every CODEC_SYMBOLS entry."""
+    try:
+        shown = subprocess.run(["nm", "-j", os.path.realpath(binary)], capture_output=True,
+                               timeout=TIMEOUT, env=child_env())
+    except FileNotFoundError:
+        return False, "nm is not on PATH"
+    except subprocess.TimeoutExpired:
+        return False, f"nm -j timed out after {TIMEOUT} s"
+    except OSError as error:
+        return False, f"nm: {error}"
+    if shown.returncode != 0:
+        return False, (f"nm -j exit {shown.returncode}: "
+                       f"{shown.stderr.decode('utf-8', 'replace').strip()[:300]}")
+    names = set(shown.stdout.decode("utf-8", "replace").split())
+    missing = [symbol for symbol in CODEC_SYMBOLS if symbol not in names]
+    if missing:
+        return False, f"{missing} not in the symbol table of {binary}"
+    return True, ""
+
+
+def system_loads(binary):
+    """Whether every load command is a system library or Sparkle (`otool -L`)."""
+    paths, reason = load_commands(binary)
+    if paths is None:
+        return False, reason
+    other = [path for path in paths
+             if not path.startswith(SYSTEM_LOADS) and not path.startswith(SPARKLE_RPATH)]
+    if other:
+        return False, f"{other} in {binary}"
+    return True, f"{len(paths)} load commands"
+
+
+def codec_licences(app):
+    """Whether the bundle holds every pin's licence texts, byte-identical to
+    build/codecs/licenses/."""
+    wanted = [(pin.name, installed) for pin in build_codecs.PINS
+              for _, installed in pin.licenses]
+    problems = []
+    for library, name in wanted:
+        source = os.path.join(CODEC_LICENSES, library, name)
+        held = os.path.join(app, LICENSES, library, name)
+        try:
+            with open(source, "rb") as handle:
+                want = handle.read()
+        except OSError as error:
+            return False, f"build/codecs has no {library}/{name} to compare: {error}"
+        try:
+            with open(held, "rb") as handle:
+                if handle.read() != want:
+                    problems.append(f"{library}/{name} differs")
+        except OSError:
+            problems.append(f"{library}/{name} is missing")
+    if problems:
+        return False, f"{problems} in {os.path.join(app, LICENSES)}"
+    return True, f"{len(wanted)} texts"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--release", default=DEFAULT_RELEASE, help="the Release Frame Job.app")
@@ -575,10 +664,10 @@ def main():
     arguments = parser.parse_args()
 
     needle, needle_reason = read_needle()
-    print("road map 11 V0, road map 12 A4, #145, road map 14 MC3, B88 and spec §11 PUB-6..PUB-9 "
-          "— no dev tools in Distribution; the helper signed in both; both apps' entitlements "
-          "and seals; the MCP proxy and its snapshot in both; the updater in Distribution "
-          "alone\n")
+    print("road map 11 V0, road map 12 A4, #145, road map 14 MC3, B88, spec §11 PUB-6..PUB-9 "
+          "and CX-4, CX-5 — no dev tools in Distribution; the helper signed in both; both apps' "
+          "entitlements and seals; the MCP proxy and its snapshot in both; the updater in "
+          "Distribution alone; the encoders static in both, with their licences\n")
     print(f"  needle:       {needle.decode('ascii') if needle else '(none)'}")
     print(f"  release:      {os.path.abspath(arguments.release)}")
     print(f"  distribution: {os.path.abspath(arguments.dist)}\n")
@@ -783,6 +872,31 @@ def main():
             held = [path for path in paths if SPARKLE_LOAD in path]
             check(f"{name} ({len(paths)} load commands)" if not held else name, not held,
                   f"{held} in {release_where}")
+
+    encoder_sides = (("Release", "D36", "D38", "D40", release, release_where, "D2",
+                      arguments.release),
+                     ("Distribution", "D37", "D39", "D41", dist, dist_where, "D3",
+                      arguments.dist))
+    for side, symbols_id, _, _, binary, where, exists_id, _ in encoder_sides:
+        name = (f"{symbols_id} the {side} binary's symbol table names "
+                + " and ".join(CODEC_SYMBOLS))
+        if binary is None:
+            check(name, False, f"no {side} binary ({exists_id})")
+        else:
+            ok, detail = codec_symbols(where)
+            check(name, ok, detail)
+    for side, _, loads_id, _, binary, where, exists_id, _ in encoder_sides:
+        name = (f"{loads_id} every {side} load command is a system library or "
+                "Sparkle's")
+        if binary is None:
+            check(name, False, f"no {side} binary ({exists_id})")
+        else:
+            ok, detail = system_loads(where)
+            check(f"{name} ({detail})" if ok else name, ok, "" if ok else detail)
+    for side, _, _, licences_id, _, _, _, app in encoder_sides:
+        ok, detail = codec_licences(app)
+        check(f"{licences_id} the {side} bundle holds the encoders' licence texts"
+              + (f" ({detail})" if ok else ""), ok, "" if ok else detail)
 
     print(f"\ndist_check: {passed}/{TOTAL}")
     return 0 if passed == TOTAL else 1
