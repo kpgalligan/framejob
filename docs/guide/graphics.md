@@ -26,6 +26,14 @@ in the editor.
 - A module's **properties** (its schema) are typed: number, boolean, colour,
   menu (enum), text, or picture (asset). A value you don't set draws with the
   module's own default.
+- **Gradients don't band.** Where a gradient is rounded to the 256 levels a
+  graphic is drawn in, Frame Job adds a fixed, fine pattern under half a
+  level, so a dark gradient shades smoothly instead of in steps. Flat
+  colours, pictures, text and transparency are drawn exactly. The pattern
+  survives `render_frame`, Save Frame… and ProRes. A 10-bit export
+  (`hevc_10bit`) smooths most of it away but keeps the in-between shades,
+  so the gradient stays smooth; an 8-bit H.264 or HEVC export smooths it
+  away too, and its steps come back.
 
 Module names use lowercase letters, digits and `-`, start with a letter or a
 digit, and are at most 63 characters (`lower-third`, `title-2`).

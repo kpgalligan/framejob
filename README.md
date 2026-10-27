@@ -153,4 +153,6 @@ Xcode 26, Rust, xcodegen and bun; then `make app`. Everything else is in
 
 Frame Job is licensed under the [Apache License, Version 2.0](LICENSE). The
 bundled fonts and the voice-activity model carry their own licences, beside
-them in `app/Resources/Fonts/` and `app/Resources/Models/`.
+them in `app/Resources/Fonts/` and `app/Resources/Models/`, and the patched
+copy of tiny-skia in `graphic/vendor/tiny-skia/` keeps its BSD-3-Clause
+licence.

@@ -270,6 +270,42 @@ fn rasterize_matches_the_crate_pin_and_leaves_padding_untouched() {
 }
 
 #[test]
+fn a_gradient_is_dithered_through_the_ffi() {
+    // Spec §11 PR-13: the staticlib links graphic's vendored tiny-skia (core's own
+    // `[patch.crates-io]`), so a horizontal grey gradient varies down a column. Without the
+    // dither every column is one value.
+    let lib = library();
+    let text = cstring(
+        r##"<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#202020"/><stop offset="1" stop-color="#606060"/></linearGradient></defs><rect width="64" height="64" fill="url(#g)"/></svg>"##,
+    );
+    let mut out = vec![0u8; 64 * 64 * 4];
+    let mut diag: *mut c_char = ptr::null_mut();
+    assert!(unsafe {
+        rc_graphic_rasterize(
+            lib,
+            text.as_ptr(),
+            64,
+            64,
+            out.as_mut_ptr(),
+            64 * 4,
+            &mut diag,
+        )
+    });
+    assert_eq!(take_string(diag), None);
+    let varied = (0..64)
+        .filter(|x| {
+            let green = |y: usize| out[(y * 64 + x) * 4 + 1];
+            (1..64).any(|y| green(y) != green(0))
+        })
+        .count();
+    assert!(
+        varied > 0,
+        "every column of the gradient is one value: not dithered"
+    );
+    unsafe { rc_graphic_library_free(lib) };
+}
+
+#[test]
 fn a_syntax_error_and_a_top_level_loop_each_answer_one_error() {
     let lib = library();
     let (g, diag) = compile(lib, "export const meta = {};\n\nconst x = ;\n", 250);

@@ -112,6 +112,7 @@ core/                Rust staticlib — the model, the ops, the plan, the recipe
 graphic/             Rust crate — the graphics engine (road map 10): a Module run in
   src/                 sandboxed QuickJS returns SVG per frame; rasterize (usvg →
   tests/               resvg → BGRA), measure_text. graphic/CLAUDE.md has its rules
+  vendor/              tiny-skia 0.12.0 with the gradient-dither patch (spec §11 PR-13)
 mcp-proxy/           Rust crate — `framejob-mcp` (road map 14 MC3, spec §11 MC-3): the stdio
   src/                 MCP server bundled in Contents/Helpers; answers initialize, ping and
   tests/               tools/list itself (the build's catalog snapshot when no Frame Job runs),

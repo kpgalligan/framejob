@@ -1,0 +1,96 @@
+diff -ru tools/proof/work/raster-dither/pristine/tiny-skia-0.12.0/src/pipeline/highp.rs graphic/vendor/tiny-skia/src/pipeline/highp.rs
+--- a/src/pipeline/highp.rs
++++ b/src/pipeline/highp.rs
+@@ -136,6 +136,8 @@
+     gamma_expand_srgb,
+     gamma_expand_dst_srgb,
+     gamma_compress_srgb,
++    // Frame Job (spec §11 PR-13): the gradient dither, below.
++    dither,
+ ];
+ 
+ pub fn fn_ptr(f: StageFn) -> *const () {
+@@ -1218,6 +1220,40 @@
+     p.r = srgb_compress(p.r);
+     p.g = srgb_compress(p.g);
+     p.b = srgb_compress(p.b);
++
++    p.next_stage();
++}
++
++// Frame Job (spec §11 PR-13): the gradient dither. A fixed offset by pixel position, uniform
++// over ±DITHER_SPAN/2 of a level (7/16: under half, so a premultiplied value on a level stays
++// exact), the same for R, G and B, each clamped to [0, a]; alpha untouched. Reads only the
++// position: no frame, thread or global state.
++const DITHER_SPAN: f32 = 0.875;
++const DITHER_SEED: u32 = 0x9E37_79B9;
++
++// lowbias32 (Chris Wellons), with wrapping multiplies.
++#[inline(always)]
++fn dither_hash(mut x: u32) -> u32 {
++    x ^= x >> 16;
++    x = x.wrapping_mul(0x7feb352d);
++    x ^= x >> 15;
++    x = x.wrapping_mul(0x846ca68b);
++    x ^= x >> 16;
++    x
++}
++
++fn dither(p: &mut Pipeline) {
++    let y = p.dy as u32;
++    let row = dither_hash(y ^ DITHER_SEED);
++    let mut lanes = [0.0f32; STAGE_WIDTH];
++    for (i, v) in lanes.iter_mut().enumerate() {
++        let h = dither_hash(row ^ (p.dx + i) as u32);
++        *v = ((h >> 8) as f32 / 16_777_216.0 - 0.5) * DITHER_SPAN / 255.0;
++    }
++    let d = f32x8::from(lanes);
++    p.r = (p.r + d).max(f32x8::default()).min(p.a);
++    p.g = (p.g + d).max(f32x8::default()).min(p.a);
++    p.b = (p.b + d).max(f32x8::default()).min(p.a);
+ 
+     p.next_stage();
+ }
+diff -ru tools/proof/work/raster-dither/pristine/tiny-skia-0.12.0/src/pipeline/lowp.rs graphic/vendor/tiny-skia/src/pipeline/lowp.rs
+--- a/src/pipeline/lowp.rs
++++ b/src/pipeline/lowp.rs
+@@ -151,6 +151,8 @@
+     null_fn, // GammaExpandSrgb
+     null_fn, // GammaExpandDestinationSrgb
+     null_fn, // GammaCompressSrgb
++    // Frame Job (spec §11 PR-13): no lowp dither, so a gradient's pipeline compiles highp.
++    null_fn, // Dither
+ ];
+ 
+ pub fn fn_ptr(f: StageFn) -> *const () {
+diff -ru tools/proof/work/raster-dither/pristine/tiny-skia-0.12.0/src/pipeline/mod.rs graphic/vendor/tiny-skia/src/pipeline/mod.rs
+--- a/src/pipeline/mod.rs
++++ b/src/pipeline/mod.rs
+@@ -147,9 +147,13 @@
+     GammaExpandSrgb,
+     GammaExpandDestinationSrgb,
+     GammaCompressSrgb,
++    // Frame Job (spec §11 PR-13): a gradient's fixed ±7/16-level offset by pixel position
++    // before store; highp only, so a pipeline holding it compiles highp.
++    Dither,
+ }
+ 
+-pub const STAGES_COUNT: usize = Stage::GammaCompressSrgb as usize + 1;
++// Frame Job (spec §11 PR-13): taken from the last stage, now `Dither`.
++pub const STAGES_COUNT: usize = Stage::Dither as usize + 1;
+ 
+ impl PixmapRef<'_> {
+     #[inline(always)]
+diff -ru tools/proof/work/raster-dither/pristine/tiny-skia-0.12.0/src/shaders/gradient.rs graphic/vendor/tiny-skia/src/shaders/gradient.rs
+--- a/src/shaders/gradient.rs
++++ b/src/shaders/gradient.rs
+@@ -255,6 +255,9 @@
+ 
+         push_stages_post(p);
+ 
++        // Frame Job (spec §11 PR-13): every gradient is dithered before blend and store.
++        p.push(pipeline::Stage::Dither);
++
+         true
+     }
+ 

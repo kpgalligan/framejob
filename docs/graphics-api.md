@@ -3,9 +3,11 @@
 A **graphic** is a motion graphic drawn by code: one JavaScript ES module
 whose `render` returns an SVG string for each frame. Frame Job runs it in a
 sandboxed QuickJS engine and rasterizes the SVG with resvg. The same frame
-with the same props always draws the same pixels. This page is the whole
-API. Every `js` block on it is run by a test, so the examples work as
-written.
+with the same props always draws the same pixels. A gradient is dithered
+where it is rounded to 8 bits, by a fixed pattern of pixel position under
+half a level, so dark gradients do not band; flat colours, images, text and
+alpha are not. This page is the whole API. Every `js` block on it is run
+by a test, so the examples work as written.
 
 ## The module
 

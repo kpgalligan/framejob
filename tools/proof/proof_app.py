@@ -37,7 +37,7 @@ FOLDER = {"debug": "Debug", "release": "Release"}
 # Each configuration's product, and its executable's name (spec §11 NM-3).
 PRODUCTS = {"Debug": "Frame Job Debug", "Release": "Frame Job", "Distribution": "Frame Job"}
 FOLDER_TARGET = {"Debug": "app-debug", "Release": "app", "Distribution": "dist"}
-WALKED = ("app", "agent", "mcp-proxy/src", "core/src", "graphic/src")
+WALKED = ("app", "agent", "mcp-proxy/src", "core/src", "graphic/src", "graphic/vendor")
 LISTED = ("mcp-proxy/Cargo.*", "core/Cargo.*", "graphic/Cargo.*", "core/include/framejob_core.h",
           "core/target/release/libframejob_core.a", "docs/graphics-api.md",
           "docs/graphics-api.d.ts", "graphic/tests/graphics/*.js", "project.yml", "VERSION")

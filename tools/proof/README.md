@@ -1812,7 +1812,7 @@ lstart=` its start, to the second), or whose product is refused, never by
 the executable's mtime ("relaunch pid N after `make app-debug`: <file>
 (modified …) is newer than the instance (started …)"). With no pid holding the socket it says so on
 stderr and does not refuse. The inputs are `app/`, `agent/`, `core/src`,
-`graphic/src`, `mcp-proxy/src`, each crate's `Cargo.*`, the C header, the
+`graphic/src`, `graphic/vendor` (the patched tiny-skia, spec §11 PR-13), `mcp-proxy/src`, each crate's `Cargo.*`, the C header, the
 built staticlib, `docs/graphics-api.md` and `.d.ts`, the graphic templates,
 `project.yml` and `VERSION`, never `node_modules`, `target`, `build`, `.git`,
 `__pycache__`, a dot-file, the generated `app/Info.plist` and
@@ -24818,3 +24818,111 @@ call and ceiling. Nine mutants: `beside-choice-dropped`, `beside-popups-dead`,
 `beside-preview-row-hidden` on P22; `timeout-ceiling-by-files` on T11. `format-popup-live` and
 `preview-row-always` are re-aimed at `cameraWanted`. The numbers are in
 `archive/camera-recording.md`'s CR3c record.
+
+## Issue #375 part 1 — graphic gradients dithered (`raster_dither_proof.py` B1–B4b, L1–L3, F1, F2, S1, Z1; `graphic/tests/dither.rs`; mutants; spec §11 PR-13)
+
+**What it proves.** The vendored tiny-skia patch (`graphic/vendor/`, its README has the diff and
+how to re-apply it) dithers every gradient where it is rounded to 8 bits. The offset is static,
+under half a level, and set by pixel position. Flat colours, images and text keep their bytes.
+The patch reaches the app, its frames and its high-quality exports.
+
+**`graphic/tests/dither.rs`** runs on `graphic::rasterize`, with no app. Its oracles:
+
+- every gradient kind lands within a level of its exact value, and takes the level plain
+  rounding never gives;
+- column means follow the exact value (RMS ≤ 0.1);
+- a colour on a level stays exact (`#336699`, and `#326496` at 0.6);
+- R = G = B on a grey gradient;
+- alpha is not dithered, and no channel goes over alpha;
+- solid fills, text and an image are not dithered.
+
+Its `#[ignore]` bench is `section_gradient_raster_cost`. `core/tests/graphic_ffi.rs`'s
+`a_gradient_is_dithered_through_the_ffi` holds the core's own `[patch]` table.
+
+**The proof.**
+
+    python3 tools/proof/raster_dither_proof.py capture DIR          # the control tree; every file kept in DIR
+    python3 tools/proof/raster_dither_proof.py --control DIR [--only ROWS]
+    python3 tools/proof/raster_dither_proof.py --mutant NAME        # cargo only, no app
+
+It runs on its own scratch-socket instance through `proof_app`, in a scratch home. Everything
+lives under `work/raster-dither/run/`. Every call and every ffmpeg is bounded, and every
+project is closed.
+
+The fixtures, all 1920×1080 at 30 fps:
+
+- `band374`: #374's dark radial gradient, `#2A4F3D` → `#0D1512`, r 1100 about the centre;
+- `band374m`: the same, its centre drifting `0.5 × frame` px, on a 5 s clip;
+- `flat`: solid rects, a one-colour gradient, and text.
+
+The rows:
+
+- **B1**: `render_graphic` at scale 1. On row 540, the median run is ≤ ½ the control's, the
+  50-px block means strictly increase, and every G is within [floor(e − 1/16),
+  ceil(e + 1/16)].
+- **B2**: 16-px block max |mean(G − e)| ≤ 0.1.
+- **B3**: `render_frame`, held to B1's and B2's rules.
+- **B4a**: a `prores_422` export, decoded to `rgb48le`. Its banding RMS is ≤ ½ the control's,
+  and the block means increase.
+- **B4b**: a `hevc_10bit` export of `band374m` at 2.5 s, decoded to `rgb48le`. Its banding RMS
+  is ≤ 0.15, and under the control's.
+- **L1–L3**: printed and **not scored**. These are `h264` and `hevc` at default quality
+  (static), and `h264` at 16 Mbit/s (moving). They are PR-13's recorded limit: an 8-bit lossy
+  export strips the dither.
+- **F1, F2**: the flat sheet and frame are byte-equal to the control's. The one-colour rect is
+  (51, 102, 153, 255).
+- **S1**: the cells of frames 0 and 30 are equal, and equal to B1's.
+- **Z1**: no `Frame Job: ` line, and every project closed.
+
+Decode an 8-bit PNG as `rgba`, and a deep picture as `rgba64le`/`rgb48le`. ffmpeg 9's 8 → 16-bit
+conversion is not exact, and its `rgb24` of 10-bit ProRes adds a dither of its own.
+
+`capture DIR` scores the run against its own files, so on the control tree B1, B3, B4a and B4b
+FAIL, and B2 passes (0.0755). Without a control, B1–B4b, F1 and F2 FAIL.
+
+The control tree is stock tiny-skia: the parent of the commit that added `graphic/vendor/tiny-skia-dither.diff` (`git log --diff-filter=A --format=%H -- graphic/vendor/tiny-skia-dither.diff`, then `^`). Build it in a copy without the two `[patch]` tables:
+
+- make a `tree_copy.make_copy`;
+- copy `core/` and `graphic/` into it, without `vendor/` and with that parent commit's `Cargo.lock` files;
+- `make app-debug` in the copy;
+- run `capture` with `RC_PROOF_APP` set to the copy's executable.
+
+**The mutants**, each one anchor in a copy of `graphic/` (`work/raster-dither/mutant/` beside an
+`app` symlink), then `cargo test --release --test dither` with `CARGO_TARGET_DIR=work/
+raster-dither-target`:
+
+| Mutant | Change | Must fail |
+|---|---|---|
+| `span-full` | `DITHER_SPAN` 1.75 | the on-level test |
+| `no-dither` | the push removed | the bracket and column-mean tests |
+| `rows-only` | the hash ignores `y` | the column-mean test |
+| `per-channel` | G takes its own hash | the channel test |
+| `alpha-dithered` | `d` added to `a` | the alpha test |
+| `no-clamp` | the clamp to `a` dropped | the alpha test |
+| `lowp-kept` | lowp's `Dither` a pass-through | the bracket test |
+| `every-paint` | `Dither` pushed for solid colours too | the solid test |
+| `core-unpatched` | core's `[patch]` removed; `--offline --test graphic_ffi a_gradient_is_dithered` | that test |
+
+Exit 0 means caught, 1 survived, and 2 the control could not be performed.
+
+**Runs.**
+
+- 2026-10-27, Debug.
+  - `capture tools/proof/work/raster-dither/control` on the control tree scored 5/9: B1, B3,
+    B4a and B4b failed.
+  - `--control` scored **9/9**:
+    - B1 and B3: median run 2 against 19, widest 19, 43 levels, 0 outside the bracket;
+    - B2: 0.0300 against 0.0755;
+    - B4a: 0.0943 against 0.3249, with noise kept 0.3306 against 0.0291, and 9,195,715 bytes
+      against 4,515,695;
+    - B4b: 0.1185 against 0.1729;
+    - L1 ratio 1.058, L2 0.899, L3 0.889.
+  - All nine mutants were caught.
+- 2026-10-27, **Release**, after `make gate` passed: `RC_PROOF_APP=release --control
+  tools/proof/work/raster-dither/control` scored **9/9**, every figure the same as the Debug run's
+  (B4a 0.0943 against 0.3249; B4b 0.1185 against 0.1729, 63,864 bytes; L1–L3 1.058, 0.899 and
+  0.889). `graphics_proof.py` (Release) scored 51/51, and `graphics_prefetch_proof.py` (Release) 7/7:
+  the worker-thread rasters of its moving gradient equal the serial path's (S1, S5).
+- The variant tables that chose B4a and B4b (round 1: h264, hevc and ProRes, static and moving,
+  at 8 and 16 Mbit/s; round 2: `hevc_10bit`, and spans of ±1 and ±1.5) come from the throwaway
+  `work/raster-dither/b4_variants.py`. PR-13 quotes them.

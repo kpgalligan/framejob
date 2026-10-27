@@ -32,3 +32,8 @@ sha2 = "0.10"
 # No LTO: cargo skips it for a staticlib+rlib unit anyway, and asking for it
 # fat-LTOs each of the 32 test binaries (designs/adr/rust-build-settings.md).
 incremental = true
+
+[patch.crates-io]
+# graphic's vendored tiny-skia with the gradient dither (spec §11 PR-13): Cargo ignores the
+# [patch] in graphic/Cargo.toml when building this crate, so it is restated here.
+tiny-skia = { path = "../graphic/vendor/tiny-skia" }

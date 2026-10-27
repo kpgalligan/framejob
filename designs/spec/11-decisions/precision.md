@@ -36,6 +36,11 @@ PR-12 was recorded in issue batch B103 (#294), before its product code, from the
 of 2026-10-14 ("fix it") and `log_proof.py`'s control on the unchanged product (L14, L16, L17);
 it amends PR-4 and PR-9.
 
+PR-13 was recorded for #375 part 1, before its code, from the owner's choice of 2026-10-27
+("Both, raster first": dither the graphic raster's gradients now, the compositor's 8-bit output
+next as #375 part 2, a deeper raster deferred to #374) and `raster_dither_proof.py`'s control on
+the unchanged product; it amends PR-5.
+
 - **PR-1 — The working depth is 16-bit float, holding encoded values clamped to [0, 1] (owner,
   2026-10-09, choices 1 and 5).**
   - The render context's buffers are `kCVPixelFormatType_64RGBAHalf`.
@@ -181,6 +186,8 @@ it amends PR-4 and PR-9.
   **Amended by PR-6 and PR-7** (precision-2 P2-0): a still deeper than 8 bits a component is
   drawn at 16-bit float (PR-6), and the reversed-clip intermediate is 10-bit (PR-7); the list is
   not edited, and PR-8 closes its 10-bit `hevc_alpha` and 10-bit recording as not wanted.
+  **Amended by PR-13** (#375 part 1): graphics stay 8-bit, and a graphic's gradients are dithered
+  where tiny-skia rounds them to 8 bits; the list is not edited.
 - **PR-6 — A still deeper than 8 bits a component is drawn at 16-bit float (owner, 2026-10-11,
   choice 1a).**
   - `LayerRenderers.renderImage` checks `image.bitsPerComponent > 8`. When it is, the image is
@@ -450,3 +457,86 @@ it amends PR-4 and PR-9.
     7/7). A JPEG asked to keep depth (`vp9-jpeg-deep`) writes the same bytes (5,099), so JPEG's
     `carriesDepth` false is equivalent there, as PR-9's `jpeg-deep` was.
   - Amends PR-4 and PR-9.
+- **PR-13 — A graphic's gradients are dithered where tiny-skia rounds them to 8 bits (owner,
+  2026-10-27, #375: "Both, raster first").**
+  - What: every gradient paint tiny-skia draws — linear and radial, the two-stop fast path
+    (`EvenlySpaced2StopGradient`) and the general many-stop stage (`Gradient`) — gets a fixed
+    offset by pixel position before it is rounded to 8 bits. resvg 0.48.1 builds only
+    `LinearGradient` and `RadialGradient` shaders (`resvg/src/path.rs`). Solid fills, images,
+    text and alpha are not dithered.
+  - How: tiny-skia 0.12.0 is vendored in `graphic/vendor/tiny-skia/` with a four-file patch
+    (`graphic/vendor/tiny-skia-dither.diff`, provenance and the re-apply steps in
+    `graphic/vendor/README.md`), linked through a `[patch.crates-io]` table in both
+    `graphic/Cargo.toml` and `core/Cargo.toml` (Cargo ignores a dependency's `[patch]`, and the
+    staticlib the app links is built from `core/`). Nothing else in the crate is edited, and
+    `graphic/src/` is unchanged (G-7's BGRA8 copy stands).
+  - Where: a new last stage, `Stage::Dither`, pushed once in `Gradient::push_stages` after the
+    gradient's own stages (its `Premultiply` and `push_stages_post`), so before blend and store.
+    That is Skia's own place for it, one line, and resvg draws in tiny-skia's default `Linear`
+    colour space, so no gamma stage follows it.
+  - Highp: lowp has no `Dither` (its entry is `null_fn`), so any pipeline holding the stage is
+    compiled highp (`RasterPipelineBuilder::compile`'s `is_lowp_compatible`). The cost is below.
+  - The pattern: for each pixel, `h = lowbias32(lowbias32(y ^ 0x9E3779B9) ^ x)` (wrapping
+    multiplies `0x7feb352d`, `0x846ca68b`; shifts 16, 15, 16), and `d = ((h >> 8) / 2^24 − 0.5)
+    × 7/8 / 255`: uniform over ±7/16 of a level. One `d` is added to R, G and B, each clamped
+    to [0, a]; alpha is untouched. The span is 7/8 of a level, under one, so a premultiplied
+    value on a level stays exact: a colour on a level never moves.
+  - Static: the stage reads only the pixel's position — no frame, time, thread or global state
+    — so the same module, frame and props draw the same pixels, on any thread (the
+    `GraphicPrefetch` workers draw the bytes the serial path does).
+  - The seed is salted (`0x9E3779B9`) where #375 part 2's compositor dither keeps its own
+    unsalted hash (PR-14), so the two quantizers' noise is independent.
+  - Limits:
+    - The pattern is anchored to the pixmap drawn into. A gradient inside a group with opacity,
+      a mask, a clip or a filter layer, or a `<pattern>` tile, is dithered in that layer; the
+      layer's composite is an image draw and is not dithered again.
+    - A gradient used in a luminance mask dithers the coverage it makes.
+    - The premultiplied colour is what is dithered: a translucent one-colour gradient whose
+      premultiplied channels fall between levels takes the two levels beside them, where a
+      solid fill of that colour takes one.
+    - A shape clip's gradients are CoreGraphics', not this.
+  - Re-recorded: `graphic/tests/pins.json`'s `title-card` (the only fixture with a gradient).
+    Checked unchanged: the other five fixtures' pins, `core/tests/graphic_ffi.rs`'s
+    `lower-third` pin, `graphics_proof.py` (solid rects only) and `graphics_prefetch_proof.py`,
+    whose comparison is within a run.
+  - No op, FFI, catalog, schema, format or MCP mirror change; always on, with no setting.
+  - Measured on the control (`raster_dither_proof.py capture`, Debug, 2026-10-27, the unchanged
+    product, its B4a/B4b files from a copy built without the `[patch]` tables): row 540 of
+    #374's gradient (`band374`, x 0–800) took 44 green levels, median run 19 px, widest 19, in
+    `render_graphic` and `render_frame` alike; rows 500–580's 16-px block max |mean(G − e)| was
+    0.0755. `graphic/tests/dither.rs` on the control: the bracket, column-mean and alpha oracles
+    failed (column-mean RMS 0.2887, round(e)'s own); the level, channel and solid oracles
+    passed. `section_gradient_raster_cost` (`band374` at 1920×1080, 30 draws, three runs):
+    median 9.41, 9.51, 9.40 ms.
+  - Measured after the change (Debug, 2026-10-27, `raster_dither_proof.py --control`, 9/9): row
+    540 took 43 levels, median run 2, widest 19, every G within a level of `e` (0 outside the
+    bracket), block max |mean(G − e)| 0.0300, in `render_graphic` and `render_frame` alike; a
+    `prores_422` export (B4a, 16-bit decode) banding RMS 0.0943 against the control's 0.3249,
+    the per-pixel noise it kept 0.3306 against 0.0291, 9,195,715 bytes against 4,515,695; a
+    `hevc_10bit` export of the moving fixture (B4b) 0.1185 against 0.1729; flat colours and the
+    one-colour gradient byte-equal to the control (F1, F2: (51, 102, 153, 255)).
+    `dither.rs` 6/6 (column-mean RMS 0.0435); the bench 8.73, 8.92, 8.91 ms (forcing highp cost
+    nothing measurable here). The nine mutants (`raster_dither_proof.py --mutant`) are caught.
+  - **Limit: an 8-bit lossy export strips the dither** (owner, 2026-10-27: "I don't really care
+    about low-bitrate exports. I only care about higher quality exports."). Measured
+    (a throwaway variant run, control build against dithered, one run each, banding RMS on a
+    16-bit decode, dithered over control; its table is #375's comment 6454026110): `h264` at default quality 1.105
+    static and 0.780 on a 5 s clip whose gradient moves; at `video_bitrate` 8 Mbit/s 1.130
+    static, 0.825 moving; at 16 Mbit/s 0.971 static, 0.734 moving; `hevc` 0.892 static. Their
+    row-540 runs stay 16–24 px median, 40–48 px widest. VideoToolbox does not spend the
+    requested rate on smooth content: the 16 Mbit/s static file is 11,139 bytes for 1 s and the
+    moving one 379,520 bytes for 5 s (about 0.6 Mbit/s), and the per-pixel noise it keeps
+    (0.00–0.24) is too little or of the wrong kind to break the bands. `raster_dither_proof.py`
+    prints three of these (L1–L3) unscored.
+  - A wider span does not get through either: at ±1 and ±1.5 levels the moving `h264` ratio is
+    0.802 and 0.762 at +61 % and +141 % file size, and at 16 Mbit/s 0.735 and 0.693 at +123 % and
+    +288 %; `render_frame`'s visible noise rises from 0.376 to 0.629 and 0.896 levels RMS, and
+    a colour on a level stops being exact (8,024 and 10,830 of a one-colour gradient's 16,384
+    pixels move a level off its solid fill). So the span stays ±7/16.
+  - The remedy for a gradient in a delivery file is a 10-bit export: `hevc_10bit` now (B4b; its
+    control already bands at 0.17–0.19 against 0.38–0.47 for 8-bit codecs), and AV1 or VP9 at
+    10 bits later (#377). A check with ffmpeg's libsvtav1 and libvpx-vp9 at 10 bits on the
+    dithered ProRes measured 0.106 stair-step for both, against 0.094 for the source (one run
+    each; commands and figures in #375's comment 6454026110). B4 is therefore scored on those exports: B4a
+    `prores_422` (≤ ½ the control's) and B4b `hevc_10bit` (≤ 0.15 and under the control's).
+  - Amends PR-5.

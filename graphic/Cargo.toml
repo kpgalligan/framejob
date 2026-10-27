@@ -38,3 +38,8 @@ flate2 = "1"
 [profile.release]
 # No LTO (designs/adr/rust-build-settings.md).
 incremental = true
+
+[patch.crates-io]
+# tiny-skia 0.12.0, vendored with the gradient dither (spec §11 PR-13; graphic/vendor/README.md).
+# core/Cargo.toml carries the same table: Cargo ignores a dependency's [patch].
+tiny-skia = { path = "vendor/tiny-skia" }

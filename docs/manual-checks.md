@@ -564,6 +564,13 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Answer:** CPU low, then up, then down at the Shift, yes or no; smoother than GR-9's first play, yes or no; CPU up while hidden, yes or no; idle CPU low with the box off, yes or no; the memory figure before and at its highest.
 - **Source:** #127 G6 phase 4 (spec §11 G-38); `tools/proof/background_render_proof.py` measures this by tool, not the keyboard path or the look.
 
+**GR-12 — A dark gradient graphic shows no rings and no visible grain**
+- **Setup:** a 1920×1080 project; your usual display brightness; View ▸ Preview Quality ▸ Full.
+- **Do:** Insert ▸ Graphic ▸ From File… a module that fills the frame with a dark radial gradient, e.g. `raster_dither_proof.py`'s `band374` (`<radialGradient gradientUnits="userSpaceOnUse" cx="960" cy="540" r="1100">`, `#2A4F3D` at the centre to `#0D1512` at the edge). Look at it in the preview, then save the frame (File ▸ Save Frame… as PNG) and open it in Preview at 100 %. Export it as `prores_422` and as `hevc_10bit`, and once as `h264`, and look at each in QuickTime Player at 100 %.
+- **Expect:** in the preview, the saved PNG, the ProRes and the `hevc_10bit` file the gradient shades smoothly, with no rings or steps you can pick out, and no grain you can see at 100 % from your normal distance. The `h264` file may show its steps again: that is PR-13's recorded limit, not a defect.
+- **Answer:** rings in the preview, yes or no; rings in the PNG, the ProRes, the `hevc_10bit`, the `h264`, each yes or no; visible grain anywhere, yes or no (and where).
+- **Source:** #375 part 1 (spec §11 PR-13); `tools/proof/raster_dither_proof.py` measures the banding (B1–B4b) and the per-pixel noise each export keeps, not how it looks to a person on a display.
+
 ## Mattes
 
 **MAT-1 — A matte plays**
