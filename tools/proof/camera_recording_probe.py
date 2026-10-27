@@ -4,7 +4,9 @@ sources; CR1b (CAM-4): `record_screen`'s camera, through the server's own functi
 (CAM-5): the recorder panel's Camera source and the countdown's prepared capture; CR2a
 (CAM-6): the camera's formats — the rows, `camera_format`, the Format popup, a chosen format;
 and CR2b (CAM-7): the preview — its step, its row and well, its layer on the prepared capture —
-and #373 (one session queue every capture shares, `stop(completion:)`).
+and #373 (one session queue every capture shares, `stop(completion:)`); and CR2c (CAM-8): hot-plug —
+the selection rule, the device observers, the pending rebuild applied only at idle, and the failed
+preview's capture stopped once.
 
     python3 tools/proof/camera_recording_probe.py [--sources DIR] [--only SECTIONS] [--mutant NAME]
 
@@ -36,6 +38,9 @@ Sections and rows:
            with and without the Continuity mark, `cameraSizeNote(_, format:)` for Best, a chosen
            row, a stale one and no camera; V21 `formatMatch` (exact, upper-case, `WxH` → its
            highest rate on the iPhone, a rate not listed, unknown) and `noSuchFormatSentence`.
+           CR2c (CAM-8): V22 `hotPlugSelection` — stored listed over a different listed current →
+           stored; stored gone, current listed → current; neither listed → nil; `""` stored →
+           current; both nil → nil.
   landing  L1 a `.camera` result over ffmpeg fixtures (a 1920×1080 30 fps `.mov`, an `.m4a`)
            through `RecordingLanding.placement`: the picture on a track, the voice on a back
            track named Microphone; L2 `ProjectDocument.untitled(around:)`: the canvas 1920×1080
@@ -135,6 +140,27 @@ Sections and rows:
            statement `panelClosing = true` and its discard but no sync, `show(` clearing
            `panelClosing`, the sync reading it, `prepareCamera(`'s `preview: true` and
            `preparedCameraFailure`, `startCamera(`'s `adopting: mayAsk`.
+           CR2c (CAM-8), on the hidden panel (never shown: `observeDevices()` called directly,
+           each notification posted with object nil, 0.2 s of the main run loop before a read):
+           P16a the first `observeDevices()` sets `devicesPending`, a second leaves 2 observers;
+           P16b with the microphone key `probe-mic-stored-gone`, the camera key the first
+           connected camera (else `probe-stored`) and fake rows `probe-gone` / `probe-mic-gone`
+           selected, a `wasConnectedNotification` → the fakes gone, the Camera ids
+           `connected()`'s (or the None row), the stored camera selected (skipped by name with
+           none), the microphone Off, the camera, format and microphone keys unchanged, nothing
+           pending; P16c a second post leaves every Camera, Format and Microphone item identical
+           (`===`), and a microphone row given `probe-mic-swapped` carries its device's id again
+           after a post (skipped by name with no microphone); P16d (skipped by name with no
+           camera) `probe-stored-gone` stored, the first camera selected and a fake row: after a
+           post the first camera still selected, the key still `probe-stored-gone`; P16e in
+           `.landing` a `wasDisconnectedNotification` keeps a fake row and leaves the lists
+           pending, and `.idle` applies them. P17 (last) `NSWindow.willCloseNotification` empties
+           `deviceObservers`; a fake row added after stays through a post, nothing pending. P18
+           comment-stripped reads: `show(` calls `observeDevices()`; `syncCameraPreview(`'s
+           first statement `applyPendingDevices()`; `devicesDidChange(` sets `devicesPending =
+           true` before `syncCameraPreview()`; the `.failed` arm's `stop()` guarded by
+           `stopped`; `connected(` and `connectedMicrophones(` filter `isConnected`;
+           `rebuildMicrophones(` calls `connectedMicrophones()`.
 
 Mutants (each a `--mutant` edit of a copy of `--sources`), run by default in the section(s)
 `MUTANT_SECTION` names — `values` unless named; `tool`, `panel`, `granted` (which need the
@@ -182,6 +208,15 @@ camera), or `values,tool` for `format-size-lowest`:
   preview-row-always  the well's row never hidden                              → P14
   preview-unsynced-phase  `syncPhase`'s sync removed                           → P15
   preview-builds-on-close  `panelWillClose`'s `panelClosing = true` removed    → P15
+  hotplug-current-first  `hotPlugSelection` checks `current` before `stored`   → V22
+  hotplug-observe-twice  `observeDevices`' idempotence guard removed           → P16a
+  hotplug-no-pending-on-observe  adding the pair does not set `devicesPending` → P16a
+  hotplug-persists    `persistChoices()` called in `applyPendingDevices`       → P16b, P16d
+  hotplug-rebuilds-unchanged  the Camera rows' comparison skipped              → P16c
+  hotplug-format-rebuilt  `selectCamera` called with no rebuild and the same id → P16c
+  hotplug-while-busy  `applyPendingDevices`' idle guard removed                → P16e
+  hotplug-observers-kept  `panelWillClose`'s `stopObservingDevices()` removed  → P17
+  failed-stops-every-tick  the `.failed` arm's `stopped` guard removed         → P18
 
 Exit (cache_pass_probe.py's rule): a plain run exits 0 iff no row failed (a skip by name is
 not a failure) and 1 when one did; a build failure is B0's FAIL. A `--mutant` run exits 1 when
@@ -205,13 +240,14 @@ WORK = ROOT / "tools/proof/work/camera-recording-probe"
 SECTIONS = ["values", "landing", "granted", "tool", "panel"]
 ROWS = {
     "values": ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12a", "V12b",
-               "V12c", "V12d", "V13", "V14", "V15", "V16", "V17", "V18", "V19", "V20", "V21"],
+               "V12c", "V12d", "V13", "V14", "V15", "V16", "V17", "V18", "V19", "V20", "V21",
+               "V22"],
     "landing": ["L1", "L2", "L3"],
     "granted": ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12",
                 "G13", "G14", "G15"],
     "tool": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"],
     "panel": ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13",
-              "P14", "P15"],
+              "P14", "P15", "P16a", "P16b", "P16c", "P16d", "P16e", "P17", "P18"],
 }
 SECTION_WALL = 180
 STEM_EPOCH = 1793034873   # 2026-10-26 17:14:33 UTC
@@ -269,6 +305,11 @@ JOIN_WEAK = """        capture.start { [weak prepared] error in
 # before the queue runs.
 STOP_COMPLETION = "            if let completion { DispatchQueue.main.async(execute: completion) }\n"
 STOP_QUEUE = "        sessionQueue.async { [self] in\n            if first {\n"
+# `hotPlugSelection`'s two lines, which `hotplug-current-first` swaps.
+STORED_FIRST = ("        if let stored, listed.contains(stored) { return stored }\n"
+                "        if let current, listed.contains(current) { return current }\n")
+CURRENT_FIRST = ("        if let current, listed.contains(current) { return current }\n"
+                 "        if let stored, listed.contains(stored) { return stored }\n")
 # name: (the rows it must fail, [(file, before, after), ...])
 MUTANTS = {
     "format-any-shape": (["V1"], [
@@ -424,6 +465,35 @@ MUTANTS = {
     "preview-builds-on-close": (["P15"], [
         ("RecorderPanelController.swift", "        panelClosing = true\n        switch phase {\n",
          "        switch phase {\n")]),
+    # CR2c (spec §11 CAM-8): hot-plug.
+    "hotplug-current-first": (["V22"], [
+        ("RecorderPanelController+Devices.swift", STORED_FIRST, CURRENT_FIRST)]),
+    "hotplug-observe-twice": (["P16a"], [
+        ("RecorderPanelController+Devices.swift",
+         "        guard deviceObservers.isEmpty else { return }\n", "")]),
+    "hotplug-no-pending-on-observe": (["P16a"], [
+        ("RecorderPanelController+Devices.swift", "        }\n        devicesPending = true\n",
+         "        }\n")]),
+    "hotplug-persists": (["P16b", "P16d"], [
+        ("RecorderPanelController+Devices.swift", "        refreshSizeNote()\n",
+         "        refreshSizeNote()\n        persistChoices()\n")]),
+    "hotplug-rebuilds-unchanged": (["P16c"], [
+        ("RecorderPanelController+Devices.swift",
+         "        let cameraRebuilt = Self.hotPlugRows(of: cameraPopup) != cameraRows\n",
+         "        let cameraRebuilt = true\n")]),
+    "hotplug-format-rebuilt": (["P16c"], [
+        ("RecorderPanelController+Devices.swift",
+         "        if cameraRebuilt || camera != selectedCameraID { selectCamera(camera) }\n",
+         "        selectCamera(camera)\n")]),
+    "hotplug-while-busy": (["P16e"], [
+        ("RecorderPanelController+Devices.swift",
+         "        guard phase == .idle, recorder.state == .idle else { return }\n", "")]),
+    "hotplug-observers-kept": (["P17"], [
+        ("RecorderPanelController.swift", "        stopObservingDevices()\n", "")]),
+    "failed-stops-every-tick": (["P18"], [
+        ("RecorderPanelController+CameraPreview.swift",
+         "            if let capture = recorder.preparedCamera?.capture, !capture.stopped { capture.stop() }\n",
+         "            recorder.preparedCamera?.capture.stop()\n")]),
 }
 # The section a mutant runs when `--only` is not given.
 MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
@@ -442,7 +512,11 @@ MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
                   "tool-adopts": "granted", "prepare-retries-thrown": "granted",
                   "preview-without-grant": "panel", "preview-builds-in-countdown": "panel",
                   "preview-retries-failure": "panel", "preview-row-always": "panel",
-                  "preview-unsynced-phase": "panel", "preview-builds-on-close": "panel"}
+                  "preview-unsynced-phase": "panel", "preview-builds-on-close": "panel",
+                  "hotplug-observe-twice": "panel", "hotplug-no-pending-on-observe": "panel",
+                  "hotplug-persists": "panel", "hotplug-rebuilds-unchanged": "panel",
+                  "hotplug-format-rebuilt": "panel", "hotplug-while-busy": "panel",
+                  "hotplug-observers-kept": "panel", "failed-stops-every-tick": "panel"}
 
 
 def run(command, **kw):
@@ -585,7 +659,39 @@ def panel_source_rows(sources):
     rows["P9"] = (all(ok for _, ok, _ in reads),
                   "; ".join(f"{sig[5:-1]} names {' and '.join(w)} {ok}" for sig, ok, w in reads))
     rows["P15"] = preview_source_row(sources, base)
+    rows["P18"] = hot_plug_source_row(sources)
     return rows
+
+
+def hot_plug_source_row(sources):
+    """P18 (CR2c, CAM-8): comment-stripped reads of hot-plug's wiring and the failed arm's guard."""
+    showing = uncommented(sources / "RecorderPanelController+Showing.swift")
+    preview = uncommented(sources / "RecorderPanelController+CameraPreview.swift")
+    devices = uncommented(sources / "RecorderPanelController+Devices.swift")
+    cameras = uncommented(sources / "CameraDevices.swift")
+    rows = uncommented(sources / "RecorderPanelController+Rows.swift")
+    checks = []
+    show = body_of(showing, "func show(") or ""
+    checks.append(("show( calls observeDevices()", "observeDevices()" in show))
+    sync = body_of(preview, "func syncCameraPreview(") or ""
+    statements = [line.strip() for line in sync[sync.find("{") + 1:].splitlines() if line.strip()]
+    first = statements[0] if statements else None
+    checks.append((f"syncCameraPreview's first statement {first!r}", first == "applyPendingDevices()"))
+    changed = body_of(devices, "func devicesDidChange(") or ""
+    mark, step = changed.find("devicesPending = true"), changed.find("syncCameraPreview()")
+    checks.append((f"devicesDidChange sets devicesPending = true at {mark}, syncs at {step}",
+                   0 <= mark < step))
+    start = sync.find("case .failed")
+    end = sync.find("case .", start + 1) if start >= 0 else -1
+    arm = sync[start:end] if start >= 0 and end > start else ""
+    checks.append((f"the .failed arm {' '.join(arm.split())!r} guards stop() by stopped",
+                   "stop()" in arm and "stopped" in arm))
+    for text, signature in ((cameras, "func connected("), (devices, "func connectedMicrophones(")):
+        body = body_of(text, signature) or ""
+        checks.append((f"{signature[5:-1]} filters isConnected", "isConnected" in body))
+    micro = body_of(rows, "func rebuildMicrophones(") or ""
+    checks.append(("rebuildMicrophones calls connectedMicrophones()", "connectedMicrophones()" in micro))
+    return (all(ok for _, ok in checks), "; ".join(f"{what} {ok}" for what, ok in checks))
 
 
 def preview_source_row(sources, base):
@@ -945,7 +1051,8 @@ def main():
         rows, facts = answer
         (here / f"facts-{name}.json").write_text(json.dumps(facts, indent=1))
         for row in rows:
-            results[row["id"]] = (bool(row["pass"]), row["detail"])
+            results[row["id"]] = ("skip" if row["pass"] == "skip" else bool(row["pass"]),
+                                  row["detail"])
         if name == "values":
             results.update(source_rows(sources))
         if name == "granted":
@@ -955,6 +1062,7 @@ def main():
             read = panel_source_rows(sources)
             results["P9"] = read["P9"]
             results["P15"] = read["P15"]
+            results["P18"] = read["P18"]
             results["P5"] = (swift_p5[0] is True and read["P5"][0] is True,
                              f"{swift_p5[1]} | the answer's re-read: {read['P5'][1]}")
             visible = facts.get("visible") is False and facts.get("visibleAtEnd") is False

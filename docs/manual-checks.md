@@ -836,6 +836,11 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Expect:** in step 1 the iPhone is listed as "<its name> (Continuity Camera)". In step 2 the preview shows the iPhone's picture, live, not mirrored. In step 3 it records and lands as REC-14's does, the movie at the iPhone's format.
 - **Source:** spec §11 CAM-6 (5), CAM-7.
 
+**REC-17 — A camera plugged in and taken away while the panel is up**
+- **Do:** 1. With the panel up on Source ▸ Camera, plug in a USB camera or wake an iPhone for Continuity Camera. 2. Choose it and one of its non-Best formats, then unplug it or move the iPhone away. 3. Plug it in again.
+- **Expect:** in step 1 the camera appears in the Camera popup within a few seconds, and its microphone, if it has one, appears in the Microphone popup. When it is unplugged, its row goes and the popup falls back to the default camera, with the preview following; the fallback camera shows the step-2 format if it lists it, else Best. When it is plugged in again, it is selected again with the format chosen in step 2.
+- **Source:** spec §11 CAM-8.
+
 ## Assistant
 
 Needs your own Anthropic API key (Setup 3).

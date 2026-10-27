@@ -30,10 +30,13 @@ enum CameraPreviewStep: Equatable {
 /// hidden panel reads nothing.
 ///
 /// **The sync** runs at the end of `show()`, of every control change, of
-/// `syncPhase()` and at the one-second tick while the panel is visible. It
+/// `syncPhase()`, at the one-second tick while the panel is visible, and at
+/// each device notification. Its first act applies a pending hot-plug
+/// (`+Devices.swift`, CAM-8 (2)), so the step sees the new selection. It
 /// keeps the row's visibility (refitting the window when it changes), lets
 /// the prepared capture go when the well is off or shows a sentence while
-/// everything is idle, and otherwise hosts the layer the step names. The
+/// everything is idle, stops a failed prepared capture once (not at every
+/// tick, CAM-8 (6)), and otherwise hosts the layer the step names. The
 /// capture is the recorder's (`ScreenRecorder+CameraPrepare.swift`): the
 /// countdown's `prepareCamera` keeps it, the panel's start adopts it, and a
 /// tool's start never does (CAM-7 (7)), so through a tool's recording the
@@ -91,8 +94,10 @@ extension RecorderPanelController {
         return failure.sentence
     }
 
-    /// The row's visibility, then the step acted on (the type doc).
+    /// A pending hot-plug applied (CAM-8 (2)), the row's visibility, then the
+    /// step acted on (the type doc).
     func syncCameraPreview() {
+        applyPendingDevices()
         let hidden = !cameraSelected
         if let row = cameraPreviewRow, row.isHidden != hidden {
             row.isHidden = hidden
@@ -112,7 +117,7 @@ extension RecorderPanelController {
                 cameraPreview.showMessage(nil)
             }
         case .failed(let sentence):
-            recorder.preparedCamera?.capture.stop()
+            if let capture = recorder.preparedCamera?.capture, !capture.stopped { capture.stop() }
             cameraPreview.showMessage(sentence)
         case .prepare:
             recorder.prepareCamera(for: currentChoice())

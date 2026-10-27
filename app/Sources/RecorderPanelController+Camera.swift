@@ -19,7 +19,8 @@ import AppKit
 /// carrying its `uniqueID` (app/CLAUDE.md "Popups"), or one row "None
 /// connected" with no id. Its selection is the stored `FrameJobRecordingCamera`
 /// when that camera is listed, else CAM-3 (7)'s default. It is rebuilt on
-/// `show()` while idle; a camera plugged in while the panel is up is CR2c's.
+/// `show()` while idle, and when a camera comes or goes while the panel is up
+/// (`+Devices.swift`, CAM-8).
 /// A Continuity Camera's row reads "<name> (Continuity Camera)" (CAM-6 (5)).
 ///
 /// **The Format popup** (CR2a, spec §11 CAM-6) lists "Best (<CAM-3's pick>)"

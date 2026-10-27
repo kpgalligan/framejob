@@ -8,7 +8,9 @@
 // format (granted G10); CR2b (CAM-7): the preview's step, row and well
 // (panel P13, P14), the preview layer on the prepared capture, #373's
 // rebuilds, a tool start beside a prepared capture and a thrown prepare
-// (granted G8 re-aimed, G11–G15).
+// (granted G8 re-aimed, G11–G15); CR2c (CAM-8): hot-plug — the selection
+// rule (V22), the observers and the pending rebuild on the hidden panel
+// (panel P16a–e, P17).
 // Compiled AS `main.swift` beside every file of
 // app/Sources (but its own main.swift) through `swift_build.build`, with an
 // Info.plist section holding the camera's and the microphone's usage strings;
@@ -25,6 +27,11 @@ var probeFacts: [String: Any] = [:]
 
 func probeRow(_ id: String, _ pass: Bool, _ detail: String) {
     probeRows.append(["id": id, "pass": pass, "detail": detail])
+}
+
+/// A row skipped by name: scored neither pass nor fail.
+func probeSkip(_ id: String, _ detail: String) {
+    probeRows.append(["id": id, "pass": "skip", "detail": detail])
 }
 
 func probeEmit() -> Never {
@@ -194,6 +201,29 @@ func values(_ request: [String: Any]) {
                  + "\(CameraCapture.warmUpRun), bound \(CameraCapture.warmUpBound) s; notes "
                  + notes.map { $0 ?? "nil" }.joined(separator: " | "))
     formatValues()
+    hotPlugValues()
+}
+
+/// V22 (CR2c, spec §11 CAM-8 (3)): `hotPlugSelection` — the stored id when
+/// listed (over a different listed current), else the current when listed,
+/// else nil; `""` counts as nil.
+func hotPlugValues() {
+    let cases: [(String, [String], String?, String?, String?)] = [
+        ("stored listed, a different current listed", ["a", "b"], "a", "b", "a"),
+        ("stored gone, current listed", ["b"], "a", "b", "b"),
+        ("neither listed", ["c"], "a", "b", nil),
+        ("\"\" stored, current listed", ["b"], "", "b", "b"),
+        ("both nil", ["a"], nil, nil, nil),
+    ]
+    var shown: [String] = []
+    var ok = true
+    for (name, listed, stored, current, want) in cases {
+        let got = RecorderPanelController.hotPlugSelection(
+            listed: listed, stored: stored, current: current)
+        ok = ok && got == want
+        shown.append("\(name) → \(got ?? "nil") (want \(want ?? "nil"))")
+    }
+    probeRow("V22", ok, shown.joined(separator: "; "))
 }
 
 /// V18–V21 (CR2a, spec §11 CAM-6): the Format rows, the choice, the titles
@@ -1056,7 +1086,148 @@ func panelRows(_ request: [String: Any]) {
     formatPanelRows(panel, fakeCamera: fakeCamera, cameraRow: cameraRow(), choose: choose, reset: reset)
     previewStepRows()
     previewPanelRows(panel, cameraRow: cameraRow(), choose: choose, reset: reset)
+    hotPlugPanelRows(panel, reset: reset)
     probeFacts["visibleAtEnd"] = panel.window?.isVisible ?? true
+}
+
+/// P16a–e and P17 (CR2c, spec §11 CAM-8) on the hidden panel, never shown:
+/// `observeDevices()` called directly, each notification posted with object
+/// nil and the main run loop run 0.2 s before reading. P17 closes the panel,
+/// so it runs last.
+func hotPlugPanelRows(_ panel: RecorderPanelController, reset: () -> Void) {
+    let defaults = UserDefaults.standard
+    let cameraKey = RecorderPanelController.cameraKey
+    let formatKey = RecorderPanelController.cameraFormatKey
+    let micKey = RecorderPanelController.microphoneKey
+    func post(_ name: Notification.Name) {
+        NotificationCenter.default.post(name: name, object: nil)
+        probeSpin(0.2)
+    }
+    func ids(_ popup: NSPopUpButton) -> [String?] {
+        popup.itemArray.map { $0.representedObject as? String }
+    }
+    @discardableResult
+    func fake(_ popup: NSPopUpButton, _ id: String) -> NSMenuItem {
+        let item = NSMenuItem(title: "Probe \(id)", action: nil, keyEquivalent: "")
+        item.representedObject = id
+        popup.menu?.addItem(item)
+        return item
+    }
+    func keys() -> [String?] { [cameraKey, formatKey, micKey].map { defaults.string(forKey: $0) } }
+    let connected = CameraDevices.connected().map(\.uniqueID)
+    let first = connected.first
+
+    // P16a — the pair added once, marking the lists pending.
+    reset()
+    let pendingBefore = panel.devicesPending
+    panel.observeDevices()
+    let pendingAfter = panel.devicesPending
+    panel.observeDevices()
+    let observers = panel.deviceObservers.count
+    probeRow("P16a", !pendingBefore && pendingAfter && observers == 2,
+             "devicesPending \(pendingBefore) → \(pendingAfter) after observeDevices(); "
+                + "\(observers) observers after a second call (want 2)")
+
+    // P16b — a post applies: the fakes gone, the stored camera, Off, no key written.
+    defaults.set("probe-mic-stored-gone", forKey: micKey)
+    defaults.set(first ?? "probe-stored", forKey: cameraKey)
+    panel.cameraPopup.select(fake(panel.cameraPopup, "probe-gone"))
+    panel.microphonePopup.select(fake(panel.microphonePopup, "probe-mic-gone"))
+    let keysBefore = keys()
+    post(AVCaptureDevice.wasConnectedNotification)
+    let cameraIDs = ids(panel.cameraPopup)
+    let wantIDs: [String?] = connected.isEmpty ? [nil] : connected.map(Optional.some)
+    let fakesGone = !cameraIDs.contains("probe-gone")
+        && !ids(panel.microphonePopup).contains("probe-mic-gone")
+    let selection = panel.selectedCameraID
+    let selectionOK = first == nil || selection == first
+    let off = panel.microphonePopup.indexOfSelectedItem == 0
+        && panel.microphonePopup.selectedItem?.representedObject == nil
+    let keysAfter = keys()
+    probeRow("P16b",
+             fakesGone && cameraIDs == wantIDs && selectionOK && off && keysAfter == keysBefore
+                && keysAfter[2] == "probe-mic-stored-gone" && !panel.devicesPending,
+             "fakes gone \(fakesGone); Camera ids \(cameraIDs.map { $0 ?? "nil" }) (connected "
+                + "\(connected)); "
+                + (first == nil ? "the stored camera's selection skipped by name: no camera connected"
+                    : "selected \(selection ?? "nil") (stored \(first ?? "nil"))")
+                + "; Microphone Off \(off); keys \(keysBefore.map { $0 ?? "nil" }) → "
+                + "\(keysAfter.map { $0 ?? "nil" }); pending \(panel.devicesPending)")
+
+    // P16c — an unchanged list rebuilds nothing; a swapped id is rebuilt.
+    let popups = [panel.cameraPopup, panel.formatPopup, panel.microphonePopup]
+    let itemsBefore = popups.map(\.itemArray)
+    post(AVCaptureDevice.wasConnectedNotification)
+    let itemsAfter = popups.map(\.itemArray)
+    let same = zip(itemsBefore, itemsAfter).allSatisfy { before, after in
+        before.count == after.count && zip(before, after).allSatisfy { $0 === $1 }
+    }
+    var swap = "the swapped id skipped by name: no microphone connected"
+    var swapOK = true
+    let microphones = RecorderPanelController.connectedMicrophones()
+    if let device = microphones.first,
+        let index = panel.microphonePopup.itemArray.firstIndex(where: {
+            $0.representedObject as? String == device.uniqueID
+        })
+    {
+        let row = panel.microphonePopup.itemArray[index]
+        row.representedObject = "probe-mic-swapped"
+        post(AVCaptureDevice.wasConnectedNotification)
+        let carried = panel.microphonePopup.item(at: index)?.representedObject as? String
+        swapOK = carried == device.uniqueID
+        swap = "row \(index) (\(row.title)) given probe-mic-swapped carries \(carried ?? "nil") "
+            + "after a post (want \(device.uniqueID))"
+    }
+    probeRow("P16c", same && swapOK,
+             "every Camera, Format and Microphone item identical after a post \(same) "
+                + "(\(itemsBefore.map(\.count)) items); \(swap)")
+
+    // P16d — the stored camera gone: the selection held before stays, no key written.
+    if let first,
+        let index = panel.cameraPopup.itemArray.firstIndex(where: {
+            $0.representedObject as? String == first
+        })
+    {
+        defaults.set("probe-stored-gone", forKey: cameraKey)
+        panel.cameraPopup.selectItem(at: index)
+        fake(panel.cameraPopup, "probe-extra")
+        post(AVCaptureDevice.wasConnectedNotification)
+        let selected = panel.selectedCameraID
+        let key = defaults.string(forKey: cameraKey)
+        probeRow("P16d",
+                 selected == first && key == "probe-stored-gone"
+                    && !ids(panel.cameraPopup).contains("probe-extra"),
+                 "stored probe-stored-gone, \(first) selected, a fake row: after a post selected "
+                    + "\(selected ?? "nil"), the camera key \(key ?? "nil"), the fake gone "
+                    + "\(!ids(panel.cameraPopup).contains("probe-extra"))")
+    } else {
+        probeSkip("P16d", "no camera connected")
+    }
+
+    // P16e — busy: the change waits for idle.
+    panel.phase = .landing
+    fake(panel.cameraPopup, "probe-busy")
+    post(AVCaptureDevice.wasDisconnectedNotification)
+    let keptBusy = ids(panel.cameraPopup).contains("probe-busy")
+    let pendingBusy = panel.devicesPending
+    panel.phase = .idle
+    let goneIdle = !ids(panel.cameraPopup).contains("probe-busy")
+    let pendingIdle = panel.devicesPending
+    probeRow("P16e", keptBusy && pendingBusy && goneIdle && !pendingIdle,
+             "landing: the fake kept \(keptBusy), pending \(pendingBusy); idle: the fake gone "
+                + "\(goneIdle), pending \(pendingIdle)")
+    reset()
+
+    // P17 — the close removes the observers.
+    NotificationCenter.default.post(name: NSWindow.willCloseNotification, object: panel.window)
+    probeSpin(0.2)
+    let emptied = panel.deviceObservers.isEmpty
+    fake(panel.cameraPopup, "probe-closed")
+    post(AVCaptureDevice.wasConnectedNotification)
+    let stays = ids(panel.cameraPopup).contains("probe-closed")
+    probeRow("P17", emptied && stays && !panel.devicesPending,
+             "after willClose: observers \(panel.deviceObservers.count); a fake row after a post "
+                + "stays \(stays), pending \(panel.devicesPending)")
 }
 
 /// P13 (CR2b, spec §11 CAM-7 (3)): `cameraPreviewStep` over every step and

@@ -151,17 +151,14 @@ extension RecorderPanelController {
         }
     }
 
-    /// "Off", then every microphone the discovery session lists, carrying its
-    /// `uniqueID` — the same session `ScreenRecorder.microphone(withID:)` asks,
-    /// so a row here is a device the recorder can find.
+    /// "Off", then every connected microphone (`connectedMicrophones()`, the
+    /// session `ScreenRecorder.microphone(withID:)` asks, so a row here is a
+    /// device the recorder can find), carrying its `uniqueID`.
     func rebuildMicrophones() {
         let current = microphonePopup.selectedItem?.representedObject as? String
         microphonePopup.removeAllItems()
         microphonePopup.menu?.addItem(NSMenuItem(title: "Off", action: nil, keyEquivalent: ""))
-        let devices = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.microphone, .external], mediaType: .audio, position: .unspecified
-        ).devices
-        for device in devices {
+        for device in Self.connectedMicrophones() {
             let item = NSMenuItem(title: device.localizedName, action: nil, keyEquivalent: "")
             item.representedObject = device.uniqueID
             microphonePopup.menu?.addItem(item)

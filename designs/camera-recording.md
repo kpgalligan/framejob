@@ -269,12 +269,17 @@ what the preview shows, so it follows the preview as CR2c.
 - **CR2c — hot-plug; CAM-8.** CAM-8 is recorded in §11 before the code.
   `AVCaptureDevice.wasConnectedNotification` and `wasDisconnectedNotification`, observed while
   the panel is up, rebuild the Camera and Format popups while idle and re-sync the preview
-  (CAM-5 (2)'s rebuild on `show()` gains a live one). A camera removed during a recording ends
-  it, CAM-3's "stops on its own", unchanged. **Decides** the observers' lifetime, and what the
-  popups select when the chosen camera goes and comes back. **Proof**: probe rows posting the
-  notifications to a hidden panel (the rebuild, the selection, idle only), the observers gone
-  after close; mutants; a manual-check row (a USB camera or the iPhone plugged and unplugged
-  with the panel up).
+  (CAM-5 (2)'s rebuild on `show()` gains a live one). The same two notifications cover every
+  capture device, so the Microphone popup is rebuilt with them: a USB camera's own microphone
+  (CAM-1's fourth answer) arrives with it. A camera removed during a recording ends
+  it, CAM-3's "stops on its own", unchanged. **Decides** the observers' lifetime, a change that
+  arrives while not idle, what the popups select when the chosen camera goes and comes back,
+  that a popup whose list is unchanged is not rebuilt, and that a hot-plug writes no key.
+  CR2b's review nit lands here, in the file this phase re-wires: the preview's `failed` step
+  stops a failed capture once, not at every tick. **Proof**: probe rows posting the
+  notifications to a hidden panel (the rebuild, the selection, idle only, an unchanged list
+  left alone, no key written), the observers gone after close; mutants; a manual-check row (a
+  USB camera or the iPhone plugged and unplugged with the panel up).
 - **CR3 — camera + screen.** The camera row under Source when recording a display or a window;
   the camera capture started beside the `SCStream` (CR0: the order of the starts made no
   measurable difference, and started in one run-loop turn the writer's camera began 87–130 ms
@@ -1209,6 +1214,113 @@ failure (not changed).
 ## CR2c — hot-plug
 
 ### Record
+
+**Landed** (2026-10-26).
+- Spec §11 CAM-8, written before any code: the observers (`AVCaptureDevice`'s connected and
+  disconnected notifications for any device, on main, added by `show()` one pair at most,
+  adding them marking the lists pending, removed at close, kept while the panel is ordered out
+  for a recording); a change pending until the first preview step that finds the phase and the
+  recorder idle, the step's first act; the rebuild (each popup's rows (id, title) compared with
+  the devices connected now, the Microphone popup's by `uniqueID` and `localizedName`, only a
+  popup that differs rebuilt; the selection the stored id when listed, else the one held
+  before, else the default; the camera selected again only when its popup was rebuilt or the
+  id changed); no key written; connected devices only; the failed preview's capture stopped
+  once; a camera taken away mid-recording ends it, its list change waiting for idle. It amends
+  CAM-5 (2)'s hot-plug clause. Its index row and the `camera-recording.md` row (311 → 347
+  lines); the `11-decisions/` cell is 13282 in 31 files.
+- `RecorderPanelController+Devices.swift` (new, 137): `HotPlugRow`, `hotPlugSelection`,
+  `connectedMicrophones`, `hotPlugRows(of:)`, `observeDevices`, `stopObservingDevices`,
+  `devicesDidChange`, `applyPendingDevices`, and the header.
+- The panel: the base file (348 → 355: `deviceObservers` and `devicesPending` beside
+  `panelClosing`; `panelWillClose` calls `stopObservingDevices()` after its two discards; the
+  type doc's twelve files naming `+Devices.swift`); `+Showing` (93 → 96: `show()` calls
+  `observeDevices()` just before its closing sync); `+CameraPreview` (138 → 143:
+  `syncCameraPreview()`'s first statement `applyPendingDevices()`, the `.failed` arm stopping
+  the prepared capture only when `!capture.stopped`, the type doc); `+Camera` (214 → 215: the
+  header's hot-plug sentence points to `+Devices.swift`); `+Rows` (383 → 380:
+  `rebuildMicrophones()` lists `Self.connectedMicrophones()`).
+- `CameraDevices.swift` (213 → 216): `connected()` keeps only `isConnected` devices, the
+  discovery session's order kept; its doc. `CameraCapture.swift` (399 → 399): `stopped` is
+  `private(set)`.
+- Proofs: `camera_recording_probe.py` (992 → 1100) and `.swift` (1468 → 1639): V22, P16a–e,
+  P17, P18, nine mutants in `MUTANTS` and `MUTANT_SECTION`, the docstring's CR2c paragraph, and
+  a Swift row skipped by name (`probeSkip`, answered `"pass": "skip"`, read as a skip).
+  `tools/proof/README.md`'s CR2c section. `recording_probe.py` unchanged: no row's read failed
+  on the new text.
+- Docs: spec §7.4's row 52 (`+Devices.swift` after `+CameraPreview.swift`, and the popups
+  following the devices; 57 lines, unchanged count); `docs/guide/screen-recording.md` (the
+  sentence on the Camera list read when the panel opens replaced by the lists following the
+  devices while the panel is up and idle, a camera that comes back chosen again with its
+  format, nothing remembered changing; "A camera" and Limits said nothing otherwise);
+  `docs/manual-checks.md` new REC-17.
+- CR2b's review nit is fixed here: the `failed` step stopped the failed prepared capture at
+  every tick, enqueuing one empty block on the shared session queue a second; it now stops it
+  once (`stopped` read through `private(set)`), and P18 and `failed-stops-every-tick` hold it.
+
+**Measured** (the built-in camera and the default microphone, the terminal's grants; this
+host's `connected()` lists three cameras, FaceTime HD first, and its microphones include a RØDE
+Unify Chat; each command once unless said):
+- `python3 tools/proof/spec_index_proof.py` after CAM-8: exit 0, `201/201 checks passed`.
+- `make typecheck`: exit 0, the 4 baseline warnings, tsc clean.
+- `python3 tools/proof/camera_recording_probe.py --only values,panel`: exit 0, `scores:
+  48/48`. V22 the five cases as wanted. P16a pending false → true, 2 observers after a second
+  call. P16b the fakes gone, the Camera ids the three `connected()` ids, the stored FaceTime
+  camera selected, Microphone Off, the keys `[<FaceTime id>, "", probe-mic-stored-gone]` before
+  and after, nothing pending. P16c every item identical (`[3, 8, 7]` items); row 1 (RØDE Unify
+  Chat) given `probe-mic-swapped` carried `RodeUnifyAudioDevice_UID_2` after a post. P16d the
+  FaceTime camera still selected, the key `probe-stored-gone`, the fake gone. P16e landing: the
+  fake kept, pending; idle: gone, not pending. P17 0 observers, the fake kept through a post,
+  not pending. P18 every read true.
+- The nine mutants, each exit 1, caught: `hotplug-current-first` 25/26 (V22: the first case →
+  b, want a); `hotplug-observe-twice` 22/23 (P16a: 4 observers);
+  `hotplug-no-pending-on-observe` 22/23 (P16a: pending false → false); `hotplug-persists`
+  21/23 (P16b: the microphone key written; P16d: the camera key the FaceTime id);
+  `hotplug-rebuilds-unchanged` and `hotplug-format-rebuilt` 22/23 each (P16c: items not
+  identical); `hotplug-while-busy` 22/23 (P16e: the fake gone during landing);
+  `hotplug-observers-kept` 22/23 (P17: 2 observers, the fake gone); `failed-stops-every-tick`
+  22/23 (P18: the arm unguarded).
+- The anchor check (every `before` of both probes' `MUTANTS` once in its file): `all once`
+  (52 and 78 mutants).
+- `python3 tools/proof/recording_probe.py --only chrome,chrome_pause,grants,voiceover_doors`:
+  exit 0, `278/278 checks passed`.
+- `make gate`: `gate: PASS 229s` (names 1 s, typecheck 5 s, fmt and lint skipped, test 114 s,
+  app 109 s).
+- `python3 tools/proof/camera_recording_probe.py`: exit 0, `scores: 75/75`, G0–G15 all run. G3
+  61/0.9992 and 60/0.9992; G4 micOffset −0.083 and −0.055 s; G6 hold 0.535 s, 13 buffers,
+  steady; G7 `prepareCamera` held main 0.030 s, `startCamera` 0.056 s; G8 the completion in
+  0.084 s, did-stop at 0.083 s before it; G9 0.689 s; G10 1920×1080 60/0.9992; G11 adopted,
+  1920×1080 59/0.9992; G12 0.775 s, 60/0.9992; G14 0.764 s, 60/0.9992; G13 and G15 pass.
+- `python3 tools/proof/recording_probe.py`: exit 0, `1222/1222 checks passed`.
+- Release (`proof_app.py launch --app release`, after the gate's `make app`):
+  `RC_PROOF_APP=release python3 tools/proof/camera_recording_proof.py <dir>/agent.sock`: exit 0,
+  `48/48`, the granted tier run (a 2 s span recorded 2.035 s; `camera_format 1920x1080@30`
+  recorded at it; the starts differ by `mic_offset`, −69.0 ms; canvas 1760 × 1328 at [30, 1];
+  the lookup's refusal naming the connected cameras). `RC_PROOF_APP=release python3
+  tools/proof/screens.py --only 16-recorder-panel`: exit 0, `6 pass, 0 fail, 0 skip of 6`, 0
+  new problems (P2 pass, 47 key literals, 31 pinned). `grep "Frame Job: " <dir>/framejob.log`:
+  nothing. Stopped by its pid.
+
+**Deviations.**
+- The probe's Swift side gains `probeSkip` and the Python side reads `"pass": "skip"` as a
+  skip: P16d is skipped by name with no camera, and before this a Swift row could only pass or
+  fail. On this host every row ran.
+- `+Devices.swift` holds a small `HotPlugRow` (id, title) and `hotPlugRows(of:)`, the compared
+  rows, beside the Interfaces' functions.
+- The Microphone popup's selection is set on every apply (`selectMicrophone`, which rebuilds
+  nothing); only the camera's is gated, because only `selectCamera` rebuilds a menu.
+- When the Camera popup is rebuilt, the unchanged `rebuildCameras()` selects the held id
+  itself (and rebuilds the Format popup), and the apply then selects CAM-8's choice, rebuilding
+  the Format popup a second time, in the same main turn.
+
+**Owed.**
+- Applied with the commit (the orchestrator's): `app/CLAUDE.md`'s recorder panel family gains
+  `+Devices.swift` (hot-plug, the twelfth file: the device observers, the pending mark applied
+  at the preview's step, the selection rule, the microphone list); `CameraDevices.swift`'s
+  `connected()` lists connected devices only (`isConnected`). The review's one nit (a doc
+  line's indent in `panelWillClose`) is fixed with the commit.
+- REC-17 (a real camera and its microphone plugged in and taken away with the panel up) is the
+  owner's; no script plugs a device.
+- CR3: camera + screen.
 
 ## CR3 — camera + screen
 

@@ -24492,3 +24492,49 @@ not named), `stop-answers-early` (G8), `preview-tool-capture` (G13), `tool-adopt
 `preview-builds-in-countdown` and `preview-retries-failure` (P13), `preview-row-always` (P14),
 `preview-unsynced-phase` and `preview-builds-on-close` (P15), all `panel`. The numbers are in
 `designs/camera-recording.md`'s CR2b record.
+
+## Camera recording CR2c — hot-plug (`camera_recording_probe.py` V22, P16a–e, P17, P18; spec §11 CAM-8)
+
+CR2c makes the recorder panel follow the devices: `show()` adds `AVCaptureDevice`'s connected
+and disconnected observers (one pair, marking the lists pending), `panelWillClose` removes them,
+and each notification marks the lists pending and steps the preview, whose first act
+(`applyPendingDevices`, `RecorderPanelController+Devices.swift`) rebuilds a Camera or
+Microphone popup whose rows differ from the devices connected now — only while the panel's
+phase and the recorder are idle, writing no key. `CameraDevices.connected()` and the
+microphone list keep only `isConnected` devices, and the preview's `failed` step stops the
+prepared capture only when it is not already stopped (CR2b's review nit).
+
+```sh
+python3 tools/proof/camera_recording_probe.py --only values,panel         # V22, P16a–e, P17, P18
+python3 tools/proof/camera_recording_probe.py --mutant hotplug-persists   # each of the nine exits 1, in MUTANT_SECTION's section
+```
+
+**V22** `hotPlugSelection` over five cases: the stored id listed beside a different listed
+current → stored; stored gone, current listed → current; neither listed → nil; `""` stored →
+current; both nil → nil. The panel rows run on the hidden panel, never shown (P1 fails on a
+shown panel), so `observeDevices()` is called directly, each notification is posted with
+object nil, and the main run loop runs 0.2 s before each read. **P16a** the first
+`observeDevices()` sets `devicesPending`; a second leaves two observers. **P16b** the
+microphone key `probe-mic-stored-gone`, the camera key the first connected camera (else
+`probe-stored`), fake rows `probe-gone` and `probe-mic-gone` selected, then a connected post:
+the fakes gone, the Camera ids `connected()`'s (or the None row), the stored camera selected
+(skipped by name with none connected), the microphone Off, the camera, format and microphone
+keys unchanged, nothing pending. **P16c** a second post: every Camera, Format and Microphone
+`NSMenuItem` identical (`===`); then a connected microphone's row given `probe-mic-swapped`
+with its title kept carries the device's `uniqueID` again after a post (skipped by name with
+no microphone). **P16d** (skipped by name with no camera) `probe-stored-gone` stored, the
+first camera selected and a fake row: after a post the first camera is still selected and the
+key still reads `probe-stored-gone`. **P16e** in `.landing` a disconnected post keeps a fake
+row and leaves the lists pending; `.idle` applies them. **P17**, last: the panel's
+`NSWindow.willCloseNotification` empties `deviceObservers`, and a fake row added after stays
+through a post with nothing pending. **P18** comment-stripped reads: `show(` calls
+`observeDevices()`; `syncCameraPreview(`'s first statement is `applyPendingDevices()`;
+`devicesDidChange(` sets `devicesPending = true` before `syncCameraPreview()`; the `.failed`
+arm's `stop()` is guarded by `stopped`; `connected(` and `connectedMicrophones(` filter
+`isConnected`; `rebuildMicrophones(` calls `connectedMicrophones()`. A row the Swift side
+skips by name answers `"pass": "skip"`. Nine mutants: `hotplug-current-first` (V22,
+`values`); `hotplug-observe-twice` and `hotplug-no-pending-on-observe` (P16a),
+`hotplug-persists` (P16b, P16d), `hotplug-rebuilds-unchanged` and `hotplug-format-rebuilt`
+(P16c), `hotplug-while-busy` (P16e), `hotplug-observers-kept` (P17), `failed-stops-every-tick`
+(P18), all `panel`. A real plug or unplug is REC-17, a person's check. The numbers are in
+`designs/camera-recording.md`'s CR2c record.

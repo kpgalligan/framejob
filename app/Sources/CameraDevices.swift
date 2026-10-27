@@ -36,12 +36,15 @@ struct CameraDeviceFacts: Equatable {
 }
 
 enum CameraDevices {
-    /// The cameras connected now, the discovery session's own order.
+    /// The cameras connected now, the discovery session's own order, keeping
+    /// only those whose `isConnected` is true (spec §11 CAM-8 (5)): the
+    /// panel, the tool's lookup, the default and the recorder's start all
+    /// read this one list.
     static func connected() -> [AVCaptureDevice] {
         AVCaptureDevice.DiscoverySession(
             deviceTypes: [.builtInWideAngleCamera, .external], mediaType: .video,
             position: .unspecified
-        ).devices
+        ).devices.filter(\.isConnected)
     }
 
     /// `device`'s facts: each format's dimensions and the highest maximum of

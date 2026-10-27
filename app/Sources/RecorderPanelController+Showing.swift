@@ -15,7 +15,9 @@ extension RecorderPanelController {
     /// type doc): the welcome window's button is the caller that would
     /// otherwise un-hide it into the recording. Shown while idle, a prepared
     /// capture that failed (or a build that threw) is let go first, so the
-    /// preview's sync tries again (spec §11 CAM-7 (5)).
+    /// preview's sync tries again (spec §11 CAM-7 (5)). The device observers
+    /// are added before that sync, which applies a change made while the
+    /// panel was closed (CAM-8 (1)).
     func show() {
         guard !hiddenForRecording else {
             NSSound.beep()
@@ -40,6 +42,7 @@ extension RecorderPanelController {
             window?.orderFrontRegardless()
         }
         armSyncTimer()
+        observeDevices()
         syncCameraPreview()
     }
 

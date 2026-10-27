@@ -2369,7 +2369,9 @@ free.
   camera-recording CR1-0, +`Camera` — Source ▸ Camera, the Camera popup
   (camera-recording CR1c, spec §11 CAM-5) and the Format popup under it
   (CR2a, CAM-6), +`CameraPreview` — the preview's step rule and its sync,
-  CR2b, CAM-7)) · `CameraPreviewWell.swift` (the camera's preview well
+  CR2b, CAM-7), +`Devices` — hot-plug, the twelfth file: the device
+  observers, the pending mark applied at the preview's sync, the selection
+  rule and the microphone list, CR2c, CAM-8) · `CameraPreviewWell.swift` (the camera's preview well
   under Format, CR2b) · `RecorderStatusItem.swift`
   — File ▸ New
   Recording… A `.floating`, `.nonactivatingPanel` with `hidesOnDeactivate`
@@ -2433,8 +2435,9 @@ free.
   `+CameraSession`), one `AVAssetWriter` per
   segment over one running capture session, `stop()`, `elapsed`, `pause()`
   and `resume()` forward to it, and segment 0's writer is armed only after
-  the warm-up hold. `CameraDevices.swift` is the camera list, CAM-3's best
-  format and its sentences; `CameraCapture.swift` the session, the
+  the warm-up hold. `CameraDevices.swift` is the camera list (connected
+  devices only, `isConnected`, CAM-8 (5)), CAM-3's best format and its
+  sentences; `CameraCapture.swift` the session, the
   configuration lock, the data output, the writers and the warm-up's running
   state (its session queue is ONE queue shared by every capture, holding the
   configuration lock from `start` to `stop`, so a capture rebuilt right after

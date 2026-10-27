@@ -20,9 +20,10 @@ import ScreenCaptureKit
 /// (R2c), `+VoiceOver.swift` the Source row "Microphone Only" (#99),
 /// `+Showing.swift` `show()`, the sync timer, `setNote` and the refit,
 /// `+Camera.swift` the Source row "Camera", its popup and the Format popup
-/// (spec §11 CAM-5, CAM-6), and `+CameraPreview.swift` the camera's live
-/// preview in `CameraPreviewWell` (CAM-7).
-/// Eleven files at the 400-line cap, and the
+/// (spec §11 CAM-5, CAM-6), `+CameraPreview.swift` the camera's live
+/// preview in `CameraPreviewWell` (CAM-7), and `+Devices.swift` hot-plug:
+/// the device observers and the popups rebuilt when a device comes or goes
+/// (CAM-8). Twelve files at the 400-line cap, and the
 /// crossing members are internal for it, the tree's rule for a class split
 /// across files.
 ///
@@ -207,6 +208,10 @@ final class RecorderPanelController: NSWindowController {
     /// From `panelWillClose`'s first line until `show()`: the preview's
     /// step reads the panel as not visible, so a close never builds a capture.
     var panelClosing = false
+    /// `AVCaptureDevice`'s two observers while the panel is up (`+Devices.swift`).
+    var deviceObservers: [NSObjectProtocol] = []
+    /// A device list may have changed (a notification, or observers newly added) and is not yet applied.
+    var devicesPending = false
     /// The recorder's sentence for a resume it refused (`+Pause.swift`):
     /// REPLACED by each retry, cleared when a resume lands or the next
     /// countdown begins, one of the two parts the live note is rebuilt
@@ -331,7 +336,8 @@ final class RecorderPanelController: NSWindowController {
     /// carries on — the status item and File ▸ Stop Recording can end it —
     /// and the sync timer stops until the next `show()`. `panelClosing` is
     /// set FIRST, so the phase change below steps the preview to off and
-    /// never builds a capture (CAM-7 (5)), and the well is emptied last.
+    /// never builds a capture (CAM-7 (5)), the device observers go (CAM-8 (1)),
+    /// and the well is emptied last.
     @objc private func panelWillClose(_ note: Notification) {
         panelClosing = true
         switch phase {
@@ -341,6 +347,7 @@ final class RecorderPanelController: NSWindowController {
         }
         recorder.discardPreparedMicrophone()
         recorder.discardPreparedCamera()
+        stopObservingDevices()
         syncTimer?.invalidate()
         syncTimer = nil
         cameraPreview.showMessage(nil)

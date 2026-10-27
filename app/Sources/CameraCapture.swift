@@ -69,7 +69,7 @@ final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     let previewLayer: AVCaptureVideoPreviewLayer?
     /// `sessionQueue` only: the configuration lock is held.
     private var holding = false
-    private var stopped = false
+    private(set) var stopped = false
     private var observers: [NSObjectProtocol] = []
 
     /// One segment's writer as `sampleQueue` holds it. `failure` is a writer

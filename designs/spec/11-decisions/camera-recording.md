@@ -309,3 +309,39 @@ its code.
      again while that record matches the camera and format, and the well shows the sentence.
      Letting the prepared capture go (`discardPreparedCamera`) clears the record: leaving Source
      Camera, showing the panel again, or Cancel retries once.
+
+- **CAM-8 — Hot-plug (CR2c), recorded before its code; amends CAM-5 (2)'s "Hot-plug while the
+  panel is up", which CAM-7 made CR2c's.** While the recorder panel is up, a camera or a
+  microphone plugged in or taken away rebuilds the Camera and Microphone popups, and the Format
+  popup when the camera changes, and the preview follows. CAM-3, CAM-5, CAM-6 and CAM-7 stand
+  except where this entry amends them.
+  1. **The observers.** `AVCaptureDevice.wasConnectedNotification` and
+     `.wasDisconnectedNotification`, for any device, delivered on main. `show()` adds them, one
+     pair at most, and adding the pair marks the lists pending, so a change made while the
+     panel was closed is caught up. Closing the panel removes them; a panel ordered out for a
+     recording keeps them.
+  2. **Pending until idle.** A notification marks the lists pending and steps the preview
+     (CAM-7 (5)). The step's first act applies a pending change, and only when the panel's
+     phase is idle and the recorder is idle; otherwise the change waits for the first step that
+     finds both idle. The return to idle draws the phase, which steps.
+  3. **The rebuild.** The Camera popup's rows (id, title) are compared with what
+     `CameraDevices.connected()` gives now — each camera's `popupTitle`, or the one row "None
+     connected" — and the Microphone popup's rows (id, title) with "Off" and then the connected
+     microphones by (`uniqueID`, `localizedName`). Only a popup that differs is rebuilt. The
+     selection, with the id held BEFORE the rebuild as `current`, is the stored id when it is
+     listed, else `current` when it is listed, else the default — CAM-3 (7)'s camera, or Off
+     for the microphone; a stored `""` counts as none. The camera is selected again (which
+     rebuilds the Format popup, CAM-6 (2): the stored format when the camera lists it, else
+     Best) only when the Camera popup was rebuilt or the selection's id differs from the one
+     selected, so no menu is rebuilt for an unrelated device. The size note is refreshed.
+  4. **No key is written.** A hot-plug writes no defaults key, so a camera that goes and comes
+     back is selected again with its stored format; the next control change writes what the
+     popups then show (CAM-5 (2)).
+  5. **Connected only.** The Camera list — which the tool's lookup, the default, the format
+     and the recorder's start share — and the Microphone list keep only devices whose
+     `isConnected` is true, in the discovery session's own order.
+  6. **The preview.** It steps in (2), so a new selection prepares under CAM-7. A prepared
+     capture of a camera that went away is CAM-7 (3)'s failure until the rebuild moves the
+     selection, and the failure's step stops that capture once, not at every tick.
+  7. **During a recording.** A camera taken away during a recording ends it (CAM-3,
+     unchanged); its list change applies at idle.
