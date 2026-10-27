@@ -1149,8 +1149,8 @@ listed as a Continuity Camera and OBS Virtual Camera as a third camera):
 - `python3 tools/proof/camera_recording_probe.py --only values,landing,tool,panel`: exit 0,
   `scores: 48/48`. V18 read FaceTime's rows 3, 0, 1, 4, 6, 5, 2 (1760×1328, 1920×1080, 1280×720,
   640×480, 1552×1552, 1328×1760, 1080×1920) and the iPhone's 7 … 0; P1's Camera popup read
-  `FaceTime HD Camera`, `OBS Virtual Camera`, `Kevin Galligan’s iPhone Camera (Continuity
-  Camera)`; P10's titles began `Best (1760×1328 at 30 fps)`.
+  `FaceTime HD Camera`, `OBS Virtual Camera` and the owner's iPhone (Continuity
+  Camera); P10's titles began `Best (1760×1328 at 30 fps)`.
 - The ten mutants, plus the two whose anchors moved, each exit 1, caught:
   `format-rows-unsorted` 23/25 (V18, and V21, whose `WxH` row comes first by the sort),
   `format-rows-duplicated` 24/25 (V18), `format-stale-kept` 24/25 (V19), `format-size-lowest`
